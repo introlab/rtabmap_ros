@@ -1,0 +1,28 @@
+<package>
+  <description brief="rtabmap_lib">
+
+     RTAB-Map library
+
+  </description>
+  <author>Mathieu Labbe</author>
+  <license>GPL</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://rtabmap.googlecode.com</url>
+  <export>
+    <cpp cflags="-I${prefix}/rtabmap/include" lflags="-L${prefix}/rtabmap/lib -Wl,-rpath, -lrtabmap_core"/>
+  </export>
+  <versioncontrol type="svn" url="http://rtabmap.googlecode.com/svn/trunk/rtabmap"/>
+  
+  <depend package="std_msgs"/>
+  <depend package="roscpp"/>
+  <depend package="cv_bridge"/>
+  <depend package="sensor_msgs"/>
+  <depend package="std_srvs"/>
+  <depend package="opencv2"/>
+  <depend package="utilite"/>
+  
+  <rosdep name="sqlite3"/>
+
+</package>
+
+

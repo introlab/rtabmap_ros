@@ -1,0 +1,11 @@
+<launch>
+	<!-- Camera parameters -->
+	<param name="cam/device_id" value="0" type="int"/>
+	<param name="cam/image_rate" value="10" type="int"/>
+	<param name="cam/image_width" value="640" type="int"/>
+	<param name="cam/image_height" value="480" type="int"/>
+	
+	<!-- Nodes -->
+	<node name="cameraReceiver" pkg="rtabmap" type="camera_node_receiver" output="screen"/>
+	<node name="camera" pkg="rtabmap" type="camera_node"/>
+</launch>

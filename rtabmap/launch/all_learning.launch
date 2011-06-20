@@ -1,0 +1,12 @@
+<launch>
+
+	<!-- TELEOP -->
+	<include file="$(find rtabmap)/launch/teleop.launch"/>
+	
+	<!-- RTAB-MAP -->
+	<include file="$(find rtabmap)/launch/rtabmap_sm.launch"/>
+	
+	<!-- CAMERA -->
+	<include file="$(find rtabmap)/launch/camera.launch"/>
+
+</launch>
