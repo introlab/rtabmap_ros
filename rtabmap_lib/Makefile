@@ -4,8 +4,8 @@ INSTALL_DIR = rtabmap
 all: installed
 
 SVN_DIR = build/rtabmap-svn
-SVN_URL = http://rtabmap.googlecode.com/svn/trunk/rtabmap
-SVN_REVISION = -r113
+SVN_URL = https://rtabmap.googlecode.com/svn/trunk/rtabmap
+SVN_REVISION = -rHEAD
 #SVN_PATCH = opencvVer.patch
 include $(shell rospack find mk)/svn_checkout.mk
 
