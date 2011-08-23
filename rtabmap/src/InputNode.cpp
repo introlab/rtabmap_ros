@@ -79,14 +79,14 @@ void velocityReceivedCallback(const geometry_msgs::TwistConstPtr & msg)
 	commands.push_back(v);
 
 	// 10 Hz max
-	while(commands.size() > nbCommands)
+	while(commands.size() > (unsigned int)nbCommands)
 	{
 		ROS_WARN("Too many commands (%zu) > %d, removing the oldest...", commands.size(), nbCommands);
 		//remove the oldest
 		commands.pop_front();
 	}
 
-	if(commands.size() == nbCommands)
+	if(commands.size() == (unsigned int)nbCommands)
 	{
 		actionsUpdated = true;
 		publish();
