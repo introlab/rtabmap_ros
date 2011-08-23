@@ -17,6 +17,6 @@
 	<include file="$(find rtabmap)/launch/rtabmap_sm.launch"/>
 	
 	<!-- CAMERA -->
-	<include file="$(find rtabmap)/launch/camera.launch"/>
+	<include file="$(find rtabmap)/launch/cameraOpenCV.launch"/>
 
 </launch>

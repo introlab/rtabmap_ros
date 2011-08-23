@@ -18,6 +18,7 @@ rtabmap::SensoryMotorStatePtr state;
 
 bool stateUpdated = false;
 bool actionsUpdated = false;
+int nbCommands = 10;
 
 void publish()
 {
@@ -78,14 +79,14 @@ void velocityReceivedCallback(const geometry_msgs::TwistConstPtr & msg)
 	commands.push_back(v);
 
 	// 10 Hz max
-	while(commands.size() > 10)
+	while(commands.size() > nbCommands)
 	{
-		ROS_WARN("Too many commands (%zu) > 10, removing the oldest...", commands.size());
+		ROS_WARN("Too many commands (%zu) > %d, removing the oldest...", commands.size(), nbCommands);
 		//remove the oldest
 		commands.pop_front();
 	}
 
-	if(commands.size() == 10)
+	if(commands.size() == nbCommands)
 	{
 		actionsUpdated = true;
 		publish();
@@ -95,7 +96,12 @@ void velocityReceivedCallback(const geometry_msgs::TwistConstPtr & msg)
 int main(int argc, char** argv)
 {
 	ros::init(argc, argv, "input_node");
-	ros::NodeHandle n;
+	ros::NodeHandle n("~");
+
+	n.param("nb_commands", nbCommands, nbCommands);
+	ROS_INFO("nb_commands=%d", nbCommands);
+
+
 	rosPublisher = n.advertise<rtabmap::SensoryMotorState>("/sm_state", 1);
 	ros::Subscriber image_sub = n.subscribe("/camera_data", 1, smReceivedCallback);
 	ros::Subscriber velocity_sub = n.subscribe("/cmd_vel", 1, velocityReceivedCallback);

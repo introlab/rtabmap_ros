@@ -14,6 +14,7 @@ std::vector<float> commands;
 int commandSize = 0;
 int commandIndex = 0;
 ros::Publisher rosPublisher;
+int commandsHz = 10; //10 Hz
 
 void infoReceivedCallback(const rtabmap::RtabmapInfoConstPtr & msg)
 {
@@ -35,14 +36,16 @@ void infoExReceivedCallback(const rtabmap::RtabmapInfoExConstPtr & msg)
 int main(int argc, char** argv)
 {
 	ros::init(argc, argv, "output_node");
-	ros::NodeHandle n;
+	ros::NodeHandle n("~");
+	n.param("commands_hz", commandsHz, commandsHz);
+	ROS_INFO("commands_hz=%d", commandsHz);
 	ros::Subscriber infoTopic;
 	ros::Subscriber infoExTopic;
-	infoTopic = n.subscribe("rtabmap_info", 1, infoReceivedCallback);
-	infoExTopic = n.subscribe("rtabmap_info_x", 1, infoExReceivedCallback);
-	rosPublisher = n.advertise<geometry_msgs::Twist>("rtabmap/cmd_vel", 1);
+	infoTopic = n.subscribe("/rtabmap_info", 1, infoReceivedCallback);
+	infoExTopic = n.subscribe("/rtabmap_info_x", 1, infoExReceivedCallback);
+	rosPublisher = n.advertise<geometry_msgs::Twist>("/rtabmap/cmd_vel", 1);
 
-	ros::Rate loop_rate(10); // 10 Hz
+	ros::Rate loop_rate(commandsHz); //  Hz
 	while(ros::ok())
 	{
 		if(commandIndex>=0 &&
