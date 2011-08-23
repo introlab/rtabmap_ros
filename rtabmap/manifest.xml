@@ -14,6 +14,7 @@
   <depend package="sensor_msgs"/>
   <depend package="std_srvs"/>
   <depend package="opencv2"/>
+  <depend package="uvc_camera"/>
   <depend package="rtabmap_lib"/>
   <depend package="turtlesim"/>
 

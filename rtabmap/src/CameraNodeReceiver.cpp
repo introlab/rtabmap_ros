@@ -42,11 +42,13 @@ int main(int argc, char** argv)
 
 	ros::init(argc, argv, "camera_node_receiver");
 	ros::NodeHandle n;
-	ros::Subscriber image_sub = n.subscribe("image", 1, imgReceivedCallback);
+	ros::Subscriber image_sub = n.subscribe("/image_raw", 1, imgReceivedCallback);
 
 	ROS_INFO("Waiting for images...");
 
 	ros::spin();
 
 	cvDestroyWindow("ImageReceived");
+
+	return 0;
 }

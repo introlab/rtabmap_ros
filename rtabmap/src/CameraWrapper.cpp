@@ -21,7 +21,7 @@
 CameraWrapper::CameraWrapper() :
 	camera_(0)
 {
-	rosPublisher_ = nh_.advertise<sensor_msgs::Image>("image", 1);
+	rosPublisher_ = nh_.advertise<sensor_msgs::Image>("image_raw", 1);
 	changeCameraImgRateSrv_ = nh_.advertiseService("changeCameraImgRate", &CameraWrapper::changeCameraImgRateCallback, this);
 	UEventsManager::addHandler(this);
 }
@@ -118,7 +118,7 @@ void CameraWrapper::handleEvent(UEvent* anEvent)
 				sensor_msgs::ImagePtr msg = sensor_msgs::CvBridge::cvToImgMsg(smState->getImage());
 				rosPublisher_.publish(msg);
 			}
-			catch (sensor_msgs::CvBridgeException ex)
+			catch (sensor_msgs::CvBridgeException & ex)
 			{
 				ROS_ERROR("%s", ex.what());
 			}

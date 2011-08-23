@@ -2,10 +2,6 @@
 	<!-- RTAB-MAP SENSORY-MOTOR VERSION -->
 	<!-- WARNING : Database is automatically deleted on each startup -->
 	<!--           See "delete_db_on_start" option below... -->
-
-	<!-- image_to_sm parameters -->
-	<param name="resize_image_width" value="640" type="int"/>
-	<param name="resize_image_height" value="480" type="int"/>
 	
 	<!-- Nodes -->	
 	<!-- cmd_vel_a has priority on cmd_vel_b -->
@@ -28,13 +24,16 @@
 	</node>
 
 	<node name="rtabmap_input" pkg="rtabmap" type="input_node">
-		<remap from="cmd_vel" to="cmd_vel" />
-		<remap from="sm_state" to="sm_state" />
-		<remap from="camera_data" to="camera_data" />
+		<remap from="/cmd_vel" to="/cmd_vel" />
+		<remap from="/sm_state" to="/sm_state" />
+		<remap from="/camera_data" to="/camera_data" />
 	</node>
 	
 	<node name="image_to_sms" pkg="rtabmap" type="image_to_sms_node">
-		<remap from="image" to="image" />
-		<remap from="sm_state" to="camera_data" />
+		<param name="image_rate" value="1" type="int"/>
+		<param name="resize_image_width" value="640" type="int"/>
+		<param name="resize_image_height" value="480" type="int"/>
+		<remap from="/image_raw" to="/image_raw" />
+		<remap from="/sm_state" to="/camera_data" />
 	</node>
 </launch>

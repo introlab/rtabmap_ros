@@ -8,39 +8,53 @@
 #include "rtabmap/SensoryMotorState.h"
 #include <geometry_msgs/Twist.h>
 #include <utilite/UMutex.h>
+#include <utilite/UTimer.h>
 
 UMutex commandMutex;
 std::list<std::vector<float> > commands;
 ros::Publisher rosPublisher;
+UTimer timer;
+rtabmap::SensoryMotorStatePtr state;
 
-void smReceivedCallback(const rtabmap::SensoryMotorStateConstPtr & msg)
+bool stateUpdated = false;
+bool actionsUpdated = false;
+
+void publish()
 {
-	ROS_INFO("Received camera data");
-	std::vector<float> tmp;
-
-	int sizeActions = -1;
-	commandMutex.lock();
+	if(stateUpdated && actionsUpdated)
 	{
+		std::vector<float> actions;
+		int sizeActions = -1;
 		for(std::list<std::vector<float> >::iterator iter = commands.begin(); iter!=commands.end();++iter)
 		{
-			tmp.insert(tmp.end(), iter->begin(), iter->end());
+			actions.insert(actions.end(), iter->begin(), iter->end());
 		}
 		sizeActions = commands.size();
 		commands.clear();
 
-	}
-	commandMutex.unlock();
+		state->actuators = actions;
 
-	rtabmap::SensoryMotorStatePtr state(new rtabmap::SensoryMotorState);
+		rosPublisher.publish(state);
+		float elapsed = timer.ticks();
+		ROS_INFO("Sensorimotor state sent (sizeActions=%d, %f Hz)", sizeActions, elapsed>0?1/elapsed:0);
+		stateUpdated = false;
+		actionsUpdated = false;
+	}
+}
+
+void smReceivedCallback(const rtabmap::SensoryMotorStateConstPtr & msg)
+{
+	ROS_INFO("Received camera data");
+
+	state = rtabmap::SensoryMotorStatePtr(new rtabmap::SensoryMotorState);
 	state->sensors = msg->sensors;
 	state->sensorStep = msg->sensorStep;
-	state->actuators = tmp;
 	state->actuatorStep = 6;
 	state->image = msg->image;
 	state->keypoints = msg->keypoints;
 
-	rosPublisher.publish(state);
-	ROS_INFO("Sensorimotor state sent (sizeActions=%d)", sizeActions);
+	stateUpdated = true;
+	publish();
 }
 
 void velocityReceivedCallback(const geometry_msgs::TwistConstPtr & msg)
@@ -52,35 +66,43 @@ void velocityReceivedCallback(const geometry_msgs::TwistConstPtr & msg)
 			msg->angular.x,
 			msg->angular.y,
 			msg->angular.z);
-	commandMutex.lock();
+
+	std::vector<float> v(6);
+	v[0] = msg->linear.x;
+	v[1] = msg->linear.y;
+	v[2] = msg->linear.z;
+	v[3] = msg->angular.x;
+	v[4] = msg->angular.y;
+	v[5] = msg->angular.z;
+
+	commands.push_back(v);
+
+	// 10 Hz max
+	while(commands.size() > 10)
 	{
-		std::vector<float> v(6);
-		v[0] = msg->linear.x;
-		v[1] = msg->linear.y;
-		v[2] = msg->linear.z;
-		v[3] = msg->angular.x;
-		v[4] = msg->angular.y;
-		v[5] = msg->angular.z;
-
-		commands.push_back(v);
-
-		// 10 Hz + 1 max
-		while(commands.size() > 11)
-		{
-			//remove the oldest
-			commands.pop_front();
-		}
+		ROS_WARN("Too many commands (%zu) > 10, removing the oldest...", commands.size());
+		//remove the oldest
+		commands.pop_front();
 	}
-	commandMutex.unlock();
+
+	if(commands.size() == 10)
+	{
+		actionsUpdated = true;
+		publish();
+	}
 }
 
 int main(int argc, char** argv)
 {
 	ros::init(argc, argv, "input_node");
 	ros::NodeHandle n;
-	rosPublisher = n.advertise<rtabmap::SensoryMotorState>("sm_state", 1);
-	ros::Subscriber image_sub = n.subscribe("camera_data", 1, smReceivedCallback);
-	ros::Subscriber velocity_sub = n.subscribe("cmd_vel", 1, velocityReceivedCallback);
+	rosPublisher = n.advertise<rtabmap::SensoryMotorState>("/sm_state", 1);
+	ros::Subscriber image_sub = n.subscribe("/camera_data", 1, smReceivedCallback);
+	ros::Subscriber velocity_sub = n.subscribe("/cmd_vel", 1, velocityReceivedCallback);
+
+	timer.start();
 
 	ros::spin();
+
+	return 0;
 }

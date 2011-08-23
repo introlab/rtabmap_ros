@@ -1,14 +1,14 @@
 <launch>
     <!-- RTAB-MAP LOOP CLOSURE DETECTION VERSION -->
-	<!-- Camera parameters -->
-	<param name="device_id" value="0" type="int"/>
-	<param name="image_rate" value="1" type="int"/>
-	<param name="image_width" value="640" type="int"/>
-	<param name="image_height" value="480" type="int"/>
-
 	<!-- Nodes -->
 	<node name="rtabmap_core" pkg="rtabmap" type="core_node"/>
 	<node name="rtabmap_gui" pkg="rtabmap" type="gui_node"/>
-	<node name="image_to_sms" pkg="rtabmap" type="image_to_sms_node"/>
-	<node name="camera" pkg="rtabmap" type="camera_node"/>
+	<node name="image_to_sms" pkg="rtabmap" type="image_to_sms_node">
+		<param name="image_rate" value="1" type="int"/>
+		<param name="resize_image_width" value="640" type="int"/>
+		<param name="resize_image_height" value="480" type="int"/>
+	</node>
+	
+	<!-- CAMERA -->
+	<include file="$(find rtabmap)/launch/camera.launch"/>
 </launch>

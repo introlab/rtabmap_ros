@@ -46,7 +46,7 @@ int main(int argc, char** argv)
 
 	if(!camera || (camera && !camera->init()))
 	{
-		ROS_ERROR("Cannot initiate the camera");
+		ROS_ERROR("Cannot initiate the camera. Verify if OpenCV is built with ffmpeg support.");
 	}
 	else
 	{
@@ -61,4 +61,6 @@ int main(int argc, char** argv)
 	{
 		delete camera;
 	}
+
+	return 0;
 }

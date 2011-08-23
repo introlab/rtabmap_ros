@@ -35,11 +35,13 @@ int main(int argc, char** argv)
 
 	ros::init(argc, argv, "camera_node_receiver_sm");
 	ros::NodeHandle n;
-	ros::Subscriber image_sub = n.subscribe("sm_state", 1, smReceivedCallback);
+	ros::Subscriber image_sub = n.subscribe("/sm_state", 1, smReceivedCallback);
 
 	ROS_INFO("Waiting for Sensorimotor states (containing images)...");
 
 	ros::spin();
 
 	cvDestroyWindow("ImageReceived");
+
+	return 0;
 }

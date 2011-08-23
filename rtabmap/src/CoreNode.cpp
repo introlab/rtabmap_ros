@@ -32,4 +32,6 @@ int main(int argc, char** argv)
 
 	ROS_INFO("RTAB-Map started...");
 	ros::spin();
+
+	return 0;
 }
