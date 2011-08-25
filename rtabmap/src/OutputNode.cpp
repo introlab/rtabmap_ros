@@ -62,6 +62,13 @@ int main(int argc, char** argv)
 			ROS_INFO("Publishing vel");
 			rosPublisher.publish(vel);
 		}
+		else
+		{
+			//publish null
+			geometry_msgs::TwistPtr vel(new geometry_msgs::Twist());
+			ROS_INFO("Publishing null vel");
+			rosPublisher.publish(vel);
+		}
 
 		ros::spinOnce();
 		loop_rate.sleep();

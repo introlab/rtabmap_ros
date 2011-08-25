@@ -89,7 +89,8 @@ void imgReceivedCallback(const sensor_msgs::ImageConstPtr & imgMsg)
 			if(image)
 			{
 				UTimer processTimer;
-				rtabmap::SMState * smState = kpThreatment.process(image);
+				rtabmap::SMState * smState = new rtabmap::SMState(image);
+				kpThreatment.process(smState);
 				double processTime = processTimer.ticks();
 				if(smState)
 				{
