@@ -1,0 +1,14 @@
+<launch>
+	<!-- CAMERA -->
+	<node pkg="omni_camera_capture" type="omni_publisher" 
+		name="omni_camera" respawn="false">
+		<param name="device" value="/dev/video0"/>
+		<param name="refresh_rate" value="1"/>
+		<param name="frame_id" value="omni_camera_link" />
+		<param name="image_encoding" value="RGB" /> <!-- GREY or RGB-->
+		<param name="image_size" value="FULL" /> <!-- PARTIAL or FULL -->
+		<param name="scale_divisor" value="1" /> <!-- 1, 2, 3, 4 or 6  in PARTIAL size-->
+		<remap from="/image" to="/image_raw" />
+	</node>
+
+</launch>
