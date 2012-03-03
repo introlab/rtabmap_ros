@@ -26,7 +26,6 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 {
 	ros::NodeHandle nh("~");
 	infoPub_ = nh.advertise<rtabmap::RtabmapInfo>("info", 1);
-	infoExPub_ = nh.advertise<rtabmap::RtabmapInfoEx>("info_x", 1);
 	parametersLoadedPub_ = nh.advertise<std_msgs::Empty>("parameters_loaded", 1);
 
 	rtabmap_ = new Rtabmap();
@@ -46,8 +45,10 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 
 	nh = ros::NodeHandle();
 	smStateTopic_ = nh.subscribe("sm_state", 1, &CoreWrapper::smReceivedCallback, this);
-	imageTopic_ = nh.subscribe("image", 1, &CoreWrapper::imageReceivedCallback, this);
 	parametersUpdatedTopic_ = nh.subscribe("rtabmap_gui/parameters_updated", 1, &CoreWrapper::parametersUpdatedCallback, this);
+
+	image_transport::ImageTransport it(nh);
+	imageTopic_ = it.subscribe("image", 1, &CoreWrapper::imageReceivedCallback, this);
 
 	UEventsManager::addHandler(this);
 }
@@ -200,8 +201,8 @@ void CoreWrapper::handleEvent(UEvent * anEvent)
 
 		if(stat.extended())
 		{
-			rtabmap::RtabmapInfoExPtr msg(new rtabmap::RtabmapInfoEx);
-			msg->info.refId = stat.refImageId();
+			rtabmap::RtabmapInfoPtr msg(new rtabmap::RtabmapInfo);
+			msg->refId = stat.refImageId();
 			if(stat.refImage())
 			{
 				int params[3] = {0};
@@ -229,9 +230,9 @@ void CoreWrapper::handleEvent(UEvent * anEvent)
 				memcpy(&compressed.data[0], buf->data.ptr, buf->width);
 				cvReleaseMat(&buf);
 
-				msg->refImage = compressed;
+				msg->infoEx.refImage = compressed;
 			}
-			msg->info.loopClosureId = stat.loopClosureId();
+			msg->loopClosureId = stat.loopClosureId();
 			if(stat.loopClosureImage())
 			{
 				int params[3] = {0};
@@ -259,81 +260,9 @@ void CoreWrapper::handleEvent(UEvent * anEvent)
 				memcpy(&compressed.data[0], buf->data.ptr, buf->width);
 				cvReleaseMat(&buf);
 
-				msg->loopClosureImage = compressed;
+				msg->infoEx.loopClosureImage = compressed;
 			}
 
-			const std::list<std::vector<float> > & actuators = stat.getActions();
-			if(actuators.size())
-			{
-				msg->info.actuatorStep = actuators.front().size();
-			}
-			for(std::list<std::vector<float> >::const_iterator iter=actuators.begin();iter!=actuators.end();++iter)
-			{
-				if((iter->size() == 0 && msg->info.actuatorStep > 0) || msg->info.actuatorStep % iter->size() != 0)
-				{
-					ROS_ERROR("Actuators must have all the same length.");
-				}
-				msg->info.actuators.insert(msg->info.actuators.end(), iter->begin(), iter->end());
-			}
-
-			//Posterior, likelihood, childCount
-			msg->posteriorKeys = uKeys(stat.posterior());
-			msg->posteriorValues = uValues(stat.posterior());
-			msg->likelihoodKeys = uKeys(stat.likelihood());
-			msg->likelihoodValues = uValues(stat.likelihood());
-			msg->weightsKeys = uKeys(stat.weights());
-			msg->weightsValues = uValues(stat.weights());
-
-			//SURF stuff...
-			msg->refWordsKeys = uListToVector(uKeys(stat.refWords()));
-			msg->refWordsValues = std::vector<rtabmap::KeyPoint>(stat.refWords().size());
-			int index = 0;
-			for(std::multimap<int, cv::KeyPoint>::const_iterator i=stat.refWords().begin();
-				i!=stat.refWords().end();
-				++i)
-			{
-				msg->refWordsValues.at(index).angle = i->second.angle;
-				msg->refWordsValues.at(index).response = i->second.response;
-				msg->refWordsValues.at(index).ptx = i->second.pt.x;
-				msg->refWordsValues.at(index).pty = i->second.pt.y;
-				msg->refWordsValues.at(index).size = i->second.size;
-				msg->refWordsValues.at(index).octave = i->second.octave;
-				msg->refWordsValues.at(index).class_id = i->second.class_id;
-				++index;
-			}
-			msg->loopWordsKeys = uListToVector(uKeys(stat.loopWords()));
-			msg->loopWordsValues = std::vector<rtabmap::KeyPoint>(stat.loopWords().size());
-			index = 0;
-			for(std::multimap<int, cv::KeyPoint>::const_iterator i=stat.loopWords().begin();
-				i!=stat.loopWords().end();
-				++i)
-			{
-				msg->loopWordsValues.at(index).angle = i->second.angle;
-				msg->loopWordsValues.at(index).response = i->second.response;
-				msg->loopWordsValues.at(index).ptx = i->second.pt.x;
-				msg->loopWordsValues.at(index).pty = i->second.pt.y;
-				msg->loopWordsValues.at(index).size = i->second.size;
-				msg->loopWordsValues.at(index).octave = i->second.octave;
-				msg->loopWordsValues.at(index).class_id = i->second.class_id;
-				++index;
-			}
-
-			// SM masks
-			msg->refMotionMask = stat.refMotionMask();
-			msg->loopMotionMask = stat.loopMotionMask();
-
-			// Statistics data
-			msg->statsKeys = uKeys(stat.data());
-			msg->statsValues = uValues(stat.data());
-
-			infoExPub_.publish(msg);
-		}
-		else
-		{
-			rtabmap::RtabmapInfoPtr msg(new rtabmap::RtabmapInfo);
-			ROS_INFO("Loop closure detected! newId=%d with oldId=%d", stat.refImageId(), stat.loopClosureId());
-			msg->refId = stat.refImageId();
-			msg->loopClosureId = stat.loopClosureId();
 			const std::list<std::vector<float> > & actuators = stat.getActions();
 			if(actuators.size())
 			{
@@ -347,6 +276,57 @@ void CoreWrapper::handleEvent(UEvent * anEvent)
 				}
 				msg->actuators.insert(msg->actuators.end(), iter->begin(), iter->end());
 			}
+
+			//Posterior, likelihood, childCount
+			msg->infoEx.posteriorKeys = uKeys(stat.posterior());
+			msg->infoEx.posteriorValues = uValues(stat.posterior());
+			msg->infoEx.likelihoodKeys = uKeys(stat.likelihood());
+			msg->infoEx.likelihoodValues = uValues(stat.likelihood());
+			msg->infoEx.weightsKeys = uKeys(stat.weights());
+			msg->infoEx.weightsValues = uValues(stat.weights());
+
+			//SURF stuff...
+			msg->infoEx.refWordsKeys = uListToVector(uKeys(stat.refWords()));
+			msg->infoEx.refWordsValues = std::vector<rtabmap::KeyPoint>(stat.refWords().size());
+			int index = 0;
+			for(std::multimap<int, cv::KeyPoint>::const_iterator i=stat.refWords().begin();
+				i!=stat.refWords().end();
+				++i)
+			{
+				msg->infoEx.refWordsValues.at(index).angle = i->second.angle;
+				msg->infoEx.refWordsValues.at(index).response = i->second.response;
+				msg->infoEx.refWordsValues.at(index).ptx = i->second.pt.x;
+				msg->infoEx.refWordsValues.at(index).pty = i->second.pt.y;
+				msg->infoEx.refWordsValues.at(index).size = i->second.size;
+				msg->infoEx.refWordsValues.at(index).octave = i->second.octave;
+				msg->infoEx.refWordsValues.at(index).class_id = i->second.class_id;
+				++index;
+			}
+			msg->infoEx.loopWordsKeys = uListToVector(uKeys(stat.loopWords()));
+			msg->infoEx.loopWordsValues = std::vector<rtabmap::KeyPoint>(stat.loopWords().size());
+			index = 0;
+			for(std::multimap<int, cv::KeyPoint>::const_iterator i=stat.loopWords().begin();
+				i!=stat.loopWords().end();
+				++i)
+			{
+				msg->infoEx.loopWordsValues.at(index).angle = i->second.angle;
+				msg->infoEx.loopWordsValues.at(index).response = i->second.response;
+				msg->infoEx.loopWordsValues.at(index).ptx = i->second.pt.x;
+				msg->infoEx.loopWordsValues.at(index).pty = i->second.pt.y;
+				msg->infoEx.loopWordsValues.at(index).size = i->second.size;
+				msg->infoEx.loopWordsValues.at(index).octave = i->second.octave;
+				msg->infoEx.loopWordsValues.at(index).class_id = i->second.class_id;
+				++index;
+			}
+
+			// SM masks
+			msg->infoEx.refMotionMask = stat.refMotionMask();
+			msg->infoEx.loopMotionMask = stat.loopMotionMask();
+
+			// Statistics data
+			msg->infoEx.statsKeys = uKeys(stat.data());
+			msg->infoEx.statsValues = uValues(stat.data());
+
 			infoPub_.publish(msg);
 		}
 	}

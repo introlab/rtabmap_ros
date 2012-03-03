@@ -1,12 +1,11 @@
-#
-#
-#
-#
-#
+
+########################################
+# Statistics stuff: 
+# These fields are empty if RTAb-Map's 
+# parameter publishStats=false
+########################################
 
 Header header
-
-rtabmap/RtabmapInfo info
 
 sensor_msgs/CompressedImage refImage
 int32 refChild
@@ -41,3 +40,4 @@ rtabmap/KeyPoint[] loopWordsValues
 ##SM masks##
 uint8[] refMotionMask
 uint8[] loopMotionMask
+

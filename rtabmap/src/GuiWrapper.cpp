@@ -27,7 +27,6 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 {
 	ros::NodeHandle nh;
 	infoTopic_ = nh.subscribe("rtabmap/info", 1, &GuiWrapper::infoReceivedCallback, this);
-	infoExTopic_ = nh.subscribe("rtabmap/info_x", 1, &GuiWrapper::infoExReceivedCallback, this);
 	velocity_sub_ = nh.subscribe("cmd_vel", 1, &GuiWrapper::velocityReceivedCallback, this);
 	app_ = new QApplication(argc, argv);
 	mainWindow_ = new MainWindow(new PreferencesDialogROS());
@@ -63,10 +62,83 @@ int GuiWrapper::exec()
 
 void GuiWrapper::infoReceivedCallback(const rtabmap::RtabmapInfoConstPtr & msg)
 {
-	ROS_INFO("Loop closure detected! newId=%d with oldId=%d", msg->refId, msg->loopClosureId);
+	ROS_INFO("RTAB-Map info received!");
+
+	// Map from ROS struct to rtabmap struct
 	rtabmap::Statistics * stat = new rtabmap::Statistics();
+
+	stat->setExtended(true); // Extended
+
 	stat->setRefImageId(msg->refId);
+	if(msg->infoEx.refImage.data.size() > 0)
+	{
+		// Decompress
+		const CvMat compressed = cvMat(1, msg->infoEx.refImage.data.size(), CV_8UC1, const_cast<unsigned char*>(&msg->infoEx.refImage.data[0]));
+		IplImage * decompressed = cvDecodeImage(&compressed, CV_LOAD_IMAGE_ANYCOLOR);
+		stat->setRefImage(&decompressed);
+	}
 	stat->setLoopClosureId(msg->loopClosureId);
+	if(msg->infoEx.loopClosureImage.data.size() > 0)
+	{
+		// Decompress
+		const CvMat compressed = cvMat(1, msg->infoEx.loopClosureImage.data.size(), CV_8UC1, const_cast<unsigned char*>(&msg->infoEx.loopClosureImage.data[0]));
+		IplImage * decompressed = cvDecodeImage(&compressed, CV_LOAD_IMAGE_ANYCOLOR);
+		stat->setLoopClosureImage(&decompressed);
+	}
+
+	//Posterior, likelihood, childCount
+	std::map<int, float> mapIntFloat;
+	for(unsigned int i=0; i<msg->infoEx.posteriorKeys.size() && i<msg->infoEx.posteriorValues.size(); ++i)
+	{
+		mapIntFloat.insert(std::pair<int, float>(msg->infoEx.posteriorKeys.at(i), msg->infoEx.posteriorValues.at(i)));
+	}
+	stat->setPosterior(mapIntFloat);
+	mapIntFloat.clear();
+	for(unsigned int i=0; i<msg->infoEx.likelihoodKeys.size() && i<msg->infoEx.likelihoodValues.size(); ++i)
+	{
+		mapIntFloat.insert(std::pair<int, float>(msg->infoEx.likelihoodKeys.at(i), msg->infoEx.likelihoodValues.at(i)));
+	}
+	stat->setLikelihood(mapIntFloat);
+	std::map<int, int> mapIntInt;
+	for(unsigned int i=0; i<msg->infoEx.weightsKeys.size() && i<msg->infoEx.weightsValues.size(); ++i)
+	{
+		mapIntInt.insert(std::pair<int, int>(msg->infoEx.weightsKeys.at(i), msg->infoEx.weightsValues.at(i)));
+	}
+	stat->setWeights(mapIntInt);
+
+	//SURF stuff...
+	std::multimap<int, cv::KeyPoint> mapIntKeypoint;
+	for(unsigned int i=0; i<msg->infoEx.refWordsKeys.size() && i<msg->infoEx.refWordsValues.size(); i++)
+	{
+		cv::KeyPoint pt;
+		pt.angle = msg->infoEx.refWordsValues.at(i).angle;
+		pt.response = msg->infoEx.refWordsValues.at(i).response;
+		//pt.laplacian = msg->refWordsValues.at(i).laplacian;
+		pt.pt.x = msg->infoEx.refWordsValues.at(i).ptx;
+		pt.pt.y = msg->infoEx.refWordsValues.at(i).pty;
+		pt.size = msg->infoEx.refWordsValues.at(i).size;
+		mapIntKeypoint.insert(std::pair<int, cv::KeyPoint>(msg->infoEx.refWordsKeys.at(i), pt));
+	}
+	stat->setRefWords(mapIntKeypoint);
+	mapIntKeypoint.clear();
+	for(unsigned int i=0; i<msg->infoEx.loopWordsKeys.size() && i<msg->infoEx.loopWordsValues.size(); i++)
+	{
+		cv::KeyPoint pt;
+		pt.angle = msg->infoEx.loopWordsValues.at(i).angle;
+		pt.response = msg->infoEx.loopWordsValues.at(i).response;
+		//pt.laplacian = msg->loopWordsValues.at(i).laplacian;
+		pt.pt.x = msg->infoEx.loopWordsValues.at(i).ptx;
+		pt.pt.y = msg->infoEx.loopWordsValues.at(i).pty;
+		pt.size = msg->infoEx.loopWordsValues.at(i).size;
+		mapIntKeypoint.insert(std::pair<int, cv::KeyPoint>(msg->infoEx.loopWordsKeys.at(i), pt));
+	}
+	stat->setLoopWords(mapIntKeypoint);
+
+	//SM stuff
+	stat->setRefMotionMask(msg->infoEx.refMotionMask);
+	stat->setLoopMotionMask(msg->infoEx.loopMotionMask);
+
+	//Actions
 	std::list<std::vector<float> > actions;
 	for(unsigned int i=0; i<msg->actuators.size(); i+=msg->actuatorStep)
 	{
@@ -78,104 +150,11 @@ void GuiWrapper::infoReceivedCallback(const rtabmap::RtabmapInfoConstPtr & msg)
 		actions.push_back(a);
 	}
 	stat->setActions(actions);
-	UEventsManager::post(new rtabmap::RtabmapEvent(&stat));
-}
-
-void GuiWrapper::infoExReceivedCallback(const rtabmap::RtabmapInfoExConstPtr & msg)
-{
-	ROS_INFO("Statistics received!");
-
-	// Map from ROS struct to rtabmap struct
-	rtabmap::Statistics * stat = new rtabmap::Statistics();
-
-	stat->setExtended(true); // Extended
-
-	stat->setRefImageId(msg->info.refId);
-	if(msg->refImage.data.size() > 0)
-	{
-		// Decompress
-		const CvMat compressed = cvMat(1, msg->refImage.data.size(), CV_8UC1, const_cast<unsigned char*>(&msg->refImage.data[0]));
-		IplImage * decompressed = cvDecodeImage(&compressed, CV_LOAD_IMAGE_ANYCOLOR);
-		stat->setRefImage(&decompressed);
-	}
-	stat->setLoopClosureId(msg->info.loopClosureId);
-	if(msg->loopClosureImage.data.size() > 0)
-	{
-		// Decompress
-		const CvMat compressed = cvMat(1, msg->loopClosureImage.data.size(), CV_8UC1, const_cast<unsigned char*>(&msg->loopClosureImage.data[0]));
-		IplImage * decompressed = cvDecodeImage(&compressed, CV_LOAD_IMAGE_ANYCOLOR);
-		stat->setLoopClosureImage(&decompressed);
-	}
-
-	//Posterior, likelihood, childCount
-	std::map<int, float> mapIntFloat;
-	for(unsigned int i=0; i<msg->posteriorKeys.size() && i<msg->posteriorValues.size(); ++i)
-	{
-		mapIntFloat.insert(std::pair<int, float>(msg->posteriorKeys.at(i), msg->posteriorValues.at(i)));
-	}
-	stat->setPosterior(mapIntFloat);
-	mapIntFloat.clear();
-	for(unsigned int i=0; i<msg->likelihoodKeys.size() && i<msg->likelihoodValues.size(); ++i)
-	{
-		mapIntFloat.insert(std::pair<int, float>(msg->likelihoodKeys.at(i), msg->likelihoodValues.at(i)));
-	}
-	stat->setLikelihood(mapIntFloat);
-	std::map<int, int> mapIntInt;
-	for(unsigned int i=0; i<msg->weightsKeys.size() && i<msg->weightsValues.size(); ++i)
-	{
-		mapIntInt.insert(std::pair<int, int>(msg->weightsKeys.at(i), msg->weightsValues.at(i)));
-	}
-	stat->setWeights(mapIntInt);
-
-	//SURF stuff...
-	std::multimap<int, cv::KeyPoint> mapIntKeypoint;
-	for(unsigned int i=0; i<msg->refWordsKeys.size() && i<msg->refWordsValues.size(); i++)
-	{
-		cv::KeyPoint pt;
-		pt.angle = msg->refWordsValues.at(i).angle;
-		pt.response = msg->refWordsValues.at(i).response;
-		//pt.laplacian = msg->refWordsValues.at(i).laplacian;
-		pt.pt.x = msg->refWordsValues.at(i).ptx;
-		pt.pt.y = msg->refWordsValues.at(i).pty;
-		pt.size = msg->refWordsValues.at(i).size;
-		mapIntKeypoint.insert(std::pair<int, cv::KeyPoint>(msg->refWordsKeys.at(i), pt));
-	}
-	stat->setRefWords(mapIntKeypoint);
-	mapIntKeypoint.clear();
-	for(unsigned int i=0; i<msg->loopWordsKeys.size() && i<msg->loopWordsValues.size(); i++)
-	{
-		cv::KeyPoint pt;
-		pt.angle = msg->loopWordsValues.at(i).angle;
-		pt.response = msg->loopWordsValues.at(i).response;
-		//pt.laplacian = msg->loopWordsValues.at(i).laplacian;
-		pt.pt.x = msg->loopWordsValues.at(i).ptx;
-		pt.pt.y = msg->loopWordsValues.at(i).pty;
-		pt.size = msg->loopWordsValues.at(i).size;
-		mapIntKeypoint.insert(std::pair<int, cv::KeyPoint>(msg->loopWordsKeys.at(i), pt));
-	}
-	stat->setLoopWords(mapIntKeypoint);
-
-	//SM stuff
-	stat->setRefMotionMask(msg->refMotionMask);
-	stat->setLoopMotionMask(msg->loopMotionMask);
-
-	//Actions
-	std::list<std::vector<float> > actions;
-	for(unsigned int i=0; i<msg->info.actuators.size(); i+=msg->info.actuatorStep)
-	{
-		std::vector<float> a(msg->info.actuatorStep);
-		for(unsigned int j=0; j<a.size(); ++j)
-		{
-			a[j] = msg->info.actuators[i+j];
-		}
-		actions.push_back(a);
-	}
-	stat->setActions(actions);
 
 	// Statistics data
-	for(unsigned int i=0; i<msg->statsKeys.size() && i<msg->statsValues.size(); i++)
+	for(unsigned int i=0; i<msg->infoEx.statsKeys.size() && i<msg->infoEx.statsValues.size(); i++)
 	{
-		stat->addStatistic(msg->statsKeys.at(i), msg->statsValues.at(i));
+		stat->addStatistic(msg->infoEx.statsKeys.at(i), msg->infoEx.statsValues.at(i));
 	}
 
 	ROS_INFO("Publishing statistics...");

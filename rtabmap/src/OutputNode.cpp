@@ -42,11 +42,6 @@ void infoReceivedCallback(const rtabmap::RtabmapInfoConstPtr & msg)
 	publishCommands(msg->actuators, msg->actuatorStep);
 }
 
-void infoExReceivedCallback(const rtabmap::RtabmapInfoExConstPtr & msg)
-{
-	publishCommands(msg->info.actuators, msg->info.actuatorStep);
-}
-
 int main(int argc, char** argv)
 {
 	ros::init(argc, argv, "rtabmap_out");
@@ -70,7 +65,6 @@ int main(int argc, char** argv)
 	ros::Subscriber infoTopic;
 	ros::Subscriber infoExTopic;
 	infoTopic = nh.subscribe("rtabmap/info", 1, infoReceivedCallback);
-	infoExTopic = nh.subscribe("rtabmap/info_x", 1, infoExReceivedCallback);
 	rosPublisher = nh.advertise<geometry_msgs::Twist>("rtabmap/cmd_vel", 1);
 
 	ros::spin();

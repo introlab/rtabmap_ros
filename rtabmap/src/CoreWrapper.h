@@ -17,6 +17,7 @@
 #include <rtabmap/core/RtabmapEvent.h>
 #include <sensor_msgs/Image.h>
 #include "rtabmap/SensoryMotorState.h"
+#include <image_transport/image_transport.h>
 
 namespace rtabmap
 {
@@ -49,10 +50,9 @@ private:
 private:
 	rtabmap::Rtabmap * rtabmap_;
 	ros::Subscriber smStateTopic_;
-	ros::Subscriber imageTopic_;
+	image_transport::Subscriber imageTopic_;
 	ros::Subscriber parametersUpdatedTopic_;
 	ros::Publisher infoPub_;
-	ros::Publisher infoExPub_;
 	ros::Publisher parametersLoadedPub_;
 	std::string configFile_;
 

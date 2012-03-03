@@ -34,12 +34,10 @@ protected:
 
 private:
 	void infoReceivedCallback(const rtabmap::RtabmapInfoConstPtr & infoMsg);
-	void infoExReceivedCallback(const rtabmap::RtabmapInfoExConstPtr & infoExMsg);
 	void velocityReceivedCallback(const geometry_msgs::TwistConstPtr & msg);
 
 private:
 	ros::Subscriber infoTopic_;
-	ros::Subscriber infoExTopic_;
 	ros::Subscriber velocity_sub_;
 	QApplication * app_;
 	rtabmap::MainWindow * mainWindow_;

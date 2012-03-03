@@ -76,9 +76,7 @@ bool CameraWrapper::changeCameraImgRateCallback(rtabmap::ChangeCameraImgRate::Re
 {
 	ros::NodeHandle nh("~");
 	nh.setParam("image_hz", request.imgRate);
-	nh.setParam("auto_restart", request.autoRestart);
 	camera_->setImageRate(request.imgRate);
-	camera_->setAutoRestart(request.autoRestart);
 	return true;
 }
 
