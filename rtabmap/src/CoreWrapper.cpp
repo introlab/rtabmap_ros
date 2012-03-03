@@ -21,11 +21,13 @@
 
 using namespace rtabmap;
 
-CoreWrapper::CoreWrapper(bool deleteDbOnStart) : rtabmap_(0)
+CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
+		rtabmap_(0)
 {
-	infoPub_ = nh_.advertise<rtabmap::RtabmapInfo>("rtabmap_info", 1);
-	infoExPub_ = nh_.advertise<rtabmap::RtabmapInfoEx>("rtabmap_info_x", 1);
-	parametersLoadedPub_ = nh_.advertise<std_msgs::Empty>("parameters_loaded", 1);
+	ros::NodeHandle nh("~");
+	infoPub_ = nh.advertise<rtabmap::RtabmapInfo>("info", 1);
+	infoExPub_ = nh.advertise<rtabmap::RtabmapInfoEx>("info_x", 1);
+	parametersLoadedPub_ = nh.advertise<std_msgs::Empty>("parameters_loaded", 1);
 
 	rtabmap_ = new Rtabmap();
 	loadNodeParameters(rtabmap_->getIniFilePath());
@@ -37,13 +39,16 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) : rtabmap_(0)
 
 	rtabmap_->init();
 
-	imageTopic_ = nh_.subscribe("sm_state", 1, &CoreWrapper::smReceivedCallback, this);
-	parametersUpdatedTopic_ = nh_.subscribe("parameters_updated", 1, &CoreWrapper::parametersUpdatedCallback, this);
+	resetMemorySrv_ = nh.advertiseService("resetMemory", &CoreWrapper::resetMemoryCallback, this);
+	dumpMemorySrv_ = nh.advertiseService("dumpMemory", &CoreWrapper::dumpMemoryCallback, this);
+	deleteMemorySrv_ = nh.advertiseService("deleteMemory", &CoreWrapper::deleteMemoryCallback, this);
+	dumpPredictionSrv_ = nh.advertiseService("dumpPrediction", &CoreWrapper::dumpPredictionCallback, this);
 
-	resetMemorySrv_ = nh_.advertiseService("resetMemory", &CoreWrapper::resetMemoryCallback, this);
-	dumpMemorySrv_ = nh_.advertiseService("dumpMemory", &CoreWrapper::dumpMemoryCallback, this);
-	deleteMemorySrv_ = nh_.advertiseService("deleteMemory", &CoreWrapper::deleteMemoryCallback, this);
-	dumpPredictionSrv_ = nh_.advertiseService("dumpPrediction", &CoreWrapper::dumpPredictionCallback, this);
+	nh = ros::NodeHandle();
+	smStateTopic_ = nh.subscribe("sm_state", 1, &CoreWrapper::smReceivedCallback, this);
+	imageTopic_ = nh.subscribe("image", 1, &CoreWrapper::imageReceivedCallback, this);
+	parametersUpdatedTopic_ = nh.subscribe("rtabmap_gui/parameters_updated", 1, &CoreWrapper::parametersUpdatedCallback, this);
+
 	UEventsManager::addHandler(this);
 }
 
@@ -69,9 +74,10 @@ void CoreWrapper::loadNodeParameters(const std::string & configFile)
 	ParametersMap parameters = Parameters::getDefaultParameters();
 	Rtabmap::readParameters(configFile.c_str(), parameters);
 
+	ros::NodeHandle nh("~");
 	for(ParametersMap::const_iterator i=parameters.begin(); i!=parameters.end(); ++i)
 	{
-		nh_.setParam(i->first, i->second);
+		nh.setParam(i->first, i->second);
 	}
 	parametersLoadedPub_.publish(std_msgs::Empty());
 }
@@ -86,10 +92,11 @@ void CoreWrapper::saveNodeParameters(const std::string & configFile)
 	}
 
 	ParametersMap parameters = Parameters::getDefaultParameters();
+	ros::NodeHandle nh("~");
 	for(ParametersMap::iterator iter=parameters.begin(); iter!=parameters.end(); ++iter)
 	{
 		std::string value;
-		if(nh_.getParam(iter->first,value))
+		if(nh.getParam(iter->first,value))
 		{
 			iter->second = value;
 		}
@@ -105,29 +112,41 @@ void CoreWrapper::saveNodeParameters(const std::string & configFile)
 void CoreWrapper::smReceivedCallback(const rtabmap::SensoryMotorStateConstPtr & msg)
 {
 	IplImage * image = 0;
-	std::list<cv::KeyPoint> keypoints;
+	std::vector<cv::KeyPoint> keypoints(msg->keypoints.size());
 
 	if(msg->image.data.size())
 	{
-		sensor_msgs::CvBridge bridge;
-		bridge.fromImage(msg->image);
-		image = cvCloneImage(bridge.toIpl());
+		boost::shared_ptr<sensor_msgs::Image> tracked_object;
+		cv_bridge::CvImageConstPtr ptr = cv_bridge::toCvShare(msg->image, tracked_object);
+		IplImage img = ptr->image;
+		image = cvCloneImage(&img);
 	}
 
 	for(unsigned int i=0; i<msg->keypoints.size() && i<msg->keypoints.size(); i++)
 	{
-		cv::KeyPoint pt;
-		pt.angle = msg->keypoints.at(i).angle;
-		pt.response = msg->keypoints.at(i).response;
-		pt.pt.x = msg->keypoints.at(i).ptx;
-		pt.pt.y = msg->keypoints.at(i).pty;
-		pt.size = msg->keypoints.at(i).size;
-		keypoints.push_back(pt);
+		keypoints[i].angle = msg->keypoints.at(i).angle;
+		keypoints[i].response = msg->keypoints.at(i).response;
+		keypoints[i].pt.x = msg->keypoints.at(i).ptx;
+		keypoints[i].pt.y = msg->keypoints.at(i).pty;
+		keypoints[i].size = msg->keypoints.at(i).size;
 	}
 	rtabmap::SMState * smState = new rtabmap::SMState(msg->sensors, msg->sensorStep, msg->actuators, msg->actuatorStep);
 	smState->setImage(image);
 	smState->setKeypoints(keypoints);
 	UEventsManager::post(new SMStateEvent(smState));
+}
+
+void CoreWrapper::imageReceivedCallback(const sensor_msgs::ImageConstPtr & msg)
+{
+	if(msg->data.size())
+	{
+		boost::shared_ptr<sensor_msgs::Image> tracked_object;
+		cv_bridge::CvImageConstPtr ptr = cv_bridge::toCvShare(msg);
+		IplImage imgTmp = ptr->image;
+		IplImage * image = &imgTmp;
+		rtabmap::SMState * smState = new rtabmap::SMState(cvCloneImage(image));
+		UEventsManager::post(new SMStateEvent(smState));
+	}
 }
 
 bool CoreWrapper::resetMemoryCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
@@ -157,10 +176,11 @@ bool CoreWrapper::dumpPredictionCallback(std_srvs::Empty::Request&, std_srvs::Em
 void CoreWrapper::parametersUpdatedCallback(const std_msgs::EmptyConstPtr & msg)
 {
 	rtabmap::ParametersMap parameters = rtabmap::Parameters::getDefaultParameters();
+	ros::NodeHandle nh("~");
 	for(rtabmap::ParametersMap::iterator iter=parameters.begin(); iter!=parameters.end(); ++iter)
 	{
 		std::string value;
-		if(nh_.getParam(iter->first, value))
+		if(nh.getParam(iter->first, value))
 		{
 			iter->second = value;
 		}
@@ -298,11 +318,14 @@ void CoreWrapper::handleEvent(UEvent * anEvent)
 				++index;
 			}
 
+			// SM masks
+			msg->refMotionMask = stat.refMotionMask();
+			msg->loopMotionMask = stat.loopMotionMask();
+
 			// Statistics data
 			msg->statsKeys = uKeys(stat.data());
 			msg->statsValues = uValues(stat.data());
 
-			ROS_INFO("Publishing statistics...");
 			infoExPub_.publish(msg);
 		}
 		else

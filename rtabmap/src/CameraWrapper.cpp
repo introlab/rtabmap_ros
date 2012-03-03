@@ -6,8 +6,8 @@
  */
 
 #include "CameraWrapper.h"
-#include <cv_bridge/CvBridge.h>
-//#include <sensor_msgs/CompressedImage.h>
+#include <cv_bridge/cv_bridge.h>
+#include <sensor_msgs/image_encodings.h>
 #include <sensor_msgs/Image.h>
 #include <rtabmap/core/CameraEvent.h>
 #include <rtabmap/core/SMState.h>
@@ -21,8 +21,10 @@
 CameraWrapper::CameraWrapper() :
 	camera_(0)
 {
-	rosPublisher_ = nh_.advertise<sensor_msgs::Image>("image_raw", 1);
-	changeCameraImgRateSrv_ = nh_.advertiseService("changeCameraImgRate", &CameraWrapper::changeCameraImgRateCallback, this);
+	ros::NodeHandle nh("~");
+	image_transport::ImageTransport it(nh);
+	rosPublisher_ = it.advertise("image", 1);
+	changeCameraImgRateSrv_ = nh.advertiseService("changeImgRate", &CameraWrapper::changeCameraImgRateCallback, this);
 	UEventsManager::addHandler(this);
 }
 
@@ -72,9 +74,11 @@ void CameraWrapper::start()
 
 bool CameraWrapper::changeCameraImgRateCallback(rtabmap::ChangeCameraImgRate::Request & request, rtabmap::ChangeCameraImgRate::Response & response)
 {
-	nh_.setParam("image_rate", request.imgRate);
-	nh_.setParam("auto_restart", request.autoRestart);
-	UEventsManager::post(new rtabmap::CameraEvent(rtabmap::CameraEvent::kCmdChangeParam, request.imgRate, request.autoRestart));
+	ros::NodeHandle nh("~");
+	nh.setParam("image_hz", request.imgRate);
+	nh.setParam("auto_restart", request.autoRestart);
+	camera_->setImageRate(request.imgRate);
+	camera_->setAutoRestart(request.autoRestart);
 	return true;
 }
 
@@ -86,42 +90,10 @@ void CameraWrapper::handleEvent(UEvent* anEvent)
 		const rtabmap::SMState * smState = e->getSMState();
 		if(smState && smState->getImage())
 		{
-			try
-			{
-				//int params[3] = {0};
-
-				//JPEG compression
-				//std::string format = "jpeg";
-				//params[0] = CV_IMWRITE_JPEG_QUALITY;
-				//params[1] = 80; // default: 80% quality
-
-				//PNG compression
-				//std::string format = "png";
-				//params[0] = CV_IMWRITE_PNG_COMPRESSION;
-				//params[1] = 9; // default: maximum compression
-
-				//std::string extension = '.' + format;
-
-				// Compress image
-				//const IplImage* image = e->getImage();
-				//CvMat* buf = cvEncodeImage(extension.c_str(), image, params);
-
-				// Set up message and publish
-				//sensor_msgs::CompressedImage compressed;
-				//compressed.format = format;
-				//compressed.data.resize(buf->width);
-				//memcpy(&compressed.data[0], buf->data.ptr, buf->width);
-				//cvReleaseMat(&buf);
-
-				//ROS_INFO("Publishing an image");
-				//rosPublisher_.publish(compressed);
-				sensor_msgs::ImagePtr msg = sensor_msgs::CvBridge::cvToImgMsg(smState->getImage());
-				rosPublisher_.publish(msg);
-			}
-			catch (sensor_msgs::CvBridgeException & ex)
-			{
-				ROS_ERROR("%s", ex.what());
-			}
+			cv_bridge::CvImage img;
+			img.encoding = sensor_msgs::image_encodings::BGR8;
+			img.image = smState->getImage();
+			rosPublisher_.publish(img.toImageMsg());
 		}
 	}
 }
@@ -161,11 +133,11 @@ CameraVideoWrapper::CameraVideoWrapper(const std::string & fileName,
 
 // Camera database wrapper
 CameraDatabaseWrapper::CameraDatabaseWrapper(const std::string & path,
-		bool ignoreChildren,
+		bool actionsLoaded,
 		float imageRate,
 		bool autoRestart,
 		unsigned int imageWidth,
 		unsigned int imageHeight)
 {
-	this->setCamera(new rtabmap::CameraDatabase(path, ignoreChildren, imageRate, autoRestart, imageWidth, imageHeight));
+	this->setCamera(new rtabmap::CameraDatabase(path, actionsLoaded, imageRate, autoRestart, imageWidth, imageHeight));
 }

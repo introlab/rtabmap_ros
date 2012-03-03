@@ -30,7 +30,8 @@ PreferencesDialogROS::~PreferencesDialogROS()
 void PreferencesDialogROS::readCameraSettings(const QString & filePath)
 {
 	double imgRate = 0;
-	nh_.getParam("cam/image_rate", imgRate);
+	ros::NodeHandle nh;
+	nh.getParam("camera/image_hz", imgRate);
 	this->setImgRate(imgRate);
 }
 
@@ -43,13 +44,14 @@ void PreferencesDialogROS::readCoreSettings(const QString & filePath)
 {
 	if(filePath.isEmpty())
 	{
+		ros::NodeHandle nh("rtabmap");
 		ROS_INFO("%s", this->getParamMessage().toStdString().c_str());
 		bool validParameters = true;
 		rtabmap::ParametersMap parameters = rtabmap::Parameters::getDefaultParameters();
 		for(rtabmap::ParametersMap::iterator i=parameters.begin(); i!=parameters.end(); ++i)
 		{
 			std::string value;
-			if(nh_.getParam((*i).first,value))
+			if(nh.getParam((*i).first,value))
 			{
 				PreferencesDialog::setParameter((*i).first, value);
 			}

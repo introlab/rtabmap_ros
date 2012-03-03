@@ -25,9 +25,6 @@ protected:
 	virtual void readCameraSettings(const QString & filePath);
 	virtual void readCoreSettings(const QString & filePath);
 	virtual void writeSettings(const QString & filePath);
-
-private:
-	ros::NodeHandle nh_;
 };
 
 #endif /* PREFERENCESDIALOGROS_H_ */

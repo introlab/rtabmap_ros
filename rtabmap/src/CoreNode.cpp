@@ -15,15 +15,18 @@ int main(int argc, char** argv)
 	ULogger::setType(ULogger::kTypeConsole);
 	ULogger::setLevel(ULogger::kWarning);
 
-	ros::init(argc, argv, "core_node");
-	const char* opt_delete_db_on_start    = "--delete_db_on_start";
+	ros::init(argc, argv, "rtabmap");
 
 	bool deleteDbOnStart = false;
-	for(int i=1;i<argc;i++)
+	for(int i=1;i<argc;++i)
 	{
-		if(!strncmp(argv[i], opt_delete_db_on_start, strlen(opt_delete_db_on_start)))
+		if(strcmp(argv[i], "--delete_db_on_start") == 0)
 		{
 			deleteDbOnStart = true;
+		}
+		else if(!strcmp(argv[i], "--udebug"))
+		{
+			ULogger::setLevel(ULogger::kDebug);
 		}
 	}
 

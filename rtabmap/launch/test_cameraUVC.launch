@@ -1,6 +1,6 @@
 <launch>
 	<!-- Nodes -->
-	<node name="cameraReceiver" pkg="rtabmap" type="camera_node_receiver" output="screen"/>
+	<node name="camera_receiver" pkg="rtabmap" type="camera_receiver" output="screen"/>
 	
 	<node pkg="uvc_camera" type="camera_node" name="uvc_camera" output="screen">
 	  <param name="width" type="int" value="640" />

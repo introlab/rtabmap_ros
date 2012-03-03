@@ -11,16 +11,20 @@
 #include <rtabmap/core/SMState.h>
 #include <utilite/ULogger.h>
 #include <utilite/UTimer.h>
-#include <cv_bridge/CvBridge.h>
+#include <cv_bridge/cv_bridge.h>
+#include <image_transport/image_transport.h>
+#include <sensor_msgs/image_encodings.h>
 #include "rtabmap/SensoryMotorState.h"
 #include <std_msgs/Empty.h>
+#include <opencv2/imgproc/imgproc_c.h>
 
 rtabmap::CamKeypointTreatment kpThreatment;
 ros::Publisher rosPublisher;
 
 int imgWidth = 0;
 int imgHeight = 0;
-int imgRate = 0;
+double imgRate = 0.0;
+int keypointsExtracted = 0;
 
 UTimer timer;
 
@@ -55,22 +59,23 @@ void imgReceivedCallback(const sensor_msgs::ImageConstPtr & imgMsg)
 	double period = 0.0;
 	if(imgRate > 0)
 	{
-		period = 1.0/double(imgRate);
+		period = 1.0/imgRate;
 		period -= 0.01 * period; // 1% error
 	}
 	double elapsed = timer.getElapsedTime();
-	if(imgRate == 0 || elapsed > period)
+	if(imgRate == 0.0 || elapsed > period)
 	{
 		timer.start();
 
-		IplImage * image = 0;
-		sensor_msgs::CvBridge bridge;
 		if(imgMsg->data.size())
 		{
-			image = bridge.imgMsgToCv(imgMsg);
+			boost::shared_ptr<sensor_msgs::Image> tracked_object;
+			cv_bridge::CvImageConstPtr ptr = cv_bridge::toCvShare(imgMsg);
+			IplImage imgTmp = ptr->image;
+			IplImage * image = &imgTmp;
+
 			bool resized = false;
-			if(image &&
-			   imgWidth &&
+			if(imgWidth &&
 			   imgHeight &&
 			   imgWidth != image->width &&
 			   imgHeight != image->height)
@@ -88,10 +93,11 @@ void imgReceivedCallback(const sensor_msgs::ImageConstPtr & imgMsg)
 
 			if(image)
 			{
-				UTimer processTimer;
 				rtabmap::SMState * smState = new rtabmap::SMState(image);
-				kpThreatment.process(smState);
-				double processTime = processTimer.ticks();
+				if(keypointsExtracted)
+				{
+					kpThreatment.process(smState);
+				}
 				if(smState)
 				{
 					rtabmap::SensoryMotorStatePtr msg(new rtabmap::SensoryMotorState);
@@ -114,12 +120,15 @@ void imgReceivedCallback(const sensor_msgs::ImageConstPtr & imgMsg)
 					}
 					else
 					{
-						sensor_msgs::CvBridge::fromIpltoRosImage(image, msg->image);
+						cv_bridge::CvImage img;
+						img.encoding = sensor_msgs::image_encodings::BGR8;
+						img.image = image;
+						msg->image = *img.toImageMsg();
 					}
-					const std::list<cv::KeyPoint> & keypoints = smState->getKeypoints();
+					const std::vector<cv::KeyPoint> & keypoints = smState->getKeypoints();
 					msg->keypoints = std::vector<rtabmap::KeyPoint>(keypoints.size());
 					int i=0;
-					for(std::list<cv::KeyPoint>::const_iterator iter = keypoints.begin(); iter!=keypoints.end(); ++iter)
+					for(std::vector<cv::KeyPoint>::const_iterator iter = keypoints.begin(); iter!=keypoints.end(); ++iter)
 					{
 						msg->keypoints.at(i).angle = iter->angle;
 						msg->keypoints.at(i).octave = iter->octave;
@@ -131,7 +140,6 @@ void imgReceivedCallback(const sensor_msgs::ImageConstPtr & imgMsg)
 						++i;
 					}
 
-					ROS_INFO("Publishing smState (processing time=%fs, period=%fs, %f Hz)...", processTime, elapsed, elapsed>0?1/elapsed:0);
 					rosPublisher.publish(msg);
 				}
 				if(resized)
@@ -149,23 +157,26 @@ void imgReceivedCallback(const sensor_msgs::ImageConstPtr & imgMsg)
 
 int main(int argc, char** argv)
 {
-	ros::init(argc, argv, "image_to_sms_node");
+	ros::init(argc, argv, "image_to_sms");
 	//ULogger::setType(ULogger::kTypeConsole);
 	//ULogger::setLevel(ULogger::kDebug);
 
-	ros::NodeHandle nh("~");
+	ros::NodeHandle np("~");
 
-	nh.param("image_rate", imgRate, imgRate);
-	nh.param("resize_image_width", imgWidth, imgWidth);
-	nh.param("resize_image_height", imgHeight, imgHeight);
+	np.param("image_hz", imgRate, imgRate);
+	np.param("resize_image_width", imgWidth, imgWidth);
+	np.param("resize_image_height", imgHeight, imgHeight);
+	np.param("keypoints_extracted", keypointsExtracted, keypointsExtracted);
 
-	ROS_INFO("imgRate=%d\nresize_image_width=%d\nresize_image_height=%d", imgRate, imgWidth, imgHeight);
+	ROS_INFO("image_hz=%f\nresize_image_width=%d\nresize_image_height=%d\nkeypointsExtracted=%d", imgRate, imgWidth, imgHeight, keypointsExtracted);
 
-	ros::Subscriber parametersUpdatedTopic = nh.subscribe("/parameters_updated", 1, parametersUpdatedCallback);
-	ros::Subscriber parametersLoadedTopic = nh.subscribe("/parameters_loaded", 1, parametersLoadedCallback);
-	rosPublisher = nh.advertise<rtabmap::SensoryMotorState>("/sm_state", 1);
+	ros::NodeHandle nh;
+	ros::Subscriber parametersUpdatedTopic = nh.subscribe("rtabmap_gui/parameters_updated", 1, parametersUpdatedCallback);
+	ros::Subscriber parametersLoadedTopic = nh.subscribe("rtabmap/parameters_loaded", 1, parametersLoadedCallback);
+	rosPublisher = nh.advertise<rtabmap::SensoryMotorState>("sm_state", 1);
 
-	ros::Subscriber image_sub = nh.subscribe("/image_raw", 1, imgReceivedCallback);
+	image_transport::ImageTransport it(nh);
+	image_transport::Subscriber image_sub = it.subscribe("image", 1, imgReceivedCallback);
 
 	updateParameters();
 

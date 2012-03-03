@@ -12,6 +12,7 @@
 #include "rtabmap/RtabmapInfo.h"
 #include "rtabmap/RtabmapInfoEx.h"
 #include "utilite/UEventsHandler.h"
+#include <geometry_msgs/Twist.h>
 
 namespace rtabmap
 {
@@ -34,11 +35,12 @@ protected:
 private:
 	void infoReceivedCallback(const rtabmap::RtabmapInfoConstPtr & infoMsg);
 	void infoExReceivedCallback(const rtabmap::RtabmapInfoExConstPtr & infoExMsg);
+	void velocityReceivedCallback(const geometry_msgs::TwistConstPtr & msg);
 
 private:
-	ros::NodeHandle nh_;
 	ros::Subscriber infoTopic_;
 	ros::Subscriber infoExTopic_;
+	ros::Subscriber velocity_sub_;
 	QApplication * app_;
 	rtabmap::MainWindow * mainWindow_;
 
@@ -49,6 +51,9 @@ private:
 	ros::ServiceClient dumpPredictionClient_;
 
 	ros::Publisher parametersUpdatedPub_;
+
+	int nbCommands_;
+	std::list<std::vector<float> > commands_;
 };
 
 #endif /* GUIWRAPPER_H_ */

@@ -10,13 +10,15 @@
   <url>http://rtabmap-ros-pkg.googlecode.com</url> 
   <depend package="std_msgs"/>
   <depend package="roscpp"/>
+  <depend package="image_transport"/>
   <depend package="cv_bridge"/>
   <depend package="sensor_msgs"/>
   <depend package="std_srvs"/>
-  <depend package="opencv2"/>
-  <depend package="uvc_camera"/>
-  <depend package="rtabmap_lib"/>
   <depend package="turtlesim"/>
+  <depend package="tf"/>
+  <depend package="rtabmap_lib"/>
+
+  <rosdep name="opencv2.3"/>
 
 </package>
 

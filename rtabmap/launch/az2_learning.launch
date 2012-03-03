@@ -1,0 +1,62 @@
+<launch>
+
+	<!-- BRING UP AZIMUT2 -->
+	<include file="$(find az2_bringup)/az2_base_controller.launch"/>
+
+	<!-- TELEOP JOYSTICK -->
+	<node name="teleop_pr2" pkg="pr2_teleop" type="teleop_pr2" args="--deadman_no_publish">
+		<remap from="cmd_vel" to="user/cmd_vel" />
+	</node>
+	<node name="joystick" pkg="joy" type="joy_node">
+		<param name="autorepeat_rate" value="20" type="double" />
+	</node>
+	
+	<!-- RTAB-MAP SENSORY-MOTOR VERSION -->
+	<!-- WARNING : Database is automatically deleted on each startup -->
+	<!--           See "delete_db_on_start" option below... -->
+	
+	<!-- cmd_vel_a has priority on cmd_vel_b -->
+	<node name="abtr_velocity" pkg="rtabmap" type="abtr_velocity">
+	    <param name="commands_hz" value="10.0" type="double"/>
+	    <param name="cmd_vel_a_buffered" value="false" type="bool"/>
+	    <param name="cmd_vel_b_buffered" value="true" type="bool"/>
+	    <param name="stats_logged" value="true" type="bool"/>
+		<remap from="cmd_vel_a" to="user/cmd_vel" />
+		<remap from="cmd_vel_b" to="rtabmap/cmd_vel" />
+		<remap from="cmd_vel" to="az2/base_controller/cmd_vel" />
+	</node>
+	
+	<node name="rtabmap_out" pkg="rtabmap" type="rtabmap_out">
+		<remap from="rtabmap/cmd_vel" to="rtabmap/cmd_vel" />
+		<remap from="rtabmap/info" to="rtabmap/info" />
+		<remap from="rtabmap/info_x" to="rtabmap/info_x" />
+	</node>
+	
+	<node name="twist_to_poses" pkg="rtabmap" type="twist_to_poses">
+		<remap from="cmd_vel" to="az2/base_controller/cmd_vel" />
+	</node>
+		
+	<!-- args: "delete_db_on_start" and "udebug" -->
+	<node name="rtabmap" pkg="rtabmap" type="rtabmap" output="screen" args="--delete_db_on_start">
+		<remap from="sm_state" to="sm_state" />
+		<remap from="rtabmap/info" to="rtabmap/info" />
+		<remap from="rtabmap/info_x" to="rtabmap/info_x" />
+	</node>
+
+	<node name="rtabmap_in" pkg="rtabmap" type="rtabmap_in">
+		<param name="nb_commands" value="2" type="int"/>
+		<remap from="cmd_vel" to="az2/base_controller/cmd_vel" />
+		<remap from="sm_state" to="sm_state" />
+		<remap from="sensor_data" to="sensor_data" />
+	</node>
+	
+	<node name="image_to_sms" pkg="rtabmap" type="image_to_sms">
+		<param name="image_hz" value="5.0" type="double"/>
+		<param name="resize_image_width" value="80" type="int"/>
+		<param name="resize_image_height" value="60" type="int"/>
+		<param name="keypoints_extracted" value="0" type="int"/>
+		<remap from="image" to="camera/image" />
+		<remap from="sm_state" to="sensor_data" />
+	</node>
+
+</launch>

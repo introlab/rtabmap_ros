@@ -18,10 +18,11 @@
   <depend package="cv_bridge"/>
   <depend package="sensor_msgs"/>
   <depend package="std_srvs"/>
-  <depend package="opencv2"/>
   <depend package="utilite"/>
   
   <rosdep name="sqlite3"/>
+  <rosdep name="fftw3"/>
+  <rosdep name="opencv2.3"/>
 
 </package>
 

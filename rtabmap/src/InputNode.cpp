@@ -9,6 +9,7 @@
 #include <geometry_msgs/Twist.h>
 #include <utilite/UMutex.h>
 #include <utilite/UTimer.h>
+#include <utilite/ULogger.h>
 
 UMutex commandMutex;
 std::list<std::vector<float> > commands;
@@ -19,6 +20,9 @@ rtabmap::SensoryMotorStatePtr state;
 bool stateUpdated = false;
 bool actionsUpdated = false;
 int nbCommands = 10;
+bool statsLogged = true;
+const char * statsFileName = "InputStats.txt";
+int index2 = 1;
 
 void publish()
 {
@@ -28,6 +32,7 @@ void publish()
 		int sizeActions = -1;
 		for(std::list<std::vector<float> >::iterator iter = commands.begin(); iter!=commands.end();++iter)
 		{
+			UINFO("%d %f %f %f", index2, iter->at(0), iter->at(1), iter->at(5));
 			actions.insert(actions.end(), iter->begin(), iter->end());
 		}
 		sizeActions = commands.size();
@@ -40,13 +45,12 @@ void publish()
 		ROS_INFO("Sensorimotor state sent (sizeActions=%d, %f Hz)", sizeActions, elapsed>0?1/elapsed:0);
 		stateUpdated = false;
 		actionsUpdated = false;
+		++index2;
 	}
 }
 
 void smReceivedCallback(const rtabmap::SensoryMotorStateConstPtr & msg)
 {
-	ROS_INFO("Received camera data");
-
 	state = rtabmap::SensoryMotorStatePtr(new rtabmap::SensoryMotorState);
 	state->sensors = msg->sensors;
 	state->sensorStep = msg->sensorStep;
@@ -81,6 +85,7 @@ void velocityReceivedCallback(const geometry_msgs::TwistConstPtr & msg)
 	// 10 Hz max
 	while(commands.size() > (unsigned int)nbCommands)
 	{
+		UINFO("Ignored %f %f %f", commands.front().at(0), commands.front().at(1), commands.front().at(5));
 		ROS_WARN("Too many commands (%zu) > %d, removing the oldest...", commands.size(), nbCommands);
 		//remove the oldest
 		commands.pop_front();
@@ -95,20 +100,39 @@ void velocityReceivedCallback(const geometry_msgs::TwistConstPtr & msg)
 
 int main(int argc, char** argv)
 {
-	ros::init(argc, argv, "input_node");
-	ros::NodeHandle n("~");
+	ros::init(argc, argv, "rtabmap_in");
+	ros::NodeHandle nh("~");
 
-	n.param("nb_commands", nbCommands, nbCommands);
+	nh.param("nb_commands", nbCommands, nbCommands);
 	ROS_INFO("nb_commands=%d", nbCommands);
 
+	if(statsLogged)
+	{
+		ULogger::setPrintWhere(false);
+		ULogger::setBuffered(true);
+		ULogger::setPrintLevel(false);
+		ULogger::setPrintTime(false);
+		ULogger::setType(ULogger::kTypeFile, statsFileName, false);
+		ROS_INFO("stats log file = \"%s\"", statsFileName);
+	}
+	else
+	{
+		ULogger::setLevel(ULogger::kError);
+	}
 
-	rosPublisher = n.advertise<rtabmap::SensoryMotorState>("/sm_state", 1);
-	ros::Subscriber image_sub = n.subscribe("/camera_data", 1, smReceivedCallback);
-	ros::Subscriber velocity_sub = n.subscribe("/cmd_vel", 1, velocityReceivedCallback);
+	nh = ros::NodeHandle();
+	rosPublisher = nh.advertise<rtabmap::SensoryMotorState>("sm_state", 1);
+	ros::Subscriber image_sub = nh.subscribe("sensor_data", 1, smReceivedCallback);
+	ros::Subscriber velocity_sub = nh.subscribe("cmd_vel", 1, velocityReceivedCallback);
 
 	timer.start();
 
 	ros::spin();
+
+	if(statsLogged)
+	{
+		ULogger::flush();
+	}
 
 	return 0;
 }

@@ -12,7 +12,7 @@
 #include <ros/ros.h>
 #include <std_srvs/Empty.h>
 #include <std_msgs/Empty.h>
-#include <cv_bridge/CvBridge.h>
+#include <cv_bridge/cv_bridge.h>
 #include "utilite/UEventsHandler.h"
 #include <rtabmap/core/RtabmapEvent.h>
 #include <sensor_msgs/Image.h>
@@ -33,6 +33,7 @@ public:
 
 private:
 	void smReceivedCallback(const rtabmap::SensoryMotorStateConstPtr & msg);
+	void imageReceivedCallback(const sensor_msgs::ImageConstPtr & msg);
 	void parametersUpdatedCallback(const std_msgs::EmptyConstPtr & msg);
 
 	bool resetMemoryCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
@@ -46,10 +47,9 @@ private:
 	virtual void handleEvent(UEvent * anEvent);
 
 private:
-	ros::NodeHandle nh_;
 	rtabmap::Rtabmap * rtabmap_;
+	ros::Subscriber smStateTopic_;
 	ros::Subscriber imageTopic_;
-	ros::Subscriber compressedImageTopic_;
 	ros::Subscriber parametersUpdatedTopic_;
 	ros::Publisher infoPub_;
 	ros::Publisher infoExPub_;

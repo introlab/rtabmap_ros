@@ -10,12 +10,25 @@
 
 #include <QApplication>
 #include <rtabmap/gui/MainWindow.h>
+#include <signal.h>
+
+void my_handler(int s){
+	QApplication::closeAllWindows();
+}
 
 int main(int argc, char** argv)
 {
-	ros::init(argc, argv, "gui_node");
+	ros::init(argc, argv, "rtabmap_gui");
 
 	GuiWrapper gui(argc, argv);
+
+	// Catch ctrl-c to close the gui
+	// (Place this after QApplication's constructor)
+	struct sigaction sigIntHandler;
+	sigIntHandler.sa_handler = my_handler;
+	sigemptyset(&sigIntHandler.sa_mask);
+	sigIntHandler.sa_flags = 0;
+	sigaction(SIGINT, &sigIntHandler, NULL);
 
 	// Here start the ROS events loop
 	ros::AsyncSpinner spinner(4); // Use 4 threads

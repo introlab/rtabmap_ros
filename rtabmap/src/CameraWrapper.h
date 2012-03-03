@@ -12,6 +12,7 @@
 #include <ros/ros.h>
 #include "rtabmap/ChangeCameraImgRate.h"
 #include <std_msgs/Empty.h>
+#include <image_transport/image_transport.h>
 
 namespace Util
 {
@@ -44,8 +45,7 @@ private:
 	bool changeCameraImgRateCallback(rtabmap::ChangeCameraImgRate::Request&, rtabmap::ChangeCameraImgRate::Response&);
 
 private:
-	ros::NodeHandle nh_;
-	ros::Publisher rosPublisher_;
+	image_transport::Publisher rosPublisher_;
 	rtabmap::Camera * camera_;
 	ros::ServiceServer changeCameraImgRateSrv_;
 };
@@ -94,7 +94,7 @@ class CameraDatabaseWrapper : public CameraWrapper
 public:
 	// Usb device like a Webcam
 	CameraDatabaseWrapper(const std::string & path,
-			bool ignoreChildren,
+			bool actionsLoaded,
 			float imageRate = 0,
 			bool autoRestart = false,
 			unsigned int imageWidth = 0,

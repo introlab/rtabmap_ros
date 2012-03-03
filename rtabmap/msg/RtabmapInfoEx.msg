@@ -37,3 +37,7 @@ rtabmap/KeyPoint[] refWordsValues
 #std::multimap<int, cv::KeyPoint> loopWords
 int32[] loopWordsKeys
 rtabmap/KeyPoint[] loopWordsValues
+
+##SM masks##
+uint8[] refMotionMask
+uint8[] loopMotionMask

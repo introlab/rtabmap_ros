@@ -1,0 +1,16 @@
+<launch>
+	<!-- Nodes -->
+	<node name="camera_receiver" pkg="rtabmap" type="camera_receiver" output="screen">
+		<remap from="image" to="camera/image"/>
+		<remap from="image/compressed" to="camera/image/compressed"/>
+		<param name="image_transport" value="raw" type="str"/>
+	</node>
+	
+	<!-- Nodes -->
+	<node name="camera" pkg="rtabmap" type="camera" output="screen">
+		<param name="device_id" value="0" type="int"/>
+		<param name="image_hz" value="30.0" type="double"/>
+		<param name="image_width" value="640" type="int"/>
+		<param name="image_height" value="480" type="int"/>
+	</node>
+</launch>
