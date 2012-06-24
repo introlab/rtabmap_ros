@@ -14,6 +14,7 @@
   <versioncontrol type="svn" url="http://utilite.googlecode.com/svn/trunk/"/>
   
   <depend package="roscpp"/>
+  <depend package="fmodex"/>
 
   <rosdep name="libqt4-dev"/>
   <rosdep name="libmp3lame-dev"/>

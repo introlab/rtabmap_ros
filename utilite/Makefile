@@ -5,7 +5,7 @@ all: installed
 
 SVN_DIR = build/utilite-svn
 SVN_URL = https://utilite.googlecode.com/svn/trunk/
-SVN_REVISION = -r173
+SVN_REVISION = -rHEAD
 #SVN_PATCH = opencvVer.patch
 include $(shell rospack find mk)/svn_checkout.mk
 
@@ -27,4 +27,4 @@ clean:
 	-cd $(SVN_DIR)/build && make clean
 	rm -rf $(INSTALL_DIR) installed
 
-.PHONY : clean download
+.PHONY : clean installfmodex

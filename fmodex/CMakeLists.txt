@@ -1,8 +1,6 @@
 cmake_minimum_required(VERSION 2.4.6)
 include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
 
-project(rtabmap-audio-pkg)
-
 # Set the build type.  Options are:
 #  Coverage       : w/ debug symbols, w/o optimization, w/ code-coverage
 #  Debug          : w/ debug symbols, w/o optimization
@@ -18,10 +16,8 @@ set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 #set the default path for built libraries to the "lib" directory
 set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
-SET(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}")
-
 #uncomment if you have defined messages
-rosbuild_genmsg()
+#rosbuild_genmsg()
 #uncomment if you have defined services
 #rosbuild_gensrv()
 
@@ -32,14 +28,3 @@ rosbuild_genmsg()
 #rosbuild_link_boost(${PROJECT_NAME} thread)
 #rosbuild_add_executable(example examples/example.cpp)
 #target_link_libraries(example ${PROJECT_NAME})
-
-rosbuild_add_executable(audio_recorder AudioRecorderNode.cpp)
-target_link_libraries(audio_recorder)
-
-FIND_PACKAGE(Qt4 COMPONENTS QtCore QtGui REQUIRED)
-find_package(Fmodex REQUIRED)
-INCLUDE(${QT_USE_FILE})
-
-INCLUDE_DIRECTORIES(${Fmodex_INCLUDE_DIRS})
-rosbuild_add_executable(audio_player AudioPlayerNode.cpp)
-target_link_libraries(audio_player ${Fmodex_LIBRARIES} ${QT_LIBRARIES})

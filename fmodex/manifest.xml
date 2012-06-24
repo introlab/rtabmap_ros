@@ -1,0 +1,14 @@
+<package>
+  <description brief="fmodex">
+
+     fmodex
+
+  </description>
+  <author>Mathieu Labbé</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/fmodex</url>
+
+</package>
+
+
