@@ -154,7 +154,7 @@ void callback(rtabmap_image::cameraConfig &config, uint32_t level)
 {
 	if(camera)
 	{
-		camera->setParameters(config.deviceId, config.frameRate, config.width, config.height);
+		camera->setParameters(config.device_id, config.frame_rate, config.width, config.height);
 	}
 }
 
