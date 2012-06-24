@@ -1,0 +1,31 @@
+<launch>
+	<!-- Nodes -->
+	<node name="camera" pkg="rtabmap_image" type="camera" output="screen">
+		<remap from="camera/image" to="image"/>
+		<param name="device_id" value="0" type="int"/>
+		<param name="image_hz" value="0" type="double"/>
+		<param name="image_width" value="640" type="int"/>
+		<param name="image_height" value="480" type="int"/>
+	</node>
+
+	<node name="rgb2ind" pkg="rtabmap_image" type="rgb2ind"/>
+	<node name="xy2polar" pkg="rtabmap_image" type="xy2polar"/>
+	<node name="motion_filter" pkg="rtabmap_image" type="motion_filter"/>
+
+	<!-- Create some image_view_qt to see images -->
+	<node name="view_indexed" pkg="rtabmap_image" type="image_view_qt">
+		<remap from="image" to="image_indexed"/>
+	</node>
+	<node name="view_polar" pkg="rtabmap_image" type="image_view_qt">
+		<remap from="image" to="image_polar"/>
+	</node>
+	<node name="view_polar_reconstructed" pkg="rtabmap_image" type="image_view_qt">
+		<remap from="image" to="image_polar_reconstructed"/>
+	</node>
+	<node name="view_motion" pkg="rtabmap_image" type="image_view_qt">
+		<remap from="image" to="image_motion_filtered"/>
+	</node>
+	
+	<!-- pop up a dynamic reconfigure -->
+	<node name="dynamic_reconfigure" pkg="dynamic_reconfigure" type="reconfigure_gui"/>
+</launch>

@@ -9,11 +9,15 @@
   <review status="unreviewed" notes=""/>
   <url>http://utilite.googlecode.com</url>
   <export>
-    <cpp cflags="-I${prefix}/utilite/include" lflags="-L${prefix}/utilite/lib -Wl,-rpath, -lutilite"/>
+    <cpp cflags="-I${prefix}/utilite/include" lflags="-L${prefix}/utilite/lib -Wl,-rpath, -lutilite -lutilite_qt -lutilite_audio"/>
   </export>
   <versioncontrol type="svn" url="http://utilite.googlecode.com/svn/trunk/"/>
   
   <depend package="roscpp"/>
+
+  <rosdep name="libqt4-dev"/>
+  <rosdep name="libmp3lame-dev"/>
+  <rosdep name="libfftw3-dev"/>
 </package>
 
 

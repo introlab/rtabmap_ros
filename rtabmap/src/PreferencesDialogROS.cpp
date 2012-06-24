@@ -32,7 +32,7 @@ void PreferencesDialogROS::readCameraSettings(const QString & filePath)
 	double imgRate = 0;
 	ros::NodeHandle nh;
 	nh.getParam("camera/image_hz", imgRate);
-	this->setImgRate(imgRate);
+	this->setInputRate(imgRate);
 }
 
 QString PreferencesDialogROS::getParamMessage()

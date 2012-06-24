@@ -1,7 +1,7 @@
 <launch>	
 	<!-- TELEOP JOYSTICK -->
 	<node name="teleop_pr2" pkg="pr2_teleop" type="teleop_pr2" args="--deadman_no_publish">
-		<remap from="cmd_vel" to="user/cmd_vel" />
+		<remap from="cmd_vel" to="tr/cmd_vel" />
 	</node>
 	<node name="joystick" pkg="joy" type="joy_node">
 		<param name="autorepeat_rate" value="20" type="double" />

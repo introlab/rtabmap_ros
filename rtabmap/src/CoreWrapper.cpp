@@ -6,18 +6,23 @@
  */
 
 #include "CoreWrapper.h"
-#include <rtabmap/core/CameraEvent.h>
+#include "MsgConversion.h"
 #include <ros/ros.h>
 #include <rtabmap/core/RtabmapEvent.h>
 #include <rtabmap/core/Rtabmap.h>
+#include <rtabmap/core/Camera.h>
 #include <rtabmap/core/Parameters.h>
-#include <rtabmap/core/SMState.h>
-#include "utilite/UtiLite.h"
-#include <highgui.h>
+#include <rtabmap/core/SensorimotorEvent.h>
+#include <utilite/UEventsManager.h>
+#include <utilite/ULogger.h>
+#include <utilite/UFile.h>
+#include <utilite/UStl.h>
+#include <opencv2/highgui/highgui.hpp>
 
 //msgs
 #include "rtabmap/RtabmapInfo.h"
 #include "rtabmap/RtabmapInfoEx.h"
+#include "rtabmap/CvMatMsg.h"
 
 using namespace rtabmap;
 
@@ -26,9 +31,11 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 {
 	ros::NodeHandle nh("~");
 	infoPub_ = nh.advertise<rtabmap::RtabmapInfo>("info", 1);
+	infoPubEx_ = nh.advertise<rtabmap::RtabmapInfo>("infoEx", 1);
 	parametersLoadedPub_ = nh.advertise<std_msgs::Empty>("parameters_loaded", 1);
 
 	rtabmap_ = new Rtabmap();
+	UEventsManager::addHandler(rtabmap_);
 	loadNodeParameters(rtabmap_->getIniFilePath());
 
 	if(deleteDbOnStart)
@@ -44,8 +51,8 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	dumpPredictionSrv_ = nh.advertiseService("dumpPrediction", &CoreWrapper::dumpPredictionCallback, this);
 
 	nh = ros::NodeHandle();
-	smStateTopic_ = nh.subscribe("sm_state", 1, &CoreWrapper::smReceivedCallback, this);
 	parametersUpdatedTopic_ = nh.subscribe("rtabmap_gui/parameters_updated", 1, &CoreWrapper::parametersUpdatedCallback, this);
+	sensorimotorTopic_ = nh.subscribe("sensorimotor", 1, &CoreWrapper::sensorimotorReceivedCallback, this);
 
 	image_transport::ImageTransport it(nh);
 	imageTopic_ = it.subscribe("image", 1, &CoreWrapper::imageReceivedCallback, this);
@@ -109,44 +116,38 @@ void CoreWrapper::saveNodeParameters(const std::string & configFile)
 	ROS_INFO("Database/long-term memory (%lu MB) is located at %s/LTM.db", UFile::length(databasePath)/1000000, databasePath.c_str());
 }
 
-
-void CoreWrapper::smReceivedCallback(const rtabmap::SensoryMotorStateConstPtr & msg)
+void CoreWrapper::sensorimotorReceivedCallback(const rtabmap::SensorimotorConstPtr & msg)
 {
-	IplImage * image = 0;
-	std::vector<cv::KeyPoint> keypoints(msg->keypoints.size());
+	std::list<Sensor> sensors;
+	std::list<Actuator> actuators;
 
-	if(msg->image.data.size())
+	for(unsigned int i=0; i<msg->sensors.size(); ++i)
 	{
-		boost::shared_ptr<sensor_msgs::Image> tracked_object;
-		cv_bridge::CvImageConstPtr ptr = cv_bridge::toCvShare(msg->image, tracked_object);
-		IplImage img = ptr->image;
-		image = cvCloneImage(&img);
+		sensors.push_back(Sensor(fromCvMatMsgToCvMat(msg->sensors[i].matrix), (Sensor::Type)msg->sensors[i].type));
+	}
+	for(unsigned int i=0; i<msg->actuators.size(); ++i)
+	{
+		actuators.push_back(Actuator(fromCvMatMsgToCvMat(msg->actuators[i].matrix), (Actuator::Type)msg->actuators[i].type));
 	}
 
-	for(unsigned int i=0; i<msg->keypoints.size() && i<msg->keypoints.size(); i++)
+	if(!sensors.size() && !actuators.size())
 	{
-		keypoints[i].angle = msg->keypoints.at(i).angle;
-		keypoints[i].response = msg->keypoints.at(i).response;
-		keypoints[i].pt.x = msg->keypoints.at(i).ptx;
-		keypoints[i].pt.y = msg->keypoints.at(i).pty;
-		keypoints[i].size = msg->keypoints.at(i).size;
+		ROS_ERROR("Sensorimotor received is empty...");
 	}
-	rtabmap::SMState * smState = new rtabmap::SMState(msg->sensors, msg->sensorStep, msg->actuators, msg->actuatorStep);
-	smState->setImage(image);
-	smState->setKeypoints(keypoints);
-	UEventsManager::post(new SMStateEvent(smState));
+	else
+	{
+		ROS_INFO("Received sensorimotor (%d sensors %d actuators).", sensors.size(), actuators.size());
+		UEventsManager::post(new SensorimotorEvent(sensors, actuators));
+	}
 }
 
 void CoreWrapper::imageReceivedCallback(const sensor_msgs::ImageConstPtr & msg)
 {
 	if(msg->data.size())
 	{
-		boost::shared_ptr<sensor_msgs::Image> tracked_object;
+		ROS_INFO("Received image.");
 		cv_bridge::CvImageConstPtr ptr = cv_bridge::toCvShare(msg);
-		IplImage imgTmp = ptr->image;
-		IplImage * image = &imgTmp;
-		rtabmap::SMState * smState = new rtabmap::SMState(cvCloneImage(image));
-		UEventsManager::post(new SMStateEvent(smState));
+		UEventsManager::post(new CameraEvent(ptr->image.clone()));
 	}
 }
 
@@ -194,140 +195,106 @@ void CoreWrapper::handleEvent(UEvent * anEvent)
 {
 	if(anEvent->getClassName().compare("RtabmapEvent") == 0)
 	{
-		RtabmapEvent * rtabmapEvent = (RtabmapEvent*)anEvent;
-		const Statistics & stat = rtabmapEvent->getStats();
-
-		//prepare ros message
-
-		if(stat.extended())
+		if(infoPub_.getNumSubscribers() || infoPubEx_.getNumSubscribers())
 		{
+			ROS_INFO("Sending RtabmapInfo msg...");
+			RtabmapEvent * rtabmapEvent = (RtabmapEvent*)anEvent;
+			const Statistics & stat = rtabmapEvent->getStats();
+
 			rtabmap::RtabmapInfoPtr msg(new rtabmap::RtabmapInfo);
+
+			// General info
 			msg->refId = stat.refImageId();
-			if(stat.refImage())
-			{
-				int params[3] = {0};
-
-				//JPEG compression
-				std::string format = "jpeg";
-				params[0] = CV_IMWRITE_JPEG_QUALITY;
-				params[1] = 80; // default: 80% quality
-
-				//PNG compression
-				//std::string format = "png";
-				//params[0] = CV_IMWRITE_PNG_COMPRESSION;
-				//params[1] = 9; // default: maximum compression
-
-				std::string extension = '.' + format;
-
-				// Compress image
-				const IplImage* image = stat.refImage();
-				CvMat* buf = cvEncodeImage(extension.c_str(), image, params);
-
-				// Set up message and publish
-				sensor_msgs::CompressedImage compressed;
-				compressed.format = format;
-				compressed.data.resize(buf->width);
-				memcpy(&compressed.data[0], buf->data.ptr, buf->width);
-				cvReleaseMat(&buf);
-
-				msg->infoEx.refImage = compressed;
-			}
 			msg->loopClosureId = stat.loopClosureId();
-			if(stat.loopClosureImage())
+
+			msg->actuators.resize(stat.getActuators().size());
+			int i=0;
+			for(std::list<Actuator>::const_iterator iter = stat.getActuators().begin(); iter!=stat.getActuators().end(); ++iter)
 			{
-				int params[3] = {0};
-
-				//JPEG compression
-				std::string format = "jpeg";
-				params[0] = CV_IMWRITE_JPEG_QUALITY;
-				params[1] = 80; // default: 80% quality
-
-				//PNG compression
-				//std::string format = "png";
-				//params[0] = CV_IMWRITE_PNG_COMPRESSION;
-				//params[1] = 9; // default: maximum compression
-
-				std::string extension = '.' + format;
-
-				// Compress image
-				const IplImage* image = stat.loopClosureImage();
-				CvMat* buf = cvEncodeImage(extension.c_str(), image, params);
-
-				// Set up message and publish
-				sensor_msgs::CompressedImage compressed;
-				compressed.format = format;
-				compressed.data.resize(buf->width);
-				memcpy(&compressed.data[0], buf->data.ptr, buf->width);
-				cvReleaseMat(&buf);
-
-				msg->infoEx.loopClosureImage = compressed;
+				msg->actuators[i].type = iter->type();
+				fromCvMatToCvMatMsg(msg->actuators[i++].matrix, iter->data());
 			}
 
-			const std::list<std::vector<float> > & actuators = stat.getActions();
-			if(actuators.size())
+			if(infoPub_.getNumSubscribers())
 			{
-				msg->actuatorStep = actuators.front().size();
+				infoPub_.publish(msg);
 			}
-			for(std::list<std::vector<float> >::const_iterator iter=actuators.begin();iter!=actuators.end();++iter)
+
+			if(infoPubEx_.getNumSubscribers())
 			{
-				if((iter->size() == 0 && msg->actuatorStep > 0) || msg->actuatorStep % iter->size() != 0)
+				// Detailed info
+				if(stat.extended())
 				{
-					ROS_ERROR("Actuators must have all the same length.");
+					if(stat.refRawData().size())
+					{
+						msg->infoEx.refRawData.resize(stat.refRawData().size());
+						i=0;
+						for(std::list<Sensor>::const_iterator iter = stat.refRawData().begin(); iter!=stat.refRawData().end(); ++iter)
+						{
+							msg->infoEx.refRawData[i].type = iter->type();
+							fromCvMatToCvMatMsg(msg->infoEx.refRawData[i++].matrix, iter->data());
+						}
+					}
+					if(stat.loopClosureRawData().size())
+					{
+						msg->infoEx.loopRawData.resize(stat.loopClosureRawData().size());
+						i=0;
+						for(std::list<Sensor>::const_iterator iter = stat.loopClosureRawData().begin(); iter!=stat.loopClosureRawData().end(); ++iter)
+						{
+							msg->infoEx.loopRawData[i].type = iter->type();
+							fromCvMatToCvMatMsg(msg->infoEx.loopRawData[i++].matrix, iter->data());
+						}
+					}
+
+					//Posterior, likelihood, childCount
+					msg->infoEx.posteriorKeys = uKeys(stat.posterior());
+					msg->infoEx.posteriorValues = uValues(stat.posterior());
+					msg->infoEx.likelihoodKeys = uKeys(stat.likelihood());
+					msg->infoEx.likelihoodValues = uValues(stat.likelihood());
+					msg->infoEx.weightsKeys = uKeys(stat.weights());
+					msg->infoEx.weightsValues = uValues(stat.weights());
+
+					//Features stuff...
+					msg->infoEx.refWordsKeys = uListToVector(uKeys(stat.refWords()));
+					msg->infoEx.refWordsValues = std::vector<rtabmap::KeyPoint>(stat.refWords().size());
+					int index = 0;
+					for(std::multimap<int, cv::KeyPoint>::const_iterator i=stat.refWords().begin();
+						i!=stat.refWords().end();
+						++i)
+					{
+						msg->infoEx.refWordsValues.at(index).angle = i->second.angle;
+						msg->infoEx.refWordsValues.at(index).response = i->second.response;
+						msg->infoEx.refWordsValues.at(index).ptx = i->second.pt.x;
+						msg->infoEx.refWordsValues.at(index).pty = i->second.pt.y;
+						msg->infoEx.refWordsValues.at(index).size = i->second.size;
+						msg->infoEx.refWordsValues.at(index).octave = i->second.octave;
+						msg->infoEx.refWordsValues.at(index).class_id = i->second.class_id;
+						++index;
+					}
+
+					msg->infoEx.loopWordsKeys = uListToVector(uKeys(stat.loopWords()));
+					msg->infoEx.loopWordsValues = std::vector<rtabmap::KeyPoint>(stat.loopWords().size());
+					index = 0;
+					for(std::multimap<int, cv::KeyPoint>::const_iterator i=stat.loopWords().begin();
+						i!=stat.loopWords().end();
+						++i)
+					{
+						msg->infoEx.loopWordsValues.at(index).angle = i->second.angle;
+						msg->infoEx.loopWordsValues.at(index).response = i->second.response;
+						msg->infoEx.loopWordsValues.at(index).ptx = i->second.pt.x;
+						msg->infoEx.loopWordsValues.at(index).pty = i->second.pt.y;
+						msg->infoEx.loopWordsValues.at(index).size = i->second.size;
+						msg->infoEx.loopWordsValues.at(index).octave = i->second.octave;
+						msg->infoEx.loopWordsValues.at(index).class_id = i->second.class_id;
+						++index;
+					}
+
+					// Statistics data
+					msg->infoEx.statsKeys = uKeys(stat.data());
+					msg->infoEx.statsValues = uValues(stat.data());
 				}
-				msg->actuators.insert(msg->actuators.end(), iter->begin(), iter->end());
+				infoPubEx_.publish(msg);
 			}
-
-			//Posterior, likelihood, childCount
-			msg->infoEx.posteriorKeys = uKeys(stat.posterior());
-			msg->infoEx.posteriorValues = uValues(stat.posterior());
-			msg->infoEx.likelihoodKeys = uKeys(stat.likelihood());
-			msg->infoEx.likelihoodValues = uValues(stat.likelihood());
-			msg->infoEx.weightsKeys = uKeys(stat.weights());
-			msg->infoEx.weightsValues = uValues(stat.weights());
-
-			//SURF stuff...
-			msg->infoEx.refWordsKeys = uListToVector(uKeys(stat.refWords()));
-			msg->infoEx.refWordsValues = std::vector<rtabmap::KeyPoint>(stat.refWords().size());
-			int index = 0;
-			for(std::multimap<int, cv::KeyPoint>::const_iterator i=stat.refWords().begin();
-				i!=stat.refWords().end();
-				++i)
-			{
-				msg->infoEx.refWordsValues.at(index).angle = i->second.angle;
-				msg->infoEx.refWordsValues.at(index).response = i->second.response;
-				msg->infoEx.refWordsValues.at(index).ptx = i->second.pt.x;
-				msg->infoEx.refWordsValues.at(index).pty = i->second.pt.y;
-				msg->infoEx.refWordsValues.at(index).size = i->second.size;
-				msg->infoEx.refWordsValues.at(index).octave = i->second.octave;
-				msg->infoEx.refWordsValues.at(index).class_id = i->second.class_id;
-				++index;
-			}
-			msg->infoEx.loopWordsKeys = uListToVector(uKeys(stat.loopWords()));
-			msg->infoEx.loopWordsValues = std::vector<rtabmap::KeyPoint>(stat.loopWords().size());
-			index = 0;
-			for(std::multimap<int, cv::KeyPoint>::const_iterator i=stat.loopWords().begin();
-				i!=stat.loopWords().end();
-				++i)
-			{
-				msg->infoEx.loopWordsValues.at(index).angle = i->second.angle;
-				msg->infoEx.loopWordsValues.at(index).response = i->second.response;
-				msg->infoEx.loopWordsValues.at(index).ptx = i->second.pt.x;
-				msg->infoEx.loopWordsValues.at(index).pty = i->second.pt.y;
-				msg->infoEx.loopWordsValues.at(index).size = i->second.size;
-				msg->infoEx.loopWordsValues.at(index).octave = i->second.octave;
-				msg->infoEx.loopWordsValues.at(index).class_id = i->second.class_id;
-				++index;
-			}
-
-			// SM masks
-			msg->infoEx.refMotionMask = stat.refMotionMask();
-			msg->infoEx.loopMotionMask = stat.loopMotionMask();
-
-			// Statistics data
-			msg->infoEx.statsKeys = uKeys(stat.data());
-			msg->infoEx.statsValues = uValues(stat.data());
-
-			infoPub_.publish(msg);
 		}
 	}
 }

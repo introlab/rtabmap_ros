@@ -16,8 +16,9 @@
 #include "utilite/UEventsHandler.h"
 #include <rtabmap/core/RtabmapEvent.h>
 #include <sensor_msgs/Image.h>
-#include "rtabmap/SensoryMotorState.h"
+#include <geometry_msgs/Twist.h>
 #include <image_transport/image_transport.h>
+#include "rtabmap/Sensorimotor.h"
 
 namespace rtabmap
 {
@@ -33,8 +34,9 @@ public:
 	void start();
 
 private:
-	void smReceivedCallback(const rtabmap::SensoryMotorStateConstPtr & msg);
+	void sensorimotorReceivedCallback(const rtabmap::SensorimotorConstPtr & msg);
 	void imageReceivedCallback(const sensor_msgs::ImageConstPtr & msg);
+	void twistCallback(const geometry_msgs::TwistConstPtr & msg);
 	void parametersUpdatedCallback(const std_msgs::EmptyConstPtr & msg);
 
 	bool resetMemoryCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
@@ -49,10 +51,13 @@ private:
 
 private:
 	rtabmap::Rtabmap * rtabmap_;
-	ros::Subscriber smStateTopic_;
+	ros::Subscriber sensorimotorTopic_;
 	image_transport::Subscriber imageTopic_;
+	ros::Subscriber audioFrameFreqSqrdMagnTopic_;
+	ros::Subscriber twistTopic_;
 	ros::Subscriber parametersUpdatedTopic_;
 	ros::Publisher infoPub_;
+	ros::Publisher infoPubEx_;
 	ros::Publisher parametersLoadedPub_;
 	std::string configFile_;
 

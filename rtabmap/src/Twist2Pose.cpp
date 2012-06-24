@@ -44,11 +44,11 @@ void twistReceivedCallback(const geometry_msgs::TwistConstPtr & msg)
 	}
 	msgLinear.header.frame_id = "/base_link";
 	msgAngular.header.frame_id = "/base_link";
+	msgLinear.header.stamp = ros::Time::now();
+	msgAngular.header.stamp = ros::Time::now();
 	rosPublisherLinear.publish(msgLinear);
 	rosPublisherAngular.publish(msgAngular);
 }
-
-#include <ros/ros.h>
 
 int main(int argc, char * argv[])
 {
@@ -57,7 +57,7 @@ int main(int argc, char * argv[])
 	ros::NodeHandle nh;
 	rosPublisherLinear = nh.advertise<geometry_msgs::PoseStamped>("pose_linear", 1);
 	rosPublisherAngular = nh.advertise<geometry_msgs::PoseStamped>("pose_angular", 1);
-	ros::Subscriber image_sub = nh.subscribe("cmd_vel", 1, twistReceivedCallback);
+	ros::Subscriber twist_sub = nh.subscribe("cmd_vel", 1, twistReceivedCallback);
 
 	ros::spin();
 

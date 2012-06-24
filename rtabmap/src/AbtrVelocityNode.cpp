@@ -6,6 +6,7 @@
 
 #include <ros/ros.h>
 #include <geometry_msgs/Twist.h>
+#include <geometry_msgs/TwistStamped.h>
 #include <utilite/UMutex.h>
 #include <queue>
 #include <utilite/ULogger.h>
@@ -103,7 +104,7 @@ int main(int argc, char** argv)
 		velBTopic = nh.subscribe("cmd_vel_b", 1, velocityBReceivedCallback);
 	}
 
-	rosPublisher = nh.advertise<geometry_msgs::Twist>("cmd_vel", 1);
+	rosPublisher = nh.advertise<geometry_msgs::TwistStamped>("cmd_vel", 1);
 
 	int index = 1;
 	ros::Rate loop_rate(commandsHz); // 10 Hz
@@ -111,24 +112,28 @@ int main(int argc, char** argv)
 	{
 		loop_rate.sleep();
 		ros::spinOnce();
+
+		geometry_msgs::TwistStampedPtr vel(new geometry_msgs::TwistStamped());
+		vel->header.frame_id = "base_link";
+		vel->header.stamp = ros::Time::now();
+
 		// priority for commandsA
 		if(commandsA.size())
 		{
-			geometry_msgs::TwistPtr vel(new geometry_msgs::Twist());
-			vel->linear.x = commandsA.front();
+			vel->twist.linear.x = commandsA.front();
 			commandsA.pop();
-			vel->linear.y = commandsA.front();
+			vel->twist.linear.y = commandsA.front();
 			commandsA.pop();
-			vel->linear.z = commandsA.front();
+			vel->twist.linear.z = commandsA.front();
 			commandsA.pop();
-			vel->angular.x = commandsA.front();
+			vel->twist.angular.x = commandsA.front();
 			commandsA.pop();
-			vel->angular.y = commandsA.front();
+			vel->twist.angular.y = commandsA.front();
 			commandsA.pop();
-			vel->angular.z = commandsA.front();
+			vel->twist.angular.z = commandsA.front();
 			commandsA.pop();
 			rosPublisher.publish(vel);
-			UINFO("%d A %f %f %f", index, vel->linear.x, vel->linear.y, vel->angular.z);
+			UINFO("%d A %f %f %f", index, vel->twist.linear.x, vel->twist.linear.y, vel->twist.angular.z);
 			if(!cmdABuffered)
 			{
 				commandsA = std::queue<float>();
@@ -145,20 +150,19 @@ int main(int argc, char** argv)
 		}
 		else if(commandsB.size())
 		{
-			geometry_msgs::TwistPtr vel(new geometry_msgs::Twist());
-			vel->linear.x = commandsB.front();
+			vel->twist.linear.x = commandsB.front();
 			commandsB.pop();
-			vel->linear.y = commandsB.front();
+			vel->twist.linear.y = commandsB.front();
 			commandsB.pop();
-			vel->linear.z = commandsB.front();
+			vel->twist.linear.z = commandsB.front();
 			commandsB.pop();
-			vel->angular.x = commandsB.front();
+			vel->twist.angular.x = commandsB.front();
 			commandsB.pop();
-			vel->angular.y = commandsB.front();
+			vel->twist.angular.y = commandsB.front();
 			commandsB.pop();
-			vel->angular.z = commandsB.front();
+			vel->twist.angular.z = commandsB.front();
 			commandsB.pop();
-			UINFO("%d B %f %f %f", index, vel->linear.x, vel->linear.y, vel->angular.z);
+			UINFO("%d B %f %f %f", index, vel->twist.linear.x, vel->twist.linear.y, vel->twist.angular.z);
 			rosPublisher.publish(vel);
 			if(!cmdBBuffered)
 			{
@@ -172,13 +176,12 @@ int main(int argc, char** argv)
 			{
 				// Republish the last command one more time
 				// (if the sender cannot reach commandsHz for an iteration)
-				geometry_msgs::TwistPtr vel(new geometry_msgs::Twist());
-				vel->linear.x = lastCommandsB[0];
-				vel->linear.y = lastCommandsB[1];
-				vel->linear.z = lastCommandsB[2];
-				vel->angular.x = lastCommandsB[3];
-				vel->angular.y = lastCommandsB[4];
-				vel->angular.z = lastCommandsB[5];
+				vel->twist.linear.x = lastCommandsB[0];
+				vel->twist.linear.y = lastCommandsB[1];
+				vel->twist.linear.z = lastCommandsB[2];
+				vel->twist.angular.x = lastCommandsB[3];
+				vel->twist.angular.y = lastCommandsB[4];
+				vel->twist.angular.z = lastCommandsB[5];
 				rosPublisher.publish(vel);
 				lastCommandsB = std::vector<float>();
 			}

@@ -11,6 +11,8 @@ include $(shell rospack find mk)/svn_checkout.mk
 
 CMAKE = cmake 
 CMAKE_ARGS = -D CMAKE_BUILD_TYPE=RELEASE \
+             -D BUILD_LIBS_ONLY=ON \
+             -D BUILD_TESTS=OFF \
              -D CMAKE_INSTALL_PREFIX=`rospack find rtabmap_lib`/$(INSTALL_DIR)
 
 installed: $(SVN_DIR) patched

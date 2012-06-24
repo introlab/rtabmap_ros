@@ -6,7 +6,7 @@
  */
 
 #include "CoreWrapper.h"
-#include "utilite/ULogger.h"
+#include <utilite/ULogger.h>
 
 int main(int argc, char** argv)
 {

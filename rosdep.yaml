@@ -1,6 +1,0 @@
-sqlite3:
-  ubuntu: libsqlite3-dev sqlite3
-  debian: libsqlite3-dev sqlite3
-fftw3:
-  ubuntu: libfftw3-dev
-  debian: libfftw3-dev

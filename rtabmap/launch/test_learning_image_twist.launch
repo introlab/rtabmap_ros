@@ -1,0 +1,38 @@
+<launch>	
+	<!-- when rosbag ... "rosbag play -.-clock my.bag"-->
+     <param name="use_sim_time" type="bool" value="True"/>
+	
+	<!-- args: "delete_db_on_start" and "udebug" -->
+	<node name="rtabmap" pkg="rtabmap" type="rtabmap" output="screen" args="--delete_db_on_start">
+		<remap from="/image" to="/image_not_used"/> <!-- Just to make sure that rtabmap does not subscribe 
+		                                                 to camera image, here we use sensorimotor input -->
+		<remap from="sensorimotor" to="sensorimotor" />
+		<remap from="rtabmap/info" to="rtabmap/info" />
+		<remap from="rtabmap/info_x" to="rtabmap/info_x" />
+	</node>
+	
+	<node name="rtabmap_out" pkg="rtabmap" type="rtabmap_out">
+		<remap from="rtabmap/cmd_vel" to="rtabmap/cmd_vel" />
+		<remap from="rtabmap/info" to="rtabmap/info" />
+		<remap from="rtabmap/info_x" to="rtabmap/info_x" />
+	</node>
+	
+	<!-- Arbitration -->
+	<!-- cmd_vel_a has priority on cmd_vel_b -->
+	<node name="abtr_velocity" pkg="rtabmap" type="abtr_velocity">
+	    <param name="commands_hz" value="10.0" type="double"/>
+	    <param name="cmd_vel_a_buffered" value="false" type="bool"/>
+	    <param name="cmd_vel_b_buffered" value="true" type="bool"/>
+	    <param name="stats_logged" value="false" type="bool"/>
+		<remap from="cmd_vel_a" to="user/cmd_vel" />
+		<remap from="cmd_vel_b" to="rtabmap/cmd_vel" />
+		<remap from="cmd_vel" to="cmd_vel" />
+	</node>
+
+	<!-- INPUT NODE -->
+	<node name="my_input_node" pkg="rtabmap" type="input_image_twist_node">
+		<remap from="cmd_vel" to="cmd_vel"/>
+		<remap from="image" to="image_local_polar_reconstructed"/>
+	</node>
+	
+</launch>

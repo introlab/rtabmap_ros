@@ -1,6 +1,6 @@
 <launch>	
 	<node pkg="pr2_teleop" type="teleop_pr2_keyboard" name="spawn_teleop_keyboard" output="screen">
-      <remap from="cmd_vel" to="user/cmd_vel" />
+      <remap from="cmd_vel" to="tr/cmd_vel" />
 
       <param name="walk_vel" value="0.5" />
       <param name="run_vel" value="1.0" />

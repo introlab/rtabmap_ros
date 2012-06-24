@@ -1,0 +1,20 @@
+<package>
+  <description brief="rtabmap_audio">
+
+     audio
+
+  </description>
+  <author>Mathieu Labbé</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/rtabmap_audio</url>
+
+  <depend package="std_msgs"/>
+  <depend package="roscpp"/>
+  <depend package="rtabmap_lib"/>
+
+  <rosdep name="libqt4-dev"/>
+
+</package>
+
+

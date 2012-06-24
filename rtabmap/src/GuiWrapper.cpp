@@ -6,27 +6,33 @@
  */
 
 #include "GuiWrapper.h"
-#include <rtabmap/gui/MainWindow.h>
-#include "PreferencesDialogROS.h"
+#include "MsgConversion.h"
 #include <QtGui/QApplication>
-#include <rtabmap/core/RtabmapEvent.h>
+
 #include <cv_bridge/cv_bridge.h>
-#include "utilite/UEventsManager.h"
-#include "std_srvs/Empty.h"
-#include "std_msgs/Empty.h"
+#include <std_srvs/Empty.h>
+#include <std_msgs/Empty.h>
+
+#include <utilite/UEventsManager.h>
+
+#include <opencv2/highgui/highgui.hpp>
+
+#include <rtabmap/gui/MainWindow.h>
+#include <rtabmap/core/RtabmapEvent.h>
 #include <rtabmap/core/Parameters.h>
-#include <highgui.h>
-#include <rtabmap/core/CameraEvent.h>
+#include <rtabmap/core/Camera.h>
+#include <rtabmap/core/Sensor.h>
+#include <rtabmap/core/SensorimotorEvent.h>
+
+#include "PreferencesDialogROS.h"
 #include "rtabmap/ChangeCameraImgRate.h"
-#include "rtabmap/core/SMState.h"
 
 using namespace rtabmap;
 
-GuiWrapper::GuiWrapper(int & argc, char** argv) :
-	nbCommands_(2)
+GuiWrapper::GuiWrapper(int & argc, char** argv)
 {
 	ros::NodeHandle nh;
-	infoTopic_ = nh.subscribe("rtabmap/info", 1, &GuiWrapper::infoReceivedCallback, this);
+	infoTopic_ = nh.subscribe("rtabmap/infoEx", 1, &GuiWrapper::infoReceivedCallback, this);
 	velocity_sub_ = nh.subscribe("cmd_vel", 1, &GuiWrapper::velocityReceivedCallback, this);
 	app_ = new QApplication(argc, argv);
 	mainWindow_ = new MainWindow(new PreferencesDialogROS());
@@ -42,8 +48,6 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 
 	nh = ros::NodeHandle("~");
 	parametersUpdatedPub_ = nh.advertise<std_msgs::Empty>("parameters_updated", 1);
-	nh.param("nb_commands", nbCommands_, nbCommands_);
-	ROS_INFO("nb_commands=%d", nbCommands_);
 
 	UEventsManager::addHandler(this);
 	UEventsManager::addHandler(mainWindow_);
@@ -70,21 +74,28 @@ void GuiWrapper::infoReceivedCallback(const rtabmap::RtabmapInfoConstPtr & msg)
 	stat->setExtended(true); // Extended
 
 	stat->setRefImageId(msg->refId);
-	if(msg->infoEx.refImage.data.size() > 0)
+	std::list<Sensor> sensors;
+	for(unsigned int i=0; i<msg->infoEx.refRawData.size(); ++i)
 	{
-		// Decompress
-		const CvMat compressed = cvMat(1, msg->infoEx.refImage.data.size(), CV_8UC1, const_cast<unsigned char*>(&msg->infoEx.refImage.data[0]));
-		IplImage * decompressed = cvDecodeImage(&compressed, CV_LOAD_IMAGE_ANYCOLOR);
-		stat->setRefImage(&decompressed);
+		Sensor s(fromCvMatMsgToCvMat(msg->infoEx.refRawData[i].matrix), (Sensor::Type)msg->infoEx.refRawData[i].type);
+		if(s.data().total())
+		{
+			sensors.push_back(s);
+		}
 	}
+	stat->setRefRawData(sensors);
+
 	stat->setLoopClosureId(msg->loopClosureId);
-	if(msg->infoEx.loopClosureImage.data.size() > 0)
+	sensors.clear();
+	for(unsigned int i=0; i<msg->infoEx.loopRawData.size(); ++i)
 	{
-		// Decompress
-		const CvMat compressed = cvMat(1, msg->infoEx.loopClosureImage.data.size(), CV_8UC1, const_cast<unsigned char*>(&msg->infoEx.loopClosureImage.data[0]));
-		IplImage * decompressed = cvDecodeImage(&compressed, CV_LOAD_IMAGE_ANYCOLOR);
-		stat->setLoopClosureImage(&decompressed);
+		Sensor s(fromCvMatMsgToCvMat(msg->infoEx.loopRawData[i].matrix), (Sensor::Type)msg->infoEx.loopRawData[i].type);
+		if(s.data().total())
+		{
+			sensors.push_back(s);
+		}
 	}
+	stat->setLoopClosureRawData(sensors);
 
 	//Posterior, likelihood, childCount
 	std::map<int, float> mapIntFloat;
@@ -108,12 +119,11 @@ void GuiWrapper::infoReceivedCallback(const rtabmap::RtabmapInfoConstPtr & msg)
 
 	//SURF stuff...
 	std::multimap<int, cv::KeyPoint> mapIntKeypoint;
-	for(unsigned int i=0; i<msg->infoEx.refWordsKeys.size() && i<msg->infoEx.refWordsValues.size(); i++)
+	for(unsigned int i=0; i<msg->infoEx.refWordsKeys.size() && i<msg->infoEx.refWordsValues.size(); ++i)
 	{
 		cv::KeyPoint pt;
 		pt.angle = msg->infoEx.refWordsValues.at(i).angle;
 		pt.response = msg->infoEx.refWordsValues.at(i).response;
-		//pt.laplacian = msg->refWordsValues.at(i).laplacian;
 		pt.pt.x = msg->infoEx.refWordsValues.at(i).ptx;
 		pt.pt.y = msg->infoEx.refWordsValues.at(i).pty;
 		pt.size = msg->infoEx.refWordsValues.at(i).size;
@@ -121,12 +131,11 @@ void GuiWrapper::infoReceivedCallback(const rtabmap::RtabmapInfoConstPtr & msg)
 	}
 	stat->setRefWords(mapIntKeypoint);
 	mapIntKeypoint.clear();
-	for(unsigned int i=0; i<msg->infoEx.loopWordsKeys.size() && i<msg->infoEx.loopWordsValues.size(); i++)
+	for(unsigned int i=0; i<msg->infoEx.loopWordsKeys.size() && i<msg->infoEx.loopWordsValues.size(); ++i)
 	{
 		cv::KeyPoint pt;
 		pt.angle = msg->infoEx.loopWordsValues.at(i).angle;
 		pt.response = msg->infoEx.loopWordsValues.at(i).response;
-		//pt.laplacian = msg->loopWordsValues.at(i).laplacian;
 		pt.pt.x = msg->infoEx.loopWordsValues.at(i).ptx;
 		pt.pt.y = msg->infoEx.loopWordsValues.at(i).pty;
 		pt.size = msg->infoEx.loopWordsValues.at(i).size;
@@ -134,22 +143,17 @@ void GuiWrapper::infoReceivedCallback(const rtabmap::RtabmapInfoConstPtr & msg)
 	}
 	stat->setLoopWords(mapIntKeypoint);
 
-	//SM stuff
-	stat->setRefMotionMask(msg->infoEx.refMotionMask);
-	stat->setLoopMotionMask(msg->infoEx.loopMotionMask);
-
 	//Actions
-	std::list<std::vector<float> > actions;
-	for(unsigned int i=0; i<msg->actuators.size(); i+=msg->actuatorStep)
+	std::list<Actuator> actuators;
+	for(unsigned int i=0; i<msg->actuators.size(); ++i)
 	{
-		std::vector<float> a(msg->actuatorStep);
-		for(unsigned int j=0; j<a.size(); ++j)
+		Actuator a(fromCvMatMsgToCvMat(msg->actuators[i].matrix), (Actuator::Type)msg->actuators[i].type);
+		if(a.data().total())
 		{
-			a[j] = msg->actuators[i+j];
+			actuators.push_back(a);
 		}
-		actions.push_back(a);
 	}
-	stat->setActions(actions);
+	stat->setActuators(actuators);
 
 	// Statistics data
 	for(unsigned int i=0; i<msg->infoEx.statsKeys.size() && i<msg->infoEx.statsValues.size(); i++)
@@ -161,23 +165,19 @@ void GuiWrapper::infoReceivedCallback(const rtabmap::RtabmapInfoConstPtr & msg)
 	UEventsManager::post(new rtabmap::RtabmapEvent(&stat));
 }
 
-void GuiWrapper::velocityReceivedCallback(const geometry_msgs::TwistConstPtr & msg)
+void GuiWrapper::velocityReceivedCallback(const geometry_msgs::TwistStampedConstPtr & msg)
 {
-	std::vector<float> v(6);
-	v[0] = msg->linear.x;
-	v[1] = msg->linear.y;
-	v[2] = msg->linear.z;
-	v[3] = msg->angular.x;
-	v[4] = msg->angular.y;
-	v[5] = msg->angular.z;
+	cv::Mat data = cv::Mat(1, 6, CV_32F);
+	data.at<float>(0) = (float)msg->twist.linear.x;
+	data.at<float>(1) = (float)msg->twist.linear.y;
+	data.at<float>(2) = (float)msg->twist.linear.z;
+	data.at<float>(3) = (float)msg->twist.angular.x;
+	data.at<float>(4) = (float)msg->twist.angular.y;
+	data.at<float>(5) = (float)msg->twist.angular.z;
 
-	commands_.push_back(v);
-
-	if(commands_.size() == (unsigned int)nbCommands_)
-	{
-		this->post(new SMStateEvent(new SMState(cv::Mat(), commands_)));
-		commands_.clear();
-	}
+	std::list<Actuator> actuators;
+	actuators.push_back(Actuator(data, rtabmap::Actuator::kTypeTwist));
+	this->post(new rtabmap::SensorimotorEvent(std::list<Sensor>(), actuators));
 }
 
 void GuiWrapper::handleEvent(UEvent * anEvent)

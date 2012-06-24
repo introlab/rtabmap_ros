@@ -7,7 +7,7 @@
   <author>Mathieu Labbe</author>
   <license>GPL</license>  
   <review status="unreviewed" notes=""/>
-  <url>http://rtabmap-ros-pkg.googlecode.com</url>
+  <url>http://rtabmap.googlecode.com</url>
   <depend stack="common_msgs" /> <!-- sensor_msgs -->
   <depend stack="ros" />
   <depend stack="ros_comm" /> <!-- std_msgs, std_srvs, roscpp -->

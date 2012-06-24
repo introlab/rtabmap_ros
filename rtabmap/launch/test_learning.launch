@@ -1,0 +1,57 @@
+<launch>	
+	<!-- launch teleop with teleop_keyboard.launch -->
+	
+	<!-- args: "delete_db_on_start" and "udebug" -->
+	<node name="rtabmap" pkg="rtabmap" type="rtabmap" output="screen" args="--delete_db_on_start">
+		<remap from="/image" to="/image_not_used"/> <!-- Just to make sure that rtabmap does not subscribe 
+		                                                 to camera image, here we use sensorimotor input -->
+		<remap from="sensorimotor" to="sensorimotor" />
+		<remap from="rtabmap/info" to="rtabmap/info" />
+		<remap from="rtabmap/info_x" to="rtabmap/info_x" />
+	</node>
+	
+	<node name="rtabmap_out" pkg="rtabmap" type="rtabmap_out">
+		<remap from="rtabmap/cmd_vel" to="rtabmap/cmd_vel" />
+		<remap from="rtabmap/info" to="rtabmap/info" />
+		<remap from="rtabmap/info_x" to="rtabmap/info_x" />
+	</node>
+	
+	<!-- Arbitration -->
+	<!-- cmd_vel_a has priority on cmd_vel_b -->
+	<node name="abtr_velocity" pkg="rtabmap" type="abtr_velocity">
+	    <param name="commands_hz" value="10.0" type="double"/>
+	    <param name="cmd_vel_a_buffered" value="false" type="bool"/>
+	    <param name="cmd_vel_b_buffered" value="true" type="bool"/>
+	    <param name="stats_logged" value="false" type="bool"/>
+		<remap from="cmd_vel_a" to="user/cmd_vel" />
+		<remap from="cmd_vel_b" to="rtabmap/cmd_vel" />
+		<remap from="cmd_vel" to="cmd_vel" />
+	</node>
+
+	<!-- INPUT NODE -->
+	<node name="my_input_node" pkg="rtabmap" type="input_image_audio_twist_node">
+		<remap from="cmd_vel" to="cmd_vel"/>
+	</node>
+	
+	<!-- SENSORS -->
+	<!-- camera -->
+	<node name="camera" pkg="rtabmap" type="camera" output="screen">
+		<remap from="camera/image" to="image"/>
+		<param name="device_id" value="0" type="int"/>
+		<param name="image_hz" value="10.0" type="double"/>
+		<param name="image_width" value="80" type="int"/>
+		<param name="image_height" value="60" type="int"/>
+	</node>
+	
+	<!-- mic -->
+	<node name="my_audio_recorder" pkg="rtabmap" type="audio_recorder" output="screen">
+		<param name="device_id" value="0" type="int"/>
+		<param name="file_name" value="" type="string"/>     <!-- use the micro -->
+		<param name="frame_length" value="2400" type="int"/> <!-- Must match with image_hz of the camera 
+		                                                          (10 Hz at 24000 fs = 2400 samples / frame) -->
+		<param name="fs" value="24000" type="int"/>
+		<param name="sample_size" value="2" type="int"/>     <!-- 16bits/sample -->
+		<param name="channels" value="1" type="int"/>        <!-- mono -->
+	</node>
+
+</launch>

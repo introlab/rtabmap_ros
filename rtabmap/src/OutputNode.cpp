@@ -5,6 +5,7 @@
  */
 
 #include <ros/ros.h>
+#include <rtabmap/core/Actuator.h>
 #include "rtabmap/RtabmapInfo.h"
 #include "rtabmap/RtabmapInfoEx.h"
 #include <geometry_msgs/Twist.h>
@@ -14,32 +15,32 @@
 ros::Publisher rosPublisher;
 bool statsLogged = true;
 const char * statsFileName = "OuputStats.txt";
-int index2 = 1;
-
-void publishCommands(const std::vector<float> & commands, int commandSize)
-{
-	if(commandSize && commandSize%6 == 0)
-	{
-		unsigned int commandIndex = 0;
-		while(commandIndex < commands.size())
-		{
-			geometry_msgs::TwistPtr vel(new geometry_msgs::Twist());
-			vel->linear.x = commands[commandIndex++];
-			vel->linear.y = commands[commandIndex++];
-			vel->linear.z = commands[commandIndex++];
-			vel->angular.x = commands[commandIndex++];
-			vel->angular.y = commands[commandIndex++];
-			vel->angular.z = commands[commandIndex++];
-			UINFO("%d %f %f %f", index2, vel->linear.x, vel->linear.y, vel->angular.z);
-			rosPublisher.publish(vel);
-		}
-		++index2;
-	}
-}
 
 void infoReceivedCallback(const rtabmap::RtabmapInfoConstPtr & msg)
 {
-	publishCommands(msg->actuators, msg->actuatorStep);
+	for(unsigned int i=0; i<msg->actuators.size(); ++i)
+	{
+		if(msg->actuators[i].type == rtabmap::Actuator::kTypeTwist)
+		{
+			if((msg->actuators[i].matrix.dataType & CV_32F) && msg->actuators[i].matrix.data.size()/sizeof(float) == 6)
+			{
+				geometry_msgs::TwistPtr vel(new geometry_msgs::Twist());
+				float * twist = (float *)msg->actuators[i].matrix.data.data();
+				vel->linear.x = twist[0];
+				vel->linear.y = twist[1];
+				vel->linear.z = twist[2];
+				vel->angular.x = twist[3];
+				vel->angular.y = twist[4];
+				vel->angular.z = twist[5];
+				UINFO("%f %f %f", vel->linear.x, vel->linear.y, vel->angular.z);
+				rosPublisher.publish(vel);
+			}
+			else
+			{
+				ROS_ERROR("Twist format is wrong...");
+			}
+		}
+	}
 }
 
 int main(int argc, char** argv)

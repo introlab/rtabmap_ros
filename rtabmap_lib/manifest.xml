@@ -20,9 +20,10 @@
   <depend package="std_srvs"/>
   <depend package="utilite"/>
   
+  <rosdep name="libqt4-dev"/>
   <rosdep name="sqlite3"/>
-  <rosdep name="fftw3"/>
-  <rosdep name="opencv2.3"/>
+  <rosdep name="libsqlite3-dev"/>
+  <rosdep name="libfftw3-dev"/>
 
 </package>
 

@@ -1,0 +1,36 @@
+<launch>
+	
+	<!-- RTAB-MAP LOOP CLOSURE DETECTION VERSION : with sensorimotor memory type-->
+	<!-- WARNING : Database is automatically deleted on each startup -->
+	<!--           See "delete_db_on_start" option below... -->
+		
+	<!-- args: "delete_db_on_start" and "udebug" -->
+	<node name="rtabmap" pkg="rtabmap" type="rtabmap" output="screen" args="--delete_db_on_start">
+		<remap from="/image" to="/image_not_used"/> <!-- Just to make sure that rtabmap does not subscribe 
+		                                                 to camera image, here we use sensorimotor input -->
+	</node>
+	
+	<node name="rtabmap_gui" pkg="rtabmap" type="rtabmap_gui" output="screen"/>
+	
+	<node name="camera" pkg="rtabmap" type="camera" output="screen">
+		<remap from="/camera/image" to="/image"/>
+		<param name="device_id" value="0" type="int"/>
+		<param name="image_hz" value="5.0" type="double"/>
+		<param name="image_width" value="80" type="int"/>
+		<param name="image_height" value="60" type="int"/>
+	</node>
+	
+	<node name="my_audio_recorder" pkg="rtabmap" type="audio_recorder" output="screen">
+		<param name="device_id" value="0" type="int"/>
+		<param name="file_name" value="" type="string"/>     <!-- use the micro -->
+		<param name="frame_length" value="4800" type="int"/> <!-- Must match with image_hz of the camera 
+		                                                          (5 Hz at 24000 fs = 4800 samples / frame) -->
+		<param name="fs" value="24000" type="int"/>
+		<param name="sample_size" value="2" type="int"/>     <!-- 16bits/sample -->
+		<param name="channels" value="1" type="int"/>        <!-- mono -->
+	</node>
+	
+	<!-- This node will synchronize images and audio frames, and 
+	     transform them to a Sensorimotor topic used by RTAB-Map. -->
+	<node name="my_input_node" pkg="rtabmap" type="input_image_audio_node" />
+</launch>
