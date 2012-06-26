@@ -23,7 +23,7 @@ protected:
 	virtual QString getParamMessage();
 
 	virtual void readCameraSettings(const QString & filePath);
-	virtual void readCoreSettings(const QString & filePath);
+	virtual bool readCoreSettings(const QString & filePath);
 	virtual void writeSettings(const QString & filePath);
 };
 

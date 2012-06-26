@@ -25,7 +25,6 @@
 #include <rtabmap/core/SensorimotorEvent.h>
 
 #include "PreferencesDialogROS.h"
-#include "rtabmap/ChangeCameraImgRate.h"
 
 using namespace rtabmap;
 
@@ -44,7 +43,6 @@ GuiWrapper::GuiWrapper(int & argc, char** argv)
 	dumpMemoryClient_ = nh.serviceClient<std_srvs::Empty>("rtabmap/dumpMemory");
 	dumpPredictionClient_ = nh.serviceClient<std_srvs::Empty>("rtabmap/dumpPrediction");
 	deleteMemoryClient_ = nh.serviceClient<std_srvs::Empty>("rtabmap/deleteMemory");
-	changeCameraImgRateClient_ = nh.serviceClient<rtabmap::ChangeCameraImgRate>("camera/changeImgRate");
 
 	nh = ros::NodeHandle("~");
 	parametersUpdatedPub_ = nh.advertise<std_msgs::Empty>("parameters_updated", 1);

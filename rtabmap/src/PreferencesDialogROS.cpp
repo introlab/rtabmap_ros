@@ -29,10 +29,7 @@ PreferencesDialogROS::~PreferencesDialogROS()
 
 void PreferencesDialogROS::readCameraSettings(const QString & filePath)
 {
-	double imgRate = 0;
-	ros::NodeHandle nh;
-	nh.getParam("camera/image_hz", imgRate);
-	this->setInputRate(imgRate);
+	this->setInputRate(0);
 }
 
 QString PreferencesDialogROS::getParamMessage()
@@ -40,7 +37,7 @@ QString PreferencesDialogROS::getParamMessage()
 	return tr("Reading parameters from the ROS server...");
 }
 
-void PreferencesDialogROS::readCoreSettings(const QString & filePath)
+bool PreferencesDialogROS::readCoreSettings(const QString & filePath)
 {
 	if(filePath.isEmpty())
 	{
@@ -69,14 +66,16 @@ void PreferencesDialogROS::readCoreSettings(const QString & filePath)
 		else
 		{
 			validParameters = false;
-			QString warning = tr("Failed to get some RTAB-Map parameters from ROS server, the rtabmap/core_node may be not started or some parameters won't work...");
+			QString warning = tr("Failed to get some RTAB-Map parameters from ROS server, the rtabmap node may be not started or some parameters won't work...");
 			ROS_ERROR("%s", warning.toStdString().c_str());
 			QMessageBox::warning(this, tr("Can't read parameters from ROS server."), warning);
+			return false;
 		}
+		return true;
 	}
 	else
 	{
-		PreferencesDialog::readCoreSettings(filePath);
+		return PreferencesDialog::readCoreSettings(filePath);
 	}
 
 }
