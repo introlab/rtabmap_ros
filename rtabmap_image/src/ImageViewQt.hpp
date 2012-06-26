@@ -50,15 +50,17 @@ class ImageViewQt : public QWidget
 {
 	Q_OBJECT;
 public:
-	ImageViewQt(QWidget * parent = 0) : QWidget(parent)
+	ImageViewQt(QWidget * parent = 0) : QWidget(parent), showFrameRate_(true), lastTime_(0)
 	{
 		this->setMouseTracking(true);
+		time_.start();
 	}
 	~ImageViewQt() {}
 
 public slots:
 	void setImage(const QImage & image)
 	{
+		lastTime_ = time_.restart();
 		if(pixmap_.width() != image.width() || pixmap_.height() != image.height())
 		{
 			for(QMap<QPair<int,int>, RGBPlot*>::iterator iter = pixelMap_.begin(); iter!=pixelMap_.end();)
@@ -131,15 +133,22 @@ private slots:
 protected:
 	virtual void paintEvent(QPaintEvent *event)
 	{
+		QPainter painter(this);
 		if(!pixmap_.isNull())
 		{
+			painter.save();
 			//Scale
 			float ratio, offsetX, offsetY;
 			this->computeScaleOffsets(ratio, offsetX, offsetY);
-			QPainter painter(this);
 			painter.translate(offsetX, offsetY);
 			painter.scale(ratio, ratio);
 			painter.drawPixmap(QPoint(0,0), pixmap_);
+			painter.restore();
+		}
+		if(showFrameRate_ && lastTime_>0)
+		{
+			painter.setPen(QColor(Qt::green));
+			painter.drawText(2, painter.font().pointSize()+2 , QString("%1 Hz").arg(1000/lastTime_));
 		}
 	}
 
@@ -184,9 +193,12 @@ protected:
 			   pos.y()>=0 && pos.y()<pixmap_.height())
 			{
 				QMenu menu;
-				QAction * a = menu.addAction(tr("Plot pixel (%1,%2) variation").arg(pos.x()).arg(pos.y()));
-				QAction * b = menu.exec(event->globalPos());
-				if(b == a)
+				QAction * a_plot = menu.addAction(tr("Plot pixel (%1,%2) variation").arg(pos.x()).arg(pos.y()));
+				QAction * a_frameRate = menu.addAction(tr("Show frame rate"));
+				a_frameRate->setCheckable(true);
+				a_frameRate->setChecked(showFrameRate_);
+				QAction * action = menu.exec(event->globalPos());
+				if(action == a_plot)
 				{
 					if(!pixelMap_.contains(QPair<int,int>(pos.x(), pos.y())))
 					{
@@ -198,6 +210,10 @@ protected:
 						pixelMap_.insert(QPair<int,int>(pos.x(), pos.y()), plot);
 					}
 				}
+				else if(action == a_frameRate)
+				{
+					showFrameRate_ = action->isChecked();
+				}
 
 			}
 		}
@@ -206,6 +222,9 @@ protected:
 private:
 	QPixmap pixmap_;
 	QMap<QPair<int,int>, RGBPlot*> pixelMap_;
+	QTime time_;
+	bool showFrameRate_;
+	int lastTime_;
 };
 
 
