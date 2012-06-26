@@ -62,6 +62,10 @@ void imgReceivedCallback(const sensor_msgs::ImageConstPtr & msg)
 			img.image = motion;
 			rosPublisher.publish(img.toImageMsg());		
 		}
+		else
+		{
+			ROS_WARN("Image format should be 8bits - 3 channels");
+		}
 	}
 }
 

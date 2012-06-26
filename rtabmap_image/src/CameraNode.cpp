@@ -19,42 +19,31 @@
 #include <utilite/ULogger.h>
 #include <utilite/UEventsHandler.h>
 #include <utilite/UEventsManager.h>
+#include <utilite/UDirectory.h>
+#include <utilite/UFile.h>
 
 #include <dynamic_reconfigure/server.h>
 #include <rtabmap_image/cameraConfig.h>
 
-// See the launch file to change the camera values
-#define DEFAULT_DEVICE_ID 0
-#define DEFAULT_IMG_RATE 10.0 //Hz
-#define DEFAULT_IMG_WIDTH 640
-#define DEFAULT_IMG_HEIGHT 480
-
-namespace rtabmap
-{
-	class Camera;
-	class CamPostTreatment;
-}
-
-class CameraVideoWrapper : public UEventsHandler
+class CameraWrapper : public UEventsHandler
 {
 public:
 	// Usb device like a Webcam
-	CameraVideoWrapper(int usbDevice = 0,
-						float imageRate = 0,
-						unsigned int imageWidth = 0,
-						unsigned int imageHeight = 0)
+	CameraWrapper(int usbDevice = 0,
+			      float imageRate = 0,
+				  unsigned int imageWidth = 0,
+				  unsigned int imageHeight = 0) :
+		camera_(0)
 	{
 		ros::NodeHandle nh("~");
 		image_transport::ImageTransport it(nh);
 		rosPublisher_ = it.advertise("image", 1);
-		startSrv_ = nh.advertiseService("start", &CameraVideoWrapper::startSrv, this);
-		stopSrv_ = nh.advertiseService("stop", &CameraVideoWrapper::stopSrv, this);
+		startSrv_ = nh.advertiseService("start", &CameraWrapper::startSrv, this);
+		stopSrv_ = nh.advertiseService("stop", &CameraWrapper::stopSrv, this);
 		UEventsManager::addHandler(this);
-
-		camera_ = new rtabmap::CameraVideo(usbDevice, imageRate, false, imageWidth, imageHeight);
 	}
 
-	virtual ~CameraVideoWrapper()
+	virtual ~CameraWrapper()
 	{
 		if(camera_)
 		{
@@ -80,8 +69,6 @@ public:
 		}
 	}
 
-	void updateParameters();
-
 	bool startSrv(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 	{
 		ROS_INFO("Camera started...");
@@ -102,37 +89,114 @@ public:
 		return true;
 	}
 
-	void setParameters(int deviceId, double frameRate, int width, int height)
+	void setParameters(int deviceId, double frameRate, int width, int height, const std::string & path, bool autoRestart)
 	{
 		if(camera_)
 		{
-			if(deviceId!=camera_->getUsbDevice() || width!=(int)camera_->getImageWidth() || height!=(int)camera_->getImageHeight())
+			rtabmap::CameraVideo * videoCam = dynamic_cast<rtabmap::CameraVideo *>(camera_);
+			rtabmap::CameraImages * imagesCam = dynamic_cast<rtabmap::CameraImages *>(camera_);
+
+			if(imagesCam)
 			{
-				//restart required
-				camera_->join(true);
-				delete camera_;
-				camera_ = new rtabmap::CameraVideo(deviceId, frameRate, false, width, height);
-				init();
-				start();
+				// images
+				if(!path.empty() && path.compare(imagesCam->getPath()) == 0)
+				{
+					imagesCam->setImageRate(frameRate);
+					imagesCam->setImageSize(width, height);
+					imagesCam->setAutoRestart(autoRestart);
+				}
+				else
+				{
+					delete camera_;
+					camera_ = 0;
+				}
+			}
+			else if(videoCam)
+			{
+				if(!path.empty() && path.compare(videoCam->getFilePath()) == 0)
+				{
+					// video
+					videoCam->setImageRate(frameRate);
+					videoCam->setImageSize(width, height);
+					videoCam->setAutoRestart(autoRestart);
+				}
+				else if(path.empty() &&
+						videoCam->getFilePath().empty() &&
+						videoCam->getUsbDevice() == deviceId)
+				{
+					// usb device
+					unsigned int w;
+					unsigned int h;
+					videoCam->getImageSize(w, h);
+					if((int)w == width && (int)h == height)
+					{
+						videoCam->setImageRate(frameRate);
+						videoCam->setAutoRestart(autoRestart);
+					}
+					else
+					{
+						delete camera_;
+						camera_ = 0;
+					}
+				}
+				else
+				{
+					delete camera_;
+					camera_ = 0;
+				}
 			}
 			else
 			{
-				camera_->setImageRate(frameRate);
+				ROS_ERROR("Wrong camera type ?!?");
+				delete camera_;
+				camera_ = 0;
 			}
+		}
+
+		if(!camera_)
+		{
+			if(!path.empty() && UDirectory::exists(path))
+			{
+				//images
+				camera_ = new rtabmap::CameraImages(path, 1, false, frameRate, autoRestart, width, height);
+			}
+			else if(!path.empty() && UFile::exists(path))
+			{
+				//video
+				camera_ = new rtabmap::CameraVideo(path, frameRate, autoRestart, width, height);
+			}
+			else
+			{
+				if(!path.empty() && !UDirectory::exists(path) && !UFile::exists(path))
+				{
+					ROS_ERROR("Path \"%s\" does not exist (or you don't have the permissions to read)... falling back to usb device...", path.c_str());
+				}
+				//usb device
+				camera_ = new rtabmap::CameraVideo(deviceId, frameRate, autoRestart, width, height);
+			}
+			init();
+			start();
 		}
 	}
 
 protected:
-	virtual void handleEvent(UEvent * anEvent)
+	virtual void handleEvent(UEvent * event)
 	{
-		if(anEvent->getClassName().compare("CameraEvent") == 0)
+		if(event->getClassName().compare("CameraEvent") == 0)
 		{
-			rtabmap::CameraEvent * e = (rtabmap::CameraEvent*)anEvent;
+			rtabmap::CameraEvent * e = (rtabmap::CameraEvent*)event;
 			const cv::Mat & image = e->image();
-			if(!image.empty())
+			if(!image.empty() && image.depth() == CV_8U)
 			{
 				cv_bridge::CvImage img;
-				img.encoding = sensor_msgs::image_encodings::BGR8;
+				if(image.channels() == 1)
+				{
+					img.encoding = sensor_msgs::image_encodings::MONO8;
+				}
+				else
+				{
+					img.encoding = sensor_msgs::image_encodings::BGR8;
+				}
 				img.image = image;
 				sensor_msgs::ImagePtr rosMsg = img.toImageMsg();
 				rosMsg->header.frame_id = "camera";
@@ -140,21 +204,33 @@ protected:
 				rosPublisher_.publish(rosMsg);
 			}
 		}
+		else if(event->getClassName().compare("ULogEvent") == 0)
+		{
+			ULogEvent * e = (ULogEvent*)event;
+			if(e->getCode() == ULogger::kWarning)
+			{
+				ROS_WARN("%s", e->getMsg().c_str());
+			}
+			else if(e->getCode() >= ULogger::kError)
+			{
+				ROS_ERROR("%s", e->getMsg().c_str());
+			}
+		}
 	}
 
 private:
 	image_transport::Publisher rosPublisher_;
-	rtabmap::CameraVideo * camera_;
+	rtabmap::Camera * camera_;
 	ros::ServiceServer startSrv_;
 	ros::ServiceServer stopSrv_;
 };
 
-CameraVideoWrapper * camera = 0;
+CameraWrapper * camera = 0;
 void callback(rtabmap_image::cameraConfig &config, uint32_t level)
 {
 	if(camera)
 	{
-		camera->setParameters(config.device_id, config.frame_rate, config.width, config.height);
+		camera->setParameters(config.device_id, config.frame_rate, config.width, config.height, config.video_or_images_path, config.auto_restart);
 	}
 }
 
@@ -162,36 +238,20 @@ int main(int argc, char** argv)
 {
 	ULogger::setType(ULogger::kTypeConsole);
 	//ULogger::setLevel(ULogger::kDebug);
+	ULogger::setEventLevel(ULogger::kWarning);
 
 	ros::init(argc, argv, "camera");
 
 	ros::NodeHandle nh("~");
 
-	int deviceId = DEFAULT_DEVICE_ID;
-	double imgRate = DEFAULT_IMG_RATE;
-	int imgWidth = DEFAULT_IMG_WIDTH;
-	int imgHeight = DEFAULT_IMG_HEIGHT;
+	camera = new CameraWrapper(); // webcam device 0
 
-	camera = new CameraVideoWrapper(deviceId, float(imgRate), imgWidth, imgHeight); // webcam device 0
+	dynamic_reconfigure::Server<rtabmap_image::cameraConfig> server;
+	dynamic_reconfigure::Server<rtabmap_image::cameraConfig>::CallbackType f;
+	f = boost::bind(&callback, _1, _2);
+	server.setCallback(f);
 
-	if(!camera || (camera && !camera->init()))
-	{
-		ROS_ERROR("Cannot initiate the camera. Verify if OpenCV is built with ffmpeg support.");
-	}
-	else
-	{
-		// Start the camera
-		camera->start();
-		ROS_INFO("Camera started...");
-
-
-		dynamic_reconfigure::Server<rtabmap_image::cameraConfig> server;
-		dynamic_reconfigure::Server<rtabmap_image::cameraConfig>::CallbackType f;
-		f = boost::bind(&callback, _1, _2);
-		server.setCallback(f);
-
-		ros::spin();
-	}
+	ros::spin();
 
 	//cleanup
 	if(camera)

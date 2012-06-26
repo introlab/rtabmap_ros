@@ -8,6 +8,7 @@
 #include <ros/ros.h>
 #include <cv_bridge/cv_bridge.h>
 #include <image_transport/image_transport.h>
+#include <sensor_msgs/image_encodings.h>
 
 #include <opencv2/highgui/highgui.hpp>
 
@@ -26,29 +27,32 @@ int i = 0;
 QImage cvtCvMat2QImage(const cv::Mat & image, bool isBgr = true)
 {
 	QImage qtemp;
-	if(!image.empty() && image.depth() == CV_8U)
+	if(!image.empty() && image.depth() == CV_8U && image.channels()==3)
 	{
 		const unsigned char * data = image.data;
-		qtemp = QImage(image.cols, image.rows, QImage::Format_RGB32);
-		for(int y = 0; y < image.rows; ++y, data += image.cols*image.elemSize())
+		if(image.channels() == 3)
 		{
-			for(int x = 0; x < image.cols; ++x)
+			qtemp = QImage(image.cols, image.rows, QImage::Format_RGB32);
+			for(int y = 0; y < image.rows; ++y, data += image.cols*image.elemSize())
 			{
-				QRgb * p = ((QRgb*)qtemp.scanLine (y)) + x;
-				if(isBgr)
+				for(int x = 0; x < image.cols; ++x)
 				{
-					*p = qRgb(data[x * image.channels()+2], data[x * image.channels()+1], data[x * image.channels()]);
-				}
-				else
-				{
-					*p = qRgb(data[x * image.channels()], data[x * image.channels()+1], data[x * image.channels()+2]);
+					QRgb * p = ((QRgb*)qtemp.scanLine (y)) + x;
+					if(isBgr)
+					{
+						*p = qRgb(data[x * image.channels()+2], data[x * image.channels()+1], data[x * image.channels()]);
+					}
+					else
+					{
+						*p = qRgb(data[x * image.channels()], data[x * image.channels()+1], data[x * image.channels()+2]);
+					}
 				}
 			}
 		}
 	}
 	else if(!image.empty() && image.depth() != CV_8U)
 	{
-		printf("Wrong image format, must be 8_bits\n");
+		printf("Wrong image format, must be 8_bits, 3 channels\n");
 	}
 	return qtemp;
 }
@@ -85,12 +89,17 @@ void imgReceivedCallback(const sensor_msgs::ImageConstPtr & msg)
 		}
 		else if(view && view->isVisible())
 		{
-			if(ptr->encoding.compare("bgr8") == 0)
+			if(ptr->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0)
+			{
+				// Process image in Qt thread...
+				QMetaObject::invokeMethod(view, "setImage", Q_ARG(const QImage &, QImage(ptr->image.data, ptr->image.cols, ptr->image.rows, ptr->image.cols, QImage::Format_Indexed8).copy()));
+			}
+			else if(ptr->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0)
 			{
 				// Process image in Qt thread...
 				QMetaObject::invokeMethod(view, "setImage", Q_ARG(const QImage &, cvtCvMat2QImage(ptr->image)));
 			}
-			else if(ptr->encoding.compare("rgb8") == 0)
+			else if(ptr->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0)
 			{
 				// Process image in Qt thread...
 				QMetaObject::invokeMethod(view, "setImage", Q_ARG(const QImage &, cvtCvMat2QImage(ptr->image, false)));
