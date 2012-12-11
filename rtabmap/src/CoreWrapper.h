@@ -18,7 +18,6 @@
 #include <sensor_msgs/Image.h>
 #include <geometry_msgs/Twist.h>
 #include <image_transport/image_transport.h>
-#include "rtabmap/Sensorimotor.h"
 
 namespace rtabmap
 {
@@ -34,7 +33,6 @@ public:
 	void start();
 
 private:
-	void sensorimotorReceivedCallback(const rtabmap::SensorimotorConstPtr & msg);
 	void imageReceivedCallback(const sensor_msgs::ImageConstPtr & msg);
 	void twistCallback(const geometry_msgs::TwistConstPtr & msg);
 	void parametersUpdatedCallback(const std_msgs::EmptyConstPtr & msg);
@@ -51,7 +49,6 @@ private:
 
 private:
 	rtabmap::Rtabmap * rtabmap_;
-	ros::Subscriber sensorimotorTopic_;
 	image_transport::Subscriber imageTopic_;
 	ros::Subscriber audioFrameFreqSqrdMagnTopic_;
 	ros::Subscriber twistTopic_;

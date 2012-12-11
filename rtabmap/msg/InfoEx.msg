@@ -1,13 +1,12 @@
 
 ########################################
-# Statistics stuff: 
-# These fields are empty if RTAb-Map's 
-# parameter publishStats=false
+# Extended info msg with statistics 
 ########################################
 
 Header header
 
-int32 refChild
+int32 refId
+int32 loopClosureId
 
 # std::map<int, float> posterior;
 int32[] posteriorKeys
@@ -25,8 +24,8 @@ int32[] weightsValues
 string[] statsKeys
 float32[] statsValues
 
-rtabmap/SensorMsg[] refRawData
-rtabmap/SensorMsg[] loopRawData
+sensor_msgs/Image refImage
+sensor_msgs/Image loopImage
 
 #
 # For features2d : std::multimap<int, cv::Keypoint> words

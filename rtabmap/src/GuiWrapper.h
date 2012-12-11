@@ -9,8 +9,7 @@
 #define GUIWRAPPER_H_
 
 #include <ros/ros.h>
-#include "rtabmap/RtabmapInfo.h"
-#include "rtabmap/RtabmapInfoEx.h"
+#include "rtabmap/InfoEx.h"
 #include "utilite/UEventsHandler.h"
 #include <geometry_msgs/TwistStamped.h>
 
@@ -33,12 +32,10 @@ protected:
 	virtual void handleEvent(UEvent * anEvent);
 
 private:
-	void infoReceivedCallback(const rtabmap::RtabmapInfoConstPtr & infoMsg);
-	void velocityReceivedCallback(const geometry_msgs::TwistStampedConstPtr & msg);
+	void infoExReceivedCallback(const rtabmap::InfoExConstPtr & infoMsg);
 
 private:
-	ros::Subscriber infoTopic_;
-	ros::Subscriber velocity_sub_;
+	ros::Subscriber infoExTopic_;
 	QApplication * app_;
 	rtabmap::MainWindow * mainWindow_;
 

@@ -1,9 +1,0 @@
-<launch>
-	<!-- Nodes -->
-	<node name="camera" pkg="rtabmap" type="camera" output="screen">
-		<param name="device_id" value="0" type="int"/>
-		<param name="image_hz" value="0" type="double"/>
-		<param name="image_width" value="640" type="int"/>
-		<param name="image_height" value="480" type="int"/>
-	</node>
-</launch>

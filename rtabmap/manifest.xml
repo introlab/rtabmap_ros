@@ -17,9 +17,7 @@
   <depend package="turtlesim"/>
   <depend package="tf"/>
   <depend package="rtabmap_lib"/>
-  <depend package="rtabmap_audio"/>
-  <depend package="rtabmap_image"/>
-
+  <depend package="cv_bridge"/>
 </package>
 
 

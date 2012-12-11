@@ -23,7 +23,7 @@
   <rosdep name="libqt4-dev"/>
   <rosdep name="sqlite3"/>
   <rosdep name="libsqlite3-dev"/>
-  <rosdep name="libfftw3-dev"/>
+  <rosdep name="libfftw3"/>
 
 </package>
 
