@@ -18,6 +18,7 @@
   <depend package="tf"/>
   <depend package="rtabmap_lib"/>
   <depend package="cv_bridge"/>
+  <depend package="uimage"/> <!-- from utilite stack -->
 </package>
 
 
