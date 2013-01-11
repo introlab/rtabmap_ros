@@ -34,14 +34,9 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	infoPubEx_ = nh.advertise<rtabmap::InfoEx>("infoEx", 1);
 	parametersLoadedPub_ = nh.advertise<std_msgs::Empty>("parameters_loaded", 1);
 
-	rtabmap_ = new Rtabmap();
+	rtabmap_ = new Rtabmap(Parameters::defaultRtabmapWorkingDirectory(), deleteDbOnStart);
 	UEventsManager::addHandler(rtabmap_);
-	loadNodeParameters(rtabmap_->getIniFilePath());
-
-	if(deleteDbOnStart)
-	{
-		this->post(new RtabmapEventCmd(RtabmapEventCmd::kCmdDeleteMemory));
-	}
+	loadNodeParameters(UDirectory::homeDir()+"/.rtabmap/rtabmap.ini");
 
 	rtabmap_->init();
 
@@ -61,7 +56,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 
 CoreWrapper::~CoreWrapper()
 {
-	this->saveNodeParameters(rtabmap_->getIniFilePath());
+	this->saveNodeParameters(UDirectory::homeDir()+"/.rtabmap/rtabmap.ini");
 	delete rtabmap_;
 }
 
