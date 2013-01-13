@@ -34,11 +34,11 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	infoPubEx_ = nh.advertise<rtabmap::InfoEx>("infoEx", 1);
 	parametersLoadedPub_ = nh.advertise<std_msgs::Empty>("parameters_loaded", 1);
 
-	rtabmap_ = new Rtabmap(Parameters::defaultRtabmapWorkingDirectory(), deleteDbOnStart);
+	rtabmap_ = new Rtabmap();
 	UEventsManager::addHandler(rtabmap_);
 	loadNodeParameters(UDirectory::homeDir()+"/.rtabmap/rtabmap.ini");
 
-	rtabmap_->init();
+	rtabmap_->init(UDirectory::homeDir()+"/.rtabmap/rtabmap.ini", deleteDbOnStart);
 
 	resetMemorySrv_ = nh.advertiseService("resetMemory", &CoreWrapper::resetMemoryCallback, this);
 	dumpMemorySrv_ = nh.advertiseService("dumpMemory", &CoreWrapper::dumpMemoryCallback, this);
@@ -70,7 +70,7 @@ void CoreWrapper::loadNodeParameters(const std::string & configFile)
 	ROS_INFO("Loading parameters from %s", configFile.c_str());
 	if(!UFile::exists(configFile.c_str()))
 	{
-		ROS_WARN("Config file doesn't exist!");
+		ROS_WARN("Config file doesn't exist! It will be generated...");
 	}
 
 	ParametersMap parameters = Parameters::getDefaultParameters();
