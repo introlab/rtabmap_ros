@@ -60,7 +60,7 @@ int GuiWrapper::exec()
 
 void GuiWrapper::infoExReceivedCallback(const rtabmap::InfoExConstPtr & msg)
 {
-	ROS_INFO("RTAB-Map info ex received!");
+	//ROS_INFO("RTAB-Map info ex received!");
 
 	// Map from ROS struct to rtabmap struct
 	rtabmap::Statistics * stat = new rtabmap::Statistics();
@@ -131,7 +131,7 @@ void GuiWrapper::infoExReceivedCallback(const rtabmap::InfoExConstPtr & msg)
 		stat->addStatistic(msg->statsKeys.at(i), msg->statsValues.at(i));
 	}
 
-	ROS_INFO("Publishing statistics...");
+	//ROS_INFO("Publishing statistics...");
 	UEventsManager::post(new rtabmap::RtabmapEvent(&stat));
 }
 

@@ -31,7 +31,6 @@ int main(int argc, char** argv)
 	}
 
 	CoreWrapper rtabmap(deleteDbOnStart);
-	rtabmap.start();
 
 	ROS_INFO("RTAB-Map started...");
 	ros::spin();

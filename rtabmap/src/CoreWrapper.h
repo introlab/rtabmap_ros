@@ -30,8 +30,6 @@ public:
 	CoreWrapper(bool deleteDbOnStart = false);
 	virtual ~CoreWrapper();
 
-	void start();
-
 private:
 	void imageReceivedCallback(const sensor_msgs::ImageConstPtr & msg);
 	void twistCallback(const geometry_msgs::TwistConstPtr & msg);

@@ -35,7 +35,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	parametersLoadedPub_ = nh.advertise<std_msgs::Empty>("parameters_loaded", 1);
 
 	rtabmap_ = new Rtabmap();
-	UEventsManager::addHandler(rtabmap_);
+
 	loadNodeParameters(UDirectory::homeDir()+"/.rtabmap/rtabmap.ini");
 
 	rtabmap_->init(UDirectory::homeDir()+"/.rtabmap/rtabmap.ini", deleteDbOnStart);
@@ -60,11 +60,6 @@ CoreWrapper::~CoreWrapper()
 	delete rtabmap_;
 }
 
-void CoreWrapper::start()
-{
-	rtabmap_->start();
-}
-
 void CoreWrapper::loadNodeParameters(const std::string & configFile)
 {
 	ROS_INFO("Loading parameters from %s", configFile.c_str());
@@ -86,11 +81,11 @@ void CoreWrapper::loadNodeParameters(const std::string & configFile)
 
 void CoreWrapper::saveNodeParameters(const std::string & configFile)
 {
-	ROS_INFO("Saving parameters to %s", configFile.c_str());
+	printf("Saving parameters to %s\n", configFile.c_str());
 
 	if(!UFile::exists(configFile.c_str()))
 	{
-		ROS_WARN("Config file doesn't exist, a new one will be created.");
+		printf("Config file doesn't exist, a new one will be created.\n");
 	}
 
 	ParametersMap parameters = Parameters::getDefaultParameters();
@@ -106,41 +101,41 @@ void CoreWrapper::saveNodeParameters(const std::string & configFile)
 
 	Rtabmap::writeParameters(configFile.c_str(), parameters);
 
-	std::string databasePath = parameters.at(Parameters::kRtabmapWorkingDirectory())+"/LTM.db";
-	ROS_INFO("Database/long-term memory (%lu MB) is located at %s/LTM.db", UFile::length(databasePath)/1000000, databasePath.c_str());
+	std::string databasePath = parameters.at(Parameters::kRtabmapWorkingDirectory())+"LTM.db";
+	printf("Saving database/long-term memory... (located at %s)\n", databasePath.c_str());
 }
 
 void CoreWrapper::imageReceivedCallback(const sensor_msgs::ImageConstPtr & msg)
 {
 	if(msg->data.size())
 	{
-		ROS_INFO("Received image.");
+		//ROS_INFO("Received image.");
 		cv_bridge::CvImageConstPtr ptr = cv_bridge::toCvShare(msg);
-		UEventsManager::post(new CameraEvent(ptr->image.clone()));
+		rtabmap_->process(ptr->image.clone());
 	}
 }
 
 bool CoreWrapper::resetMemoryCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
-	UEventsManager::post(new RtabmapEventCmd(RtabmapEventCmd::kCmdResetMemory));
+	rtabmap_->resetMemory();
 	return true;
 }
 
 bool CoreWrapper::dumpMemoryCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
-	UEventsManager::post(new RtabmapEventCmd(RtabmapEventCmd::kCmdDumpMemory));
+	rtabmap_->dumpData();
 	return true;
 }
 
 bool CoreWrapper::deleteMemoryCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
-	UEventsManager::post(new RtabmapEventCmd(RtabmapEventCmd::kCmdDeleteMemory));
+	rtabmap_->resetMemory(true);
 	return true;
 }
 
 bool CoreWrapper::dumpPredictionCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
-	UEventsManager::post(new RtabmapEventCmd(RtabmapEventCmd::kCmdDumpPrediction));
+	rtabmap_->dumpPrediction();
 	return true;
 }
 
@@ -157,7 +152,7 @@ void CoreWrapper::parametersUpdatedCallback(const std_msgs::EmptyConstPtr & msg)
 		}
 	}
 	ROS_INFO("Updating parameters");
-	UEventsManager::post(new ParamEvent(parameters));
+	rtabmap_->updateParameters(parameters);
 }
 
 void CoreWrapper::handleEvent(UEvent * anEvent)
@@ -171,7 +166,7 @@ void CoreWrapper::handleEvent(UEvent * anEvent)
 
 			if(infoPub_.getNumSubscribers())
 			{
-				ROS_INFO("Sending RtabmapInfo msg (last_id=%d)...", stat.refImageId());
+				//ROS_INFO("Sending RtabmapInfo msg (last_id=%d)...", stat.refImageId());
 				rtabmap::InfoPtr msg(new rtabmap::Info);
 				msg->refId = stat.refImageId();
 				msg->loopClosureId = stat.loopClosureId();
@@ -180,7 +175,7 @@ void CoreWrapper::handleEvent(UEvent * anEvent)
 
 			if(infoPubEx_.getNumSubscribers())
 			{
-				ROS_INFO("Sending infoEx msg (last_id=%d)...", stat.refImageId());
+				//ROS_INFO("Sending infoEx msg (last_id=%d)...", stat.refImageId());
 				rtabmap::InfoExPtr msg(new rtabmap::InfoEx);
 				msg->refId = stat.refImageId();
 				msg->loopClosureId = stat.loopClosureId();
