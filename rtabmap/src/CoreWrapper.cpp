@@ -111,7 +111,7 @@ void CoreWrapper::imageReceivedCallback(const sensor_msgs::ImageConstPtr & msg)
 	{
 		//ROS_INFO("Received image.");
 		cv_bridge::CvImageConstPtr ptr = cv_bridge::toCvShare(msg);
-		rtabmap_->process(ptr->image.clone());
+		rtabmap_->process(ptr->image.clone(), ptr->header.seq);
 	}
 }
 
