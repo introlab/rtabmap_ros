@@ -44,6 +44,7 @@ bool PreferencesDialogROS::readCoreSettings(const QString & filePath)
 		ros::NodeHandle nh("rtabmap");
 		ROS_INFO("%s", this->getParamMessage().toStdString().c_str());
 		bool validParameters = true;
+		int readCount = 0;
 		rtabmap::ParametersMap parameters = rtabmap::Parameters::getDefaultParameters();
 		for(rtabmap::ParametersMap::iterator i=parameters.begin(); i!=parameters.end(); ++i)
 		{
@@ -51,13 +52,15 @@ bool PreferencesDialogROS::readCoreSettings(const QString & filePath)
 			if(nh.getParam((*i).first,value))
 			{
 				PreferencesDialog::setParameter((*i).first, value);
+				++readCount;
 			}
 			else
 			{
 				validParameters = false;
-				break;
 			}
 		}
+
+		ROS_INFO("Parameters read = %d", readCount);
 
 		if(validParameters)
 		{
@@ -65,7 +68,6 @@ bool PreferencesDialogROS::readCoreSettings(const QString & filePath)
 		}
 		else
 		{
-			validParameters = false;
 			if(this->isVisible())
 			{
 				QString warning = tr("Failed to get some RTAB-Map parameters from ROS server, the rtabmap node may be not started or some parameters won't work...");
@@ -94,7 +96,6 @@ void PreferencesDialogROS::writeSettings(const QString & filePath)
 	if(_parameters.size())
 	{
 		emit settingsChanged(_parameters);
-
 	}
 
 	if(_obsoletePanels)
