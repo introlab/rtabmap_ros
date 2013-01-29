@@ -16,8 +16,10 @@ using namespace rtabmap;
 class PreferencesDialogROS : public PreferencesDialog
 {
 public:
-	PreferencesDialogROS();
+	PreferencesDialogROS(const QString & configFile);
 	virtual ~PreferencesDialogROS();
+
+	virtual QString getIniFilePath();
 
 protected:
 	virtual QString getParamMessage();
@@ -25,6 +27,9 @@ protected:
 	virtual void readCameraSettings(const QString & filePath);
 	virtual bool readCoreSettings(const QString & filePath);
 	virtual void writeSettings(const QString & filePath);
+
+private:
+	QString configFile_;
 };
 
 #endif /* PREFERENCESDIALOGROS_H_ */

@@ -18,13 +18,24 @@
 
 using namespace rtabmap;
 
-PreferencesDialogROS::PreferencesDialogROS()
+PreferencesDialogROS::PreferencesDialogROS(const QString & configFile) :
+		configFile_(configFile)
 {
+
 }
 
 PreferencesDialogROS::~PreferencesDialogROS()
 {
 
+}
+
+QString PreferencesDialogROS::getIniFilePath()
+{
+	if(configFile_.isEmpty())
+	{
+		return PreferencesDialog::getIniFilePath();
+	}
+	return configFile_;
 }
 
 void PreferencesDialogROS::readCameraSettings(const QString & filePath)

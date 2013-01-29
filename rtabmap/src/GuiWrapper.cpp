@@ -30,7 +30,22 @@ GuiWrapper::GuiWrapper(int & argc, char** argv)
 	ros::NodeHandle nh;
 	infoExTopic_ = nh.subscribe("rtabmap/infoEx", 1, &GuiWrapper::infoExReceivedCallback, this);
 	app_ = new QApplication(argc, argv);
-	mainWindow_ = new MainWindow(new PreferencesDialogROS());
+
+	QString configFile;
+	for(int i=1; i<argc; ++i)
+	{
+		if(strcmp(argv[i], "-d") == 0)
+		{
+			++i;
+			if(i < argc)
+			{
+				configFile = argv[i];
+			}
+			break;
+		}
+	}
+
+	mainWindow_ = new MainWindow(new PreferencesDialogROS(configFile));
 	mainWindow_->show();
 	mainWindow_->changeState(MainWindow::kMonitoring);
 	app_->connect( app_, SIGNAL( lastWindowClosed() ), app_, SLOT( quit() ) );
