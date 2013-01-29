@@ -7,7 +7,7 @@
 	<!-- args: "delete_db_on_start" and "udebug" -->
 	<node name="rtabmap" pkg="rtabmap" type="rtabmap" output="screen" args="--delete_db_on_start"/>
 	
-	<node name="rtabmap_gui" pkg="rtabmap" type="rtabmap_gui" output="screen"/>
+	<node name="rtabmapviz" pkg="rtabmap" type="rtabmapviz" output="screen"/>
 	
 	<!-- When parameter video_or_images_path is set, the camera uses the directory of images or the video file -->
 	<node name="camera" pkg="uimage" type="camera" output="screen">
