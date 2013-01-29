@@ -223,6 +223,8 @@ void CoreWrapper::handleEvent(UEvent * anEvent)
 					msg->posteriorValues = uValues(stat.posterior());
 					msg->likelihoodKeys = uKeys(stat.likelihood());
 					msg->likelihoodValues = uValues(stat.likelihood());
+					msg->rawLikelihoodKeys = uKeys(stat.rawLikelihood());
+					msg->rawLikelihoodValues = uValues(stat.rawLikelihood());
 					msg->weightsKeys = uKeys(stat.weights());
 					msg->weightsValues = uValues(stat.weights());
 

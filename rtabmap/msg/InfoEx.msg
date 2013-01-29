@@ -16,6 +16,10 @@ float32[] posteriorValues
 int32[] likelihoodKeys
 float32[] likelihoodValues
 
+# std::map<int, float> rawLikelihood;
+int32[] rawLikelihoodKeys
+float32[] rawLikelihoodValues
+
 # std::map<int, int> weights;
 int32[] weightsKeys
 int32[] weightsValues

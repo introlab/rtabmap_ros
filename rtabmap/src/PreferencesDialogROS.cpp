@@ -66,9 +66,12 @@ bool PreferencesDialogROS::readCoreSettings(const QString & filePath)
 		else
 		{
 			validParameters = false;
-			QString warning = tr("Failed to get some RTAB-Map parameters from ROS server, the rtabmap node may be not started or some parameters won't work...");
-			ROS_ERROR("%s", warning.toStdString().c_str());
-			QMessageBox::warning(this, tr("Can't read parameters from ROS server."), warning);
+			if(this->isVisible())
+			{
+				QString warning = tr("Failed to get some RTAB-Map parameters from ROS server, the rtabmap node may be not started or some parameters won't work...");
+				ROS_WARN("%s", warning.toStdString().c_str());
+				QMessageBox::warning(this, tr("Can't read parameters from ROS server."), warning);
+			}
 			return false;
 		}
 		return true;

@@ -63,20 +63,20 @@ void GuiWrapper::infoExReceivedCallback(const rtabmap::InfoExConstPtr & msg)
 	//ROS_INFO("RTAB-Map info ex received!");
 
 	// Map from ROS struct to rtabmap struct
-	rtabmap::Statistics * stat = new rtabmap::Statistics();
+	rtabmap::Statistics stat;
 
-	stat->setExtended(true); // Extended
+	stat.setExtended(true); // Extended
 
-	stat->setRefImageId(msg->refId);
-	stat->setLoopClosureId(msg->loopClosureId);
+	stat.setRefImageId(msg->refId);
+	stat.setLoopClosureId(msg->loopClosureId);
 
 	if(msg->refImage.data.size())
 	{
-		stat->setRefImage(cv_bridge::toCvShare(msg->refImage, msg)->image.clone());
+		stat.setRefImage(cv_bridge::toCvShare(msg->refImage, msg)->image.clone());
 	}
 	if(msg->loopImage.data.size())
 	{
-		stat->setLoopImage(cv_bridge::toCvShare(msg->loopImage, msg)->image.clone());
+		stat.setLoopImage(cv_bridge::toCvShare(msg->loopImage, msg)->image.clone());
 	}
 
 	//Posterior, likelihood, childCount
@@ -85,19 +85,25 @@ void GuiWrapper::infoExReceivedCallback(const rtabmap::InfoExConstPtr & msg)
 	{
 		mapIntFloat.insert(std::pair<int, float>(msg->posteriorKeys.at(i), msg->posteriorValues.at(i)));
 	}
-	stat->setPosterior(mapIntFloat);
+	stat.setPosterior(mapIntFloat);
 	mapIntFloat.clear();
 	for(unsigned int i=0; i<msg->likelihoodKeys.size() && i<msg->likelihoodValues.size(); ++i)
 	{
 		mapIntFloat.insert(std::pair<int, float>(msg->likelihoodKeys.at(i), msg->likelihoodValues.at(i)));
 	}
-	stat->setLikelihood(mapIntFloat);
+	stat.setLikelihood(mapIntFloat);
+	mapIntFloat.clear();
+	for(unsigned int i=0; i<msg->rawLikelihoodKeys.size() && i<msg->rawLikelihoodValues.size(); ++i)
+	{
+		mapIntFloat.insert(std::pair<int, float>(msg->rawLikelihoodKeys.at(i), msg->rawLikelihoodValues.at(i)));
+	}
+	stat.setRawLikelihood(mapIntFloat);
 	std::map<int, int> mapIntInt;
 	for(unsigned int i=0; i<msg->weightsKeys.size() && i<msg->weightsValues.size(); ++i)
 	{
 		mapIntInt.insert(std::pair<int, int>(msg->weightsKeys.at(i), msg->weightsValues.at(i)));
 	}
-	stat->setWeights(mapIntInt);
+	stat.setWeights(mapIntInt);
 
 	//SURF stuff...
 	std::multimap<int, cv::KeyPoint> mapIntKeypoint;
@@ -111,7 +117,7 @@ void GuiWrapper::infoExReceivedCallback(const rtabmap::InfoExConstPtr & msg)
 		pt.size = msg->refWordsValues.at(i).size;
 		mapIntKeypoint.insert(std::pair<int, cv::KeyPoint>(msg->refWordsKeys.at(i), pt));
 	}
-	stat->setRefWords(mapIntKeypoint);
+	stat.setRefWords(mapIntKeypoint);
 	mapIntKeypoint.clear();
 	for(unsigned int i=0; i<msg->loopWordsKeys.size() && i<msg->loopWordsValues.size(); ++i)
 	{
@@ -123,16 +129,16 @@ void GuiWrapper::infoExReceivedCallback(const rtabmap::InfoExConstPtr & msg)
 		pt.size = msg->loopWordsValues.at(i).size;
 		mapIntKeypoint.insert(std::pair<int, cv::KeyPoint>(msg->loopWordsKeys.at(i), pt));
 	}
-	stat->setLoopWords(mapIntKeypoint);
+	stat.setLoopWords(mapIntKeypoint);
 
 	// Statistics data
 	for(unsigned int i=0; i<msg->statsKeys.size() && i<msg->statsValues.size(); i++)
 	{
-		stat->addStatistic(msg->statsKeys.at(i), msg->statsValues.at(i));
+		stat.addStatistic(msg->statsKeys.at(i), msg->statsValues.at(i));
 	}
 
 	//ROS_INFO("Publishing statistics...");
-	UEventsManager::post(new rtabmap::RtabmapEvent(&stat));
+	UEventsManager::post(new rtabmap::RtabmapEvent(stat));
 }
 
 void GuiWrapper::handleEvent(UEvent * anEvent)
