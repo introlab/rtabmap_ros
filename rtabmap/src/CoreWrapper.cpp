@@ -50,8 +50,6 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 
 	image_transport::ImageTransport it(nh);
 	imageTopic_ = it.subscribe("image", 1, &CoreWrapper::imageReceivedCallback, this);
-
-	UEventsManager::addHandler(this);
 }
 
 CoreWrapper::~CoreWrapper()
@@ -112,6 +110,8 @@ void CoreWrapper::imageReceivedCallback(const sensor_msgs::ImageConstPtr & msg)
 		//ROS_INFO("Received image.");
 		cv_bridge::CvImageConstPtr ptr = cv_bridge::toCvShare(msg);
 		rtabmap_->process(ptr->image.clone(), ptr->header.seq);
+		const Statistics & stats = rtabmap_->getStatistics();
+		this->publishStats(stats);
 	}
 }
 
@@ -152,123 +152,117 @@ void CoreWrapper::parametersUpdatedCallback(const std_msgs::EmptyConstPtr & msg)
 		}
 	}
 	ROS_INFO("Updating parameters");
-	rtabmap_->updateParameters(parameters);
+	rtabmap_->parseParameters(parameters);
 }
 
-void CoreWrapper::handleEvent(UEvent * anEvent)
+void CoreWrapper::publishStats(const Statistics & stats)
 {
-	if(anEvent->getClassName().compare("RtabmapEvent") == 0)
+	if(infoPub_.getNumSubscribers() || infoPubEx_.getNumSubscribers())
 	{
-		if(infoPub_.getNumSubscribers() || infoPubEx_.getNumSubscribers())
+		if(infoPub_.getNumSubscribers())
 		{
-			RtabmapEvent * rtabmapEvent = (RtabmapEvent*)anEvent;
-			const Statistics & stat = rtabmapEvent->getStats();
+			//ROS_INFO("Sending RtabmapInfo msg (last_id=%d)...", stat.refImageId());
+			rtabmap::InfoPtr msg(new rtabmap::Info);
+			msg->refId = stats.refImageId();
+			msg->loopClosureId = stats.loopClosureId();
+			infoPub_.publish(msg);
+		}
 
-			if(infoPub_.getNumSubscribers())
+		if(infoPubEx_.getNumSubscribers())
+		{
+			//ROS_INFO("Sending infoEx msg (last_id=%d)...", stat.refImageId());
+			rtabmap::InfoExPtr msg(new rtabmap::InfoEx);
+			msg->refId = stats.refImageId();
+			msg->loopClosureId = stats.loopClosureId();
+
+			// Detailed info
+			if(stats.extended())
 			{
-				//ROS_INFO("Sending RtabmapInfo msg (last_id=%d)...", stat.refImageId());
-				rtabmap::InfoPtr msg(new rtabmap::Info);
-				msg->refId = stat.refImageId();
-				msg->loopClosureId = stat.loopClosureId();
-				infoPub_.publish(msg);
-			}
-
-			if(infoPubEx_.getNumSubscribers())
-			{
-				//ROS_INFO("Sending infoEx msg (last_id=%d)...", stat.refImageId());
-				rtabmap::InfoExPtr msg(new rtabmap::InfoEx);
-				msg->refId = stat.refImageId();
-				msg->loopClosureId = stat.loopClosureId();
-
-				// Detailed info
-				if(stat.extended())
+				if(!stats.refImage().empty())
 				{
-					if(!stat.refImage().empty())
+					cv_bridge::CvImage img;
+					if(stats.refImage().channels() == 1)
 					{
-						cv_bridge::CvImage img;
-						if(stat.refImage().channels() == 1)
-						{
-							img.encoding = sensor_msgs::image_encodings::MONO8;
-						}
-						else
-						{
-							img.encoding = sensor_msgs::image_encodings::BGR8;
-						}
-						img.image = stat.refImage();
-						sensor_msgs::ImagePtr rosMsg = img.toImageMsg();
-						rosMsg->header.frame_id = "camera";
-						rosMsg->header.stamp = ros::Time::now();
-						msg->refImage = *rosMsg;
+						img.encoding = sensor_msgs::image_encodings::MONO8;
 					}
-					if(!stat.loopImage().empty())
+					else
 					{
-						cv_bridge::CvImage img;
-						if(stat.loopImage().channels() == 1)
-						{
-							img.encoding = sensor_msgs::image_encodings::MONO8;
-						}
-						else
-						{
-							img.encoding = sensor_msgs::image_encodings::BGR8;
-						}
-						img.image = stat.loopImage();
-						sensor_msgs::ImagePtr rosMsg = img.toImageMsg();
-						rosMsg->header.frame_id = "camera";
-						rosMsg->header.stamp = ros::Time::now();
-						msg->loopImage = *rosMsg;
+						img.encoding = sensor_msgs::image_encodings::BGR8;
 					}
-
-					//Posterior, likelihood, childCount
-					msg->posteriorKeys = uKeys(stat.posterior());
-					msg->posteriorValues = uValues(stat.posterior());
-					msg->likelihoodKeys = uKeys(stat.likelihood());
-					msg->likelihoodValues = uValues(stat.likelihood());
-					msg->rawLikelihoodKeys = uKeys(stat.rawLikelihood());
-					msg->rawLikelihoodValues = uValues(stat.rawLikelihood());
-					msg->weightsKeys = uKeys(stat.weights());
-					msg->weightsValues = uValues(stat.weights());
-
-					//Features stuff...
-					msg->refWordsKeys = uKeys(stat.refWords());
-					msg->refWordsValues = std::vector<rtabmap::KeyPoint>(stat.refWords().size());
-					int index = 0;
-					for(std::multimap<int, cv::KeyPoint>::const_iterator i=stat.refWords().begin();
-						i!=stat.refWords().end();
-						++i)
-					{
-						msg->refWordsValues.at(index).angle = i->second.angle;
-						msg->refWordsValues.at(index).response = i->second.response;
-						msg->refWordsValues.at(index).ptx = i->second.pt.x;
-						msg->refWordsValues.at(index).pty = i->second.pt.y;
-						msg->refWordsValues.at(index).size = i->second.size;
-						msg->refWordsValues.at(index).octave = i->second.octave;
-						msg->refWordsValues.at(index).class_id = i->second.class_id;
-						++index;
-					}
-
-					msg->loopWordsKeys = uKeys(stat.loopWords());
-					msg->loopWordsValues = std::vector<rtabmap::KeyPoint>(stat.loopWords().size());
-					index = 0;
-					for(std::multimap<int, cv::KeyPoint>::const_iterator i=stat.loopWords().begin();
-						i!=stat.loopWords().end();
-						++i)
-					{
-						msg->loopWordsValues.at(index).angle = i->second.angle;
-						msg->loopWordsValues.at(index).response = i->second.response;
-						msg->loopWordsValues.at(index).ptx = i->second.pt.x;
-						msg->loopWordsValues.at(index).pty = i->second.pt.y;
-						msg->loopWordsValues.at(index).size = i->second.size;
-						msg->loopWordsValues.at(index).octave = i->second.octave;
-						msg->loopWordsValues.at(index).class_id = i->second.class_id;
-						++index;
-					}
-
-					// Statistics data
-					msg->statsKeys = uKeys(stat.data());
-					msg->statsValues = uValues(stat.data());
+					img.image = stats.refImage();
+					sensor_msgs::ImagePtr rosMsg = img.toImageMsg();
+					rosMsg->header.frame_id = "camera";
+					rosMsg->header.stamp = ros::Time::now();
+					msg->refImage = *rosMsg;
 				}
-				infoPubEx_.publish(msg);
+				if(!stats.loopImage().empty())
+				{
+					cv_bridge::CvImage img;
+					if(stats.loopImage().channels() == 1)
+					{
+						img.encoding = sensor_msgs::image_encodings::MONO8;
+					}
+					else
+					{
+						img.encoding = sensor_msgs::image_encodings::BGR8;
+					}
+					img.image = stats.loopImage();
+					sensor_msgs::ImagePtr rosMsg = img.toImageMsg();
+					rosMsg->header.frame_id = "camera";
+					rosMsg->header.stamp = ros::Time::now();
+					msg->loopImage = *rosMsg;
+				}
+
+				//Posterior, likelihood, childCount
+				msg->posteriorKeys = uKeys(stats.posterior());
+				msg->posteriorValues = uValues(stats.posterior());
+				msg->likelihoodKeys = uKeys(stats.likelihood());
+				msg->likelihoodValues = uValues(stats.likelihood());
+				msg->rawLikelihoodKeys = uKeys(stats.rawLikelihood());
+				msg->rawLikelihoodValues = uValues(stats.rawLikelihood());
+				msg->weightsKeys = uKeys(stats.weights());
+				msg->weightsValues = uValues(stats.weights());
+
+				//Features stuff...
+				msg->refWordsKeys = uKeys(stats.refWords());
+				msg->refWordsValues = std::vector<rtabmap::KeyPoint>(stats.refWords().size());
+				int index = 0;
+				for(std::multimap<int, cv::KeyPoint>::const_iterator i=stats.refWords().begin();
+					i!=stats.refWords().end();
+					++i)
+				{
+					msg->refWordsValues.at(index).angle = i->second.angle;
+					msg->refWordsValues.at(index).response = i->second.response;
+					msg->refWordsValues.at(index).ptx = i->second.pt.x;
+					msg->refWordsValues.at(index).pty = i->second.pt.y;
+					msg->refWordsValues.at(index).size = i->second.size;
+					msg->refWordsValues.at(index).octave = i->second.octave;
+					msg->refWordsValues.at(index).class_id = i->second.class_id;
+					++index;
+				}
+
+				msg->loopWordsKeys = uKeys(stats.loopWords());
+				msg->loopWordsValues = std::vector<rtabmap::KeyPoint>(stats.loopWords().size());
+				index = 0;
+				for(std::multimap<int, cv::KeyPoint>::const_iterator i=stats.loopWords().begin();
+					i!=stats.loopWords().end();
+					++i)
+				{
+					msg->loopWordsValues.at(index).angle = i->second.angle;
+					msg->loopWordsValues.at(index).response = i->second.response;
+					msg->loopWordsValues.at(index).ptx = i->second.pt.x;
+					msg->loopWordsValues.at(index).pty = i->second.pt.y;
+					msg->loopWordsValues.at(index).size = i->second.size;
+					msg->loopWordsValues.at(index).octave = i->second.octave;
+					msg->loopWordsValues.at(index).class_id = i->second.class_id;
+					++index;
+				}
+
+				// Statistics data
+				msg->statsKeys = uKeys(stats.data());
+				msg->statsValues = uValues(stats.data());
 			}
+			infoPubEx_.publish(msg);
 		}
 	}
 }

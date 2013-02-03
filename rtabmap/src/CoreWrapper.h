@@ -13,8 +13,7 @@
 #include <std_srvs/Empty.h>
 #include <std_msgs/Empty.h>
 #include <cv_bridge/cv_bridge.h>
-#include "utilite/UEventsHandler.h"
-#include <rtabmap/core/RtabmapEvent.h>
+#include <rtabmap/core/Statistics.h>
 #include <sensor_msgs/Image.h>
 #include <geometry_msgs/Twist.h>
 #include <image_transport/image_transport.h>
@@ -24,7 +23,7 @@ namespace rtabmap
 	class Rtabmap;
 }
 
-class CoreWrapper : public UEventsHandler
+class CoreWrapper
 {
 public:
 	CoreWrapper(bool deleteDbOnStart = false);
@@ -43,7 +42,7 @@ private:
 	void loadNodeParameters(const std::string & configFile);
 	void saveNodeParameters(const std::string & configFile);
 
-	virtual void handleEvent(UEvent * anEvent);
+	void publishStats(const rtabmap::Statistics & stats);
 
 private:
 	rtabmap::Rtabmap * rtabmap_;
