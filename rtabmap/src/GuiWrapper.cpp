@@ -19,7 +19,7 @@
 #include <rtabmap/gui/MainWindow.h>
 #include <rtabmap/core/RtabmapEvent.h>
 #include <rtabmap/core/Parameters.h>
-#include <rtabmap/core/Camera.h>
+#include <rtabmap/core/ParamEvent.h>
 
 #include "PreferencesDialogROS.h"
 
