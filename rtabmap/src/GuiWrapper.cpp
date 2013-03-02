@@ -85,13 +85,27 @@ void GuiWrapper::infoExReceivedCallback(const rtabmap::InfoExConstPtr & msg)
 	stat.setRefImageId(msg->refId);
 	stat.setLoopClosureId(msg->loopClosureId);
 
-	if(msg->refImage.data.size())
+	if(msg->refImage.size())
 	{
-		stat.setRefImage(cv_bridge::toCvShare(msg->refImage, msg)->image.clone());
+		cv::Mat image;
+#if CV_MAJOR_VERSION >=2 and CV_MINOR_VERSION >=4
+		image = cv::imdecode(msg->refImage, cv::IMREAD_UNCHANGED);
+#else
+		image = cv::imdecode(msg->refImage, -1);
+#endif
+		stat.setRefImage(image);
+		//stat.setRefImage(cv_bridge::toCvShare(msg->refImage, msg)->image.clone());
 	}
-	if(msg->loopImage.data.size())
+	if(msg->loopImage.size())
 	{
-		stat.setLoopImage(cv_bridge::toCvShare(msg->loopImage, msg)->image.clone());
+		cv::Mat image;
+#if CV_MAJOR_VERSION >=2 and CV_MINOR_VERSION >=4
+		image = cv::imdecode(msg->loopImage, cv::IMREAD_UNCHANGED);
+#else
+		image = cv::imdecode(msg->loopImage, -1);
+#endif
+		stat.setRefImage(image);
+		//stat.setLoopImage(cv_bridge::toCvShare(msg->loopImage, msg)->image.clone());
 	}
 
 	//Posterior, likelihood, childCount

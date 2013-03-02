@@ -28,8 +28,9 @@ int32[] weightsValues
 string[] statsKeys
 float32[] statsValues
 
-sensor_msgs/Image refImage
-sensor_msgs/Image loopImage
+#compressed images : using cv::imencode()
+uint8[] refImage
+uint8[] loopImage
 
 #
 # For features2d : std::multimap<int, cv::Keypoint> words

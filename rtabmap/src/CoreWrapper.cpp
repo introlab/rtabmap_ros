@@ -99,7 +99,7 @@ void CoreWrapper::saveNodeParameters(const std::string & configFile)
 
 	Rtabmap::writeParameters(configFile.c_str(), parameters);
 
-	std::string databasePath = parameters.at(Parameters::kRtabmapWorkingDirectory())+"LTM.db";
+	std::string databasePath = parameters.at(Parameters::kRtabmapWorkingDirectory())+"/LTM.db";
 	printf("Saving database/long-term memory... (located at %s)\n", databasePath.c_str());
 }
 
@@ -180,6 +180,10 @@ void CoreWrapper::publishStats(const Statistics & stats)
 			{
 				if(!stats.refImage().empty())
 				{
+					// compress (the gui would work on a remote computer, this on the robot)
+					cv::imencode(".png", stats.refImage(), msg->refImage);
+
+					/*
 					cv_bridge::CvImage img;
 					if(stats.refImage().channels() == 1)
 					{
@@ -194,9 +198,14 @@ void CoreWrapper::publishStats(const Statistics & stats)
 					rosMsg->header.frame_id = "camera";
 					rosMsg->header.stamp = ros::Time::now();
 					msg->refImage = *rosMsg;
+					*/
 				}
 				if(!stats.loopImage().empty())
 				{
+					// compress (the gui would work on a remote computer, this on the robot)
+					cv::imencode(".png", stats.loopImage(), msg->loopImage);
+
+					/*
 					cv_bridge::CvImage img;
 					if(stats.loopImage().channels() == 1)
 					{
@@ -211,6 +220,7 @@ void CoreWrapper::publishStats(const Statistics & stats)
 					rosMsg->header.frame_id = "camera";
 					rosMsg->header.stamp = ros::Time::now();
 					msg->loopImage = *rosMsg;
+					*/
 				}
 
 				//Posterior, likelihood, childCount
