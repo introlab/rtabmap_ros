@@ -17,6 +17,7 @@
 #include <sensor_msgs/Image.h>
 #include <geometry_msgs/Twist.h>
 #include <image_transport/image_transport.h>
+#include <rtabmap/core/Parameters.h>
 
 namespace rtabmap
 {
@@ -39,7 +40,8 @@ private:
 	bool dumpPredictionCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool deleteMemoryCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 
-	void loadNodeParameters(const std::string & configFile);
+	rtabmap::ParametersMap loadNodeParameters(const std::string & configFile,
+											  const std::string & workingDirectory);
 	void saveNodeParameters(const std::string & configFile);
 
 	void publishStats(const rtabmap::Statistics & stats);
@@ -53,7 +55,7 @@ private:
 	ros::Publisher infoPub_;
 	ros::Publisher infoPubEx_;
 	ros::Publisher parametersLoadedPub_;
-	std::string configFile_;
+	std::string configPath_;
 
 	ros::ServiceServer resetMemorySrv_;
 	ros::ServiceServer dumpMemorySrv_;

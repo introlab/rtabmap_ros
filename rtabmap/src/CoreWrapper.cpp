@@ -14,10 +14,11 @@
 #include <rtabmap/core/Rtabmap.h>
 #include <rtabmap/core/Camera.h>
 #include <rtabmap/core/Parameters.h>
-#include <utilite/UEventsManager.h>
-#include <utilite/ULogger.h>
-#include <utilite/UFile.h>
-#include <utilite/UStl.h>
+#include <rtabmap/utilite/UEventsManager.h>
+#include <rtabmap/utilite/ULogger.h>
+#include <rtabmap/utilite/UFile.h>
+#include <rtabmap/utilite/UStl.h>
+#include <rtabmap/utilite/UConversion.h>
 #include <opencv2/highgui/highgui.hpp>
 
 //msgs
@@ -27,7 +28,8 @@
 using namespace rtabmap;
 
 CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
-		rtabmap_(0)
+		rtabmap_(0),
+		configPath_(UDirectory::homeDir()+"/.rtabmap/rtabmap.ini")
 {
 	ros::NodeHandle nh("~");
 	infoPub_ = nh.advertise<rtabmap::Info>("info", 1);
@@ -36,9 +38,16 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 
 	rtabmap_ = new Rtabmap();
 
-	loadNodeParameters(UDirectory::homeDir()+"/.rtabmap/rtabmap.ini");
+	std::string workingDir = UDirectory::homeDir()+"/.rtabmap";
+	nh.param("config_path", configPath_, configPath_);
+	nh.param("working_directory", workingDir, workingDir);
 
-	rtabmap_->init(UDirectory::homeDir()+"/.rtabmap/rtabmap.ini", deleteDbOnStart);
+	configPath_ = uReplaceChar(configPath_, '~', UDirectory::homeDir());
+	workingDir = uReplaceChar(workingDir, '~', UDirectory::homeDir());
+
+	loadNodeParameters(configPath_, workingDir);
+
+	rtabmap_->init(configPath_, deleteDbOnStart);
 
 	resetMemorySrv_ = nh.advertiseService("resetMemory", &CoreWrapper::resetMemoryCallback, this);
 	dumpMemorySrv_ = nh.advertiseService("dumpMemory", &CoreWrapper::dumpMemoryCallback, this);
@@ -54,11 +63,12 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 
 CoreWrapper::~CoreWrapper()
 {
-	this->saveNodeParameters(UDirectory::homeDir()+"/.rtabmap/rtabmap.ini");
+	this->saveNodeParameters(configPath_);
 	delete rtabmap_;
 }
 
-void CoreWrapper::loadNodeParameters(const std::string & configFile)
+ParametersMap CoreWrapper::loadNodeParameters(const std::string & configFile,
+											  const std::string & workingDirectory)
 {
 	ROS_INFO("Loading parameters from %s", configFile.c_str());
 	if(!UFile::exists(configFile.c_str()))
@@ -69,12 +79,18 @@ void CoreWrapper::loadNodeParameters(const std::string & configFile)
 	ParametersMap parameters = Parameters::getDefaultParameters();
 	Rtabmap::readParameters(configFile.c_str(), parameters);
 
+	if(workingDirectory.size())
+	{
+		parameters.at(Parameters::kRtabmapWorkingDirectory()) = workingDirectory;
+	}
+
 	ros::NodeHandle nh("~");
 	for(ParametersMap::const_iterator i=parameters.begin(); i!=parameters.end(); ++i)
 	{
 		nh.setParam(i->first, i->second);
 	}
 	parametersLoadedPub_.publish(std_msgs::Empty());
+	return parameters;
 }
 
 void CoreWrapper::saveNodeParameters(const std::string & configFile)
@@ -99,7 +115,7 @@ void CoreWrapper::saveNodeParameters(const std::string & configFile)
 
 	Rtabmap::writeParameters(configFile.c_str(), parameters);
 
-	std::string databasePath = parameters.at(Parameters::kRtabmapWorkingDirectory())+"/LTM.db";
+	std::string databasePath = parameters.at(Parameters::kRtabmapWorkingDirectory())+"/rtabmap.db";
 	printf("Saving database/long-term memory... (located at %s)\n", databasePath.c_str());
 }
 
@@ -109,7 +125,7 @@ void CoreWrapper::imageReceivedCallback(const sensor_msgs::ImageConstPtr & msg)
 	{
 		//ROS_INFO("Received image.");
 		cv_bridge::CvImageConstPtr ptr = cv_bridge::toCvShare(msg);
-		rtabmap_->process(ptr->image.clone(), ptr->header.seq);
+		rtabmap_->process(ptr->image, ptr->header.seq);
 		const Statistics & stats = rtabmap_->getStatistics();
 		this->publishStats(stats);
 	}

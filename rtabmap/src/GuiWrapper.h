@@ -10,7 +10,7 @@
 
 #include <ros/ros.h>
 #include "rtabmap/InfoEx.h"
-#include "utilite/UEventsHandler.h"
+#include "rtabmap/utilite/UEventsHandler.h"
 #include <geometry_msgs/TwistStamped.h>
 
 namespace rtabmap

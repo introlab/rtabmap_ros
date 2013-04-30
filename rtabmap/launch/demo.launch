@@ -5,9 +5,14 @@
 	<!--           See "delete_db_on_start" option below... -->
 		
 	<!-- args: "delete_db_on_start" and "udebug" -->
-	<node name="rtabmap" pkg="rtabmap" type="rtabmap" output="screen" args="--delete_db_on_start"/>
+	<node name="rtabmap" pkg="rtabmap" type="rtabmap" output="screen" args="--delete_db_on_start">
 	
-	<node name="rtabmapviz" pkg="rtabmap" type="rtabmapviz" output="screen"/>
+		<param name="config_path" value="~/.rtabmap/demo.ini" type="string"/>
+		<param name="working_directory" value="~/.rtabmap" type="string"/>  
+	</node>
+	
+	<node name="rtabmapviz" pkg="rtabmap" type="rtabmapviz" output="screen"
+	 args="-d $(find rtabmap)/launch/demo.ini"/>
 	
 	<!-- When parameter video_or_images_path is set, the camera uses the directory of images or the video file -->
 	<node name="camera" pkg="uimage" type="camera" output="screen">
@@ -19,4 +24,6 @@
 		<param name="height" value="0" type="int"/>
 		<param name="auto_restart" value="false" type="bool"/> <!-- Process only one time the data set -->
 	</node>
+	
+	<node name="im_extract" pkg="rtabmap" type="im_extract"/>
 </launch>

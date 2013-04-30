@@ -6,7 +6,7 @@
  */
 
 #include "GuiWrapper.h"
-#include "utilite/ULogger.h"
+#include "rtabmap/utilite/ULogger.h"
 
 #include <QApplication>
 #include <rtabmap/gui/MainWindow.h>

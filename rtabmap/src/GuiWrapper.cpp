@@ -12,7 +12,7 @@
 #include <std_srvs/Empty.h>
 #include <std_msgs/Empty.h>
 
-#include <utilite/UEventsManager.h>
+#include <rtabmap/utilite/UEventsManager.h>
 
 #include <opencv2/highgui/highgui.hpp>
 
@@ -104,7 +104,7 @@ void GuiWrapper::infoExReceivedCallback(const rtabmap::InfoExConstPtr & msg)
 #else
 		image = cv::imdecode(msg->loopImage, -1);
 #endif
-		stat.setRefImage(image);
+		stat.setLoopImage(image);
 		//stat.setLoopImage(cv_bridge::toCvShare(msg->loopImage, msg)->image.clone());
 	}
 
