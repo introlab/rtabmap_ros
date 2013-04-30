@@ -14,6 +14,7 @@
 	<node name="rtabmapviz" pkg="rtabmap" type="rtabmapviz" output="screen"
 	 args="-d $(find rtabmap)/launch/demo.ini"/>
 	
+	<!-- uimage pkg is from the UtiLite stack : svn checkout http://utilite.googlecode.com/svn/trunk/ros-pkg utilite -->
 	<!-- When parameter video_or_images_path is set, the camera uses the directory of images or the video file -->
 	<node name="camera" pkg="uimage" type="camera" output="screen">
 		<remap from="/camera/image" to="/image"/>
@@ -24,6 +25,4 @@
 		<param name="height" value="0" type="int"/>
 		<param name="auto_restart" value="false" type="bool"/> <!-- Process only one time the data set -->
 	</node>
-	
-	<node name="im_extract" pkg="rtabmap" type="im_extract"/>
 </launch>
