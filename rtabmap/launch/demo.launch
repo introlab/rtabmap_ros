@@ -12,7 +12,7 @@
 	</node>
 	
 	<node name="rtabmapviz" pkg="rtabmap" type="rtabmapviz" output="screen"
-	 args="-d $(find rtabmap)/launch/demo.ini"/>
+	 args="-d ~/.rtabmap/demo.ini"/>
 	
 	<!-- uimage pkg is from the UtiLite stack : svn checkout http://utilite.googlecode.com/svn/trunk/ros-pkg utilite -->
 	<!-- When parameter video_or_images_path is set, the camera uses the directory of images or the video file -->
