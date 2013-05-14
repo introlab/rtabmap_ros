@@ -9,7 +9,7 @@
   <review status="unreviewed" notes=""/>
   <url>http://rtabmap.googlecode.com</url>
   <export>
-    <cpp cflags="-I${prefix}/rtabmap/include" lflags="-L${prefix}/rtabmap/lib -Wl,-rpath, -lrtabmap_core"/>
+    <cpp cflags="-I${prefix}/rtabmap/include" lflags="-L${prefix}/rtabmap/lib -Wl,-rpath, -lrtabmap_core -lrtabmap_utilite"/>
   </export>
   <versioncontrol type="svn" url="http://rtabmap.googlecode.com/svn/trunk/rtabmap"/>
   
@@ -18,12 +18,10 @@
   <depend package="cv_bridge"/>
   <depend package="sensor_msgs"/>
   <depend package="std_srvs"/>
-  <depend package="utilite"/>
   
   <rosdep name="libqt4-dev"/>
   <rosdep name="sqlite3"/>
   <rosdep name="libsqlite3-dev"/>
-  <rosdep name="libfftw3"/>
 
 </package>
 
