@@ -84,6 +84,7 @@ void GuiWrapper::infoExReceivedCallback(const rtabmap::InfoExConstPtr & msg)
 
 	stat.setRefImageId(msg->refId);
 	stat.setLoopClosureId(msg->loopClosureId);
+	stat.setLocalLoopClosureId(msg->localLoopClosureId);
 
 	if(msg->refImage.size())
 	{

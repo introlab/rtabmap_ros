@@ -7,6 +7,7 @@ Header header
 
 int32 refId
 int32 loopClosureId
+int32 localLoopClosureId
 
 # std::map<int, float> posterior;
 int32[] posteriorKeys
