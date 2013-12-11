@@ -18,7 +18,7 @@ void my_handler(int s){
 
 int main(int argc, char** argv)
 {
-	ros::init(argc, argv, "rtabmap_gui");
+	ros::init(argc, argv, "rtabmapviz");
 
 	GuiWrapper gui(argc, argv);
 
@@ -34,12 +34,12 @@ int main(int argc, char** argv)
 	ros::AsyncSpinner spinner(4); // Use 4 threads
 	spinner.start();
 
-	ROS_INFO("Node started.");
+	ROS_INFO("rtabmapviz started.");
 	// Now wait for application to finish
 	int r = gui.exec();// MUST be called by the Main Thread
 
 	spinner.stop();
 
-	ROS_INFO("All done! Closing...");
+	ROS_INFO("rtabmapviz: All done! Closing...");
 	return r;
 }

@@ -1,0 +1,19 @@
+<library path="lib/librtabmap_ros"> 
+  <class name="rtabmap/data_throttle" type="rtabmap::DataThrottleNodelet" base_class_type="nodelet::Nodelet">
+  <description>
+  This is my nodelet.
+  </description>
+  </class>
+  
+  <class name="rtabmap/data_odom_sync" type="rtabmap::DataOdomSyncNodelet" base_class_type="nodelet::Nodelet">
+  <description>
+  This is my nodelet.
+  </description>
+  </class>
+    
+  <class name="rtabmap/point_cloud_xyzrgb" type="rtabmap::PointCloudXYZRGB" base_class_type="nodelet::Nodelet">
+  <description>
+  This is my nodelet.
+  </description>
+  </class>
+</library>

@@ -19,7 +19,7 @@ public:
 	PreferencesDialogROS(const QString & configFile);
 	virtual ~PreferencesDialogROS();
 
-	virtual QString getIniFilePath();
+	virtual QString getIniFilePath() const;
 
 protected:
 	virtual QString getParamMessage();

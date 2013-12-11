@@ -26,10 +26,10 @@ PreferencesDialogROS::PreferencesDialogROS(const QString & configFile) :
 
 PreferencesDialogROS::~PreferencesDialogROS()
 {
-
+	ROS_INFO("rtabmapviz: GUI settings are saved to \"%s\"", configFile_.toStdString().c_str());
 }
 
-QString PreferencesDialogROS::getIniFilePath()
+QString PreferencesDialogROS::getIniFilePath() const
 {
 	if(configFile_.isEmpty())
 	{
@@ -52,7 +52,7 @@ bool PreferencesDialogROS::readCoreSettings(const QString & filePath)
 {
 	if(filePath.isEmpty())
 	{
-		ros::NodeHandle nh("rtabmap");
+		ros::NodeHandle nh;
 		ROS_INFO("%s", this->getParamMessage().toStdString().c_str());
 		bool validParameters = true;
 		int readCount = 0;

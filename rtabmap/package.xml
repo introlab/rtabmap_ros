@@ -1,0 +1,54 @@
+<?xml version="1.0"?>
+<package>
+  <name>rtabmap</name>
+  <version>0.0.0</version>
+  <description>The rtabmap package</description>
+
+  <maintainer email="matlabbe@gmail.com">Mathieu Labbe</maintainer>
+  <license>LGPLv3</license>
+  <url type="website">http://rtabmap.googlecode.com</url>
+  <author email="matlabbe@gmail.com">Jane Doe</author>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>cv_bridge</build_depend>
+  <build_depend>roscpp</build_depend>
+  <build_depend>rospy</build_depend>
+  <build_depend>sensor_msgs</build_depend>
+  <build_depend>std_msgs</build_depend>
+  <build_depend>std_srvs</build_depend>
+  <build_depend>nav_msgs</build_depend>
+  <build_depend>image_transport</build_depend>
+  <build_depend>tf</build_depend>
+  <build_depend>tf_conversions</build_depend>
+  <build_depend>laser_geometry</build_depend>
+  <build_depend>pcl_conversions</build_depend>
+  <build_depend>pcl_ros</build_depend>
+  <build_depend>nodelet</build_depend>
+  <build_depend>dynamic_reconfigure</build_depend>
+  
+  <run_depend>cv_bridge</run_depend>
+  <run_depend>roscpp</run_depend>
+  <run_depend>rospy</run_depend>
+  <run_depend>sensor_msgs</run_depend>
+  <run_depend>std_msgs</run_depend>
+  <run_depend>std_srvs</run_depend>
+  <run_depend>nav_msgs</run_depend>
+  <run_depend>image_transport</run_depend>
+  <run_depend>tf</run_depend>
+  <run_depend>tf_conversions</run_depend>
+  <run_depend>laser_geometry</run_depend>
+  <run_depend>pcl_conversions</run_depend>
+  <run_depend>pcl_ros</run_depend>
+  <run_depend>nodelet</run_depend>
+  <run_depend>dynamic_reconfigure</run_depend>
+
+  <build_depend>libpcl-all-dev</build_depend>
+  
+  <build_depend>librtabmap_core</build_depend>
+  <build_depend>librtabmap_gui</build_depend>
+  <build_depend>librtabmap_utilite</build_depend>
+
+  <export>
+	<nodelet plugin="${prefix}/nodelet_plugins.xml" />
+  </export>
+</package>

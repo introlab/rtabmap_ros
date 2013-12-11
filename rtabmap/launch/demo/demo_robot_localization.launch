@@ -1,0 +1,55 @@
+
+<launch>
+
+   <!-- ROBOT LOCALIZATION VERSION: use this with ROS bag demo_mapping.bag -->
+   <!-- A database "~/.ros/rtabmap.db" must be already created from -->
+   <!-- the "demo_robot_mapping.launch" demo -->
+   <!-- Once RTAB-Map GUI stated, you can do "Edit->Download Map" to get all the map in the GUI -->
+   
+  <param name="use_sim_time" type="bool" value="True"/>
+
+  <!-- SLAM (robot side) -->
+  <!-- args: "delete_db_on_start" and "udebug" -->
+  <node name="rtabmap" pkg="rtabmap" type="rtabmap" output="screen" args="">
+	<param name="frame_id" type="string" value="base_footprint"/>
+	
+	<param name="subscribe_depth" type="bool" value="true"/>
+	<param name="subscribe_laserScan" type="bool" value="true"/>
+	
+	<remap from="odom" to="/az3/base_controller/odom"/>
+	<remap from="scan" to="/jn0/base_scan"/>
+
+	<remap from="rgb/image" to="data_throttled_image"/>
+  	<remap from="depth/image" to="data_throttled_image_depth"/>
+  	<remap from="rgb/camera_info" to="data_throttled_camera_info"/>
+  	
+  	<param name="rgb/image_transport" type="string" value="compressed"/>
+    <param name="depth/image_transport" type="string" value="compressedDepth"/>
+	
+	<param name="queue_size" type="int" value="10"/>
+	
+	<!-- RTAB-Map's parameters: do "rosrun rtabmap rtabmap (double-dash)params" to see the list of available parameters. -->
+    <param name="Rtabmap/DatabasePath" type="string" value="~/.ros/rtabmap.db"/>  <!-- Database used for localization -->
+    <param name="Rtabmap/DetectionRate" type="string" value="1"/>     <!-- Don't need to do relocation very often! Though better results if the same rate as when mapping. -->
+    <param name="Mem/STMSize" type="string" value="1"/>               <!-- 1 location in short-term memory -->
+    <param name="Mem/IncrementalMemory" type="string" value="false"/>  <!-- false = Localization mode-->
+  </node>
+  
+  <!-- Visualisation (client side) -->
+  <node pkg="rtabmap" type="rtabmapviz" name="rtabmapviz" args="-d $(find rtabmap)/launch/config/rgbd_gui.ini" output="screen">
+  	  <param name="subscribe_depth" type="bool" value="true"/>
+      <param name="subscribe_laserScan" type="bool" value="true"/>
+      <param name="queue_size" type="int" value="10"/>
+      <param name="frame_id" type="string" value="base_footprint"/>
+    
+      <remap from="rgb/image" to="data_throttled_image"/>
+      <remap from="depth/image" to="data_throttled_image_depth"/>
+      <remap from="rgb/camera_info" to="data_throttled_camera_info"/>
+      <remap from="scan" to="/jn0/base_scan"/>
+      <remap from="odom" to="/az3/base_controller/odom"/>
+      
+      <param name="rgb/image_transport" type="string" value="compressed"/>
+      <param name="depth/image_transport" type="string" value="compressedDepth"/>
+  </node>
+
+</launch>

@@ -1,0 +1,104 @@
+
+#include "ros/ros.h"
+#include "pluginlib/class_list_macros.h"
+#include "nodelet/nodelet.h"
+
+#include <message_filters/subscriber.h>
+#include <message_filters/time_synchronizer.h>
+#include <message_filters/sync_policies/approximate_time.h>
+
+#include <image_transport/image_transport.h>
+#include <image_transport/subscriber_filter.h>
+
+#include <sensor_msgs/CameraInfo.h>
+#include <nav_msgs/Odometry.h>
+
+namespace rtabmap
+{
+
+class DataOdomSyncNodelet : public nodelet::Nodelet
+{
+public:
+	//Constructor
+	DataOdomSyncNodelet():
+		sync_(0)
+	{
+	}
+
+	virtual ~DataOdomSyncNodelet()
+	{
+		delete sync_;
+	}
+
+private:
+	virtual void onInit()
+	{
+		ros::NodeHandle& nh = getNodeHandle();
+		ros::NodeHandle& private_nh = getPrivateNodeHandle();
+
+		ros::NodeHandle rgb_nh(nh, "rgb");
+		ros::NodeHandle depth_nh(nh, "depth");
+		ros::NodeHandle rgb_pnh(private_nh, "rgb");
+		ros::NodeHandle depth_pnh(private_nh, "depth");
+		image_transport::ImageTransport rgb_it(rgb_nh);
+		image_transport::ImageTransport depth_it(depth_nh);
+		image_transport::TransportHints hintsRgb("raw", ros::TransportHints(), rgb_pnh);
+		image_transport::TransportHints hintsDepth("raw", ros::TransportHints(), depth_pnh);
+
+		int queueSize = 10;
+		private_nh.param("queue_size", queueSize, queueSize);
+
+		sync_ = new message_filters::Synchronizer<MySyncPolicy>(MySyncPolicy(queueSize), image_sub_, image_depth_sub_, info_sub_, odom_sub_);
+		sync_->registerCallback(boost::bind(&DataOdomSyncNodelet::callback, this, _1, _2, _3, _4));
+
+		image_sub_.subscribe(rgb_it, rgb_nh.resolveName("image_in"), 1, hintsRgb);
+		image_depth_sub_.subscribe(depth_it, depth_nh.resolveName("image_in"), 1, hintsDepth);
+		info_sub_.subscribe(rgb_nh, "camera_info_in", 1);
+		odom_sub_.subscribe(nh, "odom_in", 1);
+
+		imagePub_ = rgb_it.advertise("image_out", 10);
+		imageDepthPub_ = depth_it.advertise("image_out", 10);
+		infoPub_ = rgb_nh.advertise<sensor_msgs::CameraInfo>("camera_info_out", 10);
+		odomPub_ = nh.advertise<nav_msgs::Odometry>("odom_out", 10);
+	};
+
+	void callback(const sensor_msgs::ImageConstPtr& image,
+			const sensor_msgs::ImageConstPtr& imageDepth,
+			const sensor_msgs::CameraInfoConstPtr& camInfo,
+			const nav_msgs::OdometryConstPtr & odom)
+	{
+		if(imagePub_.getNumSubscribers())
+		{
+			imagePub_.publish(image);
+		}
+		if(imageDepthPub_.getNumSubscribers())
+		{
+			imageDepthPub_.publish(imageDepth);
+		}
+		if(infoPub_.getNumSubscribers())
+		{
+			infoPub_.publish(camInfo);
+		}
+		if(odomPub_.getNumSubscribers())
+		{
+			odomPub_.publish(odom);
+		}
+	}
+
+	image_transport::Publisher imagePub_;
+	image_transport::Publisher imageDepthPub_;
+	ros::Publisher infoPub_;
+	ros::Publisher odomPub_;
+
+	image_transport::SubscriberFilter image_sub_;
+	image_transport::SubscriberFilter image_depth_sub_;
+	message_filters::Subscriber<sensor_msgs::CameraInfo> info_sub_;
+	message_filters::Subscriber<nav_msgs::Odometry> odom_sub_;
+	typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo, nav_msgs::Odometry> MySyncPolicy;
+	message_filters::Synchronizer<MySyncPolicy> * sync_;
+
+};
+
+
+PLUGINLIB_DECLARE_CLASS(rtabmap, data_odom_sync, rtabmap::DataOdomSyncNodelet, nodelet::Nodelet);
+}
