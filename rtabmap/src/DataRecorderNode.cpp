@@ -40,7 +40,11 @@ class DataRecorderWrapper
 public:
 	DataRecorderWrapper() :
 		fileName_(""),
-		frameId_("base_link")
+		frameId_("base_link"),
+		depthScanSync_(0),
+		depthSync_(0),
+		scanSync_(0),
+		depthImageSync_(0)
 	{
 		ros::NodeHandle pnh("~");
 
@@ -60,6 +64,18 @@ public:
 	bool init()
 	{
 		return recorder_.init(fileName_.c_str());
+	}
+
+	virtual ~DataRecorderWrapper()
+	{
+		if(depthScanSync_)
+			delete depthScanSync_;
+		if(depthSync_)
+			delete depthSync_;
+		if(scanSync_)
+			delete scanSync_;
+		if(depthImageSync_)
+			delete depthImageSync_;
 	}
 
 private:
