@@ -62,16 +62,19 @@ public:
 
 	void infoExReceivedCallback(const rtabmap::InfoExConstPtr & msg)
 	{
-		if(!uContains(scans_, msg->refId) && msg->refDepth2D.size())
+		for(unsigned int i=0; i<msg->data.depth2DIDs.size() && i<msg->data.depth2Ds.size(); ++i)
 		{
-			cv::Mat depth2d = util3d::uncompressData(msg->refDepth2D);
-			scans_.insert(std::make_pair(msg->refId, util3d::depth2DToPointCloud(depth2d)));
+			if(!uContains(scans_, msg->data.depth2DIDs[i]))
+			{
+				cv::Mat depth2d = util3d::uncompressData(msg->data.depth2Ds[i].bytes);
+				scans_.insert(std::make_pair(msg->data.depth2DIDs[i], util3d::depth2DToPointCloud(depth2d)));
+			}
 		}
 
 		std::map<int, Transform> poses;
-		for(unsigned int i=0; i<msg->nodeIds.size() && i<msg->nodePoses.size(); ++i)
+		for(unsigned int i=0; i<msg->data.poseIDs.size() && i<msg->data.poses.size(); ++i)
 		{
-			poses.insert(std::make_pair(msg->nodeIds[i], transformFromPoseMsg(msg->nodePoses[i])));
+			poses.insert(std::make_pair(msg->data.poseIDs[i], transformFromPoseMsg(msg->data.poses[i])));
 		}
 
 		if(gridMap_.getNumSubscribers())
@@ -114,18 +117,18 @@ public:
 	{
 		std::map<int, std::vector<unsigned char> > depths2d;
 
-		if(msg->depth2DIDs.size() != msg->depths2D.size())
+		if(msg->depth2DIDs.size() != msg->depth2Ds.size())
 		{
 			ROS_WARN("grid_map_assembler: receiving map... depths2D and depth2DIDs are not the same size (%d vs %d)!",
-					(int)msg->depths2D.size(), (int)msg->depth2DIDs.size());
+					(int)msg->depth2Ds.size(), (int)msg->depth2DIDs.size());
 		}
 
 		// fill maps
-		for(unsigned int i=0; i<msg->depth2DIDs.size() && i < msg->depths2D.size(); ++i)
+		for(unsigned int i=0; i<msg->depth2DIDs.size() && i < msg->depth2Ds.size(); ++i)
 		{
 			if(!uContains(scans_, msg->depth2DIDs[i]))
 			{
-				cv::Mat depth2d = util3d::uncompressData(msg->depths2D[i].bytes);
+				cv::Mat depth2d = util3d::uncompressData(msg->depth2Ds[i].bytes);
 				scans_.insert(std::make_pair(msg->depth2DIDs[i], util3d::depth2DToPointCloud(depth2d)));
 			}
 		}

@@ -64,50 +64,89 @@ public:
 
 	void infoExReceivedCallback(const rtabmap::InfoExConstPtr & msg)
 	{
-		if(!uContains(rgbClouds_, msg->refId) && msg->refImage.size() && msg->refDepth.size() && msg->refDepthConstant > 0)
-		{
-			rtabmap::Transform localTransform = transformFromGeometryMsg(msg->refLocalTransform);
-
-			if(!localTransform.isNull())
+			for(unsigned int i=0; i<msg->data.localTransformIDs.size() && i<msg->data.localTransforms.size(); ++i)
 			{
-				cv::Mat image = util3d::uncompressImage(msg->refImage);
-				cv::Mat depth = util3d::uncompressImage(msg->refDepth);
-				pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = util3d::cloudFromDepthRGB(image, depth, msg->refDepthConstant, cloudDecimation_);
-
-				if(cloudVoxelSize_ > 0)
+				int id = msg->data.localTransformIDs[i];
+				if(!uContains(rgbClouds_, id))
 				{
-					cloud = util3d::voxelize(cloud, cloudVoxelSize_);
+					rtabmap::Transform localTransform = transformFromGeometryMsg(msg->data.localTransforms[i]);
+					if(!localTransform.isNull())
+					{
+						cv::Mat image, depth;
+						float depthConstant = 0.0f;
+
+						for(unsigned int i=0; i<msg->data.imageIDs.size() && i<msg->data.images.size(); ++i)
+						{
+							if(msg->data.imageIDs[i] == id)
+							{
+								image = util3d::uncompressImage(msg->data.images[i].bytes);
+								break;
+							}
+						}
+						for(unsigned int i=0; i<msg->data.depthIDs.size() && i<msg->data.depths.size(); ++i)
+						{
+							if(msg->data.depthIDs[i] == id)
+							{
+								depth = util3d::uncompressImage(msg->data.depths[i].bytes);
+								break;
+							}
+						}
+						for(unsigned int i=0; i<msg->data.depthConstantIDs.size() && i<msg->data.depthConstants.size(); ++i)
+						{
+							if(msg->data.depthConstantIDs[i] == id)
+							{
+								depthConstant = msg->data.depthConstants[i];
+								break;
+							}
+						}
+
+						if(!image.empty() && !depth.empty() && depthConstant > 0.0f)
+						{
+							pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = util3d::cloudFromDepthRGB(image, depth, depthConstant, cloudDecimation_);
+
+							if(cloudVoxelSize_ > 0)
+							{
+								cloud = util3d::voxelize(cloud, cloudVoxelSize_);
+							}
+
+							cloud = util3d::transformPointCloud(cloud, localTransform);
+
+							rgbClouds_.insert(std::make_pair(id, cloud));
+						}
+					}
 				}
-
-				cloud = util3d::transformPointCloud(cloud, localTransform);
-
-				rgbClouds_.insert(std::make_pair(msg->refId, cloud));
 			}
-		}
 
-		if(!uContains(scans_, msg->refId) && msg->refDepth2D.size())
+
+		for(unsigned int i=0; i<msg->data.depth2DIDs.size() && i<msg->data.depth2Ds.size(); ++i)
 		{
-			cv::Mat depth2d = util3d::uncompressData(msg->refDepth2D);
-
-			pcl::PointCloud<pcl::PointXYZ>::Ptr cloud = util3d::depth2DToPointCloud(depth2d);
-			if(scanVoxelSize_ > 0)
+			if(!uContains(scans_, msg->data.depth2DIDs[i]))
 			{
-				cloud = util3d::voxelize(cloud, scanVoxelSize_);
-			}
+				cv::Mat depth2d = util3d::uncompressData(msg->data.depth2Ds[i].bytes);
+				if(!depth2d.empty())
+				{
+					pcl::PointCloud<pcl::PointXYZ>::Ptr cloud = util3d::depth2DToPointCloud(depth2d);
+					if(scanVoxelSize_ > 0)
+					{
+						cloud = util3d::voxelize(cloud, scanVoxelSize_);
+					}
 
-			scans_.insert(std::make_pair(msg->refId, cloud));
+					scans_.insert(std::make_pair(msg->data.depth2DIDs[i], cloud));
+				}
+			}
 		}
+
 
 		if(assembledMapClouds_.getNumSubscribers())
 		{
 			// generate the assembled cloud!
 			pcl::PointCloud<pcl::PointXYZRGB>::Ptr assembledCloud(new pcl::PointCloud<pcl::PointXYZRGB>);
 
-			for(unsigned int i=0; i<msg->nodeIds.size() && i<msg->nodePoses.size(); ++i)
+			for(unsigned int i=0; i<msg->data.poseIDs.size() && i<msg->data.poses.size(); ++i)
 			{
-				Transform pose = transformFromPoseMsg(msg->nodePoses[i]);
+				Transform pose = transformFromPoseMsg(msg->data.poses[i]);
 
-				std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr >::iterator iter = rgbClouds_.find(msg->nodeIds[i]);
+				std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr >::iterator iter = rgbClouds_.find(msg->data.poseIDs[i]);
 				if(iter != rgbClouds_.end())
 				{
 					pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::transformPointCloud(iter->second, pose);
@@ -135,11 +174,11 @@ public:
 			// generate the assembled scan!
 			pcl::PointCloud<pcl::PointXYZ>::Ptr assembledCloud(new pcl::PointCloud<pcl::PointXYZ>);
 
-			for(unsigned int i=0; i<msg->nodeIds.size() && i<msg->nodePoses.size(); ++i)
+			for(unsigned int i=0; i<msg->data.poseIDs.size() && i<msg->data.poses.size(); ++i)
 			{
-				Transform pose = transformFromPoseMsg(msg->nodePoses[i]);
+				Transform pose = transformFromPoseMsg(msg->data.poses[i]);
 
-				std::map<int, pcl::PointCloud<pcl::PointXYZ>::Ptr >::iterator iter = scans_.find(msg->nodeIds[i]);
+				std::map<int, pcl::PointCloud<pcl::PointXYZ>::Ptr >::iterator iter = scans_.find(msg->data.poseIDs[i]);
 				if(iter != scans_.end())
 				{
 					pcl::PointCloud<pcl::PointXYZ>::Ptr transformed = util3d::transformPointCloud(iter->second, pose);
@@ -190,10 +229,10 @@ public:
 					(int)msg->depthConstants.size(), (int)msg->depthConstantIDs.size());
 		}
 
-		if(msg->depth2DIDs.size() != msg->depths2D.size())
+		if(msg->depth2DIDs.size() != msg->depth2Ds.size())
 		{
 			ROS_WARN("rtabmapviz: receiving map... depths2D and depth2DIDs are not the same size (%d vs %d)!",
-					(int)msg->depths2D.size(), (int)msg->depth2DIDs.size());
+					(int)msg->depth2Ds.size(), (int)msg->depth2DIDs.size());
 		}
 
 		// fill maps
@@ -230,11 +269,11 @@ public:
 			}
 		}
 
-		for(unsigned int i=0; i<msg->depth2DIDs.size() && i < msg->depths2D.size(); ++i)
+		for(unsigned int i=0; i<msg->depth2DIDs.size() && i < msg->depth2Ds.size(); ++i)
 		{
 			if(!uContains(scans_, msg->depth2DIDs[i]))
 			{
-				cv::Mat depth2d = util3d::uncompressData(msg->depths2D[i].bytes);
+				cv::Mat depth2d = util3d::uncompressData(msg->depth2Ds[i].bytes);
 				scans_.insert(std::make_pair(msg->depth2DIDs[i], util3d::depth2DToPointCloud(depth2d)));
 			}
 		}

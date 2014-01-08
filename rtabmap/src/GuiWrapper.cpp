@@ -111,14 +111,8 @@ void GuiWrapper::infoExReceivedCallback(const rtabmap::InfoExConstPtr & msg)
 	stat.setExtended(true); // Extended
 
 	stat.setRefImageId(msg->refId);
-	stat.setRefImageMapId(msg->refMapId);
 	stat.setLoopClosureId(msg->loopClosureId);
-	stat.setLoopClosureMapId(msg->loopClosureMapId);
 	stat.setLocalLoopClosureId(msg->localLoopClosureId);
-	stat.setLocalLoopClosureMapId(msg->localLoopClosureMapId);
-
-	stat.setRefImage(msg->refImage);
-	stat.setLoopImage(msg->loopImage);
 
 	//Posterior, likelihood, childCount
 	std::map<int, float> mapIntFloat;
@@ -179,27 +173,58 @@ void GuiWrapper::infoExReceivedCallback(const rtabmap::InfoExConstPtr & msg)
 	}
 
 	//RGB-D SLAM data
-	stat.setRefDepth(msg->refDepth);
-	stat.setRefDepth2D(msg->refDepth2D);
-	stat.setLoopDepth(msg->loopDepth);
-	stat.setLoopDepth2D(msg->loopDepth2D);
-
-	stat.setRefDepthConstant(msg->refDepthConstant);
-	stat.setLoopDepthConstant(msg->loopDepthConstant);
-
-	stat.setRefLocalTransform(transformFromGeometryMsg(msg->refLocalTransform));
-	stat.setLoopLocalTransform(transformFromGeometryMsg(msg->loopLocalTransform));
-
-	stat.setMapCorrection(transformFromGeometryMsg(msg->mapCorrection));
+	stat.setMapCorrection(transformFromGeometryMsg(msg->data.mapCorrection));
 	stat.setLoopClosureTransform(transformFromGeometryMsg(msg->loopClosureTransform));
 	stat.setCurrentPose(transformFromPoseMsg(msg->currentPose));
 
-	std::map<int, Transform> poses;
-	for(unsigned int i=0; i<msg->nodeIds.size() && i<msg->nodePoses.size(); ++i)
+	std::map<int, std::vector<unsigned char> > images;
+	for(unsigned int i=0; i<msg->data.imageIDs.size() && i<msg->data.images.size(); ++i)
 	{
-		poses.insert(std::make_pair(msg->nodeIds[i], transformFromPoseMsg(msg->nodePoses[i])));
+		images.insert(std::make_pair(msg->data.imageIDs[i], msg->data.images[i].bytes));
+	}
+	stat.setImages(images);
+
+	std::map<int, std::vector<unsigned char> > depths;
+	for(unsigned int i=0; i<msg->data.depthIDs.size() && i<msg->data.depths.size(); ++i)
+	{
+		depths.insert(std::make_pair(msg->data.depthIDs[i], msg->data.depths[i].bytes));
+	}
+	stat.setDepths(depths);
+
+	std::map<int, std::vector<unsigned char> > depth2ds;
+	for(unsigned int i=0; i<msg->data.depth2DIDs.size() && i<msg->data.depth2Ds.size(); ++i)
+	{
+		depth2ds.insert(std::make_pair(msg->data.depth2DIDs[i], msg->data.depth2Ds[i].bytes));
+	}
+	stat.setDepth2ds(depth2ds);
+
+	std::map<int, float> depthConstants;
+	for(unsigned int i=0; i<msg->data.depthConstantIDs.size() && i<msg->data.depthConstants.size(); ++i)
+	{
+		depthConstants.insert(std::make_pair(msg->data.depthConstantIDs[i], msg->data.depthConstants[i]));
+	}
+	stat.setDepthConstants(depthConstants);
+
+	std::map<int, Transform> localTransforms;
+	for(unsigned int i=0; i<msg->data.localTransformIDs.size() && i<msg->data.localTransforms.size(); ++i)
+	{
+		localTransforms.insert(std::make_pair(msg->data.localTransformIDs[i], transformFromGeometryMsg(msg->data.localTransforms[i])));
+	}
+	stat.setLocalTransforms(localTransforms);
+
+	std::map<int, Transform> poses;
+	for(unsigned int i=0; i<msg->data.poseIDs.size() && i<msg->data.poses.size(); ++i)
+	{
+		poses.insert(std::make_pair(msg->data.poseIDs[i], transformFromPoseMsg(msg->data.poses[i])));
 	}
 	stat.setPoses(poses);
+
+	std::map<int, int> mapIds;
+	for(unsigned int i=0; i<msg->data.mapIDs.size() && i<msg->data.maps.size(); ++i)
+	{
+		mapIds.insert(std::make_pair(msg->data.mapIDs[i], msg->data.maps[i]));
+	}
+	stat.setMapIds(mapIds);
 
 	this->post(new RtabmapEvent(stat));
 }
@@ -226,10 +251,10 @@ void GuiWrapper::mapDataReceivedCallback(const rtabmap::MapDataConstPtr & msg)
 				(int)msg->depths.size(), (int)msg->depthIDs.size());
 	}
 
-	if(msg->depth2DIDs.size() != msg->depths2D.size())
+	if(msg->depth2DIDs.size() != msg->depth2Ds.size())
 	{
 		ROS_WARN("rtabmapviz: receiving map... depths2D and IDs are not the same size (%d vs %d)!",
-				(int)msg->depths2D.size(), (int)msg->depth2DIDs.size());
+				(int)msg->depth2Ds.size(), (int)msg->depth2DIDs.size());
 	}
 
 	if(msg->depthConstantIDs.size() != msg->depthConstants.size())
@@ -248,9 +273,9 @@ void GuiWrapper::mapDataReceivedCallback(const rtabmap::MapDataConstPtr & msg)
 		depths.insert(std::make_pair(msg->depthIDs[i], msg->depths[i].bytes));
 	}
 
-	for(unsigned int i=0; i<msg->depth2DIDs.size() && i < msg->depths2D.size(); ++i)
+	for(unsigned int i=0; i<msg->depth2DIDs.size() && i < msg->depth2Ds.size(); ++i)
 	{
-		depths2d.insert(std::make_pair(msg->depth2DIDs[i], msg->depths2D[i].bytes));
+		depths2d.insert(std::make_pair(msg->depth2DIDs[i], msg->depth2Ds[i].bytes));
 	}
 
 	for(unsigned int i=0; i<msg->depthConstantIDs.size() && i < msg->depthConstants.size(); ++i)

@@ -1,6 +1,10 @@
 
 Header header
 
+# Map ids
+int32[] mapIDs
+int32[] maps
+
 # compressed images
 # use rtabmap::util3d::uncompressImage() from <rtabmap/core/util3d.h>
 # std::map<int, uint8[]> images;
@@ -17,7 +21,7 @@ rtabmap/Bytes[] depths
 # use rtabmap::util3d::uncompressData() from <rtabmap/core/util3d.h>
 # std::map<int, uint8[]> depths2d;
 int32[] depth2DIDs
-rtabmap/Bytes[] depths2D
+rtabmap/Bytes[] depth2Ds
 
 # depth constants
 int32[] depthConstantIDs

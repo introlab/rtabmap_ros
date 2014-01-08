@@ -7,11 +7,8 @@
 Header header
 
 int32 refId
-int32 refMapId
 int32 loopClosureId
-int32 loopClosureMapId
 int32 localLoopClosureId
-int32 localLoopClosureMapId
 
 # std::map<int, Poses> poses;
 int32[] nodeIds

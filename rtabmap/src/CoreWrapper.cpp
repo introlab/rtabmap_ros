@@ -650,12 +650,12 @@ bool CoreWrapper::publishMapDataCallback(std_srvs::Empty::Request&, std_srvs::Em
 		}
 
 		msg->depth2DIDs.resize(depths2d.size());
-		msg->depths2D.resize(depths2d.size());
+		msg->depth2Ds.resize(depths2d.size());
 		i=0;
 		for(std::map<int, std::vector<unsigned char> >::iterator iter = depths2d.begin(); iter!=depths2d.end(); ++iter)
 		{
 			msg->depth2DIDs[i] = iter->first;
-			msg->depths2D[i].bytes = iter->second;
+			msg->depth2Ds[i].bytes = iter->second;
 			++i;
 		}
 
@@ -709,11 +709,8 @@ void CoreWrapper::publishStats(const Statistics & stats)
 			msg->header.frame_id = mapFrameId_;
 
 			msg->refId = stats.refImageId();
-			msg->refMapId = stats.refImageMapId();
 			msg->loopClosureId = stats.loopClosureId();
-			msg->loopClosureMapId = stats.loopClosureMapId();
 			msg->localLoopClosureId = stats.localLoopClosureId();
-			msg->localLoopClosureMapId = stats.localLoopClosureMapId();
 
 			msg->nodeIds.resize(stats.poses().size());
 			msg->nodePoses.resize(stats.poses().size());
@@ -742,34 +739,28 @@ void CoreWrapper::publishStats(const Statistics & stats)
 			msg->header.frame_id = mapFrameId_;
 
 			msg->refId = stats.refImageId();
-			msg->refMapId = stats.refImageMapId();
 			msg->loopClosureId = stats.loopClosureId();
-			msg->loopClosureMapId = stats.loopClosureMapId();
 			msg->localLoopClosureId = stats.localLoopClosureId();
-			msg->localLoopClosureMapId = stats.localLoopClosureMapId();
 
-			msg->nodeIds.resize(stats.poses().size());
-			msg->nodePoses.resize(stats.poses().size());
+			msg->data.poseIDs.resize(stats.poses().size());
+			msg->data.poses.resize(stats.poses().size());
 			int i=0;
 			for(std::map<int, Transform>::const_iterator iter = stats.poses().begin();
 				iter!=stats.poses().end();
 				++iter)
 			{
-				msg->nodeIds[i] = iter->first;
-				transformToPoseMsg(iter->second, msg->nodePoses[i]);
+				msg->data.poseIDs[i] = iter->first;
+				transformToPoseMsg(iter->second, msg->data.poses[i]);
 				++i;
 			}
 
-			transformToGeometryMsg(stats.mapCorrection(), msg->mapCorrection);
+			transformToGeometryMsg(stats.mapCorrection(), msg->data.mapCorrection);
 			transformToGeometryMsg(stats.loopClosureTransform(), msg->loopClosureTransform);
 			transformToPoseMsg(stats.currentPose(), msg->currentPose);
 
 			// Detailed info
 			if(stats.extended())
 			{
-				msg->refImage = stats.refImage();
-				msg->loopImage = stats.loopImage();
-
 				//Posterior, likelihood, childCount
 				msg->posteriorKeys = uKeys(stats.posterior());
 				msg->posteriorValues = uValues(stats.posterior());
@@ -819,17 +810,56 @@ void CoreWrapper::publishStats(const Statistics & stats)
 				msg->statsKeys = uKeys(stats.data());
 				msg->statsValues = uValues(stats.data());
 
+				msg->data.mapIDs = uKeys(stats.getMapIds());
+				msg->data.maps = uValues(stats.getMapIds());
+
 				//RGB-D SLAM data
-				msg->refDepth = stats.refDepth();
-				msg->refDepth2D = stats.refDepth2D();
-				msg->loopDepth = stats.loopDepth();
-				msg->loopDepth2D = stats.loopDepth2D();
+				msg->data.imageIDs.resize(stats.getImages().size());
+				msg->data.images.resize(stats.getImages().size());
+				index = 0;
+				for(std::map<int, std::vector<unsigned char> >::const_iterator i=stats.getImages().begin();
+					i!=stats.getImages().end();
+					++i)
+				{
+					msg->data.imageIDs[index] = i->first;
+					msg->data.images[index].bytes = i->second;
+				}
 
-				msg->refDepthConstant = stats.refDepthConstant();
-				msg->loopDepthConstant = stats.loopDepthConstant();
+				msg->data.depthIDs.resize(stats.getDepths().size());
+				msg->data.depths.resize(stats.getDepths().size());
+				index = 0;
+				for(std::map<int, std::vector<unsigned char> >::const_iterator i=stats.getDepths().begin();
+					i!=stats.getDepths().end();
+					++i)
+				{
+					msg->data.depthIDs[index] = i->first;
+					msg->data.depths[index].bytes = i->second;
+				}
 
-				transformToGeometryMsg(stats.refLocalTransform(), msg->refLocalTransform);
-				transformToGeometryMsg(stats.loopLocalTransform(), msg->loopLocalTransform);
+				msg->data.depth2DIDs.resize(stats.getDepth2ds().size());
+				msg->data.depth2Ds.resize(stats.getDepth2ds().size());
+				index = 0;
+				for(std::map<int, std::vector<unsigned char> >::const_iterator i=stats.getDepth2ds().begin();
+					i!=stats.getDepth2ds().end();
+					++i)
+				{
+					msg->data.depth2DIDs[index] = i->first;
+					msg->data.depth2Ds[index].bytes = i->second;
+				}
+
+				msg->data.localTransformIDs.resize(stats.getLocalTransforms().size());
+				msg->data.localTransforms.resize(stats.getLocalTransforms().size());
+				index = 0;
+				for(std::map<int, Transform>::const_iterator i=stats.getLocalTransforms().begin();
+					i!=stats.getLocalTransforms().end();
+					++i)
+				{
+					msg->data.localTransformIDs[index] = i->first;
+					transformToGeometryMsg(i->second, msg->data.localTransforms[index]);
+				}
+
+				msg->data.depthConstantIDs = uKeys(stats.getDepthConstants());
+				msg->data.depthConstants = uValues(stats.getDepthConstants());
 			}
 			infoPubEx_.publish(msg);
 		}
