@@ -62,7 +62,9 @@ public:
 		{
 			if((uSplit(iter->first, '/').front().compare("Odom") == 0 ||
 				uSplit(iter->first, '/').front().compare("OdomBin") == 0 ||
-				uSplit(iter->first, '/').front().compare("Kp") == 0)
+				uSplit(iter->first, '/').front().compare("Kp") == 0 ||
+				uSplit(iter->first, '/').front().compare("SURF") == 0 ||
+				uSplit(iter->first, '/').front().compare("SIFT") == 0)
 			   &&
 			   uSplit(iter->first, '/').front().compare("OdomICP") != 0)
 			{
@@ -278,7 +280,9 @@ int main(int argc, char *argv[])
 				{
 					if((uSplit(iter->first, '/').front().compare("Odom") == 0 ||
 						uSplit(iter->first, '/').front().compare("OdomBin") == 0 ||
-						uSplit(iter->first, '/').front().compare("Kp") == 0)
+						uSplit(iter->first, '/').front().compare("Kp") == 0 ||
+						uSplit(iter->first, '/').front().compare("SURF") == 0 ||
+						uSplit(iter->first, '/').front().compare("SIFT") == 0)
 					   &&
 					   uSplit(iter->first, '/').front().compare("OdomICP") != 0)
 					{
