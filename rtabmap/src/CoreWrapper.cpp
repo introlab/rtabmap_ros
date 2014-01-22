@@ -172,7 +172,8 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	pauseSrv_ = nh.advertiseService("pause", &CoreWrapper::pauseRtabmapCallback, this);
 	resumeSrv_ = nh.advertiseService("resume", &CoreWrapper::resumeRtabmapCallback, this);
 	triggerNewMapSrv_ = nh.advertiseService("trigger_new_map", &CoreWrapper::triggerNewMapCallback, this);
-	publishMapDataSrv_ = nh.advertiseService("publish_map_data", &CoreWrapper::publishMapDataCallback, this);
+	publishFullMapDataSrv_ = nh.advertiseService("publish_full_map_data", &CoreWrapper::publishFullMapDataCallback, this);
+	publishCurrentMapDataSrv_ = nh.advertiseService("publish_current_map_data", &CoreWrapper::publishCurrentMapDataCallback, this);
 
 
 	setupCallbacks(subscribeDepth, subscribeLaserScan, queueSize);
@@ -603,16 +604,27 @@ bool CoreWrapper::triggerNewMapCallback(std_srvs::Empty::Request&, std_srvs::Emp
 	return true;
 }
 
-bool CoreWrapper::publishMapDataCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+bool CoreWrapper::publishFullMapDataCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
-	ROS_INFO("rtabmap: Publishing map data...");
+	publishMapData(true);
+	return true;
+}
+
+bool CoreWrapper::publishCurrentMapDataCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+{
+	publishMapData(false);
+	return true;
+}
+
+void CoreWrapper::publishMapData(bool full)
+{
+	ROS_INFO("rtabmap: Publishing map data (full=%s)...", full?"true":"false");
 	std::map<int, std::vector<unsigned char> > images;
 	std::map<int, std::vector<unsigned char> > depths;
 	std::map<int, std::vector<unsigned char> > depths2d;
 	std::map<int, float> depthConstants;
 	std::map<int, Transform> localTransforms;
 	std::map<int, Transform> poses;
-	Transform mapCorrection;
 
 	if(mapData_.getNumSubscribers())
 	{
@@ -625,7 +637,8 @@ bool CoreWrapper::publishMapDataCallback(std_srvs::Empty::Request&, std_srvs::Em
 				depthConstants,
 				localTransforms,
 				poses,
-				mapCorrection);
+				true,
+				full);
 
 		int i=0;
 
@@ -689,12 +702,8 @@ bool CoreWrapper::publishMapDataCallback(std_srvs::Empty::Request&, std_srvs::Em
 			++i;
 		}
 
-		transformToGeometryMsg(mapCorrection, msg->mapCorrection);
-
 		mapData_.publish(msg);
 	}
-
-	return true;
 }
 
 void CoreWrapper::publishStats(const Statistics & stats)
@@ -754,7 +763,7 @@ void CoreWrapper::publishStats(const Statistics & stats)
 				++i;
 			}
 
-			transformToGeometryMsg(stats.mapCorrection(), msg->data.mapCorrection);
+			transformToGeometryMsg(stats.mapCorrection(), msg->mapCorrection);
 			transformToGeometryMsg(stats.loopClosureTransform(), msg->loopClosureTransform);
 			transformToPoseMsg(stats.currentPose(), msg->currentPose);
 
@@ -823,6 +832,7 @@ void CoreWrapper::publishStats(const Statistics & stats)
 				{
 					msg->data.imageIDs[index] = i->first;
 					msg->data.images[index].bytes = i->second;
+					++index;
 				}
 
 				msg->data.depthIDs.resize(stats.getDepths().size());
@@ -834,6 +844,7 @@ void CoreWrapper::publishStats(const Statistics & stats)
 				{
 					msg->data.depthIDs[index] = i->first;
 					msg->data.depths[index].bytes = i->second;
+					++index;
 				}
 
 				msg->data.depth2DIDs.resize(stats.getDepth2ds().size());
@@ -845,6 +856,7 @@ void CoreWrapper::publishStats(const Statistics & stats)
 				{
 					msg->data.depth2DIDs[index] = i->first;
 					msg->data.depth2Ds[index].bytes = i->second;
+					++index;
 				}
 
 				msg->data.localTransformIDs.resize(stats.getLocalTransforms().size());
@@ -856,6 +868,7 @@ void CoreWrapper::publishStats(const Statistics & stats)
 				{
 					msg->data.localTransformIDs[index] = i->first;
 					transformToGeometryMsg(i->second, msg->data.localTransforms[index]);
+					++index;
 				}
 
 				msg->data.depthConstantIDs = uKeys(stats.getDepthConstants());

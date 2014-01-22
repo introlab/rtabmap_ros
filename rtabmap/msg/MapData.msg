@@ -35,5 +35,3 @@ geometry_msgs/Transform[] localTransforms
 int32[] poseIDs
 geometry_msgs/Pose[] poses
 
-geometry_msgs/Transform mapCorrection
-

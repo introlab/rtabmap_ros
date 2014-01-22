@@ -9,10 +9,12 @@ int32 refId
 int32 loopClosureId
 int32 localLoopClosureId
 
-# The map data (rgb, depth, depthConstant, depth2D, localTransform, poses, map ids, mapCorrection)
+# The map data (rgb, depth, depthConstant, depth2D, localTransform, poses, map ids)
 rtabmap/MapData data
 
+geometry_msgs/Transform mapCorrection
 geometry_msgs/Transform loopClosureTransform
+
 geometry_msgs/Pose currentPose
 
 ####

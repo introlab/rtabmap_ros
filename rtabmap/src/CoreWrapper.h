@@ -74,7 +74,10 @@ private:
 	bool pauseRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool resumeRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool triggerNewMapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
-	bool publishMapDataCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
+	bool publishFullMapDataCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
+	bool publishCurrentMapDataCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
+
+	void publishMapData(bool full);
 
 	rtabmap::ParametersMap loadParameters(const std::string & configFile);
 	void saveParameters(const std::string & configFile);
@@ -135,7 +138,8 @@ private:
 	ros::ServiceServer pauseSrv_;
 	ros::ServiceServer resumeSrv_;
 	ros::ServiceServer triggerNewMapSrv_;
-	ros::ServiceServer publishMapDataSrv_;
+	ros::ServiceServer publishFullMapDataSrv_;
+	ros::ServiceServer publishCurrentMapDataSrv_;
 
 	boost::thread* transformThread_;
 

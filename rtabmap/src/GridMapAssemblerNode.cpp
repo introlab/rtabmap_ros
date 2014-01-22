@@ -227,7 +227,7 @@ public:
 			UASSERT_MSG(upperbound >= 0 && upperbound < grid.rows, uFormat("upperbound=%f grid.cols=%d x+1=%d slope=%f b=%f", upperbound, grid.cols, x+1, slope, b).c_str());
 			for(int y = lowerbound; y<=(int)upperbound; ++y)
 			{
-				if(grid.at<char>(y, x) == -1)
+				//if(grid.at<char>(y, x) == -1)
 				{
 					grid.at<char>(y, x) = 0; // free space
 				}

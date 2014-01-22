@@ -173,7 +173,7 @@ void GuiWrapper::infoExReceivedCallback(const rtabmap::InfoExConstPtr & msg)
 	}
 
 	//RGB-D SLAM data
-	stat.setMapCorrection(transformFromGeometryMsg(msg->data.mapCorrection));
+	stat.setMapCorrection(transformFromGeometryMsg(msg->mapCorrection));
 	stat.setLoopClosureTransform(transformFromGeometryMsg(msg->loopClosureTransform));
 	stat.setCurrentPose(transformFromPoseMsg(msg->currentPose));
 
@@ -237,7 +237,6 @@ void GuiWrapper::mapDataReceivedCallback(const rtabmap::MapDataConstPtr & msg)
 	std::map<int, float> depthConstants;
 	std::map<int, Transform> localTransforms;
 	std::map<int, Transform> poses;
-	Transform mapCorrection;
 
 	if(msg->imageIDs.size() != msg->images.size())
 	{
@@ -295,15 +294,12 @@ void GuiWrapper::mapDataReceivedCallback(const rtabmap::MapDataConstPtr & msg)
 		poses.insert(std::make_pair(msg->poseIDs[i], t));
 	}
 
-	mapCorrection = transformFromGeometryMsg(msg->mapCorrection);
-
 	this->post(new RtabmapEvent3DMap(images,
 			depths,
 			depths2d,
 			depthConstants,
 			localTransforms,
-			poses,
-			mapCorrection));
+			poses));
 }
 
 void GuiWrapper::handleEvent(UEvent * anEvent)
@@ -393,9 +389,25 @@ void GuiWrapper::handleEvent(UEvent * anEvent)
 		{
 			if(mapDataTopic_.getNumPublishers())
 			{
-				if(!ros::service::call("publish_map_data", srv))
+				if(!ros::service::call("publish_current_map_data", srv))
 				{
-					ROS_WARN("Can't call \"publish_map_data\" service");
+					ROS_WARN("Can't call \"publish_current_map_data\" service");
+					this->post(new RtabmapEvent3DMap(1)); // service error
+				}
+			}
+			else
+			{
+				ROS_WARN("No publisher subscribed for topic \"%s\", map cannot be downloaded!", mapDataTopic_.getTopic().c_str());
+				this->post(new RtabmapEvent3DMap(2)); // topic error
+			}
+		}
+		else if(cmd == rtabmap::RtabmapEventCmd::kCmdPublish3DMapFull)
+		{
+			if(mapDataTopic_.getNumPublishers())
+			{
+				if(!ros::service::call("publish_full_map_data", srv))
+				{
+					ROS_WARN("Can't call \"publish_full_map_data\" service");
 					this->post(new RtabmapEvent3DMap(1)); // service error
 				}
 			}
