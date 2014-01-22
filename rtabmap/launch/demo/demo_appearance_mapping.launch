@@ -35,7 +35,6 @@
 	</node>
   </group>
   
-	<!-- uimage pkg is from the UtiLite stack : svn checkout http://utilite.googlecode.com/svn/trunk/ros-pkg utilite -->
 	<!-- When parameter video_or_images_path is set, the camera uses the directory of images or the video file -->
 	<node name="camera" pkg="rtabmap" type="camera" output="screen">
 		<remap from="image" to="image"/>
