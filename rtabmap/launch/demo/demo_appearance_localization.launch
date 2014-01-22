@@ -19,6 +19,7 @@
 		<param name="Rtabmap/DetectionRate" type="string" value="1"/>     <!-- Don't need to do fast detection on localization -->
 		<param name="Mem/STMSize" type="string" value="1"/>               <!-- 1 location in short-term memory -->
 		<param name="Mem/IncrementalMemory" type="string" value="false"/>  <!-- false = Localization mode-->
+		<param name="Mem/BadSignaturesIgnored" type="string" value="true"/>
 	</node>
 	
 	<!-- visualization of the "infoEx" topic sent by rtabmap node -->
