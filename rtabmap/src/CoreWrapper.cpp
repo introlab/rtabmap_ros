@@ -625,6 +625,7 @@ void CoreWrapper::publishMapData(bool full)
 	std::map<int, float> depthConstants;
 	std::map<int, Transform> localTransforms;
 	std::map<int, Transform> poses;
+	std::multimap<int, Link> constraints;
 
 	if(mapData_.getNumSubscribers())
 	{
@@ -637,6 +638,7 @@ void CoreWrapper::publishMapData(bool full)
 				depthConstants,
 				localTransforms,
 				poses,
+				constraints,
 				true,
 				full);
 
@@ -702,6 +704,20 @@ void CoreWrapper::publishMapData(bool full)
 			++i;
 		}
 
+		msg->constraintFromIDs.resize(constraints.size());
+		msg->constraintToIDs.resize(constraints.size());
+		msg->constraintTypes.resize(constraints.size());
+		msg->constraints.resize(constraints.size());
+		i=0;
+		for(std::multimap<int, Link>::iterator iter = constraints.begin(); iter!=constraints.end(); ++iter)
+		{
+			msg->constraintFromIDs[i] = iter->first;
+			msg->constraintToIDs[i] = iter->second.to();
+			msg->constraintTypes[i] = iter->second.type();
+			transformToGeometryMsg(iter->second.transform(), msg->constraints[i]);
+			++i;
+		}
+
 		mapData_.publish(msg);
 	}
 }
@@ -760,6 +776,20 @@ void CoreWrapper::publishStats(const Statistics & stats)
 			{
 				msg->data.poseIDs[i] = iter->first;
 				transformToPoseMsg(iter->second, msg->data.poses[i]);
+				++i;
+			}
+
+			msg->data.constraintFromIDs.resize(stats.constraints().size());
+			msg->data.constraintToIDs.resize(stats.constraints().size());
+			msg->data.constraintTypes.resize(stats.constraints().size());
+			msg->data.constraints.resize(stats.constraints().size());
+			i=0;
+			for(std::multimap<int, Link>::const_iterator iter = stats.constraints().begin(); iter!=stats.constraints().end(); ++iter)
+			{
+				msg->data.constraintFromIDs[i] = iter->first;
+				msg->data.constraintToIDs[i] = iter->second.to();
+				msg->data.constraintTypes[i] = iter->second.type();
+				transformToGeometryMsg(iter->second.transform(), msg->data.constraints[i]);
 				++i;
 			}
 

@@ -219,6 +219,14 @@ void GuiWrapper::infoExReceivedCallback(const rtabmap::InfoExConstPtr & msg)
 	}
 	stat.setPoses(poses);
 
+	std::multimap<int, Link> constraints;
+	for(unsigned int i=0; i<msg->data.constraintFromIDs.size() && i<msg->data.constraintToIDs.size() && i<msg->data.constraintTypes.size() && i < msg->data.constraints.size(); ++i)
+	{
+		Transform t = transformFromGeometryMsg(msg->data.constraints[i]);
+		constraints.insert(std::make_pair(msg->data.constraintFromIDs[i], Link(msg->data.constraintFromIDs[i], msg->data.constraintToIDs[i], t, (Link::Type)msg->data.constraintTypes[i])));
+	}
+	stat.setConstraints(constraints);
+
 	std::map<int, int> mapIds;
 	for(unsigned int i=0; i<msg->data.mapIDs.size() && i<msg->data.maps.size(); ++i)
 	{
@@ -237,6 +245,7 @@ void GuiWrapper::mapDataReceivedCallback(const rtabmap::MapDataConstPtr & msg)
 	std::map<int, float> depthConstants;
 	std::map<int, Transform> localTransforms;
 	std::map<int, Transform> poses;
+	std::multimap<int, Link> constraints;
 
 	if(msg->imageIDs.size() != msg->images.size())
 	{
@@ -260,6 +269,20 @@ void GuiWrapper::mapDataReceivedCallback(const rtabmap::MapDataConstPtr & msg)
 	{
 		ROS_WARN("rtabmapviz: receiving map... depthConstants and IDs are not the same size (%d vs %d)!",
 				(int)msg->depthConstants.size(), (int)msg->depthConstantIDs.size());
+	}
+
+	if(msg->poseIDs.size() != msg->poses.size())
+	{
+		ROS_WARN("rtabmapviz: receiving map... poses and IDs are not the same size (%d vs %d)!",
+				(int)msg->poses.size(), (int)msg->poseIDs.size());
+	}
+
+	if(msg->constraintFromIDs.size() != msg->constraints.size() ||
+	   msg->constraintToIDs.size() != msg->constraints.size() ||
+	   msg->constraintTypes.size() != msg->constraints.size())
+	{
+		ROS_WARN("rtabmapviz: receiving map... constraints and IDs are not the same size (%d vs %d vs %d vs %d)!",
+				(int)msg->constraints.size(), (int)msg->constraintFromIDs.size(), (int)msg->constraintToIDs.size(), (int)msg->constraintTypes.size());
 	}
 
 	for(unsigned int i=0; i<msg->imageIDs.size() && i < msg->images.size(); ++i)
@@ -294,12 +317,19 @@ void GuiWrapper::mapDataReceivedCallback(const rtabmap::MapDataConstPtr & msg)
 		poses.insert(std::make_pair(msg->poseIDs[i], t));
 	}
 
+	for(unsigned int i=0; i<msg->constraintFromIDs.size() && i<msg->constraintToIDs.size() && i<msg->constraintTypes.size() && i < msg->constraints.size(); ++i)
+	{
+		Transform t = transformFromGeometryMsg(msg->constraints[i]);
+		constraints.insert(std::make_pair(msg->constraintFromIDs[i], Link(msg->constraintFromIDs[i], msg->constraintToIDs[i], t, (Link::Type)msg->constraintTypes[i])));
+	}
+
 	this->post(new RtabmapEvent3DMap(images,
 			depths,
 			depths2d,
 			depthConstants,
 			localTransforms,
-			poses));
+			poses,
+			constraints));
 }
 
 void GuiWrapper::handleEvent(UEvent * anEvent)

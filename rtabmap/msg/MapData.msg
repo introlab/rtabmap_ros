@@ -31,7 +31,13 @@ float32[] depthConstants
 int32[] localTransformIDs
 geometry_msgs/Transform[] localTransforms
 
-# std::map<int, Poses> poses;
+# std::map<int, Pose> poses;
 int32[] poseIDs
 geometry_msgs/Pose[] poses
+
+# std::multimap<int, Link> constraints;
+int32[] constraintFromIDs
+int32[] constraintToIDs
+int32[] constraintTypes
+geometry_msgs/Transform[] constraints
 
