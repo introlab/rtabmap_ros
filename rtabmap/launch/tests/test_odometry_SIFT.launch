@@ -1,11 +1,6 @@
 
 <launch>
-   
-   <!-- Kinect -->
-  <include file="$(find openni_launch)/launch/openni.launch">
-  	<arg name="depth_registration" value="True" />
-  </include>
-  
+     
   <!-- TF FRAMES -->
   <node pkg="tf" type="static_transform_publisher" name="base_to_camera_tf" 
   	args="0.0 0.0 0.0 0.0 0.0 0.0 /base_link /camera_link 100" />
@@ -14,7 +9,7 @@
    
   <!-- sync cloud with odometry and voxelize the point cloud (for fast visualization in rviz) -->
   <node pkg="nodelet" type="nodelet" name="data_odom_sync" args="load rtabmap/data_odom_sync standalone_nodelet">
-    <remap from="rgb/image_in"       to="camera/rgb/image_color"/>
+    <remap from="rgb/image_in"       to="camera/rgb/image_rect_color"/>
     <remap from="depth/image_in"     to="camera/depth_registered/image_raw"/>
     <remap from="rgb/camera_info_in" to="camera/depth_registered/camera_info"/>
     <remap from="odom_in"             to="odom"/>
@@ -38,7 +33,7 @@
   
   <!-- Odometry -->
   <node pkg="rtabmap" type="visual_odometry" name="visual_odometry" output="screen">
-  	<remap from="rgb/image"       to="camera/rgb/image_color"/>
+  	<remap from="rgb/image"       to="camera/rgb/image_rect_color"/>
   	<remap from="depth/image"     to="camera/depth_registered/image_raw"/>
   	<remap from="rgb/camera_info" to="camera/depth_registered/camera_info"/>
 	<remap from="odom" to="odom"/>

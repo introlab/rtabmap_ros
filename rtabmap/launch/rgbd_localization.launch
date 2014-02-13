@@ -2,19 +2,14 @@
 <launch>
    
    <!-- RGB-D LOCALIZATION VERSION -->
-   
-  <!-- Kinect -->
-  <include file="$(find openni_launch)/launch/openni.launch">
-    <arg name="depth_registration" value="True" />
-  </include>
-  
+     
   <!-- TF FRAMES -->
   <node pkg="tf" type="static_transform_publisher" name="base_to_camera_tf" 
     args="0.0 0.0 0.0 0.0 0.0 0.0 /base_link /camera_link 100" />
    
   <!-- Odometry -->
   <node pkg="rtabmap" type="visual_odometry" name="visual_odometry" output="screen">
-    <remap from="rgb/image"       to="camera/rgb/image_color"/>
+    <remap from="rgb/image"       to="camera/rgb/image_rect_color"/>
     <remap from="depth/image"     to="camera/depth_registered/image_raw"/>
     <remap from="rgb/camera_info" to="camera/depth_registered/camera_info"/>
    
@@ -33,7 +28,7 @@
       <param name="subscribe_depth" type="bool" value="true"/>
       <param name="subscribe_laserScan" type="bool" value="false"/>
 	
-      <remap from="rgb/image" to="/camera/rgb/image_color"/>
+      <remap from="rgb/image" to="/camera/rgb/image_rect_color"/>
       <remap from="depth/image" to="/camera/depth_registered/image_raw"/>
       <remap from="rgb/camera_info" to="/camera/depth_registered/camera_info"/>
       <remap from="odom" to="/odom"/>
@@ -54,7 +49,7 @@
       <param name="subscribe_laserScan" type="bool" value="false"/>
       <param name="queue_size" type="int" value="30"/>
     
-      <remap from="rgb/image" to="/camera/rgb/image_color"/>
+      <remap from="rgb/image" to="/camera/rgb/image_rect_color"/>
       <remap from="depth/image" to="/camera/depth_registered/image_raw"/>
       <remap from="rgb/camera_info" to="/camera/depth_registered/camera_info"/>
       <remap from="odom" to="/odom"/>
