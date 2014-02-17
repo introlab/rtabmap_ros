@@ -419,9 +419,9 @@ void GuiWrapper::handleEvent(UEvent * anEvent)
 		{
 			if(mapDataTopic_.getNumPublishers())
 			{
-				if(!ros::service::call("publish_current_map_data", srv))
+				if(!ros::service::call("publish_local_map_data", srv))
 				{
-					ROS_WARN("Can't call \"publish_current_map_data\" service");
+					ROS_WARN("Can't call \"publish_local_map_data\" service");
 					this->post(new RtabmapEvent3DMap(1)); // service error
 				}
 			}
@@ -435,9 +435,9 @@ void GuiWrapper::handleEvent(UEvent * anEvent)
 		{
 			if(mapDataTopic_.getNumPublishers())
 			{
-				if(!ros::service::call("publish_full_map_data", srv))
+				if(!ros::service::call("publish_global_map_data", srv))
 				{
-					ROS_WARN("Can't call \"publish_full_map_data\" service");
+					ROS_WARN("Can't call \"publish_global_map_data\" service");
 					this->post(new RtabmapEvent3DMap(1)); // service error
 				}
 			}

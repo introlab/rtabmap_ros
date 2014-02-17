@@ -158,7 +158,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	}
 	if(paused_)
 	{
-		UWARN("Node paused... dont' forget to call service \"pause_rtabmap\" to start rtabmap.");
+		UWARN("Node paused... dont' forget to call service \"resume\" to start rtabmap.");
 	}
 
 	// Init RTAB-Map
@@ -172,8 +172,8 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	pauseSrv_ = nh.advertiseService("pause", &CoreWrapper::pauseRtabmapCallback, this);
 	resumeSrv_ = nh.advertiseService("resume", &CoreWrapper::resumeRtabmapCallback, this);
 	triggerNewMapSrv_ = nh.advertiseService("trigger_new_map", &CoreWrapper::triggerNewMapCallback, this);
-	publishFullMapDataSrv_ = nh.advertiseService("publish_full_map_data", &CoreWrapper::publishFullMapDataCallback, this);
-	publishCurrentMapDataSrv_ = nh.advertiseService("publish_current_map_data", &CoreWrapper::publishCurrentMapDataCallback, this);
+	publishGlobalMapDataSrv_ = nh.advertiseService("publish_global_map_data", &CoreWrapper::publishGlobalMapDataCallback, this);
+	publishLocalMapDataSrv_ = nh.advertiseService("publish_local_map_data", &CoreWrapper::publishLocalMapDataCallback, this);
 
 
 	setupCallbacks(subscribeDepth, subscribeLaserScan, queueSize);
@@ -604,21 +604,21 @@ bool CoreWrapper::triggerNewMapCallback(std_srvs::Empty::Request&, std_srvs::Emp
 	return true;
 }
 
-bool CoreWrapper::publishFullMapDataCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+bool CoreWrapper::publishGlobalMapDataCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
 	publishMapData(true);
 	return true;
 }
 
-bool CoreWrapper::publishCurrentMapDataCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+bool CoreWrapper::publishLocalMapDataCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
 	publishMapData(false);
 	return true;
 }
 
-void CoreWrapper::publishMapData(bool full)
+void CoreWrapper::publishMapData(bool global)
 {
-	ROS_INFO("rtabmap: Publishing map data (full=%s)...", full?"true":"false");
+	ROS_INFO("rtabmap: Publishing map data (global=%s)...", global?"true":"false");
 	std::map<int, std::vector<unsigned char> > images;
 	std::map<int, std::vector<unsigned char> > depths;
 	std::map<int, std::vector<unsigned char> > depths2d;
@@ -640,7 +640,7 @@ void CoreWrapper::publishMapData(bool full)
 				poses,
 				constraints,
 				true,
-				full);
+				global);
 
 		int i=0;
 

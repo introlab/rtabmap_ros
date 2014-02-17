@@ -39,7 +39,7 @@ class DataRecorderWrapper
 {
 public:
 	DataRecorderWrapper() :
-		fileName_(""),
+		fileName_("output.db"),
 		frameId_("base_link"),
 		depthScanSync_(0),
 		depthSync_(0),

@@ -9,7 +9,7 @@ int32 refId
 int32 loopClosureId
 int32 localLoopClosureId
 
-# The map data (rgb, depth, depthConstant, depth2D, localTransform, poses, map ids)
+# The map data (rgb, depth, depthConstant, depth2D, localTransform, poses, constraints, map ids)
 rtabmap/MapData data
 
 geometry_msgs/Transform mapCorrection
@@ -18,7 +18,7 @@ geometry_msgs/Transform loopClosureTransform
 geometry_msgs/Pose currentPose
 
 ####
-# For statistics and visualization below...
+# For statistics and visualization ...
 ####
 # std::map<int, float> posterior;
 int32[] posteriorKeys
