@@ -76,8 +76,11 @@ private:
 	bool triggerNewMapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool publishGlobalMapDataCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool publishLocalMapDataCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
+	bool publishGlobalGraphCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
+	bool publishLocalGraphCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 
 	void publishMapData(bool global);
+	void publishGraph(bool global);
 
 	rtabmap::ParametersMap loadParameters(const std::string & configFile);
 	void saveParameters(const std::string & configFile);
@@ -140,6 +143,8 @@ private:
 	ros::ServiceServer triggerNewMapSrv_;
 	ros::ServiceServer publishGlobalMapDataSrv_;
 	ros::ServiceServer publishLocalMapDataSrv_;
+	ros::ServiceServer publishGlobalGraphSrv_;
+	ros::ServiceServer publishLocalGraphSrv_;
 
 	boost::thread* transformThread_;
 

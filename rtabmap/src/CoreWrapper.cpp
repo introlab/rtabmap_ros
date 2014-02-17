@@ -174,6 +174,8 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	triggerNewMapSrv_ = nh.advertiseService("trigger_new_map", &CoreWrapper::triggerNewMapCallback, this);
 	publishGlobalMapDataSrv_ = nh.advertiseService("publish_global_map_data", &CoreWrapper::publishGlobalMapDataCallback, this);
 	publishLocalMapDataSrv_ = nh.advertiseService("publish_local_map_data", &CoreWrapper::publishLocalMapDataCallback, this);
+	publishGlobalGraphSrv_ = nh.advertiseService("publish_global_graph", &CoreWrapper::publishGlobalGraphCallback, this);
+	publishLocalGraphSrv_ = nh.advertiseService("publish_local_graph", &CoreWrapper::publishLocalGraphCallback, this);
 
 
 	setupCallbacks(subscribeDepth, subscribeLaserScan, queueSize);
@@ -616,6 +618,18 @@ bool CoreWrapper::publishLocalMapDataCallback(std_srvs::Empty::Request&, std_srv
 	return true;
 }
 
+bool CoreWrapper::publishGlobalGraphCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+{
+	publishGraph(true);
+	return true;
+}
+
+bool CoreWrapper::publishLocalGraphCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+{
+	publishGraph(false);
+	return true;
+}
+
 void CoreWrapper::publishMapData(bool global)
 {
 	ROS_INFO("rtabmap: Publishing map data (global=%s)...", global?"true":"false");
@@ -630,7 +644,6 @@ void CoreWrapper::publishMapData(bool global)
 	if(mapData_.getNumSubscribers())
 	{
 		rtabmap::MapDataPtr msg(new rtabmap::MapData);
-		msg->header.stamp = ros::Time::now();
 
 		rtabmap_.get3DMap(images,
 				depths,
@@ -718,6 +731,55 @@ void CoreWrapper::publishMapData(bool global)
 			++i;
 		}
 
+		msg->header.stamp = ros::Time::now();
+		mapData_.publish(msg);
+	}
+}
+
+void CoreWrapper::publishGraph(bool global)
+{
+	ROS_INFO("rtabmap: Publishing graph (global=%s)...", global?"true":"false");
+	std::map<int, Transform> poses;
+	std::multimap<int, Link> constraints;
+
+	if(mapData_.getNumSubscribers())
+	{
+		rtabmap::MapDataPtr msg(new rtabmap::MapData);
+
+		std::map<int, Transform> poses;
+		std::multimap<int, Link> constraints;
+
+		rtabmap_.getGraph(poses,
+				constraints,
+				true,
+				global);
+
+		int i=0;
+		msg->poseIDs.resize(poses.size());
+		msg->poses.resize(poses.size());
+		i=0;
+		for(std::map<int, Transform>::iterator iter = poses.begin(); iter!=poses.end(); ++iter)
+		{
+			msg->poseIDs[i] = iter->first;
+			transformToPoseMsg(iter->second, msg->poses[i]);
+			++i;
+		}
+
+		msg->constraintFromIDs.resize(constraints.size());
+		msg->constraintToIDs.resize(constraints.size());
+		msg->constraintTypes.resize(constraints.size());
+		msg->constraints.resize(constraints.size());
+		i=0;
+		for(std::multimap<int, Link>::iterator iter = constraints.begin(); iter!=constraints.end(); ++iter)
+		{
+			msg->constraintFromIDs[i] = iter->first;
+			msg->constraintToIDs[i] = iter->second.to();
+			msg->constraintTypes[i] = iter->second.type();
+			transformToGeometryMsg(iter->second.transform(), msg->constraints[i]);
+			++i;
+		}
+
+		msg->header.stamp = ros::Time::now();
 		mapData_.publish(msg);
 	}
 }

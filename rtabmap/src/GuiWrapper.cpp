@@ -415,7 +415,7 @@ void GuiWrapper::handleEvent(UEvent * anEvent)
 				ROS_ERROR("Can't call \"trigger_new_map\" service");
 			}
 		}
-		else if(cmd == rtabmap::RtabmapEventCmd::kCmdPublish3DMap)
+		else if(cmd == rtabmap::RtabmapEventCmd::kCmdPublish3DMapLocal)
 		{
 			if(mapDataTopic_.getNumPublishers())
 			{
@@ -431,13 +431,45 @@ void GuiWrapper::handleEvent(UEvent * anEvent)
 				this->post(new RtabmapEvent3DMap(2)); // topic error
 			}
 		}
-		else if(cmd == rtabmap::RtabmapEventCmd::kCmdPublish3DMapFull)
+		else if(cmd == rtabmap::RtabmapEventCmd::kCmdPublish3DMapGlobal)
 		{
 			if(mapDataTopic_.getNumPublishers())
 			{
 				if(!ros::service::call("publish_global_map_data", srv))
 				{
 					ROS_WARN("Can't call \"publish_global_map_data\" service");
+					this->post(new RtabmapEvent3DMap(1)); // service error
+				}
+			}
+			else
+			{
+				ROS_WARN("No publisher subscribed for topic \"%s\", map cannot be downloaded!", mapDataTopic_.getTopic().c_str());
+				this->post(new RtabmapEvent3DMap(2)); // topic error
+			}
+		}
+		else if(cmd == rtabmap::RtabmapEventCmd::kCmdPublishTOROGraphLocal)
+		{
+			if(mapDataTopic_.getNumPublishers())
+			{
+				if(!ros::service::call("publish_local_graph", srv))
+				{
+					ROS_WARN("Can't call \"publish_local_graph\" service");
+					this->post(new RtabmapEvent3DMap(1)); // service error
+				}
+			}
+			else
+			{
+				ROS_WARN("No publisher subscribed for topic \"%s\", map cannot be downloaded!", mapDataTopic_.getTopic().c_str());
+				this->post(new RtabmapEvent3DMap(2)); // topic error
+			}
+		}
+		else if(cmd == rtabmap::RtabmapEventCmd::kCmdPublishTOROGraphGlobal)
+		{
+			if(mapDataTopic_.getNumPublishers())
+			{
+				if(!ros::service::call("publish_global_graph", srv))
+				{
+					ROS_WARN("Can't call \"publish_global_graph\" service");
 					this->post(new RtabmapEvent3DMap(1)); // service error
 				}
 			}
