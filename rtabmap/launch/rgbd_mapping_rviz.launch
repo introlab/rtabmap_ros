@@ -14,6 +14,9 @@
     <remap from="rgb/image"       to="camera/rgb/image_rect_color"/>
     <remap from="depth/image"     to="camera/depth_registered/image_raw"/>
     <remap from="rgb/camera_info" to="camera/depth_registered/camera_info"/>
+    
+    <param name="Odom/MinInliers" type="string" value="10"/>
+	<param name="Odom/InlierDistance" type="string" value="0.01"/>
    
     <param name="frame_id" type="string" value="base_link"/>
   </node>
