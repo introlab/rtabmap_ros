@@ -30,7 +30,7 @@
 	<param name="RGBD/LocalLoopDetectionSpace" type="string" value="false"/> 
 	<param name="RGBD/LocalLoopDetectionTime" type="string" value="false"/> 
 	<param name="Mem/BadSignaturesIgnored" type="string" value="false"/>
-	<param name="LccIcp/Type" type="string" value="1"/>
+	<param name="LccIcp/Type" type="string" value="2"/>
 	<param name="LccIcp2/Iterations" type="string" value="100"/>
 	<param name="LccIcp2/VoxelSize" type="string" value="0"/>
 	<param name="LccBow/MinInliers" type="string" value="5"/>
