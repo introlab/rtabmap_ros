@@ -18,6 +18,7 @@
 #include <rtabmap/utilite/ULogger.h>
 #include <rtabmap/utilite/UFile.h>
 #include <rtabmap/utilite/UStl.h>
+#include <rtabmap/utilite/UTimer.h>
 #include <rtabmap/utilite/UConversion.h>
 #include <opencv2/highgui/highgui.hpp>
 
@@ -457,7 +458,7 @@ void CoreWrapper::process(
 		const Transform & localTransform,
 		const cv::Mat & scan)
 {
-	ROS_INFO("rtabmap: Processing data...");
+	UTimer timer;
 	if(rtabmap_.isIDsGenerated() || id > 0)
 	{
 		cv::Mat depth16;
@@ -517,6 +518,7 @@ void CoreWrapper::process(
 				 "when you need to have IDs output of RTAB-map synchronised with the source "
 				 "image sequence ID.");
 	}
+	ROS_INFO("rtabmap: Processing time = %fs", timer.ticks());
 }
 
 bool CoreWrapper::updateRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)

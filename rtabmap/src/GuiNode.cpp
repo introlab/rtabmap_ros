@@ -10,6 +10,7 @@
 
 #include <QApplication>
 #include <rtabmap/gui/MainWindow.h>
+#include <rtabmap/utilite/ULogger.h>
 #include <signal.h>
 
 void my_handler(int s){
@@ -18,6 +19,11 @@ void my_handler(int s){
 
 int main(int argc, char** argv)
 {
+	ROS_INFO("Starting node...");
+
+	ULogger::setType(ULogger::kTypeConsole);
+	ULogger::setLevel(ULogger::kWarning);
+
 	ros::init(argc, argv, "rtabmapviz");
 
 	GuiWrapper gui(argc, argv);
