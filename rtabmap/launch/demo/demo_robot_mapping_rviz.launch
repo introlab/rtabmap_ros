@@ -40,7 +40,8 @@
   
   <!-- Map assembler for rviz-->
   <node pkg="rtabmap" type="map_assembler" name="map_assembler"  output="screen" args="">
-    <param name="cloud_decimation" type="int" value="4"/>
+    <param name="cloud_decimation" type="int" value="8"/>
+    <param name="cloud_max_depth" type="double" value="4"/>
     <param name="cloud_voxel_size" type="double" value="0.02"/>
     <param name="scan_voxel_size" type="double" value="0.01"/>
   </node>

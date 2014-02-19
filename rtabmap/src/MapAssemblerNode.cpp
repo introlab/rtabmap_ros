@@ -42,11 +42,13 @@ class MapAssembler
 public:
 	MapAssembler() :
 		cloudDecimation_(4),
+		cloudMaxDepth_(4.0),
 		cloudVoxelSize_(0.02),
 		scanVoxelSize_(0.01)
 	{
 		ros::NodeHandle pnh("~");
 		pnh.param("cloud_decimation", cloudDecimation_, cloudDecimation_);
+		pnh.param("cloud_max_depth", cloudMaxDepth_, cloudMaxDepth_);
 		pnh.param("cloud_voxel_size", cloudVoxelSize_, cloudVoxelSize_);
 		pnh.param("scan_voxel_size", scanVoxelSize_, scanVoxelSize_);
 
@@ -104,6 +106,10 @@ public:
 						{
 							pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = util3d::cloudFromDepthRGB(image, depth, depthConstant, cloudDecimation_);
 
+							if(cloudMaxDepth_ > 0)
+							{
+								cloud = util3d::passThrough(cloud, "z", 0, cloudMaxDepth_);
+							}
 							if(cloudVoxelSize_ > 0)
 							{
 								cloud = util3d::voxelize(cloud, cloudVoxelSize_);
@@ -294,6 +300,7 @@ public:
 
 private:
 	int cloudDecimation_;
+	double cloudMaxDepth_;
 	double cloudVoxelSize_;
 	double scanVoxelSize_;
 
