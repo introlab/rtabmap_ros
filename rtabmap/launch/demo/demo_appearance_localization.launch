@@ -16,7 +16,7 @@
 	    <param name="RGBD/Enabled" type="string" value="false"/>          <!-- False: appearance-based -->
 	    <param name="Rtabmap/DatabasePath" type="string" value="~/.ros/rtabmap.db"/>  <!-- Database used for localization -->
 		<param name="Rtabmap/ImageBufferSize" type="string" value="0"/>   <!-- process all images -->
-		<param name="Rtabmap/DetectionRate" type="string" value="1"/>     <!-- Don't need to do fast detection on localization -->
+		<param name="Rtabmap/DetectionRate" type="string" value="0"/>     <!-- Go as fast as the camera rate (here 2 Hz, see below) -->
 		<param name="Mem/STMSize" type="string" value="1"/>               <!-- 1 location in short-term memory -->
 		<param name="Mem/IncrementalMemory" type="string" value="false"/>  <!-- false = Localization mode-->
 		<param name="Mem/BadSignaturesIgnored" type="string" value="true"/>
