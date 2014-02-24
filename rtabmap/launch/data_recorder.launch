@@ -1,0 +1,40 @@
+
+<launch>
+  <node name="data_recorder" pkg="rtabmap" type="data_recorder" output="screen">
+	<param name="output_file_name" value="output.db" type="string"/>  
+	
+	<param name="frame_id" type="string" value="camera_link"/>
+	
+	<param name="subscribe_odometry" type="bool" value="false"/>
+	<param name="subscribe_depth" type="bool" value="true"/>
+	<param name="subscribe_laserScan" type="bool" value="false"/>
+
+	<remap from="rgb/image" to="data_throttled_image"/>
+  	<remap from="depth/image" to="data_throttled_image_depth"/>
+  	<remap from="rgb/camera_info" to="data_throttled_camera_info"/>
+  	
+  	<param name="rgb/image_transport" type="string" value="raw"/>
+    <param name="depth/image_transport" type="string" value="raw"/>
+	
+	<param name="queue_size" type="int" value="10"/>
+  </node>
+
+<!-- Throttling messages -->
+  <node pkg="nodelet" type="nodelet" name="standalone_nodelet"  args="manager"/>
+  <node pkg="nodelet" type="nodelet" name="data_throttle" args="load rtabmap/data_throttle standalone_nodelet" output="screen">
+    <param name="max_rate" type="double" value="10.0"/>
+   
+    <remap from="rgb/image_in"       to="/camera/rgb/image_rect_color"/>
+    <remap from="depth/image_in"     to="/camera/depth_registered/image_raw"/>
+    <remap from="rgb/camera_info_in" to="/camera/depth_registered/camera_info"/>
+    
+    <remap from="rgb/image_out"       to="data_throttled_image"/>
+    <remap from="depth/image_out"     to="data_throttled_image_depth"/>
+    <remap from="rgb/camera_info_out" to="data_throttled_camera_info"/>
+  </node>   
+  
+  <node pkg="image_view" type="image_view" name="image_view">
+  	<remap from="image" to="/camera/depth_registered/image_raw"/>
+  </node>
+
+</launch>
