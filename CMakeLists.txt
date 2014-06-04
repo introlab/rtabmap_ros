@@ -12,7 +12,7 @@ find_package(catkin REQUIRED COMPONENTS
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
-
+find_package(OpenCV 2.4 REQUIRED)
 find_package(RTABMap 0.6 REQUIRED)
 
 ## Uncomment this if the package has a setup.py. This macro ensures
@@ -81,8 +81,20 @@ MESSAGE(STATUS "RTABMap_INCLUDE_DIRS=${RTABMap_INCLUDE_DIRS}")
 include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/include
   ${RTABMap_INCLUDE_DIRS}
+  ${OpenCV_INCLUDE_DIRS}
   ${catkin_INCLUDE_DIRS}
 )
+
+# libraries
+SET(Libraries
+   ${OpenCV_LIBRARIES}
+   ${catkin_LIBRARIES}
+   ${RTABMap_LIBRARIES}
+)
+
+MESSAGE(STATUS "**************************************************")
+MESSAGE(STATUS "OpenCV_INCLUDE_DIRS=${OpenCV_INCLUDE_DIRS}")
+MESSAGE(STATUS "OpenCV_LIBRARIES=${OpenCV_LIBRARIES}")
 
 ## Declare a cpp library
 add_library(rtabmap_ros
@@ -92,35 +104,34 @@ add_library(rtabmap_ros
    src/MsgConversion.cpp
 )
 target_link_libraries(rtabmap_ros
-  ${catkin_LIBRARIES}
-  ${RTABMap_LIBRARIES}
+  ${Libraries}
 )
 
 add_executable(rtabmap src/CoreNode.cpp src/CoreWrapper.cpp)
 add_dependencies(rtabmap rtabmap_generate_messages_cpp)
-target_link_libraries(rtabmap rtabmap_ros ${catkin_LIBRARIES} ${RTABMap_LIBRARIES})
+target_link_libraries(rtabmap rtabmap_ros ${Libraries})
 
 add_executable(visual_odometry src/VisualOdometryNode.cpp)
-target_link_libraries(visual_odometry rtabmap_ros ${catkin_LIBRARIES} ${RTABMap_LIBRARIES})
+target_link_libraries(visual_odometry rtabmap_ros ${Libraries})
 
 add_executable(map_assembler src/MapAssemblerNode.cpp)
-target_link_libraries(map_assembler rtabmap_ros ${catkin_LIBRARIES} ${RTABMap_LIBRARIES})
+target_link_libraries(map_assembler rtabmap_ros ${Libraries})
 
 add_executable(grid_map_assembler src/GridMapAssemblerNode.cpp)
-target_link_libraries(grid_map_assembler rtabmap_ros ${catkin_LIBRARIES} ${RTABMap_LIBRARIES})
+target_link_libraries(grid_map_assembler rtabmap_ros ${Libraries})
 
 add_executable(camera src/CameraNode.cpp)
 add_dependencies(camera ${${PROJECT_NAME}_EXPORTED_TARGETS})
-target_link_libraries(camera ${catkin_LIBRARIES} ${RTABMap_LIBRARIES})
+target_link_libraries(camera ${Libraries})
 
 #Qt stuff
 FIND_PACKAGE(Qt4 COMPONENTS QtCore QtGui REQUIRED)
 INCLUDE(${QT_USE_FILE})
 add_executable(rtabmapviz src/GuiNode.cpp src/GuiWrapper.cpp src/PreferencesDialogROS.cpp)
-target_link_libraries(rtabmapviz rtabmap_ros ${QT_LIBRARIES} ${catkin_LIBRARIES} ${RTABMap_LIBRARIES})
+target_link_libraries(rtabmapviz rtabmap_ros ${QT_LIBRARIES} ${Libraries})
 
 add_executable(data_recorder src/DataRecorderNode.cpp)
-target_link_libraries(data_recorder rtabmap_ros ${catkin_LIBRARIES} ${QT_LIBRARIES} ${RTABMap_LIBRARIES})
+target_link_libraries(data_recorder rtabmap_ros ${QT_LIBRARIES} ${Libraries})
 
 #############
 ## Install ##
