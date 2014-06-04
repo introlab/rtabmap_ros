@@ -92,10 +92,6 @@ SET(Libraries
    ${RTABMap_LIBRARIES}
 )
 
-MESSAGE(STATUS "**************************************************")
-MESSAGE(STATUS "OpenCV_INCLUDE_DIRS=${OpenCV_INCLUDE_DIRS}")
-MESSAGE(STATUS "OpenCV_LIBRARIES=${OpenCV_LIBRARIES}")
-
 ## Declare a cpp library
 add_library(rtabmap_ros
    src/nodelets/data_throttle.cpp
