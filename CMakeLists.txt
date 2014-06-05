@@ -12,7 +12,7 @@ find_package(catkin REQUIRED COMPONENTS
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
-find_package(OpenCV 2.4 REQUIRED)
+find_package(OpenCV 2.4 REQUIRED core highgui flann features2d calib3d imgproc nonfree)
 find_package(RTABMap 0.6 REQUIRED)
 
 ## Uncomment this if the package has a setup.py. This macro ensures
