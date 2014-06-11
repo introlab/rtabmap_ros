@@ -386,6 +386,9 @@ void GuiWrapper::handleEvent(UEvent * anEvent)
 					system(str.c_str());
 				}
 
+				// Pause visual_odometry
+				ros::service::call("pause_odom", srv);
+
 				// Pause rtabmap
 				if(!ros::service::call("pause", srv))
 				{
@@ -399,6 +402,9 @@ void GuiWrapper::handleEvent(UEvent * anEvent)
 				{
 					ROS_ERROR("Can't call \"resume\" service");
 				}
+
+				// Pause visual_odometry
+				ros::service::call("resume_odom", srv);
 
 				// Resume the camera if the rtabmap/camera node is used
 				if(!cameraNodeName_.empty())

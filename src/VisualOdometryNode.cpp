@@ -42,7 +42,8 @@ public:
 		odometry_(0),
 		frameId_("base_link"),
 		odomFrameId_("odom"),
-		sync_(0)
+		sync_(0),
+		paused_(false)
 	{
 		ros::NodeHandle nh;
 
@@ -132,6 +133,8 @@ public:
 		sync_->registerCallback(boost::bind(&VisualOdometry::callback, this, _1, _2, _3));
 
 		resetSrv_ = nh.advertiseService("reset_odom", &VisualOdometry::reset, this);
+		pauseSrv_ = nh.advertiseService("pause_odom", &VisualOdometry::pause, this);
+		resumeSrv_ = nh.advertiseService("resume_odom", &VisualOdometry::resume, this);
 	}
 
 	~VisualOdometry()
@@ -144,101 +147,132 @@ public:
 			const sensor_msgs::ImageConstPtr& depth,
 			const sensor_msgs::CameraInfoConstPtr& cameraInfo)
 	{
-		if(!(image->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
-			 image->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
-			 image->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0) ||
-		   !(depth->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1)==0 ||
-		     depth->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1)==0))
+		if(!paused_)
 		{
-			ROS_ERROR("Input type must be image=mono8,rgb8,bgr8 and image_depth=16UC1");
-			return;
-		}
-		else if(depth->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1)==0)
-		{
-			static bool warned = false;
-			if(!warned)
+			if(!(image->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
+				 image->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
+				 image->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0) ||
+			   !(depth->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1)==0 ||
+				 depth->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1)==0))
 			{
-				ROS_WARN("Input depth type is 32FC1, please use type 16UC1 for depth. The depth images "
-						 "will be processed anyway but with a conversion. This warning is only be printed once...");
-				warned = true;
+				ROS_ERROR("Input type must be image=mono8,rgb8,bgr8 and image_depth=16UC1");
+				return;
 			}
-		}
-
-		tf::StampedTransform localTransform;
-		try
-		{
-			tfListener_.lookupTransform(frameId_, image->header.frame_id, image->header.stamp, localTransform);
-		}
-		catch(tf::TransformException & ex)
-		{
-			ROS_WARN("%s",ex.what());
-			return;
-		}
-
-		ros::WallTime time = ros::WallTime::now();
-
-		if(image->data.size() && depth->data.size() && cameraInfo->K[4] != 0)
-		{
-			float depthConstant = 1.0f/cameraInfo->K[4];
-			cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(image);
-			cv_bridge::CvImageConstPtr ptrDepth = cv_bridge::toCvShare(depth);
-
-			rtabmap::Image data(ptrImage->image,
-					ptrDepth->image.type() == CV_32FC1?util3d::cvtDepthFromFloat(ptrDepth->image):ptrDepth->image,
-					depthConstant,
-					rtabmap::Transform(),
-					rtabmap::transformFromTF(localTransform));
-			rtabmap::Transform pose = odometry_->process(data);
-			if(!pose.isNull())
+			else if(depth->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1)==0)
 			{
-				//*********************
-				// Update odometry
-				//*********************
-				tf::Transform poseTF;
-				rtabmap::transformToTF(pose, poseTF);
-
-				tfBroadcaster_.sendTransform( tf::StampedTransform (poseTF, image->header.stamp, odomFrameId_, frameId_));
-
-				if(odomPub_.getNumSubscribers())
+				static bool warned = false;
+				if(!warned)
 				{
-					//next, we'll publish the odometry message over ROS
+					ROS_WARN("Input depth type is 32FC1, please use type 16UC1 for depth. The depth images "
+							 "will be processed anyway but with a conversion. This warning is only be printed once...");
+					warned = true;
+				}
+			}
+
+			tf::StampedTransform localTransform;
+			try
+			{
+				tfListener_.lookupTransform(frameId_, image->header.frame_id, image->header.stamp, localTransform);
+			}
+			catch(tf::TransformException & ex)
+			{
+				ROS_WARN("%s",ex.what());
+				return;
+			}
+
+			ros::WallTime time = ros::WallTime::now();
+
+			if(image->data.size() && depth->data.size() && cameraInfo->K[4] != 0)
+			{
+				float depthConstant = 1.0f/cameraInfo->K[4];
+				cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(image);
+				cv_bridge::CvImageConstPtr ptrDepth = cv_bridge::toCvShare(depth);
+
+				rtabmap::Image data(ptrImage->image,
+						ptrDepth->image.type() == CV_32FC1?util3d::cvtDepthFromFloat(ptrDepth->image):ptrDepth->image,
+						depthConstant,
+						rtabmap::Transform(),
+						rtabmap::transformFromTF(localTransform));
+				rtabmap::Transform pose = odometry_->process(data);
+				if(!pose.isNull())
+				{
+					//*********************
+					// Update odometry
+					//*********************
+					tf::Transform poseTF;
+					rtabmap::transformToTF(pose, poseTF);
+
+					tfBroadcaster_.sendTransform( tf::StampedTransform (poseTF, image->header.stamp, odomFrameId_, frameId_));
+
+					if(odomPub_.getNumSubscribers())
+					{
+						//next, we'll publish the odometry message over ROS
+						nav_msgs::Odometry odom;
+						odom.header.stamp = image->header.stamp; // use corresponding time stamp to image
+						odom.header.frame_id = odomFrameId_;
+						odom.child_frame_id = frameId_;
+
+						//set the position
+						odom.pose.pose.position.x = poseTF.getOrigin().x();
+						odom.pose.pose.position.y = poseTF.getOrigin().y();
+						odom.pose.pose.position.z = poseTF.getOrigin().z();
+						tf::quaternionTFToMsg(poseTF.getRotation().normalized(), odom.pose.pose.orientation);
+
+						//publish the message
+						odomPub_.publish(odom);
+					}
+				}
+				else
+				{
+					//ROS_WARN("Odometry lost!");
+
+					//send null pose to notify that odometry is lost
 					nav_msgs::Odometry odom;
 					odom.header.stamp = image->header.stamp; // use corresponding time stamp to image
 					odom.header.frame_id = odomFrameId_;
 					odom.child_frame_id = frameId_;
 
-					//set the position
-					odom.pose.pose.position.x = poseTF.getOrigin().x();
-					odom.pose.pose.position.y = poseTF.getOrigin().y();
-					odom.pose.pose.position.z = poseTF.getOrigin().z();
-					tf::quaternionTFToMsg(poseTF.getRotation().normalized(), odom.pose.pose.orientation);
-
 					//publish the message
 					odomPub_.publish(odom);
 				}
 			}
-			else
-			{
-				//ROS_WARN("Odometry lost!");
 
-				//send null pose to notify that odometry is lost
-				nav_msgs::Odometry odom;
-				odom.header.stamp = image->header.stamp; // use corresponding time stamp to image
-				odom.header.frame_id = odomFrameId_;
-				odom.child_frame_id = frameId_;
-
-				//publish the message
-				odomPub_.publish(odom);
-			}
+			ROS_INFO("Odom update time(%f s)", (ros::WallTime::now()-time).toSec());
 		}
-
-		ROS_INFO("Odom update time(%f s)", (ros::WallTime::now()-time).toSec());
 	}
 
 	bool reset(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 	{
 		ROS_INFO("visual_odometry: reset odom!");
 		odometry_->reset();
+		return true;
+	}
+
+	bool pause(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+	{
+		if(paused_)
+		{
+			ROS_WARN("visual_odometry: Already paused!");
+		}
+		else
+		{
+			paused_ = true;
+			ROS_INFO("visual_odometry: paused!");
+		}
+		return true;
+	}
+
+	bool resume(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+	{
+		if(!paused_)
+		{
+			ROS_WARN("visual_odometry: Already running!");
+		}
+		else
+		{
+			paused_ = false;
+			ROS_INFO("visual_odometry: resumed!");
+		}
 		return true;
 	}
 
@@ -251,6 +285,8 @@ private:
 
 	ros::Publisher odomPub_;
 	ros::ServiceServer resetSrv_;
+	ros::ServiceServer pauseSrv_;
+	ros::ServiceServer resumeSrv_;
 	tf::TransformBroadcaster tfBroadcaster_;
 	tf::TransformListener tfListener_;
 
@@ -259,6 +295,8 @@ private:
 	message_filters::Subscriber<sensor_msgs::CameraInfo> info_sub_;
 	typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo> MySyncPolicy;
 	message_filters::Synchronizer<MySyncPolicy> * sync_;
+
+	bool paused_;
 };
 
 int main(int argc, char *argv[])

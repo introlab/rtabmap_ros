@@ -49,6 +49,8 @@
       <remap from="odom" to="/odom"/>
       
       <remap from="reset_odom" to="/reset_odom"/> <!-- to call rtabmap/visual_odometry "reset_odom" service -->
+      <remap from="pause_odom" to="/pause_odom"/> <!-- to call rtabmap/visual_odometry "pause_odom" service -->
+      <remap from="resume_odom" to="/resume_odom"/> <!-- to call rtabmap/visual_odometry "resume_odom" service -->
     </node>
   
   </group>
