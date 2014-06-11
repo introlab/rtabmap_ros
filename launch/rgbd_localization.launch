@@ -6,21 +6,21 @@
   <!-- TF FRAMES -->
   <node pkg="tf" type="static_transform_publisher" name="base_to_camera_tf" 
     args="0.0 0.0 0.0 0.0 0.0 0.0 /base_link /camera_link 100" />
-   
-  <!-- Odometry -->
-  <node pkg="rtabmap" type="visual_odometry" name="visual_odometry" output="screen">
-    <remap from="rgb/image"       to="camera/rgb/image_rect_color"/>
-    <remap from="depth/image"     to="camera/depth_registered/image_raw"/>
-    <remap from="rgb/camera_info" to="camera/depth_registered/camera_info"/>
-   
-    <param name="frame_id" type="string" value="base_link"/>
-    
-    <!-- RTAB-Map's parameters: do "rosrun rtabmap visual_odometry (double-dash)params" to see the list of available parameters. -->
-  	<param name="Odom/Type" type="string" value="1"/>            <!-- 0=SURF/SIFT 1=FAST/BRIEF -->
-  	<param name="Odom/ResetCountdown" type="string" value="0"/>  <!-- 0=disabled, otherwise countdown before auto-resetting odometry when lost. -->
-  </node>
-  
+     
   <group ns="rtabmap">
+  
+    <!-- Odometry -->
+    <node pkg="rtabmap" type="visual_odometry" name="visual_odometry" output="screen">
+      <remap from="rgb/image"       to="/camera/rgb/image_rect_color"/>
+      <remap from="depth/image"     to="/camera/depth_registered/image_raw"/>
+      <remap from="rgb/camera_info" to="/camera/depth_registered/camera_info"/>
+   
+      <param name="frame_id" type="string" value="base_link"/>
+    
+      <!-- RTAB-Map's parameters: do "rosrun rtabmap visual_odometry (double-dash)params" to see the list of available parameters. -->
+      <param name="Odom/Type" type="string" value="1"/>            <!-- 0=SURF/SIFT 1=FAST/BRIEF -->
+      <param name="Odom/ResetCountdown" type="string" value="0"/>  <!-- 0=disabled, otherwise countdown before auto-resetting odometry when lost. -->
+    </node>
   
     <!-- Visual SLAM (robot side) -->
     <!-- args: "delete_db_on_start" and "udebug" -->
@@ -31,7 +31,7 @@
       <remap from="rgb/image" to="/camera/rgb/image_rect_color"/>
       <remap from="depth/image" to="/camera/depth_registered/image_raw"/>
       <remap from="rgb/camera_info" to="/camera/depth_registered/camera_info"/>
-      <remap from="odom" to="/odom"/>
+      <remap from="odom" to="odom"/>
 	
       <param name="queue_size" type="int" value="30"/>
       
@@ -52,11 +52,7 @@
       <remap from="rgb/image" to="/camera/rgb/image_rect_color"/>
       <remap from="depth/image" to="/camera/depth_registered/image_raw"/>
       <remap from="rgb/camera_info" to="/camera/depth_registered/camera_info"/>
-      <remap from="odom" to="/odom"/>
-      
-      <remap from="reset_odom" to="/reset_odom"/> <!-- to call rtabmap/visual_odometry "reset_odom" service -->
-      <remap from="pause_odom" to="/pause_odom"/> <!-- to call rtabmap/visual_odometry "pause_odom" service -->
-      <remap from="resume_odom" to="/resume_odom"/> <!-- to call rtabmap/visual_odometry "resume_odom" service -->
+      <remap from="odom" to="odom"/>
     </node>
   
   </group>

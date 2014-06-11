@@ -8,21 +8,21 @@
   <!-- TF FRAMES -->
   <node pkg="tf" type="static_transform_publisher" name="base_to_camera_tf" 
     args="0.0 0.0 0.0 0.0 0.0 0.0 /base_link /camera_link 100" />
-   
-  <!-- Odometry -->
-  <node pkg="rtabmap" type="visual_odometry" name="visual_odometry" output="screen">
-    <remap from="rgb/image"       to="camera/rgb/image_rect_color"/>
-    <remap from="depth/image"     to="camera/depth_registered/image_raw"/>
-    <remap from="rgb/camera_info" to="camera/depth_registered/camera_info"/>
     
-    <param name="Odom/MinInliers" type="string" value="10"/>
-	<param name="Odom/InlierDistance" type="string" value="0.01"/>
-   
-    <param name="frame_id" type="string" value="base_link"/>
-  </node>
-  
   <group ns="rtabmap">
   
+    <!-- Odometry -->
+    <node pkg="rtabmap" type="visual_odometry" name="visual_odometry" output="screen">
+      <remap from="rgb/image"       to="/camera/rgb/image_rect_color"/>
+      <remap from="depth/image"     to="/camera/depth_registered/image_raw"/>
+      <remap from="rgb/camera_info" to="/camera/depth_registered/camera_info"/>
+    
+	  <param name="Odom/MinInliers" type="string" value="10"/>
+	  <param name="Odom/InlierDistance" type="string" value="0.01"/>
+   
+      <param name="frame_id" type="string" value="base_link"/>
+    </node>
+    
     <!-- Visual SLAM -->
     <!-- args: "delete_db_on_start" and "udebug" -->
     <node name="rtabmap" pkg="rtabmap" type="rtabmap" output="screen" args="--delete_db_on_start">
@@ -32,7 +32,7 @@
       <remap from="rgb/image" to="/camera/rgb/image_rect_color"/>
       <remap from="depth/image" to="/camera/depth_registered/image_raw"/>
       <remap from="rgb/camera_info" to="/camera/depth_registered/camera_info"/>
-      <remap from="odom" to="/odom"/>
+      <remap from="odom" to="odom"/>
 	
       <param name="queue_size" type="int" value="30"/>
     </node>
@@ -55,7 +55,7 @@
     <remap from="rgb/image_in"       to="camera/rgb/image_rect_color"/>
     <remap from="depth/image_in"     to="camera/depth_registered/image_raw"/>
     <remap from="rgb/camera_info_in" to="camera/depth_registered/camera_info"/>
-    <remap from="odom_in"             to="odom"/>
+    <remap from="odom_in"             to="rtabmap/odom"/>
     
     <remap from="rgb/image_out"       to="data_odom_sync/image"/>
     <remap from="depth/image_out"     to="data_odom_sync/depth"/>
