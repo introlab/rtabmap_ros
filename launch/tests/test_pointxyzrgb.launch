@@ -1,0 +1,20 @@
+
+<launch>
+   
+  
+  <!-- sync cloud with odometry and voxelize the point cloud (for fast visualization in rviz) -->
+  <node pkg="nodelet" type="nodelet" name="points_xyzrgb" args="standalone rtabmap/point_cloud_xyzrgb">
+    <remap from="rgb/image"       to="camera/rgb/image_rect_color"/>
+    <remap from="depth/image"     to="camera/depth_registered/image_raw"/>
+    <remap from="rgb/camera_info" to="camera/depth_registered/camera_info"/>
+    <remap from="cloud"           to="/voxel_cloud" />
+    
+    <param name="queue_size" type="int" value="30"/>
+    <param name="voxel_size" type="double" value="0.02"/>
+    <param name="decimation" type="int" value="2"/>
+
+    <param name="rgb/image_transport" type="string" value="compressed"/>
+    <param name="depth/image_transport" type="string" value="compressedDepth"/>
+  </node>
+
+</launch>

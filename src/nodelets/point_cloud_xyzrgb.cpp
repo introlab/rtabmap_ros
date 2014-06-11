@@ -35,7 +35,7 @@ namespace rtabmap
 class PointCloudXYZRGB : public nodelet::Nodelet
 {
 public:
-	PointCloudXYZRGB() : voxelSize_(0.0) {}
+	PointCloudXYZRGB() : voxelSize_(0.0), decimation_(1) {}
 
 	virtual ~PointCloudXYZRGB()
 	{
@@ -51,6 +51,7 @@ private:
 		int queueSize = 10;
 		pnh.param("queue_size", queueSize, queueSize);
 		pnh.param("voxel_size", voxelSize_, voxelSize_);
+		pnh.param("decimation", decimation_, decimation_);
 
 		sync_ = new message_filters::Synchronizer<MySyncPolicy>(MySyncPolicy(queueSize), imageSub_, imageDepthSub_, cameraInfoSub_);
 		sync_->registerCallback(boost::bind(&PointCloudXYZRGB::callback, this, _1, _2, _3));
@@ -87,29 +88,30 @@ private:
 			return;
 		}
 
-
-		cv_bridge::CvImageConstPtr imagePtr = cv_bridge::toCvShare(image);
-		cv_bridge::CvImageConstPtr imageDepthPtr = cv_bridge::toCvShare(imageDepth);
-
-		pcl::PointCloud<pcl::PointXYZRGB>::Ptr pclCloud;
-		pclCloud = rtabmap::util3d::cloudFromDepthRGB(
-				imagePtr->image,
-				imageDepthPtr->image,
-				cameraInfo->K[2],
-				cameraInfo->K[5],
-				cameraInfo->K[0],
-				cameraInfo->K[4]);
-
-		if(voxelSize_ > 0.0)
-		{
-			pclCloud = rtabmap::util3d::voxelize(pclCloud, voxelSize_);
-		}
-
-		//*********************
-		// Publish Map
-		//*********************
 		if(cloudPub_.getNumSubscribers())
 		{
+			cv_bridge::CvImageConstPtr imagePtr = cv_bridge::toCvShare(image);
+			cv_bridge::CvImageConstPtr imageDepthPtr = cv_bridge::toCvShare(imageDepth);
+
+			pcl::PointCloud<pcl::PointXYZRGB>::Ptr pclCloud;
+			pclCloud = rtabmap::util3d::cloudFromDepthRGB(
+					imagePtr->image,
+					imageDepthPtr->image,
+					cameraInfo->K[2],
+					cameraInfo->K[5],
+					cameraInfo->K[0],
+					cameraInfo->K[4],
+					decimation_);
+
+			if(voxelSize_ > 0.0)
+			{
+				pclCloud = rtabmap::util3d::voxelize(pclCloud, voxelSize_);
+			}
+
+			//*********************
+			// Publish Map
+			//*********************
+
 			sensor_msgs::PointCloud2 rosCloud;
 			pcl::toROSMsg(*pclCloud, rosCloud);
 			rosCloud.header.stamp = image->header.stamp;
@@ -123,6 +125,7 @@ private:
 private:
 
 	double voxelSize_;
+	int decimation_;
 	ros::Publisher cloudPub_;
 
 	image_transport::SubscriberFilter imageSub_;
