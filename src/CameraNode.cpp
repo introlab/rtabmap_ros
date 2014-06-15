@@ -34,7 +34,7 @@ public:
 			      float imageRate = 0,
 				  unsigned int imageWidth = 0,
 				  unsigned int imageHeight = 0) :
-		camera_(0),
+		cameraThread_(0),
 		frameId_("camera")
 	{
 		ros::NodeHandle nh;
@@ -49,36 +49,36 @@ public:
 
 	virtual ~CameraWrapper()
 	{
-		if(camera_)
+		if(cameraThread_)
 		{
-			camera_->join(true);
-			delete camera_;
+			cameraThread_->join(true);
+			delete cameraThread_;
 		}
 	}
 
 	bool init()
 	{
-		if(camera_)
+		if(cameraThread_)
 		{
-			return camera_->init();
+			return cameraThread_->init();
 		}
 		return false;
 	}
 
 	void start()
 	{
-		if(camera_)
+		if(cameraThread_)
 		{
-			return camera_->start();
+			return cameraThread_->start();
 		}
 	}
 
 	bool startSrv(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 	{
 		ROS_INFO("Camera started...");
-		if(camera_)
+		if(cameraThread_)
 		{
-			camera_->start();
+			cameraThread_->start();
 		}
 		return true;
 	}
@@ -86,21 +86,21 @@ public:
 	bool stopSrv(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 	{
 		ROS_INFO("Camera stopped...");
-		if(camera_)
+		if(cameraThread_)
 		{
-			camera_->kill();
+			cameraThread_->kill();
 		}
 		return true;
 	}
 
-	void setParameters(int deviceId, double frameRate, int width, int height, const std::string & path, bool autoRestart, bool pause)
+	void setParameters(int deviceId, double frameRate, int width, int height, const std::string & path, bool pause)
 	{
-		ROS_INFO("Parameters changed: deviceId=%d, path=%s frameRate=%f w/h=%d/%d autoRestart=%s pause=%s",
-				deviceId, path.c_str(), frameRate, width, height, autoRestart?"true":"false", pause?"true":"false");
-		if(camera_)
+		ROS_INFO("Parameters changed: deviceId=%d, path=%s frameRate=%f w/h=%d/%d pause=%s",
+				deviceId, path.c_str(), frameRate, width, height, pause?"true":"false");
+		if(cameraThread_)
 		{
-			rtabmap::CameraVideo * videoCam = dynamic_cast<rtabmap::CameraVideo *>(camera_->getCamera());
-			rtabmap::CameraImages * imagesCam = dynamic_cast<rtabmap::CameraImages *>(camera_->getCamera());
+			rtabmap::CameraVideo * videoCam = dynamic_cast<rtabmap::CameraVideo *>(camera_);
+			rtabmap::CameraImages * imagesCam = dynamic_cast<rtabmap::CameraImages *>(camera_);
 
 			if(imagesCam)
 			{
@@ -109,20 +109,19 @@ public:
 				{
 					imagesCam->setImageRate(frameRate);
 					imagesCam->setImageSize(width, height);
-					camera_->setAutoRestart(autoRestart);
-					if(pause && !camera_->isPaused())
+					if(pause && !cameraThread_->isPaused())
 					{
-						camera_->join(true);
+						cameraThread_->join(true);
 					}
-					else if(!pause && camera_->isPaused())
+					else if(!pause && cameraThread_->isPaused())
 					{
-						camera_->start();
+						cameraThread_->start();
 					}
 				}
 				else
 				{
-					delete camera_;
-					camera_ = 0;
+					delete cameraThread_;
+					cameraThread_ = 0;
 				}
 			}
 			else if(videoCam)
@@ -132,14 +131,13 @@ public:
 					// video
 					videoCam->setImageRate(frameRate);
 					videoCam->setImageSize(width, height);
-					camera_->setAutoRestart(autoRestart);
-					if(pause && !camera_->isPaused())
+					if(pause && !cameraThread_->isPaused())
 					{
-						camera_->join(true);
+						cameraThread_->join(true);
 					}
-					else if(!pause && camera_->isPaused())
+					else if(!pause && cameraThread_->isPaused())
 					{
-						camera_->start();
+						cameraThread_->start();
 					}
 				}
 				else if(path.empty() &&
@@ -153,47 +151,46 @@ public:
 					if((int)w == width && (int)h == height)
 					{
 						videoCam->setImageRate(frameRate);
-						camera_->setAutoRestart(autoRestart);
-						if(pause && !camera_->isPaused())
+						if(pause && !cameraThread_->isPaused())
 						{
-							camera_->join(true);
+							cameraThread_->join(true);
 						}
-						else if(!pause && camera_->isPaused())
+						else if(!pause && cameraThread_->isPaused())
 						{
-							camera_->start();
+							cameraThread_->start();
 						}
 					}
 					else
 					{
-						delete camera_;
-						camera_ = 0;
+						delete cameraThread_;
+						cameraThread_ = 0;
 					}
 				}
 				else
 				{
-					delete camera_;
-					camera_ = 0;
+					delete cameraThread_;
+					cameraThread_ = 0;
 				}
 			}
 			else
 			{
 				ROS_ERROR("Wrong camera type ?!?");
-				delete camera_;
-				camera_ = 0;
+				delete cameraThread_;
+				cameraThread_ = 0;
 			}
 		}
 
-		if(!camera_)
+		if(!cameraThread_)
 		{
 			if(!path.empty() && UDirectory::exists(path))
 			{
 				//images
-				camera_ = new rtabmap::CameraThread(new rtabmap::CameraImages(path, 1, false, frameRate, width, height), autoRestart);
+				camera_ = new rtabmap::CameraImages(path, 1, false, frameRate, width, height);
 			}
 			else if(!path.empty() && UFile::exists(path))
 			{
 				//video
-				camera_ = new rtabmap::CameraThread(new rtabmap::CameraVideo(path, frameRate, width, height), autoRestart);
+				camera_ = new rtabmap::CameraVideo(path, frameRate, width, height);
 			}
 			else
 			{
@@ -202,8 +199,9 @@ public:
 					ROS_ERROR("Path \"%s\" does not exist (or you don't have the permissions to read)... falling back to usb device...", path.c_str());
 				}
 				//usb device
-				camera_ = new rtabmap::CameraThread(new rtabmap::CameraVideo(deviceId, frameRate, width, height), autoRestart);
+				camera_ = new rtabmap::CameraVideo(deviceId, frameRate, width, height);
 			}
+			cameraThread_ = new rtabmap::CameraThread(camera_);
 			init();
 			if(!pause)
 			{
@@ -241,7 +239,8 @@ protected:
 
 private:
 	image_transport::Publisher rosPublisher_;
-	rtabmap::CameraThread * camera_;
+	rtabmap::CameraThread * cameraThread_;
+	rtabmap::Camera * camera_;
 	ros::ServiceServer startSrv_;
 	ros::ServiceServer stopSrv_;
 	std::string frameId_;
@@ -252,7 +251,7 @@ void callback(rtabmap::CameraConfig &config, uint32_t level)
 {
 	if(camera)
 	{
-		camera->setParameters(config.device_id, config.frame_rate, config.width, config.height, config.video_or_images_path, config.auto_restart, config.pause);
+		camera->setParameters(config.device_id, config.frame_rate, config.width, config.height, config.video_or_images_path, config.pause);
 	}
 }
 
