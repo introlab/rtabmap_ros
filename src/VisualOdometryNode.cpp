@@ -61,13 +61,16 @@ public:
 		rtabmap::ParametersMap parametersOdom;
 		for(rtabmap::ParametersMap::iterator iter=parameters.begin(); iter!=parameters.end(); ++iter)
 		{
-			if((uSplit(iter->first, '/').front().compare("Odom") == 0 ||
-				uSplit(iter->first, '/').front().compare("OdomBin") == 0 ||
-				uSplit(iter->first, '/').front().compare("Kp") == 0 ||
-				uSplit(iter->first, '/').front().compare("SURF") == 0 ||
-				uSplit(iter->first, '/').front().compare("SIFT") == 0)
+			std::string group = uSplit(iter->first, '/').front();
+			if((group.compare("Odom") == 0 ||
+				group.compare("SURF") == 0 ||
+				group.compare("SIFT") == 0 ||
+				group.compare("ORB") == 0 ||
+				group.compare("FAST") == 0 ||
+				group.compare("FREAK") == 0 ||
+				group.compare("BRIEF") == 0)
 			   &&
-			   uSplit(iter->first, '/').front().compare("OdomICP") != 0)
+			   group.compare("OdomICP") != 0)
 			{
 				parametersOdom.insert(*iter);
 			}
@@ -107,14 +110,7 @@ public:
 			}
 		}
 
-		if(std::atoi(parametersOdom.at(Parameters::kOdomType()).c_str()) == 1)
-		{
-			odometry_ = new rtabmap::OdometryBinary(parametersOdom);
-		}
-		else
-		{
-			odometry_ = new rtabmap::OdometryBOW(parametersOdom);
-		}
+		odometry_ = new rtabmap::OdometryBOW(parametersOdom);
 
 		ros::NodeHandle rgb_nh(nh, "rgb");
 		ros::NodeHandle depth_nh(nh, "depth");
@@ -139,6 +135,13 @@ public:
 
 	~VisualOdometry()
 	{
+		ros::NodeHandle pnh("~");
+		ParametersMap parameters = Parameters::getDefaultParameters();
+		for(ParametersMap::iterator iter=parameters.begin(); iter!=parameters.end(); ++iter)
+		{
+			pnh.deleteParam(iter->first);
+		}
+
 		delete sync_;
 		delete odometry_;
 	}
@@ -155,7 +158,7 @@ public:
 			   !(depth->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1)==0 ||
 				 depth->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1)==0))
 			{
-				ROS_ERROR("Input type must be image=mono8,rgb8,bgr8 and image_depth=16UC1");
+				ROS_ERROR("Input type must be image=mono8,rgb8,bgr8 (mono8 recommended) and image_depth=16UC1");
 				return;
 			}
 			else if(depth->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1)==0)

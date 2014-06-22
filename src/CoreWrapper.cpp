@@ -124,7 +124,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	}
 
 	// set public parameters
-	nh.param("is_rtabmap_paused", paused_, paused_);
+	nh.setParam("is_rtabmap_paused", paused_);
 	for(ParametersMap::iterator iter=parameters.begin(); iter!=parameters.end(); ++iter)
 	{
 		nh.setParam(iter->first, iter->second);
@@ -200,6 +200,14 @@ CoreWrapper::~CoreWrapper()
 		delete depthScanSync_;
 
 	this->saveParameters(configPath_);
+
+	ros::NodeHandle nh;
+	ParametersMap parameters = Parameters::getDefaultParameters();
+	for(ParametersMap::iterator iter=parameters.begin(); iter!=parameters.end(); ++iter)
+	{
+		nh.deleteParam(iter->first);
+	}
+	nh.deleteParam("is_rtabmap_paused");
 
 	std::string databasePath = rtabmap_.getDatabasePath();
 	printf("rtabmap: Saving database/long-term memory... (located at %s)\n", databasePath.c_str());

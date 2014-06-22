@@ -41,8 +41,8 @@
   	<param name="frame_id" type="string" value="base_link"/>
   	
   	<!-- RTAB-Map's parameters: do "rosrun rtabmap visual_odometry (double-dash)params" to see the list of available parameters. -->
-  	<param name="Odom/Type" type="string" value="1"/>            <!-- 0=SURF/SIFT 1=FAST/BRIEF -->
-  	<param name="Odom/ResetCountdown" type="string" value="0"/>  <!-- 0=disabled, otherwise countdown before auto-resetting odometry when lost. -->
+  	<param name="Odom/Type" type="string" value="2"/>            <!-- 0=SURF 1=SIFT 2=ORB 3=FAST/FREAK 4=FAST/BRIEF -->
+  	<param name="Odom/NearestNeighbor" type="string" value="2"/> <!-- Should be 2 for binary descriptor (2=FLANN_LSH) -->
   </node>
   
   <node pkg="rviz" type="rviz" name="rviz" output="screen"/>
