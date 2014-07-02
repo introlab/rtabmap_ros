@@ -6,7 +6,7 @@
   <include file="$(find az3_bringup)/joystick.launch"/>
   
   <!-- Throttling messages -->
-  <group ns="rtabmap">
+  <group ns="camera">
     <node pkg="nodelet" type="nodelet" name="data_throttle" args="load rtabmap/data_throttle camera_nodelet_manager" output="screen">
       <param name="max_rate" type="double" value="10.0"/>
    
