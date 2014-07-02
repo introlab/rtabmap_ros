@@ -1,23 +1,27 @@
 
 <launch>
 
-  <!-- Visualisation (client side) -->
-  <!-- Map assembler for rviz -->
-  <node pkg="rtabmap" type="map_assembler" name="map_assembler"  output="screen">
-    <remap from="infoEx"       to="rtabmap/infoEx"/>
-    <param name="cloud_decimation" type="int" value="4"/>
-    <param name="cloud_voxel_size" type="double" value="0.02"/>
-    <param name="scan_voxel_size" type="double" value="0.01"/>
-  </node>
+  <group ns="rtabmap">
+    <!-- Visualisation (client side) -->
+    <!-- Map assembler for rviz -->
+    <node pkg="rtabmap" type="map_assembler" name="map_assembler"  output="screen">
+      <param name="cloud_decimation" type="int" value="4"/>
+      <param name="cloud_voxel_size" type="double" value="0.02"/>
+      <param name="scan_voxel_size" type="double" value="0.01"/>
+    </node>
+  
+    <!-- Grid map assembler for rviz -->
+    <node pkg="rtabmap" type="grid_map_assembler" name="grid_map_assembler" output="screen"/>
+  </group>
     
-  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap)/launch/config/rgbd.rviz"/>
+  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap)/launch/config/azimut3.rviz"/>
     
   <!-- sync cloud with odometry and voxelize the point cloud (for fast visualization in rviz) -->
   <node pkg="nodelet" type="nodelet" name="standalone_nodelet"  args="manager" output="screen"/>
   <node pkg="nodelet" type="nodelet" name="data_odom_sync" args="load rtabmap/data_odom_sync standalone_nodelet">
-    <remap from="rgb/image_in"       to="data_throttled_image"/>
-    <remap from="depth/image_in"     to="data_throttled_image_depth"/>
-    <remap from="rgb/camera_info_in" to="data_throttled_camera_info"/>
+    <remap from="rgb/image_in"       to="/camera/data_throttled_image"/>
+    <remap from="depth/image_in"     to="/camera/data_throttled_image_depth"/>
+    <remap from="rgb/camera_info_in" to="/camera/data_throttled_camera_info"/>
     <remap from="odom_in"             to="/base_controller/odom"/>
     
     <remap from="rgb/image_out"       to="data_odom_sync/image"/>
