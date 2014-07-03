@@ -43,10 +43,18 @@ class GridMapAssembler
 
 public:
 	GridMapAssembler() :
-		scanVoxelSize_(0.01)
+		gridCellSize_(0.05),
+		gridUnknownSpaceFilled_(true),
+		filterRadius_(0.5),
+		filterAngle_(30.0)
 	{
 		ros::NodeHandle pnh("~");
-		pnh.param("scan_voxel_size", scanVoxelSize_, scanVoxelSize_);
+		pnh.param("cell_size", gridCellSize_, gridCellSize_);
+		pnh.param("unknown_space_filled", gridUnknownSpaceFilled_, gridUnknownSpaceFilled_);
+		pnh.param("filter_radius", filterRadius_, filterRadius_);
+		pnh.param("filter_angle", filterAngle_, filterAngle_);
+
+		UASSERT(gridCellSize_ > 0.0);
 
 		ros::NodeHandle nh;
 		infoExTopic_ = nh.subscribe("infoEx", 1, &GridMapAssembler::infoExReceivedCallback, this);
@@ -77,18 +85,21 @@ public:
 			poses.insert(std::make_pair(msg->data.poseIDs[i], transformFromPoseMsg(msg->data.poses[i])));
 		}
 
+		if(filterRadius_ > 0.0 && filterAngle_ > 0.0)
+		{
+			poses = util3d::radiusPosesFiltering(poses, filterRadius_, filterAngle_*CV_PI/180.0);
+		}
+
 		if(gridMap_.getNumSubscribers())
 		{
-			float delta = 0.05; //m
-
 			// create the map
 			float xMin=0.0f, yMin=0.0f;
-			cv::Mat pixels = util3d::create2DMap(poses, scans_, delta, xMin, yMin);
+			cv::Mat pixels = util3d::create2DMap(poses, scans_, gridCellSize_, gridUnknownSpaceFilled_, xMin, yMin);
 
 			if(!pixels.empty())
 			{
 				//init
-				map_.info.resolution = delta;
+				map_.info.resolution = gridCellSize_;
 				map_.info.origin.position.x = 0.0;
 				map_.info.origin.position.y = 0.0;
 				map_.info.origin.position.z = 0.0;
@@ -145,7 +156,10 @@ public:
 	}
 
 private:
-	double scanVoxelSize_;
+	double gridCellSize_;
+	bool gridUnknownSpaceFilled_;
+	double filterRadius_;
+	double filterAngle_;
 
 	ros::Subscriber infoExTopic_;
 	ros::Subscriber mapDataTopic_;
