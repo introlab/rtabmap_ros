@@ -107,5 +107,5 @@ private:
 };
 
 
-PLUGINLIB_DECLARE_CLASS(rtabmap, data_throttle, rtabmap::DataThrottleNodelet, nodelet::Nodelet);
+PLUGINLIB_EXPORT_CLASS(rtabmap::DataThrottleNodelet, nodelet::Nodelet);
 }

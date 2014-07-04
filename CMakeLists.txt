@@ -7,13 +7,23 @@ project(rtabmap)
 find_package(catkin REQUIRED COMPONENTS 
              cv_bridge roscpp rospy sensor_msgs std_msgs std_srvs nav_msgs 
              image_transport tf tf_conversions laser_geometry pcl_conversions 
-             pcl_ros nodelet dynamic_reconfigure
+             pcl_ros nodelet dynamic_reconfigure rviz message_filters class_loader
 )
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 find_package(OpenCV 2.4 REQUIRED core highgui flann features2d calib3d imgproc nonfree)
 find_package(RTABMap 0.6 REQUIRED)
+
+#Qt stuff
+FIND_PACKAGE(Qt4 COMPONENTS QtCore QtGui REQUIRED)
+INCLUDE(${QT_USE_FILE})
+
+## We also use Ogre
+include($ENV{ROS_ROOT}/core/rosbuild/FindPkgConfig.cmake)
+pkg_check_modules(OGRE OGRE)
+include_directories( ${OGRE_INCLUDE_DIRS} )
+link_directories( ${OGRE_LIBRARY_DIRS} )
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
@@ -65,7 +75,7 @@ catkin_package(
   LIBRARIES rtabmap_ros
   CATKIN_DEPENDS cv_bridge roscpp rospy sensor_msgs std_msgs std_srvs nav_msgs 
                  image_transport tf tf_conversions laser_geometry pcl_conversions 
-                 pcl_ros nodelet dynamic_reconfigure
+                 pcl_ros nodelet dynamic_reconfigure rviz message_filters class_loader
   DEPENDS RTABMap
 )
 
@@ -92,16 +102,32 @@ SET(Libraries
    ${RTABMap_LIBRARIES}
 )
 
+## RVIZ plugin
+qt4_wrap_cpp(MOC_FILES
+  src/rviz/MapCloudDisplay.h
+)
+
+# tf:message_filters, mixing boost and Qt signals
+set_property(
+   SOURCE src/rviz/MapCloudDisplay.cpp
+   PROPERTY COMPILE_DEFINITIONS QT_NO_KEYWORDS
+   )
+   
 ## Declare a cpp library
 add_library(rtabmap_ros
    src/nodelets/data_throttle.cpp
    src/nodelets/data_odom_sync.cpp
    src/nodelets/point_cloud_xyzrgb.cpp 
    src/MsgConversion.cpp
+   src/rviz/MapCloudDisplay.cpp
+   ${MOC_FILES}
 )
 target_link_libraries(rtabmap_ros
   ${Libraries}
+  ${QT_LIBRARIES}
+  ${OGRE_LIBRARIES}
 )
+add_dependencies(rtabmap_ros rtabmap_generate_messages_cpp)
 
 add_executable(rtabmap src/CoreNode.cpp src/CoreWrapper.cpp)
 add_dependencies(rtabmap rtabmap_generate_messages_cpp)
@@ -120,9 +146,6 @@ add_executable(camera src/CameraNode.cpp)
 add_dependencies(camera ${${PROJECT_NAME}_EXPORTED_TARGETS})
 target_link_libraries(camera ${Libraries})
 
-#Qt stuff
-FIND_PACKAGE(Qt4 COMPONENTS QtCore QtGui REQUIRED)
-INCLUDE(${QT_USE_FILE})
 add_executable(rtabmapviz src/GuiNode.cpp src/GuiWrapper.cpp src/PreferencesDialogROS.cpp)
 target_link_libraries(rtabmapviz rtabmap_ros ${QT_LIBRARIES} ${Libraries})
 

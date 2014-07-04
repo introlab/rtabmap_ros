@@ -25,6 +25,9 @@
   <build_depend>pcl_ros</build_depend>
   <build_depend>nodelet</build_depend>
   <build_depend>dynamic_reconfigure</build_depend>
+  <build_depend>rviz</build_depend>
+  <build_depend>message_filters</build_depend>
+  <build_depend>class_loader</build_depend>
   
   <run_depend>cv_bridge</run_depend>
   <run_depend>roscpp</run_depend>
@@ -41,6 +44,9 @@
   <run_depend>pcl_ros</run_depend>
   <run_depend>nodelet</run_depend>
   <run_depend>dynamic_reconfigure</run_depend>
+  <run_depend>rviz</run_depend>
+  <run_depend>message_filters</run_depend>
+  <run_depend>class_loader</run_depend>
 
   <build_depend>libpcl-all-dev</build_depend>
   
@@ -50,5 +56,6 @@
 
   <export>
 	<nodelet plugin="${prefix}/nodelet_plugins.xml" />
+	<rviz plugin="${prefix}/plugin_description.xml"/>
   </export>
 </package>

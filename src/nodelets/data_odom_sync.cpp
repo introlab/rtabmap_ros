@@ -100,5 +100,5 @@ private:
 };
 
 
-PLUGINLIB_DECLARE_CLASS(rtabmap, data_odom_sync, rtabmap::DataOdomSyncNodelet, nodelet::Nodelet);
+PLUGINLIB_EXPORT_CLASS(rtabmap::DataOdomSyncNodelet, nodelet::Nodelet);
 }

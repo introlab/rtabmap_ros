@@ -66,62 +66,62 @@ public:
 
 	void infoExReceivedCallback(const rtabmap::InfoExConstPtr & msg)
 	{
-			for(unsigned int i=0; i<msg->data.localTransformIDs.size() && i<msg->data.localTransforms.size(); ++i)
+		for(unsigned int i=0; i<msg->data.localTransformIDs.size() && i<msg->data.localTransforms.size(); ++i)
+		{
+			int id = msg->data.localTransformIDs[i];
+			if(!uContains(rgbClouds_, id))
 			{
-				int id = msg->data.localTransformIDs[i];
-				if(!uContains(rgbClouds_, id))
+				rtabmap::Transform localTransform = transformFromGeometryMsg(msg->data.localTransforms[i]);
+				if(!localTransform.isNull())
 				{
-					rtabmap::Transform localTransform = transformFromGeometryMsg(msg->data.localTransforms[i]);
-					if(!localTransform.isNull())
+					cv::Mat image, depth;
+					float depthConstant = 0.0f;
+
+					for(unsigned int i=0; i<msg->data.imageIDs.size() && i<msg->data.images.size(); ++i)
 					{
-						cv::Mat image, depth;
-						float depthConstant = 0.0f;
-
-						for(unsigned int i=0; i<msg->data.imageIDs.size() && i<msg->data.images.size(); ++i)
+						if(msg->data.imageIDs[i] == id)
 						{
-							if(msg->data.imageIDs[i] == id)
-							{
-								image = util3d::uncompressImage(msg->data.images[i].bytes);
-								break;
-							}
+							image = util3d::uncompressImage(msg->data.images[i].bytes);
+							break;
 						}
-						for(unsigned int i=0; i<msg->data.depthIDs.size() && i<msg->data.depths.size(); ++i)
+					}
+					for(unsigned int i=0; i<msg->data.depthIDs.size() && i<msg->data.depths.size(); ++i)
+					{
+						if(msg->data.depthIDs[i] == id)
 						{
-							if(msg->data.depthIDs[i] == id)
-							{
-								depth = util3d::uncompressImage(msg->data.depths[i].bytes);
-								break;
-							}
+							depth = util3d::uncompressImage(msg->data.depths[i].bytes);
+							break;
 						}
-						for(unsigned int i=0; i<msg->data.depthConstantIDs.size() && i<msg->data.depthConstants.size(); ++i)
+					}
+					for(unsigned int i=0; i<msg->data.depthConstantIDs.size() && i<msg->data.depthConstants.size(); ++i)
+					{
+						if(msg->data.depthConstantIDs[i] == id)
 						{
-							if(msg->data.depthConstantIDs[i] == id)
-							{
-								depthConstant = msg->data.depthConstants[i];
-								break;
-							}
+							depthConstant = msg->data.depthConstants[i];
+							break;
 						}
+					}
 
-						if(!image.empty() && !depth.empty() && depthConstant > 0.0f)
+					if(!image.empty() && !depth.empty() && depthConstant > 0.0f)
+					{
+						pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = util3d::cloudFromDepthRGB(image, depth, depthConstant, cloudDecimation_);
+
+						if(cloudMaxDepth_ > 0)
 						{
-							pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = util3d::cloudFromDepthRGB(image, depth, depthConstant, cloudDecimation_);
-
-							if(cloudMaxDepth_ > 0)
-							{
-								cloud = util3d::passThrough(cloud, "z", 0, cloudMaxDepth_);
-							}
-							if(cloudVoxelSize_ > 0)
-							{
-								cloud = util3d::voxelize(cloud, cloudVoxelSize_);
-							}
-
-							cloud = util3d::transformPointCloud(cloud, localTransform);
-
-							rgbClouds_.insert(std::make_pair(id, cloud));
+							cloud = util3d::passThrough(cloud, "z", 0, cloudMaxDepth_);
 						}
+						if(cloudVoxelSize_ > 0)
+						{
+							cloud = util3d::voxelize(cloud, cloudVoxelSize_);
+						}
+
+						cloud = util3d::transformPointCloud(cloud, localTransform);
+
+						rgbClouds_.insert(std::make_pair(id, cloud));
 					}
 				}
 			}
+		}
 
 
 		for(unsigned int i=0; i<msg->data.depth2DIDs.size() && i<msg->data.depth2Ds.size(); ++i)

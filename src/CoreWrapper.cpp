@@ -839,6 +839,7 @@ void CoreWrapper::publishStats(const Statistics & stats)
 			msg->loopClosureId = stats.loopClosureId();
 			msg->localLoopClosureId = stats.localLoopClosureId();
 
+			msg->data.header = msg->header;
 			msg->data.poseIDs.resize(stats.poses().size());
 			msg->data.poses.resize(stats.poses().size());
 			int i=0;

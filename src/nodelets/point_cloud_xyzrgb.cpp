@@ -138,6 +138,6 @@ private:
 	message_filters::Synchronizer<MySyncPolicy> * sync_;
 };
 
-PLUGINLIB_DECLARE_CLASS(rtabmap, point_cloud_xyzrgb, rtabmap::PointCloudXYZRGB, nodelet::Nodelet);
+PLUGINLIB_EXPORT_CLASS(rtabmap::PointCloudXYZRGB, nodelet::Nodelet);
 }
 
