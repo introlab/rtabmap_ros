@@ -10,6 +10,8 @@
   <author email="matlabbe@gmail.com">Jane Doe</author>
 
   <buildtool_depend>catkin</buildtool_depend>
+  <buildtool_depend>genmsg</buildtool_depend>
+  
   <build_depend>cv_bridge</build_depend>
   <build_depend>roscpp</build_depend>
   <build_depend>rospy</build_depend>

@@ -57,32 +57,31 @@ public:
 		UASSERT(gridCellSize_ > 0.0);
 
 		ros::NodeHandle nh;
-		infoExTopic_ = nh.subscribe("infoEx", 1, &GridMapAssembler::infoExReceivedCallback, this);
 		mapDataTopic_ = nh.subscribe("mapData", 1, &GridMapAssembler::mapDataReceivedCallback, this);
 
 		gridMap_ = nh.advertise<nav_msgs::OccupancyGrid>("grid_map", 1);
-		getMapService_ = nh.advertiseService("get_map", &GridMapAssembler::getMapCallback, this);
+		getMapService_ = nh.advertiseService("get_grid_map", &GridMapAssembler::getGridMapCallback, this);
 	}
 
 	~GridMapAssembler()
 	{
 	}
 
-	void infoExReceivedCallback(const rtabmap::InfoExConstPtr & msg)
+	void mapDataReceivedCallback(const rtabmap::MapDataConstPtr & msg)
 	{
-		for(unsigned int i=0; i<msg->data.depth2DIDs.size() && i<msg->data.depth2Ds.size(); ++i)
+		for(unsigned int i=0; i<msg->depth2DIDs.size() && i<msg->depth2Ds.size(); ++i)
 		{
-			if(!uContains(scans_, msg->data.depth2DIDs[i]))
+			if(!uContains(scans_, msg->depth2DIDs[i]))
 			{
-				cv::Mat depth2d = util3d::uncompressData(msg->data.depth2Ds[i].bytes);
-				scans_.insert(std::make_pair(msg->data.depth2DIDs[i], util3d::depth2DToPointCloud(depth2d)));
+				cv::Mat depth2d = util3d::uncompressData(msg->depth2Ds[i].bytes);
+				scans_.insert(std::make_pair(msg->depth2DIDs[i], util3d::depth2DToPointCloud(depth2d)));
 			}
 		}
 
 		std::map<int, Transform> poses;
-		for(unsigned int i=0; i<msg->data.poseIDs.size() && i<msg->data.poses.size(); ++i)
+		for(unsigned int i=0; i<msg->poseIDs.size() && i<msg->poses.size(); ++i)
 		{
-			poses.insert(std::make_pair(msg->data.poseIDs[i], transformFromPoseMsg(msg->data.poses[i])));
+			poses.insert(std::make_pair(msg->poseIDs[i], transformFromPoseMsg(msg->poses[i])));
 		}
 
 		if(filterRadius_ > 0.0 && filterAngle_ > 0.0)
@@ -124,28 +123,7 @@ public:
 		}
 	}
 
-	void mapDataReceivedCallback(const rtabmap::MapDataConstPtr & msg)
-	{
-		std::map<int, std::vector<unsigned char> > depths2d;
-
-		if(msg->depth2DIDs.size() != msg->depth2Ds.size())
-		{
-			ROS_WARN("grid_map_assembler: receiving map... depths2D and depth2DIDs are not the same size (%d vs %d)!",
-					(int)msg->depth2Ds.size(), (int)msg->depth2DIDs.size());
-		}
-
-		// fill maps
-		for(unsigned int i=0; i<msg->depth2DIDs.size() && i < msg->depth2Ds.size(); ++i)
-		{
-			if(!uContains(scans_, msg->depth2DIDs[i]))
-			{
-				cv::Mat depth2d = util3d::uncompressData(msg->depth2Ds[i].bytes);
-				scans_.insert(std::make_pair(msg->depth2DIDs[i], util3d::depth2DToPointCloud(depth2d)));
-			}
-		}
-	}
-
-	bool getMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::GetMap::Response &res)
+	bool getGridMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::GetMap::Response &res)
 	{
 		if(map_.data.size())
 		{
@@ -161,7 +139,6 @@ private:
 	double filterRadius_;
 	double filterAngle_;
 
-	ros::Subscriber infoExTopic_;
 	ros::Subscriber mapDataTopic_;
 
 	ros::Publisher gridMap_;

@@ -30,6 +30,8 @@
 #include <rtabmap/core/Parameters.h>
 #include <rtabmap/core/Rtabmap.h>
 
+#include "rtabmap/GetMap.h"
+
 #include <message_filters/subscriber.h>
 #include <message_filters/synchronizer.h>
 #include <message_filters/sync_policies/approximate_time.h>
@@ -74,13 +76,7 @@ private:
 	bool pauseRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool resumeRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool triggerNewMapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
-	bool publishGlobalMapDataCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
-	bool publishLocalMapDataCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
-	bool publishGlobalGraphCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
-	bool publishLocalGraphCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
-
-	void publishMapData(bool global);
-	void publishGraph(bool global);
+	bool getMapCallback(rtabmap::GetMap::Request& req, rtabmap::GetMap::Response& rep);
 
 	rtabmap::ParametersMap loadParameters(const std::string & configFile);
 	void saveParameters(const std::string & configFile);
@@ -141,10 +137,7 @@ private:
 	ros::ServiceServer pauseSrv_;
 	ros::ServiceServer resumeSrv_;
 	ros::ServiceServer triggerNewMapSrv_;
-	ros::ServiceServer publishGlobalMapDataSrv_;
-	ros::ServiceServer publishLocalMapDataSrv_;
-	ros::ServiceServer publishGlobalGraphSrv_;
-	ros::ServiceServer publishLocalGraphSrv_;
+	ros::ServiceServer getMapDataSrv_;
 
 	boost::thread* transformThread_;
 

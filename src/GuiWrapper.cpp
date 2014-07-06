@@ -26,6 +26,7 @@
 #include <rtabmap/core/util3d.h>
 
 #include "rtabmap/MsgConversion.h"
+#include "rtabmap/GetMap.h"
 
 #include "PreferencesDialogROS.h"
 
@@ -86,8 +87,10 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 	UEventsManager::addHandler(this);
 	UEventsManager::addHandler(mainWindow_);
 
-	infoExTopic_ = nh.subscribe("infoEx", 1, &GuiWrapper::infoExReceivedCallback, this);
-	mapDataTopic_ = nh.subscribe("mapData", 1, &GuiWrapper::mapDataReceivedCallback, this);
+	infoExTopic_.subscribe(nh, "infoEx", 1);
+	mapDataTopic_.subscribe(nh, "mapData", 1);
+	infoMapSync_ = new message_filters::Synchronizer<MyInfoMapSyncPolicy>(MyInfoMapSyncPolicy(queueSize), infoExTopic_, mapDataTopic_);
+	infoMapSync_->registerCallback(boost::bind(&GuiWrapper::infoMapCallback, this, _1, _2));
 }
 
 GuiWrapper::~GuiWrapper()
@@ -101,7 +104,9 @@ int GuiWrapper::exec()
 	return app_->exec();
 }
 
-void GuiWrapper::infoExReceivedCallback(const rtabmap::InfoExConstPtr & msg)
+void GuiWrapper::infoMapCallback(
+		const rtabmap::InfoExConstPtr & infoMsg,
+		const rtabmap::MapDataConstPtr & mapMsg)
 {
 	//ROS_INFO("rtabmapviz: RTAB-Map info ex received!");
 
@@ -110,134 +115,134 @@ void GuiWrapper::infoExReceivedCallback(const rtabmap::InfoExConstPtr & msg)
 
 	stat.setExtended(true); // Extended
 
-	stat.setRefImageId(msg->refId);
-	stat.setLoopClosureId(msg->loopClosureId);
-	stat.setLocalLoopClosureId(msg->localLoopClosureId);
+	stat.setRefImageId(infoMsg->refId);
+	stat.setLoopClosureId(infoMsg->loopClosureId);
+	stat.setLocalLoopClosureId(infoMsg->localLoopClosureId);
 
 	//Posterior, likelihood, childCount
 	std::map<int, float> mapIntFloat;
-	for(unsigned int i=0; i<msg->posteriorKeys.size() && i<msg->posteriorValues.size(); ++i)
+	for(unsigned int i=0; i<infoMsg->posteriorKeys.size() && i<infoMsg->posteriorValues.size(); ++i)
 	{
-		mapIntFloat.insert(std::pair<int, float>(msg->posteriorKeys.at(i), msg->posteriorValues.at(i)));
+		mapIntFloat.insert(std::pair<int, float>(infoMsg->posteriorKeys.at(i), infoMsg->posteriorValues.at(i)));
 	}
 	stat.setPosterior(mapIntFloat);
 	mapIntFloat.clear();
-	for(unsigned int i=0; i<msg->likelihoodKeys.size() && i<msg->likelihoodValues.size(); ++i)
+	for(unsigned int i=0; i<infoMsg->likelihoodKeys.size() && i<infoMsg->likelihoodValues.size(); ++i)
 	{
-		mapIntFloat.insert(std::pair<int, float>(msg->likelihoodKeys.at(i), msg->likelihoodValues.at(i)));
+		mapIntFloat.insert(std::pair<int, float>(infoMsg->likelihoodKeys.at(i), infoMsg->likelihoodValues.at(i)));
 	}
 	stat.setLikelihood(mapIntFloat);
 	mapIntFloat.clear();
-	for(unsigned int i=0; i<msg->rawLikelihoodKeys.size() && i<msg->rawLikelihoodValues.size(); ++i)
+	for(unsigned int i=0; i<infoMsg->rawLikelihoodKeys.size() && i<infoMsg->rawLikelihoodValues.size(); ++i)
 	{
-		mapIntFloat.insert(std::pair<int, float>(msg->rawLikelihoodKeys.at(i), msg->rawLikelihoodValues.at(i)));
+		mapIntFloat.insert(std::pair<int, float>(infoMsg->rawLikelihoodKeys.at(i), infoMsg->rawLikelihoodValues.at(i)));
 	}
 	stat.setRawLikelihood(mapIntFloat);
 	std::map<int, int> mapIntInt;
-	for(unsigned int i=0; i<msg->weightsKeys.size() && i<msg->weightsValues.size(); ++i)
+	for(unsigned int i=0; i<infoMsg->weightsKeys.size() && i<infoMsg->weightsValues.size(); ++i)
 	{
-		mapIntInt.insert(std::pair<int, int>(msg->weightsKeys.at(i), msg->weightsValues.at(i)));
+		mapIntInt.insert(std::pair<int, int>(infoMsg->weightsKeys.at(i), infoMsg->weightsValues.at(i)));
 	}
 	stat.setWeights(mapIntInt);
 
 	//SURF stuff...
 	std::multimap<int, cv::KeyPoint> mapIntKeypoint;
-	for(unsigned int i=0; i<msg->refWordsKeys.size() && i<msg->refWordsValues.size(); ++i)
+	for(unsigned int i=0; i<infoMsg->refWordsKeys.size() && i<infoMsg->refWordsValues.size(); ++i)
 	{
 		cv::KeyPoint pt;
-		pt.angle = msg->refWordsValues.at(i).angle;
-		pt.response = msg->refWordsValues.at(i).response;
-		pt.pt.x = msg->refWordsValues.at(i).ptx;
-		pt.pt.y = msg->refWordsValues.at(i).pty;
-		pt.size = msg->refWordsValues.at(i).size;
-		mapIntKeypoint.insert(std::pair<int, cv::KeyPoint>(msg->refWordsKeys.at(i), pt));
+		pt.angle = infoMsg->refWordsValues.at(i).angle;
+		pt.response = infoMsg->refWordsValues.at(i).response;
+		pt.pt.x = infoMsg->refWordsValues.at(i).ptx;
+		pt.pt.y = infoMsg->refWordsValues.at(i).pty;
+		pt.size = infoMsg->refWordsValues.at(i).size;
+		mapIntKeypoint.insert(std::pair<int, cv::KeyPoint>(infoMsg->refWordsKeys.at(i), pt));
 	}
 	stat.setRefWords(mapIntKeypoint);
 	mapIntKeypoint.clear();
-	for(unsigned int i=0; i<msg->loopWordsKeys.size() && i<msg->loopWordsValues.size(); ++i)
+	for(unsigned int i=0; i<infoMsg->loopWordsKeys.size() && i<infoMsg->loopWordsValues.size(); ++i)
 	{
 		cv::KeyPoint pt;
-		pt.angle = msg->loopWordsValues.at(i).angle;
-		pt.response = msg->loopWordsValues.at(i).response;
-		pt.pt.x = msg->loopWordsValues.at(i).ptx;
-		pt.pt.y = msg->loopWordsValues.at(i).pty;
-		pt.size = msg->loopWordsValues.at(i).size;
-		mapIntKeypoint.insert(std::pair<int, cv::KeyPoint>(msg->loopWordsKeys.at(i), pt));
+		pt.angle = infoMsg->loopWordsValues.at(i).angle;
+		pt.response = infoMsg->loopWordsValues.at(i).response;
+		pt.pt.x = infoMsg->loopWordsValues.at(i).ptx;
+		pt.pt.y = infoMsg->loopWordsValues.at(i).pty;
+		pt.size = infoMsg->loopWordsValues.at(i).size;
+		mapIntKeypoint.insert(std::pair<int, cv::KeyPoint>(infoMsg->loopWordsKeys.at(i), pt));
 	}
 	stat.setLoopWords(mapIntKeypoint);
 
 	// Statistics data
-	for(unsigned int i=0; i<msg->statsKeys.size() && i<msg->statsValues.size(); i++)
+	for(unsigned int i=0; i<infoMsg->statsKeys.size() && i<infoMsg->statsValues.size(); i++)
 	{
-		stat.addStatistic(msg->statsKeys.at(i), msg->statsValues.at(i));
+		stat.addStatistic(infoMsg->statsKeys.at(i), infoMsg->statsValues.at(i));
 	}
 
 	//RGB-D SLAM data
-	stat.setMapCorrection(transformFromGeometryMsg(msg->mapCorrection));
-	stat.setLoopClosureTransform(transformFromGeometryMsg(msg->loopClosureTransform));
-	stat.setCurrentPose(transformFromPoseMsg(msg->currentPose));
+	stat.setMapCorrection(transformFromGeometryMsg(infoMsg->mapCorrection));
+	stat.setLoopClosureTransform(transformFromGeometryMsg(infoMsg->loopClosureTransform));
+	stat.setCurrentPose(transformFromPoseMsg(infoMsg->currentPose));
 
 	std::map<int, std::vector<unsigned char> > images;
-	for(unsigned int i=0; i<msg->data.imageIDs.size() && i<msg->data.images.size(); ++i)
+	for(unsigned int i=0; i<mapMsg->imageIDs.size() && i<mapMsg->images.size(); ++i)
 	{
-		images.insert(std::make_pair(msg->data.imageIDs[i], msg->data.images[i].bytes));
+		images.insert(std::make_pair(mapMsg->imageIDs[i], mapMsg->images[i].bytes));
 	}
 	stat.setImages(images);
 
 	std::map<int, std::vector<unsigned char> > depths;
-	for(unsigned int i=0; i<msg->data.depthIDs.size() && i<msg->data.depths.size(); ++i)
+	for(unsigned int i=0; i<mapMsg->depthIDs.size() && i<mapMsg->depths.size(); ++i)
 	{
-		depths.insert(std::make_pair(msg->data.depthIDs[i], msg->data.depths[i].bytes));
+		depths.insert(std::make_pair(mapMsg->depthIDs[i], mapMsg->depths[i].bytes));
 	}
 	stat.setDepths(depths);
 
 	std::map<int, std::vector<unsigned char> > depth2ds;
-	for(unsigned int i=0; i<msg->data.depth2DIDs.size() && i<msg->data.depth2Ds.size(); ++i)
+	for(unsigned int i=0; i<mapMsg->depth2DIDs.size() && i<mapMsg->depth2Ds.size(); ++i)
 	{
-		depth2ds.insert(std::make_pair(msg->data.depth2DIDs[i], msg->data.depth2Ds[i].bytes));
+		depth2ds.insert(std::make_pair(mapMsg->depth2DIDs[i], mapMsg->depth2Ds[i].bytes));
 	}
 	stat.setDepth2ds(depth2ds);
 
 	std::map<int, float> depthConstants;
-	for(unsigned int i=0; i<msg->data.depthConstantIDs.size() && i<msg->data.depthConstants.size(); ++i)
+	for(unsigned int i=0; i<mapMsg->depthConstantIDs.size() && i<mapMsg->depthConstants.size(); ++i)
 	{
-		depthConstants.insert(std::make_pair(msg->data.depthConstantIDs[i], msg->data.depthConstants[i]));
+		depthConstants.insert(std::make_pair(mapMsg->depthConstantIDs[i], mapMsg->depthConstants[i]));
 	}
 	stat.setDepthConstants(depthConstants);
 
 	std::map<int, Transform> localTransforms;
-	for(unsigned int i=0; i<msg->data.localTransformIDs.size() && i<msg->data.localTransforms.size(); ++i)
+	for(unsigned int i=0; i<mapMsg->localTransformIDs.size() && i<mapMsg->localTransforms.size(); ++i)
 	{
-		localTransforms.insert(std::make_pair(msg->data.localTransformIDs[i], transformFromGeometryMsg(msg->data.localTransforms[i])));
+		localTransforms.insert(std::make_pair(mapMsg->localTransformIDs[i], transformFromGeometryMsg(mapMsg->localTransforms[i])));
 	}
 	stat.setLocalTransforms(localTransforms);
 
 	std::map<int, Transform> poses;
-	for(unsigned int i=0; i<msg->data.poseIDs.size() && i<msg->data.poses.size(); ++i)
+	for(unsigned int i=0; i<mapMsg->poseIDs.size() && i<mapMsg->poses.size(); ++i)
 	{
-		poses.insert(std::make_pair(msg->data.poseIDs[i], transformFromPoseMsg(msg->data.poses[i])));
+		poses.insert(std::make_pair(mapMsg->poseIDs[i], transformFromPoseMsg(mapMsg->poses[i])));
 	}
 	stat.setPoses(poses);
 
 	std::multimap<int, Link> constraints;
-	for(unsigned int i=0; i<msg->data.constraintFromIDs.size() && i<msg->data.constraintToIDs.size() && i<msg->data.constraintTypes.size() && i < msg->data.constraints.size(); ++i)
+	for(unsigned int i=0; i<mapMsg->constraintFromIDs.size() && i<mapMsg->constraintToIDs.size() && i<mapMsg->constraintTypes.size() && i < mapMsg->constraints.size(); ++i)
 	{
-		Transform t = transformFromGeometryMsg(msg->data.constraints[i]);
-		constraints.insert(std::make_pair(msg->data.constraintFromIDs[i], Link(msg->data.constraintFromIDs[i], msg->data.constraintToIDs[i], t, (Link::Type)msg->data.constraintTypes[i])));
+		Transform t = transformFromGeometryMsg(mapMsg->constraints[i]);
+		constraints.insert(std::make_pair(mapMsg->constraintFromIDs[i], Link(mapMsg->constraintFromIDs[i], mapMsg->constraintToIDs[i], t, (Link::Type)mapMsg->constraintTypes[i])));
 	}
 	stat.setConstraints(constraints);
 
 	std::map<int, int> mapIds;
-	for(unsigned int i=0; i<msg->data.mapIDs.size() && i<msg->data.maps.size(); ++i)
+	for(unsigned int i=0; i<mapMsg->mapIDs.size() && i<mapMsg->maps.size(); ++i)
 	{
-		mapIds.insert(std::make_pair(msg->data.mapIDs[i], msg->data.maps[i]));
+		mapIds.insert(std::make_pair(mapMsg->mapIDs[i], mapMsg->maps[i]));
 	}
 	stat.setMapIds(mapIds);
 
 	this->post(new RtabmapEvent(stat));
 }
 
-void GuiWrapper::mapDataReceivedCallback(const rtabmap::MapDataConstPtr & msg)
+void GuiWrapper::processRequestedMap(const rtabmap::MapData & map)
 {
 	std::map<int, std::vector<unsigned char> > images;
 	std::map<int, std::vector<unsigned char> > depths;
@@ -247,80 +252,80 @@ void GuiWrapper::mapDataReceivedCallback(const rtabmap::MapDataConstPtr & msg)
 	std::map<int, Transform> poses;
 	std::multimap<int, Link> constraints;
 
-	if(msg->imageIDs.size() != msg->images.size())
+	if(map.imageIDs.size() != map.images.size())
 	{
 		ROS_WARN("rtabmapviz: receiving map... images and IDs are not the same size (%d vs %d)!",
-				(int)msg->images.size(), (int)msg->imageIDs.size());
+				(int)map.images.size(), (int)map.imageIDs.size());
 	}
 
-	if(msg->depthIDs.size() != msg->depths.size())
+	if(map.depthIDs.size() != map.depths.size())
 	{
 		ROS_WARN("rtabmapviz: receiving map... depths and IDs are not the same size (%d vs %d)!",
-				(int)msg->depths.size(), (int)msg->depthIDs.size());
+				(int)map.depths.size(), (int)map.depthIDs.size());
 	}
 
-	if(msg->depth2DIDs.size() != msg->depth2Ds.size())
+	if(map.depth2DIDs.size() != map.depth2Ds.size())
 	{
 		ROS_WARN("rtabmapviz: receiving map... depths2D and IDs are not the same size (%d vs %d)!",
-				(int)msg->depth2Ds.size(), (int)msg->depth2DIDs.size());
+				(int)map.depth2Ds.size(), (int)map.depth2DIDs.size());
 	}
 
-	if(msg->depthConstantIDs.size() != msg->depthConstants.size())
+	if(map.depthConstantIDs.size() != map.depthConstants.size())
 	{
 		ROS_WARN("rtabmapviz: receiving map... depthConstants and IDs are not the same size (%d vs %d)!",
-				(int)msg->depthConstants.size(), (int)msg->depthConstantIDs.size());
+				(int)map.depthConstants.size(), (int)map.depthConstantIDs.size());
 	}
 
-	if(msg->poseIDs.size() != msg->poses.size())
+	if(map.poseIDs.size() != map.poses.size())
 	{
 		ROS_WARN("rtabmapviz: receiving map... poses and IDs are not the same size (%d vs %d)!",
-				(int)msg->poses.size(), (int)msg->poseIDs.size());
+				(int)map.poses.size(), (int)map.poseIDs.size());
 	}
 
-	if(msg->constraintFromIDs.size() != msg->constraints.size() ||
-	   msg->constraintToIDs.size() != msg->constraints.size() ||
-	   msg->constraintTypes.size() != msg->constraints.size())
+	if(map.constraintFromIDs.size() != map.constraints.size() ||
+	   map.constraintToIDs.size() != map.constraints.size() ||
+	   map.constraintTypes.size() != map.constraints.size())
 	{
 		ROS_WARN("rtabmapviz: receiving map... constraints and IDs are not the same size (%d vs %d vs %d vs %d)!",
-				(int)msg->constraints.size(), (int)msg->constraintFromIDs.size(), (int)msg->constraintToIDs.size(), (int)msg->constraintTypes.size());
+				(int)map.constraints.size(), (int)map.constraintFromIDs.size(), (int)map.constraintToIDs.size(), (int)map.constraintTypes.size());
 	}
 
-	for(unsigned int i=0; i<msg->imageIDs.size() && i < msg->images.size(); ++i)
+	for(unsigned int i=0; i<map.imageIDs.size() && i < map.images.size(); ++i)
 	{
-		images.insert(std::make_pair(msg->imageIDs[i], msg->images[i].bytes));
+		images.insert(std::make_pair(map.imageIDs[i], map.images[i].bytes));
 	}
 
-	for(unsigned int i=0; i<msg->depthIDs.size() && i < msg->depths.size(); ++i)
+	for(unsigned int i=0; i<map.depthIDs.size() && i < map.depths.size(); ++i)
 	{
-		depths.insert(std::make_pair(msg->depthIDs[i], msg->depths[i].bytes));
+		depths.insert(std::make_pair(map.depthIDs[i], map.depths[i].bytes));
 	}
 
-	for(unsigned int i=0; i<msg->depth2DIDs.size() && i < msg->depth2Ds.size(); ++i)
+	for(unsigned int i=0; i<map.depth2DIDs.size() && i < map.depth2Ds.size(); ++i)
 	{
-		depths2d.insert(std::make_pair(msg->depth2DIDs[i], msg->depth2Ds[i].bytes));
+		depths2d.insert(std::make_pair(map.depth2DIDs[i], map.depth2Ds[i].bytes));
 	}
 
-	for(unsigned int i=0; i<msg->depthConstantIDs.size() && i < msg->depthConstants.size(); ++i)
+	for(unsigned int i=0; i<map.depthConstantIDs.size() && i < map.depthConstants.size(); ++i)
 	{
-		depthConstants.insert(std::make_pair(msg->depthConstantIDs[i], msg->depthConstants[i]));
+		depthConstants.insert(std::make_pair(map.depthConstantIDs[i], map.depthConstants[i]));
 	}
 
-	for(unsigned int i=0; i<msg->localTransformIDs.size() && i < msg->localTransforms.size(); ++i)
+	for(unsigned int i=0; i<map.localTransformIDs.size() && i < map.localTransforms.size(); ++i)
 	{
-		Transform t = transformFromGeometryMsg(msg->localTransforms[i]);
-		localTransforms.insert(std::make_pair(msg->localTransformIDs[i], t));
+		Transform t = transformFromGeometryMsg(map.localTransforms[i]);
+		localTransforms.insert(std::make_pair(map.localTransformIDs[i], t));
 	}
 
-	for(unsigned int i=0; i<msg->poseIDs.size() && i < msg->poses.size(); ++i)
+	for(unsigned int i=0; i<map.poseIDs.size() && i < map.poses.size(); ++i)
 	{
-		Transform t = transformFromPoseMsg(msg->poses[i]);
-		poses.insert(std::make_pair(msg->poseIDs[i], t));
+		Transform t = transformFromPoseMsg(map.poses[i]);
+		poses.insert(std::make_pair(map.poseIDs[i], t));
 	}
 
-	for(unsigned int i=0; i<msg->constraintFromIDs.size() && i<msg->constraintToIDs.size() && i<msg->constraintTypes.size() && i < msg->constraints.size(); ++i)
+	for(unsigned int i=0; i<map.constraintFromIDs.size() && i<map.constraintToIDs.size() && i<map.constraintTypes.size() && i < map.constraints.size(); ++i)
 	{
-		Transform t = transformFromGeometryMsg(msg->constraints[i]);
-		constraints.insert(std::make_pair(msg->constraintFromIDs[i], Link(msg->constraintFromIDs[i], msg->constraintToIDs[i], t, (Link::Type)msg->constraintTypes[i])));
+		Transform t = transformFromGeometryMsg(map.constraints[i]);
+		constraints.insert(std::make_pair(map.constraintFromIDs[i], Link(map.constraintFromIDs[i], map.constraintToIDs[i], t, (Link::Type)map.constraintTypes[i])));
 	}
 
 	this->post(new RtabmapEvent3DMap(images,
@@ -365,12 +370,12 @@ void GuiWrapper::handleEvent(UEvent * anEvent)
 	}
 	else if(anEvent->getClassName().compare("RtabmapEventCmd") == 0)
 	{
-		std_srvs::Empty srv;
+		std_srvs::Empty emptySrv;
 		rtabmap::RtabmapEventCmd * cmdEvent = (rtabmap::RtabmapEventCmd *)anEvent;
 		rtabmap::RtabmapEventCmd::Cmd cmd = cmdEvent->getCmd();
 		if(cmd == rtabmap::RtabmapEventCmd::kCmdDeleteMemory)
 		{
-			if(!ros::service::call("reset", srv))
+			if(!ros::service::call("reset", emptySrv))
 			{
 				ROS_ERROR("Can't call \"reset\" service");
 			}
@@ -387,10 +392,10 @@ void GuiWrapper::handleEvent(UEvent * anEvent)
 				}
 
 				// Pause visual_odometry
-				ros::service::call("pause_odom", srv);
+				ros::service::call("pause_odom", emptySrv);
 
 				// Pause rtabmap
-				if(!ros::service::call("pause", srv))
+				if(!ros::service::call("pause", emptySrv))
 				{
 					ROS_ERROR("Can't call \"pause\" service");
 				}
@@ -398,13 +403,13 @@ void GuiWrapper::handleEvent(UEvent * anEvent)
 			else
 			{
 				// Resume rtabmap
-				if(!ros::service::call("resume", srv))
+				if(!ros::service::call("resume", emptySrv))
 				{
 					ROS_ERROR("Can't call \"resume\" service");
 				}
 
 				// Pause visual_odometry
-				ros::service::call("resume_odom", srv);
+				ros::service::call("resume_odom", emptySrv);
 
 				// Resume the camera if the rtabmap/camera node is used
 				if(!cameraNodeName_.empty())
@@ -416,73 +421,28 @@ void GuiWrapper::handleEvent(UEvent * anEvent)
 		}
 		else if(cmd == rtabmap::RtabmapEventCmd::kCmdTriggerNewMap)
 		{
-			if(!ros::service::call("trigger_new_map", srv))
+			if(!ros::service::call("trigger_new_map", emptySrv))
 			{
 				ROS_ERROR("Can't call \"trigger_new_map\" service");
 			}
 		}
-		else if(cmd == rtabmap::RtabmapEventCmd::kCmdPublish3DMapLocal)
+		else if(cmd == rtabmap::RtabmapEventCmd::kCmdPublish3DMapLocal ||
+				 cmd == rtabmap::RtabmapEventCmd::kCmdPublish3DMapGlobal ||
+				 cmd == rtabmap::RtabmapEventCmd::kCmdPublishTOROGraphLocal ||
+				 cmd == rtabmap::RtabmapEventCmd::kCmdPublishTOROGraphGlobal)
 		{
-			if(mapDataTopic_.getNumPublishers())
+			rtabmap::GetMap getMapSrv;
+			getMapSrv.request.global = cmd == rtabmap::RtabmapEventCmd::kCmdPublish3DMapGlobal || cmd == rtabmap::RtabmapEventCmd::kCmdPublishTOROGraphGlobal;
+			getMapSrv.request.optimized = cmdEvent->getInt();
+			getMapSrv.request.graphOnly = cmd == rtabmap::RtabmapEventCmd::kCmdPublishTOROGraphGlobal || cmd == rtabmap::RtabmapEventCmd::kCmdPublishTOROGraphLocal;
+			if(!ros::service::call("get_map", getMapSrv))
 			{
-				if(!ros::service::call("publish_local_map_data", srv))
-				{
-					ROS_WARN("Can't call \"publish_local_map_data\" service");
-					this->post(new RtabmapEvent3DMap(1)); // service error
-				}
+				ROS_WARN("Can't call \"get_map\" service");
+				this->post(new RtabmapEvent3DMap(1)); // service error
 			}
 			else
 			{
-				ROS_WARN("No publisher subscribed for topic \"%s\", map cannot be downloaded!", mapDataTopic_.getTopic().c_str());
-				this->post(new RtabmapEvent3DMap(2)); // topic error
-			}
-		}
-		else if(cmd == rtabmap::RtabmapEventCmd::kCmdPublish3DMapGlobal)
-		{
-			if(mapDataTopic_.getNumPublishers())
-			{
-				if(!ros::service::call("publish_global_map_data", srv))
-				{
-					ROS_WARN("Can't call \"publish_global_map_data\" service");
-					this->post(new RtabmapEvent3DMap(1)); // service error
-				}
-			}
-			else
-			{
-				ROS_WARN("No publisher subscribed for topic \"%s\", map cannot be downloaded!", mapDataTopic_.getTopic().c_str());
-				this->post(new RtabmapEvent3DMap(2)); // topic error
-			}
-		}
-		else if(cmd == rtabmap::RtabmapEventCmd::kCmdPublishTOROGraphLocal)
-		{
-			if(mapDataTopic_.getNumPublishers())
-			{
-				if(!ros::service::call("publish_local_graph", srv))
-				{
-					ROS_WARN("Can't call \"publish_local_graph\" service");
-					this->post(new RtabmapEvent3DMap(1)); // service error
-				}
-			}
-			else
-			{
-				ROS_WARN("No publisher subscribed for topic \"%s\", map cannot be downloaded!", mapDataTopic_.getTopic().c_str());
-				this->post(new RtabmapEvent3DMap(2)); // topic error
-			}
-		}
-		else if(cmd == rtabmap::RtabmapEventCmd::kCmdPublishTOROGraphGlobal)
-		{
-			if(mapDataTopic_.getNumPublishers())
-			{
-				if(!ros::service::call("publish_global_graph", srv))
-				{
-					ROS_WARN("Can't call \"publish_global_graph\" service");
-					this->post(new RtabmapEvent3DMap(1)); // service error
-				}
-			}
-			else
-			{
-				ROS_WARN("No publisher subscribed for topic \"%s\", map cannot be downloaded!", mapDataTopic_.getTopic().c_str());
-				this->post(new RtabmapEvent3DMap(2)); // topic error
+				processRequestedMap(getMapSrv.response.data);
 			}
 		}
 		else

@@ -25,6 +25,7 @@
 #include <message_filters/subscriber.h>
 #include <message_filters/synchronizer.h>
 #include <message_filters/sync_policies/approximate_time.h>
+#include <message_filters/sync_policies/exact_time.h>
 
 #include <image_transport/image_transport.h>
 #include <image_transport/subscriber_filter.h>
@@ -48,8 +49,7 @@ protected:
 	virtual void handleEvent(UEvent * anEvent);
 
 private:
-	void infoExReceivedCallback(const rtabmap::InfoExConstPtr & msg);
-	void mapDataReceivedCallback(const rtabmap::MapDataConstPtr & msg);
+	void infoMapCallback(const rtabmap::InfoExConstPtr & infoMsg, const rtabmap::MapDataConstPtr & mapMsg);
 
 	void setupCallbacks(bool subscribeDepth, bool subscribeLaserScan, int queueSize);
 	void defaultCallback(const nav_msgs::OdometryConstPtr & odomMsg); // odom
@@ -66,9 +66,9 @@ private:
 						   const sensor_msgs::CameraInfoConstPtr& camInfoMsg,
 						   const sensor_msgs::LaserScanConstPtr& scanMsg);
 
+	void processRequestedMap(const rtabmap::MapData & map);
+
 private:
-	ros::Subscriber infoExTopic_;
-	ros::Subscriber mapDataTopic_;
 	QApplication * app_;
 	rtabmap::MainWindow * mainWindow_;
 	std::string cameraNodeName_;
@@ -77,12 +77,20 @@ private:
 	std::string frameId_;
 	tf::TransformListener tfListener_;
 
+	message_filters::Subscriber<rtabmap::InfoEx> infoExTopic_;
+	message_filters::Subscriber<rtabmap::MapData> mapDataTopic_;
+
 	ros::Subscriber defaultSub_; // odometry only
 	image_transport::SubscriberFilter imageSub_;
 	image_transport::SubscriberFilter imageDepthSub_;
 	message_filters::Subscriber<sensor_msgs::CameraInfo> cameraInfoSub_;
 	message_filters::Subscriber<nav_msgs::Odometry> odomSub_;
 	message_filters::Subscriber<sensor_msgs::LaserScan> scanSub_;
+
+	typedef message_filters::sync_policies::ExactTime<
+				rtabmap::InfoEx,
+				rtabmap::MapData> MyInfoMapSyncPolicy;
+	message_filters::Synchronizer<MyInfoMapSyncPolicy> * infoMapSync_;
 
 	typedef message_filters::sync_policies::ApproximateTime<
 			sensor_msgs::Image,

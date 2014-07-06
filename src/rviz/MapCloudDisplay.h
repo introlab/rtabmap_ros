@@ -6,7 +6,7 @@
 #include <queue>
 #include <vector>
 
-#include <rtabmap/InfoEx.h>
+#include <rtabmap/MapData.h>
 #include <rtabmap/core/Transform.h>
 
 #include <pluginlib/class_loader.h>
@@ -41,7 +41,7 @@ class PointCloudCommon;
  * If you set the channel's name to "rgb", it will interpret the channel as an integer rgb value, with r, g and b
  * all being 8 bits.
  */
-class MapCloudDisplay: public rviz::MessageFilterDisplay<rtabmap::InfoEx>
+class MapCloudDisplay: public rviz::MessageFilterDisplay<rtabmap::MapData>
 {
 Q_OBJECT
 public:
@@ -99,7 +99,7 @@ protected:
 	virtual void onInitialize();
 
 	/** @brief Process a single message.  Overridden from MessageFilterDisplay. */
-	virtual void processMessage( const rtabmap::InfoExConstPtr& cloud );
+	virtual void processMessage( const rtabmap::MapDataConstPtr& cloud );
 
 private:
 	/**

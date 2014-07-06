@@ -30,6 +30,7 @@
 #include "rtabmap/Info.h"
 #include "rtabmap/InfoEx.h"
 #include "rtabmap/MapData.h"
+#include "rtabmap/GetMap.h"
 
 #include "rtabmap/MsgConversion.h"
 
@@ -173,11 +174,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	pauseSrv_ = nh.advertiseService("pause", &CoreWrapper::pauseRtabmapCallback, this);
 	resumeSrv_ = nh.advertiseService("resume", &CoreWrapper::resumeRtabmapCallback, this);
 	triggerNewMapSrv_ = nh.advertiseService("trigger_new_map", &CoreWrapper::triggerNewMapCallback, this);
-	publishGlobalMapDataSrv_ = nh.advertiseService("publish_global_map_data", &CoreWrapper::publishGlobalMapDataCallback, this);
-	publishLocalMapDataSrv_ = nh.advertiseService("publish_local_map_data", &CoreWrapper::publishLocalMapDataCallback, this);
-	publishGlobalGraphSrv_ = nh.advertiseService("publish_global_graph", &CoreWrapper::publishGlobalGraphCallback, this);
-	publishLocalGraphSrv_ = nh.advertiseService("publish_local_graph", &CoreWrapper::publishLocalGraphCallback, this);
-
+	getMapDataSrv_ = nh.advertiseService("get_map", &CoreWrapper::getMapCallback, this);
 
 	setupCallbacks(subscribeDepth, subscribeLaserScan, queueSize);
 
@@ -616,33 +613,12 @@ bool CoreWrapper::triggerNewMapCallback(std_srvs::Empty::Request&, std_srvs::Emp
 	return true;
 }
 
-bool CoreWrapper::publishGlobalMapDataCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+bool CoreWrapper::getMapCallback(rtabmap::GetMap::Request& req, rtabmap::GetMap::Response& rep)
 {
-	publishMapData(true);
-	return true;
-}
-
-bool CoreWrapper::publishLocalMapDataCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
-{
-	publishMapData(false);
-	return true;
-}
-
-bool CoreWrapper::publishGlobalGraphCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
-{
-	publishGraph(true);
-	return true;
-}
-
-bool CoreWrapper::publishLocalGraphCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
-{
-	publishGraph(false);
-	return true;
-}
-
-void CoreWrapper::publishMapData(bool global)
-{
-	ROS_INFO("rtabmap: Publishing map data (global=%s)...", global?"true":"false");
+	ROS_INFO("rtabmap: Getting map (global=%s optimized=%s graphOnly=%s)...",
+			req.global?"true":"false",
+			req.optimized?"true":"false",
+			req.graphOnly?"true":"false");
 	std::map<int, std::vector<unsigned char> > images;
 	std::map<int, std::vector<unsigned char> > depths;
 	std::map<int, std::vector<unsigned char> > depths2d;
@@ -651,334 +627,290 @@ void CoreWrapper::publishMapData(bool global)
 	std::map<int, Transform> poses;
 	std::multimap<int, Link> constraints;
 
-	if(mapData_.getNumSubscribers())
+	if(req.graphOnly)
 	{
-		rtabmap::MapDataPtr msg(new rtabmap::MapData);
-
-		rtabmap_.get3DMap(images,
+		rtabmap_.getGraph(
+				poses,
+				constraints,
+				req.optimized,
+				req.global);
+	}
+	else
+	{
+		rtabmap_.get3DMap(
+				images,
 				depths,
 				depths2d,
 				depthConstants,
 				localTransforms,
 				poses,
 				constraints,
-				true,
-				global);
-
-		int i=0;
-
-		msg->imageIDs.resize(images.size());
-		msg->images.resize(images.size());
-		i=0;
-		for(std::map<int, std::vector<unsigned char> >::iterator iter = images.begin(); iter!=images.end(); ++iter)
-		{
-			msg->imageIDs[i] = iter->first;
-			msg->images[i].bytes = iter->second;
-			++i;
-		}
-
-		msg->depthIDs.resize(depths.size());
-		msg->depths.resize(depths.size());
-		i=0;
-		for(std::map<int, std::vector<unsigned char> >::iterator iter = depths.begin(); iter!=depths.end(); ++iter)
-		{
-			msg->depthIDs[i] = iter->first;
-			msg->depths[i].bytes = iter->second;
-			++i;
-		}
-
-		msg->depth2DIDs.resize(depths2d.size());
-		msg->depth2Ds.resize(depths2d.size());
-		i=0;
-		for(std::map<int, std::vector<unsigned char> >::iterator iter = depths2d.begin(); iter!=depths2d.end(); ++iter)
-		{
-			msg->depth2DIDs[i] = iter->first;
-			msg->depth2Ds[i].bytes = iter->second;
-			++i;
-		}
-
-		msg->depthConstantIDs.resize(depthConstants.size());
-		msg->depthConstants.resize(depthConstants.size());
-		i=0;
-		for(std::map<int, float>::iterator iter = depthConstants.begin(); iter!=depthConstants.end(); ++iter)
-		{
-			msg->depthConstantIDs[i] = iter->first;
-			msg->depthConstants[i] = iter->second;
-			++i;
-		}
-
-		msg->localTransformIDs.resize(localTransforms.size());
-		msg->localTransforms.resize(localTransforms.size());
-		i=0;
-		for(std::map<int, Transform>::iterator iter = localTransforms.begin(); iter!=localTransforms.end(); ++iter)
-		{
-			msg->localTransformIDs[i] = iter->first;
-			transformToGeometryMsg(iter->second, msg->localTransforms[i]);
-			++i;
-		}
-
-		msg->poseIDs.resize(poses.size());
-		msg->poses.resize(poses.size());
-		i=0;
-		for(std::map<int, Transform>::iterator iter = poses.begin(); iter!=poses.end(); ++iter)
-		{
-			msg->poseIDs[i] = iter->first;
-			transformToPoseMsg(iter->second, msg->poses[i]);
-			++i;
-		}
-
-		msg->constraintFromIDs.resize(constraints.size());
-		msg->constraintToIDs.resize(constraints.size());
-		msg->constraintTypes.resize(constraints.size());
-		msg->constraints.resize(constraints.size());
-		i=0;
-		for(std::multimap<int, Link>::iterator iter = constraints.begin(); iter!=constraints.end(); ++iter)
-		{
-			msg->constraintFromIDs[i] = iter->first;
-			msg->constraintToIDs[i] = iter->second.to();
-			msg->constraintTypes[i] = iter->second.type();
-			transformToGeometryMsg(iter->second.transform(), msg->constraints[i]);
-			++i;
-		}
-
-		msg->header.stamp = ros::Time::now();
-		mapData_.publish(msg);
+				req.optimized,
+				req.global);
 	}
-}
 
-void CoreWrapper::publishGraph(bool global)
-{
-	ROS_INFO("rtabmap: Publishing graph (global=%s)...", global?"true":"false");
-	std::map<int, Transform> poses;
-	std::multimap<int, Link> constraints;
 
-	if(mapData_.getNumSubscribers())
+	int i=0;
+
+	rep.data.imageIDs.resize(images.size());
+	rep.data.images.resize(images.size());
+	i=0;
+	for(std::map<int, std::vector<unsigned char> >::iterator iter = images.begin(); iter!=images.end(); ++iter)
 	{
-		rtabmap::MapDataPtr msg(new rtabmap::MapData);
-
-		std::map<int, Transform> poses;
-		std::multimap<int, Link> constraints;
-
-		rtabmap_.getGraph(poses,
-				constraints,
-				true,
-				global);
-
-		int i=0;
-		msg->poseIDs.resize(poses.size());
-		msg->poses.resize(poses.size());
-		i=0;
-		for(std::map<int, Transform>::iterator iter = poses.begin(); iter!=poses.end(); ++iter)
-		{
-			msg->poseIDs[i] = iter->first;
-			transformToPoseMsg(iter->second, msg->poses[i]);
-			++i;
-		}
-
-		msg->constraintFromIDs.resize(constraints.size());
-		msg->constraintToIDs.resize(constraints.size());
-		msg->constraintTypes.resize(constraints.size());
-		msg->constraints.resize(constraints.size());
-		i=0;
-		for(std::multimap<int, Link>::iterator iter = constraints.begin(); iter!=constraints.end(); ++iter)
-		{
-			msg->constraintFromIDs[i] = iter->first;
-			msg->constraintToIDs[i] = iter->second.to();
-			msg->constraintTypes[i] = iter->second.type();
-			transformToGeometryMsg(iter->second.transform(), msg->constraints[i]);
-			++i;
-		}
-
-		msg->header.stamp = ros::Time::now();
-		mapData_.publish(msg);
+		rep.data.imageIDs[i] = iter->first;
+		rep.data.images[i].bytes = iter->second;
+		++i;
 	}
+
+	rep.data.depthIDs.resize(depths.size());
+	rep.data.depths.resize(depths.size());
+	i=0;
+	for(std::map<int, std::vector<unsigned char> >::iterator iter = depths.begin(); iter!=depths.end(); ++iter)
+	{
+		rep.data.depthIDs[i] = iter->first;
+		rep.data.depths[i].bytes = iter->second;
+		++i;
+	}
+
+	rep.data.depth2DIDs.resize(depths2d.size());
+	rep.data.depth2Ds.resize(depths2d.size());
+	i=0;
+	for(std::map<int, std::vector<unsigned char> >::iterator iter = depths2d.begin(); iter!=depths2d.end(); ++iter)
+	{
+		rep.data.depth2DIDs[i] = iter->first;
+		rep.data.depth2Ds[i].bytes = iter->second;
+		++i;
+	}
+
+	rep.data.depthConstantIDs.resize(depthConstants.size());
+	rep.data.depthConstants.resize(depthConstants.size());
+	i=0;
+	for(std::map<int, float>::iterator iter = depthConstants.begin(); iter!=depthConstants.end(); ++iter)
+	{
+		rep.data.depthConstantIDs[i] = iter->first;
+		rep.data.depthConstants[i] = iter->second;
+		++i;
+	}
+
+	rep.data.localTransformIDs.resize(localTransforms.size());
+	rep.data.localTransforms.resize(localTransforms.size());
+	i=0;
+	for(std::map<int, Transform>::iterator iter = localTransforms.begin(); iter!=localTransforms.end(); ++iter)
+	{
+		rep.data.localTransformIDs[i] = iter->first;
+		transformToGeometryMsg(iter->second, rep.data.localTransforms[i]);
+		++i;
+	}
+
+	rep.data.poseIDs.resize(poses.size());
+	rep.data.poses.resize(poses.size());
+	i=0;
+	for(std::map<int, Transform>::iterator iter = poses.begin(); iter!=poses.end(); ++iter)
+	{
+		rep.data.poseIDs[i] = iter->first;
+		transformToPoseMsg(iter->second, rep.data.poses[i]);
+		++i;
+	}
+
+	rep.data.constraintFromIDs.resize(constraints.size());
+	rep.data.constraintToIDs.resize(constraints.size());
+	rep.data.constraintTypes.resize(constraints.size());
+	rep.data.constraints.resize(constraints.size());
+	i=0;
+	for(std::multimap<int, Link>::iterator iter = constraints.begin(); iter!=constraints.end(); ++iter)
+	{
+		rep.data.constraintFromIDs[i] = iter->first;
+		rep.data.constraintToIDs[i] = iter->second.to();
+		rep.data.constraintTypes[i] = iter->second.type();
+		transformToGeometryMsg(iter->second.transform(), rep.data.constraints[i]);
+		++i;
+	}
+
+	rep.data.header.stamp = ros::Time::now();
+	rep.data.header.frame_id = mapFrameId_;
+
+	return true;
 }
 
 void CoreWrapper::publishStats(const Statistics & stats)
 {
-	if(infoPub_.getNumSubscribers() || infoPubEx_.getNumSubscribers())
+	ros::Time timeNow = ros::Time::now();
+	if(infoPub_.getNumSubscribers())
 	{
-		if(infoPub_.getNumSubscribers())
+		//ROS_INFO("Sending RtabmapInfo msg (last_id=%d)...", stat.refImageId());
+		rtabmap::InfoPtr msg(new rtabmap::Info);
+		msg->header.stamp = timeNow;
+		msg->header.frame_id = mapFrameId_;
+
+		msg->refId = stats.refImageId();
+		msg->loopClosureId = stats.loopClosureId();
+		msg->localLoopClosureId = stats.localLoopClosureId();
+
+		transformToGeometryMsg(stats.mapCorrection(), msg->mapCorrection);
+		transformToGeometryMsg(stats.loopClosureTransform(), msg->loopClosureTransform);
+		transformToPoseMsg(stats.currentPose(), msg->currentPose);
+
+		infoPub_.publish(msg);
+	}
+
+	if(infoPubEx_.getNumSubscribers())
+	{
+		//ROS_INFO("Sending infoEx msg (last_id=%d)...", stat.refImageId());
+		rtabmap::InfoExPtr msg(new rtabmap::InfoEx);
+		msg->header.stamp = timeNow;
+		msg->header.frame_id = mapFrameId_;
+
+		msg->refId = stats.refImageId();
+		msg->loopClosureId = stats.loopClosureId();
+		msg->localLoopClosureId = stats.localLoopClosureId();
+
+		transformToGeometryMsg(stats.mapCorrection(), msg->mapCorrection);
+		transformToGeometryMsg(stats.loopClosureTransform(), msg->loopClosureTransform);
+		transformToPoseMsg(stats.currentPose(), msg->currentPose);
+
+		// Detailed info
+		if(stats.extended())
 		{
-			//ROS_INFO("Sending RtabmapInfo msg (last_id=%d)...", stat.refImageId());
-			rtabmap::InfoPtr msg(new rtabmap::Info);
-			msg->header.stamp = ros::Time::now();
-			msg->header.frame_id = mapFrameId_;
+			//Posterior, likelihood, childCount
+			msg->posteriorKeys = uKeys(stats.posterior());
+			msg->posteriorValues = uValues(stats.posterior());
+			msg->likelihoodKeys = uKeys(stats.likelihood());
+			msg->likelihoodValues = uValues(stats.likelihood());
+			msg->rawLikelihoodKeys = uKeys(stats.rawLikelihood());
+			msg->rawLikelihoodValues = uValues(stats.rawLikelihood());
+			msg->weightsKeys = uKeys(stats.weights());
+			msg->weightsValues = uValues(stats.weights());
 
-			msg->refId = stats.refImageId();
-			msg->loopClosureId = stats.loopClosureId();
-			msg->localLoopClosureId = stats.localLoopClosureId();
-
-			msg->nodeIds.resize(stats.poses().size());
-			msg->nodePoses.resize(stats.poses().size());
-			int i=0;
-			for(std::map<int, Transform>::const_iterator iter = stats.poses().begin();
-				iter!=stats.poses().end();
-				++iter)
+			//Features stuff...
+			msg->refWordsKeys = uKeys(stats.refWords());
+			msg->refWordsValues = std::vector<rtabmap::KeyPoint>(stats.refWords().size());
+			int index = 0;
+			for(std::multimap<int, cv::KeyPoint>::const_iterator i=stats.refWords().begin();
+				i!=stats.refWords().end();
+				++i)
 			{
-				msg->nodeIds[i] = iter->first;
-				transformToPoseMsg(iter->second, msg->nodePoses[i]);
-				++i;
+				msg->refWordsValues.at(index).angle = i->second.angle;
+				msg->refWordsValues.at(index).response = i->second.response;
+				msg->refWordsValues.at(index).ptx = i->second.pt.x;
+				msg->refWordsValues.at(index).pty = i->second.pt.y;
+				msg->refWordsValues.at(index).size = i->second.size;
+				msg->refWordsValues.at(index).octave = i->second.octave;
+				msg->refWordsValues.at(index).class_id = i->second.class_id;
+				++index;
 			}
 
-			transformToGeometryMsg(stats.mapCorrection(), msg->mapCorrection);
-			transformToGeometryMsg(stats.loopClosureTransform(), msg->loopClosureTransform);
-			transformToPoseMsg(stats.currentPose(), msg->currentPose);
+			msg->loopWordsKeys = uKeys(stats.loopWords());
+			msg->loopWordsValues = std::vector<rtabmap::KeyPoint>(stats.loopWords().size());
+			index = 0;
+			for(std::multimap<int, cv::KeyPoint>::const_iterator i=stats.loopWords().begin();
+				i!=stats.loopWords().end();
+				++i)
+			{
+				msg->loopWordsValues.at(index).angle = i->second.angle;
+				msg->loopWordsValues.at(index).response = i->second.response;
+				msg->loopWordsValues.at(index).ptx = i->second.pt.x;
+				msg->loopWordsValues.at(index).pty = i->second.pt.y;
+				msg->loopWordsValues.at(index).size = i->second.size;
+				msg->loopWordsValues.at(index).octave = i->second.octave;
+				msg->loopWordsValues.at(index).class_id = i->second.class_id;
+				++index;
+			}
 
-			infoPub_.publish(msg);
+			// Statistics data
+			msg->statsKeys = uKeys(stats.data());
+			msg->statsValues = uValues(stats.data());
+		}
+		infoPubEx_.publish(msg);
+	}
+
+	if(mapData_.getNumSubscribers())
+	{
+		//RGB-D SLAM data
+		rtabmap::MapDataPtr msg(new rtabmap::MapData);
+		msg->header.stamp = timeNow;
+		msg->header.frame_id = mapFrameId_;
+
+		msg->mapIDs = uKeys(stats.getMapIds());
+		msg->maps = uValues(stats.getMapIds());
+
+		msg->poseIDs.resize(stats.poses().size());
+		msg->poses.resize(stats.poses().size());
+		int index = 0;
+		for(std::map<int, Transform>::const_iterator iter = stats.poses().begin();
+			iter!=stats.poses().end();
+			++iter)
+		{
+			msg->poseIDs[index] = iter->first;
+			transformToPoseMsg(iter->second, msg->poses[index]);
+			++index;
 		}
 
-		if(infoPubEx_.getNumSubscribers())
+		msg->constraintFromIDs.resize(stats.constraints().size());
+		msg->constraintToIDs.resize(stats.constraints().size());
+		msg->constraintTypes.resize(stats.constraints().size());
+		msg->constraints.resize(stats.constraints().size());
+		index=0;
+		for(std::multimap<int, Link>::const_iterator iter = stats.constraints().begin(); iter!=stats.constraints().end(); ++iter)
 		{
-			//ROS_INFO("Sending infoEx msg (last_id=%d)...", stat.refImageId());
-			rtabmap::InfoExPtr msg(new rtabmap::InfoEx);
-			msg->header.stamp = ros::Time::now();
-			msg->header.frame_id = mapFrameId_;
-
-			msg->refId = stats.refImageId();
-			msg->loopClosureId = stats.loopClosureId();
-			msg->localLoopClosureId = stats.localLoopClosureId();
-
-			msg->data.header = msg->header;
-			msg->data.poseIDs.resize(stats.poses().size());
-			msg->data.poses.resize(stats.poses().size());
-			int i=0;
-			for(std::map<int, Transform>::const_iterator iter = stats.poses().begin();
-				iter!=stats.poses().end();
-				++iter)
-			{
-				msg->data.poseIDs[i] = iter->first;
-				transformToPoseMsg(iter->second, msg->data.poses[i]);
-				++i;
-			}
-
-			msg->data.constraintFromIDs.resize(stats.constraints().size());
-			msg->data.constraintToIDs.resize(stats.constraints().size());
-			msg->data.constraintTypes.resize(stats.constraints().size());
-			msg->data.constraints.resize(stats.constraints().size());
-			i=0;
-			for(std::multimap<int, Link>::const_iterator iter = stats.constraints().begin(); iter!=stats.constraints().end(); ++iter)
-			{
-				msg->data.constraintFromIDs[i] = iter->first;
-				msg->data.constraintToIDs[i] = iter->second.to();
-				msg->data.constraintTypes[i] = iter->second.type();
-				transformToGeometryMsg(iter->second.transform(), msg->data.constraints[i]);
-				++i;
-			}
-
-			transformToGeometryMsg(stats.mapCorrection(), msg->mapCorrection);
-			transformToGeometryMsg(stats.loopClosureTransform(), msg->loopClosureTransform);
-			transformToPoseMsg(stats.currentPose(), msg->currentPose);
-
-			// Detailed info
-			if(stats.extended())
-			{
-				//Posterior, likelihood, childCount
-				msg->posteriorKeys = uKeys(stats.posterior());
-				msg->posteriorValues = uValues(stats.posterior());
-				msg->likelihoodKeys = uKeys(stats.likelihood());
-				msg->likelihoodValues = uValues(stats.likelihood());
-				msg->rawLikelihoodKeys = uKeys(stats.rawLikelihood());
-				msg->rawLikelihoodValues = uValues(stats.rawLikelihood());
-				msg->weightsKeys = uKeys(stats.weights());
-				msg->weightsValues = uValues(stats.weights());
-
-				//Features stuff...
-				msg->refWordsKeys = uKeys(stats.refWords());
-				msg->refWordsValues = std::vector<rtabmap::KeyPoint>(stats.refWords().size());
-				int index = 0;
-				for(std::multimap<int, cv::KeyPoint>::const_iterator i=stats.refWords().begin();
-					i!=stats.refWords().end();
-					++i)
-				{
-					msg->refWordsValues.at(index).angle = i->second.angle;
-					msg->refWordsValues.at(index).response = i->second.response;
-					msg->refWordsValues.at(index).ptx = i->second.pt.x;
-					msg->refWordsValues.at(index).pty = i->second.pt.y;
-					msg->refWordsValues.at(index).size = i->second.size;
-					msg->refWordsValues.at(index).octave = i->second.octave;
-					msg->refWordsValues.at(index).class_id = i->second.class_id;
-					++index;
-				}
-
-				msg->loopWordsKeys = uKeys(stats.loopWords());
-				msg->loopWordsValues = std::vector<rtabmap::KeyPoint>(stats.loopWords().size());
-				index = 0;
-				for(std::multimap<int, cv::KeyPoint>::const_iterator i=stats.loopWords().begin();
-					i!=stats.loopWords().end();
-					++i)
-				{
-					msg->loopWordsValues.at(index).angle = i->second.angle;
-					msg->loopWordsValues.at(index).response = i->second.response;
-					msg->loopWordsValues.at(index).ptx = i->second.pt.x;
-					msg->loopWordsValues.at(index).pty = i->second.pt.y;
-					msg->loopWordsValues.at(index).size = i->second.size;
-					msg->loopWordsValues.at(index).octave = i->second.octave;
-					msg->loopWordsValues.at(index).class_id = i->second.class_id;
-					++index;
-				}
-
-				// Statistics data
-				msg->statsKeys = uKeys(stats.data());
-				msg->statsValues = uValues(stats.data());
-
-				msg->data.mapIDs = uKeys(stats.getMapIds());
-				msg->data.maps = uValues(stats.getMapIds());
-
-				//RGB-D SLAM data
-				msg->data.imageIDs.resize(stats.getImages().size());
-				msg->data.images.resize(stats.getImages().size());
-				index = 0;
-				for(std::map<int, std::vector<unsigned char> >::const_iterator i=stats.getImages().begin();
-					i!=stats.getImages().end();
-					++i)
-				{
-					msg->data.imageIDs[index] = i->first;
-					msg->data.images[index].bytes = i->second;
-					++index;
-				}
-
-				msg->data.depthIDs.resize(stats.getDepths().size());
-				msg->data.depths.resize(stats.getDepths().size());
-				index = 0;
-				for(std::map<int, std::vector<unsigned char> >::const_iterator i=stats.getDepths().begin();
-					i!=stats.getDepths().end();
-					++i)
-				{
-					msg->data.depthIDs[index] = i->first;
-					msg->data.depths[index].bytes = i->second;
-					++index;
-				}
-
-				msg->data.depth2DIDs.resize(stats.getDepth2ds().size());
-				msg->data.depth2Ds.resize(stats.getDepth2ds().size());
-				index = 0;
-				for(std::map<int, std::vector<unsigned char> >::const_iterator i=stats.getDepth2ds().begin();
-					i!=stats.getDepth2ds().end();
-					++i)
-				{
-					msg->data.depth2DIDs[index] = i->first;
-					msg->data.depth2Ds[index].bytes = i->second;
-					++index;
-				}
-
-				msg->data.localTransformIDs.resize(stats.getLocalTransforms().size());
-				msg->data.localTransforms.resize(stats.getLocalTransforms().size());
-				index = 0;
-				for(std::map<int, Transform>::const_iterator i=stats.getLocalTransforms().begin();
-					i!=stats.getLocalTransforms().end();
-					++i)
-				{
-					msg->data.localTransformIDs[index] = i->first;
-					transformToGeometryMsg(i->second, msg->data.localTransforms[index]);
-					++index;
-				}
-
-				msg->data.depthConstantIDs = uKeys(stats.getDepthConstants());
-				msg->data.depthConstants = uValues(stats.getDepthConstants());
-			}
-			infoPubEx_.publish(msg);
+			msg->constraintFromIDs[index] = iter->first;
+			msg->constraintToIDs[index] = iter->second.to();
+			msg->constraintTypes[index] = iter->second.type();
+			transformToGeometryMsg(iter->second.transform(), msg->constraints[index]);
+			++index;
 		}
+
+		msg->imageIDs.resize(stats.getImages().size());
+		msg->images.resize(stats.getImages().size());
+		index = 0;
+		for(std::map<int, std::vector<unsigned char> >::const_iterator i=stats.getImages().begin();
+			i!=stats.getImages().end();
+			++i)
+		{
+			msg->imageIDs[index] = i->first;
+			msg->images[index].bytes = i->second;
+			++index;
+		}
+
+		msg->depthIDs.resize(stats.getDepths().size());
+		msg->depths.resize(stats.getDepths().size());
+		index = 0;
+		for(std::map<int, std::vector<unsigned char> >::const_iterator i=stats.getDepths().begin();
+			i!=stats.getDepths().end();
+			++i)
+		{
+			msg->depthIDs[index] = i->first;
+			msg->depths[index].bytes = i->second;
+			++index;
+		}
+
+		msg->depth2DIDs.resize(stats.getDepth2ds().size());
+		msg->depth2Ds.resize(stats.getDepth2ds().size());
+		index = 0;
+		for(std::map<int, std::vector<unsigned char> >::const_iterator i=stats.getDepth2ds().begin();
+			i!=stats.getDepth2ds().end();
+			++i)
+		{
+			msg->depth2DIDs[index] = i->first;
+			msg->depth2Ds[index].bytes = i->second;
+			++index;
+		}
+
+		msg->localTransformIDs.resize(stats.getLocalTransforms().size());
+		msg->localTransforms.resize(stats.getLocalTransforms().size());
+		index = 0;
+		for(std::map<int, Transform>::const_iterator i=stats.getLocalTransforms().begin();
+			i!=stats.getLocalTransforms().end();
+			++i)
+		{
+			msg->localTransformIDs[index] = i->first;
+			transformToGeometryMsg(i->second, msg->localTransforms[index]);
+			++index;
+		}
+
+		msg->depthConstantIDs = uKeys(stats.getDepthConstants());
+		msg->depthConstants = uValues(stats.getDepthConstants());
+
+		mapData_.publish(msg);
 	}
 }
 

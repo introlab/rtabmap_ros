@@ -3,7 +3,7 @@
          type="rtabmap::MapCloudDisplay"
          base_class_type="rviz::Display">
     <description>
-      Displays graph point clouds from rtabmap/InfoEx messages.
+      Displays graph point clouds from rtabmap/MapData messages.
     </description>
   </class>
 </library>

@@ -154,51 +154,51 @@ void MapCloudDisplay::onInitialize()
 	spinner_.start();
 }
 
-void MapCloudDisplay::processMessage( const rtabmap::InfoExConstPtr& msg )
+void MapCloudDisplay::processMessage( const rtabmap::MapDataConstPtr& msg )
 {
 	// Add new clouds...
-	for(unsigned int i=0; i<msg->data.localTransformIDs.size() && i<msg->data.localTransforms.size(); ++i)
+	for(unsigned int i=0; i<msg->localTransformIDs.size() && i<msg->localTransforms.size(); ++i)
 	{
-		int id = msg->data.localTransformIDs[i];
+		int id = msg->localTransformIDs[i];
 		if(cloud_infos_.find(id) == cloud_infos_.end())
 		{
 			// Cloud not added to RVIZ, add it!
-			rtabmap::Transform localTransform = transformFromGeometryMsg(msg->data.localTransforms[i]);
+			rtabmap::Transform localTransform = transformFromGeometryMsg(msg->localTransforms[i]);
 			if(!localTransform.isNull())
 			{
 				cv::Mat image, depth;
 				float depthConstant = 0.0f;
 				rtabmap::Transform pose;
 
-				for(unsigned int i=0; i<msg->data.imageIDs.size() && i<msg->data.images.size(); ++i)
+				for(unsigned int i=0; i<msg->imageIDs.size() && i<msg->images.size(); ++i)
 				{
-					if(msg->data.imageIDs[i] == id)
+					if(msg->imageIDs[i] == id)
 					{
-						image = util3d::uncompressImage(msg->data.images[i].bytes);
+						image = util3d::uncompressImage(msg->images[i].bytes);
 						break;
 					}
 				}
-				for(unsigned int i=0; i<msg->data.depthIDs.size() && i<msg->data.depths.size(); ++i)
+				for(unsigned int i=0; i<msg->depthIDs.size() && i<msg->depths.size(); ++i)
 				{
-					if(msg->data.depthIDs[i] == id)
+					if(msg->depthIDs[i] == id)
 					{
-						depth = util3d::uncompressImage(msg->data.depths[i].bytes);
+						depth = util3d::uncompressImage(msg->depths[i].bytes);
 						break;
 					}
 				}
-				for(unsigned int i=0; i<msg->data.depthConstantIDs.size() && i<msg->data.depthConstants.size(); ++i)
+				for(unsigned int i=0; i<msg->depthConstantIDs.size() && i<msg->depthConstants.size(); ++i)
 				{
-					if(msg->data.depthConstantIDs[i] == id)
+					if(msg->depthConstantIDs[i] == id)
 					{
-						depthConstant = msg->data.depthConstants[i];
+						depthConstant = msg->depthConstants[i];
 						break;
 					}
 				}
-				for(unsigned int i=0; i<msg->data.poseIDs.size() && i<msg->data.poses.size(); ++i)
+				for(unsigned int i=0; i<msg->poseIDs.size() && i<msg->poses.size(); ++i)
 				{
-					if(msg->data.poseIDs[i] == id)
+					if(msg->poseIDs[i] == id)
 					{
-						pose = transformFromPoseMsg(msg->data.poses[i]);
+						pose = transformFromPoseMsg(msg->poses[i]);
 						break;
 					}
 				}
@@ -223,7 +223,7 @@ void MapCloudDisplay::processMessage( const rtabmap::InfoExConstPtr& msg )
 
 					sensor_msgs::PointCloud2::Ptr cloudMsg(new sensor_msgs::PointCloud2);
 					pcl::toROSMsg(*cloud, *cloudMsg);
-					cloudMsg->header = msg->data.header;
+					cloudMsg->header = msg->header;
 
 					CloudInfoPtr info(new CloudInfo);
 					info->message_ = cloudMsg;
@@ -242,9 +242,9 @@ void MapCloudDisplay::processMessage( const rtabmap::InfoExConstPtr& msg )
 
 	// Update graph
 	std::map<int, Transform> poses;
-	for(unsigned int i=0; i<msg->data.poseIDs.size() && i<msg->data.poses.size(); ++i)
+	for(unsigned int i=0; i<msg->poseIDs.size() && i<msg->poses.size(); ++i)
 	{
-		poses.insert(std::make_pair(msg->data.poseIDs[i], transformFromPoseMsg(msg->data.poses[i])));
+		poses.insert(std::make_pair(msg->poseIDs[i], transformFromPoseMsg(msg->poses[i])));
 	}
 
 	{

@@ -8,6 +8,7 @@ find_package(catkin REQUIRED COMPONENTS
              cv_bridge roscpp rospy sensor_msgs std_msgs std_srvs nav_msgs 
              image_transport tf tf_conversions laser_geometry pcl_conversions 
              pcl_ros nodelet dynamic_reconfigure rviz message_filters class_loader
+             genmsg
 )
 
 ## System dependencies are found with CMake's conventions
@@ -45,11 +46,10 @@ add_message_files(
 )
 
 ## Generate services in the 'srv' folder
-# add_service_files(
-#   FILES
-#   Service1.srv
-#   Service2.srv
-# )
+ add_service_files(
+   FILES
+   GetMap.srv
+ )
 
 ## Generate added messages and services with any dependencies listed here
 generate_messages(
