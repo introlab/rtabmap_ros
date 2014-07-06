@@ -2,14 +2,6 @@
 <launch>
 
   <group ns="rtabmap">
-    <!-- Visualisation (client side) -->
-    <!-- Map assembler for rviz -->
-    <node pkg="rtabmap" type="map_assembler" name="map_assembler"  output="screen">
-      <param name="cloud_decimation" type="int" value="4"/>
-      <param name="cloud_voxel_size" type="double" value="0.02"/>
-      <param name="scan_voxel_size" type="double" value="0.01"/>
-    </node>
-  
     <!-- Grid map assembler for rviz -->
     <node pkg="rtabmap" type="grid_map_assembler" name="grid_map_assembler" output="screen"/>
   </group>

@@ -48,7 +48,10 @@ int main(int argc, char** argv)
 					if(uSplit(iter->first, '/').front().compare("Bayes") == 0 ||
 					   uSplit(iter->first, '/').front().compare("VhEp") == 0 ||
 					   uSplit(iter->first, '/').front().compare("Odom") == 0 ||
-					   uSplit(iter->first, '/').front().compare("OdomBin") == 0 ||
+					   uSplit(iter->first, '/').front().compare("FAST") == 0 ||
+					   uSplit(iter->first, '/').front().compare("BRIEF") == 0 ||
+					   uSplit(iter->first, '/').front().compare("ORB") == 0 ||
+					   uSplit(iter->first, '/').front().compare("FREAK") == 0 ||
 					   uSplit(iter->first, '/').front().compare("OdomICP") == 0)
 					{
 						parameters.erase(iter++);
