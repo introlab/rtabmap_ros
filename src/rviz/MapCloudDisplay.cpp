@@ -27,23 +27,23 @@ namespace rtabmap
 {
 
 
-MapCloudDisplay::CloudInfo::CloudInfo()
-: manager_(0)
-, scene_node_(0)
+MapCloudDisplay::CloudInfo::CloudInfo() :
+		manager_(0),
+		scene_node_(0)
 {}
 
 MapCloudDisplay::CloudInfo::~CloudInfo()
 {
-  clear();
+	clear();
 }
 
 void MapCloudDisplay::CloudInfo::clear()
 {
-  if ( scene_node_ )
-  {
-    manager_->destroySceneNode( scene_node_ );
-    scene_node_=0;
-  }
+	if ( scene_node_ )
+	{
+		manager_->destroySceneNode( scene_node_ );
+		scene_node_=0;
+	}
 }
 
 MapCloudDisplay::MapCloudDisplay()
@@ -53,46 +53,46 @@ MapCloudDisplay::MapCloudDisplay()
 	//QIcon icon;
 	//this->setIcon(icon);
 
-    style_property_ = new rviz::EnumProperty( "Style", "Flat Squares",
-                                        "Rendering mode to use, in order of computational complexity.",
-                                        this, SLOT( updateStyle() ), this );
-    style_property_->addOption( "Points", rviz::PointCloud::RM_POINTS );
-    style_property_->addOption( "Squares", rviz::PointCloud::RM_SQUARES );
-    style_property_->addOption( "Flat Squares", rviz::PointCloud::RM_FLAT_SQUARES );
-    style_property_->addOption( "Spheres", rviz::PointCloud::RM_SPHERES );
-    style_property_->addOption( "Boxes", rviz::PointCloud::RM_BOXES );
+	style_property_ = new rviz::EnumProperty( "Style", "Flat Squares",
+										"Rendering mode to use, in order of computational complexity.",
+										this, SLOT( updateStyle() ), this );
+	style_property_->addOption( "Points", rviz::PointCloud::RM_POINTS );
+	style_property_->addOption( "Squares", rviz::PointCloud::RM_SQUARES );
+	style_property_->addOption( "Flat Squares", rviz::PointCloud::RM_FLAT_SQUARES );
+	style_property_->addOption( "Spheres", rviz::PointCloud::RM_SPHERES );
+	style_property_->addOption( "Boxes", rviz::PointCloud::RM_BOXES );
 
-    point_world_size_property_ = new rviz::FloatProperty( "Size (m)", 0.01,
-                                                  "Point size in meters.",
-                                                  this, SLOT( updateBillboardSize() ), this );
-    point_world_size_property_->setMin( 0.0001 );
+	point_world_size_property_ = new rviz::FloatProperty( "Size (m)", 0.01,
+												  "Point size in meters.",
+												  this, SLOT( updateBillboardSize() ), this );
+	point_world_size_property_->setMin( 0.0001 );
 
-    point_pixel_size_property_ = new rviz::FloatProperty( "Size (Pixels)", 3,
-                                                  "Point size in pixels.",
-                                                  this, SLOT( updateBillboardSize() ), this );
-    point_pixel_size_property_->setMin( 1 );
+	point_pixel_size_property_ = new rviz::FloatProperty( "Size (Pixels)", 3,
+												  "Point size in pixels.",
+												  this, SLOT( updateBillboardSize() ), this );
+	point_pixel_size_property_->setMin( 1 );
 
-    alpha_property_ = new rviz::FloatProperty( "Alpha", 1.0,
-                                         "Amount of transparency to apply to the points.  Note that this is experimental and does not always look correct.",
-                                         this, SLOT( updateAlpha() ), this );
-    alpha_property_->setMin( 0 );
-    alpha_property_->setMax( 1 );
+	alpha_property_ = new rviz::FloatProperty( "Alpha", 1.0,
+										 "Amount of transparency to apply to the points.  Note that this is experimental and does not always look correct.",
+										 this, SLOT( updateAlpha() ), this );
+	alpha_property_->setMin( 0 );
+	alpha_property_->setMax( 1 );
 
-    xyz_transformer_property_ = new rviz::EnumProperty( "Position Transformer", "",
-                                                  "Set the transformer to use to set the position of the points.",
-                                                  this, SLOT( updateXyzTransformer() ), this );
-    connect( xyz_transformer_property_, SIGNAL( requestOptions( EnumProperty* )),
-             this, SLOT( setXyzTransformerOptions( EnumProperty* )));
+	xyz_transformer_property_ = new rviz::EnumProperty( "Position Transformer", "",
+												  "Set the transformer to use to set the position of the points.",
+												  this, SLOT( updateXyzTransformer() ), this );
+	connect( xyz_transformer_property_, SIGNAL( requestOptions( EnumProperty* )),
+			 this, SLOT( setXyzTransformerOptions( EnumProperty* )));
 
-    color_transformer_property_ = new rviz::EnumProperty( "Color Transformer", "",
-                                                    "Set the transformer to use to set the color of the points.",
-                                                    this, SLOT( updateColorTransformer() ), this );
-    connect( color_transformer_property_, SIGNAL( requestOptions( EnumProperty* )),
-             this, SLOT( setColorTransformerOptions( EnumProperty* )));
+	color_transformer_property_ = new rviz::EnumProperty( "Color Transformer", "",
+													"Set the transformer to use to set the color of the points.",
+													this, SLOT( updateColorTransformer() ), this );
+	connect( color_transformer_property_, SIGNAL( requestOptions( EnumProperty* )),
+			 this, SLOT( setColorTransformerOptions( EnumProperty* )));
 
-  // PointCloudCommon sets up a callback queue with a thread for each
-  // instance.  Use that for processing incoming messages.
-  update_nh_.setCallbackQueue( &cbqueue_ );
+	// PointCloudCommon sets up a callback queue with a thread for each
+	// instance.  Use that for processing incoming messages.
+	update_nh_.setCallbackQueue( &cbqueue_ );
 }
 
 MapCloudDisplay::~MapCloudDisplay()
@@ -107,37 +107,37 @@ MapCloudDisplay::~MapCloudDisplay()
 
 void MapCloudDisplay::loadTransformers()
 {
-  std::vector<std::string> classes = transformer_class_loader_->getDeclaredClasses();
-  std::vector<std::string>::iterator ci;
+	std::vector<std::string> classes = transformer_class_loader_->getDeclaredClasses();
+	std::vector<std::string>::iterator ci;
 
-  for( ci = classes.begin(); ci != classes.end(); ci++ )
-  {
-    const std::string& lookup_name = *ci;
-    std::string name = transformer_class_loader_->getName( lookup_name );
+	for( ci = classes.begin(); ci != classes.end(); ci++ )
+	{
+		const std::string& lookup_name = *ci;
+		std::string name = transformer_class_loader_->getName( lookup_name );
 
-    if( transformers_.count( name ) > 0 )
-    {
-      ROS_ERROR( "Transformer type [%s] is already loaded.", name.c_str() );
-      continue;
-    }
+		if( transformers_.count( name ) > 0 )
+		{
+			ROS_ERROR( "Transformer type [%s] is already loaded.", name.c_str() );
+			continue;
+		}
 
-    rviz::PointCloudTransformerPtr trans( transformer_class_loader_->createUnmanagedInstance( lookup_name ));
-    trans->init();
-    connect( trans.get(), SIGNAL( needRetransform() ), this, SLOT( causeRetransform() ));
+		rviz::PointCloudTransformerPtr trans( transformer_class_loader_->createUnmanagedInstance( lookup_name ));
+		trans->init();
+		connect( trans.get(), SIGNAL( needRetransform() ), this, SLOT( causeRetransform() ));
 
-    TransformerInfo info;
-    info.transformer = trans;
-    info.readable_name = name;
-    info.lookup_name = lookup_name;
+		TransformerInfo info;
+		info.transformer = trans;
+		info.readable_name = name;
+		info.lookup_name = lookup_name;
 
-    info.transformer->createProperties( this, rviz::PointCloudTransformer::Support_XYZ, info.xyz_props );
-    setPropertiesHidden( info.xyz_props, true );
+		info.transformer->createProperties( this, rviz::PointCloudTransformer::Support_XYZ, info.xyz_props );
+		setPropertiesHidden( info.xyz_props, true );
 
-    info.transformer->createProperties( this, rviz::PointCloudTransformer::Support_Color, info.color_props );
-    setPropertiesHidden( info.color_props, true );
+		info.transformer->createProperties( this, rviz::PointCloudTransformer::Support_Color, info.color_props );
+		setPropertiesHidden( info.color_props, true );
 
-    transformers_[ name ] = info;
-  }
+		transformers_[ name ] = info;
+	}
 }
 
 void MapCloudDisplay::onInitialize()
@@ -257,123 +257,127 @@ void MapCloudDisplay::processMessage( const rtabmap::InfoExConstPtr& msg )
 
 void MapCloudDisplay::setPropertiesHidden( const QList<Property*>& props, bool hide )
 {
-  for( int i = 0; i < props.size(); i++ )
-  {
-    props[ i ]->setHidden( hide );
-  }
+	for( int i = 0; i < props.size(); i++ )
+	{
+		props[ i ]->setHidden( hide );
+	}
 }
 
 void MapCloudDisplay::updateTransformers( const sensor_msgs::PointCloud2ConstPtr& cloud )
 {
-  std::string xyz_name = xyz_transformer_property_->getStdString();
-  std::string color_name = color_transformer_property_->getStdString();
+	std::string xyz_name = xyz_transformer_property_->getStdString();
+	std::string color_name = color_transformer_property_->getStdString();
 
-  xyz_transformer_property_->clearOptions();
-  color_transformer_property_->clearOptions();
+	xyz_transformer_property_->clearOptions();
+	color_transformer_property_->clearOptions();
 
-  // Get the channels that we could potentially render
-  typedef std::set<std::pair<uint8_t, std::string> > S_string;
-  S_string valid_xyz, valid_color;
-  bool cur_xyz_valid = false;
-  bool cur_color_valid = false;
-  bool has_rgb_transformer = false;
-  M_TransformerInfo::iterator trans_it = transformers_.begin();
-  M_TransformerInfo::iterator trans_end = transformers_.end();
-  for(;trans_it != trans_end; ++trans_it)
-  {
-    const std::string& name = trans_it->first;
-    const rviz::PointCloudTransformerPtr& trans = trans_it->second.transformer;
-    uint32_t mask = trans->supports(cloud);
-    if (mask & rviz::PointCloudTransformer::Support_XYZ)
-    {
-      valid_xyz.insert(std::make_pair(trans->score(cloud), name));
-      if (name == xyz_name)
-      {
-        cur_xyz_valid = true;
-      }
-      xyz_transformer_property_->addOptionStd( name );
-    }
+	// Get the channels that we could potentially render
+	typedef std::set<std::pair<uint8_t, std::string> > S_string;
+	S_string valid_xyz, valid_color;
+	bool cur_xyz_valid = false;
+	bool cur_color_valid = false;
+	bool has_rgb_transformer = false;
+	M_TransformerInfo::iterator trans_it = transformers_.begin();
+	M_TransformerInfo::iterator trans_end = transformers_.end();
+	for(;trans_it != trans_end; ++trans_it)
+	{
+		const std::string& name = trans_it->first;
+		const rviz::PointCloudTransformerPtr& trans = trans_it->second.transformer;
+		uint32_t mask = trans->supports(cloud);
+		if (mask & rviz::PointCloudTransformer::Support_XYZ)
+		{
+			valid_xyz.insert(std::make_pair(trans->score(cloud), name));
+			if (name == xyz_name)
+			{
+				cur_xyz_valid = true;
+			}
+			xyz_transformer_property_->addOptionStd( name );
+		}
 
-    if (mask & rviz::PointCloudTransformer::Support_Color)
-    {
-      valid_color.insert(std::make_pair(trans->score(cloud), name));
-      if (name == color_name)
-      {
-        cur_color_valid = true;
-      }
-      if (name == "RGB8")
-      {
-        has_rgb_transformer = true;
-      }
-      color_transformer_property_->addOptionStd( name );
-    }
-  }
+		if (mask & rviz::PointCloudTransformer::Support_Color)
+		{
+			valid_color.insert(std::make_pair(trans->score(cloud), name));
+			if (name == color_name)
+			{
+				cur_color_valid = true;
+			}
+			if (name == "RGB8")
+			{
+				has_rgb_transformer = true;
+			}
+			color_transformer_property_->addOptionStd( name );
+		}
+	}
 
-  if( !cur_xyz_valid )
-  {
-    if( !valid_xyz.empty() )
-    {
-      xyz_transformer_property_->setStringStd( valid_xyz.rbegin()->second );
-    }
-  }
+	if( !cur_xyz_valid )
+	{
+		if( !valid_xyz.empty() )
+		{
+			xyz_transformer_property_->setStringStd( valid_xyz.rbegin()->second );
+		}
+	}
 
-  if( !cur_color_valid )
-  {
-    if( !valid_color.empty() )
-    {
-      if (has_rgb_transformer)
-      {
-        color_transformer_property_->setStringStd( "RGB8" );
-      } else
-      {
-        color_transformer_property_->setStringStd( valid_color.rbegin()->second );
-      }
-    }
-  }
+	if( !cur_color_valid )
+	{
+		if( !valid_color.empty() )
+		{
+			if (has_rgb_transformer)
+			{
+				color_transformer_property_->setStringStd( "RGB8" );
+			}
+			else
+			{
+				color_transformer_property_->setStringStd( valid_color.rbegin()->second );
+			}
+		}
+	}
 }
 
 void MapCloudDisplay::updateAlpha()
 {
-  for ( unsigned i=0; i<cloud_infos_.size(); i++ )
-  {
-    cloud_infos_[i]->cloud_->setAlpha( alpha_property_->getFloat() );
-  }
+	for( std::map<int, CloudInfoPtr>::iterator it = cloud_infos_.begin(); it != cloud_infos_.end(); ++it )
+	{
+		it->second->cloud_->setAlpha( alpha_property_->getFloat() );
+	}
 }
 
 void MapCloudDisplay::updateStyle()
 {
-  rviz::PointCloud::RenderMode mode = (rviz::PointCloud::RenderMode) style_property_->getOptionInt();
-  if( mode == rviz::PointCloud::RM_POINTS )
-  {
-    point_world_size_property_->hide();
-    point_pixel_size_property_->show();
-  }
-  else
-  {
-    point_world_size_property_->show();
-    point_pixel_size_property_->hide();
-  }
-  for( unsigned int i = 0; i < cloud_infos_.size(); i++ )
-  {
-    cloud_infos_[i]->cloud_->setRenderMode( mode );
-  }
-  updateBillboardSize();
+	rviz::PointCloud::RenderMode mode = (rviz::PointCloud::RenderMode) style_property_->getOptionInt();
+	if( mode == rviz::PointCloud::RM_POINTS )
+	{
+		point_world_size_property_->hide();
+		point_pixel_size_property_->show();
+	}
+	else
+	{
+		point_world_size_property_->show();
+		point_pixel_size_property_->hide();
+	}
+	for( std::map<int, CloudInfoPtr>::iterator it = cloud_infos_.begin(); it != cloud_infos_.end(); ++it )
+	{
+		it->second->cloud_->setRenderMode( mode );
+	}
+	updateBillboardSize();
 }
 
 void MapCloudDisplay::updateBillboardSize()
 {
-  rviz::PointCloud::RenderMode mode = (rviz::PointCloud::RenderMode) style_property_->getOptionInt();
-  float size;
-  if( mode == rviz::PointCloud::RM_POINTS ) {
-    size = point_pixel_size_property_->getFloat();
-  } else {
-    size = point_world_size_property_->getFloat();
-  }
-  for ( unsigned i=0; i<cloud_infos_.size(); i++ )
-  {
-    cloud_infos_[i]->cloud_->setDimensions( size, size, size );
-  }
-  context_->queueRender();
+	rviz::PointCloud::RenderMode mode = (rviz::PointCloud::RenderMode) style_property_->getOptionInt();
+	float size;
+	if( mode == rviz::PointCloud::RM_POINTS )
+	{
+		size = point_pixel_size_property_->getFloat();
+	}
+	else
+	{
+		size = point_world_size_property_->getFloat();
+	}
+	 for( std::map<int, CloudInfoPtr>::iterator it = cloud_infos_.begin(); it != cloud_infos_.end(); ++it )
+	{
+		it->second->cloud_->setDimensions( size, size, size );
+	}
+	context_->queueRender();
 }
 
 void MapCloudDisplay::causeRetransform()
@@ -520,160 +524,158 @@ void MapCloudDisplay::reset()
 
 void MapCloudDisplay::updateXyzTransformer()
 {
-  boost::recursive_mutex::scoped_lock lock( transformers_mutex_ );
-  if( transformers_.count( xyz_transformer_property_->getStdString() ) == 0 )
-  {
-    return;
-  }
-  new_xyz_transformer_ = true;
-  causeRetransform();
+	boost::recursive_mutex::scoped_lock lock( transformers_mutex_ );
+	if( transformers_.count( xyz_transformer_property_->getStdString() ) == 0 )
+	{
+		return;
+	}
+	new_xyz_transformer_ = true;
+	causeRetransform();
 }
 
 void MapCloudDisplay::updateColorTransformer()
 {
-  boost::recursive_mutex::scoped_lock lock( transformers_mutex_ );
-  if( transformers_.count( color_transformer_property_->getStdString() ) == 0 )
-  {
-    return;
-  }
-  new_color_transformer_ = true;
-  causeRetransform();
+	boost::recursive_mutex::scoped_lock lock( transformers_mutex_ );
+	if( transformers_.count( color_transformer_property_->getStdString() ) == 0 )
+	{
+		return;
+	}
+	new_color_transformer_ = true;
+	causeRetransform();
 }
 
 void MapCloudDisplay::setXyzTransformerOptions( EnumProperty* prop )
 {
-  fillTransformerOptions( prop, rviz::PointCloudTransformer::Support_XYZ );
+	fillTransformerOptions( prop, rviz::PointCloudTransformer::Support_XYZ );
 }
 
 void MapCloudDisplay::setColorTransformerOptions( EnumProperty* prop )
 {
-  fillTransformerOptions( prop, rviz::PointCloudTransformer::Support_Color );
+	fillTransformerOptions( prop, rviz::PointCloudTransformer::Support_Color );
 }
 
 void MapCloudDisplay::fillTransformerOptions( rviz::EnumProperty* prop, uint32_t mask )
 {
-  prop->clearOptions();
+	prop->clearOptions();
 
-  if (cloud_infos_.empty())
-  {
-    return;
-  }
+	if (cloud_infos_.empty())
+	{
+		return;
+	}
 
-  boost::recursive_mutex::scoped_lock tlock(transformers_mutex_);
+	boost::recursive_mutex::scoped_lock tlock(transformers_mutex_);
 
-  const sensor_msgs::PointCloud2ConstPtr& msg = cloud_infos_.begin()->second->message_;
+	const sensor_msgs::PointCloud2ConstPtr& msg = cloud_infos_.begin()->second->message_;
 
-  M_TransformerInfo::iterator it = transformers_.begin();
-  M_TransformerInfo::iterator end = transformers_.end();
-  for (; it != end; ++it)
-  {
-    const rviz::PointCloudTransformerPtr& trans = it->second.transformer;
-    if ((trans->supports(msg) & mask) == mask)
-    {
-      prop->addOption( QString::fromStdString( it->first ));
-    }
-  }
+	M_TransformerInfo::iterator it = transformers_.begin();
+	M_TransformerInfo::iterator end = transformers_.end();
+	for (; it != end; ++it)
+	{
+		const rviz::PointCloudTransformerPtr& trans = it->second.transformer;
+		if ((trans->supports(msg) & mask) == mask)
+		{
+			prop->addOption( QString::fromStdString( it->first ));
+		}
+	}
 }
 
 rviz::PointCloudTransformerPtr MapCloudDisplay::getXYZTransformer( const sensor_msgs::PointCloud2ConstPtr& cloud )
 {
-  boost::recursive_mutex::scoped_lock lock( transformers_mutex_);
-  M_TransformerInfo::iterator it = transformers_.find( xyz_transformer_property_->getStdString() );
-  if( it != transformers_.end() )
-  {
-    const rviz::PointCloudTransformerPtr& trans = it->second.transformer;
-    if( trans->supports( cloud ) & rviz::PointCloudTransformer::Support_XYZ )
-    {
-      return trans;
-    }
-  }
+	boost::recursive_mutex::scoped_lock lock( transformers_mutex_);
+	M_TransformerInfo::iterator it = transformers_.find( xyz_transformer_property_->getStdString() );
+	if( it != transformers_.end() )
+	{
+		const rviz::PointCloudTransformerPtr& trans = it->second.transformer;
+		if( trans->supports( cloud ) & rviz::PointCloudTransformer::Support_XYZ )
+		{
+			return trans;
+		}
+	}
 
-  return rviz::PointCloudTransformerPtr();
+	return rviz::PointCloudTransformerPtr();
 }
 
 rviz::PointCloudTransformerPtr MapCloudDisplay::getColorTransformer( const sensor_msgs::PointCloud2ConstPtr& cloud )
 {
-  boost::recursive_mutex::scoped_lock lock( transformers_mutex_ );
-  M_TransformerInfo::iterator it = transformers_.find( color_transformer_property_->getStdString() );
-  if( it != transformers_.end() )
-  {
-    const rviz::PointCloudTransformerPtr& trans = it->second.transformer;
-    if( trans->supports( cloud ) & rviz::PointCloudTransformer::Support_Color )
-    {
-      return trans;
-    }
-  }
+	boost::recursive_mutex::scoped_lock lock( transformers_mutex_ );
+	M_TransformerInfo::iterator it = transformers_.find( color_transformer_property_->getStdString() );
+	if( it != transformers_.end() )
+	{
+		const rviz::PointCloudTransformerPtr& trans = it->second.transformer;
+		if( trans->supports( cloud ) & rviz::PointCloudTransformer::Support_Color )
+		{
+			return trans;
+		}
+	}
 
-  return rviz::PointCloudTransformerPtr();
+	return rviz::PointCloudTransformerPtr();
 }
 
 
 void MapCloudDisplay::retransform()
 {
-  boost::recursive_mutex::scoped_lock lock(transformers_mutex_);
+	boost::recursive_mutex::scoped_lock lock(transformers_mutex_);
 
-  std::map<int, CloudInfoPtr>::iterator it = cloud_infos_.begin();
-  std::map<int, CloudInfoPtr>::iterator end = cloud_infos_.end();
-  for (; it != end; ++it)
-  {
-    const CloudInfoPtr& cloud_info = it->second;
-    transformCloud(cloud_info, false);
-    cloud_info->cloud_->clear();
-    cloud_info->cloud_->addPoints(&cloud_info->transformed_points_.front(), cloud_info->transformed_points_.size());
-  }
+	for( std::map<int, CloudInfoPtr>::iterator it = cloud_infos_.begin(); it != cloud_infos_.end(); ++it )
+	{
+		const CloudInfoPtr& cloud_info = it->second;
+		transformCloud(cloud_info, false);
+		cloud_info->cloud_->clear();
+		cloud_info->cloud_->addPoints(&cloud_info->transformed_points_.front(), cloud_info->transformed_points_.size());
+	}
 }
 
 bool MapCloudDisplay::transformCloud(const CloudInfoPtr& cloud_info, bool update_transformers)
 {
-  rviz::V_PointCloudPoint& cloud_points = cloud_info->transformed_points_;
-  cloud_points.clear();
+	rviz::V_PointCloudPoint& cloud_points = cloud_info->transformed_points_;
+	cloud_points.clear();
 
-  size_t size = cloud_info->message_->width * cloud_info->message_->height;
-  rviz::PointCloud::Point default_pt;
-  default_pt.color = Ogre::ColourValue(1, 1, 1);
-  default_pt.position = Ogre::Vector3::ZERO;
-  cloud_points.resize(size, default_pt);
+	size_t size = cloud_info->message_->width * cloud_info->message_->height;
+	rviz::PointCloud::Point default_pt;
+	default_pt.color = Ogre::ColourValue(1, 1, 1);
+	default_pt.position = Ogre::Vector3::ZERO;
+	cloud_points.resize(size, default_pt);
 
-  {
-    boost::recursive_mutex::scoped_lock lock(transformers_mutex_);
-    if( update_transformers )
-    {
-      updateTransformers( cloud_info->message_ );
-    }
-    rviz::PointCloudTransformerPtr xyz_trans = getXYZTransformer(cloud_info->message_);
-    rviz::PointCloudTransformerPtr color_trans = getColorTransformer(cloud_info->message_);
+	{
+		boost::recursive_mutex::scoped_lock lock(transformers_mutex_);
+		if( update_transformers )
+		{
+			updateTransformers( cloud_info->message_ );
+		}
+		rviz::PointCloudTransformerPtr xyz_trans = getXYZTransformer(cloud_info->message_);
+		rviz::PointCloudTransformerPtr color_trans = getColorTransformer(cloud_info->message_);
 
-    if (!xyz_trans)
-    {
-      std::stringstream ss;
-      ss << "No position transformer available for cloud";
-      this->setStatusStd(rviz::StatusProperty::Error, "Message", ss.str());
-      return false;
-    }
+		if (!xyz_trans)
+		{
+			std::stringstream ss;
+			ss << "No position transformer available for cloud";
+			this->setStatusStd(rviz::StatusProperty::Error, "Message", ss.str());
+			return false;
+		}
 
-    if (!color_trans)
-    {
-      std::stringstream ss;
-      ss << "No color transformer available for cloud";
-      this->setStatusStd(rviz::StatusProperty::Error, "Message", ss.str());
-      return false;
-    }
+		if (!color_trans)
+		{
+			std::stringstream ss;
+			ss << "No color transformer available for cloud";
+			this->setStatusStd(rviz::StatusProperty::Error, "Message", ss.str());
+			return false;
+		}
 
-    xyz_trans->transform(cloud_info->message_, rviz::PointCloudTransformer::Support_XYZ, Ogre::Matrix4::IDENTITY, cloud_points);
-    color_trans->transform(cloud_info->message_, rviz::PointCloudTransformer::Support_Color, Ogre::Matrix4::IDENTITY, cloud_points);
-  }
+		xyz_trans->transform(cloud_info->message_, rviz::PointCloudTransformer::Support_XYZ, Ogre::Matrix4::IDENTITY, cloud_points);
+		color_trans->transform(cloud_info->message_, rviz::PointCloudTransformer::Support_Color, Ogre::Matrix4::IDENTITY, cloud_points);
+	}
 
-  for (rviz::V_PointCloudPoint::iterator cloud_point = cloud_points.begin(); cloud_point != cloud_points.end(); ++cloud_point)
-  {
-    if (!rviz::validateFloats(cloud_point->position))
-    {
-      cloud_point->position.x = 999999.0f;
-      cloud_point->position.y = 999999.0f;
-      cloud_point->position.z = 999999.0f;
-    }
-  }
+	for (rviz::V_PointCloudPoint::iterator cloud_point = cloud_points.begin(); cloud_point != cloud_points.end(); ++cloud_point)
+	{
+		if (!rviz::validateFloats(cloud_point->position))
+		{
+			cloud_point->position.x = 999999.0f;
+			cloud_point->position.y = 999999.0f;
+			cloud_point->position.z = 999999.0f;
+		}
+	}
 
-  return true;
+	return true;
 }
 
 } // namespace rviz
