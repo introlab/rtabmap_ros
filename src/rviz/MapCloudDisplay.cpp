@@ -22,6 +22,7 @@
 #include <rtabmap/core/Transform.h>
 #include <rtabmap/core/util3d.h>
 #include <rtabmap/MsgConversion.h>
+#include <rtabmap/GetMap.h>
 
 namespace rtabmap
 {
@@ -90,6 +91,28 @@ MapCloudDisplay::MapCloudDisplay()
 	connect( color_transformer_property_, SIGNAL( requestOptions( EnumProperty* )),
 			 this, SLOT( setColorTransformerOptions( EnumProperty* )));
 
+	cloud_decimation_ = new rviz::IntProperty( "Cloud decimation", 4,
+										 "Decimation of the input RGB and depth images before creating the cloud.",
+										 this, SLOT( updateCloudParameters() ), this );
+	cloud_decimation_->setMin( 1 );
+	cloud_decimation_->setMax( 16 );
+
+	cloud_max_depth_ = new rviz::FloatProperty( "Cloud max depth (m)", 4.0f,
+										 "Maximum depth of the generated clouds.",
+										 this, SLOT( updateCloudParameters() ), this );
+	cloud_max_depth_->setMin( 0.0f );
+	cloud_max_depth_->setMax( 999.0f );
+
+	cloud_voxel_size_ = new rviz::FloatProperty( "Cloud voxel size (m)", 0.02f,
+										 "Voxel size of the generated clouds.",
+										 this, SLOT( updateCloudParameters() ), this );
+	cloud_voxel_size_->setMin( 0.0f );
+	cloud_voxel_size_->setMax( 1.0f );
+
+	download_map_ = new rviz::BoolProperty( "Download map", false,
+										 "Download the optimized global map using rtabmap/GetMap service. This will force to re-create all clouds.",
+										 this, SLOT( downloadMap() ), this );
+
 	// PointCloudCommon sets up a callback queue with a thread for each
 	// instance.  Use that for processing incoming messages.
 	update_nh_.setCallbackQueue( &cbqueue_ );
@@ -156,74 +179,78 @@ void MapCloudDisplay::onInitialize()
 
 void MapCloudDisplay::processMessage( const rtabmap::MapDataConstPtr& msg )
 {
+	processMapData(*msg);
+
+	this->emitTimeSignal(msg->header.stamp);
+}
+
+void MapCloudDisplay::processMapData(const rtabmap::MapData& map)
+{
 	// Add new clouds...
-	for(unsigned int i=0; i<msg->localTransformIDs.size() && i<msg->localTransforms.size(); ++i)
+	for(unsigned int i=0; i<map.localTransformIDs.size() && i<map.localTransforms.size(); ++i)
 	{
-		int id = msg->localTransformIDs[i];
+		int id = map.localTransformIDs[i];
 		if(cloud_infos_.find(id) == cloud_infos_.end())
 		{
 			// Cloud not added to RVIZ, add it!
-			rtabmap::Transform localTransform = transformFromGeometryMsg(msg->localTransforms[i]);
+			rtabmap::Transform localTransform = transformFromGeometryMsg(map.localTransforms[i]);
 			if(!localTransform.isNull())
 			{
 				cv::Mat image, depth;
 				float depthConstant = 0.0f;
 				rtabmap::Transform pose;
 
-				for(unsigned int i=0; i<msg->imageIDs.size() && i<msg->images.size(); ++i)
+				for(unsigned int i=0; i<map.imageIDs.size() && i<map.images.size(); ++i)
 				{
-					if(msg->imageIDs[i] == id)
+					if(map.imageIDs[i] == id)
 					{
-						image = util3d::uncompressImage(msg->images[i].bytes);
+						image = util3d::uncompressImage(map.images[i].bytes);
 						break;
 					}
 				}
-				for(unsigned int i=0; i<msg->depthIDs.size() && i<msg->depths.size(); ++i)
+				for(unsigned int i=0; i<map.depthIDs.size() && i<map.depths.size(); ++i)
 				{
-					if(msg->depthIDs[i] == id)
+					if(map.depthIDs[i] == id)
 					{
-						depth = util3d::uncompressImage(msg->depths[i].bytes);
+						depth = util3d::uncompressImage(map.depths[i].bytes);
 						break;
 					}
 				}
-				for(unsigned int i=0; i<msg->depthConstantIDs.size() && i<msg->depthConstants.size(); ++i)
+				for(unsigned int i=0; i<map.depthConstantIDs.size() && i<map.depthConstants.size(); ++i)
 				{
-					if(msg->depthConstantIDs[i] == id)
+					if(map.depthConstantIDs[i] == id)
 					{
-						depthConstant = msg->depthConstants[i];
+						depthConstant = map.depthConstants[i];
 						break;
 					}
 				}
-				for(unsigned int i=0; i<msg->poseIDs.size() && i<msg->poses.size(); ++i)
+				for(unsigned int i=0; i<map.poseIDs.size() && i<map.poses.size(); ++i)
 				{
-					if(msg->poseIDs[i] == id)
+					if(map.poseIDs[i] == id)
 					{
-						pose = transformFromPoseMsg(msg->poses[i]);
+						pose = transformFromPoseMsg(map.poses[i]);
 						break;
 					}
 				}
 
 				if(!image.empty() && !depth.empty() && depthConstant > 0.0f && !pose.isNull())
 				{
-					int cloudDecimation_ = 4;
-					pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = util3d::cloudFromDepthRGB(image, depth, depthConstant, cloudDecimation_);
+					pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = util3d::cloudFromDepthRGB(image, depth, depthConstant, cloud_decimation_->getInt());
 
-					float cloudMaxDepth_ = 4.0f;
-					float cloudVoxelSize_ = 0.02f;
-					if(cloudMaxDepth_ > 0)
+					if(cloud_max_depth_->getFloat() > 0.0f)
 					{
-						cloud = util3d::passThrough(cloud, "z", 0, cloudMaxDepth_);
+						cloud = util3d::passThrough(cloud, "z", 0, cloud_max_depth_->getFloat());
 					}
-					if(cloudVoxelSize_ > 0)
+					if(cloud_voxel_size_->getFloat() > 0.0f)
 					{
-						cloud = util3d::voxelize(cloud, cloudVoxelSize_);
+						cloud = util3d::voxelize(cloud, cloud_voxel_size_->getFloat());
 					}
 
 					cloud = util3d::transformPointCloud(cloud, localTransform);
 
 					sensor_msgs::PointCloud2::Ptr cloudMsg(new sensor_msgs::PointCloud2);
 					pcl::toROSMsg(*cloud, *cloudMsg);
-					cloudMsg->header = msg->header;
+					cloudMsg->header = map.header;
 
 					CloudInfoPtr info(new CloudInfo);
 					info->message_ = cloudMsg;
@@ -242,17 +269,15 @@ void MapCloudDisplay::processMessage( const rtabmap::MapDataConstPtr& msg )
 
 	// Update graph
 	std::map<int, Transform> poses;
-	for(unsigned int i=0; i<msg->poseIDs.size() && i<msg->poses.size(); ++i)
+	for(unsigned int i=0; i<map.poseIDs.size() && i<map.poses.size(); ++i)
 	{
-		poses.insert(std::make_pair(msg->poseIDs[i], transformFromPoseMsg(msg->poses[i])));
+		poses.insert(std::make_pair(map.poseIDs[i], transformFromPoseMsg(map.poses[i])));
 	}
 
 	{
 		boost::mutex::scoped_lock lock(current_map_mutex_);
 		current_map_ = poses;
 	}
-
-	this->emitTimeSignal(msg->header.stamp);
 }
 
 void MapCloudDisplay::setPropertiesHidden( const QList<Property*>& props, bool hide )
@@ -380,6 +405,29 @@ void MapCloudDisplay::updateBillboardSize()
 	context_->queueRender();
 }
 
+void MapCloudDisplay::updateCloudParameters()
+{
+	// do nothing... only take effect on next generated clouds
+}
+
+void MapCloudDisplay::downloadMap()
+{
+	rtabmap::GetMap getMapSrv;
+	getMapSrv.request.global = true;
+	getMapSrv.request.optimized = true;
+	getMapSrv.request.graphOnly = false;
+	if(!ros::service::call("get_map", getMapSrv))
+	{
+		ROS_WARN("MapCloudDisplay: Can't call \"get_map\" service");
+	}
+	else
+	{
+		this->reset();
+		processMapData(getMapSrv.response.data);
+	}
+	download_map_->setBool(false);
+}
+
 void MapCloudDisplay::causeRetransform()
 {
   needs_retransform_ = true;
@@ -456,6 +504,7 @@ void MapCloudDisplay::update( float wall_dt, float ros_dt )
 		new_color_transformer_ = false;
 	}
 
+	int totalPoints = 0;
 	{
 		// update poses
 		boost::mutex::scoped_lock lock(current_map_mutex_);
@@ -466,6 +515,7 @@ void MapCloudDisplay::update( float wall_dt, float ros_dt )
 				std::map<int, CloudInfoPtr>::iterator cloudInfoIt = cloud_infos_.find(it->first);
 				if(cloudInfoIt != cloud_infos_.end())
 				{
+					totalPoints += cloudInfoIt->second->transformed_points_.size();
 					cloudInfoIt->second->pose_ = it->second;
 					if (context_->getFrameManager()->getTransform(cloudInfoIt->second->message_->header, cloudInfoIt->second->position_, cloudInfoIt->second->orientation_))
 					{
@@ -504,8 +554,11 @@ void MapCloudDisplay::update( float wall_dt, float ros_dt )
 	}
 
 	std::stringstream ss;
-	//ss << "Showing [" << total_point_count_ << "] points from [" << clouds_.size() << "] messages";
+	ss << totalPoints;
 	this->setStatusStd(rviz::StatusProperty::Ok, "Points", ss.str());
+	std::stringstream ss2;
+	ss2 << cloud_infos_.size();
+	this->setStatusStd(rviz::StatusProperty::Ok, "Nodes", ss2.str());
 }
 
 void MapCloudDisplay::reset()

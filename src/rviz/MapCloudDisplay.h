@@ -81,6 +81,10 @@ public:
 	rviz::EnumProperty* xyz_transformer_property_;
 	rviz::EnumProperty* color_transformer_property_;
 	rviz::EnumProperty* style_property_;
+	rviz::IntProperty* cloud_decimation_;
+	rviz::FloatProperty* cloud_max_depth_;
+	rviz::FloatProperty* cloud_voxel_size_;
+	rviz::BoolProperty* download_map_;
 
 public Q_SLOTS:
 	void causeRetransform();
@@ -93,6 +97,8 @@ private Q_SLOTS:
 	void updateColorTransformer();
 	void setXyzTransformerOptions( EnumProperty* prop );
 	void setColorTransformerOptions( EnumProperty* prop );
+	void updateCloudParameters();
+	void downloadMap();
 
 protected:
 	/** @brief Do initialization. Overridden from MessageFilterDisplay. */
@@ -102,6 +108,8 @@ protected:
 	virtual void processMessage( const rtabmap::MapDataConstPtr& cloud );
 
 private:
+	void processMapData(const rtabmap::MapData& map);
+
 	/**
 	* \brief Transforms the cloud into the correct frame, and sets up our renderable cloud
 	*/
