@@ -2,9 +2,19 @@
 <launch>
 
   <!-- AZIMUT 3 bringup: launch motors/odometry, laser scan and openni -->
-  <include file="$(find az3_bringup)/az3_standalone_openni.launch"/>
+  <include file="$(find az3_bringup)/az3_standalone.launch"/>
   <include file="$(find az3_bringup)/joystick.launch"/>
   
+  <!-- OpenNI -->
+  <!-- Xtion -->
+  <include file="$(find openni2_launch)/launch/openni2.launch">
+    <arg name="depth_registration" value="True" />
+  </include>
+
+  <!-- Xtion frame -->
+  <node pkg="tf" type="static_transform_publisher" name="base_to_camera_tf"
+      args="0.077 0.067 0.185 0.0 0.0 0.0 /base_link /camera_link 100" />
+
   <!-- Throttling messages -->
   <group ns="camera">
     <node pkg="nodelet" type="nodelet" name="data_throttle" args="load rtabmap/data_throttle camera_nodelet_manager" output="screen">
@@ -41,7 +51,7 @@
 	  <!-- RTAB-Map's parameters: do "rosrun rtabmap rtabmap (double-dash)params" to see the list of available parameters. -->
 	  <param name="RGBD/ScanMatchingSize" type="string" value="1"/>             <!-- Do odometry correction with consecutive laser scans -->
 	  <param name="RGBD/LocalLoopDetectionSpace" type="string" value="true"/>   <!-- Local loop closure detection (using estimated position) with locations in WM -->
-	  <param name="RGBD/LocalLoopDetectionTime" type="string" value="true"/>    <!-- Local loop closure detection with locations in STM -->
+	  <param name="RGBD/LocalLoopDetectionTime" type="string" value="false"/>    <!-- Local loop closure detection with locations in STM -->
 	  <param name="Mem/BadSignaturesIgnored" type="string" value="false"/>      <!-- Don't ignore bad images for 3D node creation (e.g. white walls) -->
 	  <param name="LccIcp/Type" type="string" value="2"/>                       <!-- Loop closure transformation refining with ICP: 0=No ICP, 1=ICP 3D, 2=ICP 2D -->
 	  <param name="LccIcp2/Iterations" type="string" value="100"/>
