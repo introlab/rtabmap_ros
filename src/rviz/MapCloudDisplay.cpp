@@ -416,16 +416,21 @@ void MapCloudDisplay::downloadMap()
 	getMapSrv.request.global = true;
 	getMapSrv.request.optimized = true;
 	getMapSrv.request.graphOnly = false;
-	if(!ros::service::call("get_map", getMapSrv))
+	if(!ros::service::call("rtabmap/get_map", getMapSrv))
 	{
-		ROS_WARN("MapCloudDisplay: Can't call \"get_map\" service");
+		ROS_ERROR("MapCloudDisplay: Can't call \"rtabmap/get_map\" service. "
+				  "Tip: if rtabmap node is in not in rtabmap namespace, you can remap the service "
+				  "to \"get_map\" in the launch "
+				  "file like: <remap from=\"rtabmap/get_map\" to=\"get_map\"/>.");
 	}
 	else
 	{
 		this->reset();
 		processMapData(getMapSrv.response.data);
 	}
+	download_map_->blockSignals(true);
 	download_map_->setBool(false);
+	download_map_->blockSignals(false);
 }
 
 void MapCloudDisplay::causeRetransform()
