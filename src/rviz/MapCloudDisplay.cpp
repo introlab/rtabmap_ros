@@ -419,7 +419,7 @@ void MapCloudDisplay::downloadMap()
 	if(!ros::service::call("rtabmap/get_map", getMapSrv))
 	{
 		ROS_ERROR("MapCloudDisplay: Can't call \"rtabmap/get_map\" service. "
-				  "Tip: if rtabmap node is in not in rtabmap namespace, you can remap the service "
+				  "Tip: if rtabmap node is not in rtabmap namespace, you can remap the service "
 				  "to \"get_map\" in the launch "
 				  "file like: <remap from=\"rtabmap/get_map\" to=\"get_map\"/>.");
 	}
