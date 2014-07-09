@@ -174,6 +174,8 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	pauseSrv_ = nh.advertiseService("pause", &CoreWrapper::pauseRtabmapCallback, this);
 	resumeSrv_ = nh.advertiseService("resume", &CoreWrapper::resumeRtabmapCallback, this);
 	triggerNewMapSrv_ = nh.advertiseService("trigger_new_map", &CoreWrapper::triggerNewMapCallback, this);
+	setModeLocalizationSrv_ = nh.advertiseService("set_mode_localization", &CoreWrapper::setModeLocalizationCallback, this);
+	setModeMappingSrv_ = nh.advertiseService("set_mode_mapping", &CoreWrapper::setModeMappingCallback, this);
 	getMapDataSrv_ = nh.advertiseService("get_map", &CoreWrapper::getMapCallback, this);
 
 	setupCallbacks(subscribeDepth, subscribeLaserScan, queueSize);
@@ -614,6 +616,24 @@ bool CoreWrapper::triggerNewMapCallback(std_srvs::Empty::Request&, std_srvs::Emp
 {
 	ROS_INFO("rtabmap: Trigger new map");
 	rtabmap_.triggerNewMap();
+	return true;
+}
+
+bool CoreWrapper::setModeLocalizationCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+{
+	ROS_INFO("rtabmap: Set localization mode");
+	rtabmap::ParametersMap parameters;
+	parameters.insert(rtabmap::ParametersPair(rtabmap::Parameters::kMemIncrementalMemory(), "false"));
+	rtabmap_.parseParameters(parameters);
+	return true;
+}
+
+bool CoreWrapper::setModeMappingCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+{
+	ROS_INFO("rtabmap: Set mapping mode");
+	rtabmap::ParametersMap parameters;
+	parameters.insert(rtabmap::ParametersPair(rtabmap::Parameters::kMemIncrementalMemory(), "true"));
+	rtabmap_.parseParameters(parameters);
 	return true;
 }
 

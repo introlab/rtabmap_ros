@@ -35,6 +35,7 @@ namespace rtabmap
 
 MapCloudDisplay::CloudInfo::CloudInfo() :
 		manager_(0),
+		pose_(Transform::getIdentity()),
 		scene_node_(0)
 {}
 
@@ -108,11 +109,23 @@ MapCloudDisplay::MapCloudDisplay()
 	cloud_max_depth_->setMin( 0.0f );
 	cloud_max_depth_->setMax( 999.0f );
 
-	cloud_voxel_size_ = new rviz::FloatProperty( "Cloud voxel size (m)", 0.02f,
+	cloud_voxel_size_ = new rviz::FloatProperty( "Cloud voxel size (m)", 0.01f,
 										 "Voxel size of the generated clouds.",
 										 this, SLOT( updateCloudParameters() ), this );
 	cloud_voxel_size_->setMin( 0.0f );
 	cloud_voxel_size_->setMax( 1.0f );
+
+	node_filtering_radius_ = new rviz::FloatProperty( "Node filtering radius (m)", 0.2f,
+										 "(Disabled=0) Only keep one node in the specified radius.",
+										 this, SLOT( updateCloudParameters() ), this );
+	node_filtering_radius_->setMin( 0.0f );
+	node_filtering_radius_->setMax( 10.0f );
+
+	node_filtering_angle_ = new rviz::FloatProperty( "Node filtering angle (degrees)", 30.0f,
+										 "(Disabled=0) Only keep one node in the specified angle in the filtering radius.",
+										 this, SLOT( updateCloudParameters() ), this );
+	node_filtering_angle_->setMin( 0.0f );
+	node_filtering_angle_->setMax( 359.0f );
 
 	download_map_ = new rviz::BoolProperty( "Download map", false,
 										 "Download the optimized global map using rtabmap/GetMap service. This will force to re-create all clouds.",
@@ -277,6 +290,13 @@ void MapCloudDisplay::processMapData(const rtabmap::MapData& map)
 	for(unsigned int i=0; i<map.poseIDs.size() && i<map.poses.size(); ++i)
 	{
 		poses.insert(std::make_pair(map.poseIDs[i], transformFromPoseMsg(map.poses[i])));
+	}
+
+	if(node_filtering_angle_->getFloat() > 0.0f && node_filtering_radius_->getFloat() > 0.0f)
+	{
+		poses = util3d::radiusPosesFiltering(poses,
+				node_filtering_radius_->getFloat(),
+				node_filtering_angle_->getFloat()*CV_PI/180.0);
 	}
 
 	{
@@ -512,7 +532,7 @@ void MapCloudDisplay::update( float wall_dt, float ros_dt )
 
 				cloud_info->manager_ = context_->getSceneManager();
 
-				cloud_info->scene_node_ = scene_node_->createChildSceneNode( cloud_info->position_, cloud_info->orientation_ );
+				cloud_info->scene_node_ = scene_node_->createChildSceneNode();
 
 				cloud_info->scene_node_->attachObject( cloud_info->cloud_.get() );
 
@@ -548,6 +568,7 @@ void MapCloudDisplay::update( float wall_dt, float ros_dt )
 	}
 
 	int totalPoints = 0;
+	int totalNodesShown = 0;
 	{
 		// update poses
 		boost::mutex::scoped_lock lock(current_map_mutex_);
@@ -560,23 +581,27 @@ void MapCloudDisplay::update( float wall_dt, float ros_dt )
 				{
 					totalPoints += cloudInfoIt->second->transformed_points_.size();
 					cloudInfoIt->second->pose_ = it->second;
-					if (context_->getFrameManager()->getTransform(cloudInfoIt->second->message_->header, cloudInfoIt->second->position_, cloudInfoIt->second->orientation_))
+					Ogre::Vector3 framePosition;
+					Ogre::Quaternion frameOrientation;
+					if (context_->getFrameManager()->getTransform(cloudInfoIt->second->message_->header, framePosition, frameOrientation))
 					{
-						// Set pose
+						// Multiply frame with pose
 						Ogre::Matrix4 frameTransform;
-						frameTransform.makeTransform( cloudInfoIt->second->position_, Ogre::Vector3(1,1,1), cloudInfoIt->second->orientation_ );
+						frameTransform.makeTransform( framePosition, Ogre::Vector3(1,1,1), frameOrientation);
 						const rtabmap::Transform & p = cloudInfoIt->second->pose_;
 						Ogre::Matrix4 pose(p[0], p[1], p[2], p[3],
 										 p[4], p[5], p[6], p[7],
 										 p[8], p[9], p[10], p[11],
 										 0, 0, 0, 1);
 						frameTransform = frameTransform * pose;
-						cloudInfoIt->second->position_ = frameTransform.getTrans();
-						cloudInfoIt->second->orientation_ = frameTransform.extractQuaternion();
+						Ogre::Vector3 posePosition = frameTransform.getTrans();
+						Ogre::Quaternion poseOrientation = frameTransform.extractQuaternion();
+						poseOrientation.normalise();
 
-						cloudInfoIt->second->scene_node_->setPosition(cloudInfoIt->second->position_);
-						cloudInfoIt->second->scene_node_->setOrientation(cloudInfoIt->second->orientation_);
+						cloudInfoIt->second->scene_node_->setPosition(posePosition);
+						cloudInfoIt->second->scene_node_->setOrientation(poseOrientation);
 						cloudInfoIt->second->scene_node_->setVisible(true);
+						++totalNodesShown;
 					}
 					else
 					{
@@ -596,12 +621,8 @@ void MapCloudDisplay::update( float wall_dt, float ros_dt )
 		}
 	}
 
-	std::stringstream ss;
-	ss << totalPoints;
-	this->setStatusStd(rviz::StatusProperty::Ok, "Points", ss.str());
-	std::stringstream ss2;
-	ss2 << cloud_infos_.size();
-	this->setStatusStd(rviz::StatusProperty::Ok, "Nodes", ss2.str());
+	this->setStatusStd(rviz::StatusProperty::Ok, "Points", tr("%1").arg(totalPoints).toStdString());
+	this->setStatusStd(rviz::StatusProperty::Ok, "Nodes", tr("%1 shown of %2").arg(totalNodesShown).arg(cloud_infos_.size()).toStdString());
 }
 
 void MapCloudDisplay::reset()

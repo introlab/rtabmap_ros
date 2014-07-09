@@ -76,6 +76,8 @@ private:
 	bool pauseRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool resumeRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool triggerNewMapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
+	bool setModeLocalizationCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
+	bool setModeMappingCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool getMapCallback(rtabmap::GetMap::Request& req, rtabmap::GetMap::Response& rep);
 
 	rtabmap::ParametersMap loadParameters(const std::string & configFile);
@@ -137,6 +139,8 @@ private:
 	ros::ServiceServer pauseSrv_;
 	ros::ServiceServer resumeSrv_;
 	ros::ServiceServer triggerNewMapSrv_;
+	ros::ServiceServer setModeLocalizationSrv_;
+	ros::ServiceServer setModeMappingSrv_;
 	ros::ServiceServer getMapDataSrv_;
 
 	boost::thread* transformThread_;

@@ -63,9 +63,6 @@ public:
 		boost::shared_ptr<rviz::PointCloud> cloud_;
 
 		std::vector<rviz::PointCloud::Point> transformed_points_;
-
-		Ogre::Quaternion orientation_;
-		Ogre::Vector3 position_;
 	};
 	typedef boost::shared_ptr<CloudInfo> CloudInfoPtr;
 
@@ -84,6 +81,8 @@ public:
 	rviz::IntProperty* cloud_decimation_;
 	rviz::FloatProperty* cloud_max_depth_;
 	rviz::FloatProperty* cloud_voxel_size_;
+	rviz::FloatProperty* node_filtering_radius_;
+	rviz::FloatProperty* node_filtering_angle_;
 	rviz::BoolProperty* download_map_;
 
 public Q_SLOTS:
