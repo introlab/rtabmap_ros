@@ -523,7 +523,11 @@ void CoreWrapper::process(
 				 "when you need to have IDs output of RTAB-map synchronised with the source "
 				 "image sequence ID.");
 	}
-	ROS_INFO("rtabmap: Update rate=%f s, Limit=%f s, Processing time = %f s", 1.0f/rate_, rtabmap_.getTimeThreshold()/1000.0f, timer.ticks());
+	ROS_INFO("rtabmap: Update rate=%fs, Limit=%fs, Processing time = %fs (%d local nodes)",
+			1.0f/rate_,
+			rtabmap_.getTimeThreshold()/1000.0f,
+			timer.ticks(),
+			rtabmap_.getWMSize()+rtabmap_.getSTMSize());
 }
 
 bool CoreWrapper::updateRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
