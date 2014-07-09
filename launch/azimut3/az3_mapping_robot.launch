@@ -66,9 +66,9 @@
 	  <param name="RGBD/AngularUpdate" type="string" value="0.01"/>             <!-- Update map only if the robot is moving -->
 	  <param name="RGBD/LinearUpdate" type="string" value="0.01"/>              <!-- Update map only if the robot is moving -->
 	  <param name="Rtabmap/TimeThr" type="string" value="700"/>
-	  <param name="Mem/RehearsalSimilarity" type="string" value="0.45"/>   
+	  <param name="Mem/RehearsalSimilarity" type="string" value="0.45"/>
+	  <param name="Mem/RehearsedNodesKept" type="string" value="false"/>   
    	  <param name="RGBD/OptimizeFromGraphEnd" type="string" value="false"/>    <!-- Optimize graph from initial node so /map -> /odom transform will be generated -->
-
     </node>
   </group>
 </launch>

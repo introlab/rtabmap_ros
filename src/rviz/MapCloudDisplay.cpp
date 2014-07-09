@@ -1,4 +1,8 @@
 
+#include <QtGui/QApplication>
+#include <QtGui/QMessageBox>
+#include <QtCore/QTimer>
+
 #include <OgreSceneNode.h>
 #include <OgreSceneManager.h>
 
@@ -23,6 +27,7 @@
 #include <rtabmap/core/util3d.h>
 #include <rtabmap/MsgConversion.h>
 #include <rtabmap/GetMap.h>
+
 
 namespace rtabmap
 {
@@ -412,25 +417,58 @@ void MapCloudDisplay::updateCloudParameters()
 
 void MapCloudDisplay::downloadMap()
 {
-	rtabmap::GetMap getMapSrv;
-	getMapSrv.request.global = true;
-	getMapSrv.request.optimized = true;
-	getMapSrv.request.graphOnly = false;
-	if(!ros::service::call("rtabmap/get_map", getMapSrv))
+	if(download_map_->getBool())
 	{
-		ROS_ERROR("MapCloudDisplay: Can't call \"rtabmap/get_map\" service. "
-				  "Tip: if rtabmap node is not in rtabmap namespace, you can remap the service "
-				  "to \"get_map\" in the launch "
-				  "file like: <remap from=\"rtabmap/get_map\" to=\"get_map\"/>.");
+		rtabmap::GetMap getMapSrv;
+		getMapSrv.request.global = true;
+		getMapSrv.request.optimized = true;
+		getMapSrv.request.graphOnly = false;
+		ros::NodeHandle nh;
+		QMessageBox * messageBox = new QMessageBox(
+				QMessageBox::NoIcon,
+				tr("Calling \"%1\" service...").arg(nh.resolveName("rtabmap/get_map").c_str()),
+				tr("Downloading the map... please wait (rviz could become gray!)"),
+				QMessageBox::NoButton);
+		messageBox->setAttribute(Qt::WA_DeleteOnClose, true);
+		messageBox->show();
+		QApplication::processEvents();
+		uSleep(100); // hack make sure the text in the QMessageBox is shown...
+		QApplication::processEvents();
+		if(!ros::service::call("rtabmap/get_map", getMapSrv))
+		{
+			ROS_ERROR("MapCloudDisplay: Can't call \"%s\" service. "
+					  "Tip: if rtabmap node is not in rtabmap namespace, you can remap the service "
+					  "to \"get_map\" in the launch "
+					  "file like: <remap from=\"rtabmap/get_map\" to=\"get_map\"/>.",
+					  nh.resolveName("rtabmap/get_map").c_str());
+			messageBox->setText(tr("MapCloudDisplay: Can't call \"%1\" service. "
+					  "Tip: if rtabmap node is not in rtabmap namespace, you can remap the service "
+					  "to \"get_map\" in the launch "
+					  "file like: <remap from=\"rtabmap/get_map\" to=\"get_map\"/>.").
+					  arg(nh.resolveName("rtabmap/get_map").c_str()));
+		}
+		else
+		{
+			messageBox->setText(tr("Creating all clouds (%1 nodes downloaded)...").arg(getMapSrv.response.data.poses.size()));
+			QApplication::processEvents();
+			this->reset();
+			processMapData(getMapSrv.response.data);
+			messageBox->setText(tr("Creating all clouds (%1 nodes downloaded)... done!").arg(getMapSrv.response.data.poses.size()));
+
+			QTimer::singleShot(1000, messageBox, SLOT(close()));
+		}
+		download_map_->blockSignals(true);
+		download_map_->setBool(false);
+		download_map_->blockSignals(false);
 	}
 	else
 	{
-		this->reset();
-		processMapData(getMapSrv.response.data);
+		// just stay true if double-clicked on DownloadMap property, let the
+		// first process above finishes
+		download_map_->blockSignals(true);
+		download_map_->setBool(true);
+		download_map_->blockSignals(false);
 	}
-	download_map_->blockSignals(true);
-	download_map_->setBool(false);
-	download_map_->blockSignals(false);
 }
 
 void MapCloudDisplay::causeRetransform()
