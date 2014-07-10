@@ -21,6 +21,6 @@
   </node>
 
   <!-- use same launch file as "Kinect + Odometry" configuration -->
-  <include file="$(find rtabmap)/az3_mapping_robot_kinect_odom.launch"/>
+  <include file="$(find rtabmap)/launch/azimut3/az3_mapping_robot_kinect_odom.launch"/>
 
 </launch>
