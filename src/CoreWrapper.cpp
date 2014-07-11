@@ -883,56 +883,42 @@ void CoreWrapper::publishStats(const Statistics & stats)
 			++index;
 		}
 
-		msg->imageIDs.resize(stats.getImages().size());
-		msg->images.resize(stats.getImages().size());
-		index = 0;
-		for(std::map<int, std::vector<unsigned char> >::const_iterator i=stats.getImages().begin();
-			i!=stats.getImages().end();
-			++i)
+		//
+		// just add the last data for bandwidth efficiency
+		//
+		if(uContains(stats.getImages(), stats.refImageId()))
 		{
-			msg->imageIDs[index] = i->first;
-			msg->images[index].bytes = i->second;
-			++index;
+			msg->imageIDs.push_back(stats.refImageId());
+			msg->images.resize(1);
+			msg->images[0].bytes = stats.getImages().at(stats.refImageId());
 		}
 
-		msg->depthIDs.resize(stats.getDepths().size());
-		msg->depths.resize(stats.getDepths().size());
-		index = 0;
-		for(std::map<int, std::vector<unsigned char> >::const_iterator i=stats.getDepths().begin();
-			i!=stats.getDepths().end();
-			++i)
+		if(uContains(stats.getDepths(), stats.refImageId()))
 		{
-			msg->depthIDs[index] = i->first;
-			msg->depths[index].bytes = i->second;
-			++index;
+			msg->depthIDs.push_back(stats.refImageId());
+			msg->depths.resize(1);
+			msg->depths[0].bytes = stats.getDepths().at(stats.refImageId());
 		}
 
-		msg->depth2DIDs.resize(stats.getDepth2ds().size());
-		msg->depth2Ds.resize(stats.getDepth2ds().size());
-		index = 0;
-		for(std::map<int, std::vector<unsigned char> >::const_iterator i=stats.getDepth2ds().begin();
-			i!=stats.getDepth2ds().end();
-			++i)
+		if(uContains(stats.getDepth2ds(), stats.refImageId()))
 		{
-			msg->depth2DIDs[index] = i->first;
-			msg->depth2Ds[index].bytes = i->second;
-			++index;
+			msg->depth2DIDs.push_back(stats.refImageId());
+			msg->depth2Ds.resize(1);
+			msg->depth2Ds[0].bytes = stats.getDepth2ds().at(stats.refImageId());
 		}
 
-		msg->localTransformIDs.resize(stats.getLocalTransforms().size());
-		msg->localTransforms.resize(stats.getLocalTransforms().size());
-		index = 0;
-		for(std::map<int, Transform>::const_iterator i=stats.getLocalTransforms().begin();
-			i!=stats.getLocalTransforms().end();
-			++i)
+		if(uContains(stats.getLocalTransforms(), stats.refImageId()))
 		{
-			msg->localTransformIDs[index] = i->first;
-			transformToGeometryMsg(i->second, msg->localTransforms[index]);
-			++index;
+			msg->localTransformIDs.push_back(stats.refImageId());
+			msg->localTransforms.resize(1);
+			transformToGeometryMsg(stats.getLocalTransforms().at(stats.refImageId()), msg->localTransforms[0]);
 		}
 
-		msg->depthConstantIDs = uKeys(stats.getDepthConstants());
-		msg->depthConstants = uValues(stats.getDepthConstants());
+		if(uContains(stats.getDepthConstants(), stats.refImageId()))
+		{
+			msg->depthConstantIDs.push_back(stats.refImageId());
+			msg->depthConstants.push_back(stats.getDepthConstants().at(stats.refImageId()));
+		}
 
 		mapData_.publish(msg);
 	}
