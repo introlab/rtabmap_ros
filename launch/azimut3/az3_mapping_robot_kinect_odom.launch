@@ -3,7 +3,7 @@
 
   <!-- AZIMUT 3 bringup: launch motors/odometry, laser scan and openni -->
   <include file="$(find az3_bringup)/az3_standalone.launch"/>
-  <include file="$(find az3_bringup)/joystick.launch"/>
+  <!-- <include file="$(find az3_bringup)/joystick.launch"/> -->
   
   <!-- OpenNI -->
   <!-- Xtion -->

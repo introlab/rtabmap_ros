@@ -1,14 +1,24 @@
 
 <launch>
 
-  <group ns="rtabmap">
-    <!-- Grid map assembler for rviz -->
-    <node pkg="rtabmap" type="grid_map_assembler" name="grid_map_assembler" output="screen"/>
-  </group>
+  <!-- Remote teleop -->
+  <include file="$(find az3_bringup)/joystick.launch"/> 
+
+  <!-- We have two nodes (grid_map_assembler and rviz) subscribing to /rtabmap/mapData, so use -->
+  <!-- a relay on this machine -->
+  <node name="mapData_relay" type="relay" pkg="topic_tools" args="/rtabmap/mapData /rtabmap/mapData_relay" >
+    <param name="lazy" type="bool" value="false"/>
+  </node>
+
+  <!-- Grid map assembler for rviz -->
+  <node pkg="rtabmap" type="grid_map_assembler" name="grid_map_assembler" output="screen">
+    <remap from="mapData" to="rtabmap/mapData_relay"/>
+  </node>
     
   <node pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap)/launch/config/azimut3.rviz"/>
-    
-  <!-- sync cloud with odometry and voxelize the point cloud (for fast visualization in rviz) -->
+  
+  <!-- Below, construct point cloud of the latest throttled data, disabled for bandwith efficiency -->
+  <!-- sync cloud with odometry and voxelize the point cloud (for fast visualization in rviz) 
   <node pkg="nodelet" type="nodelet" name="standalone_nodelet"  args="manager" output="screen"/>
   <node pkg="nodelet" type="nodelet" name="data_odom_sync" args="load rtabmap/data_odom_sync standalone_nodelet">
     <remap from="rgb/image_in"       to="/camera/data_throttled_image"/>
@@ -35,5 +45,5 @@
     <param name="queue_size" type="int" value="10"/>
     <param name="voxel_size" type="double" value="0.01"/>
   </node>
-
+--> 
 </launch>
