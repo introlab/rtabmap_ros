@@ -1,0 +1,60 @@
+
+<launch>
+
+  <!-- record data to RTAB-Map database format (like a ROS bag, but usable in RTAB-Map for Windows/Mac OS X) -->
+
+  <include file="$(find az3_bringup)/az3_standalone.launch"/>
+  <include file="$(find az3_bringup)/joystick.launch"/>
+
+  <!-- OpenNI -->
+  <!-- Xtion -->
+  <include file="$(find openni2_launch)/launch/openni2.launch">
+    <arg name="depth_registration" value="True" />
+    <arg name="rgb_camera_info_url"
+        value="file://$(find rtabmap)/launch/calibration/rgb_PS1080_PrimeSense.yaml" />
+   <arg name="depth_camera_info_url"
+        value="file://$(find rtabmap)/launch/calibration/depth_PS1080_PrimeSense.yaml" />
+  </include>
+
+  <!-- Xtion frame -->
+  <node pkg="tf" type="static_transform_publisher" name="base_to_camera_tf"
+      args="0.077 0.067 0.185 0.0 0.0 0.0 /base_link /camera_link 100" />
+  
+  <!-- Throttling messages -->
+  <group ns="camera">
+    <node pkg="nodelet" type="nodelet" name="data_throttle" args="load rtabmap/data_throttle camera_nodelet_manager" output="screen">
+      <param name="max_rate" type="double" value="10.0"/>
+   
+      <remap from="rgb/image_in"       to="rgb/image_color"/>
+      <remap from="depth/image_in"     to="depth_registered/image_raw"/>
+      <remap from="rgb/camera_info_in" to="depth_registered/camera_info"/>
+    
+      <remap from="rgb/image_out"       to="/data_throttled_image"/>
+      <remap from="depth/image_out"     to="/data_throttled_image_depth"/>
+      <remap from="rgb/camera_info_out" to="/data_throttled_camera_info"/>
+    </node>   
+  </group>
+
+  <node name="data_recorder" pkg="rtabmap" type="data_recorder" output="screen">
+	<param name="output_file_name" value="az3_record.db" type="string"/>  
+	
+	<param name="frame_id" type="string" value="base_footprint"/>
+	
+	<param name="subscribe_odometry" type="bool" value="true"/>
+	<param name="subscribe_depth" type="bool" value="true"/>
+	<param name="subscribe_laserScan" type="bool" value="true"/>
+	
+	<remap from="odom" to="/base_controller/odom"/>
+	<remap from="scan" to="/base_scan"/>
+
+	<remap from="rgb/image" to="camera/data_throttled_image"/>
+  	<remap from="depth/image" to="camera/data_throttled_image_depth"/>
+  	<remap from="rgb/camera_info" to="camera/data_throttled_camera_info"/>
+  	
+  	<param name="rgb/image_transport" type="string" value="compressed"/>
+    <param name="depth/image_transport" type="string" value="compressedDepth"/>
+	
+	<param name="queue_size" type="int" value="10"/>
+  </node>
+
+</launch>
