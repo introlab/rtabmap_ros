@@ -5,6 +5,7 @@
 #include <rtabmap/Info.h>
 
 #include <rviz/message_filter_display.h>
+#include <rtabmap/core/Transform.h>
 
 namespace rtabmap
 {
@@ -33,6 +34,7 @@ private:
 	QString info_;
 	int globalCount_;
 	int localCount_;
+	Transform loopTransform_;
 	boost::mutex info_mutex_;
 };
 
