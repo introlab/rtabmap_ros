@@ -6,7 +6,8 @@ Panels:
       Expanded:
         - /Global Options1
         - /TF1/Frames1
-        - /MapCloud1/Status1
+        - /Info1
+        - /Info1/Status1
       Splitter Ratio: 0.411058
     Tree Height: 422
   - Class: rviz/Selection
@@ -26,7 +27,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: MapCloud
+    SyncSource: ""
 Visualization Manager:
   Class: ""
   Displays:
@@ -84,19 +85,7 @@ Visualization Manager:
         All Enabled: false
         base_link:
           Value: true
-        camera_depth_frame:
-          Value: true
-        camera_depth_optical_frame:
-          Value: true
         camera_link:
-          Value: true
-        camera_rgb_frame:
-          Value: true
-        camera_rgb_optical_frame:
-          Value: true
-        map:
-          Value: true
-        odom:
           Value: true
       Marker Scale: 1
       Name: TF
@@ -104,16 +93,7 @@ Visualization Manager:
       Show Axes: true
       Show Names: true
       Tree:
-        map:
-          odom:
-            base_link:
-              camera_link:
-                camera_depth_frame:
-                  camera_depth_optical_frame:
-                    {}
-                camera_rgb_frame:
-                  camera_rgb_optical_frame:
-                    {}
+        {}
       Update Interval: 0
       Value: true
     - Alpha: 1
@@ -196,6 +176,11 @@ Visualization Manager:
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
+    - Class: rtabmap/Info
+      Enabled: true
+      Name: Info
+      Topic: /rtabmap/info
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -251,5 +236,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1273
-  X: 100
+  X: 93
   Y: 115

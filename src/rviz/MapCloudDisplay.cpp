@@ -795,7 +795,7 @@ bool MapCloudDisplay::transformCloud(const CloudInfoPtr& cloud_info, bool update
 	return true;
 }
 
-} // namespace rviz
+} // namespace rtabmap
 
 #include <pluginlib/class_list_macros.h>
 PLUGINLIB_EXPORT_CLASS( rtabmap::MapCloudDisplay, rviz::Display )

@@ -105,12 +105,13 @@ SET(Libraries
 ## RVIZ plugin
 qt4_wrap_cpp(MOC_FILES
   src/rviz/MapCloudDisplay.h
+  src/rviz/InfoDisplay.h
   src/rviz/OrbitOrientedViewController.h
 )
 
 # tf:message_filters, mixing boost and Qt signals
 set_property(
-   SOURCE src/rviz/MapCloudDisplay.cpp src/rviz/OrbitOrientedViewController.cpp
+   SOURCE src/rviz/MapCloudDisplay.cpp src/rviz/InfoDisplay.cpp src/rviz/OrbitOrientedViewController.cpp
    PROPERTY COMPILE_DEFINITIONS QT_NO_KEYWORDS
    )
    
@@ -121,6 +122,7 @@ add_library(rtabmap_ros
    src/nodelets/point_cloud_xyzrgb.cpp 
    src/MsgConversion.cpp
    src/rviz/MapCloudDisplay.cpp
+   src/rviz/InfoDisplay.cpp
    src/rviz/OrbitOrientedViewController.cpp
    ${MOC_FILES}
 )
