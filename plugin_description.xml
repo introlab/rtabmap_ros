@@ -6,4 +6,11 @@
       Displays graph point clouds from rtabmap/MapData messages.
     </description>
   </class>
+  <class name="rtabmap/OrbitOriented"
+         type="rtabmap::OrbitOrientedViewController"
+         base_class_type="rviz::ViewController">
+    <description>
+      Camera orbit with orientation.
+    </description>
+  </class>
 </library>
