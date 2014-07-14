@@ -494,7 +494,7 @@ void GuiWrapper::depthCallback(
 
 	Transform odom = transformFromPoseMsg(odomMsg->pose.pose);
 
-	cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg);
+	cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg, "bgr8");
 	cv_bridge::CvImageConstPtr ptrDepth = cv_bridge::toCvShare(depthMsg);
 
 	float depthConstant = 1.0f/cameraInfoMsg->K[4];
@@ -535,7 +535,7 @@ void GuiWrapper::scanCallback(
 
 	Transform odom = transformFromPoseMsg(odomMsg->pose.pose);
 
-	cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg);
+	cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg, "bgr8");
 
 	rtabmap::Image image(
 			ptrImage->image.clone(),
@@ -579,7 +579,7 @@ void GuiWrapper::depthScanCallback(
 
 	Transform odom = transformFromPoseMsg(odomMsg->pose.pose);
 
-	cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg);
+	cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg, "bgr8");
 	cv_bridge::CvImageConstPtr ptrDepth = cv_bridge::toCvShare(depthMsg);
 
 	float depthConstant = 1.0f/cameraInfoMsg->K[4];

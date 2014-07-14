@@ -144,7 +144,7 @@ private:
 
 	void defaultCallback(const sensor_msgs::ImageConstPtr & imageMsg)
 	{
-		cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg);
+		cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg, "bgr8");
 		rtabmap::Image image(
 			ptrImage->image.clone(),
 			cv::Mat(),
@@ -174,7 +174,7 @@ private:
 			return;
 		}
 
-		cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg);
+		cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg, "bgr8");
 		cv_bridge::CvImageConstPtr ptrDepth = cv_bridge::toCvShare(depthMsg);
 
 		float depthConstant = 1.0f/cameraInfoMsg->K[4];
@@ -237,7 +237,7 @@ private:
 
 		Transform odom = transformFromPoseMsg(odomMsg->pose.pose);
 
-		cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg);
+		cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg, "bgr8");
 		cv_bridge::CvImageConstPtr ptrDepth = cv_bridge::toCvShare(depthMsg);
 
 		float depthConstant = 1.0f/cameraInfoMsg->K[4];
@@ -305,7 +305,7 @@ private:
 
 		Transform odom = transformFromPoseMsg(odomMsg->pose.pose);
 
-		cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg);
+		cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg, "bgr8");
 
 		rtabmap::Image image(
 			ptrImage->image.clone(),
@@ -350,7 +350,7 @@ private:
 
 		Transform odom = transformFromPoseMsg(odomMsg->pose.pose);
 
-		cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg);
+		cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg, "bgr8");
 		cv_bridge::CvImageConstPtr ptrDepth = cv_bridge::toCvShare(depthMsg);
 
 		float depthConstant = 1.0f/cameraInfoMsg->K[4];

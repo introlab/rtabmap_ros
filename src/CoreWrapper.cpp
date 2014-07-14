@@ -290,7 +290,7 @@ void CoreWrapper::defaultCallback(const sensor_msgs::ImageConstPtr & imageMsg)
 		}
 		time_ = ros::Time::now();
 
-		cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg);
+		cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg, "bgr8");
 		process(ptrImage->header.seq,
 				ptrImage->image);
 	}
@@ -329,7 +329,7 @@ void CoreWrapper::depthCallback(
 
 		Transform odom = transformFromPoseMsg(odomMsg->pose.pose);
 
-		cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg);
+		cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg, "bgr8");
 		cv_bridge::CvImageConstPtr ptrDepth = cv_bridge::toCvShare(depthMsg);
 
 		float depthConstant = 1.0f/cameraInfoMsg->K[4];
@@ -383,7 +383,7 @@ void CoreWrapper::scanCallback(
 
 		Transform odom = transformFromPoseMsg(odomMsg->pose.pose);
 
-		cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg);
+		cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg, "bgr8");
 
 		process(ptrImage->header.seq,
 				ptrImage->image,
@@ -439,7 +439,7 @@ void CoreWrapper::depthScanCallback(
 
 		Transform odom = transformFromPoseMsg(odomMsg->pose.pose);
 
-		cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg);
+		cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg, "bgr8");
 		cv_bridge::CvImageConstPtr ptrDepth = cv_bridge::toCvShare(depthMsg);
 
 		float depthConstant = 1.0f/cameraInfoMsg->K[4];

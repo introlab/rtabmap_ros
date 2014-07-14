@@ -90,7 +90,7 @@ private:
 
 		if(cloudPub_.getNumSubscribers())
 		{
-			cv_bridge::CvImageConstPtr imagePtr = cv_bridge::toCvShare(image);
+			cv_bridge::CvImageConstPtr imagePtr = cv_bridge::toCvShare(image, "bgr8");
 			cv_bridge::CvImageConstPtr imageDepthPtr = cv_bridge::toCvShare(imageDepth);
 
 			pcl::PointCloud<pcl::PointXYZRGB>::Ptr pclCloud;
