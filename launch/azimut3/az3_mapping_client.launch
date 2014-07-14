@@ -1,6 +1,9 @@
 
 <launch>
 
+  <!-- Remote teleop -->
+  <include file="$(find az3_bringup)/joystick.launch"/> 
+  
   <!-- Visualisation (client side) -->
   <group ns="rtabmap">
     <node pkg="rtabmap" type="rtabmapviz" name="rtabmapviz" args="-d $(find rtabmap)/launch/config/rgbd_gui.ini" output="screen">
