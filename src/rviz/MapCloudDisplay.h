@@ -84,6 +84,7 @@ public:
 	rviz::FloatProperty* node_filtering_radius_;
 	rviz::FloatProperty* node_filtering_angle_;
 	rviz::BoolProperty* download_map_;
+	rviz::BoolProperty* download_graph_;
 
 public Q_SLOTS:
 	void causeRetransform();
@@ -98,6 +99,7 @@ private Q_SLOTS:
 	void setColorTransformerOptions( EnumProperty* prop );
 	void updateCloudParameters();
 	void downloadMap();
+	void downloadGraph();
 
 protected:
 	/** @brief Do initialization. Overridden from MessageFilterDisplay. */
