@@ -5,15 +5,9 @@
   <include file="$(find az3_bringup)/joystick.launch"/> 
   
   <!-- Visualization and SLAM nodes use same data, so just subscribe once and relay messages -->
-  <node name="odom_relay" type="relay" pkg="topic_tools" args="/base_controller/odom /base_controller/odom_relay" >
-    <param name="lazy" type="bool" value="false"/>
-  </node>
-  <node name="scan_relay" type="relay" pkg="topic_tools" args="/base_scan /base_scan_relay" >
-    <param name="lazy" type="bool" value="false"/>
-  </node>
-  <node name="camera_info_relay" type="relay" pkg="topic_tools" args="/camera/data_throttled_camera_info /camera/data_throttled_camera_info_relay" >
-    <param name="lazy" type="bool" value="false"/>
-  </node>
+  <node name="odom_relay" type="relay" pkg="topic_tools" args="/base_controller/odom /base_controller/odom_relay"/>
+  <node name="scan_relay" type="relay" pkg="topic_tools" args="/base_scan /base_scan_relay"/>
+  <node name="camera_info_relay" type="relay" pkg="topic_tools" args="/camera/data_throttled_camera_info /camera/data_throttled_camera_info_relay"/>
   <node name="republish_rgb" type="republish" pkg="image_transport" args="theora in:=/camera/data_throttled_image raw out:=/camera/data_throttled_image_relay" />
   <node name="republish_depth" type="republish" pkg="image_transport" args="compressedDepth in:=/camera/data_throttled_image_depth raw out:=/camera/data_throttled_image_depth_relay" />
   
@@ -61,23 +55,10 @@
   
   <!-- Below, construct point cloud of the latest throttled data -->
   <node pkg="nodelet" type="nodelet" name="standalone_nodelet"  args="manager" output="screen"/>
-  <node pkg="nodelet" type="nodelet" name="data_odom_sync" args="load rtabmap/data_odom_sync standalone_nodelet">
-    <remap from="rgb/image_in"       to="/camera/data_throttled_image_relay"/>
-    <remap from="depth/image_in"     to="/camera/data_throttled_image_depth_relay"/>
-    <remap from="rgb/camera_info_in" to="/camera/data_throttled_camera_info_relay"/>
-    <remap from="odom_in"             to="/base_controller/odom_relay"/>
-    
-    <remap from="rgb/image_out"       to="data_odom_sync/image"/>
-    <remap from="depth/image_out"     to="data_odom_sync/depth"/>
-    <remap from="rgb/camera_info_out" to="data_odom_sync/camera_info"/>
-    <remap from="odom_out"            to="odom_sync"/>
-    
-    <param name="queue_size" type="int" value="30"/>
-  </node>
   <node pkg="nodelet" type="nodelet" name="points_xyzrgb" args="load rtabmap/point_cloud_xyzrgb standalone_nodelet">
-    <remap from="rgb/image"       to="data_odom_sync/image"/>
-    <remap from="depth/image"     to="data_odom_sync/depth"/>
-    <remap from="rgb/camera_info" to="data_odom_sync/camera_info"/>
+    <remap from="rgb/image"       to="/camera/data_throttled_image_relay"/>
+    <remap from="depth/image"     to="/camera/data_throttled_image_depth_relay"/>
+    <remap from="rgb/camera_info" to="/camera/data_throttled_camera_info_relay"/>
     <remap from="cloud"           to="voxel_cloud" />
     
     <param name="queue_size" type="int" value="10"/>
