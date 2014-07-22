@@ -79,12 +79,13 @@ private:
 			  const sensor_msgs::CameraInfoConstPtr& cameraInfo)
 	{
 		if(!(image->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
+			image->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||
 			image->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
 			image->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0) &&
 			(imageDepth->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1)!=0 ||
 			 imageDepth->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1)!=0))
 		{
-			ROS_ERROR("Input type must be image=mono8,rgb8,bgr8 and image_depth=32FC1,16UC1");
+			ROS_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8 and image_depth=32FC1,16UC1");
 			return;
 		}
 

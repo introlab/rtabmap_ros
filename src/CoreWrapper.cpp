@@ -290,7 +290,26 @@ void CoreWrapper::defaultCallback(const sensor_msgs::ImageConstPtr & imageMsg)
 		}
 		time_ = ros::Time::now();
 
-		cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg, "bgr8");
+		if(!(imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
+			 imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||
+			 imageMsg->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
+			 imageMsg->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0))
+		{
+			ROS_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8");
+			return;
+		}
+
+		cv_bridge::CvImageConstPtr ptrImage;
+		if(imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
+		   imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
+		{
+			ptrImage = cv_bridge::toCvShare(imageMsg, "mono8");
+		}
+		else
+		{
+			ptrImage = cv_bridge::toCvShare(imageMsg, "bgr8");
+		}
+
 		process(ptrImage->header.seq,
 				ptrImage->image);
 	}
@@ -313,6 +332,17 @@ void CoreWrapper::depthCallback(
 		}
 		time_ = ros::Time::now();
 
+		if(!(imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
+			 imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||
+			 imageMsg->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
+			 imageMsg->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0) &&
+			(depthMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1)!=0 ||
+			 depthMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1)!=0))
+		{
+			ROS_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8 and image_depth=32FC1,16UC1");
+			return;
+		}
+
 		// TF ready?
 		Transform localTransform;
 		try
@@ -329,7 +359,16 @@ void CoreWrapper::depthCallback(
 
 		Transform odom = transformFromPoseMsg(odomMsg->pose.pose);
 
-		cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg, "bgr8");
+		cv_bridge::CvImageConstPtr ptrImage;
+		if(imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
+		   imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
+		{
+			ptrImage = cv_bridge::toCvShare(imageMsg, "mono8");
+		}
+		else
+		{
+			ptrImage = cv_bridge::toCvShare(imageMsg, "bgr8");
+		}
 		cv_bridge::CvImageConstPtr ptrDepth = cv_bridge::toCvShare(depthMsg);
 
 		float depthConstant = 1.0f/cameraInfoMsg->K[4];
@@ -361,6 +400,15 @@ void CoreWrapper::scanCallback(
 		}
 		time_ = ros::Time::now();
 
+		if(!(imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
+				imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||
+				imageMsg->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
+				imageMsg->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0))
+		{
+			ROS_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8");
+			return;
+		}
+
 		// TF ready?
 		try
 		{
@@ -383,7 +431,16 @@ void CoreWrapper::scanCallback(
 
 		Transform odom = transformFromPoseMsg(odomMsg->pose.pose);
 
-		cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg, "bgr8");
+		cv_bridge::CvImageConstPtr ptrImage;
+		if(imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
+		   imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
+		{
+			ptrImage = cv_bridge::toCvShare(imageMsg, "mono8");
+		}
+		else
+		{
+			ptrImage = cv_bridge::toCvShare(imageMsg, "bgr8");
+		}
 
 		process(ptrImage->header.seq,
 				ptrImage->image,
@@ -414,6 +471,17 @@ void CoreWrapper::depthScanCallback(
 		}
 		time_ = ros::Time::now();
 
+		if(!(imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
+				imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||
+				imageMsg->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
+				imageMsg->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0) &&
+			(depthMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1)!=0 ||
+			 depthMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1)!=0))
+		{
+			ROS_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8 and image_depth=32FC1,16UC1");
+			return;
+		}
+
 		// TF ready?
 		Transform localTransform;
 		try
@@ -439,7 +507,16 @@ void CoreWrapper::depthScanCallback(
 
 		Transform odom = transformFromPoseMsg(odomMsg->pose.pose);
 
-		cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg, "bgr8");
+		cv_bridge::CvImageConstPtr ptrImage;
+		if(imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
+		   imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
+		{
+			ptrImage = cv_bridge::toCvShare(imageMsg, "mono8");
+		}
+		else
+		{
+			ptrImage = cv_bridge::toCvShare(imageMsg, "bgr8");
+		}
 		cv_bridge::CvImageConstPtr ptrDepth = cv_bridge::toCvShare(depthMsg);
 
 		float depthConstant = 1.0f/cameraInfoMsg->K[4];

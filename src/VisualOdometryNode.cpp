@@ -153,12 +153,13 @@ public:
 		if(!paused_)
 		{
 			if(!(image->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
+				 image->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||
 				 image->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
 				 image->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0) ||
 			   !(depth->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1)==0 ||
 				 depth->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1)==0))
 			{
-				ROS_ERROR("Input type must be image=mono8,rgb8,bgr8 (mono8 recommended) and image_depth=16UC1");
+				ROS_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8 (mono8 recommended) and image_depth=16UC1");
 				return;
 			}
 			else if(depth->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1)==0)
@@ -188,7 +189,7 @@ public:
 			if(image->data.size() && depth->data.size() && cameraInfo->K[4] != 0)
 			{
 				float depthConstant = 1.0f/cameraInfo->K[4];
-				cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(image);
+				cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(image, "mono8");
 				cv_bridge::CvImageConstPtr ptrDepth = cv_bridge::toCvShare(depth);
 
 				rtabmap::Image data(ptrImage->image,
