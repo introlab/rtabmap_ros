@@ -371,14 +371,20 @@ void CoreWrapper::depthCallback(
 		}
 		cv_bridge::CvImageConstPtr ptrDepth = cv_bridge::toCvShare(depthMsg);
 
-		float depthConstant = 1.0f/cameraInfoMsg->K[4];
+		float depthFx = cameraInfoMsg->K[0];
+		float depthFy = cameraInfoMsg->K[4];
+		float depthCx = cameraInfoMsg->K[2];
+		float depthCy = cameraInfoMsg->K[5];
 
 		process(ptrImage->header.seq,
 				ptrImage->image,
 				odom,
 				odomMsg->header.frame_id,
 				ptrDepth->image,
-				depthConstant,
+				depthFx,
+				depthFy,
+				depthCx,
+				depthCy,
 				localTransform,
 				cv::Mat());
 	}
@@ -447,6 +453,9 @@ void CoreWrapper::scanCallback(
 				odom,
 				odomMsg->header.frame_id,
 				cv::Mat(),
+				0.0f,
+				0.0f,
+				0.0f,
 				0.0f,
 				Transform(),
 				scan);
@@ -519,14 +528,20 @@ void CoreWrapper::depthScanCallback(
 		}
 		cv_bridge::CvImageConstPtr ptrDepth = cv_bridge::toCvShare(depthMsg);
 
-		float depthConstant = 1.0f/cameraInfoMsg->K[4];
+		float depthFx = cameraInfoMsg->K[0];
+		float depthFy = cameraInfoMsg->K[4];
+		float depthCx = cameraInfoMsg->K[2];
+		float depthCy = cameraInfoMsg->K[5];
 
 		process(ptrImage->header.seq,
 				ptrImage->image,
 				odom,
 				odomMsg->header.frame_id,
 				ptrDepth->image,
-				depthConstant,
+				depthFx,
+				depthFy,
+				depthCx,
+				depthCy,
 				localTransform,
 				scan);
 	}
@@ -538,7 +553,10 @@ void CoreWrapper::process(
 		const Transform & odom,
 		const std::string & odomFrameId,
 		const cv::Mat & depth,
-		float depthConstant,
+		float depthFx,
+		float depthFy,
+		float depthCx,
+		float depthCy,
 		const Transform & localTransform,
 		const cv::Mat & scan)
 {
@@ -574,7 +592,10 @@ void CoreWrapper::process(
 		Image data(image,
 				depth16,
 				scan,
-				depthConstant,
+				depthFx,
+				depthFy,
+				depthCx,
+				depthCy,
 				odom,
 				localTransform,
 				id);
@@ -723,7 +744,10 @@ bool CoreWrapper::getMapCallback(rtabmap::GetMap::Request& req, rtabmap::GetMap:
 	std::map<int, std::vector<unsigned char> > images;
 	std::map<int, std::vector<unsigned char> > depths;
 	std::map<int, std::vector<unsigned char> > depths2d;
-	std::map<int, float> depthConstants;
+	std::map<int, float> depthFxs;
+	std::map<int, float> depthFys;
+	std::map<int, float> depthCxs;
+	std::map<int, float> depthCys;
 	std::map<int, Transform> localTransforms;
 	std::map<int, Transform> poses;
 	std::multimap<int, Link> constraints;
@@ -742,7 +766,10 @@ bool CoreWrapper::getMapCallback(rtabmap::GetMap::Request& req, rtabmap::GetMap:
 				images,
 				depths,
 				depths2d,
-				depthConstants,
+				depthFxs,
+				depthFys,
+				depthCxs,
+				depthCys,
 				localTransforms,
 				poses,
 				constraints,
@@ -783,13 +810,41 @@ bool CoreWrapper::getMapCallback(rtabmap::GetMap::Request& req, rtabmap::GetMap:
 		++i;
 	}
 
-	rep.data.depthConstantIDs.resize(depthConstants.size());
-	rep.data.depthConstants.resize(depthConstants.size());
+	// fx,fy,cx,cy parameters
+	rep.data.depthFxIDs.resize(depthFxs.size());
+	rep.data.depthFxs.resize(depthFxs.size());
 	i=0;
-	for(std::map<int, float>::iterator iter = depthConstants.begin(); iter!=depthConstants.end(); ++iter)
+	for(std::map<int, float>::iterator iter = depthFxs.begin(); iter!=depthFxs.end(); ++iter)
 	{
-		rep.data.depthConstantIDs[i] = iter->first;
-		rep.data.depthConstants[i] = iter->second;
+		rep.data.depthFxIDs[i] = iter->first;
+		rep.data.depthFxs[i] = iter->second;
+		++i;
+	}
+	rep.data.depthFyIDs.resize(depthFys.size());
+	rep.data.depthFys.resize(depthFys.size());
+	i=0;
+	for(std::map<int, float>::iterator iter = depthFys.begin(); iter!=depthFys.end(); ++iter)
+	{
+		rep.data.depthFyIDs[i] = iter->first;
+		rep.data.depthFys[i] = iter->second;
+		++i;
+	}
+	rep.data.depthCxIDs.resize(depthCxs.size());
+	rep.data.depthCxs.resize(depthCxs.size());
+	i=0;
+	for(std::map<int, float>::iterator iter = depthCxs.begin(); iter!=depthCxs.end(); ++iter)
+	{
+		rep.data.depthCxIDs[i] = iter->first;
+		rep.data.depthCxs[i] = iter->second;
+		++i;
+	}
+	rep.data.depthCyIDs.resize(depthCys.size());
+	rep.data.depthCys.resize(depthCys.size());
+	i=0;
+	for(std::map<int, float>::iterator iter = depthCys.begin(); iter!=depthCys.end(); ++iter)
+	{
+		rep.data.depthCyIDs[i] = iter->first;
+		rep.data.depthCys[i] = iter->second;
 		++i;
 	}
 
@@ -991,11 +1046,28 @@ void CoreWrapper::publishStats(const Statistics & stats)
 			transformToGeometryMsg(stats.getLocalTransforms().at(stats.refImageId()), msg->localTransforms[0]);
 		}
 
-		if(uContains(stats.getDepthConstants(), stats.refImageId()))
+		// fx,fy,cx,cy parameters
+		if(uContains(stats.getDepthFxs(), stats.refImageId()))
 		{
-			msg->depthConstantIDs.push_back(stats.refImageId());
-			msg->depthConstants.push_back(stats.getDepthConstants().at(stats.refImageId()));
+			msg->depthFxIDs.push_back(stats.refImageId());
+			msg->depthFxs.push_back(stats.getDepthFxs().at(stats.refImageId()));
 		}
+		if(uContains(stats.getDepthFys(), stats.refImageId()))
+		{
+			msg->depthFyIDs.push_back(stats.refImageId());
+			msg->depthFys.push_back(stats.getDepthFys().at(stats.refImageId()));
+		}
+		if(uContains(stats.getDepthCxs(), stats.refImageId()))
+		{
+			msg->depthCxIDs.push_back(stats.refImageId());
+			msg->depthCxs.push_back(stats.getDepthCxs().at(stats.refImageId()));
+		}
+		if(uContains(stats.getDepthCys(), stats.refImageId()))
+		{
+			msg->depthCyIDs.push_back(stats.refImageId());
+			msg->depthCys.push_back(stats.getDepthCys().at(stats.refImageId()));
+		}
+
 
 		mapData_.publish(msg);
 	}

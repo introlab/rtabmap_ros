@@ -219,7 +219,10 @@ void MapCloudDisplay::processMapData(const rtabmap::MapData& map)
 			if(!localTransform.isNull())
 			{
 				cv::Mat image, depth;
-				float depthConstant = 0.0f;
+				float depthFx = 0.0f;
+				float depthFy = 0.0f;
+				float depthCx = 0.0f;
+				float depthCy = 0.0f;
 				rtabmap::Transform pose;
 
 				for(unsigned int i=0; i<map.imageIDs.size() && i<map.images.size(); ++i)
@@ -238,11 +241,35 @@ void MapCloudDisplay::processMapData(const rtabmap::MapData& map)
 						break;
 					}
 				}
-				for(unsigned int i=0; i<map.depthConstantIDs.size() && i<map.depthConstants.size(); ++i)
+				for(unsigned int i=0; i<map.depthFxIDs.size() && i<map.depthFxs.size(); ++i)
 				{
-					if(map.depthConstantIDs[i] == id)
+					if(map.depthFxIDs[i] == id)
 					{
-						depthConstant = map.depthConstants[i];
+						depthFx = map.depthFxs[i];
+						break;
+					}
+				}
+				for(unsigned int i=0; i<map.depthFyIDs.size() && i<map.depthFys.size(); ++i)
+				{
+					if(map.depthFyIDs[i] == id)
+					{
+						depthFy = map.depthFys[i];
+						break;
+					}
+				}
+				for(unsigned int i=0; i<map.depthCxIDs.size() && i<map.depthCxs.size(); ++i)
+				{
+					if(map.depthCxIDs[i] == id)
+					{
+						depthCx = map.depthCxs[i];
+						break;
+					}
+				}
+				for(unsigned int i=0; i<map.depthCyIDs.size() && i<map.depthCys.size(); ++i)
+				{
+					if(map.depthCyIDs[i] == id)
+					{
+						depthCy = map.depthCys[i];
 						break;
 					}
 				}
@@ -255,9 +282,9 @@ void MapCloudDisplay::processMapData(const rtabmap::MapData& map)
 					}
 				}
 
-				if(!image.empty() && !depth.empty() && depthConstant > 0.0f && !pose.isNull())
+				if(!image.empty() && !depth.empty() && depthFx > 0.0f && depthFy > 0.0f && depthCx >= 0.0f && depthCy >= 0.0f && !pose.isNull())
 				{
-					pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = util3d::cloudFromDepthRGB(image, depth, depthConstant, cloud_decimation_->getInt());
+					pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = util3d::cloudFromDepthRGB(image, depth, depthCx, depthCy, depthFx, depthFy, cloud_decimation_->getInt());
 
 					if(cloud_max_depth_->getFloat() > 0.0f)
 					{

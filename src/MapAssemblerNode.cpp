@@ -74,7 +74,10 @@ public:
 				if(!localTransform.isNull())
 				{
 					cv::Mat image, depth;
-					float depthConstant = 0.0f;
+					float depthFx = 0.0f;
+					float depthFy = 0.0f;
+					float depthCx = 0.0f;
+					float depthCy = 0.0f;
 
 					for(unsigned int i=0; i<msg->imageIDs.size() && i<msg->images.size(); ++i)
 					{
@@ -92,18 +95,42 @@ public:
 							break;
 						}
 					}
-					for(unsigned int i=0; i<msg->depthConstantIDs.size() && i<msg->depthConstants.size(); ++i)
+					for(unsigned int i=0; i<msg->depthFxIDs.size() && i<msg->depthFxs.size(); ++i)
 					{
-						if(msg->depthConstantIDs[i] == id)
+						if(msg->depthFxIDs[i] == id)
 						{
-							depthConstant = msg->depthConstants[i];
+							depthFx = msg->depthFxs[i];
+							break;
+						}
+					}
+					for(unsigned int i=0; i<msg->depthFyIDs.size() && i<msg->depthFys.size(); ++i)
+					{
+						if(msg->depthFyIDs[i] == id)
+						{
+							depthFy = msg->depthFys[i];
+							break;
+						}
+					}
+					for(unsigned int i=0; i<msg->depthCxIDs.size() && i<msg->depthCxs.size(); ++i)
+					{
+						if(msg->depthCxIDs[i] == id)
+						{
+							depthCx = msg->depthCxs[i];
+							break;
+						}
+					}
+					for(unsigned int i=0; i<msg->depthCyIDs.size() && i<msg->depthCys.size(); ++i)
+					{
+						if(msg->depthCyIDs[i] == id)
+						{
+							depthCy = msg->depthCys[i];
 							break;
 						}
 					}
 
-					if(!image.empty() && !depth.empty() && depthConstant > 0.0f)
+					if(!image.empty() && !depth.empty() && depthFx > 0.0f && depthFy > 0.0f && depthCx >= 0.0f && depthCy >= 0.0f)
 					{
-						pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = util3d::cloudFromDepthRGB(image, depth, depthConstant, cloudDecimation_);
+						pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = util3d::cloudFromDepthRGB(image, depth, depthCx, depthCy, depthFx, depthFy, cloudDecimation_);
 
 						if(cloudMaxDepth_ > 0)
 						{

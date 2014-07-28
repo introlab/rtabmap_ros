@@ -67,7 +67,10 @@ private:
 			const rtabmap::Transform & odom = rtabmap::Transform(),
 			const std::string & odomFrameId = "",
 			const cv::Mat & depth = cv::Mat(),
-			float depthConstant = 0.0f,
+			float depthFx = 0.0f,
+			float depthFy = 0.0f,
+			float depthCx = 0.0f,
+			float depthCy = 0.0f,
 			const rtabmap::Transform & localTransform = rtabmap::Transform(),
 			const cv::Mat & scan = cv::Mat());
 

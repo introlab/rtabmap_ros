@@ -23,9 +23,21 @@ rtabmap/Bytes[] depths
 int32[] depth2DIDs
 rtabmap/Bytes[] depth2Ds
 
-# depth constants
-int32[] depthConstantIDs
-float32[] depthConstants
+# depth fx
+int32[] depthFxIDs
+float32[] depthFxs
+
+# depth fy
+int32[] depthFyIDs
+float32[] depthFys
+
+# depth cx
+int32[] depthCxIDs
+float32[] depthCxs
+
+# depth cy
+int32[] depthCyIDs
+float32[] depthCys
 
 # local transforms
 int32[] localTransformIDs

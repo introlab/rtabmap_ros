@@ -150,6 +150,9 @@ private:
 			cv::Mat(),
 			cv::Mat(),
 			0.0f,
+			0.0f,
+			0.0f,
+			0.0f,
 			Transform(),
 			Transform());
 		recorder_.addData(image);
@@ -177,7 +180,10 @@ private:
 		cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg, "bgr8");
 		cv_bridge::CvImageConstPtr ptrDepth = cv_bridge::toCvShare(depthMsg);
 
-		float depthConstant = 1.0f/cameraInfoMsg->K[4];
+		float depthFx = cameraInfoMsg->K[0];
+		float depthFy = cameraInfoMsg->K[4];
+		float depthCx = cameraInfoMsg->K[2];
+		float depthCy = cameraInfoMsg->K[5];
 
 		cv::Mat depth16;
 		if(ptrDepth->image.type() != CV_16UC1)
@@ -209,7 +215,10 @@ private:
 			ptrImage->image.clone(),
 			depth16,
 			cv::Mat(),
-			depthConstant,
+			depthFx,
+			depthFy,
+			depthCx,
+			depthCy,
 			Transform(),
 			localTransform);
 		recorder_.addData(image);
@@ -240,7 +249,10 @@ private:
 		cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg, "bgr8");
 		cv_bridge::CvImageConstPtr ptrDepth = cv_bridge::toCvShare(depthMsg);
 
-		float depthConstant = 1.0f/cameraInfoMsg->K[4];
+		float depthFx = cameraInfoMsg->K[0];
+		float depthFy = cameraInfoMsg->K[4];
+		float depthCx = cameraInfoMsg->K[2];
+		float depthCy = cameraInfoMsg->K[5];
 
 		cv::Mat depth16;
 		if(ptrDepth->image.type() != CV_16UC1)
@@ -272,7 +284,10 @@ private:
 			ptrImage->image.clone(),
 			depth16,
 			cv::Mat(),
-			depthConstant,
+			depthFx,
+			depthFy,
+			depthCx,
+			depthCy,
 			odom,
 			localTransform);
 		recorder_.addData(image);
@@ -311,6 +326,9 @@ private:
 			ptrImage->image.clone(),
 			cv::Mat(),
 			scan,
+			0.0f,
+			0.0f,
+			0.0f,
 			0.0f,
 			odom,
 			Transform());
@@ -353,7 +371,10 @@ private:
 		cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg, "bgr8");
 		cv_bridge::CvImageConstPtr ptrDepth = cv_bridge::toCvShare(depthMsg);
 
-		float depthConstant = 1.0f/cameraInfoMsg->K[4];
+		float depthFx = cameraInfoMsg->K[0];
+		float depthFy = cameraInfoMsg->K[4];
+		float depthCx = cameraInfoMsg->K[2];
+		float depthCy = cameraInfoMsg->K[5];
 
 		cv::Mat depth16;
 		if(ptrDepth->image.type() != CV_16UC1)
@@ -385,7 +406,10 @@ private:
 			ptrImage->image.clone(),
 			depth16,
 			scan,
-			depthConstant,
+			depthFx,
+			depthFy,
+			depthCx,
+			depthCy,
 			odom,
 			localTransform);
 		recorder_.addData(image);

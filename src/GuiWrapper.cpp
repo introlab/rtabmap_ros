@@ -203,12 +203,33 @@ void GuiWrapper::infoMapCallback(
 	}
 	stat.setDepth2ds(depth2ds);
 
-	std::map<int, float> depthConstants;
-	for(unsigned int i=0; i<mapMsg->depthConstantIDs.size() && i<mapMsg->depthConstants.size(); ++i)
+	std::map<int, float> depthFxs;
+	for(unsigned int i=0; i<mapMsg->depthFxIDs.size() && i<mapMsg->depthFxs.size(); ++i)
 	{
-		depthConstants.insert(std::make_pair(mapMsg->depthConstantIDs[i], mapMsg->depthConstants[i]));
+		depthFxs.insert(std::make_pair(mapMsg->depthFxIDs[i], mapMsg->depthFxs[i]));
 	}
-	stat.setDepthConstants(depthConstants);
+	stat.setDepthFxs(depthFxs);
+
+	std::map<int, float> depthFys;
+	for(unsigned int i=0; i<mapMsg->depthFyIDs.size() && i<mapMsg->depthFys.size(); ++i)
+	{
+		depthFys.insert(std::make_pair(mapMsg->depthFyIDs[i], mapMsg->depthFys[i]));
+	}
+	stat.setDepthFys(depthFys);
+
+	std::map<int, float> depthCxs;
+	for(unsigned int i=0; i<mapMsg->depthCxIDs.size() && i<mapMsg->depthCxs.size(); ++i)
+	{
+		depthCxs.insert(std::make_pair(mapMsg->depthCxIDs[i], mapMsg->depthCxs[i]));
+	}
+	stat.setDepthCxs(depthCxs);
+
+	std::map<int, float> depthCys;
+	for(unsigned int i=0; i<mapMsg->depthCyIDs.size() && i<mapMsg->depthCys.size(); ++i)
+	{
+		depthCys.insert(std::make_pair(mapMsg->depthCyIDs[i], mapMsg->depthCys[i]));
+	}
+	stat.setDepthCys(depthCys);
 
 	std::map<int, Transform> localTransforms;
 	for(unsigned int i=0; i<mapMsg->localTransformIDs.size() && i<mapMsg->localTransforms.size(); ++i)
@@ -247,7 +268,10 @@ void GuiWrapper::processRequestedMap(const rtabmap::MapData & map)
 	std::map<int, std::vector<unsigned char> > images;
 	std::map<int, std::vector<unsigned char> > depths;
 	std::map<int, std::vector<unsigned char> > depths2d;
-	std::map<int, float> depthConstants;
+	std::map<int, float> depthFxs;
+	std::map<int, float> depthFys;
+	std::map<int, float> depthCxs;
+	std::map<int, float> depthCys;
 	std::map<int, Transform> localTransforms;
 	std::map<int, Transform> poses;
 	std::multimap<int, Link> constraints;
@@ -270,10 +294,25 @@ void GuiWrapper::processRequestedMap(const rtabmap::MapData & map)
 				(int)map.depth2Ds.size(), (int)map.depth2DIDs.size());
 	}
 
-	if(map.depthConstantIDs.size() != map.depthConstants.size())
+	if(map.depthFxIDs.size() != map.depthFxs.size())
 	{
-		ROS_WARN("rtabmapviz: receiving map... depthConstants and IDs are not the same size (%d vs %d)!",
-				(int)map.depthConstants.size(), (int)map.depthConstantIDs.size());
+		ROS_WARN("rtabmapviz: receiving map... depthFxs and IDs are not the same size (%d vs %d)!",
+				(int)map.depthFxs.size(), (int)map.depthFxIDs.size());
+	}
+	if(map.depthFyIDs.size() != map.depthFys.size())
+	{
+		ROS_WARN("rtabmapviz: receiving map... depthFys and IDs are not the same size (%d vs %d)!",
+				(int)map.depthFys.size(), (int)map.depthFyIDs.size());
+	}
+	if(map.depthCxIDs.size() != map.depthCxs.size())
+	{
+		ROS_WARN("rtabmapviz: receiving map... depthCxs and IDs are not the same size (%d vs %d)!",
+				(int)map.depthCxs.size(), (int)map.depthCxIDs.size());
+	}
+	if(map.depthCyIDs.size() != map.depthCys.size())
+	{
+		ROS_WARN("rtabmapviz: receiving map... depthCys and IDs are not the same size (%d vs %d)!",
+				(int)map.depthCys.size(), (int)map.depthCyIDs.size());
 	}
 
 	if(map.poseIDs.size() != map.poses.size())
@@ -305,10 +344,23 @@ void GuiWrapper::processRequestedMap(const rtabmap::MapData & map)
 		depths2d.insert(std::make_pair(map.depth2DIDs[i], map.depth2Ds[i].bytes));
 	}
 
-	for(unsigned int i=0; i<map.depthConstantIDs.size() && i < map.depthConstants.size(); ++i)
+	for(unsigned int i=0; i<map.depthFxIDs.size() && i < map.depthFxs.size(); ++i)
 	{
-		depthConstants.insert(std::make_pair(map.depthConstantIDs[i], map.depthConstants[i]));
+		depthFxs.insert(std::make_pair(map.depthFxIDs[i], map.depthFxs[i]));
 	}
+	for(unsigned int i=0; i<map.depthFyIDs.size() && i < map.depthFys.size(); ++i)
+	{
+		depthFys.insert(std::make_pair(map.depthFyIDs[i], map.depthFys[i]));
+	}
+	for(unsigned int i=0; i<map.depthCxIDs.size() && i < map.depthCxs.size(); ++i)
+	{
+		depthCxs.insert(std::make_pair(map.depthCxIDs[i], map.depthCxs[i]));
+	}
+	for(unsigned int i=0; i<map.depthCyIDs.size() && i < map.depthCys.size(); ++i)
+	{
+		depthCys.insert(std::make_pair(map.depthCyIDs[i], map.depthCys[i]));
+	}
+
 
 	for(unsigned int i=0; i<map.localTransformIDs.size() && i < map.localTransforms.size(); ++i)
 	{
@@ -331,7 +383,10 @@ void GuiWrapper::processRequestedMap(const rtabmap::MapData & map)
 	this->post(new RtabmapEvent3DMap(images,
 			depths,
 			depths2d,
-			depthConstants,
+			depthFxs,
+			depthFys,
+			depthCxs,
+			depthCys,
 			localTransforms,
 			poses,
 			constraints));
@@ -467,6 +522,9 @@ void GuiWrapper::defaultCallback(const nav_msgs::OdometryConstPtr & odomMsg)
 			cv::Mat(),
 			cv::Mat(),
 			0.0f,
+			0.0f,
+			0.0f,
+			0.0f,
 			odom,
 			Transform());
 	this->post(new OdometryEvent(image));
@@ -497,12 +555,18 @@ void GuiWrapper::depthCallback(
 	cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg, "bgr8");
 	cv_bridge::CvImageConstPtr ptrDepth = cv_bridge::toCvShare(depthMsg);
 
-	float depthConstant = 1.0f/cameraInfoMsg->K[4];
+	float depthFx = cameraInfoMsg->K[0];
+	float depthFy = cameraInfoMsg->K[4];
+	float depthCx = cameraInfoMsg->K[2];
+	float depthCy = cameraInfoMsg->K[5];
 
 	rtabmap::Image image(
 			ptrImage->image.clone(),
 			ptrDepth->image.clone(),
-			depthConstant,
+			depthFx,
+			depthFy,
+			depthCx,
+			depthCy,
 			odom,
 			localTransform);
 	this->post(new OdometryEvent(image));
@@ -541,6 +605,9 @@ void GuiWrapper::scanCallback(
 			ptrImage->image.clone(),
 			cv::Mat(),
 			scan,
+			0.0f,
+			0.0f,
+			0.0f,
 			0.0f,
 			odom,
 			Transform());
@@ -582,13 +649,19 @@ void GuiWrapper::depthScanCallback(
 	cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg, "bgr8");
 	cv_bridge::CvImageConstPtr ptrDepth = cv_bridge::toCvShare(depthMsg);
 
-	float depthConstant = 1.0f/cameraInfoMsg->K[4];
+	float depthFx = cameraInfoMsg->K[0];
+	float depthFy = cameraInfoMsg->K[4];
+	float depthCx = cameraInfoMsg->K[2];
+	float depthCy = cameraInfoMsg->K[5];
 
 	rtabmap::Image image(
 			ptrImage->image.clone(),
 			ptrDepth->image.clone(),
 			scan,
-			depthConstant,
+			depthFx,
+			depthFy,
+			depthCx,
+			depthCy,
 			odom,
 			localTransform);
 	this->post(new OdometryEvent(image));
