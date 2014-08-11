@@ -1,4 +1,6 @@
 
+Go to rtabmap.googlecode.com for more info.
+
 Notes:
 
 Check memory leaks with ROS:
