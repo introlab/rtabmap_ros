@@ -52,6 +52,7 @@
   </node>
 
   <!-- Visualisation -->
+  <node name="republish_rgb" type="republish" pkg="image_transport" args="compressed in:=/camera/data_throttled_image raw out:=/camera/data_throttled_image_relay" />
   <node pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap)/launch/config/azimut3.rviz" output="screen"/>
   
   <node pkg="nodelet" type="nodelet" name="standalone_nodelet"  args="manager" output="screen"/>
