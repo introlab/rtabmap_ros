@@ -20,7 +20,7 @@
   	  <remap from="rgb/camera_info" to="/camera/data_throttled_camera_info"/>
   	  
   	  <param name="rgb/image_transport" type="string" value="compressed"/>
-      <param name="depth/image_transport" type="string" value="compressedDepth"/>
+     	  <param name="depth/image_transport" type="string" value="compressedDepth"/>
 	
 	  <param name="queue_size" type="int" value="10"/>
 	
@@ -41,9 +41,9 @@
 	  <param name="Mem/RehearsalSimilarity" type="string" value="0.45"/>
 	  <param name="Mem/RehearsedNodesKept" type="string" value="false"/>   
     </node>
-  </group>
-  
-  <!-- Visualisation (client side) -->
+  </group> 
+
+  <!-- Visualisation -->
   <include file="$(find rtabmap)/launch/azimut3/az3_mapping_client.launch"/>
 
 </launch>
