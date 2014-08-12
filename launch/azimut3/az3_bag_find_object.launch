@@ -10,6 +10,6 @@
     <remap from="depth_registered/camera_info" to="camera/data_throttled_camera_info"/>
 
     <param name="rgb/image_transport" type="string" value="compressed"/>
-    <param name="depth/image_transport" type="string" value="compressedDepth"/>
+    <param name="depth_registered/image_transport" type="string" value="compressedDepth"/>
   </node>
 </launch>

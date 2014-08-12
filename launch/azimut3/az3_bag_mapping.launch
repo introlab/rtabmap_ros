@@ -42,6 +42,9 @@
 	  <param name="Mem/RehearsedNodesKept" type="string" value="false"/>   
     </node>
   </group> 
+  
+  <!-- send AZIMUT 3 urdf to param server -->
+  <param name="robot_description" command="$(find xacro)/xacro.py '$(find az3_description)/robots/azimut_3_laser.urdf.xacro'" />
 
   <!-- Visualisation -->
   <include file="$(find rtabmap)/launch/azimut3/az3_mapping_client.launch"/>
