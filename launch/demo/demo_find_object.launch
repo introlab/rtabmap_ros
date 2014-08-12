@@ -51,8 +51,11 @@
     <remap from="mapData" to="rtabmap/mapData"/>
   </node>
 
-  <!-- Visualisation -->
+  <!-- just to re-use azimut3.rviz config below -->
   <node name="republish_rgb" type="republish" pkg="image_transport" args="compressed in:=/camera/data_throttled_image raw out:=/camera/data_throttled_image_relay" />
+  <node name="mapData_relay" type="relay" pkg="topic_tools" args="/rtabmap/mapData /rtabmap/mapData_relay"/>
+
+  <!-- Visualisation -->
   <node pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap)/launch/config/azimut3.rviz" output="screen"/>
   
   <node pkg="nodelet" type="nodelet" name="standalone_nodelet"  args="manager" output="screen"/>
