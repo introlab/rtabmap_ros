@@ -30,6 +30,8 @@
 	  <param name="RGBD/LocalLoopDetectionTime" type="string" value="false"/>    <!-- Local loop closure detection with locations in STM -->
 	  <param name="Mem/BadSignaturesIgnored" type="string" value="false"/>      <!-- Don't ignore bad images for 3D node creation (e.g. white walls) -->
 	  <param name="LccIcp/Type" type="string" value="2"/>                       <!-- Loop closure transformation refining with ICP: 0=No ICP, 1=ICP 3D, 2=ICP 2D -->
+	  <param name="LccIcp2/CorrespondenceRatio" type="string" value="0.9"/>
+	  <param name="LccIcp2/MaxFitness" type="string" value="0.1"/>
 	  <param name="LccIcp2/Iterations" type="string" value="100"/>
 	  <param name="LccIcp2/VoxelSize" type="string" value="0"/>
 	  <param name="LccBow/MinInliers" type="string" value="5"/>                 <!-- 3D visual words minimum inliers to accept loop closure -->

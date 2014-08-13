@@ -295,6 +295,13 @@ void GuiWrapper::processRequestedMap(const rtabmap::MapData & map)
 	std::map<int, Transform> localTransforms;
 	std::map<int, Transform> poses;
 	std::multimap<int, Link> constraints;
+	std::map<int, int> mapIds;
+
+	if(map.mapIDs.size() != map.maps.size())
+	{
+		ROS_WARN("rtabmapviz: receiving map... maps and IDs are not the same size (%d vs %d)!",
+				(int)map.maps.size(), (int)map.mapIDs.size());
+	}
 
 	if(map.imageIDs.size() != map.images.size())
 	{
@@ -347,6 +354,11 @@ void GuiWrapper::processRequestedMap(const rtabmap::MapData & map)
 	{
 		ROS_WARN("rtabmapviz: receiving map... constraints and IDs are not the same size (%d vs %d vs %d vs %d)!",
 				(int)map.constraints.size(), (int)map.constraintFromIDs.size(), (int)map.constraintToIDs.size(), (int)map.constraintTypes.size());
+	}
+
+	for(unsigned int i=0; i<map.mapIDs.size() && i < map.maps.size(); ++i)
+	{
+		mapIds.insert(std::make_pair(map.mapIDs[i], map.maps[i]));
 	}
 
 	for(unsigned int i=0; i<map.imageIDs.size() && i < map.images.size(); ++i)
@@ -409,7 +421,8 @@ void GuiWrapper::processRequestedMap(const rtabmap::MapData & map)
 			depthCys,
 			localTransforms,
 			poses,
-			constraints));
+			constraints,
+			mapIds));
 }
 
 void GuiWrapper::handleEvent(UEvent * anEvent)

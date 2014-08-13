@@ -102,6 +102,7 @@ private:
 	bool setModeLocalizationCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool setModeMappingCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool getMapCallback(rtabmap::GetMap::Request& req, rtabmap::GetMap::Response& rep);
+	bool publishMapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 
 	rtabmap::ParametersMap loadParameters(const std::string & configFile);
 	void saveParameters(const std::string & configFile);
@@ -165,6 +166,7 @@ private:
 	ros::ServiceServer setModeLocalizationSrv_;
 	ros::ServiceServer setModeMappingSrv_;
 	ros::ServiceServer getMapDataSrv_;
+	ros::ServiceServer publishMapDataSrv_;
 
 	boost::thread* transformThread_;
 

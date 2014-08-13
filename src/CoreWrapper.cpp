@@ -197,6 +197,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	setModeLocalizationSrv_ = nh.advertiseService("set_mode_localization", &CoreWrapper::setModeLocalizationCallback, this);
 	setModeMappingSrv_ = nh.advertiseService("set_mode_mapping", &CoreWrapper::setModeMappingCallback, this);
 	getMapDataSrv_ = nh.advertiseService("get_map", &CoreWrapper::getMapCallback, this);
+	publishMapDataSrv_ = nh.advertiseService("publish_map", &CoreWrapper::publishMapCallback, this);
 
 	setupCallbacks(subscribeDepth, subscribeLaserScan, queueSize);
 
@@ -771,6 +772,7 @@ bool CoreWrapper::getMapCallback(rtabmap::GetMap::Request& req, rtabmap::GetMap:
 	std::map<int, Transform> localTransforms;
 	std::map<int, Transform> poses;
 	std::multimap<int, Link> constraints;
+	std::map<int, int> mapIds;
 
 	if(req.graphOnly)
 	{
@@ -793,12 +795,23 @@ bool CoreWrapper::getMapCallback(rtabmap::GetMap::Request& req, rtabmap::GetMap:
 				localTransforms,
 				poses,
 				constraints,
+				mapIds,
 				req.optimized,
 				req.global);
 	}
 
 
 	int i=0;
+
+	rep.data.mapIDs.resize(mapIds.size());
+	rep.data.maps.resize(mapIds.size());
+	i=0;
+	for(std::map<int, int>::iterator iter = mapIds.begin(); iter!=mapIds.end(); ++iter)
+	{
+		rep.data.mapIDs[i] = iter->first;
+		rep.data.maps[i] = iter->second;
+		++i;
+	}
 
 	rep.data.imageIDs.resize(images.size());
 	rep.data.images.resize(images.size());
@@ -905,6 +918,162 @@ bool CoreWrapper::getMapCallback(rtabmap::GetMap::Request& req, rtabmap::GetMap:
 	rep.data.header.stamp = ros::Time::now();
 	rep.data.header.frame_id = mapFrameId_;
 
+	return true;
+}
+
+bool CoreWrapper::publishMapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+{
+	ROS_INFO("rtabmap: Publishing map...");
+	if(mapData_.getNumSubscribers())
+	{
+		std::map<int, std::vector<unsigned char> > images;
+		std::map<int, std::vector<unsigned char> > depths;
+		std::map<int, std::vector<unsigned char> > depths2d;
+		std::map<int, float> depthFxs;
+		std::map<int, float> depthFys;
+		std::map<int, float> depthCxs;
+		std::map<int, float> depthCys;
+		std::map<int, Transform> localTransforms;
+		std::map<int, Transform> poses;
+		std::multimap<int, Link> constraints;
+		std::map<int, int> mapIds;
+
+		rtabmap_.get3DMap(
+				images,
+				depths,
+				depths2d,
+				depthFxs,
+				depthFys,
+				depthCxs,
+				depthCys,
+				localTransforms,
+				poses,
+				constraints,
+				mapIds,
+				true,
+				true);
+
+		//RGB-D SLAM data
+		rtabmap::MapDataPtr msg(new rtabmap::MapData);
+		msg->header.stamp = ros::Time::now();
+		msg->header.frame_id = mapFrameId_;
+
+		int i=0;
+
+		msg->mapIDs.resize(mapIds.size());
+		msg->maps.resize(mapIds.size());
+		i=0;
+		for(std::map<int, int>::iterator iter = mapIds.begin(); iter!=mapIds.end(); ++iter)
+		{
+			msg->mapIDs[i] = iter->first;
+			msg->maps[i] = iter->second;
+			++i;
+		}
+
+		msg->imageIDs.resize(images.size());
+		msg->images.resize(images.size());
+		i=0;
+		for(std::map<int, std::vector<unsigned char> >::iterator iter = images.begin(); iter!=images.end(); ++iter)
+		{
+			msg->imageIDs[i] = iter->first;
+			msg->images[i].bytes = iter->second;
+			++i;
+		}
+
+		msg->depthIDs.resize(depths.size());
+		msg->depths.resize(depths.size());
+		i=0;
+		for(std::map<int, std::vector<unsigned char> >::iterator iter = depths.begin(); iter!=depths.end(); ++iter)
+		{
+			msg->depthIDs[i] = iter->first;
+			msg->depths[i].bytes = iter->second;
+			++i;
+		}
+
+		msg->depth2DIDs.resize(depths2d.size());
+		msg->depth2Ds.resize(depths2d.size());
+		i=0;
+		for(std::map<int, std::vector<unsigned char> >::iterator iter = depths2d.begin(); iter!=depths2d.end(); ++iter)
+		{
+			msg->depth2DIDs[i] = iter->first;
+			msg->depth2Ds[i].bytes = iter->second;
+			++i;
+		}
+
+		// fx,fy,cx,cy parameters
+		msg->depthFxIDs.resize(depthFxs.size());
+		msg->depthFxs.resize(depthFxs.size());
+		i=0;
+		for(std::map<int, float>::iterator iter = depthFxs.begin(); iter!=depthFxs.end(); ++iter)
+		{
+			msg->depthFxIDs[i] = iter->first;
+			msg->depthFxs[i] = iter->second;
+			++i;
+		}
+		msg->depthFyIDs.resize(depthFys.size());
+		msg->depthFys.resize(depthFys.size());
+		i=0;
+		for(std::map<int, float>::iterator iter = depthFys.begin(); iter!=depthFys.end(); ++iter)
+		{
+			msg->depthFyIDs[i] = iter->first;
+			msg->depthFys[i] = iter->second;
+			++i;
+		}
+		msg->depthCxIDs.resize(depthCxs.size());
+		msg->depthCxs.resize(depthCxs.size());
+		i=0;
+		for(std::map<int, float>::iterator iter = depthCxs.begin(); iter!=depthCxs.end(); ++iter)
+		{
+			msg->depthCxIDs[i] = iter->first;
+			msg->depthCxs[i] = iter->second;
+			++i;
+		}
+		msg->depthCyIDs.resize(depthCys.size());
+		msg->depthCys.resize(depthCys.size());
+		i=0;
+		for(std::map<int, float>::iterator iter = depthCys.begin(); iter!=depthCys.end(); ++iter)
+		{
+			msg->depthCyIDs[i] = iter->first;
+			msg->depthCys[i] = iter->second;
+			++i;
+		}
+
+		msg->localTransformIDs.resize(localTransforms.size());
+		msg->localTransforms.resize(localTransforms.size());
+		i=0;
+		for(std::map<int, Transform>::iterator iter = localTransforms.begin(); iter!=localTransforms.end(); ++iter)
+		{
+			msg->localTransformIDs[i] = iter->first;
+			transformToGeometryMsg(iter->second, msg->localTransforms[i]);
+			++i;
+		}
+
+		msg->poseIDs.resize(poses.size());
+		msg->poses.resize(poses.size());
+		i=0;
+		for(std::map<int, Transform>::iterator iter = poses.begin(); iter!=poses.end(); ++iter)
+		{
+			msg->poseIDs[i] = iter->first;
+			transformToPoseMsg(iter->second, msg->poses[i]);
+			++i;
+		}
+
+		msg->constraintFromIDs.resize(constraints.size());
+		msg->constraintToIDs.resize(constraints.size());
+		msg->constraintTypes.resize(constraints.size());
+		msg->constraints.resize(constraints.size());
+		i=0;
+		for(std::multimap<int, Link>::iterator iter = constraints.begin(); iter!=constraints.end(); ++iter)
+		{
+			msg->constraintFromIDs[i] = iter->first;
+			msg->constraintToIDs[i] = iter->second.to();
+			msg->constraintTypes[i] = iter->second.type();
+			transformToGeometryMsg(iter->second.transform(), msg->constraints[i]);
+			++i;
+		}
+
+		mapData_.publish(msg);
+	}
 	return true;
 }
 
