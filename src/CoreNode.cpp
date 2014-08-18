@@ -50,6 +50,10 @@ int main(int argc, char** argv)
 		{
 			ULogger::setLevel(ULogger::kDebug);
 		}
+		else if(strcmp(argv[i], "--uinfo") == 0)
+		{
+			ULogger::setLevel(ULogger::kInfo);
+		}
 		else if(strcmp(argv[i], "--params") == 0 || strcmp(argv[i], "--params-all") == 0)
 		{
 			rtabmap::ParametersMap parameters = rtabmap::Parameters::getDefaultParameters();
@@ -97,6 +101,11 @@ int main(int argc, char** argv)
 			ROS_WARN("Node will now exit after showing default RTAB-Map parameters because "
 					 "argument \"--params\" is detected!");
 			exit(0);
+		}
+		else
+		{
+			ROS_ERROR("Not recognized argument \"%s\"", argv[i]);
+			exit(-1);
 		}
 	}
 

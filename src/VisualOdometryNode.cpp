@@ -215,7 +215,7 @@ public:
 				cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(image, "mono8");
 				cv_bridge::CvImageConstPtr ptrDepth = cv_bridge::toCvShare(depth);
 
-				rtabmap::Image data(ptrImage->image,
+				rtabmap::SensorData data(ptrImage->image,
 						ptrDepth->image.type() == CV_32FC1?util3d::cvtDepthFromFloat(ptrDepth->image):ptrDepth->image,
 						depthFx,
 						depthFy,

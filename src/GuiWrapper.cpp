@@ -551,16 +551,9 @@ void GuiWrapper::handleEvent(UEvent * anEvent)
 void GuiWrapper::defaultCallback(const nav_msgs::OdometryConstPtr & odomMsg)
 {
 	Transform odom = transformFromPoseMsg(odomMsg->pose.pose);
-	rtabmap::Image image(
-			cv::Mat(),
-			cv::Mat(),
-			0.0f,
-			0.0f,
-			0.0f,
-			0.0f,
-			odom,
-			Transform());
-	this->post(new OdometryEvent(image));
+	rtabmap::SensorData data;
+	data.setPose(odom);
+	this->post(new OdometryEvent(data));
 }
 
 void GuiWrapper::depthCallback(
@@ -593,7 +586,7 @@ void GuiWrapper::depthCallback(
 	float depthCx = cameraInfoMsg->K[2];
 	float depthCy = cameraInfoMsg->K[5];
 
-	rtabmap::Image image(
+	rtabmap::SensorData image(
 			ptrImage->image.clone(),
 			ptrDepth->image.clone(),
 			depthFx,
@@ -634,7 +627,7 @@ void GuiWrapper::scanCallback(
 
 	cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg, "bgr8");
 
-	rtabmap::Image image(
+	rtabmap::SensorData image(
 			ptrImage->image.clone(),
 			cv::Mat(),
 			scan,
@@ -687,7 +680,7 @@ void GuiWrapper::depthScanCallback(
 	float depthCx = cameraInfoMsg->K[2];
 	float depthCy = cameraInfoMsg->K[5];
 
-	rtabmap::Image image(
+	rtabmap::SensorData image(
 			ptrImage->image.clone(),
 			ptrDepth->image.clone(),
 			scan,

@@ -171,7 +171,7 @@ private:
 	void defaultCallback(const sensor_msgs::ImageConstPtr & imageMsg)
 	{
 		cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg, "bgr8");
-		rtabmap::Image image(
+		rtabmap::SensorData image(
 			ptrImage->image.clone(),
 			cv::Mat(),
 			cv::Mat(),
@@ -237,7 +237,7 @@ private:
 			depth16 = ptrDepth->image;
 		}
 
-		rtabmap::Image image(
+		rtabmap::SensorData image(
 			ptrImage->image.clone(),
 			depth16,
 			cv::Mat(),
@@ -306,7 +306,7 @@ private:
 			depth16 = ptrDepth->image;
 		}
 
-		rtabmap::Image image(
+		rtabmap::SensorData image(
 			ptrImage->image.clone(),
 			depth16,
 			cv::Mat(),
@@ -348,7 +348,7 @@ private:
 
 		cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg, "bgr8");
 
-		rtabmap::Image image(
+		rtabmap::SensorData image(
 			ptrImage->image.clone(),
 			cv::Mat(),
 			scan,
@@ -428,7 +428,7 @@ private:
 			depth16 = ptrDepth->image;
 		}
 
-		rtabmap::Image image(
+		rtabmap::SensorData image(
 			ptrImage->image.clone(),
 			depth16,
 			scan,

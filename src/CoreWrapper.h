@@ -45,6 +45,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sensor_msgs/CameraInfo.h>
 #include <sensor_msgs/LaserScan.h>
 #include <nav_msgs/Odometry.h>
+#include <stereo_msgs/DisparityImage.h>
 
 #include <rtabmap/core/Statistics.h>
 #include <rtabmap/core/Parameters.h>
@@ -72,9 +73,6 @@ private:
 					   const nav_msgs::OdometryConstPtr & odomMsg,
 					   const sensor_msgs::ImageConstPtr& imageDepthMsg,
 					   const sensor_msgs::CameraInfoConstPtr& camInfoMsg);
-	void scanCallback(const sensor_msgs::ImageConstPtr& imageMsg,
-					  const nav_msgs::OdometryConstPtr & odomMsg,
-					  const sensor_msgs::LaserScanConstPtr& scanMsg);
 	void depthScanCallback(const sensor_msgs::ImageConstPtr& imageMsg,
 						   const nav_msgs::OdometryConstPtr & odomMsg,
 						   const sensor_msgs::ImageConstPtr& imageDepthMsg,
@@ -130,7 +128,9 @@ private:
 	image_transport::Subscriber defaultSub_;
 	image_transport::SubscriberFilter imageSub_;
 	image_transport::SubscriberFilter imageDepthSub_;
+	image_transport::SubscriberFilter imageSubRight_;
 	message_filters::Subscriber<sensor_msgs::CameraInfo> cameraInfoSub_;
+	message_filters::Subscriber<sensor_msgs::CameraInfo> cameraInfoSubRight_;
 	message_filters::Subscriber<nav_msgs::Odometry> odomSub_;
 	message_filters::Subscriber<sensor_msgs::LaserScan> scanSub_;
 
@@ -148,12 +148,6 @@ private:
 			sensor_msgs::Image,
 			sensor_msgs::CameraInfo> MyDepthSyncPolicy;
 	message_filters::Synchronizer<MyDepthSyncPolicy> * depthSync_;
-
-	typedef message_filters::sync_policies::ApproximateTime<
-			sensor_msgs::Image,
-			nav_msgs::Odometry,
-			sensor_msgs::LaserScan> MyScanSyncPolicy;
-	message_filters::Synchronizer<MyScanSyncPolicy> * scanSync_;
 
 	tf::TransformBroadcaster tfBroadcaster_;
 	tf::TransformListener tfListener_;

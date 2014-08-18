@@ -34,6 +34,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/Camera.h>
 #include <rtabmap/core/Parameters.h>
 #include <rtabmap/core/util3d.h>
+#include <rtabmap/core/Memory.h>
+#include <rtabmap/core/VWDictionary.h>
 #include <rtabmap/utilite/UEventsManager.h>
 #include <rtabmap/utilite/ULogger.h>
 #include <rtabmap/utilite/UFile.h>
@@ -45,6 +47,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <pcl_ros/transforms.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <laser_geometry/laser_geometry.h>
+#include <image_geometry/stereo_camera_model.h>
 
 //msgs
 #include "rtabmap/Info.h"
@@ -159,10 +162,10 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	if(isRGBD)
 	{
 		// RGBD SLAM
-		if(!subscribeDepth && !subscribeLaserScan)
+		if(!subscribeDepth)
 		{
-			ROS_WARN("ROS param subscribe_depth and subscribe_laserScan are false, but RTAB-Map "
-					  "parameter \"RGBD/Enabled\" is true! Please set subscribe_depth and subscribe_laserScan "
+			ROS_WARN("ROS param subscribe_depth is false, but RTAB-Map "
+					  "parameter \"RGBD/Enabled\" is true! Please set subscribe_depth "
 					  "to true to use rtabmap node for RGB-D SLAM, or set \"RGBD/Enabled\" to false for loop closure "
 					  "detection on images-only.");
 		}
@@ -212,8 +215,6 @@ CoreWrapper::~CoreWrapper()
 		delete transformThread_;
 	}
 
-	if(scanSync_)
-		delete scanSync_;
 	if(depthSync_)
 		delete depthSync_;
 	if(depthScanSync_)
@@ -411,78 +412,6 @@ void CoreWrapper::depthCallback(
 	}
 }
 
-void CoreWrapper::scanCallback(
-		const sensor_msgs::ImageConstPtr& imageMsg,
-		const nav_msgs::OdometryConstPtr & odomMsg,
-		const sensor_msgs::LaserScanConstPtr& scanMsg)
-{
-	if(!paused_)
-	{
-		if(rate_>0.0f)
-		{
-			if(ros::Time::now() - time_ < ros::Duration(1.0f/rate_))
-			{
-				return;
-			}
-		}
-		time_ = ros::Time::now();
-
-		if(!(imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
-				imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||
-				imageMsg->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
-				imageMsg->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0))
-		{
-			ROS_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8");
-			return;
-		}
-
-		// TF ready?
-		try
-		{
-			tf::StampedTransform tmp;
-			tfListener_.lookupTransform(frameId_, scanMsg->header.frame_id, scanMsg->header.stamp, tmp);
-		}
-		catch(tf::TransformException & ex)
-		{
-			ROS_WARN("%s",ex.what());
-			return;
-		}
-
-		//transform in frameId_ frame
-		sensor_msgs::PointCloud2 scanOut;
-		laser_geometry::LaserProjection projection;
-		projection.transformLaserScanToPointCloud(frameId_, *scanMsg, scanOut, tfListener_);
-		pcl::PointCloud<pcl::PointXYZ> pclScan;
-		pcl::fromROSMsg(scanOut, pclScan);
-		cv::Mat scan = util3d::depth2DFromPointCloud(pclScan);
-
-		Transform odom = transformFromPoseMsg(odomMsg->pose.pose);
-
-		cv_bridge::CvImageConstPtr ptrImage;
-		if(imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
-		   imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
-		{
-			ptrImage = cv_bridge::toCvShare(imageMsg, "mono8");
-		}
-		else
-		{
-			ptrImage = cv_bridge::toCvShare(imageMsg, "bgr8");
-		}
-
-		process(ptrImage->header.seq,
-				ptrImage->image,
-				odom,
-				odomMsg->header.frame_id,
-				cv::Mat(),
-				0.0f,
-				0.0f,
-				0.0f,
-				0.0f,
-				Transform(),
-				scan);
-	}
-}
-
 void CoreWrapper::depthScanCallback(
 		const sensor_msgs::ImageConstPtr& imageMsg,
 		const nav_msgs::OdometryConstPtr & odomMsg,
@@ -610,7 +539,7 @@ void CoreWrapper::process(
 			depth16 = depth;
 		}
 
-		Image data(image,
+		SensorData data(image,
 				depth16,
 				scan,
 				depthFx,
@@ -1278,6 +1207,15 @@ void CoreWrapper::setupCallbacks(
 		bool subscribeLaserScan,
 		int queueSize)
 {
+	if(subscribeLaserScan)
+	{
+		if(!subscribeDepth)
+		{
+			ROS_WARN("When subscribing to laser scan, you should subscribe to depth too. Subscribing to depth...");
+			subscribeDepth = true;
+		}
+	}
+
 	ros::NodeHandle nh; // public
 	ros::NodeHandle pnh("~"); // private
 	ros::NodeHandle rgb_nh(nh, "rgb");
@@ -1309,15 +1247,6 @@ void CoreWrapper::setupCallbacks(
 		odomSub_.subscribe(nh, "odom", 1);
 		depthSync_ = new message_filters::Synchronizer<MyDepthSyncPolicy>(MyDepthSyncPolicy(queueSize), imageSub_, odomSub_, imageDepthSub_, cameraInfoSub_);
 		depthSync_->registerCallback(boost::bind(&CoreWrapper::depthCallback, this, _1, _2, _3, _4));
-	}
-	else if(!subscribeDepth && subscribeLaserScan)
-	{
-		ROS_INFO("Registering LaserScan callback...");
-		imageSub_.subscribe(rgb_it, rgb_nh.resolveName("image"), 1, hintsRgb);
-		odomSub_.subscribe(nh, "odom", 1);
-		scanSub_.subscribe(nh, "scan", 1);
-		scanSync_ = new message_filters::Synchronizer<MyScanSyncPolicy>(MyScanSyncPolicy(queueSize), imageSub_, odomSub_, scanSub_);
-		scanSync_->registerCallback(boost::bind(&CoreWrapper::scanCallback, this, _1, _2, _3));
 	}
 	else
 	{
