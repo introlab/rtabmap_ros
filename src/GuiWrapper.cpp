@@ -649,10 +649,14 @@ void GuiWrapper::depthScanCallback(
 {
 	// TF ready?
 	Transform localTransform;
+	sensor_msgs::PointCloud2 scanOut;
 	try
 	{
+		//transform laser to point cloud and to frameId_
+		laser_geometry::LaserProjection projection;
+		projection.transformLaserScanToPointCloud(frameId_, *scanMsg, scanOut, tfListener_);
+
 		tf::StampedTransform tmp;
-		tfListener_.lookupTransform(frameId_, scanMsg->header.frame_id, scanMsg->header.stamp, tmp);
 		tfListener_.lookupTransform(frameId_, depthMsg->header.frame_id, depthMsg->header.stamp, tmp);
 		localTransform = transformFromTF(tmp);
 	}
@@ -662,10 +666,6 @@ void GuiWrapper::depthScanCallback(
 		return;
 	}
 
-	//transform in frameId_ frame
-	sensor_msgs::PointCloud2 scanOut;
-	laser_geometry::LaserProjection projection;
-	projection.transformLaserScanToPointCloud(frameId_, *scanMsg, scanOut, tfListener_);
 	pcl::PointCloud<pcl::PointXYZ> pclScan;
 	pcl::fromROSMsg(scanOut, pclScan);
 	cv::Mat scan = util3d::depth2DFromPointCloud(pclScan);
