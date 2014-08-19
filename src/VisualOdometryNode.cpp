@@ -62,7 +62,10 @@ public:
 		odometry_(0),
 		frameId_("base_link"),
 		odomFrameId_("odom"),
+		publishTf_(true),
 		sync_(0),
+		xyzCov_(0.2),
+		rpyCov_(pow(0.01745,2)), // 1 degre
 		paused_(false)
 	{
 		ros::NodeHandle nh;
@@ -74,6 +77,7 @@ public:
 		int queueSize = 5;
 		pnh.param("frame_id", frameId_, frameId_);
 		pnh.param("odom_frame_id", odomFrameId_, odomFrameId_);
+		pnh.param("publish_tf", publishTf_, publishTf_);
 		pnh.param("queue_size", queueSize, queueSize);
 
 		//parameters
@@ -129,6 +133,9 @@ public:
 				iter->second = uNumber2Str(vDouble);
 			}
 		}
+
+		//set covariance depending on the max feature correspondence distance
+		xyzCov_ = std::atof(parametersOdom.at(Parameters::kOdomInlierDistance()).c_str());
 
 		odometry_ = new rtabmap::OdometryBOW(parametersOdom);
 
@@ -206,6 +213,7 @@ public:
 
 			ros::WallTime time = ros::WallTime::now();
 
+			int quality = -1;
 			if(image->data.size() && depth->data.size() && cameraInfo->K[4] != 0)
 			{
 				float depthFx = cameraInfo->K[0];
@@ -223,7 +231,8 @@ public:
 						depthCy,
 						rtabmap::Transform(),
 						rtabmap::transformFromTF(localTransform));
-				rtabmap::Transform pose = odometry_->process(data);
+				quality=0;
+				rtabmap::Transform pose = odometry_->process(data, &quality);
 				if(!pose.isNull())
 				{
 					//*********************
@@ -232,7 +241,10 @@ public:
 					tf::Transform poseTF;
 					rtabmap::transformToTF(pose, poseTF);
 
-					tfBroadcaster_.sendTransform( tf::StampedTransform (poseTF, image->header.stamp, odomFrameId_, frameId_));
+					if(publishTf_)
+					{
+						tfBroadcaster_.sendTransform( tf::StampedTransform (poseTF, image->header.stamp, odomFrameId_, frameId_));
+					}
 
 					if(odomPub_.getNumSubscribers())
 					{
@@ -247,6 +259,14 @@ public:
 						odom.pose.pose.position.y = poseTF.getOrigin().y();
 						odom.pose.pose.position.z = poseTF.getOrigin().z();
 						tf::quaternionTFToMsg(poseTF.getRotation().normalized(), odom.pose.pose.orientation);
+
+						odom.pose.covariance.fill(0);
+						odom.pose.covariance[0] = xyzCov_; //x
+						odom.pose.covariance[7] = xyzCov_; //x
+						odom.pose.covariance[14] = xyzCov_; //x
+						odom.pose.covariance[21] = rpyCov_; //roll
+						odom.pose.covariance[28] = rpyCov_; //pitch
+						odom.pose.covariance[35] = rpyCov_; //yaw
 
 						//publish the message
 						odomPub_.publish(odom);
@@ -267,7 +287,7 @@ public:
 				}
 			}
 
-			ROS_INFO("Odom update time(%f s)", (ros::WallTime::now()-time).toSec());
+			ROS_INFO("Odom: quality=%d, update time=%fs", quality, (ros::WallTime::now()-time).toSec());
 		}
 	}
 
@@ -312,6 +332,7 @@ private:
 	// parameters
 	std::string frameId_;
 	std::string odomFrameId_;
+	bool publishTf_;
 
 	ros::Publisher odomPub_;
 	ros::ServiceServer resetSrv_;
@@ -326,6 +347,8 @@ private:
 	typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo> MySyncPolicy;
 	message_filters::Synchronizer<MySyncPolicy> * sync_;
 
+	double xyzCov_;
+	double rpyCov_;
 	bool paused_;
 };
 
