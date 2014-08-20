@@ -42,12 +42,17 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/image_encodings.h>
+#include <sensor_msgs/PointCloud2.h>
 #include <nav_msgs/Odometry.h>
+
+#include <pcl_conversions/pcl_conversions.h>
 
 #include <cv_bridge/cv_bridge.h>
 
 #include <rtabmap/core/Odometry.h>
 #include <rtabmap/core/util3d.h>
+#include <rtabmap/core/Memory.h>
+#include <rtabmap/core/Signature.h>
 #include "rtabmap/MsgConversion.h"
 #include "rtabmap/utilite/UConversion.h"
 #include "rtabmap/utilite/ULogger.h"
@@ -69,6 +74,8 @@ public:
 		ros::NodeHandle nh;
 
 		odomPub_ = nh.advertise<nav_msgs::Odometry>("odom", 1);
+		odomLocalMapPub_ = nh.advertise<sensor_msgs::PointCloud2>("odom_local_map", 1);
+		odomLastFrame_ = nh.advertise<sensor_msgs::PointCloud2>("odom_last_frame", 1);
 
 		ros::NodeHandle pnh("~");
 
@@ -90,7 +97,8 @@ public:
 				group.compare("ORB") == 0 ||
 				group.compare("FAST") == 0 ||
 				group.compare("FREAK") == 0 ||
-				group.compare("BRIEF") == 0)
+				group.compare("BRIEF") == 0 ||
+				group.compare("GFTT") == 0)
 			   &&
 			   group.compare("OdomICP") != 0)
 			{
@@ -258,6 +266,44 @@ public:
 						//publish the message
 						odomPub_.publish(odom);
 					}
+
+					if(odomLocalMapPub_.getNumSubscribers())
+					{
+						const std::multimap<int, pcl::PointXYZ> & map = odometry_->getLocalMeansMap();
+						pcl::PointCloud<pcl::PointXYZ> cloud;
+						for(std::multimap<int, pcl::PointXYZ>::const_iterator iter=map.begin(); iter!=map.end(); ++iter)
+						{
+							cloud.push_back(iter->second);
+						}
+						sensor_msgs::PointCloud2 cloudMsg;
+						pcl::toROSMsg(cloud, cloudMsg);
+						cloudMsg.header.stamp = image->header.stamp; // use corresponding time stamp to image
+						cloudMsg.header.frame_id = odomFrameId_;
+						odomLocalMapPub_.publish(cloudMsg);
+					}
+
+					if(odomLastFrame_.getNumSubscribers())
+					{
+						const rtabmap::Signature * s  = odometry_->getMemory()->getLastWorkingSignature();
+						if(s)
+						{
+							const std::multimap<int, pcl::PointXYZ> & words3 = s->getWords3();
+							pcl::PointCloud<pcl::PointXYZ> cloud;
+							rtabmap::Transform t = rtabmap::transformFromTF(localTransform);
+							for(std::multimap<int, pcl::PointXYZ>::const_iterator iter=words3.begin(); iter!=words3.end(); ++iter)
+							{
+								// transform to odom frame
+								pcl::PointXYZ pt = util3d::transformPoint(iter->second, pose);
+								cloud.push_back(pt);
+							}
+
+							sensor_msgs::PointCloud2 cloudMsg;
+							pcl::toROSMsg(cloud, cloudMsg);
+							cloudMsg.header.stamp = image->header.stamp; // use corresponding time stamp to image
+							cloudMsg.header.frame_id = odomFrameId_;
+							odomLastFrame_.publish(cloudMsg);
+						}
+					}
 				}
 				else
 				{
@@ -314,7 +360,7 @@ public:
 	}
 
 private:
-	rtabmap::Odometry * odometry_;
+	rtabmap::OdometryBOW * odometry_;
 
 	// parameters
 	std::string frameId_;
@@ -322,6 +368,8 @@ private:
 	bool publishTf_;
 
 	ros::Publisher odomPub_;
+	ros::Publisher odomLocalMapPub_;
+	ros::Publisher odomLastFrame_;
 	ros::ServiceServer resetSrv_;
 	ros::ServiceServer pauseSrv_;
 	ros::ServiceServer resumeSrv_;
@@ -360,7 +408,8 @@ int main(int argc, char *argv[])
 						uSplit(iter->first, '/').front().compare("ORB") == 0 ||
 						uSplit(iter->first, '/').front().compare("FAST") == 0 ||
 						uSplit(iter->first, '/').front().compare("FREAK") == 0 ||
-						uSplit(iter->first, '/').front().compare("BRIEF") == 0)
+						uSplit(iter->first, '/').front().compare("BRIEF") == 0 ||
+						uSplit(iter->first, '/').front().compare("GFTT") == 0)
 					   &&
 					   uSplit(iter->first, '/').front().compare("OdomICP") != 0)
 					{

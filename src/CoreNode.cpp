@@ -76,6 +76,7 @@ int main(int argc, char** argv)
 					   uSplit(iter->first, '/').front().compare("BRIEF") == 0 ||
 					   uSplit(iter->first, '/').front().compare("ORB") == 0 ||
 					   uSplit(iter->first, '/').front().compare("FREAK") == 0 ||
+					   uSplit(iter->first, '/').front().compare("GFTT") == 0 ||
 					   uSplit(iter->first, '/').front().compare("OdomICP") == 0)
 					{
 						parameters.erase(iter++);
