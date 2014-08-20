@@ -25,36 +25,16 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "GuiWrapper.h"
-#include <QtGui/QApplication>
-#include <QtCore/QDir>
-
-#include <cv_bridge/cv_bridge.h>
-#include <std_srvs/Empty.h>
-#include <std_msgs/Empty.h>
-#include <nav_msgs/GetMap.h>
-
-#include <rtabmap/utilite/UEventsManager.h>
-#include <rtabmap/utilite/UConversion.h>
-#include <rtabmap/utilite/UStl.h>
-
-#include <opencv2/highgui/highgui.hpp>
-
-#include <rtabmap/gui/MainWindow.h>
-#include <rtabmap/core/RtabmapEvent.h>
-#include <rtabmap/core/Parameters.h>
-#include <rtabmap/core/ParamEvent.h>
-#include <rtabmap/core/OdometryEvent.h>
-#include <rtabmap/core/util3d.h>
-
+#include <ros/ros.h>
+#include "rtabmap/MapData.h"
 #include "rtabmap/MsgConversion.h"
-
-#include "PreferencesDialogROS.h"
-
+#include <rtabmap/core/util3d.h>
+#include <rtabmap/utilite/ULogger.h>
+#include <rtabmap/utilite/UStl.h>
+#include <nav_msgs/OccupancyGrid.h>
+#include <nav_msgs/GetMap.h>
 #include <pcl_ros/transforms.h>
 #include <pcl_conversions/pcl_conversions.h>
-#include <pcl/common/common.h>
-#include <laser_geometry/laser_geometry.h>
 
 using namespace rtabmap;
 
