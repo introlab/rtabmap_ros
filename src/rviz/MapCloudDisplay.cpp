@@ -249,7 +249,6 @@ void MapCloudDisplay::processMapData(const rtabmap::MapData& map)
 				float depthFy = 0.0f;
 				float depthCx = 0.0f;
 				float depthCy = 0.0f;
-				rtabmap::Transform pose;
 
 				for(unsigned int i=0; i<map.imageIDs.size() && i<map.images.size(); ++i)
 				{
@@ -299,16 +298,8 @@ void MapCloudDisplay::processMapData(const rtabmap::MapData& map)
 						break;
 					}
 				}
-				for(unsigned int i=0; i<map.poseIDs.size() && i<map.poses.size(); ++i)
-				{
-					if(map.poseIDs[i] == id)
-					{
-						pose = transformFromPoseMsg(map.poses[i]);
-						break;
-					}
-				}
 
-				if(!image.empty() && !depth.empty() && depthFx > 0.0f && depthFy > 0.0f && depthCx >= 0.0f && depthCy >= 0.0f && !pose.isNull())
+				if(!image.empty() && !depth.empty() && depthFx > 0.0f && depthFy > 0.0f && depthCx >= 0.0f && depthCy >= 0.0f)
 				{
 					pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = util3d::cloudFromDepthRGB(image, depth, depthCx, depthCy, depthFx, depthFy, cloud_decimation_->getInt());
 
@@ -329,7 +320,7 @@ void MapCloudDisplay::processMapData(const rtabmap::MapData& map)
 
 					CloudInfoPtr info(new CloudInfo);
 					info->message_ = cloudMsg;
-					info->pose_ = pose;
+					info->pose_ = rtabmap::Transform::getIdentity();
 					info->id_ = id;
 
 					if (transformCloud(info, true))
@@ -526,11 +517,11 @@ void MapCloudDisplay::downloadMap()
 		}
 		else
 		{
-			messageBox->setText(tr("Creating all clouds (%1 nodes downloaded)...").arg(getMapSrv.response.data.poses.size()));
+			messageBox->setText(tr("Creating all clouds (%1 poses and %2 clouds downloaded)...").arg(getMapSrv.response.data.poses.size()).arg(getMapSrv.response.data.depths.size()));
 			QApplication::processEvents();
 			this->reset();
 			processMapData(getMapSrv.response.data);
-			messageBox->setText(tr("Creating all clouds (%1 nodes downloaded)... done!").arg(getMapSrv.response.data.poses.size()));
+			messageBox->setText(tr("Creating all clouds (%1 poses and %2 clouds downloaded)... done!").arg(getMapSrv.response.data.poses.size()).arg(getMapSrv.response.data.depths.size()));
 
 			QTimer::singleShot(1000, messageBox, SLOT(close()));
 		}
