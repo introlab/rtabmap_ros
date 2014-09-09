@@ -14,6 +14,7 @@
   <!-- Grid map assembler for rviz -->
   <node pkg="rtabmap" type="grid_map_assembler" name="grid_map_assembler" output="screen">
     <remap from="mapData" to="rtabmap/mapData_relay"/>
+    <remap from="grid_map" to="rtabmap/grid_map"/>
   </node>
     
   <node pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap)/launch/config/azimut3.rviz"/>

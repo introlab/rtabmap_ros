@@ -6,8 +6,10 @@ Panels:
       Expanded:
         - /Global Options1
         - /TF1/Frames1
+        - /Map1
+        - /MapCloud1
         - /Info1
-      Splitter Ratio: 0.5
+      Splitter Ratio: 0.674658
     Tree Height: 527
   - Class: rviz/Selection
     Name: Selection
@@ -155,8 +157,8 @@ Visualization Manager:
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
-        Max Value: 0.526358
-        Min Value: -2.54801
+        Max Value: 1.14252
+        Min Value: -4.8348
         Value: true
       Axis: X
       Channel Name: intensity
@@ -187,7 +189,7 @@ Visualization Manager:
       Draw Behind: false
       Enabled: true
       Name: Map
-      Topic: /grid_map
+      Topic: /rtabmap/grid_map
       Value: true
     - Alpha: 1
       Class: rviz/RobotModel
@@ -294,7 +296,7 @@ Visualization Manager:
       Min Color: 0; 0; 0
       Min Intensity: 0
       Name: MapCloud
-      Node filtering angle (degrees): 30
+      Node filtering angle (degrees): 20
       Node filtering radius (m): 0.2
       Position Transformer: XYZ
       Size (Pixels): 3
@@ -329,7 +331,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rtabmap/OrbitOriented
-      Distance: 8.51031
+      Distance: 8.01121
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.06
         Stereo Focal Distance: 1
@@ -341,10 +343,10 @@ Visualization Manager:
         Z: 0
       Name: Current View
       Near Clip Distance: 0.01
-      Pitch: 0.8148
+      Pitch: 0.764797
       Target Frame: base_link
       Value: OrbitOriented (rtabmap)
-      Yaw: 3.1456
+      Yaw: 3.1156
     Saved: ~
 Window Geometry:
   Displays:
@@ -364,5 +366,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1561
-  X: 58
+  X: 44
   Y: 98

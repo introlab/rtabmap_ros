@@ -5,6 +5,7 @@
   <include file="$(find az3_bringup)/joystick.launch"/> 
   
   <!-- Visualization and SLAM nodes use same data, so just subscribe once and relay messages -->
+  <node name="mapData_relay" type="relay" pkg="topic_tools" args="/rtabmap/mapData /rtabmap/mapData_relay"/>
   <node name="odom_relay" type="relay" pkg="topic_tools" args="/base_controller/odom /base_controller/odom_relay"/>
   <node name="scan_relay" type="relay" pkg="topic_tools" args="/base_scan /base_scan_relay"/>
   <node name="camera_info_relay" type="relay" pkg="topic_tools" args="/camera/data_throttled_camera_info /camera/data_throttled_camera_info_relay"/>
