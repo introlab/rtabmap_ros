@@ -6,6 +6,13 @@
       Displays graph point clouds from rtabmap/MapData messages.
     </description>
   </class>
+  <class name="rtabmap/MapGraph"
+         type="rtabmap::MapGraphDisplay"
+         base_class_type="rviz::Display">
+    <description>
+      Displays graphs from rtabmap/MapData messages.
+    </description>
+  </class>
   <class name="rtabmap/Info"
          type="rtabmap::InfoDisplay"
          base_class_type="rviz::Display">

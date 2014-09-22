@@ -1,7 +1,7 @@
 
 Header header
 
-# Map ids
+# Map ids std::map<nodeId, mapId>
 int32[] mapIDs
 int32[] maps
 

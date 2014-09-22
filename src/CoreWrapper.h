@@ -52,6 +52,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/Rtabmap.h>
 
 #include "rtabmap/GetMap.h"
+#include "rtabmap/PublishMap.h"
 
 #include <message_filters/subscriber.h>
 #include <message_filters/synchronizer.h>
@@ -100,7 +101,7 @@ private:
 	bool setModeLocalizationCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool setModeMappingCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool getMapCallback(rtabmap::GetMap::Request& req, rtabmap::GetMap::Response& rep);
-	bool publishMapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
+	bool publishMapCallback(rtabmap::PublishMap::Request&, rtabmap::PublishMap::Response&);
 
 	rtabmap::ParametersMap loadParameters(const std::string & configFile);
 	void saveParameters(const std::string & configFile);

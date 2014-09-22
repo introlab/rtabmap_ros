@@ -54,6 +54,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtabmap/InfoEx.h"
 #include "rtabmap/MapData.h"
 #include "rtabmap/GetMap.h"
+#include "rtabmap/PublishMap.h"
 
 #include "rtabmap/MsgConversion.h"
 
@@ -708,6 +709,7 @@ bool CoreWrapper::getMapCallback(rtabmap::GetMap::Request& req, rtabmap::GetMap:
 		rtabmap_.getGraph(
 				poses,
 				constraints,
+				mapIds,
 				req.optimized,
 				req.global);
 	}
@@ -850,11 +852,12 @@ bool CoreWrapper::getMapCallback(rtabmap::GetMap::Request& req, rtabmap::GetMap:
 	return true;
 }
 
-bool CoreWrapper::publishMapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+bool CoreWrapper::publishMapCallback(rtabmap::PublishMap::Request& req, rtabmap::PublishMap::Response& res)
 {
-	ROS_INFO("rtabmap: Publishing map...");
 	if(mapData_.getNumSubscribers())
 	{
+		ROS_INFO("rtabmap: Publishing map...");
+
 		std::map<int, std::vector<unsigned char> > images;
 		std::map<int, std::vector<unsigned char> > depths;
 		std::map<int, std::vector<unsigned char> > depths2d;
@@ -867,20 +870,32 @@ bool CoreWrapper::publishMapCallback(std_srvs::Empty::Request&, std_srvs::Empty:
 		std::multimap<int, Link> constraints;
 		std::map<int, int> mapIds;
 
-		rtabmap_.get3DMap(
-				images,
-				depths,
-				depths2d,
-				depthFxs,
-				depthFys,
-				depthCxs,
-				depthCys,
-				localTransforms,
-				poses,
-				constraints,
-				mapIds,
-				true,
-				true);
+		if(req.graphOnly)
+		{
+			rtabmap_.getGraph(
+					poses,
+					constraints,
+					mapIds,
+					req.optimized,
+					req.global);
+		}
+		else
+		{
+			rtabmap_.get3DMap(
+					images,
+					depths,
+					depths2d,
+					depthFxs,
+					depthFys,
+					depthCxs,
+					depthCys,
+					localTransforms,
+					poses,
+					constraints,
+					mapIds,
+					req.optimized,
+					req.global);
+		}
 
 		//RGB-D SLAM data
 		rtabmap::MapDataPtr msg(new rtabmap::MapData);
