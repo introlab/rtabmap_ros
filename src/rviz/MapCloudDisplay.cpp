@@ -141,6 +141,13 @@ MapCloudDisplay::MapCloudDisplay()
 	cloud_voxel_size_->setMin( 0.0f );
 	cloud_voxel_size_->setMax( 1.0f );
 
+	cloud_filter_floor_height_ = new rviz::FloatProperty( "Filter floor (m)", 0.0f,
+										 "Filter the floor up to maximum height set here "
+										 "(only appropriate for 2D mapping).",
+										 this, SLOT( updateCloudParameters() ), this );
+	cloud_filter_floor_height_->setMin( 0.0f );
+	cloud_filter_floor_height_->setMax( 999.0f );
+
 	node_filtering_radius_ = new rviz::FloatProperty( "Node filtering radius (m)", 0.2f,
 										 "(Disabled=0) Only keep one node in the specified radius.",
 										 this, SLOT( updateCloudParameters() ), this );
@@ -313,6 +320,12 @@ void MapCloudDisplay::processMapData(const rtabmap::MapData& map)
 					}
 
 					cloud = util3d::transformPointCloud(cloud, localTransform);
+
+					// do it after local transform
+					if(cloud_filter_floor_height_->getFloat() > 0.0f)
+					{
+						cloud = util3d::passThrough(cloud, "z", cloud_filter_floor_height_->getFloat(), 999.0f);
+					}
 
 					sensor_msgs::PointCloud2::Ptr cloudMsg(new sensor_msgs::PointCloud2);
 					pcl::toROSMsg(*cloud, *cloudMsg);

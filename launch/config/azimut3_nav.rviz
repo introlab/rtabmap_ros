@@ -6,6 +6,7 @@ Panels:
       Expanded:
         - /Global Options1
         - /TF1/Frames1
+        - /MapCloud1
         - /Info1
       Splitter Ratio: 0.674658
     Tree Height: 497
@@ -155,8 +156,8 @@ Visualization Manager:
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
-        Max Value: 8.06687
-        Min Value: 2.84503
+        Max Value: 3.74695
+        Min Value: -2.17552e-07
         Value: true
       Axis: X
       Channel Name: intensity
@@ -304,6 +305,7 @@ Visualization Manager:
       Download graph: false
       Download map: false
       Enabled: true
+      Filter floor (m): 0.1
       Invert Rainbow: false
       Max Color: 255; 255; 255
       Max Intensity: 4096
@@ -375,22 +377,22 @@ Visualization Manager:
   Views:
     Current:
       Class: rtabmap/OrbitOriented
-      Distance: 12.8402
+      Distance: 5.21912
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.06
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -0.423813
-        Y: 0.739184
-        Z: -0.899116
+        X: 0.112302
+        Y: 0.0241702
+        Z: -0.051079
       Name: Current View
       Near Clip Distance: 0.01
-      Pitch: 0.869797
+      Pitch: 0.769797
       Target Frame: base_link
       Value: OrbitOriented (rtabmap)
-      Yaw: 3.42561
+      Yaw: 3.11563
     Saved: ~
 Window Geometry:
   Displays:
