@@ -24,7 +24,7 @@
     </group>
 
     <group ns="planner">
-        <remap from="openni_points" to="/camera/depth/points"/>
+        <remap from="openni_points" to="/planner_cloud"/>
         <remap from="base_scan" to="/base_scan"/>
         <remap from="map" to="/map"/>
         <remap from="move_base_simple/goal" to="/planner_goal"/>
@@ -57,6 +57,17 @@
       <remap from="rgb/image_out"       to="data_throttled_image"/>
       <remap from="depth/image_out"     to="data_throttled_image_depth"/>
       <remap from="rgb/camera_info_out" to="data_throttled_camera_info"/>
+    </node>
+
+    <!-- for the planner -->
+    <node pkg="nodelet" type="nodelet" name="points_xyzrgb_planner" args="load rtabmap/point_cloud_xyzrgb camera_nodelet_manager">
+      <remap from="rgb/image"       to="/camera/data_throttled_image"/>
+      <remap from="depth/image"     to="/camera/data_throttled_image_depth"/>
+      <remap from="rgb/camera_info" to="/camera/data_throttled_camera_info"/>
+      <remap from="cloud"           to="/planner_cloud" />
+    
+      <param name="queue_size" type="int" value="10"/>
+      <param name="decimation" type="int" value="4"/>
     </node>  
   </group>  
 
