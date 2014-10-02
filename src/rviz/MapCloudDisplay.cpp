@@ -651,6 +651,7 @@ void MapCloudDisplay::update( float wall_dt, float ros_dt )
 				cloud_info->scene_node_ = scene_node_->createChildSceneNode();
 
 				cloud_info->scene_node_->attachObject( cloud_info->cloud_.get() );
+				cloud_info->scene_node_->setVisible(false);
 
 				cloud_infos_.insert(*it);
 			}
