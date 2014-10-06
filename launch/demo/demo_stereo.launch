@@ -27,7 +27,7 @@
 	   <node pkg="nodelet" type="nodelet" name="disparity2depth" args="load rtabmap/disparity_to_depth standalone_nodelet"/>
 	</group>
 
-	<!-- Odometry: Choose between viso2_ros fovis_ros and homemade package -->
+	<!-- Odometry: Choose between viso2_ros, fovis_ros and homemade packages -->
 	<!--
 	<node pkg="viso2_ros" type="stereo_odometer" name="stereo_odometer" output="screen">
 		<remap from="stereo" to="/stereo_camera"/>
@@ -51,7 +51,7 @@
 	  	<remap from="rgb/camera_info" to="stereo_camera/left/camera_info"/>
 		<remap from="odom" to="/stereo_odometer/odometry"/>
 	    
-	  	<param name="frame_id" type="string" value="base_link"/>
+	  	<param name="frame_id" type="string" value="/base_link"/>
 	  	
 	  	<param name="Odom/Type" type="string" value="6"/>            
 	  	<param name="Odom/NearestNeighbor" type="string" value="3"/>
@@ -60,11 +60,42 @@
 	  	<param name="Odom/NNDR" type="string" value="0.8"/>
 	  	<param name="Odom/WordsRatio" type="string" value="0.5"/>
 	  	<param name="Odom/LocalHistory" type="string" value="1000"/>
-	  	<param name="Odom/InlierDistance" type="string" value="0.02"/>
+	  	<param name="Odom/InlierDistance" type="string" value="0.01"/>
 	  	<param name="GFTT/MaxCorners" type="string" value="400"/>
-	  	<param name="BRIEF\Bytes" type="string" value="16"/>
+	  	<param name="BRIEF/Bytes" type="string" value="16"/>
 	</node>
 	-->
+	<!--
+	<node pkg="rtabmap" type="stereo_odometry" name="stereo_odometry" output="screen">
+	  	<remap from="left/image_rect"       to="stereo_camera/left/image_rect_color"/>
+	  	<remap from="right/image_rect"       to="stereo_camera/right/image_rect_color"/>
+	  	<remap from="left/camera_info" to="stereo_camera/left/camera_info"/>
+	  	<remap from="right/camera_info" to="stereo_camera/right/camera_info"/>
+		<remap from="odom" to="/stereo_odometer/odometry"/>
+	    
+	  	<param name="frame_id" type="string" value="/base_link"/>
+	  	
+	  	<param name="min_disparity" type="int" value="0"/>
+	  	<param name="max_disparity" type="int" value="128"/>
+	  	<param name="k" type="int" value="10"/>
+	  	
+	  	<param name="Odom/Type" type="string" value="6"/>            
+	  	<param name="Odom/NearestNeighbor" type="string" value="3"/>
+	  	<param name="Odom/MinInliers" type="string" value="10"/>
+	  	<param name="Odom/Iterations" type="string" value="200"/>
+	  	<param name="Odom/MaxDepth" type="string" value="4"/>
+	  	<param name="Odom/NNDR" type="string" value="0.8"/>
+	  	<param name="Odom/WordsRatio" type="string" value="0.5"/>
+	  	<param name="Odom/LocalHistory" type="string" value="200"/>
+	  	<param name="Odom/InlierDistance" type="string" value="0.01"/>
+	  	<param name="GFTT/MaxCorners" type="string" value="800"/>
+	  	<param name="BRIEF/Bytes" type="string" value="16"/>
+	  	<param name="BRISK/Octaves" type="string" value="0"/>
+	  	<param name="BRISK/Thresh" type="string" value="10"/>
+	</node>
+	-->
+	
+	
   <group ns="rtabmap">
   
     <!-- Visual SLAM (robot side) -->
@@ -81,7 +112,7 @@
       <remap from="odom" to="/stereo_odometer/odometry"/>
       
       <param name="frame_id" type="string" value="/base_link"/>
-      <param name="queue_size" type="int" value="30"/>
+      <param name="queue_size" type="int" value="50"/>
       
       <param name="Rtabmap/TimeThr" type="string" value="700"/>
       <param name="Rtabmap/DetectionRate" type="string" value="1"/>
@@ -122,7 +153,7 @@
     <remap from="rgb/camera_info_out" to="data_odom_sync/camera_info"/>
     <remap from="odom_out"            to="odom_sync"/>
     
-    <param name="queue_size" type="int" value="30"/>
+    <param name="queue_size" type="int" value="50"/>
   </node>
   <node pkg="nodelet" type="nodelet" name="points_xyzrgb" args="load rtabmap/point_cloud_xyzrgb standalone_nodelet">
     <remap from="rgb/image"       to="data_odom_sync/image"/>

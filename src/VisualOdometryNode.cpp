@@ -91,16 +91,15 @@ public:
 		for(rtabmap::ParametersMap::iterator iter=parameters.begin(); iter!=parameters.end(); ++iter)
 		{
 			std::string group = uSplit(iter->first, '/').front();
-			if((group.compare("Odom") == 0 ||
+			if(group.compare("Odom") == 0 ||
 				group.compare("SURF") == 0 ||
 				group.compare("SIFT") == 0 ||
 				group.compare("ORB") == 0 ||
 				group.compare("FAST") == 0 ||
 				group.compare("FREAK") == 0 ||
 				group.compare("BRIEF") == 0 ||
-				group.compare("GFTT") == 0)
-			   &&
-			   group.compare("OdomICP") != 0)
+				group.compare("GFTT") == 0 ||
+				group.compare("BRISK") == 0)
 			{
 				parametersOdom.insert(*iter);
 			}
@@ -402,16 +401,15 @@ int main(int argc, char *argv[])
 				// show specific parameters
 				for(rtabmap::ParametersMap::iterator iter=parameters.begin(); iter!=parameters.end(); ++iter)
 				{
-					if((uSplit(iter->first, '/').front().compare("Odom") == 0 ||
+					if(uSplit(iter->first, '/').front().compare("Odom") == 0 ||
 						uSplit(iter->first, '/').front().compare("SURF") == 0 ||
 						uSplit(iter->first, '/').front().compare("SIFT") == 0 ||
 						uSplit(iter->first, '/').front().compare("ORB") == 0 ||
 						uSplit(iter->first, '/').front().compare("FAST") == 0 ||
 						uSplit(iter->first, '/').front().compare("FREAK") == 0 ||
 						uSplit(iter->first, '/').front().compare("BRIEF") == 0 ||
-						uSplit(iter->first, '/').front().compare("GFTT") == 0)
-					   &&
-					   uSplit(iter->first, '/').front().compare("OdomICP") != 0)
+						uSplit(iter->first, '/').front().compare("GFTT") == 0 ||
+						uSplit(iter->first, '/').front().compare("BRISK") == 0)
 					{
 						parametersOdom.insert(*iter);
 					}
