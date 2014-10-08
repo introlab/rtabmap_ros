@@ -3,6 +3,17 @@
    
    <!-- RGB-D LOCALIZATION VERSION -->
      
+   <!-- ODOMETRY ARGUMENTS: "type", "nn" and "local_map":
+        -Feature type: 0=SURF 1=SIFT 2=ORB 3=FAST/FREAK 4=FAST/BRIEF 5=GFTT/FREAK 6=GFTT/BRIEF 7=BRISK
+        -Nearest neighbor strategy : 0=Linear, 1=FLANN_KDTREE, 2=FLANN_LSH, 3=BRUTEFORCE 
+           Set to 1 for float descriptor like SIFT/SURF                  
+           Set to 3 for binary descriptor like ORB/FREAK/BRIEF/BRISK      
+        -Local map size: number of unique features to keep track 
+    -->
+   <arg name="type" default="0" />
+   <arg name="nn" default="1" />
+   <arg name="local_map" default="0" />
+   
   <!-- TF FRAMES -->
   <node pkg="tf" type="static_transform_publisher" name="base_to_camera_tf" 
     args="0.0 0.0 0.0 0.0 0.0 0.0 /base_link /camera_link 100" />
@@ -16,6 +27,10 @@
       <remap from="rgb/camera_info" to="/camera/depth_registered/camera_info"/>
    
       <param name="frame_id" type="string" value="base_link"/>
+      
+      <param name="Odom/Type" type="string" value="$(arg type)"/>            
+      <param name="Odom/NearestNeighbor" type="string" value="$(arg nn)"/>
+      <param name="Odom/LocalHistory" type="string" value="$(arg local_map)"/>
     </node>
   
     <!-- Visual SLAM (robot side) -->

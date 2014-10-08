@@ -268,7 +268,7 @@ public:
 
 					if(odomLocalMapPub_.getNumSubscribers())
 					{
-						const std::multimap<int, pcl::PointXYZ> & map = odometry_->getLocalMeansMap();
+						const std::multimap<int, pcl::PointXYZ> & map = odometry_->getLocalMap();
 						pcl::PointCloud<pcl::PointXYZ> cloud;
 						for(std::multimap<int, pcl::PointXYZ>::const_iterator iter=map.begin(); iter!=map.end(); ++iter)
 						{

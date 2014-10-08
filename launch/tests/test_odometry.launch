@@ -1,18 +1,16 @@
 
 <launch>
 
-  <!-- Arguments: "type", "nn" and "local_map" -->
-
-  <!-- Feature type: 0=SURF 1=SIFT 2=ORB 3=FAST/FREAK 4=FAST/BRIEF 5=GFTT/FREAK 6=GFTT/BRIEF -->
-  <arg name="type" default="0" /> 
-  
-  <!-- Nearest neighbor strategy : 0=Linear, 1=FLANN_KDTREE, 2=FLANN_LSH -->
-  <!-- Should be 1 for float descriptor like SIFT/SURF                   -->
-  <!-- Should be 2 for binary descriptor like ORB/FREAK/BRIEF            -->
-  <arg name="nn" default="1" />
-  
-  <!-- local map size: number of unique features to keep track -->
-  <arg name="local_map" default="0" />
+  <!-- ODOMETRY ARGUMENTS: "type", "nn" and "local_map":
+        -Feature type: 0=SURF 1=SIFT 2=ORB 3=FAST/FREAK 4=FAST/BRIEF 5=GFTT/FREAK 6=GFTT/BRIEF 7=BRISK
+        -Nearest neighbor strategy : 0=Linear, 1=FLANN_KDTREE, 2=FLANN_LSH, 3=BRUTEFORCE 
+           Set to 1 for float descriptor like SIFT/SURF                  
+           Set to 3 for binary descriptor like ORB/FREAK/BRIEF/BRISK      
+        -Local map size: number of unique features to keep track 
+    -->
+   <arg name="type" default="6" />
+   <arg name="nn" default="3" />
+   <arg name="local_map" default="2000" />
   
   <!-- TF FRAMES -->
   <node pkg="tf" type="static_transform_publisher" name="base_to_camera_tf" 

@@ -59,6 +59,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtabmap/utilite/UConversion.h"
 #include "rtabmap/utilite/ULogger.h"
 #include "rtabmap/utilite/UStl.h"
+#include "rtabmap/utilite/UTimer.h"
 
 using namespace rtabmap;
 
@@ -73,7 +74,8 @@ public:
 		publishTf_(true),
 		minDisparity_(0.0),
 		maxDisparity_(128.0),
-		k_(100),
+		k_(10),
+		winSize_(5),
 		sync_(0),
 		paused_(false)
 	{
@@ -82,8 +84,7 @@ public:
 		odomPub_ = nh.advertise<nav_msgs::Odometry>("odom", 1);
 		odomLocalMapPub_ = nh.advertise<sensor_msgs::PointCloud2>("odom_local_map", 1);
 		odomLastFrame_ = nh.advertise<sensor_msgs::PointCloud2>("odom_last_frame", 1);
-		//fundMatMapPub_ = nh.advertise<sensor_msgs::PointCloud2>("fund_mat_inliers", 1);
-		//stereoMatchesPub_ = nh.advertise<sensor_msgs::PointCloud2>("stereo_matches", 1);
+		odomDepth_ = nh.advertise<sensor_msgs::Image>("odom_depth", 1);
 
 		ros::NodeHandle pnh("~");
 
@@ -95,6 +96,7 @@ public:
 		pnh.param("min_disparity", minDisparity_, minDisparity_);
 		pnh.param("max_disparity", maxDisparity_, maxDisparity_);
 		pnh.param("k", k_, k_);
+		pnh.param("window_size", winSize_, winSize_);
 
 		//parameters
 		rtabmap::ParametersMap parameters = rtabmap::Parameters::getDefaultParameters();
@@ -272,6 +274,7 @@ public:
 				cv::Mat depth = cv::Mat::zeros(ptrImageLeft->image.rows, ptrImageLeft->image.cols, CV_32FC1);
 
 				std::vector<cv::KeyPoint> kptsLeft, kptsRight;
+				std::vector<cv::Point2f> cornersLeft, cornersRight;
 				cv::Mat descLeft, descRight;
 				kptsLeft = feature2D_->generateKeypoints(ptrImageLeft->image);
 				if(kptsLeft.size())
@@ -282,6 +285,30 @@ public:
 					if(kptsRight.size())
 					{
 						descRight = feature2D_->generateDescriptors(ptrImageRight->image, kptsRight);
+
+						if(kptsLeft.size() && kptsRight.size())
+						{
+							cornersLeft.resize(kptsLeft.size());
+							cornersRight.resize(kptsRight.size());
+							for(unsigned int i=0; i<kptsLeft.size() || i<kptsRight.size(); ++i)
+							{
+								if(i<kptsLeft.size())
+								{
+									cornersLeft[i] = kptsLeft[i].pt;
+								}
+								if(i<kptsRight.size())
+								{
+									cornersRight[i] = kptsRight[i].pt;
+								}
+							}
+							UTimer time;
+							cv::cornerSubPix( ptrImageLeft->image, cornersLeft, cv::Size( winSize_, winSize_ ), cv::Size( -1, -1 ),
+										  cv::TermCriteria( CV_TERMCRIT_ITER | CV_TERMCRIT_EPS, 20, 0.03 ) );
+
+							cv::cornerSubPix( ptrImageRight->image, cornersRight, cv::Size( winSize_, winSize_ ), cv::Size( -1, -1 ),
+										  cv::TermCriteria( CV_TERMCRIT_ITER | CV_TERMCRIT_EPS, 20, 0.03 ) );
+							UDEBUG("time subpix = %fs", time.ticks());
+						}
 					}
 				}
 
@@ -290,84 +317,32 @@ public:
 				{
 					std::vector<std::vector<cv::DMatch> > matches;
 					cv::BFMatcher matcher(descLeft.depth()==CV_8U?cv::NORM_HAMMING:cv::NORM_L2);
-					matcher.knnMatch(descLeft, descRight, matches, k_);
+					int k = std::min((int)kptsLeft.size(), k_);
+					k = std::min((int)kptsRight.size(), k);
+					matcher.knnMatch(descLeft, descRight, matches, k);
+					int added = 0;
 
 					if(matches.size())
 					{
 						image_geometry::StereoCameraModel model;
 						model.fromCameraInfo(*cameraInfoLeft, *cameraInfoRight);
 
-						// Remove outliers using fundamental matrix RANSAC
-						/*std::vector<uchar> status(matches.size(), 0);
-						//Convert Keypoints to a structure that OpenCV understands
-						//3 dimensions (Homogeneous vectors)
-						cv::Mat points1(1, (int)matches.size(), CV_32FC2);
-						cv::Mat points2(1, (int)matches.size(), CV_32FC2);
-
-						float * points1data = points1.ptr<float>(0);
-						float * points2data = points2.ptr<float>(0);
-
-						// Fill the points here ...
-						for(int i=0; i < matches.size(); ++i )
-						{
-							points1data[i*2] = kptsLeft[matches[i].queryIdx].pt.x;
-							points1data[i*2+1] = kptsLeft[matches[i].queryIdx].pt.y;
-
-							points2data[i*2] = kptsRight[matches[i].trainIdx].pt.x;
-							points2data[i*2+1] = kptsRight[matches[i].trainIdx].pt.y;
-						}
-
-						// Find the fundamental matrix
-						cv::Mat fundamentalMatrix = cv::findFundamentalMat(
-									points1,
-									points2,
-									status,
-									cv::FM_RANSAC,
-									3.0,
-									0.99);
-
-						int inliers = 0;
-						if(!fundamentalMatrix.empty())
-						{
-							pcl::PointCloud<pcl::PointXYZ> cloud;
-							for(int i = 0; i<matches.size(); ++i)
-							{
-								if(status[i])
-								{
-									float disparity = kptsLeft[matches[i].queryIdx].pt.x - kptsRight[matches[i].trainIdx].pt.x;
-									cv::Point3d pt3d;
-									model.projectDisparityTo3d(cv::Point2d(kptsLeft[matches[i].queryIdx].pt.x, kptsLeft[matches[i].queryIdx].pt.y), disparity, pt3d);
-									cloud.push_back(pcl::PointXYZ(pt3d.x, pt3d.y, pt3d.z));
-									inliers++;
-								}
-							}
-							sensor_msgs::PointCloud2 cloudMsg;
-							pcl::toROSMsg(cloud, cloudMsg);
-							cloudMsg.header.stamp = imageRectLeft->header.stamp; // use corresponding time stamp to image
-							cloudMsg.header.frame_id = odomFrameId_;
-							fundMatMapPub_.publish(cloudMsg);
-						}*/
-
-
-						int added = 0;
 						int addedFirst = 0;
-					//	pcl::PointCloud<pcl::PointXYZ> cloud;
 						for(int i=0; i< matches.size(); ++i)
 						{
 							// add only those on same Y
-							for(unsigned int j=0; j<k_; ++j)
+							for(unsigned int j=0; j<matches[i].size(); ++j)
 							{
-								float disparity = kptsLeft[matches[i].at(j).queryIdx].pt.x - kptsRight[matches[i].at(j).trainIdx].pt.x;
+								float disparity = cornersLeft[matches[i].at(j).queryIdx].x - cornersRight[matches[i].at(j).trainIdx].x;
 
 								if((int)disparity >= minDisparity_ && (int)disparity <= maxDisparity_)
 								{
-
 									float d = model.getZ(disparity);
-									if(kptsLeft[matches[i].at(j).queryIdx].pt.x >= kptsRight[matches[i].at(j).trainIdx].pt.x+0.5f &&
-										int(kptsLeft[matches[i].at(j).queryIdx].pt.y+0.5f) >= int(kptsRight[matches[i].at(j).trainIdx].pt.y+0.5f) - 3 &&
-										int(kptsLeft[matches[i].at(j).queryIdx].pt.y+0.5f) <= int(kptsRight[matches[i].at(j).trainIdx].pt.y+0.5f) + 3)
+									if(	d>0 &&
+										cornersLeft[matches[i].at(j).queryIdx].y >= cornersRight[matches[i].at(j).trainIdx].y - 3.0f &&
+										cornersLeft[matches[i].at(j).queryIdx].y <= cornersRight[matches[i].at(j).trainIdx].y + 3.0f)
 									{
-
+										kptsLeft[matches[i].at(j).queryIdx].pt = cornersLeft[matches[i].at(j).queryIdx];
 										depth.at<float>(int(kptsLeft[matches[i].at(j).queryIdx].pt.y+0.5f), int(kptsLeft[matches[i].at(j).queryIdx].pt.x+0.5f)) = d;
 										/*ROS_INFO("Add%d Left(%d, %d) Right(%d, %d) distance %d = %f disp=%f, depth=%f",
 												j,
@@ -376,9 +351,6 @@ public:
 												int(kptsRight[matches[i].at(j).trainIdx].pt.x+0.5f),
 												int(kptsRight[matches[i].at(j).trainIdx].pt.y+0.5f),
 												i, matches[i].at(j).distance, disparity, d);*/
-										//cv::Point3d pt3d;
-										//model.projectDisparityTo3d(cv::Point2d(kptsLeft[matches[i].queryIdx].pt.x, kptsLeft[matches[i].queryIdx].pt.y), disparity, pt3d);
-										//cloud.push_back(pcl::PointXYZ(pt3d.x, pt3d.y, pt3d.z));
 										if(j == 0)
 										{
 											++addedFirst;
@@ -398,15 +370,10 @@ public:
 								}
 							}
 						}
-						/*sensor_msgs::PointCloud2 cloudMsg;
-						pcl::toROSMsg(cloud, cloudMsg);
-						cloudMsg.header.stamp = imageRectLeft->header.stamp; // use corresponding time stamp to image
-						cloudMsg.header.frame_id = odomFrameId_;
-						stereoMatchesPub_.publish(cloudMsg);*/
-						//ROS_INFO("added = %d / %d inlier=%d", added, matches.size(), inliers);
-						ROS_INFO("added = %d / %d (addedFirst=%d)", added, (int)matches.size(), addedFirst);
+						UDEBUG("addedFirst = %d/%d", addedFirst, added);
 
 						//
+						UDEBUG("localTransform = %s", rtabmap::transformFromTF(localTransform).prettyPrint().c_str());
 						rtabmap::SensorData data(ptrImageLeft->image,
 								depth,
 								depthFx,
@@ -451,7 +418,7 @@ public:
 
 							if(odomLocalMapPub_.getNumSubscribers())
 							{
-								const std::multimap<int, pcl::PointXYZ> & map = odometry_->getLocalMeansMap();
+								const std::multimap<int, pcl::PointXYZ> & map = odometry_->getLocalMap();
 								pcl::PointCloud<pcl::PointXYZ> cloud;
 								for(std::multimap<int, pcl::PointXYZ>::const_iterator iter=map.begin(); iter!=map.end(); ++iter)
 								{
@@ -484,8 +451,16 @@ public:
 									cloudMsg.header.stamp = imageRectLeft->header.stamp; // use corresponding time stamp to image
 									cloudMsg.header.frame_id = odomFrameId_;
 									odomLastFrame_.publish(cloudMsg);
-									ROS_INFO("cloud = %d", (int)cloud.size());
 								}
+							}
+							if(odomDepth_.getNumSubscribers())
+							{
+								cv_bridge::CvImage img;
+								img.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
+								img.image = depth;
+								sensor_msgs::ImagePtr rosMsg = img.toImageMsg();
+								rosMsg->header= imageRectLeft->header;
+								odomDepth_.publish(rosMsg);
 							}
 						}
 						else
@@ -502,10 +477,20 @@ public:
 							odomPub_.publish(odom);
 						}
 					}
+					ROS_INFO("Odom: quality=%d, update time=%fs, stereo matches: added %d/%d",
+						quality, (ros::WallTime::now()-time).toSec(),
+						added, (int)matches.size());
 				}
-			}
+				else
+				{
+					ROS_WARN("Odom: no keypoints extracted!");
+				}
 
-			ROS_INFO("Odom: quality=%d, update time=%fs", quality, (ros::WallTime::now()-time).toSec());
+			}
+			else
+			{
+				ROS_WARN("Odom: input images empty?!?");
+			}
 		}
 	}
 
@@ -555,12 +540,12 @@ private:
 	int minDisparity_;
 	int maxDisparity_;
 	int k_;
+	int winSize_;
 
 	ros::Publisher odomPub_;
 	ros::Publisher odomLocalMapPub_;
 	ros::Publisher odomLastFrame_;
-	//ros::Publisher fundMatMapPub_;
-	//ros::Publisher stereoMatchesPub_;
+	ros::Publisher odomDepth_;
 	ros::ServiceServer resetSrv_;
 	ros::ServiceServer pauseSrv_;
 	ros::ServiceServer resumeSrv_;
@@ -580,7 +565,8 @@ private:
 int main(int argc, char *argv[])
 {
 	ULogger::setType(ULogger::kTypeConsole);
-	ULogger::setLevel(ULogger::kInfo);
+	ULogger::setLevel(ULogger::kWarning);
+	//pcl::console::setVerbosityLevel(pcl::console::L_DEBUG);
 	ros::init(argc, argv, "visual_odometry");
 
 	for(int i=1;i<argc;++i)

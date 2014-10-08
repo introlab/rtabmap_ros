@@ -537,10 +537,10 @@ void CoreWrapper::process(
 		}
 		else
 		{
-			depth16 = depth;
+			depth16 = depth.clone();
 		}
 
-		SensorData data(image,
+		SensorData data(image.clone(),
 				depth16,
 				scan,
 				depthFx,
