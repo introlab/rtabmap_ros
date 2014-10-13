@@ -1,16 +1,20 @@
 
 <launch>
 
-	<!-- AZIMUT 3 bringup: launch motors/odometry, laser scan and openni -->
-	<include file="$(find az3_bringup)/az3_standalone.launch"/>
-	<include file="$(find az3_bringup)/joystick.launch"/>
-	
-	<!-- "Disable" odometry from azimut3 -->
+    <!-- to record odom+image left+depth:
+         rosbag record /odom_sync /camera/data_throttled_image/compressed /camera/data_throttled_camera_info /camera/data_throttled_image_depth/compressedDepth    
+    -->
+
+    <!-- "Disable" odometry from azimut3 -->
     <group ns="base_controller">
       <param name="odom_frame_id" type="string" value="az3_odom"/>
       <param name="base_frame_id" type="string" value="az3_base_link"/>
     </group>
     <remap from="/base_controller/odom" to="/base_controller/az3_odom"/>
+
+	<!-- AZIMUT 3 bringup: launch motors/odometry, laser scan and openni -->
+	<include file="$(find az3_bringup)/az3_standalone.launch"/>
+	<include file="$(find az3_bringup)/joystick.launch"/>
   
 	<!-- Stereo camera -->
 	<node pkg="camera1394stereo" type="camera1394stereo_node" name="camera1394stereo_node" output="screen" >
@@ -28,7 +32,7 @@
 	<node pkg="tf" type="static_transform_publisher" name="camera_base_link"
 	    args="$(arg optical_rotate) stereo_camera_base stereo_camera 100" />  
 	<node pkg="tf" type="static_transform_publisher" name="base_to_camera_base_link"
-	    args="0 0 66 0 0 0 base_link stereo_camera_base 100" />  
+	    args="0 0 0.90 0 0.40 0 base_link stereo_camera_base 100" />  
 	    
 	<!-- Run the ROS package stereo_image_proc for image rectification and disparity computation -->
 	<group ns="/stereo_camera" >
@@ -41,7 +45,7 @@
 		<remap from="stereo" to="/stereo_camera"/>
 		<remap from="image" to="image_rect"/>
 		<param name="base_link_frame_id" value="base_footprint"/>
-		<param name="odom_frame_id" value="/base_controller/odom"/>
+		<param name="odom_frame_id" value="odom"/>
 		<param name="ref_frame_change_method" value="1"/>
 	</node>
 
@@ -57,7 +61,7 @@
       <remap from="rgb/camera_info" to="/stereo_camera/left/camera_info"/>
       <remap from="depth/image" to="/stereo_camera/depth"/>
       	
-	  <remap from="odom" to="/base_controller/odom"/>
+	  <remap from="odom" to="/stereo_odometer/odometry"/>
 	
 	  <param name="queue_size" type="int" value="30"/>
 	
@@ -70,11 +74,10 @@
       
       <param name="LccBow/MinInliers" type="string" value="10"/>
       <param name="LccBow/InlierDistance" type="string" value="0.02"/>
-      <param name="LccBow/MaxDepth" type="string" value="3"/>
+      <param name="LccBow/MaxDepth" type="string" value="10"/>
       
       <param name="LccReextract/FeatureType" type="string" value="4"/>
 	  <param name="LccReextract/LoopClosureFeatures" type="string" value="true"/>
-	  <param name="LccReextract/MaxDepth" type="string" value="3"/>
 	  <param name="LccReextract/NNDR" type="string" value="0.8"/>
 	  <param name="LccReextract/NNType" type="string" value="3"/>   
     </node>
@@ -84,7 +87,7 @@
     <remap from="rgb/image_in"       to="/stereo_camera/left/image_rect_color"/>
     <remap from="depth/image_in"     to="/stereo_camera/depth"/>
     <remap from="rgb/camera_info_in" to="/stereo_camera/left/camera_info"/>
-    <remap from="odom_in"             to="/base_controller/odom"/>
+    <remap from="odom_in"             to="/stereo_odometer/odometry"/>
     
     <remap from="rgb/image_out"       to="/camera/data_throttled_image"/>
     <remap from="depth/image_out"     to="/camera/data_throttled_image_depth"/>
