@@ -29,6 +29,7 @@
 	<param name="RGBD/ScanMatchingSize" type="string" value="0"/> 
 	<param name="RGBD/LocalLoopDetectionSpace" type="string" value="false"/> 
 	<param name="RGBD/LocalLoopDetectionTime" type="string" value="false"/> 
+	<param name="RGBD/OptimizeFromGraphEnd" type="string" value="true"/> 
 	<param name="Mem/BadSignaturesIgnored" type="string" value="false"/>
 	<param name="LccIcp/Type" type="string" value="2"/>
 	<param name="LccIcp2/Iterations" type="string" value="100"/>

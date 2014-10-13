@@ -394,20 +394,22 @@ void CoreWrapper::depthCallback(
 		}
 		cv_bridge::CvImageConstPtr ptrDepth = cv_bridge::toCvShare(depthMsg);
 
-		float depthFx = cameraInfoMsg->K[0];
-		float depthFy = cameraInfoMsg->K[4];
-		float depthCx = cameraInfoMsg->K[2];
-		float depthCy = cameraInfoMsg->K[5];
+		image_geometry::PinholeCameraModel model;
+		model.fromCameraInfo(*cameraInfoMsg);
+		float fx = model.fx();
+		float fy = model.fy();
+		float cx = model.cx();
+		float cy = model.cy();
 
 		process(ptrImage->header.seq,
 				ptrImage->image,
 				odom,
 				odomMsg->header.frame_id,
 				ptrDepth->image,
-				depthFx,
-				depthFy,
-				depthCx,
-				depthCy,
+				fx,
+				fy,
+				cx,
+				cy,
 				localTransform,
 				cv::Mat());
 	}
@@ -479,20 +481,22 @@ void CoreWrapper::depthScanCallback(
 		}
 		cv_bridge::CvImageConstPtr ptrDepth = cv_bridge::toCvShare(depthMsg);
 
-		float depthFx = cameraInfoMsg->K[0];
-		float depthFy = cameraInfoMsg->K[4];
-		float depthCx = cameraInfoMsg->K[2];
-		float depthCy = cameraInfoMsg->K[5];
+		image_geometry::PinholeCameraModel model;
+		model.fromCameraInfo(*cameraInfoMsg);
+		float fx = model.fx();
+		float fy = model.fy();
+		float cx = model.cx();
+		float cy = model.cy();
 
 		process(ptrImage->header.seq,
 				ptrImage->image,
 				odom,
 				odomMsg->header.frame_id,
 				ptrDepth->image,
-				depthFx,
-				depthFy,
-				depthCx,
-				depthCy,
+				fx,
+				fy,
+				cx,
+				cy,
 				localTransform,
 				scan);
 	}
@@ -504,10 +508,10 @@ void CoreWrapper::process(
 		const Transform & odom,
 		const std::string & odomFrameId,
 		const cv::Mat & depth,
-		float depthFx,
-		float depthFy,
-		float depthCx,
-		float depthCy,
+		float fx,
+		float fy,
+		float cx,
+		float cy,
 		const Transform & localTransform,
 		const cv::Mat & scan)
 {
@@ -543,10 +547,10 @@ void CoreWrapper::process(
 		SensorData data(image.clone(),
 				depth16,
 				scan,
-				depthFx,
-				depthFy,
-				depthCx,
-				depthCy,
+				fx,
+				fy,
+				cx,
+				cy,
 				odom,
 				localTransform,
 				id);

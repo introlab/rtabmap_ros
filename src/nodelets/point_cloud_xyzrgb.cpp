@@ -41,6 +41,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <image_transport/image_transport.h>
 #include <image_transport/subscriber_filter.h>
 
+#include <image_geometry/pinhole_camera_model.h>
+
 #include <message_filters/sync_policies/approximate_time.h>
 #include <message_filters/subscriber.h>
 
@@ -114,14 +116,21 @@ private:
 			cv_bridge::CvImageConstPtr imagePtr = cv_bridge::toCvShare(image, "bgr8");
 			cv_bridge::CvImageConstPtr imageDepthPtr = cv_bridge::toCvShare(imageDepth);
 
+			image_geometry::PinholeCameraModel model;
+			model.fromCameraInfo(*cameraInfo);
+			float fx = model.fx();
+			float fy = model.fy();
+			float cx = model.cx();
+			float cy = model.cy();
+
 			pcl::PointCloud<pcl::PointXYZRGB>::Ptr pclCloud;
 			pclCloud = rtabmap::util3d::cloudFromDepthRGB(
 					imagePtr->image,
 					imageDepthPtr->image,
-					cameraInfo->K[2],
-					cameraInfo->K[5],
-					cameraInfo->K[0],
-					cameraInfo->K[4],
+					cx,
+					cy,
+					fx,
+					fy,
 					decimation_);
 
 			if(voxelSize_ > 0.0)

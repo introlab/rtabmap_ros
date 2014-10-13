@@ -1,0 +1,26 @@
+<launch>
+    
+    <node pkg="camera1394stereo" type="camera1394stereo_node" name="camera1394stereo_node" output="screen" >
+	    <param name="video_mode" value="format7_mode3" />
+	    <param name="format7_color_coding" value="raw16" />
+	    <param name="bayer_pattern" value="bggr" />
+	    <param name="bayer_method" value="" />
+	    <param name="stereo_method" value="Interlaced" />
+	    <param name="camera_info_url_left" value="" />
+	    <param name="camera_info_url_right" value="" />
+  	</node>
+  	
+  	<arg name="pi/2" value="1.5707963267948966" />
+    <arg name="optical_rotate" value="0 0 0 -$(arg pi/2) 0 -$(arg pi/2)" />
+  	<node pkg="tf" type="static_transform_publisher" name="camera_base_link"
+        args="$(arg optical_rotate) base_link stereo_camera 100" />  
+  	
+  	<!-- Run the ROS package stereo_image_proc -->
+	<group ns="/stereo_camera" >
+		<node pkg="stereo_image_proc" type="stereo_image_proc" name="stereo_image_proc"/>
+	    <node pkg="nodelet" type="nodelet" name="disparity2depth" args="standalone rtabmap/disparity_to_depth"/>
+	</group>
+	
+	
+  
+</launch>

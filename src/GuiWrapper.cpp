@@ -38,6 +38,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <opencv2/highgui/highgui.hpp>
 
+#include <image_geometry/pinhole_camera_model.h>
+
 #include <rtabmap/gui/MainWindow.h>
 #include <rtabmap/core/RtabmapEvent.h>
 #include <rtabmap/core/Parameters.h>
@@ -581,18 +583,20 @@ void GuiWrapper::depthCallback(
 	cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg, "bgr8");
 	cv_bridge::CvImageConstPtr ptrDepth = cv_bridge::toCvShare(depthMsg);
 
-	float depthFx = cameraInfoMsg->K[0];
-	float depthFy = cameraInfoMsg->K[4];
-	float depthCx = cameraInfoMsg->K[2];
-	float depthCy = cameraInfoMsg->K[5];
+	image_geometry::PinholeCameraModel model;
+	model.fromCameraInfo(*cameraInfoMsg);
+	float fx = model.fx();
+	float fy = model.fy();
+	float cx = model.cx();
+	float cy = model.cy();
 
 	rtabmap::SensorData image(
 			ptrImage->image.clone(),
 			ptrDepth->image.clone(),
-			depthFx,
-			depthFy,
-			depthCx,
-			depthCy,
+			fx,
+			fy,
+			cx,
+			cy,
 			odom,
 			localTransform);
 	this->post(new OdometryEvent(image));
@@ -675,19 +679,21 @@ void GuiWrapper::depthScanCallback(
 	cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg, "bgr8");
 	cv_bridge::CvImageConstPtr ptrDepth = cv_bridge::toCvShare(depthMsg);
 
-	float depthFx = cameraInfoMsg->K[0];
-	float depthFy = cameraInfoMsg->K[4];
-	float depthCx = cameraInfoMsg->K[2];
-	float depthCy = cameraInfoMsg->K[5];
+	image_geometry::PinholeCameraModel model;
+	model.fromCameraInfo(*cameraInfoMsg);
+	float fx = model.fx();
+	float fy = model.fy();
+	float cx = model.cx();
+	float cy = model.cy();
 
 	rtabmap::SensorData image(
 			ptrImage->image.clone(),
 			ptrDepth->image.clone(),
 			scan,
-			depthFx,
-			depthFy,
-			depthCx,
-			depthCy,
+			fx,
+			fy,
+			cx,
+			cy,
 			odom,
 			localTransform);
 	this->post(new OdometryEvent(image));

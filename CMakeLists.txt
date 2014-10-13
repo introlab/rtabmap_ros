@@ -122,6 +122,7 @@ add_library(rtabmap_ros
    src/nodelets/point_cloud_xyzrgb.cpp 
    src/nodelets/disparity_to_depth.cpp 
    src/MsgConversion.cpp
+   src/OdometryROS.cpp
    src/rviz/MapCloudDisplay.cpp
    src/rviz/MapGraphDisplay.cpp
    src/rviz/InfoDisplay.cpp
@@ -139,8 +140,12 @@ add_executable(rtabmap src/CoreNode.cpp src/CoreWrapper.cpp)
 add_dependencies(rtabmap rtabmap_generate_messages_cpp)
 target_link_libraries(rtabmap rtabmap_ros ${Libraries})
 
-add_executable(visual_odometry src/VisualOdometryNode.cpp)
-target_link_libraries(visual_odometry rtabmap_ros ${Libraries})
+add_executable(rgbd_odometry src/RGBDOdometryNode.cpp)
+target_link_libraries(rgbd_odometry rtabmap_ros ${Libraries})
+
+#deprecated node
+add_executable(visual_odometry src/VisualOdometryDEPRECATED.cpp)
+target_link_libraries(visual_odometry ${Libraries})
 
 add_executable(stereo_odometry src/StereoOdometryNode.cpp)
 target_link_libraries(stereo_odometry rtabmap_ros ${Libraries})

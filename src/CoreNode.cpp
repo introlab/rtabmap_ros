@@ -69,8 +69,7 @@ int main(int argc, char** argv)
 				// hide specific parameters
 				for(rtabmap::ParametersMap::iterator iter=parameters.begin(); iter!=parameters.end();)
 				{
-					if(uSplit(iter->first, '/').front().compare("Odom") == 0 ||
-					   uSplit(iter->first, '/').front().compare("OdomICP") == 0)
+					if(iter->first.find("Odom") == 0)
 					{
 						parameters.erase(iter++);
 					}
