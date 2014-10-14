@@ -48,7 +48,6 @@
 		<param name="Odom/MaxDepth" type="string" value="10"/>
   	
 	  	<param name="generate_depth" type="bool" value="false"/> 
-		<!-- Parameters below only used when "generate_depth"=true -->
 	  	<param name="depth_patch_size" type="int" value="1"/>
 	  	<param name="subpix_win_size" type="int" value="3"/>
 	  	<param name="subpix_iterations" type="int" value="20"/>
@@ -80,7 +79,7 @@
       
       <param name="Rtabmap/TimeThr" type="string" value="700"/>
       <param name="Rtabmap/DetectionRate" type="string" value="1"/>
-      <param name="Rtabmap/DetectorStrategy" type="string" value="6"/>
+      <param name="Kp/DetectorStrategy" type="string" value="6"/>
       <param name="NN/NNStrategy" type="string" value="3"/>
 	  <param name="GFTT/MaxCorners" type="string" value="200"/>
       
@@ -89,7 +88,7 @@
       <param name="LccBow/MaxDepth" type="string" value="3"/>
       
       <param name="LccReextract/FeatureType" type="string" value="4"/>
-	  <param name="LccReextract/LoopClosureFeatures" type="string" value="true"/>
+	  <param name="LccReextract/Activated" type="string" value="true"/>
 	  <param name="LccReextract/MaxDepth" type="string" value="3"/>
 	  <param name="LccReextract/NNDR" type="string" value="0.8"/>
 	  <param name="LccReextract/NNType" type="string" value="3"/>  		  	

@@ -148,6 +148,30 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 		}
 	}
 
+	// Backward compatibility
+	std::list<std::string> oldParameterNames;
+	oldParameterNames.push_back("LccReextract/LoopClosureFeatures");
+	oldParameterNames.push_back("Rtabmap/DetectorStrategy");
+	for(std::list<std::string>::iterator iter=oldParameterNames.begin(); iter!=oldParameterNames.end(); ++iter)
+	{
+		std::string vStr;
+		if(pnh.getParam(*iter, vStr))
+		{
+			if(iter->compare("LccReextract/LoopClosureFeatures") == 0)
+			{
+				ROS_WARN("Parameter name changed: LccReextract/LoopClosureFeatures -> %s. Please update your launch file accordingly.",
+						Parameters::kLccReextractActivated().c_str());
+				parameters.at(Parameters::kLccReextractActivated())= vStr;
+			}
+			else if(iter->compare("Rtabmap/DetectorStrategy") == 0)
+			{
+				ROS_WARN("Parameter name changed: Rtabmap/DetectorStrategy -> %s. Please update your launch file accordingly.",
+						Parameters::kKpDetectorStrategy().c_str());
+				parameters.at(Parameters::kKpDetectorStrategy())= vStr;
+			}
+		}
+	}
+
 	// set public parameters
 	nh.setParam("is_rtabmap_paused", paused_);
 	for(ParametersMap::iterator iter=parameters.begin(); iter!=parameters.end(); ++iter)
