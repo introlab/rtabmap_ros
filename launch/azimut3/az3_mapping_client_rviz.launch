@@ -2,7 +2,7 @@
 <launch>
 
   <!-- Remote teleop -->
-  <include file="$(find az3_bringup)/joystick.launch"/> 
+  <!-- <include file="$(find az3_bringup)/joystick.launch"/> -->
 
   <!-- We have two nodes (grid_map_assembler and rviz) subscribing to /rtabmap/mapData, so use -->
   <!-- a relay on this machine, same for images -->

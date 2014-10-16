@@ -21,12 +21,6 @@
 		</node>
 	</group>
 
-	<!-- Run the ROS package stereo_image_proc for image rectification and disparity computation -->
-	<group ns="/stereo_camera">
-	   <node pkg="nodelet" type="nodelet" name="standalone_nodelet"  args="manager" output="screen"/>
-	   <node pkg="nodelet" type="nodelet" name="disparity2depth" args="load rtabmap/disparity_to_depth standalone_nodelet"/>
-	</group>
-
 	<!-- Odometry: Choose between viso2_ros, fovis_ros and homemade approach (default) -->	
 	<node pkg="viso2_ros" type="stereo_odometer" name="stereo_odometer" output="screen">
 		<remap from="stereo" to="/stereo_camera"/>
@@ -52,7 +46,6 @@
   	  	<remap from="left/camera_info"      to="/stereo_camera/left/camera_info"/>
   	  	<remap from="right/camera_info"     to="/stereo_camera/right/camera_info"/>
 	  	<remap from="odom"                  to="/stereo_odometer/odometry"/>
-	  	<remap from="odom_depth"            to="/stereo_camera/depth2"/>
     
   	  	<param name="frame_id" type="string" value="base_link"/>
   	  	<param name="approx_sync" type="bool" value="false"/>
@@ -60,17 +53,6 @@
 	  	<param name="Odom/Strategy" type="string" value="1"/>            
 		<param name="Odom/RoiRatios" type="string" value="0.03 0.03 0.04 0.04"/>
 		<param name="Odom/MaxDepth" type="string" value="10"/>
-  	
-	  	<param name="generate_depth" type="bool" value="false"/> 
-		<!-- Parameters below only used when "generate_depth"=true -->
-	  	<param name="depth_patch_size" type="int" value="1"/>
-	  	<param name="subpix_win_size" type="int" value="3"/>
-	  	<param name="subpix_iterations" type="int" value="20"/>
-	  	<param name="subpix_epsilon" type="double" value="0.02"/>
-		<param name="flow_win_size" type="int" value="9"/>
-		<param name="flow_max_level" type="int" value="4"/>
-		<param name="flow_iterations" type="int" value="20"/>
-		<param name="flow_epsilon" type="double" value="0.02"/>
   	</node>
   	-->
     
@@ -78,13 +60,14 @@
     <!-- Visual SLAM (robot side) -->
     <!-- args: "delete_db_on_start" and "udebug" -->
     <node name="rtabmap" pkg="rtabmap" type="rtabmap" output="screen" args="--delete_db_on_start">
-      <param name="subscribe_depth" type="bool" value="true"/>
+      <param name="subscribe_depth" type="bool" value="false"/>
+      <param name="subscribe_stereo" type="bool" value="true"/>
       <param name="subscribe_laserScan" type="bool" value="false"/>
 	
-      <remap from="rgb/image" to="/stereo_camera/left/image_rect_color"/>
-      <remap from="rgb/camera_info" to="/stereo_camera/left/camera_info"/>
-      
-      <remap from="depth/image" to="/stereo_camera/depth"/>
+      <remap from="left/image_rect" to="/stereo_camera/left/image_rect_color"/>
+      <remap from="right/image_rect" to="/stereo_camera/right/image_rect"/>
+      <remap from="left/camera_info" to="/stereo_camera/left/camera_info"/>
+      <remap from="right/camera_info" to="/stereo_camera/right/camera_info"/>
       
       <remap from="odom" to="/stereo_odometer/odometry"/>
       
@@ -93,9 +76,10 @@
       
       <param name="Rtabmap/TimeThr" type="string" value="700"/>
       <param name="Rtabmap/DetectionRate" type="string" value="1"/>
-      <param name="Kp/DetectorStrategy" type="string" value="6"/>
-      <param name="NN/NNStrategy" type="string" value="3"/>
-	  <param name="GFTT/MaxCorners" type="string" value="200"/>
+      <param name="Kp/DetectorStrategy" type="string" value="0"/>
+      <param name="Kp/WordsPerImage" type="string" value="200"/>
+      <param name="Kp/RoiRatios" type="string" value="0.03 0.03 0.04 0.04"/>
+      <param name="NN/NNStrategy" type="string" value="1"/>
       
       <param name="LccBow/MinInliers" type="string" value="10"/>
       <param name="LccBow/InlierDistance" type="string" value="0.02"/>
@@ -103,7 +87,7 @@
       
       <param name="LccReextract/FeatureType" type="string" value="4"/>
 	  <param name="LccReextract/Activated" type="string" value="true"/>
-	  <param name="LccReextract/MaxDepth" type="string" value="3"/>
+	  <param name="LccReextract/MaxDepth" type="string" value="10"/>
 	  <param name="LccReextract/NNDR" type="string" value="0.8"/>
 	  <param name="LccReextract/NNType" type="string" value="3"/> 		  	
     </node>
@@ -111,7 +95,7 @@
     <!-- Visualisation (client side) -->
     <!--
     <node pkg="rtabmap" type="rtabmapviz" name="rtabmapviz" args="-d $(find rtabmap)/launch/config/rgbd_gui.ini" output="screen">
-      <param name="subscribe_depth" type="bool" value="true"/>
+      <param name="subscribe_depth" type="bool" value="false"/>
       <param name="subscribe_laserScan" type="bool" value="false"/>
       <param name="queue_size" type="int" value="30"/>
     

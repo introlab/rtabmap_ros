@@ -60,21 +60,10 @@ public:
 	StereoOdometry(int argc, char * argv[]) :
 		OdometryROS(argc, argv),
 		feature2D_(0),
-		depthPatchSize_(1),
-		generateDepth_(false),
-		stereoFlowWinSize_(21),
-		stereoFlowIterations_(30),
-		stereoFlowEpsilon_(0.01),
-		stereoFlowMaxLevel_(3),
-		stereoSubPixWinSize_(5),
-		stereoSubPixIterations_(20),
-		stereoSubPixEps_(0.03),
 		approxSync_(0),
 		exactSync_(0)
 	{
 		ros::NodeHandle nh;
-
-		odomDepth_ = nh.advertise<sensor_msgs::Image>("odom_depth", 1);
 
 		ros::NodeHandle pnh("~");
 
@@ -84,27 +73,9 @@ public:
 		pnh.param("queue_size", queueSize, queueSize);
 		ROS_INFO("Approximate time sync = %s", approxSync?"true":"false");
 
-		pnh.param("generate_depth", generateDepth_, generateDepth_);
-		pnh.param("depth_patch_size", depthPatchSize_, depthPatchSize_);
-		ROS_INFO("Generate depth = %s", generateDepth_?"true":"false");
-
-		pnh.param("flow_win_size", stereoFlowWinSize_, stereoFlowWinSize_);
-		pnh.param("flow_iterations", stereoFlowIterations_, stereoFlowIterations_);
-		pnh.param("flow_epsilon", stereoFlowEpsilon_, stereoFlowEpsilon_);
-		pnh.param("flow_max_level", stereoFlowMaxLevel_, stereoFlowMaxLevel_);
-
-		pnh.param("subpix_win_size", stereoSubPixWinSize_, stereoSubPixWinSize_);
-		pnh.param("subpix_iterations", stereoSubPixIterations_, stereoSubPixIterations_);
-		pnh.param("subpix_eps", stereoSubPixEps_, stereoSubPixEps_);
-
-		UASSERT_MSG(!this->isOdometryBOW() || (this->isOdometryBOW() && generateDepth_),
-				"Odom/Strategy=0 (OdometryBOW) requires depth generation (generate_depth=true).");
-
-		UASSERT(depthPatchSize_ >= 0);
-
 		//Keypoint detector
 		ParametersMap::const_iterator iter;
-		Feature2D::Type detectorStrategy = Feature2D::kFeatureUndef;
+		Feature2D::Type detectorStrategy = (Feature2D::Type)Parameters::defaultOdomFeatureType();
 		if((iter=this->parameters().find(Parameters::kOdomFeatureType())) != this->parameters().end())
 		{
 			detectorStrategy = (Feature2D::Type)std::atoi((*iter).second.c_str());
@@ -195,172 +166,27 @@ public:
 				model.fromCameraInfo(*cameraInfoLeft, *cameraInfoRight);
 
 				float fx = model.left().fx();
-				float fy = model.left().fy();
 				float cx = model.left().cx();
 				float cy = model.left().cy();
 				float baseline = model.baseline();
 				cv_bridge::CvImageConstPtr ptrImageLeft = cv_bridge::toCvShare(imageRectLeft, "mono8");
 				cv_bridge::CvImageConstPtr ptrImageRight = cv_bridge::toCvShare(imageRectRight, "mono8");
 
-				cv::Mat depthOrRightImage;
-				std::vector<cv::KeyPoint> kptsLeft, kptsRight;
-				cv::Mat descLeft, descRight;
 				UTimer stepTimer;
-
-				if(!generateDepth_)
-				{
-					// copy right image in depth
-					depthOrRightImage = ptrImageRight->image;
-				}
-				else
-				{
-					//generate depth
-					depthOrRightImage = cv::Mat::zeros(ptrImageLeft->image.rows, ptrImageLeft->image.cols, CV_32FC1);
-
-					std::vector<cv::Point2f> cornersLeft, cornersRight;
-
-					cv::Rect roi = Feature2D::computeRoi(ptrImageLeft->image, roiRatios_);
-					kptsLeft = feature2D_->generateKeypoints(ptrImageLeft->image, 0, roi);
-					UDEBUG("time generate left kpts=%fs", stepTimer.ticks());
-
-					if(!kptsLeft.size())
-					{
-						ROS_WARN("No left keypoints extracted!");
-						return;
-					}
-
-					int stereoFeaturesAdded = 0;
-					int stereoFeaturesMatched = 0;
-					int stereoFeaturesExtracted = 0;
-
-					cv::KeyPoint::convert(kptsLeft, cornersLeft);
-
-					if(stereoSubPixWinSize_ > 0 && stereoSubPixIterations_ > 0)
-					{
-						cv::cornerSubPix( ptrImageLeft->image, cornersLeft,
-								cv::Size( stereoSubPixWinSize_, stereoSubPixWinSize_ ),
-								cv::Size( -1, -1 ),
-								cv::TermCriteria( CV_TERMCRIT_ITER | CV_TERMCRIT_EPS, stereoSubPixIterations_, stereoSubPixEps_ ) );
-						UDEBUG("time subpix left kpts=%fs", stepTimer.ticks());
-					}
-
-					std::vector<unsigned char> status;
-					std::vector<float> err;
-
-					UDEBUG("cv::calcOpticalFlowPyrLK() begin");
-					cv::calcOpticalFlowPyrLK(
-							ptrImageLeft->image,
-							ptrImageRight->image,
-							cornersLeft,
-							cornersRight,
-							status,
-							err,
-							cv::Size(stereoFlowWinSize_, stereoFlowWinSize_), stereoFlowMaxLevel_,
-							cv::TermCriteria(cv::TermCriteria::COUNT+cv::TermCriteria::EPS, stereoFlowIterations_, stereoFlowEpsilon_),
-							cv::OPTFLOW_LK_GET_MIN_EIGENVALS, 1e-4);
-					UDEBUG("cv::calcOpticalFlowPyrLK() end");
-					UDEBUG("time optical flow=%fs", stepTimer.ticks());
-
-					std::vector<cv::KeyPoint> kptsLeftFiltered(kptsLeft.size());
-					int oi = 0;
-					for(int i=0; i<status.size(); ++i)
-					{
-						if(status[i] &&
-							uIsInBounds(cornersLeft[i].x, 0.0f, float(depthOrRightImage.cols)-1.0f) &&
-							uIsInBounds(cornersLeft[i].y, 0.0f, float(depthOrRightImage.rows)-1.0f) &&
-							uIsInBounds(cornersRight[i].x, 0.0f, float(depthOrRightImage.cols)-1.0f) &&
-							uIsInBounds(cornersRight[i].y, 0.0f, float(depthOrRightImage.rows)-1.0f))
-						{
-							float disparity = cornersLeft[i].x - cornersRight[i].x;
-
-							if(disparity >= 0)
-							{
-								float d = model.getZ(disparity);
-								if(d>0)
-								{
-									bool depthAdded = false;
-									int u = int(cornersLeft[i].x+0.5f);
-									int v = int(cornersLeft[i].y+0.5f);
-									for(int j=-depthPatchSize_; j<=depthPatchSize_; ++j)
-									{
-										for(int k=-depthPatchSize_; k<=depthPatchSize_; ++k)
-										{
-											if(uIsInBounds(u+j, 0, depthOrRightImage.cols-1) &&
-											   uIsInBounds(v+k, 0, depthOrRightImage.rows-1))
-											{
-												depthOrRightImage.at<float>(v+j, u+k) = d;
-												depthAdded = true;
-											}
-										}
-									}
-									if(depthAdded)
-									{
-										kptsLeftFiltered[oi] = kptsLeft[i];
-										kptsLeftFiltered[oi].pt = cornersLeft[i];
-										++oi;
-									}
-								}
-							}
-							++stereoFeaturesMatched;
-						}
-					}
-					stereoFeaturesAdded = oi;
-					stereoFeaturesExtracted = kptsLeft.size();
-
-					UDEBUG("stereoFeaturesExtracted=%d", stereoFeaturesExtracted);
-					UDEBUG("stereoFeaturesMatched=%d", stereoFeaturesMatched);
-					UDEBUG("stereoFeaturesAdded=%d", stereoFeaturesAdded);
-
-					kptsLeftFiltered.resize(oi);
-					kptsLeft = kptsLeftFiltered;
-
-					if(!kptsLeft.size())
-					{
-						ROS_WARN("No left keypoints extracted!");
-						return;
-					}
-
-					// For OdometryBOW, we must generate descriptors
-					int odomStrategy = Parameters::defaultOdomStrategy();
-					Parameters::parse(this->parameters(), Parameters::kOdomStrategy(), odomStrategy);
-					if(odomStrategy == 0)
-					{
-						descLeft = feature2D_->generateDescriptors(ptrImageLeft->image, kptsLeft);
-						UDEBUG("time generate left descriptors=%fs, remaining kpts=%d", stepTimer.ticks(), (int)kptsLeft.size());
-						if(!kptsLeft.size())
-						{
-							ROS_WARN("No left descriptors extracted!");
-							return;
-						}
-					}
-				}
-
 				//
 				UDEBUG("localTransform = %s", rtabmap::transformFromTF(localTransform).prettyPrint().c_str());
-				UDEBUG("kptsLeft=%d descLeft=%d", (int)kptsLeft.size(), descLeft.rows);
 				rtabmap::SensorData data(ptrImageLeft->image,
-						depthOrRightImage,
+						ptrImageRight->image,
 						fx,
-						generateDepth_?fy:baseline,
+						baseline,
 						cx,
 						cy,
 						rtabmap::Transform(),
 						rtabmap::transformFromTF(localTransform));
-				data.setFeatures(kptsLeft, descLeft);
 				quality=0;
 
 				this->processData(data, imageRectLeft->header, quality);
 				UDEBUG("time odometry->process()=%fs", stepTimer.ticks());
-
-				if(generateDepth_ && odomDepth_.getNumSubscribers())
-				{
-					cv_bridge::CvImage img;
-					img.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
-					img.image = depthOrRightImage;
-					sensor_msgs::ImagePtr rosMsg = img.toImageMsg();
-					rosMsg->header= imageRectLeft->header;
-					odomDepth_.publish(rosMsg);
-				}
 
 				//ROS_INFO("Odom: quality=%d, update time=%fs, stereo matches: added/matched/extracted %d/%d/%d",
 				//	quality, (ros::WallTime::now()-time).toSec(),
@@ -378,22 +204,6 @@ public:
 private:
 	Feature2D * feature2D_;
 	std::string roiRatios_;
-
-	// ROS parameters
-	int depthPatchSize_;
-
-	bool generateDepth_;
-
-	int stereoFlowWinSize_;
-	int stereoFlowIterations_;
-	double stereoFlowEpsilon_;
-	int stereoFlowMaxLevel_;
-
-	int stereoSubPixWinSize_;
-	int stereoSubPixIterations_;
-	double stereoSubPixEps_;
-
-	ros::Publisher odomDepth_;
 
 	image_transport::SubscriberFilter imageRectLeft_;
 	image_transport::SubscriberFilter imageRectRight_;

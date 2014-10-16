@@ -38,17 +38,7 @@
 			<param name="Odom/Strategy" type="string" value="1"/>            
 			<param name="Odom/RoiRatios" type="string" value="0.03 0.03 0.04 0.04"/>
 			<param name="Odom/MaxDepth" type="string" value="10"/>
-	  	
-		  	<param name="generate_depth" type="bool" value="false"/> 
-			<!-- Parameters below only used when "generate_depth"=true -->
-		  	<param name="depth_patch_size" type="int" value="1"/>
-		  	<param name="subpix_win_size" type="int" value="3"/>
-		  	<param name="subpix_iterations" type="int" value="20"/>
-		  	<param name="subpix_epsilon" type="double" value="0.02"/>
-			<param name="flow_win_size" type="int" value="9"/>
-			<param name="flow_max_level" type="int" value="4"/>
-			<param name="flow_iterations" type="int" value="20"/>
-			<param name="flow_epsilon" type="double" value="0.02"/>
+			<param name="OdomFlow/SubPixIterations" type="string" value="0"/>
 	  	</node>
 		
 	</group>

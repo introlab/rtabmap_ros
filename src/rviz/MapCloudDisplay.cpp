@@ -308,8 +308,15 @@ void MapCloudDisplay::processMapData(const rtabmap::MapData& map)
 
 				if(!image.empty() && !depth.empty() && depthFx > 0.0f && depthFy > 0.0f && depthCx >= 0.0f && depthCy >= 0.0f)
 				{
-					pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = util3d::cloudFromDepthRGB(image, depth, depthCx, depthCy, depthFx, depthFy, cloud_decimation_->getInt());
-
+					pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud;
+					if(depth.type() == CV_8UC1)
+					{
+						cloud = util3d::cloudFromStereoImages(image, depth, depthCx, depthCy, depthFx, depthFy, cloud_decimation_->getInt());
+					}
+					else
+					{
+						cloud = util3d::cloudFromDepthRGB(image, depth, depthCx, depthCy, depthFx, depthFy, cloud_decimation_->getInt());
+					}
 					if(cloud_max_depth_->getFloat() > 0.0f)
 					{
 						cloud = util3d::passThrough(cloud, "z", 0, cloud_max_depth_->getFloat());

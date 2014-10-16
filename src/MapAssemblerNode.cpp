@@ -130,7 +130,15 @@ public:
 
 					if(!image.empty() && !depth.empty() && depthFx > 0.0f && depthFy > 0.0f && depthCx >= 0.0f && depthCy >= 0.0f)
 					{
-						pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = util3d::cloudFromDepthRGB(image, depth, depthCx, depthCy, depthFx, depthFy, cloudDecimation_);
+						pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud;
+						if(depth.type() == CV_8UC1)
+						{
+							cloud = util3d::cloudFromStereoImages(image, depth, depthCx, depthCy, depthFx, depthFy, cloudDecimation_);
+						}
+						else
+						{
+							cloud = util3d::cloudFromDepthRGB(image, depth, depthCx, depthCy, depthFx, depthFy, cloudDecimation_);
+						}
 
 						if(cloudMaxDepth_ > 0)
 						{

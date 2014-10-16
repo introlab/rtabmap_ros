@@ -68,7 +68,7 @@ public:
 	virtual ~CoreWrapper();
 
 private:
-	void setupCallbacks(bool subscribeDepth, bool subscribeLaserScan, int queueSize);
+	void setupCallbacks(bool subscribeDepth, bool subscribeLaserScan, bool subscribeStereo, int queueSize);
 	void defaultCallback(const sensor_msgs::ImageConstPtr & imageMsg); // no odom
 	void depthCallback(const sensor_msgs::ImageConstPtr& imageMsg,
 					   const nav_msgs::OdometryConstPtr & odomMsg,
@@ -79,15 +79,26 @@ private:
 						   const sensor_msgs::ImageConstPtr& imageDepthMsg,
 						   const sensor_msgs::CameraInfoConstPtr& camInfoMsg,
 						   const sensor_msgs::LaserScanConstPtr& scanMsg);
+	void stereoCallback(const sensor_msgs::ImageConstPtr& leftImageMsg,
+					   	   const sensor_msgs::ImageConstPtr& rightImageMsg,
+					   	   const sensor_msgs::CameraInfoConstPtr& leftCamInfoMsg,
+					   	   const sensor_msgs::CameraInfoConstPtr& rightCamInfoMsg,
+					   	   const nav_msgs::OdometryConstPtr & odomMsg);
+	void stereoScanCallback(const sensor_msgs::ImageConstPtr& leftImageMsg,
+						   const sensor_msgs::ImageConstPtr& rightImageMsg,
+						   const sensor_msgs::CameraInfoConstPtr& leftCamInfoMsg,
+						   const sensor_msgs::CameraInfoConstPtr& rightCamInfoMsg,
+						   const sensor_msgs::LaserScanConstPtr& scanMsg,
+						   const nav_msgs::OdometryConstPtr & odomMsg);
 
 	void process(
 			int id,
 			const cv::Mat & image,
 			const rtabmap::Transform & odom = rtabmap::Transform(),
 			const std::string & odomFrameId = "",
-			const cv::Mat & depth = cv::Mat(),
+			const cv::Mat & depthOrRightImage = cv::Mat(),
 			float fx = 0.0f,
-			float fy = 0.0f,
+			float fyOrBaseline = 0.0f,
 			float cx = 0.0f,
 			float cy = 0.0f,
 			const rtabmap::Transform & localTransform = rtabmap::Transform(),
@@ -126,12 +137,20 @@ private:
 	ros::Publisher infoPubEx_;
 	ros::Publisher mapData_;
 
+	// for loop closure detection only
 	image_transport::Subscriber defaultSub_;
+
+	//for depth callback
 	image_transport::SubscriberFilter imageSub_;
 	image_transport::SubscriberFilter imageDepthSub_;
-	image_transport::SubscriberFilter imageSubRight_;
 	message_filters::Subscriber<sensor_msgs::CameraInfo> cameraInfoSub_;
-	message_filters::Subscriber<sensor_msgs::CameraInfo> cameraInfoSubRight_;
+
+	//stereo callback
+	image_transport::SubscriberFilter imageRectLeft_;
+	image_transport::SubscriberFilter imageRectRight_;
+	message_filters::Subscriber<sensor_msgs::CameraInfo> cameraInfoLeft_;
+	message_filters::Subscriber<sensor_msgs::CameraInfo> cameraInfoRight_;
+
 	message_filters::Subscriber<nav_msgs::Odometry> odomSub_;
 	message_filters::Subscriber<sensor_msgs::LaserScan> scanSub_;
 
@@ -149,6 +168,23 @@ private:
 			sensor_msgs::Image,
 			sensor_msgs::CameraInfo> MyDepthSyncPolicy;
 	message_filters::Synchronizer<MyDepthSyncPolicy> * depthSync_;
+
+	typedef message_filters::sync_policies::ApproximateTime<
+			sensor_msgs::Image,
+			sensor_msgs::Image,
+			sensor_msgs::CameraInfo,
+			sensor_msgs::CameraInfo,
+			sensor_msgs::LaserScan,
+			nav_msgs::Odometry> MyStereoScanSyncPolicy;
+	message_filters::Synchronizer<MyStereoScanSyncPolicy> * stereoScanSync_;
+
+	typedef message_filters::sync_policies::ApproximateTime<
+			sensor_msgs::Image,
+			sensor_msgs::Image,
+			sensor_msgs::CameraInfo,
+			sensor_msgs::CameraInfo,
+			nav_msgs::Odometry> MyStereoSyncPolicy;
+	message_filters::Synchronizer<MyStereoSyncPolicy> * stereoSync_;
 
 	tf::TransformBroadcaster tfBroadcaster_;
 	tf::TransformListener tfListener_;

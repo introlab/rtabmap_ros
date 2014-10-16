@@ -61,7 +61,6 @@ OdometryROS::OdometryROS(int argc, char * argv[]) :
 	odomPub_ = nh.advertise<nav_msgs::Odometry>("odom", 1);
 	odomLocalMap_ = nh.advertise<sensor_msgs::PointCloud2>("odom_local_map", 1);
 	odomLastFrame_ = nh.advertise<sensor_msgs::PointCloud2>("odom_last_frame", 1);
-	//odomMatches_ = nh.advertise<sensor_msgs::Image>("odom_matches", 1);
 
 	ros::NodeHandle pnh("~");
 

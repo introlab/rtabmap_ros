@@ -75,12 +75,27 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 
 	bool subscribeLaserScan = false;
 	bool subscribeDepth = true;
+	bool subscribeStereo = false;
 	int queueSize = 10;
 	double tfDelay = 0.05; // 20 Hz
 
 	// ROS related parameters (private)
 	pnh.param("subscribe_depth", subscribeDepth, subscribeDepth);
 	pnh.param("subscribe_laserScan", subscribeLaserScan, subscribeLaserScan);
+	pnh.param("subscribe_stereo", subscribeStereo, subscribeStereo);
+	if(subscribeDepth && subscribeStereo)
+	{
+		UWARN("Parameters subscribe_depth and subscribe_stereo cannot be true at the same time. Parameter subscribe_depth is set to false.");
+		subscribeDepth = false;
+	}
+	if(subscribeLaserScan)
+	{
+		if(!subscribeDepth && !subscribeStereo)
+		{
+			ROS_WARN("When subscribing to laser scan, you should subscribe to depth or stereo too. Subscribing to depth by default...");
+			subscribeDepth = true;
+		}
+	}
 
 	pnh.param("config_path", configPath_, configPath_);
 
@@ -187,10 +202,10 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	if(isRGBD)
 	{
 		// RGBD SLAM
-		if(!subscribeDepth)
+		if(!subscribeDepth && !subscribeStereo)
 		{
-			ROS_WARN("ROS param subscribe_depth is false, but RTAB-Map "
-					  "parameter \"RGBD/Enabled\" is true! Please set subscribe_depth "
+			ROS_WARN("ROS param subscribe_depth and subscribe_stereo are false, but RTAB-Map "
+					  "parameter \"RGBD/Enabled\" is true! Please set subscribe_depth or subscribe_stereo "
 					  "to true to use rtabmap node for RGB-D SLAM, or set \"RGBD/Enabled\" to false for loop closure "
 					  "detection on images-only.");
 		}
@@ -198,10 +213,10 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	else
 	{
 		// loop closure detection (images-only)
-		if(subscribeDepth || subscribeLaserScan)
+		if(subscribeDepth || subscribeLaserScan || subscribeStereo)
 		{
-			ROS_WARN("ROS param subscribe_depth or subscribe_laserScan is true, but RTAB-Map "
-					  "parameter \"RGBD/Enabled\" is false! Please set subscribe_depth and subscribe_laserScan "
+			ROS_WARN("ROS param subscribe_depth, subscribe_laserScan or subscribe_stereo is true, but RTAB-Map "
+					  "parameter \"RGBD/Enabled\" is false! Please set subscribe_depth, subscribe_laserScan and subscribe_stereo "
 					  "to false to use rtabmap node for loop closure detection on images-only, or set \"RGBD/Enabled\" to true "
 					  "for RGB-D SLAM.");
 		}
@@ -227,7 +242,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	getMapDataSrv_ = nh.advertiseService("get_map", &CoreWrapper::getMapCallback, this);
 	publishMapDataSrv_ = nh.advertiseService("publish_map", &CoreWrapper::publishMapCallback, this);
 
-	setupCallbacks(subscribeDepth, subscribeLaserScan, queueSize);
+	setupCallbacks(subscribeDepth, subscribeLaserScan, subscribeStereo, queueSize);
 
 	transformThread_ = new boost::thread(boost::bind(&CoreWrapper::publishLoop, this, tfDelay));
 }
@@ -382,9 +397,9 @@ void CoreWrapper::depthCallback(
 		if(!(imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
 			 imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||
 			 imageMsg->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
-			 imageMsg->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0) &&
-			(depthMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1)!=0 ||
-			 depthMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1)!=0))
+			 imageMsg->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0) ||
+			!(depthMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1) == 0 ||
+			 depthMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1) == 0))
 		{
 			ROS_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8 and image_depth=32FC1,16UC1");
 			return;
@@ -460,9 +475,9 @@ void CoreWrapper::depthScanCallback(
 		if(!(imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
 				imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||
 				imageMsg->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
-				imageMsg->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0) &&
-			(depthMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1)!=0 ||
-			 depthMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1)!=0))
+				imageMsg->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0) ||
+			!(depthMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1) == 0 ||
+			 depthMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1) == 0))
 		{
 			ROS_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8 and image_depth=32FC1,16UC1");
 			return;
@@ -526,14 +541,186 @@ void CoreWrapper::depthScanCallback(
 	}
 }
 
+void CoreWrapper::stereoCallback(
+		const sensor_msgs::ImageConstPtr& leftImageMsg,
+	   const sensor_msgs::ImageConstPtr& rightImageMsg,
+	   const sensor_msgs::CameraInfoConstPtr& leftCamInfoMsg,
+	   const sensor_msgs::CameraInfoConstPtr& rightCamInfoMsg,
+	   const nav_msgs::OdometryConstPtr & odomMsg)
+{
+	if(!paused_)
+	{
+		if(rate_>0.0f)
+		{
+			if(ros::Time::now() - time_ < ros::Duration(1.0f/rate_))
+			{
+				return;
+			}
+		}
+		time_ = ros::Time::now();
+
+		if(!(leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
+			leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0 ||
+			leftImageMsg->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
+			leftImageMsg->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0) ||
+			!(rightImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
+			rightImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0 ||
+			rightImageMsg->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
+			rightImageMsg->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0))
+		{
+			ROS_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8");
+			return;
+		}
+
+		// TF ready?
+		Transform localTransform;
+		try
+		{
+			tf::StampedTransform tmp;
+			tfListener_.lookupTransform(frameId_, leftImageMsg->header.frame_id, leftImageMsg->header.stamp, tmp);
+			localTransform = transformFromTF(tmp);
+		}
+		catch(tf::TransformException & ex)
+		{
+			ROS_WARN("%s",ex.what());
+			return;
+		}
+
+		Transform odom = transformFromPoseMsg(odomMsg->pose.pose);
+
+		cv_bridge::CvImageConstPtr ptrLeftImage, ptrRightImage;
+		if(leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
+		   leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
+		{
+			ptrLeftImage = cv_bridge::toCvShare(leftImageMsg, "mono8");
+		}
+		else
+		{
+			ptrLeftImage = cv_bridge::toCvShare(leftImageMsg, "bgr8");
+		}
+		ptrRightImage = cv_bridge::toCvShare(rightImageMsg, "mono8");
+
+		image_geometry::StereoCameraModel model;
+		model.fromCameraInfo(*leftCamInfoMsg, *rightCamInfoMsg);
+
+		float fx = model.left().fx();
+		float cx = model.left().cx();
+		float cy = model.left().cy();
+		float baseline = model.baseline();
+
+		process(leftImageMsg->header.seq,
+				ptrLeftImage->image,
+				odom,
+				odomMsg->header.frame_id,
+				ptrRightImage->image,
+				fx,
+				baseline,
+				cx,
+				cy,
+				localTransform,
+				cv::Mat());
+	}
+}
+
+void CoreWrapper::stereoScanCallback(
+		const sensor_msgs::ImageConstPtr& leftImageMsg,
+	   const sensor_msgs::ImageConstPtr& rightImageMsg,
+	   const sensor_msgs::CameraInfoConstPtr& leftCamInfoMsg,
+	   const sensor_msgs::CameraInfoConstPtr& rightCamInfoMsg,
+	   const sensor_msgs::LaserScanConstPtr& scanMsg,
+	   const nav_msgs::OdometryConstPtr & odomMsg)
+{
+	if(!paused_)
+	{
+		if(rate_>0.0f)
+		{
+			if(ros::Time::now() - time_ < ros::Duration(1.0f/rate_))
+			{
+				return;
+			}
+		}
+		time_ = ros::Time::now();
+
+		if(!(leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
+			leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0 ||
+			leftImageMsg->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
+			leftImageMsg->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0) ||
+			!(rightImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
+			rightImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0 ||
+			rightImageMsg->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
+			rightImageMsg->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0))
+		{
+			ROS_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8");
+			return;
+		}
+
+		// TF ready?
+		Transform localTransform;
+		try
+		{
+			tf::StampedTransform tmp;
+			tfListener_.lookupTransform(frameId_, scanMsg->header.frame_id, scanMsg->header.stamp, tmp);
+			tfListener_.lookupTransform(frameId_, leftImageMsg->header.frame_id, leftImageMsg->header.stamp, tmp);
+			localTransform = transformFromTF(tmp);
+		}
+		catch(tf::TransformException & ex)
+		{
+			ROS_WARN("%s",ex.what());
+			return;
+		}
+
+		//transform in frameId_ frame
+		sensor_msgs::PointCloud2 scanOut;
+		laser_geometry::LaserProjection projection;
+		projection.transformLaserScanToPointCloud(frameId_, *scanMsg, scanOut, tfListener_);
+		pcl::PointCloud<pcl::PointXYZ> pclScan;
+		pcl::fromROSMsg(scanOut, pclScan);
+		cv::Mat scan = util3d::depth2DFromPointCloud(pclScan);
+
+		Transform odom = transformFromPoseMsg(odomMsg->pose.pose);
+
+		cv_bridge::CvImageConstPtr ptrLeftImage, ptrRightImage;
+		if(leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
+		   leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
+		{
+			ptrLeftImage = cv_bridge::toCvShare(leftImageMsg, "mono8");
+		}
+		else
+		{
+			ptrLeftImage = cv_bridge::toCvShare(leftImageMsg, "bgr8");
+		}
+		ptrRightImage = cv_bridge::toCvShare(rightImageMsg, "mono8");
+
+		image_geometry::StereoCameraModel model;
+		model.fromCameraInfo(*leftCamInfoMsg, *rightCamInfoMsg);
+
+		float fx = model.left().fx();
+		float cx = model.left().cx();
+		float cy = model.left().cy();
+		float baseline = model.baseline();
+
+		process(leftImageMsg->header.seq,
+				ptrLeftImage->image,
+				odom,
+				odomMsg->header.frame_id,
+				ptrRightImage->image,
+				fx,
+				baseline,
+				cx,
+				cy,
+				localTransform,
+				scan);
+	}
+}
+
 void CoreWrapper::process(
 		int id,
 		const cv::Mat & image,
 		const Transform & odom,
 		const std::string & odomFrameId,
-		const cv::Mat & depth,
+		const cv::Mat & depthOrRightImage,
 		float fx,
-		float fy,
+		float fyOrBaseline,
 		float cx,
 		float cy,
 		const Transform & localTransform,
@@ -542,37 +729,47 @@ void CoreWrapper::process(
 	UTimer timer;
 	if(rtabmap_.isIDsGenerated() || id > 0)
 	{
-		cv::Mat depth16;
-		if(!depth.empty() && depth.type() != CV_16UC1)
+		cv::Mat imageB;
+		if(!depthOrRightImage.empty())
 		{
-			if(depth.type() == CV_32FC1)
+			if(depthOrRightImage.type() == CV_8UC1)
 			{
-				//convert to 16 bits
-				depth16 = util3d::cvtDepthFromFloat(depth);
-				static bool shown = false;
-				if(!shown)
+				//right image
+				imageB = depthOrRightImage.clone();
+			}
+			else if(depthOrRightImage.type() != CV_16UC1)
+			{
+				// depth float
+				if(depthOrRightImage.type() == CV_32FC1)
 				{
-					ROS_WARN("Use depth image with \"unsigned short\" type to "
-							 "avoid conversion. This message is only printed once...");
-					shown = true;
+					//convert to 16 bits
+					imageB = util3d::cvtDepthFromFloat(depthOrRightImage);
+					static bool shown = false;
+					if(!shown)
+					{
+						ROS_WARN("Use depth image with \"unsigned short\" type to "
+								 "avoid conversion. This message is only printed once...");
+						shown = true;
+					}
+				}
+				else
+				{
+					ROS_ERROR("Depth image must be of type \"unsigned short\"!");
+					return;
 				}
 			}
 			else
 			{
-				ROS_ERROR("Depth image must be of type \"unsigned short\"!");
-				return;
+				// depth short
+				imageB = depthOrRightImage.clone();
 			}
-		}
-		else
-		{
-			depth16 = depth.clone();
 		}
 
 		SensorData data(image.clone(),
-				depth16,
+				imageB,
 				scan,
 				fx,
-				fy,
+				fyOrBaseline,
 				cx,
 				cy,
 				odom,
@@ -1248,52 +1445,80 @@ void CoreWrapper::publishStats(const Statistics & stats)
 void CoreWrapper::setupCallbacks(
 		bool subscribeDepth,
 		bool subscribeLaserScan,
+		bool subscribeStereo,
 		int queueSize)
 {
-	if(subscribeLaserScan)
-	{
-		if(!subscribeDepth)
-		{
-			ROS_WARN("When subscribing to laser scan, you should subscribe to depth too. Subscribing to depth...");
-			subscribeDepth = true;
-		}
-	}
-
 	ros::NodeHandle nh; // public
 	ros::NodeHandle pnh("~"); // private
-	ros::NodeHandle rgb_nh(nh, "rgb");
-	ros::NodeHandle depth_nh(nh, "depth");
-	ros::NodeHandle rgb_pnh(pnh, "rgb");
-	ros::NodeHandle depth_pnh(pnh, "depth");
-	image_transport::ImageTransport rgb_it(rgb_nh);
-	image_transport::ImageTransport depth_it(depth_nh);
-	image_transport::TransportHints hintsRgb("raw", ros::TransportHints(), rgb_pnh);
-	image_transport::TransportHints hintsDepth("raw", ros::TransportHints(), depth_pnh);
 
-	if(subscribeDepth && subscribeLaserScan)
+	if(subscribeDepth)
 	{
-		ROS_INFO("Registering Depth+LaserScan callback...");
+		ros::NodeHandle rgb_nh(nh, "rgb");
+		ros::NodeHandle depth_nh(nh, "depth");
+		ros::NodeHandle rgb_pnh(pnh, "rgb");
+		ros::NodeHandle depth_pnh(pnh, "depth");
+		image_transport::ImageTransport rgb_it(rgb_nh);
+		image_transport::ImageTransport depth_it(depth_nh);
+		image_transport::TransportHints hintsRgb("raw", ros::TransportHints(), rgb_pnh);
+		image_transport::TransportHints hintsDepth("raw", ros::TransportHints(), depth_pnh);
+
 		imageSub_.subscribe(rgb_it, rgb_nh.resolveName("image"), 1, hintsRgb);
 		imageDepthSub_.subscribe(depth_it, depth_nh.resolveName("image"), 1, hintsDepth);
 		cameraInfoSub_.subscribe(rgb_nh, "camera_info", 1);
 		odomSub_.subscribe(nh, "odom", 1);
-		scanSub_.subscribe(nh, "scan", 1);
-		depthScanSync_ = new message_filters::Synchronizer<MyDepthScanSyncPolicy>(MyDepthScanSyncPolicy(queueSize), imageSub_, odomSub_, imageDepthSub_, cameraInfoSub_, scanSub_);
-		depthScanSync_->registerCallback(boost::bind(&CoreWrapper::depthScanCallback, this, _1, _2, _3, _4, _5));
+
+		if(subscribeLaserScan)
+		{
+			ROS_INFO("Registering Depth+LaserScan callback...");
+			scanSub_.subscribe(nh, "scan", 1);
+			depthScanSync_ = new message_filters::Synchronizer<MyDepthScanSyncPolicy>(MyDepthScanSyncPolicy(queueSize), imageSub_, odomSub_, imageDepthSub_, cameraInfoSub_, scanSub_);
+			depthScanSync_->registerCallback(boost::bind(&CoreWrapper::depthScanCallback, this, _1, _2, _3, _4, _5));
+		}
+		else //!subscribeLaserScan
+		{
+			ROS_INFO("Registering Depth callback...");
+			depthSync_ = new message_filters::Synchronizer<MyDepthSyncPolicy>(MyDepthSyncPolicy(queueSize), imageSub_, odomSub_, imageDepthSub_, cameraInfoSub_);
+			depthSync_->registerCallback(boost::bind(&CoreWrapper::depthCallback, this, _1, _2, _3, _4));
+		}
 	}
-	else if(subscribeDepth && !subscribeLaserScan)
+	else if(subscribeStereo)
 	{
-		ROS_INFO("Registering Depth callback...");
-		imageSub_.subscribe(rgb_it, rgb_nh.resolveName("image"), 1, hintsRgb);
-		imageDepthSub_.subscribe(depth_it, depth_nh.resolveName("image"), 1, hintsDepth);
-		cameraInfoSub_.subscribe(rgb_nh, "camera_info", 1);
+		ros::NodeHandle left_nh(nh, "left");
+		ros::NodeHandle right_nh(nh, "right");
+		ros::NodeHandle left_pnh(pnh, "left");
+		ros::NodeHandle right_pnh(pnh, "right");
+		image_transport::ImageTransport left_it(left_nh);
+		image_transport::ImageTransport right_it(right_nh);
+		image_transport::TransportHints hintsLeft("raw", ros::TransportHints(), left_pnh);
+		image_transport::TransportHints hintsRight("raw", ros::TransportHints(), right_pnh);
+
+		imageRectLeft_.subscribe(left_it, left_nh.resolveName("image_rect"), 1, hintsLeft);
+		imageRectRight_.subscribe(right_it, right_nh.resolveName("image_rect"), 1, hintsRight);
+		cameraInfoLeft_.subscribe(left_nh, "camera_info", 1);
+		cameraInfoRight_.subscribe(right_nh, "camera_info", 1);
 		odomSub_.subscribe(nh, "odom", 1);
-		depthSync_ = new message_filters::Synchronizer<MyDepthSyncPolicy>(MyDepthSyncPolicy(queueSize), imageSub_, odomSub_, imageDepthSub_, cameraInfoSub_);
-		depthSync_->registerCallback(boost::bind(&CoreWrapper::depthCallback, this, _1, _2, _3, _4));
+
+		if(subscribeLaserScan)
+		{
+			ROS_INFO("Registering Stereo+LaserScan callback...");
+			scanSub_.subscribe(nh, "scan", 1);
+			stereoScanSync_ = new message_filters::Synchronizer<MyStereoScanSyncPolicy>(MyStereoScanSyncPolicy(queueSize), imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_, scanSub_, odomSub_);
+			stereoScanSync_->registerCallback(boost::bind(&CoreWrapper::stereoScanCallback, this, _1, _2, _3, _4, _5, _6));
+		}
+		else //!subscribeLaserScan
+		{
+			ROS_INFO("Registering Stereo callback...");
+			stereoSync_ = new message_filters::Synchronizer<MyStereoSyncPolicy>(MyStereoSyncPolicy(queueSize), imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_, odomSub_);
+			stereoSync_->registerCallback(boost::bind(&CoreWrapper::stereoCallback, this, _1, _2, _3, _4, _5));
+		}
 	}
 	else
 	{
-		ROS_INFO("Registering default callback...");
+		ROS_INFO("Registering image-only callback...");
+		ros::NodeHandle rgb_nh(nh, "rgb");
+		ros::NodeHandle rgb_pnh(pnh, "rgb");
+		image_transport::ImageTransport rgb_it(rgb_nh);
+		image_transport::TransportHints hintsRgb("raw", ros::TransportHints(), rgb_pnh);
 		defaultSub_ = rgb_it.subscribe("image", 1, &CoreWrapper::defaultCallback, this);
 	}
 }
