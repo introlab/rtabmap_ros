@@ -8,7 +8,7 @@ find_package(catkin REQUIRED COMPONENTS
              cv_bridge roscpp rospy sensor_msgs std_msgs std_srvs nav_msgs 
              image_transport tf tf_conversions laser_geometry pcl_conversions 
              pcl_ros nodelet dynamic_reconfigure rviz message_filters class_loader
-             genmsg
+             genmsg stereo_msgs
 )
 
 ## System dependencies are found with CMake's conventions
@@ -77,6 +77,7 @@ catkin_package(
   CATKIN_DEPENDS cv_bridge roscpp rospy sensor_msgs std_msgs std_srvs nav_msgs 
                  image_transport tf tf_conversions laser_geometry pcl_conversions 
                  pcl_ros nodelet dynamic_reconfigure rviz message_filters class_loader
+                 stereo_msgs
   DEPENDS RTABMap
 )
 
