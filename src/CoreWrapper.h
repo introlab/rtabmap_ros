@@ -45,7 +45,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sensor_msgs/CameraInfo.h>
 #include <sensor_msgs/LaserScan.h>
 #include <nav_msgs/Odometry.h>
-#include <stereo_msgs/DisparityImage.h>
 
 #include <rtabmap/core/Statistics.h>
 #include <rtabmap/core/Parameters.h>

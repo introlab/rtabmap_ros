@@ -7,6 +7,14 @@
     </description>
   </class>
   
+  <class name="rtabmap/stereo_throttle" 
+         type="rtabmap::StereoThrottleNodelet" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
+  
   <class name="rtabmap/data_odom_sync" 
          type="rtabmap::DataOdomSyncNodelet" 
          base_class_type="nodelet::Nodelet">
