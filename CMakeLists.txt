@@ -152,6 +152,9 @@ target_link_libraries(visual_odometry ${Libraries})
 add_executable(stereo_odometry src/StereoOdometryNode.cpp)
 target_link_libraries(stereo_odometry rtabmap_ros ${Libraries})
 
+add_executable(map_optimizer src/MapOptimizerNode.cpp)
+target_link_libraries(map_optimizer rtabmap_ros ${Libraries})
+
 add_executable(map_assembler src/MapAssemblerNode.cpp)
 target_link_libraries(map_assembler rtabmap_ros ${Libraries})
 

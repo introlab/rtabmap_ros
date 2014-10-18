@@ -67,6 +67,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 		odomFrameId_(""),
 		configPath_(""),
 		mapToOdom_(tf::Transform::getIdentity()),
+		transformThread_(0),
 		rate_(Parameters::defaultRtabmapDetectionRate()),
 		time_(ros::Time::now())
 {
@@ -244,7 +245,17 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 
 	setupCallbacks(subscribeDepth, subscribeLaserScan, subscribeStereo, queueSize);
 
-	transformThread_ = new boost::thread(boost::bind(&CoreWrapper::publishLoop, this, tfDelay));
+	int toroIterations = 0;
+	Parameters::parse(parameters, Parameters::kRGBDToroIterations(), toroIterations);
+	if(toroIterations != 0)
+	{
+		transformThread_ = new boost::thread(boost::bind(&CoreWrapper::publishLoop, this, tfDelay));
+	}
+	else
+	{
+		UWARN("Graph optimization is disabled (%s=0), the tf between frame \"%s\" and odometry frame will not be published. You can safely ignore this warning if you are using map_optimizer node.",
+				Parameters::kRGBDToroIterations().c_str(), mapFrameId_.c_str());
+	}
 }
 
 CoreWrapper::~CoreWrapper()
