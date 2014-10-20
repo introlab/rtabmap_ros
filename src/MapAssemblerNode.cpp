@@ -33,6 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/utilite/UStl.h>
 #include <pcl_ros/transforms.h>
 #include <pcl_conversions/pcl_conversions.h>
+#include <nav_msgs/OccupancyGrid.h>
 
 using namespace rtabmap;
 
@@ -44,7 +45,15 @@ public:
 		cloudDecimation_(4),
 		cloudMaxDepth_(4.0),
 		cloudVoxelSize_(0.02),
-		scanVoxelSize_(0.01)
+		scanVoxelSize_(0.01),
+		nodeFilteringAngle_(30), // degrees
+		nodeFilteringRadius_(0.5),
+		computeOccupancyGrid_(false),
+		gridCellSize_(0.05),
+		groundMaxAngle_(M_PI_4),
+		clusterMinSize_(20),
+		emptyCellFillingRadius_(1),
+		maxHeight_(0)
 	{
 		ros::NodeHandle pnh("~");
 		pnh.param("cloud_decimation", cloudDecimation_, cloudDecimation_);
@@ -52,11 +61,29 @@ public:
 		pnh.param("cloud_voxel_size", cloudVoxelSize_, cloudVoxelSize_);
 		pnh.param("scan_voxel_size", scanVoxelSize_, scanVoxelSize_);
 
+		pnh.param("filter_radius", nodeFilteringRadius_, nodeFilteringRadius_);
+		pnh.param("filter_angle", nodeFilteringAngle_, nodeFilteringAngle_);
+
+		pnh.param("occupancy_grid", computeOccupancyGrid_, computeOccupancyGrid_);
+		pnh.param("occupancy_cell_size", gridCellSize_, gridCellSize_);
+		pnh.param("occupancy_ground_max_angle", groundMaxAngle_, groundMaxAngle_);
+		pnh.param("occupancy_cluster_min_size", clusterMinSize_, clusterMinSize_);
+		pnh.param("occupancy_empty_filling_radius", emptyCellFillingRadius_, emptyCellFillingRadius_);
+		pnh.param("occupancy_max_height", maxHeight_, maxHeight_);
+
+		UASSERT(gridCellSize_ > 0);
+		UASSERT(emptyCellFillingRadius_ >= 0);
+		UASSERT(maxHeight_ >= 0);
+
 		ros::NodeHandle nh;
 		mapDataTopic_ = nh.subscribe("mapData", 1, &MapAssembler::mapDataReceivedCallback, this);
 
 		assembledMapClouds_ = nh.advertise<sensor_msgs::PointCloud2>("assembled_clouds", 1);
 		assembledMapScans_ = nh.advertise<sensor_msgs::PointCloud2>("assembled_scans", 1);
+		if(computeOccupancyGrid_)
+		{
+			occupancyMapPub_ = nh.advertise<nav_msgs::OccupancyGrid>("grid_projection_map", 1);
+		}
 	}
 
 	~MapAssembler()
@@ -152,6 +179,20 @@ public:
 						cloud = util3d::transformPointCloud(cloud, localTransform);
 
 						rgbClouds_.insert(std::make_pair(id, cloud));
+
+						if(computeOccupancyGrid_)
+						{
+							pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloudClipped = cloud;
+							if(maxHeight_ > 0)
+							{
+								cloudClipped = util3d::passThrough(cloudClipped, "z", std::numeric_limits<int>::min(), maxHeight_);
+							}
+							cv::Mat ground, obstacles;
+							if(util3d::occupancy2DFromCloud3D(cloudClipped, ground, obstacles, gridCellSize_, groundMaxAngle_, clusterMinSize_))
+							{
+								occupancyLocalMaps_.insert(std::make_pair(id, std::make_pair(ground, obstacles)));
+							}
+						}
 					}
 				}
 			}
@@ -176,20 +217,28 @@ public:
 			}
 		}
 
+		// filter poses
+		std::map<int, Transform> poses;
+		for(unsigned int i=0; i<msg->poseIDs.size() && i<msg->poses.size(); ++i)
+		{
+			poses.insert(std::make_pair(msg->poseIDs[i], transformFromPoseMsg(msg->poses[i])));
+		}
+		if(nodeFilteringAngle_ > 0.0 && nodeFilteringRadius_ > 0.0)
+		{
+			poses = util3d::radiusPosesFiltering(poses, nodeFilteringRadius_, nodeFilteringAngle_*CV_PI/180.0);
+		}
 
 		if(assembledMapClouds_.getNumSubscribers())
 		{
 			// generate the assembled cloud!
 			pcl::PointCloud<pcl::PointXYZRGB>::Ptr assembledCloud(new pcl::PointCloud<pcl::PointXYZRGB>);
 
-			for(unsigned int i=0; i<msg->poseIDs.size() && i<msg->poses.size(); ++i)
+			for(std::map<int, Transform>::iterator iter = poses.begin(); iter!=poses.end(); ++iter)
 			{
-				Transform pose = transformFromPoseMsg(msg->poses[i]);
-
-				std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr >::iterator iter = rgbClouds_.find(msg->poseIDs[i]);
-				if(iter != rgbClouds_.end())
+				std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr >::iterator jter = rgbClouds_.find(iter->first);
+				if(jter != rgbClouds_.end())
 				{
-					pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::transformPointCloud(iter->second, pose);
+					pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::transformPointCloud(jter->second, iter->second);
 					*assembledCloud+=*transformed;
 				}
 			}
@@ -214,14 +263,12 @@ public:
 			// generate the assembled scan!
 			pcl::PointCloud<pcl::PointXYZ>::Ptr assembledCloud(new pcl::PointCloud<pcl::PointXYZ>);
 
-			for(unsigned int i=0; i<msg->poseIDs.size() && i<msg->poses.size(); ++i)
+			for(std::map<int, Transform>::iterator iter = poses.begin(); iter!=poses.end(); ++iter)
 			{
-				Transform pose = transformFromPoseMsg(msg->poses[i]);
-
-				std::map<int, pcl::PointCloud<pcl::PointXYZ>::Ptr >::iterator iter = scans_.find(msg->poseIDs[i]);
-				if(iter != scans_.end())
+				std::map<int, pcl::PointCloud<pcl::PointXYZ>::Ptr >::iterator jter = scans_.find(iter->first);
+				if(jter != scans_.end())
 				{
-					pcl::PointCloud<pcl::PointXYZ>::Ptr transformed = util3d::transformPointCloud(iter->second, pose);
+					pcl::PointCloud<pcl::PointXYZ>::Ptr transformed = util3d::transformPointCloud(jter->second, iter->second);
 					*assembledCloud+=*transformed;
 				}
 			}
@@ -240,6 +287,40 @@ public:
 				assembledMapScans_.publish(cloudMsg);
 			}
 		}
+
+		if(occupancyMapPub_.getNumSubscribers())
+		{
+			// create the map
+			float xMin=0.0f, yMin=0.0f;
+			cv::Mat pixels = util3d::create2DMapFromOccupancyLocalMaps(poses, occupancyLocalMaps_, gridCellSize_, xMin, yMin, emptyCellFillingRadius_);
+
+			if(!pixels.empty())
+			{
+				//init
+				nav_msgs::OccupancyGrid map;
+				map.info.resolution = gridCellSize_;
+				map.info.origin.position.x = 0.0;
+				map.info.origin.position.y = 0.0;
+				map.info.origin.position.z = 0.0;
+				map.info.origin.orientation.x = 0.0;
+				map.info.origin.orientation.y = 0.0;
+				map.info.origin.orientation.z = 0.0;
+				map.info.origin.orientation.w = 1.0;
+
+				map.info.width = pixels.cols;
+				map.info.height = pixels.rows;
+				map.info.origin.position.x = xMin;
+				map.info.origin.position.y = yMin;
+				map.data.resize(map.info.width * map.info.height);
+
+				memcpy(map.data.data(), pixels.data, map.info.width * map.info.height);
+
+				map.header.frame_id = msg->header.frame_id;
+				map.header.stamp = ros::Time::now();
+
+				occupancyMapPub_.publish(map);
+			}
+		}
 	}
 
 private:
@@ -248,10 +329,23 @@ private:
 	double cloudVoxelSize_;
 	double scanVoxelSize_;
 
+	double nodeFilteringAngle_;
+	double nodeFilteringRadius_;
+
+	bool computeOccupancyGrid_;
+	double gridCellSize_;
+	double groundMaxAngle_;
+	int clusterMinSize_;
+	int emptyCellFillingRadius_;
+	double maxHeight_;
+
+	std::map<int, std::pair<cv::Mat, cv::Mat> > occupancyLocalMaps_; // <ground, obstacles>
+
 	ros::Subscriber mapDataTopic_;
 
 	ros::Publisher assembledMapClouds_;
 	ros::Publisher assembledMapScans_;
+	ros::Publisher occupancyMapPub_;
 
 	std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr > rgbClouds_;
 	std::map<int, pcl::PointCloud<pcl::PointXYZ>::Ptr > scans_;

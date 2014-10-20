@@ -46,7 +46,7 @@ public:
 		gridCellSize_(0.05),
 		gridUnknownSpaceFilled_(true),
 		filterRadius_(0.5),
-		filterAngle_(30.0)
+		filterAngle_(30.0) // degrees
 	{
 		ros::NodeHandle pnh("~");
 		pnh.param("cell_size", gridCellSize_, gridCellSize_);
