@@ -3,7 +3,17 @@
   <!-- rosbag record camera/data_throttled_image/compressed camera/data_throttled_image_depth/compressedDepth camera/data_throttled_camera_info tf base_scan /base_controller/odom -->
   
   <include file="$(find az3_bringup)/az3_standalone.launch"/>
-  <include file="$(find az3_bringup)/joystick.launch"/>
+
+<!-- To control with only one joystick -->
+<include file="$(find turtlebot_teleop)/launch/includes/velocity_smoother.launch.xml"/>
+
+  <node pkg="turtlebot_teleop" type="turtlebot_teleop_joy" name="turtlebot_teleop_joystick">
+    <param name="scale_angular" value="1.5"/>
+    <param name="scale_linear" value="0.5"/>
+    <remap from="turtlebot_teleop_joystick/cmd_vel" to="base_controller/cmd_vel"/>
+  </node>
+
+  <node pkg="joy" type="joy_node" name="joystick"/>
 
   <!-- OpenNI -->
   <include file="$(find rtabmap)/launch/azimut3/az3_openni.launch"/>
