@@ -69,7 +69,7 @@
 	<!-- Run the ROS package stereo_image_proc for image rectification-->
 	<group ns="/stereo_camera" >
 		<!-- HACK: the fps parameter on camera1394stereo_node doesn't work for my camera!?!?
-			 Throttle camera images to 10 Hz () -->
+			 Throttle camera images to 5 Hz (), odometry on azimut cannot run over 5Hz -->
 		<node pkg="nodelet" type="nodelet" name="stereo_throttle" args="standalone rtabmap/stereo_throttle">
 			<remap from="left/image"       to="left/image_raw"/>
 		    <remap from="right/image"      to="right/image_raw"/>
@@ -77,15 +77,22 @@
 		    <remap from="right/camera_info" to="right/camera_info"/>
 		    
 		    <param name="queue_size" type="int" value="10"/>
-		    <param name="rate" type="double" value="10"/>
+		    <param name="rate" type="double" value="5"/>
 		</node>
 	
 		<node pkg="stereo_image_proc" type="stereo_image_proc" name="stereo_image_proc">
-			<remap from="left/image_raw" to="left/image_raw_throttle"/>
-			<remap from="left/camera_info" to="left/camera_info_throttle"/>
-			<remap from="right/image_raw" to="right/image_raw_throttle"/>
+			<remap from="left/image_raw"    to="left/image_raw_throttle"/>
+			<remap from="left/camera_info"  to="left/camera_info_throttle"/>
+			<remap from="right/image_raw"   to="right/image_raw_throttle"/>
 			<remap from="right/camera_info" to="right/camera_info_throttle"/>
-			<remap from="points2" to="/planner_cloud"/>
+		</node>
+		<node pkg="nodelet" type="nodelet" name="disparity2cloud" args="standalone rtabmap/point_cloud_xyz">
+			<remap from="disparity/image"       to="disparity"/>
+			<remap from="disparity/camera_info" to="right/camera_info_throttle"/>
+			<remap from="cloud"                 to="/planner_cloud"/>
+			
+			<param name="voxel_size" type="double" value="0.05"/>
+			<param name="decimation" type="int" value="4"/>
 		</node>
 	</group>
 	

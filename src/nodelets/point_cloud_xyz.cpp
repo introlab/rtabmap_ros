@@ -37,6 +37,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/image_encodings.h>
 #include <sensor_msgs/CameraInfo.h>
+#include <stereo_msgs/DisparityImage.h>
 
 #include <image_transport/image_transport.h>
 #include <image_transport/subscriber_filter.h>
@@ -62,6 +63,7 @@ public:
 	virtual ~PointCloudXYZ()
 	{
 		delete sync_;
+		delete syncDisparity_;
 	}
 
 private:
@@ -77,12 +79,18 @@ private:
 
 		sync_ = new message_filters::Synchronizer<MySyncPolicy>(MySyncPolicy(queueSize), imageDepthSub_, cameraInfoSub_);
 		sync_->registerCallback(boost::bind(&PointCloudXYZ::callback, this, _1, _2));
-		cloudPub_ = nh.advertise<sensor_msgs::PointCloud2>("cloud", 1);
+
+		syncDisparity_ = new message_filters::Synchronizer<MySyncDispPolicy>(MySyncDispPolicy(queueSize), disparitySub_, disparityCameraInfoSub_);
+		syncDisparity_->registerCallback(boost::bind(&PointCloudXYZ::callbackDisparity, this, _1, _2));
 
 		image_transport::ImageTransport it(nh);
+		imageDepthSub_.subscribe(it, "depth/image", 1);
+		cameraInfoSub_.subscribe(nh, "depth/camera_info", 1);
 
-		imageDepthSub_.subscribe(it, "depth", 1);
-		cameraInfoSub_.subscribe(nh, "camera_info", 1);
+		disparitySub_.subscribe(nh, "disparity/image", 1);
+		disparityCameraInfoSub_.subscribe(nh, "disparity/camera_info", 1);
+
+		cloudPub_ = nh.advertise<sensor_msgs::PointCloud2>("cloud", 1);
 	}
 
 
@@ -135,7 +143,55 @@ private:
 			//publish the message
 			cloudPub_.publish(rosCloud);
 		}
-}
+	}
+
+	void callbackDisparity(
+			const stereo_msgs::DisparityImageConstPtr& disparityMsg,
+			const sensor_msgs::CameraInfoConstPtr& cameraInfo)
+	{
+		if(disparityMsg->image.encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1) !=0)
+		{
+			ROS_ERROR("Input type must be disparity=32FC1");
+			return;
+		}
+
+		// sensor_msgs::image_encodings::TYPE_32FC1
+		cv::Mat disparity(disparityMsg->image.height, disparityMsg->image.width, CV_32FC1, const_cast<uchar*>(disparityMsg->image.data.data()));
+
+		if(cloudPub_.getNumSubscribers())
+		{
+			image_geometry::PinholeCameraModel model;
+			model.fromCameraInfo(*cameraInfo);
+			float cx = model.cx();
+			float cy = model.cy();
+
+			pcl::PointCloud<pcl::PointXYZ>::Ptr pclCloud;
+			pclCloud = rtabmap::util3d::cloudFromDisparity(
+					disparity,
+					cx,
+					cy,
+					disparityMsg->f,
+					disparityMsg->T,
+					decimation_);
+
+			if(voxelSize_ > 0.0)
+			{
+				pclCloud = rtabmap::util3d::voxelize(pclCloud, voxelSize_);
+			}
+
+			//*********************
+			// Publish Map
+			//*********************
+
+			sensor_msgs::PointCloud2 rosCloud;
+			pcl::toROSMsg(*pclCloud, rosCloud);
+			rosCloud.header.stamp = disparityMsg->header.stamp;
+			rosCloud.header.frame_id = disparityMsg->header.frame_id;
+
+			//publish the message
+			cloudPub_.publish(rosCloud);
+		}
+	}
 
 private:
 
@@ -146,10 +202,14 @@ private:
 	image_transport::SubscriberFilter imageDepthSub_;
 	message_filters::Subscriber<sensor_msgs::CameraInfo> cameraInfoSub_;
 
+	message_filters::Subscriber<stereo_msgs::DisparityImage> disparitySub_;
+	message_filters::Subscriber<sensor_msgs::CameraInfo> disparityCameraInfoSub_;
 
-	// without odometry subscription (odometry is computed by this node)
 	typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::CameraInfo> MySyncPolicy;
 	message_filters::Synchronizer<MySyncPolicy> * sync_;
+
+	typedef message_filters::sync_policies::ApproximateTime<stereo_msgs::DisparityImage, sensor_msgs::CameraInfo> MySyncDispPolicy;
+	message_filters::Synchronizer<MySyncDispPolicy> * syncDisparity_;
 };
 
 PLUGINLIB_EXPORT_CLASS(rtabmap::PointCloudXYZ, nodelet::Nodelet);

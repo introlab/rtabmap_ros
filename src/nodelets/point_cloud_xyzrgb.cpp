@@ -162,8 +162,6 @@ private:
 	image_transport::SubscriberFilter imageDepthSub_;
 	message_filters::Subscriber<sensor_msgs::CameraInfo> cameraInfoSub_;
 
-
-	// without odometry subscription (odometry is computed by this node)
 	typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo> MySyncPolicy;
 	message_filters::Synchronizer<MySyncPolicy> * sync_;
 };
