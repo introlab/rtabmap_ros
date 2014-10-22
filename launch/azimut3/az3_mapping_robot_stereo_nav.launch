@@ -85,6 +85,7 @@
 			<remap from="left/camera_info" to="left/camera_info_throttle"/>
 			<remap from="right/image_raw" to="right/image_raw_throttle"/>
 			<remap from="right/camera_info" to="right/camera_info_throttle"/>
+			<remap from="points2" to="/planner_cloud"/>
 		</node>
 	</group>
 	

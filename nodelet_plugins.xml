@@ -31,6 +31,14 @@
     </description>
   </class>
   
+  <class name="rtabmap/point_cloud_xyz" 
+         type="rtabmap::PointCloudXYZ" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
+  
   <class name="rtabmap/disparity_to_depth" 
          type="rtabmap::DisparityToDepth" 
          base_class_type="nodelet::Nodelet">
