@@ -121,6 +121,7 @@ add_library(rtabmap_ros
    src/nodelets/data_throttle.cpp
    src/nodelets/stereo_throttle.cpp
    src/nodelets/data_odom_sync.cpp
+   src/nodelets/disparity_odom_sync.cpp
    src/nodelets/point_cloud_xyzrgb.cpp 
    src/nodelets/point_cloud_xyz.cpp
    src/nodelets/disparity_to_depth.cpp 

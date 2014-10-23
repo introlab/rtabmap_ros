@@ -61,16 +61,17 @@
   	<!-- TF transforms for the stereo camera -->
   	<arg name="pi/2" value="1.5707963267948966" />
 	<arg name="optical_rotate" value="0 0 0 -$(arg pi/2) 0 -$(arg pi/2)" />
-	<node pkg="tf" type="static_transform_publisher" name="camera_base_link"
+	<node pkg="tf" type="static_transform_publisher" name="stereo_camera_base_link"
 	    args="$(arg optical_rotate) stereo_camera_base stereo_camera 100" />  
-	<node pkg="tf" type="static_transform_publisher" name="base_to_camera_base_link"
+	<node pkg="tf" type="static_transform_publisher" name="base_to_stereo_camera_base_link"
 	    args="0.01 0.06 0.90 0 0.2 0 base_link stereo_camera_base 100" />  
 	    
 	<!-- Run the ROS package stereo_image_proc for image rectification-->
 	<group ns="/stereo_camera" >
+	    <node pkg="nodelet" type="nodelet" name="stereo_nodelet"  args="manager"/>
 		<!-- HACK: the fps parameter on camera1394stereo_node doesn't work for my camera!?!?
 			 Throttle camera images to 5 Hz (), odometry on azimut cannot run over 5Hz -->
-		<node pkg="nodelet" type="nodelet" name="stereo_throttle" args="standalone rtabmap/stereo_throttle">
+		<node pkg="nodelet" type="nodelet" name="stereo_throttle" args="load rtabmap/stereo_throttle stereo_nodelet">
 			<remap from="left/image"       to="left/image_raw"/>
 		    <remap from="right/image"      to="right/image_raw"/>
 		    <remap from="left/camera_info" to="left/camera_info"/>
@@ -86,9 +87,14 @@
 			<remap from="right/image_raw"   to="right/image_raw_throttle"/>
 			<remap from="right/camera_info" to="right/camera_info_throttle"/>
 		</node>
-		<node pkg="nodelet" type="nodelet" name="disparity2cloud" args="standalone rtabmap/point_cloud_xyz">
-			<remap from="disparity/image"       to="disparity"/>
-			<remap from="disparity/camera_info" to="right/camera_info_throttle"/>
+		<node pkg="nodelet" type="nodelet" name="disparity_odom_sync" args="load rtabmap/disparity_odom_sync stereo_nodelet">
+			<remap from="disparity"       to="disparity"/>
+		    <remap from="camera_info"     to="right/camera_info_throttle"/>
+		    <remap from="odom"            to="/stereo_odometer/odometry"/>
+		</node>
+		<node pkg="nodelet" type="nodelet" name="disparity2cloud" args="load rtabmap/point_cloud_xyz stereo_nodelet">
+			<remap from="disparity/image"       to="disparity_sync"/>
+			<remap from="disparity/camera_info" to="camera_info_sync"/>
 			<remap from="cloud"                 to="/planner_cloud"/>
 			
 			<param name="voxel_size" type="double" value="0.05"/>
@@ -158,6 +164,7 @@
     </node>
     <node pkg="rtabmap" type="map_assembler" name="map_assembler">
     	  <param name="occupancy_grid" type="bool" value="true"/>
+    	  <remap from="grid_projection_map" to="/map"/>
     </node>
  	
   </group>
