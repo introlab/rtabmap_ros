@@ -11,30 +11,27 @@
 	<include file="$(find az3_bringup)/az3_standalone.launch"/>
 	
 	<node name="joy" pkg="joy" type="joy_node"/>
-
     <group ns="teleop">
         <remap from="joy" to="/joy"/>
-        <node name="teleop" pkg="nodelet" type="nodelet" 
-            args="standalone azimut_tools/Teleop"/>
+        <node name="teleop" pkg="nodelet" type="nodelet" args="standalone azimut_tools/Teleop"/>
         <param name="cmd_eta/abtr_priority" value="50"/>
     </group>
 
-    <group ns="go_back">
-        <remap from="joy"  to="/joy"/>
-        <remap from="goal" to="/planner_goal"/>
-        <node name="go_back" pkg="azimut_tools" type="go_back"/>
-        <rosparam>
-            btn_save: 1
-            btn_goto: 3
-        </rosparam>
-    </group>
-
+	<!-- ROS navigation stack move_base -->
     <group ns="planner">
         <remap from="openni_points" to="/planner_cloud"/>
         <remap from="base_scan" to="/base_scan"/>
         <remap from="map" to="/map"/>
         <remap from="move_base_simple/goal" to="/planner_goal"/>
-        <include file="$(find az3_navigation)/launch/az3_move_base_slam.launch"/>
+        
+        <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen">
+    	  <rosparam file="$(find rtabmap)/launch/config/azimut3/costmap_common_params.yaml" command="load" ns="global_costmap" />
+     	  <rosparam file="$(find rtabmap)/launch/config/azimut3/costmap_common_params.yaml" command="load" ns="local_costmap" />
+    	  <rosparam file="$(find rtabmap)/launch/config/azimut3/local_costmap_params.yaml" command="load" />
+    	  <rosparam file="$(find rtabmap)/launch/config/azimut3/global_costmap_params.yaml" command="load" />
+    	  <rosparam file="$(find rtabmap)/launch/config/azimut3/base_local_planner_params.yaml" command="load" />
+   		</node>
+   		
         <param name="cmd_vel/abtr_priority" value="10"/>
     </group>
 
@@ -42,6 +39,7 @@
         <remap from="abtr_cmd_eta" to="/base_controller/cmd_eta"/>
     </node>
 
+	<!-- Arbitration between teleop and planner -->
     <node name="register_cmd_eta" pkg="abtr_priority" type="register"
         args="/cmd_eta /teleop/cmd_eta"/>
     <node name="register_cmd_vel" pkg="abtr_priority" type="register"
@@ -87,14 +85,11 @@
 			<remap from="right/image_raw"   to="right/image_raw_throttle"/>
 			<remap from="right/camera_info" to="right/camera_info_throttle"/>
 		</node>
-		<node pkg="nodelet" type="nodelet" name="disparity_odom_sync" args="load rtabmap/disparity_odom_sync stereo_nodelet">
-			<remap from="disparity"       to="disparity"/>
-		    <remap from="camera_info"     to="right/camera_info_throttle"/>
-		    <remap from="odom"            to="/stereo_odometer/odometry"/>
-		</node>
+		
+		<!-- Create point cloud for the planner -->
 		<node pkg="nodelet" type="nodelet" name="disparity2cloud" args="load rtabmap/point_cloud_xyz stereo_nodelet">
-			<remap from="disparity/image"       to="disparity_sync"/>
-			<remap from="disparity/camera_info" to="right/camera_info_throttle_sync"/>
+			<remap from="disparity/image"       to="disparity"/>
+			<remap from="disparity/camera_info" to="right/camera_info_throttle"/>
 			<remap from="cloud"                 to="/planner_cloud"/>
 			
 			<param name="voxel_size" type="double" value="0.05"/>

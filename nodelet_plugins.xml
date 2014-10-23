@@ -22,15 +22,7 @@
       This is my nodelet.
     </description>
   </class>
-  
-  <class name="rtabmap/disparity_odom_sync" 
-         type="rtabmap::DisparityOdomSyncNodelet" 
-         base_class_type="nodelet::Nodelet">
-    <description>
-      This is my nodelet.
-    </description>
-  </class>
-    
+      
   <class name="rtabmap/point_cloud_xyzrgb" 
          type="rtabmap::PointCloudXYZRGB" 
          base_class_type="nodelet::Nodelet">
