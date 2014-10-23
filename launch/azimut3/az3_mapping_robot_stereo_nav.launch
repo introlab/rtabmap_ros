@@ -94,7 +94,7 @@
 		</node>
 		<node pkg="nodelet" type="nodelet" name="disparity2cloud" args="load rtabmap/point_cloud_xyz stereo_nodelet">
 			<remap from="disparity/image"       to="disparity_sync"/>
-			<remap from="disparity/camera_info" to="camera_info_sync"/>
+			<remap from="disparity/camera_info" to="right/camera_info_throttle_sync"/>
 			<remap from="cloud"                 to="/planner_cloud"/>
 			
 			<param name="voxel_size" type="double" value="0.05"/>

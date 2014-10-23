@@ -32,6 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <message_filters/subscriber.h>
 #include <message_filters/time_synchronizer.h>
 #include <message_filters/sync_policies/approximate_time.h>
+#include <message_filters/sync_policies/exact_time.h>
 
 #include <stereo_msgs/DisparityImage.h>
 
@@ -46,13 +47,17 @@ class DisparityOdomSyncNodelet : public nodelet::Nodelet
 public:
 	//Constructor
 	DisparityOdomSyncNodelet():
-		sync_(0)
+		approxSync_(0),
+		exactSync_(0)
 	{
 	}
 
 	virtual ~DisparityOdomSyncNodelet()
 	{
-		delete sync_;
+		if(approxSync_)
+			delete approxSync_;
+		if(exactSync_)
+			delete exactSync_;
 	}
 
 private:
@@ -62,18 +67,29 @@ private:
 		ros::NodeHandle& private_nh = getPrivateNodeHandle();
 
 		int queueSize = 10;
+		bool approxSync = false;
 		private_nh.param("queue_size", queueSize, queueSize);
+		private_nh.param("approx_sync", approxSync, approxSync);
+		ROS_INFO("Approximate time sync = %s", approxSync?"true":"false");
 
-		sync_ = new message_filters::Synchronizer<MySyncPolicy>(MySyncPolicy(queueSize), disparitySub_, infoSub_, odomSub_);
-		sync_->registerCallback(boost::bind(&DisparityOdomSyncNodelet::callback, this, _1, _2, _3));
+		if(approxSync)
+		{
+			approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize), disparitySub_, infoSub_, odomSub_);
+			approxSync_->registerCallback(boost::bind(&DisparityOdomSyncNodelet::callback, this, _1, _2, _3));
+		}
+		else
+		{
+			exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize), disparitySub_, infoSub_, odomSub_);
+			exactSync_->registerCallback(boost::bind(&DisparityOdomSyncNodelet::callback, this, _1, _2, _3));
+		}
 
 		disparitySub_.subscribe(nh, "disparity", 1);
 		infoSub_.subscribe(nh, "camera_info", 1);
 		odomSub_.subscribe(nh, "odom", 1);
 
-		disparityPub_ = nh.advertise<stereo_msgs::DisparityImage>(nh.resolveName("disparity")+"_sync", 10);
-		infoPub_ = nh.advertise<sensor_msgs::CameraInfo>(nh.resolveName("camera_info")+"_sync", 10);
-		odomPub_ = nh.advertise<nav_msgs::Odometry>(nh.resolveName("odom")+"_sync", 10);
+		disparityPub_ = nh.advertise<stereo_msgs::DisparityImage>(nh.resolveName("disparity")+"_sync", 1);
+		infoPub_ = nh.advertise<sensor_msgs::CameraInfo>(nh.resolveName("camera_info")+"_sync", 1);
+		odomPub_ = nh.advertise<nav_msgs::Odometry>(nh.resolveName("odom")+"_sync", 1);
 	};
 
 	void callback(const stereo_msgs::DisparityImageConstPtr& image,
@@ -101,8 +117,10 @@ private:
 	message_filters::Subscriber<stereo_msgs::DisparityImage> disparitySub_;
 	message_filters::Subscriber<sensor_msgs::CameraInfo> infoSub_;
 	message_filters::Subscriber<nav_msgs::Odometry> odomSub_;
-	typedef message_filters::sync_policies::ApproximateTime<stereo_msgs::DisparityImage, sensor_msgs::CameraInfo, nav_msgs::Odometry> MySyncPolicy;
-	message_filters::Synchronizer<MySyncPolicy> * sync_;
+	typedef message_filters::sync_policies::ApproximateTime<stereo_msgs::DisparityImage, sensor_msgs::CameraInfo, nav_msgs::Odometry> MyApproxSyncPolicy;
+	message_filters::Synchronizer<MyApproxSyncPolicy> * approxSync_;
+	typedef message_filters::sync_policies::ExactTime<stereo_msgs::DisparityImage, sensor_msgs::CameraInfo, nav_msgs::Odometry> MyExactSyncPolicy;
+	message_filters::Synchronizer<MyExactSyncPolicy> * exactSync_;
 
 };
 
