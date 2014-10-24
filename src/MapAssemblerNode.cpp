@@ -169,14 +169,14 @@ public:
 
 						if(cloudMaxDepth_ > 0)
 						{
-							cloud = util3d::passThrough(cloud, "z", 0, cloudMaxDepth_);
+							cloud = util3d::passThrough<pcl::PointXYZRGB>(cloud, "z", 0, cloudMaxDepth_);
 						}
 						if(cloudVoxelSize_ > 0)
 						{
-							cloud = util3d::voxelize(cloud, cloudVoxelSize_);
+							cloud = util3d::voxelize<pcl::PointXYZRGB>(cloud, cloudVoxelSize_);
 						}
 
-						cloud = util3d::transformPointCloud(cloud, localTransform);
+						cloud = util3d::transformPointCloud<pcl::PointXYZRGB>(cloud, localTransform);
 
 						rgbClouds_.insert(std::make_pair(id, cloud));
 
@@ -185,7 +185,7 @@ public:
 							pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloudClipped = cloud;
 							if(maxHeight_ > 0)
 							{
-								cloudClipped = util3d::passThrough(cloudClipped, "z", std::numeric_limits<int>::min(), maxHeight_);
+								cloudClipped = util3d::passThrough<pcl::PointXYZRGB>(cloudClipped, "z", std::numeric_limits<int>::min(), maxHeight_);
 							}
 							cv::Mat ground, obstacles;
 							if(util3d::occupancy2DFromCloud3D(cloudClipped, ground, obstacles, gridCellSize_, groundMaxAngle_, clusterMinSize_))
@@ -209,7 +209,7 @@ public:
 					pcl::PointCloud<pcl::PointXYZ>::Ptr cloud = util3d::depth2DToPointCloud(depth2d);
 					if(scanVoxelSize_ > 0)
 					{
-						cloud = util3d::voxelize(cloud, scanVoxelSize_);
+						cloud = util3d::voxelize<pcl::PointXYZ>(cloud, scanVoxelSize_);
 					}
 
 					scans_.insert(std::make_pair(msg->depth2DIDs[i], cloud));
@@ -238,7 +238,7 @@ public:
 				std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr >::iterator jter = rgbClouds_.find(iter->first);
 				if(jter != rgbClouds_.end())
 				{
-					pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::transformPointCloud(jter->second, iter->second);
+					pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::transformPointCloud<pcl::PointXYZRGB>(jter->second, iter->second);
 					*assembledCloud+=*transformed;
 				}
 			}
@@ -247,7 +247,7 @@ public:
 			{
 				if(cloudVoxelSize_ > 0)
 				{
-					assembledCloud = util3d::voxelize(assembledCloud,cloudVoxelSize_);
+					assembledCloud = util3d::voxelize<pcl::PointXYZRGB>(assembledCloud,cloudVoxelSize_);
 				}
 
 				sensor_msgs::PointCloud2::Ptr cloudMsg(new sensor_msgs::PointCloud2);
@@ -268,7 +268,7 @@ public:
 				std::map<int, pcl::PointCloud<pcl::PointXYZ>::Ptr >::iterator jter = scans_.find(iter->first);
 				if(jter != scans_.end())
 				{
-					pcl::PointCloud<pcl::PointXYZ>::Ptr transformed = util3d::transformPointCloud(jter->second, iter->second);
+					pcl::PointCloud<pcl::PointXYZ>::Ptr transformed = util3d::transformPointCloud<pcl::PointXYZ>(jter->second, iter->second);
 					*assembledCloud+=*transformed;
 				}
 			}
@@ -277,7 +277,7 @@ public:
 			{
 				if(scanVoxelSize_ > 0)
 				{
-					assembledCloud = util3d::voxelize(assembledCloud, scanVoxelSize_);
+					assembledCloud = util3d::voxelize<pcl::PointXYZ>(assembledCloud, scanVoxelSize_);
 				}
 
 				sensor_msgs::PointCloud2::Ptr cloudMsg(new sensor_msgs::PointCloud2);

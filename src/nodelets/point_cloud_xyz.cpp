@@ -58,7 +58,12 @@ namespace rtabmap
 class PointCloudXYZ : public nodelet::Nodelet
 {
 public:
-	PointCloudXYZ() : voxelSize_(0.0), decimation_(1) {}
+	PointCloudXYZ() :
+		voxelSize_(0.0),
+		decimation_(1),
+		noiseFilterRadius_(0.0),
+		noiseFilterMinNeighbors_(5)
+	{}
 
 	virtual ~PointCloudXYZ()
 	{
@@ -76,6 +81,8 @@ private:
 		pnh.param("queue_size", queueSize, queueSize);
 		pnh.param("voxel_size", voxelSize_, voxelSize_);
 		pnh.param("decimation", decimation_, decimation_);
+		pnh.param("noise_filter_radius", noiseFilterRadius_, noiseFilterRadius_);
+		pnh.param("noise_filter_min_neighbors", noiseFilterMinNeighbors_, noiseFilterMinNeighbors_);
 
 		sync_ = new message_filters::Synchronizer<MySyncPolicy>(MySyncPolicy(queueSize), imageDepthSub_, cameraInfoSub_);
 		sync_->registerCallback(boost::bind(&PointCloudXYZ::callback, this, _1, _2));
@@ -118,7 +125,7 @@ private:
 			float cy = model.cy();
 
 			pcl::PointCloud<pcl::PointXYZ>::Ptr pclCloud;
-			pclCloud = rtabmap::util3d::cloudFromDepth(
+			pclCloud = util3d::cloudFromDepth(
 					imageDepthPtr->image,
 					cx,
 					cy,
@@ -126,9 +133,17 @@ private:
 					fy,
 					decimation_);
 
+			if(noiseFilterRadius_ > 0.0 && noiseFilterMinNeighbors_ > 0)
+			{
+				pcl::IndicesPtr indices = util3d::radiusFiltering<pcl::PointXYZ>(pclCloud, noiseFilterRadius_, noiseFilterMinNeighbors_);
+				pcl::PointCloud<pcl::PointXYZ>::Ptr tmp(new pcl::PointCloud<pcl::PointXYZ>);
+				pcl::copyPointCloud(*pclCloud, *indices, *tmp);
+				pclCloud = tmp;
+			}
+
 			if(voxelSize_ > 0.0)
 			{
-				pclCloud = rtabmap::util3d::voxelize(pclCloud, voxelSize_);
+				pclCloud = util3d::voxelize<pcl::PointXYZ>(pclCloud, voxelSize_);
 			}
 
 			//*********************
@@ -149,14 +164,22 @@ private:
 			const stereo_msgs::DisparityImageConstPtr& disparityMsg,
 			const sensor_msgs::CameraInfoConstPtr& cameraInfo)
 	{
-		if(disparityMsg->image.encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1) !=0)
+		if(disparityMsg->image.encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1) !=0 &&
+		   disparityMsg->image.encoding.compare(sensor_msgs::image_encodings::TYPE_16SC1) !=0)
 		{
-			ROS_ERROR("Input type must be disparity=32FC1");
+			ROS_ERROR("Input type must be disparity=32FC1 or 16SC1");
 			return;
 		}
 
-		// sensor_msgs::image_encodings::TYPE_32FC1
-		cv::Mat disparity(disparityMsg->image.height, disparityMsg->image.width, CV_32FC1, const_cast<uchar*>(disparityMsg->image.data.data()));
+		cv::Mat disparity;
+		if(disparityMsg->image.encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1) == 0)
+		{
+			disparity = cv::Mat(disparityMsg->image.height, disparityMsg->image.width, CV_32FC1, const_cast<uchar*>(disparityMsg->image.data.data()));
+		}
+		else
+		{
+			disparity = cv::Mat(disparityMsg->image.height, disparityMsg->image.width, CV_16SC1, const_cast<uchar*>(disparityMsg->image.data.data()));
+		}
 
 		if(cloudPub_.getNumSubscribers())
 		{
@@ -166,7 +189,7 @@ private:
 			float cy = model.cy();
 
 			pcl::PointCloud<pcl::PointXYZ>::Ptr pclCloud;
-			pclCloud = rtabmap::util3d::cloudFromDisparity(
+			pclCloud = util3d::cloudFromDisparity(
 					disparity,
 					cx,
 					cy,
@@ -174,9 +197,17 @@ private:
 					disparityMsg->T,
 					decimation_);
 
+			if(noiseFilterRadius_ > 0.0 && noiseFilterMinNeighbors_ > 0)
+			{
+				pcl::IndicesPtr indices = util3d::radiusFiltering<pcl::PointXYZ>(pclCloud, noiseFilterRadius_, noiseFilterMinNeighbors_);
+				pcl::PointCloud<pcl::PointXYZ>::Ptr tmp(new pcl::PointCloud<pcl::PointXYZ>);
+				pcl::copyPointCloud(*pclCloud, *indices, *tmp);
+				pclCloud = tmp;
+			}
+
 			if(voxelSize_ > 0.0)
 			{
-				pclCloud = rtabmap::util3d::voxelize(pclCloud, voxelSize_);
+				pclCloud = util3d::voxelize<pcl::PointXYZ>(pclCloud, voxelSize_);
 			}
 
 			//*********************
@@ -197,6 +228,9 @@ private:
 
 	double voxelSize_;
 	int decimation_;
+	double noiseFilterRadius_;
+	int noiseFilterMinNeighbors_;
+
 	ros::Publisher cloudPub_;
 
 	image_transport::SubscriberFilter imageDepthSub_;

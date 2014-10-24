@@ -328,7 +328,7 @@ Transform OdometryROS::processData(SensorData & data, const std_msgs::Header & h
 				if(cloud->size())
 				{
 					pcl::PointCloud<pcl::PointXYZ>::Ptr cloudTransformed;
-					cloudTransformed = util3d::transformPointCloud(cloud, pose);
+					cloudTransformed = util3d::transformPointCloud<pcl::PointXYZ>(cloud, pose);
 					sensor_msgs::PointCloud2 cloudMsg;
 					pcl::toROSMsg(*cloudTransformed, cloudMsg);
 					cloudMsg.header.stamp = header.stamp; // use corresponding time stamp to image

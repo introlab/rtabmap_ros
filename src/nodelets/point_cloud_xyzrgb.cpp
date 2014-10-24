@@ -135,7 +135,7 @@ private:
 
 			if(voxelSize_ > 0.0)
 			{
-				pclCloud = rtabmap::util3d::voxelize(pclCloud, voxelSize_);
+				pclCloud = rtabmap::util3d::voxelize<pcl::PointXYZRGB>(pclCloud, voxelSize_);
 			}
 
 			//*********************

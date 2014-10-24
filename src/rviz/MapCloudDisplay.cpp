@@ -319,19 +319,19 @@ void MapCloudDisplay::processMapData(const rtabmap::MapData& map)
 					}
 					if(cloud_max_depth_->getFloat() > 0.0f)
 					{
-						cloud = util3d::passThrough(cloud, "z", 0, cloud_max_depth_->getFloat());
+						cloud = util3d::passThrough<pcl::PointXYZRGB>(cloud, "z", 0, cloud_max_depth_->getFloat());
 					}
 					if(cloud_voxel_size_->getFloat() > 0.0f)
 					{
-						cloud = util3d::voxelize(cloud, cloud_voxel_size_->getFloat());
+						cloud = util3d::voxelize<pcl::PointXYZRGB>(cloud, cloud_voxel_size_->getFloat());
 					}
 
-					cloud = util3d::transformPointCloud(cloud, localTransform);
+					cloud = util3d::transformPointCloud<pcl::PointXYZRGB>(cloud, localTransform);
 
 					// do it after local transform
 					if(cloud_filter_floor_height_->getFloat() > 0.0f)
 					{
-						cloud = util3d::passThrough(cloud, "z", cloud_filter_floor_height_->getFloat(), 999.0f);
+						cloud = util3d::passThrough<pcl::PointXYZRGB>(cloud, "z", cloud_filter_floor_height_->getFloat(), 999.0f);
 					}
 
 					sensor_msgs::PointCloud2::Ptr cloudMsg(new sensor_msgs::PointCloud2);
