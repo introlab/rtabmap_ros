@@ -45,6 +45,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <image_geometry/pinhole_camera_model.h>
 
 #include <message_filters/sync_policies/approximate_time.h>
+#include <message_filters/sync_policies/exact_time.h>
 #include <message_filters/subscriber.h>
 
 #include <cv_bridge/cv_bridge.h>
@@ -59,16 +60,27 @@ class PointCloudXYZ : public nodelet::Nodelet
 {
 public:
 	PointCloudXYZ() :
+		maxDepth_(0.0),
 		voxelSize_(0.0),
 		decimation_(1),
 		noiseFilterRadius_(0.0),
-		noiseFilterMinNeighbors_(5)
+		noiseFilterMinNeighbors_(5),
+		approxSyncDepth_(0),
+		approxSyncDisparity_(0),
+		exactSyncDepth_(0),
+		exactSyncDisparity_(0)
 	{}
 
 	virtual ~PointCloudXYZ()
 	{
-		delete sync_;
-		delete syncDisparity_;
+		if(approxSyncDepth_)
+			delete approxSyncDepth_;
+		if(approxSyncDisparity_)
+			delete approxSyncDisparity_;
+		if(exactSyncDepth_)
+			delete exactSyncDepth_;
+		if(exactSyncDisparity_)
+			delete exactSyncDisparity_;
 	}
 
 private:
@@ -78,29 +90,46 @@ private:
 		ros::NodeHandle & pnh = getPrivateNodeHandle();
 
 		int queueSize = 10;
+		bool approxSync = true;
+		pnh.param("approx_sync", approxSync, approxSync);
 		pnh.param("queue_size", queueSize, queueSize);
+		pnh.param("max_depth", maxDepth_, maxDepth_);
 		pnh.param("voxel_size", voxelSize_, voxelSize_);
 		pnh.param("decimation", decimation_, decimation_);
 		pnh.param("noise_filter_radius", noiseFilterRadius_, noiseFilterRadius_);
 		pnh.param("noise_filter_min_neighbors", noiseFilterMinNeighbors_, noiseFilterMinNeighbors_);
+		ROS_INFO("Approximate time sync = %s", approxSync?"true":"false");
 
-		sync_ = new message_filters::Synchronizer<MySyncPolicy>(MySyncPolicy(queueSize), imageDepthSub_, cameraInfoSub_);
-		sync_->registerCallback(boost::bind(&PointCloudXYZ::callback, this, _1, _2));
+		if(approxSync)
+		{
+			approxSyncDepth_ = new message_filters::Synchronizer<MyApproxSyncDepthPolicy>(MyApproxSyncDepthPolicy(queueSize), imageDepthSub_, cameraInfoSub_);
+			approxSyncDepth_->registerCallback(boost::bind(&PointCloudXYZ::callback, this, _1, _2));
 
-		syncDisparity_ = new message_filters::Synchronizer<MySyncDispPolicy>(MySyncDispPolicy(queueSize), disparitySub_, disparityCameraInfoSub_);
-		syncDisparity_->registerCallback(boost::bind(&PointCloudXYZ::callbackDisparity, this, _1, _2));
+			approxSyncDisparity_ = new message_filters::Synchronizer<MyApproxSyncDisparityDispPolicy>(MyApproxSyncDisparityDispPolicy(queueSize), disparitySub_, disparityCameraInfoSub_);
+			approxSyncDisparity_->registerCallback(boost::bind(&PointCloudXYZ::callbackDisparity, this, _1, _2));
+		}
+		else
+		{
+			exactSyncDepth_ = new message_filters::Synchronizer<MyExactSyncDepthPolicy>(MyExactSyncDepthPolicy(queueSize), imageDepthSub_, cameraInfoSub_);
+			exactSyncDepth_->registerCallback(boost::bind(&PointCloudXYZ::callback, this, _1, _2));
 
-		image_transport::ImageTransport it(nh);
-		imageDepthSub_.subscribe(it, "depth/image", 1);
-		cameraInfoSub_.subscribe(nh, "depth/camera_info", 1);
+			exactSyncDisparity_ = new message_filters::Synchronizer<MyExactSyncDisparityDispPolicy>(MyExactSyncDisparityDispPolicy(queueSize), disparitySub_, disparityCameraInfoSub_);
+			exactSyncDisparity_->registerCallback(boost::bind(&PointCloudXYZ::callbackDisparity, this, _1, _2));
+		}
+
+		ros::NodeHandle depth_nh(nh, "depth");
+		ros::NodeHandle depth_pnh(pnh, "depth");
+		image_transport::ImageTransport depth_it(depth_nh);
+		image_transport::TransportHints hintsDepth("raw", ros::TransportHints(), depth_pnh);
+
+		imageDepthSub_.subscribe(depth_it, depth_nh.resolveName("image"), 1, hintsDepth);
+		cameraInfoSub_.subscribe(depth_nh, "camera_info", 1);
 
 		disparitySub_.subscribe(nh, "disparity/image", 1);
 		disparityCameraInfoSub_.subscribe(nh, "disparity/camera_info", 1);
 
 		cloudPub_ = nh.advertise<sensor_msgs::PointCloud2>("cloud", 1);
 	}
-
-
 
 	void callback(
 			  const sensor_msgs::ImageConstPtr& depth,
@@ -133,30 +162,7 @@ private:
 					fy,
 					decimation_);
 
-			if(noiseFilterRadius_ > 0.0 && noiseFilterMinNeighbors_ > 0)
-			{
-				pcl::IndicesPtr indices = util3d::radiusFiltering<pcl::PointXYZ>(pclCloud, noiseFilterRadius_, noiseFilterMinNeighbors_);
-				pcl::PointCloud<pcl::PointXYZ>::Ptr tmp(new pcl::PointCloud<pcl::PointXYZ>);
-				pcl::copyPointCloud(*pclCloud, *indices, *tmp);
-				pclCloud = tmp;
-			}
-
-			if(voxelSize_ > 0.0)
-			{
-				pclCloud = util3d::voxelize<pcl::PointXYZ>(pclCloud, voxelSize_);
-			}
-
-			//*********************
-			// Publish Map
-			//*********************
-
-			sensor_msgs::PointCloud2 rosCloud;
-			pcl::toROSMsg(*pclCloud, rosCloud);
-			rosCloud.header.stamp = depth->header.stamp;
-			rosCloud.header.frame_id = depth->header.frame_id;
-
-			//publish the message
-			cloudPub_.publish(rosCloud);
+			processAndPublish(pclCloud, depth->header);
 		}
 	}
 
@@ -197,35 +203,42 @@ private:
 					disparityMsg->T,
 					decimation_);
 
-			if(noiseFilterRadius_ > 0.0 && noiseFilterMinNeighbors_ > 0)
-			{
-				pcl::IndicesPtr indices = util3d::radiusFiltering<pcl::PointXYZ>(pclCloud, noiseFilterRadius_, noiseFilterMinNeighbors_);
-				pcl::PointCloud<pcl::PointXYZ>::Ptr tmp(new pcl::PointCloud<pcl::PointXYZ>);
-				pcl::copyPointCloud(*pclCloud, *indices, *tmp);
-				pclCloud = tmp;
-			}
-
-			if(voxelSize_ > 0.0)
-			{
-				pclCloud = util3d::voxelize<pcl::PointXYZ>(pclCloud, voxelSize_);
-			}
-
-			//*********************
-			// Publish Map
-			//*********************
-
-			sensor_msgs::PointCloud2 rosCloud;
-			pcl::toROSMsg(*pclCloud, rosCloud);
-			rosCloud.header.stamp = disparityMsg->header.stamp;
-			rosCloud.header.frame_id = disparityMsg->header.frame_id;
-
-			//publish the message
-			cloudPub_.publish(rosCloud);
+			processAndPublish(pclCloud, disparityMsg->header);
 		}
+	}
+
+	void processAndPublish(pcl::PointCloud<pcl::PointXYZ>::Ptr & pclCloud, const std_msgs::Header & header)
+	{
+		if(pclCloud->size() && maxDepth_ > 0)
+		{
+			pclCloud = util3d::passThrough<pcl::PointXYZ>(pclCloud, "z", 0, maxDepth_);
+		}
+
+		if(pclCloud->size() && noiseFilterRadius_ > 0.0 && noiseFilterMinNeighbors_ > 0)
+		{
+			pcl::IndicesPtr indices = util3d::radiusFiltering<pcl::PointXYZ>(pclCloud, noiseFilterRadius_, noiseFilterMinNeighbors_);
+			pcl::PointCloud<pcl::PointXYZ>::Ptr tmp(new pcl::PointCloud<pcl::PointXYZ>);
+			pcl::copyPointCloud(*pclCloud, *indices, *tmp);
+			pclCloud = tmp;
+		}
+
+		if(pclCloud->size() && voxelSize_ > 0.0)
+		{
+			pclCloud = util3d::voxelize<pcl::PointXYZ>(pclCloud, voxelSize_);
+		}
+
+		sensor_msgs::PointCloud2 rosCloud;
+		pcl::toROSMsg(*pclCloud, rosCloud);
+		rosCloud.header.stamp = header.stamp;
+		rosCloud.header.frame_id = header.frame_id;
+
+		//publish the message
+		cloudPub_.publish(rosCloud);
 	}
 
 private:
 
+	double maxDepth_;
 	double voxelSize_;
 	int decimation_;
 	double noiseFilterRadius_;
@@ -239,11 +252,18 @@ private:
 	message_filters::Subscriber<stereo_msgs::DisparityImage> disparitySub_;
 	message_filters::Subscriber<sensor_msgs::CameraInfo> disparityCameraInfoSub_;
 
-	typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::CameraInfo> MySyncPolicy;
-	message_filters::Synchronizer<MySyncPolicy> * sync_;
+	typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::CameraInfo> MyApproxSyncDepthPolicy;
+	message_filters::Synchronizer<MyApproxSyncDepthPolicy> * approxSyncDepth_;
 
-	typedef message_filters::sync_policies::ApproximateTime<stereo_msgs::DisparityImage, sensor_msgs::CameraInfo> MySyncDispPolicy;
-	message_filters::Synchronizer<MySyncDispPolicy> * syncDisparity_;
+	typedef message_filters::sync_policies::ApproximateTime<stereo_msgs::DisparityImage, sensor_msgs::CameraInfo> MyApproxSyncDisparityDispPolicy;
+	message_filters::Synchronizer<MyApproxSyncDisparityDispPolicy> * approxSyncDisparity_;
+
+	typedef message_filters::sync_policies::ExactTime<sensor_msgs::Image, sensor_msgs::CameraInfo> MyExactSyncDepthPolicy;
+	message_filters::Synchronizer<MyExactSyncDepthPolicy> * exactSyncDepth_;
+
+	typedef message_filters::sync_policies::ExactTime<stereo_msgs::DisparityImage, sensor_msgs::CameraInfo> MyExactSyncDisparityDispPolicy;
+	message_filters::Synchronizer<MyExactSyncDisparityDispPolicy> * exactSyncDisparity_;
+
 };
 
 PLUGINLIB_EXPORT_CLASS(rtabmap::PointCloudXYZ, nodelet::Nodelet);

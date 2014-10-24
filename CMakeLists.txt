@@ -124,6 +124,7 @@ add_library(rtabmap_ros
    src/nodelets/point_cloud_xyzrgb.cpp 
    src/nodelets/point_cloud_xyz.cpp
    src/nodelets/disparity_to_depth.cpp 
+   src/nodelets/obstacles_detection.cpp
    src/MsgConversion.cpp
    src/OdometryROS.cpp
    src/rviz/MapCloudDisplay.cpp

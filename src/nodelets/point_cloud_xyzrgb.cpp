@@ -138,10 +138,6 @@ private:
 				pclCloud = rtabmap::util3d::voxelize<pcl::PointXYZRGB>(pclCloud, voxelSize_);
 			}
 
-			//*********************
-			// Publish Map
-			//*********************
-
 			sensor_msgs::PointCloud2 rosCloud;
 			pcl::toROSMsg(*pclCloud, rosCloud);
 			rosCloud.header.stamp = image->header.stamp;

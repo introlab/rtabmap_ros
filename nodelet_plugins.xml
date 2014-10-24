@@ -46,4 +46,12 @@
       This is my nodelet.
     </description>
   </class>
+  
+  <class name="rtabmap/obstacles_detection" 
+         type="rtabmap::ObstaclesDetection" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
 </library>
