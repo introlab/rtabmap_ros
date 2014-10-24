@@ -3,7 +3,7 @@ TrajectoryPlannerROS:
   # Current limits based on AZ3 standalone configuration.
   acc_lim_x:  0.75
   acc_lim_y:  0.75
-  acc_lim_th: 4.00
+  acc_lim_theta: 4.00
   # min_vel_x and max_rotational_vel were set to keep the ICR at
   # minimal distance of 0.48 m. 
   # Basically, max_rotational_vel * rho_min <= min_vel_x
@@ -30,3 +30,4 @@ TrajectoryPlannerROS:
   dwa: true
 
   oscillation_reset_dist: 0.05
+  meter_scoring: true

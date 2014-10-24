@@ -62,7 +62,7 @@
 	<node pkg="tf" type="static_transform_publisher" name="stereo_camera_base_link"
 	    args="$(arg optical_rotate) stereo_camera_base stereo_camera 100" />  
 	<node pkg="tf" type="static_transform_publisher" name="base_to_stereo_camera_base_link"
-	    args="0.01 0.06 0.90 0 0.2 0 base_link stereo_camera_base 100" />  
+	    args="0.01 0.06 0.90 0 0.45 0 base_link stereo_camera_base 100" />  
 	    
 	<!-- Run the ROS package stereo_image_proc for image rectification-->
 	<group ns="/stereo_camera" >
@@ -84,17 +84,28 @@
 			<remap from="left/camera_info"  to="left/camera_info_throttle"/>
 			<remap from="right/image_raw"   to="right/image_raw_throttle"/>
 			<remap from="right/camera_info" to="right/camera_info_throttle"/>
+			<param name="disparity_range" value="128"/>
 		</node>
 		
 		<!-- Create point cloud for the planner -->
 		<node pkg="nodelet" type="nodelet" name="disparity2cloud" args="load rtabmap/point_cloud_xyz stereo_nodelet">
 			<remap from="disparity/image"       to="disparity"/>
 			<remap from="disparity/camera_info" to="right/camera_info_throttle"/>
-			<remap from="cloud"                 to="/planner_cloud"/>
+			<remap from="cloud"                 to="cloudXYZ"/>
 			
 			<param name="voxel_size" type="double" value="0.05"/>
 			<param name="decimation" type="int" value="4"/>
+			<param name="max_depth" type="double" value="4"/>
 		</node>
+		<node pkg="nodelet" type="nodelet" name="obstacles_detection" args="load rtabmap/obstacles_detection stereo_nodelet">
+    			<remap from="cloud" to="cloudXYZ"/>
+			<remap from="obstacles_2d" to="/planner_cloud"/>
+
+			<param name="frame_id" type="string" value="base_footprint"/>
+			<param name="map_frame_id" type="string" value="map"/>
+			<param name="min_cluster_size" type="int" value="20"/>
+			<param name="max_obstacles_height" type="double" value="0.0"/>
+  		</node>
 	</group>
 	
 	<!-- Visual Odometry -->

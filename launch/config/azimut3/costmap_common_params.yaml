@@ -1,11 +1,40 @@
 obstacle_range: 2.5
 raytrace_range: 3.0
 footprint: [[ 0.3,  0.3], [-0.3,  0.3], [-0.3, -0.3], [ 0.3, -0.3]]
+footprint_padding: 0.2
 #robot_radius: ir_of_robot
 inflation_radius: 0.55
+transform_tolerance: 1
 
-observation_sources: laser_scan_sensor point_cloud_sensor
+#observation_sources: laser_scan_sensor point_cloud_sensor
+observation_sources: point_cloud_sensor
 
-laser_scan_sensor: {data_type: LaserScan, topic: base_scan, marking: true, clearing: true}
+laser_scan_sensor: {
+  data_type: LaserScan, 
+  topic: base_scan, 
+  expected_update_rate: 0.2, 
+  marking: true, 
+  clearing: true}
 
-point_cloud_sensor: {data_type: PointCloud2, topic: openni_points, marking: true, clearing: true}
+point_cloud_sensor: {
+  sensor_frame: base_footprint,
+  data_type: PointCloud2, 
+  topic: openni_points, 
+  expected_update_rate: 0.5, 
+  marking: true, 
+  clearing: true}
+
+controller_patience: 2.0
+
+NavfnROS:
+    allow_unknown: true
+
+recovery_behaviors: [
+    {name: conservative_clear, type: clear_costmap_recovery/ClearCostmapRecovery},
+    {name: aggressive_clear, type: clear_costmap_recovery/ClearCostmapRecovery}
+]
+
+conservative_clear: 
+    reset_distance: 3.00
+aggressive_clear:
+    reset_distance: 1.84
