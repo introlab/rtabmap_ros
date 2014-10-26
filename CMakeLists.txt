@@ -42,6 +42,7 @@ add_message_files(
    InfoEx.msg
    KeyPoint.msg
    MapData.msg
+   NodeData.msg
    Bytes.msg
 )
 

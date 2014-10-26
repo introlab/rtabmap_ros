@@ -69,12 +69,12 @@ public:
 
 	void mapDataReceivedCallback(const rtabmap::MapDataConstPtr & msg)
 	{
-		for(unsigned int i=0; i<msg->depth2DIDs.size() && i<msg->depth2Ds.size(); ++i)
+		for(unsigned int i=0; i<msg->nodes.size(); ++i)
 		{
-			if(!uContains(scans_, msg->depth2DIDs[i]))
+			if(!uContains(scans_, msg->nodes[i].id) && msg->nodes[i].depth2D.bytes.size())
 			{
-				cv::Mat depth2d = util3d::uncompressData(msg->depth2Ds[i].bytes);
-				scans_.insert(std::make_pair(msg->depth2DIDs[i], util3d::depth2DToPointCloud(depth2d)));
+				cv::Mat depth2d = util3d::uncompressData(msg->nodes[i].depth2D.bytes);
+				scans_.insert(std::make_pair(msg->nodes[i].id, util3d::depth2DToPointCloud(depth2d)));
 			}
 		}
 

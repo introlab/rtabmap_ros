@@ -9,13 +9,10 @@ int32 refId
 int32 loopClosureId
 int32 localLoopClosureId
 
-geometry_msgs/Transform mapCorrection
 geometry_msgs/Transform loopClosureTransform
 
-geometry_msgs/Pose currentPose
-
 ####
-# For statistics and visualization ...
+# For statistics...
 ####
 # std::map<int, float> posterior;
 int32[] posteriorKeys
@@ -36,12 +33,3 @@ int32[] weightsValues
 # std::map<std::string, float> stats
 string[] statsKeys
 float32[] statsValues
-
-#
-# For features2d : std::multimap<int, cv::Keypoint> words
-#
-int32[] refWordsKeys
-rtabmap/KeyPoint[] refWordsValues
-
-int32[] loopWordsKeys
-rtabmap/KeyPoint[] loopWordsValues

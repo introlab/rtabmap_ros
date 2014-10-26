@@ -167,32 +167,6 @@ void GuiWrapper::infoMapCallback(
 	}
 	stat.setWeights(mapIntInt);
 
-	//SURF stuff...
-	std::multimap<int, cv::KeyPoint> mapIntKeypoint;
-	for(unsigned int i=0; i<infoMsg->refWordsKeys.size() && i<infoMsg->refWordsValues.size(); ++i)
-	{
-		cv::KeyPoint pt;
-		pt.angle = infoMsg->refWordsValues.at(i).angle;
-		pt.response = infoMsg->refWordsValues.at(i).response;
-		pt.pt.x = infoMsg->refWordsValues.at(i).ptx;
-		pt.pt.y = infoMsg->refWordsValues.at(i).pty;
-		pt.size = infoMsg->refWordsValues.at(i).size;
-		mapIntKeypoint.insert(std::pair<int, cv::KeyPoint>(infoMsg->refWordsKeys.at(i), pt));
-	}
-	stat.setRefWords(mapIntKeypoint);
-	mapIntKeypoint.clear();
-	for(unsigned int i=0; i<infoMsg->loopWordsKeys.size() && i<infoMsg->loopWordsValues.size(); ++i)
-	{
-		cv::KeyPoint pt;
-		pt.angle = infoMsg->loopWordsValues.at(i).angle;
-		pt.response = infoMsg->loopWordsValues.at(i).response;
-		pt.pt.x = infoMsg->loopWordsValues.at(i).ptx;
-		pt.pt.y = infoMsg->loopWordsValues.at(i).pty;
-		pt.size = infoMsg->loopWordsValues.at(i).size;
-		mapIntKeypoint.insert(std::pair<int, cv::KeyPoint>(infoMsg->loopWordsKeys.at(i), pt));
-	}
-	stat.setLoopWords(mapIntKeypoint);
-
 	// Statistics data
 	for(unsigned int i=0; i<infoMsg->statsKeys.size() && i<infoMsg->statsValues.size(); i++)
 	{
@@ -200,65 +174,8 @@ void GuiWrapper::infoMapCallback(
 	}
 
 	//RGB-D SLAM data
-	stat.setMapCorrection(transformFromGeometryMsg(infoMsg->mapCorrection));
+	stat.setMapCorrection(transformFromGeometryMsg(mapMsg->mapToOdom));
 	stat.setLoopClosureTransform(transformFromGeometryMsg(infoMsg->loopClosureTransform));
-	stat.setCurrentPose(transformFromPoseMsg(infoMsg->currentPose));
-
-	std::map<int, std::vector<unsigned char> > images;
-	for(unsigned int i=0; i<mapMsg->imageIDs.size() && i<mapMsg->images.size(); ++i)
-	{
-		images.insert(std::make_pair(mapMsg->imageIDs[i], mapMsg->images[i].bytes));
-	}
-	stat.setImages(images);
-
-	std::map<int, std::vector<unsigned char> > depths;
-	for(unsigned int i=0; i<mapMsg->depthIDs.size() && i<mapMsg->depths.size(); ++i)
-	{
-		depths.insert(std::make_pair(mapMsg->depthIDs[i], mapMsg->depths[i].bytes));
-	}
-	stat.setDepths(depths);
-
-	std::map<int, std::vector<unsigned char> > depth2ds;
-	for(unsigned int i=0; i<mapMsg->depth2DIDs.size() && i<mapMsg->depth2Ds.size(); ++i)
-	{
-		depth2ds.insert(std::make_pair(mapMsg->depth2DIDs[i], mapMsg->depth2Ds[i].bytes));
-	}
-	stat.setDepth2ds(depth2ds);
-
-	std::map<int, float> depthFxs;
-	for(unsigned int i=0; i<mapMsg->depthFxIDs.size() && i<mapMsg->depthFxs.size(); ++i)
-	{
-		depthFxs.insert(std::make_pair(mapMsg->depthFxIDs[i], mapMsg->depthFxs[i]));
-	}
-	stat.setDepthFxs(depthFxs);
-
-	std::map<int, float> depthFys;
-	for(unsigned int i=0; i<mapMsg->depthFyIDs.size() && i<mapMsg->depthFys.size(); ++i)
-	{
-		depthFys.insert(std::make_pair(mapMsg->depthFyIDs[i], mapMsg->depthFys[i]));
-	}
-	stat.setDepthFys(depthFys);
-
-	std::map<int, float> depthCxs;
-	for(unsigned int i=0; i<mapMsg->depthCxIDs.size() && i<mapMsg->depthCxs.size(); ++i)
-	{
-		depthCxs.insert(std::make_pair(mapMsg->depthCxIDs[i], mapMsg->depthCxs[i]));
-	}
-	stat.setDepthCxs(depthCxs);
-
-	std::map<int, float> depthCys;
-	for(unsigned int i=0; i<mapMsg->depthCyIDs.size() && i<mapMsg->depthCys.size(); ++i)
-	{
-		depthCys.insert(std::make_pair(mapMsg->depthCyIDs[i], mapMsg->depthCys[i]));
-	}
-	stat.setDepthCys(depthCys);
-
-	std::map<int, Transform> localTransforms;
-	for(unsigned int i=0; i<mapMsg->localTransformIDs.size() && i<mapMsg->localTransforms.size(); ++i)
-	{
-		localTransforms.insert(std::make_pair(mapMsg->localTransformIDs[i], transformFromGeometryMsg(mapMsg->localTransforms[i])));
-	}
-	stat.setLocalTransforms(localTransforms);
 
 	std::map<int, Transform> poses;
 	for(unsigned int i=0; i<mapMsg->poseIDs.size() && i<mapMsg->poses.size(); ++i)
@@ -282,19 +199,48 @@ void GuiWrapper::infoMapCallback(
 	}
 	stat.setMapIds(mapIds);
 
+	//data
+	if(mapMsg->nodes.size() == 1)
+	{
+		//Features stuff...
+		std::multimap<int, cv::KeyPoint> words;
+		for(unsigned int i=0; i<mapMsg->nodes[0].wordsKeys.size() && i<mapMsg->nodes[0].wordsValues.size(); ++i)
+		{
+			cv::KeyPoint pt;
+			pt.angle = mapMsg->nodes[0].wordsValues.at(i).angle;
+			pt.response = mapMsg->nodes[0].wordsValues.at(i).response;
+			pt.pt.x = mapMsg->nodes[0].wordsValues.at(i).ptx;
+			pt.pt.y = mapMsg->nodes[0].wordsValues.at(i).pty;
+			pt.size = mapMsg->nodes[0].wordsValues.at(i).size;
+			words.insert(std::pair<int, cv::KeyPoint>(mapMsg->nodes[0].wordsKeys.at(i), pt));
+		}
+
+		Signature signature(mapMsg->nodes[0].id,
+				-1, // not set, see maps above
+				words,
+				std::multimap<int, pcl::PointXYZ>(),
+				Transform(), // not set, see poses above
+				mapMsg->nodes[0].depth2D.bytes,
+				mapMsg->nodes[0].image.bytes,
+				mapMsg->nodes[0].depth.bytes,
+				mapMsg->nodes[0].fx,
+				mapMsg->nodes[0].fy,
+				mapMsg->nodes[0].cx,
+				mapMsg->nodes[0].cy,
+				transformFromGeometryMsg(mapMsg->nodes[0].localTransform));
+		stat.setSignature(signature);
+	}
+	else if(mapMsg->nodes.size() > 1)
+	{
+		ROS_ERROR("rtabmapviz: nodes > 1 !?!?");
+	}
+
 	this->post(new RtabmapEvent(stat));
 }
 
 void GuiWrapper::processRequestedMap(const rtabmap::MapData & map)
 {
-	std::map<int, std::vector<unsigned char> > images;
-	std::map<int, std::vector<unsigned char> > depths;
-	std::map<int, std::vector<unsigned char> > depths2d;
-	std::map<int, float> depthFxs;
-	std::map<int, float> depthFys;
-	std::map<int, float> depthCxs;
-	std::map<int, float> depthCys;
-	std::map<int, Transform> localTransforms;
+	std::map<int, Signature> signatures;
 	std::map<int, Transform> poses;
 	std::multimap<int, Link> constraints;
 	std::map<int, int> mapIds;
@@ -303,45 +249,6 @@ void GuiWrapper::processRequestedMap(const rtabmap::MapData & map)
 	{
 		ROS_WARN("rtabmapviz: receiving map... maps and IDs are not the same size (%d vs %d)!",
 				(int)map.maps.size(), (int)map.mapIDs.size());
-	}
-
-	if(map.imageIDs.size() != map.images.size())
-	{
-		ROS_WARN("rtabmapviz: receiving map... images and IDs are not the same size (%d vs %d)!",
-				(int)map.images.size(), (int)map.imageIDs.size());
-	}
-
-	if(map.depthIDs.size() != map.depths.size())
-	{
-		ROS_WARN("rtabmapviz: receiving map... depths and IDs are not the same size (%d vs %d)!",
-				(int)map.depths.size(), (int)map.depthIDs.size());
-	}
-
-	if(map.depth2DIDs.size() != map.depth2Ds.size())
-	{
-		ROS_WARN("rtabmapviz: receiving map... depths2D and IDs are not the same size (%d vs %d)!",
-				(int)map.depth2Ds.size(), (int)map.depth2DIDs.size());
-	}
-
-	if(map.depthFxIDs.size() != map.depthFxs.size())
-	{
-		ROS_WARN("rtabmapviz: receiving map... depthFxs and IDs are not the same size (%d vs %d)!",
-				(int)map.depthFxs.size(), (int)map.depthFxIDs.size());
-	}
-	if(map.depthFyIDs.size() != map.depthFys.size())
-	{
-		ROS_WARN("rtabmapviz: receiving map... depthFys and IDs are not the same size (%d vs %d)!",
-				(int)map.depthFys.size(), (int)map.depthFyIDs.size());
-	}
-	if(map.depthCxIDs.size() != map.depthCxs.size())
-	{
-		ROS_WARN("rtabmapviz: receiving map... depthCxs and IDs are not the same size (%d vs %d)!",
-				(int)map.depthCxs.size(), (int)map.depthCxIDs.size());
-	}
-	if(map.depthCyIDs.size() != map.depthCys.size())
-	{
-		ROS_WARN("rtabmapviz: receiving map... depthCys and IDs are not the same size (%d vs %d)!",
-				(int)map.depthCys.size(), (int)map.depthCyIDs.size());
 	}
 
 	if(map.poseIDs.size() != map.poses.size())
@@ -363,45 +270,6 @@ void GuiWrapper::processRequestedMap(const rtabmap::MapData & map)
 		mapIds.insert(std::make_pair(map.mapIDs[i], map.maps[i]));
 	}
 
-	for(unsigned int i=0; i<map.imageIDs.size() && i < map.images.size(); ++i)
-	{
-		images.insert(std::make_pair(map.imageIDs[i], map.images[i].bytes));
-	}
-
-	for(unsigned int i=0; i<map.depthIDs.size() && i < map.depths.size(); ++i)
-	{
-		depths.insert(std::make_pair(map.depthIDs[i], map.depths[i].bytes));
-	}
-
-	for(unsigned int i=0; i<map.depth2DIDs.size() && i < map.depth2Ds.size(); ++i)
-	{
-		depths2d.insert(std::make_pair(map.depth2DIDs[i], map.depth2Ds[i].bytes));
-	}
-
-	for(unsigned int i=0; i<map.depthFxIDs.size() && i < map.depthFxs.size(); ++i)
-	{
-		depthFxs.insert(std::make_pair(map.depthFxIDs[i], map.depthFxs[i]));
-	}
-	for(unsigned int i=0; i<map.depthFyIDs.size() && i < map.depthFys.size(); ++i)
-	{
-		depthFys.insert(std::make_pair(map.depthFyIDs[i], map.depthFys[i]));
-	}
-	for(unsigned int i=0; i<map.depthCxIDs.size() && i < map.depthCxs.size(); ++i)
-	{
-		depthCxs.insert(std::make_pair(map.depthCxIDs[i], map.depthCxs[i]));
-	}
-	for(unsigned int i=0; i<map.depthCyIDs.size() && i < map.depthCys.size(); ++i)
-	{
-		depthCys.insert(std::make_pair(map.depthCyIDs[i], map.depthCys[i]));
-	}
-
-
-	for(unsigned int i=0; i<map.localTransformIDs.size() && i < map.localTransforms.size(); ++i)
-	{
-		Transform t = transformFromGeometryMsg(map.localTransforms[i]);
-		localTransforms.insert(std::make_pair(map.localTransformIDs[i], t));
-	}
-
 	for(unsigned int i=0; i<map.poseIDs.size() && i < map.poses.size(); ++i)
 	{
 		Transform t = transformFromPoseMsg(map.poses[i]);
@@ -414,14 +282,39 @@ void GuiWrapper::processRequestedMap(const rtabmap::MapData & map)
 		constraints.insert(std::make_pair(map.constraintFromIDs[i], Link(map.constraintFromIDs[i], map.constraintToIDs[i], t, (Link::Type)map.constraintTypes[i])));
 	}
 
-	this->post(new RtabmapEvent3DMap(images,
-			depths,
-			depths2d,
-			depthFxs,
-			depthFys,
-			depthCxs,
-			depthCys,
-			localTransforms,
+	//data
+	for(unsigned int i=0; i<map.nodes.size(); ++i)
+	{
+		//Features stuff...
+		std::multimap<int, cv::KeyPoint> words;
+		for(unsigned int j=0; j<map.nodes[i].wordsKeys.size() && j<map.nodes[0].wordsValues.size(); ++j)
+		{
+			cv::KeyPoint pt;
+			pt.angle = map.nodes[i].wordsValues.at(j).angle;
+			pt.response = map.nodes[i].wordsValues.at(j).response;
+			pt.pt.x = map.nodes[i].wordsValues.at(j).ptx;
+			pt.pt.y = map.nodes[i].wordsValues.at(j).pty;
+			pt.size = map.nodes[i].wordsValues.at(j).size;
+			words.insert(std::pair<int, cv::KeyPoint>(map.nodes[i].wordsKeys.at(j), pt));
+		}
+
+		signatures.insert(std::make_pair(map.nodes[i].id,
+				Signature(map.nodes[i].id,
+				-1, // not set, see maps above
+				words,
+				std::multimap<int, pcl::PointXYZ>(),
+				Transform(), // not set, see poses above
+				map.nodes[i].depth2D.bytes,
+				map.nodes[i].image.bytes,
+				map.nodes[i].depth.bytes,
+				map.nodes[i].fx,
+				map.nodes[i].fy,
+				map.nodes[i].cx,
+				map.nodes[i].cy,
+				transformFromGeometryMsg(map.nodes[i].localTransform))));
+	}
+
+	this->post(new RtabmapEvent3DMap(signatures,
 			poses,
 			constraints,
 			mapIds));

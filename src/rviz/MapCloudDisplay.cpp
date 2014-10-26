@@ -242,80 +242,41 @@ void MapCloudDisplay::processMessage( const rtabmap::MapDataConstPtr& msg )
 void MapCloudDisplay::processMapData(const rtabmap::MapData& map)
 {
 	// Add new clouds...
-	for(unsigned int i=0; i<map.localTransformIDs.size() && i<map.localTransforms.size(); ++i)
+	for(unsigned int i=0; i<map.nodes.size() && i<map.nodes.size(); ++i)
 	{
-		int id = map.localTransformIDs[i];
+		int id = map.nodes[i].id;
 		if(cloud_infos_.find(id) == cloud_infos_.end())
 		{
 			// Cloud not added to RVIZ, add it!
-			rtabmap::Transform localTransform = transformFromGeometryMsg(map.localTransforms[i]);
+			rtabmap::Transform localTransform = transformFromGeometryMsg(map.nodes[i].localTransform);
 			if(!localTransform.isNull())
 			{
 				cv::Mat image, depth;
-				float depthFx = 0.0f;
-				float depthFy = 0.0f;
-				float depthCx = 0.0f;
-				float depthCy = 0.0f;
+				float fx = map.nodes[i].fx;
+				float fy = map.nodes[i].fy;
+				float cx = map.nodes[i].cx;
+				float cy = map.nodes[i].cy;
 
-				for(unsigned int i=0; i<map.imageIDs.size() && i<map.images.size(); ++i)
-				{
-					if(map.imageIDs[i] == id)
-					{
-						image = util3d::uncompressImage(map.images[i].bytes);
-						break;
-					}
-				}
-				for(unsigned int i=0; i<map.depthIDs.size() && i<map.depths.size(); ++i)
-				{
-					if(map.depthIDs[i] == id)
-					{
-						depth = util3d::uncompressImage(map.depths[i].bytes);
-						break;
-					}
-				}
-				for(unsigned int i=0; i<map.depthFxIDs.size() && i<map.depthFxs.size(); ++i)
-				{
-					if(map.depthFxIDs[i] == id)
-					{
-						depthFx = map.depthFxs[i];
-						break;
-					}
-				}
-				for(unsigned int i=0; i<map.depthFyIDs.size() && i<map.depthFys.size(); ++i)
-				{
-					if(map.depthFyIDs[i] == id)
-					{
-						depthFy = map.depthFys[i];
-						break;
-					}
-				}
-				for(unsigned int i=0; i<map.depthCxIDs.size() && i<map.depthCxs.size(); ++i)
-				{
-					if(map.depthCxIDs[i] == id)
-					{
-						depthCx = map.depthCxs[i];
-						break;
-					}
-				}
-				for(unsigned int i=0; i<map.depthCyIDs.size() && i<map.depthCys.size(); ++i)
-				{
-					if(map.depthCyIDs[i] == id)
-					{
-						depthCy = map.depthCys[i];
-						break;
-					}
-				}
+				//uncompress data
+				util3d::CompressionThread ctImage(map.nodes[i].image.bytes, true);
+				util3d::CompressionThread ctDepth(map.nodes[i].depth.bytes, true);
+				ctImage.start();
+				ctDepth.start();
+				ctImage.join();
+				ctDepth.join();
+				image = ctImage.getUncompressedData();
+				depth = ctDepth.getUncompressedData();
 
-				if(!image.empty() && !depth.empty() && depthFx > 0.0f && depthFy > 0.0f && depthCx >= 0.0f && depthCy >= 0.0f)
+				if(!image.empty() && !depth.empty() && fx > 0.0f && fy > 0.0f && cx >= 0.0f && cy >= 0.0f)
 				{
 					pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud;
 					if(depth.type() == CV_8UC1)
 					{
-						cloud = util3d::cloudFromStereoImages(image, depth, depthCx, depthCy, depthFx, depthFy, cloud_decimation_->getInt());
+						cloud = util3d::cloudFromStereoImages(image, depth, cx, cy, fx, fy, cloud_decimation_->getInt());
 					}
 					else
 					{
-						cloud = util3d::cloudFromDepthRGB(image, depth, depthCx, depthCy, depthFx, depthFy, cloud_decimation_->getInt());
+						cloud = util3d::cloudFromDepthRGB(image, depth, cx, cy, fx, fy, cloud_decimation_->getInt());
 					}
 					if(cloud_max_depth_->getFloat() > 0.0f)
 					{
@@ -537,11 +498,13 @@ void MapCloudDisplay::downloadMap()
 		}
 		else
 		{
-			messageBox->setText(tr("Creating all clouds (%1 poses and %2 clouds downloaded)...").arg(getMapSrv.response.data.poses.size()).arg(getMapSrv.response.data.depths.size()));
+			messageBox->setText(tr("Creating all clouds (%1 poses and %2 clouds downloaded)...")
+					.arg(getMapSrv.response.data.poses.size()).arg(getMapSrv.response.data.nodes.size()));
 			QApplication::processEvents();
 			this->reset();
 			processMapData(getMapSrv.response.data);
-			messageBox->setText(tr("Creating all clouds (%1 poses and %2 clouds downloaded)... done!").arg(getMapSrv.response.data.poses.size()).arg(getMapSrv.response.data.depths.size()));
+			messageBox->setText(tr("Creating all clouds (%1 poses and %2 clouds downloaded)... done!")
+					.arg(getMapSrv.response.data.poses.size()).arg(getMapSrv.response.data.nodes.size()));
 
 			QTimer::singleShot(1000, messageBox, SLOT(close()));
 		}

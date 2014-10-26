@@ -10,7 +10,4 @@ int32 refId
 int32 loopClosureId
 int32 localLoopClosureId
 
-geometry_msgs/Transform mapCorrection
 geometry_msgs/Transform loopClosureTransform
-
-geometry_msgs/Pose currentPose

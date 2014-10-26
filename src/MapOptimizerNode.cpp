@@ -139,47 +139,82 @@ public:
 			// optimize only local map
 			poses_.clear();
 			constraints_.clear();
+			mapIds_.clear();
 		}
 
 		// save new poses and constraints
 		// Assuming that nodes/constraints are all linked together
 		UASSERT(msg->poseIDs.size() == msg->poses.size());
+		UASSERT(msg->mapIDs.size() == msg->poseIDs.size());
+		UASSERT(msg->mapIDs.size() == msg->maps.size());
+		std::map<int, Transform> newPoses;
+		std::map<int, int> newMapIds;
 		for(unsigned int i=0; i<msg->poseIDs.size() && i<msg->poseIDs.size(); ++i)
 		{
-			poses_.insert(std::make_pair(msg->poseIDs[i], transformFromPoseMsg(msg->poses[i])));
+			newPoses.insert(std::make_pair(msg->poseIDs[i], transformFromPoseMsg(msg->poses[i])));
+			newMapIds.insert(std::make_pair(msg->mapIDs[i], msg->maps[i]));
 		}
 		UASSERT(msg->constraints.size() == msg->constraintFromIDs.size() &&
 				msg->constraints.size() == msg->constraintToIDs.size() &&
 				msg->constraints.size() == msg->constraintTypes.size());
+		std::multimap<int, Link> allNewConstraints;
+		std::multimap<int, Link> filteredNewConstraints;
+		bool constraintsChanged = false;
 		for(unsigned int i=0; i<msg->constraints.size() && i<msg->constraints.size(); ++i)
 		{
+			Link link(msg->constraintFromIDs[i], msg->constraintToIDs[i], transformFromGeometryMsg(msg->constraints[i]), (Link::Type)msg->constraintTypes[i]);
+			allNewConstraints.insert(std::make_pair(link.from(), link));
 			bool edgeAlreadyAdded = false;
-			for(std::multimap<int, Link>::iterator iter = constraints_.lower_bound(msg->constraintFromIDs[i]);
-					iter != constraints_.end() && iter->first == msg->constraintFromIDs[i];
+			for(std::multimap<int, Link>::iterator iter = constraints_.lower_bound(link.from());
+					iter != constraints_.end() && iter->first == link.from();
 					++iter)
 			{
-				if(iter->second.to() == msg->constraintToIDs[i])
+				if(iter->second.to() == link.to())
 				{
 					edgeAlreadyAdded = true;
+					if(iter->second.transform() != link.transform())
+					{
+						constraintsChanged = true;
+					}
 				}
 			}
 			if(!edgeAlreadyAdded)
 			{
-				constraints_.insert(std::make_pair(msg->constraintFromIDs[i], Link(msg->constraintFromIDs[i], msg->constraintToIDs[i], transformFromGeometryMsg(msg->constraints[i]), (Link::Type)msg->constraintTypes[i])));
+				filteredNewConstraints.insert(std::make_pair(link.from(), link));
 			}
+		}
+
+		//If a transform has changed, clear all.
+		if(constraintsChanged)
+		{
+			UWARN("Some received constraints have changed from the cached "
+					"constraints. RTAB-Map is restarted? If yes, ignore this "
+					"warning. Clearing all cached constraints and restart with "
+					"the new ones...");
+			poses_ = newPoses;
+			mapIds_ = newMapIds;
+			constraints_ = allNewConstraints;
+		}
+		else
+		{
+			poses_.insert(newPoses.begin(), newPoses.end());
+			mapIds_.insert(newMapIds.begin(), newMapIds.end());
+			constraints_.insert(filteredNewConstraints.begin(), filteredNewConstraints.end());
 		}
 
 		// Optimize only if there is a subscriber
 		if(mapDataPub_.getNumSubscribers())
 		{
 			std::map<int, Transform> optimizedPoses;
+			std::map<int, int> mapIds = mapIds_;
+			Transform mapCorrection = Transform::getIdentity();
 			if(poses_.size() > 1 && constraints_.size() > 0)
 			{
 				Transform mapCorrectionToro;
 				util3d::optimizeTOROGraph(poses_, constraints_, optimizedPoses, mapCorrectionToro, iterations_, true);
 
 				mapToOdomMutex_.lock();
-				Transform mapCorrection = optimizedPoses.at(poses_.rbegin()->first) * poses_.rbegin()->second.inverse();
+				mapCorrection = optimizedPoses.at(poses_.rbegin()->first) * poses_.rbegin()->second.inverse();
 				rtabmap::transformToTF(mapCorrection, mapToOdom_);
 				mapToOdomMutex_.unlock();
 			}
@@ -192,16 +227,24 @@ public:
 				ROS_ERROR("map_optimizer: Poses=%zu and edges=%zu (poses must "
 					   "not be null if there are edges, and edges must be null if poses <= 1)",
 					   poses_.size(), constraints_.size());
+				mapIds.clear();
 			}
 
+			UASSERT(optimizedPoses.size() == mapIds.size());
 			rtabmap::MapData outputMsg = *msg;
 			outputMsg.poseIDs.resize(optimizedPoses.size());
 			outputMsg.poses.resize(optimizedPoses.size());
+			outputMsg.mapIDs.resize(mapIds.size());
+			outputMsg.maps.resize(mapIds.size());
+			rtabmap::transformToGeometryMsg(mapCorrection, outputMsg.mapToOdom);
 			int i=0;
-			for(std::map<int, Transform>::iterator iter = optimizedPoses.begin(); iter!=optimizedPoses.end(); ++iter)
+			std::map<int, int>::iterator jter = mapIds.begin();
+			for(std::map<int, Transform>::iterator iter = optimizedPoses.begin(); iter!=optimizedPoses.end(); ++iter, ++jter)
 			{
 				outputMsg.poseIDs[i] = iter->first;
 				transformToPoseMsg(iter->second, outputMsg.poses[i]);
+				outputMsg.mapIDs[i] = jter->first;
+				outputMsg.maps[i] = jter->second;
 				++i;
 			}
 			mapDataPub_.publish(outputMsg);
@@ -225,6 +268,7 @@ private:
 
 	std::map<int, Transform> poses_;
 	std::multimap<int, Link> constraints_;
+	std::map<int, int> mapIds_;
 
 	tf::TransformBroadcaster tfBroadcaster_;
 	boost::thread* transformThread_;

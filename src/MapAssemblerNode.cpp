@@ -92,79 +92,40 @@ public:
 
 	void mapDataReceivedCallback(const rtabmap::MapDataConstPtr & msg)
 	{
-		for(unsigned int i=0; i<msg->localTransformIDs.size() && i<msg->localTransforms.size(); ++i)
+		for(unsigned int i=0; i<msg->nodes.size(); ++i)
 		{
-			int id = msg->localTransformIDs[i];
+			int id = msg->nodes[i].id;
 			if(!uContains(rgbClouds_, id))
 			{
-				rtabmap::Transform localTransform = transformFromGeometryMsg(msg->localTransforms[i]);
+				rtabmap::Transform localTransform = transformFromGeometryMsg(msg->nodes[i].localTransform);
 				if(!localTransform.isNull())
 				{
 					cv::Mat image, depth;
-					float depthFx = 0.0f;
-					float depthFy = 0.0f;
-					float depthCx = 0.0f;
-					float depthCy = 0.0f;
+					float fx = msg->nodes[i].fx;
+					float fy = msg->nodes[i].fy;
+					float cx = msg->nodes[i].cx;
+					float cy = msg->nodes[i].cy;
 
-					for(unsigned int i=0; i<msg->imageIDs.size() && i<msg->images.size(); ++i)
-					{
-						if(msg->imageIDs[i] == id)
-						{
-							image = util3d::uncompressImage(msg->images[i].bytes);
-							break;
-						}
-					}
-					for(unsigned int i=0; i<msg->depthIDs.size() && i<msg->depths.size(); ++i)
-					{
-						if(msg->depthIDs[i] == id)
-						{
-							depth = util3d::uncompressImage(msg->depths[i].bytes);
-							break;
-						}
-					}
-					for(unsigned int i=0; i<msg->depthFxIDs.size() && i<msg->depthFxs.size(); ++i)
-					{
-						if(msg->depthFxIDs[i] == id)
-						{
-							depthFx = msg->depthFxs[i];
-							break;
-						}
-					}
-					for(unsigned int i=0; i<msg->depthFyIDs.size() && i<msg->depthFys.size(); ++i)
-					{
-						if(msg->depthFyIDs[i] == id)
-						{
-							depthFy = msg->depthFys[i];
-							break;
-						}
-					}
-					for(unsigned int i=0; i<msg->depthCxIDs.size() && i<msg->depthCxs.size(); ++i)
-					{
-						if(msg->depthCxIDs[i] == id)
-						{
-							depthCx = msg->depthCxs[i];
-							break;
-						}
-					}
-					for(unsigned int i=0; i<msg->depthCyIDs.size() && i<msg->depthCys.size(); ++i)
-					{
-						if(msg->depthCyIDs[i] == id)
-						{
-							depthCy = msg->depthCys[i];
-							break;
-						}
-					}
+					//uncompress data
+					util3d::CompressionThread ctImage(msg->nodes[i].image.bytes, true);
+					util3d::CompressionThread ctDepth(msg->nodes[i].depth.bytes, true);
+					ctImage.start();
+					ctDepth.start();
+					ctImage.join();
+					ctDepth.join();
+					image = ctImage.getUncompressedData();
+					depth = ctDepth.getUncompressedData();
 
-					if(!image.empty() && !depth.empty() && depthFx > 0.0f && depthFy > 0.0f && depthCx >= 0.0f && depthCy >= 0.0f)
+					if(!image.empty() && !depth.empty() && fx > 0.0f && fy > 0.0f && cx >= 0.0f && cy >= 0.0f)
 					{
 						pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud;
 						if(depth.type() == CV_8UC1)
 						{
-							cloud = util3d::cloudFromStereoImages(image, depth, depthCx, depthCy, depthFx, depthFy, cloudDecimation_);
+							cloud = util3d::cloudFromStereoImages(image, depth, cx, cy, fx, fy, cloudDecimation_);
 						}
 						else
 						{
-							cloud = util3d::cloudFromDepthRGB(image, depth, depthCx, depthCy, depthFx, depthFy, cloudDecimation_);
+							cloud = util3d::cloudFromDepthRGB(image, depth, cx, cy, fx, fy, cloudDecimation_);
 						}
 
 						if(cloudMaxDepth_ > 0)
@@ -196,14 +157,10 @@ public:
 					}
 				}
 			}
-		}
 
-
-		for(unsigned int i=0; i<msg->depth2DIDs.size() && i<msg->depth2Ds.size(); ++i)
-		{
-			if(!uContains(scans_, msg->depth2DIDs[i]))
+			if(!uContains(scans_, id) && msg->nodes[i].depth2D.bytes.size())
 			{
-				cv::Mat depth2d = util3d::uncompressData(msg->depth2Ds[i].bytes);
+				cv::Mat depth2d = util3d::uncompressData(msg->nodes[i].depth2D.bytes);
 				if(!depth2d.empty())
 				{
 					pcl::PointCloud<pcl::PointXYZ>::Ptr cloud = util3d::depth2DToPointCloud(depth2d);
@@ -212,7 +169,7 @@ public:
 						cloud = util3d::voxelize<pcl::PointXYZ>(cloud, scanVoxelSize_);
 					}
 
-					scans_.insert(std::make_pair(msg->depth2DIDs[i], cloud));
+					scans_.insert(std::make_pair(id, cloud));
 				}
 			}
 		}

@@ -1,47 +1,13 @@
 
 Header header
 
-# Map ids std::map<nodeId, mapId>
-int32[] mapIDs
-int32[] maps
+##################
+# Graph stuff
+##################
 
-# compressed images
-# use rtabmap::util3d::uncompressImage() from <rtabmap/core/util3d.h>
-# std::map<int, uint8[]> images;
-int32[] imageIDs
-rtabmap/Bytes[] images
-
-# compressed depth images
-# use rtabmap::util3d::uncompressImage() from <rtabmap/core/util3d.h>
-# std::map<int, uint8[]> depths;
-int32[] depthIDs
-rtabmap/Bytes[] depths
-
-# compressed 2D point clouds (laser scans)
-# use rtabmap::util3d::uncompressData() from <rtabmap/core/util3d.h>
-# std::map<int, uint8[]> depths2d;
-int32[] depth2DIDs
-rtabmap/Bytes[] depth2Ds
-
-# depth fx
-int32[] depthFxIDs
-float32[] depthFxs
-
-# depth fy
-int32[] depthFyIDs
-float32[] depthFys
-
-# depth cx
-int32[] depthCxIDs
-float32[] depthCxs
-
-# depth cy
-int32[] depthCyIDs
-float32[] depthCys
-
-# local transforms
-int32[] localTransformIDs
-geometry_msgs/Transform[] localTransforms
+# /map to /odom transform
+# Always identity when the graph is optimized from the latest pose.
+geometry_msgs/Transform mapToOdom
 
 # std::map<int, Pose> poses;
 int32[] poseIDs
@@ -52,4 +18,14 @@ int32[] constraintFromIDs
 int32[] constraintToIDs
 int32[] constraintTypes
 geometry_msgs/Transform[] constraints
+
+# Map ids std::map<nodeId, mapId>
+int32[] mapIDs
+int32[] maps
+
+##################
+# Point cloud stuff
+##################
+
+NodeData[] nodes
 
