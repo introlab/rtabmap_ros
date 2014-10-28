@@ -32,6 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <geometry_msgs/Transform.h>
 #include <geometry_msgs/Pose.h>
 #include <rtabmap/core/Transform.h>
+#include <opencv2/opencv.hpp>
 
 namespace rtabmap {
 
@@ -43,6 +44,10 @@ rtabmap::Transform transformFromGeometryMsg(const geometry_msgs::Transform & msg
 
 void transformToPoseMsg(const rtabmap::Transform & transform, geometry_msgs::Pose & msg);
 rtabmap::Transform transformFromPoseMsg(const geometry_msgs::Pose & msg);
+
+// copy data
+void compressedMatToBytes(const cv::Mat & compressed, std::vector<unsigned char> & bytes);
+cv::Mat compressedMatFromBytes(const std::vector<unsigned char> & bytes, bool copy = true);
 
 }
 

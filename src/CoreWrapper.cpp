@@ -1000,9 +1000,9 @@ bool CoreWrapper::getMapCallback(rtabmap::GetMap::Request& req, rtabmap::GetMap:
 	for(std::map<int, Signature>::iterator iter = signatures.begin(); iter!=signatures.end(); ++iter)
 	{
 		rep.data.nodes[i].id = iter->second.id();
-		rep.data.nodes[i].image.bytes = iter->second.getImage();
-		rep.data.nodes[i].depth.bytes = iter->second.getDepth();
-		rep.data.nodes[i].depth2D.bytes = iter->second.getDepth2D();
+		compressedMatToBytes(iter->second.getImageCompressed(), rep.data.nodes[i].image.bytes);
+		compressedMatToBytes(iter->second.getDepthCompressed(), rep.data.nodes[i].depth.bytes);
+		compressedMatToBytes(iter->second.getDepth2DCompressed(), rep.data.nodes[i].depth2D.bytes);
 		rep.data.nodes[i].fx = iter->second.getDepthFx();
 		rep.data.nodes[i].fy = iter->second.getDepthFy();
 		rep.data.nodes[i].cx = iter->second.getDepthCx();
@@ -1107,9 +1107,9 @@ bool CoreWrapper::publishMapCallback(rtabmap::PublishMap::Request& req, rtabmap:
 		for(std::map<int, Signature>::iterator iter = signatures.begin(); iter!=signatures.end(); ++iter)
 		{
 			msg->nodes[i].id = iter->second.id();
-			msg->nodes[i].image.bytes = iter->second.getImage();
-			msg->nodes[i].depth.bytes = iter->second.getDepth();
-			msg->nodes[i].depth2D.bytes = iter->second.getDepth2D();
+			compressedMatToBytes(iter->second.getImageCompressed(), msg->nodes[i].image.bytes);
+			compressedMatToBytes(iter->second.getDepthCompressed(), msg->nodes[i].depth.bytes);
+			compressedMatToBytes(iter->second.getDepth2DCompressed(), msg->nodes[i].depth2D.bytes);
 			msg->nodes[i].fx = iter->second.getDepthFx();
 			msg->nodes[i].fy = iter->second.getDepthFy();
 			msg->nodes[i].cx = iter->second.getDepthCx();
@@ -1235,9 +1235,9 @@ void CoreWrapper::publishStats(const Statistics & stats)
 		// add data
 		msg->nodes.resize(1);
 		msg->nodes[0].id = stats.getSignature().id();
-		msg->nodes[0].image.bytes = stats.getSignature().getImage();
-		msg->nodes[0].depth.bytes = stats.getSignature().getDepth();
-		msg->nodes[0].depth2D.bytes = stats.getSignature().getDepth2D();
+		compressedMatToBytes(stats.getSignature().getImageCompressed(), msg->nodes[0].image.bytes);
+		compressedMatToBytes(stats.getSignature().getDepthCompressed(), msg->nodes[0].depth.bytes);
+		compressedMatToBytes(stats.getSignature().getDepth2DCompressed(), msg->nodes[0].depth2D.bytes);
 		msg->nodes[0].fx = stats.getSignature().getDepthFx();
 		msg->nodes[0].fy = stats.getSignature().getDepthFy();
 		msg->nodes[0].cx = stats.getSignature().getDepthCx();

@@ -258,8 +258,8 @@ void MapCloudDisplay::processMapData(const rtabmap::MapData& map)
 				float cy = map.nodes[i].cy;
 
 				//uncompress data
-				util3d::CompressionThread ctImage(&map.nodes[i].image.bytes, true);
-				util3d::CompressionThread ctDepth(&map.nodes[i].depth.bytes, true);
+				util3d::CompressionThread ctImage(compressedMatFromBytes(map.nodes[i].image.bytes, false), true);
+				util3d::CompressionThread ctDepth(compressedMatFromBytes(map.nodes[i].depth.bytes, false), true);
 				ctImage.start();
 				ctDepth.start();
 				ctImage.join();

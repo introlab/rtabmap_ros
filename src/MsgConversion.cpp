@@ -97,4 +97,29 @@ rtabmap::Transform transformFromPoseMsg(const geometry_msgs::Pose & msg)
 	return transformFromTF(tfTransform);
 }
 
+void compressedMatToBytes(const cv::Mat & compressed, std::vector<unsigned char> & bytes)
+{
+	UASSERT(compressed.empty() || compressed.type() == CV_8UC1);
+	bytes.clear();
+	if(!compressed.empty())
+	{
+		bytes.resize(compressed.cols * compressed.rows);
+		memcpy(bytes.data(), compressed.data, bytes.size());
+	}
+}
+
+cv::Mat compressedMatFromBytes(const std::vector<unsigned char> & bytes, bool copy)
+{
+	cv::Mat out;
+	if(bytes.size())
+	{
+		out = cv::Mat(1, bytes.size(), CV_8UC1, (void*)bytes.data());
+		if(copy)
+		{
+			out = out.clone();
+		}
+	}
+	return out;
+}
+
 }
