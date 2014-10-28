@@ -64,9 +64,28 @@ OdometryROS::OdometryROS(int argc, char * argv[]) :
 
 	ros::NodeHandle pnh("~");
 
+	Transform initialPose = Transform::getIdentity();
+	std::string initialPoseStr;
 	pnh.param("frame_id", frameId_, frameId_);
 	pnh.param("odom_frame_id", odomFrameId_, odomFrameId_);
 	pnh.param("publish_tf", publishTf_, publishTf_);
+	pnh.param("initial_pose", initialPoseStr, initialPoseStr); // "x y z roll pitch yaw"
+	if(initialPoseStr.size())
+	{
+		std::vector<std::string> values = uListToVector(uSplit(initialPoseStr, ' '));
+		if(values.size() == 6)
+		{
+			initialPose = Transform(
+					atof(values[0].c_str()), atof(values[1].c_str()), atof(values[2].c_str()),
+					atof(values[3].c_str()), atof(values[4].c_str()), atof(values[5].c_str()));
+		}
+		else
+		{
+			ROS_ERROR("Wrong initial_pose format: %s (should be \"x y z roll pitch yaw\" with angle in radians). "
+					  "Identity will be used...", initialPoseStr.c_str());
+		}
+	}
+
 
 	//parameters
 	rtabmap::ParametersMap parameters = rtabmap::Parameters::getDefaultParameters();
@@ -185,8 +204,13 @@ OdometryROS::OdometryROS(int argc, char * argv[]) :
 		ROS_INFO("Using OdometryBOW");
 		odometry_ = new rtabmap::OdometryBOW(parameters_);
 	}
+	if(!initialPose.isIdentity())
+	{
+		odometry_->reset(initialPose);
+	}
 
 	resetSrv_ = nh.advertiseService("reset_odom", &OdometryROS::reset, this);
+	resetToPoseSrv_ = nh.advertiseService("reset_odom_to_pose", &OdometryROS::resetToPose, this);
 	pauseSrv_ = nh.advertiseService("pause_odom", &OdometryROS::pause, this);
 	resumeSrv_ = nh.advertiseService("resume_odom", &OdometryROS::resume, this);
 }
@@ -377,6 +401,14 @@ bool OdometryROS::reset(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
 	ROS_INFO("visual_odometry: reset odom!");
 	odometry_->reset();
+	return true;
+}
+
+bool OdometryROS::resetToPose(rtabmap::ResetPose::Request& req, rtabmap::ResetPose::Response&)
+{
+	Transform pose(req.x, req.y, req.z, req.roll, req.pitch, req.yaw);
+	ROS_INFO("visual_odometry: reset odom to pose %s!", pose.prettyPrint().c_str());
+	odometry_->reset(pose);
 	return true;
 }
 

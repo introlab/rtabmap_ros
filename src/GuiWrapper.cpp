@@ -356,7 +356,7 @@ void GuiWrapper::handleEvent(UEvent * anEvent)
 		std_srvs::Empty emptySrv;
 		rtabmap::RtabmapEventCmd * cmdEvent = (rtabmap::RtabmapEventCmd *)anEvent;
 		rtabmap::RtabmapEventCmd::Cmd cmd = cmdEvent->getCmd();
-		if(cmd == rtabmap::RtabmapEventCmd::kCmdDeleteMemory)
+		if(cmd == rtabmap::RtabmapEventCmd::kCmdResetMemory)
 		{
 			if(!ros::service::call("reset", emptySrv))
 			{

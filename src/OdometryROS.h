@@ -37,6 +37,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <std_srvs/Empty.h>
 #include <std_msgs/Header.h>
 
+#include <rtabmap/ResetPose.h>
 #include <rtabmap/core/SensorData.h>
 #include <rtabmap/core/Parameters.h>
 
@@ -53,6 +54,7 @@ public:
 	Transform processData(SensorData & data, const std_msgs::Header & header, int & quality);
 
 	bool reset(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
+	bool resetToPose(rtabmap::ResetPose::Request&, rtabmap::ResetPose::Response&);
 	bool pause(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool resume(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 
@@ -77,6 +79,7 @@ private:
 	ros::Publisher odomLastFrame_;
 	ros::Publisher odomMatches_;
 	ros::ServiceServer resetSrv_;
+	ros::ServiceServer resetToPoseSrv_;
 	ros::ServiceServer pauseSrv_;
 	ros::ServiceServer resumeSrv_;
 	tf::TransformBroadcaster tfBroadcaster_;

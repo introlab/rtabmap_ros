@@ -63,7 +63,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 class CoreWrapper
 {
 public:
-	CoreWrapper(bool deleteDbOnStart = false);
+	CoreWrapper(bool deleteDbOnStart);
 	virtual ~CoreWrapper();
 
 private:
@@ -128,6 +128,7 @@ private:
 	std::string mapFrameId_;
 	std::string odomFrameId_;
 	std::string configPath_;
+	std::string databasePath_;
 
 	tf::Transform mapToOdom_;
 	boost::mutex mapToOdomMutex_;

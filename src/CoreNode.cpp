@@ -29,6 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/utilite/ULogger.h>
 #include <rtabmap/utilite/UDirectory.h>
 #include <rtabmap/utilite/UStl.h>
+#include <rtabmap/utilite/UFile.h>
 
 int main(int argc, char** argv)
 {
@@ -60,9 +61,6 @@ int main(int argc, char** argv)
 			uInsert(parameters,
 					std::make_pair(rtabmap::Parameters::kRtabmapWorkingDirectory(),
 					UDirectory::homeDir()+"/.ros")); // change default to ~/.ros
-			uInsert(parameters,
-					std::make_pair(rtabmap::Parameters::kRtabmapDatabasePath(),
-					UDirectory::homeDir()+"/.ros/"+rtabmap::Parameters::getDefaultDatabaseName())); // change default to ~/.ros
 
 			if(strcmp(argv[i], "--params") == 0)
 			{

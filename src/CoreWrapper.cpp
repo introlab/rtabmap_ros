@@ -66,6 +66,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 		mapFrameId_("map"),
 		odomFrameId_(""),
 		configPath_(""),
+		databasePath_(UDirectory::homeDir()+"/.ros/"+rtabmap::Parameters::getDefaultDatabaseName()),
 		mapToOdom_(tf::Transform::getIdentity()),
 		transformThread_(0),
 		rate_(Parameters::defaultRtabmapDetectionRate()),
@@ -99,6 +100,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	}
 
 	pnh.param("config_path", configPath_, configPath_);
+	pnh.param("database_path", databasePath_, databasePath_);
 
 	pnh.param("frame_id", frameId_, frameId_);
 	pnh.param("map_frame_id", mapFrameId_, mapFrameId_);
@@ -122,7 +124,6 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 
 	// update parameters with user input parameters (private)
 	uInsert(parameters, std::make_pair(Parameters::kRtabmapWorkingDirectory(), UDirectory::homeDir()+"/.ros")); // change default to ~/.ros
-	uInsert(parameters, std::make_pair(Parameters::kRtabmapDatabasePath(), UDirectory::homeDir()+"/.ros/"+Parameters::getDefaultDatabaseName())); // change default to ~/.ros
 	for(ParametersMap::iterator iter=parameters.begin(); iter!=parameters.end(); ++iter)
 	{
 		std::string vStr;
@@ -135,10 +136,6 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 			iter->second = vStr;
 
 			if(iter->first.compare(Parameters::kRtabmapWorkingDirectory()) == 0)
-			{
-				iter->second = uReplaceChar(iter->second, '~', UDirectory::homeDir());
-			}
-			else if(iter->first.compare(Parameters::kRtabmapDatabasePath()) == 0)
 			{
 				iter->second = uReplaceChar(iter->second, '~', UDirectory::homeDir());
 			}
@@ -224,13 +221,21 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	}
 	if(paused_)
 	{
-		UWARN("Node paused... dont' forget to call service \"resume\" to start rtabmap.");
+		ROS_WARN("Node paused... don't forget to call service \"resume\" to start rtabmap.");
+	}
+
+	if(deleteDbOnStart)
+	{
+		if(UFile::erase(databasePath_) == 0)
+		{
+			ROS_INFO("rtabmap: Deleted database \"%s\" (--delete_db_on_start is set).", databasePath_.c_str());
+		}
 	}
 
 	// Init RTAB-Map
-	rtabmap_.init(parameters, deleteDbOnStart);
+	rtabmap_.init(parameters, databasePath_);
 
-	ROS_INFO("rtabmap: using database from \"%s\".", rtabmap_.getDatabasePath().c_str());
+	ROS_INFO("rtabmap: Using database from \"%s\".", databasePath_.c_str());
 
 	// setup services
 	updateSrv_ = nh.advertiseService("update_parameters", &CoreWrapper::updateRtabmapCallback, this);
@@ -281,8 +286,7 @@ CoreWrapper::~CoreWrapper()
 	}
 	nh.deleteParam("is_rtabmap_paused");
 
-	std::string databasePath = rtabmap_.getDatabasePath();
-	printf("rtabmap: Saving database/long-term memory... (located at %s)\n", databasePath.c_str());
+	printf("rtabmap: Saving database/long-term memory... (located at %s)\n", databasePath_.c_str());
 }
 
 ParametersMap CoreWrapper::loadParameters(const std::string & configFile)
@@ -861,7 +865,7 @@ bool CoreWrapper::updateRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Emp
 bool CoreWrapper::resetRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
 	ROS_INFO("rtabmap: Reset");
-	rtabmap_.resetMemory(true);
+	rtabmap_.resetMemory();
 	return true;
 }
 

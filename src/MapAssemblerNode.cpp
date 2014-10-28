@@ -107,8 +107,8 @@ public:
 					float cy = msg->nodes[i].cy;
 
 					//uncompress data
-					util3d::CompressionThread ctImage(msg->nodes[i].image.bytes, true);
-					util3d::CompressionThread ctDepth(msg->nodes[i].depth.bytes, true);
+					util3d::CompressionThread ctImage(&msg->nodes[i].image.bytes, true);
+					util3d::CompressionThread ctDepth(&msg->nodes[i].depth.bytes, true);
 					ctImage.start();
 					ctDepth.start();
 					ctImage.join();
