@@ -204,6 +204,9 @@ void GuiWrapper::infoMapCallback(
 	{
 		//Features stuff...
 		std::multimap<int, cv::KeyPoint> words;
+		std::multimap<int, pcl::PointXYZ> words3D;
+		pcl::PointCloud<pcl::PointXYZ> cloud;
+		pcl::fromROSMsg(mapMsg->nodes[0].words3DValues, cloud);
 		for(unsigned int i=0; i<mapMsg->nodes[0].wordsKeys.size() && i<mapMsg->nodes[0].wordsValues.size(); ++i)
 		{
 			cv::KeyPoint pt;
@@ -212,14 +215,24 @@ void GuiWrapper::infoMapCallback(
 			pt.pt.x = mapMsg->nodes[0].wordsValues.at(i).ptx;
 			pt.pt.y = mapMsg->nodes[0].wordsValues.at(i).pty;
 			pt.size = mapMsg->nodes[0].wordsValues.at(i).size;
-			words.insert(std::pair<int, cv::KeyPoint>(mapMsg->nodes[0].wordsKeys.at(i), pt));
+			int wordId = mapMsg->nodes[0].wordsKeys.at(i);
+			words.insert(std::make_pair(wordId, pt));
+			if(i< cloud.size())
+			{
+				words3D.insert(std::make_pair(wordId, cloud[i]));
+			}
+		}
+
+		if(words3D.size() && words3D.size() != words.size())
+		{
+			ROS_ERROR("Words 2D and 3D should be the same size (%d, %d)!", (int)words.size(), (int)words3D.size());
 		}
 
 		Signature signature(mapMsg->nodes[0].id,
-				-1, // not set, see maps above
+				mapMsg->nodes[0].mapId,
 				words,
-				std::multimap<int, pcl::PointXYZ>(),
-				Transform(), // not set, see poses above
+				words3D,
+				transformFromPoseMsg(mapMsg->nodes[0].pose),
 				compressedMatFromBytes(mapMsg->nodes[0].depth2D.bytes),
 				compressedMatFromBytes(mapMsg->nodes[0].image.bytes),
 				compressedMatFromBytes(mapMsg->nodes[0].depth.bytes),
@@ -287,6 +300,9 @@ void GuiWrapper::processRequestedMap(const rtabmap::MapData & map)
 	{
 		//Features stuff...
 		std::multimap<int, cv::KeyPoint> words;
+		std::multimap<int, pcl::PointXYZ> words3D;
+		pcl::PointCloud<pcl::PointXYZ> cloud;
+		pcl::fromROSMsg(map.nodes[i].words3DValues, cloud);
 		for(unsigned int j=0; j<map.nodes[i].wordsKeys.size() && j<map.nodes[0].wordsValues.size(); ++j)
 		{
 			cv::KeyPoint pt;
@@ -295,15 +311,25 @@ void GuiWrapper::processRequestedMap(const rtabmap::MapData & map)
 			pt.pt.x = map.nodes[i].wordsValues.at(j).ptx;
 			pt.pt.y = map.nodes[i].wordsValues.at(j).pty;
 			pt.size = map.nodes[i].wordsValues.at(j).size;
-			words.insert(std::pair<int, cv::KeyPoint>(map.nodes[i].wordsKeys.at(j), pt));
+			int wordId = map.nodes[i].wordsKeys.at(j);
+			words.insert(std::make_pair(wordId, pt));
+			if(j < cloud.size())
+			{
+				words3D.insert(std::make_pair(wordId, cloud[j]));
+			}
+		}
+
+		if(words3D.size() && words3D.size() != words.size())
+		{
+			ROS_ERROR("Words 2D and 3D should be the same size (%d, %d)!", (int)words.size(), (int)words3D.size());
 		}
 
 		signatures.insert(std::make_pair(map.nodes[i].id,
 				Signature(map.nodes[i].id,
-				-1, // not set, see maps above
+				map.nodes[i].mapId,
 				words,
-				std::multimap<int, pcl::PointXYZ>(),
-				Transform(), // not set, see poses above
+				words3D,
+				transformFromPoseMsg(map.nodes[i].pose),
 				compressedMatFromBytes(map.nodes[i].depth2D.bytes),
 				compressedMatFromBytes(map.nodes[i].image.bytes),
 				compressedMatFromBytes(map.nodes[i].depth.bytes),

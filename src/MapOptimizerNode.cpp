@@ -31,6 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/util3d.h>
 #include <rtabmap/core/Parameters.h>
 #include <rtabmap/utilite/ULogger.h>
+#include <rtabmap/utilite/UTimer.h>
 #include <ros/subscriber.h>
 #include <ros/publisher.h>
 #include <tf/tf.h>
@@ -48,7 +49,7 @@ public:
 		odomFrameId_("odom"),
 		iterations_(100),
 		globalOptimization_(true),
-		condChecked_(false),
+		optimizeFromLastNode_(false),
 		mapToOdom_(tf::Transform::getIdentity()),
 		transformThread_(0)
 	{
@@ -59,32 +60,26 @@ public:
 		pnh.param("odom_frame_id", odomFrameId_, odomFrameId_);
 		pnh.param("iterations", iterations_, iterations_);
 		pnh.param("global_optimization", globalOptimization_, globalOptimization_);
+		pnh.param("optimize_from_last_node", optimizeFromLastNode_, optimizeFromLastNode_);
 
 		UASSERT(iterations_ > 0);
 
 		double tfDelay = 0.05; // 20 Hz
+		bool publishTf = true;
+		pnh.param("publish_tf", publishTf, publishTf);
 		pnh.param("tf_delay", tfDelay, tfDelay);
-
-		// Verify that rtabmap is not sending optimized poses!
-		std::string toroIterations;
-		if(nh.getParam(Parameters::kRGBDToroIterations(), toroIterations))
-		{
-			if(std::atoi(toroIterations.c_str()) != 0)
-			{
-				ROS_WARN("map_optimizer: Parameter \"%s\" of rtabmap node is not 0 (value=%s), it should be 0 (optimization desactivated).",
-						Parameters::kRGBDToroIterations().c_str(), toroIterations.c_str());
-				exit(-1);
-			}
-		}
 
 		mapDataTopic_ = nh.subscribe("mapData", 1, &MapOptimizer::mapDataReceivedCallback, this);
 		mapDataPub_ = nh.advertise<rtabmap::MapData>(nh.resolveName("mapData")+"_optimized", 1);
 
-		ROS_INFO("map_optimizer will publish tf between frames \"%s\" and \"%s\"", mapFrameId_.c_str(), odomFrameId_.c_str());
-		ROS_INFO("map_optimizer: map_frame_id = %s", mapFrameId_.c_str());
-		ROS_INFO("map_optimizer: odom_frame_id = %s", odomFrameId_.c_str());
-		ROS_INFO("map_optimizer: tf_delay = %f", tfDelay);
-		transformThread_ = new boost::thread(boost::bind(&MapOptimizer::publishLoop, this, tfDelay));
+		if(publishTf)
+		{
+			ROS_INFO("map_optimizer will publish tf between frames \"%s\" and \"%s\"", mapFrameId_.c_str(), odomFrameId_.c_str());
+			ROS_INFO("map_optimizer: map_frame_id = %s", mapFrameId_.c_str());
+			ROS_INFO("map_optimizer: odom_frame_id = %s", odomFrameId_.c_str());
+			ROS_INFO("map_optimizer: tf_delay = %f", tfDelay);
+			transformThread_ = new boost::thread(boost::bind(&MapOptimizer::publishLoop, this, tfDelay));
+		}
 	}
 
 	~MapOptimizer()
@@ -113,60 +108,26 @@ public:
 
 	void mapDataReceivedCallback(const rtabmap::MapDataConstPtr & msg)
 	{
-		if(globalOptimization_ && !condChecked_)
-		{
-			// Verify that rtabmap is not sending optimized poses!
-			ros::NodeHandle nh;
-			std::string toroIterations;
-			if(nh.getParam(Parameters::kRGBDToroIterations(), toroIterations))
-			{
-				if(std::atoi(toroIterations.c_str()) != 0)
-				{
-					ROS_ERROR("map_optimizer: Parameter \"%s\" of rtabmap node is not 0 (value=%s), it should be 0 (optimization desactivated).",
-							Parameters::kRGBDToroIterations().c_str(), toroIterations.c_str());
-					exit(-1);
-				}
-			}
-			else
-			{
-				ROS_ERROR("map_optimizer: Could not get parameter \"%s\" of rtabmap node, it should be 0 (optimization desactivated). Is rtabmap node started? and in the same namespace that map_assembler?", Parameters::kRGBDToroIterations().c_str());
-				exit(-1);
-			}
-			condChecked_ = true;
-		}
-		else if(!globalOptimization_)
-		{
-			// optimize only local map
-			poses_.clear();
-			constraints_.clear();
-			mapIds_.clear();
-		}
-
 		// save new poses and constraints
 		// Assuming that nodes/constraints are all linked together
 		UASSERT(msg->poseIDs.size() == msg->poses.size());
 		UASSERT(msg->mapIDs.size() == msg->poseIDs.size());
 		UASSERT(msg->mapIDs.size() == msg->maps.size());
-		std::map<int, Transform> newPoses;
-		std::map<int, int> newMapIds;
-		for(unsigned int i=0; i<msg->poseIDs.size() && i<msg->poseIDs.size(); ++i)
-		{
-			newPoses.insert(std::make_pair(msg->poseIDs[i], transformFromPoseMsg(msg->poses[i])));
-			newMapIds.insert(std::make_pair(msg->mapIDs[i], msg->maps[i]));
-		}
 		UASSERT(msg->constraints.size() == msg->constraintFromIDs.size() &&
 				msg->constraints.size() == msg->constraintToIDs.size() &&
 				msg->constraints.size() == msg->constraintTypes.size());
-		std::multimap<int, Link> allNewConstraints;
-		std::multimap<int, Link> filteredNewConstraints;
-		bool constraintsChanged = false;
+
+		bool dataChanged = false;
+
+		std::multimap<int, Link> newConstraints;
 		for(unsigned int i=0; i<msg->constraints.size() && i<msg->constraints.size(); ++i)
 		{
 			Link link(msg->constraintFromIDs[i], msg->constraintToIDs[i], transformFromGeometryMsg(msg->constraints[i]), (Link::Type)msg->constraintTypes[i]);
-			allNewConstraints.insert(std::make_pair(link.from(), link));
+			newConstraints.insert(std::make_pair(link.from(), link));
+
 			bool edgeAlreadyAdded = false;
-			for(std::multimap<int, Link>::iterator iter = constraints_.lower_bound(link.from());
-					iter != constraints_.end() && iter->first == link.from();
+			for(std::multimap<int, Link>::iterator iter = cachedConstraints_.lower_bound(link.from());
+					iter != cachedConstraints_.end() && iter->first == link.from();
 					++iter)
 			{
 				if(iter->second.to() == link.to())
@@ -174,59 +135,106 @@ public:
 					edgeAlreadyAdded = true;
 					if(iter->second.transform() != link.transform())
 					{
-						constraintsChanged = true;
+						dataChanged = true;
 					}
 				}
 			}
 			if(!edgeAlreadyAdded)
 			{
-				filteredNewConstraints.insert(std::make_pair(link.from(), link));
+				cachedConstraints_.insert(std::make_pair(link.from(), link));
 			}
 		}
 
-		//If a transform has changed, clear all.
-		if(constraintsChanged)
+		std::map<int, Transform> newPoses;
+		std::map<int, int> newMapIds;
+		// add new odometry poses
+		for(unsigned int i=0; i<msg->nodes.size(); ++i)
 		{
-			UWARN("Some received constraints have changed from the cached "
-					"constraints. RTAB-Map is restarted? If yes, ignore this "
-					"warning. Clearing all cached constraints and restart with "
-					"the new ones...");
-			poses_ = newPoses;
-			mapIds_ = newMapIds;
-			constraints_ = allNewConstraints;
+			int id = msg->nodes[i].id;
+			Transform pose = transformFromPoseMsg(msg->nodes[i].pose);
+			newPoses.insert(std::make_pair(id, pose));
+			newMapIds.insert(std::make_pair(id, msg->nodes[i].mapId));
+
+			std::pair<std::map<int, Transform>::iterator, bool> p = cachedPoses_.insert(std::make_pair(id, pose));
+			if(!p.second && pose != cachedPoses_.at(id))
+			{
+				dataChanged = true;
+			}
+			else if(p.second)
+			{
+				cachedMapIds_.insert(std::make_pair(id, msg->nodes[i].mapId));
+			}
+		}
+
+		if(dataChanged)
+		{
+			ROS_WARN("Graph data has changed! Reset cache...");
+			cachedPoses_ = newPoses;
+			cachedMapIds_ = newMapIds;
+			cachedConstraints_ = newConstraints;
+		}
+
+		//match poses in the graph
+		std::map<int, Transform> poses;
+		std::map<int, int> mapIds;
+		std::multimap<int, Link> constraints;
+		if(globalOptimization_)
+		{
+			poses = cachedPoses_;
+			mapIds = cachedMapIds_;
+			constraints = cachedConstraints_;
 		}
 		else
 		{
-			poses_.insert(newPoses.begin(), newPoses.end());
-			mapIds_.insert(newMapIds.begin(), newMapIds.end());
-			constraints_.insert(filteredNewConstraints.begin(), filteredNewConstraints.end());
+			constraints = newConstraints;
+			for(unsigned int i=0; i<msg->poseIDs.size(); ++i)
+			{
+				std::map<int, Transform>::iterator iter = cachedPoses_.find(msg->poseIDs[i]);
+				if(iter != cachedPoses_.end())
+				{
+					poses.insert(*iter);
+					mapIds.insert(*cachedMapIds_.find(iter->first));
+				}
+				else
+				{
+					ROS_ERROR("Odometry pose of node %d not found in cache!", msg->poseIDs[i]);
+					return;
+				}
+			}
 		}
 
 		// Optimize only if there is a subscriber
 		if(mapDataPub_.getNumSubscribers())
 		{
+			UTimer timer;
 			std::map<int, Transform> optimizedPoses;
-			std::map<int, int> mapIds = mapIds_;
 			Transform mapCorrection = Transform::getIdentity();
-			if(poses_.size() > 1 && constraints_.size() > 0)
+			if(poses.size() > 1 && constraints.size() > 0)
 			{
-				Transform mapCorrectionToro;
-				util3d::optimizeTOROGraph(poses_, constraints_, optimizedPoses, mapCorrectionToro, iterations_, true);
+				if(optimizeFromLastNode_)
+				{
+					std::map<int, int> depthGraph = util3d::generateDepthGraph(constraints, poses.rbegin()->first);
+					util3d::optimizeTOROGraph(depthGraph, poses, constraints, optimizedPoses, iterations_);
+				}
+				else
+				{
+					util3d::optimizeTOROGraph(poses, constraints, optimizedPoses, iterations_);
+				}
 
 				mapToOdomMutex_.lock();
-				mapCorrection = optimizedPoses.at(poses_.rbegin()->first) * poses_.rbegin()->second.inverse();
+				mapCorrection = optimizedPoses.at(poses.rbegin()->first) * poses.rbegin()->second.inverse();
 				rtabmap::transformToTF(mapCorrection, mapToOdom_);
 				mapToOdomMutex_.unlock();
 			}
-			else if(poses_.size() == 1 && constraints_.size() == 0)
+			else if(poses.size() == 1 && constraints.size() == 0)
 			{
-				optimizedPoses = poses_;
+				optimizedPoses = poses;
 			}
-			else if(poses_.size() || constraints_.size())
+			else if(poses.size() || constraints.size())
 			{
-				ROS_ERROR("map_optimizer: Poses=%zu and edges=%zu (poses must "
+				ROS_ERROR("map_optimizer: Poses=%d and edges=%d (poses must "
 					   "not be null if there are edges, and edges must be null if poses <= 1)",
-					   poses_.size(), constraints_.size());
+					  (int)poses.size(), (int)constraints.size());
 				mapIds.clear();
 			}
 
@@ -248,6 +256,8 @@ public:
 				++i;
 			}
 			mapDataPub_.publish(outputMsg);
+
+			ROS_INFO("Time graph optimization = %f s", timer.ticks());
 		}
 	}
 
@@ -256,8 +266,7 @@ private:
 	std::string odomFrameId_;
 	int iterations_;
 	bool globalOptimization_;
-
-	bool condChecked_;
+	bool optimizeFromLastNode_;
 
 	tf::Transform mapToOdom_;
 	boost::mutex mapToOdomMutex_;
@@ -266,9 +275,9 @@ private:
 
 	ros::Publisher mapDataPub_;
 
-	std::map<int, Transform> poses_;
-	std::multimap<int, Link> constraints_;
-	std::map<int, int> mapIds_;
+	std::map<int, Transform> cachedPoses_;
+	std::map<int, int> cachedMapIds_;
+	std::multimap<int, Link> cachedConstraints_;
 
 	tf::TransformBroadcaster tfBroadcaster_;
 	boost::thread* transformThread_;

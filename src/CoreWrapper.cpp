@@ -79,6 +79,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	bool subscribeDepth = true;
 	bool subscribeStereo = false;
 	int queueSize = 10;
+	bool publishTf = true;
 	double tfDelay = 0.05; // 20 Hz
 
 	// ROS related parameters (private)
@@ -106,6 +107,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	pnh.param("map_frame_id", mapFrameId_, mapFrameId_);
 	pnh.param("queue_size", queueSize, queueSize);
 
+	pnh.param("publish_tf", publishTf, publishTf);
 	pnh.param("tf_delay", tfDelay, tfDelay);
 
 	ROS_INFO("rtabmap: frame_id = %s", frameId_.c_str());
@@ -252,11 +254,11 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 
 	int toroIterations = 0;
 	Parameters::parse(parameters, Parameters::kRGBDToroIterations(), toroIterations);
-	if(toroIterations != 0)
+	if(publishTf && toroIterations != 0)
 	{
 		transformThread_ = new boost::thread(boost::bind(&CoreWrapper::publishLoop, this, tfDelay));
 	}
-	else
+	else if(publishTf)
 	{
 		UWARN("Graph optimization is disabled (%s=0), the tf between frame \"%s\" and odometry frame will not be published. You can safely ignore this warning if you are using map_optimizer node.",
 				Parameters::kRGBDToroIterations().c_str(), mapFrameId_.c_str());
@@ -1000,6 +1002,8 @@ bool CoreWrapper::getMapCallback(rtabmap::GetMap::Request& req, rtabmap::GetMap:
 	for(std::map<int, Signature>::iterator iter = signatures.begin(); iter!=signatures.end(); ++iter)
 	{
 		rep.data.nodes[i].id = iter->second.id();
+		rep.data.nodes[i].mapId = iter->second.mapId();
+		transformToPoseMsg(iter->second.getPose(), rep.data.nodes[i].pose);
 		compressedMatToBytes(iter->second.getImageCompressed(), rep.data.nodes[i].image.bytes);
 		compressedMatToBytes(iter->second.getDepthCompressed(), rep.data.nodes[i].depth.bytes);
 		compressedMatToBytes(iter->second.getDepth2DCompressed(), rep.data.nodes[i].depth2D.bytes);
@@ -1025,6 +1029,26 @@ bool CoreWrapper::getMapCallback(rtabmap::GetMap::Request& req, rtabmap::GetMap:
 			rep.data.nodes[i].wordsValues.at(j).octave = jter->second.octave;
 			rep.data.nodes[i].wordsValues.at(j).class_id = jter->second.class_id;
 			++j;
+		}
+
+		if(iter->second.getWords3().size() && iter->second.getWords3().size() == iter->second.getWords().size())
+		{
+			pcl::PointCloud<pcl::PointXYZ> cloud;
+			cloud.resize(iter->second.getWords3().size());
+			j = 0;
+			for(std::multimap<int, pcl::PointXYZ>::const_iterator jter=iter->second.getWords3().begin();
+				jter!=iter->second.getWords3().end();
+				++jter)
+			{
+				cloud[j++] = jter->second;
+			}
+			pcl::toROSMsg(cloud, rep.data.nodes[i].words3DValues);
+		}
+		else if(iter->second.getWords3().size())
+		{
+			ROS_ERROR("Words 2D and words 3D must have the same size (%d vs %d)!",
+					(int)iter->second.getWords().size(),
+					(int)iter->second.getWords3().size());
 		}
 
 		++i;
@@ -1107,6 +1131,8 @@ bool CoreWrapper::publishMapCallback(rtabmap::PublishMap::Request& req, rtabmap:
 		for(std::map<int, Signature>::iterator iter = signatures.begin(); iter!=signatures.end(); ++iter)
 		{
 			msg->nodes[i].id = iter->second.id();
+			msg->nodes[i].mapId = iter->second.mapId();
+			transformToPoseMsg(iter->second.getPose(), msg->nodes[i].pose);
 			compressedMatToBytes(iter->second.getImageCompressed(), msg->nodes[i].image.bytes);
 			compressedMatToBytes(iter->second.getDepthCompressed(), msg->nodes[i].depth.bytes);
 			compressedMatToBytes(iter->second.getDepth2DCompressed(), msg->nodes[i].depth2D.bytes);
@@ -1132,6 +1158,26 @@ bool CoreWrapper::publishMapCallback(rtabmap::PublishMap::Request& req, rtabmap:
 				msg->nodes[i].wordsValues.at(j).octave = jter->second.octave;
 				msg->nodes[i].wordsValues.at(j).class_id = jter->second.class_id;
 				++j;
+			}
+
+			if(iter->second.getWords3().size() && iter->second.getWords3().size() == iter->second.getWords().size())
+			{
+				pcl::PointCloud<pcl::PointXYZ> cloud;
+				cloud.resize(iter->second.getWords3().size());
+				j = 0;
+				for(std::multimap<int, pcl::PointXYZ>::const_iterator jter=iter->second.getWords3().begin();
+					jter!=iter->second.getWords3().end();
+					++jter)
+				{
+					cloud[j++] = jter->second;
+				}
+				pcl::toROSMsg(cloud, msg->nodes[i].words3DValues);
+			}
+			else if(iter->second.getWords3().size())
+			{
+				ROS_ERROR("Words 2D and words 3D must have the same size (%d vs %d)!",
+						(int)iter->second.getWords().size(),
+						(int)iter->second.getWords3().size());
 			}
 
 			++i;
@@ -1235,6 +1281,8 @@ void CoreWrapper::publishStats(const Statistics & stats)
 		// add data
 		msg->nodes.resize(1);
 		msg->nodes[0].id = stats.getSignature().id();
+		msg->nodes[0].mapId = stats.getSignature().mapId();
+		transformToPoseMsg(stats.getSignature().getPose(), msg->nodes[0].pose);
 		compressedMatToBytes(stats.getSignature().getImageCompressed(), msg->nodes[0].image.bytes);
 		compressedMatToBytes(stats.getSignature().getDepthCompressed(), msg->nodes[0].depth.bytes);
 		compressedMatToBytes(stats.getSignature().getDepth2DCompressed(), msg->nodes[0].depth2D.bytes);
@@ -1260,6 +1308,26 @@ void CoreWrapper::publishStats(const Statistics & stats)
 			msg->nodes[0].wordsValues.at(index).octave = jter->second.octave;
 			msg->nodes[0].wordsValues.at(index).class_id = jter->second.class_id;
 			++index;
+		}
+
+		if(stats.getSignature().getWords3().size() && stats.getSignature().getWords3().size() == stats.getSignature().getWords().size())
+		{
+			pcl::PointCloud<pcl::PointXYZ> cloud;
+			cloud.resize(stats.getSignature().getWords3().size());
+			index = 0;
+			for(std::multimap<int, pcl::PointXYZ>::const_iterator jter=stats.getSignature().getWords3().begin();
+				jter!=stats.getSignature().getWords3().end();
+				++jter)
+			{
+				cloud[index++] = jter->second;
+			}
+			pcl::toROSMsg(cloud, msg->nodes[0].words3DValues);
+		}
+		else if(stats.getSignature().getWords3().size())
+		{
+			ROS_ERROR("Words 2D and words 3D must have the same size (%d vs %d)!",
+					(int)stats.getSignature().getWords().size(),
+					(int)stats.getSignature().getWords3().size());
 		}
 
 		mapData_.publish(msg);
