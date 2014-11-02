@@ -33,6 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/utilite/UStl.h>
 #include <nav_msgs/OccupancyGrid.h>
 #include <nav_msgs/GetMap.h>
+#include <std_srvs/Empty.h>
 #include <pcl_ros/transforms.h>
 #include <pcl_conversions/pcl_conversions.h>
 
@@ -60,7 +61,10 @@ public:
 		mapDataTopic_ = nh.subscribe("mapData", 1, &GridMapAssembler::mapDataReceivedCallback, this);
 
 		gridMap_ = nh.advertise<nav_msgs::OccupancyGrid>("grid_map", 1);
-		getMapService_ = nh.advertiseService("get_grid_map", &GridMapAssembler::getGridMapCallback, this);
+
+		//private service
+		getMapService_ = pnh.advertiseService("get_map", &GridMapAssembler::getGridMapCallback, this);
+		resetService_ = pnh.advertiseService("reset", &GridMapAssembler::reset, this);
 	}
 
 	~GridMapAssembler()
@@ -133,6 +137,14 @@ public:
 		return false;
 	}
 
+	bool reset(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+	{
+		ROS_INFO("grid_map_assembler: reset!");
+		scans_.clear();
+		map_ = nav_msgs::OccupancyGrid();
+		return true;
+	}
+
 private:
 	double gridCellSize_;
 	bool gridUnknownSpaceFilled_;
@@ -144,6 +156,7 @@ private:
 	ros::Publisher gridMap_;
 
 	ros::ServiceServer getMapService_;
+	ros::ServiceServer resetService_;
 
 	std::map<int, pcl::PointCloud<pcl::PointXYZ>::Ptr > scans_;
 

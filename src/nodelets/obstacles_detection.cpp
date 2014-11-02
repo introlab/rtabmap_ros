@@ -65,7 +65,6 @@ class ObstaclesDetection : public nodelet::Nodelet
 public:
 	ObstaclesDetection() :
 		frameId_("base_link"),
-		mapFrameId_("odom"),
 		normalEstimationRadius_(0.05),
 		groundNormalAngle_(M_PI_4),
 		minClusterSize_(20),
@@ -84,7 +83,6 @@ private:
 		int queueSize = 10;
 		pnh.param("queue_size", queueSize, queueSize);
 		pnh.param("frame_id", frameId_, frameId_);
-		pnh.param("map_frame_id", mapFrameId_, mapFrameId_);
 		pnh.param("normal_estimation_radius", normalEstimationRadius_, normalEstimationRadius_);
 		pnh.param("ground_normal_angle", groundNormalAngle_, groundNormalAngle_);
 		pnh.param("min_cluster_size", minClusterSize_, minClusterSize_);
@@ -94,16 +92,15 @@ private:
 
 		groundPub_ = nh.advertise<sensor_msgs::PointCloud2>("ground", 1);
 		obstaclesPub_ = nh.advertise<sensor_msgs::PointCloud2>("obstacles", 1);
-		obstaclesToMap2dPub_ = nh.advertise<sensor_msgs::PointCloud2>("obstacles_2d", 1);
 	}
 
 
 
 	void callback(const sensor_msgs::PointCloud2ConstPtr & cloudMsg)
 	{
-		if(groundPub_.getNumSubscribers() || obstaclesPub_.getNumSubscribers() || obstaclesToMap2dPub_.getNumSubscribers())
+		if(groundPub_.getNumSubscribers() || obstaclesPub_.getNumSubscribers())
 		{
-			Transform localTransform, fixedToBaseTransform;
+			Transform localTransform;
 			try
 			{
 				tf::StampedTransform tmp;
@@ -114,17 +111,6 @@ private:
 				}
 				tfListener_.lookupTransform(frameId_, cloudMsg->header.frame_id, cloudMsg->header.stamp, tmp);
 				localTransform = transformFromTF(tmp);
-
-				if(obstaclesToMap2dPub_.getNumSubscribers())
-				{
-					if(!tfListener_.waitForTransform(mapFrameId_, cloudMsg->header.frame_id, cloudMsg->header.stamp, ros::Duration(1)))
-					{
-						ROS_WARN("Could not get transform from %s to %s after 1 second!", mapFrameId_.c_str(), cloudMsg->header.frame_id.c_str());
-						return;
-					}
-					tfListener_.lookupTransform(mapFrameId_, frameId_, cloudMsg->header.stamp, tmp);
-					fixedToBaseTransform = transformFromTF(tmp);
-				}
 			}
 			catch(tf::TransformException & ex)
 			{
@@ -153,19 +139,9 @@ private:
 				pcl::copyPointCloud(*cloud, *ground, *groundCloud);
 			}
 			pcl::PointCloud<pcl::PointXYZ>::Ptr obstaclesCloud(new pcl::PointCloud<pcl::PointXYZ>);
-			pcl::PointCloud<pcl::PointXYZ>::Ptr obstaclesToMap2dCloud(new pcl::PointCloud<pcl::PointXYZ>);
-			if((obstaclesPub_.getNumSubscribers() || obstaclesToMap2dPub_.getNumSubscribers()) && obstacles->size())
+			if(obstaclesPub_.getNumSubscribers() && obstacles->size())
 			{
 				pcl::copyPointCloud(*cloud, *obstacles, *obstaclesCloud);
-
-				if(obstaclesToMap2dPub_.getNumSubscribers())
-				{
-					//force 2d
-					float x,y,z, roll,pitch,yaw;
-					fixedToBaseTransform.getTranslationAndEulerAngles(x,y,z, roll,pitch,yaw);
-					Transform transform2d(x,y, 0, 0,0,yaw);
-					obstaclesToMap2dCloud = util3d::transformPointCloud<pcl::PointXYZ>(obstaclesCloud, transform2d);
-				}
 			}
 
 			if(groundPub_.getNumSubscribers())
@@ -189,22 +165,11 @@ private:
 				//publish the message
 				obstaclesPub_.publish(rosCloud);
 			}
-			if(obstaclesToMap2dPub_.getNumSubscribers())
-			{
-				sensor_msgs::PointCloud2 rosCloud;
-				pcl::toROSMsg(*obstaclesToMap2dCloud, rosCloud);
-				rosCloud.header.stamp = cloudMsg->header.stamp;
-				rosCloud.header.frame_id = mapFrameId_;
-
-				//publish the message
-				obstaclesToMap2dPub_.publish(rosCloud);
-			}
 		}
 	}
 
 private:
 	std::string frameId_;
-	std::string mapFrameId_;
 	double normalEstimationRadius_;
 	double groundNormalAngle_;
 	int minClusterSize_;
@@ -214,7 +179,6 @@ private:
 
 	ros::Publisher groundPub_;
 	ros::Publisher obstaclesPub_;
-	ros::Publisher obstaclesToMap2dPub_;
 
 	ros::Subscriber cloudSub_;
 };

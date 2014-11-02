@@ -176,6 +176,9 @@ target_link_libraries(rtabmapviz rtabmap_ros ${QT_LIBRARIES} ${Libraries})
 add_executable(data_recorder src/DataRecorderNode.cpp)
 target_link_libraries(data_recorder rtabmap_ros ${QT_LIBRARIES} ${Libraries})
 
+add_executable(data_player src/DbPlayerNode.cpp)
+target_link_libraries(data_player rtabmap_ros ${QT_LIBRARIES} ${Libraries})
+
 #############
 ## Install ##
 #############

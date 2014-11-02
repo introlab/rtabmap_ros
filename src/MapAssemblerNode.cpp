@@ -34,6 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <pcl_ros/transforms.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <nav_msgs/OccupancyGrid.h>
+#include <std_srvs/Empty.h>
 
 using namespace rtabmap;
 
@@ -84,6 +85,9 @@ public:
 		{
 			occupancyMapPub_ = nh.advertise<nav_msgs::OccupancyGrid>("grid_projection_map", 1);
 		}
+
+		// private service
+		resetService_ = pnh.advertiseService("reset", &MapAssembler::reset, this);
 	}
 
 	~MapAssembler()
@@ -280,6 +284,15 @@ public:
 		}
 	}
 
+	bool reset(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+	{
+		ROS_INFO("map_assembler: reset!");
+		occupancyLocalMaps_.clear();
+		rgbClouds_.clear();
+		scans_.clear();
+		return true;
+	}
+
 private:
 	int cloudDecimation_;
 	double cloudMaxDepth_;
@@ -303,6 +316,8 @@ private:
 	ros::Publisher assembledMapClouds_;
 	ros::Publisher assembledMapScans_;
 	ros::Publisher occupancyMapPub_;
+
+	ros::ServiceServer resetService_;
 
 	std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr > rgbClouds_;
 	std::map<int, pcl::PointCloud<pcl::PointXYZ>::Ptr > scans_;

@@ -99,7 +99,7 @@
 		</node>
 		<node pkg="nodelet" type="nodelet" name="obstacles_detection" args="load rtabmap/obstacles_detection stereo_nodelet">
     			<remap from="cloud" to="cloudXYZ"/>
-			<remap from="obstacles_2d" to="/planner_cloud"/>
+			<remap from="obstacles" to="/planner_cloud"/>
 
 			<param name="frame_id" type="string" value="base_footprint"/>
 			<param name="map_frame_id" type="string" value="map"/>
