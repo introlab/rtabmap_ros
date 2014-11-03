@@ -44,18 +44,21 @@ class GridMapAssembler
 
 public:
 	GridMapAssembler() :
-		gridCellSize_(0.05),
+		gridCellSize_(0.05), // meters
+		mapSize_(0), // meters
 		gridUnknownSpaceFilled_(true),
 		filterRadius_(0.5),
 		filterAngle_(30.0) // degrees
 	{
 		ros::NodeHandle pnh("~");
-		pnh.param("cell_size", gridCellSize_, gridCellSize_);
+		pnh.param("cell_size", gridCellSize_, gridCellSize_); // m
+		pnh.param("map_size", mapSize_, mapSize_); // m
 		pnh.param("unknown_space_filled", gridUnknownSpaceFilled_, gridUnknownSpaceFilled_);
 		pnh.param("filter_radius", filterRadius_, filterRadius_);
 		pnh.param("filter_angle", filterAngle_, filterAngle_);
 
 		UASSERT(gridCellSize_ > 0.0);
+		UASSERT(mapSize_ >= 0.0);
 
 		ros::NodeHandle nh;
 		mapDataTopic_ = nh.subscribe("mapData", 1, &GridMapAssembler::mapDataReceivedCallback, this);
@@ -97,7 +100,7 @@ public:
 		{
 			// create the map
 			float xMin=0.0f, yMin=0.0f;
-			cv::Mat pixels = util3d::create2DMap(poses, scans_, gridCellSize_, gridUnknownSpaceFilled_, xMin, yMin);
+			cv::Mat pixels = util3d::create2DMap(poses, scans_, gridCellSize_, gridUnknownSpaceFilled_, xMin, yMin, mapSize_);
 
 			if(!pixels.empty())
 			{
@@ -147,6 +150,7 @@ public:
 
 private:
 	double gridCellSize_;
+	double mapSize_;
 	bool gridUnknownSpaceFilled_;
 	double filterRadius_;
 	double filterAngle_;

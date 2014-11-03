@@ -71,10 +71,12 @@ public:
 		pnh.param("occupancy_cluster_min_size", clusterMinSize_, clusterMinSize_);
 		pnh.param("occupancy_empty_filling_radius", emptyCellFillingRadius_, emptyCellFillingRadius_);
 		pnh.param("occupancy_max_height", maxHeight_, maxHeight_);
+		pnh.param("occupancy_map_size", occupancyMapSize_, occupancyMapSize_);
 
 		UASSERT(gridCellSize_ > 0);
 		UASSERT(emptyCellFillingRadius_ >= 0);
 		UASSERT(maxHeight_ >= 0);
+		UASSERT(occupancyMapSize_ >=0.0);
 
 		ros::NodeHandle nh;
 		mapDataTopic_ = nh.subscribe("mapData", 1, &MapAssembler::mapDataReceivedCallback, this);
@@ -253,7 +255,7 @@ public:
 		{
 			// create the map
 			float xMin=0.0f, yMin=0.0f;
-			cv::Mat pixels = util3d::create2DMapFromOccupancyLocalMaps(poses, occupancyLocalMaps_, gridCellSize_, xMin, yMin, emptyCellFillingRadius_);
+			cv::Mat pixels = util3d::create2DMapFromOccupancyLocalMaps(poses, occupancyLocalMaps_, gridCellSize_, xMin, yMin, emptyCellFillingRadius_, occupancyMapSize_);
 
 			if(!pixels.empty())
 			{
@@ -308,6 +310,7 @@ private:
 	int clusterMinSize_;
 	int emptyCellFillingRadius_;
 	double maxHeight_;
+	double occupancyMapSize_;
 
 	std::map<int, std::pair<cv::Mat, cv::Mat> > occupancyLocalMaps_; // <ground, obstacles>
 
