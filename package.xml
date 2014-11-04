@@ -2,12 +2,12 @@
 <package>
   <name>rtabmap</name>
   <version>0.0.0</version>
-  <description>The rtabmap package</description>
+  <description>The rtabmap ros-pkg</description>
 
   <maintainer email="matlabbe@gmail.com">Mathieu Labbe</maintainer>
-  <license>LGPLv3</license>
+  <license>BSD</license>
   <url type="website">http://rtabmap.googlecode.com</url>
-  <author email="matlabbe@gmail.com">Jane Doe</author>
+  <author email="matlabbe@gmail.com">Mathieu Labbe</author>
 
   <buildtool_depend>catkin</buildtool_depend>
   <buildtool_depend>genmsg</buildtool_depend>
@@ -55,10 +55,6 @@
   <run_depend>class_loader</run_depend>
 
   <build_depend>libpcl-all-dev</build_depend>
-  
-  <build_depend>librtabmap_core</build_depend>
-  <build_depend>librtabmap_gui</build_depend>
-  <build_depend>librtabmap_utilite</build_depend>
 
   <export>
 	<nodelet plugin="${prefix}/nodelet_plugins.xml" />
