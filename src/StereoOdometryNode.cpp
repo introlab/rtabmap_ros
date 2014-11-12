@@ -41,16 +41,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <cv_bridge/cv_bridge.h>
 
-#include <opencv2/video/tracking.hpp>
-
 #include "rtabmap/MsgConversion.h"
 
-#include <rtabmap/core/Features2d.h>
-
 #include <rtabmap/utilite/ULogger.h>
-#include <rtabmap/utilite/UStl.h>
 #include <rtabmap/utilite/UTimer.h>
-#include <rtabmap/utilite/UMath.h>
 
 using namespace rtabmap;
 
@@ -59,7 +53,6 @@ class StereoOdometry : public OdometryROS
 public:
 	StereoOdometry(int argc, char * argv[]) :
 		OdometryROS(argc, argv),
-		feature2D_(0),
 		approxSync_(0),
 		exactSync_(0)
 	{
@@ -72,18 +65,6 @@ public:
 		pnh.param("approx_sync", approxSync, approxSync);
 		pnh.param("queue_size", queueSize, queueSize);
 		ROS_INFO("Approximate time sync = %s", approxSync?"true":"false");
-
-		//Keypoint detector
-		ParametersMap::const_iterator iter;
-		Feature2D::Type detectorStrategy = (Feature2D::Type)Parameters::defaultOdomFeatureType();
-		if((iter=this->parameters().find(Parameters::kOdomFeatureType())) != this->parameters().end())
-		{
-			detectorStrategy = (Feature2D::Type)std::atoi((*iter).second.c_str());
-		}
-		feature2D_ = Feature2D::create(detectorStrategy, this->parameters());
-
-		roiRatios_ = Parameters::defaultOdomRoiRatios();
-		Parameters::parse(this->parameters(), Parameters::kOdomRoiRatios(), roiRatios_);
 
 		ros::NodeHandle left_nh(nh, "left");
 		ros::NodeHandle right_nh(nh, "right");
@@ -121,7 +102,6 @@ public:
 		{
 			delete exactSync_;
 		}
-		delete feature2D_;
 	}
 
 	void callback(
@@ -188,9 +168,6 @@ public:
 				this->processData(data, imageRectLeft->header, quality);
 				UDEBUG("time odometry->process()=%fs", stepTimer.ticks());
 
-				//ROS_INFO("Odom: quality=%d, update time=%fs, stereo matches: added/matched/extracted %d/%d/%d",
-				//	quality, (ros::WallTime::now()-time).toSec(),
-				//	stereoFeaturesAdded, stereoFeaturesMatched, stereoFeaturesExtracted);
 				ROS_INFO("Odom: quality=%d, update time=%fs",
 						quality, (ros::WallTime::now()-time).toSec());
 			}
@@ -202,9 +179,6 @@ public:
 	}
 
 private:
-	Feature2D * feature2D_;
-	std::string roiRatios_;
-
 	image_transport::SubscriberFilter imageRectLeft_;
 	image_transport::SubscriberFilter imageRectRight_;
 	message_filters::Subscriber<sensor_msgs::CameraInfo> cameraInfoLeft_;
