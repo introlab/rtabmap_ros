@@ -376,19 +376,6 @@ Transform OdometryROS::processData(SensorData & data, const std_msgs::Header & h
 		odomPub_.publish(odom);
 	}
 
-	if(odomMatches_.getNumSubscribers())
-	{
-		if(dynamic_cast<OdometryOpticalFlow*>(odometry_))
-		{
-			cv_bridge::CvImage img;
-			img.encoding = sensor_msgs::image_encodings::BGR8;
-			img.image = ((OdometryOpticalFlow*)odometry_)->imgMatches_;
-			sensor_msgs::ImagePtr rosMsg = img.toImageMsg();
-			rosMsg->header= header;
-			odomMatches_.publish(rosMsg);
-		}
-	}
-
 	return pose;
 }
 

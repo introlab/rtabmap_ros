@@ -77,7 +77,6 @@ private:
 	ros::Publisher odomPub_;
 	ros::Publisher odomLocalMap_;
 	ros::Publisher odomLastFrame_;
-	ros::Publisher odomMatches_;
 	ros::ServiceServer resetSrv_;
 	ros::ServiceServer resetToPoseSrv_;
 	ros::ServiceServer pauseSrv_;
