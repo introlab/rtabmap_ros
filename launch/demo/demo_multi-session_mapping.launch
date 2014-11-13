@@ -41,6 +41,8 @@
 	<param name="RGBD/LinearUpdate" type="string" value="0.01"/>
 	<param name="Rtabmap/TimeThr" type="string" value="700"/>
 	<param name="Mem/RehearsalSimilarity" type="string" value="0.45"/>
+	<param name="Kp/TfIdfLikelihoodUsed" type="string" value="false"/>
+	<param name="Bayes/FullPredictionUpdate" type="string" value="true"/>
   </node>
   
   <!-- Visualisation (client side) -->

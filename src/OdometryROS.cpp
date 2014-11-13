@@ -93,6 +93,7 @@ OdometryROS::OdometryROS(int argc, char * argv[]) :
 	{
 		std::string group = uSplit(iter->first, '/').front();
 		if(uStrContains(group, "Odom") ||
+			group.compare("Stereo") ||
 			group.compare("SURF") == 0 ||
 			group.compare("SIFT") == 0 ||
 			group.compare("ORB") == 0 ||
@@ -240,6 +241,7 @@ void OdometryROS::processArguments(int argc, char * argv[])
 				for(rtabmap::ParametersMap::iterator iter=parameters.begin(); iter!=parameters.end(); ++iter)
 				{
 					if(iter->first.find("Odom") == 0 ||
+						uSplit(iter->first, '/').front().compare("Stereo") == 0 ||
 						uSplit(iter->first, '/').front().compare("SURF") == 0 ||
 						uSplit(iter->first, '/').front().compare("SIFT") == 0 ||
 						uSplit(iter->first, '/').front().compare("ORB") == 0 ||
