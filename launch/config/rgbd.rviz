@@ -7,7 +7,6 @@ Panels:
         - /Global Options1
         - /TF1/Frames1
         - /Info1
-        - /Info1/Status1
       Splitter Ratio: 0.411058
     Tree Height: 422
   - Class: rviz/Selection
@@ -27,7 +26,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: ""
+    SyncSource: PointCloud2
 Visualization Manager:
   Class: ""
   Displays:
@@ -85,7 +84,19 @@ Visualization Manager:
         All Enabled: false
         base_link:
           Value: true
+        camera_depth_frame:
+          Value: true
+        camera_depth_optical_frame:
+          Value: true
         camera_link:
+          Value: true
+        camera_rgb_frame:
+          Value: true
+        camera_rgb_optical_frame:
+          Value: true
+        map:
+          Value: true
+        odom:
           Value: true
       Marker Scale: 1
       Name: TF
@@ -93,46 +104,18 @@ Visualization Manager:
       Show Axes: true
       Show Names: true
       Tree:
-        {}
+        map:
+          odom:
+            base_link:
+              camera_link:
+                camera_depth_frame:
+                  camera_depth_optical_frame:
+                    {}
+                camera_rgb_frame:
+                  camera_rgb_optical_frame:
+                    {}
       Update Interval: 0
       Value: true
-    - Alpha: 1
-      Autocompute Intensity Bounds: true
-      Autocompute Value Bounds:
-        Max Value: 8.41375
-        Min Value: 2.13701
-        Value: true
-      Axis: X
-      Channel Name: intensity
-      Class: rviz/LaserScan
-      Color: 255; 255; 255
-      Color Transformer: AxisColor
-      Decay Time: 0
-      Enabled: true
-      Invert Rainbow: false
-      Max Color: 255; 255; 255
-      Max Intensity: 4096
-      Min Color: 0; 0; 0
-      Min Intensity: 0
-      Name: LaserScan
-      Position Transformer: XYZ
-      Queue Size: 10
-      Selectable: true
-      Size (Pixels): 3
-      Size (m): 0.01
-      Style: Points
-      Topic: /base_scan
-      Use Fixed Frame: false
-      Use rainbow: true
-      Value: true
-    - Alpha: 0.7
-      Class: rviz/Map
-      Color Scheme: map
-      Draw Behind: false
-      Enabled: false
-      Name: Map
-      Topic: /rtabmap/grid_map
-      Value: false
     - Class: rviz/Image
       Enabled: true
       Image Topic: /camera/rgb/image_rect_color
@@ -158,8 +141,10 @@ Visualization Manager:
       Cloud voxel size (m): 0.01
       Color: 255; 255; 255
       Color Transformer: RGB8
+      Download graph: false
       Download map: false
       Enabled: true
+      Filter floor (m): 0
       Invert Rainbow: false
       Max Color: 255; 255; 255
       Max Intensity: 4096
@@ -236,5 +221,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1273
-  X: 93
+  X: 86
   Y: 115
