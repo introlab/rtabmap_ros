@@ -56,6 +56,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <message_filters/subscriber.h>
 #include <message_filters/synchronizer.h>
 #include <message_filters/sync_policies/approximate_time.h>
+#include <message_filters/sync_policies/exact_time.h>
 
 #include <image_transport/image_transport.h>
 #include <image_transport/subscriber_filter.h>
@@ -67,7 +68,7 @@ public:
 	virtual ~CoreWrapper();
 
 private:
-	void setupCallbacks(bool subscribeDepth, bool subscribeLaserScan, bool subscribeStereo, int queueSize);
+	void setupCallbacks(bool subscribeDepth, bool subscribeLaserScan, bool subscribeStereo, int queueSize, bool stereoApproxSync);
 	void defaultCallback(const sensor_msgs::ImageConstPtr & imageMsg); // no odom
 	void depthCallback(const sensor_msgs::ImageConstPtr& imageMsg,
 					   const nav_msgs::OdometryConstPtr & odomMsg,
@@ -183,8 +184,16 @@ private:
 			sensor_msgs::Image,
 			sensor_msgs::CameraInfo,
 			sensor_msgs::CameraInfo,
-			nav_msgs::Odometry> MyStereoSyncPolicy;
-	message_filters::Synchronizer<MyStereoSyncPolicy> * stereoSync_;
+			nav_msgs::Odometry> MyStereoApproxSyncPolicy;
+	message_filters::Synchronizer<MyStereoApproxSyncPolicy> * stereoApproxSync_;
+
+	typedef message_filters::sync_policies::ExactTime<
+			sensor_msgs::Image,
+			sensor_msgs::Image,
+			sensor_msgs::CameraInfo,
+			sensor_msgs::CameraInfo,
+			nav_msgs::Odometry> MyStereoExactSyncPolicy;
+	message_filters::Synchronizer<MyStereoExactSyncPolicy> * stereoExactSync_;
 
 	tf::TransformBroadcaster tfBroadcaster_;
 	tf::TransformListener tfListener_;

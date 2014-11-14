@@ -68,6 +68,11 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 		configPath_(""),
 		databasePath_(UDirectory::homeDir()+"/.ros/"+rtabmap::Parameters::getDefaultDatabaseName()),
 		mapToOdom_(tf::Transform::getIdentity()),
+		depthSync_(0),
+		depthScanSync_(0),
+		stereoScanSync_(0),
+		stereoApproxSync_(0),
+		stereoExactSync_(0),
 		transformThread_(0),
 		rate_(Parameters::defaultRtabmapDetectionRate()),
 		time_(ros::Time::now())
@@ -81,6 +86,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	int queueSize = 10;
 	bool publishTf = true;
 	double tfDelay = 0.05; // 20 Hz
+	bool stereoApproxSync = false;
 
 	// ROS related parameters (private)
 	pnh.param("subscribe_depth", subscribeDepth, subscribeDepth);
@@ -106,6 +112,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	pnh.param("frame_id", frameId_, frameId_);
 	pnh.param("map_frame_id", mapFrameId_, mapFrameId_);
 	pnh.param("queue_size", queueSize, queueSize);
+	pnh.param("stereo_approx_sync", stereoApproxSync, stereoApproxSync);
 
 	pnh.param("publish_tf", publishTf, publishTf);
 	pnh.param("tf_delay", tfDelay, tfDelay);
@@ -250,7 +257,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	getMapDataSrv_ = nh.advertiseService("get_map", &CoreWrapper::getMapCallback, this);
 	publishMapDataSrv_ = nh.advertiseService("publish_map", &CoreWrapper::publishMapCallback, this);
 
-	setupCallbacks(subscribeDepth, subscribeLaserScan, subscribeStereo, queueSize);
+	setupCallbacks(subscribeDepth, subscribeLaserScan, subscribeStereo, queueSize, stereoApproxSync);
 
 	int toroIterations = 0;
 	Parameters::parse(parameters, Parameters::kRGBDToroIterations(), toroIterations);
@@ -277,6 +284,12 @@ CoreWrapper::~CoreWrapper()
 		delete depthSync_;
 	if(depthScanSync_)
 		delete depthScanSync_;
+	if(stereoScanSync_)
+		delete stereoScanSync_;
+	if(stereoApproxSync_)
+		delete stereoApproxSync_;
+	if(stereoExactSync_)
+		delete stereoExactSync_;
 
 	this->saveParameters(configPath_);
 
@@ -1349,7 +1362,8 @@ void CoreWrapper::setupCallbacks(
 		bool subscribeDepth,
 		bool subscribeLaserScan,
 		bool subscribeStereo,
-		int queueSize)
+		int queueSize,
+		bool stereoApproxSync)
 {
 	ros::NodeHandle nh; // public
 	ros::NodeHandle pnh("~"); // private
@@ -1410,9 +1424,19 @@ void CoreWrapper::setupCallbacks(
 		}
 		else //!subscribeLaserScan
 		{
-			ROS_INFO("Registering Stereo callback...");
-			stereoSync_ = new message_filters::Synchronizer<MyStereoSyncPolicy>(MyStereoSyncPolicy(queueSize), imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_, odomSub_);
-			stereoSync_->registerCallback(boost::bind(&CoreWrapper::stereoCallback, this, _1, _2, _3, _4, _5));
+			if(stereoApproxSync)
+			{
+				ROS_INFO("Registering Stereo Approx callback...");
+				stereoApproxSync_ = new message_filters::Synchronizer<MyStereoApproxSyncPolicy>(MyStereoApproxSyncPolicy(queueSize), imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_, odomSub_);
+				stereoApproxSync_->registerCallback(boost::bind(&CoreWrapper::stereoCallback, this, _1, _2, _3, _4, _5));
+			}
+			else
+			{
+				ROS_INFO("Registering Stereo Exact callback...");
+				stereoExactSync_ = new message_filters::Synchronizer<MyStereoExactSyncPolicy>(MyStereoExactSyncPolicy(queueSize), imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_, odomSub_);
+				stereoExactSync_->registerCallback(boost::bind(&CoreWrapper::stereoCallback, this, _1, _2, _3, _4, _5));
+			}
+
 		}
 	}
 	else
