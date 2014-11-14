@@ -80,7 +80,7 @@
 
          <param name="LccBow/MaxDepth" type="string" value="5"/>
          <param name="LccBow/MinInliers" type="string" value="10"/>
-         <param name="LccBow/InlierDistance" type="string" value="0.05"/>
+         <param name="LccBow/InlierDistance" type="string" value="0.02"/>
 
          <param name="LccReextract/Activated" type="string" value="true"/>
          <param name="LccReextract/MaxWords" type="string" value="500"/>
