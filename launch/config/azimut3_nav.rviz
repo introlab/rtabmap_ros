@@ -1,13 +1,13 @@
 Panels:
   - Class: rviz/Displays
-    Help Height: 78
+    Help Height: 0
     Name: Displays
     Property Tree Widget:
       Expanded:
         - /Global Options1
         - /TF1/Frames1
-      Splitter Ratio: 0.477273
-    Tree Height: 459
+      Splitter Ratio: 0.601881
+    Tree Height: 181
   - Class: rviz/Selection
     Name: Selection
   - Class: rviz/Views
@@ -20,7 +20,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: Info
+    SyncSource: Image
   - Class: rviz/Tool Properties
     Expanded:
       - /2D Pose Estimate1
@@ -58,7 +58,7 @@ Visualization Manager:
       Channel Name: rgb
       Class: rviz/PointCloud2
       Color: 255; 255; 255
-      Color Transformer: RGB8
+      Color Transformer: Intensity
       Decay Time: 0
       Enabled: true
       Invert Rainbow: false
@@ -73,7 +73,7 @@ Visualization Manager:
       Size (Pixels): 3
       Size (m): 0.01
       Style: Points
-      Topic: /voxel_cloud
+      Topic: /odom_last_frame
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
@@ -82,25 +82,23 @@ Visualization Manager:
       Frame Timeout: 15
       Frames:
         All Enabled: false
+        az3_base_link:
+          Value: true
+        az3_odom:
+          Value: true
         base_footprint:
           Value: true
         base_laser_link:
           Value: true
         base_link:
           Value: true
-        camera_depth_frame:
-          Value: true
-        camera_depth_optical_frame:
-          Value: true
-        camera_link:
-          Value: true
-        camera_rgb_frame:
-          Value: true
-        camera_rgb_optical_frame:
-          Value: true
         map:
           Value: true
         odom:
+          Value: true
+        stereo_camera:
+          Value: true
+        stereo_camera_base:
           Value: true
         wheelLB_linkWheel_link:
           Value: true
@@ -130,13 +128,9 @@ Visualization Manager:
               base_link:
                 base_laser_link:
                   {}
-                camera_link:
-                  camera_depth_frame:
-                    camera_depth_optical_frame:
-                      {}
-                  camera_rgb_frame:
-                    camera_rgb_optical_frame:
-                      {}
+                stereo_camera_base:
+                  stereo_camera:
+                    {}
                 wheelLB_linkWheel_link:
                   wheelLB_wheel_link:
                     {}
@@ -154,8 +148,8 @@ Visualization Manager:
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
-        Max Value: 7.24125
-        Min Value: 1.59028
+        Max Value: 5.45389
+        Min Value: 4.86317
         Value: true
       Axis: X
       Channel Name: intensity
@@ -184,10 +178,10 @@ Visualization Manager:
       Class: rviz/Map
       Color Scheme: map
       Draw Behind: false
-      Enabled: true
+      Enabled: false
       Name: Map
       Topic: /map
-      Value: true
+      Value: false
     - Alpha: 0.7
       Class: rviz/Map
       Color Scheme: costmap
@@ -200,84 +194,29 @@ Visualization Manager:
       Class: rviz/Map
       Color Scheme: costmap
       Draw Behind: false
-      Enabled: true
+      Enabled: false
       Name: Map
       Topic: /planner/move_base/global_costmap/costmap
-      Value: true
+      Value: false
     - Alpha: 1
       Class: rviz/RobotModel
       Collision Enabled: false
-      Enabled: true
+      Enabled: false
       Links:
         All Links Enabled: true
         Expand Joint Details: false
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
-        base_footprint:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        base_laser_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        base_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        wheelLB_linkWheel_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        wheelLB_wheel_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        wheelLF_linkWheel_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        wheelLF_wheel_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        wheelRB_linkWheel_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        wheelRB_wheel_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        wheelRF_linkWheel_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        wheelRF_wheel_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
       Name: RobotModel
       Robot Description: robot_description
       TF Prefix: ""
       Update Interval: 0
-      Value: true
+      Value: false
       Visual Enabled: true
     - Class: rviz/Image
       Enabled: true
-      Image Topic: /camera/data_throttled_image_relay
+      Image Topic: /stereo_camera/left/image_rect
       Max Value: 1
       Median window: 5
       Min Value: 0
@@ -295,28 +234,28 @@ Visualization Manager:
       Axis: Z
       Channel Name: intensity
       Class: rtabmap/MapCloud
-      Cloud decimation: 4
-      Cloud max depth (m): 3
-      Cloud voxel size (m): 0.02
+      Cloud decimation: 8
+      Cloud max depth (m): 4
+      Cloud voxel size (m): 0
       Color: 255; 255; 255
       Color Transformer: RGB8
       Download graph: false
       Download map: false
       Enabled: true
-      Filter floor (m): 0.1
+      Filter floor (m): 0
       Invert Rainbow: false
       Max Color: 255; 255; 255
       Max Intensity: 4096
       Min Color: 0; 0; 0
       Min Intensity: 0
       Name: MapCloud
-      Node filtering angle (degrees): 20
-      Node filtering radius (m): 0.2
+      Node filtering angle (degrees): 0
+      Node filtering radius (m): 0
       Position Transformer: XYZ
       Size (Pixels): 3
       Size (m): 0.01
       Style: Points
-      Topic: /rtabmap/mapData_relay
+      Topic: /rtabmap/mapData
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
@@ -362,6 +301,35 @@ Visualization Manager:
       Name: MapGraph
       Topic: /rtabmap/mapData_relay
       Value: true
+    - Alpha: 1
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz/PointCloud2
+      Color: 85; 255; 0
+      Color Transformer: FlatColor
+      Decay Time: 0
+      Enabled: true
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Max Intensity: 4096
+      Min Color: 0; 0; 0
+      Min Intensity: 0
+      Name: PointCloud2
+      Position Transformer: XYZ
+      Queue Size: 10
+      Selectable: true
+      Size (Pixels): 3
+      Size (m): 0.01
+      Style: Points
+      Topic: /odom_local_map
+      Use Fixed Frame: true
+      Use rainbow: true
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -382,32 +350,32 @@ Visualization Manager:
   Views:
     Current:
       Class: rtabmap/OrbitOriented
-      Distance: 13.4608
+      Distance: 6.10754
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.06
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -0.188739
-        Y: -0.297
-        Z: 0.157103
+        X: -0.963614
+        Y: -1.20902
+        Z: 0.399736
       Name: Current View
       Near Clip Distance: 0.01
-      Pitch: 1.1698
-      Target Frame: base_link
+      Pitch: 0.559801
+      Target Frame: base_footprint
       Value: OrbitOriented (rtabmap)
-      Yaw: 2.92062
+      Yaw: 3.13741
     Saved: ~
 Window Geometry:
   Displays:
     collapsed: false
-  Height: 917
+  Height: 535
   Hide Left Dock: false
   Hide Right Dock: false
   Image:
     collapsed: false
-  QMainWindow State: 000000ff00000000fd0000000400000000000001510000034ffc0200000007fb0000001200530065006c0065006300740069006f006e00000001e10000009b0000006400fffffffb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c00610079007301000000280000025a000000dd00fffffffb0000000a0049006d0061006700650100000288000000ef0000001600fffffffb0000000a0049006d006100670065010000027d000000fa0000000000000000fb0000001e0054006f006f006c002000500072006f007000650072007400690065007300000002f7000000800000006400ffffff000000010000010f00000377fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000000000000377000000b000fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000004a00000003efc0100000002fb0000000800540069006d00650000000000000004a0000002f600fffffffb0000000800540069006d00650100000000000004500000000000000000000004c20000034f00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd000000040000000000000151000001d1fc0200000008fb0000001200530065006c0065006300740069006f006e00000001e10000009b0000006400fffffffb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c0061007900730100000028000000f6000000dd00fffffffb0000000a0049006d0061006700650100000124000000d50000001600fffffffb0000000a0049006d0061006700650000000184000000490000000000000000fb0000000a0049006d006100670065010000027d000000fa0000000000000000fb0000001e0054006f006f006c002000500072006f007000650072007400690065007300000002f7000000800000006400ffffff000000010000010f000001d1fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a005600690065007700730100000028000001d1000000b000fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000004a00000003efc0100000002fb0000000800540069006d00650000000000000004a0000002f600fffffffb0000000800540069006d00650100000000000004500000000000000000000003ad000001d100000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Selection:
     collapsed: false
   Time:
@@ -418,4 +386,4 @@ Window Geometry:
     collapsed: false
   Width: 1561
   X: 42
-  Y: 98
+  Y: 53

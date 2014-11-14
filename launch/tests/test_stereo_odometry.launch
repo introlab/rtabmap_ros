@@ -26,21 +26,20 @@
 	  	  	<remap from="left/camera_info"      to="left/camera_info"/>
 	  	  	<remap from="right/camera_info"     to="right/camera_info"/>
 		  	<remap from="odom" to="odom_stereo"/>
-		  	
-		  	<remap from="odom_local_map" to="/odom_local_map"/>
-		  	<remap from="odom_last_frame" to="/odom_last_frame"/>
 	    
 	  	  	<param name="frame_id" type="string" value="base_link"/>
 	  	  	<param name="odom_frame_id" type="string" value="odom"/>
 	  	  	<param name="approx_sync" type="bool" value="false"/>
 	  	  	<param name="queue_size" type="int" value="5"/>
 
-			<param name="Odom/Strategy" type="string" value="1"/>            
-			<param name="Odom/RoiRatios" type="string" value="0.03 0.03 0.04 0.04"/>
-			<param name="Odom/MaxDepth" type="string" value="10"/>
-			<param name="OdomFlow/SubPixIterations" type="string" value="0"/>
-	  	</node>
-		
+			<param name="Odom/InlierDistance" type="string" value="0.1"/>
+	  		<param name="Odom/MinInliers" type="string" value="10"/>
+	  		<param name="Odom/RoiRatios" type="string" value="0.03 0.03 0.04 0.04"/>
+	  		<param name="Odom/MaxDepth" type="string" value="10"/>
+      
+	  		<param name="GFTT/MaxCorners" type="string" value="500"/>
+	  		<param name="GFTT/MinDistance" type="string" value="5"/>
+	  	</node>		
 	</group>
   
   

@@ -3,7 +3,7 @@
 
   <!-- We have two nodes (grid_map_assembler and rviz) subscribing to /rtabmap/mapData, so use -->
   <!-- a relay on this machine, same for images -->
-  <node name="mapData_relay" type="relay" pkg="topic_tools" args="/rtabmap/mapData /rtabmap/mapData_relay"/>
+  <node name="mapData_relay" type="relay" pkg="topic_tools" args="/rtabmap/mapData_optimized /rtabmap/mapData_relay"/>
   <node name="camera_info_relay" type="relay" pkg="topic_tools" args="/camera/data_throttled_camera_info /camera/data_throttled_camera_info_relay"/>
   <node name="republish_rgb" type="republish" pkg="image_transport" args="theora in:=/camera/data_throttled_image raw out:=/camera/data_throttled_image_relay" />
   <node name="republish_depth" type="republish" pkg="image_transport" args="compressedDepth in:=/camera/data_throttled_image_depth raw out:=/camera/data_throttled_image_depth_relay" />
