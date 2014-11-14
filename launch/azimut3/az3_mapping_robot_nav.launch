@@ -71,12 +71,6 @@
     </node>  
   </group>  
 
-  <!-- Grid map assembler for rviz -->
-  <node pkg="rtabmap" type="grid_map_assembler" name="grid_map_assembler" output="screen">
-    <remap from="mapData" to="rtabmap/mapData"/>
-    <remap from="grid_map" to="map"/>
-  </node>
-
   <!-- SLAM (robot side) -->
   <!-- args: "delete_db_on_start" and "udebug" -->
   <group ns="rtabmap">
@@ -88,7 +82,7 @@
 	
 	  <remap from="odom" to="/base_controller/odom"/>
 	  <remap from="scan" to="/base_scan"/>
-	  <remap from="mapData" to="mapData_notOptimized"/>
+	  <remap from="mapData" to="mapData"/>
 
 	  <remap from="rgb/image" to="/camera/data_throttled_image"/>
   	  <remap from="depth/image" to="/camera/data_throttled_image_depth"/>
@@ -111,35 +105,42 @@
 	  <param name="Mem/RehearsedNodesKept" type="string" value="false"/>
 
 	  <param name="Rtabmap/TimeThr" type="string" value="700"/>
-    	  <param name="Rtabmap/DetectionRate" type="string" value="1"/>
+      <param name="Rtabmap/DetectionRate" type="string" value="1"/>
 
 	  <param name="RGBD/ToroIterations" type="string" value="0"/>
-    	  <param name="RGBD/OptimizeFromGraphEnd" type="string" value="false"/>
+      <param name="RGBD/OptimizeFromGraphEnd" type="string" value="false"/>
 	 
 	  <param name="Kp/TfIdfLikelihoodUsed" type="string" value="true"/>
 	  <param name="Kp/DetectorStrategy" type="string" value="0"/>
-    	  <param name="Kp/WordsPerImage" type="string" value="200"/>
-    	  <param name="Kp/RoiRatios" type="string" value="0.03 0.03 0.04 0.04"/>
-    	  <param name="Kp/NNStrategy" type="string" value="1"/>
+      <param name="Kp/WordsPerImage" type="string" value="200"/>
+      <param name="Kp/RoiRatios" type="string" value="0.03 0.03 0.04 0.04"/>
+      <param name="Kp/NNStrategy" type="string" value="1"/>
 	  
 	  <param name="Bayes/FullPredictionUpdate" type="string" value="false"/>
 	  
 	  <param name="SURF/HessianThreshold" type="string" value="1000"/>
 	  
-    	  <param name="LccBow/MaxDepth" type="string" value="4"/>
-    	  <param name="LccBow/MinInliers" type="string" value="10"/>
-    	  <param name="LccBow/InlierDistance" type="string" value="0.1"/>
+      <param name="LccBow/MaxDepth" type="string" value="4"/>
+      <param name="LccBow/MinInliers" type="string" value="10"/>
+      <param name="LccBow/InlierDistance" type="string" value="0.1"/>
       
-    	  <param name="LccReextract/Activated" type="string" value="true"/>
-    	  <param name="LccReextract/FeatureType" type="string" value="4"/>
+      <param name="LccReextract/Activated" type="string" value="true"/>
+      <param name="LccReextract/FeatureType" type="string" value="4"/>
 	  <param name="LccReextract/MaxWords" type="string" value="400"/>
 	  <param name="LccReextract/NNDR" type="string" value="0.8"/>
-	  <param name="LccReextract/NNType" type="string" value="3"/>   
+	  <param name="LccReextract/NNType" type="string" value="3"/>  
+
+      <!-- Disable graph optimization because we use map_optimizer node below -->
+      <param name="RGBD/ToroIterations" type="string" value="0"/>
     </node>
     <!-- to always have the global map optimized -->
-    <node pkg="rtabmap" type="map_optimizer" name="map_optimizer">
-   	  <remap from="mapData" to="mapData_notOptimized"/>
-	  <remap from="mapData_notOptimized_optimized" to="mapData"/> 
-    </node>
+    <node pkg="rtabmap" type="map_optimizer" name="map_optimizer"/>
   </group>
+  
+  <!-- Grid map assembler for rviz -->
+  <node pkg="rtabmap" type="grid_map_assembler" name="grid_map_assembler" output="screen">
+    <remap from="mapData" to="rtabmap/mapData_optimized"/>
+    <remap from="grid_map" to="map"/>
+  </node>
+  
 </launch>
