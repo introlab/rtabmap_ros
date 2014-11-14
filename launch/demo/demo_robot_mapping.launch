@@ -35,7 +35,14 @@
 	<param name="LccIcp/Type" type="string" value="2"/>                      <!-- 0=No ICP, 1=ICP 3D, 2=ICP 2D -->
 	<param name="LccBow/MaxDepth" type="string" value="0.0"/>                <!-- 3D visual words maximum depth 0=infinity -->
 	<param name="LccBow/InlierDistance" type="string" value="0.1"/>          <!-- 3D visual words correspondence distance -->
+    <param name="RGBD/ToroIterations" type="string" value="0"/>
   </node>
+    
+    <!-- Grid map assembler for rviz -->
+    <node pkg="rtabmap" type="map_optimizer" name="map_optimizer" output="screen"/>
+    <node pkg="rtabmap" type="grid_map_assembler" name="grid_map_assembler" output="screen">
+    	<remap from="mapData" to="mapData_optimized"/>
+    </node>
   
   <!-- Visualisation (client side) -->
   <node pkg="rtabmap" type="rtabmapviz" name="rtabmapviz" args="-d $(find rtabmap)/launch/config/rgbd_gui.ini" output="screen">
@@ -49,6 +56,7 @@
       <remap from="rgb/camera_info" to="data_throttled_camera_info"/>
       <remap from="scan" to="/jn0/base_scan"/>
       <remap from="odom" to="/az3/base_controller/odom"/>
+      <remap from="mapData" to="mapData_optimized"/>
       
       <param name="rgb/image_transport" type="string" value="compressed"/>
       <param name="depth/image_transport" type="string" value="compressedDepth"/>
