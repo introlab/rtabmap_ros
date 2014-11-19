@@ -174,6 +174,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	std::list<std::string> oldParameterNames;
 	oldParameterNames.push_back("LccReextract/LoopClosureFeatures");
 	oldParameterNames.push_back("Rtabmap/DetectorStrategy");
+	oldParameterNames.push_back("RGBD/ScanMatchingSize");
 	for(std::list<std::string>::iterator iter=oldParameterNames.begin(); iter!=oldParameterNames.end(); ++iter)
 	{
 		std::string vStr;
@@ -190,6 +191,12 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 				ROS_WARN("Parameter name changed: Rtabmap/DetectorStrategy -> %s. Please update your launch file accordingly.",
 						Parameters::kKpDetectorStrategy().c_str());
 				parameters.at(Parameters::kKpDetectorStrategy())= vStr;
+			}
+			else if(iter->compare("RGBD/ScanMatchingSize") == 0)
+			{
+				ROS_WARN("Parameter name changed: RGBD/ScanMatchingSize -> %s. Please update your launch file accordingly.",
+						Parameters::kRGBDPoseScanMatching().c_str());
+				parameters.at(Parameters::kRGBDPoseScanMatching())= std::atoi(vStr.c_str()) > 0?"true":"false";
 			}
 		}
 	}

@@ -25,7 +25,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: PointCloud2
+    SyncSource: ""
 Visualization Manager:
   Class: ""
   Displays:
@@ -110,173 +110,13 @@ Visualization Manager:
       Frame Timeout: 15
       Frames:
         All Enabled: false
-        L_forearm_link:
-          Value: true
-        L_frame_tool_link:
-          Value: true
-        L_gripper_up_link:
-          Value: true
-        L_shoulder_fixed_link:
-          Value: true
-        L_shoulder_pan_link:
-          Value: true
-        L_shoulder_tilt_link:
-          Value: true
-        L_upper_arm_link:
-          Value: true
-        R_forearm_link:
-          Value: true
-        R_frame_tool_link:
-          Value: true
-        R_gripper_up_link:
-          Value: true
-        R_shoulder_fixed_link:
-          Value: true
-        R_shoulder_pan_link:
-          Value: true
-        R_shoulder_tilt_link:
-          Value: true
-        R_upper_arm_link:
-          Value: true
-        base_footprint:
-          Value: true
-        base_laser_link:
-          Value: true
-        base_link:
-          Value: true
-        head_l_eye_eyebrow_link:
-          Value: true
-        head_l_eye_link:
-          Value: true
-        head_l_eye_pupil_link:
-          Value: true
-        head_link:
-          Value: true
-        head_r_eye_eyebrow_link:
-          Value: true
-        head_r_eye_link:
-          Value: true
-        head_r_eye_pupil_link:
-          Value: true
-        map:
-          Value: true
-        neck_bracket_link:
-          Value: true
-        neck_pan_link:
-          Value: true
-        neck_tilt_link:
-          Value: true
-        neck_top_frame:
-          Value: true
-        odom:
-          Value: true
-        openni_base_link:
-          Value: true
-        openni_camera_link:
-          Value: true
-        openni_depth_frame:
-          Value: true
-        openni_depth_optical_frame:
-          Value: true
-        openni_rgb_frame:
-          Value: true
-        openni_rgb_optical_frame:
-          Value: true
-        torso_imu_link:
-          Value: true
-        torso_link:
-          Value: true
-        torso_stand_link:
-          Value: true
-        torso_top_frame:
-          Value: true
-        wheelLB_linkWheel_link:
-          Value: true
-        wheelLB_wheel_link:
-          Value: true
-        wheelLF_linkWheel_link:
-          Value: true
-        wheelLF_wheel_link:
-          Value: true
-        wheelRB_linkWheel_link:
-          Value: true
-        wheelRB_wheel_link:
-          Value: true
-        wheelRF_linkWheel_link:
-          Value: true
-        wheelRF_wheel_link:
-          Value: true
       Marker Scale: 1
       Name: TF
       Show Arrows: true
       Show Axes: true
       Show Names: true
       Tree:
-        map:
-          odom:
-            base_footprint:
-              base_link:
-                base_laser_link:
-                  {}
-                torso_link:
-                  L_shoulder_fixed_link:
-                    L_shoulder_pan_link:
-                      L_shoulder_tilt_link:
-                        L_upper_arm_link:
-                          L_forearm_link:
-                            L_frame_tool_link:
-                              {}
-                            L_gripper_up_link:
-                              {}
-                  R_shoulder_fixed_link:
-                    R_shoulder_pan_link:
-                      R_shoulder_tilt_link:
-                        R_upper_arm_link:
-                          R_forearm_link:
-                            R_frame_tool_link:
-                              {}
-                            R_gripper_up_link:
-                              {}
-                  torso_top_frame:
-                    neck_pan_link:
-                      neck_tilt_link:
-                        neck_bracket_link:
-                          neck_top_frame:
-                            head_link:
-                              head_l_eye_link:
-                                head_l_eye_eyebrow_link:
-                                  {}
-                                head_l_eye_pupil_link:
-                                  {}
-                              head_r_eye_link:
-                                head_r_eye_eyebrow_link:
-                                  {}
-                                head_r_eye_pupil_link:
-                                  {}
-                              openni_base_link:
-                                openni_camera_link:
-                                  openni_depth_frame:
-                                    openni_depth_optical_frame:
-                                      {}
-                                    openni_rgb_frame:
-                                      openni_rgb_optical_frame:
-                                        {}
-                    torso_imu_link:
-                      {}
-                torso_stand_link:
-                  {}
-                wheelLB_linkWheel_link:
-                  wheelLB_wheel_link:
-                    {}
-                wheelLF_linkWheel_link:
-                  wheelLF_wheel_link:
-                    {}
-                wheelRB_linkWheel_link:
-                  wheelRB_wheel_link:
-                    {}
-                wheelRF_linkWheel_link:
-                  wheelRF_wheel_link:
-                    {}
+        {}
       Update Interval: 0
       Value: true
     - Class: rviz/Image
@@ -320,7 +160,7 @@ Visualization Manager:
       Size (Pixels): 3
       Size (m): 0.01
       Style: Points
-      Topic: /rtabmap/mapData_optimized
+      Topic: /rtabmap/mapData
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
@@ -329,7 +169,7 @@ Visualization Manager:
       Color: 25; 255; 0
       Enabled: true
       Name: MapGraph
-      Topic: /rtabmap/mapData_optimized
+      Topic: /rtabmap/mapData
       Value: true
     - Alpha: 0.7
       Class: rviz/Map
@@ -399,5 +239,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1273
-  X: 257
+  X: 250
   Y: 86
