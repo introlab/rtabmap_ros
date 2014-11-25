@@ -7,7 +7,7 @@
   <include file="$(find az3_bringup)/joystick.launch"/>
 
   <!-- OpenNI -->
-  <include file="$(find rtabmap)/launch/azimut3/az3_openni.launch"/>
+  <include file="$(find rtabmap_ros)/launch/azimut3/az3_openni.launch"/>
   
   <!-- Throttling messages -->
   <group ns="camera">
@@ -24,7 +24,7 @@
     </node>   
   </group>
 
-  <node name="data_recorder" pkg="rtabmap" type="data_recorder" output="screen">
+  <node name="data_recorder" pkg="rtabmap_ros" type="data_recorder" output="screen">
 	<param name="output_file_name" value="az3_record.db" type="string"/>  
 	
 	<param name="frame_id" type="string" value="base_footprint"/>

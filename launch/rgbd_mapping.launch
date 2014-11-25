@@ -25,7 +25,7 @@
   <group ns="rtabmap">
   
     <!-- Odometry -->
-    <node pkg="rtabmap" type="rgbd_odometry" name="visual_odometry" output="screen">
+    <node pkg="rtabmap_ros" type="rgbd_odometry" name="visual_odometry" output="screen">
       <remap from="rgb/image"       to="/camera/rgb/image_rect_color"/>
       <remap from="depth/image"     to="/camera/depth_registered/image_raw"/>
       <remap from="rgb/camera_info" to="/camera/depth_registered/camera_info"/>
@@ -40,7 +40,7 @@
   
     <!-- Visual SLAM (robot side) -->
     <!-- args: "delete_db_on_start" and "udebug" -->
-    <node name="rtabmap" pkg="rtabmap" type="rtabmap" output="screen" args="--delete_db_on_start">
+    <node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="screen" args="--delete_db_on_start">
       <param name="subscribe_depth" type="bool" value="true"/>
       <param name="subscribe_laserScan" type="bool" value="false"/>
 	
@@ -57,7 +57,7 @@
     </node>
   
     <!-- Visualisation (client side) -->
-    <node pkg="rtabmap" type="rtabmapviz" name="rtabmapviz" args="-d $(find rtabmap)/launch/config/rgbd_gui.ini" output="screen">
+    <node pkg="rtabmap_ros" type="rtabmapviz" name="rtabmapviz" args="-d $(find rtabmap_ros)/launch/config/rgbd_gui.ini" output="screen">
       <param name="subscribe_depth" type="bool" value="true"/>
       <param name="subscribe_laserScan" type="bool" value="false"/>
       <param name="queue_size" type="int" value="30"/>

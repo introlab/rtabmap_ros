@@ -6,7 +6,7 @@
   <!-- <include file="$(find az3_bringup)/joystick.launch"/> -->
   
   <!-- OpenNI -->
-  <include file="$(find rtabmap)/launch/azimut3/az3_openni.launch"/>
+  <include file="$(find rtabmap_ros)/launch/azimut3/az3_openni.launch"/>
 
   <!-- Throttling messages -->
   <group ns="camera">
@@ -26,7 +26,7 @@
   <!-- SLAM (robot side) -->
   <!-- args: "delete_db_on_start" and "udebug" -->
   <group ns="rtabmap">
-    <node name="rtabmap" pkg="rtabmap" type="rtabmap" output="screen" args="--delete_db_on_start">
+    <node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="screen" args="--delete_db_on_start">
 	  <param name="frame_id" type="string" value="base_footprint"/>
 	
 	  <param name="subscribe_depth" type="bool" value="true"/>

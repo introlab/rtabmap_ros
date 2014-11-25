@@ -1,6 +1,6 @@
 
 <launch>
-  <node name="data_recorder" pkg="rtabmap" type="data_recorder" output="screen">
+  <node name="data_recorder" pkg="rtabmap_ros" type="data_recorder" output="screen">
 	<param name="output_file_name" value="output.db" type="string"/>  
 	
 	<param name="frame_id" type="string" value="camera_link"/>

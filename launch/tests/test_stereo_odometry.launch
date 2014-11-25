@@ -20,7 +20,7 @@
 		<node pkg="stereo_image_proc" type="stereo_image_proc" name="stereo_image_proc"/>
 		
 		<!-- Odometry -->
-		<node pkg="rtabmap" type="stereo_odometry" name="stereo_odometry" output="screen">
+		<node pkg="rtabmap_ros" type="stereo_odometry" name="stereo_odometry" output="screen">
 	  	  	<remap from="left/image_rect"       to="left/image_rect"/>
 	  	  	<remap from="right/image_rect"      to="right/image_rect"/>
 	  	  	<remap from="left/camera_info"      to="left/camera_info"/>
@@ -43,6 +43,6 @@
 	</group>
   
   
-  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap)/launch/config/test_odometry.rviz"/>
+  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap_ros)/launch/config/test_odometry.rviz"/>
   
 </launch>

@@ -43,7 +43,7 @@
 
 
   <!-- OpenNI -->
-  <include file="$(find rtabmap)/launch/azimut3/az3_openni.launch"/>
+  <include file="$(find rtabmap_ros)/launch/azimut3/az3_openni.launch"/>
 
   <!-- Throttling messages -->
   <group ns="camera">
@@ -74,7 +74,7 @@
   <!-- SLAM (robot side) -->
   <!-- args: "delete_db_on_start" and "udebug" -->
   <group ns="rtabmap">
-    <node name="rtabmap" pkg="rtabmap" type="rtabmap" output="screen" args="--delete_db_on_start">
+    <node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="screen" args="--delete_db_on_start">
 	  <param name="frame_id" type="string" value="base_footprint"/>
 	
 	  <param name="subscribe_depth" type="bool" value="true"/>
@@ -134,11 +134,11 @@
       <param name="RGBD/ToroIterations" type="string" value="0"/>
     </node>
     <!-- to always have the global map optimized -->
-    <node pkg="rtabmap" type="map_optimizer" name="map_optimizer"/>
+    <node pkg="rtabmap_ros" type="map_optimizer" name="map_optimizer"/>
   </group>
   
   <!-- Grid map assembler for rviz -->
-  <node pkg="rtabmap" type="grid_map_assembler" name="grid_map_assembler" output="screen">
+  <node pkg="rtabmap_ros" type="grid_map_assembler" name="grid_map_assembler" output="screen">
     <remap from="mapData" to="rtabmap/mapData_optimized"/>
     <remap from="grid_map" to="map"/>
   </node>

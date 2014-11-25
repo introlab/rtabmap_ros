@@ -6,7 +6,7 @@
   <!-- <include file="$(find az3_bringup)/joystick.launch"/> -->
   
   <!-- OpenNI -->
-  <include file="$(find rtabmap)/launch/azimut3/az3_openni.launch"/>
+  <include file="$(find rtabmap_ros)/launch/azimut3/az3_openni.launch"/>
 
   <!-- Throttling messages -->
   <group ns="camera">

@@ -22,7 +22,7 @@
 	</node>
 	-->
 
-    <node pkg="rtabmap" type="stereo_odometry" name="stereo_odometer" output="screen">
+    <node pkg="rtabmap_ros" type="stereo_odometry" name="stereo_odometer" output="screen">
   	  	<remap from="left/image_rect"       to="/stereo_camera/left/image_rect"/>
   	  	<remap from="right/image_rect"      to="/stereo_camera/right/image_rect"/>
   	  	<remap from="left/camera_info"      to="/stereo_camera/left/camera_info"/>
@@ -56,7 +56,7 @@
   	</node>
 
   	
-  <node name="data_recorder" pkg="rtabmap" type="data_recorder" output="screen">
+  <node name="data_recorder" pkg="rtabmap_ros" type="data_recorder" output="screen">
 	<param name="output_file_name" value="output.db" type="string"/>  
 	
 	<param name="frame_id" type="string" value="base_link"/>

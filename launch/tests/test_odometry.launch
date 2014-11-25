@@ -43,7 +43,7 @@
   </node>
   
   <!-- Odometry -->
-  <node pkg="rtabmap" type="visual_odometry" name="visual_odometry" output="screen">
+  <node pkg="rtabmap_ros" type="visual_odometry" name="visual_odometry" output="screen">
   	<remap from="rgb/image"       to="camera/rgb/image_rect_color"/>
   	<remap from="depth/image"     to="camera/depth_registered/image_raw"/>
   	<remap from="rgb/camera_info" to="camera/depth_registered/camera_info"/>
@@ -57,5 +57,5 @@
   	<param name="Odom/LocalHistory" type="string" value="$(arg local_map)"/>
   </node>
   
-  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap)/launch/config/test_odometry.rviz"/>
+  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap_ros)/launch/config/test_odometry.rviz"/>
 </launch>

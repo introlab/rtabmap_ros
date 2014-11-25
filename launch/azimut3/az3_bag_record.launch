@@ -16,7 +16,7 @@
   <node pkg="joy" type="joy_node" name="joystick"/>
 
   <!-- OpenNI -->
-  <include file="$(find rtabmap)/launch/azimut3/az3_openni.launch"/>
+  <include file="$(find rtabmap_ros)/launch/azimut3/az3_openni.launch"/>
   
   <!-- Throttling messages -->
   <group ns="camera">
