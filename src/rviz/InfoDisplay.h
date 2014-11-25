@@ -28,7 +28,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef INFO_DISPLAY_H
 #define INFO_DISPLAY_H
 
-#include <rtabmap/Info.h>
+#include <rtabmap_ros/Info.h>
 
 #include <rviz/message_filter_display.h>
 #include <rtabmap/core/Transform.h>
@@ -36,7 +36,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace rtabmap
 {
 
-class InfoDisplay: public rviz::MessageFilterDisplay<rtabmap::Info>
+class InfoDisplay: public rviz::MessageFilterDisplay<rtabmap_ros::Info>
 {
 Q_OBJECT
 public:
@@ -51,7 +51,7 @@ protected:
 	virtual void onInitialize();
 
 	/** @brief Process a single message.  Overridden from MessageFilterDisplay. */
-	virtual void processMessage( const rtabmap::InfoConstPtr& cloud );
+	virtual void processMessage( const rtabmap_ros::InfoConstPtr& cloud );
 
 private:
 	ros::AsyncSpinner spinner_;

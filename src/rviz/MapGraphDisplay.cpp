@@ -82,7 +82,7 @@ void MapGraphDisplay::destroyObjects()
 	manual_objects_.clear();
 }
 
-void MapGraphDisplay::processMessage( const rtabmap::MapData::ConstPtr& msg )
+void MapGraphDisplay::processMessage( const rtabmap_ros::MapData::ConstPtr& msg )
 {
 	if(!(msg->maps.size() == msg->poseIDs.size() && msg->poses.size() == msg->poseIDs.size()))
 	{

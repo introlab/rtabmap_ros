@@ -36,7 +36,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <tf/tf.h>
 #include <tf/transform_broadcaster.h>
 #include <std_srvs/Empty.h>
-#include <rtabmap/MsgConversion.h>
+#include <rtabmap_ros/MsgConversion.h>
 #include <rtabmap/utilite/ULogger.h>
 
 #include <rtabmap/core/DBReader.h>

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(rtabmap)
+project(rtabmap_ros)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -13,7 +13,6 @@ find_package(catkin REQUIRED COMPONENTS
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
-find_package(OpenCV 2.4 REQUIRED core highgui flann features2d calib3d imgproc nonfree)
 find_package(RTABMap 0.7 REQUIRED)
 
 #Qt stuff
@@ -94,13 +93,11 @@ catkin_package(
 include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/include
   ${RTABMap_INCLUDE_DIRS}
-  ${OpenCV_INCLUDE_DIRS}
   ${catkin_INCLUDE_DIRS}
 )
 
 # libraries
 SET(Libraries
-   ${OpenCV_LIBRARIES}
    ${catkin_LIBRARIES}
    ${RTABMap_LIBRARIES}
 )

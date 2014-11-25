@@ -4,4 +4,4 @@ bool optimized
 bool graphOnly
 ---
 #response
-rtabmap/MapData data
+MapData data

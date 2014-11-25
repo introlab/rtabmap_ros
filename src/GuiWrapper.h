@@ -29,8 +29,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define GUIWRAPPER_H_
 
 #include <ros/ros.h>
-#include "rtabmap/InfoEx.h"
-#include "rtabmap/MapData.h"
+#include "rtabmap_ros/InfoEx.h"
+#include "rtabmap_ros/MapData.h"
 #include "rtabmap/utilite/UEventsHandler.h"
 
 #include <tf/transform_listener.h>
@@ -69,7 +69,7 @@ protected:
 	virtual void handleEvent(UEvent * anEvent);
 
 private:
-	void infoMapCallback(const rtabmap::InfoExConstPtr & infoMsg, const rtabmap::MapDataConstPtr & mapMsg);
+	void infoMapCallback(const rtabmap_ros::InfoExConstPtr & infoMsg, const rtabmap_ros::MapDataConstPtr & mapMsg);
 
 	void setupCallbacks(bool subscribeDepth, bool subscribeLaserScan, int queueSize);
 	void defaultCallback(const nav_msgs::OdometryConstPtr & odomMsg); // odom
@@ -86,7 +86,7 @@ private:
 						   const sensor_msgs::CameraInfoConstPtr& camInfoMsg,
 						   const sensor_msgs::LaserScanConstPtr& scanMsg);
 
-	void processRequestedMap(const rtabmap::MapData & map);
+	void processRequestedMap(const rtabmap_ros::MapData & map);
 
 private:
 	QApplication * app_;
@@ -97,8 +97,8 @@ private:
 	std::string frameId_;
 	tf::TransformListener tfListener_;
 
-	message_filters::Subscriber<rtabmap::InfoEx> infoExTopic_;
-	message_filters::Subscriber<rtabmap::MapData> mapDataTopic_;
+	message_filters::Subscriber<rtabmap_ros::InfoEx> infoExTopic_;
+	message_filters::Subscriber<rtabmap_ros::MapData> mapDataTopic_;
 
 	ros::Subscriber defaultSub_; // odometry only
 	image_transport::SubscriberFilter imageSub_;
@@ -108,8 +108,8 @@ private:
 	message_filters::Subscriber<sensor_msgs::LaserScan> scanSub_;
 
 	typedef message_filters::sync_policies::ExactTime<
-				rtabmap::InfoEx,
-				rtabmap::MapData> MyInfoMapSyncPolicy;
+			rtabmap_ros::InfoEx,
+			rtabmap_ros::MapData> MyInfoMapSyncPolicy;
 	message_filters::Synchronizer<MyInfoMapSyncPolicy> * infoMapSync_;
 
 	typedef message_filters::sync_policies::ApproximateTime<

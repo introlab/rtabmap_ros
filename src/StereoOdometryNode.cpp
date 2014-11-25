@@ -41,7 +41,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <cv_bridge/cv_bridge.h>
 
-#include "rtabmap/MsgConversion.h"
+#include "rtabmap_ros/MsgConversion.h"
 
 #include <rtabmap/utilite/ULogger.h>
 #include <rtabmap/utilite/UTimer.h>

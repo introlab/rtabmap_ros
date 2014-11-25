@@ -44,7 +44,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/utilite/UFile.h>
 
 #include <dynamic_reconfigure/server.h>
-#include <rtabmap/CameraConfig.h>
+#include <rtabmap_ros/CameraConfig.h>
 
 class CameraWrapper : public UEventsHandler
 {

@@ -26,8 +26,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #include <ros/ros.h>
-#include "rtabmap/MapData.h"
-#include "rtabmap/MsgConversion.h"
+#include "rtabmap_ros/MapData.h"
+#include "rtabmap_ros/MsgConversion.h"
 #include <rtabmap/core/util3d.h>
 #include <rtabmap/utilite/ULogger.h>
 #include <rtabmap/utilite/UStl.h>
@@ -96,7 +96,7 @@ public:
 	{
 	}
 
-	void mapDataReceivedCallback(const rtabmap::MapDataConstPtr & msg)
+	void mapDataReceivedCallback(const rtabmap_ros::MapDataConstPtr & msg)
 	{
 		for(unsigned int i=0; i<msg->nodes.size(); ++i)
 		{

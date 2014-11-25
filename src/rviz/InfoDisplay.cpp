@@ -26,7 +26,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #include "InfoDisplay.h"
-#include "rtabmap/MsgConversion.h"
+#include "rtabmap_ros/MsgConversion.h"
 
 namespace rtabmap
 {
@@ -57,7 +57,7 @@ void InfoDisplay::onInitialize()
 	spinner_.start();
 }
 
-void InfoDisplay::processMessage( const rtabmap::InfoConstPtr& msg )
+void InfoDisplay::processMessage( const rtabmap_ros::InfoConstPtr& msg )
 {
 	{
 		boost::mutex::scoped_lock lock(info_mutex_);

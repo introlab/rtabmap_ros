@@ -49,7 +49,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <image_geometry/stereo_camera_model.h>
 
-#include "rtabmap/MsgConversion.h"
+#include "rtabmap_ros/MsgConversion.h"
 
 #include <pcl_ros/transforms.h>
 #include <pcl_conversions/pcl_conversions.h>

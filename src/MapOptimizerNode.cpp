@@ -26,8 +26,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #include <ros/ros.h>
-#include "rtabmap/MapData.h"
-#include "rtabmap/MsgConversion.h"
+#include "rtabmap_ros/MapData.h"
+#include "rtabmap_ros/MsgConversion.h"
 #include <rtabmap/core/util3d.h>
 #include <rtabmap/core/Parameters.h>
 #include <rtabmap/utilite/ULogger.h>
@@ -70,7 +70,7 @@ public:
 		pnh.param("tf_delay", tfDelay, tfDelay);
 
 		mapDataTopic_ = nh.subscribe("mapData", 1, &MapOptimizer::mapDataReceivedCallback, this);
-		mapDataPub_ = nh.advertise<rtabmap::MapData>(nh.resolveName("mapData")+"_optimized", 1);
+		mapDataPub_ = nh.advertise<rtabmap_ros::MapData>(nh.resolveName("mapData")+"_optimized", 1);
 
 		if(publishTf)
 		{
@@ -106,7 +106,7 @@ public:
 		}
 	}
 
-	void mapDataReceivedCallback(const rtabmap::MapDataConstPtr & msg)
+	void mapDataReceivedCallback(const rtabmap_ros::MapDataConstPtr & msg)
 	{
 		// save new poses and constraints
 		// Assuming that nodes/constraints are all linked together
@@ -239,7 +239,7 @@ public:
 			}
 
 			UASSERT(optimizedPoses.size() == mapIds.size());
-			rtabmap::MapData outputMsg = *msg;
+			rtabmap_ros::MapData outputMsg = *msg;
 			outputMsg.poseIDs.resize(optimizedPoses.size());
 			outputMsg.poses.resize(optimizedPoses.size());
 			outputMsg.mapIDs.resize(mapIds.size());

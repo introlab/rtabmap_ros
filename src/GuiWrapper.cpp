@@ -47,8 +47,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/OdometryEvent.h>
 #include <rtabmap/core/util3d.h>
 
-#include "rtabmap/MsgConversion.h"
-#include "rtabmap/GetMap.h"
+#include "rtabmap_ros/MsgConversion.h"
+#include "rtabmap_ros/GetMap.h"
 
 #include "PreferencesDialogROS.h"
 
@@ -127,8 +127,8 @@ int GuiWrapper::exec()
 }
 
 void GuiWrapper::infoMapCallback(
-		const rtabmap::InfoExConstPtr & infoMsg,
-		const rtabmap::MapDataConstPtr & mapMsg)
+		const rtabmap_ros::InfoExConstPtr & infoMsg,
+		const rtabmap_ros::MapDataConstPtr & mapMsg)
 {
 	//ROS_INFO("rtabmapviz: RTAB-Map info ex received!");
 
@@ -251,7 +251,7 @@ void GuiWrapper::infoMapCallback(
 	this->post(new RtabmapEvent(stat));
 }
 
-void GuiWrapper::processRequestedMap(const rtabmap::MapData & map)
+void GuiWrapper::processRequestedMap(const rtabmap_ros::MapData & map)
 {
 	std::map<int, Signature> signatures;
 	std::map<int, Transform> poses;
@@ -440,7 +440,7 @@ void GuiWrapper::handleEvent(UEvent * anEvent)
 				 cmd == rtabmap::RtabmapEventCmd::kCmdPublishTOROGraphLocal ||
 				 cmd == rtabmap::RtabmapEventCmd::kCmdPublishTOROGraphGlobal)
 		{
-			rtabmap::GetMap getMapSrv;
+			rtabmap_ros::GetMap getMapSrv;
 			getMapSrv.request.global = cmd == rtabmap::RtabmapEventCmd::kCmdPublish3DMapGlobal || cmd == rtabmap::RtabmapEventCmd::kCmdPublishTOROGraphGlobal;
 			getMapSrv.request.optimized = cmdEvent->getInt();
 			getMapSrv.request.graphOnly = cmd == rtabmap::RtabmapEventCmd::kCmdPublishTOROGraphGlobal || cmd == rtabmap::RtabmapEventCmd::kCmdPublishTOROGraphLocal;

@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <queue>
 #include <vector>
 
-#include <rtabmap/MapData.h>
+#include <rtabmap_ros/MapData.h>
 #include <rtabmap/core/Transform.h>
 
 #include <pluginlib/class_loader.h>
@@ -67,7 +67,7 @@ class PointCloudCommon;
  * If you set the channel's name to "rgb", it will interpret the channel as an integer rgb value, with r, g and b
  * all being 8 bits.
  */
-class MapCloudDisplay: public rviz::MessageFilterDisplay<rtabmap::MapData>
+class MapCloudDisplay: public rviz::MessageFilterDisplay<rtabmap_ros::MapData>
 {
 Q_OBJECT
 public:
@@ -133,10 +133,10 @@ protected:
 	virtual void onInitialize();
 
 	/** @brief Process a single message.  Overridden from MessageFilterDisplay. */
-	virtual void processMessage( const rtabmap::MapDataConstPtr& cloud );
+	virtual void processMessage( const rtabmap_ros::MapDataConstPtr& cloud );
 
 private:
-	void processMapData(const rtabmap::MapData& map);
+	void processMapData(const rtabmap_ros::MapData& map);
 
 	/**
 	* \brief Transforms the cloud into the correct frame, and sets up our renderable cloud

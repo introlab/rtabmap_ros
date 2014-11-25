@@ -51,8 +51,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "MapCloudDisplay.h"
 #include <rtabmap/core/Transform.h>
 #include <rtabmap/core/util3d.h>
-#include <rtabmap/MsgConversion.h>
-#include <rtabmap/GetMap.h>
+#include <rtabmap_ros/MsgConversion.h>
+#include <rtabmap_ros/GetMap.h>
 
 
 namespace rtabmap
@@ -232,14 +232,14 @@ void MapCloudDisplay::onInitialize()
 	spinner_.start();
 }
 
-void MapCloudDisplay::processMessage( const rtabmap::MapDataConstPtr& msg )
+void MapCloudDisplay::processMessage( const rtabmap_ros::MapDataConstPtr& msg )
 {
 	processMapData(*msg);
 
 	this->emitTimeSignal(msg->header.stamp);
 }
 
-void MapCloudDisplay::processMapData(const rtabmap::MapData& map)
+void MapCloudDisplay::processMapData(const rtabmap_ros::MapData& map)
 {
 	// Add new clouds...
 	for(unsigned int i=0; i<map.nodes.size() && i<map.nodes.size(); ++i)
@@ -468,7 +468,7 @@ void MapCloudDisplay::downloadMap()
 {
 	if(download_map_->getBool())
 	{
-		rtabmap::GetMap getMapSrv;
+		rtabmap_ros::GetMap getMapSrv;
 		getMapSrv.request.global = true;
 		getMapSrv.request.optimized = true;
 		getMapSrv.request.graphOnly = false;
@@ -526,7 +526,7 @@ void MapCloudDisplay::downloadGraph()
 {
 	if(download_graph_->getBool())
 	{
-		rtabmap::GetMap getMapSrv;
+		rtabmap_ros::GetMap getMapSrv;
 		getMapSrv.request.global = true;
 		getMapSrv.request.optimized = true;
 		getMapSrv.request.graphOnly = true;

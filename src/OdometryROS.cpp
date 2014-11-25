@@ -40,7 +40,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/util3d.h>
 #include <rtabmap/core/Memory.h>
 #include <rtabmap/core/Signature.h>
-#include "rtabmap/MsgConversion.h"
+#include "rtabmap_ros/MsgConversion.h"
 #include "rtabmap/utilite/UConversion.h"
 #include "rtabmap/utilite/ULogger.h"
 #include "rtabmap/utilite/UStl.h"
@@ -393,7 +393,7 @@ bool OdometryROS::reset(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 	return true;
 }
 
-bool OdometryROS::resetToPose(rtabmap::ResetPose::Request& req, rtabmap::ResetPose::Response&)
+bool OdometryROS::resetToPose(rtabmap_ros::ResetPose::Request& req, rtabmap_ros::ResetPose::Response&)
 {
 	Transform pose(req.x, req.y, req.z, req.roll, req.pitch, req.yaw);
 	ROS_INFO("visual_odometry: reset odom to pose %s!", pose.prettyPrint().c_str());

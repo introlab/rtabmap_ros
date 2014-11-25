@@ -37,7 +37,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <std_srvs/Empty.h>
 #include <std_msgs/Header.h>
 
-#include <rtabmap/ResetPose.h>
+#include <rtabmap_ros/ResetPose.h>
 #include <rtabmap/core/SensorData.h>
 #include <rtabmap/core/Parameters.h>
 
@@ -54,7 +54,7 @@ public:
 	Transform processData(SensorData & data, const std_msgs::Header & header, int & quality);
 
 	bool reset(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
-	bool resetToPose(rtabmap::ResetPose::Request&, rtabmap::ResetPose::Response&);
+	bool resetToPose(rtabmap_ros::ResetPose::Request&, rtabmap_ros::ResetPose::Response&);
 	bool pause(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool resume(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 

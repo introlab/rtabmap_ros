@@ -50,13 +50,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <image_geometry/stereo_camera_model.h>
 
 //msgs
-#include "rtabmap/Info.h"
-#include "rtabmap/InfoEx.h"
-#include "rtabmap/MapData.h"
-#include "rtabmap/GetMap.h"
-#include "rtabmap/PublishMap.h"
+#include "rtabmap_ros/Info.h"
+#include "rtabmap_ros/InfoEx.h"
+#include "rtabmap_ros/MapData.h"
+#include "rtabmap_ros/GetMap.h"
+#include "rtabmap_ros/PublishMap.h"
 
-#include "rtabmap/MsgConversion.h"
+#include "rtabmap_ros/MsgConversion.h"
 
 using namespace rtabmap;
 
@@ -122,9 +122,9 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	ROS_INFO("rtabmap: queue_size = %d", queueSize);
 	ROS_INFO("rtabmap: tf_delay = %f", tfDelay);
 
-	infoPub_ = nh.advertise<rtabmap::Info>("info", 1);
-	infoPubEx_ = nh.advertise<rtabmap::InfoEx>("infoEx", 1);
-	mapData_ = nh.advertise<rtabmap::MapData>("mapData", 1);
+	infoPub_ = nh.advertise<rtabmap_ros::Info>("info", 1);
+	infoPubEx_ = nh.advertise<rtabmap_ros::InfoEx>("infoEx", 1);
+	mapData_ = nh.advertise<rtabmap_ros::MapData>("mapData", 1);
 
 	configPath_ = uReplaceChar(configPath_, '~', UDirectory::homeDir());
 
@@ -948,7 +948,7 @@ bool CoreWrapper::setModeMappingCallback(std_srvs::Empty::Request&, std_srvs::Em
 	return true;
 }
 
-bool CoreWrapper::getMapCallback(rtabmap::GetMap::Request& req, rtabmap::GetMap::Response& rep)
+bool CoreWrapper::getMapCallback(rtabmap_ros::GetMap::Request& req, rtabmap_ros::GetMap::Response& rep)
 {
 	ROS_INFO("rtabmap: Getting map (global=%s optimized=%s graphOnly=%s)...",
 			req.global?"true":"false",
@@ -1080,7 +1080,7 @@ bool CoreWrapper::getMapCallback(rtabmap::GetMap::Request& req, rtabmap::GetMap:
 	return true;
 }
 
-bool CoreWrapper::publishMapCallback(rtabmap::PublishMap::Request& req, rtabmap::PublishMap::Response& res)
+bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtabmap_ros::PublishMap::Response& res)
 {
 	if(mapData_.getNumSubscribers())
 	{
@@ -1112,7 +1112,7 @@ bool CoreWrapper::publishMapCallback(rtabmap::PublishMap::Request& req, rtabmap:
 		}
 
 		//RGB-D SLAM data
-		rtabmap::MapDataPtr msg(new rtabmap::MapData);
+		rtabmap_ros::MapDataPtr msg(new rtabmap_ros::MapData);
 		msg->header.stamp = ros::Time::now();
 		msg->header.frame_id = mapFrameId_;
 
@@ -1214,7 +1214,7 @@ void CoreWrapper::publishStats(const Statistics & stats)
 	if(infoPub_.getNumSubscribers())
 	{
 		//ROS_INFO("Sending RtabmapInfo msg (last_id=%d)...", stat.refImageId());
-		rtabmap::InfoPtr msg(new rtabmap::Info);
+		rtabmap_ros::InfoPtr msg(new rtabmap_ros::Info);
 		msg->header.stamp = timeNow;
 		msg->header.frame_id = mapFrameId_;
 
@@ -1230,7 +1230,7 @@ void CoreWrapper::publishStats(const Statistics & stats)
 	if(infoPubEx_.getNumSubscribers())
 	{
 		//ROS_INFO("Sending infoEx msg (last_id=%d)...", stat.refImageId());
-		rtabmap::InfoExPtr msg(new rtabmap::InfoEx);
+		rtabmap_ros::InfoExPtr msg(new rtabmap_ros::InfoEx);
 		msg->header.stamp = timeNow;
 		msg->header.frame_id = mapFrameId_;
 
@@ -1263,7 +1263,7 @@ void CoreWrapper::publishStats(const Statistics & stats)
 	if(mapData_.getNumSubscribers())
 	{
 		//RGB-D SLAM data
-		rtabmap::MapDataPtr msg(new rtabmap::MapData);
+		rtabmap_ros::MapDataPtr msg(new rtabmap_ros::MapData);
 		msg->header.stamp = timeNow;
 		msg->header.frame_id = mapFrameId_;
 

@@ -53,7 +53,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/highgui/highgui.hpp>
 
-#include <rtabmap/MsgConversion.h>
+#include <rtabmap_ros/MsgConversion.h>
 
 #include "rtabmap/core/util3d.h"
 

@@ -29,7 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef RVIZ_PATH_DISPLAY_H
 #define RVIZ_PATH_DISPLAY_H
 
-#include <rtabmap/MapData.h>
+#include <rtabmap_ros/MapData.h>
 
 #include <rviz/message_filter_display.h>
 
@@ -53,7 +53,7 @@ namespace rtabmap
  * \class MapGraphDisplay
  * \brief Displays the graph in rtabmap::MapData message
  */
-class MapGraphDisplay: public MessageFilterDisplay<rtabmap::MapData>
+class MapGraphDisplay: public MessageFilterDisplay<rtabmap_ros::MapData>
 {
 Q_OBJECT
 public:
@@ -68,7 +68,7 @@ protected:
   virtual void onInitialize();
 
   /** @brief Overridden from MessageFilterDisplay. */
-  void processMessage( const rtabmap::MapData::ConstPtr& msg );
+  void processMessage( const rtabmap_ros::MapData::ConstPtr& msg );
 
 private:
   void destroyObjects();
