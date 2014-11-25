@@ -1,13 +1,13 @@
 <?xml version="1.0"?>
 <package>
-  <name>rtabmap</name>
+  <name>rtabmap_ros</name>
   <version>0.7.1</version>
   <description>The rtabmap ros-pkg</description>
 
   <maintainer email="matlabbe@gmail.com">Mathieu Labbe</maintainer>
   <license>BSD</license>
   <url type="website">http://introlab.github.io/rtabmap</url>
-  <author email="matlabbe@gmail.com">Mathieu Labbe</author>
+  <url type="repository">https://github.com/introlab/rtabmap_ros</url>
 
   <buildtool_depend>catkin</buildtool_depend>
   <buildtool_depend>genmsg</buildtool_depend>
