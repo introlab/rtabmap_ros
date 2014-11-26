@@ -54,7 +54,8 @@ public:
 		groundMaxAngle_(M_PI_4),
 		clusterMinSize_(20),
 		emptyCellFillingRadius_(1),
-		maxHeight_(0)
+		maxHeight_(0),
+		occupancyMapSize_(0.0)
 	{
 		ros::NodeHandle pnh("~");
 		pnh.param("cloud_decimation", cloudDecimation_, cloudDecimation_);
