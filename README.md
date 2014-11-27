@@ -30,7 +30,7 @@ source ~/catkin_ws/devel/setup.bash
 First, you need to install the RTAB-Map standalone libraries.
  
  ```
-$ svn checkout https://github.com/introlab/rtabmap.git rtabmap
+$ git clone https://github.com/introlab/rtabmap.git rtabmap
 $ cd rtabmap/build
 $ cmake -DCMAKE_INSTALL_PREFIX=~/catkin_ws/devel ..  [<---double dots included]
 $ make -j4
@@ -41,7 +41,7 @@ Now install the RTAB-Map ros-pkg in your src folder of your Catkin workspace.
  
  ```
 $ cd ~/catkin_ws
-$ svn checkout https://github.com/introlab/rtabmap_ros.git src/rtabmap_ros
+$ git clone https://github.com/introlab/rtabmap_ros.git src/rtabmap_ros
 $ catkin_make
 ```
 
@@ -51,12 +51,14 @@ See [rtabmap_ros](http://wiki.ros.org/rtabmap_ros) for launch file examples.
 
 ```
 ~$ cd rtabmap
-~/rtabmap$ svn up
+~/rtabmap$ git pull origin master
 ~/rtabmap$ cd build
 ~/rtabmap/build$ make
 ~/rtabmap/build$ make install
 
-~/rtabmap/build$ cd ~/catkin_ws
+~/rtabmap/build$ cd ~/catkin_ws/src/rtabmap
+~/catkin_ws/src/rtabmap$ git pull origin master
+~/catkin_ws/src/rtabmap$ cd ../..
 ~/catkin_ws$ catkin_make
 ```
 
