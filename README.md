@@ -47,16 +47,16 @@ $ catkin_make
 #### Update to new version 
 
 ```
-~$ cd rtabmap
-~/rtabmap$ git pull origin master
-~/rtabmap$ cd build
-~/rtabmap/build$ make
-~/rtabmap/build$ make install
+$ cd rtabmap
+$ git pull origin master
+$ cd build
+$ make
+$ make install
 
-~/rtabmap/build$ cd ~/catkin_ws/src/rtabmap
-~/catkin_ws/src/rtabmap$ git pull origin master
-~/catkin_ws/src/rtabmap$ cd ../..
-~/catkin_ws$ catkin_make
+$ cd ~/catkin_ws/src/rtabmap
+$ git pull origin master
+$ cd ~/catkin_ws
+$ catkin_make
 ```
 
 
