@@ -6,6 +6,7 @@
   <maintainer email="matlabbe@gmail.com">Mathieu Labbe</maintainer>
   <author>Mathieu Labbe</author>
   <license>BSD</license>
+  <url type="bugtracker">https://github.com/introlab/rtabmap_ros/issues</url>
   <url type="repository">https://github.com/introlab/rtabmap_ros</url>
 
   <buildtool_depend>catkin</buildtool_depend>
