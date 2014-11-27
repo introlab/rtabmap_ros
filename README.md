@@ -8,7 +8,6 @@ For more information about this package, visit the [rtabmap_ros](http://wiki.ros
 For the RTAB-Map libraries and standalone application, visit the [RTAB-Map's home page](http://introlab.github.io/rtabmap) or the [RTAB-Map's wiki](https://github.com/introlab/rtabmap/wiki).
 
 ## Installation 
-For the standalone version, visit [RTAB-Map's wiki](https://github.com/introlab/rtabmap/wiki/Installation) for installation instructions.
 
 ### ROS distribution 
 RTAB-Map is released as binaries in the ROS distribution. Example for ROS hydro:
