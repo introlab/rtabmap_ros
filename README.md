@@ -26,7 +26,7 @@ source /opt/ros/hydro/setup.bash
 source ~/catkin_ws/devel/setup.bash
 ```
 
- 1. First, you need to install the RTAB-Map standalone libraries.
+ 1. First, you need to install the RTAB-Map standalone libraries (**don't checkout in the Catkin workspace**).
  
  ```
 $ git clone https://github.com/introlab/rtabmap.git rtabmap
