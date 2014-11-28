@@ -1,7 +1,7 @@
 rtabmap_ros
 ===========
 
-RTAB-Map ROS package.
+RTAB-Map's ROS package.
 
 For more information, demos and tutorials about this package, visit the [rtabmap_ros](http://wiki.ros.org/rtabmap_ros) page on the ROS wiki.
 
