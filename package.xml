@@ -1,12 +1,12 @@
 <?xml version="1.0"?>
 <package>
   <name>rtabmap_ros</name>
-  <version>0.7.1</version>
-  <description>The rtabmap ros-pkg</description>
-
+  <version>0.7.2</version>
+  <description>RTAB-Map's ros-pkg. RTAB-Map is an RGB-D SLAM approach with real-time constraints.</description>
   <maintainer email="matlabbe@gmail.com">Mathieu Labbe</maintainer>
+  <author>Mathieu Labbe</author>
   <license>BSD</license>
-  <url type="website">http://introlab.github.io/rtabmap</url>
+  <url type="bugtracker">https://github.com/introlab/rtabmap_ros/issues</url>
   <url type="repository">https://github.com/introlab/rtabmap_ros</url>
 
   <buildtool_depend>catkin</buildtool_depend>
