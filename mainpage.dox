@@ -1,26 +1,12 @@
 /**
-\mainpage
-\htmlinclude manifest.html
 
-\b avpd is ... 
+@mainpage
 
-<!-- 
-Provide an overview of your package.
--->
+@htmlinclude manifest.html
 
+@b rtabmap_ros contains nodes for RGB-D SLAM using RTAB-Map.
+See http://www.ros.org/wiki/rtabmap_ros for documentation.
 
-\section codeapi Code API
-
-<!--
-Provide links to specific auto-generated API documentation within your
-package that is of particular interest to a reader. Doxygen will
-document pretty much every part of your code, so do your best here to
-point the reader to the actual API.
-
-If your codebase is fairly large or has different sets of APIs, you
-should use the doxygen 'group' tag to keep these APIs together. For
-example, the roscpp documentation has 'libros' group.
--->
-
+Currently this package has no public code API.
 
 */
