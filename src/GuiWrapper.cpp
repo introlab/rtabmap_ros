@@ -206,7 +206,10 @@ void GuiWrapper::infoMapCallback(
 		std::multimap<int, cv::KeyPoint> words;
 		std::multimap<int, pcl::PointXYZ> words3D;
 		pcl::PointCloud<pcl::PointXYZ> cloud;
-		pcl::fromROSMsg(mapMsg->nodes[0].words3DValues, cloud);
+		if(mapMsg->nodes[0].words3DValues.data.size())
+		{
+			pcl::fromROSMsg(mapMsg->nodes[0].words3DValues, cloud);
+		}
 		for(unsigned int i=0; i<mapMsg->nodes[0].wordsKeys.size() && i<mapMsg->nodes[0].wordsValues.size(); ++i)
 		{
 			cv::KeyPoint pt;
