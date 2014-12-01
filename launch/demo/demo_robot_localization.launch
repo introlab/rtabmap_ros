@@ -41,6 +41,8 @@
 	<param name="LccIcp2/MaxFitness" type="string" value="10"/>
 	<param name="LccBow/MaxDepth" type="string" value="0.0"/>                <!-- 3D visual words maximum depth 0=infinity -->
 	<param name="LccBow/InlierDistance" type="string" value="0.1"/>          <!-- 3D visual words correspondence distance -->
+	<param name="Kp/DetectorStrategy" type="string" value="0"/>   <!-- use SURF -->
+	<param name="Kp/NNStrategy" type="string" value="1"/>         <!-- kdTree -->
   </node>
   
   <!-- Visualisation (client side) -->

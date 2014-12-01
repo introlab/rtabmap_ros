@@ -52,6 +52,8 @@
 	  <param name="RGBD/LocalLoopDetectionTime" type="string" value="false"/>
       <param name="LccBow/MinInliers" type="string" value="10"/>
       <param name="LccBow/InlierDistance" type="string" value="0.05"/>
+      <param name="Kp/DetectorStrategy" type="string" value="0"/>   <!-- use SURF -->
+	  <param name="Kp/NNStrategy" type="string" value="1"/>         <!-- kdTree -->
            
       <!-- Uncomment to force 3dof loop closure constraint using                   -->
       <!-- the 2d scans (set ScanMatchingSize=1 to correct odometry with laser)    -->

@@ -75,6 +75,8 @@
          
          <param name="Kp/WordsPerImage" type="string" value="200"/>
          <param name="Kp/RoiRatios" type="string" value="0.03 0.03 0.04 0.04"/>
+         <param name="Kp/DetectorStrategy" type="string" value="0"/>   <!-- use SURF -->
+		 <param name="Kp/NNStrategy" type="string" value="1"/>         <!-- kdTree -->
 
          <param name="SURF/HessianThreshold" type="string" value="1000"/>
 

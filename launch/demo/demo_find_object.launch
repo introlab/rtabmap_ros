@@ -42,6 +42,8 @@
 	  <param name="Rtabmap/TimeThr" type="string" value="700"/>
 	  <param name="Mem/RehearsalSimilarity" type="string" value="0.45"/>
 	  <param name="Mem/RehearsedNodesKept" type="string" value="false"/>   
+	  <param name="Kp/DetectorStrategy" type="string" value="0"/>   <!-- use SURF -->
+	  <param name="Kp/NNStrategy" type="string" value="1"/>         <!-- kdTree -->
     </node>
   </group> 
   

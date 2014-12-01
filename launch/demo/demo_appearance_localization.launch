@@ -20,6 +20,8 @@
 		<param name="Mem/STMSize" type="string" value="1"/>               <!-- 1 location in short-term memory -->
 		<param name="Mem/IncrementalMemory" type="string" value="false"/>  <!-- false = Localization mode-->
 		<param name="Mem/BadSignaturesIgnored" type="string" value="true"/>
+		<param name="Kp/DetectorStrategy" type="string" value="0"/>   <!-- use SURF -->
+		<param name="Kp/NNStrategy" type="string" value="1"/>         <!-- kdTree -->
 	</node>
 	
 	<!-- visualization of the "infoEx" topic sent by rtabmap node -->

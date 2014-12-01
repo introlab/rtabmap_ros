@@ -43,6 +43,8 @@
 	<param name="Mem/RehearsalSimilarity" type="string" value="0.45"/>
 	<param name="Kp/TfIdfLikelihoodUsed" type="string" value="false"/>
 	<param name="Bayes/FullPredictionUpdate" type="string" value="true"/>
+	<param name="Kp/DetectorStrategy" type="string" value="0"/>   <!-- use SURF -->
+	<param name="Kp/NNStrategy" type="string" value="1"/>         <!-- kdTree -->
   </node>
   
   <!-- Visualisation (client side) -->
