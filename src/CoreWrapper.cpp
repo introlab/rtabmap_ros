@@ -409,8 +409,33 @@ void CoreWrapper::defaultCallback(const sensor_msgs::ImageConstPtr & imageMsg)
 			ptrImage = cv_bridge::toCvShare(imageMsg, "bgr8");
 		}
 
-		process(ptrImage->header.seq,
-				ptrImage->image);
+		// process data
+		UTimer timer;
+		if(rtabmap_.isIDsGenerated() || ptrImage->header.seq > 0)
+		{
+			if(!rtabmap_.process(ptrImage->image.clone(), ptrImage->header.seq))
+			{
+				ROS_WARN("RTAB-Map could not process the data received! (ROS id = %d)", ptrImage->header.seq);
+			}
+			else
+			{
+				const Statistics & stats = rtabmap_.getStatistics();
+				this->publishStats(stats);
+			}
+		}
+		else if(!rtabmap_.isIDsGenerated())
+		{
+			ROS_WARN("Ignoring received image because its sequence ID=0. Please "
+					 "set \"Mem/GenerateIds\"=\"true\" to ignore ros generated sequence id. "
+					 "Use only \"Mem/GenerateIds\"=\"false\" for once-time run of RTAB-Map and "
+					 "when you need to have IDs output of RTAB-map synchronised with the source "
+					 "image sequence ID.");
+		}
+		ROS_INFO("rtabmap: Update rate=%fs, Limit=%fs, Processing time = %fs (%d local nodes)",
+				1.0f/rate_,
+				rtabmap_.getTimeThreshold()/1000.0f,
+				timer.ticks(),
+				rtabmap_.getWMSize()+rtabmap_.getSTMSize());
 	}
 }
 
