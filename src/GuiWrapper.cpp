@@ -305,7 +305,10 @@ void GuiWrapper::processRequestedMap(const rtabmap_ros::MapData & map)
 		std::multimap<int, cv::KeyPoint> words;
 		std::multimap<int, pcl::PointXYZ> words3D;
 		pcl::PointCloud<pcl::PointXYZ> cloud;
-		pcl::fromROSMsg(map.nodes[i].words3DValues, cloud);
+		if(map.nodes[i].words3DValues.data.size())
+		{
+			pcl::fromROSMsg(map.nodes[i].words3DValues, cloud);
+		}
 		for(unsigned int j=0; j<map.nodes[i].wordsKeys.size() && j<map.nodes[0].wordsValues.size(); ++j)
 		{
 			cv::KeyPoint pt;
