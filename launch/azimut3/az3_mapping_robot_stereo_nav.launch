@@ -25,11 +25,11 @@
         <remap from="move_base_simple/goal" to="/planner_goal"/>
         
         <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen">
-    	  <rosparam file="$(find rtabmap_ros)/launch/config/azimut3/costmap_common_params.yaml" command="load" ns="global_costmap" />
-     	  <rosparam file="$(find rtabmap_ros)/launch/config/azimut3/costmap_common_params.yaml" command="load" ns="local_costmap" />
-    	  <rosparam file="$(find rtabmap_ros)/launch/config/azimut3/local_costmap_params.yaml" command="load" />
-    	  <rosparam file="$(find rtabmap_ros)/launch/config/azimut3/global_costmap_params.yaml" command="load" />
-    	  <rosparam file="$(find rtabmap_ros)/launch/config/azimut3/base_local_planner_params.yaml" command="load" />
+    	  <rosparam file="$(find rtabmap_ros)/launch/azimut3/config/costmap_common_params.yaml" command="load" ns="global_costmap" />
+     	  <rosparam file="$(find rtabmap_ros)/launch/azimut3/config/costmap_common_params.yaml" command="load" ns="local_costmap" />
+    	  <rosparam file="$(find rtabmap_ros)/launch/azimut3/config/local_costmap_params.yaml" command="load" />
+    	  <rosparam file="$(find rtabmap_ros)/launch/azimut3/config/global_costmap_params.yaml" command="load" />
+    	  <rosparam file="$(find rtabmap_ros)/launch/azimut3/config/base_local_planner_params.yaml" command="load" />
    		</node>
    		
         <param name="cmd_vel/abtr_priority" value="10"/>

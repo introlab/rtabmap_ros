@@ -8,7 +8,7 @@
   <node name="republish_rgb" type="republish" pkg="image_transport" args="theora in:=/camera/data_throttled_image raw out:=/camera/data_throttled_image_relay" />
   <node name="republish_depth" type="republish" pkg="image_transport" args="compressedDepth in:=/camera/data_throttled_image_depth raw out:=/camera/data_throttled_image_depth_relay" />
     
-  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap_ros)/launch/config/azimut3_nav.rviz"/>
+  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap_ros)/launch/azimut3/config/azimut3_nav.rviz"/>
   
   <!-- Below, construct point cloud of the latest throttled data, disabled for bandwidth efficiency -->
   <node pkg="nodelet" type="nodelet" name="points_xyzrgb" args="standalone rtabmap/point_cloud_xyzrgb">

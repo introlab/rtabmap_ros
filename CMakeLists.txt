@@ -191,25 +191,45 @@ target_link_libraries(data_player rtabmap_ros ${QT_LIBRARIES} ${Libraries})
 # )
 
 ## Mark executables and/or libraries for installation
-# install(TARGETS rtabmap rtabmap_node
-#   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-#   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-#   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-# )
+install(TARGETS 
+   rtabmap_ros 
+   rtabmap 
+   rtabmapviz 
+   rgbd_odometry 
+   stereo_odometry
+   map_assembler
+   grid_map_assembler
+   map_optimizer
+   data_recorder
+   data_player
+   camera
+   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+ )
 
 ## Mark cpp header files for installation
-# install(DIRECTORY include/${PROJECT_NAME}/
-#   DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
-#   FILES_MATCHING PATTERN "*.h"
-#   PATTERN ".svn" EXCLUDE
-# )
+install(DIRECTORY include/${PROJECT_NAME}/
+   DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+   FILES_MATCHING PATTERN "*.h"
+   PATTERN ".svn" EXCLUDE
+)
 
 ## Mark other files for installation (e.g. launch and bag files, etc.)
-# install(FILES
-#   # myfile1
-#   # myfile2
-#   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-# )
+install(FILES
+   launch/rgbd_mapping.launch
+   launch/rgbd_mapping_rviz.launch
+   launch/rgbd_localization.launch
+   launch/rgbd_localization_rviz.launch
+   launch/data_recorder.launch
+   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch
+)
+install(DIRECTORY 
+   launch/config
+   launch/data
+   launch/demo
+   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch
+)
 
 #############
 ## Testing ##

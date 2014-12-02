@@ -41,7 +41,7 @@
 	<node name="camera" pkg="rtabmap_ros" type="camera" output="screen">
 		<remap from="image" to="image"/>
 		<param name="device_id" value="0" type="int"/>
-		<param name="video_or_images_path" value="$(find rtabmap_ros)/data" type="string"/>
+		<param name="video_or_images_path" value="$(find rtabmap_ros)/launch/data/demo_appearance" type="string"/>
 		<param name="frame_rate" value="2.0" type="double"/>
 		<param name="width" value="0" type="int"/>
 		<param name="height" value="0" type="int"/>

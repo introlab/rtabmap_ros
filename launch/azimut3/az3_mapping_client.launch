@@ -17,7 +17,7 @@
     <remap from="grid_map" to="rtabmap/grid_map"/>
   </node>
     
-  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap_ros)/launch/config/azimut3.rviz"/>
+  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap_ros)/launch/azimut3/config/azimut3.rviz"/>
   
   <!-- Below, construct point cloud of the latest throttled data, disabled for bandwidth efficiency -->
   <node pkg="nodelet" type="nodelet" name="standalone_nodelet"  args="manager" output="screen"/>

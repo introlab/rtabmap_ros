@@ -52,7 +52,7 @@
     <node pkg="rtabmap_ros" type="grid_map_assembler" name="grid_map_assembler" output="screen"/>
   </group>
    
-  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap_ros)/launch/config/azimut3.rviz"/>
+  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap_ros)/launch/azimut3/config/azimut3.rviz"/>
   
   <!-- Below, construct point cloud of the latest throttled data -->
   <node pkg="nodelet" type="nodelet" name="standalone_nodelet"  args="manager" output="screen"/>
