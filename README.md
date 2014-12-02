@@ -53,7 +53,7 @@ $ cd build
 $ make
 $ make install
 
-$ cd ~/catkin_ws/src/rtabmap
+$ roscd rtabmap_ros
 $ git pull origin master
 $ cd ~/catkin_ws
 $ catkin_make
