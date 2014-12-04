@@ -128,7 +128,15 @@ public:
 			tf::StampedTransform localTransform;
 			try
 			{
-				UDEBUG("");
+				if(this->waitForTransform())
+				{
+					if(!this->tfListener().waitForTransform(this->frameId(), imageRectLeft->header.frame_id, imageRectLeft->header.stamp, ros::Duration(1)))
+					{
+						ROS_WARN("Could not get transform from %s to %s after 1 second!", this->frameId().c_str(), imageRectLeft->header.frame_id.c_str());
+						return;
+					}
+				}
+
 				this->tfListener().lookupTransform(this->frameId(), imageRectLeft->header.frame_id, imageRectLeft->header.stamp, localTransform);
 			}
 			catch(tf::TransformException & ex)

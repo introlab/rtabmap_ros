@@ -95,6 +95,7 @@ private:
 
 	// odometry subscription stuffs
 	std::string frameId_;
+	bool waitForTransform_;
 	tf::TransformListener tfListener_;
 
 	message_filters::Subscriber<rtabmap_ros::InfoEx> infoExTopic_;

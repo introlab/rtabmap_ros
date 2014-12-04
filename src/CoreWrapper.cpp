@@ -67,6 +67,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 		odomFrameId_(""),
 		configPath_(""),
 		databasePath_(UDirectory::homeDir()+"/.ros/"+rtabmap::Parameters::getDefaultDatabaseName()),
+		waitForTransform_(false),
 		mapToOdom_(tf::Transform::getIdentity()),
 		depthSync_(0),
 		depthScanSync_(0),
@@ -116,6 +117,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 
 	pnh.param("publish_tf", publishTf, publishTf);
 	pnh.param("tf_delay", tfDelay, tfDelay);
+	pnh.param("wait_for_transform", waitForTransform_, waitForTransform_);
 
 	ROS_INFO("rtabmap: frame_id = %s", frameId_.c_str());
 	ROS_INFO("rtabmap: map_frame_id = %s", mapFrameId_.c_str());
@@ -471,6 +473,15 @@ void CoreWrapper::depthCallback(
 		Transform localTransform;
 		try
 		{
+			if(waitForTransform_)
+			{
+				if(!tfListener_.waitForTransform(frameId_, depthMsg->header.frame_id, depthMsg->header.stamp, ros::Duration(1)))
+				{
+					ROS_WARN("Could not get transform from %s to %s after 1 second!", frameId_.c_str(), depthMsg->header.frame_id.c_str());
+					return;
+				}
+			}
+
 			tf::StampedTransform tmp;
 			tfListener_.lookupTransform(frameId_, depthMsg->header.frame_id, depthMsg->header.stamp, tmp);
 			localTransform = transformFromTF(tmp);
@@ -549,6 +560,20 @@ void CoreWrapper::depthScanCallback(
 		Transform localTransform;
 		try
 		{
+			if(waitForTransform_)
+			{
+				if(!tfListener_.waitForTransform(frameId_, scanMsg->header.frame_id, scanMsg->header.stamp, ros::Duration(1)))
+				{
+					ROS_WARN("Could not get transform from %s to %s after 1 second!", frameId_.c_str(), scanMsg->header.frame_id.c_str());
+					return;
+				}
+				if(!tfListener_.waitForTransform(frameId_, depthMsg->header.frame_id, depthMsg->header.stamp, ros::Duration(1)))
+				{
+					ROS_WARN("Could not get transform from %s to %s after 1 second!", frameId_.c_str(), depthMsg->header.frame_id.c_str());
+					return;
+				}
+			}
+
 			tf::StampedTransform tmp;
 			tfListener_.lookupTransform(frameId_, scanMsg->header.frame_id, scanMsg->header.stamp, tmp);
 			tfListener_.lookupTransform(frameId_, depthMsg->header.frame_id, depthMsg->header.stamp, tmp);
@@ -638,6 +663,15 @@ void CoreWrapper::stereoCallback(
 		Transform localTransform;
 		try
 		{
+			if(waitForTransform_)
+			{
+				if(!tfListener_.waitForTransform(frameId_, leftImageMsg->header.frame_id, leftImageMsg->header.stamp, ros::Duration(1)))
+				{
+					ROS_WARN("Could not get transform from %s to %s after 1 second!", frameId_.c_str(), leftImageMsg->header.frame_id.c_str());
+					return;
+				}
+			}
+
 			tf::StampedTransform tmp;
 			tfListener_.lookupTransform(frameId_, leftImageMsg->header.frame_id, leftImageMsg->header.stamp, tmp);
 			localTransform = transformFromTF(tmp);
@@ -720,6 +754,20 @@ void CoreWrapper::stereoScanCallback(
 		Transform localTransform;
 		try
 		{
+			if(waitForTransform_)
+			{
+				if(!tfListener_.waitForTransform(frameId_, scanMsg->header.frame_id, scanMsg->header.stamp, ros::Duration(1)))
+				{
+					ROS_WARN("Could not get transform from %s to %s after 1 second!", frameId_.c_str(), scanMsg->header.frame_id.c_str());
+					return;
+				}
+				if(!tfListener_.waitForTransform(frameId_, leftImageMsg->header.frame_id, leftImageMsg->header.stamp, ros::Duration(1)))
+				{
+					ROS_WARN("Could not get transform from %s to %s after 1 second!", frameId_.c_str(), leftImageMsg->header.frame_id.c_str());
+					return;
+				}
+			}
+
 			tf::StampedTransform tmp;
 			tfListener_.lookupTransform(frameId_, scanMsg->header.frame_id, scanMsg->header.stamp, tmp);
 			tfListener_.lookupTransform(frameId_, leftImageMsg->header.frame_id, leftImageMsg->header.stamp, tmp);

@@ -130,6 +130,7 @@ private:
 	std::string odomFrameId_;
 	std::string configPath_;
 	std::string databasePath_;
+	bool waitForTransform_;
 
 	tf::Transform mapToOdom_;
 	boost::mutex mapToOdomMutex_;

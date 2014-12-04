@@ -25,71 +25,66 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef ODOMETRYROS_H_
-#define ODOMETRYROS_H_
-
 #include <ros/ros.h>
-
+#include <nav_msgs/Odometry.h>
 #include <tf/tf.h>
 #include <tf/transform_broadcaster.h>
-#include <tf/transform_listener.h>
+#include <rtabmap_ros/MsgConversion.h>
 
-#include <std_srvs/Empty.h>
-#include <std_msgs/Header.h>
-
-#include <rtabmap_ros/ResetPose.h>
-#include <rtabmap/core/SensorData.h>
-#include <rtabmap/core/Parameters.h>
-
-namespace rtabmap {
-class Odometry;
-
-class OdometryROS
+class OdomMsgToTF
 {
+
 public:
-	OdometryROS(int argc, char * argv[]);
-	~OdometryROS();
+	OdomMsgToTF() :
+		frameId_(""),
+		odomFrameId_("")
+	{
+		ros::NodeHandle pnh("~");
+		pnh.param("frame_id", frameId_, frameId_);
+		pnh.param("odom_frame_id", odomFrameId_, odomFrameId_);
 
-	void processArguments(int argc, char * argv[]);
-	Transform processData(SensorData & data, const std_msgs::Header & header, int & quality);
+		ros::NodeHandle nh;
+		odomTopic_ = nh.subscribe("odom", 1, &OdomMsgToTF::odomReceivedCallback, this);
+	}
 
-	bool reset(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
-	bool resetToPose(rtabmap_ros::ResetPose::Request&, rtabmap_ros::ResetPose::Response&);
-	bool pause(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
-	bool resume(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
+	virtual ~OdomMsgToTF(){}
 
-	const std::string & frameId() const {return frameId_;}
-	const std::string & odomFrameId() const {return odomFrameId_;}
-	const ParametersMap & parameters() const {return parameters_;}
-	const tf::TransformListener & tfListener() const {return tfListener_;}
-	bool isPaused() const {return paused_;}
-	bool isOdometryBOW() const;
-	bool waitForTransform() const {return waitForTransform_;}
+	void odomReceivedCallback(const nav_msgs::OdometryConstPtr & msg)
+	{
+		if(frameId_.empty())
+		{
+			frameId_ = msg->child_frame_id;
+		}
+		if(odomFrameId_.empty())
+		{
+			odomFrameId_ = msg->header.frame_id;
+		}
+		tf::StampedTransform t;
+		rtabmap::Transform pose = rtabmap::transformFromPoseMsg(msg->pose.pose);
+		if(pose.isNull())
+		{
+			ROS_WARN("Odometry received is null! Cannot send tf...");
+		}
+		else
+		{
+			rtabmap::transformToTF(pose, t);
+			tfBroadcaster_.sendTransform(tf::StampedTransform (t, msg->header.stamp, odomFrameId_, frameId_));
+		}
+	}
 
 private:
-	rtabmap::Odometry * odometry_;
-
-	// parameters
 	std::string frameId_;
 	std::string odomFrameId_;
-	std::string groundTruthFrameId_;
-	bool publishTf_;
-	bool waitForTransform_;
-	ParametersMap parameters_;
 
-	ros::Publisher odomPub_;
-	ros::Publisher odomLocalMap_;
-	ros::Publisher odomLastFrame_;
-	ros::ServiceServer resetSrv_;
-	ros::ServiceServer resetToPoseSrv_;
-	ros::ServiceServer pauseSrv_;
-	ros::ServiceServer resumeSrv_;
+	ros::Subscriber odomTopic_;
 	tf::TransformBroadcaster tfBroadcaster_;
-	tf::TransformListener tfListener_;
-
-	bool paused_;
 };
 
-}
 
-#endif
+int main(int argc, char** argv)
+{
+	ros::init(argc, argv, "odom_msg_to_tf");
+	OdomMsgToTF odomToTf;
+	ros::spin();
+	return 0;
+}

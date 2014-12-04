@@ -51,7 +51,9 @@ OdometryROS::OdometryROS(int argc, char * argv[]) :
 	odometry_(0),
 	frameId_("base_link"),
 	odomFrameId_("odom"),
+	groundTruthFrameId_(""),
 	publishTf_(true),
+	waitForTransform_(false),
 	paused_(false)
 {
 	this->processArguments(argc, argv);
@@ -69,7 +71,9 @@ OdometryROS::OdometryROS(int argc, char * argv[]) :
 	pnh.param("frame_id", frameId_, frameId_);
 	pnh.param("odom_frame_id", odomFrameId_, odomFrameId_);
 	pnh.param("publish_tf", publishTf_, publishTf_);
+	pnh.param("wait_for_transform", waitForTransform_, waitForTransform_);
 	pnh.param("initial_pose", initialPoseStr, initialPoseStr); // "x y z roll pitch yaw"
+	pnh.param("ground_truth_frame_id", groundTruthFrameId_, groundTruthFrameId_);
 	if(initialPoseStr.size())
 	{
 		std::vector<std::string> values = uListToVector(uSplit(initialPoseStr, ' '));
@@ -276,6 +280,36 @@ void OdometryROS::processArguments(int argc, char * argv[])
 
 Transform OdometryROS::processData(SensorData & data, const std_msgs::Header & header, int & quality)
 {
+	if(odometry_->getPose().isNull() &&
+	   !groundTruthFrameId_.empty())
+	{
+		tf::StampedTransform initialPose; // sync with the first value of the ground truth
+		try
+		{
+			if(this->waitForTransform())
+			{
+				if(!this->tfListener().waitForTransform(groundTruthFrameId_, frameId_, header.stamp, ros::Duration(1)))
+				{
+					ROS_WARN("Could not get transform from %s to %s after 1 second!", groundTruthFrameId_.c_str(), frameId_.c_str());
+					return rtabmap::Transform(); // return null
+				}
+			}
+			this->tfListener().lookupTransform(groundTruthFrameId_, frameId_, header.stamp, initialPose);
+		}
+		catch(tf::TransformException & ex)
+		{
+			ROS_WARN("%s",ex.what());
+			return rtabmap::Transform(); // return null
+		}
+		Transform pose = rtabmap::transformFromTF(initialPose);
+		ROS_INFO("Initializing odometry pose to %s (from \"%s\" -> \"%s\")",
+				pose.prettyPrint().c_str(),
+				groundTruthFrameId_.c_str(),
+				frameId_.c_str());
+		odometry_->reset(pose);
+	}
+
+	// process data
 	rtabmap::Transform pose = odometry_->process(data, &quality);
 	if(!pose.isNull())
 	{

@@ -62,6 +62,7 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 		app_(0),
 		mainWindow_(0),
 		frameId_("base_link"),
+		waitForTransform_(false),
 		cameraNodeName_("")
 {
 	ros::NodeHandle nh;
@@ -103,6 +104,7 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 	pnh.param("subscribe_depth", subscribeDepth, subscribeDepth);
 	pnh.param("subscribe_laserScan", subscribeLaserScan, subscribeLaserScan);
 	pnh.param("queue_size", queueSize, queueSize);
+	pnh.param("wait_for_transform", waitForTransform_, waitForTransform_);
 	pnh.param("camera_node_name", cameraNodeName_, cameraNodeName_); // used to pause the rtabmap/camera when pausing the process
 	this->setupCallbacks(subscribeDepth, subscribeLaserScan, queueSize);
 
@@ -493,6 +495,15 @@ void GuiWrapper::depthCallback(
 	Transform localTransform;
 	try
 	{
+		if(waitForTransform_)
+		{
+			if(!tfListener_.waitForTransform(frameId_, depthMsg->header.frame_id, depthMsg->header.stamp, ros::Duration(1)))
+			{
+				ROS_WARN("Could not get transform from %s to %s after 1 second!", frameId_.c_str(), depthMsg->header.frame_id.c_str());
+				return;
+			}
+		}
+
 		tf::StampedTransform tmp;
 		tfListener_.lookupTransform(frameId_, depthMsg->header.frame_id, depthMsg->header.stamp, tmp);
 		localTransform = transformFromTF(tmp);
@@ -535,6 +546,15 @@ void GuiWrapper::scanCallback(
 	// TF ready?
 	try
 	{
+		if(waitForTransform_)
+		{
+			if(!tfListener_.waitForTransform(frameId_, scanMsg->header.frame_id, scanMsg->header.stamp, ros::Duration(1)))
+			{
+				ROS_WARN("Could not get transform from %s to %s after 1 second!", frameId_.c_str(), scanMsg->header.frame_id.c_str());
+				return;
+			}
+		}
+
 		tf::StampedTransform tmp;
 		tfListener_.lookupTransform(frameId_, scanMsg->header.frame_id, scanMsg->header.stamp, tmp);
 	}
@@ -584,6 +604,15 @@ void GuiWrapper::depthScanCallback(
 		//transform laser to point cloud and to frameId_
 		laser_geometry::LaserProjection projection;
 		projection.transformLaserScanToPointCloud(frameId_, *scanMsg, scanOut, tfListener_);
+
+		if(waitForTransform_)
+		{
+			if(!tfListener_.waitForTransform(frameId_, depthMsg->header.frame_id, depthMsg->header.stamp, ros::Duration(1)))
+			{
+				ROS_WARN("Could not get transform from %s to %s after 1 second!", frameId_.c_str(), depthMsg->header.frame_id.c_str());
+				return;
+			}
+		}
 
 		tf::StampedTransform tmp;
 		tfListener_.lookupTransform(frameId_, depthMsg->header.frame_id, depthMsg->header.stamp, tmp);

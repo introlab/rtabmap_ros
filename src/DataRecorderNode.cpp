@@ -70,6 +70,7 @@ public:
 	DataRecorderWrapper() :
 		fileName_("output.db"),
 		frameId_("base_link"),
+		waitForTransform_(false),
 		depthScanSync_(0),
 		depthSync_(0),
 		scanSync_(0),
@@ -90,6 +91,7 @@ public:
 		pnh.param("queue_size", queueSize, queueSize);
 		pnh.param("output_file_name", fileName_, fileName_);
 		pnh.param("frame_id", frameId_, frameId_);
+		pnh.param("wait_for_transform", waitForTransform_, waitForTransform_);
 
 		setupCallbacks(subscribeOdometry, subscribeDepth, subscribeStereo, subscribeLaserScan, queueSize);
 	}
@@ -234,6 +236,15 @@ private:
 		Transform localTransform;
 		try
 		{
+			if(waitForTransform_)
+			{
+				if(!tfListener_.waitForTransform(frameId_, depthMsg->header.frame_id, depthMsg->header.stamp, ros::Duration(1)))
+				{
+					ROS_WARN("Could not get transform from %s to %s after 1 second!", frameId_.c_str(), depthMsg->header.frame_id.c_str());
+					return;
+				}
+			}
+
 			tf::StampedTransform tmp;
 			tfListener_.lookupTransform(frameId_, depthMsg->header.frame_id, depthMsg->header.stamp, tmp);
 			localTransform = transformFromTF(tmp);
@@ -303,6 +314,15 @@ private:
 		Transform localTransform;
 		try
 		{
+			if(waitForTransform_)
+			{
+				if(!tfListener_.waitForTransform(frameId_, depthMsg->header.frame_id, depthMsg->header.stamp, ros::Duration(1)))
+				{
+					ROS_WARN("Could not get transform from %s to %s after 1 second!", frameId_.c_str(), depthMsg->header.frame_id.c_str());
+					return;
+				}
+			}
+
 			tf::StampedTransform tmp;
 			tfListener_.lookupTransform(frameId_, depthMsg->header.frame_id, depthMsg->header.stamp, tmp);
 			localTransform = transformFromTF(tmp);
@@ -372,6 +392,16 @@ private:
 		// TF ready?
 		try
 		{
+
+			if(waitForTransform_)
+			{
+				if(!tfListener_.waitForTransform(frameId_, scanMsg->header.frame_id, scanMsg->header.stamp, ros::Duration(1)))
+				{
+					ROS_WARN("Could not get transform from %s to %s after 1 second!", frameId_.c_str(), scanMsg->header.frame_id.c_str());
+					return;
+				}
+			}
+
 			tf::StampedTransform tmp;
 			tfListener_.lookupTransform(frameId_, scanMsg->header.frame_id, scanMsg->header.stamp, tmp);
 		}
@@ -418,6 +448,20 @@ private:
 		Transform localTransform;
 		try
 		{
+			if(waitForTransform_)
+			{
+				if(!tfListener_.waitForTransform(frameId_, scanMsg->header.frame_id, scanMsg->header.stamp, ros::Duration(1)))
+				{
+					ROS_WARN("Could not get transform from %s to %s after 1 second!", frameId_.c_str(), scanMsg->header.frame_id.c_str());
+					return;
+				}
+				if(!tfListener_.waitForTransform(frameId_, depthMsg->header.frame_id, depthMsg->header.stamp, ros::Duration(1)))
+				{
+					ROS_WARN("Could not get transform from %s to %s after 1 second!", frameId_.c_str(), depthMsg->header.frame_id.c_str());
+					return;
+				}
+			}
+
 			tf::StampedTransform tmp;
 			tfListener_.lookupTransform(frameId_, scanMsg->header.frame_id, scanMsg->header.stamp, tmp);
 			tfListener_.lookupTransform(frameId_, depthMsg->header.frame_id, depthMsg->header.stamp, tmp);
@@ -499,6 +543,15 @@ private:
 		Transform localTransform;
 		try
 		{
+			if(waitForTransform_)
+			{
+				if(!tfListener_.waitForTransform(frameId_, leftImageMsg->header.frame_id, leftImageMsg->header.stamp, ros::Duration(1)))
+				{
+					ROS_WARN("Could not get transform from %s to %s after 1 second!", frameId_.c_str(), leftImageMsg->header.frame_id.c_str());
+					return;
+				}
+			}
+
 			tf::StampedTransform tmp;
 			tfListener_.lookupTransform(frameId_, leftImageMsg->header.frame_id, leftImageMsg->header.stamp, tmp);
 			localTransform = transformFromTF(tmp);
@@ -544,6 +597,15 @@ private:
 		Transform localTransform;
 		try
 		{
+			if(waitForTransform_)
+			{
+				if(!tfListener_.waitForTransform(frameId_, leftImageMsg->header.frame_id, leftImageMsg->header.stamp, ros::Duration(1)))
+				{
+					ROS_WARN("Could not get transform from %s to %s after 1 second!", frameId_.c_str(), leftImageMsg->header.frame_id.c_str());
+					return;
+				}
+			}
+
 			tf::StampedTransform tmp;
 			tfListener_.lookupTransform(frameId_, leftImageMsg->header.frame_id, leftImageMsg->header.stamp, tmp);
 			localTransform = transformFromTF(tmp);
@@ -581,6 +643,7 @@ private:
 	DataRecorder recorder_;
 	std::string fileName_;
 	std::string frameId_;
+	bool waitForTransform_;
 
 	image_transport::Subscriber defaultSub_;
 	image_transport::SubscriberFilter imageSub_;
