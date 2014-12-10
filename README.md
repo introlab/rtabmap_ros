@@ -10,9 +10,14 @@ For the RTAB-Map libraries and standalone application, visit the [RTAB-Map's hom
 ## Installation 
 
 ### ROS distribution 
-RTAB-Map is released as binaries in the ROS distribution. Example for ROS hydro:
+RTAB-Map is released as binaries in the ROS distribution.
+ * Indigo
+  ```
+$ sudo apt-get install ros-indigo-rtabmap-ros
 ```
-$ sudo apt-get install ros-hydro-rtabmap_ros
+ * Hydro
+  ```
+$ sudo apt-get install ros-hydro-rtabmap-ros
 ```
 
 ### Build from source
