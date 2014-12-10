@@ -80,7 +80,6 @@ catkin_package(
                  image_transport tf tf_conversions laser_geometry pcl_conversions 
                  pcl_ros nodelet dynamic_reconfigure rviz message_filters class_loader
                  stereo_msgs
-  DEPENDS RTABMap
 )
 
 ###########
@@ -232,6 +231,13 @@ install(DIRECTORY
    launch/data
    launch/demo
    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch
+)
+
+## install plugins/nodelets xml
+install(FILES
+   nodelet_plugins.xml
+   plugin_description.xml
+   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )
 
 #############
