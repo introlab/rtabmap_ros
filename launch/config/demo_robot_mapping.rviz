@@ -138,7 +138,7 @@ Visualization Manager:
         Value: true
       Axis: Z
       Channel Name: intensity
-      Class: rtabmap/MapCloud
+      Class: rtabmap_ros/MapCloud
       Cloud decimation: 8
       Cloud max depth (m): 4
       Cloud voxel size (m): 0.01
@@ -165,7 +165,7 @@ Visualization Manager:
       Use rainbow: true
       Value: true
     - Alpha: 1
-      Class: rtabmap/MapGraph
+      Class: rtabmap_ros/MapGraph
       Color: 25; 255; 0
       Enabled: true
       Name: MapGraph
@@ -179,7 +179,7 @@ Visualization Manager:
       Name: Map
       Topic: /rtabmap/grid_map
       Value: true
-    - Class: rtabmap/Info
+    - Class: rtabmap_ros/Info
       Enabled: true
       Name: Info
       Topic: /rtabmap/info

@@ -1,27 +1,27 @@
 <library path="lib/librtabmap_ros">
-  <class name="rtabmap/MapCloud"
-         type="rtabmap::MapCloudDisplay"
+  <class name="rtabmap_ros/MapCloud"
+         type="rtabmap_ros::MapCloudDisplay"
          base_class_type="rviz::Display">
     <description>
-      Displays graph point clouds from rtabmap/MapData messages.
+      Displays graph point clouds from rtabmap_ros/MapData messages.
     </description>
   </class>
-  <class name="rtabmap/MapGraph"
-         type="rtabmap::MapGraphDisplay"
+  <class name="rtabmap_ros/MapGraph"
+         type="rtabmap_ros::MapGraphDisplay"
          base_class_type="rviz::Display">
     <description>
-      Displays graphs from rtabmap/MapData messages.
+      Displays graphs from rtabmap_ros/MapData messages.
     </description>
   </class>
-  <class name="rtabmap/Info"
-         type="rtabmap::InfoDisplay"
+  <class name="rtabmap_ros/Info"
+         type="rtabmap_ros::InfoDisplay"
          base_class_type="rviz::Display">
     <description>
-      Displays information from rtabmap/Info messages.
+      Displays information from rtabmap_ros/Info messages.
     </description>
   </class>
-  <class name="rtabmap/OrbitOriented"
-         type="rtabmap::OrbitOrientedViewController"
+  <class name="rtabmap_ros/OrbitOriented"
+         type="rtabmap_ros::OrbitOrientedViewController"
          base_class_type="rviz::ViewController">
     <description>
       Camera orbit with orientation.

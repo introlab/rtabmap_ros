@@ -43,6 +43,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace rtabmap {
 class Odometry;
+}
+
+namespace rtabmap_ros {
 
 class OdometryROS
 {
@@ -51,7 +54,7 @@ public:
 	~OdometryROS();
 
 	void processArguments(int argc, char * argv[]);
-	Transform processData(SensorData & data, const std_msgs::Header & header, int & quality);
+	void processData(const rtabmap::SensorData & data, const std_msgs::Header & header);
 
 	bool reset(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool resetToPose(rtabmap_ros::ResetPose::Request&, rtabmap_ros::ResetPose::Response&);
@@ -60,7 +63,7 @@ public:
 
 	const std::string & frameId() const {return frameId_;}
 	const std::string & odomFrameId() const {return odomFrameId_;}
-	const ParametersMap & parameters() const {return parameters_;}
+	const rtabmap::ParametersMap & parameters() const {return parameters_;}
 	const tf::TransformListener & tfListener() const {return tfListener_;}
 	bool isPaused() const {return paused_;}
 	bool isOdometryBOW() const;
@@ -75,9 +78,10 @@ private:
 	std::string groundTruthFrameId_;
 	bool publishTf_;
 	bool waitForTransform_;
-	ParametersMap parameters_;
+	rtabmap::ParametersMap parameters_;
 
 	ros::Publisher odomPub_;
+	ros::Publisher odomInfoPub_;
 	ros::Publisher odomLocalMap_;
 	ros::Publisher odomLastFrame_;
 	ros::ServiceServer resetSrv_;

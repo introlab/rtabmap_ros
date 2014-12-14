@@ -21,7 +21,7 @@
 
 <!-- Throttling messages -->
   <node pkg="nodelet" type="nodelet" name="standalone_nodelet"  args="manager"/>
-  <node pkg="nodelet" type="nodelet" name="data_throttle" args="load rtabmap/data_throttle standalone_nodelet" output="screen">
+  <node pkg="nodelet" type="nodelet" name="data_throttle" args="load rtabmap_ros/data_throttle standalone_nodelet" output="screen">
     <param name="max_rate" type="double" value="10.0"/>
    
     <remap from="rgb/image_in"       to="/camera/rgb/image_rect_color"/>

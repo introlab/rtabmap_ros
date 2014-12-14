@@ -78,17 +78,17 @@ public:
 	{
 		for(unsigned int i=0; i<msg->nodes.size(); ++i)
 		{
-			if(!uContains(scans_, msg->nodes[i].id) && msg->nodes[i].depth2D.bytes.size())
+			if(!uContains(scans_, msg->nodes[i].id) && msg->nodes[i].laserScan.size())
 			{
-				cv::Mat depth2d = util3d::uncompressData(msg->nodes[i].depth2D.bytes);
-				scans_.insert(std::make_pair(msg->nodes[i].id, util3d::depth2DToPointCloud(depth2d)));
+				cv::Mat laserScan = util3d::uncompressData(msg->nodes[i].laserScan);
+				scans_.insert(std::make_pair(msg->nodes[i].id, util3d::laserScanToPointCloud(laserScan)));
 			}
 		}
 
 		std::map<int, Transform> poses;
-		for(unsigned int i=0; i<msg->poseIDs.size() && i<msg->poses.size(); ++i)
+		for(unsigned int i=0; i<msg->graph.nodeIds.size() && i<msg->graph.poses.size(); ++i)
 		{
-			poses.insert(std::make_pair(msg->poseIDs[i], transformFromPoseMsg(msg->poses[i])));
+			poses.insert(std::make_pair(msg->graph.nodeIds[i], rtabmap_ros::transformFromPoseMsg(msg->graph.poses[i])));
 		}
 
 		if(filterRadius_ > 0.0 && filterAngle_ > 0.0)

@@ -23,15 +23,15 @@
 		<param name="Mem/IncrementalMemory" type="string" value="true"/>  <!-- true = SLAM mode -->
 		<param name="Mem/RehearsalIdUpdatedToNewOne" type="string" value="true"/>  <!-- On merging, update to new ID-->
 		<param name="Mem/BadSignaturesIgnored" type="string" value="true"/>
-		<param name="Kp/DetectorStrategy" type="string" value="0"/>   <!-- use SURF -->
-		<param name="Kp/NNStrategy" type="string" value="1"/>         <!-- kdTree -->
+		<param name="Kp/DetectorStrategy" type="string" value="2"/>   <!-- use SURF -->
+		<param name="Kp/NNStrategy" type="string" value="3"/>         <!-- kdTree -->
 	</node>
 	
 	<!-- visualization of the "infoEx" topic sent by rtabmap node -->
 	<node name="rtabmapviz" pkg="rtabmap_ros" type="rtabmapviz" output="screen" args="-d $(find rtabmap_ros)/launch/config/appearance_gui.ini">
 	    
-	    <!-- This enables the GUI to pause a rtabmap/camera when action "pause" is checked. -->
-	    <!-- NOTE: It is specific to rtabmap/camera. Action "pause" in the GUI will still pause the rtabmap node. -->
+	    <!-- This enables the GUI to pause a rtabmap_ros/camera when action "pause" is checked. -->
+	    <!-- NOTE: It is specific to rtabmap_ros/camera. Action "pause" in the GUI will still pause the rtabmap node. -->
 		<param name="camera_node_name" type="string" value="/camera"/>      
 		 
 	</node>

@@ -54,7 +54,7 @@ typedef std::vector<std::string> V_string;
 
 using namespace rviz;
 
-namespace rtabmap
+namespace rtabmap_ros
 {
 
 class PointCloudCommon;
@@ -185,6 +185,6 @@ private:
 	pluginlib::ClassLoader<rviz::PointCloudTransformer>* transformer_class_loader_;
 };
 
-} // namespace rtabmap
+} // namespace rtabmap_ros
 
 #endif

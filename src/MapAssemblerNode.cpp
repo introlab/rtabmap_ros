@@ -49,6 +49,8 @@ public:
 		scanVoxelSize_(0.01),
 		nodeFilteringAngle_(30), // degrees
 		nodeFilteringRadius_(0.5),
+		noiseFilterRadius_(0.0),
+		noiseFilterMinNeighbors_(5),
 		computeOccupancyGrid_(false),
 		gridCellSize_(0.05),
 		groundMaxAngle_(M_PI_4),
@@ -65,6 +67,9 @@ public:
 
 		pnh.param("filter_radius", nodeFilteringRadius_, nodeFilteringRadius_);
 		pnh.param("filter_angle", nodeFilteringAngle_, nodeFilteringAngle_);
+
+		pnh.param("noise_filter_radius", noiseFilterRadius_, noiseFilterRadius_);
+		pnh.param("noise_filter_min_neighbors", noiseFilterMinNeighbors_, noiseFilterMinNeighbors_);
 
 		pnh.param("occupancy_grid", computeOccupancyGrid_, computeOccupancyGrid_);
 		pnh.param("occupancy_cell_size", gridCellSize_, gridCellSize_);
@@ -104,7 +109,7 @@ public:
 			int id = msg->nodes[i].id;
 			if(!uContains(rgbClouds_, id))
 			{
-				rtabmap::Transform localTransform = transformFromGeometryMsg(msg->nodes[i].localTransform);
+				rtabmap::Transform localTransform = rtabmap_ros::transformFromGeometryMsg(msg->nodes[i].localTransform);
 				if(!localTransform.isNull())
 				{
 					cv::Mat image, depth;
@@ -114,8 +119,8 @@ public:
 					float cy = msg->nodes[i].cy;
 
 					//uncompress data
-					util3d::CompressionThread ctImage(compressedMatFromBytes(msg->nodes[i].image.bytes, false), true);
-					util3d::CompressionThread ctDepth(compressedMatFromBytes(msg->nodes[i].depth.bytes, false), true);
+					util3d::CompressionThread ctImage(rtabmap_ros::compressedMatFromBytes(msg->nodes[i].image, false), true);
+					util3d::CompressionThread ctDepth(rtabmap_ros::compressedMatFromBytes(msg->nodes[i].depth, false), true);
 					ctImage.start();
 					ctDepth.start();
 					ctImage.join();
@@ -135,57 +140,70 @@ public:
 							cloud = util3d::cloudFromDepthRGB(image, depth, cx, cy, fx, fy, cloudDecimation_);
 						}
 
-						if(cloudMaxDepth_ > 0)
+						if(cloud->size() && cloudMaxDepth_ > 0)
 						{
 							cloud = util3d::passThrough<pcl::PointXYZRGB>(cloud, "z", 0, cloudMaxDepth_);
 						}
-						if(cloudVoxelSize_ > 0)
+						if(cloud->size() && noiseFilterRadius_ > 0.0 && noiseFilterMinNeighbors_ > 0)
+						{
+							pcl::IndicesPtr indices = rtabmap::util3d::radiusFiltering<pcl::PointXYZRGB>(cloud, noiseFilterRadius_, noiseFilterMinNeighbors_);
+							pcl::PointCloud<pcl::PointXYZRGB>::Ptr tmp(new pcl::PointCloud<pcl::PointXYZRGB>);
+							pcl::copyPointCloud(*cloud, *indices, *tmp);
+							cloud = tmp;
+						}
+						if(cloud->size() && cloudVoxelSize_ > 0)
 						{
 							cloud = util3d::voxelize<pcl::PointXYZRGB>(cloud, cloudVoxelSize_);
 						}
 
-						cloud = util3d::transformPointCloud<pcl::PointXYZRGB>(cloud, localTransform);
-
-						rgbClouds_.insert(std::make_pair(id, cloud));
-
-						if(computeOccupancyGrid_)
+						if(cloud->size())
 						{
-							pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloudClipped = cloud;
-							if(maxHeight_ > 0)
+							cloud = util3d::transformPointCloud<pcl::PointXYZRGB>(cloud, localTransform);
+
+
+							rgbClouds_.insert(std::make_pair(id, cloud));
+
+							if(computeOccupancyGrid_)
 							{
-								cloudClipped = util3d::passThrough<pcl::PointXYZRGB>(cloudClipped, "z", std::numeric_limits<int>::min(), maxHeight_);
-							}
-							cv::Mat ground, obstacles;
-							if(util3d::occupancy2DFromCloud3D(cloudClipped, ground, obstacles, gridCellSize_, groundMaxAngle_, clusterMinSize_))
-							{
-								occupancyLocalMaps_.insert(std::make_pair(id, std::make_pair(ground, obstacles)));
+								pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloudClipped = cloud;
+								if(maxHeight_ > 0)
+								{
+									cloudClipped = util3d::passThrough<pcl::PointXYZRGB>(cloudClipped, "z", std::numeric_limits<int>::min(), maxHeight_);
+								}
+								cv::Mat ground, obstacles;
+								if(util3d::occupancy2DFromCloud3D(cloudClipped, ground, obstacles, gridCellSize_, groundMaxAngle_, clusterMinSize_))
+								{
+									occupancyLocalMaps_.insert(std::make_pair(id, std::make_pair(ground, obstacles)));
+								}
 							}
 						}
 					}
 				}
 			}
 
-			if(!uContains(scans_, id) && msg->nodes[i].depth2D.bytes.size())
+			if(!uContains(scans_, id) && msg->nodes[i].laserScan.size())
 			{
-				cv::Mat depth2d = util3d::uncompressData(msg->nodes[i].depth2D.bytes);
-				if(!depth2d.empty())
+				cv::Mat laserScan = util3d::uncompressData(msg->nodes[i].laserScan);
+				if(!laserScan.empty())
 				{
-					pcl::PointCloud<pcl::PointXYZ>::Ptr cloud = util3d::depth2DToPointCloud(depth2d);
-					if(scanVoxelSize_ > 0)
+					pcl::PointCloud<pcl::PointXYZ>::Ptr cloud = util3d::laserScanToPointCloud(laserScan);
+					if(cloud->size() && scanVoxelSize_ > 0)
 					{
 						cloud = util3d::voxelize<pcl::PointXYZ>(cloud, scanVoxelSize_);
 					}
-
-					scans_.insert(std::make_pair(id, cloud));
+					if(cloud->size())
+					{
+						scans_.insert(std::make_pair(id, cloud));
+					}
 				}
 			}
 		}
 
 		// filter poses
 		std::map<int, Transform> poses;
-		for(unsigned int i=0; i<msg->poseIDs.size() && i<msg->poses.size(); ++i)
+		for(unsigned int i=0; i<msg->graph.nodeIds.size() && i<msg->graph.poses.size(); ++i)
 		{
-			poses.insert(std::make_pair(msg->poseIDs[i], transformFromPoseMsg(msg->poses[i])));
+			poses.insert(std::make_pair(msg->graph.nodeIds[i], rtabmap_ros::transformFromPoseMsg(msg->graph.poses[i])));
 		}
 		if(nodeFilteringAngle_ > 0.0 && nodeFilteringRadius_ > 0.0)
 		{
@@ -304,6 +322,9 @@ private:
 
 	double nodeFilteringAngle_;
 	double nodeFilteringRadius_;
+
+	double noiseFilterRadius_;
+	double noiseFilterMinNeighbors_;
 
 	bool computeOccupancyGrid_;
 	double gridCellSize_;

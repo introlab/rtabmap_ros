@@ -51,7 +51,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "rtabmap/core/util3d.h"
 
-namespace rtabmap
+namespace rtabmap_ros
 {
 
 class PointCloudXYZRGB : public nodelet::Nodelet
@@ -162,6 +162,6 @@ private:
 	message_filters::Synchronizer<MySyncPolicy> * sync_;
 };
 
-PLUGINLIB_EXPORT_CLASS(rtabmap::PointCloudXYZRGB, nodelet::Nodelet);
+PLUGINLIB_EXPORT_CLASS(rtabmap_ros::PointCloudXYZRGB, nodelet::Nodelet);
 }
 

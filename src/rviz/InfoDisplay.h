@@ -33,7 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rviz/message_filter_display.h>
 #include <rtabmap/core/Transform.h>
 
-namespace rtabmap
+namespace rtabmap_ros
 {
 
 class InfoDisplay: public rviz::MessageFilterDisplay<rtabmap_ros::Info>
@@ -60,10 +60,10 @@ private:
 	QString info_;
 	int globalCount_;
 	int localCount_;
-	Transform loopTransform_;
+	rtabmap::Transform loopTransform_;
 	boost::mutex info_mutex_;
 };
 
-} // namespace rtabmap
+} // namespace rtabmap_ros
 
 #endif

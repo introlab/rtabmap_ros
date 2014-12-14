@@ -39,7 +39,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sensor_msgs/CameraInfo.h>
 #include <nav_msgs/Odometry.h>
 
-namespace rtabmap
+namespace rtabmap_ros
 {
 
 class DataOdomSyncNodelet : public nodelet::Nodelet
@@ -126,5 +126,5 @@ private:
 };
 
 
-PLUGINLIB_EXPORT_CLASS(rtabmap::DataOdomSyncNodelet, nodelet::Nodelet);
+PLUGINLIB_EXPORT_CLASS(rtabmap_ros::DataOdomSyncNodelet, nodelet::Nodelet);
 }

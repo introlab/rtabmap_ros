@@ -267,7 +267,7 @@ private:
 };
 
 CameraWrapper * camera = 0;
-void callback(rtabmap::CameraConfig &config, uint32_t level)
+void callback(rtabmap_ros::CameraConfig &config, uint32_t level)
 {
 	if(camera)
 	{
@@ -287,8 +287,8 @@ int main(int argc, char** argv)
 
 	camera = new CameraWrapper(); // webcam device 0
 
-	dynamic_reconfigure::Server<rtabmap::CameraConfig> server;
-	dynamic_reconfigure::Server<rtabmap::CameraConfig>::CallbackType f;
+	dynamic_reconfigure::Server<rtabmap_ros::CameraConfig> server;
+	dynamic_reconfigure::Server<rtabmap_ros::CameraConfig>::CallbackType f;
 	f = boost::bind(&callback, _1, _2);
 	server.setCallback(f);
 

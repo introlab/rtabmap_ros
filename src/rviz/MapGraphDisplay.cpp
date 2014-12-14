@@ -43,7 +43,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "MapGraphDisplay.h"
 
-namespace rtabmap
+namespace rtabmap_ros
 {
 
 MapGraphDisplay::MapGraphDisplay()
@@ -84,22 +84,22 @@ void MapGraphDisplay::destroyObjects()
 
 void MapGraphDisplay::processMessage( const rtabmap_ros::MapData::ConstPtr& msg )
 {
-	if(!(msg->maps.size() == msg->poseIDs.size() && msg->poses.size() == msg->poseIDs.size()))
+	if(!(msg->graph.mapIds.size() == msg->graph.nodeIds.size() && msg->graph.poses.size() == msg->graph.nodeIds.size()))
 	{
-		ROS_ERROR("rtambap::MapGraph: Error map ids, pose ids and poses must have all the same size.");
+		ROS_ERROR("rtabmap_ros::MapGraph: Error map ids, pose ids and poses must have all the same size.");
 		return;
 	}
 
 	// Find all graphs
 	std::map<int, std::map<int, geometry_msgs::Point> > graphs;
-	for(unsigned int i=0; i<msg->poses.size(); ++i)
+	for(unsigned int i=0; i<msg->graph.poses.size(); ++i)
 	{
-		std::map<int, std::map<int, geometry_msgs::Point> >::iterator iter = graphs.find(msg->maps[i]);
+		std::map<int, std::map<int, geometry_msgs::Point> >::iterator iter = graphs.find(msg->graph.mapIds[i]);
 		if(iter == graphs.end())
 		{
-			iter = graphs.insert(std::make_pair(msg->maps[i], std::map<int, geometry_msgs::Point>())).first;
+			iter = graphs.insert(std::make_pair(msg->graph.mapIds[i], std::map<int, geometry_msgs::Point>())).first;
 		}
-		iter->second.insert(std::make_pair(msg->poseIDs[i], msg->poses[i].position));
+		iter->second.insert(std::make_pair(msg->graph.nodeIds[i], msg->graph.poses[i].position));
 	}
 
 	destroyObjects();
@@ -142,7 +142,7 @@ void MapGraphDisplay::processMessage( const rtabmap_ros::MapData::ConstPtr& msg 
 	}
 }
 
-} // namespace rviz
+} // namespace rtabmap_ros
 
 #include <pluginlib/class_list_macros.h>
-PLUGINLIB_EXPORT_CLASS( rtabmap::MapGraphDisplay, rviz::Display )
+PLUGINLIB_EXPORT_CLASS( rtabmap_ros::MapGraphDisplay, rviz::Display )

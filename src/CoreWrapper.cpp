@@ -51,7 +51,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 //msgs
 #include "rtabmap_ros/Info.h"
-#include "rtabmap_ros/InfoEx.h"
 #include "rtabmap_ros/MapData.h"
 #include "rtabmap_ros/GetMap.h"
 #include "rtabmap_ros/PublishMap.h"
@@ -125,8 +124,8 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	ROS_INFO("rtabmap: tf_delay = %f", tfDelay);
 
 	infoPub_ = nh.advertise<rtabmap_ros::Info>("info", 1);
-	infoPubEx_ = nh.advertise<rtabmap_ros::InfoEx>("infoEx", 1);
 	mapData_ = nh.advertise<rtabmap_ros::MapData>("mapData", 1);
+	mapGraph_ = nh.advertise<rtabmap_ros::Graph>("graph", 1);
 
 	configPath_ = uReplaceChar(configPath_, '~', UDirectory::homeDir());
 
@@ -484,7 +483,7 @@ void CoreWrapper::depthCallback(
 
 			tf::StampedTransform tmp;
 			tfListener_.lookupTransform(frameId_, depthMsg->header.frame_id, depthMsg->header.stamp, tmp);
-			localTransform = transformFromTF(tmp);
+			localTransform = rtabmap_ros::transformFromTF(tmp);
 		}
 		catch(tf::TransformException & ex)
 		{
@@ -492,7 +491,7 @@ void CoreWrapper::depthCallback(
 			return;
 		}
 
-		Transform odom = transformFromPoseMsg(odomMsg->pose.pose);
+		Transform odom = rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose);
 
 		cv_bridge::CvImageConstPtr ptrImage;
 		if(imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
@@ -517,6 +516,7 @@ void CoreWrapper::depthCallback(
 				ptrImage->image,
 				odom,
 				odomMsg->header.frame_id,
+				odomMsg->pose.covariance[0]>0?odomMsg->pose.covariance[0]:1.0f,
 				ptrDepth->image,
 				fx,
 				fy,
@@ -577,7 +577,7 @@ void CoreWrapper::depthScanCallback(
 			tf::StampedTransform tmp;
 			tfListener_.lookupTransform(frameId_, scanMsg->header.frame_id, scanMsg->header.stamp, tmp);
 			tfListener_.lookupTransform(frameId_, depthMsg->header.frame_id, depthMsg->header.stamp, tmp);
-			localTransform = transformFromTF(tmp);
+			localTransform = rtabmap_ros::transformFromTF(tmp);
 		}
 		catch(tf::TransformException & ex)
 		{
@@ -591,9 +591,9 @@ void CoreWrapper::depthScanCallback(
 		projection.transformLaserScanToPointCloud(frameId_, *scanMsg, scanOut, tfListener_);
 		pcl::PointCloud<pcl::PointXYZ> pclScan;
 		pcl::fromROSMsg(scanOut, pclScan);
-		cv::Mat scan = util3d::depth2DFromPointCloud(pclScan);
+		cv::Mat scan = util3d::laserScanFromPointCloud(pclScan);
 
-		Transform odom = transformFromPoseMsg(odomMsg->pose.pose);
+		Transform odom = rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose);
 
 		cv_bridge::CvImageConstPtr ptrImage;
 		if(imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
@@ -618,6 +618,7 @@ void CoreWrapper::depthScanCallback(
 				ptrImage->image,
 				odom,
 				odomMsg->header.frame_id,
+				odomMsg->pose.covariance[0]>0?odomMsg->pose.covariance[0]:1.0f,
 				ptrDepth->image,
 				fx,
 				fy,
@@ -674,7 +675,7 @@ void CoreWrapper::stereoCallback(
 
 			tf::StampedTransform tmp;
 			tfListener_.lookupTransform(frameId_, leftImageMsg->header.frame_id, leftImageMsg->header.stamp, tmp);
-			localTransform = transformFromTF(tmp);
+			localTransform = rtabmap_ros::transformFromTF(tmp);
 		}
 		catch(tf::TransformException & ex)
 		{
@@ -682,7 +683,7 @@ void CoreWrapper::stereoCallback(
 			return;
 		}
 
-		Transform odom = transformFromPoseMsg(odomMsg->pose.pose);
+		Transform odom = rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose);
 
 		cv_bridge::CvImageConstPtr ptrLeftImage, ptrRightImage;
 		if(leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
@@ -708,6 +709,7 @@ void CoreWrapper::stereoCallback(
 				ptrLeftImage->image,
 				odom,
 				odomMsg->header.frame_id,
+				odomMsg->pose.covariance[0]>0?odomMsg->pose.covariance[0]:1.0f,
 				ptrRightImage->image,
 				fx,
 				baseline,
@@ -771,7 +773,7 @@ void CoreWrapper::stereoScanCallback(
 			tf::StampedTransform tmp;
 			tfListener_.lookupTransform(frameId_, scanMsg->header.frame_id, scanMsg->header.stamp, tmp);
 			tfListener_.lookupTransform(frameId_, leftImageMsg->header.frame_id, leftImageMsg->header.stamp, tmp);
-			localTransform = transformFromTF(tmp);
+			localTransform = rtabmap_ros::transformFromTF(tmp);
 		}
 		catch(tf::TransformException & ex)
 		{
@@ -785,9 +787,9 @@ void CoreWrapper::stereoScanCallback(
 		projection.transformLaserScanToPointCloud(frameId_, *scanMsg, scanOut, tfListener_);
 		pcl::PointCloud<pcl::PointXYZ> pclScan;
 		pcl::fromROSMsg(scanOut, pclScan);
-		cv::Mat scan = util3d::depth2DFromPointCloud(pclScan);
+		cv::Mat scan = util3d::laserScanFromPointCloud(pclScan);
 
-		Transform odom = transformFromPoseMsg(odomMsg->pose.pose);
+		Transform odom = rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose);
 
 		cv_bridge::CvImageConstPtr ptrLeftImage, ptrRightImage;
 		if(leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
@@ -813,6 +815,7 @@ void CoreWrapper::stereoScanCallback(
 				ptrLeftImage->image,
 				odom,
 				odomMsg->header.frame_id,
+				odomMsg->pose.covariance[0],
 				ptrRightImage->image,
 				fx,
 				baseline,
@@ -828,6 +831,7 @@ void CoreWrapper::process(
 		const cv::Mat & image,
 		const Transform & odom,
 		const std::string & odomFrameId,
+		float odomVariance,
 		const cv::Mat & depthOrRightImage,
 		float fx,
 		float fyOrBaseline,
@@ -875,15 +879,16 @@ void CoreWrapper::process(
 			}
 		}
 
-		SensorData data(image.clone(),
+		SensorData data(scan,
+				image.clone(),
 				imageB,
-				scan,
 				fx,
 				fyOrBaseline,
 				cx,
 				cy,
-				odom,
 				localTransform,
+				odom,
+				odomVariance,
 				id);
 
 		if(!rtabmap_.process(data))
@@ -893,7 +898,7 @@ void CoreWrapper::process(
 		else
 		{
 			mapToOdomMutex_.lock();
-			rtabmap::transformToTF(rtabmap_.getMapCorrection(), mapToOdom_);
+			rtabmap_ros::transformToTF(rtabmap_.getMapCorrection(), mapToOdom_);
 			odomFrameId_ = odomFrameId;
 			mapToOdomMutex_.unlock();
 
@@ -1052,99 +1057,25 @@ bool CoreWrapper::getMapCallback(rtabmap_ros::GetMap::Request& req, rtabmap_ros:
 				req.global);
 	}
 
-
-	int i=0;
-
-	rep.data.mapIDs.resize(mapIds.size());
-	rep.data.maps.resize(mapIds.size());
-	i=0;
-	for(std::map<int, int>::iterator iter = mapIds.begin(); iter!=mapIds.end(); ++iter)
+	if(poses.size() && poses.size() != mapIds.size())
 	{
-		rep.data.mapIDs[i] = iter->first;
-		rep.data.maps[i] = iter->second;
-		++i;
+		ROS_ERROR("poses and map ids are not the same size!? %d vs %d", (int)poses.size(), (int)mapIds.size());
+		return false;
 	}
 
-	rep.data.poseIDs.resize(poses.size());
-	rep.data.poses.resize(poses.size());
-	i=0;
-	for(std::map<int, Transform>::iterator iter = poses.begin(); iter!=poses.end(); ++iter)
-	{
-		rep.data.poseIDs[i] = iter->first;
-		transformToPoseMsg(iter->second, rep.data.poses[i]);
-		++i;
-	}
-
-	rep.data.constraintFromIDs.resize(constraints.size());
-	rep.data.constraintToIDs.resize(constraints.size());
-	rep.data.constraintTypes.resize(constraints.size());
-	rep.data.constraints.resize(constraints.size());
-	i=0;
-	for(std::multimap<int, Link>::iterator iter = constraints.begin(); iter!=constraints.end(); ++iter)
-	{
-		rep.data.constraintFromIDs[i] = iter->first;
-		rep.data.constraintToIDs[i] = iter->second.to();
-		rep.data.constraintTypes[i] = iter->second.type();
-		transformToGeometryMsg(iter->second.transform(), rep.data.constraints[i]);
-		++i;
-	}
+	//RGB-D SLAM data
+	rtabmap_ros::mapGraphToROS(poses,
+		mapIds,
+		constraints,
+		Transform::getIdentity(),
+		rep.data.graph);
 
 	// add data
 	rep.data.nodes.resize(signatures.size());
-	i=0;
+	int i=0;
 	for(std::map<int, Signature>::iterator iter = signatures.begin(); iter!=signatures.end(); ++iter)
 	{
-		rep.data.nodes[i].id = iter->second.id();
-		rep.data.nodes[i].mapId = iter->second.mapId();
-		transformToPoseMsg(iter->second.getPose(), rep.data.nodes[i].pose);
-		compressedMatToBytes(iter->second.getImageCompressed(), rep.data.nodes[i].image.bytes);
-		compressedMatToBytes(iter->second.getDepthCompressed(), rep.data.nodes[i].depth.bytes);
-		compressedMatToBytes(iter->second.getDepth2DCompressed(), rep.data.nodes[i].depth2D.bytes);
-		rep.data.nodes[i].fx = iter->second.getDepthFx();
-		rep.data.nodes[i].fy = iter->second.getDepthFy();
-		rep.data.nodes[i].cx = iter->second.getDepthCx();
-		rep.data.nodes[i].cy = iter->second.getDepthCy();
-		transformToGeometryMsg(iter->second.getLocalTransform(), rep.data.nodes[i].localTransform);
-
-		//Features stuff...
-		rep.data.nodes[i].wordsKeys = uKeys(iter->second.getWords());
-		rep.data.nodes[i].wordsValues.resize(iter->second.getWords().size());
-		int j = 0;
-		for(std::multimap<int, cv::KeyPoint>::const_iterator jter=iter->second.getWords().begin();
-			jter!=iter->second.getWords().end();
-			++jter)
-		{
-			rep.data.nodes[i].wordsValues.at(j).angle = jter->second.angle;
-			rep.data.nodes[i].wordsValues.at(j).response = jter->second.response;
-			rep.data.nodes[i].wordsValues.at(j).ptx = jter->second.pt.x;
-			rep.data.nodes[i].wordsValues.at(j).pty = jter->second.pt.y;
-			rep.data.nodes[i].wordsValues.at(j).size = jter->second.size;
-			rep.data.nodes[i].wordsValues.at(j).octave = jter->second.octave;
-			rep.data.nodes[i].wordsValues.at(j).class_id = jter->second.class_id;
-			++j;
-		}
-
-		if(iter->second.getWords3().size() && iter->second.getWords3().size() == iter->second.getWords().size())
-		{
-			pcl::PointCloud<pcl::PointXYZ> cloud;
-			cloud.resize(iter->second.getWords3().size());
-			j = 0;
-			for(std::multimap<int, pcl::PointXYZ>::const_iterator jter=iter->second.getWords3().begin();
-				jter!=iter->second.getWords3().end();
-				++jter)
-			{
-				cloud[j++] = jter->second;
-			}
-			pcl::toROSMsg(cloud, rep.data.nodes[i].words3DValues);
-		}
-		else if(iter->second.getWords3().size())
-		{
-			ROS_ERROR("Words 2D and words 3D must have the same size (%d vs %d)!",
-					(int)iter->second.getWords().size(),
-					(int)iter->second.getWords3().size());
-		}
-
-		++i;
+		rtabmap_ros::nodeDataToROS(iter->second, rep.data.nodes[i++]);
 	}
 
 	rep.data.header.stamp = ros::Time::now();
@@ -1155,7 +1086,7 @@ bool CoreWrapper::getMapCallback(rtabmap_ros::GetMap::Request& req, rtabmap_ros:
 
 bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtabmap_ros::PublishMap::Response& res)
 {
-	if(mapData_.getNumSubscribers())
+	if(mapData_.getNumSubscribers() || mapGraph_.getNumSubscribers())
 	{
 		ROS_INFO("rtabmap: Publishing map...");
 
@@ -1164,7 +1095,7 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 		std::multimap<int, Link> constraints;
 		std::map<int, int> mapIds;
 
-		if(req.graphOnly)
+		if(mapData_.getNumSubscribers() == 0 || req.graphOnly)
 		{
 			rtabmap_.getGraph(
 					poses,
@@ -1184,99 +1115,48 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 					req.global);
 		}
 
-		//RGB-D SLAM data
-		rtabmap_ros::MapDataPtr msg(new rtabmap_ros::MapData);
-		msg->header.stamp = ros::Time::now();
-		msg->header.frame_id = mapFrameId_;
-
-		int i=0;
-
-		msg->mapIDs = uKeys(mapIds);
-		msg->maps = uValues(mapIds);
-
-		msg->poseIDs.resize(poses.size());
-		msg->poses.resize(poses.size());
-		i=0;
-		for(std::map<int, Transform>::iterator iter = poses.begin(); iter!=poses.end(); ++iter)
+		if(poses.size() && poses.size() != mapIds.size())
 		{
-			msg->poseIDs[i] = iter->first;
-			transformToPoseMsg(iter->second, msg->poses[i]);
-			++i;
+			ROS_ERROR("poses and map ids are not the same size!? %d vs %d", (int)poses.size(), (int)mapIds.size());
+			return false;
 		}
 
-		msg->constraintFromIDs.resize(constraints.size());
-		msg->constraintToIDs.resize(constraints.size());
-		msg->constraintTypes.resize(constraints.size());
-		msg->constraints.resize(constraints.size());
-		i=0;
-		for(std::multimap<int, Link>::iterator iter = constraints.begin(); iter!=constraints.end(); ++iter)
+		rtabmap_ros::GraphPtr graphMsg(new rtabmap_ros::Graph);
+		graphMsg->header.stamp = ros::Time::now();
+		graphMsg->header.frame_id = mapFrameId_;
+
+		rtabmap_ros::mapGraphToROS(poses,
+			mapIds,
+			constraints,
+			Transform::getIdentity(),
+			*graphMsg);
+
+		if(mapData_.getNumSubscribers())
 		{
-			msg->constraintFromIDs[i] = iter->first;
-			msg->constraintToIDs[i] = iter->second.to();
-			msg->constraintTypes[i] = iter->second.type();
-			transformToGeometryMsg(iter->second.transform(), msg->constraints[i]);
-			++i;
+			//RGB-D SLAM data
+			rtabmap_ros::MapDataPtr msg(new rtabmap_ros::MapData);
+			msg->header = graphMsg->header;
+			msg->graph = *graphMsg;
+
+			// add data
+			msg->nodes.resize(signatures.size());
+			int i=0;
+			for(std::map<int, Signature>::iterator iter = signatures.begin(); iter!=signatures.end(); ++iter)
+			{
+				rtabmap_ros::nodeDataToROS(iter->second, msg->nodes[i++]);
+			}
+
+			mapData_.publish(msg);
 		}
 
-		// add data
-		msg->nodes.resize(signatures.size());
-		i=0;
-		for(std::map<int, Signature>::iterator iter = signatures.begin(); iter!=signatures.end(); ++iter)
+		if(mapGraph_.getNumSubscribers())
 		{
-			msg->nodes[i].id = iter->second.id();
-			msg->nodes[i].mapId = iter->second.mapId();
-			transformToPoseMsg(iter->second.getPose(), msg->nodes[i].pose);
-			compressedMatToBytes(iter->second.getImageCompressed(), msg->nodes[i].image.bytes);
-			compressedMatToBytes(iter->second.getDepthCompressed(), msg->nodes[i].depth.bytes);
-			compressedMatToBytes(iter->second.getDepth2DCompressed(), msg->nodes[i].depth2D.bytes);
-			msg->nodes[i].fx = iter->second.getDepthFx();
-			msg->nodes[i].fy = iter->second.getDepthFy();
-			msg->nodes[i].cx = iter->second.getDepthCx();
-			msg->nodes[i].cy = iter->second.getDepthCy();
-			transformToGeometryMsg(iter->second.getLocalTransform(), msg->nodes[i].localTransform);
-
-			//Features stuff...
-			msg->nodes[i].wordsKeys = uKeys(iter->second.getWords());
-			msg->nodes[i].wordsValues.resize(iter->second.getWords().size());
-			int j = 0;
-			for(std::multimap<int, cv::KeyPoint>::const_iterator jter=iter->second.getWords().begin();
-				jter!=iter->second.getWords().end();
-				++jter)
-			{
-				msg->nodes[i].wordsValues.at(j).angle = jter->second.angle;
-				msg->nodes[i].wordsValues.at(j).response = jter->second.response;
-				msg->nodes[i].wordsValues.at(j).ptx = jter->second.pt.x;
-				msg->nodes[i].wordsValues.at(j).pty = jter->second.pt.y;
-				msg->nodes[i].wordsValues.at(j).size = jter->second.size;
-				msg->nodes[i].wordsValues.at(j).octave = jter->second.octave;
-				msg->nodes[i].wordsValues.at(j).class_id = jter->second.class_id;
-				++j;
-			}
-
-			if(iter->second.getWords3().size() && iter->second.getWords3().size() == iter->second.getWords().size())
-			{
-				pcl::PointCloud<pcl::PointXYZ> cloud;
-				cloud.resize(iter->second.getWords3().size());
-				j = 0;
-				for(std::multimap<int, pcl::PointXYZ>::const_iterator jter=iter->second.getWords3().begin();
-					jter!=iter->second.getWords3().end();
-					++jter)
-				{
-					cloud[j++] = jter->second;
-				}
-				pcl::toROSMsg(cloud, msg->nodes[i].words3DValues);
-			}
-			else if(iter->second.getWords3().size())
-			{
-				ROS_ERROR("Words 2D and words 3D must have the same size (%d vs %d)!",
-						(int)iter->second.getWords().size(),
-						(int)iter->second.getWords3().size());
-			}
-
-			++i;
+			mapGraph_.publish(graphMsg);
 		}
-
-		mapData_.publish(msg);
+	}
+	else
+	{
+		ROS_INFO("rtabmap: not publishing the map because there are no subscribers to MapData...");
 	}
 	return true;
 }
@@ -1295,23 +1175,7 @@ void CoreWrapper::publishStats(const Statistics & stats)
 		msg->loopClosureId = stats.loopClosureId();
 		msg->localLoopClosureId = stats.localLoopClosureId();
 
-		transformToGeometryMsg(stats.loopClosureTransform(), msg->loopClosureTransform);
-
-		infoPub_.publish(msg);
-	}
-
-	if(infoPubEx_.getNumSubscribers())
-	{
-		//ROS_INFO("Sending infoEx msg (last_id=%d)...", stat.refImageId());
-		rtabmap_ros::InfoExPtr msg(new rtabmap_ros::InfoEx);
-		msg->header.stamp = timeNow;
-		msg->header.frame_id = mapFrameId_;
-
-		msg->refId = stats.refImageId();
-		msg->loopClosureId = stats.loopClosureId();
-		msg->localLoopClosureId = stats.localLoopClosureId();
-
-		transformToGeometryMsg(stats.loopClosureTransform(), msg->loopClosureTransform);
+		rtabmap_ros::transformToGeometryMsg(stats.loopClosureTransform(), msg->loopClosureTransform);
 
 		// Detailed info
 		if(stats.extended())
@@ -1330,100 +1194,46 @@ void CoreWrapper::publishStats(const Statistics & stats)
 			msg->statsKeys = uKeys(stats.data());
 			msg->statsValues = uValues(stats.data());
 		}
-		infoPubEx_.publish(msg);
+		infoPub_.publish(msg);
 	}
 
-	if(mapData_.getNumSubscribers())
+	if(mapData_.getNumSubscribers() || mapGraph_.getNumSubscribers())
 	{
-		//RGB-D SLAM data
-		rtabmap_ros::MapDataPtr msg(new rtabmap_ros::MapData);
-		msg->header.stamp = timeNow;
-		msg->header.frame_id = mapFrameId_;
-
-		transformToGeometryMsg(stats.mapCorrection(), msg->mapToOdom);
-
-		msg->mapIDs = uKeys(stats.getMapIds());
-		msg->maps = uValues(stats.getMapIds());
-
-		msg->poseIDs.resize(stats.poses().size());
-		msg->poses.resize(stats.poses().size());
-		int index = 0;
-		for(std::map<int, Transform>::const_iterator iter = stats.poses().begin();
-			iter!=stats.poses().end();
-			++iter)
+		if(stats.poses().size() == 0 || stats.poses().size() == stats.getMapIds().size())
 		{
-			msg->poseIDs[index] = iter->first;
-			transformToPoseMsg(iter->second, msg->poses[index]);
-			++index;
-		}
+			rtabmap_ros::GraphPtr graphMsg(new rtabmap_ros::Graph);
+			graphMsg->header.stamp = timeNow;
+			graphMsg->header.frame_id = mapFrameId_;
 
-		msg->constraintFromIDs.resize(stats.constraints().size());
-		msg->constraintToIDs.resize(stats.constraints().size());
-		msg->constraintTypes.resize(stats.constraints().size());
-		msg->constraints.resize(stats.constraints().size());
-		index=0;
-		for(std::multimap<int, Link>::const_iterator iter = stats.constraints().begin(); iter!=stats.constraints().end(); ++iter)
-		{
-			msg->constraintFromIDs[index] = iter->first;
-			msg->constraintToIDs[index] = iter->second.to();
-			msg->constraintTypes[index] = iter->second.type();
-			transformToGeometryMsg(iter->second.transform(), msg->constraints[index]);
-			++index;
-		}
+			rtabmap_ros::mapGraphToROS(
+				stats.poses(),
+				stats.getMapIds(),
+				stats.constraints(),
+				stats.mapCorrection(),
+				*graphMsg);
 
-		// add data
-		msg->nodes.resize(1);
-		msg->nodes[0].id = stats.getSignature().id();
-		msg->nodes[0].mapId = stats.getSignature().mapId();
-		transformToPoseMsg(stats.getSignature().getPose(), msg->nodes[0].pose);
-		compressedMatToBytes(stats.getSignature().getImageCompressed(), msg->nodes[0].image.bytes);
-		compressedMatToBytes(stats.getSignature().getDepthCompressed(), msg->nodes[0].depth.bytes);
-		compressedMatToBytes(stats.getSignature().getDepth2DCompressed(), msg->nodes[0].depth2D.bytes);
-		msg->nodes[0].fx = stats.getSignature().getDepthFx();
-		msg->nodes[0].fy = stats.getSignature().getDepthFy();
-		msg->nodes[0].cx = stats.getSignature().getDepthCx();
-		msg->nodes[0].cy = stats.getSignature().getDepthCy();
-		transformToGeometryMsg(stats.getSignature().getLocalTransform(), msg->nodes[0].localTransform);
-
-		//Features stuff...
-		msg->nodes[0].wordsKeys = uKeys(stats.getSignature().getWords());
-		msg->nodes[0].wordsValues.resize(stats.getSignature().getWords().size());
-		index = 0;
-		for(std::multimap<int, cv::KeyPoint>::const_iterator jter=stats.getSignature().getWords().begin();
-			jter!=stats.getSignature().getWords().end();
-			++jter)
-		{
-			msg->nodes[0].wordsValues.at(index).angle = jter->second.angle;
-			msg->nodes[0].wordsValues.at(index).response = jter->second.response;
-			msg->nodes[0].wordsValues.at(index).ptx = jter->second.pt.x;
-			msg->nodes[0].wordsValues.at(index).pty = jter->second.pt.y;
-			msg->nodes[0].wordsValues.at(index).size = jter->second.size;
-			msg->nodes[0].wordsValues.at(index).octave = jter->second.octave;
-			msg->nodes[0].wordsValues.at(index).class_id = jter->second.class_id;
-			++index;
-		}
-
-		if(stats.getSignature().getWords3().size() && stats.getSignature().getWords3().size() == stats.getSignature().getWords().size())
-		{
-			pcl::PointCloud<pcl::PointXYZ> cloud;
-			cloud.resize(stats.getSignature().getWords3().size());
-			index = 0;
-			for(std::multimap<int, pcl::PointXYZ>::const_iterator jter=stats.getSignature().getWords3().begin();
-				jter!=stats.getSignature().getWords3().end();
-				++jter)
+			if(mapData_.getNumSubscribers())
 			{
-				cloud[index++] = jter->second;
-			}
-			pcl::toROSMsg(cloud, msg->nodes[0].words3DValues);
-		}
-		else if(stats.getSignature().getWords3().size())
-		{
-			ROS_ERROR("Words 2D and words 3D must have the same size (%d vs %d)!",
-					(int)stats.getSignature().getWords().size(),
-					(int)stats.getSignature().getWords3().size());
-		}
+				//RGB-D SLAM data
+				rtabmap_ros::MapDataPtr msg(new rtabmap_ros::MapData);
+				msg->header = graphMsg->header;
+				msg->graph = *graphMsg;
 
-		mapData_.publish(msg);
+				msg->nodes.resize(1);
+				rtabmap_ros::nodeDataToROS(stats.getSignature(), msg->nodes[0]);
+
+				mapData_.publish(msg);
+			}
+
+			if(mapGraph_.getNumSubscribers())
+			{
+				mapGraph_.publish(graphMsg);
+			}
+		}
+		else
+		{
+			ROS_ERROR("Poses and map ids are not the same size!? %d vs %d", (int)stats.poses().size(), (int)stats.getMapIds().size());
+		}
 	}
 }
 

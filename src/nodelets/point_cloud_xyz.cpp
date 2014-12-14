@@ -53,7 +53,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "rtabmap/core/util3d.h"
 
-namespace rtabmap
+namespace rtabmap_ros
 {
 
 class PointCloudXYZ : public nodelet::Nodelet
@@ -154,7 +154,7 @@ private:
 			float cy = model.cy();
 
 			pcl::PointCloud<pcl::PointXYZ>::Ptr pclCloud;
-			pclCloud = util3d::cloudFromDepth(
+			pclCloud = rtabmap::util3d::cloudFromDepth(
 					imageDepthPtr->image,
 					cx,
 					cy,
@@ -195,7 +195,7 @@ private:
 			float cy = model.cy();
 
 			pcl::PointCloud<pcl::PointXYZ>::Ptr pclCloud;
-			pclCloud = util3d::cloudFromDisparity(
+			pclCloud = rtabmap::util3d::cloudFromDisparity(
 					disparity,
 					cx,
 					cy,
@@ -211,12 +211,12 @@ private:
 	{
 		if(pclCloud->size() && maxDepth_ > 0)
 		{
-			pclCloud = util3d::passThrough<pcl::PointXYZ>(pclCloud, "z", 0, maxDepth_);
+			pclCloud = rtabmap::util3d::passThrough<pcl::PointXYZ>(pclCloud, "z", 0, maxDepth_);
 		}
 
 		if(pclCloud->size() && noiseFilterRadius_ > 0.0 && noiseFilterMinNeighbors_ > 0)
 		{
-			pcl::IndicesPtr indices = util3d::radiusFiltering<pcl::PointXYZ>(pclCloud, noiseFilterRadius_, noiseFilterMinNeighbors_);
+			pcl::IndicesPtr indices = rtabmap::util3d::radiusFiltering<pcl::PointXYZ>(pclCloud, noiseFilterRadius_, noiseFilterMinNeighbors_);
 			pcl::PointCloud<pcl::PointXYZ>::Ptr tmp(new pcl::PointCloud<pcl::PointXYZ>);
 			pcl::copyPointCloud(*pclCloud, *indices, *tmp);
 			pclCloud = tmp;
@@ -224,7 +224,7 @@ private:
 
 		if(pclCloud->size() && voxelSize_ > 0.0)
 		{
-			pclCloud = util3d::voxelize<pcl::PointXYZ>(pclCloud, voxelSize_);
+			pclCloud = rtabmap::util3d::voxelize<pcl::PointXYZ>(pclCloud, voxelSize_);
 		}
 
 		sensor_msgs::PointCloud2 rosCloud;
@@ -266,6 +266,6 @@ private:
 
 };
 
-PLUGINLIB_EXPORT_CLASS(rtabmap::PointCloudXYZ, nodelet::Nodelet);
+PLUGINLIB_EXPORT_CLASS(rtabmap_ros::PointCloudXYZ, nodelet::Nodelet);
 }
 

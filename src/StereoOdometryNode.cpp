@@ -48,11 +48,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace rtabmap;
 
-class StereoOdometry : public OdometryROS
+class StereoOdometry : public rtabmap_ros::OdometryROS
 {
 public:
 	StereoOdometry(int argc, char * argv[]) :
-		OdometryROS(argc, argv),
+		rtabmap_ros::OdometryROS(argc, argv),
 		approxSync_(0),
 		exactSync_(0)
 	{
@@ -162,22 +162,18 @@ public:
 
 				UTimer stepTimer;
 				//
-				UDEBUG("localTransform = %s", rtabmap::transformFromTF(localTransform).prettyPrint().c_str());
+				UDEBUG("localTransform = %s", rtabmap_ros::transformFromTF(localTransform).prettyPrint().c_str());
 				rtabmap::SensorData data(ptrImageLeft->image,
 						ptrImageRight->image,
 						fx,
 						baseline,
 						cx,
 						cy,
+						rtabmap_ros::transformFromTF(localTransform),
 						rtabmap::Transform(),
-						rtabmap::transformFromTF(localTransform));
-				quality=0;
+						1.0f);
 
-				this->processData(data, imageRectLeft->header, quality);
-				UDEBUG("time odometry->process()=%fs", stepTimer.ticks());
-
-				ROS_INFO("Odom: quality=%d, update time=%fs",
-						quality, (ros::WallTime::now()-time).toSec());
+				this->processData(data, imageRectLeft->header);
 			}
 			else
 			{

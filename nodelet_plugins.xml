@@ -1,54 +1,54 @@
 <library path="lib/librtabmap_ros"> 
-  <class name="rtabmap/data_throttle" 
-         type="rtabmap::DataThrottleNodelet" 
+  <class name="rtabmap_ros/data_throttle" 
+         type="rtabmap_ros::DataThrottleNodelet" 
          base_class_type="nodelet::Nodelet">
     <description>
       This is my nodelet.
     </description>
   </class>
   
-  <class name="rtabmap/stereo_throttle" 
-         type="rtabmap::StereoThrottleNodelet" 
+  <class name="rtabmap_ros/stereo_throttle" 
+         type="rtabmap_ros::StereoThrottleNodelet" 
          base_class_type="nodelet::Nodelet">
     <description>
       This is my nodelet.
     </description>
   </class>
   
-  <class name="rtabmap/data_odom_sync" 
-         type="rtabmap::DataOdomSyncNodelet" 
+  <class name="rtabmap_ros/data_odom_sync" 
+         type="rtabmap_ros::DataOdomSyncNodelet" 
          base_class_type="nodelet::Nodelet">
     <description>
       This is my nodelet.
     </description>
   </class>
       
-  <class name="rtabmap/point_cloud_xyzrgb" 
-         type="rtabmap::PointCloudXYZRGB" 
+  <class name="rtabmap_ros/point_cloud_xyzrgb" 
+         type="rtabmap_ros::PointCloudXYZRGB" 
          base_class_type="nodelet::Nodelet">
     <description>
       This is my nodelet.
     </description>
   </class>
   
-  <class name="rtabmap/point_cloud_xyz" 
-         type="rtabmap::PointCloudXYZ" 
+  <class name="rtabmap_ros/point_cloud_xyz" 
+         type="rtabmap_ros::PointCloudXYZ" 
          base_class_type="nodelet::Nodelet">
     <description>
       This is my nodelet.
     </description>
   </class>
   
-  <class name="rtabmap/disparity_to_depth" 
-         type="rtabmap::DisparityToDepth" 
+  <class name="rtabmap_ros/disparity_to_depth" 
+         type="rtabmap_ros::DisparityToDepth" 
          base_class_type="nodelet::Nodelet">
     <description>
       This is my nodelet.
     </description>
   </class>
   
-  <class name="rtabmap/obstacles_detection" 
-         type="rtabmap::ObstaclesDetection" 
+  <class name="rtabmap_ros/obstacles_detection" 
+         type="rtabmap_ros::ObstaclesDetection" 
          base_class_type="nodelet::Nodelet">
     <description>
       This is my nodelet.

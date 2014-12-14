@@ -41,11 +41,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/Memory.h>
 #include <rtabmap/core/Signature.h>
 #include "rtabmap_ros/MsgConversion.h"
+#include "rtabmap_ros/OdomInfo.h"
 #include "rtabmap/utilite/UConversion.h"
 #include "rtabmap/utilite/ULogger.h"
 #include "rtabmap/utilite/UStl.h"
 
-namespace rtabmap {
+using namespace rtabmap;
+
+namespace rtabmap_ros {
 
 OdometryROS::OdometryROS(int argc, char * argv[]) :
 	odometry_(0),
@@ -61,6 +64,7 @@ OdometryROS::OdometryROS(int argc, char * argv[]) :
 	ros::NodeHandle nh;
 
 	odomPub_ = nh.advertise<nav_msgs::Odometry>("odom", 1);
+	odomInfoPub_ = nh.advertise<rtabmap_ros::OdomInfo>("odom_info", 1);
 	odomLocalMap_ = nh.advertise<sensor_msgs::PointCloud2>("odom_local_map", 1);
 	odomLastFrame_ = nh.advertise<sensor_msgs::PointCloud2>("odom_last_frame", 1);
 
@@ -278,7 +282,7 @@ void OdometryROS::processArguments(int argc, char * argv[])
 	}
 }
 
-Transform OdometryROS::processData(SensorData & data, const std_msgs::Header & header, int & quality)
+void OdometryROS::processData(const SensorData & data, const std_msgs::Header & header)
 {
 	if(odometry_->getPose().isNull() &&
 	   !groundTruthFrameId_.empty())
@@ -291,7 +295,7 @@ Transform OdometryROS::processData(SensorData & data, const std_msgs::Header & h
 				if(!this->tfListener().waitForTransform(groundTruthFrameId_, frameId_, header.stamp, ros::Duration(1)))
 				{
 					ROS_WARN("Could not get transform from %s to %s after 1 second!", groundTruthFrameId_.c_str(), frameId_.c_str());
-					return rtabmap::Transform(); // return null
+					return;
 				}
 			}
 			this->tfListener().lookupTransform(groundTruthFrameId_, frameId_, header.stamp, initialPose);
@@ -299,9 +303,9 @@ Transform OdometryROS::processData(SensorData & data, const std_msgs::Header & h
 		catch(tf::TransformException & ex)
 		{
 			ROS_WARN("%s",ex.what());
-			return rtabmap::Transform(); // return null
+			return;
 		}
-		Transform pose = rtabmap::transformFromTF(initialPose);
+		rtabmap::Transform pose = rtabmap_ros::transformFromTF(initialPose);
 		ROS_INFO("Initializing odometry pose to %s (from \"%s\" -> \"%s\")",
 				pose.prettyPrint().c_str(),
 				groundTruthFrameId_.c_str(),
@@ -310,14 +314,16 @@ Transform OdometryROS::processData(SensorData & data, const std_msgs::Header & h
 	}
 
 	// process data
-	rtabmap::Transform pose = odometry_->process(data, &quality);
+	ros::WallTime time = ros::WallTime::now();
+	rtabmap::OdometryInfo info;
+	rtabmap::Transform pose = odometry_->process(data, &info);
 	if(!pose.isNull())
 	{
 		//*********************
 		// Update odometry
 		//*********************
 		tf::Transform poseTF;
-		rtabmap::transformToTF(pose, poseTF);
+		rtabmap_ros::transformToTF(pose, poseTF);
 
 		if(publishTf_)
 		{
@@ -337,6 +343,14 @@ Transform OdometryROS::processData(SensorData & data, const std_msgs::Header & h
 			odom.pose.pose.position.y = poseTF.getOrigin().y();
 			odom.pose.pose.position.z = poseTF.getOrigin().z();
 			tf::quaternionTFToMsg(poseTF.getRotation().normalized(), odom.pose.pose.orientation);
+
+			//set covariance
+			odom.pose.covariance.at(0) = info.variance;  // xx
+			odom.pose.covariance.at(7) = info.variance;  // yy
+			odom.pose.covariance.at(14) = info.variance; // zz
+			odom.pose.covariance.at(21) = info.variance; // rr
+			odom.pose.covariance.at(28) = info.variance; // pp
+			odom.pose.covariance.at(35) = info.variance; // yawyaw
 
 			//publish the message
 			odomPub_.publish(odom);
@@ -412,7 +426,16 @@ Transform OdometryROS::processData(SensorData & data, const std_msgs::Header & h
 		odomPub_.publish(odom);
 	}
 
-	return pose;
+	if(odomInfoPub_.getNumSubscribers())
+	{
+		rtabmap_ros::OdomInfo infoMsg;
+		odomInfoToROS(info, infoMsg);
+		infoMsg.header.stamp = header.stamp; // use corresponding time stamp to image
+		infoMsg.header.frame_id = odomFrameId_;
+		odomInfoPub_.publish(infoMsg);
+	}
+
+	ROS_INFO("Odom: quality=%d, std dev=%fm, update time=%fs", info.inliers, pose.isNull()?0.0f:std::sqrt(info.variance), (ros::WallTime::now()-time).toSec());
 }
 
 bool OdometryROS::isOdometryBOW() const

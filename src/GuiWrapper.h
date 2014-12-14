@@ -29,7 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define GUIWRAPPER_H_
 
 #include <ros/ros.h>
-#include "rtabmap_ros/InfoEx.h"
+#include "rtabmap_ros/Info.h"
 #include "rtabmap_ros/MapData.h"
 #include "rtabmap/utilite/UEventsHandler.h"
 
@@ -69,7 +69,7 @@ protected:
 	virtual void handleEvent(UEvent * anEvent);
 
 private:
-	void infoMapCallback(const rtabmap_ros::InfoExConstPtr & infoMsg, const rtabmap_ros::MapDataConstPtr & mapMsg);
+	void infoMapCallback(const rtabmap_ros::InfoConstPtr & infoMsg, const rtabmap_ros::MapDataConstPtr & mapMsg);
 
 	void setupCallbacks(bool subscribeDepth, bool subscribeLaserScan, int queueSize);
 	void defaultCallback(const nav_msgs::OdometryConstPtr & odomMsg); // odom
@@ -77,9 +77,6 @@ private:
 					   const nav_msgs::OdometryConstPtr & odomMsg,
 					   const sensor_msgs::ImageConstPtr& imageDepthMsg,
 					   const sensor_msgs::CameraInfoConstPtr& camInfoMsg);
-	void scanCallback(const sensor_msgs::ImageConstPtr& imageMsg,
-					  const nav_msgs::OdometryConstPtr & odomMsg,
-					  const sensor_msgs::LaserScanConstPtr& scanMsg);
 	void depthScanCallback(const sensor_msgs::ImageConstPtr& imageMsg,
 						   const nav_msgs::OdometryConstPtr & odomMsg,
 						   const sensor_msgs::ImageConstPtr& imageDepthMsg,
@@ -98,7 +95,7 @@ private:
 	bool waitForTransform_;
 	tf::TransformListener tfListener_;
 
-	message_filters::Subscriber<rtabmap_ros::InfoEx> infoExTopic_;
+	message_filters::Subscriber<rtabmap_ros::Info> infoTopic_;
 	message_filters::Subscriber<rtabmap_ros::MapData> mapDataTopic_;
 
 	ros::Subscriber defaultSub_; // odometry only
@@ -109,7 +106,7 @@ private:
 	message_filters::Subscriber<sensor_msgs::LaserScan> scanSub_;
 
 	typedef message_filters::sync_policies::ExactTime<
-			rtabmap_ros::InfoEx,
+			rtabmap_ros::Info,
 			rtabmap_ros::MapData> MyInfoMapSyncPolicy;
 	message_filters::Synchronizer<MyInfoMapSyncPolicy> * infoMapSync_;
 
@@ -127,12 +124,6 @@ private:
 			sensor_msgs::Image,
 			sensor_msgs::CameraInfo> MyDepthSyncPolicy;
 	message_filters::Synchronizer<MyDepthSyncPolicy> * depthSync_;
-
-	typedef message_filters::sync_policies::ApproximateTime<
-			sensor_msgs::Image,
-			nav_msgs::Odometry,
-			sensor_msgs::LaserScan> MyScanSyncPolicy;
-	message_filters::Synchronizer<MyScanSyncPolicy> * scanSync_;
 };
 
 #endif /* GUIWRAPPER_H_ */

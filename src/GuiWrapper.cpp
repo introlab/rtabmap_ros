@@ -56,8 +56,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <pcl_conversions/pcl_conversions.h>
 #include <laser_geometry/laser_geometry.h>
 
-using namespace rtabmap;
-
 GuiWrapper::GuiWrapper(int & argc, char** argv) :
 		app_(0),
 		mainWindow_(0),
@@ -111,9 +109,9 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 	UEventsManager::addHandler(this);
 	UEventsManager::addHandler(mainWindow_);
 
-	infoExTopic_.subscribe(nh, "infoEx", 1);
+	infoTopic_.subscribe(nh, "info", 1);
 	mapDataTopic_.subscribe(nh, "mapData", 1);
-	infoMapSync_ = new message_filters::Synchronizer<MyInfoMapSyncPolicy>(MyInfoMapSyncPolicy(queueSize), infoExTopic_, mapDataTopic_);
+	infoMapSync_ = new message_filters::Synchronizer<MyInfoMapSyncPolicy>(MyInfoMapSyncPolicy(queueSize), infoTopic_, mapDataTopic_);
 	infoMapSync_->registerCallback(boost::bind(&GuiWrapper::infoMapCallback, this, _1, _2));
 }
 
@@ -129,7 +127,7 @@ int GuiWrapper::exec()
 }
 
 void GuiWrapper::infoMapCallback(
-		const rtabmap_ros::InfoExConstPtr & infoMsg,
+		const rtabmap_ros::InfoConstPtr & infoMsg,
 		const rtabmap_ros::MapDataConstPtr & mapMsg)
 {
 	//ROS_INFO("rtabmapviz: RTAB-Map info ex received!");
@@ -175,78 +173,26 @@ void GuiWrapper::infoMapCallback(
 		stat.addStatistic(infoMsg->statsKeys.at(i), infoMsg->statsValues.at(i));
 	}
 
+	stat.setLoopClosureTransform(rtabmap_ros::transformFromGeometryMsg(infoMsg->loopClosureTransform));
+
 	//RGB-D SLAM data
-	stat.setMapCorrection(transformFromGeometryMsg(mapMsg->mapToOdom));
-	stat.setLoopClosureTransform(transformFromGeometryMsg(infoMsg->loopClosureTransform));
 
+	Transform mapToOdom;
 	std::map<int, Transform> poses;
-	for(unsigned int i=0; i<mapMsg->poseIDs.size() && i<mapMsg->poses.size(); ++i)
-	{
-		poses.insert(std::make_pair(mapMsg->poseIDs[i], transformFromPoseMsg(mapMsg->poses[i])));
-	}
-	stat.setPoses(poses);
-
-	std::multimap<int, Link> constraints;
-	for(unsigned int i=0; i<mapMsg->constraintFromIDs.size() && i<mapMsg->constraintToIDs.size() && i<mapMsg->constraintTypes.size() && i < mapMsg->constraints.size(); ++i)
-	{
-		Transform t = transformFromGeometryMsg(mapMsg->constraints[i]);
-		constraints.insert(std::make_pair(mapMsg->constraintFromIDs[i], Link(mapMsg->constraintFromIDs[i], mapMsg->constraintToIDs[i], t, (Link::Type)mapMsg->constraintTypes[i])));
-	}
-	stat.setConstraints(constraints);
-
 	std::map<int, int> mapIds;
-	for(unsigned int i=0; i<mapMsg->mapIDs.size() && i<mapMsg->maps.size(); ++i)
-	{
-		mapIds.insert(std::make_pair(mapMsg->mapIDs[i], mapMsg->maps[i]));
-	}
+	std::multimap<int, Link> links;
+
+	rtabmap_ros::mapGraphFromROS(mapMsg->graph, poses, mapIds, links, mapToOdom);
+
+	stat.setMapCorrection(mapToOdom);
+	stat.setPoses(poses);
 	stat.setMapIds(mapIds);
+	stat.setConstraints(links);
 
 	//data
 	if(mapMsg->nodes.size() == 1)
 	{
-		//Features stuff...
-		std::multimap<int, cv::KeyPoint> words;
-		std::multimap<int, pcl::PointXYZ> words3D;
-		pcl::PointCloud<pcl::PointXYZ> cloud;
-		if(mapMsg->nodes[0].words3DValues.data.size())
-		{
-			pcl::fromROSMsg(mapMsg->nodes[0].words3DValues, cloud);
-		}
-		for(unsigned int i=0; i<mapMsg->nodes[0].wordsKeys.size() && i<mapMsg->nodes[0].wordsValues.size(); ++i)
-		{
-			cv::KeyPoint pt;
-			pt.angle = mapMsg->nodes[0].wordsValues.at(i).angle;
-			pt.response = mapMsg->nodes[0].wordsValues.at(i).response;
-			pt.pt.x = mapMsg->nodes[0].wordsValues.at(i).ptx;
-			pt.pt.y = mapMsg->nodes[0].wordsValues.at(i).pty;
-			pt.size = mapMsg->nodes[0].wordsValues.at(i).size;
-			int wordId = mapMsg->nodes[0].wordsKeys.at(i);
-			words.insert(std::make_pair(wordId, pt));
-			if(i< cloud.size())
-			{
-				words3D.insert(std::make_pair(wordId, cloud[i]));
-			}
-		}
-
-		if(words3D.size() && words3D.size() != words.size())
-		{
-			ROS_ERROR("Words 2D and 3D should be the same size (%d, %d)!", (int)words.size(), (int)words3D.size());
-		}
-
-		Signature signature(mapMsg->nodes[0].id,
-				mapMsg->nodes[0].mapId,
-				words,
-				words3D,
-				transformFromPoseMsg(mapMsg->nodes[0].pose),
-				compressedMatFromBytes(mapMsg->nodes[0].depth2D.bytes),
-				compressedMatFromBytes(mapMsg->nodes[0].image.bytes),
-				compressedMatFromBytes(mapMsg->nodes[0].depth.bytes),
-				mapMsg->nodes[0].fx,
-				mapMsg->nodes[0].fy,
-				mapMsg->nodes[0].cx,
-				mapMsg->nodes[0].cy,
-				transformFromGeometryMsg(mapMsg->nodes[0].localTransform));
-		stat.setSignature(signature);
+		stat.setSignature(rtabmap_ros::nodeDataFromROS(mapMsg->nodes[0]));
 	}
 	else if(mapMsg->nodes.size() > 1)
 	{
@@ -260,92 +206,30 @@ void GuiWrapper::processRequestedMap(const rtabmap_ros::MapData & map)
 {
 	std::map<int, Signature> signatures;
 	std::map<int, Transform> poses;
-	std::multimap<int, Link> constraints;
+	std::multimap<int, rtabmap::Link> constraints;
 	std::map<int, int> mapIds;
+	Transform mapToOdom;
 
-	if(map.mapIDs.size() != map.maps.size())
+	if(map.graph.nodeIds.size() != map.graph.mapIds.size())
 	{
-		ROS_WARN("rtabmapviz: receiving map... maps and IDs are not the same size (%d vs %d)!",
-				(int)map.maps.size(), (int)map.mapIDs.size());
+		ROS_ERROR("rtabmapviz: receiving map... node and amp IDs are not the same size (%d vs %d)!",
+				(int)map.graph.nodeIds.size(), (int)map.graph.mapIds.size());
+		return;
 	}
 
-	if(map.poseIDs.size() != map.poses.size())
+	if(map.graph.poses.size() && map.graph.nodeIds.size() != map.graph.poses.size())
 	{
-		ROS_WARN("rtabmapviz: receiving map... poses and IDs are not the same size (%d vs %d)!",
-				(int)map.poses.size(), (int)map.poseIDs.size());
+		ROS_ERROR("rtabmapviz: receiving map... poses and node IDs are not the same size (%d vs %d)!",
+				(int)map.graph.poses.size(), (int)map.graph.nodeIds.size());
+		return;
 	}
 
-	if(map.constraintFromIDs.size() != map.constraints.size() ||
-	   map.constraintToIDs.size() != map.constraints.size() ||
-	   map.constraintTypes.size() != map.constraints.size())
-	{
-		ROS_WARN("rtabmapviz: receiving map... constraints and IDs are not the same size (%d vs %d vs %d vs %d)!",
-				(int)map.constraints.size(), (int)map.constraintFromIDs.size(), (int)map.constraintToIDs.size(), (int)map.constraintTypes.size());
-	}
-
-	for(unsigned int i=0; i<map.mapIDs.size() && i < map.maps.size(); ++i)
-	{
-		mapIds.insert(std::make_pair(map.mapIDs[i], map.maps[i]));
-	}
-
-	for(unsigned int i=0; i<map.poseIDs.size() && i < map.poses.size(); ++i)
-	{
-		Transform t = transformFromPoseMsg(map.poses[i]);
-		poses.insert(std::make_pair(map.poseIDs[i], t));
-	}
-
-	for(unsigned int i=0; i<map.constraintFromIDs.size() && i<map.constraintToIDs.size() && i<map.constraintTypes.size() && i < map.constraints.size(); ++i)
-	{
-		Transform t = transformFromGeometryMsg(map.constraints[i]);
-		constraints.insert(std::make_pair(map.constraintFromIDs[i], Link(map.constraintFromIDs[i], map.constraintToIDs[i], t, (Link::Type)map.constraintTypes[i])));
-	}
+	rtabmap_ros::mapGraphFromROS(map.graph, poses, mapIds, constraints, mapToOdom);
 
 	//data
 	for(unsigned int i=0; i<map.nodes.size(); ++i)
 	{
-		//Features stuff...
-		std::multimap<int, cv::KeyPoint> words;
-		std::multimap<int, pcl::PointXYZ> words3D;
-		pcl::PointCloud<pcl::PointXYZ> cloud;
-		if(map.nodes[i].words3DValues.data.size())
-		{
-			pcl::fromROSMsg(map.nodes[i].words3DValues, cloud);
-		}
-		for(unsigned int j=0; j<map.nodes[i].wordsKeys.size() && j<map.nodes[0].wordsValues.size(); ++j)
-		{
-			cv::KeyPoint pt;
-			pt.angle = map.nodes[i].wordsValues.at(j).angle;
-			pt.response = map.nodes[i].wordsValues.at(j).response;
-			pt.pt.x = map.nodes[i].wordsValues.at(j).ptx;
-			pt.pt.y = map.nodes[i].wordsValues.at(j).pty;
-			pt.size = map.nodes[i].wordsValues.at(j).size;
-			int wordId = map.nodes[i].wordsKeys.at(j);
-			words.insert(std::make_pair(wordId, pt));
-			if(j < cloud.size())
-			{
-				words3D.insert(std::make_pair(wordId, cloud[j]));
-			}
-		}
-
-		if(words3D.size() && words3D.size() != words.size())
-		{
-			ROS_ERROR("Words 2D and 3D should be the same size (%d, %d)!", (int)words.size(), (int)words3D.size());
-		}
-
-		signatures.insert(std::make_pair(map.nodes[i].id,
-				Signature(map.nodes[i].id,
-				map.nodes[i].mapId,
-				words,
-				words3D,
-				transformFromPoseMsg(map.nodes[i].pose),
-				compressedMatFromBytes(map.nodes[i].depth2D.bytes),
-				compressedMatFromBytes(map.nodes[i].image.bytes),
-				compressedMatFromBytes(map.nodes[i].depth.bytes),
-				map.nodes[i].fx,
-				map.nodes[i].fy,
-				map.nodes[i].cx,
-				map.nodes[i].cy,
-				transformFromGeometryMsg(map.nodes[i].localTransform))));
+		signatures.insert(std::make_pair(map.nodes[i].id, rtabmap_ros::nodeDataFromROS(map.nodes[i])));
 	}
 
 	this->post(new RtabmapEvent3DMap(signatures,
@@ -479,9 +363,9 @@ void GuiWrapper::handleEvent(UEvent * anEvent)
 
 void GuiWrapper::defaultCallback(const nav_msgs::OdometryConstPtr & odomMsg)
 {
-	Transform odom = transformFromPoseMsg(odomMsg->pose.pose);
+	Transform odom = rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose);
 	rtabmap::SensorData data;
-	data.setPose(odom);
+	data.setPose(odom, odomMsg->pose.covariance[0]);
 	this->post(new OdometryEvent(data));
 }
 
@@ -506,15 +390,13 @@ void GuiWrapper::depthCallback(
 
 		tf::StampedTransform tmp;
 		tfListener_.lookupTransform(frameId_, depthMsg->header.frame_id, depthMsg->header.stamp, tmp);
-		localTransform = transformFromTF(tmp);
+		localTransform = rtabmap_ros::transformFromTF(tmp);
 	}
 	catch(tf::TransformException & ex)
 	{
 		ROS_WARN("%s",ex.what());
 		return;
 	}
-
-	Transform odom = transformFromPoseMsg(odomMsg->pose.pose);
 
 	cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg, "bgr8");
 	cv_bridge::CvImageConstPtr ptrDepth = cv_bridge::toCvShare(depthMsg);
@@ -533,59 +415,9 @@ void GuiWrapper::depthCallback(
 			fy,
 			cx,
 			cy,
-			odom,
-			localTransform);
-	this->post(new OdometryEvent(image));
-}
-
-void GuiWrapper::scanCallback(
-		const sensor_msgs::ImageConstPtr& imageMsg,
-		const nav_msgs::OdometryConstPtr & odomMsg,
-		const sensor_msgs::LaserScanConstPtr& scanMsg)
-{
-	// TF ready?
-	try
-	{
-		if(waitForTransform_)
-		{
-			if(!tfListener_.waitForTransform(frameId_, scanMsg->header.frame_id, scanMsg->header.stamp, ros::Duration(1)))
-			{
-				ROS_WARN("Could not get transform from %s to %s after 1 second!", frameId_.c_str(), scanMsg->header.frame_id.c_str());
-				return;
-			}
-		}
-
-		tf::StampedTransform tmp;
-		tfListener_.lookupTransform(frameId_, scanMsg->header.frame_id, scanMsg->header.stamp, tmp);
-	}
-	catch(tf::TransformException & ex)
-	{
-		ROS_WARN("%s",ex.what());
-		return;
-	}
-
-	//transform in frameId_ frame
-	sensor_msgs::PointCloud2 scanOut;
-	laser_geometry::LaserProjection projection;
-	projection.transformLaserScanToPointCloud(frameId_, *scanMsg, scanOut, tfListener_);
-	pcl::PointCloud<pcl::PointXYZ> pclScan;
-	pcl::fromROSMsg(scanOut, pclScan);
-	cv::Mat scan = util3d::depth2DFromPointCloud(pclScan);
-
-	Transform odom = transformFromPoseMsg(odomMsg->pose.pose);
-
-	cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg, "bgr8");
-
-	rtabmap::SensorData image(
-			ptrImage->image.clone(),
-			cv::Mat(),
-			scan,
-			0.0f,
-			0.0f,
-			0.0f,
-			0.0f,
-			odom,
-			Transform());
+			localTransform,
+			rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose),
+			odomMsg->pose.covariance[0]);
 	this->post(new OdometryEvent(image));
 }
 
@@ -616,7 +448,7 @@ void GuiWrapper::depthScanCallback(
 
 		tf::StampedTransform tmp;
 		tfListener_.lookupTransform(frameId_, depthMsg->header.frame_id, depthMsg->header.stamp, tmp);
-		localTransform = transformFromTF(tmp);
+		localTransform = rtabmap_ros::transformFromTF(tmp);
 	}
 	catch(tf::TransformException & ex)
 	{
@@ -626,9 +458,7 @@ void GuiWrapper::depthScanCallback(
 
 	pcl::PointCloud<pcl::PointXYZ> pclScan;
 	pcl::fromROSMsg(scanOut, pclScan);
-	cv::Mat scan = util3d::depth2DFromPointCloud(pclScan);
-
-	Transform odom = transformFromPoseMsg(odomMsg->pose.pose);
+	cv::Mat scan = util3d::laserScanFromPointCloud(pclScan);
 
 	cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg, "bgr8");
 	cv_bridge::CvImageConstPtr ptrDepth = cv_bridge::toCvShare(depthMsg);
@@ -641,15 +471,16 @@ void GuiWrapper::depthScanCallback(
 	float cy = model.cy();
 
 	rtabmap::SensorData image(
+			scan,
 			ptrImage->image.clone(),
 			ptrDepth->image.clone(),
-			scan,
 			fx,
 			fy,
 			cx,
 			cy,
-			odom,
-			localTransform);
+			localTransform,
+			rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose),
+			odomMsg->pose.covariance[0]);
 	this->post(new OdometryEvent(image));
 }
 
@@ -690,18 +521,13 @@ void GuiWrapper::setupCallbacks(
 		depthSync_ = new message_filters::Synchronizer<MyDepthSyncPolicy>(MyDepthSyncPolicy(queueSize), imageSub_, odomSub_, imageDepthSub_, cameraInfoSub_);
 		depthSync_->registerCallback(boost::bind(&GuiWrapper::depthCallback, this, _1, _2, _3, _4));
 	}
-	else if(!subscribeDepth && subscribeLaserScan)
-	{
-		ROS_INFO("Registering LaserScan callback...");
-		imageSub_.subscribe(rgb_it, rgb_nh.resolveName("image"), 1, hintsRgb);
-		odomSub_.subscribe(nh, "odom", 1);
-		scanSub_.subscribe(nh, "scan", 1);
-		scanSync_ = new message_filters::Synchronizer<MyScanSyncPolicy>(MyScanSyncPolicy(queueSize), imageSub_, odomSub_, scanSub_);
-		scanSync_->registerCallback(boost::bind(&GuiWrapper::scanCallback, this, _1, _2, _3));
-	}
 	else // default odom only
 	{
-		ROS_INFO("Registering default callback...");
+		if(!subscribeDepth && subscribeLaserScan)
+		{
+			ROS_WARN("Cannot subscribe to laser scan without depth subscription...");
+		}
+		ROS_INFO("Registering default callback (\"odom\" only)...");
 		defaultSub_ = nh.subscribe("odom", 1, &GuiWrapper::defaultCallback, this);
 	}
 }

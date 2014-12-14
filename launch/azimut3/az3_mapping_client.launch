@@ -21,7 +21,7 @@
   
   <!-- Below, construct point cloud of the latest throttled data, disabled for bandwidth efficiency -->
   <node pkg="nodelet" type="nodelet" name="standalone_nodelet"  args="manager" output="screen"/>
-  <node pkg="nodelet" type="nodelet" name="points_xyzrgb" args="load rtabmap/point_cloud_xyzrgb standalone_nodelet">
+  <node pkg="nodelet" type="nodelet" name="points_xyzrgb" args="load rtabmap_ros/point_cloud_xyzrgb standalone_nodelet">
     <remap from="rgb/image"       to="/camera/data_throttled_image_relay"/>
     <remap from="depth/image"     to="/camera/data_throttled_image_depth_relay"/>
     <remap from="rgb/camera_info" to="/camera/data_throttled_camera_info_relay"/>

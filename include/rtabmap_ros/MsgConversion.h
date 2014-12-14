@@ -29,12 +29,26 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define MSGCONVERSION_H_
 
 #include <tf/LinearMath/Transform.h>
+
 #include <geometry_msgs/Transform.h>
 #include <geometry_msgs/Pose.h>
-#include <rtabmap/core/Transform.h>
-#include <opencv2/opencv.hpp>
 
-namespace rtabmap {
+#include <opencv2/opencv.hpp>
+#include <opencv2/features2d/features2d.hpp>
+
+#include <rtabmap/core/Transform.h>
+#include <rtabmap/core/Link.h>
+#include <rtabmap/core/Signature.h>
+#include <rtabmap/core/OdometryInfo.h>
+
+#include <rtabmap_ros/Link.h>
+#include <rtabmap_ros/KeyPoint.h>
+#include <rtabmap_ros/MapData.h>
+#include <rtabmap_ros/Graph.h>
+#include <rtabmap_ros/NodeData.h>
+#include <rtabmap_ros/OdomInfo.h>
+
+namespace rtabmap_ros {
 
 void transformToTF(const rtabmap::Transform & transform, tf::Transform & tfTransform);
 rtabmap::Transform transformFromTF(const tf::Transform & transform);
@@ -48,6 +62,31 @@ rtabmap::Transform transformFromPoseMsg(const geometry_msgs::Pose & msg);
 // copy data
 void compressedMatToBytes(const cv::Mat & compressed, std::vector<unsigned char> & bytes);
 cv::Mat compressedMatFromBytes(const std::vector<unsigned char> & bytes, bool copy = true);
+
+rtabmap::Link linkFromROS(const rtabmap_ros::Link & msg);
+void linkToROS(const rtabmap::Link & link, rtabmap_ros::Link & msg);
+
+cv::KeyPoint keypointFromROS(const rtabmap_ros::KeyPoint & msg);
+void keypointToROS(const cv::KeyPoint & kpt, rtabmap_ros::KeyPoint & msg);
+
+void mapGraphFromROS(
+		const rtabmap_ros::Graph & msg,
+		std::map<int, rtabmap::Transform> & poses,
+		std::map<int, int> & mapIds,
+		std::multimap<int, rtabmap::Link> & links,
+		rtabmap::Transform & mapToOdom);
+void mapGraphToROS(
+		const std::map<int, rtabmap::Transform> & poses,
+		const std::map<int, int> & mapIds,
+		const std::multimap<int, rtabmap::Link> & links,
+		const rtabmap::Transform & mapToOdom,
+		rtabmap_ros::Graph & msg);
+
+rtabmap::Signature nodeDataFromROS(const rtabmap_ros::NodeData & msg);
+void nodeDataToROS(const rtabmap::Signature & signature, rtabmap_ros::NodeData & msg);
+
+rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::OdomInfo & msg);
+void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_ros::OdomInfo & msg);
 
 }
 

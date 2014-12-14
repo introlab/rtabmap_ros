@@ -37,7 +37,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <cv_bridge/cv_bridge.h>
 
-namespace rtabmap
+namespace rtabmap_ros
 {
 
 class DisparityToDepth : public nodelet::Nodelet
@@ -136,5 +136,5 @@ private:
 	ros::Subscriber sub_;
 };
 
-PLUGINLIB_EXPORT_CLASS(rtabmap::DisparityToDepth, nodelet::Nodelet);
+PLUGINLIB_EXPORT_CLASS(rtabmap_ros::DisparityToDepth, nodelet::Nodelet);
 }

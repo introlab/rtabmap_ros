@@ -26,8 +26,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 
-#ifndef RVIZ_PATH_DISPLAY_H
-#define RVIZ_PATH_DISPLAY_H
+#ifndef MAP_GRAPH_DISPLAY_H
+#define MAP_GRAPH_DISPLAY_H
 
 #include <rtabmap_ros/MapData.h>
 
@@ -46,7 +46,7 @@ class FloatProperty;
 
 using namespace rviz;
 
-namespace rtabmap
+namespace rtabmap_ros
 {
 
 /**
@@ -79,7 +79,7 @@ private:
   FloatProperty* alpha_property_;
 };
 
-} // namespace rviz
+} // namespace rtabmap_ros
 
-#endif /* RVIZ_PATH_DISPLAY_H */
+#endif /* MAP_GRAPH_DISPLAY_H */
 

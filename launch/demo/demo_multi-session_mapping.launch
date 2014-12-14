@@ -26,7 +26,7 @@
 	<param name="queue_size" type="int" value="10"/>
 	
 	<!-- RTAB-Map's parameters: do "rosrun rtabmap rtabmap (double-dash)params" to see the list of available parameters. -->
-	<param name="RGBD/ScanMatchingSize" type="string" value="0"/> 
+	<param name="RGBD/PoseScanMatching" type="string" value="false"/> 
 	<param name="RGBD/LocalLoopDetectionSpace" type="string" value="false"/> 
 	<param name="RGBD/LocalLoopDetectionTime" type="string" value="false"/> 
 	<param name="RGBD/OptimizeFromGraphEnd" type="string" value="true"/> 

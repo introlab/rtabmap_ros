@@ -13,7 +13,7 @@
 	<group ns="/wide_stereo">
 	   <node pkg="nodelet" type="nodelet" name="standalone_nodelet"  args="manager" output="screen"/>
        <node pkg="nodelet" type="nodelet" name="disparity" args="load stereo_image_proc/disparity standalone_nodelet"/>
-	   <node pkg="nodelet" type="nodelet" name="disparity2depth" args="load rtabmap/disparity_to_depth standalone_nodelet"/>
+	   <node pkg="nodelet" type="nodelet" name="disparity2depth" args="load rtabmap_ros/disparity_to_depth standalone_nodelet"/>
 	</group>
 
 	<!-- Odometry: Run the viso2_ros package -->

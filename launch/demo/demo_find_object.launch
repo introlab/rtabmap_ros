@@ -42,8 +42,6 @@
 	  <param name="Rtabmap/TimeThr" type="string" value="700"/>
 	  <param name="Mem/RehearsalSimilarity" type="string" value="0.45"/>
 	  <param name="Mem/RehearsedNodesKept" type="string" value="false"/>   
-	  <param name="Kp/DetectorStrategy" type="string" value="0"/>   <!-- use SURF -->
-	  <param name="Kp/NNStrategy" type="string" value="1"/>         <!-- kdTree -->
     </node>
   </group> 
   
@@ -65,7 +63,7 @@
   <node pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap_ros)/launch/config/demo_find_object.rviz" output="screen"/>
   
   <node pkg="nodelet" type="nodelet" name="standalone_nodelet"  args="manager" output="screen"/>
-  <node pkg="nodelet" type="nodelet" name="points_xyzrgb" args="load rtabmap/point_cloud_xyzrgb standalone_nodelet">
+  <node pkg="nodelet" type="nodelet" name="points_xyzrgb" args="load rtabmap_ros/point_cloud_xyzrgb standalone_nodelet">
     <remap from="rgb/image"       to="/camera/data_throttled_image"/>
     <remap from="depth/image"     to="/camera/data_throttled_image_depth"/>
     <remap from="rgb/camera_info" to="/camera/data_throttled_camera_info"/>

@@ -48,7 +48,7 @@
       <param name="Odom/MinInliers" type="string" value="10"/>
       <param name="Odom/RoiRatios" type="string" value="0.03 0.03 0.04 0.04"/>
       <param name="Odom/MaxDepth" type="string" value="10"/>
-      
+      <param name="OdomBow/NNDR" type="string" value="0.8"/>
       <param name="GFTT/MaxCorners" type="string" value="500"/>
       <param name="GFTT/MinDistance" type="string" value="5"/>
    </node>

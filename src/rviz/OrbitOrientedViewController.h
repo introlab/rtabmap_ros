@@ -30,7 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "rviz/default_plugin/view_controllers/orbit_view_controller.h"
 
-namespace rtabmap
+namespace rtabmap_ros
 {
 
 class OrbitOrientedViewController: public rviz::OrbitViewController

@@ -96,6 +96,7 @@ private:
 			const cv::Mat & image,
 			const rtabmap::Transform & odom = rtabmap::Transform(),
 			const std::string & odomFrameId = "",
+			float odomVariance = 1.0f,
 			const cv::Mat & depthOrRightImage = cv::Mat(),
 			float fx = 0.0f,
 			float fyOrBaseline = 0.0f,
@@ -136,8 +137,8 @@ private:
 	boost::mutex mapToOdomMutex_;
 
 	ros::Publisher infoPub_;
-	ros::Publisher infoPubEx_;
 	ros::Publisher mapData_;
+	ros::Publisher mapGraph_;
 
 	// for loop closure detection only
 	image_transport::Subscriber defaultSub_;

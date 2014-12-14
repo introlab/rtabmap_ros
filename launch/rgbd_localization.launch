@@ -3,17 +3,23 @@
    
    <!-- RGB-D LOCALIZATION VERSION -->
      
-   <!-- ODOMETRY ARGUMENTS: "strategy", "feature", "nn" and "local_map":
-        -Strategy: 0=BOW (bag-of-words) 1=Optical Flow
-        -Feature type: 0=SURF 1=SIFT 2=ORB 3=FAST/FREAK 4=FAST/BRIEF 5=GFTT/FREAK 6=GFTT/BRIEF 7=BRISK
-        -Nearest neighbor strategy : 0=Linear, 1=FLANN_KDTREE, 2=FLANN_LSH, 3=BRUTEFORCE 
-           Set to 1 for float descriptor like SIFT/SURF                  
-           Set to 3 for binary descriptor like ORB/FREAK/BRIEF/BRISK      
-        -Local map size: number of unique features to keep track 
+   <!-- ODOMETRY MAIN ARGUMENTS: 
+        -"strategy"        : Strategy: 0=BOW (bag-of-words) 1=Optical Flow
+        -"feature"         : Feature type: 0=SURF 1=SIFT 2=ORB 3=FAST/FREAK 4=FAST/BRIEF 5=GFTT/FREAK 6=GFTT/BRIEF 7=BRISK
+        -"nn"              : Nearest neighbor strategy : 0=Linear, 1=FLANN_KDTREE, 2=FLANN_LSH, 3=BRUTEFORCE 
+                             Set to 1 for float descriptor like SIFT/SURF                  
+                             Set to 3 for binary descriptor like ORB/FREAK/BRIEF/BRISK  
+        -"max_depth"       : Maximum features depth (m)  
+        -"min_inliers"     : Minimum visual correspondences to accept a transformation (m)  
+        -"inlier_distance" : RANSAC maximum inliers distance (m)  
+        -"local_map"       : Local map size: number of unique features to keep track 
     -->
    <arg name="strategy" default="0" />
    <arg name="feature" default="6" />
    <arg name="nn" default="3" />
+   <arg name="max_depth" default="4.0" />
+   <arg name="min_inliers" default="20" />
+   <arg name="inlier_distance" default="0.02" />
    <arg name="local_map" default="1000" />
    
   <!-- TF FRAMES -->
@@ -31,9 +37,12 @@
       <param name="frame_id" type="string" value="base_link"/>
       
       <param name="Odom/Strategy" type="string" value="$(arg strategy)"/> 
-	  <param name="Odom/FeatureType" type="string" value="$(arg feature)"/>            
-      <param name="OdomBow/NNType" type="string" value="$(arg nn)"/>
-      <param name="OdomBow/LocalHistorySize" type="string" value="$(arg local_map)"/>
+	  <param name="Odom/FeatureType" type="string" value="$(arg feature)"/>  
+	  <param name="OdomBow/NNType" type="string" value="$(arg nn)"/>
+	  <param name="Odom/MaxDepth" type="string" value="$(arg max_depth)"/>  
+	  <param name="Odom/MinInliers" type="string" value="$(arg min_inliers)"/> 
+	  <param name="Odom/InlierDistance" type="string" value="$(arg inlier_distance)"/>       
+      <param name="OdomBow/LocalHistorySize" type="string" value="$(arg local_map)"/>  
     </node>
   
     <!-- Visual SLAM (robot side) -->

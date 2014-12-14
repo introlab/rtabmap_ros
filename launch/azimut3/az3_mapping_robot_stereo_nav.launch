@@ -69,7 +69,7 @@
 	    <node pkg="nodelet" type="nodelet" name="stereo_nodelet"  args="manager"/>
 		<!-- HACK: the fps parameter on camera1394stereo_node doesn't work for my camera!?!?
 			 Throttle camera images -->
-		<node pkg="nodelet" type="nodelet" name="stereo_throttle" args="load rtabmap/stereo_throttle stereo_nodelet">
+		<node pkg="nodelet" type="nodelet" name="stereo_throttle" args="load rtabmap_ros/stereo_throttle stereo_nodelet">
 			<remap from="left/image"       to="left/image_raw"/>
 		    <remap from="right/image"      to="right/image_raw"/>
 		    <remap from="left/camera_info" to="left/camera_info"/>
@@ -88,7 +88,7 @@
 		</node>
 		
 		<!-- Create point cloud for the planner -->
-		<node pkg="nodelet" type="nodelet" name="disparity2cloud" args="load rtabmap/point_cloud_xyz stereo_nodelet">
+		<node pkg="nodelet" type="nodelet" name="disparity2cloud" args="load rtabmap_ros/point_cloud_xyz stereo_nodelet">
 			<remap from="disparity/image"       to="disparity"/>
 			<remap from="disparity/camera_info" to="right/camera_info_throttle"/>
 			<remap from="cloud"                 to="cloudXYZ"/>
@@ -97,7 +97,7 @@
 			<param name="decimation" type="int" value="4"/>
 			<param name="max_depth" type="double" value="4"/>
 		</node>
-		<node pkg="nodelet" type="nodelet" name="obstacles_detection" args="load rtabmap/obstacles_detection stereo_nodelet">
+		<node pkg="nodelet" type="nodelet" name="obstacles_detection" args="load rtabmap_ros/obstacles_detection stereo_nodelet">
     			<remap from="cloud" to="cloudXYZ"/>
 			<remap from="obstacles" to="/planner_cloud"/>
 

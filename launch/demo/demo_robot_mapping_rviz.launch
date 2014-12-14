@@ -37,8 +37,6 @@
 	  <param name="LccBow/MaxDepth" type="string" value="0.0"/>                <!-- 3D visual words maximum depth 0=infinity -->
 	  <param name="LccBow/InlierDistance" type="string" value="0.1"/>          <!-- 3D visual words correspondence distance -->
       <param name="RGBD/OptimizeFromGraphEnd" type="string" value="false"/>    <!-- Optimize graph from initial node so /map -> /odom transform will be generated -->
-      <param name="Kp/DetectorStrategy" type="string" value="0"/>   <!-- use SURF -->
-	  <param name="Kp/NNStrategy" type="string" value="1"/>         <!-- kdTree -->
     </node>
     
     <!-- Grid map assembler for rviz -->
@@ -50,9 +48,7 @@
   <!-- Visualisation -->
       
   <node pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap_ros)/launch/config/demo_robot_mapping.rviz" output="screen"/>
-  
-  <node pkg="nodelet" type="nodelet" name="standalone_nodelet"  args="manager" output="screen"/>
-   <node pkg="nodelet" type="nodelet" name="points_xyzrgb" args="load rtabmap/point_cloud_xyzrgb standalone_nodelet">
+   <node pkg="nodelet" type="nodelet" name="points_xyzrgb" args="standalone rtabmap_ros/point_cloud_xyzrgb">
     <remap from="rgb/image"       to="data_throttled_image"/>
     <remap from="depth/image"     to="data_throttled_image_depth"/>
     <remap from="rgb/camera_info" to="data_throttled_camera_info"/>

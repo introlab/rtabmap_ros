@@ -134,17 +134,11 @@ int main(int argc, char** argv)
 	ros::Publisher rightCamInfoPub;
 	ros::Publisher odometryPub;
 	tf::TransformBroadcaster tfBroadcaster;
-	ros::Publisher cloudPub;
 
-	cv::Mat image, depth, depth2d;
-	float fx,fy,cx,cy;
-	rtabmap::Transform localTransform, pose;
-	int seq = 0;
-
-	reader.getNextImage(image, depth, depth2d, fx, fy, cx, cy, localTransform, pose, seq);
-	while(ros::ok() && !image.empty())
+	rtabmap::SensorData data = reader.getNextData();
+	while(ros::ok() && !data.isValid())
 	{
-		ROS_INFO("Reading image %d...", seq);
+		ROS_INFO("Reading sensor data %d...", data.id());
 
 		ros::Time time = ros::Time::now();
 
@@ -164,19 +158,19 @@ int main(int argc, char** argv)
 		camInfoB = camInfoA;
 
 		int type = -1;
-		if(!depth.empty() && (depth.type() == CV_32FC1 || depth.type() == CV_16UC1))
+		if(!data.depth().empty() && (data.depth().type() == CV_32FC1 || data.depth().type() == CV_16UC1))
 		{
 			//depth
 			camInfoA.D.resize(5,0);
 
-			camInfoA.P[0] = fx;
-			camInfoA.K[0] = fx;
-			camInfoA.P[5] = fy;
-			camInfoA.K[4] = fy;
-			camInfoA.P[2] = cx;
-			camInfoA.K[2] = cx;
-			camInfoA.P[6] = cy;
-			camInfoA.K[5] = cy;
+			camInfoA.P[0] = data.fx();
+			camInfoA.K[0] = data.fx();
+			camInfoA.P[5] = data.fy();
+			camInfoA.K[4] = data.fy();
+			camInfoA.P[2] = data.cx();
+			camInfoA.K[2] = data.cx();
+			camInfoA.P[6] = data.cy();
+			camInfoA.K[5] = data.cy();
 
 			camInfoB = camInfoA;
 
@@ -187,22 +181,22 @@ int main(int argc, char** argv)
 			if(rgbCamInfoPub.getTopic().empty()) rgbCamInfoPub = nh.advertise<sensor_msgs::CameraInfo>("rgb/camera_info", 1);
 			if(depthCamInfoPub.getTopic().empty()) depthCamInfoPub = nh.advertise<sensor_msgs::CameraInfo>("depth_registered/camera_info", 1);
 		}
-		else if(!depth.empty() && depth.type() == CV_8U)
+		else if(!data.rightImage().empty() && data.rightImage().type() == CV_8U)
 		{
 			//stereo
 			camInfoA.D.resize(8,0);
 
-			camInfoA.P[0] = fx;
-			camInfoA.K[0] = fx;
-			camInfoA.P[5] = fx; // fx = fy
-			camInfoA.K[4] = fx; // fx = fy
-			camInfoA.P[2] = cx;
-			camInfoA.K[2] = cx;
-			camInfoA.P[6] = cy;
-			camInfoA.K[5] = cy;
+			camInfoA.P[0] = data.fx();
+			camInfoA.K[0] = data.fx();
+			camInfoA.P[5] = data.fx(); // fx = fy
+			camInfoA.K[4] = data.fx(); // fx = fy
+			camInfoA.P[2] = data.cx();
+			camInfoA.K[2] = data.cx();
+			camInfoA.P[6] = data.cy();
+			camInfoA.K[5] = data.cy();
 
 			camInfoB = camInfoA;
-			camInfoB.P[3] = fy*-fx; // Right_Tx = -baseline*fx
+			camInfoB.P[3] = data.baseline()*-data.fx(); // Right_Tx = -baseline*fx
 
 			type=1;
 
@@ -217,30 +211,30 @@ int main(int argc, char** argv)
 			if(imagePub.getTopic().empty()) imagePub = it.advertise("image", 1);
 		}
 
-		camInfoA.height = image.rows;
-		camInfoA.width = image.cols;
-		camInfoB.height = depth.rows;
-		camInfoB.width = depth.cols;
+		camInfoA.height = data.image().rows;
+		camInfoA.width = data.image().cols;
+		camInfoB.height = data.depthOrRightImage().rows;
+		camInfoB.width = data.depthOrRightImage().cols;
 
 		// publish transforms first
 		if(publishTf)
 		{
 			ros::Time tfExpiration = time + ros::Duration(1.0/rate);
-			if(!localTransform.isNull())
+			if(!data.localTransform().isNull())
 			{
 				tf::Transform baseToCamera;
-				rtabmap::transformToTF(localTransform, baseToCamera);
+				rtabmap_ros::transformToTF(data.localTransform(), baseToCamera);
 				tfBroadcaster.sendTransform( tf::StampedTransform (baseToCamera, tfExpiration, frameId, cameraFrameId));
 			}
 
-			if(!pose.isNull())
+			if(!data.pose().isNull())
 			{
 				tf::Transform odomToBase;
-				rtabmap::transformToTF(pose, odomToBase);
+				rtabmap_ros::transformToTF(data.pose(), odomToBase);
 				tfBroadcaster.sendTransform( tf::StampedTransform (odomToBase, tfExpiration, odomFrameId, frameId));
 			}
 		}
-		if(!pose.isNull())
+		if(!data.pose().isNull())
 		{
 			if(odometryPub.getTopic().empty()) odometryPub = nh.advertise<nav_msgs::Odometry>("odom", 1);
 
@@ -250,7 +244,13 @@ int main(int argc, char** argv)
 				odom.child_frame_id = frameId;
 				odom.header.frame_id = odomFrameId;
 				odom.header.stamp = time;
-				rtabmap::transformToPoseMsg(pose, odom.pose.pose);
+				rtabmap_ros::transformToPoseMsg(data.pose(), odom.pose.pose);
+				odom.pose.covariance[0] = data.poseVariance();
+				odom.pose.covariance[7] = data.poseVariance();
+				odom.pose.covariance[14] = data.poseVariance();
+				odom.pose.covariance[21] = data.poseVariance();
+				odom.pose.covariance[28] = data.poseVariance();
+				odom.pose.covariance[35] = data.poseVariance();
 				odometryPub.publish(odom);
 			}
 		}
@@ -278,7 +278,7 @@ int main(int argc, char** argv)
 		if(imagePub.getNumSubscribers() || rgbPub.getNumSubscribers() || leftPub.getNumSubscribers())
 		{
 			cv_bridge::CvImage img;
-			if(image.channels() == 1)
+			if(data.image().channels() == 1)
 			{
 				img.encoding = sensor_msgs::image_encodings::MONO8;
 			}
@@ -286,7 +286,7 @@ int main(int argc, char** argv)
 			{
 				img.encoding = sensor_msgs::image_encodings::BGR8;
 			}
-			img.image = image;
+			img.image = data.image();
 			sensor_msgs::ImagePtr imageRosMsg = img.toImageMsg();
 			imageRosMsg->header.frame_id = cameraFrameId;
 			imageRosMsg->header.stamp = time;
@@ -306,10 +306,10 @@ int main(int argc, char** argv)
 			}
 		}
 
-		if(depthPub.getNumSubscribers() && !depth.empty() && type==0)
+		if(depthPub.getNumSubscribers() && !data.depth().empty() && type==0)
 		{
 			cv_bridge::CvImage img;
-			if(depth.type() == CV_32FC1)
+			if(data.depth().type() == CV_32FC1)
 			{
 				img.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
 			}
@@ -317,7 +317,7 @@ int main(int argc, char** argv)
 			{
 				img.encoding = sensor_msgs::image_encodings::TYPE_16UC1;
 			}
-			img.image = depth;
+			img.image = data.depth();
 			sensor_msgs::ImagePtr imageRosMsg = img.toImageMsg();
 			imageRosMsg->header.frame_id = cameraFrameId;
 			imageRosMsg->header.stamp = time;
@@ -326,11 +326,11 @@ int main(int argc, char** argv)
 			depthCamInfoPub.publish(camInfoB);
 		}
 
-		if(rightPub.getNumSubscribers() && !depth.empty() && type==1)
+		if(rightPub.getNumSubscribers() && !data.rightImage().empty() && type==1)
 		{
 			cv_bridge::CvImage img;
 			img.encoding = sensor_msgs::image_encodings::MONO8;
-			img.image = depth;
+			img.image = data.rightImage();
 			sensor_msgs::ImagePtr imageRosMsg = img.toImageMsg();
 			imageRosMsg->header.frame_id = cameraFrameId;
 			imageRosMsg->header.stamp = time;
@@ -347,13 +347,7 @@ int main(int argc, char** argv)
 			ros::spinOnce();
 		}
 
-		image = cv::Mat();
-		depth = cv::Mat();
-		depth2d = cv::Mat();
-		fx=fy=cx=cy=seq=0;
-		pose.setNull();
-		localTransform.setNull();
-		reader.getNextImage(image, depth, depth2d, fx, fy, cx, cy, localTransform, pose, seq);
+		data = reader.getNextData();
 	}
 
 

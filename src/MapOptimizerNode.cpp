@@ -48,6 +48,7 @@ public:
 		mapFrameId_("map"),
 		odomFrameId_("odom"),
 		iterations_(100),
+		ignoreVariance_(false),
 		globalOptimization_(true),
 		optimizeFromLastNode_(false),
 		mapToOdom_(tf::Transform::getIdentity()),
@@ -59,6 +60,7 @@ public:
 		pnh.param("map_frame_id", mapFrameId_, mapFrameId_);
 		pnh.param("odom_frame_id", odomFrameId_, odomFrameId_);
 		pnh.param("iterations", iterations_, iterations_);
+		pnh.param("ignore_variance", ignoreVariance_, ignoreVariance_);
 		pnh.param("global_optimization", globalOptimization_, globalOptimization_);
 		pnh.param("optimize_from_last_node", optimizeFromLastNode_, optimizeFromLastNode_);
 
@@ -110,19 +112,15 @@ public:
 	{
 		// save new poses and constraints
 		// Assuming that nodes/constraints are all linked together
-		UASSERT(msg->poseIDs.size() == msg->poses.size());
-		UASSERT(msg->mapIDs.size() == msg->poseIDs.size());
-		UASSERT(msg->mapIDs.size() == msg->maps.size());
-		UASSERT(msg->constraints.size() == msg->constraintFromIDs.size() &&
-				msg->constraints.size() == msg->constraintToIDs.size() &&
-				msg->constraints.size() == msg->constraintTypes.size());
+		UASSERT(msg->graph.nodeIds.size() == msg->graph.poses.size());
+		UASSERT(msg->graph.nodeIds.size() == msg->graph.mapIds.size());
 
 		bool dataChanged = false;
 
 		std::multimap<int, Link> newConstraints;
-		for(unsigned int i=0; i<msg->constraints.size() && i<msg->constraints.size(); ++i)
+		for(unsigned int i=0; i<msg->graph.links.size(); ++i)
 		{
-			Link link(msg->constraintFromIDs[i], msg->constraintToIDs[i], transformFromGeometryMsg(msg->constraints[i]), (Link::Type)msg->constraintTypes[i]);
+			Link link = rtabmap_ros::linkFromROS(msg->graph.links[i]);
 			newConstraints.insert(std::make_pair(link.from(), link));
 
 			bool edgeAlreadyAdded = false;
@@ -151,7 +149,7 @@ public:
 		for(unsigned int i=0; i<msg->nodes.size(); ++i)
 		{
 			int id = msg->nodes[i].id;
-			Transform pose = transformFromPoseMsg(msg->nodes[i].pose);
+			Transform pose = rtabmap_ros::transformFromPoseMsg(msg->nodes[i].pose);
 			newPoses.insert(std::make_pair(id, pose));
 			newMapIds.insert(std::make_pair(id, msg->nodes[i].mapId));
 
@@ -187,9 +185,9 @@ public:
 		else
 		{
 			constraints = newConstraints;
-			for(unsigned int i=0; i<msg->poseIDs.size(); ++i)
+			for(unsigned int i=0; i<msg->graph.nodeIds.size(); ++i)
 			{
-				std::map<int, Transform>::iterator iter = cachedPoses_.find(msg->poseIDs[i]);
+				std::map<int, Transform>::iterator iter = cachedPoses_.find(msg->graph.nodeIds[i]);
 				if(iter != cachedPoses_.end())
 				{
 					poses.insert(*iter);
@@ -197,7 +195,7 @@ public:
 				}
 				else
 				{
-					ROS_ERROR("Odometry pose of node %d not found in cache!", msg->poseIDs[i]);
+					ROS_ERROR("Odometry pose of node %d not found in cache!", msg->graph.nodeIds[i]);
 					return;
 				}
 			}
@@ -214,16 +212,16 @@ public:
 				if(optimizeFromLastNode_)
 				{
 					std::map<int, int> depthGraph = util3d::generateDepthGraph(constraints, poses.rbegin()->first);
-					util3d::optimizeTOROGraph(depthGraph, poses, constraints, optimizedPoses, iterations_);
+					util3d::optimizeTOROGraph(depthGraph, poses, constraints, optimizedPoses, iterations_, true, ignoreVariance_);
 				}
 				else
 				{
-					util3d::optimizeTOROGraph(poses, constraints, optimizedPoses, iterations_);
+					util3d::optimizeTOROGraph(poses, constraints, optimizedPoses, iterations_, true, ignoreVariance_);
 				}
 
 				mapToOdomMutex_.lock();
 				mapCorrection = optimizedPoses.at(poses.rbegin()->first) * poses.rbegin()->second.inverse();
-				rtabmap::transformToTF(mapCorrection, mapToOdom_);
+				rtabmap_ros::transformToTF(mapCorrection, mapToOdom_);
 				mapToOdomMutex_.unlock();
 			}
 			else if(poses.size() == 1 && constraints.size() == 0)
@@ -239,22 +237,11 @@ public:
 			}
 
 			UASSERT(optimizedPoses.size() == mapIds.size());
-			rtabmap_ros::MapData outputMsg = *msg;
-			outputMsg.poseIDs.resize(optimizedPoses.size());
-			outputMsg.poses.resize(optimizedPoses.size());
-			outputMsg.mapIDs.resize(mapIds.size());
-			outputMsg.maps.resize(mapIds.size());
-			rtabmap::transformToGeometryMsg(mapCorrection, outputMsg.mapToOdom);
-			int i=0;
-			std::map<int, int>::iterator jter = mapIds.begin();
-			for(std::map<int, Transform>::iterator iter = optimizedPoses.begin(); iter!=optimizedPoses.end(); ++iter, ++jter)
-			{
-				outputMsg.poseIDs[i] = iter->first;
-				transformToPoseMsg(iter->second, outputMsg.poses[i]);
-				outputMsg.mapIDs[i] = jter->first;
-				outputMsg.maps[i] = jter->second;
-				++i;
-			}
+			rtabmap_ros::MapData outputMsg;
+			rtabmap_ros::mapGraphToROS(optimizedPoses, mapIds, std::multimap<int, rtabmap::Link>(), mapCorrection, outputMsg.graph);
+			outputMsg.graph.links = msg->graph.links;
+			outputMsg.header = msg->header;
+			outputMsg.nodes = msg->nodes;
 			mapDataPub_.publish(outputMsg);
 
 			ROS_INFO("Time graph optimization = %f s", timer.ticks());
@@ -265,6 +252,7 @@ private:
 	std::string mapFrameId_;
 	std::string odomFrameId_;
 	int iterations_;
+	bool ignoreVariance_;
 	bool globalOptimization_;
 	bool optimizeFromLastNode_;
 

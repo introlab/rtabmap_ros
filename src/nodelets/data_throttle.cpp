@@ -38,7 +38,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <sensor_msgs/CameraInfo.h>
 
-namespace rtabmap
+namespace rtabmap_ros
 {
 
 class DataThrottleNodelet : public nodelet::Nodelet
@@ -134,5 +134,5 @@ private:
 };
 
 
-PLUGINLIB_EXPORT_CLASS(rtabmap::DataThrottleNodelet, nodelet::Nodelet);
+PLUGINLIB_EXPORT_CLASS(rtabmap_ros::DataThrottleNodelet, nodelet::Nodelet);
 }

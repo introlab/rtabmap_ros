@@ -60,14 +60,14 @@ public:
 			odomFrameId_ = msg->header.frame_id;
 		}
 		tf::StampedTransform t;
-		rtabmap::Transform pose = rtabmap::transformFromPoseMsg(msg->pose.pose);
+		rtabmap::Transform pose = rtabmap_ros::transformFromPoseMsg(msg->pose.pose);
 		if(pose.isNull())
 		{
 			ROS_WARN("Odometry received is null! Cannot send tf...");
 		}
 		else
 		{
-			rtabmap::transformToTF(pose, t);
+			rtabmap_ros::transformToTF(pose, t);
 			tfBroadcaster_.sendTransform(tf::StampedTransform (t, msg->header.stamp, odomFrameId_, frameId_));
 		}
 	}

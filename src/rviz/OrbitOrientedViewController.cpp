@@ -38,7 +38,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rviz/properties/vector_property.h"
 #include "rviz/ogre_helpers/shape.h"
 
-namespace rtabmap
+namespace rtabmap_ros
 {
 
 void OrbitOrientedViewController::updateCamera()
@@ -73,4 +73,4 @@ void OrbitOrientedViewController::updateCamera()
 }
 
 #include <pluginlib/class_list_macros.h>
-PLUGINLIB_EXPORT_CLASS( rtabmap::OrbitOrientedViewController, rviz::ViewController )
+PLUGINLIB_EXPORT_CLASS( rtabmap_ros::OrbitOrientedViewController, rviz::ViewController )

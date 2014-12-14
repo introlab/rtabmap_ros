@@ -31,15 +31,17 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <zlib.h>
 #include <ros/ros.h>
 #include <rtabmap/core/util3d.h>
+#include <rtabmap/utilite/UStl.h>
 #include <tf_conversions/tf_eigen.h>
+#include <pcl_conversions/pcl_conversions.h>
 
-namespace rtabmap {
+namespace rtabmap_ros {
 
 void transformToTF(const rtabmap::Transform & transform, tf::Transform & tfTransform)
 {
 	if(!transform.isNull())
 	{
-		tf::transformEigenToTF(util3d::transformToEigen3d(transform), tfTransform);
+		tf::transformEigenToTF(rtabmap::util3d::transformToEigen3d(transform), tfTransform);
 	}
 	else
 	{
@@ -51,7 +53,7 @@ rtabmap::Transform transformFromTF(const tf::Transform & transform)
 {
 	Eigen::Affine3d eigenTf;
 	tf::transformTFToEigen(transform, eigenTf);
-	return util3d::transformFromEigen3d(eigenTf);
+	return rtabmap::util3d::transformFromEigen3d(eigenTf);
 }
 
 void transformToGeometryMsg(const rtabmap::Transform & transform, geometry_msgs::Transform & msg)
@@ -120,6 +122,210 @@ cv::Mat compressedMatFromBytes(const std::vector<unsigned char> & bytes, bool co
 		}
 	}
 	return out;
+}
+
+rtabmap::Link linkFromROS(const rtabmap_ros::Link & msg)
+{
+	return rtabmap::Link(msg.fromId, msg.toId, (rtabmap::Link::Type)msg.type, transformFromGeometryMsg(msg.transform), msg.variance);
+}
+
+void linkToROS(const rtabmap::Link & link, rtabmap_ros::Link & msg)
+{
+	msg.fromId = link.from();
+	msg.toId = link.to();
+	msg.type = link.type();
+	msg.variance = link.variance();
+	transformToGeometryMsg(link.transform(), msg.transform);
+}
+
+cv::KeyPoint keypointFromROS(const rtabmap_ros::KeyPoint & msg)
+{
+	return cv::KeyPoint(msg.ptx, msg.pty, msg.size, msg.angle, msg.response, msg.octave, msg.class_id);
+}
+
+void keypointToROS(const cv::KeyPoint & kpt, rtabmap_ros::KeyPoint & msg)
+{
+	msg.angle = kpt.angle;
+	msg.class_id = kpt.class_id;
+	msg.octave = kpt.octave;
+	msg.ptx = kpt.pt.x;
+	msg.pty = kpt.pt.y;
+	msg.response = kpt.response;
+	msg.size = kpt.size;
+}
+
+void mapGraphFromROS(
+		const rtabmap_ros::Graph & msg,
+		std::map<int, rtabmap::Transform> & poses,
+		std::map<int, int> & mapIds,
+		std::multimap<int, rtabmap::Link> & links,
+		rtabmap::Transform & mapToOdom)
+{
+	mapToOdom = transformFromGeometryMsg(msg.mapToOdom);
+
+	for(unsigned int i=0; i<msg.nodeIds.size() && i<msg.mapIds.size(); ++i)
+	{
+		if(msg.poses.size())
+		{
+			poses.insert(std::make_pair(msg.nodeIds[i], rtabmap_ros::transformFromPoseMsg(msg.poses[i])));
+		}
+		mapIds.insert(std::make_pair(msg.nodeIds[i], msg.mapIds[i]));
+	}
+
+	for(unsigned int i=0; i<msg.links.size(); ++i)
+	{
+		rtabmap::Transform t = rtabmap_ros::transformFromGeometryMsg(msg.links[i].transform);
+		links.insert(std::make_pair(msg.links[i].fromId, linkFromROS(msg.links[i])));
+	}
+}
+void mapGraphToROS(
+		const std::map<int, rtabmap::Transform> & poses,
+		const std::map<int, int> & mapIds,
+		const std::multimap<int, rtabmap::Link> & links,
+		const rtabmap::Transform & mapToOdom,
+		rtabmap_ros::Graph & msg)
+{
+	UASSERT(poses.size() == 0 || poses.size() == mapIds.size());
+
+	transformToGeometryMsg(mapToOdom, msg.mapToOdom);
+
+	msg.nodeIds.resize(mapIds.size());
+	msg.poses.resize(poses.size());
+	msg.mapIds.resize(mapIds.size());
+	int index = 0;
+	std::map<int, rtabmap::Transform>::const_iterator iterPoses = poses.begin();
+	for(std::map<int, int>::const_iterator iter = mapIds.begin();
+		iter!=mapIds.end();
+		++iter)
+	{
+		msg.nodeIds[index] = iter->first;
+		msg.mapIds[index] = iter->second;
+		if(iterPoses != poses.end())
+		{
+			transformToPoseMsg(iterPoses->second, msg.poses[index]);
+			++iterPoses;
+		}
+		++index;
+	}
+
+	msg.links.resize(links.size());
+	index=0;
+	for(std::multimap<int, rtabmap::Link>::const_iterator iter = links.begin(); iter!=links.end(); ++iter)
+	{
+		linkToROS(iter->second, msg.links[index++]);
+	}
+}
+
+rtabmap::Signature nodeDataFromROS(const rtabmap_ros::NodeData & msg)
+{
+	//Features stuff...
+	std::multimap<int, cv::KeyPoint> words;
+	std::multimap<int, pcl::PointXYZ> words3D;
+	pcl::PointCloud<pcl::PointXYZ> cloud;
+	if(msg.wordPts.data.size() &&
+	   msg.wordPts.data.size() == msg.wordIds.size())
+	{
+		pcl::fromROSMsg(msg.wordPts, cloud);
+	}
+	for(unsigned int i=0; i<msg.wordIds.size() && i<msg.wordKpts.size(); ++i)
+	{
+		cv::KeyPoint pt = keypointFromROS(msg.wordKpts.at(i));
+		int wordId = msg.wordIds.at(i);
+		words.insert(std::make_pair(wordId, pt));
+		if(i< cloud.size())
+		{
+			words3D.insert(std::make_pair(wordId, cloud[i]));
+		}
+	}
+
+	if(words3D.size() && words3D.size() != words.size())
+	{
+		ROS_ERROR("Words 2D and 3D should be the same size (%d, %d)!", (int)words.size(), (int)words3D.size());
+	}
+
+	return rtabmap::Signature(msg.id,
+			msg.mapId,
+			words,
+			words3D,
+			transformFromPoseMsg(msg.pose),
+			compressedMatFromBytes(msg.laserScan),
+			compressedMatFromBytes(msg.image),
+			compressedMatFromBytes(msg.depth),
+			msg.fx,
+			msg.fy,
+			msg.cx,
+			msg.cy,
+			transformFromGeometryMsg(msg.localTransform));
+}
+void nodeDataToROS(const rtabmap::Signature & signature, rtabmap_ros::NodeData & msg)
+{
+	// add data
+	msg.id = signature.id();
+	msg.mapId = signature.mapId();
+	transformToPoseMsg(signature.getPose(), msg.pose);
+	compressedMatToBytes(signature.getImageCompressed(), msg.image);
+	compressedMatToBytes(signature.getDepthCompressed(), msg.depth);
+	compressedMatToBytes(signature.getLaserScanCompressed(), msg.laserScan);
+	msg.fx = signature.getDepthFx();
+	msg.fy = signature.getDepthFy();
+	msg.cx = signature.getDepthCx();
+	msg.cy = signature.getDepthCy();
+	transformToGeometryMsg(signature.getLocalTransform(), msg.localTransform);
+
+	//Features stuff...
+	msg.wordIds = uKeys(signature.getWords());
+	msg.wordKpts.resize(signature.getWords().size());
+	int index = 0;
+	for(std::multimap<int, cv::KeyPoint>::const_iterator jter=signature.getWords().begin();
+		jter!=signature.getWords().end();
+		++jter)
+	{
+		keypointToROS(jter->second, msg.wordKpts.at(index++));
+	}
+
+	if(signature.getWords3().size() && signature.getWords3().size() == signature.getWords().size())
+	{
+		pcl::PointCloud<pcl::PointXYZ> cloud;
+		cloud.resize(signature.getWords3().size());
+		index = 0;
+		for(std::multimap<int, pcl::PointXYZ>::const_iterator jter=signature.getWords3().begin();
+			jter!=signature.getWords3().end();
+			++jter)
+		{
+			cloud[index++] = jter->second;
+		}
+		pcl::toROSMsg(cloud, msg.wordPts);
+	}
+	else if(signature.getWords3().size())
+	{
+		ROS_ERROR("Words 2D and words 3D must have the same size (%d vs %d)!",
+				(int)signature.getWords().size(),
+				(int)signature.getWords3().size());
+	}
+}
+
+rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::OdomInfo & msg)
+{
+	rtabmap::OdometryInfo info;
+	info.lost = msg.lost;
+	info.matches = msg.matches;
+	info.features = msg.features;
+	info.inliers = msg.inliers;
+	info.localMapSize = msg.localMapSize;
+	info.time = msg.time;
+	info.variance = msg.variance;
+	return info;
+}
+
+void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_ros::OdomInfo & msg)
+{
+	msg.lost = info.lost;
+	msg.matches = info.matches;
+	msg.features = info.features;
+	msg.inliers = info.inliers;
+	msg.localMapSize = info.localMapSize;
+	msg.time = info.time;
+	msg.variance = info.variance;
 }
 
 }

@@ -28,7 +28,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "InfoDisplay.h"
 #include "rtabmap_ros/MsgConversion.h"
 
-namespace rtabmap
+namespace rtabmap_ros
 {
 
 InfoDisplay::InfoDisplay()
@@ -75,7 +75,7 @@ void InfoDisplay::processMessage( const rtabmap_ros::InfoConstPtr& msg )
 		{
 			info_ = "";
 		}
-		loopTransform_ = transformFromGeometryMsg(msg->loopClosureTransform);
+		loopTransform_ = rtabmap_ros::transformFromGeometryMsg(msg->loopClosureTransform);
 	}
 
 	this->emitTimeSignal(msg->header.stamp);
@@ -114,7 +114,7 @@ void InfoDisplay::reset()
 	}
 }
 
-} // namespace rtabmap
+} // namespace rtabmap_ros
 
 #include <pluginlib/class_list_macros.h>
-PLUGINLIB_EXPORT_CLASS( rtabmap::InfoDisplay, rviz::Display )
+PLUGINLIB_EXPORT_CLASS( rtabmap_ros::InfoDisplay, rviz::Display )

@@ -57,7 +57,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "rtabmap/core/util3d.h"
 
-namespace rtabmap
+namespace rtabmap_ros
 {
 
 class ObstaclesDetection : public nodelet::Nodelet
@@ -102,7 +102,7 @@ private:
 	{
 		if(groundPub_.getNumSubscribers() || obstaclesPub_.getNumSubscribers())
 		{
-			Transform localTransform;
+			rtabmap::Transform localTransform;
 			try
 			{
 				if(waitForTransform_)
@@ -115,7 +115,7 @@ private:
 				}
 				tf::StampedTransform tmp;
 				tfListener_.lookupTransform(frameId_, cloudMsg->header.frame_id, cloudMsg->header.stamp, tmp);
-				localTransform = transformFromTF(tmp);
+				localTransform = rtabmap_ros::transformFromTF(tmp);
 			}
 			catch(tf::TransformException & ex)
 			{
@@ -128,13 +128,13 @@ private:
 			pcl::IndicesPtr ground, obstacles;
 			if(cloud->size())
 			{
-				cloud = util3d::transformPointCloud<pcl::PointXYZ>(cloud, localTransform);
+				cloud = rtabmap::util3d::transformPointCloud<pcl::PointXYZ>(cloud, localTransform);
 
 				if(maxObstaclesHeight_ > 0)
 				{
-					cloud = util3d::passThrough<pcl::PointXYZ>(cloud, "z", std::numeric_limits<int>::min(), maxObstaclesHeight_);
+					cloud = rtabmap::util3d::passThrough<pcl::PointXYZ>(cloud, "z", std::numeric_limits<int>::min(), maxObstaclesHeight_);
 				}
-				util3d::segmentObstaclesFromGround<pcl::PointXYZ>(cloud,
+				rtabmap::util3d::segmentObstaclesFromGround<pcl::PointXYZ>(cloud,
 						ground, obstacles, normalEstimationRadius_, groundNormalAngle_, minClusterSize_);
 			}
 
@@ -189,6 +189,6 @@ private:
 	ros::Subscriber cloudSub_;
 };
 
-PLUGINLIB_EXPORT_CLASS(rtabmap::ObstaclesDetection, nodelet::Nodelet);
+PLUGINLIB_EXPORT_CLASS(rtabmap_ros::ObstaclesDetection, nodelet::Nodelet);
 }
 

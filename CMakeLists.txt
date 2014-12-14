@@ -13,7 +13,7 @@ find_package(catkin REQUIRED COMPONENTS
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
-find_package(RTABMap 0.7 REQUIRED)
+find_package(RTABMap 0.8 REQUIRED)
 
 #Qt stuff
 FIND_PACKAGE(Qt4 COMPONENTS QtCore QtGui REQUIRED)
@@ -38,11 +38,12 @@ link_directories( ${OGRE_LIBRARY_DIRS} )
 add_message_files(
    FILES
    Info.msg
-   InfoEx.msg
    KeyPoint.msg
    MapData.msg
+   Graph.msg
    NodeData.msg
-   Bytes.msg
+   Link.msg
+   OdomInfo.msg
 )
 
 ## Generate services in the 'srv' folder
@@ -145,10 +146,6 @@ target_link_libraries(rtabmap rtabmap_ros ${Libraries})
 
 add_executable(rgbd_odometry src/RGBDOdometryNode.cpp)
 target_link_libraries(rgbd_odometry rtabmap_ros ${Libraries})
-
-#deprecated node
-add_executable(visual_odometry src/VisualOdometryDEPRECATED.cpp)
-target_link_libraries(visual_odometry ${Libraries})
 
 add_executable(stereo_odometry src/StereoOdometryNode.cpp)
 target_link_libraries(stereo_odometry rtabmap_ros ${Libraries})
