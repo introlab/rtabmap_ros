@@ -61,6 +61,8 @@ using namespace rtabmap;
 
 CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 		paused_(false),
+		lastPose_(Transform::getIdentity()),
+		_variance(0),
 		frameId_("base_link"),
 		mapFrameId_("map"),
 		odomFrameId_(""),
@@ -440,6 +442,34 @@ void CoreWrapper::defaultCallback(const sensor_msgs::ImageConstPtr & imageMsg)
 	}
 }
 
+bool CoreWrapper::commonMetricCallbackBegin(const nav_msgs::OdometryConstPtr & odomMsg)
+{
+	Transform odom = rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose);
+	if(!lastPose_.isIdentity() && odom.isIdentity())
+	{
+		UWARN("Odometry is reset (identity pose detected). Increment map id!");
+		rtabmap_.triggerNewMap();
+		_variance = 0;
+	}
+
+	lastPose_ = odom;
+	if(odomMsg->pose.covariance[0] > _variance)
+	{
+		_variance = odomMsg->pose.covariance[0];
+	}
+
+	// Throttle
+	if(rate_>0.0f)
+	{
+		if(ros::Time::now() - time_ < ros::Duration(1.0f/rate_))
+		{
+			return false;
+		}
+	}
+	time_ = ros::Time::now();
+	return true;
+}
+
 void CoreWrapper::depthCallback(
 		const sensor_msgs::ImageConstPtr& imageMsg,
 		const nav_msgs::OdometryConstPtr & odomMsg,
@@ -448,14 +478,10 @@ void CoreWrapper::depthCallback(
 {
 	if(!paused_)
 	{
-		if(rate_>0.0f)
+		if(!commonMetricCallbackBegin(odomMsg))
 		{
-			if(ros::Time::now() - time_ < ros::Duration(1.0f/rate_))
-			{
-				return;
-			}
+			return;
 		}
-		time_ = ros::Time::now();
 
 		if(!(imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
 			 imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||
@@ -491,7 +517,6 @@ void CoreWrapper::depthCallback(
 			return;
 		}
 
-		Transform odom = rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose);
 
 		cv_bridge::CvImageConstPtr ptrImage;
 		if(imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
@@ -514,9 +539,9 @@ void CoreWrapper::depthCallback(
 
 		process(ptrImage->header.seq,
 				ptrImage->image,
-				odom,
+				lastPose_,
 				odomMsg->header.frame_id,
-				odomMsg->pose.covariance[0]>0?odomMsg->pose.covariance[0]:1.0f,
+				_variance>0?_variance:1.0f,
 				ptrDepth->image,
 				fx,
 				fy,
@@ -524,6 +549,7 @@ void CoreWrapper::depthCallback(
 				cy,
 				localTransform,
 				cv::Mat());
+		_variance = 0;
 	}
 }
 
@@ -536,14 +562,10 @@ void CoreWrapper::depthScanCallback(
 {
 	if(!paused_)
 	{
-		if(rate_>0.0f)
+		if(!commonMetricCallbackBegin(odomMsg))
 		{
-			if(ros::Time::now() - time_ < ros::Duration(1.0f/rate_))
-			{
-				return;
-			}
+			return;
 		}
-		time_ = ros::Time::now();
 
 		if(!(imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
 				imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||
@@ -593,8 +615,6 @@ void CoreWrapper::depthScanCallback(
 		pcl::fromROSMsg(scanOut, pclScan);
 		cv::Mat scan = util3d::laserScanFromPointCloud(pclScan);
 
-		Transform odom = rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose);
-
 		cv_bridge::CvImageConstPtr ptrImage;
 		if(imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
 		   imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
@@ -616,9 +636,9 @@ void CoreWrapper::depthScanCallback(
 
 		process(ptrImage->header.seq,
 				ptrImage->image,
-				odom,
+				lastPose_,
 				odomMsg->header.frame_id,
-				odomMsg->pose.covariance[0]>0?odomMsg->pose.covariance[0]:1.0f,
+				_variance>0?_variance:1.0f,
 				ptrDepth->image,
 				fx,
 				fy,
@@ -626,6 +646,7 @@ void CoreWrapper::depthScanCallback(
 				cy,
 				localTransform,
 				scan);
+		_variance = 0;
 	}
 }
 
@@ -638,14 +659,10 @@ void CoreWrapper::stereoCallback(
 {
 	if(!paused_)
 	{
-		if(rate_>0.0f)
+		if(!commonMetricCallbackBegin(odomMsg))
 		{
-			if(ros::Time::now() - time_ < ros::Duration(1.0f/rate_))
-			{
-				return;
-			}
+			return;
 		}
-		time_ = ros::Time::now();
 
 		if(!(leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
 			leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0 ||
@@ -683,8 +700,6 @@ void CoreWrapper::stereoCallback(
 			return;
 		}
 
-		Transform odom = rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose);
-
 		cv_bridge::CvImageConstPtr ptrLeftImage, ptrRightImage;
 		if(leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
 		   leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
@@ -707,9 +722,9 @@ void CoreWrapper::stereoCallback(
 
 		process(leftImageMsg->header.seq,
 				ptrLeftImage->image,
-				odom,
+				lastPose_,
 				odomMsg->header.frame_id,
-				odomMsg->pose.covariance[0]>0?odomMsg->pose.covariance[0]:1.0f,
+				_variance>0?_variance:1.0f,
 				ptrRightImage->image,
 				fx,
 				baseline,
@@ -717,6 +732,7 @@ void CoreWrapper::stereoCallback(
 				cy,
 				localTransform,
 				cv::Mat());
+		_variance = 0;
 	}
 }
 
@@ -730,14 +746,10 @@ void CoreWrapper::stereoScanCallback(
 {
 	if(!paused_)
 	{
-		if(rate_>0.0f)
+		if(!commonMetricCallbackBegin(odomMsg))
 		{
-			if(ros::Time::now() - time_ < ros::Duration(1.0f/rate_))
-			{
-				return;
-			}
+			return;
 		}
-		time_ = ros::Time::now();
 
 		if(!(leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
 			leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0 ||
@@ -789,8 +801,6 @@ void CoreWrapper::stereoScanCallback(
 		pcl::fromROSMsg(scanOut, pclScan);
 		cv::Mat scan = util3d::laserScanFromPointCloud(pclScan);
 
-		Transform odom = rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose);
-
 		cv_bridge::CvImageConstPtr ptrLeftImage, ptrRightImage;
 		if(leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
 		   leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
@@ -813,9 +823,9 @@ void CoreWrapper::stereoScanCallback(
 
 		process(leftImageMsg->header.seq,
 				ptrLeftImage->image,
-				odom,
+				lastPose_,
 				odomMsg->header.frame_id,
-				odomMsg->pose.covariance[0],
+				_variance>0?_variance:1.0f,
 				ptrRightImage->image,
 				fx,
 				baseline,
@@ -823,6 +833,7 @@ void CoreWrapper::stereoScanCallback(
 				cy,
 				localTransform,
 				scan);
+		_variance = 0;
 	}
 }
 
@@ -966,6 +977,8 @@ bool CoreWrapper::resetRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empt
 {
 	ROS_INFO("rtabmap: Reset");
 	rtabmap_.resetMemory();
+	_variance = 0;
+	lastPose_.setIdentity();
 	return true;
 }
 

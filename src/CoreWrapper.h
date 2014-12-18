@@ -70,6 +70,8 @@ public:
 private:
 	void setupCallbacks(bool subscribeDepth, bool subscribeLaserScan, bool subscribeStereo, int queueSize, bool stereoApproxSync);
 	void defaultCallback(const sensor_msgs::ImageConstPtr & imageMsg); // no odom
+
+	bool commonMetricCallbackBegin(const nav_msgs::OdometryConstPtr & odomMsg);
 	void depthCallback(const sensor_msgs::ImageConstPtr& imageMsg,
 					   const nav_msgs::OdometryConstPtr & odomMsg,
 					   const sensor_msgs::ImageConstPtr& imageDepthMsg,
@@ -125,6 +127,8 @@ private:
 private:
 	rtabmap::Rtabmap rtabmap_;
 	bool paused_;
+	rtabmap::Transform lastPose_;
+	float _variance;
 
 	std::string frameId_;
 	std::string mapFrameId_;

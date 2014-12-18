@@ -186,12 +186,6 @@ OdometryROS::OdometryROS(int argc, char * argv[]) :
 						Parameters::kOdomBowNNType().c_str());
 				parameters_.at(Parameters::kOdomBowNNType())= vStr;
 			}
-			else if(iter->compare("Odom/WordsRatio") == 0)
-			{
-				ROS_WARN("Parameter name changed: Odom/WordsRatio -> %s. Please update your launch file accordingly.",
-						Parameters::kOdomFeaturesRatio().c_str());
-				parameters_.at(Parameters::kOdomFeaturesRatio())= vStr;
-			}
 			else if(iter->compare("Odom/NNDR") == 0)
 			{
 				ROS_WARN("Parameter name changed: Odom/NNDR -> %s. Please update your launch file accordingly.",
