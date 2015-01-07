@@ -10,7 +10,7 @@ For the RTAB-Map libraries and standalone application, visit the [RTAB-Map's hom
 ## Installation 
 
 ### ROS distribution 
-RTAB-Map is released as binaries in the ROS distribution.
+RTAB-Map is released as binaries in the ROS distribution. **Note: there are some issues on the actual version released (0.7.3) on ROS, visit [issue 3](https://github.com/introlab/rtabmap_ros/issues/3) for solutions until version 0.8.0 is released.**
  * Indigo
   ```
 $ sudo apt-get install ros-indigo-rtabmap-ros
