@@ -1,86 +1,56 @@
-
 <launch>
-
-    <!-- from bag: rosbag record /stereo_camera/left/image_rect/compressed /stereo_camera/right/image_rect/compressed /stereo_camera/left/camera_info /stereo_camera/right/camera_info /stereo_camera/depth/compressedDepth -->
-
-    <param name="use_sim_time" type="bool" value="True"/>
+    
+    <node pkg="camera1394stereo" type="camera1394stereo_node" name="camera1394stereo_node" output="screen" >
+	    <param name="video_mode" value="format7_mode3" />
+	    <param name="format7_color_coding" value="raw16" />
+	    <param name="bayer_pattern" value="bggr" />
+	    <param name="bayer_method" value="" />
+	    <param name="stereo_method" value="Interlaced" />
+	    <param name="camera_info_url_left" value="" />
+	    <param name="camera_info_url_right" value="" />
+  	</node>
   	
   	<arg name="pi/2" value="1.5707963267948966" />
     <arg name="optical_rotate" value="0 0 0 -$(arg pi/2) 0 -$(arg pi/2)" />
   	<node pkg="tf" type="static_transform_publisher" name="camera_base_link"
         args="$(arg optical_rotate) base_link stereo_camera 100" />  
   	
-	<!-- Odometry: Choose between viso2_ros, fovis_ros and homemade approach (default) -->
-	<!--
-	<node pkg="viso2_ros" type="stereo_odometer" name="stereo_odometer" output="screen">
-		<remap from="stereo" to="/stereo_camera"/>
-		<remap from="image" to="image_rect"/>
-		<param name="base_link_frame_id" value="base_link"/>
-		<param name="odom_frame_id" value="/odom"/>
-		<param name="ref_frame_change_method" value="1"/>
-		<param name="image_transport" type="string" value="compressed"/>
-	</node>
-	-->
-
-    <node pkg="rtabmap_ros" type="stereo_odometry" name="stereo_odometer" output="screen">
-  	  	<remap from="left/image_rect"       to="/stereo_camera/left/image_rect"/>
-  	  	<remap from="right/image_rect"      to="/stereo_camera/right/image_rect"/>
-  	  	<remap from="left/camera_info"      to="/stereo_camera/left/camera_info"/>
-  	  	<remap from="right/camera_info"     to="/stereo_camera/right/camera_info"/>
-	  	<remap from="odom"                  to="/stereo_odometer/odometry"/>
-	  	<remap from="odom_depth"            to="/stereo_camera/depth2"/>
-	  	
-	  	<param name="left/image_transport" type="string" value="compressed"/>
-	  	<param name="right/image_transport" type="string" value="compressed"/>
-    
-  	  	<param name="frame_id" type="string" value="base_link"/>
-  	  	<param name="approx_sync" type="bool" value="false"/>
-  	
-	  	<param name="frame_id" type="string" value="base_link"/>
-  	  	<param name="approx_sync" type="bool" value="false"/>
-
-		<param name="Odom/Strategy" type="string" value="1"/>            
-		<param name="Odom/RoiRatios" type="string" value="0.03 0.03 0.04 0.04"/>
-		<param name="Odom/MaxDepth" type="string" value="10"/>
-  	
-	  	<param name="generate_depth" type="bool" value="false"/> 
-		<!-- Parameters below only used when "generate_depth"=true -->
-	  	<param name="depth_patch_size" type="int" value="1"/>
-	  	<param name="subpix_win_size" type="int" value="3"/>
-	  	<param name="subpix_iterations" type="int" value="20"/>
-	  	<param name="subpix_epsilon" type="double" value="0.02"/>
-		<param name="flow_win_size" type="int" value="9"/>
-		<param name="flow_max_level" type="int" value="4"/>
-		<param name="flow_iterations" type="int" value="20"/>
-		<param name="flow_epsilon" type="double" value="0.02"/>
-  	</node>
-
-  	
+  	<!-- Run the ROS package stereo_image_proc -->
+	<group ns="/stereo_camera" >
+		<node pkg="nodelet" type="nodelet" name="stereo_throttle" args="standalone rtabmap_ros/stereo_throttle">
+			<remap from="left/image"       to="left/image_raw"/>
+		    <remap from="right/image"      to="right/image_raw"/>
+		    <remap from="left/camera_info" to="left/camera_info"/>
+		    <remap from="right/camera_info" to="right/camera_info"/>
+		    
+		    <param name="queue_size" type="int" value="10"/>
+		    <param name="rate" type="double" value="20"/>
+		</node>
+		
+		<node pkg="stereo_image_proc" type="stereo_image_proc" name="stereo_image_proc">
+			<remap from="left/image_raw"    to="left/image_raw_throttle"/>
+			<remap from="left/camera_info"  to="left/camera_info_throttle"/>
+			<remap from="right/image_raw"   to="right/image_raw_throttle"/>
+			<remap from="right/camera_info" to="right/camera_info_throttle"/>
+		</node>
+	</group>
+	
   <node name="data_recorder" pkg="rtabmap_ros" type="data_recorder" output="screen">
 	<param name="output_file_name" value="output.db" type="string"/>  
 	
 	<param name="frame_id" type="string" value="base_link"/>
 	
-	<param name="subscribe_odometry" type="bool" value="true"/>
+	<param name="subscribe_odometry" type="bool" value="false"/>
 	<param name="subscribe_depth" type="bool" value="false"/>
 	<param name="subscribe_stereo" type="bool" value="true"/>
 	<param name="queue_size" type="int" value="20"/>
 
-	<remap from="left/image_rect" to="/stereo_camera/left/image_rect"/>
-  	<remap from="right/image_rect" to="/stereo_camera/right/image_rect"/>
-  	<remap from="left/camera_info" to="/stereo_camera/left/camera_info"/>
-  	<remap from="right/camera_info" to="/stereo_camera/right/camera_info"/>
-  	
-  	<remap from="rgb/image" to="/stereo_camera/left/image_rect"/>
-  	<remap from="depth/image" to="/stereo_camera/depth2"/>
-  	<remap from="rgb/camera_info" to="/stereo_camera/left/camera_info"/>
-  	
-  	<remap from="odom" to="/stereo_odometer/odometry"/>
-  	
-  	<param name="rgb/image_transport" type="string" value="compressed"/>
-  	<param name="left/image_transport" type="string" value="compressed"/>
-    <param name="right/image_transport" type="string" value="compressed"/>
+	<remap from="left/image_rect" to="/stereo_camera/left/image_rect_color"/>
+  	<remap from="right/image_rect" to="/stereo_camera/right/image_rect_color"/>
+  	<remap from="left/camera_info" to="/stereo_camera/left/camera_info_throttle"/>
+  	<remap from="right/camera_info" to="/stereo_camera/right/camera_info_throttle"/>
 	
 	<param name="queue_size" type="int" value="10"/>
   </node>
+  
 </launch>
