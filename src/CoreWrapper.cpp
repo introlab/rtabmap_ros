@@ -161,15 +161,15 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 			ROS_INFO("Setting RTAB-Map parameter \"%s\"=\"%s\"", iter->first.c_str(), uBool2Str(vBool).c_str());
 			iter->second = uBool2Str(vBool);
 		}
-		else if(pnh.getParam(iter->first, vInt))
-		{
-			ROS_INFO("Setting RTAB-Map parameter \"%s\"=\"%s\"", iter->first.c_str(), uNumber2Str(vInt).c_str());
-			iter->second = uNumber2Str(vInt);
-		}
 		else if(pnh.getParam(iter->first, vDouble))
 		{
 			ROS_INFO("Setting RTAB-Map parameter \"%s\"=\"%s\"", iter->first.c_str(), uNumber2Str(vDouble).c_str());
 			iter->second = uNumber2Str(vDouble);
+		}
+		else if(pnh.getParam(iter->first, vInt))
+		{
+			ROS_INFO("Setting RTAB-Map parameter \"%s\"=\"%s\"", iter->first.c_str(), uNumber2Str(vInt).c_str());
+			iter->second = uNumber2Str(vInt);
 		}
 	}
 
