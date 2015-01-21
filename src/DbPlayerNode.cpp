@@ -136,7 +136,7 @@ int main(int argc, char** argv)
 	tf::TransformBroadcaster tfBroadcaster;
 
 	rtabmap::SensorData data = reader.getNextData();
-	while(ros::ok() && !data.isValid())
+	while(ros::ok() && data.isValid())
 	{
 		ROS_INFO("Reading sensor data %d...", data.id());
 
