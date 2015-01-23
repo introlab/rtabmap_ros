@@ -7,8 +7,8 @@
   <!-- Once RTAB-Map GUI started, you can do "Edit->Download Map" to get all the map in the GUI -->
    
   <!-- Choose visualization -->
-  <arg name="rviz" default="true" />
-  <arg name="rtabmapviz" default="false" /> 
+  <arg name="rviz" default="false" />
+  <arg name="rtabmapviz" default="true" /> 
   
   <param name="use_sim_time" type="bool" value="True"/>
 
