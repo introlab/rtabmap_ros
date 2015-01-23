@@ -48,7 +48,7 @@ public:
 	GridMapAssembler() :
 		gridCellSize_(0.05), // meters
 		mapSize_(0), // meters
-		gridUnknownSpaceFilled_(true),
+		gridUnknownSpaceFilled_(false),
 		filterRadius_(0.5),
 		filterAngle_(30.0) // degrees
 	{
