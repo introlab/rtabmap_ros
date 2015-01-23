@@ -29,6 +29,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtabmap_ros/MapData.h"
 #include "rtabmap_ros/MsgConversion.h"
 #include <rtabmap/core/util3d.h>
+#include <rtabmap/core/Graph.h>
+#include <rtabmap/core/Compression.h>
 #include <rtabmap/utilite/ULogger.h>
 #include <rtabmap/utilite/UStl.h>
 #include <nav_msgs/OccupancyGrid.h>
@@ -80,7 +82,7 @@ public:
 		{
 			if(!uContains(scans_, msg->nodes[i].id) && msg->nodes[i].laserScan.size())
 			{
-				cv::Mat laserScan = util3d::uncompressData(msg->nodes[i].laserScan);
+				cv::Mat laserScan = rtabmap::uncompressData(msg->nodes[i].laserScan);
 				scans_.insert(std::make_pair(msg->nodes[i].id, util3d::laserScanToPointCloud(laserScan)));
 			}
 		}
@@ -93,7 +95,7 @@ public:
 
 		if(filterRadius_ > 0.0 && filterAngle_ > 0.0)
 		{
-			poses = util3d::radiusPosesFiltering(poses, filterRadius_, filterAngle_*CV_PI/180.0);
+			poses = rtabmap::radiusPosesFiltering(poses, filterRadius_, filterAngle_*CV_PI/180.0);
 		}
 
 		if(gridMap_.getNumSubscribers())

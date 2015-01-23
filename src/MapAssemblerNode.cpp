@@ -29,6 +29,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtabmap_ros/MapData.h"
 #include "rtabmap_ros/MsgConversion.h"
 #include <rtabmap/core/util3d.h>
+#include <rtabmap/core/Compression.h>
+#include <rtabmap/core/Graph.h>
 #include <rtabmap/utilite/ULogger.h>
 #include <rtabmap/utilite/UStl.h>
 #include <pcl_ros/transforms.h>
@@ -119,8 +121,8 @@ public:
 					float cy = msg->nodes[i].cy;
 
 					//uncompress data
-					util3d::CompressionThread ctImage(rtabmap_ros::compressedMatFromBytes(msg->nodes[i].image, false), true);
-					util3d::CompressionThread ctDepth(rtabmap_ros::compressedMatFromBytes(msg->nodes[i].depth, false), true);
+					rtabmap::CompressionThread ctImage(rtabmap_ros::compressedMatFromBytes(msg->nodes[i].image, false), true);
+					rtabmap::CompressionThread ctDepth(rtabmap_ros::compressedMatFromBytes(msg->nodes[i].depth, false), true);
 					ctImage.start();
 					ctDepth.start();
 					ctImage.join();
@@ -183,7 +185,7 @@ public:
 
 			if(!uContains(scans_, id) && msg->nodes[i].laserScan.size())
 			{
-				cv::Mat laserScan = util3d::uncompressData(msg->nodes[i].laserScan);
+				cv::Mat laserScan = rtabmap::uncompressData(msg->nodes[i].laserScan);
 				if(!laserScan.empty())
 				{
 					pcl::PointCloud<pcl::PointXYZ>::Ptr cloud = util3d::laserScanToPointCloud(laserScan);
@@ -207,7 +209,7 @@ public:
 		}
 		if(nodeFilteringAngle_ > 0.0 && nodeFilteringRadius_ > 0.0)
 		{
-			poses = util3d::radiusPosesFiltering(poses, nodeFilteringRadius_, nodeFilteringAngle_*CV_PI/180.0);
+			poses = rtabmap::radiusPosesFiltering(poses, nodeFilteringRadius_, nodeFilteringAngle_*CV_PI/180.0);
 		}
 
 		if(assembledMapClouds_.getNumSubscribers())

@@ -29,6 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtabmap_ros/MapData.h"
 #include "rtabmap_ros/MsgConversion.h"
 #include <rtabmap/core/util3d.h>
+#include <rtabmap/core/Graph.h>
 #include <rtabmap/core/Parameters.h>
 #include <rtabmap/utilite/ULogger.h>
 #include <rtabmap/utilite/UTimer.h>
@@ -211,12 +212,12 @@ public:
 			{
 				if(optimizeFromLastNode_)
 				{
-					std::map<int, int> depthGraph = util3d::generateDepthGraph(constraints, poses.rbegin()->first);
-					util3d::optimizeTOROGraph(depthGraph, poses, constraints, optimizedPoses, iterations_, true, ignoreVariance_);
+					std::map<int, int> depthGraph = rtabmap::generateDepthGraph(constraints, poses.rbegin()->first);
+					rtabmap::optimizeTOROGraph(depthGraph, poses, constraints, optimizedPoses, iterations_, true, ignoreVariance_);
 				}
 				else
 				{
-					util3d::optimizeTOROGraph(poses, constraints, optimizedPoses, iterations_, true, ignoreVariance_);
+					rtabmap::optimizeTOROGraph(poses, constraints, optimizedPoses, iterations_, true, ignoreVariance_);
 				}
 
 				mapToOdomMutex_.lock();

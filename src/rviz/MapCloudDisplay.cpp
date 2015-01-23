@@ -51,6 +51,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "MapCloudDisplay.h"
 #include <rtabmap/core/Transform.h>
 #include <rtabmap/core/util3d.h>
+#include <rtabmap/core/Compression.h>
+#include <rtabmap/core/Graph.h>
 #include <rtabmap_ros/MsgConversion.h>
 #include <rtabmap_ros/GetMap.h>
 
@@ -258,8 +260,8 @@ void MapCloudDisplay::processMapData(const rtabmap_ros::MapData& map)
 				float cy = map.nodes[i].cy;
 
 				//uncompress data
-				rtabmap::util3d::CompressionThread ctImage(compressedMatFromBytes(map.nodes[i].image, false), true);
-				rtabmap::util3d::CompressionThread ctDepth(compressedMatFromBytes(map.nodes[i].depth, false), true);
+				rtabmap::CompressionThread ctImage(compressedMatFromBytes(map.nodes[i].image, false), true);
+				rtabmap::CompressionThread ctDepth(compressedMatFromBytes(map.nodes[i].depth, false), true);
 				ctImage.start();
 				ctDepth.start();
 				ctImage.join();
@@ -323,7 +325,7 @@ void MapCloudDisplay::processMapData(const rtabmap_ros::MapData& map)
 
 	if(node_filtering_angle_->getFloat() > 0.0f && node_filtering_radius_->getFloat() > 0.0f)
 	{
-		poses = rtabmap::util3d::radiusPosesFiltering(poses,
+		poses = rtabmap::radiusPosesFiltering(poses,
 				node_filtering_radius_->getFloat(),
 				node_filtering_angle_->getFloat()*CV_PI/180.0);
 	}

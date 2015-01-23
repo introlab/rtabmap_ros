@@ -34,7 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <signal.h>
 
 void my_handler(int s){
-	QApplication::closeAllWindows();
+	QApplication::exit();
 }
 
 int main(int argc, char** argv)

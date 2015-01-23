@@ -41,7 +41,7 @@ void transformToTF(const rtabmap::Transform & transform, tf::Transform & tfTrans
 {
 	if(!transform.isNull())
 	{
-		tf::transformEigenToTF(rtabmap::util3d::transformToEigen3d(transform), tfTransform);
+		tf::transformEigenToTF(transform.toEigen3d(), tfTransform);
 	}
 	else
 	{
@@ -53,7 +53,7 @@ rtabmap::Transform transformFromTF(const tf::Transform & transform)
 {
 	Eigen::Affine3d eigenTf;
 	tf::transformTFToEigen(transform, eigenTf);
-	return rtabmap::util3d::transformFromEigen3d(eigenTf);
+	return rtabmap::Transform::fromEigen3d(eigenTf);
 }
 
 void transformToGeometryMsg(const rtabmap::Transform & transform, geometry_msgs::Transform & msg)

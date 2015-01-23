@@ -30,6 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sensor_msgs/image_encodings.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/CameraInfo.h>
+#include <pcl_conversions/pcl_conversions.h>
 #include <nav_msgs/Odometry.h>
 #include <cv_bridge/cv_bridge.h>
 #include <image_transport/image_transport.h>
@@ -38,7 +39,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <std_srvs/Empty.h>
 #include <rtabmap_ros/MsgConversion.h>
 #include <rtabmap/utilite/ULogger.h>
-
+#include <rtabmap/core/util3d.h>
 #include <rtabmap/core/DBReader.h>
 
 bool paused = false;
@@ -133,6 +134,7 @@ int main(int argc, char** argv)
 	ros::Publisher leftCamInfoPub;
 	ros::Publisher rightCamInfoPub;
 	ros::Publisher odometryPub;
+	ros::Publisher scanPub;
 	tf::TransformBroadcaster tfBroadcaster;
 
 	rtabmap::SensorData data = reader.getNextData();
@@ -215,6 +217,11 @@ int main(int argc, char** argv)
 		camInfoA.width = data.image().cols;
 		camInfoB.height = data.depthOrRightImage().rows;
 		camInfoB.width = data.depthOrRightImage().cols;
+
+		if(!data.laserScan().empty())
+		{
+			if(scanPub.getTopic().empty()) scanPub = nh.advertise<sensor_msgs::PointCloud2>("scan_cloud", 1);
+		}
 
 		// publish transforms first
 		if(publishTf)
@@ -337,6 +344,16 @@ int main(int argc, char** argv)
 
 			rightPub.publish(imageRosMsg);
 			rightCamInfoPub.publish(camInfoB);
+		}
+
+		if(scanPub.getNumSubscribers() && !data.laserScan().empty())
+		{
+			pcl::PointCloud<pcl::PointXYZ>::Ptr cloud = rtabmap::util3d::laserScanToPointCloud(data.laserScan());
+			sensor_msgs::PointCloud2 msg;
+			pcl::toROSMsg(*cloud, msg);
+			msg.header.frame_id = frameId;
+			msg.header.stamp = time;
+			scanPub.publish(msg);
 		}
 
 		ros::spinOnce();

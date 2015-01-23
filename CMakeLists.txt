@@ -159,6 +159,9 @@ target_link_libraries(map_assembler rtabmap_ros ${Libraries})
 add_executable(grid_map_assembler src/GridMapAssemblerNode.cpp)
 target_link_libraries(grid_map_assembler rtabmap_ros ${Libraries})
 
+add_executable(planner src/PlannerNode.cpp)
+target_link_libraries(planner rtabmap_ros ${Libraries})
+
 add_executable(camera src/CameraNode.cpp)
 add_dependencies(camera ${${PROJECT_NAME}_EXPORTED_TARGETS})
 target_link_libraries(camera ${Libraries})

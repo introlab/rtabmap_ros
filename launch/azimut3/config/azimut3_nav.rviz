@@ -265,7 +265,7 @@ Visualization Manager:
         Value: true
       Axis: Z
       Channel Name: intensity
-      Class: rtabmap/MapCloud
+      Class: rtabmap_ros/MapCloud
       Cloud decimation: 8
       Cloud max depth (m): 4
       Cloud voxel size (m): 0
@@ -291,7 +291,7 @@ Visualization Manager:
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
-    - Class: rtabmap/Info
+    - Class: rtabmap_ros/Info
       Enabled: true
       Name: Info
       Topic: /rtabmap/info
@@ -327,7 +327,7 @@ Visualization Manager:
       Topic: /planner/move_base/TrajectoryPlannerROS/local_plan
       Value: true
     - Alpha: 1
-      Class: rtabmap/MapGraph
+      class: rtabmap_ros/MapGraph
       Color: 0; 0; 255
       Enabled: true
       Name: MapGraph
@@ -381,7 +381,7 @@ Visualization Manager:
   Value: true
   Views:
     Current:
-      Class: rtabmap/OrbitOriented
+      class: rtabmap_ros/OrbitOriented
       Distance: 25.5693
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.06
