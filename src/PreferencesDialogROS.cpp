@@ -46,7 +46,6 @@ PreferencesDialogROS::PreferencesDialogROS(const QString & configFile) :
 
 PreferencesDialogROS::~PreferencesDialogROS()
 {
-	ROS_INFO("rtabmapviz: GUI settings are saved to \"%s\"", configFile_.toStdString().c_str());
 }
 
 QString PreferencesDialogROS::getIniFilePath() const

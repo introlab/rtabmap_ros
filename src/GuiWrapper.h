@@ -31,6 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <ros/ros.h>
 #include "rtabmap_ros/Info.h"
 #include "rtabmap_ros/MapData.h"
+#include "rtabmap_ros/OdomInfo.h"
 #include "rtabmap/utilite/UEventsHandler.h"
 
 #include <tf/transform_listener.h>
@@ -71,12 +72,18 @@ protected:
 private:
 	void infoMapCallback(const rtabmap_ros::InfoConstPtr & infoMsg, const rtabmap_ros::MapDataConstPtr & mapMsg);
 
-	void setupCallbacks(bool subscribeDepth, bool subscribeLaserScan, int queueSize);
+	void setupCallbacks(bool subscribeDepth, bool subscribeLaserScan, bool subscribeOdomInfo, int queueSize);
 	void defaultCallback(const nav_msgs::OdometryConstPtr & odomMsg); // odom
 	void depthCallback(const sensor_msgs::ImageConstPtr& imageMsg,
 					   const nav_msgs::OdometryConstPtr & odomMsg,
 					   const sensor_msgs::ImageConstPtr& imageDepthMsg,
 					   const sensor_msgs::CameraInfoConstPtr& camInfoMsg);
+	void depthOdomInfoCallback(
+			const sensor_msgs::ImageConstPtr& imageMsg,
+			const nav_msgs::OdometryConstPtr & odomMsg,
+			const rtabmap_ros::OdomInfoConstPtr & odomInfoMsg,
+			const sensor_msgs::ImageConstPtr& depthMsg,
+			const sensor_msgs::CameraInfoConstPtr& cameraInfoMsg);
 	void depthScanCallback(const sensor_msgs::ImageConstPtr& imageMsg,
 						   const nav_msgs::OdometryConstPtr & odomMsg,
 						   const sensor_msgs::ImageConstPtr& imageDepthMsg,
@@ -103,6 +110,7 @@ private:
 	image_transport::SubscriberFilter imageDepthSub_;
 	message_filters::Subscriber<sensor_msgs::CameraInfo> cameraInfoSub_;
 	message_filters::Subscriber<nav_msgs::Odometry> odomSub_;
+	message_filters::Subscriber<rtabmap_ros::OdomInfo> odomInfoSub_;
 	message_filters::Subscriber<sensor_msgs::LaserScan> scanSub_;
 
 	typedef message_filters::sync_policies::ExactTime<
@@ -124,6 +132,14 @@ private:
 			sensor_msgs::Image,
 			sensor_msgs::CameraInfo> MyDepthSyncPolicy;
 	message_filters::Synchronizer<MyDepthSyncPolicy> * depthSync_;
+
+	typedef message_filters::sync_policies::ApproximateTime<
+			sensor_msgs::Image,
+			nav_msgs::Odometry,
+			rtabmap_ros::OdomInfo,
+			sensor_msgs::Image,
+			sensor_msgs::CameraInfo> MyDepthOdomInfoSyncPolicy;
+	message_filters::Synchronizer<MyDepthOdomInfoSyncPolicy> * depthOdomInfoSync_;
 };
 
 #endif /* GUIWRAPPER_H_ */

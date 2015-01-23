@@ -69,6 +69,9 @@ void linkToROS(const rtabmap::Link & link, rtabmap_ros::Link & msg);
 cv::KeyPoint keypointFromROS(const rtabmap_ros::KeyPoint & msg);
 void keypointToROS(const cv::KeyPoint & kpt, rtabmap_ros::KeyPoint & msg);
 
+std::vector<cv::KeyPoint> keypointsFromROS(const std::vector<rtabmap_ros::KeyPoint> & msg);
+void keypointsToROS(const std::vector<cv::KeyPoint> & kpts, std::vector<rtabmap_ros::KeyPoint> & msg);
+
 void mapGraphFromROS(
 		const rtabmap_ros::Graph & msg,
 		std::map<int, rtabmap::Transform> & poses,

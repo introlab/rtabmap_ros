@@ -61,7 +61,10 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 		mainWindow_(0),
 		frameId_("base_link"),
 		waitForTransform_(false),
-		cameraNodeName_("")
+		cameraNodeName_(""),
+		depthScanSync_(0),
+		depthSync_(0),
+		depthOdomInfoSync_(0)
 {
 	ros::NodeHandle nh;
 	app_ = new QApplication(argc, argv);
@@ -97,14 +100,16 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 	// To receive odometry events
 	bool subscribeLaserScan = false;
 	bool subscribeDepth = false;
+	bool subscribeOdomInfo = false;
 	int queueSize = 10;
 	pnh.param("frame_id", frameId_, frameId_);
 	pnh.param("subscribe_depth", subscribeDepth, subscribeDepth);
 	pnh.param("subscribe_laserScan", subscribeLaserScan, subscribeLaserScan);
+	pnh.param("subscribe_odom_info", subscribeOdomInfo, subscribeOdomInfo);
 	pnh.param("queue_size", queueSize, queueSize);
 	pnh.param("wait_for_transform", waitForTransform_, waitForTransform_);
 	pnh.param("camera_node_name", cameraNodeName_, cameraNodeName_); // used to pause the rtabmap/camera when pausing the process
-	this->setupCallbacks(subscribeDepth, subscribeLaserScan, queueSize);
+	this->setupCallbacks(subscribeDepth, subscribeLaserScan, subscribeOdomInfo, queueSize);
 
 	UEventsManager::addHandler(this);
 	UEventsManager::addHandler(mainWindow_);
@@ -117,6 +122,19 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 
 GuiWrapper::~GuiWrapper()
 {
+	if(depthSync_)
+	{
+		delete depthSync_;
+	}
+	if(depthScanSync_)
+	{
+		delete depthScanSync_;
+	}
+	if(depthOdomInfoSync_)
+	{
+		delete depthOdomInfoSync_;
+	}
+	delete infoMapSync_;
 	delete mainWindow_;
 	delete app_;
 }
@@ -364,7 +382,7 @@ void GuiWrapper::handleEvent(UEvent * anEvent)
 void GuiWrapper::defaultCallback(const nav_msgs::OdometryConstPtr & odomMsg)
 {
 	Transform odom = rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose);
-	rtabmap::SensorData data;
+	rtabmap::SensorData data(cv::Mat(), odomMsg->header.seq);
 	data.setPose(odom, odomMsg->pose.covariance[0]);
 	this->post(new OdometryEvent(data));
 }
@@ -417,8 +435,64 @@ void GuiWrapper::depthCallback(
 			cy,
 			localTransform,
 			rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose),
-			odomMsg->pose.covariance[0]);
+			odomMsg->pose.covariance[0],
+			odomMsg->header.seq);
 	this->post(new OdometryEvent(image));
+}
+
+void GuiWrapper::depthOdomInfoCallback(
+		const sensor_msgs::ImageConstPtr& imageMsg,
+		const nav_msgs::OdometryConstPtr & odomMsg,
+		const rtabmap_ros::OdomInfoConstPtr & odomInfoMsg,
+		const sensor_msgs::ImageConstPtr& depthMsg,
+		const sensor_msgs::CameraInfoConstPtr& cameraInfoMsg)
+{
+	// TF ready?
+	Transform localTransform;
+	try
+	{
+		if(waitForTransform_)
+		{
+			if(!tfListener_.waitForTransform(frameId_, depthMsg->header.frame_id, depthMsg->header.stamp, ros::Duration(1)))
+			{
+				ROS_WARN("Could not get transform from %s to %s after 1 second!", frameId_.c_str(), depthMsg->header.frame_id.c_str());
+				return;
+			}
+		}
+
+		tf::StampedTransform tmp;
+		tfListener_.lookupTransform(frameId_, depthMsg->header.frame_id, depthMsg->header.stamp, tmp);
+		localTransform = rtabmap_ros::transformFromTF(tmp);
+	}
+	catch(tf::TransformException & ex)
+	{
+		ROS_WARN("%s",ex.what());
+		return;
+	}
+
+	cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg, "bgr8");
+	cv_bridge::CvImageConstPtr ptrDepth = cv_bridge::toCvShare(depthMsg);
+
+	image_geometry::PinholeCameraModel model;
+	model.fromCameraInfo(*cameraInfoMsg);
+	float fx = model.fx();
+	float fy = model.fy();
+	float cx = model.cx();
+	float cy = model.cy();
+
+	rtabmap::SensorData image(
+			ptrImage->image.clone(),
+			ptrDepth->image.clone(),
+			fx,
+			fy,
+			cx,
+			cy,
+			localTransform,
+			rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose),
+			odomMsg->pose.covariance[0],
+			odomMsg->header.seq);
+	OdometryInfo info = rtabmap_ros::odomInfoFromROS(*odomInfoMsg);
+	this->post(new OdometryEvent(image, info));
 }
 
 void GuiWrapper::depthScanCallback(
@@ -480,13 +554,15 @@ void GuiWrapper::depthScanCallback(
 			cy,
 			localTransform,
 			rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose),
-			odomMsg->pose.covariance[0]);
+			odomMsg->pose.covariance[0],
+			odomMsg->header.seq);
 	this->post(new OdometryEvent(image));
 }
 
 void GuiWrapper::setupCallbacks(
 		bool subscribeDepth,
 		bool subscribeLaserScan,
+		bool subscribeOdomInfo,
 		int queueSize)
 {
 	ros::NodeHandle nh; // public
@@ -510,6 +586,17 @@ void GuiWrapper::setupCallbacks(
 		scanSub_.subscribe(nh, "scan", 1);
 		depthScanSync_ = new message_filters::Synchronizer<MyDepthScanSyncPolicy>(MyDepthScanSyncPolicy(queueSize), imageSub_, odomSub_, imageDepthSub_, cameraInfoSub_, scanSub_);
 		depthScanSync_->registerCallback(boost::bind(&GuiWrapper::depthScanCallback, this, _1, _2, _3, _4, _5));
+	}
+	else if(subscribeDepth && !subscribeLaserScan && subscribeOdomInfo)
+	{
+		ROS_INFO("Registering Depth callback...");
+		imageSub_.subscribe(rgb_it, rgb_nh.resolveName("image"), 1, hintsRgb);
+		imageDepthSub_.subscribe(depth_it, depth_nh.resolveName("image"), 1, hintsDepth);
+		cameraInfoSub_.subscribe(rgb_nh, "camera_info", 1);
+		odomSub_.subscribe(nh, "odom", 1);
+		odomInfoSub_.subscribe(nh, "odom_info", 1);
+		depthOdomInfoSync_ = new message_filters::Synchronizer<MyDepthOdomInfoSyncPolicy>(MyDepthOdomInfoSyncPolicy(queueSize), imageSub_, odomSub_, odomInfoSub_, imageDepthSub_, cameraInfoSub_);
+		depthOdomInfoSync_->registerCallback(boost::bind(&GuiWrapper::depthOdomInfoCallback, this, _1, _2, _3, _4, _5));
 	}
 	else if(subscribeDepth && !subscribeLaserScan)
 	{

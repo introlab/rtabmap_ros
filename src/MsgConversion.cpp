@@ -154,6 +154,25 @@ void keypointToROS(const cv::KeyPoint & kpt, rtabmap_ros::KeyPoint & msg)
 	msg.size = kpt.size;
 }
 
+std::vector<cv::KeyPoint> keypointsFromROS(const std::vector<rtabmap_ros::KeyPoint> & msg)
+{
+	std::vector<cv::KeyPoint> v(msg.size());
+	for(unsigned int i=0; i<msg.size(); ++i)
+	{
+		v[i] = keypointFromROS(msg[i]);
+	}
+	return v;
+}
+
+void keypointsToROS(const std::vector<cv::KeyPoint> & kpts, std::vector<rtabmap_ros::KeyPoint> & msg)
+{
+	msg.resize(kpts.size());
+	for(unsigned int i=0; i<msg.size(); ++i)
+	{
+		keypointToROS(kpts[i], msg[i]);
+	}
+}
+
 void mapGraphFromROS(
 		const rtabmap_ros::Graph & msg,
 		std::map<int, rtabmap::Transform> & poses,
@@ -314,6 +333,22 @@ rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::OdomInfo & msg)
 	info.localMapSize = msg.localMapSize;
 	info.time = msg.time;
 	info.variance = msg.variance;
+
+	info.type = msg.type;
+
+	UASSERT(msg.wordsKeys.size() == msg.wordsValues.size());
+	for(unsigned int i=0; i<msg.wordsKeys.size(); ++i)
+	{
+		info.words.insert(std::make_pair(msg.wordsKeys[i], keypointFromROS(msg.wordsValues[i])));
+	}
+
+	info.wordMatches = msg.wordMatches;
+	info.wordInliers = msg.wordInliers;
+
+	info.refCorners = keypointsFromROS(msg.refCorners);
+	info.newCorners = keypointsFromROS(msg.newCorners);
+	info.cornerInliers = msg.cornerInliers;
+
 	return info;
 }
 
@@ -326,6 +361,19 @@ void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_ros::OdomInfo & m
 	msg.localMapSize = info.localMapSize;
 	msg.time = info.time;
 	msg.variance = info.variance;
+
+	msg.type = info.type;
+
+	msg.wordsKeys = uKeys(info.words);
+	keypointsToROS(uValues(info.words), msg.wordsValues);
+
+	msg.wordMatches = info.wordMatches;
+	msg.wordInliers = info.wordInliers;
+
+	keypointsToROS(info.refCorners, msg.refCorners);
+	keypointsToROS(info.newCorners, msg.newCorners);
+	msg.cornerInliers = info.cornerInliers;
+
 }
 
 }

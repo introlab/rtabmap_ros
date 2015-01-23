@@ -13,6 +13,7 @@
         -"min_inliers"     : Minimum visual correspondences to accept a transformation (m)  
         -"inlier_distance" : RANSAC maximum inliers distance (m)  
         -"local_map"       : Local map size: number of unique features to keep track 
+        -"odom_info_data"  : Fill odometry info messages with inliers/outliers data.
     -->
    <arg name="strategy" default="0" />
    <arg name="feature" default="6" />
@@ -21,6 +22,7 @@
    <arg name="min_inliers" default="20" />
    <arg name="inlier_distance" default="0.02" />
    <arg name="local_map" default="1000" />
+   <arg name="odom_info_data" default="true" />
    
   <!-- TF FRAMES -->
   <node pkg="tf" type="static_transform_publisher" name="base_to_camera_tf" 
@@ -33,8 +35,6 @@
       <remap from="rgb/image"       to="/camera/rgb/image_rect_color"/>
       <remap from="depth/image"     to="/camera/depth_registered/image_raw"/>
       <remap from="rgb/camera_info" to="/camera/depth_registered/camera_info"/>
-   
-      <param name="frame_id" type="string" value="base_link"/>
       
       <param name="Odom/Strategy" type="string" value="$(arg strategy)"/> 
 	  <param name="Odom/FeatureType" type="string" value="$(arg feature)"/>  
@@ -42,7 +42,8 @@
 	  <param name="Odom/MaxDepth" type="string" value="$(arg max_depth)"/>  
 	  <param name="Odom/MinInliers" type="string" value="$(arg min_inliers)"/> 
 	  <param name="Odom/InlierDistance" type="string" value="$(arg inlier_distance)"/>       
-      <param name="OdomBow/LocalHistorySize" type="string" value="$(arg local_map)"/>  
+      <param name="OdomBow/LocalHistorySize" type="string" value="$(arg local_map)"/>
+      <param name="Odom/FillInfoData" type="string" value="$(arg odom_info_data)"/>   
     </node>
   
     <!-- Visual SLAM (robot side) -->
@@ -54,29 +55,22 @@
       <remap from="rgb/image" to="/camera/rgb/image_rect_color"/>
       <remap from="depth/image" to="/camera/depth_registered/image_raw"/>
       <remap from="rgb/camera_info" to="/camera/depth_registered/camera_info"/>
-      <remap from="odom" to="odom"/>
-	
-      <param name="queue_size" type="int" value="30"/>
       
       <!-- RTAB-Map's parameters: do "rosrun rtabmap rtabmap (double-dash)params" to see the list of available parameters. -->
       <param name="Rtabmap/DatabasePath" type="string" value="~/.ros/rtabmap.db"/>  <!-- Database used for localization -->
-      <param name="Rtabmap/DetectionRate" type="string" value="1"/>     <!-- Don't need to do relocation very often! Though better results if the same rate as when mapping. -->
       <param name="Mem/STMSize" type="string" value="1"/>               <!-- 1 location in short-term memory -->
       <param name="Mem/IncrementalMemory" type="string" value="false"/>  <!-- false = Localization mode-->
       <param name="LccBow/MinInliers" type="string" value="10"/>        <!-- Minimum inliers to accept a loop closure -->
-      <param name="RGBD/OptimizeFromGraphEnd" type="string" value="false"/> 
     </node>
   
     <!-- Visualisation (client side) -->
     <node pkg="rtabmap_ros" type="rtabmapviz" name="rtabmapviz" args="-d $(find rtabmap_ros)/launch/config/rgbd_gui.ini" output="screen">
       <param name="subscribe_depth" type="bool" value="true"/>
-      <param name="subscribe_laserScan" type="bool" value="false"/>
-      <param name="queue_size" type="int" value="30"/>
+      <param name="subscribe_odom_info" type="bool" value="$(arg odom_info_data)"/>
     
       <remap from="rgb/image" to="/camera/rgb/image_rect_color"/>
       <remap from="depth/image" to="/camera/depth_registered/image_raw"/>
       <remap from="rgb/camera_info" to="/camera/depth_registered/camera_info"/>
-      <remap from="odom" to="odom"/>
     </node>
   
   </group>
