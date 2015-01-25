@@ -5,7 +5,7 @@
   <!--                         from demo_mapping.bag with:                               -->
   <!-- rosbag filter demo_mapping.bag demo_mapping_no_odom.bag 'topic != "/tf" or topic == "/tf" and m.transforms[0].header.frame_id != "/odom"' -->
   <!-- WARNING : Database is automatically deleted on each startup                       -->
-  <!--           See "delete_db_on_start" option below...                                 ->
+  <!--           See "delete_db_on_start" option below...                                -->
   
   <!-- Choose visualization -->
   <arg name="rviz" default="true" />
