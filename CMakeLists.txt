@@ -220,9 +220,7 @@ install(DIRECTORY include/${PROJECT_NAME}/
 ## Mark other files for installation (e.g. launch and bag files, etc.)
 install(FILES
    launch/rgbd_mapping.launch
-   launch/rgbd_mapping_rviz.launch
    launch/rgbd_localization.launch
-   launch/rgbd_localization_rviz.launch
    launch/data_recorder.launch
    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch
 )
