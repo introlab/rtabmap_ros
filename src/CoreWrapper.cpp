@@ -130,6 +130,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	mapGraph_ = nh.advertise<rtabmap_ros::Graph>("graph", 1);
 
 	configPath_ = uReplaceChar(configPath_, '~', UDirectory::homeDir());
+	databasePath_ = uReplaceChar(databasePath_, '~', UDirectory::homeDir());
 
 	// load parameters
 	ParametersMap parameters = loadParameters(configPath_);
@@ -251,10 +252,10 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 		}
 	}
 
+	ROS_INFO("rtabmap: Using database from \"%s\".", databasePath_.c_str());
+
 	// Init RTAB-Map
 	rtabmap_.init(parameters, databasePath_);
-
-	ROS_INFO("rtabmap: Using database from \"%s\".", databasePath_.c_str());
 
 	// setup services
 	updateSrv_ = nh.advertiseService("update_parameters", &CoreWrapper::updateRtabmapCallback, this);
