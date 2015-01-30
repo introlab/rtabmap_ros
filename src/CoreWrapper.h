@@ -40,6 +40,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <cv_bridge/cv_bridge.h>
 
 #include <std_msgs/Empty.h>
+#include <std_msgs/Int32.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/CameraInfo.h>
@@ -92,6 +93,9 @@ private:
 						   const sensor_msgs::CameraInfoConstPtr& rightCamInfoMsg,
 						   const sensor_msgs::LaserScanConstPtr& scanMsg,
 						   const nav_msgs::OdometryConstPtr & odomMsg);
+	void goalNodeCallback(const std_msgs::Int32ConstPtr & msg);
+	void updateGoal();
+	void publishGoal();
 
 	void process(
 			int id,
@@ -129,6 +133,7 @@ private:
 	bool paused_;
 	rtabmap::Transform lastPose_;
 	float _variance;
+	rtabmap::Transform currentMetricGoal_;
 
 	std::string frameId_;
 	std::string mapFrameId_;
@@ -143,6 +148,14 @@ private:
 	ros::Publisher infoPub_;
 	ros::Publisher mapData_;
 	ros::Publisher mapGraph_;
+
+	//Planning stuff
+	ros::Subscriber goalNodeSub_;
+	ros::Publisher nextMetricGoalPub_;
+	ros::Publisher nextMetricGoalIdPub_;
+	ros::Publisher goalReachedPub_;
+	ros::Publisher pathPub_;
+	ros::Publisher pathIdsPub_;
 
 	// for loop closure detection only
 	image_transport::Subscriber defaultSub_;

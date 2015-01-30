@@ -30,6 +30,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/image_encodings.h>
 #include <cv_bridge/cv_bridge.h>
+#include <nav_msgs/Path.h>
+#include <std_msgs/Int32MultiArray.h>
 #include <rtabmap/core/RtabmapEvent.h>
 #include <rtabmap/core/Camera.h>
 #include <rtabmap/core/Parameters.h>
@@ -128,6 +130,18 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	infoPub_ = nh.advertise<rtabmap_ros::Info>("info", 1);
 	mapData_ = nh.advertise<rtabmap_ros::MapData>("mapData", 1);
 	mapGraph_ = nh.advertise<rtabmap_ros::Graph>("graph", 1);
+
+	// planning topics
+	goalNodeSub_ = nh.subscribe("goal_node", 1, &CoreWrapper::goalNodeCallback, this);
+	nextMetricGoalPub_ = nh.advertise<geometry_msgs::PoseStamped>("goal_pose", 1);
+	nextMetricGoalIdPub_ = nh.advertise<std_msgs::Int32>("goal_pose_id", 1);
+	goalReachedPub_ = nh.advertise<std_msgs::Empty>("goal_reached", 1);
+	pathPub_ = nh.advertise<nav_msgs::Path>("path", 1);
+	pathIdsPub_ = nh.advertise<std_msgs::Int32MultiArray>("path_ids", 1);
+
+	ros::Publisher nextMetricGoal_;
+	ros::Publisher goalReached_;
+	ros::Publisher path_;
 
 	configPath_ = uReplaceChar(configPath_, '~', UDirectory::homeDir());
 	databasePath_ = uReplaceChar(databasePath_, '~', UDirectory::homeDir());
@@ -916,6 +930,8 @@ void CoreWrapper::process(
 
 			const Statistics & stats = rtabmap_.getStatistics();
 			this->publishStats(stats);
+
+			this->updateGoal();
 		}
 	}
 	else if(!rtabmap_.isIDsGenerated())
@@ -931,6 +947,118 @@ void CoreWrapper::process(
 			rtabmap_.getTimeThreshold()/1000.0f,
 			timer.ticks(),
 			rtabmap_.getWMSize()+rtabmap_.getSTMSize());
+}
+
+void CoreWrapper::goalNodeCallback(const std_msgs::Int32ConstPtr & msg)
+{
+	currentMetricGoal_.setNull();
+	int id = msg->data;
+	ROS_INFO("Planning: set goal %d", id);
+
+	std::list<std::pair<int, Transform> > poses = rtabmap_.computePath(id);
+	if(poses.size())
+	{
+		currentMetricGoal_ = rtabmap_.getPose(rtabmap_.getPathGoalId());
+		if(currentMetricGoal_.isNull())
+		{
+			ROS_ERROR("Pose of node %d not found!? Cannot send a metric goal...", rtabmap_.getPathGoalId());
+			rtabmap_.clearPath();
+		}
+		else
+		{
+			ROS_INFO("Planning: Path successfully created (size=%d)", (int)poses.size());
+			ros::Time now = ros::Time::now();
+			if(pathPub_.getNumSubscribers())
+			{
+				nav_msgs::Path path;
+				path.header.frame_id = mapFrameId_;
+				path.header.stamp = now;
+				path.poses.resize(poses.size());
+				int oi = 0;
+				for(std::list<std::pair<int, Transform> >::iterator iter=poses.begin(); iter!=poses.end(); ++iter)
+				{
+					path.poses[oi].header = path.header;
+					rtabmap_ros::transformToPoseMsg(iter->second, path.poses[oi].pose);
+					++oi;
+				}
+				pathPub_.publish(path);
+			}
+			if(pathIdsPub_.getNumSubscribers())
+			{
+				std_msgs::Int32MultiArray array;
+				array.data.resize(poses.size());
+				int oi = 0;
+				for(std::list<std::pair<int, Transform> >::iterator iter=poses.begin(); iter!=poses.end(); ++iter)
+				{
+					array.data[oi++] = iter->first;
+				}
+				pathIdsPub_.publish(array);
+			}
+
+			publishGoal();
+		}
+	}
+	else
+	{
+		ROS_WARN("Planning: Cannot compute a path (or goal is already reached)!");
+		goalReachedPub_.publish(std_msgs::Empty());
+	}
+}
+
+void CoreWrapper::updateGoal()
+{
+	if(!currentMetricGoal_.isNull())
+	{
+		if(rtabmap_.getPath().size() == 0)
+		{
+			// Goal reached
+			ROS_INFO("Planning: Publishing goal reached!");
+			if(goalReachedPub_.getNumSubscribers())
+			{
+				goalReachedPub_.publish(std_msgs::Empty());
+			}
+			currentMetricGoal_.setNull();
+		}
+		else
+		{
+			Transform updatedGoalPose = rtabmap_.getPose(rtabmap_.getPathGoalId());
+			if(!updatedGoalPose.isNull())
+			{
+				// detect if the goal has changed or local map
+				// has changed so much that current goal drifted
+				if(currentMetricGoal_.getDistance(updatedGoalPose) > rtabmap_.getGoalReachedRadius()/2.0f)
+				{
+					currentMetricGoal_ = updatedGoalPose;
+
+					publishGoal();
+				}
+			}
+			else
+			{
+				ROS_ERROR("Planning: Pose of node %d not found!? Cannot send a metric goal...", rtabmap_.getPathGoalId());
+			}
+		}
+	}
+}
+
+void CoreWrapper::publishGoal()
+{
+	ROS_INFO("Planning: Publishing next goal: Location %d pose=%s",
+			rtabmap_.getPathGoalId(), currentMetricGoal_.prettyPrint().c_str());
+	if(nextMetricGoalPub_.getNumSubscribers())
+	{
+		geometry_msgs::PoseStamped goalMsg;
+		goalMsg.header.frame_id = mapFrameId_;
+		goalMsg.header.stamp = ros::Time::now();
+		rtabmap_ros::transformToPoseMsg(currentMetricGoal_, goalMsg.pose);
+		nextMetricGoalPub_.publish(goalMsg);
+	}
+	if(nextMetricGoalIdPub_.getNumSubscribers())
+	{
+		std_msgs::Int32 msg;
+		msg.data = rtabmap_.getPathGoalId();
+		nextMetricGoalIdPub_.publish(msg);
+	}
 }
 
 bool CoreWrapper::updateRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
@@ -980,6 +1108,7 @@ bool CoreWrapper::resetRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empt
 	rtabmap_.resetMemory();
 	_variance = 0;
 	lastPose_.setIdentity();
+	currentMetricGoal_.setNull();
 	return true;
 }
 
