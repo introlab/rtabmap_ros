@@ -94,8 +94,7 @@ private:
 						   const sensor_msgs::LaserScanConstPtr& scanMsg,
 						   const nav_msgs::OdometryConstPtr & odomMsg);
 	void goalNodeCallback(const std_msgs::Int32ConstPtr & msg);
-	void updateGoal();
-	void publishGoal();
+	void updateGoal(const ros::Time & stamp);
 
 	void process(
 			int id,
@@ -126,7 +125,9 @@ private:
 
 	void publishLoop(double tfDelay);
 
-	void publishStats(const rtabmap::Statistics & stats);
+	void publishStats(const rtabmap::Statistics & stats, const ros::Time & stamp);
+	void publishGoal(const ros::Time & stamp);
+	void publishLocalPath(const ros::Time & stamp);
 
 private:
 	rtabmap::Rtabmap rtabmap_;
@@ -152,10 +153,9 @@ private:
 	//Planning stuff
 	ros::Subscriber goalNodeSub_;
 	ros::Publisher nextMetricGoalPub_;
-	ros::Publisher nextMetricGoalIdPub_;
 	ros::Publisher goalReachedPub_;
-	ros::Publisher pathPub_;
-	ros::Publisher pathIdsPub_;
+	ros::Publisher globalPathPub_;
+	ros::Publisher localPathPub_;
 
 	// for loop closure detection only
 	image_transport::Subscriber defaultSub_;

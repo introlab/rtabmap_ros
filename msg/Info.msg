@@ -33,3 +33,6 @@ int32[] weightsValues
 # std::map<std::string, float> stats
 string[] statsKeys
 float32[] statsValues
+
+# std::vector<int> localPath
+int32[] localPath

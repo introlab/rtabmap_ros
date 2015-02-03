@@ -124,6 +124,80 @@ cv::Mat compressedMatFromBytes(const std::vector<unsigned char> & bytes, bool co
 	return out;
 }
 
+void infoFromROS(const rtabmap_ros::Info & info, rtabmap::Statistics & stat)
+{
+	stat.setExtended(true); // Extended
+
+	// rtabmap_ros::Info
+	stat.setRefImageId(info.refId);
+	stat.setLoopClosureId(info.loopClosureId);
+	stat.setLocalLoopClosureId(info.localLoopClosureId);
+
+	stat.setLoopClosureTransform(rtabmap_ros::transformFromGeometryMsg(info.loopClosureTransform));
+
+	//Posterior, likelihood, childCount
+	std::map<int, float> mapIntFloat;
+	for(unsigned int i=0; i<info.posteriorKeys.size() && i<info.posteriorValues.size(); ++i)
+	{
+		mapIntFloat.insert(std::pair<int, float>(info.posteriorKeys.at(i), info.posteriorValues.at(i)));
+	}
+	stat.setPosterior(mapIntFloat);
+	mapIntFloat.clear();
+	for(unsigned int i=0; i<info.likelihoodKeys.size() && i<info.likelihoodValues.size(); ++i)
+	{
+		mapIntFloat.insert(std::pair<int, float>(info.likelihoodKeys.at(i), info.likelihoodValues.at(i)));
+	}
+	stat.setLikelihood(mapIntFloat);
+	mapIntFloat.clear();
+	for(unsigned int i=0; i<info.rawLikelihoodKeys.size() && i<info.rawLikelihoodValues.size(); ++i)
+	{
+		mapIntFloat.insert(std::pair<int, float>(info.rawLikelihoodKeys.at(i), info.rawLikelihoodValues.at(i)));
+	}
+	stat.setRawLikelihood(mapIntFloat);
+	std::map<int, int> mapIntInt;
+	for(unsigned int i=0; i<info.weightsKeys.size() && i<info.weightsValues.size(); ++i)
+	{
+		mapIntInt.insert(std::pair<int, int>(info.weightsKeys.at(i), info.weightsValues.at(i)));
+	}
+	stat.setWeights(mapIntInt);
+
+	stat.setLocalPath(info.localPath);
+
+	// Statistics data
+	for(unsigned int i=0; i<info.statsKeys.size() && i<info.statsValues.size(); i++)
+	{
+		stat.addStatistic(info.statsKeys.at(i), info.statsValues.at(i));
+	}
+}
+
+void infoToROS(const rtabmap::Statistics & stats, rtabmap_ros::Info & info)
+{
+	info.refId = stats.refImageId();
+	info.loopClosureId = stats.loopClosureId();
+	info.localLoopClosureId = stats.localLoopClosureId();
+
+	rtabmap_ros::transformToGeometryMsg(stats.loopClosureTransform(), info.loopClosureTransform);
+
+	// Detailed info
+	if(stats.extended())
+	{
+		//Posterior, likelihood, childCount
+		info.posteriorKeys = uKeys(stats.posterior());
+		info.posteriorValues = uValues(stats.posterior());
+		info.likelihoodKeys = uKeys(stats.likelihood());
+		info.likelihoodValues = uValues(stats.likelihood());
+		info.rawLikelihoodKeys = uKeys(stats.rawLikelihood());
+		info.rawLikelihoodValues = uValues(stats.rawLikelihood());
+		info.weightsKeys = uKeys(stats.weights());
+		info.weightsValues = uValues(stats.weights());
+		info.localPath = stats.localPath();
+
+		// Statistics data
+		info.statsKeys = uKeys(stats.data());
+		info.statsValues = uValues(stats.data());
+	}
+}
+
 rtabmap::Link linkFromROS(const rtabmap_ros::Link & msg)
 {
 	return rtabmap::Link(msg.fromId, msg.toId, (rtabmap::Link::Type)msg.type, transformFromGeometryMsg(msg.transform), msg.variance);

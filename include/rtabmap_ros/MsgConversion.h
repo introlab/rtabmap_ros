@@ -40,6 +40,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/Link.h>
 #include <rtabmap/core/Signature.h>
 #include <rtabmap/core/OdometryInfo.h>
+#include <rtabmap/core/Statistics.h>
 
 #include <rtabmap_ros/Link.h>
 #include <rtabmap_ros/KeyPoint.h>
@@ -47,6 +48,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap_ros/Graph.h>
 #include <rtabmap_ros/NodeData.h>
 #include <rtabmap_ros/OdomInfo.h>
+#include <rtabmap_ros/Info.h>
 
 namespace rtabmap_ros {
 
@@ -62,6 +64,9 @@ rtabmap::Transform transformFromPoseMsg(const geometry_msgs::Pose & msg);
 // copy data
 void compressedMatToBytes(const cv::Mat & compressed, std::vector<unsigned char> & bytes);
 cv::Mat compressedMatFromBytes(const std::vector<unsigned char> & bytes, bool copy = true);
+
+void infoFromROS(const rtabmap_ros::Info & info, rtabmap::Statistics & stat);
+void infoToROS(const rtabmap::Statistics & stats, rtabmap_ros::Info & info);
 
 rtabmap::Link linkFromROS(const rtabmap_ros::Link & msg);
 void linkToROS(const rtabmap::Link & link, rtabmap_ros::Link & msg);

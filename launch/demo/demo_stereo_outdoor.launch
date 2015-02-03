@@ -13,6 +13,10 @@
       $ roslaunch rtabmap demo_stereo_outdoor.launch
       $ rosbag play -.-clock stereo_oudoorA.bag
    -->
+   
+   <!-- Choose visualization -->
+   <arg name="rviz" default="true" />
+   <arg name="rtabmapviz" default="false" />
     
    <param name="use_sim_time" type="bool" value="True"/>
    
@@ -51,6 +55,7 @@
       <param name="OdomBow/NNDR" type="string" value="0.8"/>
       <param name="GFTT/MaxCorners" type="string" value="500"/>
       <param name="GFTT/MinDistance" type="string" value="5"/>
+      <param name="Odom/FillInfoData" type="string" value="$(arg rtabmapviz)"/>
    </node>
      
    <group ns="rtabmap">   
@@ -94,15 +99,30 @@
       <!-- Optimizing outside rtabmap node makes it able to optimize always the global map -->
       <node pkg="rtabmap_ros" type="map_optimizer" name="map_optimizer"/>
       
-      <node pkg="rtabmap_ros" type="map_assembler" name="map_assembler">
+      <node if="$(arg rviz)" pkg="rtabmap_ros" type="map_assembler" name="map_assembler">
          <param name="occupancy_grid" type="bool" value="true"/>
          <remap from="mapData" to="mapData_optimized"/>
          <remap from="grid_projection_map" to="/map"/>
       </node>
+      
+      <!-- Visualisation RTAB-Map -->
+      <node if="$(arg rtabmapviz)" pkg="rtabmap_ros" type="rtabmapviz" name="rtabmapviz" args="-d $(find rtabmap_ros)/launch/config/rgbd_gui.ini" output="screen">
+         <param name="subscribe_stereo" type="bool" value="true"/>
+         <param name="subscribe_odom_info" type="bool" value="true"/>
+         <param name="queue_size" type="int" value="10"/>
+         <param name="frame_id" type="string" value="base_footprint"/>
+         <remap from="left/image_rect" to="/stereo_camera/left/image_rect_color"/>
+         <remap from="right/image_rect" to="/stereo_camera/right/image_rect"/>
+         <remap from="left/camera_info" to="/stereo_camera/left/camera_info_throttle"/>
+         <remap from="right/camera_info" to="/stereo_camera/right/camera_info_throttle"/>
+         <remap from="odom_info" to="/odom_info"/>
+         <remap from="odom" to="/odometry"/>
+         <remap from="mapData" to="mapData_optimized"/>
+      </node>
          
    </group>
   
-   <!-- RVIZ --> 
-   <node pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap_ros)/launch/config/demo_stereo_outdoor.rviz"/>
+   <!-- Visualisation RVIZ --> 
+   <node if="$(arg rviz)" pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap_ros)/launch/config/demo_stereo_outdoor.rviz"/>
 
 </launch>

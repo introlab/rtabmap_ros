@@ -134,10 +134,9 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	// planning topics
 	goalNodeSub_ = nh.subscribe("goal_node", 1, &CoreWrapper::goalNodeCallback, this);
 	nextMetricGoalPub_ = nh.advertise<geometry_msgs::PoseStamped>("goal_pose", 1);
-	nextMetricGoalIdPub_ = nh.advertise<std_msgs::Int32>("goal_pose_id", 1);
 	goalReachedPub_ = nh.advertise<std_msgs::Empty>("goal_reached", 1);
-	pathPub_ = nh.advertise<nav_msgs::Path>("path", 1);
-	pathIdsPub_ = nh.advertise<std_msgs::Int32MultiArray>("path_ids", 1);
+	globalPathPub_ = nh.advertise<nav_msgs::Path>("global_path", 1);
+	localPathPub_ = nh.advertise<nav_msgs::Path>("local_path", 1);
 
 	ros::Publisher nextMetricGoal_;
 	ros::Publisher goalReached_;
@@ -438,7 +437,7 @@ void CoreWrapper::defaultCallback(const sensor_msgs::ImageConstPtr & imageMsg)
 			else
 			{
 				const Statistics & stats = rtabmap_.getStatistics();
-				this->publishStats(stats);
+				this->publishStats(stats, ros::Time::now());
 			}
 		}
 		else if(!rtabmap_.isIDsGenerated())
@@ -929,9 +928,45 @@ void CoreWrapper::process(
 			mapToOdomMutex_.unlock();
 
 			const Statistics & stats = rtabmap_.getStatistics();
-			this->publishStats(stats);
+			ros::Time timeNow = ros::Time::now();
+			this->publishStats(stats, timeNow);
 
-			this->updateGoal();
+			// update goal if planning is enabled
+			if(!currentMetricGoal_.isNull())
+			{
+				if(rtabmap_.getPath().size() == 0)
+				{
+					// Goal reached
+					ROS_INFO("Planning: Publishing goal reached!");
+					if(goalReachedPub_.getNumSubscribers())
+					{
+						goalReachedPub_.publish(std_msgs::Empty());
+					}
+					currentMetricGoal_.setNull();
+				}
+				else
+				{
+					Transform updatedGoalPose = rtabmap_.getPose(rtabmap_.getPathGoalId());
+					if(!updatedGoalPose.isNull())
+					{
+						// detect if the goal has changed or local map
+						// has changed so much that current goal drifted
+						if(currentMetricGoal_.getDistance(updatedGoalPose) > rtabmap_.getGoalReachedRadius()/2.0f)
+						{
+							currentMetricGoal_ = updatedGoalPose;
+
+							publishGoal(timeNow);
+						}
+
+						// publish local path
+						publishLocalPath(timeNow);
+					}
+					else
+					{
+						ROS_ERROR("Planning: Pose of node %d not found!? Cannot send a metric goal...", rtabmap_.getPathGoalId());
+					}
+				}
+			}
 		}
 	}
 	else if(!rtabmap_.isIDsGenerated())
@@ -968,96 +1003,35 @@ void CoreWrapper::goalNodeCallback(const std_msgs::Int32ConstPtr & msg)
 		{
 			ROS_INFO("Planning: Path successfully created (size=%d)", (int)poses.size());
 			ros::Time now = ros::Time::now();
-			if(pathPub_.getNumSubscribers())
+
+			// Global path
+			if(globalPathPub_.getNumSubscribers())
 			{
 				nav_msgs::Path path;
 				path.header.frame_id = mapFrameId_;
 				path.header.stamp = now;
 				path.poses.resize(poses.size());
 				int oi = 0;
+				std::stringstream stream;
 				for(std::list<std::pair<int, Transform> >::iterator iter=poses.begin(); iter!=poses.end(); ++iter)
 				{
 					path.poses[oi].header = path.header;
 					rtabmap_ros::transformToPoseMsg(iter->second, path.poses[oi].pose);
 					++oi;
+					stream << iter->first << " ";
 				}
-				pathPub_.publish(path);
-			}
-			if(pathIdsPub_.getNumSubscribers())
-			{
-				std_msgs::Int32MultiArray array;
-				array.data.resize(poses.size());
-				int oi = 0;
-				for(std::list<std::pair<int, Transform> >::iterator iter=poses.begin(); iter!=poses.end(); ++iter)
-				{
-					array.data[oi++] = iter->first;
-				}
-				pathIdsPub_.publish(array);
+				ROS_INFO("Publishing global path: [%s]", stream.str().c_str());
+				globalPathPub_.publish(path);
 			}
 
-			publishGoal();
+			publishGoal(now);
+			publishLocalPath(now);
 		}
 	}
 	else
 	{
 		ROS_WARN("Planning: Cannot compute a path (or goal is already reached)!");
 		goalReachedPub_.publish(std_msgs::Empty());
-	}
-}
-
-void CoreWrapper::updateGoal()
-{
-	if(!currentMetricGoal_.isNull())
-	{
-		if(rtabmap_.getPath().size() == 0)
-		{
-			// Goal reached
-			ROS_INFO("Planning: Publishing goal reached!");
-			if(goalReachedPub_.getNumSubscribers())
-			{
-				goalReachedPub_.publish(std_msgs::Empty());
-			}
-			currentMetricGoal_.setNull();
-		}
-		else
-		{
-			Transform updatedGoalPose = rtabmap_.getPose(rtabmap_.getPathGoalId());
-			if(!updatedGoalPose.isNull())
-			{
-				// detect if the goal has changed or local map
-				// has changed so much that current goal drifted
-				if(currentMetricGoal_.getDistance(updatedGoalPose) > rtabmap_.getGoalReachedRadius()/2.0f)
-				{
-					currentMetricGoal_ = updatedGoalPose;
-
-					publishGoal();
-				}
-			}
-			else
-			{
-				ROS_ERROR("Planning: Pose of node %d not found!? Cannot send a metric goal...", rtabmap_.getPathGoalId());
-			}
-		}
-	}
-}
-
-void CoreWrapper::publishGoal()
-{
-	ROS_INFO("Planning: Publishing next goal: Location %d pose=%s",
-			rtabmap_.getPathGoalId(), currentMetricGoal_.prettyPrint().c_str());
-	if(nextMetricGoalPub_.getNumSubscribers())
-	{
-		geometry_msgs::PoseStamped goalMsg;
-		goalMsg.header.frame_id = mapFrameId_;
-		goalMsg.header.stamp = ros::Time::now();
-		rtabmap_ros::transformToPoseMsg(currentMetricGoal_, goalMsg.pose);
-		nextMetricGoalPub_.publish(goalMsg);
-	}
-	if(nextMetricGoalIdPub_.getNumSubscribers())
-	{
-		std_msgs::Int32 msg;
-		msg.data = rtabmap_.getPathGoalId();
-		nextMetricGoalIdPub_.publish(msg);
 	}
 }
 
@@ -1304,39 +1278,16 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 	return true;
 }
 
-void CoreWrapper::publishStats(const Statistics & stats)
+void CoreWrapper::publishStats(const Statistics & stats, const ros::Time & stamp)
 {
-	ros::Time timeNow = ros::Time::now();
 	if(infoPub_.getNumSubscribers())
 	{
 		//ROS_INFO("Sending RtabmapInfo msg (last_id=%d)...", stat.refImageId());
 		rtabmap_ros::InfoPtr msg(new rtabmap_ros::Info);
-		msg->header.stamp = timeNow;
+		msg->header.stamp = stamp;
 		msg->header.frame_id = mapFrameId_;
 
-		msg->refId = stats.refImageId();
-		msg->loopClosureId = stats.loopClosureId();
-		msg->localLoopClosureId = stats.localLoopClosureId();
-
-		rtabmap_ros::transformToGeometryMsg(stats.loopClosureTransform(), msg->loopClosureTransform);
-
-		// Detailed info
-		if(stats.extended())
-		{
-			//Posterior, likelihood, childCount
-			msg->posteriorKeys = uKeys(stats.posterior());
-			msg->posteriorValues = uValues(stats.posterior());
-			msg->likelihoodKeys = uKeys(stats.likelihood());
-			msg->likelihoodValues = uValues(stats.likelihood());
-			msg->rawLikelihoodKeys = uKeys(stats.rawLikelihood());
-			msg->rawLikelihoodValues = uValues(stats.rawLikelihood());
-			msg->weightsKeys = uKeys(stats.weights());
-			msg->weightsValues = uValues(stats.weights());
-
-			// Statistics data
-			msg->statsKeys = uKeys(stats.data());
-			msg->statsValues = uValues(stats.data());
-		}
+		rtabmap_ros::infoToROS(stats, *msg);
 		infoPub_.publish(msg);
 	}
 
@@ -1345,7 +1296,7 @@ void CoreWrapper::publishStats(const Statistics & stats)
 		if(stats.poses().size() == 0 || stats.poses().size() == stats.getMapIds().size())
 		{
 			rtabmap_ros::GraphPtr graphMsg(new rtabmap_ros::Graph);
-			graphMsg->header.stamp = timeNow;
+			graphMsg->header.stamp = stamp;
 			graphMsg->header.frame_id = mapFrameId_;
 
 			rtabmap_ros::mapGraphToROS(
@@ -1376,6 +1327,53 @@ void CoreWrapper::publishStats(const Statistics & stats)
 		else
 		{
 			ROS_ERROR("Poses and map ids are not the same size!? %d vs %d", (int)stats.poses().size(), (int)stats.getMapIds().size());
+		}
+	}
+}
+
+void CoreWrapper::publishGoal(const ros::Time & stamp)
+{
+	if(!currentMetricGoal_.isNull())
+	{
+		ROS_INFO("Planning: Publishing next goal: Location %d pose=%s",
+				rtabmap_.getPathGoalId(), currentMetricGoal_.prettyPrint().c_str());
+		if(nextMetricGoalPub_.getNumSubscribers())
+		{
+			geometry_msgs::PoseStamped goalMsg;
+			goalMsg.header.frame_id = mapFrameId_;
+			goalMsg.header.stamp = ros::Time::now();
+			rtabmap_ros::transformToPoseMsg(currentMetricGoal_, goalMsg.pose);
+			ROS_INFO("Publishing next goal: %d", rtabmap_.getPathGoalId());
+			nextMetricGoalPub_.publish(goalMsg);
+		}
+	}
+}
+
+void CoreWrapper::publishLocalPath(const ros::Time & stamp)
+{
+	if(rtabmap_.getPath().size())
+	{
+		std::list<std::pair<int, Transform> > poses = rtabmap_.getPathNextPoses();
+		if(poses.size())
+		{
+			if(localPathPub_.getNumSubscribers())
+			{
+				nav_msgs::Path path;
+				path.header.frame_id = mapFrameId_;
+				path.header.stamp = stamp;
+				path.poses.resize(poses.size());
+				int oi = 0;
+				std::stringstream stream;
+				for(std::list<std::pair<int, Transform> >::iterator iter=poses.begin(); iter!=poses.end(); ++iter)
+				{
+					path.poses[oi].header = path.header;
+					rtabmap_ros::transformToPoseMsg(iter->second, path.poses[oi].pose);
+					++oi;
+					stream << iter->first << " ";
+				}
+				ROS_INFO("Publishing local path: [%s]", stream.str().c_str());
+				localPathPub_.publish(path);
+			}
 		}
 	}
 }
