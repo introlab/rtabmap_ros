@@ -1,17 +1,24 @@
 
 <launch>
 
-  <!-- We have two nodes (grid_map_assembler and rviz) subscribing to /rtabmap/mapData, so use -->
-  <!-- a relay on this machine, same for images -->
-  <node name="mapData_relay" type="relay" pkg="topic_tools" args="/rtabmap/mapData /rtabmap/mapData_relay"/>
-  <node name="camera_info_relay" type="relay" pkg="topic_tools" args="/camera/data_throttled_camera_info /camera/data_throttled_camera_info_relay"/>
-  <node name="republish_rgb" type="republish" pkg="image_transport" args="theora in:=/camera/data_throttled_image raw out:=/camera/data_throttled_image_relay" />
-  <node name="republish_depth" type="republish" pkg="image_transport" args="compressedDepth in:=/camera/data_throttled_image_depth raw out:=/camera/data_throttled_image_depth_relay" />
+  <!-- Choose visualization -->
+  <arg name="rviz" default="true" />
+  <arg name="rtabmapviz" default="false" />
+  
+  <group ns="rtabmap">  
+  <!-- Visualisation RTAB-Map -->
+  <node if="$(arg rtabmapviz)" pkg="rtabmap_ros" type="rtabmapviz" name="rtabmapviz" args="-d $(find rtabmap_ros)/launch/config/rgbd_gui.ini" output="screen">
+      <param name="queue_size" type="int" value="10"/>
+      <param name="frame_id" type="string" value="base_footprint"/>
+      <remap from="odom" to="/base_controller/odom"/>
+  </node>
+  </group>
     
-  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap_ros)/launch/azimut3/config/azimut3_nav.rviz"/>
+  <!-- Visualisation RVIZ -->
+  <node if="$(arg rviz)" pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap_ros)/launch/azimut3/config/azimut3_nav.rviz"/>
   
   <!-- Below, construct point cloud of the latest throttled data, disabled for bandwidth efficiency -->
-  <node pkg="nodelet" type="nodelet" name="points_xyzrgb" args="standalone rtabmap_ros/point_cloud_xyzrgb">
+  <node if="$(arg rviz)" pkg="nodelet" type="nodelet" name="points_xyzrgb" args="standalone rtabmap_ros/point_cloud_xyzrgb">
     <remap from="rgb/image"       to="/camera/data_throttled_image_relay"/>
     <remap from="depth/image"     to="/camera/data_throttled_image_depth_relay"/>
     <remap from="rgb/camera_info" to="/camera/data_throttled_camera_info_relay"/>
@@ -20,4 +27,11 @@
     <param name="queue_size" type="int" value="10"/>
     <param name="voxel_size" type="double" value="0.01"/>
   </node>
+  
+  <!-- use a relay on this machine, same for images -->
+  <node if="$(arg rviz)" name="mapData_relay" type="relay" pkg="topic_tools" args="/rtabmap/mapData /rtabmap/mapData_relay"/>
+  <node if="$(arg rviz)" name="camera_info_relay" type="relay" pkg="topic_tools" args="/camera/data_throttled_camera_info /camera/data_throttled_camera_info_relay"/>
+  <node if="$(arg rviz)" name="republish_rgb" type="republish" pkg="image_transport" args="theora in:=/camera/data_throttled_image raw out:=/camera/data_throttled_image_relay" />
+  <node if="$(arg rviz)" name="republish_depth" type="republish" pkg="image_transport" args="compressedDepth in:=/camera/data_throttled_image_depth raw out:=/camera/data_throttled_image_depth_relay" />
+  
 </launch>

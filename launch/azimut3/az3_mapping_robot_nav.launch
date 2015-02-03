@@ -115,7 +115,6 @@
       <param name="Kp/TfIdfLikelihoodUsed" type="string" value="true"/>
       <param name="Kp/DetectorStrategy" type="string" value="0"/>
       <param name="Kp/WordsPerImage" type="string" value="200"/>
-      <param name="Kp/RoiRatios" type="string" value="0.03 0.03 0.04 0.04"/>
       <param name="Kp/NNStrategy" type="string" value="1"/>
 	  
       <param name="Bayes/FullPredictionUpdate" type="string" value="false"/>
