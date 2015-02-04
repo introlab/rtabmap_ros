@@ -1,6 +1,9 @@
 
 <launch>
 
+  <!-- args: "delete_db_on_start" and "udebug" --> 
+  <arg name="rtabmap_args" default="--delete_db_on_start" />
+
   <!-- AZIMUT 3 bringup: launch motors/odometry, laser scan and openni -->
   <include file="$(find az3_bringup)/az3_standalone.launch"/>
 
@@ -72,9 +75,8 @@
   </group>  
 
   <!-- SLAM (robot side) -->
-  <!-- args: "delete_db_on_start" and "udebug" -->
   <group ns="rtabmap">
-    <node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="screen" args="--delete_db_on_start">
+    <node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="screen" args="$(arg rtabmap_args)">
       <param name="frame_id" type="string" value="base_footprint"/>
 	
       <param name="subscribe_depth" type="bool" value="true"/>
@@ -121,15 +123,10 @@
 	  
       <param name="SURF/HessianThreshold" type="string" value="1000"/>
 	  
+	  <param name="LccBow/Force2D" type="string" value="true"/>
       <param name="LccBow/MaxDepth" type="string" value="4"/>
-      <param name="LccBow/MinInliers" type="string" value="10"/>
+      <param name="LccBow/MinInliers" type="string" value="5"/>
       <param name="LccBow/InlierDistance" type="string" value="0.1"/>
-      
-      <param name="LccReextract/Activated" type="string" value="true"/>
-      <param name="LccReextract/FeatureType" type="string" value="4"/>
-      <param name="LccReextract/MaxWords" type="string" value="400"/>
-      <param name="LccReextract/NNDR" type="string" value="0.8"/>
-      <param name="LccReextract/NNType" type="string" value="3"/> 
     </node>
   
   
