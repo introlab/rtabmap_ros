@@ -84,8 +84,8 @@ OdometryROS::OdometryROS(int argc, char * argv[]) :
 		if(values.size() == 6)
 		{
 			initialPose = Transform(
-					atof(values[0].c_str()), atof(values[1].c_str()), atof(values[2].c_str()),
-					atof(values[3].c_str()), atof(values[4].c_str()), atof(values[5].c_str()));
+					uStr2Float(values[0]), uStr2Float(values[1]), uStr2Float(values[2]),
+					uStr2Float(values[3]), uStr2Float(values[4]), uStr2Float(values[5]));
 		}
 		else
 		{

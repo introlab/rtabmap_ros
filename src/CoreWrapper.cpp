@@ -226,7 +226,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	}
 	if(parameters.find(Parameters::kRtabmapDetectionRate()) != parameters.end())
 	{
-		rate_ = std::atof(parameters.at(Parameters::kRtabmapDetectionRate()).c_str());
+		rate_ = uStr2Float(parameters.at(Parameters::kRtabmapDetectionRate()));
 		ROS_INFO("RTAB-Map rate detection = %f Hz", rate_);
 	}
 	bool isRGBD = uStr2Bool(parameters.at(Parameters::kRGBDEnabled()).c_str());
@@ -1069,7 +1069,7 @@ bool CoreWrapper::updateRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Emp
 	ROS_INFO("rtabmap: Updating parameters");
 	if(parameters.find(Parameters::kRtabmapDetectionRate()) != parameters.end())
 	{
-		rate_ = std::atof(parameters.at(Parameters::kRtabmapDetectionRate()).c_str());
+		rate_ = uStr2Float(parameters.at(Parameters::kRtabmapDetectionRate()));
 		ROS_INFO("RTAB-Map rate detection = %f Hz", rate_);
 	}
 	rtabmap_.parseParameters(parameters);
