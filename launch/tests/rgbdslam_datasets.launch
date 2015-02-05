@@ -1,9 +1,13 @@
 
 <launch>
    
-   <!-- RGB-D MAPPING VERSION -->
-   <!-- WARNING : Database is automatically deleted on each startup -->
-   <!--           See "delete_db_on_start" option below... -->
+   <!-- Example to run rgbd datasets:
+   $ wget http://vision.in.tum.de/rgbd/dataset/freiburg3/rgbd_dataset_freiburg3_long_office_household.bag
+   $ rosbag decompress rgbd_dataset_freiburg3_long_office_household.bag
+
+   $ roslaunch rtabmap_ros rgbdslam_datasets.launch feature=6
+   $ rosbag play -.-clock rgbd_dataset_freiburg3_long_office_household.bag
+   -->
    
    <param name="use_sim_time" type="bool" value="True"/>
    
