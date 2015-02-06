@@ -1052,12 +1052,12 @@ void CoreWrapper::goalCommonCallback(const std::list<std::pair<int, Transform> >
 	}
 	else
 	{
-		ROS_WARN("Planning: Cannot compute a path!");
+		ROS_WARN("Planning: Goal already reached (RGBD/GoalReachedRadius=%fm).", rtabmap_.getGoalReachedRadius());
 		rtabmap_.clearPath();
 		if(goalReachedPub_.getNumSubscribers())
 		{
 			std_msgs::Bool result;
-			result.data = false;
+			result.data = true;
 			goalReachedPub_.publish(result);
 		}
 	}
