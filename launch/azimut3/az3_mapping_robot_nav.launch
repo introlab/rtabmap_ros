@@ -26,7 +26,7 @@
       <remap from="depth/image" to="/camera/depth_registered/image_raw"/>
       <remap from="rgb/camera_info" to="/camera/depth_registered/camera_info"/>
 
-      <remap from="goal_out" to="/planner_goal"/>	
+      <remap from="goal_out" to="current_goal"/>	
       <remap from="move_base" to="/planner/move_base"/>
 
       <param name="use_action_for_goal" type="bool" value="true"/>
