@@ -212,12 +212,12 @@ public:
 			{
 				if(optimizeFromLastNode_)
 				{
-					std::map<int, int> depthGraph = rtabmap::generateDepthGraph(constraints, poses.rbegin()->first);
-					rtabmap::optimizeTOROGraph(depthGraph, poses, constraints, optimizedPoses, iterations_, true, ignoreVariance_);
+					std::map<int, int> depthGraph = rtabmap::graph::generateDepthGraph(constraints, poses.rbegin()->first);
+					rtabmap::graph::optimizeTOROGraph(depthGraph, poses, constraints, optimizedPoses, iterations_, true, ignoreVariance_);
 				}
 				else
 				{
-					rtabmap::optimizeTOROGraph(poses, constraints, optimizedPoses, iterations_, true, ignoreVariance_);
+					rtabmap::graph::optimizeTOROGraph(poses, constraints, optimizedPoses, iterations_, true, ignoreVariance_);
 				}
 
 				mapToOdomMutex_.lock();

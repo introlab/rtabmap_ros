@@ -1,0 +1,5 @@
+#request
+int32 target_node_id
+bool in_global_graph
+---
+#response 

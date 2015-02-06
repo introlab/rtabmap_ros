@@ -95,7 +95,7 @@ public:
 
 		if(filterRadius_ > 0.0 && filterAngle_ > 0.0)
 		{
-			poses = rtabmap::radiusPosesFiltering(poses, filterRadius_, filterAngle_*CV_PI/180.0);
+			poses = rtabmap::graph::radiusPosesFiltering(poses, filterRadius_, filterAngle_*CV_PI/180.0);
 		}
 
 		if(gridMap_.getNumSubscribers())

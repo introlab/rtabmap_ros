@@ -7,72 +7,8 @@
   <!-- AZIMUT 3 bringup: launch motors/odometry, laser scan and openni -->
   <include file="$(find az3_bringup)/az3_standalone.launch"/>
 
-  <node name="joy" pkg="joy" type="joy_node"/>
-
-  <group ns="teleop">
-        <remap from="joy" to="/joy"/>
-        <node name="teleop" pkg="nodelet" type="nodelet" 
-            args="standalone azimut_tools/Teleop"/>
-        <param name="cmd_eta/abtr_priority" value="50"/>
-    </group>
-
-    <group ns="go_back">
-        <remap from="joy"  to="/joy"/>
-        <remap from="goal" to="/planner_goal"/>
-        <node name="go_back" pkg="azimut_tools" type="go_back"/>
-        <rosparam>
-            btn_save: 1
-            btn_goto: 3
-        </rosparam>
-    </group>
-
-    <group ns="planner">
-        <remap from="openni_points" to="/planner_cloud"/>
-        <remap from="base_scan" to="/base_scan"/>
-        <remap from="map" to="/map"/>
-        <remap from="move_base_simple/goal" to="/planner_goal"/>
-        <include file="$(find az3_navigation)/launch/az3_move_base_slam.launch"/>
-        <param name="cmd_vel/abtr_priority" value="10"/>
-    </group>
-
-    <node name="az3_abtr" pkg="azimut_tools" type="azimut_abtr_priority_node">
-        <remap from="abtr_cmd_eta" to="/base_controller/cmd_eta"/>
-    </node>
-
-    <node name="register_cmd_eta" pkg="abtr_priority" type="register"
-        args="/cmd_eta /teleop/cmd_eta"/>
-    <node name="register_cmd_vel" pkg="abtr_priority" type="register"
-        args="/cmd_vel /planner/cmd_vel"/>
-
-
   <!-- OpenNI -->
   <include file="$(find rtabmap_ros)/launch/azimut3/az3_openni.launch"/>
-
-  <!-- Throttling messages -->
-  <group ns="camera">
-    <node pkg="nodelet" type="nodelet" name="data_throttle" args="load rtabmap_ros/data_throttle camera_nodelet_manager" output="screen">
-      <param name="max_rate" type="double" value="5.0"/>
-   
-      <remap from="rgb/image_in"       to="rgb/image_rect_color"/>
-      <remap from="depth/image_in"     to="depth_registered/image_raw"/>
-      <remap from="rgb/camera_info_in" to="depth_registered/camera_info"/>
-    
-      <remap from="rgb/image_out"       to="data_throttled_image"/>
-      <remap from="depth/image_out"     to="data_throttled_image_depth"/>
-      <remap from="rgb/camera_info_out" to="data_throttled_camera_info"/>
-    </node>
-
-    <!-- for the planner -->
-    <node pkg="nodelet" type="nodelet" name="points_xyzrgb_planner" args="load rtabmap_ros/point_cloud_xyzrgb camera_nodelet_manager">
-      <remap from="rgb/image"       to="/camera/data_throttled_image"/>
-      <remap from="depth/image"     to="/camera/data_throttled_image_depth"/>
-      <remap from="rgb/camera_info" to="/camera/data_throttled_camera_info"/>
-      <remap from="cloud"           to="/planner_cloud" />
-    
-      <param name="queue_size" type="int" value="10"/>
-      <param name="decimation" type="int" value="4"/>
-    </node>  
-  </group>  
 
   <!-- SLAM (robot side) -->
   <group ns="rtabmap">
@@ -94,7 +30,6 @@
 
       <param name="queue_size" type="int" value="10"/>
 	
-      <!-- RTAB-Map's parameters: do "rosrun rtabmap rtabmap (double-dash)params" to see the list of available parameters. -->
       <param name="RGBD/PoseScanMatching" type="string" value="true"/>           
       <param name="RGBD/LocalLoopDetectionSpace" type="string" value="true"/>
   
@@ -136,4 +71,41 @@
     </node>
 
   </group>
+  
+  <!-- teleop -->
+  <node name="joy" pkg="joy" type="joy_node"/>
+  <group ns="teleop">
+     <remap from="joy" to="/joy"/>
+     <node name="teleop" pkg="nodelet" type="nodelet" args="standalone azimut_tools/Teleop"/>
+     <param name="cmd_eta/abtr_priority" value="50"/>
+  </group>
+
+  <!-- ROS navigation stack move_base -->
+  <group ns="planner">
+     <remap from="openni_points" to="/planner_cloud"/>
+     <remap from="base_scan" to="/base_scan"/>
+     <remap from="map" to="/map"/>
+     <remap from="move_base_simple/goal" to="/planner_goal"/>
+        
+     <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen">
+    	<rosparam file="$(find rtabmap_ros)/launch/azimut3/config/costmap_common_params.yaml" command="load" ns="global_costmap" />
+     	<rosparam file="$(find rtabmap_ros)/launch/azimut3/config/costmap_common_params.yaml" command="load" ns="local_costmap" />
+    	<rosparam file="$(find rtabmap_ros)/launch/azimut3/config/local_costmap_params_laser_only.yaml" command="load" />
+    	<rosparam file="$(find rtabmap_ros)/launch/azimut3/config/global_costmap_params.yaml" command="load" />
+    	<rosparam file="$(find rtabmap_ros)/launch/azimut3/config/base_local_planner_params.yaml" command="load" />
+     </node>
+   		
+     <param name="cmd_vel/abtr_priority" value="10"/>
+  </group>
+
+  <node name="az3_abtr" pkg="azimut_tools" type="azimut_abtr_priority_node">
+     <remap from="abtr_cmd_eta" to="/base_controller/cmd_eta"/>
+  </node>
+
+  <!-- Arbitration between teleop and planner -->
+  <node name="register_cmd_eta" pkg="abtr_priority" type="register"
+        args="/cmd_eta /teleop/cmd_eta"/>
+  <node name="register_cmd_vel" pkg="abtr_priority" type="register"
+        args="/cmd_vel /planner/cmd_vel"/>
+  
 </launch>

@@ -132,8 +132,9 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	mapGraph_ = nh.advertise<rtabmap_ros::Graph>("graph", 1);
 
 	// planning topics
-	goalNodeSub_ = nh.subscribe("goal_node", 1, &CoreWrapper::goalNodeCallback, this);
-	nextMetricGoalPub_ = nh.advertise<geometry_msgs::PoseStamped>("goal_pose", 1);
+	goalSub_ = nh.subscribe("in_goal", 1, &CoreWrapper::goalCallback, this);
+	goalGlobalSub_ = nh.subscribe("in_goal_global", 1, &CoreWrapper::goalGlobalCallback, this);
+	nextMetricGoalPub_ = nh.advertise<geometry_msgs::PoseStamped>("out_goal", 1);
 	goalReachedPub_ = nh.advertise<std_msgs::Empty>("goal_reached", 1);
 	globalPathPub_ = nh.advertise<nav_msgs::Path>("global_path", 1);
 	localPathPub_ = nh.advertise<nav_msgs::Path>("local_path", 1);
@@ -280,6 +281,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	setModeMappingSrv_ = nh.advertiseService("set_mode_mapping", &CoreWrapper::setModeMappingCallback, this);
 	getMapDataSrv_ = nh.advertiseService("get_map", &CoreWrapper::getMapCallback, this);
 	publishMapDataSrv_ = nh.advertiseService("publish_map", &CoreWrapper::publishMapCallback, this);
+	setGoalSrv_ = nh.advertiseService("set_goal", &CoreWrapper::setGoalCallback, this);
 
 	setupCallbacks(subscribeDepth, subscribeLaserScan, subscribeStereo, queueSize, stereoApproxSync);
 
@@ -946,16 +948,22 @@ void CoreWrapper::process(
 				}
 				else
 				{
-					Transform updatedGoalPose = rtabmap_.getPose(rtabmap_.getPathGoalId());
+					Transform updatedGoalPose = rtabmap_.getPose(rtabmap_.getPathCurrentGoalId());
 					if(!updatedGoalPose.isNull())
 					{
+						// Adjust the target pose relative to last node
+						if(rtabmap_.getPathCurrentGoalId() == rtabmap_.getPath().back())
+						{
+							updatedGoalPose *= rtabmap_.getPathTransformToGoal();
+						}
+
 						// detect if the goal has changed or local map
 						// has changed so much that current goal drifted
 						if(currentMetricGoal_.getDistance(updatedGoalPose) > rtabmap_.getGoalReachedRadius()/2.0f)
 						{
 							currentMetricGoal_ = updatedGoalPose;
 
-							publishGoal(timeNow);
+							publishCurrentGoal(timeNow);
 						}
 
 						// publish local path
@@ -963,7 +971,7 @@ void CoreWrapper::process(
 					}
 					else
 					{
-						ROS_ERROR("Planning: Pose of node %d not found!? Cannot send a metric goal...", rtabmap_.getPathGoalId());
+						ROS_ERROR("Planning: Pose of node %d not found!? Cannot send a metric goal...", rtabmap_.getPathCurrentGoalId());
 					}
 				}
 			}
@@ -984,19 +992,15 @@ void CoreWrapper::process(
 			rtabmap_.getWMSize()+rtabmap_.getSTMSize());
 }
 
-void CoreWrapper::goalNodeCallback(const std_msgs::Int32ConstPtr & msg)
+void CoreWrapper::goalCommonCallback(const std::list<std::pair<int, Transform> > & poses)
 {
 	currentMetricGoal_.setNull();
-	int id = msg->data;
-	ROS_INFO("Planning: set goal %d", id);
-
-	std::list<std::pair<int, Transform> > poses = rtabmap_.computePath(id);
 	if(poses.size())
 	{
-		currentMetricGoal_ = rtabmap_.getPose(rtabmap_.getPathGoalId());
+		currentMetricGoal_ = rtabmap_.getPose(rtabmap_.getPathCurrentGoalId());
 		if(currentMetricGoal_.isNull())
 		{
-			ROS_ERROR("Pose of node %d not found!? Cannot send a metric goal...", rtabmap_.getPathGoalId());
+			ROS_ERROR("Pose of node %d not found!? Cannot send a metric goal...", rtabmap_.getPathCurrentGoalId());
 			rtabmap_.clearPath();
 		}
 		else
@@ -1013,7 +1017,7 @@ void CoreWrapper::goalNodeCallback(const std_msgs::Int32ConstPtr & msg)
 				path.poses.resize(poses.size());
 				int oi = 0;
 				std::stringstream stream;
-				for(std::list<std::pair<int, Transform> >::iterator iter=poses.begin(); iter!=poses.end(); ++iter)
+				for(std::list<std::pair<int, Transform> >::const_iterator iter=poses.begin(); iter!=poses.end(); ++iter)
 				{
 					path.poses[oi].header = path.header;
 					rtabmap_ros::transformToPoseMsg(iter->second, path.poses[oi].pose);
@@ -1024,7 +1028,13 @@ void CoreWrapper::goalNodeCallback(const std_msgs::Int32ConstPtr & msg)
 				globalPathPub_.publish(path);
 			}
 
-			publishGoal(now);
+			// Adjust the target pose relative to last node
+			if(rtabmap_.getPathCurrentGoalId() == poses.back().first)
+			{
+				currentMetricGoal_ *= rtabmap_.getPathTransformToGoal();
+			}
+
+			publishCurrentGoal(now);
 			publishLocalPath(now);
 		}
 	}
@@ -1033,6 +1043,30 @@ void CoreWrapper::goalNodeCallback(const std_msgs::Int32ConstPtr & msg)
 		ROS_WARN("Planning: Cannot compute a path (or goal is already reached)!");
 		goalReachedPub_.publish(std_msgs::Empty());
 	}
+}
+
+void CoreWrapper::goalCallback(const geometry_msgs::PoseStampedConstPtr & msg)
+{
+	Transform targetPose = rtabmap_ros::transformFromPoseMsg(msg->pose);
+	if(targetPose.isNull())
+	{
+		ROS_ERROR("Pose received is null!");
+		return;
+	}
+	ROS_INFO("Planning: set goal %s", targetPose.prettyPrint().c_str());
+	goalCommonCallback(rtabmap_.computePath(targetPose, false));
+}
+
+void CoreWrapper::goalGlobalCallback(const geometry_msgs::PoseStampedConstPtr & msg)
+{
+	Transform targetPose = rtabmap_ros::transformFromPoseMsg(msg->pose);
+	if(targetPose.isNull())
+	{
+		ROS_ERROR("Pose received is null!");
+		return;
+	}
+	ROS_INFO("Planning: set goal %s", targetPose.prettyPrint().c_str());
+	goalCommonCallback(rtabmap_.computePath(targetPose, true));
 }
 
 bool CoreWrapper::updateRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
@@ -1278,6 +1312,14 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 	return true;
 }
 
+bool CoreWrapper::setGoalCallback(rtabmap_ros::SetGoal::Request& req, rtabmap_ros::SetGoal::Response& res)
+{
+	int id = req.target_node_id;
+	ROS_INFO("Planning: set goal %d", id);
+	goalCommonCallback(rtabmap_.computePath(id, req.in_global_graph));
+	return !currentMetricGoal_.isNull();
+}
+
 void CoreWrapper::publishStats(const Statistics & stats, const ros::Time & stamp)
 {
 	if(infoPub_.getNumSubscribers())
@@ -1331,19 +1373,19 @@ void CoreWrapper::publishStats(const Statistics & stats, const ros::Time & stamp
 	}
 }
 
-void CoreWrapper::publishGoal(const ros::Time & stamp)
+void CoreWrapper::publishCurrentGoal(const ros::Time & stamp)
 {
 	if(!currentMetricGoal_.isNull())
 	{
 		ROS_INFO("Planning: Publishing next goal: Location %d pose=%s",
-				rtabmap_.getPathGoalId(), currentMetricGoal_.prettyPrint().c_str());
+				rtabmap_.getPathCurrentGoalId(), currentMetricGoal_.prettyPrint().c_str());
 		if(nextMetricGoalPub_.getNumSubscribers())
 		{
 			geometry_msgs::PoseStamped goalMsg;
 			goalMsg.header.frame_id = mapFrameId_;
 			goalMsg.header.stamp = ros::Time::now();
 			rtabmap_ros::transformToPoseMsg(currentMetricGoal_, goalMsg.pose);
-			ROS_INFO("Publishing next goal: %d", rtabmap_.getPathGoalId());
+			ROS_INFO("Publishing next goal: %d", rtabmap_.getPathCurrentGoalId());
 			nextMetricGoalPub_.publish(goalMsg);
 		}
 	}

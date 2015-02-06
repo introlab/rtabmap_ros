@@ -325,7 +325,7 @@ void MapCloudDisplay::processMapData(const rtabmap_ros::MapData& map)
 
 	if(node_filtering_angle_->getFloat() > 0.0f && node_filtering_radius_->getFloat() > 0.0f)
 	{
-		poses = rtabmap::radiusPosesFiltering(poses,
+		poses = rtabmap::graph::radiusPosesFiltering(poses,
 				node_filtering_radius_->getFloat(),
 				node_filtering_angle_->getFloat()*CV_PI/180.0);
 	}

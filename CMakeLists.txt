@@ -52,6 +52,7 @@ add_message_files(
    GetMap.srv
    PublishMap.srv
    ResetPose.srv
+   SetGoal.srv
  )
 
 ## Generate added messages and services with any dependencies listed here

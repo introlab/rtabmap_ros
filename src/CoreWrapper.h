@@ -53,6 +53,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "rtabmap_ros/GetMap.h"
 #include "rtabmap_ros/PublishMap.h"
+#include "rtabmap_ros/SetGoal.h"
 
 #include <message_filters/subscriber.h>
 #include <message_filters/synchronizer.h>
@@ -93,7 +94,10 @@ private:
 						   const sensor_msgs::CameraInfoConstPtr& rightCamInfoMsg,
 						   const sensor_msgs::LaserScanConstPtr& scanMsg,
 						   const nav_msgs::OdometryConstPtr & odomMsg);
-	void goalNodeCallback(const std_msgs::Int32ConstPtr & msg);
+
+	void goalCommonCallback(const std::list<std::pair<int, rtabmap::Transform> > & poses);
+	void goalCallback(const geometry_msgs::PoseStampedConstPtr & msg);
+	void goalGlobalCallback(const geometry_msgs::PoseStampedConstPtr & msg);
 	void updateGoal(const ros::Time & stamp);
 
 	void process(
@@ -119,6 +123,7 @@ private:
 	bool setModeMappingCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool getMapCallback(rtabmap_ros::GetMap::Request& req, rtabmap_ros::GetMap::Response& rep);
 	bool publishMapCallback(rtabmap_ros::PublishMap::Request&, rtabmap_ros::PublishMap::Response&);
+	bool setGoalCallback(rtabmap_ros::SetGoal::Request& req, rtabmap_ros::SetGoal::Response& res);
 
 	rtabmap::ParametersMap loadParameters(const std::string & configFile);
 	void saveParameters(const std::string & configFile);
@@ -126,7 +131,7 @@ private:
 	void publishLoop(double tfDelay);
 
 	void publishStats(const rtabmap::Statistics & stats, const ros::Time & stamp);
-	void publishGoal(const ros::Time & stamp);
+	void publishCurrentGoal(const ros::Time & stamp);
 	void publishLocalPath(const ros::Time & stamp);
 
 private:
@@ -151,7 +156,8 @@ private:
 	ros::Publisher mapGraph_;
 
 	//Planning stuff
-	ros::Subscriber goalNodeSub_;
+	ros::Subscriber goalSub_;
+	ros::Subscriber goalGlobalSub_;
 	ros::Publisher nextMetricGoalPub_;
 	ros::Publisher goalReachedPub_;
 	ros::Publisher globalPathPub_;
@@ -226,6 +232,7 @@ private:
 	ros::ServiceServer setModeMappingSrv_;
 	ros::ServiceServer getMapDataSrv_;
 	ros::ServiceServer publishMapDataSrv_;
+	ros::ServiceServer setGoalSrv_;
 
 	boost::thread* transformThread_;
 

@@ -209,7 +209,7 @@ public:
 		}
 		if(nodeFilteringAngle_ > 0.0 && nodeFilteringRadius_ > 0.0)
 		{
-			poses = rtabmap::radiusPosesFiltering(poses, nodeFilteringRadius_, nodeFilteringAngle_*CV_PI/180.0);
+			poses = rtabmap::graph::radiusPosesFiltering(poses, nodeFilteringRadius_, nodeFilteringAngle_*CV_PI/180.0);
 		}
 
 		if(assembledMapClouds_.getNumSubscribers())
