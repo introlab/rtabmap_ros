@@ -22,9 +22,9 @@
       <remap from="scan" to="/base_scan"/>
       <remap from="mapData" to="mapData"/>
 
-      <remap from="rgb/image" to="/camera/data_throttled_image"/>
-      <remap from="depth/image" to="/camera/data_throttled_image_depth"/>
-      <remap from="rgb/camera_info" to="/camera/data_throttled_camera_info"/>
+      <remap from="rgb/image" to="/camera/rgb/image_rect_color"/>
+      <remap from="depth/image" to="/camera/depth_registered/image_raw"/>
+      <remap from="rgb/camera_info" to="/camera/depth_registered/camera_info"/>
 
       <remap from="goal_out" to="/planner_goal"/>	
       <remap from="move_base" to="/planner/move_base"/>
@@ -84,7 +84,6 @@
 
   <!-- ROS navigation stack move_base -->
   <group ns="planner">
-     <remap from="openni_points" to="/planner_cloud"/>
      <remap from="base_scan" to="/base_scan"/>
      <remap from="map" to="/map"/>
      <remap from="move_base_simple/goal" to="/planner_goal"/>
