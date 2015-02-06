@@ -20,8 +20,6 @@ $ sudo apt-get install ros-indigo-rtabmap-ros
 $ sudo apt-get install ros-hydro-rtabmap-ros
 ```
 
-**Note for Hydro: there are some issues on the actual version released (0.7.3) on ROS, visit [issues](https://github.com/introlab/rtabmap_ros/issues).**
-
 ### Build from source
 This section shows how to install RTAB-Map ros-pkg on **ROS Hydro** (Catkin build). RTAB-Map works only with the PCL 1.7, which is the default version installed with ROS Hydro (**Fuerte and Groovy are not supported**).
  * **Note for ROS Indigo**: If you want SURF/SIFT, you have to build OpenCV from source to have access to **nonfree module**. See [issue 8](https://code.google.com/p/rtabmap/issues/detail?id=8&can=1) for more details.
