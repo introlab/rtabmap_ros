@@ -71,6 +71,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 		configPath_(""),
 		databasePath_(UDirectory::homeDir()+"/.ros/"+rtabmap::Parameters::getDefaultDatabaseName()),
 		waitForTransform_(false),
+		useActionForGoal_(false),
 		mapToOdom_(tf::Transform::getIdentity()),
 		depthSync_(0),
 		depthScanSync_(0),
@@ -79,7 +80,8 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 		stereoExactSync_(0),
 		transformThread_(0),
 		rate_(Parameters::defaultRtabmapDetectionRate()),
-		time_(ros::Time::now())
+		time_(ros::Time::now()),
+		mbClient_("move_base", true)
 {
 	ros::NodeHandle nh;
 	ros::NodeHandle pnh("~");
@@ -121,6 +123,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	pnh.param("publish_tf", publishTf, publishTf);
 	pnh.param("tf_delay", tfDelay, tfDelay);
 	pnh.param("wait_for_transform", waitForTransform_, waitForTransform_);
+	pnh.param("use_action_for_goal", useActionForGoal_, useActionForGoal_);
 
 	ROS_INFO("rtabmap: frame_id = %s", frameId_.c_str());
 	ROS_INFO("rtabmap: map_frame_id = %s", mapFrameId_.c_str());
@@ -132,9 +135,9 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	mapGraph_ = nh.advertise<rtabmap_ros::Graph>("graph", 1);
 
 	// planning topics
-	goalSub_ = nh.subscribe("in_goal", 1, &CoreWrapper::goalCallback, this);
-	goalGlobalSub_ = nh.subscribe("in_goal_global", 1, &CoreWrapper::goalGlobalCallback, this);
-	nextMetricGoalPub_ = nh.advertise<geometry_msgs::PoseStamped>("out_goal", 1);
+	goalSub_ = nh.subscribe("goal", 1, &CoreWrapper::goalCallback, this);
+	goalGlobalSub_ = nh.subscribe("goal_global", 1, &CoreWrapper::goalGlobalCallback, this);
+	nextMetricGoalPub_ = nh.advertise<geometry_msgs::PoseStamped>("goal_out", 1);
 	goalReachedPub_ = nh.advertise<std_msgs::Empty>("goal_reached", 1);
 	globalPathPub_ = nh.advertise<nav_msgs::Path>("global_path", 1);
 	localPathPub_ = nh.advertise<nav_msgs::Path>("local_path", 1);
@@ -1379,16 +1382,71 @@ void CoreWrapper::publishCurrentGoal(const ros::Time & stamp)
 	{
 		ROS_INFO("Planning: Publishing next goal: Location %d pose=%s",
 				rtabmap_.getPathCurrentGoalId(), currentMetricGoal_.prettyPrint().c_str());
-		if(nextMetricGoalPub_.getNumSubscribers())
+
+		geometry_msgs::PoseStamped poseMsg;
+		poseMsg.header.frame_id = mapFrameId_;
+		poseMsg.header.stamp = stamp;
+		rtabmap_ros::transformToPoseMsg(currentMetricGoal_, poseMsg.pose);
+
+		if(useActionForGoal_)
 		{
-			geometry_msgs::PoseStamped goalMsg;
-			goalMsg.header.frame_id = mapFrameId_;
-			goalMsg.header.stamp = ros::Time::now();
-			rtabmap_ros::transformToPoseMsg(currentMetricGoal_, goalMsg.pose);
-			ROS_INFO("Publishing next goal: %d", rtabmap_.getPathCurrentGoalId());
-			nextMetricGoalPub_.publish(goalMsg);
+			if(!mbClient_.isServerConnected())
+			{
+				ROS_INFO("Connecting to move_base action server...");
+				mbClient_.waitForServer(ros::Duration(5.0));
+			}
+			if(mbClient_.isServerConnected())
+			{
+				move_base_msgs::MoveBaseGoal goal;
+				goal.target_pose = poseMsg;
+
+				ROS_INFO("Publishing next goal: %d", rtabmap_.getPathCurrentGoalId());
+				mbClient_.sendGoal(goal,
+						boost::bind(&CoreWrapper::goalDoneCb, this, _1, _2),
+						boost::bind(&CoreWrapper::goalActiveCb, this),
+						boost::bind(&CoreWrapper::goalFeedbackCb, this, _1));
+			}
+			else
+			{
+				ROS_ERROR("Cannot connect to move_base action server!");
+			}
+		}
+		else
+		{
+			if(nextMetricGoalPub_.getNumSubscribers())
+			{
+				ROS_INFO("Publishing next goal: %d", rtabmap_.getPathCurrentGoalId());
+				nextMetricGoalPub_.publish(poseMsg);
+			}
 		}
 	}
+}
+
+// Called once when the goal completes
+void CoreWrapper::goalDoneCb(const actionlib::SimpleClientGoalState& state,
+             const move_base_msgs::MoveBaseResultConstPtr& result)
+{
+	if(state == actionlib::SimpleClientGoalState::SUCCEEDED)
+	{
+		ROS_INFO("Planning: move_base success");
+	}
+	else
+	{
+		ROS_INFO("Planning: move_base failed for some reason.");
+	}
+}
+
+// Called once when the goal becomes active
+void CoreWrapper::goalActiveCb()
+{
+	ROS_INFO("Planning: Goal just went active");
+}
+
+// Called every time feedback is received for the goal
+void CoreWrapper::goalFeedbackCb(const move_base_msgs::MoveBaseFeedbackConstPtr& feedback)
+{
+	Transform basePosition = rtabmap_ros::transformFromPoseMsg(feedback->base_position.pose);
+	ROS_INFO("Planning: feedback base_position = %s", basePosition.prettyPrint().c_str());
 }
 
 void CoreWrapper::publishLocalPath(const ros::Time & stamp)

@@ -63,6 +63,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <image_transport/image_transport.h>
 #include <image_transport/subscriber_filter.h>
 
+#include <actionlib/client/simple_action_client.h>
+#include <move_base_msgs/MoveBaseAction.h>
+#include <move_base_msgs/MoveBaseActionGoal.h>
+#include <move_base_msgs/MoveBaseActionResult.h>
+#include <move_base_msgs/MoveBaseActionFeedback.h>
+#include <actionlib_msgs/GoalStatusArray.h>
+typedef actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> MoveBaseClient;
+
 class CoreWrapper
 {
 public:
@@ -132,6 +140,9 @@ private:
 
 	void publishStats(const rtabmap::Statistics & stats, const ros::Time & stamp);
 	void publishCurrentGoal(const ros::Time & stamp);
+	void goalDoneCb(const actionlib::SimpleClientGoalState& state, const move_base_msgs::MoveBaseResultConstPtr& result);
+	void goalActiveCb();
+	void goalFeedbackCb(const move_base_msgs::MoveBaseFeedbackConstPtr& feedback);
 	void publishLocalPath(const ros::Time & stamp);
 
 private:
@@ -147,6 +158,7 @@ private:
 	std::string configPath_;
 	std::string databasePath_;
 	bool waitForTransform_;
+	bool useActionForGoal_;
 
 	tf::Transform mapToOdom_;
 	boost::mutex mapToOdomMutex_;
@@ -233,6 +245,8 @@ private:
 	ros::ServiceServer getMapDataSrv_;
 	ros::ServiceServer publishMapDataSrv_;
 	ros::ServiceServer setGoalSrv_;
+
+	MoveBaseClient mbClient_;
 
 	boost::thread* transformThread_;
 
