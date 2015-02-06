@@ -32,6 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <cv_bridge/cv_bridge.h>
 #include <nav_msgs/Path.h>
 #include <std_msgs/Int32MultiArray.h>
+#include <std_msgs/Bool.h>
 #include <rtabmap/core/RtabmapEvent.h>
 #include <rtabmap/core/Camera.h>
 #include <rtabmap/core/Parameters.h>
@@ -138,7 +139,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	goalSub_ = nh.subscribe("goal", 1, &CoreWrapper::goalCallback, this);
 	goalGlobalSub_ = nh.subscribe("goal_global", 1, &CoreWrapper::goalGlobalCallback, this);
 	nextMetricGoalPub_ = nh.advertise<geometry_msgs::PoseStamped>("goal_out", 1);
-	goalReachedPub_ = nh.advertise<std_msgs::Empty>("goal_reached", 1);
+	goalReachedPub_ = nh.advertise<std_msgs::Bool>("goal_reached", 1);
 	globalPathPub_ = nh.advertise<nav_msgs::Path>("global_path", 1);
 	localPathPub_ = nh.advertise<nav_msgs::Path>("local_path", 1);
 
@@ -945,7 +946,9 @@ void CoreWrapper::process(
 					ROS_INFO("Planning: Publishing goal reached!");
 					if(goalReachedPub_.getNumSubscribers())
 					{
-						goalReachedPub_.publish(std_msgs::Empty());
+						std_msgs::Bool result;
+						result.data = true;
+						goalReachedPub_.publish(result);
 					}
 					currentMetricGoal_.setNull();
 				}
@@ -1005,6 +1008,12 @@ void CoreWrapper::goalCommonCallback(const std::list<std::pair<int, Transform> >
 		{
 			ROS_ERROR("Pose of node %d not found!? Cannot send a metric goal...", rtabmap_.getPathCurrentGoalId());
 			rtabmap_.clearPath();
+			if(goalReachedPub_.getNumSubscribers())
+			{
+				std_msgs::Bool result;
+				result.data = false;
+				goalReachedPub_.publish(result);
+			}
 		}
 		else
 		{
@@ -1044,7 +1053,13 @@ void CoreWrapper::goalCommonCallback(const std::list<std::pair<int, Transform> >
 	else
 	{
 		ROS_WARN("Planning: Cannot compute a path (or goal is already reached)!");
-		goalReachedPub_.publish(std_msgs::Empty());
+		rtabmap_.clearPath();
+		if(goalReachedPub_.getNumSubscribers())
+		{
+			std_msgs::Bool result;
+			result.data = false;
+			goalReachedPub_.publish(result);
+		}
 	}
 }
 
@@ -1428,25 +1443,34 @@ void CoreWrapper::goalDoneCb(const actionlib::SimpleClientGoalState& state,
 {
 	if(state == actionlib::SimpleClientGoalState::SUCCEEDED)
 	{
-		ROS_INFO("Planning: move_base success");
+		ROS_INFO("Planning: move_base success!");
 	}
 	else
 	{
-		ROS_INFO("Planning: move_base failed for some reason.");
+		ROS_ERROR("Planning: move_base failed for some reason. Aborting the plan...");
+	}
+
+	rtabmap_.clearPath();
+	currentMetricGoal_.setNull();
+	if(goalReachedPub_.getNumSubscribers())
+	{
+		std_msgs::Bool result;
+		result.data = state == actionlib::SimpleClientGoalState::SUCCEEDED;
+		goalReachedPub_.publish(result);
 	}
 }
 
 // Called once when the goal becomes active
 void CoreWrapper::goalActiveCb()
 {
-	ROS_INFO("Planning: Goal just went active");
+	//ROS_INFO("Planning: Goal just went active");
 }
 
 // Called every time feedback is received for the goal
 void CoreWrapper::goalFeedbackCb(const move_base_msgs::MoveBaseFeedbackConstPtr& feedback)
 {
-	Transform basePosition = rtabmap_ros::transformFromPoseMsg(feedback->base_position.pose);
-	ROS_INFO("Planning: feedback base_position = %s", basePosition.prettyPrint().c_str());
+	//Transform basePosition = rtabmap_ros::transformFromPoseMsg(feedback->base_position.pose);
+	//ROS_INFO("Planning: feedback base_position = %s", basePosition.prettyPrint().c_str());
 }
 
 void CoreWrapper::publishLocalPath(const ros::Time & stamp)

@@ -6,9 +6,6 @@ Panels:
       Expanded:
         - /Global Options1
         - /TF1/Frames1
-        - /MapCloud1
-        - /Path1
-        - /Path2
       Splitter Ratio: 0.601881
     Tree Height: 192
   - Class: rviz/Selection
@@ -22,7 +19,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: ""
+    SyncSource: Info
   - Class: rviz/Tool Properties
     Expanded:
       - /2D Pose Estimate1
@@ -71,6 +68,8 @@ Visualization Manager:
           Value: true
         camera_rgb_optical_frame:
           Value: true
+        map:
+          Value: true
         odom:
           Value: true
         wheelLB_linkWheel_link:
@@ -95,7 +94,31 @@ Visualization Manager:
       Show Axes: true
       Show Names: true
       Tree:
-        {}
+        map:
+          odom:
+            base_footprint:
+              base_link:
+                base_laser_link:
+                  {}
+                camera_link:
+                  camera_depth_frame:
+                    camera_depth_optical_frame:
+                      {}
+                  camera_rgb_frame:
+                    camera_rgb_optical_frame:
+                      {}
+                wheelLB_linkWheel_link:
+                  wheelLB_wheel_link:
+                    {}
+                wheelLF_linkWheel_link:
+                  wheelLF_wheel_link:
+                    {}
+                wheelRB_linkWheel_link:
+                  wheelRB_wheel_link:
+                    {}
+                wheelRF_linkWheel_link:
+                  wheelRF_wheel_link:
+                    {}
       Update Interval: 0
       Value: true
     - Alpha: 1
@@ -139,18 +162,18 @@ Visualization Manager:
       Class: rviz/Map
       Color Scheme: costmap
       Draw Behind: false
-      Enabled: true
+      Enabled: false
       Name: Map
       Topic: /planner/move_base/local_costmap/costmap
-      Value: true
+      Value: false
     - Alpha: 0.7
       Class: rviz/Map
       Color Scheme: costmap
       Draw Behind: false
-      Enabled: false
+      Enabled: true
       Name: Map
       Topic: /planner/move_base/global_costmap/costmap
-      Value: false
+      Value: true
     - Alpha: 1
       Class: rviz/RobotModel
       Collision Enabled: false
@@ -284,7 +307,7 @@ Visualization Manager:
       Shaft Length: 1
       Shaft Radius: 0.05
       Shape: Arrow
-      Topic: /planner_goal
+      Topic: /rtabmap/goal
       Value: true
     - Alpha: 1
       Buffer Length: 1
@@ -333,10 +356,26 @@ Visualization Manager:
       Value: false
     - Alpha: 1
       Class: rtabmap_ros/MapGraph
-      Color: 255; 0; 0
+      Color: 0; 0; 255
       Enabled: true
       Name: MapGraph
       Topic: /rtabmap/mapData_relay
+      Value: true
+    - Alpha: 1
+      Buffer Length: 1
+      Class: rviz/Path
+      Color: 255; 85; 255
+      Enabled: true
+      Name: Path
+      Topic: /rtabmap/global_path
+      Value: true
+    - Alpha: 1
+      Buffer Length: 1
+      Class: rviz/Path
+      Color: 85; 255; 255
+      Enabled: true
+      Name: Path
+      Topic: /rtabmap/local_path
       Value: true
   Enabled: true
   Global Options:
@@ -358,7 +397,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 8.53098
+      Distance: 7.4465
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.06
         Stereo Focal Distance: 1
@@ -370,10 +409,10 @@ Visualization Manager:
         Z: -0.156054
       Name: Current View
       Near Clip Distance: 0.01
-      Pitch: 0.9304
+      Pitch: 1.4204
       Target Frame: base_footprint
       Value: Orbit (rviz)
-      Yaw: 2.26538
+      Yaw: 2.93539
     Saved: ~
 Window Geometry:
   Displays:
@@ -393,5 +432,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 714
-  X: 928
+  X: 921
   Y: 32
