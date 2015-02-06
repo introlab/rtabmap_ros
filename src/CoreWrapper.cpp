@@ -1403,6 +1403,7 @@ void CoreWrapper::publishCurrentGoal(const ros::Time & stamp)
 		poseMsg.header.stamp = stamp;
 		rtabmap_ros::transformToPoseMsg(currentMetricGoal_, poseMsg.pose);
 
+		ROS_INFO("Publishing next goal: %d", rtabmap_.getPathCurrentGoalId());
 		if(useActionForGoal_)
 		{
 			if(!mbClient_.isServerConnected())
@@ -1415,7 +1416,6 @@ void CoreWrapper::publishCurrentGoal(const ros::Time & stamp)
 				move_base_msgs::MoveBaseGoal goal;
 				goal.target_pose = poseMsg;
 
-				ROS_INFO("Publishing next goal: %d", rtabmap_.getPathCurrentGoalId());
 				mbClient_.sendGoal(goal,
 						boost::bind(&CoreWrapper::goalDoneCb, this, _1, _2),
 						boost::bind(&CoreWrapper::goalActiveCb, this),
@@ -1426,13 +1426,9 @@ void CoreWrapper::publishCurrentGoal(const ros::Time & stamp)
 				ROS_ERROR("Cannot connect to move_base action server!");
 			}
 		}
-		else
+		if(nextMetricGoalPub_.getNumSubscribers())
 		{
-			if(nextMetricGoalPub_.getNumSubscribers())
-			{
-				ROS_INFO("Publishing next goal: %d", rtabmap_.getPathCurrentGoalId());
-				nextMetricGoalPub_.publish(poseMsg);
-			}
+			nextMetricGoalPub_.publish(poseMsg);
 		}
 	}
 }
