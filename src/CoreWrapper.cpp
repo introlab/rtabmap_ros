@@ -1052,7 +1052,7 @@ void CoreWrapper::goalCommonCallback(const std::list<std::pair<int, Transform> >
 	}
 	else
 	{
-		ROS_WARN("Planning: Cannot compute a path (or goal is already reached)!");
+		ROS_WARN("Planning: Cannot compute a path!");
 		rtabmap_.clearPath();
 		if(goalReachedPub_.getNumSubscribers())
 		{
@@ -1441,23 +1441,27 @@ void CoreWrapper::publishCurrentGoal(const ros::Time & stamp)
 void CoreWrapper::goalDoneCb(const actionlib::SimpleClientGoalState& state,
              const move_base_msgs::MoveBaseResultConstPtr& result)
 {
-	if(state == actionlib::SimpleClientGoalState::SUCCEEDED)
+	if(!currentMetricGoal_.isNull())
 	{
-		ROS_INFO("Planning: move_base success!");
-	}
-	else
-	{
-		ROS_ERROR("Planning: move_base failed for some reason. Aborting the plan...");
+		if(state == actionlib::SimpleClientGoalState::SUCCEEDED)
+		{
+			ROS_INFO("Planning: move_base success!");
+		}
+		else
+		{
+			ROS_ERROR("Planning: move_base failed for some reason. Aborting the plan...");
+		}
+
+		if(!goalReachedPub_.getNumSubscribers())
+		{
+			std_msgs::Bool result;
+			result.data = state == actionlib::SimpleClientGoalState::SUCCEEDED;
+			goalReachedPub_.publish(result);
+		}
 	}
 
 	rtabmap_.clearPath();
 	currentMetricGoal_.setNull();
-	if(goalReachedPub_.getNumSubscribers())
-	{
-		std_msgs::Bool result;
-		result.data = state == actionlib::SimpleClientGoalState::SUCCEEDED;
-		goalReachedPub_.publish(result);
-	}
 }
 
 // Called once when the goal becomes active
