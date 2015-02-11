@@ -34,7 +34,7 @@
   </node>   
   
   <node pkg="image_view" type="image_view" name="image_view">
-  	<remap from="image" to="/camera/depth_registered/image_raw"/>
+  	<remap from="image" to="data_throttled_image"/>
   </node>
 
 </launch>
