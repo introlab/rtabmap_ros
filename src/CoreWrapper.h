@@ -46,6 +46,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sensor_msgs/CameraInfo.h>
 #include <sensor_msgs/LaserScan.h>
 #include <nav_msgs/Odometry.h>
+#include <nav_msgs/GetMap.h>
 
 #include <rtabmap/core/Statistics.h>
 #include <rtabmap/core/Parameters.h>
@@ -62,6 +63,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <image_transport/image_transport.h>
 #include <image_transport/subscriber_filter.h>
+
+#include <pcl/point_types.h>
+#include <pcl/point_cloud.h>
 
 #include <actionlib/client/simple_action_client.h>
 #include <move_base_msgs/MoveBaseAction.h>
@@ -129,7 +133,9 @@ private:
 	bool triggerNewMapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool setModeLocalizationCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool setModeMappingCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
-	bool getMapCallback(rtabmap_ros::GetMap::Request& req, rtabmap_ros::GetMap::Response& rep);
+	bool getMapCallback(rtabmap_ros::GetMap::Request& req, rtabmap_ros::GetMap::Response& res);
+	bool getProjMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::GetMap::Response &res);
+	bool getGridMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::GetMap::Response &res);
 	bool publishMapCallback(rtabmap_ros::PublishMap::Request&, rtabmap_ros::PublishMap::Response&);
 	bool setGoalCallback(rtabmap_ros::SetGoal::Request& req, rtabmap_ros::SetGoal::Response& res);
 
@@ -138,7 +144,9 @@ private:
 
 	void publishLoop(double tfDelay);
 
-	void publishStats(const rtabmap::Statistics & stats, const ros::Time & stamp);
+	void publishStats(const ros::Time & stamp);
+	std::map<int, rtabmap::Transform> updateMapCaches(const std::map<int, rtabmap::Transform> & poses, bool updateCloud, bool updateProj, bool updateGrid);
+	void publishMaps(const std::map<int, rtabmap::Transform> & poses, const ros::Time & stamp);
 	void publishCurrentGoal(const ros::Time & stamp);
 	void goalDoneCb(const actionlib::SimpleClientGoalState& state, const move_base_msgs::MoveBaseResultConstPtr& result);
 	void goalActiveCb();
@@ -160,12 +168,31 @@ private:
 	bool waitForTransform_;
 	bool useActionForGoal_;
 
+	// mapping stuff
+	int cloudDecimation_;
+	double cloudMaxDepth_;
+	double cloudVoxelSize_;
+	double projMaxGroundAngle_;
+	int projMinClusterSize_;
+	double projMaxHeight_;
+	double gridCellSize_;
+	double gridSize_;
+	double mapFilterRadius_;
+	double mapFilterAngle_;
+
 	tf::Transform mapToOdom_;
 	boost::mutex mapToOdomMutex_;
 
+	std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr > clouds_;
+	std::map<int, std::pair<cv::Mat, cv::Mat> > projMaps_; // <ground, obstacles>
+	std::map<int, std::pair<cv::Mat, cv::Mat> > gridMaps_; // <ground, obstacles>
+
 	ros::Publisher infoPub_;
-	ros::Publisher mapData_;
-	ros::Publisher mapGraph_;
+	ros::Publisher mapDataPub_;
+	ros::Publisher mapGraphPub_;
+	ros::Publisher cloudMapPub_;
+	ros::Publisher projMapPub_;
+	ros::Publisher gridMapPub_;
 
 	//Planning stuff
 	ros::Subscriber goalSub_;
@@ -243,6 +270,8 @@ private:
 	ros::ServiceServer setModeLocalizationSrv_;
 	ros::ServiceServer setModeMappingSrv_;
 	ros::ServiceServer getMapDataSrv_;
+	ros::ServiceServer getProjMapSrv_;
+	ros::ServiceServer getGridMapSrv_;
 	ros::ServiceServer publishMapDataSrv_;
 	ros::ServiceServer setGoalSrv_;
 

@@ -42,11 +42,6 @@
       <param name="RGBD/OptimizeFromGraphEnd" type="string" value="false"/>    <!-- Optimize graph from initial node so /map -> /odom transform will be generated -->
     </node>
     
-    <!-- Grid map assembler for rviz -->
-    <node if="$(arg rviz)" pkg="rtabmap_ros" type="grid_map_assembler" name="grid_map_assembler">
-    	<param name="unknown_space_filled" type="bool" value="false"/>
-    </node>
-    
     <!-- Visualisation RTAB-Map -->
     <node if="$(arg rtabmapviz)" pkg="rtabmap_ros" type="rtabmapviz" name="rtabmapviz" args="-d $(find rtabmap_ros)/launch/config/rgbd_gui.ini" output="screen">
   	  <param name="subscribe_depth" type="bool" value="true"/>

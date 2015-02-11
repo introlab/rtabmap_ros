@@ -70,11 +70,6 @@
       <param name="depth/image_transport" type="string" value="compressedDepth"/>
   </node>
   
-  <!-- Grid map assembler for rviz -->
-  <node if="$(arg rviz)" pkg="rtabmap_ros" type="grid_map_assembler" name="grid_map_assembler">
-   	<param name="unknown_space_filled" type="bool" value="false"/>
-  </node>
-  
   </group>
     
   <!-- Visualisation RVIZ -->

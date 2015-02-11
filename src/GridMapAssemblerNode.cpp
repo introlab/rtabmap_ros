@@ -33,6 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/Compression.h>
 #include <rtabmap/utilite/ULogger.h>
 #include <rtabmap/utilite/UStl.h>
+#include <rtabmap/utilite/UTimer.h>
 #include <nav_msgs/OccupancyGrid.h>
 #include <nav_msgs/GetMap.h>
 #include <std_srvs/Empty.h>
@@ -48,14 +49,12 @@ public:
 	GridMapAssembler() :
 		gridCellSize_(0.05), // meters
 		mapSize_(0), // meters
-		gridUnknownSpaceFilled_(false),
 		filterRadius_(0.5),
 		filterAngle_(30.0) // degrees
 	{
 		ros::NodeHandle pnh("~");
 		pnh.param("cell_size", gridCellSize_, gridCellSize_); // m
 		pnh.param("map_size", mapSize_, mapSize_); // m
-		pnh.param("unknown_space_filled", gridUnknownSpaceFilled_, gridUnknownSpaceFilled_);
 		pnh.param("filter_radius", filterRadius_, filterRadius_);
 		pnh.param("filter_angle", filterAngle_, filterAngle_);
 
@@ -78,12 +77,22 @@ public:
 
 	void mapDataReceivedCallback(const rtabmap_ros::MapDataConstPtr & msg)
 	{
+		UTimer timer;
 		for(unsigned int i=0; i<msg->nodes.size(); ++i)
 		{
-			if(!uContains(scans_, msg->nodes[i].id) && msg->nodes[i].laserScan.size())
+			if(!uContains(gridMaps_, msg->nodes[i].id) && msg->nodes[i].laserScan.size())
 			{
 				cv::Mat laserScan = rtabmap::uncompressData(msg->nodes[i].laserScan);
-				scans_.insert(std::make_pair(msg->nodes[i].id, util3d::laserScanToPointCloud(laserScan)));
+				if(!laserScan.empty())
+				{
+					cv::Mat ground, obstacles;
+					util3d::occupancy2DFromLaserScan(laserScan, ground, obstacles, gridCellSize_);
+
+					if(!ground.empty() || !obstacles.empty())
+					{
+						gridMaps_.insert(std::make_pair(msg->nodes[i].id, std::make_pair(ground, obstacles)));
+					}
+				}
 			}
 		}
 
@@ -102,7 +111,13 @@ public:
 		{
 			// create the map
 			float xMin=0.0f, yMin=0.0f;
-			cv::Mat pixels = util3d::create2DMap(poses, scans_, gridCellSize_, gridUnknownSpaceFilled_, xMin, yMin, mapSize_);
+			//cv::Mat pixels = util3d::create2DMap(poses, scans_, gridCellSize_, gridUnknownSpaceFilled_, xMin, yMin, mapSize_);
+			cv::Mat pixels = util3d::create2DMapFromOccupancyLocalMaps(
+							poses,
+							gridMaps_,
+							gridCellSize_,
+							xMin, yMin,
+							mapSize_);
 
 			if(!pixels.empty())
 			{
@@ -128,6 +143,7 @@ public:
 				map_.header.stamp = ros::Time::now();
 
 				gridMap_.publish(map_);
+				ROS_INFO("Grid Map published [%d,%d] (%fs)", pixels.cols, pixels.rows, timer.ticks());
 			}
 		}
 	}
@@ -145,7 +161,7 @@ public:
 	bool reset(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 	{
 		ROS_INFO("grid_map_assembler: reset!");
-		scans_.clear();
+		gridMaps_.clear();
 		map_ = nav_msgs::OccupancyGrid();
 		return true;
 	}
@@ -153,7 +169,6 @@ public:
 private:
 	double gridCellSize_;
 	double mapSize_;
-	bool gridUnknownSpaceFilled_;
 	double filterRadius_;
 	double filterAngle_;
 
@@ -164,7 +179,7 @@ private:
 	ros::ServiceServer getMapService_;
 	ros::ServiceServer resetService_;
 
-	std::map<int, pcl::PointCloud<pcl::PointXYZ>::Ptr > scans_;
+	std::map<int, std::pair<cv::Mat, cv::Mat> > gridMaps_; //<ground,obstacles>
 
 	nav_msgs::OccupancyGrid map_;
 };

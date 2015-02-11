@@ -33,6 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/Graph.h>
 #include <rtabmap/utilite/ULogger.h>
 #include <rtabmap/utilite/UStl.h>
+#include <rtabmap/utilite/UTimer.h>
 #include <pcl_ros/transforms.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <nav_msgs/OccupancyGrid.h>
@@ -57,7 +58,6 @@ public:
 		gridCellSize_(0.05),
 		groundMaxAngle_(M_PI_4),
 		clusterMinSize_(20),
-		emptyCellFillingRadius_(1),
 		maxHeight_(0),
 		occupancyMapSize_(0.0)
 	{
@@ -77,12 +77,10 @@ public:
 		pnh.param("occupancy_cell_size", gridCellSize_, gridCellSize_);
 		pnh.param("occupancy_ground_max_angle", groundMaxAngle_, groundMaxAngle_);
 		pnh.param("occupancy_cluster_min_size", clusterMinSize_, clusterMinSize_);
-		pnh.param("occupancy_empty_filling_radius", emptyCellFillingRadius_, emptyCellFillingRadius_);
 		pnh.param("occupancy_max_height", maxHeight_, maxHeight_);
 		pnh.param("occupancy_map_size", occupancyMapSize_, occupancyMapSize_);
 
 		UASSERT(gridCellSize_ > 0);
-		UASSERT(emptyCellFillingRadius_ >= 0);
 		UASSERT(maxHeight_ >= 0);
 		UASSERT(occupancyMapSize_ >=0.0);
 
@@ -106,6 +104,7 @@ public:
 
 	void mapDataReceivedCallback(const rtabmap_ros::MapDataConstPtr & msg)
 	{
+		UTimer timer;
 		for(unsigned int i=0; i<msg->nodes.size(); ++i)
 		{
 			int id = msg->nodes[i].id;
@@ -168,15 +167,22 @@ public:
 							if(computeOccupancyGrid_)
 							{
 								pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloudClipped = cloud;
-								if(maxHeight_ > 0)
+								if(cloudClipped->size() && maxHeight_ > 0)
 								{
 									cloudClipped = util3d::passThrough<pcl::PointXYZRGB>(cloudClipped, "z", std::numeric_limits<int>::min(), maxHeight_);
 								}
-								cv::Mat ground, obstacles;
-								if(util3d::occupancy2DFromCloud3D(cloudClipped, ground, obstacles, gridCellSize_, groundMaxAngle_, clusterMinSize_))
+								if(cloudClipped->size())
 								{
-									occupancyLocalMaps_.insert(std::make_pair(id, std::make_pair(ground, obstacles)));
+									cloudClipped = util3d::voxelize<pcl::PointXYZRGB>(cloudClipped, gridCellSize_);
+
+									cv::Mat ground, obstacles;
+									util3d::occupancy2DFromCloud3D<pcl::PointXYZRGB>(cloudClipped, ground, obstacles, gridCellSize_, groundMaxAngle_, clusterMinSize_);
+									if(!ground.empty() || !obstacles.empty())
+									{
+										occupancyLocalMaps_.insert(std::make_pair(id, std::make_pair(ground, obstacles)));
+									}
 								}
+
 							}
 						}
 					}
@@ -276,7 +282,11 @@ public:
 		{
 			// create the map
 			float xMin=0.0f, yMin=0.0f;
-			cv::Mat pixels = util3d::create2DMapFromOccupancyLocalMaps(poses, occupancyLocalMaps_, gridCellSize_, xMin, yMin, emptyCellFillingRadius_, occupancyMapSize_);
+			cv::Mat pixels = util3d::create2DMapFromOccupancyLocalMaps(
+					poses,
+					occupancyLocalMaps_,
+					gridCellSize_, xMin, yMin,
+					occupancyMapSize_);
 
 			if(!pixels.empty())
 			{
@@ -305,6 +315,7 @@ public:
 				occupancyMapPub_.publish(map);
 			}
 		}
+		ROS_INFO("Processing data %fs", timer.ticks());
 	}
 
 	bool reset(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
@@ -332,7 +343,6 @@ private:
 	double gridCellSize_;
 	double groundMaxAngle_;
 	int clusterMinSize_;
-	int emptyCellFillingRadius_;
 	double maxHeight_;
 	double occupancyMapSize_;
 
