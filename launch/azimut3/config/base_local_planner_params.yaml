@@ -7,7 +7,7 @@ TrajectoryPlannerROS:
   # min_vel_x and max_rotational_vel were set to keep the ICR at
   # minimal distance of 0.48 m. 
   # Basically, max_rotational_vel * rho_min <= min_vel_x
-  max_vel_x:  0.500
+  max_vel_x:  0.700
   min_vel_x:  0.212
   max_rotational_vel: 0.550
   min_in_place_rotational_vel: 0.15
