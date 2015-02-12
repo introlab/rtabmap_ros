@@ -32,6 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <message_filters/subscriber.h>
 #include <message_filters/time_synchronizer.h>
 #include <message_filters/sync_policies/approximate_time.h>
+#include <message_filters/sync_policies/exact_time.h>
 
 #include <image_transport/image_transport.h>
 #include <image_transport/subscriber_filter.h>
@@ -47,13 +48,21 @@ public:
 	//Constructor
 	DataThrottleNodelet():
 		max_update_rate_(0),
-		sync_(0)
+		approxSync_(0),
+		exactSync_(0)
 	{
 	}
 
 	virtual ~DataThrottleNodelet()
 	{
-		delete sync_;
+		if(approxSync_)
+		{
+			delete approxSync_;
+		}
+		if(exactSync_)
+		{
+			delete exactSync_;
+		}
 	}
 
 private:
@@ -74,11 +83,22 @@ private:
 		image_transport::TransportHints hintsDepth("raw", ros::TransportHints(), depth_pnh);
 
 		int queueSize = 10;
+		bool approxSync = true;
 		private_nh.param("max_rate", max_update_rate_, max_update_rate_);
 		private_nh.param("queue_size", queueSize, queueSize);
+		private_nh.param("approx_sync", approxSync, approxSync);
+		ROS_INFO("Approximate time sync = %s", approxSync?"true":"false");
 
-		sync_ = new message_filters::Synchronizer<MySyncPolicy>(MySyncPolicy(queueSize), image_sub_, image_depth_sub_, info_sub_);
-		sync_->registerCallback(boost::bind(&DataThrottleNodelet::callback, this, _1, _2, _3));
+		if(approxSync)
+		{
+			approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize), image_sub_, image_depth_sub_, info_sub_);
+			approxSync_->registerCallback(boost::bind(&DataThrottleNodelet::callback, this, _1, _2, _3));
+		}
+		else
+		{
+			exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize), image_sub_, image_depth_sub_, info_sub_);
+			exactSync_->registerCallback(boost::bind(&DataThrottleNodelet::callback, this, _1, _2, _3));
+		}
 
 		image_sub_.subscribe(rgb_it, rgb_nh.resolveName("image_in"), 1, hintsRgb);
 		image_depth_sub_.subscribe(depth_it, depth_nh.resolveName("image_in"), 1, hintsDepth);
@@ -128,8 +148,11 @@ private:
 	image_transport::SubscriberFilter image_sub_;
 	image_transport::SubscriberFilter image_depth_sub_;
 	message_filters::Subscriber<sensor_msgs::CameraInfo> info_sub_;
-	typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo> MySyncPolicy;
-	message_filters::Synchronizer<MySyncPolicy> * sync_;
+
+	typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo> MyApproxSyncPolicy;
+	message_filters::Synchronizer<MyApproxSyncPolicy> * approxSync_;
+	typedef message_filters::sync_policies::ExactTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo> MyExactSyncPolicy;
+	message_filters::Synchronizer<MyExactSyncPolicy> * exactSync_;
 
 };
 

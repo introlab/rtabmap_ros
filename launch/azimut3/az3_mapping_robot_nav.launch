@@ -106,7 +106,7 @@
   
   <!-- Throttling messages -->
   <group ns="camera">
-    <node pkg="nodelet" type="nodelet" name="data_throttle" args="load rtabmap/data_throttle camera_nodelet_manager" output="screen">
+    <node pkg="nodelet" type="nodelet" name="data_throttle" args="load rtabmap_ros/data_throttle camera_nodelet_manager" output="screen">
       <param name="max_rate" type="double" value="2.0"/>
    
       <remap from="rgb/image_in"       to="rgb/image_rect_color"/>
@@ -119,12 +119,13 @@
     </node>
 
     <!-- for the planner -->
-    <node pkg="nodelet" type="nodelet" name="points_xyzrgb_planner" args="load rtabmap/point_cloud_xyzrgb camera_nodelet_manager">
-      <remap from="rgb/image"       to="/camera/data_throttled_image"/>
+    <node pkg="nodelet" type="nodelet" name="points_xyz_planner" args="load rtabmap_ros/point_cloud_xyz camera_nodelet_manager">
       <remap from="depth/image"     to="/camera/data_throttled_image_depth"/>
-      <remap from="rgb/camera_info" to="/camera/data_throttled_camera_info"/>
+      <remap from="depth/camera_info" to="/camera/data_throttled_camera_info"/>
       <remap from="cloud"           to="/local_costmap_cloud" />
       <param name="decimation" type="int" value="4"/>
+      <param name="max_depth" type="double" value="6.0"/>
+      <param name="noise_filter_radius" type="double" value="0.05"/>
     </node>  
   </group>
 </launch>
