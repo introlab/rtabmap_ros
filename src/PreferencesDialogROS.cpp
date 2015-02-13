@@ -69,7 +69,7 @@ QString PreferencesDialogROS::getParamMessage()
 
 bool PreferencesDialogROS::readCoreSettings(const QString & filePath)
 {
-	if(filePath.isEmpty())
+	if(filePath.isEmpty() || filePath.compare(getTmpIniFilePath()) == 0)
 	{
 		ros::NodeHandle nh;
 		ROS_INFO("%s", this->getParamMessage().toStdString().c_str());
