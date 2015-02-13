@@ -7,7 +7,7 @@ Panels:
         - /Global Options1
         - /TF1/Frames1
       Splitter Ratio: 0.601881
-    Tree Height: 192
+    Tree Height: 371
   - Class: rviz/Selection
     Name: Selection
   - Class: rviz/Views
@@ -19,7 +19,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: Info
+    SyncSource: ""
   - Class: rviz/Tool Properties
     Expanded:
       - /2D Pose Estimate1
@@ -52,73 +52,13 @@ Visualization Manager:
       Frame Timeout: 15
       Frames:
         All Enabled: false
-        base_footprint:
-          Value: true
-        base_laser_link:
-          Value: true
-        base_link:
-          Value: true
-        camera_depth_frame:
-          Value: true
-        camera_depth_optical_frame:
-          Value: true
-        camera_link:
-          Value: true
-        camera_rgb_frame:
-          Value: true
-        camera_rgb_optical_frame:
-          Value: true
-        map:
-          Value: true
-        odom:
-          Value: true
-        wheelLB_linkWheel_link:
-          Value: true
-        wheelLB_wheel_link:
-          Value: true
-        wheelLF_linkWheel_link:
-          Value: true
-        wheelLF_wheel_link:
-          Value: true
-        wheelRB_linkWheel_link:
-          Value: true
-        wheelRB_wheel_link:
-          Value: true
-        wheelRF_linkWheel_link:
-          Value: true
-        wheelRF_wheel_link:
-          Value: true
       Marker Scale: 1
       Name: TF
       Show Arrows: true
       Show Axes: true
       Show Names: true
       Tree:
-        map:
-          odom:
-            base_footprint:
-              base_link:
-                base_laser_link:
-                  {}
-                camera_link:
-                  camera_depth_frame:
-                    camera_depth_optical_frame:
-                      {}
-                  camera_rgb_frame:
-                    camera_rgb_optical_frame:
-                      {}
-                wheelLB_linkWheel_link:
-                  wheelLB_wheel_link:
-                    {}
-                wheelLF_linkWheel_link:
-                  wheelLF_wheel_link:
-                    {}
-                wheelRB_linkWheel_link:
-                  wheelRB_wheel_link:
-                    {}
-                wheelRF_linkWheel_link:
-                  wheelRF_wheel_link:
-                    {}
+        {}
       Update Interval: 0
       Value: true
     - Alpha: 1
@@ -163,16 +103,16 @@ Visualization Manager:
       Color Scheme: costmap
       Draw Behind: false
       Enabled: false
-      Name: Map
-      Topic: /planner/move_base/local_costmap/costmap
+      Name: Global costmap
+      Topic: /planner/move_base/global_costmap/costmap
       Value: false
     - Alpha: 0.7
       Class: rviz/Map
       Color Scheme: costmap
       Draw Behind: false
       Enabled: true
-      Name: Map
-      Topic: /planner/move_base/global_costmap/costmap
+      Name: Local costmap
+      Topic: /planner/move_base/local_costmap/costmap
       Value: true
     - Alpha: 1
       Class: rviz/RobotModel
@@ -184,61 +124,6 @@ Visualization Manager:
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
-        base_footprint:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        base_laser_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        base_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        wheelLB_linkWheel_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        wheelLB_wheel_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        wheelLF_linkWheel_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        wheelLF_wheel_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        wheelRB_linkWheel_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        wheelRB_wheel_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        wheelRF_linkWheel_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        wheelRF_wheel_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
       Name: RobotModel
       Robot Description: robot_description
       TF Prefix: ""
@@ -247,14 +132,14 @@ Visualization Manager:
       Visual Enabled: true
     - Class: rviz/Image
       Enabled: false
-      Image Topic: /camera/data_throttled_image_relay
+      Image Topic: /camera/data_throttled_image
       Max Value: 1
       Median window: 5
       Min Value: 0
       Name: Image
       Normalize Range: true
       Queue Size: 2
-      Transport Hint: raw
+      Transport Hint: theora
       Value: false
     - Alpha: 1
       Autocompute Intensity Bounds: true
@@ -265,7 +150,7 @@ Visualization Manager:
       Axis: Z
       Channel Name: intensity
       Class: rtabmap_ros/MapCloud
-      Cloud decimation: 8
+      Cloud decimation: 1
       Cloud max depth (m): 4
       Cloud voxel size (m): 0
       Color: 255; 255; 255
@@ -312,10 +197,10 @@ Visualization Manager:
     - Alpha: 1
       Buffer Length: 1
       Class: rviz/Path
-      Color: 25; 255; 0
+      Color: 255; 149; 57
       Enabled: true
       Name: Path
-      Topic: /planner/move_base/TrajectoryPlannerROS/global_plan
+      Topic: /planner/move_base/NavfnROS/plan
       Value: true
     - Alpha: 1
       Buffer Length: 1
@@ -350,21 +235,21 @@ Visualization Manager:
       Size (Pixels): 3
       Size (m): 0.01
       Style: Points
-      Topic: /voxel_cloud
+      Topic: /rtabmap/cloud_map
       Use Fixed Frame: true
       Use rainbow: true
       Value: false
     - Alpha: 1
       Class: rtabmap_ros/MapGraph
       Color: 0; 0; 255
-      Enabled: true
+      Enabled: false
       Name: MapGraph
       Topic: /rtabmap/mapData_relay
-      Value: true
+      Value: false
     - Alpha: 1
       Buffer Length: 1
       Class: rviz/Path
-      Color: 255; 85; 255
+      Color: 255; 0; 255
       Enabled: true
       Name: Path
       Topic: /rtabmap/global_path
@@ -376,6 +261,20 @@ Visualization Manager:
       Enabled: true
       Name: Path
       Topic: /rtabmap/local_path
+      Value: true
+    - Alpha: 1
+      Axes Length: 1
+      Axes Radius: 0.1
+      Class: rviz/Pose
+      Color: 0; 255; 0
+      Enabled: true
+      Head Length: 0.3
+      Head Radius: 0.1
+      Name: Pose
+      Shaft Length: 1
+      Shaft Radius: 0.05
+      Shape: Arrow
+      Topic: /rtabmap/current_goal
       Value: true
   Enabled: true
   Global Options:
@@ -397,32 +296,32 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 7.4465
+      Distance: 17.1662
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.06
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0.0430748
-        Y: -0.00858197
-        Z: -0.156054
+        X: -0.0852849
+        Y: 0.0904403
+        Z: -0.189729
       Name: Current View
       Near Clip Distance: 0.01
-      Pitch: 1.4204
+      Pitch: 1.2048
       Target Frame: base_footprint
       Value: Orbit (rviz)
-      Yaw: 2.93539
+      Yaw: 3.50041
     Saved: ~
 Window Geometry:
   Displays:
     collapsed: false
-  Height: 504
+  Height: 800
   Hide Left Dock: false
   Hide Right Dock: false
   Image:
     collapsed: false
-  QMainWindow State: 000000ff00000000fd000000040000000000000151000001b2fc0200000008fb0000001200530065006c0065006300740069006f006e00000001e10000009b0000006400fffffffb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000002800000101000000dd00fffffffb0000000a0049006d006100670065000000018a0000012d0000001600fffffffb0000000a0049006d0061006700650000000184000000490000000000000000fb0000000a0049006d006100670065010000027d000000fa0000000000000000fb0000001e0054006f006f006c002000500072006f0070006500720074006900650073010000012f000000ab0000006400ffffff000000010000010f000001b2fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a005600690065007700730000000028000001b2000000b000fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000004a00000003efc0100000002fb0000000800540069006d00650000000000000004a0000002f600fffffffb0000000800540069006d0065010000000000000450000000000000000000000173000001b200000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd000000040000000000000151000002dafc0200000008fb0000001200530065006c0065006300740069006f006e00000001e10000009b0000006400fffffffb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c0061007900730100000028000001b4000000dd00fffffffb0000000a0049006d00610067006500000001290000012d0000001600fffffffb0000000a0049006d0061006700650000000184000000490000000000000000fb0000000a0049006d006100670065010000027d000000fa0000000000000000fb0000001e0054006f006f006c002000500072006f007000650072007400690065007301000001e2000001200000006400ffffff000000010000010f000001b2fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a005600690065007700730000000028000001b2000000b000fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000004a00000003efc0100000002fb0000000800540069006d00650000000000000004a0000002f600fffffffb0000000800540069006d0065010000000000000450000000000000000000000375000002da00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Selection:
     collapsed: false
   Time:
@@ -431,6 +330,6 @@ Window Geometry:
     collapsed: false
   Views:
     collapsed: false
-  Width: 714
-  X: 921
+  Width: 1228
+  X: 372
   Y: 32
