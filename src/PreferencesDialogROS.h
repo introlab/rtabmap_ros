@@ -48,6 +48,8 @@ protected:
 	virtual bool readCoreSettings(const QString & filePath);
 	virtual void writeSettings(const QString & filePath);
 
+	virtual QString getTmpIniFilePath() const;
+
 private:
 	QString configFile_;
 };

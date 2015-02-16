@@ -28,6 +28,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "PreferencesDialogROS.h"
 #include <rtabmap/core/Parameters.h>
 #include <QtCore/QDir>
+#include <QtCore/QFileInfo>
 #include <QtCore/QSettings>
 #include <QtGui/QHBoxLayout>
 #include <QtCore/QTimer>
@@ -46,6 +47,7 @@ PreferencesDialogROS::PreferencesDialogROS(const QString & configFile) :
 
 PreferencesDialogROS::~PreferencesDialogROS()
 {
+	QFile::remove(getTmpIniFilePath());
 }
 
 QString PreferencesDialogROS::getIniFilePath() const
@@ -55,6 +57,11 @@ QString PreferencesDialogROS::getIniFilePath() const
 		return PreferencesDialog::getIniFilePath();
 	}
 	return configFile_;
+}
+
+QString PreferencesDialogROS::getTmpIniFilePath() const
+{
+	return QDir::homePath()+"/.ros/"+QFileInfo(configFile_).fileName()+".tmp";
 }
 
 void PreferencesDialogROS::readCameraSettings(const QString & filePath)
