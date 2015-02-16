@@ -51,6 +51,7 @@
 	<param name="Bayes/FullPredictionUpdate" type="string" value="true"/>
 	<param name="Kp/DetectorStrategy" type="string" value="0"/>   <!-- use SURF -->
 	<param name="Kp/NNStrategy" type="string" value="1"/>         <!-- kdTree -->
+	<param name="Kp/WordsPerImage" type="string" value="400"/> 
   </node>
   
   <!-- Visualisation RTAB-Map -->

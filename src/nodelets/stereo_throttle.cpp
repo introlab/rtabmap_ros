@@ -38,6 +38,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <sensor_msgs/CameraInfo.h>
 
+#include <cv_bridge/cv_bridge.h>
+
+#include <rtabmap/core/util3d.h>
+
 namespace rtabmap_ros
 {
 
@@ -46,9 +50,10 @@ class StereoThrottleNodelet : public nodelet::Nodelet
 public:
 	//Constructor
 	StereoThrottleNodelet():
-		max_update_rate_(0),
+		rate_(0),
 		approxSync_(0),
-		exactSync_(0)
+		exactSync_(0),
+		decimation_(1)
 	{
 	}
 
@@ -66,7 +71,7 @@ public:
 
 private:
 	ros::Time last_update_;
-	double max_update_rate_;
+	double rate_;
 	virtual void onInit()
 	{
 		ros::NodeHandle& nh = getNodeHandle();
@@ -84,14 +89,13 @@ private:
 		int queueSize = 5;
 		bool approxSync = false;
 		pnh.param("approx_sync", approxSync, approxSync);
-		pnh.param("rate", max_update_rate_, max_update_rate_);
+		pnh.param("rate", rate_, rate_);
 		pnh.param("queue_size", queueSize, queueSize);
+		pnh.param("decimation", decimation_, decimation_);
+		ROS_ASSERT(decimation_ >= 1);
+		ROS_INFO("Rate=%f Hz", rate_);
+		ROS_INFO("Decimation=%d", decimation_);
 		ROS_INFO("Approximate time sync = %s", approxSync?"true":"false");
-
-		if(max_update_rate_ == 0.0)
-		{
-			ROS_WARN("Parameter \"rate\" (Hz) is not set!");
-		}
 
 		if(approxSync)
 		{
@@ -120,35 +124,101 @@ private:
 			const sensor_msgs::CameraInfoConstPtr& camInfoLeft,
 			const sensor_msgs::CameraInfoConstPtr& camInfoRight)
 	{
-		if (max_update_rate_ > 0.0)
+		if (rate_ > 0.0)
 		{
-			NODELET_DEBUG("update set to %f", max_update_rate_);
-			if ( last_update_ + ros::Duration(1.0/max_update_rate_) > ros::Time::now())
+			NODELET_DEBUG("update set to %f", rate_);
+			if ( last_update_ + ros::Duration(1.0/rate_) > ros::Time::now())
 			{
 				NODELET_DEBUG("throttle last update at %f skipping", last_update_.toSec());
 				return;
 			}
 		}
 		else
-			NODELET_DEBUG("update_rate unset continuing");
+			NODELET_DEBUG("rate unset continuing");
 
 		last_update_ = ros::Time::now();
 
 		if(imageLeftPub_.getNumSubscribers())
 		{
-			imageLeftPub_.publish(imageLeft);
+			if(decimation_ > 1)
+			{
+				cv_bridge::CvImageConstPtr imagePtr = cv_bridge::toCvShare(imageLeft);
+				cv_bridge::CvImage out;
+				out.header = imagePtr->header;
+				out.encoding = imagePtr->encoding;
+				out.image = rtabmap::util3d::decimate(imagePtr->image, decimation_);
+				imageLeftPub_.publish(out.toImageMsg());
+			}
+			else
+			{
+				imageLeftPub_.publish(imageLeft);
+			}
 		}
 		if(imageRightPub_.getNumSubscribers())
 		{
-			imageRightPub_.publish(imageRight);
+			if(decimation_ > 1)
+			{
+				cv_bridge::CvImageConstPtr imagePtr = cv_bridge::toCvShare(imageRight);
+				cv_bridge::CvImage out;
+				out.header = imagePtr->header;
+				out.encoding = imagePtr->encoding;
+				out.image = rtabmap::util3d::decimate(imagePtr->image, decimation_);
+				imageRightPub_.publish(out.toImageMsg());
+			}
+			else
+			{
+				imageRightPub_.publish(imageRight);
+			}
 		}
 		if(infoLeftPub_.getNumSubscribers())
 		{
-			infoLeftPub_.publish(camInfoLeft);
+			if(decimation_ > 1)
+			{
+				sensor_msgs::CameraInfo info = *camInfoLeft;
+				info.height /= decimation_;
+				info.width /= decimation_;
+				info.roi.height /= decimation_;
+				info.roi.width /= decimation_;
+				info.K[2]/=float(decimation_); // cx
+				info.K[5]/=float(decimation_); // cy
+				info.K[0]/=float(decimation_); // fx
+				info.K[4]/=float(decimation_); // fy
+				info.P[2]/=float(decimation_); // cx
+				info.P[6]/=float(decimation_); // cy
+				info.P[0]/=float(decimation_); // fx
+				info.P[5]/=float(decimation_); // fy
+				info.P[3]/=float(decimation_); // Tx
+				infoLeftPub_.publish(info);
+			}
+			else
+			{
+				infoLeftPub_.publish(camInfoLeft);
+			}
 		}
 		if(infoRightPub_.getNumSubscribers())
 		{
-			infoRightPub_.publish(camInfoRight);
+			if(decimation_ > 1)
+			{
+				sensor_msgs::CameraInfo info = *camInfoRight;
+				info.height /= decimation_;
+				info.width /= decimation_;
+				info.roi.height /= decimation_;
+				info.roi.width /= decimation_;
+				info.K[2]/=float(decimation_); // cx
+				info.K[5]/=float(decimation_); // cy
+				info.K[0]/=float(decimation_); // fx
+				info.K[4]/=float(decimation_); // fy
+				info.P[2]/=float(decimation_); // cx
+				info.P[6]/=float(decimation_); // cy
+				info.P[0]/=float(decimation_); // fx
+				info.P[5]/=float(decimation_); // fy
+				info.P[3]/=float(decimation_); // Tx
+				infoRightPub_.publish(info);
+			}
+			else
+			{
+				infoRightPub_.publish(camInfoRight);
+			}
 		}
 	}
 
@@ -166,6 +236,8 @@ private:
 	message_filters::Synchronizer<MyApproxSyncPolicy> * approxSync_;
 	typedef message_filters::sync_policies::ExactTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo, sensor_msgs::CameraInfo> MyExactSyncPolicy;
 	message_filters::Synchronizer<MyExactSyncPolicy> * exactSync_;
+
+	int decimation_;
 
 };
 

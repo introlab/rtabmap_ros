@@ -8,7 +8,9 @@
   <include file="$(find az3_bringup)/az3_standalone.launch"/>
 
   <!-- OpenNI -->
-  <include file="$(find rtabmap_ros)/launch/azimut3/az3_openni.launch"/>
+  <include file="$(find rtabmap_ros)/launch/azimut3/az3_openni.launch">
+    <arg name="data_skip" value="5" />
+  </include>
 
   <!-- SLAM (robot side) -->
   <group ns="rtabmap">
@@ -108,23 +110,24 @@
   <!-- Throttling messages -->
   <group ns="camera">
     <node pkg="nodelet" type="nodelet" name="data_throttle" args="load rtabmap_ros/data_throttle camera_nodelet_manager" output="screen">
-      <param name="max_rate" type="double" value="4.0"/>
+      <param name="rate" type="double" value="0"/> <!-- set by data_skip above -->
+      <param name="decimation" type="int" value="4"/>
    
       <remap from="rgb/image_in"       to="rgb/image_rect_color"/>
       <remap from="depth/image_in"     to="depth_registered/image_raw"/>
       <remap from="rgb/camera_info_in" to="depth_registered/camera_info"/>
     
-      <remap from="rgb/image_out"       to="data_throttled_image"/>
-      <remap from="depth/image_out"     to="data_throttled_image_depth"/>
-      <remap from="rgb/camera_info_out" to="data_throttled_camera_info"/>
+      <remap from="rgb/image_out"       to="data_resized_image"/>
+      <remap from="depth/image_out"     to="data_resized_image_depth"/>
+      <remap from="rgb/camera_info_out" to="data_resized_camera_info"/>
     </node>
 
     <!-- for the planner -->
     <node pkg="nodelet" type="nodelet" name="points_xyz_planner" args="load rtabmap_ros/point_cloud_xyz camera_nodelet_manager">
-      <remap from="depth/image"     to="/camera/data_throttled_image_depth"/>
-      <remap from="depth/camera_info" to="/camera/data_throttled_camera_info"/>
+      <remap from="depth/image"     to="data_resized_image_depth"/>
+      <remap from="depth/camera_info" to="data_resized_camera_info"/>
       <remap from="cloud"           to="/local_costmap_cloud" />
-      <param name="decimation" type="int" value="4"/>
+      <param name="decimation" type="int" value="1"/>
       <param name="max_depth" type="double" value="6.0"/>
       <param name="noise_filter_radius" type="double" value="0.05"/>
       <param name="noise_filter_min_neighbors" type="int" value="10"/>

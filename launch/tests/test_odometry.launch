@@ -19,7 +19,7 @@
    <node pkg="nodelet" type="nodelet" name="standalone_nodelet"  args="manager" output="screen"/>
    
   <!-- sync cloud with odometry and voxelize the point cloud (for fast visualization in rviz) -->
-  <node pkg="nodelet" type="nodelet" name="data_odom_sync" args="load rtabmap/data_odom_sync standalone_nodelet">
+  <node pkg="nodelet" type="nodelet" name="data_odom_sync" args="load rtabmap_ros/data_odom_sync standalone_nodelet">
     <remap from="rgb/image_in"       to="camera/rgb/image_rect_color"/>
     <remap from="depth/image_in"     to="camera/depth_registered/image_raw"/>
     <remap from="rgb/camera_info_in" to="camera/depth_registered/camera_info"/>
@@ -32,7 +32,7 @@
     
     <param name="queue_size" type="int" value="30"/>
   </node>
-  <node pkg="nodelet" type="nodelet" name="points_xyzrgb" args="load rtabmap/point_cloud_xyzrgb standalone_nodelet">
+  <node pkg="nodelet" type="nodelet" name="points_xyzrgb" args="load rtabmap_ros/point_cloud_xyzrgb standalone_nodelet">
     <remap from="rgb/image"       to="data_odom_sync/image"/>
     <remap from="depth/image"     to="data_odom_sync/depth"/>
     <remap from="rgb/camera_info" to="data_odom_sync/camera_info"/>

@@ -11,8 +11,8 @@
   
   <!-- Throttling messages -->
   <group ns="camera">
-    <node pkg="nodelet" type="nodelet" name="data_throttle" args="load rtabmap/data_throttle camera_nodelet_manager" output="screen">
-      <param name="max_rate" type="double" value="10.0"/>
+    <node pkg="nodelet" type="nodelet" name="data_throttle" args="load rtabmap_ros/data_throttle camera_nodelet_manager" output="screen">
+      <param name="rate" type="double" value="10.0"/>
    
       <remap from="rgb/image_in"       to="rgb/image_rect_color"/>
       <remap from="depth/image_in"     to="depth_registered/image_raw"/>

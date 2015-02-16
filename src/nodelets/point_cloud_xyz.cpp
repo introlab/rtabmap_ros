@@ -105,7 +105,7 @@ private:
 			approxSyncDepth_ = new message_filters::Synchronizer<MyApproxSyncDepthPolicy>(MyApproxSyncDepthPolicy(queueSize), imageDepthSub_, cameraInfoSub_);
 			approxSyncDepth_->registerCallback(boost::bind(&PointCloudXYZ::callback, this, _1, _2));
 
-			approxSyncDisparity_ = new message_filters::Synchronizer<MyApproxSyncDisparityDispPolicy>(MyApproxSyncDisparityDispPolicy(queueSize), disparitySub_, disparityCameraInfoSub_);
+			approxSyncDisparity_ = new message_filters::Synchronizer<MyApproxSyncDisparityPolicy>(MyApproxSyncDisparityPolicy(queueSize), disparitySub_, disparityCameraInfoSub_);
 			approxSyncDisparity_->registerCallback(boost::bind(&PointCloudXYZ::callbackDisparity, this, _1, _2));
 		}
 		else
@@ -113,7 +113,7 @@ private:
 			exactSyncDepth_ = new message_filters::Synchronizer<MyExactSyncDepthPolicy>(MyExactSyncDepthPolicy(queueSize), imageDepthSub_, cameraInfoSub_);
 			exactSyncDepth_->registerCallback(boost::bind(&PointCloudXYZ::callback, this, _1, _2));
 
-			exactSyncDisparity_ = new message_filters::Synchronizer<MyExactSyncDisparityDispPolicy>(MyExactSyncDisparityDispPolicy(queueSize), disparitySub_, disparityCameraInfoSub_);
+			exactSyncDisparity_ = new message_filters::Synchronizer<MyExactSyncDisparityPolicy>(MyExactSyncDisparityPolicy(queueSize), disparitySub_, disparityCameraInfoSub_);
 			exactSyncDisparity_->registerCallback(boost::bind(&PointCloudXYZ::callbackDisparity, this, _1, _2));
 		}
 
@@ -255,14 +255,14 @@ private:
 	typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::CameraInfo> MyApproxSyncDepthPolicy;
 	message_filters::Synchronizer<MyApproxSyncDepthPolicy> * approxSyncDepth_;
 
-	typedef message_filters::sync_policies::ApproximateTime<stereo_msgs::DisparityImage, sensor_msgs::CameraInfo> MyApproxSyncDisparityDispPolicy;
-	message_filters::Synchronizer<MyApproxSyncDisparityDispPolicy> * approxSyncDisparity_;
+	typedef message_filters::sync_policies::ApproximateTime<stereo_msgs::DisparityImage, sensor_msgs::CameraInfo> MyApproxSyncDisparityPolicy;
+	message_filters::Synchronizer<MyApproxSyncDisparityPolicy> * approxSyncDisparity_;
 
 	typedef message_filters::sync_policies::ExactTime<sensor_msgs::Image, sensor_msgs::CameraInfo> MyExactSyncDepthPolicy;
 	message_filters::Synchronizer<MyExactSyncDepthPolicy> * exactSyncDepth_;
 
-	typedef message_filters::sync_policies::ExactTime<stereo_msgs::DisparityImage, sensor_msgs::CameraInfo> MyExactSyncDisparityDispPolicy;
-	message_filters::Synchronizer<MyExactSyncDisparityDispPolicy> * exactSyncDisparity_;
+	typedef message_filters::sync_policies::ExactTime<stereo_msgs::DisparityImage, sensor_msgs::CameraInfo> MyExactSyncDisparityPolicy;
+	message_filters::Synchronizer<MyExactSyncDisparityPolicy> * exactSyncDisparity_;
 
 };
 
