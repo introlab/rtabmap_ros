@@ -960,12 +960,7 @@ void CoreWrapper::process(
 				odomVariance,
 				id);
 
-		if(!rtabmap_.process(data))
-		{
-			timeRtabmap = timer.ticks();
-			ROS_WARN("RTAB-Map could not process the data received! (ROS id = %d)", id);
-		}
-		else
+		if(rtabmap_.process(data))
 		{
 			timeRtabmap = timer.ticks();
 			mapToOdomMutex_.lock();
@@ -1028,6 +1023,10 @@ void CoreWrapper::process(
 					}
 				}
 			}
+		}
+		else
+		{
+			timeRtabmap = timer.ticks();
 		}
 		ROS_INFO("rtabmap: Update rate=%fs, Limit=%fs, RTAB-Map=%fs, Publish=%fs (%d local nodes)",
 					1.0f/rate_,
