@@ -1005,7 +1005,7 @@ void CoreWrapper::process(
 					if(!updatedGoalPose.isNull())
 					{
 						// Adjust the target pose relative to last node
-						if(rtabmap_.getPathCurrentGoalId() == rtabmap_.getPath().back())
+						if(rtabmap_.getPathCurrentGoalId() == rtabmap_.getPath().back().first)
 						{
 							updatedGoalPose *= rtabmap_.getPathTransformToGoal();
 						}
@@ -1046,7 +1046,7 @@ void CoreWrapper::process(
 	}
 }
 
-void CoreWrapper::goalCommonCallback(const std::list<std::pair<int, Transform> > & poses)
+void CoreWrapper::goalCommonCallback(const std::vector<std::pair<int, Transform> > & poses)
 {
 	currentMetricGoal_.setNull();
 	if(poses.size())
@@ -1075,15 +1075,21 @@ void CoreWrapper::goalCommonCallback(const std::list<std::pair<int, Transform> >
 				path.header.frame_id = mapFrameId_;
 				path.header.stamp = now;
 				path.poses.resize(poses.size());
-				int oi = 0;
 				std::stringstream stream;
-				for(std::list<std::pair<int, Transform> >::const_iterator iter=poses.begin(); iter!=poses.end(); ++iter)
+				for(unsigned int i=0; i<poses.size(); ++i)
 				{
-					path.poses[oi].header = path.header;
-					rtabmap_ros::transformToPoseMsg(iter->second, path.poses[oi].pose);
-					++oi;
-					stream << iter->first << " ";
+					path.poses[i].header = path.header;
+					rtabmap_ros::transformToPoseMsg(poses[i].second, path.poses[i].pose);
+					stream << poses[i].first << " ";
 				}
+				if(!rtabmap_.getPathTransformToGoal().isIdentity())
+				{
+					path.poses.resize(poses.size()+1);
+					Transform t = poses.back().second*rtabmap_.getPathTransformToGoal();
+					rtabmap_ros::transformToPoseMsg(t, path.poses[path.poses.size()-1].pose);
+					stream << "G";
+				}
+
 				ROS_INFO("Publishing global path: [%s]", stream.str().c_str());
 				globalPathPub_.publish(path);
 			}
@@ -1120,7 +1126,8 @@ void CoreWrapper::goalCallback(const geometry_msgs::PoseStampedConstPtr & msg)
 		return;
 	}
 	ROS_INFO("Planning: set goal %s", targetPose.prettyPrint().c_str());
-	goalCommonCallback(rtabmap_.computePath(targetPose, false));
+	rtabmap_.computePath(targetPose, false);
+	goalCommonCallback(rtabmap_.getPath());
 }
 
 void CoreWrapper::goalGlobalCallback(const geometry_msgs::PoseStampedConstPtr & msg)
@@ -1132,7 +1139,8 @@ void CoreWrapper::goalGlobalCallback(const geometry_msgs::PoseStampedConstPtr & 
 		return;
 	}
 	ROS_INFO("Planning: set goal %s", targetPose.prettyPrint().c_str());
-	goalCommonCallback(rtabmap_.computePath(targetPose, true));
+	rtabmap_.computePath(targetPose, true);
+	goalCommonCallback(rtabmap_.getPath());
 }
 
 bool CoreWrapper::updateRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
@@ -1471,7 +1479,8 @@ bool CoreWrapper::setGoalCallback(rtabmap_ros::SetGoal::Request& req, rtabmap_ro
 {
 	int id = req.target_node_id;
 	ROS_INFO("Planning: set goal %d", id);
-	goalCommonCallback(rtabmap_.computePath(id, req.in_global_graph));
+	rtabmap_.computePath(id, req.in_global_graph);
+	goalCommonCallback(rtabmap_.getPath());
 	return !currentMetricGoal_.isNull();
 }
 
@@ -2002,7 +2011,7 @@ void CoreWrapper::publishLocalPath(const ros::Time & stamp)
 {
 	if(rtabmap_.getPath().size())
 	{
-		std::list<std::pair<int, Transform> > poses = rtabmap_.getPathNextPoses();
+		std::vector<std::pair<int, Transform> > poses = rtabmap_.getPathNextPoses();
 		if(poses.size())
 		{
 			if(localPathPub_.getNumSubscribers())
@@ -2013,7 +2022,7 @@ void CoreWrapper::publishLocalPath(const ros::Time & stamp)
 				path.poses.resize(poses.size());
 				int oi = 0;
 				std::stringstream stream;
-				for(std::list<std::pair<int, Transform> >::iterator iter=poses.begin(); iter!=poses.end(); ++iter)
+				for(std::vector<std::pair<int, Transform> >::iterator iter=poses.begin(); iter!=poses.end(); ++iter)
 				{
 					path.poses[oi].header = path.header;
 					rtabmap_ros::transformToPoseMsg(iter->second, path.poses[oi].pose);

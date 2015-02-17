@@ -107,7 +107,7 @@ private:
 						   const sensor_msgs::LaserScanConstPtr& scanMsg,
 						   const nav_msgs::OdometryConstPtr & odomMsg);
 
-	void goalCommonCallback(const std::list<std::pair<int, rtabmap::Transform> > & poses);
+	void goalCommonCallback(const std::vector<std::pair<int, rtabmap::Transform> > & poses);
 	void goalCallback(const geometry_msgs::PoseStampedConstPtr & msg);
 	void goalGlobalCallback(const geometry_msgs::PoseStampedConstPtr & msg);
 	void updateGoal(const ros::Time & stamp);
