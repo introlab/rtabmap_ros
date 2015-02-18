@@ -1019,7 +1019,15 @@ void CoreWrapper::process(
 					}
 					else
 					{
-						ROS_ERROR("Planning: Pose of node %d not found!? Cannot send a metric goal...", rtabmap_.getPathCurrentGoalId());
+						ROS_ERROR("Planning: Local map broken (the robot may have moved to far from planned nodes)");
+						rtabmap_.clearPath();
+						if(goalReachedPub_.getNumSubscribers())
+						{
+							std_msgs::Bool result;
+							result.data = false;
+							goalReachedPub_.publish(result);
+						}
+						currentMetricGoal_.setNull();
 					}
 				}
 			}
@@ -1105,7 +1113,9 @@ void CoreWrapper::goalCommonCallback(const std::vector<std::pair<int, Transform>
 	}
 	else
 	{
-		ROS_WARN("Planning: Goal already reached (RGBD/GoalReachedRadius=%fm).", rtabmap_.getGoalReachedRadius());
+		ROS_WARN("Planning: Goal already reached (RGBD/GoalReachedRadius=%fm) or too far from the graph (RGBD/GoalMaxDistance=%fm).",
+				rtabmap_.getGoalReachedRadius(),
+				rtabmap_.getGoalMaxDistance());
 		rtabmap_.clearPath();
 		if(goalReachedPub_.getNumSubscribers())
 		{
@@ -1125,7 +1135,9 @@ void CoreWrapper::goalCallback(const geometry_msgs::PoseStampedConstPtr & msg)
 		return;
 	}
 	ROS_INFO("Planning: set goal %s", targetPose.prettyPrint().c_str());
+	UTimer timer;
 	rtabmap_.computePath(targetPose, false);
+	ROS_INFO("Planning: Time computing path = %f s", timer.ticks());
 	goalCommonCallback(rtabmap_.getPath());
 }
 
@@ -1138,7 +1150,9 @@ void CoreWrapper::goalGlobalCallback(const geometry_msgs::PoseStampedConstPtr & 
 		return;
 	}
 	ROS_INFO("Planning: set goal %s", targetPose.prettyPrint().c_str());
+	UTimer timer;
 	rtabmap_.computePath(targetPose, true);
+	ROS_INFO("Planning: Time computing path = %f s", timer.ticks());
 	goalCommonCallback(rtabmap_.getPath());
 }
 
@@ -1478,7 +1492,9 @@ bool CoreWrapper::setGoalCallback(rtabmap_ros::SetGoal::Request& req, rtabmap_ro
 {
 	int id = req.target_node_id;
 	ROS_INFO("Planning: set goal %d", id);
+	UTimer timer;
 	rtabmap_.computePath(id, req.in_global_graph);
+	ROS_INFO("Planning: Time computing path = %f s", timer.ticks());
 	goalCommonCallback(rtabmap_.getPath());
 	return !currentMetricGoal_.isNull();
 }
