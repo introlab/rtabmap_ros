@@ -233,6 +233,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	oldParameterNames.push_back("LccReextract/LoopClosureFeatures");
 	oldParameterNames.push_back("Rtabmap/DetectorStrategy");
 	oldParameterNames.push_back("RGBD/ScanMatchingSize");
+	oldParameterNames.push_back("RGBD/LocalLoopDetectionRadius");
 	for(std::list<std::string>::iterator iter=oldParameterNames.begin(); iter!=oldParameterNames.end(); ++iter)
 	{
 		std::string vStr;
@@ -255,6 +256,12 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 				ROS_WARN("Parameter name changed: RGBD/ScanMatchingSize -> %s. Please update your launch file accordingly.",
 						Parameters::kRGBDPoseScanMatching().c_str());
 				parameters.at(Parameters::kRGBDPoseScanMatching())= std::atoi(vStr.c_str()) > 0?"true":"false";
+			}
+			else if(iter->compare("RGBD/LocalLoopDetectionRadius") == 0)
+			{
+				ROS_WARN("Parameter name changed: RGBD/LocalLoopDetectionRadius -> %s. Please update your launch file accordingly.",
+						Parameters::kRGBDLocalRadius().c_str());
+				parameters.at(Parameters::kRGBDLocalRadius())= vStr;
 			}
 		}
 	}
@@ -1019,7 +1026,8 @@ void CoreWrapper::process(
 					}
 					else
 					{
-						ROS_ERROR("Planning: Local map broken (the robot may have moved to far from planned nodes)");
+						ROS_ERROR("Planning: Local map broken, current goal id=%d (the robot may have moved to far from planned nodes)",
+								rtabmap_.getPathCurrentGoalId());
 						rtabmap_.clearPath();
 						if(goalReachedPub_.getNumSubscribers())
 						{
@@ -1115,7 +1123,7 @@ void CoreWrapper::goalCommonCallback(const std::vector<std::pair<int, Transform>
 	{
 		ROS_WARN("Planning: Goal already reached (RGBD/GoalReachedRadius=%fm) or too far from the graph (RGBD/GoalMaxDistance=%fm).",
 				rtabmap_.getGoalReachedRadius(),
-				rtabmap_.getGoalMaxDistance());
+				rtabmap_.getLocalRadius());
 		rtabmap_.clearPath();
 		if(goalReachedPub_.getNumSubscribers())
 		{
