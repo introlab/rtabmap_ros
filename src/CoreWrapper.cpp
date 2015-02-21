@@ -55,6 +55,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <laser_geometry/laser_geometry.h>
 #include <image_geometry/stereo_camera_model.h>
 
+#include <octomap/octomap.h>
+#include <octomap_ros/conversions.h>
+#include <octomap_msgs/Octomap.h>
+#include <octomap_msgs/conversions.h>
+
 //msgs
 #include "rtabmap_ros/Info.h"
 #include "rtabmap_ros/MapData.h"
@@ -78,7 +83,8 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 		useActionForGoal_(false),
 		cloudDecimation_(4),
 		cloudMaxDepth_(4.0), // meters
-		cloudVoxelSize_(0.02), // meters
+		cloudVoxelSize_(0.05), // meters
+		cloudOutputVoxelized_(false),
 		projMaxGroundAngle_(45.0), // degrees
 		projMinClusterSize_(20),
 		projMaxHeight_(2.0), // meters
@@ -86,6 +92,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 		gridSize_(0), // meters
 		mapFilterRadius_(0.5),
 		mapFilterAngle_(30.0), // degrees
+		mapCacheCleanup_(true),
 		mapToOdom_(tf::Transform::getIdentity()),
 		depthSync_(0),
 		depthScanSync_(0),
@@ -143,6 +150,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	pnh.param("cloud_decimation", cloudDecimation_, cloudDecimation_);
 	pnh.param("cloud_max_depth", cloudMaxDepth_, cloudMaxDepth_);
 	pnh.param("cloud_voxel_size", cloudVoxelSize_, cloudVoxelSize_);
+	pnh.param("cloud_output_voxelized", cloudOutputVoxelized_, cloudOutputVoxelized_);
 
 	//projection map stuff
 	pnh.param("proj_max_ground_angle", projMaxGroundAngle_, projMaxGroundAngle_);
@@ -156,6 +164,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	// common map stuff
 	pnh.param("map_filter_radius", mapFilterRadius_, mapFilterRadius_);
 	pnh.param("map_filter_angle", mapFilterAngle_, mapFilterAngle_);
+	pnh.param("map_cache_cleanup", mapCacheCleanup_, mapCacheCleanup_);
 
 	ROS_INFO("rtabmap: frame_id = %s", frameId_.c_str());
 	ROS_INFO("rtabmap: map_frame_id = %s", mapFrameId_.c_str());
@@ -331,6 +340,8 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	getProjMapSrv_ = nh.advertiseService("get_proj_map", &CoreWrapper::getProjMapCallback, this);
 	publishMapDataSrv_ = nh.advertiseService("publish_map", &CoreWrapper::publishMapCallback, this);
 	setGoalSrv_ = nh.advertiseService("set_goal", &CoreWrapper::setGoalCallback, this);
+	octomapBinarySrv_ = nh.advertiseService("octomap_binary", &CoreWrapper::octomapBinaryCallback, this);
+	octomapFullSrv_ = nh.advertiseService("octomap_full", &CoreWrapper::octomapFullCallback, this);
 
 	setupCallbacks(subscribeDepth, subscribeLaserScan, subscribeStereo, queueSize, stereoApproxSync);
 
@@ -986,6 +997,25 @@ void CoreWrapper::process(
 					gridMapPub_.getNumSubscribers() != 0);
 			this->publishMaps(filteredPoses, timeNow);
 
+			// clear memory if no one subscribed
+			if(mapCacheCleanup_)
+			{
+				if(cloudMapPub_.getNumSubscribers() == 0)
+				{
+					clouds_.clear();
+				}
+
+				if(projMapPub_.getNumSubscribers() == 0)
+				{
+					projMaps_.clear();
+				}
+
+				if(gridMapPub_.getNumSubscribers() == 0)
+				{
+					gridMaps_.clear();
+				}
+			}
+
 			// update goal if planning is enabled
 			if(!currentMetricGoal_.isNull())
 			{
@@ -1345,6 +1375,12 @@ bool CoreWrapper::getProjMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::
 				xMin, yMin,
 				gridSize_);
 
+		// clear memory if no one subscribed
+		if(mapCacheCleanup_ && projMapPub_.getNumSubscribers() == 0)
+		{
+			projMaps_.clear();
+		}
+
 		if(!pixels.empty())
 		{
 			//init
@@ -1388,6 +1424,12 @@ bool CoreWrapper::getGridMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::
 				xMin, yMin,
 				gridSize_);
 
+		// clear memory if no one subscribed
+		if(mapCacheCleanup_ && gridMapPub_.getNumSubscribers() == 0)
+		{
+			gridMaps_.clear();
+		}
+
 		if(!pixels.empty())
 		{
 			//init
@@ -1418,16 +1460,18 @@ bool CoreWrapper::getGridMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::
 
 bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtabmap_ros::PublishMap::Response& res)
 {
-	if(mapDataPub_.getNumSubscribers() || mapGraphPub_.getNumSubscribers())
-	{
-		ROS_INFO("rtabmap: Publishing map...");
+	ROS_INFO("rtabmap: Publishing map...");
 
+	if(mapDataPub_.getNumSubscribers() ||
+		mapGraphPub_.getNumSubscribers() ||
+		(!req.graphOnly && (cloudMapPub_.getNumSubscribers() || projMapPub_.getNumSubscribers() || gridMapPub_.getNumSubscribers())))
+	{
 		std::map<int, Signature> signatures;
 		std::map<int, Transform> poses;
 		std::multimap<int, Link> constraints;
 		std::map<int, int> mapIds;
 
-		if(mapDataPub_.getNumSubscribers() == 0 || req.graphOnly)
+		if(req.graphOnly)
 		{
 			rtabmap_.getGraph(
 					poses,
@@ -1453,46 +1497,92 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 			return false;
 		}
 
-		rtabmap_ros::GraphPtr graphMsg(new rtabmap_ros::Graph);
 		ros::Time now = ros::Time::now();
-		graphMsg->header.stamp = now;
-		graphMsg->header.frame_id = mapFrameId_;
-
-		rtabmap_ros::mapGraphToROS(poses,
-			mapIds,
-			constraints,
-			Transform::getIdentity(),
-			*graphMsg);
-
-		if(mapDataPub_.getNumSubscribers())
+		if(mapDataPub_.getNumSubscribers() || mapGraphPub_.getNumSubscribers())
 		{
-			//RGB-D SLAM data
-			rtabmap_ros::MapDataPtr msg(new rtabmap_ros::MapData);
-			msg->header = graphMsg->header;
-			msg->graph = *graphMsg;
+			rtabmap_ros::GraphPtr graphMsg(new rtabmap_ros::Graph);
+			graphMsg->header.stamp = now;
+			graphMsg->header.frame_id = mapFrameId_;
 
-			// add data
-			msg->nodes.resize(signatures.size());
-			int i=0;
-			for(std::map<int, Signature>::iterator iter = signatures.begin(); iter!=signatures.end(); ++iter)
+			rtabmap_ros::mapGraphToROS(poses,
+				mapIds,
+				constraints,
+				Transform::getIdentity(),
+				*graphMsg);
+
+			if(mapDataPub_.getNumSubscribers())
 			{
-				rtabmap_ros::nodeDataToROS(iter->second, msg->nodes[i++]);
+				//RGB-D SLAM data
+				rtabmap_ros::MapDataPtr msg(new rtabmap_ros::MapData);
+				msg->header = graphMsg->header;
+				msg->graph = *graphMsg;
+
+				// add data
+				msg->nodes.resize(signatures.size());
+				int i=0;
+				for(std::map<int, Signature>::iterator iter = signatures.begin(); iter!=signatures.end(); ++iter)
+				{
+					rtabmap_ros::nodeDataToROS(iter->second, msg->nodes[i++]);
+				}
+
+				mapDataPub_.publish(msg);
 			}
 
-			mapDataPub_.publish(msg);
+			if(mapGraphPub_.getNumSubscribers())
+			{
+				mapGraphPub_.publish(graphMsg);
+			}
 		}
 
-		if(mapGraphPub_.getNumSubscribers())
+		if(!req.graphOnly)
 		{
-			mapGraphPub_.publish(graphMsg);
-		}
+			std::map<int, Transform> filteredPoses;
+			if(signatures.size())
+			{
+				filteredPoses = this->updateMapCaches(poses,
+									cloudMapPub_.getNumSubscribers() != 0,
+									projMapPub_.getNumSubscribers() != 0,
+									gridMapPub_.getNumSubscribers() != 0,
+									signatures);
+			}
+			else if(mapFilterRadius_ > 0.0)
+			{
+				// filter nodes
+				double angle = mapFilterAngle_ == 0.0?CV_PI+0.1:mapFilterAngle_*CV_PI/180.0;
+				filteredPoses = rtabmap::graph::radiusPosesFiltering(poses, mapFilterRadius_, angle);
+			}
+			else
+			{
+				filteredPoses = poses;
+			}
+			publishMaps(filteredPoses, now);
 
-		publishMaps(poses, now);
+			// clear memory if no one subscribed
+			if(mapCacheCleanup_)
+			{
+				if(cloudMapPub_.getNumSubscribers() == 0)
+				{
+					clouds_.clear();
+				}
+
+				if(projMapPub_.getNumSubscribers() == 0)
+				{
+					projMaps_.clear();
+				}
+
+				if(gridMapPub_.getNumSubscribers() == 0)
+				{
+					gridMaps_.clear();
+				}
+			}
+		}
 	}
 	else
 	{
-		ROS_INFO("rtabmap: not publishing the map because there are no subscribers to MapData...");
+		UWARN("No subscribers, don't need to publish!");
+		return false;
 	}
+
 	return true;
 }
 
@@ -1566,9 +1656,10 @@ std::map<int, rtabmap::Transform> CoreWrapper::updateMapCaches(
 		const std::map<int, rtabmap::Transform> & poses,
 		bool updateCloud,
 		bool updateProj,
-		bool updateGrid)
+		bool updateGrid,
+		const std::map<int, Signature> & signatures)
 {
-	if(!rtabmap_.getMemory())
+	if(!rtabmap_.getMemory() && signatures.size() == 0)
 	{
 		ROS_FATAL("Memory not initialized!?");
 		return std::map<int, rtabmap::Transform>();
@@ -1603,7 +1694,18 @@ std::map<int, rtabmap::Transform> CoreWrapper::updateMapCaches(
 					depthRequired ||
 					scanRequired)
 				{
-					data = rtabmap_.getMemory()->getSignatureDataConst(iter->first);
+					if(signatures.size())
+					{
+						std::map<int, Signature>::const_iterator findIter = signatures.find(iter->first);
+						if(findIter != signatures.end())
+						{
+							data = findIter->second;
+						}
+					}
+					else
+					{
+						data = rtabmap_.getMemory()->getSignatureDataConst(iter->first);
+					}
 				}
 
 				if(data.id() > 0)
@@ -1815,22 +1917,6 @@ std::map<int, rtabmap::Transform> CoreWrapper::updateMapCaches(
 		}
 	}
 
-	// clear memory if no one subscribed
-	if(cloudMapPub_.getNumSubscribers() == 0)
-	{
-		clouds_.clear();
-	}
-
-	if(projMapPub_.getNumSubscribers() == 0)
-	{
-		projMaps_.clear();
-	}
-
-	if(gridMapPub_.getNumSubscribers() == 0)
-	{
-		gridMaps_.clear();
-	}
-
 	return filteredPoses;
 }
 
@@ -1842,8 +1928,9 @@ void CoreWrapper::publishMaps(
 	if(cloudMapPub_.getNumSubscribers())
 	{
 		// generate the assembled cloud!
+		UTimer time;
 		pcl::PointCloud<pcl::PointXYZRGB>::Ptr assembledCloud(new pcl::PointCloud<pcl::PointXYZRGB>);
-
+		int count = 0;
 		for(std::map<int, Transform>::const_iterator iter = poses.begin(); iter!=poses.end(); ++iter)
 		{
 			std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr >::iterator jter = clouds_.find(iter->first);
@@ -1851,21 +1938,27 @@ void CoreWrapper::publishMaps(
 			{
 				pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::transformPointCloud<pcl::PointXYZRGB>(jter->second, iter->second);
 				*assembledCloud+=*transformed;
+				++count;
 			}
 		}
 
 		if(assembledCloud->size())
 		{
-			if(cloudVoxelSize_ > 0)
+			if(cloudVoxelSize_ > 0 && cloudOutputVoxelized_)
 			{
 				assembledCloud = util3d::voxelize<pcl::PointXYZRGB>(assembledCloud, cloudVoxelSize_);
 			}
+			ROS_INFO("Assembled %d clouds (%fs)", count, time.ticks());
 
 			sensor_msgs::PointCloud2::Ptr cloudMsg(new sensor_msgs::PointCloud2);
 			pcl::toROSMsg(*assembledCloud, *cloudMsg);
 			cloudMsg->header.stamp = stamp;
 			cloudMsg->header.frame_id = mapFrameId_;
 			cloudMapPub_.publish(cloudMsg);
+		}
+		else if(poses.size())
+		{
+			ROS_WARN("Cloud map is empty! (clouds=%d)", (int)clouds_.size());
 		}
 	}
 
@@ -1906,6 +1999,10 @@ void CoreWrapper::publishMaps(
 
 			projMapPub_.publish(map);
 		}
+		else if(poses.size())
+		{
+			ROS_WARN("Projection map is empty! (proj maps=%d)", (int)projMaps_.size());
+		}
 	}
 
 	if(gridMapPub_.getNumSubscribers())
@@ -1944,6 +2041,10 @@ void CoreWrapper::publishMaps(
 			map.header.stamp = stamp;
 
 			gridMapPub_.publish(map);
+		}
+		else if(poses.size())
+		{
+			ROS_WARN("Grid map is empty! (local maps=%d)", (int)gridMaps_.size());
 		}
 	}
 }
@@ -2057,6 +2158,80 @@ void CoreWrapper::publishLocalPath(const ros::Time & stamp)
 			}
 		}
 	}
+}
+
+// returned OcTree must be deleted
+// RTAB-Map optimizes the graph at almost each iteration, an octomap cannot
+// be updated online. Only available on service. To have an "online" octomap published as a topic,
+// you may want to subscribe an octomap_server to /rtabmap/cloud topic.
+//
+octomap::OcTree * CoreWrapper::createOctomap()
+{
+	octomap::OcTree * octree = new octomap::OcTree(gridCellSize_);
+	UTimer time;
+	std::map<int, Transform> poses = rtabmap_.getLocalOptimizedPoses();
+	if(clouds_.size() == 0)
+	{
+		poses = this->updateMapCaches(poses, true, false, false);
+	}
+	for(std::map<int, Transform>::const_iterator posesIter = poses.begin(); posesIter!=poses.end(); ++posesIter)
+	{
+		std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr >::iterator cloudsIter = clouds_.find(posesIter->first);
+		if(cloudsIter != clouds_.end())
+		{
+			octomap::Pointcloud * scan = new octomap::Pointcloud();
+			octomap::pointcloudPCLToOctomap(*cloudsIter->second, *scan);
+			float x,y,z, r,p,w;
+			posesIter->second.getTranslationAndEulerAngles(x,y,z,r,p,w);
+			octomap::ScanNode node(scan, octomap::pose6d(x,y,z, r,p,w), posesIter->first);
+			octree->insertPointCloud(node, cloudMaxDepth_, true, true);
+			ROS_INFO("inserted %d pt=%d (%fs)", posesIter->first, (int)scan->size(), time.ticks());
+		}
+	}
+
+	octree->updateInnerOccupancy();
+	ROS_INFO("updated inner occupancy (%fs)", time.ticks());
+
+	// clear memory if no one subscribed
+	if(mapCacheCleanup_ && cloudMapPub_.getNumSubscribers() == 0)
+	{
+		clouds_.clear();
+	}
+	return octree;
+}
+
+bool CoreWrapper::octomapBinaryCallback(
+		octomap_msgs::GetOctomap::Request  &req,
+		octomap_msgs::GetOctomap::Response &res)
+{
+	ROS_INFO("Sending binary map data on service request");
+	res.map.header.frame_id = mapFrameId_;
+	res.map.header.stamp = ros::Time::now();
+
+	octomap::OcTree * octree = createOctomap();
+	bool success = octree != 0 && octree->size() && octomap_msgs::binaryMapToMsg(*octree, res.map);
+	if(octree)
+	{
+		delete octree;
+	}
+	return success;
+}
+
+bool CoreWrapper::octomapFullCallback(
+		octomap_msgs::GetOctomap::Request  &req,
+		octomap_msgs::GetOctomap::Response &res)
+{
+	ROS_INFO("Sending full map data on service request");
+	res.map.header.frame_id = mapFrameId_;
+	res.map.header.stamp = ros::Time::now();
+
+	octomap::OcTree * octree = createOctomap();
+	bool success = octree != 0 && octree->size() && octomap_msgs::fullMapToMsg(*octree, res.map);
+	if(octree)
+	{
+		delete octree;
+	}
+	return success;
 }
 
 /**

@@ -8,12 +8,13 @@ find_package(catkin REQUIRED COMPONENTS
              cv_bridge roscpp rospy sensor_msgs std_msgs std_srvs nav_msgs geometry_msgs
              image_transport tf tf_conversions laser_geometry pcl_conversions 
              pcl_ros nodelet dynamic_reconfigure rviz message_filters class_loader
-             genmsg stereo_msgs
+             genmsg stereo_msgs octomap_ros
 )
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 find_package(RTABMap 0.8 REQUIRED)
+find_package(octomap REQUIRED)
 
 #Qt stuff
 FIND_PACKAGE(Qt4 COMPONENTS QtCore QtGui REQUIRED)
@@ -81,7 +82,7 @@ catkin_package(
   CATKIN_DEPENDS cv_bridge roscpp rospy sensor_msgs std_msgs std_srvs nav_msgs geometry_msgs
                  image_transport tf tf_conversions laser_geometry pcl_conversions 
                  pcl_ros nodelet dynamic_reconfigure rviz message_filters class_loader
-                 stereo_msgs
+                 stereo_msgs octomap_ros
 )
 
 ###########
@@ -95,12 +96,14 @@ include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/include
   ${RTABMap_INCLUDE_DIRS}
   ${catkin_INCLUDE_DIRS}
+  ${OCTOMAP_INCLUDE_DIRS}
 )
 
 # libraries
 SET(Libraries
    ${catkin_LIBRARIES}
    ${RTABMap_LIBRARIES}
+   ${OCTOMAP_LIBRARIES}
 )
 
 ## RVIZ plugin
