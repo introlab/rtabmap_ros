@@ -2095,18 +2095,31 @@ void CoreWrapper::publishCurrentGoal(const ros::Time & stamp)
 void CoreWrapper::goalDoneCb(const actionlib::SimpleClientGoalState& state,
              const move_base_msgs::MoveBaseResultConstPtr& result)
 {
+	bool ignore = false;
 	if(!currentMetricGoal_.isNull())
 	{
 		if(state == actionlib::SimpleClientGoalState::SUCCEEDED)
 		{
-			ROS_INFO("Planning: move_base success!");
+			if(rtabmap_.getPath().size() &&
+				rtabmap_.getPathCurrentGoalId() != rtabmap_.getPath().back().first &&
+				!uContains(rtabmap_.getLocalOptimizedPoses(), rtabmap_.getPath().back().first))
+			{
+				ROS_WARN("Planning: move_base reached current goal but it is not "
+						 "the last one planned by rtabmap. A new goal should be sent when "
+						 "rtabmap will be able to retrieve next locations on the path.");
+				ignore = true;
+			}
+			else
+			{
+				ROS_INFO("Planning: move_base success!");
+			}
 		}
 		else
 		{
 			ROS_ERROR("Planning: move_base failed for some reason. Aborting the plan...");
 		}
 
-		if(!goalReachedPub_.getNumSubscribers())
+		if(!ignore && !goalReachedPub_.getNumSubscribers())
 		{
 			std_msgs::Bool result;
 			result.data = state == actionlib::SimpleClientGoalState::SUCCEEDED;
@@ -2114,8 +2127,11 @@ void CoreWrapper::goalDoneCb(const actionlib::SimpleClientGoalState& state,
 		}
 	}
 
-	rtabmap_.clearPath();
-	currentMetricGoal_.setNull();
+	if(!ignore)
+	{
+		rtabmap_.clearPath();
+		currentMetricGoal_.setNull();
+	}
 }
 
 // Called once when the goal becomes active
