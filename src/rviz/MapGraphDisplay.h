@@ -75,7 +75,11 @@ private:
 
   std::vector<Ogre::ManualObject*> manual_objects_;
 
-  ColorProperty* color_property_;
+  ColorProperty* color_neighbor_property_;
+  ColorProperty* color_global_property_;
+  ColorProperty* color_local_property_;
+  ColorProperty* color_user_property_;
+  ColorProperty* color_virtual_property_;
   FloatProperty* alpha_property_;
 };
 
