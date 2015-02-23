@@ -90,27 +90,71 @@ private:
 	void setupCallbacks(bool subscribeDepth, bool subscribeLaserScan, bool subscribeStereo, int queueSize, bool stereoApproxSync);
 	void defaultCallback(const sensor_msgs::ImageConstPtr & imageMsg); // no odom
 
-	bool commonMetricCallbackBegin(const nav_msgs::OdometryConstPtr & odomMsg);
-	void depthCallback(const sensor_msgs::ImageConstPtr& imageMsg,
-					   const nav_msgs::OdometryConstPtr & odomMsg,
-					   const sensor_msgs::ImageConstPtr& imageDepthMsg,
-					   const sensor_msgs::CameraInfoConstPtr& camInfoMsg);
-	void depthScanCallback(const sensor_msgs::ImageConstPtr& imageMsg,
-						   const nav_msgs::OdometryConstPtr & odomMsg,
-						   const sensor_msgs::ImageConstPtr& imageDepthMsg,
-						   const sensor_msgs::CameraInfoConstPtr& camInfoMsg,
-						   const sensor_msgs::LaserScanConstPtr& scanMsg);
-	void stereoCallback(const sensor_msgs::ImageConstPtr& leftImageMsg,
-					   	   const sensor_msgs::ImageConstPtr& rightImageMsg,
-					   	   const sensor_msgs::CameraInfoConstPtr& leftCamInfoMsg,
-					   	   const sensor_msgs::CameraInfoConstPtr& rightCamInfoMsg,
-					   	   const nav_msgs::OdometryConstPtr & odomMsg);
-	void stereoScanCallback(const sensor_msgs::ImageConstPtr& leftImageMsg,
-						   const sensor_msgs::ImageConstPtr& rightImageMsg,
-						   const sensor_msgs::CameraInfoConstPtr& leftCamInfoMsg,
-						   const sensor_msgs::CameraInfoConstPtr& rightCamInfoMsg,
-						   const sensor_msgs::LaserScanConstPtr& scanMsg,
-						   const nav_msgs::OdometryConstPtr & odomMsg);
+	bool commonOdomUpdate(const nav_msgs::OdometryConstPtr & odomMsg);
+	bool commonOdomTFUpdate(const ros::Time & stamp); // TF odom
+	rtabmap::Transform getLocalTransform(const std::string & sensorFrameId, const ros::Time & stamp) const;
+
+	void commonDepthCallback(
+				const std::string & odomFrameId,
+				const sensor_msgs::ImageConstPtr& imageMsg,
+				const sensor_msgs::ImageConstPtr& imageDepthMsg,
+				const sensor_msgs::CameraInfoConstPtr& camInfoMsg,
+				const sensor_msgs::LaserScanConstPtr& scanMsg);
+	void commonStereoCallback(
+				const std::string & odomFrameId,
+				const sensor_msgs::ImageConstPtr& leftImageMsg,
+				const sensor_msgs::ImageConstPtr& rightImageMsg,
+				const sensor_msgs::CameraInfoConstPtr& leftCamInfoMsg,
+				const sensor_msgs::CameraInfoConstPtr& rightCamInfoMsg,
+				const sensor_msgs::LaserScanConstPtr& scanMsg);
+
+	// with odom msg
+	void depthCallback(
+			const sensor_msgs::ImageConstPtr& imageMsg,
+			const nav_msgs::OdometryConstPtr & odomMsg,
+			const sensor_msgs::ImageConstPtr& imageDepthMsg,
+			const sensor_msgs::CameraInfoConstPtr& camInfoMsg);
+	void depthScanCallback(
+			const sensor_msgs::ImageConstPtr& imageMsg,
+			const nav_msgs::OdometryConstPtr & odomMsg,
+			const sensor_msgs::ImageConstPtr& imageDepthMsg,
+			const sensor_msgs::CameraInfoConstPtr& camInfoMsg,
+			const sensor_msgs::LaserScanConstPtr& scanMsg);
+	void stereoCallback(
+			const sensor_msgs::ImageConstPtr& leftImageMsg,
+			const sensor_msgs::ImageConstPtr& rightImageMsg,
+			const sensor_msgs::CameraInfoConstPtr& leftCamInfoMsg,
+			const sensor_msgs::CameraInfoConstPtr& rightCamInfoMsg,
+			const nav_msgs::OdometryConstPtr & odomMsg);
+	void stereoScanCallback(
+			const sensor_msgs::ImageConstPtr& leftImageMsg,
+			const sensor_msgs::ImageConstPtr& rightImageMsg,
+			const sensor_msgs::CameraInfoConstPtr& leftCamInfoMsg,
+			const sensor_msgs::CameraInfoConstPtr& rightCamInfoMsg,
+			const sensor_msgs::LaserScanConstPtr& scanMsg,
+			const nav_msgs::OdometryConstPtr & odomMsg);
+
+	// without odom, when TF is used for odom
+	void depthTFCallback(
+			const sensor_msgs::ImageConstPtr& imageMsg,
+			const sensor_msgs::ImageConstPtr& imageDepthMsg,
+			const sensor_msgs::CameraInfoConstPtr& camInfoMsg);
+	void depthScanTFCallback(
+			const sensor_msgs::ImageConstPtr& imageMsg,
+			const sensor_msgs::ImageConstPtr& imageDepthMsg,
+			const sensor_msgs::CameraInfoConstPtr& camInfoMsg,
+			const sensor_msgs::LaserScanConstPtr& scanMsg);
+	void stereoTFCallback(
+			const sensor_msgs::ImageConstPtr& leftImageMsg,
+			const sensor_msgs::ImageConstPtr& rightImageMsg,
+			const sensor_msgs::CameraInfoConstPtr& leftCamInfoMsg,
+			const sensor_msgs::CameraInfoConstPtr& rightCamInfoMsg);
+	void stereoScanTFCallback(
+			const sensor_msgs::ImageConstPtr& leftImageMsg,
+			const sensor_msgs::ImageConstPtr& rightImageMsg,
+			const sensor_msgs::CameraInfoConstPtr& leftCamInfoMsg,
+			const sensor_msgs::CameraInfoConstPtr& rightCamInfoMsg,
+			const sensor_msgs::LaserScanConstPtr& scanMsg);
 
 	void goalCommonCallback(const std::vector<std::pair<int, rtabmap::Transform> > & poses);
 	void goalCallback(const geometry_msgs::PoseStampedConstPtr & msg);
@@ -171,7 +215,7 @@ private:
 	rtabmap::Rtabmap rtabmap_;
 	bool paused_;
 	rtabmap::Transform lastPose_;
-	float _variance;
+	float variance_;
 	rtabmap::Transform currentMetricGoal_;
 
 	std::string frameId_;
@@ -274,6 +318,42 @@ private:
 			sensor_msgs::CameraInfo,
 			nav_msgs::Odometry> MyStereoExactSyncPolicy;
 	message_filters::Synchronizer<MyStereoExactSyncPolicy> * stereoExactSync_;
+
+	// without odom, when TF is used for odom
+	typedef message_filters::sync_policies::ApproximateTime<
+			sensor_msgs::Image,
+			sensor_msgs::Image,
+			sensor_msgs::CameraInfo,
+			sensor_msgs::LaserScan> MyDepthScanTFSyncPolicy;
+	message_filters::Synchronizer<MyDepthScanTFSyncPolicy> * depthScanTFSync_;
+
+	typedef message_filters::sync_policies::ApproximateTime<
+			sensor_msgs::Image,
+			sensor_msgs::Image,
+			sensor_msgs::CameraInfo> MyDepthTFSyncPolicy;
+	message_filters::Synchronizer<MyDepthTFSyncPolicy> * depthTFSync_;
+
+	typedef message_filters::sync_policies::ApproximateTime<
+			sensor_msgs::Image,
+			sensor_msgs::Image,
+			sensor_msgs::CameraInfo,
+			sensor_msgs::CameraInfo,
+			sensor_msgs::LaserScan> MyStereoScanTFSyncPolicy;
+	message_filters::Synchronizer<MyStereoScanTFSyncPolicy> * stereoScanTFSync_;
+
+	typedef message_filters::sync_policies::ApproximateTime<
+			sensor_msgs::Image,
+			sensor_msgs::Image,
+			sensor_msgs::CameraInfo,
+			sensor_msgs::CameraInfo> MyStereoApproxTFSyncPolicy;
+	message_filters::Synchronizer<MyStereoApproxTFSyncPolicy> * stereoApproxTFSync_;
+
+	typedef message_filters::sync_policies::ExactTime<
+			sensor_msgs::Image,
+			sensor_msgs::Image,
+			sensor_msgs::CameraInfo,
+			sensor_msgs::CameraInfo> MyStereoExactTFSyncPolicy;
+	message_filters::Synchronizer<MyStereoExactTFSyncPolicy> * stereoExactTFSync_;
 
 	tf::TransformBroadcaster tfBroadcaster_;
 	tf::TransformListener tfListener_;
