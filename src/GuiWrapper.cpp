@@ -58,6 +58,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <pcl_conversions/pcl_conversions.h>
 #include <laser_geometry/laser_geometry.h>
 
+float max3( const float& a, const float& b, const float& c)
+{
+	float m=a>b?a:b;
+	return m>c?m:c;
+}
+
 GuiWrapper::GuiWrapper(int & argc, char** argv) :
 		app_(0),
 		mainWindow_(0),
@@ -364,7 +370,9 @@ void GuiWrapper::defaultCallback(const nav_msgs::OdometryConstPtr & odomMsg)
 {
 	Transform odom = rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose);
 	rtabmap::SensorData data(cv::Mat(), odomMsg->header.seq);
-	data.setPose(odom, odomMsg->pose.covariance[0]);
+	float transVariance = max3(odomMsg->pose.covariance[0], odomMsg->pose.covariance[7], odomMsg->pose.covariance[14]);
+	float rotVariance = max3(odomMsg->pose.covariance[21], odomMsg->pose.covariance[28], odomMsg->pose.covariance[35]);
+	data.setPose(odom, rotVariance, transVariance);
 	this->post(new OdometryEvent(data));
 }
 
@@ -407,6 +415,9 @@ void GuiWrapper::depthCallback(
 	float cx = model.cx();
 	float cy = model.cy();
 
+	float transVariance = max3(odomMsg->pose.covariance[0], odomMsg->pose.covariance[7], odomMsg->pose.covariance[14]);
+	float rotVariance = max3(odomMsg->pose.covariance[21], odomMsg->pose.covariance[28], odomMsg->pose.covariance[35]);
+
 	rtabmap::SensorData image(
 			ptrImage->image.clone(),
 			ptrDepth->image.clone(),
@@ -416,7 +427,8 @@ void GuiWrapper::depthCallback(
 			cy,
 			localTransform,
 			rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose),
-			odomMsg->pose.covariance[0],
+			rotVariance,
+			transVariance,
 			odomMsg->header.seq);
 	this->post(new OdometryEvent(image));
 }
@@ -461,6 +473,9 @@ void GuiWrapper::depthOdomInfoCallback(
 	float cx = model.cx();
 	float cy = model.cy();
 
+	float transVariance = max3(odomMsg->pose.covariance[0], odomMsg->pose.covariance[7], odomMsg->pose.covariance[14]);
+	float rotVariance = max3(odomMsg->pose.covariance[21], odomMsg->pose.covariance[28], odomMsg->pose.covariance[35]);
+
 	rtabmap::SensorData image(
 			ptrImage->image.clone(),
 			ptrDepth->image.clone(),
@@ -470,7 +485,8 @@ void GuiWrapper::depthOdomInfoCallback(
 			cy,
 			localTransform,
 			rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose),
-			odomMsg->pose.covariance[0],
+			rotVariance,
+			transVariance,
 			odomMsg->header.seq);
 	OdometryInfo info = rtabmap_ros::odomInfoFromROS(*odomInfoMsg);
 	this->post(new OdometryEvent(image, info));
@@ -525,6 +541,9 @@ void GuiWrapper::depthScanCallback(
 	float cx = model.cx();
 	float cy = model.cy();
 
+	float transVariance = max3(odomMsg->pose.covariance[0], odomMsg->pose.covariance[7], odomMsg->pose.covariance[14]);
+	float rotVariance = max3(odomMsg->pose.covariance[21], odomMsg->pose.covariance[28], odomMsg->pose.covariance[35]);
+
 	rtabmap::SensorData image(
 			scan,
 			ptrImage->image.clone(),
@@ -535,7 +554,8 @@ void GuiWrapper::depthScanCallback(
 			cy,
 			localTransform,
 			rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose),
-			odomMsg->pose.covariance[0],
+			rotVariance,
+			transVariance,
 			odomMsg->header.seq);
 	this->post(new OdometryEvent(image));
 }
@@ -613,6 +633,9 @@ void GuiWrapper::stereoScanCallback(
 	float cy = model.left().cy();
 	float baseline = model.baseline();
 
+	float transVariance = max3(odomMsg->pose.covariance[0], odomMsg->pose.covariance[7], odomMsg->pose.covariance[14]);
+	float rotVariance = max3(odomMsg->pose.covariance[21], odomMsg->pose.covariance[28], odomMsg->pose.covariance[35]);
+
 	rtabmap::SensorData image(
 			scan,
 			ptrLeftImage->image.clone(),
@@ -623,7 +646,8 @@ void GuiWrapper::stereoScanCallback(
 			cy,
 			localTransform,
 			rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose),
-			odomMsg->pose.covariance[0],
+			rotVariance,
+			transVariance,
 			odomMsg->header.seq);
 	this->post(new OdometryEvent(image));
 }
@@ -692,6 +716,9 @@ void GuiWrapper::stereoOdomInfoCallback(
 	float cy = model.left().cy();
 	float baseline = model.baseline();
 
+	float transVariance = max3(odomMsg->pose.covariance[0], odomMsg->pose.covariance[7], odomMsg->pose.covariance[14]);
+	float rotVariance = max3(odomMsg->pose.covariance[21], odomMsg->pose.covariance[28], odomMsg->pose.covariance[35]);
+
 	rtabmap::SensorData image(
 			ptrLeftImage->image.clone(),
 			ptrRightImage->image.clone(),
@@ -701,7 +728,8 @@ void GuiWrapper::stereoOdomInfoCallback(
 			cy,
 			localTransform,
 			rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose),
-			odomMsg->pose.covariance[0],
+			rotVariance,
+			transVariance,
 			odomMsg->header.seq);
 	OdometryInfo info = rtabmap_ros::odomInfoFromROS(*odomInfoMsg);
 	this->post(new OdometryEvent(image, info));
@@ -770,6 +798,9 @@ void GuiWrapper::stereoCallback(
 	float cy = model.left().cy();
 	float baseline = model.baseline();
 
+	float transVariance = max3(odomMsg->pose.covariance[0], odomMsg->pose.covariance[7], odomMsg->pose.covariance[14]);
+	float rotVariance = max3(odomMsg->pose.covariance[21], odomMsg->pose.covariance[28], odomMsg->pose.covariance[35]);
+
 	rtabmap::SensorData image(
 			ptrLeftImage->image.clone(),
 			ptrRightImage->image.clone(),
@@ -779,7 +810,8 @@ void GuiWrapper::stereoCallback(
 			cy,
 			localTransform,
 			rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose),
-			odomMsg->pose.covariance[0],
+			rotVariance,
+			transVariance,
 			odomMsg->header.seq);
 	this->post(new OdometryEvent(image));
 }

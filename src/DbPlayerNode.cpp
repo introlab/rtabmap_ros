@@ -252,12 +252,12 @@ int main(int argc, char** argv)
 				odom.header.frame_id = odomFrameId;
 				odom.header.stamp = time;
 				rtabmap_ros::transformToPoseMsg(data.pose(), odom.pose.pose);
-				odom.pose.covariance[0] = data.poseVariance();
-				odom.pose.covariance[7] = data.poseVariance();
-				odom.pose.covariance[14] = data.poseVariance();
-				odom.pose.covariance[21] = data.poseVariance();
-				odom.pose.covariance[28] = data.poseVariance();
-				odom.pose.covariance[35] = data.poseVariance();
+				odom.pose.covariance[0] = data.poseTransVariance();
+				odom.pose.covariance[7] = data.poseTransVariance();
+				odom.pose.covariance[14] = data.poseTransVariance();
+				odom.pose.covariance[21] = data.poseRotVariance();
+				odom.pose.covariance[28] = data.poseRotVariance();
+				odom.pose.covariance[35] = data.poseRotVariance();
 				odometryPub.publish(odom);
 			}
 		}

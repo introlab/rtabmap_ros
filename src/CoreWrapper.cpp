@@ -70,10 +70,17 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace rtabmap;
 
+float max3( const float& a, const float& b, const float& c)
+{
+	float m=a>b?a:b;
+	return m>c?m:c;
+}
+
 CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 		paused_(false),
 		lastPose_(Transform::getIdentity()),
-		variance_(0),
+		rotVariance_(0),
+		transVariance_(0),
 		frameId_("base_link"),
 		mapFrameId_("map"),
 		odomFrameId_(""),
@@ -99,6 +106,11 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 		stereoScanSync_(0),
 		stereoApproxSync_(0),
 		stereoExactSync_(0),
+		depthTFSync_(0),
+		depthScanTFSync_(0),
+		stereoScanTFSync_(0),
+		stereoApproxTFSync_(0),
+		stereoExactTFSync_(0),
 		transformThread_(0),
 		rate_(Parameters::defaultRtabmapDetectionRate()),
 		time_(ros::Time::now()),
@@ -537,13 +549,20 @@ bool CoreWrapper::commonOdomUpdate(const nav_msgs::OdometryConstPtr & odomMsg)
 		{
 			UWARN("Odometry is reset (identity pose detected). Increment map id!");
 			rtabmap_.triggerNewMap();
-			variance_ = 0;
+			rotVariance_ = 0;
+			transVariance_ = 0;
 		}
 
 		lastPose_ = odom;
-		if(odomMsg->pose.covariance[0] > variance_)
+		float transVariance = max3(odomMsg->pose.covariance[0], odomMsg->pose.covariance[7], odomMsg->pose.covariance[14]);
+		float rotVariance = max3(odomMsg->pose.covariance[21], odomMsg->pose.covariance[28], odomMsg->pose.covariance[35]);
+		if(rotVariance > rotVariance_)
 		{
-			variance_ = odomMsg->pose.covariance[0];
+			rotVariance_ = rotVariance;
+		}
+		if(transVariance > transVariance_)
+		{
+			transVariance_ = transVariance;
 		}
 
 		// Throttle
@@ -591,7 +610,8 @@ bool CoreWrapper::commonOdomTFUpdate(const ros::Time & stamp)
 		{
 			UWARN("Odometry is reset (identity pose detected). Increment map id!");
 			rtabmap_.triggerNewMap();
-			variance_ = 0;
+			rotVariance_ = 0;
+			transVariance_ = 0;
 		}
 
 		lastPose_ = odom;
@@ -700,7 +720,8 @@ void CoreWrapper::commonDepthCallback(
 			ptrImage->image,
 			lastPose_,
 			odomFrameId,
-			variance_>0?variance_:1.0f,
+			rotVariance_>0?rotVariance_:1.0f,
+			transVariance_>0?transVariance_:1.0f,
 			ptrDepth->image,
 			fx,
 			fy,
@@ -708,7 +729,8 @@ void CoreWrapper::commonDepthCallback(
 			cy,
 			localTransform,
 			scan);
-	variance_ = 0;
+	rotVariance_ = 0;
+	transVariance_ = 0;
 }
 
 void CoreWrapper::commonStereoCallback(
@@ -779,7 +801,8 @@ void CoreWrapper::commonStereoCallback(
 			ptrLeftImage->image,
 			lastPose_,
 			odomFrameId,
-			variance_>0?variance_:1.0f,
+			rotVariance_>0?rotVariance_:1.0f,
+			transVariance_>0?transVariance_:1.0f,
 			ptrRightImage->image,
 			fx,
 			baseline,
@@ -787,7 +810,8 @@ void CoreWrapper::commonStereoCallback(
 			cy,
 			localTransform,
 			scan);
-	variance_ = 0;
+	rotVariance_ = 0;
+	transVariance_ = 0;
 }
 
 void CoreWrapper::depthCallback(
@@ -905,7 +929,8 @@ void CoreWrapper::process(
 		const cv::Mat & image,
 		const Transform & odom,
 		const std::string & odomFrameId,
-		float odomVariance,
+		float odomRotationalVariance,
+		float odomTransitionalVariance,
 		const cv::Mat & depthOrRightImage,
 		float fx,
 		float fyOrBaseline,
@@ -963,7 +988,8 @@ void CoreWrapper::process(
 				cy,
 				localTransform,
 				odom,
-				odomVariance,
+				odomRotationalVariance,
+				odomTransitionalVariance,
 				id);
 
 		if(rtabmap_.process(data))
@@ -1227,7 +1253,8 @@ bool CoreWrapper::resetRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empt
 {
 	ROS_INFO("rtabmap: Reset");
 	rtabmap_.resetMemory();
-	variance_ = 0;
+	rotVariance_ = 0;
+	transVariance_ = 0;
 	lastPose_.setIdentity();
 	currentMetricGoal_.setNull();
 	return true;

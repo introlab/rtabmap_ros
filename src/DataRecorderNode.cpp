@@ -63,6 +63,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace rtabmap;
 
+float max3( const float& a, const float& b, const float& c)
+{
+	float m=a>b?a:b;
+	return m>c?m:c;
+}
 
 class DataRecorderWrapper
 {
@@ -283,7 +288,9 @@ private:
 			cy,
 			localTransform,
 			Transform(),
-			1.0f);
+			1.0f,
+			1.0f,
+			0);
 		recorder_.addData(data);
 	}
 
@@ -352,6 +359,9 @@ private:
 			depth16 = ptrDepth->image.clone();
 		}
 
+		float transVariance = max3(odomMsg->pose.covariance[0], odomMsg->pose.covariance[7], odomMsg->pose.covariance[14]);
+		float rotVariance = max3(odomMsg->pose.covariance[21], odomMsg->pose.covariance[28], odomMsg->pose.covariance[35]);
+
 		rtabmap::SensorData data(
 			ptrImage->image.clone(),
 			depth16,
@@ -361,7 +371,9 @@ private:
 			cy,
 			localTransform,
 			rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose),
-			odomMsg->pose.covariance[0]>0?odomMsg->pose.covariance[0]:1.0f);
+			rotVariance>0?rotVariance:1.0f,
+			transVariance>0?transVariance:1.0f,
+			0);
 		recorder_.addData(data);
 	}
 
@@ -445,6 +457,9 @@ private:
 			depth16 = ptrDepth->image.clone();
 		}
 
+		float transVariance = max3(odomMsg->pose.covariance[0], odomMsg->pose.covariance[7], odomMsg->pose.covariance[14]);
+		float rotVariance = max3(odomMsg->pose.covariance[21], odomMsg->pose.covariance[28], odomMsg->pose.covariance[35]);
+
 		rtabmap::SensorData data(
 			scan,
 			ptrImage->image.clone(),
@@ -455,7 +470,9 @@ private:
 			cy,
 			localTransform,
 			rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose),
-			odomMsg->pose.covariance[0]>0?odomMsg->pose.covariance[0]:1.0f);
+			rotVariance>0?rotVariance:1.0f,
+			transVariance>0?transVariance:1.0f,
+			0);
 		recorder_.addData(data);
 	}
 
@@ -499,6 +516,8 @@ private:
 		float cx = model.right().cx();
 		float cy = model.right().cy();
 
+		float transVariance = max3(odomMsg->pose.covariance[0], odomMsg->pose.covariance[7], odomMsg->pose.covariance[14]);
+		float rotVariance = max3(odomMsg->pose.covariance[21], odomMsg->pose.covariance[28], odomMsg->pose.covariance[35]);
 		rtabmap::SensorData data(
 				ptrLeftImage->image.clone(),
 				ptrRightImage->image.clone(),
@@ -508,7 +527,9 @@ private:
 				cy,
 				localTransform,
 				rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose),
-				odomMsg->pose.covariance[0]>0?odomMsg->pose.covariance[0]:1.0f);
+				rotVariance>0?rotVariance:1.0f,
+				transVariance>0?transVariance:1.0f,
+				0);
 		recorder_.addData(data);
 	}
 
@@ -560,7 +581,9 @@ private:
 				cy,
 				localTransform,
 				Transform(),
-				1.0f);
+				1.0f,
+				1.0f,
+				0);
 		recorder_.addData(data);
 	}
 

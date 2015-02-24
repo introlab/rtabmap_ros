@@ -166,7 +166,8 @@ private:
 			const cv::Mat & image,
 			const rtabmap::Transform & odom = rtabmap::Transform(),
 			const std::string & odomFrameId = "",
-			float odomVariance = 1.0f,
+			float odomRotationalVariance = 1.0f,
+			float odomTransitionalVariance = 1.0f,
 			const cv::Mat & depthOrRightImage = cv::Mat(),
 			float fx = 0.0f,
 			float fyOrBaseline = 0.0f,
@@ -215,7 +216,8 @@ private:
 	rtabmap::Rtabmap rtabmap_;
 	bool paused_;
 	rtabmap::Transform lastPose_;
-	float variance_;
+	float rotVariance_;
+	float transVariance_;
 	rtabmap::Transform currentMetricGoal_;
 
 	std::string frameId_;

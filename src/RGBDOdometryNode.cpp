@@ -147,7 +147,9 @@ public:
 						cy,
 						rtabmap_ros::transformFromTF(localTransform),
 						rtabmap::Transform(),
-						1.0f);
+						1.0f,
+						1.0f,
+						0);
 
 				this->processData(data, image->header);
 			}

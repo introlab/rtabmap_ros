@@ -200,7 +200,7 @@ void infoToROS(const rtabmap::Statistics & stats, rtabmap_ros::Info & info)
 
 rtabmap::Link linkFromROS(const rtabmap_ros::Link & msg)
 {
-	return rtabmap::Link(msg.fromId, msg.toId, (rtabmap::Link::Type)msg.type, transformFromGeometryMsg(msg.transform), msg.variance);
+	return rtabmap::Link(msg.fromId, msg.toId, (rtabmap::Link::Type)msg.type, transformFromGeometryMsg(msg.transform), msg.rotVariance, msg.transVariance);
 }
 
 void linkToROS(const rtabmap::Link & link, rtabmap_ros::Link & msg)
@@ -208,7 +208,8 @@ void linkToROS(const rtabmap::Link & link, rtabmap_ros::Link & msg)
 	msg.fromId = link.from();
 	msg.toId = link.to();
 	msg.type = link.type();
-	msg.variance = link.variance();
+	msg.rotVariance = link.rotVariance();
+	msg.transVariance = link.transVariance();
 	transformToGeometryMsg(link.transform(), msg.transform);
 }
 

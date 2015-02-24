@@ -11,4 +11,5 @@ int32 fromId
 int32 toId
 int32 type
 geometry_msgs/Transform transform
-int32 variance
+float32 rotVariance
+float32 transVariance
