@@ -96,6 +96,8 @@ void nodeDataToROS(const rtabmap::Signature & signature, rtabmap_ros::NodeData &
 rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::OdomInfo & msg);
 void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_ros::OdomInfo & msg);
 
+inline double timestampFromROS(const ros::Time & stamp) {return double(stamp.sec) + double(stamp.nsec)/1000000000.0;}
+
 }
 
 #endif /* MSGCONVERSION_H_ */

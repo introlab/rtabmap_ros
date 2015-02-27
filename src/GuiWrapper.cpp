@@ -429,7 +429,8 @@ void GuiWrapper::depthCallback(
 			rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose),
 			rotVariance,
 			transVariance,
-			odomMsg->header.seq);
+			odomMsg->header.seq,
+			rtabmap_ros::timestampFromROS(odomMsg->header.stamp));
 	this->post(new OdometryEvent(image));
 }
 
@@ -487,7 +488,8 @@ void GuiWrapper::depthOdomInfoCallback(
 			rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose),
 			rotVariance,
 			transVariance,
-			odomMsg->header.seq);
+			odomMsg->header.seq,
+			rtabmap_ros::timestampFromROS(odomMsg->header.stamp));
 	OdometryInfo info = rtabmap_ros::odomInfoFromROS(*odomInfoMsg);
 	this->post(new OdometryEvent(image, info));
 }
@@ -556,7 +558,8 @@ void GuiWrapper::depthScanCallback(
 			rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose),
 			rotVariance,
 			transVariance,
-			odomMsg->header.seq);
+			odomMsg->header.seq,
+			rtabmap_ros::timestampFromROS(odomMsg->header.stamp));
 	this->post(new OdometryEvent(image));
 }
 
@@ -648,7 +651,8 @@ void GuiWrapper::stereoScanCallback(
 			rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose),
 			rotVariance,
 			transVariance,
-			odomMsg->header.seq);
+			odomMsg->header.seq,
+			rtabmap_ros::timestampFromROS(odomMsg->header.stamp));
 	this->post(new OdometryEvent(image));
 }
 
@@ -730,7 +734,8 @@ void GuiWrapper::stereoOdomInfoCallback(
 			rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose),
 			rotVariance,
 			transVariance,
-			odomMsg->header.seq);
+			odomMsg->header.seq,
+			rtabmap_ros::timestampFromROS(odomMsg->header.stamp));
 	OdometryInfo info = rtabmap_ros::odomInfoFromROS(*odomInfoMsg);
 	this->post(new OdometryEvent(image, info));
 }
@@ -812,7 +817,8 @@ void GuiWrapper::stereoCallback(
 			rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose),
 			rotVariance,
 			transVariance,
-			odomMsg->header.seq);
+			odomMsg->header.seq,
+			rtabmap_ros::timestampFromROS(odomMsg->header.stamp));
 	this->post(new OdometryEvent(image));
 }
 

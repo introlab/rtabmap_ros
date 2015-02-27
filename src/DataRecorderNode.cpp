@@ -290,7 +290,8 @@ private:
 			Transform(),
 			1.0f,
 			1.0f,
-			0);
+			0,
+			rtabmap_ros::timestampFromROS(imageMsg->header.stamp));
 		recorder_.addData(data);
 	}
 
@@ -373,7 +374,8 @@ private:
 			rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose),
 			rotVariance>0?rotVariance:1.0f,
 			transVariance>0?transVariance:1.0f,
-			0);
+			0,
+			rtabmap_ros::timestampFromROS(imageMsg->header.stamp));
 		recorder_.addData(data);
 	}
 
@@ -472,7 +474,8 @@ private:
 			rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose),
 			rotVariance>0?rotVariance:1.0f,
 			transVariance>0?transVariance:1.0f,
-			0);
+			0,
+			rtabmap_ros::timestampFromROS(imageMsg->header.stamp));
 		recorder_.addData(data);
 	}
 
@@ -529,7 +532,8 @@ private:
 				rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose),
 				rotVariance>0?rotVariance:1.0f,
 				transVariance>0?transVariance:1.0f,
-				0);
+				0,
+				rtabmap_ros::timestampFromROS(leftImageMsg->header.stamp));
 		recorder_.addData(data);
 	}
 
@@ -583,7 +587,8 @@ private:
 				Transform(),
 				1.0f,
 				1.0f,
-				0);
+				0,
+				rtabmap_ros::timestampFromROS(leftImageMsg->header.stamp));
 		recorder_.addData(data);
 	}
 

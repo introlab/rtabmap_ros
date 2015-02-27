@@ -173,7 +173,8 @@ public:
 						rtabmap::Transform(),
 						1.0f,
 						1.0f,
-						0);
+						0,
+						rtabmap_ros::timestampFromROS(imageRectLeft->header.stamp));
 
 				this->processData(data, imageRectLeft->header);
 			}

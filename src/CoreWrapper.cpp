@@ -353,6 +353,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	getProjMapSrv_ = nh.advertiseService("get_proj_map", &CoreWrapper::getProjMapCallback, this);
 	publishMapDataSrv_ = nh.advertiseService("publish_map", &CoreWrapper::publishMapCallback, this);
 	setGoalSrv_ = nh.advertiseService("set_goal", &CoreWrapper::setGoalCallback, this);
+	setLabelSrv_ = nh.advertiseService("set_label", &CoreWrapper::setLabelCallback, this);
 	octomapBinarySrv_ = nh.advertiseService("octomap_binary", &CoreWrapper::octomapBinaryCallback, this);
 	octomapFullSrv_ = nh.advertiseService("octomap_full", &CoreWrapper::octomapFullCallback, this);
 
@@ -717,6 +718,7 @@ void CoreWrapper::commonDepthCallback(
 	float cy = model.cy();
 
 	process(ptrImage->header.seq,
+			ptrImage->header.stamp,
 			ptrImage->image,
 			lastPose_,
 			odomFrameId,
@@ -798,6 +800,7 @@ void CoreWrapper::commonStereoCallback(
 	float baseline = model.baseline();
 
 	process(leftImageMsg->header.seq,
+			leftImageMsg->header.stamp,
 			ptrLeftImage->image,
 			lastPose_,
 			odomFrameId,
@@ -926,6 +929,7 @@ void CoreWrapper::stereoScanTFCallback(
 
 void CoreWrapper::process(
 		int id,
+		const ros::Time & stamp,
 		const cv::Mat & image,
 		const Transform & odom,
 		const std::string & odomFrameId,
@@ -990,7 +994,8 @@ void CoreWrapper::process(
 				odom,
 				odomRotationalVariance,
 				odomTransitionalVariance,
-				id);
+				id,
+				rtabmap_ros::timestampFromROS(stamp));
 
 		if(rtabmap_.process(data))
 		{
@@ -1001,15 +1006,14 @@ void CoreWrapper::process(
 			mapToOdomMutex_.unlock();
 
 			// Publish local graph, info
-			ros::Time timeNow = ros::Time::now();
-			this->publishStats(timeNow);
+			this->publishStats(stamp);
 			std::map<int, rtabmap::Transform> filteredPoses;
 
 			filteredPoses = this->updateMapCaches(rtabmap_.getLocalOptimizedPoses(),
 					cloudMapPub_.getNumSubscribers() != 0,
 					projMapPub_.getNumSubscribers() != 0,
 					gridMapPub_.getNumSubscribers() != 0);
-			this->publishMaps(filteredPoses, timeNow);
+			this->publishMaps(filteredPoses, stamp);
 
 			// clear memory if no one subscribed
 			if(mapCacheCleanup_)
@@ -1062,11 +1066,11 @@ void CoreWrapper::process(
 						{
 							currentMetricGoal_ = updatedGoalPose;
 
-							publishCurrentGoal(timeNow);
+							publishCurrentGoal(stamp);
 						}
 
 						// publish local path
-						publishLocalPath(timeNow);
+						publishLocalPath(stamp);
 					}
 					else
 					{
@@ -1509,7 +1513,6 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 		if(poses.size() && poses.size() != mapIds.size())
 		{
 			ROS_ERROR("poses and map ids are not the same size!? %d vs %d", (int)poses.size(), (int)mapIds.size());
-			return false;
 		}
 
 		ros::Time now = ros::Time::now();
@@ -1595,7 +1598,6 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 	else
 	{
 		UWARN("No subscribers, don't need to publish!");
-		return false;
 	}
 
 	return true;
@@ -1603,13 +1605,60 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 
 bool CoreWrapper::setGoalCallback(rtabmap_ros::SetGoal::Request& req, rtabmap_ros::SetGoal::Response& res)
 {
-	int id = req.target_node_id;
-	ROS_INFO("Planning: set goal %d", id);
-	UTimer timer;
-	rtabmap_.computePath(id, req.in_global_graph);
-	ROS_INFO("Planning: Time computing path = %f s", timer.ticks());
-	goalCommonCallback(rtabmap_.getPath());
-	return !currentMetricGoal_.isNull();
+	int id = req.node_id;
+	if(id == 0 && !req.node_label.empty() && rtabmap_.getMemory())
+	{
+		id = rtabmap_.getMemory()->getSignatureIdByLabel(req.node_label);
+	}
+
+	if(id > 0)
+	{
+		ROS_INFO("Planning: set goal %d", id);
+		UTimer timer;
+		rtabmap_.computePath(id, true);
+		ROS_INFO("Planning: Time computing path = %f s", timer.ticks());
+		goalCommonCallback(rtabmap_.getPath());
+		if(currentMetricGoal_.isNull())
+		{
+			ROS_ERROR("Planning: Node id %d not found or goal already reached!", id);
+		}
+	}
+	else if(!req.node_label.empty())
+	{
+		ROS_ERROR("Planning: Node with label \"%s\" not found!", req.node_label.c_str());
+	}
+	else
+	{
+		ROS_ERROR("Planning: Node id should be > 0 !");
+	}
+	return true;
+}
+
+bool CoreWrapper::setLabelCallback(rtabmap_ros::SetLabel::Request& req, rtabmap_ros::SetLabel::Response& res)
+{
+	if(rtabmap_.labelLocation(req.node_id, req.node_label))
+	{
+		if(req.node_id > 0)
+		{
+			ROS_INFO("Set label \"%s\" to node %d", req.node_label.c_str(), req.node_id);
+		}
+		else
+		{
+			ROS_INFO("Set label \"%s\" to last node", req.node_label.c_str());
+		}
+	}
+	else
+	{
+		if(req.node_id > 0)
+		{
+			ROS_ERROR("Could not set label \"%s\" to node %d", req.node_label.c_str(), req.node_id);
+		}
+		else
+		{
+			ROS_ERROR("Could not set label \"%s\" to last node", req.node_label.c_str());
+		}
+	}
+	return true;
 }
 
 void CoreWrapper::publishStats(const ros::Time & stamp)

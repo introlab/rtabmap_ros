@@ -337,8 +337,12 @@ rtabmap::Signature nodeDataFromROS(const rtabmap_ros::NodeData & msg)
 		ROS_ERROR("Words 2D and 3D should be the same size (%d, %d)!", (int)words.size(), (int)words3D.size());
 	}
 
-	return rtabmap::Signature(msg.id,
+	return rtabmap::Signature(
+			msg.id,
 			msg.mapId,
+			msg.weight,
+			msg.stamp,
+			msg.label,
 			words,
 			words3D,
 			transformFromPoseMsg(msg.pose),
@@ -356,6 +360,9 @@ void nodeDataToROS(const rtabmap::Signature & signature, rtabmap_ros::NodeData &
 	// add data
 	msg.id = signature.id();
 	msg.mapId = signature.mapId();
+	msg.weight = signature.getWeight();
+	msg.stamp = signature.getStamp();
+	msg.label = signature.getLabel();
 	transformToPoseMsg(signature.getPose(), msg.pose);
 	compressedMatToBytes(signature.getImageCompressed(), msg.image);
 	compressedMatToBytes(signature.getDepthCompressed(), msg.depth);
