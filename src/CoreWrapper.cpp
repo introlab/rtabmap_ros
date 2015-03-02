@@ -2257,10 +2257,23 @@ octomap::OcTree * CoreWrapper::createOctomap()
 	for(std::map<int, Transform>::const_iterator posesIter = poses.begin(); posesIter!=poses.end(); ++posesIter)
 	{
 		std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr >::iterator cloudsIter = clouds_.find(posesIter->first);
-		if(cloudsIter != clouds_.end())
+		if(cloudsIter != clouds_.end() && cloudsIter->second->size())
 		{
 			octomap::Pointcloud * scan = new octomap::Pointcloud();
-			octomap::pointcloudPCLToOctomap(*cloudsIter->second, *scan);
+
+			//octomap::pointcloudPCLToOctomap(*cloudsIter->second, *scan); // Not anymore in Indigo!
+			scan->reserve(cloudsIter->second->size());
+			for(pcl::PointCloud<pcl::PointXYZRGB>::const_iterator it = cloudsIter->second->begin();
+				it != cloudsIter->second->end();
+				++it)
+			{
+				// Check if the point is invalid
+				if(pcl::isFinite(*it))
+				{
+					scan->push_back(it->x, it->y, it->z);
+				}
+			}
+
 			float x,y,z, r,p,w;
 			posesIter->second.getTranslationAndEulerAngles(x,y,z,r,p,w);
 			octomap::ScanNode node(scan, octomap::pose6d(x,y,z, r,p,w), posesIter->first);
