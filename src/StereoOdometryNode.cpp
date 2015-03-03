@@ -160,6 +160,13 @@ public:
 				cv_bridge::CvImageConstPtr ptrImageLeft = cv_bridge::toCvShare(imageRectLeft, "mono8");
 				cv_bridge::CvImageConstPtr ptrImageRight = cv_bridge::toCvShare(imageRectRight, "mono8");
 
+				if(baseline <= 0)
+				{
+					ROS_FATAL("The stereo baseline (%f) should be positive (baseline=-Tx/fx). We assume a horizontal left/right stereo "
+							  "setup where the Tx (or P(0,3)) is negative in the right camera info msg.", baseline);
+					return;
+				}
+
 				UTimer stepTimer;
 				//
 				UDEBUG("localTransform = %s", rtabmap_ros::transformFromTF(localTransform).prettyPrint().c_str());
