@@ -81,6 +81,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 		lastPose_(Transform::getIdentity()),
 		rotVariance_(0),
 		transVariance_(0),
+		latestNodeWasReached_(false),
 		frameId_("base_link"),
 		mapFrameId_("map"),
 		odomFrameId_(""),
@@ -1048,6 +1049,7 @@ void CoreWrapper::process(
 						goalReachedPub_.publish(result);
 					}
 					currentMetricGoal_.setNull();
+					latestNodeWasReached_ = false;
 				}
 				else
 				{
@@ -1055,14 +1057,23 @@ void CoreWrapper::process(
 					if(!updatedGoalPose.isNull())
 					{
 						// Adjust the target pose relative to last node
-						if(rtabmap_.getPathCurrentGoalId() == rtabmap_.getPath().back().first)
+						bool lastPoseModified = false;
+						if(rtabmap_.getPathCurrentGoalId() == rtabmap_.getPath().back().first && rtabmap_.getLocalOptimizedPoses().size())
 						{
-							updatedGoalPose *= rtabmap_.getPathTransformToGoal();
+							if(latestNodeWasReached_ || rtabmap_.getLocalOptimizedPoses().rbegin()->second.getDistance(currentMetricGoal_) < rtabmap_.getGoalReachedRadius())
+							{
+								if(!latestNodeWasReached_)
+								{
+									lastPoseModified = true;
+								}
+								latestNodeWasReached_ = true;
+								updatedGoalPose *= rtabmap_.getPathTransformToGoal();
+							}
 						}
 
 						// detect if the goal has changed or local map
 						// has changed so much that current goal drifted
-						if(currentMetricGoal_.getDistance(updatedGoalPose) > rtabmap_.getGoalReachedRadius()/2.0f)
+						if(lastPoseModified || currentMetricGoal_.getDistance(updatedGoalPose) > rtabmap_.getGoalReachedRadius())
 						{
 							currentMetricGoal_ = updatedGoalPose;
 
@@ -1084,6 +1095,7 @@ void CoreWrapper::process(
 							goalReachedPub_.publish(result);
 						}
 						currentMetricGoal_.setNull();
+						latestNodeWasReached_ = false;
 					}
 				}
 			}
@@ -1112,6 +1124,7 @@ void CoreWrapper::process(
 void CoreWrapper::goalCommonCallback(const std::vector<std::pair<int, Transform> > & poses)
 {
 	currentMetricGoal_.setNull();
+	latestNodeWasReached_ = false;
 	if(poses.size())
 	{
 		currentMetricGoal_ = rtabmap_.getPose(rtabmap_.getPathCurrentGoalId());
@@ -1158,9 +1171,13 @@ void CoreWrapper::goalCommonCallback(const std::vector<std::pair<int, Transform>
 			}
 
 			// Adjust the target pose relative to last node
-			if(rtabmap_.getPathCurrentGoalId() == poses.back().first)
+			if(rtabmap_.getPathCurrentGoalId() == rtabmap_.getPath().back().first && rtabmap_.getLocalOptimizedPoses().size())
 			{
-				currentMetricGoal_ *= rtabmap_.getPathTransformToGoal();
+				if(rtabmap_.getLocalOptimizedPoses().rbegin()->second.getDistance(currentMetricGoal_) < rtabmap_.getGoalReachedRadius())
+				{
+					latestNodeWasReached_ = true;
+					currentMetricGoal_ *= rtabmap_.getPathTransformToGoal();
+				}
 			}
 
 			publishCurrentGoal(now);
@@ -1261,6 +1278,7 @@ bool CoreWrapper::resetRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empt
 	transVariance_ = 0;
 	lastPose_.setIdentity();
 	currentMetricGoal_.setNull();
+	latestNodeWasReached_ = false;
 	return true;
 }
 
@@ -2195,6 +2213,7 @@ void CoreWrapper::goalDoneCb(const actionlib::SimpleClientGoalState& state,
 	{
 		rtabmap_.clearPath();
 		currentMetricGoal_.setNull();
+		latestNodeWasReached_ = false;
 	}
 }
 

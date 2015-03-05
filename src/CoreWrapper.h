@@ -222,6 +222,7 @@ private:
 	float rotVariance_;
 	float transVariance_;
 	rtabmap::Transform currentMetricGoal_;
+	bool latestNodeWasReached_;
 
 	std::string frameId_;
 	std::string mapFrameId_;
