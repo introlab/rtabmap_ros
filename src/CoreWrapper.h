@@ -54,6 +54,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/Rtabmap.h>
 
 #include "rtabmap_ros/GetMap.h"
+#include "rtabmap_ros/ListLabels.h"
 #include "rtabmap_ros/PublishMap.h"
 #include "rtabmap_ros/SetGoal.h"
 #include "rtabmap_ros/SetLabel.h"
@@ -191,6 +192,7 @@ private:
 	bool publishMapCallback(rtabmap_ros::PublishMap::Request&, rtabmap_ros::PublishMap::Response&);
 	bool setGoalCallback(rtabmap_ros::SetGoal::Request& req, rtabmap_ros::SetGoal::Response& res);
 	bool setLabelCallback(rtabmap_ros::SetLabel::Request& req, rtabmap_ros::SetLabel::Response& res);
+	bool listLabelsCallback(rtabmap_ros::ListLabels::Request& req, rtabmap_ros::ListLabels::Response& res);
 	bool octomapBinaryCallback(octomap_msgs::GetOctomap::Request  &req, octomap_msgs::GetOctomap::Response &res);
 	bool octomapFullCallback(octomap_msgs::GetOctomap::Request  &req, octomap_msgs::GetOctomap::Response &res);
 
@@ -256,6 +258,7 @@ private:
 	ros::Publisher infoPub_;
 	ros::Publisher mapDataPub_;
 	ros::Publisher mapGraphPub_;
+	ros::Publisher labelsPub_;
 	ros::Publisher cloudMapPub_;
 	ros::Publisher projMapPub_;
 	ros::Publisher gridMapPub_;
@@ -377,6 +380,7 @@ private:
 	ros::ServiceServer publishMapDataSrv_;
 	ros::ServiceServer setGoalSrv_;
 	ros::ServiceServer setLabelSrv_;
+	ros::ServiceServer listLabelsSrv_;
 	ros::ServiceServer octomapBinarySrv_;
 	ros::ServiceServer octomapFullSrv_;
 

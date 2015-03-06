@@ -5,7 +5,7 @@ project(rtabmap_ros)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS 
-             cv_bridge roscpp rospy sensor_msgs std_msgs std_srvs nav_msgs geometry_msgs
+             cv_bridge roscpp rospy sensor_msgs std_msgs std_srvs nav_msgs geometry_msgs visualization_msgs
              image_transport tf tf_conversions laser_geometry pcl_conversions 
              pcl_ros nodelet dynamic_reconfigure rviz message_filters class_loader
              genmsg stereo_msgs octomap_ros
@@ -51,6 +51,7 @@ add_message_files(
  add_service_files(
    FILES
    GetMap.srv
+   ListLabels.srv
    PublishMap.srv
    ResetPose.srv
    SetGoal.srv
@@ -80,7 +81,7 @@ generate_dynamic_reconfigure_options(cfg/Camera.cfg)
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES rtabmap_ros
-  CATKIN_DEPENDS cv_bridge roscpp rospy sensor_msgs std_msgs std_srvs nav_msgs geometry_msgs
+  CATKIN_DEPENDS cv_bridge roscpp rospy sensor_msgs std_msgs std_srvs nav_msgs geometry_msgs visualization_msgs
                  image_transport tf tf_conversions laser_geometry pcl_conversions 
                  pcl_ros nodelet dynamic_reconfigure rviz message_filters class_loader
                  stereo_msgs octomap_ros

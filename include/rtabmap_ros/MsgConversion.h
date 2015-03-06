@@ -81,11 +81,13 @@ void mapGraphFromROS(
 		const rtabmap_ros::Graph & msg,
 		std::map<int, rtabmap::Transform> & poses,
 		std::map<int, int> & mapIds,
+		std::map<int, std::string> & labels,
 		std::multimap<int, rtabmap::Link> & links,
 		rtabmap::Transform & mapToOdom);
 void mapGraphToROS(
 		const std::map<int, rtabmap::Transform> & poses,
 		const std::map<int, int> & mapIds,
+		const std::map<int, std::string> & labels,
 		const std::multimap<int, rtabmap::Link> & links,
 		const rtabmap::Transform & mapToOdom,
 		rtabmap_ros::Graph & msg);

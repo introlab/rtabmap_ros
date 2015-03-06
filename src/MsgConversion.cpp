@@ -252,18 +252,21 @@ void mapGraphFromROS(
 		const rtabmap_ros::Graph & msg,
 		std::map<int, rtabmap::Transform> & poses,
 		std::map<int, int> & mapIds,
+		std::map<int, std::string> & labels,
 		std::multimap<int, rtabmap::Link> & links,
 		rtabmap::Transform & mapToOdom)
 {
 	mapToOdom = transformFromGeometryMsg(msg.mapToOdom);
 
-	for(unsigned int i=0; i<msg.nodeIds.size() && i<msg.mapIds.size(); ++i)
+	UASSERT(msg.nodeIds.size() == msg.mapIds.size());
+	UASSERT(msg.nodeIds.size() == msg.poses.size());
+	UASSERT(msg.nodeIds.size() == msg.labels.size());
+
+	for(unsigned int i=0; i<msg.nodeIds.size(); ++i)
 	{
-		if(msg.poses.size())
-		{
-			poses.insert(std::make_pair(msg.nodeIds[i], rtabmap_ros::transformFromPoseMsg(msg.poses[i])));
-		}
+		poses.insert(std::make_pair(msg.nodeIds[i], rtabmap_ros::transformFromPoseMsg(msg.poses[i])));
 		mapIds.insert(std::make_pair(msg.nodeIds[i], msg.mapIds[i]));
+		labels.insert(std::make_pair(msg.nodeIds[i], msg.labels[i]));
 	}
 
 	for(unsigned int i=0; i<msg.links.size(); ++i)
@@ -275,30 +278,32 @@ void mapGraphFromROS(
 void mapGraphToROS(
 		const std::map<int, rtabmap::Transform> & poses,
 		const std::map<int, int> & mapIds,
+		const std::map<int, std::string> & labels,
 		const std::multimap<int, rtabmap::Link> & links,
 		const rtabmap::Transform & mapToOdom,
 		rtabmap_ros::Graph & msg)
 {
-	UASSERT(poses.size() == 0 || poses.size() == mapIds.size());
+	UASSERT(poses.size() == 0 || (poses.size() == mapIds.size() && poses.size() == labels.size()));
 
 	transformToGeometryMsg(mapToOdom, msg.mapToOdom);
 
-	msg.nodeIds.resize(mapIds.size());
+	msg.nodeIds.resize(poses.size());
 	msg.poses.resize(poses.size());
-	msg.mapIds.resize(mapIds.size());
+	msg.mapIds.resize(poses.size());
+	msg.labels.resize(poses.size());
 	int index = 0;
 	std::map<int, rtabmap::Transform>::const_iterator iterPoses = poses.begin();
-	for(std::map<int, int>::const_iterator iter = mapIds.begin();
-		iter!=mapIds.end();
-		++iter)
+	std::map<int, int>::const_iterator iterMapIds = mapIds.begin();
+	std::map<int, std::string>::const_iterator iterLabels = labels.begin();
+	while(iterPoses != poses.end())
 	{
-		msg.nodeIds[index] = iter->first;
-		msg.mapIds[index] = iter->second;
-		if(iterPoses != poses.end())
-		{
-			transformToPoseMsg(iterPoses->second, msg.poses[index]);
-			++iterPoses;
-		}
+		msg.nodeIds[index] = iterPoses->first;
+		msg.mapIds[index] = iterMapIds->second;
+		msg.labels[index] = iterLabels->second;
+		transformToPoseMsg(iterPoses->second, msg.poses[index]);
+		++iterPoses;
+		++iterMapIds;
+		++iterLabels;
 		++index;
 	}
 

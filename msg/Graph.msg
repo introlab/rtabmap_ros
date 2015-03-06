@@ -12,6 +12,7 @@ geometry_msgs/Transform mapToOdom
 # std::map<nodeId, mapId>
 int32[] nodeIds
 int32[] mapIds
+string[] labels
 
 # std::map<nodeId, Pose>
 geometry_msgs/Pose[] poses
