@@ -218,15 +218,17 @@ public:
 			Transform mapCorrection = Transform::getIdentity();
 			if(poses.size() > 1 && constraints.size() > 0)
 			{
-				if(optimizeFromLastNode_)
-				{
-					std::map<int, int> depthGraph = rtabmap::graph::generateDepthGraph(constraints, poses.rbegin()->first);
-					rtabmap::graph::optimizeTOROGraph(depthGraph, poses, constraints, optimizedPoses, iterations_, true, ignoreVariance_);
-				}
-				else
-				{
-					rtabmap::graph::optimizeTOROGraph(poses, constraints, optimizedPoses, iterations_, true, ignoreVariance_);
-				}
+				graph::TOROOptimizer optimizer(iterations_, false, ignoreVariance_);
+				int fromId = optimizeFromLastNode_?poses.rbegin()->first:poses.begin()->first;
+				std::map<int, rtabmap::Transform> posesOut;
+				std::multimap<int, rtabmap::Link> linksOut;
+				optimizer.getConnectedGraph(
+						fromId,
+						poses,
+						constraints,
+						posesOut,
+						linksOut);
+				optimizedPoses = optimizer.optimize(fromId, posesOut, linksOut);
 
 				mapToOdomMutex_.lock();
 				mapCorrection = optimizedPoses.at(poses.rbegin()->first) * poses.rbegin()->second.inverse();

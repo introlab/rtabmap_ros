@@ -259,6 +259,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	oldParameterNames.push_back("Rtabmap/DetectorStrategy");
 	oldParameterNames.push_back("RGBD/ScanMatchingSize");
 	oldParameterNames.push_back("RGBD/LocalLoopDetectionRadius");
+	oldParameterNames.push_back("RGBD/ToroIterations");
 	for(std::list<std::string>::iterator iter=oldParameterNames.begin(); iter!=oldParameterNames.end(); ++iter)
 	{
 		std::string vStr;
@@ -287,6 +288,12 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 				ROS_WARN("Parameter name changed: RGBD/LocalLoopDetectionRadius -> %s. Please update your launch file accordingly.",
 						Parameters::kRGBDLocalRadius().c_str());
 				parameters.at(Parameters::kRGBDLocalRadius())= vStr;
+			}
+			else if(iter->compare("RGBD/ToroIterations") == 0)
+			{
+				ROS_WARN("Parameter name changed: RGBD/ToroIterations -> %s. Please update your launch file accordingly.",
+						Parameters::kRGBDOptimizeIterations().c_str());
+				parameters.at(Parameters::kRGBDOptimizeIterations())= vStr;
 			}
 		}
 	}
@@ -363,16 +370,16 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 
 	setupCallbacks(subscribeDepth, subscribeLaserScan, subscribeStereo, queueSize, stereoApproxSync);
 
-	int toroIterations = 0;
-	Parameters::parse(parameters, Parameters::kRGBDToroIterations(), toroIterations);
-	if(publishTf && toroIterations != 0)
+	int optimizeIterations = 0;
+	Parameters::parse(parameters, Parameters::kRGBDOptimizeIterations(), optimizeIterations);
+	if(publishTf && optimizeIterations != 0)
 	{
 		transformThread_ = new boost::thread(boost::bind(&CoreWrapper::publishLoop, this, tfDelay));
 	}
 	else if(publishTf)
 	{
 		UWARN("Graph optimization is disabled (%s=0), the tf between frame \"%s\" and odometry frame will not be published. You can safely ignore this warning if you are using map_optimizer node.",
-				Parameters::kRGBDToroIterations().c_str(), mapFrameId_.c_str());
+				Parameters::kRGBDOptimizeIterations().c_str(), mapFrameId_.c_str());
 	}
 }
 
