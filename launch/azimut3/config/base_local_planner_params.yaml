@@ -8,23 +8,23 @@ TrajectoryPlannerROS:
   # minimal distance of 0.48 m. 
   # Basically, max_rotational_vel * rho_min <= min_vel_x
   max_vel_x:  0.700
-  min_vel_x:  0.212
-  max_rotational_vel: 0.550
+  min_vel_x:  0.24
+  max_rotational_vel: 0.5
   min_in_place_rotational_vel: 0.15
   escape_vel: -0.10
-  holonomic_robot: false
+  holonomic_robot: true
 
   xy_goal_tolerance:  0.20
   yaw_goal_tolerance: 0.20
 
-  sim_time: 1.7
+  sim_time: 1
   sim_granularity: 0.025
   vx_samples: 3
-  vtheta_samples: 3
   vtheta_samples: 20
+  controller_frequency: 10
 
-  goal_distance_bias: 0.8
-  path_distance_bias: 0.6
+  pdist_scale: 0.6
+  gdist_scale: 0.8
   occdist_scale: 0.01
   heading_lookahead: 0.325
   dwa: true

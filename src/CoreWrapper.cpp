@@ -1070,7 +1070,9 @@ void CoreWrapper::process(
 						bool lastPoseModified = false;
 						if(rtabmap_.getPathCurrentGoalId() == rtabmap_.getPath().back().first && rtabmap_.getLocalOptimizedPoses().size())
 						{
-							if(latestNodeWasReached_ || rtabmap_.getLocalOptimizedPoses().rbegin()->second.getDistance(currentMetricGoal_) < rtabmap_.getGoalReachedRadius())
+							if(latestNodeWasReached_ ||
+							   rtabmap_.getLocalOptimizedPoses().rbegin()->second.getDistance(currentMetricGoal_) < rtabmap_.getGoalReachedRadius() ||
+							   rtabmap_.getPathTransformToGoal().getNorm() < rtabmap_.getGoalReachedRadius())
 							{
 								if(!latestNodeWasReached_)
 								{
@@ -2372,7 +2374,7 @@ void CoreWrapper::goalDoneCb(const actionlib::SimpleClientGoalState& state,
 		{
 			if(rtabmap_.getPath().size() &&
 				rtabmap_.getPathCurrentGoalId() != rtabmap_.getPath().back().first &&
-				!uContains(rtabmap_.getLocalOptimizedPoses(), rtabmap_.getPath().back().first))
+				(!uContains(rtabmap_.getLocalOptimizedPoses(), rtabmap_.getPath().back().first) || !latestNodeWasReached_))
 			{
 				ROS_WARN("Planning: move_base reached current goal but it is not "
 						 "the last one planned by rtabmap. A new goal should be sent when "
