@@ -214,11 +214,11 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	databasePath_ = uReplaceChar(databasePath_, '~', UDirectory::homeDir());
 
 	// load parameters
-	ParametersMap parameters = loadParameters(configPath_);
+	parameters_ = loadParameters(configPath_);
 
 	// update parameters with user input parameters (private)
-	uInsert(parameters, std::make_pair(Parameters::kRtabmapWorkingDirectory(), UDirectory::homeDir()+"/.ros")); // change default to ~/.ros
-	for(ParametersMap::iterator iter=parameters.begin(); iter!=parameters.end(); ++iter)
+	uInsert(parameters_, std::make_pair(Parameters::kRtabmapWorkingDirectory(), UDirectory::homeDir()+"/.ros")); // change default to ~/.ros
+	for(ParametersMap::iterator iter=parameters_.begin(); iter!=parameters_.end(); ++iter)
 	{
 		std::string vStr;
 		bool vBool;
@@ -271,47 +271,47 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 			{
 				ROS_WARN("Parameter name changed: LccReextract/LoopClosureFeatures -> %s. Please update your launch file accordingly.",
 						Parameters::kLccReextractActivated().c_str());
-				parameters.at(Parameters::kLccReextractActivated())= vStr;
+				parameters_.at(Parameters::kLccReextractActivated())= vStr;
 			}
 			else if(iter->compare("Rtabmap/DetectorStrategy") == 0)
 			{
 				ROS_WARN("Parameter name changed: Rtabmap/DetectorStrategy -> %s. Please update your launch file accordingly.",
 						Parameters::kKpDetectorStrategy().c_str());
-				parameters.at(Parameters::kKpDetectorStrategy())= vStr;
+				parameters_.at(Parameters::kKpDetectorStrategy())= vStr;
 			}
 			else if(iter->compare("RGBD/ScanMatchingSize") == 0)
 			{
 				ROS_WARN("Parameter name changed: RGBD/ScanMatchingSize -> %s. Please update your launch file accordingly.",
 						Parameters::kRGBDPoseScanMatching().c_str());
-				parameters.at(Parameters::kRGBDPoseScanMatching())= std::atoi(vStr.c_str()) > 0?"true":"false";
+				parameters_.at(Parameters::kRGBDPoseScanMatching())= std::atoi(vStr.c_str()) > 0?"true":"false";
 			}
 			else if(iter->compare("RGBD/LocalLoopDetectionRadius") == 0)
 			{
 				ROS_WARN("Parameter name changed: RGBD/LocalLoopDetectionRadius -> %s. Please update your launch file accordingly.",
 						Parameters::kRGBDLocalRadius().c_str());
-				parameters.at(Parameters::kRGBDLocalRadius())= vStr;
+				parameters_.at(Parameters::kRGBDLocalRadius())= vStr;
 			}
 			else if(iter->compare("RGBD/ToroIterations") == 0)
 			{
 				ROS_WARN("Parameter name changed: RGBD/ToroIterations -> %s. Please update your launch file accordingly.",
 						Parameters::kRGBDOptimizeIterations().c_str());
-				parameters.at(Parameters::kRGBDOptimizeIterations())= vStr;
+				parameters_.at(Parameters::kRGBDOptimizeIterations())= vStr;
 			}
 		}
 	}
 
 	// set public parameters
 	nh.setParam("is_rtabmap_paused", paused_);
-	for(ParametersMap::iterator iter=parameters.begin(); iter!=parameters.end(); ++iter)
+	for(ParametersMap::iterator iter=parameters_.begin(); iter!=parameters_.end(); ++iter)
 	{
 		nh.setParam(iter->first, iter->second);
 	}
-	if(parameters.find(Parameters::kRtabmapDetectionRate()) != parameters.end())
+	if(parameters_.find(Parameters::kRtabmapDetectionRate()) != parameters_.end())
 	{
-		rate_ = uStr2Float(parameters.at(Parameters::kRtabmapDetectionRate()));
+		rate_ = uStr2Float(parameters_.at(Parameters::kRtabmapDetectionRate()));
 		ROS_INFO("RTAB-Map rate detection = %f Hz", rate_);
 	}
-	bool isRGBD = uStr2Bool(parameters.at(Parameters::kRGBDEnabled()).c_str());
+	bool isRGBD = uStr2Bool(parameters_.at(Parameters::kRGBDEnabled()).c_str());
 	if(isRGBD)
 	{
 		// RGBD SLAM
@@ -350,7 +350,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	ROS_INFO("rtabmap: Using database from \"%s\".", databasePath_.c_str());
 
 	// Init RTAB-Map
-	rtabmap_.init(parameters, databasePath_);
+	rtabmap_.init(parameters_, databasePath_);
 
 	// setup services
 	updateSrv_ = nh.advertiseService("update_parameters", &CoreWrapper::updateRtabmapCallback, this);
@@ -358,6 +358,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	pauseSrv_ = nh.advertiseService("pause", &CoreWrapper::pauseRtabmapCallback, this);
 	resumeSrv_ = nh.advertiseService("resume", &CoreWrapper::resumeRtabmapCallback, this);
 	triggerNewMapSrv_ = nh.advertiseService("trigger_new_map", &CoreWrapper::triggerNewMapCallback, this);
+	backupDatabase_ = nh.advertiseService("backup", &CoreWrapper::backupDatabaseCallback, this);
 	setModeLocalizationSrv_ = nh.advertiseService("set_mode_localization", &CoreWrapper::setModeLocalizationCallback, this);
 	setModeMappingSrv_ = nh.advertiseService("set_mode_mapping", &CoreWrapper::setModeMappingCallback, this);
 	getMapDataSrv_ = nh.advertiseService("get_map", &CoreWrapper::getMapCallback, this);
@@ -373,7 +374,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	setupCallbacks(subscribeDepth, subscribeLaserScan, subscribeStereo, queueSize, stereoApproxSync);
 
 	int optimizeIterations = 0;
-	Parameters::parse(parameters, Parameters::kRGBDOptimizeIterations(), optimizeIterations);
+	Parameters::parse(parameters_, Parameters::kRGBDOptimizeIterations(), optimizeIterations);
 	if(publishTf && optimizeIterations != 0)
 	{
 		transformThread_ = new boost::thread(boost::bind(&CoreWrapper::publishLoop, this, tfDelay));
@@ -1293,6 +1294,9 @@ bool CoreWrapper::resetRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empt
 	lastPose_.setIdentity();
 	currentMetricGoal_.setNull();
 	latestNodeWasReached_ = false;
+	clouds_.clear();
+	projMaps_.clear();
+	gridMaps_.clear();
 	return true;
 }
 
@@ -1332,6 +1336,29 @@ bool CoreWrapper::triggerNewMapCallback(std_srvs::Empty::Request&, std_srvs::Emp
 {
 	ROS_INFO("rtabmap: Trigger new map");
 	rtabmap_.triggerNewMap();
+	return true;
+}
+
+bool CoreWrapper::backupDatabaseCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+{
+	ROS_INFO("Backup: Saving memory...");
+	rtabmap_.close();
+	ROS_INFO("Backup: Saving memory... done!");
+
+	rotVariance_ = 0;
+	transVariance_ = 0;
+	lastPose_.setIdentity();
+	currentMetricGoal_.setNull();
+	latestNodeWasReached_ = false;
+
+	ROS_INFO("Backup: Saving \"%s\" to \"%s\"...", databasePath_.c_str(), (databasePath_+".back").c_str());
+	UFile::copy(databasePath_, databasePath_+".back");
+	ROS_INFO("Backup: Saving \"%s\" to \"%s\"... done!", databasePath_.c_str(), (databasePath_+".back").c_str());
+
+	ROS_INFO("Backup: Reloading memory...");
+	rtabmap_.init(parameters_, databasePath_);
+	ROS_INFO("Backup: Reloading memory... done!");
+
 	return true;
 }
 

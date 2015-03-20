@@ -184,6 +184,7 @@ private:
 	bool pauseRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool resumeRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool triggerNewMapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
+	bool backupDatabaseCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool setModeLocalizationCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool setModeMappingCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool getMapCallback(rtabmap_ros::GetMap::Request& req, rtabmap_ros::GetMap::Response& res);
@@ -225,6 +226,7 @@ private:
 	float transVariance_;
 	rtabmap::Transform currentMetricGoal_;
 	bool latestNodeWasReached_;
+	rtabmap::ParametersMap parameters_;
 
 	std::string frameId_;
 	std::string mapFrameId_;
@@ -373,6 +375,7 @@ private:
 	ros::ServiceServer pauseSrv_;
 	ros::ServiceServer resumeSrv_;
 	ros::ServiceServer triggerNewMapSrv_;
+	ros::ServiceServer backupDatabase_;
 	ros::ServiceServer setModeLocalizationSrv_;
 	ros::ServiceServer setModeMappingSrv_;
 	ros::ServiceServer getMapDataSrv_;
