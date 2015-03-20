@@ -1066,34 +1066,23 @@ void CoreWrapper::process(
 				}
 				else
 				{
-					Transform updatedGoalPose = rtabmap_.getPose(rtabmap_.getPathCurrentGoalId());
-					if(!updatedGoalPose.isNull())
+					currentMetricGoal_ = rtabmap_.getPose(rtabmap_.getPathCurrentGoalId());
+					if(!currentMetricGoal_.isNull())
 					{
 						// Adjust the target pose relative to last node
-						bool lastPoseModified = false;
 						if(rtabmap_.getPathCurrentGoalId() == rtabmap_.getPath().back().first && rtabmap_.getLocalOptimizedPoses().size())
 						{
 							if(latestNodeWasReached_ ||
 							   rtabmap_.getLocalOptimizedPoses().rbegin()->second.getDistance(currentMetricGoal_) < rtabmap_.getGoalReachedRadius() ||
 							   rtabmap_.getPathTransformToGoal().getNorm() < rtabmap_.getGoalReachedRadius())
 							{
-								if(!latestNodeWasReached_)
-								{
-									lastPoseModified = true;
-								}
 								latestNodeWasReached_ = true;
-								updatedGoalPose *= rtabmap_.getPathTransformToGoal();
+								currentMetricGoal_ *= rtabmap_.getPathTransformToGoal();
 							}
 						}
 
-						// detect if the goal has changed or local map
-						// has changed so much that current goal drifted
-						if(lastPoseModified || currentMetricGoal_.getDistance(updatedGoalPose) > rtabmap_.getGoalReachedRadius())
-						{
-							currentMetricGoal_ = updatedGoalPose;
-
-							publishCurrentGoal(stamp);
-						}
+						// publish next goal with updated currentMetricGoal_
+						publishCurrentGoal(stamp);
 
 						// publish local path
 						publishLocalPath(stamp);
