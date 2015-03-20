@@ -244,6 +244,7 @@ private:
 	double projMaxHeight_;
 	double gridCellSize_;
 	double gridSize_;
+	bool gridEroded_;
 	double mapFilterRadius_;
 	double mapFilterAngle_;
 	bool mapCacheCleanup_;

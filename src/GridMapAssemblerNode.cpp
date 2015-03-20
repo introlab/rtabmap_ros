@@ -49,6 +49,7 @@ public:
 	GridMapAssembler() :
 		gridCellSize_(0.05), // meters
 		mapSize_(0), // meters
+		eroded_(false),
 		filterRadius_(0.5),
 		filterAngle_(30.0) // degrees
 	{
@@ -57,6 +58,7 @@ public:
 		pnh.param("map_size", mapSize_, mapSize_); // m
 		pnh.param("filter_radius", filterRadius_, filterRadius_);
 		pnh.param("filter_angle", filterAngle_, filterAngle_);
+		pnh.param("eroded", eroded_, eroded_);
 
 		UASSERT(gridCellSize_ > 0.0);
 		UASSERT(mapSize_ >= 0.0);
@@ -117,7 +119,8 @@ public:
 							gridMaps_,
 							gridCellSize_,
 							xMin, yMin,
-							mapSize_);
+							mapSize_,
+							eroded_);
 
 			if(!pixels.empty())
 			{
@@ -169,6 +172,7 @@ public:
 private:
 	double gridCellSize_;
 	double mapSize_;
+	bool eroded_;
 	double filterRadius_;
 	double filterAngle_;
 

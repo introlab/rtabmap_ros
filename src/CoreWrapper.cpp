@@ -99,6 +99,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 		projMaxHeight_(2.0), // meters
 		gridCellSize_(0.05), // meters
 		gridSize_(0), // meters
+		gridEroded_(false),
 		mapFilterRadius_(0.5),
 		mapFilterAngle_(30.0), // degrees
 		mapCacheCleanup_(true),
@@ -175,6 +176,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	// common grid map stuff
 	pnh.param("grid_cell_size", gridCellSize_, gridCellSize_); // m
 	pnh.param("grid_size", gridSize_, gridSize_); // m
+	pnh.param("grid_eroded", gridEroded_, gridEroded_);
 
 	// common map stuff
 	pnh.param("map_filter_radius", mapFilterRadius_, mapFilterRadius_);
@@ -1426,7 +1428,8 @@ bool CoreWrapper::getProjMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::
 				projMaps_,
 				gridCellSize_,
 				xMin, yMin,
-				gridSize_);
+				gridSize_,
+				gridEroded_);
 
 		// clear memory if no one subscribed
 		if(mapCacheCleanup_ && projMapPub_.getNumSubscribers() == 0)
@@ -1475,7 +1478,8 @@ bool CoreWrapper::getGridMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::
 				gridMaps_,
 				gridCellSize_,
 				xMin, yMin,
-				gridSize_);
+				gridSize_,
+				gridEroded_);
 
 		// clear memory if no one subscribed
 		if(mapCacheCleanup_ && gridMapPub_.getNumSubscribers() == 0)
@@ -2243,7 +2247,8 @@ void CoreWrapper::publishMaps(
 				projMaps_,
 				gridCellSize_,
 				xMin, yMin,
-				gridSize_);
+				gridSize_,
+				gridEroded_);
 
 		if(!pixels.empty())
 		{
@@ -2286,7 +2291,8 @@ void CoreWrapper::publishMaps(
 				gridMaps_,
 				gridCellSize_,
 				xMin, yMin,
-				gridSize_);
+				gridSize_,
+				gridEroded_);
 
 		if(!pixels.empty())
 		{
