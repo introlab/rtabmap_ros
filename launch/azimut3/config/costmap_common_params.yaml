@@ -4,12 +4,13 @@ footprint: [[ 0.3,  0.3], [-0.3,  0.3], [-0.3, -0.3], [ 0.3, -0.3]]
 footprint_padding: 0.03
 #robot_radius: ir_of_robot
 inflation_radius: 0.55
-transform_tolerance: 1
+transform_tolerance: 2
 
 controller_patience: 2.0
+#planner_frequency: 0.2
 
 NavfnROS:
-    allow_unknown: true
+    allow_unknown: false
 
 recovery_behaviors: [
     {name: conservative_clear, type: clear_costmap_recovery/ClearCostmapRecovery},

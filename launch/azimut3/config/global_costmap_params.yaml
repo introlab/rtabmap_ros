@@ -1,6 +1,7 @@
 global_costmap:
   global_frame: map
   robot_base_frame: base_footprint
-  update_frequency: 0.5
-  publish_frequency: 0.5
+  update_frequency: 1
+  publish_frequency: 1
   static_map: true
+  always_send_full_costmap: true

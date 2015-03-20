@@ -17,11 +17,11 @@ TrajectoryPlannerROS:
   xy_goal_tolerance:  0.20
   yaw_goal_tolerance: 0.20
 
-  sim_time: 1
+  sim_time: 1.5
   sim_granularity: 0.025
   vx_samples: 3
-  vtheta_samples: 20
-  controller_frequency: 10
+  vtheta_samples: 30
+  controller_frequency: 20
 
   pdist_scale: 0.6
   gdist_scale: 0.8
@@ -30,4 +30,4 @@ TrajectoryPlannerROS:
   dwa: true
 
   oscillation_reset_dist: 0.05
-  meter_scoring: true
+  meter_scoring: false
