@@ -11,8 +11,8 @@ local_costmap:
   origin_x: -2.0
   origin_y: -2.0
 
-  observation_sources: laser_scan_sensor
-  #observation_sources: laser_scan_sensor point_cloud_sensor
+  #observation_sources: laser_scan_sensor
+  observation_sources: laser_scan_sensor point_cloud_sensor
 
   laser_scan_sensor: {
     data_type: LaserScan, 
