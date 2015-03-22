@@ -1,0 +1,8 @@
+<class_libraries>
+  <library path="lib/librtabmap_ros">
+    <class type="rtabmap_ros::StaticLayer"     base_class_type="costmap_2d::Layer">
+      <description>Listens to OccupancyGrid messages and copies them in, like from map_server.</description>
+    </class>
+  </library>
+</class_libraries>
+

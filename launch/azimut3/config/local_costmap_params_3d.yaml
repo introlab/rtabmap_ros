@@ -11,15 +11,15 @@ local_costmap:
   origin_x: -2.0
   origin_y: -2.0
 
-  observation_sources: laser_scan_sensor point_cloud_sensor
-  #observation_sources: point_cloud_sensor
+  #observation_sources: laser_scan_sensor point_cloud_sensor
+  observation_sources: point_cloud_sensor
 
   laser_scan_sensor: {
     data_type: LaserScan, 
     topic: base_scan, 
     expected_update_rate: 0.2, 
     marking: true, 
-    clearing: false}
+    clearing: true}
 
   # assuming receiving a cloud from rtabmap/obstacles_detection node
   point_cloud_sensor: {

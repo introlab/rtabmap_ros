@@ -6,18 +6,5 @@ footprint_padding: 0.03
 inflation_radius: 0.55
 transform_tolerance: 2
 
-controller_patience: 2.0
-#planner_frequency: 0.2
 
-NavfnROS:
-    allow_unknown: false
 
-recovery_behaviors: [
-    {name: conservative_clear, type: clear_costmap_recovery/ClearCostmapRecovery},
-    {name: aggressive_clear, type: clear_costmap_recovery/ClearCostmapRecovery}
-]
-
-conservative_clear: 
-    reset_distance: 3.00
-aggressive_clear:
-    reset_distance: 1.84

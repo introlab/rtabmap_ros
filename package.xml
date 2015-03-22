@@ -35,6 +35,7 @@
   <build_depend>class_loader</build_depend>
   <build_depend>rtabmap</build_depend>
   <build_depend>move_base_msgs</build_depend>
+  <build_depend>costmap_2d</build_depend>
   <build_depend>octomap_ros</build_depend>
   <build_depend>octomap</build_depend>
   
@@ -62,6 +63,7 @@
   <run_depend>class_loader</run_depend>
   <run_depend>rtabmap</run_depend>
   <run_depend>move_base_msgs</run_depend>
+  <run_depend>costmap_2d</run_depend>
   <run_depend>octomap_ros</run_depend>
   <run_depend>octomap</run_depend>
 
@@ -70,5 +72,6 @@
   <export>
 	<nodelet plugin="${prefix}/nodelet_plugins.xml" />
 	<rviz plugin="${prefix}/plugin_description.xml"/>
+    <costmap_2d plugin="${prefix}/costmap_plugins.xml"/>
   </export>
 </package>

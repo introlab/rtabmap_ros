@@ -8,7 +8,7 @@ find_package(catkin REQUIRED COMPONENTS
              cv_bridge roscpp rospy sensor_msgs std_msgs std_srvs nav_msgs geometry_msgs visualization_msgs
              image_transport tf tf_conversions laser_geometry pcl_conversions 
              pcl_ros nodelet dynamic_reconfigure rviz message_filters class_loader
-             genmsg stereo_msgs octomap_ros
+             genmsg stereo_msgs octomap_ros costmap_2d
 )
 
 ## System dependencies are found with CMake's conventions
@@ -84,7 +84,7 @@ catkin_package(
   CATKIN_DEPENDS cv_bridge roscpp rospy sensor_msgs std_msgs std_srvs nav_msgs geometry_msgs visualization_msgs
                  image_transport tf tf_conversions laser_geometry pcl_conversions 
                  pcl_ros nodelet dynamic_reconfigure rviz message_filters class_loader
-                 stereo_msgs octomap_ros
+                 stereo_msgs octomap_ros costmap_2d
 )
 
 ###########
@@ -137,6 +137,7 @@ add_library(rtabmap_ros
    src/rviz/MapGraphDisplay.cpp
    src/rviz/InfoDisplay.cpp
    src/rviz/OrbitOrientedViewController.cpp
+   src/costmap_2d/static_layer.cpp
    ${MOC_FILES}
 )
 target_link_libraries(rtabmap_ros
@@ -238,6 +239,7 @@ install(DIRECTORY
 install(FILES
    nodelet_plugins.xml
    plugin_description.xml
+   costmap_plugins.xml
    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )
 

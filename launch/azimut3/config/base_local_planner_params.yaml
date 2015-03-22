@@ -11,23 +11,16 @@ TrajectoryPlannerROS:
   min_vel_x:  0.24
   max_rotational_vel: 0.5
   min_in_place_rotational_vel: 0.15
-  escape_vel: -0.10
-  holonomic_robot: true
 
   xy_goal_tolerance:  0.20
   yaw_goal_tolerance: 0.20
 
   sim_time: 1.5
-  sim_granularity: 0.025
-  vx_samples: 3
   vtheta_samples: 30
-  controller_frequency: 20
 
-  pdist_scale: 0.6
-  gdist_scale: 0.8
-  occdist_scale: 0.01
-  heading_lookahead: 0.325
-  dwa: true
+  meter_scoring: true
 
-  oscillation_reset_dist: 0.05
-  meter_scoring: false
+#global planner 
+NavfnROS:
+    allow_unknown: false
+    visualize_potential: true
