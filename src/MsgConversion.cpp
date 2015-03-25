@@ -351,6 +351,7 @@ rtabmap::Signature nodeDataFromROS(const rtabmap_ros::NodeData & msg)
 			words,
 			words3D,
 			transformFromPoseMsg(msg.pose),
+			std::vector<unsigned char>(),
 			compressedMatFromBytes(msg.laserScan),
 			compressedMatFromBytes(msg.image),
 			compressedMatFromBytes(msg.depth),
