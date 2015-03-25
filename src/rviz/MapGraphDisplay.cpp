@@ -104,10 +104,12 @@ void MapGraphDisplay::processMessage( const rtabmap_ros::MapData::ConstPtr& msg 
 	// Get links
 	std::map<int, rtabmap::Transform> poses;
 	std::map<int, int> mapIds;
+	std::map<int,  double> stamps;
 	std::map<int, std::string> labels;
+	std::map<int, std::vector<unsigned char> > userDatas;
 	std::multimap<int, rtabmap::Link> links;
 	rtabmap::Transform mapToOdom;
-	rtabmap_ros::mapGraphFromROS(msg->graph, poses, mapIds, labels, links, mapToOdom);
+	rtabmap_ros::mapGraphFromROS(msg->graph, poses, mapIds, stamps, labels, userDatas, links, mapToOdom);
 
 	destroyObjects();
 

@@ -115,7 +115,9 @@ public:
 		// Assuming that nodes/constraints are all linked together
 		UASSERT(msg->graph.nodeIds.size() == msg->graph.poses.size());
 		UASSERT(msg->graph.nodeIds.size() == msg->graph.mapIds.size());
+		UASSERT(msg->graph.nodeIds.size() == msg->graph.stamps.size());
 		UASSERT(msg->graph.nodeIds.size() == msg->graph.labels.size());
+		UASSERT(msg->graph.nodeIds.size() == msg->graph.userDatas.size());
 
 		bool dataChanged = false;
 
@@ -147,7 +149,9 @@ public:
 
 		std::map<int, Transform> newPoses;
 		std::map<int, int> newMapIds;
+		std::map<int, double> newStamps;
 		std::map<int, std::string> newLabels;
+		std::map<int, std::vector<unsigned char> > newUserDatas;
 		// add new odometry poses
 		for(unsigned int i=0; i<msg->nodes.size(); ++i)
 		{
@@ -155,7 +159,9 @@ public:
 			Transform pose = rtabmap_ros::transformFromPoseMsg(msg->nodes[i].pose);
 			newPoses.insert(std::make_pair(id, pose));
 			newMapIds.insert(std::make_pair(id, msg->nodes[i].mapId));
+			newStamps.insert(std::make_pair(id, msg->nodes[i].stamp));
 			newLabels.insert(std::make_pair(id, msg->nodes[i].label));
+			newUserDatas.insert(std::make_pair(id, msg->nodes[i].userData.data));
 
 			std::pair<std::map<int, Transform>::iterator, bool> p = cachedPoses_.insert(std::make_pair(id, pose));
 			if(!p.second && pose != cachedPoses_.at(id))
@@ -165,7 +171,9 @@ public:
 			else if(p.second)
 			{
 				cachedMapIds_.insert(std::make_pair(id, msg->nodes[i].mapId));
+				cachedStamps_.insert(std::make_pair(id, msg->nodes[i].stamp));
 				cachedLabels_.insert(std::make_pair(id, msg->nodes[i].label));
+				cachedUserDatas_.insert(std::make_pair(id, msg->nodes[i].userData.data));
 			}
 		}
 
@@ -174,20 +182,26 @@ public:
 			ROS_WARN("Graph data has changed! Reset cache...");
 			cachedPoses_ = newPoses;
 			cachedMapIds_ = newMapIds;
+			cachedStamps_ = newStamps;
 			cachedLabels_ = newLabels;
+			cachedUserDatas_ = newUserDatas;
 			cachedConstraints_ = newConstraints;
 		}
 
 		//match poses in the graph
 		std::map<int, Transform> poses;
 		std::map<int, int> mapIds;
+		std::map<int, double> stamps;
 		std::map<int, std::string> labels;
+		std::map<int, std::vector<unsigned char> > userDatas;
 		std::multimap<int, Link> constraints;
 		if(globalOptimization_)
 		{
 			poses = cachedPoses_;
 			mapIds = cachedMapIds_;
+			stamps = cachedStamps_;
 			labels = cachedLabels_;
+			userDatas = cachedUserDatas_;
 			constraints = cachedConstraints_;
 		}
 		else
@@ -200,7 +214,9 @@ public:
 				{
 					poses.insert(*iter);
 					mapIds.insert(*cachedMapIds_.find(iter->first));
+					stamps.insert(*cachedStamps_.find(iter->first));
 					labels.insert(*cachedLabels_.find(iter->first));
+					userDatas.insert(*cachedUserDatas_.find(iter->first));
 				}
 				else
 				{
@@ -246,12 +262,16 @@ public:
 					  (int)poses.size(), (int)constraints.size());
 				mapIds.clear();
 				labels.clear();
+				stamps.clear();
+				userDatas.clear();
 			}
 
 			UASSERT(optimizedPoses.size() == mapIds.size());
 			UASSERT(optimizedPoses.size() == labels.size());
+			UASSERT(optimizedPoses.size() == stamps.size());
+			UASSERT(optimizedPoses.size() == userDatas.size());
 			rtabmap_ros::MapData outputMsg;
-			rtabmap_ros::mapGraphToROS(optimizedPoses, mapIds, labels, std::multimap<int, rtabmap::Link>(), mapCorrection, outputMsg.graph);
+			rtabmap_ros::mapGraphToROS(optimizedPoses, mapIds, stamps, labels, userDatas, std::multimap<int, rtabmap::Link>(), mapCorrection, outputMsg.graph);
 			outputMsg.graph.links = msg->graph.links;
 			outputMsg.header = msg->header;
 			outputMsg.nodes = msg->nodes;
@@ -278,7 +298,9 @@ private:
 
 	std::map<int, Transform> cachedPoses_;
 	std::map<int, int> cachedMapIds_;
+	std::map<int, double> cachedStamps_;
 	std::map<int, std::string> cachedLabels_;
+	std::map<int, std::vector<unsigned char> > cachedUserDatas_;
 	std::multimap<int, Link> cachedConstraints_;
 
 	tf::TransformBroadcaster tfBroadcaster_;

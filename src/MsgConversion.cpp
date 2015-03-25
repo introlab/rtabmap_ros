@@ -252,7 +252,9 @@ void mapGraphFromROS(
 		const rtabmap_ros::Graph & msg,
 		std::map<int, rtabmap::Transform> & poses,
 		std::map<int, int> & mapIds,
+		std::map<int, double> & stamps,
 		std::map<int, std::string> & labels,
+		std::map<int, std::vector<unsigned char> > & userDatas,
 		std::multimap<int, rtabmap::Link> & links,
 		rtabmap::Transform & mapToOdom)
 {
@@ -260,13 +262,17 @@ void mapGraphFromROS(
 
 	UASSERT(msg.nodeIds.size() == msg.mapIds.size());
 	UASSERT(msg.nodeIds.size() == msg.poses.size());
+	UASSERT(msg.nodeIds.size() == msg.stamps.size());
 	UASSERT(msg.nodeIds.size() == msg.labels.size());
+	UASSERT(msg.nodeIds.size() == msg.userDatas.size());
 
 	for(unsigned int i=0; i<msg.nodeIds.size(); ++i)
 	{
 		poses.insert(std::make_pair(msg.nodeIds[i], rtabmap_ros::transformFromPoseMsg(msg.poses[i])));
 		mapIds.insert(std::make_pair(msg.nodeIds[i], msg.mapIds[i]));
+		stamps.insert(std::make_pair(msg.nodeIds[i], msg.stamps[i]));
 		labels.insert(std::make_pair(msg.nodeIds[i], msg.labels[i]));
+		userDatas.insert(std::make_pair(msg.nodeIds[i], msg.userDatas[i].data));
 	}
 
 	for(unsigned int i=0; i<msg.links.size(); ++i)
@@ -278,32 +284,46 @@ void mapGraphFromROS(
 void mapGraphToROS(
 		const std::map<int, rtabmap::Transform> & poses,
 		const std::map<int, int> & mapIds,
+		const std::map<int, double> & stamps,
 		const std::map<int, std::string> & labels,
+		const std::map<int, std::vector<unsigned char> > & userDatas,
 		const std::multimap<int, rtabmap::Link> & links,
 		const rtabmap::Transform & mapToOdom,
 		rtabmap_ros::Graph & msg)
 {
-	UASSERT(poses.size() == 0 || (poses.size() == mapIds.size() && poses.size() == labels.size()));
+	UASSERT(poses.size() == 0 ||
+			(poses.size() == mapIds.size() &&
+			 poses.size() == labels.size() &&
+			 poses.size() == stamps.size() &&
+			 poses.size() == userDatas.size()));
 
 	transformToGeometryMsg(mapToOdom, msg.mapToOdom);
 
 	msg.nodeIds.resize(poses.size());
 	msg.poses.resize(poses.size());
 	msg.mapIds.resize(poses.size());
+	msg.stamps.resize(poses.size());
 	msg.labels.resize(poses.size());
+	msg.userDatas.resize(poses.size());
 	int index = 0;
 	std::map<int, rtabmap::Transform>::const_iterator iterPoses = poses.begin();
 	std::map<int, int>::const_iterator iterMapIds = mapIds.begin();
+	std::map<int, double>::const_iterator iterStamps = stamps.begin();
 	std::map<int, std::string>::const_iterator iterLabels = labels.begin();
+	std::map<int, std::vector<unsigned char> >::const_iterator iterUserDatas = userDatas.begin();
 	while(iterPoses != poses.end())
 	{
 		msg.nodeIds[index] = iterPoses->first;
 		msg.mapIds[index] = iterMapIds->second;
+		msg.stamps[index] = iterStamps->second;
 		msg.labels[index] = iterLabels->second;
+		msg.userDatas[index].data = iterUserDatas->second;
 		transformToPoseMsg(iterPoses->second, msg.poses[index]);
 		++iterPoses;
 		++iterMapIds;
+		++iterStamps;
 		++iterLabels;
+		++iterUserDatas;
 		++index;
 	}
 
@@ -351,7 +371,7 @@ rtabmap::Signature nodeDataFromROS(const rtabmap_ros::NodeData & msg)
 			words,
 			words3D,
 			transformFromPoseMsg(msg.pose),
-			std::vector<unsigned char>(),
+			msg.userData.data,
 			compressedMatFromBytes(msg.laserScan),
 			compressedMatFromBytes(msg.image),
 			compressedMatFromBytes(msg.depth),
@@ -369,6 +389,7 @@ void nodeDataToROS(const rtabmap::Signature & signature, rtabmap_ros::NodeData &
 	msg.weight = signature.getWeight();
 	msg.stamp = signature.getStamp();
 	msg.label = signature.getLabel();
+	msg.userData.data = signature.getUserData();
 	transformToPoseMsg(signature.getPose(), msg.pose);
 	compressedMatToBytes(signature.getImageCompressed(), msg.image);
 	compressedMatToBytes(signature.getDepthCompressed(), msg.depth);

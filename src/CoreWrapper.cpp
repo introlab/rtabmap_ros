@@ -1379,7 +1379,9 @@ bool CoreWrapper::getMapCallback(rtabmap_ros::GetMap::Request& req, rtabmap_ros:
 	std::map<int, Transform> poses;
 	std::multimap<int, Link> constraints;
 	std::map<int, int> mapIds;
+	std::map<int, double> stamps;
 	std::map<int, std::string> labels;
+	std::map<int, std::vector<unsigned char> > userDatas;
 
 	if(req.graphOnly)
 	{
@@ -1387,7 +1389,9 @@ bool CoreWrapper::getMapCallback(rtabmap_ros::GetMap::Request& req, rtabmap_ros:
 				poses,
 				constraints,
 				mapIds,
+				stamps,
 				labels,
+				userDatas,
 				req.optimized,
 				req.global);
 	}
@@ -1398,7 +1402,9 @@ bool CoreWrapper::getMapCallback(rtabmap_ros::GetMap::Request& req, rtabmap_ros:
 				poses,
 				constraints,
 				mapIds,
+				stamps,
 				labels,
+				userDatas,
 				req.optimized,
 				req.global);
 	}
@@ -1412,7 +1418,9 @@ bool CoreWrapper::getMapCallback(rtabmap_ros::GetMap::Request& req, rtabmap_ros:
 	//RGB-D SLAM data
 	rtabmap_ros::mapGraphToROS(poses,
 		mapIds,
+		stamps,
 		labels,
+		userDatas,
 		constraints,
 		Transform::getIdentity(),
 		res.data.graph);
@@ -1543,7 +1551,9 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 		std::map<int, Transform> poses;
 		std::multimap<int, Link> constraints;
 		std::map<int, int> mapIds;
+		std::map<int, double> stamps;
 		std::map<int, std::string> labels;
+		std::map<int, std::vector<unsigned char> > userDatas;
 
 		if(req.graphOnly)
 		{
@@ -1551,7 +1561,9 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 					poses,
 					constraints,
 					mapIds,
+					stamps,
 					labels,
+					userDatas,
 					req.optimized,
 					req.global);
 		}
@@ -1562,7 +1574,9 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 					poses,
 					constraints,
 					mapIds,
+					stamps,
 					labels,
+					userDatas,
 					req.optimized,
 					req.global);
 		}
@@ -1581,7 +1595,9 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 
 			rtabmap_ros::mapGraphToROS(poses,
 				mapIds,
+				stamps,
 				labels,
+				userDatas,
 				constraints,
 				Transform::getIdentity(),
 				*graphMsg);
@@ -1810,6 +1826,7 @@ bool CoreWrapper::listLabelsCallback(rtabmap_ros::ListLabels::Request& req, rtab
 
 void CoreWrapper::publishStats(const ros::Time & stamp)
 {
+	UDEBUG("Publishing stats...");
 	const rtabmap::Statistics & stats = rtabmap_.getStatistics();
 
 	if(infoPub_.getNumSubscribers())
@@ -1826,7 +1843,9 @@ void CoreWrapper::publishStats(const ros::Time & stamp)
 	if(mapDataPub_.getNumSubscribers() || mapGraphPub_.getNumSubscribers())
 	{
 		if(stats.poses().size() == stats.getMapIds().size() &&
-		   stats.poses().size() == stats.getLabels().size())
+		   stats.poses().size() == stats.getStamps().size() &&
+		   stats.poses().size() == stats.getLabels().size() &&
+		   stats.poses().size() == stats.getUserDatas().size())
 		{
 			rtabmap_ros::GraphPtr graphMsg(new rtabmap_ros::Graph);
 			graphMsg->header.stamp = stamp;
@@ -1835,7 +1854,9 @@ void CoreWrapper::publishStats(const ros::Time & stamp)
 			rtabmap_ros::mapGraphToROS(
 				stats.poses(),
 				stats.getMapIds(),
+				stats.getStamps(),
 				stats.getLabels(),
+				stats.getUserDatas(),
 				stats.constraints(),
 				stats.mapCorrection(),
 				*graphMsg);
@@ -1951,6 +1972,8 @@ std::map<int, rtabmap::Transform> CoreWrapper::updateMapCaches(
 		bool updateGrid,
 		const std::map<int, Signature> & signatures)
 {
+	UDEBUG("Updating map caches...");
+
 	if(!rtabmap_.getMemory() && signatures.size() == 0)
 	{
 		ROS_FATAL("Memory not initialized!?");
@@ -2216,6 +2239,8 @@ void CoreWrapper::publishMaps(
 		const std::map<int, rtabmap::Transform> & poses,
 		const ros::Time & stamp)
 {
+	UDEBUG("Publishing maps...");
+
 	// publish maps
 	if(cloudMapPub_.getNumSubscribers())
 	{

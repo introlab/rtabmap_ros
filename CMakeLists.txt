@@ -45,6 +45,7 @@ add_message_files(
    NodeData.msg
    Link.msg
    OdomInfo.msg
+   UserData.msg
 )
 
 ## Generate services in the 'srv' folder

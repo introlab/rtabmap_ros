@@ -185,14 +185,19 @@ void GuiWrapper::infoMapCallback(
 	rtabmap::Transform mapToOdom;
 	std::map<int, rtabmap::Transform> poses;
 	std::map<int, int> mapIds;
+	std::map<int, double> stamps;
 	std::map<int, std::string> labels;
+	std::map<int, std::vector<unsigned char> > userDatas;
 	std::multimap<int, Link> links;
 
-	rtabmap_ros::mapGraphFromROS(mapMsg->graph, poses, mapIds, labels, links, mapToOdom);
+	rtabmap_ros::mapGraphFromROS(mapMsg->graph, poses, mapIds, stamps, labels, userDatas, links, mapToOdom);
 
 	stat.setMapCorrection(mapToOdom);
 	stat.setPoses(poses);
 	stat.setMapIds(mapIds);
+	stat.setStamps(stamps);
+	stat.setLabels(labels);
+	stat.setUserDatas(userDatas);
 	stat.setConstraints(links);
 
 	//data
@@ -214,7 +219,9 @@ void GuiWrapper::processRequestedMap(const rtabmap_ros::MapData & map)
 	std::map<int, Transform> poses;
 	std::multimap<int, rtabmap::Link> constraints;
 	std::map<int, int> mapIds;
+	std::map<int, double> stamps;
 	std::map<int, std::string> labels;
+	std::map<int, std::vector<unsigned char> > userDatas;
 	Transform mapToOdom;
 
 	if(map.graph.nodeIds.size() != map.graph.mapIds.size())
@@ -231,7 +238,7 @@ void GuiWrapper::processRequestedMap(const rtabmap_ros::MapData & map)
 		return;
 	}
 
-	rtabmap_ros::mapGraphFromROS(map.graph, poses, mapIds, labels, constraints, mapToOdom);
+	rtabmap_ros::mapGraphFromROS(map.graph, poses, mapIds, stamps, labels, userDatas, constraints, mapToOdom);
 
 	//data
 	for(unsigned int i=0; i<map.nodes.size(); ++i)
@@ -243,7 +250,9 @@ void GuiWrapper::processRequestedMap(const rtabmap_ros::MapData & map)
 				poses,
 				constraints,
 				mapIds,
-				labels);
+				stamps,
+				labels,
+				userDatas);
 	QMetaObject::invokeMethod(mainWindow_, "processRtabmapEvent3DMap", Q_ARG(rtabmap::RtabmapEvent3DMap, e));
 }
 
