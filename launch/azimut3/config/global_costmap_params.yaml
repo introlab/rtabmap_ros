@@ -1,10 +1,10 @@
-global_costmap:
-  global_frame: map
-  robot_base_frame: base_footprint
-  update_frequency: 1
-  publish_frequency: 1
-  always_send_full_costmap: true
-  plugins: [
-    {name: static_layer, type: "rtabmap_ros::StaticLayer"},
-    {name: inflation_layer, type: "costmap_2d::InflationLayer"}
-  ]
+#global_costmap
+global_frame: map
+robot_base_frame: base_footprint
+update_frequency: 1
+publish_frequency: 2
+always_send_full_costmap: false
+plugins:
+   - {name: static_layer, type: "rtabmap_ros::StaticLayer"}
+   - {name: inflation_layer, type: "costmap_2d::InflationLayer"}
+
