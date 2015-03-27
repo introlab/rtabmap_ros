@@ -142,12 +142,12 @@ private:
 			}
 
 			pcl::PointCloud<pcl::PointXYZ>::Ptr groundCloud(new pcl::PointCloud<pcl::PointXYZ>);
-			if(groundPub_.getNumSubscribers() && ground->size())
+			if(groundPub_.getNumSubscribers() && ground.get() && ground->size())
 			{
 				pcl::copyPointCloud(*cloud, *ground, *groundCloud);
 			}
 			pcl::PointCloud<pcl::PointXYZ>::Ptr obstaclesCloud(new pcl::PointCloud<pcl::PointXYZ>);
-			if(obstaclesPub_.getNumSubscribers() && obstacles->size())
+			if(obstaclesPub_.getNumSubscribers() && obstacles.get() && obstacles->size())
 			{
 				pcl::copyPointCloud(*cloud, *obstacles, *obstaclesCloud);
 			}
