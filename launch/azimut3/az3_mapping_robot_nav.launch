@@ -19,10 +19,9 @@
       <param name="cloud_decimation" type="int" value="1"/>                    <!-- we already decimate in memory below -->
       <param name="grid_eroded" type="bool" value="true"/>
       <param name="grid_cell_size" type="double" value="0.05"/>
-      <param name="scan_inf_is_valid" type="bool" value="true"/>
 
       <remap from="odom" to="/base_controller/odom"/>
-      <remap from="scan" to="/scan"/>
+      <remap from="scan" to="/base_scan"/>
       <remap from="mapData" to="mapData"/>
 
       <remap from="rgb/image" to="/camera/rgb/image_rect_color"/>
@@ -80,7 +79,7 @@
 
   <!-- ROS navigation stack move_base -->
   <group ns="planner">
-     <remap from="base_scan" to="/scan"/>
+     <remap from="base_scan" to="/base_scan"/>
      <remap from="obstacles_cloud" to="/obstacles_cloud"/>
      <remap from="ground_cloud" to="/ground_cloud"/>
      <remap from="map" to="/map"/>

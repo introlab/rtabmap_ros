@@ -237,7 +237,6 @@ private:
 	bool useActionForGoal_;
 
 	// mapping stuff
-	bool scanInfIsValid_;
 	int cloudDecimation_;
 	double cloudMaxDepth_;
 	double cloudVoxelSize_;
