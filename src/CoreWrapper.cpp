@@ -90,6 +90,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 		databasePath_(UDirectory::homeDir()+"/.ros/"+rtabmap::Parameters::getDefaultDatabaseName()),
 		waitForTransform_(false),
 		useActionForGoal_(false),
+		scanInfIsValid_(false),
 		cloudDecimation_(4),
 		cloudMaxDepth_(4.0), // meters
 		cloudVoxelSize_(0.05), // meters
@@ -161,6 +162,9 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	pnh.param("tf_delay", tfDelay, tfDelay);
 	pnh.param("wait_for_transform", waitForTransform_, waitForTransform_);
 	pnh.param("use_action_for_goal", useActionForGoal_, useActionForGoal_);
+
+	// scan stuff
+	pnh.param("scan_inf_is_valid", scanInfIsValid_, scanInfIsValid_);
 
 	// cloud map stuff
 	pnh.param("cloud_decimation", cloudDecimation_, cloudDecimation_);
@@ -706,7 +710,27 @@ void CoreWrapper::commonDepthCallback(
 		//transform in frameId_ frame
 		sensor_msgs::PointCloud2 scanOut;
 		laser_geometry::LaserProjection projection;
-		projection.transformLaserScanToPointCloud(frameId_, *scanMsg, scanOut, tfListener_);
+
+		if(scanInfIsValid_)
+		{
+			// Filter positive infinities ("Inf"s) to max_range.
+			float epsilon = 0.0001; // a tenth of a millimeter
+			sensor_msgs::LaserScan message = *scanMsg;
+			for( size_t i = 0; i < message.ranges.size(); i++ )
+			{
+				float range = message.ranges[ i ];
+				if( !std::isfinite( range ) && range > 0 )
+				{
+					message.ranges[ i ] = message.range_max - epsilon;
+				}
+			}
+			projection.transformLaserScanToPointCloud(frameId_, message, scanOut, tfListener_);
+		}
+		else
+		{
+			projection.transformLaserScanToPointCloud(frameId_, *scanMsg, scanOut, tfListener_);
+		}
+
 		pcl::PointCloud<pcl::PointXYZ> pclScan;
 		pcl::fromROSMsg(scanOut, pclScan);
 		scan = util3d::laserScanFromPointCloud(pclScan);
@@ -787,7 +811,27 @@ void CoreWrapper::commonStereoCallback(
 		//transform in frameId_ frame
 		sensor_msgs::PointCloud2 scanOut;
 		laser_geometry::LaserProjection projection;
-		projection.transformLaserScanToPointCloud(frameId_, *scanMsg, scanOut, tfListener_);
+
+		if(scanInfIsValid_)
+		{
+			// Filter positive infinities ("Inf"s) to max_range.
+			float epsilon = 0.0001; // a tenth of a millimeter
+			sensor_msgs::LaserScan message = *scanMsg;
+			for( size_t i = 0; i < message.ranges.size(); i++ )
+			{
+				float range = message.ranges[ i ];
+				if( !std::isfinite( range ) && range > 0 )
+				{
+					message.ranges[ i ] = message.range_max - epsilon;
+				}
+			}
+			projection.transformLaserScanToPointCloud(frameId_, message, scanOut, tfListener_);
+		}
+		else
+		{
+			projection.transformLaserScanToPointCloud(frameId_, *scanMsg, scanOut, tfListener_);
+		}
+
 		pcl::PointCloud<pcl::PointXYZ> pclScan;
 		pcl::fromROSMsg(scanOut, pclScan);
 		scan = util3d::laserScanFromPointCloud(pclScan);
