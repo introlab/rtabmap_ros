@@ -134,8 +134,11 @@ private:
 				{
 					cloud = rtabmap::util3d::passThrough<pcl::PointXYZ>(cloud, "z", std::numeric_limits<int>::min(), maxObstaclesHeight_);
 				}
-				rtabmap::util3d::segmentObstaclesFromGround<pcl::PointXYZ>(cloud,
-						ground, obstacles, normalEstimationRadius_, groundNormalAngle_, minClusterSize_);
+				if(cloud->size())
+				{
+					rtabmap::util3d::segmentObstaclesFromGround<pcl::PointXYZ>(cloud,
+							ground, obstacles, normalEstimationRadius_, groundNormalAngle_, minClusterSize_);
+				}
 			}
 
 			pcl::PointCloud<pcl::PointXYZ>::Ptr groundCloud(new pcl::PointCloud<pcl::PointXYZ>);
