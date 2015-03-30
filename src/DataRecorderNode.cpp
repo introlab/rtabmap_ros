@@ -87,7 +87,6 @@ public:
 		bool subscribeDepth = false;
 		bool subscribeStereo = false;
 		int queueSize = 10;
-		bool showGUI = true;
 		pnh.param("subscribe_odometry", subscribeOdometry, subscribeOdometry);
 		pnh.param("subscribe_depth", subscribeDepth, subscribeDepth);
 		pnh.param("subscribe_stereo", subscribeStereo, subscribeStereo);
