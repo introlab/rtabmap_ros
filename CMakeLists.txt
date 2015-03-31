@@ -227,6 +227,7 @@ install(FILES
    launch/rgbd_mapping.launch
    launch/rgbd_localization.launch
    launch/data_recorder.launch
+   launch/rgbd_mapping_kinect2.launch
    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch
 )
 install(DIRECTORY 
