@@ -117,6 +117,7 @@ private:
 	QApplication * app_;
 	rtabmap::MainWindow * mainWindow_;
 	std::string cameraNodeName_;
+	double lastOdomInfoUpdateTime_;
 
 	// odometry subscription stuffs
 	std::string frameId_;

@@ -48,6 +48,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/ParamEvent.h>
 #include <rtabmap/core/OdometryEvent.h>
 #include <rtabmap/core/util3d.h>
+#include <rtabmap/utilite/UTimer.h>
 
 #include "rtabmap_ros/MsgConversion.h"
 #include "rtabmap_ros/GetMap.h"
@@ -70,6 +71,7 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 		frameId_("base_link"),
 		waitForTransform_(false),
 		cameraNodeName_(""),
+		lastOdomInfoUpdateTime_(0),
 		depthScanSync_(0),
 		depthSync_(0),
 		depthOdomInfoSync_(0),
@@ -387,7 +389,9 @@ void GuiWrapper::defaultCallback(const nav_msgs::OdometryConstPtr & odomMsg)
 		rtabmap::SensorData data(cv::Mat(), odomMsg->header.seq);
 		float transVariance = max3(odomMsg->pose.covariance[0], odomMsg->pose.covariance[7], odomMsg->pose.covariance[14]);
 		float rotVariance = max3(odomMsg->pose.covariance[21], odomMsg->pose.covariance[28], odomMsg->pose.covariance[35]);
-		data.setPose(odom, rotVariance, transVariance);
+		data.setPose(odom,
+				rotVariance>0?rotVariance:1,
+				transVariance>0?transVariance:1);
 
 		rtabmap::OdometryInfo info;
 		QMetaObject::invokeMethod(mainWindow_, "processOdometry", Q_ARG(rtabmap::SensorData, data), Q_ARG(rtabmap::OdometryInfo, info));
@@ -400,8 +404,13 @@ void GuiWrapper::depthCallback(
 		const sensor_msgs::ImageConstPtr& depthMsg,
 		const sensor_msgs::CameraInfoConstPtr& cameraInfoMsg)
 {
-	if(!mainWindow_->isProcessingOdometry() && !mainWindow_->isProcessingStatistics())
+	// limit 10 Hz max
+	if(UTimer::now() - lastOdomInfoUpdateTime_ > 0.1 &&
+		!mainWindow_->isProcessingOdometry() &&
+		!mainWindow_->isProcessingStatistics())
 	{
+		lastOdomInfoUpdateTime_ = UTimer::now();
+
 		// TF ready?
 		Transform localTransform;
 		try
@@ -447,8 +456,8 @@ void GuiWrapper::depthCallback(
 				cy,
 				localTransform,
 				rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose),
-				rotVariance,
-				transVariance,
+				rotVariance>0?rotVariance:1,
+				transVariance>0?transVariance:1,
 				odomMsg->header.seq,
 				rtabmap_ros::timestampFromROS(odomMsg->header.stamp));
 
@@ -464,8 +473,12 @@ void GuiWrapper::depthOdomInfoCallback(
 		const sensor_msgs::ImageConstPtr& depthMsg,
 		const sensor_msgs::CameraInfoConstPtr& cameraInfoMsg)
 {
-	if(!mainWindow_->isProcessingOdometry() && !mainWindow_->isProcessingStatistics())
+	// limit 10 Hz max
+	if(UTimer::now() - lastOdomInfoUpdateTime_ > 0.1 &&
+		!mainWindow_->isProcessingOdometry() &&
+		!mainWindow_->isProcessingStatistics())
 	{
+		lastOdomInfoUpdateTime_ = UTimer::now();
 		// TF ready?
 		Transform localTransform;
 		try
@@ -511,8 +524,8 @@ void GuiWrapper::depthOdomInfoCallback(
 				cy,
 				localTransform,
 				rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose),
-				rotVariance,
-				transVariance,
+				rotVariance>0?rotVariance:1,
+				transVariance>0?transVariance:1,
 				odomMsg->header.seq,
 				rtabmap_ros::timestampFromROS(odomMsg->header.stamp));
 
@@ -528,8 +541,12 @@ void GuiWrapper::depthScanCallback(
 		const sensor_msgs::CameraInfoConstPtr& cameraInfoMsg,
 		const sensor_msgs::LaserScanConstPtr& scanMsg)
 {
-	if(!mainWindow_->isProcessingOdometry() && !mainWindow_->isProcessingStatistics())
+	// limit 10 Hz max
+	if(UTimer::now() - lastOdomInfoUpdateTime_ > 0.1 &&
+		!mainWindow_->isProcessingOdometry() &&
+		!mainWindow_->isProcessingStatistics())
 	{
+		lastOdomInfoUpdateTime_ = UTimer::now();
 		// TF ready?
 		Transform localTransform;
 		sensor_msgs::PointCloud2 scanOut;
@@ -585,8 +602,8 @@ void GuiWrapper::depthScanCallback(
 				cy,
 				localTransform,
 				rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose),
-				rotVariance,
-				transVariance,
+				rotVariance>0?rotVariance:1,
+				transVariance>0?transVariance:1,
 				odomMsg->header.seq,
 				rtabmap_ros::timestampFromROS(odomMsg->header.stamp));
 
@@ -603,8 +620,12 @@ void GuiWrapper::stereoScanCallback(
 		const sensor_msgs::CameraInfoConstPtr& leftCameraInfoMsg,
 		const sensor_msgs::CameraInfoConstPtr& rightCameraInfoMsg)
 {
-	if(!mainWindow_->isProcessingOdometry() && !mainWindow_->isProcessingStatistics())
+	// limit 10 Hz max
+	if(UTimer::now() - lastOdomInfoUpdateTime_ > 0.1 &&
+		!mainWindow_->isProcessingOdometry() &&
+		!mainWindow_->isProcessingStatistics())
 	{
+		lastOdomInfoUpdateTime_ = UTimer::now();
 		if(!(leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
 			leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0 ||
 			leftImageMsg->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
@@ -683,8 +704,8 @@ void GuiWrapper::stereoScanCallback(
 				cy,
 				localTransform,
 				rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose),
-				rotVariance,
-				transVariance,
+				rotVariance>0?rotVariance:1,
+				transVariance>0?transVariance:1,
 				odomMsg->header.seq,
 				rtabmap_ros::timestampFromROS(odomMsg->header.stamp));
 
@@ -701,8 +722,12 @@ void GuiWrapper::stereoOdomInfoCallback(
 		const sensor_msgs::CameraInfoConstPtr& leftCameraInfoMsg,
 		const sensor_msgs::CameraInfoConstPtr& rightCameraInfoMsg)
 {
-	if(!mainWindow_->isProcessingOdometry() && !mainWindow_->isProcessingStatistics())
+	// limit 10 Hz max
+	if(UTimer::now() - lastOdomInfoUpdateTime_ > 0.1 &&
+		!mainWindow_->isProcessingOdometry() &&
+		!mainWindow_->isProcessingStatistics())
 	{
+		lastOdomInfoUpdateTime_ = UTimer::now();
 		if(!(leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
 			leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0 ||
 			leftImageMsg->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
@@ -771,8 +796,8 @@ void GuiWrapper::stereoOdomInfoCallback(
 				cy,
 				localTransform,
 				rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose),
-				rotVariance,
-				transVariance,
+				rotVariance>0?rotVariance:1,
+				transVariance>0?transVariance:1,
 				odomMsg->header.seq,
 				rtabmap_ros::timestampFromROS(odomMsg->header.stamp));
 
@@ -788,8 +813,12 @@ void GuiWrapper::stereoCallback(
 		const sensor_msgs::CameraInfoConstPtr& leftCameraInfoMsg,
 		const sensor_msgs::CameraInfoConstPtr& rightCameraInfoMsg)
 {
-	if(!mainWindow_->isProcessingOdometry() && !mainWindow_->isProcessingStatistics())
+	// limit 10 Hz max
+	if(UTimer::now() - lastOdomInfoUpdateTime_ > 0.1 &&
+		!mainWindow_->isProcessingOdometry() &&
+		!mainWindow_->isProcessingStatistics())
 	{
+		lastOdomInfoUpdateTime_ = UTimer::now();
 		if(!(leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
 			leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0 ||
 			leftImageMsg->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
@@ -858,8 +887,8 @@ void GuiWrapper::stereoCallback(
 				cy,
 				localTransform,
 				rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose),
-				rotVariance,
-				transVariance,
+				rotVariance>0?rotVariance:1,
+				transVariance>0?transVariance:1,
 				odomMsg->header.seq,
 				rtabmap_ros::timestampFromROS(odomMsg->header.stamp));
 
