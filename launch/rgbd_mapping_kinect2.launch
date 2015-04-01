@@ -39,6 +39,8 @@
    <arg name="min_inliers" default="20" />
    <arg name="inlier_distance" default="0.02" />
    <arg name="local_map" default="1000" />
+   <arg name="gftt_max_corners" default="500" />
+   <arg name="gftt_min_distance" default="7" />
    
   <!-- TF FRAMES -->
   <node pkg="tf" type="static_transform_publisher" name="base_to_camera_tf" 
@@ -52,7 +54,7 @@
       <remap from="depth/image" to="/kinect2/$(arg depth_prefix)/image"/>
       <remap from="rgb/camera_info" to="/kinect2/$(arg rgb_prefix)/camera_info"/>
 
-      <param name="approx_sync" type="bool" value="false"/>
+      <param name="approx_sync" type="bool" value="true"/>
 	  
       <param name="Odom/Strategy" type="string" value="$(arg strategy)"/> 
       <param name="Odom/FeatureType" type="string" value="$(arg feature)"/>  
@@ -60,8 +62,10 @@
       <param name="Odom/MaxDepth" type="string" value="$(arg max_depth)"/>  
       <param name="Odom/MinInliers" type="string" value="$(arg min_inliers)"/> 
       <param name="Odom/InlierDistance" type="string" value="$(arg inlier_distance)"/>       
-      <param name="OdomBow/LocalHistorySize" type="string" value="$(arg local_map)"/> 
-      <param name="Odom/FillInfoData" type="string" value="$(arg rtabmapviz)"/>   
+      <param name="OdomBow/LocalHistorySize" type="string" value="$(arg local_map)"/>
+      <param name="Odom/FillInfoData" type="string" value="$(arg rtabmapviz)"/>
+      <param name="GFTT/MaxCorners" type="string" value="$(arg gftt_max_corners)"/>
+      <param name="GFTT/MinDistance" type="string" value="$(arg gftt_min_distance)"/>
     </node>
   
     <!-- Visual SLAM (robot side) -->
@@ -73,7 +77,7 @@
       <remap from="depth/image" to="/kinect2/$(arg depth_prefix)/image"/>
       <remap from="rgb/camera_info" to="/kinect2/$(arg rgb_prefix)/camera_info"/>
 
-      <param name="approx_sync" type="bool" value="false"/>
+      <param name="approx_sync" type="bool" value="true"/>
 
       <param name="LccBow/MinInliers" type="string" value="10"/>
       <param name="LccBow/InlierDistance" type="string" value="0.02"/>
@@ -83,7 +87,7 @@
     <node if="$(arg rtabmapviz)" pkg="rtabmap_ros" type="rtabmapviz" name="rtabmapviz" args="-d $(find rtabmap_ros)/launch/config/rgbd_gui.ini" output="screen">
       <param name="subscribe_depth" type="bool" value="true"/>
       <param name="subscribe_odom_info" type="bool" value="true"/>
-      <param name="approx_sync" type="bool" value="false"/>
+      <param name="approx_sync" type="bool" value="true"/>
     
       <remap from="rgb/image" to="/kinect2/$(arg rgb_prefix)/image"/>
       <remap from="depth/image" to="/kinect2/$(arg depth_prefix)/image"/>
@@ -103,7 +107,7 @@
 
     <remap from="odom_in"             to="rtabmap/odom"/>
 
-    <param name="approx_sync" type="bool" value="false"/>
+    <param name="approx_sync" type="bool" value="true"/>
     
     <remap from="rgb/image_out"       to="data_odom_sync/image"/>
     <remap from="depth/image_out"     to="data_odom_sync/depth"/>
