@@ -390,8 +390,8 @@ void GuiWrapper::defaultCallback(const nav_msgs::OdometryConstPtr & odomMsg)
 		float transVariance = max3(odomMsg->pose.covariance[0], odomMsg->pose.covariance[7], odomMsg->pose.covariance[14]);
 		float rotVariance = max3(odomMsg->pose.covariance[21], odomMsg->pose.covariance[28], odomMsg->pose.covariance[35]);
 		data.setPose(odom,
-				rotVariance>0?rotVariance:1,
-				transVariance>0?transVariance:1);
+				uIsFinite(rotVariance) && rotVariance>0?rotVariance:1,
+				uIsFinite(transVariance) && transVariance>0?transVariance:1);
 
 		rtabmap::OdometryInfo info;
 		QMetaObject::invokeMethod(mainWindow_, "processOdometry", Q_ARG(rtabmap::SensorData, data), Q_ARG(rtabmap::OdometryInfo, info));
@@ -456,8 +456,8 @@ void GuiWrapper::depthCallback(
 				cy,
 				localTransform,
 				rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose),
-				rotVariance>0?rotVariance:1,
-				transVariance>0?transVariance:1,
+				uIsFinite(rotVariance) && rotVariance>0?rotVariance:1,
+				uIsFinite(transVariance) && transVariance>0?transVariance:1,
 				odomMsg->header.seq,
 				rtabmap_ros::timestampFromROS(odomMsg->header.stamp));
 
@@ -524,8 +524,8 @@ void GuiWrapper::depthOdomInfoCallback(
 				cy,
 				localTransform,
 				rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose),
-				rotVariance>0?rotVariance:1,
-				transVariance>0?transVariance:1,
+				uIsFinite(rotVariance) && rotVariance>0?rotVariance:1,
+				uIsFinite(transVariance) && transVariance>0?transVariance:1,
 				odomMsg->header.seq,
 				rtabmap_ros::timestampFromROS(odomMsg->header.stamp));
 
@@ -602,8 +602,8 @@ void GuiWrapper::depthScanCallback(
 				cy,
 				localTransform,
 				rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose),
-				rotVariance>0?rotVariance:1,
-				transVariance>0?transVariance:1,
+				uIsFinite(rotVariance) && rotVariance>0?rotVariance:1,
+				uIsFinite(transVariance) && transVariance>0?transVariance:1,
 				odomMsg->header.seq,
 				rtabmap_ros::timestampFromROS(odomMsg->header.stamp));
 
@@ -704,8 +704,8 @@ void GuiWrapper::stereoScanCallback(
 				cy,
 				localTransform,
 				rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose),
-				rotVariance>0?rotVariance:1,
-				transVariance>0?transVariance:1,
+				uIsFinite(rotVariance) && rotVariance>0?rotVariance:1,
+				uIsFinite(transVariance) && transVariance>0?transVariance:1,
 				odomMsg->header.seq,
 				rtabmap_ros::timestampFromROS(odomMsg->header.stamp));
 
@@ -796,8 +796,8 @@ void GuiWrapper::stereoOdomInfoCallback(
 				cy,
 				localTransform,
 				rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose),
-				rotVariance>0?rotVariance:1,
-				transVariance>0?transVariance:1,
+				uIsFinite(rotVariance) && rotVariance>0?rotVariance:1,
+				uIsFinite(transVariance) && transVariance>0?transVariance:1,
 				odomMsg->header.seq,
 				rtabmap_ros::timestampFromROS(odomMsg->header.stamp));
 
@@ -887,8 +887,8 @@ void GuiWrapper::stereoCallback(
 				cy,
 				localTransform,
 				rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose),
-				rotVariance>0?rotVariance:1,
-				transVariance>0?transVariance:1,
+				uIsFinite(rotVariance) && rotVariance>0?rotVariance:1,
+				uIsFinite(transVariance) && transVariance>0?transVariance:1,
 				odomMsg->header.seq,
 				rtabmap_ros::timestampFromROS(odomMsg->header.stamp));
 
