@@ -49,6 +49,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/utilite/UStl.h>
 #include <rtabmap/utilite/UTimer.h>
 #include <rtabmap/utilite/UConversion.h>
+#include <rtabmap/utilite/UMath.h>
 #include <opencv2/highgui/highgui.hpp>
 
 #include <pcl_ros/transforms.h>
@@ -571,11 +572,11 @@ bool CoreWrapper::commonOdomUpdate(const nav_msgs::OdometryConstPtr & odomMsg)
 		lastPose_ = odom;
 		float transVariance = max3(odomMsg->pose.covariance[0], odomMsg->pose.covariance[7], odomMsg->pose.covariance[14]);
 		float rotVariance = max3(odomMsg->pose.covariance[21], odomMsg->pose.covariance[28], odomMsg->pose.covariance[35]);
-		if(rotVariance > rotVariance_)
+		if(uIsFinite(rotVariance) && rotVariance > rotVariance_)
 		{
 			rotVariance_ = rotVariance;
 		}
-		if(transVariance > transVariance_)
+		if(uIsFinite(transVariance) && transVariance > transVariance_)
 		{
 			transVariance_ = transVariance;
 		}
