@@ -371,8 +371,8 @@ private:
 			cy,
 			localTransform,
 			rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose),
-			rotVariance>0?rotVariance:1.0f,
-			transVariance>0?transVariance:1.0f,
+			uIsFinite(rotVariance) && rotVariance>0?rotVariance:1,
+			uIsFinite(transVariance) && transVariance>0?transVariance:1,
 			0,
 			rtabmap_ros::timestampFromROS(imageMsg->header.stamp));
 		recorder_.addData(data);
@@ -471,8 +471,8 @@ private:
 			cy,
 			localTransform,
 			rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose),
-			rotVariance>0?rotVariance:1.0f,
-			transVariance>0?transVariance:1.0f,
+			uIsFinite(rotVariance) && rotVariance>0?rotVariance:1,
+			uIsFinite(transVariance) && transVariance>0?transVariance:1,
 			0,
 			rtabmap_ros::timestampFromROS(imageMsg->header.stamp));
 		recorder_.addData(data);
@@ -529,8 +529,8 @@ private:
 				cy,
 				localTransform,
 				rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose),
-				rotVariance>0?rotVariance:1.0f,
-				transVariance>0?transVariance:1.0f,
+				uIsFinite(rotVariance) && rotVariance>0?rotVariance:1,
+				uIsFinite(transVariance) && transVariance>0?transVariance:1,
 				0,
 				rtabmap_ros::timestampFromROS(leftImageMsg->header.stamp));
 		recorder_.addData(data);
