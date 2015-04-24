@@ -37,10 +37,10 @@
   <group ns="rtabmap">
   
     <!-- Odometry -->
-    <node pkg="rtabmap_ros" type="rgbd_odometry" name="visual_odometry" output="screen">
+    <node pkg="rtabmap_ros" type="rgbd_odometry" name="rgbd_odometry" output="screen">
       <remap from="rgb/image"       to="/camera/rgb/image_rect_color"/>
       <remap from="depth/image"     to="/camera/depth_registered/image_raw"/>
-      <remap from="rgb/camera_info" to="/camera/depth_registered/camera_info"/>
+      <remap from="rgb/camera_info" to="/camera/rgb/camera_info"/>
 	  
 	  <param name="Odom/Strategy" type="string" value="$(arg strategy)"/> 
 	  <param name="Odom/FeatureType" type="string" value="$(arg feature)"/>  
@@ -59,7 +59,7 @@
 	
       <remap from="rgb/image" to="/camera/rgb/image_rect_color"/>
       <remap from="depth/image" to="/camera/depth_registered/image_raw"/>
-      <remap from="rgb/camera_info" to="/camera/depth_registered/camera_info"/>
+      <remap from="rgb/camera_info" to="/camera/rgb/camera_info"/>
 
       <param name="LccBow/MinInliers" type="string" value="10"/>
       <param name="LccBow/InlierDistance" type="string" value="0.02"/>
@@ -72,7 +72,7 @@
     
       <remap from="rgb/image" to="/camera/rgb/image_rect_color"/>
       <remap from="depth/image" to="/camera/depth_registered/image_raw"/>
-      <remap from="rgb/camera_info" to="/camera/depth_registered/camera_info"/>
+      <remap from="rgb/camera_info" to="/camera/rgb/camera_info"/>
     </node>
   
   </group>
@@ -84,7 +84,7 @@
   <node if="$(arg rviz)" pkg="nodelet" type="nodelet" name="data_odom_sync" args="load rtabmap_ros/data_odom_sync standalone_nodelet">
     <remap from="rgb/image_in"       to="camera/rgb/image_rect_color"/>
     <remap from="depth/image_in"     to="camera/depth_registered/image_raw"/>
-    <remap from="rgb/camera_info_in" to="camera/depth_registered/camera_info"/>
+    <remap from="rgb/camera_info_in" to="camera/rgb/camera_info"/>
     <remap from="odom_in"             to="rtabmap/odom"/>
     
     <remap from="rgb/image_out"       to="data_odom_sync/image"/>

@@ -72,6 +72,12 @@ public:
 		image_depth_sub_.subscribe(depth_it, depth_nh.resolveName("image"), 1, hintsDepth);
 		info_sub_.subscribe(rgb_nh, "camera_info", 1);
 
+		ROS_INFO("\n%s subscribed to:\n   %s,\n   %s,\n   %s",
+				ros::this_node::getName().c_str(),
+				image_mono_sub_.getTopic().c_str(),
+				image_depth_sub_.getTopic().c_str(),
+				info_sub_.getTopic().c_str());
+
 		sync_ = new message_filters::Synchronizer<MySyncPolicy>(MySyncPolicy(queueSize), image_mono_sub_, image_depth_sub_, info_sub_);
 		sync_->registerCallback(boost::bind(&RGBDOdometry::callback, this, _1, _2, _3));
 	}

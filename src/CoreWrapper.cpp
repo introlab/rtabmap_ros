@@ -2636,12 +2636,27 @@ void CoreWrapper::setupCallbacks(
 				scanSub_.subscribe(nh, "scan", 1);
 				depthScanSync_ = new message_filters::Synchronizer<MyDepthScanSyncPolicy>(MyDepthScanSyncPolicy(queueSize), imageSub_, odomSub_, imageDepthSub_, cameraInfoSub_, scanSub_);
 				depthScanSync_->registerCallback(boost::bind(&CoreWrapper::depthScanCallback, this, _1, _2, _3, _4, _5));
+
+				ROS_INFO("\n%s subscribed to:\n   %s,\n   %s,\n   %s,\n   %s,\n   %s",
+						ros::this_node::getName().c_str(),
+						imageSub_.getTopic().c_str(),
+						imageDepthSub_.getTopic().c_str(),
+						cameraInfoSub_.getTopic().c_str(),
+						odomSub_.getTopic().c_str(),
+						scanSub_.getTopic().c_str());
 			}
 			else //!subscribeLaserScan
 			{
 				ROS_INFO("Registering Depth callback...");
 				depthSync_ = new message_filters::Synchronizer<MyDepthSyncPolicy>(MyDepthSyncPolicy(queueSize), imageSub_, odomSub_, imageDepthSub_, cameraInfoSub_);
 				depthSync_->registerCallback(boost::bind(&CoreWrapper::depthCallback, this, _1, _2, _3, _4));
+
+				ROS_INFO("\n%s subscribed to:\n   %s,\n   %s,\n   %s,\n   %s",
+						ros::this_node::getName().c_str(),
+						imageSub_.getTopic().c_str(),
+						imageDepthSub_.getTopic().c_str(),
+						cameraInfoSub_.getTopic().c_str(),
+						odomSub_.getTopic().c_str());
 			}
 		}
 		else
@@ -2649,16 +2664,27 @@ void CoreWrapper::setupCallbacks(
 			// use odom from TF, so subscribe to sensors only
 			if(subscribeLaserScan)
 			{
-				ROS_INFO("Registering Depth+LaserScan+OdomTF callback...");
 				scanSub_.subscribe(nh, "scan", 1);
 				depthScanTFSync_ = new message_filters::Synchronizer<MyDepthScanTFSyncPolicy>(MyDepthScanTFSyncPolicy(queueSize), imageSub_, imageDepthSub_, cameraInfoSub_, scanSub_);
 				depthScanTFSync_->registerCallback(boost::bind(&CoreWrapper::depthScanTFCallback, this, _1, _2, _3, _4));
+
+				ROS_INFO("\n%s subscribed to:\n   %s,\n   %s,\n   %s,\n   %s",
+						ros::this_node::getName().c_str(),
+						imageSub_.getTopic().c_str(),
+						imageDepthSub_.getTopic().c_str(),
+						cameraInfoSub_.getTopic().c_str(),
+						scanSub_.getTopic().c_str());
 			}
 			else //!subscribeLaserScan
 			{
-				ROS_INFO("Registering Depth+OdomTF callback...");
 				depthTFSync_ = new message_filters::Synchronizer<MyDepthTFSyncPolicy>(MyDepthTFSyncPolicy(queueSize), imageSub_, imageDepthSub_, cameraInfoSub_);
 				depthTFSync_->registerCallback(boost::bind(&CoreWrapper::depthTFCallback, this, _1, _2, _3));
+
+				ROS_INFO("\n%s subscribed to:\n   %s,\n   %s,\n   %s",
+						ros::this_node::getName().c_str(),
+						imageSub_.getTopic().c_str(),
+						imageDepthSub_.getTopic().c_str(),
+						cameraInfoSub_.getTopic().c_str());
 			}
 		}
 	}
@@ -2683,10 +2709,18 @@ void CoreWrapper::setupCallbacks(
 			odomSub_.subscribe(nh, "odom", 1);
 			if(subscribeLaserScan)
 			{
-				ROS_INFO("Registering Stereo+LaserScan callback...");
 				scanSub_.subscribe(nh, "scan", 1);
 				stereoScanSync_ = new message_filters::Synchronizer<MyStereoScanSyncPolicy>(MyStereoScanSyncPolicy(queueSize), imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_, scanSub_, odomSub_);
 				stereoScanSync_->registerCallback(boost::bind(&CoreWrapper::stereoScanCallback, this, _1, _2, _3, _4, _5, _6));
+
+				ROS_INFO("\n%s subscribed to:\n   %s,\n   %s,\n   %s,\n   %s,\n   %s,\n   %s",
+						ros::this_node::getName().c_str(),
+						imageRectLeft_.getTopic().c_str(),
+						imageRectRight_.getTopic().c_str(),
+						cameraInfoLeft_.getTopic().c_str(),
+						cameraInfoRight_.getTopic().c_str(),
+						odomSub_.getTopic().c_str(),
+						scanSub_.getTopic().c_str());
 			}
 			else //!subscribeLaserScan
 			{
@@ -2702,6 +2736,14 @@ void CoreWrapper::setupCallbacks(
 					stereoExactSync_ = new message_filters::Synchronizer<MyStereoExactSyncPolicy>(MyStereoExactSyncPolicy(queueSize), imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_, odomSub_);
 					stereoExactSync_->registerCallback(boost::bind(&CoreWrapper::stereoCallback, this, _1, _2, _3, _4, _5));
 				}
+
+				ROS_INFO("\n%s subscribed to:\n   %s,\n   %s,\n   %s,\n   %s,\n   %s",
+						ros::this_node::getName().c_str(),
+						imageRectLeft_.getTopic().c_str(),
+						imageRectRight_.getTopic().c_str(),
+						cameraInfoLeft_.getTopic().c_str(),
+						cameraInfoRight_.getTopic().c_str(),
+						odomSub_.getTopic().c_str());
 			}
 		}
 		else
@@ -2713,6 +2755,14 @@ void CoreWrapper::setupCallbacks(
 				scanSub_.subscribe(nh, "scan", 1);
 				stereoScanTFSync_ = new message_filters::Synchronizer<MyStereoScanTFSyncPolicy>(MyStereoScanTFSyncPolicy(queueSize), imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_, scanSub_);
 				stereoScanTFSync_->registerCallback(boost::bind(&CoreWrapper::stereoScanTFCallback, this, _1, _2, _3, _4, _5));
+
+				ROS_INFO("\n%s subscribed to:\n   %s,\n   %s,\n   %s,\n   %s,\n   %s",
+						ros::this_node::getName().c_str(),
+						imageRectLeft_.getTopic().c_str(),
+						imageRectRight_.getTopic().c_str(),
+						cameraInfoLeft_.getTopic().c_str(),
+						cameraInfoRight_.getTopic().c_str(),
+						scanSub_.getTopic().c_str());
 			}
 			else //!subscribeLaserScan
 			{
@@ -2728,17 +2778,25 @@ void CoreWrapper::setupCallbacks(
 					stereoExactTFSync_ = new message_filters::Synchronizer<MyStereoExactTFSyncPolicy>(MyStereoExactTFSyncPolicy(queueSize), imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_);
 					stereoExactTFSync_->registerCallback(boost::bind(&CoreWrapper::stereoTFCallback, this, _1, _2, _3, _4));
 				}
+
+				ROS_INFO("\n%s subscribed to:\n   %s,\n   %s,\n   %s,\n   %s",
+						ros::this_node::getName().c_str(),
+						imageRectLeft_.getTopic().c_str(),
+						imageRectRight_.getTopic().c_str(),
+						cameraInfoLeft_.getTopic().c_str(),
+						cameraInfoRight_.getTopic().c_str());
 			}
 		}
 	}
 	else
 	{
-		ROS_INFO("Registering image-only callback...");
 		ros::NodeHandle rgb_nh(nh, "rgb");
 		ros::NodeHandle rgb_pnh(pnh, "rgb");
 		image_transport::ImageTransport rgb_it(rgb_nh);
 		image_transport::TransportHints hintsRgb("raw", ros::TransportHints(), rgb_pnh);
 		defaultSub_ = rgb_it.subscribe("image", 1, &CoreWrapper::defaultCallback, this);
+
+		ROS_INFO("\n%s subscribed to:\n   %s", ros::this_node::getName().c_str(), defaultSub_.getTopic().c_str());
 	}
 }
 
