@@ -19,8 +19,8 @@ Header header
 #    std::vector<int> wordInliers;
 #
 #    // Optical Flow odometry
-#    std::vector<cv::KeyPoint> refCorners;
-#    std::vector<cv::KeyPoint> newCorners;
+#    std::vector<cv::Point2f> refCorners;
+#    std::vector<cv::Point2f> newCorners;
 #    std::vector<int> cornerInliers;
 #}
 
@@ -39,7 +39,7 @@ KeyPoint[] wordsValues
 int32[] wordMatches
 int32[] wordInliers
 
-KeyPoint[] refCorners
-KeyPoint[] newCorners
+Point2f[] refCorners
+Point2f[] newCorners
 int32[] cornerInliers
 

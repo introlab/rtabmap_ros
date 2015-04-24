@@ -215,7 +215,7 @@ void linkToROS(const rtabmap::Link & link, rtabmap_ros::Link & msg)
 
 cv::KeyPoint keypointFromROS(const rtabmap_ros::KeyPoint & msg)
 {
-	return cv::KeyPoint(msg.ptx, msg.pty, msg.size, msg.angle, msg.response, msg.octave, msg.class_id);
+	return cv::KeyPoint(msg.pt.x, msg.pt.y, msg.size, msg.angle, msg.response, msg.octave, msg.class_id);
 }
 
 void keypointToROS(const cv::KeyPoint & kpt, rtabmap_ros::KeyPoint & msg)
@@ -223,8 +223,8 @@ void keypointToROS(const cv::KeyPoint & kpt, rtabmap_ros::KeyPoint & msg)
 	msg.angle = kpt.angle;
 	msg.class_id = kpt.class_id;
 	msg.octave = kpt.octave;
-	msg.ptx = kpt.pt.x;
-	msg.pty = kpt.pt.y;
+	msg.pt.x = kpt.pt.x;
+	msg.pt.y = kpt.pt.y;
 	msg.response = kpt.response;
 	msg.size = kpt.size;
 }
@@ -245,6 +245,36 @@ void keypointsToROS(const std::vector<cv::KeyPoint> & kpts, std::vector<rtabmap_
 	for(unsigned int i=0; i<msg.size(); ++i)
 	{
 		keypointToROS(kpts[i], msg[i]);
+	}
+}
+
+cv::Point2f point2fFromROS(const rtabmap_ros::Point2f & msg)
+{
+	return cv::Point2f(msg.x, msg.y);
+}
+
+void point2fToROS(const cv::Point2f & kpt, rtabmap_ros::Point2f & msg)
+{
+	msg.x = kpt.x;
+	msg.y = kpt.y;
+}
+
+std::vector<cv::Point2f> points2fFromROS(const std::vector<rtabmap_ros::Point2f> & msg)
+{
+	std::vector<cv::Point2f> v(msg.size());
+	for(unsigned int i=0; i<msg.size(); ++i)
+	{
+		v[i] = point2fFromROS(msg[i]);
+	}
+	return v;
+}
+
+void points2fToROS(const std::vector<cv::Point2f> & kpts, std::vector<rtabmap_ros::Point2f> & msg)
+{
+	msg.resize(kpts.size());
+	for(unsigned int i=0; i<msg.size(); ++i)
+	{
+		point2fToROS(kpts[i], msg[i]);
 	}
 }
 
@@ -394,10 +424,10 @@ void nodeDataToROS(const rtabmap::Signature & signature, rtabmap_ros::NodeData &
 	compressedMatToBytes(signature.getImageCompressed(), msg.image);
 	compressedMatToBytes(signature.getDepthCompressed(), msg.depth);
 	compressedMatToBytes(signature.getLaserScanCompressed(), msg.laserScan);
-	msg.fx = signature.getDepthFx();
-	msg.fy = signature.getDepthFy();
-	msg.cx = signature.getDepthCx();
-	msg.cy = signature.getDepthCy();
+	msg.fx = signature.getFx();
+	msg.fy = signature.getFy();
+	msg.cx = signature.getCx();
+	msg.cy = signature.getCy();
 	transformToGeometryMsg(signature.getLocalTransform(), msg.localTransform);
 
 	//Features stuff...
@@ -454,8 +484,8 @@ rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::OdomInfo & msg)
 	info.wordMatches = msg.wordMatches;
 	info.wordInliers = msg.wordInliers;
 
-	info.refCorners = keypointsFromROS(msg.refCorners);
-	info.newCorners = keypointsFromROS(msg.newCorners);
+	info.refCorners = points2fFromROS(msg.refCorners);
+	info.newCorners = points2fFromROS(msg.newCorners);
 	info.cornerInliers = msg.cornerInliers;
 
 	return info;
@@ -479,8 +509,8 @@ void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_ros::OdomInfo & m
 	msg.wordMatches = info.wordMatches;
 	msg.wordInliers = info.wordInliers;
 
-	keypointsToROS(info.refCorners, msg.refCorners);
-	keypointsToROS(info.newCorners, msg.newCorners);
+	points2fToROS(info.refCorners, msg.refCorners);
+	points2fToROS(info.newCorners, msg.newCorners);
 	msg.cornerInliers = info.cornerInliers;
 
 }

@@ -44,6 +44,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <rtabmap_ros/Link.h>
 #include <rtabmap_ros/KeyPoint.h>
+#include <rtabmap_ros/Point2f.h>
 #include <rtabmap_ros/MapData.h>
 #include <rtabmap_ros/Graph.h>
 #include <rtabmap_ros/NodeData.h>
@@ -76,6 +77,12 @@ void keypointToROS(const cv::KeyPoint & kpt, rtabmap_ros::KeyPoint & msg);
 
 std::vector<cv::KeyPoint> keypointsFromROS(const std::vector<rtabmap_ros::KeyPoint> & msg);
 void keypointsToROS(const std::vector<cv::KeyPoint> & kpts, std::vector<rtabmap_ros::KeyPoint> & msg);
+
+cv::Point2f point2fFromROS(const rtabmap_ros::Point2f & msg);
+void point2fToROS(const cv::Point2f & kpt, rtabmap_ros::Point2f & msg);
+
+std::vector<cv::Point2f> points2fFromROS(const std::vector<rtabmap_ros::Point2f> & msg);
+void points2fToROS(const std::vector<cv::Point2f> & kpts, std::vector<rtabmap_ros::Point2f> & msg);
 
 void mapGraphFromROS(
 		const rtabmap_ros::Graph & msg,

@@ -8,8 +8,7 @@
 #    int class_id;
 #}
 
-float32 ptx
-float32 pty
+Point2f pt
 float32 size
 float32 angle
 float32 response

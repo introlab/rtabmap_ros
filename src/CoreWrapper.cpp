@@ -263,6 +263,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	oldParameterNames.push_back("RGBD/ScanMatchingSize");
 	oldParameterNames.push_back("RGBD/LocalLoopDetectionRadius");
 	oldParameterNames.push_back("RGBD/ToroIterations");
+	oldParameterNames.push_back("Mem/RehearsedNodesKept");
 	for(std::list<std::string>::iterator iter=oldParameterNames.begin(); iter!=oldParameterNames.end(); ++iter)
 	{
 		std::string vStr;
@@ -297,6 +298,12 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 				ROS_WARN("Parameter name changed: RGBD/ToroIterations -> %s. Please update your launch file accordingly.",
 						Parameters::kRGBDOptimizeIterations().c_str());
 				parameters_.at(Parameters::kRGBDOptimizeIterations())= vStr;
+			}
+			else if(iter->compare("Mem/RehearsedNodesKept") == 0)
+			{
+				ROS_WARN("Parameter name changed: Mem/RehearsedNodesKept -> %s. Please update your launch file accordingly.",
+						Parameters::kMemNotLinkedNodesKept().c_str());
+				parameters_.at(Parameters::kMemNotLinkedNodesKept())= vStr;
 			}
 		}
 	}
@@ -2040,10 +2047,10 @@ std::map<int, rtabmap::Transform> CoreWrapper::updateMapCaches(
 							// Stereo detected, we should uncompress left image too
 							data.uncompressDataConst(&image, 0, 0);
 						}
-						float fx = data.getDepthFx();
-						float fy = data.getDepthFy();
-						float cx = data.getDepthCx();
-						float cy = data.getDepthCy();
+						float fx = data.getFx();
+						float fy = data.getFy();
+						float cx = data.getCx();
+						float cy = data.getCy();
 
 						pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloudRGB;
 						pcl::PointCloud<pcl::PointXYZ>::Ptr cloudXYZ;

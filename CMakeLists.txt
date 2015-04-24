@@ -46,6 +46,7 @@ add_message_files(
    Link.msg
    OdomInfo.msg
    UserData.msg
+   Point2f.msg
 )
 
 ## Generate services in the 'srv' folder
