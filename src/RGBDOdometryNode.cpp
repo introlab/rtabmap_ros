@@ -98,9 +98,10 @@ public:
 				 image->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
 				 image->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0) ||
 			   !(depth->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1)==0 ||
-				 depth->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1)==0))
+				 depth->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1)==0 ||
+				 depth->encoding.compare(sensor_msgs::image_encodings::MONO16)==0))
 			{
-				ROS_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8 (mono8 recommended) and image_depth=16UC1");
+				ROS_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8 (mono8 recommended) and image_depth=16UC1,32FC1,mono16");
 				return;
 			}
 			else if(depth->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1)==0)
@@ -108,7 +109,7 @@ public:
 				static bool warned = false;
 				if(!warned)
 				{
-					ROS_WARN("Input depth type is 32FC1, please use type 16UC1 for depth. The depth images "
+					ROS_WARN("Input depth type is 32FC1, please use type 16UC1 or mono16 for depth. The depth images "
 							 "will be processed anyway but with a conversion. This warning is only be printed once...");
 					warned = true;
 				}

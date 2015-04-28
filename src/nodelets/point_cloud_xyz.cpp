@@ -136,9 +136,10 @@ private:
 			  const sensor_msgs::CameraInfoConstPtr& cameraInfo)
 	{
 		if(depth->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1)!=0 &&
-		   depth->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1)!=0)
+		   depth->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1)!=0 &&
+		   depth->encoding.compare(sensor_msgs::image_encodings::MONO16)!=0)
 		{
-			ROS_ERROR("Input type depth=32FC1,16UC1");
+			ROS_ERROR("Input type depth=32FC1,16UC1,MONO16");
 			return;
 		}
 
