@@ -57,10 +57,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <laser_geometry/laser_geometry.h>
 #include <image_geometry/stereo_camera_model.h>
 
+#ifdef WITH_OCTOMAP
 #include <octomap/octomap.h>
 #include <octomap_ros/conversions.h>
 #include <octomap_msgs/Octomap.h>
 #include <octomap_msgs/conversions.h>
+#endif
+
 
 //msgs
 #include "rtabmap_ros/Info.h"
@@ -376,8 +379,10 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	setGoalSrv_ = nh.advertiseService("set_goal", &CoreWrapper::setGoalCallback, this);
 	setLabelSrv_ = nh.advertiseService("set_label", &CoreWrapper::setLabelCallback, this);
 	listLabelsSrv_ = nh.advertiseService("list_labels", &CoreWrapper::listLabelsCallback, this);
+#ifdef WITH_OCTOMAP
 	octomapBinarySrv_ = nh.advertiseService("octomap_binary", &CoreWrapper::octomapBinaryCallback, this);
 	octomapFullSrv_ = nh.advertiseService("octomap_full", &CoreWrapper::octomapFullCallback, this);
+#endif
 
 	setupCallbacks(subscribeDepth, subscribeLaserScan, subscribeStereo, queueSize, stereoApproxSync);
 
@@ -2509,6 +2514,7 @@ void CoreWrapper::publishLocalPath(const ros::Time & stamp)
 	}
 }
 
+#ifdef WITH_OCTOMAP
 // returned OcTree must be deleted
 // RTAB-Map optimizes the graph at almost each iteration, an octomap cannot
 // be updated online. Only available on service. To have an "online" octomap published as a topic,
@@ -2595,6 +2601,7 @@ bool CoreWrapper::octomapFullCallback(
 	}
 	return success;
 }
+#endif
 
 /**
  * exclusive callbacks:
