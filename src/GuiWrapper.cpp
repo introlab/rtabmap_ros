@@ -594,6 +594,7 @@ void GuiWrapper::depthScanCallback(
 
 		rtabmap::SensorData image(
 				scan,
+				(int)scanMsg->ranges.size(),
 				ptrImage->image.clone(),
 				ptrDepth->image.clone(),
 				fx,
@@ -696,6 +697,7 @@ void GuiWrapper::stereoScanCallback(
 
 		rtabmap::SensorData image(
 				scan,
+				(int)scanMsg->ranges.size(),
 				ptrLeftImage->image.clone(),
 				ptrRightImage->image.clone(),
 				fx,

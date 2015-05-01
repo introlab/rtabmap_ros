@@ -177,7 +177,8 @@ private:
 			float cx = 0.0f,
 			float cy = 0.0f,
 			const rtabmap::Transform & localTransform = rtabmap::Transform(),
-			const cv::Mat & scan = cv::Mat());
+			const cv::Mat & scan = cv::Mat(),
+			int scanMaxPts = 0);
 
 	bool updateRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool resetRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);

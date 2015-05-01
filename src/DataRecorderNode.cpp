@@ -75,8 +75,9 @@ public:
 	DataRecorderWrapper() :
 		fileName_("output.db"),
 		frameId_("base_link"),
+		odomFrameId_(""), // null = use topic, otherwise use referred TF.
 		waitForTransform_(false),
-		depthScanSync_(0),
+		depthOdomScanSync_(0),
 		depthSync_(0),
 		depthImageSync_(0)
 	{
@@ -87,16 +88,24 @@ public:
 		bool subscribeDepth = false;
 		bool subscribeStereo = false;
 		int queueSize = 10;
+		double agePenalty = 0.1;
 		pnh.param("subscribe_odometry", subscribeOdometry, subscribeOdometry);
 		pnh.param("subscribe_depth", subscribeDepth, subscribeDepth);
 		pnh.param("subscribe_stereo", subscribeStereo, subscribeStereo);
 		pnh.param("subscribe_laserScan", subscribeLaserScan, subscribeLaserScan);
 		pnh.param("queue_size", queueSize, queueSize);
+		pnh.param("age_penalty", agePenalty, agePenalty);
 		pnh.param("output_file_name", fileName_, fileName_);
 		pnh.param("frame_id", frameId_, frameId_);
+		pnh.param("odom_frame_id", odomFrameId_, odomFrameId_);
 		pnh.param("wait_for_transform", waitForTransform_, waitForTransform_);
+		if(!subscribeOdometry)
+		{
+			UWARN("odom_frame_id set without setting subscribe_odometry to true. Ignoring odometry from TF.");
+			odomFrameId_.clear();
+		}
 
-		setupCallbacks(subscribeOdometry, subscribeDepth, subscribeStereo, subscribeLaserScan, queueSize);
+		setupCallbacks(subscribeOdometry, subscribeDepth, subscribeStereo, subscribeLaserScan, queueSize, agePenalty);
 	}
 	bool init()
 	{
@@ -105,8 +114,8 @@ public:
 
 	virtual ~DataRecorderWrapper()
 	{
-		if(depthScanSync_)
-			delete depthScanSync_;
+		if(depthOdomScanSync_)
+			delete depthOdomScanSync_;
 		if(depthSync_)
 			delete depthSync_;
 		if(depthImageSync_)
@@ -119,7 +128,8 @@ private:
 			bool subscribeDepth,
 			bool subscribeStereo,
 			bool subscribeLaserScan,
-			int queueSize)
+			int queueSize,
+			double agePenalty)
 	{
 		if(subscribeStereo)
 		{
@@ -140,14 +150,15 @@ private:
 			cameraInfoRightSub_.subscribe(right_nh, "camera_info", 1);
 			if(subscribeOdom)
 			{
-				ROS_INFO("Registering Stero+Odom callback...");
+				ROS_INFO("Registering Stereo+Odom callback...");
 				odomSub_.subscribe(nh, "odom", 1);
 				stereoOdomSync_ = new message_filters::Synchronizer<MyStereoOdomSyncPolicy>(MyStereoOdomSyncPolicy(queueSize), imageSub_, imageRightSub_, cameraInfoSub_, cameraInfoRightSub_, odomSub_);
+				stereoOdomSync_->setAgePenalty(agePenalty);
 				stereoOdomSync_->registerCallback(boost::bind(&DataRecorderWrapper::stereoOdomCallback, this, _1, _2, _3, _4, _5));
 			}
 			else
 			{
-				ROS_INFO("Registering Stero callback...");
+				ROS_INFO("Registering Stereo callback...");
 				stereoSync_ = new message_filters::Synchronizer<MyStereoSyncPolicy>(MyStereoSyncPolicy(queueSize), imageSub_, imageRightSub_, cameraInfoSub_, cameraInfoRightSub_);
 				stereoSync_->registerCallback(boost::bind(&DataRecorderWrapper::stereoCallback, this, _1, _2, _3, _4));
 			}
@@ -171,10 +182,20 @@ private:
 				imageSub_.subscribe(rgb_it, rgb_nh.resolveName("image"), 1, hintsRgb);
 				imageDepthSub_.subscribe(depth_it, depth_nh.resolveName("image"), 1, hintsDepth);
 				cameraInfoSub_.subscribe(rgb_nh, "camera_info", 1);
-				odomSub_.subscribe(nh, "odom", 1);
 				scanSub_.subscribe(nh, "scan", 1);
-				depthScanSync_ = new message_filters::Synchronizer<MyDepthScanSyncPolicy>(MyDepthScanSyncPolicy(queueSize), imageSub_, odomSub_, imageDepthSub_, cameraInfoSub_, scanSub_);
-				depthScanSync_->registerCallback(boost::bind(&DataRecorderWrapper::depthScanCallback, this, _1, _2, _3, _4, _5));
+				if(odomFrameId_.empty())
+				{
+					odomSub_.subscribe(nh, "odom", 1);
+					depthOdomScanSync_ = new message_filters::Synchronizer<MyDepthOdomScanSyncPolicy>(MyDepthOdomScanSyncPolicy(queueSize), imageSub_, odomSub_, imageDepthSub_, cameraInfoSub_, scanSub_);
+					depthOdomScanSync_->setAgePenalty(agePenalty);
+					depthOdomScanSync_->registerCallback(boost::bind(&DataRecorderWrapper::depthOdomScanCallback, this, _1, _2, _3, _4, _5));
+				}
+				else
+				{
+					depthScanSync_ = new message_filters::Synchronizer<MyDepthScanSyncPolicy>(MyDepthScanSyncPolicy(queueSize), imageSub_, imageDepthSub_, cameraInfoSub_, scanSub_);
+					depthScanSync_->setAgePenalty(agePenalty);
+					depthScanSync_->registerCallback(boost::bind(&DataRecorderWrapper::depthScanCallback, this, _1, _2, _3, _4));
+				}
 			}
 			else if(subscribeOdom && subscribeDepth && !subscribeLaserScan)
 			{
@@ -184,6 +205,7 @@ private:
 				cameraInfoSub_.subscribe(rgb_nh, "camera_info", 1);
 				odomSub_.subscribe(nh, "odom", 1);
 				depthSync_ = new message_filters::Synchronizer<MyDepthSyncPolicy>(MyDepthSyncPolicy(queueSize), imageSub_, odomSub_, imageDepthSub_, cameraInfoSub_);
+				depthSync_->setAgePenalty(agePenalty);
 				depthSync_->registerCallback(boost::bind(&DataRecorderWrapper::depthCallback, this, _1, _2, _3, _4));
 			}
 			else if(!subscribeOdom && subscribeDepth)
@@ -193,6 +215,7 @@ private:
 				imageDepthSub_.subscribe(depth_it, depth_nh.resolveName("image"), 1, hintsDepth);
 				cameraInfoSub_.subscribe(rgb_nh, "camera_info", 1);
 				depthImageSync_ = new message_filters::Synchronizer<MyDepthImageSyncPolicy>(MyDepthImageSyncPolicy(queueSize), imageSub_, imageDepthSub_, cameraInfoSub_);
+				depthImageSync_->setAgePenalty(agePenalty);
 				depthImageSync_->registerCallback(boost::bind(&DataRecorderWrapper::depthImageCallback, this, _1, _2, _3));
 			}
 			else
@@ -374,11 +397,11 @@ private:
 			uIsFinite(rotVariance) && rotVariance>0?rotVariance:1,
 			uIsFinite(transVariance) && transVariance>0?transVariance:1,
 			0,
-			rtabmap_ros::timestampFromROS(imageMsg->header.stamp));
+			rtabmap_ros::timestampFromROS(odomMsg->header.stamp));
 		recorder_.addData(data);
 	}
 
-	void depthScanCallback(
+	void depthOdomScanCallback(
 			const sensor_msgs::ImageConstPtr& imageMsg,
 			const nav_msgs::OdometryConstPtr & odomMsg,
 			const sensor_msgs::ImageConstPtr& depthMsg,
@@ -463,6 +486,7 @@ private:
 
 		rtabmap::SensorData data(
 			scan,
+			(int)scanMsg->ranges.size(),
 			ptrImage->image.clone(),
 			depth16,
 			fx,
@@ -474,7 +498,118 @@ private:
 			uIsFinite(rotVariance) && rotVariance>0?rotVariance:1,
 			uIsFinite(transVariance) && transVariance>0?transVariance:1,
 			0,
-			rtabmap_ros::timestampFromROS(imageMsg->header.stamp));
+			rtabmap_ros::timestampFromROS(odomMsg->header.stamp));
+		recorder_.addData(data);
+	}
+
+	void depthScanCallback(
+			const sensor_msgs::ImageConstPtr& imageMsg,
+			const sensor_msgs::ImageConstPtr& depthMsg,
+			const sensor_msgs::CameraInfoConstPtr& cameraInfoMsg,
+			const sensor_msgs::LaserScanConstPtr& scanMsg)
+	{
+		// TF ready?
+		Transform localTransform;
+		Transform odom;
+		try
+		{
+			if(waitForTransform_)
+			{
+				if(!tfListener_.waitForTransform(frameId_, scanMsg->header.frame_id, scanMsg->header.stamp, ros::Duration(1)))
+				{
+					ROS_WARN("Could not get transform from %s to %s after 1 second!", frameId_.c_str(), scanMsg->header.frame_id.c_str());
+					return;
+				}
+				if(!tfListener_.waitForTransform(frameId_, depthMsg->header.frame_id, depthMsg->header.stamp, ros::Duration(1)))
+				{
+					ROS_WARN("Could not get transform from %s to %s after 1 second!", frameId_.c_str(), depthMsg->header.frame_id.c_str());
+					return;
+				}
+				if(!odomFrameId_.empty())
+				{
+					if(!tfListener_.waitForTransform(odomFrameId_, frameId_, scanMsg->header.stamp, ros::Duration(1)))
+					{
+						ROS_WARN("Could not get transform from %s to %s after 1 second!", odomFrameId_.c_str(), frameId_.c_str());
+						return;
+					}
+				}
+			}
+
+			tf::StampedTransform tmp;
+			tfListener_.lookupTransform(frameId_, scanMsg->header.frame_id, scanMsg->header.stamp, tmp);
+			tfListener_.lookupTransform(frameId_, depthMsg->header.frame_id, depthMsg->header.stamp, tmp);
+			localTransform = rtabmap_ros::transformFromTF(tmp);
+			if(!odomFrameId_.empty())
+			{
+				tfListener_.lookupTransform(odomFrameId_, frameId_, scanMsg->header.stamp, tmp);
+				odom = rtabmap_ros::transformFromTF(tmp);
+			}
+		}
+		catch(tf::TransformException & ex)
+		{
+			ROS_WARN("%s",ex.what());
+			return;
+		}
+
+		//transform in frameId_ frame
+		sensor_msgs::PointCloud2 scanOut;
+		laser_geometry::LaserProjection projection;
+		projection.transformLaserScanToPointCloud(frameId_, *scanMsg, scanOut, tfListener_);
+		pcl::PointCloud<pcl::PointXYZ> pclScan;
+		pcl::fromROSMsg(scanOut, pclScan);
+		cv::Mat scan = util3d::laserScanFromPointCloud(pclScan);
+
+		cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg, "bgr8");
+		cv_bridge::CvImageConstPtr ptrDepth = cv_bridge::toCvShare(depthMsg);
+
+		image_geometry::PinholeCameraModel model;
+		model.fromCameraInfo(*cameraInfoMsg);
+		float fx = model.fx();
+		float fy = model.fy();
+		float cx = model.cx();
+		float cy = model.cy();
+
+		cv::Mat depth16;
+		if(ptrDepth->image.type() != CV_16UC1)
+		{
+			if(ptrDepth->image.type() == CV_32FC1)
+			{
+				//convert to 16 bits
+				depth16 = util3d::cvtDepthFromFloat(ptrDepth->image);
+				static bool shown = false;
+				if(!shown)
+				{
+					ROS_WARN("Use depth image with \"unsigned short\" type to "
+							 "avoid conversion. This message is only printed once...");
+					shown = true;
+				}
+			}
+			else
+			{
+				ROS_ERROR("Depth image must be of type \"unsigned short\"!");
+				return;
+			}
+		}
+		else
+		{
+			depth16 = ptrDepth->image.clone();
+		}
+
+		rtabmap::SensorData data(
+			scan,
+			(int)scanMsg->ranges.size(),
+			ptrImage->image.clone(),
+			depth16,
+			fx,
+			fy,
+			cx,
+			cy,
+			localTransform,
+			odom,
+			1,
+			1,
+			0,
+			rtabmap_ros::timestampFromROS(scanMsg->header.stamp));
 		recorder_.addData(data);
 	}
 
@@ -532,7 +667,7 @@ private:
 				uIsFinite(rotVariance) && rotVariance>0?rotVariance:1,
 				uIsFinite(transVariance) && transVariance>0?transVariance:1,
 				0,
-				rtabmap_ros::timestampFromROS(leftImageMsg->header.stamp));
+				rtabmap_ros::timestampFromROS(odomMsg->header.stamp));
 		recorder_.addData(data);
 	}
 
@@ -595,6 +730,7 @@ private:
 	DataRecorder recorder_;
 	std::string fileName_;
 	std::string frameId_;
+	std::string odomFrameId_;
 	bool waitForTransform_;
 
 	image_transport::Subscriber defaultSub_;
@@ -611,8 +747,15 @@ private:
 			nav_msgs::Odometry,
 			sensor_msgs::Image,
 			sensor_msgs::CameraInfo,
-			sensor_msgs::LaserScan> MyDepthScanSyncPolicy;
-	message_filters::Synchronizer<MyDepthScanSyncPolicy> * depthScanSync_;
+			sensor_msgs::LaserScan> MyDepthOdomScanSyncPolicy;
+	message_filters::Synchronizer<MyDepthOdomScanSyncPolicy> * depthOdomScanSync_;
+
+	typedef message_filters::sync_policies::ApproximateTime<
+				sensor_msgs::Image,
+				sensor_msgs::Image,
+				sensor_msgs::CameraInfo,
+				sensor_msgs::LaserScan> MyDepthScanSyncPolicy;
+		message_filters::Synchronizer<MyDepthScanSyncPolicy> * depthScanSync_;
 
 	typedef message_filters::sync_policies::ApproximateTime<
 			sensor_msgs::Image,

@@ -94,7 +94,7 @@ int main(int argc, char** argv)
 	pnh.param("frame_id", frameId, frameId);
 	pnh.param("odom_frame_id", odomFrameId, odomFrameId);
 	pnh.param("camera_frame_id", cameraFrameId, cameraFrameId);
-	pnh.param("rate", rate, rate);
+	pnh.param("rate", rate, rate); // Set -1 to use database stamps
 	pnh.param("database", databasePath, databasePath);
 	pnh.param("publish_tf", publishTf, publishTf);
 	pnh.param("start_id", startId, startId);

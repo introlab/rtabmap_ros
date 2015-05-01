@@ -741,7 +741,7 @@ void CoreWrapper::commonDepthCallback(
 	float cy = model.cy();
 
 	process(ptrImage->header.seq,
-			ptrImage->header.stamp,
+			scanMsg.get() != 0?scanMsg->header.stamp:ptrImage->header.stamp,
 			ptrImage->image,
 			lastPose_,
 			odomFrameId,
@@ -753,7 +753,8 @@ void CoreWrapper::commonDepthCallback(
 			cx,
 			cy,
 			localTransform,
-			scan);
+			scan,
+			(int)scanMsg->ranges.size());
 	rotVariance_ = 0;
 	transVariance_ = 0;
 }
@@ -835,7 +836,8 @@ void CoreWrapper::commonStereoCallback(
 			cx,
 			cy,
 			localTransform,
-			scan);
+			scan,
+			(int)scanMsg->ranges.size());
 	rotVariance_ = 0;
 	transVariance_ = 0;
 }
@@ -916,7 +918,7 @@ void CoreWrapper::depthScanTFCallback(
 		const sensor_msgs::CameraInfoConstPtr& cameraInfoMsg,
 		const sensor_msgs::LaserScanConstPtr& scanMsg)
 {
-	if(!commonOdomTFUpdate(depthMsg->header.stamp))
+	if(!commonOdomTFUpdate(scanMsg->header.stamp))
 	{
 		return;
 	}
@@ -964,7 +966,8 @@ void CoreWrapper::process(
 		float cx,
 		float cy,
 		const Transform & localTransform,
-		const cv::Mat & scan)
+		const cv::Mat & scan,
+		int scanMaxPts)
 {
 	UTimer timer;
 	if(rtabmap_.isIDsGenerated() || id > 0)
@@ -1007,6 +1010,7 @@ void CoreWrapper::process(
 		}
 
 		SensorData data(scan,
+				scanMaxPts,
 				image.clone(),
 				imageB,
 				fx,
