@@ -47,7 +47,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sensor_msgs/LaserScan.h>
 #include <nav_msgs/Odometry.h>
 #include <nav_msgs/GetMap.h>
-#include <octomap_msgs/GetOctomap.h>
 
 #include <rtabmap/core/Statistics.h>
 #include <rtabmap/core/Parameters.h>
@@ -69,6 +68,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <pcl/point_types.h>
 #include <pcl/point_cloud.h>
+
+#ifdef WITH_OCTOMAP
+#include <octomap_msgs/GetOctomap.h>
+#endif
 
 #include <actionlib/client/simple_action_client.h>
 #include <move_base_msgs/MoveBaseAction.h>
@@ -195,8 +198,10 @@ private:
 	bool setGoalCallback(rtabmap_ros::SetGoal::Request& req, rtabmap_ros::SetGoal::Response& res);
 	bool setLabelCallback(rtabmap_ros::SetLabel::Request& req, rtabmap_ros::SetLabel::Response& res);
 	bool listLabelsCallback(rtabmap_ros::ListLabels::Request& req, rtabmap_ros::ListLabels::Response& res);
+#ifdef WITH_OCTOMAP
 	bool octomapBinaryCallback(octomap_msgs::GetOctomap::Request  &req, octomap_msgs::GetOctomap::Response &res);
 	bool octomapFullCallback(octomap_msgs::GetOctomap::Request  &req, octomap_msgs::GetOctomap::Response &res);
+#endif
 
 	rtabmap::ParametersMap loadParameters(const std::string & configFile);
 	void saveParameters(const std::string & configFile);
@@ -217,7 +222,9 @@ private:
 	void goalFeedbackCb(const move_base_msgs::MoveBaseFeedbackConstPtr& feedback);
 	void publishLocalPath(const ros::Time & stamp);
 
+#ifdef WITH_OCTOMAP
 	octomap::OcTree * createOctomap();
+#endif
 
 private:
 	rtabmap::Rtabmap rtabmap_;
@@ -387,8 +394,10 @@ private:
 	ros::ServiceServer setGoalSrv_;
 	ros::ServiceServer setLabelSrv_;
 	ros::ServiceServer listLabelsSrv_;
+#ifdef WITH_OCTOMAP
 	ros::ServiceServer octomapBinarySrv_;
 	ros::ServiceServer octomapFullSrv_;
+#endif
 
 	MoveBaseClient mbClient_;
 

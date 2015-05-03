@@ -8,13 +8,16 @@ find_package(catkin REQUIRED COMPONENTS
              cv_bridge roscpp rospy sensor_msgs std_msgs std_srvs nav_msgs geometry_msgs visualization_msgs
              image_transport tf tf_conversions laser_geometry pcl_conversions 
              pcl_ros nodelet dynamic_reconfigure rviz message_filters class_loader
-             genmsg stereo_msgs octomap_ros costmap_2d
+             genmsg stereo_msgs
 )
+
+# Optional components
+find_package(costmap_2d)
+find_package(octomap_ros)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 find_package(RTABMap 0.8.12 REQUIRED)
-find_package(octomap REQUIRED)
 
 #Qt stuff
 FIND_PACKAGE(Qt4 COMPONENTS QtCore QtGui REQUIRED)
@@ -86,7 +89,7 @@ catkin_package(
   CATKIN_DEPENDS cv_bridge roscpp rospy sensor_msgs std_msgs std_srvs nav_msgs geometry_msgs visualization_msgs
                  image_transport tf tf_conversions laser_geometry pcl_conversions 
                  pcl_ros nodelet dynamic_reconfigure rviz message_filters class_loader
-                 stereo_msgs octomap_ros costmap_2d
+                 stereo_msgs
 )
 
 ###########
@@ -100,14 +103,12 @@ include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/include
   ${RTABMap_INCLUDE_DIRS}
   ${catkin_INCLUDE_DIRS}
-  ${OCTOMAP_INCLUDE_DIRS}
 )
 
 # libraries
 SET(Libraries
    ${catkin_LIBRARIES}
    ${RTABMap_LIBRARIES}
-   ${OCTOMAP_LIBRARIES}
 )
 
 ## RVIZ plugin
@@ -124,8 +125,7 @@ set_property(
    PROPERTY COMPILE_DEFINITIONS QT_NO_KEYWORDS
    )
    
-## Declare a cpp library
-add_library(rtabmap_ros
+SET(rtabmap_ros_lib_src
    src/nodelets/data_throttle.cpp
    src/nodelets/stereo_throttle.cpp
    src/nodelets/data_odom_sync.cpp
@@ -139,8 +139,26 @@ add_library(rtabmap_ros
    src/rviz/MapGraphDisplay.cpp
    src/rviz/InfoDisplay.cpp
    src/rviz/OrbitOrientedViewController.cpp
-   src/costmap_2d/static_layer.cpp
    ${MOC_FILES}
+)   
+
+# If costmap_2d is found, add the plugin
+IF(costmap_2d_FOUND)
+MESSAGE(STATUS "WITH costmap_2d")
+include_directories(${costmap_2d_INCLUDE_DIRS})
+SET(Libraries
+  ${costmap_2d_LIBRARIES}
+  ${Libraries}
+  )
+SET(rtabmap_ros_lib_src
+  src/costmap_2d/static_layer.cpp
+  ${rtabmap_ros_lib_src}
+  )
+ENDIF(costmap_2d_FOUND)
+
+## Declare a cpp library
+add_library(rtabmap_ros
+   ${rtabmap_ros_lib_src}
 )
 target_link_libraries(rtabmap_ros
   ${Libraries}
@@ -148,6 +166,19 @@ target_link_libraries(rtabmap_ros
   ${OGRE_LIBRARIES}
 )
 add_dependencies(rtabmap_ros rtabmap_generate_messages_cpp)
+
+# If octomap is found, add definition
+IF(octomap_ros_FOUND)
+MESSAGE(STATUS "WITH octomap")
+include_directories(
+  ${octomap_ros_INCLUDE_DIRS}
+)
+SET(Libraries
+  ${octomap_ros_LIBRARIES}
+  ${Libraries}
+)
+add_definitions(-DWITH_OCTOMAP)
+ENDIF(octomap_ros_FOUND)
 
 add_executable(rtabmap src/CoreNode.cpp src/CoreWrapper.cpp)
 add_dependencies(rtabmap rtabmap_generate_messages_cpp)
