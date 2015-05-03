@@ -15,10 +15,13 @@
    -->
    <arg name="rgb_prefix" default="rgb_lowres" />
    <arg name="depth_prefix" default="depth_lowres" />
+   
+   <!-- Fixed frame id, you may set "base_link" or "base_footprint" if they are published -->
+   <arg name="frame_id" default="kinect2_link"/>
   
-  <!-- Choose visualization -->
-  <arg name="rviz" default="false" />
-  <arg name="rtabmapviz" default="true" /> 
+   <!-- Choose visualization -->
+   <arg name="rviz" default="false" />
+   <arg name="rtabmapviz" default="true" /> 
   
    <!-- ODOMETRY MAIN ARGUMENTS: 
         -"strategy"        : Strategy: 0=BOW (bag-of-words) 1=Optical Flow
@@ -35,17 +38,13 @@
    <arg name="strategy" default="0" />
    <arg name="feature" default="6" />
    <arg name="nn" default="3" />
-   <arg name="max_depth" default="4.0" />
+   <arg name="max_depth" default="8.0" />
    <arg name="min_inliers" default="20" />
    <arg name="inlier_distance" default="0.02" />
    <arg name="local_map" default="1000" />
    <arg name="gftt_max_corners" default="500" />
    <arg name="gftt_min_distance" default="7" />
-   
-  <!-- TF FRAMES -->
-  <node pkg="tf" type="static_transform_publisher" name="base_to_camera_tf" 
-    args="0.0 0.0 0.0 0.0 0.0 0.0 /base_link /kinect2_link 100" />
-     
+        
   <group ns="rtabmap">
   
     <!-- Odometry -->
@@ -54,6 +53,7 @@
       <remap from="depth/image" to="/kinect2/$(arg depth_prefix)/image"/>
       <remap from="rgb/camera_info" to="/kinect2/$(arg rgb_prefix)/camera_info"/>
 
+      <param name="frame_id" type="string" value="$(arg frame_id)"/>
       <param name="approx_sync" type="bool" value="true"/>
 	  
       <param name="Odom/Strategy" type="string" value="$(arg strategy)"/> 
@@ -72,6 +72,7 @@
     <!-- args: "delete_db_on_start" and "udebug" -->
     <node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="screen" args="--delete_db_on_start">
       <param name="subscribe_depth" type="bool" value="true"/>
+	  <param name="frame_id" type="string" value="$(arg frame_id)"/>
 	
       <remap from="rgb/image" to="/kinect2/$(arg rgb_prefix)/image"/>
       <remap from="depth/image" to="/kinect2/$(arg depth_prefix)/image"/>
@@ -80,7 +81,7 @@
       <param name="approx_sync" type="bool" value="true"/>
 
       <param name="LccBow/MinInliers" type="string" value="10"/>
-      <param name="LccBow/InlierDistance" type="string" value="0.02"/>
+      <param name="LccBow/InlierDistance" type="string" value="$(arg inlier_distance)"/>
     </node>
   
     <!-- Visualisation RTAB-Map -->
@@ -88,6 +89,7 @@
       <param name="subscribe_depth" type="bool" value="true"/>
       <param name="subscribe_odom_info" type="bool" value="true"/>
       <param name="approx_sync" type="bool" value="true"/>
+      <param name="frame_id" type="string" value="$(arg frame_id)"/>
     
       <remap from="rgb/image" to="/kinect2/$(arg rgb_prefix)/image"/>
       <remap from="depth/image" to="/kinect2/$(arg depth_prefix)/image"/>

@@ -94,7 +94,7 @@ private:
 
 	bool commonOdomUpdate(const nav_msgs::OdometryConstPtr & odomMsg);
 	bool commonOdomTFUpdate(const ros::Time & stamp); // TF odom
-	rtabmap::Transform getLocalTransform(const std::string & sensorFrameId, const ros::Time & stamp) const;
+	rtabmap::Transform getTransform(const std::string & fromFrameId, const std::string & toFrameId, const ros::Time & stamp) const;
 
 	void commonDepthCallback(
 				const std::string & odomFrameId,
@@ -223,6 +223,7 @@ private:
 	rtabmap::Rtabmap rtabmap_;
 	bool paused_;
 	rtabmap::Transform lastPose_;
+	ros::Time lastPoseStamp_;
 	float rotVariance_;
 	float transVariance_;
 	rtabmap::Transform currentMetricGoal_;

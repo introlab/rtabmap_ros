@@ -13,7 +13,7 @@ find_package(catkin REQUIRED COMPONENTS
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
-find_package(RTABMap 0.8.11 REQUIRED)
+find_package(RTABMap 0.8.12 REQUIRED)
 find_package(octomap REQUIRED)
 
 #Qt stuff
@@ -175,9 +175,6 @@ target_link_libraries(camera ${Libraries})
 add_executable(rtabmapviz src/GuiNode.cpp src/GuiWrapper.cpp src/PreferencesDialogROS.cpp)
 target_link_libraries(rtabmapviz rtabmap_ros ${QT_LIBRARIES} ${Libraries})
 
-add_executable(data_recorder src/DataRecorderNode.cpp)
-target_link_libraries(data_recorder rtabmap_ros ${QT_LIBRARIES} ${Libraries})
-
 add_executable(data_player src/DbPlayerNode.cpp)
 target_link_libraries(data_player rtabmap_ros ${QT_LIBRARIES} ${Libraries})
 
@@ -208,7 +205,6 @@ install(TARGETS
    map_assembler
    grid_map_assembler
    map_optimizer
-   data_recorder
    data_player
    camera
    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
