@@ -318,6 +318,10 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 						Parameters::kRGBDLocalLoopDetectionMaxGraphDepth().c_str());
 				parameters_.at(Parameters::kRGBDLocalLoopDetectionMaxGraphDepth())= vStr;
 			}
+			else if(iter->compare("RGBD/PlanVirtualLinksMaxDiffID") == 0)
+			{
+				ROS_WARN("Parameter \"RGBD/PlanVirtualLinksMaxDiffID\" doesn't exist anymore.");
+			}
 		}
 	}
 
