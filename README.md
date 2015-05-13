@@ -12,11 +12,11 @@ For the RTAB-Map libraries and standalone application, visit the [RTAB-Map's hom
 ### ROS distribution 
 RTAB-Map is released as binaries in the ROS distribution.
  * Indigo
-  ```
+  ```bash
 $ sudo apt-get install ros-indigo-rtabmap-ros
 ```
  * Hydro
-  ```
+  ```bash
 $ sudo apt-get install ros-hydro-rtabmap-ros
 ```
 
@@ -26,14 +26,15 @@ This section shows how to install RTAB-Map ros-pkg on **ROS Hydro/Indigo** (Catk
 
  * The next instructions assume that you have setup your ROS workspace using this [tutorial](http://wiki.ros.org/catkin/Tutorials/create_a_workspace). The workspace path is `~/catkin_ws` and your `~/.bashrc` contains:
  
-  ```
+  ```bash
 source /opt/ros/hydro/setup.bash
 source ~/catkin_ws/devel/setup.bash
 ```
 
  1. First, you need to install the RTAB-Map standalone libraries (**don't checkout in the Catkin workspace** but install in your Catkin's devel folder).
  
- ```
+ ```bash
+$ cd ~
 $ git clone https://github.com/introlab/rtabmap.git rtabmap
 $ cd rtabmap/build
 $ cmake -DCMAKE_INSTALL_PREFIX=~/catkin_ws/devel ..  [<---double dots included]
@@ -43,7 +44,7 @@ $ make install
 
  2. Now install the RTAB-Map ros-pkg in your src folder of your Catkin workspace.
  
- ```
+ ```bash
 $ cd ~/catkin_ws
 $ git clone https://github.com/introlab/rtabmap_ros.git src/rtabmap_ros
 $ catkin_make
@@ -51,7 +52,7 @@ $ catkin_make
 
 #### Update to new version 
 
-```
+```bash
 $ cd rtabmap
 $ git pull origin master
 $ cd build
