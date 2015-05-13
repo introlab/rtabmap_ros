@@ -37,7 +37,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <cv_bridge/cv_bridge.h>
 
 #include <rtabmap/core/Odometry.h>
-#include <rtabmap/core/util3d.h>
+#include <rtabmap/core/util3d_transforms.h>
 #include <rtabmap/core/Memory.h>
 #include <rtabmap/core/Signature.h>
 #include "rtabmap_ros/MsgConversion.h"
@@ -396,7 +396,7 @@ void OdometryROS::processData(const SensorData & data, const std_msgs::Header & 
 				if(cloud->size())
 				{
 					pcl::PointCloud<pcl::PointXYZ>::Ptr cloudTransformed;
-					cloudTransformed = util3d::transformPointCloud<pcl::PointXYZ>(cloud, pose);
+					cloudTransformed = util3d::transformPointCloud(cloud, pose);
 					sensor_msgs::PointCloud2 cloudMsg;
 					pcl::toROSMsg(*cloudTransformed, cloudMsg);
 					cloudMsg.header.stamp = header.stamp; // use corresponding time stamp to image

@@ -52,6 +52,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <opencv2/highgui/highgui.hpp>
 
 #include "rtabmap/core/util3d.h"
+#include "rtabmap/core/util3d_filtering.h"
 
 namespace rtabmap_ros
 {
@@ -252,12 +253,12 @@ private:
 	{
 		if(pclCloud->size() && maxDepth_ > 0)
 		{
-			pclCloud = rtabmap::util3d::passThrough<pcl::PointXYZRGB>(pclCloud, "z", 0, maxDepth_);
+			pclCloud = rtabmap::util3d::passThrough(pclCloud, "z", 0, maxDepth_);
 		}
 
 		if(pclCloud->size() && noiseFilterRadius_ > 0.0 && noiseFilterMinNeighbors_ > 0)
 		{
-			pcl::IndicesPtr indices = rtabmap::util3d::radiusFiltering<pcl::PointXYZRGB>(pclCloud, noiseFilterRadius_, noiseFilterMinNeighbors_);
+			pcl::IndicesPtr indices = rtabmap::util3d::radiusFiltering(pclCloud, noiseFilterRadius_, noiseFilterMinNeighbors_);
 			pcl::PointCloud<pcl::PointXYZRGB>::Ptr tmp(new pcl::PointCloud<pcl::PointXYZRGB>);
 			pcl::copyPointCloud(*pclCloud, *indices, *tmp);
 			pclCloud = tmp;
@@ -265,7 +266,7 @@ private:
 
 		if(pclCloud->size() && voxelSize_ > 0.0)
 		{
-			pclCloud = rtabmap::util3d::voxelize<pcl::PointXYZRGB>(pclCloud, voxelSize_);
+			pclCloud = rtabmap::util3d::voxelize(pclCloud, voxelSize_);
 		}
 
 		sensor_msgs::PointCloud2 rosCloud;

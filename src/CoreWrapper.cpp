@@ -40,6 +40,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/Camera.h>
 #include <rtabmap/core/Parameters.h>
 #include <rtabmap/core/util3d.h>
+#include <rtabmap/core/util3d_filtering.h>
+#include <rtabmap/core/util3d_mapping.h>
+#include <rtabmap/core/util3d_transforms.h>
+#include <rtabmap/core/util3d_conversions.h>
+#include <rtabmap/core/util2d.h>
 #include <rtabmap/core/Graph.h>
 #include <rtabmap/core/Memory.h>
 #include <rtabmap/core/VWDictionary.h>
@@ -762,7 +767,7 @@ void CoreWrapper::commonDepthCallback(
 					return;
 				}
 				Transform t = odomT.inverse() * sensorT;
-				pclScan = util3d::transformPointCloud<pcl::PointXYZ>(pclScan, t);
+				pclScan = util3d::transformPointCloud(pclScan, t);
 
 			}
 		}
@@ -882,7 +887,7 @@ void CoreWrapper::commonStereoCallback(
 					return;
 				}
 				Transform t = odomT.inverse() * sensorT;
-				pclScan = util3d::transformPointCloud<pcl::PointXYZ>(pclScan, t);
+				pclScan = util3d::transformPointCloud(pclScan, t);
 
 			}
 		}
@@ -2164,15 +2169,15 @@ std::map<int, rtabmap::Transform> CoreWrapper::updateMapCaches(
 
 								if(cloudRGB->size() && cloudMaxDepth_ > 0)
 								{
-									cloudRGB = util3d::passThrough<pcl::PointXYZRGB>(cloudRGB, "z", 0, cloudMaxDepth_);
+									cloudRGB = util3d::passThrough(cloudRGB, "z", 0, cloudMaxDepth_);
 								}
 								if(cloudRGB->size() && cloudVoxelSize_ > 0)
 								{
-									cloudRGB = util3d::voxelize<pcl::PointXYZRGB>(cloudRGB, cloudVoxelSize_);
+									cloudRGB = util3d::voxelize(cloudRGB, cloudVoxelSize_);
 								}
 								if(cloudRGB->size())
 								{
-									cloudRGB = util3d::transformPointCloud<pcl::PointXYZRGB>(cloudRGB, localTransform);
+									cloudRGB = util3d::transformPointCloud(cloudRGB, localTransform);
 								}
 							}
 							else
@@ -2200,7 +2205,7 @@ std::map<int, rtabmap::Transform> CoreWrapper::updateMapCaches(
 											leftMono = image;
 										}
 										cloudXYZ = rtabmap::util3d::cloudFromDisparity(
-												util3d::disparityFromStereoImages(leftMono, depth),
+												util2d::disparityFromStereoImages(leftMono, depth),
 												cx, cy,
 												fx, fy,
 												cloudDecimation_);
@@ -2215,16 +2220,16 @@ std::map<int, rtabmap::Transform> CoreWrapper::updateMapCaches(
 								{
 									if(cloudXYZ->size() && cloudMaxDepth_ > 0)
 									{
-										cloudXYZ = util3d::passThrough<pcl::PointXYZ>(cloudXYZ, "z", 0, cloudMaxDepth_);
+										cloudXYZ = util3d::passThrough(cloudXYZ, "z", 0, cloudMaxDepth_);
 									}
 									if(cloudXYZ->size() && gridCellSize_ > 0)
 									{
 										// use gridCellSize since this cloud is only for the projection map
-										cloudXYZ = util3d::voxelize<pcl::PointXYZ>(cloudXYZ, gridCellSize_);
+										cloudXYZ = util3d::voxelize(cloudXYZ, gridCellSize_);
 									}
 									if(cloudXYZ->size())
 									{
-										cloudXYZ = util3d::transformPointCloud<pcl::PointXYZ>(cloudXYZ, localTransform);
+										cloudXYZ = util3d::transformPointCloud(cloudXYZ, localTransform);
 									}
 								}
 								else
@@ -2251,11 +2256,11 @@ std::map<int, rtabmap::Transform> CoreWrapper::updateMapCaches(
 								pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloudClipped = cloudRGB;
 								if(cloudClipped->size() && projMaxHeight_ > 0)
 								{
-									cloudClipped = util3d::passThrough<pcl::PointXYZRGB>(cloudClipped, "z", std::numeric_limits<int>::min(), projMaxHeight_);
+									cloudClipped = util3d::passThrough(cloudClipped, "z", std::numeric_limits<int>::min(), projMaxHeight_);
 								}
 								if(cloudClipped->size())
 								{
-									cloudClipped = util3d::voxelize<pcl::PointXYZRGB>(cloudClipped, gridCellSize_);
+									cloudClipped = util3d::voxelize(cloudClipped, gridCellSize_);
 									util3d::occupancy2DFromCloud3D<pcl::PointXYZRGB>(cloudClipped, ground, obstacles, gridCellSize_, projMaxGroundAngle_*M_PI/180.0, projMinClusterSize_);
 								}
 							}
@@ -2264,7 +2269,7 @@ std::map<int, rtabmap::Transform> CoreWrapper::updateMapCaches(
 								pcl::PointCloud<pcl::PointXYZ>::Ptr cloudClipped = cloudXYZ;
 								if(cloudClipped->size() && projMaxHeight_ > 0)
 								{
-									cloudClipped = util3d::passThrough<pcl::PointXYZ>(cloudClipped, "z", std::numeric_limits<int>::min(), projMaxHeight_);
+									cloudClipped = util3d::passThrough(cloudClipped, "z", std::numeric_limits<int>::min(), projMaxHeight_);
 								}
 								if(cloudClipped->size())
 								{
@@ -2353,7 +2358,7 @@ void CoreWrapper::publishMaps(
 			std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr >::iterator jter = clouds_.find(iter->first);
 			if(jter != clouds_.end())
 			{
-				pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::transformPointCloud<pcl::PointXYZRGB>(jter->second, iter->second);
+				pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::transformPointCloud(jter->second, iter->second);
 				*assembledCloud+=*transformed;
 				++count;
 			}
@@ -2363,7 +2368,7 @@ void CoreWrapper::publishMaps(
 		{
 			if(cloudVoxelSize_ > 0 && cloudOutputVoxelized_)
 			{
-				assembledCloud = util3d::voxelize<pcl::PointXYZRGB>(assembledCloud, cloudVoxelSize_);
+				assembledCloud = util3d::voxelize(assembledCloud, cloudVoxelSize_);
 			}
 			ROS_INFO("Assembled %d clouds (%fs)", count, time.ticks());
 

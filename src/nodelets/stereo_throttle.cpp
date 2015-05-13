@@ -40,7 +40,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <cv_bridge/cv_bridge.h>
 
-#include <rtabmap/core/util3d.h>
+#include <rtabmap/core/util2d.h>
 
 namespace rtabmap_ros
 {
@@ -146,7 +146,7 @@ private:
 				cv_bridge::CvImage out;
 				out.header = imagePtr->header;
 				out.encoding = imagePtr->encoding;
-				out.image = rtabmap::util3d::decimate(imagePtr->image, decimation_);
+				out.image = rtabmap::util2d::decimate(imagePtr->image, decimation_);
 				imageLeftPub_.publish(out.toImageMsg());
 			}
 			else
@@ -162,7 +162,7 @@ private:
 				cv_bridge::CvImage out;
 				out.header = imagePtr->header;
 				out.encoding = imagePtr->encoding;
-				out.image = rtabmap::util3d::decimate(imagePtr->image, decimation_);
+				out.image = rtabmap::util2d::decimate(imagePtr->image, decimation_);
 				imageRightPub_.publish(out.toImageMsg());
 			}
 			else

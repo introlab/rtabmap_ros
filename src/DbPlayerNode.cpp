@@ -39,7 +39,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <std_srvs/Empty.h>
 #include <rtabmap_ros/MsgConversion.h>
 #include <rtabmap/utilite/ULogger.h>
-#include <rtabmap/core/util3d.h>
+#include <rtabmap/core/util3d_conversions.h>
 #include <rtabmap/core/DBReader.h>
 
 bool paused = false;

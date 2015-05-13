@@ -47,7 +47,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/Parameters.h>
 #include <rtabmap/core/ParamEvent.h>
 #include <rtabmap/core/OdometryEvent.h>
-#include <rtabmap/core/util3d.h>
+#include <rtabmap/core/util3d_conversions.h>
 #include <rtabmap/utilite/UTimer.h>
 
 #include "rtabmap_ros/MsgConversion.h"
