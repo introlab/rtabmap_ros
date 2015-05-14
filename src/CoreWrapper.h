@@ -36,8 +36,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <tf/transform_listener.h>
 #include <tf2_ros/transform_broadcaster.h>
 
-#include <cv_bridge/cv_bridge.h>
-
 #include <std_msgs/Empty.h>
 #include <std_msgs/Int32.h>
 #include <sensor_msgs/PointCloud2.h>
@@ -47,7 +45,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <nav_msgs/Odometry.h>
 #include <nav_msgs/GetMap.h>
 
-#include <rtabmap/core/Statistics.h>
 #include <rtabmap/core/Parameters.h>
 #include <rtabmap/core/Rtabmap.h>
 
@@ -57,6 +54,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtabmap_ros/SetGoal.h"
 #include "rtabmap_ros/SetLabel.h"
 
+#include "MapsManager.h"
+
 #include <message_filters/subscriber.h>
 #include <message_filters/synchronizer.h>
 #include <message_filters/sync_policies/approximate_time.h>
@@ -64,9 +63,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <image_transport/image_transport.h>
 #include <image_transport/subscriber_filter.h>
-
-#include <pcl/point_types.h>
-#include <pcl/point_cloud.h>
 
 #ifdef WITH_OCTOMAP
 #include <octomap_msgs/GetOctomap.h>
@@ -79,10 +75,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <move_base_msgs/MoveBaseActionFeedback.h>
 #include <actionlib_msgs/GoalStatusArray.h>
 typedef actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> MoveBaseClient;
-
-namespace octomap{
-class OcTree;
-}
 
 class CoreWrapper
 {
@@ -207,23 +199,12 @@ private:
 
 	void publishLoop(double tfDelay);
 
-	std::map<int, rtabmap::Transform> updateMapCaches(const std::map<int, rtabmap::Transform> & poses,
-			bool updateCloud,
-			bool updateProj,
-			bool updateGrid,
-			const std::map<int, rtabmap::Signature> & signatures = std::map<int, rtabmap::Signature>());
-
 	void publishStats(const ros::Time & stamp);
-	void publishMaps(const std::map<int, rtabmap::Transform> & poses, const ros::Time & stamp);
 	void publishCurrentGoal(const ros::Time & stamp);
 	void goalDoneCb(const actionlib::SimpleClientGoalState& state, const move_base_msgs::MoveBaseResultConstPtr& result);
 	void goalActiveCb();
 	void goalFeedbackCb(const move_base_msgs::MoveBaseFeedbackConstPtr& feedback);
 	void publishLocalPath(const ros::Time & stamp);
-
-#ifdef WITH_OCTOMAP
-	octomap::OcTree * createOctomap();
-#endif
 
 private:
 	rtabmap::Rtabmap rtabmap_;
@@ -244,35 +225,15 @@ private:
 	bool waitForTransform_;
 	bool useActionForGoal_;
 
-	// mapping stuff
-	int cloudDecimation_;
-	double cloudMaxDepth_;
-	double cloudVoxelSize_;
-	bool cloudOutputVoxelized_;
-	double projMaxGroundAngle_;
-	int projMinClusterSize_;
-	double projMaxHeight_;
-	double gridCellSize_;
-	double gridSize_;
-	bool gridEroded_;
-	double mapFilterRadius_;
-	double mapFilterAngle_;
-	bool mapCacheCleanup_;
-
 	rtabmap::Transform mapToOdom_;
 	boost::mutex mapToOdomMutex_;
 
-	std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr > clouds_;
-	std::map<int, std::pair<cv::Mat, cv::Mat> > projMaps_; // <ground, obstacles>
-	std::map<int, std::pair<cv::Mat, cv::Mat> > gridMaps_; // <ground, obstacles>
+	MapsManager mapsManager_;
 
 	ros::Publisher infoPub_;
 	ros::Publisher mapDataPub_;
 	ros::Publisher mapGraphPub_;
 	ros::Publisher labelsPub_;
-	ros::Publisher cloudMapPub_;
-	ros::Publisher projMapPub_;
-	ros::Publisher gridMapPub_;
 
 	//Planning stuff
 	ros::Subscriber goalSub_;

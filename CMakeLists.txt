@@ -180,7 +180,7 @@ SET(Libraries
 add_definitions(-DWITH_OCTOMAP)
 ENDIF(octomap_ros_FOUND)
 
-add_executable(rtabmap src/CoreNode.cpp src/CoreWrapper.cpp)
+add_executable(rtabmap src/CoreNode.cpp src/CoreWrapper.cpp src/MapsManager.cpp)
 add_dependencies(rtabmap rtabmap_generate_messages_cpp)
 target_link_libraries(rtabmap rtabmap_ros ${Libraries})
 
