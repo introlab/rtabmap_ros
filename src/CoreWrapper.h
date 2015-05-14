@@ -31,11 +31,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <ros/ros.h>
 
-#include <tf/tf.h>
-#include <tf/transform_broadcaster.h>
-#include <tf/transform_listener.h>
-
 #include <std_srvs/Empty.h>
+
+#include <tf/transform_listener.h>
+#include <tf2_ros/transform_broadcaster.h>
 
 #include <cv_bridge/cv_bridge.h>
 
@@ -260,7 +259,7 @@ private:
 	double mapFilterAngle_;
 	bool mapCacheCleanup_;
 
-	tf::Transform mapToOdom_;
+	rtabmap::Transform mapToOdom_;
 	boost::mutex mapToOdomMutex_;
 
 	std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr > clouds_;
@@ -376,7 +375,7 @@ private:
 			sensor_msgs::CameraInfo> MyStereoExactTFSyncPolicy;
 	message_filters::Synchronizer<MyStereoExactTFSyncPolicy> * stereoExactTFSync_;
 
-	tf::TransformBroadcaster tfBroadcaster_;
+	tf2_ros::TransformBroadcaster tfBroadcaster_;
 	tf::TransformListener tfListener_;
 
 	ros::ServiceServer updateSrv_;

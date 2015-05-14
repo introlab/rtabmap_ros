@@ -35,8 +35,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/utilite/UTimer.h>
 #include <ros/subscriber.h>
 #include <ros/publisher.h>
-#include <tf/tf.h>
-#include <tf/transform_broadcaster.h>
+#include <tf2_ros/transform_broadcaster.h>
 #include <boost/thread.hpp>
 
 using namespace rtabmap;
@@ -52,7 +51,7 @@ public:
 		ignoreVariance_(false),
 		globalOptimization_(true),
 		optimizeFromLastNode_(false),
-		mapToOdom_(tf::Transform::getIdentity()),
+		mapToOdom_(rtabmap::Transform::getIdentity()),
 		transformThread_(0)
 	{
 		ros::NodeHandle nh;
@@ -103,7 +102,12 @@ public:
 		{
 			mapToOdomMutex_.lock();
 			ros::Time tfExpiration = ros::Time::now() + ros::Duration(tfDelay);
-			tfBroadcaster_.sendTransform( tf::StampedTransform (mapToOdom_, tfExpiration, mapFrameId_, odomFrameId_));
+			geometry_msgs::TransformStamped msg;
+			msg.child_frame_id = odomFrameId_;
+			msg.header.frame_id = mapFrameId_;
+			msg.header.stamp = tfExpiration;
+			rtabmap_ros::transformToGeometryMsg(mapToOdom_, msg.transform);
+			tfBroadcaster_.sendTransform(msg);
 			mapToOdomMutex_.unlock();
 			r.sleep();
 		}
@@ -248,7 +252,7 @@ public:
 
 				mapToOdomMutex_.lock();
 				mapCorrection = optimizedPoses.at(poses.rbegin()->first) * poses.rbegin()->second.inverse();
-				rtabmap_ros::transformToTF(mapCorrection, mapToOdom_);
+				mapToOdom_ = mapCorrection;
 				mapToOdomMutex_.unlock();
 			}
 			else if(poses.size() == 1 && constraints.size() == 0)
@@ -289,7 +293,7 @@ private:
 	bool globalOptimization_;
 	bool optimizeFromLastNode_;
 
-	tf::Transform mapToOdom_;
+	rtabmap::Transform mapToOdom_;
 	boost::mutex mapToOdomMutex_;
 
 	ros::Subscriber mapDataTopic_;
@@ -303,7 +307,7 @@ private:
 	std::map<int, std::vector<unsigned char> > cachedUserDatas_;
 	std::multimap<int, Link> cachedConstraints_;
 
-	tf::TransformBroadcaster tfBroadcaster_;
+	tf2_ros::TransformBroadcaster tfBroadcaster_;
 	boost::thread* transformThread_;
 };
 

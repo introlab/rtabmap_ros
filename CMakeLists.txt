@@ -6,7 +6,7 @@ project(rtabmap_ros)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS 
              cv_bridge roscpp rospy sensor_msgs std_msgs std_srvs nav_msgs geometry_msgs visualization_msgs
-             image_transport tf tf_conversions laser_geometry pcl_conversions 
+             image_transport tf tf_conversions tf2_ros eigen_conversions laser_geometry pcl_conversions 
              pcl_ros nodelet dynamic_reconfigure rviz message_filters class_loader
              genmsg stereo_msgs move_base_msgs
 )
@@ -87,9 +87,9 @@ catkin_package(
   INCLUDE_DIRS include
   LIBRARIES rtabmap_ros
   CATKIN_DEPENDS cv_bridge roscpp rospy sensor_msgs std_msgs std_srvs nav_msgs geometry_msgs visualization_msgs
-                 image_transport tf tf_conversions laser_geometry pcl_conversions 
+                 image_transport tf tf_conversions tf2_ros eigen_conversions laser_geometry pcl_conversions 
                  pcl_ros nodelet dynamic_reconfigure rviz message_filters class_loader
-                 stereo_msgs move_base_msgs
+                 stereo_msgs move_base_msgs 
 )
 
 ###########

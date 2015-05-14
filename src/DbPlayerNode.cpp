@@ -34,8 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <nav_msgs/Odometry.h>
 #include <cv_bridge/cv_bridge.h>
 #include <image_transport/image_transport.h>
-#include <tf/tf.h>
-#include <tf/transform_broadcaster.h>
+#include <tf2_ros/transform_broadcaster.h>
 #include <std_srvs/Empty.h>
 #include <rtabmap_ros/MsgConversion.h>
 #include <rtabmap/utilite/ULogger.h>
@@ -135,7 +134,7 @@ int main(int argc, char** argv)
 	ros::Publisher rightCamInfoPub;
 	ros::Publisher odometryPub;
 	ros::Publisher scanPub;
-	tf::TransformBroadcaster tfBroadcaster;
+	tf2_ros::TransformBroadcaster tfBroadcaster;
 
 	rtabmap::SensorData data = reader.getNextData();
 	while(ros::ok() && data.isValid())
@@ -229,16 +228,22 @@ int main(int argc, char** argv)
 			ros::Time tfExpiration = time + ros::Duration(1.0/rate);
 			if(!data.localTransform().isNull())
 			{
-				tf::Transform baseToCamera;
-				rtabmap_ros::transformToTF(data.localTransform(), baseToCamera);
-				tfBroadcaster.sendTransform( tf::StampedTransform (baseToCamera, tfExpiration, frameId, cameraFrameId));
+				geometry_msgs::TransformStamped baseToCamera;
+				baseToCamera.child_frame_id = cameraFrameId;
+				baseToCamera.header.frame_id = frameId;
+				baseToCamera.header.stamp = tfExpiration;
+				rtabmap_ros::transformToGeometryMsg(data.localTransform(), baseToCamera.transform);
+				tfBroadcaster.sendTransform(baseToCamera);
 			}
 
 			if(!data.pose().isNull())
 			{
-				tf::Transform odomToBase;
-				rtabmap_ros::transformToTF(data.pose(), odomToBase);
-				tfBroadcaster.sendTransform( tf::StampedTransform (odomToBase, tfExpiration, odomFrameId, frameId));
+				geometry_msgs::TransformStamped odomToBase;
+				odomToBase.child_frame_id = frameId;
+				odomToBase.header.frame_id = odomFrameId;
+				odomToBase.header.stamp = tfExpiration;
+				rtabmap_ros::transformToGeometryMsg(data.pose(), odomToBase.transform);
+				tfBroadcaster.sendTransform(odomToBase);
 			}
 		}
 		if(!data.pose().isNull())

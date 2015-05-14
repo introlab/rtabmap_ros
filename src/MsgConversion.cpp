@@ -32,8 +32,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <ros/ros.h>
 #include <rtabmap/core/util3d.h>
 #include <rtabmap/utilite/UStl.h>
-#include <tf_conversions/tf_eigen.h>
 #include <pcl_conversions/pcl_conversions.h>
+#include <eigen_conversions/eigen_msg.h>
+#include <tf_conversions/tf_eigen.h>
 
 namespace rtabmap_ros {
 
@@ -60,9 +61,7 @@ void transformToGeometryMsg(const rtabmap::Transform & transform, geometry_msgs:
 {
 	if(!transform.isNull())
 	{
-		tf::Transform tfTransform;
-		transformToTF(transform, tfTransform);
-		tf::transformTFToMsg(tfTransform, msg);
+		tf::transformEigenToMsg(transform.toEigen3d(), msg);
 	}
 	else
 	{
@@ -73,18 +72,24 @@ void transformToGeometryMsg(const rtabmap::Transform & transform, geometry_msgs:
 
 rtabmap::Transform transformFromGeometryMsg(const geometry_msgs::Transform & msg)
 {
-	tf::Transform tfTransform;
-	tf::transformMsgToTF(msg, tfTransform);
-	return transformFromTF(tfTransform);
+	if(msg.rotation.w == 0 &&
+		msg.rotation.x == 0 &&
+		msg.rotation.y == 0 &&
+		msg.rotation.z ==0)
+	{
+		return rtabmap::Transform();
+	}
+
+	Eigen::Affine3d tfTransform;
+	tf::transformMsgToEigen(msg, tfTransform);
+	return rtabmap::Transform::fromEigen3d(tfTransform);
 }
 
 void transformToPoseMsg(const rtabmap::Transform & transform, geometry_msgs::Pose & msg)
 {
 	if(!transform.isNull())
 	{
-		tf::Transform tfTransform;
-		transformToTF(transform, tfTransform);
-		tf::poseTFToMsg(tfTransform, msg);
+		tf::poseEigenToMsg(transform.toEigen3d(), msg);
 	}
 	else
 	{
@@ -94,9 +99,16 @@ void transformToPoseMsg(const rtabmap::Transform & transform, geometry_msgs::Pos
 
 rtabmap::Transform transformFromPoseMsg(const geometry_msgs::Pose & msg)
 {
-	tf::Pose tfTransform;
-	tf::poseMsgToTF(msg, tfTransform);
-	return transformFromTF(tfTransform);
+	if(msg.orientation.w == 0 &&
+		msg.orientation.x == 0 &&
+		msg.orientation.y == 0 &&
+		msg.orientation.z ==0)
+	{
+		return rtabmap::Transform();
+	}
+	Eigen::Affine3d tfPose;
+	tf::poseMsgToEigen(msg, tfPose);
+	return rtabmap::Transform::fromEigen3d(tfPose);
 }
 
 void compressedMatToBytes(const cv::Mat & compressed, std::vector<unsigned char> & bytes)

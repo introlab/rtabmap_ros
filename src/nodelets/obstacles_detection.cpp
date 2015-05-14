@@ -33,7 +33,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
 
-#include <tf/tf.h>
 #include <tf/transform_listener.h>
 
 #include <sensor_msgs/PointCloud2.h>

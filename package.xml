@@ -25,6 +25,8 @@
   <build_depend>image_transport</build_depend>
   <build_depend>tf</build_depend>
   <build_depend>tf_conversions</build_depend>
+  <build_depend>tf2_ros</build_depend>
+  <build_depend>eigen_conversions</build_depend>
   <build_depend>laser_geometry</build_depend>
   <build_depend>pcl_conversions</build_depend>
   <build_depend>pcl_ros</build_depend>
@@ -53,6 +55,8 @@
   <run_depend>image_transport_plugins</run_depend>
   <run_depend>tf</run_depend>
   <run_depend>tf_conversions</run_depend>
+  <run_depend>tf2_ros</run_depend>
+  <run_depend>eigen_conversions</run_depend>
   <run_depend>laser_geometry</run_depend>
   <run_depend>pcl_conversions</run_depend>
   <run_depend>pcl_ros</run_depend>

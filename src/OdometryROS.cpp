@@ -316,12 +316,15 @@ void OdometryROS::processData(const SensorData & data, const std_msgs::Header & 
 		//*********************
 		// Update odometry
 		//*********************
-		tf::Transform poseTF;
-		rtabmap_ros::transformToTF(pose, poseTF);
+		geometry_msgs::TransformStamped poseMsg;
+		poseMsg.child_frame_id = frameId_;
+		poseMsg.header.frame_id = odomFrameId_;
+		poseMsg.header.stamp = header.stamp;
+		rtabmap_ros::transformToGeometryMsg(pose, poseMsg.transform);
 
 		if(publishTf_)
 		{
-			tfBroadcaster_.sendTransform( tf::StampedTransform (poseTF, header.stamp, odomFrameId_, frameId_));
+			tfBroadcaster_.sendTransform(poseMsg);
 		}
 
 		if(odomPub_.getNumSubscribers())
@@ -333,10 +336,10 @@ void OdometryROS::processData(const SensorData & data, const std_msgs::Header & 
 			odom.child_frame_id = frameId_;
 
 			//set the position
-			odom.pose.pose.position.x = poseTF.getOrigin().x();
-			odom.pose.pose.position.y = poseTF.getOrigin().y();
-			odom.pose.pose.position.z = poseTF.getOrigin().z();
-			tf::quaternionTFToMsg(poseTF.getRotation().normalized(), odom.pose.pose.orientation);
+			odom.pose.pose.position.x = poseMsg.transform.translation.x;
+			odom.pose.pose.position.y = poseMsg.transform.translation.y;
+			odom.pose.pose.position.z = poseMsg.transform.translation.z;
+			odom.pose.pose.orientation = poseMsg.transform.rotation;
 
 			//set covariance
 			odom.pose.covariance.at(0) = info.variance;  // xx

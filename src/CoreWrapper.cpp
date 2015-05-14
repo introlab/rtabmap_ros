@@ -26,6 +26,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #include "CoreWrapper.h"
+
 #include <stdio.h>
 #include <ros/ros.h>
 #include <sensor_msgs/Image.h>
@@ -35,30 +36,24 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <nav_msgs/OccupancyGrid.h>
 #include <std_msgs/Int32MultiArray.h>
 #include <std_msgs/Bool.h>
+
 #include <visualization_msgs/MarkerArray.h>
-#include <rtabmap/core/RtabmapEvent.h>
-#include <rtabmap/core/Camera.h>
-#include <rtabmap/core/Parameters.h>
-#include <rtabmap/core/util3d.h>
-#include <rtabmap/core/util3d_filtering.h>
+
+#include <rtabmap/utilite/ULogger.h>
+#include <rtabmap/utilite/UTimer.h>
+#include <rtabmap/utilite/UStl.h>
+#include <rtabmap/utilite/UConversion.h>
+#include <rtabmap/utilite/UFile.h>
 #include <rtabmap/core/util3d_mapping.h>
+#include <rtabmap/core/util3d_filtering.h>
 #include <rtabmap/core/util3d_transforms.h>
 #include <rtabmap/core/util3d_conversions.h>
 #include <rtabmap/core/util2d.h>
 #include <rtabmap/core/Graph.h>
 #include <rtabmap/core/Memory.h>
-#include <rtabmap/core/VWDictionary.h>
-#include <rtabmap/utilite/UEventsManager.h>
-#include <rtabmap/utilite/ULogger.h>
-#include <rtabmap/utilite/UFile.h>
-#include <rtabmap/utilite/UStl.h>
-#include <rtabmap/utilite/UTimer.h>
-#include <rtabmap/utilite/UConversion.h>
-#include <rtabmap/utilite/UMath.h>
-#include <opencv2/highgui/highgui.hpp>
 
-#include <pcl_ros/transforms.h>
 #include <pcl_conversions/pcl_conversions.h>
+
 #include <laser_geometry/laser_geometry.h>
 #include <image_geometry/stereo_camera_model.h>
 
@@ -112,7 +107,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 		mapFilterRadius_(0.5),
 		mapFilterAngle_(30.0), // degrees
 		mapCacheCleanup_(true),
-		mapToOdom_(tf::Transform::getIdentity()),
+		mapToOdom_(rtabmap::Transform::getIdentity()),
 		depthSync_(0),
 		depthScanSync_(0),
 		stereoScanSync_(0),
@@ -508,7 +503,12 @@ void CoreWrapper::publishLoop(double tfDelay)
 		{
 			mapToOdomMutex_.lock();
 			ros::Time tfExpiration = ros::Time::now() + ros::Duration(tfDelay);
-			tfBroadcaster_.sendTransform( tf::StampedTransform (mapToOdom_, tfExpiration, mapFrameId_, odomFrameId_));
+			geometry_msgs::TransformStamped msg;
+			msg.child_frame_id = odomFrameId_;
+			msg.header.frame_id = mapFrameId_;
+			msg.header.stamp = tfExpiration;
+			rtabmap_ros::transformToGeometryMsg(mapToOdom_, msg.transform);
+			tfBroadcaster_.sendTransform(msg);
 			mapToOdomMutex_.unlock();
 		}
 		r.sleep();
@@ -627,6 +627,7 @@ bool CoreWrapper::commonOdomTFUpdate(const ros::Time & stamp)
 		{
 			if(waitForTransform_)
 			{
+				//if(!tfBuffer_.canTransform(odomFrameId_, frameId_, stamp, ros::Duration(1)))
 				if(!tfListener_.waitForTransform(odomFrameId_, frameId_, stamp, ros::Duration(1)))
 				{
 					ROS_WARN("Could not get transform from %s to %s after 1 second!", odomFrameId_.c_str(), frameId_.c_str());
@@ -676,6 +677,7 @@ Transform CoreWrapper::getTransform(const std::string & fromFrameId, const std::
 	{
 		if(waitForTransform_)
 		{
+			//if(!tfBuffer_.canTransform(fromFrameId, toFrameId, stamp, ros::Duration(1)))
 			if(!tfListener_.waitForTransform(fromFrameId, toFrameId, stamp, ros::Duration(1)))
 			{
 				ROS_WARN("Could not get transform from %s to %s after 1 second!", fromFrameId.c_str(), toFrameId.c_str());
@@ -872,6 +874,7 @@ void CoreWrapper::commonStereoCallback(
 		//transform in frameId_ frame
 		sensor_msgs::PointCloud2 scanOut;
 		laser_geometry::LaserProjection projection;
+		//projection.transformLaserScanToPointCloud(frameId_, *scanMsg, scanOut, tfBuffer_);
 		projection.transformLaserScanToPointCloud(frameId_, *scanMsg, scanOut, tfListener_);
 		pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
 		pcl::fromROSMsg(scanOut, *pclScan);
@@ -1119,7 +1122,7 @@ void CoreWrapper::process(
 		{
 			timeRtabmap = timer.ticks();
 			mapToOdomMutex_.lock();
-			rtabmap_ros::transformToTF(rtabmap_.getMapCorrection(), mapToOdom_);
+			mapToOdom_ = rtabmap_.getMapCorrection();
 			odomFrameId_ = odomFrameId;
 			mapToOdomMutex_.unlock();
 

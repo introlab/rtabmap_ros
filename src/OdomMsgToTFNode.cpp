@@ -27,8 +27,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <ros/ros.h>
 #include <nav_msgs/Odometry.h>
-#include <tf/tf.h>
-#include <tf/transform_broadcaster.h>
+#include <tf2_ros/transform_broadcaster.h>
 #include <rtabmap_ros/MsgConversion.h>
 
 class OdomMsgToTF
@@ -59,7 +58,7 @@ public:
 		{
 			odomFrameId_ = msg->header.frame_id;
 		}
-		tf::StampedTransform t;
+		geometry_msgs::TransformStamped t;
 		rtabmap::Transform pose = rtabmap_ros::transformFromPoseMsg(msg->pose.pose);
 		if(pose.isNull())
 		{
@@ -67,8 +66,11 @@ public:
 		}
 		else
 		{
-			rtabmap_ros::transformToTF(pose, t);
-			tfBroadcaster_.sendTransform(tf::StampedTransform (t, msg->header.stamp, odomFrameId_, frameId_));
+			t.child_frame_id = frameId_;
+			t.header.frame_id = odomFrameId_;
+			t.header.stamp = msg->header.stamp;
+			rtabmap_ros::transformToGeometryMsg(pose, t.transform);
+			tfBroadcaster_.sendTransform(t);
 		}
 	}
 
@@ -77,7 +79,7 @@ private:
 	std::string odomFrameId_;
 
 	ros::Subscriber odomTopic_;
-	tf::TransformBroadcaster tfBroadcaster_;
+	tf2_ros::TransformBroadcaster tfBroadcaster_;
 };
 
 

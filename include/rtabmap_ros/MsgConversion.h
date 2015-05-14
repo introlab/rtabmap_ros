@@ -28,8 +28,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef MSGCONVERSION_H_
 #define MSGCONVERSION_H_
 
-#include <tf/LinearMath/Transform.h>
-
+#include <tf/tf.h>
 #include <geometry_msgs/Transform.h>
 #include <geometry_msgs/Pose.h>
 

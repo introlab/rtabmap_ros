@@ -30,8 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <ros/ros.h>
 
-#include <tf/tf.h>
-#include <tf/transform_broadcaster.h>
+#include <tf2_ros/transform_broadcaster.h>
 #include <tf/transform_listener.h>
 
 #include <std_srvs/Empty.h>
@@ -88,7 +87,7 @@ private:
 	ros::ServiceServer resetToPoseSrv_;
 	ros::ServiceServer pauseSrv_;
 	ros::ServiceServer resumeSrv_;
-	tf::TransformBroadcaster tfBroadcaster_;
+	tf2_ros::TransformBroadcaster tfBroadcaster_;
 	tf::TransformListener tfListener_;
 
 	bool paused_;
