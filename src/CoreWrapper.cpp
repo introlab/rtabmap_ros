@@ -705,6 +705,13 @@ void CoreWrapper::commonDepthCallback(
 			return;
 		}
 
+		// set maps manager laser scan range parameter
+		mapsManager_.setLaserScanParameters(
+				scanMsg->range_max,
+				scanMsg->angle_min,
+				scanMsg->angle_max,
+				scanMsg->angle_increment);
+
 		//transform in frameId_ frame
 		sensor_msgs::PointCloud2 scanOut;
 		laser_geometry::LaserProjection projection;
@@ -825,6 +832,14 @@ void CoreWrapper::commonStereoCallback(
 		{
 			return;
 		}
+
+		// set maps manager laser scan range parameter
+		mapsManager_.setLaserScanParameters(
+				scanMsg->range_max,
+				scanMsg->angle_min,
+				scanMsg->angle_max,
+				scanMsg->angle_increment);
+
 		//transform in frameId_ frame
 		sensor_msgs::PointCloud2 scanOut;
 		laser_geometry::LaserProjection projection;

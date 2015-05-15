@@ -10,6 +10,7 @@
 #include <rtabmap/utilite/ULogger.h>
 #include <rtabmap/utilite/UTimer.h>
 #include <rtabmap/utilite/UStl.h>
+#include <rtabmap/utilite/UConversion.h>
 #include <rtabmap/core/util3d_mapping.h>
 #include <rtabmap/core/util3d_filtering.h>
 #include <rtabmap/core/util3d_transforms.h>
@@ -41,7 +42,11 @@ MapsManager::MapsManager() :
 		gridEroded_(false),
 		mapFilterRadius_(0.5),
 		mapFilterAngle_(30.0), // degrees
-		mapCacheCleanup_(true)
+		mapCacheCleanup_(true),
+		laserScanMaxRange_(0),
+		laserScanMinAngle_(0),
+		laserScanMaxAngle_(0),
+		laserScanIncrement_(0)
 {
 
 	ros::NodeHandle nh;
@@ -83,6 +88,22 @@ void MapsManager::clear()
 	clouds_.clear();
 	projMaps_.clear();
 	gridMaps_.clear();
+	laserScanMaxRange_ = 0;
+	laserScanMinAngle_ = 0;
+	laserScanMaxAngle_ = 0;
+	laserScanIncrement_ = 0;
+}
+
+void MapsManager::setLaserScanParameters(
+		float maxRange,
+		float minAngle,
+		float maxAngle,
+		float increment)
+{
+	laserScanMaxRange_ = maxRange;
+	laserScanMinAngle_ = minAngle;
+	laserScanMaxAngle_ = maxAngle;
+	laserScanIncrement_ = increment;
 }
 
 std::map<int, Transform> MapsManager::getFilteredPoses(const std::map<int, Transform> & poses)
@@ -532,13 +553,57 @@ cv::Mat MapsManager::generateGridMap(
 		float & gridCellSize)
 {
 	gridCellSize = gridCellSize_;
-	return util3d::create2DMapFromOccupancyLocalMaps(
+	cv::Mat map = util3d::create2DMapFromOccupancyLocalMaps(
 			poses,
 			gridMaps_,
 			gridCellSize_,
 			xMin, yMin,
 			gridSize_,
 			gridEroded_);
+
+	// Fill unknown space around the last pose
+	if(!map.empty() &&
+		laserScanMaxRange_ &&
+		laserScanMinAngle_ < laserScanMaxAngle_ &&
+		laserScanIncrement_ &&
+		poses.size())
+	{
+		const Transform & pose = poses.rbegin()->second;
+		float roll, pitch, yaw;
+		pose.getEulerAngles(roll, pitch, yaw);
+		cv::Point2i start((pose.x()-xMin)/gridCellSize_ + 0.5f, (pose.y()-yMin)/gridCellSize_ + 0.5f);
+
+		//rotate counterclockwise 180 degrees at the computed step "a" degrees
+		cv::Mat rotation = (cv::Mat_<float>(2,2) << cos(laserScanIncrement_), -sin(laserScanIncrement_),
+													 sin(laserScanIncrement_), cos(laserScanIncrement_));
+
+		cv::Mat origin(2,1,CV_32F), endFirst(2,1,CV_32F);
+		origin.at<float>(0) = pose.x();
+		origin.at<float>(1) = pose.y();
+		endFirst.at<float>(0) = laserScanMaxRange_;
+		endFirst.at<float>(1) = 0;
+
+		yaw += laserScanMinAngle_;
+		cv::Mat initRotation = (cv::Mat_<float>(2,2) << cos(yaw), -sin(yaw),
+														 sin(yaw), cos(yaw));
+
+		cv::Mat endCurrent = initRotation*endFirst + origin;
+		for(float a=laserScanMinAngle_; a<=laserScanMaxAngle_; a+=laserScanIncrement_)
+		{
+			cv::Point2i end((endCurrent.at<float>(0)-xMin)/gridCellSize_ + 0.5f, (endCurrent.at<float>(1)-yMin)/gridCellSize_ + 0.5f);
+			//end must be inside the grid
+			end.x = end.x < 0?0:end.x;
+			end.x = end.x >= map.cols?map.cols-1:end.x;
+			end.y = end.y < 0?0:end.y;
+			end.y = end.y >= map.rows?map.rows-1:end.y;
+			util3d::rayTrace(start, end, map, true); // trace free space
+
+			// next point
+			endCurrent = rotation*(endCurrent - origin) + origin;
+		}
+	}
+
+	return map;
 }
 
 #ifdef WITH_OCTOMAP
