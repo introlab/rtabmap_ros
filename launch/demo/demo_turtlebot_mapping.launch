@@ -3,10 +3,10 @@
   <!-- 
        Usage:
        $ roslaunch turtlebot_bringup minimal.launch
-       $ roslaunch rtabmap_ros turtlebot_mapping.launch
+       $ roslaunch rtabmap_ros demo_turtlebot_mapping.launch
        
        Visualization:
-       $ roslaunch turtlebot_rviz_launchers view_navigation.launch
+       $ roslaunch rtabmap_ros demo_turtlebot_rviz.launch
        
        This launch file is a one to one replacement of the gmapping_demo.launch in this tutorial:
        http://wiki.ros.org/turtlebot_navigation/Tutorials/indigo/Build%20a%20map%20with%20SLAM
