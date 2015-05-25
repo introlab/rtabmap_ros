@@ -21,7 +21,7 @@
        http://wiki.ros.org/turtlebot_navigation/Tutorials/Autonomously%20navigate%20in%20a%20known%20map
   -->
   
-  <arg name="database_path"     default="~/.ros/rtabmap.db"/>
+  <arg name="database_path"     default=""/>
   <arg name="localization"      default="false"/>
   <arg name="rgbd_odometry"     default="false"/>
   <arg name="args"              default=""/>
@@ -34,7 +34,7 @@
   <group ns="rtabmap">
 
     <node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="screen" args="$(arg args)">
-      <param name="database_path"       type="string" value="$(arg database_path)"/>
+	  <param name="database_path"       type="string" value="$(arg database_path)"/>
 	  <param name="frame_id"            type="string" value="base_footprint"/>
 	  <param name="odom_frame_id"       type="string" value="odom"/>
 	  <param name="wait_for_transform"  type="bool"   value="true"/>
