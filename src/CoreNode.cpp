@@ -30,6 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/utilite/UDirectory.h>
 #include <rtabmap/utilite/UStl.h>
 #include <rtabmap/utilite/UFile.h>
+#include <rtabmap/core/Version.h>
 
 int main(int argc, char** argv)
 {
@@ -102,7 +103,7 @@ int main(int argc, char** argv)
 
 	CoreWrapper * rtabmap = new CoreWrapper(deleteDbOnStart);
 
-	ROS_INFO("rtabmap started...");
+	ROS_INFO("rtabmap %s started...", RTABMAP_VERSION);
 	ros::spin();
 
 	delete rtabmap;

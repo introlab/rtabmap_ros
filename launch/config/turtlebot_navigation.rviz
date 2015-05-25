@@ -49,7 +49,7 @@ Visualization Manager:
         Z: 0
       Plane: XY
       Plane Cell Count: 10
-      Reference Frame: <Fixed Frame>
+      Reference Frame: map
       Value: true
     - Alpha: 1
       Class: rviz/RobotModel
@@ -366,7 +366,7 @@ Visualization Manager:
       Class: rtabmap_ros/MapCloud
       Cloud decimation: 4
       Cloud max depth (m): 4
-      Cloud voxel size (m): 0.01
+      Cloud voxel size (m): 0.05
       Color: 255; 255; 255
       Color Transformer: RGB8
       Download graph: false
@@ -379,8 +379,8 @@ Visualization Manager:
       Min Color: 0; 0; 0
       Min Intensity: 0
       Name: Rtabmap cloud
-      Node filtering angle (degrees): 30
-      Node filtering radius (m): 0.2
+      Node filtering angle (degrees): 0
+      Node filtering radius (m): 0
       Position Transformer: XYZ
       Size (Pixels): 3
       Size (m): 0.01
@@ -409,7 +409,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 7.70311
+      Distance: 5.31174
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.06
         Stereo Focal Distance: 1
@@ -418,13 +418,13 @@ Visualization Manager:
       Focal Point:
         X: 0.00901246
         Y: -0.126793
-        Z: 0.0121136
+        Z: 0.0223136
       Name: Current View
       Near Clip Distance: 0.01
-      Pitch: 1.5348
-      Target Frame: base_link
+      Pitch: 1.3598
+      Target Frame: base_footprint
       Value: Orbit (rviz)
-      Yaw: 3.12411
+      Yaw: 3.12914
     Saved: ~
 Window Geometry:
   Displays:
@@ -442,5 +442,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1503
-  X: 106
+  X: 85
   Y: 188
