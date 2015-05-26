@@ -21,7 +21,7 @@
        http://wiki.ros.org/turtlebot_navigation/Tutorials/Autonomously%20navigate%20in%20a%20known%20map
   -->
   
-  <arg name="database_path"     default=""/>
+  <arg name="database_path"     default="rtabmap.db"/>
   <arg name="localization"      default="false"/>
   <arg name="rgbd_odometry"     default="false"/>
   <arg name="args"              default=""/>

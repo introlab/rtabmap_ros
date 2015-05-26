@@ -174,6 +174,14 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 
 	configPath_ = uReplaceChar(configPath_, '~', UDirectory::homeDir());
 	databasePath_ = uReplaceChar(databasePath_, '~', UDirectory::homeDir());
+	if(configPath_.size() && configPath_.at(0) != '/')
+	{
+		configPath_ = UDirectory::currentDir(true) + configPath_;
+	}
+	if(databasePath_.size() && databasePath_.at(0) != '/')
+	{
+		databasePath_ = UDirectory::currentDir(true) + databasePath_;
+	}
 
 	// load parameters
 	parameters_ = loadParameters(configPath_);
@@ -316,7 +324,14 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 		}
 	}
 
-	ROS_INFO("rtabmap: Using database from \"%s\".", databasePath_.c_str());
+	if(databasePath_.size())
+	{
+		ROS_INFO("rtabmap: Using database from \"%s\".", databasePath_.c_str());
+	}
+	else
+	{
+		ROS_INFO("rtabmap: database_path parameter not set, the map will not be saved.");
+	}
 
 	// Init RTAB-Map
 	rtabmap_.init(parameters_, databasePath_);
