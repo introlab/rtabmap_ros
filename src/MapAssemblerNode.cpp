@@ -32,7 +32,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/util3d.h>
 #include <rtabmap/core/util3d_filtering.h>
 #include <rtabmap/core/util3d_mapping.h>
-#include <rtabmap/core/util3d_conversions.h>
 #include <rtabmap/core/Compression.h>
 #include <rtabmap/core/Graph.h>
 #include <rtabmap/utilite/ULogger.h>
