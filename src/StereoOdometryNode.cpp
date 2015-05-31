@@ -159,34 +159,31 @@ public:
 			{
 				image_geometry::StereoCameraModel model;
 				model.fromCameraInfo(*cameraInfoLeft, *cameraInfoRight);
-
-				float fx = model.left().fx();
-				float cx = model.left().cx();
-				float cy = model.left().cy();
-				float baseline = model.baseline();
-				cv_bridge::CvImageConstPtr ptrImageLeft = cv_bridge::toCvShare(imageRectLeft, "mono8");
-				cv_bridge::CvImageConstPtr ptrImageRight = cv_bridge::toCvShare(imageRectRight, "mono8");
-
-				if(baseline <= 0)
+				if(model.baseline() <= 0)
 				{
 					ROS_FATAL("The stereo baseline (%f) should be positive (baseline=-Tx/fx). We assume a horizontal left/right stereo "
-							  "setup where the Tx (or P(0,3)) is negative in the right camera info msg.", baseline);
+							  "setup where the Tx (or P(0,3)) is negative in the right camera info msg.", model.baseline());
 					return;
 				}
+
+				rtabmap::StereoCameraModel stereoModel(
+						model.left().fx(),
+						model.left().fy(),
+						model.left().cx(),
+						model.left().cy(),
+						model.baseline(),
+						rtabmap_ros::transformFromTF(localTransform));
+
+				cv_bridge::CvImageConstPtr ptrImageLeft = cv_bridge::toCvShare(imageRectLeft, "mono8");
+				cv_bridge::CvImageConstPtr ptrImageRight = cv_bridge::toCvShare(imageRectRight, "mono8");
 
 				UTimer stepTimer;
 				//
 				UDEBUG("localTransform = %s", rtabmap_ros::transformFromTF(localTransform).prettyPrint().c_str());
-				rtabmap::SensorData data(ptrImageLeft->image,
+				rtabmap::SensorData data(
+						ptrImageLeft->image,
 						ptrImageRight->image,
-						fx,
-						baseline,
-						cx,
-						cy,
-						rtabmap_ros::transformFromTF(localTransform),
-						rtabmap::Transform(),
-						1.0f,
-						1.0f,
+						stereoModel,
 						0,
 						rtabmap_ros::timestampFromROS(imageRectLeft->header.stamp));
 

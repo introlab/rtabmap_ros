@@ -236,7 +236,7 @@ protected:
 		if(event->getClassName().compare("CameraEvent") == 0)
 		{
 			rtabmap::CameraEvent * e = (rtabmap::CameraEvent*)event;
-			const cv::Mat & image = e->data().image();
+			const cv::Mat & image = e->data().imageRaw();
 			if(!image.empty() && image.depth() == CV_8U)
 			{
 				cv_bridge::CvImage img;

@@ -95,21 +95,17 @@ void MapGraphDisplay::destroyObjects()
 
 void MapGraphDisplay::processMessage( const rtabmap_ros::MapData::ConstPtr& msg )
 {
-	if(!(msg->graph.mapIds.size() == msg->graph.nodeIds.size() && msg->graph.poses.size() == msg->graph.nodeIds.size()))
+	if(!(msg->poses.size() == msg->posesId.size()))
 	{
-		ROS_ERROR("rtabmap_ros::MapGraph: Error map ids, pose ids and poses must have all the same size.");
+		ROS_ERROR("rtabmap_ros::MapGraph: Error pose ids and poses must have all the same size.");
 		return;
 	}
 
 	// Get links
 	std::map<int, rtabmap::Transform> poses;
-	std::map<int, int> mapIds;
-	std::map<int,  double> stamps;
-	std::map<int, std::string> labels;
-	std::map<int, std::vector<unsigned char> > userDatas;
 	std::multimap<int, rtabmap::Link> links;
 	rtabmap::Transform mapToOdom;
-	rtabmap_ros::mapGraphFromROS(msg->graph, poses, mapIds, stamps, labels, userDatas, links, mapToOdom);
+	rtabmap_ros::mapDataFromROS(*msg, poses, links, mapToOdom);
 
 	destroyObjects();
 

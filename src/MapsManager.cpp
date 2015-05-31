@@ -162,7 +162,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 		{
 			if(!iter->second.isNull())
 			{
-				rtabmap::Signature data;
+				rtabmap::SensorData data;
 				bool rgbDepthRequired = updateCloud && !uContains(clouds_, iter->first);
 				bool depthRequired = updateProj && !uContains(projMaps_, iter->first);
 				bool scanRequired = updateGrid && !uContains(gridMaps_, iter->first);
@@ -175,7 +175,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 						std::map<int, rtabmap::Signature>::const_iterator findIter = signatures.find(iter->first);
 						if(findIter != signatures.end())
 						{
-							data = findIter->second;
+							data = findIter->second.sensorData();
 						}
 					}
 					else
@@ -186,55 +186,25 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 
 				if(data.id() > 0)
 				{
-					rtabmap::Transform localTransform = data.getLocalTransform();
-					if(!localTransform.isNull())
+					if(!data.imageCompressed().empty() &&
+					   !data.depthOrRightCompressed().empty() &&
+					   (data.cameraModels().size() || data.stereoCameraModel().isValid()))
 					{
 						// Which data should we decompress?
 						cv::Mat image, depth, scan;
-						data.uncompressDataConst(rgbDepthRequired?&image:0, rgbDepthRequired||depthRequired?&depth:0, scanRequired?&scan:0);
-						if(!depth.empty() &&
-							depth.type() == CV_8UC1 &&
-							image.empty() &&
-							!rgbDepthRequired)
-						{
-							// Stereo detected, we should uncompress left image too
-							data.uncompressDataConst(&image, 0, 0);
-						}
-						float fx = data.getFx();
-						float fy = data.getFy();
-						float cx = data.getCx();
-						float cy = data.getCy();
+						data.uncompressData(rgbDepthRequired||data.stereoCameraModel().isValid()?&image:0, rgbDepthRequired||depthRequired?&depth:0, scanRequired?&scan:0);
 
 						pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloudRGB;
 						pcl::PointCloud<pcl::PointXYZ>::Ptr cloudXYZ;
 						if(rgbDepthRequired)
 						{
-							if(!image.empty() &&
-								!depth.empty() &&
-								fx > 0.0f && fy > 0.0f &&
-								cx >= 0.0f && cy >= 0.0f)
+							if(!image.empty() && !depth.empty())
 							{
-								if(depth.type() == CV_8UC1)
-								{
-									cloudRGB = util3d::cloudFromStereoImages(image, depth, cx, cy, fx, fy, cloudDecimation_);
-								}
-								else
-								{
-									cloudRGB = util3d::cloudFromDepthRGB(image, depth, cx, cy, fx, fy, cloudDecimation_);
-								}
-
-								if(cloudRGB->size() && cloudMaxDepth_ > 0)
-								{
-									cloudRGB = util3d::passThrough(cloudRGB, "z", 0, cloudMaxDepth_);
-								}
-								if(cloudRGB->size() && cloudVoxelSize_ > 0)
-								{
-									cloudRGB = util3d::voxelize(cloudRGB, cloudVoxelSize_);
-								}
-								if(cloudRGB->size())
-								{
-									cloudRGB = util3d::transformPointCloud(cloudRGB, localTransform);
-								}
+								cloudRGB = util3d::cloudRGBFromSensorData(
+										data,
+										cloudDecimation_,
+										cloudMaxDepth_,
+										cloudVoxelSize_);
 							}
 							else
 							{
@@ -243,55 +213,13 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 						}
 						else if(depthRequired)
 						{
-							if(	!depth.empty() &&
-								fx > 0.0f && fy > 0.0f &&
-								cx >= 0.0f && cy >= 0.0f)
+							if(	!depth.empty())
 							{
-								if(depth.type() == CV_8UC1)
-								{
-									if(!image.empty())
-									{
-										cv::Mat leftMono;
-										if(image.channels() == 3)
-										{
-											cv::cvtColor(image, leftMono, CV_BGR2GRAY);
-										}
-										else
-										{
-											leftMono = image;
-										}
-										cloudXYZ = rtabmap::util3d::cloudFromDisparity(
-												util2d::disparityFromStereoImages(leftMono, depth),
-												cx, cy,
-												fx, fy,
-												cloudDecimation_);
-									}
-								}
-								else
-								{
-									cloudXYZ = util3d::cloudFromDepth(depth, cx, cy, fx, fy, cloudDecimation_);
-								}
-
-								if(cloudXYZ.get())
-								{
-									if(cloudXYZ->size() && cloudMaxDepth_ > 0)
-									{
-										cloudXYZ = util3d::passThrough(cloudXYZ, "z", 0, cloudMaxDepth_);
-									}
-									if(cloudXYZ->size() && gridCellSize_ > 0)
-									{
-										// use gridCellSize since this cloud is only for the projection map
-										cloudXYZ = util3d::voxelize(cloudXYZ, gridCellSize_);
-									}
-									if(cloudXYZ->size())
-									{
-										cloudXYZ = util3d::transformPointCloud(cloudXYZ, localTransform);
-									}
-								}
-								else
-								{
-									ROS_ERROR("Left stereo image was empty! (node=%d)", iter->first);
-								}
+								cloudXYZ = util3d::cloudFromSensorData(
+										data,
+										cloudDecimation_,
+										cloudMaxDepth_,
+										gridCellSize_); // use gridCellSize since this cloud is only for the projection map
 							}
 							else
 							{

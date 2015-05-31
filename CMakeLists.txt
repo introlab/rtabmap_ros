@@ -17,7 +17,7 @@ find_package(octomap_ros)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
-find_package(RTABMap 0.9.0 REQUIRED)
+find_package(RTABMap 0.10.0 REQUIRED)
 
 #Qt stuff
 FIND_PACKAGE(Qt4 COMPONENTS QtCore QtGui REQUIRED)
@@ -44,7 +44,6 @@ add_message_files(
    Info.msg
    KeyPoint.msg
    MapData.msg
-   Graph.msg
    NodeData.msg
    Link.msg
    OdomInfo.msg

@@ -45,7 +45,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap_ros/KeyPoint.h>
 #include <rtabmap_ros/Point2f.h>
 #include <rtabmap_ros/MapData.h>
-#include <rtabmap_ros/Graph.h>
 #include <rtabmap_ros/NodeData.h>
 #include <rtabmap_ros/OdomInfo.h>
 #include <rtabmap_ros/Info.h>
@@ -83,24 +82,28 @@ void point2fToROS(const cv::Point2f & kpt, rtabmap_ros::Point2f & msg);
 std::vector<cv::Point2f> points2fFromROS(const std::vector<rtabmap_ros::Point2f> & msg);
 void points2fToROS(const std::vector<cv::Point2f> & kpts, std::vector<rtabmap_ros::Point2f> & msg);
 
-void mapGraphFromROS(
-		const rtabmap_ros::Graph & msg,
+void mapDataFromROS(
+		const rtabmap_ros::MapData & msg,
 		std::map<int, rtabmap::Transform> & poses,
-		std::map<int, int> & mapIds,
-		std::map<int, double> & stamps,
-		std::map<int, std::string> & labels,
-		std::map<int, std::vector<unsigned char> > & userDatas,
+		std::multimap<int, rtabmap::Link> & links,
+		std::map<int, rtabmap::Signature> & signatures,
+		rtabmap::Transform & mapToOdom);
+void mapDataFromROS(
+		const rtabmap_ros::MapData & msg,
+		std::map<int, rtabmap::Transform> & poses,
 		std::multimap<int, rtabmap::Link> & links,
 		rtabmap::Transform & mapToOdom);
-void mapGraphToROS(
+void mapDataToROS(
 		const std::map<int, rtabmap::Transform> & poses,
-		const std::map<int, int> & mapIds,
-		const std::map<int, double> & stamps,
-		const std::map<int, std::string> & labels,
-		const std::map<int, std::vector<unsigned char> > & userDatas,
+		const std::multimap<int, rtabmap::Link> & links,
+		const std::map<int, rtabmap::Signature> & signatures,
+		const rtabmap::Transform & mapToOdom,
+		rtabmap_ros::MapData & msg);
+void mapDataToROS(
+		const std::map<int, rtabmap::Transform> & poses,
 		const std::multimap<int, rtabmap::Link> & links,
 		const rtabmap::Transform & mapToOdom,
-		rtabmap_ros::Graph & msg);
+		rtabmap_ros::MapData & msg);
 
 rtabmap::Signature nodeDataFromROS(const rtabmap_ros::NodeData & msg);
 void nodeDataToROS(const rtabmap::Signature & signature, rtabmap_ros::NodeData & msg);

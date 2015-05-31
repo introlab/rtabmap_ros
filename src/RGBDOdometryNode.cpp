@@ -138,24 +138,19 @@ public:
 			{
 				image_geometry::PinholeCameraModel model;
 				model.fromCameraInfo(*cameraInfo);
-				float fx = model.fx();
-				float fy = model.fy();
-				float cx = model.cx();
-				float cy = model.cy();
+				rtabmap::CameraModel rtabmapModel(
+						model.fx(),
+						model.fy(),
+						model.cx(),
+						model.cy(),
+						rtabmap_ros::transformFromTF(localTransform));
 				cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(image, "mono8");
 				cv_bridge::CvImageConstPtr ptrDepth = cv_bridge::toCvShare(depth);
 
 				rtabmap::SensorData data(
 						ptrImage->image,
 						ptrDepth->image,
-						fx,
-						fy,
-						cx,
-						cy,
-						rtabmap_ros::transformFromTF(localTransform),
-						rtabmap::Transform(),
-						1.0f,
-						1.0f,
+						rtabmapModel,
 						0,
 						rtabmap_ros::timestampFromROS(image->header.stamp));
 

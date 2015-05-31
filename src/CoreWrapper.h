@@ -163,13 +163,14 @@ private:
 			const cv::Mat & image,
 			const rtabmap::Transform & odom = rtabmap::Transform(),
 			const std::string & odomFrameId = "",
-			float odomRotationalVariance = 1.0f,
-			float odomTransitionalVariance = 1.0f,
+			double odomRotationalVariance = 1.0,
+			double odomTransitionalVariance = 1.0,
 			const cv::Mat & depthOrRightImage = cv::Mat(),
-			float fx = 0.0f,
-			float fyOrBaseline = 0.0f,
-			float cx = 0.0f,
-			float cy = 0.0f,
+			double fx = 0.0,
+			double fy = 0.0,
+			double cx = 0.0,
+			double cy = 0.0,
+			double baseline = 0.0,
 			const rtabmap::Transform & localTransform = rtabmap::Transform(),
 			const cv::Mat & scan = cv::Mat(),
 			int scanMaxPts = 0);
@@ -211,8 +212,8 @@ private:
 	bool paused_;
 	rtabmap::Transform lastPose_;
 	ros::Time lastPoseStamp_;
-	float rotVariance_;
-	float transVariance_;
+	double rotVariance_;
+	double transVariance_;
 	rtabmap::Transform currentMetricGoal_;
 	bool latestNodeWasReached_;
 	rtabmap::ParametersMap parameters_;
@@ -232,7 +233,6 @@ private:
 
 	ros::Publisher infoPub_;
 	ros::Publisher mapDataPub_;
-	ros::Publisher mapGraphPub_;
 	ros::Publisher labelsPub_;
 
 	//Planning stuff

@@ -2,14 +2,25 @@
 Header header
 
 ##################
-# Graph stuff
+# Optimized graph
 ##################
+##
+# /map to /odom transform
+# Always identity when the graph is optimized from the latest pose.
+##
+geometry_msgs/Transform mapToOdom
 
-Graph graph
+# The poses
+int32[] posesId
+geometry_msgs/Pose[] poses
+
+# The links
+Link[] links
 
 ##################
-# Point cloud stuff
+# Graph data
 ##################
-
 NodeData[] nodes
+
+
 

@@ -43,10 +43,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/utilite/UFile.h>
 #include <rtabmap/utilite/UConversion.h>
 #include <rtabmap/utilite/UStl.h>
+#include <rtabmap/utilite/UMath.h>
 
 #include <rtabmap/core/util3d_conversions.h>
 #include <rtabmap/core/util3d_transforms.h>
 #include <rtabmap/core/Memory.h>
+#include <rtabmap/core/OdometryEvent.h>
 
 #include <pcl_conversions/pcl_conversions.h>
 
@@ -67,12 +69,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtabmap_ros/MsgConversion.h"
 
 using namespace rtabmap;
-
-float max3( const float& a, const float& b, const float& c)
-{
-	float m=a>b?a:b;
-	return m>c?m:c;
-}
 
 CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 		paused_(false),
@@ -157,7 +153,6 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 
 	infoPub_ = nh.advertise<rtabmap_ros::Info>("info", 1);
 	mapDataPub_ = nh.advertise<rtabmap_ros::MapData>("mapData", 1);
-	mapGraphPub_ = nh.advertise<rtabmap_ros::Graph>("graph", 1);
 	labelsPub_ = nh.advertise<visualization_msgs::MarkerArray>("labels", 1);
 
 	// planning topics
@@ -561,8 +556,8 @@ bool CoreWrapper::commonOdomUpdate(const nav_msgs::OdometryConstPtr & odomMsg)
 
 		lastPose_ = odom;
 		lastPoseStamp_ = odomMsg->header.stamp;
-		float transVariance = max3(odomMsg->pose.covariance[0], odomMsg->pose.covariance[7], odomMsg->pose.covariance[14]);
-		float rotVariance = max3(odomMsg->pose.covariance[21], odomMsg->pose.covariance[28], odomMsg->pose.covariance[35]);
+		double transVariance = uMax3(odomMsg->pose.covariance[0], odomMsg->pose.covariance[7], odomMsg->pose.covariance[14]);
+		double rotVariance = uMax3(odomMsg->pose.covariance[21], odomMsg->pose.covariance[28], odomMsg->pose.covariance[35]);
 		if(uIsFinite(rotVariance) && rotVariance > rotVariance_)
 		{
 			rotVariance_ = rotVariance;
@@ -766,23 +761,24 @@ void CoreWrapper::commonDepthCallback(
 
 	image_geometry::PinholeCameraModel model;
 	model.fromCameraInfo(*cameraInfoMsg);
-	float fx = model.fx();
-	float fy = model.fy();
-	float cx = model.cx();
-	float cy = model.cy();
+	double fx = model.fx();
+	double fy = model.fy();
+	double cx = model.cx();
+	double cy = model.cy();
 
 	process(ptrImage->header.seq,
 			scanMsg.get() != 0?scanMsg->header.stamp:ptrDepth->header.stamp,
 			ptrImage->image,
 			lastPose_,
 			odomFrameId,
-			rotVariance_>0?rotVariance_:1.0f,
-			transVariance_>0?transVariance_:1.0f,
+			rotVariance_>0?rotVariance_:1.0,
+			transVariance_>0?transVariance_:1.0,
 			ptrDepth->image,
 			fx,
 			fy,
 			cx,
 			cy,
+			0,
 			localTransform,
 			scan,
 			scanMsg.get() != 0?(int)scanMsg->ranges.size():0);
@@ -896,23 +892,25 @@ void CoreWrapper::commonStereoCallback(
 	image_geometry::StereoCameraModel model;
 	model.fromCameraInfo(*leftCamInfoMsg, *rightCamInfoMsg);
 
-	float fx = model.left().fx();
-	float cx = model.left().cx();
-	float cy = model.left().cy();
-	float baseline = model.baseline();
+	double fx = model.left().fx();
+	double fy = model.left().fy();
+	double cx = model.left().cx();
+	double cy = model.left().cy();
+	double baseline = model.baseline();
 
 	process(leftImageMsg->header.seq,
 			scanMsg.get() != 0?scanMsg->header.stamp:leftImageMsg->header.stamp,
 			ptrLeftImage->image,
 			lastPose_,
 			odomFrameId,
-			rotVariance_>0?rotVariance_:1.0f,
-			transVariance_>0?transVariance_:1.0f,
+			rotVariance_>0?rotVariance_:1.0,
+			transVariance_>0?transVariance_:1.0,
 			ptrRightImage->image,
 			fx,
-			baseline,
+			fy,
 			cx,
 			cy,
+			baseline,
 			localTransform,
 			scan,
 			scanMsg.get() != 0?(int)scanMsg->ranges.size():0);
@@ -1036,13 +1034,14 @@ void CoreWrapper::process(
 		const cv::Mat & image,
 		const Transform & odom,
 		const std::string & odomFrameId,
-		float odomRotationalVariance,
-		float odomTransitionalVariance,
+		double odomRotationalVariance,
+		double odomTransitionalVariance,
 		const cv::Mat & depthOrRightImage,
-		float fx,
-		float fyOrBaseline,
-		float cx,
-		float cy,
+		double fx,
+		double fy,
+		double cx,
+		double cy,
+		double baseline,
 		const Transform & localTransform,
 		const cv::Mat & scan,
 		int scanMaxPts)
@@ -1087,22 +1086,34 @@ void CoreWrapper::process(
 			}
 		}
 
-		SensorData data(scan,
-				scanMaxPts,
-				image.clone(),
-				imageB,
-				fx,
-				fyOrBaseline,
-				cx,
-				cy,
-				localTransform,
-				odom,
-				odomRotationalVariance,
-				odomTransitionalVariance,
-				id,
-				rtabmap_ros::timestampFromROS(stamp));
+		SensorData data;
+		if(baseline > 0)
+		{
+			//stereo
+			data = SensorData(
+					scan,
+					scanMaxPts,
+					image.clone(),
+					imageB,
+					StereoCameraModel(fx, fy, cx, cy, baseline, localTransform),
+					id,
+					rtabmap_ros::timestampFromROS(stamp));
+		}
+		else
+		{
+			//depth
+			data = SensorData(
+					scan,
+					scanMaxPts,
+					image.clone(),
+					imageB,
+					CameraModel(fx, fy, cx, cy, localTransform),
+					id,
+					rtabmap_ros::timestampFromROS(stamp));
+		}
 
-		if(rtabmap_.process(data))
+
+		if(rtabmap_.process(data, odom, OdometryEvent::generateCovarianceMatrix(odomRotationalVariance, odomTransitionalVariance)))
 		{
 			timeRtabmap = timer.ticks();
 			mapToOdomMutex_.lock();
@@ -1451,22 +1462,15 @@ bool CoreWrapper::getMapCallback(rtabmap_ros::GetMap::Request& req, rtabmap_ros:
 	std::map<int, Signature> signatures;
 	std::map<int, Transform> poses;
 	std::multimap<int, Link> constraints;
-	std::map<int, int> mapIds;
-	std::map<int, double> stamps;
-	std::map<int, std::string> labels;
-	std::map<int, std::vector<unsigned char> > userDatas;
 
 	if(req.graphOnly)
 	{
 		rtabmap_.getGraph(
 				poses,
 				constraints,
-				mapIds,
-				stamps,
-				labels,
-				userDatas,
 				req.optimized,
-				req.global);
+				req.global,
+				&signatures);
 	}
 	else
 	{
@@ -1474,37 +1478,22 @@ bool CoreWrapper::getMapCallback(rtabmap_ros::GetMap::Request& req, rtabmap_ros:
 				signatures,
 				poses,
 				constraints,
-				mapIds,
-				stamps,
-				labels,
-				userDatas,
 				req.optimized,
 				req.global);
 	}
 
-	if(poses.size() && poses.size() != mapIds.size())
+	if(poses.size() && poses.size() != signatures.size())
 	{
-		ROS_ERROR("poses and map ids are not the same size!? %d vs %d", (int)poses.size(), (int)mapIds.size());
+		ROS_ERROR("poses and signatures are not the same size!? %d vs %d", (int)poses.size(), (int)signatures.size());
 		return false;
 	}
 
 	//RGB-D SLAM data
-	rtabmap_ros::mapGraphToROS(poses,
-		mapIds,
-		stamps,
-		labels,
-		userDatas,
+	rtabmap_ros::mapDataToROS(poses,
 		constraints,
+		signatures,
 		Transform::getIdentity(),
-		res.data.graph);
-
-	// add data
-	res.data.nodes.resize(signatures.size());
-	int i=0;
-	for(std::map<int, Signature>::iterator iter = signatures.begin(); iter!=signatures.end(); ++iter)
-	{
-		rtabmap_ros::nodeDataToROS(iter->second, res.data.nodes[i++]);
-	}
+		res.data);
 
 	res.data.header.stamp = ros::Time::now();
 	res.data.header.frame_id = mapFrameId_;
@@ -1602,29 +1591,20 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 {
 	ROS_INFO("rtabmap: Publishing map...");
 
-	if(mapDataPub_.getNumSubscribers() ||
-		mapGraphPub_.getNumSubscribers() ||
-		!req.graphOnly)
+	if(mapDataPub_.getNumSubscribers())
 	{
-		std::map<int, Signature> signatures;
 		std::map<int, Transform> poses;
 		std::multimap<int, Link> constraints;
-		std::map<int, int> mapIds;
-		std::map<int, double> stamps;
-		std::map<int, std::string> labels;
-		std::map<int, std::vector<unsigned char> > userDatas;
+		std::map<int, Signature > signatures;
 
 		if(req.graphOnly)
 		{
 			rtabmap_.getGraph(
 					poses,
 					constraints,
-					mapIds,
-					stamps,
-					labels,
-					userDatas,
 					req.optimized,
-					req.global);
+					req.global,
+					&signatures);
 		}
 		else
 		{
@@ -1632,57 +1612,29 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 					signatures,
 					poses,
 					constraints,
-					mapIds,
-					stamps,
-					labels,
-					userDatas,
 					req.optimized,
 					req.global);
 		}
 
-		if(poses.size() && poses.size() != mapIds.size())
+		if(poses.size() && poses.size() != signatures.size())
 		{
-			ROS_ERROR("poses and map ids are not the same size!? %d vs %d", (int)poses.size(), (int)mapIds.size());
+			ROS_ERROR("poses and signatures are not the same size!? %d vs %d", (int)poses.size(), (int)signatures.size());
 		}
 
 		ros::Time now = ros::Time::now();
-		if(mapDataPub_.getNumSubscribers() || mapGraphPub_.getNumSubscribers())
+		if(mapDataPub_.getNumSubscribers())
 		{
-			rtabmap_ros::GraphPtr graphMsg(new rtabmap_ros::Graph);
-			graphMsg->header.stamp = now;
-			graphMsg->header.frame_id = mapFrameId_;
+			rtabmap_ros::MapDataPtr msg(new rtabmap_ros::MapData);
+			msg->header.stamp = now;
+			msg->header.frame_id = mapFrameId_;
 
-			rtabmap_ros::mapGraphToROS(poses,
-				mapIds,
-				stamps,
-				labels,
-				userDatas,
+			rtabmap_ros::mapDataToROS(poses,
 				constraints,
+				signatures,
 				Transform::getIdentity(),
-				*graphMsg);
+				*msg);
 
-			if(mapDataPub_.getNumSubscribers())
-			{
-				//RGB-D SLAM data
-				rtabmap_ros::MapDataPtr msg(new rtabmap_ros::MapData);
-				msg->header = graphMsg->header;
-				msg->graph = *graphMsg;
-
-				// add data
-				msg->nodes.resize(signatures.size());
-				int i=0;
-				for(std::map<int, Signature>::iterator iter = signatures.begin(); iter!=signatures.end(); ++iter)
-				{
-					rtabmap_ros::nodeDataToROS(iter->second, msg->nodes[i++]);
-				}
-
-				mapDataPub_.publish(msg);
-			}
-
-			if(mapGraphPub_.getNumSubscribers())
-			{
-				mapGraphPub_.publish(graphMsg);
-			}
+			mapDataPub_.publish(msg);
 		}
 
 		if(!req.graphOnly)
@@ -1707,18 +1659,18 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 
 		if(labelsPub_.getNumSubscribers())
 		{
-			if(poses.size() && labels.size())
+			if(poses.size() && signatures.size())
 			{
 				visualization_msgs::MarkerArray markers;
-				for(std::map<int, std::string>::const_iterator iter=labels.begin();
-					iter!=labels.end();
+				for(std::map<int, Signature>::const_iterator iter=signatures.begin();
+					iter!=signatures.end();
 					++iter)
 				{
 					std::map<int, Transform>::const_iterator poseIter= poses.find(iter->first);
 					if(poseIter!=poses.end())
 					{
 						// Add labels
-						if(!iter->second.empty())
+						if(!iter->second.getLabel().empty())
 						{
 							visualization_msgs::Marker marker;
 							marker.header.frame_id = mapFrameId_;
@@ -1742,7 +1694,7 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 							marker.color.b = 0.0;
 
 							marker.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
-							marker.text = iter->second;
+							marker.text = iter->second.getLabel();
 
 							markers.markers.push_back(marker);
 						}
@@ -1876,66 +1828,36 @@ void CoreWrapper::publishStats(const ros::Time & stamp)
 		infoPub_.publish(msg);
 	}
 
-	if(mapDataPub_.getNumSubscribers() || mapGraphPub_.getNumSubscribers())
+	if(mapDataPub_.getNumSubscribers())
 	{
-		if(stats.poses().size() == stats.getMapIds().size() &&
-		   stats.poses().size() == stats.getStamps().size() &&
-		   stats.poses().size() == stats.getLabels().size() &&
-		   stats.poses().size() == stats.getUserDatas().size())
-		{
-			rtabmap_ros::GraphPtr graphMsg(new rtabmap_ros::Graph);
-			graphMsg->header.stamp = stamp;
-			graphMsg->header.frame_id = mapFrameId_;
+		rtabmap_ros::MapDataPtr msg(new rtabmap_ros::MapData);
+		msg->header.stamp = stamp;
+		msg->header.frame_id = mapFrameId_;
 
-			rtabmap_ros::mapGraphToROS(
-				stats.poses(),
-				stats.getMapIds(),
-				stats.getStamps(),
-				stats.getLabels(),
-				stats.getUserDatas(),
-				stats.constraints(),
-				stats.mapCorrection(),
-				*graphMsg);
+		rtabmap_ros::mapDataToROS(
+			stats.poses(),
+			stats.constraints(),
+			stats.getSignatures(),
+			stats.mapCorrection(),
+			*msg);
 
-			if(mapDataPub_.getNumSubscribers())
-			{
-				//RGB-D SLAM data
-				rtabmap_ros::MapDataPtr msg(new rtabmap_ros::MapData);
-				msg->header = graphMsg->header;
-				msg->graph = *graphMsg;
-
-				msg->nodes.resize(1);
-				rtabmap_ros::nodeDataToROS(stats.getSignature(), msg->nodes[0]);
-
-				mapDataPub_.publish(msg);
-			}
-
-			if(mapGraphPub_.getNumSubscribers())
-			{
-				mapGraphPub_.publish(graphMsg);
-			}
-		}
-		else
-		{
-			ROS_ERROR("Poses, map ids and labels are not the same size!? %d vs %d vs %d",
-					(int)stats.poses().size(), (int)stats.getMapIds().size(), (int)stats.getLabels().size());
-		}
+		mapDataPub_.publish(msg);
 	}
 
 	if(labelsPub_.getNumSubscribers())
 	{
-		if(stats.poses().size() && stats.getLabels().size())
+		if(stats.poses().size() && stats.getSignatures().size())
 		{
 			visualization_msgs::MarkerArray markers;
-			for(std::map<int, std::string>::const_iterator iter=stats.getLabels().begin();
-				iter!=stats.getLabels().end();
+			for(std::map<int, Signature>::const_iterator iter=stats.getSignatures().begin();
+				iter!=stats.getSignatures().end();
 				++iter)
 			{
 				std::map<int, Transform>::const_iterator poseIter= stats.poses().find(iter->first);
 				if(poseIter!=stats.poses().end())
 				{
 					// Add labels
-					if(!iter->second.empty())
+					if(!iter->second.getLabel().empty())
 					{
 						visualization_msgs::Marker marker;
 						marker.header.frame_id = mapFrameId_;
@@ -1959,7 +1881,7 @@ void CoreWrapper::publishStats(const ros::Time & stamp)
 						marker.color.b = 0.0;
 
 						marker.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
-						marker.text = iter->second;
+						marker.text = iter->second.getLabel();
 
 						markers.markers.push_back(marker);
 					}

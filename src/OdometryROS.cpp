@@ -377,7 +377,6 @@ void OdometryROS::processData(const SensorData & data, const std_msgs::Header & 
 				{
 					const std::multimap<int, pcl::PointXYZ> & words3 = s->getWords3();
 					pcl::PointCloud<pcl::PointXYZ> cloud;
-					rtabmap::Transform t = data.localTransform();
 					for(std::multimap<int, pcl::PointXYZ>::const_iterator iter=words3.begin(); iter!=words3.end(); ++iter)
 					{
 						// transform to odom frame
