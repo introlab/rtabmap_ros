@@ -25,6 +25,7 @@
   <arg name="localization"      default="false"/>
   <arg name="rgbd_odometry"     default="false"/>
   <arg name="args"              default=""/>
+  <arg name="version083"        default="false"/>
   
   <!-- Navigation stuff (move_base) -->
   <include file="$(find turtlebot_bringup)/launch/3dsensor.launch"/>
@@ -48,8 +49,8 @@
   	  <remap from="rgb/camera_info" to="/camera/rgb/camera_info"/>
   	  
   	  <!-- output -->
-  	  <remap from="grid_map" to="/map"/>
-  	  <!-- <remap from="proj_map" to="/map"/> -->
+  	  <remap unless="$(arg version083)" from="grid_map" to="/map"/>
+  	  <!-- <remap unless="$(arg version083)" from="proj_map" to="/map"/> -->
 	
 	  <!-- RTAB-Map's parameters: do "rosrun rtabmap rtabmap (double-dash)params" to see the list of available parameters. -->
 	  <param name="RGBD/LocalLoopDetectionSpace" type="string" value="true"/>   <!-- Local loop closure detection (using estimated position) with locations in WM -->
@@ -69,7 +70,7 @@
 	  <param unless="$(arg localization)" name="Mem/IncrementalMemory" type="string" value="true"/>
 	  <param name="Mem/InitWMWithAllNodes" type="string" value="$(arg localization)"/> 
     </node>
-    
+   
     <!-- Odometry : ONLY for testing without the actual robot! /odom TF should not be already published. -->
     <node if="$(arg rgbd_odometry)" pkg="rtabmap_ros" type="rgbd_odometry" name="rgbd_odometry" output="screen">
       <param name="frame_id"           type="string" value="base_footprint"/>
@@ -78,6 +79,11 @@
       <remap from="rgb/image"       to="/camera/rgb/image_rect_color"/>
       <remap from="depth/image"     to="/camera/depth_registered/image_raw"/>
       <remap from="rgb/camera_info" to="/camera/rgb/camera_info"/>
+    </node>
+
+    <!-- backward compatibility with hydro 0.8.3 only -->
+    <node if="$(arg version083)" pkg="rtabmap_ros" type="grid_map_assembler" name="grid_map_assembler">
+      <remap from="grid_map" to="/map"/>
     </node>
     
   </group>
