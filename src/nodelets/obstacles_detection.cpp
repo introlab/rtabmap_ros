@@ -70,6 +70,7 @@ public:
 		normalEstimationRadius_(0.05),
 		groundNormalAngle_(M_PI_4),
 		minClusterSize_(20),
+		maxFloorHeight_(-1),
 		maxObstaclesHeight_(0),
 		waitForTransform_(false)
 	{}
@@ -90,6 +91,7 @@ private:
 		pnh.param("ground_normal_angle", groundNormalAngle_, groundNormalAngle_);
 		pnh.param("min_cluster_size", minClusterSize_, minClusterSize_);
 		pnh.param("max_obstacles_height", maxObstaclesHeight_, maxObstaclesHeight_);
+		pnh.param("max_floor_height", maxFloorHeight_, maxFloorHeight_);
 		pnh.param("wait_for_transform", waitForTransform_, waitForTransform_);
 
 		cloudSub_ = nh.subscribe("cloud", 1, &ObstaclesDetection::callback, this);
@@ -144,7 +146,7 @@ private:
 			}
 
 			pcl::PointCloud<pcl::PointXYZ>::Ptr groundCloud(new pcl::PointCloud<pcl::PointXYZ>);
-			if(groundPub_.getNumSubscribers() && ground.get() && ground->size())
+			if((groundPub_.getNumSubscribers() || obstaclesPub_.getNumSubscribers()) && ground.get() && ground->size())
 			{
 				pcl::copyPointCloud(*cloud, *ground, *groundCloud);
 			}
@@ -152,6 +154,13 @@ private:
 			if(obstaclesPub_.getNumSubscribers() && obstacles.get() && obstacles->size())
 			{
 				pcl::copyPointCloud(*cloud, *obstacles, *obstaclesCloud);
+			}
+ 			if(maxFloorHeight_ > 0 && (groundPub_.getNumSubscribers() || obstaclesPub_.getNumSubscribers()))
+			{
+    			pcl::PointCloud<pcl::PointXYZ>::Ptr flatObstaclesCloud(new pcl::PointCloud<pcl::PointXYZ>);
+	            flatObstaclesCloud = rtabmap::util3d::passThrough(groundCloud, "z", maxFloorHeight_, std::numeric_limits<int>::max());
+	            *obstaclesCloud += *flatObstaclesCloud;
+	            groundCloud = rtabmap::util3d::passThrough(groundCloud, "z", std::numeric_limits<int>::min(), maxFloorHeight_);
 			}
 
 			if(groundPub_.getNumSubscribers())
@@ -184,6 +193,7 @@ private:
 	double groundNormalAngle_;
 	int minClusterSize_;
 	double maxObstaclesHeight_;
+	double maxFloorHeight_;
 	bool waitForTransform_;
 
 	tf::TransformListener tfListener_;
