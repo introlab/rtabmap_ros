@@ -16,6 +16,7 @@
 
 #include <message_filters/sync_policies/approximate_time.h>
 #include <message_filters/subscriber.h>
+#include <message_filters/sync_policies/approximate_time.h>
 
 #include <rtabmap_ros/MsgConversion.h>
 
@@ -25,71 +26,58 @@ namespace rtabmap_ros
 class PointCloudAggregator : public nodelet::Nodelet
 {
 public:
-	PointCloudAggregator()
+	PointCloudAggregator() : sync(NULL)
 	{}
 
 	virtual ~PointCloudAggregator()
-	{}
+	{
+	    if (sync!=NULL) delete sync;
+	}
 
 private:
+	void clouds_callback(const sensor_msgs::PointCloud2ConstPtr & cloudMsg_1,
+	                     const sensor_msgs::PointCloud2ConstPtr & cloudMsg_2,
+	                     const sensor_msgs::PointCloud2ConstPtr & cloudMsg_3)
+	{
+		if(cloudPub_.getNumSubscribers())
+		{
+			pcl::fromROSMsg(*cloudMsg_1, cloud1);
+			pcl::fromROSMsg(*cloudMsg_2, cloud2);
+			pcl::fromROSMsg(*cloudMsg_3, cloud3);
+		    pcl::PointCloud<pcl::PointXYZ> totalCloud;
+		    totalCloud = cloud1 + cloud2;
+		    totalCloud += cloud3;
+		    sensor_msgs::PointCloud2 rosCloud;
+		    pcl::toROSMsg(totalCloud, rosCloud);
+		    rosCloud.header.stamp = cloudMsg_1->header.stamp;
+		    rosCloud.header.frame_id = cloudMsg_1->header.frame_id;
+		    cloudPub_.publish(rosCloud);
+		}
+	}
+
+    typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::PointCloud2, sensor_msgs::PointCloud2, sensor_msgs::PointCloud2> MySyncPolicy;
 	virtual void onInit()
 	{
 		ros::NodeHandle & nh = getNodeHandle();
 		ros::NodeHandle & pnh = getPrivateNodeHandle();
 
-		int queueSize = 10;
+		int queueSize = 5;
 		pnh.param("queue_size", queueSize, queueSize);
 
-		cloudSub_1_ = nh.subscribe("cloud1", 1, &PointCloudAggregator::callback_1, this);
-		cloudSub_2_ = nh.subscribe("cloud2", 1, &PointCloudAggregator::callback_2, this);
-		cloudSub_3_ = nh.subscribe("cloud3", 1, &PointCloudAggregator::callback_3, this);
+		cloudSub_1_.subscribe(nh, "cloud1", 1);
+		cloudSub_2_.subscribe(nh, "cloud2", 1);
+		cloudSub_3_.subscribe(nh, "cloud3", 1);
+
+        sync = new message_filters::Synchronizer<MySyncPolicy>(MySyncPolicy(queueSize), cloudSub_1_, cloudSub_2_, cloudSub_3_);
+        sync->registerCallback(boost::bind(&rtabmap_ros::PointCloudAggregator::clouds_callback, this, _1, _2, _3));
 
 		cloudPub_ = nh.advertise<sensor_msgs::PointCloud2>("combined_cloud", 1);
 	}
 
-	void callback_1(const sensor_msgs::PointCloud2ConstPtr & cloudMsg)
-	{
-		if(cloudPub_.getNumSubscribers())
-		{
-			pcl::fromROSMsg(*cloudMsg, cloud1);
-			gather_and_publish(cloudMsg);
-		}
-	}
-	
-	void callback_2(const sensor_msgs::PointCloud2ConstPtr & cloudMsg)
-	{
-		if(cloudPub_.getNumSubscribers())
-		{
-			pcl::fromROSMsg(*cloudMsg, cloud2);
-			gather_and_publish(cloudMsg);
-		}
-	}
-	
-	void callback_3(const sensor_msgs::PointCloud2ConstPtr & cloudMsg)
-	{
-		if(cloudPub_.getNumSubscribers())
-		{
-			pcl::fromROSMsg(*cloudMsg, cloud3);
-			gather_and_publish(cloudMsg);
-		}
-	}
-	
-	void gather_and_publish(const sensor_msgs::PointCloud2ConstPtr & cloudMsg)
-	{
-		pcl::PointCloud<pcl::PointXYZ> totalCloud;
-		totalCloud = cloud1 + cloud2;
-		totalCloud += cloud3;
-		sensor_msgs::PointCloud2 rosCloud;
-		pcl::toROSMsg(totalCloud, rosCloud);
-		rosCloud.header.stamp = cloudMsg->header.stamp;
-		rosCloud.header.frame_id = cloudMsg->header.frame_id;
-		cloudPub_.publish(rosCloud);
-	}
-
-private:
-	ros::Subscriber cloudSub_1_;
-	ros::Subscriber cloudSub_2_;
-	ros::Subscriber cloudSub_3_;
+    message_filters::Synchronizer<MySyncPolicy>* sync;
+	message_filters::Subscriber<sensor_msgs::PointCloud2> cloudSub_1_;
+	message_filters::Subscriber<sensor_msgs::PointCloud2> cloudSub_2_;
+	message_filters::Subscriber<sensor_msgs::PointCloud2> cloudSub_3_;
 	pcl::PointCloud<pcl::PointXYZ> cloud1, cloud2, cloud3;
 
 	ros::Publisher cloudPub_;
