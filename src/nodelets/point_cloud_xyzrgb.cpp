@@ -171,7 +171,7 @@ private:
 
 		if(cloudPub_.getNumSubscribers())
 		{
-			cv_bridge::CvImageConstPtr imagePtr = cv_bridge::toCvShare(image, "bgr8");
+			cv_bridge::CvImageConstPtr imagePtr = cv_bridge::toCvShare(image, image->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0?"":"mono8");
 			cv_bridge::CvImageConstPtr imageDepthPtr = cv_bridge::toCvShare(imageDepth);
 
 			image_geometry::PinholeCameraModel model;
