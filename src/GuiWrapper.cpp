@@ -434,7 +434,7 @@ void GuiWrapper::depthCallback(
 			return;
 		}
 
-		cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg, "bgr8");
+		cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg, imageMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0?"":"mono8");
 		cv_bridge::CvImageConstPtr ptrDepth = cv_bridge::toCvShare(depthMsg);
 
 		image_geometry::PinholeCameraModel model;
@@ -502,7 +502,7 @@ void GuiWrapper::depthOdomInfoCallback(
 			return;
 		}
 
-		cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg, "bgr8");
+		cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg, imageMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0?"":"mono8");
 		cv_bridge::CvImageConstPtr ptrDepth = cv_bridge::toCvShare(depthMsg);
 
 		image_geometry::PinholeCameraModel model;
@@ -579,7 +579,7 @@ void GuiWrapper::depthScanCallback(
 		pcl::fromROSMsg(scanOut, pclScan);
 		cv::Mat scan = util3d::laserScanFromPointCloud(pclScan);
 
-		cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg, "bgr8");
+		cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(imageMsg, imageMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0?"":"mono8");
 		cv_bridge::CvImageConstPtr ptrDepth = cv_bridge::toCvShare(depthMsg);
 
 		image_geometry::PinholeCameraModel model;

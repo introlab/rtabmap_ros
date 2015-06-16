@@ -672,7 +672,8 @@ void CoreWrapper::commonDepthCallback(
 		const sensor_msgs::CameraInfoConstPtr& cameraInfoMsg,
 		const sensor_msgs::LaserScanConstPtr& scanMsg)
 {
-	if(!(imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
+	if(!(imageMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) == 0 ||
+			imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
 			imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||
 			imageMsg->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
 			imageMsg->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0) ||
@@ -753,7 +754,11 @@ void CoreWrapper::commonDepthCallback(
 	}
 
 	cv_bridge::CvImageConstPtr ptrImage;
-	if(imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
+	if(imageMsg, imageMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0)
+	{
+		ptrImage = cv_bridge::toCvShare(imageMsg);
+	}
+	else if(imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
 	   imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
 	{
 		ptrImage = cv_bridge::toCvShare(imageMsg, "mono8");
