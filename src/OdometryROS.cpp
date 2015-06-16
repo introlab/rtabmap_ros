@@ -157,6 +157,7 @@ OdometryROS::OdometryROS(int argc, char * argv[]) :
 	oldParameterNames.push_back("Odom/LocalHistory");
 	oldParameterNames.push_back("Odom/NearestNeighbor");
 	oldParameterNames.push_back("Odom/NNDR");
+	oldParameterNames.push_back("GFTT/MaxCorners");
 	for(std::list<std::string>::iterator iter=oldParameterNames.begin(); iter!=oldParameterNames.end(); ++iter)
 	{
 		std::string vStr;
@@ -191,6 +192,12 @@ OdometryROS::OdometryROS(int argc, char * argv[]) :
 				ROS_WARN("Parameter name changed: Odom/NNDR -> %s. Please update your launch file accordingly.",
 						Parameters::kOdomBowNNDR().c_str());
 				parameters_.at(Parameters::kOdomBowNNDR())= vStr;
+			}
+			else if(iter->compare("GFTT/MaxCorners") == 0)
+			{
+				ROS_WARN("Parameter GFTT/MaxCorners doesn't exist anymore, use %s. Please update your launch file accordingly.",
+						Parameters::kOdomMaxFeatures().c_str());
+				parameters_.at(Parameters::kOdomMaxFeatures())= vStr;
 			}
 		}
 	}

@@ -551,8 +551,12 @@ rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::OdomInfo & msg)
 	info.features = msg.features;
 	info.inliers = msg.inliers;
 	info.localMapSize = msg.localMapSize;
-	info.time = msg.time;
+	info.timeEstimation = msg.timeEstimation;
 	info.variance = msg.variance;
+	info.timeParticleFiltering =  msg.timeParticleFiltering;
+	info.stamp = msg.stamp;
+	info.interval = msg.interval;
+	info.distanceTravelled = msg.distanceTravelled;
 
 	info.type = msg.type;
 
@@ -569,6 +573,9 @@ rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::OdomInfo & msg)
 	info.newCorners = points2fFromROS(msg.newCorners);
 	info.cornerInliers = msg.cornerInliers;
 
+	info.transform = transformFromGeometryMsg(msg.transform);
+	info.transformFiltered = transformFromGeometryMsg(msg.transformFiltered);
+
 	return info;
 }
 
@@ -579,8 +586,13 @@ void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_ros::OdomInfo & m
 	msg.features = info.features;
 	msg.inliers = info.inliers;
 	msg.localMapSize = info.localMapSize;
-	msg.time = info.time;
+	msg.timeEstimation = info.timeEstimation;
 	msg.variance = info.variance;
+	msg.timeParticleFiltering =  info.timeParticleFiltering;
+	msg.stamp = info.stamp;
+	msg.interval = info.interval;
+	msg.distanceTravelled = info.distanceTravelled;
+
 
 	msg.type = info.type;
 
@@ -593,6 +605,9 @@ void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_ros::OdomInfo & m
 	points2fToROS(info.refCorners, msg.refCorners);
 	points2fToROS(info.newCorners, msg.newCorners);
 	msg.cornerInliers = info.cornerInliers;
+
+	transformToGeometryMsg(info.transform, msg.transform);
+	transformToGeometryMsg(info.transformFiltered, msg.transformFiltered);
 
 }
 
