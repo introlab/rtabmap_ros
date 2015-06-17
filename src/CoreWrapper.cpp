@@ -112,6 +112,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	int queueSize = 10;
 	bool publishTf = true;
 	double tfDelay = 0.05; // 20 Hz
+	std::string tfPrefix = "";
 	bool stereoApproxSync = false;
 
 	// ROS related parameters (private)
@@ -144,10 +145,27 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 
 	pnh.param("publish_tf",          publishTf, publishTf);
 	pnh.param("tf_delay",            tfDelay, tfDelay);
+	pnh.param("tf_prefix",           tfPrefix, tfPrefix);
 	pnh.param("wait_for_transform",  waitForTransform_, waitForTransform_);
 	pnh.param("use_action_for_goal", useActionForGoal_, useActionForGoal_);
 	pnh.param("gen_scan",            genScan_, genScan_);
 	pnh.param("gen_scan_max_depth",  genScanMaxDepth_, genScanMaxDepth_);
+
+	if(!tfPrefix.empty())
+	{
+		if(!frameId_.empty())
+		{
+			frameId_ = tfPrefix+"/"+frameId_;
+		}
+		if(!mapFrameId_.empty())
+		{
+			mapFrameId_ = tfPrefix+"/"+mapFrameId_;
+		}
+		if(!odomFrameId_.empty())
+		{
+			odomFrameId_ = tfPrefix+"/"+odomFrameId_;
+		}
+	}
 
 	if(depthCameras <= 0 && subscribeDepth)
 	{

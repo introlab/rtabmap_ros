@@ -71,7 +71,7 @@ MapsManager::MapsManager() :
 	// common map stuff
 	pnh.param("map_filter_radius", mapFilterRadius_, mapFilterRadius_);
 	pnh.param("map_filter_angle", mapFilterAngle_, mapFilterAngle_);
-	pnh.param("map_mapsManager_cleanup", mapCacheCleanup_, mapCacheCleanup_);
+	pnh.param("map_cleanup", mapCacheCleanup_, mapCacheCleanup_);
 
 	// mapping topics
 	cloudMapPub_ = nh.advertise<sensor_msgs::PointCloud2>("cloud_map", 1);

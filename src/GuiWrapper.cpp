@@ -120,6 +120,7 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 	bool subscribeStereo = false;
 	int queueSize = 10;
 	int depthCameras = 1;
+	std::string tfPrefix;
 	pnh.param("frame_id", frameId_, frameId_);
 	pnh.param("odom_frame_id", odomFrameId_, odomFrameId_); // set to use odom from TF
 	pnh.param("subscribe_depth", subscribeDepth, subscribeDepth);
@@ -128,8 +129,22 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 	pnh.param("subscribe_stereo", subscribeStereo, subscribeStereo);
 	pnh.param("depth_cameras", depthCameras, depthCameras);
 	pnh.param("queue_size", queueSize, queueSize);
+	pnh.param("tf_prefix", tfPrefix, tfPrefix);
 	pnh.param("wait_for_transform", waitForTransform_, waitForTransform_);
-	pnh.param("camera_node_name", cameraNodeName_, cameraNodeName_); // used to pause the rtabmap/camera when pausing the process
+	pnh.param("camera_node_name", cameraNodeName_, cameraNodeName_); // used to pause the rtabmap_ros/camera when pausing the process
+
+	if(!tfPrefix.empty())
+	{
+		if(!frameId_.empty())
+		{
+			frameId_ = tfPrefix + "/" + frameId_;
+		}
+		if(!odomFrameId_.empty())
+		{
+			odomFrameId_ = tfPrefix + "/" + odomFrameId_;
+		}
+	}
+
 	this->setupCallbacks(
 			subscribeDepth,
 			subscribeLaserScan,

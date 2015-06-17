@@ -72,12 +72,31 @@ OdometryROS::OdometryROS(int argc, char * argv[]) :
 
 	Transform initialPose = Transform::getIdentity();
 	std::string initialPoseStr;
+	std::string tfPrefix;
 	pnh.param("frame_id", frameId_, frameId_);
 	pnh.param("odom_frame_id", odomFrameId_, odomFrameId_);
 	pnh.param("publish_tf", publishTf_, publishTf_);
+	pnh.param("tf_prefix", tfPrefix, tfPrefix);
 	pnh.param("wait_for_transform", waitForTransform_, waitForTransform_);
 	pnh.param("initial_pose", initialPoseStr, initialPoseStr); // "x y z roll pitch yaw"
 	pnh.param("ground_truth_frame_id", groundTruthFrameId_, groundTruthFrameId_);
+
+	if(!tfPrefix.empty())
+	{
+		if(!frameId_.empty())
+		{
+			frameId_ = tfPrefix + "/" + frameId_;
+		}
+		if(!odomFrameId_.empty())
+		{
+			odomFrameId_ = tfPrefix + "/" + odomFrameId_;
+		}
+		if(!groundTruthFrameId_.empty())
+		{
+			groundTruthFrameId_ = tfPrefix + "/" + groundTruthFrameId_;
+		}
+	}
+
 	if(initialPoseStr.size())
 	{
 		std::vector<std::string> values = uListToVector(uSplit(initialPoseStr, ' '));
