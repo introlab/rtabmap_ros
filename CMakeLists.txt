@@ -19,6 +19,8 @@ find_package(octomap_ros)
 # find_package(Boost REQUIRED COMPONENTS system)
 find_package(RTABMap 0.9.0 REQUIRED)
 
+find_package(OpenCV REQUIRED)
+
 #Qt stuff
 FIND_PACKAGE(Qt4 COMPONENTS QtCore QtGui REQUIRED)
 INCLUDE(${QT_USE_FILE})
@@ -102,11 +104,13 @@ catkin_package(
 include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/include
   ${RTABMap_INCLUDE_DIRS}
+  ${OpenCV_INCLUDE_DIRS}
   ${catkin_INCLUDE_DIRS}
 )
 
 # libraries
 SET(Libraries
+   ${OpenCV_LIBRARIES}
    ${catkin_LIBRARIES}
    ${RTABMap_LIBRARIES}
 )
