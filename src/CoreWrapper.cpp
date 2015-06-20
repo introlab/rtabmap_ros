@@ -752,7 +752,8 @@ void CoreWrapper::commonDepthCallback(
 	std::vector<CameraModel> cameraModels;
 	for(unsigned int i=0; i<imageMsgs.size(); ++i)
 	{
-		if(!(imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
+		if(!(imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) == 0 ||
+			 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
 			 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||
 			 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
 			 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0) ||
@@ -786,7 +787,11 @@ void CoreWrapper::commonDepthCallback(
 		}
 
 		cv_bridge::CvImageConstPtr ptrImage;
-		if(imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
+		if(imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0)
+		{
+			ptrImage = cv_bridge::toCvShare(imageMsgs[i]);
+		}
+		else if(imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
 		   imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
 		{
 			ptrImage = cv_bridge::toCvShare(imageMsgs[i], "mono8");

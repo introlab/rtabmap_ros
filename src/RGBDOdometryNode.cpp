@@ -163,7 +163,8 @@ public:
 	{
 		if(!this->isPaused())
 		{
-			if(!(image->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
+			if(!(image->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) ==0 ||
+				 image->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
 				 image->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||
 				 image->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
 				 image->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0) ||
@@ -171,7 +172,9 @@ public:
 				 depth->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1)==0 ||
 				 depth->encoding.compare(sensor_msgs::image_encodings::MONO16)==0))
 			{
-				ROS_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8 (mono8 recommended) and image_depth=16UC1,32FC1,mono16");
+				ROS_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8 (mono8 "
+						  "recommended) and image_depth=16UC1,32FC1,mono16. Types detected: %s %s",
+						image->encoding.c_str(), depth->encoding.c_str());
 				return;
 			}
 			else if(depth->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1)==0)
@@ -214,7 +217,7 @@ public:
 						model.cx(),
 						model.cy(),
 						rtabmap_ros::transformFromTF(localTransform));
-				cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(image, "mono8");
+				cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(image, image->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0?"":"mono8");
 				cv_bridge::CvImageConstPtr ptrDepth = cv_bridge::toCvShare(depth);
 
 				rtabmap::SensorData data(
@@ -258,7 +261,8 @@ public:
 			std::vector<CameraModel> cameraModels;
 			for(unsigned int i=0; i<imageMsgs.size(); ++i)
 			{
-				if(!(imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
+				if(!(imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) ==0 ||
+					 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
 					 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||
 					 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
 					 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0) ||
@@ -292,7 +296,11 @@ public:
 				}
 
 				cv_bridge::CvImageConstPtr ptrImage;
-				if(imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
+				if(imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0)
+				{
+					ptrImage = cv_bridge::toCvShare(imageMsgs[i]);
+				}
+				else if(imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
 				   imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
 				{
 					ptrImage = cv_bridge::toCvShare(imageMsgs[i], "mono8");

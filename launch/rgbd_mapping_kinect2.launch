@@ -5,19 +5,21 @@
         Install Kinect2 : Follow ALL directives at https://github.com/code-iai/iai_kinect2
                           Make sure it is calibrated!
         Run:
+           $ roslaunch kinect2_bridge kinect2_bridge.launch publish_tf:=true
            $ roslaunch rtabmap_ros rgbd_mapping_kinect2.launch
-           $ rosrun kinect2_bridge kinect2_bridge  _publish_tf:=true
-
-        Prefixes:
-           sd: rgb_lowres / depth_lowres
-           hd: rgb_rect / depth_highres
-           ir: ir_rect / depth_rect
    -->
-   <arg name="rgb_prefix" default="rgb_lowres" />
-   <arg name="depth_prefix" default="depth_lowres" />
+
+   <!-- Which image resolution to process in rtabmap: sd, qhd, hd -->
+   <arg name="resolution" default="qhd" />
    
    <!-- Fixed frame id, you may set "base_link" or "base_footprint" if they are published -->
-   <arg name="frame_id" default="kinect2_link"/>
+   <arg name="frame_id" default="kinect2_base_link"/>
+   
+   <!-- Rotate the camera -->
+   <arg name="pi/2" value="1.5707963267948966"/>
+   <arg name="optical_rotate" value="0 0 0 -$(arg pi/2) 0 -$(arg pi/2)" />
+   <node pkg="tf" type="static_transform_publisher" name="kinect2_base_link"
+        args="$(arg optical_rotate) kinect2_base_link kinect2_link 100" /> 
   
    <!-- Choose visualization -->
    <arg name="rviz" default="false" />
@@ -38,7 +40,7 @@
    <arg name="strategy" default="0" />
    <arg name="feature" default="6" />
    <arg name="nn" default="3" />
-   <arg name="max_depth" default="8.0" />
+   <arg name="max_depth" default="10.0" />
    <arg name="min_inliers" default="20" />
    <arg name="inlier_distance" default="0.02" />
    <arg name="local_map" default="1000" />
@@ -49,9 +51,9 @@
   
     <!-- Odometry -->
     <node pkg="rtabmap_ros" type="rgbd_odometry" name="visual_odometry" output="screen">
-      <remap from="rgb/image" to="/kinect2/$(arg rgb_prefix)/image"/>
-      <remap from="depth/image" to="/kinect2/$(arg depth_prefix)/image"/>
-      <remap from="rgb/camera_info" to="/kinect2/$(arg rgb_prefix)/camera_info"/>
+      <remap from="rgb/image" to="/kinect2/$(arg resolution)/image_mono_rect"/>
+      <remap from="depth/image" to="/kinect2/$(arg resolution)/image_depth_rect"/>
+      <remap from="rgb/camera_info" to="/kinect2/$(arg resolution)/camera_info"/>
 
       <param name="frame_id" type="string" value="$(arg frame_id)"/>
       <param name="approx_sync" type="bool" value="true"/>
@@ -74,9 +76,9 @@
       <param name="subscribe_depth" type="bool" value="true"/>
 	  <param name="frame_id" type="string" value="$(arg frame_id)"/>
 	
-      <remap from="rgb/image" to="/kinect2/$(arg rgb_prefix)/image"/>
-      <remap from="depth/image" to="/kinect2/$(arg depth_prefix)/image"/>
-      <remap from="rgb/camera_info" to="/kinect2/$(arg rgb_prefix)/camera_info"/>
+      <remap from="rgb/image" to="/kinect2/$(arg resolution)/image_color_rect"/>
+      <remap from="depth/image" to="/kinect2/$(arg resolution)/image_depth_rect"/>
+      <remap from="rgb/camera_info" to="/kinect2/$(arg resolution)/camera_info"/>
 
       <param name="approx_sync" type="bool" value="true"/>
 
@@ -91,9 +93,9 @@
       <param name="approx_sync" type="bool" value="true"/>
       <param name="frame_id" type="string" value="$(arg frame_id)"/>
     
-      <remap from="rgb/image" to="/kinect2/$(arg rgb_prefix)/image"/>
-      <remap from="depth/image" to="/kinect2/$(arg depth_prefix)/image"/>
-      <remap from="rgb/camera_info" to="/kinect2/$(arg rgb_prefix)/camera_info"/>
+      <remap from="rgb/image" to="/kinect2/$(arg resolution)/image_color_rect"/>
+      <remap from="depth/image" to="/kinect2/$(arg resolution)/image_depth_rect"/>
+      <remap from="rgb/camera_info" to="/kinect2/$(arg resolution)/camera_info"/>
     </node>
   
   </group>
@@ -103,9 +105,9 @@
   <!-- sync cloud with odometry and voxelize the point cloud (for fast visualization in rviz) -->
   <node if="$(arg rviz)" pkg="nodelet" type="nodelet" name="standalone_nodelet"  args="manager" output="screen"/>
   <node if="$(arg rviz)" pkg="nodelet" type="nodelet" name="data_odom_sync" args="load rtabmap_ros/data_odom_sync standalone_nodelet">
-    <remap from="rgb/image_in"       to="/kinect2/$(arg rgb_prefix)/image"/>
-    <remap from="depth/image_in"     to="/kinect2/$(arg depth_prefix)/image"/>
-    <remap from="rgb/camera_info_in" to="/kinect2/$(arg rgb_prefix)/camera_info"/>
+    <remap from="rgb/image_in"       to="/kinect2/$(arg resolution)/image_color_rect"/>
+    <remap from="depth/image_in"     to="/kinect2/$(arg resolution)/image_depth_rect"/>
+    <remap from="rgb/camera_info_in" to="/kinect2/$(arg resolution)/camera_info"/>
 
     <remap from="odom_in"             to="rtabmap/odom"/>
 

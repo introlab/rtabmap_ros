@@ -156,7 +156,8 @@ private:
 			  const sensor_msgs::ImageConstPtr& imageDepth,
 			  const sensor_msgs::CameraInfoConstPtr& cameraInfo)
 	{
-		if(!(image->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
+		if(!(image->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) ==0 ||
+			image->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
 			image->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||
 			image->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
 			image->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0) &&
@@ -170,7 +171,7 @@ private:
 
 		if(cloudPub_.getNumSubscribers())
 		{
-			cv_bridge::CvImageConstPtr imagePtr = cv_bridge::toCvShare(image, "bgr8");
+			cv_bridge::CvImageConstPtr imagePtr = cv_bridge::toCvShare(image, image->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0?"":"mono8");
 			cv_bridge::CvImageConstPtr imageDepthPtr = cv_bridge::toCvShare(imageDepth);
 
 			image_geometry::PinholeCameraModel model;
