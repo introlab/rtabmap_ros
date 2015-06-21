@@ -98,6 +98,8 @@ private:
 
 		groundPub_ = nh.advertise<sensor_msgs::PointCloud2>("ground", 1);
 		obstaclesPub_ = nh.advertise<sensor_msgs::PointCloud2>("obstacles", 1);
+
+		this->_lastFrameTime = ros::Time::now();
 	}
 
 
@@ -106,6 +108,8 @@ private:
 	{
 		if(groundPub_.getNumSubscribers() || obstaclesPub_.getNumSubscribers())
 		{
+
+
 			rtabmap::Transform localTransform;
 			try
 			{
@@ -113,7 +117,7 @@ private:
 				{
 					if(!tfListener_.waitForTransform(frameId_, cloudMsg->header.frame_id, cloudMsg->header.stamp, ros::Duration(1)))
 					{
-						ROS_WARN("Could not get transform from %s to %s after 1 second!", frameId_.c_str(), cloudMsg->header.frame_id.c_str());
+						ROS_ERROR("Could not get transform from %s to %s after 1 second!", frameId_.c_str(), cloudMsg->header.frame_id.c_str());
 						return;
 					}
 				}
@@ -123,9 +127,10 @@ private:
 			}
 			catch(tf::TransformException & ex)
 			{
-				ROS_WARN("%s",ex.what());
+				ROS_ERROR("%s",ex.what());
 				return;
 			}
+
 
 			pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
 			pcl::fromROSMsg(*cloudMsg, *cloud);
@@ -140,8 +145,17 @@ private:
 				}
 				if(cloud->size())
 				{
+					ros::Time lasttime = ros::Time::now();
 					rtabmap::util3d::segmentObstaclesFromGround<pcl::PointXYZ>(cloud,
 							ground, obstacles, normalEstimationRadius_, groundNormalAngle_, minClusterSize_);
+
+					ros::Time curtime = ros::Time::now();
+					ros::Duration process_duration = curtime - lasttime;
+					ros::Duration between_frames = curtime - this->_lastFrameTime;
+					this->_lastFrameTime = curtime;
+					std::stringstream buffer;
+					buffer << "acloudsize=" << cloud->size() << " t=" << process_duration.toSec() << "s; " << (1./between_frames.toSec()) << "Hz";
+					ROS_ERROR("3%s: %s", this->getName().c_str(), buffer.str().c_str());
 				}
 			}
 
@@ -184,6 +198,7 @@ private:
 				//publish the message
 				obstaclesPub_.publish(rosCloud);
 			}
+
 		}
 	}
 
@@ -202,6 +217,7 @@ private:
 	ros::Publisher obstaclesPub_;
 
 	ros::Subscriber cloudSub_;
+	ros::Time _lastFrameTime;
 };
 
 PLUGINLIB_EXPORT_CLASS(rtabmap_ros::ObstaclesDetection, nodelet::Nodelet);
