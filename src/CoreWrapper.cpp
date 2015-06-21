@@ -188,7 +188,6 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 
 	// planning topics
 	goalSub_ = nh.subscribe("goal", 1, &CoreWrapper::goalCallback, this);
-	goalGlobalSub_ = nh.subscribe("goal_global", 1, &CoreWrapper::goalGlobalCallback, this);
 	nextMetricGoalPub_ = nh.advertise<geometry_msgs::PoseStamped>("goal_out", 1);
 	goalReachedPub_ = nh.advertise<std_msgs::Bool>("goal_reached", 1);
 	globalPathPub_ = nh.advertise<nav_msgs::Path>("global_path", 1);
@@ -1396,22 +1395,7 @@ void CoreWrapper::goalCallback(const geometry_msgs::PoseStampedConstPtr & msg)
 	}
 	ROS_INFO("Planning: set goal %s", targetPose.prettyPrint().c_str());
 	UTimer timer;
-	rtabmap_.computePath(targetPose, false);
-	ROS_INFO("Planning: Time computing path = %f s", timer.ticks());
-	goalCommonCallback(rtabmap_.getPath());
-}
-
-void CoreWrapper::goalGlobalCallback(const geometry_msgs::PoseStampedConstPtr & msg)
-{
-	Transform targetPose = rtabmap_ros::transformFromPoseMsg(msg->pose);
-	if(targetPose.isNull())
-	{
-		ROS_ERROR("Pose received is null!");
-		return;
-	}
-	ROS_INFO("Planning: set goal %s", targetPose.prettyPrint().c_str());
-	UTimer timer;
-	rtabmap_.computePath(targetPose, true);
+	rtabmap_.computePath(targetPose);
 	ROS_INFO("Planning: Time computing path = %f s", timer.ticks());
 	goalCommonCallback(rtabmap_.getPath());
 }

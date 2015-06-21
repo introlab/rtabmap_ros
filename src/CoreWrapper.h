@@ -174,7 +174,6 @@ private:
 
 	void goalCommonCallback(const std::vector<std::pair<int, rtabmap::Transform> > & poses);
 	void goalCallback(const geometry_msgs::PoseStampedConstPtr & msg);
-	void goalGlobalCallback(const geometry_msgs::PoseStampedConstPtr & msg);
 	void updateGoal(const ros::Time & stamp);
 
 	void process(
@@ -249,7 +248,6 @@ private:
 
 	//Planning stuff
 	ros::Subscriber goalSub_;
-	ros::Subscriber goalGlobalSub_;
 	ros::Publisher nextMetricGoalPub_;
 	ros::Publisher goalReachedPub_;
 	ros::Publisher globalPathPub_;
