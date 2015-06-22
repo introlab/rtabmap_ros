@@ -163,9 +163,7 @@ private:
 		ros::Duration process_duration = curtime - lasttime;
 		ros::Duration between_frames = curtime - this->_lastFrameTime;
 		this->_lastFrameTime = curtime;
-		std::stringstream buffer;
-		buffer << "acloudsize=" << cloud->size() << " t=" << process_duration.toSec() << "s; " << (1./between_frames.toSec()) << "Hz";
-		ROS_ERROR("3%s: %s", this->getName().c_str(), buffer.str().c_str());
+
 
 		pcl::PointCloud<pcl::PointXYZ>::Ptr groundCloud(new pcl::PointCloud<pcl::PointXYZ>);
 		if(ground.get() && ground->size())
@@ -179,14 +177,19 @@ private:
 			pcl::copyPointCloud(*cloud, *obstacles, *obstaclesCloud);
 		}
 
-		if(maxFloorHeight_ > 0)
-		{
-			pcl::PointCloud<pcl::PointXYZ>::Ptr flatObstaclesCloud(new pcl::PointCloud<pcl::PointXYZ>);
-			flatObstaclesCloud = rtabmap::util3d::passThrough(groundCloud, "z", maxFloorHeight_, std::numeric_limits<int>::max());
-			*obstaclesCloud += *flatObstaclesCloud;
+		std::stringstream buffer;
+		buffer << "cloud=" << cloud->size() << " floor=" << ground->size() << " obst=" << obstacles->size();
+		buffer << " t=" << process_duration.toSec() << "s; " << (1./between_frames.toSec()) << "Hz";
+		ROS_ERROR("3%s: %s", this->getName().c_str(), buffer.str().c_str());
 
-			groundCloud = rtabmap::util3d::passThrough(groundCloud, "z", std::numeric_limits<int>::min(), maxFloorHeight_);
-		}
+//		if(maxFloorHeight_ > 0)
+//		{
+//			pcl::PointCloud<pcl::PointXYZ>::Ptr flatObstaclesCloud(new pcl::PointCloud<pcl::PointXYZ>);
+//			flatObstaclesCloud = rtabmap::util3d::passThrough(groundCloud, "z", maxFloorHeight_, std::numeric_limits<int>::max());
+//			*obstaclesCloud += *flatObstaclesCloud;
+//
+//			groundCloud = rtabmap::util3d::passThrough(groundCloud, "z", std::numeric_limits<int>::min(), maxFloorHeight_);
+//		}
 
 		if(groundPub_.getNumSubscribers())
 		{
