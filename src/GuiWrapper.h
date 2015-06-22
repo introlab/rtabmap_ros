@@ -213,6 +213,7 @@ private:
 
 	message_filters::Subscriber<rtabmap_ros::Info> infoTopic_;
 	message_filters::Subscriber<rtabmap_ros::MapData> mapDataTopic_;
+	ros::Subscriber globalPathTopic_;
 
 	ros::Subscriber defaultSub_; // odometry only
 	std::vector<image_transport::SubscriberFilter*> imageSubs_;

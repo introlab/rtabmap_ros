@@ -53,6 +53,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "rtabmap_ros/MsgConversion.h"
 #include "rtabmap_ros/GetMap.h"
+#include "rtabmap_ros/SetGoal.h"
 
 #include "PreferencesDialogROS.h"
 
@@ -359,6 +360,23 @@ void GuiWrapper::handleEvent(UEvent * anEvent)
 			else
 			{
 				processRequestedMap(getMapSrv.response.data);
+			}
+		}
+		else if(cmd == rtabmap::RtabmapEventCmd::kCmdGoal)
+		{
+			rtabmap_ros::SetGoal setGoalSrv;
+			setGoalSrv.request.node_id = cmdEvent->getInt();
+			setGoalSrv.request.node_label = cmdEvent->getStr();
+			if(!ros::service::call("set_goal", setGoalSrv))
+			{
+				ROS_ERROR("Can't call \"set_goal\" service");
+			}
+		}
+		else if(cmd == rtabmap::RtabmapEventCmd::kCmdCancelGoal)
+		{
+			if(!ros::service::call("cancel_goal", emptySrv))
+			{
+				ROS_ERROR("Can't call \"cancel_goal\" service");
 			}
 		}
 		else

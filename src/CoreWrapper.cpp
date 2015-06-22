@@ -375,6 +375,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	getProjMapSrv_ = nh.advertiseService("get_proj_map", &CoreWrapper::getProjMapCallback, this);
 	publishMapDataSrv_ = nh.advertiseService("publish_map", &CoreWrapper::publishMapCallback, this);
 	setGoalSrv_ = nh.advertiseService("set_goal", &CoreWrapper::setGoalCallback, this);
+	cancelGoalSrv_ = nh.advertiseService("cancel_goal", &CoreWrapper::cancelGoalCallback, this);
 	setLabelSrv_ = nh.advertiseService("set_label", &CoreWrapper::setLabelCallback, this);
 	listLabelsSrv_ = nh.advertiseService("list_labels", &CoreWrapper::listLabelsCallback, this);
 #ifdef WITH_OCTOMAP
@@ -1846,6 +1847,23 @@ bool CoreWrapper::setGoalCallback(rtabmap_ros::SetGoal::Request& req, rtabmap_ro
 	{
 		ROS_ERROR("Planning: Node id should be > 0 !");
 	}
+	return true;
+}
+
+bool CoreWrapper::cancelGoalCallback(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res)
+{
+	if(rtabmap_.getPath().size())
+	{
+		ROS_WARN("Goal cancelled!");
+		rtabmap_.clearPath();
+		currentMetricGoal_.setNull();
+		latestNodeWasReached_ = false;
+		if(mbClient_.isServerConnected())
+		{
+			mbClient_.cancelGoal();
+		}
+	}
+
 	return true;
 }
 
