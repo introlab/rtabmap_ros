@@ -71,7 +71,7 @@ public:
 		groundNormalAngle_(M_PI_4),
 		minClusterSize_(20),
 		maxFloorHeight_(-1),
-		//maxObstaclesHeight_(0),
+		maxObstaclesHeight_(1.5),
 		waitForTransform_(false)
 	{}
 
@@ -90,7 +90,7 @@ private:
 		pnh.param("normal_estimation_radius", normalEstimationRadius_, normalEstimationRadius_);
 		pnh.param("ground_normal_angle", groundNormalAngle_, groundNormalAngle_);
 		pnh.param("min_cluster_size", minClusterSize_, minClusterSize_);
-		//pnh.param("max_obstacles_height", maxObstaclesHeight_, maxObstaclesHeight_);
+		pnh.param("max_obstacles_height", maxObstaclesHeight_, maxObstaclesHeight_);
 		pnh.param("max_floor_height", maxFloorHeight_, maxFloorHeight_);
 		pnh.param("wait_for_transform", waitForTransform_, waitForTransform_);
 
@@ -163,7 +163,9 @@ private:
 		}
 
 		pcl::PointCloud<pcl::PointXYZ>::Ptr obstaclesCloud(new pcl::PointCloud<pcl::PointXYZ>);
-		obstaclesCloud = rtabmap::util3d::passThrough(originalCloud, "z", maxFloorHeight_, std::numeric_limits<int>::max());
+
+
+		obstaclesCloud = rtabmap::util3d::passThrough(originalCloud, "z", maxFloorHeight_, maxObstaclesHeight_);
 
 		if(obstacles.get() && obstacles->size())
 		{
@@ -211,7 +213,7 @@ private:
 	double normalEstimationRadius_;
 	double groundNormalAngle_;
 	int minClusterSize_;
-	//double maxObstaclesHeight_;
+	double maxObstaclesHeight_;
 	double maxFloorHeight_;
 	bool waitForTransform_;
 
