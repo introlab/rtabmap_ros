@@ -106,100 +106,110 @@ private:
 
 	void callback(const sensor_msgs::PointCloud2ConstPtr & cloudMsg)
 	{
-		if(groundPub_.getNumSubscribers() || obstaclesPub_.getNumSubscribers())
+		if (groundPub_.getNumSubscribers() == 0 && obstaclesPub_.getNumSubscribers() == 0)
 		{
-
-
-			rtabmap::Transform localTransform;
-			try
-			{
-				if(waitForTransform_)
-				{
-					if(!tfListener_.waitForTransform(frameId_, cloudMsg->header.frame_id, cloudMsg->header.stamp, ros::Duration(1)))
-					{
-						ROS_ERROR("Could not get transform from %s to %s after 1 second!", frameId_.c_str(), cloudMsg->header.frame_id.c_str());
-						return;
-					}
-				}
-				tf::StampedTransform tmp;
-				tfListener_.lookupTransform(frameId_, cloudMsg->header.frame_id, cloudMsg->header.stamp, tmp);
-				localTransform = rtabmap_ros::transformFromTF(tmp);
-			}
-			catch(tf::TransformException & ex)
-			{
-				ROS_ERROR("%s",ex.what());
-				return;
-			}
-
-
-			pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
-			pcl::fromROSMsg(*cloudMsg, *cloud);
-			pcl::IndicesPtr ground, obstacles;
-			if(cloud->size())
-			{
-				cloud = rtabmap::util3d::transformPointCloud(cloud, localTransform);
-
-				if(maxObstaclesHeight_ > 0)
-				{
-					cloud = rtabmap::util3d::passThrough(cloud, "z", std::numeric_limits<int>::min(), maxObstaclesHeight_);
-				}
-				if(cloud->size())
-				{
-					ros::Time lasttime = ros::Time::now();
-					rtabmap::util3d::segmentObstaclesFromGround<pcl::PointXYZ>(cloud,
-							ground, obstacles, normalEstimationRadius_, groundNormalAngle_, minClusterSize_);
-
-					ros::Time curtime = ros::Time::now();
-					ros::Duration process_duration = curtime - lasttime;
-					ros::Duration between_frames = curtime - this->_lastFrameTime;
-					this->_lastFrameTime = curtime;
-					std::stringstream buffer;
-					buffer << "acloudsize=" << cloud->size() << " t=" << process_duration.toSec() << "s; " << (1./between_frames.toSec()) << "Hz";
-					ROS_ERROR("3%s: %s", this->getName().c_str(), buffer.str().c_str());
-				}
-			}
-
-			pcl::PointCloud<pcl::PointXYZ>::Ptr groundCloud(new pcl::PointCloud<pcl::PointXYZ>);
-			if((groundPub_.getNumSubscribers() || obstaclesPub_.getNumSubscribers()) && ground.get() && ground->size())
-			{
-				pcl::copyPointCloud(*cloud, *ground, *groundCloud);
-			}
-			pcl::PointCloud<pcl::PointXYZ>::Ptr obstaclesCloud(new pcl::PointCloud<pcl::PointXYZ>);
-			if(obstaclesPub_.getNumSubscribers() && obstacles.get() && obstacles->size())
-			{
-				pcl::copyPointCloud(*cloud, *obstacles, *obstaclesCloud);
-			}
- 			if(maxFloorHeight_ > 0 && (groundPub_.getNumSubscribers() || obstaclesPub_.getNumSubscribers()))
-			{
-    			pcl::PointCloud<pcl::PointXYZ>::Ptr flatObstaclesCloud(new pcl::PointCloud<pcl::PointXYZ>);
-	            flatObstaclesCloud = rtabmap::util3d::passThrough(groundCloud, "z", maxFloorHeight_, std::numeric_limits<int>::max());
-	            *obstaclesCloud += *flatObstaclesCloud;
-	            groundCloud = rtabmap::util3d::passThrough(groundCloud, "z", std::numeric_limits<int>::min(), maxFloorHeight_);
-			}
-
-			if(groundPub_.getNumSubscribers())
-			{
-				sensor_msgs::PointCloud2 rosCloud;
-				pcl::toROSMsg(*groundCloud, rosCloud);
-				rosCloud.header.stamp = cloudMsg->header.stamp;
-				rosCloud.header.frame_id = frameId_;
-
-				//publish the message
-				groundPub_.publish(rosCloud);
-			}
-
-			if(obstaclesPub_.getNumSubscribers())
-			{
-				sensor_msgs::PointCloud2 rosCloud;
-				pcl::toROSMsg(*obstaclesCloud, rosCloud);
-				rosCloud.header.stamp = cloudMsg->header.stamp;
-				rosCloud.header.frame_id = frameId_;
-
-				//publish the message
-				obstaclesPub_.publish(rosCloud);
-			}
-
+			// no one wants the results
+			return;
 		}
+
+		rtabmap::Transform localTransform;
+		try
+		{
+			if(waitForTransform_)
+			{
+				if(!tfListener_.waitForTransform(frameId_, cloudMsg->header.frame_id, cloudMsg->header.stamp, ros::Duration(1)))
+				{
+					ROS_ERROR("Could not get transform from %s to %s after 1 second!", frameId_.c_str(), cloudMsg->header.frame_id.c_str());
+					return;
+				}
+			}
+			tf::StampedTransform tmp;
+			tfListener_.lookupTransform(frameId_, cloudMsg->header.frame_id, cloudMsg->header.stamp, tmp);
+			localTransform = rtabmap_ros::transformFromTF(tmp);
+		}
+		catch(tf::TransformException & ex)
+		{
+			ROS_ERROR("%s",ex.what());
+			return;
+		}
+
+
+		pcl::PointCloud<pcl::PointXYZ>::Ptr originalCloud(new pcl::PointCloud<pcl::PointXYZ>);
+		pcl::fromROSMsg(*cloudMsg, *originalCloud);
+		if(originalCloud->size() == 0)
+		{
+			ROS_ERROR("Recieved empty point cloud!");
+			return;
+		}
+		originalCloud = rtabmap::util3d::transformPointCloud(originalCloud, localTransform);
+
+		/////////////////////////////////////////////////////////////////////////////
+
+		pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
+		pcl::copyPointCloud(*originalCloud, *cloud);
+
+		if(maxObstaclesHeight_ > 0)
+		{
+			cloud = rtabmap::util3d::passThrough(cloud, "z", std::numeric_limits<int>::min(), maxObstaclesHeight_);
+		}
+
+		ros::Time lasttime = ros::Time::now();
+
+		pcl::IndicesPtr ground, obstacles;
+		rtabmap::util3d::segmentObstaclesFromGround<pcl::PointXYZ>(cloud,
+				ground, obstacles, normalEstimationRadius_, groundNormalAngle_, minClusterSize_);
+
+		ros::Time curtime = ros::Time::now();
+		ros::Duration process_duration = curtime - lasttime;
+		ros::Duration between_frames = curtime - this->_lastFrameTime;
+		this->_lastFrameTime = curtime;
+		std::stringstream buffer;
+		buffer << "acloudsize=" << cloud->size() << " t=" << process_duration.toSec() << "s; " << (1./between_frames.toSec()) << "Hz";
+		ROS_ERROR("3%s: %s", this->getName().c_str(), buffer.str().c_str());
+
+		pcl::PointCloud<pcl::PointXYZ>::Ptr groundCloud(new pcl::PointCloud<pcl::PointXYZ>);
+		if(ground.get() && ground->size())
+		{
+			pcl::copyPointCloud(*cloud, *ground, *groundCloud);
+		}
+
+		pcl::PointCloud<pcl::PointXYZ>::Ptr obstaclesCloud(new pcl::PointCloud<pcl::PointXYZ>);
+		if(obstaclesPub_.getNumSubscribers() && obstacles.get() && obstacles->size())
+		{
+			pcl::copyPointCloud(*cloud, *obstacles, *obstaclesCloud);
+		}
+
+		if(maxFloorHeight_ > 0)
+		{
+			pcl::PointCloud<pcl::PointXYZ>::Ptr flatObstaclesCloud(new pcl::PointCloud<pcl::PointXYZ>);
+			flatObstaclesCloud = rtabmap::util3d::passThrough(groundCloud, "z", maxFloorHeight_, std::numeric_limits<int>::max());
+			*obstaclesCloud += *flatObstaclesCloud;
+
+			groundCloud = rtabmap::util3d::passThrough(groundCloud, "z", std::numeric_limits<int>::min(), maxFloorHeight_);
+		}
+
+		if(groundPub_.getNumSubscribers())
+		{
+			sensor_msgs::PointCloud2 rosCloud;
+			pcl::toROSMsg(*groundCloud, rosCloud);
+			rosCloud.header.stamp = cloudMsg->header.stamp;
+			rosCloud.header.frame_id = frameId_;
+
+			//publish the message
+			groundPub_.publish(rosCloud);
+		}
+
+		if(obstaclesPub_.getNumSubscribers())
+		{
+			sensor_msgs::PointCloud2 rosCloud;
+			pcl::toROSMsg(*obstaclesCloud, rosCloud);
+			rosCloud.header.stamp = cloudMsg->header.stamp;
+			rosCloud.header.frame_id = frameId_;
+
+			//publish the message
+			obstaclesPub_.publish(rosCloud);
+		}
+
 	}
 
 private:
