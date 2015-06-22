@@ -71,7 +71,7 @@ public:
 		groundNormalAngle_(M_PI_4),
 		minClusterSize_(20),
 		maxFloorHeight_(-1),
-		maxObstaclesHeight_(0),
+		//maxObstaclesHeight_(0),
 		waitForTransform_(false)
 	{}
 
@@ -90,7 +90,7 @@ private:
 		pnh.param("normal_estimation_radius", normalEstimationRadius_, normalEstimationRadius_);
 		pnh.param("ground_normal_angle", groundNormalAngle_, groundNormalAngle_);
 		pnh.param("min_cluster_size", minClusterSize_, minClusterSize_);
-		pnh.param("max_obstacles_height", maxObstaclesHeight_, maxObstaclesHeight_);
+		//pnh.param("max_obstacles_height", maxObstaclesHeight_, maxObstaclesHeight_);
 		pnh.param("max_floor_height", maxFloorHeight_, maxFloorHeight_);
 		pnh.param("wait_for_transform", waitForTransform_, waitForTransform_);
 
@@ -145,51 +145,41 @@ private:
 
 		/////////////////////////////////////////////////////////////////////////////
 
-		pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
-		pcl::copyPointCloud(*originalCloud, *cloud);
-
-		if(maxObstaclesHeight_ > 0)
-		{
-			cloud = rtabmap::util3d::passThrough(cloud, "z", std::numeric_limits<int>::min(), maxObstaclesHeight_);
-		}
+		pcl::PointCloud<pcl::PointXYZ>::Ptr hypotheticalGroundCloud(new pcl::PointCloud<pcl::PointXYZ>);
+		hypotheticalGroundCloud = rtabmap::util3d::passThrough(originalCloud, "z", std::numeric_limits<int>::min(), maxFloorHeight_);
 
 		ros::Time lasttime = ros::Time::now();
 
 		pcl::IndicesPtr ground, obstacles;
-		rtabmap::util3d::segmentObstaclesFromGround<pcl::PointXYZ>(cloud,
+		rtabmap::util3d::segmentObstaclesFromGround<pcl::PointXYZ>(hypotheticalGroundCloud,
 				ground, obstacles, normalEstimationRadius_, groundNormalAngle_, minClusterSize_);
+
+
+		pcl::PointCloud<pcl::PointXYZ>::Ptr groundCloud(new pcl::PointCloud<pcl::PointXYZ>);
+		if(ground.get() && ground->size())
+		{
+			pcl::copyPointCloud(*hypotheticalGroundCloud, *ground, *groundCloud);
+		}
+
+		pcl::PointCloud<pcl::PointXYZ>::Ptr obstaclesCloud(new pcl::PointCloud<pcl::PointXYZ>);
+		obstaclesCloud = rtabmap::util3d::passThrough(originalCloud, "z", maxFloorHeight_, std::numeric_limits<int>::max());
+
+		if(obstacles.get() && obstacles->size())
+		{
+			pcl::PointCloud<pcl::PointXYZ>::Ptr obstaclesNearFloorCloud(new pcl::PointCloud<pcl::PointXYZ>);
+			pcl::copyPointCloud(*hypotheticalGroundCloud, *obstacles, *obstaclesNearFloorCloud);
+			*obstaclesCloud += *obstaclesNearFloorCloud;
+		}
 
 		ros::Time curtime = ros::Time::now();
 		ros::Duration process_duration = curtime - lasttime;
 		ros::Duration between_frames = curtime - this->_lastFrameTime;
 		this->_lastFrameTime = curtime;
 
-
-		pcl::PointCloud<pcl::PointXYZ>::Ptr groundCloud(new pcl::PointCloud<pcl::PointXYZ>);
-		if(ground.get() && ground->size())
-		{
-			pcl::copyPointCloud(*cloud, *ground, *groundCloud);
-		}
-
-		pcl::PointCloud<pcl::PointXYZ>::Ptr obstaclesCloud(new pcl::PointCloud<pcl::PointXYZ>);
-		if(obstaclesPub_.getNumSubscribers() && obstacles.get() && obstacles->size())
-		{
-			pcl::copyPointCloud(*cloud, *obstacles, *obstaclesCloud);
-		}
-
 		std::stringstream buffer;
-		buffer << "cloud=" << cloud->size() << " floor=" << ground->size() << " obst=" << obstacles->size();
+		buffer << "cloud=" << originalCloud->size() << " hypothetical ground=" << hypotheticalGroundCloud->size() << " floor=" << ground->size() << " obst=" << obstacles->size();
 		buffer << " t=" << process_duration.toSec() << "s; " << (1./between_frames.toSec()) << "Hz";
 		ROS_ERROR("3%s: %s", this->getName().c_str(), buffer.str().c_str());
-
-//		if(maxFloorHeight_ > 0)
-//		{
-//			pcl::PointCloud<pcl::PointXYZ>::Ptr flatObstaclesCloud(new pcl::PointCloud<pcl::PointXYZ>);
-//			flatObstaclesCloud = rtabmap::util3d::passThrough(groundCloud, "z", maxFloorHeight_, std::numeric_limits<int>::max());
-//			*obstaclesCloud += *flatObstaclesCloud;
-//
-//			groundCloud = rtabmap::util3d::passThrough(groundCloud, "z", std::numeric_limits<int>::min(), maxFloorHeight_);
-//		}
 
 		if(groundPub_.getNumSubscribers())
 		{
@@ -220,7 +210,7 @@ private:
 	double normalEstimationRadius_;
 	double groundNormalAngle_;
 	int minClusterSize_;
-	double maxObstaclesHeight_;
+	//double maxObstaclesHeight_;
 	double maxFloorHeight_;
 	bool waitForTransform_;
 
