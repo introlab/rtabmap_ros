@@ -452,20 +452,25 @@ rtabmap::Signature nodeDataFromROS(const rtabmap_ros::NodeData & msg)
 			msg.stamp,
 			msg.label,
 			transformFromPoseMsg(msg.pose),
-			msg.userData.data,
 			stereoModel.isValid()?
 				rtabmap::SensorData(
 					compressedMatFromBytes(msg.laserScan),
 					msg.laserScanMaxPts,
 					compressedMatFromBytes(msg.image),
 					compressedMatFromBytes(msg.depth),
-					stereoModel):
+					stereoModel,
+					msg.id,
+					msg.stamp,
+					compressedMatFromBytes(msg.userData)):
 				rtabmap::SensorData(
 					compressedMatFromBytes(msg.laserScan),
 					msg.laserScanMaxPts,
 					compressedMatFromBytes(msg.image),
 					compressedMatFromBytes(msg.depth),
-					models));
+					models,
+					msg.id,
+					msg.stamp,
+					compressedMatFromBytes(msg.userData)));
 	s.setWords(words);
 	s.setWords3(words3D);
 	return s;
@@ -478,11 +483,11 @@ void nodeDataToROS(const rtabmap::Signature & signature, rtabmap_ros::NodeData &
 	msg.weight = signature.getWeight();
 	msg.stamp = signature.getStamp();
 	msg.label = signature.getLabel();
-	msg.userData.data = signature.getUserData();
 	transformToPoseMsg(signature.getPose(), msg.pose);
 	compressedMatToBytes(signature.sensorData().imageCompressed(), msg.image);
 	compressedMatToBytes(signature.sensorData().depthOrRightCompressed(), msg.depth);
 	compressedMatToBytes(signature.sensorData().laserScanCompressed(), msg.laserScan);
+	compressedMatToBytes(signature.sensorData().userDataCompressed(), msg.userData);
 	msg.baseline = 0;
 	if(signature.sensorData().cameraModels().size())
 	{

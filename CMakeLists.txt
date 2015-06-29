@@ -17,7 +17,7 @@ find_package(octomap_ros)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
-find_package(RTABMap 0.10.0 REQUIRED)
+find_package(RTABMap 0.10.1 REQUIRED)
 
 find_package(OpenCV REQUIRED)
 
@@ -49,7 +49,6 @@ add_message_files(
    NodeData.msg
    Link.msg
    OdomInfo.msg
-   UserData.msg
    Point2f.msg
 )
 

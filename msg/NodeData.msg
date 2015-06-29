@@ -4,7 +4,6 @@ int32 mapId
 int32 weight
 float64 stamp
 string label
-UserData userData
 
 # Pose from odometry not corrected
 geometry_msgs/Pose pose
@@ -30,6 +29,10 @@ geometry_msgs/Transform[] localTransform
 # use rtabmap::util3d::uncompressData() from "rtabmap/core/util3d.h"
 uint8[] laserScan
 int32 laserScanMaxPts
+
+# compressed user data
+# use rtabmap::util3d::uncompressData() from "rtabmap/core/util3d.h"
+uint8[] userData
 
 # std::multimap<wordId, cv::Keypoint>
 # std::multimap<wordId, pcl::PointXYZ>

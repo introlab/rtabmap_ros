@@ -258,6 +258,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	oldParameterNames.push_back("RGBD/LocalLoopDetectionRadius");
 	oldParameterNames.push_back("RGBD/ToroIterations");
 	oldParameterNames.push_back("Mem/RehearsedNodesKept");
+	oldParameterNames.push_back("Odom/PnPEstimation");
 	for(std::list<std::string>::iterator iter=oldParameterNames.begin(); iter!=oldParameterNames.end(); ++iter)
 	{
 		std::string vStr;
@@ -308,6 +309,12 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 			else if(iter->compare("RGBD/PlanVirtualLinksMaxDiffID") == 0)
 			{
 				ROS_WARN("Parameter \"RGBD/PlanVirtualLinksMaxDiffID\" doesn't exist anymore.");
+			}
+			else if(iter->compare("RGBD/LocalLoopDetectionMaxDiffID") == 0)
+			{
+				ROS_WARN("Parameter name changed: Odom/PnPEstimation -> %s. Please update your launch file accordingly.",
+						Parameters::kOdomEstimationType().c_str());
+				parameters_.at(Parameters::kOdomEstimationType())= uNumber2Str(1);
 			}
 		}
 	}
