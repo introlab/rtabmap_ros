@@ -259,12 +259,25 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	oldParameterNames.push_back("RGBD/ToroIterations");
 	oldParameterNames.push_back("Mem/RehearsedNodesKept");
 	oldParameterNames.push_back("Odom/PnPEstimation");
+	oldParameterNames.push_back("LccBow/MaxDepth");
+	oldParameterNames.push_back("GFTT/MaxCorners");
 	for(std::list<std::string>::iterator iter=oldParameterNames.begin(); iter!=oldParameterNames.end(); ++iter)
 	{
 		std::string vStr;
 		if(pnh.getParam(*iter, vStr))
 		{
-			if(iter->compare("LccReextract/LoopClosureFeatures") == 0)
+			if(iter->compare("GFTT/MaxCorners") == 0)
+			{
+				ROS_WARN("Parameter name changed: GFTT/MaxCorners -> %s. Please update your launch file accordingly.",
+						Parameters::kKpWordsPerImage().c_str());
+			}
+			else if(iter->compare("LccBow/MaxDepth") == 0)
+			{
+				ROS_WARN("Parameter name changed: LccBow/MaxDepth -> %s. Please update your launch file accordingly.",
+						Parameters::kLccReextractMaxDepth().c_str());
+				parameters_.at(Parameters::kLccReextractMaxDepth())= vStr;
+			}
+			else if(iter->compare("LccReextract/LoopClosureFeatures") == 0)
 			{
 				ROS_WARN("Parameter name changed: LccReextract/LoopClosureFeatures -> %s. Please update your launch file accordingly.",
 						Parameters::kLccReextractActivated().c_str());
