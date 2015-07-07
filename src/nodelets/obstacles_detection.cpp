@@ -72,7 +72,8 @@ public:
 		minClusterSize_(20),
 		maxFloorHeight_(-1),
 		maxObstaclesHeight_(1.5),
-		waitForTransform_(false)
+		waitForTransform_(false),
+		simpleSegmentation_(false)
 	{}
 
 	virtual ~ObstaclesDetection()
@@ -93,6 +94,7 @@ private:
 		pnh.param("max_obstacles_height", maxObstaclesHeight_, maxObstaclesHeight_);
 		pnh.param("max_floor_height", maxFloorHeight_, maxFloorHeight_);
 		pnh.param("wait_for_transform", waitForTransform_, waitForTransform_);
+		pnh.param("simple_segmentation", simpleSegmentation_, simpleSegmentation_);
 
 		cloudSub_ = nh.subscribe("cloud", 1, &ObstaclesDetection::callback, this);
 
@@ -148,31 +150,33 @@ private:
 		pcl::PointCloud<pcl::PointXYZ>::Ptr hypotheticalGroundCloud(new pcl::PointCloud<pcl::PointXYZ>);
 		hypotheticalGroundCloud = rtabmap::util3d::passThrough(originalCloud, "z", std::numeric_limits<int>::min(), maxFloorHeight_);
 
+		pcl::PointCloud<pcl::PointXYZ>::Ptr obstaclesCloud(new pcl::PointCloud<pcl::PointXYZ>);
+		obstaclesCloud = rtabmap::util3d::passThrough(originalCloud, "z", maxFloorHeight_, maxObstaclesHeight_);
+
 		ros::Time lasttime = ros::Time::now();
 
 		pcl::IndicesPtr ground, obstacles;
-		rtabmap::util3d::segmentObstaclesFromGround<pcl::PointXYZ>(hypotheticalGroundCloud,
-				ground, obstacles, normalEstimationRadius_, groundNormalAngle_, minClusterSize_);
-
-
-
 		pcl::PointCloud<pcl::PointXYZ>::Ptr groundCloud(new pcl::PointCloud<pcl::PointXYZ>);
-		if(ground.get() && ground->size())
-		{
-			pcl::copyPointCloud(*hypotheticalGroundCloud, *ground, *groundCloud);
+
+		if (!simpleSegmentation_){
+			rtabmap::util3d::segmentObstaclesFromGround<pcl::PointXYZ>(hypotheticalGroundCloud,
+					ground, obstacles, normalEstimationRadius_, groundNormalAngle_, minClusterSize_);
+
+			if(ground.get() && ground->size())
+			{
+				pcl::copyPointCloud(*hypotheticalGroundCloud, *ground, *groundCloud);
+			}
+			if(obstacles.get() && obstacles->size())
+			{
+				pcl::PointCloud<pcl::PointXYZ>::Ptr obstaclesNearFloorCloud(new pcl::PointCloud<pcl::PointXYZ>);
+				pcl::copyPointCloud(*hypotheticalGroundCloud, *obstacles, *obstaclesNearFloorCloud);
+				*obstaclesCloud += *obstaclesNearFloorCloud;
+			}
+		}
+		else{
+			groundCloud = hypotheticalGroundCloud;
 		}
 
-		pcl::PointCloud<pcl::PointXYZ>::Ptr obstaclesCloud(new pcl::PointCloud<pcl::PointXYZ>);
-
-
-		obstaclesCloud = rtabmap::util3d::passThrough(originalCloud, "z", maxFloorHeight_, maxObstaclesHeight_);
-
-		if(obstacles.get() && obstacles->size())
-		{
-			pcl::PointCloud<pcl::PointXYZ>::Ptr obstaclesNearFloorCloud(new pcl::PointCloud<pcl::PointXYZ>);
-			pcl::copyPointCloud(*hypotheticalGroundCloud, *obstacles, *obstaclesNearFloorCloud);
-			*obstaclesCloud += *obstaclesNearFloorCloud;
-		}
 
 		if(groundPub_.getNumSubscribers())
 		{
@@ -216,6 +220,7 @@ private:
 	double maxObstaclesHeight_;
 	double maxFloorHeight_;
 	bool waitForTransform_;
+	bool simpleSegmentation_;
 
 	tf::TransformListener tfListener_;
 
