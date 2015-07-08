@@ -114,6 +114,9 @@ private:
 			return;
 		}
 
+		ROS_ERROR("1111111111111111111111");
+
+
 		rtabmap::Transform localTransform;
 		try
 		{
@@ -125,6 +128,9 @@ private:
 					return;
 				}
 			}
+
+			ROS_ERROR("2222222222222222222222222222222");
+
 			tf::StampedTransform tmp;
 			tfListener_.lookupTransform(frameId_, cloudMsg->header.frame_id, cloudMsg->header.stamp, tmp);
 			localTransform = rtabmap_ros::transformFromTF(tmp);
@@ -145,6 +151,8 @@ private:
 		}
 		originalCloud = rtabmap::util3d::transformPointCloud(originalCloud, localTransform);
 
+		ROS_ERROR("3333333333333333333333333");
+
 		/////////////////////////////////////////////////////////////////////////////
 
 		pcl::PointCloud<pcl::PointXYZ>::Ptr hypotheticalGroundCloud(new pcl::PointCloud<pcl::PointXYZ>);
@@ -159,6 +167,8 @@ private:
 		pcl::PointCloud<pcl::PointXYZ>::Ptr groundCloud(new pcl::PointCloud<pcl::PointXYZ>);
 
 		if (!simpleSegmentation_){
+			ROS_ERROR("44444444444444444444444444444");
+
 			rtabmap::util3d::segmentObstaclesFromGround<pcl::PointXYZ>(hypotheticalGroundCloud,
 					ground, obstacles, normalEstimationRadius_, groundNormalAngle_, minClusterSize_);
 
@@ -174,6 +184,7 @@ private:
 			}
 		}
 		else{
+			ROS_ERROR("555555555555555555555555");
 			groundCloud = hypotheticalGroundCloud;
 		}
 
