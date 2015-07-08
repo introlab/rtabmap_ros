@@ -158,7 +158,6 @@ private:
 		ROS_ERROR("AAAa3333333333333333333333333");
 
 		pcl::PointCloud<pcl::PointXYZ>::Ptr obstaclesCloud(new pcl::PointCloud<pcl::PointXYZ>);
-		obstaclesCloud = rtabmap::util3d::passThrough(originalCloud, "z", maxFloorHeight_, maxObstaclesHeight_);
 
 		ROS_ERROR("BBBb3333333333333333333333333");
 
@@ -177,6 +176,9 @@ private:
 			{
 				pcl::copyPointCloud(*hypotheticalGroundCloud, *ground, *groundCloud);
 			}
+
+			obstaclesCloud = rtabmap::util3d::passThrough(originalCloud, "z", maxFloorHeight_, maxObstaclesHeight_);
+
 			if(obstacles.get() && obstacles->size())
 			{
 				pcl::PointCloud<pcl::PointXYZ>::Ptr obstaclesNearFloorCloud(new pcl::PointCloud<pcl::PointXYZ>);
@@ -186,6 +188,7 @@ private:
 		}
 		else{
 			ROS_ERROR("555555555555555555555555");
+			obstaclesCloud = rtabmap::util3d::passThrough(originalCloud, "z", maxFloorHeight_, maxObstaclesHeight_);
 			groundCloud = hypotheticalGroundCloud;
 		}
 
