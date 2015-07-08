@@ -70,7 +70,8 @@ public:
 		approxSyncDisparity_(0),
 		exactSyncDepth_(0),
 		exactSyncDisparity_(0),
-		cut_(0)
+		cut_right_(0),
+		cut_left_(0)
 	{}
 
 	virtual ~PointCloudXYZ()
@@ -100,7 +101,8 @@ private:
 		pnh.param("decimation", decimation_, decimation_);
 		pnh.param("noise_filter_radius", noiseFilterRadius_, noiseFilterRadius_);
 		pnh.param("noise_filter_min_neighbors", noiseFilterMinNeighbors_, noiseFilterMinNeighbors_);
-		pnh.param("cut", cut_, cut_);
+		pnh.param("cut_left", cut_left_, cut_left_);
+		pnh.param("cut_right", cut_right_, cut_right_);
 		ROS_INFO("Approximate time sync = %s", approxSync?"true":"false");
 
 		if(approxSync)
@@ -153,12 +155,12 @@ private:
 			int rows = image.rows;
 			int cols = image.cols;
 
-			if (cut_>0){
-				cv::Mat pRoi = image(cv::Rect(0, 0, cut_, rows));
+			if (cut_left_>0){
+				cv::Mat pRoi = image(cv::Rect(0, 0, cut_left_, rows));
 				pRoi.setTo(cv::Scalar(0.));
 			}
-			else if (cut_<0){
-				cv::Mat pRoi = image(cv::Rect(cols+cut_, 0, -cut_, rows));
+			if (cut_right_<0){
+				cv::Mat pRoi = image(cv::Rect(cols-cut_right_, 0, cut_right_, rows));
 				pRoi.setTo(cv::Scalar(0.));
 			}
 
@@ -258,7 +260,8 @@ private:
 	int decimation_;
 	double noiseFilterRadius_;
 	int noiseFilterMinNeighbors_;
-	int cut_;
+	int cut_left_;
+	int cut_right_;
 
 	ros::Publisher cloudPub_;
 
