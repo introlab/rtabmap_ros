@@ -195,6 +195,7 @@ private:
 		}
 
 
+		/*
 		if(groundPub_.getNumSubscribers())
 		{
 			sensor_msgs::PointCloud2 rosCloud;
@@ -204,7 +205,7 @@ private:
 
 			//publish the message
 			groundPub_.publish(rosCloud);
-		}
+		}*/
 
 		if(obstaclesPub_.getNumSubscribers())
 		{
