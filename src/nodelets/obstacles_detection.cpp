@@ -114,9 +114,6 @@ private:
 			return;
 		}
 
-		ROS_ERROR("1111111111111111111111");
-
-
 		rtabmap::Transform localTransform;
 		try
 		{
@@ -158,8 +155,12 @@ private:
 		pcl::PointCloud<pcl::PointXYZ>::Ptr hypotheticalGroundCloud(new pcl::PointCloud<pcl::PointXYZ>);
 		hypotheticalGroundCloud = rtabmap::util3d::passThrough(originalCloud, "z", std::numeric_limits<int>::min(), maxFloorHeight_);
 
+		ROS_ERROR("AAAa3333333333333333333333333");
+
 		pcl::PointCloud<pcl::PointXYZ>::Ptr obstaclesCloud(new pcl::PointCloud<pcl::PointXYZ>);
 		obstaclesCloud = rtabmap::util3d::passThrough(originalCloud, "z", maxFloorHeight_, maxObstaclesHeight_);
+
+		ROS_ERROR("BBBb3333333333333333333333333");
 
 		ros::Time lasttime = ros::Time::now();
 
