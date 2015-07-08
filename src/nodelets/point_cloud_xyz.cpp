@@ -69,7 +69,8 @@ public:
 		approxSyncDepth_(0),
 		approxSyncDisparity_(0),
 		exactSyncDepth_(0),
-		exactSyncDisparity_(0)
+		exactSyncDisparity_(0),
+		cut_(0)
 	{}
 
 	virtual ~PointCloudXYZ()
@@ -99,6 +100,7 @@ private:
 		pnh.param("decimation", decimation_, decimation_);
 		pnh.param("noise_filter_radius", noiseFilterRadius_, noiseFilterRadius_);
 		pnh.param("noise_filter_min_neighbors", noiseFilterMinNeighbors_, noiseFilterMinNeighbors_);
+		pnh.param("cut", cut_, cut_);
 		ROS_INFO("Approximate time sync = %s", approxSync?"true":"false");
 
 		if(approxSync)
@@ -147,6 +149,18 @@ private:
 		if(cloudPub_.getNumSubscribers())
 		{
 			cv_bridge::CvImageConstPtr imageDepthPtr = cv_bridge::toCvShare(depth);
+			cv::Mat image=imageDepthPtr->image;
+			int rows = image.rows;
+			int cols = image.cols;
+
+			if (cut_>0){
+				cv::Mat pRoi = image(cv::Rect(0, 0, cut_, rows));
+				pRoi.setTo(cv::Scalar(0.));
+			}
+			else if (cut_<0){
+				cv::Mat pRoi = image(cv::Rect(cols+cut_, 0, -cut_, rows));
+				pRoi.setTo(cv::Scalar(0.));
+			}
 
 			image_geometry::PinholeCameraModel model;
 			model.fromCameraInfo(*cameraInfo);
@@ -157,13 +171,12 @@ private:
 
 			pcl::PointCloud<pcl::PointXYZ>::Ptr pclCloud;
 			pclCloud = rtabmap::util3d::cloudFromDepth(
-					imageDepthPtr->image,
+					image,
 					cx,
 					cy,
 					fx,
 					fy,
 					decimation_);
-
 			processAndPublish(pclCloud, depth->header);
 		}
 	}
@@ -245,6 +258,7 @@ private:
 	int decimation_;
 	double noiseFilterRadius_;
 	int noiseFilterMinNeighbors_;
+	int cut_;
 
 	ros::Publisher cloudPub_;
 

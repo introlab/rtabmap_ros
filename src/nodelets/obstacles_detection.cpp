@@ -157,27 +157,20 @@ private:
 
 		ros::Time lasttime = ros::Time::now();
 
+		hypotheticalGroundCloud = rtabmap::util3d::passThrough(originalCloud, "z", std::numeric_limits<int>::min(), maxFloorHeight_);
+
 		if (!simpleSegmentation_){
 
-			ROS_ERROR("1-1");
-			hypotheticalGroundCloud = rtabmap::util3d::passThrough(originalCloud, "z", std::numeric_limits<int>::min(), maxFloorHeight_);
-			ROS_ERROR("1-2");
 
 			rtabmap::util3d::segmentObstaclesFromGround<pcl::PointXYZ>(hypotheticalGroundCloud,
 					ground, obstacles, normalEstimationRadius_, groundNormalAngle_, minClusterSize_);
-
-			ROS_ERROR("1-3");
 
 			if(ground.get() && ground->size())
 			{
 				pcl::copyPointCloud(*hypotheticalGroundCloud, *ground, *groundCloud);
 			}
 
-			ROS_ERROR("1-4");
-
 			obstaclesCloud = rtabmap::util3d::passThrough(originalCloud, "z", maxFloorHeight_, maxObstaclesHeight_);
-
-			ROS_ERROR("1-5");
 
 			if(obstacles.get() && obstacles->size())
 			{
@@ -185,27 +178,25 @@ private:
 				pcl::copyPointCloud(*hypotheticalGroundCloud, *obstacles, *obstaclesNearFloorCloud);
 				*obstaclesCloud += *obstaclesNearFloorCloud;
 			}
-			ROS_ERROR("R 44444444444444444444444444444");
 
 		}
 		else{
-			ROS_ERROR("2-1");
 			obstaclesCloud = rtabmap::util3d::passThrough(originalCloud, "z", maxFloorHeight_, maxObstaclesHeight_);
-			ROS_ERROR("2-2");
 		}
 
 
-		/*
+
 		if(groundPub_.getNumSubscribers())
 		{
 			sensor_msgs::PointCloud2 rosCloud;
-			pcl::toROSMsg(*groundCloud, rosCloud);
+			if (simpleSegmentation_) {pcl::toROSMsg(*hypotheticalGroundCloud, rosCloud);;}
+			else {pcl::toROSMsg(*groundCloud, rosCloud);}
 			rosCloud.header.stamp = cloudMsg->header.stamp;
 			rosCloud.header.frame_id = frameId_;
 
 			//publish the message
 			groundPub_.publish(rosCloud);
-		}*/
+		}
 
 		if(obstaclesPub_.getNumSubscribers())
 		{
@@ -223,9 +214,9 @@ private:
 		ros::Duration process_duration = curtime - lasttime;
 		ros::Duration between_frames = curtime - this->_lastFrameTime;
 		this->_lastFrameTime = curtime;
-		std::stringstream buffer;
-		buffer << "cloud=" << originalCloud->size() << " ground=" << hypotheticalGroundCloud->size() << " floor=" << ground->size() << " obst=" << obstacles->size();
-		buffer << " t=" << process_duration.toSec() << "s; " << (1./between_frames.toSec()) << "Hz";
+		//std::stringstream buffer;
+		//buffer << "cloud=" << originalCloud->size() << " ground=" << hypotheticalGroundCloud->size() << " floor=" << ground->size() << " obst=" << obstacles->size();
+		//buffer << " t=" << process_duration.toSec() << "s; " << (1./between_frames.toSec()) << "Hz";
 		//ROS_ERROR("3%s: %s", this->getName().c_str(), buffer.str().c_str());
 
 	}
