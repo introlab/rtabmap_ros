@@ -126,7 +126,6 @@ private:
 				}
 			}
 
-			ROS_ERROR("2222222222222222222222222222222");
 
 			tf::StampedTransform tmp;
 			tfListener_.lookupTransform(frameId_, cloudMsg->header.frame_id, cloudMsg->header.stamp, tmp);
@@ -148,38 +147,38 @@ private:
 		}
 		originalCloud = rtabmap::util3d::transformPointCloud(originalCloud, localTransform);
 
-		ROS_ERROR("3333333333333333333333333");
 
 		/////////////////////////////////////////////////////////////////////////////
 
 		pcl::PointCloud<pcl::PointXYZ>::Ptr hypotheticalGroundCloud(new pcl::PointCloud<pcl::PointXYZ>);
-		hypotheticalGroundCloud = rtabmap::util3d::passThrough(originalCloud, "z", std::numeric_limits<int>::min(), maxFloorHeight_);
-
-		ROS_ERROR("AAAa3333333333333333333333333");
-
 		pcl::PointCloud<pcl::PointXYZ>::Ptr obstaclesCloud(new pcl::PointCloud<pcl::PointXYZ>);
-
-		ROS_ERROR("BBBb3333333333333333333333333");
-
-		ros::Time lasttime = ros::Time::now();
-
 		pcl::IndicesPtr ground, obstacles;
 		pcl::PointCloud<pcl::PointXYZ>::Ptr groundCloud(new pcl::PointCloud<pcl::PointXYZ>);
 
+		ros::Time lasttime = ros::Time::now();
+
 		if (!simpleSegmentation_){
-			ROS_ERROR("44444444444444444444444444444");
+
+			ROS_ERROR("1-1");
+			hypotheticalGroundCloud = rtabmap::util3d::passThrough(originalCloud, "z", std::numeric_limits<int>::min(), maxFloorHeight_);
+
+			ROS_ERROR("1-2");
 
 			rtabmap::util3d::segmentObstaclesFromGround<pcl::PointXYZ>(hypotheticalGroundCloud,
 					ground, obstacles, normalEstimationRadius_, groundNormalAngle_, minClusterSize_);
+
+			ROS_ERROR("1-3");
 
 			if(ground.get() && ground->size())
 			{
 				pcl::copyPointCloud(*hypotheticalGroundCloud, *ground, *groundCloud);
 			}
 
+			ROS_ERROR("1-4");
+
 			obstaclesCloud = rtabmap::util3d::passThrough(originalCloud, "z", maxFloorHeight_, maxObstaclesHeight_);
 
-			ROS_ERROR("RRR 44444444444444444444444444444");
+			ROS_ERROR("1-5");
 
 			if(obstacles.get() && obstacles->size())
 			{
@@ -191,12 +190,7 @@ private:
 
 		}
 		else{
-			ROS_ERROR("555555555555555555555555");
 			obstaclesCloud = rtabmap::util3d::passThrough(originalCloud, "z", maxFloorHeight_, maxObstaclesHeight_);
-			ROS_ERROR("RRR 555555555555555555555555");
-
-			groundCloud = hypotheticalGroundCloud;
-
 		}
 
 
