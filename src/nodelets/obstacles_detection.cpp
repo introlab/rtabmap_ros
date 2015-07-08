@@ -179,17 +179,24 @@ private:
 
 			obstaclesCloud = rtabmap::util3d::passThrough(originalCloud, "z", maxFloorHeight_, maxObstaclesHeight_);
 
+			ROS_ERROR("RRR 44444444444444444444444444444");
+
 			if(obstacles.get() && obstacles->size())
 			{
 				pcl::PointCloud<pcl::PointXYZ>::Ptr obstaclesNearFloorCloud(new pcl::PointCloud<pcl::PointXYZ>);
 				pcl::copyPointCloud(*hypotheticalGroundCloud, *obstacles, *obstaclesNearFloorCloud);
 				*obstaclesCloud += *obstaclesNearFloorCloud;
 			}
+			ROS_ERROR("R 44444444444444444444444444444");
+
 		}
 		else{
 			ROS_ERROR("555555555555555555555555");
 			obstaclesCloud = rtabmap::util3d::passThrough(originalCloud, "z", maxFloorHeight_, maxObstaclesHeight_);
+			ROS_ERROR("RRR 555555555555555555555555");
+
 			groundCloud = hypotheticalGroundCloud;
+
 		}
 
 
