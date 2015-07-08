@@ -161,7 +161,6 @@ private:
 
 			ROS_ERROR("1-1");
 			hypotheticalGroundCloud = rtabmap::util3d::passThrough(originalCloud, "z", std::numeric_limits<int>::min(), maxFloorHeight_);
-
 			ROS_ERROR("1-2");
 
 			rtabmap::util3d::segmentObstaclesFromGround<pcl::PointXYZ>(hypotheticalGroundCloud,
@@ -190,7 +189,9 @@ private:
 
 		}
 		else{
+			ROS_ERROR("2-1");
 			obstaclesCloud = rtabmap::util3d::passThrough(originalCloud, "z", maxFloorHeight_, maxObstaclesHeight_);
+			ROS_ERROR("2-2");
 		}
 
 
