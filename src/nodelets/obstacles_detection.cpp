@@ -140,11 +140,35 @@ private:
 
 		pcl::PointCloud<pcl::PointXYZ>::Ptr originalCloud(new pcl::PointCloud<pcl::PointXYZ>);
 		pcl::fromROSMsg(*cloudMsg, *originalCloud);
+
 		if(originalCloud->size() == 0)
 		{
 			ROS_ERROR("Recieved empty point cloud!");
+			if(groundPub_.getNumSubscribers())
+			{
+				sensor_msgs::PointCloud2 rosCloud;
+				pcl::toROSMsg(*originalCloud, rosCloud);
+				rosCloud.header.stamp = cloudMsg->header.stamp;
+				rosCloud.header.frame_id = frameId_;
+
+				//publish the message
+				groundPub_.publish(rosCloud);
+			}
+
+			if(obstaclesPub_.getNumSubscribers())
+			{
+				sensor_msgs::PointCloud2 rosCloud;
+				pcl::toROSMsg(*originalCloud, rosCloud);
+				rosCloud.header.stamp = cloudMsg->header.stamp;
+				rosCloud.header.frame_id = frameId_;
+
+				//publish the message
+				obstaclesPub_.publish(rosCloud);
+			}
 			return;
 		}
+
+
 		originalCloud = rtabmap::util3d::transformPointCloud(originalCloud, localTransform);
 
 
