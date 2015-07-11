@@ -71,7 +71,8 @@ public:
 		exactSyncDepth_(0),
 		exactSyncDisparity_(0),
 		cut_right_(0),
-		cut_left_(0)
+		cut_left_(0),
+		special_filter_close_object_(false)
 	{}
 
 	virtual ~PointCloudXYZ()
@@ -103,6 +104,8 @@ private:
 		pnh.param("noise_filter_min_neighbors", noiseFilterMinNeighbors_, noiseFilterMinNeighbors_);
 		pnh.param("cut_left", cut_left_, cut_left_);
 		pnh.param("cut_right", cut_right_, cut_right_);
+		pnh.param("special_filter_close_object", special_filter_close_object_, special_filter_close_object_);
+
 		ROS_INFO("Approximate time sync = %s", approxSync?"true":"false");
 
 		if(approxSync)
@@ -163,6 +166,29 @@ private:
 				cv::Mat pRoi = image(cv::Rect(cols-cut_right_, 0, cut_right_, rows));
 				pRoi.setTo(cv::Scalar(0.));
 			}
+
+			if (special_filter_close_object_){
+				cv::Mat pRoi = image(cv::Rect(int(0.05*(float(cols))),int(0.05*(float(rows))),int(0.9*(float(cols))),int(0.9*float(rows))));
+				//cv::GaussianBlur(pRoi, pRoi, cv::Size(3, 3), 0, 0);
+				cv::medianBlur(pRoi, pRoi, 3);
+
+				//Do filter of close objects
+				pRoi = image(cv::Rect(int(cols/10),int(0.8*(float(rows))),int(0.8*(float(cols))),int(0.15*float(rows))));
+				cv::Mat bluredImage=pRoi.clone();
+
+				//Working Ok with 15 / 15
+				cv::GaussianBlur(pRoi, bluredImage, cv::Size(5, 5), 0, 0);
+
+				for(int y = 0; y < bluredImage.cols; y++)
+					for(int x = 0; x < bluredImage.rows; x++){
+						if (bluredImage.at<unsigned short>(x,y) == 0){
+							pRoi.at<unsigned short>(x,y) = 400;
+						}
+					}
+			}
+
+
+
 
 			image_geometry::PinholeCameraModel model;
 			model.fromCameraInfo(*cameraInfo);
@@ -262,6 +288,7 @@ private:
 	int noiseFilterMinNeighbors_;
 	int cut_left_;
 	int cut_right_;
+	bool special_filter_close_object_;
 
 	ros::Publisher cloudPub_;
 
