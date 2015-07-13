@@ -169,7 +169,6 @@ private:
 
 			if (special_filter_close_object_){
 				cv::Mat pRoi = image(cv::Rect(int(0.05*(float(cols))),int(0.05*(float(rows))),int(0.9*(float(cols))),int(0.9*float(rows))));
-				//cv::GaussianBlur(pRoi, pRoi, cv::Size(3, 3), 0, 0);
 				cv::medianBlur(pRoi, pRoi, 3);
 
 				//Do filter of close objects
@@ -186,10 +185,6 @@ private:
 						}
 					}
 			}
-
-
-
-
 			image_geometry::PinholeCameraModel model;
 			model.fromCameraInfo(*cameraInfo);
 			float fx = model.fx();
