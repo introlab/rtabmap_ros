@@ -73,7 +73,8 @@ public:
 		maxFloorHeight_(-1),
 		maxObstaclesHeight_(1.5),
 		waitForTransform_(false),
-		simpleSegmentation_(false)
+		simpleSegmentation_(false),
+		optimizeForCloseObject_(true)
 	{}
 
 	virtual ~ObstaclesDetection()
@@ -95,6 +96,7 @@ private:
 		pnh.param("max_floor_height", maxFloorHeight_, maxFloorHeight_);
 		pnh.param("wait_for_transform", waitForTransform_, waitForTransform_);
 		pnh.param("simple_segmentation", simpleSegmentation_, simpleSegmentation_);
+		pnh.param("optimize_for_close_object", optimizeForCloseObject_, optimizeForCloseObject_);
 
 		cloudSub_ = nh.subscribe("cloud", 1, &ObstaclesDetection::callback, this);
 
@@ -181,9 +183,7 @@ private:
 
 		ros::Time lasttime = ros::Time::now();
 
-
-/*
-		if (!simpleSegmentation_){
+		if (!simpleSegmentation_ && !optimizeForCloseObject_){
 
 			originalCloud = rtabmap::util3d::transformPointCloud(originalCloud, localTransform);
 			hypotheticalGroundCloud = rtabmap::util3d::passThrough(originalCloud, "z", std::numeric_limits<int>::min(), maxFloorHeight_);
@@ -205,8 +205,16 @@ private:
 				*obstaclesCloud += *obstaclesNearFloorCloud;
 			}
 
-		}*/
-		if (!simpleSegmentation_){
+		}
+		if (!simpleSegmentation_ && optimizeForCloseObject_){
+			// If the option optimize for close object has been set to true,
+			// we divide the floor point cloud into two subsections, one for all potential floor points up to 1m
+			// one for potential floor points further away than 1m.
+			// For the points at closer range, we use a smaller normal estimation radius and ground normal angle,
+			// which allows to detect smaller objects, without increasing the number of false positive.
+			// For all other points, we use a biger normal estimation radius (* 3.) and a bigger tolerance for the
+			// grond normal angle (* 2.).
+
 
 			originalCloud = rtabmap::util3d::transformPointCloud(originalCloud, localTransform);
 			pcl::PointCloud<pcl::PointXYZ>::Ptr originalCloud_front = rtabmap::util3d::passThrough(originalCloud, "x", std::numeric_limits<int>::min(), 1.);
@@ -306,6 +314,7 @@ private:
 	double maxFloorHeight_;
 	bool waitForTransform_;
 	bool simpleSegmentation_;
+	bool optimizeForCloseObject_;
 
 	tf::TransformListener tfListener_;
 

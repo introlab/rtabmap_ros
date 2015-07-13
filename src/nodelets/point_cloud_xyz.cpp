@@ -168,9 +168,8 @@ private:
 			}
 
 			if (special_filter_close_object_){
-				cv::Mat pRoi = image(cv::Rect(int(0.05*(float(cols))),int(0.05*(float(rows))),int(0.9*(float(cols))),int(0.9*float(rows))));
-				//cv::GaussianBlur(pRoi, pRoi, cv::Size(3, 3), 0, 0);
-				cv::medianBlur(pRoi, pRoi, 3);
+				//cv::Mat pRoi = image(cv::Rect(int(0.05*(float(cols))),int(0.05*(float(rows))),int(0.9*(float(cols))),int(0.9*float(rows))));
+				//cv::medianBlur(pRoi, pRoi, 3);
 
 				//Do filter of close objects
 				pRoi = image(cv::Rect(int(cols/10),int(0.8*(float(rows))),int(0.8*(float(cols))),int(0.15*float(rows))));
@@ -186,9 +185,6 @@ private:
 						}
 					}
 			}
-
-
-
 
 			image_geometry::PinholeCameraModel model;
 			model.fromCameraInfo(*cameraInfo);
