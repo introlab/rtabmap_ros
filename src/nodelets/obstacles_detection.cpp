@@ -224,6 +224,7 @@ private:
 			pcl::PointCloud<pcl::PointXYZ>::Ptr hypotheticalGroundCloud_back = rtabmap::util3d::passThrough(originalCloud_back, "z", std::numeric_limits<int>::min(), maxFloorHeight_);
 
 			obstaclesCloud = rtabmap::util3d::passThrough(originalCloud, "z", maxFloorHeight_, maxObstaclesHeight_);
+			obstaclesCloud = rtabmap::util3d::passThrough(obstaclesCloud, "x",  0.8, std::numeric_limits<int>::max());
 
 			//STEP 1.
 			rtabmap::util3d::segmentObstaclesFromGround<pcl::PointXYZ>(hypotheticalGroundCloud_front,
