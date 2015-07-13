@@ -158,6 +158,10 @@ private:
 			int rows = image.rows;
 			int cols = image.cols;
 
+			//Cut left and cut right options to mask the image.
+			//If cut_left (resp. cut_right)  is set to a positive value, we set the first (resp. last) columns
+			//of the depth image to 0, meaning that no depth reading has been received.
+			//Number of columns to be masked is equal to cut_left (resp. cut_right value)
 			if (cut_left_>0){
 				cv::Mat pRoi = image(cv::Rect(0, 0, cut_left_, rows));
 				pRoi.setTo(cv::Scalar(0.));
@@ -167,6 +171,13 @@ private:
 				pRoi.setTo(cv::Scalar(0.));
 			}
 
+			//This option enables a filter for close object.
+			//Fist, we do a median blur on the image to get rid of potential noise
+			//Second, we set all false reading that are likely due to an object sitting in front of the camera
+			// to a short distance estimation (here, 40cm).
+			//This hence make the assumption that the depth camera is looking forward and sees the floor on
+			// the bottom rows of the depth image
+			//This option is highly experimental and should be used with extreme care.
 			if (special_filter_close_object_){
 				cv::Mat pRoi = image(cv::Rect(int(0.05*(float(cols))),int(0.05*(float(rows))),int(0.9*(float(cols))),int(0.9*float(rows))));
 				cv::medianBlur(pRoi, pRoi, 3);
@@ -174,10 +185,7 @@ private:
 				//Do filter of close objects
 				pRoi = image(cv::Rect(int(cols/10),int(0.8*(float(rows))),int(0.8*(float(cols))),int(0.15*float(rows))));
 				cv::Mat bluredImage=pRoi.clone();
-
-				//Working Ok with 15 / 15
 				cv::GaussianBlur(pRoi, bluredImage, cv::Size(5, 5), 0, 0);
-
 				for(int y = 0; y < bluredImage.cols; y++)
 					for(int x = 0; x < bluredImage.rows; x++){
 						if (bluredImage.at<unsigned short>(x,y) == 0){

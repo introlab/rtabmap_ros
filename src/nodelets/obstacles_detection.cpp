@@ -291,11 +291,6 @@ private:
 		ros::Duration process_duration = curtime - lasttime;
 		ros::Duration between_frames = curtime - this->_lastFrameTime;
 		this->_lastFrameTime = curtime;
-		//std::stringstream buffer;
-		//buffer << "cloud=" << originalCloud->size() << " ground=" << hypotheticalGroundCloud->size() << " floor=" << ground->size() << " obst=" << obstacles->size();
-		//buffer << " t=" << process_duration.toSec() << "s; " << (1./between_frames.toSec()) << "Hz";
-		//ROS_ERROR("3%s: %s", this->getName().c_str(), buffer.str().c_str());
-
 	}
 
 private:
