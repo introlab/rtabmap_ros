@@ -193,6 +193,7 @@ private:
 						}
 					}
 			}
+
 			image_geometry::PinholeCameraModel model;
 			model.fromCameraInfo(*cameraInfo);
 			float fx = model.fx();
