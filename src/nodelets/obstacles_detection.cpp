@@ -127,8 +127,6 @@ private:
 					return;
 				}
 			}
-
-
 			tf::StampedTransform tmp;
 			tfListener_.lookupTransform(frameId_, cloudMsg->header.frame_id, cloudMsg->header.stamp, tmp);
 			localTransform = rtabmap_ros::transformFromTF(tmp);
@@ -139,10 +137,11 @@ private:
 			return;
 		}
 
-
 		pcl::PointCloud<pcl::PointXYZ>::Ptr originalCloud(new pcl::PointCloud<pcl::PointXYZ>);
 		pcl::fromROSMsg(*cloudMsg, *originalCloud);
 
+		//Even if the original cloud is empty, we need to publish the empty cloud,
+		//Otherwise, the aggregator of point cloud would wait indefinitely to get a valid pointcloud
 		if(originalCloud->size() == 0)
 		{
 			ROS_ERROR("Recieved empty point cloud!");
@@ -170,12 +169,7 @@ private:
 			return;
 		}
 
-
-
-
-
-		/////////////////////////////////////////////////////////////////////////////
-
+		//Common variables for all strategies
 		pcl::PointCloud<pcl::PointXYZ>::Ptr hypotheticalGroundCloud(new pcl::PointCloud<pcl::PointXYZ>);
 		pcl::PointCloud<pcl::PointXYZ>::Ptr obstaclesCloud(new pcl::PointCloud<pcl::PointXYZ>);
 		pcl::IndicesPtr ground, obstacles;
@@ -184,7 +178,11 @@ private:
 		ros::Time lasttime = ros::Time::now();
 
 		if (!simpleSegmentation_ && !optimizeForCloseObject_){
-
+			//This is the default strategy
+			//The cloud is divided into two pointcloud based on reported Z and the position of the camera.
+			// One is the hypothetical ground cloud and the other one is the obstacles pointcloud.
+			//The algorithm then extracts (and remove) from the hypothetical ground cloud the detected obstacles,
+			//and add them to the obstacles pointcloud
 			originalCloud = rtabmap::util3d::transformPointCloud(originalCloud, localTransform);
 			hypotheticalGroundCloud = rtabmap::util3d::passThrough(originalCloud, "z", std::numeric_limits<int>::min(), maxFloorHeight_);
 
@@ -214,7 +212,6 @@ private:
 			// which allows to detect smaller objects, without increasing the number of false positive.
 			// For all other points, we use a biger normal estimation radius (* 3.) and a bigger tolerance for the
 			// grond normal angle (* 2.).
-
 
 			originalCloud = rtabmap::util3d::transformPointCloud(originalCloud, localTransform);
 			pcl::PointCloud<pcl::PointXYZ>::Ptr originalCloud_front = rtabmap::util3d::passThrough(originalCloud, "x", std::numeric_limits<int>::min(), 1.);
@@ -264,11 +261,12 @@ private:
 
 		}
 		else{
+			//If the option simple segmentation has been set to true,
+			//the floor is always the hypothetical ground cloud, with is a cut-off based on the z estimation of each point
 			originalCloud = rtabmap::util3d::transformPointCloud(originalCloud, localTransform);
 			hypotheticalGroundCloud = rtabmap::util3d::passThrough(originalCloud, "z", std::numeric_limits<int>::min(), maxFloorHeight_);
 			obstaclesCloud = rtabmap::util3d::passThrough(originalCloud, "z", maxFloorHeight_, maxObstaclesHeight_);
 		}
-
 
 
 		if(groundPub_.getNumSubscribers())
