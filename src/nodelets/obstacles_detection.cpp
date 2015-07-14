@@ -181,12 +181,19 @@ private:
 		hypotheticalGroundCloud  = rtabmap::util3d::passThrough(originalCloud, "z", std::numeric_limits<int>::min(), maxFloorHeight_);
 		obstaclesCloud = rtabmap::util3d::passThrough(originalCloud, "z", maxFloorHeight_, maxObstaclesHeight_);
 
-		if (!simpleSegmentation_ && !optimizeForCloseObject_){
-			//This is the default strategy
-			//The cloud is divided into two pointcloud based on reported Z and the position of the camera.
+		if (simpleSegmentation_){
+		    // If the option simple segmentation has been set to true,
+		    // the floor is just the hypothetical ground cloud, simply
+		    // cut off based on z
+		    groundCloud = hypotheticalGroundCloud;
+		}
+
+		else if (!optimizeForCloseObject_){
+			// This is the default strategy
+			// The cloud is divided in two based on reported Z and the position of the camera.
 			// One is the hypothetical ground cloud and the other one is the obstacles pointcloud.
-			//The algorithm then extracts (and remove) from the hypothetical ground cloud the detected obstacles,
-			//and add them to the obstacles pointcloud
+			// The algorithm then extracts (and removes) from the hypothetical ground cloud
+			// the detected obstacles, and adds them to the obstacles pointcloud
 
 			rtabmap::util3d::segmentObstaclesFromGround<pcl::PointXYZ>(hypotheticalGroundCloud,
 					ground, obstacles, normalEstimationRadius_, groundNormalAngle_, minClusterSize_);
@@ -204,13 +211,14 @@ private:
 			}
 
 		}
-		if (!simpleSegmentation_ && optimizeForCloseObject_){
+
+		else if (optimizeForCloseObject_){
 			// If the option optimize for close object has been set to true,
 			// we divide the floor point cloud into two subsections, one for all potential floor points up to 1m
 			// one for potential floor points further away than 1m.
 			// For the points at closer range, we use a smaller normal estimation radius and ground normal angle,
 			// which allows to detect smaller objects, without increasing the number of false positive.
-			// For all other points, we use a biger normal estimation radius (* 3.) and a bigger tolerance for the
+			// For all other points, we use a bigger normal estimation radius (* 3.) and tolerance for the
 			// grond normal angle (* 2.).
 
 			pcl::PointCloud<pcl::PointXYZ>::Ptr hypotheticalGroundCloud_near = rtabmap::util3d::passThrough(hypotheticalGroundCloud, "x", std::numeric_limits<int>::min(), 1.);
@@ -255,14 +263,11 @@ private:
 			}
 
 		}
-		//If the option simple segmentation has been set to true,
-		//the floor is always the hypothetical ground cloud, with is a cut-off based on the z estimation of each point
 
 		if(groundPub_.getNumSubscribers())
 		{
 			sensor_msgs::PointCloud2 rosCloud;
-			if (simpleSegmentation_) {pcl::toROSMsg(*hypotheticalGroundCloud, rosCloud);;}
-			else {pcl::toROSMsg(*groundCloud, rosCloud);}
+			pcl::toROSMsg(*groundCloud, rosCloud);
 			rosCloud.header.stamp = cloudMsg->header.stamp;
 			rosCloud.header.frame_id = frameId_;
 
