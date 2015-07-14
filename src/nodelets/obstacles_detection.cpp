@@ -181,14 +181,14 @@ private:
 		hypotheticalGroundCloud  = rtabmap::util3d::passThrough(originalCloud, "z", std::numeric_limits<int>::min(), maxFloorHeight_);
 		obstaclesCloud = rtabmap::util3d::passThrough(originalCloud, "z", maxFloorHeight_, maxObstaclesHeight_);
 
-		if (simpleSegmentation_){
+		if (simpleSegmentation_) {
 		    // If the option simple segmentation has been set to true,
 		    // the floor is just the hypothetical ground cloud, simply
 		    // cut off based on z
 		    groundCloud = hypotheticalGroundCloud;
 		}
 
-		else if (!optimizeForCloseObject_){
+		else if (!optimizeForCloseObject_) {
 			// This is the default strategy
 			// The cloud is divided in two based on reported Z and the position of the camera.
 			// One is the hypothetical ground cloud and the other one is the obstacles pointcloud.
@@ -212,8 +212,8 @@ private:
 
 		}
 
-		else if (optimizeForCloseObject_){
-			// If the option optimize for close object has been set to true,
+		else {
+			// in this case optimizeForCloseObject_ is true:
 			// we divide the floor point cloud into two subsections, one for all potential floor points up to 1m
 			// one for potential floor points further away than 1m.
 			// For the points at closer range, we use a smaller normal estimation radius and ground normal angle,
