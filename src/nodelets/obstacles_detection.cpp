@@ -177,14 +177,16 @@ private:
 
 		ros::Time lasttime = ros::Time::now();
 
+		originalCloud = rtabmap::util3d::transformPointCloud(originalCloud, localTransform);
+		hypotheticalGroundCloud  = rtabmap::util3d::passThrough(originalCloud, "z", std::numeric_limits<int>::min(), maxFloorHeight_);
+		obstaclesCloud = rtabmap::util3d::passThrough(originalCloud, "z", maxFloorHeight_, maxObstaclesHeight_);
+
 		if (!simpleSegmentation_ && !optimizeForCloseObject_){
 			//This is the default strategy
 			//The cloud is divided into two pointcloud based on reported Z and the position of the camera.
 			// One is the hypothetical ground cloud and the other one is the obstacles pointcloud.
 			//The algorithm then extracts (and remove) from the hypothetical ground cloud the detected obstacles,
 			//and add them to the obstacles pointcloud
-			originalCloud = rtabmap::util3d::transformPointCloud(originalCloud, localTransform);
-			hypotheticalGroundCloud = rtabmap::util3d::passThrough(originalCloud, "z", std::numeric_limits<int>::min(), maxFloorHeight_);
 
 			rtabmap::util3d::segmentObstaclesFromGround<pcl::PointXYZ>(hypotheticalGroundCloud,
 					ground, obstacles, normalEstimationRadius_, groundNormalAngle_, minClusterSize_);
@@ -193,8 +195,6 @@ private:
 			{
 				pcl::copyPointCloud(*hypotheticalGroundCloud, *ground, *groundCloud);
 			}
-
-			obstaclesCloud = rtabmap::util3d::passThrough(originalCloud, "z", maxFloorHeight_, maxObstaclesHeight_);
 
 			if(obstacles.get() && obstacles->size())
 			{
@@ -213,14 +213,9 @@ private:
 			// For all other points, we use a biger normal estimation radius (* 3.) and a bigger tolerance for the
 			// grond normal angle (* 2.).
 
-			originalCloud = rtabmap::util3d::transformPointCloud(originalCloud, localTransform);
-			pcl::PointCloud<pcl::PointXYZ>::Ptr originalCloud_front = rtabmap::util3d::passThrough(originalCloud, "x", std::numeric_limits<int>::min(), 1.);
-			pcl::PointCloud<pcl::PointXYZ>::Ptr originalCloud_back = rtabmap::util3d::passThrough(originalCloud, "x", 1., std::numeric_limits<int>::max());
+			pcl::PointCloud<pcl::PointXYZ>::Ptr hypotheticalGroundCloud_front = rtabmap::util3d::passThrough(hypotheticalGroundCloud, "x", std::numeric_limits<int>::min(), 1.);
+			pcl::PointCloud<pcl::PointXYZ>::Ptr hypotheticalGroundCloud_back = rtabmap::util3d::passThrough(hypotheticalGroundCloud, "x", 1., std::numeric_limits<int>::max());
 
-			pcl::PointCloud<pcl::PointXYZ>::Ptr hypotheticalGroundCloud_front = rtabmap::util3d::passThrough(originalCloud_front, "z", std::numeric_limits<int>::min(), maxFloorHeight_);
-			pcl::PointCloud<pcl::PointXYZ>::Ptr hypotheticalGroundCloud_back = rtabmap::util3d::passThrough(originalCloud_back, "z", std::numeric_limits<int>::min(), maxFloorHeight_);
-
-			obstaclesCloud = rtabmap::util3d::passThrough(originalCloud, "z", maxFloorHeight_, maxObstaclesHeight_);
 			obstaclesCloud = rtabmap::util3d::passThrough(obstaclesCloud, "x",  0.8, std::numeric_limits<int>::max());
 
 			//STEP 1.
@@ -254,20 +249,14 @@ private:
 
 			if(obstacles.get() && obstacles->size())
 			{
-				pcl::PointCloud<pcl::PointXYZ>::Ptr obstaclesNearFloorCloud(new pcl::PointCloud<pcl::PointXYZ>);
-				pcl::copyPointCloud(*hypotheticalGroundCloud_back, *obstacles, *obstaclesNearFloorCloud);
-				*obstaclesCloud += *obstaclesNearFloorCloud;
+				pcl::PointCloud<pcl::PointXYZ>::Ptr obstaclesNearFloorBackCloud(new pcl::PointCloud<pcl::PointXYZ>);
+				pcl::copyPointCloud(*hypotheticalGroundCloud_back, *obstacles, *obstaclesNearFloorBackCloud);
+				*obstaclesCloud += *obstaclesNearFloorBackCloud;
 			}
 
 		}
-		else{
-			//If the option simple segmentation has been set to true,
-			//the floor is always the hypothetical ground cloud, with is a cut-off based on the z estimation of each point
-			originalCloud = rtabmap::util3d::transformPointCloud(originalCloud, localTransform);
-			hypotheticalGroundCloud = rtabmap::util3d::passThrough(originalCloud, "z", std::numeric_limits<int>::min(), maxFloorHeight_);
-			obstaclesCloud = rtabmap::util3d::passThrough(originalCloud, "z", maxFloorHeight_, maxObstaclesHeight_);
-		}
-
+		//If the option simple segmentation has been set to true,
+		//the floor is always the hypothetical ground cloud, with is a cut-off based on the z estimation of each point
 
 		if(groundPub_.getNumSubscribers())
 		{

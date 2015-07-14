@@ -72,7 +72,7 @@ public:
 		exactSyncDisparity_(0),
 		cut_right_(0),
 		cut_left_(0),
-		special_filter_close_object_(false)
+		create_close_obstacle_if_depth_is_missing_(false)
 	{}
 
 	virtual ~PointCloudXYZ()
@@ -104,7 +104,7 @@ private:
 		pnh.param("noise_filter_min_neighbors", noiseFilterMinNeighbors_, noiseFilterMinNeighbors_);
 		pnh.param("cut_left", cut_left_, cut_left_);
 		pnh.param("cut_right", cut_right_, cut_right_);
-		pnh.param("special_filter_close_object", special_filter_close_object_, special_filter_close_object_);
+		pnh.param("special_filter_close_object", create_close_obstacle_if_depth_is_missing_, create_close_obstacle_if_depth_is_missing_);
 
 		ROS_INFO("Approximate time sync = %s", approxSync?"true":"false");
 
@@ -178,17 +178,19 @@ private:
 			//This hence make the assumption that the depth camera is looking forward and sees the floor on
 			// the bottom rows of the depth image
 			//This option is highly experimental and should be used with extreme care.
-			if (special_filter_close_object_){
+			if (create_close_obstacle_if_depth_is_missing_){
 				cv::Mat pRoi = image(cv::Rect(int(0.05*(float(cols))),int(0.05*(float(rows))),int(0.9*(float(cols))),int(0.9*float(rows))));
 				cv::medianBlur(pRoi, pRoi, 3);
 
 				//Do filter of close objects
+				//If the depth is registered, there is usually a black frame around the depth image
+				//Hence, the ROI stops before the expected "frame"
 				pRoi = image(cv::Rect(int(cols/10),int(0.8*(float(rows))),int(0.8*(float(cols))),int(0.15*float(rows))));
-				cv::Mat bluredImage=pRoi.clone();
-				cv::GaussianBlur(pRoi, bluredImage, cv::Size(5, 5), 0, 0);
-				for(int y = 0; y < bluredImage.cols; y++)
-					for(int x = 0; x < bluredImage.rows; x++){
-						if (bluredImage.at<unsigned short>(x,y) == 0){
+				cv::Mat blurredImage=pRoi.clone();
+				cv::GaussianBlur(pRoi, blurredImage, cv::Size(5, 5), 0, 0);
+				for(int y = 0; y < blurredImage.cols; y++)
+					for(int x = 0; x < blurredImage.rows; x++){
+						if (blurredImage.at<unsigned short>(x,y) == 0){
 							pRoi.at<unsigned short>(x,y) = 400;
 						}
 					}
@@ -292,7 +294,7 @@ private:
 	int noiseFilterMinNeighbors_;
 	int cut_left_;
 	int cut_right_;
-	bool special_filter_close_object_;
+	bool create_close_obstacle_if_depth_is_missing_;
 
 	ros::Publisher cloudPub_;
 
