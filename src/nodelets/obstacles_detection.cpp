@@ -213,36 +213,36 @@ private:
 			// For all other points, we use a biger normal estimation radius (* 3.) and a bigger tolerance for the
 			// grond normal angle (* 2.).
 
-			pcl::PointCloud<pcl::PointXYZ>::Ptr hypotheticalGroundCloud_front = rtabmap::util3d::passThrough(hypotheticalGroundCloud, "x", std::numeric_limits<int>::min(), 1.);
-			pcl::PointCloud<pcl::PointXYZ>::Ptr hypotheticalGroundCloud_back = rtabmap::util3d::passThrough(hypotheticalGroundCloud, "x", 1., std::numeric_limits<int>::max());
+			pcl::PointCloud<pcl::PointXYZ>::Ptr hypotheticalGroundCloud_near = rtabmap::util3d::passThrough(hypotheticalGroundCloud, "x", std::numeric_limits<int>::min(), 1.);
+			pcl::PointCloud<pcl::PointXYZ>::Ptr hypotheticalGroundCloud_far = rtabmap::util3d::passThrough(hypotheticalGroundCloud, "x", 1., std::numeric_limits<int>::max());
 
 			obstaclesCloud = rtabmap::util3d::passThrough(obstaclesCloud, "x",  0.8, std::numeric_limits<int>::max());
 
 			//STEP 1.
-			rtabmap::util3d::segmentObstaclesFromGround<pcl::PointXYZ>(hypotheticalGroundCloud_front,
+			rtabmap::util3d::segmentObstaclesFromGround<pcl::PointXYZ>(hypotheticalGroundCloud_near,
 								ground, obstacles, normalEstimationRadius_, groundNormalAngle_, minClusterSize_);
 
 			if(ground.get() && ground->size())
 			{
-				pcl::copyPointCloud(*hypotheticalGroundCloud_front, *ground, *groundCloud);
+				pcl::copyPointCloud(*hypotheticalGroundCloud_near, *ground, *groundCloud);
 			}
 
 
 			if(obstacles.get() && obstacles->size())
 			{
 				pcl::PointCloud<pcl::PointXYZ>::Ptr obstaclesNearFloorCloud(new pcl::PointCloud<pcl::PointXYZ>);
-				pcl::copyPointCloud(*hypotheticalGroundCloud_front, *obstacles, *obstaclesNearFloorCloud);
+				pcl::copyPointCloud(*hypotheticalGroundCloud_near, *obstacles, *obstaclesNearFloorCloud);
 				*obstaclesCloud += *obstaclesNearFloorCloud;
 			}
 
 			//STEP 2.
-			rtabmap::util3d::segmentObstaclesFromGround<pcl::PointXYZ>(hypotheticalGroundCloud_back,
+			rtabmap::util3d::segmentObstaclesFromGround<pcl::PointXYZ>(hypotheticalGroundCloud_far,
 											ground, obstacles, 3.*normalEstimationRadius_, 2.*groundNormalAngle_, minClusterSize_);
 
 			if(ground.get() && ground->size())
 			{
 				pcl::PointCloud<pcl::PointXYZ>::Ptr groundCloud2 (new pcl::PointCloud<pcl::PointXYZ>);
-				pcl::copyPointCloud(*hypotheticalGroundCloud_back, *ground, *groundCloud2);
+				pcl::copyPointCloud(*hypotheticalGroundCloud_far, *ground, *groundCloud2);
 				*groundCloud += *groundCloud2;
 			}
 
@@ -250,7 +250,7 @@ private:
 			if(obstacles.get() && obstacles->size())
 			{
 				pcl::PointCloud<pcl::PointXYZ>::Ptr obstaclesNearFloorBackCloud(new pcl::PointCloud<pcl::PointXYZ>);
-				pcl::copyPointCloud(*hypotheticalGroundCloud_back, *obstacles, *obstaclesNearFloorBackCloud);
+				pcl::copyPointCloud(*hypotheticalGroundCloud_far, *obstacles, *obstaclesNearFloorBackCloud);
 				*obstaclesCloud += *obstaclesNearFloorBackCloud;
 			}
 
