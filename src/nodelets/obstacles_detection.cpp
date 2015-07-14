@@ -198,9 +198,9 @@ private:
 
 			if(obstacles.get() && obstacles->size())
 			{
-				pcl::PointCloud<pcl::PointXYZ>::Ptr obstaclesNearFloorCloud(new pcl::PointCloud<pcl::PointXYZ>);
-				pcl::copyPointCloud(*hypotheticalGroundCloud, *obstacles, *obstaclesNearFloorCloud);
-				*obstaclesCloud += *obstaclesNearFloorCloud;
+				pcl::PointCloud<pcl::PointXYZ>::Ptr obstaclesFloorCloud(new pcl::PointCloud<pcl::PointXYZ>);
+				pcl::copyPointCloud(*hypotheticalGroundCloud, *obstacles, *obstaclesFloorCloud);
+				*obstaclesCloud += *obstaclesFloorCloud;
 			}
 
 		}
@@ -218,7 +218,7 @@ private:
 
 			obstaclesCloud = rtabmap::util3d::passThrough(obstaclesCloud, "x",  0.8, std::numeric_limits<int>::max());
 
-			//STEP 1.
+			// Part 1: segment floor and obstacles near the robot
 			rtabmap::util3d::segmentObstaclesFromGround<pcl::PointXYZ>(hypotheticalGroundCloud_near,
 								ground, obstacles, normalEstimationRadius_, groundNormalAngle_, minClusterSize_);
 
@@ -230,12 +230,12 @@ private:
 
 			if(obstacles.get() && obstacles->size())
 			{
-				pcl::PointCloud<pcl::PointXYZ>::Ptr obstaclesNearFloorCloud(new pcl::PointCloud<pcl::PointXYZ>);
-				pcl::copyPointCloud(*hypotheticalGroundCloud_near, *obstacles, *obstaclesNearFloorCloud);
-				*obstaclesCloud += *obstaclesNearFloorCloud;
+				pcl::PointCloud<pcl::PointXYZ>::Ptr obstaclesFloorCloud_near(new pcl::PointCloud<pcl::PointXYZ>);
+				pcl::copyPointCloud(*hypotheticalGroundCloud_near, *obstacles, *obstaclesFloorCloud_near);
+				*obstaclesCloud += *obstaclesFloorCloud_near;
 			}
 
-			//STEP 2.
+			// Part 2: segment floor and obstacles far from the robot
 			rtabmap::util3d::segmentObstaclesFromGround<pcl::PointXYZ>(hypotheticalGroundCloud_far,
 											ground, obstacles, 3.*normalEstimationRadius_, 2.*groundNormalAngle_, minClusterSize_);
 
@@ -249,9 +249,9 @@ private:
 
 			if(obstacles.get() && obstacles->size())
 			{
-				pcl::PointCloud<pcl::PointXYZ>::Ptr obstaclesNearFloorBackCloud(new pcl::PointCloud<pcl::PointXYZ>);
-				pcl::copyPointCloud(*hypotheticalGroundCloud_far, *obstacles, *obstaclesNearFloorBackCloud);
-				*obstaclesCloud += *obstaclesNearFloorBackCloud;
+				pcl::PointCloud<pcl::PointXYZ>::Ptr obstaclesFloorCloud_far(new pcl::PointCloud<pcl::PointXYZ>);
+				pcl::copyPointCloud(*hypotheticalGroundCloud_far, *obstacles, *obstaclesFloorCloud_far);
+				*obstaclesCloud += *obstaclesFloorCloud_far;
 			}
 
 		}
