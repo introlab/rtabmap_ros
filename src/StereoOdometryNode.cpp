@@ -132,19 +132,21 @@ public:
 				return;
 			}
 
+			ros::Time stamp = imageRectLeft->header.stamp>imageRectRight->header.stamp?imageRectLeft->header.stamp:imageRectRight->header.stamp;
+
 			tf::StampedTransform localTransform;
 			try
 			{
 				if(this->waitForTransform())
 				{
-					if(!this->tfListener().waitForTransform(this->frameId(), imageRectLeft->header.frame_id, imageRectLeft->header.stamp, ros::Duration(1)))
+					if(!this->tfListener().waitForTransform(this->frameId(), imageRectLeft->header.frame_id, stamp, ros::Duration(1)))
 					{
 						ROS_WARN("Could not get transform from %s to %s after 1 second!", this->frameId().c_str(), imageRectLeft->header.frame_id.c_str());
 						return;
 					}
 				}
 
-				this->tfListener().lookupTransform(this->frameId(), imageRectLeft->header.frame_id, imageRectLeft->header.stamp, localTransform);
+				this->tfListener().lookupTransform(this->frameId(), imageRectLeft->header.frame_id, stamp, localTransform);
 			}
 			catch(tf::TransformException & ex)
 			{
@@ -185,9 +187,9 @@ public:
 						ptrImageRight->image,
 						stereoModel,
 						0,
-						rtabmap_ros::timestampFromROS(imageRectLeft->header.stamp));
+						rtabmap_ros::timestampFromROS(stamp));
 
-				this->processData(data, imageRectLeft->header);
+				this->processData(data, stamp);
 			}
 			else
 			{

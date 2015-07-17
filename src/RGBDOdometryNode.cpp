@@ -188,18 +188,20 @@ public:
 				}
 			}
 
+			ros::Time stamp = image->header.stamp>depth->header.stamp?image->header.stamp:depth->header.stamp;
+
 			tf::StampedTransform localTransform;
 			try
 			{
 				if(this->waitForTransform())
 				{
-					if(!this->tfListener().waitForTransform(this->frameId(), image->header.frame_id, image->header.stamp, ros::Duration(1)))
+					if(!this->tfListener().waitForTransform(this->frameId(), image->header.frame_id, stamp, ros::Duration(1)))
 					{
 						ROS_WARN("Could not get transform from %s to %s after 1 second!", this->frameId().c_str(), image->header.frame_id.c_str());
 						return;
 					}
 				}
-				this->tfListener().lookupTransform(this->frameId(), image->header.frame_id, image->header.stamp, localTransform);
+				this->tfListener().lookupTransform(this->frameId(), image->header.frame_id, stamp, localTransform);
 			}
 			catch(tf::TransformException & ex)
 			{
@@ -225,9 +227,9 @@ public:
 						ptrDepth->image,
 						rtabmapModel,
 						0,
-						rtabmap_ros::timestampFromROS(image->header.stamp));
+						rtabmap_ros::timestampFromROS(stamp));
 
-				this->processData(data, image->header);
+				this->processData(data, stamp);
 			}
 		}
 	}
@@ -252,6 +254,7 @@ public:
 			infoMsgs.push_back(cameraInfo);
 			infoMsgs.push_back(cameraInfo2);
 
+			ros::Time higherStamp;
 			int imageWidth = imageMsgs[0]->width;
 			int imageHeight = imageMsgs[0]->height;
 			int cameraCount = imageMsgs.size();
@@ -276,18 +279,29 @@ public:
 				UASSERT(imageMsgs[i]->width == imageWidth && imageMsgs[i]->height == imageHeight);
 				UASSERT(depthMsgs[i]->width == imageWidth && depthMsgs[i]->height == imageHeight);
 
+				ros::Time stamp = imageMsgs[i]->header.stamp>depthMsgs[i]->header.stamp?imageMsgs[i]->header.stamp:depthMsgs[i]->header.stamp;
+
+				if(i == 0)
+				{
+					higherStamp = stamp;
+				}
+				else if(stamp > higherStamp)
+				{
+					higherStamp = stamp;
+				}
+
 				tf::StampedTransform localTransform;
 				try
 				{
 					if(this->waitForTransform())
 					{
-						if(!this->tfListener().waitForTransform(this->frameId(), imageMsgs[i]->header.frame_id, imageMsgs[i]->header.stamp, ros::Duration(1)))
+						if(!this->tfListener().waitForTransform(this->frameId(), imageMsgs[i]->header.frame_id, stamp, ros::Duration(1)))
 						{
 							ROS_WARN("Could not get transform from %s to %s after 1 second!", this->frameId().c_str(), imageMsgs[i]->header.frame_id.c_str());
 							return;
 						}
 					}
-					this->tfListener().lookupTransform(this->frameId(), imageMsgs[i]->header.frame_id, imageMsgs[i]->header.stamp, localTransform);
+					this->tfListener().lookupTransform(this->frameId(), imageMsgs[i]->header.frame_id, stamp, localTransform);
 				}
 				catch(tf::TransformException & ex)
 				{
@@ -368,9 +382,9 @@ public:
 					depth,
 					cameraModels,
 					0,
-					rtabmap_ros::timestampFromROS(image->header.stamp));
+					rtabmap_ros::timestampFromROS(higherStamp));
 
-			this->processData(data, image->header);
+			this->processData(data, higherStamp);
 		}
 	}
 

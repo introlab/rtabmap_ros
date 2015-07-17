@@ -53,7 +53,7 @@ public:
 	~OdometryROS();
 
 	void processArguments(int argc, char * argv[]);
-	void processData(const rtabmap::SensorData & data, const std_msgs::Header & header);
+	void processData(const rtabmap::SensorData & data, const ros::Time & stamp);
 
 	bool reset(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool resetToPose(rtabmap_ros::ResetPose::Request&, rtabmap_ros::ResetPose::Response&);
