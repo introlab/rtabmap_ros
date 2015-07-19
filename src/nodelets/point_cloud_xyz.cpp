@@ -66,13 +66,13 @@ public:
 		decimation_(1),
 		noiseFilterRadius_(0.0),
 		noiseFilterMinNeighbors_(5),
+		cut_left_(0),
+		cut_right_(0),
+		create_close_obstacle_if_depth_is_missing_(false),
 		approxSyncDepth_(0),
 		approxSyncDisparity_(0),
 		exactSyncDepth_(0),
-		exactSyncDisparity_(0),
-		cut_right_(0),
-		cut_left_(0),
-		create_close_obstacle_if_depth_is_missing_(false)
+		exactSyncDisparity_(0)
 	{}
 
 	virtual ~PointCloudXYZ()
