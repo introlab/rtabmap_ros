@@ -54,4 +54,13 @@
       This is my nodelet.
     </description>
   </class>
+
+  <class name="rtabmap_ros/point_cloud_aggregator" 
+         type="rtabmap_ros::PointCloudAggregator" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
+
 </library>

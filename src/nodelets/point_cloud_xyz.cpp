@@ -66,6 +66,9 @@ public:
 		decimation_(1),
 		noiseFilterRadius_(0.0),
 		noiseFilterMinNeighbors_(5),
+		cut_left_(0),
+		cut_right_(0),
+		create_close_obstacle_if_depth_is_missing_(false),
 		approxSyncDepth_(0),
 		approxSyncDisparity_(0),
 		exactSyncDepth_(0),
@@ -99,6 +102,10 @@ private:
 		pnh.param("decimation", decimation_, decimation_);
 		pnh.param("noise_filter_radius", noiseFilterRadius_, noiseFilterRadius_);
 		pnh.param("noise_filter_min_neighbors", noiseFilterMinNeighbors_, noiseFilterMinNeighbors_);
+		pnh.param("cut_left", cut_left_, cut_left_);
+		pnh.param("cut_right", cut_right_, cut_right_);
+		pnh.param("special_filter_close_object", create_close_obstacle_if_depth_is_missing_, create_close_obstacle_if_depth_is_missing_);
+
 		ROS_INFO("Approximate time sync = %s", approxSync?"true":"false");
 
 		if(approxSync)
@@ -147,6 +154,47 @@ private:
 		if(cloudPub_.getNumSubscribers())
 		{
 			cv_bridge::CvImageConstPtr imageDepthPtr = cv_bridge::toCvShare(depth);
+			cv::Mat image=imageDepthPtr->image;
+			int rows = image.rows;
+			int cols = image.cols;
+
+			//Cut left and cut right options to mask the image.
+			//If cut_left (resp. cut_right)  is set to a positive value, we set the first (resp. last) columns
+			//of the depth image to 0, meaning that no depth reading has been received.
+			//Number of columns to be masked is equal to cut_left (resp. cut_right value)
+			if (cut_left_>0){
+				cv::Mat pRoi = image(cv::Rect(0, 0, cut_left_, rows));
+				pRoi.setTo(cv::Scalar(0.));
+			}
+			if (cut_right_<0){
+				cv::Mat pRoi = image(cv::Rect(cols-cut_right_, 0, cut_right_, rows));
+				pRoi.setTo(cv::Scalar(0.));
+			}
+
+			//This option enables a filter for close object.
+			//Fist, we do a median blur on the image to get rid of potential noise
+			//Second, we set all false reading that are likely due to an object sitting in front of the camera
+			// to a short distance estimation (here, 40cm).
+			//This hence make the assumption that the depth camera is looking forward and sees the floor on
+			// the bottom rows of the depth image
+			//This option is highly experimental and should be used with extreme care.
+			if (create_close_obstacle_if_depth_is_missing_){
+				cv::Mat pRoi = image(cv::Rect(int(0.05*(float(cols))),int(0.05*(float(rows))),int(0.9*(float(cols))),int(0.9*float(rows))));
+				cv::medianBlur(pRoi, pRoi, 3);
+
+				//Do filter of close objects
+				//If the depth is registered, there is usually a black frame around the depth image
+				//Hence, the ROI stops before the expected "frame"
+				pRoi = image(cv::Rect(int(cols/10),int(0.8*(float(rows))),int(0.8*(float(cols))),int(0.15*float(rows))));
+				cv::Mat blurredImage=pRoi.clone();
+				cv::GaussianBlur(pRoi, blurredImage, cv::Size(5, 5), 0, 0);
+				for(int y = 0; y < blurredImage.cols; y++)
+					for(int x = 0; x < blurredImage.rows; x++){
+						if (blurredImage.at<unsigned short>(x,y) == 0){
+							pRoi.at<unsigned short>(x,y) = 400;
+						}
+					}
+			}
 
 			image_geometry::PinholeCameraModel model;
 			model.fromCameraInfo(*cameraInfo);
@@ -157,13 +205,12 @@ private:
 
 			pcl::PointCloud<pcl::PointXYZ>::Ptr pclCloud;
 			pclCloud = rtabmap::util3d::cloudFromDepth(
-					imageDepthPtr->image,
+					image,
 					cx,
 					cy,
 					fx,
 					fy,
 					decimation_);
-
 			processAndPublish(pclCloud, depth->header);
 		}
 	}
@@ -245,6 +292,9 @@ private:
 	int decimation_;
 	double noiseFilterRadius_;
 	int noiseFilterMinNeighbors_;
+	int cut_left_;
+	int cut_right_;
+	bool create_close_obstacle_if_depth_is_missing_;
 
 	ros::Publisher cloudPub_;
 
