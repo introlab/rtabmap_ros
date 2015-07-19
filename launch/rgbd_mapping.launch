@@ -6,11 +6,18 @@
    <!--           See "delete_db_on_start" option below... -->
   
    <!-- Choose visualization -->
-   <arg name="rviz" default="false" />
-   <arg name="rtabmapviz" default="true" /> 
+   <arg name="rviz"                    default="false" />
+   <arg name="rtabmapviz"              default="true" /> 
   
    <!-- Fixed frame id, you may set "base_link" or "base_footprint" if they are published -->
-   <arg name="frame_id" default="camera_link"/>
+   <arg name="frame_id"                default="camera_link"/>
+   
+   <!-- Image topics input -->
+   <arg name="rgb_topic"               default="/camera/rgb/image_rect_color" />
+   <arg name="depth_registered_topic"  default="/camera/depth_registered/image_raw" />
+   <arg name="camera_info_topic"       default="/camera/rgb/camera_info" />
+   
+   <arg name="namespace"               default="rtabmap"/>
   
    <!-- ODOMETRY MAIN ARGUMENTS: 
         -"strategy"        : Strategy: 0=BOW (bag-of-words) 1=Optical Flow
@@ -24,43 +31,43 @@
         -"local_map"       : Local map size: number of unique features to keep track 
         -"odom_info_data"  : Fill odometry info messages with inliers/outliers data.
     -->
-   <arg name="strategy" default="0" />
-   <arg name="feature" default="6" />
-   <arg name="nn" default="3" />
-   <arg name="max_depth" default="4.0" />
-   <arg name="min_inliers" default="20" />
-   <arg name="inlier_distance" default="0.02" />
-   <arg name="local_map" default="1000" />
-   <arg name="odom_info_data" default="true" />
+   <arg name="strategy"            default="0" />
+   <arg name="feature"             default="6" />
+   <arg name="nn"                  default="3" />
+   <arg name="max_depth"           default="4.0" />
+   <arg name="min_inliers"         default="20" />
+   <arg name="inlier_distance"     default="0.02" />
+   <arg name="local_map"           default="1000" />
+   <arg name="odom_info_data"      default="true" />
         
-  <group ns="rtabmap">
+  <group ns="$(arg namespace)">
   
     <!-- Odometry -->
     <node pkg="rtabmap_ros" type="rgbd_odometry" name="rgbd_odometry" output="screen">
-      <remap from="rgb/image"       to="/camera/rgb/image_rect_color"/>
-      <remap from="depth/image"     to="/camera/depth_registered/image_raw"/>
-      <remap from="rgb/camera_info" to="/camera/rgb/camera_info"/>
+      <remap from="rgb/image"       to="$(arg rgb_topic)"/>
+      <remap from="depth/image"     to="$(arg depth_registered_topic)"/>
+      <remap from="rgb/camera_info" to="$(arg camera_info_topic)"/>
 	  
-	  <param name="frame_id" type="string" value="$(arg frame_id)"/>
-	  <param name="Odom/Strategy" type="string" value="$(arg strategy)"/> 
-	  <param name="Odom/FeatureType" type="string" value="$(arg feature)"/>  
-	  <param name="OdomBow/NNType" type="string" value="$(arg nn)"/>
-	  <param name="Odom/MaxDepth" type="string" value="$(arg max_depth)"/>  
-	  <param name="Odom/MinInliers" type="string" value="$(arg min_inliers)"/> 
-	  <param name="Odom/InlierDistance" type="string" value="$(arg inlier_distance)"/>       
+	  <param name="frame_id"                 type="string" value="$(arg frame_id)"/>
+	  <param name="Odom/Strategy"            type="string" value="$(arg strategy)"/> 
+	  <param name="Odom/FeatureType"         type="string" value="$(arg feature)"/>  
+	  <param name="OdomBow/NNType"           type="string" value="$(arg nn)"/>
+	  <param name="Odom/MaxDepth"            type="string" value="$(arg max_depth)"/>  
+	  <param name="Odom/MinInliers"          type="string" value="$(arg min_inliers)"/> 
+	  <param name="Odom/InlierDistance"      type="string" value="$(arg inlier_distance)"/>       
       <param name="OdomBow/LocalHistorySize" type="string" value="$(arg local_map)"/> 
-      <param name="Odom/FillInfoData" type="string" value="$(arg odom_info_data)"/>   
+      <param name="Odom/FillInfoData"        type="string" value="$(arg odom_info_data)"/>   
     </node>
   
     <!-- Visual SLAM (robot side) -->
     <!-- args: "delete_db_on_start" and "udebug" -->
     <node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="screen" args="--delete_db_on_start">
-      <param name="subscribe_depth" type="bool" value="true"/>
-	  <param name="frame_id" type="string" value="$(arg frame_id)"/>
+      <param name="subscribe_depth" type="bool"   value="true"/>
+	  <param name="frame_id"        type="string" value="$(arg frame_id)"/>
 	
-      <remap from="rgb/image" to="/camera/rgb/image_rect_color"/>
-      <remap from="depth/image" to="/camera/depth_registered/image_raw"/>
-      <remap from="rgb/camera_info" to="/camera/rgb/camera_info"/>
+      <remap from="rgb/image"       to="$(arg rgb_topic)"/>
+      <remap from="depth/image"     to="$(arg depth_registered_topic)"/>
+      <remap from="rgb/camera_info" to="$(arg camera_info_topic)"/>
 
       <param name="LccBow/MinInliers" type="string" value="10"/>
       <param name="LccBow/InlierDistance" type="string" value="$(arg inlier_distance)"/>
@@ -68,13 +75,13 @@
   
     <!-- Visualisation RTAB-Map -->
     <node if="$(arg rtabmapviz)" pkg="rtabmap_ros" type="rtabmapviz" name="rtabmapviz" args="-d $(find rtabmap_ros)/launch/config/rgbd_gui.ini" output="screen">
-      <param name="subscribe_depth" type="bool" value="true"/>
-      <param name="subscribe_odom_info" type="bool" value="$(arg odom_info_data)"/>
-      <param name="frame_id" type="string" value="$(arg frame_id)"/>
+      <param name="subscribe_depth"     type="bool"   value="true"/>
+      <param name="subscribe_odom_info" type="bool"   value="$(arg odom_info_data)"/>
+      <param name="frame_id"            type="string" value="$(arg frame_id)"/>
     
-      <remap from="rgb/image" to="/camera/rgb/image_rect_color"/>
-      <remap from="depth/image" to="/camera/depth_registered/image_raw"/>
-      <remap from="rgb/camera_info" to="/camera/rgb/camera_info"/>
+      <remap from="rgb/image"       to="$(arg rgb_topic)"/>
+      <remap from="depth/image"     to="$(arg depth_registered_topic)"/>
+      <remap from="rgb/camera_info" to="$(arg camera_info_topic)"/>
     </node>
   
   </group>
@@ -84,9 +91,9 @@
   <!-- sync cloud with odometry and voxelize the point cloud (for fast visualization in rviz) -->
   <node if="$(arg rviz)" pkg="nodelet" type="nodelet" name="standalone_nodelet"  args="manager" output="screen"/>
   <node if="$(arg rviz)" pkg="nodelet" type="nodelet" name="data_odom_sync" args="load rtabmap_ros/data_odom_sync standalone_nodelet">
-    <remap from="rgb/image_in"       to="camera/rgb/image_rect_color"/>
-    <remap from="depth/image_in"     to="camera/depth_registered/image_raw"/>
-    <remap from="rgb/camera_info_in" to="camera/rgb/camera_info"/>
+    <remap from="rgb/image_in"        to="$(arg rgb_topic)"/>
+    <remap from="depth/image_in"      to="$(arg depth_registered_topic)"/>
+    <remap from="rgb/camera_info_in"  to="$(arg camera_info_topic)"/>
     <remap from="odom_in"             to="rtabmap/odom"/>
     
     <remap from="rgb/image_out"       to="data_odom_sync/image"/>

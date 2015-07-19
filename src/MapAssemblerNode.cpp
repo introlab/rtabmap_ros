@@ -32,7 +32,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/util3d.h>
 #include <rtabmap/core/util3d_filtering.h>
 #include <rtabmap/core/util3d_mapping.h>
-#include <rtabmap/core/util3d_conversions.h>
 #include <rtabmap/core/Compression.h>
 #include <rtabmap/core/Graph.h>
 #include <rtabmap/utilite/ULogger.h>
@@ -114,41 +113,23 @@ public:
 			int id = msg->nodes[i].id;
 			if(!uContains(rgbClouds_, id))
 			{
-				rtabmap::Transform localTransform = rtabmap_ros::transformFromGeometryMsg(msg->nodes[i].localTransform);
-				if(!localTransform.isNull())
+				rtabmap::Signature s = rtabmap_ros::nodeDataFromROS(msg->nodes[i]);
+				if(!s.sensorData().imageCompressed().empty() &&
+				   !s.sensorData().depthOrRightCompressed().empty() &&
+				   (s.sensorData().cameraModels().size() || s.sensorData().stereoCameraModel().isValid()))
 				{
 					cv::Mat image, depth;
-					float fx = msg->nodes[i].fx;
-					float fy = msg->nodes[i].fy;
-					float cx = msg->nodes[i].cx;
-					float cy = msg->nodes[i].cy;
+					s.sensorData().uncompressData(&image, &depth, 0);
 
-					//uncompress data
-					rtabmap::CompressionThread ctImage(rtabmap_ros::compressedMatFromBytes(msg->nodes[i].image, false), true);
-					rtabmap::CompressionThread ctDepth(rtabmap_ros::compressedMatFromBytes(msg->nodes[i].depth, false), true);
-					ctImage.start();
-					ctDepth.start();
-					ctImage.join();
-					ctDepth.join();
-					image = ctImage.getUncompressedData();
-					depth = ctDepth.getUncompressedData();
 
-					if(!image.empty() && !depth.empty() && fx > 0.0f && fy > 0.0f && cx >= 0.0f && cy >= 0.0f)
+					if(!s.sensorData().imageRaw().empty() && !s.sensorData().depthOrRightRaw().empty())
 					{
 						pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud;
-						if(depth.type() == CV_8UC1)
-						{
-							cloud = util3d::cloudFromStereoImages(image, depth, cx, cy, fx, fy, cloudDecimation_);
-						}
-						else
-						{
-							cloud = util3d::cloudFromDepthRGB(image, depth, cx, cy, fx, fy, cloudDecimation_);
-						}
+						cloud = rtabmap::util3d::cloudRGBFromSensorData(
+								s.sensorData(),
+								cloudDecimation_,
+								cloudMaxDepth_);
 
-						if(cloud->size() && cloudMaxDepth_ > 0)
-						{
-							cloud = util3d::passThrough(cloud, "z", 0, cloudMaxDepth_);
-						}
 						if(cloud->size() && noiseFilterRadius_ > 0.0 && noiseFilterMinNeighbors_ > 0)
 						{
 							pcl::IndicesPtr indices = rtabmap::util3d::radiusFiltering(cloud, noiseFilterRadius_, noiseFilterMinNeighbors_);
@@ -163,9 +144,6 @@ public:
 
 						if(cloud->size())
 						{
-							cloud = util3d::transformPointCloud(cloud, localTransform);
-
-
 							rgbClouds_.insert(std::make_pair(id, cloud));
 
 							if(computeOccupancyGrid_)
@@ -213,9 +191,10 @@ public:
 
 		// filter poses
 		std::map<int, Transform> poses;
-		for(unsigned int i=0; i<msg->graph.nodeIds.size() && i<msg->graph.poses.size(); ++i)
+		UASSERT(msg->posesId.size() == msg->poses.size());
+		for(unsigned int i=0; i<msg->posesId.size(); ++i)
 		{
-			poses.insert(std::make_pair(msg->graph.nodeIds[i], rtabmap_ros::transformFromPoseMsg(msg->graph.poses[i])));
+			poses.insert(std::make_pair(msg->posesId[i], rtabmap_ros::transformFromPoseMsg(msg->poses[i])));
 		}
 		if(nodeFilteringAngle_ > 0.0 && nodeFilteringRadius_ > 0.0)
 		{

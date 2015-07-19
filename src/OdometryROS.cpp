@@ -72,12 +72,31 @@ OdometryROS::OdometryROS(int argc, char * argv[]) :
 
 	Transform initialPose = Transform::getIdentity();
 	std::string initialPoseStr;
+	std::string tfPrefix;
 	pnh.param("frame_id", frameId_, frameId_);
 	pnh.param("odom_frame_id", odomFrameId_, odomFrameId_);
 	pnh.param("publish_tf", publishTf_, publishTf_);
+	pnh.param("tf_prefix", tfPrefix, tfPrefix);
 	pnh.param("wait_for_transform", waitForTransform_, waitForTransform_);
 	pnh.param("initial_pose", initialPoseStr, initialPoseStr); // "x y z roll pitch yaw"
 	pnh.param("ground_truth_frame_id", groundTruthFrameId_, groundTruthFrameId_);
+
+	if(!tfPrefix.empty())
+	{
+		if(!frameId_.empty())
+		{
+			frameId_ = tfPrefix + "/" + frameId_;
+		}
+		if(!odomFrameId_.empty())
+		{
+			odomFrameId_ = tfPrefix + "/" + odomFrameId_;
+		}
+		if(!groundTruthFrameId_.empty())
+		{
+			groundTruthFrameId_ = tfPrefix + "/" + groundTruthFrameId_;
+		}
+	}
+
 	if(initialPoseStr.size())
 	{
 		std::vector<std::string> values = uListToVector(uSplit(initialPoseStr, ' '));
@@ -157,6 +176,7 @@ OdometryROS::OdometryROS(int argc, char * argv[]) :
 	oldParameterNames.push_back("Odom/LocalHistory");
 	oldParameterNames.push_back("Odom/NearestNeighbor");
 	oldParameterNames.push_back("Odom/NNDR");
+	oldParameterNames.push_back("GFTT/MaxCorners");
 	for(std::list<std::string>::iterator iter=oldParameterNames.begin(); iter!=oldParameterNames.end(); ++iter)
 	{
 		std::string vStr;
@@ -191,6 +211,12 @@ OdometryROS::OdometryROS(int argc, char * argv[]) :
 				ROS_WARN("Parameter name changed: Odom/NNDR -> %s. Please update your launch file accordingly.",
 						Parameters::kOdomBowNNDR().c_str());
 				parameters_.at(Parameters::kOdomBowNNDR())= vStr;
+			}
+			else if(iter->compare("GFTT/MaxCorners") == 0)
+			{
+				ROS_WARN("Parameter GFTT/MaxCorners doesn't exist anymore, use %s. Please update your launch file accordingly.",
+						Parameters::kOdomMaxFeatures().c_str());
+				parameters_.at(Parameters::kOdomMaxFeatures())= vStr;
 			}
 		}
 	}
@@ -276,7 +302,7 @@ void OdometryROS::processArguments(int argc, char * argv[])
 	}
 }
 
-void OdometryROS::processData(const SensorData & data, const std_msgs::Header & header)
+void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 {
 	if(odometry_->getPose().isNull() &&
 	   !groundTruthFrameId_.empty())
@@ -286,13 +312,13 @@ void OdometryROS::processData(const SensorData & data, const std_msgs::Header & 
 		{
 			if(this->waitForTransform())
 			{
-				if(!this->tfListener().waitForTransform(groundTruthFrameId_, frameId_, header.stamp, ros::Duration(1)))
+				if(!this->tfListener().waitForTransform(groundTruthFrameId_, frameId_, stamp, ros::Duration(1)))
 				{
 					ROS_WARN("Could not get transform from %s to %s after 1 second!", groundTruthFrameId_.c_str(), frameId_.c_str());
 					return;
 				}
 			}
-			this->tfListener().lookupTransform(groundTruthFrameId_, frameId_, header.stamp, initialPose);
+			this->tfListener().lookupTransform(groundTruthFrameId_, frameId_, stamp, initialPose);
 		}
 		catch(tf::TransformException & ex)
 		{
@@ -319,7 +345,7 @@ void OdometryROS::processData(const SensorData & data, const std_msgs::Header & 
 		geometry_msgs::TransformStamped poseMsg;
 		poseMsg.child_frame_id = frameId_;
 		poseMsg.header.frame_id = odomFrameId_;
-		poseMsg.header.stamp = header.stamp;
+		poseMsg.header.stamp = stamp;
 		rtabmap_ros::transformToGeometryMsg(pose, poseMsg.transform);
 
 		if(publishTf_)
@@ -331,7 +357,7 @@ void OdometryROS::processData(const SensorData & data, const std_msgs::Header & 
 		{
 			//next, we'll publish the odometry message over ROS
 			nav_msgs::Odometry odom;
-			odom.header.stamp = header.stamp; // use corresponding time stamp to image
+			odom.header.stamp = stamp; // use corresponding time stamp to image
 			odom.header.frame_id = odomFrameId_;
 			odom.child_frame_id = frameId_;
 
@@ -363,7 +389,7 @@ void OdometryROS::processData(const SensorData & data, const std_msgs::Header & 
 			}
 			sensor_msgs::PointCloud2 cloudMsg;
 			pcl::toROSMsg(cloud, cloudMsg);
-			cloudMsg.header.stamp = header.stamp; // use corresponding time stamp to image
+			cloudMsg.header.stamp = stamp; // use corresponding time stamp to image
 			cloudMsg.header.frame_id = odomFrameId_;
 			odomLocalMap_.publish(cloudMsg);
 		}
@@ -377,7 +403,6 @@ void OdometryROS::processData(const SensorData & data, const std_msgs::Header & 
 				{
 					const std::multimap<int, pcl::PointXYZ> & words3 = s->getWords3();
 					pcl::PointCloud<pcl::PointXYZ> cloud;
-					rtabmap::Transform t = data.localTransform();
 					for(std::multimap<int, pcl::PointXYZ>::const_iterator iter=words3.begin(); iter!=words3.end(); ++iter)
 					{
 						// transform to odom frame
@@ -387,7 +412,7 @@ void OdometryROS::processData(const SensorData & data, const std_msgs::Header & 
 
 					sensor_msgs::PointCloud2 cloudMsg;
 					pcl::toROSMsg(cloud, cloudMsg);
-					cloudMsg.header.stamp = header.stamp; // use corresponding time stamp to image
+					cloudMsg.header.stamp = stamp; // use corresponding time stamp to image
 					cloudMsg.header.frame_id = odomFrameId_;
 					odomLastFrame_.publish(cloudMsg);
 				}
@@ -402,7 +427,7 @@ void OdometryROS::processData(const SensorData & data, const std_msgs::Header & 
 					cloudTransformed = util3d::transformPointCloud(cloud, pose);
 					sensor_msgs::PointCloud2 cloudMsg;
 					pcl::toROSMsg(*cloudTransformed, cloudMsg);
-					cloudMsg.header.stamp = header.stamp; // use corresponding time stamp to image
+					cloudMsg.header.stamp = stamp; // use corresponding time stamp to image
 					cloudMsg.header.frame_id = odomFrameId_;
 					odomLastFrame_.publish(cloudMsg);
 				}
@@ -415,7 +440,7 @@ void OdometryROS::processData(const SensorData & data, const std_msgs::Header & 
 
 		//send null pose to notify that odometry is lost
 		nav_msgs::Odometry odom;
-		odom.header.stamp = header.stamp; // use corresponding time stamp to image
+		odom.header.stamp = stamp; // use corresponding time stamp to image
 		odom.header.frame_id = odomFrameId_;
 		odom.child_frame_id = frameId_;
 
@@ -427,7 +452,7 @@ void OdometryROS::processData(const SensorData & data, const std_msgs::Header & 
 	{
 		rtabmap_ros::OdomInfo infoMsg;
 		odomInfoToROS(info, infoMsg);
-		infoMsg.header.stamp = header.stamp; // use corresponding time stamp to image
+		infoMsg.header.stamp = stamp; // use corresponding time stamp to image
 		infoMsg.header.frame_id = odomFrameId_;
 		odomInfoPub_.publish(infoMsg);
 	}

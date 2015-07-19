@@ -30,7 +30,11 @@ int32 inliers
 float32 variance
 int32 features
 int32 localMapSize
-float32 time
+float32 timeEstimation
+float32 timeParticleFiltering
+float32 stamp
+float32 interval
+float32 distanceTravelled
 
 int32 type
 
@@ -42,4 +46,7 @@ int32[] wordInliers
 Point2f[] refCorners
 Point2f[] newCorners
 int32[] cornerInliers
+
+geometry_msgs/Transform transform
+geometry_msgs/Transform transformFiltered
 

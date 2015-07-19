@@ -252,66 +252,45 @@ void MapCloudDisplay::processMapData(const rtabmap_ros::MapData& map)
 		if(cloud_infos_.find(id) == cloud_infos_.end())
 		{
 			// Cloud not added to RVIZ, add it!
-			rtabmap::Transform localTransform = transformFromGeometryMsg(map.nodes[i].localTransform);
-			if(!localTransform.isNull())
+			rtabmap::Signature s = rtabmap_ros::nodeDataFromROS(map.nodes[i]);
+			if(!s.sensorData().imageCompressed().empty() &&
+			   !s.sensorData().depthOrRightCompressed().empty() &&
+			   (s.sensorData().cameraModels().size() || s.sensorData().stereoCameraModel().isValid()))
 			{
 				cv::Mat image, depth;
-				float fx = map.nodes[i].fx;
-				float fy = map.nodes[i].fy;
-				float cx = map.nodes[i].cx;
-				float cy = map.nodes[i].cy;
+				s.sensorData().uncompressData(&image, &depth, 0);
 
-				//uncompress data
-				rtabmap::CompressionThread ctImage(compressedMatFromBytes(map.nodes[i].image, false), true);
-				rtabmap::CompressionThread ctDepth(compressedMatFromBytes(map.nodes[i].depth, false), true);
-				ctImage.start();
-				ctDepth.start();
-				ctImage.join();
-				ctDepth.join();
-				image = ctImage.getUncompressedData();
-				depth = ctDepth.getUncompressedData();
 
-				if(!image.empty() && !depth.empty() && fx > 0.0f && fy > 0.0f && cx >= 0.0f && cy >= 0.0f)
+				if(!s.sensorData().imageRaw().empty() && !s.sensorData().depthOrRightRaw().empty())
 				{
 					pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud;
-					if(depth.type() == CV_8UC1)
-					{
-						cloud = rtabmap::util3d::cloudFromStereoImages(image, depth, cx, cy, fx, fy, cloud_decimation_->getInt());
-					}
-					else
-					{
-						cloud = rtabmap::util3d::cloudFromDepthRGB(image, depth, cx, cy, fx, fy, cloud_decimation_->getInt());
-					}
-					if(cloud_max_depth_->getFloat() > 0.0f)
-					{
-						cloud = rtabmap::util3d::passThrough(cloud, "z", 0, cloud_max_depth_->getFloat());
-					}
-					if(cloud_voxel_size_->getFloat() > 0.0f)
-					{
-						cloud = rtabmap::util3d::voxelize(cloud, cloud_voxel_size_->getFloat());
-					}
+					cloud = rtabmap::util3d::cloudRGBFromSensorData(
+							s.sensorData(),
+							cloud_decimation_->getInt(),
+							cloud_max_depth_->getFloat(),
+							cloud_voxel_size_->getFloat());
 
-					cloud = rtabmap::util3d::transformPointCloud(cloud, localTransform);
-
-					// do it after local transform
-					if(cloud_filter_floor_height_->getFloat() > 0.0f)
+					if(cloud->size())
 					{
-						cloud = rtabmap::util3d::passThrough(cloud, "z", cloud_filter_floor_height_->getFloat(), 999.0f);
-					}
+						if(cloud_filter_floor_height_->getFloat() > 0.0f)
+						{
+							cloud = rtabmap::util3d::passThrough(cloud, "z", cloud_filter_floor_height_->getFloat(), 999.0f);
+						}
 
-					sensor_msgs::PointCloud2::Ptr cloudMsg(new sensor_msgs::PointCloud2);
-					pcl::toROSMsg(*cloud, *cloudMsg);
-					cloudMsg->header = map.header;
+						sensor_msgs::PointCloud2::Ptr cloudMsg(new sensor_msgs::PointCloud2);
+						pcl::toROSMsg(*cloud, *cloudMsg);
+						cloudMsg->header = map.header;
 
-					CloudInfoPtr info(new CloudInfo);
-					info->message_ = cloudMsg;
-					info->pose_ = rtabmap::Transform::getIdentity();
-					info->id_ = id;
+						CloudInfoPtr info(new CloudInfo);
+						info->message_ = cloudMsg;
+						info->pose_ = rtabmap::Transform::getIdentity();
+						info->id_ = id;
 
-					if (transformCloud(info, true))
-					{
-						boost::mutex::scoped_lock lock(new_clouds_mutex_);
-						new_cloud_infos_.insert(std::make_pair(id, info));
+						if (transformCloud(info, true))
+						{
+							boost::mutex::scoped_lock lock(new_clouds_mutex_);
+							new_cloud_infos_.insert(std::make_pair(id, info));
+						}
 					}
 				}
 			}
@@ -320,9 +299,9 @@ void MapCloudDisplay::processMapData(const rtabmap_ros::MapData& map)
 
 	// Update graph
 	std::map<int, rtabmap::Transform> poses;
-	for(unsigned int i=0; i<map.graph.nodeIds.size() && i<map.graph.poses.size(); ++i)
+	for(unsigned int i=0; i<map.posesId.size() && i<map.poses.size(); ++i)
 	{
-		poses.insert(std::make_pair(map.graph.nodeIds[i], rtabmap_ros::transformFromPoseMsg(map.graph.poses[i])));
+		poses.insert(std::make_pair(map.posesId[i], rtabmap_ros::transformFromPoseMsg(map.poses[i])));
 	}
 
 	if(node_filtering_angle_->getFloat() > 0.0f && node_filtering_radius_->getFloat() > 0.0f)
@@ -503,12 +482,12 @@ void MapCloudDisplay::downloadMap()
 		else
 		{
 			messageBox->setText(tr("Creating all clouds (%1 poses and %2 clouds downloaded)...")
-					.arg(getMapSrv.response.data.graph.poses.size()).arg(getMapSrv.response.data.nodes.size()));
+					.arg(getMapSrv.response.data.poses.size()).arg(getMapSrv.response.data.nodes.size()));
 			QApplication::processEvents();
 			this->reset();
 			processMapData(getMapSrv.response.data);
 			messageBox->setText(tr("Creating all clouds (%1 poses and %2 clouds downloaded)... done!")
-					.arg(getMapSrv.response.data.graph.poses.size()).arg(getMapSrv.response.data.nodes.size()));
+					.arg(getMapSrv.response.data.poses.size()).arg(getMapSrv.response.data.nodes.size()));
 
 			QTimer::singleShot(1000, messageBox, SLOT(close()));
 		}
@@ -560,10 +539,10 @@ void MapCloudDisplay::downloadGraph()
 		}
 		else
 		{
-			messageBox->setText(tr("Updating the map (%1 nodes downloaded)...").arg(getMapSrv.response.data.graph.poses.size()));
+			messageBox->setText(tr("Updating the map (%1 nodes downloaded)...").arg(getMapSrv.response.data.poses.size()));
 			QApplication::processEvents();
 			processMapData(getMapSrv.response.data);
-			messageBox->setText(tr("Updating the map (%1 nodes downloaded)... done!").arg(getMapSrv.response.data.graph.poses.size()));
+			messageBox->setText(tr("Updating the map (%1 nodes downloaded)... done!").arg(getMapSrv.response.data.poses.size()));
 
 			QTimer::singleShot(1000, messageBox, SLOT(close()));
 		}

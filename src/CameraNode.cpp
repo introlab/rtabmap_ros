@@ -33,7 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <image_transport/image_transport.h>
 #include <std_srvs/Empty.h>
 
-#include <rtabmap/core/Camera.h>
+#include <rtabmap/core/CameraRGB.h>
 #include <rtabmap/core/CameraThread.h>
 #include <rtabmap/core/CameraEvent.h>
 
@@ -55,6 +55,7 @@ public:
 				  unsigned int imageWidth = 0,
 				  unsigned int imageHeight = 0) :
 		cameraThread_(0),
+		camera_(0),
 		frameId_("camera")
 	{
 		ros::NodeHandle nh;
@@ -80,7 +81,7 @@ public:
 	{
 		if(cameraThread_)
 		{
-			return cameraThread_->init();
+			return cameraThread_->camera()->init();
 		}
 		return false;
 	}
@@ -113,10 +114,10 @@ public:
 		return true;
 	}
 
-	void setParameters(int deviceId, double frameRate, int width, int height, const std::string & path, bool pause)
+	void setParameters(int deviceId, double frameRate, const std::string & path, bool pause)
 	{
-		ROS_INFO("Parameters changed: deviceId=%d, path=%s frameRate=%f w/h=%d/%d pause=%s",
-				deviceId, path.c_str(), frameRate, width, height, pause?"true":"false");
+		ROS_INFO("Parameters changed: deviceId=%d, path=%s frameRate=%f pause=%s",
+				deviceId, path.c_str(), frameRate, pause?"true":"false");
 		if(cameraThread_)
 		{
 			rtabmap::CameraVideo * videoCam = dynamic_cast<rtabmap::CameraVideo *>(camera_);
@@ -128,7 +129,6 @@ public:
 				if(!path.empty() && UDirectory::getDir(path+"/").compare(UDirectory::getDir(imagesCam->getPath())) == 0)
 				{
 					imagesCam->setImageRate(frameRate);
-					imagesCam->setImageSize(width, height);
 					if(pause && !cameraThread_->isPaused())
 					{
 						cameraThread_->join(true);
@@ -150,7 +150,6 @@ public:
 				{
 					// video
 					videoCam->setImageRate(frameRate);
-					videoCam->setImageSize(width, height);
 					if(pause && !cameraThread_->isPaused())
 					{
 						cameraThread_->join(true);
@@ -165,25 +164,14 @@ public:
 						videoCam->getUsbDevice() == deviceId)
 				{
 					// usb device
-					unsigned int w;
-					unsigned int h;
-					videoCam->getImageSize(w, h);
-					if((int)w == width && (int)h == height)
+					videoCam->setImageRate(frameRate);
+					if(pause && !cameraThread_->isPaused())
 					{
-						videoCam->setImageRate(frameRate);
-						if(pause && !cameraThread_->isPaused())
-						{
-							cameraThread_->join(true);
-						}
-						else if(!pause && cameraThread_->isPaused())
-						{
-							cameraThread_->start();
-						}
+						cameraThread_->join(true);
 					}
-					else
+					else if(!pause && cameraThread_->isPaused())
 					{
-						delete cameraThread_;
-						cameraThread_ = 0;
+						cameraThread_->start();
 					}
 				}
 				else
@@ -205,12 +193,12 @@ public:
 			if(!path.empty() && UDirectory::exists(path))
 			{
 				//images
-				camera_ = new rtabmap::CameraImages(path, 1, false, frameRate, width, height);
+				camera_ = new rtabmap::CameraImages(path, 1, false, frameRate);
 			}
 			else if(!path.empty() && UFile::exists(path))
 			{
 				//video
-				camera_ = new rtabmap::CameraVideo(path, frameRate, width, height);
+				camera_ = new rtabmap::CameraVideo(path, frameRate);
 			}
 			else
 			{
@@ -219,7 +207,7 @@ public:
 					ROS_ERROR("Path \"%s\" does not exist (or you don't have the permissions to read)... falling back to usb device...", path.c_str());
 				}
 				//usb device
-				camera_ = new rtabmap::CameraVideo(deviceId, frameRate, width, height);
+				camera_ = new rtabmap::CameraVideo(deviceId, frameRate);
 			}
 			cameraThread_ = new rtabmap::CameraThread(camera_);
 			init();
@@ -236,7 +224,7 @@ protected:
 		if(event->getClassName().compare("CameraEvent") == 0)
 		{
 			rtabmap::CameraEvent * e = (rtabmap::CameraEvent*)event;
-			const cv::Mat & image = e->data().image();
+			const cv::Mat & image = e->data().imageRaw();
 			if(!image.empty() && image.depth() == CV_8U)
 			{
 				cv_bridge::CvImage img;
@@ -271,7 +259,7 @@ void callback(rtabmap_ros::CameraConfig &config, uint32_t level)
 {
 	if(camera)
 	{
-		camera->setParameters(config.device_id, config.frame_rate, config.width, config.height, config.video_or_images_path, config.pause);
+		camera->setParameters(config.device_id, config.frame_rate, config.video_or_images_path, config.pause);
 	}
 }
 

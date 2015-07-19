@@ -83,7 +83,13 @@ public:
 	virtual ~CoreWrapper();
 
 private:
-	void setupCallbacks(bool subscribeDepth, bool subscribeLaserScan, bool subscribeStereo, int queueSize, bool stereoApproxSync);
+	void setupCallbacks(
+			bool subscribeDepth,
+			bool subscribeLaserScan,
+			bool subscribeStereo,
+			int queueSize,
+			bool stereoApproxSync,
+			int depthCameras);
 	void defaultCallback(const sensor_msgs::ImageConstPtr & imageMsg); // no odom
 
 	bool commonOdomUpdate(const nav_msgs::OdometryConstPtr & odomMsg);
@@ -93,8 +99,14 @@ private:
 	void commonDepthCallback(
 				const std::string & odomFrameId,
 				const sensor_msgs::ImageConstPtr& imageMsg,
-				const sensor_msgs::ImageConstPtr& imageDepthMsg,
-				const sensor_msgs::CameraInfoConstPtr& camInfoMsg,
+				const sensor_msgs::ImageConstPtr& depthMsg,
+				const sensor_msgs::CameraInfoConstPtr& cameraInfoMsg,
+				const sensor_msgs::LaserScanConstPtr& scanMsg);
+	void commonDepthCallback(
+				const std::string & odomFrameId,
+				const std::vector<sensor_msgs::ImageConstPtr> & imageMsgs,
+				const std::vector<sensor_msgs::ImageConstPtr> & depthMsgs,
+				const std::vector<sensor_msgs::CameraInfoConstPtr> & cameraInfoMsgs,
 				const sensor_msgs::LaserScanConstPtr& scanMsg);
 	void commonStereoCallback(
 				const std::string & odomFrameId,
@@ -129,6 +141,14 @@ private:
 			const sensor_msgs::CameraInfoConstPtr& rightCamInfoMsg,
 			const sensor_msgs::LaserScanConstPtr& scanMsg,
 			const nav_msgs::OdometryConstPtr & odomMsg);
+	void depth2Callback(
+			const nav_msgs::OdometryConstPtr & odomMsg,
+			const sensor_msgs::ImageConstPtr& image1Msg,
+			const sensor_msgs::ImageConstPtr& imageDepth1Msg,
+			const sensor_msgs::CameraInfoConstPtr& camInfo1Msg,
+			const sensor_msgs::ImageConstPtr& image2Msg,
+			const sensor_msgs::ImageConstPtr& imageDept2hMsg,
+			const sensor_msgs::CameraInfoConstPtr& camInfo2Msg);
 
 	// without odom, when TF is used for odom
 	void depthTFCallback(
@@ -154,25 +174,15 @@ private:
 
 	void goalCommonCallback(const std::vector<std::pair<int, rtabmap::Transform> > & poses);
 	void goalCallback(const geometry_msgs::PoseStampedConstPtr & msg);
-	void goalGlobalCallback(const geometry_msgs::PoseStampedConstPtr & msg);
 	void updateGoal(const ros::Time & stamp);
 
 	void process(
-			int id,
 			const ros::Time & stamp,
-			const cv::Mat & image,
+			const rtabmap::SensorData & data,
 			const rtabmap::Transform & odom = rtabmap::Transform(),
 			const std::string & odomFrameId = "",
-			float odomRotationalVariance = 1.0f,
-			float odomTransitionalVariance = 1.0f,
-			const cv::Mat & depthOrRightImage = cv::Mat(),
-			float fx = 0.0f,
-			float fyOrBaseline = 0.0f,
-			float cx = 0.0f,
-			float cy = 0.0f,
-			const rtabmap::Transform & localTransform = rtabmap::Transform(),
-			const cv::Mat & scan = cv::Mat(),
-			int scanMaxPts = 0);
+			double odomRotationalVariance = 1.0,
+			double odomTransitionalVariance = 1.0);
 
 	bool updateRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool resetRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
@@ -187,6 +197,7 @@ private:
 	bool getGridMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::GetMap::Response &res);
 	bool publishMapCallback(rtabmap_ros::PublishMap::Request&, rtabmap_ros::PublishMap::Response&);
 	bool setGoalCallback(rtabmap_ros::SetGoal::Request& req, rtabmap_ros::SetGoal::Response& res);
+	bool cancelGoalCallback(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res);
 	bool setLabelCallback(rtabmap_ros::SetLabel::Request& req, rtabmap_ros::SetLabel::Response& res);
 	bool listLabelsCallback(rtabmap_ros::ListLabels::Request& req, rtabmap_ros::ListLabels::Response& res);
 #ifdef WITH_OCTOMAP
@@ -211,8 +222,8 @@ private:
 	bool paused_;
 	rtabmap::Transform lastPose_;
 	ros::Time lastPoseStamp_;
-	float rotVariance_;
-	float transVariance_;
+	double rotVariance_;
+	double transVariance_;
 	rtabmap::Transform currentMetricGoal_;
 	bool latestNodeWasReached_;
 	rtabmap::ParametersMap parameters_;
@@ -224,6 +235,8 @@ private:
 	std::string databasePath_;
 	bool waitForTransform_;
 	bool useActionForGoal_;
+	bool genScan_;
+	double genScanMaxDepth_;
 
 	rtabmap::Transform mapToOdom_;
 	boost::mutex mapToOdomMutex_;
@@ -232,12 +245,10 @@ private:
 
 	ros::Publisher infoPub_;
 	ros::Publisher mapDataPub_;
-	ros::Publisher mapGraphPub_;
 	ros::Publisher labelsPub_;
 
 	//Planning stuff
 	ros::Subscriber goalSub_;
-	ros::Subscriber goalGlobalSub_;
 	ros::Publisher nextMetricGoalPub_;
 	ros::Publisher goalReachedPub_;
 	ros::Publisher globalPathPub_;
@@ -247,9 +258,9 @@ private:
 	image_transport::Subscriber defaultSub_;
 
 	//for depth callback
-	image_transport::SubscriberFilter imageSub_;
-	image_transport::SubscriberFilter imageDepthSub_;
-	message_filters::Subscriber<sensor_msgs::CameraInfo> cameraInfoSub_;
+	std::vector<image_transport::SubscriberFilter*> imageSubs_;
+	std::vector<image_transport::SubscriberFilter*> imageDepthSubs_;
+	std::vector<message_filters::Subscriber<sensor_msgs::CameraInfo>*> cameraInfoSubs_;
 
 	//stereo callback
 	image_transport::SubscriberFilter imageRectLeft_;
@@ -299,6 +310,16 @@ private:
 			sensor_msgs::CameraInfo,
 			nav_msgs::Odometry> MyStereoExactSyncPolicy;
 	message_filters::Synchronizer<MyStereoExactSyncPolicy> * stereoExactSync_;
+
+	typedef message_filters::sync_policies::ApproximateTime<
+			nav_msgs::Odometry,
+			sensor_msgs::Image,
+			sensor_msgs::Image,
+			sensor_msgs::CameraInfo,
+			sensor_msgs::Image,
+			sensor_msgs::Image,
+			sensor_msgs::CameraInfo> MyDepth2SyncPolicy;
+	message_filters::Synchronizer<MyDepth2SyncPolicy> * depth2Sync_;
 
 	// without odom, when TF is used for odom
 	typedef message_filters::sync_policies::ApproximateTime<
@@ -352,6 +373,7 @@ private:
 	ros::ServiceServer getGridMapSrv_;
 	ros::ServiceServer publishMapDataSrv_;
 	ros::ServiceServer setGoalSrv_;
+	ros::ServiceServer cancelGoalSrv_;
 	ros::ServiceServer setLabelSrv_;
 	ros::ServiceServer listLabelsSrv_;
 #ifdef WITH_OCTOMAP
