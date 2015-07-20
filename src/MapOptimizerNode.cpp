@@ -194,7 +194,6 @@ public:
 				}
 			}
 		}
-
 		// Optimize only if there is a subscriber
 		if(mapDataPub_.getNumSubscribers())
 		{
@@ -214,9 +213,8 @@ public:
 						posesOut,
 						linksOut);
 				optimizedPoses = optimizer.optimize(fromId, posesOut, linksOut);
-
 				mapToOdomMutex_.lock();
-				mapCorrection = optimizedPoses.at(poses.rbegin()->first) * poses.rbegin()->second.inverse();
+				mapCorrection = optimizedPoses.at(posesOut.rbegin()->first) * posesOut.rbegin()->second.inverse();
 				mapToOdom_ = mapCorrection;
 				mapToOdomMutex_.unlock();
 			}
