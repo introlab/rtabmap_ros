@@ -94,6 +94,13 @@ void MapsManager::clear()
 	laserScanIncrement_ = 0;
 }
 
+bool MapsManager::hasSubscribers() const
+{
+	return  cloudMapPub_.getNumSubscribers() != 0 ||
+			projMapPub_.getNumSubscribers() != 0 ||
+			gridMapPub_.getNumSubscribers() != 0;
+}
+
 void MapsManager::setLaserScanParameters(
 		float maxRange,
 		float minAngle,
@@ -192,7 +199,10 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 					{
 						// Which data should we decompress?
 						cv::Mat image, depth, scan;
-						data.uncompressData(rgbDepthRequired||data.stereoCameraModel().isValid()?&image:0, rgbDepthRequired||depthRequired?&depth:0, scanRequired?&scan:0);
+						data.uncompressData(
+								(rgbDepthRequired||data.stereoCameraModel().isValid()) ? &image:0,
+								(rgbDepthRequired||depthRequired) ? &depth:0,
+								scanRequired?&scan:0);
 
 						pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloudRGB;
 						pcl::PointCloud<pcl::PointXYZ>::Ptr cloudXYZ;

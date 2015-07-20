@@ -29,6 +29,7 @@ public:
 	MapsManager();
 	virtual ~MapsManager();
 	void clear();
+	bool hasSubscribers() const;
 
 	std::map<int, rtabmap::Transform> getFilteredPoses(
 			const std::map<int, rtabmap::Transform> & poses);

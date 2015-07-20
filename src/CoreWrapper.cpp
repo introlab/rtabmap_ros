@@ -1687,7 +1687,9 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 {
 	ROS_INFO("rtabmap: Publishing map...");
 
-	if(mapDataPub_.getNumSubscribers())
+	if(mapDataPub_.getNumSubscribers() ||
+	   (!req.graphOnly && mapsManager_.hasSubscribers()) ||
+	   (req.graphOnly && labelsPub_.getNumSubscribers()))
 	{
 		std::map<int, Transform> poses;
 		std::multimap<int, Link> constraints;
@@ -1714,7 +1716,7 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 
 		if(poses.size() && poses.size() != signatures.size())
 		{
-			ROS_ERROR("poses and signatures are not the same size!? %d vs %d", (int)poses.size(), (int)signatures.size());
+			ROS_WARN("poses and signatures are not the same size!? %d vs %d", (int)poses.size(), (int)signatures.size());
 		}
 
 		ros::Time now = ros::Time::now();
@@ -1733,7 +1735,7 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 			mapDataPub_.publish(msg);
 		}
 
-		if(!req.graphOnly)
+		if(!req.graphOnly && mapsManager_.hasSubscribers())
 		{
 			std::map<int, Transform> filteredPoses;
 			if(signatures.size())
@@ -1741,9 +1743,9 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 				filteredPoses = mapsManager_.updateMapCaches(
 						poses,
 						rtabmap_.getMemory(),
-						true,
-						true,
-						true,
+						false,
+						false,
+						false,
 						signatures);
 			}
 			else
