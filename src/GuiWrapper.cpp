@@ -71,7 +71,7 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 		app_(0),
 		mainWindow_(0),
 		frameId_("base_link"),
-		waitForTransform_(false),
+		waitForTransform_(true),
 		cameraNodeName_(""),
 		lastOdomInfoUpdateTime_(0),
 		depthScanSync_(0),

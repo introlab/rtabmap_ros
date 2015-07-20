@@ -81,7 +81,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 		odomFrameId_(""),
 		configPath_(""),
 		databasePath_(UDirectory::homeDir()+"/.ros/"+rtabmap::Parameters::getDefaultDatabaseName()),
-		waitForTransform_(false),
+		waitForTransform_(true),
 		useActionForGoal_(false),
 		genScan_(false),
 		genScanMaxDepth_(4.0),

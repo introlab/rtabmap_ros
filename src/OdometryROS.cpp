@@ -56,7 +56,7 @@ OdometryROS::OdometryROS(int argc, char * argv[]) :
 	odomFrameId_("odom"),
 	groundTruthFrameId_(""),
 	publishTf_(true),
-	waitForTransform_(false),
+	waitForTransform_(true),
 	paused_(false)
 {
 	this->processArguments(argc, argv);

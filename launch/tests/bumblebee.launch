@@ -15,10 +15,24 @@
   	<node pkg="tf" type="static_transform_publisher" name="camera_base_link"
         args="$(arg optical_rotate) base_link stereo_camera 100" />  
   	
-  	<!-- Run the ROS package stereo_image_proc -->
+  	<!-- Run the ROS package stereo_image_proc (throttle to 10 Hz to avoid rectifying all images) -->
 	<group ns="/stereo_camera" >
-		<node pkg="stereo_image_proc" type="stereo_image_proc" name="stereo_image_proc"/>
-	    <node pkg="nodelet" type="nodelet" name="disparity2depth" args="standalone rtabmap_ros/disparity_to_depth"/>
+	    <node pkg="nodelet" type="nodelet" name="stereo_throttle" args="standalone rtabmap_ros/stereo_throttle">
+			<remap from="left/image"        to="left/image_raw"/>
+		    <remap from="right/image"       to="right/image_raw"/>
+		    <remap from="left/camera_info"  to="left/camera_info"/>
+		    <remap from="right/camera_info" to="right/camera_info"/>
+		    
+		    <param name="queue_size" type="int" value="10"/>
+		    <param name="rate" type="double" value="10"/>
+		</node>
+		
+		<node pkg="stereo_image_proc" type="stereo_image_proc" name="stereo_image_proc">
+		    <remap from="left/image_raw"    to="left/image_raw_throttle"/>
+			<remap from="left/camera_info"  to="left/camera_info_throttle"/>
+			<remap from="right/image_raw"   to="right/image_raw_throttle"/>
+			<remap from="right/camera_info" to="right/camera_info_throttle"/>
+		</node>
 	</group>
 	
 	
