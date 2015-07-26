@@ -381,6 +381,11 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	// Init RTAB-Map
 	rtabmap_.init(parameters_, databasePath_);
 
+	if(databasePath_.size() && rtabmap_.getMemory())
+	{
+		ROS_INFO("rtabmap: Database version = \"%s\".", rtabmap_.getMemory()->getDatabaseVersion().c_str());
+	}
+
 	// setup services
 	updateSrv_ = nh.advertiseService("update_parameters", &CoreWrapper::updateRtabmapCallback, this);
 	resetSrv_ = nh.advertiseService("reset", &CoreWrapper::resetRtabmapCallback, this);
