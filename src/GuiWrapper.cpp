@@ -54,6 +54,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtabmap_ros/MsgConversion.h"
 #include "rtabmap_ros/GetMap.h"
 #include "rtabmap_ros/SetGoal.h"
+#include "rtabmap_ros/SetLabel.h"
 
 #include "PreferencesDialogROS.h"
 
@@ -377,6 +378,16 @@ void GuiWrapper::handleEvent(UEvent * anEvent)
 			if(!ros::service::call("cancel_goal", emptySrv))
 			{
 				ROS_ERROR("Can't call \"cancel_goal\" service");
+			}
+		}
+		else if(cmd == rtabmap::RtabmapEventCmd::kCmdLabel)
+		{
+			rtabmap_ros::SetLabel setLabelSrv;
+			setLabelSrv.request.node_id = cmdEvent->getInt();
+			setLabelSrv.request.node_label = cmdEvent->getStr();
+			if(!ros::service::call("set_label", setLabelSrv))
+			{
+				ROS_ERROR("Can't call \"set_label\" service");
 			}
 		}
 		else
