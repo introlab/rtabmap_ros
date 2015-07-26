@@ -5,6 +5,7 @@
     <description>
       Displays graph point clouds from rtabmap_ros/MapData messages.
     </description>
+    <message_type>rtabmap_ros/MapData</message_type>
   </class>
   <class name="rtabmap_ros/MapGraph"
          type="rtabmap_ros::MapGraphDisplay"
@@ -12,6 +13,7 @@
     <description>
       Displays graphs from rtabmap_ros/MapData messages.
     </description>
+    <message_type>rtabmap_ros/MapData</message_type>
   </class>
   <class name="rtabmap_ros/Info"
          type="rtabmap_ros::InfoDisplay"
@@ -19,6 +21,7 @@
     <description>
       Displays information from rtabmap_ros/Info messages.
     </description>
+    <message_type>rtabmap_ros/Info</message_type>
   </class>
   <class name="rtabmap_ros/OrbitOriented"
          type="rtabmap_ros::OrbitOrientedViewController"
