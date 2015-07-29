@@ -381,7 +381,7 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 
 		if(odomLocalMap_.getNumSubscribers() && dynamic_cast<OdometryBOW*>(odometry_))
 		{
-			const std::multimap<int, pcl::PointXYZ> & map = ((OdometryBOW*)odometry_)->getLocalMap();
+			const std::map<int, pcl::PointXYZ> & map = ((OdometryBOW*)odometry_)->getLocalMap();
 			pcl::PointCloud<pcl::PointXYZ> cloud;
 			for(std::multimap<int, pcl::PointXYZ>::const_iterator iter=map.begin(); iter!=map.end(); ++iter)
 			{
