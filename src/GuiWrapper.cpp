@@ -300,41 +300,38 @@ void GuiWrapper::handleEvent(UEvent * anEvent)
 		}
 		else if(cmd == rtabmap::RtabmapEventCmd::kCmdPause)
 		{
-			if(cmdEvent->getInt())
+			// Pause the camera if the rtabmap/camera node is used
+			if(!cameraNodeName_.empty())
 			{
-				// Pause the camera if the rtabmap/camera node is used
-				if(!cameraNodeName_.empty())
-				{
-					std::string str = uFormat("rosrun dynamic_reconfigure dynparam set %s pause true", cameraNodeName_.c_str());
-					system(str.c_str());
-				}
-
-				// Pause visual_odometry
-				ros::service::call("pause_odom", emptySrv);
-
-				// Pause rtabmap
-				if(!ros::service::call("pause", emptySrv))
-				{
-					ROS_ERROR("Can't call \"pause\" service");
-				}
+				std::string str = uFormat("rosrun dynamic_reconfigure dynparam set %s pause true", cameraNodeName_.c_str());
+				system(str.c_str());
 			}
-			else
+
+			// Pause visual_odometry
+			ros::service::call("pause_odom", emptySrv);
+
+			// Pause rtabmap
+			if(!ros::service::call("pause", emptySrv))
 			{
-				// Resume rtabmap
-				if(!ros::service::call("resume", emptySrv))
-				{
-					ROS_ERROR("Can't call \"resume\" service");
-				}
+				ROS_ERROR("Can't call \"pause\" service");
+			}
+		}
+		else if(cmd == rtabmap::RtabmapEventCmd::kCmdResume)
+		{
+			// Resume rtabmap
+			if(!ros::service::call("resume", emptySrv))
+			{
+				ROS_ERROR("Can't call \"resume\" service");
+			}
 
-				// Pause visual_odometry
-				ros::service::call("resume_odom", emptySrv);
+			// Pause visual_odometry
+			ros::service::call("resume_odom", emptySrv);
 
-				// Resume the camera if the rtabmap/camera node is used
-				if(!cameraNodeName_.empty())
-				{
-					std::string str = uFormat("rosrun dynamic_reconfigure dynparam set %s pause false", cameraNodeName_.c_str());
-					system(str.c_str());
-				}
+			// Resume the camera if the rtabmap/camera node is used
+			if(!cameraNodeName_.empty())
+			{
+				std::string str = uFormat("rosrun dynamic_reconfigure dynparam set %s pause false", cameraNodeName_.c_str());
+				system(str.c_str());
 			}
 		}
 		else if(cmd == rtabmap::RtabmapEventCmd::kCmdTriggerNewMap)
@@ -344,15 +341,16 @@ void GuiWrapper::handleEvent(UEvent * anEvent)
 				ROS_ERROR("Can't call \"trigger_new_map\" service");
 			}
 		}
-		else if(cmd == rtabmap::RtabmapEventCmd::kCmdPublish3DMapLocal ||
-				 cmd == rtabmap::RtabmapEventCmd::kCmdPublish3DMapGlobal ||
-				 cmd == rtabmap::RtabmapEventCmd::kCmdPublishTOROGraphLocal ||
-				 cmd == rtabmap::RtabmapEventCmd::kCmdPublishTOROGraphGlobal)
+		else if(cmd == rtabmap::RtabmapEventCmd::kCmdPublish3DMap)
 		{
+			UASSERT(cmdEvent->value1().isBool());
+			UASSERT(cmdEvent->value2().isBool());
+			UASSERT(cmdEvent->value3().isBool());
+
 			rtabmap_ros::GetMap getMapSrv;
-			getMapSrv.request.global = cmd == rtabmap::RtabmapEventCmd::kCmdPublish3DMapGlobal || cmd == rtabmap::RtabmapEventCmd::kCmdPublishTOROGraphGlobal;
-			getMapSrv.request.optimized = cmdEvent->getInt();
-			getMapSrv.request.graphOnly = cmd == rtabmap::RtabmapEventCmd::kCmdPublishTOROGraphGlobal || cmd == rtabmap::RtabmapEventCmd::kCmdPublishTOROGraphLocal;
+			getMapSrv.request.global = cmdEvent->value1().toBool();
+			getMapSrv.request.optimized = cmdEvent->value2().toBool();
+			getMapSrv.request.graphOnly = cmdEvent->value3().toBool();
 			if(!ros::service::call("get_map", getMapSrv))
 			{
 				ROS_WARN("Can't call \"get_map\" service");
@@ -365,9 +363,10 @@ void GuiWrapper::handleEvent(UEvent * anEvent)
 		}
 		else if(cmd == rtabmap::RtabmapEventCmd::kCmdGoal)
 		{
+			UASSERT(cmdEvent->value1().isStr() || cmdEvent->value1().isInt() || cmdEvent->value1().isUInt());
 			rtabmap_ros::SetGoal setGoalSrv;
-			setGoalSrv.request.node_id = cmdEvent->getInt();
-			setGoalSrv.request.node_label = cmdEvent->getStr();
+			setGoalSrv.request.node_id = !cmdEvent->value1().isStr()?cmdEvent->value1().toInt():0;
+			setGoalSrv.request.node_label = cmdEvent->value1().isStr()?cmdEvent->value1().toStr():"";
 			if(!ros::service::call("set_goal", setGoalSrv))
 			{
 				ROS_ERROR("Can't call \"set_goal\" service");
@@ -382,9 +381,10 @@ void GuiWrapper::handleEvent(UEvent * anEvent)
 		}
 		else if(cmd == rtabmap::RtabmapEventCmd::kCmdLabel)
 		{
+			UASSERT(cmdEvent->value1().isStr() || cmdEvent->value1().isInt() || cmdEvent->value1().isUInt());
 			rtabmap_ros::SetLabel setLabelSrv;
-			setLabelSrv.request.node_id = cmdEvent->getInt();
-			setLabelSrv.request.node_label = cmdEvent->getStr();
+			setLabelSrv.request.node_id = !cmdEvent->value1().isStr()?cmdEvent->value1().toInt():0;
+			setLabelSrv.request.node_label = cmdEvent->value1().isStr()?cmdEvent->value1().toStr():"";
 			if(!ros::service::call("set_label", setLabelSrv))
 			{
 				ROS_ERROR("Can't call \"set_label\" service");
