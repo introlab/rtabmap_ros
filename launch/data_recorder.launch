@@ -14,9 +14,18 @@
   <arg name="queue_size"    default="10"/>
   <arg name="max_rate"      default="0"/>       <!-- Record as fast as possible --> 
   
-  <arg name="camera_prefix" default="camera"/>
-  <arg name="odom_topic"    default="odom"/>
-  <arg name="scan_topic"    default="scan"/>
+  <arg name="rgb_topic"        default="camera/rgb/image_rect_color"/>
+  <arg name="rgb_info_topic"   default="camera/rgb/camera_info"/>
+  <arg name="depth_topic"      default="camera/depth_registered/image_raw"/>
+  <arg name="left_topic"       default="camera/left/image_rect_color"/>
+  <arg name="left_info_topic"  default="camera/left/camera_info"/>
+  <arg name="right_topic"      default="camera/right/image_rect"/>
+  <arg name="right_info_topic" default="camera/right/camera_info"/>
+  <arg name="odom_topic"       default="odom"/>
+  <arg name="scan_topic"       default="scan"/>
+  
+  <arg name="rgb_image_transport"  default="raw"/>
+  <arg name="depth_image_transport"  default="raw"/>
 
   <node name="data_recorder" pkg="rtabmap_ros" type="rtabmap" output="screen" args="--delete_db_on_start">
   
@@ -43,13 +52,18 @@
 	<param if="$(arg subscribe_odometry)" name="odom_frame_id" type="string" value="$(arg odom_frame_id)"/>
 	<param unless="$(arg subscribe_odometry)" name="odom_frame_id" type="string" value="$(arg frame_id)"/>
 	
-	<remap from="rgb/image"         to="$(arg camera_prefix)/rgb/image_rect_color"/>
-	<remap from="rgb/camera_info"   to="$(arg camera_prefix)/rgb/camera_info"/>
-  	<remap from="depth/image"       to="$(arg camera_prefix)/depth_registered/image_raw"/>
-  	<remap from="left/image_rect"   to="$(arg camera_prefix)/left/image_rect"/>
-  	<remap from="left/camera_info"  to="$(arg camera_prefix)/left/camera_info"/>
-  	<remap from="right/image_rect"  to="$(arg camera_prefix)/right/image_rect"/>
-  	<remap from="right/camera_info" to="$(arg camera_prefix)/right/camera_info"/>
+	<param name="rgb/image_transport" type="string" value="$(arg rgb_image_transport)"/>
+    <param name="depth/image_transport" type="string" value="$(arg depth_image_transport)"/>
+    <param name="left/image_transport" type="string" value="$(arg rgb_image_transport)"/>
+    <param name="right/image_transport" type="string" value="$(arg rgb_image_transport)"/>
+  
+	<remap from="rgb/image"         to="$(arg rgb_topic)"/>
+	<remap from="rgb/camera_info"   to="$(arg rgb_info_topic)"/>
+  	<remap from="depth/image"       to="$(arg depth_topic)"/>
+  	<remap from="left/image_rect"   to="$(arg left_topic)"/>
+  	<remap from="left/camera_info"  to="$(arg left_info_topic)"/>
+  	<remap from="right/image_rect"  to="$(arg right_topic)"/>
+  	<remap from="right/camera_info" to="$(arg right_info_topic)"/>
   	<remap from="scan"              to="$(arg scan_topic)"/>
   	<remap from="odom"              to="$(arg odom_topic)"/>
   </node>
