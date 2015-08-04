@@ -381,10 +381,11 @@ void GuiWrapper::handleEvent(UEvent * anEvent)
 		}
 		else if(cmd == rtabmap::RtabmapEventCmd::kCmdLabel)
 		{
-			UASSERT(cmdEvent->value1().isStr() || cmdEvent->value1().isInt() || cmdEvent->value1().isUInt());
+			UASSERT(cmdEvent->value1().isStr());
+			UASSERT(cmdEvent->value2().isUndef() || cmdEvent->value2().isInt() || cmdEvent->value2().isUInt());
 			rtabmap_ros::SetLabel setLabelSrv;
-			setLabelSrv.request.node_id = !cmdEvent->value1().isStr()?cmdEvent->value1().toInt():0;
-			setLabelSrv.request.node_label = cmdEvent->value1().isStr()?cmdEvent->value1().toStr():"";
+			setLabelSrv.request.node_label = cmdEvent->value1().toStr();
+			setLabelSrv.request.node_id = cmdEvent->value2().isUndef()?0:cmdEvent->value2().toInt();
 			if(!ros::service::call("set_label", setLabelSrv))
 			{
 				ROS_ERROR("Can't call \"set_label\" service");
