@@ -28,6 +28,9 @@
   <arg name="subscribe_scan"          default="false"/>         <!-- Assuming 2D scan if set, rtabmap will do 3DoF mapping instead of 6DoF -->
   <arg name="scan_topic"              default="/scan"/>
    
+  <arg name="visual_odometry"         default="true"/>          <!-- Generate visual odometry -->
+  <arg name="odom_topic"              default="/odom"/>         <!-- Odometry topic used if visual_odometry is false -->
+  
   <arg name="namespace"               default="rtabmap"/>
   <arg name="wait_for_transform"      default="true"/>
   
@@ -46,7 +49,7 @@
   <group ns="$(arg namespace)">
   
     <!-- Odometry -->
-    <node pkg="rtabmap_ros" type="stereo_odometry" name="stereo_odometry" output="screen">
+    <node if="$(arg visual_odometry)" pkg="rtabmap_ros" type="stereo_odometry" name="stereo_odometry" output="screen">
       <remap from="left/image_rect"        to="$(arg left_image_topic)"/>
       <remap from="right/image_rect"       to="$(arg right_image_topic)"/>
       <remap from="left/camera_info"       to="$(arg left_camera_info_topic)"/>
@@ -63,7 +66,7 @@
       <param name="Odom/MinInliers"          type="string" value="$(arg min_inliers)"/> 
       <param name="Odom/InlierDistance"      type="string" value="$(arg inlier_distance)"/>       
       <param name="OdomBow/LocalHistorySize" type="string" value="$(arg local_map)"/> 
-      <param name="Odom/FillInfoData"        type="string" value="$(arg odom_info_data)"/>   
+      <param name="Odom/FillInfoData"        type="string" value="true"/>   
     </node>
   
     <!-- Visual SLAM (robot side) -->
@@ -82,6 +85,7 @@
       <remap from="left/camera_info"       to="$(arg left_camera_info_topic)"/>
       <remap from="right/camera_info"      to="$(arg right_camera_info_topic)"/>
       <remap from="scan"                   to="$(arg scan_topic)"/>
+      <remap unless="$(arg visual_odometry)" from="odom"  to="$(arg odom_topic)"/>
       
       <param name="Rtabmap/TimeThr"           type="string" value="$(arg time_threshold)"/>
       <param name="RGBD/OptimizeFromGraphEnd" type="string" value="$(arg optimize_from_last_node)"/>
@@ -100,7 +104,7 @@
       <param name="subscribe_depth"      type="bool"   value="false"/>
       <param name="subscribe_stereo"     type="bool"   value="true"/>
       <param name="subscribe_scan"       type="bool"   value="$(arg subscribe_scan)"/>
-      <param name="subscribe_odom_info"  type="bool"   value="$(arg odom_info_data)"/>
+      <param name="subscribe_odom_info"  type="bool"   value="$(arg visual_odometry)"/>
       <param name="frame_id"             type="string" value="$(arg frame_id)"/>
       <param name="wait_for_transform"   type="bool"   value="$(arg wait_for_transform)"/>
     
@@ -109,6 +113,7 @@
       <remap from="left/camera_info"       to="$(arg left_camera_info_topic)"/>
       <remap from="right/camera_info"      to="$(arg right_camera_info_topic)"/>
       <remap from="scan"                   to="$(arg scan_topic)"/>
+      <remap unless="$(arg visual_odometry)" from="odom"  to="$(arg odom_topic)"/>
     </node>
   
   </group>
