@@ -40,6 +40,7 @@ MapsManager::MapsManager() :
 		gridCellSize_(0.05), // meters
 		gridSize_(0), // meters
 		gridEroded_(false),
+		gridUnknownSpaceFilled_(false),
 		mapFilterRadius_(0.5),
 		mapFilterAngle_(30.0), // degrees
 		mapCacheCleanup_(true),
@@ -67,6 +68,7 @@ MapsManager::MapsManager() :
 	pnh.param("grid_cell_size", gridCellSize_, gridCellSize_); // m
 	pnh.param("grid_size", gridSize_, gridSize_); // m
 	pnh.param("grid_eroded", gridEroded_, gridEroded_);
+	pnh.param("grid_unknown_space_filled", gridUnknownSpaceFilled_, gridUnknownSpaceFilled_);
 
 	// common map stuff
 	pnh.param("map_filter_radius", mapFilterRadius_, mapFilterRadius_);
@@ -276,7 +278,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 						if(scanRequired)
 						{
 							cv::Mat ground, obstacles;
-							util3d::occupancy2DFromLaserScan(scan, ground, obstacles, gridCellSize_);
+							util3d::occupancy2DFromLaserScan(scan, ground, obstacles, gridCellSize_, gridUnknownSpaceFilled_);
 							gridMaps_.insert(std::make_pair(iter->first, std::make_pair(ground, obstacles)));
 						}
 					}

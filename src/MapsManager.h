@@ -77,6 +77,7 @@ private:
 	double gridCellSize_;
 	double gridSize_;
 	bool gridEroded_;
+	bool gridUnknownSpaceFilled_;
 	double mapFilterRadius_;
 	double mapFilterAngle_;
 	bool mapCacheCleanup_;
