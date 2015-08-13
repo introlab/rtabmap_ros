@@ -31,6 +31,7 @@ pkg_check_modules(OGRE OGRE)
 include_directories( ${OGRE_INCLUDE_DIRS} )
 link_directories( ${OGRE_LIBRARY_DIRS} )
 
+
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
 ## See http://ros.org/doc/api/catkin/html/user_guide/setup_dot_py.html
@@ -206,8 +207,12 @@ add_executable(camera src/CameraNode.cpp)
 add_dependencies(camera ${${PROJECT_NAME}_EXPORTED_TARGETS})
 target_link_libraries(camera ${Libraries})
 
-add_executable(rtabmapviz src/GuiNode.cpp src/GuiWrapper.cpp src/PreferencesDialogROS.cpp)
-target_link_libraries(rtabmapviz rtabmap_ros ${QT_LIBRARIES} ${Libraries})
+IF(RTABMAP_GUI)
+    add_executable(rtabmapviz src/GuiNode.cpp src/GuiWrapper.cpp src/PreferencesDialogROS.cpp)
+    target_link_libraries(rtabmapviz rtabmap_ros ${QT_LIBRARIES} ${Libraries})
+ELSE()
+    MESSAGE(WARNING "Found RTAB-Map built without its GUI library. Node rtabmapviz will not be built!")
+ENDIF()
 
 add_executable(data_player src/DbPlayerNode.cpp)
 target_link_libraries(data_player rtabmap_ros ${QT_LIBRARIES} ${Libraries})
@@ -230,6 +235,7 @@ target_link_libraries(odom_msg_to_tf rtabmap_ros ${Libraries})
 # )
 
 ## Mark executables and/or libraries for installation
+IF(RTABMAP_GUI)
 install(TARGETS 
    rtabmap_ros 
    rtabmap 
@@ -245,6 +251,22 @@ install(TARGETS
    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
  )
+ ELSE() # without rtabmapviz
+ install(TARGETS 
+   rtabmap_ros 
+   rtabmap 
+   rgbd_odometry 
+   stereo_odometry
+   map_assembler
+   grid_map_assembler
+   map_optimizer
+   data_player
+   camera
+   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+ )
+ ENDIF()
 
 ## Mark cpp header files for installation
 install(DIRECTORY include/${PROJECT_NAME}/
