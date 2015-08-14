@@ -190,22 +190,9 @@ public:
 
 			ros::Time stamp = image->header.stamp>depth->header.stamp?image->header.stamp:depth->header.stamp;
 
-			tf::StampedTransform localTransform;
-			try
+			Transform localTransform = getTransform(this->frameId(), image->header.frame_id, stamp);
+			if(localTransform.isNull())
 			{
-				if(this->waitForTransform())
-				{
-					if(!this->tfListener().waitForTransform(this->frameId(), image->header.frame_id, stamp, ros::Duration(1)))
-					{
-						ROS_WARN("Could not get transform from %s to %s after 1 second!", this->frameId().c_str(), image->header.frame_id.c_str());
-						return;
-					}
-				}
-				this->tfListener().lookupTransform(this->frameId(), image->header.frame_id, stamp, localTransform);
-			}
-			catch(tf::TransformException & ex)
-			{
-				ROS_WARN("%s",ex.what());
 				return;
 			}
 
@@ -218,7 +205,7 @@ public:
 						model.fy(),
 						model.cx(),
 						model.cy(),
-						rtabmap_ros::transformFromTF(localTransform));
+						localTransform);
 				cv_bridge::CvImageConstPtr ptrImage = cv_bridge::toCvShare(image, image->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0?"":"mono8");
 				cv_bridge::CvImageConstPtr ptrDepth = cv_bridge::toCvShare(depth);
 
@@ -290,22 +277,9 @@ public:
 					higherStamp = stamp;
 				}
 
-				tf::StampedTransform localTransform;
-				try
+				Transform localTransform = getTransform(this->frameId(), imageMsgs[i]->header.frame_id, stamp);
+				if(localTransform.isNull())
 				{
-					if(this->waitForTransform())
-					{
-						if(!this->tfListener().waitForTransform(this->frameId(), imageMsgs[i]->header.frame_id, stamp, ros::Duration(1)))
-						{
-							ROS_WARN("Could not get transform from %s to %s after 1 second!", this->frameId().c_str(), imageMsgs[i]->header.frame_id.c_str());
-							return;
-						}
-					}
-					this->tfListener().lookupTransform(this->frameId(), imageMsgs[i]->header.frame_id, stamp, localTransform);
-				}
-				catch(tf::TransformException & ex)
-				{
-					ROS_WARN("%s",ex.what());
 					return;
 				}
 
@@ -374,7 +348,7 @@ public:
 						model.fy(),
 						model.cx(),
 						model.cy(),
-						rtabmap_ros::transformFromTF(localTransform)));
+						localTransform));
 			}
 
 			rtabmap::SensorData data(

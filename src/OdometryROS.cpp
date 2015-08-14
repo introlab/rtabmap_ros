@@ -57,6 +57,7 @@ OdometryROS::OdometryROS(int argc, char * argv[]) :
 	groundTruthFrameId_(""),
 	publishTf_(true),
 	waitForTransform_(true),
+	waitForTransformDuration_(0.1), // 100 ms
 	paused_(false)
 {
 	this->processArguments(argc, argv);
@@ -78,6 +79,7 @@ OdometryROS::OdometryROS(int argc, char * argv[]) :
 	pnh.param("publish_tf", publishTf_, publishTf_);
 	pnh.param("tf_prefix", tfPrefix, tfPrefix);
 	pnh.param("wait_for_transform", waitForTransform_, waitForTransform_);
+	pnh.param("wait_for_transform_duration",  waitForTransformDuration_, waitForTransformDuration_);
 	pnh.param("initial_pose", initialPoseStr, initialPoseStr); // "x y z roll pitch yaw"
 	pnh.param("ground_truth_frame_id", groundTruthFrameId_, groundTruthFrameId_);
 
@@ -302,35 +304,50 @@ void OdometryROS::processArguments(int argc, char * argv[])
 	}
 }
 
+Transform OdometryROS::getTransform(const std::string & fromFrameId, const std::string & toFrameId, const ros::Time & stamp) const
+{
+	// TF ready?
+	Transform transform;
+	try
+	{
+		if(waitForTransform_ && !stamp.isZero() && waitForTransformDuration_ > 0.0)
+		{
+			//if(!tfBuffer_.canTransform(fromFrameId, toFrameId, stamp, ros::Duration(1)))
+			if(!tfListener_.waitForTransform(fromFrameId, toFrameId, stamp, ros::Duration(waitForTransformDuration_)))
+			{
+				ROS_WARN("odometry: Could not get transform from %s to %s after %f seconds!", fromFrameId.c_str(), toFrameId.c_str(), waitForTransformDuration_);
+				return transform;
+			}
+		}
+
+		tf::StampedTransform tmp;
+		tfListener_.lookupTransform(fromFrameId, toFrameId, stamp, tmp);
+		transform = rtabmap_ros::transformFromTF(tmp);
+	}
+	catch(tf::TransformException & ex)
+	{
+		ROS_WARN("%s",ex.what());
+	}
+	return transform;
+}
+
 void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 {
 	if(odometry_->getPose().isNull() &&
 	   !groundTruthFrameId_.empty())
 	{
-		tf::StampedTransform initialPose; // sync with the first value of the ground truth
-		try
+		// sync with the first value of the ground truth
+		Transform initialPose = getTransform(groundTruthFrameId_, frameId_, stamp);
+		if(initialPose.isNull())
 		{
-			if(this->waitForTransform())
-			{
-				if(!this->tfListener().waitForTransform(groundTruthFrameId_, frameId_, stamp, ros::Duration(1)))
-				{
-					ROS_WARN("Could not get transform from %s to %s after 1 second!", groundTruthFrameId_.c_str(), frameId_.c_str());
-					return;
-				}
-			}
-			this->tfListener().lookupTransform(groundTruthFrameId_, frameId_, stamp, initialPose);
-		}
-		catch(tf::TransformException & ex)
-		{
-			ROS_WARN("%s",ex.what());
 			return;
 		}
-		rtabmap::Transform pose = rtabmap_ros::transformFromTF(initialPose);
+
 		ROS_INFO("Initializing odometry pose to %s (from \"%s\" -> \"%s\")",
-				pose.prettyPrint().c_str(),
+				initialPose.prettyPrint().c_str(),
 				groundTruthFrameId_.c_str(),
 				frameId_.c_str());
-		odometry_->reset(pose);
+		odometry_->reset(initialPose);
 	}
 
 	// process data

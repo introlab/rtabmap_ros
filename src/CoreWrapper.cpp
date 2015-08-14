@@ -82,6 +82,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 		configPath_(""),
 		databasePath_(UDirectory::homeDir()+"/.ros/"+rtabmap::Parameters::getDefaultDatabaseName()),
 		waitForTransform_(true),
+		waitForTransformDuration_(0.1), // 100 ms
 		useActionForGoal_(false),
 		genScan_(false),
 		genScanMaxDepth_(4.0),
@@ -147,6 +148,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	pnh.param("tf_delay",            tfDelay, tfDelay);
 	pnh.param("tf_prefix",           tfPrefix, tfPrefix);
 	pnh.param("wait_for_transform",  waitForTransform_, waitForTransform_);
+	pnh.param("wait_for_transform_duration",  waitForTransformDuration_, waitForTransformDuration_);
 	pnh.param("use_action_for_goal", useActionForGoal_, useActionForGoal_);
 	pnh.param("gen_scan",            genScan_, genScan_);
 	pnh.param("gen_scan_max_depth",  genScanMaxDepth_, genScanMaxDepth_);
@@ -660,26 +662,9 @@ bool CoreWrapper::commonOdomTFUpdate(const ros::Time & stamp)
 	if(!paused_)
 	{
 		// Odom TF ready?
-		Transform odom;
-		try
+		Transform odom = getTransform(odomFrameId_, frameId_, stamp);
+		if(odom.isNull())
 		{
-			if(waitForTransform_)
-			{
-				//if(!tfBuffer_.canTransform(odomFrameId_, frameId_, stamp, ros::Duration(1)))
-				if(!tfListener_.waitForTransform(odomFrameId_, frameId_, stamp, ros::Duration(1)))
-				{
-					ROS_WARN("Could not get transform from %s to %s after 1 second!", odomFrameId_.c_str(), frameId_.c_str());
-					return false;
-				}
-			}
-
-			tf::StampedTransform tmp;
-			tfListener_.lookupTransform(odomFrameId_, frameId_, stamp, tmp);
-			odom = rtabmap_ros::transformFromTF(tmp);
-		}
-		catch(tf::TransformException & ex)
-		{
-			ROS_WARN("%s",ex.what());
 			return false;
 		}
 
@@ -710,28 +695,28 @@ bool CoreWrapper::commonOdomTFUpdate(const ros::Time & stamp)
 Transform CoreWrapper::getTransform(const std::string & fromFrameId, const std::string & toFrameId, const ros::Time & stamp) const
 {
 	// TF ready?
-	Transform localTransform;
+	Transform transform;
 	try
 	{
-		if(waitForTransform_)
+		if(waitForTransform_ && !stamp.isZero() && waitForTransformDuration_>0.0)
 		{
 			//if(!tfBuffer_.canTransform(fromFrameId, toFrameId, stamp, ros::Duration(1)))
-			if(!tfListener_.waitForTransform(fromFrameId, toFrameId, stamp, ros::Duration(1)))
+			if(!tfListener_.waitForTransform(fromFrameId, toFrameId, stamp, ros::Duration(waitForTransformDuration_)))
 			{
-				ROS_WARN("Could not get transform from %s to %s after 1 second!", fromFrameId.c_str(), toFrameId.c_str());
-				return localTransform;
+				ROS_WARN("rtabmap: Could not get transform from %s to %s after %f second!", fromFrameId.c_str(), toFrameId.c_str(), waitForTransformDuration_);
+				return transform;
 			}
 		}
 
 		tf::StampedTransform tmp;
 		tfListener_.lookupTransform(fromFrameId, toFrameId, stamp, tmp);
-		localTransform = rtabmap_ros::transformFromTF(tmp);
+		transform = rtabmap_ros::transformFromTF(tmp);
 	}
 	catch(tf::TransformException & ex)
 	{
 		ROS_WARN("%s",ex.what());
 	}
-	return localTransform;
+	return transform;
 }
 
 void CoreWrapper::commonDepthCallback(

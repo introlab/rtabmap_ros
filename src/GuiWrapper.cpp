@@ -73,6 +73,7 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 		mainWindow_(0),
 		frameId_("base_link"),
 		waitForTransform_(true),
+		waitForTransformDuration_(0.1), // 100 ms
 		cameraNodeName_(""),
 		lastOdomInfoUpdateTime_(0),
 		depthScanSync_(0),
@@ -133,6 +134,7 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 	pnh.param("queue_size", queueSize, queueSize);
 	pnh.param("tf_prefix", tfPrefix, tfPrefix);
 	pnh.param("wait_for_transform", waitForTransform_, waitForTransform_);
+	pnh.param("wait_for_transform_duration",  waitForTransformDuration_, waitForTransformDuration_);
 	pnh.param("camera_node_name", cameraNodeName_, cameraNodeName_); // used to pause the rtabmap_ros/camera when pausing the process
 
 	if(!tfPrefix.empty())
@@ -409,28 +411,28 @@ void GuiWrapper::handleEvent(UEvent * anEvent)
 Transform GuiWrapper::getTransform(const std::string & fromFrameId, const std::string & toFrameId, const ros::Time & stamp) const
 {
 	// TF ready?
-	Transform localTransform;
+	Transform transform;
 	try
 	{
-		if(waitForTransform_ && !stamp.isZero())
+		if(waitForTransform_ && !stamp.isZero() && waitForTransformDuration_ > 0.0)
 		{
 			//if(!tfBuffer_.canTransform(fromFrameId, toFrameId, stamp, ros::Duration(1)))
-			if(!tfListener_.waitForTransform(fromFrameId, toFrameId, stamp, ros::Duration(1)))
+			if(!tfListener_.waitForTransform(fromFrameId, toFrameId, stamp, ros::Duration(waitForTransformDuration_)))
 			{
-				ROS_WARN("Could not get transform from %s to %s after 1 second!", fromFrameId.c_str(), toFrameId.c_str());
-				return localTransform;
+				ROS_WARN("rtabmapviz: Could not get transform from %s to %s after %f seconds!", fromFrameId.c_str(), toFrameId.c_str(), waitForTransformDuration_);
+				return transform;
 			}
 		}
 
 		tf::StampedTransform tmp;
 		tfListener_.lookupTransform(fromFrameId, toFrameId, stamp, tmp);
-		localTransform = rtabmap_ros::transformFromTF(tmp);
+		transform = rtabmap_ros::transformFromTF(tmp);
 	}
 	catch(tf::TransformException & ex)
 	{
 		ROS_WARN("%s",ex.what());
 	}
-	return localTransform;
+	return transform;
 }
 
 void GuiWrapper::commonDepthCallback(
@@ -512,12 +514,6 @@ void GuiWrapper::commonDepthCallback(
 		if(odomHeader.frame_id.empty())
 		{
 			ROS_ERROR("Odometry frame not set!?");
-			return;
-		}
-
-		//for sync transform
-		if(odomT.isNull())
-		{
 			return;
 		}
 
@@ -684,7 +680,7 @@ void GuiWrapper::commonDepthCallback(
 					cameraModels,
 					odomHeader.seq,
 					rtabmap_ros::timestampFromROS(odomHeader.stamp)),
-			odomT,
+			odomMsg.get()?rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose):odomT,
 			covariance,
 			info);
 
@@ -763,12 +759,6 @@ void GuiWrapper::commonStereoCallback(
 			return;
 		}
 
-		//for sync transform
-		if(odomT.isNull())
-		{
-			return;
-		}
-
 		Transform localTransform = getTransform(frameId_, leftCamInfoMsg->header.frame_id, leftCamInfoMsg->header.stamp);
 		if(localTransform.isNull())
 		{
@@ -777,12 +767,15 @@ void GuiWrapper::commonStereoCallback(
 		// sync with odometry stamp
 		if(odomHeader.stamp != leftCamInfoMsg->header.stamp)
 		{
-			Transform sensorT = getTransform(odomHeader.frame_id, frameId_, leftCamInfoMsg->header.stamp);
-			if(sensorT.isNull())
+			if(!odomT.isNull())
 			{
-				return;
+				Transform sensorT = getTransform(odomHeader.frame_id, frameId_, leftCamInfoMsg->header.stamp);
+				if(sensorT.isNull())
+				{
+					return;
+				}
+				localTransform = odomT.inverse() * sensorT * localTransform;
 			}
-			localTransform = odomT.inverse() * sensorT * localTransform;
 		}
 
 		image_geometry::StereoCameraModel model;
@@ -860,7 +853,7 @@ void GuiWrapper::commonStereoCallback(
 					stereoModel,
 					odomHeader.seq,
 					rtabmap_ros::timestampFromROS(odomHeader.stamp)),
-			odomT,
+			odomMsg.get()?rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose):odomT,
 			covariance,
 			info);
 

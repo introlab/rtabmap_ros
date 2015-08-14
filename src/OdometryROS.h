@@ -66,7 +66,7 @@ public:
 	const tf::TransformListener & tfListener() const {return tfListener_;}
 	bool isPaused() const {return paused_;}
 	bool isOdometryBOW() const;
-	bool waitForTransform() const {return waitForTransform_;}
+	rtabmap::Transform getTransform(const std::string & fromFrameId, const std::string & toFrameId, const ros::Time & stamp) const;
 
 private:
 	rtabmap::Odometry * odometry_;
@@ -77,6 +77,7 @@ private:
 	std::string groundTruthFrameId_;
 	bool publishTf_;
 	bool waitForTransform_;
+	double waitForTransformDuration_;
 	rtabmap::ParametersMap parameters_;
 
 	ros::Publisher odomPub_;

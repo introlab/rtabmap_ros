@@ -209,6 +209,7 @@ private:
 	std::string frameId_;
 	std::string odomFrameId_;
 	bool waitForTransform_;
+	double waitForTransformDuration_;
 	tf::TransformListener tfListener_;
 
 	message_filters::Subscriber<rtabmap_ros::Info> infoTopic_;

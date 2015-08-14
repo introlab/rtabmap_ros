@@ -134,23 +134,9 @@ public:
 
 			ros::Time stamp = imageRectLeft->header.stamp>imageRectRight->header.stamp?imageRectLeft->header.stamp:imageRectRight->header.stamp;
 
-			tf::StampedTransform localTransform;
-			try
+			Transform localTransform = getTransform(this->frameId(), imageRectLeft->header.frame_id, stamp);
+			if(localTransform.isNull())
 			{
-				if(this->waitForTransform())
-				{
-					if(!this->tfListener().waitForTransform(this->frameId(), imageRectLeft->header.frame_id, stamp, ros::Duration(1)))
-					{
-						ROS_WARN("Could not get transform from %s to %s after 1 second!", this->frameId().c_str(), imageRectLeft->header.frame_id.c_str());
-						return;
-					}
-				}
-
-				this->tfListener().lookupTransform(this->frameId(), imageRectLeft->header.frame_id, stamp, localTransform);
-			}
-			catch(tf::TransformException & ex)
-			{
-				ROS_WARN("%s",ex.what());
 				return;
 			}
 
@@ -174,14 +160,14 @@ public:
 						model.left().cx(),
 						model.left().cy(),
 						model.baseline(),
-						rtabmap_ros::transformFromTF(localTransform));
+						localTransform);
 
 				cv_bridge::CvImageConstPtr ptrImageLeft = cv_bridge::toCvShare(imageRectLeft, "mono8");
 				cv_bridge::CvImageConstPtr ptrImageRight = cv_bridge::toCvShare(imageRectRight, "mono8");
 
 				UTimer stepTimer;
 				//
-				UDEBUG("localTransform = %s", rtabmap_ros::transformFromTF(localTransform).prettyPrint().c_str());
+				UDEBUG("localTransform = %s", localTransform.prettyPrint().c_str());
 				rtabmap::SensorData data(
 						ptrImageLeft->image,
 						ptrImageRight->image,

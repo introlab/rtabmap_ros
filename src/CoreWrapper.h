@@ -234,6 +234,7 @@ private:
 	std::string configPath_;
 	std::string databasePath_;
 	bool waitForTransform_;
+	double waitForTransformDuration_;
 	bool useActionForGoal_;
 	bool genScan_;
 	double genScanMaxDepth_;
