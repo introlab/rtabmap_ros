@@ -521,115 +521,118 @@ void GuiWrapper::commonDepthCallback(
 			return;
 		}
 
-		int imageWidth = imageMsgs[0]->width;
-		int imageHeight = imageMsgs[0]->height;
-		int cameraCount = imageMsgs.size();
 		cv::Mat rgb;
 		cv::Mat depth;
-		pcl::PointCloud<pcl::PointXYZ> scanCloud;
 		std::vector<CameraModel> cameraModels;
-		for(unsigned int i=0; i<imageMsgs.size(); ++i)
+		if(imageMsgs[0].get() && depthMsgs[0].get())
 		{
-			if(!(imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) ==0 ||
-				 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
-				 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||
-				 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
-				 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0) ||
-				!(depthMsgs[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1) == 0 ||
-				 depthMsgs[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1) == 0 ||
-				 depthMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0))
+			int imageWidth = imageMsgs[0]->width;
+			int imageHeight = imageMsgs[0]->height;
+			int cameraCount = imageMsgs.size();
+			pcl::PointCloud<pcl::PointXYZ> scanCloud;
+			for(unsigned int i=0; i<imageMsgs.size(); ++i)
 			{
-				ROS_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8 and image_depth=32FC1,16UC1,mono16");
-				return;
-			}
-			UASSERT(imageMsgs[i]->width == imageWidth && imageMsgs[i]->height == imageHeight);
-			UASSERT(depthMsgs[i]->width == imageWidth && depthMsgs[i]->height == imageHeight);
-
-			Transform localTransform = getTransform(frameId_, depthMsgs[i]->header.frame_id, depthMsgs[i]->header.stamp);
-			if(localTransform.isNull())
-			{
-				return;
-			}
-			// sync with odometry stamp
-			if(odomHeader.stamp != depthMsgs[i]->header.stamp)
-			{
-				if(!odomT.isNull())
+				if(!(imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) ==0 ||
+					 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
+					 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||
+					 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
+					 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0) ||
+					!(depthMsgs[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1) == 0 ||
+					 depthMsgs[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1) == 0 ||
+					 depthMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0))
 				{
-					Transform sensorT = getTransform(odomHeader.frame_id, frameId_, depthMsgs[i]->header.stamp);
-					if(sensorT.isNull())
+					ROS_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8 and image_depth=32FC1,16UC1,mono16");
+					return;
+				}
+				UASSERT(imageMsgs[i]->width == imageWidth && imageMsgs[i]->height == imageHeight);
+				UASSERT(depthMsgs[i]->width == imageWidth && depthMsgs[i]->height == imageHeight);
+
+				Transform localTransform = getTransform(frameId_, depthMsgs[i]->header.frame_id, depthMsgs[i]->header.stamp);
+				if(localTransform.isNull())
+				{
+					return;
+				}
+				// sync with odometry stamp
+				if(odomHeader.stamp != depthMsgs[i]->header.stamp)
+				{
+					if(!odomT.isNull())
 					{
-						return;
+						Transform sensorT = getTransform(odomHeader.frame_id, frameId_, depthMsgs[i]->header.stamp);
+						if(sensorT.isNull())
+						{
+							return;
+						}
+						localTransform = odomT.inverse() * sensorT * localTransform;
 					}
-					localTransform = odomT.inverse() * sensorT * localTransform;
 				}
-			}
 
-			cv_bridge::CvImageConstPtr ptrImage;
-			if(imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0)
-			{
-				ptrImage = cv_bridge::toCvShare(imageMsgs[i]);
-			}
-			else if(imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
-			   imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
-			{
-				ptrImage = cv_bridge::toCvShare(imageMsgs[i], "mono8");
-			}
-			else
-			{
-				ptrImage = cv_bridge::toCvShare(imageMsgs[i], "bgr8");
-			}
-			cv_bridge::CvImageConstPtr ptrDepth = cv_bridge::toCvShare(depthMsgs[i]);
-			cv::Mat subDepth = ptrDepth->image;
-			if(subDepth.type() == CV_32FC1)
-			{
-				subDepth = util3d::cvtDepthFromFloat(subDepth);
-				static bool shown = false;
-				if(!shown)
+				cv_bridge::CvImageConstPtr ptrImage;
+				if(imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0)
 				{
-					ROS_WARN("Use depth image with \"unsigned short\" type to "
-							 "avoid conversion. This message is only printed once...");
-					shown = true;
+					ptrImage = cv_bridge::toCvShare(imageMsgs[i]);
 				}
-			}
+				else if(imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
+				   imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
+				{
+					ptrImage = cv_bridge::toCvShare(imageMsgs[i], "mono8");
+				}
+				else
+				{
+					ptrImage = cv_bridge::toCvShare(imageMsgs[i], "bgr8");
+				}
+				cv_bridge::CvImageConstPtr ptrDepth = cv_bridge::toCvShare(depthMsgs[i]);
+				cv::Mat subDepth = ptrDepth->image;
+				if(subDepth.type() == CV_32FC1)
+				{
+					subDepth = util3d::cvtDepthFromFloat(subDepth);
+					static bool shown = false;
+					if(!shown)
+					{
+						ROS_WARN("Use depth image with \"unsigned short\" type to "
+								 "avoid conversion. This message is only printed once...");
+						shown = true;
+					}
+				}
 
-			// initialize
-			if(rgb.empty())
-			{
-				rgb = cv::Mat(imageHeight, imageWidth*cameraCount, ptrImage->image.type());
-			}
-			if(depth.empty())
-			{
-				depth = cv::Mat(imageHeight, imageWidth*cameraCount, subDepth.type());
-			}
+				// initialize
+				if(rgb.empty())
+				{
+					rgb = cv::Mat(imageHeight, imageWidth*cameraCount, ptrImage->image.type());
+				}
+				if(depth.empty())
+				{
+					depth = cv::Mat(imageHeight, imageWidth*cameraCount, subDepth.type());
+				}
 
-			if(ptrImage->image.type() == rgb.type())
-			{
-				ptrImage->image.copyTo(cv::Mat(rgb, cv::Rect(i*imageWidth, 0, imageWidth, imageHeight)));
-			}
-			else
-			{
-				ROS_ERROR("Some RGB images are not the same type!");
-				return;
-			}
+				if(ptrImage->image.type() == rgb.type())
+				{
+					ptrImage->image.copyTo(cv::Mat(rgb, cv::Rect(i*imageWidth, 0, imageWidth, imageHeight)));
+				}
+				else
+				{
+					ROS_ERROR("Some RGB images are not the same type!");
+					return;
+				}
 
-			if(subDepth.type() == depth.type())
-			{
-				subDepth.copyTo(cv::Mat(depth, cv::Rect(i*imageWidth, 0, imageWidth, imageHeight)));
-			}
-			else
-			{
-				ROS_ERROR("Some Depth images are not the same type!");
-				return;
-			}
+				if(subDepth.type() == depth.type())
+				{
+					subDepth.copyTo(cv::Mat(depth, cv::Rect(i*imageWidth, 0, imageWidth, imageHeight)));
+				}
+				else
+				{
+					ROS_ERROR("Some Depth images are not the same type!");
+					return;
+				}
 
-			image_geometry::PinholeCameraModel model;
-			model.fromCameraInfo(*cameraInfoMsgs[i]);
-			cameraModels.push_back(rtabmap::CameraModel(
-					model.fx(),
-					model.fy(),
-					model.cx(),
-					model.cy(),
-					localTransform));
+				image_geometry::PinholeCameraModel model;
+				model.fromCameraInfo(*cameraInfoMsgs[i]);
+				cameraModels.push_back(rtabmap::CameraModel(
+						model.fx(),
+						model.fy(),
+						model.cx(),
+						model.cy(),
+						localTransform));
+			}
 		}
 
 		cv::Mat scan;
@@ -1514,7 +1517,7 @@ void GuiWrapper::setupCallbacks(
 
 		ROS_INFO("\n%s subscribed to:\n   %s",
 				ros::this_node::getName().c_str(),
-				odomSub_.getTopic().c_str());
+				defaultSub_.getTopic().c_str());
 	}
 }
 

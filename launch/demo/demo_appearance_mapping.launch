@@ -23,8 +23,8 @@
 		<param name="Mem/IncrementalMemory" type="string" value="true"/>  <!-- true = SLAM mode -->
 		<param name="Mem/RehearsalIdUpdatedToNewOne" type="string" value="true"/>  <!-- On merging, update to new ID-->
 		<param name="Mem/BadSignaturesIgnored" type="string" value="true"/>
-		<param name="Kp/DetectorStrategy" type="string" value="2"/>   <!-- use SURF -->
-		<param name="Kp/NNStrategy" type="string" value="3"/>         <!-- kdTree -->
+		<param name="Kp/DetectorStrategy" type="string" value="0"/>   <!-- use SURF -->
+		<param name="Kp/NNStrategy" type="string" value="1"/>         <!-- kdTree -->
 	</node>
 	
 	<!-- visualization of the "infoEx" topic sent by rtabmap node -->
