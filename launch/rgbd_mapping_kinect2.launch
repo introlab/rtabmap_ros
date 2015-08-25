@@ -48,7 +48,7 @@
    <arg name="min_inliers" default="20" />
    <arg name="inlier_distance" default="0.02" />
    <arg name="local_map" default="1000" />
-   <arg name="gftt_max_corners" default="500" />
+   <arg name="gftt_max_corners" default="1000" />
    <arg name="gftt_min_distance" default="7" />
         
   <group ns="rtabmap">
@@ -70,7 +70,7 @@
       <param name="Odom/InlierDistance" type="string" value="$(arg inlier_distance)"/>       
       <param name="OdomBow/LocalHistorySize" type="string" value="$(arg local_map)"/>
       <param name="Odom/FillInfoData" type="string" value="$(arg rtabmapviz)"/>
-      <param name="GFTT/MaxCorners" type="string" value="$(arg gftt_max_corners)"/>
+      <param name="Odom/MaxFeatures" type="string" value="$(arg gftt_max_corners)"/>
       <param name="GFTT/MinDistance" type="string" value="$(arg gftt_min_distance)"/>
     </node>
   
