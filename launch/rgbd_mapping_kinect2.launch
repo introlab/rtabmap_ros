@@ -55,7 +55,7 @@
   
     <!-- Odometry -->
     <node pkg="rtabmap_ros" type="rgbd_odometry" name="visual_odometry" output="screen">
-      <remap from="rgb/image" to="/kinect2/$(arg resolution)/image_mono_rect"/>
+      <remap from="rgb/image" to="/kinect2/$(arg resolution)/image_color_rect"/>
       <remap from="depth/image" to="/kinect2/$(arg resolution)/image_depth_rect"/>
       <remap from="rgb/camera_info" to="/kinect2/$(arg resolution)/camera_info"/>
 
