@@ -43,6 +43,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtabmap_ros/MsgConversion.h"
 
 #include <rtabmap/core/util3d.h>
+#include <rtabmap/core/util2d.h>
 #include <rtabmap/utilite/ULogger.h>
 
 using namespace rtabmap;
@@ -301,7 +302,7 @@ public:
 				cv::Mat subDepth = ptrDepth->image;
 				if(subDepth.type() == CV_32FC1)
 				{
-					subDepth = rtabmap::util3d::cvtDepthFromFloat(subDepth);
+					subDepth = rtabmap::util2d::cvtDepthFromFloat(subDepth);
 					static bool shown = false;
 					if(!shown)
 					{

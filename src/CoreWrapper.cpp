@@ -45,6 +45,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/utilite/UStl.h>
 #include <rtabmap/utilite/UMath.h>
 
+#include <rtabmap/core/util2d.h>
 #include <rtabmap/core/util3d.h>
 #include <rtabmap/core/util3d_transforms.h>
 #include <rtabmap/core/Memory.h>
@@ -814,7 +815,7 @@ void CoreWrapper::commonDepthCallback(
 		cv::Mat subDepth = ptrDepth->image;
 		if(subDepth.type() == CV_32FC1)
 		{
-			subDepth = util3d::cvtDepthFromFloat(subDepth);
+			subDepth = util2d::cvtDepthFromFloat(subDepth);
 			static bool shown = false;
 			if(!shown)
 			{

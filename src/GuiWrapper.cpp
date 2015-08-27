@@ -47,6 +47,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/Parameters.h>
 #include <rtabmap/core/ParamEvent.h>
 #include <rtabmap/core/OdometryEvent.h>
+#include <rtabmap/core/util2d.h>
 #include <rtabmap/core/util3d.h>
 #include <rtabmap/core/util3d_transforms.h>
 #include <rtabmap/utilite/UTimer.h>
@@ -580,7 +581,7 @@ void GuiWrapper::commonDepthCallback(
 				cv::Mat subDepth = ptrDepth->image;
 				if(subDepth.type() == CV_32FC1)
 				{
-					subDepth = util3d::cvtDepthFromFloat(subDepth);
+					subDepth = util2d::cvtDepthFromFloat(subDepth);
 					static bool shown = false;
 					if(!shown)
 					{
