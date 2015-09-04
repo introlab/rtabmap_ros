@@ -136,7 +136,9 @@ int main(int argc, char** argv)
 	ros::Publisher scanPub;
 	tf2_ros::TransformBroadcaster tfBroadcaster;
 
+	UTimer timer;
 	rtabmap::OdometryEvent odom = reader.getNextData();
+	double acquisitionTime = timer.ticks();
 	while(ros::ok() && odom.data().id())
 	{
 		ROS_INFO("Reading sensor data %d...", odom.data().id());
@@ -238,7 +240,7 @@ int main(int argc, char** argv)
 		// publish transforms first
 		if(publishTf)
 		{
-			ros::Time tfExpiration = time + ros::Duration(1.0/rate);
+			ros::Time tfExpiration = time + ros::Duration(rate>0?1.0/rate:acquisitionTime);
 
 			rtabmap::Transform localTransform;
 			if(odom.data().cameraModels().size() == 1)
@@ -391,6 +393,7 @@ int main(int argc, char** argv)
 		}
 
 		odom = reader.getNextData();
+		acquisitionTime = timer.ticks();
 	}
 
 
