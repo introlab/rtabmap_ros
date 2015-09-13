@@ -169,7 +169,7 @@ target_link_libraries(rtabmap_ros
   ${QT_LIBRARIES}
   ${OGRE_LIBRARIES}
 )
-add_dependencies(rtabmap_ros rtabmap_generate_messages_cpp)
+add_dependencies(rtabmap_ros ${${PROJECT_NAME}_EXPORTED_TARGETS})
 
 # If octomap is found, add definition
 IF(octomap_ros_FOUND)
@@ -185,7 +185,6 @@ add_definitions(-DWITH_OCTOMAP)
 ENDIF(octomap_ros_FOUND)
 
 add_executable(rtabmap src/CoreNode.cpp src/CoreWrapper.cpp src/MapsManager.cpp)
-add_dependencies(rtabmap rtabmap_generate_messages_cpp)
 target_link_libraries(rtabmap rtabmap_ros ${Libraries})
 
 add_executable(rgbd_odometry src/RGBDOdometryNode.cpp)
