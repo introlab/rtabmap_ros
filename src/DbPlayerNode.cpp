@@ -29,6 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/image_encodings.h>
 #include <sensor_msgs/PointCloud2.h>
+#include <sensor_msgs/LaserScan.h>
 #include <sensor_msgs/CameraInfo.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <nav_msgs/Odometry.h>
@@ -37,9 +38,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <tf2_ros/transform_broadcaster.h>
 #include <std_srvs/Empty.h>
 #include <rtabmap_ros/MsgConversion.h>
+#include <rtabmap_ros/SetGoal.h>
 #include <rtabmap/utilite/ULogger.h>
+#include <rtabmap/utilite/UStl.h>
 #include <rtabmap/core/util3d.h>
 #include <rtabmap/core/DBReader.h>
+#include <cmath>
 
 bool paused = false;
 bool pauseCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
@@ -85,6 +89,7 @@ int main(int argc, char** argv)
 	std::string frameId = "base_link";
 	std::string odomFrameId = "odom";
 	std::string cameraFrameId = "camera_optical_link";
+	std::string scanFrameId = "base_laser_link";
 	double rate = 1.0f;
 	std::string databasePath = "";
 	bool publishTf = true;
@@ -93,14 +98,26 @@ int main(int argc, char** argv)
 	pnh.param("frame_id", frameId, frameId);
 	pnh.param("odom_frame_id", odomFrameId, odomFrameId);
 	pnh.param("camera_frame_id", cameraFrameId, cameraFrameId);
+	pnh.param("scan_frame_id", scanFrameId, scanFrameId);
 	pnh.param("rate", rate, rate); // Set -1 to use database stamps
 	pnh.param("database", databasePath, databasePath);
 	pnh.param("publish_tf", publishTf, publishTf);
 	pnh.param("start_id", startId, startId);
 
+	// based on URG-04LX
+	double scanHeight, scanAngleMin, scanAngleMax, scanAngleIncrement, scanTime, scanRangeMin, scanRangeMax;
+	pnh.param<double>("scan_height", scanHeight, 0.3);
+	pnh.param<double>("scan_angle_min", scanAngleMin, -M_PI / 2.0);
+	pnh.param<double>("scan_angle_max", scanAngleMax, M_PI / 2.0);
+	pnh.param<double>("scan_angle_increment", scanAngleIncrement, M_PI / 360.0);
+	pnh.param<double>("scan_time", scanTime, 1.0 / 10.0);
+	pnh.param<double>("scan_range_min", scanRangeMin, 0.02);
+	pnh.param<double>("scan_range_max", scanRangeMax, 6.0);
+
 	ROS_INFO("frame_id = %s", frameId.c_str());
 	ROS_INFO("odom_frame_id = %s", odomFrameId.c_str());
 	ROS_INFO("camera_frame_id = %s", cameraFrameId.c_str());
+	ROS_INFO("scan_frame_id = %s", scanFrameId.c_str());
 	ROS_INFO("database = %s", databasePath.c_str());
 	ROS_INFO("rate = %f", rate);
 	ROS_INFO("publish_tf = %s", publishTf?"true":"false");
@@ -234,7 +251,7 @@ int main(int argc, char** argv)
 
 		if(!odom.data().laserScanRaw().empty())
 		{
-			if(scanPub.getTopic().empty()) scanPub = nh.advertise<sensor_msgs::PointCloud2>("scan_cloud", 1);
+			if(scanPub.getTopic().empty()) scanPub = nh.advertise<sensor_msgs::LaserScan>("scan", 1);
 		}
 
 		// publish transforms first
@@ -269,6 +286,16 @@ int main(int argc, char** argv)
 				odomToBase.header.stamp = tfExpiration;
 				rtabmap_ros::transformToGeometryMsg(odom.pose(), odomToBase.transform);
 				tfBroadcaster.sendTransform(odomToBase);
+			}
+
+			if(!scanPub.getTopic().empty())
+			{
+				geometry_msgs::TransformStamped baseToLaserScan;
+				baseToLaserScan.child_frame_id = scanFrameId;
+				baseToLaserScan.header.frame_id = frameId;
+				baseToLaserScan.header.stamp = tfExpiration;
+				rtabmap_ros::transformToGeometryMsg(rtabmap::Transform(0,0,scanHeight,0,0,0), baseToLaserScan.transform);
+				tfBroadcaster.sendTransform(baseToLaserScan);
 			}
 		}
 		if(!odom.pose().isNull())
@@ -376,12 +403,73 @@ int main(int argc, char** argv)
 
 		if(scanPub.getNumSubscribers() && !odom.data().laserScanRaw().empty())
 		{
-			pcl::PointCloud<pcl::PointXYZ>::Ptr cloud = rtabmap::util3d::laserScanToPointCloud(odom.data().laserScanRaw());
-			sensor_msgs::PointCloud2 msg;
-			pcl::toROSMsg(*cloud, msg);
-			msg.header.frame_id = frameId;
+			//inspired from pointcloud_to_laserscan package
+			sensor_msgs::LaserScan msg;
+			msg.header.frame_id = scanFrameId;
 			msg.header.stamp = time;
+
+			msg.angle_min = scanAngleMin;
+			msg.angle_max = scanAngleMax;
+			msg.angle_increment = scanAngleIncrement;
+			msg.time_increment = 0.0;
+			msg.scan_time = scanTime;
+			msg.range_min = scanRangeMin;
+			msg.range_max = scanRangeMax;
+
+			uint32_t rangesSize = std::ceil((msg.angle_max - msg.angle_min) / msg.angle_increment);
+			msg.ranges.assign(rangesSize, 0.0);
+
+			const cv::Mat & scan = odom.data().laserScanRaw();
+			UASSERT(scan.type() == CV_32FC2 || scan.type() == CV_32FC3);
+			UASSERT(scan.rows == 1);
+			for (int i=0; i<scan.cols; ++i)
+			{
+				cv::Vec2f pos = scan.at<cv::Vec2f>(i);
+				double range = hypot(pos[0], pos[1]);
+				if (range >= scanRangeMin && range <=scanRangeMax)
+				{
+					double angle = atan2(pos[1], pos[0]);
+					if (angle >= msg.angle_min && angle <= msg.angle_max)
+					{
+						int index = (angle - msg.angle_min) / msg.angle_increment;
+						if (index>=0 && index<rangesSize && (range < msg.ranges[index] || msg.ranges[index]==0))
+						{
+							msg.ranges[index] = range;
+						}
+					}
+				}
+			}
+
 			scanPub.publish(msg);
+		}
+
+		if(odom.data().userDataRaw().type() == CV_8SC1 &&
+		   odom.data().userDataRaw().cols >= 7 && // including null str ending
+		   odom.data().userDataRaw().rows == 1 &&
+		   memcmp(odom.data().userDataRaw().data, "GOAL:", 5) == 0)
+		{
+			//GOAL format detected, remove it from the user data and send it as goal event
+			std::string goalStr = (const char *)odom.data().userDataRaw().data;
+			if(!goalStr.empty())
+			{
+				std::list<std::string> strs = uSplit(goalStr, ':');
+				if(strs.size() == 2)
+				{
+					int goalId = atoi(strs.rbegin()->c_str());
+
+					if(goalId > 0)
+					{
+						ROS_WARN("Goal %d detected, calling rtabmap's set_goal service!", goalId);
+						rtabmap_ros::SetGoal setGoalSrv;
+						setGoalSrv.request.node_id = goalId;
+						setGoalSrv.request.node_label = "";
+						if(!ros::service::call("set_goal", setGoalSrv))
+						{
+							ROS_ERROR("Can't call \"set_goal\" service");
+						}
+					}
+				}
+			}
 		}
 
 		ros::spinOnce();
@@ -392,6 +480,7 @@ int main(int argc, char** argv)
 			ros::spinOnce();
 		}
 
+		timer.restart();
 		odom = reader.getNextData();
 		acquisitionTime = timer.ticks();
 	}
