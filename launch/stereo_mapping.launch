@@ -19,10 +19,11 @@
   <arg name="database_path"           default="~/.ros/rtabmap.db"/>
   <arg name="rtabmap_args"            default=""/>              <!-- delete_db_on_start, udebug -->
   
-  <arg name="left_image_topic"        default="/stereo_camera/left/image_rect_color" />
-  <arg name="right_image_topic"       default="/stereo_camera/right/image_rect" />      <!-- using grayscale image for efficiency -->
-  <arg name="left_camera_info_topic"  default="/stereo_camera/left/camera_info" />
-  <arg name="right_camera_info_topic" default="/stereo_camera/right/camera_info" />
+  <arg name="stereo_namespace"        default="/stereo_camera"/>
+  <arg name="left_image_topic"        default="$(arg stereo_namespace)/left/image_rect_color" />
+  <arg name="right_image_topic"       default="$(arg stereo_namespace)/right/image_rect" />      <!-- using grayscale image for efficiency -->
+  <arg name="left_camera_info_topic"  default="$(arg stereo_namespace)/left/camera_info" />
+  <arg name="right_camera_info_topic" default="$(arg stereo_namespace)/right/camera_info" />
   <arg name="approximate_sync"        default="false"/>         <!-- if timestamps of the stereo images are not synchronized -->
    
   <arg name="subscribe_scan"          default="false"/>         <!-- Assuming 2D scan if set, rtabmap will do 3DoF mapping instead of 6DoF -->
