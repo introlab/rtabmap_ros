@@ -255,7 +255,7 @@ private:
 			obstaclesPub_.publish(rosCloud);
 		}
 
-		ROS_INFO("Obstacles segmentation time = %f s", (ros::Time::now() - time).toSec());
+		//ROS_INFO("Obstacles segmentation time = %f s", (ros::Time::now() - time).toSec());
 	}
 
 private:
