@@ -191,10 +191,10 @@ public:
 
 		// filter poses
 		std::map<int, Transform> poses;
-		UASSERT(msg->posesId.size() == msg->poses.size());
-		for(unsigned int i=0; i<msg->posesId.size(); ++i)
+		UASSERT(msg->graph.posesId.size() == msg->graph.poses.size());
+		for(unsigned int i=0; i<msg->graph.posesId.size(); ++i)
 		{
-			poses.insert(std::make_pair(msg->posesId[i], rtabmap_ros::transformFromPoseMsg(msg->poses[i])));
+			poses.insert(std::make_pair(msg->graph.posesId[i], rtabmap_ros::transformFromPoseMsg(msg->graph.poses[i])));
 		}
 		if(nodeFilteringAngle_ > 0.0 && nodeFilteringRadius_ > 0.0)
 		{

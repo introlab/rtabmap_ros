@@ -246,6 +246,7 @@ private:
 
 	ros::Publisher infoPub_;
 	ros::Publisher mapDataPub_;
+	ros::Publisher mapGraphPub_;
 	ros::Publisher labelsPub_;
 
 	//Planning stuff

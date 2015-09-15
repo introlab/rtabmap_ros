@@ -93,7 +93,7 @@ void MapGraphDisplay::destroyObjects()
 	manual_objects_.clear();
 }
 
-void MapGraphDisplay::processMessage( const rtabmap_ros::MapData::ConstPtr& msg )
+void MapGraphDisplay::processMessage( const rtabmap_ros::MapGraph::ConstPtr& msg )
 {
 	if(!(msg->poses.size() == msg->posesId.size()))
 	{
@@ -105,7 +105,7 @@ void MapGraphDisplay::processMessage( const rtabmap_ros::MapData::ConstPtr& msg 
 	std::map<int, rtabmap::Transform> poses;
 	std::multimap<int, rtabmap::Link> links;
 	rtabmap::Transform mapToOdom;
-	rtabmap_ros::mapDataFromROS(*msg, poses, links, mapToOdom);
+	rtabmap_ros::mapGraphFromROS(*msg, poses, links, mapToOdom);
 
 	destroyObjects();
 

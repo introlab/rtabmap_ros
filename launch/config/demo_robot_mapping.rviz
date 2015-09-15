@@ -169,7 +169,7 @@ Visualization Manager:
       Color: 25; 255; 0
       Enabled: true
       Name: MapGraph
-      Topic: /rtabmap/mapData
+      Topic: /rtabmap/mapGraph
       Value: true
     - Alpha: 0.7
       Class: rviz/Map

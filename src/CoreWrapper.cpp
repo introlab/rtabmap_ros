@@ -64,6 +64,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //msgs
 #include "rtabmap_ros/Info.h"
 #include "rtabmap_ros/MapData.h"
+#include "rtabmap_ros/MapGraph.h"
 #include "rtabmap_ros/GetMap.h"
 #include "rtabmap_ros/PublishMap.h"
 
@@ -187,6 +188,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 
 	infoPub_ = nh.advertise<rtabmap_ros::Info>("info", 1);
 	mapDataPub_ = nh.advertise<rtabmap_ros::MapData>("mapData", 1);
+	mapGraphPub_ = nh.advertise<rtabmap_ros::MapGraph>("mapGraph", 1);
 	labelsPub_ = nh.advertise<visualization_msgs::MarkerArray>("labels", 1);
 
 	// planning topics
@@ -1726,6 +1728,20 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 			mapDataPub_.publish(msg);
 		}
 
+		if(mapGraphPub_.getNumSubscribers())
+		{
+			rtabmap_ros::MapGraphPtr msg(new rtabmap_ros::MapGraph);
+			msg->header.stamp = now;
+			msg->header.frame_id = mapFrameId_;
+
+			rtabmap_ros::mapGraphToROS(poses,
+				constraints,
+				Transform::getIdentity(),
+				*msg);
+
+			mapGraphPub_.publish(msg);
+		}
+
 		if(!req.graphOnly && mapsManager_.hasSubscribers())
 		{
 			std::map<int, Transform> filteredPoses;
@@ -1948,6 +1964,21 @@ void CoreWrapper::publishStats(const ros::Time & stamp)
 			*msg);
 
 		mapDataPub_.publish(msg);
+	}
+
+	if(mapGraphPub_.getNumSubscribers())
+	{
+		rtabmap_ros::MapGraphPtr msg(new rtabmap_ros::MapGraph);
+		msg->header.stamp = stamp;
+		msg->header.frame_id = mapFrameId_;
+
+		rtabmap_ros::mapGraphToROS(
+			stats.poses(),
+			stats.constraints(),
+			stats.mapCorrection(),
+			*msg);
+
+		mapGraphPub_.publish(msg);
 	}
 
 	if(labelsPub_.getNumSubscribers())

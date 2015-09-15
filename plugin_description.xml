@@ -11,9 +11,9 @@
          type="rtabmap_ros::MapGraphDisplay"
          base_class_type="rviz::Display">
     <description>
-      Displays graphs from rtabmap_ros/MapData messages.
+      Displays graphs from rtabmap_ros/MapGraph messages.
     </description>
-    <message_type>rtabmap_ros/MapData</message_type>
+    <message_type>rtabmap_ros/MapGraph</message_type>
   </class>
   <class name="rtabmap_ros/Info"
          type="rtabmap_ros::InfoDisplay"

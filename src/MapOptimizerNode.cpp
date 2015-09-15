@@ -27,6 +27,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <ros/ros.h>
 #include "rtabmap_ros/MapData.h"
+#include "rtabmap_ros/MapGraph.h"
 #include "rtabmap_ros/MsgConversion.h"
 #include <rtabmap/core/util3d.h>
 #include <rtabmap/core/Graph.h>
@@ -73,6 +74,7 @@ public:
 
 		mapDataTopic_ = nh.subscribe("mapData", 1, &MapOptimizer::mapDataReceivedCallback, this);
 		mapDataPub_ = nh.advertise<rtabmap_ros::MapData>(nh.resolveName("mapData")+"_optimized", 1);
+		mapGraphPub_ = nh.advertise<rtabmap_ros::MapGraph>(nh.resolveName("mapData")+"Graph_optimized", 1);
 
 		if(publishTf)
 		{
@@ -117,14 +119,14 @@ public:
 	{
 		// save new poses and constraints
 		// Assuming that nodes/constraints are all linked together
-		UASSERT(msg->posesId.size() == msg->poses.size());
+		UASSERT(msg->graph.posesId.size() == msg->graph.poses.size());
 
 		bool dataChanged = false;
 
 		std::multimap<int, Link> newConstraints;
-		for(unsigned int i=0; i<msg->links.size(); ++i)
+		for(unsigned int i=0; i<msg->graph.links.size(); ++i)
 		{
-			Link link = rtabmap_ros::linkFromROS(msg->links[i]);
+			Link link = rtabmap_ros::linkFromROS(msg->graph.links[i]);
 			newConstraints.insert(std::make_pair(link.from(), link));
 
 			bool edgeAlreadyAdded = false;
@@ -180,22 +182,22 @@ public:
 		else
 		{
 			constraints = newConstraints;
-			for(unsigned int i=0; i<msg->posesId.size(); ++i)
+			for(unsigned int i=0; i<msg->graph.posesId.size(); ++i)
 			{
-				std::map<int, Transform>::iterator iter = cachedPoses_.find(msg->posesId[i]);
+				std::map<int, Transform>::iterator iter = cachedPoses_.find(msg->graph.posesId[i]);
 				if(iter != cachedPoses_.end())
 				{
 					poses.insert(*iter);
 				}
 				else
 				{
-					ROS_ERROR("Odometry pose of node %d not found in cache!", msg->posesId[i]);
+					ROS_ERROR("Odometry pose of node %d not found in cache!", msg->graph.posesId[i]);
 					return;
 				}
 			}
 		}
 		// Optimize only if there is a subscriber
-		if(mapDataPub_.getNumSubscribers())
+		if(mapDataPub_.getNumSubscribers() || mapGraphPub_.getNumSubscribers())
 		{
 			UTimer timer;
 			std::map<int, Transform> optimizedPoses;
@@ -229,14 +231,26 @@ public:
 					  (int)poses.size(), (int)constraints.size());
 			}
 
-			rtabmap_ros::MapData outputMsg;
-			rtabmap_ros::mapDataToROS(optimizedPoses,
+			rtabmap_ros::MapData outputDataMsg;
+			rtabmap_ros::MapGraph outputGraphMsg;
+			rtabmap_ros::mapGraphToROS(optimizedPoses,
 					linksOut,
 					mapCorrection,
-					outputMsg);
-			outputMsg.header = msg->header;
-			outputMsg.nodes = msg->nodes;
-			mapDataPub_.publish(outputMsg);
+					outputGraphMsg);
+
+			if(mapGraphPub_.getNumSubscribers())
+			{
+				outputGraphMsg.header = msg->header;
+				mapGraphPub_.publish(outputGraphMsg);
+			}
+
+			if(mapDataPub_.getNumSubscribers())
+			{
+				outputDataMsg.header = msg->header;
+				outputDataMsg.graph = outputGraphMsg;
+				outputDataMsg.nodes = msg->nodes;
+				mapDataPub_.publish(outputDataMsg);
+			}
 
 			ROS_INFO("Time graph optimization = %f s", timer.ticks());
 		}
@@ -256,6 +270,7 @@ private:
 	ros::Subscriber mapDataTopic_;
 
 	ros::Publisher mapDataPub_;
+	ros::Publisher mapGraphPub_;
 
 	std::map<int, Transform> cachedPoses_;
 	std::multimap<int, Link> cachedConstraints_;

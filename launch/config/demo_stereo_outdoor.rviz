@@ -156,7 +156,7 @@ Visualization Manager:
       Color: 25; 255; 0
       Enabled: true
       Name: MapGraph
-      Topic: /rtabmap/mapData_optimized
+      Topic: /rtabmap/mapDataGraph_optimized
       Value: true
     - Class: rviz/Image
       Enabled: true

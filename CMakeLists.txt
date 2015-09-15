@@ -47,6 +47,7 @@ add_message_files(
    Info.msg
    KeyPoint.msg
    MapData.msg
+   MapGraph.msg
    NodeData.msg
    Link.msg
    OdomInfo.msg
