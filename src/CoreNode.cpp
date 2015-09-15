@@ -37,7 +37,7 @@ int main(int argc, char** argv)
 	ROS_INFO("Starting node...");
 
 	ULogger::setType(ULogger::kTypeConsole);
-	ULogger::setLevel(ULogger::kInfo);
+	ULogger::setLevel(ULogger::kWarning);
 
 	ros::init(argc, argv, "rtabmap");
 
