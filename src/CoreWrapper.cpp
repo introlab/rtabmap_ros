@@ -888,13 +888,6 @@ void CoreWrapper::commonDepthCallback(
 			return;
 		}
 
-		// set maps manager laser scan range parameter
-		mapsManager_.setLaserScanParameters(
-				scanMsg->range_max,
-				scanMsg->angle_min,
-				scanMsg->angle_max,
-				scanMsg->angle_increment);
-
 		//transform in frameId_ frame
 		sensor_msgs::PointCloud2 scanOut;
 		laser_geometry::LaserProjection projection;
@@ -999,13 +992,6 @@ void CoreWrapper::commonStereoCallback(
 		{
 			return;
 		}
-
-		// set maps manager laser scan range parameter
-		mapsManager_.setLaserScanParameters(
-				scanMsg->range_max,
-				scanMsg->angle_min,
-				scanMsg->angle_max,
-				scanMsg->angle_increment);
 
 		//transform in frameId_ frame
 		sensor_msgs::PointCloud2 scanOut;
@@ -1233,14 +1219,24 @@ void CoreWrapper::process(
 
 			// Publish local graph, info
 			this->publishStats(stamp);
-			std::map<int, rtabmap::Transform> filteredPoses;
+			std::map<int, rtabmap::Transform> filteredPoses = rtabmap_.getLocalOptimizedPoses();
 
+			// create a tmp signature with latest sensory data
+			std::map<int, rtabmap::Signature> tmpSignature;
+			SensorData tmpData = data;
+			tmpData.setId(-1);
+			tmpSignature.insert(std::make_pair(-1, Signature(-1, -1, 0, data.stamp(), "", odom, tmpData)));
+			filteredPoses.insert(std::make_pair(-1, odom));
+
+			// Update maps
 			filteredPoses = mapsManager_.updateMapCaches(
-					rtabmap_.getLocalOptimizedPoses(),
+					filteredPoses,
 					rtabmap_.getMemory(),
 					false,
 					false,
-					false);
+					false,
+					tmpSignature);
+
 			mapsManager_.publishMaps(filteredPoses, stamp, mapFrameId_);
 
 			// update goal if planning is enabled

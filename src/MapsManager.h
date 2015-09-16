@@ -59,8 +59,6 @@ public:
 			float & yMin,
 			float & gridCellSize);
 
-	void setLaserScanParameters(float maxRange, float minAngle, float maxAngle, float increment);
-
 #ifdef WITH_OCTOMAP
 	octomap::OcTree * createOctomap(const std::map<int, rtabmap::Transform> & poses);
 #endif
@@ -81,11 +79,6 @@ private:
 	double mapFilterRadius_;
 	double mapFilterAngle_;
 	bool mapCacheCleanup_;
-
-	float laserScanMaxRange_;
-	float laserScanMinAngle_;
-	float laserScanMaxAngle_;
-	float laserScanIncrement_;
 
 	ros::Publisher cloudMapPub_;
 	ros::Publisher projMapPub_;

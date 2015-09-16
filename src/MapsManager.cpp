@@ -43,11 +43,7 @@ MapsManager::MapsManager() :
 		gridUnknownSpaceFilled_(false),
 		mapFilterRadius_(0.5),
 		mapFilterAngle_(30.0), // degrees
-		mapCacheCleanup_(true),
-		laserScanMaxRange_(0),
-		laserScanMinAngle_(0),
-		laserScanMaxAngle_(0),
-		laserScanIncrement_(0)
+		mapCacheCleanup_(true)
 {
 
 	ros::NodeHandle nh;
@@ -90,10 +86,6 @@ void MapsManager::clear()
 	clouds_.clear();
 	projMaps_.clear();
 	gridMaps_.clear();
-	laserScanMaxRange_ = 0;
-	laserScanMinAngle_ = 0;
-	laserScanMaxAngle_ = 0;
-	laserScanIncrement_ = 0;
 }
 
 bool MapsManager::hasSubscribers() const
@@ -101,18 +93,6 @@ bool MapsManager::hasSubscribers() const
 	return  cloudMapPub_.getNumSubscribers() != 0 ||
 			projMapPub_.getNumSubscribers() != 0 ||
 			gridMapPub_.getNumSubscribers() != 0;
-}
-
-void MapsManager::setLaserScanParameters(
-		float maxRange,
-		float minAngle,
-		float maxAngle,
-		float increment)
-{
-	laserScanMaxRange_ = maxRange;
-	laserScanMinAngle_ = minAngle;
-	laserScanMaxAngle_ = maxAngle;
-	laserScanIncrement_ = increment;
 }
 
 std::map<int, Transform> MapsManager::getFilteredPoses(const std::map<int, Transform> & poses)
@@ -160,43 +140,45 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 		{
 			double angle = mapFilterAngle_ == 0.0?CV_PI+0.1:mapFilterAngle_*CV_PI/180.0;
 			filteredPoses = rtabmap::graph::radiusPosesFiltering(poses, mapFilterRadius_, angle);
+			if(poses.size() && poses.begin()->first < 0)
+			{
+				// make sure to keep latest data
+				filteredPoses.insert(*poses.begin());
+			}
 		}
 		else
 		{
 			filteredPoses = poses;
 		}
 
-
 		for(std::map<int, rtabmap::Transform>::iterator iter=filteredPoses.begin(); iter!=filteredPoses.end(); ++iter)
 		{
 			if(!iter->second.isNull())
 			{
 				rtabmap::SensorData data;
-				bool rgbDepthRequired = updateCloud && !uContains(clouds_, iter->first);
-				bool depthRequired = updateProj && !uContains(projMaps_, iter->first);
-				bool scanRequired = updateGrid && !uContains(gridMaps_, iter->first);
+				bool rgbDepthRequired = updateCloud && (iter->first < 0 || !uContains(clouds_, iter->first));
+				bool depthRequired = updateProj && (iter->first < 0 || !uContains(projMaps_, iter->first));
+				bool scanRequired = updateGrid && (iter->first < 0 || !uContains(gridMaps_, iter->first));
+
 				if(rgbDepthRequired ||
 					depthRequired ||
 					scanRequired)
 				{
-					if(signatures.size())
+					std::map<int, rtabmap::Signature>::const_iterator findIter = signatures.find(iter->first);
+					if(findIter != signatures.end())
 					{
-						std::map<int, rtabmap::Signature>::const_iterator findIter = signatures.find(iter->first);
-						if(findIter != signatures.end())
-						{
-							data = findIter->second.sensorData();
-						}
+						data = findIter->second.sensorData();
 					}
-					else
+					else if(memory)
 					{
 						data = memory->getSignatureDataConst(iter->first);
 					}
 				}
 
-				if(data.id() > 0)
+				if(data.id() != 0)
 				{
-					if(!data.imageCompressed().empty() &&
-					   !data.depthOrRightCompressed().empty() &&
+					if(!(data.imageCompressed().empty() && data.imageRaw().empty()) &&
+					   !(data.depthOrRightCompressed().empty() && data.depthOrRightRaw().empty()) &&
 					   (data.cameraModels().size() || data.stereoCameraModel().isValid()))
 					{
 						// Which data should we decompress?
@@ -241,7 +223,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 
 						if(cloudRGB.get())
 						{
-							clouds_.insert(std::make_pair(iter->first, cloudRGB));
+							uInsert(clouds_, std::make_pair(iter->first, cloudRGB));
 						}
 
 						if(depthRequired)
@@ -272,19 +254,23 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 									util3d::occupancy2DFromCloud3D<pcl::PointXYZ>(cloudClipped, ground, obstacles, gridCellSize_, projMaxGroundAngle_*M_PI/180.0, projMinClusterSize_);
 								}
 							}
-							projMaps_.insert(std::make_pair(iter->first, std::make_pair(ground, obstacles)));
+							uInsert(projMaps_, std::make_pair(iter->first, std::make_pair(ground, obstacles)));
 						}
 
 						if(scanRequired)
 						{
 							cv::Mat ground, obstacles;
-							util3d::occupancy2DFromLaserScan(scan, ground, obstacles, gridCellSize_, gridUnknownSpaceFilled_);
-							gridMaps_.insert(std::make_pair(iter->first, std::make_pair(ground, obstacles)));
+							util3d::occupancy2DFromLaserScan(scan, ground, obstacles, gridCellSize_, data.id() < 0 || gridUnknownSpaceFilled_);
+							uInsert(gridMaps_, std::make_pair(iter->first, std::make_pair(ground, obstacles)));
 						}
 					}
 					else
 					{
-						ROS_ERROR("Local transform detected for node %d", iter->first);
+						ROS_ERROR("Some data missing for node %d to update the maps (image=%d, depth=%d, camera=%d)",
+								iter->first,
+								!(data.imageCompressed().empty() && data.imageRaw().empty())?1:0,
+							   !(data.depthOrRightCompressed().empty() && data.depthOrRightRaw().empty())?1:0,
+							   (data.cameraModels().size() || data.stereoCameraModel().isValid())?1:0);
 					}
 				}
 			}
@@ -500,49 +486,6 @@ cv::Mat MapsManager::generateGridMap(
 			xMin, yMin,
 			gridSize_,
 			gridEroded_);
-
-	// Fill unknown space around the last pose
-	if(!map.empty() &&
-		laserScanMaxRange_ &&
-		laserScanMinAngle_ < laserScanMaxAngle_ &&
-		laserScanIncrement_ &&
-		poses.size())
-	{
-		const Transform & pose = poses.rbegin()->second;
-		float roll, pitch, yaw;
-		pose.getEulerAngles(roll, pitch, yaw);
-		cv::Point2i start((pose.x()-xMin)/gridCellSize_ + 0.5f, (pose.y()-yMin)/gridCellSize_ + 0.5f);
-
-		//rotate counterclockwise 180 degrees at the computed step "a" degrees
-		cv::Mat rotation = (cv::Mat_<float>(2,2) << cos(laserScanIncrement_), -sin(laserScanIncrement_),
-													 sin(laserScanIncrement_), cos(laserScanIncrement_));
-
-		cv::Mat origin(2,1,CV_32F), endFirst(2,1,CV_32F);
-		origin.at<float>(0) = pose.x();
-		origin.at<float>(1) = pose.y();
-		endFirst.at<float>(0) = laserScanMaxRange_;
-		endFirst.at<float>(1) = 0;
-
-		yaw += laserScanMinAngle_;
-		cv::Mat initRotation = (cv::Mat_<float>(2,2) << cos(yaw), -sin(yaw),
-														 sin(yaw), cos(yaw));
-
-		cv::Mat endCurrent = initRotation*endFirst + origin;
-		for(float a=laserScanMinAngle_; a<=laserScanMaxAngle_; a+=laserScanIncrement_)
-		{
-			cv::Point2i end((endCurrent.at<float>(0)-xMin)/gridCellSize_ + 0.5f, (endCurrent.at<float>(1)-yMin)/gridCellSize_ + 0.5f);
-			//end must be inside the grid
-			end.x = end.x < 0?0:end.x;
-			end.x = end.x >= map.cols?map.cols-1:end.x;
-			end.y = end.y < 0?0:end.y;
-			end.y = end.y >= map.rows?map.rows-1:end.y;
-			util3d::rayTrace(start, end, map, true); // trace free space
-
-			// next point
-			endCurrent = rotation*(endCurrent - origin) + origin;
-		}
-	}
-
 	return map;
 }
 
