@@ -27,7 +27,7 @@ TrajectoryPlannerROS:
 
   meter_scoring: true
 
-  pdist_scale: 0.8 # The higher will follow more the global path.
+  pdist_scale: 0.7 # The higher will follow more the global path.
   gdist_scale: 0.8
   occdist_scale: 0.01
   publish_cost_grid_pc: false
