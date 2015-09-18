@@ -1,0 +1,14 @@
+global_frame: odom
+robot_base_frame: base_footprint
+update_frequency: 2
+publish_frequency: 1
+rolling_window: true
+width: 3.0
+height: 3.0
+resolution: 0.025
+origin_x: 0
+origin_y: 0
+
+plugins:
+  - {name: obstacle_layer,   type: "costmap_2d::ObstacleLayer"}
+  - {name: inflation_layer,  type: "costmap_2d::InflationLayer"}

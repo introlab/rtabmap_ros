@@ -12,7 +12,7 @@ TrajectoryPlannerROS:
   max_vel_theta: 0.5
   min_vel_theta: -0.5
   min_in_place_vel_theta: 0.25
-  holonomic_robot: true
+  holonomic_robot: false
 
   xy_goal_tolerance:  0.25
   yaw_goal_tolerance: 0.25
@@ -27,8 +27,8 @@ TrajectoryPlannerROS:
 
   meter_scoring: true
 
-  pdist_scale: 0.95 # The higher will follow more the global path.
-  gdist_scale: 0.2
+  pdist_scale: 0.8 # The higher will follow more the global path.
+  gdist_scale: 0.8
   occdist_scale: 0.01
   publish_cost_grid_pc: false
 
