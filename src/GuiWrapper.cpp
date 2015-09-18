@@ -676,6 +676,7 @@ void GuiWrapper::commonDepthCallback(
 			rtabmap::SensorData(
 					scan,
 					scanMsg.get()?(int)scanMsg->ranges.size():0,
+					scanMsg.get()?(int)scanMsg->range_max:0,
 					rgb,
 					depth,
 					cameraModels,
@@ -849,6 +850,7 @@ void GuiWrapper::commonStereoCallback(
 			rtabmap::SensorData(
 					scan,
 					scanMsg.get()?(int)scanMsg->ranges.size():0,
+					scanMsg.get()?(int)scanMsg->range_max:0,
 					left,
 					right,
 					stereoModel,

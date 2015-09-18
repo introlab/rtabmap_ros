@@ -66,6 +66,7 @@ namespace rtabmap_ros
 MapCloudDisplay::CloudInfo::CloudInfo() :
 		manager_(0),
 		pose_(rtabmap::Transform::getIdentity()),
+		id_(0),
 		scene_node_(0)
 {}
 
@@ -85,6 +86,9 @@ void MapCloudDisplay::CloudInfo::clear()
 
 MapCloudDisplay::MapCloudDisplay()
   : spinner_(1, &cbqueue_),
+    new_xyz_transformer_(false),
+    new_color_transformer_(false),
+    needs_retransform_(false),
     transformer_class_loader_(NULL)
 {
 	//QIcon icon;
@@ -697,7 +701,6 @@ void MapCloudDisplay::update( float wall_dt, float ros_dt )
 
 void MapCloudDisplay::reset()
 {
-	MFDClass::reset();
 	{
 		boost::mutex::scoped_lock lock(new_clouds_mutex_);
 		cloud_infos_.clear();
@@ -707,6 +710,7 @@ void MapCloudDisplay::reset()
 		boost::mutex::scoped_lock lock(current_map_mutex_);
 		current_map_.clear();
 	}
+	MFDClass::reset();
 }
 
 void MapCloudDisplay::updateXyzTransformer()

@@ -456,6 +456,7 @@ rtabmap::Signature nodeDataFromROS(const rtabmap_ros::NodeData & msg)
 				rtabmap::SensorData(
 					compressedMatFromBytes(msg.laserScan),
 					msg.laserScanMaxPts,
+					msg.laserScanMaxRange,
 					compressedMatFromBytes(msg.image),
 					compressedMatFromBytes(msg.depth),
 					stereoModel,
@@ -465,6 +466,7 @@ rtabmap::Signature nodeDataFromROS(const rtabmap_ros::NodeData & msg)
 				rtabmap::SensorData(
 					compressedMatFromBytes(msg.laserScan),
 					msg.laserScanMaxPts,
+					msg.laserScanMaxRange,
 					compressedMatFromBytes(msg.image),
 					compressedMatFromBytes(msg.depth),
 					models,
@@ -488,6 +490,8 @@ void nodeDataToROS(const rtabmap::Signature & signature, rtabmap_ros::NodeData &
 	compressedMatToBytes(signature.sensorData().depthOrRightCompressed(), msg.depth);
 	compressedMatToBytes(signature.sensorData().laserScanCompressed(), msg.laserScan);
 	compressedMatToBytes(signature.sensorData().userDataCompressed(), msg.userData);
+	msg.laserScanMaxPts = signature.sensorData().laserScanMaxPts();
+	msg.laserScanMaxRange = signature.sensorData().laserScanMaxRange();
 	msg.baseline = 0;
 	if(signature.sensorData().cameraModels().size())
 	{

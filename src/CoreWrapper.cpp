@@ -763,6 +763,7 @@ void CoreWrapper::commonDepthCallback(
 	cv::Mat depth;
 	pcl::PointCloud<pcl::PointXYZ> scanCloud;
 	std::vector<CameraModel> cameraModels;
+	int genMaxScanPts = 0;
 	for(unsigned int i=0; i<imageMsgs.size(); ++i)
 	{
 		if(!(imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) == 0 ||
@@ -876,6 +877,7 @@ void CoreWrapper::commonDepthCallback(
 					model.cy(),
 					genScanMaxDepth_,
 					localTransform);
+			genMaxScanPts += subDepth.cols;
 		}
 	}
 
@@ -921,7 +923,8 @@ void CoreWrapper::commonDepthCallback(
 
 	process(stamp,
 			SensorData(scan,
-					scanMsg.get() != 0?(int)scanMsg->ranges.size():0,
+					scanMsg.get() != 0?(int)scanMsg->ranges.size():genMaxScanPts,
+					scanMsg.get() != 0?scanMsg->range_max:(genScan_?genScanMaxDepth_:0.0f),
 					rgb,
 					depth,
 					cameraModels,
@@ -1016,6 +1019,7 @@ void CoreWrapper::commonStereoCallback(
 
 			}
 		}
+
 		scan = util3d::laserScanFromPointCloud(*pclScan);
 	}
 
@@ -1045,6 +1049,7 @@ void CoreWrapper::commonStereoCallback(
 	process(stamp,
 			SensorData(scan,
 					scanMsg.get() != 0?(int)scanMsg->ranges.size():0,
+					scanMsg.get() != 0?scanMsg->range_max:0,
 					ptrLeftImage->image,
 					ptrRightImage->image,
 					stereoModel,

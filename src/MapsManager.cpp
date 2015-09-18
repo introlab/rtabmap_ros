@@ -33,7 +33,9 @@ MapsManager::MapsManager() :
 		cloudDecimation_(4),
 		cloudMaxDepth_(4.0), // meters
 		cloudVoxelSize_(0.05), // meters
+		cloudFloorCullingHeight_(0.0),
 		cloudOutputVoxelized_(false),
+		cloudFrustumCulling_(false),
 		projMaxGroundAngle_(45.0), // degrees
 		projMinClusterSize_(20),
 		projMaxHeight_(2.0), // meters
@@ -53,7 +55,9 @@ MapsManager::MapsManager() :
 	pnh.param("cloud_decimation", cloudDecimation_, cloudDecimation_);
 	pnh.param("cloud_max_depth", cloudMaxDepth_, cloudMaxDepth_);
 	pnh.param("cloud_voxel_size", cloudVoxelSize_, cloudVoxelSize_);
+	pnh.param("cloud_floor_culling_height", cloudFloorCullingHeight_, cloudFloorCullingHeight_);
 	pnh.param("cloud_output_voxelized", cloudOutputVoxelized_, cloudOutputVoxelized_);
+	pnh.param("cloud_frustum_culling", cloudFrustumCulling_, cloudFrustumCulling_);
 
 	//projection map stuff
 	pnh.param("proj_max_ground_angle", projMaxGroundAngle_, projMaxGroundAngle_);
@@ -84,6 +88,7 @@ MapsManager::~MapsManager() {
 void MapsManager::clear()
 {
 	clouds_.clear();
+	cameraModels_.clear();
 	projMaps_.clear();
 	gridMaps_.clear();
 }
@@ -140,10 +145,17 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 		{
 			double angle = mapFilterAngle_ == 0.0?CV_PI+0.1:mapFilterAngle_*CV_PI/180.0;
 			filteredPoses = rtabmap::graph::radiusPosesFiltering(poses, mapFilterRadius_, angle);
-			if(poses.size() && poses.begin()->first < 0)
+			for(std::map<int, rtabmap::Transform>::const_iterator iter=poses.begin(); iter!=poses.end(); ++iter)
 			{
-				// make sure to keep latest data
-				filteredPoses.insert(*poses.begin());
+				if(iter->first <=0)
+				{
+					// make sure to keep latest data
+					filteredPoses.insert(*iter);
+				}
+				else
+				{
+					break;
+				}
 			}
 		}
 		else
@@ -224,6 +236,31 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 						if(cloudRGB.get())
 						{
 							uInsert(clouds_, std::make_pair(iter->first, cloudRGB));
+
+							// Make sure that image size is set in camera models.
+							// The camera models are used when cloud_frustum_culling=true.
+							std::vector<rtabmap::CameraModel> models;
+							if(data.stereoCameraModel().isValid())
+							{
+								//insert only the left camera model
+								rtabmap::CameraModel model = data.stereoCameraModel().left();
+								model.setImageSize(cv::Size(data.imageRaw().cols, data.imageRaw().rows));
+								models.push_back(model);
+							}
+							else if(data.cameraModels().size())
+							{
+								UASSERT_MSG(data.imageRaw().cols % data.cameraModels().size() == 0,
+										uFormat("data.imageRaw().cols=%d data.cameraModels().size()=%d",
+												data.imageRaw().cols, (int)data.cameraModels().size()).c_str());
+
+								models.resize(data.cameraModels().size());
+								for(unsigned int i=0; i<data.cameraModels().size(); ++i)
+								{
+									models[i] = data.cameraModels()[i];
+									models[i].setImageSize(cv::Size(data.imageRaw().cols/data.cameraModels().size(), data.imageRaw().rows));
+								}
+							}
+							uInsert(cameraModels_, std::make_pair(iter->first, models));
 						}
 
 						if(depthRequired)
@@ -260,7 +297,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 						if(scanRequired)
 						{
 							cv::Mat ground, obstacles;
-							util3d::occupancy2DFromLaserScan(scan, ground, obstacles, gridCellSize_, data.id() < 0 || gridUnknownSpaceFilled_);
+							util3d::occupancy2DFromLaserScan(scan, ground, obstacles, gridCellSize_, data.id() < 0 || gridUnknownSpaceFilled_, data.laserScanMaxRange());
 							uInsert(gridMaps_, std::make_pair(iter->first, std::make_pair(ground, obstacles)));
 						}
 					}
@@ -317,6 +354,18 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 				++iter;
 			}
 		}
+		for(std::map<int, std::vector<rtabmap::CameraModel> >::iterator iter=cameraModels_.begin();
+			iter!=cameraModels_.end();)
+		{
+			if(!uContains(poses, iter->first))
+			{
+				cameraModels_.erase(iter++);
+			}
+			else
+			{
+				++iter;
+			}
+		}
 	}
 
 	return filteredPoses;
@@ -336,23 +385,67 @@ void MapsManager::publishMaps(
 		UTimer time;
 		pcl::PointCloud<pcl::PointXYZRGB>::Ptr assembledCloud(new pcl::PointCloud<pcl::PointXYZRGB>);
 		int count = 0;
+		std::list<std::pair<int, Transform> > negativePoses;
 		for(std::map<int, Transform>::const_iterator iter = poses.begin(); iter!=poses.end(); ++iter)
 		{
-			std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr >::iterator jter = clouds_.find(iter->first);
-			if(jter != clouds_.end())
+			if(iter->first > 0)
 			{
-				pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::transformPointCloud(jter->second, iter->second);
-				*assembledCloud+=*transformed;
-				++count;
+				std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr >::iterator jter = clouds_.find(iter->first);
+				if(jter != clouds_.end())
+				{
+					pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::transformPointCloud(jter->second, iter->second);
+					*assembledCloud+=*transformed;
+					++count;
+				}
+			}
+			else
+			{
+				negativePoses.push_back(*iter);
 			}
 		}
 
 		if(assembledCloud->size())
 		{
+			if(cloudFrustumCulling_ && negativePoses.size())
+			{
+				for(std::list<std::pair<int, Transform> >::reverse_iterator iter=negativePoses.rbegin(); iter!=negativePoses.rend(); ++iter)
+				{
+					std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr >::iterator jter = clouds_.find(iter->first);
+					std::map<int, std::vector<CameraModel> >::iterator kter = cameraModels_.find(iter->first);
+					if(jter != clouds_.end() && kter != cameraModels_.end())
+					{
+						for(unsigned int i=0; i<kter->second.size(); ++i)
+						{
+							if(kter->second[i].isValid())
+							{
+								int size =  assembledCloud->size();
+								assembledCloud = util3d::frustumFiltering(
+										assembledCloud,
+										iter->second,
+										kter->second[i].horizontalFOV(),
+										kter->second[i].verticalFOV(),
+										0.0f,
+										cloudMaxDepth_>0.0?cloudMaxDepth_:999999.,
+										true);
+								//ROS_INFO("Frustum culling %d ->%d", size, (int)assembledCloud->size());
+								pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::transformPointCloud(jter->second, iter->second);
+								*assembledCloud+=*transformed;
+							}
+						}
+					}
+				}
+			}
+
+			if(cloudFloorCullingHeight_ > 0.0)
+			{
+				assembledCloud = util3d::passThrough(assembledCloud, "z", cloudFloorCullingHeight_, 99999.0f);
+			}
+
 			if(cloudVoxelSize_ > 0 && cloudOutputVoxelized_)
 			{
 				assembledCloud = util3d::voxelize(assembledCloud, cloudVoxelSize_);
 			}
+
 			ROS_INFO("Assembled %d clouds (%fs)", count, time.ticks());
 
 			sensor_msgs::PointCloud2::Ptr cloudMsg(new sensor_msgs::PointCloud2);
@@ -369,6 +462,7 @@ void MapsManager::publishMaps(
 	else if(mapCacheCleanup_)
 	{
 		clouds_.clear();
+		cameraModels_.clear();
 	}
 
 	if(projMapPub_.getNumSubscribers())
@@ -534,6 +628,7 @@ octomap::OcTree * MapsManager::createOctomap(const std::map<int, Transform> & po
 	if(mapCacheCleanup_ && cloudMapPub_.getNumSubscribers() == 0)
 	{
 		clouds_.clear();
+		cameraModels_.clear();
 	}
 	return octree;
 }

@@ -29,6 +29,7 @@ geometry_msgs/Transform[] localTransform
 # use rtabmap::util3d::uncompressData() from "rtabmap/core/util3d.h"
 uint8[] laserScan
 int32 laserScanMaxPts
+float32 laserScanMaxRange
 
 # compressed user data
 # use rtabmap::util3d::uncompressData() from "rtabmap/core/util3d.h"

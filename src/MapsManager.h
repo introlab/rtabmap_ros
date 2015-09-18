@@ -68,7 +68,9 @@ private:
 	int cloudDecimation_;
 	double cloudMaxDepth_;
 	double cloudVoxelSize_;
+	double cloudFloorCullingHeight_;
 	bool cloudOutputVoxelized_;
+	bool cloudFrustumCulling_;
 	double projMaxGroundAngle_;
 	int projMinClusterSize_;
 	double projMaxHeight_;
@@ -85,6 +87,7 @@ private:
 	ros::Publisher gridMapPub_;
 
 	std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr > clouds_;
+	std::map<int, std::vector<rtabmap::CameraModel> > cameraModels_;
 	std::map<int, std::pair<cv::Mat, cv::Mat> > projMaps_; // <ground, obstacles>
 	std::map<int, std::pair<cv::Mat, cv::Mat> > gridMaps_; // <ground, obstacles>
 };
