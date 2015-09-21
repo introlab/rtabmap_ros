@@ -218,6 +218,7 @@ private:
 	void goalActiveCb();
 	void goalFeedbackCb(const move_base_msgs::MoveBaseFeedbackConstPtr& feedback);
 	void publishLocalPath(const ros::Time & stamp);
+	void publishGlobalPath(const ros::Time & stamp);
 
 private:
 	rtabmap::Rtabmap rtabmap_;

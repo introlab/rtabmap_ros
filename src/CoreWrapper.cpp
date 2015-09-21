@@ -1283,6 +1283,9 @@ void CoreWrapper::process(
 
 						// publish local path
 						publishLocalPath(stamp);
+
+						// publish global path
+						publishGlobalPath(stamp);
 					}
 					else
 					{
@@ -1345,32 +1348,6 @@ void CoreWrapper::goalCommonCallback(const std::vector<std::pair<int, Transform>
 		{
 			ROS_INFO("Planning: Path successfully created (size=%d)", (int)poses.size());
 
-			// Global path
-			if(globalPathPub_.getNumSubscribers())
-			{
-				nav_msgs::Path path;
-				path.header.frame_id = mapFrameId_;
-				path.header.stamp = stamp;
-				path.poses.resize(poses.size());
-				std::stringstream stream;
-				for(unsigned int i=0; i<poses.size(); ++i)
-				{
-					path.poses[i].header = path.header;
-					rtabmap_ros::transformToPoseMsg(poses[i].second, path.poses[i].pose);
-					stream << poses[i].first << " ";
-				}
-				if(!rtabmap_.getPathTransformToGoal().isIdentity())
-				{
-					path.poses.resize(poses.size()+1);
-					Transform t = poses.back().second*rtabmap_.getPathTransformToGoal();
-					rtabmap_ros::transformToPoseMsg(t, path.poses[path.poses.size()-1].pose);
-					stream << "G";
-				}
-
-				ROS_INFO("Publishing global path: [%s]", stream.str().c_str());
-				globalPathPub_.publish(path);
-			}
-
 			// Adjust the target pose relative to last node
 			if(rtabmap_.getPathCurrentGoalId() == rtabmap_.getPath().back().first && rtabmap_.getLocalOptimizedPoses().size())
 			{
@@ -1383,6 +1360,7 @@ void CoreWrapper::goalCommonCallback(const std::vector<std::pair<int, Transform>
 
 			publishCurrentGoal(stamp);
 			publishLocalPath(stamp);
+			publishGlobalPath(stamp);
 		}
 	}
 	else
@@ -2191,17 +2169,46 @@ void CoreWrapper::publishLocalPath(const ros::Time & stamp)
 				path.header.stamp = stamp;
 				path.poses.resize(poses.size());
 				int oi = 0;
-				std::stringstream stream;
 				for(std::vector<std::pair<int, Transform> >::iterator iter=poses.begin(); iter!=poses.end(); ++iter)
 				{
 					path.poses[oi].header = path.header;
 					rtabmap_ros::transformToPoseMsg(iter->second, path.poses[oi].pose);
 					++oi;
-					stream << iter->first << " ";
 				}
-				ROS_INFO("Publishing local path: [%s]", stream.str().c_str());
 				localPathPub_.publish(path);
 			}
+		}
+	}
+}
+
+void CoreWrapper::publishGlobalPath(const ros::Time & stamp)
+{
+	if(globalPathPub_.getNumSubscribers() && rtabmap_.getPath().size())
+	{
+		Transform pose = uValue(rtabmap_.getLocalOptimizedPoses(), rtabmap_.getPathCurrentGoalId(), Transform());
+		if(!pose.isNull() && rtabmap_.getPathCurrentGoalIndex() < rtabmap_.getPath().size())
+		{
+			// transform the global path in the goal referential
+			Transform t = pose * rtabmap_.getPath().at(rtabmap_.getPathCurrentGoalIndex()).second.inverse();
+
+			nav_msgs::Path path;
+			path.header.frame_id = mapFrameId_;
+			path.header.stamp = stamp;
+			path.poses.resize(rtabmap_.getPath().size());
+			int oi = 0;
+			for(std::vector<std::pair<int, Transform> >::const_iterator iter=rtabmap_.getPath().begin(); iter!=rtabmap_.getPath().end(); ++iter)
+			{
+				path.poses[oi].header = path.header;
+				rtabmap_ros::transformToPoseMsg(t*iter->second, path.poses[oi].pose);
+				++oi;
+			}
+			if(!rtabmap_.getPathTransformToGoal().isIdentity())
+			{
+				path.poses.resize(path.poses.size()+1);
+				Transform p = t * rtabmap_.getPath().back().second*rtabmap_.getPathTransformToGoal();
+				rtabmap_ros::transformToPoseMsg(p, path.poses[path.poses.size()-1].pose);
+			}
+			globalPathPub_.publish(path);
 		}
 	}
 }

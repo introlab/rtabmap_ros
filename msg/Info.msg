@@ -36,3 +36,4 @@ float32[] statsValues
 
 # std::vector<int> localPath
 int32[] localPath
+int32 currentGoalId

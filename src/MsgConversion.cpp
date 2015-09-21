@@ -174,6 +174,7 @@ void infoFromROS(const rtabmap_ros::Info & info, rtabmap::Statistics & stat)
 	stat.setWeights(mapIntInt);
 
 	stat.setLocalPath(info.localPath);
+	stat.setCurrentGoalId(info.currentGoalId);
 
 	// Statistics data
 	for(unsigned int i=0; i<info.statsKeys.size() && i<info.statsValues.size(); i++)
@@ -203,6 +204,7 @@ void infoToROS(const rtabmap::Statistics & stats, rtabmap_ros::Info & info)
 		info.weightsKeys = uKeys(stats.weights());
 		info.weightsValues = uValues(stats.weights());
 		info.localPath = stats.localPath();
+		info.currentGoalId = stats.currentGoalId();
 
 		// Statistics data
 		info.statsKeys = uKeys(stats.data());
