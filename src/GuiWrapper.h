@@ -32,6 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtabmap_ros/Info.h"
 #include "rtabmap_ros/MapData.h"
 #include "rtabmap_ros/OdomInfo.h"
+#include "rtabmap_ros/Goal.h"
 #include "rtabmap/utilite/UEventsHandler.h"
 #include "rtabmap/core/Transform.h"
 
@@ -43,6 +44,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sensor_msgs/CameraInfo.h>
 #include <sensor_msgs/LaserScan.h>
 #include <nav_msgs/Odometry.h>
+#include <nav_msgs/Path.h>
 
 #include <message_filters/subscriber.h>
 #include <message_filters/synchronizer.h>
@@ -72,6 +74,7 @@ protected:
 
 private:
 	void infoMapCallback(const rtabmap_ros::InfoConstPtr & infoMsg, const rtabmap_ros::MapDataConstPtr & mapMsg);
+	void goalPathCallback(const rtabmap_ros::GoalConstPtr & goalMsg, const nav_msgs::PathConstPtr & pathMsg);
 
 	void setupCallbacks(
 			bool subscribeDepth,
@@ -214,7 +217,9 @@ private:
 
 	message_filters::Subscriber<rtabmap_ros::Info> infoTopic_;
 	message_filters::Subscriber<rtabmap_ros::MapData> mapDataTopic_;
-	ros::Subscriber globalPathTopic_;
+
+	message_filters::Subscriber<rtabmap_ros::Goal> goalTopic_;
+	message_filters::Subscriber<nav_msgs::Path> pathTopic_;
 
 	ros::Subscriber defaultSub_; // odometry only
 	std::vector<image_transport::SubscriberFilter*> imageSubs_;
@@ -233,6 +238,11 @@ private:
 			rtabmap_ros::Info,
 			rtabmap_ros::MapData> MyInfoMapSyncPolicy;
 	message_filters::Synchronizer<MyInfoMapSyncPolicy> * infoMapSync_;
+
+	typedef message_filters::sync_policies::ExactTime<
+			rtabmap_ros::Goal,
+			nav_msgs::Path> MyGoalPathSyncPolicy;
+	message_filters::Synchronizer<MyGoalPathSyncPolicy> * goalPathSync_;
 
 	// with odom msg
 	typedef message_filters::sync_policies::ApproximateTime<

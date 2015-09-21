@@ -4,3 +4,5 @@ int32 node_id
 string node_label
 ---
 #response 
+int32[] path_ids
+geometry_msgs/Pose[] path_poses

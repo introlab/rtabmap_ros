@@ -53,6 +53,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtabmap_ros/PublishMap.h"
 #include "rtabmap_ros/SetGoal.h"
 #include "rtabmap_ros/SetLabel.h"
+#include "rtabmap_ros/Goal.h"
 
 #include "MapsManager.h"
 
@@ -172,8 +173,9 @@ private:
 			const sensor_msgs::CameraInfoConstPtr& rightCamInfoMsg,
 			const sensor_msgs::LaserScanConstPtr& scanMsg);
 
-	void goalCommonCallback(const std::vector<std::pair<int, rtabmap::Transform> > & poses);
+	void goalCommonCallback(const std::vector<std::pair<int, rtabmap::Transform> > & poses, const ros::Time & stamp);
 	void goalCallback(const geometry_msgs::PoseStampedConstPtr & msg);
+	void goalNodeCallback(const rtabmap_ros::GoalConstPtr & msg);
 	void updateGoal(const ros::Time & stamp);
 
 	void process(
@@ -251,6 +253,7 @@ private:
 
 	//Planning stuff
 	ros::Subscriber goalSub_;
+	ros::Subscriber goalNodeSub_;
 	ros::Publisher nextMetricGoalPub_;
 	ros::Publisher goalReachedPub_;
 	ros::Publisher globalPathPub_;

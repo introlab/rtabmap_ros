@@ -193,6 +193,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 
 	// planning topics
 	goalSub_ = nh.subscribe("goal", 1, &CoreWrapper::goalCallback, this);
+	goalNodeSub_ = nh.subscribe("goal_node", 1, &CoreWrapper::goalNodeCallback, this);
 	nextMetricGoalPub_ = nh.advertise<geometry_msgs::PoseStamped>("goal_out", 1);
 	goalReachedPub_ = nh.advertise<std_msgs::Bool>("goal_reached", 1);
 	globalPathPub_ = nh.advertise<nav_msgs::Path>("global_path", 1);
@@ -1322,7 +1323,7 @@ void CoreWrapper::process(
 	}
 }
 
-void CoreWrapper::goalCommonCallback(const std::vector<std::pair<int, Transform> > & poses)
+void CoreWrapper::goalCommonCallback(const std::vector<std::pair<int, Transform> > & poses, const ros::Time & stamp)
 {
 	currentMetricGoal_.setNull();
 	latestNodeWasReached_ = false;
@@ -1343,14 +1344,13 @@ void CoreWrapper::goalCommonCallback(const std::vector<std::pair<int, Transform>
 		else
 		{
 			ROS_INFO("Planning: Path successfully created (size=%d)", (int)poses.size());
-			ros::Time now = ros::Time::now();
 
 			// Global path
 			if(globalPathPub_.getNumSubscribers())
 			{
 				nav_msgs::Path path;
 				path.header.frame_id = mapFrameId_;
-				path.header.stamp = now;
+				path.header.stamp = stamp;
 				path.poses.resize(poses.size());
 				std::stringstream stream;
 				for(unsigned int i=0; i<poses.size(); ++i)
@@ -1381,8 +1381,8 @@ void CoreWrapper::goalCommonCallback(const std::vector<std::pair<int, Transform>
 				}
 			}
 
-			publishCurrentGoal(now);
-			publishLocalPath(now);
+			publishCurrentGoal(stamp);
+			publishLocalPath(stamp);
 		}
 	}
 	else
@@ -1412,7 +1412,37 @@ void CoreWrapper::goalCallback(const geometry_msgs::PoseStampedConstPtr & msg)
 	UTimer timer;
 	rtabmap_.computePath(targetPose);
 	ROS_INFO("Planning: Time computing path = %f s", timer.ticks());
-	goalCommonCallback(rtabmap_.getPath());
+	goalCommonCallback(rtabmap_.getPath(), msg->header.stamp);
+}
+
+void CoreWrapper::goalNodeCallback(const rtabmap_ros::GoalConstPtr & msg)
+{
+	int id = msg->node_id;
+	if(id == 0 && !msg->node_label.empty() && rtabmap_.getMemory())
+	{
+		id = rtabmap_.getMemory()->getSignatureIdByLabel(msg->node_label);
+	}
+
+	if(id > 0)
+	{
+		ROS_INFO("Planning: set goal %d", id);
+		UTimer timer;
+		rtabmap_.computePath(id, true);
+		ROS_INFO("Planning: Time computing path = %f s", timer.ticks());
+		goalCommonCallback(rtabmap_.getPath(), msg->header.stamp);
+		if(currentMetricGoal_.isNull())
+		{
+			ROS_ERROR("Planning: Node id %d not found or goal already reached!", id);
+		}
+	}
+	else if(!msg->node_label.empty())
+	{
+		ROS_ERROR("Planning: Node with label \"%s\" not found!", msg->node_label.c_str());
+	}
+	else
+	{
+		ROS_ERROR("Planning: Node id should be > 0 !");
+	}
 }
 
 bool CoreWrapper::updateRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
@@ -1851,31 +1881,18 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 
 bool CoreWrapper::setGoalCallback(rtabmap_ros::SetGoal::Request& req, rtabmap_ros::SetGoal::Response& res)
 {
-	int id = req.node_id;
-	if(id == 0 && !req.node_label.empty() && rtabmap_.getMemory())
+	rtabmap_ros::GoalPtr msg(new rtabmap_ros::Goal());
+	msg->header.stamp = ros::Time::now();
+	msg->node_id = req.node_id;
+	msg->node_label = req.node_label;
+	goalNodeCallback(msg);
+	const std::vector<std::pair<int, Transform> > & path = rtabmap_.getPath();
+	res.path_ids.resize(path.size());
+	res.path_poses.resize(path.size());
+	for(unsigned int i=0; i<path.size(); ++i)
 	{
-		id = rtabmap_.getMemory()->getSignatureIdByLabel(req.node_label);
-	}
-
-	if(id > 0)
-	{
-		ROS_INFO("Planning: set goal %d", id);
-		UTimer timer;
-		rtabmap_.computePath(id, true);
-		ROS_INFO("Planning: Time computing path = %f s", timer.ticks());
-		goalCommonCallback(rtabmap_.getPath());
-		if(currentMetricGoal_.isNull())
-		{
-			ROS_ERROR("Planning: Node id %d not found or goal already reached!", id);
-		}
-	}
-	else if(!req.node_label.empty())
-	{
-		ROS_ERROR("Planning: Node with label \"%s\" not found!", req.node_label.c_str());
-	}
-	else
-	{
-		ROS_ERROR("Planning: Node id should be > 0 !");
+		res.path_ids[i] = path[i].first;
+		rtabmap_ros::transformToPoseMsg(path[i].second, res.path_poses[i]);
 	}
 	return true;
 }

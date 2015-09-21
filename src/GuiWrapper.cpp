@@ -168,6 +168,14 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 			infoTopic_,
 			mapDataTopic_);
 	infoMapSync_->registerCallback(boost::bind(&GuiWrapper::infoMapCallback, this, _1, _2));
+
+	goalTopic_.subscribe(nh, "goal_node", 1);
+	pathTopic_.subscribe(nh, "global_path", 1);
+	goalPathSync_ = new message_filters::Synchronizer<MyGoalPathSyncPolicy>(
+			MyGoalPathSyncPolicy(queueSize),
+			goalTopic_,
+			pathTopic_);
+	goalPathSync_->registerCallback(boost::bind(&GuiWrapper::goalPathCallback, this, _1, _2));
 }
 
 GuiWrapper::~GuiWrapper()
@@ -241,6 +249,20 @@ void GuiWrapper::infoMapCallback(
 	stat.setConstraints(links);
 
 	this->post(new RtabmapEvent(stat));
+}
+
+void GuiWrapper::goalPathCallback(
+		const rtabmap_ros::GoalConstPtr & goalMsg,
+		const nav_msgs::PathConstPtr & pathMsg)
+{
+	// we don't have the node ids, just generate fake ones.
+	std::vector<std::pair<int, Transform> > poses(pathMsg->poses.size());
+	for(unsigned int i=0; i<pathMsg->poses.size(); ++i)
+	{
+		poses[i].first = -int(i)-1;
+		poses[i].second = rtabmap_ros::transformFromPoseMsg(pathMsg->poses[i].pose);
+	}
+	this->post(new RtabmapGlobalPathEvent(goalMsg->node_id, goalMsg->node_label, poses));
 }
 
 void GuiWrapper::processRequestedMap(const rtabmap_ros::MapData & map)
@@ -373,6 +395,17 @@ void GuiWrapper::handleEvent(UEvent * anEvent)
 			if(!ros::service::call("set_goal", setGoalSrv))
 			{
 				ROS_ERROR("Can't call \"set_goal\" service");
+			}
+			else
+			{
+				UASSERT(setGoalSrv.response.path_ids.size() == setGoalSrv.response.path_poses.size());
+				std::vector<std::pair<int, Transform> > poses(setGoalSrv.response.path_poses.size());
+				for(unsigned int i=0; i<setGoalSrv.response.path_poses.size(); ++i)
+				{
+					poses[i].first = setGoalSrv.response.path_ids[i];
+					poses[i].second = rtabmap_ros::transformFromPoseMsg(setGoalSrv.response.path_poses[i]);
+				}
+				this->post(new RtabmapGlobalPathEvent(setGoalSrv.request.node_id, setGoalSrv.request.node_label, poses));
 			}
 		}
 		else if(cmd == rtabmap::RtabmapEventCmd::kCmdCancelGoal)
