@@ -1887,6 +1887,12 @@ bool CoreWrapper::cancelGoalCallback(std_srvs::Empty::Request& req, std_srvs::Em
 		{
 			mbClient_.cancelGoal();
 		}
+		if(goalReachedPub_.getNumSubscribers())
+		{
+			std_msgs::Bool result;
+			result.data = false;
+			goalReachedPub_.publish(result);
+		}
 	}
 
 	return true;
@@ -2126,7 +2132,7 @@ void CoreWrapper::goalDoneCb(const actionlib::SimpleClientGoalState& state,
 			ROS_ERROR("Planning: move_base failed for some reason. Aborting the plan...");
 		}
 
-		if(!ignore && !goalReachedPub_.getNumSubscribers())
+		if(!ignore && goalReachedPub_.getNumSubscribers())
 		{
 			std_msgs::Bool result;
 			result.data = state == actionlib::SimpleClientGoalState::SUCCEEDED;
