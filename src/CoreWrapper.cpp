@@ -1250,12 +1250,19 @@ void CoreWrapper::process(
 			{
 				if(rtabmap_.getPath().size() == 0)
 				{
-					// Goal reached
-					ROS_INFO("Planning: Publishing goal reached!");
+					if(rtabmap_.getPathStatus() > 0)
+					{
+						// Goal reached
+						ROS_INFO("Planning: Publishing goal reached!");
+					}
+					else
+					{
+						ROS_WARN("Planning: Plan failed!");
+					}
 					if(goalReachedPub_.getNumSubscribers())
 					{
 						std_msgs::Bool result;
-						result.data = true;
+						result.data = rtabmap_.getPathStatus() > 0;
 						goalReachedPub_.publish(result);
 					}
 					currentMetricGoal_.setNull();
@@ -1291,7 +1298,7 @@ void CoreWrapper::process(
 					{
 						ROS_ERROR("Planning: Local map broken, current goal id=%d (the robot may have moved to far from planned nodes)",
 								rtabmap_.getPathCurrentGoalId());
-						rtabmap_.clearPath();
+						rtabmap_.clearPath(-1);
 						if(goalReachedPub_.getNumSubscribers())
 						{
 							std_msgs::Bool result;
@@ -1359,10 +1366,9 @@ void CoreWrapper::goalCommonCallback(
 		latestNodeWasReached_ = false;
 		if(poses.size() == 0)
 		{
-			ROS_WARN("Planning: Goal already reached (RGBD/GoalReachedRadius=%fm) or too far from the graph (RGBD/GoalMaxDistance=%fm).",
-					rtabmap_.getGoalReachedRadius(),
-					rtabmap_.getLocalRadius());
-			rtabmap_.clearPath();
+			ROS_WARN("Planning: Goal already reached (RGBD/GoalReachedRadius=%fm).",
+					rtabmap_.getGoalReachedRadius());
+			rtabmap_.clearPath(1);
 			if(goalReachedPub_.getNumSubscribers())
 			{
 				std_msgs::Bool result;
@@ -1421,12 +1427,12 @@ void CoreWrapper::goalCommonCallback(
 	}
 	else
 	{
-		ROS_ERROR("Planning: A node near the goal's pose not found!");
+		ROS_ERROR("Planning: A node near the goal's pose not found! The pose may be to far from the graph (RGBD/LocalRadius=%f m)", rtabmap_.getLocalRadius());
 	}
 
 	if(!success)
 	{
-		rtabmap_.clearPath();
+		rtabmap_.clearPath(-1);
 		if(goalReachedPub_.getNumSubscribers())
 		{
 			std_msgs::Bool result;
@@ -1910,7 +1916,7 @@ bool CoreWrapper::cancelGoalCallback(std_srvs::Empty::Request& req, std_srvs::Em
 	if(rtabmap_.getPath().size())
 	{
 		ROS_WARN("Goal cancelled!");
-		rtabmap_.clearPath();
+		rtabmap_.clearPath(0);
 		currentMetricGoal_.setNull();
 		latestNodeWasReached_ = false;
 		if(mbClient_.isServerConnected())
@@ -2172,7 +2178,7 @@ void CoreWrapper::goalDoneCb(const actionlib::SimpleClientGoalState& state,
 
 	if(!ignore)
 	{
-		rtabmap_.clearPath();
+		rtabmap_.clearPath(1);
 		currentMetricGoal_.setNull();
 		latestNodeWasReached_ = false;
 	}
