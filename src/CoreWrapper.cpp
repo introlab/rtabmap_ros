@@ -1232,7 +1232,7 @@ void CoreWrapper::process(
 			SensorData tmpData = data;
 			tmpData.setId(-1);
 			tmpSignature.insert(std::make_pair(-1, Signature(-1, -1, 0, data.stamp(), "", odom, tmpData)));
-			filteredPoses.insert(std::make_pair(-1, odom));
+			filteredPoses.insert(std::make_pair(-1, rtabmap_.getMapCorrection()*odom));
 
 			// Update maps
 			filteredPoses = mapsManager_.updateMapCaches(
