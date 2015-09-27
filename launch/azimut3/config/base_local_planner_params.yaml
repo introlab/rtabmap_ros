@@ -12,7 +12,7 @@ TrajectoryPlannerROS:
   max_vel_theta: 0.5
   min_vel_theta: -0.5
   min_in_place_vel_theta: 0.25
-  holonomic_robot: false
+  holonomic_robot: true
 
   xy_goal_tolerance:  0.25
   yaw_goal_tolerance: 0.25

@@ -1258,6 +1258,10 @@ void CoreWrapper::process(
 					else
 					{
 						ROS_WARN("Planning: Plan failed!");
+						if(mbClient_.isServerConnected())
+						{
+							mbClient_.cancelGoal();
+						}
 					}
 					if(goalReachedPub_.getNumSubscribers())
 					{
@@ -1919,10 +1923,6 @@ bool CoreWrapper::cancelGoalCallback(std_srvs::Empty::Request& req, std_srvs::Em
 		rtabmap_.clearPath(0);
 		currentMetricGoal_.setNull();
 		latestNodeWasReached_ = false;
-		if(mbClient_.isServerConnected())
-		{
-			mbClient_.cancelGoal();
-		}
 		if(goalReachedPub_.getNumSubscribers())
 		{
 			std_msgs::Bool result;
@@ -1930,6 +1930,10 @@ bool CoreWrapper::cancelGoalCallback(std_srvs::Empty::Request& req, std_srvs::Em
 			goalReachedPub_.publish(result);
 		}
 	}
+	if(mbClient_.isServerConnected())
+        {
+        	mbClient_.cancelGoal();
+        }
 
 	return true;
 }
