@@ -75,7 +75,7 @@
     <node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="screen" args="$(arg rtabmap_args)">
       <param name="subscribe_depth"     type="bool"   value="false"/>
       <param name="subscribe_stereo"    type="bool"   value="true"/>
-      <param name="subscribe_scan"      type="bool"   value="$(arg subscribe_scan)"/>
+      <param name="subscribe_laserScan"      type="bool"   value="$(arg subscribe_scan)"/>
       <param name="frame_id"            type="string" value="$(arg frame_id)"/>
       <param name="wait_for_transform_duration"  type="double"   value="$(arg wait_for_transform)"/>
       <param name="database_path"       type="string" value="$(arg database_path)"/>
@@ -104,7 +104,7 @@
     <node if="$(arg rtabmapviz)" pkg="rtabmap_ros" type="rtabmapviz" name="rtabmapviz" args="$(arg rtabmapviz_cfg)" output="screen">
       <param name="subscribe_depth"      type="bool"   value="false"/>
       <param name="subscribe_stereo"     type="bool"   value="true"/>
-      <param name="subscribe_scan"       type="bool"   value="$(arg subscribe_scan)"/>
+      <param name="subscribe_laserScan"       type="bool"   value="$(arg subscribe_scan)"/>
       <param name="subscribe_odom_info"  type="bool"   value="$(arg visual_odometry)"/>
       <param name="frame_id"             type="string" value="$(arg frame_id)"/>
       <param name="wait_for_transform_duration"   type="double"   value="$(arg wait_for_transform)"/>
