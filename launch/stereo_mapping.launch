@@ -25,6 +25,7 @@
   <arg name="left_camera_info_topic"  default="$(arg stereo_namespace)/left/camera_info" />
   <arg name="right_camera_info_topic" default="$(arg stereo_namespace)/right/camera_info" />
   <arg name="approximate_sync"        default="false"/>         <!-- if timestamps of the stereo images are not synchronized -->
+  <arg name="compressed"              default="false"/>
    
   <arg name="subscribe_scan"          default="false"/>         <!-- Assuming 2D scan if set, rtabmap will do 3DoF mapping instead of 6DoF -->
   <arg name="scan_topic"              default="/scan"/>
@@ -38,7 +39,7 @@
   <!-- Odometry parameters: -->
   <arg name="strategy"            default="0" />       <!-- Strategy: 0=BOW (bag-of-words) 1=Optical Flow -->
   <arg name="feature"             default="6" />       <!-- Feature type: 0=SURF 1=SIFT 2=ORB 3=FAST/FREAK 4=FAST/BRIEF 5=GFTT/FREAK 6=GFTT/BRIEF 7=BRISK -->
-  <arg name="Odom/EstimationType" default="1" />       <!-- Motion estimation approach: 0:3D->3D, 1:3D->2D (PnP) -->
+  <arg name="estimation"          default="0" />       <!-- Motion estimation approach: 0:3D->3D, 1:3D->2D (PnP) -->
   <arg name="nn"                  default="3" />       <!-- Nearest neighbor strategy : 0=Linear, 1=FLANN_KDTREE (SIFT, SURF), 2=FLANN_LSH, 3=BRUTEFORCE (ORB/FREAK/BRIEF/BRISK) -->
   <arg name="max_depth"           default="10.0" />    <!-- Maximum features depth (m) -->
   <arg name="min_inliers"         default="20" />      <!-- Minimum visual correspondences to accept a transformation (m) -->
@@ -48,6 +49,9 @@
         
   <!-- Nodes -->
   <group ns="$(arg namespace)">
+  
+    <node if="$(arg compressed)" name="republish_left"  type="republish" pkg="image_transport" args="compressed in:=$(arg left_image_topic) raw out:=$(arg left_image_topic)" />
+    <node if="$(arg compressed)" name="republish_right" type="republish" pkg="image_transport" args="compressed in:=$(arg right_image_topic) raw out:=$(arg right_image_topic)" />
   
     <!-- Odometry -->
     <node if="$(arg visual_odometry)" pkg="rtabmap_ros" type="stereo_odometry" name="stereo_odometry" output="screen">
@@ -63,6 +67,7 @@
       <param name="Odom/Strategy"            type="string" value="$(arg strategy)"/> 
       <param name="Odom/FeatureType"         type="string" value="$(arg feature)"/>  
       <param name="OdomBow/NNType"           type="string" value="$(arg nn)"/>
+      <param name="Odom/EstimationType"      type="string" value="$(arg estimation)"/> 
       <param name="Odom/MaxDepth"            type="string" value="$(arg max_depth)"/>  
       <param name="Odom/MinInliers"          type="string" value="$(arg min_inliers)"/> 
       <param name="Odom/InlierDistance"      type="string" value="$(arg inlier_distance)"/>       

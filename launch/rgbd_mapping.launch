@@ -23,6 +23,7 @@
   <arg name="rgb_topic"               default="/camera/rgb/image_rect_color" />
   <arg name="depth_registered_topic"  default="/camera/depth_registered/image_raw" />
   <arg name="camera_info_topic"       default="/camera/rgb/camera_info" />
+  <arg name="compressed"              default="false"/>
    
   <arg name="subscribe_scan"          default="false"/>         <!-- Assuming 2D scan if set, rtabmap will do 3DoF mapping instead of 6DoF -->
   <arg name="scan_topic"              default="/scan"/>
@@ -36,6 +37,7 @@
   <!-- Odometry parameters: -->
   <arg name="strategy"            default="0" />       <!-- Strategy: 0=BOW (bag-of-words) 1=Optical Flow -->
   <arg name="feature"             default="6" />       <!-- Feature type: 0=SURF 1=SIFT 2=ORB 3=FAST/FREAK 4=FAST/BRIEF 5=GFTT/FREAK 6=GFTT/BRIEF 7=BRISK -->
+  <arg name="estimation"          default="0" />       <!-- Motion estimation approach: 0:3D->3D, 1:3D->2D (PnP) -->
   <arg name="nn"                  default="3" />       <!-- Nearest neighbor strategy : 0=Linear, 1=FLANN_KDTREE (SIFT, SURF), 2=FLANN_LSH, 3=BRUTEFORCE (ORB/FREAK/BRIEF/BRISK) -->
   <arg name="max_depth"           default="4.0" />     <!-- Maximum features depth (m) -->
   <arg name="min_inliers"         default="20" />      <!-- Minimum visual correspondences to accept a transformation (m) -->
@@ -44,6 +46,9 @@
         
   <!-- Nodes -->
   <group ns="$(arg namespace)">
+  
+    <node if="$(arg compressed)" name="republish_rgb" type="republish" pkg="image_transport" args="compressed in:=$(arg rgb_topic) raw out:=$(arg rgb_topic)" />
+    <node if="$(arg compressed)" name="republish_depth" type="republish" pkg="image_transport" args="compressedDepth in:=$(arg depth_registered_topic) raw out:=$(arg depth_registered_topic)" />
   
     <!-- Odometry -->
     <node if="$(arg visual_odometry)" pkg="rtabmap_ros" type="rgbd_odometry" name="rgbd_odometry" output="screen" launch-prefix="$(arg launch_prefix)">
@@ -57,6 +62,7 @@
 	  <param name="Odom/Strategy"            type="string" value="$(arg strategy)"/> 
 	  <param name="Odom/FeatureType"         type="string" value="$(arg feature)"/>  
 	  <param name="OdomBow/NNType"           type="string" value="$(arg nn)"/>
+	  <param name="Odom/EstimationType"      type="string" value="$(arg estimation)"/> 
 	  <param name="Odom/MaxDepth"            type="string" value="$(arg max_depth)"/>  
 	  <param name="Odom/MinInliers"          type="string" value="$(arg min_inliers)"/> 
 	  <param name="Odom/InlierDistance"      type="string" value="$(arg inlier_distance)"/>       
