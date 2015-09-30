@@ -39,7 +39,7 @@
   <!-- Odometry parameters: -->
   <arg name="strategy"            default="0" />       <!-- Strategy: 0=BOW (bag-of-words) 1=Optical Flow -->
   <arg name="feature"             default="6" />       <!-- Feature type: 0=SURF 1=SIFT 2=ORB 3=FAST/FREAK 4=FAST/BRIEF 5=GFTT/FREAK 6=GFTT/BRIEF 7=BRISK -->
-  <arg name="estimation"          default="0" />       <!-- Motion estimation approach: 0:3D->3D, 1:3D->2D (PnP) -->
+  <arg name="estimation"          default="1" />       <!-- Motion estimation approach: 0:3D->3D, 1:3D->2D (PnP) -->
   <arg name="nn"                  default="3" />       <!-- Nearest neighbor strategy : 0=Linear, 1=FLANN_KDTREE (SIFT, SURF), 2=FLANN_LSH, 3=BRUTEFORCE (ORB/FREAK/BRIEF/BRISK) -->
   <arg name="max_depth"           default="10.0" />    <!-- Maximum features depth (m) -->
   <arg name="min_inliers"         default="20" />      <!-- Minimum visual correspondences to accept a transformation (m) -->
