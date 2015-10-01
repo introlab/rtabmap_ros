@@ -49,10 +49,12 @@ namespace rtabmap_ros {
 class OdometryROS
 {
 public:
-	OdometryROS(int argc, char * argv[]);
-	~OdometryROS();
+	static rtabmap::ParametersMap getDefaultOdometryParameters(bool stereo = false);
+	static void processArguments(int argc, char * argv[], bool stereo = false);
 
-	void processArguments(int argc, char * argv[]);
+public:
+	OdometryROS(int argc, char * argv[], bool stereo = false);
+	~OdometryROS();
 	void processData(const rtabmap::SensorData & data, const ros::Time & stamp);
 
 	bool reset(std_srvs::Empty::Request&, std_srvs::Empty::Response&);

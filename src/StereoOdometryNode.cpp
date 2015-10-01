@@ -52,7 +52,7 @@ class StereoOdometry : public rtabmap_ros::OdometryROS
 {
 public:
 	StereoOdometry(int argc, char * argv[]) :
-		rtabmap_ros::OdometryROS(argc, argv),
+		rtabmap_ros::OdometryROS(argc, argv, true),
 		approxSync_(0),
 		exactSync_(0)
 	{
@@ -201,6 +201,9 @@ int main(int argc, char *argv[])
 	ULogger::setLevel(ULogger::kWarning);
 	//pcl::console::setVerbosityLevel(pcl::console::L_DEBUG);
 	ros::init(argc, argv, "stereo_odometry");
+
+	// process "--params" argument
+	rtabmap_ros::OdometryROS::processArguments(argc, argv, true);
 
 	StereoOdometry odom(argc, argv);
 	ros::spin();

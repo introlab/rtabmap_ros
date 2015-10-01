@@ -50,7 +50,7 @@ using namespace rtabmap;
 
 namespace rtabmap_ros {
 
-OdometryROS::OdometryROS(int argc, char * argv[]) :
+OdometryROS::OdometryROS(int argc, char * argv[], bool stereo) :
 	odometry_(0),
 	frameId_("base_link"),
 	odomFrameId_("odom"),
@@ -60,8 +60,6 @@ OdometryROS::OdometryROS(int argc, char * argv[]) :
 	waitForTransformDuration_(0.1), // 100 ms
 	paused_(false)
 {
-	this->processArguments(argc, argv);
-
 	ros::NodeHandle nh;
 
 	odomPub_ = nh.advertise<nav_msgs::Odometry>("odom", 1);
@@ -117,25 +115,7 @@ OdometryROS::OdometryROS(int argc, char * argv[]) :
 
 
 	//parameters
-	rtabmap::ParametersMap parameters = rtabmap::Parameters::getDefaultParameters();
-	for(rtabmap::ParametersMap::iterator iter=parameters.begin(); iter!=parameters.end(); ++iter)
-	{
-		std::string group = uSplit(iter->first, '/').front();
-		if(uStrContains(group, "Odom") ||
-			group.compare("Stereo") ||
-			group.compare("SURF") == 0 ||
-			group.compare("SIFT") == 0 ||
-			group.compare("ORB") == 0 ||
-			group.compare("FAST") == 0 ||
-			group.compare("FREAK") == 0 ||
-			group.compare("BRIEF") == 0 ||
-			group.compare("GFTT") == 0 ||
-			group.compare("BRISK") == 0)
-		{
-			parameters_.insert(*iter);
-		}
-	}
-
+	parameters_ = this->getDefaultOdometryParameters(stereo);
 	for(rtabmap::ParametersMap::iterator iter=parameters_.begin(); iter!=parameters_.end(); ++iter)
 	{
 		std::string vStr;
@@ -257,35 +237,48 @@ OdometryROS::~OdometryROS()
 	delete odometry_;
 }
 
-void OdometryROS::processArguments(int argc, char * argv[])
+rtabmap::ParametersMap OdometryROS::getDefaultOdometryParameters(bool stereo)
+{
+	rtabmap::ParametersMap odomParameters;
+	rtabmap::ParametersMap defaultParameters = rtabmap::Parameters::getDefaultParameters();
+	for(rtabmap::ParametersMap::iterator iter=defaultParameters.begin(); iter!=defaultParameters.end(); ++iter)
+	{
+		std::string group = uSplit(iter->first, '/').front();
+		if(uStrContains(group, "Odom") ||
+			group.compare("Stereo") ||
+			group.compare("SURF") == 0 ||
+			group.compare("SIFT") == 0 ||
+			group.compare("ORB") == 0 ||
+			group.compare("FAST") == 0 ||
+			group.compare("FREAK") == 0 ||
+			group.compare("BRIEF") == 0 ||
+			group.compare("GFTT") == 0 ||
+			group.compare("BRISK") == 0)
+		{
+			if(stereo)
+			{
+				if(iter->first.compare(Parameters::kOdomMaxDepth()) == 0)
+				{
+					iter->second = "0"; // infinity
+				}
+				else if(iter->first.compare(Parameters::kOdomEstimationType()) == 0)
+				{
+					iter->second = "1"; // 3D->2D (PNP)
+				}
+			}
+			odomParameters.insert(*iter);
+		}
+	}
+	return odomParameters;
+}
+
+void OdometryROS::processArguments(int argc, char * argv[], bool stereo)
 {
 	for(int i=1;i<argc;++i)
 	{
 		if(strcmp(argv[i], "--params") == 0)
 		{
-			rtabmap::ParametersMap parameters = rtabmap::Parameters::getDefaultParameters();
-			rtabmap::ParametersMap parametersOdom;
-			if(strcmp(argv[i], "--params") == 0)
-			{
-				// show specific parameters
-				for(rtabmap::ParametersMap::iterator iter=parameters.begin(); iter!=parameters.end(); ++iter)
-				{
-					if(iter->first.find("Odom") == 0 ||
-						uSplit(iter->first, '/').front().compare("Stereo") == 0 ||
-						uSplit(iter->first, '/').front().compare("SURF") == 0 ||
-						uSplit(iter->first, '/').front().compare("SIFT") == 0 ||
-						uSplit(iter->first, '/').front().compare("ORB") == 0 ||
-						uSplit(iter->first, '/').front().compare("FAST") == 0 ||
-						uSplit(iter->first, '/').front().compare("FREAK") == 0 ||
-						uSplit(iter->first, '/').front().compare("BRIEF") == 0 ||
-						uSplit(iter->first, '/').front().compare("GFTT") == 0 ||
-						uSplit(iter->first, '/').front().compare("BRISK") == 0)
-					{
-						parametersOdom.insert(*iter);
-					}
-				}
-			}
-
+			rtabmap::ParametersMap parametersOdom = getDefaultOdometryParameters(stereo);
 			for(rtabmap::ParametersMap::iterator iter=parametersOdom.begin(); iter!=parametersOdom.end(); ++iter)
 			{
 				std::string str = "Param: " + iter->first + " = \"" + iter->second + "\"";

@@ -382,6 +382,9 @@ int main(int argc, char *argv[])
 	ULogger::setLevel(ULogger::kWarning);
 	ros::init(argc, argv, "rgbd_odometry");
 
+	// process "--params" argument
+	rtabmap_ros::OdometryROS::processArguments(argc, argv);
+
 	RGBDOdometry odom(argc, argv);
 	ros::spin();
 	return 0;

@@ -41,7 +41,7 @@
   <arg name="feature"             default="6" />       <!-- Feature type: 0=SURF 1=SIFT 2=ORB 3=FAST/FREAK 4=FAST/BRIEF 5=GFTT/FREAK 6=GFTT/BRIEF 7=BRISK -->
   <arg name="estimation"          default="1" />       <!-- Motion estimation approach: 0:3D->3D, 1:3D->2D (PnP) -->
   <arg name="nn"                  default="3" />       <!-- Nearest neighbor strategy : 0=Linear, 1=FLANN_KDTREE (SIFT, SURF), 2=FLANN_LSH, 3=BRUTEFORCE (ORB/FREAK/BRIEF/BRISK) -->
-  <arg name="max_depth"           default="10.0" />    <!-- Maximum features depth (m) -->
+  <arg name="max_depth"           default="0" />       <!-- Maximum features depth (m) -->
   <arg name="min_inliers"         default="20" />      <!-- Minimum visual correspondences to accept a transformation (m) -->
   <arg name="inlier_distance"     default="0.1" />     <!-- RANSAC maximum inliers distance (m) -->
   <arg name="local_map"           default="1000" />    <!-- Local map size: number of unique features to keep track -->
@@ -97,6 +97,7 @@
       <param name="RGBD/OptimizeFromGraphEnd" type="string" value="$(arg optimize_from_last_node)"/>
       <param name="LccBow/MinInliers"         type="string" value="10"/>
       <param name="LccBow/InlierDistance"     type="string" value="$(arg inlier_distance)"/>
+      <param name="LccBow/EstimationType"     type="string" value="$(arg estimation)"/> 
       
       <!-- when 2D scan is set -->
       <param if="$(arg subscribe_scan)" name="RGBD/OptimizeSlam2D"          type="string" value="true"/>
