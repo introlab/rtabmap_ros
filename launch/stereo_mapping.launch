@@ -46,6 +46,7 @@
   <arg name="inlier_distance"     default="0.1" />     <!-- RANSAC maximum inliers distance (m) -->
   <arg name="local_map"           default="1000" />    <!-- Local map size: number of unique features to keep track -->
   <arg name="odom_info_data"      default="true" />    <!-- Fill odometry info messages with inliers/outliers data. -->
+  <arg name="variance_inliers"    default="false"/>    <!-- Variance from inverse of inliers count -->  
         
   <!-- Nodes -->
   <group ns="$(arg namespace)">
@@ -73,6 +74,7 @@
       <param name="Odom/InlierDistance"      type="string" value="$(arg inlier_distance)"/>       
       <param name="OdomBow/LocalHistorySize" type="string" value="$(arg local_map)"/> 
       <param name="Odom/FillInfoData"        type="string" value="true"/>   
+      <param name="Odom/VarianceFromInliersCount" type="string" value="$(arg variance_inliers)"/>
     </node>
   
     <!-- Visual SLAM (robot side) -->
@@ -98,6 +100,7 @@
       <param name="LccBow/MinInliers"         type="string" value="10"/>
       <param name="LccBow/InlierDistance"     type="string" value="$(arg inlier_distance)"/>
       <param name="LccBow/EstimationType"     type="string" value="$(arg estimation)"/> 
+      <param name="LccBow/VarianceFromInliersCount" type="string" value="$(arg variance_inliers)"/>
       
       <!-- when 2D scan is set -->
       <param if="$(arg subscribe_scan)" name="RGBD/OptimizeSlam2D"          type="string" value="true"/>
