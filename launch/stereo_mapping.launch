@@ -46,7 +46,7 @@
   <arg name="inlier_distance"     default="0.1" />     <!-- RANSAC maximum inliers distance (m) -->
   <arg name="local_map"           default="1000" />    <!-- Local map size: number of unique features to keep track -->
   <arg name="odom_info_data"      default="true" />    <!-- Fill odometry info messages with inliers/outliers data. -->
-  <arg name="variance_inliers"    default="false"/>    <!-- Variance from inverse of inliers count -->  
+  <arg name="variance_inliers"    default="true"/>    <!-- Variance from inverse of inliers count -->  
         
   <!-- Nodes -->
   <group ns="$(arg namespace)">

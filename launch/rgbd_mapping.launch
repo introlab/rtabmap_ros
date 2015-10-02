@@ -43,7 +43,7 @@
   <arg name="min_inliers"         default="20" />      <!-- Minimum visual correspondences to accept a transformation (m) -->
   <arg name="inlier_distance"     default="0.1" />     <!-- RANSAC maximum inliers distance (m) -->
   <arg name="local_map"           default="1000" />    <!-- Local map size: number of unique features to keep track -->
-  <arg name="variance_inliers"    default="false"/>    <!-- Variance from inverse of inliers count -->  
+  <arg name="variance_inliers"    default="true"/>    <!-- Variance from inverse of inliers count -->  
         
   <!-- Nodes -->
   <group ns="$(arg namespace)">
