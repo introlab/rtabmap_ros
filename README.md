@@ -28,14 +28,28 @@ $ sudo apt-get install ros-hydro-rtabmap-ros
 This section shows how to install RTAB-Map ros-pkg on **ROS Hydro/Indigo/Jade** (Catkin build). RTAB-Map works only with the PCL 1.7, which is the default version installed with ROS Hydro/Indigo/Jade (**Fuerte and Groovy are not supported**).
  * **Note for ROS Indigo/Jade**: If you want SURF/SIFT, you have to build OpenCV from source to have access to *nonfree* module. Install it in `/usr/local` (default) and the rtabmap library should link with it instead of the one installed in ROS.
 
- * The next instructions assume that you have setup your ROS workspace using this [tutorial](http://wiki.ros.org/catkin/Tutorials/create_a_workspace). The workspace path is `~/catkin_ws` and your `~/.bashrc` contains:
+ * The next instructions assume that you have setup your ROS workspace using this [tutorial](http://wiki.ros.org/catkin/Tutorials/create_a_workspace). I will use indigo prefix for conveninence, but it should work with hydro and jade. The workspace path is `~/catkin_ws` and your `~/.bashrc` contains:
  
   ```bash
-source /opt/ros/[hydro|indigo|jade]/setup.bash
+source /opt/ros/indigo/setup.bash
 source ~/catkin_ws/devel/setup.bash
 ```
 
- 1. First, you need to install the RTAB-Map standalone libraries (**don't checkout in the Catkin workspace** but install in your Catkin's devel folder).
+ 0. Optional dependencies
+  * ROS (Qt, dc1394, OpenNI, OpenNI2, Freenect, g2o, Costmap2d, Rviz, Octomap):
+   ```bash
+$ sudo apt-get install libqt4-dev libdc1394-dev ros-indigo-openni-launch ros-indigo-openni2-launch ros-indigo-freenect-launch ros-indigo-costmap-2d ros-indigo-octomap-ros ros-indigo-g2o ros-indigo-rviz
+```
+    Note that I've found that [latest g2o version](https://github.com/RainerKuemmerle/g2o) built from source is faster.
+  * [GTSAM](https://collab.cc.gatech.edu/borg/gtsam): Follow installation instructions from [here](https://collab.cc.gatech.edu/borg/gtsam/#quickstart). RTAB-Map needs latest version from source, it will not build with 3.2.1.
+  * [cvsba](http://www.uco.es/investiga/grupos/ava/node/39): Follow installation instructions from [here](http://www.uco.es/investiga/grupos/ava/node/39). Their installation is not standard CMake, you need these extra steps so RTAB-Map can find it:
+   ```bash
+$ mkdir /usr/local/lib/cmake/cvsba 
+$ mv /usr/local/lib/cmake/Findcvsba.cmake /usr/local/lib/cmake/cvsba/cvsbaConfig.cmake
+```
+  * Freenect2: Follow installation instructions from [here](https://github.com/OpenKinect/libfreenect2#debianubuntu-1404-perhaps-earlier).
+
+ 1. Install the RTAB-Map standalone libraries (**don't checkout in the Catkin workspace** but install in your Catkin's devel folder).
  
  ```bash
 $ cd ~
@@ -46,7 +60,7 @@ $ make -j4
 $ make install
 ```
 
- 2. Now install the RTAB-Map ros-pkg in your src folder of your Catkin workspace.
+ 2. Install the RTAB-Map ros-pkg in your src folder of your Catkin workspace.
  
  ```bash
 $ cd ~/catkin_ws
