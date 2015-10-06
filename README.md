@@ -46,7 +46,7 @@ $ sudo apt-get install libqt4-dev libpcl-1.7-all-dev libdc1394-dev ros-indigo-op
 $ mkdir /usr/local/lib/cmake/cvsba 
 $ mv /usr/local/lib/cmake/Findcvsba.cmake /usr/local/lib/cmake/cvsba/cvsbaConfig.cmake
 ```
-  * Freenect2: Follow installation instructions from [here](https://github.com/OpenKinect/libfreenect2#debianubuntu-1404-perhaps-earlier).
+  * [Freenect2](https://github.com/OpenKinect/libfreenect2): Follow installation instructions from [here](https://github.com/OpenKinect/libfreenect2#debianubuntu-1404-perhaps-earlier).
 
  1. Install the RTAB-Map standalone libraries (**don't checkout in the Catkin workspace** but install in your Catkin's devel folder).
  
