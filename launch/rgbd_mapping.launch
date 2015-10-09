@@ -24,6 +24,7 @@
   <arg name="depth_registered_topic"  default="/camera/depth_registered/image_raw" />
   <arg name="camera_info_topic"       default="/camera/rgb/camera_info" />
   <arg name="compressed"              default="false"/>
+  <arg name="convert_depth_to_mm"     default="true"/>
    
   <arg name="subscribe_scan"          default="false"/>         <!-- Assuming 2D scan if set, rtabmap will do 3DoF mapping instead of 6DoF -->
   <arg name="scan_topic"              default="/scan"/>
@@ -92,6 +93,7 @@
       <param name="LccBow/InlierDistance"     type="string" value="$(arg inlier_distance)"/>
       <param name="LccBow/EstimationType"     type="string" value="$(arg estimation)"/> 
       <param name="LccBow/VarianceFromInliersCount" type="string" value="$(arg variance_inliers)"/>
+      <param name="Mem/SaveDepth16Format"     type="string" value="$(arg convert_depth_to_mm)"/>
       
       <!-- when 2D scan is set -->
       <param if="$(arg subscribe_scan)" name="RGBD/OptimizeSlam2D"          type="string" value="true"/>

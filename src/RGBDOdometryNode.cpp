@@ -178,16 +178,6 @@ public:
 						image->encoding.c_str(), depth->encoding.c_str());
 				return;
 			}
-			else if(depth->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1)==0)
-			{
-				static bool warned = false;
-				if(!warned)
-				{
-					ROS_WARN("Input depth type is 32FC1, please use type 16UC1 or mono16 for depth. The depth images "
-							 "will be processed anyway but with a conversion. This warning is only be printed once...");
-					warned = true;
-				}
-			}
 
 			ros::Time stamp = image->header.stamp>depth->header.stamp?image->header.stamp:depth->header.stamp;
 
@@ -300,17 +290,6 @@ public:
 				}
 				cv_bridge::CvImageConstPtr ptrDepth = cv_bridge::toCvShare(depthMsgs[i]);
 				cv::Mat subDepth = ptrDepth->image;
-				if(subDepth.type() == CV_32FC1)
-				{
-					subDepth = rtabmap::util2d::cvtDepthFromFloat(subDepth);
-					static bool shown = false;
-					if(!shown)
-					{
-						ROS_WARN("Use depth image with \"unsigned short\" type to "
-								 "avoid conversion. This message is only printed once...");
-						shown = true;
-					}
-				}
 
 				// initialize
 				if(rgb.empty())

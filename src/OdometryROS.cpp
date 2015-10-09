@@ -308,7 +308,8 @@ Transform OdometryROS::getTransform(const std::string & fromFrameId, const std::
 			//if(!tfBuffer_.canTransform(fromFrameId, toFrameId, stamp, ros::Duration(1)))
 			if(!tfListener_.waitForTransform(fromFrameId, toFrameId, stamp, ros::Duration(waitForTransformDuration_)))
 			{
-				ROS_WARN("odometry: Could not get transform from %s to %s after %f seconds!", fromFrameId.c_str(), toFrameId.c_str(), waitForTransformDuration_);
+				ROS_WARN("odometry: Could not get transform from %s to %s (stamp=%f) after %f seconds (\"wait_for_transform_duration\"=%f)!",
+						fromFrameId.c_str(), toFrameId.c_str(), stamp.toSec(), waitForTransformDuration_, waitForTransformDuration_);
 				return transform;
 			}
 		}

@@ -817,17 +817,6 @@ void CoreWrapper::commonDepthCallback(
 		}
 		cv_bridge::CvImageConstPtr ptrDepth = cv_bridge::toCvShare(depthMsgs[i]);
 		cv::Mat subDepth = ptrDepth->image;
-		if(subDepth.type() == CV_32FC1)
-		{
-			subDepth = util2d::cvtDepthFromFloat(subDepth);
-			static bool shown = false;
-			if(!shown)
-			{
-				ROS_WARN("Use depth image with \"unsigned short\" type to "
-						 "avoid conversion. This message is only printed once...");
-				shown = true;
-			}
-		}
 
 		// initialize
 		if(rgb.empty())
@@ -1045,6 +1034,19 @@ void CoreWrapper::commonStereoCallback(
 			model.left().cy(),
 			model.baseline(),
 			localTransform);
+
+	if(model.baseline() > 10.0)
+	{
+		static bool shown = false;
+		if(!shown)
+		{
+			ROS_WARN("Detected baseline (%f m) is quite large! Is your "
+					 "right camera_info P(0,3) correctly set? Note that "
+					 "baseline=-P(0,3)/P(0,0). This warning is printed only once.",
+					 model.baseline());
+			shown = true;
+		}
+	}
 
 	ros::Time stamp = scanMsg.get() != 0?scanMsg->header.stamp:leftImageMsg->header.stamp;
 	process(stamp,

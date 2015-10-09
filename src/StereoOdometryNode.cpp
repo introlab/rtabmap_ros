@@ -162,6 +162,19 @@ public:
 						model.baseline(),
 						localTransform);
 
+				if(model.baseline() > 10.0)
+				{
+					static bool shown = false;
+					if(!shown)
+					{
+						ROS_WARN("Detected baseline (%f m) is quite large! Is your "
+								 "right camera_info P(0,3) correctly set? Note that "
+								 "baseline=-P(0,3)/P(0,0). This warning is printed only once.",
+								 model.baseline());
+						shown = true;
+					}
+				}
+
 				cv_bridge::CvImageConstPtr ptrImageLeft = cv_bridge::toCvShare(imageRectLeft, "mono8");
 				cv_bridge::CvImageConstPtr ptrImageRight = cv_bridge::toCvShare(imageRectRight, "mono8");
 
