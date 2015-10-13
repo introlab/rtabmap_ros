@@ -479,8 +479,7 @@ CoreWrapper::~CoreWrapper()
 	this->saveParameters(configPath_);
 
 	ros::NodeHandle nh;
-	ParametersMap parameters = Parameters::getDefaultParameters();
-	for(ParametersMap::iterator iter=parameters.begin(); iter!=parameters.end(); ++iter)
+	for(ParametersMap::iterator iter=parameters_.begin(); iter!=parameters_.end(); ++iter)
 	{
 		nh.deleteParam(iter->first);
 	}
@@ -516,19 +515,7 @@ void CoreWrapper::saveParameters(const std::string & configFile)
 		{
 			printf("Config file doesn't exist, a new one will be created.\n");
 		}
-
-		ParametersMap parameters = Parameters::getDefaultParameters();
-		ros::NodeHandle nh;
-		for(ParametersMap::iterator iter=parameters.begin(); iter!=parameters.end(); ++iter)
-		{
-			std::string value;
-			if(nh.getParam(iter->first,value))
-			{
-				iter->second = value;
-			}
-		}
-
-		Rtabmap::writeParameters(configFile.c_str(), parameters);
+		Rtabmap::writeParameters(configFile.c_str(), parameters_);
 	}
 	else
 	{
@@ -817,6 +804,20 @@ void CoreWrapper::commonDepthCallback(
 		}
 		cv_bridge::CvImageConstPtr ptrDepth = cv_bridge::toCvShare(depthMsgs[i]);
 		cv::Mat subDepth = ptrDepth->image;
+		UASSERT(uContains(parameters_, Parameters::kMemSaveDepth16Format()));
+		if(subDepth.type() == CV_32FC1 && uStr2Bool(parameters_.at(Parameters::kMemSaveDepth16Format())))
+		{
+			subDepth = util2d::cvtDepthFromFloat(subDepth);
+			static bool shown = false;
+			if(!shown)
+			{
+				ROS_WARN("Save depth data to 16 bits format: depth type detected is "
+					  "32FC1, use 16UC1 depth format to avoid this conversion "
+					  "(or set parameter \"Mem/SaveDepth16Format=false\" to use "
+					  "32bits format). This message is only printed once...");
+				shown = true;
+			}
+		}
 
 		// initialize
 		if(rgb.empty())
@@ -1471,9 +1472,8 @@ void CoreWrapper::goalNodeCallback(const rtabmap_ros::GoalConstPtr & msg)
 
 bool CoreWrapper::updateRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
-	rtabmap::ParametersMap parameters = rtabmap::Parameters::getDefaultParameters();
 	ros::NodeHandle nh;
-	for(rtabmap::ParametersMap::iterator iter=parameters.begin(); iter!=parameters.end(); ++iter)
+	for(rtabmap::ParametersMap::iterator iter=parameters_.begin(); iter!=parameters_.end(); ++iter)
 	{
 		std::string vStr;
 		bool vBool;
@@ -1501,12 +1501,12 @@ bool CoreWrapper::updateRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Emp
 		}
 	}
 	ROS_INFO("rtabmap: Updating parameters");
-	if(parameters.find(Parameters::kRtabmapDetectionRate()) != parameters.end())
+	if(parameters_.find(Parameters::kRtabmapDetectionRate()) != parameters_.end())
 	{
-		rate_ = uStr2Float(parameters.at(Parameters::kRtabmapDetectionRate()));
+		rate_ = uStr2Float(parameters_.at(Parameters::kRtabmapDetectionRate()));
 		ROS_INFO("RTAB-Map rate detection = %f Hz", rate_);
 	}
-	rtabmap_.parseParameters(parameters);
+	rtabmap_.parseParameters(parameters_);
 	return true;
 }
 
