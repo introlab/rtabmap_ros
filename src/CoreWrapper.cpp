@@ -2108,7 +2108,7 @@ void CoreWrapper::publishCurrentGoal(const ros::Time & stamp)
 {
 	if(!currentMetricGoal_.isNull())
 	{
-		ROS_INFO("Planning: Publishing next goal: Location %d pose=%s",
+		ROS_INFO("Publishing next goal: %d -> %s",
 				rtabmap_.getPathCurrentGoalId(), currentMetricGoal_.prettyPrint().c_str());
 
 		geometry_msgs::PoseStamped poseMsg;
@@ -2116,7 +2116,6 @@ void CoreWrapper::publishCurrentGoal(const ros::Time & stamp)
 		poseMsg.header.stamp = stamp;
 		rtabmap_ros::transformToPoseMsg(currentMetricGoal_, poseMsg.pose);
 
-		ROS_INFO("Publishing next goal: %d", rtabmap_.getPathCurrentGoalId());
 		if(useActionForGoal_)
 		{
 			if(!mbClient_.isServerConnected())
