@@ -176,6 +176,7 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 			goalTopic_,
 			pathTopic_);
 	goalPathSync_->registerCallback(boost::bind(&GuiWrapper::goalPathCallback, this, _1, _2));
+	goalReachedTopic_ = nh.subscribe("goal_reached", 1, &GuiWrapper::goalReachedCallback, this);
 }
 
 GuiWrapper::~GuiWrapper()
@@ -263,6 +264,12 @@ void GuiWrapper::goalPathCallback(
 		poses[i].second = rtabmap_ros::transformFromPoseMsg(pathMsg->poses[i].pose);
 	}
 	this->post(new RtabmapGlobalPathEvent(goalMsg->node_id, goalMsg->node_label, poses));
+}
+
+void GuiWrapper::goalReachedCallback(
+		const std_msgs::BoolConstPtr & value)
+{
+	this->post(new RtabmapGoalStatusEvent(value->data?1:-1));
 }
 
 void GuiWrapper::processRequestedMap(const rtabmap_ros::MapData & map)

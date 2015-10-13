@@ -45,6 +45,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sensor_msgs/LaserScan.h>
 #include <nav_msgs/Odometry.h>
 #include <nav_msgs/Path.h>
+#include <std_msgs/Bool.h>
 
 #include <message_filters/subscriber.h>
 #include <message_filters/synchronizer.h>
@@ -75,6 +76,7 @@ protected:
 private:
 	void infoMapCallback(const rtabmap_ros::InfoConstPtr & infoMsg, const rtabmap_ros::MapDataConstPtr & mapMsg);
 	void goalPathCallback(const rtabmap_ros::GoalConstPtr & goalMsg, const nav_msgs::PathConstPtr & pathMsg);
+	void goalReachedCallback(const std_msgs::BoolConstPtr & value);
 
 	void setupCallbacks(
 			bool subscribeDepth,
@@ -220,6 +222,7 @@ private:
 
 	message_filters::Subscriber<rtabmap_ros::Goal> goalTopic_;
 	message_filters::Subscriber<nav_msgs::Path> pathTopic_;
+	ros::Subscriber goalReachedTopic_;
 
 	ros::Subscriber defaultSub_; // odometry only
 	std::vector<image_transport::SubscriberFilter*> imageSubs_;
