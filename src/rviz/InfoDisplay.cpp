@@ -76,7 +76,12 @@ void InfoDisplay::processMessage( const rtabmap_ros::InfoConstPtr& msg )
 			info_ = "";
 		}
 		loopTransform_ = rtabmap_ros::transformFromGeometryMsg(msg->loopClosureTransform);
+
+		rtabmap::Statistics stat;
+		rtabmap_ros::infoFromROS(*msg, stat);
+		statistics_ = stat.data();
 	}
+
 
 	this->emitTimeSignal(msg->header.stamp);
 }
@@ -100,6 +105,11 @@ void InfoDisplay::update( float wall_dt, float ros_dt )
 		}
 		this->setStatusStd(rviz::StatusProperty::Ok, "Global", tr("%1").arg(globalCount_).toStdString());
 		this->setStatusStd(rviz::StatusProperty::Ok, "Local", tr("%1").arg(localCount_).toStdString());
+
+		for(std::map<std::string, float>::const_iterator iter=statistics_.begin(); iter!=statistics_.end(); ++iter)
+		{
+			this->setStatus(rviz::StatusProperty::Ok, iter->first.c_str(), tr("%1").arg(iter->second));
+		}
 	}
 }
 
@@ -111,6 +121,7 @@ void InfoDisplay::reset()
 		info_.clear();
 		globalCount_ = 0;
 		localCount_ = 0;
+		statistics_.clear();
 	}
 }
 

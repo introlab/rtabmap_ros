@@ -60,6 +60,7 @@ private:
 	QString info_;
 	int globalCount_;
 	int localCount_;
+	std::map<std::string, float> statistics_;
 	rtabmap::Transform loopTransform_;
 	boost::mutex info_mutex_;
 };
