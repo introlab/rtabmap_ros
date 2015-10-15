@@ -27,7 +27,7 @@ $ sudo apt-get install ros-hydro-rtabmap-ros
 ### Build from source
 This section shows how to install RTAB-Map ros-pkg on **ROS Hydro/Indigo/Jade** (Catkin build). RTAB-Map works only with the PCL 1.7, which is the default version installed with ROS Hydro/Indigo/Jade (**Fuerte and Groovy are not supported**).
 
- * The next instructions assume that you have setup your ROS workspace using this [tutorial](http://wiki.ros.org/catkin/Tutorials/create_a_workspace). I will use indigo prefix for convenience, but it should work with hydro and jade. The workspace path is `~/catkin_ws` and your `~/.bashrc` contains:
+ * The next instructions assume that you have set up your ROS workspace using this [tutorial](http://wiki.ros.org/catkin/Tutorials/create_a_workspace). I will use indigo prefix for convenience, but it should work with hydro and jade. The workspace path is `~/catkin_ws` and your `~/.bashrc` contains:
  
   ```bash
 source /opt/ros/indigo/setup.bash
