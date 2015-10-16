@@ -36,6 +36,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <cv_bridge/cv_bridge.h>
 
+#include <rtabmap/core/Rtabmap.h>
 #include <rtabmap/core/Odometry.h>
 #include <rtabmap/core/util3d_transforms.h>
 #include <rtabmap/core/Memory.h>
@@ -45,6 +46,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtabmap/utilite/UConversion.h"
 #include "rtabmap/utilite/ULogger.h"
 #include "rtabmap/utilite/UStl.h"
+#include "rtabmap/utilite/UFile.h"
 
 using namespace rtabmap;
 
@@ -72,6 +74,7 @@ OdometryROS::OdometryROS(int argc, char * argv[], bool stereo) :
 	Transform initialPose = Transform::getIdentity();
 	std::string initialPoseStr;
 	std::string tfPrefix;
+	std::string configPath;
 	pnh.param("frame_id", frameId_, frameId_);
 	pnh.param("odom_frame_id", odomFrameId_, odomFrameId_);
 	pnh.param("publish_tf", publishTf_, publishTf_);
@@ -80,6 +83,12 @@ OdometryROS::OdometryROS(int argc, char * argv[], bool stereo) :
 	pnh.param("wait_for_transform_duration",  waitForTransformDuration_, waitForTransformDuration_);
 	pnh.param("initial_pose", initialPoseStr, initialPoseStr); // "x y z roll pitch yaw"
 	pnh.param("ground_truth_frame_id", groundTruthFrameId_, groundTruthFrameId_);
+	pnh.param("config_path", configPath, configPath);
+	configPath = uReplaceChar(configPath, '~', UDirectory::homeDir());
+	if(configPath.size() && configPath.at(0) != '/')
+	{
+		configPath = UDirectory::currentDir(true) + configPath;
+	}
 
 	if(!tfPrefix.empty())
 	{
@@ -116,6 +125,28 @@ OdometryROS::OdometryROS(int argc, char * argv[], bool stereo) :
 
 	//parameters
 	parameters_ = this->getDefaultOdometryParameters(stereo);
+	if(!configPath.empty())
+	{
+		if(UFile::exists(configPath.c_str()))
+		{
+			ROS_INFO("Odometry: Loading parameters from %s", configPath.c_str());
+			rtabmap::ParametersMap allParameters;
+			Rtabmap::readParameters(configPath.c_str(), allParameters);
+			// only update odometry parameters
+			for(ParametersMap::iterator iter=parameters_.begin(); iter!=parameters_.end(); ++iter)
+			{
+				ParametersMap::iterator jter = allParameters.find(iter->first);
+				if(jter!=allParameters.end())
+				{
+					iter->second = jter->second;
+				}
+			}
+		}
+		else
+		{
+			ROS_ERROR("Config file \"%s\" not found!", configPath.c_str());
+		}
+	}
 	for(rtabmap::ParametersMap::iterator iter=parameters_.begin(); iter!=parameters_.end(); ++iter)
 	{
 		std::string vStr;
