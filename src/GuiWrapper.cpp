@@ -36,6 +36,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <rtabmap/utilite/UEventsManager.h>
 #include <rtabmap/utilite/UConversion.h>
+#include <rtabmap/utilite/UDirectory.h>
 
 #include <opencv2/highgui/highgui.hpp>
 
@@ -125,6 +126,7 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 	int queueSize = 10;
 	int depthCameras = 1;
 	std::string tfPrefix;
+	std::string initCachePath;
 	pnh.param("frame_id", frameId_, frameId_);
 	pnh.param("odom_frame_id", odomFrameId_, odomFrameId_); // set to use odom from TF
 	pnh.param("subscribe_depth", subscribeDepth, subscribeDepth);
@@ -137,6 +139,33 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 	pnh.param("wait_for_transform", waitForTransform_, waitForTransform_);
 	pnh.param("wait_for_transform_duration",  waitForTransformDuration_, waitForTransformDuration_);
 	pnh.param("camera_node_name", cameraNodeName_, cameraNodeName_); // used to pause the rtabmap_ros/camera when pausing the process
+	pnh.param("init_cache_path", initCachePath, initCachePath);
+	if(initCachePath.size())
+	{
+		initCachePath = uReplaceChar(initCachePath, '~', UDirectory::homeDir());
+		if(initCachePath.at(0) != '/')
+		{
+			initCachePath = UDirectory::currentDir(true) + initCachePath;
+		}
+		ROS_INFO("rtabmapviz: Initializing cache with local database \"%s\"", initCachePath.c_str());
+		uSleep(2000); // make sure rtabmap node is created if launched at the same time
+		rtabmap_ros::GetMap getMapSrv;
+		getMapSrv.request.global = false;
+		getMapSrv.request.optimized = true;
+		getMapSrv.request.graphOnly = true;
+		if(!ros::service::call("get_map", getMapSrv))
+		{
+			ROS_WARN("Can't call \"get_map\" service. The cache will still be loaded "
+					"but the clouds won't be created until next time rtabmapviz "
+					"receives the optimized graph.");
+		}
+		else
+		{
+			// this will update the poses and constraints of the MainWindow
+			processRequestedMap(getMapSrv.response.data);
+		}
+		QMetaObject::invokeMethod(mainWindow_, "updateCacheFromDatabase", Q_ARG(QString, QString(initCachePath.c_str())));
+	}
 
 	if(!tfPrefix.empty())
 	{
