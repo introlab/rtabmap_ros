@@ -19,7 +19,7 @@ $ sudo apt-get install ros-jade-rtabmap-ros
   ```
 $ sudo apt-get install ros-indigo-rtabmap-ros
 ```
- * Hydro
+ * Hydro: Note that rtabmap binaries are stuck at version 0.8.12. To use the latest version, see [Build from source](https://github.com/introlab/rtabmap_ros#build-from-source) below.
   ```
 $ sudo apt-get install ros-hydro-rtabmap-ros
 ```
