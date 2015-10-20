@@ -19,10 +19,11 @@ $ sudo apt-get install ros-jade-rtabmap-ros
   ```
 $ sudo apt-get install ros-indigo-rtabmap-ros
 ```
- * Hydro: Note that rtabmap binaries are stuck at version 0.8.12. To use the latest version, see [Build from source](https://github.com/introlab/rtabmap_ros#build-from-source) below.
+ * Hydro:
   ```
 $ sudo apt-get install ros-hydro-rtabmap-ros
 ```
+   * Note that rtabmap_ros Hydro binaries are stuck at version 0.8.12. To use the latest version, see [Build from source](https://github.com/introlab/rtabmap_ros#build-from-source) below.
 
 ### Build from source
 This section shows how to install RTAB-Map ros-pkg on **ROS Hydro/Indigo/Jade** (Catkin build). RTAB-Map works only with the PCL 1.7, which is the default version installed with ROS Hydro/Indigo/Jade (**Fuerte and Groovy are not supported**).
