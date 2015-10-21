@@ -276,7 +276,7 @@ rtabmap::ParametersMap OdometryROS::getDefaultOdometryParameters(bool stereo)
 	{
 		std::string group = uSplit(iter->first, '/').front();
 		if(uStrContains(group, "Odom") ||
-			group.compare("Stereo") ||
+			(stereo && group.compare("Stereo") == 0) ||
 			group.compare("SURF") == 0 ||
 			group.compare("SIFT") == 0 ||
 			group.compare("ORB") == 0 ||
