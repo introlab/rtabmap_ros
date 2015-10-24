@@ -52,7 +52,9 @@ namespace rtabmap_ros
 MapGraphDisplay::MapGraphDisplay()
 {
 	color_neighbor_property_ = new rviz::ColorProperty( "Neighbor", Qt::blue,
-                                       "Color to draw neighbor links.", this );
+	                                       "Color to draw neighbor links.", this );
+	color_neighbor_merged_property_ = new rviz::ColorProperty( "Merged neighbor", QColor(255,170,0),
+	                                       "Color to draw merged neighbor links.", this );
 	color_global_property_ = new rviz::ColorProperty( "Global loop closure", Qt::red,
 	                                       "Color to draw global loop closure links.", this );
 	color_local_property_ = new rviz::ColorProperty( "Local loop closure", Qt::yellow,
@@ -138,6 +140,10 @@ void MapGraphDisplay::processMessage( const rtabmap_ros::MapGraph::ConstPtr& msg
 				if(iter->second.type() == rtabmap::Link::kNeighbor)
 				{
 					color = color_neighbor_property_->getOgreColor();
+				}
+				else if(iter->second.type() == rtabmap::Link::kNeighborMerged)
+				{
+					color = color_neighbor_merged_property_->getOgreColor();
 				}
 				else if(iter->second.type() == rtabmap::Link::kVirtualClosure)
 				{

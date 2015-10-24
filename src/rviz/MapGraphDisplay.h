@@ -76,6 +76,7 @@ private:
   std::vector<Ogre::ManualObject*> manual_objects_;
 
   ColorProperty* color_neighbor_property_;
+  ColorProperty* color_neighbor_merged_property_;
   ColorProperty* color_global_property_;
   ColorProperty* color_local_property_;
   ColorProperty* color_user_property_;
