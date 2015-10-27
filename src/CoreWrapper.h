@@ -173,7 +173,7 @@ private:
 			const sensor_msgs::CameraInfoConstPtr& rightCamInfoMsg,
 			const sensor_msgs::LaserScanConstPtr& scanMsg);
 
-	void goalCommonCallback(int id, const std::string & label, const rtabmap::Transform & pose, const ros::Time & stamp);
+	void goalCommonCallback(int id, const std::string & label, const rtabmap::Transform & pose, const ros::Time & stamp, double * planningTime = 0);
 	void goalCallback(const geometry_msgs::PoseStampedConstPtr & msg);
 	void goalNodeCallback(const rtabmap_ros::GoalConstPtr & msg);
 	void updateGoal(const ros::Time & stamp);

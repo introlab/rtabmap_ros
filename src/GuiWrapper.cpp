@@ -292,7 +292,7 @@ void GuiWrapper::goalPathCallback(
 		poses[i].first = -int(i)-1;
 		poses[i].second = rtabmap_ros::transformFromPoseMsg(pathMsg->poses[i].pose);
 	}
-	this->post(new RtabmapGlobalPathEvent(goalMsg->node_id, goalMsg->node_label, poses));
+	this->post(new RtabmapGlobalPathEvent(goalMsg->node_id, goalMsg->node_label, poses, 0.0));
 }
 
 void GuiWrapper::goalReachedCallback(
@@ -441,7 +441,7 @@ void GuiWrapper::handleEvent(UEvent * anEvent)
 					poses[i].first = setGoalSrv.response.path_ids[i];
 					poses[i].second = rtabmap_ros::transformFromPoseMsg(setGoalSrv.response.path_poses[i]);
 				}
-				this->post(new RtabmapGlobalPathEvent(setGoalSrv.request.node_id, setGoalSrv.request.node_label, poses));
+				this->post(new RtabmapGlobalPathEvent(setGoalSrv.request.node_id, setGoalSrv.request.node_label, poses, setGoalSrv.response.planning_time));
 			}
 		}
 		else if(cmd == rtabmap::RtabmapEventCmd::kCmdCancelGoal)

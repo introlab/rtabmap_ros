@@ -1344,7 +1344,8 @@ void CoreWrapper::goalCommonCallback(
 		int id,
 		const std::string & label,
 		const Transform & pose,
-		const ros::Time & stamp)
+		const ros::Time & stamp,
+		double * planningTime)
 {
 	UTimer timer;
 
@@ -1362,10 +1363,19 @@ void CoreWrapper::goalCommonCallback(
 		ROS_INFO("Planning: set goal %s", pose.prettyPrint().c_str());
 	}
 
+	if(planningTime)
+	{
+		*planningTime = 0.0;
+	}
+
 	bool success = false;
 	if((id > 0 && rtabmap_.computePath(id, true)) ||
 	   (!pose.isNull() && rtabmap_.computePath(pose)))
 	{
+		if(planningTime)
+		{
+			*planningTime = timer.elapsed();
+		}
 		ROS_INFO("Planning: Time computing path = %f s", timer.ticks());
 		const std::vector<std::pair<int, Transform> > & poses = rtabmap_.getPath();
 
@@ -1905,10 +1915,12 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 
 bool CoreWrapper::setGoalCallback(rtabmap_ros::SetGoal::Request& req, rtabmap_ros::SetGoal::Response& res)
 {
-	goalCommonCallback(req.node_id, req.node_label, Transform(), ros::Time::now());
+	double planningTime = 0.0;
+	goalCommonCallback(req.node_id, req.node_label, Transform(), ros::Time::now(), &planningTime);
 	const std::vector<std::pair<int, Transform> > & path = rtabmap_.getPath();
 	res.path_ids.resize(path.size());
 	res.path_poses.resize(path.size());
+	res.planning_time = planningTime;
 	for(unsigned int i=0; i<path.size(); ++i)
 	{
 		res.path_ids[i] = path[i].first;
