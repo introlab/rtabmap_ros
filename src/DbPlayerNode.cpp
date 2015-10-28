@@ -257,8 +257,6 @@ int main(int argc, char** argv)
 		// publish transforms first
 		if(publishTf)
 		{
-			ros::Time tfExpiration = time + ros::Duration(rate>0?1.0/rate:acquisitionTime);
-
 			rtabmap::Transform localTransform;
 			if(odom.data().cameraModels().size() == 1)
 			{
@@ -273,7 +271,7 @@ int main(int argc, char** argv)
 				geometry_msgs::TransformStamped baseToCamera;
 				baseToCamera.child_frame_id = cameraFrameId;
 				baseToCamera.header.frame_id = frameId;
-				baseToCamera.header.stamp = tfExpiration;
+				baseToCamera.header.stamp = time;
 				rtabmap_ros::transformToGeometryMsg(localTransform, baseToCamera.transform);
 				tfBroadcaster.sendTransform(baseToCamera);
 			}
@@ -283,7 +281,7 @@ int main(int argc, char** argv)
 				geometry_msgs::TransformStamped odomToBase;
 				odomToBase.child_frame_id = frameId;
 				odomToBase.header.frame_id = odomFrameId;
-				odomToBase.header.stamp = tfExpiration;
+				odomToBase.header.stamp = time;
 				rtabmap_ros::transformToGeometryMsg(odom.pose(), odomToBase.transform);
 				tfBroadcaster.sendTransform(odomToBase);
 			}
@@ -293,7 +291,7 @@ int main(int argc, char** argv)
 				geometry_msgs::TransformStamped baseToLaserScan;
 				baseToLaserScan.child_frame_id = scanFrameId;
 				baseToLaserScan.header.frame_id = frameId;
-				baseToLaserScan.header.stamp = tfExpiration;
+				baseToLaserScan.header.stamp = time;
 				rtabmap_ros::transformToGeometryMsg(rtabmap::Transform(0,0,scanHeight,0,0,0), baseToLaserScan.transform);
 				tfBroadcaster.sendTransform(baseToLaserScan);
 			}
