@@ -124,7 +124,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	pnh.param("subscribe_stereo",    subscribeStereo, subscribeStereo);
 	if(subscribeDepth && subscribeStereo)
 	{
-		UWARN("Parameters subscribe_depth and subscribe_stereo cannot be true at the same time. Parameter subscribe_depth is set to false.");
+		ROS_WARN("rtabmap: Parameters subscribe_depth and subscribe_stereo cannot be true at the same time. Parameter subscribe_depth is set to false.");
 		subscribeDepth = false;
 	}
 	if(subscribeLaserScan)

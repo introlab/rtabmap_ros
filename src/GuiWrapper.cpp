@@ -1212,7 +1212,9 @@ void GuiWrapper::setupCallbacks(
 
 	if(subscribeDepth && subscribeStereo)
 	{
-		ROS_WARN("\"subscribe_depth\" already true, ignoring \"subscribe_stereo\".");
+		ROS_WARN("rtabmapviz: Parameters subscribe_depth and subscribe_stereo cannot be true at the "
+				 "same time. Parameter subscribe_depth is set to false.");
+		subscribeDepth = false;
 	}
 	if(!subscribeDepth && !subscribeStereo && subscribeLaserScan)
 	{
