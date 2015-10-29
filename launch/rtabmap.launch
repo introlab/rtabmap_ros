@@ -70,7 +70,6 @@
 	  
         <param name="frame_id"                    type="string" value="$(arg frame_id)"/>
         <param name="wait_for_transform_duration" type="double" value="$(arg wait_for_transform)"/>
-        <param name="approx_sync"                 type="bool"   value="$(arg approx_sync)"/>
         <param name="config_path"                 type="string" value="$(arg cfg)"/>
         <param name="queue_size"                  type="int" value="$(arg queue_size)"/>
       </node>
@@ -160,7 +159,7 @@
 
     <param name="decimation"  type="double" value="2"/>
     <param name="voxel_size"  type="double" value="0.02"/>
-    <param name="approx_sync" type="bool"   value="$(arg approx_sync)"/>
+    <param if="$(arg stereo)" name="approx_sync" type="bool"   value="$(arg approx_sync)"/>
   </node>
 
 </launch>
