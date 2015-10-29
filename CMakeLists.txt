@@ -278,6 +278,7 @@ install(DIRECTORY include/${PROJECT_NAME}/
 
 ## Mark other files for installation (e.g. launch and bag files, etc.)
 install(FILES
+   launch/rtabmap.launch
    launch/rgbd_mapping.launch
    launch/stereo_mapping.launch
    launch/data_recorder.launch
