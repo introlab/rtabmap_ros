@@ -555,6 +555,28 @@ void nodeDataToROS(const rtabmap::Signature & signature, rtabmap_ros::NodeData &
 	}
 }
 
+rtabmap::Signature nodeInfoFromROS(const rtabmap_ros::NodeData & msg)
+{
+	rtabmap::Signature s(
+			msg.id,
+			msg.mapId,
+			msg.weight,
+			msg.stamp,
+			msg.label,
+			transformFromPoseMsg(msg.pose));
+	return s;
+}
+void nodeInfoToROS(const rtabmap::Signature & signature, rtabmap_ros::NodeData & msg)
+{
+	// add data
+	msg.id = signature.id();
+	msg.mapId = signature.mapId();
+	msg.weight = signature.getWeight();
+	msg.stamp = signature.getStamp();
+	msg.label = signature.getLabel();
+	transformToPoseMsg(signature.getPose(), msg.pose);
+}
+
 rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::OdomInfo & msg)
 {
 	rtabmap::OdometryInfo info;

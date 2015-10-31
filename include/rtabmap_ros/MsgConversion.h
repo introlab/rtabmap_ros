@@ -110,6 +110,9 @@ void mapGraphToROS(
 rtabmap::Signature nodeDataFromROS(const rtabmap_ros::NodeData & msg);
 void nodeDataToROS(const rtabmap::Signature & signature, rtabmap_ros::NodeData & msg);
 
+rtabmap::Signature nodeInfoFromROS(const rtabmap_ros::NodeData & msg);
+void nodeInfoToROS(const rtabmap::Signature & signature, rtabmap_ros::NodeData & msg);
+
 rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::OdomInfo & msg);
 void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_ros::OdomInfo & msg);
 

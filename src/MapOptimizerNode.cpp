@@ -137,8 +137,10 @@ public:
 				if(iter->second.to() == link.to())
 				{
 					edgeAlreadyAdded = true;
-					if(iter->second.transform() != link.transform())
+					if(iter->second.transform().getDistanceSquared(link.transform()) > 0.0001)
 					{
+						ROS_WARN("%d ->%d (%s vs %s)",iter->second.from(), iter->second.to(), iter->second.transform().prettyPrint().c_str(),
+								link.transform().prettyPrint().c_str());
 						dataChanged = true;
 					}
 				}
@@ -149,16 +151,17 @@ public:
 			}
 		}
 
-		std::map<int, Transform> newPoses;
+		std::map<int, Signature> newNodeInfos;
 		// add new odometry poses
 		for(unsigned int i=0; i<msg->nodes.size(); ++i)
 		{
 			int id = msg->nodes[i].id;
 			Transform pose = rtabmap_ros::transformFromPoseMsg(msg->nodes[i].pose);
-			newPoses.insert(std::make_pair(id, pose));
+			Signature s = rtabmap_ros::nodeInfoFromROS(msg->nodes[i]);
+			newNodeInfos.insert(std::make_pair(id, s));
 
-			std::pair<std::map<int, Transform>::iterator, bool> p = cachedPoses_.insert(std::make_pair(id, pose));
-			if(!p.second && pose != cachedPoses_.at(id))
+			std::pair<std::map<int, Signature>::iterator, bool> p = cachedNodeInfos_.insert(std::make_pair(id, s));
+			if(!p.second && pose.getDistanceSquared(cachedNodeInfos_.at(id).getPose()) > 0.0001)
 			{
 				dataChanged = true;
 			}
@@ -167,27 +170,27 @@ public:
 		if(dataChanged)
 		{
 			ROS_WARN("Graph data has changed! Reset cache...");
-			cachedPoses_ = newPoses;
 			cachedConstraints_ = newConstraints;
+			cachedNodeInfos_ = newNodeInfos;
 		}
 
 		//match poses in the graph
-		std::map<int, Transform> poses;
 		std::multimap<int, Link> constraints;
+		std::map<int, Signature> nodeInfos;
 		if(globalOptimization_)
 		{
-			poses = cachedPoses_;
 			constraints = cachedConstraints_;
+			nodeInfos = cachedNodeInfos_;
 		}
 		else
 		{
 			constraints = newConstraints;
 			for(unsigned int i=0; i<msg->graph.posesId.size(); ++i)
 			{
-				std::map<int, Transform>::iterator iter = cachedPoses_.find(msg->graph.posesId[i]);
-				if(iter != cachedPoses_.end())
+				std::map<int, Signature>::iterator iter = cachedNodeInfos_.find(msg->graph.posesId[i]);
+				if(iter != cachedNodeInfos_.end())
 				{
-					poses.insert(*iter);
+					nodeInfos.insert(*iter);
 				}
 				else
 				{
@@ -196,18 +199,25 @@ public:
 				}
 			}
 		}
+
+		std::map<int, Transform> poses;
+		for(std::map<int, Signature>::iterator iter=nodeInfos.begin(); iter!=nodeInfos.end(); ++iter)
+		{
+			poses.insert(std::make_pair(iter->first, iter->second.getPose()));
+		}
+
 		// Optimize only if there is a subscriber
 		if(mapDataPub_.getNumSubscribers() || mapGraphPub_.getNumSubscribers())
 		{
 			UTimer timer;
 			std::map<int, Transform> optimizedPoses;
 			Transform mapCorrection = Transform::getIdentity();
+			std::map<int, rtabmap::Transform> posesOut;
 			std::multimap<int, rtabmap::Link> linksOut;
 			if(poses.size() > 1 && constraints.size() > 0)
 			{
 				graph::TOROOptimizer optimizer(iterations_, false, ignoreVariance_);
 				int fromId = optimizeFromLastNode_?poses.rbegin()->first:poses.begin()->first;
-				std::map<int, rtabmap::Transform> posesOut;
 				optimizer.getConnectedGraph(
 						fromId,
 						poses,
@@ -249,6 +259,33 @@ public:
 				outputDataMsg.header = msg->header;
 				outputDataMsg.graph = outputGraphMsg;
 				outputDataMsg.nodes = msg->nodes;
+				if(posesOut.size() > msg->nodes.size())
+				{
+					std::set<int> addedNodes;
+					for(unsigned int i=0; i<msg->nodes.size(); ++i)
+					{
+						addedNodes.insert(msg->nodes[i].id);
+					}
+					std::list<int> toAdd;
+					for(std::map<int, Transform>::iterator iter=posesOut.begin(); iter!=posesOut.end(); ++iter)
+					{
+						if(addedNodes.find(iter->first) == addedNodes.end())
+						{
+							toAdd.push_back(iter->first);
+						}
+					}
+					if(toAdd.size())
+					{
+						int oi = outputDataMsg.nodes.size();
+						outputDataMsg.nodes.resize(outputDataMsg.nodes.size()+toAdd.size());
+						for(std::list<int>::iterator iter=toAdd.begin(); iter!=toAdd.end(); ++iter)
+						{
+							UASSERT(cachedNodeInfos_.find(*iter) != cachedNodeInfos_.end());
+							rtabmap_ros::nodeDataToROS(cachedNodeInfos_.at(*iter), outputDataMsg.nodes[oi]);
+							++oi;
+						}
+					}
+				}
 				mapDataPub_.publish(outputDataMsg);
 			}
 
@@ -272,8 +309,8 @@ private:
 	ros::Publisher mapDataPub_;
 	ros::Publisher mapGraphPub_;
 
-	std::map<int, Transform> cachedPoses_;
 	std::multimap<int, Link> cachedConstraints_;
+	std::map<int, Signature> cachedNodeInfos_;
 
 	tf2_ros::TransformBroadcaster tfBroadcaster_;
 	boost::thread* transformThread_;
