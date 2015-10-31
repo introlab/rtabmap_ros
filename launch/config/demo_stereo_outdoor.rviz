@@ -147,17 +147,22 @@ Visualization Manager:
       Size (Pixels): 3
       Size (m): 0.01
       Style: Points
-      Topic: /rtabmap/mapData_optimized
+      Topic: /rtabmap/mapData
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
     - Alpha: 1
       Class: rtabmap_ros/MapGraph
-      Color: 25; 255; 0
       Enabled: true
+      Global loop closure: 255; 0; 0
+      Local loop closure: 255; 255; 0
+      Merged neighbor: 255; 170; 0
       Name: MapGraph
+      Neighbor: 0; 0; 255
       Topic: /rtabmap/mapDataGraph_optimized
+      User: 255; 0; 0
       Value: true
+      Virtual: 255; 0; 255
     - Class: rviz/Image
       Enabled: true
       Image Topic: /stereo_camera/left/image_rect_color
@@ -173,10 +178,10 @@ Visualization Manager:
       Class: rviz/Map
       Color Scheme: map
       Draw Behind: false
-      Enabled: false
+      Enabled: true
       Name: Map
-      Topic: /map
-      Value: false
+      Topic: /rtabmap/proj_map
+      Value: true
     - Class: rtabmap_ros/Info
       Enabled: true
       Name: Info
@@ -206,7 +211,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rtabmap_ros/OrbitOriented
-      Distance: 6.60197
+      Distance: 8.28384
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.06
         Stereo Focal Distance: 1
@@ -218,10 +223,10 @@ Visualization Manager:
         Z: 0.113349
       Name: Current View
       Near Clip Distance: 0.01
-      Pitch: 0.455398
+      Pitch: 0.635398
       Target Frame: base_footprint
       Value: OrbitOriented (rtabmap)
-      Yaw: 3.1304
+      Yaw: 3.0704
     Saved: ~
 Window Geometry:
   Displays:
@@ -241,5 +246,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1341
-  X: 147
-  Y: 48
+  X: 117
+  Y: 18
