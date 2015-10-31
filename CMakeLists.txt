@@ -145,6 +145,7 @@ SET(rtabmap_ros_lib_src
    src/rviz/MapGraphDisplay.cpp
    src/rviz/InfoDisplay.cpp
    src/rviz/OrbitOrientedViewController.cpp
+   src/MapsManager.cpp
    ${MOC_FILES}
 )   
 
@@ -186,7 +187,7 @@ SET(Libraries
 add_definitions(-DWITH_OCTOMAP)
 ENDIF(octomap_ros_FOUND)
 
-add_executable(rtabmap src/CoreNode.cpp src/CoreWrapper.cpp src/MapsManager.cpp)
+add_executable(rtabmap src/CoreNode.cpp src/CoreWrapper.cpp)
 target_link_libraries(rtabmap rtabmap_ros ${Libraries})
 
 add_executable(rgbd_odometry src/RGBDOdometryNode.cpp)
@@ -200,9 +201,6 @@ target_link_libraries(map_optimizer rtabmap_ros ${Libraries})
 
 add_executable(map_assembler src/MapAssemblerNode.cpp)
 target_link_libraries(map_assembler rtabmap_ros ${Libraries})
-
-add_executable(grid_map_assembler src/GridMapAssemblerNode.cpp)
-target_link_libraries(grid_map_assembler rtabmap_ros ${Libraries})
 
 add_executable(camera src/CameraNode.cpp)
 add_dependencies(camera ${${PROJECT_NAME}_EXPORTED_TARGETS})
@@ -244,7 +242,6 @@ install(TARGETS
    rgbd_odometry 
    stereo_odometry
    map_assembler
-   grid_map_assembler
    map_optimizer
    data_player
    camera
@@ -259,7 +256,6 @@ install(TARGETS
    rgbd_odometry 
    stereo_odometry
    map_assembler
-   grid_map_assembler
    map_optimizer
    data_player
    camera

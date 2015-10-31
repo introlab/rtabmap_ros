@@ -26,7 +26,7 @@ class Memory;
 
 class MapsManager {
 public:
-	MapsManager();
+	MapsManager(bool usePublicNamespace);
 	virtual ~MapsManager();
 	void clear();
 	bool hasSubscribers() const;
@@ -40,6 +40,7 @@ public:
 			bool updateCloud,
 			bool updateProj,
 			bool updateGrid,
+			bool updateScan,
 			const std::map<int, rtabmap::Signature> & signatures = std::map<int, rtabmap::Signature>());
 
 	void publishMaps(
@@ -71,6 +72,10 @@ private:
 	double cloudFloorCullingHeight_;
 	bool cloudOutputVoxelized_;
 	bool cloudFrustumCulling_;
+	double cloudNoiseFilteringRadius_;
+	int cloudNoiseFilteringMinNeighbors_;
+	double scanVoxelSize_;
+	bool scanOutputVoxelized_;
 	double projMaxGroundAngle_;
 	int projMinClusterSize_;
 	double projMaxHeight_;
@@ -85,8 +90,10 @@ private:
 	ros::Publisher cloudMapPub_;
 	ros::Publisher projMapPub_;
 	ros::Publisher gridMapPub_;
+	ros::Publisher scanMapPub_;
 
 	std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr > clouds_;
+	std::map<int, pcl::PointCloud<pcl::PointXYZ>::Ptr > scans_;
 	std::map<int, std::vector<rtabmap::CameraModel> > cameraModels_;
 	std::map<int, std::pair<cv::Mat, cv::Mat> > projMaps_; // <ground, obstacles>
 	std::map<int, std::pair<cv::Mat, cv::Mat> > gridMaps_; // <ground, obstacles>

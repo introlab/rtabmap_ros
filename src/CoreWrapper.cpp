@@ -89,6 +89,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 		genScan_(false),
 		genScanMaxDepth_(4.0),
 		mapToOdom_(rtabmap::Transform::getIdentity()),
+		mapsManager_(true),
 		depthSync_(0),
 		depthScanSync_(0),
 		stereoScanSync_(0),
@@ -1244,6 +1245,7 @@ void CoreWrapper::process(
 					false,
 					false,
 					false,
+					false,
 					tmpSignature);
 
 			mapsManager_.publishMaps(filteredPoses, stamp, mapFrameId_);
@@ -1663,6 +1665,7 @@ bool CoreWrapper::getProjMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::
 			rtabmap_.getMemory(),
 			false,
 			true,
+			false,
 			false);
 	if(filteredPoses.size())
 	{
@@ -1706,7 +1709,8 @@ bool CoreWrapper::getGridMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::
 			rtabmap_.getMemory(),
 			false,
 			false,
-			true);
+			true,
+			false);
 	if(filteredPoses.size())
 	{
 		// create the grid map
@@ -1815,6 +1819,7 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 				filteredPoses = mapsManager_.updateMapCaches(
 						poses,
 						rtabmap_.getMemory(),
+						false,
 						false,
 						false,
 						false,
@@ -2282,7 +2287,7 @@ bool CoreWrapper::octomapBinaryCallback(
 	res.map.header.stamp = ros::Time::now();
 
 	std::map<int, Transform> poses = rtabmap_.getLocalOptimizedPoses();
-	poses = mapsManager_.updateMapCaches(poses, rtabmap_.getMemory(), true, false, false);
+	poses = mapsManager_.updateMapCaches(poses, rtabmap_.getMemory(), true, false, false, false);
 
 	octomap::OcTree * octree = mapsManager_.createOctomap(poses);
 	bool success = octree != 0 && octree->size() && octomap_msgs::binaryMapToMsg(*octree, res.map);
@@ -2302,7 +2307,7 @@ bool CoreWrapper::octomapFullCallback(
 	res.map.header.stamp = ros::Time::now();
 
 	std::map<int, Transform> poses = rtabmap_.getLocalOptimizedPoses();
-	poses = mapsManager_.updateMapCaches(poses, rtabmap_.getMemory(), true, false, false);
+	poses = mapsManager_.updateMapCaches(poses, rtabmap_.getMemory(), true, false, false, false);
 
 	octomap::OcTree * octree = mapsManager_.createOctomap(poses);
 	bool success = octree != 0 && octree->size() && octomap_msgs::fullMapToMsg(*octree, res.map);

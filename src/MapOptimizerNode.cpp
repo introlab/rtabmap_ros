@@ -34,6 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/Parameters.h>
 #include <rtabmap/utilite/ULogger.h>
 #include <rtabmap/utilite/UTimer.h>
+#include <rtabmap/utilite/UConversion.h>
 #include <ros/subscriber.h>
 #include <ros/publisher.h>
 #include <tf2_ros/transform_broadcaster.h>
@@ -48,8 +49,6 @@ public:
 	MapOptimizer() :
 		mapFrameId_("map"),
 		odomFrameId_("odom"),
-		iterations_(100),
-		ignoreVariance_(false),
 		globalOptimization_(true),
 		optimizeFromLastNode_(false),
 		mapToOdom_(rtabmap::Transform::getIdentity()),
@@ -58,14 +57,35 @@ public:
 		ros::NodeHandle nh;
 		ros::NodeHandle pnh("~");
 
+		double epsilon = 0.0;
+		bool robust = true;
+		bool slam2d =false;
+		int strategy = 0; // 0=TORO, 1=g2o, 2=GTSAM
+		int iterations = 100;
+		bool ignoreVariance = false;
+
 		pnh.param("map_frame_id", mapFrameId_, mapFrameId_);
 		pnh.param("odom_frame_id", odomFrameId_, odomFrameId_);
-		pnh.param("iterations", iterations_, iterations_);
-		pnh.param("ignore_variance", ignoreVariance_, ignoreVariance_);
+		pnh.param("iterations", iterations, iterations);
+		pnh.param("ignore_variance", ignoreVariance, ignoreVariance);
 		pnh.param("global_optimization", globalOptimization_, globalOptimization_);
 		pnh.param("optimize_from_last_node", optimizeFromLastNode_, optimizeFromLastNode_);
+		pnh.param("epsilon", epsilon, epsilon);
+		pnh.param("robust", robust, robust);
+		pnh.param("slam_2d", slam2d, slam2d);
+		pnh.param("strategy", strategy, strategy);
 
-		UASSERT(iterations_ > 0);
+
+		UASSERT(iterations > 0);
+
+		ParametersMap parameters;
+		parameters.insert(ParametersPair(Parameters::kRGBDOptimizeStrategy(), uNumber2Str(strategy)));
+		parameters.insert(ParametersPair(Parameters::kRGBDOptimizeEpsilon(), uNumber2Str(epsilon)));
+		parameters.insert(ParametersPair(Parameters::kRGBDOptimizeIterations(), uNumber2Str(iterations)));
+		parameters.insert(ParametersPair(Parameters::kRGBDOptimizeRobust(), uBool2Str(robust)));
+		parameters.insert(ParametersPair(Parameters::kRGBDOptimizeSlam2D(), uBool2Str(slam2d)));
+		parameters.insert(ParametersPair(Parameters::kRGBDOptimizeVarianceIgnored(), uBool2Str(ignoreVariance)));
+		optimizer_ = graph::Optimizer::create(parameters);
 
 		double tfDelay = 0.05; // 20 Hz
 		bool publishTf = true;
@@ -216,15 +236,14 @@ public:
 			std::multimap<int, rtabmap::Link> linksOut;
 			if(poses.size() > 1 && constraints.size() > 0)
 			{
-				graph::TOROOptimizer optimizer(iterations_, false, ignoreVariance_);
 				int fromId = optimizeFromLastNode_?poses.rbegin()->first:poses.begin()->first;
-				optimizer.getConnectedGraph(
+				optimizer_->getConnectedGraph(
 						fromId,
 						poses,
 						constraints,
 						posesOut,
 						linksOut);
-				optimizedPoses = optimizer.optimize(fromId, posesOut, linksOut);
+				optimizedPoses = optimizer_->optimize(fromId, posesOut, linksOut);
 				mapToOdomMutex_.lock();
 				mapCorrection = optimizedPoses.at(posesOut.rbegin()->first) * posesOut.rbegin()->second.inverse();
 				mapToOdom_ = mapCorrection;
@@ -296,10 +315,9 @@ public:
 private:
 	std::string mapFrameId_;
 	std::string odomFrameId_;
-	int iterations_;
-	bool ignoreVariance_;
 	bool globalOptimization_;
 	bool optimizeFromLastNode_;
+	graph::Optimizer * optimizer_;
 
 	rtabmap::Transform mapToOdom_;
 	boost::mutex mapToOdomMutex_;
