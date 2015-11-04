@@ -36,6 +36,8 @@ MapsManager::MapsManager(bool usePublicNamespace) :
 		cloudFloorCullingHeight_(0.0),
 		cloudOutputVoxelized_(false),
 		cloudFrustumCulling_(false),
+		cloudNoiseFilteringRadius_(0.0),
+		cloudNoiseFilteringMinNeighbors_(5),
 		scanVoxelSize_(0.0),
 		scanOutputVoxelized_(false),
 		projMaxGroundAngle_(45.0), // degrees
