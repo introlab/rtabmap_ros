@@ -2,7 +2,7 @@
 <launch>
 
   <arg name="rtabmap_args" default="" />
-  <arg name="localization_mode" default="false" />
+  <arg name="localization" default="false" />
 
   <!-- AZIMUT 3 bringup: launch motors/odometry -->
   <include file="$(find az3_bringup)/az3_standalone.launch"/>
@@ -28,8 +28,9 @@
       <remap from="grid_map"        to="/map"/>
 
       <!-- RTAB-Map's parameters -->
-      <param unless="$(arg localization_mode)" name="Rtabmap/TimeThr"    type="string" value="400"/>
-      <param if="$(arg localization_mode)"     name="Memory/Incremental" type="string" value="false"/>
+      <param unless="$(arg localization)" name="Rtabmap/TimeThr"        type="string" value="500"/>
+      <param if="$(arg localization)"     name="Mem/IncrementalMemory"  type="string" value="false"/>
+      <param if="$(arg localization)"     name="Mem/InitWMWithAllNodes" type="string" value="true"/>
       <param name="RGBD/PoseScanMatching"        type="string" value="true"/>           
       <param name="RGBD/LocalRadius"             type="string" value="4"/>  
       <param name="Mem/RehearsalSimilarity"      type="string" value="0.30"/>
@@ -39,7 +40,8 @@
       <param name="RGBD/OptimizeVarianceIgnored" type="string" value="false"/>
       <param name="RGBD/PlanAngularVelocity"     type="string" value="1.0"/>  <!-- preference for path traversed forward -->
       <param name="LccBow/Force2D"               type="string" value="true"/>
-      <param name="LccIcp/Type"                  type="string" value="2"/> 
+      <param name="LccIcp/Type"                  type="string" value="2"/>
+      <param name="LccIcp2/CorrespondenceRatio"  type="string" value="0.2"/>
     </node>
   </group>
   
@@ -53,7 +55,7 @@
 
   <!-- ROS navigation stack move_base -->
   <group ns="planner">
-     <remap from="base_scan"             to="/kinect_scan"/>
+     <remap from="scan"             to="/kinect_scan"/>
      <remap from="obstacles_cloud"       to="/obstacles_cloud"/>
      <remap from="ground_cloud"          to="/ground_cloud"/>
      <remap from="map"                   to="/map"/>
@@ -83,7 +85,7 @@
   <!-- Throttling messages -->
   <group ns="camera">
     <node pkg="nodelet" type="nodelet" name="data_throttle" args="load rtabmap_ros/data_throttle camera_nodelet_manager">
-      <param name="rate" type="double" value="5"/>
+      <param name="rate" type="double" value="3"/>
 
       <remap from="rgb/image_in"        to="rgb/image_rect_color"/>
       <remap from="depth/image_in"      to="depth_registered/image_raw"/>
@@ -95,7 +97,8 @@
     </node>
 
     <!-- for the planner -->
-    <node pkg="nodelet" type="nodelet" name="points_xyz_planner" args="load rtabmap_ros/point_cloud_xyz camera_nodelet_manager">
+    <node pkg="nodelet" type="nodelet" name="obstacle_nodelet_manager"  args="manager" output="screen"/>
+    <node pkg="nodelet" type="nodelet" name="points_xyz_planner" args="load rtabmap_ros/point_cloud_xyz obstacle_nodelet_manager">
       <remap from="depth/image"        to="throttled_image_depth"/>
       <remap from="depth/camera_info"  to="throttled_camera_info"/>
       <remap from="cloud"              to="cloudXYZ" />
@@ -104,7 +107,7 @@
       <param name="voxel_size"  type="double" value="0.02"/>
     </node>
   
-    <node pkg="nodelet" type="nodelet" name="obstacles_detection" args="load rtabmap_ros/obstacles_detection camera_nodelet_manager">
+    <node pkg="nodelet" type="nodelet" name="obstacles_detection" args="load rtabmap_ros/obstacles_detection obstacle_nodelet_manager">
       <remap from="cloud"     to="cloudXYZ"/>
       <remap from="obstacles" to="/obstacles_cloud"/>
       <remap from="ground"    to="/ground_cloud"/>

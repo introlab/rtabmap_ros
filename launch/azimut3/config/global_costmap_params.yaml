@@ -2,7 +2,7 @@
 global_frame: map
 robot_base_frame: base_footprint
 update_frequency: 1
-publish_frequency: 2
+publish_frequency: 1
 always_send_full_costmap: false
 plugins:
    - {name: static_layer, type: "rtabmap_ros::StaticLayer"}
