@@ -1,7 +1,7 @@
 global_frame: odom
 robot_base_frame: base_footprint
-update_frequency: 2
-publish_frequency: 1
+update_frequency: 5
+publish_frequency: 2
 rolling_window: true
 width: 3.0
 height: 3.0

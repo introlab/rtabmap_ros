@@ -17,7 +17,7 @@ obstacle_layer:
   laser_scan_sensor: {
     data_type: LaserScan,
     topic: base_scan,
-    expected_update_rate: 0.2,
+    expected_update_rate: 0.1,
     marking: true,
     clearing: true
   }
@@ -26,7 +26,7 @@ obstacle_layer:
     sensor_frame: base_footprint,
     data_type: PointCloud2,
     topic: obstacles_cloud,
-    expected_update_rate: 0.5,
+    expected_update_rate: 0.2,
     marking: true,
     clearing: true,
     min_obstacle_height: 0.04
@@ -36,10 +36,10 @@ obstacle_layer:
     sensor_frame: base_footprint,
     data_type: PointCloud2,
     topic: ground_cloud,
-    expected_update_rate: 0.5,
+    expected_update_rate: 0.2,
     marking: false,
     clearing: true,
-    min_obstacle_height: -1.0 # make usre the ground is not filtered
+    min_obstacle_height: -1.0 # make sure the ground is not filtered
   }
 
 
