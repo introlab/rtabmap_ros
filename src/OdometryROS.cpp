@@ -255,6 +255,11 @@ OdometryROS::OdometryROS(int argc, char * argv[], bool stereo) :
 	resetToPoseSrv_ = nh.advertiseService("reset_odom_to_pose", &OdometryROS::resetToPose, this);
 	pauseSrv_ = nh.advertiseService("pause_odom", &OdometryROS::pause, this);
 	resumeSrv_ = nh.advertiseService("resume_odom", &OdometryROS::resume, this);
+
+	setLogDebugSrv_ = pnh.advertiseService("log_debug", &OdometryROS::setLogDebug, this);
+	setLogInfoSrv_ = pnh.advertiseService("log_info", &OdometryROS::setLogInfo, this);
+	setLogWarnSrv_ = pnh.advertiseService("log_warning", &OdometryROS::setLogWarn, this);
+	setLogErrorSrv_ = pnh.advertiseService("log_error", &OdometryROS::setLogError, this);
 }
 
 OdometryROS::~OdometryROS()
@@ -549,5 +554,31 @@ bool OdometryROS::resume(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 	}
 	return true;
 }
+
+bool OdometryROS::setLogDebug(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+{
+	ROS_INFO("visual_odometry: Set log level to Debug");
+	ULogger::setLevel(ULogger::kDebug);
+	return true;
+}
+bool OdometryROS::setLogInfo(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+{
+	ROS_INFO("visual_odometry: Set log level to Info");
+	ULogger::setLevel(ULogger::kInfo);
+	return true;
+}
+bool OdometryROS::setLogWarn(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+{
+	ROS_INFO("visual_odometry: Set log level to Warning");
+	ULogger::setLevel(ULogger::kWarning);
+	return true;
+}
+bool OdometryROS::setLogError(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+{
+	ROS_INFO("visual_odometry: Set log level to Error");
+	ULogger::setLevel(ULogger::kError);
+	return true;
+}
+
 
 }

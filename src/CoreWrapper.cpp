@@ -414,6 +414,11 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	octomapBinarySrv_ = nh.advertiseService("octomap_binary", &CoreWrapper::octomapBinaryCallback, this);
 	octomapFullSrv_ = nh.advertiseService("octomap_full", &CoreWrapper::octomapFullCallback, this);
 #endif
+	//private services
+	setLogDebugSrv_ = pnh.advertiseService("log_debug", &CoreWrapper::setLogDebug, this);
+	setLogInfoSrv_ = pnh.advertiseService("log_info", &CoreWrapper::setLogInfo, this);
+	setLogWarnSrv_ = pnh.advertiseService("log_warning", &CoreWrapper::setLogWarn, this);
+	setLogErrorSrv_ = pnh.advertiseService("log_error", &CoreWrapper::setLogError, this);
 
 	setupCallbacks(subscribeDepth, subscribeLaserScan, subscribeStereo, queueSize, stereoApproxSync, depthCameras);
 
@@ -1612,6 +1617,31 @@ bool CoreWrapper::setModeMappingCallback(std_srvs::Empty::Request&, std_srvs::Em
 	rtabmap::ParametersMap parameters;
 	parameters.insert(rtabmap::ParametersPair(rtabmap::Parameters::kMemIncrementalMemory(), "true"));
 	rtabmap_.parseParameters(parameters);
+	return true;
+}
+
+bool CoreWrapper::setLogDebug(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+{
+	ROS_INFO("rtabmap: Set log level to Debug");
+	ULogger::setLevel(ULogger::kDebug);
+	return true;
+}
+bool CoreWrapper::setLogInfo(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+{
+	ROS_INFO("rtabmap: Set log level to Info");
+	ULogger::setLevel(ULogger::kInfo);
+	return true;
+}
+bool CoreWrapper::setLogWarn(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+{
+	ROS_INFO("rtabmap: Set log level to Warning");
+	ULogger::setLevel(ULogger::kWarning);
+	return true;
+}
+bool CoreWrapper::setLogError(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+{
+	ROS_INFO("rtabmap: Set log level to Error");
+	ULogger::setLevel(ULogger::kError);
 	return true;
 }
 

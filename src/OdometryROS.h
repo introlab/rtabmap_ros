@@ -61,6 +61,10 @@ public:
 	bool resetToPose(rtabmap_ros::ResetPose::Request&, rtabmap_ros::ResetPose::Response&);
 	bool pause(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool resume(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
+	bool setLogDebug(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
+	bool setLogInfo(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
+	bool setLogWarn(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
+	bool setLogError(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 
 	const std::string & frameId() const {return frameId_;}
 	const std::string & odomFrameId() const {return odomFrameId_;}
@@ -90,6 +94,10 @@ private:
 	ros::ServiceServer resetToPoseSrv_;
 	ros::ServiceServer pauseSrv_;
 	ros::ServiceServer resumeSrv_;
+	ros::ServiceServer setLogDebugSrv_;
+	ros::ServiceServer setLogInfoSrv_;
+	ros::ServiceServer setLogWarnSrv_;
+	ros::ServiceServer setLogErrorSrv_;
 	tf2_ros::TransformBroadcaster tfBroadcaster_;
 	tf::TransformListener tfListener_;
 

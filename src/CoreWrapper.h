@@ -194,6 +194,10 @@ private:
 	bool backupDatabaseCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool setModeLocalizationCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool setModeMappingCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
+	bool setLogDebug(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
+	bool setLogInfo(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
+	bool setLogWarn(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
+	bool setLogError(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool getMapCallback(rtabmap_ros::GetMap::Request& req, rtabmap_ros::GetMap::Response& res);
 	bool getProjMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::GetMap::Response &res);
 	bool getGridMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::GetMap::Response &res);
@@ -374,6 +378,10 @@ private:
 	ros::ServiceServer backupDatabase_;
 	ros::ServiceServer setModeLocalizationSrv_;
 	ros::ServiceServer setModeMappingSrv_;
+	ros::ServiceServer setLogDebugSrv_;
+	ros::ServiceServer setLogInfoSrv_;
+	ros::ServiceServer setLogWarnSrv_;
+	ros::ServiceServer setLogErrorSrv_;
 	ros::ServiceServer getMapDataSrv_;
 	ros::ServiceServer getProjMapSrv_;
 	ros::ServiceServer getGridMapSrv_;

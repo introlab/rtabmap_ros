@@ -56,6 +56,10 @@ int main(int argc, char** argv)
 		{
 			ULogger::setLevel(ULogger::kInfo);
 		}
+		else if(strcmp(argv[i], "--uwarn") == 0)
+		{
+			ULogger::setLevel(ULogger::kWarning);
+		}
 		else if(strcmp(argv[i], "--params") == 0 || strcmp(argv[i], "--params-all") == 0)
 		{
 			rtabmap::ParametersMap parameters = rtabmap::Parameters::getDefaultParameters();
