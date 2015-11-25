@@ -258,83 +258,32 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	}
 
 	// Backward compatibility
-	std::list<std::string> oldParameterNames;
-	oldParameterNames.push_back("LccReextract/LoopClosureFeatures");
-	oldParameterNames.push_back("Rtabmap/DetectorStrategy");
-	oldParameterNames.push_back("RGBD/ScanMatchingSize");
-	oldParameterNames.push_back("RGBD/LocalLoopDetectionRadius");
-	oldParameterNames.push_back("RGBD/ToroIterations");
-	oldParameterNames.push_back("Mem/RehearsedNodesKept");
-	oldParameterNames.push_back("Odom/PnPEstimation");
-	oldParameterNames.push_back("LccBow/MaxDepth");
-	oldParameterNames.push_back("GFTT/MaxCorners");
-	for(std::list<std::string>::iterator iter=oldParameterNames.begin(); iter!=oldParameterNames.end(); ++iter)
+	for(std::map<std::string, std::pair<bool, std::string> >::const_iterator iter=Parameters::getRemovedParameters().begin();
+		iter!=Parameters::getRemovedParameters().end();
+		++iter)
 	{
 		std::string vStr;
-		if(pnh.getParam(*iter, vStr))
+		if(pnh.getParam(iter->first, vStr))
 		{
-			if(iter->compare("GFTT/MaxCorners") == 0)
+			if(iter->second.first)
 			{
-				ROS_WARN("Parameter name changed: GFTT/MaxCorners -> %s. Please update your launch file accordingly.",
-						Parameters::kKpWordsPerImage().c_str());
+				// can be migrated
+				parameters_.at(iter->second.second)= vStr;
+				ROS_WARN("Rtabmap: Parameter name changed: \"%s\" -> \"%s\". Please update your launch file accordingly. Value \"%s\" is still set to the new parameter name.",
+						iter->first.c_str(), iter->second.second.c_str(), vStr.c_str());
 			}
-			else if(iter->compare("LccBow/MaxDepth") == 0)
+			else
 			{
-				ROS_WARN("Parameter name changed: LccBow/MaxDepth -> %s. Please update your launch file accordingly.",
-						Parameters::kLccReextractMaxDepth().c_str());
-				parameters_.at(Parameters::kLccReextractMaxDepth())= vStr;
-			}
-			else if(iter->compare("LccReextract/LoopClosureFeatures") == 0)
-			{
-				ROS_WARN("Parameter name changed: LccReextract/LoopClosureFeatures -> %s. Please update your launch file accordingly.",
-						Parameters::kLccReextractActivated().c_str());
-				parameters_.at(Parameters::kLccReextractActivated())= vStr;
-			}
-			else if(iter->compare("Rtabmap/DetectorStrategy") == 0)
-			{
-				ROS_WARN("Parameter name changed: Rtabmap/DetectorStrategy -> %s. Please update your launch file accordingly.",
-						Parameters::kKpDetectorStrategy().c_str());
-				parameters_.at(Parameters::kKpDetectorStrategy())= vStr;
-			}
-			else if(iter->compare("RGBD/ScanMatchingSize") == 0)
-			{
-				ROS_WARN("Parameter name changed: RGBD/ScanMatchingSize -> %s. Please update your launch file accordingly.",
-						Parameters::kRGBDPoseScanMatching().c_str());
-				parameters_.at(Parameters::kRGBDPoseScanMatching())= std::atoi(vStr.c_str()) > 0?"true":"false";
-			}
-			else if(iter->compare("RGBD/LocalLoopDetectionRadius") == 0)
-			{
-				ROS_WARN("Parameter name changed: RGBD/LocalLoopDetectionRadius -> %s. Please update your launch file accordingly.",
-						Parameters::kRGBDLocalRadius().c_str());
-				parameters_.at(Parameters::kRGBDLocalRadius())= vStr;
-			}
-			else if(iter->compare("RGBD/ToroIterations") == 0)
-			{
-				ROS_WARN("Parameter name changed: RGBD/ToroIterations -> %s. Please update your launch file accordingly.",
-						Parameters::kRGBDOptimizeIterations().c_str());
-				parameters_.at(Parameters::kRGBDOptimizeIterations())= vStr;
-			}
-			else if(iter->compare("Mem/RehearsedNodesKept") == 0)
-			{
-				ROS_WARN("Parameter name changed: Mem/RehearsedNodesKept -> %s. Please update your launch file accordingly.",
-						Parameters::kMemNotLinkedNodesKept().c_str());
-				parameters_.at(Parameters::kMemNotLinkedNodesKept())= vStr;
-			}
-			else if(iter->compare("RGBD/LocalLoopDetectionMaxDiffID") == 0)
-			{
-				ROS_WARN("Parameter name changed: RGBD/LocalLoopDetectionMaxDiffID -> %s. Please update your launch file accordingly.",
-						Parameters::kRGBDLocalLoopDetectionMaxGraphDepth().c_str());
-				parameters_.at(Parameters::kRGBDLocalLoopDetectionMaxGraphDepth())= vStr;
-			}
-			else if(iter->compare("RGBD/PlanVirtualLinksMaxDiffID") == 0)
-			{
-				ROS_WARN("Parameter \"RGBD/PlanVirtualLinksMaxDiffID\" doesn't exist anymore.");
-			}
-			else if(iter->compare("RGBD/LocalLoopDetectionMaxDiffID") == 0)
-			{
-				ROS_WARN("Parameter name changed: Odom/PnPEstimation -> %s. Please update your launch file accordingly.",
-						Parameters::kOdomEstimationType().c_str());
-				parameters_.at(Parameters::kOdomEstimationType())= uNumber2Str(1);
+				if(iter->second.second.empty())
+				{
+					ROS_WARN("Rtabmap: Parameter \"%s\" doesn't exist anymore!",
+							iter->first.c_str());
+				}
+				else
+				{
+					ROS_WARN("Rtabmap: Parameter \"%s\" doesn't exist anymore! You may look at this similar parameter: \"%s\"",
+							iter->first.c_str(), iter->second.second.c_str());
+				}
 			}
 		}
 	}

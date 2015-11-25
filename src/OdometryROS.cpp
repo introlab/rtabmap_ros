@@ -174,7 +174,7 @@ OdometryROS::OdometryROS(int argc, char * argv[], bool stereo) :
 			iter->second = uNumber2Str(vInt);
 		}
 
-		if(iter->first.compare(Parameters::kOdomMinInliers()) == 0 && atoi(iter->second.c_str()) < 8)
+		if(iter->first.compare(Parameters::kVisMinInliers()) == 0 && atoi(iter->second.c_str()) < 8)
 		{
 			ROS_WARN("Parameter min_inliers must be >= 8, setting to 8...");
 			iter->second = uNumber2Str(8);
@@ -182,54 +182,32 @@ OdometryROS::OdometryROS(int argc, char * argv[], bool stereo) :
 	}
 
 	// Backward compatibility
-	std::list<std::string> oldParameterNames;
-	oldParameterNames.push_back("Odom/Type");
-	oldParameterNames.push_back("Odom/MaxWords");
-	oldParameterNames.push_back("Odom/WordsRatio");
-	oldParameterNames.push_back("Odom/LocalHistory");
-	oldParameterNames.push_back("Odom/NearestNeighbor");
-	oldParameterNames.push_back("Odom/NNDR");
-	oldParameterNames.push_back("GFTT/MaxCorners");
-	for(std::list<std::string>::iterator iter=oldParameterNames.begin(); iter!=oldParameterNames.end(); ++iter)
+	for(std::map<std::string, std::pair<bool, std::string> >::const_iterator iter=Parameters::getRemovedParameters().begin();
+		iter!=Parameters::getRemovedParameters().end();
+		++iter)
 	{
 		std::string vStr;
-		if(pnh.getParam(*iter, vStr))
+		if(pnh.getParam(iter->first, vStr))
 		{
-			if(iter->compare("Odom/Type") == 0)
+			if(iter->second.first)
 			{
-				ROS_WARN("Parameter name changed: Odom/Type -> %s. Please update your launch file accordingly.",
-						Parameters::kOdomFeatureType().c_str());
-				parameters_.at(Parameters::kOdomFeatureType())= vStr;
+				// can be migrated
+				parameters_.at(iter->second.second)= vStr;
+				ROS_WARN("Odometry: Parameter name changed: \"%s\" -> \"%s\". Please update your launch file accordingly. Value \"%s\" is still set to the new parameter name.",
+						iter->first.c_str(), iter->second.second.c_str(), vStr.c_str());
 			}
-			else if(iter->compare("Odom/MaxWords") == 0)
+			else
 			{
-				ROS_WARN("Parameter name changed: Odom/MaxWords -> %s. Please update your launch file accordingly.",
-						Parameters::kOdomMaxFeatures().c_str());
-				parameters_.at(Parameters::kOdomMaxFeatures())= vStr;
-			}
-			else if(iter->compare("Odom/LocalHistory") == 0)
-			{
-				ROS_WARN("Parameter name changed: Odom/LocalHistory -> %s. Please update your launch file accordingly.",
-						Parameters::kOdomBowLocalHistorySize().c_str());
-				parameters_.at(Parameters::kOdomBowLocalHistorySize())= vStr;
-			}
-			else if(iter->compare("Odom/NearestNeighbor") == 0)
-			{
-				ROS_WARN("Parameter name changed: Odom/NearestNeighbor -> %s. Please update your launch file accordingly.",
-						Parameters::kOdomBowNNType().c_str());
-				parameters_.at(Parameters::kOdomBowNNType())= vStr;
-			}
-			else if(iter->compare("Odom/NNDR") == 0)
-			{
-				ROS_WARN("Parameter name changed: Odom/NNDR -> %s. Please update your launch file accordingly.",
-						Parameters::kOdomBowNNDR().c_str());
-				parameters_.at(Parameters::kOdomBowNNDR())= vStr;
-			}
-			else if(iter->compare("GFTT/MaxCorners") == 0)
-			{
-				ROS_WARN("Parameter GFTT/MaxCorners doesn't exist anymore, use %s. Please update your launch file accordingly.",
-						Parameters::kOdomMaxFeatures().c_str());
-				parameters_.at(Parameters::kOdomMaxFeatures())= vStr;
+				if(iter->second.second.empty())
+				{
+					ROS_WARN("Odometry: Parameter \"%s\" doesn't exist anymore!",
+							iter->first.c_str());
+				}
+				else
+				{
+					ROS_WARN("Odometry: Parameter \"%s\" doesn't exist anymore! You may look at this similar parameter: \"%s\"",
+							iter->first.c_str(), iter->second.second.c_str());
+				}
 			}
 		}
 	}
@@ -289,15 +267,13 @@ rtabmap::ParametersMap OdometryROS::getDefaultOdometryParameters(bool stereo)
 			group.compare("FREAK") == 0 ||
 			group.compare("BRIEF") == 0 ||
 			group.compare("GFTT") == 0 ||
-			group.compare("BRISK") == 0)
+			group.compare("BRISK") == 0 ||
+			group.compare("Reg") == 0 ||
+			group.compare("Vis") == 0)
 		{
 			if(stereo)
 			{
-				if(iter->first.compare(Parameters::kOdomMaxDepth()) == 0)
-				{
-					iter->second = "0"; // infinity
-				}
-				else if(iter->first.compare(Parameters::kOdomEstimationType()) == 0)
+				if(iter->first.compare(Parameters::kVisEstimationType()) == 0)
 				{
 					iter->second = "1"; // 3D->2D (PNP)
 				}
