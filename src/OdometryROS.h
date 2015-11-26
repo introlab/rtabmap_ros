@@ -49,7 +49,6 @@ namespace rtabmap_ros {
 class OdometryROS
 {
 public:
-	static rtabmap::ParametersMap getDefaultOdometryParameters(bool stereo = false);
 	static void processArguments(int argc, char * argv[], bool stereo = false);
 
 public:

@@ -124,14 +124,14 @@ OdometryROS::OdometryROS(int argc, char * argv[], bool stereo) :
 
 
 	//parameters
-	parameters_ = this->getDefaultOdometryParameters(stereo);
+	parameters_ = Parameters::getDefaultOdometryParameters(stereo);
 	if(!configPath.empty())
 	{
 		if(UFile::exists(configPath.c_str()))
 		{
 			ROS_INFO("Odometry: Loading parameters from %s", configPath.c_str());
 			rtabmap::ParametersMap allParameters;
-			Rtabmap::readParameters(configPath.c_str(), allParameters);
+			Parameters::readINI(configPath.c_str(), allParameters);
 			// only update odometry parameters
 			for(ParametersMap::iterator iter=parameters_.begin(); iter!=parameters_.end(); ++iter)
 			{
@@ -251,46 +251,13 @@ OdometryROS::~OdometryROS()
 	delete odometry_;
 }
 
-rtabmap::ParametersMap OdometryROS::getDefaultOdometryParameters(bool stereo)
-{
-	rtabmap::ParametersMap odomParameters;
-	rtabmap::ParametersMap defaultParameters = rtabmap::Parameters::getDefaultParameters();
-	for(rtabmap::ParametersMap::iterator iter=defaultParameters.begin(); iter!=defaultParameters.end(); ++iter)
-	{
-		std::string group = uSplit(iter->first, '/').front();
-		if(uStrContains(group, "Odom") ||
-			(stereo && group.compare("Stereo") == 0) ||
-			group.compare("SURF") == 0 ||
-			group.compare("SIFT") == 0 ||
-			group.compare("ORB") == 0 ||
-			group.compare("FAST") == 0 ||
-			group.compare("FREAK") == 0 ||
-			group.compare("BRIEF") == 0 ||
-			group.compare("GFTT") == 0 ||
-			group.compare("BRISK") == 0 ||
-			group.compare("Reg") == 0 ||
-			group.compare("Vis") == 0)
-		{
-			if(stereo)
-			{
-				if(iter->first.compare(Parameters::kVisEstimationType()) == 0)
-				{
-					iter->second = "1"; // 3D->2D (PNP)
-				}
-			}
-			odomParameters.insert(*iter);
-		}
-	}
-	return odomParameters;
-}
-
 void OdometryROS::processArguments(int argc, char * argv[], bool stereo)
 {
 	for(int i=1;i<argc;++i)
 	{
 		if(strcmp(argv[i], "--params") == 0)
 		{
-			rtabmap::ParametersMap parametersOdom = getDefaultOdometryParameters(stereo);
+			rtabmap::ParametersMap parametersOdom = Parameters::getDefaultOdometryParameters(stereo);
 			for(rtabmap::ParametersMap::iterator iter=parametersOdom.begin(); iter!=parametersOdom.end(); ++iter)
 			{
 				std::string str = "Param: " + iter->first + " = \"" + iter->second + "\"";
