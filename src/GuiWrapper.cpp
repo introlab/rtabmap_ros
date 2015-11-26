@@ -119,7 +119,8 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 	ros::NodeHandle pnh("~");
 
 	// To receive odometry events
-	bool subscribeLaserScan = false;
+	bool subscribeLaserScan2d = false;
+	bool subscribeLaserScan3d = false;
 	bool subscribeDepth = false;
 	bool subscribeOdomInfo = false;
 	bool subscribeStereo = false;
@@ -130,7 +131,12 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 	pnh.param("frame_id", frameId_, frameId_);
 	pnh.param("odom_frame_id", odomFrameId_, odomFrameId_); // set to use odom from TF
 	pnh.param("subscribe_depth", subscribeDepth, subscribeDepth);
-	pnh.param("subscribe_laserScan", subscribeLaserScan, subscribeLaserScan);
+	if(pnh.getParam("subscribe_laserScan", subscribeLaserScan2d))
+	{
+		ROS_WARN("rtabmapviz: \"subscribe_laserScan\" parameter is deprecated, use \"subscribe_scan\" instead. The scan topic is still subscribed.");
+	}
+	pnh.param("subscribe_scan", subscribeLaserScan2d, subscribeLaserScan2d);
+	pnh.param("subscribe_scan_cloud", subscribeLaserScan3d, subscribeLaserScan3d);
 	pnh.param("subscribe_odom_info", subscribeOdomInfo, subscribeOdomInfo);
 	pnh.param("subscribe_stereo", subscribeStereo, subscribeStereo);
 	pnh.param("depth_cameras", depthCameras, depthCameras);
@@ -181,7 +187,8 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 
 	this->setupCallbacks(
 			subscribeDepth,
-			subscribeLaserScan,
+			subscribeLaserScan2d,
+			subscribeLaserScan3d,
 			subscribeOdomInfo,
 			subscribeStereo,
 			queueSize,
@@ -510,7 +517,8 @@ void GuiWrapper::commonDepthCallback(
 		const sensor_msgs::ImageConstPtr& imageMsg,
 		const sensor_msgs::ImageConstPtr& depthMsg,
 		const sensor_msgs::CameraInfoConstPtr& cameraInfoMsg,
-		const sensor_msgs::LaserScanConstPtr& scanMsg,
+		const sensor_msgs::LaserScanConstPtr& scan2dMsg,
+		const sensor_msgs::PointCloud2ConstPtr& scan3dMsg,
 		const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg)
 {
 	std::vector<sensor_msgs::ImageConstPtr> imageMsgs;
@@ -519,7 +527,7 @@ void GuiWrapper::commonDepthCallback(
 	imageMsgs.push_back(imageMsg);
 	depthMsgs.push_back(depthMsg);
 	cameraInfoMsgs.push_back(cameraInfoMsg);
-	commonDepthCallback(odomMsg, imageMsgs, depthMsgs, cameraInfoMsgs, scanMsg, odomInfoMsg);
+	commonDepthCallback(odomMsg, imageMsgs, depthMsgs, cameraInfoMsgs, scan2dMsg, scan3dMsg, odomInfoMsg);
 }
 
 void GuiWrapper::commonDepthCallback(
@@ -527,7 +535,8 @@ void GuiWrapper::commonDepthCallback(
 		const std::vector<sensor_msgs::ImageConstPtr> & imageMsgs,
 		const std::vector<sensor_msgs::ImageConstPtr> & depthMsgs,
 		const std::vector<sensor_msgs::CameraInfoConstPtr> & cameraInfoMsgs,
-		const sensor_msgs::LaserScanConstPtr& scanMsg,
+		const sensor_msgs::LaserScanConstPtr& scan2dMsg,
+		const sensor_msgs::PointCloud2ConstPtr& scan3dMsg,
 		const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg)
 {
 	if(UTimer::now() - lastOdomInfoUpdateTime_ > 0.1 &&
@@ -547,9 +556,13 @@ void GuiWrapper::commonDepthCallback(
 		}
 		else
 		{
-			if(scanMsg.get())
+			if(scan2dMsg.get())
 			{
-				odomHeader = scanMsg->header;
+				odomHeader = scan2dMsg->header;
+			}
+			else if(scan3dMsg.get())
+			{
+				odomHeader = scan3dMsg->header;
 			}
 			else if(cameraInfoMsgs.size() && cameraInfoMsgs[0].get())
 			{
@@ -691,10 +704,10 @@ void GuiWrapper::commonDepthCallback(
 		}
 
 		cv::Mat scan;
-		if(scanMsg.get() != 0)
+		if(scan2dMsg.get() != 0)
 		{
 			// make sure the frame of the laser is updated too
-			if(getTransform(frameId_, scanMsg->header.frame_id, scanMsg->header.stamp).isNull())
+			if(getTransform(frameId_, scan2dMsg->header.frame_id, scan2dMsg->header.stamp).isNull())
 			{
 				return;
 			}
@@ -702,16 +715,16 @@ void GuiWrapper::commonDepthCallback(
 			//transform in frameId_ frame
 			sensor_msgs::PointCloud2 scanOut;
 			laser_geometry::LaserProjection projection;
-			projection.transformLaserScanToPointCloud(frameId_, *scanMsg, scanOut, tfListener_);
+			projection.transformLaserScanToPointCloud(frameId_, *scan2dMsg, scanOut, tfListener_);
 			pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
 			pcl::fromROSMsg(scanOut, *pclScan);
 
 			// sync with odometry stamp
-			if(odomHeader.stamp != scanMsg->header.stamp)
+			if(odomHeader.stamp != scan2dMsg->header.stamp)
 			{
 				if(!odomT.isNull())
 				{
-					Transform sensorT = getTransform(odomHeader.frame_id, frameId_, scanMsg->header.stamp);
+					Transform sensorT = getTransform(odomHeader.frame_id, frameId_, scan2dMsg->header.stamp);
 					if(sensorT.isNull())
 					{
 						return;
@@ -721,6 +734,12 @@ void GuiWrapper::commonDepthCallback(
 
 				}
 			}
+			scan = util3d::laserScanFromPointCloud(*pclScan);
+		}
+		else if(scan3dMsg.get() != 0)
+		{
+			pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
+			pcl::fromROSMsg(*scan3dMsg, *pclScan);
 			scan = util3d::laserScanFromPointCloud(*pclScan);
 		}
 
@@ -733,8 +752,8 @@ void GuiWrapper::commonDepthCallback(
 		rtabmap::OdometryEvent odomEvent(
 			rtabmap::SensorData(
 					scan,
-					scanMsg.get()?(int)scanMsg->ranges.size():0,
-					scanMsg.get()?(int)scanMsg->range_max:0,
+					scan2dMsg.get()?(int)scan2dMsg->ranges.size():0,
+					scan2dMsg.get()?(int)scan2dMsg->range_max:0,
 					rgb,
 					depth,
 					cameraModels,
@@ -754,7 +773,8 @@ void GuiWrapper::commonStereoCallback(
 		const sensor_msgs::ImageConstPtr& rightImageMsg,
 		const sensor_msgs::CameraInfoConstPtr& leftCamInfoMsg,
 		const sensor_msgs::CameraInfoConstPtr& rightCamInfoMsg,
-		const sensor_msgs::LaserScanConstPtr& scanMsg,
+		const sensor_msgs::LaserScanConstPtr& scan2dMsg,
+		const sensor_msgs::PointCloud2ConstPtr& scan3dMsg,
 		const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg)
 {
 	// limit 10 Hz max
@@ -787,9 +807,13 @@ void GuiWrapper::commonStereoCallback(
 		}
 		else
 		{
-			if(scanMsg.get())
+			if(scan2dMsg.get())
 			{
-				odomHeader = scanMsg->header;
+				odomHeader = scan2dMsg->header;
+			}
+			else if(scan3dMsg.get())
+			{
+				odomHeader = scan3dMsg->header;
 			}
 			else
 			{
@@ -878,10 +902,10 @@ void GuiWrapper::commonStereoCallback(
 		cv::Mat right = cv_bridge::toCvCopy(rightImageMsg, "mono8")->image;
 
 		cv::Mat scan;
-		if(scanMsg.get() != 0)
+		if(scan2dMsg.get() != 0)
 		{
 			// make sure the frame of the laser is updated too
-			if(getTransform(frameId_, scanMsg->header.frame_id, scanMsg->header.stamp).isNull())
+			if(getTransform(frameId_, scan2dMsg->header.frame_id, scan2dMsg->header.stamp).isNull())
 			{
 				return;
 			}
@@ -889,16 +913,16 @@ void GuiWrapper::commonStereoCallback(
 			//transform in frameId_ frame
 			sensor_msgs::PointCloud2 scanOut;
 			laser_geometry::LaserProjection projection;
-			projection.transformLaserScanToPointCloud(frameId_, *scanMsg, scanOut, tfListener_);
+			projection.transformLaserScanToPointCloud(frameId_, *scan2dMsg, scanOut, tfListener_);
 			pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
 			pcl::fromROSMsg(scanOut, *pclScan);
 
 			// sync with odometry stamp
-			if(odomHeader.stamp != scanMsg->header.stamp)
+			if(odomHeader.stamp != scan2dMsg->header.stamp)
 			{
 				if(!odomT.isNull())
 				{
-					Transform sensorT = getTransform(odomHeader.frame_id, frameId_, scanMsg->header.stamp);
+					Transform sensorT = getTransform(odomHeader.frame_id, frameId_, scan2dMsg->header.stamp);
 					if(sensorT.isNull())
 					{
 						return;
@@ -908,6 +932,12 @@ void GuiWrapper::commonStereoCallback(
 
 				}
 			}
+			scan = util3d::laserScan2dFromPointCloud(*pclScan);
+		}
+		else if(scan3dMsg.get() != 0)
+		{
+			pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
+			pcl::fromROSMsg(*scan3dMsg, *pclScan);
 			scan = util3d::laserScanFromPointCloud(*pclScan);
 		}
 
@@ -920,8 +950,8 @@ void GuiWrapper::commonStereoCallback(
 		rtabmap::OdometryEvent odomEvent(
 			rtabmap::SensorData(
 					scan,
-					scanMsg.get()?(int)scanMsg->ranges.size():0,
-					scanMsg.get()?(int)scanMsg->range_max:0,
+					scan2dMsg.get()?(int)scan2dMsg->ranges.size():0,
+					scan2dMsg.get()?(int)scan2dMsg->range_max:0,
 					left,
 					right,
 					stereoModel,
@@ -944,6 +974,7 @@ void GuiWrapper::defaultCallback(const nav_msgs::OdometryConstPtr & odomMsg)
 			sensor_msgs::ImageConstPtr(),
 			sensor_msgs::CameraInfoConstPtr(),
 			sensor_msgs::LaserScanConstPtr(),
+			sensor_msgs::PointCloud2ConstPtr(),
 			rtabmap_ros::OdomInfoConstPtr());
 }
 
@@ -959,6 +990,7 @@ void GuiWrapper::depthCallback(
 			depthMsg,
 			cameraInfoMsg,
 			sensor_msgs::LaserScanConstPtr(),
+			sensor_msgs::PointCloud2ConstPtr(),
 			rtabmap_ros::OdomInfoConstPtr());
 }
 
@@ -987,6 +1019,7 @@ void GuiWrapper::depth2Callback(
 			depthMsgs,
 			cameraInfoMsgs,
 			sensor_msgs::LaserScanConstPtr(),
+			sensor_msgs::PointCloud2ConstPtr(),
 			rtabmap_ros::OdomInfoConstPtr());
 }
 
@@ -1003,6 +1036,7 @@ void GuiWrapper::depthOdomInfoCallback(
 			depthMsg,
 			cameraInfoMsg,
 			sensor_msgs::LaserScanConstPtr(),
+			sensor_msgs::PointCloud2ConstPtr(),
 			odomInfoMsg);
 }
 
@@ -1032,6 +1066,7 @@ void GuiWrapper::depthOdomInfo2Callback(
 			depthMsgs,
 			cameraInfoMsgs,
 			sensor_msgs::LaserScanConstPtr(),
+			sensor_msgs::PointCloud2ConstPtr(),
 			odomInfoMsg);
 }
 
@@ -1047,6 +1082,24 @@ void GuiWrapper::depthScanCallback(
 			imageMsg,
 			depthMsg,
 			cameraInfoMsg,
+			scanMsg,
+			sensor_msgs::PointCloud2ConstPtr(),
+			rtabmap_ros::OdomInfoConstPtr());
+}
+
+void GuiWrapper::depthScan3dCallback(
+		const sensor_msgs::PointCloud2ConstPtr& scanMsg,
+		const nav_msgs::OdometryConstPtr & odomMsg,
+		const sensor_msgs::ImageConstPtr& imageMsg,
+		const sensor_msgs::ImageConstPtr& depthMsg,
+		const sensor_msgs::CameraInfoConstPtr& cameraInfoMsg)
+{
+	commonDepthCallback(
+			odomMsg,
+			imageMsg,
+			depthMsg,
+			cameraInfoMsg,
+			sensor_msgs::LaserScanConstPtr(),
 			scanMsg,
 			rtabmap_ros::OdomInfoConstPtr());
 }
@@ -1066,6 +1119,26 @@ void GuiWrapper::stereoScanCallback(
 			leftCameraInfoMsg,
 			rightCameraInfoMsg,
 			scanMsg,
+			sensor_msgs::PointCloud2ConstPtr(),
+			rtabmap_ros::OdomInfoConstPtr());
+}
+
+void GuiWrapper::stereoScan3dCallback(
+		const sensor_msgs::PointCloud2ConstPtr& scanMsg,
+		const nav_msgs::OdometryConstPtr & odomMsg,
+		const sensor_msgs::ImageConstPtr& leftImageMsg,
+		const sensor_msgs::ImageConstPtr& rightImageMsg,
+		const sensor_msgs::CameraInfoConstPtr& leftCameraInfoMsg,
+		const sensor_msgs::CameraInfoConstPtr& rightCameraInfoMsg)
+{
+	commonStereoCallback(
+			odomMsg,
+			leftImageMsg,
+			rightImageMsg,
+			leftCameraInfoMsg,
+			rightCameraInfoMsg,
+			sensor_msgs::LaserScanConstPtr(),
+			scanMsg,
 			rtabmap_ros::OdomInfoConstPtr());
 }
 
@@ -1084,6 +1157,7 @@ void GuiWrapper::stereoOdomInfoCallback(
 			leftCameraInfoMsg,
 			rightCameraInfoMsg,
 			sensor_msgs::LaserScanConstPtr(),
+			sensor_msgs::PointCloud2ConstPtr(),
 			odomInfoMsg);
 }
 
@@ -1101,6 +1175,7 @@ void GuiWrapper::stereoCallback(
 			leftCameraInfoMsg,
 			rightCameraInfoMsg,
 			sensor_msgs::LaserScanConstPtr(),
+			sensor_msgs::PointCloud2ConstPtr(),
 			rtabmap_ros::OdomInfoConstPtr());
 }
 
@@ -1116,6 +1191,7 @@ void GuiWrapper::depthTFCallback(
 			depthMsg,
 			cameraInfoMsg,
 			sensor_msgs::LaserScanConstPtr(),
+			sensor_msgs::PointCloud2ConstPtr(),
 			rtabmap_ros::OdomInfoConstPtr());
 }
 
@@ -1131,6 +1207,7 @@ void GuiWrapper::depthOdomInfoTFCallback(
 			depthMsg,
 			cameraInfoMsg,
 			sensor_msgs::LaserScanConstPtr(),
+			sensor_msgs::PointCloud2ConstPtr(),
 			odomInfoMsg);
 }
 
@@ -1145,6 +1222,23 @@ void GuiWrapper::depthScanTFCallback(
 			imageMsg,
 			depthMsg,
 			cameraInfoMsg,
+			scanMsg,
+			sensor_msgs::PointCloud2ConstPtr(),
+			rtabmap_ros::OdomInfoConstPtr());
+}
+
+void GuiWrapper::depthScan3dTFCallback(
+		const sensor_msgs::PointCloud2ConstPtr& scanMsg,
+		const sensor_msgs::ImageConstPtr& imageMsg,
+		const sensor_msgs::ImageConstPtr& depthMsg,
+		const sensor_msgs::CameraInfoConstPtr& cameraInfoMsg)
+{
+	commonDepthCallback(
+			nav_msgs::OdometryConstPtr(),
+			imageMsg,
+			depthMsg,
+			cameraInfoMsg,
+			sensor_msgs::LaserScanConstPtr(),
 			scanMsg,
 			rtabmap_ros::OdomInfoConstPtr());
 }
@@ -1163,6 +1257,25 @@ void GuiWrapper::stereoScanTFCallback(
 			leftCameraInfoMsg,
 			rightCameraInfoMsg,
 			scanMsg,
+			sensor_msgs::PointCloud2ConstPtr(),
+			rtabmap_ros::OdomInfoConstPtr());
+}
+
+void GuiWrapper::stereoScan3dTFCallback(
+		const sensor_msgs::PointCloud2ConstPtr& scanMsg,
+		const sensor_msgs::ImageConstPtr& leftImageMsg,
+		const sensor_msgs::ImageConstPtr& rightImageMsg,
+		const sensor_msgs::CameraInfoConstPtr& leftCameraInfoMsg,
+		const sensor_msgs::CameraInfoConstPtr& rightCameraInfoMsg)
+{
+	commonStereoCallback(
+			nav_msgs::OdometryConstPtr(),
+			leftImageMsg,
+			rightImageMsg,
+			leftCameraInfoMsg,
+			rightCameraInfoMsg,
+			sensor_msgs::LaserScanConstPtr(),
+			scanMsg,
 			rtabmap_ros::OdomInfoConstPtr());
 }
 
@@ -1180,6 +1293,7 @@ void GuiWrapper::stereoOdomInfoTFCallback(
 			leftCameraInfoMsg,
 			rightCameraInfoMsg,
 			sensor_msgs::LaserScanConstPtr(),
+			sensor_msgs::PointCloud2ConstPtr(),
 			odomInfoMsg);
 }
 
@@ -1196,12 +1310,14 @@ void GuiWrapper::stereoTFCallback(
 			leftCameraInfoMsg,
 			rightCameraInfoMsg,
 			sensor_msgs::LaserScanConstPtr(),
+			sensor_msgs::PointCloud2ConstPtr(),
 			rtabmap_ros::OdomInfoConstPtr());
 }
 
 void GuiWrapper::setupCallbacks(
 		bool subscribeDepth,
-		bool subscribeLaserScan,
+		bool subscribeLaserScan2d,
+		bool subscribeLaserScan3d,
 		bool subscribeOdomInfo,
 		bool subscribeStereo,
 		int queueSize,
@@ -1216,7 +1332,7 @@ void GuiWrapper::setupCallbacks(
 				 "same time. Parameter subscribe_depth is set to false.");
 		subscribeDepth = false;
 	}
-	if(!subscribeDepth && !subscribeStereo && subscribeLaserScan)
+	if(!subscribeDepth && !subscribeStereo && (subscribeLaserScan2d || subscribeLaserScan3d))
 	{
 		ROS_WARN("Cannot subscribe to laser scan without depth or stereo subscription...");
 	}
@@ -1233,7 +1349,7 @@ void GuiWrapper::setupCallbacks(
 	if(subscribeDepth)
 	{
 		UASSERT(depthCameras >= 1 && depthCameras <= 2);
-		UASSERT_MSG(depthCameras == 1 || !(subscribeLaserScan || !odomFrameId_.empty()), "Not yet supported!");
+		UASSERT_MSG(depthCameras == 1 || !(subscribeLaserScan2d || subscribeLaserScan3d || !odomFrameId_.empty()), "Not yet supported!");
 
 		imageSubs_.resize(depthCameras);
 		imageDepthSubs_.resize(depthCameras);
@@ -1267,7 +1383,7 @@ void GuiWrapper::setupCallbacks(
 		if(odomFrameId_.empty())
 		{
 			odomSub_.subscribe(nh, "odom", 1);
-			if(subscribeLaserScan)
+			if(subscribeLaserScan2d)
 			{
 				scanSub_.subscribe(nh, "scan", 1);
 				depthScanSync_ = new message_filters::Synchronizer<MyDepthScanSyncPolicy>(
@@ -1286,6 +1402,26 @@ void GuiWrapper::setupCallbacks(
 						cameraInfoSubs_[0]->getTopic().c_str(),
 						odomSub_.getTopic().c_str(),
 						scanSub_.getTopic().c_str());
+			}
+			else if(subscribeLaserScan3d)
+			{
+				scan3dSub_.subscribe(nh, "scan_cloud", 1);
+				depthScan3dSync_ = new message_filters::Synchronizer<MyDepthScan3dSyncPolicy>(
+						MyDepthScan3dSyncPolicy(queueSize),
+						scan3dSub_,
+						odomSub_,
+						*imageSubs_[0],
+						*imageDepthSubs_[0],
+						*cameraInfoSubs_[0]);
+				depthScan3dSync_->registerCallback(boost::bind(&GuiWrapper::depthScan3dCallback, this, _1, _2, _3, _4, _5));
+
+				ROS_INFO("\n%s subscribed to:\n   %s,\n   %s,\n   %s,\n   %s,\n   %s",
+						ros::this_node::getName().c_str(),
+						imageSubs_[0]->getTopic().c_str(),
+						imageDepthSubs_[0]->getTopic().c_str(),
+						cameraInfoSubs_[0]->getTopic().c_str(),
+						odomSub_.getTopic().c_str(),
+						scan3dSub_.getTopic().c_str());
 			}
 			else if(subscribeOdomInfo)
 			{
@@ -1382,7 +1518,7 @@ void GuiWrapper::setupCallbacks(
 		else
 		{
 			// use TF as odom
-			if(subscribeLaserScan)
+			if(subscribeLaserScan2d)
 			{
 				scanSub_.subscribe(nh, "scan", 1);
 				depthScanTFSync_ = new message_filters::Synchronizer<MyDepthScanTFSyncPolicy>(
@@ -1399,6 +1535,24 @@ void GuiWrapper::setupCallbacks(
 						imageDepthSubs_[0]->getTopic().c_str(),
 						cameraInfoSubs_[0]->getTopic().c_str(),
 						scanSub_.getTopic().c_str());
+			}
+			else if(subscribeLaserScan3d)
+			{
+				scan3dSub_.subscribe(nh, "scan_cloud", 1);
+				depthScan3dTFSync_ = new message_filters::Synchronizer<MyDepthScan3dTFSyncPolicy>(
+						MyDepthScan3dTFSyncPolicy(queueSize),
+						scan3dSub_,
+						*imageSubs_[0],
+						*imageDepthSubs_[0],
+						*cameraInfoSubs_[0]);
+				depthScan3dTFSync_->registerCallback(boost::bind(&GuiWrapper::depthScan3dTFCallback, this, _1, _2, _3, _4));
+
+				ROS_INFO("\n%s subscribed to:\n   %s,\n   %s,\n   %s,\n   %s",
+						ros::this_node::getName().c_str(),
+						imageSubs_[0]->getTopic().c_str(),
+						imageDepthSubs_[0]->getTopic().c_str(),
+						cameraInfoSubs_[0]->getTopic().c_str(),
+						scan3dSub_.getTopic().c_str());
 			}
 			else if(subscribeOdomInfo)
 			{
@@ -1454,7 +1608,7 @@ void GuiWrapper::setupCallbacks(
 		if(odomFrameId_.empty())
 		{
 			odomSub_.subscribe(nh, "odom", 1);
-			if(subscribeLaserScan)
+			if(subscribeLaserScan2d)
 			{
 				scanSub_.subscribe(nh, "scan", 1);
 				stereoScanSync_ = new message_filters::Synchronizer<MyStereoScanSyncPolicy>(
@@ -1475,6 +1629,28 @@ void GuiWrapper::setupCallbacks(
 						cameraInfoRight_.getTopic().c_str(),
 						odomSub_.getTopic().c_str(),
 						scanSub_.getTopic().c_str());
+			}
+			else if(subscribeLaserScan3d)
+			{
+				scan3dSub_.subscribe(nh, "scan_cloud", 1);
+				stereoScan3dSync_ = new message_filters::Synchronizer<MyStereoScan3dSyncPolicy>(
+						MyStereoScan3dSyncPolicy(queueSize),
+						scan3dSub_,
+						odomSub_,
+						imageRectLeft_,
+						imageRectRight_,
+						cameraInfoLeft_,
+						cameraInfoRight_);
+				stereoScan3dSync_->registerCallback(boost::bind(&GuiWrapper::stereoScan3dCallback, this, _1, _2, _3, _4, _5, _6));
+
+				ROS_INFO("\n%s subscribed to:\n   %s,\n   %s,\n   %s,\n   %s,\n   %s,\n   %s",
+						ros::this_node::getName().c_str(),
+						imageRectLeft_.getTopic().c_str(),
+						imageRectRight_.getTopic().c_str(),
+						cameraInfoLeft_.getTopic().c_str(),
+						cameraInfoRight_.getTopic().c_str(),
+						odomSub_.getTopic().c_str(),
+						scan3dSub_.getTopic().c_str());
 			}
 			else if(subscribeOdomInfo)
 			{
@@ -1521,7 +1697,7 @@ void GuiWrapper::setupCallbacks(
 		else
 		{
 			//use odom TF
-			if(subscribeLaserScan)
+			if(subscribeLaserScan2d)
 			{
 				scanSub_.subscribe(nh, "scan", 1);
 				stereoScanTFSync_ = new message_filters::Synchronizer<MyStereoScanTFSyncPolicy>(
@@ -1540,6 +1716,26 @@ void GuiWrapper::setupCallbacks(
 						cameraInfoLeft_.getTopic().c_str(),
 						cameraInfoRight_.getTopic().c_str(),
 						scanSub_.getTopic().c_str());
+			}
+			else if(subscribeLaserScan3d)
+			{
+				scan3dSub_.subscribe(nh, "scan_cloud", 1);
+				stereoScan3dTFSync_ = new message_filters::Synchronizer<MyStereoScan3dTFSyncPolicy>(
+						MyStereoScan3dTFSyncPolicy(queueSize),
+						scan3dSub_,
+						imageRectLeft_,
+						imageRectRight_,
+						cameraInfoLeft_,
+						cameraInfoRight_);
+				stereoScan3dTFSync_->registerCallback(boost::bind(&GuiWrapper::stereoScan3dTFCallback, this, _1, _2, _3, _4, _5));
+
+				ROS_INFO("\n%s subscribed to:\n   %s,\n   %s,\n   %s,\n   %s,\n   %s",
+						ros::this_node::getName().c_str(),
+						imageRectLeft_.getTopic().c_str(),
+						imageRectRight_.getTopic().c_str(),
+						cameraInfoLeft_.getTopic().c_str(),
+						cameraInfoRight_.getTopic().c_str(),
+						scan3dSub_.getTopic().c_str());
 			}
 			else if(subscribeOdomInfo)
 			{

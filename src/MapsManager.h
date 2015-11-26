@@ -74,6 +74,7 @@ private:
 	bool cloudFrustumCulling_;
 	double cloudNoiseFilteringRadius_;
 	int cloudNoiseFilteringMinNeighbors_;
+	int scanDecimation_;
 	double scanVoxelSize_;
 	bool scanOutputVoxelized_;
 	double projMaxGroundAngle_;

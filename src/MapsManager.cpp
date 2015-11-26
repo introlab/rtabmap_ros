@@ -66,6 +66,7 @@ MapsManager::MapsManager(bool usePublicNamespace) :
 	pnh.param("cloud_noise_filtering_min_neighbors", cloudNoiseFilteringMinNeighbors_, cloudNoiseFilteringMinNeighbors_);
 
 	// scan map stuff
+	pnh.param("scan_decimation", scanDecimation_, scanDecimation_);
 	pnh.param("scan_voxel_size", scanVoxelSize_, scanVoxelSize_);
 	pnh.param("scan_output_voxelized", scanOutputVoxelized_, scanOutputVoxelized_);
 
@@ -344,21 +345,28 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 						{
 							if(scan.cols && (gridRequired || scanVoxelSize_ > 0.0))
 							{
-								pcl::PointCloud<pcl::PointXYZ>::Ptr scanCloud = util3d::laserScanToPointCloud(scan);
-								if(scanVoxelSize_ > 0.0)
+								if(scanDecimation_ > 1)
 								{
-									scanCloud = util3d::voxelize(scanCloud, scanVoxelSize_);
-									if(gridRequired)
+									scan = util3d::downsample(scan, scanDecimation_);
+								}
+								if(scanRequired || scanVoxelSize_ > 0.0)
+								{
+									pcl::PointCloud<pcl::PointXYZ>::Ptr scanCloud = util3d::laserScanToPointCloud(scan);
+									if(scanVoxelSize_ > 0.0)
 									{
-										scan = util3d::laserScanFromPointCloud(*scanCloud);
+										scanCloud = util3d::voxelize(scanCloud, scanVoxelSize_);
+										if(gridRequired && scan.type() == CV_32FC2)
+										{
+											scan = util3d::laserScan2dFromPointCloud(*scanCloud);
+										}
+									}
+									if(scanRequired)
+									{
+										uInsert(scans_, std::make_pair(iter->first, scanCloud));
 									}
 								}
-								if(scanRequired)
-								{
-									uInsert(scans_, std::make_pair(iter->first, scanCloud));
-								}
 							}
-							if(gridRequired)
+							if(gridRequired && scan.type() == CV_32FC2)
 							{
 								cv::Mat ground, obstacles;
 								util3d::occupancy2DFromLaserScan(scan, ground, obstacles, gridCellSize_, data.id() < 0 || gridUnknownSpaceFilled_, data.laserScanMaxRange());
