@@ -929,8 +929,8 @@ void CoreWrapper::commonDepthCallback(
 					rtabmap_ros::timestampFromROS(stamp)),
 			lastPose_,
 			odomFrameId,
-			rotVariance_>0?rotVariance_:1.0,
-			transVariance_>0?transVariance_:1.0);
+			uIsFinite(rotVariance_) && rotVariance_>0?rotVariance_:1.0,
+			uIsFinite(transVariance_) && transVariance_>0?transVariance_:1.0);
 	rotVariance_ = 0;
 	transVariance_ = 0;
 }
@@ -1067,8 +1067,8 @@ void CoreWrapper::commonStereoCallback(
 					rtabmap_ros::timestampFromROS(stamp)),
 			lastPose_,
 			odomFrameId,
-			rotVariance_>0?rotVariance_:1.0,
-			transVariance_>0?transVariance_:1.0);
+			uIsFinite(rotVariance_) && rotVariance_>0?rotVariance_:1.0,
+			uIsFinite(transVariance_) && transVariance_>0?transVariance_:1.0);
 
 	rotVariance_ = 0;
 	transVariance_ = 0;
