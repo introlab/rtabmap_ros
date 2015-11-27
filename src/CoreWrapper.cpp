@@ -383,7 +383,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	setupCallbacks(subscribeDepth, subscribeScan2d, subscribeScan3d, subscribeStereo, queueSize, stereoApproxSync, depthCameras);
 
 	int optimizeIterations = 0;
-	Parameters::parse(parameters_, Parameters::kRGBDOptimizeIterations(), optimizeIterations);
+	Parameters::parse(parameters_, Parameters::kOptimizerIterations(), optimizeIterations);
 	if(publishTf && optimizeIterations != 0)
 	{
 		transformThread_ = new boost::thread(boost::bind(&CoreWrapper::publishLoop, this, tfDelay));
@@ -391,7 +391,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	else if(publishTf)
 	{
 		UWARN("Graph optimization is disabled (%s=0), the tf between frame \"%s\" and odometry frame will not be published. You can safely ignore this warning if you are using map_optimizer node.",
-				Parameters::kRGBDOptimizeIterations().c_str(), mapFrameId_.c_str());
+				Parameters::kOptimizerIterations().c_str(), mapFrameId_.c_str());
 	}
 }
 

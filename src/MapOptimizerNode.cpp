@@ -31,6 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtabmap_ros/MsgConversion.h"
 #include <rtabmap/core/util3d.h>
 #include <rtabmap/core/Graph.h>
+#include <rtabmap/core/Optimizer.h>
 #include <rtabmap/core/Parameters.h>
 #include <rtabmap/utilite/ULogger.h>
 #include <rtabmap/utilite/UTimer.h>
@@ -79,13 +80,13 @@ public:
 		UASSERT(iterations > 0);
 
 		ParametersMap parameters;
-		parameters.insert(ParametersPair(Parameters::kRGBDOptimizeStrategy(), uNumber2Str(strategy)));
-		parameters.insert(ParametersPair(Parameters::kRGBDOptimizeEpsilon(), uNumber2Str(epsilon)));
-		parameters.insert(ParametersPair(Parameters::kRGBDOptimizeIterations(), uNumber2Str(iterations)));
-		parameters.insert(ParametersPair(Parameters::kRGBDOptimizeRobust(), uBool2Str(robust)));
-		parameters.insert(ParametersPair(Parameters::kRGBDOptimizeSlam2D(), uBool2Str(slam2d)));
-		parameters.insert(ParametersPair(Parameters::kRGBDOptimizeVarianceIgnored(), uBool2Str(ignoreVariance)));
-		optimizer_ = graph::Optimizer::create(parameters);
+		parameters.insert(ParametersPair(Parameters::kOptimizerStrategy(), uNumber2Str(strategy)));
+		parameters.insert(ParametersPair(Parameters::kOptimizerEpsilon(), uNumber2Str(epsilon)));
+		parameters.insert(ParametersPair(Parameters::kOptimizerIterations(), uNumber2Str(iterations)));
+		parameters.insert(ParametersPair(Parameters::kOptimizerRobust(), uBool2Str(robust)));
+		parameters.insert(ParametersPair(Parameters::kOptimizerSlam2D(), uBool2Str(slam2d)));
+		parameters.insert(ParametersPair(Parameters::kOptimizerVarianceIgnored(), uBool2Str(ignoreVariance)));
+		optimizer_ = Optimizer::create(parameters);
 
 		double tfDelay = 0.05; // 20 Hz
 		bool publishTf = true;
@@ -317,7 +318,7 @@ private:
 	std::string odomFrameId_;
 	bool globalOptimization_;
 	bool optimizeFromLastNode_;
-	graph::Optimizer * optimizer_;
+	Optimizer * optimizer_;
 
 	rtabmap::Transform mapToOdom_;
 	boost::mutex mapToOdomMutex_;
