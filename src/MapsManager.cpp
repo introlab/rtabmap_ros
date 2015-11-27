@@ -34,6 +34,7 @@ MapsManager::MapsManager(bool usePublicNamespace) :
 		cloudMaxDepth_(4.0), // meters
 		cloudVoxelSize_(0.05), // meters
 		cloudFloorCullingHeight_(0.0),
+		cloudCeilingCullingHeight_(0.0),
 		cloudOutputVoxelized_(false),
 		cloudFrustumCulling_(false),
 		cloudNoiseFilteringRadius_(0.0),
@@ -60,6 +61,14 @@ MapsManager::MapsManager(bool usePublicNamespace) :
 	pnh.param("cloud_max_depth", cloudMaxDepth_, cloudMaxDepth_);
 	pnh.param("cloud_voxel_size", cloudVoxelSize_, cloudVoxelSize_);
 	pnh.param("cloud_floor_culling_height", cloudFloorCullingHeight_, cloudFloorCullingHeight_);
+	pnh.param("cloud_ceiling_culling_height", cloudCeilingCullingHeight_, cloudCeilingCullingHeight_);
+	if(cloudFloorCullingHeight_ > 0 &&
+	   cloudCeilingCullingHeight_ > 0 &&
+	   cloudCeilingCullingHeight_ < cloudFloorCullingHeight_)
+	{
+		ROS_WARN("\"cloud_floor_culling_height\" should be lower than \"cloud_ceiling_culling_height\", setting \"cloud_ceiling_culling_height\" to 0 (disabled).");
+		cloudCeilingCullingHeight_ = 0;
+	}
 	pnh.param("cloud_output_voxelized", cloudOutputVoxelized_, cloudOutputVoxelized_);
 	pnh.param("cloud_frustum_culling", cloudFrustumCulling_, cloudFrustumCulling_);
 	pnh.param("cloud_noise_filtering_radius", cloudNoiseFilteringRadius_, cloudNoiseFilteringRadius_);
@@ -504,9 +513,11 @@ void MapsManager::publishMaps(
 				}
 			}
 
-			if(assembledCloud->size() && cloudFloorCullingHeight_ > 0.0)
+			if(assembledCloud->size() && (cloudFloorCullingHeight_ > 0.0 || cloudCeilingCullingHeight_ > 0.0))
 			{
-				assembledCloud = util3d::passThrough(assembledCloud, "z", cloudFloorCullingHeight_, 99999.0f);
+				assembledCloud = util3d::passThrough(assembledCloud, "z",
+						cloudFloorCullingHeight_>0.0?cloudFloorCullingHeight_:-999.0,
+						cloudCeilingCullingHeight_>0.0 && (cloudFloorCullingHeight_<=0.0 || cloudCeilingCullingHeight_>cloudFloorCullingHeight_)?cloudCeilingCullingHeight_:999.0);
 			}
 
 			if(assembledCloud->size() && cloudVoxelSize_ > 0 && cloudOutputVoxelized_)

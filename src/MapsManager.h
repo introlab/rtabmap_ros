@@ -70,6 +70,7 @@ private:
 	double cloudMaxDepth_;
 	double cloudVoxelSize_;
 	double cloudFloorCullingHeight_;
+	double cloudCeilingCullingHeight_;
 	bool cloudOutputVoxelized_;
 	bool cloudFrustumCulling_;
 	double cloudNoiseFilteringRadius_;

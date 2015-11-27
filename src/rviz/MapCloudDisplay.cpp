@@ -156,6 +156,13 @@ MapCloudDisplay::MapCloudDisplay()
 	cloud_filter_floor_height_->setMin( 0.0f );
 	cloud_filter_floor_height_->setMax( 999.0f );
 
+	cloud_filter_ceiling_height_ = new rviz::FloatProperty( "Filter ceiling (m)", 0.0f,
+										 "Filter the ceiling at the specified height set here "
+										 "(only appropriate for 2D mapping).",
+										 this, SLOT( updateCloudParameters() ), this );
+	cloud_filter_ceiling_height_->setMin( 0.0f );
+	cloud_filter_ceiling_height_->setMax( 999.0f );
+
 	node_filtering_radius_ = new rviz::FloatProperty( "Node filtering radius (m)", 0.2f,
 										 "(Disabled=0) Only keep one node in the specified radius.",
 										 this, SLOT( updateCloudParameters() ), this );
@@ -276,9 +283,11 @@ void MapCloudDisplay::processMapData(const rtabmap_ros::MapData& map)
 
 					if(cloud->size())
 					{
-						if(cloud_filter_floor_height_->getFloat() > 0.0f)
+						if(cloud_filter_floor_height_->getFloat() > 0.0f || cloud_filter_ceiling_height_->getFloat() > 0.0f)
 						{
-							cloud = rtabmap::util3d::passThrough(cloud, "z", cloud_filter_floor_height_->getFloat(), 999.0f);
+							cloud = rtabmap::util3d::passThrough(cloud, "z",
+									cloud_filter_floor_height_->getFloat()>0.0f?cloud_filter_floor_height_->getFloat():-999.0f,
+									cloud_filter_ceiling_height_->getFloat()>0.0f && (cloud_filter_floor_height_->getFloat()<=0.0f || cloud_filter_ceiling_height_->getFloat()>cloud_filter_floor_height_->getFloat())?cloud_filter_ceiling_height_->getFloat():999.0f);
 						}
 
 						sensor_msgs::PointCloud2::Ptr cloudMsg(new sensor_msgs::PointCloud2);
