@@ -629,8 +629,8 @@ bool CoreWrapper::commonOdomUpdate(const nav_msgs::OdometryConstPtr & odomMsg)
 
 		lastPose_ = odom;
 		lastPoseStamp_ = odomMsg->header.stamp;
-		double transVariance = uMax3(odomMsg->pose.covariance[0], odomMsg->pose.covariance[7], odomMsg->pose.covariance[14]);
-		double rotVariance = uMax3(odomMsg->pose.covariance[21], odomMsg->pose.covariance[28], odomMsg->pose.covariance[35]);
+		float transVariance = uMax3(odomMsg->pose.covariance[0], odomMsg->pose.covariance[7], odomMsg->pose.covariance[14]);
+		float rotVariance = uMax3(odomMsg->pose.covariance[21], odomMsg->pose.covariance[28], odomMsg->pose.covariance[35]);
 		if(uIsFinite(rotVariance) && rotVariance > rotVariance_)
 		{
 			rotVariance_ = rotVariance;
@@ -1217,8 +1217,8 @@ void CoreWrapper::process(
 		const SensorData & data,
 		const Transform & odom,
 		const std::string & odomFrameId,
-		double odomRotationalVariance,
-		double odomTransitionalVariance)
+		float odomRotationalVariance,
+		float odomTransitionalVariance)
 {
 	UTimer timer;
 	if(rtabmap_.isIDsGenerated() || data.id() > 0)
