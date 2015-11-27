@@ -45,6 +45,8 @@
       <param name="Mem/RehearsalSimilarity" type="string" value="0.45"/>
       <param name="Mem/RehearsedNodesKept" type="string" value="false"/>
       <param name="Mem/ImageDecimation" type="string" value="4"/>
+      <param name="Mem/IncrementalMemory" type="string" value="true"/>
+      <param name="Mem/InitWMWithAllNodes" type="string" value="false"/>
       
       <param name="Rtabmap/StartNewMapOnLoopClosure" type="string" value="true"/>
       <param name="Rtabmap/TimeThr" type="string" value="600"/>
@@ -79,7 +81,7 @@
 
   <!-- ROS navigation stack move_base -->
   <group ns="planner">
-     <remap from="base_scan" to="/base_scan"/>
+     <remap from="scan" to="/base_scan"/>
      <remap from="obstacles_cloud" to="/obstacles_cloud"/>
      <remap from="ground_cloud" to="/ground_cloud"/>
      <remap from="map" to="/map"/>
@@ -87,9 +89,9 @@
         
      <node pkg="move_base" type="move_base" respawn="true" name="move_base" output="screen">
         <param name="base_global_planner" value="navfn/NavfnROS"/>
-    	<rosparam file="$(find rtabmap_ros)/launch/azimut3/config/costmap_common_params.yaml" command="load" ns="global_costmap" />
-     	<rosparam file="$(find rtabmap_ros)/launch/azimut3/config/costmap_common_params.yaml" command="load" ns="local_costmap" />
-    	<rosparam file="$(find rtabmap_ros)/launch/azimut3/config/local_costmap_params_2d.yaml" command="load" ns="local_costmap" />
+    	<rosparam file="$(find rtabmap_ros)/launch/azimut3/config/costmap_common_params_2d.yaml" command="load" ns="global_costmap" />
+     	<rosparam file="$(find rtabmap_ros)/launch/azimut3/config/costmap_common_params_2d.yaml" command="load" ns="local_costmap" />
+    	<rosparam file="$(find rtabmap_ros)/launch/azimut3/config/local_costmap_params.yaml" command="load" ns="local_costmap" />
     	<rosparam file="$(find rtabmap_ros)/launch/azimut3/config/global_costmap_params.yaml" command="load" ns="global_costmap"/>
     	<rosparam file="$(find rtabmap_ros)/launch/azimut3/config/base_local_planner_params.yaml" command="load" />
      </node>
@@ -109,7 +111,7 @@
   
   <!-- Throttling messages -->
   <group ns="camera">
-    <node pkg="nodelet" type="nodelet" name="data_throttle" args="load rtabmap_ros/data_throttle camera_nodelet_manager" output="screen">
+    <node pkg="nodelet" type="nodelet" name="data_throttle" args="load rtabmap_ros/data_throttle camera_nodelet_manager">
       <param name="rate" type="double" value="5"/>
       <param name="decimation" type="int" value="2"/>
    
