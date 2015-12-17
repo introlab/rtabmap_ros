@@ -1678,7 +1678,7 @@ bool CoreWrapper::getMapCallback(rtabmap_ros::GetMap::Request& req, rtabmap_ros:
 	rtabmap_ros::mapDataToROS(poses,
 		constraints,
 		signatures,
-		Transform::getIdentity(),
+		mapToOdom_,
 		res.data);
 
 	res.data.header.stamp = ros::Time::now();
@@ -1821,7 +1821,7 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 			rtabmap_ros::mapDataToROS(poses,
 				constraints,
 				signatures,
-				Transform::getIdentity(),
+				mapToOdom_,
 				*msg);
 
 			mapDataPub_.publish(msg);
@@ -1835,7 +1835,7 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 
 			rtabmap_ros::mapGraphToROS(poses,
 				constraints,
-				Transform::getIdentity(),
+				mapToOdom_,
 				*msg);
 
 			mapGraphPub_.publish(msg);
