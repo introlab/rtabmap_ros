@@ -37,7 +37,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <cv_bridge/cv_bridge.h>
 
 #include <rtabmap/core/Rtabmap.h>
-#include <rtabmap/core/Odometry.h>
+#include <rtabmap/core/OdometryLocalMap.h>
+#include <rtabmap/core/OdometryF2F.h>
 #include <rtabmap/core/util3d_transforms.h>
 #include <rtabmap/core/Memory.h>
 #include <rtabmap/core/Signature.h>
@@ -214,16 +215,7 @@ OdometryROS::OdometryROS(int argc, char * argv[], bool stereo) :
 
 	int odomStrategy = 0; // BOW
 	Parameters::parse(parameters_, Parameters::kOdomStrategy(), odomStrategy);
-	if(odomStrategy == 1)
-	{
-		ROS_INFO("Using OdometryF2F");
-		odometry_ = new rtabmap::OdometryF2F(parameters_);
-	}
-	else
-	{
-		ROS_INFO("Using OdometryBOW");
-		odometry_ = new rtabmap::OdometryBOW(parameters_);
-	}
+	odometry_ = Odometry::create(parameters_);
 	if(!initialPose.isIdentity())
 	{
 		odometry_->reset(initialPose);
@@ -370,10 +362,10 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 		}
 
 		// local map / reference frame
-		if(odomLocalMap_.getNumSubscribers() && dynamic_cast<OdometryBOW*>(odometry_))
+		if(odomLocalMap_.getNumSubscribers() && dynamic_cast<OdometryLocalMap*>(odometry_))
 		{
 			pcl::PointCloud<pcl::PointXYZ> cloud;
-			const std::map<int, cv::Point3f> & map = ((OdometryBOW*)odometry_)->getLocalMap();
+			const std::map<int, cv::Point3f> & map = ((OdometryLocalMap*)odometry_)->getLocalMap();
 			for(std::map<int, cv::Point3f>::const_iterator iter=map.begin(); iter!=map.end(); ++iter)
 			{
 				cloud.push_back(pcl::PointXYZ(iter->second.y, iter->second.y, iter->second.z));
@@ -387,9 +379,9 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 
 		if(odomLastFrame_.getNumSubscribers())
 		{
-			if(dynamic_cast<OdometryBOW*>(odometry_))
+			if(dynamic_cast<OdometryLocalMap*>(odometry_))
 			{
-				const rtabmap::Signature * s  = ((OdometryBOW*)odometry_)->getMemory()->getLastWorkingSignature();
+				const rtabmap::Signature * s  = ((OdometryLocalMap*)odometry_)->getMemory()->getLastWorkingSignature();
 				if(s)
 				{
 					const std::multimap<int, cv::Point3f> & words3 = s->getWords3();
@@ -458,7 +450,7 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 
 bool OdometryROS::isOdometryBOW() const
 {
-	return dynamic_cast<OdometryBOW*>(odometry_) != 0;
+	return dynamic_cast<OdometryLocalMap*>(odometry_) != 0;
 }
 
 bool OdometryROS::reset(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
