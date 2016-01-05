@@ -31,6 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <tf/tf.h>
 #include <geometry_msgs/Transform.h>
 #include <geometry_msgs/Pose.h>
+#include <sensor_msgs/CameraInfo.h>
 
 #include <opencv2/opencv.hpp>
 #include <opencv2/features2d/features2d.hpp>
@@ -40,6 +41,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/Signature.h>
 #include <rtabmap/core/OdometryInfo.h>
 #include <rtabmap/core/Statistics.h>
+#include <rtabmap/core/StereoCameraModel.h>
 
 #include <rtabmap_ros/Link.h>
 #include <rtabmap_ros/KeyPoint.h>
@@ -82,6 +84,14 @@ void point2fToROS(const cv::Point2f & kpt, rtabmap_ros::Point2f & msg);
 
 std::vector<cv::Point2f> points2fFromROS(const std::vector<rtabmap_ros::Point2f> & msg);
 void points2fToROS(const std::vector<cv::Point2f> & kpts, std::vector<rtabmap_ros::Point2f> & msg);
+
+rtabmap::CameraModel cameraModelFromROS(
+		const sensor_msgs::CameraInfo & camInfo,
+		const rtabmap::Transform & localTransform = rtabmap::Transform::getIdentity());
+rtabmap::StereoCameraModel stereoCameraModelFromROS(
+		const sensor_msgs::CameraInfo & leftCamInfo,
+		const sensor_msgs::CameraInfo & rightCamInfo,
+		const rtabmap::Transform & localTransform = rtabmap::Transform::getIdentity());
 
 void mapDataFromROS(
 		const rtabmap_ros::MapData & msg,

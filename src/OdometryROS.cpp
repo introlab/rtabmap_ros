@@ -216,8 +216,8 @@ OdometryROS::OdometryROS(int argc, char * argv[], bool stereo) :
 	Parameters::parse(parameters_, Parameters::kOdomStrategy(), odomStrategy);
 	if(odomStrategy == 1)
 	{
-		ROS_INFO("Using OdometryOpticalFlow");
-		odometry_ = new rtabmap::OdometryOpticalFlow(parameters_);
+		ROS_INFO("Using OdometryF2F");
+		odometry_ = new rtabmap::OdometryF2F(parameters_);
 	}
 	else
 	{
@@ -369,13 +369,14 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 			odomPub_.publish(odom);
 		}
 
+		// local map / reference frame
 		if(odomLocalMap_.getNumSubscribers() && dynamic_cast<OdometryBOW*>(odometry_))
 		{
-			const std::map<int, pcl::PointXYZ> & map = ((OdometryBOW*)odometry_)->getLocalMap();
 			pcl::PointCloud<pcl::PointXYZ> cloud;
-			for(std::map<int, pcl::PointXYZ>::const_iterator iter=map.begin(); iter!=map.end(); ++iter)
+			const std::map<int, cv::Point3f> & map = ((OdometryBOW*)odometry_)->getLocalMap();
+			for(std::map<int, cv::Point3f>::const_iterator iter=map.begin(); iter!=map.end(); ++iter)
 			{
-				cloud.push_back(iter->second);
+				cloud.push_back(pcl::PointXYZ(iter->second.y, iter->second.y, iter->second.z));
 			}
 			sensor_msgs::PointCloud2 cloudMsg;
 			pcl::toROSMsg(cloud, cloudMsg);
@@ -391,13 +392,13 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 				const rtabmap::Signature * s  = ((OdometryBOW*)odometry_)->getMemory()->getLastWorkingSignature();
 				if(s)
 				{
-					const std::multimap<int, pcl::PointXYZ> & words3 = s->getWords3();
+					const std::multimap<int, cv::Point3f> & words3 = s->getWords3();
 					pcl::PointCloud<pcl::PointXYZ> cloud;
-					for(std::multimap<int, pcl::PointXYZ>::const_iterator iter=words3.begin(); iter!=words3.end(); ++iter)
+					for(std::multimap<int, cv::Point3f>::const_iterator iter=words3.begin(); iter!=words3.end(); ++iter)
 					{
 						// transform to odom frame
-						pcl::PointXYZ pt = util3d::transformPoint(iter->second, pose);
-						cloud.push_back(pt);
+						cv::Point3f pt = util3d::transformPoint(iter->second, pose);
+						cloud.push_back(pcl::PointXYZ(pt.x, pt.y, pt.z));
 					}
 
 					sensor_msgs::PointCloud2 cloudMsg;
@@ -409,14 +410,19 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 			}
 			else
 			{
-				//Optical flow
-				const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud = ((OdometryOpticalFlow*)odometry_)->getLastCorners3D();
-				if(cloud->size())
+				//Frame to Frame
+				const Signature & refFrame = ((OdometryF2F*)odometry_)->getRefFrame();
+				if(refFrame.getWords3().size())
 				{
-					pcl::PointCloud<pcl::PointXYZ>::Ptr cloudTransformed;
-					cloudTransformed = util3d::transformPointCloud(cloud, pose);
+					pcl::PointCloud<pcl::PointXYZ> cloud;
+					for(std::multimap<int, cv::Point3f>::const_iterator iter=refFrame.getWords3().begin(); iter!=refFrame.getWords3().end(); ++iter)
+					{
+						// transform to odom frame
+						cv::Point3f pt = util3d::transformPoint(iter->second, pose);
+						cloud.push_back(pcl::PointXYZ(pt.x, pt.y, pt.z));
+					}
 					sensor_msgs::PointCloud2 cloudMsg;
-					pcl::toROSMsg(*cloudTransformed, cloudMsg);
+					pcl::toROSMsg(cloud, cloudMsg);
 					cloudMsg.header.stamp = stamp; // use corresponding time stamp to image
 					cloudMsg.header.frame_id = odomFrameId_;
 					odomLastFrame_.publish(cloudMsg);

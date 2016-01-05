@@ -54,7 +54,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <pcl_conversions/pcl_conversions.h>
 
 #include <laser_geometry/laser_geometry.h>
-#include <image_geometry/stereo_camera_model.h>
 
 #ifdef WITH_OCTOMAP
 #include <octomap_msgs/conversions.h>
@@ -817,23 +816,16 @@ void CoreWrapper::commonDepthCallback(
 			return;
 		}
 
-		image_geometry::PinholeCameraModel model;
-		model.fromCameraInfo(*cameraInfoMsgs[i]);
-		cameraModels.push_back(rtabmap::CameraModel(
-				model.fx(),
-				model.fy(),
-				model.cx(),
-				model.cy(),
-				localTransform));
+		cameraModels.push_back(rtabmap_ros::cameraModelFromROS(*cameraInfoMsgs[i], localTransform));
 
 		if(scan2dMsg.get() == 0 && genScan_)
 		{
 			scanCloud2d += util3d::laserScanFromDepthImage(
 					subDepth,
-					model.fx(),
-					model.fy(),
-					model.cx(),
-					model.cy(),
+					cameraModels.back().fx(),
+					cameraModels.back().fy(),
+					cameraModels.back().cx(),
+					cameraModels.back().cy(),
 					genScanMaxDepth_,
 					localTransform);
 			genMaxScanPts += subDepth.cols;
@@ -1009,17 +1001,9 @@ void CoreWrapper::commonStereoCallback(
 	}
 	ptrRightImage = cv_bridge::toCvShare(rightImageMsg, "mono8");
 
-	image_geometry::StereoCameraModel model;
-	model.fromCameraInfo(*leftCamInfoMsg, *rightCamInfoMsg);
-	rtabmap::StereoCameraModel stereoModel(
-			model.left().fx(),
-			model.left().fy(),
-			model.left().cx(),
-			model.left().cy(),
-			model.baseline(),
-			localTransform);
+	rtabmap::StereoCameraModel stereoModel = rtabmap_ros::stereoCameraModelFromROS(*leftCamInfoMsg, *rightCamInfoMsg, localTransform);
 
-	if(model.baseline() > 10.0)
+	if(stereoModel.baseline() > 10.0)
 	{
 		static bool shown = false;
 		if(!shown)
@@ -1027,7 +1011,7 @@ void CoreWrapper::commonStereoCallback(
 			ROS_WARN("Detected baseline (%f m) is quite large! Is your "
 					 "right camera_info P(0,3) correctly set? Note that "
 					 "baseline=-P(0,3)/P(0,0). This warning is printed only once.",
-					 model.baseline());
+					 stereoModel.baseline());
 			shown = true;
 		}
 	}

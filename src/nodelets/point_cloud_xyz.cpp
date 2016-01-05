@@ -29,6 +29,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <pluginlib/class_list_macros.h>
 #include <nodelet/nodelet.h>
 
+#include <rtabmap_ros/MsgConversion.h>
+
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
@@ -238,18 +240,12 @@ private:
 
 		if(cloudPub_.getNumSubscribers())
 		{
-			image_geometry::PinholeCameraModel model;
-			model.fromCameraInfo(*cameraInfo);
-			float cx = model.cx();
-			float cy = model.cy();
-
 			pcl::PointCloud<pcl::PointXYZ>::Ptr pclCloud;
+			rtabmap::CameraModel leftModel = rtabmap_ros::cameraModelFromROS(*cameraInfo);
+			rtabmap::StereoCameraModel stereoModel(disparityMsg->f, disparityMsg->f, leftModel.cx(), leftModel.cy(), disparityMsg->T);
 			pclCloud = rtabmap::util3d::cloudFromDisparity(
 					disparity,
-					cx,
-					cy,
-					disparityMsg->f,
-					disparityMsg->T,
+					stereoModel,
 					decimation_);
 
 			processAndPublish(pclCloud, disparityMsg->header);

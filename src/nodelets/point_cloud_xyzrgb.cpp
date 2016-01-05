@@ -33,6 +33,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
 
+#include <rtabmap_ros/MsgConversion.h>
+
 #include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/image_encodings.h>
@@ -228,22 +230,11 @@ private:
 			}
 			ptrRightImage = cv_bridge::toCvShare(imageRight, "mono8");
 
-			image_geometry::StereoCameraModel model;
-			model.fromCameraInfo(*camInfoLeft, *camInfoRight);
-
-			float fx = model.left().fx();
-			float cx = model.left().cx();
-			float cy = model.left().cy();
-			float baseline = model.baseline();
-
 			pcl::PointCloud<pcl::PointXYZRGB>::Ptr pclCloud;
 			pclCloud = rtabmap::util3d::cloudFromStereoImages(
 					ptrLeftImage->image,
 					ptrRightImage->image,
-					cx,
-					cy,
-					fx,
-					baseline,
+					rtabmap_ros::stereoCameraModelFromROS(*camInfoLeft, *camInfoRight),
 					decimation_);
 
 			processAndPublish(pclCloud, imageLeft->header);

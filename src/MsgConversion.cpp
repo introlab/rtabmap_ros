@@ -36,6 +36,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <pcl_conversions/pcl_conversions.h>
 #include <eigen_conversions/eigen_msg.h>
 #include <tf_conversions/tf_eigen.h>
+#include <image_geometry/pinhole_camera_model.h>
+#include <image_geometry/stereo_camera_model.h>
 
 namespace rtabmap_ros {
 
@@ -293,6 +295,35 @@ void points2fToROS(const std::vector<cv::Point2f> & kpts, std::vector<rtabmap_ro
 	}
 }
 
+rtabmap::CameraModel cameraModelFromROS(
+		const sensor_msgs::CameraInfo & camInfo,
+		const rtabmap::Transform & localTransform)
+{
+	image_geometry::PinholeCameraModel model;
+	model.fromCameraInfo(camInfo);
+	return rtabmap::CameraModel(
+			model.fx(),
+			model.fy(),
+			model.cx(),
+			model.cy(),
+			localTransform);
+}
+rtabmap::StereoCameraModel stereoCameraModelFromROS(
+		const sensor_msgs::CameraInfo & leftCamInfo,
+		const sensor_msgs::CameraInfo & rightCamInfo,
+		const rtabmap::Transform & localTransform)
+{
+	image_geometry::StereoCameraModel model;
+	model.fromCameraInfo(leftCamInfo, rightCamInfo);
+	return rtabmap::StereoCameraModel(
+			model.left().fx(),
+			model.left().fy(),
+			model.left().cx(),
+			model.left().cy(),
+			model.baseline(),
+			localTransform);
+}
+
 void mapDataFromROS(
 		const rtabmap_ros::MapData & msg,
 		std::map<int, rtabmap::Transform> & poses,
@@ -384,7 +415,7 @@ rtabmap::Signature nodeDataFromROS(const rtabmap_ros::NodeData & msg)
 {
 	//Features stuff...
 	std::multimap<int, cv::KeyPoint> words;
-	std::multimap<int, pcl::PointXYZ> words3D;
+	std::multimap<int, cv::Point3f> words3D;
 	pcl::PointCloud<pcl::PointXYZ> cloud;
 	if(msg.wordPts.data.size() &&
 	   msg.wordPts.data.size() == msg.wordIds.size())
@@ -398,7 +429,7 @@ rtabmap::Signature nodeDataFromROS(const rtabmap_ros::NodeData & msg)
 		words.insert(std::make_pair(wordId, pt));
 		if(i< cloud.size())
 		{
-			words3D.insert(std::make_pair(wordId, cloud[i]));
+			words3D.insert(std::make_pair(wordId, cv::Point3f(cloud[i].x, cloud[i].y, cloud[i].z)));
 		}
 	}
 
@@ -539,11 +570,13 @@ void nodeDataToROS(const rtabmap::Signature & signature, rtabmap_ros::NodeData &
 		pcl::PointCloud<pcl::PointXYZ> cloud;
 		cloud.resize(signature.getWords3().size());
 		index = 0;
-		for(std::multimap<int, pcl::PointXYZ>::const_iterator jter=signature.getWords3().begin();
+		for(std::multimap<int, cv::Point3f>::const_iterator jter=signature.getWords3().begin();
 			jter!=signature.getWords3().end();
 			++jter)
 		{
-			cloud[index++] = jter->second;
+			cloud[index].x = jter->second.x;
+			cloud[index].y = jter->second.y;
+			cloud[index++].z = jter->second.z;
 		}
 		pcl::toROSMsg(cloud, msg.wordPts);
 	}
