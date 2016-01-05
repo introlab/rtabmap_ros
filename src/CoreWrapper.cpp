@@ -136,7 +136,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	if(subscribeScan2d && subscribeScan3d)
 	{
 		ROS_WARN("rtabmap: Parameters subscribe_scan and subscribe_scan_cloud cannot be true at the same time. Parameter subscribe_scan_cloud is set to false.");
-		subscribeDepth = false;
+		subscribeScan3d = false;
 	}
 	if(subscribeScan2d || subscribeScan3d)
 	{
