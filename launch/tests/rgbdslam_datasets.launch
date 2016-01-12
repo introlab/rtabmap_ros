@@ -65,6 +65,7 @@
       <param name="subscribe_laserScan" type="bool" value="false"/>
       
       <param name="frame_id" type="string" value="kinect"/>
+      <param name="ground_truth_frame_id" type="string" value="world"/>
 	
       <remap from="rgb/image" to="/camera/rgb/image_color"/>
       <remap from="depth/image" to="/camera/depth/image"/>
