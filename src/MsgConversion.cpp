@@ -486,6 +486,7 @@ rtabmap::Signature nodeDataFromROS(const rtabmap_ros::NodeData & msg)
 			msg.stamp,
 			msg.label,
 			transformFromPoseMsg(msg.pose),
+			transformFromPoseMsg(msg.groundTruthPose),
 			stereoModel.isValid()?
 				rtabmap::SensorData(
 					compressedMatFromBytes(msg.laserScan),
@@ -520,6 +521,7 @@ void nodeDataToROS(const rtabmap::Signature & signature, rtabmap_ros::NodeData &
 	msg.stamp = signature.getStamp();
 	msg.label = signature.getLabel();
 	transformToPoseMsg(signature.getPose(), msg.pose);
+	transformToPoseMsg(signature.getGroundTruthPose(), msg.groundTruthPose);
 	compressedMatToBytes(signature.sensorData().imageCompressed(), msg.image);
 	compressedMatToBytes(signature.sensorData().depthOrRightCompressed(), msg.depth);
 	compressedMatToBytes(signature.sensorData().laserScanCompressed(), msg.laserScan);
@@ -596,7 +598,8 @@ rtabmap::Signature nodeInfoFromROS(const rtabmap_ros::NodeData & msg)
 			msg.weight,
 			msg.stamp,
 			msg.label,
-			transformFromPoseMsg(msg.pose));
+			transformFromPoseMsg(msg.pose),
+			transformFromPoseMsg(msg.groundTruthPose));
 	return s;
 }
 void nodeInfoToROS(const rtabmap::Signature & signature, rtabmap_ros::NodeData & msg)
@@ -608,6 +611,7 @@ void nodeInfoToROS(const rtabmap::Signature & signature, rtabmap_ros::NodeData &
 	msg.stamp = signature.getStamp();
 	msg.label = signature.getLabel();
 	transformToPoseMsg(signature.getPose(), msg.pose);
+	transformToPoseMsg(signature.getGroundTruthPose(), msg.groundTruthPose);
 }
 
 rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::OdomInfo & msg)
