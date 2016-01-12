@@ -40,6 +40,7 @@ public:
 	virtual ~PreferencesDialogROS();
 
 	virtual QString getIniFilePath() const;
+	virtual QString getTmpIniFilePath() const;
 
 protected:
 	virtual QString getParamMessage();
@@ -48,8 +49,6 @@ protected:
 	virtual bool readCoreSettings(const QString & filePath);
 	virtual void writeCameraSettings(const QString & filePath) const {}
 	virtual void writeCoreSettings(const QString & filePath) const {}
-
-	virtual QString getTmpIniFilePath() const;
 
 private:
 	QString configFile_;
