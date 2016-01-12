@@ -80,6 +80,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 		frameId_("base_link"),
 		mapFrameId_("map"),
 		odomFrameId_(""),
+		groundTruthFrameId_(""), // e.g., "world"
 		configPath_(""),
 		databasePath_(UDirectory::homeDir()+"/.ros/"+rtabmap::Parameters::getDefaultDatabaseName()),
 		waitForTransform_(true),
@@ -153,6 +154,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	pnh.param("frame_id",            frameId_, frameId_);
 	pnh.param("map_frame_id",        mapFrameId_, mapFrameId_);
 	pnh.param("odom_frame_id",       odomFrameId_, odomFrameId_); // set to use odom from TF
+	pnh.param("ground_truth_frame_id", groundTruthFrameId_, groundTruthFrameId_);
 	pnh.param("depth_cameras",       depthCameras, depthCameras);
 	pnh.param("queue_size",          queueSize, queueSize);
 	pnh.param("stereo_approx_sync",  stereoApproxSync, stereoApproxSync);
@@ -180,6 +182,11 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 		{
 			odomFrameId_ = tfPrefix+"/"+odomFrameId_;
 		}
+		if(!groundTruthFrameId_.empty())
+		{
+			groundTruthFrameId_ = tfPrefix+"/"+groundTruthFrameId_;
+		}
+		// keep worldFrameId_ without prefix as it should be global
 	}
 
 	if(depthCameras <= 0 && subscribeDepth)
@@ -191,6 +198,10 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	if(!odomFrameId_.empty())
 	{
 		ROS_INFO("rtabmap: odom_frame_id = %s", odomFrameId_.c_str());
+	}
+	if(!groundTruthFrameId_.empty())
+	{
+		ROS_INFO("rtabmap: ground_truth_frame_id = %s", groundTruthFrameId_.c_str());
 	}
 	ROS_INFO("rtabmap: map_frame_id = %s", mapFrameId_.c_str());
 	ROS_INFO("rtabmap: queue_size = %d", queueSize);
@@ -880,15 +891,24 @@ void CoreWrapper::commonDepthCallback(
 						scan3dMsg.get() != 0?scan3dMsg->header.stamp:
 					    depthMsgs[0]->header.stamp;
 
+	Transform groundTruthPose;
+	if(!groundTruthFrameId_.empty())
+	{
+		groundTruthPose = getTransform(groundTruthFrameId_, frameId_, stamp);
+	}
+
+	SensorData data(scan,
+			scan2dMsg.get() != 0?(int)scan2dMsg->ranges.size():genMaxScanPts,
+			scan2dMsg.get() != 0?scan2dMsg->range_max:(genScan_?genScanMaxDepth_:0.0f),
+			rgb,
+			depth,
+			cameraModels,
+			imageMsgs[0]->header.seq,
+			rtabmap_ros::timestampFromROS(stamp));
+	data.setGroundTruth(groundTruthPose);
+
 	process(stamp,
-			SensorData(scan,
-					scan2dMsg.get() != 0?(int)scan2dMsg->ranges.size():genMaxScanPts,
-					scan2dMsg.get() != 0?scan2dMsg->range_max:(genScan_?genScanMaxDepth_:0.0f),
-					rgb,
-					depth,
-					cameraModels,
-					imageMsgs[0]->header.seq,
-					rtabmap_ros::timestampFromROS(stamp)),
+			data,
 			lastPose_,
 			odomFrameId,
 			uIsFinite(rotVariance_) && rotVariance_>0?rotVariance_:1.0,
@@ -1019,15 +1039,25 @@ void CoreWrapper::commonStereoCallback(
 	ros::Time stamp =   scan2dMsg.get() != 0?scan2dMsg->header.stamp:
 						scan3dMsg.get() != 0?scan3dMsg->header.stamp:
 					    leftImageMsg->header.stamp;
+
+	Transform groundTruthPose;
+	if(!groundTruthFrameId_.empty())
+	{
+		groundTruthPose = getTransform(groundTruthFrameId_, frameId_, stamp);
+	}
+
+	SensorData data(scan,
+			scan2dMsg.get() != 0?(int)scan2dMsg->ranges.size():0,
+			scan2dMsg.get() != 0?scan2dMsg->range_max:0,
+			ptrLeftImage->image,
+			ptrRightImage->image,
+			stereoModel,
+			leftImageMsg->header.seq,
+			rtabmap_ros::timestampFromROS(stamp));
+	data.setGroundTruth(groundTruthPose);
+
 	process(stamp,
-			SensorData(scan,
-					scan2dMsg.get() != 0?(int)scan2dMsg->ranges.size():0,
-					scan2dMsg.get() != 0?scan2dMsg->range_max:0,
-					ptrLeftImage->image,
-					ptrRightImage->image,
-					stereoModel,
-					leftImageMsg->header.seq,
-					rtabmap_ros::timestampFromROS(stamp)),
+			data,
 			lastPose_,
 			odomFrameId,
 			uIsFinite(rotVariance_) && rotVariance_>0?rotVariance_:1.0,

@@ -89,7 +89,7 @@ public:
 			Signature tmpS = nodes_.at(poses.rbegin()->first);
 			SensorData tmpData = tmpS.sensorData();
 			tmpData.setId(-1);
-			uInsert(nodes_, std::make_pair(-1, Signature(-1, -1, 0, tmpS.getStamp(), "", tmpS.getPose(), tmpS.getGroundTruthPose(), tmpData)));
+			uInsert(nodes_, std::make_pair(-1, Signature(-1, -1, 0, tmpS.getStamp(), "", tmpS.getPose(), Transform(), tmpData)));
 			poses.insert(std::make_pair(-1, poses.rbegin()->second));
 		}
 
