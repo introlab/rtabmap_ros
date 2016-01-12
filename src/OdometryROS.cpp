@@ -368,7 +368,7 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 			const std::multimap<int, cv::Point3f> & map = ((OdometryLocalMap*)odometry_)->getLocalMap();
 			for(std::multimap<int, cv::Point3f>::const_iterator iter=map.begin(); iter!=map.end(); ++iter)
 			{
-				cloud.push_back(pcl::PointXYZ(iter->second.y, iter->second.y, iter->second.z));
+				cloud.push_back(pcl::PointXYZ(iter->second.x, iter->second.y, iter->second.z));
 			}
 			sensor_msgs::PointCloud2 cloudMsg;
 			pcl::toROSMsg(cloud, cloudMsg);
