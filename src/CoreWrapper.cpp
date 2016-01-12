@@ -121,7 +121,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 
 	// ROS related parameters (private)
 	pnh.param("subscribe_depth",     subscribeDepth, subscribeDepth);
-	if(pnh.getParam("subscribe_laserScan", subscribeScan2d))
+	if(pnh.getParam("subscribe_laserScan", subscribeScan2d) && subscribeScan2d)
 	{
 		ROS_WARN("rtabmap: \"subscribe_laserScan\" parameter is deprecated, use \"subscribe_scan\" instead. The scan topic is still subscribed.");
 	}
@@ -286,12 +286,12 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 			{
 				if(iter->second.second.empty())
 				{
-					ROS_WARN("Rtabmap: Parameter \"%s\" doesn't exist anymore!",
+					ROS_ERROR("Rtabmap: Parameter \"%s\" doesn't exist anymore!",
 							iter->first.c_str());
 				}
 				else
 				{
-					ROS_WARN("Rtabmap: Parameter \"%s\" doesn't exist anymore! You may look at this similar parameter: \"%s\"",
+					ROS_ERROR("Rtabmap: Parameter \"%s\" doesn't exist anymore! You may look at this similar parameter: \"%s\"",
 							iter->first.c_str(), iter->second.second.c_str());
 				}
 			}

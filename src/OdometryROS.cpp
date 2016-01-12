@@ -201,12 +201,12 @@ OdometryROS::OdometryROS(int argc, char * argv[], bool stereo) :
 			{
 				if(iter->second.second.empty())
 				{
-					ROS_WARN("Odometry: Parameter \"%s\" doesn't exist anymore!",
+					ROS_ERROR("Odometry: Parameter \"%s\" doesn't exist anymore!",
 							iter->first.c_str());
 				}
 				else
 				{
-					ROS_WARN("Odometry: Parameter \"%s\" doesn't exist anymore! You may look at this similar parameter: \"%s\"",
+					ROS_ERROR("Odometry: Parameter \"%s\" doesn't exist anymore! You may look at this similar parameter: \"%s\"",
 							iter->first.c_str(), iter->second.second.c_str());
 				}
 			}

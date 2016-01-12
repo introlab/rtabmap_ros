@@ -128,7 +128,7 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 	pnh.param("frame_id", frameId_, frameId_);
 	pnh.param("odom_frame_id", odomFrameId_, odomFrameId_); // set to use odom from TF
 	pnh.param("subscribe_depth", subscribeDepth, subscribeDepth);
-	if(pnh.getParam("subscribe_laserScan", subscribeLaserScan2d))
+	if(pnh.getParam("subscribe_laserScan", subscribeLaserScan2d) && subscribeLaserScan2d)
 	{
 		ROS_WARN("rtabmapviz: \"subscribe_laserScan\" parameter is deprecated, use \"subscribe_scan\" instead. The scan topic is still subscribed.");
 	}
