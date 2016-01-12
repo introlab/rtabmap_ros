@@ -122,25 +122,3 @@ bool PreferencesDialogROS::readCoreSettings(const QString & filePath)
 
 }
 
-void PreferencesDialogROS::writeSettings(const QString & filePath)
-{
-	writeGuiSettings(filePath);
-
-	// This will tell the MainWindow that the
-	//parameters are updated. The MainWindow will send an Event that
-	// will be handled by the GuiWrapper where we will write
-	// parameters in ROS and the rtabmap_node will be notified.
-	if(_parameters.size())
-	{
-		emit settingsChanged(_parameters);
-	}
-
-	if(_obsoletePanels)
-	{
-		emit settingsChanged(_obsoletePanels);
-	}
-
-	_parameters = rtabmap::ParametersMap();
-	_obsoletePanels = kPanelDummy;
-}
-

@@ -46,7 +46,8 @@ protected:
 
 	virtual void readCameraSettings(const QString & filePath);
 	virtual bool readCoreSettings(const QString & filePath);
-	virtual void writeSettings(const QString & filePath);
+	virtual void writeCameraSettings(const QString & filePath) const {}
+	virtual void writeCoreSettings(const QString & filePath) const {}
 
 	virtual QString getTmpIniFilePath() const;
 
