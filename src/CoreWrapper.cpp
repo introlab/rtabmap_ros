@@ -778,6 +778,7 @@ void CoreWrapper::commonDepthCallback(
 		Transform localTransform = getTransform(frameId_, depthMsgs[i]->header.frame_id, depthMsgs[i]->header.stamp);
 		if(localTransform.isNull())
 		{
+			ROS_ERROR("TF of received depth image %d at time %fs is not set, aborting rtabmap update.", i, depthMsgs[i]->header.stamp.toSec());
 			return;
 		}
 		// sync with odometry stamp
@@ -788,9 +789,13 @@ void CoreWrapper::commonDepthCallback(
 				Transform sensorT = getTransform(odomFrameId, frameId_, depthMsgs[i]->header.stamp);
 				if(sensorT.isNull())
 				{
-					return;
+					ROS_WARN("Could not get odometry value for depth image %d stamp (%fs). Latest odometry "
+							 "stamp is %fs. The depth image pose will not be synchronized with odometry.", i, depthMsgs[i]->header.stamp.toSec(), lastPoseStamp_.toSec());
 				}
-				localTransform = odomT.inverse() * sensorT * localTransform;
+				else
+				{
+					localTransform = odomT.inverse() * sensorT * localTransform;
+				}
 			}
 		}
 
@@ -884,6 +889,7 @@ void CoreWrapper::commonDepthCallback(
 		// make sure the frame of the laser is updated too
 		if(getTransform(frameId_, scanMsg->header.frame_id, scanMsg->header.stamp).isNull())
 		{
+			ROS_ERROR("TF of received laser scan topic at time %fs is not set, aborting rtabmap update.", scanMsg->header.stamp.toSec());
 			return;
 		}
 
@@ -902,10 +908,14 @@ void CoreWrapper::commonDepthCallback(
 				Transform sensorT = getTransform(odomFrameId, frameId_, scanMsg->header.stamp);
 				if(sensorT.isNull())
 				{
-					return;
+					ROS_WARN("Could not get odometry value for laser scan stamp (%fs). Latest odometry "
+							"stamp is %fs. The laser scan pose will not be synchronized with odometry.", scanMsg->header.stamp.toSec(), lastPoseStamp_.toSec());
 				}
-				Transform t = odomT.inverse() * sensorT;
-				pclScan = util3d::transformPointCloud(pclScan, t);
+				else
+				{
+					Transform t = odomT.inverse() * sensorT;
+					pclScan = util3d::transformPointCloud(pclScan, t);
+				}
 
 			}
 		}
