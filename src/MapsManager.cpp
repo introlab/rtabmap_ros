@@ -224,12 +224,12 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 				{
 					if(!(data.imageCompressed().empty() && data.imageRaw().empty()) &&
 					   !(data.depthOrRightCompressed().empty() && data.depthOrRightRaw().empty()) &&
-					   (data.cameraModels().size() || data.stereoCameraModel().isValid()))
+					   (data.cameraModels().size() || data.stereoCameraModel().isValidForProjection()))
 					{
 						// Which data should we decompress?
 						cv::Mat image, depth, scan;
 						data.uncompressData(
-								(rgbDepthRequired||data.stereoCameraModel().isValid()) ? &image:0,
+								(rgbDepthRequired||data.stereoCameraModel().isValidForProjection()) ? &image:0,
 								(rgbDepthRequired||depthRequired) ? &depth:0,
 								scanRequired||gridRequired?&scan:0);
 
@@ -287,7 +287,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 							// Make sure that image size is set in camera models.
 							// The camera models are used when cloud_frustum_culling=true.
 							std::vector<rtabmap::CameraModel> models;
-							if(data.stereoCameraModel().isValid())
+							if(data.stereoCameraModel().isValidForProjection())
 							{
 								//insert only the left camera model
 								rtabmap::CameraModel model = data.stereoCameraModel().left();
@@ -380,7 +380,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 								iter->first,
 								!(data.imageCompressed().empty() && data.imageRaw().empty())?1:0,
 							   !(data.depthOrRightCompressed().empty() && data.depthOrRightRaw().empty())?1:0,
-							   (data.cameraModels().size() || data.stereoCameraModel().isValid())?1:0);
+							   (data.cameraModels().size() || data.stereoCameraModel().isValidForProjection())?1:0);
 					}
 				}
 			}
@@ -489,7 +489,7 @@ void MapsManager::publishMaps(
 					{
 						for(unsigned int i=0; i<kter->second.size(); ++i)
 						{
-							if(kter->second[i].isValid())
+							if(kter->second[i].isValidForProjection())
 							{
 								int size =  assembledCloud->size();
 								assembledCloud = util3d::frustumFiltering(

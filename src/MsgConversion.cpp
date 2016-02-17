@@ -487,7 +487,7 @@ rtabmap::Signature nodeDataFromROS(const rtabmap_ros::NodeData & msg)
 			msg.label,
 			transformFromPoseMsg(msg.pose),
 			transformFromPoseMsg(msg.groundTruthPose),
-			stereoModel.isValid()?
+			stereoModel.isValidForProjection()?
 				rtabmap::SensorData(
 					compressedMatFromBytes(msg.laserScan),
 					msg.laserScanMaxPts,
@@ -545,7 +545,7 @@ void nodeDataToROS(const rtabmap::Signature & signature, rtabmap_ros::NodeData &
 			transformToGeometryMsg(signature.sensorData().cameraModels()[i].localTransform(), msg.localTransform[i]);
 		}
 	}
-	else if(signature.sensorData().stereoCameraModel().isValid())
+	else if(signature.sensorData().stereoCameraModel().isValidForProjection())
 	{
 		msg.fx.push_back(signature.sensorData().stereoCameraModel().left().fx());
 		msg.fy.push_back(signature.sensorData().stereoCameraModel().left().fy());

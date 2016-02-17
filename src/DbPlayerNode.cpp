@@ -214,7 +214,7 @@ int main(int argc, char** argv)
 		else if(!odom.data().rightRaw().empty() && odom.data().rightRaw().type() == CV_8U)
 		{
 			//stereo
-			if(odom.data().stereoCameraModel().isValid())
+			if(odom.data().stereoCameraModel().isValidForProjection())
 			{
 				camInfoA.D.resize(8,0);
 
@@ -262,7 +262,7 @@ int main(int argc, char** argv)
 			{
 				localTransform = odom.data().cameraModels()[0].localTransform();
 			}
-			else if(odom.data().stereoCameraModel().isValid())
+			else if(odom.data().stereoCameraModel().isValidForProjection())
 			{
 				localTransform = odom.data().stereoCameraModel().left().localTransform();
 			}

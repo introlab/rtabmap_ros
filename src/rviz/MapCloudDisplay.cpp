@@ -259,7 +259,7 @@ void MapCloudDisplay::processMapData(const rtabmap_ros::MapData& map)
 			rtabmap::Signature s = rtabmap_ros::nodeDataFromROS(map.nodes[i]);
 			if(!s.sensorData().imageCompressed().empty() &&
 			   !s.sensorData().depthOrRightCompressed().empty() &&
-			   (s.sensorData().cameraModels().size() || s.sensorData().stereoCameraModel().isValid()))
+			   (s.sensorData().cameraModels().size() || s.sensorData().stereoCameraModel().isValidForProjection()))
 			{
 				cv::Mat image, depth;
 				s.sensorData().uncompressData(&image, &depth, 0);
