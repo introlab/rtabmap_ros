@@ -74,6 +74,7 @@ using namespace rtabmap;
 CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 		paused_(false),
 		lastPose_(Transform::getIdentity()),
+		lastPoseIntermediate_(false),
 		rotVariance_(0),
 		transVariance_(0),
 		latestNodeWasReached_(false),
@@ -103,6 +104,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 		stereoExactTFSync_(0),
 		transformThread_(0),
 		rate_(Parameters::defaultRtabmapDetectionRate()),
+		createIntermediateNodes_(Parameters::defaultRtabmapCreateIntermediateNodes()),
 		time_(ros::Time::now()),
 		mbClient_("move_base", true)
 {
@@ -317,8 +319,16 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 	}
 	if(parameters_.find(Parameters::kRtabmapDetectionRate()) != parameters_.end())
 	{
-		rate_ = uStr2Float(parameters_.at(Parameters::kRtabmapDetectionRate()));
-		ROS_INFO("RTAB-Map rate detection = %f Hz", rate_);
+		Parameters::parse(parameters_, Parameters::kRtabmapDetectionRate(), rate_);
+		ROS_INFO("RTAB-Map detection rate = %f Hz", rate_);
+	}
+	if(parameters_.find(Parameters::kRtabmapCreateIntermediateNodes()) != parameters_.end())
+	{
+		Parameters::parse(parameters_, Parameters::kRtabmapCreateIntermediateNodes(), createIntermediateNodes_);
+		if(createIntermediateNodes_)
+		{
+			ROS_INFO("Create intermediate nodes");
+		}
 	}
 	bool isRGBD = uStr2Bool(parameters_.at(Parameters::kRGBDEnabled()).c_str());
 	if(isRGBD)
@@ -589,14 +599,15 @@ bool CoreWrapper::commonOdomUpdate(const nav_msgs::OdometryConstPtr & odomMsg)
 	if(!paused_)
 	{
 		Transform odom = rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose);
-		if(!lastPose_.isIdentity() && odom.isIdentity())
+		if(!lastPose_.isIdentity() && (odom.isIdentity() || odomMsg->pose.covariance[0] >= 9999))
 		{
-			UWARN("Odometry is reset (identity pose detected). Increment map id!");
+			UWARN("Odometry is reset (identity pose or high variance (%f) detected). Increment map id!", odomMsg->pose.covariance[0]);
 			rtabmap_.triggerNewMap();
 			rotVariance_ = 0;
 			transVariance_ = 0;
 		}
 
+		lastPoseIntermediate_ = false;
 		lastPose_ = odom;
 		lastPoseStamp_ = odomMsg->header.stamp;
 		double transVariance = uMax3(odomMsg->pose.covariance[0], odomMsg->pose.covariance[7], odomMsg->pose.covariance[14]);
@@ -611,14 +622,30 @@ bool CoreWrapper::commonOdomUpdate(const nav_msgs::OdometryConstPtr & odomMsg)
 		}
 
 		// Throttle
+		bool ignoreFrame = false;
 		if(rate_>0.0f)
 		{
 			if(ros::Time::now() - time_ < ros::Duration(1.0f/rate_))
 			{
+				ignoreFrame = true;
+			}
+		}
+		if(ignoreFrame)
+		{
+			if(createIntermediateNodes_)
+			{
+				lastPoseIntermediate_ = true;
+			}
+			else
+			{
 				return false;
 			}
 		}
-		time_ = ros::Time::now();
+		else if(!ignoreFrame)
+		{
+			time_ = ros::Time::now();
+		}
+
 		return true;
 	}
 	return false;
@@ -643,6 +670,7 @@ bool CoreWrapper::commonOdomTFUpdate(const ros::Time & stamp)
 			transVariance_ = 0;
 		}
 
+		lastPoseIntermediate_ = false;
 		lastPose_ = odom;
 		lastPoseStamp_ = stamp;
 		// Throttle
@@ -903,7 +931,7 @@ void CoreWrapper::commonDepthCallback(
 			rgb,
 			depth,
 			cameraModels,
-			imageMsgs[0]->header.seq,
+			lastPoseIntermediate_?-1:imageMsgs[0]->header.seq,
 			rtabmap_ros::timestampFromROS(stamp));
 	data.setGroundTruth(groundTruthPose);
 
@@ -1052,7 +1080,7 @@ void CoreWrapper::commonStereoCallback(
 			ptrLeftImage->image,
 			ptrRightImage->image,
 			stereoModel,
-			leftImageMsg->header.seq,
+			lastPoseIntermediate_?-1:leftImageMsg->header.seq,
 			rtabmap_ros::timestampFromROS(stamp));
 	data.setGroundTruth(groundTruthPose);
 
@@ -1593,6 +1621,7 @@ bool CoreWrapper::resetRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empt
 	rotVariance_ = 0;
 	transVariance_ = 0;
 	lastPose_.setIdentity();
+	lastPoseIntermediate_ = false;
 	currentMetricGoal_.setNull();
 	latestNodeWasReached_ = false;
 	mapsManager_.clear();

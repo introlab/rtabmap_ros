@@ -257,6 +257,7 @@ private:
 	bool paused_;
 	rtabmap::Transform lastPose_;
 	ros::Time lastPoseStamp_;
+	bool lastPoseIntermediate_;
 	double rotVariance_;
 	double transVariance_;
 	rtabmap::Transform currentMetricGoal_;
@@ -462,6 +463,7 @@ private:
 	boost::thread* transformThread_;
 
 	float rate_;
+	bool createIntermediateNodes_;
 	ros::Time time_;
 };
 
