@@ -465,6 +465,7 @@ private:
 	float rate_;
 	bool createIntermediateNodes_;
 	ros::Time time_;
+	ros::Time previousStamp_;
 };
 
 #endif /* COREWRAPPER_H_ */

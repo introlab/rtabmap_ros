@@ -106,6 +106,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 		rate_(Parameters::defaultRtabmapDetectionRate()),
 		createIntermediateNodes_(Parameters::defaultRtabmapCreateIntermediateNodes()),
 		time_(ros::Time::now()),
+		previousStamp_(0),
 		mbClient_("move_base", true)
 {
 	ros::NodeHandle nh;
@@ -625,7 +626,8 @@ bool CoreWrapper::commonOdomUpdate(const nav_msgs::OdometryConstPtr & odomMsg)
 		bool ignoreFrame = false;
 		if(rate_>0.0f)
 		{
-			if(ros::Time::now() - time_ < ros::Duration(1.0f/rate_))
+			if((previousStamp_.toSec() > 0.0 && odomMsg->header.stamp.toSec() > previousStamp_.toSec() && odomMsg->header.stamp - previousStamp_ < ros::Duration(1.0f/rate_)) ||
+			   ((previousStamp_.toSec() <= 0.0 || odomMsg->header.stamp.toSec() <= previousStamp_.toSec()) && ros::Time::now() - time_ < ros::Duration(1.0f/rate_)))
 			{
 				ignoreFrame = true;
 			}
@@ -644,6 +646,7 @@ bool CoreWrapper::commonOdomUpdate(const nav_msgs::OdometryConstPtr & odomMsg)
 		else if(!ignoreFrame)
 		{
 			time_ = ros::Time::now();
+			previousStamp_ = odomMsg->header.stamp;
 		}
 
 		return true;
@@ -673,15 +676,33 @@ bool CoreWrapper::commonOdomTFUpdate(const ros::Time & stamp)
 		lastPoseIntermediate_ = false;
 		lastPose_ = odom;
 		lastPoseStamp_ = stamp;
-		// Throttle
+
+		bool ignoreFrame = false;
 		if(rate_>0.0f)
 		{
-			if(ros::Time::now() - time_ < ros::Duration(1.0f/rate_))
+			if((previousStamp_.toSec() > 0.0 && stamp.toSec() > previousStamp_.toSec() && stamp - previousStamp_ < ros::Duration(1.0f/rate_)) ||
+			   ((previousStamp_.toSec() <= 0.0 || stamp.toSec() <= previousStamp_.toSec()) && ros::Time::now() - time_ < ros::Duration(1.0f/rate_)))
+			{
+				ignoreFrame = true;
+			}
+		}
+		if(ignoreFrame)
+		{
+			if(createIntermediateNodes_)
+			{
+				lastPoseIntermediate_ = true;
+			}
+			else
 			{
 				return false;
 			}
 		}
-		time_ = ros::Time::now();
+		else if(!ignoreFrame)
+		{
+			time_ = ros::Time::now();
+			previousStamp_ = stamp;
+		}
+
 		return true;
 	}
 	return false;
@@ -1319,95 +1340,102 @@ void CoreWrapper::process(
 			odomFrameId_ = odomFrameId;
 			mapToOdomMutex_.unlock();
 
-			// Publish local graph, info
-			this->publishStats(stamp);
-			std::map<int, rtabmap::Transform> filteredPoses = rtabmap_.getLocalOptimizedPoses();
-
-			// create a tmp signature with latest sensory data
-			std::map<int, rtabmap::Signature> tmpSignature;
-			SensorData tmpData = data;
-			tmpData.setId(-1);
-			tmpSignature.insert(std::make_pair(-1, Signature(-1, -1, 0, data.stamp(), "", odom, Transform(), tmpData)));
-			filteredPoses.insert(std::make_pair(-1, rtabmap_.getMapCorrection()*odom));
-
-			// Update maps
-			filteredPoses = mapsManager_.updateMapCaches(
-					filteredPoses,
-					rtabmap_.getMemory(),
-					false,
-					false,
-					false,
-					false,
-					tmpSignature);
-
-			mapsManager_.publishMaps(filteredPoses, stamp, mapFrameId_);
-
-			// update goal if planning is enabled
-			if(!currentMetricGoal_.isNull())
+			if(data.id() < 0)
 			{
-				if(rtabmap_.getPath().size() == 0)
+				ROS_INFO("Intermediate node added");
+			}
+			else
+			{
+				// Publish local graph, info
+				this->publishStats(stamp);
+				std::map<int, rtabmap::Transform> filteredPoses = rtabmap_.getLocalOptimizedPoses();
+
+				// create a tmp signature with latest sensory data
+				std::map<int, rtabmap::Signature> tmpSignature;
+				SensorData tmpData = data;
+				tmpData.setId(-1);
+				tmpSignature.insert(std::make_pair(-1, Signature(-1, -1, 0, data.stamp(), "", odom, Transform(), tmpData)));
+				filteredPoses.insert(std::make_pair(-1, rtabmap_.getMapCorrection()*odom));
+
+				// Update maps
+				filteredPoses = mapsManager_.updateMapCaches(
+						filteredPoses,
+						rtabmap_.getMemory(),
+						false,
+						false,
+						false,
+						false,
+						tmpSignature);
+
+				mapsManager_.publishMaps(filteredPoses, stamp, mapFrameId_);
+
+				// update goal if planning is enabled
+				if(!currentMetricGoal_.isNull())
 				{
-					if(rtabmap_.getPathStatus() > 0)
+					if(rtabmap_.getPath().size() == 0)
 					{
-						// Goal reached
-						ROS_INFO("Planning: Publishing goal reached!");
-					}
-					else
-					{
-						ROS_WARN("Planning: Plan failed!");
-						if(mbClient_.isServerConnected())
+						if(rtabmap_.getPathStatus() > 0)
 						{
-							mbClient_.cancelGoal();
+							// Goal reached
+							ROS_INFO("Planning: Publishing goal reached!");
 						}
-					}
-					if(goalReachedPub_.getNumSubscribers())
-					{
-						std_msgs::Bool result;
-						result.data = rtabmap_.getPathStatus() > 0;
-						goalReachedPub_.publish(result);
-					}
-					currentMetricGoal_.setNull();
-					latestNodeWasReached_ = false;
-				}
-				else
-				{
-					currentMetricGoal_ = rtabmap_.getPose(rtabmap_.getPathCurrentGoalId());
-					if(!currentMetricGoal_.isNull())
-					{
-						// Adjust the target pose relative to last node
-						if(rtabmap_.getPathCurrentGoalId() == rtabmap_.getPath().back().first && rtabmap_.getLocalOptimizedPoses().size())
+						else
 						{
-							if(latestNodeWasReached_ ||
-							   rtabmap_.getLastLocalizationPose().getDistance(currentMetricGoal_) < rtabmap_.getGoalReachedRadius() ||
-							   rtabmap_.getPathTransformToGoal().getNorm() < rtabmap_.getGoalReachedRadius())
+							ROS_WARN("Planning: Plan failed!");
+							if(mbClient_.isServerConnected())
 							{
-								latestNodeWasReached_ = true;
-								currentMetricGoal_ *= rtabmap_.getPathTransformToGoal();
+								mbClient_.cancelGoal();
 							}
 						}
-
-						// publish next goal with updated currentMetricGoal_
-						publishCurrentGoal(stamp);
-
-						// publish local path
-						publishLocalPath(stamp);
-
-						// publish global path
-						publishGlobalPath(stamp);
-					}
-					else
-					{
-						ROS_ERROR("Planning: Local map broken, current goal id=%d (the robot may have moved to far from planned nodes)",
-								rtabmap_.getPathCurrentGoalId());
-						rtabmap_.clearPath(-1);
 						if(goalReachedPub_.getNumSubscribers())
 						{
 							std_msgs::Bool result;
-							result.data = false;
+							result.data = rtabmap_.getPathStatus() > 0;
 							goalReachedPub_.publish(result);
 						}
 						currentMetricGoal_.setNull();
 						latestNodeWasReached_ = false;
+					}
+					else
+					{
+						currentMetricGoal_ = rtabmap_.getPose(rtabmap_.getPathCurrentGoalId());
+						if(!currentMetricGoal_.isNull())
+						{
+							// Adjust the target pose relative to last node
+							if(rtabmap_.getPathCurrentGoalId() == rtabmap_.getPath().back().first && rtabmap_.getLocalOptimizedPoses().size())
+							{
+								if(latestNodeWasReached_ ||
+								   rtabmap_.getLastLocalizationPose().getDistance(currentMetricGoal_) < rtabmap_.getGoalReachedRadius() ||
+								   rtabmap_.getPathTransformToGoal().getNorm() < rtabmap_.getGoalReachedRadius())
+								{
+									latestNodeWasReached_ = true;
+									currentMetricGoal_ *= rtabmap_.getPathTransformToGoal();
+								}
+							}
+
+							// publish next goal with updated currentMetricGoal_
+							publishCurrentGoal(stamp);
+
+							// publish local path
+							publishLocalPath(stamp);
+
+							// publish global path
+							publishGlobalPath(stamp);
+						}
+						else
+						{
+							ROS_ERROR("Planning: Local map broken, current goal id=%d (the robot may have moved to far from planned nodes)",
+									rtabmap_.getPathCurrentGoalId());
+							rtabmap_.clearPath(-1);
+							if(goalReachedPub_.getNumSubscribers())
+							{
+								std_msgs::Bool result;
+								result.data = false;
+								goalReachedPub_.publish(result);
+							}
+							currentMetricGoal_.setNull();
+							latestNodeWasReached_ = false;
+						}
 					}
 				}
 			}
@@ -1625,6 +1653,7 @@ bool CoreWrapper::resetRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empt
 	currentMetricGoal_.setNull();
 	latestNodeWasReached_ = false;
 	mapsManager_.clear();
+	previousStamp_ = ros::Time(0);
 	return true;
 }
 
