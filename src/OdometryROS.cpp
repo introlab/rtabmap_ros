@@ -37,7 +37,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <cv_bridge/cv_bridge.h>
 
 #include <rtabmap/core/Rtabmap.h>
-#include <rtabmap/core/OdometryLocalMap.h>
+#include <rtabmap/core/OdometryF2M.h>
 #include <rtabmap/core/OdometryF2F.h>
 #include <rtabmap/core/util3d_transforms.h>
 #include <rtabmap/core/Memory.h>
@@ -318,7 +318,8 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 	// process data
 	ros::WallTime time = ros::WallTime::now();
 	rtabmap::OdometryInfo info;
-	rtabmap::Transform pose = odometry_->process(data, &info);
+	SensorData dataCpy = data;
+	rtabmap::Transform pose = odometry_->process(dataCpy, &info);
 	if(!pose.isNull())
 	{
 		//*********************
@@ -362,10 +363,10 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 		}
 
 		// local map / reference frame
-		if(odomLocalMap_.getNumSubscribers() && dynamic_cast<OdometryLocalMap*>(odometry_))
+		if(odomLocalMap_.getNumSubscribers() && dynamic_cast<OdometryF2M*>(odometry_))
 		{
 			pcl::PointCloud<pcl::PointXYZ> cloud;
-			const std::multimap<int, cv::Point3f> & map = ((OdometryLocalMap*)odometry_)->getLocalMap();
+			const std::multimap<int, cv::Point3f> & map = ((OdometryF2M*)odometry_)->getMap().getWords3();
 			for(std::multimap<int, cv::Point3f>::const_iterator iter=map.begin(); iter!=map.end(); ++iter)
 			{
 				cloud.push_back(pcl::PointXYZ(iter->second.x, iter->second.y, iter->second.z));
@@ -379,12 +380,11 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 
 		if(odomLastFrame_.getNumSubscribers())
 		{
-			if(dynamic_cast<OdometryLocalMap*>(odometry_))
+			if(dynamic_cast<OdometryF2M*>(odometry_))
 			{
-				const rtabmap::Signature * s  = ((OdometryLocalMap*)odometry_)->getMemory()->getLastWorkingSignature();
-				if(s)
+				const std::multimap<int, cv::Point3f> & words3  = ((OdometryF2M*)odometry_)->getLastFrame().getWords3();
+				if(words3.size())
 				{
-					const std::multimap<int, cv::Point3f> & words3 = s->getWords3();
 					pcl::PointCloud<pcl::PointXYZ> cloud;
 					for(std::multimap<int, cv::Point3f>::const_iterator iter=words3.begin(); iter!=words3.end(); ++iter)
 					{
@@ -448,9 +448,9 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 	ROS_INFO("Odom: quality=%d, std dev=%fm, update time=%fs", info.inliers, pose.isNull()?0.0f:std::sqrt(info.variance), (ros::WallTime::now()-time).toSec());
 }
 
-bool OdometryROS::isOdometryBOW() const
+bool OdometryROS::isOdometryF2M() const
 {
-	return dynamic_cast<OdometryLocalMap*>(odometry_) != 0;
+	return dynamic_cast<OdometryF2M*>(odometry_) != 0;
 }
 
 bool OdometryROS::reset(std_srvs::Empty::Request&, std_srvs::Empty::Response&)

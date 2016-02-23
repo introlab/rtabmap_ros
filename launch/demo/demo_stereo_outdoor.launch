@@ -49,12 +49,13 @@
       <param name="odom_frame_id" type="string" value="odom"/>
 
       <param name="Odom/Strategy" type="string" value="0"/> <!-- 0=BOW, 1=OpticalFlow -->
-      <param name="Odom/EstimationType" type="string" value="1"/> <!-- 3D->2D (PnP) -->
-      <param name="Odom/MinInliers" type="string" value="10"/>
-      <param name="Odom/RoiRatios" type="string" value="0.03 0.03 0.04 0.04"/>
-      <param name="Odom/MaxDepth" type="string" value="10"/>
-      <param name="OdomBow/NNDR" type="string" value="0.8"/>
-      <param name="Odom/MaxFeatures" type="string" value="1000"/>
+      <param name="Vis/EstimationType" type="string" value="1"/> <!-- 3D->2D (PnP) -->
+      <param name="Vis/MinInliers" type="string" value="10"/>
+      <param name="Vis/RoiRatios" type="string" value="0.03 0.03 0.04 0.04"/>
+      <param name="Vis/MaxDepth" type="string" value="10"/>
+      <param name="Vis/NNDR" type="string" value="0.8"/>
+      <param name="Vis/MaxFeatures" type="string" value="1000"/>
+      <param name="Vis/CorGuessWinSize" type="string" value="31"/>
       <param name="Odom/FillInfoData" type="string" value="$(arg rtabmapviz)"/>
       <param name="GFTT/MinDistance" type="string" value="10"/>
       <param name="GFTT/QualityLevel" type="string" value="0.00001"/> 
@@ -80,19 +81,19 @@
          <param name="Rtabmap/TimeThr" type="string" value="700"/>
          <param name="Rtabmap/DetectionRate" type="string" value="1"/>
          
-         <param name="Kp/WordsPerImage" type="string" value="200"/>
+         <param name="Kp/MaxFeatures" type="string" value="200"/>
          <param name="Kp/RoiRatios" type="string" value="0.03 0.03 0.04 0.04"/>
          <param name="Kp/DetectorStrategy" type="string" value="0"/>   <!-- use SURF -->
          <param name="Kp/NNStrategy" type="string" value="1"/>         <!-- kdTree -->
 
          <param name="SURF/HessianThreshold" type="string" value="1000"/>
 
-         <param name="LccBow/MinInliers" type="string" value="10"/>
-         <param name="LccBow/EstimationType" type="string" value="1"/> <!-- 3D->2D (PnP) -->
+         <param name="Vis/MinInliers" type="string" value="10"/>
+         <param name="Vis/EstimationType" type="string" value="1"/> <!-- 3D->2D (PnP) -->
 
-         <param name="LccReextract/Activated" type="string" value="true"/>
-         <param name="LccReextract/MaxWords" type="string" value="500"/>
-         <param name="LccReextract/MaxDepth" type="string" value="10"/> 
+         <param name="RGBD/LoopClosureReextractFeatures" type="string" value="true"/>
+         <param name="Vis/MaxFeatures" type="string" value="500"/>
+         <param name="Vis/MaxDepth" type="string" value="10"/> 
       </node>
       
       <!-- Visualisation RTAB-Map -->
