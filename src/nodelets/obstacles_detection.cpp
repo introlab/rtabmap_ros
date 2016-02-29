@@ -119,7 +119,7 @@ private:
 			{
 				if(!tfListener_.waitForTransform(frameId_, cloudMsg->header.frame_id, cloudMsg->header.stamp, ros::Duration(1)))
 				{
-					ROS_ERROR("Could not get transform from %s to %s after 1 second!", frameId_.c_str(), cloudMsg->header.frame_id.c_str());
+					NODELET_ERROR("Could not get transform from %s to %s after 1 second!", frameId_.c_str(), cloudMsg->header.frame_id.c_str());
 					return;
 				}
 			}
@@ -129,7 +129,7 @@ private:
 		}
 		catch(tf::TransformException & ex)
 		{
-			ROS_ERROR("%s",ex.what());
+			NODELET_ERROR("%s",ex.what());
 			return;
 		}
 
@@ -255,7 +255,7 @@ private:
 			obstaclesPub_.publish(rosCloud);
 		}
 
-		//ROS_INFO("Obstacles segmentation time = %f s", (ros::Time::now() - time).toSec());
+		//NODELET_INFO("Obstacles segmentation time = %f s", (ros::Time::now() - time).toSec());
 	}
 
 private:

@@ -102,7 +102,7 @@ private:
 		pnh.param("noise_filter_radius", noiseFilterRadius_, noiseFilterRadius_);
 		pnh.param("noise_filter_min_neighbors", noiseFilterMinNeighbors_, noiseFilterMinNeighbors_);
 
-		ROS_INFO("Approximate time sync = %s", approxSync?"true":"false");
+		NODELET_INFO("Approximate time sync = %s", approxSync?"true":"false");
 
 		cloudPub_ = nh.advertise<sensor_msgs::PointCloud2>("cloud", 1);
 
@@ -167,7 +167,7 @@ private:
 			 imageDepth->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1)==0 ||
 			 imageDepth->encoding.compare(sensor_msgs::image_encodings::MONO16)==0))
 		{
-			ROS_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8 and image_depth=32FC1,16UC1,mono16");
+			NODELET_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8 and image_depth=32FC1,16UC1,mono16");
 			return;
 		}
 
@@ -212,7 +212,7 @@ private:
 				imageRight->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
 				imageRight->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0))
 		{
-			ROS_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8 (enc=%s)", imageLeft->encoding.c_str());
+			NODELET_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8 (enc=%s)", imageLeft->encoding.c_str());
 			return;
 		}
 

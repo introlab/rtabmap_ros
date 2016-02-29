@@ -108,7 +108,7 @@ private:
 		pnh.param("cut_right", cut_right_, cut_right_);
 		pnh.param("special_filter_close_object", create_close_obstacle_if_depth_is_missing_, create_close_obstacle_if_depth_is_missing_);
 
-		ROS_INFO("Approximate time sync = %s", approxSync?"true":"false");
+		NODELET_INFO("Approximate time sync = %s", approxSync?"true":"false");
 
 		if(approxSync)
 		{
@@ -149,7 +149,7 @@ private:
 		   depth->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1)!=0 &&
 		   depth->encoding.compare(sensor_msgs::image_encodings::MONO16)!=0)
 		{
-			ROS_ERROR("Input type depth=32FC1,16UC1,MONO16");
+			NODELET_ERROR("Input type depth=32FC1,16UC1,MONO16");
 			return;
 		}
 
@@ -224,7 +224,7 @@ private:
 		if(disparityMsg->image.encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1) !=0 &&
 		   disparityMsg->image.encoding.compare(sensor_msgs::image_encodings::TYPE_16SC1) !=0)
 		{
-			ROS_ERROR("Input type must be disparity=32FC1 or 16SC1");
+			NODELET_ERROR("Input type must be disparity=32FC1 or 16SC1");
 			return;
 		}
 
