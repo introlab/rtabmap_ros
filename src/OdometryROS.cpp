@@ -265,6 +265,14 @@ void OdometryROS::processArguments(int argc, char * argv[], bool stereo)
 					 "argument \"--params\" is detected!");
 			exit(0);
 		}
+		else if(strcmp(argv[i], "--udebug") == 0)
+		{
+			ULogger::setLevel(ULogger::kDebug);
+		}
+		else if(strcmp(argv[i], "--uinfo") == 0)
+		{
+			ULogger::setLevel(ULogger::kInfo);
+		}
 	}
 }
 
