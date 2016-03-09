@@ -101,6 +101,7 @@ private:
 	tf::TransformListener tfListener_;
 
 	bool paused_;
+	ros::Time previousStamp_;
 };
 
 }

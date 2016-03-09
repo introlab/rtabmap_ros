@@ -611,8 +611,8 @@ bool CoreWrapper::commonOdomUpdate(const nav_msgs::OdometryConstPtr & odomMsg)
 		lastPoseIntermediate_ = false;
 		lastPose_ = odom;
 		lastPoseStamp_ = odomMsg->header.stamp;
-		double transVariance = uMax3(odomMsg->pose.covariance[0], odomMsg->pose.covariance[7], odomMsg->pose.covariance[14]);
-		double rotVariance = uMax3(odomMsg->pose.covariance[21], odomMsg->pose.covariance[28], odomMsg->pose.covariance[35]);
+		float transVariance = uMax3(odomMsg->pose.covariance[0], odomMsg->pose.covariance[7], odomMsg->pose.covariance[14]);
+		float rotVariance = uMax3(odomMsg->pose.covariance[21], odomMsg->pose.covariance[28], odomMsg->pose.covariance[35]);
 		if(uIsFinite(rotVariance) && rotVariance > rotVariance_)
 		{
 			rotVariance_ = rotVariance;
@@ -799,6 +799,7 @@ void CoreWrapper::commonDepthCallback(
 		Transform localTransform = getTransform(frameId_, depthMsgs[i]->header.frame_id, depthMsgs[i]->header.stamp);
 		if(localTransform.isNull())
 		{
+			ROS_ERROR("TF of received depth image %d at time %fs is not set, aborting rtabmap update.", i, depthMsgs[i]->header.stamp.toSec());
 			return;
 		}
 		// sync with odometry stamp
@@ -809,9 +810,13 @@ void CoreWrapper::commonDepthCallback(
 				Transform sensorT = getTransform(odomFrameId, frameId_, depthMsgs[i]->header.stamp);
 				if(sensorT.isNull())
 				{
-					return;
+					ROS_WARN("Could not get odometry value for depth image %d stamp (%fs). Latest odometry "
+							 "stamp is %fs. The depth image pose will not be synchronized with odometry.", i, depthMsgs[i]->header.stamp.toSec(), lastPoseStamp_.toSec());
 				}
-				localTransform = odomT.inverse() * sensorT * localTransform;
+				else
+				{
+					localTransform = odomT.inverse() * sensorT * localTransform;
+				}
 			}
 		}
 
@@ -896,8 +901,11 @@ void CoreWrapper::commonDepthCallback(
 	if(scan2dMsg.get() != 0)
 	{
 		// make sure the frame of the laser is updated too
-		if(getTransform(frameId_, scan2dMsg->header.frame_id, scan2dMsg->header.stamp).isNull())
+		if(getTransform(frameId_,
+				scan2dMsg->header.frame_id,
+				scan2dMsg->header.stamp + ros::Duration().fromSec(scan2dMsg->ranges.size()*scan2dMsg->time_increment)).isNull())
 		{
+			ROS_ERROR("TF of received laser scan topic at time %fs is not set, aborting rtabmap update.", scan2dMsg->header.stamp.toSec());
 			return;
 		}
 
@@ -916,10 +924,14 @@ void CoreWrapper::commonDepthCallback(
 				Transform sensorT = getTransform(odomFrameId, frameId_, scan2dMsg->header.stamp);
 				if(sensorT.isNull())
 				{
-					return;
+					ROS_WARN("Could not get odometry value for laser scan stamp (%fs). Latest odometry "
+							"stamp is %fs. The laser scan pose will not be synchronized with odometry.", scanMsg->header.stamp.toSec(), lastPoseStamp_.toSec());
 				}
-				Transform t = odomT.inverse() * sensorT;
-				pclScan = util3d::transformPointCloud(pclScan, t);
+				else
+				{
+					Transform t = odomT.inverse() * sensorT;
+					pclScan = util3d::transformPointCloud(pclScan, t);
+				}
 
 			}
 		}
@@ -1020,8 +1032,11 @@ void CoreWrapper::commonStereoCallback(
 	if(scan2dMsg.get() != 0)
 	{
 		// make sure the frame of the laser is updated too
-		if(getTransform(frameId_, scan2dMsg->header.frame_id, scan2dMsg->header.stamp).isNull())
+		if(getTransform(frameId_,
+				scan2dMsg->header.frame_id,
+				scan2dMsg->header.stamp + ros::Duration().fromSec(scan2dMsg->ranges.size()*scan2dMsg->time_increment)).isNull())
 		{
+			ROS_ERROR("TF of received laser scan topic at time %fs is not set, aborting rtabmap update.", scan2dMsg->header.stamp.toSec());
 			return;
 		}
 
@@ -1325,8 +1340,8 @@ void CoreWrapper::process(
 		const SensorData & data,
 		const Transform & odom,
 		const std::string & odomFrameId,
-		double odomRotationalVariance,
-		double odomTransitionalVariance)
+		float odomRotationalVariance,
+		float odomTransitionalVariance)
 {
 	UTimer timer;
 	if(rtabmap_.isIDsGenerated() || data.id() > 0)
@@ -1795,7 +1810,7 @@ bool CoreWrapper::getMapCallback(rtabmap_ros::GetMap::Request& req, rtabmap_ros:
 	rtabmap_ros::mapDataToROS(poses,
 		constraints,
 		signatures,
-		Transform::getIdentity(),
+		mapToOdom_,
 		res.data);
 
 	res.data.header.stamp = ros::Time::now();
@@ -1938,7 +1953,7 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 			rtabmap_ros::mapDataToROS(poses,
 				constraints,
 				signatures,
-				Transform::getIdentity(),
+				mapToOdom_,
 				*msg);
 
 			mapDataPub_.publish(msg);
@@ -1952,7 +1967,7 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 
 			rtabmap_ros::mapGraphToROS(poses,
 				constraints,
-				Transform::getIdentity(),
+				mapToOdom_,
 				*msg);
 
 			mapGraphPub_.publish(msg);

@@ -366,6 +366,21 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 			odom.pose.covariance.at(28) = info.variance; // pp
 			odom.pose.covariance.at(35) = info.variance; // yawyaw
 
+			//set velocity
+			if(previousStamp_.isValid())
+			{
+				float dt = 1.0f/(stamp - previousStamp_).toSec();
+				float x,y,z,roll,pitch,yaw;
+				odometry_->previousTransform().getTranslationAndEulerAngles(x,y,z,roll,pitch,yaw);
+				odom.twist.twist.linear.x = x*dt;
+				odom.twist.twist.linear.y = y*dt;
+				odom.twist.twist.linear.z = z*dt;
+				odom.twist.twist.angular.x = roll*dt;
+				odom.twist.twist.angular.y = pitch*dt;
+				odom.twist.twist.angular.z = yaw*dt;
+			}
+			previousStamp_ = stamp;
+
 			//publish the message
 			odomPub_.publish(odom);
 		}
@@ -465,6 +480,7 @@ bool OdometryROS::reset(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
 	ROS_INFO("visual_odometry: reset odom!");
 	odometry_->reset();
+	previousStamp_ = ros::Time();
 	return true;
 }
 
@@ -473,6 +489,7 @@ bool OdometryROS::resetToPose(rtabmap_ros::ResetPose::Request& req, rtabmap_ros:
 	Transform pose(req.x, req.y, req.z, req.roll, req.pitch, req.yaw);
 	ROS_INFO("visual_odometry: reset odom to pose %s!", pose.prettyPrint().c_str());
 	odometry_->reset(pose);
+	previousStamp_ = ros::Time();
 	return true;
 }
 
