@@ -887,7 +887,9 @@ void CoreWrapper::commonDepthCallback(
 	if(scanMsg.get() != 0)
 	{
 		// make sure the frame of the laser is updated too
-		if(getTransform(frameId_, scanMsg->header.frame_id, scanMsg->header.stamp).isNull())
+		if(getTransform(frameId_,
+				scanMsg->header.frame_id,
+				scanMsg->header.stamp + ros::Duration().fromSec(scanMsg->ranges.size()*scanMsg->time_increment)).isNull())
 		{
 			ROS_ERROR("TF of received laser scan topic at time %fs is not set, aborting rtabmap update.", scanMsg->header.stamp.toSec());
 			return;
@@ -998,8 +1000,11 @@ void CoreWrapper::commonStereoCallback(
 	if(scanMsg.get() != 0)
 	{
 		// make sure the frame of the laser is updated too
-		if(getTransform(frameId_, scanMsg->header.frame_id, scanMsg->header.stamp).isNull())
+		if(getTransform(frameId_,
+				scanMsg->header.frame_id,
+				scanMsg->header.stamp + ros::Duration().fromSec(scanMsg->ranges.size()*scanMsg->time_increment)).isNull())
 		{
+			ROS_ERROR("TF of received laser scan topic at time %fs is not set, aborting rtabmap update.", scanMsg->header.stamp.toSec());
 			return;
 		}
 
