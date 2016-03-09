@@ -46,6 +46,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap_ros/Link.h>
 #include <rtabmap_ros/KeyPoint.h>
 #include <rtabmap_ros/Point2f.h>
+#include <rtabmap_ros/Point3f.h>
 #include <rtabmap_ros/MapData.h>
 #include <rtabmap_ros/MapGraph.h>
 #include <rtabmap_ros/NodeData.h>
@@ -84,6 +85,12 @@ void point2fToROS(const cv::Point2f & kpt, rtabmap_ros::Point2f & msg);
 
 std::vector<cv::Point2f> points2fFromROS(const std::vector<rtabmap_ros::Point2f> & msg);
 void points2fToROS(const std::vector<cv::Point2f> & kpts, std::vector<rtabmap_ros::Point2f> & msg);
+
+cv::Point3f point3fFromROS(const rtabmap_ros::Point3f & msg);
+void point3fToROS(const cv::Point3f & kpt, rtabmap_ros::Point3f & msg);
+
+std::vector<cv::Point3f> points3fFromROS(const std::vector<rtabmap_ros::Point3f> & msg);
+void points3fToROS(const std::vector<cv::Point3f> & kpts, std::vector<rtabmap_ros::Point3f> & msg);
 
 rtabmap::CameraModel cameraModelFromROS(
 		const sensor_msgs::CameraInfo & camInfo,

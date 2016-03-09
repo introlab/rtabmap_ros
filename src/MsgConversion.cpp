@@ -295,6 +295,37 @@ void points2fToROS(const std::vector<cv::Point2f> & kpts, std::vector<rtabmap_ro
 	}
 }
 
+cv::Point3f point3fFromROS(const rtabmap_ros::Point3f & msg)
+{
+	return cv::Point3f(msg.x, msg.y, msg.z);
+}
+
+void point3fToROS(const cv::Point3f & kpt, rtabmap_ros::Point3f & msg)
+{
+	msg.x = kpt.x;
+	msg.y = kpt.y;
+	msg.z = kpt.z;
+}
+
+std::vector<cv::Point3f> points3fFromROS(const std::vector<rtabmap_ros::Point3f> & msg)
+{
+	std::vector<cv::Point3f> v(msg.size());
+	for(unsigned int i=0; i<msg.size(); ++i)
+	{
+		v[i] = point3fFromROS(msg[i]);
+	}
+	return v;
+}
+
+void points3fToROS(const std::vector<cv::Point3f> & kpts, std::vector<rtabmap_ros::Point3f> & msg)
+{
+	msg.resize(kpts.size());
+	for(unsigned int i=0; i<msg.size(); ++i)
+	{
+		point3fToROS(kpts[i], msg[i]);
+	}
+}
+
 rtabmap::CameraModel cameraModelFromROS(
 		const sensor_msgs::CameraInfo & camInfo,
 		const rtabmap::Transform & localTransform)
@@ -306,7 +337,9 @@ rtabmap::CameraModel cameraModelFromROS(
 			model.fy(),
 			model.cx(),
 			model.cy(),
-			localTransform);
+			localTransform,
+			0.0,
+			cv::Size(model.fullResolution().width, model.fullResolution().height));
 }
 rtabmap::StereoCameraModel stereoCameraModelFromROS(
 		const sensor_msgs::CameraInfo & leftCamInfo,
@@ -321,7 +354,8 @@ rtabmap::StereoCameraModel stereoCameraModelFromROS(
 			model.left().cx(),
 			model.left().cy(),
 			model.baseline(),
-			localTransform);
+			localTransform,
+			cv::Size(model.left().fullResolution().width, model.left().fullResolution().height));
 }
 
 void mapDataFromROS(
@@ -647,6 +681,12 @@ rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::OdomInfo & msg)
 	info.transform = transformFromGeometryMsg(msg.transform);
 	info.transformFiltered = transformFromGeometryMsg(msg.transformFiltered);
 
+	UASSERT(msg.localMapKeys.size() == msg.localMapValues.size());
+	for(unsigned int i=0; i<msg.localMapKeys.size(); ++i)
+	{
+		info.localMap.insert(std::make_pair(msg.localMapKeys[i], point3fFromROS(msg.localMapValues[i])));
+	}
+
 	return info;
 }
 
@@ -664,7 +704,6 @@ void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_ros::OdomInfo & m
 	msg.interval = info.interval;
 	msg.distanceTravelled = info.distanceTravelled;
 
-
 	msg.type = info.type;
 
 	msg.wordsKeys = uKeys(info.words);
@@ -679,6 +718,9 @@ void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_ros::OdomInfo & m
 
 	transformToGeometryMsg(info.transform, msg.transform);
 	transformToGeometryMsg(info.transformFiltered, msg.transformFiltered);
+
+	msg.localMapKeys = uKeys(info.localMap);
+	points3fToROS(uValues(info.localMap), msg.localMapValues);
 
 }
 

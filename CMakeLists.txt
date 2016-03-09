@@ -52,6 +52,7 @@ add_message_files(
    Link.msg
    OdomInfo.msg
    Point2f.msg
+   Point3f.msg
    Goal.msg
 )
 

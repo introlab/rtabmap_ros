@@ -369,15 +369,14 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 			//set velocity
 			if(previousStamp_.isValid())
 			{
-				float dt = 1.0f/(stamp - previousStamp_).toSec();
 				float x,y,z,roll,pitch,yaw;
-				odometry_->previousTransform().getTranslationAndEulerAngles(x,y,z,roll,pitch,yaw);
-				odom.twist.twist.linear.x = x*dt;
-				odom.twist.twist.linear.y = y*dt;
-				odom.twist.twist.linear.z = z*dt;
-				odom.twist.twist.angular.x = roll*dt;
-				odom.twist.twist.angular.y = pitch*dt;
-				odom.twist.twist.angular.z = yaw*dt;
+				odometry_->previousVelocityTransform().getTranslationAndEulerAngles(x,y,z,roll,pitch,yaw);
+				odom.twist.twist.linear.x = x;
+				odom.twist.twist.linear.y = y;
+				odom.twist.twist.linear.z = z;
+				odom.twist.twist.angular.x = roll;
+				odom.twist.twist.angular.y = pitch;
+				odom.twist.twist.angular.z = yaw;
 			}
 			previousStamp_ = stamp;
 

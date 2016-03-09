@@ -42,6 +42,8 @@ int32[] wordsKeys
 KeyPoint[] wordsValues
 int32[] wordMatches
 int32[] wordInliers
+int32[] localMapKeys
+Point3f[] localMapValues
 
 Point2f[] refCorners
 Point2f[] newCorners

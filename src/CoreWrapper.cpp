@@ -925,7 +925,7 @@ void CoreWrapper::commonDepthCallback(
 				if(sensorT.isNull())
 				{
 					ROS_WARN("Could not get odometry value for laser scan stamp (%fs). Latest odometry "
-							"stamp is %fs. The laser scan pose will not be synchronized with odometry.", scanMsg->header.stamp.toSec(), lastPoseStamp_.toSec());
+							"stamp is %fs. The laser scan pose will not be synchronized with odometry.", scan2dMsg->header.stamp.toSec(), lastPoseStamp_.toSec());
 				}
 				else
 				{
