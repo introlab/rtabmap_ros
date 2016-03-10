@@ -150,7 +150,21 @@ private:
 			const sensor_msgs::ImageConstPtr& imageMsg,
 		    const sensor_msgs::ImageConstPtr& imageDepthMsg,
 		    const sensor_msgs::CameraInfoConstPtr& camInfoMsg);
+	void depthScanOdomInfoCallback(
+			const rtabmap_ros::OdomInfoConstPtr & odomInfoMsg,
+			const sensor_msgs::LaserScanConstPtr& scanMsg,
+			const nav_msgs::OdometryConstPtr & odomMsg,
+			const sensor_msgs::ImageConstPtr& imageMsg,
+			const sensor_msgs::ImageConstPtr& imageDepthMsg,
+			const sensor_msgs::CameraInfoConstPtr& camInfoMsg);
 	void depthScan3dCallback(
+			const sensor_msgs::PointCloud2ConstPtr& scanMsg,
+			const nav_msgs::OdometryConstPtr & odomMsg,
+			const sensor_msgs::ImageConstPtr& imageMsg,
+			const sensor_msgs::ImageConstPtr& imageDepthMsg,
+			const sensor_msgs::CameraInfoConstPtr& camInfoMsg);
+	void depthScan3dOdomInfoCallback(
+			const rtabmap_ros::OdomInfoConstPtr & odomInfoMsg,
 			const sensor_msgs::PointCloud2ConstPtr& scanMsg,
 			const nav_msgs::OdometryConstPtr & odomMsg,
 			const sensor_msgs::ImageConstPtr& imageMsg,
@@ -164,7 +178,23 @@ private:
 			const sensor_msgs::ImageConstPtr& rightImageMsg,
 			const sensor_msgs::CameraInfoConstPtr& leftCameraInfoMsg,
 			const sensor_msgs::CameraInfoConstPtr& rightCameraInfoMsg);
+	void stereoScanOdomInfoCallback(
+			const rtabmap_ros::OdomInfoConstPtr & odomInfoMsg,
+			const sensor_msgs::LaserScanConstPtr& scanMsg,
+			const nav_msgs::OdometryConstPtr & odomMsg,
+			const sensor_msgs::ImageConstPtr& leftImageMsg,
+			const sensor_msgs::ImageConstPtr& rightImageMsg,
+			const sensor_msgs::CameraInfoConstPtr& leftCameraInfoMsg,
+			const sensor_msgs::CameraInfoConstPtr& rightCameraInfoMsg);
 	void stereoScan3dCallback(
+			const sensor_msgs::PointCloud2ConstPtr& scanMsg,
+			const nav_msgs::OdometryConstPtr & odomMsg,
+			const sensor_msgs::ImageConstPtr& leftImageMsg,
+			const sensor_msgs::ImageConstPtr& rightImageMsg,
+			const sensor_msgs::CameraInfoConstPtr& leftCameraInfoMsg,
+			const sensor_msgs::CameraInfoConstPtr& rightCameraInfoMsg);
+	void stereoScan3dOdomInfoCallback(
+			const rtabmap_ros::OdomInfoConstPtr & odomInfoMsg,
 			const sensor_msgs::PointCloud2ConstPtr& scanMsg,
 			const nav_msgs::OdometryConstPtr & odomMsg,
 			const sensor_msgs::ImageConstPtr& leftImageMsg,
@@ -286,12 +316,30 @@ private:
 	message_filters::Synchronizer<MyDepthScanSyncPolicy> * depthScanSync_;
 
 	typedef message_filters::sync_policies::ApproximateTime<
+			rtabmap_ros::OdomInfo,
+			sensor_msgs::LaserScan,
+			nav_msgs::Odometry,
+			sensor_msgs::Image,
+			sensor_msgs::Image,
+			sensor_msgs::CameraInfo> MyDepthScanOdomInfoSyncPolicy;
+	message_filters::Synchronizer<MyDepthScanOdomInfoSyncPolicy> * depthScanOdomInfoSync_;
+
+	typedef message_filters::sync_policies::ApproximateTime<
 			sensor_msgs::PointCloud2,
 			nav_msgs::Odometry,
 			sensor_msgs::Image,
 			sensor_msgs::Image,
 			sensor_msgs::CameraInfo> MyDepthScan3dSyncPolicy;
 	message_filters::Synchronizer<MyDepthScan3dSyncPolicy> * depthScan3dSync_;
+
+	typedef message_filters::sync_policies::ApproximateTime<
+			rtabmap_ros::OdomInfo,
+			sensor_msgs::PointCloud2,
+			nav_msgs::Odometry,
+			sensor_msgs::Image,
+			sensor_msgs::Image,
+			sensor_msgs::CameraInfo> MyDepthScan3dOdomInfoSyncPolicy;
+	message_filters::Synchronizer<MyDepthScan3dOdomInfoSyncPolicy> * depthScan3dOdomInfoSync_;
 
 	typedef message_filters::sync_policies::ApproximateTime<
 			nav_msgs::Odometry,
@@ -326,6 +374,16 @@ private:
 	message_filters::Synchronizer<MyStereoScanSyncPolicy> * stereoScanSync_;
 
 	typedef message_filters::sync_policies::ApproximateTime<
+			rtabmap_ros::OdomInfo,
+			sensor_msgs::LaserScan,
+			nav_msgs::Odometry,
+			sensor_msgs::Image,
+			sensor_msgs::Image,
+			sensor_msgs::CameraInfo,
+			sensor_msgs::CameraInfo> MyStereoScanOdomInfoSyncPolicy;
+	message_filters::Synchronizer<MyStereoScanOdomInfoSyncPolicy> * stereoScanOdomInfoSync_;
+
+	typedef message_filters::sync_policies::ApproximateTime<
 			sensor_msgs::PointCloud2,
 			nav_msgs::Odometry,
 			sensor_msgs::Image,
@@ -333,6 +391,16 @@ private:
 			sensor_msgs::CameraInfo,
 			sensor_msgs::CameraInfo> MyStereoScan3dSyncPolicy;
 	message_filters::Synchronizer<MyStereoScan3dSyncPolicy> * stereoScan3dSync_;
+
+	typedef message_filters::sync_policies::ApproximateTime<
+			rtabmap_ros::OdomInfo,
+			sensor_msgs::PointCloud2,
+			nav_msgs::Odometry,
+			sensor_msgs::Image,
+			sensor_msgs::Image,
+			sensor_msgs::CameraInfo,
+			sensor_msgs::CameraInfo> MyStereoScan3dOdomInfoSyncPolicy;
+	message_filters::Synchronizer<MyStereoScan3dOdomInfoSyncPolicy> * stereoScan3dOdomInfoSync_;
 
 	typedef message_filters::sync_policies::ApproximateTime<
 			rtabmap_ros::OdomInfo,

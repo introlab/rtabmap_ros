@@ -1069,6 +1069,24 @@ void GuiWrapper::depthScanCallback(
 			rtabmap_ros::OdomInfoConstPtr());
 }
 
+void GuiWrapper::depthScanOdomInfoCallback(
+		const rtabmap_ros::OdomInfoConstPtr & odomInfoMsg,
+		const sensor_msgs::LaserScanConstPtr& scanMsg,
+		const nav_msgs::OdometryConstPtr & odomMsg,
+		const sensor_msgs::ImageConstPtr& imageMsg,
+		const sensor_msgs::ImageConstPtr& depthMsg,
+		const sensor_msgs::CameraInfoConstPtr& cameraInfoMsg)
+{
+	commonDepthCallback(
+			odomMsg,
+			imageMsg,
+			depthMsg,
+			cameraInfoMsg,
+			scanMsg,
+			sensor_msgs::PointCloud2ConstPtr(),
+			odomInfoMsg);
+}
+
 void GuiWrapper::depthScan3dCallback(
 		const sensor_msgs::PointCloud2ConstPtr& scanMsg,
 		const nav_msgs::OdometryConstPtr & odomMsg,
@@ -1084,6 +1102,24 @@ void GuiWrapper::depthScan3dCallback(
 			sensor_msgs::LaserScanConstPtr(),
 			scanMsg,
 			rtabmap_ros::OdomInfoConstPtr());
+}
+
+void GuiWrapper::depthScan3dOdomInfoCallback(
+		const rtabmap_ros::OdomInfoConstPtr & odomInfoMsg,
+		const sensor_msgs::PointCloud2ConstPtr& scanMsg,
+		const nav_msgs::OdometryConstPtr & odomMsg,
+		const sensor_msgs::ImageConstPtr& imageMsg,
+		const sensor_msgs::ImageConstPtr& depthMsg,
+		const sensor_msgs::CameraInfoConstPtr& cameraInfoMsg)
+{
+	commonDepthCallback(
+			odomMsg,
+			imageMsg,
+			depthMsg,
+			cameraInfoMsg,
+			sensor_msgs::LaserScanConstPtr(),
+			scanMsg,
+			odomInfoMsg);
 }
 
 void GuiWrapper::stereoScanCallback(
@@ -1105,6 +1141,26 @@ void GuiWrapper::stereoScanCallback(
 			rtabmap_ros::OdomInfoConstPtr());
 }
 
+void GuiWrapper::stereoScanOdomInfoCallback(
+		const rtabmap_ros::OdomInfoConstPtr & odomInfoMsg,
+		const sensor_msgs::LaserScanConstPtr& scanMsg,
+		const nav_msgs::OdometryConstPtr & odomMsg,
+		const sensor_msgs::ImageConstPtr& leftImageMsg,
+		const sensor_msgs::ImageConstPtr& rightImageMsg,
+		const sensor_msgs::CameraInfoConstPtr& leftCameraInfoMsg,
+		const sensor_msgs::CameraInfoConstPtr& rightCameraInfoMsg)
+{
+	commonStereoCallback(
+			odomMsg,
+			leftImageMsg,
+			rightImageMsg,
+			leftCameraInfoMsg,
+			rightCameraInfoMsg,
+			scanMsg,
+			sensor_msgs::PointCloud2ConstPtr(),
+			odomInfoMsg);
+}
+
 void GuiWrapper::stereoScan3dCallback(
 		const sensor_msgs::PointCloud2ConstPtr& scanMsg,
 		const nav_msgs::OdometryConstPtr & odomMsg,
@@ -1122,6 +1178,26 @@ void GuiWrapper::stereoScan3dCallback(
 			sensor_msgs::LaserScanConstPtr(),
 			scanMsg,
 			rtabmap_ros::OdomInfoConstPtr());
+}
+
+void GuiWrapper::stereoScan3dOdomInfoCallback(
+		const rtabmap_ros::OdomInfoConstPtr & odomInfoMsg,
+		const sensor_msgs::PointCloud2ConstPtr& scanMsg,
+		const nav_msgs::OdometryConstPtr & odomMsg,
+		const sensor_msgs::ImageConstPtr& leftImageMsg,
+		const sensor_msgs::ImageConstPtr& rightImageMsg,
+		const sensor_msgs::CameraInfoConstPtr& leftCameraInfoMsg,
+		const sensor_msgs::CameraInfoConstPtr& rightCameraInfoMsg)
+{
+	commonStereoCallback(
+			odomMsg,
+			leftImageMsg,
+			rightImageMsg,
+			leftCameraInfoMsg,
+			rightCameraInfoMsg,
+			sensor_msgs::LaserScanConstPtr(),
+			scanMsg,
+			odomInfoMsg);
 }
 
 void GuiWrapper::stereoOdomInfoCallback(
@@ -1368,42 +1444,92 @@ void GuiWrapper::setupCallbacks(
 			if(subscribeLaserScan2d)
 			{
 				scanSub_.subscribe(nh, "scan", 1);
-				depthScanSync_ = new message_filters::Synchronizer<MyDepthScanSyncPolicy>(
-						MyDepthScanSyncPolicy(queueSize),
-						scanSub_,
-						odomSub_,
-						*imageSubs_[0],
-						*imageDepthSubs_[0],
-						*cameraInfoSubs_[0]);
-				depthScanSync_->registerCallback(boost::bind(&GuiWrapper::depthScanCallback, this, _1, _2, _3, _4, _5));
+				if(subscribeOdomInfo)
+				{
+					odomInfoSub_.subscribe(nh, "odom_info", 1);
+					depthScanOdomInfoSync_ = new message_filters::Synchronizer<MyDepthScanOdomInfoSyncPolicy>(
+							MyDepthScanOdomInfoSyncPolicy(queueSize),
+							odomInfoSub_,
+							scanSub_,
+							odomSub_,
+							*imageSubs_[0],
+							*imageDepthSubs_[0],
+							*cameraInfoSubs_[0]);
+					depthScanOdomInfoSync_->registerCallback(boost::bind(&GuiWrapper::depthScanOdomInfoCallback, this, _1, _2, _3, _4, _5, _6));
 
-				ROS_INFO("\n%s subscribed to:\n   %s,\n   %s,\n   %s,\n   %s,\n   %s",
-						ros::this_node::getName().c_str(),
-						imageSubs_[0]->getTopic().c_str(),
-						imageDepthSubs_[0]->getTopic().c_str(),
-						cameraInfoSubs_[0]->getTopic().c_str(),
-						odomSub_.getTopic().c_str(),
-						scanSub_.getTopic().c_str());
+					ROS_INFO("\n%s subscribed to:\n   %s,\n   %s,\n   %s,\n   %s,\n   %s,\n   %s",
+							ros::this_node::getName().c_str(),
+							imageSubs_[0]->getTopic().c_str(),
+							imageDepthSubs_[0]->getTopic().c_str(),
+							cameraInfoSubs_[0]->getTopic().c_str(),
+							odomSub_.getTopic().c_str(),
+							scanSub_.getTopic().c_str(),
+							odomInfoSub_.getTopic().c_str());
+				}
+				else
+				{
+					depthScanSync_ = new message_filters::Synchronizer<MyDepthScanSyncPolicy>(
+							MyDepthScanSyncPolicy(queueSize),
+							scanSub_,
+							odomSub_,
+							*imageSubs_[0],
+							*imageDepthSubs_[0],
+							*cameraInfoSubs_[0]);
+					depthScanSync_->registerCallback(boost::bind(&GuiWrapper::depthScanCallback, this, _1, _2, _3, _4, _5));
+
+					ROS_INFO("\n%s subscribed to:\n   %s,\n   %s,\n   %s,\n   %s,\n   %s",
+							ros::this_node::getName().c_str(),
+							imageSubs_[0]->getTopic().c_str(),
+							imageDepthSubs_[0]->getTopic().c_str(),
+							cameraInfoSubs_[0]->getTopic().c_str(),
+							odomSub_.getTopic().c_str(),
+							scanSub_.getTopic().c_str());
+				}
 			}
 			else if(subscribeLaserScan3d)
 			{
 				scan3dSub_.subscribe(nh, "scan_cloud", 1);
-				depthScan3dSync_ = new message_filters::Synchronizer<MyDepthScan3dSyncPolicy>(
-						MyDepthScan3dSyncPolicy(queueSize),
-						scan3dSub_,
-						odomSub_,
-						*imageSubs_[0],
-						*imageDepthSubs_[0],
-						*cameraInfoSubs_[0]);
-				depthScan3dSync_->registerCallback(boost::bind(&GuiWrapper::depthScan3dCallback, this, _1, _2, _3, _4, _5));
+				if(subscribeOdomInfo)
+				{
+					odomInfoSub_.subscribe(nh, "odom_info", 1);
+					depthScan3dOdomInfoSync_ = new message_filters::Synchronizer<MyDepthScan3dOdomInfoSyncPolicy>(
+							MyDepthScan3dOdomInfoSyncPolicy(queueSize),
+							odomInfoSub_,
+							scan3dSub_,
+							odomSub_,
+							*imageSubs_[0],
+							*imageDepthSubs_[0],
+							*cameraInfoSubs_[0]);
+					depthScan3dOdomInfoSync_->registerCallback(boost::bind(&GuiWrapper::depthScan3dOdomInfoCallback, this, _1, _2, _3, _4, _5, _6));
 
-				ROS_INFO("\n%s subscribed to:\n   %s,\n   %s,\n   %s,\n   %s,\n   %s",
-						ros::this_node::getName().c_str(),
-						imageSubs_[0]->getTopic().c_str(),
-						imageDepthSubs_[0]->getTopic().c_str(),
-						cameraInfoSubs_[0]->getTopic().c_str(),
-						odomSub_.getTopic().c_str(),
-						scan3dSub_.getTopic().c_str());
+					ROS_INFO("\n%s subscribed to:\n   %s,\n   %s,\n   %s,\n   %s,\n   %s,\n   %s",
+							ros::this_node::getName().c_str(),
+							imageSubs_[0]->getTopic().c_str(),
+							imageDepthSubs_[0]->getTopic().c_str(),
+							cameraInfoSubs_[0]->getTopic().c_str(),
+							odomSub_.getTopic().c_str(),
+							scan3dSub_.getTopic().c_str(),
+							odomInfoSub_.getTopic().c_str());
+				}
+				else
+				{
+					depthScan3dSync_ = new message_filters::Synchronizer<MyDepthScan3dSyncPolicy>(
+							MyDepthScan3dSyncPolicy(queueSize),
+							scan3dSub_,
+							odomSub_,
+							*imageSubs_[0],
+							*imageDepthSubs_[0],
+							*cameraInfoSubs_[0]);
+					depthScan3dSync_->registerCallback(boost::bind(&GuiWrapper::depthScan3dCallback, this, _1, _2, _3, _4, _5));
+
+					ROS_INFO("\n%s subscribed to:\n   %s,\n   %s,\n   %s,\n   %s,\n   %s",
+							ros::this_node::getName().c_str(),
+							imageSubs_[0]->getTopic().c_str(),
+							imageDepthSubs_[0]->getTopic().c_str(),
+							cameraInfoSubs_[0]->getTopic().c_str(),
+							odomSub_.getTopic().c_str(),
+							scan3dSub_.getTopic().c_str());
+				}
 			}
 			else if(subscribeOdomInfo)
 			{
@@ -1593,46 +1719,100 @@ void GuiWrapper::setupCallbacks(
 			if(subscribeLaserScan2d)
 			{
 				scanSub_.subscribe(nh, "scan", 1);
-				stereoScanSync_ = new message_filters::Synchronizer<MyStereoScanSyncPolicy>(
-						MyStereoScanSyncPolicy(queueSize),
-						scanSub_,
-						odomSub_,
-						imageRectLeft_,
-						imageRectRight_,
-						cameraInfoLeft_,
-						cameraInfoRight_);
-				stereoScanSync_->registerCallback(boost::bind(&GuiWrapper::stereoScanCallback, this, _1, _2, _3, _4, _5, _6));
+				if(subscribeOdomInfo)
+				{
+					odomInfoSub_.subscribe(nh, "odom_info", 1);
+					stereoScanOdomInfoSync_ = new message_filters::Synchronizer<MyStereoScanOdomInfoSyncPolicy>(
+							MyStereoScanOdomInfoSyncPolicy(queueSize),
+							odomInfoSub_,
+							scanSub_,
+							odomSub_,
+							imageRectLeft_,
+							imageRectRight_,
+							cameraInfoLeft_,
+							cameraInfoRight_);
+					stereoScanOdomInfoSync_->registerCallback(boost::bind(&GuiWrapper::stereoScanOdomInfoCallback, this, _1, _2, _3, _4, _5, _6, _7));
 
-				ROS_INFO("\n%s subscribed to:\n   %s,\n   %s,\n   %s,\n   %s,\n   %s,\n   %s",
-						ros::this_node::getName().c_str(),
-						imageRectLeft_.getTopic().c_str(),
-						imageRectRight_.getTopic().c_str(),
-						cameraInfoLeft_.getTopic().c_str(),
-						cameraInfoRight_.getTopic().c_str(),
-						odomSub_.getTopic().c_str(),
-						scanSub_.getTopic().c_str());
+					ROS_INFO("\n%s subscribed to:\n   %s,\n   %s,\n   %s,\n   %s,\n   %s,\n   %s,\n   %s",
+							ros::this_node::getName().c_str(),
+							imageRectLeft_.getTopic().c_str(),
+							imageRectRight_.getTopic().c_str(),
+							cameraInfoLeft_.getTopic().c_str(),
+							cameraInfoRight_.getTopic().c_str(),
+							odomSub_.getTopic().c_str(),
+							scanSub_.getTopic().c_str(),
+							odomInfoSub_.getTopic().c_str());
+				}
+				else
+				{
+					stereoScanSync_ = new message_filters::Synchronizer<MyStereoScanSyncPolicy>(
+							MyStereoScanSyncPolicy(queueSize),
+							scanSub_,
+							odomSub_,
+							imageRectLeft_,
+							imageRectRight_,
+							cameraInfoLeft_,
+							cameraInfoRight_);
+					stereoScanSync_->registerCallback(boost::bind(&GuiWrapper::stereoScanCallback, this, _1, _2, _3, _4, _5, _6));
+
+					ROS_INFO("\n%s subscribed to:\n   %s,\n   %s,\n   %s,\n   %s,\n   %s,\n   %s",
+							ros::this_node::getName().c_str(),
+							imageRectLeft_.getTopic().c_str(),
+							imageRectRight_.getTopic().c_str(),
+							cameraInfoLeft_.getTopic().c_str(),
+							cameraInfoRight_.getTopic().c_str(),
+							odomSub_.getTopic().c_str(),
+							scanSub_.getTopic().c_str());
+				}
 			}
 			else if(subscribeLaserScan3d)
 			{
 				scan3dSub_.subscribe(nh, "scan_cloud", 1);
-				stereoScan3dSync_ = new message_filters::Synchronizer<MyStereoScan3dSyncPolicy>(
-						MyStereoScan3dSyncPolicy(queueSize),
-						scan3dSub_,
-						odomSub_,
-						imageRectLeft_,
-						imageRectRight_,
-						cameraInfoLeft_,
-						cameraInfoRight_);
-				stereoScan3dSync_->registerCallback(boost::bind(&GuiWrapper::stereoScan3dCallback, this, _1, _2, _3, _4, _5, _6));
+				if(subscribeOdomInfo)
+				{
+					odomInfoSub_.subscribe(nh, "odom_info", 1);
+					stereoScan3dOdomInfoSync_ = new message_filters::Synchronizer<MyStereoScan3dOdomInfoSyncPolicy>(
+							MyStereoScan3dOdomInfoSyncPolicy(queueSize),
+							odomInfoSub_,
+							scan3dSub_,
+							odomSub_,
+							imageRectLeft_,
+							imageRectRight_,
+							cameraInfoLeft_,
+							cameraInfoRight_);
+					stereoScan3dOdomInfoSync_->registerCallback(boost::bind(&GuiWrapper::stereoScan3dOdomInfoCallback, this, _1, _2, _3, _4, _5, _6, _7));
 
-				ROS_INFO("\n%s subscribed to:\n   %s,\n   %s,\n   %s,\n   %s,\n   %s,\n   %s",
-						ros::this_node::getName().c_str(),
-						imageRectLeft_.getTopic().c_str(),
-						imageRectRight_.getTopic().c_str(),
-						cameraInfoLeft_.getTopic().c_str(),
-						cameraInfoRight_.getTopic().c_str(),
-						odomSub_.getTopic().c_str(),
-						scan3dSub_.getTopic().c_str());
+					ROS_INFO("\n%s subscribed to:\n   %s,\n   %s,\n   %s,\n   %s,\n   %s,\n   %s,\n   %s",
+							ros::this_node::getName().c_str(),
+							imageRectLeft_.getTopic().c_str(),
+							imageRectRight_.getTopic().c_str(),
+							cameraInfoLeft_.getTopic().c_str(),
+							cameraInfoRight_.getTopic().c_str(),
+							odomSub_.getTopic().c_str(),
+							scan3dSub_.getTopic().c_str(),
+							odomInfoSub_.getTopic().c_str());
+				}
+				else
+				{
+					stereoScan3dSync_ = new message_filters::Synchronizer<MyStereoScan3dSyncPolicy>(
+							MyStereoScan3dSyncPolicy(queueSize),
+							scan3dSub_,
+							odomSub_,
+							imageRectLeft_,
+							imageRectRight_,
+							cameraInfoLeft_,
+							cameraInfoRight_);
+					stereoScan3dSync_->registerCallback(boost::bind(&GuiWrapper::stereoScan3dCallback, this, _1, _2, _3, _4, _5, _6));
+
+					ROS_INFO("\n%s subscribed to:\n   %s,\n   %s,\n   %s,\n   %s,\n   %s,\n   %s",
+							ros::this_node::getName().c_str(),
+							imageRectLeft_.getTopic().c_str(),
+							imageRectRight_.getTopic().c_str(),
+							cameraInfoLeft_.getTopic().c_str(),
+							cameraInfoRight_.getTopic().c_str(),
+							odomSub_.getTopic().c_str(),
+							scan3dSub_.getTopic().c_str());
+				}
 			}
 			else if(subscribeOdomInfo)
 			{
