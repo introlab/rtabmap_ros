@@ -37,7 +37,7 @@
 	  <param name="RGBD/ProximityByTime" type="string" value="false"/>   <!-- Local loop closure detection with locations in STM -->
 	  <param name="RGBD/OptimizeFromGraphEnd" type="string" value="true"/> 
           <param name="Reg/Force3DoF" type="string" value="true"/>
-	  <param name="Reg/Strategy" type="string" value="1"/>                      <!-- 0=No ICP, 1=ICP 3D, 2=ICP 2D -->
+	  <param name="Reg/Strategy" type="string" value="1"/>                      <!-- 0=Visual, 1=ICP, 2=Visual+ICP -->
 	  <param name="Vis/InlierDistance" type="string" value="0.1"/>          <!-- 3D visual words correspondence distance -->
 	  <param name="RGBD/OptimizeFromGraphEnd" type="string" value="false"/>    <!-- Optimize graph from initial node so /map -> /odom transform will be generated -->
 	  <param name="Optimizer/Slam2D" type="string" value="true"/>  
