@@ -80,7 +80,7 @@ typedef actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> MoveBaseCl
 class CoreWrapper
 {
 public:
-	CoreWrapper(bool deleteDbOnStart);
+	CoreWrapper(bool deleteDbOnStart, const rtabmap::ParametersMap & parameters);
 	virtual ~CoreWrapper();
 
 private:

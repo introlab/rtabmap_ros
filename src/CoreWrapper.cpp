@@ -71,7 +71,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace rtabmap;
 
-CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
+CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters) :
 		paused_(false),
 		lastPose_(Transform::getIdentity()),
 		lastPoseIntermediate_(false),
@@ -279,6 +279,13 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart) :
 			ROS_INFO("Setting RTAB-Map parameter \"%s\"=\"%s\"", iter->first.c_str(), uNumber2Str(vInt).c_str());
 			iter->second = uNumber2Str(vInt);
 		}
+	}
+
+	//update with input arguments
+	for(ParametersMap::const_iterator iter=parameters.begin(); iter!=parameters.end(); ++iter)
+	{
+		uInsert(parameters_, ParametersPair(iter->first, iter->second));
+		ROS_INFO("Update RTAB-Map parameter \"%s\"=\"%s\" from arguments", iter->first.c_str(), iter->second.c_str());
 	}
 
 	// Backward compatibility

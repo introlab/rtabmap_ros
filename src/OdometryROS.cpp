@@ -182,6 +182,17 @@ OdometryROS::OdometryROS(int argc, char * argv[], bool stereo) :
 		}
 	}
 
+	rtabmap::ParametersMap parameters = rtabmap::Parameters::parseArguments(argc, argv);
+	for(rtabmap::ParametersMap::iterator iter=parameters.begin(); iter!=parameters.end(); ++iter)
+	{
+		rtabmap::ParametersMap::iterator jter = parameters_.find(iter->first);
+		if(jter!=parameters_.end())
+		{
+			ROS_INFO("Update odometry parameter \"%s\"=\"%s\" from arguments", iter->first.c_str(), iter->second.c_str());
+			jter->second = iter->second;
+		}
+	}
+
 	// Backward compatibility
 	for(std::map<std::string, std::pair<bool, std::string> >::const_iterator iter=Parameters::getRemovedParameters().begin();
 		iter!=Parameters::getRemovedParameters().end();
