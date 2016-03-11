@@ -76,7 +76,7 @@
       <node if="$(arg compressed)" name="republish_rgb" type="republish" pkg="image_transport" args="$(arg rgb_image_transport) in:=$(arg rgb_topic) raw out:=$(arg rgb_topic_relay)" />
       <node if="$(arg compressed)" name="republish_depth" type="republish" pkg="image_transport" args="compressedDepth in:=$(arg depth_topic) raw out:=$(arg depth_topic_relay)" />
   
-      <node if="$(arg visual_odometry)" pkg="rtabmap_ros" type="rgbd_odometry" name="rgbd_odometry" output="screen" launch-prefix="$(arg launch_prefix)">
+      <node if="$(arg visual_odometry)" pkg="rtabmap_ros" type="rgbd_odometry" name="rgbd_odometry" output="screen" args="$(arg rtabmap_args)" launch-prefix="$(arg launch_prefix)">
         <remap from="rgb/image"       to="$(arg rgb_topic_relay)"/>
         <remap from="depth/image"     to="$(arg depth_topic_relay)"/>
         <remap from="rgb/camera_info" to="$(arg camera_info_topic)"/>
@@ -93,7 +93,7 @@
       <node if="$(arg compressed)" name="republish_left"  type="republish" pkg="image_transport" args="compressed in:=$(arg left_image_topic) raw out:=$(arg left_image_topic_relay)" />
       <node if="$(arg compressed)" name="republish_right" type="republish" pkg="image_transport" args="compressed in:=$(arg right_image_topic) raw out:=$(arg right_image_topic_relay)" />
   
-      <node if="$(arg visual_odometry)" pkg="rtabmap_ros" type="stereo_odometry" name="stereo_odometry" output="screen" launch-prefix="$(arg launch_prefix)">
+      <node if="$(arg visual_odometry)" pkg="rtabmap_ros" type="stereo_odometry" name="stereo_odometry" output="screen" args="$(arg rtabmap_args)" launch-prefix="$(arg launch_prefix)">
         <remap from="left/image_rect"        to="$(arg left_image_topic_relay)"/>
         <remap from="right/image_rect"       to="$(arg right_image_topic_relay)"/>
         <remap from="left/camera_info"       to="$(arg left_camera_info_topic)"/>

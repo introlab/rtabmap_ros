@@ -30,7 +30,7 @@
    <arg name="rviz_cfg"                default="-d $(find rtabmap_ros)/launch/config/rgbd.rviz" />
   
    <!-- ODOMETRY MAIN ARGUMENTS: 
-        -"strategy"        : Strategy: 0=BOW (bag-of-words) 1=Optical Flow
+        -"strategy"        : Strategy: Frame-to-Map 1=Frame-To-Frame
         -"feature"         : Feature type: 0=SURF 1=SIFT 2=ORB 3=FAST/FREAK 4=FAST/BRIEF 5=GFTT/FREAK 6=GFTT/BRIEF 7=BRISK
         -"nn"              : Nearest neighbor strategy : 0=Linear, 1=FLANN_KDTREE, 2=FLANN_LSH, 3=BRUTEFORCE 
                              Set to 1 for float descriptor like SIFT/SURF                  
@@ -63,14 +63,14 @@
       <param name="approx_sync" type="bool" value="true"/>
 	  
       <param name="Odom/Strategy" type="string" value="$(arg strategy)"/> 
-      <param name="Odom/FeatureType" type="string" value="$(arg feature)"/>  
-      <param name="OdomBow/NNType" type="string" value="$(arg nn)"/>
-      <param name="Odom/MaxDepth" type="string" value="$(arg max_depth)"/>  
-      <param name="Odom/MinInliers" type="string" value="$(arg min_inliers)"/> 
-      <param name="Odom/InlierDistance" type="string" value="$(arg inlier_distance)"/>       
-      <param name="OdomBow/LocalHistorySize" type="string" value="$(arg local_map)"/>
+      <param name="Vis/FeatureType" type="string" value="$(arg feature)"/>  
+      <param name="Vis/CorNNType" type="string" value="$(arg nn)"/>
+      <param name="Vis/MaxDepth" type="string" value="$(arg max_depth)"/>  
+      <param name="Vis/MinInliers" type="string" value="$(arg min_inliers)"/> 
+      <param name="Vis/InlierDistance" type="string" value="$(arg inlier_distance)"/>       
+      <param name="OdomF2M/MaxSize" type="string" value="$(arg local_map)"/>
       <param name="Odom/FillInfoData" type="string" value="$(arg rtabmapviz)"/>
-      <param name="Odom/MaxFeatures" type="string" value="$(arg gftt_max_corners)"/>
+      <param name="Vis/MaxFeatures" type="string" value="$(arg gftt_max_corners)"/>
       <param name="GFTT/MinDistance" type="string" value="$(arg gftt_min_distance)"/>
     </node>
   
@@ -86,8 +86,8 @@
 
       <param name="approx_sync" type="bool" value="true"/>
 
-      <param name="LccBow/MinInliers" type="string" value="10"/>
-      <param name="LccBow/InlierDistance" type="string" value="$(arg inlier_distance)"/>
+      <param name="Vis/MinInliers" type="string" value="$(arg min_inliers)"/>
+      <param name="Vis/InlierDistance" type="string" value="$(arg inlier_distance)"/>
     </node>
   
     <!-- Visualisation RTAB-Map -->
