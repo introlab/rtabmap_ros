@@ -31,15 +31,15 @@
   <node name="data_recorder" pkg="rtabmap_ros" type="rtabmap" output="screen" args="--delete_db_on_start">
   
     <!-- Disable any processing -->
-	<param name="Mem/RehearsalSimilarity" type="string" value="1.0"/>    <!-- desactivate rehearsal -->
-	<param name="Kp/WordsPerImage"        type="string" value="-1"/>     <!-- desactivate keypoints extraction -->
-	<param name="Rtabmap/MaxRetrieved"    type="string" value="0"/>      <!-- desactivate global retrieval -->
-	<param name="RGBD/MaxLocalRetrieved"  type="string" value="0"/>      <!-- desactivate local retrieval -->
+	<param name="Mem/RehearsalSimilarity" type="string" value="1.0"/>    <!-- deactivate rehearsal -->
+	<param name="Kp/MaxFeatures"          type="string" value="-1"/>     <!-- deactivate keypoints extraction -->
+	<param name="Rtabmap/MaxRetrieved"    type="string" value="0"/>      <!-- deactivate global retrieval -->
+	<param name="RGBD/MaxLocalRetrieved"  type="string" value="0"/>      <!-- deactivate local retrieval -->
 	<param name="Mem/MapLabelsAdded"      type="string" value="false"/>  <!-- don't create map labels --> 
 	<param name="Rtabmap/MemoryThr"       type="string" value="2"/>      <!-- keep the WM empty --> 
 	<param name="Mem/STMSize"             type="string" value="1"/>      <!-- STM=1 --> 
 	<param name="publish_tf"              type="bool"   value="false"/>  <!-- don't publish TF -->
-	<param name="RGBD/LocalLoopDetectionSpace" type="string"   value="false"/> 
+	<param name="RGBD/ProximityBySpace"   type="string" value="false"/> 
 	<param name="RGBD/LinearUpdate"       type="string" value="0"/> 
 	<param name="RGBD/AngularUpdate"      type="string" value="0"/> 
 	<param unless="$(arg subscribe_odometry)" name="RGBD/Enabled" type="string" value="false"/>
