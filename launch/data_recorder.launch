@@ -4,7 +4,7 @@
   <arg name="subscribe_odometry"   default="false"/>
   <arg name="subscribe_depth"      default="true"/>
   <arg name="subscribe_stereo"     default="false"/>
-  <arg name="subscribe_laserScan"  default="false"/>
+  <arg name="subscribe_scan"       default="false"/>
   <arg name="stereo_approx_sync"   default="false"/>
   
   <arg name="frame_id"      default="camera_link"/>
@@ -49,7 +49,7 @@
 	<param name="database_path"       type="string" value="$(arg output_path)"/>
 	<param name="frame_id"            type="string" value="$(arg frame_id)"/>
 	<param name="subscribe_depth"     type="bool"   value="$(arg subscribe_depth)"/>
-	<param name="subscribe_laserScan" type="bool"   value="$(arg subscribe_laserScan)"/>
+	<param name="subscribe_scan"      type="bool"   value="$(arg subscribe_scan)"/>
 	<param name="subscribe_stereo"    type="bool"   value="$(arg subscribe_stereo)"/>
 	<param name="queue_size"          type="int"    value="$(arg queue_size)"/>
 	<param name="stereo_approx_sync"  type="bool"    value="$(arg stereo_approx_sync)"/>
