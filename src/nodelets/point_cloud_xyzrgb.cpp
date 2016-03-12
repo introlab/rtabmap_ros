@@ -173,7 +173,21 @@ private:
 
 		if(cloudPub_.getNumSubscribers())
 		{
-			cv_bridge::CvImageConstPtr imagePtr = cv_bridge::toCvShare(image);
+			cv_bridge::CvImageConstPtr imagePtr;
+			if(image->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0)
+			{
+				imagePtr = cv_bridge::toCvShare(image);
+			}
+			else if(image->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
+					image->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
+			{
+				imagePtr = cv_bridge::toCvShare(image, "mono8");
+			}
+			else
+			{
+				imagePtr = cv_bridge::toCvShare(image, "bgr8");
+			}
+
 			cv_bridge::CvImageConstPtr imageDepthPtr = cv_bridge::toCvShare(imageDepth);
 
 			image_geometry::PinholeCameraModel model;

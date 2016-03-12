@@ -39,6 +39,7 @@ MapsManager::MapsManager(bool usePublicNamespace) :
 		cloudFrustumCulling_(false),
 		cloudNoiseFilteringRadius_(0.0),
 		cloudNoiseFilteringMinNeighbors_(5),
+		scanDecimation_(0),
 		scanVoxelSize_(0.0),
 		scanOutputVoxelized_(false),
 		projMaxGroundAngle_(45.0), // degrees
@@ -48,6 +49,7 @@ MapsManager::MapsManager(bool usePublicNamespace) :
 		gridSize_(0), // meters
 		gridEroded_(false),
 		gridUnknownSpaceFilled_(false),
+		gridMaxUnknownSpaceFilledRange_(6.0),
 		mapFilterRadius_(0.5),
 		mapFilterAngle_(30.0), // degrees
 		mapCacheCleanup_(true)
@@ -89,6 +91,7 @@ MapsManager::MapsManager(bool usePublicNamespace) :
 	pnh.param("grid_size", gridSize_, gridSize_); // m
 	pnh.param("grid_eroded", gridEroded_, gridEroded_);
 	pnh.param("grid_unknown_space_filled", gridUnknownSpaceFilled_, gridUnknownSpaceFilled_);
+	pnh.param("grid_unknown_space_filled_max_range", gridMaxUnknownSpaceFilledRange_, gridMaxUnknownSpaceFilledRange_);
 
 	// common map stuff
 	pnh.param("map_filter_radius", mapFilterRadius_, mapFilterRadius_);
@@ -358,6 +361,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 								{
 									scan = util3d::downsample(scan, scanDecimation_);
 								}
+
 								if(scanRequired || scanVoxelSize_ > 0.0)
 								{
 									pcl::PointCloud<pcl::PointXYZ>::Ptr scanCloud = util3d::laserScanToPointCloud(scan);
@@ -369,16 +373,24 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 											scan = util3d::laserScan2dFromPointCloud(*scanCloud);
 										}
 									}
+
 									if(scanRequired)
 									{
 										uInsert(scans_, std::make_pair(iter->first, scanCloud));
 									}
 								}
 							}
+
 							if(gridRequired && scan.type() == CV_32FC2)
 							{
 								cv::Mat ground, obstacles;
-								util3d::occupancy2DFromLaserScan(scan, ground, obstacles, gridCellSize_, data.id() < 0 || gridUnknownSpaceFilled_, data.laserScanMaxRange());
+								util3d::occupancy2DFromLaserScan(
+										scan,
+										ground,
+										obstacles,
+										gridCellSize_,
+										data.id() < 0 || gridUnknownSpaceFilled_,
+										data.laserScanMaxRange()>gridMaxUnknownSpaceFilledRange_?gridMaxUnknownSpaceFilledRange_:data.laserScanMaxRange());
 								uInsert(gridMaps_, std::make_pair(iter->first, std::make_pair(ground, obstacles)));
 							}
 						}

@@ -7,7 +7,7 @@ Header header
 
 int32 refId
 int32 loopClosureId
-int32 localLoopClosureId
+int32 proximityDetectionId
 
 geometry_msgs/Transform loopClosureTransform
 

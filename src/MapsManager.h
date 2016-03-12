@@ -85,6 +85,7 @@ private:
 	double gridSize_;
 	bool gridEroded_;
 	bool gridUnknownSpaceFilled_;
+	double gridMaxUnknownSpaceFilledRange_;
 	double mapFilterRadius_;
 	double mapFilterAngle_;
 	bool mapCacheCleanup_;
