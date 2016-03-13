@@ -1080,17 +1080,17 @@ void CoreWrapper::commonStereoCallback(
 		scan = util3d::laserScanFromPointCloud(*pclScan);
 	}
 
-	cv_bridge::CvImageConstPtr ptrLeftImage, ptrRightImage;
+	cv_bridge::CvImagePtr ptrLeftImage, ptrRightImage;
 	if(leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
 	   leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
 	{
-		ptrLeftImage = cv_bridge::toCvShare(leftImageMsg, "mono8");
+		ptrLeftImage = cv_bridge::toCvCopy(leftImageMsg, "mono8");
 	}
 	else
 	{
-		ptrLeftImage = cv_bridge::toCvShare(leftImageMsg, "bgr8");
+		ptrLeftImage = cv_bridge::toCvCopy(leftImageMsg, "bgr8");
 	}
-	ptrRightImage = cv_bridge::toCvShare(rightImageMsg, "mono8");
+	ptrRightImage = cv_bridge::toCvCopy(rightImageMsg, "mono8");
 
 	rtabmap::StereoCameraModel stereoModel = rtabmap_ros::stereoCameraModelFromROS(*leftCamInfoMsg, *rightCamInfoMsg, localTransform);
 

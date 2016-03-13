@@ -175,8 +175,8 @@ public:
 					}
 				}
 
-				cv_bridge::CvImageConstPtr ptrImageLeft = cv_bridge::toCvShare(imageRectLeft, "mono8");
-				cv_bridge::CvImageConstPtr ptrImageRight = cv_bridge::toCvShare(imageRectRight, "mono8");
+				cv_bridge::CvImagePtr ptrImageLeft = cv_bridge::toCvCopy(imageRectLeft, "mono8");
+				cv_bridge::CvImagePtr ptrImageRight = cv_bridge::toCvCopy(imageRectRight, "mono8");
 
 				UTimer stepTimer;
 				//

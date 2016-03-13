@@ -36,28 +36,28 @@
          <param name="disparity_range" value="128"/>
       </node>
    </group>
-         
-   <!-- Stereo Odometry -->   
-   <node pkg="rtabmap_ros" type="stereo_odometry" name="stereo_odometry" output="screen">
-      <remap from="left/image_rect"       to="/stereo_camera/left/image_rect"/>
-      <remap from="right/image_rect"      to="/stereo_camera/right/image_rect"/>
-      <remap from="left/camera_info"      to="/stereo_camera/left/camera_info_throttle"/>
-      <remap from="right/camera_info"     to="/stereo_camera/right/camera_info_throttle"/>
-      <remap from="odom"                  to="/stereo_odometry"/>
-
-      <param name="frame_id" type="string" value="base_footprint"/>
-      <param name="odom_frame_id" type="string" value="odom"/>
-
-      <param name="Odom/Strategy" type="string" value="0"/> <!-- 0=Frame-to-Map, 1=Frame=to=Frame -->
-      <param name="Vis/EstimationType" type="string" value="0"/> <!-- 0=3D->3D 1=3D->2D (PnP) -->
-      <param name="Vis/MaxDepth" type="string" value="10"/>
-      <param name="Odom/FillInfoData" type="string" value="$(arg rtabmapviz)"/> 
-      <param name="GFTT/MinDistance" type="string" value="10"/>
-      <param name="GFTT/QualityLevel" type="string" value="0.00001"/> 
-      
-   </node>
-     
+              
    <group ns="rtabmap">   
+   
+      <!-- Stereo Odometry -->   
+      <node pkg="rtabmap_ros" type="stereo_odometry" name="stereo_odometry" output="screen">
+         <remap from="left/image_rect"       to="/stereo_camera/left/image_rect"/>
+         <remap from="right/image_rect"      to="/stereo_camera/right/image_rect"/>
+         <remap from="left/camera_info"      to="/stereo_camera/left/camera_info_throttle"/>
+         <remap from="right/camera_info"     to="/stereo_camera/right/camera_info_throttle"/>
+         <remap from="odom"                  to="/stereo_odometry"/>
+
+         <param name="frame_id" type="string" value="base_footprint"/>
+         <param name="odom_frame_id" type="string" value="odom"/>
+
+         <param name="Odom/Strategy" type="string" value="0"/> <!-- 0=Frame-to-Map, 1=Frame=to=Frame -->
+         <param name="Vis/EstimationType" type="string" value="0"/> <!-- 0=3D->3D 1=3D->2D (PnP) -->
+         <param name="Vis/MaxDepth" type="string" value="10"/>
+         <param name="Odom/FillInfoData" type="string" value="$(arg rtabmapviz)"/> 
+         <param name="GFTT/MinDistance" type="string" value="10"/>
+         <param name="GFTT/QualityLevel" type="string" value="0.00001"/> 
+      </node>
+   
       <!-- Visual SLAM: args: "delete_db_on_start" and "udebug" -->
       <node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="screen" args="--delete_db_on_start">
          <param name="frame_id" type="string" value="base_footprint"/>
@@ -81,7 +81,7 @@
          <param name="SURF/HessianThreshold" type="string" value="1000"/>
          <param name="Vis/EstimationType" type="string" value="0"/> <!-- 0=3D->3D, 1=3D->2D (PnP) -->
          <param name="RGBD/LoopClosureReextractFeatures" type="string" value="true"/>
-         <param name="Vis/MaxDepth" type="string" value="10"/> 
+         <param name="Vis/MaxDepth" type="string" value="10"/>
       </node>
       
       <!-- Visualisation RTAB-Map -->
@@ -94,7 +94,7 @@
          <remap from="right/image_rect" to="/stereo_camera/right/image_rect"/>
          <remap from="left/camera_info" to="/stereo_camera/left/camera_info_throttle"/>
          <remap from="right/camera_info" to="/stereo_camera/right/camera_info_throttle"/>
-         <remap from="odom_info" to="/odom_info"/>
+         <remap from="odom_info" to="odom_info"/>
          <remap from="odom" to="/stereo_odometry"/>
          <remap from="mapData" to="mapData"/>
       </node>
