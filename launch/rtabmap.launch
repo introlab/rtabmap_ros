@@ -54,6 +54,9 @@
    
   <arg name="subscribe_scan"          default="false"/>
   <arg name="scan_topic"              default="/scan"/>
+  
+  <arg name="subscribe_scan_cloud"    default="false"/>
+  <arg name="scan_cloud_topic"        default="/scan_cloud"/>
    
   <arg name="visual_odometry"         default="true"/>          <!-- Launch rtabmap visual odometry node -->
   <arg name="odom_topic"              default="/odom"/>         <!-- Odometry topic used if visual_odometry is false -->
@@ -110,15 +113,16 @@
     <!-- Visual SLAM (robot side) -->
     <!-- args: "delete_db_on_start" and "udebug" -->
     <node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="screen" args="$(arg rtabmap_args)" launch-prefix="$(arg launch_prefix)">
-      <param name="subscribe_depth"     type="bool"   value="$(arg rgbd)"/>
-      <param name="subscribe_stereo"    type="bool"   value="$(arg stereo)"/>
-      <param name="subscribe_laserScan" type="bool"   value="$(arg subscribe_scan)"/>
-      <param name="frame_id"            type="string" value="$(arg frame_id)"/>
+      <param name="subscribe_depth"      type="bool"   value="$(arg rgbd)"/>
+      <param name="subscribe_stereo"     type="bool"   value="$(arg stereo)"/>
+      <param name="subscribe_scan"       type="bool"   value="$(arg subscribe_scan)"/>
+      <param name="subscribe_scan_cloud" type="bool"   value="$(arg subscribe_scan_cloud)"/>
+      <param name="frame_id"             type="string" value="$(arg frame_id)"/>
       <param name="wait_for_transform_duration"  type="double"   value="$(arg wait_for_transform)"/>
-      <param name="database_path"       type="string" value="$(arg database_path)"/>
-      <param name="stereo_approx_sync"  type="bool"   value="$(arg approx_sync)"/>
+      <param name="database_path"        type="string" value="$(arg database_path)"/>
+      <param name="stereo_approx_sync"   type="bool"   value="$(arg approx_sync)"/>
       <param name="config_path"          type="string" value="$(arg cfg)"/>
-      <param name="queue_size"                  type="int" value="$(arg queue_size)"/>
+      <param name="queue_size"           type="int" value="$(arg queue_size)"/>
       
       <remap from="rgb/image"       to="$(arg rgb_topic_relay)"/>
       <remap from="depth/image"     to="$(arg depth_topic_relay)"/>
@@ -130,6 +134,7 @@
       <remap from="right/camera_info"      to="$(arg right_camera_info_topic)"/>
       
       <remap from="scan"                   to="$(arg scan_topic)"/>
+      <remap from="scan_cloud"             to="$(arg scan_cloud_topic)"/>
       <remap unless="$(arg visual_odometry)" from="odom"  to="$(arg odom_topic)"/>
     </node>
   
@@ -137,11 +142,12 @@
     <node if="$(arg rtabmapviz)" pkg="rtabmap_ros" type="rtabmapviz" name="rtabmapviz" args="-d $(arg cfg)" output="screen" launch-prefix="$(arg launch_prefix)">
       <param name="subscribe_depth"      type="bool"   value="$(arg rgbd)"/>
       <param name="subscribe_stereo"     type="bool"   value="$(arg stereo)"/>
-      <param name="subscribe_laserScan"  type="bool"   value="$(arg subscribe_scan)"/>
+      <param name="subscribe_scan"       type="bool"   value="$(arg subscribe_scan)"/>
+      <param name="subscribe_scan_cloud" type="bool"   value="$(arg subscribe_scan_cloud)"/>
       <param name="subscribe_odom_info"  type="bool"   value="$(arg visual_odometry)"/>
       <param name="frame_id"             type="string" value="$(arg frame_id)"/>
-      <param name="wait_for_transform_duration"   type="double"   value="$(arg wait_for_transform)"/>
-      <param name="queue_size"                  type="int" value="$(arg queue_size)"/>
+      <param name="wait_for_transform_duration" type="double"   value="$(arg wait_for_transform)"/>
+      <param name="queue_size"           type="int" value="$(arg queue_size)"/>
     
       <remap from="rgb/image"       to="$(arg rgb_topic_relay)"/>
       <remap from="depth/image"     to="$(arg depth_topic_relay)"/>
@@ -153,6 +159,7 @@
       <remap from="right/camera_info"      to="$(arg right_camera_info_topic)"/>
       
       <remap from="scan"                   to="$(arg scan_topic)"/>
+      <remap from="scan_cloud"             to="$(arg scan_cloud_topic)"/>
       <remap unless="$(arg visual_odometry)" from="odom"  to="$(arg odom_topic)"/>
     </node>
   
