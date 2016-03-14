@@ -53,6 +53,7 @@
          <param name="Odom/Strategy"      type="string" value="0"/> <!-- 0=Frame-to-Map, 1=Frame=to=Frame -->
          <param name="Vis/EstimationType" type="string" value="0"/> <!-- 0=3D->3D 1=3D->2D (PnP) -->
          <param name="Vis/MaxDepth"       type="string" value="10"/>
+         <param name="Vis/MinInliers"     type="string" value="10"/>
          <param name="Odom/FillInfoData"  type="string" value="$(arg rtabmapviz)"/> 
          <param name="GFTT/MinDistance"   type="string" value="10"/>
          <param name="GFTT/QualityLevel"  type="string" value="0.00001"/> 
