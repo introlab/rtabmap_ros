@@ -256,11 +256,18 @@ void MapCloudDisplay::processMessage( const rtabmap_ros::MapDataConstPtr& msg )
 
 void MapCloudDisplay::processMapData(const rtabmap_ros::MapData& map)
 {
+	std::map<int, rtabmap::Transform> poses;
+	for(unsigned int i=0; i<map.graph.posesId.size() && i<map.graph.poses.size(); ++i)
+	{
+		poses.insert(std::make_pair(map.graph.posesId[i], rtabmap_ros::transformFromPoseMsg(map.graph.poses[i])));
+	}
+
 	// Add new clouds...
 	for(unsigned int i=0; i<map.nodes.size() && i<map.nodes.size(); ++i)
 	{
 		int id = map.nodes[i].id;
-		if(cloud_infos_.find(id) == cloud_infos_.end())
+		if(poses.find(id) != poses.end() &&
+		   cloud_infos_.find(id) == cloud_infos_.end())
 		{
 			// Cloud not added to RVIZ, add it!
 			rtabmap::Signature s = rtabmap_ros::nodeDataFromROS(map.nodes[i]);
@@ -311,12 +318,6 @@ void MapCloudDisplay::processMapData(const rtabmap_ros::MapData& map)
 	}
 
 	// Update graph
-	std::map<int, rtabmap::Transform> poses;
-	for(unsigned int i=0; i<map.graph.posesId.size() && i<map.graph.poses.size(); ++i)
-	{
-		poses.insert(std::make_pair(map.graph.posesId[i], rtabmap_ros::transformFromPoseMsg(map.graph.poses[i])));
-	}
-
 	if(node_filtering_angle_->getFloat() > 0.0f && node_filtering_radius_->getFloat() > 0.0f)
 	{
 		poses = rtabmap::graph::radiusPosesFiltering(poses,
