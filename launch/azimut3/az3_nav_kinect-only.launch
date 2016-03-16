@@ -27,8 +27,10 @@
       <remap from="rgb/camera_info" to="/camera/depth_registered/camera_info"/>
       <remap from="odom"            to="/base_controller/odom"/>
 
-      <param name="Odom/MinInliers" type="string" value="10"/>
-      <param name="Odom/InlierDistance" type="string" value="0.1"/>    
+      <param name="Vis/MinInliers" type="string" value="10"/>
+      <param name="Vis/InlierDistance" type="string" value="0.1"/>
+      <param name="Vis/MaxDepth" type="string" value="4"/>    
+      <param name="Reg/Force3DoF" type="string" value="true"/>     
 
       <param name="frame_id" type="string" value="base_footprint"/>
     </node>
