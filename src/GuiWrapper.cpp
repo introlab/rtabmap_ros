@@ -68,7 +68,6 @@ float max3( const float& a, const float& b, const float& c)
 }
 
 GuiWrapper::GuiWrapper(int & argc, char** argv) :
-		app_(0),
 		mainWindow_(0),
 		frameId_("base_link"),
 		waitForTransform_(true),
@@ -85,7 +84,6 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 		depthOdomInfo2Sync_(0)
 {
 	ros::NodeHandle nh;
-	app_ = new QApplication(argc, argv);
 
 	QString configFile = QDir::homePath()+"/.ros/rtabmapGUI.ini";
 	for(int i=1; i<argc; ++i)
@@ -111,7 +109,6 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 	bool paused = false;
 	nh.param("is_rtabmap_paused", paused, paused);
 	mainWindow_->setMonitoringState(paused);
-	app_->connect( app_, SIGNAL( lastWindowClosed() ), app_, SLOT( quit() ) );
 
 	ros::NodeHandle pnh("~");
 
@@ -249,12 +246,6 @@ GuiWrapper::~GuiWrapper()
 
 	delete infoMapSync_;
 	delete mainWindow_;
-	delete app_;
-}
-
-int GuiWrapper::exec()
-{
-	return app_->exec();
 }
 
 void GuiWrapper::infoMapCallback(

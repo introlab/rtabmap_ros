@@ -68,8 +68,6 @@ public:
 	GuiWrapper(int & argc, char** argv);
 	virtual ~GuiWrapper();
 
-	int exec();
-
 protected:
 	virtual void handleEvent(UEvent * anEvent);
 
@@ -263,7 +261,6 @@ private:
 	rtabmap::Transform getTransform(const std::string & fromFrameId, const std::string & toFrameId, const ros::Time & stamp) const;
 
 private:
-	QApplication * app_;
 	rtabmap::MainWindow * mainWindow_;
 	std::string cameraNodeName_;
 	double lastOdomInfoUpdateTime_;

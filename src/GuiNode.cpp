@@ -33,9 +33,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/utilite/ULogger.h>
 #include <signal.h>
 
+QApplication * app = 0;
+
 void my_handler(int s){
 	ROS_INFO("rtabmapviz: ctrl-c catched! Exiting Qt app...");
-	QApplication::exit();
+	if(app)
+	{
+		QMetaObject::invokeMethod(app, "quit");
+	}
 }
 
 int main(int argc, char** argv)
@@ -46,6 +51,9 @@ int main(int argc, char** argv)
 	ULogger::setLevel(ULogger::kWarning);
 
 	ros::init(argc, argv, "rtabmapviz");
+
+	app = new QApplication(argc, argv);
+	app->connect( app, SIGNAL( lastWindowClosed() ), app, SLOT( quit() ) );
 
 	GuiWrapper gui(argc, argv);
 
@@ -63,10 +71,11 @@ int main(int argc, char** argv)
 
 	ROS_INFO("rtabmapviz started.");
 	// Now wait for application to finish
-	int r = gui.exec();// MUST be called by the Main Thread
+	int r = app->exec();// MUST be called by the Main Thread
 
 	spinner.stop();
 
+	delete app;
 	ROS_INFO("rtabmapviz: All done! Closing...");
 	return r;
 }
