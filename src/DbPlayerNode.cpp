@@ -90,7 +90,7 @@ int main(int argc, char** argv)
 	std::string odomFrameId = "odom";
 	std::string cameraFrameId = "camera_optical_link";
 	std::string scanFrameId = "base_laser_link";
-	double rate = 1.0f;
+	double rate = -1.0f;
 	std::string databasePath = "";
 	bool publishTf = true;
 	int startId = 0;
