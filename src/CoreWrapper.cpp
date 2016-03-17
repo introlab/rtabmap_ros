@@ -726,7 +726,8 @@ Transform CoreWrapper::getTransform(const std::string & fromFrameId, const std::
 			//if(!tfBuffer_.canTransform(fromFrameId, toFrameId, stamp, ros::Duration(1)))
 			if(!tfListener_.waitForTransform(fromFrameId, toFrameId, stamp, ros::Duration(waitForTransformDuration_)))
 			{
-				ROS_WARN("rtabmap: Could not get transform from %s to %s after %f second!", fromFrameId.c_str(), toFrameId.c_str(), waitForTransformDuration_);
+				ROS_WARN("rtabmap: Could not get transform from %s to %s after %f seconds (for stamp=%f)!",
+						fromFrameId.c_str(), toFrameId.c_str(), waitForTransformDuration_, stamp.toSec());
 				return transform;
 			}
 		}

@@ -34,6 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <signal.h>
 
 void my_handler(int s){
+	ROS_INFO("rtabmapviz: ctrl-c catched! Exiting Qt app...");
 	QApplication::exit();
 }
 

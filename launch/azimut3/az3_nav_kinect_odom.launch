@@ -60,7 +60,7 @@
 
       <param name="Bayes/PredictionLC"        type="string" value="0.1 0.36 0.30 0.16 0.062 0.0151 0.00255 0.00035"/>
 
-      <param name="OptimizerSlam2D"           type="string" value="true"/>
+      <param name="Optimizer/Slam2D"           type="string" value="true"/>
       <param name="Optimizer/Iterations"      type="string" value="100"/>
       <param name="RGBD/OptimizeFromGraphEnd" type="string" value="false"/>
       <param name="Optimizer/Strategy"        type="string" value="1"/>      
