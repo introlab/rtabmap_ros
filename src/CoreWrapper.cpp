@@ -85,7 +85,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 		configPath_(""),
 		databasePath_(UDirectory::homeDir()+"/.ros/"+rtabmap::Parameters::getDefaultDatabaseName()),
 		waitForTransform_(true),
-		waitForTransformDuration_(0.1), // 100 ms
+		waitForTransformDuration_(0.2), // 200 ms
 		useActionForGoal_(false),
 		genScan_(false),
 		genScanMaxDepth_(4.0),

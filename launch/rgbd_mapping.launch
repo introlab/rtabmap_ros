@@ -39,7 +39,7 @@
   <arg name="odom_topic"              default="/odom"/>         <!-- Odometry topic used if visual_odometry is false -->
    
   <arg name="namespace"               default="rtabmap"/>
-  <arg name="wait_for_transform"      default="0.1"/>
+  <arg name="wait_for_transform"      default="0.2"/>
   
   <!-- Nodes -->
   <group ns="$(arg namespace)">

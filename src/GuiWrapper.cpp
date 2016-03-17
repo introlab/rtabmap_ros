@@ -71,7 +71,7 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 		mainWindow_(0),
 		frameId_("base_link"),
 		waitForTransform_(true),
-		waitForTransformDuration_(0.1), // 100 ms
+		waitForTransformDuration_(0.2), // 200 ms
 		cameraNodeName_(""),
 		lastOdomInfoUpdateTime_(0),
 		depthScanSync_(0),
@@ -211,6 +211,7 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 
 GuiWrapper::~GuiWrapper()
 {
+	UDEBUG("");
 	if(depthSync_)
 		delete depthSync_;
 	if(depth2Sync_)
