@@ -114,6 +114,7 @@ SET(Libraries
    ${OpenCV_LIBRARIES}
    ${catkin_LIBRARIES}
    ${RTABMap_LIBRARIES}
+   ${rviz_DEFAULT_PLUGIN_LIBRARIES}
 )
 
 ## RVIZ plugin
