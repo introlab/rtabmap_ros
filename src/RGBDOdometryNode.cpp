@@ -189,14 +189,7 @@ public:
 
 			if(image->data.size() && depth->data.size() && cameraInfo->K[4] != 0)
 			{
-				image_geometry::PinholeCameraModel model;
-				model.fromCameraInfo(*cameraInfo);
-				rtabmap::CameraModel rtabmapModel(
-						model.fx(),
-						model.fy(),
-						model.cx(),
-						model.cy(),
-						localTransform);
+				rtabmap::CameraModel rtabmapModel = rtabmap_ros::cameraModelFromROS(*cameraInfo, localTransform);
 				cv_bridge::CvImagePtr ptrImage = cv_bridge::toCvCopy(image, image->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0?"":"mono8");
 				cv_bridge::CvImagePtr ptrDepth = cv_bridge::toCvCopy(depth);
 
@@ -321,14 +314,7 @@ public:
 					return;
 				}
 
-				image_geometry::PinholeCameraModel model;
-				model.fromCameraInfo(*infoMsgs[i]);
-				cameraModels.push_back(rtabmap::CameraModel(
-						model.fx(),
-						model.fy(),
-						model.cx(),
-						model.cy(),
-						localTransform));
+				cameraModels.push_back(rtabmap_ros::cameraModelFromROS(*infoMsgs[i], localTransform));
 			}
 
 			rtabmap::SensorData data(
