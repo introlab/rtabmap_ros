@@ -52,7 +52,8 @@ MapsManager::MapsManager(bool usePublicNamespace) :
 		gridMaxUnknownSpaceFilledRange_(6.0),
 		mapFilterRadius_(0.5),
 		mapFilterAngle_(30.0), // degrees
-		mapCacheCleanup_(true)
+		mapCacheCleanup_(true),
+		negativePosesIgnored(false)
 {
 
 	ros::NodeHandle nh;
@@ -97,6 +98,7 @@ MapsManager::MapsManager(bool usePublicNamespace) :
 	pnh.param("map_filter_radius", mapFilterRadius_, mapFilterRadius_);
 	pnh.param("map_filter_angle", mapFilterAngle_, mapFilterAngle_);
 	pnh.param("map_cleanup", mapCacheCleanup_, mapCacheCleanup_);
+	pnh.param("map_negative_poses_ignored", negativePosesIgnored, negativePosesIgnored);
 
 	// If true, the last message published on
 	// the map topics will be saved and sent to new subscribers when they
@@ -204,6 +206,21 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 		else
 		{
 			filteredPoses = poses;
+		}
+
+		if(negativePosesIgnored)
+		{
+			for(std::map<int, rtabmap::Transform>::iterator iter=filteredPoses.begin(); iter!=filteredPoses.end();)
+			{
+				if(iter->first <= 0)
+				{
+					filteredPoses.erase(iter++);
+				}
+				else
+				{
+					++iter;
+				}
+			}
 		}
 
 		for(std::map<int, rtabmap::Transform>::iterator iter=filteredPoses.begin(); iter!=filteredPoses.end(); ++iter)

@@ -89,6 +89,7 @@ private:
 	double mapFilterRadius_;
 	double mapFilterAngle_;
 	bool mapCacheCleanup_;
+	bool negativePosesIgnored;
 
 	ros::Publisher cloudMapPub_;
 	ros::Publisher projMapPub_;
