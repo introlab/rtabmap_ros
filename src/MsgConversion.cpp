@@ -452,10 +452,11 @@ rtabmap::Signature nodeDataFromROS(const rtabmap_ros::NodeData & msg)
 	std::multimap<int, cv::Point3f> words3D;
 	pcl::PointCloud<pcl::PointXYZ> cloud;
 	if(msg.wordPts.data.size() &&
-	   msg.wordPts.data.size() == msg.wordIds.size())
+	   msg.wordPts.height*msg.wordPts.width == msg.wordIds.size())
 	{
 		pcl::fromROSMsg(msg.wordPts, cloud);
 	}
+
 	for(unsigned int i=0; i<msg.wordIds.size() && i<msg.wordKpts.size(); ++i)
 	{
 		cv::KeyPoint pt = keypointFromROS(msg.wordKpts.at(i));
