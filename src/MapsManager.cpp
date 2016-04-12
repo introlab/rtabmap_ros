@@ -91,6 +91,10 @@ MapsManager::MapsManager(bool usePublicNamespace) :
 
 	// common grid map stuff
 	pnh.param("grid_cell_size", gridCellSize_, gridCellSize_); // m
+	if(gridCellSize_ <= 0)
+	{
+		ROS_FATAL("\"grid_cell_size\" (%f) should be greater than 0!", gridCellSize_);
+	}
 	pnh.param("grid_size", gridSize_, gridSize_); // m
 	pnh.param("grid_eroded", gridEroded_, gridEroded_);
 	pnh.param("grid_unknown_space_filled", gridUnknownSpaceFilled_, gridUnknownSpaceFilled_);
@@ -305,10 +309,8 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 										cloudMaxDepth_,
 										cloudMinDepth_,
 										validIndices.get()); // use gridCellSize since this cloud is only for the projection map
-								if(gridCellSize_)
-								{
-									cloudXYZ = util3d::voxelize(cloudXYZ, validIndices, gridCellSize_);
-								}
+								UASSERT(gridCellSize_ > 0);
+								cloudXYZ = util3d::voxelize(cloudXYZ, validIndices, gridCellSize_);
 								if(cloudXYZ->size() && cloudNoiseFilteringRadius_ > 0.0 && cloudNoiseFilteringMinNeighbors_ > 0)
 								{
 									pcl::IndicesPtr indices = rtabmap::util3d::radiusFiltering(cloudXYZ, cloudNoiseFilteringRadius_, cloudNoiseFilteringMinNeighbors_);
@@ -366,6 +368,14 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 								if(cloudClipped->size() && gridCellSize_ > cloudVoxelSize_)
 								{
 									cloudClipped = util3d::voxelize(cloudClipped, gridCellSize_);
+								}
+								if(cloudClipped->size())
+								{
+									// add pose rotation without yaw
+									float roll, pitch, yaw;
+									iter->second.getEulerAngles(roll, pitch, yaw);
+									cloudClipped = util3d::transformPointCloud(cloudClipped, Transform(0,0,0, roll, pitch, 0));
+
 									util3d::occupancy2DFromCloud3D<pcl::PointXYZRGB>(cloudClipped, ground, obstacles, gridCellSize_, projMaxGroundAngle_*M_PI/180.0, projMinClusterSize_);
 								}
 							}
@@ -378,6 +388,11 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 								}
 								if(cloudClipped->size())
 								{
+									// add pose rotation without yaw
+									float roll, pitch, yaw;
+									iter->second.getEulerAngles(roll, pitch, yaw);
+									cloudClipped = util3d::transformPointCloud(cloudClipped, Transform(0,0,0, roll, pitch, 0));
+
 									util3d::occupancy2DFromCloud3D<pcl::PointXYZ>(cloudClipped, ground, obstacles, gridCellSize_, projMaxGroundAngle_*M_PI/180.0, projMinClusterSize_);
 								}
 							}
@@ -546,7 +561,7 @@ void MapsManager::publishMaps(
 								int size =  assembledCloud->size();
 								assembledCloud = util3d::frustumFiltering(
 										assembledCloud,
-										iter->second,
+										iter->second, // FIXME: should include camera local transform
 										kter->second[i].horizontalFOV(),
 										kter->second[i].verticalFOV(),
 										0.0f,
