@@ -275,6 +275,7 @@ private:
 	bool useActionForGoal_;
 	bool genScan_;
 	double genScanMaxDepth_;
+	double genScanMinDepth_;
 
 	rtabmap::Transform mapToOdom_;
 	boost::mutex mapToOdomMutex_;

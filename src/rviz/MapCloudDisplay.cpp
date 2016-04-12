@@ -143,6 +143,12 @@ MapCloudDisplay::MapCloudDisplay()
 	cloud_max_depth_->setMin( 0.0f );
 	cloud_max_depth_->setMax( 999.0f );
 
+	cloud_min_depth_ = new rviz::FloatProperty( "Cloud min depth (m)", 0.0f,
+											 "Minimum depth of the generated clouds.",
+											 this, SLOT( updateCloudParameters() ), this );
+	cloud_min_depth_->setMin( 0.0f );
+	cloud_min_depth_->setMax( 999.0f );
+
 	cloud_voxel_size_ = new rviz::FloatProperty( "Cloud voxel size (m)", 0.01f,
 										 "Voxel size of the generated clouds.",
 										 this, SLOT( updateCloudParameters() ), this );
@@ -282,11 +288,18 @@ void MapCloudDisplay::processMapData(const rtabmap_ros::MapData& map)
 				if(!s.sensorData().imageRaw().empty() && !s.sensorData().depthOrRightRaw().empty())
 				{
 					pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud;
+					pcl::IndicesPtr validIndices(new std::vector<int>);
 					cloud = rtabmap::util3d::cloudRGBFromSensorData(
 							s.sensorData(),
 							cloud_decimation_->getInt(),
 							cloud_max_depth_->getFloat(),
-							cloud_voxel_size_->getFloat());
+							cloud_min_depth_->getFloat(),
+							validIndices.get());
+
+					if(cloud_voxel_size_->getFloat())
+					{
+						cloud = rtabmap::util3d::voxelize(cloud, validIndices, cloud_voxel_size_->getFloat());
+					}
 
 					if(cloud->size())
 					{

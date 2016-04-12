@@ -32,6 +32,7 @@ using namespace rtabmap;
 MapsManager::MapsManager(bool usePublicNamespace) :
 		cloudDecimation_(4),
 		cloudMaxDepth_(4.0), // meters
+		cloudMinDepth_(0.0), // meters
 		cloudVoxelSize_(0.05), // meters
 		cloudFloorCullingHeight_(0.0),
 		cloudCeilingCullingHeight_(0.0),
@@ -62,6 +63,7 @@ MapsManager::MapsManager(bool usePublicNamespace) :
 	// cloud map stuff
 	pnh.param("cloud_decimation", cloudDecimation_, cloudDecimation_);
 	pnh.param("cloud_max_depth", cloudMaxDepth_, cloudMaxDepth_);
+	pnh.param("cloud_min_depth", cloudMinDepth_, cloudMinDepth_);
 	pnh.param("cloud_voxel_size", cloudVoxelSize_, cloudVoxelSize_);
 	pnh.param("cloud_floor_culling_height", cloudFloorCullingHeight_, cloudFloorCullingHeight_);
 	pnh.param("cloud_ceiling_culling_height", cloudCeilingCullingHeight_, cloudCeilingCullingHeight_);
@@ -268,11 +270,17 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 						{
 							if(!image.empty() && !depth.empty())
 							{
+								pcl::IndicesPtr validIndices(new std::vector<int>);
 								cloudRGB = util3d::cloudRGBFromSensorData(
 										data,
 										cloudDecimation_,
 										cloudMaxDepth_,
-										cloudVoxelSize_);
+										cloudMinDepth_,
+										validIndices.get());
+								if(cloudVoxelSize_)
+								{
+									cloudRGB = util3d::voxelize(cloudRGB, validIndices, cloudVoxelSize_);
+								}
 								if(cloudRGB->size() && cloudNoiseFilteringRadius_ > 0.0 && cloudNoiseFilteringMinNeighbors_ > 0)
 								{
 									pcl::IndicesPtr indices = rtabmap::util3d::radiusFiltering(cloudRGB, cloudNoiseFilteringRadius_, cloudNoiseFilteringMinNeighbors_);
@@ -290,11 +298,17 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 						{
 							if(	!depth.empty())
 							{
+								pcl::IndicesPtr validIndices(new std::vector<int>);
 								cloudXYZ = util3d::cloudFromSensorData(
 										data,
 										cloudDecimation_,
 										cloudMaxDepth_,
-										gridCellSize_); // use gridCellSize since this cloud is only for the projection map
+										cloudMinDepth_,
+										validIndices.get()); // use gridCellSize since this cloud is only for the projection map
+								if(gridCellSize_)
+								{
+									cloudXYZ = util3d::voxelize(cloudXYZ, validIndices, gridCellSize_);
+								}
 								if(cloudXYZ->size() && cloudNoiseFilteringRadius_ > 0.0 && cloudNoiseFilteringMinNeighbors_ > 0)
 								{
 									pcl::IndicesPtr indices = rtabmap::util3d::radiusFiltering(cloudXYZ, cloudNoiseFilteringRadius_, cloudNoiseFilteringMinNeighbors_);

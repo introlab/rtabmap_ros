@@ -68,6 +68,7 @@ private:
 	// mapping stuff
 	int cloudDecimation_;
 	double cloudMaxDepth_;
+	double cloudMinDepth_;
 	double cloudVoxelSize_;
 	double cloudFloorCullingHeight_;
 	double cloudCeilingCullingHeight_;

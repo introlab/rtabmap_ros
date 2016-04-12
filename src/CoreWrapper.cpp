@@ -89,6 +89,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 		useActionForGoal_(false),
 		genScan_(false),
 		genScanMaxDepth_(4.0),
+		genScanMinDepth_(0.0),
 		mapToOdom_(rtabmap::Transform::getIdentity()),
 		mapsManager_(true),
 		depthSync_(0),
@@ -170,6 +171,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 	pnh.param("use_action_for_goal", useActionForGoal_, useActionForGoal_);
 	pnh.param("gen_scan",            genScan_, genScan_);
 	pnh.param("gen_scan_max_depth",  genScanMaxDepth_, genScanMaxDepth_);
+	pnh.param("gen_scan_min_depth",  genScanMinDepth_, genScanMinDepth_);
 
 	if(!tfPrefix.empty())
 	{
@@ -900,6 +902,7 @@ void CoreWrapper::commonDepthCallback(
 					cameraModels.back().cx(),
 					cameraModels.back().cy(),
 					genScanMaxDepth_,
+					genScanMinDepth_,
 					localTransform);
 			genMaxScanPts += subDepth.cols;
 		}
