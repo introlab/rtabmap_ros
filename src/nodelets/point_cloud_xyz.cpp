@@ -64,6 +64,7 @@ class PointCloudXYZ : public nodelet::Nodelet
 public:
 	PointCloudXYZ() :
 		maxDepth_(0.0),
+		minDepth_(0.0),
 		voxelSize_(0.0),
 		decimation_(1),
 		noiseFilterRadius_(0.0),
@@ -100,6 +101,7 @@ private:
 		pnh.param("approx_sync", approxSync, approxSync);
 		pnh.param("queue_size", queueSize, queueSize);
 		pnh.param("max_depth", maxDepth_, maxDepth_);
+		pnh.param("min_depth", minDepth_, minDepth_);
 		pnh.param("voxel_size", voxelSize_, voxelSize_);
 		pnh.param("decimation", decimation_, decimation_);
 		pnh.param("noise_filter_radius", noiseFilterRadius_, noiseFilterRadius_);
@@ -254,9 +256,9 @@ private:
 
 	void processAndPublish(pcl::PointCloud<pcl::PointXYZ>::Ptr & pclCloud, const std_msgs::Header & header)
 	{
-		if(pclCloud->size() && maxDepth_ > 0)
+		if(pclCloud->size() && (minDepth_ != 0.0 || maxDepth_ > minDepth_))
 		{
-			pclCloud = rtabmap::util3d::passThrough(pclCloud, "z", 0, maxDepth_);
+			pclCloud = rtabmap::util3d::passThrough(pclCloud, "z", minDepth_, maxDepth_>minDepth_?maxDepth_:std::numeric_limits<float>::max());
 		}
 
 		if(pclCloud->size() && noiseFilterRadius_ > 0.0 && noiseFilterMinNeighbors_ > 0)
@@ -284,6 +286,7 @@ private:
 private:
 
 	double maxDepth_;
+	double minDepth_;
 	double voxelSize_;
 	int decimation_;
 	double noiseFilterRadius_;

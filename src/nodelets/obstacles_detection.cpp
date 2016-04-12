@@ -104,7 +104,7 @@ private:
 
 	void callback(const sensor_msgs::PointCloud2ConstPtr & cloudMsg)
 	{
-		ros::Time time = ros::Time::now();
+		ros::WallTime time = ros::WallTime::now();
 
 		if (groundPub_.getNumSubscribers() == 0 && obstaclesPub_.getNumSubscribers() == 0)
 		{
@@ -255,7 +255,7 @@ private:
 			obstaclesPub_.publish(rosCloud);
 		}
 
-		//NODELET_INFO("Obstacles segmentation time = %f s", (ros::Time::now() - time).toSec());
+		//NODELET_INFO("Obstacles segmentation time = %f s", (ros::WallTime::now() - time).toSec());
 	}
 
 private:
