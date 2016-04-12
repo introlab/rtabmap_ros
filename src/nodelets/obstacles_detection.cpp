@@ -67,8 +67,9 @@ class ObstaclesDetection : public nodelet::Nodelet
 public:
 	ObstaclesDetection() :
 		frameId_("base_link"),
-		normalEstimationRadius_(0.05),
+		normalKSearch_(20),
 		groundNormalAngle_(M_PI_4),
+		clusterRadius_(0.05),
 		minClusterSize_(20),
 		maxObstaclesHeight_(0.0), // if<=0.0 -> disabled
 		waitForTransform_(false),
@@ -87,8 +88,20 @@ private:
 		int queueSize = 10;
 		pnh.param("queue_size", queueSize, queueSize);
 		pnh.param("frame_id", frameId_, frameId_);
-		pnh.param("normal_estimation_radius", normalEstimationRadius_, normalEstimationRadius_);
+		pnh.param("normal_k", normalKSearch_, normalKSearch_);
 		pnh.param("ground_normal_angle", groundNormalAngle_, groundNormalAngle_);
+		if(pnh.hasParam("normal_estimation_radius") && !pnh.hasParam("cluster_radius"))
+		{
+			NODELET_WARN("Parameter \"normal_estimation_radius\" has been renamed "
+					 "to \"cluster_radius\"! Your value is still copied to "
+					 "corresponding parameter. Instead of normal radius, nearest neighbors count "
+					 "\"normal_k\" is used instead (default 20).");
+			pnh.param("normal_estimation_radius", clusterRadius_, clusterRadius_);
+		}
+		else
+		{
+			pnh.param("cluster_radius", clusterRadius_, clusterRadius_);
+		}
 		pnh.param("min_cluster_size", minClusterSize_, minClusterSize_);
 		pnh.param("max_obstacles_height", maxObstaclesHeight_, maxObstaclesHeight_);
 		pnh.param("wait_for_transform", waitForTransform_, waitForTransform_);
@@ -158,8 +171,9 @@ private:
 							originalCloud,
 							ground,
 							obstacles,
-							normalEstimationRadius_,
+							normalKSearch_,
 							groundNormalAngle_,
+							clusterRadius_,
 							minClusterSize_);
 
 					if(groundPub_.getNumSubscribers() && ground.get() && ground->size())
@@ -190,8 +204,9 @@ private:
 							originalCloud_near,
 							ground,
 							obstacles,
-							normalEstimationRadius_,
+							normalKSearch_,
 							groundNormalAngle_,
+							clusterRadius_,
 							minClusterSize_);
 
 					if(groundPub_.getNumSubscribers() && ground.get() && ground->size())
@@ -211,8 +226,9 @@ private:
 							originalCloud_far,
 							ground,
 							obstacles,
-							3.*normalEstimationRadius_,
+							normalKSearch_,
 							2.*groundNormalAngle_,
+							3.*clusterRadius_,
 							minClusterSize_);
 
 					if(groundPub_.getNumSubscribers() && ground.get() && ground->size())
@@ -260,8 +276,9 @@ private:
 
 private:
 	std::string frameId_;
-	double normalEstimationRadius_;
+	int normalKSearch_;
 	double groundNormalAngle_;
+	double clusterRadius_;
 	int minClusterSize_;
 	double maxObstaclesHeight_;
 	bool waitForTransform_;
