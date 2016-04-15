@@ -45,7 +45,9 @@ MapsManager::MapsManager(bool usePublicNamespace) :
 		scanOutputVoxelized_(false),
 		projMaxGroundAngle_(45.0), // degrees
 		projMinClusterSize_(20),
-		projMaxHeight_(2.0), // meters
+		projMaxObstaclesHeight_(2.0), // meters (<=0 disabled)
+		projMaxGroundHeight_(0.0), // meters (<=0 disabled, only works if proj_detect_flat_obstacles is true)
+		projDetectFlatObstacles_(false),
 		gridCellSize_(0.05), // meters
 		gridSize_(0), // meters
 		gridEroded_(false),
@@ -87,7 +89,19 @@ MapsManager::MapsManager(bool usePublicNamespace) :
 	//projection map stuff
 	pnh.param("proj_max_ground_angle", projMaxGroundAngle_, projMaxGroundAngle_);
 	pnh.param("proj_min_cluster_size", projMinClusterSize_, projMinClusterSize_);
-	pnh.param("proj_max_height", projMaxHeight_, projMaxHeight_);
+	if(pnh.hasParam("proj_max_height") && !pnh.hasParam("proj_max_obstacles_height"))
+	{
+		ROS_WARN("Parameter \"proj_max_height\" has been renamed "
+				 "to \"proj_max_obstacles_height\"! Your value is still copied to "
+				 "corresponding parameter.");
+		pnh.param("proj_max_height", projMaxObstaclesHeight_, projMaxObstaclesHeight_);
+	}
+	else
+	{
+		pnh.param("proj_max_obstacles_height", projMaxObstaclesHeight_, projMaxObstaclesHeight_);
+	}
+	pnh.param("proj_max_ground_height", projMaxGroundHeight_, projMaxGroundHeight_);
+	pnh.param("proj_detect_flat_obstacles", projDetectFlatObstacles_, projDetectFlatObstacles_);
 
 	// common grid map stuff
 	pnh.param("grid_cell_size", gridCellSize_, gridCellSize_); // m
@@ -194,6 +208,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 		// filter nodes
 		if(mapFilterRadius_ > 0.0)
 		{
+			UDEBUG("Filter nodes...");
 			double angle = mapFilterAngle_ == 0.0?CV_PI+0.1:mapFilterAngle_*CV_PI/180.0;
 			filteredPoses = rtabmap::graph::radiusPosesFiltering(poses, mapFilterRadius_, angle);
 			for(std::map<int, rtabmap::Transform>::const_iterator iter=poses.begin(); iter!=poses.end(); ++iter)
@@ -244,6 +259,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 					scanRequired ||
 					gridRequired)
 				{
+					UDEBUG("Data required for %d", iter->first);
 					std::map<int, rtabmap::Signature>::const_iterator findIter = signatures.find(iter->first);
 					if(findIter != signatures.end())
 					{
@@ -272,6 +288,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 						pcl::PointCloud<pcl::PointXYZ>::Ptr cloudXYZ;
 						if(rgbDepthRequired)
 						{
+							UDEBUG("rgbDepthRequired");
 							if(!image.empty() && !depth.empty())
 							{
 								pcl::IndicesPtr validIndices(new std::vector<int>);
@@ -300,6 +317,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 						}
 						else if(depthRequired)
 						{
+							UDEBUG("depthRequired");
 							if(	!depth.empty())
 							{
 								pcl::IndicesPtr validIndices(new std::vector<int>);
@@ -357,13 +375,14 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 
 						if(depthRequired)
 						{
+							UDEBUG("Creating proj map for %d...", iter->first);
 							cv::Mat ground, obstacles;
 							if(cloudRGB.get())
 							{
 								pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloudClipped = cloudRGB;
-								if(cloudClipped->size() && projMaxHeight_ > 0)
+								if(cloudClipped->size() && projMaxObstaclesHeight_ > 0)
 								{
-									cloudClipped = util3d::passThrough(cloudClipped, "z", std::numeric_limits<int>::min(), projMaxHeight_);
+									cloudClipped = util3d::passThrough(cloudClipped, "z", std::numeric_limits<int>::min(), projMaxObstaclesHeight_);
 								}
 								if(cloudClipped->size() && gridCellSize_ > cloudVoxelSize_)
 								{
@@ -376,15 +395,15 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 									iter->second.getEulerAngles(roll, pitch, yaw);
 									cloudClipped = util3d::transformPointCloud(cloudClipped, Transform(0,0,0, roll, pitch, 0));
 
-									util3d::occupancy2DFromCloud3D<pcl::PointXYZRGB>(cloudClipped, ground, obstacles, gridCellSize_, projMaxGroundAngle_*M_PI/180.0, projMinClusterSize_);
+									util3d::occupancy2DFromCloud3D<pcl::PointXYZRGB>(cloudClipped, ground, obstacles, gridCellSize_, projMaxGroundAngle_*M_PI/180.0, projMinClusterSize_, projDetectFlatObstacles_, projMaxGroundHeight_);
 								}
 							}
 							else if(cloudXYZ.get())
 							{
 								pcl::PointCloud<pcl::PointXYZ>::Ptr cloudClipped = cloudXYZ;
-								if(cloudClipped->size() && projMaxHeight_ > 0)
+								if(cloudClipped->size() && projMaxObstaclesHeight_ > 0)
 								{
-									cloudClipped = util3d::passThrough(cloudClipped, "z", std::numeric_limits<int>::min(), projMaxHeight_);
+									cloudClipped = util3d::passThrough(cloudClipped, "z", std::numeric_limits<int>::min(), projMaxObstaclesHeight_);
 								}
 								if(cloudClipped->size())
 								{
@@ -393,7 +412,8 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 									iter->second.getEulerAngles(roll, pitch, yaw);
 									cloudClipped = util3d::transformPointCloud(cloudClipped, Transform(0,0,0, roll, pitch, 0));
 
-									util3d::occupancy2DFromCloud3D<pcl::PointXYZ>(cloudClipped, ground, obstacles, gridCellSize_, projMaxGroundAngle_*M_PI/180.0, projMinClusterSize_);
+									UDEBUG("util3d::occupancy2DFromCloud3D()");
+									util3d::occupancy2DFromCloud3D<pcl::PointXYZ>(cloudClipped, ground, obstacles, gridCellSize_, projMaxGroundAngle_*M_PI/180.0, projMinClusterSize_, projDetectFlatObstacles_, projMaxGroundHeight_);
 								}
 							}
 							uInsert(projMaps_, std::make_pair(iter->first, std::make_pair(ground, obstacles)));
@@ -458,6 +478,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 		}
 
 		// cleanup not used nodes
+		UDEBUG("Cleanup not used nodes");
 		for(std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr >::iterator iter=clouds_.begin();
 			iter!=clouds_.end();)
 		{

@@ -81,7 +81,9 @@ private:
 	bool scanOutputVoxelized_;
 	double projMaxGroundAngle_;
 	int projMinClusterSize_;
-	double projMaxHeight_;
+	double projMaxObstaclesHeight_;
+	double projMaxGroundHeight_;
+	bool projDetectFlatObstacles_;
 	double gridCellSize_;
 	double gridSize_;
 	bool gridEroded_;

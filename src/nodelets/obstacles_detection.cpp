@@ -72,6 +72,7 @@ public:
 		clusterRadius_(0.05),
 		minClusterSize_(20),
 		maxObstaclesHeight_(0.0), // if<=0.0 -> disabled
+		maxGroundHeight_(0.0),    // if<=0.0 -> disabled, used only if detect_flat_obstacles is true
 		segmentFlatObstacles_(false),
 		waitForTransform_(false),
 		optimizeForCloseObjects_(false)
@@ -105,6 +106,7 @@ private:
 		}
 		pnh.param("min_cluster_size", minClusterSize_, minClusterSize_);
 		pnh.param("max_obstacles_height", maxObstaclesHeight_, maxObstaclesHeight_);
+		pnh.param("max_ground_height", maxGroundHeight_, maxGroundHeight_);
 		pnh.param("detect_flat_obstacles", segmentFlatObstacles_, segmentFlatObstacles_);
 		pnh.param("wait_for_transform", waitForTransform_, waitForTransform_);
 		pnh.param("optimize_for_close_objects", optimizeForCloseObjects_, optimizeForCloseObjects_);
@@ -177,7 +179,8 @@ private:
 							groundNormalAngle_,
 							clusterRadius_,
 							minClusterSize_,
-							segmentFlatObstacles_);
+							segmentFlatObstacles_,
+							maxGroundHeight_);
 
 					if(groundPub_.getNumSubscribers() && ground.get() && ground->size())
 					{
@@ -211,7 +214,8 @@ private:
 							groundNormalAngle_,
 							clusterRadius_,
 							minClusterSize_,
-							segmentFlatObstacles_);
+							segmentFlatObstacles_,
+							maxGroundHeight_);
 
 					if(groundPub_.getNumSubscribers() && ground.get() && ground->size())
 					{
@@ -234,7 +238,8 @@ private:
 							2.*groundNormalAngle_,
 							3.*clusterRadius_,
 							minClusterSize_,
-							segmentFlatObstacles_);
+							segmentFlatObstacles_,
+							maxGroundHeight_);
 
 					if(groundPub_.getNumSubscribers() && ground.get() && ground->size())
 					{
@@ -286,6 +291,7 @@ private:
 	double clusterRadius_;
 	int minClusterSize_;
 	double maxObstaclesHeight_;
+	double maxGroundHeight_;
 	bool segmentFlatObstacles_;
 	bool waitForTransform_;
 	bool optimizeForCloseObjects_;
