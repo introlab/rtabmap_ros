@@ -31,8 +31,13 @@ This section shows how to install RTAB-Map ros-pkg on **ROS Hydro/Indigo/Jade** 
  * The next instructions assume that you have set up your ROS workspace using this [tutorial](http://wiki.ros.org/catkin/Tutorials/create_a_workspace). I will use indigo prefix for convenience, but it should work with hydro and jade. The workspace path is `~/catkin_ws` and your `~/.bashrc` contains:
  
   ```bash
-source /opt/ros/indigo/setup.bash
-source ~/catkin_ws/devel/setup.bash
+$ source /opt/ros/indigo/setup.bash
+$ source ~/catkin_ws/devel/setup.bash
+```
+
+ * Make sure you don't have the binaries installed too (if you tried them before):
+ ```bash
+$ sudo apt-get remove ros-indigo-rtabmap
 ```
 
  0. Optional dependencies
