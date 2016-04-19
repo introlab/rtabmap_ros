@@ -49,6 +49,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtabmap/utilite/UStl.h"
 #include "rtabmap/utilite/UFile.h"
 
+#define BAD_COVARIANCE 9999
+
 using namespace rtabmap;
 
 namespace rtabmap_ros {
@@ -385,7 +387,8 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 			odom.pose.covariance.at(35) = info.variance; // yawyaw
 
 			//set velocity
-			if(previousStamp_.isValid())
+			bool setTwist = !odometry_->previousVelocityTransform().isNull();
+			if(setTwist)
 			{
 				float x,y,z,roll,pitch,yaw;
 				odometry_->previousVelocityTransform().getTranslationAndEulerAngles(x,y,z,roll,pitch,yaw);
@@ -396,7 +399,13 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 				odom.twist.twist.angular.y = pitch;
 				odom.twist.twist.angular.z = yaw;
 			}
-			previousStamp_ = stamp;
+			// libviso2 uses approximately pose variance/2
+			odom.twist.covariance.at(0) = setTwist?odom.pose.covariance.at(0)/2.0:BAD_COVARIANCE;  // xx
+			odom.twist.covariance.at(7) = setTwist?odom.pose.covariance.at(7)/2.0:BAD_COVARIANCE;  // yy
+			odom.twist.covariance.at(14) = setTwist?odom.pose.covariance.at(14)/2.0:BAD_COVARIANCE; // zz
+			odom.twist.covariance.at(21) = setTwist?odom.pose.covariance.at(21)/2.0:BAD_COVARIANCE; // rr
+			odom.twist.covariance.at(28) = setTwist?odom.pose.covariance.at(28)/2.0:BAD_COVARIANCE; // pp
+			odom.twist.covariance.at(35) = setTwist?odom.pose.covariance.at(35)/2.0:BAD_COVARIANCE; // yawyaw
 
 			//publish the message
 			odomPub_.publish(odom);
@@ -471,6 +480,18 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 		odom.header.stamp = stamp; // use corresponding time stamp to image
 		odom.header.frame_id = odomFrameId_;
 		odom.child_frame_id = frameId_;
+		odom.pose.covariance.at(0) = BAD_COVARIANCE;  // xx
+		odom.pose.covariance.at(7) = BAD_COVARIANCE;  // yy
+		odom.pose.covariance.at(14) = BAD_COVARIANCE; // zz
+		odom.pose.covariance.at(21) = BAD_COVARIANCE; // rr
+		odom.pose.covariance.at(28) = BAD_COVARIANCE; // pp
+		odom.pose.covariance.at(35) = BAD_COVARIANCE; // yawyaw
+		odom.twist.covariance.at(0) = BAD_COVARIANCE;  // xx
+		odom.twist.covariance.at(7) = BAD_COVARIANCE;  // yy
+		odom.twist.covariance.at(14) = BAD_COVARIANCE; // zz
+		odom.twist.covariance.at(21) = BAD_COVARIANCE; // rr
+		odom.twist.covariance.at(28) = BAD_COVARIANCE; // pp
+		odom.twist.covariance.at(35) = BAD_COVARIANCE; // yawyaw
 
 		//publish the message
 		odomPub_.publish(odom);
@@ -521,7 +542,6 @@ bool OdometryROS::reset(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
 	ROS_INFO("visual_odometry: reset odom!");
 	odometry_->reset();
-	previousStamp_ = ros::Time();
 	return true;
 }
 
@@ -530,7 +550,6 @@ bool OdometryROS::resetToPose(rtabmap_ros::ResetPose::Request& req, rtabmap_ros:
 	Transform pose(req.x, req.y, req.z, req.roll, req.pitch, req.yaw);
 	ROS_INFO("visual_odometry: reset odom to pose %s!", pose.prettyPrint().c_str());
 	odometry_->reset(pose);
-	previousStamp_ = ros::Time();
 	return true;
 }
 

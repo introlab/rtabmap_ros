@@ -104,7 +104,6 @@ private:
 	bool paused_;
 	int resetCountdown_;
 	int resetCurrentCount_;
-	ros::Time previousStamp_;
 };
 
 }

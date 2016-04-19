@@ -59,6 +59,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <octomap_msgs/conversions.h>
 #endif
 
+#define BAD_COVARIANCE 9999
 
 //msgs
 #include "rtabmap_ros/Info.h"
@@ -609,7 +610,7 @@ bool CoreWrapper::commonOdomUpdate(const nav_msgs::OdometryConstPtr & odomMsg)
 	if(!paused_)
 	{
 		Transform odom = rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose);
-		if(!lastPose_.isIdentity() && (odom.isIdentity() || odomMsg->pose.covariance[0] >= 9999))
+		if(!lastPose_.isIdentity() && (odom.isIdentity() || odomMsg->pose.covariance[0] >= BAD_COVARIANCE))
 		{
 			UWARN("Odometry is reset (identity pose or high variance (%f) detected). Increment map id!", odomMsg->pose.covariance[0]);
 			rtabmap_.triggerNewMap();
