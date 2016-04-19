@@ -61,7 +61,10 @@ OdometryROS::OdometryROS(int argc, char * argv[], bool stereo) :
 	publishTf_(true),
 	waitForTransform_(true),
 	waitForTransformDuration_(0.1), // 100 ms
-	paused_(false)
+	publishNullWhenLost_(true),
+	paused_(false),
+	resetCountdown_(0),
+	resetCurrentCount_(0)
 {
 	ros::NodeHandle nh;
 
@@ -85,6 +88,8 @@ OdometryROS::OdometryROS(int argc, char * argv[], bool stereo) :
 	pnh.param("initial_pose", initialPoseStr, initialPoseStr); // "x y z roll pitch yaw"
 	pnh.param("ground_truth_frame_id", groundTruthFrameId_, groundTruthFrameId_);
 	pnh.param("config_path", configPath, configPath);
+	pnh.param("publish_null_when_lost", publishNullWhenLost_, publishNullWhenLost_);
+
 	configPath = uReplaceChar(configPath, '~', UDirectory::homeDir());
 	if(configPath.size() && configPath.at(0) != '/')
 	{
@@ -224,8 +229,8 @@ OdometryROS::OdometryROS(int argc, char * argv[], bool stereo) :
 		}
 	}
 
-	int odomStrategy = 0; // BOW
-	Parameters::parse(parameters_, Parameters::kOdomStrategy(), odomStrategy);
+	Parameters::parse(parameters_, Parameters::kOdomResetCountdown(), resetCountdown_);
+	parameters_.at(Parameters::kOdomResetCountdown()) = "0"; // use modified reset countdown here
 	odometry_ = Odometry::create(parameters_);
 	if(!initialPose.isIdentity())
 	{
@@ -341,6 +346,8 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 	rtabmap::Transform pose = odometry_->process(dataCpy, &info);
 	if(!pose.isNull())
 	{
+		resetCurrentCount_ = resetCountdown_;
+
 		//*********************
 		// Update odometry
 		//*********************
@@ -455,7 +462,7 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 			}
 		}
 	}
-	else
+	else if(publishNullWhenLost_)
 	{
 		//ROS_WARN("Odometry lost!");
 
@@ -467,6 +474,30 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 
 		//publish the message
 		odomPub_.publish(odom);
+	}
+
+	if(pose.isNull() && resetCurrentCount_ > 0)
+	{
+		ROS_WARN("Odometry lost! Odometry will be reset after next %d consecutive unsuccessful odometry updates...", resetCurrentCount_);
+
+		--resetCurrentCount_;
+		if(resetCurrentCount_ == 0)
+		{
+			// Check TF to see if sensor fusion is used (e.g., the output of robot_localization)
+			Transform tfPose = this->getTransform(odomFrameId_, frameId_, stamp);
+			if(tfPose.isNull())
+			{
+				ROS_WARN("Odometry automatically reset to latest computed pose!");
+				odometry_->reset(odometry_->getPose());
+			}
+			else
+			{
+				ROS_WARN("Odometry automatically reset to latest odometry pose available from TF (%s->%s)!",
+						odomFrameId_.c_str(), frameId_.c_str());
+				odometry_->reset(tfPose);
+			}
+
+		}
 	}
 
 	if(odomInfoPub_.getNumSubscribers())
