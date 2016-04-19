@@ -83,6 +83,7 @@ private:
 	bool publishTf_;
 	bool waitForTransform_;
 	double waitForTransformDuration_;
+	bool publishNullWhenLost_;
 	rtabmap::ParametersMap parameters_;
 
 	ros::Publisher odomPub_;
@@ -101,6 +102,8 @@ private:
 	tf::TransformListener tfListener_;
 
 	bool paused_;
+	int resetCountdown_;
+	int resetCurrentCount_;
 	ros::Time previousStamp_;
 };
 
