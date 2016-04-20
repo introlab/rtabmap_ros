@@ -379,12 +379,13 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 			odom.pose.pose.orientation = poseMsg.transform.rotation;
 
 			//set covariance
-			odom.pose.covariance.at(0) = info.variance;  // xx
-			odom.pose.covariance.at(7) = info.variance;  // yy
-			odom.pose.covariance.at(14) = info.variance; // zz
-			odom.pose.covariance.at(21) = info.variance; // rr
-			odom.pose.covariance.at(28) = info.variance; // pp
-			odom.pose.covariance.at(35) = info.variance; // yawyaw
+			// libviso2 uses approximately vel variance * 2
+			odom.pose.covariance.at(0) = info.variance*2;  // xx
+			odom.pose.covariance.at(7) = info.variance*2;  // yy
+			odom.pose.covariance.at(14) = info.variance*2; // zz
+			odom.pose.covariance.at(21) = info.variance*2; // rr
+			odom.pose.covariance.at(28) = info.variance*2; // pp
+			odom.pose.covariance.at(35) = info.variance*2; // yawyaw
 
 			//set velocity
 			bool setTwist = !odometry_->previousVelocityTransform().isNull();
@@ -399,13 +400,13 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 				odom.twist.twist.angular.y = pitch;
 				odom.twist.twist.angular.z = yaw;
 			}
-			// libviso2 uses approximately pose variance/2
-			odom.twist.covariance.at(0) = setTwist?odom.pose.covariance.at(0)/2.0:BAD_COVARIANCE;  // xx
-			odom.twist.covariance.at(7) = setTwist?odom.pose.covariance.at(7)/2.0:BAD_COVARIANCE;  // yy
-			odom.twist.covariance.at(14) = setTwist?odom.pose.covariance.at(14)/2.0:BAD_COVARIANCE; // zz
-			odom.twist.covariance.at(21) = setTwist?odom.pose.covariance.at(21)/2.0:BAD_COVARIANCE; // rr
-			odom.twist.covariance.at(28) = setTwist?odom.pose.covariance.at(28)/2.0:BAD_COVARIANCE; // pp
-			odom.twist.covariance.at(35) = setTwist?odom.pose.covariance.at(35)/2.0:BAD_COVARIANCE; // yawyaw
+
+			odom.twist.covariance.at(0) = setTwist?info.variance:BAD_COVARIANCE;  // xx
+			odom.twist.covariance.at(7) = setTwist?info.variance:BAD_COVARIANCE;  // yy
+			odom.twist.covariance.at(14) = setTwist?info.variance:BAD_COVARIANCE; // zz
+			odom.twist.covariance.at(21) = setTwist?info.variance:BAD_COVARIANCE; // rr
+			odom.twist.covariance.at(28) = setTwist?info.variance:BAD_COVARIANCE; // pp
+			odom.twist.covariance.at(35) = setTwist?info.variance:BAD_COVARIANCE; // yawyaw
 
 			//publish the message
 			odomPub_.publish(odom);

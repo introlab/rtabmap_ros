@@ -610,9 +610,9 @@ bool CoreWrapper::commonOdomUpdate(const nav_msgs::OdometryConstPtr & odomMsg)
 	if(!paused_)
 	{
 		Transform odom = rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose);
-		if(!lastPose_.isIdentity() && !odom.isNull() && (odom.isIdentity() || odomMsg->pose.covariance[0] >= BAD_COVARIANCE))
+		if(!lastPose_.isIdentity() && !odom.isNull() && (odom.isIdentity() || odomMsg->twist.covariance[0] >= BAD_COVARIANCE))
 		{
-			UWARN("Odometry is reset (identity pose or high variance (%f) detected). Increment map id!", odomMsg->pose.covariance[0]);
+			UWARN("Odometry is reset (identity pose or high variance (%f) detected). Increment map id!", odomMsg->twist.covariance[0]);
 			rtabmap_.triggerNewMap();
 			rotVariance_ = 0;
 			transVariance_ = 0;
@@ -621,8 +621,8 @@ bool CoreWrapper::commonOdomUpdate(const nav_msgs::OdometryConstPtr & odomMsg)
 		lastPoseIntermediate_ = false;
 		lastPose_ = odom;
 		lastPoseStamp_ = odomMsg->header.stamp;
-		float transVariance = uMax3(odomMsg->pose.covariance[0], odomMsg->pose.covariance[7], odomMsg->pose.covariance[14]);
-		float rotVariance = uMax3(odomMsg->pose.covariance[21], odomMsg->pose.covariance[28], odomMsg->pose.covariance[35]);
+		float transVariance = uMax3(odomMsg->twist.covariance[0], odomMsg->twist.covariance[7], odomMsg->twist.covariance[14]);
+		float rotVariance = uMax3(odomMsg->twist.covariance[21], odomMsg->twist.covariance[28], odomMsg->twist.covariance[35]);
 		if(uIsFinite(rotVariance) && rotVariance > rotVariance_)
 		{
 			rotVariance_ = rotVariance;
