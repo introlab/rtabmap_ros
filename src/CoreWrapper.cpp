@@ -610,7 +610,7 @@ bool CoreWrapper::commonOdomUpdate(const nav_msgs::OdometryConstPtr & odomMsg)
 	if(!paused_)
 	{
 		Transform odom = rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose);
-		if(!lastPose_.isIdentity() && (odom.isIdentity() || odomMsg->pose.covariance[0] >= BAD_COVARIANCE))
+		if(!lastPose_.isIdentity() && !odom.isNull() && (odom.isIdentity() || odomMsg->pose.covariance[0] >= BAD_COVARIANCE))
 		{
 			UWARN("Odometry is reset (identity pose or high variance (%f) detected). Increment map id!", odomMsg->pose.covariance[0]);
 			rtabmap_.triggerNewMap();
