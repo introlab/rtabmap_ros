@@ -95,6 +95,10 @@ void points3fToROS(const std::vector<cv::Point3f> & kpts, std::vector<rtabmap_ro
 rtabmap::CameraModel cameraModelFromROS(
 		const sensor_msgs::CameraInfo & camInfo,
 		const rtabmap::Transform & localTransform = rtabmap::Transform::getIdentity());
+void cameraModelToROS(
+		const rtabmap::CameraModel & model,
+		sensor_msgs::CameraInfo & camInfo);
+
 rtabmap::StereoCameraModel stereoCameraModelFromROS(
 		const sensor_msgs::CameraInfo & leftCamInfo,
 		const sensor_msgs::CameraInfo & rightCamInfo,

@@ -341,6 +341,40 @@ rtabmap::CameraModel cameraModelFromROS(
 			0.0,
 			cv::Size(model.fullResolution().width, model.fullResolution().height));
 }
+void cameraModelToROS(
+		const rtabmap::CameraModel & model,
+		sensor_msgs::CameraInfo & camInfo)
+{
+	UASSERT(model.isValidForRectification());
+
+	camInfo.D = std::vector<double>(model.D_raw().cols);
+	memcpy(camInfo.D.data(), model.D_raw().data, model.D_raw().cols*sizeof(double));
+
+	UASSERT(model.K_raw().total() == 9);
+	memcpy(camInfo.K.elems, model.K_raw().data, 9*sizeof(double));
+
+	UASSERT(model.R().total() == 9);
+	memcpy(camInfo.R.elems, model.R().data, 9*sizeof(double));
+
+	UASSERT(model.P().total() == 12);
+	memcpy(camInfo.P.elems, model.P().data, 12*sizeof(double));
+
+	if(camInfo.D.size() > 5)
+	{
+		camInfo.distortion_model = "rational_polynomial";
+	}
+	else
+	{
+		camInfo.distortion_model = "plumb_bob";
+	}
+	camInfo.binning_x = 1;
+	camInfo.binning_y = 1;
+	camInfo.roi.width = model.imageWidth();
+	camInfo.roi.height = model.imageHeight();
+
+	camInfo.width = model.imageWidth();
+	camInfo.height = model.imageHeight();
+}
 rtabmap::StereoCameraModel stereoCameraModelFromROS(
 		const sensor_msgs::CameraInfo & leftCamInfo,
 		const sensor_msgs::CameraInfo & rightCamInfo,
