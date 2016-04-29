@@ -7,13 +7,14 @@ project(rtabmap_ros)
 find_package(catkin REQUIRED COMPONENTS 
              cv_bridge roscpp rospy sensor_msgs std_msgs std_srvs nav_msgs geometry_msgs visualization_msgs
              image_transport tf tf_conversions tf2_ros eigen_conversions laser_geometry pcl_conversions 
-             pcl_ros nodelet dynamic_reconfigure rviz message_filters class_loader
+             pcl_ros nodelet dynamic_reconfigure message_filters class_loader
              genmsg stereo_msgs move_base_msgs
 )
 
 # Optional components
 find_package(costmap_2d)
 find_package(octomap_ros)
+find_package(rviz)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -95,13 +96,16 @@ ENDIF(costmap_2d_FOUND)
 IF(octomap_ros_FOUND)
 SET(optional_dependencies ${optional_dependencies} octomap_ros)
 ENDIF(octomap_ros_FOUND)
+IF(rviz_FOUND)
+SET(optional_dependencies ${optional_dependencies} rviz)
+ENDIF(rviz_FOUND)
 
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES rtabmap_ros
   CATKIN_DEPENDS cv_bridge roscpp rospy sensor_msgs std_msgs std_srvs nav_msgs geometry_msgs visualization_msgs
                  image_transport tf tf_conversions tf2_ros eigen_conversions laser_geometry pcl_conversions 
-                 pcl_ros nodelet dynamic_reconfigure rviz message_filters class_loader
+                 pcl_ros nodelet dynamic_reconfigure message_filters class_loader
                  stereo_msgs move_base_msgs ${optional_dependencies}
   DEPENDS RTABMap OpenCV
 )
@@ -125,23 +129,8 @@ SET(Libraries
    ${OpenCV_LIBRARIES}
    ${catkin_LIBRARIES}
    ${RTABMap_LIBRARIES}
-   ${rviz_DEFAULT_PLUGIN_LIBRARIES}
 )
-
-## RVIZ plugin
-qt4_wrap_cpp(MOC_FILES
-  src/rviz/MapCloudDisplay.h
-  src/rviz/MapGraphDisplay.h
-  src/rviz/InfoDisplay.h
-  src/rviz/OrbitOrientedViewController.h
-)
-
-# tf:message_filters, mixing boost and Qt signals
-set_property(
-   SOURCE src/rviz/MapCloudDisplay.cpp src/rviz/MapGraphDisplay.cpp src/rviz/InfoDisplay.cpp src/rviz/OrbitOrientedViewController.cpp
-   PROPERTY COMPILE_DEFINITIONS QT_NO_KEYWORDS
-   )
-   
+  
 SET(rtabmap_ros_lib_src
    src/nodelets/data_throttle.cpp
    src/nodelets/stereo_throttle.cpp
@@ -153,12 +142,7 @@ SET(rtabmap_ros_lib_src
    src/nodelets/point_cloud_aggregator.cpp
    src/MsgConversion.cpp
    src/OdometryROS.cpp
-   src/rviz/MapCloudDisplay.cpp
-   src/rviz/MapGraphDisplay.cpp
-   src/rviz/InfoDisplay.cpp
-   src/rviz/OrbitOrientedViewController.cpp
    src/MapsManager.cpp
-   ${MOC_FILES}
 )   
 
 # If costmap_2d is found, add the plugin
@@ -175,7 +159,45 @@ SET(rtabmap_ros_lib_src
   )
 ENDIF(costmap_2d_FOUND)
 
+# If rviz is found, add plugins
+IF(rviz_FOUND)
+MESSAGE(STATUS "WITH rviz")
+include_directories(
+  ${rviz_INCLUDE_DIRS}
+)
+SET(Libraries
+  ${Libraries}
+  ${rviz_LIBRARIES}
+  ${rviz_DEFAULT_PLUGIN_LIBRARIES}
+)
+
+## RVIZ plugin
+qt4_wrap_cpp(MOC_FILES
+  src/rviz/MapCloudDisplay.h
+  src/rviz/MapGraphDisplay.h
+  src/rviz/InfoDisplay.h
+  src/rviz/OrbitOrientedViewController.h
+)
+
+# tf:message_filters, mixing boost and Qt signals
+set_property(
+   SOURCE src/rviz/MapCloudDisplay.cpp src/rviz/MapGraphDisplay.cpp src/rviz/InfoDisplay.cpp src/rviz/OrbitOrientedViewController.cpp
+   PROPERTY COMPILE_DEFINITIONS QT_NO_KEYWORDS
+)
+
+SET(rtabmap_ros_lib_src
+   ${rtabmap_ros_lib_src}
+   src/rviz/MapCloudDisplay.cpp
+   src/rviz/MapGraphDisplay.cpp
+   src/rviz/InfoDisplay.cpp
+   src/rviz/OrbitOrientedViewController.cpp
+   ${MOC_FILES}
+)
+ENDIF(rviz_FOUND)
+
+############################
 ## Declare a cpp library
+############################
 add_library(rtabmap_ros
    ${rtabmap_ros_lib_src}
 )
