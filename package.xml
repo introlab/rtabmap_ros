@@ -37,7 +37,8 @@
   <build_depend>class_loader</build_depend>
   <build_depend>rtabmap</build_depend>
   <build_depend>move_base_msgs</build_depend>
-  <build_depend>costmap_2d</build_depend>
+  <!-- costmap_2d is not on kinetic yet --> 
+  <!-- <build_depend>costmap_2d</build_depend> -->
   <build_depend>octomap_ros</build_depend>
   <build_depend>octomap</build_depend>
   

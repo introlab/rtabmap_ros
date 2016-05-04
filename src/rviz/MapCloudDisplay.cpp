@@ -25,9 +25,9 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include <QtGui/QApplication>
-#include <QtGui/QMessageBox>
-#include <QtCore/QTimer>
+#include <QApplication>
+#include <QMessageBox>
+#include <QTimer>
 
 #include <OgreSceneNode.h>
 #include <OgreSceneManager.h>

@@ -23,8 +23,16 @@ find_package(RTABMap 0.11.4 REQUIRED)
 find_package(OpenCV REQUIRED)
 
 #Qt stuff
-FIND_PACKAGE(Qt4 COMPONENTS QtCore QtGui REQUIRED)
-INCLUDE(${QT_USE_FILE})
+# If Qt is here, rtabmapviz will be built
+# look for Qt5 before Qt4
+FIND_PACKAGE(Qt5 COMPONENTS Widgets Core Gui)
+IF(Qt5_FOUND)
+  FIND_PACKAGE(Qt4 COMPONENTS QtCore QtGui)
+ENDIF(Qt5_FOUND)
+
+IF(QT4_FOUND)
+    INCLUDE(${QT_USE_FILE})
+ENDIF(QT4_FOUND)
 
 ## We also use Ogre
 include($ENV{ROS_ROOT}/core/rosbuild/FindPkgConfig.cmake)
@@ -159,6 +167,13 @@ SET(rtabmap_ros_lib_src
   )
 ENDIF(costmap_2d_FOUND)
 
+IF(QT4_FOUND OR Qt5_FOUND)
+SET(Libraries 
+   ${Libraries}
+   ${QT_LIBRARIES}
+)
+ENDIF(QT4_FOUND OR Qt5_FOUND)
+
 # If rviz is found, add plugins
 IF(rviz_FOUND)
 MESSAGE(STATUS "WITH rviz")
@@ -172,12 +187,21 @@ SET(Libraries
 )
 
 ## RVIZ plugin
+IF(QT4_FOUND)
 qt4_wrap_cpp(MOC_FILES
   src/rviz/MapCloudDisplay.h
   src/rviz/MapGraphDisplay.h
   src/rviz/InfoDisplay.h
   src/rviz/OrbitOrientedViewController.h
 )
+ELSE()
+qt5_wrap_cpp(MOC_FILES
+  src/rviz/MapCloudDisplay.h
+  src/rviz/MapGraphDisplay.h
+  src/rviz/InfoDisplay.h
+  src/rviz/OrbitOrientedViewController.h
+)
+ENDIF()
 
 # tf:message_filters, mixing boost and Qt signals
 set_property(
@@ -201,11 +225,14 @@ ENDIF(rviz_FOUND)
 add_library(rtabmap_ros
    ${rtabmap_ros_lib_src}
 )
+
 target_link_libraries(rtabmap_ros
   ${Libraries}
-  ${QT_LIBRARIES}
   ${OGRE_LIBRARIES}
 )
+IF(Qt5_FOUND)
+    QT5_USE_MODULES(rtabmap_ros Widgets Core Gui)
+ENDIF()
 add_dependencies(rtabmap_ros ${${PROJECT_NAME}_EXPORTED_TARGETS})
 
 # If octomap is found, add definition
@@ -243,6 +270,9 @@ target_link_libraries(camera ${Libraries})
 IF(RTABMAP_GUI)
     add_executable(rtabmapviz src/GuiNode.cpp src/GuiWrapper.cpp src/PreferencesDialogROS.cpp)
     target_link_libraries(rtabmapviz rtabmap_ros ${QT_LIBRARIES} ${Libraries})
+    IF(Qt5_FOUND)
+        QT5_USE_MODULES(rtabmapviz Widgets Core Gui)
+    ENDIF()
 ELSE()
     MESSAGE(WARNING "Found RTAB-Map built without its GUI library. Node rtabmapviz will not be built!")
 ENDIF()
@@ -329,6 +359,12 @@ install(FILES
    costmap_plugins.xml
    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )
+IF(costmap_2d_FOUND)
+install(FILES
+   costmap_plugins.xml
+   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+)
+ENDIF(costmap_2d_FOUND)
 
 #############
 ## Testing ##

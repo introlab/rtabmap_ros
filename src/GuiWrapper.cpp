@@ -26,8 +26,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #include "GuiWrapper.h"
-#include <QtGui/QApplication>
-#include <QtCore/QDir>
+#include <QApplication>
+#include <QDir>
 
 #include <cv_bridge/cv_bridge.h>
 #include <std_srvs/Empty.h>

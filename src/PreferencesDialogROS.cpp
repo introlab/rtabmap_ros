@@ -27,14 +27,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "PreferencesDialogROS.h"
 #include <rtabmap/core/Parameters.h>
-#include <QtCore/QDir>
-#include <QtCore/QFileInfo>
-#include <QtCore/QSettings>
-#include <QtGui/QHBoxLayout>
-#include <QtCore/QTimer>
-#include <QtGui/QLabel>
+#include <QDir>
+#include <QFileInfo>
+#include <QSettings>
+#include <QHBoxLayout>
+#include <QTimer>
+#include <QLabel>
 #include <rtabmap/core/RtabmapEvent.h>
-#include <QtGui/QMessageBox>
+#include <QMessageBox>
 #include <ros/exceptions.h>
 #include <rtabmap/utilite/UStl.h>
 
