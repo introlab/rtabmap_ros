@@ -25,7 +25,7 @@ find_package(OpenCV REQUIRED)
 #Qt stuff
 # If Qt is here, rtabmapviz will be built
 # look for Qt5 before Qt4
-FIND_PACKAGE(Qt5 COMPONENTS Widgets Core Gui)
+FIND_PACKAGE(Qt5 COMPONENTS Widgets Core Gui QUIET)
 IF(Qt5_FOUND)
   FIND_PACKAGE(Qt4 COMPONENTS QtCore QtGui)
 ENDIF(Qt5_FOUND)
@@ -232,7 +232,7 @@ target_link_libraries(rtabmap_ros
 )
 IF(Qt5_FOUND)
     QT5_USE_MODULES(rtabmap_ros Widgets Core Gui)
-ENDIF()
+ENDIF(Qt5_FOUND)
 add_dependencies(rtabmap_ros ${${PROJECT_NAME}_EXPORTED_TARGETS})
 
 # If octomap is found, add definition
