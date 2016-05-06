@@ -68,7 +68,7 @@
   <run_depend>class_loader</run_depend>
   <run_depend>rtabmap</run_depend>
   <run_depend>move_base_msgs</run_depend>
-  <run_depend>costmap_2d</run_depend>
+  <!-- <run_depend>costmap_2d</run_depend> -->
   <run_depend>octomap_ros</run_depend>
   <run_depend>octomap</run_depend>
 
