@@ -28,6 +28,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef MAP_CLOUD_DISPLAY_H
 #define MAP_CLOUD_DISPLAY_H
 
+#ifndef Q_MOC_RUN  // See: https://bugreports.qt-project.org/browse/QTBUG-22829
+
 #include <deque>
 #include <queue>
 #include <vector>
@@ -41,6 +43,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rviz/ogre_helpers/point_cloud.h>
 #include <rviz/message_filter_display.h>
 #include <rviz/default_plugin/point_cloud_transformer.h>
+
+#endif
 
 namespace rviz {
 class IntProperty;
