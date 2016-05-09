@@ -18,21 +18,30 @@ find_package(rviz)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
-find_package(RTABMap 0.11.4 REQUIRED)
+find_package(RTABMap 0.11.5 REQUIRED)
 
 find_package(OpenCV REQUIRED)
 
 #Qt stuff
-# If Qt is here, rtabmapviz will be built
-# look for Qt5 before Qt4
-FIND_PACKAGE(Qt5 COMPONENTS Widgets Core Gui QUIET)
-IF(Qt5_FOUND)
-  FIND_PACKAGE(Qt4 COMPONENTS QtCore QtGui)
-ENDIF(Qt5_FOUND)
-
-IF(QT4_FOUND)
-    INCLUDE(${QT_USE_FILE})
-ENDIF(QT4_FOUND)
+# If librtabmap_gui.so is found, rtabmapviz will be built
+# If rviz is found, plugins will be built
+IF(RTABMAP_GUI OR rviz_FOUND)
+   IF(RTABMAP_QT_VERSION EQUAL 4)
+      FIND_PACKAGE(Qt4 COMPONENTS QtCore QtGui REQUIRED)
+      INCLUDE(${QT_USE_FILE})
+   ELSE()
+      IF(RTABMAP_GUI)
+         FIND_PACKAGE(Qt5 COMPONENTS Widgets Core Gui REQUIRED)
+      ELSE()
+         # For rviz plugins, look for Qt5 before Qt4
+         FIND_PACKAGE(Qt5 COMPONENTS Widgets Core Gui QUIET)
+         IF(NOT Qt5_FOUND)
+            FIND_PACKAGE(Qt4 COMPONENTS QtCore QtGui REQUIRED)
+            INCLUDE(${QT_USE_FILE})
+         ENDIF(NOT Qt5_FOUND)
+      ENDIF()
+   ENDIF()   
+ENDIF(RTABMAP_GUI OR rviz_FOUND)
 
 ## We also use Ogre
 include($ENV{ROS_ROOT}/core/rosbuild/FindPkgConfig.cmake)
