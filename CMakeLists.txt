@@ -105,25 +105,13 @@ generate_dynamic_reconfigure_options(cfg/Camera.cfg)
 ## LIBRARIES: libraries you create in this project that dependent projects also need
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
-
-SET(optional_dependencies "")
-IF(costmap_2d_FOUND)
-SET(optional_dependencies ${optional_dependencies} costmap_2d )
-ENDIF(costmap_2d_FOUND)
-IF(octomap_ros_FOUND)
-SET(optional_dependencies ${optional_dependencies} octomap_ros)
-ENDIF(octomap_ros_FOUND)
-IF(rviz_FOUND)
-SET(optional_dependencies ${optional_dependencies} rviz)
-ENDIF(rviz_FOUND)
-
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES rtabmap_ros
   CATKIN_DEPENDS cv_bridge roscpp rospy sensor_msgs std_msgs std_srvs nav_msgs geometry_msgs visualization_msgs
                  image_transport tf tf_conversions tf2_ros eigen_conversions laser_geometry pcl_conversions 
                  pcl_ros nodelet dynamic_reconfigure message_filters class_loader
-                 stereo_msgs move_base_msgs ${optional_dependencies}
+                 stereo_msgs move_base_msgs
   DEPENDS RTABMap OpenCV
 )
 
