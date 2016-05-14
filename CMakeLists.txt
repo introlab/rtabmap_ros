@@ -134,7 +134,6 @@ SET(Libraries
    ${OpenCV_LIBRARIES}
    ${catkin_LIBRARIES}
    ${RTABMap_LIBRARIES}
-   ${rviz_DEFAULT_PLUGIN_LIBRARIES}
 )
   
 SET(rtabmap_ros_lib_src
