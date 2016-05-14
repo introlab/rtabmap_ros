@@ -33,6 +33,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
 
+#include <rtabmap_ros/MsgConversion.h>
+
 #include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/image_encodings.h>
@@ -62,6 +64,7 @@ class PointCloudXYZRGB : public nodelet::Nodelet
 public:
 	PointCloudXYZRGB() :
 		maxDepth_(0.0),
+		minDepth_(0.0),
 		voxelSize_(0.0),
 		decimation_(1),
 		noiseFilterRadius_(0.0),
@@ -95,12 +98,13 @@ private:
 		pnh.param("approx_sync", approxSync, approxSync);
 		pnh.param("queue_size", queueSize, queueSize);
 		pnh.param("max_depth", maxDepth_, maxDepth_);
+		pnh.param("min_depth", minDepth_, minDepth_);
 		pnh.param("voxel_size", voxelSize_, voxelSize_);
 		pnh.param("decimation", decimation_, decimation_);
 		pnh.param("noise_filter_radius", noiseFilterRadius_, noiseFilterRadius_);
 		pnh.param("noise_filter_min_neighbors", noiseFilterMinNeighbors_, noiseFilterMinNeighbors_);
 
-		ROS_INFO("Approximate time sync = %s", approxSync?"true":"false");
+		NODELET_INFO("Approximate time sync = %s", approxSync?"true":"false");
 
 		cloudPub_ = nh.advertise<sensor_msgs::PointCloud2>("cloud", 1);
 
@@ -165,13 +169,27 @@ private:
 			 imageDepth->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1)==0 ||
 			 imageDepth->encoding.compare(sensor_msgs::image_encodings::MONO16)==0))
 		{
-			ROS_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8 and image_depth=32FC1,16UC1,mono16");
+			NODELET_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8 and image_depth=32FC1,16UC1,mono16");
 			return;
 		}
 
 		if(cloudPub_.getNumSubscribers())
 		{
-			cv_bridge::CvImageConstPtr imagePtr = cv_bridge::toCvShare(image);
+			cv_bridge::CvImageConstPtr imagePtr;
+			if(image->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0)
+			{
+				imagePtr = cv_bridge::toCvShare(image);
+			}
+			else if(image->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
+					image->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
+			{
+				imagePtr = cv_bridge::toCvShare(image, "mono8");
+			}
+			else
+			{
+				imagePtr = cv_bridge::toCvShare(image, "bgr8");
+			}
+
 			cv_bridge::CvImageConstPtr imageDepthPtr = cv_bridge::toCvShare(imageDepth);
 
 			image_geometry::PinholeCameraModel model;
@@ -210,7 +228,7 @@ private:
 				imageRight->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
 				imageRight->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0))
 		{
-			ROS_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8 (enc=%s)", imageLeft->encoding.c_str());
+			NODELET_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8 (enc=%s)", imageLeft->encoding.c_str());
 			return;
 		}
 
@@ -228,22 +246,11 @@ private:
 			}
 			ptrRightImage = cv_bridge::toCvShare(imageRight, "mono8");
 
-			image_geometry::StereoCameraModel model;
-			model.fromCameraInfo(*camInfoLeft, *camInfoRight);
-
-			float fx = model.left().fx();
-			float cx = model.left().cx();
-			float cy = model.left().cy();
-			float baseline = model.baseline();
-
 			pcl::PointCloud<pcl::PointXYZRGB>::Ptr pclCloud;
 			pclCloud = rtabmap::util3d::cloudFromStereoImages(
 					ptrLeftImage->image,
 					ptrRightImage->image,
-					cx,
-					cy,
-					fx,
-					baseline,
+					rtabmap_ros::stereoCameraModelFromROS(*camInfoLeft, *camInfoRight),
 					decimation_);
 
 			processAndPublish(pclCloud, imageLeft->header);
@@ -252,9 +259,9 @@ private:
 
 	void processAndPublish(pcl::PointCloud<pcl::PointXYZRGB>::Ptr & pclCloud, const std_msgs::Header & header)
 	{
-		if(pclCloud->size() && maxDepth_ > 0)
+		if(pclCloud->size() && (minDepth_ != 0.0 || maxDepth_ > minDepth_))
 		{
-			pclCloud = rtabmap::util3d::passThrough(pclCloud, "z", 0, maxDepth_);
+			pclCloud = rtabmap::util3d::passThrough(pclCloud, "z", minDepth_, maxDepth_>minDepth_?maxDepth_:std::numeric_limits<float>::max());
 		}
 
 		if(pclCloud->size() && noiseFilterRadius_ > 0.0 && noiseFilterMinNeighbors_ > 0)
@@ -282,6 +289,7 @@ private:
 private:
 
 	double maxDepth_;
+	double minDepth_;
 	double voxelSize_;
 	int decimation_;
 	double noiseFilterRadius_;

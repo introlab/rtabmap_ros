@@ -193,7 +193,7 @@ public:
 			if(!path.empty() && UDirectory::exists(path))
 			{
 				//images
-				camera_ = new rtabmap::CameraImages(path, 1, false, false, false, frameRate);
+				camera_ = new rtabmap::CameraImages(path, frameRate);
 			}
 			else if(!path.empty() && UFile::exists(path))
 			{

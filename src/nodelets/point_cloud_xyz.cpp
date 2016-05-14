@@ -29,6 +29,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <pluginlib/class_list_macros.h>
 #include <nodelet/nodelet.h>
 
+#include <rtabmap_ros/MsgConversion.h>
+
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
@@ -62,6 +64,7 @@ class PointCloudXYZ : public nodelet::Nodelet
 public:
 	PointCloudXYZ() :
 		maxDepth_(0.0),
+		minDepth_(0.0),
 		voxelSize_(0.0),
 		decimation_(1),
 		noiseFilterRadius_(0.0),
@@ -98,6 +101,7 @@ private:
 		pnh.param("approx_sync", approxSync, approxSync);
 		pnh.param("queue_size", queueSize, queueSize);
 		pnh.param("max_depth", maxDepth_, maxDepth_);
+		pnh.param("min_depth", minDepth_, minDepth_);
 		pnh.param("voxel_size", voxelSize_, voxelSize_);
 		pnh.param("decimation", decimation_, decimation_);
 		pnh.param("noise_filter_radius", noiseFilterRadius_, noiseFilterRadius_);
@@ -106,7 +110,7 @@ private:
 		pnh.param("cut_right", cut_right_, cut_right_);
 		pnh.param("special_filter_close_object", create_close_obstacle_if_depth_is_missing_, create_close_obstacle_if_depth_is_missing_);
 
-		ROS_INFO("Approximate time sync = %s", approxSync?"true":"false");
+		NODELET_INFO("Approximate time sync = %s", approxSync?"true":"false");
 
 		if(approxSync)
 		{
@@ -147,7 +151,7 @@ private:
 		   depth->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1)!=0 &&
 		   depth->encoding.compare(sensor_msgs::image_encodings::MONO16)!=0)
 		{
-			ROS_ERROR("Input type depth=32FC1,16UC1,MONO16");
+			NODELET_ERROR("Input type depth=32FC1,16UC1,MONO16");
 			return;
 		}
 
@@ -222,7 +226,7 @@ private:
 		if(disparityMsg->image.encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1) !=0 &&
 		   disparityMsg->image.encoding.compare(sensor_msgs::image_encodings::TYPE_16SC1) !=0)
 		{
-			ROS_ERROR("Input type must be disparity=32FC1 or 16SC1");
+			NODELET_ERROR("Input type must be disparity=32FC1 or 16SC1");
 			return;
 		}
 
@@ -238,18 +242,12 @@ private:
 
 		if(cloudPub_.getNumSubscribers())
 		{
-			image_geometry::PinholeCameraModel model;
-			model.fromCameraInfo(*cameraInfo);
-			float cx = model.cx();
-			float cy = model.cy();
-
 			pcl::PointCloud<pcl::PointXYZ>::Ptr pclCloud;
+			rtabmap::CameraModel leftModel = rtabmap_ros::cameraModelFromROS(*cameraInfo);
+			rtabmap::StereoCameraModel stereoModel(disparityMsg->f, disparityMsg->f, leftModel.cx(), leftModel.cy(), disparityMsg->T);
 			pclCloud = rtabmap::util3d::cloudFromDisparity(
 					disparity,
-					cx,
-					cy,
-					disparityMsg->f,
-					disparityMsg->T,
+					stereoModel,
 					decimation_);
 
 			processAndPublish(pclCloud, disparityMsg->header);
@@ -258,9 +256,9 @@ private:
 
 	void processAndPublish(pcl::PointCloud<pcl::PointXYZ>::Ptr & pclCloud, const std_msgs::Header & header)
 	{
-		if(pclCloud->size() && maxDepth_ > 0)
+		if(pclCloud->size() && (minDepth_ != 0.0 || maxDepth_ > minDepth_))
 		{
-			pclCloud = rtabmap::util3d::passThrough(pclCloud, "z", 0, maxDepth_);
+			pclCloud = rtabmap::util3d::passThrough(pclCloud, "z", minDepth_, maxDepth_>minDepth_?maxDepth_:std::numeric_limits<float>::max());
 		}
 
 		if(pclCloud->size() && noiseFilterRadius_ > 0.0 && noiseFilterMinNeighbors_ > 0)
@@ -288,6 +286,7 @@ private:
 private:
 
 	double maxDepth_;
+	double minDepth_;
 	double voxelSize_;
 	int decimation_;
 	double noiseFilterRadius_;

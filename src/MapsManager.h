@@ -26,7 +26,7 @@ class Memory;
 
 class MapsManager {
 public:
-	MapsManager();
+	MapsManager(bool usePublicNamespace);
 	virtual ~MapsManager();
 	void clear();
 	bool hasSubscribers() const;
@@ -40,6 +40,7 @@ public:
 			bool updateCloud,
 			bool updateProj,
 			bool updateGrid,
+			bool updateScan,
 			const std::map<int, rtabmap::Signature> & signatures = std::map<int, rtabmap::Signature>());
 
 	void publishMaps(
@@ -67,26 +68,39 @@ private:
 	// mapping stuff
 	int cloudDecimation_;
 	double cloudMaxDepth_;
+	double cloudMinDepth_;
 	double cloudVoxelSize_;
 	double cloudFloorCullingHeight_;
+	double cloudCeilingCullingHeight_;
 	bool cloudOutputVoxelized_;
 	bool cloudFrustumCulling_;
+	double cloudNoiseFilteringRadius_;
+	int cloudNoiseFilteringMinNeighbors_;
+	int scanDecimation_;
+	double scanVoxelSize_;
+	bool scanOutputVoxelized_;
 	double projMaxGroundAngle_;
 	int projMinClusterSize_;
-	double projMaxHeight_;
+	double projMaxObstaclesHeight_;
+	double projMaxGroundHeight_;
+	bool projDetectFlatObstacles_;
 	double gridCellSize_;
 	double gridSize_;
 	bool gridEroded_;
 	bool gridUnknownSpaceFilled_;
+	double gridMaxUnknownSpaceFilledRange_;
 	double mapFilterRadius_;
 	double mapFilterAngle_;
 	bool mapCacheCleanup_;
+	bool negativePosesIgnored;
 
 	ros::Publisher cloudMapPub_;
 	ros::Publisher projMapPub_;
 	ros::Publisher gridMapPub_;
+	ros::Publisher scanMapPub_;
 
 	std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr > clouds_;
+	std::map<int, pcl::PointCloud<pcl::PointXYZ>::Ptr > scans_;
 	std::map<int, std::vector<rtabmap::CameraModel> > cameraModels_;
 	std::map<int, std::pair<cv::Mat, cv::Mat> > projMaps_; // <ground, obstacles>
 	std::map<int, std::pair<cv::Mat, cv::Mat> > gridMaps_; // <ground, obstacles>

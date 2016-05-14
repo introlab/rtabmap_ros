@@ -9,6 +9,9 @@
   <arg name="rviz"                    default="false" />
   <arg name="rtabmapviz"              default="true" /> 
   
+  <!-- Localization-only mode -->
+  <arg name="localization"            default="false"/>
+  
   <!-- Corresponding config files -->
   <arg name="rtabmapviz_cfg"          default="-d $(find rtabmap_ros)/launch/config/rgbd_gui.ini" />
   <arg name="rviz_cfg"                default="-d $(find rtabmap_ros)/launch/config/rgbd.rviz" />
@@ -29,91 +32,82 @@
   <arg name="subscribe_scan"          default="false"/>         <!-- Assuming 2D scan if set, rtabmap will do 3DoF mapping instead of 6DoF -->
   <arg name="scan_topic"              default="/scan"/>
   
+  <arg name="subscribe_scan_cloud"    default="false"/>         <!-- Assuming 3D scan if set -->
+  <arg name="scan_cloud_topic"        default="/scan_cloud"/>
+  
   <arg name="visual_odometry"         default="true"/>          <!-- Generate visual odometry -->
   <arg name="odom_topic"              default="/odom"/>         <!-- Odometry topic used if visual_odometry is false -->
    
   <arg name="namespace"               default="rtabmap"/>
-  <arg name="wait_for_transform"      default="0.1"/>
+  <arg name="wait_for_transform"      default="0.2"/>
   
-  <!-- Odometry parameters: -->
-  <arg name="strategy"            default="0" />       <!-- Strategy: 0=BOW (bag-of-words) 1=Optical Flow -->
-  <arg name="feature"             default="6" />       <!-- Feature type: 0=SURF 1=SIFT 2=ORB 3=FAST/FREAK 4=FAST/BRIEF 5=GFTT/FREAK 6=GFTT/BRIEF 7=BRISK -->
-  <arg name="estimation"          default="0" />       <!-- Motion estimation approach: 0:3D->3D, 1:3D->2D (PnP) -->
-  <arg name="nn"                  default="3" />       <!-- Nearest neighbor strategy : 0=Linear, 1=FLANN_KDTREE (SIFT, SURF), 2=FLANN_LSH, 3=BRUTEFORCE (ORB/FREAK/BRIEF/BRISK) -->
-  <arg name="max_depth"           default="0" />       <!-- Maximum features depth (m) -->
-  <arg name="min_inliers"         default="20" />      <!-- Minimum visual correspondences to accept a transformation (m) -->
-  <arg name="inlier_distance"     default="0.1" />     <!-- RANSAC maximum inliers distance (m) -->
-  <arg name="local_map"           default="1000" />    <!-- Local map size: number of unique features to keep track -->
-  <arg name="variance_inliers"    default="true"/>    <!-- Variance from inverse of inliers count -->  
-        
   <!-- Nodes -->
   <group ns="$(arg namespace)">
   
-    <node if="$(arg compressed)" name="republish_rgb" type="republish" pkg="image_transport" args="compressed in:=$(arg rgb_topic) raw out:=$(arg rgb_topic)" />
+    <node if="$(arg compressed)" name="republish_rgb"   type="republish" pkg="image_transport" args="compressed in:=$(arg rgb_topic) raw out:=$(arg rgb_topic)" />
     <node if="$(arg compressed)" name="republish_depth" type="republish" pkg="image_transport" args="compressedDepth in:=$(arg depth_registered_topic) raw out:=$(arg depth_registered_topic)" />
   
     <!-- Odometry -->
-    <node if="$(arg visual_odometry)" pkg="rtabmap_ros" type="rgbd_odometry" name="rgbd_odometry" output="screen" launch-prefix="$(arg launch_prefix)">
+    <node if="$(arg visual_odometry)" pkg="rtabmap_ros" type="rgbd_odometry" name="rgbd_odometry" output="screen" args="$(arg rtabmap_args)" launch-prefix="$(arg launch_prefix)">
       <remap from="rgb/image"       to="$(arg rgb_topic)"/>
       <remap from="depth/image"     to="$(arg depth_registered_topic)"/>
       <remap from="rgb/camera_info" to="$(arg camera_info_topic)"/>
 	  
-	  <param name="frame_id"                 type="string" value="$(arg frame_id)"/>
-	  <param name="wait_for_transform_duration"       type="double"   value="$(arg wait_for_transform)"/>
+	  <param name="frame_id"                    type="string" value="$(arg frame_id)"/>
+	  <param name="wait_for_transform_duration" type="double"   value="$(arg wait_for_transform)"/>
 	  
-	  <param name="Odom/Strategy"            type="string" value="$(arg strategy)"/> 
-	  <param name="Odom/FeatureType"         type="string" value="$(arg feature)"/>  
-	  <param name="OdomBow/NNType"           type="string" value="$(arg nn)"/>
-	  <param name="Odom/EstimationType"      type="string" value="$(arg estimation)"/> 
-	  <param name="Odom/MaxDepth"            type="string" value="$(arg max_depth)"/>  
-	  <param name="Odom/MinInliers"          type="string" value="$(arg min_inliers)"/> 
-	  <param name="Odom/InlierDistance"      type="string" value="$(arg inlier_distance)"/>       
-      <param name="OdomBow/LocalHistorySize" type="string" value="$(arg local_map)"/> 
-      <param name="Odom/FillInfoData"        type="string" value="true"/> 
-      <param name="Odom/VarianceFromInliersCount" type="string" value="$(arg variance_inliers)"/>  
+      <param name="Odom/FillInfoData"           type="string" value="true"/> 
     </node>
   
     <!-- Visual SLAM (robot side) -->
     <node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="screen" args="$(arg rtabmap_args)" launch-prefix="$(arg launch_prefix)">
-      <param name="subscribe_depth"    type="bool"   value="true"/>
-      <param name="subscribe_laserScan"     type="bool"   value="$(arg subscribe_scan)"/>
-	  <param name="frame_id"           type="string" value="$(arg frame_id)"/>
-	  <param name="wait_for_transform_duration" type="double"   value="$(arg wait_for_transform)"/>
-	  <param name="database_path"      type="string" value="$(arg database_path)"/>
+      <param name="subscribe_depth"             type="bool"   value="true"/>
+      <param name="subscribe_scan"              type="bool"   value="$(arg subscribe_scan)"/>
+      <param name="subscribe_scan_cloud"        type="bool"   value="$(arg subscribe_scan_cloud)"/>
+	  <param name="frame_id"                    type="string" value="$(arg frame_id)"/>
+	  <param name="wait_for_transform_duration" type="double" value="$(arg wait_for_transform)"/>
+	  <param name="database_path"               type="string" value="$(arg database_path)"/>
 	
       <remap from="rgb/image"       to="$(arg rgb_topic)"/>
       <remap from="depth/image"     to="$(arg depth_registered_topic)"/>
       <remap from="rgb/camera_info" to="$(arg camera_info_topic)"/>
       <remap from="scan"            to="$(arg scan_topic)"/>
+      <remap from="scan_cloud"      to="$(arg scan_cloud_topic)"/>
       <remap unless="$(arg visual_odometry)" from="odom"  to="$(arg odom_topic)"/>
       
-      <param name="Rtabmap/TimeThr"           type="string" value="$(arg time_threshold)"/>
-      <param name="RGBD/OptimizeFromGraphEnd" type="string" value="$(arg optimize_from_last_node)"/>
-      <param name="LccBow/MinInliers"         type="string" value="10"/>
-      <param name="LccBow/InlierDistance"     type="string" value="$(arg inlier_distance)"/>
-      <param name="LccBow/EstimationType"     type="string" value="$(arg estimation)"/> 
-      <param name="LccBow/VarianceFromInliersCount" type="string" value="$(arg variance_inliers)"/>
-      <param name="Mem/SaveDepth16Format"     type="string" value="$(arg convert_depth_to_mm)"/>
+      <param name="Rtabmap/TimeThr"              type="string" value="$(arg time_threshold)"/>
+      <param name="RGBD/OptimizeFromGraphEnd"    type="string" value="$(arg optimize_from_last_node)"/>
+      <param name="Mem/SaveDepth16Format"        type="string" value="$(arg convert_depth_to_mm)"/>
       
+      <!-- localization mode -->
+	  <param     if="$(arg localization)" name="Mem/IncrementalMemory" type="string" value="false"/>
+	  <param unless="$(arg localization)" name="Mem/IncrementalMemory" type="string" value="true"/>
+	  <param name="Mem/InitWMWithAllNodes" type="string" value="$(arg localization)"/>
+
       <!-- when 2D scan is set -->
-      <param if="$(arg subscribe_scan)" name="RGBD/OptimizeSlam2D"          type="string" value="true"/>
-      <param if="$(arg subscribe_scan)" name="RGBD/LocalLoopDetectionSpace" type="string" value="true"/>
-      <param if="$(arg subscribe_scan)" name="LccIcp/Type"                  type="string" value="2"/> 
-	  <param if="$(arg subscribe_scan)" name="LccIcp2/CorrespondenceRatio"  type="string" value="0.25"/>
+      <param if="$(arg subscribe_scan)" name="Optimizer/Slam2D"        type="string" value="true"/>
+	  <param if="$(arg subscribe_scan)" name="Icp/CorrespondenceRatio" type="string" value="0.25"/>
+	  <param if="$(arg subscribe_scan)" name="Reg/Strategy"            type="string" value="1"/> 
+	  <param if="$(arg subscribe_scan)" name="Reg/Force3DoF"           type="string" value="true"/>
+
+	  <!-- when 3D scan is set -->
+	  <param if="$(arg subscribe_scan_cloud)" name="Reg/Strategy"      type="string" value="1"/>
     </node>
   
     <!-- Visualisation RTAB-Map -->
     <node if="$(arg rtabmapviz)" pkg="rtabmap_ros" type="rtabmapviz" name="rtabmapviz" args="$(arg rtabmapviz_cfg)" output="screen" launch-prefix="$(arg launch_prefix)">
-      <param name="subscribe_depth"     type="bool"   value="true"/>
-      <param name="subscribe_laserScan"      type="bool"   value="$(arg subscribe_scan)"/>
-      <param name="subscribe_odom_info" type="bool"   value="$(arg visual_odometry)"/>
-      <param name="frame_id"            type="string" value="$(arg frame_id)"/>
+      <param name="subscribe_depth"       type="bool"   value="true"/>
+      <param name="subscribe_scan"        type="bool"   value="$(arg subscribe_scan)"/>
+      <param name="subscribe_scan_cloud"  type="bool"   value="$(arg subscribe_scan_cloud)"/>
+      <param name="subscribe_odom_info"   type="bool"   value="$(arg visual_odometry)"/>
+      <param name="frame_id"              type="string" value="$(arg frame_id)"/>
       <param name="wait_for_transform_duration"  type="double"   value="$(arg wait_for_transform)"/>
     
       <remap from="rgb/image"       to="$(arg rgb_topic)"/>
       <remap from="depth/image"     to="$(arg depth_registered_topic)"/>
       <remap from="rgb/camera_info" to="$(arg camera_info_topic)"/>
       <remap from="scan"            to="$(arg scan_topic)"/>
+      <remap from="scan_cloud"      to="$(arg scan_cloud_topic)"/>
       <remap unless="$(arg visual_odometry)" from="odom"  to="$(arg odom_topic)"/>
     </node>
   

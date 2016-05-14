@@ -33,8 +33,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/utilite/ULogger.h>
 #include <signal.h>
 
+QApplication * app = 0;
+ros::AsyncSpinner * spinner = 0;
+
 void my_handler(int s){
-	QApplication::exit();
+	ROS_INFO("rtabmapviz: ctrl-c catched! Exiting Qt app...");
+	spinner->stop();
+	exit(-1);
 }
 
 int main(int argc, char** argv)
@@ -46,7 +51,10 @@ int main(int argc, char** argv)
 
 	ros::init(argc, argv, "rtabmapviz");
 
-	GuiWrapper gui(argc, argv);
+	app = new QApplication(argc, argv);
+	app->connect( app, SIGNAL( lastWindowClosed() ), app, SLOT( quit() ) );
+
+	GuiWrapper * gui = new GuiWrapper(argc, argv);
 
 	// Catch ctrl-c to close the gui
 	// (Place this after QApplication's constructor)
@@ -57,15 +65,18 @@ int main(int argc, char** argv)
 	sigaction(SIGINT, &sigIntHandler, NULL);
 
 	// Here start the ROS events loop
-	ros::AsyncSpinner spinner(4); // Use 4 threads
-	spinner.start();
+	spinner = new ros::AsyncSpinner(1); // Use 1 thread
+	spinner->start();
 
 	ROS_INFO("rtabmapviz started.");
 	// Now wait for application to finish
-	int r = gui.exec();// MUST be called by the Main Thread
+	int r = app->exec();// MUST be called by the Main Thread
 
-	spinner.stop();
+	spinner->stop();
+	delete spinner;
 
+	delete gui;
+	delete app;
 	ROS_INFO("rtabmapviz: All done! Closing...");
 	return r;
 }

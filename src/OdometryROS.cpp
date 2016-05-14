@@ -37,7 +37,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <cv_bridge/cv_bridge.h>
 
 #include <rtabmap/core/Rtabmap.h>
-#include <rtabmap/core/Odometry.h>
+#include <rtabmap/core/OdometryF2M.h>
+#include <rtabmap/core/OdometryF2F.h>
 #include <rtabmap/core/util3d_transforms.h>
 #include <rtabmap/core/Memory.h>
 #include <rtabmap/core/Signature.h>
@@ -47,6 +48,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtabmap/utilite/ULogger.h"
 #include "rtabmap/utilite/UStl.h"
 #include "rtabmap/utilite/UFile.h"
+
+#define BAD_COVARIANCE 9999
 
 using namespace rtabmap;
 
@@ -60,7 +63,10 @@ OdometryROS::OdometryROS(int argc, char * argv[], bool stereo) :
 	publishTf_(true),
 	waitForTransform_(true),
 	waitForTransformDuration_(0.1), // 100 ms
-	paused_(false)
+	publishNullWhenLost_(true),
+	paused_(false),
+	resetCountdown_(0),
+	resetCurrentCount_(0)
 {
 	ros::NodeHandle nh;
 
@@ -84,6 +90,8 @@ OdometryROS::OdometryROS(int argc, char * argv[], bool stereo) :
 	pnh.param("initial_pose", initialPoseStr, initialPoseStr); // "x y z roll pitch yaw"
 	pnh.param("ground_truth_frame_id", groundTruthFrameId_, groundTruthFrameId_);
 	pnh.param("config_path", configPath, configPath);
+	pnh.param("publish_null_when_lost", publishNullWhenLost_, publishNullWhenLost_);
+
 	configPath = uReplaceChar(configPath, '~', UDirectory::homeDir());
 	if(configPath.size() && configPath.at(0) != '/')
 	{
@@ -124,14 +132,14 @@ OdometryROS::OdometryROS(int argc, char * argv[], bool stereo) :
 
 
 	//parameters
-	parameters_ = this->getDefaultOdometryParameters(stereo);
+	parameters_ = Parameters::getDefaultOdometryParameters(stereo);
 	if(!configPath.empty())
 	{
 		if(UFile::exists(configPath.c_str()))
 		{
 			ROS_INFO("Odometry: Loading parameters from %s", configPath.c_str());
 			rtabmap::ParametersMap allParameters;
-			Rtabmap::readParameters(configPath.c_str(), allParameters);
+			Parameters::readINI(configPath.c_str(), allParameters);
 			// only update odometry parameters
 			for(ParametersMap::iterator iter=parameters_.begin(); iter!=parameters_.end(); ++iter)
 			{
@@ -174,78 +182,58 @@ OdometryROS::OdometryROS(int argc, char * argv[], bool stereo) :
 			iter->second = uNumber2Str(vInt);
 		}
 
-		if(iter->first.compare(Parameters::kOdomMinInliers()) == 0 && atoi(iter->second.c_str()) < 8)
+		if(iter->first.compare(Parameters::kVisMinInliers()) == 0 && atoi(iter->second.c_str()) < 8)
 		{
 			ROS_WARN("Parameter min_inliers must be >= 8, setting to 8...");
 			iter->second = uNumber2Str(8);
 		}
 	}
 
+	rtabmap::ParametersMap parameters = rtabmap::Parameters::parseArguments(argc, argv);
+	for(rtabmap::ParametersMap::iterator iter=parameters.begin(); iter!=parameters.end(); ++iter)
+	{
+		rtabmap::ParametersMap::iterator jter = parameters_.find(iter->first);
+		if(jter!=parameters_.end())
+		{
+			ROS_INFO("Update odometry parameter \"%s\"=\"%s\" from arguments", iter->first.c_str(), iter->second.c_str());
+			jter->second = iter->second;
+		}
+	}
+
 	// Backward compatibility
-	std::list<std::string> oldParameterNames;
-	oldParameterNames.push_back("Odom/Type");
-	oldParameterNames.push_back("Odom/MaxWords");
-	oldParameterNames.push_back("Odom/WordsRatio");
-	oldParameterNames.push_back("Odom/LocalHistory");
-	oldParameterNames.push_back("Odom/NearestNeighbor");
-	oldParameterNames.push_back("Odom/NNDR");
-	oldParameterNames.push_back("GFTT/MaxCorners");
-	for(std::list<std::string>::iterator iter=oldParameterNames.begin(); iter!=oldParameterNames.end(); ++iter)
+	for(std::map<std::string, std::pair<bool, std::string> >::const_iterator iter=Parameters::getRemovedParameters().begin();
+		iter!=Parameters::getRemovedParameters().end();
+		++iter)
 	{
 		std::string vStr;
-		if(pnh.getParam(*iter, vStr))
+		if(pnh.getParam(iter->first, vStr))
 		{
-			if(iter->compare("Odom/Type") == 0)
+			if(iter->second.first)
 			{
-				ROS_WARN("Parameter name changed: Odom/Type -> %s. Please update your launch file accordingly.",
-						Parameters::kOdomFeatureType().c_str());
-				parameters_.at(Parameters::kOdomFeatureType())= vStr;
+				// can be migrated
+				parameters_.at(iter->second.second)= vStr;
+				ROS_WARN("Odometry: Parameter name changed: \"%s\" -> \"%s\". Please update your launch file accordingly. Value \"%s\" is still set to the new parameter name.",
+						iter->first.c_str(), iter->second.second.c_str(), vStr.c_str());
 			}
-			else if(iter->compare("Odom/MaxWords") == 0)
+			else
 			{
-				ROS_WARN("Parameter name changed: Odom/MaxWords -> %s. Please update your launch file accordingly.",
-						Parameters::kOdomMaxFeatures().c_str());
-				parameters_.at(Parameters::kOdomMaxFeatures())= vStr;
-			}
-			else if(iter->compare("Odom/LocalHistory") == 0)
-			{
-				ROS_WARN("Parameter name changed: Odom/LocalHistory -> %s. Please update your launch file accordingly.",
-						Parameters::kOdomBowLocalHistorySize().c_str());
-				parameters_.at(Parameters::kOdomBowLocalHistorySize())= vStr;
-			}
-			else if(iter->compare("Odom/NearestNeighbor") == 0)
-			{
-				ROS_WARN("Parameter name changed: Odom/NearestNeighbor -> %s. Please update your launch file accordingly.",
-						Parameters::kOdomBowNNType().c_str());
-				parameters_.at(Parameters::kOdomBowNNType())= vStr;
-			}
-			else if(iter->compare("Odom/NNDR") == 0)
-			{
-				ROS_WARN("Parameter name changed: Odom/NNDR -> %s. Please update your launch file accordingly.",
-						Parameters::kOdomBowNNDR().c_str());
-				parameters_.at(Parameters::kOdomBowNNDR())= vStr;
-			}
-			else if(iter->compare("GFTT/MaxCorners") == 0)
-			{
-				ROS_WARN("Parameter GFTT/MaxCorners doesn't exist anymore, use %s. Please update your launch file accordingly.",
-						Parameters::kOdomMaxFeatures().c_str());
-				parameters_.at(Parameters::kOdomMaxFeatures())= vStr;
+				if(iter->second.second.empty())
+				{
+					ROS_ERROR("Odometry: Parameter \"%s\" doesn't exist anymore!",
+							iter->first.c_str());
+				}
+				else
+				{
+					ROS_ERROR("Odometry: Parameter \"%s\" doesn't exist anymore! You may look at this similar parameter: \"%s\"",
+							iter->first.c_str(), iter->second.second.c_str());
+				}
 			}
 		}
 	}
 
-	int odomStrategy = 0; // BOW
-	Parameters::parse(parameters_, Parameters::kOdomStrategy(), odomStrategy);
-	if(odomStrategy == 1)
-	{
-		ROS_INFO("Using OdometryOpticalFlow");
-		odometry_ = new rtabmap::OdometryOpticalFlow(parameters_);
-	}
-	else
-	{
-		ROS_INFO("Using OdometryBOW");
-		odometry_ = new rtabmap::OdometryBOW(parameters_);
-	}
+	Parameters::parse(parameters_, Parameters::kOdomResetCountdown(), resetCountdown_);
+	parameters_.at(Parameters::kOdomResetCountdown()) = "0"; // use modified reset countdown here
+	odometry_ = Odometry::create(parameters_);
 	if(!initialPose.isIdentity())
 	{
 		odometry_->reset(initialPose);
@@ -255,6 +243,11 @@ OdometryROS::OdometryROS(int argc, char * argv[], bool stereo) :
 	resetToPoseSrv_ = nh.advertiseService("reset_odom_to_pose", &OdometryROS::resetToPose, this);
 	pauseSrv_ = nh.advertiseService("pause_odom", &OdometryROS::pause, this);
 	resumeSrv_ = nh.advertiseService("resume_odom", &OdometryROS::resume, this);
+
+	setLogDebugSrv_ = pnh.advertiseService("log_debug", &OdometryROS::setLogDebug, this);
+	setLogInfoSrv_ = pnh.advertiseService("log_info", &OdometryROS::setLogInfo, this);
+	setLogWarnSrv_ = pnh.advertiseService("log_warning", &OdometryROS::setLogWarn, this);
+	setLogErrorSrv_ = pnh.advertiseService("log_error", &OdometryROS::setLogError, this);
 }
 
 OdometryROS::~OdometryROS()
@@ -268,48 +261,13 @@ OdometryROS::~OdometryROS()
 	delete odometry_;
 }
 
-rtabmap::ParametersMap OdometryROS::getDefaultOdometryParameters(bool stereo)
-{
-	rtabmap::ParametersMap odomParameters;
-	rtabmap::ParametersMap defaultParameters = rtabmap::Parameters::getDefaultParameters();
-	for(rtabmap::ParametersMap::iterator iter=defaultParameters.begin(); iter!=defaultParameters.end(); ++iter)
-	{
-		std::string group = uSplit(iter->first, '/').front();
-		if(uStrContains(group, "Odom") ||
-			group.compare("Stereo") ||
-			group.compare("SURF") == 0 ||
-			group.compare("SIFT") == 0 ||
-			group.compare("ORB") == 0 ||
-			group.compare("FAST") == 0 ||
-			group.compare("FREAK") == 0 ||
-			group.compare("BRIEF") == 0 ||
-			group.compare("GFTT") == 0 ||
-			group.compare("BRISK") == 0)
-		{
-			if(stereo)
-			{
-				if(iter->first.compare(Parameters::kOdomMaxDepth()) == 0)
-				{
-					iter->second = "0"; // infinity
-				}
-				else if(iter->first.compare(Parameters::kOdomEstimationType()) == 0)
-				{
-					iter->second = "1"; // 3D->2D (PNP)
-				}
-			}
-			odomParameters.insert(*iter);
-		}
-	}
-	return odomParameters;
-}
-
 void OdometryROS::processArguments(int argc, char * argv[], bool stereo)
 {
 	for(int i=1;i<argc;++i)
 	{
 		if(strcmp(argv[i], "--params") == 0)
 		{
-			rtabmap::ParametersMap parametersOdom = getDefaultOdometryParameters(stereo);
+			rtabmap::ParametersMap parametersOdom = Parameters::getDefaultOdometryParameters(stereo);
 			for(rtabmap::ParametersMap::iterator iter=parametersOdom.begin(); iter!=parametersOdom.end(); ++iter)
 			{
 				std::string str = "Param: " + iter->first + " = \"" + iter->second + "\"";
@@ -324,6 +282,14 @@ void OdometryROS::processArguments(int argc, char * argv[], bool stereo)
 			ROS_WARN("Node will now exit after showing default odometry parameters because "
 					 "argument \"--params\" is detected!");
 			exit(0);
+		}
+		else if(strcmp(argv[i], "--udebug") == 0)
+		{
+			ULogger::setLevel(ULogger::kDebug);
+		}
+		else if(strcmp(argv[i], "--uinfo") == 0)
+		{
+			ULogger::setLevel(ULogger::kInfo);
 		}
 	}
 }
@@ -378,9 +344,12 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 	// process data
 	ros::WallTime time = ros::WallTime::now();
 	rtabmap::OdometryInfo info;
-	rtabmap::Transform pose = odometry_->process(data, &info);
+	SensorData dataCpy = data;
+	rtabmap::Transform pose = odometry_->process(dataCpy, &info);
 	if(!pose.isNull())
 	{
+		resetCurrentCount_ = resetCountdown_;
+
 		//*********************
 		// Update odometry
 		//*********************
@@ -410,24 +379,47 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 			odom.pose.pose.orientation = poseMsg.transform.rotation;
 
 			//set covariance
-			odom.pose.covariance.at(0) = info.variance;  // xx
-			odom.pose.covariance.at(7) = info.variance;  // yy
-			odom.pose.covariance.at(14) = info.variance; // zz
-			odom.pose.covariance.at(21) = info.variance; // rr
-			odom.pose.covariance.at(28) = info.variance; // pp
-			odom.pose.covariance.at(35) = info.variance; // yawyaw
+			// libviso2 uses approximately vel variance * 2
+			odom.pose.covariance.at(0) = info.variance*2;  // xx
+			odom.pose.covariance.at(7) = info.variance*2;  // yy
+			odom.pose.covariance.at(14) = info.variance*2; // zz
+			odom.pose.covariance.at(21) = info.variance*2; // rr
+			odom.pose.covariance.at(28) = info.variance*2; // pp
+			odom.pose.covariance.at(35) = info.variance*2; // yawyaw
+
+			//set velocity
+			bool setTwist = !odometry_->previousVelocityTransform().isNull();
+			if(setTwist)
+			{
+				float x,y,z,roll,pitch,yaw;
+				odometry_->previousVelocityTransform().getTranslationAndEulerAngles(x,y,z,roll,pitch,yaw);
+				odom.twist.twist.linear.x = x;
+				odom.twist.twist.linear.y = y;
+				odom.twist.twist.linear.z = z;
+				odom.twist.twist.angular.x = roll;
+				odom.twist.twist.angular.y = pitch;
+				odom.twist.twist.angular.z = yaw;
+			}
+
+			odom.twist.covariance.at(0) = setTwist?info.variance:BAD_COVARIANCE;  // xx
+			odom.twist.covariance.at(7) = setTwist?info.variance:BAD_COVARIANCE;  // yy
+			odom.twist.covariance.at(14) = setTwist?info.variance:BAD_COVARIANCE; // zz
+			odom.twist.covariance.at(21) = setTwist?info.variance:BAD_COVARIANCE; // rr
+			odom.twist.covariance.at(28) = setTwist?info.variance:BAD_COVARIANCE; // pp
+			odom.twist.covariance.at(35) = setTwist?info.variance:BAD_COVARIANCE; // yawyaw
 
 			//publish the message
 			odomPub_.publish(odom);
 		}
 
-		if(odomLocalMap_.getNumSubscribers() && dynamic_cast<OdometryBOW*>(odometry_))
+		// local map / reference frame
+		if(odomLocalMap_.getNumSubscribers() && dynamic_cast<OdometryF2M*>(odometry_))
 		{
-			const std::map<int, pcl::PointXYZ> & map = ((OdometryBOW*)odometry_)->getLocalMap();
 			pcl::PointCloud<pcl::PointXYZ> cloud;
-			for(std::map<int, pcl::PointXYZ>::const_iterator iter=map.begin(); iter!=map.end(); ++iter)
+			const std::multimap<int, cv::Point3f> & map = ((OdometryF2M*)odometry_)->getMap().getWords3();
+			for(std::multimap<int, cv::Point3f>::const_iterator iter=map.begin(); iter!=map.end(); ++iter)
 			{
-				cloud.push_back(iter->second);
+				cloud.push_back(pcl::PointXYZ(iter->second.x, iter->second.y, iter->second.z));
 			}
 			sensor_msgs::PointCloud2 cloudMsg;
 			pcl::toROSMsg(cloud, cloudMsg);
@@ -438,18 +430,17 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 
 		if(odomLastFrame_.getNumSubscribers())
 		{
-			if(dynamic_cast<OdometryBOW*>(odometry_))
+			if(dynamic_cast<OdometryF2M*>(odometry_))
 			{
-				const rtabmap::Signature * s  = ((OdometryBOW*)odometry_)->getMemory()->getLastWorkingSignature();
-				if(s)
+				const std::multimap<int, cv::Point3f> & words3  = ((OdometryF2M*)odometry_)->getLastFrame().getWords3();
+				if(words3.size())
 				{
-					const std::multimap<int, pcl::PointXYZ> & words3 = s->getWords3();
 					pcl::PointCloud<pcl::PointXYZ> cloud;
-					for(std::multimap<int, pcl::PointXYZ>::const_iterator iter=words3.begin(); iter!=words3.end(); ++iter)
+					for(std::multimap<int, cv::Point3f>::const_iterator iter=words3.begin(); iter!=words3.end(); ++iter)
 					{
 						// transform to odom frame
-						pcl::PointXYZ pt = util3d::transformPoint(iter->second, pose);
-						cloud.push_back(pt);
+						cv::Point3f pt = util3d::transformPoint(iter->second, pose);
+						cloud.push_back(pcl::PointXYZ(pt.x, pt.y, pt.z));
 					}
 
 					sensor_msgs::PointCloud2 cloudMsg;
@@ -461,14 +452,19 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 			}
 			else
 			{
-				//Optical flow
-				const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud = ((OdometryOpticalFlow*)odometry_)->getLastCorners3D();
-				if(cloud->size())
+				//Frame to Frame
+				const Signature & refFrame = ((OdometryF2F*)odometry_)->getRefFrame();
+				if(refFrame.getWords3().size())
 				{
-					pcl::PointCloud<pcl::PointXYZ>::Ptr cloudTransformed;
-					cloudTransformed = util3d::transformPointCloud(cloud, pose);
+					pcl::PointCloud<pcl::PointXYZ> cloud;
+					for(std::multimap<int, cv::Point3f>::const_iterator iter=refFrame.getWords3().begin(); iter!=refFrame.getWords3().end(); ++iter)
+					{
+						// transform to odom frame
+						cv::Point3f pt = util3d::transformPoint(iter->second, pose);
+						cloud.push_back(pcl::PointXYZ(pt.x, pt.y, pt.z));
+					}
 					sensor_msgs::PointCloud2 cloudMsg;
-					pcl::toROSMsg(*cloudTransformed, cloudMsg);
+					pcl::toROSMsg(cloud, cloudMsg);
 					cloudMsg.header.stamp = stamp; // use corresponding time stamp to image
 					cloudMsg.header.frame_id = odomFrameId_;
 					odomLastFrame_.publish(cloudMsg);
@@ -476,7 +472,7 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 			}
 		}
 	}
-	else
+	else if(publishNullWhenLost_)
 	{
 		//ROS_WARN("Odometry lost!");
 
@@ -485,9 +481,45 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 		odom.header.stamp = stamp; // use corresponding time stamp to image
 		odom.header.frame_id = odomFrameId_;
 		odom.child_frame_id = frameId_;
+		odom.pose.covariance.at(0) = BAD_COVARIANCE;  // xx
+		odom.pose.covariance.at(7) = BAD_COVARIANCE;  // yy
+		odom.pose.covariance.at(14) = BAD_COVARIANCE; // zz
+		odom.pose.covariance.at(21) = BAD_COVARIANCE; // rr
+		odom.pose.covariance.at(28) = BAD_COVARIANCE; // pp
+		odom.pose.covariance.at(35) = BAD_COVARIANCE; // yawyaw
+		odom.twist.covariance.at(0) = BAD_COVARIANCE;  // xx
+		odom.twist.covariance.at(7) = BAD_COVARIANCE;  // yy
+		odom.twist.covariance.at(14) = BAD_COVARIANCE; // zz
+		odom.twist.covariance.at(21) = BAD_COVARIANCE; // rr
+		odom.twist.covariance.at(28) = BAD_COVARIANCE; // pp
+		odom.twist.covariance.at(35) = BAD_COVARIANCE; // yawyaw
 
 		//publish the message
 		odomPub_.publish(odom);
+	}
+
+	if(pose.isNull() && resetCurrentCount_ > 0)
+	{
+		ROS_WARN("Odometry lost! Odometry will be reset after next %d consecutive unsuccessful odometry updates...", resetCurrentCount_);
+
+		--resetCurrentCount_;
+		if(resetCurrentCount_ == 0)
+		{
+			// Check TF to see if sensor fusion is used (e.g., the output of robot_localization)
+			Transform tfPose = this->getTransform(odomFrameId_, frameId_, stamp);
+			if(tfPose.isNull())
+			{
+				ROS_WARN("Odometry automatically reset to latest computed pose!");
+				odometry_->reset(odometry_->getPose());
+			}
+			else
+			{
+				ROS_WARN("Odometry automatically reset to latest odometry pose available from TF (%s->%s)!",
+						odomFrameId_.c_str(), frameId_.c_str());
+				odometry_->reset(tfPose);
+			}
+
+		}
 	}
 
 	if(odomInfoPub_.getNumSubscribers())
@@ -502,9 +534,9 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 	ROS_INFO("Odom: quality=%d, std dev=%fm, update time=%fs", info.inliers, pose.isNull()?0.0f:std::sqrt(info.variance), (ros::WallTime::now()-time).toSec());
 }
 
-bool OdometryROS::isOdometryBOW() const
+bool OdometryROS::isOdometryF2M() const
 {
-	return dynamic_cast<OdometryBOW*>(odometry_) != 0;
+	return dynamic_cast<OdometryF2M*>(odometry_) != 0;
 }
 
 bool OdometryROS::reset(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
@@ -549,5 +581,31 @@ bool OdometryROS::resume(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 	}
 	return true;
 }
+
+bool OdometryROS::setLogDebug(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+{
+	ROS_INFO("visual_odometry: Set log level to Debug");
+	ULogger::setLevel(ULogger::kDebug);
+	return true;
+}
+bool OdometryROS::setLogInfo(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+{
+	ROS_INFO("visual_odometry: Set log level to Info");
+	ULogger::setLevel(ULogger::kInfo);
+	return true;
+}
+bool OdometryROS::setLogWarn(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+{
+	ROS_INFO("visual_odometry: Set log level to Warning");
+	ULogger::setLevel(ULogger::kWarning);
+	return true;
+}
+bool OdometryROS::setLogError(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+{
+	ROS_INFO("visual_odometry: Set log level to Error");
+	ULogger::setLevel(ULogger::kError);
+	return true;
+}
+
 
 }

@@ -36,6 +36,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <pcl_conversions/pcl_conversions.h>
 #include <eigen_conversions/eigen_msg.h>
 #include <tf_conversions/tf_eigen.h>
+#include <image_geometry/pinhole_camera_model.h>
+#include <image_geometry/stereo_camera_model.h>
 
 namespace rtabmap_ros {
 
@@ -144,7 +146,7 @@ void infoFromROS(const rtabmap_ros::Info & info, rtabmap::Statistics & stat)
 	// rtabmap_ros::Info
 	stat.setRefImageId(info.refId);
 	stat.setLoopClosureId(info.loopClosureId);
-	stat.setLocalLoopClosureId(info.localLoopClosureId);
+	stat.setProximityDetectionId(info.proximityDetectionId);
 
 	stat.setLoopClosureTransform(rtabmap_ros::transformFromGeometryMsg(info.loopClosureTransform));
 
@@ -188,7 +190,7 @@ void infoToROS(const rtabmap::Statistics & stats, rtabmap_ros::Info & info)
 {
 	info.refId = stats.refImageId();
 	info.loopClosureId = stats.loopClosureId();
-	info.localLoopClosureId = stats.localLoopClosureId();
+	info.proximityDetectionId = stats.proximityDetectionId();
 
 	rtabmap_ros::transformToGeometryMsg(stats.loopClosureTransform(), info.loopClosureTransform);
 
@@ -293,6 +295,103 @@ void points2fToROS(const std::vector<cv::Point2f> & kpts, std::vector<rtabmap_ro
 	}
 }
 
+cv::Point3f point3fFromROS(const rtabmap_ros::Point3f & msg)
+{
+	return cv::Point3f(msg.x, msg.y, msg.z);
+}
+
+void point3fToROS(const cv::Point3f & kpt, rtabmap_ros::Point3f & msg)
+{
+	msg.x = kpt.x;
+	msg.y = kpt.y;
+	msg.z = kpt.z;
+}
+
+std::vector<cv::Point3f> points3fFromROS(const std::vector<rtabmap_ros::Point3f> & msg)
+{
+	std::vector<cv::Point3f> v(msg.size());
+	for(unsigned int i=0; i<msg.size(); ++i)
+	{
+		v[i] = point3fFromROS(msg[i]);
+	}
+	return v;
+}
+
+void points3fToROS(const std::vector<cv::Point3f> & kpts, std::vector<rtabmap_ros::Point3f> & msg)
+{
+	msg.resize(kpts.size());
+	for(unsigned int i=0; i<msg.size(); ++i)
+	{
+		point3fToROS(kpts[i], msg[i]);
+	}
+}
+
+rtabmap::CameraModel cameraModelFromROS(
+		const sensor_msgs::CameraInfo & camInfo,
+		const rtabmap::Transform & localTransform)
+{
+	image_geometry::PinholeCameraModel model;
+	model.fromCameraInfo(camInfo);
+	return rtabmap::CameraModel(
+			model.fx(),
+			model.fy(),
+			model.cx(),
+			model.cy(),
+			localTransform,
+			0.0,
+			cv::Size(model.fullResolution().width, model.fullResolution().height));
+}
+void cameraModelToROS(
+		const rtabmap::CameraModel & model,
+		sensor_msgs::CameraInfo & camInfo)
+{
+	UASSERT(model.isValidForRectification());
+
+	camInfo.D = std::vector<double>(model.D_raw().cols);
+	memcpy(camInfo.D.data(), model.D_raw().data, model.D_raw().cols*sizeof(double));
+
+	UASSERT(model.K_raw().total() == 9);
+	memcpy(camInfo.K.elems, model.K_raw().data, 9*sizeof(double));
+
+	UASSERT(model.R().total() == 9);
+	memcpy(camInfo.R.elems, model.R().data, 9*sizeof(double));
+
+	UASSERT(model.P().total() == 12);
+	memcpy(camInfo.P.elems, model.P().data, 12*sizeof(double));
+
+	if(camInfo.D.size() > 5)
+	{
+		camInfo.distortion_model = "rational_polynomial";
+	}
+	else
+	{
+		camInfo.distortion_model = "plumb_bob";
+	}
+	camInfo.binning_x = 1;
+	camInfo.binning_y = 1;
+	camInfo.roi.width = model.imageWidth();
+	camInfo.roi.height = model.imageHeight();
+
+	camInfo.width = model.imageWidth();
+	camInfo.height = model.imageHeight();
+}
+rtabmap::StereoCameraModel stereoCameraModelFromROS(
+		const sensor_msgs::CameraInfo & leftCamInfo,
+		const sensor_msgs::CameraInfo & rightCamInfo,
+		const rtabmap::Transform & localTransform)
+{
+	image_geometry::StereoCameraModel model;
+	model.fromCameraInfo(leftCamInfo, rightCamInfo);
+	return rtabmap::StereoCameraModel(
+			model.left().fx(),
+			model.left().fy(),
+			model.left().cx(),
+			model.left().cy(),
+			model.baseline(),
+			localTransform,
+			cv::Size(model.left().fullResolution().width, model.left().fullResolution().height));
+}
+
 void mapDataFromROS(
 		const rtabmap_ros::MapData & msg,
 		std::map<int, rtabmap::Transform> & poses,
@@ -384,13 +483,14 @@ rtabmap::Signature nodeDataFromROS(const rtabmap_ros::NodeData & msg)
 {
 	//Features stuff...
 	std::multimap<int, cv::KeyPoint> words;
-	std::multimap<int, pcl::PointXYZ> words3D;
+	std::multimap<int, cv::Point3f> words3D;
 	pcl::PointCloud<pcl::PointXYZ> cloud;
 	if(msg.wordPts.data.size() &&
-	   msg.wordPts.data.size() == msg.wordIds.size())
+	   msg.wordPts.height*msg.wordPts.width == msg.wordIds.size())
 	{
 		pcl::fromROSMsg(msg.wordPts, cloud);
 	}
+
 	for(unsigned int i=0; i<msg.wordIds.size() && i<msg.wordKpts.size(); ++i)
 	{
 		cv::KeyPoint pt = keypointFromROS(msg.wordKpts.at(i));
@@ -398,7 +498,7 @@ rtabmap::Signature nodeDataFromROS(const rtabmap_ros::NodeData & msg)
 		words.insert(std::make_pair(wordId, pt));
 		if(i< cloud.size())
 		{
-			words3D.insert(std::make_pair(wordId, cloud[i]));
+			words3D.insert(std::make_pair(wordId, cv::Point3f(cloud[i].x, cloud[i].y, cloud[i].z)));
 		}
 	}
 
@@ -455,7 +555,8 @@ rtabmap::Signature nodeDataFromROS(const rtabmap_ros::NodeData & msg)
 			msg.stamp,
 			msg.label,
 			transformFromPoseMsg(msg.pose),
-			stereoModel.isValid()?
+			transformFromPoseMsg(msg.groundTruthPose),
+			stereoModel.isValidForProjection()?
 				rtabmap::SensorData(
 					compressedMatFromBytes(msg.laserScan),
 					msg.laserScanMaxPts,
@@ -489,6 +590,7 @@ void nodeDataToROS(const rtabmap::Signature & signature, rtabmap_ros::NodeData &
 	msg.stamp = signature.getStamp();
 	msg.label = signature.getLabel();
 	transformToPoseMsg(signature.getPose(), msg.pose);
+	transformToPoseMsg(signature.getGroundTruthPose(), msg.groundTruthPose);
 	compressedMatToBytes(signature.sensorData().imageCompressed(), msg.image);
 	compressedMatToBytes(signature.sensorData().depthOrRightCompressed(), msg.depth);
 	compressedMatToBytes(signature.sensorData().laserScanCompressed(), msg.laserScan);
@@ -512,7 +614,7 @@ void nodeDataToROS(const rtabmap::Signature & signature, rtabmap_ros::NodeData &
 			transformToGeometryMsg(signature.sensorData().cameraModels()[i].localTransform(), msg.localTransform[i]);
 		}
 	}
-	else if(signature.sensorData().stereoCameraModel().isValid())
+	else if(signature.sensorData().stereoCameraModel().isValidForProjection())
 	{
 		msg.fx.push_back(signature.sensorData().stereoCameraModel().left().fx());
 		msg.fy.push_back(signature.sensorData().stereoCameraModel().left().fy());
@@ -539,11 +641,13 @@ void nodeDataToROS(const rtabmap::Signature & signature, rtabmap_ros::NodeData &
 		pcl::PointCloud<pcl::PointXYZ> cloud;
 		cloud.resize(signature.getWords3().size());
 		index = 0;
-		for(std::multimap<int, pcl::PointXYZ>::const_iterator jter=signature.getWords3().begin();
+		for(std::multimap<int, cv::Point3f>::const_iterator jter=signature.getWords3().begin();
 			jter!=signature.getWords3().end();
 			++jter)
 		{
-			cloud[index++] = jter->second;
+			cloud[index].x = jter->second.x;
+			cloud[index].y = jter->second.y;
+			cloud[index++].z = jter->second.z;
 		}
 		pcl::toROSMsg(cloud, msg.wordPts);
 	}
@@ -553,6 +657,30 @@ void nodeDataToROS(const rtabmap::Signature & signature, rtabmap_ros::NodeData &
 				(int)signature.getWords().size(),
 				(int)signature.getWords3().size());
 	}
+}
+
+rtabmap::Signature nodeInfoFromROS(const rtabmap_ros::NodeData & msg)
+{
+	rtabmap::Signature s(
+			msg.id,
+			msg.mapId,
+			msg.weight,
+			msg.stamp,
+			msg.label,
+			transformFromPoseMsg(msg.pose),
+			transformFromPoseMsg(msg.groundTruthPose));
+	return s;
+}
+void nodeInfoToROS(const rtabmap::Signature & signature, rtabmap_ros::NodeData & msg)
+{
+	// add data
+	msg.id = signature.id();
+	msg.mapId = signature.mapId();
+	msg.weight = signature.getWeight();
+	msg.stamp = signature.getStamp();
+	msg.label = signature.getLabel();
+	transformToPoseMsg(signature.getPose(), msg.pose);
+	transformToPoseMsg(signature.getGroundTruthPose(), msg.groundTruthPose);
 }
 
 rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::OdomInfo & msg)
@@ -588,6 +716,12 @@ rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::OdomInfo & msg)
 	info.transform = transformFromGeometryMsg(msg.transform);
 	info.transformFiltered = transformFromGeometryMsg(msg.transformFiltered);
 
+	UASSERT(msg.localMapKeys.size() == msg.localMapValues.size());
+	for(unsigned int i=0; i<msg.localMapKeys.size(); ++i)
+	{
+		info.localMap.insert(std::make_pair(msg.localMapKeys[i], point3fFromROS(msg.localMapValues[i])));
+	}
+
 	return info;
 }
 
@@ -605,7 +739,6 @@ void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_ros::OdomInfo & m
 	msg.interval = info.interval;
 	msg.distanceTravelled = info.distanceTravelled;
 
-
 	msg.type = info.type;
 
 	msg.wordsKeys = uKeys(info.words);
@@ -620,6 +753,9 @@ void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_ros::OdomInfo & m
 
 	transformToGeometryMsg(info.transform, msg.transform);
 	transformToGeometryMsg(info.transformFiltered, msg.transformFiltered);
+
+	msg.localMapKeys = uKeys(info.localMap);
+	points3fToROS(uValues(info.localMap), msg.localMapValues);
 
 }
 

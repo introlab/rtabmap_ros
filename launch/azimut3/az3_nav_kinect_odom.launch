@@ -1,0 +1,161 @@
+
+<launch>
+
+  <!-- Localization-only mode -->
+  <arg name="localization"      default="false"/>
+  <arg     if="$(arg localization)" name="rtabmap_args"  default=""/>
+  <arg unless="$(arg localization)" name="rtabmap_args"  default="--delete_db_on_start"/>  
+
+  <!-- AZIMUT 3 bringup: launch motors/odometry, laser scan and openni -->
+  <include file="$(find az3_bringup)/az3_standalone.launch"/>
+
+  <!-- OpenNI -->
+  <include file="$(find rtabmap_ros)/launch/azimut3/az3_openni.launch"/>
+
+  <!-- SLAM (robot side) -->
+  <group ns="rtabmap">
+    <node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="screen" args="$(arg rtabmap_args)">
+      <param name="frame_id"            type="string" value="base_footprint"/>
+      <param name="subscribe_scan"      type="bool" value="false"/>
+      <param name="use_action_for_goal" type="bool" value="true"/>
+      <param name="cloud_decimation"    type="int" value="4"/>                    <!-- we already decimate in memory below -->
+      <param name="grid_eroded"         type="bool" value="true"/>
+      <param name="grid_cell_size"      type="double" value="0.05"/>
+
+      <remap from="odom"    to="/base_controller/odom"/>
+      <remap from="scan"    to="/base_scan"/>
+      <remap from="mapData" to="mapData"/>
+
+      <remap from="rgb/image"       to="/camera/rgb/image_rect_color"/>
+      <remap from="depth/image"     to="/camera/depth_registered/image_raw"/>
+      <remap from="rgb/camera_info" to="/camera/depth_registered/camera_info"/>
+
+      <remap from="goal_out"  to="current_goal"/>	
+      <remap from="move_base" to="/planner/move_base"/>
+      <remap from="proj_map"  to="/map"/>
+
+      <!-- RTAB-Map's parameters -->
+      <param name="RGBD/NeighborLinkRefining" type="string" value="false"/>           
+      <param name="RGBD/ProximityBySpace"     type="string" value="true"/>
+  
+      <param name="Reg/Strategy"              type="string" value="0"/>                    
+	 
+      <param name="RGBD/AngularUpdate"        type="string" value="0.1"/>    
+      <param name="RGBD/LinearUpdate"         type="string" value="0.1"/> 
+      <param name="RGBD/LocalRadius"          type="string" value="5"/>
+	  
+      <param name="Mem/RehearsalSimilarity"   type="string" value="0.45"/>
+      <param name="Mem/NotLinkedNodesKept"    type="string" value="false"/>
+      <param name="Mem/ImageDecimation"       type="string" value="1"/>
+      
+      <param name="Rtabmap/StartNewMapOnLoopClosure" type="string" value="false"/>
+      <param name="Rtabmap/TimeThr"           type="string" value="600"/>
+      <param name="Rtabmap/DetectionRate"     type="string" value="1"/>
+
+      <param name="Mem/RawDescriptorsKept"    type="string" value="true"/>
+      <param name="RGBD/LoopClosureReextractFeatures" type="string" value="false"/>
+      <param name="Mem/UseDepthAsMask"        type="string" value="true"/>
+      <param name="Reg/Force3DoF"             type="string" value="true"/>
+      <param name="Vis/EstimationType"        type="string" value="1"/>
+
+      <param name="Bayes/PredictionLC"        type="string" value="0.1 0.36 0.30 0.16 0.062 0.0151 0.00255 0.00035"/>
+
+      <param name="Optimizer/Slam2D"           type="string" value="true"/>
+      <param name="Optimizer/Iterations"      type="string" value="100"/>
+      <param name="RGBD/OptimizeFromGraphEnd" type="string" value="false"/>
+      <param name="Optimizer/Strategy"        type="string" value="1"/>      
+      <param name="Optimizer/Robust"          type="string" value="false"/>
+      <param name="Optimizer/VarianceIgnored" type="string" value="true"/>
+      <param name="RGBD/PlanStuckIterations"  type="string" value="10"/>
+
+      <param name="Kp/DetectorStrategy"       type="string" value="0"/>
+      <param name="Kp/MaxFeatures"            type="string" value="300"/>
+
+      <param name="SURF/HessianThreshold"     type="string" value="500"/>
+      
+      <!-- localization mode -->
+      <param     if="$(arg localization)" name="Mem/IncrementalMemory" type="string" value="false"/>
+      <param unless="$(arg localization)" name="Mem/IncrementalMemory" type="string" value="true"/>
+      <param name="Mem/InitWMWithAllNodes" type="string" value="$(arg localization)"/> 
+   </node>
+  </group>
+  
+  <!-- teleop -->
+  <node name="joy" pkg="joy" type="joy_node"/>
+  <group ns="teleop">
+     <remap from="joy" to="/joy"/>
+     <node name="teleop" pkg="nodelet" type="nodelet" args="standalone azimut_tools/Teleop"/>
+     <param name="cmd_eta/abtr_priority" value="50"/>
+  </group>
+
+  <!-- ROS navigation stack move_base -->
+  <group ns="planner">
+     <remap from="scan" to="/base_scan"/>
+     <remap from="obstacles_cloud" to="/obstacles_cloud"/>
+     <remap from="ground_cloud" to="/ground_cloud"/>
+     <remap from="map" to="/map"/>
+     <remap from="move_base_simple/goal" to="/planner_goal"/>
+     
+     <arg name="observation_sources" value="point_cloud_sensorA point_cloud_sensorB"/>   
+     <node pkg="move_base" type="move_base" respawn="true" name="move_base" output="screen">
+        <param name="base_global_planner" value="navfn/NavfnROS"/>
+    	<rosparam file="$(find rtabmap_ros)/launch/azimut3/config/costmap_common_params_2d.yaml" command="load" ns="global_costmap" />
+     	<rosparam file="$(find rtabmap_ros)/launch/azimut3/config/costmap_common_params_2d.yaml" command="load" ns="local_costmap" />
+    	<rosparam file="$(find rtabmap_ros)/launch/azimut3/config/local_costmap_params.yaml" command="load" ns="local_costmap" />
+    	<rosparam file="$(find rtabmap_ros)/launch/azimut3/config/global_costmap_params.yaml" command="load" ns="global_costmap"/>
+    	<rosparam file="$(find rtabmap_ros)/launch/azimut3/config/base_local_planner_params.yaml" command="load" />
+        <param name="global_costmap/obstacle_layer/observation_sources" value="$(arg observation_sources)"/>
+        <param name="local_costmap/obstacle_layer/observation_sources" value="$(arg observation_sources)"/>
+     </node>
+   		
+     <param name="cmd_vel/abtr_priority" value="10"/>
+  </group>
+
+  <node name="az3_abtr" pkg="azimut_tools" type="azimut_abtr_priority_node">
+     <remap from="abtr_cmd_eta" to="/base_controller/cmd_eta"/>
+  </node>
+
+  <!-- Arbitration between teleop and planner -->
+  <node name="register_cmd_eta" pkg="abtr_priority" type="register"
+        args="/cmd_eta /teleop/cmd_eta"/>
+  <node name="register_cmd_vel" pkg="abtr_priority" type="register"
+        args="/cmd_vel /planner/cmd_vel"/>
+  
+  <!-- Throttling messages -->
+  <group ns="camera">
+    <node pkg="nodelet" type="nodelet" name="data_throttle" args="load rtabmap_ros/data_throttle camera_nodelet_manager">
+      <param name="rate" type="double" value="5"/>
+      <param name="decimation" type="int" value="2"/>
+   
+      <remap from="rgb/image_in"       to="rgb/image_rect_color"/>
+      <remap from="depth/image_in"     to="depth_registered/image_raw"/>
+      <remap from="rgb/camera_info_in" to="depth_registered/camera_info"/>
+    
+      <remap from="rgb/image_out"       to="data_resized_image"/>
+      <remap from="depth/image_out"     to="data_resized_image_depth"/>
+      <remap from="rgb/camera_info_out" to="data_resized_camera_info"/>
+    </node>
+
+    <!-- for the planner -->
+    <node pkg="nodelet" type="nodelet" name="points_xyz_planner" args="load rtabmap_ros/point_cloud_xyz camera_nodelet_manager">
+      <remap from="depth/image"            to="data_resized_image_depth"/>
+      <remap from="depth/camera_info"      to="data_resized_camera_info"/>
+      <remap from="cloud"                  to="cloudXYZ" />
+      <param name="decimation" type="int" value="1"/>                     <!-- already decimated above -->
+      <param name="max_depth"  type="double" value="3.0"/>
+      <param name="voxel_size" type="double" value="0.02"/>
+    </node>
+  
+    <node pkg="nodelet" type="nodelet" name="obstacles_detection" args="load rtabmap_ros/obstacles_detection camera_nodelet_manager">
+      <remap from="cloud"     to="cloudXYZ"/>
+      <remap from="obstacles" to="/obstacles_cloud"/>
+      <remap from="ground"    to="/ground_cloud"/>
+
+      <param name="frame_id"             type="string" value="base_footprint"/>		
+      <param name="map_frame_id"         type="string" value="map"/>
+      <param name="wait_for_transform"   type="bool" value="true"/>
+      <param name="min_cluster_size"     type="int" value="20"/>
+      <param name="max_obstacles_height" type="double" value="0.4"/>
+    </node>  
+  </group>
+</launch>

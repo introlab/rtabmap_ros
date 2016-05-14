@@ -6,7 +6,6 @@ Panels:
       Expanded:
         - /Global Options1
         - /Status1
-        - /Info1
       Splitter Ratio: 0.5
     Tree Height: 438
   - Class: rviz/Selection
@@ -134,6 +133,7 @@ Visualization Manager:
       Download graph: false
       Download map: false
       Enabled: true
+      Filter ceiling (m): 0
       Filter floor (m): 0
       Invert Rainbow: false
       Max Color: 255; 255; 255
@@ -147,17 +147,22 @@ Visualization Manager:
       Size (Pixels): 3
       Size (m): 0.01
       Style: Points
-      Topic: /rtabmap/mapData_optimized
+      Topic: /rtabmap/mapData
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
     - Alpha: 1
       Class: rtabmap_ros/MapGraph
-      Color: 25; 255; 0
       Enabled: true
+      Global loop closure: 255; 0; 0
+      Local loop closure: 255; 255; 0
+      Merged neighbor: 255; 170; 0
       Name: MapGraph
-      Topic: /rtabmap/mapDataGraph_optimized
+      Neighbor: 0; 0; 255
+      Topic: /rtabmap/mapGraph
+      User: 255; 0; 0
       Value: true
+      Virtual: 255; 0; 255
     - Class: rviz/Image
       Enabled: true
       Image Topic: /stereo_camera/left/image_rect_color
@@ -173,14 +178,72 @@ Visualization Manager:
       Class: rviz/Map
       Color Scheme: map
       Draw Behind: false
-      Enabled: false
+      Enabled: true
       Name: Map
-      Topic: /map
-      Value: false
+      Topic: /rtabmap/proj_map
+      Value: true
     - Class: rtabmap_ros/Info
       Enabled: true
       Name: Info
       Topic: /rtabmap/info
+      Value: true
+    - Alpha: 1
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 1.17745
+        Min Value: -1.72299
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz/PointCloud2
+      Color: 255; 255; 0
+      Color Transformer: FlatColor
+      Decay Time: 0
+      Enabled: true
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Max Intensity: 4096
+      Min Color: 0; 0; 0
+      Min Intensity: 0
+      Name: OdomMap
+      Position Transformer: XYZ
+      Queue Size: 10
+      Selectable: true
+      Size (Pixels): 3
+      Size (m): 0.01
+      Style: Points
+      Topic: /rtabmap/odom_local_map
+      Use Fixed Frame: true
+      Use rainbow: true
+      Value: true
+    - Alpha: 1
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz/PointCloud2
+      Color: 85; 255; 0
+      Color Transformer: FlatColor
+      Decay Time: 0
+      Enabled: true
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Max Intensity: 4096
+      Min Color: 0; 0; 0
+      Min Intensity: 0
+      Name: OdomFrame
+      Position Transformer: XYZ
+      Queue Size: 10
+      Selectable: true
+      Size (Pixels): 3
+      Size (m): 0.01
+      Style: Points
+      Topic: /rtabmap/odom_last_frame
+      Use Fixed Frame: true
+      Use rainbow: true
       Value: true
   Enabled: true
   Global Options:
@@ -206,7 +269,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rtabmap_ros/OrbitOriented
-      Distance: 6.60197
+      Distance: 8.28384
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.06
         Stereo Focal Distance: 1
@@ -218,10 +281,10 @@ Visualization Manager:
         Z: 0.113349
       Name: Current View
       Near Clip Distance: 0.01
-      Pitch: 0.455398
+      Pitch: 0.635398
       Target Frame: base_footprint
       Value: OrbitOriented (rtabmap)
-      Yaw: 3.1304
+      Yaw: 3.0704
     Saved: ~
 Window Geometry:
   Displays:
@@ -241,5 +304,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1341
-  X: 147
-  Y: 48
+  X: 97
+  Y: 14

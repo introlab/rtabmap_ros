@@ -29,23 +29,34 @@
 
 using namespace rtabmap;
 
-MapsManager::MapsManager() :
+MapsManager::MapsManager(bool usePublicNamespace) :
 		cloudDecimation_(4),
 		cloudMaxDepth_(4.0), // meters
+		cloudMinDepth_(0.0), // meters
 		cloudVoxelSize_(0.05), // meters
 		cloudFloorCullingHeight_(0.0),
+		cloudCeilingCullingHeight_(0.0),
 		cloudOutputVoxelized_(false),
 		cloudFrustumCulling_(false),
+		cloudNoiseFilteringRadius_(0.0),
+		cloudNoiseFilteringMinNeighbors_(5),
+		scanDecimation_(0),
+		scanVoxelSize_(0.0),
+		scanOutputVoxelized_(false),
 		projMaxGroundAngle_(45.0), // degrees
 		projMinClusterSize_(20),
-		projMaxHeight_(2.0), // meters
+		projMaxObstaclesHeight_(2.0), // meters (<=0 disabled)
+		projMaxGroundHeight_(0.0), // meters (<=0 disabled, only works if proj_detect_flat_obstacles is true)
+		projDetectFlatObstacles_(false),
 		gridCellSize_(0.05), // meters
 		gridSize_(0), // meters
 		gridEroded_(false),
 		gridUnknownSpaceFilled_(false),
+		gridMaxUnknownSpaceFilledRange_(6.0),
 		mapFilterRadius_(0.5),
 		mapFilterAngle_(30.0), // degrees
-		mapCacheCleanup_(true)
+		mapCacheCleanup_(true),
+		negativePosesIgnored(false)
 {
 
 	ros::NodeHandle nh;
@@ -54,31 +65,82 @@ MapsManager::MapsManager() :
 	// cloud map stuff
 	pnh.param("cloud_decimation", cloudDecimation_, cloudDecimation_);
 	pnh.param("cloud_max_depth", cloudMaxDepth_, cloudMaxDepth_);
+	pnh.param("cloud_min_depth", cloudMinDepth_, cloudMinDepth_);
 	pnh.param("cloud_voxel_size", cloudVoxelSize_, cloudVoxelSize_);
 	pnh.param("cloud_floor_culling_height", cloudFloorCullingHeight_, cloudFloorCullingHeight_);
+	pnh.param("cloud_ceiling_culling_height", cloudCeilingCullingHeight_, cloudCeilingCullingHeight_);
+	if(cloudFloorCullingHeight_ > 0 &&
+	   cloudCeilingCullingHeight_ > 0 &&
+	   cloudCeilingCullingHeight_ < cloudFloorCullingHeight_)
+	{
+		ROS_WARN("\"cloud_floor_culling_height\" should be lower than \"cloud_ceiling_culling_height\", setting \"cloud_ceiling_culling_height\" to 0 (disabled).");
+		cloudCeilingCullingHeight_ = 0;
+	}
 	pnh.param("cloud_output_voxelized", cloudOutputVoxelized_, cloudOutputVoxelized_);
 	pnh.param("cloud_frustum_culling", cloudFrustumCulling_, cloudFrustumCulling_);
+	pnh.param("cloud_noise_filtering_radius", cloudNoiseFilteringRadius_, cloudNoiseFilteringRadius_);
+	pnh.param("cloud_noise_filtering_min_neighbors", cloudNoiseFilteringMinNeighbors_, cloudNoiseFilteringMinNeighbors_);
+
+	// scan map stuff
+	pnh.param("scan_decimation", scanDecimation_, scanDecimation_);
+	pnh.param("scan_voxel_size", scanVoxelSize_, scanVoxelSize_);
+	pnh.param("scan_output_voxelized", scanOutputVoxelized_, scanOutputVoxelized_);
 
 	//projection map stuff
 	pnh.param("proj_max_ground_angle", projMaxGroundAngle_, projMaxGroundAngle_);
 	pnh.param("proj_min_cluster_size", projMinClusterSize_, projMinClusterSize_);
-	pnh.param("proj_max_height", projMaxHeight_, projMaxHeight_);
+	if(pnh.hasParam("proj_max_height") && !pnh.hasParam("proj_max_obstacles_height"))
+	{
+		ROS_WARN("Parameter \"proj_max_height\" has been renamed "
+				 "to \"proj_max_obstacles_height\"! Your value is still copied to "
+				 "corresponding parameter.");
+		pnh.param("proj_max_height", projMaxObstaclesHeight_, projMaxObstaclesHeight_);
+	}
+	else
+	{
+		pnh.param("proj_max_obstacles_height", projMaxObstaclesHeight_, projMaxObstaclesHeight_);
+	}
+	pnh.param("proj_max_ground_height", projMaxGroundHeight_, projMaxGroundHeight_);
+	pnh.param("proj_detect_flat_obstacles", projDetectFlatObstacles_, projDetectFlatObstacles_);
 
 	// common grid map stuff
 	pnh.param("grid_cell_size", gridCellSize_, gridCellSize_); // m
+	if(gridCellSize_ <= 0)
+	{
+		ROS_FATAL("\"grid_cell_size\" (%f) should be greater than 0!", gridCellSize_);
+	}
 	pnh.param("grid_size", gridSize_, gridSize_); // m
 	pnh.param("grid_eroded", gridEroded_, gridEroded_);
 	pnh.param("grid_unknown_space_filled", gridUnknownSpaceFilled_, gridUnknownSpaceFilled_);
+	pnh.param("grid_unknown_space_filled_max_range", gridMaxUnknownSpaceFilledRange_, gridMaxUnknownSpaceFilledRange_);
 
 	// common map stuff
 	pnh.param("map_filter_radius", mapFilterRadius_, mapFilterRadius_);
 	pnh.param("map_filter_angle", mapFilterAngle_, mapFilterAngle_);
 	pnh.param("map_cleanup", mapCacheCleanup_, mapCacheCleanup_);
+	pnh.param("map_negative_poses_ignored", negativePosesIgnored, negativePosesIgnored);
+
+	// If true, the last message published on
+	// the map topics will be saved and sent to new subscribers when they
+	// connect
+	bool latch = true;
+	pnh.param("latch", latch, latch);
 
 	// mapping topics
-	cloudMapPub_ = nh.advertise<sensor_msgs::PointCloud2>("cloud_map", 1);
-	projMapPub_ = nh.advertise<nav_msgs::OccupancyGrid>("proj_map", 1);
-	gridMapPub_ = nh.advertise<nav_msgs::OccupancyGrid>("grid_map", 1);
+	if(usePublicNamespace)
+	{
+		cloudMapPub_ = nh.advertise<sensor_msgs::PointCloud2>("cloud_map", 1, latch);
+		projMapPub_ = nh.advertise<nav_msgs::OccupancyGrid>("proj_map", 1, latch);
+		gridMapPub_ = nh.advertise<nav_msgs::OccupancyGrid>("grid_map", 1, latch);
+		scanMapPub_ = nh.advertise<sensor_msgs::PointCloud2>("scan_map", 1, latch);
+	}
+	else
+	{
+		cloudMapPub_ = pnh.advertise<sensor_msgs::PointCloud2>("cloud_map", 1, latch);
+		projMapPub_ = pnh.advertise<nav_msgs::OccupancyGrid>("proj_map", 1, latch);
+		gridMapPub_ = pnh.advertise<nav_msgs::OccupancyGrid>("grid_map", 1, latch);
+		scanMapPub_ = pnh.advertise<sensor_msgs::PointCloud2>("scan_map", 1, latch);
+	}
 }
 
 MapsManager::~MapsManager() {
@@ -97,7 +159,8 @@ bool MapsManager::hasSubscribers() const
 {
 	return  cloudMapPub_.getNumSubscribers() != 0 ||
 			projMapPub_.getNumSubscribers() != 0 ||
-			gridMapPub_.getNumSubscribers() != 0;
+			gridMapPub_.getNumSubscribers() != 0 ||
+			scanMapPub_.getNumSubscribers() != 0;
 }
 
 std::map<int, Transform> MapsManager::getFilteredPoses(const std::map<int, Transform> & poses)
@@ -117,32 +180,35 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 		bool updateCloud,
 		bool updateProj,
 		bool updateGrid,
+		bool updateScan,
 		const std::map<int, rtabmap::Signature> & signatures)
 {
-	if(!updateCloud && !updateProj && !updateGrid)
+	if(!updateCloud && !updateProj && !updateGrid && !updateScan)
 	{
 		//  all false, udpate only those where we have subscribers
 		updateCloud = cloudMapPub_.getNumSubscribers() != 0;
 		updateProj = projMapPub_.getNumSubscribers() != 0;
 		updateGrid = gridMapPub_.getNumSubscribers() != 0;
+		updateScan = scanMapPub_.getNumSubscribers() != 0;
 	}
 
 	UDEBUG("Updating map caches...");
 
 	if(!memory && signatures.size() == 0)
 	{
-		ROS_FATAL("Memory should not be null!?");
+		ROS_ERROR("Memory and signatures should not be both null!?");
 		return std::map<int, rtabmap::Transform>();
 	}
 
 	std::map<int, rtabmap::Transform> filteredPoses;
 
 	// update cache
-	if(updateCloud || updateProj || updateGrid)
+	if(updateCloud || updateProj || updateGrid || updateScan)
 	{
 		// filter nodes
 		if(mapFilterRadius_ > 0.0)
 		{
+			UDEBUG("Filter nodes...");
 			double angle = mapFilterAngle_ == 0.0?CV_PI+0.1:mapFilterAngle_*CV_PI/180.0;
 			filteredPoses = rtabmap::graph::radiusPosesFiltering(poses, mapFilterRadius_, angle);
 			for(std::map<int, rtabmap::Transform>::const_iterator iter=poses.begin(); iter!=poses.end(); ++iter)
@@ -163,6 +229,21 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 			filteredPoses = poses;
 		}
 
+		if(negativePosesIgnored)
+		{
+			for(std::map<int, rtabmap::Transform>::iterator iter=filteredPoses.begin(); iter!=filteredPoses.end();)
+			{
+				if(iter->first <= 0)
+				{
+					filteredPoses.erase(iter++);
+				}
+				else
+				{
+					++iter;
+				}
+			}
+		}
+
 		for(std::map<int, rtabmap::Transform>::iterator iter=filteredPoses.begin(); iter!=filteredPoses.end(); ++iter)
 		{
 			if(!iter->second.isNull())
@@ -170,12 +251,15 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 				rtabmap::SensorData data;
 				bool rgbDepthRequired = updateCloud && (iter->first < 0 || !uContains(clouds_, iter->first));
 				bool depthRequired = updateProj && (iter->first < 0 || !uContains(projMaps_, iter->first));
-				bool scanRequired = updateGrid && (iter->first < 0 || !uContains(gridMaps_, iter->first));
+				bool gridRequired = updateGrid && (iter->first < 0 || !uContains(gridMaps_, iter->first));
+				bool scanRequired = updateScan && (iter->first < 0 || !uContains(scans_, iter->first));
 
 				if(rgbDepthRequired ||
 					depthRequired ||
-					scanRequired)
+					scanRequired ||
+					gridRequired)
 				{
+					UDEBUG("Data required for %d", iter->first);
 					std::map<int, rtabmap::Signature>::const_iterator findIter = signatures.find(iter->first);
 					if(findIter != signatures.end())
 					{
@@ -191,26 +275,40 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 				{
 					if(!(data.imageCompressed().empty() && data.imageRaw().empty()) &&
 					   !(data.depthOrRightCompressed().empty() && data.depthOrRightRaw().empty()) &&
-					   (data.cameraModels().size() || data.stereoCameraModel().isValid()))
+					   (data.cameraModels().size() || data.stereoCameraModel().isValidForProjection()))
 					{
 						// Which data should we decompress?
 						cv::Mat image, depth, scan;
 						data.uncompressData(
-								(rgbDepthRequired||data.stereoCameraModel().isValid()) ? &image:0,
+								(rgbDepthRequired||data.stereoCameraModel().isValidForProjection()) ? &image:0,
 								(rgbDepthRequired||depthRequired) ? &depth:0,
-								scanRequired?&scan:0);
+								scanRequired||gridRequired?&scan:0);
 
 						pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloudRGB;
 						pcl::PointCloud<pcl::PointXYZ>::Ptr cloudXYZ;
 						if(rgbDepthRequired)
 						{
+							UDEBUG("rgbDepthRequired");
 							if(!image.empty() && !depth.empty())
 							{
+								pcl::IndicesPtr validIndices(new std::vector<int>);
 								cloudRGB = util3d::cloudRGBFromSensorData(
 										data,
 										cloudDecimation_,
 										cloudMaxDepth_,
-										cloudVoxelSize_);
+										cloudMinDepth_,
+										validIndices.get());
+								if(cloudVoxelSize_)
+								{
+									cloudRGB = util3d::voxelize(cloudRGB, validIndices, cloudVoxelSize_);
+								}
+								if(cloudRGB->size() && cloudNoiseFilteringRadius_ > 0.0 && cloudNoiseFilteringMinNeighbors_ > 0)
+								{
+									pcl::IndicesPtr indices = rtabmap::util3d::radiusFiltering(cloudRGB, cloudNoiseFilteringRadius_, cloudNoiseFilteringMinNeighbors_);
+									pcl::PointCloud<pcl::PointXYZRGB>::Ptr tmp(new pcl::PointCloud<pcl::PointXYZRGB>);
+									pcl::copyPointCloud(*cloudRGB, *indices, *tmp);
+									cloudRGB = tmp;
+								}
 							}
 							else
 							{
@@ -219,13 +317,25 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 						}
 						else if(depthRequired)
 						{
+							UDEBUG("depthRequired");
 							if(	!depth.empty())
 							{
+								pcl::IndicesPtr validIndices(new std::vector<int>);
 								cloudXYZ = util3d::cloudFromSensorData(
 										data,
 										cloudDecimation_,
 										cloudMaxDepth_,
-										gridCellSize_); // use gridCellSize since this cloud is only for the projection map
+										cloudMinDepth_,
+										validIndices.get()); // use gridCellSize since this cloud is only for the projection map
+								UASSERT(gridCellSize_ > 0);
+								cloudXYZ = util3d::voxelize(cloudXYZ, validIndices, gridCellSize_);
+								if(cloudXYZ->size() && cloudNoiseFilteringRadius_ > 0.0 && cloudNoiseFilteringMinNeighbors_ > 0)
+								{
+									pcl::IndicesPtr indices = rtabmap::util3d::radiusFiltering(cloudXYZ, cloudNoiseFilteringRadius_, cloudNoiseFilteringMinNeighbors_);
+									pcl::PointCloud<pcl::PointXYZ>::Ptr tmp(new pcl::PointCloud<pcl::PointXYZ>);
+									pcl::copyPointCloud(*cloudXYZ, *indices, *tmp);
+									cloudXYZ = tmp;
+								}
 							}
 							else
 							{
@@ -240,7 +350,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 							// Make sure that image size is set in camera models.
 							// The camera models are used when cloud_frustum_culling=true.
 							std::vector<rtabmap::CameraModel> models;
-							if(data.stereoCameraModel().isValid())
+							if(data.stereoCameraModel().isValidForProjection())
 							{
 								//insert only the left camera model
 								rtabmap::CameraModel model = data.stereoCameraModel().left();
@@ -265,40 +375,90 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 
 						if(depthRequired)
 						{
+							UDEBUG("Creating proj map for %d...", iter->first);
 							cv::Mat ground, obstacles;
 							if(cloudRGB.get())
 							{
 								pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloudClipped = cloudRGB;
-								if(cloudClipped->size() && projMaxHeight_ > 0)
+								if(cloudClipped->size() && projMaxObstaclesHeight_ > 0)
 								{
-									cloudClipped = util3d::passThrough(cloudClipped, "z", std::numeric_limits<int>::min(), projMaxHeight_);
+									cloudClipped = util3d::passThrough(cloudClipped, "z", std::numeric_limits<int>::min(), projMaxObstaclesHeight_);
+								}
+								if(cloudClipped->size() && gridCellSize_ > cloudVoxelSize_)
+								{
+									cloudClipped = util3d::voxelize(cloudClipped, gridCellSize_);
 								}
 								if(cloudClipped->size())
 								{
-									cloudClipped = util3d::voxelize(cloudClipped, gridCellSize_);
-									util3d::occupancy2DFromCloud3D<pcl::PointXYZRGB>(cloudClipped, ground, obstacles, gridCellSize_, projMaxGroundAngle_*M_PI/180.0, projMinClusterSize_);
+									// add pose rotation without yaw
+									float roll, pitch, yaw;
+									iter->second.getEulerAngles(roll, pitch, yaw);
+									cloudClipped = util3d::transformPointCloud(cloudClipped, Transform(0,0,0, roll, pitch, 0));
+
+									util3d::occupancy2DFromCloud3D<pcl::PointXYZRGB>(cloudClipped, ground, obstacles, gridCellSize_, projMaxGroundAngle_*M_PI/180.0, projMinClusterSize_, projDetectFlatObstacles_, projMaxGroundHeight_);
 								}
 							}
 							else if(cloudXYZ.get())
 							{
 								pcl::PointCloud<pcl::PointXYZ>::Ptr cloudClipped = cloudXYZ;
-								if(cloudClipped->size() && projMaxHeight_ > 0)
+								if(cloudClipped->size() && projMaxObstaclesHeight_ > 0)
 								{
-									cloudClipped = util3d::passThrough(cloudClipped, "z", std::numeric_limits<int>::min(), projMaxHeight_);
+									cloudClipped = util3d::passThrough(cloudClipped, "z", std::numeric_limits<int>::min(), projMaxObstaclesHeight_);
 								}
 								if(cloudClipped->size())
 								{
-									util3d::occupancy2DFromCloud3D<pcl::PointXYZ>(cloudClipped, ground, obstacles, gridCellSize_, projMaxGroundAngle_*M_PI/180.0, projMinClusterSize_);
+									// add pose rotation without yaw
+									float roll, pitch, yaw;
+									iter->second.getEulerAngles(roll, pitch, yaw);
+									cloudClipped = util3d::transformPointCloud(cloudClipped, Transform(0,0,0, roll, pitch, 0));
+
+									UDEBUG("util3d::occupancy2DFromCloud3D()");
+									util3d::occupancy2DFromCloud3D<pcl::PointXYZ>(cloudClipped, ground, obstacles, gridCellSize_, projMaxGroundAngle_*M_PI/180.0, projMinClusterSize_, projDetectFlatObstacles_, projMaxGroundHeight_);
 								}
 							}
 							uInsert(projMaps_, std::make_pair(iter->first, std::make_pair(ground, obstacles)));
 						}
 
-						if(scanRequired)
+						if(scanRequired || gridRequired)
 						{
-							cv::Mat ground, obstacles;
-							util3d::occupancy2DFromLaserScan(scan, ground, obstacles, gridCellSize_, data.id() < 0 || gridUnknownSpaceFilled_, data.laserScanMaxRange());
-							uInsert(gridMaps_, std::make_pair(iter->first, std::make_pair(ground, obstacles)));
+							if(scan.cols && (gridRequired || scanVoxelSize_ > 0.0))
+							{
+								if(scanDecimation_ > 1)
+								{
+									scan = util3d::downsample(scan, scanDecimation_);
+								}
+
+								if(scanRequired || scanVoxelSize_ > 0.0)
+								{
+									pcl::PointCloud<pcl::PointXYZ>::Ptr scanCloud = util3d::laserScanToPointCloud(scan);
+									if(scanVoxelSize_ > 0.0)
+									{
+										scanCloud = util3d::voxelize(scanCloud, scanVoxelSize_);
+										if(gridRequired && scan.type() == CV_32FC2)
+										{
+											scan = util3d::laserScan2dFromPointCloud(*scanCloud);
+										}
+									}
+
+									if(scanRequired)
+									{
+										uInsert(scans_, std::make_pair(iter->first, scanCloud));
+									}
+								}
+							}
+
+							if(gridRequired && scan.type() == CV_32FC2)
+							{
+								cv::Mat ground, obstacles;
+								util3d::occupancy2DFromLaserScan(
+										scan,
+										ground,
+										obstacles,
+										gridCellSize_,
+										data.id() < 0 || gridUnknownSpaceFilled_,
+										data.laserScanMaxRange()>gridMaxUnknownSpaceFilledRange_?gridMaxUnknownSpaceFilledRange_:data.laserScanMaxRange());
+								uInsert(gridMaps_, std::make_pair(iter->first, std::make_pair(ground, obstacles)));
+							}
 						}
 					}
 					else
@@ -307,7 +467,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 								iter->first,
 								!(data.imageCompressed().empty() && data.imageRaw().empty())?1:0,
 							   !(data.depthOrRightCompressed().empty() && data.depthOrRightRaw().empty())?1:0,
-							   (data.cameraModels().size() || data.stereoCameraModel().isValid())?1:0);
+							   (data.cameraModels().size() || data.stereoCameraModel().isValidForProjection())?1:0);
 					}
 				}
 			}
@@ -318,6 +478,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 		}
 
 		// cleanup not used nodes
+		UDEBUG("Cleanup not used nodes");
 		for(std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr >::iterator iter=clouds_.begin();
 			iter!=clouds_.end();)
 		{
@@ -416,32 +577,37 @@ void MapsManager::publishMaps(
 					{
 						for(unsigned int i=0; i<kter->second.size(); ++i)
 						{
-							if(kter->second[i].isValid())
+							if(kter->second[i].isValidForProjection())
 							{
 								int size =  assembledCloud->size();
 								assembledCloud = util3d::frustumFiltering(
 										assembledCloud,
-										iter->second,
+										iter->second, // FIXME: should include camera local transform
 										kter->second[i].horizontalFOV(),
 										kter->second[i].verticalFOV(),
 										0.0f,
 										cloudMaxDepth_>0.0?cloudMaxDepth_:999999.,
 										true);
 								//ROS_INFO("Frustum culling %d ->%d", size, (int)assembledCloud->size());
-								pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::transformPointCloud(jter->second, iter->second);
-								*assembledCloud+=*transformed;
+								if(jter->second->size())
+								{
+									pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::transformPointCloud(jter->second, iter->second);
+									*assembledCloud+=*transformed;
+								}
 							}
 						}
 					}
 				}
 			}
 
-			if(cloudFloorCullingHeight_ > 0.0)
+			if(assembledCloud->size() && (cloudFloorCullingHeight_ > 0.0 || cloudCeilingCullingHeight_ > 0.0))
 			{
-				assembledCloud = util3d::passThrough(assembledCloud, "z", cloudFloorCullingHeight_, 99999.0f);
+				assembledCloud = util3d::passThrough(assembledCloud, "z",
+						cloudFloorCullingHeight_>0.0?cloudFloorCullingHeight_:-999.0,
+						cloudCeilingCullingHeight_>0.0 && (cloudFloorCullingHeight_<=0.0 || cloudCeilingCullingHeight_>cloudFloorCullingHeight_)?cloudCeilingCullingHeight_:999.0);
 			}
 
-			if(cloudVoxelSize_ > 0 && cloudOutputVoxelized_)
+			if(assembledCloud->size() && cloudVoxelSize_ > 0 && cloudOutputVoxelized_)
 			{
 				assembledCloud = util3d::voxelize(assembledCloud, cloudVoxelSize_);
 			}
@@ -456,13 +622,60 @@ void MapsManager::publishMaps(
 		}
 		else if(poses.size())
 		{
-			ROS_WARN("Cloud map is empty! (clouds=%d)", (int)clouds_.size());
+			ROS_WARN("Cloud map is empty! (poses=%d clouds=%d)", (int)poses.size(), (int)clouds_.size());
 		}
 	}
 	else if(mapCacheCleanup_)
 	{
 		clouds_.clear();
 		cameraModels_.clear();
+	}
+
+	if(scanMapPub_.getNumSubscribers())
+	{
+		// generate the assembled scan cloud!
+		UTimer time;
+		pcl::PointCloud<pcl::PointXYZ>::Ptr assembledCloud(new pcl::PointCloud<pcl::PointXYZ>);
+		int count = 0;
+		std::list<std::pair<int, Transform> > negativePoses;
+		for(std::map<int, Transform>::const_iterator iter = poses.begin(); iter!=poses.end(); ++iter)
+		{
+			if(iter->first > 0)
+			{
+				std::map<int, pcl::PointCloud<pcl::PointXYZ>::Ptr >::iterator jter = scans_.find(iter->first);
+				if(jter != scans_.end() && jter->second->size())
+				{
+					pcl::PointCloud<pcl::PointXYZ>::Ptr transformed = util3d::transformPointCloud(jter->second, iter->second);
+					*assembledCloud+=*transformed;
+					++count;
+				}
+			}
+			// negative poses are not used
+		}
+
+		if(assembledCloud->size())
+		{
+			if(assembledCloud->size() && scanVoxelSize_ > 0 && scanOutputVoxelized_)
+			{
+				assembledCloud = util3d::voxelize(assembledCloud, scanVoxelSize_);
+			}
+
+			ROS_INFO("Assembled %d scans (%fs)", count, time.ticks());
+
+			sensor_msgs::PointCloud2::Ptr cloudMsg(new sensor_msgs::PointCloud2);
+			pcl::toROSMsg(*assembledCloud, *cloudMsg);
+			cloudMsg->header.stamp = stamp;
+			cloudMsg->header.frame_id = mapFrameId;
+			scanMapPub_.publish(cloudMsg);
+		}
+		else if(poses.size())
+		{
+			ROS_WARN("Scan map is empty! (poses=%d, scans=%d)", (int)poses.size(), (int)scans_.size());
+		}
+	}
+	else if(mapCacheCleanup_)
+	{
+		scans_.clear();
 	}
 
 	if(projMapPub_.getNumSubscribers())

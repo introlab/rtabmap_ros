@@ -1,7 +1,5 @@
 footprint: [[ 0.3,  0.3], [-0.3,  0.3], [-0.3, -0.3], [ 0.3, -0.3]]
-footprint_padding: 0.02
-#robot_radius: 0.38
-#robot_radius: ir_of_robot
+footprint_padding: 0.04
 inflation_layer:
   inflation_radius: 0.7 # 2xfootprint, it helps to keep the global planned path farther from obstacles
 transform_tolerance: 2
@@ -16,8 +14,8 @@ obstacle_layer:
 
   laser_scan_sensor: {
     data_type: LaserScan,
-    topic: base_scan,
-    expected_update_rate: 0.2,
+    topic: scan,
+    expected_update_rate: 0.1,
     marking: true,
     clearing: true
   }
@@ -39,7 +37,7 @@ obstacle_layer:
     expected_update_rate: 0.5,
     marking: false,
     clearing: true,
-    min_obstacle_height: -1.0 # make usre the ground is not filtered
+    min_obstacle_height: -1.0 # make sure the ground is not filtered
   }
 
 

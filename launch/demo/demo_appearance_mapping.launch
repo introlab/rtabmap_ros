@@ -4,27 +4,35 @@
 	<!-- WARNING : Database is automatically deleted on each startup -->
 	<!--           See "delete_db_on_start" option below... -->
 
+  <!-- Localization-only mode -->
+  <arg name="localization"      default="false"/>
+  <arg     if="$(arg localization)" name="rtabmap_args"  default=""/>
+  <arg unless="$(arg localization)" name="rtabmap_args"  default="--delete_db_on_start"/>
+
   <group ns="rtabmap">
 	<!-- args: "delete_db_on_start" and "udebug" -->
-	<node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="screen" args="--delete_db_on_start">
+	<node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="screen" args="$(arg rtabmap_args)">
 	
-	    <param name="subscribe_depth" type="bool" value="false"/>        <!-- must be false for appearance-based mode -->
+	    <param name="subscribe_depth"     type="bool" value="false"/>    <!-- must be false for appearance-based mode -->
         <param name="subscribe_laserScan" type="bool" value="false"/>    <!-- must be false for appearance-based mode -->
-        <param name="queue_size" type="int" value="10"/>
+        <param name="queue_size"          type="int" value="10"/>
     
         <remap from="rgb/image" to="/image"/>                             <!-- connect to "image" topic of the camera below -->
       
 		<!-- RTAB-Map's parameters: do "rosrun rtabmap rtabmap (double-dash)params" to see the list of available parameters. -->
-	    <param name="RGBD/Enabled" type="string" value="false"/>          <!-- False: appearance-based -->
-		<param name="Rtabmap/ImageBufferSize" type="string" value="0"/>   <!-- process all images -->
-		<param name="Rtabmap/DetectionRate" type="string" value="0"/>     <!-- Go as fast as the camera rate (here 2 Hz, see below) -->
-		<param name="Mem/RehearsalSimilarity" type="string" value="0.4"/> <!-- 40% -->
-		<param name="Mem/STMSize" type="string" value="15"/>              <!-- 15 locations in short-term memory -->
-		<param name="Mem/IncrementalMemory" type="string" value="true"/>  <!-- true = SLAM mode -->
-		<param name="Mem/RehearsalIdUpdatedToNewOne" type="string" value="true"/>  <!-- On merging, update to new ID-->
-		<param name="Mem/BadSignaturesIgnored" type="string" value="true"/>
-		<param name="Kp/DetectorStrategy" type="string" value="0"/>   <!-- use SURF -->
-		<param name="Kp/NNStrategy" type="string" value="1"/>         <!-- kdTree -->
+	    <param name="RGBD/Enabled"                   type="string" value="false"/>  <!-- False: appearance-based -->
+		<param name="Rtabmap/ImageBufferSize"        type="string" value="0"/>      <!-- process all images -->
+		<param name="Rtabmap/DetectionRate"          type="string" value="0"/>      <!-- Go as fast as the camera rate (here 2 Hz, see below) -->
+		<param name="Mem/RehearsalSimilarity"        type="string" value="0.4"/>    <!-- 40% -->
+		<param name="Mem/STMSize"                    type="string" value="15"/>     <!-- 15 locations in short-term memory -->
+		<param name="Mem/RehearsalIdUpdatedToNewOne" type="string" value="true"/>   <!-- On merging, update to new ID-->
+		<param name="Mem/BadSignaturesIgnored"       type="string" value="true"/>
+		<param name="Kp/DetectorStrategy"            type="string" value="0"/>      <!-- use SURF -->
+		
+		<!-- localization mode -->
+	    <param     if="$(arg localization)" name="Mem/IncrementalMemory" type="string" value="false"/>
+	    <param unless="$(arg localization)" name="Mem/IncrementalMemory" type="string" value="true"/>
+	    <param name="Mem/InitWMWithAllNodes" type="string" value="$(arg localization)"/>
 	</node>
 	
 	<!-- visualization of the "infoEx" topic sent by rtabmap node -->
@@ -40,11 +48,12 @@
 	<!-- When parameter video_or_images_path is set, the camera uses the directory of images or the video file -->
 	<node name="camera" pkg="rtabmap_ros" type="camera" output="screen">
 		<remap from="image" to="image"/>
-		<param name="device_id" value="0" type="int"/>
+		
+		<param name="device_id"            value="0" type="int"/>
 		<param name="video_or_images_path" value="$(find rtabmap_ros)/launch/data/demo_appearance" type="string"/>
-		<param name="frame_rate" value="2.0" type="double"/>
-		<param name="width" value="0" type="int"/>
-		<param name="height" value="0" type="int"/>
-		<param name="auto_restart" value="false" type="bool"/> <!-- Process only one time the data set -->
+		<param name="frame_rate"           value="2.0" type="double"/>
+		<param name="width"                value="0" type="int"/>
+		<param name="height"               value="0" type="int"/>
+		<param name="auto_restart"         value="false" type="bool"/> <!-- Process only one time the data set -->
 	</node>
 </launch>

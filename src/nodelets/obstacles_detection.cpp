@@ -67,10 +67,13 @@ class ObstaclesDetection : public nodelet::Nodelet
 public:
 	ObstaclesDetection() :
 		frameId_("base_link"),
-		normalEstimationRadius_(0.05),
+		normalKSearch_(20),
 		groundNormalAngle_(M_PI_4),
+		clusterRadius_(0.05),
 		minClusterSize_(20),
 		maxObstaclesHeight_(0.0), // if<=0.0 -> disabled
+		maxGroundHeight_(0.0),    // if<=0.0 -> disabled, used only if detect_flat_obstacles is true
+		segmentFlatObstacles_(false),
 		waitForTransform_(false),
 		optimizeForCloseObjects_(false)
 	{}
@@ -87,10 +90,24 @@ private:
 		int queueSize = 10;
 		pnh.param("queue_size", queueSize, queueSize);
 		pnh.param("frame_id", frameId_, frameId_);
-		pnh.param("normal_estimation_radius", normalEstimationRadius_, normalEstimationRadius_);
+		pnh.param("normal_k", normalKSearch_, normalKSearch_);
 		pnh.param("ground_normal_angle", groundNormalAngle_, groundNormalAngle_);
+		if(pnh.hasParam("normal_estimation_radius") && !pnh.hasParam("cluster_radius"))
+		{
+			NODELET_WARN("Parameter \"normal_estimation_radius\" has been renamed "
+					 "to \"cluster_radius\"! Your value is still copied to "
+					 "corresponding parameter. Instead of normal radius, nearest neighbors count "
+					 "\"normal_k\" is used instead (default 20).");
+			pnh.param("normal_estimation_radius", clusterRadius_, clusterRadius_);
+		}
+		else
+		{
+			pnh.param("cluster_radius", clusterRadius_, clusterRadius_);
+		}
 		pnh.param("min_cluster_size", minClusterSize_, minClusterSize_);
 		pnh.param("max_obstacles_height", maxObstaclesHeight_, maxObstaclesHeight_);
+		pnh.param("max_ground_height", maxGroundHeight_, maxGroundHeight_);
+		pnh.param("detect_flat_obstacles", segmentFlatObstacles_, segmentFlatObstacles_);
 		pnh.param("wait_for_transform", waitForTransform_, waitForTransform_);
 		pnh.param("optimize_for_close_objects", optimizeForCloseObjects_, optimizeForCloseObjects_);
 
@@ -104,7 +121,7 @@ private:
 
 	void callback(const sensor_msgs::PointCloud2ConstPtr & cloudMsg)
 	{
-		ros::Time time = ros::Time::now();
+		ros::WallTime time = ros::WallTime::now();
 
 		if (groundPub_.getNumSubscribers() == 0 && obstaclesPub_.getNumSubscribers() == 0)
 		{
@@ -119,7 +136,7 @@ private:
 			{
 				if(!tfListener_.waitForTransform(frameId_, cloudMsg->header.frame_id, cloudMsg->header.stamp, ros::Duration(1)))
 				{
-					ROS_ERROR("Could not get transform from %s to %s after 1 second!", frameId_.c_str(), cloudMsg->header.frame_id.c_str());
+					NODELET_ERROR("Could not get transform from %s to %s after 1 second!", frameId_.c_str(), cloudMsg->header.frame_id.c_str());
 					return;
 				}
 			}
@@ -129,7 +146,7 @@ private:
 		}
 		catch(tf::TransformException & ex)
 		{
-			ROS_ERROR("%s",ex.what());
+			NODELET_ERROR("%s",ex.what());
 			return;
 		}
 
@@ -158,9 +175,12 @@ private:
 							originalCloud,
 							ground,
 							obstacles,
-							normalEstimationRadius_,
+							normalKSearch_,
 							groundNormalAngle_,
-							minClusterSize_);
+							clusterRadius_,
+							minClusterSize_,
+							segmentFlatObstacles_,
+							maxGroundHeight_);
 
 					if(groundPub_.getNumSubscribers() && ground.get() && ground->size())
 					{
@@ -190,9 +210,12 @@ private:
 							originalCloud_near,
 							ground,
 							obstacles,
-							normalEstimationRadius_,
+							normalKSearch_,
 							groundNormalAngle_,
-							minClusterSize_);
+							clusterRadius_,
+							minClusterSize_,
+							segmentFlatObstacles_,
+							maxGroundHeight_);
 
 					if(groundPub_.getNumSubscribers() && ground.get() && ground->size())
 					{
@@ -211,9 +234,12 @@ private:
 							originalCloud_far,
 							ground,
 							obstacles,
-							3.*normalEstimationRadius_,
+							normalKSearch_,
 							2.*groundNormalAngle_,
-							minClusterSize_);
+							3.*clusterRadius_,
+							minClusterSize_,
+							segmentFlatObstacles_,
+							maxGroundHeight_);
 
 					if(groundPub_.getNumSubscribers() && ground.get() && ground->size())
 					{
@@ -255,15 +281,18 @@ private:
 			obstaclesPub_.publish(rosCloud);
 		}
 
-		//ROS_INFO("Obstacles segmentation time = %f s", (ros::Time::now() - time).toSec());
+		//NODELET_INFO("Obstacles segmentation time = %f s", (ros::WallTime::now() - time).toSec());
 	}
 
 private:
 	std::string frameId_;
-	double normalEstimationRadius_;
+	int normalKSearch_;
 	double groundNormalAngle_;
+	double clusterRadius_;
 	int minClusterSize_;
 	double maxObstaclesHeight_;
+	double maxGroundHeight_;
+	bool segmentFlatObstacles_;
 	bool waitForTransform_;
 	bool optimizeForCloseObjects_;
 

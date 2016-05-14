@@ -48,14 +48,6 @@ int main(int argc, char** argv)
 		{
 			deleteDbOnStart = true;
 		}
-		else if(strcmp(argv[i], "--udebug") == 0)
-		{
-			ULogger::setLevel(ULogger::kDebug);
-		}
-		else if(strcmp(argv[i], "--uinfo") == 0)
-		{
-			ULogger::setLevel(ULogger::kInfo);
-		}
 		else if(strcmp(argv[i], "--params") == 0 || strcmp(argv[i], "--params-all") == 0)
 		{
 			rtabmap::ParametersMap parameters = rtabmap::Parameters::getDefaultParameters();
@@ -94,14 +86,11 @@ int main(int argc, char** argv)
 					 "argument \"--params\" is detected!");
 			exit(0);
 		}
-		else
-		{
-			ROS_ERROR("Not recognized argument \"%s\"", argv[i]);
-			exit(-1);
-		}
 	}
 
-	CoreWrapper * rtabmap = new CoreWrapper(deleteDbOnStart);
+	rtabmap::ParametersMap parameters = rtabmap::Parameters::parseArguments(argc, argv);
+
+	CoreWrapper * rtabmap = new CoreWrapper(deleteDbOnStart, parameters);
 
 	ROS_INFO("rtabmap %s started...", RTABMAP_VERSION);
 	ros::spin();

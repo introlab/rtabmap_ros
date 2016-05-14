@@ -51,8 +51,8 @@ void InfoDisplay::onInitialize()
 	this->setStatusStd(rviz::StatusProperty::Ok, "Info", "");
 	this->setStatusStd(rviz::StatusProperty::Ok, "Position (XYZ)", "");
 	this->setStatusStd(rviz::StatusProperty::Ok, "Orientation (RPY)", "");
-	this->setStatusStd(rviz::StatusProperty::Ok, "Global", "0");
-	this->setStatusStd(rviz::StatusProperty::Ok, "Local", "0");
+	this->setStatusStd(rviz::StatusProperty::Ok, "Loop closures", "0");
+	this->setStatusStd(rviz::StatusProperty::Ok, "Proximity detections", "0");
 
 	spinner_.start();
 }
@@ -63,12 +63,12 @@ void InfoDisplay::processMessage( const rtabmap_ros::InfoConstPtr& msg )
 		boost::mutex::scoped_lock lock(info_mutex_);
 		if(msg->loopClosureId)
 		{
-			info_ = QString("%1->%2 [Global]").arg(msg->refId).arg(msg->loopClosureId);
+			info_ = QString("%1->%2").arg(msg->refId).arg(msg->loopClosureId);
 			globalCount_ += 1;
 		}
-		else if(msg->localLoopClosureId)
+		else if(msg->proximityDetectionId)
 		{
-			info_ = QString("%1->%2 [Local]").arg(msg->refId).arg(msg->localLoopClosureId);
+			info_ = QString("%1->%2 [Proximity]").arg(msg->refId).arg(msg->proximityDetectionId);
 			localCount_ += 1;
 		}
 		else
@@ -103,8 +103,8 @@ void InfoDisplay::update( float wall_dt, float ros_dt )
 			this->setStatusStd(rviz::StatusProperty::Ok, "Position (XYZ)", tr("%1;%2;%3").arg(x).arg(y).arg(z).toStdString());
 			this->setStatusStd(rviz::StatusProperty::Ok, "Orientation (RPY)", tr("%1;%2;%3").arg(roll).arg(pitch).arg(yaw).toStdString());
 		}
-		this->setStatusStd(rviz::StatusProperty::Ok, "Global", tr("%1").arg(globalCount_).toStdString());
-		this->setStatusStd(rviz::StatusProperty::Ok, "Local", tr("%1").arg(localCount_).toStdString());
+		this->setStatusStd(rviz::StatusProperty::Ok, "Loop closures", tr("%1").arg(globalCount_).toStdString());
+		this->setStatusStd(rviz::StatusProperty::Ok, "Proximity detections", tr("%1").arg(localCount_).toStdString());
 
 		for(std::map<std::string, float>::const_iterator iter=statistics_.begin(); iter!=statistics_.end(); ++iter)
 		{

@@ -91,16 +91,16 @@ private:
 		bool approxSync = true;
 		if(private_nh.getParam("max_rate", rate_))
 		{
-			ROS_WARN("\"max_rate\" is now known as \"rate\".");
+			NODELET_WARN("\"max_rate\" is now known as \"rate\".");
 		}
 		private_nh.param("rate", rate_, rate_);
 		private_nh.param("queue_size", queueSize, queueSize);
 		private_nh.param("approx_sync", approxSync, approxSync);
 		private_nh.param("decimation", decimation_, decimation_);
 		ROS_ASSERT(decimation_ >= 1);
-		ROS_INFO("Rate=%f Hz", rate_);
-		ROS_INFO("Decimation=%d", decimation_);
-		ROS_INFO("Approximate time sync = %s", approxSync?"true":"false");
+		NODELET_INFO("Rate=%f Hz", rate_);
+		NODELET_INFO("Decimation=%d", decimation_);
+		NODELET_INFO("Approximate time sync = %s", approxSync?"true":"false");
 
 		if(approxSync)
 		{

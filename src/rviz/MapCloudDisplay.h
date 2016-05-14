@@ -28,6 +28,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef MAP_CLOUD_DISPLAY_H
 #define MAP_CLOUD_DISPLAY_H
 
+#ifndef Q_MOC_RUN  // See: https://bugreports.qt-project.org/browse/QTBUG-22829
+
 #include <deque>
 #include <queue>
 #include <vector>
@@ -41,6 +43,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rviz/ogre_helpers/point_cloud.h>
 #include <rviz/message_filter_display.h>
 #include <rviz/default_plugin/point_cloud_transformer.h>
+
+#endif
 
 namespace rviz {
 class IntProperty;
@@ -106,8 +110,10 @@ public:
 	rviz::EnumProperty* style_property_;
 	rviz::IntProperty* cloud_decimation_;
 	rviz::FloatProperty* cloud_max_depth_;
+	rviz::FloatProperty* cloud_min_depth_;
 	rviz::FloatProperty* cloud_voxel_size_;
 	rviz::FloatProperty* cloud_filter_floor_height_;
+	rviz::FloatProperty* cloud_filter_ceiling_height_;
 	rviz::FloatProperty* node_filtering_radius_;
 	rviz::FloatProperty* node_filtering_angle_;
 	rviz::BoolProperty* download_map_;

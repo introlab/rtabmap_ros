@@ -21,7 +21,7 @@
    <param name="use_sim_time" type="bool" value="True"/>
    
    <!-- Just to uncompress images for stereo_image_rect -->
-   <node name="republish_left" type="republish" pkg="image_transport" args="compressed in:=/stereo_camera/left/image_raw_throttle raw out:=/stereo_camera/left/image_raw_throttle_relay" />
+   <node name="republish_left"  type="republish" pkg="image_transport" args="compressed in:=/stereo_camera/left/image_raw_throttle raw out:=/stereo_camera/left/image_raw_throttle_relay" />
    <node name="republish_right" type="republish" pkg="image_transport" args="compressed in:=/stereo_camera/right/image_raw_throttle raw out:=/stereo_camera/right/image_raw_throttle_relay" />
 
    <!-- Run the ROS package stereo_image_proc for image rectification -->
@@ -36,88 +36,69 @@
          <param name="disparity_range" value="128"/>
       </node>
    </group>
-         
-   <!-- Stereo Odometry -->   
-   <node pkg="rtabmap_ros" type="stereo_odometry" name="stereo_odometry" output="screen">
-      <remap from="left/image_rect"       to="/stereo_camera/left/image_rect"/>
-      <remap from="right/image_rect"      to="/stereo_camera/right/image_rect"/>
-      <remap from="left/camera_info"      to="/stereo_camera/left/camera_info_throttle"/>
-      <remap from="right/camera_info"     to="/stereo_camera/right/camera_info_throttle"/>
-      <remap from="odom"                  to="/odometry"/>
-
-      <param name="frame_id" type="string" value="base_footprint"/>
-      <param name="odom_frame_id" type="string" value="odom"/>
-
-      <param name="Odom/InlierDistance" type="string" value="0.1"/>
-      <param name="Odom/MinInliers" type="string" value="10"/>
-      <param name="Odom/RoiRatios" type="string" value="0.03 0.03 0.04 0.04"/>
-      <param name="Odom/MaxDepth" type="string" value="10"/>
-      <param name="OdomBow/NNDR" type="string" value="0.8"/>
-      <param name="GFTT/MaxCorners" type="string" value="500"/>
-      <param name="GFTT/MinDistance" type="string" value="5"/>
-      <param name="Odom/FillInfoData" type="string" value="$(arg rtabmapviz)"/>
-   </node>
-     
+              
    <group ns="rtabmap">   
+   
+      <!-- Stereo Odometry -->   
+      <node pkg="rtabmap_ros" type="stereo_odometry" name="stereo_odometry" output="screen">
+         <remap from="left/image_rect"       to="/stereo_camera/left/image_rect"/>
+         <remap from="right/image_rect"      to="/stereo_camera/right/image_rect"/>
+         <remap from="left/camera_info"      to="/stereo_camera/left/camera_info_throttle"/>
+         <remap from="right/camera_info"     to="/stereo_camera/right/camera_info_throttle"/>
+         <remap from="odom"                  to="/stereo_odometry"/>
+
+         <param name="frame_id"      type="string" value="base_footprint"/>
+         <param name="odom_frame_id" type="string" value="odom"/>
+
+         <param name="Odom/Strategy"      type="string" value="0"/> <!-- 0=Frame-to-Map, 1=Frame=to=Frame -->
+         <param name="Vis/EstimationType" type="string" value="0"/> <!-- 0=3D->3D 1=3D->2D (PnP) -->
+         <param name="Vis/MaxDepth"       type="string" value="10"/>
+         <param name="Vis/MinInliers"     type="string" value="10"/>
+         <param name="Odom/FillInfoData"  type="string" value="$(arg rtabmapviz)"/> 
+         <param name="GFTT/MinDistance"   type="string" value="10"/>
+         <param name="GFTT/QualityLevel"  type="string" value="0.00001"/> 
+      </node>
+   
       <!-- Visual SLAM: args: "delete_db_on_start" and "udebug" -->
       <node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="screen" args="--delete_db_on_start">
-         <param name="frame_id" type="string" value="base_footprint"/>
+         <param name="frame_id"         type="string" value="base_footprint"/>
          <param name="subscribe_stereo" type="bool" value="true"/>
-         <param name="subscribe_depth" type="bool" value="false"/>
+         <param name="subscribe_depth"  type="bool" value="false"/>
 
-         <remap from="left/image_rect" to="/stereo_camera/left/image_rect_color"/>
-         <remap from="right/image_rect" to="/stereo_camera/right/image_rect"/>
-         <remap from="left/camera_info" to="/stereo_camera/left/camera_info_throttle"/>
+         <remap from="left/image_rect"   to="/stereo_camera/left/image_rect_color"/>
+         <remap from="right/image_rect"  to="/stereo_camera/right/image_rect"/>
+         <remap from="left/camera_info"  to="/stereo_camera/left/camera_info_throttle"/>
          <remap from="right/camera_info" to="/stereo_camera/right/camera_info_throttle"/>
 
-         <remap from="odom" to="/odometry"/>
+         <remap from="odom" to="/stereo_odometry"/>
 
          <param name="queue_size" type="int" value="30"/>
 
          <!-- RTAB-Map's parameters -->
-         <param name="Rtabmap/TimeThr" type="string" value="700"/>
-         <param name="Rtabmap/DetectionRate" type="string" value="1"/>
-         
-         <param name="Kp/WordsPerImage" type="string" value="200"/>
-         <param name="Kp/RoiRatios" type="string" value="0.03 0.03 0.04 0.04"/>
-         <param name="Kp/DetectorStrategy" type="string" value="0"/>   <!-- use SURF -->
-		 <param name="Kp/NNStrategy" type="string" value="1"/>         <!-- kdTree -->
-
-         <param name="SURF/HessianThreshold" type="string" value="1000"/>
-
-         <param name="LccBow/MaxDepth" type="string" value="5"/>
-         <param name="LccBow/MinInliers" type="string" value="10"/>
-         <param name="LccBow/InlierDistance" type="string" value="0.02"/>
-
-         <param name="LccReextract/Activated" type="string" value="true"/>
-         <param name="LccReextract/MaxWords" type="string" value="500"/>
-         
-         <!-- Disable graph optimization because we use map_optimizer node below -->
-         <param name="RGBD/ToroIterations" type="string" value="0"/> 
-      </node>
-    
-      <!-- Optimizing outside rtabmap node makes it able to optimize always the global map -->
-      <node pkg="rtabmap_ros" type="map_optimizer" name="map_optimizer"/>
-      
-      <node if="$(arg rviz)" pkg="rtabmap_ros" type="map_assembler" name="map_assembler">
-         <param name="occupancy_grid" type="bool" value="true"/>
-         <remap from="mapData" to="mapData_optimized"/>
-         <remap from="grid_projection_map" to="/map"/>
+         <param name="Rtabmap/TimeThr"                   type="string" value="700"/>
+         <param name="Kp/MaxFeatures"                    type="string" value="200"/>
+         <param name="Kp/MaxDepth"                       type="string" value="10"/>
+         <param name="Kp/DetectorStrategy"               type="string" value="0"/>   <!-- use SURF -->
+         <param name="SURF/HessianThreshold"             type="string" value="1000"/>
+         <param name="Vis/EstimationType"                type="string" value="0"/>   <!-- 0=3D->3D, 1=3D->2D (PnP) -->
+         <param name="RGBD/LoopClosureReextractFeatures" type="string" value="true"/>
+         <param name="Vis/MaxDepth"                      type="string" value="10"/>
       </node>
       
       <!-- Visualisation RTAB-Map -->
       <node if="$(arg rtabmapviz)" pkg="rtabmap_ros" type="rtabmapviz" name="rtabmapviz" args="-d $(find rtabmap_ros)/launch/config/rgbd_gui.ini" output="screen">
-         <param name="subscribe_stereo" type="bool" value="true"/>
+         <param name="subscribe_stereo"    type="bool" value="true"/>
          <param name="subscribe_odom_info" type="bool" value="true"/>
-         <param name="queue_size" type="int" value="10"/>
-         <param name="frame_id" type="string" value="base_footprint"/>
-         <remap from="left/image_rect" to="/stereo_camera/left/image_rect_color"/>
-         <remap from="right/image_rect" to="/stereo_camera/right/image_rect"/>
-         <remap from="left/camera_info" to="/stereo_camera/left/camera_info_throttle"/>
+         <param name="queue_size"          type="int" value="10"/>
+         <param name="frame_id"            type="string" value="base_footprint"/>
+         
+         <remap from="left/image_rect"  to="/stereo_camera/left/image_rect_color"/>
+         <remap from="right/image_rect"  to="/stereo_camera/right/image_rect"/>
+         <remap from="left/camera_info"  to="/stereo_camera/left/camera_info_throttle"/>
          <remap from="right/camera_info" to="/stereo_camera/right/camera_info_throttle"/>
-         <remap from="odom_info" to="/odom_info"/>
-         <remap from="odom" to="/odometry"/>
-         <remap from="mapData" to="mapData_optimized"/>
+         <remap from="odom_info"         to="odom_info"/>
+         <remap from="odom"              to="/stereo_odometry"/>
+         <remap from="mapData"           to="mapData"/>
       </node>
          
    </group>

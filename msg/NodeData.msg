@@ -8,6 +8,9 @@ string label
 # Pose from odometry not corrected
 geometry_msgs/Pose pose
 
+# Ground truth (optional)
+geometry_msgs/Pose groundTruthPose
+
 # compressed image in /camera_link frame
 # use rtabmap::util3d::uncompressImage() from "rtabmap/core/util3d.h"
 uint8[] image

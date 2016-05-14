@@ -93,9 +93,9 @@ private:
 		pnh.param("queue_size", queueSize, queueSize);
 		pnh.param("decimation", decimation_, decimation_);
 		ROS_ASSERT(decimation_ >= 1);
-		ROS_INFO("Rate=%f Hz", rate_);
-		ROS_INFO("Decimation=%d", decimation_);
-		ROS_INFO("Approximate time sync = %s", approxSync?"true":"false");
+		NODELET_INFO("Rate=%f Hz", rate_);
+		NODELET_INFO("Decimation=%d", decimation_);
+		NODELET_INFO("Approximate time sync = %s", approxSync?"true":"false");
 
 		if(approxSync)
 		{

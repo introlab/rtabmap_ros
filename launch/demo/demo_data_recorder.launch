@@ -10,7 +10,7 @@
     <arg name="subscribe_odometry"   value="true"/>
     <arg name="subscribe_depth"      value="true"/>
     <arg name="subscribe_stereo"     value="false"/>
-    <arg name="subscribe_laserScan"  value="true"/>
+    <arg name="subscribe_scan"       value="true"/>
   
     <arg name="frame_id"      value="base_footprint"/>
     <arg name="odom_frame_id" value=""/>        <!-- use topic when not set, otherwise use TF if set -->
@@ -20,7 +20,6 @@
     <arg name="queue_size"    value="10"/>
     <arg name="max_rate"      value="0"/>
   
-    <arg name="camera_prefix" value="/camera"/>
     <arg name="odom_topic"    value="/az3/base_controller/odom"/>
     <arg name="scan_topic"    value="/jn0/base_scan"/>
   </include>

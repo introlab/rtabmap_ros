@@ -4,7 +4,8 @@
   <arg name="subscribe_odometry"   default="false"/>
   <arg name="subscribe_depth"      default="true"/>
   <arg name="subscribe_stereo"     default="false"/>
-  <arg name="subscribe_laserScan"  default="false"/>
+  <arg name="subscribe_scan"       default="false"/>
+  <arg name="stereo_approx_sync"   default="false"/>
   
   <arg name="frame_id"      default="camera_link"/>
   <arg name="odom_frame_id" default=""/>        <!-- use topic when not set, otherwise use TF if set -->
@@ -30,13 +31,17 @@
   <node name="data_recorder" pkg="rtabmap_ros" type="rtabmap" output="screen" args="--delete_db_on_start">
   
     <!-- Disable any processing -->
-	<param name="Mem/RehearsalSimilarity" type="string" value="1.0"/>    <!-- desactivate rehearsal -->
-	<param name="Kp/WordsPerImage"        type="string" value="-1"/>     <!-- desactivate keypoints extraction -->
-	<param name="Rtabmap/MaxRetrieved"    type="string" value="0"/>      <!-- desactivate global retrieval -->
-	<param name="RGBD/MaxLocalRetrieved"  type="string" value="0"/>      <!-- desactivate local retrieval -->
-	<param name="Rtabmap/MemoryThr"       type="string" value="1"/>      <!-- keep the WM empty --> 
+	<param name="Mem/RehearsalSimilarity" type="string" value="1.0"/>    <!-- deactivate rehearsal -->
+	<param name="Kp/MaxFeatures"          type="string" value="-1"/>     <!-- deactivate keypoints extraction -->
+	<param name="Rtabmap/MaxRetrieved"    type="string" value="0"/>      <!-- deactivate global retrieval -->
+	<param name="RGBD/MaxLocalRetrieved"  type="string" value="0"/>      <!-- deactivate local retrieval -->
+	<param name="Mem/MapLabelsAdded"      type="string" value="false"/>  <!-- don't create map labels --> 
+	<param name="Rtabmap/MemoryThr"       type="string" value="2"/>      <!-- keep the WM empty --> 
 	<param name="Mem/STMSize"             type="string" value="1"/>      <!-- STM=1 --> 
 	<param name="publish_tf"              type="bool"   value="false"/>  <!-- don't publish TF -->
+	<param name="RGBD/ProximityBySpace"   type="string" value="false"/> 
+	<param name="RGBD/LinearUpdate"       type="string" value="0"/> 
+	<param name="RGBD/AngularUpdate"      type="string" value="0"/> 
 	<param unless="$(arg subscribe_odometry)" name="RGBD/Enabled" type="string" value="false"/>
 	
 	<param name="Rtabmap/DetectionRate"   type="string" value="$(arg max_rate)"/>
@@ -44,9 +49,10 @@
 	<param name="database_path"       type="string" value="$(arg output_path)"/>
 	<param name="frame_id"            type="string" value="$(arg frame_id)"/>
 	<param name="subscribe_depth"     type="bool"   value="$(arg subscribe_depth)"/>
-	<param name="subscribe_laserScan" type="bool"   value="$(arg subscribe_laserScan)"/>
+	<param name="subscribe_scan"      type="bool"   value="$(arg subscribe_scan)"/>
 	<param name="subscribe_stereo"    type="bool"   value="$(arg subscribe_stereo)"/>
 	<param name="queue_size"          type="int"    value="$(arg queue_size)"/>
+	<param name="stereo_approx_sync"  type="bool"    value="$(arg stereo_approx_sync)"/>
 	
 	<!-- Hack to use a fake odom_frame_id=frame_id if subscribe_odometry = false -->
 	<param if="$(arg subscribe_odometry)" name="odom_frame_id" type="string" value="$(arg odom_frame_id)"/>

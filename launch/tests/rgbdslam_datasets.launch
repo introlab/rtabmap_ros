@@ -10,20 +10,7 @@
    -->
    
    <param name="use_sim_time" type="bool" value="True"/>
-   
-   <!-- ODOMETRY ARGUMENTS: "strategy", "feature", "nn" and "local_map":
-        -Strategy: 0=BOW (bag-of-words) 1=Optical Flow
-        -Feature type: 0=SURF 1=SIFT 2=ORB 3=FAST/FREAK 4=FAST/BRIEF 5=GFTT/FREAK 6=GFTT/BRIEF 7=BRISK
-        -Nearest neighbor strategy : 0=Linear, 1=FLANN_KDTREE, 2=FLANN_LSH, 3=BRUTEFORCE 
-           Set to 1 for float descriptor like SIFT/SURF                  
-           Set to 3 for binary descriptor like ORB/FREAK/BRIEF/BRISK      
-        -Local map size: number of unique features to keep track 
-    -->
-   <arg name="strategy" default="0" />
-   <arg name="feature" default="6" />
-   <arg name="nn" default="3" />
-   <arg name="local_map" default="1000" />
-   
+     
    <!-- Choose visualization -->
    <arg name="rviz" default="true" />
    <arg name="rtabmapviz" default="false" /> 
@@ -40,13 +27,18 @@
       <remap from="rgb/image"       to="/camera/rgb/image_color"/>
       <remap from="depth/image"     to="/camera/depth/image"/>
       <remap from="rgb/camera_info" to="/camera/rgb/camera_info"/>
+      <remap from="odom" to="vis_odom"/>
 	  
-	  <param name="Odom/Strategy" type="string" value="$(arg strategy)"/> 
-	  <param name="Odom/FeatureType" type="string" value="$(arg feature)"/>            
-      <param name="OdomBow/NNType" type="string" value="$(arg nn)"/>
-      <param name="OdomBow/LocalHistorySize" type="string" value="$(arg local_map)"/>
-      <param name="Odom/FillInfoData" type="string" value="$(arg rtabmapviz)"/> 
-      
+      <param name="Odom/Strategy" type="string" value="0"/>      <!-- 0=Frame-to-Map, 1=Frame-to-KeyFrame -->
+      <param name="Vis/CorType" type="string" value="0"/>        <!-- 0=features matching 1=Optical Flow -->
+      <param name="Vis/EstimationType" type="string" value="0"/> <!-- 0=3D->3D, 1=3D->2D (PnP) -->
+      <param name="Odom/FillInfoData" type="string" value="$(arg rtabmapviz)"/>
+      <param name="Vis/MaxDepth" type="string" value="4"/>
+      <param name="Vis/CorNNDR" type="string" value="0.6"/>
+      <param name="Odom/ResetCountdown" type="string" value="15"/> 
+      <param name="Odom/KeyFrameThr" type="string" value="0.5"/>
+
+      <param name="odom_frame_id" type="string" value="vis_odom"/>
       <param name="frame_id" type="string" value="kinect"/>
       <param name="publish_tf" type="bool" value="false"/>
       <param name="queue_size" type="int" value="30"/>
@@ -64,15 +56,20 @@
       <param name="subscribe_depth" type="bool" value="true"/>
       <param name="subscribe_laserScan" type="bool" value="false"/>
       
+      <param name="Rtabmap/StartNewMapOnLoopClosure" type="string" value="true"/>
+      <param name="Vis/EstimationType" type="string" value="0"/>
+      <param name="Vis/MaxDepth" type="string" value="4"/>
+      <param name="RGBD/LoopClosureReextractFeatures" type="string" value="false"/>
+      <param name="Mem/RawDescriptorsKept" type="string" value="true"/>
+      <param name="Kp/DetectorStrategy" type="string" value="0"/>
+
       <param name="frame_id" type="string" value="kinect"/>
+      <param name="ground_truth_frame_id" type="string" value="world"/> 
 	
       <remap from="rgb/image" to="/camera/rgb/image_color"/>
       <remap from="depth/image" to="/camera/depth/image"/>
       <remap from="rgb/camera_info" to="/camera/rgb/camera_info"/>
-      <remap from="odom" to="odom"/>
-      
-      <param name="LccBow/MinInliers" type="string" value="10"/>
-      <param name="LccBow/InlierDistance" type="string" value="0.05"/>
+      <remap from="odom" to="vis_odom"/>
 
       <param name="queue_size" type="int" value="30"/>
     </node>
@@ -89,7 +86,7 @@
       <remap from="rgb/image" to="/camera/rgb/image_color"/>
       <remap from="depth/image" to="/camera/depth/image"/>
       <remap from="rgb/camera_info" to="/camera/rgb/camera_info"/>
-      <remap from="odom" to="odom"/>
+      <remap from="odom" to="vis_odom"/>
     </node>
         
   </group>

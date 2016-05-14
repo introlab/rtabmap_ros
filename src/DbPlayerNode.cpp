@@ -90,7 +90,7 @@ int main(int argc, char** argv)
 	std::string odomFrameId = "odom";
 	std::string cameraFrameId = "camera_optical_link";
 	std::string scanFrameId = "base_laser_link";
-	double rate = 1.0f;
+	double rate = -1.0f;
 	std::string databasePath = "";
 	bool publishTf = true;
 	int startId = 0;
@@ -214,7 +214,7 @@ int main(int argc, char** argv)
 		else if(!odom.data().rightRaw().empty() && odom.data().rightRaw().type() == CV_8U)
 		{
 			//stereo
-			if(odom.data().stereoCameraModel().isValid())
+			if(odom.data().stereoCameraModel().isValidForProjection())
 			{
 				camInfoA.D.resize(8,0);
 
@@ -257,14 +257,12 @@ int main(int argc, char** argv)
 		// publish transforms first
 		if(publishTf)
 		{
-			ros::Time tfExpiration = time + ros::Duration(rate>0?1.0/rate:acquisitionTime);
-
 			rtabmap::Transform localTransform;
 			if(odom.data().cameraModels().size() == 1)
 			{
 				localTransform = odom.data().cameraModels()[0].localTransform();
 			}
-			else if(odom.data().stereoCameraModel().isValid())
+			else if(odom.data().stereoCameraModel().isValidForProjection())
 			{
 				localTransform = odom.data().stereoCameraModel().left().localTransform();
 			}
@@ -273,7 +271,7 @@ int main(int argc, char** argv)
 				geometry_msgs::TransformStamped baseToCamera;
 				baseToCamera.child_frame_id = cameraFrameId;
 				baseToCamera.header.frame_id = frameId;
-				baseToCamera.header.stamp = tfExpiration;
+				baseToCamera.header.stamp = time;
 				rtabmap_ros::transformToGeometryMsg(localTransform, baseToCamera.transform);
 				tfBroadcaster.sendTransform(baseToCamera);
 			}
@@ -283,7 +281,7 @@ int main(int argc, char** argv)
 				geometry_msgs::TransformStamped odomToBase;
 				odomToBase.child_frame_id = frameId;
 				odomToBase.header.frame_id = odomFrameId;
-				odomToBase.header.stamp = tfExpiration;
+				odomToBase.header.stamp = time;
 				rtabmap_ros::transformToGeometryMsg(odom.pose(), odomToBase.transform);
 				tfBroadcaster.sendTransform(odomToBase);
 			}
@@ -293,7 +291,7 @@ int main(int argc, char** argv)
 				geometry_msgs::TransformStamped baseToLaserScan;
 				baseToLaserScan.child_frame_id = scanFrameId;
 				baseToLaserScan.header.frame_id = frameId;
-				baseToLaserScan.header.stamp = tfExpiration;
+				baseToLaserScan.header.stamp = time;
 				rtabmap_ros::transformToGeometryMsg(rtabmap::Transform(0,0,scanHeight,0,0,0), baseToLaserScan.transform);
 				tfBroadcaster.sendTransform(baseToLaserScan);
 			}

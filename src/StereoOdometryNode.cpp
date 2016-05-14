@@ -145,24 +145,15 @@ public:
 			int quality = -1;
 			if(imageRectLeft->data.size() && imageRectRight->data.size())
 			{
-				image_geometry::StereoCameraModel model;
-				model.fromCameraInfo(*cameraInfoLeft, *cameraInfoRight);
-				if(model.baseline() <= 0)
+				rtabmap::StereoCameraModel stereoModel = rtabmap_ros::stereoCameraModelFromROS(*cameraInfoLeft, *cameraInfoRight, localTransform);
+				if(stereoModel.baseline() <= 0)
 				{
 					ROS_FATAL("The stereo baseline (%f) should be positive (baseline=-Tx/fx). We assume a horizontal left/right stereo "
-							  "setup where the Tx (or P(0,3)) is negative in the right camera info msg.", model.baseline());
+							  "setup where the Tx (or P(0,3)) is negative in the right camera info msg.", stereoModel.baseline());
 					return;
 				}
 
-				rtabmap::StereoCameraModel stereoModel(
-						model.left().fx(),
-						model.left().fy(),
-						model.left().cx(),
-						model.left().cy(),
-						model.baseline(),
-						localTransform);
-
-				if(model.baseline() > 10.0)
+				if(stereoModel.baseline() > 10.0)
 				{
 					static bool shown = false;
 					if(!shown)
@@ -170,13 +161,13 @@ public:
 						ROS_WARN("Detected baseline (%f m) is quite large! Is your "
 								 "right camera_info P(0,3) correctly set? Note that "
 								 "baseline=-P(0,3)/P(0,0). This warning is printed only once.",
-								 model.baseline());
+								 stereoModel.baseline());
 						shown = true;
 					}
 				}
 
-				cv_bridge::CvImageConstPtr ptrImageLeft = cv_bridge::toCvShare(imageRectLeft, "mono8");
-				cv_bridge::CvImageConstPtr ptrImageRight = cv_bridge::toCvShare(imageRectRight, "mono8");
+				cv_bridge::CvImagePtr ptrImageLeft = cv_bridge::toCvCopy(imageRectLeft, "mono8");
+				cv_bridge::CvImagePtr ptrImageRight = cv_bridge::toCvCopy(imageRectRight, "mono8");
 
 				UTimer stepTimer;
 				//

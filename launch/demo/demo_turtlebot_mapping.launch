@@ -25,9 +25,13 @@
   <arg name="localization"      default="false"/>
   <arg name="rgbd_odometry"     default="false"/>
   <arg name="args"              default=""/>
-  <arg name="version083"        default="false"/>
   <arg name="rtabmapviz"        default="false"/>
-  <arg name="wait_for_transform"  default="0.1"/>
+  
+  <arg name="wait_for_transform"  default="0.2"/> 
+  <!-- 
+      robot_state_publisher's publishing frequency in "turtlebot_bringup/launch/includes/robot.launch.xml" 
+      can be increase from 5 to 10 Hz to avoid some TF warnings.
+  -->
   
   <!-- Navigation stuff (move_base) -->
   <include file="$(find turtlebot_bringup)/launch/3dsensor.launch"/>
@@ -42,7 +46,7 @@
 	  <param name="odom_frame_id"       type="string" value="odom"/>
 	  <param name="wait_for_transform_duration"  type="double"   value="$(arg wait_for_transform)"/>
 	  <param name="subscribe_depth"     type="bool"   value="true"/>
-	  <param name="subscribe_laserScan" type="bool"   value="true"/>
+	  <param name="subscribe_scan"      type="bool"   value="true"/>
 	
 	  <!-- inputs -->
 	  <remap from="scan"            to="/scan"/>
@@ -51,21 +55,22 @@
   	  <remap from="rgb/camera_info" to="/camera/rgb/camera_info"/>
   	  
   	  <!-- output -->
-  	  <remap unless="$(arg version083)" from="grid_map" to="/map"/>
-  	  <!-- <remap unless="$(arg version083)" from="proj_map" to="/map"/> -->
+  	  <remap from="grid_map" to="/map"/>
 	
 	  <!-- RTAB-Map's parameters: do "rosrun rtabmap rtabmap (double-dash)params" to see the list of available parameters. -->
-	  <param name="RGBD/LocalLoopDetectionSpace" type="string" value="true"/>   <!-- Local loop closure detection (using estimated position) with locations in WM -->
+	  <param name="RGBD/ProximityBySpace"        type="string" value="true"/>   <!-- Local loop closure detection (using estimated position) with locations in WM -->
 	  <param name="RGBD/OptimizeFromGraphEnd"    type="string" value="false"/>  <!-- Set to false to generate map correction between /map and /odom -->
 	  <param name="Kp/MaxDepth"                  type="string" value="4.0"/>
-	  <param name="LccIcp/Type"                  type="string" value="2"/>      <!-- Loop closure transformation refining with ICP: 0=No ICP, 1=ICP 3D, 2=ICP 2D -->
-	  <param name="LccIcp2/CorrespondenceRatio"  type="string" value="0.3"/>
-	  <param name="LccBow/MinInliers"            type="string" value="5"/>      <!-- 3D visual words minimum inliers to accept loop closure -->
-	  <param name="LccBow/InlierDistance"        type="string" value="0.1"/>    <!-- 3D visual words correspondence distance -->
+	  <param name="Reg/Strategy"                 type="string" value="1"/>      <!-- Loop closure transformation refining with ICP: 0=Visual, 1=ICP, 2=Visual+ICP -->
+	  <param name="Icp/CoprrespondenceRatio"     type="string" value="0.3"/>
+	  <param name="Vis/MinInliers"               type="string" value="5"/>      <!-- 3D visual words minimum inliers to accept loop closure -->
+	  <param name="Vis/InlierDistance"           type="string" value="0.1"/>    <!-- 3D visual words correspondence distance -->
 	  <param name="RGBD/AngularUpdate"           type="string" value="0.1"/>    <!-- Update map only if the robot is moving -->
 	  <param name="RGBD/LinearUpdate"            type="string" value="0.1"/>    <!-- Update map only if the robot is moving -->
 	  <param name="Rtabmap/TimeThr"              type="string" value="700"/>
-	  <param name="Mem/RehearsalSimilarity"      type="string" value="0.30"/>   
+	  <param name="Mem/RehearsalSimilarity"      type="string" value="0.30"/>
+	  <param name="Optimizer/Slam2D"             type="string" value="true"/>
+	  <param name="Reg/Force3DoF"                type="string" value="true"/>   
 	  
 	  <!-- localization mode -->
 	  <param     if="$(arg localization)" name="Mem/IncrementalMemory" type="string" value="false"/>
@@ -75,25 +80,21 @@
    
     <!-- Odometry : ONLY for testing without the actual robot! /odom TF should not be already published. -->
     <node if="$(arg rgbd_odometry)" pkg="rtabmap_ros" type="rgbd_odometry" name="rgbd_odometry" output="screen">
-      <param name="frame_id"           type="string" value="base_footprint"/>
-      <param name="wait_for_transform_duration" type="double"   value="$(arg wait_for_transform)"/>
-      <param name="Odom/Force2D"       type="string"   value="true"/>
-      <param name="Odom/InlierDistance" type="string"   value="0.05"/>
+      <param name="frame_id"                    type="string" value="base_footprint"/>
+      <param name="wait_for_transform_duration" type="double" value="$(arg wait_for_transform)"/>
+      <param name="Reg/Force3DoF"               type="string" value="true"/>
+      <param name="Vis/InlierDistance"          type="string" value="0.05"/>
+      
       <remap from="rgb/image"       to="/camera/rgb/image_rect_color"/>
       <remap from="depth/image"     to="/camera/depth_registered/image_raw"/>
       <remap from="rgb/camera_info" to="/camera/rgb/camera_info"/>
     </node>
-
-    <!-- backward compatibility with hydro 0.8.3 only -->
-    <node if="$(arg version083)" pkg="rtabmap_ros" type="grid_map_assembler" name="grid_map_assembler">
-      <remap from="grid_map" to="/map"/>
-    </node>
     
     <!-- visualization with rtabmapviz -->
     <node if="$(arg rtabmapviz)" pkg="rtabmap_ros" type="rtabmapviz" name="rtabmapviz" args="-d $(find rtabmap_ros)/launch/config/rgbd_gui.ini" output="screen">
-  	  <param name="subscribe_depth" type="bool" value="true"/>
-      <param name="subscribe_laserScan" type="bool" value="true"/>
-      <param name="frame_id" type="string" value="base_footprint"/>
+  	  <param name="subscribe_depth"             type="bool" value="true"/>
+      <param name="subscribe_scan"              type="bool" value="true"/>
+      <param name="frame_id"                    type="string" value="base_footprint"/>
       <param name="wait_for_transform_duration" type="double" value="$(arg wait_for_transform)"/>
     
       <remap from="rgb/image"       to="/camera/rgb/image_rect_color"/>

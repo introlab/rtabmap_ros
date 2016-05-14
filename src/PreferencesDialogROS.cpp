@@ -27,15 +27,16 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "PreferencesDialogROS.h"
 #include <rtabmap/core/Parameters.h>
-#include <QtCore/QDir>
-#include <QtCore/QFileInfo>
-#include <QtCore/QSettings>
-#include <QtGui/QHBoxLayout>
-#include <QtCore/QTimer>
-#include <QtGui/QLabel>
+#include <QDir>
+#include <QFileInfo>
+#include <QSettings>
+#include <QHBoxLayout>
+#include <QTimer>
+#include <QLabel>
 #include <rtabmap/core/RtabmapEvent.h>
-#include <QtGui/QMessageBox>
+#include <QMessageBox>
 #include <ros/exceptions.h>
+#include <rtabmap/utilite/UStl.h>
 
 using namespace rtabmap;
 
@@ -76,19 +77,42 @@ QString PreferencesDialogROS::getParamMessage()
 
 bool PreferencesDialogROS::readCoreSettings(const QString & filePath)
 {
-	if(filePath.isEmpty() || filePath.compare(getTmpIniFilePath()) == 0)
+	QString path = getIniFilePath();
+	if(!filePath.isEmpty())
 	{
-		ros::NodeHandle nh;
-		ROS_INFO("%s", this->getParamMessage().toStdString().c_str());
-		bool validParameters = true;
-		int readCount = 0;
-		rtabmap::ParametersMap parameters = rtabmap::Parameters::getDefaultParameters();
-		for(rtabmap::ParametersMap::iterator i=parameters.begin(); i!=parameters.end(); ++i)
+		path = filePath;
+	}
+
+	ros::NodeHandle nh;
+	ROS_INFO("%s", this->getParamMessage().toStdString().c_str());
+	bool validParameters = true;
+	int readCount = 0;
+	rtabmap::ParametersMap parameters = rtabmap::Parameters::getDefaultParameters();
+	for(rtabmap::ParametersMap::iterator i=parameters.begin(); i!=parameters.end(); ++i)
+	{
+		if(i->first.compare(rtabmap::Parameters::kRtabmapWorkingDirectory()) == 0)
+		{
+			// use working directory of the GUI, not the one on rosparam server
+			QSettings settings(path, QSettings::IniFormat);
+			settings.beginGroup("Core");
+			QString value = settings.value(rtabmap::Parameters::kRtabmapWorkingDirectory().c_str(), "").toString();
+			if(!value.isEmpty() && QDir(value).exists())
+			{
+				this->setParameter(rtabmap::Parameters::kRtabmapWorkingDirectory(), value.toStdString());
+			}
+			else
+			{
+				// use default one
+				this->setParameter(rtabmap::Parameters::kRtabmapWorkingDirectory(), (QDir::homePath()+"/.ros").toStdString());
+			}
+			settings.endGroup();
+		}
+		else
 		{
 			std::string value;
-			if(nh.getParam((*i).first,value))
+			if(nh.getParam(i->first,value))
 			{
-				PreferencesDialog::setParameter((*i).first, value);
+				PreferencesDialog::setParameter(i->first, value);
 				++readCount;
 			}
 			else
@@ -96,51 +120,50 @@ bool PreferencesDialogROS::readCoreSettings(const QString & filePath)
 				validParameters = false;
 			}
 		}
+	}
 
-		ROS_INFO("Parameters read = %d", readCount);
+	ROS_INFO("Parameters read = %d", readCount);
 
-		if(validParameters)
-		{
-			ROS_INFO("Parameters successfully read.");
-		}
-		else
-		{
-			if(this->isVisible())
-			{
-				QString warning = tr("Failed to get some RTAB-Map parameters from ROS server, the rtabmap node may be not started or some parameters won't work...");
-				ROS_WARN("%s", warning.toStdString().c_str());
-				QMessageBox::warning(this, tr("Can't read parameters from ROS server."), warning);
-			}
-			return false;
-		}
-		return true;
+	if(validParameters)
+	{
+		ROS_INFO("Parameters successfully read.");
 	}
 	else
 	{
-		return PreferencesDialog::readCoreSettings(filePath);
+		if(this->isVisible())
+		{
+			QString warning = tr("Failed to get some RTAB-Map parameters from ROS server, the rtabmap node may be not started or some parameters won't work...");
+			ROS_WARN("%s", warning.toStdString().c_str());
+			QMessageBox::warning(this, tr("Can't read parameters from ROS server."), warning);
+		}
+		return false;
 	}
-
+	return true;
 }
 
-void PreferencesDialogROS::writeSettings(const QString & filePath)
+void PreferencesDialogROS::writeCoreSettings(const QString & filePath) const
 {
-	writeGuiSettings(filePath);
-
-	// This will tell the MainWindow that the
-	//parameters are updated. The MainWindow will send an Event that
-	// will be handled by the GuiWrapper where we will write
-	// parameters in ROS and the rtabmap_node will be notified.
-	if(_parameters.size())
+	QString path = getIniFilePath();
+	if(!filePath.isEmpty())
 	{
-		emit settingsChanged(_parameters);
+		path = filePath;
 	}
 
-	if(_obsoletePanels)
+	if(QFile::exists(path))
 	{
-		emit settingsChanged(_obsoletePanels);
-	}
+		rtabmap::ParametersMap parameters = this->getAllParameters();
 
-	_parameters = rtabmap::ParametersMap();
-	_obsoletePanels = kPanelDummy;
+		std::string workingDir = uValue(parameters, Parameters::kRtabmapWorkingDirectory(), std::string(""));
+
+		if(!workingDir.empty())
+		{
+			//Just update GUI working directory
+			QSettings settings(path, QSettings::IniFormat);
+			settings.beginGroup("Core");
+			settings.remove("");
+			settings.setValue(Parameters::kRtabmapWorkingDirectory().c_str(), workingDir.c_str());
+			settings.endGroup();
+		}
+	}
 }
 
