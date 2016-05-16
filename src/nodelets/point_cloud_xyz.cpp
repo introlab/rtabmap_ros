@@ -256,9 +256,17 @@ private:
 
 	void processAndPublish(pcl::PointCloud<pcl::PointXYZ>::Ptr & pclCloud, const std_msgs::Header & header)
 	{
-		if(pclCloud->size() && (minDepth_ != 0.0 || maxDepth_ > minDepth_))
+		if(pclCloud->size())
 		{
-			pclCloud = rtabmap::util3d::passThrough(pclCloud, "z", minDepth_, maxDepth_>minDepth_?maxDepth_:std::numeric_limits<float>::max());
+			if(minDepth_ != 0.0 || maxDepth_ > minDepth_)
+			{
+				pclCloud = rtabmap::util3d::passThrough(pclCloud, "z", minDepth_, maxDepth_>minDepth_?maxDepth_:std::numeric_limits<float>::max());
+			}
+			else if(noiseFilterRadius_ > 0.0 && noiseFilterMinNeighbors_ > 0)
+			{
+				// remvoe NaN values
+				pclCloud = rtabmap::util3d::removeNaNFromPointCloud(pclCloud);
+			}
 		}
 
 		if(pclCloud->size() && noiseFilterRadius_ > 0.0 && noiseFilterMinNeighbors_ > 0)
