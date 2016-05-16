@@ -421,7 +421,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 
 						if(scanRequired || gridRequired)
 						{
-							if(scan.cols && (gridRequired || scanVoxelSize_ > 0.0))
+							if(scan.cols && (scanRequired || scanVoxelSize_ > 0.0 || scanDecimation_ > 1))
 							{
 								if(scanDecimation_ > 1)
 								{
@@ -485,6 +485,18 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 			if(!uContains(poses, iter->first))
 			{
 				clouds_.erase(iter++);
+			}
+			else
+			{
+				++iter;
+			}
+		}
+		for(std::map<int, pcl::PointCloud<pcl::PointXYZ>::Ptr >::iterator iter=scans_.begin();
+			iter!=scans_.end();)
+		{
+			if(!uContains(poses, iter->first))
+			{
+				scans_.erase(iter++);
 			}
 			else
 			{
