@@ -310,30 +310,29 @@ private:
 
 	void processAndPublish(pcl::PointCloud<pcl::PointXYZRGB>::Ptr & pclCloud, const std_msgs::Header & header)
 	{
-		if(pclCloud->size())
+		if(pclCloud->size() && (minDepth_ != 0.0 || maxDepth_ > minDepth_))
 		{
-			if(minDepth_ != 0.0 || maxDepth_ > minDepth_)
-			{
-				pclCloud = rtabmap::util3d::passThrough(pclCloud, "z", minDepth_, maxDepth_>minDepth_?maxDepth_:std::numeric_limits<float>::max());
-			}
-			else if(noiseFilterRadius_ > 0.0 && noiseFilterMinNeighbors_ > 0)
-			{
-				// remvoe NaN values
-				pclCloud = rtabmap::util3d::removeNaNFromPointCloud(pclCloud);
-			}
-		}
-
-		if(pclCloud->size() && noiseFilterRadius_ > 0.0 && noiseFilterMinNeighbors_ > 0)
-		{
-			pcl::IndicesPtr indices = rtabmap::util3d::radiusFiltering(pclCloud, noiseFilterRadius_, noiseFilterMinNeighbors_);
-			pcl::PointCloud<pcl::PointXYZRGB>::Ptr tmp(new pcl::PointCloud<pcl::PointXYZRGB>);
-			pcl::copyPointCloud(*pclCloud, *indices, *tmp);
-			pclCloud = tmp;
+			pclCloud = rtabmap::util3d::passThrough(pclCloud, "z", minDepth_, maxDepth_>minDepth_?maxDepth_:std::numeric_limits<float>::max());
 		}
 
 		if(pclCloud->size() && voxelSize_ > 0.0)
 		{
 			pclCloud = rtabmap::util3d::voxelize(pclCloud, voxelSize_);
+		}
+
+		// Do radius filtering after voxel filtering ( a lot faster)
+		if(pclCloud->size() && noiseFilterRadius_ > 0.0 && noiseFilterMinNeighbors_ > 0)
+		{
+			if(voxelSize_ <= 0.0 && !(minDepth_ != 0.0 || maxDepth_ > minDepth_))
+			{
+				// remove NaN values
+				pclCloud = rtabmap::util3d::removeNaNFromPointCloud(pclCloud);
+			}
+
+			pcl::IndicesPtr indices = rtabmap::util3d::radiusFiltering(pclCloud, noiseFilterRadius_, noiseFilterMinNeighbors_);
+			pcl::PointCloud<pcl::PointXYZRGB>::Ptr tmp(new pcl::PointCloud<pcl::PointXYZRGB>);
+			pcl::copyPointCloud(*pclCloud, *indices, *tmp);
+			pclCloud = tmp;
 		}
 
 		sensor_msgs::PointCloud2 rosCloud;
