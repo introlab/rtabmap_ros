@@ -127,31 +127,34 @@ private:
 
 		//parse roi (region of interest)
 		roiRatios_.resize(4, 0);
-		std::list<std::string> strValues = uSplit(roiStr, ' ');
-		if(strValues.size() != 4)
+		if(!roiStr.empty())
 		{
-			ROS_ERROR("The number of values must be 4 (\"roi_ratios\"=\"%s\")", roiStr.c_str());
-		}
-		else
-		{
-			std::vector<float> tmpValues(4);
-			unsigned int i=0;
-			for(std::list<std::string>::iterator jter = strValues.begin(); jter!=strValues.end(); ++jter)
+			std::list<std::string> strValues = uSplit(roiStr, ' ');
+			if(strValues.size() != 4)
 			{
-				tmpValues[i] = uStr2Float(*jter);
-				++i;
-			}
-
-			if(tmpValues[0] >= 0 && tmpValues[0] < 1 && tmpValues[0] < 1.0f-tmpValues[1] &&
-				tmpValues[1] >= 0 && tmpValues[1] < 1 && tmpValues[1] < 1.0f-tmpValues[0] &&
-				tmpValues[2] >= 0 && tmpValues[2] < 1 && tmpValues[2] < 1.0f-tmpValues[3] &&
-				tmpValues[3] >= 0 && tmpValues[3] < 1 && tmpValues[3] < 1.0f-tmpValues[2])
-			{
-				roiRatios_ = tmpValues;
+				ROS_ERROR("The number of values must be 4 (\"roi_ratios\"=\"%s\")", roiStr.c_str());
 			}
 			else
 			{
-				ROS_ERROR("The roi ratios are not valid (\"roi_ratios\"=\"%s\")", roiStr.c_str());
+				std::vector<float> tmpValues(4);
+				unsigned int i=0;
+				for(std::list<std::string>::iterator jter = strValues.begin(); jter!=strValues.end(); ++jter)
+				{
+					tmpValues[i] = uStr2Float(*jter);
+					++i;
+				}
+
+				if(tmpValues[0] >= 0 && tmpValues[0] < 1 && tmpValues[0] < 1.0f-tmpValues[1] &&
+					tmpValues[1] >= 0 && tmpValues[1] < 1 && tmpValues[1] < 1.0f-tmpValues[0] &&
+					tmpValues[2] >= 0 && tmpValues[2] < 1 && tmpValues[2] < 1.0f-tmpValues[3] &&
+					tmpValues[3] >= 0 && tmpValues[3] < 1 && tmpValues[3] < 1.0f-tmpValues[2])
+				{
+					roiRatios_ = tmpValues;
+				}
+				else
+				{
+					ROS_ERROR("The roi ratios are not valid (\"roi_ratios\"=\"%s\")", roiStr.c_str());
+				}
 			}
 		}
 
@@ -202,22 +205,25 @@ private:
 
 		if(cloudPub_.getNumSubscribers())
 		{
+			ros::WallTime time = ros::WallTime::now();
+
 			cv_bridge::CvImageConstPtr imageDepthPtr = cv_bridge::toCvShare(depth);
 			cv::Rect roi = rtabmap::Feature2D::computeRoi(imageDepthPtr->image, roiRatios_);
-			cv::Mat image(imageDepthPtr->image, roi);
 
 			image_geometry::PinholeCameraModel model;
 			model.fromCameraInfo(*cameraInfo);
 
 			pcl::PointCloud<pcl::PointXYZ>::Ptr pclCloud;
 			pclCloud = rtabmap::util3d::cloudFromDepth(
-					image,
+					cv::Mat(imageDepthPtr->image, roi),
 					model.cx()-roiRatios_[0]*double(imageDepthPtr->image.cols),
 					model.cy()-roiRatios_[2]*double(imageDepthPtr->image.rows),
 					model.fx(),
 					model.fy(),
 					decimation_);
 			processAndPublish(pclCloud, depth->header);
+
+			NODELET_DEBUG("point_cloud_xyz from depth time = %f s", (ros::WallTime::now() - time).toSec());
 		}
 	}
 
@@ -244,6 +250,8 @@ private:
 
 		if(cloudPub_.getNumSubscribers())
 		{
+			ros::WallTime time = ros::WallTime::now();
+
 			cv::Rect roi = rtabmap::Feature2D::computeRoi(disparity, roiRatios_);
 
 			pcl::PointCloud<pcl::PointXYZ>::Ptr pclCloud;
@@ -255,6 +263,8 @@ private:
 					decimation_);
 
 			processAndPublish(pclCloud, disparityMsg->header);
+
+			NODELET_DEBUG("point_cloud_xyz from disparity time = %f s", (ros::WallTime::now() - time).toSec());
 		}
 	}
 

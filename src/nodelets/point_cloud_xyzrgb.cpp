@@ -55,6 +55,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "rtabmap/core/util3d.h"
 #include "rtabmap/core/util3d_filtering.h"
+#include "rtabmap/core/Features2d.h"
+#include "rtabmap/utilite/UConversion.h"
+#include "rtabmap/utilite/UStl.h"
 
 namespace rtabmap_ros
 {
@@ -95,6 +98,7 @@ private:
 
 		int queueSize = 10;
 		bool approxSync = true;
+		std::string roiStr;
 		pnh.param("approx_sync", approxSync, approxSync);
 		pnh.param("queue_size", queueSize, queueSize);
 		pnh.param("max_depth", maxDepth_, maxDepth_);
@@ -103,6 +107,40 @@ private:
 		pnh.param("decimation", decimation_, decimation_);
 		pnh.param("noise_filter_radius", noiseFilterRadius_, noiseFilterRadius_);
 		pnh.param("noise_filter_min_neighbors", noiseFilterMinNeighbors_, noiseFilterMinNeighbors_);
+		pnh.param("roi_ratios", roiStr, roiStr);
+
+		//parse roi (region of interest)
+		roiRatios_.resize(4, 0);
+		if(!roiStr.empty())
+		{
+			std::list<std::string> strValues = uSplit(roiStr, ' ');
+			if(strValues.size() != 4)
+			{
+				ROS_ERROR("The number of values must be 4 (\"roi_ratios\"=\"%s\")", roiStr.c_str());
+			}
+			else
+			{
+				std::vector<float> tmpValues(4);
+				unsigned int i=0;
+				for(std::list<std::string>::iterator jter = strValues.begin(); jter!=strValues.end(); ++jter)
+				{
+					tmpValues[i] = uStr2Float(*jter);
+					++i;
+				}
+
+				if(tmpValues[0] >= 0 && tmpValues[0] < 1 && tmpValues[0] < 1.0f-tmpValues[1] &&
+					tmpValues[1] >= 0 && tmpValues[1] < 1 && tmpValues[1] < 1.0f-tmpValues[0] &&
+					tmpValues[2] >= 0 && tmpValues[2] < 1 && tmpValues[2] < 1.0f-tmpValues[3] &&
+					tmpValues[3] >= 0 && tmpValues[3] < 1 && tmpValues[3] < 1.0f-tmpValues[2])
+				{
+					roiRatios_ = tmpValues;
+				}
+				else
+				{
+					ROS_ERROR("The roi ratios are not valid (\"roi_ratios\"=\"%s\")", roiStr.c_str());
+				}
+			}
+		}
 
 		NODELET_INFO("Approximate time sync = %s", approxSync?"true":"false");
 
@@ -175,6 +213,8 @@ private:
 
 		if(cloudPub_.getNumSubscribers())
 		{
+			ros::WallTime time = ros::WallTime::now();
+
 			cv_bridge::CvImageConstPtr imagePtr;
 			if(image->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0)
 			{
@@ -194,23 +234,25 @@ private:
 
 			image_geometry::PinholeCameraModel model;
 			model.fromCameraInfo(*cameraInfo);
-			float fx = model.fx();
-			float fy = model.fy();
-			float cx = model.cx();
-			float cy = model.cy();
+
+			ROS_ASSERT(imageDepthPtr->image.cols == imagePtr->image.cols);
+			ROS_ASSERT(imageDepthPtr->image.rows == imagePtr->image.rows);
 
 			pcl::PointCloud<pcl::PointXYZRGB>::Ptr pclCloud;
+			cv::Rect roi = rtabmap::Feature2D::computeRoi(imageDepthPtr->image, roiRatios_);
 			pclCloud = rtabmap::util3d::cloudFromDepthRGB(
-					imagePtr->image,
-					imageDepthPtr->image,
-					cx,
-					cy,
-					fx,
-					fy,
+					cv::Mat(imagePtr->image, roi),
+					cv::Mat(imageDepthPtr->image, roi),
+					model.cx()-roiRatios_[0]*double(imageDepthPtr->image.cols),
+					model.cy()-roiRatios_[2]*double(imageDepthPtr->image.rows),
+					model.fx(),
+					model.fy(),
 					decimation_);
 
 
 			processAndPublish(pclCloud, imagePtr->header);
+
+			NODELET_DEBUG("point_cloud_xyzrgb from RGB-D time = %f s", (ros::WallTime::now() - time).toSec());
 		}
 	}
 
@@ -234,6 +276,8 @@ private:
 
 		if(cloudPub_.getNumSubscribers())
 		{
+			ros::WallTime time = ros::WallTime::now();
+
 			cv_bridge::CvImageConstPtr ptrLeftImage, ptrRightImage;
 			if(imageLeft->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
 				imageLeft->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
@@ -246,6 +290,11 @@ private:
 			}
 			ptrRightImage = cv_bridge::toCvShare(imageRight, "mono8");
 
+			if(roiRatios_[0]!=0.0f || roiRatios_[1]!=0.0f || roiRatios_[2]!=0.0f || roiRatios_[3]!=0.0f)
+			{
+				ROS_WARN("\"roi_ratios\" set but ignored for stereo images.");
+			}
+
 			pcl::PointCloud<pcl::PointXYZRGB>::Ptr pclCloud;
 			pclCloud = rtabmap::util3d::cloudFromStereoImages(
 					ptrLeftImage->image,
@@ -254,6 +303,8 @@ private:
 					decimation_);
 
 			processAndPublish(pclCloud, imageLeft->header);
+
+			NODELET_DEBUG("point_cloud_xyzrgb from stereo time = %f s", (ros::WallTime::now() - time).toSec());
 		}
 	}
 
@@ -302,6 +353,7 @@ private:
 	int decimation_;
 	double noiseFilterRadius_;
 	int noiseFilterMinNeighbors_;
+	std::vector<float> roiRatios_;
 
 	ros::Publisher cloudPub_;
 

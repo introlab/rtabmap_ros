@@ -305,7 +305,7 @@ private:
 			projObstaclesPub_.publish(rosCloud);
 		}
 
-		//NODELET_INFO("Obstacles segmentation time = %f s", (ros::WallTime::now() - time).toSec());
+		NODELET_DEBUG("Obstacles segmentation time = %f s", (ros::WallTime::now() - time).toSec());
 	}
 
 private:
