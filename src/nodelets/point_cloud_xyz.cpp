@@ -55,6 +55,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "rtabmap/core/util3d.h"
 #include "rtabmap/core/util3d_filtering.h"
+#include "rtabmap/core/Features2d.h"
+#include "rtabmap/utilite/UConversion.h"
+#include "rtabmap/utilite/UStl.h"
 
 namespace rtabmap_ros
 {
@@ -69,9 +72,6 @@ public:
 		decimation_(1),
 		noiseFilterRadius_(0.0),
 		noiseFilterMinNeighbors_(5),
-		cut_left_(0),
-		cut_right_(0),
-		create_close_obstacle_if_depth_is_missing_(false),
 		approxSyncDepth_(0),
 		approxSyncDisparity_(0),
 		exactSyncDepth_(0),
@@ -98,6 +98,7 @@ private:
 
 		int queueSize = 10;
 		bool approxSync = true;
+		std::string roiStr;
 		pnh.param("approx_sync", approxSync, approxSync);
 		pnh.param("queue_size", queueSize, queueSize);
 		pnh.param("max_depth", maxDepth_, maxDepth_);
@@ -106,9 +107,53 @@ private:
 		pnh.param("decimation", decimation_, decimation_);
 		pnh.param("noise_filter_radius", noiseFilterRadius_, noiseFilterRadius_);
 		pnh.param("noise_filter_min_neighbors", noiseFilterMinNeighbors_, noiseFilterMinNeighbors_);
-		pnh.param("cut_left", cut_left_, cut_left_);
-		pnh.param("cut_right", cut_right_, cut_right_);
-		pnh.param("special_filter_close_object", create_close_obstacle_if_depth_is_missing_, create_close_obstacle_if_depth_is_missing_);
+		pnh.param("roi_ratios", roiStr, roiStr);
+
+		// Deprecated
+		if(pnh.hasParam("cut_left"))
+		{
+			ROS_ERROR("\"cut_left\" parameter is replaced by \"roi_ratios\". It will be ignored.");
+		}
+		if(pnh.hasParam("cut_right"))
+		{
+			ROS_ERROR("\"cut_right\" parameter is replaced by \"roi_ratios\". It will be ignored.");
+		}
+		if(pnh.hasParam("special_filter_close_object"))
+		{
+			ROS_ERROR("\"special_filter_close_object\" parameter is removed. This kind of processing "
+					  "should be done before or after this nodelet. See old implementation here: "
+					  "https://github.com/introlab/rtabmap_ros/blob/f0026b071c7c54fbcc71df778dd7e17f52f78fc4/src/nodelets/point_cloud_xyz.cpp#L178-L201.");
+		}
+
+		//parse roi (region of interest)
+		roiRatios_.resize(4, 0);
+		std::list<std::string> strValues = uSplit(roiStr, ' ');
+		if(strValues.size() != 4)
+		{
+			ROS_ERROR("The number of values must be 4 (\"roi_ratios\"=\"%s\")", roiStr.c_str());
+		}
+		else
+		{
+			std::vector<float> tmpValues(4);
+			unsigned int i=0;
+			for(std::list<std::string>::iterator jter = strValues.begin(); jter!=strValues.end(); ++jter)
+			{
+				tmpValues[i] = uStr2Float(*jter);
+				++i;
+			}
+
+			if(tmpValues[0] >= 0 && tmpValues[0] < 1 && tmpValues[0] < 1.0f-tmpValues[1] &&
+				tmpValues[1] >= 0 && tmpValues[1] < 1 && tmpValues[1] < 1.0f-tmpValues[0] &&
+				tmpValues[2] >= 0 && tmpValues[2] < 1 && tmpValues[2] < 1.0f-tmpValues[3] &&
+				tmpValues[3] >= 0 && tmpValues[3] < 1 && tmpValues[3] < 1.0f-tmpValues[2])
+			{
+				roiRatios_ = tmpValues;
+			}
+			else
+			{
+				ROS_ERROR("The roi ratios are not valid (\"roi_ratios\"=\"%s\")", roiStr.c_str());
+			}
+		}
 
 		NODELET_INFO("Approximate time sync = %s", approxSync?"true":"false");
 
@@ -158,62 +203,19 @@ private:
 		if(cloudPub_.getNumSubscribers())
 		{
 			cv_bridge::CvImageConstPtr imageDepthPtr = cv_bridge::toCvShare(depth);
-			cv::Mat image=imageDepthPtr->image;
-			int rows = image.rows;
-			int cols = image.cols;
-
-			//Cut left and cut right options to mask the image.
-			//If cut_left (resp. cut_right)  is set to a positive value, we set the first (resp. last) columns
-			//of the depth image to 0, meaning that no depth reading has been received.
-			//Number of columns to be masked is equal to cut_left (resp. cut_right value)
-			if (cut_left_>0){
-				cv::Mat pRoi = image(cv::Rect(0, 0, cut_left_, rows));
-				pRoi.setTo(cv::Scalar(0.));
-			}
-			if (cut_right_<0){
-				cv::Mat pRoi = image(cv::Rect(cols-cut_right_, 0, cut_right_, rows));
-				pRoi.setTo(cv::Scalar(0.));
-			}
-
-			//This option enables a filter for close object.
-			//Fist, we do a median blur on the image to get rid of potential noise
-			//Second, we set all false reading that are likely due to an object sitting in front of the camera
-			// to a short distance estimation (here, 40cm).
-			//This hence make the assumption that the depth camera is looking forward and sees the floor on
-			// the bottom rows of the depth image
-			//This option is highly experimental and should be used with extreme care.
-			if (create_close_obstacle_if_depth_is_missing_){
-				cv::Mat pRoi = image(cv::Rect(int(0.05*(float(cols))),int(0.05*(float(rows))),int(0.9*(float(cols))),int(0.9*float(rows))));
-				cv::medianBlur(pRoi, pRoi, 3);
-
-				//Do filter of close objects
-				//If the depth is registered, there is usually a black frame around the depth image
-				//Hence, the ROI stops before the expected "frame"
-				pRoi = image(cv::Rect(int(cols/10),int(0.8*(float(rows))),int(0.8*(float(cols))),int(0.15*float(rows))));
-				cv::Mat blurredImage=pRoi.clone();
-				cv::GaussianBlur(pRoi, blurredImage, cv::Size(5, 5), 0, 0);
-				for(int y = 0; y < blurredImage.cols; y++)
-					for(int x = 0; x < blurredImage.rows; x++){
-						if (blurredImage.at<unsigned short>(x,y) == 0){
-							pRoi.at<unsigned short>(x,y) = 400;
-						}
-					}
-			}
+			cv::Rect roi = rtabmap::Feature2D::computeRoi(imageDepthPtr->image, roiRatios_);
+			cv::Mat image(imageDepthPtr->image, roi);
 
 			image_geometry::PinholeCameraModel model;
 			model.fromCameraInfo(*cameraInfo);
-			float fx = model.fx();
-			float fy = model.fy();
-			float cx = model.cx();
-			float cy = model.cy();
 
 			pcl::PointCloud<pcl::PointXYZ>::Ptr pclCloud;
 			pclCloud = rtabmap::util3d::cloudFromDepth(
 					image,
-					cx,
-					cy,
-					fx,
-					fy,
+					model.cx()-roiRatios_[0]*double(imageDepthPtr->image.cols),
+					model.cy()-roiRatios_[2]*double(imageDepthPtr->image.rows),
+					model.fx(),
+					model.fy(),
 					decimation_);
 			processAndPublish(pclCloud, depth->header);
 		}
@@ -242,11 +244,13 @@ private:
 
 		if(cloudPub_.getNumSubscribers())
 		{
+			cv::Rect roi = rtabmap::Feature2D::computeRoi(disparity, roiRatios_);
+
 			pcl::PointCloud<pcl::PointXYZ>::Ptr pclCloud;
 			rtabmap::CameraModel leftModel = rtabmap_ros::cameraModelFromROS(*cameraInfo);
-			rtabmap::StereoCameraModel stereoModel(disparityMsg->f, disparityMsg->f, leftModel.cx(), leftModel.cy(), disparityMsg->T);
+			rtabmap::StereoCameraModel stereoModel(disparityMsg->f, disparityMsg->f, leftModel.cx()-roiRatios_[0]*double(disparity.cols), leftModel.cy()-roiRatios_[2]*double(disparity.rows), disparityMsg->T);
 			pclCloud = rtabmap::util3d::cloudFromDisparity(
-					disparity,
+					cv::Mat(disparity, roi),
 					stereoModel,
 					decimation_);
 
@@ -299,9 +303,7 @@ private:
 	int decimation_;
 	double noiseFilterRadius_;
 	int noiseFilterMinNeighbors_;
-	int cut_left_;
-	int cut_right_;
-	bool create_close_obstacle_if_depth_is_missing_;
+	std::vector<float> roiRatios_;
 
 	ros::Publisher cloudPub_;
 
