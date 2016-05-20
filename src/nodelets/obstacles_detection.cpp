@@ -201,7 +201,7 @@ private:
 						std::set<int> flatObstaclesSet;
 						if(projObstaclesPub_.getNumSubscribers())
 						{
-							std::set<int> flatObstaclesSet(flatObstacles->begin(), flatObstacles->end());
+							flatObstaclesSet.insert(flatObstacles->begin(), flatObstacles->end());
 						}
 
 						obstaclesCloud->resize(obstacles->size());
@@ -211,7 +211,7 @@ private:
 						for(unsigned int i=0; i<obstacles->size(); ++i)
 						{
 							obstaclesCloud->points[i] = originalCloud->at(obstacles->at(i));
-							if(flatObstaclesSet.size() &&
+							if(flatObstaclesSet.size() == 0 ||  
 							   flatObstaclesSet.find(obstacles->at(i))==flatObstaclesSet.end())
 							{
 								obstaclesCloudWithoutFlatSurfaces->points[oi] = obstaclesCloud->points[i];
@@ -220,6 +220,7 @@ private:
 							}
 
 						}
+
 						obstaclesCloudWithoutFlatSurfaces->resize(oi);
 						if(obstaclesCloudWithoutFlatSurfaces->size() && projVoxelSize_ > 0.0)
 						{
