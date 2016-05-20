@@ -48,6 +48,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/util2d.h>
 #include <rtabmap/core/util3d.h>
 #include <rtabmap/core/util3d_transforms.h>
+#include <rtabmap/core/util3d_surface.h>
 #include <rtabmap/core/Memory.h>
 #include <rtabmap/core/OdometryEvent.h>
 
@@ -92,6 +93,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 		genScanMaxDepth_(4.0),
 		genScanMinDepth_(0.0),
 		scanCloudMaxPoints_(0),
+		scanCloudNormalK_(0),
 		mapToOdom_(rtabmap::Transform::getIdentity()),
 		mapsManager_(true),
 		depthSync_(0),
@@ -175,6 +177,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 	pnh.param("gen_scan_max_depth",  genScanMaxDepth_, genScanMaxDepth_);
 	pnh.param("gen_scan_min_depth",  genScanMinDepth_, genScanMinDepth_);
 	pnh.param("scan_cloud_max_points",  scanCloudMaxPoints_, scanCloudMaxPoints_);
+	pnh.param("scan_cloud_normal_k", scanCloudNormalK_, scanCloudNormalK_);
 
 	if(!tfPrefix.empty())
 	{
@@ -953,9 +956,37 @@ void CoreWrapper::commonDepthCallback(
 	}
 	else if(scan3dMsg.get() != 0)
 	{
-		pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
-		pcl::fromROSMsg(*scan3dMsg, *pclScan);
-		scan = util3d::laserScanFromPointCloud(*pclScan);
+		bool containNormals = false;
+		for(unsigned int i=0; i<scan3dMsg->fields.size(); ++i)
+		{
+			if(scan3dMsg->fields[i].name.compare("normal_x") == 0)
+			{
+				containNormals = true;
+				break;
+			}
+		}
+		if(containNormals)
+		{
+			pcl::PointCloud<pcl::PointNormal>::Ptr pclScan(new pcl::PointCloud<pcl::PointNormal>);
+			pcl::fromROSMsg(*scan3dMsg, *pclScan);
+			scan = util3d::laserScanFromPointCloud(*pclScan);
+		}
+		else
+		{
+			pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
+			pcl::fromROSMsg(*scan3dMsg, *pclScan);
+
+			if(scanCloudNormalK_ > 0)
+			{
+				//compute normals
+				pcl::PointCloud<pcl::PointNormal>::Ptr pclScanNormal = util3d::computeNormals(pclScan, scanCloudNormalK_);
+				scan = util3d::laserScanFromPointCloud(*pclScanNormal);
+			}
+			else
+			{
+				scan = util3d::laserScanFromPointCloud(*pclScan);
+			}
+		}
 	}
 	else if(scanCloud2d.size())
 	{
@@ -1082,9 +1113,37 @@ void CoreWrapper::commonStereoCallback(
 	}
 	else if(scan3dMsg.get() != 0)
 	{
-		pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
-		pcl::fromROSMsg(*scan3dMsg, *pclScan);
-		scan = util3d::laserScanFromPointCloud(*pclScan);
+		bool containNormals = false;
+		for(unsigned int i=0; i<scan3dMsg->fields.size(); ++i)
+		{
+			if(scan3dMsg->fields[i].name.compare("normal_x") == 0)
+			{
+				containNormals = true;
+				break;
+			}
+		}
+		if(containNormals)
+		{
+			pcl::PointCloud<pcl::PointNormal>::Ptr pclScan(new pcl::PointCloud<pcl::PointNormal>);
+			pcl::fromROSMsg(*scan3dMsg, *pclScan);
+			scan = util3d::laserScanFromPointCloud(*pclScan);
+		}
+		else
+		{
+			pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
+			pcl::fromROSMsg(*scan3dMsg, *pclScan);
+
+			if(scanCloudNormalK_ > 0)
+			{
+				//compute normals
+				pcl::PointCloud<pcl::PointNormal>::Ptr pclScanNormal = util3d::computeNormals(pclScan, scanCloudNormalK_);
+				scan = util3d::laserScanFromPointCloud(*pclScanNormal);
+			}
+			else
+			{
+				scan = util3d::laserScanFromPointCloud(*pclScan);
+			}
+		}
 	}
 
 	cv_bridge::CvImagePtr ptrLeftImage, ptrRightImage;
