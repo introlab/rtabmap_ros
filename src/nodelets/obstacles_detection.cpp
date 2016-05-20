@@ -160,6 +160,7 @@ private:
 		pcl::IndicesPtr ground, obstacles;
 		pcl::PointCloud<pcl::PointXYZ>::Ptr obstaclesCloud(new pcl::PointCloud<pcl::PointXYZ>);
 		pcl::PointCloud<pcl::PointXYZ>::Ptr groundCloud(new pcl::PointCloud<pcl::PointXYZ>);
+		pcl::PointCloud<pcl::PointXYZ>::Ptr obstaclesCloudWithoutFlatSurfaces(new pcl::PointCloud<pcl::PointXYZ>);
 
 		if(originalCloud->size())
 		{
@@ -174,6 +175,7 @@ private:
 				if(!optimizeForCloseObjects_)
 				{
 					// This is the default strategy
+					pcl::IndicesPtr flatObstacles(new std::vector<int>);
 					rtabmap::util3d::segmentObstaclesFromGround<pcl::PointXYZ>(
 							originalCloud,
 							ground,
@@ -183,16 +185,47 @@ private:
 							clusterRadius_,
 							minClusterSize_,
 							segmentFlatObstacles_,
-							maxGroundHeight_);
+							maxGroundHeight_,
+							&flatObstacles);
 
-					if(groundPub_.getNumSubscribers() && ground.get() && ground->size())
+					if(groundPub_.getNumSubscribers() &&
+							ground.get() && ground->size())
 					{
 						pcl::copyPointCloud(*originalCloud, *ground, *groundCloud);
 					}
 
-					if((obstaclesPub_.getNumSubscribers() || projObstaclesPub_.getNumSubscribers()) && obstacles.get() && obstacles->size())
+					if((obstaclesPub_.getNumSubscribers() || projObstaclesPub_.getNumSubscribers()) &&
+							obstacles.get() && obstacles->size())
 					{
-						pcl::copyPointCloud(*originalCloud, *obstacles, *obstaclesCloud);
+						// remove flat obstacles from obstacles
+						std::set<int> flatObstaclesSet;
+						if(projObstaclesPub_.getNumSubscribers())
+						{
+							flatObstaclesSet.insert(flatObstacles->begin(), flatObstacles->end());
+						}
+
+						obstaclesCloud->resize(obstacles->size());
+						obstaclesCloudWithoutFlatSurfaces->resize(obstacles->size());
+
+						int oi=0;
+						for(unsigned int i=0; i<obstacles->size(); ++i)
+						{
+							obstaclesCloud->points[i] = originalCloud->at(obstacles->at(i));
+							if(flatObstaclesSet.size() == 0 ||  
+							   flatObstaclesSet.find(obstacles->at(i))==flatObstaclesSet.end())
+							{
+								obstaclesCloudWithoutFlatSurfaces->points[oi] = obstaclesCloud->points[i];
+								obstaclesCloudWithoutFlatSurfaces->points[oi].z = 0;
+								++oi;
+							}
+
+						}
+
+						obstaclesCloudWithoutFlatSurfaces->resize(oi);
+						if(obstaclesCloudWithoutFlatSurfaces->size() && projVoxelSize_ > 0.0)
+						{
+							obstaclesCloudWithoutFlatSurfaces = rtabmap::util3d::voxelize(obstaclesCloudWithoutFlatSurfaces, projVoxelSize_);
+						}
 					}
 				}
 				else
@@ -286,18 +319,8 @@ private:
 
 		if(projObstaclesPub_.getNumSubscribers())
 		{
-			for(unsigned int i=0; i<obstaclesCloud->size(); ++i)
-			{
-				obstaclesCloud->at(i).z = 0;
-			}
-
-			if(obstaclesCloud->size() && projVoxelSize_ > 0.0)
-			{
-				obstaclesCloud = rtabmap::util3d::voxelize(obstaclesCloud, projVoxelSize_);
-			}
-
 			sensor_msgs::PointCloud2 rosCloud;
-			pcl::toROSMsg(*obstaclesCloud, rosCloud);
+			pcl::toROSMsg(*obstaclesCloudWithoutFlatSurfaces, rosCloud);
 			rosCloud.header.stamp = cloudMsg->header.stamp;
 			rosCloud.header.frame_id = frameId_;
 
