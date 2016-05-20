@@ -91,6 +91,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 		genScan_(false),
 		genScanMaxDepth_(4.0),
 		genScanMinDepth_(0.0),
+		scanCloudMaxPoints_(0),
 		mapToOdom_(rtabmap::Transform::getIdentity()),
 		mapsManager_(true),
 		depthSync_(0),
@@ -173,6 +174,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 	pnh.param("gen_scan",            genScan_, genScan_);
 	pnh.param("gen_scan_max_depth",  genScanMaxDepth_, genScanMaxDepth_);
 	pnh.param("gen_scan_min_depth",  genScanMinDepth_, genScanMinDepth_);
+	pnh.param("scan_cloud_max_points",  scanCloudMaxPoints_, scanCloudMaxPoints_);
 
 	if(!tfPrefix.empty())
 	{
@@ -971,7 +973,7 @@ void CoreWrapper::commonDepthCallback(
 	}
 
 	SensorData data(scan,
-			scan2dMsg.get() != 0?(int)scan2dMsg->ranges.size():genMaxScanPts,
+			scan2dMsg.get() != 0?(int)scan2dMsg->ranges.size():(genScan_?genMaxScanPts:scan3dMsg.get() != 0?scanCloudMaxPoints_:0),
 			scan2dMsg.get() != 0?scan2dMsg->range_max:(genScan_?genScanMaxDepth_:0.0f),
 			rgb,
 			depth,
@@ -1123,7 +1125,7 @@ void CoreWrapper::commonStereoCallback(
 	}
 
 	SensorData data(scan,
-			scan2dMsg.get() != 0?(int)scan2dMsg->ranges.size():0,
+			scan2dMsg.get() != 0?(int)scan2dMsg->ranges.size():scan3dMsg.get() != 0?scanCloudMaxPoints_:0,
 			scan2dMsg.get() != 0?scan2dMsg->range_max:0,
 			ptrLeftImage->image,
 			ptrRightImage->image,
