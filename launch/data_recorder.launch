@@ -11,7 +11,7 @@
   <arg name="odom_frame_id" default=""/>        <!-- use topic when not set, otherwise use TF if set -->
   
   <arg name="output_path"   default="output.db"/>
-  <arg name="record_in_RAM" default="true"/>
+  <arg name="record_in_RAM" default="false"/>
   <arg name="queue_size"    default="10"/>
   <arg name="max_rate"      default="0"/>       <!-- Record as fast as possible --> 
   
