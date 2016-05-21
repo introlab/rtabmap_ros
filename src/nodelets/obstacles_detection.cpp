@@ -167,7 +167,7 @@ private:
 			originalCloud = rtabmap::util3d::transformPointCloud(originalCloud, localTransform);
 			if(maxObstaclesHeight_ > 0)
 			{
-				originalCloud = rtabmap::util3d::passThrough(originalCloud, "z", std::numeric_limits<int>::min(), maxObstaclesHeight_);
+				originalCloud = rtabmap::util3d::passThrough(originalCloud, "z", std::numeric_limits<float>::min(), maxObstaclesHeight_);
 			}
 
 			if(originalCloud->size())
