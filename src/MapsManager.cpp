@@ -53,7 +53,7 @@ MapsManager::MapsManager(bool usePublicNamespace) :
 		gridEroded_(false),
 		gridUnknownSpaceFilled_(false),
 		gridMaxUnknownSpaceFilledRange_(6.0),
-		mapFilterRadius_(0.5),
+		mapFilterRadius_(0.0),
 		mapFilterAngle_(30.0), // degrees
 		mapCacheCleanup_(true),
 		negativePosesIgnored(false)

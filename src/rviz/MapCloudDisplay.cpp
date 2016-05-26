@@ -169,7 +169,7 @@ MapCloudDisplay::MapCloudDisplay()
 	cloud_filter_ceiling_height_->setMin( 0.0f );
 	cloud_filter_ceiling_height_->setMax( 999.0f );
 
-	node_filtering_radius_ = new rviz::FloatProperty( "Node filtering radius (m)", 0.2f,
+	node_filtering_radius_ = new rviz::FloatProperty( "Node filtering radius (m)", 0.0f,
 										 "(Disabled=0) Only keep one node in the specified radius.",
 										 this, SLOT( updateCloudParameters() ), this );
 	node_filtering_radius_->setMin( 0.0f );
