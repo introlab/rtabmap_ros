@@ -3,14 +3,14 @@ rtabmap_ros
 
 RTAB-Map's ROS package.
 
-For more information, demos and tutorials about this package, visit the [rtabmap_ros](http://wiki.ros.org/rtabmap_ros) page on the ROS wiki.
+For more information, demos and tutorials about this package, visit [rtabmap_ros](http://wiki.ros.org/rtabmap_ros) page on ROS wiki.
 
-For the RTAB-Map libraries and standalone application, visit the [RTAB-Map's home page](http://introlab.github.io/rtabmap) or the [RTAB-Map's wiki](https://github.com/introlab/rtabmap/wiki).
+For the RTAB-Map libraries and standalone application, visit [RTAB-Map's home page](http://introlab.github.io/rtabmap) or [RTAB-Map's wiki](https://github.com/introlab/rtabmap/wiki).
 
 ## Installation 
 
 ### ROS distribution 
-RTAB-Map is released as binaries in the ROS distribution. For the **latest binaries**, use [ros-shadow-fixed](http://wiki.ros.org/ShadowRepository) repository.
+RTAB-Map is released as binaries in the ROS distribution. For **latest binaries**, use [ros-shadow-fixed](http://wiki.ros.org/ShadowRepository) repository.
  * Kinetic
   ```
 $ sudo apt-get install ros-kinetic-rtabmap-ros
@@ -64,7 +64,7 @@ $ mv /usr/local/lib/cmake/Findcvsba.cmake /usr/local/lib/cmake/cvsba/cvsbaConfig
 
   * [Freenect2](https://github.com/OpenKinect/libfreenect2): Follow installation instructions from [here](https://github.com/OpenKinect/libfreenect2#debianubuntu-1404-perhaps-earlier).
 
- 1. Install the RTAB-Map standalone libraries (**don't checkout in the Catkin workspace** but install in your Catkin's devel folder).
+ 1. Install RTAB-Map standalone libraries (**don't checkout in the Catkin workspace** but install in your Catkin's devel folder).
  
  ```bash
 $ cd ~
@@ -75,7 +75,7 @@ $ make -j4
 $ make install
 ```
 
- 2. Install the RTAB-Map ros-pkg in your src folder of your Catkin workspace.
+ 2. Install RTAB-Map ros-pkg in your src folder of your Catkin workspace.
  
  ```bash
 $ cd ~/catkin_ws
