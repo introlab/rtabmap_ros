@@ -94,6 +94,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 		genScanMinDepth_(0.0),
 		scanCloudMaxPoints_(0),
 		scanCloudNormalK_(0),
+		flipScan_(false),
 		mapToOdom_(rtabmap::Transform::getIdentity()),
 		mapsManager_(true),
 		depthSync_(0),
@@ -178,6 +179,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 	pnh.param("gen_scan_min_depth",  genScanMinDepth_, genScanMinDepth_);
 	pnh.param("scan_cloud_max_points",  scanCloudMaxPoints_, scanCloudMaxPoints_);
 	pnh.param("scan_cloud_normal_k", scanCloudNormalK_, scanCloudNormalK_);
+	pnh.param("flip_scan", flipScan_, flipScan_);
 
 	if(!tfPrefix.empty())
 	{
@@ -959,6 +961,12 @@ void CoreWrapper::commonDepthCallback(
 			}
 		}
 		scan = util3d::laserScan2dFromPointCloud(*pclScan);
+		if(flipScan_)
+		{
+			cv::Mat flipScan;
+			cv::flip(scan, flipScan, 1);
+			scan = flipScan;
+		}
 	}
 	else if(scan3dMsg.get() != 0)
 	{
@@ -1116,6 +1124,12 @@ void CoreWrapper::commonStereoCallback(
 		}
 
 		scan = util3d::laserScan2dFromPointCloud(*pclScan);
+		if(flipScan_)
+		{
+			cv::Mat flipScan;
+			cv::flip(scan, flipScan, 1);
+			scan = flipScan;
+		}
 	}
 	else if(scan3dMsg.get() != 0)
 	{
@@ -2953,5 +2967,6 @@ void CoreWrapper::setupCallbacks(
 		ROS_INFO("\n%s subscribed to:\n   %s", ros::this_node::getName().c_str(), defaultSub_.getTopic().c_str());
 	}
 }
+
 
 

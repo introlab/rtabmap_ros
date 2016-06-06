@@ -278,6 +278,7 @@ private:
 	double genScanMinDepth_;
 	int scanCloudMaxPoints_;
 	int scanCloudNormalK_;
+	bool flipScan_;
 
 	rtabmap::Transform mapToOdom_;
 	boost::mutex mapToOdomMutex_;
@@ -472,3 +473,4 @@ private:
 };
 
 #endif /* COREWRAPPER_H_ */
+
