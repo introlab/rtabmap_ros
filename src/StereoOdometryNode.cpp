@@ -54,16 +54,16 @@ public:
 	StereoOdometry(int argc, char * argv[]) :
 		rtabmap_ros::OdometryROS(argc, argv, true),
 		approxSync_(0),
-		exactSync_(0)
+		exactSync_(0),
+		queueSize_(5)
 	{
 		ros::NodeHandle nh;
 
 		ros::NodeHandle pnh("~");
 
 		bool approxSync = false;
-		int queueSize = 5;
 		pnh.param("approx_sync", approxSync, approxSync);
-		pnh.param("queue_size", queueSize, queueSize);
+		pnh.param("queue_size", queueSize_, queueSize_);
 		ROS_INFO("Approximate time sync = %s", approxSync?"true":"false");
 
 		ros::NodeHandle left_nh(nh, "left");
@@ -89,17 +89,17 @@ public:
 
 		if(approxSync)
 		{
-			approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize), imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_);
+			approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize_), imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_);
 			approxSync_->registerCallback(boost::bind(&StereoOdometry::callback, this, _1, _2, _3, _4));
 		}
 		else
 		{
-			exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize), imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_);
+			exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize_), imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_);
 			exactSync_->registerCallback(boost::bind(&StereoOdometry::callback, this, _1, _2, _3, _4));
 		}
 	}
 
-	~StereoOdometry()
+	virtual ~StereoOdometry()
 	{
 		if(approxSync_)
 		{
@@ -188,6 +188,24 @@ public:
 		}
 	}
 
+protected:
+	virtual void flushCallbacks()
+	{
+		//flush callbacks
+		if(approxSync_)
+		{
+			delete approxSync_;
+			approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize_), imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_);
+			approxSync_->registerCallback(boost::bind(&StereoOdometry::callback, this, _1, _2, _3, _4));
+		}
+		if(exactSync_)
+		{
+			delete exactSync_;
+			exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize_), imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_);
+			exactSync_->registerCallback(boost::bind(&StereoOdometry::callback, this, _1, _2, _3, _4));
+		}
+	}
+
 private:
 	image_transport::SubscriberFilter imageRectLeft_;
 	image_transport::SubscriberFilter imageRectRight_;
@@ -197,6 +215,7 @@ private:
 	message_filters::Synchronizer<MyApproxSyncPolicy> * approxSync_;
 	typedef message_filters::sync_policies::ExactTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo, sensor_msgs::CameraInfo> MyExactSyncPolicy;
 	message_filters::Synchronizer<MyExactSyncPolicy> * exactSync_;
+	int queueSize_;
 };
 
 int main(int argc, char *argv[])

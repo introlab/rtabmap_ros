@@ -53,7 +53,7 @@ public:
 
 public:
 	OdometryROS(int argc, char * argv[], bool stereo = false);
-	~OdometryROS();
+	virtual ~OdometryROS();
 	void processData(const rtabmap::SensorData & data, const ros::Time & stamp);
 
 	bool reset(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
@@ -72,6 +72,9 @@ public:
 	bool isPaused() const {return paused_;}
 	bool isOdometryF2M() const;
 	rtabmap::Transform getTransform(const std::string & fromFrameId, const std::string & toFrameId, const ros::Time & stamp) const;
+
+protected:
+	virtual void flushCallbacks() = 0;
 
 private:
 	rtabmap::Odometry * odometry_;

@@ -543,6 +543,7 @@ bool OdometryROS::reset(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
 	ROS_INFO("visual_odometry: reset odom!");
 	odometry_->reset();
+	this->flushCallbacks();
 	return true;
 }
 
@@ -551,6 +552,7 @@ bool OdometryROS::resetToPose(rtabmap_ros::ResetPose::Request& req, rtabmap_ros:
 	Transform pose(req.x, req.y, req.z, req.roll, req.pitch, req.yaw);
 	ROS_INFO("visual_odometry: reset odom to pose %s!", pose.prettyPrint().c_str());
 	odometry_->reset(pose);
+	this->flushCallbacks();
 	return true;
 }
 

@@ -54,14 +54,14 @@ public:
 	RGBDOdometry(int argc, char * argv[]) :
 		rtabmap_ros::OdometryROS(argc, argv),
 		sync_(0),
-		sync2_(0)
+		sync2_(0),
+		queueSize_(5)
 	{
 		ros::NodeHandle nh;
 		ros::NodeHandle pnh("~");
 
-		int queueSize = 5;
 		int depthCameras = 1;
-		pnh.param("queue_size", queueSize, queueSize);
+		pnh.param("queue_size", queueSize_, queueSize_);
 		pnh.param("depth_cameras", depthCameras, depthCameras);
 		if(depthCameras <= 0)
 		{
@@ -110,7 +110,7 @@ public:
 					info2_sub_.getTopic().c_str());
 
 			sync2_ = new message_filters::Synchronizer<MySync2Policy>(
-					MySync2Policy(queueSize),
+					MySync2Policy(queueSize_),
 					image_mono_sub_,
 					image_depth_sub_,
 					info_sub_,
@@ -140,12 +140,12 @@ public:
 					image_depth_sub_.getTopic().c_str(),
 					info_sub_.getTopic().c_str());
 
-			sync_ = new message_filters::Synchronizer<MySyncPolicy>(MySyncPolicy(queueSize), image_mono_sub_, image_depth_sub_, info_sub_);
+			sync_ = new message_filters::Synchronizer<MySyncPolicy>(MySyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_);
 			sync_->registerCallback(boost::bind(&RGBDOdometry::callback, this, _1, _2, _3));
 		}
 	}
 
-	~RGBDOdometry()
+	virtual ~RGBDOdometry()
 	{
 		if(sync_)
 		{
@@ -328,6 +328,31 @@ public:
 		}
 	}
 
+protected:
+	virtual void flushCallbacks()
+	{
+		// flush callbacks
+		if(sync_)
+		{
+			delete sync_;
+			sync_ = new message_filters::Synchronizer<MySyncPolicy>(MySyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_);
+			sync_->registerCallback(boost::bind(&RGBDOdometry::callback, this, _1, _2, _3));
+		}
+		if(sync2_)
+		{
+			delete sync2_;
+			sync2_ = new message_filters::Synchronizer<MySync2Policy>(
+					MySync2Policy(queueSize_),
+					image_mono_sub_,
+					image_depth_sub_,
+					info_sub_,
+					image_mono2_sub_,
+					image_depth2_sub_,
+					info2_sub_);
+			sync2_->registerCallback(boost::bind(&RGBDOdometry::callback2, this, _1, _2, _3, _4, _5, _6));
+		}
+	}
+
 private:
 	image_transport::SubscriberFilter image_mono_sub_;
 	image_transport::SubscriberFilter image_depth_sub_;
@@ -339,6 +364,7 @@ private:
 	message_filters::Synchronizer<MySyncPolicy> * sync_;
 	typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo, sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo> MySync2Policy;
 	message_filters::Synchronizer<MySync2Policy> * sync2_;
+	int queueSize_;
 };
 
 int main(int argc, char *argv[])
