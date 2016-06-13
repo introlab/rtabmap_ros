@@ -979,7 +979,9 @@ void CoreWrapper::commonDepthCallback(
 			if(scanCloudNormalK_ > 0)
 			{
 				//compute normals
-				pcl::PointCloud<pcl::PointNormal>::Ptr pclScanNormal = util3d::computeNormals(pclScan, scanCloudNormalK_);
+				pcl::PointCloud<pcl::Normal>::Ptr normals = util3d::computeNormals(pclScan, scanCloudNormalK_);
+				pcl::PointCloud<pcl::PointNormal>::Ptr pclScanNormal(new pcl::PointCloud<pcl::PointNormal>);
+				pcl::concatenateFields(*pclScan, *normals, *pclScanNormal);
 				scan = util3d::laserScanFromPointCloud(*pclScanNormal);
 			}
 			else
@@ -1136,7 +1138,9 @@ void CoreWrapper::commonStereoCallback(
 			if(scanCloudNormalK_ > 0)
 			{
 				//compute normals
-				pcl::PointCloud<pcl::PointNormal>::Ptr pclScanNormal = util3d::computeNormals(pclScan, scanCloudNormalK_);
+				pcl::PointCloud<pcl::Normal>::Ptr normals = util3d::computeNormals(pclScan, scanCloudNormalK_);
+				pcl::PointCloud<pcl::PointNormal>::Ptr pclScanNormal(new pcl::PointCloud<pcl::PointNormal>);
+				pcl::concatenateFields(*pclScan, *normals, *pclScanNormal);
 				scan = util3d::laserScanFromPointCloud(*pclScanNormal);
 			}
 			else
