@@ -207,7 +207,7 @@ public:
 					ROS_ERROR("Path \"%s\" does not exist (or you don't have the permissions to read)... falling back to usb device...", path.c_str());
 				}
 				//usb device
-				camera_ = new rtabmap::CameraVideo(deviceId, frameRate);
+				camera_ = new rtabmap::CameraVideo(deviceId, false, frameRate);
 			}
 			cameraThread_ = new rtabmap::CameraThread(camera_);
 			init();
