@@ -817,8 +817,19 @@ void CoreWrapper::commonDepthCallback(
 			ROS_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8 and image_depth=32FC1,16UC1,mono16");
 			return;
 		}
-		UASSERT(imageMsgs[i]->width == imageWidth && imageMsgs[i]->height == imageHeight);
-		UASSERT(depthMsgs[i]->width == imageWidth && depthMsgs[i]->height == imageHeight);
+
+		UASSERT_MSG(imageMsgs[i]->width == imageWidth && imageMsgs[i]->height == imageHeight,
+				uFormat("imageWidth=%d vs %d imageHeight=%d vs %d",
+						imageWidth,
+						imageMsgs[i]->width,
+						imageHeight,
+						imageMsgs[i]->height).c_str());
+		UASSERT_MSG(depthMsgs[i]->width == imageWidth && depthMsgs[i]->height == imageHeight,
+				uFormat("imageWidth=%d vs %d imageHeight=%d vs %d",
+						imageWidth,
+						depthMsgs[i]->width,
+						imageHeight,
+						depthMsgs[i]->height).c_str());
 
 		Transform localTransform = getTransform(frameId_, depthMsgs[i]->header.frame_id, depthMsgs[i]->header.stamp);
 		if(localTransform.isNull())
