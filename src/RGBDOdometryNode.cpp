@@ -45,6 +45,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/util3d.h>
 #include <rtabmap/core/util2d.h>
 #include <rtabmap/utilite/ULogger.h>
+#include <rtabmap/utilite/UConversion.h>
 
 using namespace rtabmap;
 
