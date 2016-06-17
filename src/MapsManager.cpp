@@ -577,62 +577,74 @@ void MapsManager::publishMaps(
 			}
 		}
 
-		if(assembledCloud->size())
+		for(std::list<std::pair<int, Transform> >::reverse_iterator iter=negativePoses.rbegin(); iter!=negativePoses.rend(); ++iter)
 		{
-			if(cloudFrustumCulling_ && negativePoses.size())
+			std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr >::iterator jter = clouds_.find(iter->first);
+
+			if(jter != clouds_.end() && jter->second->size())
 			{
-				for(std::list<std::pair<int, Transform> >::reverse_iterator iter=negativePoses.rbegin(); iter!=negativePoses.rend(); ++iter)
+				std::map<int, std::vector<CameraModel> >::iterator kter = cameraModels_.find(iter->first);
+				if(cloudFrustumCulling_ && kter != cameraModels_.end() && assembledCloud->size())
 				{
-					std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr >::iterator jter = clouds_.find(iter->first);
-					std::map<int, std::vector<CameraModel> >::iterator kter = cameraModels_.find(iter->first);
-					if(jter != clouds_.end() && kter != cameraModels_.end())
+					for(unsigned int i=0; i<kter->second.size(); ++i)
 					{
-						for(unsigned int i=0; i<kter->second.size(); ++i)
+						if(kter->second[i].isValidForProjection())
 						{
-							if(kter->second[i].isValidForProjection())
-							{
-								int size =  assembledCloud->size();
-								assembledCloud = util3d::frustumFiltering(
-										assembledCloud,
-										iter->second, // FIXME: should include camera local transform
-										kter->second[i].horizontalFOV(),
-										kter->second[i].verticalFOV(),
-										0.0f,
-										cloudMaxDepth_>0.0?cloudMaxDepth_:999999.,
-										true);
-								//ROS_INFO("Frustum culling %d ->%d", size, (int)assembledCloud->size());
-								if(jter->second->size())
-								{
-									pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::transformPointCloud(jter->second, iter->second);
-									*assembledCloud+=*transformed;
-								}
-							}
+							assembledCloud = util3d::frustumFiltering(
+									assembledCloud,
+									iter->second, // FIXME: should include camera local transform
+									kter->second[i].horizontalFOV(),
+									kter->second[i].verticalFOV(),
+									0.0f,
+									cloudMaxDepth_>0.0?cloudMaxDepth_:999999.,
+									true);
+							//ROS_INFO("Frustum culling %d ->%d", size, (int)assembledCloud->size());
+
+							pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::transformPointCloud(jter->second, iter->second);
+							*assembledCloud+=*transformed;
+							++count;
 						}
 					}
 				}
+				else
+				{
+					pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::transformPointCloud(jter->second, iter->second);
+					if(assembledCloud->size())
+					{
+						*assembledCloud+=*transformed;
+					}
+					else
+					{
+						assembledCloud = transformed;
+					}
+					++count;
+				}
 			}
+		}
 
-			if(assembledCloud->size() && (cloudFloorCullingHeight_ > 0.0 || cloudCeilingCullingHeight_ > 0.0))
-			{
-				assembledCloud = util3d::passThrough(assembledCloud, "z",
-						cloudFloorCullingHeight_>0.0?cloudFloorCullingHeight_:-999.0,
-						cloudCeilingCullingHeight_>0.0 && (cloudFloorCullingHeight_<=0.0 || cloudCeilingCullingHeight_>cloudFloorCullingHeight_)?cloudCeilingCullingHeight_:999.0);
-			}
+		if(assembledCloud->size() && (cloudFloorCullingHeight_ > 0.0 || cloudCeilingCullingHeight_ > 0.0))
+		{
+			assembledCloud = util3d::passThrough(assembledCloud, "z",
+					cloudFloorCullingHeight_>0.0?cloudFloorCullingHeight_:-999.0,
+					cloudCeilingCullingHeight_>0.0 && (cloudFloorCullingHeight_<=0.0 || cloudCeilingCullingHeight_>cloudFloorCullingHeight_)?cloudCeilingCullingHeight_:999.0);
+		}
 
-			if(assembledCloud->size() && cloudVoxelSize_ > 0 && cloudOutputVoxelized_)
-			{
-				assembledCloud = util3d::voxelize(assembledCloud, cloudVoxelSize_);
-			}
+		if(assembledCloud->size() && cloudVoxelSize_ > 0 && cloudOutputVoxelized_)
+		{
+			assembledCloud = util3d::voxelize(assembledCloud, cloudVoxelSize_);
+		}
 
-			ROS_INFO("Assembled %d clouds (%fs)", count, time.ticks());
+		ROS_INFO("Assembled %d clouds (%fs)", count, time.ticks());
 
+		if(assembledCloud->size())
+		{
 			sensor_msgs::PointCloud2::Ptr cloudMsg(new sensor_msgs::PointCloud2);
 			pcl::toROSMsg(*assembledCloud, *cloudMsg);
 			cloudMsg->header.stamp = stamp;
 			cloudMsg->header.frame_id = mapFrameId;
 			cloudMapPub_.publish(cloudMsg);
 		}
-		else if(poses.size())
+		else if(poses.size() - negativePoses.size())
 		{
 			ROS_WARN("Cloud map is empty! (poses=%d clouds=%d)", (int)poses.size(), (int)clouds_.size());
 		}
