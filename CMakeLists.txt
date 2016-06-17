@@ -276,6 +276,9 @@ add_executable(camera src/CameraNode.cpp)
 add_dependencies(camera ${${PROJECT_NAME}_EXPORTED_TARGETS})
 target_link_libraries(camera ${Libraries})
 
+add_executable(stereo_camera src/StereoCameraNode.cpp)
+target_link_libraries(stereo_camera rtabmap_ros ${Libraries})
+
 IF(RTABMAP_GUI)
     add_executable(rtabmapviz src/GuiNode.cpp src/GuiWrapper.cpp src/PreferencesDialogROS.cpp)
     target_link_libraries(rtabmapviz rtabmap_ros ${QT_LIBRARIES} ${Libraries})
