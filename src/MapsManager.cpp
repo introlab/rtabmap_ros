@@ -244,6 +244,31 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 			}
 		}
 
+		bool longUpdate = false;
+		if(filteredPoses.size() > 20)
+		{
+			if(updateCloud && clouds_.size() < 5)
+			{
+				ROS_WARN("Many clouds should be created (~%d), this may take a while to update the map(s)...", int(filteredPoses.size()-clouds_.size()));
+				longUpdate = true;
+			}
+			else if(updateProj && projMaps_.size() < 5)
+			{
+				ROS_WARN("Many occupancy grid map from projections should be created (~%d), this may take a while to update the map(s)...", int(filteredPoses.size()-projMaps_.size()));
+				longUpdate = true;
+			}
+			else if(updateGrid && gridMaps_.size() < 5)
+			{
+				ROS_WARN("Many occupancy grid map from laser scans should be created (~%d), this may take a while to update the map(s)...", int(filteredPoses.size()-gridMaps_.size()));
+				longUpdate = true;
+			}
+			else if(updateScan && scans_.size() < 5)
+			{
+				ROS_WARN("Many scans should be created (~%d), this may take a while to update the map(s)...", int(filteredPoses.size()-scans_.size()));
+				longUpdate = true;
+			}
+		}
+
 		for(std::map<int, rtabmap::Transform>::iterator iter=filteredPoses.begin(); iter!=filteredPoses.end(); ++iter)
 		{
 			if(!iter->second.isNull())
@@ -538,6 +563,11 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 			{
 				++iter;
 			}
+		}
+
+		if(longUpdate)
+		{
+			ROS_WARN("Map(s) updated!");
 		}
 	}
 
