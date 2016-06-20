@@ -21,7 +21,7 @@
     <group ns="planner">
         <remap from="openni_points" to="/planner_cloud"/>
         <remap from="base_scan" to="/base_scan"/>
-        <remap from="map" to="/map"/>
+        <remap from="map" to="/rtabmap/proj_map"/>
         <remap from="move_base_simple/goal" to="/planner_goal"/>
         
         <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen">
@@ -160,20 +160,7 @@
 
          <param name="LccReextract/Activated" type="string" value="true"/>
          <param name="LccReextract/MaxWords" type="string" value="500"/>
-         
-         <!-- Disable graph optimization because we use map_optimizer node below -->
-         <param name="RGBD/ToroIterations" type="string" value="0"/> 
       </node>
-    
-      <!-- Optimizing outside rtabmap node makes it able to optimize always the global map -->
-      <node pkg="rtabmap_ros" type="map_optimizer" name="map_optimizer"/>
-      
-      <node pkg="rtabmap_ros" type="map_assembler" name="map_assembler">
-         <param name="occupancy_grid" type="bool" value="true"/>
-         <remap from="mapData" to="mapData_optimized"/>
-         <remap from="grid_projection_map" to="/map"/>
-      </node>
-         
    </group>
   
 </launch>
