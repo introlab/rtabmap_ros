@@ -1697,6 +1697,20 @@ void CoreWrapper::goalCallback(const geometry_msgs::PoseStampedConstPtr & msg)
 		ROS_ERROR("Pose received is null!");
 		return;
 	}
+
+	// transform goal in /map frame
+	if(mapFrameId_.compare(msg->header.frame_id) != 0)
+	{
+		Transform t = this->getTransform(mapFrameId_, msg->header.frame_id, msg->header.stamp);
+		if(t.isNull())
+		{
+			ROS_ERROR("Cannot transform goal pose from \"%s\" frame to \"%s\" frame!",
+					msg->header.frame_id.c_str(), mapFrameId_.c_str());
+			return;
+		}
+		targetPose = t * targetPose;
+	}
+
 	goalCommonCallback(0, "", targetPose, msg->header.stamp);
 }
 
