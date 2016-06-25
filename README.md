@@ -64,7 +64,7 @@ $ mv /usr/local/lib/cmake/Findcvsba.cmake /usr/local/lib/cmake/cvsba/cvsbaConfig
 
   * [Freenect2](https://github.com/OpenKinect/libfreenect2): Follow installation instructions from [here](https://github.com/OpenKinect/libfreenect2#debianubuntu-1404-perhaps-earlier).
 
- 1. Install RTAB-Map standalone libraries. Add `-DCMAKE_INSTALL_PREFIX=~/catkin_ws/devel` to `cmake` command below if you want to install in your Catkin's devel folder without `sudo`.
+ 1. Install RTAB-Map standalone libraries. Add `-DCMAKE_INSTALL_PREFIX=~/catkin_ws/devel` to `cmake` command below if you want to install in your Catkin's devel folder without `sudo`. **Do not clone in your Catkin workspace**.
  
  ```bash
 $ cd ~
