@@ -42,6 +42,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/utilite/ULogger.h>
 #include <rtabmap/utilite/UStl.h>
 #include <rtabmap/utilite/UThread.h>
+#include <rtabmap/utilite/UDirectory.h>
+#include <rtabmap/utilite/UConversion.h>
 #include <rtabmap/core/util3d.h>
 #include <rtabmap/core/DBReader.h>
 #include <rtabmap/core/OdometryEvent.h>
@@ -120,18 +122,23 @@ int main(int argc, char** argv)
 	ROS_INFO("odom_frame_id = %s", odomFrameId.c_str());
 	ROS_INFO("camera_frame_id = %s", cameraFrameId.c_str());
 	ROS_INFO("scan_frame_id = %s", scanFrameId.c_str());
-	ROS_INFO("database = %s", databasePath.c_str());
 	ROS_INFO("rate = %f", rate);
 	ROS_INFO("publish_tf = %s", publishTf?"true":"false");
-
-	rtabmap::DBReader reader(databasePath, rate, false, false, false, startId);
+	ROS_INFO("start_id = %d", startId);
 
 	if(databasePath.empty())
 	{
 		ROS_ERROR("Parameter \"database\" must be set (path to a RTAB-Map database).");
 		return -1;
 	}
+	databasePath = uReplaceChar(databasePath, '~', UDirectory::homeDir());
+	if(databasePath.size() && databasePath.at(0) != '/')
+	{
+		databasePath = UDirectory::currentDir(true) + databasePath;
+	}
+	ROS_INFO("database = %s", databasePath.c_str());
 
+	rtabmap::DBReader reader(databasePath, rate, false, false, false, startId);
 	if(!reader.init())
 	{
 		ROS_ERROR("Cannot open database \"%s\".", databasePath.c_str());

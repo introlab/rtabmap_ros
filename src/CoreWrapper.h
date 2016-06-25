@@ -242,7 +242,7 @@ private:
 	rtabmap::ParametersMap loadParameters(const std::string & configFile);
 	void saveParameters(const std::string & configFile);
 
-	void publishLoop(double tfDelay);
+	void publishLoop(double tfDelay, double tfTolerance);
 
 	void publishStats(const ros::Time & stamp);
 	void publishCurrentGoal(const ros::Time & stamp);

@@ -126,6 +126,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 	int queueSize = 10;
 	bool publishTf = true;
 	double tfDelay = 0.05; // 20 Hz
+	double tfTolerance = 0.1; // 100 ms
 	std::string tfPrefix = "";
 	bool stereoApproxSync = false;
 
@@ -171,6 +172,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 	pnh.param("publish_tf",          publishTf, publishTf);
 	pnh.param("tf_delay",            tfDelay, tfDelay);
 	pnh.param("tf_prefix",           tfPrefix, tfPrefix);
+	pnh.param("tf_tolerance",        tfTolerance, tfTolerance);
 	pnh.param("wait_for_transform",  waitForTransform_, waitForTransform_);
 	pnh.param("wait_for_transform_duration",  waitForTransformDuration_, waitForTransformDuration_);
 	pnh.param("use_action_for_goal", useActionForGoal_, useActionForGoal_);
@@ -219,6 +221,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 	ROS_INFO("rtabmap: map_frame_id = %s", mapFrameId_.c_str());
 	ROS_INFO("rtabmap: queue_size = %d", queueSize);
 	ROS_INFO("rtabmap: tf_delay = %f", tfDelay);
+	ROS_INFO("rtabmap: tf_tolerance = %f", tfTolerance);
 	ROS_INFO("rtabmap: depth_cameras = %d", depthCameras);
 
 	infoPub_ = nh.advertise<rtabmap_ros::Info>("info", 1);
@@ -424,7 +427,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 	Parameters::parse(parameters_, Parameters::kOptimizerIterations(), optimizeIterations);
 	if(publishTf && optimizeIterations != 0)
 	{
-		transformThread_ = new boost::thread(boost::bind(&CoreWrapper::publishLoop, this, tfDelay));
+		transformThread_ = new boost::thread(boost::bind(&CoreWrapper::publishLoop, this, tfDelay, tfTolerance));
 	}
 	else if(publishTf)
 	{
@@ -527,7 +530,7 @@ void CoreWrapper::saveParameters(const std::string & configFile)
 	}
 }
 
-void CoreWrapper::publishLoop(double tfDelay)
+void CoreWrapper::publishLoop(double tfDelay, double tfTolerance)
 {
 	if(tfDelay == 0)
 		return;
@@ -537,7 +540,7 @@ void CoreWrapper::publishLoop(double tfDelay)
 		if(!odomFrameId_.empty())
 		{
 			mapToOdomMutex_.lock();
-			ros::Time tfExpiration = ros::Time::now() + ros::Duration(tfDelay);
+			ros::Time tfExpiration = ros::Time::now() + ros::Duration(tfTolerance);
 			geometry_msgs::TransformStamped msg;
 			msg.child_frame_id = odomFrameId_;
 			msg.header.frame_id = mapFrameId_;
