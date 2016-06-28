@@ -735,10 +735,15 @@ void GuiWrapper::commonDepthCallback(
 		}
 		ignoreData = false;
 	}
-	else
+	else if(odomInfoMsg.get())
 	{
 		info = rtabmap_ros::odomInfoFromROS(*odomInfoMsg).copyWithoutData();
 		ignoreData = true;
+	}
+	else
+	{
+		// don't update GUI odom stuff if we don't use visual odometry
+		return;
 	}
 
 	rtabmap::OdometryEvent odomEvent(
@@ -935,10 +940,15 @@ void GuiWrapper::commonStereoCallback(
 		}
 		ignoreData = false;
 	}
-	else
+	else if(odomInfoMsg.get())
 	{
 		info = rtabmap_ros::odomInfoFromROS(*odomInfoMsg).copyWithoutData();
 		ignoreData = true;
+	}
+	else
+	{
+		// don't update GUI odom stuff if we don't use visual odometry
+		return;
 	}
 
 	rtabmap::OdometryEvent odomEvent(
