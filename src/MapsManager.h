@@ -14,12 +14,8 @@
 #include <ros/time.h>
 #include <ros/publisher.h>
 
-namespace octomap{
-class OcTree;
-}
-
 namespace rtabmap {
-
+class OctoMap;
 class Memory;
 
 }  // namespace rtabmap
@@ -41,6 +37,7 @@ public:
 			bool updateProj,
 			bool updateGrid,
 			bool updateScan,
+			bool updateOctomap,
 			const std::map<int, rtabmap::Signature> & signatures = std::map<int, rtabmap::Signature>());
 
 	void publishMaps(
@@ -60,9 +57,7 @@ public:
 			float & yMin,
 			float & gridCellSize);
 
-#ifdef WITH_OCTOMAP
-	octomap::OcTree * createOctomap(const std::map<int, rtabmap::Transform> & poses);
-#endif
+	rtabmap::OctoMap * getOctomap() const {return octomap_;}
 
 private:
 	// mapping stuff
@@ -98,12 +93,19 @@ private:
 	ros::Publisher projMapPub_;
 	ros::Publisher gridMapPub_;
 	ros::Publisher scanMapPub_;
+	ros::Publisher octoMapPubBin_;
+	ros::Publisher octoMapPubFull_;
+	ros::Publisher octoMapCloud_;
+	ros::Publisher octoMapCloudGround_;
+	ros::Publisher octoMapProj_;
 
 	std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr > clouds_;
 	std::map<int, pcl::PointCloud<pcl::PointXYZ>::Ptr > scans_;
 	std::map<int, std::vector<rtabmap::CameraModel> > cameraModels_;
 	std::map<int, std::pair<cv::Mat, cv::Mat> > projMaps_; // <ground, obstacles>
 	std::map<int, std::pair<cv::Mat, cv::Mat> > gridMaps_; // <ground, obstacles>
+
+	rtabmap::OctoMap * octomap_;
 };
 
 #endif /* MAPSMANAGER_H_ */

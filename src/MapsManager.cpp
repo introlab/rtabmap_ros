@@ -17,14 +17,18 @@
 #include <rtabmap/core/util2d.h>
 #include <rtabmap/core/Memory.h>
 #include <rtabmap/core/Graph.h>
+#include <rtabmap/core/Version.h>
 
 #include <nav_msgs/OccupancyGrid.h>
 #include <ros/ros.h>
 
 #include <pcl_conversions/pcl_conversions.h>
 
-#ifdef WITH_OCTOMAP
-#include <octomap/octomap.h>
+#ifdef WITH_OCTOMAP_ROS
+#ifdef RTABMAP_OCTOMAP
+#include <octomap_msgs/conversions.h>
+#include <rtabmap/core/OctoMap.h>
+#endif
 #endif
 
 using namespace rtabmap;
@@ -56,7 +60,8 @@ MapsManager::MapsManager(bool usePublicNamespace) :
 		mapFilterRadius_(0.0),
 		mapFilterAngle_(30.0), // degrees
 		mapCacheCleanup_(true),
-		negativePosesIgnored(false)
+		negativePosesIgnored(false),
+		octomap_(0)
 {
 
 	ros::NodeHandle nh;
@@ -120,6 +125,12 @@ MapsManager::MapsManager(bool usePublicNamespace) :
 	pnh.param("map_cleanup", mapCacheCleanup_, mapCacheCleanup_);
 	pnh.param("map_negative_poses_ignored", negativePosesIgnored, negativePosesIgnored);
 
+#ifdef WITH_OCTOMAP_ROS
+#ifdef RTABMAP_OCTOMAP
+	octomap_ = new OctoMap(gridCellSize_);
+#endif
+#endif
+
 	// If true, the last message published on
 	// the map topics will be saved and sent to new subscribers when they
 	// connect
@@ -133,6 +144,15 @@ MapsManager::MapsManager(bool usePublicNamespace) :
 		projMapPub_ = nh.advertise<nav_msgs::OccupancyGrid>("proj_map", 1, latch);
 		gridMapPub_ = nh.advertise<nav_msgs::OccupancyGrid>("grid_map", 1, latch);
 		scanMapPub_ = nh.advertise<sensor_msgs::PointCloud2>("scan_map", 1, latch);
+#ifdef WITH_OCTOMAP_ROS
+#ifdef RTABMAP_OCTOMAP
+		octoMapPubBin_ = nh.advertise<octomap_msgs::Octomap>("octomap_binary", 1, latch);
+		octoMapPubFull_ = nh.advertise<octomap_msgs::Octomap>("octomap_full", 1, latch);
+		octoMapCloud_ = nh.advertise<sensor_msgs::PointCloud2>("octomap_cloud", 1, latch);
+		octoMapCloudGround_ = nh.advertise<sensor_msgs::PointCloud2>("octomap_cloud_ground", 1, latch);
+		octoMapProj_ = nh.advertise<nav_msgs::OccupancyGrid>("octomap_proj", 1, latch);
+#endif
+#endif
 	}
 	else
 	{
@@ -140,11 +160,30 @@ MapsManager::MapsManager(bool usePublicNamespace) :
 		projMapPub_ = pnh.advertise<nav_msgs::OccupancyGrid>("proj_map", 1, latch);
 		gridMapPub_ = pnh.advertise<nav_msgs::OccupancyGrid>("grid_map", 1, latch);
 		scanMapPub_ = pnh.advertise<sensor_msgs::PointCloud2>("scan_map", 1, latch);
+#ifdef WITH_OCTOMAP_ROS
+#ifdef RTABMAP_OCTOMAP
+		octoMapPubBin_ = pnh.advertise<octomap_msgs::Octomap>("octomap_binary", 1, latch);
+		octoMapPubFull_ = pnh.advertise<octomap_msgs::Octomap>("octomap_full", 1, latch);
+		octoMapCloud_ = pnh.advertise<sensor_msgs::PointCloud2>("octomap_cloud", 1, latch);
+		octoMapCloudGround_ = pnh.advertise<sensor_msgs::PointCloud2>("octomap_cloud_ground", 1, latch);
+		octoMapProj_ = pnh.advertise<nav_msgs::OccupancyGrid>("octomap_proj", 1, latch);
+#endif
+#endif
 	}
 }
 
 MapsManager::~MapsManager() {
 	clear();
+
+#ifdef WITH_OCTOMAP_ROS
+#ifdef RTABMAP_OCTOMAP
+	if(octomap_)
+	{
+		delete octomap_;
+		octomap_ = 0;
+	}
+#endif
+#endif
 }
 
 void MapsManager::clear()
@@ -153,6 +192,11 @@ void MapsManager::clear()
 	cameraModels_.clear();
 	projMaps_.clear();
 	gridMaps_.clear();
+#ifdef WITH_OCTOMAP_ROS
+#ifdef RTABMAP_OCTOMAP
+	octomap_->clear();
+#endif
+#endif
 }
 
 bool MapsManager::hasSubscribers() const
@@ -160,7 +204,12 @@ bool MapsManager::hasSubscribers() const
 	return  cloudMapPub_.getNumSubscribers() != 0 ||
 			projMapPub_.getNumSubscribers() != 0 ||
 			gridMapPub_.getNumSubscribers() != 0 ||
-			scanMapPub_.getNumSubscribers() != 0;
+			scanMapPub_.getNumSubscribers() != 0 ||
+			octoMapPubBin_.getNumSubscribers() != 0 ||
+			octoMapPubFull_.getNumSubscribers() != 0 ||
+			octoMapCloud_.getNumSubscribers() != 0 ||
+			octoMapCloudGround_.getNumSubscribers() != 0 ||
+			octoMapProj_.getNumSubscribers() != 0;
 }
 
 std::map<int, Transform> MapsManager::getFilteredPoses(const std::map<int, Transform> & poses)
@@ -181,6 +230,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 		bool updateProj,
 		bool updateGrid,
 		bool updateScan,
+		bool updateOctomap,
 		const std::map<int, rtabmap::Signature> & signatures)
 {
 	if(!updateCloud && !updateProj && !updateGrid && !updateScan)
@@ -190,7 +240,21 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 		updateProj = projMapPub_.getNumSubscribers() != 0;
 		updateGrid = gridMapPub_.getNumSubscribers() != 0;
 		updateScan = scanMapPub_.getNumSubscribers() != 0;
+		updateOctomap =
+				octoMapPubBin_.getNumSubscribers() != 0 ||
+				octoMapPubFull_.getNumSubscribers() != 0 ||
+				octoMapCloud_.getNumSubscribers() != 0 ||
+				octoMapCloudGround_.getNumSubscribers() != 0 ||
+				octoMapProj_.getNumSubscribers() != 0;
 	}
+
+#ifndef WITH_OCTOMAP_ROS
+	updateOctomap = false;
+#endif
+#ifndef RTABMAP_OCTOMAP
+	updateOctomap = false;
+#endif
+
 
 	UDEBUG("Updating map caches...");
 
@@ -203,7 +267,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 	std::map<int, rtabmap::Transform> filteredPoses;
 
 	// update cache
-	if(updateCloud || updateProj || updateGrid || updateScan)
+	if(updateCloud || updateProj || updateGrid || updateScan || updateOctomap)
 	{
 		// filter nodes
 		if(mapFilterRadius_ > 0.0)
@@ -278,6 +342,18 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 				bool depthRequired = updateProj && (iter->first < 0 || !uContains(projMaps_, iter->first));
 				bool gridRequired = updateGrid && (iter->first < 0 || !uContains(gridMaps_, iter->first));
 				bool scanRequired = updateScan && (iter->first < 0 || !uContains(scans_, iter->first));
+
+#ifdef WITH_OCTOMAP_ROS
+#ifdef RTABMAP_OCTOMAP
+				if(!rgbDepthRequired)
+				{
+					rgbDepthRequired = updateOctomap &&
+							(iter->first < 0 ||
+							  octomap_->addedNodes().empty() ||
+							  iter->first > octomap_->addedNodes().rbegin()->first);
+				}
+#endif
+#endif
 
 				if(rgbDepthRequired ||
 					depthRequired ||
@@ -398,9 +474,9 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 							uInsert(cameraModels_, std::make_pair(iter->first, models));
 						}
 
-						if(depthRequired)
+						if(depthRequired || updateOctomap)
 						{
-							UDEBUG("Creating proj map for %d...", iter->first);
+							UDEBUG("Creating proj map / octomap for %d...", iter->first);
 							cv::Mat ground, obstacles;
 							if(cloudRGB.get())
 							{
@@ -420,10 +496,56 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 									iter->second.getEulerAngles(roll, pitch, yaw);
 									cloudClipped = util3d::transformPointCloud(cloudClipped, Transform(0,0,0, roll, pitch, 0));
 
-									util3d::occupancy2DFromCloud3D<pcl::PointXYZRGB>(cloudClipped, ground, obstacles, gridCellSize_, projMaxGroundAngle_*M_PI/180.0, projMinClusterSize_, projDetectFlatObstacles_, projMaxGroundHeight_);
+									pcl::IndicesPtr groundIndices, obstaclesIndices;
+									util3d::segmentObstaclesFromGround<pcl::PointXYZRGB>(
+											cloudClipped,
+											groundIndices,
+											obstaclesIndices,
+											20,
+											projMaxGroundAngle_*M_PI/180.0,
+											gridCellSize_*2.0f,
+											projMinClusterSize_,
+											projDetectFlatObstacles_,
+											projMaxGroundHeight_);
+
+									pcl::PointCloud<pcl::PointXYZRGB>::Ptr groundCloud(new pcl::PointCloud<pcl::PointXYZRGB>);
+									pcl::PointCloud<pcl::PointXYZRGB>::Ptr obstaclesCloud(new pcl::PointCloud<pcl::PointXYZRGB>);
+
+									if(groundIndices->size())
+									{
+										pcl::copyPointCloud(*cloudClipped, *groundIndices, *groundCloud);
+									}
+
+									if(obstaclesIndices->size())
+									{
+										pcl::copyPointCloud(*cloudClipped, *obstaclesIndices, *obstaclesCloud);
+									}
+
+									if(updateProj)
+									{
+										util3d::occupancy2DFromGroundObstacles<pcl::PointXYZRGB>(
+												groundCloud,
+												obstaclesCloud,
+												ground,
+												obstacles,
+												gridCellSize_);
+										uInsert(projMaps_, std::make_pair(iter->first, std::make_pair(ground, obstacles)));
+									}
+
+#ifdef WITH_OCTOMAP_ROS
+#ifdef RTABMAP_OCTOMAP
+									if(updateOctomap)
+									{
+										Transform tinv = Transform(0,0,0, roll, pitch, 0).inverse();
+										groundCloud = util3d::transformPointCloud(groundCloud, tinv);
+										obstaclesCloud = util3d::transformPointCloud(obstaclesCloud, tinv);
+										octomap_->addToCache(iter->first, groundCloud, obstaclesCloud);
+									}
+#endif
+#endif
 								}
 							}
-							else if(cloudXYZ.get())
+							else if(updateProj && cloudXYZ.get())
 							{
 								pcl::PointCloud<pcl::PointXYZ>::Ptr cloudClipped = cloudXYZ;
 								if(cloudClipped->size() && projMaxObstaclesHeight_ > 0)
@@ -437,11 +559,28 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 									iter->second.getEulerAngles(roll, pitch, yaw);
 									cloudClipped = util3d::transformPointCloud(cloudClipped, Transform(0,0,0, roll, pitch, 0));
 
-									UDEBUG("util3d::occupancy2DFromCloud3D()");
-									util3d::occupancy2DFromCloud3D<pcl::PointXYZ>(cloudClipped, ground, obstacles, gridCellSize_, projMaxGroundAngle_*M_PI/180.0, projMinClusterSize_, projDetectFlatObstacles_, projMaxGroundHeight_);
+									pcl::IndicesPtr groundIndices, obstaclesIndices;
+									util3d::segmentObstaclesFromGround<pcl::PointXYZ>(
+											cloudClipped,
+											groundIndices,
+											obstaclesIndices,
+											20,
+											projMaxGroundAngle_*M_PI/180.0,
+											gridCellSize_*2.0f,
+											projMinClusterSize_,
+											projDetectFlatObstacles_,
+											projMaxGroundHeight_);
+
+									util3d::occupancy2DFromGroundObstacles<pcl::PointXYZ>(
+											cloudClipped,
+											groundIndices,
+											obstaclesIndices,
+											ground,
+											obstacles,
+											gridCellSize_);
+									uInsert(projMaps_, std::make_pair(iter->first, std::make_pair(ground, obstacles)));
 								}
 							}
-							uInsert(projMaps_, std::make_pair(iter->first, std::make_pair(ground, obstacles)));
 						}
 
 						if(scanRequired || gridRequired)
@@ -501,6 +640,17 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 				ROS_ERROR("Pose null for node %d", iter->first);
 			}
 		}
+
+#ifdef WITH_OCTOMAP_ROS
+#ifdef RTABMAP_OCTOMAP
+		if(updateOctomap)
+		{
+			UTimer time;
+			octomap_->update(filteredPoses);
+			ROS_INFO("Octomap update time = %fs", time.ticks());
+		}
+#endif
+#endif
 
 		// cleanup not used nodes
 		UDEBUG("Cleanup not used nodes");
@@ -684,6 +834,101 @@ void MapsManager::publishMaps(
 		clouds_.clear();
 		cameraModels_.clear();
 	}
+#ifdef WITH_OCTOMAP_ROS
+#ifdef RTABMAP_OCTOMAP
+	if(octoMapPubBin_.getNumSubscribers() ||
+			octoMapPubFull_.getNumSubscribers() ||
+			octoMapCloud_.getNumSubscribers() ||
+			octoMapCloudGround_.getNumSubscribers() ||
+			octoMapProj_.getNumSubscribers())
+	{
+		if(octoMapPubBin_.getNumSubscribers())
+		{
+			octomap_msgs::Octomap msg;
+			octomap_msgs::binaryMapToMsg(*octomap_->octree(), msg);
+			msg.header.frame_id = mapFrameId;
+			msg.header.stamp = stamp;
+			octoMapPubBin_.publish(msg);
+		}
+		if(octoMapPubFull_.getNumSubscribers())
+		{
+			octomap_msgs::Octomap msg;
+			octomap_msgs::binaryMapToMsg(*octomap_->octree(), msg);
+			msg.header.frame_id = mapFrameId;
+			msg.header.stamp = stamp;
+			octoMapPubFull_.publish(msg);
+		}
+		if(octoMapCloud_.getNumSubscribers() || octoMapCloudGround_.getNumSubscribers())
+		{
+			sensor_msgs::PointCloud2 msg;
+			pcl::IndicesPtr obstacles(new std::vector<int>);
+			pcl::IndicesPtr ground(new std::vector<int>);
+			pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = octomap_->createCloud(obstacles.get(), ground.get());
+
+			if(octoMapCloud_.getNumSubscribers())
+			{
+				pcl::PointCloud<pcl::PointXYZRGB> cloudObstacles;
+				pcl::copyPointCloud(*cloud, *obstacles, cloudObstacles);
+				pcl::toROSMsg(cloudObstacles, msg);
+				msg.header.frame_id = mapFrameId;
+				msg.header.stamp = stamp;
+				octoMapCloud_.publish(msg);
+			}
+			if(octoMapCloudGround_.getNumSubscribers())
+			{
+				pcl::PointCloud<pcl::PointXYZRGB> cloudGround;
+				pcl::copyPointCloud(*cloud, *ground, cloudGround);
+				pcl::toROSMsg(cloudGround, msg);
+				msg.header.frame_id = mapFrameId;
+				msg.header.stamp = stamp;
+				octoMapCloudGround_.publish(msg);
+			}
+		}
+		if(octoMapProj_.getNumSubscribers())
+		{
+			// create the projection map
+			float xMin=0.0f, yMin=0.0f, gridCellSize = 0.05f;
+			cv::Mat pixels = octomap_->createProjectionMap(xMin, yMin, gridCellSize, gridSize_);
+
+			if(!pixels.empty())
+			{
+				//init
+				nav_msgs::OccupancyGrid map;
+				map.info.resolution = gridCellSize;
+				map.info.origin.position.x = 0.0;
+				map.info.origin.position.y = 0.0;
+				map.info.origin.position.z = 0.0;
+				map.info.origin.orientation.x = 0.0;
+				map.info.origin.orientation.y = 0.0;
+				map.info.origin.orientation.z = 0.0;
+				map.info.origin.orientation.w = 1.0;
+
+				map.info.width = pixels.cols;
+				map.info.height = pixels.rows;
+				map.info.origin.position.x = xMin;
+				map.info.origin.position.y = yMin;
+				map.data.resize(map.info.width * map.info.height);
+
+				memcpy(map.data.data(), pixels.data, map.info.width * map.info.height);
+
+				map.header.frame_id = mapFrameId;
+				map.header.stamp = stamp;
+
+				octoMapProj_.publish(map);
+			}
+			else if(poses.size())
+			{
+				ROS_WARN("Projection map is empty! (proj maps=%d)", (int)projMaps_.size());
+			}
+		}
+	}
+	else
+	{
+		octomap_->clear();
+	}
+#endif
+#endif
+
 
 	if(scanMapPub_.getNumSubscribers())
 	{
@@ -849,55 +1094,4 @@ cv::Mat MapsManager::generateGridMap(
 			gridEroded_);
 	return map;
 }
-
-#ifdef WITH_OCTOMAP
-// returned OcTree must be deleted
-// RTAB-Map optimizes the graph at almost each iteration, an octomap cannot
-// be updated online. Only available on service. To have an "online" octomap published as a topic,
-// you may want to subscribe an octomap_server to /rtabmap/cloud topic.
-//
-octomap::OcTree * MapsManager::createOctomap(const std::map<int, Transform> & poses)
-{
-	octomap::OcTree * octree = new octomap::OcTree(gridCellSize_);
-	UTimer time;
-	for(std::map<int, Transform>::const_iterator posesIter = poses.begin(); posesIter!=poses.end(); ++posesIter)
-	{
-		std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr >::iterator cloudsIter = clouds_.find(posesIter->first);
-		if(cloudsIter != clouds_.end() && cloudsIter->second->size())
-		{
-			octomap::Pointcloud * scan = new octomap::Pointcloud();
-
-			//octomap::pointcloudPCLToOctomap(*cloudsIter->second, *scan); // Not anymore in Indigo!
-			scan->reserve(cloudsIter->second->size());
-			for(pcl::PointCloud<pcl::PointXYZRGB>::const_iterator it = cloudsIter->second->begin();
-				it != cloudsIter->second->end();
-				++it)
-			{
-				// Check if the point is invalid
-				if(pcl::isFinite(*it))
-				{
-					scan->push_back(it->x, it->y, it->z);
-				}
-			}
-
-			float x,y,z, r,p,w;
-			posesIter->second.getTranslationAndEulerAngles(x,y,z,r,p,w);
-			octomap::ScanNode node(scan, octomap::pose6d(x,y,z, r,p,w), posesIter->first);
-			octree->insertPointCloud(node, cloudMaxDepth_, true, true);
-			ROS_INFO("inserted %d pt=%d (%fs)", posesIter->first, (int)scan->size(), time.ticks());
-		}
-	}
-
-	octree->updateInnerOccupancy();
-	ROS_INFO("updated inner occupancy (%fs)", time.ticks());
-
-	// clear memory if no one subscribed
-	if(mapCacheCleanup_ && cloudMapPub_.getNumSubscribers() == 0)
-	{
-		clouds_.clear();
-		cameraModels_.clear();
-	}
-	return octree;
-}
-#endif
 

@@ -176,6 +176,19 @@ SET(rtabmap_ros_lib_src
   )
 ENDIF(costmap_2d_FOUND)
 
+# If octomap is found, add definition
+IF(octomap_ros_FOUND)
+MESSAGE(STATUS "WITH octomap")
+include_directories(
+  ${octomap_ros_INCLUDE_DIRS}
+)
+SET(Libraries
+  ${octomap_ros_LIBRARIES}
+  ${Libraries}
+)
+ADD_DEFINITIONS("-DWITH_OCTOMAP_ROS")
+ENDIF(octomap_ros_FOUND)
+
 IF(QT4_FOUND OR Qt5_FOUND)
 SET(Libraries 
    ${Libraries}
@@ -243,19 +256,6 @@ IF(Qt5_FOUND)
     QT5_USE_MODULES(rtabmap_ros Widgets Core Gui)
 ENDIF(Qt5_FOUND)
 add_dependencies(rtabmap_ros ${${PROJECT_NAME}_EXPORTED_TARGETS})
-
-# If octomap is found, add definition
-IF(octomap_ros_FOUND)
-MESSAGE(STATUS "WITH octomap")
-include_directories(
-  ${octomap_ros_INCLUDE_DIRS}
-)
-SET(Libraries
-  ${octomap_ros_LIBRARIES}
-  ${Libraries}
-)
-add_definitions(-DWITH_OCTOMAP)
-ENDIF(octomap_ros_FOUND)
 
 add_executable(rtabmap src/CoreNode.cpp src/CoreWrapper.cpp)
 target_link_libraries(rtabmap rtabmap_ros ${Libraries})

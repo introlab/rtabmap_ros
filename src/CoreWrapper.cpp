@@ -51,13 +51,17 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/util3d_surface.h>
 #include <rtabmap/core/Memory.h>
 #include <rtabmap/core/OdometryEvent.h>
+#include <rtabmap/core/Version.h>
 
 #include <pcl_conversions/pcl_conversions.h>
 
 #include <laser_geometry/laser_geometry.h>
 
-#ifdef WITH_OCTOMAP
+#ifdef WITH_OCTOMAP_ROS
+#ifdef RTABMAP_OCTOMAP
 #include <octomap_msgs/conversions.h>
+#include <rtabmap/core/OctoMap.h>
+#endif
 #endif
 
 #define BAD_COVARIANCE 9999
@@ -411,9 +415,11 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 	cancelGoalSrv_ = nh.advertiseService("cancel_goal", &CoreWrapper::cancelGoalCallback, this);
 	setLabelSrv_ = nh.advertiseService("set_label", &CoreWrapper::setLabelCallback, this);
 	listLabelsSrv_ = nh.advertiseService("list_labels", &CoreWrapper::listLabelsCallback, this);
-#ifdef WITH_OCTOMAP
+#ifdef WITH_OCTOMAP_ROS
+#ifdef RTABMAP_OCTOMAP
 	octomapBinarySrv_ = nh.advertiseService("octomap_binary", &CoreWrapper::octomapBinaryCallback, this);
 	octomapFullSrv_ = nh.advertiseService("octomap_full", &CoreWrapper::octomapFullCallback, this);
+#endif
 #endif
 	//private services
 	setLogDebugSrv_ = pnh.advertiseService("log_debug", &CoreWrapper::setLogDebug, this);
@@ -1458,6 +1464,8 @@ void CoreWrapper::process(
 	if(rtabmap_.isIDsGenerated() || data.id() > 0)
 	{
 		double timeRtabmap = 0.0;
+		double timeUpdateMaps = 0.0;
+		double timePublishMaps = 0.0;
 		if(rtabmap_.process(data, odom, OdometryEvent::generateCovarianceMatrix(odomRotationalVariance, odomTransitionalVariance)))
 		{
 			timeRtabmap = timer.ticks();
@@ -1491,7 +1499,10 @@ void CoreWrapper::process(
 						false,
 						false,
 						false,
+						false,
 						tmpSignature);
+
+				timeUpdateMaps = timer.ticks();
 
 				mapsManager_.publishMaps(filteredPoses, stamp, mapFrameId_);
 
@@ -1564,17 +1575,20 @@ void CoreWrapper::process(
 						}
 					}
 				}
+
+				timePublishMaps = timer.ticks();
 			}
 		}
 		else
 		{
 			timeRtabmap = timer.ticks();
 		}
-		ROS_INFO("rtabmap: Rate=%.2fs, Limit=%.3fs, RTAB-Map=%.4fs, Pub=%.4fs (local map=%d, WM=%d)",
+		ROS_INFO("rtabmap: Rate=%.2fs, Limit=%.3fs, RTAB-Map=%.4fs, Maps update=%.4fs pub=%.4fs (local map=%d, WM=%d)",
 				rate_>0?1.0f/rate_:0,
 				rtabmap_.getTimeThreshold()/1000.0f,
 				timeRtabmap,
-				timer.ticks(),
+				timeUpdateMaps,
+				timePublishMaps,
 				(int)rtabmap_.getLocalOptimizedPoses().size(),
 				rtabmap_.getWMSize()+rtabmap_.getSTMSize());
 	}
@@ -1953,6 +1967,7 @@ bool CoreWrapper::getProjMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::
 			false,
 			true,
 			false,
+			false,
 			false);
 	if(filteredPoses.size())
 	{
@@ -1997,6 +2012,7 @@ bool CoreWrapper::getGridMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::
 			false,
 			false,
 			true,
+			false,
 			false);
 	if(filteredPoses.size())
 	{
@@ -2106,6 +2122,7 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 				filteredPoses = mapsManager_.updateMapCaches(
 						poses,
 						rtabmap_.getMemory(),
+						false,
 						false,
 						false,
 						false,
@@ -2564,7 +2581,8 @@ void CoreWrapper::publishGlobalPath(const ros::Time & stamp)
 	}
 }
 
-#ifdef WITH_OCTOMAP
+#ifdef WITH_OCTOMAP_ROS
+#ifdef RTABMAP_OCTOMAP
 bool CoreWrapper::octomapBinaryCallback(
 		octomap_msgs::GetOctomap::Request  &req,
 		octomap_msgs::GetOctomap::Response &res)
@@ -2574,14 +2592,10 @@ bool CoreWrapper::octomapBinaryCallback(
 	res.map.header.stamp = ros::Time::now();
 
 	std::map<int, Transform> poses = rtabmap_.getLocalOptimizedPoses();
-	poses = mapsManager_.updateMapCaches(poses, rtabmap_.getMemory(), true, false, false, false);
+	poses = mapsManager_.updateMapCaches(poses, rtabmap_.getMemory(), false, false, false, false, true);
 
-	octomap::OcTree * octree = mapsManager_.createOctomap(poses);
-	bool success = octree != 0 && octree->size() && octomap_msgs::binaryMapToMsg(*octree, res.map);
-	if(octree)
-	{
-		delete octree;
-	}
+	const rtabmap::OctoMap * octomap = mapsManager_.getOctomap();
+	bool success = octomap->octree()->size() && octomap_msgs::binaryMapToMsg(*octomap->octree(), res.map);
 	return success;
 }
 
@@ -2594,16 +2608,13 @@ bool CoreWrapper::octomapFullCallback(
 	res.map.header.stamp = ros::Time::now();
 
 	std::map<int, Transform> poses = rtabmap_.getLocalOptimizedPoses();
-	poses = mapsManager_.updateMapCaches(poses, rtabmap_.getMemory(), true, false, false, false);
+	poses = mapsManager_.updateMapCaches(poses, rtabmap_.getMemory(), false, false, false, false, true);
 
-	octomap::OcTree * octree = mapsManager_.createOctomap(poses);
-	bool success = octree != 0 && octree->size() && octomap_msgs::fullMapToMsg(*octree, res.map);
-	if(octree)
-	{
-		delete octree;
-	}
+	const rtabmap::OctoMap * octomap = mapsManager_.getOctomap();
+	bool success = octomap->octree()->size() && octomap_msgs::fullMapToMsg(*octomap->octree(), res.map);
 	return success;
 }
+#endif
 #endif
 
 /**

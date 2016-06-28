@@ -101,6 +101,7 @@ public:
 				false,
 				false,
 				false,
+				false,
 				nodes_);
 
 		mapsManager_.publishMaps(poses, msg->header.stamp, msg->header.frame_id);
