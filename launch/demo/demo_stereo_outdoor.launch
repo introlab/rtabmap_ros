@@ -55,6 +55,7 @@
          <param name="Vis/MaxDepth"       type="string" value="10"/>
          <param name="Vis/MinInliers"     type="string" value="10"/>
          <param name="Odom/FillInfoData"  type="string" value="$(arg rtabmapviz)"/> 
+         <param name="OdomF2M/MaxSize"    type="string" value="1000"/> 
          <param name="GFTT/MinDistance"   type="string" value="10"/>
          <param name="GFTT/QualityLevel"  type="string" value="0.00001"/> 
       </node>
