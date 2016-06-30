@@ -132,7 +132,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 	double tfDelay = 0.05; // 20 Hz
 	double tfTolerance = 0.1; // 100 ms
 	std::string tfPrefix = "";
-	bool stereoApproxSync = false;
+	bool approxSync = true;
 
 	// ROS related parameters (private)
 	pnh.param("subscribe_depth",     subscribeDepth, subscribeDepth);
@@ -171,7 +171,17 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 	pnh.param("ground_truth_frame_id", groundTruthFrameId_, groundTruthFrameId_);
 	pnh.param("depth_cameras",       depthCameras, depthCameras);
 	pnh.param("queue_size",          queueSize, queueSize);
-	pnh.param("stereo_approx_sync",  stereoApproxSync, stereoApproxSync);
+	if(pnh.hasParam("stereo_approx_sync") && !pnh.hasParam("approx_sync"))
+	{
+		ROS_WARN("Parameter \"stereo_approx_sync\" has been renamed "
+				 "to \"approx_sync\"! Your value is still copied to "
+				 "corresponding parameter.");
+		pnh.param("stereo_approx_sync", approxSync, approxSync);
+	}
+	else
+	{
+		pnh.param("approx_sync", approxSync, approxSync);
+	}
 
 	pnh.param("publish_tf",          publishTf, publishTf);
 	pnh.param("tf_delay",            tfDelay, tfDelay);
@@ -227,6 +237,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 	ROS_INFO("rtabmap: tf_delay = %f", tfDelay);
 	ROS_INFO("rtabmap: tf_tolerance = %f", tfTolerance);
 	ROS_INFO("rtabmap: depth_cameras = %d", depthCameras);
+	ROS_INFO("rtabmap: approx_sync = %s", approxSync?"true":"false");
 
 	infoPub_ = nh.advertise<rtabmap_ros::Info>("info", 1);
 	mapDataPub_ = nh.advertise<rtabmap_ros::MapData>("mapData", 1);
@@ -427,7 +438,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 	setLogWarnSrv_ = pnh.advertiseService("log_warning", &CoreWrapper::setLogWarn, this);
 	setLogErrorSrv_ = pnh.advertiseService("log_error", &CoreWrapper::setLogError, this);
 
-	setupCallbacks(subscribeDepth, subscribeScan2d, subscribeScan3d, subscribeStereo, queueSize, stereoApproxSync, depthCameras);
+	setupCallbacks(subscribeDepth, subscribeScan2d, subscribeScan3d, subscribeStereo, queueSize, approxSync, depthCameras);
 
 	int optimizeIterations = 0;
 	Parameters::parse(parameters_, Parameters::kOptimizerIterations(), optimizeIterations);
@@ -2634,7 +2645,7 @@ void CoreWrapper::setupCallbacks(
 		bool subscribeScan3d,
 		bool subscribeStereo,
 		int queueSize,
-		bool stereoApproxSync,
+		bool approxSync,
 		int depthCameras)
 {
 	ros::NodeHandle nh; // public
@@ -2679,7 +2690,6 @@ void CoreWrapper::setupCallbacks(
 			odomSub_.subscribe(nh, "odom", 1);
 			if(subscribeScan2d)
 			{
-				ROS_INFO("Registering Depth+LaserScan callback...");
 				scanSub_.subscribe(nh, "scan", 1);
 				depthScanSync_ = new message_filters::Synchronizer<MyDepthScanSyncPolicy>(
 						MyDepthScanSyncPolicy(queueSize),
@@ -2700,7 +2710,6 @@ void CoreWrapper::setupCallbacks(
 			}
 			else if(subscribeScan3d)
 			{
-				ROS_INFO("Registering Depth+LaserScan3d callback...");
 				scan3dSub_.subscribe(nh, "scan_cloud", 1);
 				depthScan3dSync_ = new message_filters::Synchronizer<MyDepthScan3dSyncPolicy>(
 						MyDepthScan3dSyncPolicy(queueSize),
@@ -2723,7 +2732,6 @@ void CoreWrapper::setupCallbacks(
 			{
 				if(depthCameras > 1)
 				{
-					ROS_INFO("Registering Depth2 callback...");
 					depth2Sync_ = new message_filters::Synchronizer<MyDepth2SyncPolicy>(
 							MyDepth2SyncPolicy(queueSize),
 							odomSub_,
@@ -2747,17 +2755,29 @@ void CoreWrapper::setupCallbacks(
 				}
 				else
 				{
-					ROS_INFO("Registering Depth callback...");
-					depthSync_ = new message_filters::Synchronizer<MyDepthSyncPolicy>(
-							MyDepthSyncPolicy(queueSize),
-							*imageSubs_[0],
-							odomSub_,
-							*imageDepthSubs_[0],
-							*cameraInfoSubs_[0]);
-					depthSync_->registerCallback(boost::bind(&CoreWrapper::depthCallback, this, _1, _2, _3, _4));
-
-					ROS_INFO("\n%s subscribed to:\n   %s,\n   %s,\n   %s,\n   %s",
+					if(approxSync)
+					{
+						depthSync_ = new message_filters::Synchronizer<MyDepthSyncPolicy>(
+								MyDepthSyncPolicy(queueSize),
+								*imageSubs_[0],
+								odomSub_,
+								*imageDepthSubs_[0],
+								*cameraInfoSubs_[0]);
+						depthSync_->registerCallback(boost::bind(&CoreWrapper::depthCallback, this, _1, _2, _3, _4));
+					}
+					else
+					{
+						depthExactSync_ = new message_filters::Synchronizer<MyDepthExactSyncPolicy>(
+								MyDepthExactSyncPolicy(queueSize),
+								*imageSubs_[0],
+								odomSub_,
+								*imageDepthSubs_[0],
+								*cameraInfoSubs_[0]);
+						depthExactSync_->registerCallback(boost::bind(&CoreWrapper::depthCallback, this, _1, _2, _3, _4));
+					}
+					ROS_INFO("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s",
 							ros::this_node::getName().c_str(),
+							approxSync?"approx":"exact",
 							imageSubs_[0]->getTopic().c_str(),
 							imageDepthSubs_[0]->getTopic().c_str(),
 							cameraInfoSubs_[0]->getTopic().c_str(),
@@ -2806,15 +2826,27 @@ void CoreWrapper::setupCallbacks(
 			}
 			else //!subscribeLaserScan
 			{
-				depthTFSync_ = new message_filters::Synchronizer<MyDepthTFSyncPolicy>(
-						MyDepthTFSyncPolicy(queueSize),
-						*imageSubs_[0],
-						*imageDepthSubs_[0],
-						*cameraInfoSubs_[0]);
-				depthTFSync_->registerCallback(boost::bind(&CoreWrapper::depthTFCallback, this, _1, _2, _3));
-
-				ROS_INFO("\n%s subscribed to:\n   %s,\n   %s,\n   %s",
+				if(approxSync)
+				{
+					depthTFSync_ = new message_filters::Synchronizer<MyDepthTFSyncPolicy>(
+							MyDepthTFSyncPolicy(queueSize),
+							*imageSubs_[0],
+							*imageDepthSubs_[0],
+							*cameraInfoSubs_[0]);
+					depthTFSync_->registerCallback(boost::bind(&CoreWrapper::depthTFCallback, this, _1, _2, _3));
+				}
+				else
+				{
+					depthTFExactSync_ = new message_filters::Synchronizer<MyDepthTFExactSyncPolicy>(
+							MyDepthTFExactSyncPolicy(queueSize),
+							*imageSubs_[0],
+							*imageDepthSubs_[0],
+							*cameraInfoSubs_[0]);
+					depthTFExactSync_->registerCallback(boost::bind(&CoreWrapper::depthTFCallback, this, _1, _2, _3));
+				}
+				ROS_INFO("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s",
 						ros::this_node::getName().c_str(),
+						approxSync?"approx":"exact",
 						imageSubs_[0]->getTopic().c_str(),
 						imageDepthSubs_[0]->getTopic().c_str(),
 						cameraInfoSubs_[0]->getTopic().c_str());
@@ -2886,9 +2918,8 @@ void CoreWrapper::setupCallbacks(
 			}
 			else //!subscribeLaserScan
 			{
-				if(stereoApproxSync)
+				if(approxSync)
 				{
-					ROS_INFO("Registering Stereo Approx callback...");
 					stereoApproxSync_ = new message_filters::Synchronizer<MyStereoApproxSyncPolicy>(
 							MyStereoApproxSyncPolicy(queueSize),
 							imageRectLeft_,
@@ -2900,7 +2931,6 @@ void CoreWrapper::setupCallbacks(
 				}
 				else
 				{
-					ROS_INFO("Registering Stereo Exact callback...");
 					stereoExactSync_ = new message_filters::Synchronizer<MyStereoExactSyncPolicy>(
 							MyStereoExactSyncPolicy(queueSize),
 							imageRectLeft_,
@@ -2911,8 +2941,9 @@ void CoreWrapper::setupCallbacks(
 					stereoExactSync_->registerCallback(boost::bind(&CoreWrapper::stereoCallback, this, _1, _2, _3, _4, _5));
 				}
 
-				ROS_INFO("\n%s subscribed to:\n   %s,\n   %s,\n   %s,\n   %s,\n   %s",
+				ROS_INFO("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s,\n   %s",
 						ros::this_node::getName().c_str(),
+						approxSync?"approx":"exact",
 						imageRectLeft_.getTopic().c_str(),
 						imageRectRight_.getTopic().c_str(),
 						cameraInfoLeft_.getTopic().c_str(),
@@ -2925,7 +2956,6 @@ void CoreWrapper::setupCallbacks(
 			// use odom from TF, so subscribe to sensors only
 			if(subscribeScan2d)
 			{
-				ROS_INFO("Registering Stereo+LaserScan2d+OdomTF callback...");
 				scanSub_.subscribe(nh, "scan", 1);
 				stereoScanTFSync_ = new message_filters::Synchronizer<MyStereoScanTFSyncPolicy>(
 						MyStereoScanTFSyncPolicy(queueSize),
@@ -2946,7 +2976,6 @@ void CoreWrapper::setupCallbacks(
 			}
 			else if(subscribeScan3d)
 			{
-				ROS_INFO("Registering Stereo+LaserScan3d+OdomTF callback...");
 				scan3dSub_.subscribe(nh, "scan_cloud", 1);
 				stereoScan3dTFSync_ = new message_filters::Synchronizer<MyStereoScan3dTFSyncPolicy>(
 						MyStereoScan3dTFSyncPolicy(queueSize),
@@ -2967,9 +2996,8 @@ void CoreWrapper::setupCallbacks(
 			}
 			else //!subscribeLaserScan
 			{
-				if(stereoApproxSync)
+				if(approxSync)
 				{
-					ROS_INFO("Registering Stereo+OdomTF Approx callback...");
 					stereoApproxTFSync_ = new message_filters::Synchronizer<MyStereoApproxTFSyncPolicy>(
 							MyStereoApproxTFSyncPolicy(queueSize),
 							imageRectLeft_,
@@ -2980,7 +3008,6 @@ void CoreWrapper::setupCallbacks(
 				}
 				else
 				{
-					ROS_INFO("Registering Stereo+OdomTF Exact callback...");
 					stereoExactTFSync_ = new message_filters::Synchronizer<MyStereoExactTFSyncPolicy>(
 							MyStereoExactTFSyncPolicy(queueSize),
 							imageRectLeft_,
@@ -2990,8 +3017,9 @@ void CoreWrapper::setupCallbacks(
 					stereoExactTFSync_->registerCallback(boost::bind(&CoreWrapper::stereoTFCallback, this, _1, _2, _3, _4));
 				}
 
-				ROS_INFO("\n%s subscribed to:\n   %s,\n   %s,\n   %s,\n   %s",
+				ROS_INFO("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s",
 						ros::this_node::getName().c_str(),
+						approxSync?"approx":"exact",
 						imageRectLeft_.getTopic().c_str(),
 						imageRectRight_.getTopic().c_str(),
 						cameraInfoLeft_.getTopic().c_str(),

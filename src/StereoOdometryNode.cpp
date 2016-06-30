@@ -80,13 +80,6 @@ public:
 		cameraInfoLeft_.subscribe(left_nh, "camera_info", 1);
 		cameraInfoRight_.subscribe(right_nh, "camera_info", 1);
 
-		ROS_INFO("\n%s subscribed to:\n   %s,\n   %s,\n   %s,\n   %s",
-				ros::this_node::getName().c_str(),
-				imageRectLeft_.getTopic().c_str(),
-				imageRectRight_.getTopic().c_str(),
-				cameraInfoLeft_.getTopic().c_str(),
-				cameraInfoRight_.getTopic().c_str());
-
 		if(approxSync)
 		{
 			approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize_), imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_);
@@ -97,6 +90,15 @@ public:
 			exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize_), imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_);
 			exactSync_->registerCallback(boost::bind(&StereoOdometry::callback, this, _1, _2, _3, _4));
 		}
+
+
+		ROS_INFO("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s",
+				ros::this_node::getName().c_str(),
+				approxSync?"approx":"exact",
+				imageRectLeft_.getTopic().c_str(),
+				imageRectRight_.getTopic().c_str(),
+				cameraInfoLeft_.getTopic().c_str(),
+				cameraInfoRight_.getTopic().c_str());
 	}
 
 	virtual ~StereoOdometry()

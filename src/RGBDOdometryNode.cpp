@@ -54,7 +54,8 @@ class RGBDOdometry : public rtabmap_ros::OdometryROS
 public:
 	RGBDOdometry(int argc, char * argv[]) :
 		rtabmap_ros::OdometryROS(argc, argv),
-		sync_(0),
+		approxSync_(0),
+		exactSync_(0),
 		sync2_(0),
 		queueSize_(5)
 	{
@@ -62,6 +63,8 @@ public:
 		ros::NodeHandle pnh("~");
 
 		int depthCameras = 1;
+		bool approxSync = true;
+		pnh.param("approx_sync", approxSync, approxSync);
 		pnh.param("queue_size", queueSize_, queueSize_);
 		pnh.param("depth_cameras", depthCameras, depthCameras);
 		if(depthCameras <= 0)
@@ -135,22 +138,35 @@ public:
 			image_depth_sub_.subscribe(depth_it, depth_nh.resolveName("image"), 1, hintsDepth);
 			info_sub_.subscribe(rgb_nh, "camera_info", 1);
 
-			ROS_INFO("\n%s subscribed to:\n   %s,\n   %s,\n   %s",
+			if(approxSync)
+			{
+				approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_);
+				approxSync_->registerCallback(boost::bind(&RGBDOdometry::callback, this, _1, _2, _3));
+			}
+			else
+			{
+				exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_);
+				exactSync_->registerCallback(boost::bind(&RGBDOdometry::callback, this, _1, _2, _3));
+			}
+
+			ROS_INFO("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s",
 					ros::this_node::getName().c_str(),
+					approxSync?"approx":"exact",
 					image_mono_sub_.getTopic().c_str(),
 					image_depth_sub_.getTopic().c_str(),
 					info_sub_.getTopic().c_str());
-
-			sync_ = new message_filters::Synchronizer<MySyncPolicy>(MySyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_);
-			sync_->registerCallback(boost::bind(&RGBDOdometry::callback, this, _1, _2, _3));
 		}
 	}
 
 	virtual ~RGBDOdometry()
 	{
-		if(sync_)
+		if(approxSync_)
 		{
-			delete sync_;
+			delete approxSync_;
+		}
+		if(exactSync_)
+		{
+			delete exactSync_;
 		}
 		if(sync2_)
 		{
@@ -343,11 +359,17 @@ protected:
 	virtual void flushCallbacks()
 	{
 		// flush callbacks
-		if(sync_)
+		if(approxSync_)
 		{
-			delete sync_;
-			sync_ = new message_filters::Synchronizer<MySyncPolicy>(MySyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_);
-			sync_->registerCallback(boost::bind(&RGBDOdometry::callback, this, _1, _2, _3));
+			delete approxSync_;
+			approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_);
+			approxSync_->registerCallback(boost::bind(&RGBDOdometry::callback, this, _1, _2, _3));
+		}
+		if(exactSync_)
+		{
+			delete exactSync_;
+			exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_);
+			exactSync_->registerCallback(boost::bind(&RGBDOdometry::callback, this, _1, _2, _3));
 		}
 		if(sync2_)
 		{
@@ -371,8 +393,10 @@ private:
 	image_transport::SubscriberFilter image_mono2_sub_;
 	image_transport::SubscriberFilter image_depth2_sub_;
 	message_filters::Subscriber<sensor_msgs::CameraInfo> info2_sub_;
-	typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo> MySyncPolicy;
-	message_filters::Synchronizer<MySyncPolicy> * sync_;
+	typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo> MyApproxSyncPolicy;
+	message_filters::Synchronizer<MyApproxSyncPolicy> * approxSync_;
+	typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo> MyExactSyncPolicy;
+	message_filters::Synchronizer<MyExactSyncPolicy> * exactSync_;
 	typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo, sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo> MySync2Policy;
 	message_filters::Synchronizer<MySync2Policy> * sync2_;
 	int queueSize_;

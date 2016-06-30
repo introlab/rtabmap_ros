@@ -1,5 +1,7 @@
 
 <launch>
+   <!-- Backward compatibility launch file, use "rtabmap.launch rgbd:=false stereo:=true" instead -->
+
    <!-- Your camera should be calibrated and publishing rectified left and right 
         images + corresponding camera_info msgs. You can use stereo_image_proc for image rectification.
         Example:
@@ -17,20 +19,17 @@
   <arg name="rviz_cfg"                default="-d $(find rtabmap_ros)/launch/config/rgbd.rviz" />
   
   <arg name="frame_id"                default="base_link"/>     <!-- Fixed frame id, you may set "base_link" or "base_footprint" if they are published -->
-  <arg name="time_threshold"          default="0"/>             <!-- (ms) If not 0 ms, memory management is used to keep processing time on this fixed limit. -->
-  <arg name="optimize_from_last_node" default="false"/>         <!-- Optimize the map from the last node. Should be true on multi-session mapping and when time threshold is set -->
   <arg name="database_path"           default="~/.ros/rtabmap.db"/>
-  <arg name="rtabmap_args"            default=""/>              <!-- delete_db_on_start, udebug -->
+  <arg name="rtabmap_args"            default=""/>   <!-- delete_db_on_start, udebug -->
   <arg name="launch_prefix"           default=""/>
+  <arg name="approx_sync"             default="false"/>         <!-- if timestamps of the input topics are not synchronized -->
   
   <arg name="stereo_namespace"        default="/stereo_camera"/>
   <arg name="left_image_topic"        default="$(arg stereo_namespace)/left/image_rect_color" />
   <arg name="right_image_topic"       default="$(arg stereo_namespace)/right/image_rect" />      <!-- using grayscale image for efficiency -->
   <arg name="left_camera_info_topic"  default="$(arg stereo_namespace)/left/camera_info" />
   <arg name="right_camera_info_topic" default="$(arg stereo_namespace)/right/camera_info" />
-  <arg name="approximate_sync"        default="false"/>         <!-- if timestamps of the stereo images are not synchronized -->
   <arg name="compressed"              default="false"/>
-  <arg name="convert_depth_to_mm"     default="true"/>
    
   <arg name="subscribe_scan"          default="false"/>         <!-- Assuming 2D scan if set, rtabmap will do 3DoF mapping instead of 6DoF -->
   <arg name="scan_topic"              default="/scan"/>
@@ -44,98 +43,40 @@
   <arg name="namespace"               default="rtabmap"/>
   <arg name="wait_for_transform"      default="0.2"/>
   
-  <!-- Nodes -->
-  <group ns="$(arg namespace)">
+  <include file="$(find rtabmap_ros)/launch/rtabmap.launch">
+    <arg name="rgbd"                    value="false"/>
+    <arg name="stereo"                  value="true"/>
+    <arg name="rtabmapviz"              value="$(arg rtabmapviz)" /> 
+    <arg name="rviz"                    value="$(arg rviz)" />
+    <arg name="localization"            value="$(arg localization)"/>
+    <arg name="gui_cfg"                 value="$(arg rtabmapviz_cfg)" />
+    <arg name="rviz_cfg"                value="$(arg rviz_cfg)" />
   
-    <node if="$(arg compressed)" name="republish_left"  type="republish" pkg="image_transport" args="compressed in:=$(arg left_image_topic) raw out:=$(arg left_image_topic)" />
-    <node if="$(arg compressed)" name="republish_right" type="republish" pkg="image_transport" args="compressed in:=$(arg right_image_topic) raw out:=$(arg right_image_topic)" />
-  
-    <!-- Odometry -->
-    <node if="$(arg visual_odometry)" pkg="rtabmap_ros" type="stereo_odometry" name="stereo_odometry" output="screen" args="$(arg rtabmap_args)" launch-prefix="$(arg launch_prefix)">
-      <remap from="left/image_rect"        to="$(arg left_image_topic)"/>
-      <remap from="right/image_rect"       to="$(arg right_image_topic)"/>
-      <remap from="left/camera_info"       to="$(arg left_camera_info_topic)"/>
-      <remap from="right/camera_info"      to="$(arg right_camera_info_topic)"/>
-	  
-      <param name="frame_id"                 type="string" value="$(arg frame_id)"/>
-      <param name="wait_for_transform_duration"       type="double"   value="$(arg wait_for_transform)"/>
-      <param name="approx_sync"              type="bool"   value="$(arg approximate_sync)"/>
-	  
-      <param name="Odom/FillInfoData"        type="string" value="true"/> 
-    </node>
-  
-    <!-- Visual SLAM (robot side) -->
-    <!-- args: "delete_db_on_start" and "udebug" -->
-    <node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="screen" args="$(arg rtabmap_args)" launch-prefix="$(arg launch_prefix)">
-      <param name="subscribe_depth"              type="bool"   value="false"/>
-      <param name="subscribe_stereo"             type="bool"   value="true"/>
-      <param name="subscribe_scan"               type="bool"   value="$(arg subscribe_scan)"/>
-      <param name="subscribe_scan_cloud"         type="bool"   value="$(arg subscribe_scan_cloud)"/>
-      <param name="frame_id"                     type="string" value="$(arg frame_id)"/>
-      <param name="wait_for_transform_duration"  type="double"   value="$(arg wait_for_transform)"/>
-      <param name="database_path"                type="string" value="$(arg database_path)"/>
-      <param name="stereo_approx_sync"           type="bool"   value="$(arg approximate_sync)"/>
-	
-      <remap from="left/image_rect"        to="$(arg left_image_topic)"/>
-      <remap from="right/image_rect"       to="$(arg right_image_topic)"/>
-      <remap from="left/camera_info"       to="$(arg left_camera_info_topic)"/>
-      <remap from="right/camera_info"      to="$(arg right_camera_info_topic)"/>
-      <remap from="scan"                   to="$(arg scan_topic)"/>
-      <remap from="scan_cloud"      to="$(arg scan_cloud_topic)"/>
-      <remap unless="$(arg visual_odometry)" from="odom"  to="$(arg odom_topic)"/>
-      
-      <param name="Rtabmap/TimeThr"              type="string" value="$(arg time_threshold)"/>
-      <param name="RGBD/OptimizeFromGraphEnd"    type="string" value="$(arg optimize_from_last_node)"/>
-      <param name="Mem/SaveDepth16Format"        type="string" value="$(arg convert_depth_to_mm)"/>
-      
-      <!-- localization mode -->
-	  <param     if="$(arg localization)" name="Mem/IncrementalMemory" type="string" value="false"/>
-	  <param unless="$(arg localization)" name="Mem/IncrementalMemory" type="string" value="true"/>
-	  <param name="Mem/InitWMWithAllNodes" type="string" value="$(arg localization)"/>
+    <arg name="frame_id"                value="$(arg frame_id)"/>
+    <arg name="namespace"               value="$(arg namespace)"/>
+    <arg name="database_path"           value="$(arg database_path)"/>
+    <arg name="wait_for_transform"      value="$(arg wait_for_transform)"/>
+    <arg name="rtabmap_args"            value="$(arg rtabmap_args)"/>  
+    <arg name="launch_prefix"           value="$(arg launch_prefix)"/>          
+    <arg name="approx_sync"             value="$(arg approx_sync)"/>
 
-      <!-- when 2D scan is set -->
-      <param if="$(arg subscribe_scan)" name="Optimizer/Slam2D"        type="string" value="true"/>
-	  <param if="$(arg subscribe_scan)" name="Icp/CorrespondenceRatio" type="string" value="0.25"/>
-	  <param if="$(arg subscribe_scan)" name="Reg/Strategy"            type="string" value="1"/> 
-	  <param if="$(arg subscribe_scan)" name="Reg/Force3DoF"           type="string" value="true"/>
-
-	  <!-- when 3D scan is set -->
-	  <param if="$(arg subscribe_scan_cloud)" name="Reg/Strategy"      type="string" value="1"/>
-    </node>
+    <arg name="stereo_namespace"        value="$(arg stereo_namespace)"/>
+    <arg name="left_image_topic"        value="$(arg left_image_topic)" />
+    <arg name="right_image_topic"       value="$(arg right_image_topic)" />
+    <arg name="left_camera_info_topic"  value="$(arg left_camera_info_topic)" />
+    <arg name="right_camera_info_topic" value="$(arg right_camera_info_topic)" />
   
-    <!-- Visualisation RTAB-Map -->
-    <node if="$(arg rtabmapviz)" pkg="rtabmap_ros" type="rtabmapviz" name="rtabmapviz" args="$(arg rtabmapviz_cfg)" output="screen" launch-prefix="$(arg launch_prefix)">
-      <param name="subscribe_depth"           type="bool"   value="false"/>
-      <param name="subscribe_stereo"          type="bool"   value="true"/>
-      <param name="subscribe_scan"            type="bool"   value="$(arg subscribe_scan)"/>
-      <param name="subscribe_scan_cloud"      type="bool"   value="$(arg subscribe_scan_cloud)"/>
-      <param name="subscribe_odom_info"       type="bool"   value="$(arg visual_odometry)"/>
-      <param name="frame_id"                  type="string" value="$(arg frame_id)"/>
-      <param name="wait_for_transform_duration"   type="double"   value="$(arg wait_for_transform)"/>
-    
-      <remap from="left/image_rect"        to="$(arg left_image_topic)"/>
-      <remap from="right/image_rect"       to="$(arg right_image_topic)"/>
-      <remap from="left/camera_info"       to="$(arg left_camera_info_topic)"/>
-      <remap from="right/camera_info"      to="$(arg right_camera_info_topic)"/>
-      <remap from="scan"                   to="$(arg scan_topic)"/>
-      <remap from="scan_cloud"             to="$(arg scan_cloud_topic)"/>
-      <remap unless="$(arg visual_odometry)" from="odom"  to="$(arg odom_topic)"/>
-    </node>
+    <arg name="compressed"              value="$(arg compressed)"/>                                                                                
+   
+    <arg name="subscribe_scan"          value="$(arg subscribe_scan)"/>
+    <arg name="scan_topic"              value="$(arg scan_topic)"/>
   
-  </group>
-  
-  <!-- Visualization RVIZ -->
-  <node if="$(arg rviz)" pkg="rviz" type="rviz" name="rviz" args="$(arg rviz_cfg)"/>
-  <node if="$(arg rviz)" pkg="nodelet" type="nodelet" name="points_xyzrgb" args="standalone rtabmap_ros/point_cloud_xyzrgb">
-    <remap from="left/image"        to="$(arg left_image_topic)"/>
-    <remap from="right/image"       to="$(arg right_image_topic)"/>
-    <remap from="left/camera_info"  to="$(arg left_camera_info_topic)"/>
-    <remap from="right/camera_info" to="$(arg right_camera_info_topic)"/>
-    <remap from="cloud"             to="voxel_cloud" />
-
-    <param name="decimation"  type="double" value="2"/>
-    <param name="voxel_size"  type="double" value="0.02"/>
-    <param name="approx_sync" type="bool"   value="$(arg approximate_sync)"/>
-  </node>
+    <arg name="subscribe_scan_cloud"    value="$(arg subscribe_scan_cloud)"/>
+    <arg name="scan_cloud_topic"        value="$(arg scan_cloud_topic)"/>
+   
+    <arg name="visual_odometry"         value="$(arg visual_odometry)"/>          
+    <arg name="odom_topic"              value="$(arg odom_topic)"/>         
+    <arg name="odom_args"               value="$(arg rtabmap_args)"/>
+  </include>
 
 </launch>

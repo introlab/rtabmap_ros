@@ -90,7 +90,7 @@ private:
 			bool subscribeScan3d,
 			bool subscribeStereo,
 			int queueSize,
-			bool stereoApproxSync,
+			bool approxSync,
 			int depthCameras);
 	void defaultCallback(const sensor_msgs::ImageConstPtr & imageMsg); // no odom
 
@@ -338,6 +338,12 @@ private:
 			sensor_msgs::Image,
 			sensor_msgs::CameraInfo> MyDepthSyncPolicy;
 	message_filters::Synchronizer<MyDepthSyncPolicy> * depthSync_;
+	typedef message_filters::sync_policies::ExactTime<
+			sensor_msgs::Image,
+			nav_msgs::Odometry,
+			sensor_msgs::Image,
+			sensor_msgs::CameraInfo> MyDepthExactSyncPolicy;
+	message_filters::Synchronizer<MyDepthExactSyncPolicy> * depthExactSync_;
 
 	typedef message_filters::sync_policies::ApproximateTime<
 			sensor_msgs::Image,
@@ -403,6 +409,11 @@ private:
 			sensor_msgs::Image,
 			sensor_msgs::CameraInfo> MyDepthTFSyncPolicy;
 	message_filters::Synchronizer<MyDepthTFSyncPolicy> * depthTFSync_;
+	typedef message_filters::sync_policies::ExactTime<
+				sensor_msgs::Image,
+				sensor_msgs::Image,
+				sensor_msgs::CameraInfo> MyDepthTFExactSyncPolicy;
+	message_filters::Synchronizer<MyDepthTFExactSyncPolicy> * depthTFExactSync_;
 
 	typedef message_filters::sync_policies::ApproximateTime<
 			sensor_msgs::Image,
