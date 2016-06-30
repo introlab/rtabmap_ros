@@ -64,6 +64,7 @@ OdometryROS::OdometryROS(int argc, char * argv[], bool stereo) :
 	waitForTransform_(true),
 	waitForTransformDuration_(0.1), // 100 ms
 	publishNullWhenLost_(true),
+	guessFromTf_(false),
 	paused_(false),
 	resetCountdown_(0),
 	resetCurrentCount_(0)
@@ -91,6 +92,13 @@ OdometryROS::OdometryROS(int argc, char * argv[], bool stereo) :
 	pnh.param("ground_truth_frame_id", groundTruthFrameId_, groundTruthFrameId_);
 	pnh.param("config_path", configPath, configPath);
 	pnh.param("publish_null_when_lost", publishNullWhenLost_, publishNullWhenLost_);
+	pnh.param("guess_from_tf", guessFromTf_, guessFromTf_);
+
+	if(publishTf_ && guessFromTf_)
+	{
+		ROS_WARN("\"publish_tf\" and \"guess_from_tf\" cannot be used at the same time. \"guess_from_tf\" is disabled.");
+		guessFromTf_ = false;
+	}
 
 	configPath = uReplaceChar(configPath, '~', UDirectory::homeDir());
 	if(configPath.size() && configPath.at(0) != '/')
@@ -324,7 +332,7 @@ Transform OdometryROS::getTransform(const std::string & fromFrameId, const std::
 
 void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 {
-	if(odometry_->getPose().isNull() &&
+	if(odometry_->getPose().isIdentity() &&
 	   !groundTruthFrameId_.empty())
 	{
 		// sync with the first value of the ground truth
@@ -341,11 +349,32 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 		odometry_->reset(initialPose);
 	}
 
+	Transform guess;
+	if(guessFromTf_)
+	{
+		Transform previousPose = this->getTransform(odomFrameId_, frameId_, ros::Time(odometry_->previousStamp()));
+		Transform pose = this->getTransform(odomFrameId_, frameId_, stamp);
+		if(!previousPose.isNull() && !pose.isNull())
+		{
+			guess = previousPose.inverse() * pose;
+
+			/*if(!odometry_->previousVelocityTransform().isNull())
+			{
+				float dt = rtabmap_ros::timestampFromROS(stamp) - odometry_->previousStamp();
+				float vx,vy,vz, vroll,vpitch,vyaw;
+				odometry_->previousVelocityTransform().getTranslationAndEulerAngles(vx,vy,vz, vroll,vpitch,vyaw);
+				Transform motionGuess(vx*dt, vy*dt, vz*dt, vroll*dt, vpitch*dt, vyaw*dt);
+				ROS_WARN("P  Guess %s", motionGuess.prettyPrint().c_str());
+			}
+			ROS_WARN("TF Guess %s", guess.prettyPrint().c_str());*/
+		}
+	}
+
 	// process data
 	ros::WallTime time = ros::WallTime::now();
 	rtabmap::OdometryInfo info;
 	SensorData dataCpy = data;
-	rtabmap::Transform pose = odometry_->process(dataCpy, &info);
+	rtabmap::Transform pose = odometry_->process(dataCpy, guess, &info);
 	if(!pose.isNull())
 	{
 		resetCurrentCount_ = resetCountdown_;

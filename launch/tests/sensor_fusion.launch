@@ -28,10 +28,12 @@
       <param name="frame_id"               type="string" value="$(arg frame_id)"/>
       <param name="publish_tf"             type="bool"   value="false"/>
       <param name="publish_null_when_lost" type="bool"   value="true"/>
+      <param name="guess_from_tf"          type="bool"   value="true"/>
 
       <param name="Odom/FillInfoData"      type="string" value="true"/>
-      <param name="Odom/ResetCountdown"    type="string" value="1"/> 
+      <param name="Odom/ResetCountdown"    type="string" value="1"/>
       <param name="Vis/FeatureType"        type="string" value="6"/> 
+      <param name="OdomF2M/MaxSize"        type="string" value="1000"/>
     </node>
 
     <!-- SLAM -->
@@ -56,8 +58,8 @@
   <!-- Odometry fusion (EKF), refer to demo launch file in robot_localization for more info -->
   <node pkg="robot_localization" type="ekf_localization_node" name="ekf_localization" clear_params="true" output="screen">
 
-      <param name="frequency" value="10"/>
-      <param name="sensor_timeout" value="0.5"/>
+      <param name="frequency" value="50"/>
+      <param name="sensor_timeout" value="0.1"/>
       <param name="two_d_mode" value="false"/>
 
       <param name="odom_frame" value="odom"/>
@@ -101,7 +103,7 @@
 
       <!-- ======== ADVANCED PARAMETERS ======== -->
       <param name="odom0_queue_size" value="5"/>
-      <param name="imu0_queue_size" value="5"/> 
+      <param name="imu0_queue_size" value="50"/> 
 
       <!-- The values are ordered as x, y, z, roll, pitch, yaw, vx, vy, vz,
            vroll, vpitch, vyaw, ax, ay, az. -->
