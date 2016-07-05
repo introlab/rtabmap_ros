@@ -1553,8 +1553,7 @@ void CoreWrapper::process(
 							if(rtabmap_.getPathCurrentGoalId() == rtabmap_.getPath().back().first && rtabmap_.getLocalOptimizedPoses().size())
 							{
 								if(latestNodeWasReached_ ||
-								   rtabmap_.getLastLocalizationPose().getDistance(currentMetricGoal_) < rtabmap_.getGoalReachedRadius() ||
-								   rtabmap_.getPathTransformToGoal().getNorm() < rtabmap_.getGoalReachedRadius())
+								   rtabmap_.getLastLocalizationPose().getDistance(currentMetricGoal_) < rtabmap_.getLocalRadius())
 								{
 									latestNodeWasReached_ = true;
 									currentMetricGoal_ *= rtabmap_.getPathTransformToGoal();
@@ -1677,7 +1676,7 @@ void CoreWrapper::goalCommonCallback(
 				// Adjust the target pose relative to last node
 				if(rtabmap_.getPathCurrentGoalId() == rtabmap_.getPath().back().first && rtabmap_.getLocalOptimizedPoses().size())
 				{
-					if(rtabmap_.getLastLocalizationPose().getDistance(currentMetricGoal_) < rtabmap_.getGoalReachedRadius())
+					if(rtabmap_.getLastLocalizationPose().getDistance(currentMetricGoal_) < rtabmap_.getLocalRadius())
 					{
 						latestNodeWasReached_ = true;
 						currentMetricGoal_ *= rtabmap_.getPathTransformToGoal();
