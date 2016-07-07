@@ -102,14 +102,20 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 		mapToOdom_(rtabmap::Transform::getIdentity()),
 		mapsManager_(true),
 		depthSync_(0),
+		depthExactSync_(0),
 		depthScanSync_(0),
+		depthScan3dSync_(0),
 		stereoScanSync_(0),
+		stereoScan3dSync_(0),
 		stereoApproxSync_(0),
 		stereoExactSync_(0),
 		depth2Sync_(0),
 		depthTFSync_(0),
+		depthTFExactSync_(0),
 		depthScanTFSync_(0),
+		depthScan3dTFSync_(0),
 		stereoScanTFSync_(0),
+		stereoScan3dTFSync_(0),
 		stereoApproxTFSync_(0),
 		stereoExactTFSync_(0),
 		transformThread_(0),
@@ -463,10 +469,16 @@ CoreWrapper::~CoreWrapper()
 
 	if(depthSync_)
 		delete depthSync_;
+	if(depthExactSync_)
+		delete depthExactSync_;
 	if(depthScanSync_)
 		delete depthScanSync_;
+	if(depthScan3dSync_)
+		delete depthScan3dSync_;
 	if(stereoScanSync_)
 		delete stereoScanSync_;
+	if(stereoScan3dSync_)
+		delete stereoScan3dSync_;
 	if(stereoApproxSync_)
 		delete stereoApproxSync_;
 	if(stereoExactSync_)
@@ -475,10 +487,16 @@ CoreWrapper::~CoreWrapper()
 		delete depth2Sync_;
 	if(depthTFSync_)
 		delete depthTFSync_;
+	if(depthTFExactSync_)
+		delete depthTFExactSync_;
 	if(depthScanTFSync_)
 		delete depthScanTFSync_;
+	if(depthScan3dTFSync_)
+		delete depthScan3dTFSync_;
 	if(stereoScanTFSync_)
 		delete stereoScanTFSync_;
+	if(stereoScan3dTFSync_)
+		delete stereoScan3dTFSync_;
 	if(stereoApproxTFSync_)
 		delete stereoApproxTFSync_;
 	if(stereoExactTFSync_)

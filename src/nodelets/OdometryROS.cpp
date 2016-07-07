@@ -55,7 +55,7 @@ using namespace rtabmap;
 
 namespace rtabmap_ros {
 
-OdometryROS::OdometryROS(int argc, char * argv[], bool stereo) :
+OdometryROS::OdometryROS(bool stereo) :
 	odometry_(0),
 	frameId_("base_link"),
 	odomFrameId_("odom"),
@@ -67,16 +67,35 @@ OdometryROS::OdometryROS(int argc, char * argv[], bool stereo) :
 	guessFromTf_(false),
 	paused_(false),
 	resetCountdown_(0),
-	resetCurrentCount_(0)
+	resetCurrentCount_(0),
+	stereo_(stereo)
 {
-	ros::NodeHandle nh;
+
+}
+
+OdometryROS::~OdometryROS()
+{
+	ros::NodeHandle & pnh = getPrivateNodeHandle();
+	if(pnh.ok())
+	{
+		for(ParametersMap::iterator iter=parameters_.begin(); iter!=parameters_.end(); ++iter)
+		{
+			pnh.deleteParam(iter->first);
+		}
+	}
+
+	delete odometry_;
+}
+
+void OdometryROS::onInit()
+{
+	ros::NodeHandle & nh = getNodeHandle();
+	ros::NodeHandle & pnh = getPrivateNodeHandle();
 
 	odomPub_ = nh.advertise<nav_msgs::Odometry>("odom", 1);
 	odomInfoPub_ = nh.advertise<rtabmap_ros::OdomInfo>("odom_info", 1);
 	odomLocalMap_ = nh.advertise<sensor_msgs::PointCloud2>("odom_local_map", 1);
 	odomLastFrame_ = nh.advertise<sensor_msgs::PointCloud2>("odom_last_frame", 1);
-
-	ros::NodeHandle pnh("~");
 
 	Transform initialPose = Transform::getIdentity();
 	std::string initialPoseStr;
@@ -96,7 +115,7 @@ OdometryROS::OdometryROS(int argc, char * argv[], bool stereo) :
 
 	if(publishTf_ && guessFromTf_)
 	{
-		ROS_WARN("\"publish_tf\" and \"guess_from_tf\" cannot be used at the same time. \"guess_from_tf\" is disabled.");
+		NODELET_WARN( "\"publish_tf\" and \"guess_from_tf\" cannot be used at the same time. \"guess_from_tf\" is disabled.");
 		guessFromTf_ = false;
 	}
 
@@ -133,19 +152,19 @@ OdometryROS::OdometryROS(int argc, char * argv[], bool stereo) :
 		}
 		else
 		{
-			ROS_ERROR("Wrong initial_pose format: %s (should be \"x y z roll pitch yaw\" with angle in radians). "
+			NODELET_ERROR( "Wrong initial_pose format: %s (should be \"x y z roll pitch yaw\" with angle in radians). "
 					  "Identity will be used...", initialPoseStr.c_str());
 		}
 	}
 
 
 	//parameters
-	parameters_ = Parameters::getDefaultOdometryParameters(stereo);
+	parameters_ = Parameters::getDefaultOdometryParameters(stereo_);
 	if(!configPath.empty())
 	{
 		if(UFile::exists(configPath.c_str()))
 		{
-			ROS_INFO("Odometry: Loading parameters from %s", configPath.c_str());
+			NODELET_INFO( "Odometry: Loading parameters from %s", configPath.c_str());
 			rtabmap::ParametersMap allParameters;
 			Parameters::readINI(configPath.c_str(), allParameters);
 			// only update odometry parameters
@@ -160,7 +179,7 @@ OdometryROS::OdometryROS(int argc, char * argv[], bool stereo) :
 		}
 		else
 		{
-			ROS_ERROR("Config file \"%s\" not found!", configPath.c_str());
+			NODELET_ERROR( "Config file \"%s\" not found!", configPath.c_str());
 		}
 	}
 	for(rtabmap::ParametersMap::iterator iter=parameters_.begin(); iter!=parameters_.end(); ++iter)
@@ -171,39 +190,45 @@ OdometryROS::OdometryROS(int argc, char * argv[], bool stereo) :
 		double vDouble;
 		if(pnh.getParam(iter->first, vStr))
 		{
-			ROS_INFO("Setting odometry parameter \"%s\"=\"%s\"", iter->first.c_str(), vStr.c_str());
+			NODELET_INFO( "Setting odometry parameter \"%s\"=\"%s\"", iter->first.c_str(), vStr.c_str());
 			iter->second = vStr;
 		}
 		else if(pnh.getParam(iter->first, vBool))
 		{
-			ROS_INFO("Setting odometry parameter \"%s\"=\"%s\"", iter->first.c_str(), uBool2Str(vBool).c_str());
+			NODELET_INFO( "Setting odometry parameter \"%s\"=\"%s\"", iter->first.c_str(), uBool2Str(vBool).c_str());
 			iter->second = uBool2Str(vBool);
 		}
 		else if(pnh.getParam(iter->first, vDouble))
 		{
-			ROS_INFO("Setting odometry parameter \"%s\"=\"%s\"", iter->first.c_str(), uNumber2Str(vDouble).c_str());
+			NODELET_INFO( "Setting odometry parameter \"%s\"=\"%s\"", iter->first.c_str(), uNumber2Str(vDouble).c_str());
 			iter->second = uNumber2Str(vDouble);
 		}
 		else if(pnh.getParam(iter->first, vInt))
 		{
-			ROS_INFO("Setting odometry parameter \"%s\"=\"%s\"", iter->first.c_str(), uNumber2Str(vInt).c_str());
+			NODELET_INFO( "Setting odometry parameter \"%s\"=\"%s\"", iter->first.c_str(), uNumber2Str(vInt).c_str());
 			iter->second = uNumber2Str(vInt);
 		}
 
 		if(iter->first.compare(Parameters::kVisMinInliers()) == 0 && atoi(iter->second.c_str()) < 8)
 		{
-			ROS_WARN("Parameter min_inliers must be >= 8, setting to 8...");
+			NODELET_WARN( "Parameter min_inliers must be >= 8, setting to 8...");
 			iter->second = uNumber2Str(8);
 		}
 	}
 
-	rtabmap::ParametersMap parameters = rtabmap::Parameters::parseArguments(argc, argv);
+	std::vector<std::string> argList = getMyArgv();
+	char * argv[argList.size()];
+	for(unsigned int i=0; i<argList.size(); ++i)
+	{
+		argv[i] = &argList[i].at(0);
+	}
+	rtabmap::ParametersMap parameters = rtabmap::Parameters::parseArguments(argList.size(), argv);
 	for(rtabmap::ParametersMap::iterator iter=parameters.begin(); iter!=parameters.end(); ++iter)
 	{
 		rtabmap::ParametersMap::iterator jter = parameters_.find(iter->first);
 		if(jter!=parameters_.end())
 		{
-			ROS_INFO("Update odometry parameter \"%s\"=\"%s\" from arguments", iter->first.c_str(), iter->second.c_str());
+			NODELET_INFO( "Update odometry parameter \"%s\"=\"%s\" from arguments", iter->first.c_str(), iter->second.c_str());
 			jter->second = iter->second;
 		}
 	}
@@ -220,19 +245,19 @@ OdometryROS::OdometryROS(int argc, char * argv[], bool stereo) :
 			{
 				// can be migrated
 				parameters_.at(iter->second.second)= vStr;
-				ROS_WARN("Odometry: Parameter name changed: \"%s\" -> \"%s\". Please update your launch file accordingly. Value \"%s\" is still set to the new parameter name.",
+				NODELET_WARN( "Odometry: Parameter name changed: \"%s\" -> \"%s\". Please update your launch file accordingly. Value \"%s\" is still set to the new parameter name.",
 						iter->first.c_str(), iter->second.second.c_str(), vStr.c_str());
 			}
 			else
 			{
 				if(iter->second.second.empty())
 				{
-					ROS_ERROR("Odometry: Parameter \"%s\" doesn't exist anymore!",
+					NODELET_ERROR( "Odometry: Parameter \"%s\" doesn't exist anymore!",
 							iter->first.c_str());
 				}
 				else
 				{
-					ROS_ERROR("Odometry: Parameter \"%s\" doesn't exist anymore! You may look at this similar parameter: \"%s\"",
+					NODELET_ERROR( "Odometry: Parameter \"%s\" doesn't exist anymore! You may look at this similar parameter: \"%s\"",
 							iter->first.c_str(), iter->second.second.c_str());
 				}
 			}
@@ -256,50 +281,8 @@ OdometryROS::OdometryROS(int argc, char * argv[], bool stereo) :
 	setLogInfoSrv_ = pnh.advertiseService("log_info", &OdometryROS::setLogInfo, this);
 	setLogWarnSrv_ = pnh.advertiseService("log_warning", &OdometryROS::setLogWarn, this);
 	setLogErrorSrv_ = pnh.advertiseService("log_error", &OdometryROS::setLogError, this);
-}
 
-OdometryROS::~OdometryROS()
-{
-	ros::NodeHandle pnh("~");
-	for(ParametersMap::iterator iter=parameters_.begin(); iter!=parameters_.end(); ++iter)
-	{
-		pnh.deleteParam(iter->first);
-	}
-
-	delete odometry_;
-}
-
-void OdometryROS::processArguments(int argc, char * argv[], bool stereo)
-{
-	for(int i=1;i<argc;++i)
-	{
-		if(strcmp(argv[i], "--params") == 0)
-		{
-			rtabmap::ParametersMap parametersOdom = Parameters::getDefaultOdometryParameters(stereo);
-			for(rtabmap::ParametersMap::iterator iter=parametersOdom.begin(); iter!=parametersOdom.end(); ++iter)
-			{
-				std::string str = "Param: " + iter->first + " = \"" + iter->second + "\"";
-				std::cout <<
-						str <<
-						std::setw(60 - str.size()) <<
-						" [" <<
-						rtabmap::Parameters::getDescription(iter->first).c_str() <<
-						"]" <<
-						std::endl;
-			}
-			ROS_WARN("Node will now exit after showing default odometry parameters because "
-					 "argument \"--params\" is detected!");
-			exit(0);
-		}
-		else if(strcmp(argv[i], "--udebug") == 0)
-		{
-			ULogger::setLevel(ULogger::kDebug);
-		}
-		else if(strcmp(argv[i], "--uinfo") == 0)
-		{
-			ULogger::setLevel(ULogger::kInfo);
-		}
-	}
+	onOdomInit();
 }
 
 Transform OdometryROS::getTransform(const std::string & fromFrameId, const std::string & toFrameId, const ros::Time & stamp) const
@@ -313,7 +296,7 @@ Transform OdometryROS::getTransform(const std::string & fromFrameId, const std::
 			//if(!tfBuffer_.canTransform(fromFrameId, toFrameId, stamp, ros::Duration(1)))
 			if(!tfListener_.waitForTransform(fromFrameId, toFrameId, stamp, ros::Duration(waitForTransformDuration_)))
 			{
-				ROS_WARN("odometry: Could not get transform from %s to %s (stamp=%f) after %f seconds (\"wait_for_transform_duration\"=%f)!",
+				NODELET_WARN( "odometry: Could not get transform from %s to %s (stamp=%f) after %f seconds (\"wait_for_transform_duration\"=%f)!",
 						fromFrameId.c_str(), toFrameId.c_str(), stamp.toSec(), waitForTransformDuration_, waitForTransformDuration_);
 				return transform;
 			}
@@ -325,7 +308,7 @@ Transform OdometryROS::getTransform(const std::string & fromFrameId, const std::
 	}
 	catch(tf::TransformException & ex)
 	{
-		ROS_WARN("%s",ex.what());
+		NODELET_WARN( "%s",ex.what());
 	}
 	return transform;
 }
@@ -342,7 +325,7 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 			return;
 		}
 
-		ROS_INFO("Initializing odometry pose to %s (from \"%s\" -> \"%s\")",
+		NODELET_INFO( "Initializing odometry pose to %s (from \"%s\" -> \"%s\")",
 				initialPose.prettyPrint().c_str(),
 				groundTruthFrameId_.c_str(),
 				frameId_.c_str());
@@ -364,9 +347,9 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 				float vx,vy,vz, vroll,vpitch,vyaw;
 				odometry_->previousVelocityTransform().getTranslationAndEulerAngles(vx,vy,vz, vroll,vpitch,vyaw);
 				Transform motionGuess(vx*dt, vy*dt, vz*dt, vroll*dt, vpitch*dt, vyaw*dt);
-				ROS_WARN("P  Guess %s", motionGuess.prettyPrint().c_str());
+				NODELET_WARN( "P  Guess %s", motionGuess.prettyPrint().c_str());
 			}
-			ROS_WARN("TF Guess %s", guess.prettyPrint().c_str());*/
+			NODELET_WARN( "TF Guess %s", guess.prettyPrint().c_str());*/
 		}
 	}
 
@@ -503,7 +486,7 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 	}
 	else if(publishNullWhenLost_)
 	{
-		//ROS_WARN("Odometry lost!");
+		//NODELET_WARN( "Odometry lost!");
 
 		//send null pose to notify that odometry is lost
 		nav_msgs::Odometry odom;
@@ -529,7 +512,7 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 
 	if(pose.isNull() && resetCurrentCount_ > 0)
 	{
-		ROS_WARN("Odometry lost! Odometry will be reset after next %d consecutive unsuccessful odometry updates...", resetCurrentCount_);
+		NODELET_WARN( "Odometry lost! Odometry will be reset after next %d consecutive unsuccessful odometry updates...", resetCurrentCount_);
 
 		--resetCurrentCount_;
 		if(resetCurrentCount_ == 0)
@@ -538,12 +521,12 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 			Transform tfPose = this->getTransform(odomFrameId_, frameId_, stamp);
 			if(tfPose.isNull())
 			{
-				ROS_WARN("Odometry automatically reset to latest computed pose!");
+				NODELET_WARN( "Odometry automatically reset to latest computed pose!");
 				odometry_->reset(odometry_->getPose());
 			}
 			else
 			{
-				ROS_WARN("Odometry automatically reset to latest odometry pose available from TF (%s->%s)!",
+				NODELET_WARN( "Odometry automatically reset to latest odometry pose available from TF (%s->%s)!",
 						odomFrameId_.c_str(), frameId_.c_str());
 				odometry_->reset(tfPose);
 			}
@@ -560,7 +543,7 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 		odomInfoPub_.publish(infoMsg);
 	}
 
-	ROS_INFO("Odom: quality=%d, std dev=%fm, update time=%fs", info.inliers, pose.isNull()?0.0f:std::sqrt(info.variance), (ros::WallTime::now()-time).toSec());
+	NODELET_INFO( "Odom: quality=%d, std dev=%fm, update time=%fs", info.inliers, pose.isNull()?0.0f:std::sqrt(info.variance), (ros::WallTime::now()-time).toSec());
 }
 
 bool OdometryROS::isOdometryF2M() const
@@ -570,7 +553,7 @@ bool OdometryROS::isOdometryF2M() const
 
 bool OdometryROS::reset(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
-	ROS_INFO("visual_odometry: reset odom!");
+	NODELET_INFO( "visual_odometry: reset odom!");
 	odometry_->reset();
 	this->flushCallbacks();
 	return true;
@@ -579,7 +562,7 @@ bool OdometryROS::reset(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 bool OdometryROS::resetToPose(rtabmap_ros::ResetPose::Request& req, rtabmap_ros::ResetPose::Response&)
 {
 	Transform pose(req.x, req.y, req.z, req.roll, req.pitch, req.yaw);
-	ROS_INFO("visual_odometry: reset odom to pose %s!", pose.prettyPrint().c_str());
+	NODELET_INFO( "visual_odometry: reset odom to pose %s!", pose.prettyPrint().c_str());
 	odometry_->reset(pose);
 	this->flushCallbacks();
 	return true;
@@ -589,12 +572,12 @@ bool OdometryROS::pause(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
 	if(paused_)
 	{
-		ROS_WARN("visual_odometry: Already paused!");
+		NODELET_WARN( "visual_odometry: Already paused!");
 	}
 	else
 	{
 		paused_ = true;
-		ROS_INFO("visual_odometry: paused!");
+		NODELET_INFO( "visual_odometry: paused!");
 	}
 	return true;
 }
@@ -603,37 +586,37 @@ bool OdometryROS::resume(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
 	if(!paused_)
 	{
-		ROS_WARN("visual_odometry: Already running!");
+		NODELET_WARN( "visual_odometry: Already running!");
 	}
 	else
 	{
 		paused_ = false;
-		ROS_INFO("visual_odometry: resumed!");
+		NODELET_INFO( "visual_odometry: resumed!");
 	}
 	return true;
 }
 
 bool OdometryROS::setLogDebug(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
-	ROS_INFO("visual_odometry: Set log level to Debug");
+	NODELET_INFO( "visual_odometry: Set log level to Debug");
 	ULogger::setLevel(ULogger::kDebug);
 	return true;
 }
 bool OdometryROS::setLogInfo(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
-	ROS_INFO("visual_odometry: Set log level to Info");
+	NODELET_INFO( "visual_odometry: Set log level to Info");
 	ULogger::setLevel(ULogger::kInfo);
 	return true;
 }
 bool OdometryROS::setLogWarn(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
-	ROS_INFO("visual_odometry: Set log level to Warning");
+	NODELET_INFO( "visual_odometry: Set log level to Warning");
 	ULogger::setLevel(ULogger::kWarning);
 	return true;
 }
 bool OdometryROS::setLogError(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
-	ROS_INFO("visual_odometry: Set log level to Error");
+	NODELET_INFO( "visual_odometry: Set log level to Error");
 	ULogger::setLevel(ULogger::kError);
 	return true;
 }

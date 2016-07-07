@@ -149,6 +149,8 @@ SET(Libraries
 )
   
 SET(rtabmap_ros_lib_src
+   src/nodelets/rgbd_odometry.cpp
+   src/nodelets/stereo_odometry.cpp
    src/nodelets/data_throttle.cpp
    src/nodelets/stereo_throttle.cpp
    src/nodelets/data_odom_sync.cpp
@@ -157,8 +159,8 @@ SET(rtabmap_ros_lib_src
    src/nodelets/disparity_to_depth.cpp 
    src/nodelets/obstacles_detection.cpp
    src/nodelets/point_cloud_aggregator.cpp
+   src/nodelets/OdometryROS.cpp
    src/MsgConversion.cpp
-   src/OdometryROS.cpp
    src/MapsManager.cpp
 )   
 
@@ -261,10 +263,10 @@ add_executable(rtabmap src/CoreNode.cpp src/CoreWrapper.cpp)
 target_link_libraries(rtabmap rtabmap_ros ${Libraries})
 
 add_executable(rgbd_odometry src/RGBDOdometryNode.cpp)
-target_link_libraries(rgbd_odometry rtabmap_ros ${Libraries})
+target_link_libraries(rgbd_odometry ${Libraries})
 
 add_executable(stereo_odometry src/StereoOdometryNode.cpp)
-target_link_libraries(stereo_odometry rtabmap_ros ${Libraries})
+target_link_libraries(stereo_odometry ${Libraries})
 
 add_executable(map_optimizer src/MapOptimizerNode.cpp)
 target_link_libraries(map_optimizer rtabmap_ros ${Libraries})

@@ -2,7 +2,7 @@
 <launch>
   <!-- Convenience launch file to launch odometry, rtabmap and rtabmapviz nodes at once -->
 
-  <!-- For rgbd:=true
+  <!-- For stereo:=false
         Your RGB-D sensor should be already started with "depth_registration:=true".
         Examples:
            $ roslaunch freenect_launch freenect.launch depth_registration:=true 
@@ -15,7 +15,6 @@
            $ roslaunch rtabmap_ros bumblebee.launch -->
      
   <!-- Choose between RGB-D and stereo -->      
-  <arg name="rgbd"            default="true"/>
   <arg name="stereo"          default="false"/>
  
   <!-- Choose visualization -->
@@ -80,7 +79,7 @@
   <group ns="$(arg namespace)">
   
     <!-- RGB-D Odometry -->
-    <group if="$(arg rgbd)">
+    <group unless="$(arg stereo)">
       <node if="$(arg compressed)" name="republish_rgb" type="republish" pkg="image_transport" args="$(arg rgb_image_transport) in:=$(arg rgb_topic) raw out:=$(arg rgb_topic_relay)" />
       <node if="$(arg compressed)" name="republish_depth" type="republish" pkg="image_transport" args="compressedDepth in:=$(arg depth_topic) raw out:=$(arg depth_topic_relay)" />
   
@@ -119,7 +118,8 @@
     <!-- Visual SLAM (robot side) -->
     <!-- args: "delete_db_on_start" and "udebug" -->
     <node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="screen" args="$(arg rtabmap_args)" launch-prefix="$(arg launch_prefix)">
-      <param name="subscribe_depth"      type="bool"   value="$(arg rgbd)"/>
+      <param     if="$(arg stereo)" name="subscribe_depth"  type="bool" value="false"/>
+      <param unless="$(arg stereo)" name="subscribe_depth"  type="bool" value="true"/>
       <param name="subscribe_stereo"     type="bool"   value="$(arg stereo)"/>
       <param name="subscribe_scan"       type="bool"   value="$(arg subscribe_scan)"/>
       <param name="subscribe_scan_cloud" type="bool"   value="$(arg subscribe_scan_cloud)"/>
@@ -151,7 +151,8 @@
   
     <!-- Visualisation RTAB-Map -->
     <node if="$(arg rtabmapviz)" pkg="rtabmap_ros" type="rtabmapviz" name="rtabmapviz" args="-d $(arg gui_cfg)" output="screen" launch-prefix="$(arg launch_prefix)">
-      <param name="subscribe_depth"      type="bool"   value="$(arg rgbd)"/>
+      <param     if="$(arg stereo)" name="subscribe_depth"  type="bool" value="false"/>
+      <param unless="$(arg stereo)" name="subscribe_depth"  type="bool" value="true"/>
       <param name="subscribe_stereo"     type="bool"   value="$(arg stereo)"/>
       <param name="subscribe_scan"       type="bool"   value="$(arg subscribe_scan)"/>
       <param name="subscribe_scan_cloud" type="bool"   value="$(arg subscribe_scan_cloud)"/>
