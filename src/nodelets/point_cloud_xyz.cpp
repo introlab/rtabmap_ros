@@ -214,12 +214,15 @@ private:
 			model.fromCameraInfo(*cameraInfo);
 
 			pcl::PointCloud<pcl::PointXYZ>::Ptr pclCloud;
-			pclCloud = rtabmap::util3d::cloudFromDepth(
-					cv::Mat(imageDepthPtr->image, roi),
-					model.cx()-roiRatios_[0]*double(imageDepthPtr->image.cols),
-					model.cy()-roiRatios_[2]*double(imageDepthPtr->image.rows),
+			rtabmap::CameraModel m(
 					model.fx(),
 					model.fy(),
+					model.cx()-roiRatios_[0]*double(imageDepthPtr->image.cols),
+					model.cy()-roiRatios_[2]*double(imageDepthPtr->image.rows));
+
+			pclCloud = rtabmap::util3d::cloudFromDepth(
+					cv::Mat(imageDepthPtr->image, roi),
+					m,
 					decimation_);
 			processAndPublish(pclCloud, depth->header);
 
