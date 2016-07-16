@@ -87,7 +87,7 @@ private:
 	double mapFilterRadius_;
 	double mapFilterAngle_;
 	bool mapCacheCleanup_;
-	bool negativePosesIgnored;
+	bool negativePosesIgnored_;
 
 	ros::Publisher cloudMapPub_;
 	ros::Publisher projMapPub_;
@@ -96,7 +96,7 @@ private:
 	ros::Publisher octoMapPubBin_;
 	ros::Publisher octoMapPubFull_;
 	ros::Publisher octoMapCloud_;
-	ros::Publisher octoMapCloudGround_;
+	ros::Publisher octoMapEmptySpace_;
 	ros::Publisher octoMapProj_;
 
 	std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr > clouds_;
@@ -106,6 +106,8 @@ private:
 	std::map<int, std::pair<cv::Mat, cv::Mat> > gridMaps_; // <ground, obstacles>
 
 	rtabmap::OctoMap * octomap_;
+	int octomapTreeDepth_;
+	bool octomapGroundIsObstacle_;
 };
 
 #endif /* MAPSMANAGER_H_ */
