@@ -79,6 +79,7 @@ private:
 	double projMaxObstaclesHeight_;
 	double projMaxGroundHeight_;
 	bool projDetectFlatObstacles_;
+	bool projMapFrame_;
 	double gridCellSize_;
 	double gridSize_;
 	bool gridEroded_;

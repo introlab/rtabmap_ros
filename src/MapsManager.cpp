@@ -52,6 +52,7 @@ MapsManager::MapsManager(bool usePublicNamespace) :
 		projMaxObstaclesHeight_(2.0), // meters (<=0 disabled)
 		projMaxGroundHeight_(0.0), // meters (<=0 disabled, only works if proj_detect_flat_obstacles is true)
 		projDetectFlatObstacles_(false),
+		projMapFrame_(false),
 		gridCellSize_(0.05), // meters
 		gridSize_(0), // meters
 		gridEroded_(false),
@@ -109,6 +110,7 @@ MapsManager::MapsManager(bool usePublicNamespace) :
 	}
 	pnh.param("proj_max_ground_height", projMaxGroundHeight_, projMaxGroundHeight_);
 	pnh.param("proj_detect_flat_obstacles", projDetectFlatObstacles_, projDetectFlatObstacles_);
+	pnh.param("proj_map_frame", projMapFrame_, projMapFrame_);
 
 	// common grid map stuff
 	pnh.param("grid_cell_size", gridCellSize_, gridCellSize_); // m
@@ -508,7 +510,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 									// add pose rotation without yaw
 									float roll, pitch, yaw;
 									iter->second.getEulerAngles(roll, pitch, yaw);
-									cloudClipped = util3d::transformPointCloud(cloudClipped, Transform(0,0,0, roll, pitch, 0));
+									cloudClipped = util3d::transformPointCloud(cloudClipped, Transform(0,0,projMapFrame_?iter->second.z():0, roll, pitch, 0));
 
 									pcl::IndicesPtr groundIndices, obstaclesIndices;
 									util3d::segmentObstaclesFromGround<pcl::PointXYZRGB>(
@@ -550,7 +552,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 #ifdef RTABMAP_OCTOMAP
 									if(updateOctomap)
 									{
-										Transform tinv = Transform(0,0,0, roll, pitch, 0).inverse();
+										Transform tinv = Transform(0,0,projMapFrame_?iter->second.z():0, roll, pitch, 0).inverse();
 										groundCloud = util3d::transformPointCloud(groundCloud, tinv);
 										obstaclesCloud = util3d::transformPointCloud(obstaclesCloud, tinv);
 										if(octomapGroundIsObstacle_)
@@ -576,7 +578,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 									// add pose rotation without yaw
 									float roll, pitch, yaw;
 									iter->second.getEulerAngles(roll, pitch, yaw);
-									cloudClipped = util3d::transformPointCloud(cloudClipped, Transform(0,0,0, roll, pitch, 0));
+									cloudClipped = util3d::transformPointCloud(cloudClipped, Transform(0,0,projMapFrame_?iter->second.z():0, roll, pitch, 0));
 
 									pcl::IndicesPtr groundIndices, obstaclesIndices;
 									util3d::segmentObstaclesFromGround<pcl::PointXYZ>(
