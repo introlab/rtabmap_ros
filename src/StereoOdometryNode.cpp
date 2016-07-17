@@ -37,6 +37,7 @@ int main(int argc, char **argv)
 	ros::init(argc, argv, "stereo_odometry");
 
 	// process "--params" argument
+	nodelet::V_string nargv;
 	for(int i=1;i<argc;++i)
 	{
 		if(strcmp(argv[i], "--params") == 0)
@@ -65,11 +66,12 @@ int main(int argc, char **argv)
 		{
 			ULogger::setLevel(ULogger::kInfo);
 		}
+		nargv.push_back(argv[i]);
+
 	}
 
 	nodelet::Loader nodelet;
 	nodelet::M_string remap(ros::names::getRemappings());
-	nodelet::V_string nargv;
 	std::string nodelet_name = ros::this_node::getName();
 	nodelet.load(nodelet_name, "rtabmap_ros/stereo_odometry", remap, nargv);
 	ros::spin();

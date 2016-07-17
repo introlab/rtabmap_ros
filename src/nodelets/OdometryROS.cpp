@@ -222,6 +222,7 @@ void OdometryROS::onInit()
 	{
 		argv[i] = &argList[i].at(0);
 	}
+
 	rtabmap::ParametersMap parameters = rtabmap::Parameters::parseArguments(argList.size(), argv);
 	for(rtabmap::ParametersMap::iterator iter=parameters.begin(); iter!=parameters.end(); ++iter)
 	{

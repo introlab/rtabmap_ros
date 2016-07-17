@@ -101,7 +101,7 @@
       <node if="$(arg compressed)" name="republish_left"  type="republish" pkg="image_transport" args="compressed in:=$(arg left_image_topic) raw out:=$(arg left_image_topic_relay)" />
       <node if="$(arg compressed)" name="republish_right" type="republish" pkg="image_transport" args="compressed in:=$(arg right_image_topic) raw out:=$(arg right_image_topic_relay)" />
   
-      <node if="$(arg visual_odometry)" pkg="rtabmap_ros" type="stereo_odometry" name="stereo_odometry" output="screen" args="$(arg rtabmap_args)" launch-prefix="$(arg launch_prefix)">
+      <node if="$(arg visual_odometry)" pkg="rtabmap_ros" type="stereo_odometry" name="stereo_odometry" output="screen" args="$(arg odom_args)" launch-prefix="$(arg launch_prefix)">
         <remap from="left/image_rect"        to="$(arg left_image_topic_relay)"/>
         <remap from="right/image_rect"       to="$(arg right_image_topic_relay)"/>
         <remap from="left/camera_info"       to="$(arg left_camera_info_topic)"/>

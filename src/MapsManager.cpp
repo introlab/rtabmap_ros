@@ -872,7 +872,7 @@ void MapsManager::publishMaps(
 		if(octoMapPubFull_.getNumSubscribers())
 		{
 			octomap_msgs::Octomap msg;
-			octomap_msgs::binaryMapToMsg(*octomap_->octree(), msg);
+			octomap_msgs::fullMapToMsg(*octomap_->octree(), msg);
 			msg.header.frame_id = mapFrameId;
 			msg.header.stamp = stamp;
 			octoMapPubFull_.publish(msg);
