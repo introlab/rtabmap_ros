@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2010-2014, Mathieu Labbe - IntRoLab - Universite de Sherbrooke
+Copyright (c) 2010-2016, Mathieu Labbe - IntRoLab - Universite de Sherbrooke
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -240,13 +240,16 @@ private:
 
 			pcl::PointCloud<pcl::PointXYZRGB>::Ptr pclCloud;
 			cv::Rect roi = rtabmap::Feature2D::computeRoi(imageDepthPtr->image, roiRatios_);
+
+			rtabmap::CameraModel m(
+					model.fx(),
+					model.fy(),
+					model.cx()-roiRatios_[0]*double(imageDepthPtr->image.cols),
+					model.cy()-roiRatios_[2]*double(imageDepthPtr->image.rows));
 			pclCloud = rtabmap::util3d::cloudFromDepthRGB(
 					cv::Mat(imagePtr->image, roi),
 					cv::Mat(imageDepthPtr->image, roi),
-					model.cx()-roiRatios_[0]*double(imageDepthPtr->image.cols),
-					model.cy()-roiRatios_[2]*double(imageDepthPtr->image.rows),
-					model.fx(),
-					model.fy(),
+					m,
 					decimation_);
 
 

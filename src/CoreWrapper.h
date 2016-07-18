@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2010-2014, Mathieu Labbe - IntRoLab - Universite de Sherbrooke
+Copyright (c) 2010-2016, Mathieu Labbe - IntRoLab - Universite de Sherbrooke
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -65,7 +65,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <image_transport/image_transport.h>
 #include <image_transport/subscriber_filter.h>
 
-#ifdef WITH_OCTOMAP
+#ifdef WITH_OCTOMAP_ROS
 #include <octomap_msgs/GetOctomap.h>
 #endif
 
@@ -90,7 +90,7 @@ private:
 			bool subscribeScan3d,
 			bool subscribeStereo,
 			int queueSize,
-			bool stereoApproxSync,
+			bool approxSync,
 			int depthCameras);
 	void defaultCallback(const sensor_msgs::ImageConstPtr & imageMsg); // no odom
 
@@ -234,7 +234,7 @@ private:
 	bool cancelGoalCallback(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res);
 	bool setLabelCallback(rtabmap_ros::SetLabel::Request& req, rtabmap_ros::SetLabel::Response& res);
 	bool listLabelsCallback(rtabmap_ros::ListLabels::Request& req, rtabmap_ros::ListLabels::Response& res);
-#ifdef WITH_OCTOMAP
+#ifdef WITH_OCTOMAP_ROS
 	bool octomapBinaryCallback(octomap_msgs::GetOctomap::Request  &req, octomap_msgs::GetOctomap::Response &res);
 	bool octomapFullCallback(octomap_msgs::GetOctomap::Request  &req, octomap_msgs::GetOctomap::Response &res);
 #endif
@@ -242,7 +242,7 @@ private:
 	rtabmap::ParametersMap loadParameters(const std::string & configFile);
 	void saveParameters(const std::string & configFile);
 
-	void publishLoop(double tfDelay);
+	void publishLoop(double tfDelay, double tfTolerance);
 
 	void publishStats(const ros::Time & stamp);
 	void publishCurrentGoal(const ros::Time & stamp);
@@ -338,6 +338,12 @@ private:
 			sensor_msgs::Image,
 			sensor_msgs::CameraInfo> MyDepthSyncPolicy;
 	message_filters::Synchronizer<MyDepthSyncPolicy> * depthSync_;
+	typedef message_filters::sync_policies::ExactTime<
+			sensor_msgs::Image,
+			nav_msgs::Odometry,
+			sensor_msgs::Image,
+			sensor_msgs::CameraInfo> MyDepthExactSyncPolicy;
+	message_filters::Synchronizer<MyDepthExactSyncPolicy> * depthExactSync_;
 
 	typedef message_filters::sync_policies::ApproximateTime<
 			sensor_msgs::Image,
@@ -403,6 +409,11 @@ private:
 			sensor_msgs::Image,
 			sensor_msgs::CameraInfo> MyDepthTFSyncPolicy;
 	message_filters::Synchronizer<MyDepthTFSyncPolicy> * depthTFSync_;
+	typedef message_filters::sync_policies::ExactTime<
+				sensor_msgs::Image,
+				sensor_msgs::Image,
+				sensor_msgs::CameraInfo> MyDepthTFExactSyncPolicy;
+	message_filters::Synchronizer<MyDepthTFExactSyncPolicy> * depthTFExactSync_;
 
 	typedef message_filters::sync_policies::ApproximateTime<
 			sensor_msgs::Image,
@@ -457,7 +468,7 @@ private:
 	ros::ServiceServer cancelGoalSrv_;
 	ros::ServiceServer setLabelSrv_;
 	ros::ServiceServer listLabelsSrv_;
-#ifdef WITH_OCTOMAP
+#ifdef WITH_OCTOMAP_ROS
 	ros::ServiceServer octomapBinarySrv_;
 	ros::ServiceServer octomapFullSrv_;
 #endif

@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2010-2014, Mathieu Labbe - IntRoLab - Universite de Sherbrooke
+Copyright (c) 2010-2016, Mathieu Labbe - IntRoLab - Universite de Sherbrooke
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -51,13 +51,17 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/util3d_surface.h>
 #include <rtabmap/core/Memory.h>
 #include <rtabmap/core/OdometryEvent.h>
+#include <rtabmap/core/Version.h>
 
 #include <pcl_conversions/pcl_conversions.h>
 
 #include <laser_geometry/laser_geometry.h>
 
-#ifdef WITH_OCTOMAP
+#ifdef WITH_OCTOMAP_ROS
+#ifdef RTABMAP_OCTOMAP
 #include <octomap_msgs/conversions.h>
+#include <rtabmap/core/OctoMap.h>
+#endif
 #endif
 
 #define BAD_COVARIANCE 9999
@@ -98,14 +102,20 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 		mapToOdom_(rtabmap::Transform::getIdentity()),
 		mapsManager_(true),
 		depthSync_(0),
+		depthExactSync_(0),
 		depthScanSync_(0),
+		depthScan3dSync_(0),
 		stereoScanSync_(0),
+		stereoScan3dSync_(0),
 		stereoApproxSync_(0),
 		stereoExactSync_(0),
 		depth2Sync_(0),
 		depthTFSync_(0),
+		depthTFExactSync_(0),
 		depthScanTFSync_(0),
+		depthScan3dTFSync_(0),
 		stereoScanTFSync_(0),
+		stereoScan3dTFSync_(0),
 		stereoApproxTFSync_(0),
 		stereoExactTFSync_(0),
 		transformThread_(0),
@@ -126,8 +136,9 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 	int queueSize = 10;
 	bool publishTf = true;
 	double tfDelay = 0.05; // 20 Hz
+	double tfTolerance = 0.1; // 100 ms
 	std::string tfPrefix = "";
-	bool stereoApproxSync = false;
+	bool approxSync = true;
 
 	// ROS related parameters (private)
 	pnh.param("subscribe_depth",     subscribeDepth, subscribeDepth);
@@ -166,11 +177,22 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 	pnh.param("ground_truth_frame_id", groundTruthFrameId_, groundTruthFrameId_);
 	pnh.param("depth_cameras",       depthCameras, depthCameras);
 	pnh.param("queue_size",          queueSize, queueSize);
-	pnh.param("stereo_approx_sync",  stereoApproxSync, stereoApproxSync);
+	if(pnh.hasParam("stereo_approx_sync") && !pnh.hasParam("approx_sync"))
+	{
+		ROS_WARN("Parameter \"stereo_approx_sync\" has been renamed "
+				 "to \"approx_sync\"! Your value is still copied to "
+				 "corresponding parameter.");
+		pnh.param("stereo_approx_sync", approxSync, approxSync);
+	}
+	else
+	{
+		pnh.param("approx_sync", approxSync, approxSync);
+	}
 
 	pnh.param("publish_tf",          publishTf, publishTf);
 	pnh.param("tf_delay",            tfDelay, tfDelay);
 	pnh.param("tf_prefix",           tfPrefix, tfPrefix);
+	pnh.param("tf_tolerance",        tfTolerance, tfTolerance);
 	pnh.param("wait_for_transform",  waitForTransform_, waitForTransform_);
 	pnh.param("wait_for_transform_duration",  waitForTransformDuration_, waitForTransformDuration_);
 	pnh.param("use_action_for_goal", useActionForGoal_, useActionForGoal_);
@@ -219,7 +241,9 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 	ROS_INFO("rtabmap: map_frame_id = %s", mapFrameId_.c_str());
 	ROS_INFO("rtabmap: queue_size = %d", queueSize);
 	ROS_INFO("rtabmap: tf_delay = %f", tfDelay);
+	ROS_INFO("rtabmap: tf_tolerance = %f", tfTolerance);
 	ROS_INFO("rtabmap: depth_cameras = %d", depthCameras);
+	ROS_INFO("rtabmap: approx_sync = %s", approxSync?"true":"false");
 
 	infoPub_ = nh.advertise<rtabmap_ros::Info>("info", 1);
 	mapDataPub_ = nh.advertise<rtabmap_ros::MapData>("mapData", 1);
@@ -408,9 +432,11 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 	cancelGoalSrv_ = nh.advertiseService("cancel_goal", &CoreWrapper::cancelGoalCallback, this);
 	setLabelSrv_ = nh.advertiseService("set_label", &CoreWrapper::setLabelCallback, this);
 	listLabelsSrv_ = nh.advertiseService("list_labels", &CoreWrapper::listLabelsCallback, this);
-#ifdef WITH_OCTOMAP
+#ifdef WITH_OCTOMAP_ROS
+#ifdef RTABMAP_OCTOMAP
 	octomapBinarySrv_ = nh.advertiseService("octomap_binary", &CoreWrapper::octomapBinaryCallback, this);
 	octomapFullSrv_ = nh.advertiseService("octomap_full", &CoreWrapper::octomapFullCallback, this);
+#endif
 #endif
 	//private services
 	setLogDebugSrv_ = pnh.advertiseService("log_debug", &CoreWrapper::setLogDebug, this);
@@ -418,13 +444,13 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 	setLogWarnSrv_ = pnh.advertiseService("log_warning", &CoreWrapper::setLogWarn, this);
 	setLogErrorSrv_ = pnh.advertiseService("log_error", &CoreWrapper::setLogError, this);
 
-	setupCallbacks(subscribeDepth, subscribeScan2d, subscribeScan3d, subscribeStereo, queueSize, stereoApproxSync, depthCameras);
+	setupCallbacks(subscribeDepth, subscribeScan2d, subscribeScan3d, subscribeStereo, queueSize, approxSync, depthCameras);
 
 	int optimizeIterations = 0;
 	Parameters::parse(parameters_, Parameters::kOptimizerIterations(), optimizeIterations);
 	if(publishTf && optimizeIterations != 0)
 	{
-		transformThread_ = new boost::thread(boost::bind(&CoreWrapper::publishLoop, this, tfDelay));
+		transformThread_ = new boost::thread(boost::bind(&CoreWrapper::publishLoop, this, tfDelay, tfTolerance));
 	}
 	else if(publishTf)
 	{
@@ -443,10 +469,16 @@ CoreWrapper::~CoreWrapper()
 
 	if(depthSync_)
 		delete depthSync_;
+	if(depthExactSync_)
+		delete depthExactSync_;
 	if(depthScanSync_)
 		delete depthScanSync_;
+	if(depthScan3dSync_)
+		delete depthScan3dSync_;
 	if(stereoScanSync_)
 		delete stereoScanSync_;
+	if(stereoScan3dSync_)
+		delete stereoScan3dSync_;
 	if(stereoApproxSync_)
 		delete stereoApproxSync_;
 	if(stereoExactSync_)
@@ -455,10 +487,16 @@ CoreWrapper::~CoreWrapper()
 		delete depth2Sync_;
 	if(depthTFSync_)
 		delete depthTFSync_;
+	if(depthTFExactSync_)
+		delete depthTFExactSync_;
 	if(depthScanTFSync_)
 		delete depthScanTFSync_;
+	if(depthScan3dTFSync_)
+		delete depthScan3dTFSync_;
 	if(stereoScanTFSync_)
 		delete stereoScanTFSync_;
+	if(stereoScan3dTFSync_)
+		delete stereoScan3dTFSync_;
 	if(stereoApproxTFSync_)
 		delete stereoApproxTFSync_;
 	if(stereoExactTFSync_)
@@ -527,7 +565,7 @@ void CoreWrapper::saveParameters(const std::string & configFile)
 	}
 }
 
-void CoreWrapper::publishLoop(double tfDelay)
+void CoreWrapper::publishLoop(double tfDelay, double tfTolerance)
 {
 	if(tfDelay == 0)
 		return;
@@ -537,7 +575,7 @@ void CoreWrapper::publishLoop(double tfDelay)
 		if(!odomFrameId_.empty())
 		{
 			mapToOdomMutex_.lock();
-			ros::Time tfExpiration = ros::Time::now() + ros::Duration(tfDelay);
+			ros::Time tfExpiration = ros::Time::now() + ros::Duration(tfTolerance);
 			geometry_msgs::TransformStamped msg;
 			msg.child_frame_id = odomFrameId_;
 			msg.header.frame_id = mapFrameId_;
@@ -817,8 +855,19 @@ void CoreWrapper::commonDepthCallback(
 			ROS_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8 and image_depth=32FC1,16UC1,mono16");
 			return;
 		}
-		UASSERT(imageMsgs[i]->width == imageWidth && imageMsgs[i]->height == imageHeight);
-		UASSERT(depthMsgs[i]->width == imageWidth && depthMsgs[i]->height == imageHeight);
+
+		UASSERT_MSG(imageMsgs[i]->width == imageWidth && imageMsgs[i]->height == imageHeight,
+				uFormat("imageWidth=%d vs %d imageHeight=%d vs %d",
+						imageWidth,
+						imageMsgs[i]->width,
+						imageHeight,
+						imageMsgs[i]->height).c_str());
+		UASSERT_MSG(depthMsgs[i]->width == imageWidth && depthMsgs[i]->height == imageHeight,
+				uFormat("imageWidth=%d vs %d imageHeight=%d vs %d",
+						imageWidth,
+						depthMsgs[i]->width,
+						imageHeight,
+						depthMsgs[i]->height).c_str());
 
 		Transform localTransform = getTransform(frameId_, depthMsgs[i]->header.frame_id, depthMsgs[i]->header.stamp);
 		if(localTransform.isNull())
@@ -993,7 +1042,9 @@ void CoreWrapper::commonDepthCallback(
 			if(scanCloudNormalK_ > 0)
 			{
 				//compute normals
-				pcl::PointCloud<pcl::PointNormal>::Ptr pclScanNormal = util3d::computeNormals(pclScan, scanCloudNormalK_);
+				pcl::PointCloud<pcl::Normal>::Ptr normals = util3d::computeNormals(pclScan, scanCloudNormalK_);
+				pcl::PointCloud<pcl::PointNormal>::Ptr pclScanNormal(new pcl::PointCloud<pcl::PointNormal>);
+				pcl::concatenateFields(*pclScan, *normals, *pclScanNormal);
 				scan = util3d::laserScanFromPointCloud(*pclScanNormal);
 			}
 			else
@@ -1156,7 +1207,9 @@ void CoreWrapper::commonStereoCallback(
 			if(scanCloudNormalK_ > 0)
 			{
 				//compute normals
-				pcl::PointCloud<pcl::PointNormal>::Ptr pclScanNormal = util3d::computeNormals(pclScan, scanCloudNormalK_);
+				pcl::PointCloud<pcl::Normal>::Ptr normals = util3d::computeNormals(pclScan, scanCloudNormalK_);
+				pcl::PointCloud<pcl::PointNormal>::Ptr pclScanNormal(new pcl::PointCloud<pcl::PointNormal>);
+				pcl::concatenateFields(*pclScan, *normals, *pclScanNormal);
 				scan = util3d::laserScanFromPointCloud(*pclScanNormal);
 			}
 			else
@@ -1440,6 +1493,8 @@ void CoreWrapper::process(
 	if(rtabmap_.isIDsGenerated() || data.id() > 0)
 	{
 		double timeRtabmap = 0.0;
+		double timeUpdateMaps = 0.0;
+		double timePublishMaps = 0.0;
 		if(rtabmap_.process(data, odom, OdometryEvent::generateCovarianceMatrix(odomRotationalVariance, odomTransitionalVariance)))
 		{
 			timeRtabmap = timer.ticks();
@@ -1473,7 +1528,10 @@ void CoreWrapper::process(
 						false,
 						false,
 						false,
+						false,
 						tmpSignature);
+
+				timeUpdateMaps = timer.ticks();
 
 				mapsManager_.publishMaps(filteredPoses, stamp, mapFrameId_);
 
@@ -1545,17 +1603,20 @@ void CoreWrapper::process(
 						}
 					}
 				}
+
+				timePublishMaps = timer.ticks();
 			}
 		}
 		else
 		{
 			timeRtabmap = timer.ticks();
 		}
-		ROS_INFO("rtabmap: Rate=%.2fs, Limit=%.3fs, RTAB-Map=%.4fs, Pub=%.4fs (local map=%d, WM=%d)",
+		ROS_INFO("rtabmap: Rate=%.2fs, Limit=%.3fs, RTAB-Map=%.4fs, Maps update=%.4fs pub=%.4fs (local map=%d, WM=%d)",
 				rate_>0?1.0f/rate_:0,
 				rtabmap_.getTimeThreshold()/1000.0f,
 				timeRtabmap,
-				timer.ticks(),
+				timeUpdateMaps,
+				timePublishMaps,
 				(int)rtabmap_.getLocalOptimizedPoses().size(),
 				rtabmap_.getWMSize()+rtabmap_.getSTMSize());
 	}
@@ -1934,6 +1995,7 @@ bool CoreWrapper::getProjMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::
 			false,
 			true,
 			false,
+			false,
 			false);
 	if(filteredPoses.size())
 	{
@@ -1978,6 +2040,7 @@ bool CoreWrapper::getGridMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::
 			false,
 			false,
 			true,
+			false,
 			false);
 	if(filteredPoses.size())
 	{
@@ -2087,6 +2150,7 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 				filteredPoses = mapsManager_.updateMapCaches(
 						poses,
 						rtabmap_.getMemory(),
+						false,
 						false,
 						false,
 						false,
@@ -2545,7 +2609,8 @@ void CoreWrapper::publishGlobalPath(const ros::Time & stamp)
 	}
 }
 
-#ifdef WITH_OCTOMAP
+#ifdef WITH_OCTOMAP_ROS
+#ifdef RTABMAP_OCTOMAP
 bool CoreWrapper::octomapBinaryCallback(
 		octomap_msgs::GetOctomap::Request  &req,
 		octomap_msgs::GetOctomap::Response &res)
@@ -2555,14 +2620,10 @@ bool CoreWrapper::octomapBinaryCallback(
 	res.map.header.stamp = ros::Time::now();
 
 	std::map<int, Transform> poses = rtabmap_.getLocalOptimizedPoses();
-	poses = mapsManager_.updateMapCaches(poses, rtabmap_.getMemory(), true, false, false, false);
+	poses = mapsManager_.updateMapCaches(poses, rtabmap_.getMemory(), false, false, false, false, true);
 
-	octomap::OcTree * octree = mapsManager_.createOctomap(poses);
-	bool success = octree != 0 && octree->size() && octomap_msgs::binaryMapToMsg(*octree, res.map);
-	if(octree)
-	{
-		delete octree;
-	}
+	const rtabmap::OctoMap * octomap = mapsManager_.getOctomap();
+	bool success = octomap->octree()->size() && octomap_msgs::binaryMapToMsg(*octomap->octree(), res.map);
 	return success;
 }
 
@@ -2575,16 +2636,13 @@ bool CoreWrapper::octomapFullCallback(
 	res.map.header.stamp = ros::Time::now();
 
 	std::map<int, Transform> poses = rtabmap_.getLocalOptimizedPoses();
-	poses = mapsManager_.updateMapCaches(poses, rtabmap_.getMemory(), true, false, false, false);
+	poses = mapsManager_.updateMapCaches(poses, rtabmap_.getMemory(), false, false, false, false, true);
 
-	octomap::OcTree * octree = mapsManager_.createOctomap(poses);
-	bool success = octree != 0 && octree->size() && octomap_msgs::fullMapToMsg(*octree, res.map);
-	if(octree)
-	{
-		delete octree;
-	}
+	const rtabmap::OctoMap * octomap = mapsManager_.getOctomap();
+	bool success = octomap->octree()->size() && octomap_msgs::fullMapToMsg(*octomap->octree(), res.map);
 	return success;
 }
+#endif
 #endif
 
 /**
@@ -2604,7 +2662,7 @@ void CoreWrapper::setupCallbacks(
 		bool subscribeScan3d,
 		bool subscribeStereo,
 		int queueSize,
-		bool stereoApproxSync,
+		bool approxSync,
 		int depthCameras)
 {
 	ros::NodeHandle nh; // public
@@ -2649,7 +2707,6 @@ void CoreWrapper::setupCallbacks(
 			odomSub_.subscribe(nh, "odom", 1);
 			if(subscribeScan2d)
 			{
-				ROS_INFO("Registering Depth+LaserScan callback...");
 				scanSub_.subscribe(nh, "scan", 1);
 				depthScanSync_ = new message_filters::Synchronizer<MyDepthScanSyncPolicy>(
 						MyDepthScanSyncPolicy(queueSize),
@@ -2670,7 +2727,6 @@ void CoreWrapper::setupCallbacks(
 			}
 			else if(subscribeScan3d)
 			{
-				ROS_INFO("Registering Depth+LaserScan3d callback...");
 				scan3dSub_.subscribe(nh, "scan_cloud", 1);
 				depthScan3dSync_ = new message_filters::Synchronizer<MyDepthScan3dSyncPolicy>(
 						MyDepthScan3dSyncPolicy(queueSize),
@@ -2693,7 +2749,6 @@ void CoreWrapper::setupCallbacks(
 			{
 				if(depthCameras > 1)
 				{
-					ROS_INFO("Registering Depth2 callback...");
 					depth2Sync_ = new message_filters::Synchronizer<MyDepth2SyncPolicy>(
 							MyDepth2SyncPolicy(queueSize),
 							odomSub_,
@@ -2717,17 +2772,29 @@ void CoreWrapper::setupCallbacks(
 				}
 				else
 				{
-					ROS_INFO("Registering Depth callback...");
-					depthSync_ = new message_filters::Synchronizer<MyDepthSyncPolicy>(
-							MyDepthSyncPolicy(queueSize),
-							*imageSubs_[0],
-							odomSub_,
-							*imageDepthSubs_[0],
-							*cameraInfoSubs_[0]);
-					depthSync_->registerCallback(boost::bind(&CoreWrapper::depthCallback, this, _1, _2, _3, _4));
-
-					ROS_INFO("\n%s subscribed to:\n   %s,\n   %s,\n   %s,\n   %s",
+					if(approxSync)
+					{
+						depthSync_ = new message_filters::Synchronizer<MyDepthSyncPolicy>(
+								MyDepthSyncPolicy(queueSize),
+								*imageSubs_[0],
+								odomSub_,
+								*imageDepthSubs_[0],
+								*cameraInfoSubs_[0]);
+						depthSync_->registerCallback(boost::bind(&CoreWrapper::depthCallback, this, _1, _2, _3, _4));
+					}
+					else
+					{
+						depthExactSync_ = new message_filters::Synchronizer<MyDepthExactSyncPolicy>(
+								MyDepthExactSyncPolicy(queueSize),
+								*imageSubs_[0],
+								odomSub_,
+								*imageDepthSubs_[0],
+								*cameraInfoSubs_[0]);
+						depthExactSync_->registerCallback(boost::bind(&CoreWrapper::depthCallback, this, _1, _2, _3, _4));
+					}
+					ROS_INFO("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s",
 							ros::this_node::getName().c_str(),
+							approxSync?"approx":"exact",
 							imageSubs_[0]->getTopic().c_str(),
 							imageDepthSubs_[0]->getTopic().c_str(),
 							cameraInfoSubs_[0]->getTopic().c_str(),
@@ -2776,15 +2843,27 @@ void CoreWrapper::setupCallbacks(
 			}
 			else //!subscribeLaserScan
 			{
-				depthTFSync_ = new message_filters::Synchronizer<MyDepthTFSyncPolicy>(
-						MyDepthTFSyncPolicy(queueSize),
-						*imageSubs_[0],
-						*imageDepthSubs_[0],
-						*cameraInfoSubs_[0]);
-				depthTFSync_->registerCallback(boost::bind(&CoreWrapper::depthTFCallback, this, _1, _2, _3));
-
-				ROS_INFO("\n%s subscribed to:\n   %s,\n   %s,\n   %s",
+				if(approxSync)
+				{
+					depthTFSync_ = new message_filters::Synchronizer<MyDepthTFSyncPolicy>(
+							MyDepthTFSyncPolicy(queueSize),
+							*imageSubs_[0],
+							*imageDepthSubs_[0],
+							*cameraInfoSubs_[0]);
+					depthTFSync_->registerCallback(boost::bind(&CoreWrapper::depthTFCallback, this, _1, _2, _3));
+				}
+				else
+				{
+					depthTFExactSync_ = new message_filters::Synchronizer<MyDepthTFExactSyncPolicy>(
+							MyDepthTFExactSyncPolicy(queueSize),
+							*imageSubs_[0],
+							*imageDepthSubs_[0],
+							*cameraInfoSubs_[0]);
+					depthTFExactSync_->registerCallback(boost::bind(&CoreWrapper::depthTFCallback, this, _1, _2, _3));
+				}
+				ROS_INFO("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s",
 						ros::this_node::getName().c_str(),
+						approxSync?"approx":"exact",
 						imageSubs_[0]->getTopic().c_str(),
 						imageDepthSubs_[0]->getTopic().c_str(),
 						cameraInfoSubs_[0]->getTopic().c_str());
@@ -2856,9 +2935,8 @@ void CoreWrapper::setupCallbacks(
 			}
 			else //!subscribeLaserScan
 			{
-				if(stereoApproxSync)
+				if(approxSync)
 				{
-					ROS_INFO("Registering Stereo Approx callback...");
 					stereoApproxSync_ = new message_filters::Synchronizer<MyStereoApproxSyncPolicy>(
 							MyStereoApproxSyncPolicy(queueSize),
 							imageRectLeft_,
@@ -2870,7 +2948,6 @@ void CoreWrapper::setupCallbacks(
 				}
 				else
 				{
-					ROS_INFO("Registering Stereo Exact callback...");
 					stereoExactSync_ = new message_filters::Synchronizer<MyStereoExactSyncPolicy>(
 							MyStereoExactSyncPolicy(queueSize),
 							imageRectLeft_,
@@ -2881,8 +2958,9 @@ void CoreWrapper::setupCallbacks(
 					stereoExactSync_->registerCallback(boost::bind(&CoreWrapper::stereoCallback, this, _1, _2, _3, _4, _5));
 				}
 
-				ROS_INFO("\n%s subscribed to:\n   %s,\n   %s,\n   %s,\n   %s,\n   %s",
+				ROS_INFO("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s,\n   %s",
 						ros::this_node::getName().c_str(),
+						approxSync?"approx":"exact",
 						imageRectLeft_.getTopic().c_str(),
 						imageRectRight_.getTopic().c_str(),
 						cameraInfoLeft_.getTopic().c_str(),
@@ -2895,7 +2973,6 @@ void CoreWrapper::setupCallbacks(
 			// use odom from TF, so subscribe to sensors only
 			if(subscribeScan2d)
 			{
-				ROS_INFO("Registering Stereo+LaserScan2d+OdomTF callback...");
 				scanSub_.subscribe(nh, "scan", 1);
 				stereoScanTFSync_ = new message_filters::Synchronizer<MyStereoScanTFSyncPolicy>(
 						MyStereoScanTFSyncPolicy(queueSize),
@@ -2916,7 +2993,6 @@ void CoreWrapper::setupCallbacks(
 			}
 			else if(subscribeScan3d)
 			{
-				ROS_INFO("Registering Stereo+LaserScan3d+OdomTF callback...");
 				scan3dSub_.subscribe(nh, "scan_cloud", 1);
 				stereoScan3dTFSync_ = new message_filters::Synchronizer<MyStereoScan3dTFSyncPolicy>(
 						MyStereoScan3dTFSyncPolicy(queueSize),
@@ -2937,9 +3013,8 @@ void CoreWrapper::setupCallbacks(
 			}
 			else //!subscribeLaserScan
 			{
-				if(stereoApproxSync)
+				if(approxSync)
 				{
-					ROS_INFO("Registering Stereo+OdomTF Approx callback...");
 					stereoApproxTFSync_ = new message_filters::Synchronizer<MyStereoApproxTFSyncPolicy>(
 							MyStereoApproxTFSyncPolicy(queueSize),
 							imageRectLeft_,
@@ -2950,7 +3025,6 @@ void CoreWrapper::setupCallbacks(
 				}
 				else
 				{
-					ROS_INFO("Registering Stereo+OdomTF Exact callback...");
 					stereoExactTFSync_ = new message_filters::Synchronizer<MyStereoExactTFSyncPolicy>(
 							MyStereoExactTFSyncPolicy(queueSize),
 							imageRectLeft_,
@@ -2960,8 +3034,9 @@ void CoreWrapper::setupCallbacks(
 					stereoExactTFSync_->registerCallback(boost::bind(&CoreWrapper::stereoTFCallback, this, _1, _2, _3, _4));
 				}
 
-				ROS_INFO("\n%s subscribed to:\n   %s,\n   %s,\n   %s,\n   %s",
+				ROS_INFO("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s",
 						ros::this_node::getName().c_str(),
+						approxSync?"approx":"exact",
 						imageRectLeft_.getTopic().c_str(),
 						imageRectRight_.getTopic().c_str(),
 						cameraInfoLeft_.getTopic().c_str(),

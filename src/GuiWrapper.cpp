@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2010-2014, Mathieu Labbe - IntRoLab - Universite de Sherbrooke
+Copyright (c) 2010-2016, Mathieu Labbe - IntRoLab - Universite de Sherbrooke
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -529,70 +529,74 @@ void GuiWrapper::commonDepthCallback(
 		const sensor_msgs::PointCloud2ConstPtr& scan3dMsg,
 		const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg)
 {
+	UASSERT(imageMsgs.size()>0 &&
+			imageMsgs.size() == depthMsgs.size() &&
+			imageMsgs.size() == cameraInfoMsgs.size());
+
+	std_msgs::Header odomHeader;
+	if(odomMsg.get())
+	{
+		odomHeader = odomMsg->header;
+	}
+	else
+	{
+		if(scan2dMsg.get())
+		{
+			odomHeader = scan2dMsg->header;
+		}
+		else if(scan3dMsg.get())
+		{
+			odomHeader = scan3dMsg->header;
+		}
+		else if(cameraInfoMsgs.size() && cameraInfoMsgs[0].get())
+		{
+			odomHeader = cameraInfoMsgs[0]->header;
+		}
+		else if(depthMsgs.size() && depthMsgs[0].get())
+		{
+			odomHeader = depthMsgs[0]->header;
+		}
+		else if(imageMsgs.size() && imageMsgs[0].get())
+		{
+			odomHeader = imageMsgs[0]->header;
+		}
+		odomHeader.frame_id = odomFrameId_;
+	}
+
+	Transform odomT = getTransform(odomHeader.frame_id, frameId_, odomHeader.stamp);
+	cv::Mat covariance = cv::Mat::eye(6,6,CV_64FC1);
+	if(odomMsg.get())
+	{
+		UASSERT(odomMsg->pose.covariance.size() == 36);
+		if(!(odomMsg->pose.covariance[0] == 0 &&
+			 odomMsg->pose.covariance[7] == 0 &&
+			 odomMsg->pose.covariance[14] == 0 &&
+			 odomMsg->pose.covariance[21] == 0 &&
+			 odomMsg->pose.covariance[28] == 0 &&
+			 odomMsg->pose.covariance[35] == 0))
+		{
+			covariance = cv::Mat(6,6,CV_64FC1,(void*)odomMsg->pose.covariance.data()).clone();
+		}
+	}
+	if(odomHeader.frame_id.empty())
+	{
+		ROS_ERROR("Odometry frame not set!?");
+		return;
+	}
+
+	cv::Mat rgb;
+	cv::Mat depth;
+	std::vector<CameraModel> cameraModels;
+	cv::Mat scan;
+	rtabmap::OdometryInfo info;
+	bool ignoreData = false;
+
 	if(UTimer::now() - lastOdomInfoUpdateTime_ > 0.1 &&
 	   !mainWindow_->isProcessingOdometry() &&
 	   !mainWindow_->isProcessingStatistics())
 	{
 		lastOdomInfoUpdateTime_ = UTimer::now();
 
-		UASSERT(imageMsgs.size()>0 &&
-				imageMsgs.size() == depthMsgs.size() &&
-				imageMsgs.size() == cameraInfoMsgs.size());
-
-		std_msgs::Header odomHeader;
-		if(odomMsg.get())
-		{
-			odomHeader = odomMsg->header;
-		}
-		else
-		{
-			if(scan2dMsg.get())
-			{
-				odomHeader = scan2dMsg->header;
-			}
-			else if(scan3dMsg.get())
-			{
-				odomHeader = scan3dMsg->header;
-			}
-			else if(cameraInfoMsgs.size() && cameraInfoMsgs[0].get())
-			{
-				odomHeader = cameraInfoMsgs[0]->header;
-			}
-			else if(depthMsgs.size() && depthMsgs[0].get())
-			{
-				odomHeader = depthMsgs[0]->header;
-			}
-			else if(imageMsgs.size() && imageMsgs[0].get())
-			{
-				odomHeader = imageMsgs[0]->header;
-			}
-			odomHeader.frame_id = odomFrameId_;
-		}
-
-		Transform odomT = getTransform(odomHeader.frame_id, frameId_, odomHeader.stamp);
-		cv::Mat covariance = cv::Mat::eye(6,6,CV_64FC1);
-		if(odomMsg.get())
-		{
-			UASSERT(odomMsg->pose.covariance.size() == 36);
-			if(!(odomMsg->pose.covariance[0] == 0 &&
-				 odomMsg->pose.covariance[7] == 0 &&
-				 odomMsg->pose.covariance[14] == 0 &&
-				 odomMsg->pose.covariance[21] == 0 &&
-				 odomMsg->pose.covariance[28] == 0 &&
-				 odomMsg->pose.covariance[35] == 0))
-			{
-				covariance = cv::Mat(6,6,CV_64FC1,(void*)odomMsg->pose.covariance.data()).clone();
-			}
-		}
-		if(odomHeader.frame_id.empty())
-		{
-			ROS_ERROR("Odometry frame not set!?");
-			return;
-		}
-
-		cv::Mat rgb;
-		cv::Mat depth;
-		std::vector<CameraModel> cameraModels;
 		if(imageMsgs[0].get() && depthMsgs[0].get())
 		{
 			int imageWidth = imageMsgs[0]->width;
@@ -686,7 +690,6 @@ void GuiWrapper::commonDepthCallback(
 			}
 		}
 
-		cv::Mat scan;
 		if(scan2dMsg.get() != 0)
 		{
 			// make sure the frame of the laser is updated too
@@ -726,28 +729,38 @@ void GuiWrapper::commonDepthCallback(
 			scan = util3d::laserScanFromPointCloud(*pclScan);
 		}
 
-		rtabmap::OdometryInfo info;
 		if(odomInfoMsg.get())
 		{
 			info = rtabmap_ros::odomInfoFromROS(*odomInfoMsg);
 		}
-
-		rtabmap::OdometryEvent odomEvent(
-			rtabmap::SensorData(
-					scan,
-					scan2dMsg.get()?(int)scan2dMsg->ranges.size():0,
-					scan2dMsg.get()?(int)scan2dMsg->range_max:0,
-					rgb,
-					depth,
-					cameraModels,
-					odomHeader.seq,
-					rtabmap_ros::timestampFromROS(odomHeader.stamp)),
-			odomMsg.get()?rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose):odomT,
-			covariance,
-			info);
-
-		QMetaObject::invokeMethod(mainWindow_, "processOdometry", Q_ARG(rtabmap::OdometryEvent, odomEvent));
+		ignoreData = false;
 	}
+	else if(odomInfoMsg.get())
+	{
+		info = rtabmap_ros::odomInfoFromROS(*odomInfoMsg).copyWithoutData();
+		ignoreData = true;
+	}
+	else
+	{
+		// don't update GUI odom stuff if we don't use visual odometry
+		return;
+	}
+
+	rtabmap::OdometryEvent odomEvent(
+		rtabmap::SensorData(
+				scan,
+				scan2dMsg.get()?(int)scan2dMsg->ranges.size():0,
+				scan2dMsg.get()?(int)scan2dMsg->range_max:0,
+				rgb,
+				depth,
+				cameraModels,
+				odomHeader.seq,
+				rtabmap_ros::timestampFromROS(odomHeader.stamp)),
+		odomMsg.get()?rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose):odomT,
+		covariance,
+		info);
+
+	QMetaObject::invokeMethod(mainWindow_, "processOdometry", Q_ARG(rtabmap::OdometryEvent, odomEvent), Q_ARG(bool, ignoreData));
 }
 
 void GuiWrapper::commonStereoCallback(
@@ -760,6 +773,91 @@ void GuiWrapper::commonStereoCallback(
 		const sensor_msgs::PointCloud2ConstPtr& scan3dMsg,
 		const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg)
 {
+	UASSERT(leftImageMsg.get() && rightImageMsg.get());
+	UASSERT(leftCamInfoMsg.get() && rightCamInfoMsg.get());
+
+	if(!(leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
+		 leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0 ||
+		 leftImageMsg->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
+		 leftImageMsg->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0) ||
+	   !(rightImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
+		 rightImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0 ||
+		 rightImageMsg->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
+		 rightImageMsg->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0))
+	{
+		ROS_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8");
+		return;
+	}
+
+	std_msgs::Header odomHeader;
+	if(odomMsg.get())
+	{
+		odomHeader = odomMsg->header;
+	}
+	else
+	{
+		if(scan2dMsg.get())
+		{
+			odomHeader = scan2dMsg->header;
+		}
+		else if(scan3dMsg.get())
+		{
+			odomHeader = scan3dMsg->header;
+		}
+		else
+		{
+			odomHeader = leftCamInfoMsg->header;
+		}
+		odomHeader.frame_id = odomFrameId_;
+	}
+
+	Transform odomT = getTransform(odomHeader.frame_id, frameId_, odomHeader.stamp);
+	cv::Mat covariance = cv::Mat::eye(6,6,CV_64FC1);
+	if(odomMsg.get())
+	{
+		UASSERT(odomMsg->pose.covariance.size() == 36);
+		if(!(odomMsg->pose.covariance[0] == 0 &&
+			 odomMsg->pose.covariance[7] == 0 &&
+			 odomMsg->pose.covariance[14] == 0 &&
+			 odomMsg->pose.covariance[21] == 0 &&
+			 odomMsg->pose.covariance[28] == 0 &&
+			 odomMsg->pose.covariance[35] == 0))
+		{
+			covariance = cv::Mat(6,6,CV_64FC1,(void*)odomMsg->pose.covariance.data()).clone();
+		}
+	}
+	if(odomHeader.frame_id.empty())
+	{
+		ROS_ERROR("Odometry frame not set!?");
+		return;
+	}
+
+	Transform localTransform = getTransform(frameId_, leftCamInfoMsg->header.frame_id, leftCamInfoMsg->header.stamp);
+	if(localTransform.isNull())
+	{
+		return;
+	}
+	// sync with odometry stamp
+	if(odomHeader.stamp != leftCamInfoMsg->header.stamp)
+	{
+		if(!odomT.isNull())
+		{
+			Transform sensorT = getTransform(odomHeader.frame_id, frameId_, leftCamInfoMsg->header.stamp);
+			if(sensorT.isNull())
+			{
+				return;
+			}
+			localTransform = odomT.inverse() * sensorT * localTransform;
+		}
+	}
+
+	cv::Mat left;
+	cv::Mat right;
+	cv::Mat scan;
+	rtabmap::StereoCameraModel stereoModel;
+	rtabmap::OdometryInfo info;
+	bool ignoreData = false;
+
 	// limit 10 Hz max
 	if(UTimer::now() - lastOdomInfoUpdateTime_ > 0.1 &&
 	   !mainWindow_->isProcessingOdometry() &&
@@ -767,85 +865,7 @@ void GuiWrapper::commonStereoCallback(
 	{
 		lastOdomInfoUpdateTime_ = UTimer::now();
 
-		UASSERT(leftImageMsg.get() && rightImageMsg.get());
-		UASSERT(leftCamInfoMsg.get() && rightCamInfoMsg.get());
-
-		if(!(leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
-			 leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0 ||
-			 leftImageMsg->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
-			 leftImageMsg->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0) ||
-		   !(rightImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
-			 rightImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0 ||
-			 rightImageMsg->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
-			 rightImageMsg->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0))
-		{
-			ROS_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8");
-			return;
-		}
-
-		std_msgs::Header odomHeader;
-		if(odomMsg.get())
-		{
-			odomHeader = odomMsg->header;
-		}
-		else
-		{
-			if(scan2dMsg.get())
-			{
-				odomHeader = scan2dMsg->header;
-			}
-			else if(scan3dMsg.get())
-			{
-				odomHeader = scan3dMsg->header;
-			}
-			else
-			{
-				odomHeader = leftCamInfoMsg->header;
-			}
-			odomHeader.frame_id = odomFrameId_;
-		}
-
-		Transform odomT = getTransform(odomHeader.frame_id, frameId_, odomHeader.stamp);
-		cv::Mat covariance = cv::Mat::eye(6,6,CV_64FC1);
-		if(odomMsg.get())
-		{
-			UASSERT(odomMsg->pose.covariance.size() == 36);
-			if(!(odomMsg->pose.covariance[0] == 0 &&
-				 odomMsg->pose.covariance[7] == 0 &&
-				 odomMsg->pose.covariance[14] == 0 &&
-				 odomMsg->pose.covariance[21] == 0 &&
-				 odomMsg->pose.covariance[28] == 0 &&
-				 odomMsg->pose.covariance[35] == 0))
-			{
-				covariance = cv::Mat(6,6,CV_64FC1,(void*)odomMsg->pose.covariance.data()).clone();
-			}
-		}
-		if(odomHeader.frame_id.empty())
-		{
-			ROS_ERROR("Odometry frame not set!?");
-			return;
-		}
-
-		Transform localTransform = getTransform(frameId_, leftCamInfoMsg->header.frame_id, leftCamInfoMsg->header.stamp);
-		if(localTransform.isNull())
-		{
-			return;
-		}
-		// sync with odometry stamp
-		if(odomHeader.stamp != leftCamInfoMsg->header.stamp)
-		{
-			if(!odomT.isNull())
-			{
-				Transform sensorT = getTransform(odomHeader.frame_id, frameId_, leftCamInfoMsg->header.stamp);
-				if(sensorT.isNull())
-				{
-					return;
-				}
-				localTransform = odomT.inverse() * sensorT * localTransform;
-			}
-		}
-
-		rtabmap::StereoCameraModel stereoModel = rtabmap_ros::stereoCameraModelFromROS(*leftCamInfoMsg, *rightCamInfoMsg, localTransform);
+		stereoModel = rtabmap_ros::stereoCameraModelFromROS(*leftCamInfoMsg, *rightCamInfoMsg, localTransform);
 
 		if(stereoModel.baseline() > 10.0)
 		{
@@ -862,7 +882,6 @@ void GuiWrapper::commonStereoCallback(
 
 		// left
 		cv_bridge::CvImageConstPtr ptrImage;
-		cv::Mat left;
 		if(leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
 		   leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
 		{
@@ -874,9 +893,8 @@ void GuiWrapper::commonStereoCallback(
 		}
 
 		// right
-		cv::Mat right = cv_bridge::toCvCopy(rightImageMsg, "mono8")->image;
+		right = cv_bridge::toCvCopy(rightImageMsg, "mono8")->image;
 
-		cv::Mat scan;
 		if(scan2dMsg.get() != 0)
 		{
 			// make sure the frame of the laser is updated too
@@ -916,28 +934,38 @@ void GuiWrapper::commonStereoCallback(
 			scan = util3d::laserScanFromPointCloud(*pclScan);
 		}
 
-		rtabmap::OdometryInfo info;
 		if(odomInfoMsg.get())
 		{
 			info = rtabmap_ros::odomInfoFromROS(*odomInfoMsg);
 		}
-
-		rtabmap::OdometryEvent odomEvent(
-			rtabmap::SensorData(
-					scan,
-					scan2dMsg.get()?(int)scan2dMsg->ranges.size():0,
-					scan2dMsg.get()?(int)scan2dMsg->range_max:0,
-					left,
-					right,
-					stereoModel,
-					odomHeader.seq,
-					rtabmap_ros::timestampFromROS(odomHeader.stamp)),
-			odomMsg.get()?rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose):odomT,
-			covariance,
-			info);
-
-		QMetaObject::invokeMethod(mainWindow_, "processOdometry", Q_ARG(rtabmap::OdometryEvent, odomEvent));
+		ignoreData = false;
 	}
+	else if(odomInfoMsg.get())
+	{
+		info = rtabmap_ros::odomInfoFromROS(*odomInfoMsg).copyWithoutData();
+		ignoreData = true;
+	}
+	else
+	{
+		// don't update GUI odom stuff if we don't use visual odometry
+		return;
+	}
+
+	rtabmap::OdometryEvent odomEvent(
+		rtabmap::SensorData(
+				scan,
+				scan2dMsg.get()?(int)scan2dMsg->ranges.size():0,
+				scan2dMsg.get()?(int)scan2dMsg->range_max:0,
+				left,
+				right,
+				stereoModel,
+				odomHeader.seq,
+				rtabmap_ros::timestampFromROS(odomHeader.stamp)),
+		odomMsg.get()?rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose):odomT,
+		covariance,
+		info);
+
+	QMetaObject::invokeMethod(mainWindow_, "processOdometry", Q_ARG(rtabmap::OdometryEvent, odomEvent), Q_ARG(bool, ignoreData));
 }
 
 // With odom msg

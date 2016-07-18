@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2010-2014, Mathieu Labbe - IntRoLab - Universite de Sherbrooke
+Copyright (c) 2010-2016, Mathieu Labbe - IntRoLab - Universite de Sherbrooke
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -29,6 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define ODOMETRYROS_H_
 
 #include <ros/ros.h>
+#include <nodelet/nodelet.h>
 
 #include <tf2_ros/transform_broadcaster.h>
 #include <tf/transform_listener.h>
@@ -46,14 +47,13 @@ class Odometry;
 
 namespace rtabmap_ros {
 
-class OdometryROS
+class OdometryROS : public nodelet::Nodelet
 {
-public:
-	static void processArguments(int argc, char * argv[], bool stereo = false);
 
 public:
-	OdometryROS(int argc, char * argv[], bool stereo = false);
+	OdometryROS(bool stereo);
 	virtual ~OdometryROS();
+
 	void processData(const rtabmap::SensorData & data, const ros::Time & stamp);
 
 	bool reset(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
@@ -77,6 +77,10 @@ protected:
 	virtual void flushCallbacks() = 0;
 
 private:
+	virtual void onInit();
+	virtual void onOdomInit() = 0;
+
+private:
 	rtabmap::Odometry * odometry_;
 
 	// parameters
@@ -87,6 +91,7 @@ private:
 	bool waitForTransform_;
 	double waitForTransformDuration_;
 	bool publishNullWhenLost_;
+	bool guessFromTf_;
 	rtabmap::ParametersMap parameters_;
 
 	ros::Publisher odomPub_;
@@ -107,6 +112,7 @@ private:
 	bool paused_;
 	int resetCountdown_;
 	int resetCurrentCount_;
+	bool stereo_;
 };
 
 }

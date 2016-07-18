@@ -1,4 +1,21 @@
 <library path="lib/librtabmap_ros"> 
+
+  <class name="rtabmap_ros/rgbd_odometry" 
+         type="rtabmap_ros::RGBDOdometry" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
+  
+  <class name="rtabmap_ros/stereo_odometry" 
+         type="rtabmap_ros::StereoOdometry" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
+
   <class name="rtabmap_ros/data_throttle" 
          type="rtabmap_ros::DataThrottleNodelet" 
          base_class_type="nodelet::Nodelet">

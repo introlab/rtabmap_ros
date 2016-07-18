@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2010-2014, Mathieu Labbe - IntRoLab - Universite de Sherbrooke
+Copyright (c) 2010-2016, Mathieu Labbe - IntRoLab - Universite de Sherbrooke
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -41,8 +41,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap_ros/SetGoal.h>
 #include <rtabmap/utilite/ULogger.h>
 #include <rtabmap/utilite/UStl.h>
+#include <rtabmap/utilite/UThread.h>
+#include <rtabmap/utilite/UDirectory.h>
+#include <rtabmap/utilite/UConversion.h>
 #include <rtabmap/core/util3d.h>
 #include <rtabmap/core/DBReader.h>
+#include <rtabmap/core/OdometryEvent.h>
 #include <cmath>
 
 bool paused = false;
@@ -118,19 +122,24 @@ int main(int argc, char** argv)
 	ROS_INFO("odom_frame_id = %s", odomFrameId.c_str());
 	ROS_INFO("camera_frame_id = %s", cameraFrameId.c_str());
 	ROS_INFO("scan_frame_id = %s", scanFrameId.c_str());
-	ROS_INFO("database = %s", databasePath.c_str());
 	ROS_INFO("rate = %f", rate);
 	ROS_INFO("publish_tf = %s", publishTf?"true":"false");
-
-	rtabmap::DBReader reader(databasePath, rate);
+	ROS_INFO("start_id = %d", startId);
 
 	if(databasePath.empty())
 	{
 		ROS_ERROR("Parameter \"database\" must be set (path to a RTAB-Map database).");
 		return -1;
 	}
+	databasePath = uReplaceChar(databasePath, '~', UDirectory::homeDir());
+	if(databasePath.size() && databasePath.at(0) != '/')
+	{
+		databasePath = UDirectory::currentDir(true) + databasePath;
+	}
+	ROS_INFO("database = %s", databasePath.c_str());
 
-	if(!reader.init(startId))
+	rtabmap::DBReader reader(databasePath, rate, false, false, false, startId);
+	if(!reader.init())
 	{
 		ROS_ERROR("Cannot open database \"%s\".", databasePath.c_str());
 		return -1;
@@ -154,7 +163,9 @@ int main(int argc, char** argv)
 	tf2_ros::TransformBroadcaster tfBroadcaster;
 
 	UTimer timer;
-	rtabmap::OdometryEvent odom = reader.getNextData();
+	rtabmap::CameraInfo info;
+	rtabmap::SensorData data = reader.takeImage(&info);
+	rtabmap::OdometryEvent odom(data, info.odomPose, info.odomCovariance);
 	double acquisitionTime = timer.ticks();
 	while(ros::ok() && odom.data().id())
 	{
@@ -479,7 +490,9 @@ int main(int argc, char** argv)
 		}
 
 		timer.restart();
-		odom = reader.getNextData();
+		info = rtabmap::CameraInfo();
+		data = reader.takeImage(&info);
+		odom = rtabmap::OdometryEvent(data, info.odomPose, info.odomCovariance);
 		acquisitionTime = timer.ticks();
 	}
 

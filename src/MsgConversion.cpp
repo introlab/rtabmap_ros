@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2010-2014, Mathieu Labbe - IntRoLab - Universite de Sherbrooke
+Copyright (c) 2010-2016, Mathieu Labbe - IntRoLab - Universite de Sherbrooke
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -147,6 +147,7 @@ void infoFromROS(const rtabmap_ros::Info & info, rtabmap::Statistics & stat)
 	stat.setRefImageId(info.refId);
 	stat.setLoopClosureId(info.loopClosureId);
 	stat.setProximityDetectionId(info.proximityDetectionId);
+	stat.setStamp(info.header.stamp.toSec());
 
 	stat.setLoopClosureTransform(rtabmap_ros::transformFromGeometryMsg(info.loopClosureTransform));
 
@@ -345,19 +346,38 @@ void cameraModelToROS(
 		const rtabmap::CameraModel & model,
 		sensor_msgs::CameraInfo & camInfo)
 {
-	UASSERT(model.isValidForRectification());
-
 	camInfo.D = std::vector<double>(model.D_raw().cols);
 	memcpy(camInfo.D.data(), model.D_raw().data, model.D_raw().cols*sizeof(double));
 
-	UASSERT(model.K_raw().total() == 9);
-	memcpy(camInfo.K.elems, model.K_raw().data, 9*sizeof(double));
+	UASSERT(model.K_raw().empty() || model.K_raw().total() == 9);
+	if(model.K_raw().empty())
+	{
+		memset(camInfo.K.elems, 0.0, 9*sizeof(double));
+	}
+	else
+	{
+		memcpy(camInfo.K.elems, model.K_raw().data, 9*sizeof(double));
+	}
 
-	UASSERT(model.R().total() == 9);
-	memcpy(camInfo.R.elems, model.R().data, 9*sizeof(double));
+	UASSERT(model.R().empty() || model.R().total() == 9);
+	if(model.R().empty())
+	{
+		memset(camInfo.R.elems, 0.0, 9*sizeof(double));
+	}
+	else
+	{
+		memcpy(camInfo.R.elems, model.R().data, 9*sizeof(double));
+	}
 
-	UASSERT(model.P().total() == 12);
-	memcpy(camInfo.P.elems, model.P().data, 12*sizeof(double));
+	UASSERT(model.P().empty() || model.P().total() == 12);
+	if(model.P().empty())
+	{
+		memset(camInfo.P.elems, 0.0, 12*sizeof(double));
+	}
+	else
+	{
+		memcpy(camInfo.P.elems, model.P().data, 12*sizeof(double));
+	}
 
 	if(camInfo.D.size() > 5)
 	{

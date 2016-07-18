@@ -2,7 +2,7 @@
 <launch>
   <!-- Convenience launch file to launch odometry, rtabmap and rtabmapviz nodes at once -->
 
-  <!-- For rgbd:=true
+  <!-- For stereo:=false
         Your RGB-D sensor should be already started with "depth_registration:=true".
         Examples:
            $ roslaunch freenect_launch freenect.launch depth_registration:=true 
@@ -15,7 +15,6 @@
            $ roslaunch rtabmap_ros bumblebee.launch -->
      
   <!-- Choose between RGB-D and stereo -->      
-  <arg name="rgbd"            default="true"/>
   <arg name="stereo"          default="false"/>
  
   <!-- Choose visualization -->
@@ -37,7 +36,8 @@
   <arg name="wait_for_transform"      default="0.2"/>
   <arg name="rtabmap_args"            default=""/>              <!-- delete_db_on_start, udebug -->
   <arg name="launch_prefix"           default=""/>              <!-- for debugging purpose, it fills launch-prefix tag of the nodes -->
-  
+  <arg name="approx_sync"             default="true"/>         <!-- if timestamps of the input topics are not synchronized -->
+   
   <!-- RGB-D related topics -->
   <arg name="rgb_topic"               default="/camera/rgb/image_rect_color" />
   <arg name="depth_topic"             default="/camera/depth_registered/image_raw" />
@@ -49,7 +49,6 @@
   <arg name="right_image_topic"       default="$(arg stereo_namespace)/right/image_rect" />      <!-- using grayscale image for efficiency -->
   <arg name="left_camera_info_topic"  default="$(arg stereo_namespace)/left/camera_info" />
   <arg name="right_camera_info_topic" default="$(arg stereo_namespace)/right/camera_info" />
-  <arg name="approx_sync"             default="false"/>         <!-- if timestamps of the stereo images are not synchronized -->
   
   <arg name="compressed"              default="false"/>         <!-- If you want to subscribe to compressed image topics -->
                                                                 <!-- For depth_topic, "compressedDepth" image_transport is used. --> 
@@ -80,7 +79,7 @@
   <group ns="$(arg namespace)">
   
     <!-- RGB-D Odometry -->
-    <group if="$(arg rgbd)">
+    <group unless="$(arg stereo)">
       <node if="$(arg compressed)" name="republish_rgb" type="republish" pkg="image_transport" args="$(arg rgb_image_transport) in:=$(arg rgb_topic) raw out:=$(arg rgb_topic_relay)" />
       <node if="$(arg compressed)" name="republish_depth" type="republish" pkg="image_transport" args="compressedDepth in:=$(arg depth_topic) raw out:=$(arg depth_topic_relay)" />
   
@@ -91,6 +90,7 @@
 	  
         <param name="frame_id"                    type="string" value="$(arg frame_id)"/>
         <param name="wait_for_transform_duration" type="double" value="$(arg wait_for_transform)"/>
+        <param name="approx_sync"                 type="bool"   value="$(arg approx_sync)"/>
         <param name="config_path"                 type="string" value="$(arg cfg)"/>
         <param name="queue_size"                  type="int" value="$(arg queue_size)"/>
       </node>
@@ -101,7 +101,7 @@
       <node if="$(arg compressed)" name="republish_left"  type="republish" pkg="image_transport" args="compressed in:=$(arg left_image_topic) raw out:=$(arg left_image_topic_relay)" />
       <node if="$(arg compressed)" name="republish_right" type="republish" pkg="image_transport" args="compressed in:=$(arg right_image_topic) raw out:=$(arg right_image_topic_relay)" />
   
-      <node if="$(arg visual_odometry)" pkg="rtabmap_ros" type="stereo_odometry" name="stereo_odometry" output="screen" args="$(arg rtabmap_args)" launch-prefix="$(arg launch_prefix)">
+      <node if="$(arg visual_odometry)" pkg="rtabmap_ros" type="stereo_odometry" name="stereo_odometry" output="screen" args="$(arg odom_args)" launch-prefix="$(arg launch_prefix)">
         <remap from="left/image_rect"        to="$(arg left_image_topic_relay)"/>
         <remap from="right/image_rect"       to="$(arg right_image_topic_relay)"/>
         <remap from="left/camera_info"       to="$(arg left_camera_info_topic)"/>
@@ -118,14 +118,15 @@
     <!-- Visual SLAM (robot side) -->
     <!-- args: "delete_db_on_start" and "udebug" -->
     <node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="screen" args="$(arg rtabmap_args)" launch-prefix="$(arg launch_prefix)">
-      <param name="subscribe_depth"      type="bool"   value="$(arg rgbd)"/>
+      <param     if="$(arg stereo)" name="subscribe_depth"  type="bool" value="false"/>
+      <param unless="$(arg stereo)" name="subscribe_depth"  type="bool" value="true"/>
       <param name="subscribe_stereo"     type="bool"   value="$(arg stereo)"/>
       <param name="subscribe_scan"       type="bool"   value="$(arg subscribe_scan)"/>
       <param name="subscribe_scan_cloud" type="bool"   value="$(arg subscribe_scan_cloud)"/>
       <param name="frame_id"             type="string" value="$(arg frame_id)"/>
       <param name="wait_for_transform_duration"  type="double"   value="$(arg wait_for_transform)"/>
       <param name="database_path"        type="string" value="$(arg database_path)"/>
-      <param name="stereo_approx_sync"   type="bool"   value="$(arg approx_sync)"/>
+      <param name="approx_sync"          type="bool"   value="$(arg approx_sync)"/>
       <param name="config_path"          type="string" value="$(arg cfg)"/>
       <param name="queue_size"           type="int" value="$(arg queue_size)"/>
       
@@ -150,7 +151,8 @@
   
     <!-- Visualisation RTAB-Map -->
     <node if="$(arg rtabmapviz)" pkg="rtabmap_ros" type="rtabmapviz" name="rtabmapviz" args="-d $(arg gui_cfg)" output="screen" launch-prefix="$(arg launch_prefix)">
-      <param name="subscribe_depth"      type="bool"   value="$(arg rgbd)"/>
+      <param     if="$(arg stereo)" name="subscribe_depth"  type="bool" value="false"/>
+      <param unless="$(arg stereo)" name="subscribe_depth"  type="bool" value="true"/>
       <param name="subscribe_stereo"     type="bool"   value="$(arg stereo)"/>
       <param name="subscribe_scan"       type="bool"   value="$(arg subscribe_scan)"/>
       <param name="subscribe_scan_cloud" type="bool"   value="$(arg subscribe_scan_cloud)"/>
@@ -189,7 +191,7 @@
 
     <param name="decimation"  type="double" value="2"/>
     <param name="voxel_size"  type="double" value="0.02"/>
-    <param if="$(arg stereo)" name="approx_sync" type="bool"   value="$(arg approx_sync)"/>
+    <param name="approx_sync" type="bool"   value="$(arg approx_sync)"/>
   </node>
 
 </launch>

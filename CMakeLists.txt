@@ -18,7 +18,7 @@ find_package(rviz)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
-find_package(RTABMap 0.11.7 REQUIRED)
+find_package(RTABMap 0.11.8 REQUIRED)
 
 find_package(OpenCV REQUIRED)
 
@@ -149,6 +149,8 @@ SET(Libraries
 )
   
 SET(rtabmap_ros_lib_src
+   src/nodelets/rgbd_odometry.cpp
+   src/nodelets/stereo_odometry.cpp
    src/nodelets/data_throttle.cpp
    src/nodelets/stereo_throttle.cpp
    src/nodelets/data_odom_sync.cpp
@@ -157,8 +159,8 @@ SET(rtabmap_ros_lib_src
    src/nodelets/disparity_to_depth.cpp 
    src/nodelets/obstacles_detection.cpp
    src/nodelets/point_cloud_aggregator.cpp
+   src/nodelets/OdometryROS.cpp
    src/MsgConversion.cpp
-   src/OdometryROS.cpp
    src/MapsManager.cpp
 )   
 
@@ -175,6 +177,19 @@ SET(rtabmap_ros_lib_src
   ${rtabmap_ros_lib_src}
   )
 ENDIF(costmap_2d_FOUND)
+
+# If octomap is found, add definition
+IF(octomap_ros_FOUND)
+MESSAGE(STATUS "WITH octomap")
+include_directories(
+  ${octomap_ros_INCLUDE_DIRS}
+)
+SET(Libraries
+  ${octomap_ros_LIBRARIES}
+  ${Libraries}
+)
+ADD_DEFINITIONS("-DWITH_OCTOMAP_ROS")
+ENDIF(octomap_ros_FOUND)
 
 IF(QT4_FOUND OR Qt5_FOUND)
 SET(Libraries 
@@ -244,27 +259,14 @@ IF(Qt5_FOUND)
 ENDIF(Qt5_FOUND)
 add_dependencies(rtabmap_ros ${${PROJECT_NAME}_EXPORTED_TARGETS})
 
-# If octomap is found, add definition
-IF(octomap_ros_FOUND)
-MESSAGE(STATUS "WITH octomap")
-include_directories(
-  ${octomap_ros_INCLUDE_DIRS}
-)
-SET(Libraries
-  ${octomap_ros_LIBRARIES}
-  ${Libraries}
-)
-add_definitions(-DWITH_OCTOMAP)
-ENDIF(octomap_ros_FOUND)
-
 add_executable(rtabmap src/CoreNode.cpp src/CoreWrapper.cpp)
 target_link_libraries(rtabmap rtabmap_ros ${Libraries})
 
 add_executable(rgbd_odometry src/RGBDOdometryNode.cpp)
-target_link_libraries(rgbd_odometry rtabmap_ros ${Libraries})
+target_link_libraries(rgbd_odometry ${Libraries})
 
 add_executable(stereo_odometry src/StereoOdometryNode.cpp)
-target_link_libraries(stereo_odometry rtabmap_ros ${Libraries})
+target_link_libraries(stereo_odometry ${Libraries})
 
 add_executable(map_optimizer src/MapOptimizerNode.cpp)
 target_link_libraries(map_optimizer rtabmap_ros ${Libraries})
@@ -275,6 +277,9 @@ target_link_libraries(map_assembler rtabmap_ros ${Libraries})
 add_executable(camera src/CameraNode.cpp)
 add_dependencies(camera ${${PROJECT_NAME}_EXPORTED_TARGETS})
 target_link_libraries(camera ${Libraries})
+
+add_executable(stereo_camera src/StereoCameraNode.cpp)
+target_link_libraries(stereo_camera rtabmap_ros ${Libraries})
 
 IF(RTABMAP_GUI)
     add_executable(rtabmapviz src/GuiNode.cpp src/GuiWrapper.cpp src/PreferencesDialogROS.cpp)

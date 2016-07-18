@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2010-2014, Mathieu Labbe - IntRoLab - Universite de Sherbrooke
+Copyright (c) 2010-2016, Mathieu Labbe - IntRoLab - Universite de Sherbrooke
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -97,6 +97,7 @@ public:
 		poses = mapsManager_.updateMapCaches(
 				poses,
 				0,
+				false,
 				false,
 				false,
 				false,

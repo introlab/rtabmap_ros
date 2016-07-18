@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package>
   <name>rtabmap_ros</name>
-  <version>0.11.7</version>
+  <version>0.11.8</version>
   <description>RTAB-Map's ros-pkg. RTAB-Map is a RGB-D SLAM approach with real-time constraints.</description>
   <maintainer email="matlabbe@gmail.com">Mathieu Labbe</maintainer>
   <author>Mathieu Labbe</author>
@@ -39,7 +39,6 @@
   <build_depend>move_base_msgs</build_depend>
   <build_depend>costmap_2d</build_depend>
   <build_depend>octomap_ros</build_depend>
-  <build_depend>octomap</build_depend>
   
   <run_depend>cv_bridge</run_depend>
   <run_depend>roscpp</run_depend>
@@ -69,7 +68,6 @@
   <run_depend>move_base_msgs</run_depend>
   <run_depend>costmap_2d</run_depend>
   <run_depend>octomap_ros</run_depend>
-  <run_depend>octomap</run_depend>
 
   <build_depend>libpcl-all-dev</build_depend>
 
