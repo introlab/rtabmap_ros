@@ -147,6 +147,7 @@ void infoFromROS(const rtabmap_ros::Info & info, rtabmap::Statistics & stat)
 	stat.setRefImageId(info.refId);
 	stat.setLoopClosureId(info.loopClosureId);
 	stat.setProximityDetectionId(info.proximityDetectionId);
+	stat.setStamp(info.header.stamp.toSec());
 
 	stat.setLoopClosureTransform(rtabmap_ros::transformFromGeometryMsg(info.loopClosureTransform));
 
