@@ -269,7 +269,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 		bool updateOctomap,
 		const std::map<int, rtabmap::Signature> & signatures)
 {
-	if(!updateCloud && !updateProj && !updateGrid && !updateScan)
+	if(!updateCloud && !updateProj && !updateGrid && !updateScan && !updateOctomap)
 	{
 		//  all false, udpate only those where we have subscribers
 		updateCloud = cloudMapPub_.getNumSubscribers() != 0;
@@ -367,6 +367,15 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 				ROS_WARN("Many scans should be created (~%d), this may take a while to update the map(s)...", int(filteredPoses.size()-scans_.size()));
 				longUpdate = true;
 			}
+#ifdef WITH_OCTOMAP_ROS
+#ifdef RTABMAP_OCTOMAP
+			else if(updateOctomap && octomap_->addedNodes().size() < 5)
+			{
+				ROS_WARN("Many clouds should be added to octomap (~%d), this may take a while to update the map(s)...", int(filteredPoses.size()-octomap_->addedNodes().size()));
+				longUpdate = true;
+			}
+#endif
+#endif
 		}
 
 		for(std::map<int, rtabmap::Transform>::iterator iter=filteredPoses.begin(); iter!=filteredPoses.end(); ++iter)
