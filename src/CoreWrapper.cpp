@@ -2708,17 +2708,31 @@ void CoreWrapper::setupCallbacks(
 			if(subscribeScan2d)
 			{
 				scanSub_.subscribe(nh, "scan", 1);
-				depthScanSync_ = new message_filters::Synchronizer<MyDepthScanSyncPolicy>(
-						MyDepthScanSyncPolicy(queueSize),
-						*imageSubs_[0],
-						odomSub_,
-						*imageDepthSubs_[0],
-						*cameraInfoSubs_[0],
-						scanSub_);
-				depthScanSync_->registerCallback(boost::bind(&CoreWrapper::depthScanCallback, this, _1, _2, _3, _4, _5));
-
-				ROS_INFO("\n%s subscribed to:\n   %s,\n   %s,\n   %s,\n   %s,\n   %s",
+				if(approxSync)
+				{
+					depthScanSync_ = new message_filters::Synchronizer<MyDepthScanSyncPolicy>(
+							MyDepthScanSyncPolicy(queueSize),
+							*imageSubs_[0],
+							odomSub_,
+							*imageDepthSubs_[0],
+							*cameraInfoSubs_[0],
+							scanSub_);
+					depthScanSync_->registerCallback(boost::bind(&CoreWrapper::depthScanCallback, this, _1, _2, _3, _4, _5));
+				}
+				else
+				{
+					depthScanExactSync_ = new message_filters::Synchronizer<MyDepthScanExactSyncPolicy>(
+							MyDepthScanExactSyncPolicy(queueSize),
+							*imageSubs_[0],
+							odomSub_,
+							*imageDepthSubs_[0],
+							*cameraInfoSubs_[0],
+							scanSub_);
+					depthScanExactSync_->registerCallback(boost::bind(&CoreWrapper::depthScanCallback, this, _1, _2, _3, _4, _5));
+				}
+				ROS_INFO("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s,\n   %s",
 						ros::this_node::getName().c_str(),
+						approxSync?"approx":"exact",
 						imageSubs_[0]->getTopic().c_str(),
 						imageDepthSubs_[0]->getTopic().c_str(),
 						cameraInfoSubs_[0]->getTopic().c_str(),
@@ -2728,17 +2742,31 @@ void CoreWrapper::setupCallbacks(
 			else if(subscribeScan3d)
 			{
 				scan3dSub_.subscribe(nh, "scan_cloud", 1);
-				depthScan3dSync_ = new message_filters::Synchronizer<MyDepthScan3dSyncPolicy>(
-						MyDepthScan3dSyncPolicy(queueSize),
-						*imageSubs_[0],
-						odomSub_,
-						*imageDepthSubs_[0],
-						*cameraInfoSubs_[0],
-						scan3dSub_);
-				depthScan3dSync_->registerCallback(boost::bind(&CoreWrapper::depthScan3dCallback, this, _1, _2, _3, _4, _5));
-
-				ROS_INFO("\n%s subscribed to:\n   %s,\n   %s,\n   %s,\n   %s,\n   %s",
+				if(approxSync)
+				{
+					depthScan3dSync_ = new message_filters::Synchronizer<MyDepthScan3dSyncPolicy>(
+							MyDepthScan3dSyncPolicy(queueSize),
+							*imageSubs_[0],
+							odomSub_,
+							*imageDepthSubs_[0],
+							*cameraInfoSubs_[0],
+							scan3dSub_);
+					depthScan3dSync_->registerCallback(boost::bind(&CoreWrapper::depthScan3dCallback, this, _1, _2, _3, _4, _5));
+				}
+				else
+				{
+					depthScan3dExactSync_ = new message_filters::Synchronizer<MyDepthScan3dExactSyncPolicy>(
+							MyDepthScan3dExactSyncPolicy(queueSize),
+							*imageSubs_[0],
+							odomSub_,
+							*imageDepthSubs_[0],
+							*cameraInfoSubs_[0],
+							scan3dSub_);
+					depthScan3dExactSync_->registerCallback(boost::bind(&CoreWrapper::depthScan3dCallback, this, _1, _2, _3, _4, _5));
+				}
+				ROS_INFO("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s,\n   %s",
 						ros::this_node::getName().c_str(),
+						approxSync?"approx":"exact",
 						imageSubs_[0]->getTopic().c_str(),
 						imageDepthSubs_[0]->getTopic().c_str(),
 						cameraInfoSubs_[0]->getTopic().c_str(),
@@ -2808,16 +2836,29 @@ void CoreWrapper::setupCallbacks(
 			if(subscribeScan2d)
 			{
 				scanSub_.subscribe(nh, "scan", 1);
-				depthScanTFSync_ = new message_filters::Synchronizer<MyDepthScanTFSyncPolicy>(
-						MyDepthScanTFSyncPolicy(queueSize),
-						*imageSubs_[0],
-						*imageDepthSubs_[0],
-						*cameraInfoSubs_[0],
-						scanSub_);
-				depthScanTFSync_->registerCallback(boost::bind(&CoreWrapper::depthScanTFCallback, this, _1, _2, _3, _4));
-
-				ROS_INFO("\n%s subscribed to:\n   %s,\n   %s,\n   %s,\n   %s",
+				if(approxSync)
+				{
+					depthScanTFSync_ = new message_filters::Synchronizer<MyDepthScanTFSyncPolicy>(
+							MyDepthScanTFSyncPolicy(queueSize),
+							*imageSubs_[0],
+							*imageDepthSubs_[0],
+							*cameraInfoSubs_[0],
+							scanSub_);
+					depthScanTFSync_->registerCallback(boost::bind(&CoreWrapper::depthScanTFCallback, this, _1, _2, _3, _4));
+				}
+				else
+				{
+					depthScanTFExactSync_ = new message_filters::Synchronizer<MyDepthScanTFExactSyncPolicy>(
+							MyDepthScanTFExactSyncPolicy(queueSize),
+							*imageSubs_[0],
+							*imageDepthSubs_[0],
+							*cameraInfoSubs_[0],
+							scanSub_);
+					depthScanTFExactSync_->registerCallback(boost::bind(&CoreWrapper::depthScanTFCallback, this, _1, _2, _3, _4));
+				}
+				ROS_INFO("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s",
 						ros::this_node::getName().c_str(),
+						approxSync?"approx":"exact",
 						imageSubs_[0]->getTopic().c_str(),
 						imageDepthSubs_[0]->getTopic().c_str(),
 						cameraInfoSubs_[0]->getTopic().c_str(),
@@ -2826,16 +2867,29 @@ void CoreWrapper::setupCallbacks(
 			else if(subscribeScan3d)
 			{
 				scan3dSub_.subscribe(nh, "scan_cloud", 1);
-				depthScan3dTFSync_ = new message_filters::Synchronizer<MyDepthScan3dTFSyncPolicy>(
-						MyDepthScan3dTFSyncPolicy(queueSize),
-						*imageSubs_[0],
-						*imageDepthSubs_[0],
-						*cameraInfoSubs_[0],
-						scan3dSub_);
-				depthScan3dTFSync_->registerCallback(boost::bind(&CoreWrapper::depthScan3dTFCallback, this, _1, _2, _3, _4));
-
-				ROS_INFO("\n%s subscribed to:\n   %s,\n   %s,\n   %s,\n   %s",
+				if(approxSync)
+				{
+					depthScan3dTFSync_ = new message_filters::Synchronizer<MyDepthScan3dTFSyncPolicy>(
+							MyDepthScan3dTFSyncPolicy(queueSize),
+							*imageSubs_[0],
+							*imageDepthSubs_[0],
+							*cameraInfoSubs_[0],
+							scan3dSub_);
+					depthScan3dTFSync_->registerCallback(boost::bind(&CoreWrapper::depthScan3dTFCallback, this, _1, _2, _3, _4));
+				}
+				else
+				{
+					depthScan3dTFExactSync_ = new message_filters::Synchronizer<MyDepthScan3dTFExactSyncPolicy>(
+							MyDepthScan3dTFExactSyncPolicy(queueSize),
+							*imageSubs_[0],
+							*imageDepthSubs_[0],
+							*cameraInfoSubs_[0],
+							scan3dSub_);
+					depthScan3dTFExactSync_->registerCallback(boost::bind(&CoreWrapper::depthScan3dTFCallback, this, _1, _2, _3, _4));
+				}
+				ROS_INFO("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s",
 						ros::this_node::getName().c_str(),
+						approxSync?"approx":"exact",
 						imageSubs_[0]->getTopic().c_str(),
 						imageDepthSubs_[0]->getTopic().c_str(),
 						cameraInfoSubs_[0]->getTopic().c_str(),
