@@ -323,6 +323,13 @@ private:
 			sensor_msgs::CameraInfo,
 			sensor_msgs::LaserScan> MyDepthScanSyncPolicy;
 	message_filters::Synchronizer<MyDepthScanSyncPolicy> * depthScanSync_;
+	typedef message_filters::sync_policies::ExactTime<
+			sensor_msgs::Image,
+			nav_msgs::Odometry,
+			sensor_msgs::Image,
+			sensor_msgs::CameraInfo,
+			sensor_msgs::LaserScan> MyDepthScanExactSyncPolicy;
+	message_filters::Synchronizer<MyDepthScanExactSyncPolicy> * depthScanExactSync_;
 
 	typedef message_filters::sync_policies::ApproximateTime<
 			sensor_msgs::Image,
@@ -331,6 +338,13 @@ private:
 			sensor_msgs::CameraInfo,
 			sensor_msgs::PointCloud2> MyDepthScan3dSyncPolicy;
 	message_filters::Synchronizer<MyDepthScan3dSyncPolicy> * depthScan3dSync_;
+	typedef message_filters::sync_policies::ExactTime<
+			sensor_msgs::Image,
+			nav_msgs::Odometry,
+			sensor_msgs::Image,
+			sensor_msgs::CameraInfo,
+			sensor_msgs::PointCloud2> MyDepthScan3dExactSyncPolicy;
+	message_filters::Synchronizer<MyDepthScan3dExactSyncPolicy> * depthScan3dExactSync_;
 
 	typedef message_filters::sync_policies::ApproximateTime<
 			sensor_msgs::Image,
@@ -396,6 +410,12 @@ private:
 			sensor_msgs::CameraInfo,
 			sensor_msgs::LaserScan> MyDepthScanTFSyncPolicy;
 	message_filters::Synchronizer<MyDepthScanTFSyncPolicy> * depthScanTFSync_;
+	typedef message_filters::sync_policies::ExactTime<
+			sensor_msgs::Image,
+			sensor_msgs::Image,
+			sensor_msgs::CameraInfo,
+			sensor_msgs::LaserScan> MyDepthScanTFExactSyncPolicy;
+	message_filters::Synchronizer<MyDepthScanTFExactSyncPolicy> * depthScanTFExactSync_;
 
 	typedef message_filters::sync_policies::ApproximateTime<
 			sensor_msgs::Image,
@@ -403,6 +423,12 @@ private:
 			sensor_msgs::CameraInfo,
 			sensor_msgs::PointCloud2> MyDepthScan3dTFSyncPolicy;
 	message_filters::Synchronizer<MyDepthScan3dTFSyncPolicy> * depthScan3dTFSync_;
+	typedef message_filters::sync_policies::ExactTime<
+			sensor_msgs::Image,
+			sensor_msgs::Image,
+			sensor_msgs::CameraInfo,
+			sensor_msgs::PointCloud2> MyDepthScan3dTFExactSyncPolicy;
+	message_filters::Synchronizer<MyDepthScan3dTFExactSyncPolicy> * depthScan3dTFExactSync_;
 
 	typedef message_filters::sync_policies::ApproximateTime<
 			sensor_msgs::Image,
