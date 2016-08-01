@@ -426,7 +426,7 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 		}
 
 		// local map / reference frame
-		if(odomLocalMap_.getNumSubscribers() && odometry_->isF2M())
+		if(odomLocalMap_.getNumSubscribers() && odometry_->getType() == Odometry::kTypeF2M)
 		{
 			pcl::PointCloud<pcl::PointXYZ> cloud;
 			const std::multimap<int, cv::Point3f> & map = ((OdometryF2M*)odometry_)->getMap().getWords3();
@@ -444,7 +444,7 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 		if(odomLastFrame_.getNumSubscribers())
 		{
 			// check which type of Odometry is using
-			if(odometry_->isF2M()) // If it's Frame to Map Odometry
+			if(odometry_->getType() == Odometry::kTypeF2M) // If it's Frame to Map Odometry
 			{
 				const std::multimap<int, cv::Point3f> & words3  = ((OdometryF2M*)odometry_)->getLastFrame().getWords3();
 				if(words3.size())
@@ -464,7 +464,7 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 					odomLastFrame_.publish(cloudMsg);
 				}
 			}
-			else if(odometry_->isF2F()) // if Using Frame to Frame Odometry
+			else if(odometry_->getType() == Odometry::kTypeF2F) // if Using Frame to Frame Odometry
 			{
 				const Signature & refFrame = ((OdometryF2F*)odometry_)->getRefFrame();
 
@@ -548,11 +548,6 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 	}
 
 	NODELET_INFO( "Odom: quality=%d, std dev=%fm, update time=%fs", info.inliers, pose.isNull()?0.0f:std::sqrt(info.variance), (ros::WallTime::now()-time).toSec());
-}
-
-bool OdometryROS::isOdometryF2M() const
-{
-	return odometry_->isF2M();
 }
 
 bool OdometryROS::reset(std_srvs::Empty::Request&, std_srvs::Empty::Response&)

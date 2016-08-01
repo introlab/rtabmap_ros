@@ -70,7 +70,6 @@ public:
 	const rtabmap::ParametersMap & parameters() const {return parameters_;}
 	const tf::TransformListener & tfListener() const {return tfListener_;}
 	bool isPaused() const {return paused_;}
-	bool isOdometryF2M() const;
 	rtabmap::Transform getTransform(const std::string & fromFrameId, const std::string & toFrameId, const ros::Time & stamp) const;
 
 protected:
