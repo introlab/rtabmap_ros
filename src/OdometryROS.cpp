@@ -25,7 +25,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "OdometryROS.h"
+#include "rtabmap_ros/OdometryROS.h"
 
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/image_encodings.h>
@@ -426,7 +426,7 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 		}
 
 		// local map / reference frame
-		if(odomLocalMap_.getNumSubscribers() && dynamic_cast<OdometryF2M*>(odometry_))
+		if(odomLocalMap_.getNumSubscribers() && odometry_->isF2M())
 		{
 			pcl::PointCloud<pcl::PointXYZ> cloud;
 			const std::multimap<int, cv::Point3f> & map = ((OdometryF2M*)odometry_)->getMap().getWords3();
@@ -443,7 +443,8 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 
 		if(odomLastFrame_.getNumSubscribers())
 		{
-			if(dynamic_cast<OdometryF2M*>(odometry_))
+			// check which type of Odometry is using
+			if(odometry_->isF2M()) // If it's Frame to Map Odometry
 			{
 				const std::multimap<int, cv::Point3f> & words3  = ((OdometryF2M*)odometry_)->getLastFrame().getWords3();
 				if(words3.size())
@@ -463,10 +464,10 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 					odomLastFrame_.publish(cloudMsg);
 				}
 			}
-			else
+			else if(odometry_->isF2F()) // if Using Frame to Frame Odometry
 			{
-				//Frame to Frame
 				const Signature & refFrame = ((OdometryF2F*)odometry_)->getRefFrame();
+
 				if(refFrame.getWords3().size())
 				{
 					pcl::PointCloud<pcl::PointXYZ> cloud;
@@ -482,6 +483,8 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 					cloudMsg.header.frame_id = odomFrameId_;
 					odomLastFrame_.publish(cloudMsg);
 				}
+			}else{
+				NODELET_ERROR("ERROR, Wrong Type of Odometry, Shouldn't happen");
 			}
 		}
 	}
@@ -549,7 +552,7 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 
 bool OdometryROS::isOdometryF2M() const
 {
-	return dynamic_cast<OdometryF2M*>(odometry_) != 0;
+	return odometry_->isF2M();
 }
 
 bool OdometryROS::reset(std_srvs::Empty::Request&, std_srvs::Empty::Response&)

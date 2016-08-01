@@ -28,7 +28,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <ros/ros.h>
 #include "rtabmap_ros/MapData.h"
 #include "rtabmap_ros/MsgConversion.h"
-#include "MapsManager.h"
+#include "rtabmap_ros/MapsManager.h"
 #include <rtabmap/core/util3d_transforms.h>
 #include <rtabmap/core/util3d.h>
 #include <rtabmap/core/util3d_filtering.h>

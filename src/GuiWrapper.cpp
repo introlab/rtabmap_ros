@@ -25,7 +25,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "GuiWrapper.h"
+#include "rtabmap_ros/GuiWrapper.h"
 #include <QApplication>
 #include <QDir>
 
@@ -54,8 +54,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtabmap_ros/GetMap.h"
 #include "rtabmap_ros/SetGoal.h"
 #include "rtabmap_ros/SetLabel.h"
-
-#include "PreferencesDialogROS.h"
+#include "rtabmap_ros/PreferencesDialogROS.h"
 
 #include <pcl_ros/transforms.h>
 #include <pcl_conversions/pcl_conversions.h>

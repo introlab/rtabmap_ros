@@ -25,7 +25,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "CoreWrapper.h"
+#include "rtabmap_ros/CoreWrapper.h"
 
 #include <stdio.h>
 #include <ros/ros.h>

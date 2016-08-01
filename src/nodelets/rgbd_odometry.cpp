@@ -25,7 +25,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "OdometryROS.h"
+#include <rtabmap_ros/OdometryROS.h>
 
 #include <pluginlib/class_list_macros.h>
 #include <nodelet/nodelet.h>
@@ -208,7 +208,7 @@ private:
 				return;
 			}
 
-			ros::Time stamp = image->header.stamp>depth->header.stamp?image->header.stamp:depth->header.stamp;
+			ros::Time stamp = image->header.stamp > depth->header.stamp? image->header.stamp : depth->header.stamp;
 
 			Transform localTransform = getTransform(this->frameId(), image->header.frame_id, stamp);
 			if(localTransform.isNull())
