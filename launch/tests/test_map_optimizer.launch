@@ -1,10 +1,10 @@
 <launch>
    <include file="$(find rtabmap_ros)/launch/rtabmap.launch">
      <arg name="rtabmap_args" value="
-								     --delete_db_on_start 
-								     --RGBD/OptimizeMaxError 0 
-								     --Optimizer/Iterations 0
-								     --RGBD/ProximityBySpace false"/>
+                                     --delete_db_on_start 
+                                     --RGBD/OptimizeMaxError 0 
+                                     --Optimizer/Iterations 0
+                                     --RGBD/ProximityBySpace false"/>
      <arg name="rtabmapviz" value="false"/>
   </include>
   
