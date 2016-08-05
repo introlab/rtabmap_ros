@@ -63,6 +63,7 @@
    
   <arg name="visual_odometry"         default="true"/>          <!-- Launch rtabmap visual odometry node -->
   <arg name="odom_topic"              default="/odom"/>         <!-- Odometry topic used if visual_odometry is false -->
+  <arg name="odom_frame_id"           default=""/>              <!-- If set, TF is used to get odometry instead of the topic -->
   <arg name="odom_args"               default="$(arg rtabmap_args)"/>
   
   <!-- These arguments should not be modified directly, see referred topics without "_relay" suffix above -->
@@ -124,6 +125,7 @@
       <param name="subscribe_scan"       type="bool"   value="$(arg subscribe_scan)"/>
       <param name="subscribe_scan_cloud" type="bool"   value="$(arg subscribe_scan_cloud)"/>
       <param name="frame_id"             type="string" value="$(arg frame_id)"/>
+      <param name="odom_frame_id"        type="string" value="$(arg odom_frame_id)"/>
       <param name="wait_for_transform_duration"  type="double"   value="$(arg wait_for_transform)"/>
       <param name="database_path"        type="string" value="$(arg database_path)"/>
       <param name="approx_sync"          type="bool"   value="$(arg approx_sync)"/>
@@ -158,6 +160,7 @@
       <param name="subscribe_scan_cloud" type="bool"   value="$(arg subscribe_scan_cloud)"/>
       <param name="subscribe_odom_info"  type="bool"   value="$(arg visual_odometry)"/>
       <param name="frame_id"             type="string" value="$(arg frame_id)"/>
+      <param name="odom_frame_id"        type="string" value="$(arg odom_frame_id)"/>
       <param name="wait_for_transform_duration" type="double"   value="$(arg wait_for_transform)"/>
       <param name="queue_size"           type="int" value="$(arg queue_size)"/>
     
