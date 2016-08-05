@@ -44,7 +44,6 @@
   <arg name="wait_for_transform"      default="0.2"/>
   
   <include file="$(find rtabmap_ros)/launch/rtabmap.launch">
-    <arg name="rgbd"                    value="false"/>
     <arg name="stereo"                  value="true"/>
     <arg name="rtabmapviz"              value="$(arg rtabmapviz)" /> 
     <arg name="rviz"                    value="$(arg rviz)" />
