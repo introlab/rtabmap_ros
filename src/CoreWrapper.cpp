@@ -115,6 +115,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 		depthTFSync_(0),
 		depthTFExactSync_(0),
 		depthScanTFSync_(0),
+		depthScanTFExactSync_(0),
 		depthScan3dTFSync_(0),
 		depthScan3dTFExactSync_(0),
 		stereoScanTFSync_(0),
