@@ -104,7 +104,9 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 		depthSync_(0),
 		depthExactSync_(0),
 		depthScanSync_(0),
+		depthScanExactSync_(0),
 		depthScan3dSync_(0),
+		depthScan3dExactSync_(0),
 		stereoScanSync_(0),
 		stereoScan3dSync_(0),
 		stereoApproxSync_(0),
@@ -114,6 +116,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 		depthTFExactSync_(0),
 		depthScanTFSync_(0),
 		depthScan3dTFSync_(0),
+		depthScan3dTFExactSync_(0),
 		stereoScanTFSync_(0),
 		stereoScan3dTFSync_(0),
 		stereoApproxTFSync_(0),
@@ -473,8 +476,12 @@ CoreWrapper::~CoreWrapper()
 		delete depthExactSync_;
 	if(depthScanSync_)
 		delete depthScanSync_;
+	if(depthScanExactSync_)
+		delete depthScanExactSync_;
 	if(depthScan3dSync_)
 		delete depthScan3dSync_;
+	if(depthScan3dExactSync_)
+		delete depthScan3dExactSync_;
 	if(stereoScanSync_)
 		delete stereoScanSync_;
 	if(stereoScan3dSync_)
@@ -491,8 +498,12 @@ CoreWrapper::~CoreWrapper()
 		delete depthTFExactSync_;
 	if(depthScanTFSync_)
 		delete depthScanTFSync_;
+	if(depthScanTFExactSync_)
+		delete depthScanTFExactSync_;
 	if(depthScan3dTFSync_)
 		delete depthScan3dTFSync_;
+	if(depthScan3dTFExactSync_)
+		delete depthScan3dTFExactSync_;
 	if(stereoScanTFSync_)
 		delete stereoScanTFSync_;
 	if(stereoScan3dTFSync_)
