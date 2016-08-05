@@ -566,15 +566,15 @@ void GuiWrapper::commonDepthCallback(
 	cv::Mat covariance = cv::Mat::eye(6,6,CV_64FC1);
 	if(odomMsg.get())
 	{
-		UASSERT(odomMsg->pose.covariance.size() == 36);
-		if(!(odomMsg->pose.covariance[0] == 0 &&
-			 odomMsg->pose.covariance[7] == 0 &&
-			 odomMsg->pose.covariance[14] == 0 &&
-			 odomMsg->pose.covariance[21] == 0 &&
-			 odomMsg->pose.covariance[28] == 0 &&
-			 odomMsg->pose.covariance[35] == 0))
+		UASSERT(odomMsg->twist.covariance.size() == 36);
+		if(odomMsg->twist.covariance[0] != 0 &&
+			 odomMsg->twist.covariance[7] != 0 &&
+			 odomMsg->twist.covariance[14] != 0 &&
+			 odomMsg->twist.covariance[21] != 0 &&
+			 odomMsg->twist.covariance[28] != 0 &&
+			 odomMsg->twist.covariance[35] != 0)
 		{
-			covariance = cv::Mat(6,6,CV_64FC1,(void*)odomMsg->pose.covariance.data()).clone();
+			covariance = cv::Mat(6,6,CV_64FC1,(void*)odomMsg->twist.covariance.data()).clone();
 		}
 	}
 	if(odomHeader.frame_id.empty())
@@ -814,15 +814,15 @@ void GuiWrapper::commonStereoCallback(
 	cv::Mat covariance = cv::Mat::eye(6,6,CV_64FC1);
 	if(odomMsg.get())
 	{
-		UASSERT(odomMsg->pose.covariance.size() == 36);
-		if(!(odomMsg->pose.covariance[0] == 0 &&
-			 odomMsg->pose.covariance[7] == 0 &&
-			 odomMsg->pose.covariance[14] == 0 &&
-			 odomMsg->pose.covariance[21] == 0 &&
-			 odomMsg->pose.covariance[28] == 0 &&
-			 odomMsg->pose.covariance[35] == 0))
+		UASSERT(odomMsg->twist.covariance.size() == 36);
+		if(odomMsg->twist.covariance[0] != 0 &&
+			 odomMsg->twist.covariance[7] != 0 &&
+			 odomMsg->twist.covariance[14] != 0 &&
+			 odomMsg->twist.covariance[21] != 0 &&
+			 odomMsg->twist.covariance[28] != 0 &&
+			 odomMsg->twist.covariance[35] != 0)
 		{
-			covariance = cv::Mat(6,6,CV_64FC1,(void*)odomMsg->pose.covariance.data()).clone();
+			covariance = cv::Mat(6,6,CV_64FC1,(void*)odomMsg->twist.covariance.data()).clone();
 		}
 	}
 	if(odomHeader.frame_id.empty())

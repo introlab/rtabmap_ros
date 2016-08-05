@@ -681,7 +681,7 @@ bool CoreWrapper::commonOdomUpdate(const nav_msgs::OdometryConstPtr & odomMsg)
 		// Only update variance if odom is not null
 		if(!odom.isNull())
 		{
-			// using MIN in case of 3DoF mapping (maybe not parameters are set, except x and yaw for the twist)
+			// using MIN in case of 3DoF mapping (maybe no parameters are set, except x and yaw for the twist)
 			float transVariance = uMax3(odomMsg->twist.covariance[0], MIN(odomMsg->twist.covariance[7], BAD_COVARIANCE), MIN(odomMsg->twist.covariance[14], BAD_COVARIANCE));
 			float rotVariance = uMax3(MIN(odomMsg->twist.covariance[21],BAD_COVARIANCE), MIN(odomMsg->twist.covariance[28], BAD_COVARIANCE), odomMsg->twist.covariance[35]);
 			if(uIsFinite(rotVariance) && rotVariance > rotVariance_)
