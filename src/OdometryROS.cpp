@@ -39,6 +39,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/Rtabmap.h>
 #include <rtabmap/core/OdometryF2M.h>
 #include <rtabmap/core/OdometryF2F.h>
+#include <rtabmap/core/util3d.h>
 #include <rtabmap/core/util3d_transforms.h>
 #include <rtabmap/core/Memory.h>
 #include <rtabmap/core/Signature.h>
@@ -98,6 +99,7 @@ void OdometryROS::onInit()
 	odomPub_ = nh.advertise<nav_msgs::Odometry>("odom", 1);
 	odomInfoPub_ = nh.advertise<rtabmap_ros::OdomInfo>("odom_info", 1);
 	odomLocalMap_ = nh.advertise<sensor_msgs::PointCloud2>("odom_local_map", 1);
+	odomLocalScanMap_ = nh.advertise<sensor_msgs::PointCloud2>("odom_local_scan_map", 1);
 	odomLastFrame_ = nh.advertise<sensor_msgs::PointCloud2>("odom_last_frame", 1);
 
 	Transform initialPose = Transform::getIdentity();
@@ -501,6 +503,25 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 			}else{
 				NODELET_ERROR("ERROR, Wrong Type of Odometry, Shouldn't happen");
 			}
+		}
+
+		if(odomLocalScanMap_.getNumSubscribers() && !info.localScanMap.empty())
+		{
+			sensor_msgs::PointCloud2 cloudMsg;
+			if(info.localScanMap.channels() == 6)
+			{
+				pcl::PointCloud<pcl::PointNormal>::Ptr cloud = util3d::laserScanToPointCloudNormal(info.localScanMap);
+				pcl::toROSMsg(*cloud, cloudMsg);
+			}
+			else
+			{
+				pcl::PointCloud<pcl::PointXYZ>::Ptr cloud = util3d::laserScanToPointCloud(info.localScanMap);
+				pcl::toROSMsg(*cloud, cloudMsg);
+			}
+
+			cloudMsg.header.stamp = stamp; // use corresponding time stamp to image
+			cloudMsg.header.frame_id = odomFrameId_;
+			odomLocalScanMap_.publish(cloudMsg);
 		}
 	}
 	else if(publishNullWhenLost_)

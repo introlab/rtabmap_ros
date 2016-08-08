@@ -31,6 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <zlib.h>
 #include <ros/ros.h>
 #include <rtabmap/core/util3d.h>
+#include <rtabmap/core/Compression.h>
 #include <rtabmap/utilite/UStl.h>
 #include <rtabmap/utilite/ULogger.h>
 #include <pcl_conversions/pcl_conversions.h>
@@ -711,6 +712,7 @@ rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::OdomInfo & msg)
 	info.features = msg.features;
 	info.inliers = msg.inliers;
 	info.localMapSize = msg.localMapSize;
+	info.localScanMapSize = msg.localScanMapSize;
 	info.timeEstimation = msg.timeEstimation;
 	info.variance = msg.variance;
 	info.timeParticleFiltering =  msg.timeParticleFiltering;
@@ -742,6 +744,8 @@ rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::OdomInfo & msg)
 		info.localMap.insert(std::make_pair(msg.localMapKeys[i], point3fFromROS(msg.localMapValues[i])));
 	}
 
+	info.localScanMap = rtabmap::uncompressData(msg.localScanMap);
+
 	return info;
 }
 
@@ -752,6 +756,7 @@ void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_ros::OdomInfo & m
 	msg.features = info.features;
 	msg.inliers = info.inliers;
 	msg.localMapSize = info.localMapSize;
+	msg.localScanMapSize = info.localScanMapSize;
 	msg.timeEstimation = info.timeEstimation;
 	msg.variance = info.variance;
 	msg.timeParticleFiltering =  info.timeParticleFiltering;
@@ -777,6 +782,7 @@ void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_ros::OdomInfo & m
 	msg.localMapKeys = uKeys(info.localMap);
 	points3fToROS(uValues(info.localMap), msg.localMapValues);
 
+	msg.localScanMap = rtabmap::compressData(info.localScanMap);
 }
 
 }
