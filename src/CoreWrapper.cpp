@@ -790,10 +790,11 @@ Transform CoreWrapper::getTransform(const std::string & fromFrameId, const std::
 		if(waitForTransform_ && !stamp.isZero() && waitForTransformDuration_>0.0)
 		{
 			//if(!tfBuffer_.canTransform(fromFrameId, toFrameId, stamp, ros::Duration(1)))
-			if(!tfListener_.waitForTransform(fromFrameId, toFrameId, stamp, ros::Duration(waitForTransformDuration_)))
+			std::string errorMsg;
+			if(!tfListener_.waitForTransform(fromFrameId, toFrameId, stamp, ros::Duration(waitForTransformDuration_), ros::Duration(0.01), &errorMsg))
 			{
-				ROS_WARN("rtabmap: Could not get transform from %s to %s after %f seconds (for stamp=%f)!",
-						fromFrameId.c_str(), toFrameId.c_str(), waitForTransformDuration_, stamp.toSec());
+				ROS_WARN("rtabmap: Could not get transform from %s to %s after %f seconds (for stamp=%f)! Error=\"%s\"",
+						fromFrameId.c_str(), toFrameId.c_str(), waitForTransformDuration_, stamp.toSec(), errorMsg.c_str());
 				return transform;
 			}
 		}
@@ -1040,16 +1041,52 @@ void CoreWrapper::commonDepthCallback(
 				break;
 			}
 		}
+
+		// sync with odometry stamp
+		Transform localScanTransform = getTransform(frameId_, scan3dMsg->header.frame_id, scan3dMsg->header.stamp);
+		if(localScanTransform.isNull())
+		{
+			ROS_ERROR("TF of received scan cloud at time %fs is not set, aborting rtabmap update.", scan3dMsg->header.stamp.toSec());
+			return;
+		}
+		Transform laserOdomT = localScanTransform;
+		if(lastPoseStamp_ != scan3dMsg->header.stamp)
+		{
+			if(!odomT.isNull())
+			{
+				Transform sensorT = getTransform(odomFrameId, frameId_, scan3dMsg->header.stamp);
+				if(sensorT.isNull())
+				{
+					ROS_WARN("Could not get odometry value for laser scan stamp (%fs). Latest odometry "
+							"stamp is %fs. The laser scan pose will not be synchronized with odometry.", scan3dMsg->header.stamp.toSec(), lastPoseStamp_.toSec());
+				}
+				else
+				{
+					laserOdomT = odomT.inverse() * sensorT * localScanTransform;
+				}
+
+			}
+		}
+
 		if(containNormals)
 		{
 			pcl::PointCloud<pcl::PointNormal>::Ptr pclScan(new pcl::PointCloud<pcl::PointNormal>);
 			pcl::fromROSMsg(*scan3dMsg, *pclScan);
+			if(!laserOdomT.isIdentity())
+			{
+				pclScan = util3d::transformPointCloud(pclScan, laserOdomT);
+			}
 			scan = util3d::laserScanFromPointCloud(*pclScan);
 		}
 		else
 		{
 			pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
 			pcl::fromROSMsg(*scan3dMsg, *pclScan);
+
+			if(!laserOdomT.isIdentity())
+			{
+				pclScan = util3d::transformPointCloud(pclScan, laserOdomT);
+			}
 
 			if(scanCloudNormalK_ > 0)
 			{
@@ -1205,16 +1242,54 @@ void CoreWrapper::commonStereoCallback(
 				break;
 			}
 		}
+
+		// sync with odometry stamp
+		Transform localScanTransform = getTransform(frameId_, scan3dMsg->header.frame_id, scan3dMsg->header.stamp);
+		if(localScanTransform.isNull())
+		{
+			ROS_ERROR("TF of received scan cloud at time %fs is not set, aborting rtabmap update.", scan3dMsg->header.stamp.toSec());
+			return;
+		}
+		Transform laserOdomT = localScanTransform;
+		if(lastPoseStamp_ != scan3dMsg->header.stamp)
+		{
+			if(!odomT.isNull())
+			{
+				Transform sensorT = getTransform(odomFrameId, frameId_, scan3dMsg->header.stamp);
+				if(sensorT.isNull())
+				{
+					ROS_WARN("Could not get odometry value for laser scan stamp (%fs). Latest odometry "
+							"stamp is %fs. The laser scan pose will not be synchronized with odometry.", scan3dMsg->header.stamp.toSec(), lastPoseStamp_.toSec());
+				}
+				else
+				{
+					laserOdomT = odomT.inverse() * sensorT * localScanTransform;
+				}
+
+			}
+		}
+
 		if(containNormals)
 		{
 			pcl::PointCloud<pcl::PointNormal>::Ptr pclScan(new pcl::PointCloud<pcl::PointNormal>);
 			pcl::fromROSMsg(*scan3dMsg, *pclScan);
+
+			if(!laserOdomT.isIdentity())
+			{
+				pclScan = util3d::transformPointCloud(pclScan, laserOdomT);
+			}
+
 			scan = util3d::laserScanFromPointCloud(*pclScan);
 		}
 		else
 		{
 			pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
 			pcl::fromROSMsg(*scan3dMsg, *pclScan);
+
+			if(!laserOdomT.isIdentity())
+			{
+				pclScan = util3d::transformPointCloud(pclScan, laserOdomT);
+			}
 
 			if(scanCloudNormalK_ > 0)
 			{

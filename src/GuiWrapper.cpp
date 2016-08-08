@@ -482,10 +482,11 @@ Transform GuiWrapper::getTransform(const std::string & fromFrameId, const std::s
 		if(waitForTransform_ && !stamp.isZero() && waitForTransformDuration_ > 0.0)
 		{
 			//if(!tfBuffer_.canTransform(fromFrameId, toFrameId, stamp, ros::Duration(1)))
-			if(!tfListener_.waitForTransform(fromFrameId, toFrameId, stamp, ros::Duration(waitForTransformDuration_)))
+			std::string errorMsg;
+			if(!tfListener_.waitForTransform(fromFrameId, toFrameId, stamp, ros::Duration(waitForTransformDuration_), ros::Duration(0.01), &errorMsg))
 			{
-				ROS_WARN("rtabmapviz: Could not get transform from %s to %s after %f seconds (for stamp=%f)!",
-						fromFrameId.c_str(), toFrameId.c_str(), waitForTransformDuration_, stamp.toSec());
+				ROS_WARN("rtabmapviz: Could not get transform from %s to %s after %f seconds (for stamp=%f)! Error=\"%s\".",
+						fromFrameId.c_str(), toFrameId.c_str(), waitForTransformDuration_, stamp.toSec(), errorMsg.c_str());
 				return transform;
 			}
 		}

@@ -55,11 +55,12 @@ using namespace rtabmap;
 
 namespace rtabmap_ros {
 
-OdometryROS::OdometryROS(bool stereo) :
+OdometryROS::OdometryROS(bool stereoParams, bool visParams, bool icpParams) :
 	odometry_(0),
 	frameId_("base_link"),
 	odomFrameId_("odom"),
 	groundTruthFrameId_(""),
+	guessFrameId_(""),
 	publishTf_(true),
 	waitForTransform_(true),
 	waitForTransformDuration_(0.1), // 100 ms
@@ -68,7 +69,9 @@ OdometryROS::OdometryROS(bool stereo) :
 	paused_(false),
 	resetCountdown_(0),
 	resetCurrentCount_(0),
-	stereo_(stereo)
+	stereoParams_(stereoParams),
+	visParams_(visParams),
+	icpParams_(icpParams)
 {
 
 }
@@ -112,10 +115,13 @@ void OdometryROS::onInit()
 	pnh.param("config_path", configPath, configPath);
 	pnh.param("publish_null_when_lost", publishNullWhenLost_, publishNullWhenLost_);
 	pnh.param("guess_from_tf", guessFromTf_, guessFromTf_);
+	pnh.param("guess_frame_id", guessFrameId_, frameId_);
 
-	if(publishTf_ && guessFromTf_)
+	if(publishTf_ && guessFromTf_ && guessFrameId_.compare(frameId_) == 0)
 	{
-		NODELET_WARN( "\"publish_tf\" and \"guess_from_tf\" cannot be used at the same time. \"guess_from_tf\" is disabled.");
+		NODELET_WARN( "\"publish_tf\" and \"guess_from_tf\" cannot be used "
+				"at the same time if \"guess_frame_id\" and \"frame_id\" "
+				"are the same frame (value=\"%s\"). \"guess_from_tf\" is disabled.", frameId_.c_str());
 		guessFromTf_ = false;
 	}
 
@@ -159,7 +165,7 @@ void OdometryROS::onInit()
 
 
 	//parameters
-	parameters_ = Parameters::getDefaultOdometryParameters(stereo_);
+	parameters_ = Parameters::getDefaultOdometryParameters(stereoParams_, visParams_, icpParams_);
 	if(!configPath.empty())
 	{
 		if(UFile::exists(configPath.c_str()))
@@ -267,6 +273,9 @@ void OdometryROS::onInit()
 
 	Parameters::parse(parameters_, Parameters::kOdomResetCountdown(), resetCountdown_);
 	parameters_.at(Parameters::kOdomResetCountdown()) = "0"; // use modified reset countdown here
+
+	this->updateParameters(parameters_);
+
 	odometry_ = Odometry::create(parameters_);
 	if(!initialPose.isIdentity())
 	{
@@ -295,10 +304,11 @@ Transform OdometryROS::getTransform(const std::string & fromFrameId, const std::
 		if(waitForTransform_ && !stamp.isZero() && waitForTransformDuration_ > 0.0)
 		{
 			//if(!tfBuffer_.canTransform(fromFrameId, toFrameId, stamp, ros::Duration(1)))
-			if(!tfListener_.waitForTransform(fromFrameId, toFrameId, stamp, ros::Duration(waitForTransformDuration_)))
+			std::string errorMsg;
+			if(!tfListener_.waitForTransform(fromFrameId, toFrameId, stamp, ros::Duration(waitForTransformDuration_), ros::Duration(0.01), &errorMsg))
 			{
-				NODELET_WARN( "odometry: Could not get transform from %s to %s (stamp=%f) after %f seconds (\"wait_for_transform_duration\"=%f)!",
-						fromFrameId.c_str(), toFrameId.c_str(), stamp.toSec(), waitForTransformDuration_, waitForTransformDuration_);
+				NODELET_WARN( "odometry: Could not get transform from %s to %s (stamp=%f) after %f seconds (\"wait_for_transform_duration\"=%f)! Error=\"%s\"",
+						fromFrameId.c_str(), toFrameId.c_str(), stamp.toSec(), waitForTransformDuration_, waitForTransformDuration_, errorMsg.c_str());
 				return transform;
 			}
 		}
@@ -336,8 +346,9 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 	Transform guess;
 	if(guessFromTf_)
 	{
-		Transform previousPose = this->getTransform(odomFrameId_, frameId_, ros::Time(odometry_->previousStamp()));
-		Transform pose = this->getTransform(odomFrameId_, frameId_, stamp);
+		ROS_WARN("Time previous=%f new=%f", odometry_->previousStamp(), stamp.toSec());
+		Transform previousPose = this->getTransform(odomFrameId_, guessFrameId_, ros::Time(odometry_->previousStamp()));
+		Transform pose = this->getTransform(odomFrameId_, guessFrameId_, stamp);
 		if(!previousPose.isNull() && !pose.isNull())
 		{
 			guess = previousPose.inverse() * pose;
@@ -351,6 +362,11 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 				NODELET_WARN( "P  Guess %s", motionGuess.prettyPrint().c_str());
 			}
 			NODELET_WARN( "TF Guess %s", guess.prettyPrint().c_str());*/
+		}
+		else
+		{
+			ROS_ERROR("\"guess_from_tf\" is true, but guess cannot be computed between frames \"%s\" -> \"%s\". Aborting odometry update...", odomFrameId_.c_str(), guessFrameId_.c_str());
+			return;
 		}
 	}
 
@@ -547,7 +563,22 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 		odomInfoPub_.publish(infoMsg);
 	}
 
-	NODELET_INFO( "Odom: quality=%d, std dev=%fm, update time=%fs", info.inliers, pose.isNull()?0.0f:std::sqrt(info.variance), (ros::WallTime::now()-time).toSec());
+	if(visParams_)
+	{
+		if(icpParams_)
+		{
+			NODELET_INFO( "Odom: quality=%d, ratio=%f, std dev=%fm, update time=%fs", info.inliers, info.icpInliersRatio, pose.isNull()?0.0f:std::sqrt(info.variance), (ros::WallTime::now()-time).toSec());
+		}
+		else
+		{
+			NODELET_INFO( "Odom: quality=%d, std dev=%fm, update time=%fs", info.inliers, pose.isNull()?0.0f:std::sqrt(info.variance), (ros::WallTime::now()-time).toSec());
+		}
+	}
+	else
+	{
+		NODELET_INFO( "Odom: ratio=%f, std dev=%fm, update time=%fs", info.icpInliersRatio, pose.isNull()?0.0f:std::sqrt(info.variance), (ros::WallTime::now()-time).toSec());
+	}
+
 }
 
 bool OdometryROS::reset(std_srvs::Empty::Request&, std_srvs::Empty::Response&)

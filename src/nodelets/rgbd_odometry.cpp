@@ -49,6 +49,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/util2d.h>
 #include <rtabmap/utilite/ULogger.h>
 #include <rtabmap/utilite/UConversion.h>
+#include <rtabmap/utilite/UStl.h>
 
 using namespace rtabmap;
 
@@ -59,7 +60,7 @@ class RGBDOdometry : public rtabmap_ros::OdometryROS
 {
 public:
 	RGBDOdometry() :
-		OdometryROS(false),
+		OdometryROS(false, true, false),
 		approxSync_(0),
 		exactSync_(0),
 		sync2_(0),
@@ -132,15 +133,6 @@ private:
 			image_depth2_sub_.subscribe(depth1_it, depth1_nh.resolveName("image"), 1, hintsDepth1);
 			info2_sub_.subscribe(rgb1_nh, "camera_info", 1);
 
-			NODELET_INFO("\n%s subscribed to:\n   %s,\n   %s,\n   %s,\n   %s,\n   %s,\n   %s",
-					ros::this_node::getName().c_str(),
-					image_mono_sub_.getTopic().c_str(),
-					image_depth_sub_.getTopic().c_str(),
-					info_sub_.getTopic().c_str(),
-					image_mono2_sub_.getTopic().c_str(),
-					image_depth2_sub_.getTopic().c_str(),
-					info2_sub_.getTopic().c_str());
-
 			sync2_ = new message_filters::Synchronizer<MySync2Policy>(
 					MySync2Policy(queueSize_),
 					image_mono_sub_,
@@ -150,6 +142,14 @@ private:
 					image_depth2_sub_,
 					info2_sub_);
 			sync2_->registerCallback(boost::bind(&RGBDOdometry::callback2, this, _1, _2, _3, _4, _5, _6));
+			NODELET_INFO("\n%s subscribed to (approx sync):\n   %s,\n   %s,\n   %s,\n   %s,\n   %s,\n   %s",
+					ros::this_node::getName().c_str(),
+					image_mono_sub_.getTopic().c_str(),
+					image_depth_sub_.getTopic().c_str(),
+					info_sub_.getTopic().c_str(),
+					image_mono2_sub_.getTopic().c_str(),
+					image_depth2_sub_.getTopic().c_str(),
+					info2_sub_.getTopic().c_str());
 		}
 		else
 		{
@@ -186,6 +186,17 @@ private:
 		}
 	}
 
+	virtual void updateParameters(ParametersMap & parameters)
+	{
+		//make sure we are using Reg/Strategy=0
+		ParametersMap::iterator iter = parameters.find(Parameters::kRegStrategy());
+		if(iter != parameters.end() && iter->second.compare("0") != 0)
+		{
+			ROS_WARN("RGBD odometry works only with \"Reg/Strategy\"=0. Ignoring value %s.", iter->second.c_str());
+		}
+		uInsert(parameters, ParametersPair(Parameters::kRegStrategy(), "0"));
+	}
+
 	void callback(
 			const sensor_msgs::ImageConstPtr& image,
 			const sensor_msgs::ImageConstPtr& depth,
@@ -208,6 +219,7 @@ private:
 				return;
 			}
 
+			// use the highest stamp to make sure that there will be no future interpolation required when synchronized with another node
 			ros::Time stamp = image->header.stamp > depth->header.stamp? image->header.stamp : depth->header.stamp;
 
 			Transform localTransform = getTransform(this->frameId(), image->header.frame_id, stamp);

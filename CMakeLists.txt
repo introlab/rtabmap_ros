@@ -18,7 +18,7 @@ find_package(rviz)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
-find_package(RTABMap 0.11.8 REQUIRED)
+find_package(RTABMap 0.11.9 REQUIRED)
 
 find_package(OpenCV REQUIRED)
 
@@ -151,6 +151,8 @@ SET(Libraries
 SET(rtabmap_ros_lib_src
    src/nodelets/rgbd_odometry.cpp
    src/nodelets/stereo_odometry.cpp
+   src/nodelets/rgbdicp_odometry.cpp
+   src/nodelets/icp_odometry.cpp
    src/nodelets/data_throttle.cpp
    src/nodelets/stereo_throttle.cpp
    src/nodelets/data_odom_sync.cpp
@@ -267,6 +269,12 @@ target_link_libraries(rgbd_odometry ${Libraries})
 
 add_executable(stereo_odometry src/StereoOdometryNode.cpp)
 target_link_libraries(stereo_odometry ${Libraries})
+
+add_executable(rgbdicp_odometry src/RGBDICPOdometryNode.cpp)
+target_link_libraries(rgbdicp_odometry ${Libraries})
+
+add_executable(icp_odometry src/ICPOdometryNode.cpp)
+target_link_libraries(icp_odometry ${Libraries})
 
 add_executable(map_optimizer src/MapOptimizerNode.cpp)
 target_link_libraries(map_optimizer rtabmap_ros ${Libraries})

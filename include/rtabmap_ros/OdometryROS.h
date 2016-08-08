@@ -51,7 +51,7 @@ class OdometryROS : public nodelet::Nodelet
 {
 
 public:
-	OdometryROS(bool stereo);
+	OdometryROS(bool stereoParams, bool visParams, bool icpParams);
 	virtual ~OdometryROS();
 
 	void processData(const rtabmap::SensorData & data, const ros::Time & stamp);
@@ -68,16 +68,17 @@ public:
 	const std::string & frameId() const {return frameId_;}
 	const std::string & odomFrameId() const {return odomFrameId_;}
 	const rtabmap::ParametersMap & parameters() const {return parameters_;}
-	const tf::TransformListener & tfListener() const {return tfListener_;}
 	bool isPaused() const {return paused_;}
 	rtabmap::Transform getTransform(const std::string & fromFrameId, const std::string & toFrameId, const ros::Time & stamp) const;
 
 protected:
 	virtual void flushCallbacks() = 0;
+	tf::TransformListener & tfListener() {return tfListener_;}
 
 private:
 	virtual void onInit();
 	virtual void onOdomInit() = 0;
+	virtual void updateParameters(rtabmap::ParametersMap & parameters) {}
 
 private:
 	rtabmap::Odometry * odometry_;
@@ -86,6 +87,7 @@ private:
 	std::string frameId_;
 	std::string odomFrameId_;
 	std::string groundTruthFrameId_;
+	std::string guessFrameId_;
 	bool publishTf_;
 	bool waitForTransform_;
 	double waitForTransformDuration_;
@@ -111,7 +113,9 @@ private:
 	bool paused_;
 	int resetCountdown_;
 	int resetCurrentCount_;
-	bool stereo_;
+	bool stereoParams_;
+	bool visParams_;
+	bool icpParams_;
 };
 
 }
