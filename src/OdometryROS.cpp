@@ -346,7 +346,6 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 	Transform guess;
 	if(guessFromTf_)
 	{
-		ROS_WARN("Time previous=%f new=%f", odometry_->previousStamp(), stamp.toSec());
 		Transform previousPose = this->getTransform(odomFrameId_, guessFrameId_, ros::Time(odometry_->previousStamp()));
 		Transform pose = this->getTransform(odomFrameId_, guessFrameId_, stamp);
 		if(!previousPose.isNull() && !pose.isNull())
