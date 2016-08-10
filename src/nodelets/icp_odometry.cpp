@@ -72,9 +72,6 @@ private:
 		ros::NodeHandle & nh = getNodeHandle();
 		ros::NodeHandle & pnh = getPrivateNodeHandle();
 
-		bool approxSync = true;
-		bool subscribeScanCloud = false;
-		pnh.param("approx_sync", approxSync, approxSync);
 		pnh.param("scan_cloud_max_points",  scanCloudMaxPoints_, scanCloudMaxPoints_);
 		pnh.param("scan_cloud_normal_k", scanCloudNormalK_, scanCloudNormalK_);
 
