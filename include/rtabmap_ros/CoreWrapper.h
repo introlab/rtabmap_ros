@@ -268,6 +268,7 @@ private:
 	std::string mapFrameId_;
 	std::string odomFrameId_;
 	std::string groundTruthFrameId_;
+	std::string groundTruthBaseFrameId_;
 	std::string configPath_;
 	std::string databasePath_;
 	bool waitForTransform_;

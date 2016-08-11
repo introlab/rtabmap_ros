@@ -88,6 +88,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 		mapFrameId_("map"),
 		odomFrameId_(""),
 		groundTruthFrameId_(""), // e.g., "world"
+		groundTruthBaseFrameId_(""), // e.g., "base_link_gt"
 		configPath_(""),
 		databasePath_(UDirectory::homeDir()+"/.ros/"+rtabmap::Parameters::getDefaultDatabaseName()),
 		waitForTransform_(true),
@@ -179,6 +180,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 	pnh.param("map_frame_id",        mapFrameId_, mapFrameId_);
 	pnh.param("odom_frame_id",       odomFrameId_, odomFrameId_); // set to use odom from TF
 	pnh.param("ground_truth_frame_id", groundTruthFrameId_, groundTruthFrameId_);
+	pnh.param("ground_truth_base_frame_id", groundTruthBaseFrameId_, frameId_);
 	pnh.param("depth_cameras",       depthCameras, depthCameras);
 	pnh.param("queue_size",          queueSize, queueSize);
 	if(pnh.hasParam("stereo_approx_sync") && !pnh.hasParam("approx_sync"))
@@ -225,6 +227,10 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 		{
 			groundTruthFrameId_ = tfPrefix+"/"+groundTruthFrameId_;
 		}
+		if(!groundTruthBaseFrameId_.empty())
+		{
+			groundTruthBaseFrameId_ = tfPrefix+"/"+groundTruthBaseFrameId_;
+		}
 		// keep worldFrameId_ without prefix as it should be global
 	}
 
@@ -240,7 +246,9 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 	}
 	if(!groundTruthFrameId_.empty())
 	{
-		ROS_INFO("rtabmap: ground_truth_frame_id = %s", groundTruthFrameId_.c_str());
+		ROS_INFO("rtabmap: ground_truth_frame_id = %s -> ground_truth_base_frame_id = %s",
+				groundTruthFrameId_.c_str(),
+				groundTruthBaseFrameId_.c_str());
 	}
 	ROS_INFO("rtabmap: map_frame_id = %s", mapFrameId_.c_str());
 	ROS_INFO("rtabmap: queue_size = %d", queueSize);
@@ -1114,7 +1122,7 @@ void CoreWrapper::commonDepthCallback(
 	Transform groundTruthPose;
 	if(!groundTruthFrameId_.empty())
 	{
-		groundTruthPose = getTransform(groundTruthFrameId_, frameId_, stamp);
+		groundTruthPose = getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, stamp);
 	}
 
 	SensorData data(scan,
@@ -1340,7 +1348,7 @@ void CoreWrapper::commonStereoCallback(
 	Transform groundTruthPose;
 	if(!groundTruthFrameId_.empty())
 	{
-		groundTruthPose = getTransform(groundTruthFrameId_, frameId_, stamp);
+		groundTruthPose = getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, stamp);
 	}
 
 	SensorData data(scan,
