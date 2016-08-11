@@ -254,10 +254,10 @@ public:
 			{
 				optimizedPoses = poses;
 			}
-			else if(poses.size() || constraints.size())
+			else if(poses.size() == 0 && constraints.size())
 			{
-				ROS_ERROR("map_optimizer: Poses=%d and edges=%d (poses must "
-					   "not be null if there are edges, and edges must be null if poses <= 1)",
+				ROS_ERROR("map_optimizer: Poses=%d and edges=%d: poses must "
+					   "not be null if there are edges.",
 					  (int)poses.size(), (int)constraints.size());
 			}
 
