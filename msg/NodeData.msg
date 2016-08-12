@@ -43,3 +43,7 @@ uint8[] userData
 int32[] wordIds
 KeyPoint[] wordKpts
 sensor_msgs/PointCloud2 wordPts
+
+# compressed descriptors
+# use rtabmap::util3d::uncompressData() from "rtabmap/core/util3d.h"
+uint8[] descriptors

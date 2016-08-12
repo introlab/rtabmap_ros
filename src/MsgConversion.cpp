@@ -505,11 +505,14 @@ rtabmap::Signature nodeDataFromROS(const rtabmap_ros::NodeData & msg)
 	//Features stuff...
 	std::multimap<int, cv::KeyPoint> words;
 	std::multimap<int, cv::Point3f> words3D;
+	std::multimap<int, cv::Mat> wordsDescriptors;
 	pcl::PointCloud<pcl::PointXYZ> cloud;
+	cv::Mat descriptors;
 	if(msg.wordPts.data.size() &&
 	   msg.wordPts.height*msg.wordPts.width == msg.wordIds.size())
 	{
 		pcl::fromROSMsg(msg.wordPts, cloud);
+		descriptors = rtabmap::uncompressData(msg.descriptors);
 	}
 
 	for(unsigned int i=0; i<msg.wordIds.size() && i<msg.wordKpts.size(); ++i)
@@ -520,6 +523,10 @@ rtabmap::Signature nodeDataFromROS(const rtabmap_ros::NodeData & msg)
 		if(i< cloud.size())
 		{
 			words3D.insert(std::make_pair(wordId, cv::Point3f(cloud[i].x, cloud[i].y, cloud[i].z)));
+		}
+		if(i < descriptors.rows)
+		{
+			wordsDescriptors.insert(std::make_pair(wordId, descriptors.row(i).clone()));
 		}
 	}
 
@@ -600,6 +607,7 @@ rtabmap::Signature nodeDataFromROS(const rtabmap_ros::NodeData & msg)
 					compressedMatFromBytes(msg.userData)));
 	s.setWords(words);
 	s.setWords3(words3D);
+	s.setWordsDescriptors(wordsDescriptors);
 	return s;
 }
 void nodeDataToROS(const rtabmap::Signature & signature, rtabmap_ros::NodeData & msg)
@@ -677,6 +685,42 @@ void nodeDataToROS(const rtabmap::Signature & signature, rtabmap_ros::NodeData &
 		ROS_ERROR("Words 2D and words 3D must have the same size (%d vs %d)!",
 				(int)signature.getWords().size(),
 				(int)signature.getWords3().size());
+	}
+
+	if(signature.getWordsDescriptors().size() && signature.getWordsDescriptors().size() == signature.getWords().size())
+	{
+		cv::Mat descriptors(
+				signature.getWordsDescriptors().size(),
+				signature.getWordsDescriptors().begin()->second.cols,
+				signature.getWordsDescriptors().begin()->second.type());
+		index = 0;
+		bool valid = true;
+		for(std::multimap<int, cv::Mat>::const_iterator jter=signature.getWordsDescriptors().begin();
+			jter!=signature.getWordsDescriptors().end() && valid;
+			++jter)
+		{
+			if(jter->second.cols == descriptors.cols &&
+				jter->second.type() == descriptors.type())
+			{
+				jter->second.copyTo(descriptors.row(index++));
+			}
+			else
+			{
+				valid = false;
+				ROS_ERROR("Some descriptors have different type/size! Cannot copy them...");
+			}
+		}
+
+		if(valid)
+		{
+			msg.descriptors = rtabmap::compressData(descriptors);
+		}
+	}
+	else if(signature.getWordsDescriptors().size())
+	{
+		ROS_ERROR("Words and descriptors must have the same size (%d vs %d)!",
+				(int)signature.getWords().size(),
+				(int)signature.getWordsDescriptors().size());
 	}
 }
 
