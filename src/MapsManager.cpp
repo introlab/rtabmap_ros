@@ -76,6 +76,7 @@ MapsManager::MapsManager(bool usePublicNamespace) :
 		gridCellSize_(0.05), // meters
 		gridSize_(0), // meters
 		gridEroded_(false),
+		footprintRadius_(0.0),
 		gridUnknownSpaceFilled_(false),
 		gridMaxUnknownSpaceFilledRange_(6.0),
 		mapFilterRadius_(0.0),
@@ -140,6 +141,7 @@ MapsManager::MapsManager(bool usePublicNamespace) :
 	}
 	pnh.param("grid_size", gridSize_, gridSize_); // m
 	pnh.param("grid_eroded", gridEroded_, gridEroded_);
+	pnh.param("grid_footprint_radius", footprintRadius_, footprintRadius_);
 	pnh.param("grid_unknown_space_filled", gridUnknownSpaceFilled_, gridUnknownSpaceFilled_);
 	pnh.param("grid_unknown_space_filled_max_range", gridMaxUnknownSpaceFilledRange_, gridMaxUnknownSpaceFilledRange_);
 
@@ -1125,7 +1127,8 @@ cv::Mat MapsManager::generateProjMap(
 			gridCellSize_,
 			xMin, yMin,
 			gridSize_,
-			gridEroded_);
+			gridEroded_,
+			footprintRadius_);
 }
 
 cv::Mat MapsManager::generateGridMap(
@@ -1141,7 +1144,8 @@ cv::Mat MapsManager::generateGridMap(
 			gridCellSize_,
 			xMin, yMin,
 			gridSize_,
-			gridEroded_);
+			gridEroded_,
+			footprintRadius_);
 	return map;
 }
 

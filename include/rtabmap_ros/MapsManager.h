@@ -103,6 +103,7 @@ private:
 	double gridCellSize_;
 	double gridSize_;
 	bool gridEroded_;
+	double footprintRadius_;
 	bool gridUnknownSpaceFilled_;
 	double gridMaxUnknownSpaceFilledRange_;
 	double mapFilterRadius_;
