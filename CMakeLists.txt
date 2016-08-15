@@ -160,6 +160,7 @@ SET(rtabmap_ros_lib_src
    src/nodelets/point_cloud_xyz.cpp
    src/nodelets/disparity_to_depth.cpp 
    src/nodelets/obstacles_detection.cpp
+   src/nodelets/obstacles_detection_indoor.cpp
    src/nodelets/point_cloud_aggregator.cpp
    src/OdometryROS.cpp
    src/MsgConversion.cpp
@@ -400,3 +401,4 @@ ENDIF(costmap_2d_FOUND)
 
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
+

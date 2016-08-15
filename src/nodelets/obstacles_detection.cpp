@@ -293,6 +293,20 @@ private:
 						*obstaclesCloud += *obstacles2;
 					}
 				}
+
+				if(!localTransform.isIdentity())
+				{
+					//transform back in topic frame
+					rtabmap::Transform localTransformInv = localTransform.inverse();
+					if(groundCloud->size())
+					{
+						groundCloud = rtabmap::util3d::transformPointCloud(groundCloud, localTransformInv);
+					}
+					if(obstaclesCloud->size())
+					{
+						obstaclesCloud = rtabmap::util3d::transformPointCloud(obstaclesCloud, localTransformInv);
+					}
+				}
 			}
 		}
 
@@ -300,8 +314,7 @@ private:
 		{
 			sensor_msgs::PointCloud2 rosCloud;
 			pcl::toROSMsg(*groundCloud, rosCloud);
-			rosCloud.header.stamp = cloudMsg->header.stamp;
-			rosCloud.header.frame_id = frameId_;
+			rosCloud.header = cloudMsg->header;
 
 			//publish the message
 			groundPub_.publish(rosCloud);
@@ -311,8 +324,7 @@ private:
 		{
 			sensor_msgs::PointCloud2 rosCloud;
 			pcl::toROSMsg(*obstaclesCloud, rosCloud);
-			rosCloud.header.stamp = cloudMsg->header.stamp;
-			rosCloud.header.frame_id = frameId_;
+			rosCloud.header = cloudMsg->header;
 
 			//publish the message
 			obstaclesPub_.publish(rosCloud);
@@ -356,4 +368,5 @@ private:
 
 PLUGINLIB_EXPORT_CLASS(rtabmap_ros::ObstaclesDetection, nodelet::Nodelet);
 }
+
 

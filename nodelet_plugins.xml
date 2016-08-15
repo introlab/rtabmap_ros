@@ -87,6 +87,14 @@
       This is my nodelet.
     </description>
   </class>
+  
+  <class name="rtabmap_ros/obstacles_detection_indoor" 
+         type="rtabmap_ros::ObstaclesDetectionIndoor" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
 
   <class name="rtabmap_ros/point_cloud_aggregator" 
          type="rtabmap_ros::PointCloudAggregator" 
@@ -97,3 +105,4 @@
   </class>
 
 </library>
+
