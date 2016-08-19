@@ -94,6 +94,7 @@ $ git pull origin master
 $ cd build
 $ make
 $ make install
+// Do "sudo make install" if you installed rtabmap in "/usr/local"
 
 $ roscd rtabmap_ros
 $ git pull origin master
