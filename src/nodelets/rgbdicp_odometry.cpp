@@ -266,12 +266,14 @@ private:
 				cv_bridge::CvImagePtr ptrDepth = cv_bridge::toCvCopy(depth);
 
 				cv::Mat scan;
+				Transform localScanTransform = Transform::getIdentity();
 				if(scanMsg.get() != 0)
 				{
 					// make sure the frame of the laser is updated too
-					if(getTransform(this->frameId(),
+					localScanTransform = getTransform(this->frameId(),
 							scanMsg->header.frame_id,
-							scanMsg->header.stamp + ros::Duration().fromSec(scanMsg->ranges.size()*scanMsg->time_increment)).isNull())
+							scanMsg->header.stamp + ros::Duration().fromSec(scanMsg->ranges.size()*scanMsg->time_increment));
+					if(localScanTransform.isNull())
 					{
 						ROS_ERROR("TF of received laser scan topic at time %fs is not set, aborting odometry update.", scanMsg->header.stamp.toSec());
 						return;
@@ -280,7 +282,7 @@ private:
 					//transform in frameId_ frame
 					sensor_msgs::PointCloud2 scanOut;
 					laser_geometry::LaserProjection projection;
-					projection.transformLaserScanToPointCloud(this->frameId(), *scanMsg, scanOut, this->tfListener());
+					projection.transformLaserScanToPointCloud(scanMsg->header.frame_id, *scanMsg, scanOut, this->tfListener());
 					pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
 					pcl::fromROSMsg(scanOut, *pclScan);
 
@@ -297,7 +299,7 @@ private:
 							break;
 						}
 					}
-					Transform localScanTransform = getTransform(this->frameId(), cloudMsg->header.frame_id, cloudMsg->header.stamp);
+					localScanTransform = getTransform(this->frameId(), cloudMsg->header.frame_id, cloudMsg->header.stamp);
 					if(localScanTransform.isNull())
 					{
 						ROS_ERROR("TF of received scan cloud at time %fs is not set, aborting rtabmap update.", cloudMsg->header.stamp.toSec());
@@ -308,21 +310,12 @@ private:
 					{
 						pcl::PointCloud<pcl::PointNormal>::Ptr pclScan(new pcl::PointCloud<pcl::PointNormal>);
 						pcl::fromROSMsg(*cloudMsg, *pclScan);
-						if(!localScanTransform.isIdentity())
-						{
-							pclScan = util3d::transformPointCloud(pclScan, localScanTransform);
-						}
 						scan = util3d::laserScanFromPointCloud(*pclScan);
 					}
 					else
 					{
 						pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
 						pcl::fromROSMsg(*cloudMsg, *pclScan);
-
-						if(!localScanTransform.isIdentity())
-						{
-							pclScan = util3d::transformPointCloud(pclScan, localScanTransform);
-						}
 
 						if(scanCloudNormalK_ > 0)
 						{
@@ -341,8 +334,10 @@ private:
 
 				rtabmap::SensorData data(
 						scan,
-						scanMsg.get() != 0?(int)scanMsg->ranges.size():cloudMsg.get() != 0?scanCloudMaxPoints_:0,
-						scanMsg.get() != 0?scanMsg->range_max:0,
+						LaserScanInfo(
+								scanMsg.get() != 0?(int)scanMsg->ranges.size():cloudMsg.get() != 0?scanCloudMaxPoints_:0,
+								scanMsg.get() != 0?scanMsg->range_max:0,
+								localScanTransform),
 						ptrImage->image,
 						ptrDepth->image,
 						rtabmapModel,

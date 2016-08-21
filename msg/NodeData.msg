@@ -33,10 +33,18 @@ geometry_msgs/Transform[] localTransform
 uint8[] laserScan
 int32 laserScanMaxPts
 float32 laserScanMaxRange
+geometry_msgs/Transform laserScanLocalTransform
 
 # compressed user data
 # use rtabmap::util3d::uncompressData() from "rtabmap/core/util3d.h"
 uint8[] userData
+
+# compressed occupancy grid
+# use rtabmap::util3d::uncompressData() from "rtabmap/core/util3d.h"
+uint8[] grid_ground
+uint8[] grid_obstacles
+float32 grid_cell_size
+Point3f grid_view_point
 
 # std::multimap<wordId, cv::Keypoint>
 # std::multimap<wordId, pcl::PointXYZ>

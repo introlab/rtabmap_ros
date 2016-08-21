@@ -77,6 +77,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <actionlib_msgs/GoalStatusArray.h>
 typedef actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> MoveBaseClient;
 
+namespace rtabmap {
+class StereoDense;
+}
+
 class CoreWrapper
 {
 public:
@@ -226,7 +230,8 @@ private:
 	bool setLogInfo(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool setLogWarn(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool setLogError(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
-	bool getMapCallback(rtabmap_ros::GetMap::Request& req, rtabmap_ros::GetMap::Response& res);
+	bool getMapDataCallback(rtabmap_ros::GetMap::Request& req, rtabmap_ros::GetMap::Response& res);
+	bool getMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::GetMap::Response &res);
 	bool getProjMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::GetMap::Response &res);
 	bool getGridMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::GetMap::Response &res);
 	bool publishMapCallback(rtabmap_ros::PublishMap::Request&, rtabmap_ros::PublishMap::Response&);
@@ -239,7 +244,7 @@ private:
 	bool octomapFullCallback(octomap_msgs::GetOctomap::Request  &req, octomap_msgs::GetOctomap::Response &res);
 #endif
 
-	rtabmap::ParametersMap loadParameters(const std::string & configFile);
+	void loadParameters(const std::string & configFile, rtabmap::ParametersMap & parameters);
 	void saveParameters(const std::string & configFile);
 
 	void publishLoop(double tfDelay, double tfTolerance);
@@ -489,6 +494,7 @@ private:
 	ros::ServiceServer setLogErrorSrv_;
 	ros::ServiceServer getMapDataSrv_;
 	ros::ServiceServer getProjMapSrv_;
+	ros::ServiceServer getMapSrv_;
 	ros::ServiceServer getGridMapSrv_;
 	ros::ServiceServer publishMapDataSrv_;
 	ros::ServiceServer setGoalSrv_;
@@ -504,6 +510,7 @@ private:
 
 	boost::thread* transformThread_;
 
+	bool stereoToDepth_;
 	float rate_;
 	bool createIntermediateNodes_;
 	ros::Time time_;

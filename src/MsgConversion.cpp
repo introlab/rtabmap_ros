@@ -332,16 +332,42 @@ rtabmap::CameraModel cameraModelFromROS(
 		const sensor_msgs::CameraInfo & camInfo,
 		const rtabmap::Transform & localTransform)
 {
-	image_geometry::PinholeCameraModel model;
-	model.fromCameraInfo(camInfo);
+	cv::Mat D;
+	if(camInfo.D.size())
+	{
+		D = cv::Mat(1, camInfo.D.size(), CV_64FC1);
+		memcpy(D.data, camInfo.D.data(), D.cols*sizeof(double));
+	}
+
+	cv:: Mat K;
+	UASSERT(camInfo.K.empty() || camInfo.K.size() == 9);
+	if(!camInfo.K.empty())
+	{
+		K = cv::Mat(3, 3, CV_64FC1);
+		memcpy(K.data, camInfo.K.elems, 9*sizeof(double));
+	}
+
+	cv:: Mat R;
+	UASSERT(camInfo.R.empty() || camInfo.R.size() == 9);
+	if(!camInfo.R.empty())
+	{
+		R = cv::Mat(3, 3, CV_64FC1);
+		memcpy(R.data, camInfo.R.elems, 9*sizeof(double));
+	}
+
+	cv:: Mat P;
+	UASSERT(camInfo.P.empty() || camInfo.P.size() == 12);
+	if(!camInfo.P.empty())
+	{
+		P = cv::Mat(3, 4, CV_64FC1);
+		memcpy(P.data, camInfo.P.elems, 12*sizeof(double));
+	}
+
 	return rtabmap::CameraModel(
-			model.fx(),
-			model.fy(),
-			model.cx(),
-			model.cy(),
-			localTransform,
-			0.0,
-			cv::Size(model.fullResolution().width, model.fullResolution().height));
+			"ros",
+			cv::Size(camInfo.width, camInfo.height),
+			K, D, R, P,
+			localTransform);
 }
 void cameraModelToROS(
 		const rtabmap::CameraModel & model,
@@ -401,16 +427,11 @@ rtabmap::StereoCameraModel stereoCameraModelFromROS(
 		const sensor_msgs::CameraInfo & rightCamInfo,
 		const rtabmap::Transform & localTransform)
 {
-	image_geometry::StereoCameraModel model;
-	model.fromCameraInfo(leftCamInfo, rightCamInfo);
 	return rtabmap::StereoCameraModel(
-			model.left().fx(),
-			model.left().fy(),
-			model.left().cx(),
-			model.left().cy(),
-			model.baseline(),
-			localTransform,
-			cv::Size(model.left().fullResolution().width, model.left().fullResolution().height));
+			"ros",
+			cameraModelFromROS(leftCamInfo, localTransform),
+			cameraModelFromROS(rightCamInfo, localTransform),
+			rtabmap::Transform());
 }
 
 void mapDataFromROS(
@@ -587,8 +608,10 @@ rtabmap::Signature nodeDataFromROS(const rtabmap_ros::NodeData & msg)
 			stereoModel.isValidForProjection()?
 				rtabmap::SensorData(
 					compressedMatFromBytes(msg.laserScan),
-					msg.laserScanMaxPts,
-					msg.laserScanMaxRange,
+					rtabmap::LaserScanInfo(
+							msg.laserScanMaxPts,
+							msg.laserScanMaxRange,
+							transformFromGeometryMsg(msg.laserScanLocalTransform)),
 					compressedMatFromBytes(msg.image),
 					compressedMatFromBytes(msg.depth),
 					stereoModel,
@@ -597,8 +620,10 @@ rtabmap::Signature nodeDataFromROS(const rtabmap_ros::NodeData & msg)
 					compressedMatFromBytes(msg.userData)):
 				rtabmap::SensorData(
 					compressedMatFromBytes(msg.laserScan),
-					msg.laserScanMaxPts,
-					msg.laserScanMaxRange,
+					rtabmap::LaserScanInfo(
+							msg.laserScanMaxPts,
+							msg.laserScanMaxRange,
+							transformFromGeometryMsg(msg.laserScanLocalTransform)),
 					compressedMatFromBytes(msg.image),
 					compressedMatFromBytes(msg.depth),
 					models,
@@ -608,6 +633,11 @@ rtabmap::Signature nodeDataFromROS(const rtabmap_ros::NodeData & msg)
 	s.setWords(words);
 	s.setWords3(words3D);
 	s.setWordsDescriptors(wordsDescriptors);
+	s.sensorData().setOccupancyGrid(
+			compressedMatFromBytes(msg.grid_ground),
+			compressedMatFromBytes(msg.grid_obstacles),
+			msg.grid_cell_size,
+			point3fFromROS(msg.grid_view_point));
 	return s;
 }
 void nodeDataToROS(const rtabmap::Signature & signature, rtabmap_ros::NodeData & msg)
@@ -624,8 +654,13 @@ void nodeDataToROS(const rtabmap::Signature & signature, rtabmap_ros::NodeData &
 	compressedMatToBytes(signature.sensorData().depthOrRightCompressed(), msg.depth);
 	compressedMatToBytes(signature.sensorData().laserScanCompressed(), msg.laserScan);
 	compressedMatToBytes(signature.sensorData().userDataCompressed(), msg.userData);
-	msg.laserScanMaxPts = signature.sensorData().laserScanMaxPts();
-	msg.laserScanMaxRange = signature.sensorData().laserScanMaxRange();
+	compressedMatToBytes(signature.sensorData().gridGroundCellsCompressed(), msg.grid_ground);
+	compressedMatToBytes(signature.sensorData().gridObstacleCellsCompressed(), msg.grid_obstacles);
+	point3fToROS(signature.sensorData().gridViewPoint(), msg.grid_view_point);
+	msg.grid_cell_size = signature.sensorData().gridCellSize();
+	msg.laserScanMaxPts = signature.sensorData().laserScanInfo().maxPoints();
+	msg.laserScanMaxRange = signature.sensorData().laserScanInfo().maxRange();
+	transformToGeometryMsg(signature.sensorData().laserScanInfo().localTransform(), msg.laserScanLocalTransform);
 	msg.baseline = 0;
 	if(signature.sensorData().cameraModels().size())
 	{

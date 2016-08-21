@@ -93,9 +93,10 @@ private:
 	void callbackScan(const sensor_msgs::LaserScanConstPtr& scanMsg)
 	{
 		// make sure the frame of the laser is updated too
-		if(getTransform(this->frameId(),
+		Transform localScanTransform = getTransform(this->frameId(),
 				scanMsg->header.frame_id,
-				scanMsg->header.stamp + ros::Duration().fromSec(scanMsg->ranges.size()*scanMsg->time_increment)).isNull())
+				scanMsg->header.stamp + ros::Duration().fromSec(scanMsg->ranges.size()*scanMsg->time_increment));
+		if(localScanTransform.isNull())
 		{
 			ROS_ERROR("TF of received laser scan topic at time %fs is not set, aborting odometry update.", scanMsg->header.stamp.toSec());
 			return;
@@ -104,7 +105,7 @@ private:
 		//transform in frameId_ frame
 		sensor_msgs::PointCloud2 scanOut;
 		laser_geometry::LaserProjection projection;
-		projection.transformLaserScanToPointCloud(this->frameId(), *scanMsg, scanOut, this->tfListener());
+		projection.transformLaserScanToPointCloud(scanMsg->header.frame_id, *scanMsg, scanOut, this->tfListener());
 		pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
 		pcl::fromROSMsg(scanOut, *pclScan);
 
@@ -112,8 +113,7 @@ private:
 
 		rtabmap::SensorData data(
 				scan,
-				(int)scanMsg->ranges.size(),
-				scanMsg->range_max,
+				LaserScanInfo((int)scanMsg->ranges.size(), scanMsg->range_max, localScanTransform),
 				cv::Mat(),
 				cv::Mat(),
 				CameraModel(),
@@ -147,21 +147,12 @@ private:
 		{
 			pcl::PointCloud<pcl::PointNormal>::Ptr pclScan(new pcl::PointCloud<pcl::PointNormal>);
 			pcl::fromROSMsg(*cloudMsg, *pclScan);
-			if(!localScanTransform.isIdentity())
-			{
-				pclScan = util3d::transformPointCloud(pclScan, localScanTransform);
-			}
 			scan = util3d::laserScanFromPointCloud(*pclScan);
 		}
 		else
 		{
 			pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
 			pcl::fromROSMsg(*cloudMsg, *pclScan);
-
-			if(!localScanTransform.isIdentity())
-			{
-				pclScan = util3d::transformPointCloud(pclScan, localScanTransform);
-			}
 
 			if(scanCloudNormalK_ > 0)
 			{
@@ -179,8 +170,7 @@ private:
 
 		rtabmap::SensorData data(
 				scan,
-				scanCloudMaxPoints_,
-				0,
+				LaserScanInfo(scanCloudMaxPoints_, 0, localScanTransform),
 				cv::Mat(),
 				cv::Mat(),
 				CameraModel(),

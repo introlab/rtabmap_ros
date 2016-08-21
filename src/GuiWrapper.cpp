@@ -407,9 +407,9 @@ void GuiWrapper::handleEvent(UEvent * anEvent)
 			getMapSrv.request.global = cmdEvent->value1().toBool();
 			getMapSrv.request.optimized = cmdEvent->value2().toBool();
 			getMapSrv.request.graphOnly = cmdEvent->value3().toBool();
-			if(!ros::service::call("get_map", getMapSrv))
+			if(!ros::service::call("get_map_data", getMapSrv))
 			{
-				ROS_WARN("Can't call \"get_map\" service");
+				ROS_WARN("Can't call \"get_map_data\" service");
 				this->post(new RtabmapEvent3DMap(1)); // service error
 			}
 			else
@@ -588,6 +588,7 @@ void GuiWrapper::commonDepthCallback(
 	cv::Mat depth;
 	std::vector<CameraModel> cameraModels;
 	cv::Mat scan;
+	Transform scanLocalTransform = Transform::getIdentity();
 	rtabmap::OdometryInfo info;
 	bool ignoreData = false;
 
@@ -693,15 +694,20 @@ void GuiWrapper::commonDepthCallback(
 		if(scan2dMsg.get() != 0)
 		{
 			// make sure the frame of the laser is updated too
-			if(getTransform(frameId_, scan2dMsg->header.frame_id, scan2dMsg->header.stamp).isNull())
+			scanLocalTransform = getTransform(
+					frameId_,
+					scan2dMsg->header.frame_id,
+					scan2dMsg->header.stamp + ros::Duration().fromSec(scan2dMsg->ranges.size()*scan2dMsg->time_increment));
+			if(scanLocalTransform.isNull())
 			{
+				ROS_ERROR("TF of received scan at time %fs is not set, aborting rtabmapviz update.", scan2dMsg->header.stamp.toSec());
 				return;
 			}
 
 			//transform in frameId_ frame
 			sensor_msgs::PointCloud2 scanOut;
 			laser_geometry::LaserProjection projection;
-			projection.transformLaserScanToPointCloud(frameId_, *scan2dMsg, scanOut, tfListener_);
+			projection.transformLaserScanToPointCloud(scan2dMsg->header.frame_id, *scan2dMsg, scanOut, tfListener_);
 			pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
 			pcl::fromROSMsg(scanOut, *pclScan);
 
@@ -715,18 +721,62 @@ void GuiWrapper::commonDepthCallback(
 					{
 						return;
 					}
-					Transform t = odomT.inverse() * sensorT;
-					pclScan = util3d::transformPointCloud(pclScan, t);
-
+					scanLocalTransform = odomT.inverse() * sensorT * scanLocalTransform;
 				}
 			}
 			scan = util3d::laserScanFromPointCloud(*pclScan);
 		}
 		else if(scan3dMsg.get() != 0)
 		{
-			pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
-			pcl::fromROSMsg(*scan3dMsg, *pclScan);
-			scan = util3d::laserScanFromPointCloud(*pclScan);
+			bool containNormals = false;
+			for(unsigned int i=0; i<scan3dMsg->fields.size(); ++i)
+			{
+				if(scan3dMsg->fields[i].name.compare("normal_x") == 0)
+				{
+					containNormals = true;
+					break;
+				}
+			}
+
+			// sync with odometry stamp
+			scanLocalTransform = getTransform(frameId_, scan3dMsg->header.frame_id, scan3dMsg->header.stamp);
+			if(scanLocalTransform.isNull())
+			{
+				ROS_ERROR("TF of received scan cloud at time %fs is not set, aborting rtabmap update.", scan3dMsg->header.stamp.toSec());
+				return;
+			}
+			if(odomHeader.stamp != scan3dMsg->header.stamp)
+			{
+				if(!odomT.isNull())
+				{
+					Transform sensorT = getTransform(odomHeader.frame_id, frameId_, scan3dMsg->header.stamp);
+					if(sensorT.isNull())
+					{
+						ROS_WARN("Could not get odometry value for laser scan stamp (%fs). Latest odometry "
+								"stamp is %fs. The laser scan pose will not be synchronized with odometry.", scan3dMsg->header.stamp.toSec(), odomHeader.stamp.toSec());
+					}
+					else
+					{
+						scanLocalTransform = odomT.inverse() * sensorT * scanLocalTransform;
+					}
+
+				}
+			}
+
+			if(containNormals)
+			{
+				pcl::PointCloud<pcl::PointNormal>::Ptr pclScan(new pcl::PointCloud<pcl::PointNormal>);
+				pcl::fromROSMsg(*scan3dMsg, *pclScan);
+
+				scan = util3d::laserScanFromPointCloud(*pclScan);
+			}
+			else
+			{
+				pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
+				pcl::fromROSMsg(*scan3dMsg, *pclScan);
+
+				scan = util3d::laserScanFromPointCloud(*pclScan);
+			}
 		}
 
 		if(odomInfoMsg.get())
@@ -749,8 +799,10 @@ void GuiWrapper::commonDepthCallback(
 	rtabmap::OdometryEvent odomEvent(
 		rtabmap::SensorData(
 				scan,
-				scan2dMsg.get()?(int)scan2dMsg->ranges.size():0,
-				scan2dMsg.get()?(int)scan2dMsg->range_max:0,
+				LaserScanInfo(
+						scan2dMsg.get()?(int)scan2dMsg->ranges.size():0,
+						scan2dMsg.get()?(int)scan2dMsg->range_max:0,
+						scanLocalTransform),
 				rgb,
 				depth,
 				cameraModels,
@@ -854,6 +906,7 @@ void GuiWrapper::commonStereoCallback(
 	cv::Mat left;
 	cv::Mat right;
 	cv::Mat scan;
+	Transform scanLocalTransform = Transform::getIdentity();
 	rtabmap::StereoCameraModel stereoModel;
 	rtabmap::OdometryInfo info;
 	bool ignoreData = false;
@@ -898,15 +951,20 @@ void GuiWrapper::commonStereoCallback(
 		if(scan2dMsg.get() != 0)
 		{
 			// make sure the frame of the laser is updated too
-			if(getTransform(frameId_, scan2dMsg->header.frame_id, scan2dMsg->header.stamp).isNull())
+			scanLocalTransform = getTransform(
+					frameId_,
+					scan2dMsg->header.frame_id,
+					scan2dMsg->header.stamp + ros::Duration().fromSec(scan2dMsg->ranges.size()*scan2dMsg->time_increment));
+			if(scanLocalTransform.isNull())
 			{
+				ROS_ERROR("TF of received scan at time %fs is not set, aborting rtabmapviz update.", scan2dMsg->header.stamp.toSec());
 				return;
 			}
 
 			//transform in frameId_ frame
 			sensor_msgs::PointCloud2 scanOut;
 			laser_geometry::LaserProjection projection;
-			projection.transformLaserScanToPointCloud(frameId_, *scan2dMsg, scanOut, tfListener_);
+			projection.transformLaserScanToPointCloud(scan2dMsg->header.frame_id, *scan2dMsg, scanOut, tfListener_);
 			pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
 			pcl::fromROSMsg(scanOut, *pclScan);
 
@@ -920,18 +978,62 @@ void GuiWrapper::commonStereoCallback(
 					{
 						return;
 					}
-					Transform t = odomT.inverse() * sensorT;
-					pclScan = util3d::transformPointCloud(pclScan, t);
-
+					scanLocalTransform = odomT.inverse() * sensorT * scanLocalTransform;
 				}
 			}
 			scan = util3d::laserScan2dFromPointCloud(*pclScan);
 		}
 		else if(scan3dMsg.get() != 0)
 		{
-			pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
-			pcl::fromROSMsg(*scan3dMsg, *pclScan);
-			scan = util3d::laserScanFromPointCloud(*pclScan);
+			bool containNormals = false;
+			for(unsigned int i=0; i<scan3dMsg->fields.size(); ++i)
+			{
+				if(scan3dMsg->fields[i].name.compare("normal_x") == 0)
+				{
+					containNormals = true;
+					break;
+				}
+			}
+
+			// sync with odometry stamp
+			scanLocalTransform = getTransform(frameId_, scan3dMsg->header.frame_id, scan3dMsg->header.stamp);
+			if(scanLocalTransform.isNull())
+			{
+				ROS_ERROR("TF of received scan cloud at time %fs is not set, aborting rtabmap update.", scan3dMsg->header.stamp.toSec());
+				return;
+			}
+			if(odomHeader.stamp != scan3dMsg->header.stamp)
+			{
+				if(!odomT.isNull())
+				{
+					Transform sensorT = getTransform(odomHeader.frame_id, frameId_, scan3dMsg->header.stamp);
+					if(sensorT.isNull())
+					{
+						ROS_WARN("Could not get odometry value for laser scan stamp (%fs). Latest odometry "
+								"stamp is %fs. The laser scan pose will not be synchronized with odometry.", scan3dMsg->header.stamp.toSec(), odomHeader.stamp.toSec());
+					}
+					else
+					{
+						scanLocalTransform = odomT.inverse() * sensorT * scanLocalTransform;
+					}
+
+				}
+			}
+
+			if(containNormals)
+			{
+				pcl::PointCloud<pcl::PointNormal>::Ptr pclScan(new pcl::PointCloud<pcl::PointNormal>);
+				pcl::fromROSMsg(*scan3dMsg, *pclScan);
+
+				scan = util3d::laserScanFromPointCloud(*pclScan);
+			}
+			else
+			{
+				pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
+				pcl::fromROSMsg(*scan3dMsg, *pclScan);
+
+				scan = util3d::laserScanFromPointCloud(*pclScan);
+			}
 		}
 
 		if(odomInfoMsg.get())
@@ -954,8 +1056,10 @@ void GuiWrapper::commonStereoCallback(
 	rtabmap::OdometryEvent odomEvent(
 		rtabmap::SensorData(
 				scan,
-				scan2dMsg.get()?(int)scan2dMsg->ranges.size():0,
-				scan2dMsg.get()?(int)scan2dMsg->range_max:0,
+				LaserScanInfo(
+						scan2dMsg.get()?(int)scan2dMsg->ranges.size():0,
+						scan2dMsg.get()?(int)scan2dMsg->range_max:0,
+						scanLocalTransform),
 				left,
 				right,
 				stereoModel,

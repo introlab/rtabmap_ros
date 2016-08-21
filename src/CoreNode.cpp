@@ -51,9 +51,8 @@ int main(int argc, char** argv)
 		else if(strcmp(argv[i], "--params") == 0 || strcmp(argv[i], "--params-all") == 0)
 		{
 			rtabmap::ParametersMap parameters = rtabmap::Parameters::getDefaultParameters();
-			uInsert(parameters,
-					std::make_pair(rtabmap::Parameters::kRtabmapWorkingDirectory(),
-					UDirectory::homeDir()+"/.ros")); // change default to ~/.ros
+			uInsert(parameters, rtabmap::ParametersPair(rtabmap::Parameters::kRGBDCreateOccupancyGrid(), "true")); // default true in ROS
+			uInsert(parameters,	rtabmap::ParametersPair(rtabmap::Parameters::kRtabmapWorkingDirectory(), UDirectory::homeDir()+"/.ros")); // change default to ~/.ros
 
 			if(strcmp(argv[i], "--params") == 0)
 			{
