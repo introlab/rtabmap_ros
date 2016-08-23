@@ -30,6 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <rtabmap/core/Signature.h>
 #include <rtabmap/core/Parameters.h>
+#include <rtabmap/core/FlannIndex.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <ros/time.h>
@@ -77,6 +78,8 @@ public:
 private:
 	// mapping stuff
 	bool cloudOutputVoxelized_;
+	bool cloudSubtractFiltering_;
+	int cloudSubtractFilteringMinNeighbors_;
 	double gridCellSize_;
 	bool gridIncremental_;
 	double gridSize_;
@@ -103,6 +106,10 @@ private:
 	std::map<int, rtabmap::Transform> assembledObstaclePoses_;
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr assembledObstacles_;
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr assembledGround_;
+	rtabmap::FlannIndex assembledGroundIndex_;
+	rtabmap::FlannIndex assembledObstacleIndex_;
+	std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr > groundClouds_;
+	std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr > obstacleClouds_;
 
 	std::map<int, rtabmap::Transform> gridPoses_;
 	cv::Mat gridMap_;

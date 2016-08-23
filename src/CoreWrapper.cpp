@@ -242,7 +242,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 		depthCameras = 1;
 	}
 
-	ROS_INFO("rtabmap: frame_id = %s", frameId_.c_str());
+	ROS_INFO("rtabmap: frame_id      = %s", frameId_.c_str());
 	if(!odomFrameId_.empty())
 	{
 		ROS_INFO("rtabmap: odom_frame_id = %s", odomFrameId_.c_str());
@@ -253,12 +253,12 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 				groundTruthFrameId_.c_str(),
 				groundTruthBaseFrameId_.c_str());
 	}
-	ROS_INFO("rtabmap: map_frame_id = %s", mapFrameId_.c_str());
-	ROS_INFO("rtabmap: queue_size = %d", queueSize);
-	ROS_INFO("rtabmap: tf_delay = %f", tfDelay);
-	ROS_INFO("rtabmap: tf_tolerance = %f", tfTolerance);
+	ROS_INFO("rtabmap: map_frame_id  = %s", mapFrameId_.c_str());
+	ROS_INFO("rtabmap: queue_size    = %d", queueSize);
+	ROS_INFO("rtabmap: tf_delay      = %f", tfDelay);
+	ROS_INFO("rtabmap: tf_tolerance  = %f", tfTolerance);
 	ROS_INFO("rtabmap: depth_cameras = %d", depthCameras);
-	ROS_INFO("rtabmap: approx_sync = %s", approxSync?"true":"false");
+	ROS_INFO("rtabmap: approx_sync   = %s", approxSync?"true":"false");
 
 	infoPub_ = nh.advertise<rtabmap_ros::Info>("info", 1);
 	mapDataPub_ = nh.advertise<rtabmap_ros::MapData>("mapData", 1);
