@@ -29,12 +29,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <stdio.h>
 #include <ros/ros.h>
-#include <sensor_msgs/Image.h>
-#include <sensor_msgs/image_encodings.h>
-#include <cv_bridge/cv_bridge.h>
+
 #include <nav_msgs/Path.h>
 #include <std_msgs/Int32MultiArray.h>
 #include <std_msgs/Bool.h>
+#include <sensor_msgs/image_encodings.h>
+#include <cv_bridge/cv_bridge.h>
 
 #include <visualization_msgs/MarkerArray.h>
 
@@ -48,15 +48,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/util2d.h>
 #include <rtabmap/core/util3d.h>
 #include <rtabmap/core/util3d_transforms.h>
-#include <rtabmap/core/util3d_surface.h>
 #include <rtabmap/core/Memory.h>
 #include <rtabmap/core/OdometryEvent.h>
 #include <rtabmap/core/Version.h>
-#include <rtabmap/core/StereoDense.h>
-
-#include <pcl_conversions/pcl_conversions.h>
-
-#include <laser_geometry/laser_geometry.h>
 
 #ifdef WITH_OCTOMAP_ROS
 #ifdef RTABMAP_OCTOMAP
@@ -870,196 +864,70 @@ void CoreWrapper::commonDepthCallback(
 		const sensor_msgs::LaserScanConstPtr& scan2dMsg,
 		const sensor_msgs::PointCloud2ConstPtr& scan3dMsg)
 {
-	UASSERT(imageMsgs.size()>0 &&
-			imageMsgs.size() == depthMsgs.size() &&
-			imageMsgs.size() == cameraInfoMsgs.size());
-
-	//for sync transform
-	Transform odomT = getTransform(odomFrameId, frameId_, lastPoseStamp_);
-	if(odomT.isNull() && !odomFrameId_.empty())
-	{
-		ROS_WARN("Could not get TF transform from %s to %s, sensors will not be synchronized with odometry pose.",
-				odomFrameId.c_str(), frameId_.c_str());
-	}
-
-	int imageWidth = imageMsgs[0]->width;
-	int imageHeight = imageMsgs[0]->height;
-	int cameraCount = imageMsgs.size();
 	cv::Mat rgb;
 	cv::Mat depth;
-	pcl::PointCloud<pcl::PointXYZ> scanCloud2d;
-	std::vector<CameraModel> cameraModels;
-	int genMaxScanPts = 0;
-	for(unsigned int i=0; i<imageMsgs.size(); ++i)
+	std::vector<rtabmap::CameraModel> cameraModels;
+	if(!rtabmap_ros::convertRGBDMsgs(
+			imageMsgs,
+			depthMsgs,
+			cameraInfoMsgs,
+			frameId_,
+			odomFrameId,
+			lastPoseStamp_,
+			rgb,
+			depth,
+			cameraModels,
+			tfListener_,
+			waitForTransform_?waitForTransformDuration_:0.0))
 	{
-		if(!(imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) == 0 ||
-			 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
-			 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||
-			 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
-			 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0) ||
-			!(depthMsgs[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1) == 0 ||
-			 depthMsgs[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1) == 0 ||
-			 depthMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0))
-		{
-			ROS_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8 and image_depth=32FC1,16UC1,mono16");
-			return;
-		}
+		ROS_ERROR("Could not convert rgb/depth msgs! Aborting rtabmap update...");
+		return;
+	}
 
-		UASSERT_MSG(imageMsgs[i]->width == imageWidth && imageMsgs[i]->height == imageHeight,
-				uFormat("imageWidth=%d vs %d imageHeight=%d vs %d",
-						imageWidth,
-						imageMsgs[i]->width,
-						imageHeight,
-						imageMsgs[i]->height).c_str());
-		UASSERT_MSG(depthMsgs[i]->width == imageWidth && depthMsgs[i]->height == imageHeight,
-				uFormat("imageWidth=%d vs %d imageHeight=%d vs %d",
-						imageWidth,
-						depthMsgs[i]->width,
-						imageHeight,
-						depthMsgs[i]->height).c_str());
+	UASSERT(uContains(parameters_, rtabmap::Parameters::kMemSaveDepth16Format()));
+	if(depth.type() == CV_32FC1 && uStr2Bool(parameters_.at(Parameters::kMemSaveDepth16Format())))
+	{
+		depth = rtabmap::util2d::cvtDepthFromFloat(depth);
+		static bool shown = false;
+		if(!shown)
+		{
+			ROS_WARN("Save depth data to 16 bits format: depth type detected is "
+				  "32FC1, use 16UC1 depth format to avoid this conversion "
+				  "(or set parameter \"Mem/SaveDepth16Format=false\" to use "
+				  "32bits format). This message is only printed once...");
+			shown = true;
+		}
+	}
 
-		Transform localTransform = getTransform(frameId_, depthMsgs[i]->header.frame_id, depthMsgs[i]->header.stamp);
-		if(localTransform.isNull())
-		{
-			ROS_ERROR("TF of received depth image %d at time %fs is not set, aborting rtabmap update.", i, depthMsgs[i]->header.stamp.toSec());
-			return;
-		}
-		// sync with odometry stamp
-		if(lastPoseStamp_ != depthMsgs[i]->header.stamp)
-		{
-			if(!odomT.isNull())
-			{
-				Transform sensorT = getTransform(odomFrameId, frameId_, depthMsgs[i]->header.stamp);
-				if(sensorT.isNull())
-				{
-					ROS_WARN("Could not get odometry value for depth image %d stamp (%fs). Latest odometry "
-							 "stamp is %fs. The depth image pose will not be synchronized with odometry.", i, depthMsgs[i]->header.stamp.toSec(), lastPoseStamp_.toSec());
-				}
-				else
-				{
-					localTransform = odomT.inverse() * sensorT * localTransform;
-				}
-			}
-		}
-
-		cv_bridge::CvImageConstPtr ptrImage;
-		if(imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0)
-		{
-			ptrImage = cv_bridge::toCvShare(imageMsgs[i]);
-		}
-		else if(imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
-		   imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
-		{
-			ptrImage = cv_bridge::toCvShare(imageMsgs[i], "mono8");
-		}
-		else
-		{
-			ptrImage = cv_bridge::toCvShare(imageMsgs[i], "bgr8");
-		}
-		cv_bridge::CvImageConstPtr ptrDepth = cv_bridge::toCvShare(depthMsgs[i]);
-		cv::Mat subDepth = ptrDepth->image;
-		UASSERT(uContains(parameters_, Parameters::kMemSaveDepth16Format()));
-		if(subDepth.type() == CV_32FC1 && uStr2Bool(parameters_.at(Parameters::kMemSaveDepth16Format())))
-		{
-			subDepth = util2d::cvtDepthFromFloat(subDepth);
-			static bool shown = false;
-			if(!shown)
-			{
-				ROS_WARN("Save depth data to 16 bits format: depth type detected is "
-					  "32FC1, use 16UC1 depth format to avoid this conversion "
-					  "(or set parameter \"Mem/SaveDepth16Format=false\" to use "
-					  "32bits format). This message is only printed once...");
-				shown = true;
-			}
-		}
-
-		// initialize
-		if(rgb.empty())
-		{
-			rgb = cv::Mat(imageHeight, imageWidth*cameraCount, ptrImage->image.type());
-		}
-		if(depth.empty())
-		{
-			depth = cv::Mat(imageHeight, imageWidth*cameraCount, subDepth.type());
-		}
-
-		if(ptrImage->image.type() == rgb.type())
-		{
-			ptrImage->image.copyTo(cv::Mat(rgb, cv::Rect(i*imageWidth, 0, imageWidth, imageHeight)));
-		}
-		else
-		{
-			ROS_ERROR("Some RGB images are not the same type!");
-			return;
-		}
-
-		if(subDepth.type() == depth.type())
-		{
-			subDepth.copyTo(cv::Mat(depth, cv::Rect(i*imageWidth, 0, imageWidth, imageHeight)));
-		}
-		else
-		{
-			ROS_ERROR("Some Depth images are not the same type!");
-			return;
-		}
-
-		cameraModels.push_back(rtabmap_ros::cameraModelFromROS(*cameraInfoMsgs[i], localTransform));
-
-		if(scan2dMsg.get() == 0 && genScan_)
-		{
-			scanCloud2d += util3d::laserScanFromDepthImage(
-					subDepth,
-					cameraModels.back().fx(),
-					cameraModels.back().fy(),
-					cameraModels.back().cx(),
-					cameraModels.back().cy(),
-					genScanMaxDepth_,
-					genScanMinDepth_,
-					localTransform);
-			genMaxScanPts += subDepth.cols;
-		}
+	pcl::PointCloud<pcl::PointXYZ> scanCloud2d;
+	bool genMaxScanPts = 0;
+	if(scan2dMsg.get() == 0 && scan3dMsg.get() == 0 && genScan_)
+	{
+		scanCloud2d += util3d::laserScanFromDepthImages(
+				depth,
+				cameraModels,
+				genScanMaxDepth_,
+				genScanMinDepth_);
+		genMaxScanPts += depth.cols;
 	}
 
 	cv::Mat scan;
 	Transform scanLocalTransform = Transform::getIdentity();
 	if(scan2dMsg.get() != 0)
 	{
-		// make sure the frame of the laser is updated too
-		scanLocalTransform = getTransform(frameId_,
-				scan2dMsg->header.frame_id,
-				scan2dMsg->header.stamp + ros::Duration().fromSec(scan2dMsg->ranges.size()*scan2dMsg->time_increment));
-		if(scanLocalTransform.isNull())
+		if(!rtabmap_ros::convertScanMsg(
+				scan2dMsg,
+				frameId_,
+				odomFrameId,
+				lastPoseStamp_,
+				scan,
+				scanLocalTransform,
+				tfListener_,
+				waitForTransform_?waitForTransformDuration_:0))
 		{
-			ROS_ERROR("TF of received laser scan topic at time %fs is not set, aborting rtabmap update.", scan2dMsg->header.stamp.toSec());
+			ROS_ERROR("Could not convert laser scan msg! Aborting rtabmap update...");
 			return;
 		}
-
-		//transform in frameId_ frame
-		sensor_msgs::PointCloud2 scanOut;
-		laser_geometry::LaserProjection projection;
-		projection.transformLaserScanToPointCloud(scan2dMsg->header.frame_id, *scan2dMsg, scanOut, tfListener_);
-		pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
-		pcl::fromROSMsg(scanOut, *pclScan);
-
-		// sync with odometry stamp
-		if(lastPoseStamp_ != scan2dMsg->header.stamp)
-		{
-			if(!odomT.isNull())
-			{
-				Transform sensorT = getTransform(odomFrameId, frameId_, scan2dMsg->header.stamp);
-				if(sensorT.isNull())
-				{
-					ROS_WARN("Could not get odometry value for laser scan stamp (%fs). Latest odometry "
-							"stamp is %fs. The laser scan pose will not be synchronized with odometry.", scan2dMsg->header.stamp.toSec(), lastPoseStamp_.toSec());
-				}
-				else
-				{
-					scanLocalTransform = odomT.inverse() * sensorT * scanLocalTransform;
-				}
-
-			}
-		}
-		scan = util3d::laserScan2dFromPointCloud(*pclScan);
 		if(flipScan_)
 		{
 			cv::Mat flipScan;
@@ -1069,64 +937,19 @@ void CoreWrapper::commonDepthCallback(
 	}
 	else if(scan3dMsg.get() != 0)
 	{
-		bool containNormals = false;
-		for(unsigned int i=0; i<scan3dMsg->fields.size(); ++i)
+		if(!rtabmap_ros::convertScan3dMsg(
+				scan3dMsg,
+				frameId_,
+				odomFrameId,
+				lastPoseStamp_,
+				scanCloudNormalK_,
+				scan,
+				scanLocalTransform,
+				tfListener_,
+				waitForTransform_?waitForTransformDuration_:0))
 		{
-			if(scan3dMsg->fields[i].name.compare("normal_x") == 0)
-			{
-				containNormals = true;
-				break;
-			}
-		}
-
-		// sync with odometry stamp
-		scanLocalTransform = getTransform(frameId_, scan3dMsg->header.frame_id, scan3dMsg->header.stamp);
-		if(scanLocalTransform.isNull())
-		{
-			ROS_ERROR("TF of received scan cloud at time %fs is not set, aborting rtabmap update.", scan3dMsg->header.stamp.toSec());
+			ROS_ERROR("Could not convert 3d laser scan msg! Aborting rtabmap update...");
 			return;
-		}
-		if(lastPoseStamp_ != scan3dMsg->header.stamp)
-		{
-			if(!odomT.isNull())
-			{
-				Transform sensorT = getTransform(odomFrameId, frameId_, scan3dMsg->header.stamp);
-				if(sensorT.isNull())
-				{
-					ROS_WARN("Could not get odometry value for laser scan stamp (%fs). Latest odometry "
-							"stamp is %fs. The laser scan pose will not be synchronized with odometry.", scan3dMsg->header.stamp.toSec(), lastPoseStamp_.toSec());
-				}
-				else
-				{
-					scanLocalTransform = odomT.inverse() * sensorT * scanLocalTransform;
-				}
-
-			}
-		}
-
-		if(containNormals)
-		{
-			pcl::PointCloud<pcl::PointNormal>::Ptr pclScan(new pcl::PointCloud<pcl::PointNormal>);
-			pcl::fromROSMsg(*scan3dMsg, *pclScan);
-			scan = util3d::laserScanFromPointCloud(*pclScan);
-		}
-		else
-		{
-			pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
-			pcl::fromROSMsg(*scan3dMsg, *pclScan);
-
-			if(scanCloudNormalK_ > 0)
-			{
-				//compute normals
-				pcl::PointCloud<pcl::Normal>::Ptr normals = util3d::computeNormals(pclScan, scanCloudNormalK_);
-				pcl::PointCloud<pcl::PointNormal>::Ptr pclScanNormal(new pcl::PointCloud<pcl::PointNormal>);
-				pcl::concatenateFields(*pclScan, *normals, *pclScanNormal);
-				scan = util3d::laserScanFromPointCloud(*pclScanNormal);
-			}
-			else
-			{
-				scan = util3d::laserScanFromPointCloud(*pclScan);
-			}
 		}
 	}
 	else if(scanCloud2d.size())
@@ -1134,14 +957,10 @@ void CoreWrapper::commonDepthCallback(
 		scan = util3d::laserScan2dFromPointCloud(scanCloud2d);
 	}
 
-	ros::Time stamp =   scan2dMsg.get() != 0?scan2dMsg->header.stamp:
-						scan3dMsg.get() != 0?scan3dMsg->header.stamp:
-					    depthMsgs[0]->header.stamp;
-
 	Transform groundTruthPose;
 	if(!groundTruthFrameId_.empty())
 	{
-		groundTruthPose = getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, stamp);
+		groundTruthPose = getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, lastPoseStamp_);
 	}
 
 	SensorData data(scan,
@@ -1153,10 +972,10 @@ void CoreWrapper::commonDepthCallback(
 			depth,
 			cameraModels,
 			lastPoseIntermediate_?-1:imageMsgs[0]->header.seq,
-			rtabmap_ros::timestampFromROS(stamp));
+			rtabmap_ros::timestampFromROS(lastPoseStamp_));
 	data.setGroundTruth(groundTruthPose);
 
-	process(stamp,
+	process(lastPoseStamp_,
 			data,
 			lastPose_,
 			odomFrameId,
@@ -1175,62 +994,41 @@ void CoreWrapper::commonStereoCallback(
 		const sensor_msgs::LaserScanConstPtr& scan2dMsg,
 		const sensor_msgs::PointCloud2ConstPtr& scan3dMsg)
 {
-	if(!(leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
-		leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0 ||
-		leftImageMsg->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
-		leftImageMsg->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0) ||
-		!(rightImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
-		rightImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0 ||
-		rightImageMsg->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
-		rightImageMsg->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0))
+
+	cv::Mat left;
+	cv::Mat right;
+	StereoCameraModel stereoModel;
+	if(!rtabmap_ros::convertStereoMsg(
+			leftImageMsg,
+			rightImageMsg,
+			leftCamInfoMsg,
+			rightCamInfoMsg,
+			frameId_,
+			odomFrameId,
+			lastPoseStamp_,
+			left,
+			right,
+			stereoModel,
+			tfListener_,
+			waitForTransform_?waitForTransformDuration_:0.0))
 	{
-		ROS_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8");
+		ROS_ERROR("Could not convert stereo msgs! Aborting rtabmap update...");
 		return;
-	}
-
-	cv_bridge::CvImagePtr ptrLeftImage, ptrRightImage;
-	if(leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
-	   leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
-	{
-		ptrLeftImage = cv_bridge::toCvCopy(leftImageMsg, "mono8");
-	}
-	else
-	{
-		ptrLeftImage = cv_bridge::toCvCopy(leftImageMsg, "bgr8");
-	}
-	ptrRightImage = cv_bridge::toCvCopy(rightImageMsg, "mono8");
-
-	Transform localTransform = getTransform(frameId_, leftImageMsg->header.frame_id, leftImageMsg->header.stamp);
-	if(localTransform.isNull())
-	{
-		return;
-	}
-
-	rtabmap::StereoCameraModel stereoModel = rtabmap_ros::stereoCameraModelFromROS(*leftCamInfoMsg, *rightCamInfoMsg, localTransform);
-
-	if(stereoModel.baseline() > 10.0)
-	{
-		static bool shown = false;
-		if(!shown)
-		{
-			ROS_WARN("Detected baseline (%f m) is quite large! Is your "
-					 "right camera_info P(0,3) correctly set? Note that "
-					 "baseline=-P(0,3)/P(0,0). This warning is printed only once.",
-					 stereoModel.baseline());
-			shown = true;
-		}
 	}
 
 	if(stereoToDepth_)
 	{
 		// cv::stereoBM() see "$ rosrun rtabmap_ros rtabmap --params | grep StereoBM" for parameters
-		cv::Mat disparity = util2d::disparityFromStereoImages(ptrLeftImage->image, ptrRightImage->image, parameters_);
+		cv::Mat disparity = rtabmap::util2d::disparityFromStereoImages(
+				left,
+				right,
+				parameters_);
 		if(disparity.empty())
 		{
 			ROS_ERROR("Could not compute disparity image (\"stereo_to_depth\" is true)!");
 			return;
 		}
-		cv::Mat depth = util2d::depthFromDisparity(
+		cv::Mat depth = rtabmap::util2d::depthFromDisparity(
 						disparity,
 						stereoModel.left().fx(),
 						stereoModel.baseline());
@@ -1259,65 +1057,23 @@ void CoreWrapper::commonStereoCallback(
 		commonDepthCallback(odomFrameId, leftImageMsg, depthMsg, leftCamInfoMsg, scan2dMsg, scan3dMsg);
 	}
 
-	//for sync transform
-	Transform odomT = getTransform(odomFrameId, frameId_, lastPoseStamp_);
-	if(odomT.isNull() && !odomFrameId_.empty())
-	{
-		ROS_WARN("Could not get TF transform from %s to %s, sensors will not be synchronized with odometry pose.",
-				odomFrameId.c_str(), frameId_.c_str());
-	}
-
-	// sync with odometry stamp
-	if(lastPoseStamp_ != leftImageMsg->header.stamp)
-	{
-		if(!odomT.isNull())
-		{
-			Transform sensorT = getTransform(odomFrameId, frameId_, leftImageMsg->header.stamp);
-			if(sensorT.isNull())
-			{
-				return;
-			}
-			localTransform = odomT.inverse() * sensorT * localTransform;
-		}
-	}
-
 	cv::Mat scan;
 	Transform scanLocalTransform = Transform::getIdentity();
 	if(scan2dMsg.get() != 0)
 	{
-		// make sure the frame of the laser is updated too
-		scanLocalTransform = getTransform(frameId_,
-				scan2dMsg->header.frame_id,
-				scan2dMsg->header.stamp + ros::Duration().fromSec(scan2dMsg->ranges.size()*scan2dMsg->time_increment));
-		if(scanLocalTransform.isNull())
+		if(!rtabmap_ros::convertScanMsg(
+				scan2dMsg,
+				frameId_,
+				odomFrameId,
+				lastPoseStamp_,
+				scan,
+				scanLocalTransform,
+				tfListener_,
+				waitForTransform_?waitForTransformDuration_:0))
 		{
-			ROS_ERROR("TF of received laser scan topic at time %fs is not set, aborting rtabmap update.", scan2dMsg->header.stamp.toSec());
+			ROS_ERROR("Could not convert laser scan msg! Aborting rtabmap update...");
 			return;
 		}
-
-		//transform in frameId_ frame
-		sensor_msgs::PointCloud2 scanOut;
-		laser_geometry::LaserProjection projection;
-		//projection.transformLaserScanToPointCloud(frameId_, *scanMsg, scanOut, tfBuffer_);
-		projection.transformLaserScanToPointCloud(scan2dMsg->header.frame_id, *scan2dMsg, scanOut, tfListener_);
-		pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
-		pcl::fromROSMsg(scanOut, *pclScan);
-
-		// sync with odometry stamp
-		if(lastPoseStamp_ != scan2dMsg->header.stamp)
-		{
-			if(!odomT.isNull())
-			{
-				Transform sensorT = getTransform(odomFrameId, frameId_, scan2dMsg->header.stamp);
-				if(sensorT.isNull())
-				{
-					return;
-				}
-				scanLocalTransform = odomT.inverse() * sensorT * scanLocalTransform;
-			}
-		}
-
-		scan = util3d::laserScan2dFromPointCloud(*pclScan);
 		if(flipScan_)
 		{
 			cv::Mat flipScan;
@@ -1327,76 +1083,26 @@ void CoreWrapper::commonStereoCallback(
 	}
 	else if(scan3dMsg.get() != 0)
 	{
-		bool containNormals = false;
-		for(unsigned int i=0; i<scan3dMsg->fields.size(); ++i)
+		if(!rtabmap_ros::convertScan3dMsg(
+				scan3dMsg,
+				frameId_,
+				odomFrameId,
+				lastPoseStamp_,
+				scanCloudNormalK_,
+				scan,
+				scanLocalTransform,
+				tfListener_,
+				waitForTransform_?waitForTransformDuration_:0))
 		{
-			if(scan3dMsg->fields[i].name.compare("normal_x") == 0)
-			{
-				containNormals = true;
-				break;
-			}
-		}
-
-		// sync with odometry stamp
-		scanLocalTransform = getTransform(frameId_, scan3dMsg->header.frame_id, scan3dMsg->header.stamp);
-		if(scanLocalTransform.isNull())
-		{
-			ROS_ERROR("TF of received scan cloud at time %fs is not set, aborting rtabmap update.", scan3dMsg->header.stamp.toSec());
+			ROS_ERROR("Could not convert 3d laser scan msg! Aborting rtabmap update...");
 			return;
 		}
-		if(lastPoseStamp_ != scan3dMsg->header.stamp)
-		{
-			if(!odomT.isNull())
-			{
-				Transform sensorT = getTransform(odomFrameId, frameId_, scan3dMsg->header.stamp);
-				if(sensorT.isNull())
-				{
-					ROS_WARN("Could not get odometry value for laser scan stamp (%fs). Latest odometry "
-							"stamp is %fs. The laser scan pose will not be synchronized with odometry.", scan3dMsg->header.stamp.toSec(), lastPoseStamp_.toSec());
-				}
-				else
-				{
-					scanLocalTransform = odomT.inverse() * sensorT * scanLocalTransform;
-				}
-
-			}
-		}
-
-		if(containNormals)
-		{
-			pcl::PointCloud<pcl::PointNormal>::Ptr pclScan(new pcl::PointCloud<pcl::PointNormal>);
-			pcl::fromROSMsg(*scan3dMsg, *pclScan);
-
-			scan = util3d::laserScanFromPointCloud(*pclScan);
-		}
-		else
-		{
-			pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
-			pcl::fromROSMsg(*scan3dMsg, *pclScan);
-
-			if(scanCloudNormalK_ > 0)
-			{
-				//compute normals
-				pcl::PointCloud<pcl::Normal>::Ptr normals = util3d::computeNormals(pclScan, scanCloudNormalK_);
-				pcl::PointCloud<pcl::PointNormal>::Ptr pclScanNormal(new pcl::PointCloud<pcl::PointNormal>);
-				pcl::concatenateFields(*pclScan, *normals, *pclScanNormal);
-				scan = util3d::laserScanFromPointCloud(*pclScanNormal);
-			}
-			else
-			{
-				scan = util3d::laserScanFromPointCloud(*pclScan);
-			}
-		}
 	}
-
-	ros::Time stamp =   scan2dMsg.get() != 0?scan2dMsg->header.stamp:
-						scan3dMsg.get() != 0?scan3dMsg->header.stamp:
-					    leftImageMsg->header.stamp;
 
 	Transform groundTruthPose;
 	if(!groundTruthFrameId_.empty())
 	{
-		groundTruthPose = getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, stamp);
+		groundTruthPose = getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, lastPoseStamp_);
 	}
 
 	SensorData data(scan,
@@ -1404,14 +1110,14 @@ void CoreWrapper::commonStereoCallback(
 					scan2dMsg.get() != 0?(int)scan2dMsg->ranges.size():scan3dMsg.get() != 0?scanCloudMaxPoints_:0,
 					scan2dMsg.get() != 0?scan2dMsg->range_max:0,
 					scanLocalTransform),
-			ptrLeftImage->image,
-			ptrRightImage->image,
+			left,
+			right,
 			stereoModel,
 			lastPoseIntermediate_?-1:leftImageMsg->header.seq,
-			rtabmap_ros::timestampFromROS(stamp));
+			rtabmap_ros::timestampFromROS(lastPoseStamp_));
 	data.setGroundTruth(groundTruthPose);
 
-	process(stamp,
+	process(lastPoseStamp_,
 			data,
 			lastPose_,
 			odomFrameId,

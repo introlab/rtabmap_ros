@@ -258,7 +258,6 @@ private:
 			const sensor_msgs::CameraInfoConstPtr& rightCameraInfoMsg);
 
 	void processRequestedMap(const rtabmap_ros::MapData & map);
-	rtabmap::Transform getTransform(const std::string & fromFrameId, const std::string & toFrameId, const ros::Time & stamp) const;
 
 private:
 	rtabmap::MainWindow * mainWindow_;

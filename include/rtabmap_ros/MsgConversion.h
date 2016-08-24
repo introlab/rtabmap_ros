@@ -29,9 +29,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define MSGCONVERSION_H_
 
 #include <tf/tf.h>
+#include <tf/transform_listener.h>
 #include <geometry_msgs/Transform.h>
 #include <geometry_msgs/Pose.h>
 #include <sensor_msgs/CameraInfo.h>
+#include <sensor_msgs/LaserScan.h>
+#include <sensor_msgs/Image.h>
 
 #include <opencv2/opencv.hpp>
 #include <opencv2/features2d/features2d.hpp>
@@ -138,6 +141,73 @@ rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::OdomInfo & msg);
 void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_ros::OdomInfo & msg);
 
 inline double timestampFromROS(const ros::Time & stamp) {return double(stamp.sec) + double(stamp.nsec)/1000000000.0;}
+
+// common stuff
+rtabmap::Transform getTransform(
+		const std::string & fromFrameId,
+		const std::string & toFrameId,
+		const ros::Time & stamp,
+		tf::TransformListener & listener,
+		double waitForTransform);
+
+
+// get moving transform accordingly to a fixed frame. For example get
+// transform of /base_link between two stamps accordingly to /odom frame.
+rtabmap::Transform getTransform(
+		const std::string & sourceTargetFrame,
+		const std::string & fixedFrame,
+		const ros::Time & stampSource,
+		const ros::Time & stampTarget,
+		tf::TransformListener & listener,
+		double waitForTransform);
+
+bool convertRGBDMsgs(
+		const std::vector<sensor_msgs::ImageConstPtr> & imageMsgs,
+		const std::vector<sensor_msgs::ImageConstPtr> & depthMsgs,
+		const std::vector<sensor_msgs::CameraInfoConstPtr> & cameraInfoMsgs,
+		const std::string & frameId,
+		const std::string & odomFrameId,
+		const ros::Time & odomStamp,
+		cv::Mat & rgb,
+		cv::Mat & depth,
+		std::vector<rtabmap::CameraModel> & cameraModels,
+		tf::TransformListener & listener,
+		double waitForTransform);
+
+bool convertStereoMsg(
+		const sensor_msgs::ImageConstPtr& leftImageMsg,
+		const sensor_msgs::ImageConstPtr& rightImageMsg,
+		const sensor_msgs::CameraInfoConstPtr& leftCamInfoMsg,
+		const sensor_msgs::CameraInfoConstPtr& rightCamInfoMsg,
+		const std::string & frameId,
+		const std::string & odomFrameId,
+		const ros::Time & odomStamp,
+		cv::Mat & left,
+		cv::Mat & right,
+		rtabmap::StereoCameraModel & stereoModel,
+		tf::TransformListener & listener,
+		double waitForTransform);
+
+bool convertScanMsg(
+		const sensor_msgs::LaserScanConstPtr& scan2dMsg,
+		const std::string & frameId,
+		const std::string & odomFrameId,
+		const ros::Time & odomStamp,
+		cv::Mat & scan,
+		rtabmap::Transform & scanLocalTransform,
+		tf::TransformListener & listener,
+		double waitForTransform);
+
+bool convertScan3dMsg(
+		const sensor_msgs::PointCloud2ConstPtr & scan3dMsg,
+		const std::string & frameId,
+		const std::string & odomFrameId,
+		const ros::Time & odomStamp,
+		int scanCloudNormalK,
+		cv::Mat & scan,
+		rtabmap::Transform & scanLocalTransform,
+		tf::TransformListener & listener,
+		double waitForTransform);
 
 }
 
