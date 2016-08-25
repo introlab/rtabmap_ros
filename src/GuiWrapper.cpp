@@ -65,6 +65,7 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 		frameId_("base_link"),
 		waitForTransform_(true),
 		waitForTransformDuration_(0.2), // 200 ms
+		odomSensorSync_(false),
 		cameraNodeName_(""),
 		lastOdomInfoUpdateTime_(0),
 		depthScanSync_(0),
@@ -131,6 +132,7 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 	pnh.param("tf_prefix", tfPrefix, tfPrefix);
 	pnh.param("wait_for_transform", waitForTransform_, waitForTransform_);
 	pnh.param("wait_for_transform_duration",  waitForTransformDuration_, waitForTransformDuration_);
+	pnh.param("odom_sensor_sync", odomSensorSync_, odomSensorSync_);
 	pnh.param("camera_node_name", cameraNodeName_, cameraNodeName_); // used to pause the rtabmap_ros/camera when pausing the process
 	pnh.param("init_cache_path", initCachePath, initCachePath);
 	if(initCachePath.size())
@@ -570,7 +572,7 @@ void GuiWrapper::commonDepthCallback(
 					depthMsgs,
 					cameraInfoMsgs,
 					frameId_,
-					odomHeader.frame_id,
+					odomSensorSync_?odomHeader.frame_id:"",
 					odomHeader.stamp,
 					rgb,
 					depth,
@@ -588,7 +590,7 @@ void GuiWrapper::commonDepthCallback(
 			if(!rtabmap_ros::convertScanMsg(
 					scan2dMsg,
 					frameId_,
-					odomHeader.frame_id,
+					odomSensorSync_?odomHeader.frame_id:"",
 					odomHeader.stamp,
 					scan,
 					scanLocalTransform,
@@ -604,7 +606,7 @@ void GuiWrapper::commonDepthCallback(
 			if(!rtabmap_ros::convertScan3dMsg(
 					scan3dMsg,
 					frameId_,
-					odomHeader.frame_id,
+					odomSensorSync_?odomHeader.frame_id:"",
 					odomHeader.stamp,
 					0,
 					scan,
@@ -727,7 +729,7 @@ void GuiWrapper::commonStereoCallback(
 				leftCamInfoMsg,
 				rightCamInfoMsg,
 				frameId_,
-				odomHeader.frame_id,
+				odomSensorSync_?odomHeader.frame_id:"",
 				odomHeader.stamp,
 				left,
 				right,
@@ -744,7 +746,7 @@ void GuiWrapper::commonStereoCallback(
 			if(!rtabmap_ros::convertScanMsg(
 					scan2dMsg,
 					frameId_,
-					odomHeader.frame_id,
+					odomSensorSync_?odomHeader.frame_id:"",
 					odomHeader.stamp,
 					scan,
 					scanLocalTransform,
@@ -760,7 +762,7 @@ void GuiWrapper::commonStereoCallback(
 			if(!rtabmap_ros::convertScan3dMsg(
 					scan3dMsg,
 					frameId_,
-					odomHeader.frame_id,
+					odomSensorSync_?odomHeader.frame_id:"",
 					odomHeader.stamp,
 					0,
 					scan,

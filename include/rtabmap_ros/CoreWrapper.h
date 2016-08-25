@@ -100,7 +100,6 @@ private:
 
 	bool commonOdomUpdate(const nav_msgs::OdometryConstPtr & odomMsg);
 	bool commonOdomTFUpdate(const ros::Time & stamp); // TF odom
-	rtabmap::Transform getTransform(const std::string & fromFrameId, const std::string & toFrameId, const ros::Time & stamp) const;
 
 	void commonDepthCallback(
 				const std::string & odomFrameId,
@@ -511,6 +510,7 @@ private:
 	boost::thread* transformThread_;
 
 	bool stereoToDepth_;
+	bool odomSensorSync_;
 	float rate_;
 	bool createIntermediateNodes_;
 	ros::Time time_;

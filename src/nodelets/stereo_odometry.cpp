@@ -86,7 +86,6 @@ private:
 		bool approxSync = false;
 		pnh.param("approx_sync", approxSync, approxSync);
 		pnh.param("queue_size", queueSize_, queueSize_);
-		NODELET_INFO("Approximate time sync = %s", approxSync?"true":"false");
 
 		ros::NodeHandle left_nh(nh, "left");
 		ros::NodeHandle right_nh(nh, "right");

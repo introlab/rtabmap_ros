@@ -994,7 +994,7 @@ bool convertRGBDMsgs(
 			return false;
 		}
 		// sync with odometry stamp
-		if(odomStamp != depthMsgs[i]->header.stamp)
+		if(!odomFrameId.empty() && odomStamp != depthMsgs[i]->header.stamp)
 		{
 			rtabmap::Transform sensorT = getTransform(
 					frameId,
@@ -1010,6 +1010,7 @@ bool convertRGBDMsgs(
 			}
 			else
 			{
+				//ROS_WARN("RGBD correction = %s (time diff=%fs)", sensorT.prettyPrint().c_str(), fabs(depthMsgs[i]->header.stamp.toSec()-odomStamp.toSec()));
 				localTransform = sensorT * localTransform;
 			}
 		}
@@ -1113,7 +1114,7 @@ bool convertStereoMsg(
 		return false;
 	}
 	// sync with odometry stamp
-	if(odomStamp != leftImageMsg->header.stamp)
+	if(!odomFrameId.empty() && odomStamp != leftImageMsg->header.stamp)
 	{
 		rtabmap::Transform sensorT = getTransform(
 				frameId,
@@ -1163,7 +1164,7 @@ bool convertScanMsg(
 {
 	// make sure the frame of the laser is updated too
 	rtabmap::Transform tmpT = getTransform(
-			odomFrameId,
+			odomFrameId.empty()?frameId:odomFrameId,
 			scan2dMsg->header.frame_id,
 			scan2dMsg->header.stamp + ros::Duration().fromSec(scan2dMsg->ranges.size()*scan2dMsg->time_increment),
 			listener,
@@ -1187,14 +1188,14 @@ bool convertScanMsg(
 	//transform in frameId_ frame
 	sensor_msgs::PointCloud2 scanOut;
 	laser_geometry::LaserProjection projection;
-	projection.transformLaserScanToPointCloud(odomFrameId, *scan2dMsg, scanOut, listener);
+	projection.transformLaserScanToPointCloud(odomFrameId.empty()?frameId:odomFrameId, *scan2dMsg, scanOut, listener);
 	pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
 	pcl::fromROSMsg(scanOut, *pclScan);
 
 	//transform back in laser frame
 	rtabmap::Transform laserToOdom = getTransform(
 			scan2dMsg->header.frame_id,
-			odomFrameId,
+			odomFrameId.empty()?frameId:odomFrameId,
 			scan2dMsg->header.stamp,
 			listener,
 			waitForTransform);
@@ -1204,7 +1205,7 @@ bool convertScanMsg(
 	}
 
 	// sync with odometry stamp
-	if(odomStamp != scan2dMsg->header.stamp)
+	if(!odomFrameId.empty() && odomStamp != scan2dMsg->header.stamp)
 	{
 		rtabmap::Transform sensorT = getTransform(
 				frameId,
@@ -1220,6 +1221,7 @@ bool convertScanMsg(
 		}
 		else
 		{
+			//ROS_WARN("scan correction = %s (time diff=%fs)", sensorT.prettyPrint().c_str(), fabs(scan2dMsg->header.stamp.toSec()-odomStamp.toSec()));
 			scanLocalTransform = sensorT * scanLocalTransform;
 		}
 	}
@@ -1256,7 +1258,7 @@ bool convertScan3dMsg(
 	}
 
 	// sync with odometry stamp
-	if(odomStamp != scan3dMsg->header.stamp)
+	if(!odomFrameId.empty() && odomStamp != scan3dMsg->header.stamp)
 	{
 		rtabmap::Transform sensorT = getTransform(
 				frameId,

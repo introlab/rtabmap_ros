@@ -269,6 +269,7 @@ private:
 	std::string odomFrameId_;
 	bool waitForTransform_;
 	double waitForTransformDuration_;
+	bool odomSensorSync_;
 	tf::TransformListener tfListener_;
 
 	message_filters::Subscriber<rtabmap_ros::Info> infoTopic_;
