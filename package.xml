@@ -39,7 +39,8 @@
   <build_depend>move_base_msgs</build_depend>
   <build_depend>costmap_2d</build_depend>
   <build_depend>octomap_ros</build_depend>
-  
+  <build_depend>image_geometry</build_depend>
+
   <run_depend>cv_bridge</run_depend>
   <run_depend>roscpp</run_depend>
   <run_depend>rospy</run_depend>
@@ -68,6 +69,7 @@
   <run_depend>move_base_msgs</run_depend>
   <run_depend>costmap_2d</run_depend>
   <run_depend>octomap_ros</run_depend>
+  <run_depend>image_geometry</run_depend>
 
   <build_depend>libpcl-all-dev</build_depend>
 
