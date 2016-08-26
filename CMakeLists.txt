@@ -8,7 +8,7 @@ find_package(catkin REQUIRED COMPONENTS
              cv_bridge roscpp rospy sensor_msgs std_msgs std_srvs nav_msgs geometry_msgs visualization_msgs
              image_transport tf tf_conversions tf2_ros eigen_conversions laser_geometry pcl_conversions 
              pcl_ros nodelet dynamic_reconfigure message_filters class_loader
-             genmsg stereo_msgs move_base_msgs
+             genmsg stereo_msgs move_base_msgs image_geometry
 )
 
 # Optional components
@@ -123,7 +123,7 @@ catkin_package(
   CATKIN_DEPENDS cv_bridge roscpp rospy sensor_msgs std_msgs std_srvs nav_msgs geometry_msgs visualization_msgs
                  image_transport tf tf_conversions tf2_ros eigen_conversions laser_geometry pcl_conversions 
                  pcl_ros nodelet dynamic_reconfigure message_filters class_loader
-                 stereo_msgs move_base_msgs ${optional_dependencies}
+                 stereo_msgs move_base_msgs image_geometry ${optional_dependencies}
   DEPENDS RTABMap OpenCV
 )
 
