@@ -1554,7 +1554,14 @@ void CoreWrapper::goalCommonCallback(
 	}
 	else if(pose.isNull())
 	{
-		ROS_ERROR("Planning: Node id should be > 0 !");
+		if(id > 0)
+		{
+			ROS_ERROR("Planning: Could not plan to node %d! The node is not in map's graph (look for warnings before this message for more details).", id);
+		}
+		else
+		{
+			ROS_ERROR("Planning: Node id should be > 0 !");
+		}
 	}
 	else
 	{
