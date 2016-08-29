@@ -276,6 +276,10 @@ void MapsManager::setParameters(const rtabmap::ParametersMap & parameters)
 
 	// don't use grid cell size from parameters as we use grid_cell_size ros param
 	uInsert(parameters_, ParametersPair(Parameters::kGridCellSize(), uNumber2Str(gridCellSize_)));
+
+	// For negative laser scans, always fill empty space
+	uInsert(parameters_, ParametersPair(Parameters::kGridScan2dUnknownSpaceFilled(), "true"));
+
 	occupancyGrid_->parseParameters(parameters_);
 }
 
