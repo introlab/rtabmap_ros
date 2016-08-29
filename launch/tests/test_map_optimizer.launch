@@ -13,7 +13,12 @@
      
      <node pkg="rtabmap_ros" type="rtabmapviz" name="rtabmapviz" output="screen">
         <remap from="mapData" to="mapData_optimized"/>
+        <param name="frame_id" value="camera_link"/>
         <param name="subscribe_depth" value="false"/>
      </node>
-  </group>
+     
+     <node pkg="rtabmap_ros" type="map_assembler" name="map_assembler">
+        <remap from="mapData" to="mapData_optimized"/>
+     </node>
+  </group>  
 </launch>
