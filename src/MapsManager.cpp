@@ -470,8 +470,8 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 							{
 								// normally data should be already uncompressed for negative ids
 								occupancyGrid_->createLocalMap(findIter->second, ground, obstacles, viewPoint);
-								gridMaps_.insert(std::make_pair(iter->first, std::make_pair(ground, obstacles)));
-								gridMapsViewpoints_.insert(std::make_pair(iter->first, viewPoint));
+								uInsert(gridMaps_, std::make_pair(iter->first, std::make_pair(ground, obstacles)));
+								uInsert(gridMapsViewpoints_, std::make_pair(iter->first, viewPoint));
 							}
 							else
 							{
