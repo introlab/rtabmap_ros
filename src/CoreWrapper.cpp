@@ -95,7 +95,6 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 		genScanMinDepth_(0.0),
 		scanCloudMaxPoints_(0),
 		scanCloudNormalK_(0),
-		flipScan_(false),
 		mapToOdom_(rtabmap::Transform::getIdentity()),
 		mapsManager_(true),
 		depthSync_(0),
@@ -209,9 +208,14 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 	pnh.param("gen_scan_min_depth",  genScanMinDepth_, genScanMinDepth_);
 	pnh.param("scan_cloud_max_points",  scanCloudMaxPoints_, scanCloudMaxPoints_);
 	pnh.param("scan_cloud_normal_k", scanCloudNormalK_, scanCloudNormalK_);
-	pnh.param("flip_scan", flipScan_, flipScan_);
 	pnh.param("stereo_to_depth", stereoToDepth_, stereoToDepth_);
 	pnh.param("odom_sensor_sync", odomSensorSync_, odomSensorSync_);
+	if(pnh.hasParam("flip_scan"))
+	{
+		ROS_WARN("Parameter \"flip_scan\" doesn't exist anymore. Rtabmap now "
+				"detects automatically if the laser is upside down with /tf, then if so, it "
+				"switches scan values.");
+	}
 
 	if(!tfPrefix.empty())
 	{
@@ -907,7 +911,8 @@ void CoreWrapper::commonDepthCallback(
 			ROS_ERROR("Could not convert laser scan msg! Aborting rtabmap update...");
 			return;
 		}
-		if(flipScan_)
+		Transform zAxis(0,0,1,0,0,0);
+		if((scanLocalTransform.rotation()*zAxis).z() < 0)
 		{
 			cv::Mat flipScan;
 			cv::flip(scan, flipScan, 1);
@@ -1049,7 +1054,8 @@ void CoreWrapper::commonStereoCallback(
 			ROS_ERROR("Could not convert laser scan msg! Aborting rtabmap update...");
 			return;
 		}
-		if(flipScan_)
+		Transform zAxis(0,0,1,0,0,0);
+		if((scanLocalTransform.rotation()*zAxis).z() < 0)
 		{
 			cv::Mat flipScan;
 			cv::flip(scan, flipScan, 1);
