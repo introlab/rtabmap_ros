@@ -1,6 +1,7 @@
 <launch>
 
   <arg name="localization"      default="false"/>
+  <arg name="uid"/>
 
   <!-- Kinect: -->
   <include file="$(find freenect_launch)/launch/freenect.launch">
@@ -12,7 +13,7 @@
   <node pkg="imu_brick" type="imu_brick_node" name="imu_brick">
       <param name="frame_id"                       value="imu_link"/>
       <param name="period_ms"                      value="10"/>
-      <param name="uid"              type="string" value="6xDEo7"/>
+      <param name="uid"              type="string" value="$(arg uid)"/>
       <param name="cov_orientation"  type="double" value="0.0005"/>
       <param name="cov_velocity"     type="double" value="0.00025"/>
       <param name="cov_acceleration" type="double" value="0.1"/>
