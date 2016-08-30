@@ -199,6 +199,8 @@ private:
 			NODELET_ERROR("obstacles_detection: Parameter \"%s\" is true but map_frame_id is not set!", rtabmap::Parameters::kGridMapFrameProjection().c_str());
 		}
 
+		grid_.parseParameters(parameters);
+
 		cloudSub_ = nh.subscribe("cloud", 1, &ObstaclesDetection::callback, this);
 
 		groundPub_ = nh.advertise<sensor_msgs::PointCloud2>("ground", 1);
