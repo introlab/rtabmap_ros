@@ -88,8 +88,8 @@
     </description>
   </class>
   
-  <class name="rtabmap_ros/obstacles_detection_indoor" 
-         type="rtabmap_ros::ObstaclesDetectionIndoor" 
+  <class name="rtabmap_ros/obstacles_detection_old" 
+         type="rtabmap_ros::ObstaclesDetectionOld" 
          base_class_type="nodelet::Nodelet">
     <description>
       This is my nodelet.

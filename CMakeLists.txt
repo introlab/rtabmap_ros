@@ -160,7 +160,7 @@ SET(rtabmap_ros_lib_src
    src/nodelets/point_cloud_xyz.cpp
    src/nodelets/disparity_to_depth.cpp 
    src/nodelets/obstacles_detection.cpp
-   src/nodelets/obstacles_detection_indoor.cpp
+   src/nodelets/obstacles_detection_old.cpp
    src/nodelets/point_cloud_aggregator.cpp
    src/OdometryROS.cpp
    src/MsgConversion.cpp
