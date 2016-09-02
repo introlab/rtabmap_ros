@@ -69,12 +69,13 @@ MapsManager::MapsManager(bool usePublicNamespace) :
 		mapFilterRadius_(0.0),
 		mapFilterAngle_(30.0), // degrees
 		mapCacheCleanup_(true),
-		negativePosesIgnored_(true),
+		negativePosesIgnored_(false),
 		assembledObstacles_(new pcl::PointCloud<pcl::PointXYZRGB>),
 		assembledGround_(new pcl::PointCloud<pcl::PointXYZRGB>),
 		occupancyGrid_(new OccupancyGrid),
 		octomap_(0),
-		octomapTreeDepth_(16)
+		octomapTreeDepth_(16),
+		octomapOccupancyThr_(0.5)
 {
 
 	ros::NodeHandle nh;
@@ -128,7 +129,9 @@ MapsManager::MapsManager(bool usePublicNamespace) :
 
 #ifdef WITH_OCTOMAP_ROS
 #ifdef RTABMAP_OCTOMAP
-	octomap_ = new OctoMap(gridCellSize_);
+	pnh.param("octomap_occupancy_thr", octomapOccupancyThr_, octomapOccupancyThr_);
+	UASSERT(octomapOccupancyThr_>=0.0 && octomapOccupancyThr_<=1.0);
+	octomap_ = new OctoMap(gridCellSize_, octomapOccupancyThr_);
 	pnh.param("octomap_tree_depth", octomapTreeDepth_, octomapTreeDepth_);
 	if(octomapTreeDepth_ > 16)
 	{
@@ -141,6 +144,7 @@ MapsManager::MapsManager(bool usePublicNamespace) :
 		octomapTreeDepth_ = 16;
 	}
 	ROS_INFO("%s(maps): octomap_tree_depth         = %d", name.c_str(), octomapTreeDepth_);
+	ROS_INFO("%s(maps): octomap_occupancy_thr      = %f", name.c_str(), octomapOccupancyThr_);
 #endif
 #endif
 
