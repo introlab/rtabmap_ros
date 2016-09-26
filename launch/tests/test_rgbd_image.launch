@@ -28,6 +28,7 @@
       <param name="subscribe_depth"       type="bool"   value="false"/>
       <param name="subscribe_rgbd"       type="bool"   value="true"/>
       <param name="frame_id"             type="string" value="camera_link"/>
+      <param name="approx_sync"          type="string" value="false"/>
       <remap     if="$(arg compressed)"    from="rgbd_image"   to="/camera/rgbd_image/compressed"/>
       <remap unless="$(arg compressed)"    from="rgbd_image"   to="/camera/rgbd_image"/>
     </node>
@@ -36,6 +37,7 @@
       <param name="subscribe_depth"      type="bool"   value="false"/>
       <param name="subscribe_rgbd"       type="bool"   value="true"/>
       <param name="frame_id"             type="string" value="camera_link"/>
+      <param name="approx_sync"          type="string" value="false"/>
       <remap     if="$(arg compressed)"    from="rgbd_image"   to="/camera/rgbd_image/compressed"/>
       <remap unless="$(arg compressed)"    from="rgbd_image"   to="/camera/rgbd_image"/>
       <param name="subscribe_odom_info"  type="bool"   value="true"/>
