@@ -72,6 +72,8 @@ add_message_files(
    Point2f.msg
    Point3f.msg
    Goal.msg
+   RGBDImage.msg
+   UserData.msg
 )
 
 ## Generate services in the 'srv' folder
@@ -162,9 +164,15 @@ SET(rtabmap_ros_lib_src
    src/nodelets/obstacles_detection.cpp
    src/nodelets/obstacles_detection_old.cpp
    src/nodelets/point_cloud_aggregator.cpp
+   src/nodelets/rgbd_sync.cpp
    src/OdometryROS.cpp
    src/MsgConversion.cpp
    src/MapsManager.cpp
+   src/CommonDataSubscriber.cpp
+   src/impl/CommonDataSubscriberDepth.cpp
+   src/impl/CommonDataSubscriberStereo.cpp
+   src/impl/CommonDataSubscriberRGBD.cpp
+   src/impl/CommonDataSubscriberRGBD2.cpp
 )   
 
 # If costmap_2d is found, add the plugin
@@ -327,6 +335,7 @@ install(TARGETS
    rtabmap 
    rtabmapviz 
    rgbd_odometry 
+   rgbdicp_odometry 
    stereo_odometry
    map_assembler
    map_optimizer
@@ -341,6 +350,7 @@ install(TARGETS
    rtabmap_ros 
    rtabmap 
    rgbd_odometry 
+   rgbdicp_odometry 
    stereo_odometry
    map_assembler
    map_optimizer

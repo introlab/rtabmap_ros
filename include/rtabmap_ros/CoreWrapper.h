@@ -38,11 +38,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <std_msgs/Empty.h>
 #include <std_msgs/Int32.h>
-#include <sensor_msgs/PointCloud2.h>
-#include <sensor_msgs/Image.h>
-#include <sensor_msgs/CameraInfo.h>
-#include <sensor_msgs/LaserScan.h>
-#include <nav_msgs/Odometry.h>
 #include <nav_msgs/GetMap.h>
 
 #include <rtabmap/core/Parameters.h>
@@ -54,16 +49,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtabmap_ros/SetGoal.h"
 #include "rtabmap_ros/SetLabel.h"
 #include "rtabmap_ros/Goal.h"
+#include "rtabmap_ros/CommonDataSubscriber.h"
 
 #include "MapsManager.h"
-
-#include <message_filters/subscriber.h>
-#include <message_filters/synchronizer.h>
-#include <message_filters/sync_policies/approximate_time.h>
-#include <message_filters/sync_policies/exact_time.h>
-
-#include <image_transport/image_transport.h>
-#include <image_transport/subscriber_filter.h>
 
 #ifdef WITH_OCTOMAP_ROS
 #include <octomap_msgs/GetOctomap.h>
@@ -81,128 +69,48 @@ namespace rtabmap {
 class StereoDense;
 }
 
-class CoreWrapper
+namespace rtabmap_ros {
+
+class CoreWrapper : public CommonDataSubscriber
 {
 public:
 	CoreWrapper(bool deleteDbOnStart, const rtabmap::ParametersMap & parameters);
 	virtual ~CoreWrapper();
 
 private:
-	void setupCallbacks(
-			bool subscribeDepth,
-			bool subscribeScan2d,
-			bool subscribeScan3d,
-			bool subscribeStereo,
-			int queueSize,
-			bool approxSync,
-			int depthCameras);
-	void defaultCallback(const sensor_msgs::ImageConstPtr & imageMsg); // no odom
 
-	bool commonOdomUpdate(const nav_msgs::OdometryConstPtr & odomMsg);
-	bool commonOdomTFUpdate(const ros::Time & stamp); // TF odom
+	bool odomUpdate(const nav_msgs::OdometryConstPtr & odomMsg);
+	bool odomTFUpdate(const ros::Time & stamp); // TF odom
 
-	void commonDepthCallback(
-				const std::string & odomFrameId,
-				const sensor_msgs::ImageConstPtr& imageMsg,
-				const sensor_msgs::ImageConstPtr& depthMsg,
-				const sensor_msgs::CameraInfoConstPtr& cameraInfoMsg,
+	virtual void commonDepthCallback(
+				const nav_msgs::OdometryConstPtr & odomMsg,
+				const rtabmap_ros::UserDataConstPtr & userDataMsg,
+				const std::vector<cv_bridge::CvImageConstPtr> & imageMsgs,
+				const std::vector<cv_bridge::CvImageConstPtr> & depthMsgs,
+				const std::vector<sensor_msgs::CameraInfo> & cameraInfoMsgs,
 				const sensor_msgs::LaserScanConstPtr& scanMsg,
-				const sensor_msgs::PointCloud2ConstPtr& scan3dMsg);
-	void commonDepthCallback(
-				const std::string & odomFrameId,
-				const std::vector<sensor_msgs::ImageConstPtr> & imageMsgs,
-				const std::vector<sensor_msgs::ImageConstPtr> & depthMsgs,
-				const std::vector<sensor_msgs::CameraInfoConstPtr> & cameraInfoMsgs,
-				const sensor_msgs::LaserScanConstPtr& scanMsg,
-				const sensor_msgs::PointCloud2ConstPtr& scan3dMsg);
-	void commonStereoCallback(
-				const std::string & odomFrameId,
+				const sensor_msgs::PointCloud2ConstPtr& scan3dMsg,
+				const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg);
+	void commonDepthCallbackImpl(
+			const std::string & odomFrameId,
+			const rtabmap_ros::UserDataConstPtr & userDataMsg,
+			const std::vector<cv_bridge::CvImageConstPtr> & imageMsgs,
+			const std::vector<cv_bridge::CvImageConstPtr> & depthMsgs,
+			const std::vector<sensor_msgs::CameraInfo> & cameraInfoMsgs,
+			const sensor_msgs::LaserScanConstPtr& scan2dMsg,
+			const sensor_msgs::PointCloud2ConstPtr& scan3dMsg,
+			const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg);
+	virtual void commonStereoCallback(
+				const nav_msgs::OdometryConstPtr & odomMsg,
 				const sensor_msgs::ImageConstPtr& leftImageMsg,
 				const sensor_msgs::ImageConstPtr& rightImageMsg,
 				const sensor_msgs::CameraInfoConstPtr& leftCamInfoMsg,
 				const sensor_msgs::CameraInfoConstPtr& rightCamInfoMsg,
 				const sensor_msgs::LaserScanConstPtr& scanMsg,
-				const sensor_msgs::PointCloud2ConstPtr& scan3dMsg);
+				const sensor_msgs::PointCloud2ConstPtr& scan3dMsg,
+				const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg);
 
-	// with odom msg
-	void depthCallback(
-			const sensor_msgs::ImageConstPtr& imageMsg,
-			const nav_msgs::OdometryConstPtr & odomMsg,
-			const sensor_msgs::ImageConstPtr& imageDepthMsg,
-			const sensor_msgs::CameraInfoConstPtr& camInfoMsg);
-	void depthScanCallback(
-			const sensor_msgs::ImageConstPtr& imageMsg,
-			const nav_msgs::OdometryConstPtr & odomMsg,
-			const sensor_msgs::ImageConstPtr& imageDepthMsg,
-			const sensor_msgs::CameraInfoConstPtr& camInfoMsg,
-			const sensor_msgs::LaserScanConstPtr& scanMsg);
-	void depthScan3dCallback(
-			const sensor_msgs::ImageConstPtr& imageMsg,
-			const nav_msgs::OdometryConstPtr & odomMsg,
-			const sensor_msgs::ImageConstPtr& imageDepthMsg,
-			const sensor_msgs::CameraInfoConstPtr& camInfoMsg,
-			const sensor_msgs::PointCloud2ConstPtr& scanMsg);
-	void stereoCallback(
-			const sensor_msgs::ImageConstPtr& leftImageMsg,
-			const sensor_msgs::ImageConstPtr& rightImageMsg,
-			const sensor_msgs::CameraInfoConstPtr& leftCamInfoMsg,
-			const sensor_msgs::CameraInfoConstPtr& rightCamInfoMsg,
-			const nav_msgs::OdometryConstPtr & odomMsg);
-	void stereoScanCallback(
-			const sensor_msgs::ImageConstPtr& leftImageMsg,
-			const sensor_msgs::ImageConstPtr& rightImageMsg,
-			const sensor_msgs::CameraInfoConstPtr& leftCamInfoMsg,
-			const sensor_msgs::CameraInfoConstPtr& rightCamInfoMsg,
-			const sensor_msgs::LaserScanConstPtr& scanMsg,
-			const nav_msgs::OdometryConstPtr & odomMsg);
-	void stereoScan3dCallback(
-			const sensor_msgs::ImageConstPtr& leftImageMsg,
-			const sensor_msgs::ImageConstPtr& rightImageMsg,
-			const sensor_msgs::CameraInfoConstPtr& leftCamInfoMsg,
-			const sensor_msgs::CameraInfoConstPtr& rightCamInfoMsg,
-			const sensor_msgs::PointCloud2ConstPtr& scanMsg,
-			const nav_msgs::OdometryConstPtr & odomMsg);
-	void depth2Callback(
-			const nav_msgs::OdometryConstPtr & odomMsg,
-			const sensor_msgs::ImageConstPtr& image1Msg,
-			const sensor_msgs::ImageConstPtr& imageDepth1Msg,
-			const sensor_msgs::CameraInfoConstPtr& camInfo1Msg,
-			const sensor_msgs::ImageConstPtr& image2Msg,
-			const sensor_msgs::ImageConstPtr& imageDept2hMsg,
-			const sensor_msgs::CameraInfoConstPtr& camInfo2Msg);
-
-	// without odom, when TF is used for odom
-	void depthTFCallback(
-			const sensor_msgs::ImageConstPtr& imageMsg,
-			const sensor_msgs::ImageConstPtr& imageDepthMsg,
-			const sensor_msgs::CameraInfoConstPtr& camInfoMsg);
-	void depthScanTFCallback(
-			const sensor_msgs::ImageConstPtr& imageMsg,
-			const sensor_msgs::ImageConstPtr& imageDepthMsg,
-			const sensor_msgs::CameraInfoConstPtr& camInfoMsg,
-			const sensor_msgs::LaserScanConstPtr& scanMsg);
-	void depthScan3dTFCallback(
-			const sensor_msgs::ImageConstPtr& imageMsg,
-			const sensor_msgs::ImageConstPtr& imageDepthMsg,
-			const sensor_msgs::CameraInfoConstPtr& camInfoMsg,
-			const sensor_msgs::PointCloud2ConstPtr& scanMsg);
-	void stereoTFCallback(
-			const sensor_msgs::ImageConstPtr& leftImageMsg,
-			const sensor_msgs::ImageConstPtr& rightImageMsg,
-			const sensor_msgs::CameraInfoConstPtr& leftCamInfoMsg,
-			const sensor_msgs::CameraInfoConstPtr& rightCamInfoMsg);
-	void stereoScanTFCallback(
-			const sensor_msgs::ImageConstPtr& leftImageMsg,
-			const sensor_msgs::ImageConstPtr& rightImageMsg,
-			const sensor_msgs::CameraInfoConstPtr& leftCamInfoMsg,
-			const sensor_msgs::CameraInfoConstPtr& rightCamInfoMsg,
-			const sensor_msgs::LaserScanConstPtr& scanMsg);
-	void stereoScan3dTFCallback(
-			const sensor_msgs::ImageConstPtr& leftImageMsg,
-			const sensor_msgs::ImageConstPtr& rightImageMsg,
-			const sensor_msgs::CameraInfoConstPtr& leftCamInfoMsg,
-			const sensor_msgs::CameraInfoConstPtr& rightCamInfoMsg,
-			const sensor_msgs::PointCloud2ConstPtr& scanMsg);
+	void defaultCallback(const sensor_msgs::ImageConstPtr & imageMsg); // no odom
 
 	void goalCommonCallback(int id, const std::string & label, const rtabmap::Transform & pose, const ros::Time & stamp, double * planningTime = 0);
 	void goalCallback(const geometry_msgs::PoseStampedConstPtr & msg);
@@ -269,8 +177,8 @@ private:
 	rtabmap::ParametersMap parameters_;
 
 	std::string frameId_;
-	std::string mapFrameId_;
 	std::string odomFrameId_;
+	std::string mapFrameId_;
 	std::string groundTruthFrameId_;
 	std::string groundTruthBaseFrameId_;
 	std::string configPath_;
@@ -301,179 +209,6 @@ private:
 	ros::Publisher goalReachedPub_;
 	ros::Publisher globalPathPub_;
 	ros::Publisher localPathPub_;
-
-	// for loop closure detection only
-	image_transport::Subscriber defaultSub_;
-
-	//for depth callback
-	std::vector<image_transport::SubscriberFilter*> imageSubs_;
-	std::vector<image_transport::SubscriberFilter*> imageDepthSubs_;
-	std::vector<message_filters::Subscriber<sensor_msgs::CameraInfo>*> cameraInfoSubs_;
-
-	//stereo callback
-	image_transport::SubscriberFilter imageRectLeft_;
-	image_transport::SubscriberFilter imageRectRight_;
-	message_filters::Subscriber<sensor_msgs::CameraInfo> cameraInfoLeft_;
-	message_filters::Subscriber<sensor_msgs::CameraInfo> cameraInfoRight_;
-
-	message_filters::Subscriber<nav_msgs::Odometry> odomSub_;
-	message_filters::Subscriber<sensor_msgs::LaserScan> scanSub_;
-	message_filters::Subscriber<sensor_msgs::PointCloud2> scan3dSub_;
-
-	typedef message_filters::sync_policies::ApproximateTime<
-			sensor_msgs::Image,
-			nav_msgs::Odometry,
-			sensor_msgs::Image,
-			sensor_msgs::CameraInfo,
-			sensor_msgs::LaserScan> MyDepthScanSyncPolicy;
-	message_filters::Synchronizer<MyDepthScanSyncPolicy> * depthScanSync_;
-	typedef message_filters::sync_policies::ExactTime<
-			sensor_msgs::Image,
-			nav_msgs::Odometry,
-			sensor_msgs::Image,
-			sensor_msgs::CameraInfo,
-			sensor_msgs::LaserScan> MyDepthScanExactSyncPolicy;
-	message_filters::Synchronizer<MyDepthScanExactSyncPolicy> * depthScanExactSync_;
-
-	typedef message_filters::sync_policies::ApproximateTime<
-			sensor_msgs::Image,
-			nav_msgs::Odometry,
-			sensor_msgs::Image,
-			sensor_msgs::CameraInfo,
-			sensor_msgs::PointCloud2> MyDepthScan3dSyncPolicy;
-	message_filters::Synchronizer<MyDepthScan3dSyncPolicy> * depthScan3dSync_;
-	typedef message_filters::sync_policies::ExactTime<
-			sensor_msgs::Image,
-			nav_msgs::Odometry,
-			sensor_msgs::Image,
-			sensor_msgs::CameraInfo,
-			sensor_msgs::PointCloud2> MyDepthScan3dExactSyncPolicy;
-	message_filters::Synchronizer<MyDepthScan3dExactSyncPolicy> * depthScan3dExactSync_;
-
-	typedef message_filters::sync_policies::ApproximateTime<
-			sensor_msgs::Image,
-			nav_msgs::Odometry,
-			sensor_msgs::Image,
-			sensor_msgs::CameraInfo> MyDepthSyncPolicy;
-	message_filters::Synchronizer<MyDepthSyncPolicy> * depthSync_;
-	typedef message_filters::sync_policies::ExactTime<
-			sensor_msgs::Image,
-			nav_msgs::Odometry,
-			sensor_msgs::Image,
-			sensor_msgs::CameraInfo> MyDepthExactSyncPolicy;
-	message_filters::Synchronizer<MyDepthExactSyncPolicy> * depthExactSync_;
-
-	typedef message_filters::sync_policies::ApproximateTime<
-			sensor_msgs::Image,
-			sensor_msgs::Image,
-			sensor_msgs::CameraInfo,
-			sensor_msgs::CameraInfo,
-			sensor_msgs::LaserScan,
-			nav_msgs::Odometry> MyStereoScanSyncPolicy;
-	message_filters::Synchronizer<MyStereoScanSyncPolicy> * stereoScanSync_;
-
-	typedef message_filters::sync_policies::ApproximateTime<
-			sensor_msgs::Image,
-			sensor_msgs::Image,
-			sensor_msgs::CameraInfo,
-			sensor_msgs::CameraInfo,
-			sensor_msgs::PointCloud2,
-			nav_msgs::Odometry> MyStereoScan3dSyncPolicy;
-	message_filters::Synchronizer<MyStereoScan3dSyncPolicy> * stereoScan3dSync_;
-
-	typedef message_filters::sync_policies::ApproximateTime<
-			sensor_msgs::Image,
-			sensor_msgs::Image,
-			sensor_msgs::CameraInfo,
-			sensor_msgs::CameraInfo,
-			nav_msgs::Odometry> MyStereoApproxSyncPolicy;
-	message_filters::Synchronizer<MyStereoApproxSyncPolicy> * stereoApproxSync_;
-
-	typedef message_filters::sync_policies::ExactTime<
-			sensor_msgs::Image,
-			sensor_msgs::Image,
-			sensor_msgs::CameraInfo,
-			sensor_msgs::CameraInfo,
-			nav_msgs::Odometry> MyStereoExactSyncPolicy;
-	message_filters::Synchronizer<MyStereoExactSyncPolicy> * stereoExactSync_;
-
-	typedef message_filters::sync_policies::ApproximateTime<
-			nav_msgs::Odometry,
-			sensor_msgs::Image,
-			sensor_msgs::Image,
-			sensor_msgs::CameraInfo,
-			sensor_msgs::Image,
-			sensor_msgs::Image,
-			sensor_msgs::CameraInfo> MyDepth2SyncPolicy;
-	message_filters::Synchronizer<MyDepth2SyncPolicy> * depth2Sync_;
-
-	// without odom, when TF is used for odom
-	typedef message_filters::sync_policies::ApproximateTime<
-			sensor_msgs::Image,
-			sensor_msgs::Image,
-			sensor_msgs::CameraInfo,
-			sensor_msgs::LaserScan> MyDepthScanTFSyncPolicy;
-	message_filters::Synchronizer<MyDepthScanTFSyncPolicy> * depthScanTFSync_;
-	typedef message_filters::sync_policies::ExactTime<
-			sensor_msgs::Image,
-			sensor_msgs::Image,
-			sensor_msgs::CameraInfo,
-			sensor_msgs::LaserScan> MyDepthScanTFExactSyncPolicy;
-	message_filters::Synchronizer<MyDepthScanTFExactSyncPolicy> * depthScanTFExactSync_;
-
-	typedef message_filters::sync_policies::ApproximateTime<
-			sensor_msgs::Image,
-			sensor_msgs::Image,
-			sensor_msgs::CameraInfo,
-			sensor_msgs::PointCloud2> MyDepthScan3dTFSyncPolicy;
-	message_filters::Synchronizer<MyDepthScan3dTFSyncPolicy> * depthScan3dTFSync_;
-	typedef message_filters::sync_policies::ExactTime<
-			sensor_msgs::Image,
-			sensor_msgs::Image,
-			sensor_msgs::CameraInfo,
-			sensor_msgs::PointCloud2> MyDepthScan3dTFExactSyncPolicy;
-	message_filters::Synchronizer<MyDepthScan3dTFExactSyncPolicy> * depthScan3dTFExactSync_;
-
-	typedef message_filters::sync_policies::ApproximateTime<
-			sensor_msgs::Image,
-			sensor_msgs::Image,
-			sensor_msgs::CameraInfo> MyDepthTFSyncPolicy;
-	message_filters::Synchronizer<MyDepthTFSyncPolicy> * depthTFSync_;
-	typedef message_filters::sync_policies::ExactTime<
-				sensor_msgs::Image,
-				sensor_msgs::Image,
-				sensor_msgs::CameraInfo> MyDepthTFExactSyncPolicy;
-	message_filters::Synchronizer<MyDepthTFExactSyncPolicy> * depthTFExactSync_;
-
-	typedef message_filters::sync_policies::ApproximateTime<
-			sensor_msgs::Image,
-			sensor_msgs::Image,
-			sensor_msgs::CameraInfo,
-			sensor_msgs::CameraInfo,
-			sensor_msgs::LaserScan> MyStereoScanTFSyncPolicy;
-	message_filters::Synchronizer<MyStereoScanTFSyncPolicy> * stereoScanTFSync_;
-
-	typedef message_filters::sync_policies::ApproximateTime<
-			sensor_msgs::Image,
-			sensor_msgs::Image,
-			sensor_msgs::CameraInfo,
-			sensor_msgs::CameraInfo,
-			sensor_msgs::PointCloud2> MyStereoScan3dTFSyncPolicy;
-	message_filters::Synchronizer<MyStereoScan3dTFSyncPolicy> * stereoScan3dTFSync_;
-
-	typedef message_filters::sync_policies::ApproximateTime<
-			sensor_msgs::Image,
-			sensor_msgs::Image,
-			sensor_msgs::CameraInfo,
-			sensor_msgs::CameraInfo> MyStereoApproxTFSyncPolicy;
-	message_filters::Synchronizer<MyStereoApproxTFSyncPolicy> * stereoApproxTFSync_;
-
-	typedef message_filters::sync_policies::ExactTime<
-			sensor_msgs::Image,
-			sensor_msgs::Image,
-			sensor_msgs::CameraInfo,
-			sensor_msgs::CameraInfo> MyStereoExactTFSyncPolicy;
-	message_filters::Synchronizer<MyStereoExactTFSyncPolicy> * stereoExactTFSync_;
 
 	tf2_ros::TransformBroadcaster tfBroadcaster_;
 	tf::TransformListener tfListener_;
@@ -508,6 +243,9 @@ private:
 
 	boost::thread* transformThread_;
 
+	// for loop closure detection only
+	image_transport::Subscriber defaultSub_;
+
 	bool stereoToDepth_;
 	bool odomSensorSync_;
 	float rate_;
@@ -515,6 +253,8 @@ private:
 	ros::Time time_;
 	ros::Time previousStamp_;
 };
+
+}
 
 #endif /* COREWRAPPER_H_ */
 

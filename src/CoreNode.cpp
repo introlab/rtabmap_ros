@@ -89,7 +89,7 @@ int main(int argc, char** argv)
 
 	rtabmap::ParametersMap parameters = rtabmap::Parameters::parseArguments(argc, argv);
 
-	CoreWrapper * rtabmap = new CoreWrapper(deleteDbOnStart, parameters);
+	rtabmap_ros::CoreWrapper * rtabmap = new rtabmap_ros::CoreWrapper(deleteDbOnStart, parameters);
 
 	ROS_INFO("rtabmap %s started...", RTABMAP_VERSION);
 	ros::spin();

@@ -24,6 +24,8 @@ float32[] fx
 float32[] fy
 float32[] cx
 float32[] cy
+float32[] width
+float32[] height
 float32 baseline
 # local transform (/base_link -> /camera_link)
 geometry_msgs/Transform[] localTransform

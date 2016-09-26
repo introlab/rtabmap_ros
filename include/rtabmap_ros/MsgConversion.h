@@ -38,6 +38,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <opencv2/opencv.hpp>
 #include <opencv2/features2d/features2d.hpp>
+#include <cv_bridge/cv_bridge.h>
 
 #include <rtabmap/core/Transform.h>
 #include <rtabmap/core/Link.h>
@@ -55,6 +56,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap_ros/NodeData.h>
 #include <rtabmap_ros/OdomInfo.h>
 #include <rtabmap_ros/Info.h>
+#include <rtabmap_ros/RGBDImage.h>
+#include <rtabmap_ros/UserData.h>
 
 namespace rtabmap_ros {
 
@@ -66,6 +69,9 @@ rtabmap::Transform transformFromGeometryMsg(const geometry_msgs::Transform & msg
 
 void transformToPoseMsg(const rtabmap::Transform & transform, geometry_msgs::Pose & msg);
 rtabmap::Transform transformFromPoseMsg(const geometry_msgs::Pose & msg);
+
+void toCvCopy(const rtabmap_ros::RGBDImage & image, cv_bridge::CvImagePtr & rgb, cv_bridge::CvImagePtr & depth);
+void toCvShare(const rtabmap_ros::RGBDImageConstPtr & image, cv_bridge::CvImageConstPtr & rgb, cv_bridge::CvImageConstPtr & depth);
 
 // copy data
 void compressedMatToBytes(const cv::Mat & compressed, std::vector<unsigned char> & bytes);
@@ -140,6 +146,9 @@ void nodeInfoToROS(const rtabmap::Signature & signature, rtabmap_ros::NodeData &
 rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::OdomInfo & msg);
 void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_ros::OdomInfo & msg);
 
+cv::Mat userDataFromROS(const rtabmap_ros::UserData & dataMsg);
+void userDataToROS(const cv::Mat & data, rtabmap_ros::UserData & dataMsg, bool compress);
+
 inline double timestampFromROS(const ros::Time & stamp) {return double(stamp.sec) + double(stamp.nsec)/1000000000.0;}
 
 // common stuff
@@ -162,9 +171,9 @@ rtabmap::Transform getTransform(
 		double waitForTransform);
 
 bool convertRGBDMsgs(
-		const std::vector<sensor_msgs::ImageConstPtr> & imageMsgs,
-		const std::vector<sensor_msgs::ImageConstPtr> & depthMsgs,
-		const std::vector<sensor_msgs::CameraInfoConstPtr> & cameraInfoMsgs,
+		const std::vector<cv_bridge::CvImageConstPtr> & imageMsgs,
+		const std::vector<cv_bridge::CvImageConstPtr> & depthMsgs,
+		const std::vector<sensor_msgs::CameraInfo> & cameraInfoMsgs,
 		const std::string & frameId,
 		const std::string & odomFrameId,
 		const ros::Time & odomStamp,
