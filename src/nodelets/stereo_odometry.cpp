@@ -113,13 +113,14 @@ private:
 		}
 
 
-		NODELET_INFO("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s",
+		std::string subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s",
 				ros::this_node::getName().c_str(),
 				approxSync?"approx":"exact",
 				imageRectLeft_.getTopic().c_str(),
 				imageRectRight_.getTopic().c_str(),
 				cameraInfoLeft_.getTopic().c_str(),
 				cameraInfoRight_.getTopic().c_str());
+		this->startWarningThread(subscribedTopicsMsg, approxSync);
 	}
 
 	virtual void updateParameters(ParametersMap & parameters)
@@ -139,6 +140,7 @@ private:
 			const sensor_msgs::CameraInfoConstPtr& cameraInfoLeft,
 			const sensor_msgs::CameraInfoConstPtr& cameraInfoRight)
 	{
+		callbackCalled();
 		if(!this->isPaused())
 		{
 			if(!(imageRectLeft->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||

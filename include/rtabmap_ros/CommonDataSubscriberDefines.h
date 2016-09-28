@@ -28,6 +28,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef INCLUDE_RTABMAP_ROS_COMMONDATASUBSCRIBERIMPL_H_
 #define INCLUDE_RTABMAP_ROS_COMMONDATASUBSCRIBERIMPL_H_
 
+#include <rtabmap/utilite/UConversion.h>
 
 #define DATA_SYNC2(PREFIX, SYNC_NAME, MSG0, MSG1) \
 	typedef message_filters::sync_policies::SYNC_NAME##Time<MSG0, MSG1> PREFIX##SYNC_NAME##SyncPolicy; \
@@ -98,7 +99,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 					PREFIX##ExactSyncPolicy(QUEUE_SIZE), SUB0, SUB1); \
 			PREFIX##ExactSync_->registerCallback(boost::bind(&CommonDataSubscriber::PREFIX##Callback, this, _1, _2)); \
 		} \
-		ROS_INFO("\n%s subscribed to (%s sync):\n   %s,\n   %s", \
+		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s", \
 				ros::this_node::getName().c_str(), \
 				APPROX?"approx":"exact", \
 				SUB0.getTopic().c_str(), \
@@ -117,7 +118,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 					PREFIX##ExactSyncPolicy(QUEUE_SIZE), SUB0, SUB1, SUB2); \
 			PREFIX##ExactSync_->registerCallback(boost::bind(&CommonDataSubscriber::PREFIX##Callback, this, _1, _2, _3)); \
 		} \
-		ROS_INFO("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s", \
+		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s", \
 				ros::this_node::getName().c_str(), \
 				APPROX?"approx":"exact", \
 				SUB0.getTopic().c_str(), \
@@ -137,7 +138,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 					PREFIX##ExactSyncPolicy(QUEUE_SIZE), SUB0, SUB1, SUB2, SUB3); \
 			PREFIX##ExactSync_->registerCallback(boost::bind(&CommonDataSubscriber::PREFIX##Callback, this, _1, _2, _3, _4)); \
 		} \
-		ROS_INFO("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s", \
+		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s", \
 				ros::this_node::getName().c_str(), \
 				APPROX?"approx":"exact", \
 				SUB0.getTopic().c_str(), \
@@ -158,7 +159,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 					PREFIX##ExactSyncPolicy(QUEUE_SIZE), SUB0, SUB1, SUB2, SUB3, SUB4); \
 			PREFIX##ExactSync_->registerCallback(boost::bind(&CommonDataSubscriber::PREFIX##Callback, this, _1, _2, _3, _4, _5)); \
 		} \
-		ROS_INFO("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s,\n   %s", \
+		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s,\n   %s", \
 				ros::this_node::getName().c_str(), \
 				approxSync?"approx":"exact", \
 				SUB0.getTopic().c_str(), \
@@ -180,7 +181,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 					PREFIX##ExactSyncPolicy(QUEUE_SIZE), SUB0, SUB1, SUB2, SUB3, SUB4, SUB5); \
 			PREFIX##ExactSync_->registerCallback(boost::bind(&CommonDataSubscriber::PREFIX##Callback, this, _1, _2, _3, _4, _5, _6)); \
 		} \
-		ROS_INFO("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s,\n   %s,\n   %s", \
+		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s,\n   %s,\n   %s", \
 				ros::this_node::getName().c_str(), \
 				APPROX?"approx":"exact", \
 				SUB0.getTopic().c_str(), \

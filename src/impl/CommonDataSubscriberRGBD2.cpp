@@ -33,6 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace rtabmap_ros {
 
 #define IMAGE_CONVERSION() \
+		callbackCalled(); \
 		std::vector<cv_bridge::CvImageConstPtr> imageMsgs(2); \
 		std::vector<cv_bridge::CvImageConstPtr> depthMsgs(2); \
 		rtabmap_ros::toCvShare(image1Msg, imageMsgs[0], depthMsgs[0]); \

@@ -32,6 +32,9 @@ namespace rtabmap_ros {
 
 CommonDataSubscriber::CommonDataSubscriber() :
 		queueSize_(10),
+		approxSync_(true),
+		warningThread_(0),
+		callbackCalled_(false),
 		subscribedToDepth_(true),
 		subscribedToStereo_(false),
 		subscribedToRGBD_(false),
@@ -126,7 +129,6 @@ CommonDataSubscriber::CommonDataSubscriber() :
 	bool subscribeOdomInfo = false;
 	bool subscribeUserData = false;
 	int rgbdCameras = 1;
-	bool approxSync = true;
 
 	// ROS related parameters (private)
 	pnh.param("subscribe_depth",     subscribedToDepth_, subscribedToDepth_);
@@ -170,7 +172,7 @@ CommonDataSubscriber::CommonDataSubscriber() :
 	}
 	if(subscribedToStereo_)
 	{
-		approxSync = false; // default for stereo: exact sync
+		approxSync_ = false; // default for stereo: exact sync
 	}
 
 	std::string odomFrameId;
@@ -186,11 +188,11 @@ CommonDataSubscriber::CommonDataSubscriber() :
 		ROS_WARN("Parameter \"stereo_approx_sync\" has been renamed "
 				 "to \"approx_sync\"! Your value is still copied to "
 				 "corresponding parameter.");
-		pnh.param("stereo_approx_sync", approxSync, approxSync);
+		pnh.param("stereo_approx_sync", approxSync_, approxSync_);
 	}
 	else
 	{
-		pnh.param("approx_sync", approxSync, approxSync);
+		pnh.param("approx_sync", approxSync_, approxSync_);
 	}
 
 	if(rgbdCameras <= 0 && subscribedToRGBD_)
@@ -200,7 +202,7 @@ CommonDataSubscriber::CommonDataSubscriber() :
 
 	ROS_INFO("%s: queue_size    = %d", ros::this_node::getName().c_str(), queueSize_);
 	ROS_INFO("%s: rgbd_cameras = %d", ros::this_node::getName().c_str(), rgbdCameras);
-	ROS_INFO("%s: approx_sync   = %s", ros::this_node::getName().c_str(), approxSync?"true":"false");
+	ROS_INFO("%s: approx_sync   = %s", ros::this_node::getName().c_str(), approxSync_?"true":"false");
 
 	bool subscribeOdom = odomFrameId.empty();
 	if(subscribedToDepth_)
@@ -212,7 +214,7 @@ CommonDataSubscriber::CommonDataSubscriber() :
 				subscribeScan3d,
 				subscribeOdomInfo,
 				queueSize_,
-				approxSync);
+				approxSync_);
 	}
 	else if(subscribedToStereo_)
 	{
@@ -220,7 +222,7 @@ CommonDataSubscriber::CommonDataSubscriber() :
 				subscribeOdom,
 				subscribeOdomInfo,
 				queueSize_,
-				approxSync);
+				approxSync_);
 	}
 	else if(subscribedToRGBD_)
 	{
@@ -233,7 +235,7 @@ CommonDataSubscriber::CommonDataSubscriber() :
 					subscribeScan3d,
 					subscribeOdomInfo,
 					queueSize_,
-					approxSync);
+					approxSync_);
 		}
 		else
 		{
@@ -244,13 +246,23 @@ CommonDataSubscriber::CommonDataSubscriber() :
 					subscribeScan3d,
 					subscribeOdomInfo,
 					queueSize_,
-					approxSync);
+					approxSync_);
 		}
+	}
+	if(subscribedToDepth_ || subscribedToStereo_ || subscribedToRGBD_)
+	{
+		warningThread_ = new boost::thread(boost::bind(&CommonDataSubscriber::warningLoop, this));
+		ROS_INFO(subscribedTopicsMsg_.c_str());
 	}
 }
 
 CommonDataSubscriber::~CommonDataSubscriber()
 {
+	if(warningThread_)
+	{
+		delete warningThread_;
+	}
+
 	// RGB + Depth
 	SYNC_DEL(depth);
 	SYNC_DEL(depthScan2d);
@@ -337,6 +349,25 @@ CommonDataSubscriber::~CommonDataSubscriber()
 	rgbdSubs_.clear();
 }
 
+void CommonDataSubscriber::warningLoop()
+{
+	ros::Duration r(10.0);
+	while(ros::ok() && !callbackCalled_)
+	{
+		r.sleep();
+		if(ros::ok() && !callbackCalled_)
+		{
+			ROS_WARN("%s: Did not receive data since 10 seconds! Make sure the input topics are "
+					"published (\"$ rostopic hz my_topic\") and the timestamps in their "
+					"header are set. %s%s",
+					ros::this_node::getName().c_str(),
+					approxSync_?"":"Parameter \"approx_sync\" is false, which means that input "
+						"topics should have all the exact timestamp for the callback to be called.",
+					subscribedTopicsMsg_.c_str());
+		}
+	}
+}
+
 void CommonDataSubscriber::commonSingleDepthCallback(
 		const nav_msgs::OdometryConstPtr & odomMsg,
 		const rtabmap_ros::UserDataConstPtr & userDataMsg,
@@ -347,6 +378,7 @@ void CommonDataSubscriber::commonSingleDepthCallback(
 		const sensor_msgs::PointCloud2ConstPtr& scan3dMsg,
 		const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg)
 {
+	callbackCalled();
 	std::vector<cv_bridge::CvImageConstPtr> imageMsgs;
 	std::vector<cv_bridge::CvImageConstPtr> depthMsgs;
 	std::vector<sensor_msgs::CameraInfo> cameraInfoMsgs;

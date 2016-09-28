@@ -377,7 +377,8 @@ void CommonDataSubscriber::setupRGBDCallbacks(
 	{
 		rgbdSub_ = nh.subscribe("rgbd_image", 1, &CommonDataSubscriber::rgbdCallback, this);
 
-		ROS_INFO("\n%s subscribed to:\n   %s",
+		subscribedTopicsMsg_ =
+				uFormat("\n%s subscribed to:\n   %s",
 				ros::this_node::getName().c_str(),
 				rgbdSub_.getTopic().c_str());
 	}

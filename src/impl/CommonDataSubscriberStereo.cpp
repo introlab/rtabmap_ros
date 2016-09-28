@@ -36,6 +36,7 @@ void CommonDataSubscriber::stereoCallback(
 	   const sensor_msgs::CameraInfoConstPtr& leftCamInfoMsg,
 	   const sensor_msgs::CameraInfoConstPtr& rightCamInfoMsg)
 {
+	callbackCalled();
 	nav_msgs::OdometryConstPtr odomMsg; // Null
 	sensor_msgs::LaserScanConstPtr scanMsg; // null
 	sensor_msgs::PointCloud2ConstPtr scan3dMsg; // null
@@ -49,6 +50,7 @@ void CommonDataSubscriber::stereoInfoCallback(
 	   const sensor_msgs::CameraInfoConstPtr& rightCamInfoMsg,
 	   const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg)
 {
+	callbackCalled();
 	nav_msgs::OdometryConstPtr odomMsg; // Null
 	sensor_msgs::LaserScanConstPtr scan2dMsg; // null
 	sensor_msgs::PointCloud2ConstPtr scan3dMsg; // null
@@ -63,6 +65,7 @@ void CommonDataSubscriber::stereoOdomCallback(
 		const sensor_msgs::CameraInfoConstPtr& leftCamInfoMsg,
 		const sensor_msgs::CameraInfoConstPtr& rightCamInfoMsg)
 {
+	callbackCalled();
 	sensor_msgs::LaserScanConstPtr scanMsg; // Null
 	sensor_msgs::PointCloud2ConstPtr scan3dMsg; // null
 	rtabmap_ros::OdomInfoConstPtr odomInfoMsg; // null
@@ -76,6 +79,7 @@ void CommonDataSubscriber::stereoOdomInfoCallback(
 		const sensor_msgs::CameraInfoConstPtr& rightCamInfoMsg,
 		const rtabmap_ros::OdomInfoConstPtr & odomInfoMsg)
 {
+	callbackCalled();
 	sensor_msgs::LaserScanConstPtr scan2dMsg; // Null
 	sensor_msgs::PointCloud2ConstPtr scan3dMsg; // Null
 	commonStereoCallback(odomMsg, leftImageMsg, rightImageMsg, leftCamInfoMsg, rightCamInfoMsg, scan2dMsg, scan3dMsg, odomInfoMsg);

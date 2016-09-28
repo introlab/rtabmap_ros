@@ -36,7 +36,10 @@
   <arg name="wait_for_transform"      default="0.2"/>
   <arg name="rtabmap_args"            default=""/>              <!-- delete_db_on_start, udebug -->
   <arg name="launch_prefix"           default=""/>              <!-- for debugging purpose, it fills launch-prefix tag of the nodes -->
-  <arg name="approx_sync"             default="true"/>         <!-- if timestamps of the input topics are not synchronized -->
+  
+  <!-- if timestamps of the input topics are synchronized using approximate or exact time policy-->
+  <arg     if="$(arg stereo)" name="approx_sync"  default="false"/>
+  <arg unless="$(arg stereo)" name="approx_sync"  default="true"/>         
    
   <!-- RGB-D related topics -->
   <arg name="rgb_topic"               default="/camera/rgb/image_rect_color" />
@@ -163,6 +166,7 @@
       <param name="odom_frame_id"        type="string" value="$(arg odom_frame_id)"/>
       <param name="wait_for_transform_duration" type="double"   value="$(arg wait_for_transform)"/>
       <param name="queue_size"           type="int" value="$(arg queue_size)"/>
+      <param name="approx_sync"                 type="bool"   value="$(arg approx_sync)"/>
     
       <remap from="rgb/image"       to="$(arg rgb_topic_relay)"/>
       <remap from="depth/image"     to="$(arg depth_topic_relay)"/>

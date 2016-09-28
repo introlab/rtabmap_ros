@@ -50,6 +50,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap_ros/OdomInfo.h>
 #include <rtabmap_ros/CommonDataSubscriberDefines.h>
 
+#include <boost/thread.hpp>
+
 namespace rtabmap_ros {
 
 class CommonDataSubscriber {
@@ -97,6 +99,8 @@ protected:
 				const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg);
 
 private:
+	void warningLoop();
+	void callbackCalled() {callbackCalled_ = true;}
 	void setupDepthCallbacks(
 			bool subscribeOdom,
 			bool subscribeUserData,
@@ -127,8 +131,14 @@ private:
 			int queueSize,
 			bool approxSync);
 
+protected:
+	std::string subscribedTopicsMsg_;
+
 private:
 	int queueSize_;
+	bool approxSync_;
+	boost::thread* warningThread_;
+	bool callbackCalled_;
 	bool subscribedToDepth_;
 	bool subscribedToStereo_;
 	bool subscribedToRGBD_;

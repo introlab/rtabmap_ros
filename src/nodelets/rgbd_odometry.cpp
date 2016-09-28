@@ -114,6 +114,7 @@ private:
 			NODELET_FATAL("Only 2 cameras maximum supported yet.");
 		}
 
+		std::string subscribedTopicsMsg;
 		if(rgbdCameras == 2)
 		{
 			rgbd_image1_sub_.subscribe(nh, "rgbd_image0", 1);
@@ -135,7 +136,7 @@ private:
 						rgbd_image2_sub_);
 				exactSync2_->registerCallback(boost::bind(&RGBDOdometry::callback2, this, _1, _2));
 			}
-			NODELET_INFO("\n%s subscribed to (%s sync):\n   %s,\n   %s",
+			subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s",
 					ros::this_node::getName().c_str(),
 					approxSync?"approx":"exact",
 					rgbd_image1_sub_.getTopic().c_str(),
@@ -167,13 +168,14 @@ private:
 				exactSync_->registerCallback(boost::bind(&RGBDOdometry::callback, this, _1, _2, _3));
 			}
 
-			NODELET_INFO("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s",
+			subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s",
 					ros::this_node::getName().c_str(),
 					approxSync?"approx":"exact",
 					image_mono_sub_.getTopic().c_str(),
 					image_depth_sub_.getTopic().c_str(),
 					info_sub_.getTopic().c_str());
 		}
+		this->startWarningThread(subscribedTopicsMsg, approxSync);
 	}
 
 	virtual void updateParameters(ParametersMap & parameters)
@@ -303,6 +305,7 @@ private:
 			const sensor_msgs::ImageConstPtr& depth,
 			const sensor_msgs::CameraInfoConstPtr& cameraInfo)
 	{
+		callbackCalled();
 		if(!this->isPaused())
 		{
 			std::vector<cv_bridge::CvImageConstPtr> imageMsgs(1);
@@ -320,6 +323,7 @@ private:
 			const rtabmap_ros::RGBDImageConstPtr& image,
 			const rtabmap_ros::RGBDImageConstPtr& image2)
 	{
+		callbackCalled();
 		if(!this->isPaused())
 		{
 			std::vector<cv_bridge::CvImageConstPtr> imageMsgs(2);

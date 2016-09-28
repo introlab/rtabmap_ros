@@ -58,6 +58,8 @@ namespace rtabmap_ros {
 
 OdometryROS::OdometryROS(bool stereoParams, bool visParams, bool icpParams) :
 	odometry_(0),
+	warningThread_(0),
+	callbackCalled_(false),
 	frameId_("base_link"),
 	odomFrameId_("odom"),
 	groundTruthFrameId_(""),
@@ -79,6 +81,10 @@ OdometryROS::OdometryROS(bool stereoParams, bool visParams, bool icpParams) :
 
 OdometryROS::~OdometryROS()
 {
+	if(warningThread_)
+	{
+		delete warningThread_;
+	}
 	ros::NodeHandle & pnh = getPrivateNodeHandle();
 	if(pnh.ok())
 	{
@@ -295,6 +301,31 @@ void OdometryROS::onInit()
 	setLogErrorSrv_ = pnh.advertiseService("log_error", &OdometryROS::setLogError, this);
 
 	onOdomInit();
+}
+
+void OdometryROS::startWarningThread(const std::string & subscribedTopicsMsg, bool approxSync)
+{
+	warningThread_ = new boost::thread(boost::bind(&OdometryROS::warningLoop, this, subscribedTopicsMsg, approxSync));
+	NODELET_INFO(subscribedTopicsMsg.c_str());
+}
+
+void OdometryROS::warningLoop(const std::string & subscribedTopicsMsg, bool approxSync)
+{
+	ros::Duration r(10.0);
+	while(ros::ok() && !callbackCalled_)
+	{
+		r.sleep();
+		if(ros::ok() && !callbackCalled_)
+		{
+			ROS_WARN("%s: Did not receive data since 10 seconds! Make sure the input topics are "
+					"published (\"$ rostopic hz my_topic\") and the timestamps in their "
+					"header are set. %s%s",
+					ros::this_node::getName().c_str(),
+					approxSync?"":"Parameter \"approx_sync\" is false, which means that input "
+						"topics should have all the exact timestamp for the callback to be called.",
+					subscribedTopicsMsg.c_str());
+		}
+	}
 }
 
 Transform OdometryROS::getTransform(const std::string & fromFrameId, const std::string & toFrameId, const ros::Time & stamp) const

@@ -41,6 +41,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/SensorData.h>
 #include <rtabmap/core/Parameters.h>
 
+#include <boost/thread.hpp>
+
 namespace rtabmap {
 class Odometry;
 }
@@ -72,16 +74,22 @@ public:
 	rtabmap::Transform getTransform(const std::string & fromFrameId, const std::string & toFrameId, const ros::Time & stamp) const;
 
 protected:
+	void startWarningThread(const std::string & subscribedTopicsMsg, bool approxSync);
+	void callbackCalled() {callbackCalled_ = true;}
+
 	virtual void flushCallbacks() = 0;
 	tf::TransformListener & tfListener() {return tfListener_;}
 
 private:
+	void warningLoop(const std::string & subscribedTopicsMsg, bool approxSync);
 	virtual void onInit();
 	virtual void onOdomInit() = 0;
 	virtual void updateParameters(rtabmap::ParametersMap & parameters) {}
 
 private:
 	rtabmap::Odometry * odometry_;
+	boost::thread * warningThread_;
+	bool callbackCalled_;
 
 	// parameters
 	std::string frameId_;

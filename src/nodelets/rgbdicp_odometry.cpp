@@ -125,6 +125,7 @@ private:
 		image_depth_sub_.subscribe(depth_it, depth_nh.resolveName("image"), 1, hintsDepth);
 		info_sub_.subscribe(rgb_nh, "camera_info", 1);
 
+		std::string subscribedTopicsMsg;
 		if(subscribeScanCloud)
 		{
 			cloud_sub_.subscribe(nh, "scan_cloud", 1);
@@ -139,7 +140,7 @@ private:
 				exactCloudSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackCloud, this, _1, _2, _3, _4));
 			}
 
-			NODELET_INFO("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s, \n   %s",
+			subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s, \n   %s",
 					ros::this_node::getName().c_str(),
 					approxSync?"approx":"exact",
 					image_mono_sub_.getTopic().c_str(),
@@ -161,7 +162,7 @@ private:
 				exactScanSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackScan, this, _1, _2, _3, _4));
 			}
 
-			NODELET_INFO("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s, \n   %s",
+			subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s, \n   %s",
 					ros::this_node::getName().c_str(),
 					approxSync?"approx":"exact",
 					image_mono_sub_.getTopic().c_str(),
@@ -169,6 +170,7 @@ private:
 					info_sub_.getTopic().c_str(),
 					scan_sub_.getTopic().c_str());
 		}
+		this->startWarningThread(subscribedTopicsMsg, approxSync);
 	}
 
 	virtual void updateParameters(ParametersMap & parameters)
@@ -219,6 +221,7 @@ private:
 			const sensor_msgs::LaserScanConstPtr& scanMsg,
 			const sensor_msgs::PointCloud2ConstPtr& cloudMsg)
 	{
+		callbackCalled();
 		if(!this->isPaused())
 		{
 			if(!(image->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) ==0 ||
