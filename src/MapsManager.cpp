@@ -417,7 +417,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 		{
 			if(updateGrid && gridMaps_.size() < 5)
 			{
-				ROS_WARN("Many occupancy grids should be loaded (~%d), this may take a while to update the map(s)...", int(filteredPoses.size()-octomap_->addedNodes().size()));
+				ROS_WARN("Many occupancy grids should be loaded (~%d), this may take a while to update the map(s)...", int(filteredPoses.size()-gridMaps_.size()));
 				longUpdate = true;
 			}
 #ifdef WITH_OCTOMAP_ROS

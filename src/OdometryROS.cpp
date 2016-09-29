@@ -306,7 +306,7 @@ void OdometryROS::onInit()
 void OdometryROS::startWarningThread(const std::string & subscribedTopicsMsg, bool approxSync)
 {
 	warningThread_ = new boost::thread(boost::bind(&OdometryROS::warningLoop, this, subscribedTopicsMsg, approxSync));
-	NODELET_INFO(subscribedTopicsMsg.c_str());
+	NODELET_INFO("%s", subscribedTopicsMsg.c_str());
 }
 
 void OdometryROS::warningLoop(const std::string & subscribedTopicsMsg, bool approxSync)

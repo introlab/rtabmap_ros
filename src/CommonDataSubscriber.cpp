@@ -252,7 +252,7 @@ CommonDataSubscriber::CommonDataSubscriber() :
 	if(subscribedToDepth_ || subscribedToStereo_ || subscribedToRGBD_)
 	{
 		warningThread_ = new boost::thread(boost::bind(&CommonDataSubscriber::warningLoop, this));
-		ROS_INFO(subscribedTopicsMsg_.c_str());
+		ROS_INFO("%s", subscribedTopicsMsg_.c_str());
 	}
 }
 
