@@ -29,6 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <stdio.h>
 #include <ros/ros.h>
+#include "pluginlib/class_list_macros.h"
 
 #include <nav_msgs/Path.h>
 #include <std_msgs/Int32MultiArray.h>
@@ -75,7 +76,8 @@ using namespace rtabmap;
 
 namespace rtabmap_ros {
 
-CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters) :
+CoreWrapper::CoreWrapper() :
+		CommonDataSubscriber(false),
 		paused_(false),
 		lastPose_(Transform::getIdentity()),
 		lastPoseIntermediate_(false),
@@ -100,6 +102,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 		mapToOdom_(rtabmap::Transform::getIdentity()),
 		mapsManager_(true),
 		transformThread_(0),
+		tfThreadRunning_(false),
 		stereoToDepth_(false),
 		odomSensorSync_(false),
 		rate_(Parameters::defaultRtabmapDetectionRate()),
@@ -108,8 +111,14 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 		previousStamp_(0),
 		mbClient_("move_base", true)
 {
-	ros::NodeHandle nh;
-	ros::NodeHandle pnh("~");
+}
+
+void CoreWrapper::onInit()
+{
+	ros::NodeHandle & nh = getNodeHandle();
+	ros::NodeHandle & pnh = getPrivateNodeHandle();
+
+	setupCallbacks(nh, pnh);
 
 	bool publishTf = true;
 	double tfDelay = 0.05; // 20 Hz
@@ -126,7 +135,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 	pnh.param("ground_truth_base_frame_id", groundTruthBaseFrameId_, frameId_);
 	if(pnh.hasParam("depth_cameras") && !pnh.hasParam("depth_cameras"))
 	{
-		ROS_ERROR("\"depth_cameras\" parameter doesn't exist "
+		NODELET_ERROR("\"depth_cameras\" parameter doesn't exist "
 				"anymore! It is replaced by \"rgbd_cameras\" parameter "
 				"used when \"subscribe_rgbd\" is true");
 	}
@@ -147,7 +156,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 	pnh.param("odom_sensor_sync", odomSensorSync_, odomSensorSync_);
 	if(pnh.hasParam("flip_scan"))
 	{
-		ROS_WARN("Parameter \"flip_scan\" doesn't exist anymore. Rtabmap now "
+		NODELET_WARN("Parameter \"flip_scan\" doesn't exist anymore. Rtabmap now "
 				"detects automatically if the laser is upside down with /tf, then if so, it "
 				"switches scan values.");
 	}
@@ -177,21 +186,21 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 		// keep worldFrameId_ without prefix as it should be global
 	}
 
-	ROS_INFO("rtabmap: frame_id      = %s", frameId_.c_str());
+	NODELET_INFO("rtabmap: frame_id      = %s", frameId_.c_str());
 	if(!odomFrameId_.empty())
 	{
-		ROS_INFO("rtabmap: odom_frame_id = %s", odomFrameId_.c_str());
+		NODELET_INFO("rtabmap: odom_frame_id = %s", odomFrameId_.c_str());
 	}
 	if(!groundTruthFrameId_.empty())
 	{
-		ROS_INFO("rtabmap: ground_truth_frame_id = %s -> ground_truth_base_frame_id = %s",
+		NODELET_INFO("rtabmap: ground_truth_frame_id = %s -> ground_truth_base_frame_id = %s",
 				groundTruthFrameId_.c_str(),
 				groundTruthBaseFrameId_.c_str());
 	}
-	ROS_INFO("rtabmap: map_frame_id  = %s", mapFrameId_.c_str());
-	ROS_INFO("rtabmap: tf_delay      = %f", tfDelay);
-	ROS_INFO("rtabmap: tf_tolerance  = %f", tfTolerance);
-	ROS_INFO("rtabmap: odom_sensor_sync   = %s", odomSensorSync_?"true":"false");
+	NODELET_INFO("rtabmap: map_frame_id  = %s", mapFrameId_.c_str());
+	NODELET_INFO("rtabmap: tf_delay      = %f", tfDelay);
+	NODELET_INFO("rtabmap: tf_tolerance  = %f", tfTolerance);
+	NODELET_INFO("rtabmap: odom_sensor_sync   = %s", odomSensorSync_?"true":"false");
 
 	infoPub_ = nh.advertise<rtabmap_ros::Info>("info", 1);
 	mapDataPub_ = nh.advertise<rtabmap_ros::MapData>("mapData", 1);
@@ -237,7 +246,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 		double vDouble;
 		if(pnh.getParam(iter->first, vStr))
 		{
-			ROS_INFO("Setting RTAB-Map parameter \"%s\"=\"%s\"", iter->first.c_str(), vStr.c_str());
+			NODELET_INFO("Setting RTAB-Map parameter \"%s\"=\"%s\"", iter->first.c_str(), vStr.c_str());
 
 			if(iter->first.compare(Parameters::kRtabmapWorkingDirectory()) == 0)
 			{
@@ -251,26 +260,38 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 		}
 		else if(pnh.getParam(iter->first, vBool))
 		{
-			ROS_INFO("Setting RTAB-Map parameter \"%s\"=\"%s\"", iter->first.c_str(), uBool2Str(vBool).c_str());
+			NODELET_INFO("Setting RTAB-Map parameter \"%s\"=\"%s\"", iter->first.c_str(), uBool2Str(vBool).c_str());
 			uInsert(parameters_, ParametersPair(iter->first, uBool2Str(vBool)));
 		}
 		else if(pnh.getParam(iter->first, vDouble))
 		{
-			ROS_INFO("Setting RTAB-Map parameter \"%s\"=\"%s\"", iter->first.c_str(), uNumber2Str(vDouble).c_str());
+			NODELET_INFO("Setting RTAB-Map parameter \"%s\"=\"%s\"", iter->first.c_str(), uNumber2Str(vDouble).c_str());
 			uInsert(parameters_, ParametersPair(iter->first, uNumber2Str(vDouble)));
 		}
 		else if(pnh.getParam(iter->first, vInt))
 		{
-			ROS_INFO("Setting RTAB-Map parameter \"%s\"=\"%s\"", iter->first.c_str(), uNumber2Str(vInt).c_str());
+			NODELET_INFO("Setting RTAB-Map parameter \"%s\"=\"%s\"", iter->first.c_str(), uNumber2Str(vInt).c_str());
 			uInsert(parameters_, ParametersPair(iter->first, uNumber2Str(vInt)));
 		}
 	}
 
-	//update with input arguments
+	//parse input arguments
+	std::vector<std::string> argList = getMyArgv();
+	char * argv[argList.size()];
+	bool deleteDbOnStart;
+	for(unsigned int i=0; i<argList.size(); ++i)
+	{
+		argv[i] = &argList[i].at(0);
+		if(strcmp(argv[i], "--delete_db_on_start") == 0)
+		{
+			deleteDbOnStart = true;
+		}
+	}
+	rtabmap::ParametersMap parameters = rtabmap::Parameters::parseArguments(argList.size(), argv);
 	for(ParametersMap::const_iterator iter=parameters.begin(); iter!=parameters.end(); ++iter)
 	{
 		uInsert(parameters_, ParametersPair(iter->first, iter->second));
-		ROS_INFO("Update RTAB-Map parameter \"%s\"=\"%s\" from arguments", iter->first.c_str(), iter->second.c_str());
+		NODELET_INFO("Update RTAB-Map parameter \"%s\"=\"%s\" from arguments", iter->first.c_str(), iter->second.c_str());
 	}
 
 	// Backward compatibility
@@ -285,19 +306,19 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 			{
 				// can be migrated
 				uInsert(parameters_, ParametersPair(iter->second.second, vStr));
-				ROS_WARN("Rtabmap: Parameter name changed: \"%s\" -> \"%s\". Please update your launch file accordingly. Value \"%s\" is still set to the new parameter name.",
+				NODELET_WARN("Rtabmap: Parameter name changed: \"%s\" -> \"%s\". Please update your launch file accordingly. Value \"%s\" is still set to the new parameter name.",
 						iter->first.c_str(), iter->second.second.c_str(), vStr.c_str());
 			}
 			else
 			{
 				if(iter->second.second.empty())
 				{
-					ROS_ERROR("Rtabmap: Parameter \"%s\" doesn't exist anymore!",
+					NODELET_ERROR("Rtabmap: Parameter \"%s\" doesn't exist anymore!",
 							iter->first.c_str());
 				}
 				else
 				{
-					ROS_ERROR("Rtabmap: Parameter \"%s\" doesn't exist anymore! You may look at this similar parameter: \"%s\"",
+					NODELET_ERROR("Rtabmap: Parameter \"%s\" doesn't exist anymore! You may look at this similar parameter: \"%s\"",
 							iter->first.c_str(), iter->second.second.c_str());
 				}
 			}
@@ -309,7 +330,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 
 	if((this->isSubscribedToScan2d() || this->isSubscribedToScan3d()) && parameters_.find(Parameters::kGridFromDepth()) == parameters_.end())
 	{
-		ROS_WARN("Setting \"%s\" parameter to false (default true) as \"subscribe_scan\" or \"subscribe_scan_cloud\" is "
+		NODELET_WARN("Setting \"%s\" parameter to false (default true) as \"subscribe_scan\" or \"subscribe_scan_cloud\" is "
 				"true. The occupancy grid map will be constructed from "
 				"laser scans. To get occupancy grid map from cloud projection, set \"%s\" "
 				"to true. To suppress this warning, "
@@ -332,14 +353,14 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 	if(parameters_.find(Parameters::kRtabmapDetectionRate()) != parameters_.end())
 	{
 		Parameters::parse(parameters_, Parameters::kRtabmapDetectionRate(), rate_);
-		ROS_INFO("RTAB-Map detection rate = %f Hz", rate_);
+		NODELET_INFO("RTAB-Map detection rate = %f Hz", rate_);
 	}
 	if(parameters_.find(Parameters::kRtabmapCreateIntermediateNodes()) != parameters_.end())
 	{
 		Parameters::parse(parameters_, Parameters::kRtabmapCreateIntermediateNodes(), createIntermediateNodes_);
 		if(createIntermediateNodes_)
 		{
-			ROS_INFO("Create intermediate nodes");
+			NODELET_INFO("Create intermediate nodes");
 		}
 	}
 	bool isRGBD = uStr2Bool(parameters_.at(Parameters::kRGBDEnabled()).c_str());
@@ -348,7 +369,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 		// RGBD SLAM
 		if(!this->isSubscribedToDepth() && !this->isSubscribedToStereo() && !this->isSubscribedToRGBD())
 		{
-			ROS_WARN("ROS param subscribe_depth, subscribe_stereo and subscribe_rgbd are false, but RTAB-Map "
+			NODELET_WARN("ROS param subscribe_depth, subscribe_stereo and subscribe_rgbd are false, but RTAB-Map "
 					  "parameter \"%s\" is true! Please set subscribe_depth, subscribe_stereo or subscribe_rgbd "
 					  "to true to use rtabmap node for RGB-D SLAM, or set \"%s\" to false for loop closure "
 					  "detection on images-only.", Parameters::kRGBDEnabled().c_str(), Parameters::kRGBDEnabled().c_str());
@@ -357,30 +378,30 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 
 	if(paused_)
 	{
-		ROS_WARN("Node paused... don't forget to call service \"resume\" to start rtabmap.");
+		NODELET_WARN("Node paused... don't forget to call service \"resume\" to start rtabmap.");
 	}
 
 	if(deleteDbOnStart)
 	{
 		if(UFile::erase(databasePath_) == 0)
 		{
-			ROS_INFO("rtabmap: Deleted database \"%s\" (--delete_db_on_start is set).", databasePath_.c_str());
+			NODELET_INFO("rtabmap: Deleted database \"%s\" (--delete_db_on_start is set).", databasePath_.c_str());
 		}
 	}
 
 	if(databasePath_.size())
 	{
-		ROS_INFO("rtabmap: Using database from \"%s\".", databasePath_.c_str());
+		NODELET_INFO("rtabmap: Using database from \"%s\".", databasePath_.c_str());
 	}
 	else
 	{
-		ROS_INFO("rtabmap: database_path parameter not set, the map will not be saved.");
+		NODELET_INFO("rtabmap: database_path parameter not set, the map will not be saved.");
 	}
 
 	mapsManager_.setParameters(parameters_);
 	if(this->isSubscribedToStereo())
 	{
-		ROS_INFO("rtabmap: stereo_to_depth = %s", stereoToDepth_?"true":"false");
+		NODELET_INFO("rtabmap: stereo_to_depth = %s", stereoToDepth_?"true":"false");
 	}
 
 	// Init RTAB-Map
@@ -388,7 +409,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 
 	if(databasePath_.size() && rtabmap_.getMemory())
 	{
-		ROS_INFO("rtabmap: Database version = \"%s\".", rtabmap_.getMemory()->getDatabaseVersion().c_str());
+		NODELET_INFO("rtabmap: Database version = \"%s\".", rtabmap_.getMemory()->getDatabaseVersion().c_str());
 	}
 
 	// setup services
@@ -425,6 +446,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 	Parameters::parse(parameters_, Parameters::kOptimizerIterations(), optimizeIterations);
 	if(publishTf && optimizeIterations != 0)
 	{
+		tfThreadRunning_ = true;
 		transformThread_ = new boost::thread(boost::bind(&CoreWrapper::publishLoop, this, tfDelay, tfTolerance));
 	}
 	else if(publishTf)
@@ -441,7 +463,7 @@ CoreWrapper::CoreWrapper(bool deleteDbOnStart, const ParametersMap & parameters)
 		image_transport::TransportHints hintsRgb("raw", ros::TransportHints(), rgb_pnh);
 		defaultSub_ = rgb_it.subscribe("image", 1, &CoreWrapper::defaultCallback, this);
 
-		ROS_INFO("\n%s subscribed to:\n   %s", ros::this_node::getName().c_str(), defaultSub_.getTopic().c_str());
+		NODELET_INFO("\n%s subscribed to:\n   %s", ros::this_node::getName().c_str(), defaultSub_.getTopic().c_str());
 	}
 }
 
@@ -449,6 +471,7 @@ CoreWrapper::~CoreWrapper()
 {
 	if(transformThread_)
 	{
+		tfThreadRunning_ = false;
 		transformThread_->join();
 		delete transformThread_;
 	}
@@ -469,10 +492,10 @@ void CoreWrapper::loadParameters(const std::string & configFile, ParametersMap &
 {
 	if(!configFile.empty())
 	{
-		ROS_INFO("Loading parameters from %s", configFile.c_str());
+		NODELET_INFO("Loading parameters from %s", configFile.c_str());
 		if(!UFile::exists(configFile.c_str()))
 		{
-			ROS_WARN("Config file doesn't exist! It will be generated...");
+			NODELET_WARN("Config file doesn't exist! It will be generated...");
 		}
 		Parameters::readINI(configFile.c_str(), parameters);
 	}
@@ -492,7 +515,7 @@ void CoreWrapper::saveParameters(const std::string & configFile)
 	}
 	else
 	{
-		ROS_INFO("Parameters are not saved! (No configuration file provided...)");
+		NODELET_INFO("Parameters are not saved! (No configuration file provided...)");
 	}
 }
 
@@ -501,7 +524,7 @@ void CoreWrapper::publishLoop(double tfDelay, double tfTolerance)
 	if(tfDelay == 0)
 		return;
 	ros::Rate r(1.0 / tfDelay);
-	while(ros::ok())
+	while(tfThreadRunning_)
 	{
 		if(!odomFrameId_.empty())
 		{
@@ -537,7 +560,7 @@ void CoreWrapper::defaultCallback(const sensor_msgs::ImageConstPtr & imageMsg)
 			 imageMsg->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
 			 imageMsg->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0))
 		{
-			ROS_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8");
+			NODELET_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8");
 			return;
 		}
 
@@ -558,7 +581,7 @@ void CoreWrapper::defaultCallback(const sensor_msgs::ImageConstPtr & imageMsg)
 		{
 			if(!rtabmap_.process(ptrImage->image.clone(), ptrImage->header.seq))
 			{
-				ROS_WARN("RTAB-Map could not process the data received! (ROS id = %d)", ptrImage->header.seq);
+				NODELET_WARN("RTAB-Map could not process the data received! (ROS id = %d)", ptrImage->header.seq);
 			}
 			else
 			{
@@ -567,13 +590,13 @@ void CoreWrapper::defaultCallback(const sensor_msgs::ImageConstPtr & imageMsg)
 		}
 		else if(!rtabmap_.isIDsGenerated())
 		{
-			ROS_WARN("Ignoring received image because its sequence ID=0. Please "
+			NODELET_WARN("Ignoring received image because its sequence ID=0. Please "
 					 "set \"Mem/GenerateIds\"=\"true\" to ignore ros generated sequence id. "
 					 "Use only \"Mem/GenerateIds\"=\"false\" for once-time run of RTAB-Map and "
 					 "when you need to have IDs output of RTAB-map synchronised with the source "
 					 "image sequence ID.");
 		}
-		ROS_INFO("rtabmap: Update rate=%fs, Limit=%fs, Processing time = %fs (%d local nodes)",
+		NODELET_INFO("rtabmap: Update rate=%fs, Limit=%fs, Processing time = %fs (%d local nodes)",
 				1.0f/rate_,
 				rtabmap_.getTimeThreshold()/1000.0f,
 				timer.ticks(),
@@ -776,7 +799,7 @@ void CoreWrapper::commonDepthCallbackImpl(
 			tfListener_,
 			waitForTransform_?waitForTransformDuration_:0.0))
 	{
-		ROS_ERROR("Could not convert rgb/depth msgs! Aborting rtabmap update...");
+		NODELET_ERROR("Could not convert rgb/depth msgs! Aborting rtabmap update...");
 		return;
 	}
 
@@ -787,7 +810,7 @@ void CoreWrapper::commonDepthCallbackImpl(
 		static bool shown = false;
 		if(!shown)
 		{
-			ROS_WARN("Save depth data to 16 bits format: depth type detected is "
+			NODELET_WARN("Save depth data to 16 bits format: depth type detected is "
 				  "32FC1, use 16UC1 depth format to avoid this conversion "
 				  "(or set parameter \"Mem/SaveDepth16Format=false\" to use "
 				  "32bits format). This message is only printed once...");
@@ -821,7 +844,7 @@ void CoreWrapper::commonDepthCallbackImpl(
 				tfListener_,
 				waitForTransform_?waitForTransformDuration_:0))
 		{
-			ROS_ERROR("Could not convert laser scan msg! Aborting rtabmap update...");
+			NODELET_ERROR("Could not convert laser scan msg! Aborting rtabmap update...");
 			return;
 		}
 		Transform zAxis(0,0,1,0,0,0);
@@ -845,7 +868,7 @@ void CoreWrapper::commonDepthCallbackImpl(
 				tfListener_,
 				waitForTransform_?waitForTransformDuration_:0))
 		{
-			ROS_ERROR("Could not convert 3d laser scan msg! Aborting rtabmap update...");
+			NODELET_ERROR("Could not convert 3d laser scan msg! Aborting rtabmap update...");
 			return;
 		}
 	}
@@ -942,7 +965,7 @@ void CoreWrapper::commonStereoCallback(
 			tfListener_,
 			waitForTransform_?waitForTransformDuration_:0.0))
 	{
-		ROS_ERROR("Could not convert stereo msgs! Aborting rtabmap update...");
+		NODELET_ERROR("Could not convert stereo msgs! Aborting rtabmap update...");
 		return;
 	}
 
@@ -955,7 +978,7 @@ void CoreWrapper::commonStereoCallback(
 				parameters_);
 		if(disparity.empty())
 		{
-			ROS_ERROR("Could not compute disparity image (\"stereo_to_depth\" is true)!");
+			NODELET_ERROR("Could not compute disparity image (\"stereo_to_depth\" is true)!");
 			return;
 		}
 		cv::Mat depth = rtabmap::util2d::depthFromDisparity(
@@ -965,7 +988,7 @@ void CoreWrapper::commonStereoCallback(
 
 		if(depth.empty())
 		{
-			ROS_ERROR("Could not compute depth image (\"stereo_to_depth\" is true)!");
+			NODELET_ERROR("Could not compute depth image (\"stereo_to_depth\" is true)!");
 			return;
 		}
 		UASSERT(depth.type() == CV_16UC1 || depth.type() == CV_32FC1);
@@ -1007,7 +1030,7 @@ void CoreWrapper::commonStereoCallback(
 				tfListener_,
 				waitForTransform_?waitForTransformDuration_:0))
 		{
-			ROS_ERROR("Could not convert laser scan msg! Aborting rtabmap update...");
+			NODELET_ERROR("Could not convert laser scan msg! Aborting rtabmap update...");
 			return;
 		}
 		Transform zAxis(0,0,1,0,0,0);
@@ -1031,7 +1054,7 @@ void CoreWrapper::commonStereoCallback(
 				tfListener_,
 				waitForTransform_?waitForTransformDuration_:0))
 		{
-			ROS_ERROR("Could not convert 3d laser scan msg! Aborting rtabmap update...");
+			NODELET_ERROR("Could not convert 3d laser scan msg! Aborting rtabmap update...");
 			return;
 		}
 	}
@@ -1089,7 +1112,7 @@ void CoreWrapper::process(
 
 			if(data.id() < 0)
 			{
-				ROS_INFO("Intermediate node added");
+				NODELET_INFO("Intermediate node added");
 			}
 			else
 			{
@@ -1124,11 +1147,11 @@ void CoreWrapper::process(
 						if(rtabmap_.getPathStatus() > 0)
 						{
 							// Goal reached
-							ROS_INFO("Planning: Publishing goal reached!");
+							NODELET_INFO("Planning: Publishing goal reached!");
 						}
 						else
 						{
-							ROS_WARN("Planning: Plan failed!");
+							NODELET_WARN("Planning: Plan failed!");
 							if(mbClient_.isServerConnected())
 							{
 								mbClient_.cancelGoal();
@@ -1170,7 +1193,7 @@ void CoreWrapper::process(
 						}
 						else
 						{
-							ROS_ERROR("Planning: Local map broken, current goal id=%d (the robot may have moved to far from planned nodes)",
+							NODELET_ERROR("Planning: Local map broken, current goal id=%d (the robot may have moved to far from planned nodes)",
 									rtabmap_.getPathCurrentGoalId());
 							rtabmap_.clearPath(-1);
 							if(goalReachedPub_.getNumSubscribers())
@@ -1192,7 +1215,7 @@ void CoreWrapper::process(
 		{
 			timeRtabmap = timer.ticks();
 		}
-		ROS_INFO("rtabmap (%d): Rate=%.2fs, Limit=%.3fs, RTAB-Map=%.4fs, Maps update=%.4fs pub=%.4fs (local map=%d, WM=%d)",
+		NODELET_INFO("rtabmap (%d): Rate=%.2fs, Limit=%.3fs, RTAB-Map=%.4fs, Maps update=%.4fs pub=%.4fs (local map=%d, WM=%d)",
 				rtabmap_.getLastLocationId(),
 				rate_>0?1.0f/rate_:0,
 				rtabmap_.getTimeThreshold()/1000.0f,
@@ -1204,7 +1227,7 @@ void CoreWrapper::process(
 	}
 	else if(!rtabmap_.isIDsGenerated())
 	{
-		ROS_WARN("Ignoring received image because its sequence ID=0. Please "
+		NODELET_WARN("Ignoring received image because its sequence ID=0. Please "
 				 "set \"Mem/GenerateIds\"=\"true\" to ignore ros generated sequence id. "
 				 "Use only \"Mem/GenerateIds\"=\"false\" for once-time run of RTAB-Map and "
 				 "when you need to have IDs output of RTAB-map synchronised with the source "
@@ -1228,11 +1251,11 @@ void CoreWrapper::goalCommonCallback(
 
 	if(id > 0)
 	{
-		ROS_INFO("Planning: set goal %d", id);
+		NODELET_INFO("Planning: set goal %d", id);
 	}
 	else if(!pose.isNull())
 	{
-		ROS_INFO("Planning: set goal %s", pose.prettyPrint().c_str());
+		NODELET_INFO("Planning: set goal %s", pose.prettyPrint().c_str());
 	}
 
 	if(planningTime)
@@ -1248,14 +1271,14 @@ void CoreWrapper::goalCommonCallback(
 		{
 			*planningTime = timer.elapsed();
 		}
-		ROS_INFO("Planning: Time computing path = %f s", timer.ticks());
+		NODELET_INFO("Planning: Time computing path = %f s", timer.ticks());
 		const std::vector<std::pair<int, Transform> > & poses = rtabmap_.getPath();
 
 		currentMetricGoal_.setNull();
 		latestNodeWasReached_ = false;
 		if(poses.size() == 0)
 		{
-			ROS_WARN("Planning: Goal already reached (RGBD/GoalReachedRadius=%fm).",
+			NODELET_WARN("Planning: Goal already reached (RGBD/GoalReachedRadius=%fm).",
 					rtabmap_.getGoalReachedRadius());
 			rtabmap_.clearPath(1);
 			if(goalReachedPub_.getNumSubscribers())
@@ -1271,7 +1294,7 @@ void CoreWrapper::goalCommonCallback(
 			currentMetricGoal_ = rtabmap_.getPose(rtabmap_.getPathCurrentGoalId());
 			if(!currentMetricGoal_.isNull())
 			{
-				ROS_INFO("Planning: Path successfully created (size=%d)", (int)poses.size());
+				NODELET_INFO("Planning: Path successfully created (size=%d)", (int)poses.size());
 
 				// Adjust the target pose relative to last node
 				if(rtabmap_.getPathCurrentGoalId() == rtabmap_.getPath().back().first && rtabmap_.getLocalOptimizedPoses().size())
@@ -1297,33 +1320,33 @@ void CoreWrapper::goalCommonCallback(
 					}
 					stream << iter->first;
 				}
-				ROS_INFO("Global path: [%s]", stream.str().c_str());
+				NODELET_INFO("Global path: [%s]", stream.str().c_str());
 				success=true;
 			}
 			else
 			{
-				ROS_ERROR("Pose of node %d not found!? Cannot send a metric goal...", rtabmap_.getPathCurrentGoalId());
+				NODELET_ERROR("Pose of node %d not found!? Cannot send a metric goal...", rtabmap_.getPathCurrentGoalId());
 			}
 		}
 	}
 	else if(!label.empty())
 	{
-		ROS_ERROR("Planning: Node with label \"%s\" not found!", label.c_str());
+		NODELET_ERROR("Planning: Node with label \"%s\" not found!", label.c_str());
 	}
 	else if(pose.isNull())
 	{
 		if(id > 0)
 		{
-			ROS_ERROR("Planning: Could not plan to node %d! The node is not in map's graph (look for warnings before this message for more details).", id);
+			NODELET_ERROR("Planning: Could not plan to node %d! The node is not in map's graph (look for warnings before this message for more details).", id);
 		}
 		else
 		{
-			ROS_ERROR("Planning: Node id should be > 0 !");
+			NODELET_ERROR("Planning: Node id should be > 0 !");
 		}
 	}
 	else
 	{
-		ROS_ERROR("Planning: A node near the goal's pose not found! The pose may be to far from the graph (RGBD/LocalRadius=%f m)", rtabmap_.getLocalRadius());
+		NODELET_ERROR("Planning: A node near the goal's pose not found! The pose may be to far from the graph (RGBD/LocalRadius=%f m)", rtabmap_.getLocalRadius());
 	}
 
 	if(!success)
@@ -1343,7 +1366,7 @@ void CoreWrapper::goalCallback(const geometry_msgs::PoseStampedConstPtr & msg)
 	Transform targetPose = rtabmap_ros::transformFromPoseMsg(msg->pose);
 	if(targetPose.isNull())
 	{
-		ROS_ERROR("Pose received is null!");
+		NODELET_ERROR("Pose received is null!");
 		return;
 	}
 
@@ -1353,7 +1376,7 @@ void CoreWrapper::goalCallback(const geometry_msgs::PoseStampedConstPtr & msg)
 		Transform t = rtabmap_ros::getTransform(mapFrameId_, msg->header.frame_id, msg->header.stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
 		if(t.isNull())
 		{
-			ROS_ERROR("Cannot transform goal pose from \"%s\" frame to \"%s\" frame!",
+			NODELET_ERROR("Cannot transform goal pose from \"%s\" frame to \"%s\" frame!",
 					msg->header.frame_id.c_str(), mapFrameId_.c_str());
 			return;
 		}
@@ -1367,7 +1390,7 @@ void CoreWrapper::goalNodeCallback(const rtabmap_ros::GoalConstPtr & msg)
 {
 	if(msg->node_id <= 0 && msg->node_label.empty())
 	{
-		ROS_ERROR("Node id or label should be set!");
+		NODELET_ERROR("Node id or label should be set!");
 		return;
 	}
 	goalCommonCallback(msg->node_id, msg->node_label, Transform(), msg->header.stamp);
@@ -1384,30 +1407,30 @@ bool CoreWrapper::updateRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Emp
 		double vDouble;
 		if(nh.getParam(iter->first, vStr))
 		{
-			ROS_INFO("Setting RTAB-Map parameter \"%s\"=\"%s\"", iter->first.c_str(), vStr.c_str());
+			NODELET_INFO("Setting RTAB-Map parameter \"%s\"=\"%s\"", iter->first.c_str(), vStr.c_str());
 			iter->second = vStr;
 		}
 		else if(nh.getParam(iter->first, vBool))
 		{
-			ROS_INFO("Setting RTAB-Map parameter \"%s\"=\"%s\"", iter->first.c_str(), uBool2Str(vBool).c_str());
+			NODELET_INFO("Setting RTAB-Map parameter \"%s\"=\"%s\"", iter->first.c_str(), uBool2Str(vBool).c_str());
 			iter->second = uBool2Str(vBool);
 		}
 		else if(nh.getParam(iter->first, vInt))
 		{
-			ROS_INFO("Setting RTAB-Map parameter \"%s\"=\"%s\"", iter->first.c_str(), uNumber2Str(vInt).c_str());
+			NODELET_INFO("Setting RTAB-Map parameter \"%s\"=\"%s\"", iter->first.c_str(), uNumber2Str(vInt).c_str());
 			iter->second = uNumber2Str(vInt).c_str();
 		}
 		else if(nh.getParam(iter->first, vDouble))
 		{
-			ROS_INFO("Setting RTAB-Map parameter \"%s\"=\"%s\"", iter->first.c_str(), uNumber2Str(vDouble).c_str());
+			NODELET_INFO("Setting RTAB-Map parameter \"%s\"=\"%s\"", iter->first.c_str(), uNumber2Str(vDouble).c_str());
 			iter->second = uNumber2Str(vDouble).c_str();
 		}
 	}
-	ROS_INFO("rtabmap: Updating parameters");
+	NODELET_INFO("rtabmap: Updating parameters");
 	if(parameters_.find(Parameters::kRtabmapDetectionRate()) != parameters_.end())
 	{
 		rate_ = uStr2Float(parameters_.at(Parameters::kRtabmapDetectionRate()));
-		ROS_INFO("RTAB-Map rate detection = %f Hz", rate_);
+		NODELET_INFO("RTAB-Map rate detection = %f Hz", rate_);
 	}
 	rtabmap_.parseParameters(parameters_);
 	mapsManager_.setParameters(parameters_);
@@ -1416,7 +1439,7 @@ bool CoreWrapper::updateRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Emp
 
 bool CoreWrapper::resetRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
-	ROS_INFO("rtabmap: Reset");
+	NODELET_INFO("rtabmap: Reset");
 	rtabmap_.resetMemory();
 	rotVariance_ = 0;
 	transVariance_ = 0;
@@ -1433,12 +1456,12 @@ bool CoreWrapper::pauseRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empt
 {
 	if(paused_)
 	{
-		ROS_WARN("rtabmap: Already paused!");
+		NODELET_WARN("rtabmap: Already paused!");
 	}
 	else
 	{
 		paused_ = true;
-		ROS_INFO("rtabmap: paused!");
+		NODELET_INFO("rtabmap: paused!");
 		ros::NodeHandle nh;
 		nh.setParam("is_rtabmap_paused", true);
 	}
@@ -1449,12 +1472,12 @@ bool CoreWrapper::resumeRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Emp
 {
 	if(!paused_)
 	{
-		ROS_WARN("rtabmap: Already running!");
+		NODELET_WARN("rtabmap: Already running!");
 	}
 	else
 	{
 		paused_ = false;
-		ROS_INFO("rtabmap: resumed!");
+		NODELET_INFO("rtabmap: resumed!");
 		ros::NodeHandle nh;
 		nh.setParam("is_rtabmap_paused", false);
 	}
@@ -1463,16 +1486,16 @@ bool CoreWrapper::resumeRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Emp
 
 bool CoreWrapper::triggerNewMapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
-	ROS_INFO("rtabmap: Trigger new map");
+	NODELET_INFO("rtabmap: Trigger new map");
 	rtabmap_.triggerNewMap();
 	return true;
 }
 
 bool CoreWrapper::backupDatabaseCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
-	ROS_INFO("Backup: Saving memory...");
+	NODELET_INFO("Backup: Saving memory...");
 	rtabmap_.close();
-	ROS_INFO("Backup: Saving memory... done!");
+	NODELET_INFO("Backup: Saving memory... done!");
 
 	rotVariance_ = 0;
 	transVariance_ = 0;
@@ -1480,20 +1503,20 @@ bool CoreWrapper::backupDatabaseCallback(std_srvs::Empty::Request&, std_srvs::Em
 	currentMetricGoal_.setNull();
 	latestNodeWasReached_ = false;
 
-	ROS_INFO("Backup: Saving \"%s\" to \"%s\"...", databasePath_.c_str(), (databasePath_+".back").c_str());
+	NODELET_INFO("Backup: Saving \"%s\" to \"%s\"...", databasePath_.c_str(), (databasePath_+".back").c_str());
 	UFile::copy(databasePath_, databasePath_+".back");
-	ROS_INFO("Backup: Saving \"%s\" to \"%s\"... done!", databasePath_.c_str(), (databasePath_+".back").c_str());
+	NODELET_INFO("Backup: Saving \"%s\" to \"%s\"... done!", databasePath_.c_str(), (databasePath_+".back").c_str());
 
-	ROS_INFO("Backup: Reloading memory...");
+	NODELET_INFO("Backup: Reloading memory...");
 	rtabmap_.init(parameters_, databasePath_);
-	ROS_INFO("Backup: Reloading memory... done!");
+	NODELET_INFO("Backup: Reloading memory... done!");
 
 	return true;
 }
 
 bool CoreWrapper::setModeLocalizationCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
-	ROS_INFO("rtabmap: Set localization mode");
+	NODELET_INFO("rtabmap: Set localization mode");
 	rtabmap::ParametersMap parameters;
 	parameters.insert(rtabmap::ParametersPair(rtabmap::Parameters::kMemIncrementalMemory(), "false"));
 	rtabmap_.parseParameters(parameters);
@@ -1502,7 +1525,7 @@ bool CoreWrapper::setModeLocalizationCallback(std_srvs::Empty::Request&, std_srv
 
 bool CoreWrapper::setModeMappingCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
-	ROS_INFO("rtabmap: Set mapping mode");
+	NODELET_INFO("rtabmap: Set mapping mode");
 	rtabmap::ParametersMap parameters;
 	parameters.insert(rtabmap::ParametersPair(rtabmap::Parameters::kMemIncrementalMemory(), "true"));
 	rtabmap_.parseParameters(parameters);
@@ -1511,32 +1534,32 @@ bool CoreWrapper::setModeMappingCallback(std_srvs::Empty::Request&, std_srvs::Em
 
 bool CoreWrapper::setLogDebug(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
-	ROS_INFO("rtabmap: Set log level to Debug");
+	NODELET_INFO("rtabmap: Set log level to Debug");
 	ULogger::setLevel(ULogger::kDebug);
 	return true;
 }
 bool CoreWrapper::setLogInfo(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
-	ROS_INFO("rtabmap: Set log level to Info");
+	NODELET_INFO("rtabmap: Set log level to Info");
 	ULogger::setLevel(ULogger::kInfo);
 	return true;
 }
 bool CoreWrapper::setLogWarn(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
-	ROS_INFO("rtabmap: Set log level to Warning");
+	NODELET_INFO("rtabmap: Set log level to Warning");
 	ULogger::setLevel(ULogger::kWarning);
 	return true;
 }
 bool CoreWrapper::setLogError(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
-	ROS_INFO("rtabmap: Set log level to Error");
+	NODELET_INFO("rtabmap: Set log level to Error");
 	ULogger::setLevel(ULogger::kError);
 	return true;
 }
 
 bool CoreWrapper::getMapDataCallback(rtabmap_ros::GetMap::Request& req, rtabmap_ros::GetMap::Response& res)
 {
-	ROS_INFO("rtabmap: Getting map (global=%s optimized=%s graphOnly=%s)...",
+	NODELET_INFO("rtabmap: Getting map (global=%s optimized=%s graphOnly=%s)...",
 			req.global?"true":"false",
 			req.optimized?"true":"false",
 			req.graphOnly?"true":"false");
@@ -1581,7 +1604,7 @@ bool CoreWrapper::getProjMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::
 	if(parameters_.find(Parameters::kGridFromDepth()) != parameters_.end() &&
 		!uStr2Bool(parameters_.at(Parameters::kGridFromDepth())))
 	{
-		ROS_WARN("/get_proj_map service is deprecated! Call /get_grid_map service "
+		NODELET_WARN("/get_proj_map service is deprecated! Call /get_grid_map service "
 					"instead with <param name=\"%s\" type=\"string\" value=\"true\"/>. "
 					"Do \"$ rosrun rtabmap_ros rtabmap --params | grep Grid\" to see "
 					"all occupancy grid parameters.",
@@ -1589,14 +1612,14 @@ bool CoreWrapper::getProjMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::
 	}
 	else
 	{
-		ROS_WARN("/get_proj_map service is deprecated! Call /get_grid_map service instead.");
+		NODELET_WARN("/get_proj_map service is deprecated! Call /get_grid_map service instead.");
 	}
 	return getGridMapCallback(req, res);
 }
 
 bool CoreWrapper::getGridMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::GetMap::Response &res)
 {
-	ROS_WARN("/get_grid_map service is deprecated! Call /get_map service instead.");
+	NODELET_WARN("/get_grid_map service is deprecated! Call /get_map service instead.");
 	return getMapCallback(req, res);
 }
 
@@ -1644,7 +1667,7 @@ bool CoreWrapper::getMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::GetM
 
 bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtabmap_ros::PublishMap::Response& res)
 {
-	ROS_INFO("rtabmap: Publishing map...");
+	NODELET_INFO("rtabmap: Publishing map...");
 
 	if(mapDataPub_.getNumSubscribers() ||
 	   (!req.graphOnly && mapsManager_.hasSubscribers()) ||
@@ -1675,7 +1698,7 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 
 		if(poses.size() && poses.size() != signatures.size())
 		{
-			ROS_WARN("poses and signatures are not the same size!? %d vs %d", (int)poses.size(), (int)signatures.size());
+			NODELET_WARN("poses and signatures are not the same size!? %d vs %d", (int)poses.size(), (int)signatures.size());
 		}
 
 		ros::Time now = ros::Time::now();
@@ -1833,7 +1856,7 @@ bool CoreWrapper::cancelGoalCallback(std_srvs::Empty::Request& req, std_srvs::Em
 {
 	if(rtabmap_.getPath().size())
 	{
-		ROS_WARN("Goal cancelled!");
+		NODELET_WARN("Goal cancelled!");
 		rtabmap_.clearPath(0);
 		currentMetricGoal_.setNull();
 		latestNodeWasReached_ = false;
@@ -1858,22 +1881,22 @@ bool CoreWrapper::setLabelCallback(rtabmap_ros::SetLabel::Request& req, rtabmap_
 	{
 		if(req.node_id > 0)
 		{
-			ROS_INFO("Set label \"%s\" to node %d", req.node_label.c_str(), req.node_id);
+			NODELET_INFO("Set label \"%s\" to node %d", req.node_label.c_str(), req.node_id);
 		}
 		else
 		{
-			ROS_INFO("Set label \"%s\" to last node", req.node_label.c_str());
+			NODELET_INFO("Set label \"%s\" to last node", req.node_label.c_str());
 		}
 	}
 	else
 	{
 		if(req.node_id > 0)
 		{
-			ROS_ERROR("Could not set label \"%s\" to node %d", req.node_label.c_str(), req.node_id);
+			NODELET_ERROR("Could not set label \"%s\" to node %d", req.node_label.c_str(), req.node_id);
 		}
 		else
 		{
-			ROS_ERROR("Could not set label \"%s\" to last node", req.node_label.c_str());
+			NODELET_ERROR("Could not set label \"%s\" to last node", req.node_label.c_str());
 		}
 	}
 	return true;
@@ -1885,7 +1908,7 @@ bool CoreWrapper::listLabelsCallback(rtabmap_ros::ListLabels::Request& req, rtab
 	{
 		std::map<int, std::string> labels = rtabmap_.getMemory()->getAllLabels();
 		res.labels = uValues(labels);
-		ROS_INFO("List labels service: %d labels found.", (int)res.labels.size());
+		NODELET_INFO("List labels service: %d labels found.", (int)res.labels.size());
 	}
 	return true;
 }
@@ -1897,7 +1920,7 @@ void CoreWrapper::publishStats(const ros::Time & stamp)
 
 	if(infoPub_.getNumSubscribers())
 	{
-		//ROS_INFO("Sending RtabmapInfo msg (last_id=%d)...", stat.refImageId());
+		//NODELET_INFO("Sending RtabmapInfo msg (last_id=%d)...", stat.refImageId());
 		rtabmap_ros::InfoPtr msg(new rtabmap_ros::Info);
 		msg->header.stamp = stamp;
 		msg->header.frame_id = mapFrameId_;
@@ -2020,7 +2043,7 @@ void CoreWrapper::publishCurrentGoal(const ros::Time & stamp)
 {
 	if(!currentMetricGoal_.isNull())
 	{
-		ROS_INFO("Publishing next goal: %d -> %s",
+		NODELET_INFO("Publishing next goal: %d -> %s",
 				rtabmap_.getPathCurrentGoalId(), currentMetricGoal_.prettyPrint().c_str());
 
 		geometry_msgs::PoseStamped poseMsg;
@@ -2032,7 +2055,7 @@ void CoreWrapper::publishCurrentGoal(const ros::Time & stamp)
 		{
 			if(!mbClient_.isServerConnected())
 			{
-				ROS_INFO("Connecting to move_base action server...");
+				NODELET_INFO("Connecting to move_base action server...");
 				mbClient_.waitForServer(ros::Duration(5.0));
 			}
 			if(mbClient_.isServerConnected())
@@ -2047,7 +2070,7 @@ void CoreWrapper::publishCurrentGoal(const ros::Time & stamp)
 			}
 			else
 			{
-				ROS_ERROR("Cannot connect to move_base action server!");
+				NODELET_ERROR("Cannot connect to move_base action server!");
 			}
 		}
 		if(nextMetricGoalPub_.getNumSubscribers())
@@ -2070,19 +2093,19 @@ void CoreWrapper::goalDoneCb(const actionlib::SimpleClientGoalState& state,
 				rtabmap_.getPathCurrentGoalId() != rtabmap_.getPath().back().first &&
 				(!uContains(rtabmap_.getLocalOptimizedPoses(), rtabmap_.getPath().back().first) || !latestNodeWasReached_))
 			{
-				ROS_WARN("Planning: move_base reached current goal but it is not "
+				NODELET_WARN("Planning: move_base reached current goal but it is not "
 						 "the last one planned by rtabmap. A new goal should be sent when "
 						 "rtabmap will be able to retrieve next locations on the path.");
 				ignore = true;
 			}
 			else
 			{
-				ROS_INFO("Planning: move_base success!");
+				NODELET_INFO("Planning: move_base success!");
 			}
 		}
 		else
 		{
-			ROS_ERROR("Planning: move_base failed for some reason. Aborting the plan...");
+			NODELET_ERROR("Planning: move_base failed for some reason. Aborting the plan...");
 		}
 
 		if(!ignore && goalReachedPub_.getNumSubscribers())
@@ -2104,14 +2127,14 @@ void CoreWrapper::goalDoneCb(const actionlib::SimpleClientGoalState& state,
 // Called once when the goal becomes active
 void CoreWrapper::goalActiveCb()
 {
-	//ROS_INFO("Planning: Goal just went active");
+	//NODELET_INFO("Planning: Goal just went active");
 }
 
 // Called every time feedback is received for the goal
 void CoreWrapper::goalFeedbackCb(const move_base_msgs::MoveBaseFeedbackConstPtr& feedback)
 {
 	//Transform basePosition = rtabmap_ros::transformFromPoseMsg(feedback->base_position.pose);
-	//ROS_INFO("Planning: feedback base_position = %s", basePosition.prettyPrint().c_str());
+	//NODELET_INFO("Planning: feedback base_position = %s", basePosition.prettyPrint().c_str());
 }
 
 void CoreWrapper::publishLocalPath(const ros::Time & stamp)
@@ -2178,7 +2201,7 @@ bool CoreWrapper::octomapBinaryCallback(
 		octomap_msgs::GetOctomap::Request  &req,
 		octomap_msgs::GetOctomap::Response &res)
 {
-	ROS_INFO("Sending binary map data on service request");
+	NODELET_INFO("Sending binary map data on service request");
 	res.map.header.frame_id = mapFrameId_;
 	res.map.header.stamp = ros::Time::now();
 
@@ -2194,7 +2217,7 @@ bool CoreWrapper::octomapFullCallback(
 		octomap_msgs::GetOctomap::Request  &req,
 		octomap_msgs::GetOctomap::Response &res)
 {
-	ROS_INFO("Sending full map data on service request");
+	NODELET_INFO("Sending full map data on service request");
 	res.map.header.frame_id = mapFrameId_;
 	res.map.header.stamp = ros::Time::now();
 
@@ -2207,5 +2230,7 @@ bool CoreWrapper::octomapFullCallback(
 }
 #endif
 #endif
+
+PLUGINLIB_EXPORT_CLASS(rtabmap_ros::CoreWrapper, nodelet::Nodelet);
 
 }

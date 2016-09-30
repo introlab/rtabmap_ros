@@ -63,6 +63,7 @@ float max3( const float& a, const float& b, const float& c)
 namespace rtabmap_ros {
 
 GuiWrapper::GuiWrapper(int & argc, char** argv) :
+		CommonDataSubscriber(true),
 		mainWindow_(0),
 		frameId_("base_link"),
 		odomFrameId_(""),
@@ -73,6 +74,9 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 		lastOdomInfoUpdateTime_(0)
 {
 	ros::NodeHandle nh;
+	ros::NodeHandle pnh("~");
+
+	setupCallbacks(nh, pnh);
 
 	QString configFile = QDir::homePath()+"/.ros/rtabmapGUI.ini";
 	for(int i=1; i<argc; ++i)
@@ -98,8 +102,6 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 	bool paused = false;
 	nh.param("is_rtabmap_paused", paused, paused);
 	mainWindow_->setMonitoringState(paused);
-
-	ros::NodeHandle pnh("~");
 
 	// To receive odometry events
 	std::string tfPrefix;
@@ -173,7 +175,7 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 
 	if(!this->isDataSubscribed())
 	{
-		defaultSub_ = nh.subscribe("odom", 1, &GuiWrapper::defaultCallback, this);
+		defaultSub_ = nh.subscribe("odom", queueSize_, &GuiWrapper::defaultCallback, this);
 
 		ROS_INFO("\n%s subscribed to:\n   %s",
 				ros::this_node::getName().c_str(),

@@ -30,6 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 #include <ros/ros.h>
+#include <nodelet/nodelet.h>
 
 #include <std_srvs/Empty.h>
 
@@ -71,13 +72,15 @@ class StereoDense;
 
 namespace rtabmap_ros {
 
-class CoreWrapper : public CommonDataSubscriber
+class CoreWrapper : public CommonDataSubscriber, public nodelet::Nodelet
 {
 public:
-	CoreWrapper(bool deleteDbOnStart, const rtabmap::ParametersMap & parameters);
+	CoreWrapper();
 	virtual ~CoreWrapper();
 
 private:
+
+	virtual void onInit();
 
 	bool odomUpdate(const nav_msgs::OdometryConstPtr & odomMsg);
 	bool odomTFUpdate(const ros::Time & stamp); // TF odom
@@ -242,6 +245,7 @@ private:
 	MoveBaseClient mbClient_;
 
 	boost::thread* transformThread_;
+	bool tfThreadRunning_;
 
 	// for loop closure detection only
 	image_transport::Subscriber defaultSub_;

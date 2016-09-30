@@ -86,14 +86,14 @@ void CommonDataSubscriber::stereoOdomInfoCallback(
 }
 
 void CommonDataSubscriber::setupStereoCallbacks(
+		ros::NodeHandle & nh,
+		ros::NodeHandle & pnh,
 		bool subscribeOdom,
 		bool subscribeOdomInfo,
 		int queueSize,
 		bool approxSync)
 {
 	ROS_INFO("Setup stereo callback");
-	ros::NodeHandle nh; // public
-	ros::NodeHandle pnh("~"); // private
 
 	ros::NodeHandle left_nh(nh, "left");
 	ros::NodeHandle right_nh(nh, "right");

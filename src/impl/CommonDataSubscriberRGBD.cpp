@@ -249,6 +249,8 @@ void CommonDataSubscriber::rgbdOdomDataInfoCallback(
 }
 
 void CommonDataSubscriber::setupRGBDCallbacks(
+		ros::NodeHandle & nh,
+		ros::NodeHandle & pnh,
 		bool subscribeOdom,
 		bool subscribeUserData,
 		bool subscribeScan2d,
@@ -258,8 +260,6 @@ void CommonDataSubscriber::setupRGBDCallbacks(
 		bool approxSync)
 {
 	ROS_INFO("Setup rgbd callback");
-	ros::NodeHandle nh; // public
-	ros::NodeHandle pnh("~"); // private
 
 	if(subscribeOdom || subscribeUserData || subscribeScan2d || subscribeScan3d || subscribeOdomInfo)
 	{

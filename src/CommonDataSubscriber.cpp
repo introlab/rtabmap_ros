@@ -29,13 +29,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace rtabmap_ros {
 
-
-CommonDataSubscriber::CommonDataSubscriber() :
+CommonDataSubscriber::CommonDataSubscriber(bool gui) :
 		queueSize_(10),
 		approxSync_(true),
 		warningThread_(0),
 		callbackCalled_(false),
-		subscribedToDepth_(true),
+		subscribedToDepth_(!gui),
 		subscribedToStereo_(false),
 		subscribedToRGBD_(false),
 		subscribedToScan2d_(false),
@@ -122,8 +121,10 @@ CommonDataSubscriber::CommonDataSubscriber() :
 		SYNC_INIT(rgbd2OdomDataInfo)
 
 {
-	ros::NodeHandle pnh("~");
+}
 
+void CommonDataSubscriber::setupCallbacks(ros::NodeHandle & nh, ros::NodeHandle & pnh)
+{
 	bool subscribeScan2d = false;
 	bool subscribeScan3d = false;
 	bool subscribeOdomInfo = false;
@@ -208,6 +209,8 @@ CommonDataSubscriber::CommonDataSubscriber() :
 	if(subscribedToDepth_)
 	{
 		setupDepthCallbacks(
+				nh,
+				pnh,
 				subscribeOdom,
 				subscribeUserData,
 				subscribeScan2d,
@@ -219,6 +222,8 @@ CommonDataSubscriber::CommonDataSubscriber() :
 	else if(subscribedToStereo_)
 	{
 		setupStereoCallbacks(
+				nh,
+				pnh,
 				subscribeOdom,
 				subscribeOdomInfo,
 				queueSize_,
@@ -229,6 +234,8 @@ CommonDataSubscriber::CommonDataSubscriber() :
 		if(rgbdCameras == 2)
 		{
 			setupRGBD2Callbacks(
+					nh,
+					pnh,
 					subscribeOdom,
 					subscribeUserData,
 					subscribeScan2d,
@@ -240,6 +247,8 @@ CommonDataSubscriber::CommonDataSubscriber() :
 		else
 		{
 			setupRGBDCallbacks(
+					nh,
+					pnh,
 					subscribeOdom,
 					subscribeUserData,
 					subscribeScan2d,
@@ -260,6 +269,8 @@ CommonDataSubscriber::~CommonDataSubscriber()
 {
 	if(warningThread_)
 	{
+		callbackCalled();
+		warningThread_->join();
 		delete warningThread_;
 	}
 
@@ -351,13 +362,13 @@ CommonDataSubscriber::~CommonDataSubscriber()
 
 void CommonDataSubscriber::warningLoop()
 {
-	ros::Duration r(10.0);
-	while(ros::ok() && !callbackCalled_)
+	ros::Duration r(5.0);
+	while(!callbackCalled_)
 	{
 		r.sleep();
-		if(ros::ok() && !callbackCalled_)
+		if(!callbackCalled_)
 		{
-			ROS_WARN("%s: Did not receive data since 10 seconds! Make sure the input topics are "
+			ROS_WARN("%s: Did not receive data since 5 seconds! Make sure the input topics are "
 					"published (\"$ rostopic hz my_topic\") and the timestamps in their "
 					"header are set. %s%s",
 					ros::this_node::getName().c_str(),

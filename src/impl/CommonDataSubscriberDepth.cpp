@@ -230,6 +230,8 @@ void CommonDataSubscriber::depthOdomDataInfoCallback(
 }
 
 void CommonDataSubscriber::setupDepthCallbacks(
+		ros::NodeHandle & nh,
+		ros::NodeHandle & pnh,
 		bool subscribeOdom,
 		bool subscribeUserData,
 		bool subscribeScan2d,
@@ -239,8 +241,6 @@ void CommonDataSubscriber::setupDepthCallbacks(
 		bool approxSync)
 {
 	ROS_INFO("Setup depth callback");
-	ros::NodeHandle nh; // public
-	ros::NodeHandle pnh("~"); // private
 
 	std::string rgbPrefix = "rgb";
 	std::string depthPrefix = "depth";

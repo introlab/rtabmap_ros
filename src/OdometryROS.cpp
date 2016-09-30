@@ -83,6 +83,8 @@ OdometryROS::~OdometryROS()
 {
 	if(warningThread_)
 	{
+		callbackCalled();
+		warningThread_->join();
 		delete warningThread_;
 	}
 	ros::NodeHandle & pnh = getPrivateNodeHandle();
@@ -311,13 +313,13 @@ void OdometryROS::startWarningThread(const std::string & subscribedTopicsMsg, bo
 
 void OdometryROS::warningLoop(const std::string & subscribedTopicsMsg, bool approxSync)
 {
-	ros::Duration r(10.0);
-	while(ros::ok() && !callbackCalled_)
+	ros::Duration r(5.0);
+	while(!callbackCalled_)
 	{
 		r.sleep();
-		if(ros::ok() && !callbackCalled_)
+		if(!callbackCalled_)
 		{
-			ROS_WARN("%s: Did not receive data since 10 seconds! Make sure the input topics are "
+			ROS_WARN("%s: Did not receive data since 5 seconds! Make sure the input topics are "
 					"published (\"$ rostopic hz my_topic\") and the timestamps in their "
 					"header are set. %s%s",
 					ros::this_node::getName().c_str(),

@@ -169,6 +169,7 @@ SET(rtabmap_ros_lib_src
    src/MsgConversion.cpp
    src/MapsManager.cpp
    src/CommonDataSubscriber.cpp
+   src/CoreWrapper.cpp
    src/impl/CommonDataSubscriberDepth.cpp
    src/impl/CommonDataSubscriberStereo.cpp
    src/impl/CommonDataSubscriberRGBD.cpp
@@ -270,8 +271,8 @@ IF(Qt5_FOUND)
 ENDIF(Qt5_FOUND)
 add_dependencies(rtabmap_ros ${${PROJECT_NAME}_EXPORTED_TARGETS})
 
-add_executable(rtabmap src/CoreNode.cpp src/CoreWrapper.cpp)
-target_link_libraries(rtabmap rtabmap_ros ${Libraries})
+add_executable(rtabmap src/CoreNode.cpp)
+target_link_libraries(rtabmap ${Libraries})
 
 add_executable(rgbd_odometry src/RGBDOdometryNode.cpp)
 target_link_libraries(rgbd_odometry ${Libraries})

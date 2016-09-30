@@ -56,7 +56,7 @@ namespace rtabmap_ros {
 
 class CommonDataSubscriber {
 public:
-	CommonDataSubscriber();
+	CommonDataSubscriber(bool gui);
 	virtual ~CommonDataSubscriber();
 
 	bool isSubscribedToDepth() const  {return subscribedToDepth_;}
@@ -69,6 +69,7 @@ public:
 	int getQueueSize() const {return queueSize_;}
 
 protected:
+	void setupCallbacks(ros::NodeHandle & nh, ros::NodeHandle & pnh);
 	virtual void commonDepthCallback(
 				const nav_msgs::OdometryConstPtr & odomMsg,
 				const rtabmap_ros::UserDataConstPtr & userDataMsg,
@@ -102,6 +103,8 @@ private:
 	void warningLoop();
 	void callbackCalled() {callbackCalled_ = true;}
 	void setupDepthCallbacks(
+			ros::NodeHandle & nh,
+			ros::NodeHandle & pnh,
 			bool subscribeOdom,
 			bool subscribeUserData,
 			bool subscribeScan2d,
@@ -110,11 +113,15 @@ private:
 			int queueSize,
 			bool approxSync);
 	void setupStereoCallbacks(
+			ros::NodeHandle & nh,
+			ros::NodeHandle & pnh,
 			bool subscribeOdom,
 			bool subscribeOdomInfo,
 			int queueSize,
 			bool approxSync);
 	void setupRGBDCallbacks(
+			ros::NodeHandle & nh,
+			ros::NodeHandle & pnh,
 			bool subscribeOdom,
 			bool subscribeUserData,
 			bool subscribeScan2d,
@@ -123,6 +130,8 @@ private:
 			int queueSize,
 			bool approxSync);
 	void setupRGBD2Callbacks(
+			ros::NodeHandle & nh,
+			ros::NodeHandle & pnh,
 			bool subscribeOdom,
 			bool subscribeUserData,
 			bool subscribeScan2d,
@@ -133,9 +142,9 @@ private:
 
 protected:
 	std::string subscribedTopicsMsg_;
+	int queueSize_;
 
 private:
-	int queueSize_;
 	bool approxSync_;
 	boost::thread* warningThread_;
 	bool callbackCalled_;
