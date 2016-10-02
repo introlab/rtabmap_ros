@@ -118,8 +118,6 @@ void CoreWrapper::onInit()
 	ros::NodeHandle & nh = getNodeHandle();
 	ros::NodeHandle & pnh = getPrivateNodeHandle();
 
-	setupCallbacks(nh, pnh);
-
 	bool publishTf = true;
 	double tfDelay = 0.05; // 20 Hz
 	double tfTolerance = 0.1; // 100 ms
@@ -201,6 +199,12 @@ void CoreWrapper::onInit()
 	NODELET_INFO("rtabmap: tf_delay      = %f", tfDelay);
 	NODELET_INFO("rtabmap: tf_tolerance  = %f", tfTolerance);
 	NODELET_INFO("rtabmap: odom_sensor_sync   = %s", odomSensorSync_?"true":"false");
+	bool subscribeStereo = false;
+	pnh.param("subscribe_stereo",      subscribeStereo, subscribeStereo);
+	if(subscribeStereo)
+	{
+		NODELET_INFO("rtabmap: stereo_to_depth = %s", stereoToDepth_?"true":"false");
+	}
 
 	infoPub_ = nh.advertise<rtabmap_ros::Info>("info", 1);
 	mapDataPub_ = nh.advertise<rtabmap_ros::MapData>("mapData", 1);
@@ -328,7 +332,11 @@ void CoreWrapper::onInit()
 	// Backward compatibility (MapsManager)
 	mapsManager_.backwardCompatibilityParameters(parameters_);
 
-	if((this->isSubscribedToScan2d() || this->isSubscribedToScan3d()) && parameters_.find(Parameters::kGridFromDepth()) == parameters_.end())
+	bool subscribeScan2d = false;
+	bool subscribeScan3d = false;
+	pnh.param("subscribe_scan",      subscribeScan2d, subscribeScan2d);
+	pnh.param("subscribe_scan_cloud", subscribeScan3d, subscribeScan3d);
+	if((subscribeScan2d || subscribeScan3d) && parameters_.find(Parameters::kGridFromDepth()) == parameters_.end())
 	{
 		NODELET_WARN("Setting \"%s\" parameter to false (default true) as \"subscribe_scan\" or \"subscribe_scan_cloud\" is "
 				"true. The occupancy grid map will be constructed from "
@@ -363,18 +371,6 @@ void CoreWrapper::onInit()
 			NODELET_INFO("Create intermediate nodes");
 		}
 	}
-	bool isRGBD = uStr2Bool(parameters_.at(Parameters::kRGBDEnabled()).c_str());
-	if(isRGBD)
-	{
-		// RGBD SLAM
-		if(!this->isSubscribedToDepth() && !this->isSubscribedToStereo() && !this->isSubscribedToRGBD())
-		{
-			NODELET_WARN("ROS param subscribe_depth, subscribe_stereo and subscribe_rgbd are false, but RTAB-Map "
-					  "parameter \"%s\" is true! Please set subscribe_depth, subscribe_stereo or subscribe_rgbd "
-					  "to true to use rtabmap node for RGB-D SLAM, or set \"%s\" to false for loop closure "
-					  "detection on images-only.", Parameters::kRGBDEnabled().c_str(), Parameters::kRGBDEnabled().c_str());
-		}
-	}
 
 	if(paused_)
 	{
@@ -399,10 +395,6 @@ void CoreWrapper::onInit()
 	}
 
 	mapsManager_.setParameters(parameters_);
-	if(this->isSubscribedToStereo())
-	{
-		NODELET_INFO("rtabmap: stereo_to_depth = %s", stereoToDepth_?"true":"false");
-	}
 
 	// Init RTAB-Map
 	rtabmap_.init(parameters_, databasePath_);
@@ -455,8 +447,18 @@ void CoreWrapper::onInit()
 				Parameters::kOptimizerIterations().c_str(), mapFrameId_.c_str());
 	}
 
+	setupCallbacks(nh, pnh); // do it at the end
 	if(!this->isDataSubscribed())
 	{
+		bool isRGBD = uStr2Bool(parameters_.at(Parameters::kRGBDEnabled()).c_str());
+		if(isRGBD)
+		{
+			NODELET_WARN("ROS param subscribe_depth, subscribe_stereo and subscribe_rgbd are false, but RTAB-Map "
+					  "parameter \"%s\" is true! Please set subscribe_depth, subscribe_stereo or subscribe_rgbd "
+					  "to true to use rtabmap node for RGB-D SLAM, or set \"%s\" to false for loop closure "
+					  "detection on images-only.", Parameters::kRGBDEnabled().c_str(), Parameters::kRGBDEnabled().c_str());
+		}
+
 		ros::NodeHandle rgb_nh(nh, "rgb");
 		ros::NodeHandle rgb_pnh(pnh, "rgb");
 		image_transport::ImageTransport rgb_it(rgb_nh);
@@ -854,6 +856,12 @@ void CoreWrapper::commonDepthCallbackImpl(
 			cv::flip(scan, flipScan, 1);
 			scan = flipScan;
 		}
+		if(rtabmap_.getMemory() && uStrNumCmp(rtabmap_.getMemory()->getDatabaseVersion(), "0.11.10") < 0)
+		{
+			// backward compatibility, project 2D scan in /base_link frame
+			scan = util3d::transformLaserScan(scan, scanLocalTransform);
+			scanLocalTransform = Transform::getIdentity();
+		}
 	}
 	else if(scan3dMsg.get() != 0)
 	{
@@ -1040,6 +1048,12 @@ void CoreWrapper::commonStereoCallback(
 			cv::flip(scan, flipScan, 1);
 			scan = flipScan;
 		}
+		if(rtabmap_.getMemory() && uStrNumCmp(rtabmap_.getMemory()->getDatabaseVersion(), "0.11.10") < 0)
+		{
+			// backward compatibility, project 2D scan in /base_link frame
+			scan = util3d::transformLaserScan(scan, scanLocalTransform);
+			scanLocalTransform = Transform::getIdentity();
+		}
 	}
 	else if(scan3dMsg.get() != 0)
 	{
@@ -1120,12 +1134,19 @@ void CoreWrapper::process(
 				this->publishStats(stamp);
 				std::map<int, rtabmap::Transform> filteredPoses = rtabmap_.getLocalOptimizedPoses();
 
-				// create a tmp signature with latest sensory data
+				// create a tmp signature with latest sensory data if latest signature was ignored
 				std::map<int, rtabmap::Signature> tmpSignature;
-				SensorData tmpData = data;
-				tmpData.setId(-1);
-				tmpSignature.insert(std::make_pair(-1, Signature(-1, -1, 0, data.stamp(), "", odom, Transform(), tmpData)));
-				filteredPoses.insert(std::make_pair(-1, rtabmap_.getMapCorrection()*odom));
+				if(rtabmap_.getMemory() == 0 ||
+					filteredPoses.size() == 0 ||
+					rtabmap_.getMemory()->getLastSignatureId() != filteredPoses.rbegin()->first ||
+					rtabmap_.getMemory()->getLastWorkingSignature() == 0 ||
+					rtabmap_.getMemory()->getLastWorkingSignature()->sensorData().gridCellSize() == 0)
+				{
+					SensorData tmpData = data;
+					tmpData.setId(-1);
+					tmpSignature.insert(std::make_pair(-1, Signature(-1, -1, 0, data.stamp(), "", odom, Transform(), tmpData)));
+					filteredPoses.insert(std::make_pair(-1, rtabmap_.getMapCorrection()*odom));
+				}
 
 				// Update maps
 				filteredPoses = mapsManager_.updateMapCaches(

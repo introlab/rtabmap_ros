@@ -431,6 +431,8 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 #endif
 		}
 
+		bool occupancySavedInDB = memory && uStrNumCmp(memory->getDatabaseVersion(), "0.11.10")>=0?true:false;
+
 		for(std::map<int, rtabmap::Transform>::iterator iter=filteredPoses.begin(); iter!=filteredPoses.end(); ++iter)
 		{
 			if(!iter->second.isNull())
@@ -446,32 +448,58 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 					}
 					else if(memory)
 					{
-						data = memory->getSignatureDataConst(iter->first, false, false, false, true);
+						data = memory->getSignatureDataConst(iter->first, occupancyGrid_->isGridFromDepth() && !occupancySavedInDB, !occupancyGrid_->isGridFromDepth() && !occupancySavedInDB, false, true);
 					}
 
 					if(data.id() != 0)
 					{
-						cv::Mat ground, obstacles;
-						data.uncompressData(
-								0,
-								0,
-								0,
-								0,
-								&ground,
-								&obstacles);
-
 						UDEBUG("Adding grid map %d to cache...", iter->first);
-
 						cv::Point3f viewPoint;
-						if(iter->first > 0 || data.gridCellSize())
+						cv::Mat ground, obstacles;
+						if(iter->first > 0)
 						{
-							viewPoint = data.gridViewPoint();
-							gridMaps_.insert(std::make_pair(iter->first, std::make_pair(ground, obstacles)));
-							gridMapsViewpoints_.insert(std::make_pair(iter->first, viewPoint));
+							cv::Mat rgb, depth, scan;
+							bool generateGrid = data.gridCellSize() == 0.0f;
+							static bool warningShown = false;
+							if(occupancySavedInDB && generateGrid && !warningShown)
+							{
+								warningShown = true;
+								UWARN("Occupancy grid for location %d should be added to global map (e..g, a ROS node is subscribed to "
+										"any occupancy grid output) but it cannot be found "
+										"in memory. For convenience, the occupancy "
+										"grid is regenerated. Make sure parameter \"%s\" is true to "
+										"avoid this warning for the next locations added to map. For older "
+										"locations already in database without an occupancy grid map, you can use the "
+										"\"rtabmap-databaseViewer\" to regenerate the missing occupancy grid maps and "
+										"save them back in the database for next sessions. This warning is only shown once.",
+										data.id(), Parameters::kRGBDCreateOccupancyGrid().c_str());
+							}
+							data.uncompressData(
+									occupancyGrid_->isGridFromDepth() && generateGrid?&rgb:0,
+									occupancyGrid_->isGridFromDepth() && generateGrid?&depth:0,
+									!occupancyGrid_->isGridFromDepth() && generateGrid?&scan:0,
+									0,
+									generateGrid?0:&ground,
+									generateGrid?0:&obstacles);
+
+							if(generateGrid)
+							{
+								Signature tmp(data);
+								tmp.setPose(iter->second);
+								occupancyGrid_->createLocalMap(tmp, ground, obstacles, viewPoint);
+								uInsert(gridMaps_, std::make_pair(iter->first, std::make_pair(ground, obstacles)));
+								uInsert(gridMapsViewpoints_, std::make_pair(iter->first, viewPoint));
+							}
+							else
+							{
+								viewPoint = data.gridViewPoint();
+								gridMaps_.insert(std::make_pair(iter->first, std::make_pair(ground, obstacles)));
+								gridMapsViewpoints_.insert(std::make_pair(iter->first, viewPoint));
+							}
 						}
 						else
 						{
-							// generate tmp occupancy grid for negative ids
+							// generate tmp occupancy grid for negative ids (assuming data is already uncompressed)
 							// we need the signature
 							std::map<int, rtabmap::Signature>::const_iterator findIter = signatures.find(iter->first);
 							if(findIter != signatures.end())
