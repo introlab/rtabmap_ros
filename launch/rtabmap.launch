@@ -54,9 +54,8 @@
   <arg name="right_camera_info_topic" default="$(arg stereo_namespace)/right/camera_info" />
   
   <arg name="compressed"              default="false"/>         <!-- If you want to subscribe to compressed image topics -->
-                                                                <!-- For depth_topic, "compressedDepth" image_transport is used. --> 
-                                                                <!-- For rgb_topic, see "rgb_image_transport" argument. -->
   <arg name="rgb_image_transport"     default="compressed"/>    <!-- Common types: compressed, theora (see "rosrun image_transport list_transports") -->
+  <arg name="depth_image_transport"   default="compressedDepth"/>  <!-- Common types: compressed, theora (see "rosrun image_transport list_transports") -->
    
   <arg name="subscribe_scan"          default="false"/>
   <arg name="scan_topic"              default="/scan"/>
@@ -85,7 +84,7 @@
     <!-- RGB-D Odometry -->
     <group unless="$(arg stereo)">
       <node if="$(arg compressed)" name="republish_rgb" type="republish" pkg="image_transport" args="$(arg rgb_image_transport) in:=$(arg rgb_topic) raw out:=$(arg rgb_topic_relay)" />
-      <node if="$(arg compressed)" name="republish_depth" type="republish" pkg="image_transport" args="compressedDepth in:=$(arg depth_topic) raw out:=$(arg depth_topic_relay)" />
+      <node if="$(arg compressed)" name="republish_depth" type="republish" pkg="image_transport" args="$(arg depth_image_transport) in:=$(arg depth_topic) raw out:=$(arg depth_topic_relay)" />
   
       <node if="$(arg visual_odometry)" pkg="rtabmap_ros" type="rgbd_odometry" name="rgbd_odometry" output="screen" args="$(arg odom_args)" launch-prefix="$(arg launch_prefix)">
         <remap from="rgb/image"       to="$(arg rgb_topic_relay)"/>
