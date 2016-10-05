@@ -827,7 +827,7 @@ void MapsManager::publishMaps(
 					assembledGroundPoses_.insert(*iter);
 					if(jter!=gridMaps_.end() && jter->second.first.cols)
 					{
-						pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::laserScanToPointCloudRGB(jter->second.first, iter->second);
+						pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::laserScanToPointCloudRGB(jter->second.first, iter->second, 0, 255, 0);
 						pcl::PointCloud<pcl::PointXYZRGB>::Ptr subtractedCloud = transformed;
 						if(cloudSubtractFiltering_)
 						{
@@ -868,7 +868,7 @@ void MapsManager::publishMaps(
 					assembledObstaclePoses_.insert(*iter);
 					if(jter!=gridMaps_.end() && jter->second.second.cols)
 					{
-						pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::laserScanToPointCloudRGB(jter->second.second, iter->second);
+						pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::laserScanToPointCloudRGB(jter->second.second, iter->second, 255, 0, 0);
 						pcl::PointCloud<pcl::PointXYZRGB>::Ptr subtractedCloud = transformed;
 						if(cloudSubtractFiltering_)
 						{
