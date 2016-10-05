@@ -164,6 +164,7 @@ SET(rtabmap_ros_lib_src
    src/nodelets/obstacles_detection.cpp
    src/nodelets/obstacles_detection_old.cpp
    src/nodelets/point_cloud_aggregator.cpp
+   src/nodelets/undistort_depth.cpp
    src/nodelets/rgbd_sync.cpp
    src/OdometryROS.cpp
    src/MsgConversion.cpp

@@ -119,6 +119,14 @@
       This is my nodelet.
     </description>
   </class>
+  
+  <class name="rtabmap_ros/undistort_depth" 
+         type="rtabmap_ros::UndistortDepth" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
 
 </library>
 
