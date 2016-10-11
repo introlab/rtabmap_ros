@@ -73,7 +73,8 @@ public:
 			float & yMin,
 			float & gridCellSize);
 
-	rtabmap::OctoMap * getOctomap() const {return octomap_;}
+	const rtabmap::OctoMap * getOctomap() const {return octomap_;}
+	const rtabmap::OccupancyGrid * getOccupancyGrid() const {return occupancyGrid_;}
 
 private:
 	// mapping stuff

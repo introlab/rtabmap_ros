@@ -53,6 +53,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/Memory.h>
 #include <rtabmap/core/OdometryEvent.h>
 #include <rtabmap/core/Version.h>
+#include <rtabmap/core/OccupancyGrid.h>
 
 #ifdef WITH_OCTOMAP_ROS
 #ifdef RTABMAP_OCTOMAP
@@ -1140,7 +1141,8 @@ void CoreWrapper::process(
 					filteredPoses.size() == 0 ||
 					rtabmap_.getMemory()->getLastSignatureId() != filteredPoses.rbegin()->first ||
 					rtabmap_.getMemory()->getLastWorkingSignature() == 0 ||
-					rtabmap_.getMemory()->getLastWorkingSignature()->sensorData().gridCellSize() == 0)
+					rtabmap_.getMemory()->getLastWorkingSignature()->sensorData().gridCellSize() == 0 ||
+					(!mapsManager_.getOccupancyGrid()->isGridFromDepth() && data.laserScanRaw().channels() == 2)) // 2d laser scan would fill empty space for latest data
 				{
 					SensorData tmpData = data;
 					tmpData.setId(-1);
