@@ -42,7 +42,6 @@ int main(int argc, char** argv)
 
 	ros::init(argc, argv, "rtabmap");
 
-	bool deleteDbOnStart = false;
 	nodelet::V_string nargv;
 	for(int i=1;i<argc;++i)
 	{

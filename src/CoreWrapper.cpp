@@ -282,7 +282,7 @@ void CoreWrapper::onInit()
 	//parse input arguments
 	std::vector<std::string> argList = getMyArgv();
 	char * argv[argList.size()];
-	bool deleteDbOnStart;
+	bool deleteDbOnStart = false;
 	for(unsigned int i=0; i<argList.size(); ++i)
 	{
 		argv[i] = &argList[i].at(0);
