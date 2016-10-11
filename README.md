@@ -57,7 +57,7 @@ $ sudo apt-get remove ros-kinetic-rtabmap
 $ sudo apt-get install libqt4-dev libpcl-1.7-all-dev libdc1394-dev ros-kinetic-openni-launch ros-kinetic-openni2-launch ros-kinetic-freenect-launch ros-kinetic-costmap-2d ros-kinetic-octomap-ros ros-kinetic-g2o ros-kinetic-rviz ros-kinetic-cv-bridge
 ```
 
-  * [GTSAM](https://collab.cc.gatech.edu/borg/gtsam): Follow installation instructions from [here](https://collab.cc.gatech.edu/borg/gtsam/#quickstart). RTAB-Map needs latest version from source (`git clone https://bitbucket.org/gtborg/gtsam.git`), it will not build with 3.2.1.
+  * [GTSAM](https://collab.cc.gatech.edu/borg/gtsam): Follow installation instructions from [here](https://collab.cc.gatech.edu/borg/gtsam/#quickstart). RTAB-Map needs latest version from source (`git clone https://bitbucket.org/gtborg/gtsam.git`), it will **not build** with 3.2.1.
   
   * [cvsba](http://www.uco.es/investiga/grupos/ava/node/39): Follow installation instructions from [here](http://www.uco.es/investiga/grupos/ava/node/39). Their installation is not standard CMake, you need these extra steps so RTAB-Map can find it:
     ```bash
@@ -94,7 +94,7 @@ $ git pull origin master
 $ cd build
 $ make
 $ make install
-// Do "sudo make install" if you installed rtabmap in "/usr/local"
+# Do "sudo make install" if you installed rtabmap in "/usr/local"
 
 $ roscd rtabmap_ros
 $ git pull origin master
