@@ -370,10 +370,12 @@ void CommonDataSubscriber::warningLoop()
 		{
 			ROS_WARN("%s: Did not receive data since 5 seconds! Make sure the input topics are "
 					"published (\"$ rostopic hz my_topic\") and the timestamps in their "
-					"header are set. %s%s",
+					"header are set. If topics are coming from different computers, make sure "
+					"the clocks of the computers are synchronized (\"ntpdate\"). %s%s",
 					ros::this_node::getName().c_str(),
-					approxSync_?"":"Parameter \"approx_sync\" is false, which means that input "
-						"topics should have all the exact timestamp for the callback to be called.",
+					approxSync_?
+							uFormat("If topics are not published at the same rate, you could increase \"queue_size\" parameter (current=%d).", queueSize_).c_str():
+							"Parameter \"approx_sync\" is false, which means that input topics should have all the exact timestamp for the callback to be called.",
 					subscribedTopicsMsg_.c_str());
 		}
 	}
