@@ -101,7 +101,6 @@ CoreWrapper::CoreWrapper() :
 		scanCloudMaxPoints_(0),
 		scanCloudNormalK_(0),
 		mapToOdom_(rtabmap::Transform::getIdentity()),
-		mapsManager_(true),
 		transformThread_(0),
 		tfThreadRunning_(false),
 		stereoToDepth_(false),
@@ -118,6 +117,8 @@ void CoreWrapper::onInit()
 {
 	ros::NodeHandle & nh = getNodeHandle();
 	ros::NodeHandle & pnh = getPrivateNodeHandle();
+
+	mapsManager_.init(nh, pnh, getName(), true);
 
 	bool publishTf = true;
 	double tfDelay = 0.05; // 20 Hz
@@ -331,7 +332,7 @@ void CoreWrapper::onInit()
 	}
 
 	// Backward compatibility (MapsManager)
-	mapsManager_.backwardCompatibilityParameters(parameters_);
+	mapsManager_.backwardCompatibilityParameters(pnh, parameters_);
 
 	bool subscribeScan2d = false;
 	bool subscribeScan3d = false;
@@ -448,7 +449,7 @@ void CoreWrapper::onInit()
 				Parameters::kOptimizerIterations().c_str(), mapFrameId_.c_str());
 	}
 
-	setupCallbacks(nh, pnh); // do it at the end
+	setupCallbacks(nh, pnh, getName()); // do it at the end
 	if(!this->isDataSubscribed())
 	{
 		bool isRGBD = uStr2Bool(parameters_.at(Parameters::kRGBDEnabled()).c_str());
@@ -466,7 +467,7 @@ void CoreWrapper::onInit()
 		image_transport::TransportHints hintsRgb("raw", ros::TransportHints(), rgb_pnh);
 		defaultSub_ = rgb_it.subscribe("image", 1, &CoreWrapper::defaultCallback, this);
 
-		NODELET_INFO("\n%s subscribed to:\n   %s", ros::this_node::getName().c_str(), defaultSub_.getTopic().c_str());
+		NODELET_INFO("\n%s subscribed to:\n   %s", getName().c_str(), defaultSub_.getTopic().c_str());
 	}
 }
 

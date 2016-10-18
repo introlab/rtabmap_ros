@@ -100,7 +100,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 			PREFIX##ExactSync_->registerCallback(boost::bind(&CommonDataSubscriber::PREFIX##Callback, this, _1, _2)); \
 		} \
 		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s", \
-				ros::this_node::getName().c_str(), \
+				name_.c_str(), \
 				APPROX?"approx":"exact", \
 				SUB0.getTopic().c_str(), \
 				SUB1.getTopic().c_str());
@@ -119,7 +119,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 			PREFIX##ExactSync_->registerCallback(boost::bind(&CommonDataSubscriber::PREFIX##Callback, this, _1, _2, _3)); \
 		} \
 		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s", \
-				ros::this_node::getName().c_str(), \
+				name_.c_str(), \
 				APPROX?"approx":"exact", \
 				SUB0.getTopic().c_str(), \
 				SUB1.getTopic().c_str(), \
@@ -139,7 +139,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 			PREFIX##ExactSync_->registerCallback(boost::bind(&CommonDataSubscriber::PREFIX##Callback, this, _1, _2, _3, _4)); \
 		} \
 		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s", \
-				ros::this_node::getName().c_str(), \
+				name_.c_str(), \
 				APPROX?"approx":"exact", \
 				SUB0.getTopic().c_str(), \
 				SUB1.getTopic().c_str(), \
@@ -160,7 +160,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 			PREFIX##ExactSync_->registerCallback(boost::bind(&CommonDataSubscriber::PREFIX##Callback, this, _1, _2, _3, _4, _5)); \
 		} \
 		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s,\n   %s", \
-				ros::this_node::getName().c_str(), \
+				name_.c_str(), \
 				approxSync?"approx":"exact", \
 				SUB0.getTopic().c_str(), \
 				SUB1.getTopic().c_str(), \
@@ -182,7 +182,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 			PREFIX##ExactSync_->registerCallback(boost::bind(&CommonDataSubscriber::PREFIX##Callback, this, _1, _2, _3, _4, _5, _6)); \
 		} \
 		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s,\n   %s,\n   %s", \
-				ros::this_node::getName().c_str(), \
+				name_.c_str(), \
 				APPROX?"approx":"exact", \
 				SUB0.getTopic().c_str(), \
 				SUB1.getTopic().c_str(), \

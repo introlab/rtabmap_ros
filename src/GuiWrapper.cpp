@@ -171,7 +171,7 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 	goalPathSync_->registerCallback(boost::bind(&GuiWrapper::goalPathCallback, this, _1, _2));
 	goalReachedTopic_ = nh.subscribe("goal_reached", 1, &GuiWrapper::goalReachedCallback, this);
 
-	setupCallbacks(nh, pnh); // do it at the end
+	setupCallbacks(nh, pnh, ros::this_node::getName()); // do it at the end
 	if(!this->isDataSubscribed())
 	{
 		defaultSub_ = nh.subscribe("odom", queueSize_, &GuiWrapper::defaultCallback, this);

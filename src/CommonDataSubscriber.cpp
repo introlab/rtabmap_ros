@@ -123,13 +123,14 @@ CommonDataSubscriber::CommonDataSubscriber(bool gui) :
 {
 }
 
-void CommonDataSubscriber::setupCallbacks(ros::NodeHandle & nh, ros::NodeHandle & pnh)
+void CommonDataSubscriber::setupCallbacks(ros::NodeHandle & nh, ros::NodeHandle & pnh, const std::string & name)
 {
 	bool subscribeScan2d = false;
 	bool subscribeScan3d = false;
 	bool subscribeOdomInfo = false;
 	bool subscribeUserData = false;
 	int rgbdCameras = 1;
+	name_ = name;
 
 	// ROS related parameters (private)
 	pnh.param("subscribe_depth",     subscribedToDepth_, subscribedToDepth_);
@@ -201,9 +202,9 @@ void CommonDataSubscriber::setupCallbacks(ros::NodeHandle & nh, ros::NodeHandle 
 		rgbdCameras = 1;
 	}
 
-	ROS_INFO("%s: queue_size    = %d", ros::this_node::getName().c_str(), queueSize_);
-	ROS_INFO("%s: rgbd_cameras = %d", ros::this_node::getName().c_str(), rgbdCameras);
-	ROS_INFO("%s: approx_sync   = %s", ros::this_node::getName().c_str(), approxSync_?"true":"false");
+	ROS_INFO("%s: queue_size    = %d", name.c_str(), queueSize_);
+	ROS_INFO("%s: rgbd_cameras = %d", name.c_str(), rgbdCameras);
+	ROS_INFO("%s: approx_sync   = %s", name.c_str(), approxSync_?"true":"false");
 
 	bool subscribeOdom = odomFrameId.empty();
 	if(subscribedToDepth_)
@@ -372,7 +373,7 @@ void CommonDataSubscriber::warningLoop()
 					"published (\"$ rostopic hz my_topic\") and the timestamps in their "
 					"header are set. If topics are coming from different computers, make sure "
 					"the clocks of the computers are synchronized (\"ntpdate\"). %s%s",
-					ros::this_node::getName().c_str(),
+					name_.c_str(),
 					approxSync_?
 							uFormat("If topics are not published at the same rate, you could increase \"queue_size\" parameter (current=%d).", queueSize_).c_str():
 							"Parameter \"approx_sync\" is false, which means that input topics should have all the exact timestamp for the callback to be called.",

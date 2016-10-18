@@ -114,7 +114,7 @@ private:
 
 
 		std::string subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s",
-				ros::this_node::getName().c_str(),
+				getName().c_str(),
 				approxSync?"approx":"exact",
 				imageRectLeft_.getTopic().c_str(),
 				imageRectRight_.getTopic().c_str(),

@@ -142,7 +142,7 @@ private:
 					exactSync2_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD2, this, _1, _2));
 				}
 				subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s",
-						ros::this_node::getName().c_str(),
+						getName().c_str(),
 						approxSync?"approx":"exact",
 						rgbd_image1_sub_.getTopic().c_str(),
 						rgbd_image2_sub_.getTopic().c_str());
@@ -153,7 +153,7 @@ private:
 
 				subscribedTopicsMsg =
 						uFormat("\n%s subscribed to:\n   %s",
-						ros::this_node::getName().c_str(),
+						getName().c_str(),
 						rgbdSub_.getTopic().c_str());
 			}
 		}
@@ -184,7 +184,7 @@ private:
 			}
 
 			subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s",
-					ros::this_node::getName().c_str(),
+					getName().c_str(),
 					approxSync?"approx":"exact",
 					image_mono_sub_.getTopic().c_str(),
 					image_depth_sub_.getTopic().c_str(),

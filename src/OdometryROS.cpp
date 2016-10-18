@@ -322,7 +322,7 @@ void OdometryROS::warningLoop(const std::string & subscribedTopicsMsg, bool appr
 			ROS_WARN("%s: Did not receive data since 5 seconds! Make sure the input topics are "
 					"published (\"$ rostopic hz my_topic\") and the timestamps in their "
 					"header are set. %s%s",
-					ros::this_node::getName().c_str(),
+					getName().c_str(),
 					approxSync?"":"Parameter \"approx_sync\" is false, which means that input "
 						"topics should have all the exact timestamp for the callback to be called.",
 					subscribedTopicsMsg.c_str());

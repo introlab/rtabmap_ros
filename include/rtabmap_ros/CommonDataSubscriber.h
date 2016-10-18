@@ -69,7 +69,7 @@ public:
 	int getQueueSize() const {return queueSize_;}
 
 protected:
-	void setupCallbacks(ros::NodeHandle & nh, ros::NodeHandle & pnh);
+	void setupCallbacks(ros::NodeHandle & nh, ros::NodeHandle & pnh, const std::string & name);
 	virtual void commonDepthCallback(
 				const nav_msgs::OdometryConstPtr & odomMsg,
 				const rtabmap_ros::UserDataConstPtr & userDataMsg,
@@ -154,6 +154,7 @@ private:
 	bool subscribedToScan2d_;
 	bool subscribedToScan3d_;
 	bool subscribedToOdomInfo_;
+	std::string name_;
 
 	//for depth callback
 	image_transport::SubscriberFilter imageSub_;

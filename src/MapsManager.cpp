@@ -57,7 +57,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace rtabmap;
 
-MapsManager::MapsManager(bool usePublicNamespace) :
+MapsManager::MapsManager() :
 		cloudOutputVoxelized_(true),
 		cloudSubtractFiltering_(false),
 		cloudSubtractFilteringMinNeighbors_(2),
@@ -77,10 +77,10 @@ MapsManager::MapsManager(bool usePublicNamespace) :
 		octomapTreeDepth_(16),
 		octomapOccupancyThr_(0.5)
 {
+}
 
-	ros::NodeHandle nh;
-	ros::NodeHandle pnh("~");
-
+void MapsManager::init(ros::NodeHandle & nh, ros::NodeHandle & pnh, const std::string & name, bool usePublicNamespace)
+{
 	// common grid map stuff
 	pnh.param("grid_cell_size", gridCellSize_, gridCellSize_); // m
 	if(gridCellSize_ <= 0)
@@ -113,7 +113,6 @@ MapsManager::MapsManager(bool usePublicNamespace) :
 	pnh.param("cloud_subtract_filtering", cloudSubtractFiltering_, cloudSubtractFiltering_);
 	pnh.param("cloud_subtract_filtering_min_neighbors", cloudSubtractFilteringMinNeighbors_, cloudSubtractFilteringMinNeighbors_);
 
-	std::string name = ros::this_node::getName();
 	ROS_INFO("%s(maps): grid_cell_size             = %f", name.c_str(), gridCellSize_);
 	ROS_INFO("%s(maps): grid_incremental           = %s", name.c_str(), gridIncremental_?"true":"false");
 	ROS_INFO("%s(maps): grid_size                  = %f", name.c_str(), gridSize_);
@@ -155,23 +154,31 @@ MapsManager::MapsManager(bool usePublicNamespace) :
 	pnh.param("latch", latch, latch);
 
 	// mapping topics
-	ros::NodeHandle nht(usePublicNamespace?"":"~");
-	gridMapPub_ = nht.advertise<nav_msgs::OccupancyGrid>("grid_map", 1, latch);
-	cloudMapPub_ = nht.advertise<sensor_msgs::PointCloud2>("cloud_map", 1, latch);
-	cloudObstaclesPub_ = nht.advertise<sensor_msgs::PointCloud2>("cloud_obstacles", 1, latch);
-	cloudGroundPub_ = nht.advertise<sensor_msgs::PointCloud2>("cloud_ground", 1, latch);
+	ros::NodeHandle * nht;
+	if(usePublicNamespace)
+	{
+		nht = &nh;
+	}
+	else
+	{
+		nht = &pnh;
+	}
+	gridMapPub_ = nht->advertise<nav_msgs::OccupancyGrid>("grid_map", 1, latch);
+	cloudMapPub_ = nht->advertise<sensor_msgs::PointCloud2>("cloud_map", 1, latch);
+	cloudObstaclesPub_ = nht->advertise<sensor_msgs::PointCloud2>("cloud_obstacles", 1, latch);
+	cloudGroundPub_ = nht->advertise<sensor_msgs::PointCloud2>("cloud_ground", 1, latch);
 
 	// deprecated
-	projMapPub_ = nht.advertise<nav_msgs::OccupancyGrid>("proj_map", 1, latch);
-	scanMapPub_ = nht.advertise<sensor_msgs::PointCloud2>("scan_map", 1, latch);
+	projMapPub_ = nht->advertise<nav_msgs::OccupancyGrid>("proj_map", 1, latch);
+	scanMapPub_ = nht->advertise<sensor_msgs::PointCloud2>("scan_map", 1, latch);
 
 #ifdef WITH_OCTOMAP_ROS
 #ifdef RTABMAP_OCTOMAP
-	octoMapPubBin_ = nht.advertise<octomap_msgs::Octomap>("octomap_binary", 1, latch);
-	octoMapPubFull_ = nht.advertise<octomap_msgs::Octomap>("octomap_full", 1, latch);
-	octoMapCloud_ = nht.advertise<sensor_msgs::PointCloud2>("octomap_occupied_space", 1, latch);
-	octoMapEmptySpace_ = nht.advertise<sensor_msgs::PointCloud2>("octomap_empty_space", 1, latch);
-	octoMapProj_ = nht.advertise<nav_msgs::OccupancyGrid>("octomap_grid", 1, latch);
+	octoMapPubBin_ = nht->advertise<octomap_msgs::Octomap>("octomap_binary", 1, latch);
+	octoMapPubFull_ = nht->advertise<octomap_msgs::Octomap>("octomap_full", 1, latch);
+	octoMapCloud_ = nht->advertise<sensor_msgs::PointCloud2>("octomap_occupied_space", 1, latch);
+	octoMapEmptySpace_ = nht->advertise<sensor_msgs::PointCloud2>("octomap_empty_space", 1, latch);
+	octoMapProj_ = nht->advertise<nav_msgs::OccupancyGrid>("octomap_grid", 1, latch);
 #endif
 #endif
 }
@@ -234,10 +241,8 @@ void parameterMoved(
 	}
 }
 
-void MapsManager::backwardCompatibilityParameters(ParametersMap & parameters) const
+void MapsManager::backwardCompatibilityParameters(ros::NodeHandle & pnh, ParametersMap & parameters) const
 {
-	ros::NodeHandle pnh("~");
-
 	// removed
 	if(pnh.hasParam("cloud_frustum_culling"))
 	{

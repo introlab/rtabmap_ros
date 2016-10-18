@@ -45,11 +45,12 @@ class OccupancyGrid;
 
 class MapsManager {
 public:
-	MapsManager(bool usePublicNamespace);
+	MapsManager();
 	virtual ~MapsManager();
+	void init(ros::NodeHandle & nh, ros::NodeHandle & pnh, const std::string & name, bool usePublicNamespace);
 	void clear();
 	bool hasSubscribers() const;
-	void backwardCompatibilityParameters(rtabmap::ParametersMap & parameters) const;
+	void backwardCompatibilityParameters(ros::NodeHandle & pnh, rtabmap::ParametersMap & parameters) const;
 	void setParameters(const rtabmap::ParametersMap & parameters);
 
 	std::map<int, rtabmap::Transform> getFilteredPoses(

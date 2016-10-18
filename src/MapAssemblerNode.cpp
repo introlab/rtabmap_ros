@@ -49,12 +49,13 @@ class MapAssembler
 {
 
 public:
-	MapAssembler() :
-		mapsManager_(false)
+	MapAssembler()
 	{
 		ros::NodeHandle pnh("~");
-
 		ros::NodeHandle nh;
+
+		mapsManager_.init(nh, pnh, ros::this_node::getName(), false);
+
 		mapDataTopic_ = nh.subscribe("mapData", 1, &MapAssembler::mapDataReceivedCallback, this);
 
 		// private service
