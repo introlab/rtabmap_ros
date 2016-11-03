@@ -34,7 +34,7 @@ script:
     - git clone https://github.com/introlab/rtabmap.git
     - cd rtabmap
     - mkdir -p build && cd build
-    - cmake -DCMAKE_INSTALL_PREFIX=~/introlab/catkin_ws/devel .. 
+    - cmake -DCMAKE_INSTALL_PREFIX=~/build/introlab/catkin_ws/devel .. 
     - make
     - make install
     - cd ../../catkin_ws
