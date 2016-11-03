@@ -15,6 +15,7 @@ addons:
       - libsqlite3-dev
 
 install:
+    - sudo pip install -U catkin_pkg
     - sudo sh -c 'echo "deb http://packages.ros.org/ros/ubuntu trusty main" > /etc/apt/sources.list.d/ros-latest.list'
     - wget http://packages.ros.org/ros.key -O - | sudo apt-key add -
     - sudo apt-get update
@@ -22,7 +23,6 @@ install:
 
 script: 
     - source /opt/ros/indigo/setup.bash
-    - ls /usr/lib/python2.7/dist-packages | grep catkin
     - cd ..
     - mkdir -p catkin_ws/src
     - mv rtabmap_ros catkin_ws/src/.
