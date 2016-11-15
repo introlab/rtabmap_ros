@@ -84,7 +84,7 @@ public:
 		parameters.insert(ParametersPair(Parameters::kOptimizerEpsilon(), uNumber2Str(epsilon)));
 		parameters.insert(ParametersPair(Parameters::kOptimizerIterations(), uNumber2Str(iterations)));
 		parameters.insert(ParametersPair(Parameters::kOptimizerRobust(), uBool2Str(robust)));
-		parameters.insert(ParametersPair(Parameters::kOptimizerSlam2D(), uBool2Str(slam2d)));
+		parameters.insert(ParametersPair(Parameters::kRegForce3DoF(), uBool2Str(slam2d)));
 		parameters.insert(ParametersPair(Parameters::kOptimizerVarianceIgnored(), uBool2Str(ignoreVariance)));
 		optimizer_ = Optimizer::create(parameters);
 

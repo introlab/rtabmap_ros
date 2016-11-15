@@ -303,9 +303,13 @@ void MapCloudDisplay::processMapData(const rtabmap_ros::MapData& map)
 				{
 					if(cloud_filter_floor_height_->getFloat() > 0.0f || cloud_filter_ceiling_height_->getFloat() > 0.0f)
 					{
+						// convert in /odom frame
+						cloud = rtabmap::util3d::transformPointCloud(cloud, s.getPose());
 						cloud = rtabmap::util3d::passThrough(cloud, "z",
 								cloud_filter_floor_height_->getFloat()>0.0f?cloud_filter_floor_height_->getFloat():-999.0f,
 								cloud_filter_ceiling_height_->getFloat()>0.0f && (cloud_filter_floor_height_->getFloat()<=0.0f || cloud_filter_ceiling_height_->getFloat()>cloud_filter_floor_height_->getFloat())?cloud_filter_ceiling_height_->getFloat():999.0f);
+						// convert back in /base_link frame
+						cloud = rtabmap::util3d::transformPointCloud(cloud, s.getPose().inverse());
 					}
 
 					sensor_msgs::PointCloud2::Ptr cloudMsg(new sensor_msgs::PointCloud2);
