@@ -54,6 +54,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/OdometryEvent.h>
 #include <rtabmap/core/Version.h>
 #include <rtabmap/core/OccupancyGrid.h>
+#include <rtabmap/core/DBDriver.h>
 
 #ifdef WITH_OCTOMAP_ROS
 #ifdef RTABMAP_OCTOMAP
@@ -349,6 +350,33 @@ void CoreWrapper::onInit()
 				Parameters::kGridFromDepth().c_str(),
 				Parameters::kGridFromDepth().c_str());
 		parameters_.insert(ParametersPair(Parameters::kGridFromDepth(), "false"));
+	}
+
+	// modify default parameters with those in the database
+	if(!deleteDbOnStart)
+	{
+		ParametersMap dbParameters;
+		rtabmap::DBDriver * driver = rtabmap::DBDriver::create();
+		if(driver->openConnection(databasePath_))
+		{
+			dbParameters = driver->getLastParameters(); // parameter migration is already done
+		}
+		delete driver;
+		for(ParametersMap::iterator iter=dbParameters.begin(); iter!=dbParameters.end(); ++iter)
+		{
+			if(iter->first.compare(Parameters::kRtabmapWorkingDirectory()) == 0)
+			{
+				// ignore working directory
+				continue;
+			}
+			if(parameters_.find(iter->first) == parameters_.end() &&
+				allParameters.find(iter->first) != allParameters.end() &&
+				allParameters.find(iter->first)->second.compare(iter->second) !=0)
+			{
+				NODELET_INFO("Update RTAB-Map parameter \"%s\"=\"%s\" from database", iter->first.c_str(), iter->second.c_str());
+				parameters_.insert(*iter);
+			}
+		}
 	}
 
 	// Add all other parameters (not copied if already exists)
