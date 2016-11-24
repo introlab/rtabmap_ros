@@ -33,7 +33,7 @@
 	
 	<!-- RTAB-Map's parameters: do "rosrun rtabmap rtabmap (double-dash)params" to see the list of available parameters. -->
 	<param name="RGBD/NeighborLinkRefining"  type="string" value="false"/> 
-	<param name="RGBD/ProximityBySpace"      type="string" value="false"/> 
+	<param name="RGBD/ProximityBySpace"      type="string" value="false"/> <!-- Referred paper did only global loop closure detection -->
 	<param name="RGBD/ProximityByTime"       type="string" value="false"/> 
 	<param name="RGBD/OptimizeFromGraphEnd"  type="string" value="true"/> 
 	<param name="Reg/Strategy"               type="string" value="1"/>
@@ -51,7 +51,10 @@
 	<param name="Kp/MaxFeatures"             type="string" value="400"/>
 	<param name="Optimizer/Slam2D"           type="string" value="true"/>
 	<param name="Reg/Force3DoF"              type="string" value="true"/> 
-	<param name="RGBD/OptimizeMaxError"      type="string" value="0.25"/> 
+	<param name="RGBD/OptimizeMaxError"      type="string" value="0.25"/>
+        <param name="Optimizer/Strategy"         type="string" value="0"/>  <!-- TORO is the most stable for multi-session mapping -->
+        <param name="Optimizer/Iterations"       type="string" value="100"/> 
+        <param name="Kp/IncrementalFlann"        type="string" value="false"/>  <!-- Referred paper didn't use incremental FLANN -->
   </node>
   
   <!-- Visualisation RTAB-Map -->
