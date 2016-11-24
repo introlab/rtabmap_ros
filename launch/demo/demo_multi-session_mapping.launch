@@ -51,6 +51,7 @@
 	<param name="Kp/MaxFeatures"             type="string" value="400"/>
 	<param name="Optimizer/Slam2D"           type="string" value="true"/>
 	<param name="Reg/Force3DoF"              type="string" value="true"/> 
+	<param name="RGBD/OptimizeMaxError"      type="string" value="0.25"/> 
   </node>
   
   <!-- Visualisation RTAB-Map -->
