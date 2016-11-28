@@ -15,7 +15,7 @@
     <arg name="device_id" value="#2" />
   </include>
 
-  <!-- Frames: Kinects are placed at 90 degrees -->
+  <!-- Frames: Kinects are placed at 90 degrees, clockwise -->
   <node pkg="tf" type="static_transform_publisher" name="base_to_camera1_tf"
       args="0.0 0.0 0.0 0.0 0.0 0.0 /base_link /camera1_link 100" />
   <node pkg="tf" type="static_transform_publisher" name="base_to_camera2_tf"
@@ -70,6 +70,7 @@
       <remap from="rgbd_image0"       to="/camera1/rgbd_image"/>
       <remap from="rgbd_image1"       to="/camera2/rgbd_image"/>
 	  
+	  <param name="subscribe_rgbd"           type="bool"   value="true"/>
 	  <param name="frame_id"                 type="string" value="base_link"/>
 	  <param name="rgbd_cameras"             type="int"    value="2"/>
 	  <param name="wait_for_transform"       type="bool"   value="$(arg wait_for_transform)"/>
@@ -92,6 +93,7 @@
 	  <param name="frame_id"         type="string" value="base_link"/>
 	  <param name="gen_scan"         type="bool"   value="true"/>
 	  <param name="wait_for_transform" type="bool"   value="$(arg wait_for_transform)"/>
+	  <param name="map_negative_poses_ignored" type="bool"   value="true"/>
 	
       <remap from="rgbd_image0"       to="/camera1/rgbd_image"/>
       <remap from="rgbd_image1"       to="/camera2/rgbd_image"/>
