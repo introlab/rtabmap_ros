@@ -659,6 +659,18 @@ bool CoreWrapper::odomUpdate(const nav_msgs::OdometryConstPtr & odomMsg)
 			// using MIN in case of 3DoF mapping (maybe no parameters are set, except x and yaw for the twist)
 			float transVariance = uMax3(odomMsg->twist.covariance[0], MIN(odomMsg->twist.covariance[7], BAD_COVARIANCE), MIN(odomMsg->twist.covariance[14], BAD_COVARIANCE));
 			float rotVariance = uMax3(MIN(odomMsg->twist.covariance[21],BAD_COVARIANCE), MIN(odomMsg->twist.covariance[28], BAD_COVARIANCE), odomMsg->twist.covariance[35]);
+
+			if(transVariance == BAD_COVARIANCE)
+			{
+				//use the one of the pose
+				transVariance = uMax3(odomMsg->pose.covariance[0]/2.0, MIN(odomMsg->pose.covariance[7]/2.0, BAD_COVARIANCE), MIN(odomMsg->pose.covariance[14]/2.0, BAD_COVARIANCE));
+			}
+			if(rotVariance == BAD_COVARIANCE)
+			{
+				//use the one of the pose
+				rotVariance = uMax3(MIN(odomMsg->pose.covariance[21]/2.0,BAD_COVARIANCE), MIN(odomMsg->pose.covariance[28]/2.0, BAD_COVARIANCE), odomMsg->pose.covariance[35]/2.0);
+			}
+
 			if(uIsFinite(rotVariance) && rotVariance > rotVariance_)
 			{
 				rotVariance_ = rotVariance;
