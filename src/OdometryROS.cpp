@@ -443,12 +443,12 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 
 			//set covariance
 			// libviso2 uses approximately vel variance * 2
-			odom.pose.covariance.at(0) = info.variance*2;  // xx
-			odom.pose.covariance.at(7) = info.variance*2;  // yy
-			odom.pose.covariance.at(14) = info.variance*2; // zz
-			odom.pose.covariance.at(21) = info.variance*2; // rr
-			odom.pose.covariance.at(28) = info.variance*2; // pp
-			odom.pose.covariance.at(35) = info.variance*2; // yawyaw
+			odom.pose.covariance.at(0) = info.varianceLin*2;  // xx
+			odom.pose.covariance.at(7) = info.varianceLin*2;  // yy
+			odom.pose.covariance.at(14) = info.varianceLin*2; // zz
+			odom.pose.covariance.at(21) = info.varianceAng*2; // rr
+			odom.pose.covariance.at(28) = info.varianceAng*2; // pp
+			odom.pose.covariance.at(35) = info.varianceAng*2; // yawyaw
 
 			//set velocity
 			bool setTwist = !odometry_->previousVelocityTransform().isNull();
@@ -464,12 +464,12 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 				odom.twist.twist.angular.z = yaw;
 			}
 
-			odom.twist.covariance.at(0) = setTwist?info.variance:BAD_COVARIANCE;  // xx
-			odom.twist.covariance.at(7) = setTwist?info.variance:BAD_COVARIANCE;  // yy
-			odom.twist.covariance.at(14) = setTwist?info.variance:BAD_COVARIANCE; // zz
-			odom.twist.covariance.at(21) = setTwist?info.variance:BAD_COVARIANCE; // rr
-			odom.twist.covariance.at(28) = setTwist?info.variance:BAD_COVARIANCE; // pp
-			odom.twist.covariance.at(35) = setTwist?info.variance:BAD_COVARIANCE; // yawyaw
+			odom.twist.covariance.at(0) = setTwist?info.varianceLin:BAD_COVARIANCE;  // xx
+			odom.twist.covariance.at(7) = setTwist?info.varianceLin:BAD_COVARIANCE;  // yy
+			odom.twist.covariance.at(14) = setTwist?info.varianceLin:BAD_COVARIANCE; // zz
+			odom.twist.covariance.at(21) = setTwist?info.varianceAng:BAD_COVARIANCE; // rr
+			odom.twist.covariance.at(28) = setTwist?info.varianceAng:BAD_COVARIANCE; // pp
+			odom.twist.covariance.at(35) = setTwist?info.varianceAng:BAD_COVARIANCE; // yawyaw
 
 			//publish the message
 			odomPub_.publish(odom);
@@ -620,16 +620,16 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 	{
 		if(icpParams_)
 		{
-			NODELET_INFO( "Odom: quality=%d, ratio=%f, std dev=%fm, update time=%fs", info.inliers, info.icpInliersRatio, pose.isNull()?0.0f:std::sqrt(info.variance), (ros::WallTime::now()-time).toSec());
+			NODELET_INFO( "Odom: quality=%d, ratio=%f, std dev=%fm|%frad, update time=%fs", info.inliers, info.icpInliersRatio, pose.isNull()?0.0f:std::sqrt(info.varianceLin), pose.isNull()?0.0f:std::sqrt(info.varianceAng), (ros::WallTime::now()-time).toSec());
 		}
 		else
 		{
-			NODELET_INFO( "Odom: quality=%d, std dev=%fm, update time=%fs", info.inliers, pose.isNull()?0.0f:std::sqrt(info.variance), (ros::WallTime::now()-time).toSec());
+			NODELET_INFO( "Odom: quality=%d, std dev=%fm|%frad, update time=%fs", info.inliers, pose.isNull()?0.0f:std::sqrt(info.varianceLin), pose.isNull()?0.0f:std::sqrt(info.varianceAng), (ros::WallTime::now()-time).toSec());
 		}
 	}
 	else
 	{
-		NODELET_INFO( "Odom: ratio=%f, std dev=%fm, update time=%fs", info.icpInliersRatio, pose.isNull()?0.0f:std::sqrt(info.variance), (ros::WallTime::now()-time).toSec());
+		NODELET_INFO( "Odom: ratio=%f, std dev=%fm|%frad, update time=%fs", info.icpInliersRatio, pose.isNull()?0.0f:std::sqrt(info.varianceLin), pose.isNull()?0.0f:std::sqrt(info.varianceAng), (ros::WallTime::now()-time).toSec());
 	}
 
 }

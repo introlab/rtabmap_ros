@@ -879,7 +879,8 @@ rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::OdomInfo & msg)
 	info.localMapSize = msg.localMapSize;
 	info.localScanMapSize = msg.localScanMapSize;
 	info.timeEstimation = msg.timeEstimation;
-	info.variance = msg.variance;
+	info.varianceLin = msg.varianceLin;
+	info.varianceAng = msg.varianceAng;
 	info.timeParticleFiltering =  msg.timeParticleFiltering;
 	info.stamp = msg.stamp;
 	info.interval = msg.interval;
@@ -923,7 +924,8 @@ void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_ros::OdomInfo & m
 	msg.localMapSize = info.localMapSize;
 	msg.localScanMapSize = info.localScanMapSize;
 	msg.timeEstimation = info.timeEstimation;
-	msg.variance = info.variance;
+	msg.varianceLin = info.varianceLin;
+	msg.varianceAng = info.varianceAng;
 	msg.timeParticleFiltering =  info.timeParticleFiltering;
 	msg.stamp = info.stamp;
 	msg.interval = info.interval;

@@ -6,7 +6,8 @@ Header header
 #    bool lost;
 #    int matches;
 #    int inliers;
-#    float variance;
+#    float varianceLin;
+#    float varianceAng;
 #    int features;
 #    int localMapSize;
 #    float time;
@@ -27,7 +28,8 @@ Header header
 bool lost
 int32 matches
 int32 inliers
-float32 variance
+float32 varianceLin
+float32 varianceAng
 int32 features
 int32 localMapSize
 int32 localScanMapSize
