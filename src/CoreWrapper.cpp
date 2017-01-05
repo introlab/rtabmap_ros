@@ -671,13 +671,13 @@ bool CoreWrapper::odomUpdate(const nav_msgs::OdometryConstPtr & odomMsg)
 				rotVariance = uMax3(MIN(odomMsg->pose.covariance[21]/2.0,BAD_COVARIANCE), MIN(odomMsg->pose.covariance[28]/2.0, BAD_COVARIANCE), odomMsg->pose.covariance[35]/2.0);
 			}
 
-			if(uIsFinite(rotVariance) && rotVariance > rotVariance_)
+			if(uIsFinite(rotVariance) && rotVariance != 1.0f)
 			{
-				rotVariance_ = rotVariance;
+				rotVariance_ += rotVariance;
 			}
-			if(uIsFinite(transVariance) && transVariance > transVariance_)
+			if(uIsFinite(transVariance) && transVariance != 1.0f)
 			{
-				transVariance_ = transVariance;
+				transVariance_ += transVariance;
 			}
 		}
 
