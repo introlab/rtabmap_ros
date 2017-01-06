@@ -6,6 +6,7 @@
    <!-- Choose visualization -->
   <arg name="rviz" default="false" />
   <arg name="rtabmapviz" default="true" />
+  <arg name="rtabmap_args" default="" />
 
   <param name="use_sim_time" type="bool" value="True"/>
 
@@ -13,7 +14,7 @@
   
   <!-- SLAM (robot side) -->
   <!-- args: "delete_db_on_start" and "udebug" -->
-  <node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="screen" args="">
+  <node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="screen" args="$(arg rtabmap_args)">
 	<param name="frame_id" type="string" value="base_footprint"/>
 	
 	<param name="subscribe_depth" type="bool" value="true"/>
