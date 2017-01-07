@@ -62,6 +62,8 @@
       <param name="RGBD/LoopClosureReextractFeatures" type="string" value="false"/>
       <param name="Mem/RawDescriptorsKept" type="string" value="true"/>
       <param name="Kp/DetectorStrategy" type="string" value="0"/>
+      <param name="RGBD/CreateOccupancyGrid" type="string" value="false"/>
+      <param name="Rtabmap/CreateIntermediateNodes" type="string" value="true"/>
 
       <param name="frame_id" type="string" value="kinect"/>
       <param name="ground_truth_frame_id" type="string" value="world"/> 

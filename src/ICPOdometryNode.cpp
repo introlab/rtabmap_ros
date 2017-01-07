@@ -25,58 +25,54 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "rtabmap_ros/GuiWrapper.h"
-#include "rtabmap/utilite/ULogger.h"
-
-#include <QApplication>
-#include <rtabmap/gui/MainWindow.h>
+#include "ros/ros.h"
+#include "nodelet/loader.h"
 #include <rtabmap/utilite/ULogger.h>
-#include <signal.h>
+#include <rtabmap/core/Parameters.h>
 
-QApplication * app = 0;
-ros::AsyncSpinner * spinner = 0;
-
-void my_handler(int s){
-	ROS_INFO("rtabmapviz: ctrl-c catched! Exiting Qt app...");
-	spinner->stop();
-	exit(-1);
-}
-
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
-	ROS_INFO("Starting node...");
-
 	ULogger::setType(ULogger::kTypeConsole);
 	ULogger::setLevel(ULogger::kWarning);
+	ros::init(argc, argv, "icp_odometry");
 
-	ros::init(argc, argv, "rtabmapviz");
+	// process "--params" argument
+	nodelet::V_string nargv;
+	for(int i=1;i<argc;++i)
+	{
+		if(strcmp(argv[i], "--params") == 0)
+		{
+			rtabmap::ParametersMap parametersOdom = rtabmap::Parameters::getDefaultOdometryParameters(false, false, true);
+			for(rtabmap::ParametersMap::iterator iter=parametersOdom.begin(); iter!=parametersOdom.end(); ++iter)
+			{
+				std::string str = "Param: " + iter->first + " = \"" + iter->second + "\"";
+				std::cout <<
+						str <<
+						std::setw(60 - str.size()) <<
+						" [" <<
+						rtabmap::Parameters::getDescription(iter->first).c_str() <<
+						"]" <<
+						std::endl;
+			}
+			ROS_WARN("Node will now exit after showing default odometry parameters because "
+					 "argument \"--params\" is detected!");
+			exit(0);
+		}
+		else if(strcmp(argv[i], "--udebug") == 0)
+		{
+			ULogger::setLevel(ULogger::kDebug);
+		}
+		else if(strcmp(argv[i], "--uinfo") == 0)
+		{
+			ULogger::setLevel(ULogger::kInfo);
+		}
+		nargv.push_back(argv[i]);
+	}
 
-	app = new QApplication(argc, argv);
-	app->connect( app, SIGNAL( lastWindowClosed() ), app, SLOT( quit() ) );
-
-	rtabmap_ros::GuiWrapper * gui = new rtabmap_ros::GuiWrapper(argc, argv);
-
-	// Catch ctrl-c to close the gui
-	// (Place this after QApplication's constructor)
-	struct sigaction sigIntHandler;
-	sigIntHandler.sa_handler = my_handler;
-	sigemptyset(&sigIntHandler.sa_mask);
-	sigIntHandler.sa_flags = 0;
-	sigaction(SIGINT, &sigIntHandler, NULL);
-
-	// Here start the ROS events loop
-	spinner = new ros::AsyncSpinner(1); // Use 1 thread
-	spinner->start();
-
-	ROS_INFO("rtabmapviz started.");
-	// Now wait for application to finish
-	int r = app->exec();// MUST be called by the Main Thread
-
-	spinner->stop();
-	delete spinner;
-
-	delete gui;
-	delete app;
-	ROS_INFO("rtabmapviz: All done! Closing...");
-	return r;
+	nodelet::Loader nodelet;
+	nodelet::M_string remap(ros::names::getRemappings());
+	std::string nodelet_name = ros::this_node::getName();
+	nodelet.load(nodelet_name, "rtabmap_ros/icp_odometry", remap, nargv);
+	ros::spin();
+	return 0;
 }

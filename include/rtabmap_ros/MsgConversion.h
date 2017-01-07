@@ -29,12 +29,16 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define MSGCONVERSION_H_
 
 #include <tf/tf.h>
+#include <tf/transform_listener.h>
 #include <geometry_msgs/Transform.h>
 #include <geometry_msgs/Pose.h>
 #include <sensor_msgs/CameraInfo.h>
+#include <sensor_msgs/LaserScan.h>
+#include <sensor_msgs/Image.h>
 
 #include <opencv2/opencv.hpp>
 #include <opencv2/features2d/features2d.hpp>
+#include <cv_bridge/cv_bridge.h>
 
 #include <rtabmap/core/Transform.h>
 #include <rtabmap/core/Link.h>
@@ -52,6 +56,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap_ros/NodeData.h>
 #include <rtabmap_ros/OdomInfo.h>
 #include <rtabmap_ros/Info.h>
+#include <rtabmap_ros/RGBDImage.h>
+#include <rtabmap_ros/UserData.h>
 
 namespace rtabmap_ros {
 
@@ -63,6 +69,9 @@ rtabmap::Transform transformFromGeometryMsg(const geometry_msgs::Transform & msg
 
 void transformToPoseMsg(const rtabmap::Transform & transform, geometry_msgs::Pose & msg);
 rtabmap::Transform transformFromPoseMsg(const geometry_msgs::Pose & msg);
+
+void toCvCopy(const rtabmap_ros::RGBDImage & image, cv_bridge::CvImagePtr & rgb, cv_bridge::CvImagePtr & depth);
+void toCvShare(const rtabmap_ros::RGBDImageConstPtr & image, cv_bridge::CvImageConstPtr & rgb, cv_bridge::CvImageConstPtr & depth);
 
 // copy data
 void compressedMatToBytes(const cv::Mat & compressed, std::vector<unsigned char> & bytes);
@@ -137,7 +146,77 @@ void nodeInfoToROS(const rtabmap::Signature & signature, rtabmap_ros::NodeData &
 rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::OdomInfo & msg);
 void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_ros::OdomInfo & msg);
 
+cv::Mat userDataFromROS(const rtabmap_ros::UserData & dataMsg);
+void userDataToROS(const cv::Mat & data, rtabmap_ros::UserData & dataMsg, bool compress);
+
 inline double timestampFromROS(const ros::Time & stamp) {return double(stamp.sec) + double(stamp.nsec)/1000000000.0;}
+
+// common stuff
+rtabmap::Transform getTransform(
+		const std::string & fromFrameId,
+		const std::string & toFrameId,
+		const ros::Time & stamp,
+		tf::TransformListener & listener,
+		double waitForTransform);
+
+
+// get moving transform accordingly to a fixed frame. For example get
+// transform of /base_link between two stamps accordingly to /odom frame.
+rtabmap::Transform getTransform(
+		const std::string & sourceTargetFrame,
+		const std::string & fixedFrame,
+		const ros::Time & stampSource,
+		const ros::Time & stampTarget,
+		tf::TransformListener & listener,
+		double waitForTransform);
+
+bool convertRGBDMsgs(
+		const std::vector<cv_bridge::CvImageConstPtr> & imageMsgs,
+		const std::vector<cv_bridge::CvImageConstPtr> & depthMsgs,
+		const std::vector<sensor_msgs::CameraInfo> & cameraInfoMsgs,
+		const std::string & frameId,
+		const std::string & odomFrameId,
+		const ros::Time & odomStamp,
+		cv::Mat & rgb,
+		cv::Mat & depth,
+		std::vector<rtabmap::CameraModel> & cameraModels,
+		tf::TransformListener & listener,
+		double waitForTransform);
+
+bool convertStereoMsg(
+		const sensor_msgs::ImageConstPtr& leftImageMsg,
+		const sensor_msgs::ImageConstPtr& rightImageMsg,
+		const sensor_msgs::CameraInfoConstPtr& leftCamInfoMsg,
+		const sensor_msgs::CameraInfoConstPtr& rightCamInfoMsg,
+		const std::string & frameId,
+		const std::string & odomFrameId,
+		const ros::Time & odomStamp,
+		cv::Mat & left,
+		cv::Mat & right,
+		rtabmap::StereoCameraModel & stereoModel,
+		tf::TransformListener & listener,
+		double waitForTransform);
+
+bool convertScanMsg(
+		const sensor_msgs::LaserScanConstPtr& scan2dMsg,
+		const std::string & frameId,
+		const std::string & odomFrameId,
+		const ros::Time & odomStamp,
+		cv::Mat & scan,
+		rtabmap::Transform & scanLocalTransform,
+		tf::TransformListener & listener,
+		double waitForTransform);
+
+bool convertScan3dMsg(
+		const sensor_msgs::PointCloud2ConstPtr & scan3dMsg,
+		const std::string & frameId,
+		const std::string & odomFrameId,
+		const ros::Time & odomStamp,
+		int scanCloudNormalK,
+		cv::Mat & scan,
+		rtabmap::Transform & scanLocalTransform,
+		tf::TransformListener & listener,
+		double waitForTransform);
 
 }
 

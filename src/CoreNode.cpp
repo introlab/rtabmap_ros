@@ -25,12 +25,14 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "CoreWrapper.h"
+#include "ros/ros.h"
+#include <rtabmap/core/Parameters.h>
 #include <rtabmap/utilite/ULogger.h>
 #include <rtabmap/utilite/UDirectory.h>
 #include <rtabmap/utilite/UStl.h>
 #include <rtabmap/utilite/UFile.h>
 #include <rtabmap/core/Version.h>
+#include "nodelet/loader.h"
 
 int main(int argc, char** argv)
 {
@@ -41,19 +43,14 @@ int main(int argc, char** argv)
 
 	ros::init(argc, argv, "rtabmap");
 
-	bool deleteDbOnStart = false;
+	nodelet::V_string nargv;
 	for(int i=1;i<argc;++i)
 	{
-		if(strcmp(argv[i], "--delete_db_on_start") == 0)
-		{
-			deleteDbOnStart = true;
-		}
-		else if(strcmp(argv[i], "--params") == 0 || strcmp(argv[i], "--params-all") == 0)
+		if(strcmp(argv[i], "--params") == 0 || strcmp(argv[i], "--params-all") == 0)
 		{
 			rtabmap::ParametersMap parameters = rtabmap::Parameters::getDefaultParameters();
-			uInsert(parameters,
-					std::make_pair(rtabmap::Parameters::kRtabmapWorkingDirectory(),
-					UDirectory::homeDir()+"/.ros")); // change default to ~/.ros
+			uInsert(parameters, rtabmap::ParametersPair(rtabmap::Parameters::kRGBDCreateOccupancyGrid(), "true")); // default true in ROS
+			uInsert(parameters,	rtabmap::ParametersPair(rtabmap::Parameters::kRtabmapWorkingDirectory(), UDirectory::homeDir()+"/.ros")); // change default to ~/.ros
 
 			if(strcmp(argv[i], "--params") == 0)
 			{
@@ -86,16 +83,15 @@ int main(int argc, char** argv)
 					 "argument \"--params\" is detected!");
 			exit(0);
 		}
+		nargv.push_back(argv[i]);
 	}
 
-	rtabmap::ParametersMap parameters = rtabmap::Parameters::parseArguments(argc, argv);
-
-	CoreWrapper * rtabmap = new CoreWrapper(deleteDbOnStart, parameters);
-
+	nodelet::Loader nodelet;
+	nodelet::M_string remap(ros::names::getRemappings());
+	std::string nodelet_name = ros::this_node::getName();
+	nodelet.load(nodelet_name, "rtabmap_ros/rtabmap", remap, nargv);
 	ROS_INFO("rtabmap %s started...", RTABMAP_VERSION);
 	ros::spin();
-
-	delete rtabmap;
 
 	return 0;
 }

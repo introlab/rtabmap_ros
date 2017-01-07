@@ -1,8 +1,6 @@
 <launch>
 
 <!-- Use stereo_outdoorA.bag for testing -->
-<arg name="optimize_for_close_objects" default="false" />
-
 <include file="$(find rtabmap_ros)/launch/demo/demo_stereo_outdoor.launch"/>
 
 <group ns="/stereo_camera" >
@@ -23,7 +21,6 @@
 		<param name="wait_for_transform" type="bool" value="true"/>
 		<param name="min_cluster_size" type="int" value="20"/>
 		<param name="max_obstacles_height" type="double" value="0.0"/>
-		<param name="optimize_for_close_objects" type="bool" value="$(arg optimize_for_close_objects)"/>
     </node>
 </group>
 

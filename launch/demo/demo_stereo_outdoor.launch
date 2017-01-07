@@ -77,6 +77,8 @@
 
          <!-- RTAB-Map's parameters -->
          <param name="Rtabmap/TimeThr"                   type="string" value="700"/>
+         <param name="Grid/DepthDecimation"              type="string" value="4"/>
+         <param name="Grid/FlatObstacleDetected"         type="string" value="true"/>
          <param name="Kp/MaxFeatures"                    type="string" value="200"/>
          <param name="Kp/MaxDepth"                       type="string" value="10"/>
          <param name="Kp/DetectorStrategy"               type="string" value="0"/>   <!-- use SURF -->

@@ -25,7 +25,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "OdometryROS.h"
+#include "rtabmap_ros/OdometryROS.h"
 #include "pluginlib/class_list_macros.h"
 #include "nodelet/nodelet.h"
 
@@ -47,6 +47,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <rtabmap/utilite/ULogger.h>
 #include <rtabmap/utilite/UTimer.h>
+#include <rtabmap/utilite/UStl.h>
 
 using namespace rtabmap;
 
@@ -57,7 +58,7 @@ class StereoOdometry : public rtabmap_ros::OdometryROS
 {
 public:
 	StereoOdometry() :
-		rtabmap_ros::OdometryROS(true),
+		rtabmap_ros::OdometryROS(true, true, false),
 		approxSync_(0),
 		exactSync_(0),
 		queueSize_(5)
@@ -85,7 +86,6 @@ private:
 		bool approxSync = false;
 		pnh.param("approx_sync", approxSync, approxSync);
 		pnh.param("queue_size", queueSize_, queueSize_);
-		NODELET_INFO("Approximate time sync = %s", approxSync?"true":"false");
 
 		ros::NodeHandle left_nh(nh, "left");
 		ros::NodeHandle right_nh(nh, "right");
@@ -113,13 +113,25 @@ private:
 		}
 
 
-		NODELET_INFO("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s",
-				ros::this_node::getName().c_str(),
+		std::string subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s",
+				getName().c_str(),
 				approxSync?"approx":"exact",
 				imageRectLeft_.getTopic().c_str(),
 				imageRectRight_.getTopic().c_str(),
 				cameraInfoLeft_.getTopic().c_str(),
 				cameraInfoRight_.getTopic().c_str());
+		this->startWarningThread(subscribedTopicsMsg, approxSync);
+	}
+
+	virtual void updateParameters(ParametersMap & parameters)
+	{
+		//make sure we are using Reg/Strategy=0
+		ParametersMap::iterator iter = parameters.find(Parameters::kRegStrategy());
+		if(iter != parameters.end() && iter->second.compare("0") != 0)
+		{
+			ROS_WARN("Stereo odometry works only with \"Reg/Strategy\"=0. Ignoring value %s.", iter->second.c_str());
+		}
+		uInsert(parameters, ParametersPair(Parameters::kRegStrategy(), "0"));
 	}
 
 	void callback(
@@ -128,6 +140,7 @@ private:
 			const sensor_msgs::CameraInfoConstPtr& cameraInfoLeft,
 			const sensor_msgs::CameraInfoConstPtr& cameraInfoRight)
 	{
+		callbackCalled();
 		if(!this->isPaused())
 		{
 			if(!(imageRectLeft->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||

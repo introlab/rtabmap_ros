@@ -15,8 +15,8 @@
   <arg name="localization"            default="false"/>
   
   <!-- Corresponding config files -->
-  <arg name="rtabmapviz_cfg"          default="-d $(find rtabmap_ros)/launch/config/rgbd_gui.ini" />
-  <arg name="rviz_cfg"                default="-d $(find rtabmap_ros)/launch/config/rgbd.rviz" />
+  <arg name="rtabmapviz_cfg"          default="$(find rtabmap_ros)/launch/config/rgbd_gui.ini" />
+  <arg name="rviz_cfg"                default="$(find rtabmap_ros)/launch/config/rgbd.rviz" />
   
   <arg name="frame_id"                default="base_link"/>     <!-- Fixed frame id, you may set "base_link" or "base_footprint" if they are published -->
   <arg name="database_path"           default="~/.ros/rtabmap.db"/>
@@ -39,12 +39,12 @@
   
   <arg name="visual_odometry"         default="true"/>          <!-- Generate visual odometry -->
   <arg name="odom_topic"              default="/odom"/>         <!-- Odometry topic used if visual_odometry is false -->
+  <arg name="odom_frame_id"           default=""/>              <!-- If set, TF is used to get odometry instead of the topic -->
   
   <arg name="namespace"               default="rtabmap"/>
   <arg name="wait_for_transform"      default="0.2"/>
   
   <include file="$(find rtabmap_ros)/launch/rtabmap.launch">
-    <arg name="rgbd"                    value="false"/>
     <arg name="stereo"                  value="true"/>
     <arg name="rtabmapviz"              value="$(arg rtabmapviz)" /> 
     <arg name="rviz"                    value="$(arg rviz)" />
@@ -75,7 +75,8 @@
     <arg name="scan_cloud_topic"        value="$(arg scan_cloud_topic)"/>
    
     <arg name="visual_odometry"         value="$(arg visual_odometry)"/>          
-    <arg name="odom_topic"              value="$(arg odom_topic)"/>         
+    <arg name="odom_topic"              value="$(arg odom_topic)"/>       
+    <arg name="odom_frame_id"           value="$(arg odom_frame_id)"/>   
     <arg name="odom_args"               value="$(arg rtabmap_args)"/>
   </include>
 

@@ -1,5 +1,13 @@
 <library path="lib/librtabmap_ros"> 
 
+  <class name="rtabmap_ros/rtabmap" 
+         type="rtabmap_ros::CoreWrapper" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
+
   <class name="rtabmap_ros/rgbd_odometry" 
          type="rtabmap_ros::RGBDOdometry" 
          base_class_type="nodelet::Nodelet">
@@ -10,6 +18,22 @@
   
   <class name="rtabmap_ros/stereo_odometry" 
          type="rtabmap_ros::StereoOdometry" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
+  
+  <class name="rtabmap_ros/rgbdicp_odometry" 
+         type="rtabmap_ros::RGBDICPOdometry" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
+  
+  <class name="rtabmap_ros/icp_odometry" 
+         type="rtabmap_ros::ICPOdometry" 
          base_class_type="nodelet::Nodelet">
     <description>
       This is my nodelet.
@@ -71,6 +95,14 @@
       This is my nodelet.
     </description>
   </class>
+  
+  <class name="rtabmap_ros/obstacles_detection_old" 
+         type="rtabmap_ros::ObstaclesDetectionOld" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
 
   <class name="rtabmap_ros/point_cloud_aggregator" 
          type="rtabmap_ros::PointCloudAggregator" 
@@ -79,5 +111,22 @@
       This is my nodelet.
     </description>
   </class>
+  
+  <class name="rtabmap_ros/rgbd_sync" 
+         type="rtabmap_ros::RGBDSync" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
+  
+  <class name="rtabmap_ros/undistort_depth" 
+         type="rtabmap_ros::UndistortDepth" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
 
 </library>
+

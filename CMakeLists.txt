@@ -18,7 +18,7 @@ find_package(rviz)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
-find_package(RTABMap 0.11.8 REQUIRED)
+find_package(RTABMap 0.11.13 REQUIRED)
 
 find_package(OpenCV REQUIRED)
 
@@ -72,6 +72,8 @@ add_message_files(
    Point2f.msg
    Point3f.msg
    Goal.msg
+   RGBDImage.msg
+   UserData.msg
 )
 
 ## Generate services in the 'srv' folder
@@ -151,6 +153,8 @@ SET(Libraries
 SET(rtabmap_ros_lib_src
    src/nodelets/rgbd_odometry.cpp
    src/nodelets/stereo_odometry.cpp
+   src/nodelets/rgbdicp_odometry.cpp
+   src/nodelets/icp_odometry.cpp
    src/nodelets/data_throttle.cpp
    src/nodelets/stereo_throttle.cpp
    src/nodelets/data_odom_sync.cpp
@@ -158,10 +162,19 @@ SET(rtabmap_ros_lib_src
    src/nodelets/point_cloud_xyz.cpp
    src/nodelets/disparity_to_depth.cpp 
    src/nodelets/obstacles_detection.cpp
+   src/nodelets/obstacles_detection_old.cpp
    src/nodelets/point_cloud_aggregator.cpp
-   src/nodelets/OdometryROS.cpp
+   src/nodelets/undistort_depth.cpp
+   src/nodelets/rgbd_sync.cpp
+   src/OdometryROS.cpp
    src/MsgConversion.cpp
    src/MapsManager.cpp
+   src/CommonDataSubscriber.cpp
+   src/CoreWrapper.cpp
+   src/impl/CommonDataSubscriberDepth.cpp
+   src/impl/CommonDataSubscriberStereo.cpp
+   src/impl/CommonDataSubscriberRGBD.cpp
+   src/impl/CommonDataSubscriberRGBD2.cpp
 )   
 
 # If costmap_2d is found, add the plugin
@@ -259,14 +272,20 @@ IF(Qt5_FOUND)
 ENDIF(Qt5_FOUND)
 add_dependencies(rtabmap_ros ${${PROJECT_NAME}_EXPORTED_TARGETS})
 
-add_executable(rtabmap src/CoreNode.cpp src/CoreWrapper.cpp)
-target_link_libraries(rtabmap rtabmap_ros ${Libraries})
+add_executable(rtabmap src/CoreNode.cpp)
+target_link_libraries(rtabmap ${Libraries})
 
 add_executable(rgbd_odometry src/RGBDOdometryNode.cpp)
 target_link_libraries(rgbd_odometry ${Libraries})
 
 add_executable(stereo_odometry src/StereoOdometryNode.cpp)
 target_link_libraries(stereo_odometry ${Libraries})
+
+add_executable(rgbdicp_odometry src/RGBDICPOdometryNode.cpp)
+target_link_libraries(rgbdicp_odometry ${Libraries})
+
+add_executable(icp_odometry src/ICPOdometryNode.cpp)
+target_link_libraries(icp_odometry ${Libraries})
 
 add_executable(map_optimizer src/MapOptimizerNode.cpp)
 target_link_libraries(map_optimizer rtabmap_ros ${Libraries})
@@ -318,6 +337,7 @@ install(TARGETS
    rtabmap 
    rtabmapviz 
    rgbd_odometry 
+   rgbdicp_odometry 
    stereo_odometry
    map_assembler
    map_optimizer
@@ -332,6 +352,7 @@ install(TARGETS
    rtabmap_ros 
    rtabmap 
    rgbd_odometry 
+   rgbdicp_odometry 
    stereo_odometry
    map_assembler
    map_optimizer
@@ -392,3 +413,4 @@ ENDIF(costmap_2d_FOUND)
 
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
+

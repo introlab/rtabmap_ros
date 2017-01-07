@@ -28,7 +28,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <ros/ros.h>
 #include "rtabmap_ros/MapData.h"
 #include "rtabmap_ros/MsgConversion.h"
-#include "MapsManager.h"
+#include "rtabmap_ros/MapsManager.h"
 #include <rtabmap/core/util3d_transforms.h>
 #include <rtabmap/core/util3d.h>
 #include <rtabmap/core/util3d_filtering.h>
@@ -49,12 +49,13 @@ class MapAssembler
 {
 
 public:
-	MapAssembler() :
-		mapsManager_(false)
+	MapAssembler()
 	{
 		ros::NodeHandle pnh("~");
-
 		ros::NodeHandle nh;
+
+		mapsManager_.init(nh, pnh, ros::this_node::getName(), false);
+
 		mapDataTopic_ = nh.subscribe("mapData", 1, &MapAssembler::mapDataReceivedCallback, this);
 
 		// private service
@@ -97,9 +98,6 @@ public:
 		poses = mapsManager_.updateMapCaches(
 				poses,
 				0,
-				false,
-				false,
-				false,
 				false,
 				false,
 				nodes_);

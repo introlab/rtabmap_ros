@@ -180,7 +180,7 @@ Visualization Manager:
       Draw Behind: false
       Enabled: true
       Name: Map
-      Topic: /rtabmap/proj_map
+      Topic: /rtabmap/grid_map
       Value: true
     - Class: rtabmap_ros/Info
       Enabled: true

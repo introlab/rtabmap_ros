@@ -25,7 +25,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "OdometryROS.h"
+#include "rtabmap_ros/OdometryROS.h"
 
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/image_encodings.h>
@@ -39,6 +39,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/Rtabmap.h>
 #include <rtabmap/core/OdometryF2M.h>
 #include <rtabmap/core/OdometryF2F.h>
+#include <rtabmap/core/util3d.h>
 #include <rtabmap/core/util3d_transforms.h>
 #include <rtabmap/core/Memory.h>
 #include <rtabmap/core/Signature.h>
@@ -55,11 +56,14 @@ using namespace rtabmap;
 
 namespace rtabmap_ros {
 
-OdometryROS::OdometryROS(bool stereo) :
+OdometryROS::OdometryROS(bool stereoParams, bool visParams, bool icpParams) :
 	odometry_(0),
+	warningThread_(0),
+	callbackCalled_(false),
 	frameId_("base_link"),
 	odomFrameId_("odom"),
 	groundTruthFrameId_(""),
+	guessFrameId_(""),
 	publishTf_(true),
 	waitForTransform_(true),
 	waitForTransformDuration_(0.1), // 100 ms
@@ -68,13 +72,21 @@ OdometryROS::OdometryROS(bool stereo) :
 	paused_(false),
 	resetCountdown_(0),
 	resetCurrentCount_(0),
-	stereo_(stereo)
+	stereoParams_(stereoParams),
+	visParams_(visParams),
+	icpParams_(icpParams)
 {
 
 }
 
 OdometryROS::~OdometryROS()
 {
+	if(warningThread_)
+	{
+		callbackCalled();
+		warningThread_->join();
+		delete warningThread_;
+	}
 	ros::NodeHandle & pnh = getPrivateNodeHandle();
 	if(pnh.ok())
 	{
@@ -95,6 +107,7 @@ void OdometryROS::onInit()
 	odomPub_ = nh.advertise<nav_msgs::Odometry>("odom", 1);
 	odomInfoPub_ = nh.advertise<rtabmap_ros::OdomInfo>("odom_info", 1);
 	odomLocalMap_ = nh.advertise<sensor_msgs::PointCloud2>("odom_local_map", 1);
+	odomLocalScanMap_ = nh.advertise<sensor_msgs::PointCloud2>("odom_local_scan_map", 1);
 	odomLastFrame_ = nh.advertise<sensor_msgs::PointCloud2>("odom_last_frame", 1);
 
 	Transform initialPose = Transform::getIdentity();
@@ -112,10 +125,13 @@ void OdometryROS::onInit()
 	pnh.param("config_path", configPath, configPath);
 	pnh.param("publish_null_when_lost", publishNullWhenLost_, publishNullWhenLost_);
 	pnh.param("guess_from_tf", guessFromTf_, guessFromTf_);
+	pnh.param("guess_frame_id", guessFrameId_, frameId_);
 
-	if(publishTf_ && guessFromTf_)
+	if(publishTf_ && guessFromTf_ && guessFrameId_.compare(frameId_) == 0)
 	{
-		NODELET_WARN( "\"publish_tf\" and \"guess_from_tf\" cannot be used at the same time. \"guess_from_tf\" is disabled.");
+		NODELET_WARN( "\"publish_tf\" and \"guess_from_tf\" cannot be used "
+				"at the same time if \"guess_frame_id\" and \"frame_id\" "
+				"are the same frame (value=\"%s\"). \"guess_from_tf\" is disabled.", frameId_.c_str());
 		guessFromTf_ = false;
 	}
 
@@ -159,7 +175,7 @@ void OdometryROS::onInit()
 
 
 	//parameters
-	parameters_ = Parameters::getDefaultOdometryParameters(stereo_);
+	parameters_ = Parameters::getDefaultOdometryParameters(stereoParams_, visParams_, icpParams_);
 	if(!configPath.empty())
 	{
 		if(UFile::exists(configPath.c_str()))
@@ -267,6 +283,9 @@ void OdometryROS::onInit()
 
 	Parameters::parse(parameters_, Parameters::kOdomResetCountdown(), resetCountdown_);
 	parameters_.at(Parameters::kOdomResetCountdown()) = "0"; // use modified reset countdown here
+
+	this->updateParameters(parameters_);
+
 	odometry_ = Odometry::create(parameters_);
 	if(!initialPose.isIdentity())
 	{
@@ -286,6 +305,31 @@ void OdometryROS::onInit()
 	onOdomInit();
 }
 
+void OdometryROS::startWarningThread(const std::string & subscribedTopicsMsg, bool approxSync)
+{
+	warningThread_ = new boost::thread(boost::bind(&OdometryROS::warningLoop, this, subscribedTopicsMsg, approxSync));
+	NODELET_INFO("%s", subscribedTopicsMsg.c_str());
+}
+
+void OdometryROS::warningLoop(const std::string & subscribedTopicsMsg, bool approxSync)
+{
+	ros::Duration r(5.0);
+	while(!callbackCalled_)
+	{
+		r.sleep();
+		if(!callbackCalled_)
+		{
+			ROS_WARN("%s: Did not receive data since 5 seconds! Make sure the input topics are "
+					"published (\"$ rostopic hz my_topic\") and the timestamps in their "
+					"header are set. %s%s",
+					getName().c_str(),
+					approxSync?"":"Parameter \"approx_sync\" is false, which means that input "
+						"topics should have all the exact timestamp for the callback to be called.",
+					subscribedTopicsMsg.c_str());
+		}
+	}
+}
+
 Transform OdometryROS::getTransform(const std::string & fromFrameId, const std::string & toFrameId, const ros::Time & stamp) const
 {
 	// TF ready?
@@ -295,10 +339,11 @@ Transform OdometryROS::getTransform(const std::string & fromFrameId, const std::
 		if(waitForTransform_ && !stamp.isZero() && waitForTransformDuration_ > 0.0)
 		{
 			//if(!tfBuffer_.canTransform(fromFrameId, toFrameId, stamp, ros::Duration(1)))
-			if(!tfListener_.waitForTransform(fromFrameId, toFrameId, stamp, ros::Duration(waitForTransformDuration_)))
+			std::string errorMsg;
+			if(!tfListener_.waitForTransform(fromFrameId, toFrameId, stamp, ros::Duration(waitForTransformDuration_), ros::Duration(0.01), &errorMsg))
 			{
-				NODELET_WARN( "odometry: Could not get transform from %s to %s (stamp=%f) after %f seconds (\"wait_for_transform_duration\"=%f)!",
-						fromFrameId.c_str(), toFrameId.c_str(), stamp.toSec(), waitForTransformDuration_, waitForTransformDuration_);
+				NODELET_WARN( "odometry: Could not get transform from %s to %s (stamp=%f) after %f seconds (\"wait_for_transform_duration\"=%f)! Error=\"%s\"",
+						fromFrameId.c_str(), toFrameId.c_str(), stamp.toSec(), waitForTransformDuration_, waitForTransformDuration_, errorMsg.c_str());
 				return transform;
 			}
 		}
@@ -336,8 +381,8 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 	Transform guess;
 	if(guessFromTf_)
 	{
-		Transform previousPose = this->getTransform(odomFrameId_, frameId_, ros::Time(odometry_->previousStamp()));
-		Transform pose = this->getTransform(odomFrameId_, frameId_, stamp);
+		Transform previousPose = this->getTransform(odomFrameId_, guessFrameId_, ros::Time(odometry_->previousStamp()));
+		Transform pose = this->getTransform(odomFrameId_, guessFrameId_, stamp);
 		if(!previousPose.isNull() && !pose.isNull())
 		{
 			guess = previousPose.inverse() * pose;
@@ -351,6 +396,11 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 				NODELET_WARN( "P  Guess %s", motionGuess.prettyPrint().c_str());
 			}
 			NODELET_WARN( "TF Guess %s", guess.prettyPrint().c_str());*/
+		}
+		else
+		{
+			ROS_ERROR("\"guess_from_tf\" is true, but guess cannot be computed between frames \"%s\" -> \"%s\". Aborting odometry update...", odomFrameId_.c_str(), guessFrameId_.c_str());
+			return;
 		}
 	}
 
@@ -393,12 +443,12 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 
 			//set covariance
 			// libviso2 uses approximately vel variance * 2
-			odom.pose.covariance.at(0) = info.variance*2;  // xx
-			odom.pose.covariance.at(7) = info.variance*2;  // yy
-			odom.pose.covariance.at(14) = info.variance*2; // zz
-			odom.pose.covariance.at(21) = info.variance*2; // rr
-			odom.pose.covariance.at(28) = info.variance*2; // pp
-			odom.pose.covariance.at(35) = info.variance*2; // yawyaw
+			odom.pose.covariance.at(0) = info.varianceLin*2;  // xx
+			odom.pose.covariance.at(7) = info.varianceLin*2;  // yy
+			odom.pose.covariance.at(14) = info.varianceLin*2; // zz
+			odom.pose.covariance.at(21) = info.varianceAng*2; // rr
+			odom.pose.covariance.at(28) = info.varianceAng*2; // pp
+			odom.pose.covariance.at(35) = info.varianceAng*2; // yawyaw
 
 			//set velocity
 			bool setTwist = !odometry_->previousVelocityTransform().isNull();
@@ -414,19 +464,19 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 				odom.twist.twist.angular.z = yaw;
 			}
 
-			odom.twist.covariance.at(0) = setTwist?info.variance:BAD_COVARIANCE;  // xx
-			odom.twist.covariance.at(7) = setTwist?info.variance:BAD_COVARIANCE;  // yy
-			odom.twist.covariance.at(14) = setTwist?info.variance:BAD_COVARIANCE; // zz
-			odom.twist.covariance.at(21) = setTwist?info.variance:BAD_COVARIANCE; // rr
-			odom.twist.covariance.at(28) = setTwist?info.variance:BAD_COVARIANCE; // pp
-			odom.twist.covariance.at(35) = setTwist?info.variance:BAD_COVARIANCE; // yawyaw
+			odom.twist.covariance.at(0) = setTwist?info.varianceLin:BAD_COVARIANCE;  // xx
+			odom.twist.covariance.at(7) = setTwist?info.varianceLin:BAD_COVARIANCE;  // yy
+			odom.twist.covariance.at(14) = setTwist?info.varianceLin:BAD_COVARIANCE; // zz
+			odom.twist.covariance.at(21) = setTwist?info.varianceAng:BAD_COVARIANCE; // rr
+			odom.twist.covariance.at(28) = setTwist?info.varianceAng:BAD_COVARIANCE; // pp
+			odom.twist.covariance.at(35) = setTwist?info.varianceAng:BAD_COVARIANCE; // yawyaw
 
 			//publish the message
 			odomPub_.publish(odom);
 		}
 
 		// local map / reference frame
-		if(odomLocalMap_.getNumSubscribers() && dynamic_cast<OdometryF2M*>(odometry_))
+		if(odomLocalMap_.getNumSubscribers() && odometry_->getType() == Odometry::kTypeF2M)
 		{
 			pcl::PointCloud<pcl::PointXYZ> cloud;
 			const std::multimap<int, cv::Point3f> & map = ((OdometryF2M*)odometry_)->getMap().getWords3();
@@ -443,7 +493,8 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 
 		if(odomLastFrame_.getNumSubscribers())
 		{
-			if(dynamic_cast<OdometryF2M*>(odometry_))
+			// check which type of Odometry is using
+			if(odometry_->getType() == Odometry::kTypeF2M) // If it's Frame to Map Odometry
 			{
 				const std::multimap<int, cv::Point3f> & words3  = ((OdometryF2M*)odometry_)->getLastFrame().getWords3();
 				if(words3.size())
@@ -463,10 +514,10 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 					odomLastFrame_.publish(cloudMsg);
 				}
 			}
-			else
+			else if(odometry_->getType() == Odometry::kTypeF2F) // if Using Frame to Frame Odometry
 			{
-				//Frame to Frame
 				const Signature & refFrame = ((OdometryF2F*)odometry_)->getRefFrame();
+
 				if(refFrame.getWords3().size())
 				{
 					pcl::PointCloud<pcl::PointXYZ> cloud;
@@ -482,7 +533,28 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 					cloudMsg.header.frame_id = odomFrameId_;
 					odomLastFrame_.publish(cloudMsg);
 				}
+			}else{
+				NODELET_ERROR("ERROR, Wrong Type of Odometry, Shouldn't happen");
 			}
+		}
+
+		if(odomLocalScanMap_.getNumSubscribers() && !info.localScanMap.empty())
+		{
+			sensor_msgs::PointCloud2 cloudMsg;
+			if(info.localScanMap.channels() == 6)
+			{
+				pcl::PointCloud<pcl::PointNormal>::Ptr cloud = util3d::laserScanToPointCloudNormal(info.localScanMap);
+				pcl::toROSMsg(*cloud, cloudMsg);
+			}
+			else
+			{
+				pcl::PointCloud<pcl::PointXYZ>::Ptr cloud = util3d::laserScanToPointCloud(info.localScanMap);
+				pcl::toROSMsg(*cloud, cloudMsg);
+			}
+
+			cloudMsg.header.stamp = stamp; // use corresponding time stamp to image
+			cloudMsg.header.frame_id = odomFrameId_;
+			odomLocalScanMap_.publish(cloudMsg);
 		}
 	}
 	else if(publishNullWhenLost_)
@@ -544,12 +616,22 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 		odomInfoPub_.publish(infoMsg);
 	}
 
-	NODELET_INFO( "Odom: quality=%d, std dev=%fm, update time=%fs", info.inliers, pose.isNull()?0.0f:std::sqrt(info.variance), (ros::WallTime::now()-time).toSec());
-}
+	if(visParams_)
+	{
+		if(icpParams_)
+		{
+			NODELET_INFO( "Odom: quality=%d, ratio=%f, std dev=%fm|%frad, update time=%fs", info.inliers, info.icpInliersRatio, pose.isNull()?0.0f:std::sqrt(info.varianceLin), pose.isNull()?0.0f:std::sqrt(info.varianceAng), (ros::WallTime::now()-time).toSec());
+		}
+		else
+		{
+			NODELET_INFO( "Odom: quality=%d, std dev=%fm|%frad, update time=%fs", info.inliers, pose.isNull()?0.0f:std::sqrt(info.varianceLin), pose.isNull()?0.0f:std::sqrt(info.varianceAng), (ros::WallTime::now()-time).toSec());
+		}
+	}
+	else
+	{
+		NODELET_INFO( "Odom: ratio=%f, std dev=%fm|%frad, update time=%fs", info.icpInliersRatio, pose.isNull()?0.0f:std::sqrt(info.varianceLin), pose.isNull()?0.0f:std::sqrt(info.varianceAng), (ros::WallTime::now()-time).toSec());
+	}
 
-bool OdometryROS::isOdometryF2M() const
-{
-	return dynamic_cast<OdometryF2M*>(odometry_) != 0;
 }
 
 bool OdometryROS::reset(std_srvs::Empty::Request&, std_srvs::Empty::Response&)

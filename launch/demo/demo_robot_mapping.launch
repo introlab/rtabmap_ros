@@ -33,19 +33,18 @@
   	  <remap from="depth/image"     to="/data_throttled_image_depth"/>
   	  <remap from="rgb/camera_info" to="/data_throttled_camera_info"/>
   	
-      <param name="rgb/image_transport"   type="string" value="compressed"/>
-      <param name="depth/image_transport" type="string" value="compressedDepth"/>
+	  <param name="rgb/image_transport"   type="string" value="compressed"/>
+	  <param name="depth/image_transport" type="string" value="compressedDepth"/>
 	
 	  <!-- RTAB-Map's parameters: do "rosrun rtabmap rtabmap (double-dash)params" to see the list of available parameters. -->
 	  <param name="RGBD/NeighborLinkRefining" type="string" value="true"/>  <!-- Do odometry correction with consecutive laser scans -->
 	  <param name="RGBD/ProximityBySpace"     type="string" value="true"/>  <!-- Local loop closure detection (using estimated position) with locations in WM -->
 	  <param name="RGBD/ProximityByTime"      type="string" value="false"/> <!-- Local loop closure detection with locations in STM -->
-	  <param name="RGBD/OptimizeFromGraphEnd" type="string" value="true"/>
 	  <param name="Reg/Strategy"              type="string" value="1"/>     <!-- 0=Visual, 1=ICP, 2=Visual+ICP -->
 	  <param name="Vis/InlierDistance"        type="string" value="0.1"/>   <!-- 3D visual words correspondence distance -->
 	  <param name="RGBD/OptimizeFromGraphEnd" type="string" value="false"/> <!-- Optimize graph from initial node so /map -> /odom transform will be generated -->
-	  <param name="Optimizer/Slam2D"          type="string" value="true"/>
 	  <param name="Reg/Force3DoF"             type="string" value="true"/>
+	  <param name="Grid/FromDepth"            type="string" value="false"/>
 	  
 	  <!-- localization mode -->
 	  <param     if="$(arg localization)" name="Mem/IncrementalMemory" type="string" value="false"/>

@@ -25,7 +25,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "OdometryROS.h"
+#include <rtabmap_ros/OdometryROS.h>
 
 #include <pluginlib/class_list_macros.h>
 #include <nodelet/nodelet.h>
@@ -49,6 +49,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/util2d.h>
 #include <rtabmap/utilite/ULogger.h>
 #include <rtabmap/utilite/UConversion.h>
+#include <rtabmap/utilite/UStl.h>
 
 using namespace rtabmap;
 
@@ -59,16 +60,18 @@ class RGBDOdometry : public rtabmap_ros::OdometryROS
 {
 public:
 	RGBDOdometry() :
-		OdometryROS(false),
+		OdometryROS(false, true, false),
 		approxSync_(0),
 		exactSync_(0),
-		sync2_(0),
+		approxSync2_(0),
+		exactSync2_(0),
 		queueSize_(5)
 	{
 	}
 
 	virtual ~RGBDOdometry()
 	{
+		rgbdSub_.shutdown();
 		if(approxSync_)
 		{
 			delete approxSync_;
@@ -77,9 +80,13 @@ public:
 		{
 			delete exactSync_;
 		}
-		if(sync2_)
+		if(approxSync2_)
 		{
-			delete sync2_;
+			delete approxSync2_;
+		}
+		if(exactSync2_)
+		{
+			delete exactSync2_;
 		}
 	}
 
@@ -90,66 +97,65 @@ private:
 		ros::NodeHandle & nh = getNodeHandle();
 		ros::NodeHandle & pnh = getPrivateNodeHandle();
 
-		int depthCameras = 1;
+		int rgbdCameras = 1;
 		bool approxSync = true;
+		bool subscribeRGBD = false;
 		pnh.param("approx_sync", approxSync, approxSync);
 		pnh.param("queue_size", queueSize_, queueSize_);
-		pnh.param("depth_cameras", depthCameras, depthCameras);
-		if(depthCameras <= 0)
+		pnh.param("subscribe_rgbd", subscribeRGBD, subscribeRGBD);
+		if(pnh.hasParam("depth_cameras"))
 		{
-			depthCameras = 1;
+			ROS_ERROR("\"depth_cameras\" parameter doesn't exist anymore. It is replaced by \"rgbd_cameras\" with the \"rgbd_image\" input topics. \"subscribe_rgbd\" should be also set to true.");
 		}
-		if(depthCameras > 2)
+		pnh.param("rgbd_cameras", rgbdCameras, rgbdCameras);
+		if(rgbdCameras <= 0)
+		{
+			rgbdCameras = 1;
+		}
+		if(rgbdCameras > 2)
 		{
 			NODELET_FATAL("Only 2 cameras maximum supported yet.");
 		}
 
-		if(depthCameras == 2)
+		std::string subscribedTopicsMsg;
+		if(subscribeRGBD)
 		{
-			ros::NodeHandle rgb0_nh(nh, "rgb0");
-			ros::NodeHandle depth0_nh(nh, "depth0");
-			ros::NodeHandle rgb0_pnh(pnh, "rgb0");
-			ros::NodeHandle depth0_pnh(pnh, "depth0");
-			image_transport::ImageTransport rgb0_it(rgb0_nh);
-			image_transport::ImageTransport depth0_it(depth0_nh);
-			image_transport::TransportHints hintsRgb0("raw", ros::TransportHints(), rgb0_pnh);
-			image_transport::TransportHints hintsDepth0("raw", ros::TransportHints(), depth0_pnh);
+			if(rgbdCameras == 2)
+			{
+				rgbd_image1_sub_.subscribe(nh, "rgbd_image0", 1);
+				rgbd_image2_sub_.subscribe(nh, "rgbd_image1", 1);
 
-			image_mono_sub_.subscribe(rgb0_it, rgb0_nh.resolveName("image"), 1, hintsRgb0);
-			image_depth_sub_.subscribe(depth0_it, depth0_nh.resolveName("image"), 1, hintsDepth0);
-			info_sub_.subscribe(rgb0_nh, "camera_info", 1);
+				if(approxSync)
+				{
+					approxSync2_ = new message_filters::Synchronizer<MyApproxSync2Policy>(
+							MyApproxSync2Policy(queueSize_),
+							rgbd_image1_sub_,
+							rgbd_image2_sub_);
+					approxSync2_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD2, this, _1, _2));
+				}
+				else
+				{
+					exactSync2_ = new message_filters::Synchronizer<MyExactSync2Policy>(
+							MyExactSync2Policy(queueSize_),
+							rgbd_image1_sub_,
+							rgbd_image2_sub_);
+					exactSync2_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD2, this, _1, _2));
+				}
+				subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s",
+						getName().c_str(),
+						approxSync?"approx":"exact",
+						rgbd_image1_sub_.getTopic().c_str(),
+						rgbd_image2_sub_.getTopic().c_str());
+			}
+			else
+			{
+				rgbdSub_ = nh.subscribe("rgbd_image", queueSize_, &RGBDOdometry::callbackRGBD, this);
 
-			ros::NodeHandle rgb1_nh(nh, "rgb1");
-			ros::NodeHandle depth1_nh(nh, "depth1");
-			ros::NodeHandle rgb1_pnh(pnh, "rgb1");
-			ros::NodeHandle depth1_pnh(pnh, "depth1");
-			image_transport::ImageTransport rgb1_it(rgb1_nh);
-			image_transport::ImageTransport depth1_it(depth1_nh);
-			image_transport::TransportHints hintsRgb1("raw", ros::TransportHints(), rgb1_pnh);
-			image_transport::TransportHints hintsDepth1("raw", ros::TransportHints(), depth1_pnh);
-
-			image_mono2_sub_.subscribe(rgb1_it, rgb1_nh.resolveName("image"), 1, hintsRgb1);
-			image_depth2_sub_.subscribe(depth1_it, depth1_nh.resolveName("image"), 1, hintsDepth1);
-			info2_sub_.subscribe(rgb1_nh, "camera_info", 1);
-
-			NODELET_INFO("\n%s subscribed to:\n   %s,\n   %s,\n   %s,\n   %s,\n   %s,\n   %s",
-					ros::this_node::getName().c_str(),
-					image_mono_sub_.getTopic().c_str(),
-					image_depth_sub_.getTopic().c_str(),
-					info_sub_.getTopic().c_str(),
-					image_mono2_sub_.getTopic().c_str(),
-					image_depth2_sub_.getTopic().c_str(),
-					info2_sub_.getTopic().c_str());
-
-			sync2_ = new message_filters::Synchronizer<MySync2Policy>(
-					MySync2Policy(queueSize_),
-					image_mono_sub_,
-					image_depth_sub_,
-					info_sub_,
-					image_mono2_sub_,
-					image_depth2_sub_,
-					info2_sub_);
-			sync2_->registerCallback(boost::bind(&RGBDOdometry::callback2, this, _1, _2, _3, _4, _5, _6));
+				subscribedTopicsMsg =
+						uFormat("\n%s subscribed to:\n   %s",
+						getName().c_str(),
+						rgbdSub_.getTopic().c_str());
+			}
 		}
 		else
 		{
@@ -177,13 +183,136 @@ private:
 				exactSync_->registerCallback(boost::bind(&RGBDOdometry::callback, this, _1, _2, _3));
 			}
 
-			NODELET_INFO("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s",
-					ros::this_node::getName().c_str(),
+			subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s",
+					getName().c_str(),
 					approxSync?"approx":"exact",
 					image_mono_sub_.getTopic().c_str(),
 					image_depth_sub_.getTopic().c_str(),
 					info_sub_.getTopic().c_str());
 		}
+		this->startWarningThread(subscribedTopicsMsg, approxSync);
+	}
+
+	virtual void updateParameters(ParametersMap & parameters)
+	{
+		//make sure we are using Reg/Strategy=0
+		ParametersMap::iterator iter = parameters.find(Parameters::kRegStrategy());
+		if(iter != parameters.end() && iter->second.compare("0") != 0)
+		{
+			ROS_WARN("RGBD odometry works only with \"Reg/Strategy\"=0. Ignoring value %s.", iter->second.c_str());
+		}
+		uInsert(parameters, ParametersPair(Parameters::kRegStrategy(), "0"));
+	}
+
+	void commonCallback(
+				const std::vector<cv_bridge::CvImageConstPtr> & rgbImages,
+				const std::vector<cv_bridge::CvImageConstPtr> & depthImages,
+				const std::vector<sensor_msgs::CameraInfo>& cameraInfos)
+	{
+		ROS_ASSERT(rgbImages.size() > 0 && rgbImages.size() == depthImages.size() && rgbImages.size() == cameraInfos.size());
+		ros::Time higherStamp;
+		int imageWidth = rgbImages[0]->image.cols;
+		int imageHeight = rgbImages[0]->image.rows;
+		int cameraCount = rgbImages.size();
+		cv::Mat rgb;
+		cv::Mat depth;
+		pcl::PointCloud<pcl::PointXYZ> scanCloud;
+		std::vector<CameraModel> cameraModels;
+		for(unsigned int i=0; i<rgbImages.size(); ++i)
+		{
+			if(!(rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) ==0 ||
+				 rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
+				 rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||
+				 rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
+				 rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0) ||
+				!(depthImages[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1) == 0 ||
+				 depthImages[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1) == 0 ||
+				 depthImages[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0))
+			{
+				NODELET_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8 and image_depth=32FC1,16UC1,mono16");
+				return;
+			}
+			UASSERT_MSG(rgbImages[i]->image.cols == imageWidth && rgbImages[i]->image.rows == imageHeight,
+					uFormat("imageWidth=%d vs %d imageHeight=%d vs %d",
+							imageWidth,
+							rgbImages[i]->image.cols,
+							imageHeight,
+							rgbImages[i]->image.rows).c_str());
+			UASSERT_MSG(depthImages[i]->image.cols == imageWidth && depthImages[i]->image.rows == imageHeight,
+					uFormat("imageWidth=%d vs %d imageHeight=%d vs %d",
+							imageWidth,
+							depthImages[i]->image.cols,
+							imageHeight,
+							depthImages[i]->image.rows).c_str());
+
+			ros::Time stamp = rgbImages[i]->header.stamp>depthImages[i]->header.stamp?rgbImages[i]->header.stamp:depthImages[i]->header.stamp;
+
+			if(i == 0)
+			{
+				higherStamp = stamp;
+			}
+			else if(stamp > higherStamp)
+			{
+				higherStamp = stamp;
+			}
+
+			Transform localTransform = getTransform(this->frameId(), rgbImages[i]->header.frame_id, stamp);
+			if(localTransform.isNull())
+			{
+				return;
+			}
+
+			cv_bridge::CvImageConstPtr ptrImage = rgbImages[i];
+			if(rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) !=0 &&
+			   rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) != 0)
+			{
+				ptrImage = cv_bridge::cvtColor(rgbImages[i], "mono8");
+			}
+
+			cv_bridge::CvImageConstPtr ptrDepth = depthImages[i];
+			cv::Mat subDepth = ptrDepth->image;
+
+			// initialize
+			if(rgb.empty())
+			{
+				rgb = cv::Mat(imageHeight, imageWidth*cameraCount, ptrImage->image.type());
+			}
+			if(depth.empty())
+			{
+				depth = cv::Mat(imageHeight, imageWidth*cameraCount, subDepth.type());
+			}
+
+			if(ptrImage->image.type() == rgb.type())
+			{
+				ptrImage->image.copyTo(cv::Mat(rgb, cv::Rect(i*imageWidth, 0, imageWidth, imageHeight)));
+			}
+			else
+			{
+				NODELET_ERROR("Some RGB images are not the same type!");
+				return;
+			}
+
+			if(subDepth.type() == depth.type())
+			{
+				subDepth.copyTo(cv::Mat(depth, cv::Rect(i*imageWidth, 0, imageWidth, imageHeight)));
+			}
+			else
+			{
+				NODELET_ERROR("Some Depth images are not the same type!");
+				return;
+			}
+
+			cameraModels.push_back(rtabmap_ros::cameraModelFromROS(cameraInfos[i], localTransform));
+		}
+
+		rtabmap::SensorData data(
+				rgb,
+				depth,
+				cameraModels,
+				0,
+				rtabmap_ros::timestampFromROS(higherStamp));
+
+		this->processData(data, higherStamp);
 	}
 
 	void callback(
@@ -191,179 +320,52 @@ private:
 			const sensor_msgs::ImageConstPtr& depth,
 			const sensor_msgs::CameraInfoConstPtr& cameraInfo)
 	{
+		callbackCalled();
 		if(!this->isPaused())
 		{
-			if(!(image->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) ==0 ||
-				 image->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
-				 image->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||
-				 image->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
-				 image->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0) ||
-			   !(depth->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1)==0 ||
-				 depth->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1)==0 ||
-				 depth->encoding.compare(sensor_msgs::image_encodings::MONO16)==0))
-			{
-				NODELET_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8 (mono8 "
-						  "recommended) and image_depth=16UC1,32FC1,mono16. Types detected: %s %s",
-						image->encoding.c_str(), depth->encoding.c_str());
-				return;
-			}
+			std::vector<cv_bridge::CvImageConstPtr> imageMsgs(1);
+			std::vector<cv_bridge::CvImageConstPtr> depthMsgs(1);
+			std::vector<sensor_msgs::CameraInfo> infoMsgs;
+			imageMsgs[0] = cv_bridge::toCvShare(image);
+			depthMsgs[0] = cv_bridge::toCvShare(depth);
+			infoMsgs.push_back(*cameraInfo);
 
-			ros::Time stamp = image->header.stamp>depth->header.stamp?image->header.stamp:depth->header.stamp;
-
-			Transform localTransform = getTransform(this->frameId(), image->header.frame_id, stamp);
-			if(localTransform.isNull())
-			{
-				return;
-			}
-
-			if(image->data.size() && depth->data.size() && cameraInfo->K[4] != 0)
-			{
-				rtabmap::CameraModel rtabmapModel = rtabmap_ros::cameraModelFromROS(*cameraInfo, localTransform);
-				cv_bridge::CvImagePtr ptrImage = cv_bridge::toCvCopy(image, image->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0?"":"mono8");
-				cv_bridge::CvImagePtr ptrDepth = cv_bridge::toCvCopy(depth);
-
-				rtabmap::SensorData data(
-						ptrImage->image,
-						ptrDepth->image,
-						rtabmapModel,
-						0,
-						rtabmap_ros::timestampFromROS(stamp));
-
-				this->processData(data, stamp);
-			}
+			this->commonCallback(imageMsgs, depthMsgs, infoMsgs);
 		}
 	}
 
-	void callback2(
-			const sensor_msgs::ImageConstPtr& image,
-			const sensor_msgs::ImageConstPtr& depth,
-			const sensor_msgs::CameraInfoConstPtr& cameraInfo,
-			const sensor_msgs::ImageConstPtr& image2,
-			const sensor_msgs::ImageConstPtr& depth2,
-			const sensor_msgs::CameraInfoConstPtr& cameraInfo2)
+	void callbackRGBD(
+			const rtabmap_ros::RGBDImageConstPtr& image)
 	{
+		callbackCalled();
 		if(!this->isPaused())
 		{
-			std::vector<sensor_msgs::ImageConstPtr> imageMsgs;
-			std::vector<sensor_msgs::ImageConstPtr> depthMsgs;
-			std::vector<sensor_msgs::CameraInfoConstPtr> infoMsgs;
-			imageMsgs.push_back(image);
-			imageMsgs.push_back(image2);
-			depthMsgs.push_back(depth);
-			depthMsgs.push_back(depth2);
-			infoMsgs.push_back(cameraInfo);
-			infoMsgs.push_back(cameraInfo2);
+			std::vector<cv_bridge::CvImageConstPtr> imageMsgs(1);
+			std::vector<cv_bridge::CvImageConstPtr> depthMsgs(1);
+			std::vector<sensor_msgs::CameraInfo> infoMsgs;
+			rtabmap_ros::toCvShare(image, imageMsgs[0], depthMsgs[0]);
+			infoMsgs.push_back(image->cameraInfo);
 
-			ros::Time higherStamp;
-			int imageWidth = imageMsgs[0]->width;
-			int imageHeight = imageMsgs[0]->height;
-			int cameraCount = imageMsgs.size();
-			cv::Mat rgb;
-			cv::Mat depth;
-			pcl::PointCloud<pcl::PointXYZ> scanCloud;
-			std::vector<CameraModel> cameraModels;
-			for(unsigned int i=0; i<imageMsgs.size(); ++i)
-			{
-				if(!(imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) ==0 ||
-					 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
-					 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||
-					 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
-					 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0) ||
-					!(depthMsgs[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1) == 0 ||
-					 depthMsgs[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1) == 0 ||
-					 depthMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0))
-				{
-					NODELET_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8 and image_depth=32FC1,16UC1,mono16");
-					return;
-				}
-				UASSERT_MSG(imageMsgs[i]->width == imageWidth && imageMsgs[i]->height == imageHeight,
-						uFormat("imageWidth=%d vs %d imageHeight=%d vs %d",
-								imageWidth,
-								imageMsgs[i]->width,
-								imageHeight,
-								imageMsgs[i]->height).c_str());
-				UASSERT_MSG(depthMsgs[i]->width == imageWidth && depthMsgs[i]->height == imageHeight,
-						uFormat("imageWidth=%d vs %d imageHeight=%d vs %d",
-								imageWidth,
-								depthMsgs[i]->width,
-								imageHeight,
-								depthMsgs[i]->height).c_str());
+			this->commonCallback(imageMsgs, depthMsgs, infoMsgs);
+		}
+	}
 
-				ros::Time stamp = imageMsgs[i]->header.stamp>depthMsgs[i]->header.stamp?imageMsgs[i]->header.stamp:depthMsgs[i]->header.stamp;
+	void callbackRGBD2(
+			const rtabmap_ros::RGBDImageConstPtr& image,
+			const rtabmap_ros::RGBDImageConstPtr& image2)
+	{
+		callbackCalled();
+		if(!this->isPaused())
+		{
+			std::vector<cv_bridge::CvImageConstPtr> imageMsgs(2);
+			std::vector<cv_bridge::CvImageConstPtr> depthMsgs(2);
+			std::vector<sensor_msgs::CameraInfo> infoMsgs;
+			rtabmap_ros::toCvShare(image, imageMsgs[0], depthMsgs[0]);
+			rtabmap_ros::toCvShare(image2, imageMsgs[1], depthMsgs[1]);
+			infoMsgs.push_back(image->cameraInfo);
+			infoMsgs.push_back(image2->cameraInfo);
 
-				if(i == 0)
-				{
-					higherStamp = stamp;
-				}
-				else if(stamp > higherStamp)
-				{
-					higherStamp = stamp;
-				}
-
-				Transform localTransform = getTransform(this->frameId(), imageMsgs[i]->header.frame_id, stamp);
-				if(localTransform.isNull())
-				{
-					return;
-				}
-
-				cv_bridge::CvImageConstPtr ptrImage;
-				if(imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0)
-				{
-					ptrImage = cv_bridge::toCvShare(imageMsgs[i]);
-				}
-				else if(imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
-				   imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
-				{
-					ptrImage = cv_bridge::toCvShare(imageMsgs[i], "mono8");
-				}
-				else
-				{
-					ptrImage = cv_bridge::toCvShare(imageMsgs[i], "bgr8");
-				}
-				cv_bridge::CvImageConstPtr ptrDepth = cv_bridge::toCvShare(depthMsgs[i]);
-				cv::Mat subDepth = ptrDepth->image;
-
-				// initialize
-				if(rgb.empty())
-				{
-					rgb = cv::Mat(imageHeight, imageWidth*cameraCount, ptrImage->image.type());
-				}
-				if(depth.empty())
-				{
-					depth = cv::Mat(imageHeight, imageWidth*cameraCount, subDepth.type());
-				}
-
-				if(ptrImage->image.type() == rgb.type())
-				{
-					ptrImage->image.copyTo(cv::Mat(rgb, cv::Rect(i*imageWidth, 0, imageWidth, imageHeight)));
-				}
-				else
-				{
-					NODELET_ERROR("Some RGB images are not the same type!");
-					return;
-				}
-
-				if(subDepth.type() == depth.type())
-				{
-					subDepth.copyTo(cv::Mat(depth, cv::Rect(i*imageWidth, 0, imageWidth, imageHeight)));
-				}
-				else
-				{
-					NODELET_ERROR("Some Depth images are not the same type!");
-					return;
-				}
-
-				cameraModels.push_back(rtabmap_ros::cameraModelFromROS(*infoMsgs[i], localTransform));
-			}
-
-			rtabmap::SensorData data(
-					rgb,
-					depth,
-					cameraModels,
-					0,
-					rtabmap_ros::timestampFromROS(higherStamp));
-
-			this->processData(data, higherStamp);
+			this->commonCallback(imageMsgs, depthMsgs, infoMsgs);
 		}
 	}
 
@@ -383,18 +385,23 @@ protected:
 			exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_);
 			exactSync_->registerCallback(boost::bind(&RGBDOdometry::callback, this, _1, _2, _3));
 		}
-		if(sync2_)
+		if(approxSync2_)
 		{
-			delete sync2_;
-			sync2_ = new message_filters::Synchronizer<MySync2Policy>(
-					MySync2Policy(queueSize_),
-					image_mono_sub_,
-					image_depth_sub_,
-					info_sub_,
-					image_mono2_sub_,
-					image_depth2_sub_,
-					info2_sub_);
-			sync2_->registerCallback(boost::bind(&RGBDOdometry::callback2, this, _1, _2, _3, _4, _5, _6));
+			delete approxSync2_;
+			approxSync2_ = new message_filters::Synchronizer<MyApproxSync2Policy>(
+					MyApproxSync2Policy(queueSize_),
+					rgbd_image1_sub_,
+					rgbd_image2_sub_);
+			approxSync2_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD2, this, _1, _2));
+		}
+		if(exactSync2_)
+		{
+			delete exactSync2_;
+			exactSync2_ = new message_filters::Synchronizer<MyExactSync2Policy>(
+					MyExactSync2Policy(queueSize_),
+					rgbd_image1_sub_,
+					rgbd_image2_sub_);
+			exactSync2_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD2, this, _1, _2));
 		}
 	}
 
@@ -402,15 +409,19 @@ private:
 	image_transport::SubscriberFilter image_mono_sub_;
 	image_transport::SubscriberFilter image_depth_sub_;
 	message_filters::Subscriber<sensor_msgs::CameraInfo> info_sub_;
-	image_transport::SubscriberFilter image_mono2_sub_;
-	image_transport::SubscriberFilter image_depth2_sub_;
-	message_filters::Subscriber<sensor_msgs::CameraInfo> info2_sub_;
+
+	ros::Subscriber rgbdSub_;
+	message_filters::Subscriber<rtabmap_ros::RGBDImage> rgbd_image1_sub_;
+	message_filters::Subscriber<rtabmap_ros::RGBDImage> rgbd_image2_sub_;
+
 	typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo> MyApproxSyncPolicy;
 	message_filters::Synchronizer<MyApproxSyncPolicy> * approxSync_;
-	typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo> MyExactSyncPolicy;
+	typedef message_filters::sync_policies::ExactTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo> MyExactSyncPolicy;
 	message_filters::Synchronizer<MyExactSyncPolicy> * exactSync_;
-	typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo, sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo> MySync2Policy;
-	message_filters::Synchronizer<MySync2Policy> * sync2_;
+	typedef message_filters::sync_policies::ApproximateTime<rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage> MyApproxSync2Policy;
+	message_filters::Synchronizer<MyApproxSync2Policy> * approxSync2_;
+	typedef message_filters::sync_policies::ExactTime<rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage> MyExactSync2Policy;
+	message_filters::Synchronizer<MyExactSync2Policy> * exactSync2_;
 	int queueSize_;
 };
 

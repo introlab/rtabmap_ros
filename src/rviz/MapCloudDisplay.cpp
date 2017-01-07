@@ -272,58 +272,60 @@ void MapCloudDisplay::processMapData(const rtabmap_ros::MapData& map)
 	for(unsigned int i=0; i<map.nodes.size() && i<map.nodes.size(); ++i)
 	{
 		int id = map.nodes[i].id;
-		if(poses.find(id) != poses.end() &&
-		   cloud_infos_.find(id) == cloud_infos_.end())
+
+		// Always refresh the cloud if there are data
+		rtabmap::Signature s = rtabmap_ros::nodeDataFromROS(map.nodes[i]);
+		if(!s.sensorData().imageCompressed().empty() &&
+		   !s.sensorData().depthOrRightCompressed().empty() &&
+		   (s.sensorData().cameraModels().size() || s.sensorData().stereoCameraModel().isValidForProjection()))
 		{
-			// Cloud not added to RVIZ, add it!
-			rtabmap::Signature s = rtabmap_ros::nodeDataFromROS(map.nodes[i]);
-			if(!s.sensorData().imageCompressed().empty() &&
-			   !s.sensorData().depthOrRightCompressed().empty() &&
-			   (s.sensorData().cameraModels().size() || s.sensorData().stereoCameraModel().isValidForProjection()))
+			cv::Mat image, depth;
+			s.sensorData().uncompressData(&image, &depth, 0);
+
+
+			if(!s.sensorData().imageRaw().empty() && !s.sensorData().depthOrRightRaw().empty())
 			{
-				cv::Mat image, depth;
-				s.sensorData().uncompressData(&image, &depth, 0);
+				pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud;
+				pcl::IndicesPtr validIndices(new std::vector<int>);
+				cloud = rtabmap::util3d::cloudRGBFromSensorData(
+						s.sensorData(),
+						cloud_decimation_->getInt(),
+						cloud_max_depth_->getFloat(),
+						cloud_min_depth_->getFloat(),
+						validIndices.get());
 
-
-				if(!s.sensorData().imageRaw().empty() && !s.sensorData().depthOrRightRaw().empty())
+				if(cloud_voxel_size_->getFloat())
 				{
-					pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud;
-					pcl::IndicesPtr validIndices(new std::vector<int>);
-					cloud = rtabmap::util3d::cloudRGBFromSensorData(
-							s.sensorData(),
-							cloud_decimation_->getInt(),
-							cloud_max_depth_->getFloat(),
-							cloud_min_depth_->getFloat(),
-							validIndices.get());
+					cloud = rtabmap::util3d::voxelize(cloud, validIndices, cloud_voxel_size_->getFloat());
+				}
 
-					if(cloud_voxel_size_->getFloat())
+				if(cloud->size())
+				{
+					if(cloud_filter_floor_height_->getFloat() > 0.0f || cloud_filter_ceiling_height_->getFloat() > 0.0f)
 					{
-						cloud = rtabmap::util3d::voxelize(cloud, validIndices, cloud_voxel_size_->getFloat());
+						// convert in /odom frame
+						cloud = rtabmap::util3d::transformPointCloud(cloud, s.getPose());
+						cloud = rtabmap::util3d::passThrough(cloud, "z",
+								cloud_filter_floor_height_->getFloat()>0.0f?cloud_filter_floor_height_->getFloat():-999.0f,
+								cloud_filter_ceiling_height_->getFloat()>0.0f && (cloud_filter_floor_height_->getFloat()<=0.0f || cloud_filter_ceiling_height_->getFloat()>cloud_filter_floor_height_->getFloat())?cloud_filter_ceiling_height_->getFloat():999.0f);
+						// convert back in /base_link frame
+						cloud = rtabmap::util3d::transformPointCloud(cloud, s.getPose().inverse());
 					}
 
-					if(cloud->size())
+					sensor_msgs::PointCloud2::Ptr cloudMsg(new sensor_msgs::PointCloud2);
+					pcl::toROSMsg(*cloud, *cloudMsg);
+					cloudMsg->header = map.header;
+
+					CloudInfoPtr info(new CloudInfo);
+					info->message_ = cloudMsg;
+					info->pose_ = rtabmap::Transform::getIdentity();
+					info->id_ = id;
+
+					if (transformCloud(info, true))
 					{
-						if(cloud_filter_floor_height_->getFloat() > 0.0f || cloud_filter_ceiling_height_->getFloat() > 0.0f)
-						{
-							cloud = rtabmap::util3d::passThrough(cloud, "z",
-									cloud_filter_floor_height_->getFloat()>0.0f?cloud_filter_floor_height_->getFloat():-999.0f,
-									cloud_filter_ceiling_height_->getFloat()>0.0f && (cloud_filter_floor_height_->getFloat()<=0.0f || cloud_filter_ceiling_height_->getFloat()>cloud_filter_floor_height_->getFloat())?cloud_filter_ceiling_height_->getFloat():999.0f);
-						}
-
-						sensor_msgs::PointCloud2::Ptr cloudMsg(new sensor_msgs::PointCloud2);
-						pcl::toROSMsg(*cloud, *cloudMsg);
-						cloudMsg->header = map.header;
-
-						CloudInfoPtr info(new CloudInfo);
-						info->message_ = cloudMsg;
-						info->pose_ = rtabmap::Transform::getIdentity();
-						info->id_ = id;
-
-						if (transformCloud(info, true))
-						{
-							boost::mutex::scoped_lock lock(new_clouds_mutex_);
-							new_cloud_infos_.insert(std::make_pair(id, info));
-						}
+						boost::mutex::scoped_lock lock(new_clouds_mutex_);
+						new_cloud_infos_.erase(id);
+						new_cloud_infos_.insert(std::make_pair(id, info));
 					}
 				}
 			}
@@ -485,7 +487,7 @@ void MapCloudDisplay::downloadMap()
 		ros::NodeHandle nh;
 		QMessageBox * messageBox = new QMessageBox(
 				QMessageBox::NoIcon,
-				tr("Calling \"%1\" service...").arg(nh.resolveName("rtabmap/get_map").c_str()),
+				tr("Calling \"%1\" service...").arg(nh.resolveName("rtabmap/get_map_data").c_str()),
 				tr("Downloading the map... please wait (rviz could become gray!)"),
 				QMessageBox::NoButton);
 		messageBox->setAttribute(Qt::WA_DeleteOnClose, true);
@@ -493,18 +495,18 @@ void MapCloudDisplay::downloadMap()
 		QApplication::processEvents();
 		uSleep(100); // hack make sure the text in the QMessageBox is shown...
 		QApplication::processEvents();
-		if(!ros::service::call("rtabmap/get_map", getMapSrv))
+		if(!ros::service::call("rtabmap/get_map_data", getMapSrv))
 		{
 			ROS_ERROR("MapCloudDisplay: Can't call \"%s\" service. "
 					  "Tip: if rtabmap node is not in rtabmap namespace, you can remap the service "
 					  "to \"get_map\" in the launch "
-					  "file like: <remap from=\"rtabmap/get_map\" to=\"get_map\"/>.",
-					  nh.resolveName("rtabmap/get_map").c_str());
+					  "file like: <remap from=\"rtabmap/get_map_data\" to=\"get_map_data\"/>.",
+					  nh.resolveName("rtabmap/get_map_data").c_str());
 			messageBox->setText(tr("MapCloudDisplay: Can't call \"%1\" service. "
 					  "Tip: if rtabmap node is not in rtabmap namespace, you can remap the service "
 					  "to \"get_map\" in the launch "
-					  "file like: <remap from=\"rtabmap/get_map\" to=\"get_map\"/>.").
-					  arg(nh.resolveName("rtabmap/get_map").c_str()));
+					  "file like: <remap from=\"rtabmap/get_map_data\" to=\"get_map_data\"/>.").
+					  arg(nh.resolveName("rtabmap/get_map_data").c_str()));
 		}
 		else
 		{
@@ -633,6 +635,7 @@ void MapCloudDisplay::update( float wall_dt, float ros_dt )
 				cloud_info->scene_node_->attachObject( cloud_info->cloud_.get() );
 				cloud_info->scene_node_->setVisible(false);
 
+				cloud_infos_.erase(it->first);
 				cloud_infos_.insert(*it);
 			}
 

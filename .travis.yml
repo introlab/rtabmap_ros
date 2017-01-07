@@ -1,0 +1,46 @@
+sudo: true
+dist: trusty
+language: cpp
+
+compiler:
+  - gcc
+  - clang
+
+addons:
+  apt:
+    packages:
+      - cmake
+      - libopencv-dev
+      - libqt4-dev
+      - libsqlite3-dev
+
+install:
+    - sudo sh -c 'echo "deb http://packages.ros.org/ros/ubuntu trusty main" > /etc/apt/sources.list.d/ros-latest.list'
+    - wget http://packages.ros.org/ros.key -O - | sudo apt-key add -
+    - sudo apt-get update
+    - sudo apt-get -y install ros-indigo-ros-base libpcl-1.7-all libfreenect-dev ros-indigo-libg2o ros-indigo-octomap libopenni2-dev ros-indigo-costmap-2d ros-indigo-octomap-ros ros-indigo-rviz ros-indigo-cv-bridge ros-indigo-move-base-msgs ros-indigo-costmap-2d ros-indigo-image-geometry ros-indigo-message-filters ros-indigo-image-transport ros-indigo-eigen-conversions ros-indigo-stereo-msgs ros-indigo-nav-msgs ros-indigo-sensor-msgs ros-indigo-tf-conversions ros-indigo-laser-geometry ros-indigo-pcl-conversions ros-indigo-pcl-ros ros-indigo-dynamic-reconfigure ros-indigo-nodelet
+
+script: 
+    - source /opt/ros/indigo/setup.bash
+    - export PYTHONPATH=$PYTHONPATH:/usr/lib/python2.7/dist-packages
+    - cd ..
+    - mkdir -p catkin_ws/src
+    - cd catkin_ws/src
+    - catkin_init_workspace
+    - cd ..
+    - catkin_make
+    - cd ..
+    - mv rtabmap_ros catkin_ws/src/.
+    - git clone https://github.com/introlab/rtabmap.git
+    - cd rtabmap
+    - mkdir -p build && cd build
+    - cmake -DCMAKE_INSTALL_PREFIX=~/build/introlab/catkin_ws/devel .. 
+    - make
+    - make install
+    - cd ../../catkin_ws
+    - source devel/setup.bash
+    - catkin_make
+
+notifications:
+  email:
+    - matlabbe@gmail.com

@@ -1,0 +1,48 @@
+
+<launch>  
+
+  <arg name="compressed" default="false"/>
+
+  <group ns="camera">
+    <node pkg="nodelet" type="nodelet" name="rgbd_sync" args="load rtabmap_ros/rgbd_sync camera_nodelet_manager">
+      <remap from="rgb/image"       to="rgb/image_rect_color"/>
+      <remap from="depth/image"     to="depth_registered/image_raw"/>
+      <remap from="rgb/camera_info" to="rgb/camera_info"/>
+    </node>
+  </group>
+
+   <!-- Nodes -->
+  <group ns="rtabmap">
+  
+      <!-- RGB-D Odometry -->
+      <node pkg="rtabmap_ros" type="rgbd_odometry" name="rgbd_odometry" output="screen">
+        <remap from="rgb/image"       to="/camera/rgb/image_rect_color"/>
+        <remap from="depth/image"     to="/camera/depth_registered/image_raw"/>
+        <remap from="rgb/camera_info" to="/camera/rgb/camera_info"/>
+        
+	    <param name="Odom/AlignWithGround"  type="string" value="true"/>
+        <param name="frame_id"         type="string" value="camera_link"/>
+      </node>
+    
+    <node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="screen" args="--delete_db_on_start">
+      <param name="subscribe_depth"       type="bool"   value="false"/>
+      <param name="subscribe_rgbd"       type="bool"   value="true"/>
+      <param name="frame_id"             type="string" value="camera_link"/>
+      <param name="approx_sync"          type="string" value="false"/>
+      <remap     if="$(arg compressed)"    from="rgbd_image"   to="/camera/rgbd_image/compressed"/>
+      <remap unless="$(arg compressed)"    from="rgbd_image"   to="/camera/rgbd_image"/>
+    </node>
+  
+    <node pkg="rtabmap_ros" type="rtabmapviz" name="rtabmapviz" output="screen">
+      <param name="subscribe_depth"      type="bool"   value="false"/>
+      <param name="subscribe_rgbd"       type="bool"   value="true"/>
+      <param name="frame_id"             type="string" value="camera_link"/>
+      <param name="approx_sync"          type="string" value="false"/>
+      <remap     if="$(arg compressed)"    from="rgbd_image"   to="/camera/rgbd_image/compressed"/>
+      <remap unless="$(arg compressed)"    from="rgbd_image"   to="/camera/rgbd_image"/>
+      <param name="subscribe_odom_info"  type="bool"   value="true"/>
+    </node>
+  
+  </group>
+
+</launch>

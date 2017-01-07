@@ -1,4 +1,4 @@
-rtabmap_ros
+rtabmap_ros [![Build Status](https://travis-ci.org/introlab/rtabmap_ros.svg?branch=master)](https://travis-ci.org/introlab/rtabmap_ros)
 ===========
 
 RTAB-Map's ROS package.
@@ -35,7 +35,7 @@ $ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/ros/kinetic/lib/x86_64-linux-gnu
 ```
 
 ### Build from source
-This section shows how to install RTAB-Map ros-pkg on **ROS Hydro/Indigo/Jade/Kinetic** (Catkin build). RTAB-Map works only with the PCL 1.7, which is the default version installed with ROS Hydro/Indigo/Jade/Kinetic (**Fuerte and Groovy are not supported**).
+This section shows how to install RTAB-Map ros-pkg on **ROS Hydro/Indigo/Jade/Kinetic** (Catkin build). RTAB-Map works only with the PCL >=1.7, which is the default version installed with ROS Hydro/Indigo/Jade/Kinetic (**Fuerte and Groovy are not supported**).
 
  * The next instructions assume that you have set up your ROS workspace using this [tutorial](http://wiki.ros.org/catkin/Tutorials/create_a_workspace). I will use kinetic prefix for convenience, but it should work with Hydro, Indigo and Jade. The workspace path is `~/catkin_ws` and your `~/.bashrc` contains:
  
@@ -57,7 +57,7 @@ $ sudo apt-get remove ros-kinetic-rtabmap
 $ sudo apt-get install libqt4-dev libpcl-1.7-all-dev libdc1394-dev ros-kinetic-openni-launch ros-kinetic-openni2-launch ros-kinetic-freenect-launch ros-kinetic-costmap-2d ros-kinetic-octomap-ros ros-kinetic-g2o ros-kinetic-rviz ros-kinetic-cv-bridge
 ```
 
-  * [GTSAM](https://collab.cc.gatech.edu/borg/gtsam): Follow installation instructions from [here](https://collab.cc.gatech.edu/borg/gtsam/#quickstart). RTAB-Map needs latest version from source (`git clone https://bitbucket.org/gtborg/gtsam.git`), it will not build with 3.2.1.
+  * [GTSAM](https://collab.cc.gatech.edu/borg/gtsam): Follow installation instructions from [here](https://collab.cc.gatech.edu/borg/gtsam/#quickstart). RTAB-Map needs latest version from source (`git clone https://bitbucket.org/gtborg/gtsam.git`), it will **not build** with 3.2.1.
   
   * [cvsba](http://www.uco.es/investiga/grupos/ava/node/39): Follow installation instructions from [here](http://www.uco.es/investiga/grupos/ava/node/39). Their installation is not standard CMake, you need these extra steps so RTAB-Map can find it:
     ```bash
@@ -94,6 +94,7 @@ $ git pull origin master
 $ cd build
 $ make
 $ make install
+# Do "sudo make install" if you installed rtabmap in "/usr/local"
 
 $ roscd rtabmap_ros
 $ git pull origin master

@@ -6,7 +6,8 @@ Header header
 #    bool lost;
 #    int matches;
 #    int inliers;
-#    float variance;
+#    float varianceLin;
+#    float varianceAng;
 #    int features;
 #    int localMapSize;
 #    float time;
@@ -27,9 +28,11 @@ Header header
 bool lost
 int32 matches
 int32 inliers
-float32 variance
+float32 varianceLin
+float32 varianceAng
 int32 features
 int32 localMapSize
+int32 localScanMapSize
 float32 timeEstimation
 float32 timeParticleFiltering
 float32 stamp
@@ -51,4 +54,8 @@ int32[] cornerInliers
 
 geometry_msgs/Transform transform
 geometry_msgs/Transform transformFiltered
+
+# compressed local scan map data
+# use rtabmap::util3d::uncompressData() from "rtabmap/core/util3d.h"
+uint8[] localScanMap
 

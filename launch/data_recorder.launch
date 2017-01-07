@@ -5,7 +5,8 @@
   <arg name="subscribe_depth"      default="true"/>
   <arg name="subscribe_stereo"     default="false"/>
   <arg name="subscribe_scan"       default="false"/>
-  <arg name="stereo_approx_sync"   default="false"/>
+  <arg     if="$(arg subscribe_stereo)" name="approx_sync"  default="false"/>
+  <arg unless="$(arg subscribe_stereo)" name="approx_sync"  default="true"/>
   
   <arg name="frame_id"      default="camera_link"/>
   <arg name="odom_frame_id" default=""/>        <!-- use topic when not set, otherwise use TF if set -->
@@ -41,7 +42,8 @@
 	<param name="publish_tf"              type="bool"   value="false"/>  <!-- don't publish TF -->
 	<param name="RGBD/ProximityBySpace"   type="string" value="false"/> 
 	<param name="RGBD/LinearUpdate"       type="string" value="0"/> 
-	<param name="RGBD/AngularUpdate"      type="string" value="0"/> 
+	<param name="RGBD/AngularUpdate"      type="string" value="0"/>
+	<param name="RGBD/CreateOccupancyGrid" type="string" value="false"/> 
 	<param unless="$(arg subscribe_odometry)" name="RGBD/Enabled" type="string" value="false"/>
 	
 	<param name="Rtabmap/DetectionRate"   type="string" value="$(arg max_rate)"/>
@@ -52,7 +54,7 @@
 	<param name="subscribe_scan"      type="bool"   value="$(arg subscribe_scan)"/>
 	<param name="subscribe_stereo"    type="bool"   value="$(arg subscribe_stereo)"/>
 	<param name="queue_size"          type="int"    value="$(arg queue_size)"/>
-	<param name="stereo_approx_sync"  type="bool"    value="$(arg stereo_approx_sync)"/>
+	<param name="approx_sync"         type="bool"   value="$(arg approx_sync)"/>
 	
 	<!-- Hack to use a fake odom_frame_id=frame_id if subscribe_odometry = false -->
 	<param if="$(arg subscribe_odometry)" name="odom_frame_id" type="string" value="$(arg odom_frame_id)"/>

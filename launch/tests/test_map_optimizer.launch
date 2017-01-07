@@ -1,0 +1,24 @@
+<launch>
+   <include file="$(find rtabmap_ros)/launch/rtabmap.launch">
+     <arg name="rtabmap_args" value="
+                                     --delete_db_on_start 
+                                     --RGBD/OptimizeMaxError 0 
+                                     --Optimizer/Iterations 0
+                                     --RGBD/ProximityBySpace false"/>
+     <arg name="rtabmapviz" value="false"/>
+  </include>
+  
+  <group ns="rtabmap">
+     <node pkg="rtabmap_ros" type="map_optimizer" name="map_optimizer"/>
+     
+     <node pkg="rtabmap_ros" type="rtabmapviz" name="rtabmapviz" output="screen">
+        <remap from="mapData" to="mapData_optimized"/>
+        <param name="frame_id" value="camera_link"/>
+        <param name="subscribe_depth" value="false"/>
+     </node>
+     
+     <node pkg="rtabmap_ros" type="map_assembler" name="map_assembler">
+        <remap from="mapData" to="mapData_optimized"/>
+     </node>
+  </group>  
+</launch>

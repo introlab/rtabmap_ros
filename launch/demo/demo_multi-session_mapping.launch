@@ -6,6 +6,7 @@
    <!-- Choose visualization -->
   <arg name="rviz" default="false" />
   <arg name="rtabmapviz" default="true" />
+  <arg name="rtabmap_args" default="" />
 
   <param name="use_sim_time" type="bool" value="True"/>
 
@@ -13,7 +14,7 @@
   
   <!-- SLAM (robot side) -->
   <!-- args: "delete_db_on_start" and "udebug" -->
-  <node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="screen" args="">
+  <node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="screen" args="$(arg rtabmap_args)">
 	<param name="frame_id" type="string" value="base_footprint"/>
 	
 	<param name="subscribe_depth" type="bool" value="true"/>
@@ -33,7 +34,7 @@
 	
 	<!-- RTAB-Map's parameters: do "rosrun rtabmap rtabmap (double-dash)params" to see the list of available parameters. -->
 	<param name="RGBD/NeighborLinkRefining"  type="string" value="false"/> 
-	<param name="RGBD/ProximityBySpace"      type="string" value="false"/> 
+	<param name="RGBD/ProximityBySpace"      type="string" value="false"/> <!-- Referred paper did only global loop closure detection -->
 	<param name="RGBD/ProximityByTime"       type="string" value="false"/> 
 	<param name="RGBD/OptimizeFromGraphEnd"  type="string" value="true"/> 
 	<param name="Reg/Strategy"               type="string" value="1"/>
@@ -49,8 +50,12 @@
 	<param name="Bayes/FullPredictionUpdate" type="string" value="true"/>
 	<param name="Kp/DetectorStrategy"        type="string" value="0"/>   <!-- use SURF -->
 	<param name="Kp/MaxFeatures"             type="string" value="400"/>
-	<param name="Optimizer/Slam2D"           type="string" value="true"/>
 	<param name="Reg/Force3DoF"              type="string" value="true"/> 
+	<param name="RGBD/OptimizeMaxError"      type="string" value="0.25"/>
+        <param name="Optimizer/Strategy"         type="string" value="0"/>  <!-- TORO is the most stable for multi-session mapping -->
+        <param name="Optimizer/Iterations"       type="string" value="100"/> 
+        <param name="Kp/IncrementalFlann"        type="string" value="false"/>  <!-- Referred paper didn't use incremental FLANN -->
+        <param name="Grid/FromDepth"             type="string" value="false"/>
   </node>
   
   <!-- Visualisation RTAB-Map -->
