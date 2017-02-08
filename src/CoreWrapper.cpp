@@ -93,6 +93,8 @@ CoreWrapper::CoreWrapper() :
 		groundTruthBaseFrameId_(""), // e.g., "base_link_gt"
 		configPath_(""),
 		databasePath_(UDirectory::homeDir()+"/.ros/"+rtabmap::Parameters::getDefaultDatabaseName()),
+		odomDefaultAngVariance_(1.0),
+		odomDefaultLinVariance_(1.0),
 		waitForTransform_(true),
 		waitForTransformDuration_(0.2), // 200 ms
 		useActionForGoal_(false),
@@ -145,6 +147,8 @@ void CoreWrapper::onInit()
 	pnh.param("tf_delay",            tfDelay, tfDelay);
 	pnh.param("tf_prefix",           tfPrefix, tfPrefix);
 	pnh.param("tf_tolerance",        tfTolerance, tfTolerance);
+	pnh.param("odom_tf_angular_variance", odomDefaultAngVariance_, odomDefaultAngVariance_);
+	pnh.param("odom_tf_linear_variance", odomDefaultLinVariance_, odomDefaultLinVariance_);
 	pnh.param("wait_for_transform",  waitForTransform_, waitForTransform_);
 	pnh.param("wait_for_transform_duration",  waitForTransformDuration_, waitForTransformDuration_);
 	pnh.param("use_action_for_goal", useActionForGoal_, useActionForGoal_);
@@ -951,8 +955,8 @@ void CoreWrapper::commonDepthCallbackImpl(
 			data,
 			lastPose_,
 			odomFrameId,
-			uIsFinite(rotVariance_) && rotVariance_>0?rotVariance_:1.0,
-			uIsFinite(transVariance_) && transVariance_>0?transVariance_:1.0);
+			rotVariance_,
+			transVariance_);
 	rotVariance_ = 0;
 	transVariance_ = 0;
 }
@@ -1137,8 +1141,8 @@ void CoreWrapper::commonStereoCallback(
 			data,
 			lastPose_,
 			odomFrameId,
-			uIsFinite(rotVariance_) && rotVariance_>0?rotVariance_:1.0,
-			uIsFinite(transVariance_) && transVariance_>0?transVariance_:1.0);
+			rotVariance_,
+			transVariance_);
 
 	rotVariance_ = 0;
 	transVariance_ = 0;
@@ -1158,6 +1162,16 @@ void CoreWrapper::process(
 		double timeRtabmap = 0.0;
 		double timeUpdateMaps = 0.0;
 		double timePublishMaps = 0.0;
+
+		if(!uIsFinite(odomRotationalVariance) || odomRotationalVariance<=0.0f)
+		{
+			odomRotationalVariance = odomDefaultAngVariance_;
+		}
+		if(!uIsFinite(odomTransitionalVariance) || odomTransitionalVariance<=0.0f)
+		{
+			odomTransitionalVariance = odomDefaultLinVariance_;
+		}
+
 		if(rtabmap_.process(data, odom, OdometryEvent::generateCovarianceMatrix(odomRotationalVariance, odomTransitionalVariance)))
 		{
 			timeRtabmap = timer.ticks();

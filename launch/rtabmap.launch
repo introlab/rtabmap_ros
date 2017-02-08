@@ -63,10 +63,13 @@
   <arg name="subscribe_scan_cloud"    default="false"/>
   <arg name="scan_cloud_topic"        default="/scan_cloud"/>
    
-  <arg name="visual_odometry"         default="true"/>          <!-- Launch rtabmap visual odometry node -->
-  <arg name="odom_topic"              default="/odom"/>         <!-- Odometry topic used if visual_odometry is false -->
-  <arg name="odom_frame_id"           default=""/>              <!-- If set, TF is used to get odometry instead of the topic -->
-  <arg name="odom_args"               default="$(arg rtabmap_args)"/>
+  <arg name="visual_odometry"          default="true"/>          <!-- Launch rtabmap visual odometry node -->
+  <arg name="odom_topic"               default="/odom"/>         <!-- Odometry topic used if visual_odometry is false -->
+  <arg name="odom_frame_id"            default=""/>              <!-- If set, TF is used to get odometry instead of the topic -->
+  <arg name="odom_tf_angular_variance" default="1"/>             <!-- If TF is used to get odometry, this is the default angular variance -->
+  <arg name="odom_tf_linear_variance"  default="1"/>             <!-- If TF is used to get odometry, this is the default linear variance -->
+  <arg name="odom_args"                default="$(arg rtabmap_args)"/>
+  
   
   <!-- These arguments should not be modified directly, see referred topics without "_relay" suffix above -->
   <arg if="$(arg compressed)"     name="rgb_topic_relay"           default="$(arg rgb_topic)_relay"/>
@@ -128,6 +131,8 @@
       <param name="subscribe_scan_cloud" type="bool"   value="$(arg subscribe_scan_cloud)"/>
       <param name="frame_id"             type="string" value="$(arg frame_id)"/>
       <param name="odom_frame_id"        type="string" value="$(arg odom_frame_id)"/>
+      <param name="odom_tf_angular_variance" type="double" value="$(arg odom_tf_angular_variance)"/>
+      <param name="odom_tf_linear_variance"  type="double" value="$(arg odom_tf_linear_variance)"/>
       <param name="wait_for_transform_duration"  type="double"   value="$(arg wait_for_transform)"/>
       <param name="database_path"        type="string" value="$(arg database_path)"/>
       <param name="approx_sync"          type="bool"   value="$(arg approx_sync)"/>
