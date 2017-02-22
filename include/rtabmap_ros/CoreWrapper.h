@@ -115,6 +115,8 @@ private:
 
 	void defaultCallback(const sensor_msgs::ImageConstPtr & imageMsg); // no odom
 
+	void userDataAsyncCallback(const rtabmap_ros::UserDataConstPtr & dataMsg);
+
 	void goalCommonCallback(int id, const std::string & label, const rtabmap::Transform & pose, const ros::Time & stamp, double * planningTime = 0);
 	void goalCallback(const geometry_msgs::PoseStampedConstPtr & msg);
 	void goalNodeCallback(const rtabmap_ros::GoalConstPtr & msg);
@@ -251,6 +253,9 @@ private:
 
 	// for loop closure detection only
 	image_transport::Subscriber defaultSub_;
+
+	ros::Subscriber userDataAsyncSub_;
+	cv::Mat userData_;
 
 	bool stereoToDepth_;
 	bool odomSensorSync_;

@@ -293,6 +293,11 @@ target_link_libraries(map_optimizer rtabmap_ros ${Libraries})
 add_executable(map_assembler src/MapAssemblerNode.cpp)
 target_link_libraries(map_assembler rtabmap_ros ${Libraries})
 
+add_executable(wifi_signal_pub src/WifiSignalPubNode.cpp)
+target_link_libraries(wifi_signal_pub rtabmap_ros ${Libraries})
+add_executable(wifi_signal_sub src/WifiSignalSubNode.cpp)
+target_link_libraries(wifi_signal_sub rtabmap_ros ${Libraries})
+
 add_executable(camera src/CameraNode.cpp)
 add_dependencies(camera ${${PROJECT_NAME}_EXPORTED_TARGETS})
 target_link_libraries(camera ${Libraries})

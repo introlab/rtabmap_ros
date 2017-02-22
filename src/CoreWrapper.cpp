@@ -501,6 +501,8 @@ void CoreWrapper::onInit()
 
 		NODELET_INFO("\n%s subscribed to:\n   %s", getName().c_str(), defaultSub_.getTopic().c_str());
 	}
+
+	userDataAsyncSub_ = nh.subscribe("user_data_async", 1, &CoreWrapper::userDataAsyncCallback, this);
 }
 
 CoreWrapper::~CoreWrapper()
@@ -937,6 +939,16 @@ void CoreWrapper::commonDepthCallbackImpl(
 	if(userDataMsg.get())
 	{
 		userData = rtabmap_ros::userDataFromROS(*userDataMsg);
+		if(!userData_.empty())
+		{
+			ROS_WARN("Synchronized and asynchronized user data topics cannot be used at the same time. Async user data dropped!");
+			userData_ = cv::Mat();
+		}
+	}
+	else
+	{
+		userData = userData_;
+		userData_ = cv::Mat();
 	}
 	SensorData data(scan,
 			LaserScanInfo(
@@ -1119,6 +1131,9 @@ void CoreWrapper::commonStereoCallback(
 		}
 	}
 
+	cv::Mat userData = userData_;
+	userData_ = cv::Mat();
+
 	Transform groundTruthPose;
 	if(!groundTruthFrameId_.empty())
 	{
@@ -1134,7 +1149,8 @@ void CoreWrapper::commonStereoCallback(
 			right,
 			stereoModel,
 			lastPoseIntermediate_?-1:leftImageMsg->header.seq,
-			rtabmap_ros::timestampFromROS(lastPoseStamp_));
+			rtabmap_ros::timestampFromROS(lastPoseStamp_),
+			userData);
 	data.setGroundTruth(groundTruthPose);
 
 	process(lastPoseStamp_,
@@ -1308,8 +1324,26 @@ void CoreWrapper::process(
 		NODELET_WARN("Ignoring received image because its sequence ID=0. Please "
 				 "set \"Mem/GenerateIds\"=\"true\" to ignore ros generated sequence id. "
 				 "Use only \"Mem/GenerateIds\"=\"false\" for once-time run of RTAB-Map and "
-				 "when you need to have IDs output of RTAB-map synchronised with the source "
+				 "when you need to have IDs output of RTAB-map synchronized with the source "
 				 "image sequence ID.");
+	}
+}
+
+void CoreWrapper::userDataAsyncCallback(const rtabmap_ros::UserDataConstPtr & dataMsg)
+{
+	if(!paused_)
+	{
+		if(!userData_.empty())
+		{
+			ROS_WARN("Overwriting previous user data set. Asynchronous user "
+					"data input topic should be used with user data published at "
+					"lower rate than map update rate (current %s=%f).",
+					Parameters::kRtabmapDetectionRate().c_str(), rate_);
+		}
+		else
+		{
+			userData_ = rtabmap_ros::userDataFromROS(*dataMsg);
+		}
 	}
 }
 
@@ -1527,6 +1561,7 @@ bool CoreWrapper::resetRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empt
 	latestNodeWasReached_ = false;
 	mapsManager_.clear();
 	previousStamp_ = ros::Time(0);
+	userData_ = cv::Mat();
 	return true;
 }
 
@@ -1580,6 +1615,7 @@ bool CoreWrapper::backupDatabaseCallback(std_srvs::Empty::Request&, std_srvs::Em
 	lastPose_.setIdentity();
 	currentMetricGoal_.setNull();
 	latestNodeWasReached_ = false;
+	userData_ = cv::Mat();
 
 	NODELET_INFO("Backup: Saving \"%s\" to \"%s\"...", databasePath_.c_str(), (databasePath_+".back").c_str());
 	UFile::copy(databasePath_, databasePath_+".back");

@@ -70,6 +70,9 @@
   <arg name="odom_tf_linear_variance"  default="1"/>             <!-- If TF is used to get odometry, this is the default linear variance -->
   <arg name="odom_args"                default="$(arg rtabmap_args)"/>
   
+  <arg name="subscribe_user_data"      default="false"/>             <!-- user data synchronized subscription -->
+  <arg name="user_data_topic"          default="/user_data"/>
+  <arg name="user_data_async_topic"    default="/user_data_async" /> <!-- user data async subscription (rate should be lower than map update rate) -->
   
   <!-- These arguments should not be modified directly, see referred topics without "_relay" suffix above -->
   <arg if="$(arg compressed)"     name="rgb_topic_relay"           default="$(arg rgb_topic)_relay"/>
@@ -129,6 +132,7 @@
       <param name="subscribe_stereo"     type="bool"   value="$(arg stereo)"/>
       <param name="subscribe_scan"       type="bool"   value="$(arg subscribe_scan)"/>
       <param name="subscribe_scan_cloud" type="bool"   value="$(arg subscribe_scan_cloud)"/>
+      <param name="subscribe_user_data"  type="bool"   value="$(arg subscribe_user_data)"/>
       <param name="frame_id"             type="string" value="$(arg frame_id)"/>
       <param name="odom_frame_id"        type="string" value="$(arg odom_frame_id)"/>
       <param name="odom_tf_angular_variance" type="double" value="$(arg odom_tf_angular_variance)"/>
@@ -150,6 +154,8 @@
       
       <remap from="scan"                   to="$(arg scan_topic)"/>
       <remap from="scan_cloud"             to="$(arg scan_cloud_topic)"/>
+      <remap from="user_data"              to="$(arg user_data_topic)"/>
+      <remap from="user_data_async"        to="$(arg user_data_async_topic)"/>
       <remap unless="$(arg visual_odometry)" from="odom"  to="$(arg odom_topic)"/>
       
       <!-- localization mode -->
