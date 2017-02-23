@@ -1088,6 +1088,14 @@ bool convertRGBDMsgs(
 
 	int imageWidth = imageMsgs[0]->image.cols;
 	int imageHeight = imageMsgs[0]->image.rows;
+	int depthWidth = depthMsgs[0]->image.cols;
+	int depthHeight = depthMsgs[0]->image.rows;
+
+	UASSERT_MSG(
+			imageWidth % depthWidth == 0 && imageHeight % depthHeight == 0 &&
+			imageWidth/depthWidth == imageHeight/depthHeight,
+			uFormat("rgb=%dx%d depth=%dx%d", imageWidth, imageHeight, depthWidth, depthHeight).c_str());
+
 	int cameraCount = imageMsgs.size();
 	for(unsigned int i=0; i<imageMsgs.size(); ++i)
 	{
@@ -1095,12 +1103,17 @@ bool convertRGBDMsgs(
 			 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
 			 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||
 			 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
-			 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0) ||
+			 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0 ||
+			 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::BGRA8) == 0 ||
+			 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::RGBA8) == 0) ||
 			!(depthMsgs[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1) == 0 ||
 			 depthMsgs[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1) == 0 ||
 			 depthMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0))
 		{
-			ROS_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8 and image_depth=32FC1,16UC1,mono16");
+			ROS_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8,bgra8,rgba8 and "
+					"image_depth=32FC1,16UC1,mono16. Current rgb=%s and depth=%s",
+					imageMsgs[i]->encoding.c_str(),
+					depthMsgs[i]->encoding.c_str());
 			return false;
 		}
 
@@ -1110,11 +1123,11 @@ bool convertRGBDMsgs(
 						imageMsgs[i]->image.cols,
 						imageHeight,
 						imageMsgs[i]->image.rows).c_str());
-		UASSERT_MSG(depthMsgs[i]->image.cols == imageWidth && depthMsgs[i]->image.rows == imageHeight,
-				uFormat("imageWidth=%d vs %d imageHeight=%d vs %d",
-						imageWidth,
+		UASSERT_MSG(depthMsgs[i]->image.cols == depthWidth && depthMsgs[i]->image.rows == depthHeight,
+				uFormat("depthWidth=%d vs %d imageHeight=%d vs %d",
+						depthWidth,
 						depthMsgs[i]->image.cols,
-						imageHeight,
+						depthHeight,
 						depthMsgs[i]->image.rows).c_str());
 
 		rtabmap::Transform localTransform = rtabmap_ros::getTransform(frameId, depthMsgs[i]->header.frame_id, depthMsgs[i]->header.stamp, listener, waitForTransform);
@@ -1170,7 +1183,7 @@ bool convertRGBDMsgs(
 		}
 		if(depth.empty())
 		{
-			depth = cv::Mat(imageHeight, imageWidth*cameraCount, subDepth.type());
+			depth = cv::Mat(depthHeight, depthWidth*cameraCount, subDepth.type());
 		}
 
 		if(ptrImage->image.type() == rgb.type())
@@ -1185,7 +1198,7 @@ bool convertRGBDMsgs(
 
 		if(subDepth.type() == depth.type())
 		{
-			subDepth.copyTo(cv::Mat(depth, cv::Rect(i*imageWidth, 0, imageWidth, imageHeight)));
+			subDepth.copyTo(cv::Mat(depth, cv::Rect(i*depthWidth, 0, depthWidth, depthHeight)));
 		}
 		else
 		{
@@ -1224,7 +1237,10 @@ bool convertStereoMsg(
 		rightImageMsg->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
 		rightImageMsg->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0))
 	{
-		ROS_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8");
+		ROS_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8,bgra8,rgba8");
+		ROS_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8,bgra8,rgba8 Current left=%s and right=%s",
+				leftImageMsg->encoding.c_str(),
+				rightImageMsg->encoding.c_str());
 		return false;
 	}
 

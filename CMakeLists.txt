@@ -18,7 +18,7 @@ find_package(rviz)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
-find_package(RTABMap 0.11.13 REQUIRED)
+find_package(RTABMap 0.12.1 REQUIRED)
 
 find_package(OpenCV REQUIRED)
 
@@ -320,6 +320,9 @@ target_link_libraries(data_player rtabmap_ros ${QT_LIBRARIES} ${Libraries})
 
 add_executable(odom_msg_to_tf src/OdomMsgToTFNode.cpp)
 target_link_libraries(odom_msg_to_tf rtabmap_ros ${Libraries})
+
+add_executable(pointcloud_to_depthimage src/PointCloudToDepthImageNode.cpp)
+target_link_libraries(pointcloud_to_depthimage rtabmap_ros ${Libraries})
 
 #############
 ## Install ##
