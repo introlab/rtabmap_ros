@@ -93,7 +93,8 @@
 	  <param name="frame_id"         type="string" value="base_link"/>
 	  <param name="gen_scan"         type="bool"   value="true"/>
 	  <param name="wait_for_transform" type="bool"   value="$(arg wait_for_transform)"/>
-	  <param name="map_negative_poses_ignored" type="bool"   value="true"/>
+	  <param name="map_negative_poses_ignored" type="bool"   value="false"/>        <!-- refresh grid map even if we are not moving-->
+	  <param name="map_negative_scan_empty_ray_tracing" type="bool" value="false"/> <!-- don't fill empty space between the generated scans-->
 	
       <remap from="rgbd_image0"       to="/camera1/rgbd_image"/>
       <remap from="rgbd_image1"       to="/camera2/rgbd_image"/>
