@@ -91,6 +91,7 @@ private:
 	double mapFilterAngle_;
 	bool mapCacheCleanup_;
 	bool negativePosesIgnored_;
+	bool negativeScanEmptyRayTracing_;
 
 	ros::Publisher cloudMapPub_;
 	ros::Publisher cloudGroundPub_;

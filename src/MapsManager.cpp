@@ -70,6 +70,7 @@ MapsManager::MapsManager() :
 		mapFilterAngle_(30.0), // degrees
 		mapCacheCleanup_(true),
 		negativePosesIgnored_(false),
+		negativeScanEmptyRayTracing_(true),
 		assembledObstacles_(new pcl::PointCloud<pcl::PointXYZRGB>),
 		assembledGround_(new pcl::PointCloud<pcl::PointXYZRGB>),
 		occupancyGrid_(new OccupancyGrid),
@@ -99,6 +100,7 @@ void MapsManager::init(ros::NodeHandle & nh, ros::NodeHandle & pnh, const std::s
 	pnh.param("map_filter_angle", mapFilterAngle_, mapFilterAngle_);
 	pnh.param("map_cleanup", mapCacheCleanup_, mapCacheCleanup_);
 	pnh.param("map_negative_poses_ignored", negativePosesIgnored_, negativePosesIgnored_);
+	pnh.param("map_negative_scan_empty_ray_tracing", negativeScanEmptyRayTracing_, negativeScanEmptyRayTracing_);
 
 	if(pnh.hasParam("scan_output_voxelized"))
 	{
@@ -122,6 +124,7 @@ void MapsManager::init(ros::NodeHandle & nh, ros::NodeHandle & pnh, const std::s
 	ROS_INFO("%s(maps): map_filter_angle           = %f", name.c_str(), mapFilterAngle_);
 	ROS_INFO("%s(maps): map_cleanup                = %s", name.c_str(), mapCacheCleanup_?"true":"false");
 	ROS_INFO("%s(maps): map_negative_poses_ignored = %s", name.c_str(), negativePosesIgnored_?"true":"false");
+	ROS_INFO("%s(maps): map_negative_scan_ray_tracing = %s", name.c_str(), negativeScanEmptyRayTracing_?"true":"false");
 	ROS_INFO("%s(maps): cloud_output_voxelized     = %s", name.c_str(), cloudOutputVoxelized_?"true":"false");
 	ROS_INFO("%s(maps): cloud_subtract_filtering   = %s", name.c_str(), cloudSubtractFiltering_?"true":"false");
 	ROS_INFO("%s(maps): cloud_subtract_filtering_min_neighbors = %d", name.c_str(), cloudSubtractFilteringMinNeighbors_);
@@ -285,9 +288,6 @@ void MapsManager::setParameters(const rtabmap::ParametersMap & parameters)
 
 	// don't use grid cell size from parameters as we use grid_cell_size ros param
 	uInsert(parameters_, ParametersPair(Parameters::kGridCellSize(), uNumber2Str(gridCellSize_)));
-
-	// For negative laser scans, always fill empty space
-	uInsert(parameters_, ParametersPair(Parameters::kGridScan2dUnknownSpaceFilled(), "true"));
 
 	occupancyGrid_->parseParameters(parameters_);
 }
@@ -509,10 +509,29 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 							std::map<int, rtabmap::Signature>::const_iterator findIter = signatures.find(iter->first);
 							if(findIter != signatures.end())
 							{
+								// For negative laser scans, fill empty space?
+								bool unknownSpaceFilled = Parameters::defaultGridScan2dUnknownSpaceFilled();
+								Parameters::parse(parameters_, Parameters::kGridScan2dUnknownSpaceFilled(), unknownSpaceFilled);
+
+								if(unknownSpaceFilled != negativeScanEmptyRayTracing_ && negativeScanEmptyRayTracing_)
+								{
+									ParametersMap parameters;
+									parameters.insert(ParametersPair(Parameters::kGridScan2dUnknownSpaceFilled(), uBool2Str(negativeScanEmptyRayTracing_)));
+									occupancyGrid_->parseParameters(parameters);
+								}
+
 								// normally data should be already uncompressed for negative ids
 								occupancyGrid_->createLocalMap(findIter->second, ground, obstacles, viewPoint);
 								uInsert(gridMaps_, std::make_pair(iter->first, std::make_pair(ground, obstacles)));
 								uInsert(gridMapsViewpoints_, std::make_pair(iter->first, viewPoint));
+
+								// put back
+								if(unknownSpaceFilled != negativeScanEmptyRayTracing_ && negativeScanEmptyRayTracing_)
+								{
+									ParametersMap parameters;
+									parameters.insert(ParametersPair(Parameters::kGridScan2dUnknownSpaceFilled(), uBool2Str(unknownSpaceFilled)));
+									occupancyGrid_->parseParameters(parameters);
+								}
 							}
 							else
 							{
