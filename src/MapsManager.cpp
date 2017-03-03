@@ -277,7 +277,7 @@ void MapsManager::backwardCompatibilityParameters(ros::NodeHandle & pnh, Paramet
 
 #ifdef WITH_OCTOMAP_ROS
 #ifdef RTABMAP_OCTOMAP
-	parameterMoved(pnh, "octomap_ground_is_obstacle", Parameters::kGrid3DGroundIsObstacle(), parameters);
+	parameterMoved(pnh, "octomap_ground_is_obstacle", Parameters::kGridGroundIsObstacle(), parameters);
 #endif
 #endif
 }
