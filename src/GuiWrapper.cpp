@@ -253,7 +253,7 @@ void GuiWrapper::processRequestedMap(const rtabmap_ros::MapData & map)
 	QMetaObject::invokeMethod(mainWindow_, "processRtabmapEvent3DMap", Q_ARG(rtabmap::RtabmapEvent3DMap, e));
 }
 
-void GuiWrapper::handleEvent(UEvent * anEvent)
+bool GuiWrapper::handleEvent(UEvent * anEvent)
 {
 	if(anEvent->getClassName().compare("ParamEvent") == 0)
 	{
@@ -413,6 +413,7 @@ void GuiWrapper::handleEvent(UEvent * anEvent)
 			ROS_ERROR("Can't call \"reset_odom\" service, (will only work with rtabmap/visual_odometry node.)");
 		}
 	}
+	return false;
 }
 
 void GuiWrapper::commonDepthCallback(

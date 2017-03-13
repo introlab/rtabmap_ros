@@ -219,7 +219,7 @@ public:
 	}
 
 protected:
-	virtual void handleEvent(UEvent * event)
+	virtual bool handleEvent(UEvent * event)
 	{
 		if(event->getClassName().compare("CameraEvent") == 0)
 		{
@@ -243,6 +243,7 @@ protected:
 				rosPublisher_.publish(rosMsg);
 			}
 		}
+		return false;
 	}
 
 private:
