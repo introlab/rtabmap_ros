@@ -10,7 +10,7 @@ For the RTAB-Map libraries and standalone application, visit [RTAB-Map's home pa
 # Installation 
 
 ## ROS distribution 
-RTAB-Map is released as binaries in the ROS distribution. For **latest binaries**, use [ros-shadow-fixed](http://wiki.ros.org/ShadowRepository) repository.
+RTAB-Map is released as binaries in the ROS distribution.
 * Kinetic
     ```
     $ sudo apt-get install ros-kinetic-rtabmap-ros
