@@ -45,31 +45,28 @@ This section shows how to install RTAB-Map ros-pkg on **ROS Hydro/Indigo/Jade/Ki
     $ source ~/catkin_ws/devel/setup.bash
     ```
 
-* Make sure you don't have the binaries installed too (if you tried them before):
+ 0. Required dependencies
+     * The easiest way to get all them (Qt, PCL, VTK, OpenCV, ...) is to install/uninstall rtabmap binaries:
+          ```bash
+          $ sudo apt-get install ros-kinetic-rtabmap ros-kinetic-rtabmap-ros
+          $ sudo apt-get remove ros-kinetic-rtabmap ros-kinetic-rtabmap-ros
+          ```
  
-    ```bash
-    $ sudo apt-get remove ros-kinetic-rtabmap
-    ```
-
- 0. Optional dependencies
-     * If you want SURF/SIFT on Indigo/Jade/Kinetic (Hydro has already SIFT/SURF), you have to build [OpenCV]([OpenCV](http://opencv.org/)) from source to have access to *nonfree* module. Install it in `/usr/local` (default) and the rtabmap library should link with it instead of the one installed in ROS. I recommend to use latest 2.4 version ([2.4.11](https://github.com/Itseez/opencv/archive/2.4.11.zip)) and build it from source following these [instructions](http://docs.opencv.org/doc/tutorials/introduction/linux_install/linux_install.html#building-opencv-from-source-using-cmake-using-the-command-line). RTAB-Map can build with OpenCV3+[xfeatures2d](https://github.com/Itseez/opencv_contrib/tree/master/modules/xfeatures2d) module, but rtabmap_ros package will have libraries conflict as cv-bridge is depending on OpenCV2. If you want OpenCV3, you should build ros [vision-opencv](https://github.com/ros-perception/vision_opencv) package yourself (and all ros packages depending on it) so it can link on OpenCV3.
+ 1. Optional dependencies
+     * If you want SURF/SIFT on Indigo/Jade/Kinetic (Hydro has already SIFT/SURF), you have to build [OpenCV]([OpenCV](http://opencv.org/)) from source to have access to *nonfree* module. Install it in `/usr/local` (default) and the rtabmap library should link with it instead of the one installed in ROS. 
+         * On Indigo/Jade, I recommend to use latest 2.4 version ([2.4.11](https://github.com/Itseez/opencv/archive/2.4.11.zip)) and build it from source following these [instructions](http://docs.opencv.org/doc/tutorials/introduction/linux_install/linux_install.html#building-opencv-from-source-using-cmake-using-the-command-line). RTAB-Map can build with OpenCV3+[xfeatures2d](https://github.com/Itseez/opencv_contrib/tree/master/modules/xfeatures2d) module, but rtabmap_ros package will have libraries conflict as cv-bridge is depending on OpenCV2. If you want OpenCV3, you should build ros [vision-opencv](https://github.com/ros-perception/vision_opencv) package yourself (and all ros packages depending on it) so it can link on OpenCV3.
+         * On Kinetic, I recommend to use OpenCV3+[xfeatures2d](https://github.com/Itseez/opencv_contrib/tree/master/modules/xfeatures2d) module. You can also install OpenCV2, but rtabmap_ros package will have libraries conflict as cv-bridge is depending on OpenCV3. Thus if you want OpenCV2 on Kinetic, you should build ros [vision-opencv](https://github.com/ros-perception/vision_opencv) package yourself (and all ros packages depending on it) so it can link on OpenCV2.
   
-    * ROS (Qt, PCL, dc1394, OpenNI, OpenNI2, Freenect, g2o, Costmap2d, Rviz, Octomap, CvBridge). Note that I've found that [latest g2o version](https://github.com/RainerKuemmerle/g2o) built from source is faster (install `libsuitesparse-dev` before building `g2o`) and would be [required to avoid some crashes](http://official-rtab-map-forum.67519.x6.nabble.com/ROS-2D-occupancy-grid-tp1204p1215.html).
-        ```bash
-        $ sudo apt-get install libqt4-dev libpcl-1.7-all-dev libdc1394-dev ros-kinetic-openni-launch ros-kinetic-openni2-launch ros-kinetic-freenect-launch ros-kinetic-costmap-2d ros-kinetic-octomap-ros ros-kinetic-g2o ros-kinetic-rviz ros-kinetic-cv-bridge
-        ```
+    * `ros-kinetic-g2o`: [latest g2o version](https://github.com/RainerKuemmerle/g2o) built from source may be faster than the binaries (install `libsuitesparse-dev` before building `g2o`) and would be [required to avoid some crashes](http://official-rtab-map-forum.67519.x6.nabble.com/ROS-2D-occupancy-grid-tp1204p1215.html).
 
-    * [GTSAM](https://collab.cc.gatech.edu/borg/gtsam): Follow installation instructions from [here](https://collab.cc.gatech.edu/borg/gtsam/#quickstart). RTAB-Map needs latest version from source (`git clone https://bitbucket.org/gtborg/gtsam.git`), it will **not build** with 3.2.1.
-  
-    * [cvsba](http://www.uco.es/investiga/grupos/ava/node/39): Follow installation instructions from [here](http://www.uco.es/investiga/grupos/ava/node/39). Their installation is not standard CMake, you need these extra steps so RTAB-Map can find it:
+    * [GTSAM](https://collab.cc.gatech.edu/borg/gtsam): Follow installation instructions from [here](https://collab.cc.gatech.edu/borg/gtsam/#quickstart). RTAB-Map needs latest version from source, it will **not build** with 3.2.1.
         ```bash
-        $ mkdir /usr/local/lib/cmake/cvsba 
-        $ mv /usr/local/lib/cmake/Findcvsba.cmake /usr/local/lib/cmake/cvsba/cvsbaConfig.cmake
+        git clone https://bitbucket.org/gtborg/gtsam.git
         ```
 
     * [Freenect2](https://github.com/OpenKinect/libfreenect2): Follow installation instructions from [here](https://github.com/OpenKinect/libfreenect2#debianubuntu-1404-perhaps-earlier).
 
-1. Install RTAB-Map standalone libraries. Add `-DCMAKE_INSTALL_PREFIX=~/catkin_ws/devel` to `cmake` command below if you want to install in your Catkin's devel folder without `sudo`. **Do not clone in your Catkin workspace**.
+2. Install RTAB-Map standalone libraries. Add `-DCMAKE_INSTALL_PREFIX=~/catkin_ws/devel` to `cmake` command below if you want to install in your Catkin's devel folder without `sudo`. **Do not clone in your Catkin workspace**.
  
     ```bash
     $ cd ~
@@ -80,7 +77,7 @@ This section shows how to install RTAB-Map ros-pkg on **ROS Hydro/Indigo/Jade/Ki
     $ sudo make install
     ```
 
-2. Install RTAB-Map ros-pkg in your src folder of your Catkin workspace.
+3. Install RTAB-Map ros-pkg in your src folder of your Catkin workspace.
  
     ```bash
     $ cd ~/catkin_ws
