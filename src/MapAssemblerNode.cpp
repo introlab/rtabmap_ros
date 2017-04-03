@@ -161,6 +161,7 @@ public:
 		}
 
 		mapsManager_.init(nh, pnh, ros::this_node::getName(), false);
+		mapsManager_.backwardCompatibilityParameters(pnh, parameters);
 		mapsManager_.setParameters(parameters);
 
 		mapDataTopic_ = nh.subscribe("mapData", 1, &MapAssembler::mapDataReceivedCallback, this);
