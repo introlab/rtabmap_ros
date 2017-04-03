@@ -258,7 +258,7 @@ void OdometryROS::onInit()
 		std::string vStr;
 		if(pnh.getParam(iter->first, vStr))
 		{
-			if(iter->second.first)
+			if(iter->second.first && parameters_.find(iter->second.second) != parameters_.end())
 			{
 				// can be migrated
 				parameters_.at(iter->second.second)= vStr;

@@ -38,6 +38,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/utilite/ULogger.h>
 #include <rtabmap/utilite/UStl.h>
 #include <rtabmap/utilite/UTimer.h>
+#include <rtabmap/utilite/UFile.h>
 #include <pcl_ros/transforms.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <nav_msgs/OccupancyGrid.h>
@@ -49,12 +50,118 @@ class MapAssembler
 {
 
 public:
-	MapAssembler()
+	MapAssembler(int & argc, char** argv)
 	{
 		ros::NodeHandle pnh("~");
 		ros::NodeHandle nh;
 
+		std::string configPath;
+		pnh.param("config_path", configPath, configPath);
+
+		//parameters
+		rtabmap::ParametersMap parameters;
+		uInsert(parameters, rtabmap::Parameters::getDefaultParameters("Grid"));
+		uInsert(parameters, rtabmap::Parameters::getDefaultParameters("StereoBM"));
+		if(!configPath.empty())
+		{
+			if(UFile::exists(configPath.c_str()))
+			{
+				ROS_INFO( "%s: Loading parameters from %s", ros::this_node::getName().c_str(), configPath.c_str());
+				rtabmap::ParametersMap allParameters;
+				Parameters::readINI(configPath.c_str(), allParameters);
+				// only update odometry parameters
+				for(ParametersMap::iterator iter=parameters.begin(); iter!=parameters.end(); ++iter)
+				{
+					ParametersMap::iterator jter = allParameters.find(iter->first);
+					if(jter!=allParameters.end())
+					{
+						iter->second = jter->second;
+					}
+				}
+			}
+			else
+			{
+				ROS_ERROR( "Config file \"%s\" not found!", configPath.c_str());
+			}
+		}
+		for(rtabmap::ParametersMap::iterator iter=parameters.begin(); iter!=parameters.end(); ++iter)
+		{
+			std::string vStr;
+			bool vBool;
+			int vInt;
+			double vDouble;
+			if(pnh.getParam(iter->first, vStr))
+			{
+				ROS_INFO( "Setting %s parameter \"%s\"=\"%s\"", ros::this_node::getName().c_str(), iter->first.c_str(), vStr.c_str());
+				iter->second = vStr;
+			}
+			else if(pnh.getParam(iter->first, vBool))
+			{
+				ROS_INFO( "Setting %s parameter \"%s\"=\"%s\"", ros::this_node::getName().c_str(), iter->first.c_str(), uBool2Str(vBool).c_str());
+				iter->second = uBool2Str(vBool);
+			}
+			else if(pnh.getParam(iter->first, vDouble))
+			{
+				ROS_INFO( "Setting %s parameter \"%s\"=\"%s\"", ros::this_node::getName().c_str(), iter->first.c_str(), uNumber2Str(vDouble).c_str());
+				iter->second = uNumber2Str(vDouble);
+			}
+			else if(pnh.getParam(iter->first, vInt))
+			{
+				ROS_INFO( "Setting %s parameter \"%s\"=\"%s\"", ros::this_node::getName().c_str(), iter->first.c_str(), uNumber2Str(vInt).c_str());
+				iter->second = uNumber2Str(vInt);
+			}
+
+			if(iter->first.compare(Parameters::kVisMinInliers()) == 0 && atoi(iter->second.c_str()) < 8)
+			{
+				ROS_WARN( "Parameter min_inliers must be >= 8, setting to 8...");
+				iter->second = uNumber2Str(8);
+			}
+		}
+
+		rtabmap::ParametersMap argParameters = rtabmap::Parameters::parseArguments(argc, argv);
+		for(rtabmap::ParametersMap::iterator iter=argParameters.begin(); iter!=argParameters.end(); ++iter)
+		{
+			rtabmap::ParametersMap::iterator jter = parameters.find(iter->first);
+			if(jter!=parameters.end())
+			{
+				ROS_INFO( "Update %s parameter \"%s\"=\"%s\" from arguments", ros::this_node::getName().c_str(), iter->first.c_str(), iter->second.c_str());
+				jter->second = iter->second;
+			}
+		}
+
+		// Backward compatibility
+		for(std::map<std::string, std::pair<bool, std::string> >::const_iterator iter=Parameters::getRemovedParameters().begin();
+			iter!=Parameters::getRemovedParameters().end();
+			++iter)
+		{
+			std::string vStr;
+			if(pnh.getParam(iter->first, vStr))
+			{
+				if(iter->second.first && parameters.find(iter->second.second) != parameters.end())
+				{
+					// can be migrated
+					parameters.at(iter->second.second)= vStr;
+					ROS_WARN( "%s: Parameter name changed: \"%s\" -> \"%s\". Please update your launch file accordingly. Value \"%s\" is still set to the new parameter name.",
+							ros::this_node::getName().c_str(), iter->first.c_str(), iter->second.second.c_str(), vStr.c_str());
+				}
+				else
+				{
+					if(iter->second.second.empty())
+					{
+						ROS_ERROR( "%s: Parameter \"%s\" doesn't exist anymore!",
+								ros::this_node::getName().c_str(), iter->first.c_str());
+					}
+					else
+					{
+						ROS_ERROR( "%s: Parameter \"%s\" doesn't exist anymore! You may look at this similar parameter: \"%s\"",
+								ros::this_node::getName().c_str(), iter->first.c_str(), iter->second.second.c_str());
+					}
+				}
+			}
+		}
+
 		mapsManager_.init(nh, pnh, ros::this_node::getName(), false);
+		mapsManager_.setParameters(parameters);
 
 		mapDataTopic_ = nh.subscribe("mapData", 1, &MapAssembler::mapDataReceivedCallback, this);
 
@@ -127,7 +234,41 @@ private:
 int main(int argc, char** argv)
 {
 	ros::init(argc, argv, "map_assembler");
-	MapAssembler assembler;
+
+	// process "--params" argument
+	for(int i=1;i<argc;++i)
+	{
+		if(strcmp(argv[i], "--params") == 0)
+		{
+			rtabmap::ParametersMap parameters;
+			uInsert(parameters, rtabmap::Parameters::getDefaultParameters("Grid"));
+			uInsert(parameters, rtabmap::Parameters::getDefaultParameters("StereoBM"));
+			for(rtabmap::ParametersMap::iterator iter=parameters.begin(); iter!=parameters.end(); ++iter)
+			{
+				std::string str = "Param: " + iter->first + " = \"" + iter->second + "\"";
+				std::cout <<
+						str <<
+						std::setw(60 - str.size()) <<
+						" [" <<
+						rtabmap::Parameters::getDescription(iter->first).c_str() <<
+						"]" <<
+						std::endl;
+			}
+			ROS_WARN("Node will now exit after showing default parameters because "
+					 "argument \"--params\" is detected!");
+			exit(0);
+		}
+		else if(strcmp(argv[i], "--udebug") == 0)
+		{
+			ULogger::setLevel(ULogger::kDebug);
+		}
+		else if(strcmp(argv[i], "--uinfo") == 0)
+		{
+			ULogger::setLevel(ULogger::kInfo);
+		}
+	}
+
+	MapAssembler assembler(argc, argv);
 	ros::spin();
 	return 0;
 }

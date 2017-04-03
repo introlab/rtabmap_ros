@@ -505,37 +505,48 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 						else
 						{
 							// generate tmp occupancy grid for negative ids (assuming data is already uncompressed)
-							// we need the signature
-							std::map<int, rtabmap::Signature>::const_iterator findIter = signatures.find(iter->first);
-							if(findIter != signatures.end())
+							// For negative laser scans, fill empty space?
+							bool unknownSpaceFilled = Parameters::defaultGridScan2dUnknownSpaceFilled();
+							Parameters::parse(parameters_, Parameters::kGridScan2dUnknownSpaceFilled(), unknownSpaceFilled);
+
+							if(unknownSpaceFilled != negativeScanEmptyRayTracing_ && negativeScanEmptyRayTracing_)
 							{
-								// For negative laser scans, fill empty space?
-								bool unknownSpaceFilled = Parameters::defaultGridScan2dUnknownSpaceFilled();
-								Parameters::parse(parameters_, Parameters::kGridScan2dUnknownSpaceFilled(), unknownSpaceFilled);
+								ParametersMap parameters;
+								parameters.insert(ParametersPair(Parameters::kGridScan2dUnknownSpaceFilled(), uBool2Str(negativeScanEmptyRayTracing_)));
+								occupancyGrid_->parseParameters(parameters);
+							}
 
-								if(unknownSpaceFilled != negativeScanEmptyRayTracing_ && negativeScanEmptyRayTracing_)
-								{
-									ParametersMap parameters;
-									parameters.insert(ParametersPair(Parameters::kGridScan2dUnknownSpaceFilled(), uBool2Str(negativeScanEmptyRayTracing_)));
-									occupancyGrid_->parseParameters(parameters);
-								}
+							cv::Mat rgb, depth, scan;
+							bool generateGrid = data.gridCellSize() == 0.0f || (unknownSpaceFilled != negativeScanEmptyRayTracing_ && negativeScanEmptyRayTracing_);
+							data.uncompressData(
+								occupancyGrid_->isGridFromDepth() && generateGrid?&rgb:0,
+								occupancyGrid_->isGridFromDepth() && generateGrid?&depth:0,
+								!occupancyGrid_->isGridFromDepth() && generateGrid?&scan:0,
+								0,
+								generateGrid?0:&ground,
+								generateGrid?0:&obstacles);
 
-								// normally data should be already uncompressed for negative ids
-								occupancyGrid_->createLocalMap(findIter->second, ground, obstacles, viewPoint);
+							if(generateGrid)
+							{
+								Signature tmp(data);
+								tmp.setPose(iter->second);
+								occupancyGrid_->createLocalMap(tmp, ground, obstacles, viewPoint);
 								uInsert(gridMaps_, std::make_pair(iter->first, std::make_pair(ground, obstacles)));
 								uInsert(gridMapsViewpoints_, std::make_pair(iter->first, viewPoint));
-
-								// put back
-								if(unknownSpaceFilled != negativeScanEmptyRayTracing_ && negativeScanEmptyRayTracing_)
-								{
-									ParametersMap parameters;
-									parameters.insert(ParametersPair(Parameters::kGridScan2dUnknownSpaceFilled(), uBool2Str(unknownSpaceFilled)));
-									occupancyGrid_->parseParameters(parameters);
-								}
 							}
 							else
 							{
-								ROS_WARN("%d signature not found in cache?!?!?", iter->first);
+								viewPoint = data.gridViewPoint();
+								gridMaps_.insert(std::make_pair(iter->first, std::make_pair(ground, obstacles)));
+								gridMapsViewpoints_.insert(std::make_pair(iter->first, viewPoint));
+							}
+
+							// put back
+							if(unknownSpaceFilled != negativeScanEmptyRayTracing_ && negativeScanEmptyRayTracing_)
+							{
+								ParametersMap parameters;
+								parameters.insert(ParametersPair(Parameters::kGridScan2dUnknownSpaceFilled(), uBool2Str(unknownSpaceFilled)));
+								occupancyGrid_->parseParameters(parameters);
 							}
 						}
 						if(ground.cols || obstacles.cols)
@@ -543,7 +554,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 							occupancyGrid_->addToCache(iter->first, ground, obstacles);
 						}
 					}
-					else
+					else if(memory)
 					{
 						ROS_ERROR("Data missing for node %d to update the maps", iter->first);
 					}
