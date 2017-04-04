@@ -23,16 +23,10 @@
     <arg name="device_id" value="#2" />
   </include>
 
-  <node pkg="tf" type="static_transform_publisher" name="world_to_map1"
-        args="0 0 0 0 0 0 world map1 100" />  
-  <node pkg="tf" type="static_transform_publisher" name="world_to_map2"
-        args="0 0 0 0 0 0 world map2 100" />  
-  
   <include file="$(find rtabmap_ros)/launch/rtabmap.launch">
      <arg name="namespace"         value="rtabmap1"/>
      <arg name="localization"      value="true" />
      <arg name="frame_id"          value="camera1_link" />
-     <arg name="map_frame_id"      value="map1" />
      <arg name="vo_frame_id"       value="odom1" />
 
      <arg name="rgb_topic"         value="/camera1/rgb/image_rect_color" />
@@ -46,7 +40,6 @@
      <arg name="namespace"         value="rtabmap2"/>
      <arg name="localization"      value="true" />
      <arg name="frame_id"          value="camera2_link" />
-     <arg name="map_frame_id"      value="map2" />
      <arg name="vo_frame_id"       value="odom2" />
 
      <arg name="rgb_topic"         value="/camera2/rgb/image_rect_color" />
