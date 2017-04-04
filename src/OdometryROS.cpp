@@ -112,12 +112,14 @@ void OdometryROS::onInit()
 
 	Transform initialPose = Transform::getIdentity();
 	std::string initialPoseStr;
-	std::string tfPrefix;
 	std::string configPath;
 	pnh.param("frame_id", frameId_, frameId_);
 	pnh.param("odom_frame_id", odomFrameId_, odomFrameId_);
 	pnh.param("publish_tf", publishTf_, publishTf_);
-	pnh.param("tf_prefix", tfPrefix, tfPrefix);
+	if(pnh.hasParam("tf_prefix"))
+	{
+		ROS_ERROR("tf_prefix parameter has been removed, use directly odom_frame_id and frame_id parameters.");
+	}
 	pnh.param("wait_for_transform", waitForTransform_, waitForTransform_);
 	pnh.param("wait_for_transform_duration",  waitForTransformDuration_, waitForTransformDuration_);
 	pnh.param("initial_pose", initialPoseStr, initialPoseStr); // "x y z roll pitch yaw"
@@ -139,22 +141,6 @@ void OdometryROS::onInit()
 	if(configPath.size() && configPath.at(0) != '/')
 	{
 		configPath = UDirectory::currentDir(true) + configPath;
-	}
-
-	if(!tfPrefix.empty())
-	{
-		if(!frameId_.empty())
-		{
-			frameId_ = tfPrefix + "/" + frameId_;
-		}
-		if(!odomFrameId_.empty())
-		{
-			odomFrameId_ = tfPrefix + "/" + odomFrameId_;
-		}
-		if(!groundTruthFrameId_.empty())
-		{
-			groundTruthFrameId_ = tfPrefix + "/" + groundTruthFrameId_;
-		}
 	}
 
 	if(initialPoseStr.size())

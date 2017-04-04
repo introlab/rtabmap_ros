@@ -126,7 +126,6 @@ void CoreWrapper::onInit()
 	bool publishTf = true;
 	double tfDelay = 0.05; // 20 Hz
 	double tfTolerance = 0.1; // 100 ms
-	std::string tfPrefix = "";
 
 	pnh.param("config_path",         configPath_, configPath_);
 	pnh.param("database_path",       databasePath_, databasePath_);
@@ -145,7 +144,10 @@ void CoreWrapper::onInit()
 
 	pnh.param("publish_tf",          publishTf, publishTf);
 	pnh.param("tf_delay",            tfDelay, tfDelay);
-	pnh.param("tf_prefix",           tfPrefix, tfPrefix);
+	if(pnh.hasParam("tf_prefix"))
+	{
+		ROS_ERROR("tf_prefix parameter has been removed, use directly map_frame_id, odom_frame_id and frame_id parameters.");
+	}
 	pnh.param("tf_tolerance",        tfTolerance, tfTolerance);
 	pnh.param("odom_tf_angular_variance", odomDefaultAngVariance_, odomDefaultAngVariance_);
 	pnh.param("odom_tf_linear_variance", odomDefaultLinVariance_, odomDefaultLinVariance_);
@@ -164,31 +166,6 @@ void CoreWrapper::onInit()
 		NODELET_WARN("Parameter \"flip_scan\" doesn't exist anymore. Rtabmap now "
 				"detects automatically if the laser is upside down with /tf, then if so, it "
 				"switches scan values.");
-	}
-
-	if(!tfPrefix.empty())
-	{
-		if(!frameId_.empty())
-		{
-			frameId_ = tfPrefix+"/"+frameId_;
-		}
-		if(!mapFrameId_.empty())
-		{
-			mapFrameId_ = tfPrefix+"/"+mapFrameId_;
-		}
-		if(!odomFrameId_.empty())
-		{
-			odomFrameId_ = tfPrefix+"/"+odomFrameId_;
-		}
-		if(!groundTruthFrameId_.empty())
-		{
-			groundTruthFrameId_ = tfPrefix+"/"+groundTruthFrameId_;
-		}
-		if(!groundTruthBaseFrameId_.empty())
-		{
-			groundTruthBaseFrameId_ = tfPrefix+"/"+groundTruthBaseFrameId_;
-		}
-		// keep worldFrameId_ without prefix as it should be global
 	}
 
 	NODELET_INFO("rtabmap: frame_id      = %s", frameId_.c_str());
