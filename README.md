@@ -73,7 +73,7 @@ This section shows how to install RTAB-Map ros-pkg on **ROS Hydro/Indigo/Jade/Ki
     $ git clone https://github.com/introlab/rtabmap.git rtabmap
     $ cd rtabmap/build
     $ cmake ..  [<---double dots included]
-    $ make -j4
+    $ make
     $ sudo make install
     ```
 
@@ -82,8 +82,9 @@ This section shows how to install RTAB-Map ros-pkg on **ROS Hydro/Indigo/Jade/Ki
     ```bash
     $ cd ~/catkin_ws
     $ git clone https://github.com/introlab/rtabmap_ros.git src/rtabmap_ros
-    $ catkin_make
+    $ catkin_make -j1
     ```
+    * Use `catkin_make -j1` if compilation requires more RAM than you have (e.g., some files require up to ~1.8 GB to build).
 
 ### Update to new version 
 
@@ -98,7 +99,7 @@ $ make install
 $ roscd rtabmap_ros
 $ git pull origin master
 $ cd ~/catkin_ws
-$ catkin_make
+$ catkin_make -j1
 ```
 
 
