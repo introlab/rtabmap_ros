@@ -82,11 +82,6 @@ private:
 	bool cloudOutputVoxelized_;
 	bool cloudSubtractFiltering_;
 	int cloudSubtractFilteringMinNeighbors_;
-	double gridCellSize_;
-	bool gridIncremental_;
-	double gridSize_;
-	bool gridEroded_;
-	double footprintRadius_;
 	double mapFilterRadius_;
 	double mapFilterAngle_;
 	bool mapCacheCleanup_;
