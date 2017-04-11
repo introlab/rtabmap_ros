@@ -270,7 +270,7 @@ void CoreWrapper::onInit()
 	for(unsigned int i=0; i<argList.size(); ++i)
 	{
 		argv[i] = &argList[i].at(0);
-		if(strcmp(argv[i], "--delete_db_on_start") == 0)
+		if(strcmp(argv[i], "--delete_db_on_start") == 0 || strcmp(argv[i], "-d") == 0)
 		{
 			deleteDbOnStart = true;
 		}
@@ -392,7 +392,7 @@ void CoreWrapper::onInit()
 	{
 		if(UFile::erase(databasePath_) == 0)
 		{
-			NODELET_INFO("rtabmap: Deleted database \"%s\" (--delete_db_on_start is set).", databasePath_.c_str());
+			NODELET_INFO("rtabmap: Deleted database \"%s\" (--delete_db_on_start or -d are set).", databasePath_.c_str());
 		}
 	}
 
