@@ -88,6 +88,14 @@
     </description>
   </class>
   
+  <class name="rtabmap_ros/pointcloud_to_depthimage" 
+         type="rtabmap_ros::PointCloudToDepthImage" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
+  
   <class name="rtabmap_ros/obstacles_detection" 
          type="rtabmap_ros::ObstaclesDetection" 
          base_class_type="nodelet::Nodelet">

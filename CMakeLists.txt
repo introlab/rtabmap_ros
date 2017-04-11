@@ -161,6 +161,7 @@ SET(rtabmap_ros_lib_src
    src/nodelets/point_cloud_xyzrgb.cpp 
    src/nodelets/point_cloud_xyz.cpp
    src/nodelets/disparity_to_depth.cpp 
+   src/nodelets/pointcloud_to_depthimage.cpp 
    src/nodelets/obstacles_detection.cpp
    src/nodelets/obstacles_detection_old.cpp
    src/nodelets/point_cloud_aggregator.cpp
