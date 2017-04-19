@@ -1142,26 +1142,26 @@ bool convertRGBDMsgs(
 						depthHeight,
 						depthMsgs[i]->image.rows).c_str());
 
-		rtabmap::Transform localTransform = rtabmap_ros::getTransform(frameId, depthMsgs[i]->header.frame_id, depthMsgs[i]->header.stamp, listener, waitForTransform);
+		rtabmap::Transform localTransform = rtabmap_ros::getTransform(frameId, cameraInfoMsgs[i].header.frame_id, cameraInfoMsgs[i].header.stamp, listener, waitForTransform);
 		if(localTransform.isNull())
 		{
-			ROS_ERROR("TF of received depth image %d at time %fs is not set!", i, depthMsgs[i]->header.stamp.toSec());
+			ROS_ERROR("TF of received depth image %d at time %fs is not set!", i, cameraInfoMsgs[i].header.stamp.toSec());
 			return false;
 		}
 		// sync with odometry stamp
-		if(!odomFrameId.empty() && odomStamp != depthMsgs[i]->header.stamp)
+		if(!odomFrameId.empty() && odomStamp != cameraInfoMsgs[i].header.stamp)
 		{
 			rtabmap::Transform sensorT = getTransform(
 					frameId,
 					odomFrameId,
 					odomStamp,
-					depthMsgs[i]->header.stamp,
+					cameraInfoMsgs[i].header.stamp,
 					listener,
 					waitForTransform);
 			if(sensorT.isNull())
 			{
 				ROS_WARN("Could not get odometry value for depth image stamp (%fs). Latest odometry "
-						"stamp is %fs. The depth image pose will not be synchronized with odometry.", depthMsgs[i]->header.stamp.toSec(), odomStamp.toSec());
+						"stamp is %fs. The depth image pose will not be synchronized with odometry.", cameraInfoMsgs[i].header.stamp.toSec(), odomStamp.toSec());
 			}
 			else
 			{
