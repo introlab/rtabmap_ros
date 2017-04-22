@@ -714,14 +714,16 @@ void MapsManager::publishMaps(
 		}
 
 		// detect if the graph has changed, if so, recreate the clouds
-		bool graphGroundChanged = false;
-		bool graphObstacleChanged = false;
+		bool graphGroundOptimized = false;
+		bool graphObstacleOptimized = false;
 		bool updateGround = cloudMapPub_.getNumSubscribers() ||
 				   scanMapPub_.getNumSubscribers() ||
 				   cloudGroundPub_.getNumSubscribers();
 		bool updateObstacles = cloudMapPub_.getNumSubscribers() ||
 				   scanMapPub_.getNumSubscribers() ||
 				   cloudObstaclesPub_.getNumSubscribers();
+		bool graphGroundChanged = updateGround;
+		bool graphObstacleChanged = updateObstacles;
 		for(std::map<int, Transform>::const_iterator iter=poses.begin(); iter!=poses.end(); ++iter)
 		{
 			std::map<int, Transform>::const_iterator jter;
@@ -730,10 +732,11 @@ void MapsManager::publishMaps(
 				jter = assembledGroundPoses_.find(iter->first);
 				if(jter != assembledGroundPoses_.end())
 				{
+					graphGroundChanged = false;
 					UASSERT(!iter->second.isNull() && !jter->second.isNull());
 					if(iter->second.getDistanceSquared(jter->second) > 0.0001)
 					{
-						graphGroundChanged = true;
+						graphGroundOptimized = true;
 					}
 				}
 			}
@@ -742,10 +745,11 @@ void MapsManager::publishMaps(
 				jter = assembledObstaclePoses_.find(iter->first);
 				if(jter != assembledObstaclePoses_.end())
 				{
+					graphObstacleChanged = false;
 					UASSERT(!iter->second.isNull() && !jter->second.isNull());
 					if(iter->second.getDistanceSquared(jter->second) > 0.0001)
 					{
-						graphObstacleChanged = true;
+						graphObstacleOptimized = true;
 					}
 				}
 			}
@@ -754,7 +758,7 @@ void MapsManager::publishMaps(
 		int countGrounds = 0;
 		int previousIndexedGroundSize = assembledGroundIndex_.indexedFeatures();
 		int previousIndexedObstacleSize = assembledObstacleIndex_.indexedFeatures();
-		if(graphGroundChanged)
+		if(graphGroundOptimized || graphGroundChanged)
 		{
 			int previousSize = assembledGround_->size();
 			assembledGround_->clear();
@@ -762,7 +766,7 @@ void MapsManager::publishMaps(
 			assembledGroundPoses_.clear();
 			assembledGroundIndex_.release();
 		}
-		if(graphObstacleChanged)
+		if(graphObstacleOptimized || graphObstacleChanged )
 		{
 			int previousSize = assembledObstacles_->size();
 			assembledObstacles_->clear();
@@ -771,7 +775,7 @@ void MapsManager::publishMaps(
 			assembledObstacleIndex_.release();
 		}
 
-		if(graphGroundChanged || graphObstacleChanged)
+		if(graphGroundOptimized || graphObstacleOptimized)
 		{
 			UTimer t;
 			cv::Mat tmpGroundPts;
@@ -781,7 +785,7 @@ void MapsManager::publishMaps(
 				if(iter->first > 0)
 				{
 					if(updateGround  &&
-					   (graphGroundChanged || assembledGroundPoses_.find(iter->first) == assembledGroundPoses_.end()))
+					   (graphGroundOptimized || assembledGroundPoses_.find(iter->first) == assembledGroundPoses_.end()))
 					{
 						assembledGroundPoses_.insert(*iter);
 						std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr >::iterator kter=groundClouds_.find(iter->first);
@@ -809,7 +813,7 @@ void MapsManager::publishMaps(
 						}
 					}
 					if(updateObstacles  &&
-					   (graphObstacleChanged || assembledObstaclePoses_.find(iter->first) == assembledObstaclePoses_.end()))
+					   (graphObstacleOptimized || assembledObstaclePoses_.find(iter->first) == assembledObstaclePoses_.end()))
 					{
 						assembledObstaclePoses_.insert(*iter);
 						std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr >::iterator kter=obstacleClouds_.find(iter->first);
@@ -840,104 +844,117 @@ void MapsManager::publishMaps(
 			}
 			double addingPointsTime = t.ticks();
 
-			if(graphGroundChanged && !tmpGroundPts.empty())
+			if(graphGroundOptimized && !tmpGroundPts.empty())
 			{
 				assembledGroundIndex_.buildKDTreeSingleIndex(tmpGroundPts, 15);
 			}
-			if(graphObstacleChanged && !tmpObstaclePts.empty())
+			if(graphObstacleOptimized && !tmpObstaclePts.empty())
 			{
 				assembledObstacleIndex_.buildKDTreeSingleIndex(tmpObstaclePts, 15);
 			}
 			double indexingTime = t.ticks();
-			UINFO("Graph changed! Time recreating clouds (%d ground, %d obstacles) = %f s (indexing %fs)", countGrounds, countObstacles, addingPointsTime+indexingTime, indexingTime);
+			UINFO("Graph optimized! Time recreating clouds (%d ground, %d obstacles) = %f s (indexing %fs)", countGrounds, countObstacles, addingPointsTime+indexingTime, indexingTime);
+		}
+		else if(graphGroundChanged || graphObstacleChanged)
+		{
+			UWARN("Graph has changed! The whole cloud is regenerated.");
 		}
 
 		for(std::map<int, Transform>::const_iterator iter = poses.begin(); iter!=poses.end(); ++iter)
 		{
-			if(iter->first > 0)
+			std::map<int, std::pair<cv::Mat, cv::Mat> >::iterator jter = gridMaps_.find(iter->first);
+			if(updateGround  && assembledGroundPoses_.find(iter->first) == assembledGroundPoses_.end())
 			{
-				std::map<int, std::pair<cv::Mat, cv::Mat> >::iterator jter = gridMaps_.find(iter->first);
-				if(updateGround  && assembledGroundPoses_.find(iter->first) == assembledGroundPoses_.end())
+				if(iter->first > 0)
 				{
 					assembledGroundPoses_.insert(*iter);
-					if(jter!=gridMaps_.end() && jter->second.first.cols)
+				}
+				if(jter!=gridMaps_.end() && jter->second.first.cols)
+				{
+					pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::laserScanToPointCloudRGB(jter->second.first, iter->second, 0, 255, 0);
+					pcl::PointCloud<pcl::PointXYZRGB>::Ptr subtractedCloud = transformed;
+					if(cloudSubtractFiltering_)
 					{
-						pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::laserScanToPointCloudRGB(jter->second.first, iter->second, 0, 255, 0);
-						pcl::PointCloud<pcl::PointXYZRGB>::Ptr subtractedCloud = transformed;
-						if(cloudSubtractFiltering_)
+						if(assembledGroundIndex_.indexedFeatures())
 						{
-							if(assembledGroundIndex_.indexedFeatures())
-							{
-								subtractedCloud = subtractFiltering(transformed, assembledGroundIndex_, occupancyGrid_->getCellSize(), cloudSubtractFilteringMinNeighbors_);
-							}
-							if(subtractedCloud->size())
-							{
-								UDEBUG("Adding ground %d pts=%d/%d (index=%d)", iter->first, subtractedCloud->size(), transformed->size(), assembledGroundIndex_.indexedFeatures());
-								cv::Mat pts(subtractedCloud->size(), 3, CV_32FC1);
-								for(unsigned int i=0; i<subtractedCloud->size(); ++i)
-								{
-									pts.at<float>(i, 0) = subtractedCloud->at(i).x;
-									pts.at<float>(i, 1) = subtractedCloud->at(i).y;
-									pts.at<float>(i, 2) = subtractedCloud->at(i).z;
-								}
-								if(!assembledGroundIndex_.isBuilt())
-								{
-									assembledGroundIndex_.buildKDTreeSingleIndex(pts, 15);
-								}
-								else
-								{
-									assembledGroundIndex_.addPoints(pts);
-								}
-							}
+							subtractedCloud = subtractFiltering(transformed, assembledGroundIndex_, occupancyGrid_->getCellSize(), cloudSubtractFilteringMinNeighbors_);
 						}
-						groundClouds_.insert(std::make_pair(iter->first, util3d::transformPointCloud(subtractedCloud, iter->second.inverse())));
 						if(subtractedCloud->size())
 						{
-							*assembledGround_+=*subtractedCloud;
+							UDEBUG("Adding ground %d pts=%d/%d (index=%d)", iter->first, subtractedCloud->size(), transformed->size(), assembledGroundIndex_.indexedFeatures());
+							cv::Mat pts(subtractedCloud->size(), 3, CV_32FC1);
+							for(unsigned int i=0; i<subtractedCloud->size(); ++i)
+							{
+								pts.at<float>(i, 0) = subtractedCloud->at(i).x;
+								pts.at<float>(i, 1) = subtractedCloud->at(i).y;
+								pts.at<float>(i, 2) = subtractedCloud->at(i).z;
+							}
+							if(!assembledGroundIndex_.isBuilt())
+							{
+								assembledGroundIndex_.buildKDTreeSingleIndex(pts, 15);
+							}
+							else
+							{
+								assembledGroundIndex_.addPoints(pts);
+							}
 						}
-						++countGrounds;
 					}
+					if(iter->first>0)
+					{
+						groundClouds_.insert(std::make_pair(iter->first, util3d::transformPointCloud(subtractedCloud, iter->second.inverse())));
+					}
+					if(subtractedCloud->size())
+					{
+						*assembledGround_+=*subtractedCloud;
+					}
+					++countGrounds;
 				}
-				if(updateObstacles  && assembledObstaclePoses_.find(iter->first) == assembledObstaclePoses_.end())
+			}
+			if(updateObstacles  && assembledObstaclePoses_.find(iter->first) == assembledObstaclePoses_.end())
+			{
+				if(iter->first > 0)
 				{
 					assembledObstaclePoses_.insert(*iter);
-					if(jter!=gridMaps_.end() && jter->second.second.cols)
+				}
+				if(jter!=gridMaps_.end() && jter->second.second.cols)
+				{
+					pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::laserScanToPointCloudRGB(jter->second.second, iter->second, 255, 0, 0);
+					pcl::PointCloud<pcl::PointXYZRGB>::Ptr subtractedCloud = transformed;
+					if(cloudSubtractFiltering_)
 					{
-						pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::laserScanToPointCloudRGB(jter->second.second, iter->second, 255, 0, 0);
-						pcl::PointCloud<pcl::PointXYZRGB>::Ptr subtractedCloud = transformed;
-						if(cloudSubtractFiltering_)
+						if(assembledObstacleIndex_.indexedFeatures())
 						{
-							if(assembledObstacleIndex_.indexedFeatures())
-							{
-								subtractedCloud = subtractFiltering(transformed, assembledObstacleIndex_, occupancyGrid_->getCellSize(), cloudSubtractFilteringMinNeighbors_);
-							}
-							if(subtractedCloud->size())
-							{
-								UDEBUG("Adding obstacle %d pts=%d/%d (index=%d)", iter->first, subtractedCloud->size(), transformed->size(), assembledObstacleIndex_.indexedFeatures());
-								cv::Mat pts(subtractedCloud->size(), 3, CV_32FC1);
-								for(unsigned int i=0; i<subtractedCloud->size(); ++i)
-								{
-									pts.at<float>(i, 0) = subtractedCloud->at(i).x;
-									pts.at<float>(i, 1) = subtractedCloud->at(i).y;
-									pts.at<float>(i, 2) = subtractedCloud->at(i).z;
-								}
-								if(!assembledObstacleIndex_.isBuilt())
-								{
-									assembledObstacleIndex_.buildKDTreeSingleIndex(pts, 15);
-								}
-								else
-								{
-									assembledObstacleIndex_.addPoints(pts);
-								}
-							}
+							subtractedCloud = subtractFiltering(transformed, assembledObstacleIndex_, occupancyGrid_->getCellSize(), cloudSubtractFilteringMinNeighbors_);
 						}
-						obstacleClouds_.insert(std::make_pair(iter->first, util3d::transformPointCloud(subtractedCloud, iter->second.inverse())));
 						if(subtractedCloud->size())
 						{
-							*assembledObstacles_+=*subtractedCloud;
+							UDEBUG("Adding obstacle %d pts=%d/%d (index=%d)", iter->first, subtractedCloud->size(), transformed->size(), assembledObstacleIndex_.indexedFeatures());
+							cv::Mat pts(subtractedCloud->size(), 3, CV_32FC1);
+							for(unsigned int i=0; i<subtractedCloud->size(); ++i)
+							{
+								pts.at<float>(i, 0) = subtractedCloud->at(i).x;
+								pts.at<float>(i, 1) = subtractedCloud->at(i).y;
+								pts.at<float>(i, 2) = subtractedCloud->at(i).z;
+							}
+							if(!assembledObstacleIndex_.isBuilt())
+							{
+								assembledObstacleIndex_.buildKDTreeSingleIndex(pts, 15);
+							}
+							else
+							{
+								assembledObstacleIndex_.addPoints(pts);
+							}
 						}
-						++countObstacles;
 					}
+					if(iter->first>0)
+					{
+						obstacleClouds_.insert(std::make_pair(iter->first, util3d::transformPointCloud(subtractedCloud, iter->second.inverse())));
+					}
+					if(subtractedCloud->size())
+					{
+						*assembledObstacles_+=*subtractedCloud;
+					}
+					++countObstacles;
 				}
 			}
 		}
