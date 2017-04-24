@@ -62,7 +62,7 @@
 	  <param name="RGBD/OptimizeFromGraphEnd"    type="string" value="false"/>  <!-- Set to false to generate map correction between /map and /odom -->
 	  <param name="Kp/MaxDepth"                  type="string" value="4.0"/>
 	  <param name="Reg/Strategy"                 type="string" value="1"/>      <!-- Loop closure transformation refining with ICP: 0=Visual, 1=ICP, 2=Visual+ICP -->
-	  <param name="Icp/CoprrespondenceRatio"     type="string" value="0.3"/>
+	  <param name="Icp/CorrespondenceRatio"      type="string" value="0.3"/>
 	  <param name="Vis/MinInliers"               type="string" value="5"/>      <!-- 3D visual words minimum inliers to accept loop closure -->
 	  <param name="Vis/InlierDistance"           type="string" value="0.1"/>    <!-- 3D visual words correspondence distance -->
 	  <param name="RGBD/AngularUpdate"           type="string" value="0.1"/>    <!-- Update map only if the robot is moving -->
