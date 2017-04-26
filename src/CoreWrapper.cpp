@@ -332,6 +332,19 @@ void CoreWrapper::onInit()
 				Parameters::kGridFromDepth().c_str());
 		parameters_.insert(ParametersPair(Parameters::kGridFromDepth(), "false"));
 	}
+	if(subscribeScan2d &&
+		parameters_.find(Parameters::kRGBDProximityPathMaxNeighbors()) == parameters_.end() &&
+		(parameters_.find(Parameters::kRGBDProximityBySpace()) == parameters_.end() ||
+				uStr2Bool(parameters_.at(Parameters::kRGBDProximityBySpace()))))
+	{
+		NODELET_WARN("Setting \"%s\" parameter to 10 (default 0) as \"subscribe_scan\" is "
+				"true. Proximity detection by space will be also done by merging close "
+				"scans. To disable, set to 0. To suppress this warning, "
+				"add <param name=\"%s\" type=\"string\" value=\"10\"/>",
+				Parameters::kRGBDProximityPathMaxNeighbors().c_str(),
+				Parameters::kRGBDProximityPathMaxNeighbors().c_str());
+		parameters_.insert(ParametersPair(Parameters::kRGBDProximityPathMaxNeighbors(), "10"));
+	}
 
 	// modify default parameters with those in the database
 	if(!deleteDbOnStart)
