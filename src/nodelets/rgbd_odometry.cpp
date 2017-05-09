@@ -213,6 +213,14 @@ private:
 		ros::Time higherStamp;
 		int imageWidth = rgbImages[0]->image.cols;
 		int imageHeight = rgbImages[0]->image.rows;
+		int depthWidth = depthImages[0]->image.cols;
+		int depthHeight = depthImages[0]->image.rows;
+
+		UASSERT_MSG(
+			imageWidth % depthWidth == 0 && imageHeight % depthHeight == 0 &&
+			imageWidth/depthWidth == imageHeight/depthHeight,
+			uFormat("rgb=%dx%d depth=%dx%d", imageWidth, imageHeight, depthWidth, depthHeight).c_str());
+
 		int cameraCount = rgbImages.size();
 		cv::Mat rgb;
 		cv::Mat depth;
@@ -224,25 +232,30 @@ private:
 				 rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
 				 rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||
 				 rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
-				 rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0) ||
+				 rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0 ||
+				 rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::BGRA8) == 0 ||
+				 rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::RGBA8) == 0) ||
 				!(depthImages[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1) == 0 ||
 				 depthImages[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1) == 0 ||
 				 depthImages[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0))
-			{
-				NODELET_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8 and image_depth=32FC1,16UC1,mono16");
-				return;
-			}
+				 {
+	 				NODELET_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8,bgra8,rgba8 and "
+	 				"image_depth=32FC1,16UC1,mono16. Current rgb=%s and depth=%s",
+	 					rgbImages[i]->encoding.c_str(),
+	 					depthImages[i]->encoding.c_str());
+	 				return;
+	 			}
 			UASSERT_MSG(rgbImages[i]->image.cols == imageWidth && rgbImages[i]->image.rows == imageHeight,
 					uFormat("imageWidth=%d vs %d imageHeight=%d vs %d",
 							imageWidth,
 							rgbImages[i]->image.cols,
 							imageHeight,
 							rgbImages[i]->image.rows).c_str());
-			UASSERT_MSG(depthImages[i]->image.cols == imageWidth && depthImages[i]->image.rows == imageHeight,
-					uFormat("imageWidth=%d vs %d imageHeight=%d vs %d",
-							imageWidth,
+			UASSERT_MSG(depthImages[i]->image.cols == depthWidth && depthImages[i]->image.rows == depthHeight,
+					uFormat("depthWidth=%d vs %d depthHeight=%d vs %d",
+							depthWidth,
 							depthImages[i]->image.cols,
-							imageHeight,
+							depthHeight,
 							depthImages[i]->image.rows).c_str());
 
 			ros::Time stamp = rgbImages[i]->header.stamp>depthImages[i]->header.stamp?rgbImages[i]->header.stamp:depthImages[i]->header.stamp;
@@ -279,7 +292,7 @@ private:
 			}
 			if(depth.empty())
 			{
-				depth = cv::Mat(imageHeight, imageWidth*cameraCount, subDepth.type());
+				depth = cv::Mat(depthHeight, depthWidth*cameraCount, subDepth.type());
 			}
 
 			if(ptrImage->image.type() == rgb.type())
@@ -294,7 +307,7 @@ private:
 
 			if(subDepth.type() == depth.type())
 			{
-				subDepth.copyTo(cv::Mat(depth, cv::Rect(i*imageWidth, 0, imageWidth, imageHeight)));
+				subDepth.copyTo(cv::Mat(depth, cv::Rect(i*depthWidth, 0, depthWidth, depthHeight)));
 			}
 			else
 			{
