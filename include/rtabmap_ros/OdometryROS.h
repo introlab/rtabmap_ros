@@ -95,6 +95,7 @@ private:
 	std::string frameId_;
 	std::string odomFrameId_;
 	std::string groundTruthFrameId_;
+	std::string groundTruthBaseFrameId_;
 	std::string guessFrameId_;
 	bool publishTf_;
 	bool waitForTransform_;
