@@ -32,6 +32,8 @@
   <arg name="frame_id"                default="camera_link"/>     <!-- Fixed frame id, you may set "base_link" or "base_footprint" if they are published -->
   <arg name="odom_frame_id"           default=""/>                <!-- If set, TF is used to get odometry instead of the topic -->
   <arg name="map_frame_id"            default="map"/>
+  <arg name="ground_truth_frame_id"   default=""/>     <!-- e.g., "world" -->
+  <arg name="ground_truth_base_frame_id" default=""/>  <!-- e.g., "tracker", a fake frame matching the frame "frame_id" (but on different TF tree) -->
   <arg name="namespace"               default="rtabmap"/>
   <arg name="database_path"           default="~/.ros/rtabmap.db"/>
   <arg name="queue_size"              default="10"/>
@@ -142,6 +144,8 @@
       <param name="frame_id"             type="string" value="$(arg frame_id)"/>
       <param name="map_frame_id"         type="string" value="$(arg map_frame_id)"/>
       <param name="odom_frame_id"        type="string" value="$(arg odom_frame_id)"/>
+      <param name="ground_truth_frame_id"       type="string" value="$(arg ground_truth_frame_id)"/>
+      <param name="ground_truth_base_frame_id"  type="string" value="$(arg ground_truth_base_frame_id)"/>
       <param name="odom_tf_angular_variance" type="double" value="$(arg odom_tf_angular_variance)"/>
       <param name="odom_tf_linear_variance"  type="double" value="$(arg odom_tf_linear_variance)"/>
       <param name="wait_for_transform_duration"  type="double"   value="$(arg wait_for_transform)"/>
