@@ -105,6 +105,8 @@
 	  
         <param name="frame_id"                    type="string" value="$(arg frame_id)"/>
         <param name="odom_frame_id"               type="string" value="$(arg vo_frame_id)"/>
+        <param name="ground_truth_frame_id"       type="string" value="$(arg ground_truth_frame_id)"/>
+        <param name="ground_truth_base_frame_id"  type="string" value="$(arg ground_truth_base_frame_id)"/>
         <param name="wait_for_transform_duration" type="double" value="$(arg wait_for_transform)"/>
         <param name="approx_sync"                 type="bool"   value="$(arg approx_sync)"/>
         <param name="config_path"                 type="string" value="$(arg cfg)"/>
@@ -125,6 +127,8 @@
 	  
         <param name="frame_id"                    type="string" value="$(arg frame_id)"/>
         <param name="odom_frame_id"               type="string" value="$(arg vo_frame_id)"/>
+        <param name="ground_truth_frame_id"       type="string" value="$(arg ground_truth_frame_id)"/>
+        <param name="ground_truth_base_frame_id"  type="string" value="$(arg ground_truth_base_frame_id)"/>
         <param name="wait_for_transform_duration" type="double" value="$(arg wait_for_transform)"/>
         <param name="approx_sync"                 type="bool"   value="$(arg approx_sync)"/>
         <param name="config_path"                 type="string" value="$(arg cfg)"/>

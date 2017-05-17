@@ -63,6 +63,7 @@ OdometryROS::OdometryROS(bool stereoParams, bool visParams, bool icpParams) :
 	frameId_("base_link"),
 	odomFrameId_("odom"),
 	groundTruthFrameId_(""),
+	groundTruthBaseFrameId_(""),
 	guessFrameId_(""),
 	publishTf_(true),
 	waitForTransform_(true),
@@ -124,6 +125,7 @@ void OdometryROS::onInit()
 	pnh.param("wait_for_transform_duration",  waitForTransformDuration_, waitForTransformDuration_);
 	pnh.param("initial_pose", initialPoseStr, initialPoseStr); // "x y z roll pitch yaw"
 	pnh.param("ground_truth_frame_id", groundTruthFrameId_, groundTruthFrameId_);
+	pnh.param("ground_truth_base_frame_id", groundTruthBaseFrameId_, frameId_);
 	pnh.param("config_path", configPath, configPath);
 	pnh.param("publish_null_when_lost", publishNullWhenLost_, publishNullWhenLost_);
 	pnh.param("guess_from_tf", guessFromTf_, guessFromTf_);
@@ -351,7 +353,7 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 	   !groundTruthFrameId_.empty())
 	{
 		// sync with the first value of the ground truth
-		Transform initialPose = getTransform(groundTruthFrameId_, frameId_, stamp);
+		Transform initialPose = getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, stamp);
 		if(initialPose.isNull())
 		{
 			return;
@@ -360,7 +362,7 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 		NODELET_INFO( "Initializing odometry pose to %s (from \"%s\" -> \"%s\")",
 				initialPose.prettyPrint().c_str(),
 				groundTruthFrameId_.c_str(),
-				frameId_.c_str());
+				groundTruthBaseFrameId_.c_str());
 		odometry_->reset(initialPose);
 	}
 
