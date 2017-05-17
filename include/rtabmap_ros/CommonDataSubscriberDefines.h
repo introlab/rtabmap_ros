@@ -84,6 +84,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 		DATA_SYNC7(PREFIX, Exact, MSG0, MSG1, MSG2, MSG3, MSG4, MSG5, MSG6) \
 		void PREFIX##Callback(const MSG0##ConstPtr&, const MSG1##ConstPtr&, const MSG2##ConstPtr&, const MSG3##ConstPtr&, const MSG4##ConstPtr&, const MSG5##ConstPtr&, const MSG6##ConstPtr&); \
 
+#define DATA_SYNC8(PREFIX, SYNC_NAME, MSG0, MSG1, MSG2, MSG3, MSG4, MSG5, MSG6, MSG7) \
+		typedef message_filters::sync_policies::SYNC_NAME##Time<MSG0, MSG1, MSG2, MSG3, MSG4, MSG5, MSG6, MSG7> PREFIX##SYNC_NAME##SyncPolicy; \
+		message_filters::Synchronizer<PREFIX##SYNC_NAME##SyncPolicy> * PREFIX##SYNC_NAME##Sync_;
+
+#define DATA_SYNCS8(PREFIX, MSG0, MSG1, MSG2, MSG3, MSG4, MSG5, MSG6, MSG7) \
+		DATA_SYNC8(PREFIX, Approximate, MSG0, MSG1, MSG2, MSG3, MSG4, MSG5, MSG6, MSG7) \
+		DATA_SYNC8(PREFIX, Exact, MSG0, MSG1, MSG2, MSG3, MSG4, MSG5, MSG6, MSG7) \
+		void PREFIX##Callback(const MSG0##ConstPtr&, const MSG1##ConstPtr&, const MSG2##ConstPtr&, const MSG3##ConstPtr&, const MSG4##ConstPtr&, const MSG5##ConstPtr&, const MSG6##ConstPtr&, const MSG7##ConstPtr&); \
+
 
 // Constructor
 #define SYNC_INIT(PREFIX) \
@@ -224,6 +233,31 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 				SUB4.getTopic().c_str(), \
 				SUB5.getTopic().c_str(), \
 				SUB6.getTopic().c_str());
+
+#define SYNC_DECL8(PREFIX, APPROX, QUEUE_SIZE, SUB0, SUB1, SUB2, SUB3, SUB4, SUB5, SUB6, SUB7) \
+		if(APPROX) \
+		{ \
+			PREFIX##ApproximateSync_ = new message_filters::Synchronizer<PREFIX##ApproximateSyncPolicy>( \
+					PREFIX##ApproximateSyncPolicy(QUEUE_SIZE), SUB0, SUB1, SUB2, SUB3, SUB4, SUB5, SUB6, SUB7); \
+			PREFIX##ApproximateSync_->registerCallback(boost::bind(&CommonDataSubscriber::PREFIX##Callback, this, _1, _2, _3, _4, _5, _6, _7, _8)); \
+		} \
+		else \
+		{ \
+			PREFIX##ExactSync_ = new message_filters::Synchronizer<PREFIX##ExactSyncPolicy>( \
+					PREFIX##ExactSyncPolicy(QUEUE_SIZE), SUB0, SUB1, SUB2, SUB3, SUB4, SUB5, SUB6, SUB7); \
+			PREFIX##ExactSync_->registerCallback(boost::bind(&CommonDataSubscriber::PREFIX##Callback, this, _1, _2, _3, _4, _5, _6, _7, _8)); \
+		} \
+		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s,\n   %s,\n   %s,\n   %s", \
+				name_.c_str(), \
+				APPROX?"approx":"exact", \
+				SUB0.getTopic().c_str(), \
+				SUB1.getTopic().c_str(), \
+				SUB2.getTopic().c_str(), \
+				SUB3.getTopic().c_str(), \
+				SUB4.getTopic().c_str(), \
+				SUB5.getTopic().c_str(), \
+				SUB6.getTopic().c_str(), \
+				SUB7.getTopic().c_str());
 
 
 #endif /* INCLUDE_RTABMAP_ROS_COMMONDATASUBSCRIBERIMPL_H_ */

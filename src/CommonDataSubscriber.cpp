@@ -142,7 +142,71 @@ CommonDataSubscriber::CommonDataSubscriber(bool gui) :
 		SYNC_INIT(rgbd2OdomDataScan3d),
 		SYNC_INIT(rgbd2OdomDataInfo),
 		SYNC_INIT(rgbd2OdomDataScan2dInfo),
-		SYNC_INIT(rgbd2OdomDataScan3dInfo)
+		SYNC_INIT(rgbd2OdomDataScan3dInfo),
+
+		// 3 RGBD
+		SYNC_INIT(rgbd3),
+		SYNC_INIT(rgbd3Scan2d),
+		SYNC_INIT(rgbd3Scan3d),
+		SYNC_INIT(rgbd3Info),
+		SYNC_INIT(rgbd3Scan2dInfo),
+		SYNC_INIT(rgbd3Scan3dInfo),
+
+		// 3 RGBD + Odom
+		SYNC_INIT(rgbd3Odom),
+		SYNC_INIT(rgbd3OdomScan2d),
+		SYNC_INIT(rgbd3OdomScan3d),
+		SYNC_INIT(rgbd3OdomInfo),
+		SYNC_INIT(rgbd3OdomScan2dInfo),
+		SYNC_INIT(rgbd3OdomScan3dInfo),
+
+		// 3 RGBD + User Data
+		SYNC_INIT(rgbd3Data),
+		SYNC_INIT(rgbd3DataScan2d),
+		SYNC_INIT(rgbd3DataScan3d),
+		SYNC_INIT(rgbd3DataInfo),
+		SYNC_INIT(rgbd3DataScan2dInfo),
+		SYNC_INIT(rgbd3DataScan3dInfo),
+
+		// 3 RGBD + Odom + User Data
+		SYNC_INIT(rgbd3OdomData),
+		SYNC_INIT(rgbd3OdomDataScan2d),
+		SYNC_INIT(rgbd3OdomDataScan3d),
+		SYNC_INIT(rgbd3OdomDataInfo),
+		SYNC_INIT(rgbd3OdomDataScan2dInfo),
+		SYNC_INIT(rgbd3OdomDataScan3dInfo),
+
+		// 4 RGBD
+		SYNC_INIT(rgbd4),
+		SYNC_INIT(rgbd4Scan2d),
+		SYNC_INIT(rgbd4Scan3d),
+		SYNC_INIT(rgbd4Info),
+		SYNC_INIT(rgbd4Scan2dInfo),
+		SYNC_INIT(rgbd4Scan3dInfo),
+
+		// 4 RGBD + Odom
+		SYNC_INIT(rgbd4Odom),
+		SYNC_INIT(rgbd4OdomScan2d),
+		SYNC_INIT(rgbd4OdomScan3d),
+		SYNC_INIT(rgbd4OdomInfo),
+		SYNC_INIT(rgbd4OdomScan2dInfo),
+		SYNC_INIT(rgbd4OdomScan3dInfo),
+
+		// 4 RGBD + User Data
+		SYNC_INIT(rgbd4Data),
+		SYNC_INIT(rgbd4DataScan2d),
+		SYNC_INIT(rgbd4DataScan3d),
+		SYNC_INIT(rgbd4DataInfo),
+		SYNC_INIT(rgbd4DataScan2dInfo),
+		SYNC_INIT(rgbd4DataScan3dInfo),
+
+		// 4 RGBD + Odom + User Data
+		SYNC_INIT(rgbd4OdomData),
+		SYNC_INIT(rgbd4OdomDataScan2d),
+		SYNC_INIT(rgbd4OdomDataScan3d),
+		SYNC_INIT(rgbd4OdomDataInfo),
+		SYNC_INIT(rgbd4OdomDataScan2dInfo),
+		SYNC_INIT(rgbd4OdomDataScan3dInfo)
 
 {
 }
@@ -256,7 +320,33 @@ void CommonDataSubscriber::setupCallbacks(ros::NodeHandle & nh, ros::NodeHandle 
 	}
 	else if(subscribedToRGBD_)
 	{
-		if(rgbdCameras == 2)
+		if(rgbdCameras == 4)
+		{
+			setupRGBD4Callbacks(
+					nh,
+					pnh,
+					subscribeOdom,
+					subscribeUserData,
+					subscribeScan2d,
+					subscribeScan3d,
+					subscribeOdomInfo,
+					queueSize_,
+					approxSync_);
+		}
+		else if(rgbdCameras == 3)
+		{
+			setupRGBD3Callbacks(
+					nh,
+					pnh,
+					subscribeOdom,
+					subscribeUserData,
+					subscribeScan2d,
+					subscribeScan3d,
+					subscribeOdomInfo,
+					queueSize_,
+					approxSync_);
+		}
+		else if(rgbdCameras == 2)
 		{
 			setupRGBD2Callbacks(
 					nh,
@@ -401,6 +491,70 @@ CommonDataSubscriber::~CommonDataSubscriber()
 	SYNC_DEL(rgbd2OdomDataInfo);
 	SYNC_DEL(rgbd2OdomDataScan2dInfo);
 	SYNC_DEL(rgbd2OdomDataScan3dInfo);
+
+	// 3 RGBD
+	SYNC_DEL(rgbd3);
+	SYNC_DEL(rgbd3Scan2d);
+	SYNC_DEL(rgbd3Scan3d);
+	SYNC_DEL(rgbd3Info);
+	SYNC_DEL(rgbd3Scan2dInfo);
+	SYNC_DEL(rgbd3Scan3dInfo);
+
+	// 3 RGBD + Odom
+	SYNC_DEL(rgbd3Odom);
+	SYNC_DEL(rgbd3OdomScan2d);
+	SYNC_DEL(rgbd3OdomScan3d);
+	SYNC_DEL(rgbd3OdomInfo);
+	SYNC_DEL(rgbd3OdomScan2dInfo);
+	SYNC_DEL(rgbd3OdomScan3dInfo);
+
+	// 3 RGBD + User Data
+	SYNC_DEL(rgbd3Data);
+	SYNC_DEL(rgbd3DataScan2d);
+	SYNC_DEL(rgbd3DataScan3d);
+	SYNC_DEL(rgbd3DataInfo);
+	SYNC_DEL(rgbd3DataScan2dInfo);
+	SYNC_DEL(rgbd3DataScan3dInfo);
+
+	// 3 RGBD + Odom + User Data
+	SYNC_DEL(rgbd3OdomData);
+	SYNC_DEL(rgbd3OdomDataScan2d);
+	SYNC_DEL(rgbd3OdomDataScan3d);
+	SYNC_DEL(rgbd3OdomDataInfo);
+	SYNC_DEL(rgbd3OdomDataScan2dInfo);
+	SYNC_DEL(rgbd3OdomDataScan3dInfo);
+
+	// 4 RGBD
+	SYNC_DEL(rgbd4);
+	SYNC_DEL(rgbd4Scan2d);
+	SYNC_DEL(rgbd4Scan3d);
+	SYNC_DEL(rgbd4Info);
+	SYNC_DEL(rgbd4Scan2dInfo);
+	SYNC_DEL(rgbd4Scan3dInfo);
+
+	// 4 RGBD + Odom
+	SYNC_DEL(rgbd4Odom);
+	SYNC_DEL(rgbd4OdomScan2d);
+	SYNC_DEL(rgbd4OdomScan3d);
+	SYNC_DEL(rgbd4OdomInfo);
+	SYNC_DEL(rgbd4OdomScan2dInfo);
+	SYNC_DEL(rgbd4OdomScan3dInfo);
+
+	// 4 RGBD + User Data
+	SYNC_DEL(rgbd4Data);
+	SYNC_DEL(rgbd4DataScan2d);
+	SYNC_DEL(rgbd4DataScan3d);
+	SYNC_DEL(rgbd4DataInfo);
+	SYNC_DEL(rgbd4DataScan2dInfo);
+	SYNC_DEL(rgbd4DataScan3dInfo);
+
+	// 4 RGBD + Odom + User Data
+	SYNC_DEL(rgbd4OdomData);
+	SYNC_DEL(rgbd4OdomDataScan2d);
+	SYNC_DEL(rgbd4OdomDataScan3d);
+	SYNC_DEL(rgbd4OdomDataInfo);
+	SYNC_DEL(rgbd4OdomDataScan2dInfo);
+	SYNC_DEL(rgbd4OdomDataScan3dInfo);
 
 	for(unsigned int i=0; i<rgbdSubs_.size(); ++i)
 	{

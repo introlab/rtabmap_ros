@@ -176,6 +176,8 @@ SET(rtabmap_ros_lib_src
    src/impl/CommonDataSubscriberStereo.cpp
    src/impl/CommonDataSubscriberRGBD.cpp
    src/impl/CommonDataSubscriberRGBD2.cpp
+   src/impl/CommonDataSubscriberRGBD3.cpp
+   src/impl/CommonDataSubscriberRGBD4.cpp
 )   
 
 # If costmap_2d is found, add the plugin
