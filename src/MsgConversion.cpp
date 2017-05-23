@@ -294,7 +294,8 @@ void infoToROS(const rtabmap::Statistics & stats, rtabmap_ros::Info & info)
 
 rtabmap::Link linkFromROS(const rtabmap_ros::Link & msg)
 {
-	return rtabmap::Link(msg.fromId, msg.toId, (rtabmap::Link::Type)msg.type, transformFromGeometryMsg(msg.transform), msg.rotVariance, msg.transVariance);
+	cv::Mat information = cv::Mat(6,6,CV_64FC1, (void*)msg.information.data()).clone();
+	return rtabmap::Link(msg.fromId, msg.toId, (rtabmap::Link::Type)msg.type, transformFromGeometryMsg(msg.transform), information);
 }
 
 void linkToROS(const rtabmap::Link & link, rtabmap_ros::Link & msg)
@@ -302,8 +303,10 @@ void linkToROS(const rtabmap::Link & link, rtabmap_ros::Link & msg)
 	msg.fromId = link.from();
 	msg.toId = link.to();
 	msg.type = link.type();
-	msg.rotVariance = link.rotVariance();
-	msg.transVariance = link.transVariance();
+	if(link.infMatrix().type() == CV_64FC1 && link.infMatrix().cols == 6 && link.infMatrix().rows == 6)
+	{
+		memcpy(msg.information.data(), link.infMatrix().data, 36*sizeof(double));
+	}
 	transformToGeometryMsg(link.transform(), msg.transform);
 }
 
@@ -876,8 +879,7 @@ rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::OdomInfo & msg)
 	info.matches = msg.matches;
 	info.inliers = msg.inliers;
 	info.icpInliersRatio = msg.icpInliersRatio;
-	info.varianceLin = msg.varianceLin;
-	info.varianceAng = msg.varianceAng;
+	info.covariance = cv::Mat(6,6,CV_64FC1, (void*)msg.covariance.data()).clone();
 	info.features = msg.features;
 	info.localMapSize = msg.localMapSize;
 	info.localScanMapSize = msg.localScanMapSize;
@@ -927,8 +929,10 @@ void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_ros::OdomInfo & m
 	msg.matches = info.matches;
 	msg.inliers = info.inliers;
 	msg.icpInliersRatio = info.icpInliersRatio;
-	msg.varianceLin = info.varianceLin;
-	msg.varianceAng = info.varianceAng;
+	if(info.covariance.type() == CV_64FC1 && info.covariance.cols == 6 && info.covariance.rows == 6)
+	{
+		memcpy(msg.covariance.data(), info.covariance.data, 36*sizeof(double));
+	}
 	msg.features = info.features;
 	msg.localMapSize = info.localMapSize;
 	msg.localScanMapSize = info.localScanMapSize;

@@ -564,6 +564,7 @@ void GuiWrapper::commonDepthCallback(
 		return;
 	}
 
+	info.covariance = covariance;
 	rtabmap::OdometryEvent odomEvent(
 		rtabmap::SensorData(
 				scan,
@@ -577,7 +578,6 @@ void GuiWrapper::commonDepthCallback(
 				odomHeader.seq,
 				rtabmap_ros::timestampFromROS(odomHeader.stamp)),
 		odomMsg.get()?rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose):odomT,
-		covariance,
 		info);
 
 	QMetaObject::invokeMethod(mainWindow_, "processOdometry", Q_ARG(rtabmap::OdometryEvent, odomEvent), Q_ARG(bool, ignoreData));
@@ -720,6 +720,7 @@ void GuiWrapper::commonStereoCallback(
 		return;
 	}
 
+	info.covariance = covariance;
 	rtabmap::OdometryEvent odomEvent(
 		rtabmap::SensorData(
 				scan,
@@ -733,7 +734,6 @@ void GuiWrapper::commonStereoCallback(
 				odomHeader.seq,
 				rtabmap_ros::timestampFromROS(odomHeader.stamp)),
 		odomMsg.get()?rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose):odomT,
-		covariance,
 		info);
 
 	QMetaObject::invokeMethod(mainWindow_, "processOdometry", Q_ARG(rtabmap::OdometryEvent, odomEvent), Q_ARG(bool, ignoreData));

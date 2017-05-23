@@ -127,8 +127,7 @@ private:
 			const rtabmap::SensorData & data,
 			const rtabmap::Transform & odom = rtabmap::Transform(),
 			const std::string & odomFrameId = "",
-			float odomRotationalVariance = 1.0,
-			float odomTransitionalVariance = 1.0);
+			const cv::Mat & odomCovariance = cv::Mat::eye(6,6,CV_64FC1));
 
 	bool updateRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool resetRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
@@ -175,8 +174,7 @@ private:
 	rtabmap::Transform lastPose_;
 	ros::Time lastPoseStamp_;
 	bool lastPoseIntermediate_;
-	float rotVariance_;
-	float transVariance_;
+	cv::Mat covariance_;
 	rtabmap::Transform currentMetricGoal_;
 	bool latestNodeWasReached_;
 	rtabmap::ParametersMap parameters_;

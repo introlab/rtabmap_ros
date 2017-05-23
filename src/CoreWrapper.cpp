@@ -83,8 +83,6 @@ CoreWrapper::CoreWrapper() :
 		paused_(false),
 		lastPose_(Transform::getIdentity()),
 		lastPoseIntermediate_(false),
-		rotVariance_(0),
-		transVariance_(0),
 		latestNodeWasReached_(false),
 		frameId_("base_link"),
 		odomFrameId_(""),
@@ -641,8 +639,7 @@ bool CoreWrapper::odomUpdate(const nav_msgs::OdometryConstPtr & odomMsg)
 		{
 			UWARN("Odometry is reset (identity pose or high variance (%f) detected). Increment map id!", MAX(odomMsg->pose.covariance[0], odomMsg->twist.covariance[0]));
 			rtabmap_.triggerNewMap();
-			rotVariance_ = 0;
-			transVariance_ = 0;
+			covariance_ = cv::Mat();
 		}
 
 		lastPoseIntermediate_ = false;
@@ -652,28 +649,29 @@ bool CoreWrapper::odomUpdate(const nav_msgs::OdometryConstPtr & odomMsg)
 		// Only update variance if odom is not null
 		if(!odom.isNull())
 		{
-			// using MIN in case of 3DoF mapping (maybe no parameters are set, except x and yaw for the twist)
-			float transVariance = uMax3(odomMsg->twist.covariance[0], MIN(odomMsg->twist.covariance[7], BAD_COVARIANCE), MIN(odomMsg->twist.covariance[14], BAD_COVARIANCE));
-			float rotVariance = uMax3(MIN(odomMsg->twist.covariance[21],BAD_COVARIANCE), MIN(odomMsg->twist.covariance[28], BAD_COVARIANCE), odomMsg->twist.covariance[35]);
-
-			if(transVariance == BAD_COVARIANCE)
+			cv::Mat covariance;
+			float variance = odomMsg->twist.covariance[0];
+			if(variance == BAD_COVARIANCE)
 			{
 				//use the one of the pose
-				transVariance = uMax3(odomMsg->pose.covariance[0]/2.0, MIN(odomMsg->pose.covariance[7]/2.0, BAD_COVARIANCE), MIN(odomMsg->pose.covariance[14]/2.0, BAD_COVARIANCE));
+				covariance = cv::Mat(6,6,CV_64FC1, (void*)odomMsg->pose.covariance.data()).clone();
+				covariance /= 2.0;
 			}
-			if(rotVariance == BAD_COVARIANCE)
+			else
 			{
-				//use the one of the pose
-				rotVariance = uMax3(MIN(odomMsg->pose.covariance[21]/2.0,BAD_COVARIANCE), MIN(odomMsg->pose.covariance[28]/2.0, BAD_COVARIANCE), odomMsg->pose.covariance[35]/2.0);
+				covariance = cv::Mat(6,6,CV_64FC1, (void*)odomMsg->twist.covariance.data()).clone();
 			}
 
-			if(uIsFinite(rotVariance) && rotVariance != 1.0f)
+			if(uIsFinite(covariance.at<double>(0,0)) && covariance.at<double>(0,0) != 1.0 && covariance.at<double>(0,0)>0.0)
 			{
-				rotVariance_ += rotVariance;
-			}
-			if(uIsFinite(transVariance) && transVariance != 1.0f)
-			{
-				transVariance_ += transVariance;
+				if(covariance_.empty())
+				{
+					covariance_ = covariance;
+				}
+				else
+				{
+					covariance_ += covariance;
+				}
 			}
 		}
 
@@ -724,8 +722,7 @@ bool CoreWrapper::odomTFUpdate(const ros::Time & stamp)
 		{
 			UWARN("Odometry is reset (identity pose detected). Increment map id!");
 			rtabmap_.triggerNewMap();
-			rotVariance_ = 0;
-			transVariance_ = 0;
+			covariance_ = cv::Mat();
 		}
 
 		lastPoseIntermediate_ = false;
@@ -957,10 +954,8 @@ void CoreWrapper::commonDepthCallbackImpl(
 			data,
 			lastPose_,
 			odomFrameId,
-			rotVariance_,
-			transVariance_);
-	rotVariance_ = 0;
-	transVariance_ = 0;
+			covariance_);
+	covariance_ = cv::Mat();
 }
 
 void CoreWrapper::commonStereoCallback(
@@ -1147,11 +1142,9 @@ void CoreWrapper::commonStereoCallback(
 			data,
 			lastPose_,
 			odomFrameId,
-			rotVariance_,
-			transVariance_);
+			covariance_);
 
-	rotVariance_ = 0;
-	transVariance_ = 0;
+	covariance_ = cv::Mat();
 }
 
 void CoreWrapper::process(
@@ -1159,8 +1152,7 @@ void CoreWrapper::process(
 		const SensorData & data,
 		const Transform & odom,
 		const std::string & odomFrameId,
-		float odomRotationalVariance,
-		float odomTransitionalVariance)
+		const cv::Mat & odomCovariance)
 {
 	UTimer timer;
 	if(rtabmap_.isIDsGenerated() || data.id() > 0)
@@ -1169,16 +1161,25 @@ void CoreWrapper::process(
 		double timeUpdateMaps = 0.0;
 		double timePublishMaps = 0.0;
 
-		if(!uIsFinite(odomRotationalVariance) || odomRotationalVariance<=0.0f)
+		cv::Mat covariance = odomCovariance;
+		if(covariance.empty() || !uIsFinite(covariance.at<double>(0,0)) || covariance.at<double>(0,0)<=0.0f)
 		{
-			odomRotationalVariance = odomDefaultAngVariance_;
-		}
-		if(!uIsFinite(odomTransitionalVariance) || odomTransitionalVariance<=0.0f)
-		{
-			odomTransitionalVariance = odomDefaultLinVariance_;
+			covariance = cv::Mat::ones(6,6,CV_64FC1);
+			if(odomDefaultLinVariance_ > 0.0f)
+			{
+				covariance.at<double>(0,0) = odomDefaultLinVariance_;
+				covariance.at<double>(1,1) = odomDefaultLinVariance_;
+				covariance.at<double>(2,2) = odomDefaultLinVariance_;
+			}
+			if(odomDefaultAngVariance_ > 0.0f)
+			{
+				covariance.at<double>(3,3) = odomDefaultAngVariance_;
+				covariance.at<double>(4,4) = odomDefaultAngVariance_;
+				covariance.at<double>(5,5) = odomDefaultAngVariance_;
+			}
 		}
 
-		if(rtabmap_.process(data, odom, OdometryEvent::generateCovarianceMatrix(odomRotationalVariance, odomTransitionalVariance)))
+		if(rtabmap_.process(data, odom, covariance))
 		{
 			timeRtabmap = timer.ticks();
 			mapToOdomMutex_.lock();
@@ -1543,8 +1544,7 @@ bool CoreWrapper::resetRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empt
 {
 	NODELET_INFO("rtabmap: Reset");
 	rtabmap_.resetMemory();
-	rotVariance_ = 0;
-	transVariance_ = 0;
+	covariance_ = cv::Mat();
 	lastPose_.setIdentity();
 	lastPoseIntermediate_ = false;
 	currentMetricGoal_.setNull();
@@ -1600,8 +1600,7 @@ bool CoreWrapper::backupDatabaseCallback(std_srvs::Empty::Request&, std_srvs::Em
 	rtabmap_.close();
 	NODELET_INFO("Backup: Saving memory... done!");
 
-	rotVariance_ = 0;
-	transVariance_ = 0;
+	covariance_ = cv::Mat();
 	lastPose_.setIdentity();
 	currentMetricGoal_.setNull();
 	latestNodeWasReached_ = false;
