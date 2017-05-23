@@ -40,6 +40,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <std_msgs/Empty.h>
 #include <std_msgs/Int32.h>
 #include <nav_msgs/GetMap.h>
+#include <geometry_msgs/PoseWithCovarianceStamped.h>
 
 #include <rtabmap/core/Parameters.h>
 #include <rtabmap/core/Rtabmap.h>
@@ -116,6 +117,7 @@ private:
 	void defaultCallback(const sensor_msgs::ImageConstPtr & imageMsg); // no odom
 
 	void userDataAsyncCallback(const rtabmap_ros::UserDataConstPtr & dataMsg);
+	void globalPoseAsyncCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr & globalPoseMsg);
 
 	void goalCommonCallback(int id, const std::string & label, const rtabmap::Transform & pose, const ros::Time & stamp, double * planningTime = 0);
 	void goalCallback(const geometry_msgs::PoseStampedConstPtr & msg);
@@ -254,6 +256,9 @@ private:
 
 	ros::Subscriber userDataAsyncSub_;
 	cv::Mat userData_;
+
+	ros::Subscriber globalPoseAsyncSub_;
+	geometry_msgs::PoseWithCovarianceStamped globalPose_;
 
 	bool stereoToDepth_;
 	bool odomSensorSync_;

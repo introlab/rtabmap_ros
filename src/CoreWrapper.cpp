@@ -491,6 +491,7 @@ void CoreWrapper::onInit()
 	}
 
 	userDataAsyncSub_ = nh.subscribe("user_data_async", 1, &CoreWrapper::userDataAsyncCallback, this);
+	globalPoseAsyncSub_ = nh.subscribe("global_pose", 1, &CoreWrapper::globalPoseAsyncCallback, this);
 }
 
 CoreWrapper::~CoreWrapper()
@@ -937,6 +938,9 @@ void CoreWrapper::commonDepthCallbackImpl(
 		userData = userData_;
 		userData_ = cv::Mat();
 	}
+
+
+
 	SensorData data(scan,
 			LaserScanInfo(
 					scan2dMsg.get() != 0?(int)scan2dMsg->ranges.size():(genScan_?genMaxScanPts:scan3dMsg.get() != 0?scanCloudMaxPoints_:0),
@@ -949,6 +953,37 @@ void CoreWrapper::commonDepthCallbackImpl(
 			rtabmap_ros::timestampFromROS(lastPoseStamp_),
 			userData);
 	data.setGroundTruth(groundTruthPose);
+
+	//global pose
+	if(!globalPose_.header.stamp.isZero())
+	{
+		// assume sensor is fixed
+		Transform baseToSensor = rtabmap_ros::getTransform(
+				frameId_,
+				globalPose_.header.frame_id,
+				lastPoseStamp_,
+				tfListener_,
+				waitForTransform_?waitForTransformDuration_:0.0);
+		if(!baseToSensor.isNull())
+		{
+			// Correction of the global pose accounting the odometry movement since we received it
+			Transform correction = rtabmap_ros::getTransform(
+					frameId_,
+					odomFrameId,
+					globalPose_.header.stamp,
+					lastPoseStamp_,
+					tfListener_,
+					waitForTransform_?waitForTransformDuration_:0.0);
+			if(!correction.isNull())
+			{
+				Transform globalPose = rtabmap_ros::transformFromPoseMsg(globalPose_.pose.pose);
+				globalPose *= correction;
+				cv::Mat globalPoseCovariance = cv::Mat(6,6, CV_64FC1, (void*)globalPose_.pose.covariance.data()).clone();
+				data.setGlobalPose(globalPose, globalPoseCovariance);
+			}
+		}
+	}
+	globalPose_.header.stamp = ros::Time(0);
 
 	process(lastPoseStamp_,
 			data,
@@ -1338,6 +1373,14 @@ void CoreWrapper::userDataAsyncCallback(const rtabmap_ros::UserDataConstPtr & da
 	}
 }
 
+void CoreWrapper::globalPoseAsyncCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr & globalPoseMsg)
+{
+	if(!paused_)
+	{
+		globalPose_ = *globalPoseMsg;
+	}
+}
+
 void CoreWrapper::goalCommonCallback(
 		int id,
 		const std::string & label,
@@ -1552,6 +1595,7 @@ bool CoreWrapper::resetRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empt
 	mapsManager_.clear();
 	previousStamp_ = ros::Time(0);
 	userData_ = cv::Mat();
+	globalPose_.header.stamp = ros::Time(0);
 	return true;
 }
 
@@ -1605,6 +1649,7 @@ bool CoreWrapper::backupDatabaseCallback(std_srvs::Empty::Request&, std_srvs::Em
 	currentMetricGoal_.setNull();
 	latestNodeWasReached_ = false;
 	userData_ = cv::Mat();
+	globalPose_.header.stamp = ros::Time(0);
 
 	NODELET_INFO("Backup: Saving \"%s\" to \"%s\"...", databasePath_.c_str(), (databasePath_+".back").c_str());
 	UFile::copy(databasePath_, databasePath_+".back");
