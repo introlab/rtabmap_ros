@@ -69,6 +69,13 @@ void transformToGeometryMsg(const rtabmap::Transform & transform, geometry_msgs:
 	if(!transform.isNull())
 	{
 		tf::transformEigenToMsg(transform.toEigen3d(), msg);
+
+		// make sure the quaternion is normalized
+		long double recipNorm = 1.0 / sqrt(msg.rotation.x * msg.rotation.x + msg.rotation.y * msg.rotation.y + msg.rotation.z * msg.rotation.z + msg.rotation.w * msg.rotation.w);
+		msg.rotation.x *= recipNorm;
+		msg.rotation.y *= recipNorm;
+		msg.rotation.z *= recipNorm;
+		msg.rotation.w *= recipNorm;
 	}
 	else
 	{
