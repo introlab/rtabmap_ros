@@ -958,14 +958,17 @@ void CoreWrapper::commonDepthCallbackImpl(
 	if(!globalPose_.header.stamp.isZero())
 	{
 		// assume sensor is fixed
-		Transform baseToSensor = rtabmap_ros::getTransform(
-				frameId_,
+		Transform sensorToBase = rtabmap_ros::getTransform(
 				globalPose_.header.frame_id,
+				frameId_,
 				lastPoseStamp_,
 				tfListener_,
 				waitForTransform_?waitForTransformDuration_:0.0);
-		if(!baseToSensor.isNull())
+		if(!sensorToBase.isNull())
 		{
+			Transform globalPose = rtabmap_ros::transformFromPoseMsg(globalPose_.pose.pose);
+			globalPose *= sensorToBase; // transform global pose from sensor frame to robot base frame
+
 			// Correction of the global pose accounting the odometry movement since we received it
 			Transform correction = rtabmap_ros::getTransform(
 					frameId_,
@@ -974,7 +977,6 @@ void CoreWrapper::commonDepthCallbackImpl(
 					lastPoseStamp_,
 					tfListener_,
 					waitForTransform_?waitForTransformDuration_:0.0);
-			Transform globalPose = rtabmap_ros::transformFromPoseMsg(globalPose_.pose.pose);
 			if(!correction.isNull())
 			{
 				globalPose *= correction;
