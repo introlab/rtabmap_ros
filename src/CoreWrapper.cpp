@@ -929,7 +929,7 @@ void CoreWrapper::commonDepthCallbackImpl(
 		userData = rtabmap_ros::userDataFromROS(*userDataMsg);
 		if(!userData_.empty())
 		{
-			ROS_WARN("Synchronized and asynchronized user data topics cannot be used at the same time. Async user data dropped!");
+			NODELET_WARN("Synchronized and asynchronized user data topics cannot be used at the same time. Async user data dropped!");
 			userData_ = cv::Mat();
 		}
 	}
@@ -974,13 +974,19 @@ void CoreWrapper::commonDepthCallbackImpl(
 					lastPoseStamp_,
 					tfListener_,
 					waitForTransform_?waitForTransformDuration_:0.0);
+			Transform globalPose = rtabmap_ros::transformFromPoseMsg(globalPose_.pose.pose);
 			if(!correction.isNull())
 			{
-				Transform globalPose = rtabmap_ros::transformFromPoseMsg(globalPose_.pose.pose);
 				globalPose *= correction;
-				cv::Mat globalPoseCovariance = cv::Mat(6,6, CV_64FC1, (void*)globalPose_.pose.covariance.data()).clone();
-				data.setGlobalPose(globalPose, globalPoseCovariance);
 			}
+			else
+			{
+				NODELET_WARN("Could not adjust global pose accordingly to latest odometry pose. "
+						"If odometry is small since it received the global pose and "
+						"covariance is large, this should not be a problem.");
+			}
+			cv::Mat globalPoseCovariance = cv::Mat(6,6, CV_64FC1, (void*)globalPose_.pose.covariance.data()).clone();
+			data.setGlobalPose(globalPose, globalPoseCovariance);
 		}
 	}
 	globalPose_.header.stamp = ros::Time(0);

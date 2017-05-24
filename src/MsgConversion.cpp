@@ -1043,7 +1043,7 @@ rtabmap::Transform getTransform(
 	}
 	catch(tf::TransformException & ex)
 	{
-		ROS_WARN("%s",ex.what());
+		ROS_WARN("(getting transform %s -> %s) %s", fromFrameId.c_str(), toFrameId.c_str(), ex.what());
 	}
 	return transform;
 }
@@ -1080,7 +1080,7 @@ rtabmap::Transform getTransform(
 	}
 	catch(tf::TransformException & ex)
 	{
-		ROS_WARN("%s",ex.what());
+		ROS_WARN("(getting transform movement of %s according to fixed %s) %s", sourceTargetFrame.c_str(), fixedFrame.c_str(), ex.what());
 	}
 	return transform;
 }
