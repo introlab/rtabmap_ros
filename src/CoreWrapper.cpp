@@ -1208,7 +1208,7 @@ void CoreWrapper::process(
 		cv::Mat covariance = odomCovariance;
 		if(covariance.empty() || !uIsFinite(covariance.at<double>(0,0)) || covariance.at<double>(0,0)<=0.0f)
 		{
-			covariance = cv::Mat::ones(6,6,CV_64FC1);
+			covariance = cv::Mat::eye(6,6,CV_64FC1);
 			if(odomDefaultLinVariance_ > 0.0f)
 			{
 				covariance.at<double>(0,0) = odomDefaultLinVariance_;
