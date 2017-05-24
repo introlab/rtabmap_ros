@@ -112,6 +112,7 @@ CoreWrapper::CoreWrapper() :
 		previousStamp_(0),
 		mbClient_("move_base", true)
 {
+	globalPose_.header.stamp = ros::Time(0);
 }
 
 void CoreWrapper::onInit()
