@@ -499,12 +499,12 @@ void MapCloudDisplay::downloadMap()
 		{
 			ROS_ERROR("MapCloudDisplay: Can't call \"%s\" service. "
 					  "Tip: if rtabmap node is not in rtabmap namespace, you can remap the service "
-					  "to \"get_map\" in the launch "
+					  "to \"get_map_data\" in the launch "
 					  "file like: <remap from=\"rtabmap/get_map_data\" to=\"get_map_data\"/>.",
 					  nh.resolveName("rtabmap/get_map_data").c_str());
 			messageBox->setText(tr("MapCloudDisplay: Can't call \"%1\" service. "
 					  "Tip: if rtabmap node is not in rtabmap namespace, you can remap the service "
-					  "to \"get_map\" in the launch "
+					  "to \"get_map_data\" in the launch "
 					  "file like: <remap from=\"rtabmap/get_map_data\" to=\"get_map_data\"/>.").
 					  arg(nh.resolveName("rtabmap/get_map_data").c_str()));
 		}
@@ -545,7 +545,7 @@ void MapCloudDisplay::downloadGraph()
 		ros::NodeHandle nh;
 		QMessageBox * messageBox = new QMessageBox(
 				QMessageBox::NoIcon,
-				tr("Calling \"%1\" service...").arg(nh.resolveName("rtabmap/get_map").c_str()),
+				tr("Calling \"%1\" service...").arg(nh.resolveName("rtabmap/get_map_data").c_str()),
 				tr("Downloading the graph... please wait (rviz could become gray!)"),
 				QMessageBox::NoButton);
 		messageBox->setAttribute(Qt::WA_DeleteOnClose, true);
@@ -553,18 +553,18 @@ void MapCloudDisplay::downloadGraph()
 		QApplication::processEvents();
 		uSleep(100); // hack make sure the text in the QMessageBox is shown...
 		QApplication::processEvents();
-		if(!ros::service::call("rtabmap/get_map", getMapSrv))
+		if(!ros::service::call("rtabmap/get_map_data", getMapSrv))
 		{
 			ROS_ERROR("MapCloudDisplay: Can't call \"%s\" service. "
 					  "Tip: if rtabmap node is not in rtabmap namespace, you can remap the service "
-					  "to \"get_map\" in the launch "
-					  "file like: <remap from=\"rtabmap/get_map\" to=\"get_map\"/>.",
-					  nh.resolveName("rtabmap/get_map").c_str());
+					  "to \"get_map_data\" in the launch "
+					  "file like: <remap from=\"rtabmap/get_map_data\" to=\"get_map_data\"/>.",
+					  nh.resolveName("rtabmap/get_map_data").c_str());
 			messageBox->setText(tr("MapCloudDisplay: Can't call \"%1\" service. "
 					  "Tip: if rtabmap node is not in rtabmap namespace, you can remap the service "
-					  "to \"get_map\" in the launch "
-					  "file like: <remap from=\"rtabmap/get_map\" to=\"get_map\"/>.").
-					  arg(nh.resolveName("rtabmap/get_map").c_str()));
+					  "to \"get_map_data\" in the launch "
+					  "file like: <remap from=\"rtabmap/get_map_data\" to=\"get_map_data\"/>.").
+					  arg(nh.resolveName("rtabmap/get_map_data").c_str()));
 		}
 		else
 		{
