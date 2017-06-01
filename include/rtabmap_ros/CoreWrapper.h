@@ -178,6 +178,7 @@ private:
 	float rotVariance_;
 	float transVariance_;
 	rtabmap::Transform currentMetricGoal_;
+	rtabmap::Transform lastPublishedMetricGoal_;
 	bool latestNodeWasReached_;
 	rtabmap::ParametersMap parameters_;
 

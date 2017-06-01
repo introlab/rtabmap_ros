@@ -1248,6 +1248,7 @@ void CoreWrapper::process(
 							goalReachedPub_.publish(result);
 						}
 						currentMetricGoal_.setNull();
+						lastPublishedMetricGoal_.setNull();
 						latestNodeWasReached_ = false;
 					}
 					else
@@ -1287,6 +1288,7 @@ void CoreWrapper::process(
 								goalReachedPub_.publish(result);
 							}
 							currentMetricGoal_.setNull();
+							lastPublishedMetricGoal_.setNull();
 							latestNodeWasReached_ = false;
 						}
 					}
@@ -1377,6 +1379,7 @@ void CoreWrapper::goalCommonCallback(
 		const std::vector<std::pair<int, Transform> > & poses = rtabmap_.getPath();
 
 		currentMetricGoal_.setNull();
+		lastPublishedMetricGoal_.setNull();
 		latestNodeWasReached_ = false;
 		if(poses.size() == 0)
 		{
@@ -1548,6 +1551,7 @@ bool CoreWrapper::resetRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empt
 	lastPose_.setIdentity();
 	lastPoseIntermediate_ = false;
 	currentMetricGoal_.setNull();
+	lastPublishedMetricGoal_.setNull();
 	latestNodeWasReached_ = false;
 	mapsManager_.clear();
 	previousStamp_ = ros::Time(0);
@@ -1604,6 +1608,7 @@ bool CoreWrapper::backupDatabaseCallback(std_srvs::Empty::Request&, std_srvs::Em
 	transVariance_ = 0;
 	lastPose_.setIdentity();
 	currentMetricGoal_.setNull();
+	lastPublishedMetricGoal_.setNull();
 	latestNodeWasReached_ = false;
 	userData_ = cv::Mat();
 
@@ -1967,6 +1972,7 @@ bool CoreWrapper::cancelGoalCallback(std_srvs::Empty::Request& req, std_srvs::Em
 		NODELET_WARN("Goal cancelled!");
 		rtabmap_.clearPath(0);
 		currentMetricGoal_.setNull();
+		lastPublishedMetricGoal_.setNull();
 		latestNodeWasReached_ = false;
 		if(goalReachedPub_.getNumSubscribers())
 		{
@@ -1976,9 +1982,9 @@ bool CoreWrapper::cancelGoalCallback(std_srvs::Empty::Request& req, std_srvs::Em
 		}
 	}
 	if(mbClient_.isServerConnected())
-        {
-        	mbClient_.cancelGoal();
-        }
+	{
+		mbClient_.cancelGoal();
+	}
 
 	return true;
 }
@@ -2149,7 +2155,7 @@ void CoreWrapper::publishStats(const ros::Time & stamp)
 
 void CoreWrapper::publishCurrentGoal(const ros::Time & stamp)
 {
-	if(!currentMetricGoal_.isNull())
+	if(!currentMetricGoal_.isNull() && currentMetricGoal_ != lastPublishedMetricGoal_)
 	{
 		NODELET_INFO("Publishing next goal: %d -> %s",
 				rtabmap_.getPathCurrentGoalId(), currentMetricGoal_.prettyPrint().c_str());
@@ -2175,6 +2181,7 @@ void CoreWrapper::publishCurrentGoal(const ros::Time & stamp)
 						boost::bind(&CoreWrapper::goalDoneCb, this, _1, _2),
 						boost::bind(&CoreWrapper::goalActiveCb, this),
 						boost::bind(&CoreWrapper::goalFeedbackCb, this, _1));
+				lastPublishedMetricGoal_ = currentMetricGoal_;
 			}
 			else
 			{
@@ -2184,6 +2191,10 @@ void CoreWrapper::publishCurrentGoal(const ros::Time & stamp)
 		if(nextMetricGoalPub_.getNumSubscribers())
 		{
 			nextMetricGoalPub_.publish(poseMsg);
+			if(!useActionForGoal_)
+			{
+				lastPublishedMetricGoal_ = currentMetricGoal_;
+			}
 		}
 	}
 }
@@ -2228,6 +2239,7 @@ void CoreWrapper::goalDoneCb(const actionlib::SimpleClientGoalState& state,
 	{
 		rtabmap_.clearPath(1);
 		currentMetricGoal_.setNull();
+		lastPublishedMetricGoal_.setNull();
 		latestNodeWasReached_ = false;
 	}
 }
