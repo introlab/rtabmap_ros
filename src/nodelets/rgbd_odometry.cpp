@@ -234,7 +234,8 @@ private:
 				 rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
 				 rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0 ||
 				 rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::BGRA8) == 0 ||
-				 rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::RGBA8) == 0) ||
+				 rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::RGBA8) == 0 ||
+				 rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::BAYER_GRBG8) == 0) ||
 				!(depthImages[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1) == 0 ||
 				 depthImages[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1) == 0 ||
 				 depthImages[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0))
