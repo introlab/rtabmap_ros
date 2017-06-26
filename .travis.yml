@@ -33,6 +33,7 @@ script:
     - mv rtabmap_ros catkin_ws/src/.
     - git clone https://github.com/introlab/rtabmap.git
     - cd rtabmap
+    - if [ "$TRAVIS_BRANCH" = "devel" ]; then git checkout devel; fi
     - mkdir -p build && cd build
     - cmake -DCMAKE_INSTALL_PREFIX=~/build/introlab/catkin_ws/devel .. 
     - make

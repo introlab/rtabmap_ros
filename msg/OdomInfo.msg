@@ -5,8 +5,7 @@ bool lost
 int32 matches
 int32 inliers
 float32 icpInliersRatio
-float32 varianceLin
-float32 varianceAng
+float64[36] covariance
 int32 features
 int32 localMapSize
 int32 localScanMapSize

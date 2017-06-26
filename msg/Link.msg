@@ -4,12 +4,11 @@
 #   int to;
 #   Type type;
 #   Transform transform;
-#   float variance;
+#   cv::Mat(6,6,CV_64FC1) information;
 #}
 
 int32 fromId
 int32 toId
 int32 type
 geometry_msgs/Transform transform
-float32 rotVariance
-float32 transVariance
+float64[36] information
