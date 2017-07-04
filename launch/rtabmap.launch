@@ -75,6 +75,8 @@
   <arg name="odom_tf_angular_variance" default="1"/>             <!-- If TF is used to get odometry, this is the default angular variance -->
   <arg name="odom_tf_linear_variance"  default="1"/>             <!-- If TF is used to get odometry, this is the default linear variance -->
   <arg name="odom_args"                default="$(arg rtabmap_args)"/>
+  <arg name="odom_sensor_sync"         default="false"/>
+  
   
   <arg name="subscribe_user_data"      default="false"/>             <!-- user data synchronized subscription -->
   <arg name="user_data_topic"          default="/user_data"/>
@@ -152,6 +154,7 @@
       <param name="ground_truth_base_frame_id"  type="string" value="$(arg ground_truth_base_frame_id)"/>
       <param name="odom_tf_angular_variance" type="double" value="$(arg odom_tf_angular_variance)"/>
       <param name="odom_tf_linear_variance"  type="double" value="$(arg odom_tf_linear_variance)"/>
+      <param name="odom_sensor_sync"         type="bool"   value="$(arg odom_sensor_sync)"/>
       <param name="wait_for_transform_duration"  type="double"   value="$(arg wait_for_transform)"/>
       <param name="database_path"        type="string" value="$(arg database_path)"/>
       <param name="approx_sync"          type="bool"   value="$(arg approx_sync)"/>
