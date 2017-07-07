@@ -55,6 +55,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/Version.h>
 #include <rtabmap/core/OccupancyGrid.h>
 #include <rtabmap/core/DBDriver.h>
+#include <rtabmap/core/Registration.h>
 
 #ifdef WITH_OCTOMAP_ROS
 #ifdef RTABMAP_OCTOMAP
@@ -331,15 +332,18 @@ void CoreWrapper::onInit()
 				Parameters::kGridFromDepth().c_str());
 		parameters_.insert(ParametersPair(Parameters::kGridFromDepth(), "false"));
 	}
+	int regStrategy = 0;
+	Parameters::parse(parameters_, Parameters::kRegStrategy(), regStrategy);
 	if(subscribeScan2d &&
 		parameters_.find(Parameters::kRGBDProximityPathMaxNeighbors()) == parameters_.end() &&
-		(parameters_.find(Parameters::kRGBDProximityBySpace()) == parameters_.end() ||
-				uStr2Bool(parameters_.at(Parameters::kRGBDProximityBySpace()))))
+		(regStrategy == Registration::kTypeIcp || regStrategy == Registration::kTypeVisIcp))
 	{
 		NODELET_WARN("Setting \"%s\" parameter to 10 (default 0) as \"subscribe_scan\" is "
-				"true. Proximity detection by space will be also done by merging close "
-				"scans. To disable, set to 0. To suppress this warning, "
+				"true and \"%s\" uses ICP. Proximity detection by space will be also done by merging close "
+				"scans. To disable, set \"%s\" to 0. To suppress this warning, "
 				"add <param name=\"%s\" type=\"string\" value=\"10\"/>",
+				Parameters::kRGBDProximityPathMaxNeighbors().c_str(),
+				Parameters::kRegStrategy().c_str(),
 				Parameters::kRGBDProximityPathMaxNeighbors().c_str(),
 				Parameters::kRGBDProximityPathMaxNeighbors().c_str());
 		parameters_.insert(ParametersPair(Parameters::kRGBDProximityPathMaxNeighbors(), "10"));
