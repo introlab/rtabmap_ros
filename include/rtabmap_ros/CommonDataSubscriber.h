@@ -67,6 +67,7 @@ public:
 	bool isSubscribedToOdomInfo() const {return subscribedToOdomInfo_;}
 	bool isDataSubscribed() const {return isSubscribedToDepth() || isSubscribedToStereo() || isSubscribedToRGBD();}
 	int getQueueSize() const {return queueSize_;}
+	bool isApproxSync() const {return approxSync_;}
 
 protected:
 	void setupCallbacks(ros::NodeHandle & nh, ros::NodeHandle & pnh, const std::string & name);

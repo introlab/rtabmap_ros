@@ -255,6 +255,13 @@ private:
 	// for loop closure detection only
 	image_transport::Subscriber defaultSub_;
 
+	// for rgb/localization
+	image_transport::SubscriberFilter rgbSub_;
+	message_filters::Subscriber<nav_msgs::Odometry> rgbOdomSub_;
+	message_filters::Subscriber<sensor_msgs::CameraInfo> rgbCameraInfoSub_;
+	DATA_SYNCS2(rgb, sensor_msgs::Image, sensor_msgs::CameraInfo);
+	DATA_SYNCS3(rgbOdom, sensor_msgs::Image, sensor_msgs::CameraInfo, nav_msgs::Odometry);
+
 	ros::Subscriber userDataAsyncSub_;
 	cv::Mat userData_;
 
