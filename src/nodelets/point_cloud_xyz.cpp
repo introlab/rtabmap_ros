@@ -220,11 +220,15 @@ private:
 					model.cx()-roiRatios_[0]*double(imageDepthPtr->image.cols),
 					model.cy()-roiRatios_[2]*double(imageDepthPtr->image.rows));
 
+			pcl::IndicesPtr indices(new std::vector<int>);
 			pclCloud = rtabmap::util3d::cloudFromDepth(
 					cv::Mat(imageDepthPtr->image, roi),
 					m,
-					decimation_);
-			processAndPublish(pclCloud, depth->header);
+					decimation_,
+					maxDepth_,
+					minDepth_,
+					indices.get());
+			processAndPublish(pclCloud, indices, depth->header);
 
 			NODELET_DEBUG("point_cloud_xyz from depth time = %f s", (ros::WallTime::now() - time).toSec());
 		}
@@ -260,24 +264,23 @@ private:
 			pcl::PointCloud<pcl::PointXYZ>::Ptr pclCloud;
 			rtabmap::CameraModel leftModel = rtabmap_ros::cameraModelFromROS(*cameraInfo);
 			rtabmap::StereoCameraModel stereoModel(disparityMsg->f, disparityMsg->f, leftModel.cx()-roiRatios_[0]*double(disparity.cols), leftModel.cy()-roiRatios_[2]*double(disparity.rows), disparityMsg->T);
+			pcl::IndicesPtr indices(new std::vector<int>);
 			pclCloud = rtabmap::util3d::cloudFromDisparity(
 					cv::Mat(disparity, roi),
 					stereoModel,
-					decimation_);
+					decimation_,
+					maxDepth_,
+					minDepth_,
+					indices.get());
 
-			processAndPublish(pclCloud, disparityMsg->header);
+			processAndPublish(pclCloud, indices, disparityMsg->header);
 
 			NODELET_DEBUG("point_cloud_xyz from disparity time = %f s", (ros::WallTime::now() - time).toSec());
 		}
 	}
 
-	void processAndPublish(pcl::PointCloud<pcl::PointXYZ>::Ptr & pclCloud, const std_msgs::Header & header)
+	void processAndPublish(pcl::PointCloud<pcl::PointXYZ>::Ptr & pclCloud, pcl::IndicesPtr & indices, const std_msgs::Header & header)
 	{
-		if(pclCloud->size() && (minDepth_ != 0.0 || maxDepth_ > minDepth_))
-		{
-			pclCloud = rtabmap::util3d::passThrough(pclCloud, "z", minDepth_, maxDepth_>minDepth_?maxDepth_:std::numeric_limits<float>::max());
-		}
-
 		if(pclCloud->size() && voxelSize_ > 0.0)
 		{
 			pclCloud = rtabmap::util3d::voxelize(pclCloud, voxelSize_);
@@ -286,10 +289,13 @@ private:
 		// Do radius filtering after voxel filtering ( a lot faster)
 		if(pclCloud->size() && noiseFilterRadius_ > 0.0 && noiseFilterMinNeighbors_ > 0)
 		{
-			if(voxelSize_ <= 0.0 && !(minDepth_ != 0.0 || maxDepth_ > minDepth_))
+			if(pclCloud->is_dense)
 			{
-				// remove NaN values
-				pclCloud = rtabmap::util3d::removeNaNFromPointCloud(pclCloud);
+				indices = rtabmap::util3d::radiusFiltering(pclCloud, noiseFilterRadius_, noiseFilterMinNeighbors_);
+			}
+			else
+			{
+				indices = rtabmap::util3d::radiusFiltering(pclCloud, indices, noiseFilterRadius_, noiseFilterMinNeighbors_);
 			}
 
 			pcl::IndicesPtr indices = rtabmap::util3d::radiusFiltering(pclCloud, noiseFilterRadius_, noiseFilterMinNeighbors_);
