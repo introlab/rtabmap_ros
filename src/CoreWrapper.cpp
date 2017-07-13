@@ -763,15 +763,14 @@ bool CoreWrapper::odomUpdate(const nav_msgs::OdometryConstPtr & odomMsg)
 				covariance = cv::Mat(6,6,CV_64FC1, (void*)odomMsg->twist.covariance.data()).clone();
 			}
 
-			if(uIsFinite(covariance.at<double>(0,0)) && covariance.at<double>(0,0) != 1.0 && covariance.at<double>(0,0)>0.0)
+			if(uIsFinite(covariance.at<double>(0,0)) &&
+				covariance.at<double>(0,0) != 1.0 &&
+				covariance.at<double>(0,0)>0.0)
 			{
-				if(covariance_.empty())
+				// Use largest covariance error (to be independent of the odometry frame rate)
+				if(covariance_.empty() || covariance.at<double>(0,0) > covariance_.at<double>(0,0))
 				{
 					covariance_ = covariance;
-				}
-				else
-				{
-					covariance_ += covariance;
 				}
 			}
 		}

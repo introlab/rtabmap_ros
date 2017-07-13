@@ -356,14 +356,18 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 		Transform initialPose = getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, stamp);
 		if(initialPose.isNull())
 		{
-			return;
+			NODELET_WARN("Ground truth frames \"%s\" -> \"%s\" are set but failed to "
+					"get them, odometry won't be synchronized with ground truth.",
+					groundTruthFrameId_.c_str(), groundTruthBaseFrameId_.c_str());
 		}
-
-		NODELET_INFO( "Initializing odometry pose to %s (from \"%s\" -> \"%s\")",
-				initialPose.prettyPrint().c_str(),
-				groundTruthFrameId_.c_str(),
-				groundTruthBaseFrameId_.c_str());
-		odometry_->reset(initialPose);
+		else
+		{
+			NODELET_INFO( "Initializing odometry pose to %s (from \"%s\" -> \"%s\")",
+					initialPose.prettyPrint().c_str(),
+					groundTruthFrameId_.c_str(),
+					groundTruthBaseFrameId_.c_str());
+			odometry_->reset(initialPose);
+		}
 	}
 
 	Transform guess;
