@@ -324,7 +324,7 @@ private:
 
 	void processAndPublish(pcl::PointCloud<pcl::PointXYZRGB>::Ptr & pclCloud, pcl::IndicesPtr & indices, const std_msgs::Header & header)
 	{
-		if(pclCloud->size() && voxelSize_ > 0.0)
+		if(indices->size() && voxelSize_ > 0.0)
 		{
 			pclCloud = rtabmap::util3d::voxelize(pclCloud, indices, voxelSize_);
 		}

@@ -281,9 +281,9 @@ private:
 
 	void processAndPublish(pcl::PointCloud<pcl::PointXYZ>::Ptr & pclCloud, pcl::IndicesPtr & indices, const std_msgs::Header & header)
 	{
-		if(pclCloud->size() && voxelSize_ > 0.0)
+		if(indices->size() && voxelSize_ > 0.0)
 		{
-			pclCloud = rtabmap::util3d::voxelize(pclCloud, voxelSize_);
+			pclCloud = rtabmap::util3d::voxelize(pclCloud, indices, voxelSize_);
 		}
 
 		// Do radius filtering after voxel filtering ( a lot faster)
@@ -297,8 +297,6 @@ private:
 			{
 				indices = rtabmap::util3d::radiusFiltering(pclCloud, indices, noiseFilterRadius_, noiseFilterMinNeighbors_);
 			}
-
-			pcl::IndicesPtr indices = rtabmap::util3d::radiusFiltering(pclCloud, noiseFilterRadius_, noiseFilterMinNeighbors_);
 			pcl::PointCloud<pcl::PointXYZ>::Ptr tmp(new pcl::PointCloud<pcl::PointXYZ>);
 			pcl::copyPointCloud(*pclCloud, *indices, *tmp);
 			pclCloud = tmp;
