@@ -52,7 +52,8 @@
   <run_depend>geometry_msgs</run_depend>
   <run_depend>visualization_msgs</run_depend>
   <run_depend>image_transport</run_depend>
-  <run_depend>image_transport_plugins</run_depend>
+  <run_depend>compressed_depth_image_transport</run_depend>
+  <run_depend>compressed_image_transport</run_depend>
   <run_depend>tf</run_depend>
   <run_depend>tf_conversions</run_depend>
   <run_depend>tf2_ros</run_depend>
