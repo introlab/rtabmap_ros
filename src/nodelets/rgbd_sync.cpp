@@ -44,9 +44,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/highgui/highgui.hpp>
 
+#include <boost/thread.hpp>
+
 #include "rtabmap_ros/RGBDImage.h"
 
 #include "rtabmap/core/Compression.h"
+#include "rtabmap/utilite/UConversion.h"
 
 namespace rtabmap_ros
 {
@@ -55,6 +58,8 @@ class RGBDSync : public nodelet::Nodelet
 {
 public:
 	RGBDSync() :
+		warningThread_(0),
+		callbackCalled_(false),
 		approxSyncDepth_(0),
 		exactSyncDepth_(0)
 	{}
@@ -65,6 +70,13 @@ public:
 			delete approxSyncDepth_;
 		if(exactSyncDepth_)
 			delete exactSyncDepth_;
+
+		if(warningThread_)
+		{
+			callbackCalled_=true;
+			warningThread_->join();
+			delete warningThread_;
+		}
 	}
 
 private:
@@ -106,6 +118,35 @@ private:
 		imageSub_.subscribe(rgb_it, rgb_nh.resolveName("image"), 1, hintsRgb);
 		imageDepthSub_.subscribe(depth_it, depth_nh.resolveName("image"), 1, hintsDepth);
 		cameraInfoSub_.subscribe(rgb_nh, "camera_info", 1);
+
+		std::string subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s",
+							getName().c_str(),
+							approxSync?"approx":"exact",
+							imageSub_.getTopic().c_str(),
+							imageDepthSub_.getTopic().c_str(),
+							cameraInfoSub_.getTopic().c_str());
+
+		warningThread_ = new boost::thread(boost::bind(&RGBDSync::warningLoop, this, subscribedTopicsMsg, approxSync));
+		NODELET_INFO("%s", subscribedTopicsMsg.c_str());
+	}
+
+	void warningLoop(const std::string & subscribedTopicsMsg, bool approxSync)
+	{
+		ros::Duration r(5.0);
+		while(!callbackCalled_)
+		{
+			r.sleep();
+			if(!callbackCalled_)
+			{
+				ROS_WARN("%s: Did not receive data since 5 seconds! Make sure the input topics are "
+						"published (\"$ rostopic hz my_topic\") and the timestamps in their "
+						"header are set. %s%s",
+						getName().c_str(),
+						approxSync?"":"Parameter \"approx_sync\" is false, which means that input "
+							"topics should have all the exact timestamp for the callback to be called.",
+						subscribedTopicsMsg.c_str());
+			}
+		}
 	}
 
 	void callback(
@@ -113,6 +154,7 @@ private:
 			  const sensor_msgs::ImageConstPtr& depth,
 			  const sensor_msgs::CameraInfoConstPtr& cameraInfo)
 	{
+		callbackCalled_ = true;
 		if(rgbdImagePub_.getNumSubscribers() || rgbdImageCompressedPub_.getNumSubscribers())
 		{
 			rtabmap_ros::RGBDImage msg;
@@ -146,6 +188,9 @@ private:
 	}
 
 private:
+	boost::thread * warningThread_;
+	bool callbackCalled_;
+
 	ros::Publisher rgbdImagePub_;
 	ros::Publisher rgbdImageCompressedPub_;
 
