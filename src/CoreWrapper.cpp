@@ -416,7 +416,7 @@ void CoreWrapper::onInit()
 
 	if(databasePath_.size())
 	{
-		NODELET_INFO("rtabmap: Using database from \"%s\".", databasePath_.c_str());
+		NODELET_INFO("rtabmap: Using database from \"%s\" (%ld MB).", databasePath_.c_str(), UFile::length(databasePath_)/(1024*1024));
 	}
 	else
 	{
@@ -586,6 +586,8 @@ CoreWrapper::~CoreWrapper()
 	nh.deleteParam("is_rtabmap_paused");
 
 	printf("rtabmap: Saving database/long-term memory... (located at %s)\n", databasePath_.c_str());
+	rtabmap_.close();
+	printf("rtabmap: Saving database/long-term memory...done! (located at %s, %ld MB)\n", UFile::length(databasePath_)/(1024*1024), databasePath_.c_str());
 }
 
 void CoreWrapper::loadParameters(const std::string & configFile, ParametersMap & parameters)
