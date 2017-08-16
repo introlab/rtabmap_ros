@@ -101,6 +101,7 @@
       <remap from="rgbd_image1"       to="/camera2/rgbd_image"/>
 
       <param name="Grid/FromDepth"     type="string" value="false"/>
+      <param name="Vis/EstimationType" type="string" value="0"/> <!-- should be 0 for multi-cameras -->
       <param name="Vis/MinInliers"     type="string" value="10"/>
       <param name="Vis/InlierDistance" type="string" value="$(arg inlier_distance)"/>
     </node>
