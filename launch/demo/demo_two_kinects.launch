@@ -75,6 +75,7 @@
 	  <param name="rgbd_cameras"             type="int"    value="2"/>
 	  <param name="wait_for_transform"       type="bool"   value="$(arg wait_for_transform)"/>
 	  <param name="Odom/Strategy"            type="string" value="$(arg strategy)"/> 
+	  <param name="Vis/EstimationType"      type="string" value="0"/> <!-- should be 0 for multi-cameras -->
 	  <param name="Vis/FeatureType"         type="string" value="$(arg feature)"/>  
 	  <param name="Vis/CorNNType"           type="string" value="$(arg nn)"/>
 	  <param name="Vis/MaxDepth"            type="string" value="$(arg max_depth)"/>  
