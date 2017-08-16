@@ -202,6 +202,24 @@ private:
 			ROS_WARN("RGBD odometry works only with \"Reg/Strategy\"=0. Ignoring value %s.", iter->second.c_str());
 		}
 		uInsert(parameters, ParametersPair(Parameters::kRegStrategy(), "0"));
+
+		int estimationType = Parameters::defaultVisEstimationType();
+		Parameters::parse(parameters, Parameters::kVisEstimationType(), estimationType);
+		ros::NodeHandle & pnh = getPrivateNodeHandle();
+		int rgbdCameras = 1;
+		bool subscribeRGBD = false;
+		pnh.param("subscribe_rgbd", subscribeRGBD, subscribeRGBD);
+		pnh.param("rgbd_cameras", rgbdCameras, rgbdCameras);
+		if(subscribeRGBD && rgbdCameras> 1 && estimationType>0)
+		{
+			NODELET_WARN("Setting \"%s\" parameter to 0 (%d is not supported "
+					"for multi-cameras) as \"subscribe_rgbd\" is "
+					"true and \"rgbd_cameras\">1. Set \"%s\" to 0 to suppress this warning.",
+					Parameters::kVisEstimationType().c_str(),
+					estimationType,
+					Parameters::kVisEstimationType().c_str());
+			uInsert(parameters, ParametersPair(Parameters::kVisEstimationType(), "0"));
+		}
 	}
 
 	void commonCallback(

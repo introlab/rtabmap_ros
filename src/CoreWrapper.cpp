@@ -334,7 +334,7 @@ void CoreWrapper::onInit()
 				Parameters::kGridFromDepth().c_str());
 		parameters_.insert(ParametersPair(Parameters::kGridFromDepth(), "false"));
 	}
-	int regStrategy = 0;
+	int regStrategy = Parameters::defaultRegStrategy();
 	Parameters::parse(parameters_, Parameters::kRegStrategy(), regStrategy);
 	if(subscribeScan2d &&
 		parameters_.find(Parameters::kRGBDProximityPathMaxNeighbors()) == parameters_.end() &&
@@ -349,6 +349,23 @@ void CoreWrapper::onInit()
 				Parameters::kRGBDProximityPathMaxNeighbors().c_str(),
 				Parameters::kRGBDProximityPathMaxNeighbors().c_str());
 		parameters_.insert(ParametersPair(Parameters::kRGBDProximityPathMaxNeighbors(), "10"));
+	}
+
+	int estimationType = Parameters::defaultVisEstimationType();
+	Parameters::parse(parameters_, Parameters::kVisEstimationType(), estimationType);
+	int cameras = 0;
+	bool subscribeRGBD = false;
+	pnh.param("rgbd_cameras", cameras, cameras);
+	pnh.param("subscribe_rgbd", subscribeRGBD, subscribeRGBD);
+	if(subscribeRGBD && cameras> 1 && estimationType>0)
+	{
+		NODELET_WARN("Setting \"%s\" parameter to 0 (%d is not supported "
+				"for multi-cameras) as \"subscribe_rgbd\" is "
+				"true and \"rgbd_cameras\">1. Set \"%s\" to 0 to suppress this warning.",
+				Parameters::kVisEstimationType().c_str(),
+				estimationType,
+				Parameters::kVisEstimationType().c_str());
+		uInsert(parameters_, ParametersPair(Parameters::kVisEstimationType(), "0"));
 	}
 
 	// modify default parameters with those in the database
@@ -587,7 +604,7 @@ CoreWrapper::~CoreWrapper()
 
 	printf("rtabmap: Saving database/long-term memory... (located at %s)\n", databasePath_.c_str());
 	rtabmap_.close();
-	printf("rtabmap: Saving database/long-term memory...done! (located at %s, %ld MB)\n", UFile::length(databasePath_)/(1024*1024), databasePath_.c_str());
+	printf("rtabmap: Saving database/long-term memory...done! (located at %s, %ld MB)\n", databasePath_.c_str(), UFile::length(databasePath_)/(1024*1024));
 }
 
 void CoreWrapper::loadParameters(const std::string & configFile, ParametersMap & parameters)
