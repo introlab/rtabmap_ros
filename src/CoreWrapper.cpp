@@ -196,6 +196,7 @@ void CoreWrapper::onInit()
 	mapDataPub_ = nh.advertise<rtabmap_ros::MapData>("mapData", 1);
 	mapGraphPub_ = nh.advertise<rtabmap_ros::MapGraph>("mapGraph", 1);
 	labelsPub_ = nh.advertise<visualization_msgs::MarkerArray>("labels", 1);
+	mapPathPub_ = nh.advertise<nav_msgs::Path>("mapPath", 1);
 
 	// planning topics
 	goalSub_ = nh.subscribe("goal", 1, &CoreWrapper::goalCallback, this);
@@ -1954,7 +1955,7 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 
 	if(mapDataPub_.getNumSubscribers() ||
 	   (!req.graphOnly && mapsManager_.hasSubscribers()) ||
-	   (req.graphOnly && labelsPub_.getNumSubscribers()))
+	   (req.graphOnly && (labelsPub_.getNumSubscribers() || mapGraphPub_.getNumSubscribers() || mapPathPub_.getNumSubscribers())))
 	{
 		std::map<int, Transform> poses;
 		std::multimap<int, rtabmap::Link> constraints;
@@ -2033,11 +2034,19 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 			mapsManager_.publishMaps(filteredPoses, now, mapFrameId_);
 		}
 
-		if(labelsPub_.getNumSubscribers())
+		bool pubLabels = labelsPub_.getNumSubscribers();
+		bool pubPath = mapPathPub_.getNumSubscribers();
+		if(pubLabels || pubPath)
 		{
 			if(poses.size() && signatures.size())
 			{
 				visualization_msgs::MarkerArray markers;
+				nav_msgs::Path path;
+				if(pubPath)
+				{
+					path.poses.resize(poses.size());
+				}
+				int oi=0;
 				for(std::map<int, Signature>::const_iterator iter=signatures.begin();
 					iter!=signatures.end();
 					++iter)
@@ -2045,14 +2054,43 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 					std::map<int, Transform>::const_iterator poseIter= poses.find(iter->first);
 					if(poseIter!=poses.end())
 					{
-						// Add labels
-						if(!iter->second.getLabel().empty())
+						if(pubLabels)
 						{
+							// Add labels
+							if(!iter->second.getLabel().empty())
+							{
+								visualization_msgs::Marker marker;
+								marker.header.frame_id = mapFrameId_;
+								marker.header.stamp = now;
+								marker.ns = "labels";
+								marker.id = -iter->first;
+								marker.action = visualization_msgs::Marker::ADD;
+								marker.pose.position.x = poseIter->second.x();
+								marker.pose.position.y = poseIter->second.y();
+								marker.pose.position.z = poseIter->second.z();
+								marker.pose.orientation.x = 0.0;
+								marker.pose.orientation.y = 0.0;
+								marker.pose.orientation.z = 0.0;
+								marker.pose.orientation.w = 1.0;
+								marker.scale.x = 1;
+								marker.scale.y = 1;
+								marker.scale.z = 0.5;
+								marker.color.a = 0.7;
+								marker.color.r = 1.0;
+								marker.color.g = 0.0;
+								marker.color.b = 0.0;
+
+								marker.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
+								marker.text = iter->second.getLabel();
+
+								markers.markers.push_back(marker);
+							}
+							// Add node ids
 							visualization_msgs::Marker marker;
 							marker.header.frame_id = mapFrameId_;
 							marker.header.stamp = now;
-							marker.ns = "labels";
-							marker.id = -iter->first;
+							marker.ns = "ids";
+							marker.id = iter->first;
 							marker.action = visualization_msgs::Marker::ADD;
 							marker.pose.position.x = poseIter->second.x();
 							marker.pose.position.y = poseIter->second.y();
@@ -2063,50 +2101,38 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 							marker.pose.orientation.w = 1.0;
 							marker.scale.x = 1;
 							marker.scale.y = 1;
-							marker.scale.z = 0.5;
-							marker.color.a = 0.7;
+							marker.scale.z = 0.2;
+							marker.color.a = 0.5;
 							marker.color.r = 1.0;
-							marker.color.g = 0.0;
-							marker.color.b = 0.0;
+							marker.color.g = 1.0;
+							marker.color.b = 1.0;
+							marker.lifetime = ros::Duration(2.0f/rate_);
 
 							marker.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
-							marker.text = iter->second.getLabel();
+							marker.text = uNumber2Str(iter->first);
 
 							markers.markers.push_back(marker);
 						}
-						// Add node ids
-						visualization_msgs::Marker marker;
-						marker.header.frame_id = mapFrameId_;
-						marker.header.stamp = now;
-						marker.ns = "ids";
-						marker.id = iter->first;
-						marker.action = visualization_msgs::Marker::ADD;
-						marker.pose.position.x = poseIter->second.x();
-						marker.pose.position.y = poseIter->second.y();
-						marker.pose.position.z = poseIter->second.z();
-						marker.pose.orientation.x = 0.0;
-						marker.pose.orientation.y = 0.0;
-						marker.pose.orientation.z = 0.0;
-						marker.pose.orientation.w = 1.0;
-						marker.scale.x = 1;
-						marker.scale.y = 1;
-						marker.scale.z = 0.2;
-						marker.color.a = 0.5;
-						marker.color.r = 1.0;
-						marker.color.g = 1.0;
-						marker.color.b = 1.0;
-						marker.lifetime = ros::Duration(2.0f/rate_);
-
-						marker.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
-						marker.text = uNumber2Str(iter->first);
-
-						markers.markers.push_back(marker);
+						if(pubPath)
+						{
+							rtabmap_ros::transformToPoseMsg(poseIter->second, path.poses.at(oi).pose);
+							path.poses.at(oi).header.frame_id = mapFrameId_;
+							path.poses.at(oi).header.stamp = ros::Time(iter->second.getStamp());
+							++oi;
+						}
 					}
 				}
 
-				if(markers.markers.size())
+				if(pubLabels && markers.markers.size())
 				{
 					labelsPub_.publish(markers);
+				}
+				if(pubPath && oi)
+				{
+					path.header.frame_id = mapFrameId_;
+					path.header.stamp = now;
+					path.poses.resize(oi);
+					mapPathPub_.publish(path);
 				}
 			}
 		}
@@ -2244,11 +2270,19 @@ void CoreWrapper::publishStats(const ros::Time & stamp)
 		mapGraphPub_.publish(msg);
 	}
 
-	if(labelsPub_.getNumSubscribers())
+	bool pubLabels = labelsPub_.getNumSubscribers();
+	bool pubPath = mapPathPub_.getNumSubscribers();
+	if(pubLabels || pubPath)
 	{
 		if(stats.poses().size() && stats.getSignatures().size())
 		{
 			visualization_msgs::MarkerArray markers;
+			nav_msgs::Path path;
+			if(pubPath)
+			{
+				path.poses.resize(stats.poses().size());
+			}
+			int oi = 0;
 			for(std::map<int, Signature>::const_iterator iter=stats.getSignatures().begin();
 				iter!=stats.getSignatures().end();
 				++iter)
@@ -2256,14 +2290,43 @@ void CoreWrapper::publishStats(const ros::Time & stamp)
 				std::map<int, Transform>::const_iterator poseIter= stats.poses().find(iter->first);
 				if(poseIter!=stats.poses().end())
 				{
-					// Add labels
-					if(!iter->second.getLabel().empty())
+					if(pubLabels)
 					{
+						// Add labels
+						if(!iter->second.getLabel().empty())
+						{
+							visualization_msgs::Marker marker;
+							marker.header.frame_id = mapFrameId_;
+							marker.header.stamp = stamp;
+							marker.ns = "labels";
+							marker.id = -iter->first;
+							marker.action = visualization_msgs::Marker::ADD;
+							marker.pose.position.x = poseIter->second.x();
+							marker.pose.position.y = poseIter->second.y();
+							marker.pose.position.z = poseIter->second.z();
+							marker.pose.orientation.x = 0.0;
+							marker.pose.orientation.y = 0.0;
+							marker.pose.orientation.z = 0.0;
+							marker.pose.orientation.w = 1.0;
+							marker.scale.x = 1;
+							marker.scale.y = 1;
+							marker.scale.z = 0.5;
+							marker.color.a = 0.7;
+							marker.color.r = 1.0;
+							marker.color.g = 0.0;
+							marker.color.b = 0.0;
+
+							marker.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
+							marker.text = iter->second.getLabel();
+
+							markers.markers.push_back(marker);
+						}
+						// Add node ids
 						visualization_msgs::Marker marker;
 						marker.header.frame_id = mapFrameId_;
 						marker.header.stamp = stamp;
-						marker.ns = "labels";
-						marker.id = -iter->first;
+						marker.ns = "ids";
+						marker.id = iter->first;
 						marker.action = visualization_msgs::Marker::ADD;
 						marker.pose.position.x = poseIter->second.x();
 						marker.pose.position.y = poseIter->second.y();
@@ -2274,50 +2337,38 @@ void CoreWrapper::publishStats(const ros::Time & stamp)
 						marker.pose.orientation.w = 1.0;
 						marker.scale.x = 1;
 						marker.scale.y = 1;
-						marker.scale.z = 0.5;
-						marker.color.a = 0.7;
+						marker.scale.z = 0.2;
+						marker.color.a = 0.5;
 						marker.color.r = 1.0;
-						marker.color.g = 0.0;
-						marker.color.b = 0.0;
+						marker.color.g = 1.0;
+						marker.color.b = 1.0;
+						marker.lifetime = ros::Duration(2.0f/rate_);
 
 						marker.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
-						marker.text = iter->second.getLabel();
+						marker.text = uNumber2Str(iter->first);
 
 						markers.markers.push_back(marker);
 					}
-					// Add node ids
-					visualization_msgs::Marker marker;
-					marker.header.frame_id = mapFrameId_;
-					marker.header.stamp = stamp;
-					marker.ns = "ids";
-					marker.id = iter->first;
-					marker.action = visualization_msgs::Marker::ADD;
-					marker.pose.position.x = poseIter->second.x();
-					marker.pose.position.y = poseIter->second.y();
-					marker.pose.position.z = poseIter->second.z();
-					marker.pose.orientation.x = 0.0;
-					marker.pose.orientation.y = 0.0;
-					marker.pose.orientation.z = 0.0;
-					marker.pose.orientation.w = 1.0;
-					marker.scale.x = 1;
-					marker.scale.y = 1;
-					marker.scale.z = 0.2;
-					marker.color.a = 0.5;
-					marker.color.r = 1.0;
-					marker.color.g = 1.0;
-					marker.color.b = 1.0;
-					marker.lifetime = ros::Duration(2.0f/rate_);
-
-					marker.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
-					marker.text = uNumber2Str(iter->first);
-
-					markers.markers.push_back(marker);
+					if(pubPath)
+					{
+						rtabmap_ros::transformToPoseMsg(poseIter->second, path.poses.at(oi).pose);
+						path.poses.at(oi).header.frame_id = mapFrameId_;
+						path.poses.at(oi).header.stamp = ros::Time(iter->second.getStamp());
+						++oi;
+					}
 				}
 			}
 
-			if(markers.markers.size())
+			if(pubLabels && markers.markers.size())
 			{
 				labelsPub_.publish(markers);
+			}
+			if(pubPath && oi)
+			{
+				path.header.frame_id = mapFrameId_;
+				path.header.stamp = stamp;
+				path.poses.resize(oi);
+				mapPathPub_.publish(path);
 			}
 		}
 	}

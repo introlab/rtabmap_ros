@@ -209,6 +209,7 @@ private:
 	ros::Publisher mapDataPub_;
 	ros::Publisher mapGraphPub_;
 	ros::Publisher labelsPub_;
+	ros::Publisher mapPathPub_;
 
 	//Planning stuff
 	ros::Subscriber goalSub_;
