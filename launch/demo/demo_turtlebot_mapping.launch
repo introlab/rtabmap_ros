@@ -19,14 +19,26 @@
        the previous map, then the 2D map should re-appear again. You can then follow the same steps 
        from 3.3.2 of the "Autonomous Navigation of a Known Map with TurtleBot" tutorial:
        http://wiki.ros.org/turtlebot_navigation/Tutorials/Autonomously%20navigate%20in%20a%20known%20map
+ 
+       For turtlebot in simulation (Gazebo):
+         $ roslaunch turtlebot_gazebo turtlebot_world.launch
+         $ roslaunch rtabmap_ros demo_turtlebot_mapping.launch simulation:=true
+         $ roslaunch rtabmap_ros demo_turtlebot_rviz.launch
   -->
   
   <arg name="database_path"     default="rtabmap.db"/>
   <arg name="rgbd_odometry"     default="false"/>
   <arg name="rtabmapviz"        default="false"/>
   <arg name="localization"      default="false"/>
+  <arg name="simulation"        default="false"/>
   <arg     if="$(arg localization)" name="args"  default=""/>
   <arg unless="$(arg localization)" name="args"  default="--delete_db_on_start"/>
+
+  <arg     if="$(arg simulation)" name="rgb_topic"   default="/camera/rgb/image_raw"/>
+  <arg unless="$(arg simulation)" name="rgb_topic"   default="/camera/rgb/image_rect_color"/>
+  <arg     if="$(arg simulation)" name="depth_topic" default="/camera/depth/image_raw"/>
+  <arg unless="$(arg simulation)" name="depth_topic" default="/camera/depth_registered/image_raw"/>
+  <arg name="camera_info_topic" default="/camera/rgb/camera_info"/>
   
   <arg name="wait_for_transform"  default="0.2"/> 
   <!-- 
@@ -35,7 +47,7 @@
   -->
   
   <!-- Navigation stuff (move_base) -->
-  <include file="$(find turtlebot_bringup)/launch/3dsensor.launch"/>
+  <include unless="$(arg simulation)" file="$(find turtlebot_bringup)/launch/3dsensor.launch"/>
   <include file="$(find turtlebot_navigation)/launch/includes/move_base.launch.xml"/>
   
   <!-- Mapping -->
@@ -51,9 +63,9 @@
 	
 	  <!-- inputs -->
 	  <remap from="scan"            to="/scan"/>
-	  <remap from="rgb/image"       to="/camera/rgb/image_rect_color"/>
-  	  <remap from="depth/image"     to="/camera/depth_registered/image_raw"/>
-  	  <remap from="rgb/camera_info" to="/camera/rgb/camera_info"/>
+	  <remap from="rgb/image"       to="$(arg rgb_topic)"/>
+  	  <remap from="depth/image"     to="$(arg depth_topic)"/>
+  	  <remap from="rgb/camera_info" to="$(arg camera_info_topic)"/>
   	  
   	  <!-- output -->
   	  <remap from="grid_map" to="/map"/>
@@ -87,9 +99,9 @@
       <param name="Reg/Force3DoF"               type="string" value="true"/>
       <param name="Vis/InlierDistance"          type="string" value="0.05"/>
       
-      <remap from="rgb/image"       to="/camera/rgb/image_rect_color"/>
-      <remap from="depth/image"     to="/camera/depth_registered/image_raw"/>
-      <remap from="rgb/camera_info" to="/camera/rgb/camera_info"/>
+      <remap from="rgb/image"       to="$(arg rgb_topic)"/>
+      <remap from="depth/image"     to="$(arg depth_topic)"/>
+      <remap from="rgb/camera_info" to="$(arg camera_info_topic)"/>
     </node>
     
     <!-- visualization with rtabmapviz -->
@@ -99,9 +111,9 @@
       <param name="frame_id"                    type="string" value="base_footprint"/>
       <param name="wait_for_transform_duration" type="double" value="$(arg wait_for_transform)"/>
     
-      <remap from="rgb/image"       to="/camera/rgb/image_rect_color"/>
-      <remap from="depth/image"     to="/camera/depth_registered/image_raw"/>
-      <remap from="rgb/camera_info" to="/camera/rgb/camera_info"/>
+      <remap from="rgb/image"       to="$(arg rgb_topic)"/>
+      <remap from="depth/image"     to="$(arg depth_topic)"/>
+      <remap from="rgb/camera_info" to="$(arg camera_info_topic)"/>
       <remap from="scan"            to="/scan"/>
     </node>
     
