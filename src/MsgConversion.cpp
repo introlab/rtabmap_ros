@@ -31,6 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <zlib.h>
 #include <ros/ros.h>
 #include <rtabmap/core/util3d.h>
+#include <rtabmap/core/util3d_filtering.h>
 #include <rtabmap/core/Compression.h>
 #include <rtabmap/utilite/UStl.h>
 #include <rtabmap/utilite/ULogger.h>
@@ -1353,7 +1354,9 @@ bool convertScanMsg(
 		cv::Mat & scan,
 		rtabmap::Transform & scanLocalTransform,
 		tf::TransformListener & listener,
-		double waitForTransform)
+		double waitForTransform,
+		int scanCloudNormalK,
+		float scanCloudNormalRadius)
 {
 	// make sure the frame of the laser is updated too
 	rtabmap::Transform tmpT = getTransform(
@@ -1418,7 +1421,21 @@ bool convertScanMsg(
 			scanLocalTransform = sensorT * scanLocalTransform;
 		}
 	}
-	scan = rtabmap::util3d::laserScan2dFromPointCloud(*pclScan, laserToOdom); // put back in laser frame
+
+	if(scanCloudNormalK > 0 || scanCloudNormalRadius>0.0f)
+	{
+		//compute normals
+		pcl::PointCloud<pcl::Normal>::Ptr normals = rtabmap::util3d::computeFastOrganizedNormals2D(pclScan, scanCloudNormalK, scanCloudNormalRadius);
+		pcl::PointCloud<pcl::PointNormal>::Ptr pclScanNormal(new pcl::PointCloud<pcl::PointNormal>);
+		pcl::concatenateFields(*pclScan, *normals, *pclScanNormal);
+		scan = rtabmap::util3d::laserScanFromPointCloud(*rtabmap::util3d::removeNaNNormalsFromPointCloud(pclScanNormal), laserToOdom); // put back in laser frame
+	}
+	else
+	{
+		scan = rtabmap::util3d::laserScan2dFromPointCloud(*pclScan, laserToOdom); // put back in laser frame
+	}
+
+
 	return true;
 }
 
@@ -1427,11 +1444,12 @@ bool convertScan3dMsg(
 		const std::string & frameId,
 		const std::string & odomFrameId,
 		const ros::Time & odomStamp,
-		int scanCloudNormalK,
 		cv::Mat & scan,
 		rtabmap::Transform & scanLocalTransform,
 		tf::TransformListener & listener,
-		double waitForTransform)
+		double waitForTransform,
+		int scanCloudNormalK,
+		float scanCloudNormalRadius)
 {
 	bool containNormals = false;
 	for(unsigned int i=0; i<scan3dMsg->fields.size(); ++i)
@@ -1483,13 +1501,13 @@ bool convertScan3dMsg(
 		pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
 		pcl::fromROSMsg(*scan3dMsg, *pclScan);
 
-		if(scanCloudNormalK > 0)
+		if(scanCloudNormalK > 0 || scanCloudNormalRadius>0.0f)
 		{
 			//compute normals
-			pcl::PointCloud<pcl::Normal>::Ptr normals = rtabmap::util3d::computeNormals(pclScan, scanCloudNormalK);
+			pcl::PointCloud<pcl::Normal>::Ptr normals = rtabmap::util3d::computeNormals(pclScan, scanCloudNormalK, scanCloudNormalRadius);
 			pcl::PointCloud<pcl::PointNormal>::Ptr pclScanNormal(new pcl::PointCloud<pcl::PointNormal>);
 			pcl::concatenateFields(*pclScan, *normals, *pclScanNormal);
-			scan = rtabmap::util3d::laserScanFromPointCloud(*pclScanNormal);
+			scan = rtabmap::util3d::laserScanFromPointCloud(*rtabmap::util3d::removeNaNNormalsFromPointCloud(pclScanNormal));
 		}
 		else
 		{

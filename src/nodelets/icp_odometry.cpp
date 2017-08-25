@@ -57,7 +57,8 @@ public:
 	ICPOdometry() :
 		OdometryROS(false, false, true),
 		scanCloudMaxPoints_(0),
-		scanCloudNormalK_(0)
+		scanCloudNormalK_(0),
+		scanCloudNormalRadius_(0.0f)
 	{
 	}
 
@@ -74,6 +75,7 @@ private:
 
 		pnh.param("scan_cloud_max_points",  scanCloudMaxPoints_, scanCloudMaxPoints_);
 		pnh.param("scan_cloud_normal_k", scanCloudNormalK_, scanCloudNormalK_);
+		pnh.param("scan_cloud_normal_k", scanCloudNormalRadius_, scanCloudNormalRadius_);
 
 		scan_sub_ = nh.subscribe("scan", 1, &ICPOdometry::callbackScan, this);
 		cloud_sub_ = nh.subscribe("scan_cloud", 1, &ICPOdometry::callbackCloud, this);
@@ -109,7 +111,19 @@ private:
 		pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
 		pcl::fromROSMsg(scanOut, *pclScan);
 
-		cv::Mat scan = util3d::laserScan2dFromPointCloud(*pclScan);
+		cv::Mat scan;
+		if(scanCloudNormalK_ > 0 || scanCloudNormalRadius_>0.0f)
+		{
+			//compute normals
+			pcl::PointCloud<pcl::Normal>::Ptr normals = util3d::computeFastOrganizedNormals2D(pclScan, scanCloudNormalK_, scanCloudNormalRadius_);
+			pcl::PointCloud<pcl::PointNormal>::Ptr pclScanNormal(new pcl::PointCloud<pcl::PointNormal>);
+			pcl::concatenateFields(*pclScan, *normals, *pclScanNormal);
+			scan = util3d::laserScanFromPointCloud(*pclScanNormal);
+		}
+		else
+		{
+			scan = util3d::laserScan2dFromPointCloud(*pclScan);
+		}
 
 		rtabmap::SensorData data(
 				scan,
@@ -154,10 +168,10 @@ private:
 			pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
 			pcl::fromROSMsg(*cloudMsg, *pclScan);
 
-			if(scanCloudNormalK_ > 0)
+			if(scanCloudNormalK_ > 0 || scanCloudNormalRadius_>0.0f)
 			{
 				//compute normals
-				pcl::PointCloud<pcl::Normal>::Ptr normals = util3d::computeNormals(pclScan, scanCloudNormalK_);
+				pcl::PointCloud<pcl::Normal>::Ptr normals = util3d::computeNormals(pclScan, scanCloudNormalK_, scanCloudNormalRadius_);
 				pcl::PointCloud<pcl::PointNormal>::Ptr pclScanNormal(new pcl::PointCloud<pcl::PointNormal>);
 				pcl::concatenateFields(*pclScan, *normals, *pclScanNormal);
 				scan = util3d::laserScanFromPointCloud(*pclScanNormal);
@@ -191,6 +205,7 @@ private:
 	ros::Subscriber cloud_sub_;
 	int scanCloudMaxPoints_;
 	int scanCloudNormalK_;
+	float scanCloudNormalRadius_;
 };
 
 PLUGINLIB_EXPORT_CLASS(rtabmap_ros::ICPOdometry, nodelet::Nodelet);

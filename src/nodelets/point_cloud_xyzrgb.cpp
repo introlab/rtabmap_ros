@@ -40,6 +40,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sensor_msgs/image_encodings.h>
 #include <sensor_msgs/CameraInfo.h>
 
+#include <stereo_msgs/DisparityImage.h>
+
 #include <image_transport/image_transport.h>
 #include <image_transport/subscriber_filter.h>
 
@@ -53,9 +55,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/highgui/highgui.hpp>
 
+#include "rtabmap/core/util2d.h"
 #include "rtabmap/core/util3d.h"
 #include "rtabmap/core/util3d_filtering.h"
-#include "rtabmap/core/Features2d.h"
+#include "rtabmap/core/util3d_surface.h"
 #include "rtabmap/utilite/UConversion.h"
 #include "rtabmap/utilite/UStl.h"
 
@@ -72,6 +75,8 @@ public:
 		decimation_(1),
 		noiseFilterRadius_(0.0),
 		noiseFilterMinNeighbors_(5),
+		normalK_(0),
+		normalRadius_(0.0f),
 		approxSyncDepth_(0),
 		approxSyncStereo_(0),
 		exactSyncDepth_(0),
@@ -107,6 +112,8 @@ private:
 		pnh.param("decimation", decimation_, decimation_);
 		pnh.param("noise_filter_radius", noiseFilterRadius_, noiseFilterRadius_);
 		pnh.param("noise_filter_min_neighbors", noiseFilterMinNeighbors_, noiseFilterMinNeighbors_);
+		pnh.param("normal_k", normalK_, normalK_);
+		pnh.param("normal_radius", normalRadius_, normalRadius_);
 		pnh.param("roi_ratios", roiStr, roiStr);
 
 		//parse roi (region of interest)
@@ -142,6 +149,36 @@ private:
 			}
 		}
 
+		// StereoBM parameters
+		stereoBMParameters_ = rtabmap::Parameters::getDefaultParameters("StereoBM");
+		for(rtabmap::ParametersMap::iterator iter=stereoBMParameters_.begin(); iter!=stereoBMParameters_.end(); ++iter)
+		{
+			std::string vStr;
+			bool vBool;
+			int vInt;
+			double vDouble;
+			if(pnh.getParam(iter->first, vStr))
+			{
+				NODELET_INFO("point_cloud_xyzrgb: Setting parameter \"%s\"=\"%s\"", iter->first.c_str(), vStr.c_str());
+				iter->second = vStr;
+			}
+			else if(pnh.getParam(iter->first, vBool))
+			{
+				NODELET_INFO("point_cloud_xyzrgb: Setting parameter \"%s\"=\"%s\"", iter->first.c_str(), uBool2Str(vBool).c_str());
+				iter->second = uBool2Str(vBool);
+			}
+			else if(pnh.getParam(iter->first, vDouble))
+			{
+				NODELET_INFO("point_cloud_xyzrgb: Setting parameter \"%s\"=\"%s\"", iter->first.c_str(), uNumber2Str(vDouble).c_str());
+				iter->second = uNumber2Str(vDouble);
+			}
+			else if(pnh.getParam(iter->first, vInt))
+			{
+				NODELET_INFO("point_cloud_xyzrgb: Setting parameter \"%s\"=\"%s\"", iter->first.c_str(), uNumber2Str(vInt).c_str());
+				iter->second = uNumber2Str(vInt);
+			}
+		}
+
 		NODELET_INFO("Approximate time sync = %s", approxSync?"true":"false");
 
 		cloudPub_ = nh.advertise<sensor_msgs::PointCloud2>("cloud", 1);
@@ -152,6 +189,9 @@ private:
 			approxSyncDepth_ = new message_filters::Synchronizer<MyApproxSyncDepthPolicy>(MyApproxSyncDepthPolicy(queueSize), imageSub_, imageDepthSub_, cameraInfoSub_);
 			approxSyncDepth_->registerCallback(boost::bind(&PointCloudXYZRGB::depthCallback, this, _1, _2, _3));
 
+			approxSyncDisparity_ = new message_filters::Synchronizer<MyApproxSyncDisparityPolicy>(MyApproxSyncDisparityPolicy(queueSize), imageLeft_, imageDisparitySub_, cameraInfoLeft_);
+			approxSyncDisparity_->registerCallback(boost::bind(&PointCloudXYZRGB::disparityCallback, this, _1, _2, _3));
+
 			approxSyncStereo_ = new message_filters::Synchronizer<MyApproxSyncStereoPolicy>(MyApproxSyncStereoPolicy(queueSize), imageLeft_, imageRight_, cameraInfoLeft_, cameraInfoRight_);
 			approxSyncStereo_->registerCallback(boost::bind(&PointCloudXYZRGB::stereoCallback, this, _1, _2, _3, _4));
 		}
@@ -159,6 +199,9 @@ private:
 		{
 			exactSyncDepth_ = new message_filters::Synchronizer<MyExactSyncDepthPolicy>(MyExactSyncDepthPolicy(queueSize), imageSub_, imageDepthSub_, cameraInfoSub_);
 			exactSyncDepth_->registerCallback(boost::bind(&PointCloudXYZRGB::depthCallback, this, _1, _2, _3));
+
+			exactSyncDisparity_ = new message_filters::Synchronizer<MyExactSyncDisparityPolicy>(MyExactSyncDisparityPolicy(queueSize), imageLeft_, imageDisparitySub_, cameraInfoLeft_);
+			exactSyncDisparity_->registerCallback(boost::bind(&PointCloudXYZRGB::disparityCallback, this, _1, _2, _3));
 
 			exactSyncStereo_ = new message_filters::Synchronizer<MyExactSyncStereoPolicy>(MyExactSyncStereoPolicy(queueSize), imageLeft_, imageRight_, cameraInfoLeft_, cameraInfoRight_);
 			exactSyncStereo_->registerCallback(boost::bind(&PointCloudXYZRGB::stereoCallback, this, _1, _2, _3, _4));
@@ -177,7 +220,6 @@ private:
 		imageDepthSub_.subscribe(depth_it, depth_nh.resolveName("image"), 1, hintsDepth);
 		cameraInfoSub_.subscribe(rgb_nh, "camera_info", 1);
 
-
 		ros::NodeHandle left_nh(nh, "left");
 		ros::NodeHandle right_nh(nh, "right");
 		ros::NodeHandle left_pnh(pnh, "left");
@@ -186,6 +228,8 @@ private:
 		image_transport::ImageTransport right_it(right_nh);
 		image_transport::TransportHints hintsLeft("raw", ros::TransportHints(), left_pnh);
 		image_transport::TransportHints hintsRight("raw", ros::TransportHints(), right_pnh);
+
+		imageDisparitySub_.subscribe(nh, "disparity", 1);
 
 		imageLeft_.subscribe(left_it, left_nh.resolveName("image"), 1, hintsLeft);
 		imageRight_.subscribe(right_it, right_nh.resolveName("image"), 1, hintsRight);
@@ -242,7 +286,7 @@ private:
 			ROS_ASSERT(imageDepthPtr->image.rows == imagePtr->image.rows);
 
 			pcl::PointCloud<pcl::PointXYZRGB>::Ptr pclCloud;
-			cv::Rect roi = rtabmap::Feature2D::computeRoi(imageDepthPtr->image, roiRatios_);
+			cv::Rect roi = rtabmap::util2d::computeRoi(imageDepthPtr->image, roiRatios_);
 
 			rtabmap::CameraModel m(
 					model.fx(),
@@ -263,6 +307,68 @@ private:
 			processAndPublish(pclCloud, indices, imagePtr->header);
 
 			NODELET_DEBUG("point_cloud_xyzrgb from RGB-D time = %f s", (ros::WallTime::now() - time).toSec());
+		}
+	}
+
+	void disparityCallback(
+			const sensor_msgs::ImageConstPtr& image,
+			const stereo_msgs::DisparityImageConstPtr& imageDisparity,
+			const sensor_msgs::CameraInfoConstPtr& cameraInfo)
+	{
+		cv_bridge::CvImageConstPtr imagePtr;
+		if(image->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0)
+		{
+			imagePtr = cv_bridge::toCvShare(image);
+		}
+		else if(image->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
+				image->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
+		{
+			imagePtr = cv_bridge::toCvShare(image, "mono8");
+		}
+		else
+		{
+			imagePtr = cv_bridge::toCvShare(image, "bgr8");
+		}
+
+		if(imageDisparity->image.encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1) !=0 &&
+		   imageDisparity->image.encoding.compare(sensor_msgs::image_encodings::TYPE_16SC1) !=0)
+		{
+			NODELET_ERROR("Input type must be disparity=32FC1 or 16SC1");
+			return;
+		}
+
+		cv::Mat disparity;
+		if(imageDisparity->image.encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1) == 0)
+		{
+			disparity = cv::Mat(imageDisparity->image.height, imageDisparity->image.width, CV_32FC1, const_cast<uchar*>(imageDisparity->image.data.data()));
+		}
+		else
+		{
+			disparity = cv::Mat(imageDisparity->image.height, imageDisparity->image.width, CV_16SC1, const_cast<uchar*>(imageDisparity->image.data.data()));
+		}
+
+		if(cloudPub_.getNumSubscribers())
+		{
+			ros::WallTime time = ros::WallTime::now();
+
+			cv::Rect roi = rtabmap::util2d::computeRoi(disparity, roiRatios_);
+
+			pcl::PointCloud<pcl::PointXYZRGB>::Ptr pclCloud;
+			rtabmap::CameraModel leftModel = rtabmap_ros::cameraModelFromROS(*cameraInfo);
+			rtabmap::StereoCameraModel stereoModel(imageDisparity->f, imageDisparity->f, leftModel.cx()-roiRatios_[0]*double(disparity.cols), leftModel.cy()-roiRatios_[2]*double(disparity.rows), imageDisparity->T);
+			pcl::IndicesPtr indices(new std::vector<int>);
+			pclCloud = rtabmap::util3d::cloudFromDisparityRGB(
+					cv::Mat(imagePtr->image, roi),
+					cv::Mat(disparity, roi),
+					stereoModel,
+					decimation_,
+					maxDepth_,
+					minDepth_,
+					indices.get());
+
+			processAndPublish(pclCloud, indices, imageDisparity->header);
+
+			NODELET_DEBUG("point_cloud_xyzrgb from disparity time = %f s", (ros::WallTime::now() - time).toSec());
 		}
 	}
 
@@ -314,7 +420,8 @@ private:
 					decimation_,
 					maxDepth_,
 					minDepth_,
-					indices.get());
+					indices.get(),
+					stereoBMParameters_);
 
 			processAndPublish(pclCloud, indices, imageLeft->header);
 
@@ -346,7 +453,18 @@ private:
 		}
 
 		sensor_msgs::PointCloud2 rosCloud;
-		pcl::toROSMsg(*pclCloud, rosCloud);
+		if(pclCloud->size() && (normalK_ > 0 || noiseFilterRadius_ > 0.0f))
+		{
+			//compute normals
+			pcl::PointCloud<pcl::Normal>::Ptr normals = rtabmap::util3d::computeNormals(pclCloud, normalK_, normalRadius_);
+			pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr pclCloudNormal(new pcl::PointCloud<pcl::PointXYZRGBNormal>);
+			pcl::concatenateFields(*pclCloud, *normals, *pclCloudNormal);
+			pcl::toROSMsg(*pclCloudNormal, rosCloud);
+		}
+		else
+		{
+			pcl::toROSMsg(*pclCloud, rosCloud);
+		}
 		rosCloud.header.stamp = header.stamp;
 		rosCloud.header.frame_id = header.frame_id;
 
@@ -362,13 +480,18 @@ private:
 	int decimation_;
 	double noiseFilterRadius_;
 	int noiseFilterMinNeighbors_;
+	int normalK_;
+	float normalRadius_;
 	std::vector<float> roiRatios_;
+	rtabmap::ParametersMap stereoBMParameters_;
 
 	ros::Publisher cloudPub_;
 
 	image_transport::SubscriberFilter imageSub_;
 	image_transport::SubscriberFilter imageDepthSub_;
 	message_filters::Subscriber<sensor_msgs::CameraInfo> cameraInfoSub_;
+
+	message_filters::Subscriber<stereo_msgs::DisparityImage> imageDisparitySub_;
 
 	image_transport::SubscriberFilter imageLeft_;
 	image_transport::SubscriberFilter imageRight_;
@@ -378,11 +501,17 @@ private:
 	typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo> MyApproxSyncDepthPolicy;
 	message_filters::Synchronizer<MyApproxSyncDepthPolicy> * approxSyncDepth_;
 
+	typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, stereo_msgs::DisparityImage, sensor_msgs::CameraInfo> MyApproxSyncDisparityPolicy;
+	message_filters::Synchronizer<MyApproxSyncDisparityPolicy> * approxSyncDisparity_;
+
 	typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo, sensor_msgs::CameraInfo> MyApproxSyncStereoPolicy;
 	message_filters::Synchronizer<MyApproxSyncStereoPolicy> * approxSyncStereo_;
 
 	typedef message_filters::sync_policies::ExactTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo> MyExactSyncDepthPolicy;
 	message_filters::Synchronizer<MyExactSyncDepthPolicy> * exactSyncDepth_;
+
+	typedef message_filters::sync_policies::ExactTime<sensor_msgs::Image, stereo_msgs::DisparityImage, sensor_msgs::CameraInfo> MyExactSyncDisparityPolicy;
+	message_filters::Synchronizer<MyExactSyncDisparityPolicy> * exactSyncDisparity_;
 
 	typedef message_filters::sync_policies::ExactTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo, sensor_msgs::CameraInfo> MyExactSyncStereoPolicy;
 	message_filters::Synchronizer<MyExactSyncStereoPolicy> * exactSyncStereo_;

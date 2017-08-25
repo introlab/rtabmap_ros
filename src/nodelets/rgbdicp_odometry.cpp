@@ -73,7 +73,8 @@ public:
 		exactCloudSync_(0),
 		queueSize_(5),
 		scanCloudMaxPoints_(0),
-		scanCloudNormalK_(0)
+		scanCloudNormalK_(0),
+		scanCloudNormalRadius_(0.0f)
 	{
 	}
 
@@ -111,6 +112,7 @@ private:
 		pnh.param("subscribe_scan_cloud", subscribeScanCloud, subscribeScanCloud);
 		pnh.param("scan_cloud_max_points",  scanCloudMaxPoints_, scanCloudMaxPoints_);
 		pnh.param("scan_cloud_normal_k", scanCloudNormalK_, scanCloudNormalK_);
+		pnh.param("scan_cloud_normal_radius", scanCloudNormalRadius_, scanCloudNormalRadius_);
 
 		ros::NodeHandle rgb_nh(nh, "rgb");
 		ros::NodeHandle depth_nh(nh, "depth");
@@ -292,7 +294,18 @@ private:
 					pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
 					pcl::fromROSMsg(scanOut, *pclScan);
 
-					scan = util3d::laserScan2dFromPointCloud(*pclScan);
+					if(scanCloudNormalK_ > 0 || scanCloudNormalRadius_>0.0f)
+					{
+						//compute normals
+						pcl::PointCloud<pcl::Normal>::Ptr normals = util3d::computeFastOrganizedNormals2D(pclScan, scanCloudNormalK_, scanCloudNormalRadius_);
+						pcl::PointCloud<pcl::PointNormal>::Ptr pclScanNormal(new pcl::PointCloud<pcl::PointNormal>);
+						pcl::concatenateFields(*pclScan, *normals, *pclScanNormal);
+						scan = util3d::laserScanFromPointCloud(*pclScanNormal);
+					}
+					else
+					{
+						scan = util3d::laserScan2dFromPointCloud(*pclScan);
+					}
 				}
 				else if(cloudMsg.get() != 0)
 				{
@@ -323,10 +336,10 @@ private:
 						pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
 						pcl::fromROSMsg(*cloudMsg, *pclScan);
 
-						if(scanCloudNormalK_ > 0)
+						if(scanCloudNormalK_ > 0 || scanCloudNormalRadius_>0.0f)
 						{
 							//compute normals
-							pcl::PointCloud<pcl::Normal>::Ptr normals = util3d::computeNormals(pclScan, scanCloudNormalK_);
+							pcl::PointCloud<pcl::Normal>::Ptr normals = util3d::computeNormals(pclScan, scanCloudNormalK_, scanCloudNormalRadius_);
 							pcl::PointCloud<pcl::PointNormal>::Ptr pclScanNormal(new pcl::PointCloud<pcl::PointNormal>);
 							pcl::concatenateFields(*pclScan, *normals, *pclScanNormal);
 							scan = util3d::laserScanFromPointCloud(*pclScanNormal);
@@ -402,6 +415,7 @@ private:
 	int queueSize_;
 	int scanCloudMaxPoints_;
 	int scanCloudNormalK_;
+	float scanCloudNormalRadius_;
 };
 
 PLUGINLIB_EXPORT_CLASS(rtabmap_ros::RGBDICPOdometry, nodelet::Nodelet);

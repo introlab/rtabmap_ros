@@ -73,9 +73,9 @@
    
   <arg name="subscribe_scan"          default="false"/>
   <arg name="scan_topic"              default="/scan"/>
-  
   <arg name="subscribe_scan_cloud"    default="false"/>
   <arg name="scan_cloud_topic"        default="/scan_cloud"/>
+  <arg name="scan_normal_k"           default="0"/>
    
   <arg name="visual_odometry"          default="true"/>          <!-- Launch rtabmap visual odometry node -->
   <arg name="odom_topic"               default="/odom"/>         <!-- Odometry topic used if visual_odometry is false -->
@@ -172,6 +172,7 @@
       <param name="approx_sync"          type="bool"   value="$(arg approx_sync)"/>
       <param name="config_path"          type="string" value="$(arg cfg)"/>
       <param name="queue_size"           type="int" value="$(arg queue_size)"/>
+      <param name="scan_cloud_normal_k"  type="double" value="$(arg scan_normal_k)"/>
       
       <remap from="rgb/image"       to="$(arg rgb_topic_relay)"/>
       <remap from="depth/image"     to="$(arg depth_topic_relay)"/>

@@ -205,18 +205,21 @@ bool convertScanMsg(
 		cv::Mat & scan,
 		rtabmap::Transform & scanLocalTransform,
 		tf::TransformListener & listener,
-		double waitForTransform);
+		double waitForTransform,
+		int scanCloudNormalK = 0,
+		float scanCloudNormalRadius = 0.0f);
 
 bool convertScan3dMsg(
 		const sensor_msgs::PointCloud2ConstPtr & scan3dMsg,
 		const std::string & frameId,
 		const std::string & odomFrameId,
 		const ros::Time & odomStamp,
-		int scanCloudNormalK,
 		cv::Mat & scan,
 		rtabmap::Transform & scanLocalTransform,
 		tf::TransformListener & listener,
-		double waitForTransform);
+		double waitForTransform,
+		int scanCloudNormalK = 0,
+		float scanCloudNormalRadius = 0.0f);
 
 }
 

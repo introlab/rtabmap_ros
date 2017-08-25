@@ -36,7 +36,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <std_msgs/Bool.h>
 #include <sensor_msgs/image_encodings.h>
 #include <cv_bridge/cv_bridge.h>
-#include <pcl/io/pcd_io.h>
+#include <pcl/io/io.h>
 
 #include <visualization_msgs/MarkerArray.h>
 
@@ -50,6 +50,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/util2d.h>
 #include <rtabmap/core/util3d.h>
 #include <rtabmap/core/util3d_transforms.h>
+#include <rtabmap/core/util3d_surface.h>
 #include <rtabmap/core/Memory.h>
 #include <rtabmap/core/OdometryEvent.h>
 #include <rtabmap/core/Version.h>
@@ -102,6 +103,7 @@ CoreWrapper::CoreWrapper() :
 		genScanMinDepth_(0.0),
 		scanCloudMaxPoints_(0),
 		scanCloudNormalK_(0),
+		scanCloudNormalRadius_(0.0f),
 		mapToOdom_(rtabmap::Transform::getIdentity()),
 		transformThread_(0),
 		tfThreadRunning_(false),
@@ -161,6 +163,7 @@ void CoreWrapper::onInit()
 	pnh.param("gen_scan_min_depth",  genScanMinDepth_, genScanMinDepth_);
 	pnh.param("scan_cloud_max_points",  scanCloudMaxPoints_, scanCloudMaxPoints_);
 	pnh.param("scan_cloud_normal_k", scanCloudNormalK_, scanCloudNormalK_);
+	pnh.param("scan_cloud_normal_radius", scanCloudNormalRadius_, scanCloudNormalRadius_);
 	pnh.param("stereo_to_depth", stereoToDepth_, stereoToDepth_);
 	pnh.param("odom_sensor_sync", odomSensorSync_, odomSensorSync_);
 	if(pnh.hasParam("flip_scan"))
@@ -977,17 +980,28 @@ void CoreWrapper::commonDepthCallbackImpl(
 
 	cv::Mat scan;
 	Transform scanLocalTransform = Transform::getIdentity();
-	pcl::PointCloud<pcl::PointXYZ> scanCloud2d;
 	bool genMaxScanPts = 0;
 	if(scan2dMsg.get() == 0 && scan3dMsg.get() == 0 && !depth.empty() && genScan_)
 	{
-		scanCloud2d = util3d::laserScanFromDepthImages(
+		pcl::PointCloud<pcl::PointXYZ>::Ptr scanCloud2d(new pcl::PointCloud<pcl::PointXYZ>);
+		*scanCloud2d = util3d::laserScanFromDepthImages(
 				depth,
 				cameraModels,
 				genScanMaxDepth_,
 				genScanMinDepth_);
 		genMaxScanPts += depth.cols;
-		scan = util3d::laserScan2dFromPointCloud(scanCloud2d);
+		if(scanCloudNormalK_ > 0 || scanCloudNormalRadius_>0.0f)
+		{
+			//compute normals
+			pcl::PointCloud<pcl::Normal>::Ptr normals = rtabmap::util3d::computeFastOrganizedNormals2D(scanCloud2d, scanCloudNormalK_, scanCloudNormalRadius_);
+			pcl::PointCloud<pcl::PointNormal>::Ptr pclScanNormal(new pcl::PointCloud<pcl::PointNormal>);
+			pcl::concatenateFields(*scanCloud2d, *normals, *pclScanNormal);
+			scan = rtabmap::util3d::laserScanFromPointCloud(*pclScanNormal);
+		}
+		else
+		{
+			scan = rtabmap::util3d::laserScan2dFromPointCloud(*scanCloud2d);
+		}
 	}
 	else if(scan2dMsg.get() != 0)
 	{
@@ -999,7 +1013,9 @@ void CoreWrapper::commonDepthCallbackImpl(
 				scan,
 				scanLocalTransform,
 				tfListener_,
-				waitForTransform_?waitForTransformDuration_:0))
+				waitForTransform_?waitForTransformDuration_:0,
+				scanCloudNormalK_,
+				scanCloudNormalRadius_))
 		{
 			NODELET_ERROR("Could not convert laser scan msg! Aborting rtabmap update...");
 			return;
@@ -1025,11 +1041,12 @@ void CoreWrapper::commonDepthCallbackImpl(
 				frameId_,
 				odomSensorSync_?odomFrameId:"",
 				lastPoseStamp_,
-				scanCloudNormalK_,
 				scan,
 				scanLocalTransform,
 				tfListener_,
-				waitForTransform_?waitForTransformDuration_:0))
+				waitForTransform_?waitForTransformDuration_:0,
+				scanCloudNormalK_,
+				scanCloudNormalRadius_))
 		{
 			NODELET_ERROR("Could not convert 3d laser scan msg! Aborting rtabmap update...");
 			return;
@@ -1057,8 +1074,6 @@ void CoreWrapper::commonDepthCallbackImpl(
 		userData = userData_;
 		userData_ = cv::Mat();
 	}
-
-
 
 	SensorData data(scan,
 			LaserScanInfo(
@@ -1241,7 +1256,9 @@ void CoreWrapper::commonStereoCallback(
 				scan,
 				scanLocalTransform,
 				tfListener_,
-				waitForTransform_?waitForTransformDuration_:0))
+				waitForTransform_?waitForTransformDuration_:0,
+				scanCloudNormalK_,
+				scanCloudNormalRadius_))
 		{
 			NODELET_ERROR("Could not convert laser scan msg! Aborting rtabmap update...");
 			return;
@@ -1267,11 +1284,12 @@ void CoreWrapper::commonStereoCallback(
 				frameId_,
 				odomSensorSync_?odomFrameId:"",
 				lastPoseStamp_,
-				scanCloudNormalK_,
 				scan,
 				scanLocalTransform,
 				tfListener_,
-				waitForTransform_?waitForTransformDuration_:0))
+				waitForTransform_?waitForTransformDuration_:0,
+				scanCloudNormalK_,
+				scanCloudNormalRadius_))
 		{
 			NODELET_ERROR("Could not convert 3d laser scan msg! Aborting rtabmap update...");
 			return;
