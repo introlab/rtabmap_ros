@@ -1428,7 +1428,7 @@ bool convertScanMsg(
 		pcl::PointCloud<pcl::Normal>::Ptr normals = rtabmap::util3d::computeFastOrganizedNormals2D(pclScan, scanCloudNormalK, scanCloudNormalRadius);
 		pcl::PointCloud<pcl::PointNormal>::Ptr pclScanNormal(new pcl::PointCloud<pcl::PointNormal>);
 		pcl::concatenateFields(*pclScan, *normals, *pclScanNormal);
-		scan = rtabmap::util3d::laserScanFromPointCloud(*rtabmap::util3d::removeNaNNormalsFromPointCloud(pclScanNormal), laserToOdom); // put back in laser frame
+		scan = rtabmap::util3d::laserScan2dFromPointCloud(*pclScanNormal, laserToOdom); // put back in laser frame
 	}
 	else
 	{

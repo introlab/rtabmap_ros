@@ -300,7 +300,7 @@ private:
 						pcl::PointCloud<pcl::Normal>::Ptr normals = util3d::computeFastOrganizedNormals2D(pclScan, scanCloudNormalK_, scanCloudNormalRadius_);
 						pcl::PointCloud<pcl::PointNormal>::Ptr pclScanNormal(new pcl::PointCloud<pcl::PointNormal>);
 						pcl::concatenateFields(*pclScan, *normals, *pclScanNormal);
-						scan = util3d::laserScanFromPointCloud(*pclScanNormal);
+						scan = util3d::laserScan2dFromPointCloud(*pclScanNormal);
 					}
 					else
 					{

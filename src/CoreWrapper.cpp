@@ -996,7 +996,7 @@ void CoreWrapper::commonDepthCallbackImpl(
 			pcl::PointCloud<pcl::Normal>::Ptr normals = rtabmap::util3d::computeFastOrganizedNormals2D(scanCloud2d, scanCloudNormalK_, scanCloudNormalRadius_);
 			pcl::PointCloud<pcl::PointNormal>::Ptr pclScanNormal(new pcl::PointCloud<pcl::PointNormal>);
 			pcl::concatenateFields(*scanCloud2d, *normals, *pclScanNormal);
-			scan = rtabmap::util3d::laserScanFromPointCloud(*pclScanNormal);
+			scan = rtabmap::util3d::laserScan2dFromPointCloud(*pclScanNormal);
 		}
 		else
 		{
