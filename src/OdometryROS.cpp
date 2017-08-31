@@ -533,7 +533,7 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 		if(odomLocalScanMap_.getNumSubscribers() && !info.localScanMap.empty())
 		{
 			sensor_msgs::PointCloud2 cloudMsg;
-			if(info.localScanMap.channels() == 6)
+			if(info.localScanMap.channels() >= 5)
 			{
 				pcl::PointCloud<pcl::PointNormal>::Ptr cloud = util3d::laserScanToPointCloudNormal(info.localScanMap);
 				pcl::toROSMsg(*cloud, cloudMsg);

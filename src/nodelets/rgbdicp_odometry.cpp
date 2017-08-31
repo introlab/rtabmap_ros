@@ -111,8 +111,14 @@ private:
 		pnh.param("queue_size", queueSize_, queueSize_);
 		pnh.param("subscribe_scan_cloud", subscribeScanCloud, subscribeScanCloud);
 		pnh.param("scan_cloud_max_points",  scanCloudMaxPoints_, scanCloudMaxPoints_);
-		pnh.param("scan_cloud_normal_k", scanCloudNormalK_, scanCloudNormalK_);
-		pnh.param("scan_cloud_normal_radius", scanCloudNormalRadius_, scanCloudNormalRadius_);
+		pnh.param("scan_normal_k", scanCloudNormalK_, scanCloudNormalK_);
+		if(pnh.hasParam("scan_cloud_normal_k") && !pnh.hasParam("scan_normal_k"))
+		{
+			ROS_WARN("rtabmap: Parameter \"scan_cloud_normal_k\" has been renamed to \"scan_normal_k\". "
+					"The value is still used. Use \"scan_normal_k\" to avoid this warning.");
+			pnh.param("scan_cloud_normal_k", scanCloudNormalK_, scanCloudNormalK_);
+		}
+		pnh.param("scan_normal_radius", scanCloudNormalRadius_, scanCloudNormalRadius_);
 
 		ros::NodeHandle rgb_nh(nh, "rgb");
 		ros::NodeHandle depth_nh(nh, "depth");

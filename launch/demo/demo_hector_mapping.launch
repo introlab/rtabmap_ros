@@ -10,15 +10,18 @@
   <!-- Choose visualization -->
   <arg name="rviz" default="true" />
   <arg name="rtabmapviz" default="false" />
+  
+  <!-- Choose hector_slam or icp_odometry for odometry -->
+  <arg name="hector" default="true" />
 
   <param name="use_sim_time" type="bool" value="True"/>
   
-  <node pkg="tf" type="static_transform_publisher" name="scanmatcher_to_base_footprint" 
+  <node if="$(arg hector)" pkg="tf" type="static_transform_publisher" name="scanmatcher_to_base_footprint" 
     args="0.0 0.0 0.0 0.0 0.0 0.0 /scanmatcher_frame /base_footprint 100" />
 
   <!-- Odometry from laser scans -->
-  <!-- We use Hector mapping to generate odometry for us -->
-  <node pkg="hector_mapping" type="hector_mapping" name="hector_mapping" output="screen">
+  <!-- If argument "hector" is true, we use Hector mapping to generate odometry for us -->
+  <node if="$(arg hector)" pkg="hector_mapping" type="hector_mapping" name="hector_mapping" output="screen">
     
     <!-- Frame names -->
     <param name="map_frame" value="hector_map" />
@@ -40,6 +43,28 @@
     
     <!-- Advertising config --> 
     <param name="scan_topic" value="/jn0/base_scan"/>
+  </node>
+  
+  <!-- If argument "hector" is false, we use rtabmap's icp odometry to generate odometry for us -->
+  <node unless="$(arg hector)" pkg="rtabmap_ros" type="icp_odometry" name="icp_odometry" output="screen" >
+     <remap from="scan"      to="/jn0/base_scan"/>
+	 <remap from="odom"      to="/scanmatch_odom"/>
+	 <remap from="odom_info"      to="/rtabmap/odom_info"/>
+	  
+     <param name="frame_id"        type="string" value="base_footprint"/>   
+     
+     <param name="Icp/PointToPlane"  type="string" value="true"/>
+     <param name="Icp/VoxelSize"     type="string" value="0.05"/>
+     <param name="Icp/Epsilon"       type="string" value="0.001"/>
+     <param name="Icp/PointToPlaneK"  type="string" value="5"/>
+     <param name="Icp/PointToPlaneRadius"  type="string" value="0.3"/>
+     <param name="Icp/MaxCorrespondenceDistance" type="string" value="0.1"/>
+     <param name="Icp/PM"             type="string" value="true"/> <!-- use libpointmatcher to handle PointToPlane with 2d scans-->
+     <param name="Icp/PMOutlierRatio" type="string" value="0.95"/>
+     <param name="Odom/Strategy"        type="string" value="0"/>
+     <param name="Odom/GuessMotion"     type="string" value="true"/>
+     <param name="Odom/ResetCountdown"  type="string" value="0"/>
+     <param name="Odom/ScanKeyFrameThr"  type="string" value="0.9"/>
   </node>
 
   <group ns="rtabmap">
@@ -65,8 +90,8 @@
 	  <param name="Reg/Strategy"       type="string" value="1"/>    <!-- 0=Visual, 1=ICP, 2=Visual+ICP -->
 	  <param name="Vis/MaxDepth"       type="string" value="10.0"/> <!-- 3D visual words maximum depth 0=infinity -->
 	  <param name="Vis/InlierDistance" type="string" value="0.1"/>  <!-- 3D visual words correspondence distance -->
-	  <param name="Optimizer/Slam2D"   type="string" value="true"/>
 	  <param name="Reg/Force3DoF"      type="string" value="true"/>
+	  <param name="RGBD/ProximityBySpace"      type="string" value="false"/>
     </node>
     
     <!-- Visualisation RTAB-Map -->
@@ -74,6 +99,7 @@
   	  <param name="subscribe_depth"     type="bool" value="true"/>
       <param name="subscribe_laserScan" type="bool" value="true"/>
       <param name="frame_id"            type="string" value="base_footprint"/>
+      <param unless="$(arg hector)" name="subscribe_odom_info" type="bool" value="true"/>
     
       <remap from="rgb/image"       to="/data_throttled_image"/>
       <remap from="depth/image"     to="/data_throttled_image_depth"/>
