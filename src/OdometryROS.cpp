@@ -69,7 +69,6 @@ OdometryROS::OdometryROS(bool stereoParams, bool visParams, bool icpParams) :
 	waitForTransform_(true),
 	waitForTransformDuration_(0.1), // 100 ms
 	publishNullWhenLost_(true),
-	guessFromTf_(false),
 	paused_(false),
 	resetCountdown_(0),
 	resetCurrentCount_(0),
@@ -119,7 +118,7 @@ void OdometryROS::onInit()
 	pnh.param("publish_tf", publishTf_, publishTf_);
 	if(pnh.hasParam("tf_prefix"))
 	{
-		ROS_ERROR("tf_prefix parameter has been removed, use directly odom_frame_id and frame_id parameters.");
+		NODELET_ERROR("tf_prefix parameter has been removed, use directly odom_frame_id and frame_id parameters.");
 	}
 	pnh.param("wait_for_transform", waitForTransform_, waitForTransform_);
 	pnh.param("wait_for_transform_duration",  waitForTransformDuration_, waitForTransformDuration_);
@@ -128,15 +127,25 @@ void OdometryROS::onInit()
 	pnh.param("ground_truth_base_frame_id", groundTruthBaseFrameId_, frameId_);
 	pnh.param("config_path", configPath, configPath);
 	pnh.param("publish_null_when_lost", publishNullWhenLost_, publishNullWhenLost_);
-	pnh.param("guess_from_tf", guessFromTf_, guessFromTf_);
-	pnh.param("guess_frame_id", guessFrameId_, frameId_);
-
-	if(publishTf_ && guessFromTf_ && guessFrameId_.compare(frameId_) == 0)
+	if(pnh.hasParam("guess_from_tf"))
 	{
-		NODELET_WARN( "\"publish_tf\" and \"guess_from_tf\" cannot be used "
-				"at the same time if \"guess_frame_id\" and \"frame_id\" "
-				"are the same frame (value=\"%s\"). \"guess_from_tf\" is disabled.", frameId_.c_str());
-		guessFromTf_ = false;
+		if(!pnh.hasParam("guess_frame_id"))
+		{
+			NODELET_ERROR("Parameter \"guess_from_tf\" doesn't exist anymore, it is enabled if \"guess_frame_id\" is set.");
+		}
+		else
+		{
+			NODELET_WARN("Parameter \"guess_from_tf\" doesn't exist anymore, it is enabled if \"guess_frame_id\" is set.");
+		}
+	}
+	pnh.param("guess_frame_id", guessFrameId_, guessFrameId_); // odometry guess frame
+
+	if(publishTf_ && !guessFrameId_.empty() && guessFrameId_.compare(odomFrameId_) == 0)
+	{
+		NODELET_WARN( "\"publish_tf\" and \"guess_frame_id\" cannot be used "
+				"at the same time if \"guess_frame_id\" and \"odom_frame_id\" "
+				"are the same frame (value=\"%s\"). \"guess_frame_id\" is disabled.", odomFrameId_.c_str());
+		guessFrameId_.clear();
 	}
 
 	configPath = uReplaceChar(configPath, '~', UDirectory::homeDir());
@@ -371,27 +380,18 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 	}
 
 	Transform guess;
-	if(guessFromTf_)
+	Transform guessCurrentPose;
+	if(!guessFrameId_.empty())
 	{
-		Transform previousPose = this->getTransform(odomFrameId_, guessFrameId_, ros::Time(odometry_->previousStamp()));
-		Transform pose = this->getTransform(odomFrameId_, guessFrameId_, stamp);
-		if(!previousPose.isNull() && !pose.isNull())
+		Transform previousPose = this->getTransform(guessFrameId_, frameId_, odometry_->previousStamp()>0.0?ros::Time(odometry_->previousStamp()):stamp);
+		guessCurrentPose = this->getTransform(guessFrameId_, frameId_, stamp);
+		if(!previousPose.isNull() && !guessCurrentPose.isNull())
 		{
-			guess = previousPose.inverse() * pose;
-
-			/*if(!odometry_->previousVelocityTransform().isNull())
-			{
-				float dt = rtabmap_ros::timestampFromROS(stamp) - odometry_->previousStamp();
-				float vx,vy,vz, vroll,vpitch,vyaw;
-				odometry_->previousVelocityTransform().getTranslationAndEulerAngles(vx,vy,vz, vroll,vpitch,vyaw);
-				Transform motionGuess(vx*dt, vy*dt, vz*dt, vroll*dt, vpitch*dt, vyaw*dt);
-				NODELET_WARN( "P  Guess %s", motionGuess.prettyPrint().c_str());
-			}
-			NODELET_WARN( "TF Guess %s", guess.prettyPrint().c_str());*/
+			guess = previousPose.inverse() * guessCurrentPose;
 		}
 		else
 		{
-			ROS_ERROR("\"guess_from_tf\" is true, but guess cannot be computed between frames \"%s\" -> \"%s\". Aborting odometry update...", odomFrameId_.c_str(), guessFrameId_.c_str());
+			NODELET_ERROR("\"guess_from_tf\" is true, but guess cannot be computed between frames \"%s\" -> \"%s\". Aborting odometry update...", guessFrameId_.c_str(), frameId_.c_str());
 			return;
 		}
 	}
@@ -416,7 +416,21 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 
 		if(publishTf_)
 		{
-			tfBroadcaster_.sendTransform(poseMsg);
+			if(!guessFrameId_.empty())
+			{
+				//publish correction of actual odometry so we have /odom -> /odom_guess -> /base_link
+				geometry_msgs::TransformStamped correctionMsg;
+				correctionMsg.child_frame_id = guessFrameId_;
+				correctionMsg.header.frame_id = odomFrameId_;
+				correctionMsg.header.stamp = stamp;
+				Transform correction = pose * guessCurrentPose.inverse();
+				rtabmap_ros::transformToGeometryMsg(correction, correctionMsg.transform);
+				tfBroadcaster_.sendTransform(correctionMsg);
+			}
+			else
+			{
+				tfBroadcaster_.sendTransform(poseMsg);
+			}
 		}
 
 		if(odomPub_.getNumSubscribers())
