@@ -58,6 +58,7 @@ class PointCloudToDepthImage : public nodelet::Nodelet
 {
 public:
 	PointCloudToDepthImage() :
+		listener_(0),
 		waitForTransform_(0.1),
 		fillHolesSize_ (0),
 		fillHolesError_(0.1),
@@ -144,7 +145,7 @@ private:
 			if(!fixedFrameId_.empty())
 			{
 				// approx sync
-				rtabmap::Transform cloudDisplacement = rtabmap_ros::getTransform(
+				cloudDisplacement = rtabmap_ros::getTransform(
 						pointCloud2Msg->header.frame_id,
 						fixedFrameId_,
 						pointCloud2Msg->header.stamp,
@@ -170,7 +171,7 @@ private:
 				return;
 			}
 
-			rtabmap::Transform localTransform = cloudToCamera*cloudDisplacement;
+			rtabmap::Transform localTransform = cloudDisplacement.inverse()*cloudToCamera;
 
 			rtabmap::CameraModel model = rtabmap_ros::cameraModelFromROS(*cameraInfoMsg, localTransform);
 
