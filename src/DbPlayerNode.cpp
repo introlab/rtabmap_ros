@@ -166,7 +166,7 @@ int main(int argc, char** argv)
 	rtabmap::CameraInfo cameraInfo;
 	rtabmap::SensorData data = reader.takeImage(&cameraInfo);
 	rtabmap::OdometryInfo odomInfo;
-	odomInfo.covariance = cameraInfo.odomCovariance;
+	odomInfo.reg.covariance = cameraInfo.odomCovariance;
 	rtabmap::OdometryEvent odom(data, cameraInfo.odomPose, odomInfo);
 	double acquisitionTime = timer.ticks();
 	while(ros::ok() && odom.data().id())
@@ -494,7 +494,7 @@ int main(int argc, char** argv)
 		timer.restart();
 		cameraInfo = rtabmap::CameraInfo();
 		data = reader.takeImage(&cameraInfo);
-		odomInfo.covariance = cameraInfo.odomCovariance;
+		odomInfo.reg.covariance = cameraInfo.odomCovariance;
 		odom = rtabmap::OdometryEvent(data, cameraInfo.odomPose, odomInfo);
 		acquisitionTime = timer.ticks();
 	}

@@ -569,7 +569,7 @@ void GuiWrapper::commonDepthCallback(
 		return;
 	}
 
-	info.covariance = covariance;
+	info.reg.covariance = covariance;
 	rtabmap::OdometryEvent odomEvent(
 		rtabmap::SensorData(
 				scan,
@@ -724,7 +724,7 @@ void GuiWrapper::commonStereoCallback(
 		return;
 	}
 
-	info.covariance = covariance;
+	info.reg.covariance = covariance;
 	rtabmap::OdometryEvent odomEvent(
 		rtabmap::SensorData(
 				scan,

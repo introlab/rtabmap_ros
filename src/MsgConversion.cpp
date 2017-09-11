@@ -884,10 +884,13 @@ rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::OdomInfo & msg)
 {
 	rtabmap::OdometryInfo info;
 	info.lost = msg.lost;
-	info.matches = msg.matches;
-	info.inliers = msg.inliers;
-	info.icpInliersRatio = msg.icpInliersRatio;
-	info.covariance = cv::Mat(6,6,CV_64FC1, (void*)msg.covariance.data()).clone();
+	info.reg.matches = msg.matches;
+	info.reg.inliers = msg.inliers;
+	info.reg.icpInliersRatio = msg.icpInliersRatio;
+	info.reg.icpRotation = msg.icpRotation;
+	info.reg.icpTranslation = msg.icpTranslation;
+	info.reg.icpStructuralComplexity = msg.icpStructuralComplexity;
+	info.reg.covariance = cv::Mat(6,6,CV_64FC1, (void*)msg.covariance.data()).clone();
 	info.features = msg.features;
 	info.localMapSize = msg.localMapSize;
 	info.localScanMapSize = msg.localScanMapSize;
@@ -910,8 +913,8 @@ rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::OdomInfo & msg)
 		info.words.insert(std::make_pair(msg.wordsKeys[i], keypointFromROS(msg.wordsValues[i])));
 	}
 
-	info.wordMatches = msg.wordMatches;
-	info.wordInliers = msg.wordInliers;
+	info.reg.matchesIDs = msg.wordMatches;
+	info.reg.inliersIDs = msg.wordInliers;
 
 	info.refCorners = points2fFromROS(msg.refCorners);
 	info.newCorners = points2fFromROS(msg.newCorners);
@@ -934,12 +937,15 @@ rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::OdomInfo & msg)
 void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_ros::OdomInfo & msg)
 {
 	msg.lost = info.lost;
-	msg.matches = info.matches;
-	msg.inliers = info.inliers;
-	msg.icpInliersRatio = info.icpInliersRatio;
-	if(info.covariance.type() == CV_64FC1 && info.covariance.cols == 6 && info.covariance.rows == 6)
+	msg.matches = info.reg.matches;
+	msg.inliers = info.reg.inliers;
+	msg.icpInliersRatio = info.reg.icpInliersRatio;
+	msg.icpRotation = info.reg.icpRotation;
+	msg.icpTranslation = info.reg.icpTranslation;
+	msg.icpStructuralComplexity = info.reg.icpStructuralComplexity;
+	if(info.reg.covariance.type() == CV_64FC1 && info.reg.covariance.cols == 6 && info.reg.covariance.rows == 6)
 	{
-		memcpy(msg.covariance.data(), info.covariance.data, 36*sizeof(double));
+		memcpy(msg.covariance.data(), info.reg.covariance.data, 36*sizeof(double));
 	}
 	msg.features = info.features;
 	msg.localMapSize = info.localMapSize;
@@ -960,8 +966,8 @@ void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_ros::OdomInfo & m
 	msg.wordsKeys = uKeys(info.words);
 	keypointsToROS(uValues(info.words), msg.wordsValues);
 
-	msg.wordMatches = info.wordMatches;
-	msg.wordInliers = info.wordInliers;
+	msg.wordMatches = info.reg.matchesIDs;
+	msg.wordInliers = info.reg.inliersIDs;
 
 	points2fToROS(info.refCorners, msg.refCorners);
 	points2fToROS(info.newCorners, msg.newCorners);
