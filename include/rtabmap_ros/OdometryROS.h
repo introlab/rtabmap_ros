@@ -97,6 +97,8 @@ private:
 	std::string groundTruthFrameId_;
 	std::string groundTruthBaseFrameId_;
 	std::string guessFrameId_;
+	double guessMinTranslation_;
+	double guessMinRotation_;
 	bool publishTf_;
 	bool waitForTransform_;
 	double waitForTransformDuration_;

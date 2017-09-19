@@ -205,9 +205,7 @@ bool convertScanMsg(
 		cv::Mat & scan,
 		rtabmap::Transform & scanLocalTransform,
 		tf::TransformListener & listener,
-		double waitForTransform,
-		int scanCloudNormalK = 0,
-		float scanCloudNormalRadius = 0.0f);
+		double waitForTransform);
 
 bool convertScan3dMsg(
 		const sensor_msgs::PointCloud2ConstPtr & scan3dMsg,
@@ -217,9 +215,7 @@ bool convertScan3dMsg(
 		cv::Mat & scan,
 		rtabmap::Transform & scanLocalTransform,
 		tf::TransformListener & listener,
-		double waitForTransform,
-		int scanCloudNormalK = 0,
-		float scanCloudNormalRadius = 0.0f);
+		double waitForTransform);
 
 }
 

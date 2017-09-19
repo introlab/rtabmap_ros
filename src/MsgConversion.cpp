@@ -1360,9 +1360,7 @@ bool convertScanMsg(
 		cv::Mat & scan,
 		rtabmap::Transform & scanLocalTransform,
 		tf::TransformListener & listener,
-		double waitForTransform,
-		int scanCloudNormalK,
-		float scanCloudNormalRadius)
+		double waitForTransform)
 {
 	// make sure the frame of the laser is updated too
 	rtabmap::Transform tmpT = getTransform(
@@ -1393,6 +1391,7 @@ bool convertScanMsg(
 	projection.transformLaserScanToPointCloud(odomFrameId.empty()?frameId:odomFrameId, *scan2dMsg, scanOut, listener);
 	pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
 	pcl::fromROSMsg(scanOut, *pclScan);
+	pclScan->is_dense = true;
 
 	//transform back in laser frame
 	rtabmap::Transform laserToOdom = getTransform(
@@ -1428,19 +1427,7 @@ bool convertScanMsg(
 		}
 	}
 
-	if(scanCloudNormalK > 0 || scanCloudNormalRadius>0.0f)
-	{
-		//compute normals
-		pcl::PointCloud<pcl::Normal>::Ptr normals = rtabmap::util3d::computeFastOrganizedNormals2D(pclScan, scanCloudNormalK, scanCloudNormalRadius);
-		pcl::PointCloud<pcl::PointNormal>::Ptr pclScanNormal(new pcl::PointCloud<pcl::PointNormal>);
-		pcl::concatenateFields(*pclScan, *normals, *pclScanNormal);
-		scan = rtabmap::util3d::laserScan2dFromPointCloud(*pclScanNormal, laserToOdom); // put back in laser frame
-	}
-	else
-	{
-		scan = rtabmap::util3d::laserScan2dFromPointCloud(*pclScan, laserToOdom); // put back in laser frame
-	}
-
+	scan = rtabmap::util3d::laserScan2dFromPointCloud(*pclScan, laserToOdom); // put back in laser frame
 
 	return true;
 }
@@ -1453,9 +1440,7 @@ bool convertScan3dMsg(
 		cv::Mat & scan,
 		rtabmap::Transform & scanLocalTransform,
 		tf::TransformListener & listener,
-		double waitForTransform,
-		int scanCloudNormalK,
-		float scanCloudNormalRadius)
+		double waitForTransform)
 {
 	bool containNormals = false;
 	bool containColors = false;
@@ -1533,18 +1518,7 @@ bool convertScan3dMsg(
 				pclScan = rtabmap::util3d::removeNaNFromPointCloud(pclScan);
 			}
 
-			if(scanCloudNormalK > 0 || scanCloudNormalRadius>0.0f)
-			{
-				//compute normals
-				pcl::PointCloud<pcl::Normal>::Ptr normals = rtabmap::util3d::computeNormals(pclScan, scanCloudNormalK, scanCloudNormalRadius);
-				pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr pclScanNormal(new pcl::PointCloud<pcl::PointXYZRGBNormal>);
-				pcl::concatenateFields(*pclScan, *normals, *pclScanNormal);
-				scan = rtabmap::util3d::laserScanFromPointCloud(*rtabmap::util3d::removeNaNNormalsFromPointCloud(pclScanNormal));
-			}
-			else
-			{
-				scan = rtabmap::util3d::laserScanFromPointCloud(*pclScan);
-			}
+			scan = rtabmap::util3d::laserScanFromPointCloud(*pclScan);
 		}
 		else
 		{
@@ -1555,18 +1529,7 @@ bool convertScan3dMsg(
 				pclScan = rtabmap::util3d::removeNaNFromPointCloud(pclScan);
 			}
 
-			if(scanCloudNormalK > 0 || scanCloudNormalRadius>0.0f)
-			{
-				//compute normals
-				pcl::PointCloud<pcl::Normal>::Ptr normals = rtabmap::util3d::computeNormals(pclScan, scanCloudNormalK, scanCloudNormalRadius);
-				pcl::PointCloud<pcl::PointNormal>::Ptr pclScanNormal(new pcl::PointCloud<pcl::PointNormal>);
-				pcl::concatenateFields(*pclScan, *normals, *pclScanNormal);
-				scan = rtabmap::util3d::laserScanFromPointCloud(*rtabmap::util3d::removeNaNNormalsFromPointCloud(pclScanNormal));
-			}
-			else
-			{
-				scan = rtabmap::util3d::laserScanFromPointCloud(*pclScan);
-			}
+			scan = rtabmap::util3d::laserScanFromPointCloud(*pclScan);
 		}
 	}
 	return true;

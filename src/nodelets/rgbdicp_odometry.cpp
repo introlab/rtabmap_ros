@@ -74,8 +74,9 @@ public:
 		exactCloudSync_(0),
 		queueSize_(5),
 		scanCloudMaxPoints_(0),
-		scanCloudNormalK_(0),
-		scanCloudNormalRadius_(0.0f)
+		scanVoxelSize_(0.0f),
+		scanNormalK_(0),
+		scanNormalRadius_(0.0f)
 	{
 	}
 
@@ -112,14 +113,23 @@ private:
 		pnh.param("queue_size", queueSize_, queueSize_);
 		pnh.param("subscribe_scan_cloud", subscribeScanCloud, subscribeScanCloud);
 		pnh.param("scan_cloud_max_points",  scanCloudMaxPoints_, scanCloudMaxPoints_);
-		pnh.param("scan_normal_k", scanCloudNormalK_, scanCloudNormalK_);
+		pnh.param("scan_voxel_size", scanVoxelSize_, scanVoxelSize_);
+		pnh.param("scan_normal_k", scanNormalK_, scanNormalK_);
 		if(pnh.hasParam("scan_cloud_normal_k") && !pnh.hasParam("scan_normal_k"))
 		{
 			ROS_WARN("rtabmap: Parameter \"scan_cloud_normal_k\" has been renamed to \"scan_normal_k\". "
 					"The value is still used. Use \"scan_normal_k\" to avoid this warning.");
-			pnh.param("scan_cloud_normal_k", scanCloudNormalK_, scanCloudNormalK_);
+			pnh.param("scan_cloud_normal_k", scanNormalK_, scanNormalK_);
 		}
-		pnh.param("scan_normal_radius", scanCloudNormalRadius_, scanCloudNormalRadius_);
+		pnh.param("scan_normal_radius", scanNormalRadius_, scanNormalRadius_);
+
+		NODELET_INFO("RGBDIcpOdometry: approx_sync           = %s", approxSync?"true":"false");
+		NODELET_INFO("RGBDIcpOdometry: queue_size            = %d", queueSize_);
+		NODELET_INFO("RGBDIcpOdometry: subscribe_scan_cloud  = %s", subscribeScanCloud?"true":"false");
+		NODELET_INFO("RGBDIcpOdometry: scan_cloud_max_points = %d", scanCloudMaxPoints_);
+		NODELET_INFO("RGBDIcpOdometry: scan_voxel_size       = %f", scanVoxelSize_);
+		NODELET_INFO("RGBDIcpOdometry: scan_normal_k         = %d", scanNormalK_);
+		NODELET_INFO("RGBDIcpOdometry: scan_normal_radius    = %f", scanNormalRadius_);
 
 		ros::NodeHandle rgb_nh(nh, "rgb");
 		ros::NodeHandle depth_nh(nh, "depth");
@@ -191,16 +201,6 @@ private:
 			ROS_WARN("RGBDICP odometry works only with \"Reg/Strategy\"=2. Ignoring value %s.", iter->second.c_str());
 		}
 		uInsert(parameters, ParametersPair(Parameters::kRegStrategy(), "2"));
-	}
-
-	void callback(
-			const sensor_msgs::ImageConstPtr& image,
-			const sensor_msgs::ImageConstPtr& depth,
-			const sensor_msgs::CameraInfoConstPtr& cameraInfo)
-	{
-		sensor_msgs::LaserScanConstPtr scanMsg;
-		sensor_msgs::PointCloud2ConstPtr cloudMsg;
-		callbackCommon(image, depth, cameraInfo, scanMsg, cloudMsg);
 	}
 
 	void callbackScan(
@@ -282,6 +282,7 @@ private:
 
 				cv::Mat scan;
 				Transform localScanTransform = Transform::getIdentity();
+				int maxLaserScans = 0;
 				if(scanMsg.get() != 0)
 				{
 					// make sure the frame of the laser is updated too
@@ -300,29 +301,52 @@ private:
 					projection.transformLaserScanToPointCloud(scanMsg->header.frame_id, *scanMsg, scanOut, this->tfListener());
 					pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
 					pcl::fromROSMsg(scanOut, *pclScan);
+					pclScan->is_dense = true;
 
-					if(scanCloudNormalK_ > 0 || scanCloudNormalRadius_>0.0f)
+					maxLaserScans = (int)scanMsg->ranges.size();
+					if(pclScan->size())
 					{
-						//compute normals
-						pcl::PointCloud<pcl::Normal>::Ptr normals = util3d::computeFastOrganizedNormals2D(pclScan, scanCloudNormalK_, scanCloudNormalRadius_);
-						pcl::PointCloud<pcl::PointNormal>::Ptr pclScanNormal(new pcl::PointCloud<pcl::PointNormal>);
-						pcl::concatenateFields(*pclScan, *normals, *pclScanNormal);
-						scan = util3d::laserScan2dFromPointCloud(*pclScanNormal);
-					}
-					else
-					{
-						scan = util3d::laserScan2dFromPointCloud(*pclScan);
+						if(scanVoxelSize_ > 0.0f)
+						{
+							float pointsBeforeFiltering = (float)pclScan->size();
+							pclScan = util3d::voxelize(pclScan, scanVoxelSize_);
+							float ratio = float(pclScan->size()) / pointsBeforeFiltering;
+							maxLaserScans = int(float(maxLaserScans) * ratio);
+						}
+						if(scanNormalK_ > 0 || scanNormalRadius_>0.0f)
+						{
+							//compute normals
+							pcl::PointCloud<pcl::Normal>::Ptr normals;
+							if(scanVoxelSize_ > 0.0f)
+							{
+								normals = util3d::computeNormals2D(pclScan, scanNormalK_, scanNormalRadius_);
+							}
+							else
+							{
+								normals = util3d::computeFastOrganizedNormals2D(pclScan, scanNormalK_, scanNormalRadius_);
+							}
+							pcl::PointCloud<pcl::PointNormal>::Ptr pclScanNormal(new pcl::PointCloud<pcl::PointNormal>);
+							pcl::concatenateFields(*pclScan, *normals, *pclScanNormal);
+							scan = util3d::laserScan2dFromPointCloud(*pclScanNormal);
+						}
+						else
+						{
+							scan = util3d::laserScan2dFromPointCloud(*pclScan);
+						}
 					}
 				}
 				else if(cloudMsg.get() != 0)
 				{
 					bool containNormals = false;
-					for(unsigned int i=0; i<cloudMsg->fields.size(); ++i)
+					if(scanVoxelSize_ == 0.0f)
 					{
-						if(cloudMsg->fields[i].name.compare("normal_x") == 0)
+						for(unsigned int i=0; i<cloudMsg->fields.size(); ++i)
 						{
-							containNormals = true;
-							break;
+							if(cloudMsg->fields[i].name.compare("normal_x") == 0)
+							{
+								containNormals = true;
+								break;
+							}
 						}
 					}
 					localScanTransform = getTransform(this->frameId(), cloudMsg->header.frame_id, cloudMsg->header.stamp);
@@ -332,6 +356,7 @@ private:
 						return;
 					}
 
+					maxLaserScans = scanCloudMaxPoints_;
 					if(containNormals)
 					{
 						pcl::PointCloud<pcl::PointNormal>::Ptr pclScan(new pcl::PointCloud<pcl::PointNormal>);
@@ -351,17 +376,27 @@ private:
 							pclScan = util3d::removeNaNFromPointCloud(pclScan);
 						}
 
-						if(scanCloudNormalK_ > 0 || scanCloudNormalRadius_>0.0f)
+						if(pclScan->size())
 						{
-							//compute normals
-							pcl::PointCloud<pcl::Normal>::Ptr normals = util3d::computeNormals(pclScan, scanCloudNormalK_, scanCloudNormalRadius_);
-							pcl::PointCloud<pcl::PointNormal>::Ptr pclScanNormal(new pcl::PointCloud<pcl::PointNormal>);
-							pcl::concatenateFields(*pclScan, *normals, *pclScanNormal);
-							scan = util3d::laserScanFromPointCloud(*pclScanNormal);
-						}
-						else
-						{
-							scan = util3d::laserScanFromPointCloud(*pclScan);
+							if(scanVoxelSize_ > 0.0f)
+							{
+								float pointsBeforeFiltering = (float)pclScan->size();
+								pclScan = util3d::voxelize(pclScan, scanVoxelSize_);
+								float ratio = float(pclScan->size()) / pointsBeforeFiltering;
+								maxLaserScans = int(float(maxLaserScans) * ratio);
+							}
+							if(scanNormalK_ > 0 || scanNormalRadius_>0.0f)
+							{
+								//compute normals
+								pcl::PointCloud<pcl::Normal>::Ptr normals = util3d::computeNormals(pclScan, scanNormalK_, scanNormalRadius_);
+								pcl::PointCloud<pcl::PointNormal>::Ptr pclScanNormal(new pcl::PointCloud<pcl::PointNormal>);
+								pcl::concatenateFields(*pclScan, *normals, *pclScanNormal);
+								scan = util3d::laserScanFromPointCloud(*pclScanNormal);
+							}
+							else
+							{
+								scan = util3d::laserScanFromPointCloud(*pclScan);
+							}
 						}
 					}
 				}
@@ -369,7 +404,7 @@ private:
 				rtabmap::SensorData data(
 						scan,
 						LaserScanInfo(
-								scanMsg.get() != 0?(int)scanMsg->ranges.size():cloudMsg.get() != 0?scanCloudMaxPoints_:0,
+								scanMsg.get() != 0 || cloudMsg.get() != 0?maxLaserScans:0,
 								scanMsg.get() != 0?scanMsg->range_max:0,
 								localScanTransform),
 						ptrImage->image,
@@ -429,8 +464,9 @@ private:
 	message_filters::Synchronizer<MyExactCloudSyncPolicy> * exactCloudSync_;
 	int queueSize_;
 	int scanCloudMaxPoints_;
-	int scanCloudNormalK_;
-	float scanCloudNormalRadius_;
+	float scanVoxelSize_;
+	int scanNormalK_;
+	float scanNormalRadius_;
 };
 
 PLUGINLIB_EXPORT_CLASS(rtabmap_ros::RGBDICPOdometry, nodelet::Nodelet);

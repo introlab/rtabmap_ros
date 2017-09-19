@@ -117,6 +117,11 @@ private:
 			NODELET_FATAL("Only 2 cameras maximum supported yet.");
 		}
 
+		NODELET_INFO("RGBDOdometry: approx_sync    = %s", approxSync?"true":"false");
+		NODELET_INFO("RGBDOdometry: queue_size     = %d", queueSize_);
+		NODELET_INFO("RGBDOdometry: subscribe_rgbd = %s", subscribeRGBD?"true":"false");
+		NODELET_INFO("RGBDOdometry: rgbd_cameras   = %d", rgbdCameras);
+
 		std::string subscribedTopicsMsg;
 		if(subscribeRGBD)
 		{

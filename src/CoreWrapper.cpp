@@ -102,8 +102,6 @@ CoreWrapper::CoreWrapper() :
 		genScanMaxDepth_(4.0),
 		genScanMinDepth_(0.0),
 		scanCloudMaxPoints_(0),
-		scanCloudNormalK_(0),
-		scanCloudNormalRadius_(0.0f),
 		mapToOdom_(rtabmap::Transform::getIdentity()),
 		transformThread_(0),
 		tfThreadRunning_(false),
@@ -162,14 +160,16 @@ void CoreWrapper::onInit()
 	pnh.param("gen_scan_max_depth",  genScanMaxDepth_, genScanMaxDepth_);
 	pnh.param("gen_scan_min_depth",  genScanMinDepth_, genScanMinDepth_);
 	pnh.param("scan_cloud_max_points",  scanCloudMaxPoints_, scanCloudMaxPoints_);
-	pnh.param("scan_normal_k", scanCloudNormalK_, scanCloudNormalK_);
-	if(pnh.hasParam("scan_cloud_normal_k") && !pnh.hasParam("scan_normal_k"))
+	if(pnh.hasParam("scan_cloud_normal_k"))
 	{
-		ROS_WARN("rtabmap: Parameter \"scan_cloud_normal_k\" has been renamed to \"scan_normal_k\". "
-				"The value is still used. Use \"scan_normal_k\" to avoid this warning.");
-		pnh.param("scan_cloud_normal_k", scanCloudNormalK_, scanCloudNormalK_);
+		ROS_WARN("rtabmap: Parameter \"scan_cloud_normal_k\" has been removed. RTAB-Map's parameter \"%s\" should be used instead. "
+				"The value is copied. Use \"%s\" to avoid this warning.",
+				Parameters::kMemLaserScanNormalK().c_str(),
+				Parameters::kMemLaserScanNormalK().c_str());
+		double value;
+		pnh.getParam("scan_cloud_normal_k", value);
+		uInsert(parameters_, ParametersPair(Parameters::kMemLaserScanNormalK(), uNumber2Str(value)));
 	}
-	pnh.param("scan_normal_radius", scanCloudNormalRadius_, scanCloudNormalRadius_);
 	pnh.param("stereo_to_depth", stereoToDepth_, stereoToDepth_);
 	pnh.param("odom_sensor_sync", odomSensorSync_, odomSensorSync_);
 	if(pnh.hasParam("flip_scan"))
@@ -996,18 +996,7 @@ void CoreWrapper::commonDepthCallbackImpl(
 				genScanMaxDepth_,
 				genScanMinDepth_);
 		genMaxScanPts += depth.cols;
-		if(scanCloudNormalK_ > 0 || scanCloudNormalRadius_>0.0f)
-		{
-			//compute normals
-			pcl::PointCloud<pcl::Normal>::Ptr normals = rtabmap::util3d::computeFastOrganizedNormals2D(scanCloud2d, scanCloudNormalK_, scanCloudNormalRadius_);
-			pcl::PointCloud<pcl::PointNormal>::Ptr pclScanNormal(new pcl::PointCloud<pcl::PointNormal>);
-			pcl::concatenateFields(*scanCloud2d, *normals, *pclScanNormal);
-			scan = rtabmap::util3d::laserScan2dFromPointCloud(*pclScanNormal);
-		}
-		else
-		{
-			scan = rtabmap::util3d::laserScan2dFromPointCloud(*scanCloud2d);
-		}
+		scan = rtabmap::util3d::laserScan2dFromPointCloud(*scanCloud2d);
 	}
 	else if(scan2dMsg.get() != 0)
 	{
@@ -1019,9 +1008,7 @@ void CoreWrapper::commonDepthCallbackImpl(
 				scan,
 				scanLocalTransform,
 				tfListener_,
-				waitForTransform_?waitForTransformDuration_:0,
-				scanCloudNormalK_,
-				scanCloudNormalRadius_))
+				waitForTransform_?waitForTransformDuration_:0))
 		{
 			NODELET_ERROR("Could not convert laser scan msg! Aborting rtabmap update...");
 			return;
@@ -1050,9 +1037,7 @@ void CoreWrapper::commonDepthCallbackImpl(
 				scan,
 				scanLocalTransform,
 				tfListener_,
-				waitForTransform_?waitForTransformDuration_:0,
-				scanCloudNormalK_,
-				scanCloudNormalRadius_))
+				waitForTransform_?waitForTransformDuration_:0))
 		{
 			NODELET_ERROR("Could not convert 3d laser scan msg! Aborting rtabmap update...");
 			return;
@@ -1262,9 +1247,7 @@ void CoreWrapper::commonStereoCallback(
 				scan,
 				scanLocalTransform,
 				tfListener_,
-				waitForTransform_?waitForTransformDuration_:0,
-				scanCloudNormalK_,
-				scanCloudNormalRadius_))
+				waitForTransform_?waitForTransformDuration_:0))
 		{
 			NODELET_ERROR("Could not convert laser scan msg! Aborting rtabmap update...");
 			return;
@@ -1293,9 +1276,7 @@ void CoreWrapper::commonStereoCallback(
 				scan,
 				scanLocalTransform,
 				tfListener_,
-				waitForTransform_?waitForTransformDuration_:0,
-				scanCloudNormalK_,
-				scanCloudNormalRadius_))
+				waitForTransform_?waitForTransformDuration_:0))
 		{
 			NODELET_ERROR("Could not convert 3d laser scan msg! Aborting rtabmap update...");
 			return;

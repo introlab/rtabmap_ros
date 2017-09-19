@@ -49,6 +49,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtabmap/utilite/ULogger.h"
 #include "rtabmap/utilite/UStl.h"
 #include "rtabmap/utilite/UFile.h"
+#include "rtabmap/utilite/UMath.h"
 
 #define BAD_COVARIANCE 9999
 
@@ -65,6 +66,8 @@ OdometryROS::OdometryROS(bool stereoParams, bool visParams, bool icpParams) :
 	groundTruthFrameId_(""),
 	groundTruthBaseFrameId_(""),
 	guessFrameId_(""),
+	guessMinTranslation_(0.0),
+	guessMinRotation_(0.0),
 	publishTf_(true),
 	waitForTransform_(true),
 	waitForTransformDuration_(0.1), // 100 ms
@@ -139,6 +142,8 @@ void OdometryROS::onInit()
 		}
 	}
 	pnh.param("guess_frame_id", guessFrameId_, guessFrameId_); // odometry guess frame
+	pnh.param("guess_min_translation", guessMinTranslation_, guessMinTranslation_);
+	pnh.param("guess_min_rotation", guessMinRotation_, guessMinRotation_);
 
 	if(publishTf_ && !guessFrameId_.empty() && guessFrameId_.compare(odomFrameId_) == 0)
 	{
@@ -147,6 +152,19 @@ void OdometryROS::onInit()
 				"are the same frame (value=\"%s\"). \"guess_frame_id\" is disabled.", odomFrameId_.c_str());
 		guessFrameId_.clear();
 	}
+	NODELET_INFO("Odometry: frame_id               = %s", frameId_.c_str());
+	NODELET_INFO("Odometry: odom_frame_id          = %s", odomFrameId_.c_str());
+	NODELET_INFO("Odometry: publish_tf             = %s", publishTf_?"true":"false");
+	NODELET_INFO("Odometry: wait_for_transform     = %s", waitForTransform_?"true":"false");
+	NODELET_INFO("Odometry: wait_for_transform_duration  = %f", waitForTransformDuration_);
+	NODELET_INFO("Odometry: initial_pose           = %s", initialPose.prettyPrint().c_str());
+	NODELET_INFO("Odometry: ground_truth_frame_id  = %s", groundTruthFrameId_.c_str());
+	NODELET_INFO("Odometry: ground_truth_base_frame_id = %s", groundTruthBaseFrameId_.c_str());
+	NODELET_INFO("Odometry: config_path            = %s", configPath.c_str());
+	NODELET_INFO("Odometry: publish_null_when_lost = %s", publishNullWhenLost_?"true":"false");
+	NODELET_INFO("Odometry: guess_frame_id         = %s", guessFrameId_.c_str());
+	NODELET_INFO("Odometry: guess_min_translation  = %f", guessMinTranslation_);
+	NODELET_INFO("Odometry: guess_min_rotation     = %f", guessMinRotation_);
 
 	configPath = uReplaceChar(configPath, '~', UDirectory::homeDir());
 	if(configPath.size() && configPath.at(0) != '/')
@@ -388,6 +406,28 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 		if(!previousPose.isNull() && !guessCurrentPose.isNull())
 		{
 			guess = previousPose.inverse() * guessCurrentPose;
+
+			if(odometry_->previousStamp()>0.0 && (guessMinTranslation_ > 0.0 || guessMinRotation_ > 0.0))
+			{
+				float x,y,z,roll,pitch,yaw;
+				guess.getTranslationAndEulerAngles(x,y,z,roll,pitch,yaw);
+				if((guessMinTranslation_ <= 0.0 || uMax3(fabs(x), fabs(y), fabs(z)) < guessMinTranslation_) &&
+				   (guessMinRotation_ <= 0.0 || uMax3(fabs(roll), fabs(pitch), fabs(yaw)) < guessMinRotation_))
+				{
+					// Ignore odometry update, we didn't move enough
+					if(publishTf_)
+					{
+						geometry_msgs::TransformStamped correctionMsg;
+						correctionMsg.child_frame_id = guessFrameId_;
+						correctionMsg.header.frame_id = odomFrameId_;
+						correctionMsg.header.stamp = stamp;
+						Transform correction = odometry_->getPose() * guess * guessCurrentPose.inverse();
+						rtabmap_ros::transformToGeometryMsg(correction, correctionMsg.transform);
+						tfBroadcaster_.sendTransform(correctionMsg);
+					}
+					return;
+				}
+			}
 		}
 		else
 		{

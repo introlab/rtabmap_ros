@@ -88,6 +88,9 @@ private:
 		pnh.param("approx_sync", approxSync, approxSync);
 		pnh.param("queue_size", queueSize_, queueSize_);
 
+		NODELET_INFO("StereoOdometry: approx_sync = %s", approxSync?"true":"false");
+		NODELET_INFO("StereoOdometry: queue_size = %d", queueSize_);
+
 		ros::NodeHandle left_nh(nh, "left");
 		ros::NodeHandle right_nh(nh, "right");
 		ros::NodeHandle left_pnh(pnh, "left");
