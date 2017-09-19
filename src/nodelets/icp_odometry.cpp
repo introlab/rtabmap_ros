@@ -41,6 +41,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/util3d.h>
 #include <rtabmap/core/util3d_surface.h>
 #include <rtabmap/core/util3d_transforms.h>
+#include <rtabmap/core/util3d_filtering.h>
 #include <rtabmap/core/util2d.h>
 #include <rtabmap/utilite/ULogger.h>
 #include <rtabmap/utilite/UConversion.h>
@@ -167,12 +168,20 @@ private:
 		{
 			pcl::PointCloud<pcl::PointNormal>::Ptr pclScan(new pcl::PointCloud<pcl::PointNormal>);
 			pcl::fromROSMsg(*cloudMsg, *pclScan);
+			if(!pclScan->is_dense)
+			{
+				pclScan = util3d::removeNaNNormalsFromPointCloud(pclScan);
+			}
 			scan = util3d::laserScanFromPointCloud(*pclScan);
 		}
 		else
 		{
 			pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
 			pcl::fromROSMsg(*cloudMsg, *pclScan);
+			if(!pclScan->is_dense)
+			{
+				pclScan = util3d::removeNaNFromPointCloud(pclScan);
+			}
 
 			if(scanCloudNormalK_ > 0 || scanCloudNormalRadius_>0.0f)
 			{

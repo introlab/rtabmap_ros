@@ -1505,12 +1505,20 @@ bool convertScan3dMsg(
 		{
 			pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZRGBNormal>);
 			pcl::fromROSMsg(*scan3dMsg, *pclScan);
+			if(!pclScan->is_dense)
+			{
+				pclScan = rtabmap::util3d::removeNaNNormalsFromPointCloud(pclScan);
+			}
 			scan = rtabmap::util3d::laserScanFromPointCloud(*pclScan);
 		}
 		else
 		{
 			pcl::PointCloud<pcl::PointNormal>::Ptr pclScan(new pcl::PointCloud<pcl::PointNormal>);
 			pcl::fromROSMsg(*scan3dMsg, *pclScan);
+			if(!pclScan->is_dense)
+			{
+				pclScan = rtabmap::util3d::removeNaNNormalsFromPointCloud(pclScan);
+			}
 			scan = rtabmap::util3d::laserScanFromPointCloud(*pclScan);
 		}
 	}
@@ -1520,6 +1528,10 @@ bool convertScan3dMsg(
 		{
 			pcl::PointCloud<pcl::PointXYZRGB>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZRGB>);
 			pcl::fromROSMsg(*scan3dMsg, *pclScan);
+			if(!pclScan->is_dense)
+			{
+				pclScan = rtabmap::util3d::removeNaNFromPointCloud(pclScan);
+			}
 
 			if(scanCloudNormalK > 0 || scanCloudNormalRadius>0.0f)
 			{
@@ -1538,6 +1550,10 @@ bool convertScan3dMsg(
 		{
 			pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
 			pcl::fromROSMsg(*scan3dMsg, *pclScan);
+			if(!pclScan->is_dense)
+			{
+				pclScan = rtabmap::util3d::removeNaNFromPointCloud(pclScan);
+			}
 
 			if(scanCloudNormalK > 0 || scanCloudNormalRadius>0.0f)
 			{

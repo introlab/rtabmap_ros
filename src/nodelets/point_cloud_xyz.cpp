@@ -75,6 +75,7 @@ public:
 		noiseFilterMinNeighbors_(5),
 		normalK_(0),
 		normalRadius_(0.0f),
+		filterNaNs_(false),
 		approxSyncDepth_(0),
 		approxSyncDisparity_(0),
 		exactSyncDepth_(0),
@@ -112,6 +113,7 @@ private:
 		pnh.param("noise_filter_min_neighbors", noiseFilterMinNeighbors_, noiseFilterMinNeighbors_);
 		pnh.param("normal_k", normalK_, normalK_);
 		pnh.param("normal_radius", normalRadius_, normalRadius_);
+		pnh.param("filter_nans", filterNaNs_, filterNaNs_);
 		pnh.param("roi_ratios", roiStr, roiStr);
 
 		// Deprecated
@@ -314,10 +316,18 @@ private:
 			pcl::PointCloud<pcl::Normal>::Ptr normals = rtabmap::util3d::computeNormals(pclCloud, normalK_, normalRadius_);
 			pcl::PointCloud<pcl::PointNormal>::Ptr pclCloudNormal(new pcl::PointCloud<pcl::PointNormal>);
 			pcl::concatenateFields(*pclCloud, *normals, *pclCloudNormal);
+			if(filterNaNs_)
+			{
+				pclCloudNormal = rtabmap::util3d::removeNaNNormalsFromPointCloud(pclCloudNormal);
+			}
 			pcl::toROSMsg(*pclCloudNormal, rosCloud);
 		}
 		else
 		{
+			if(filterNaNs_ && !pclCloud->is_dense)
+			{
+				pclCloud = rtabmap::util3d::removeNaNFromPointCloud(pclCloud);
+			}
 			pcl::toROSMsg(*pclCloud, rosCloud);
 		}
 		rosCloud.header.stamp = header.stamp;
@@ -337,6 +347,7 @@ private:
 	int noiseFilterMinNeighbors_;
 	int normalK_;
 	float normalRadius_;
+	bool filterNaNs_;
 	std::vector<float> roiRatios_;
 
 	ros::Publisher cloudPub_;
