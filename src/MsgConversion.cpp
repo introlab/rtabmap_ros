@@ -729,6 +729,7 @@ rtabmap::Signature nodeDataFromROS(const rtabmap_ros::NodeData & msg)
 			compressedMatFromBytes(msg.grid_obstacles),
 			msg.grid_cell_size,
 			point3fFromROS(msg.grid_view_point));
+	s.sensorData().setGPS(rtabmap::GPS(msg.gps.stamp, msg.gps.longitude, msg.gps.latitude, msg.gps.altitude, msg.gps.error, msg.gps.bearing));
 	return s;
 }
 void nodeDataToROS(const rtabmap::Signature & signature, rtabmap_ros::NodeData & msg)
@@ -741,6 +742,12 @@ void nodeDataToROS(const rtabmap::Signature & signature, rtabmap_ros::NodeData &
 	msg.label = signature.getLabel();
 	transformToPoseMsg(signature.getPose(), msg.pose);
 	transformToPoseMsg(signature.getGroundTruthPose(), msg.groundTruthPose);
+	msg.gps.stamp = signature.sensorData().gps().stamp();
+	msg.gps.longitude = signature.sensorData().gps().longitude();
+	msg.gps.latitude = signature.sensorData().gps().latitude();
+	msg.gps.altitude = signature.sensorData().gps().altitude();
+	msg.gps.error = signature.sensorData().gps().error();
+	msg.gps.bearing = signature.sensorData().gps().bearing();
 	compressedMatToBytes(signature.sensorData().imageCompressed(), msg.image);
 	compressedMatToBytes(signature.sensorData().depthOrRightCompressed(), msg.depth);
 	compressedMatToBytes(signature.sensorData().laserScanCompressed(), msg.laserScan);

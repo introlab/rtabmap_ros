@@ -11,6 +11,9 @@ geometry_msgs/Pose pose
 # Ground truth (optional)
 geometry_msgs/Pose groundTruthPose
 
+# GPS (optional)
+GPS gps
+
 # compressed image in /camera_link frame
 # use rtabmap::util3d::uncompressImage() from "rtabmap/core/util3d.h"
 uint8[] image

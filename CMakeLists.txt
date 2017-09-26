@@ -18,7 +18,7 @@ find_package(rviz)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
-find_package(RTABMap 0.13.3 REQUIRED)
+find_package(RTABMap 0.14.0 REQUIRED)
 
 find_package(OpenCV REQUIRED)
 
@@ -74,6 +74,7 @@ add_message_files(
    Goal.msg
    RGBDImage.msg
    UserData.msg
+   GPS.msg
 )
 
 ## Generate services in the 'srv' folder
