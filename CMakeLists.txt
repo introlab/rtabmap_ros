@@ -167,7 +167,6 @@ SET(rtabmap_ros_lib_src
    src/nodelets/obstacles_detection_old.cpp
    src/nodelets/point_cloud_aggregator.cpp
    src/nodelets/undistort_depth.cpp
-   src/nodelets/rgbd_sync.cpp
    src/OdometryROS.cpp
    src/MsgConversion.cpp
    src/MapsManager.cpp
@@ -179,7 +178,13 @@ SET(rtabmap_ros_lib_src
    src/impl/CommonDataSubscriberRGBD2.cpp
    src/impl/CommonDataSubscriberRGBD3.cpp
    src/impl/CommonDataSubscriberRGBD4.cpp
-)   
+)
+
+IF(${cv_bridge_VERSION_MAJOR} GREATER 1 OR ${cv_bridge_VERSION_MINOR} GREATER 10)
+   SET(rtabmap_ros_lib_src ${rtabmap_ros_lib_src} src/nodelets/rgbd_sync.cpp)
+ELSE()
+   ADD_DEFINITIONS("-DCV_BRIDGE_HYDRO")
+ENDIF()   
 
 # If costmap_2d is found, add the plugin
 IF(costmap_2d_FOUND)

@@ -76,7 +76,7 @@ public:
 		noiseFilterRadius_(0.0),
 		noiseFilterMinNeighbors_(5),
 		normalK_(0),
-		normalRadius_(0.0f),
+		normalRadius_(0.0),
 		filterNaNs_(false),
 		approxSyncDepth_(0),
 		approxSyncDisparity_(0),
@@ -497,7 +497,7 @@ private:
 	double noiseFilterRadius_;
 	int noiseFilterMinNeighbors_;
 	int normalK_;
-	float normalRadius_;
+	double normalRadius_;
 	bool filterNaNs_;
 	std::vector<float> roiRatios_;
 	rtabmap::ParametersMap stereoBMParameters_;

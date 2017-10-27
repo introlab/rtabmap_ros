@@ -58,9 +58,9 @@ public:
 	ICPOdometry() :
 		OdometryROS(false, false, true),
 		scanCloudMaxPoints_(0),
-		scanVoxelSize_(0.0f),
+		scanVoxelSize_(0.0),
 		scanNormalK_(0),
-		scanNormalRadius_(0.0f)
+		scanNormalRadius_(0.0)
 	{
 	}
 
@@ -260,9 +260,9 @@ private:
 	ros::Subscriber scan_sub_;
 	ros::Subscriber cloud_sub_;
 	int scanCloudMaxPoints_;
-	float scanVoxelSize_;
+	double scanVoxelSize_;
 	int scanNormalK_;
-	float scanNormalRadius_;
+	double scanNormalRadius_;
 };
 
 PLUGINLIB_EXPORT_CLASS(rtabmap_ros::ICPOdometry, nodelet::Nodelet);

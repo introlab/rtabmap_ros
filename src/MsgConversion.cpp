@@ -134,7 +134,11 @@ void toCvCopy(const rtabmap_ros::RGBDImage & image, cv_bridge::CvImagePtr & rgb,
 	}
 	else if(!image.rgbCompressed.data.empty())
 	{
+#ifdef CV_BRIDGE_HYDRO
+		ROS_ERROR("Unsupported compressed image copy, please upgrade at least to ROS Indigo to use this.");
+#else
 		rgb = cv_bridge::toCvCopy(image.rgbCompressed);
+#endif
 	}
 	else
 	{
@@ -170,7 +174,11 @@ void toCvShare(const rtabmap_ros::RGBDImageConstPtr & image, cv_bridge::CvImageC
 	}
 	else if(!image->rgbCompressed.data.empty())
 	{
+#ifdef CV_BRIDGE_HYDRO
+                ROS_ERROR("Unsupported compressed image copy, please upgrade at least to ROS Indigo to use this.");
+#else
 		rgb = cv_bridge::toCvCopy(image->rgbCompressed);
+#endif
 	}
 	else
 	{

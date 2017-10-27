@@ -189,8 +189,8 @@ private:
 	std::string groundTruthBaseFrameId_;
 	std::string configPath_;
 	std::string databasePath_;
-	float odomDefaultAngVariance_;
-	float odomDefaultLinVariance_;
+	double odomDefaultAngVariance_;
+	double odomDefaultLinVariance_;
 	bool waitForTransform_;
 	double waitForTransformDuration_;
 	bool useActionForGoal_;
