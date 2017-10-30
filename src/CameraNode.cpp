@@ -90,7 +90,7 @@ public:
 	{
 		if(cameraThread_)
 		{
-			return cameraThread_->start();
+			cameraThread_->start();
 		}
 	}
 
