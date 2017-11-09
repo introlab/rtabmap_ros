@@ -310,7 +310,7 @@ private:
 		}
 
 		sensor_msgs::PointCloud2 rosCloud;
-		if(pclCloud->size() && (normalK_ > 0 || noiseFilterRadius_ > 0.0f))
+		if(pclCloud->size() && (normalK_ > 0 || normalRadius_ > 0.0f))
 		{
 			//compute normals
 			pcl::PointCloud<pcl::Normal>::Ptr normals = rtabmap::util3d::computeNormals(pclCloud, normalK_, normalRadius_);
