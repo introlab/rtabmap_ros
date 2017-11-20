@@ -63,7 +63,7 @@ This section shows how to install RTAB-Map ros-pkg on **ROS Hydro/Indigo/Jade/Ki
   
     * `ros-kinetic-libg2o`: [This g2o version](https://github.com/felixendres/g2o/tree/c++03) (c++03 branch) built from source may be faster than the binaries (install `libsuitesparse-dev` before building `g2o`) and would be [required to avoid some crashes](http://official-rtab-map-forum.67519.x6.nabble.com/ROS-2D-occupancy-grid-tp1204p1215.html). RTAB-Map won't build with latest official g2o version from source (since this [commit](https://github.com/RainerKuemmerle/g2o/commit/78280034b1983399cad3f93974b05b823ee20c25)).
 
-    * [GTSAM](https://collab.cc.gatech.edu/borg/gtsam): Follow installation instructions from [here](https://collab.cc.gatech.edu/borg/gtsam/#quickstart). RTAB-Map needs latest version from source, it will **not build** with 3.2.1.
+    * [GTSAM](https://collab.cc.gatech.edu/borg/gtsam): Follow installation instructions from [here](https://collab.cc.gatech.edu/borg/gtsam/#quickstart). RTAB-Map needs latest version from source, it will **not build** with 3.2.1. Set cmake variable `GTSAM_USE_SYSTEM_EIGEN=ON` to make sure the same Eigen version is used across all dependencies to avoid crashes.
         ```bash
         git clone https://bitbucket.org/gtborg/gtsam.git
         ```
