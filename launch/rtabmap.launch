@@ -64,8 +64,10 @@
   <arg name="right_camera_info_topic" default="$(arg stereo_namespace)/right/camera_info" />
   
   <!-- Already synchronized RGB-D related topic, with rtabmap_ros/rgbd_sync nodelet -->
-  <arg name="subscribe_rgbd"          default="false"/>
-  <arg name="rgbd_topic"              default="/camera/rgbd_image" />
+  <arg name="rgbd_sync"               default="false"/>         <!-- pre-sync rgb_topic, depth_topic, camera_info_topic -->
+  <arg name="approx_rgbd_sync"        default="true"/>          <!-- false=exact synchronization -->
+  <arg name="subscribe_rgbd"          default="$(arg rgbd_sync)"/>
+  <arg name="rgbd_topic"              default="rgbd_image" />
   
   <arg name="compressed"              default="false"/>         <!-- If you want to subscribe to compressed image topics -->
   <arg name="rgb_image_transport"     default="compressed"/>    <!-- Common types: compressed, theora (see "rosrun image_transport list_transports") -->
@@ -78,13 +80,16 @@
   <arg name="scan_normal_k"           default="0"/>
    
   <arg name="visual_odometry"          default="true"/>          <!-- Launch rtabmap visual odometry node -->
-  <arg name="odom_topic"               default="/odom"/>         <!-- Odometry topic used if visual_odometry is false -->
+  <arg name="icp_odometry"             default="false"/>         <!-- Launch rtabmap icp odometry node -->
+  <arg name="odom_topic"               default="odom"/>          <!-- Odometry topic name -->
   <arg name="vo_frame_id"              default="odom"/>
   <arg name="odom_tf_angular_variance" default="1"/>             <!-- If TF is used to get odometry, this is the default angular variance -->
   <arg name="odom_tf_linear_variance"  default="1"/>             <!-- If TF is used to get odometry, this is the default linear variance -->
-  <arg name="odom_args"                default="$(arg rtabmap_args)"/>
+  <arg name="odom_args"                default=""/>              <!-- More arguments for odometry (overwrite same parameters in rtabmap_args) -->
   <arg name="odom_sensor_sync"         default="false"/>
-  
+  <arg name="odom_guess_frame_id"        default=""/>
+  <arg name="odom_guess_min_translation" default="0"/>
+  <arg name="odom_guess_min_rotation"    default="0"/>  
   
   <arg name="subscribe_user_data"      default="false"/>             <!-- user data synchronized subscription -->
   <arg name="user_data_topic"          default="/user_data"/>
@@ -102,52 +107,90 @@
 
   <!-- Nodes -->
   <group ns="$(arg namespace)">
-  
-    <!-- RGB-D Odometry -->
+     
+    <!-- relays -->
     <group unless="$(arg stereo)">
       <node if="$(arg compressed)" name="republish_rgb" type="republish" pkg="image_transport" args="$(arg rgb_image_transport) in:=$(arg rgb_topic) raw out:=$(arg rgb_topic_relay)" />
       <node if="$(arg compressed)" name="republish_depth" type="republish" pkg="image_transport" args="$(arg depth_image_transport) in:=$(arg depth_topic) raw out:=$(arg depth_topic_relay)" />
-  
-      <node if="$(arg visual_odometry)" pkg="rtabmap_ros" type="rgbd_odometry" name="rgbd_odometry" output="$(arg output)" args="$(arg odom_args)" launch-prefix="$(arg launch_prefix)">
-        <remap from="rgb/image"       to="$(arg rgb_topic_relay)"/>
-        <remap from="depth/image"     to="$(arg depth_topic_relay)"/>
-        <remap from="rgb/camera_info" to="$(arg camera_info_topic)"/>
-        
-        <remap from="rgbd_image"      to="$(arg rgbd_topic)"/>
-	  
-        <param name="frame_id"                    type="string" value="$(arg frame_id)"/>
-        <param name="odom_frame_id"               type="string" value="$(arg vo_frame_id)"/>
-        <param name="ground_truth_frame_id"       type="string" value="$(arg ground_truth_frame_id)"/>
-        <param name="ground_truth_base_frame_id"  type="string" value="$(arg ground_truth_base_frame_id)"/>
-        <param name="wait_for_transform_duration" type="double" value="$(arg wait_for_transform)"/>
-        <param name="approx_sync"                 type="bool"   value="$(arg approx_sync)"/>
-        <param name="config_path"                 type="string" value="$(arg cfg)"/>
-        <param name="queue_size"                  type="int"    value="$(arg queue_size)"/>
-        <param name="subscribe_rgbd"              type="bool"   value="$(arg subscribe_rgbd)"/>
-      </node>
     </group>
-    
-    <!-- Stereo Odometry -->
     <group if="$(arg stereo)">
       <node if="$(arg compressed)" name="republish_left"  type="republish" pkg="image_transport" args="compressed in:=$(arg left_image_topic) raw out:=$(arg left_image_topic_relay)" />
       <node if="$(arg compressed)" name="republish_right" type="republish" pkg="image_transport" args="compressed in:=$(arg right_image_topic) raw out:=$(arg right_image_topic_relay)" />
-  
-      <node if="$(arg visual_odometry)" pkg="rtabmap_ros" type="stereo_odometry" name="stereo_odometry" output="$(arg output)" args="$(arg odom_args)" launch-prefix="$(arg launch_prefix)">
-        <remap from="left/image_rect"        to="$(arg left_image_topic_relay)"/>
-        <remap from="right/image_rect"       to="$(arg right_image_topic_relay)"/>
-        <remap from="left/camera_info"       to="$(arg left_camera_info_topic)"/>
-        <remap from="right/camera_info"      to="$(arg right_camera_info_topic)"/>
-	  
-        <param name="frame_id"                    type="string" value="$(arg frame_id)"/>
-        <param name="odom_frame_id"               type="string" value="$(arg vo_frame_id)"/>
-        <param name="ground_truth_frame_id"       type="string" value="$(arg ground_truth_frame_id)"/>
-        <param name="ground_truth_base_frame_id"  type="string" value="$(arg ground_truth_base_frame_id)"/>
-        <param name="wait_for_transform_duration" type="double" value="$(arg wait_for_transform)"/>
-        <param name="approx_sync"                 type="bool"   value="$(arg approx_sync)"/>
-        <param name="config_path"                 type="string" value="$(arg cfg)"/>
-        <param name="queue_size"                  type="int"    value="$(arg queue_size)"/>
-      </node>
     </group>
+    
+    <node if="$(arg rgbd_sync)" pkg="nodelet" type="nodelet" name="rgbd_sync" args="standalone rtabmap_ros/rgbd_sync" output="$(arg output)">
+      <remap from="rgb/image"       to="$(arg rgb_topic_relay)"/>
+      <remap from="depth/image"     to="$(arg depth_topic_relay)"/>
+      <remap from="rgb/camera_info" to="$(arg camera_info_topic)"/>
+      <remap from="rgbd_image"      to="$(arg rgbd_topic)"/>
+      <param name="approx_sync"     value="$(arg approx_rgbd_sync)"/>
+    </node>
+    
+    <!-- Visual odometry -->
+    <group unless="$(arg icp_odometry)">
+      <group if="$(arg visual_odometry)">
+      
+        <!-- RGB-D Odometry -->
+        <node unless="$(arg stereo)" pkg="rtabmap_ros" type="rgbd_odometry" name="rgbd_odometry" output="$(arg output)" args="$(arg rtabmap_args) $(arg odom_args)" launch-prefix="$(arg launch_prefix)">
+          <remap from="rgb/image"       to="$(arg rgb_topic_relay)"/>
+          <remap from="depth/image"     to="$(arg depth_topic_relay)"/>
+          <remap from="rgb/camera_info" to="$(arg camera_info_topic)"/>
+          
+          <remap from="rgbd_image"      to="$(arg rgbd_topic)"/>
+      
+          <param name="frame_id"                    type="string" value="$(arg frame_id)"/>
+          <param name="odom_frame_id"               type="string" value="$(arg vo_frame_id)"/>
+          <param name="ground_truth_frame_id"       type="string" value="$(arg ground_truth_frame_id)"/>
+          <param name="ground_truth_base_frame_id"  type="string" value="$(arg ground_truth_base_frame_id)"/>
+          <param name="wait_for_transform_duration" type="double" value="$(arg wait_for_transform)"/>
+          <param name="approx_sync"                 type="bool"   value="$(arg approx_sync)"/>
+          <param name="config_path"                 type="string" value="$(arg cfg)"/>
+          <param name="queue_size"                  type="int"    value="$(arg queue_size)"/>
+          <param name="subscribe_rgbd"              type="bool"   value="$(arg subscribe_rgbd)"/>
+          <param name="guess_frame_id"              type="string" value="$(arg odom_guess_frame_id)"/>
+          <param name="guess_min_translation"       type="double" value="$(arg odom_guess_min_translation)"/>
+          <param name="guess_min_rotation"          type="double" value="$(arg odom_guess_min_rotation)"/>
+        </node>
+
+        <!-- Stereo Odometry -->
+        <node if="$(arg stereo)" pkg="rtabmap_ros" type="stereo_odometry" name="stereo_odometry" output="$(arg output)" args="$(arg rtabmap_args) $(arg odom_args)" launch-prefix="$(arg launch_prefix)">
+          <remap from="left/image_rect"        to="$(arg left_image_topic_relay)"/>
+          <remap from="right/image_rect"       to="$(arg right_image_topic_relay)"/>
+          <remap from="left/camera_info"       to="$(arg left_camera_info_topic)"/>
+          <remap from="right/camera_info"      to="$(arg right_camera_info_topic)"/>
+      
+          <param name="frame_id"                    type="string" value="$(arg frame_id)"/>
+          <param name="odom_frame_id"               type="string" value="$(arg vo_frame_id)"/>
+          <param name="ground_truth_frame_id"       type="string" value="$(arg ground_truth_frame_id)"/>
+          <param name="ground_truth_base_frame_id"  type="string" value="$(arg ground_truth_base_frame_id)"/>
+          <param name="wait_for_transform_duration" type="double" value="$(arg wait_for_transform)"/>
+          <param name="approx_sync"                 type="bool"   value="$(arg approx_sync)"/>
+          <param name="config_path"                 type="string" value="$(arg cfg)"/>
+          <param name="queue_size"                  type="int"    value="$(arg queue_size)"/>
+          <param name="guess_frame_id"              type="string" value="$(arg odom_guess_frame_id)"/>
+          <param name="guess_min_translation"       type="double" value="$(arg odom_guess_min_translation)"/>
+          <param name="guess_min_rotation"          type="double" value="$(arg odom_guess_min_rotation)"/>
+        </node>
+      </group>
+    </group>
+    
+    <!-- ICP Odometry -->
+    <node if="$(arg icp_odometry)" pkg="rtabmap_ros" type="icp_odometry" name="icp_odometry" output="$(arg output)" args="$(arg rtabmap_args) $(arg odom_args)" launch-prefix="$(arg launch_prefix)">
+      <remap from="scan"                   to="$(arg scan_topic)"/>
+      <remap from="scan_cloud"             to="$(arg scan_cloud_topic)"/>
+      
+      <param name="frame_id"                    type="string" value="$(arg frame_id)"/>
+      <param name="odom_frame_id"               type="string" value="$(arg vo_frame_id)"/>
+      <param name="ground_truth_frame_id"       type="string" value="$(arg ground_truth_frame_id)"/>
+      <param name="ground_truth_base_frame_id"  type="string" value="$(arg ground_truth_base_frame_id)"/>
+      <param name="wait_for_transform_duration" type="double" value="$(arg wait_for_transform)"/>
+      <param name="config_path"                 type="string" value="$(arg cfg)"/>
+      <param name="queue_size"                  type="int"    value="$(arg queue_size)"/>
+      <param name="guess_frame_id"              type="string" value="$(arg odom_guess_frame_id)"/>
+      <param name="guess_min_translation"       type="double" value="$(arg odom_guess_min_translation)"/>
+      <param name="guess_min_rotation"          type="double" value="$(arg odom_guess_min_rotation)"/>
+    </node>
+    
   
     <!-- Visual SLAM (robot side) -->
     <!-- args: "delete_db_on_start" and "udebug" -->
@@ -189,7 +232,7 @@
       <remap from="scan_cloud"             to="$(arg scan_cloud_topic)"/>
       <remap from="user_data"              to="$(arg user_data_topic)"/>
       <remap from="user_data_async"        to="$(arg user_data_async_topic)"/>
-      <remap unless="$(arg visual_odometry)" from="odom"  to="$(arg odom_topic)"/>
+      <remap from="odom"                   to="$(arg odom_topic)"/>
       
       <!-- localization mode -->
 	  <param     if="$(arg localization)" name="Mem/IncrementalMemory" type="string" value="false"/>
@@ -205,7 +248,8 @@
       <param name="subscribe_stereo"     type="bool"   value="$(arg stereo)"/>
       <param name="subscribe_scan"       type="bool"   value="$(arg subscribe_scan)"/>
       <param name="subscribe_scan_cloud" type="bool"   value="$(arg subscribe_scan_cloud)"/>
-      <param name="subscribe_odom_info"  type="bool"   value="$(arg visual_odometry)"/>
+      <param if="$(arg visual_odometry)" name="subscribe_odom_info" type="bool" value="true"/>
+      <param if="$(arg icp_odometry)"    name="subscribe_odom_info" type="bool" value="true"/>
       <param name="frame_id"             type="string" value="$(arg frame_id)"/>
       <param name="odom_frame_id"        type="string" value="$(arg odom_frame_id)"/>
       <param name="wait_for_transform_duration" type="double"   value="$(arg wait_for_transform)"/>
@@ -225,7 +269,7 @@
       
       <remap from="scan"                   to="$(arg scan_topic)"/>
       <remap from="scan_cloud"             to="$(arg scan_cloud_topic)"/>
-      <remap unless="$(arg visual_odometry)" from="odom"  to="$(arg odom_topic)"/>
+      <remap from="odom"                   to="$(arg odom_topic)"/>
     </node>
   
   </group>

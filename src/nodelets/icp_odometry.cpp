@@ -99,11 +99,57 @@ private:
 	{
 		//make sure we are using Reg/Strategy=0
 		ParametersMap::iterator iter = parameters.find(Parameters::kRegStrategy());
-		if(iter != parameters.end() && iter->second.compare("0") != 0)
+		if(iter != parameters.end() && iter->second.compare("1") != 0)
 		{
 			ROS_WARN("ICP odometry works only with \"Reg/Strategy\"=1. Ignoring value %s.", iter->second.c_str());
 		}
 		uInsert(parameters, ParametersPair(Parameters::kRegStrategy(), "1"));
+
+		ros::NodeHandle & pnh = getPrivateNodeHandle();
+		iter = parameters.find(Parameters::kIcpVoxelSize());
+		if(iter != parameters.end())
+		{
+			float value = uStr2Float(iter->second);
+			if(value != 0.0f)
+			{
+				if(!pnh.hasParam("scan_voxel_size"))
+				{
+					ROS_WARN("IcpOdometry: Transferring value %s of \"%s\" to ros parameter \"scan_voxel_size\" for convenience. \"%s\" is set to 0.", iter->second.c_str(), iter->first.c_str(), iter->first.c_str());
+					scanVoxelSize_ = value;
+					iter->second = "0";
+				}
+				else
+				{
+					ROS_WARN("IcpOdometry: Both parameter \"%s\" and ros parameter \"scan_voxel_size\" are set.", iter->first.c_str());
+				}
+			}
+		}
+		iter = parameters.find(Parameters::kIcpPointToPlaneK());
+		if(iter != parameters.end())
+		{
+			int value = uStr2Int(iter->second);
+			if(value != 0)
+			{
+				if(!pnh.hasParam("scan_normal_k"))
+				{
+					ROS_WARN("IcpOdometry: Transferring value %s of \"%s\" to ros parameter \"scan_normal_k\" for convenience.", iter->second.c_str(), iter->first.c_str());
+					scanNormalK_ = value;
+				}
+			}
+		}
+		iter = parameters.find(Parameters::kIcpPointToPlaneRadius());
+		if(iter != parameters.end())
+		{
+			float value = uStr2Float(iter->second);
+			if(value != 0.0f)
+			{
+				if(!pnh.hasParam("scan_normal_radius"))
+				{
+					ROS_WARN("IcpOdometry: Transferring value %s of \"%s\" to ros parameter \"scan_normal_radius\" for convenience.", iter->second.c_str(), iter->first.c_str());
+					scanNormalRadius_ = value;
+				}
+			}
+		}
 	}
 
 	void callbackScan(const sensor_msgs::LaserScanConstPtr& scanMsg)
