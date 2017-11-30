@@ -17,6 +17,7 @@
    <!-- Choose visualization -->
    <arg name="rviz" default="true" />
    <arg name="rtabmapviz" default="false" />
+   <arg name="local_bundle" default="false" />
     
    <param name="use_sim_time" type="bool" value="True"/>
    
@@ -51,9 +52,11 @@
          <param name="odom_frame_id" type="string" value="odom"/>
 
          <param name="Odom/Strategy"      type="string" value="0"/> <!-- 0=Frame-to-Map, 1=Frame=to=Frame -->
-         <param name="Vis/EstimationType" type="string" value="0"/> <!-- 0=3D->3D 1=3D->2D (PnP) -->
-         <param name="Vis/MaxDepth"       type="string" value="10"/>
+         <param name="Vis/EstimationType" type="string" value="1"/> <!-- 0=3D->3D 1=3D->2D (PnP) -->
+         <param name="Vis/MaxDepth"       type="string" value="0"/>
+         <param name="Odom/GuessMotion" type="string" value="true"/>
          <param name="Vis/MinInliers"     type="string" value="10"/>
+         <param if="$(arg local_bundle)" name="OdomF2M/BundleAdjustment" type="string" value="1"/>
          <param name="Odom/FillInfoData"  type="string" value="$(arg rtabmapviz)"/> 
          <param name="OdomF2M/MaxSize"    type="string" value="1000"/> 
          <param name="GFTT/MinDistance"   type="string" value="10"/>
@@ -74,18 +77,17 @@
          <remap from="odom" to="/stereo_odometry"/>
 
          <param name="queue_size" type="int" value="30"/>
+         <param name="map_negative_poses_ignored" type="bool" value="true"/>
 
          <!-- RTAB-Map's parameters -->
          <param name="Rtabmap/TimeThr"                   type="string" value="700"/>
          <param name="Grid/DepthDecimation"              type="string" value="4"/>
          <param name="Grid/FlatObstacleDetected"         type="string" value="true"/>
-         <param name="Kp/MaxFeatures"                    type="string" value="200"/>
-         <param name="Kp/MaxDepth"                       type="string" value="10"/>
-         <param name="Kp/DetectorStrategy"               type="string" value="0"/>   <!-- use SURF -->
-         <param name="SURF/HessianThreshold"             type="string" value="1000"/>
-         <param name="Vis/EstimationType"                type="string" value="0"/>   <!-- 0=3D->3D, 1=3D->2D (PnP) -->
-         <param name="RGBD/LoopClosureReextractFeatures" type="string" value="true"/>
-         <param name="Vis/MaxDepth"                      type="string" value="10"/>
+         <param name="Kp/MaxDepth"                       type="string" value="0"/>
+         <param name="Kp/DetectorStrategy"               type="string" value="6"/>  
+         <param name="Vis/EstimationType"                type="string" value="1"/>   <!-- 0=3D->3D, 1=3D->2D (PnP) -->
+         <param name="Vis/MaxDepth"                      type="string" value="0"/>
+         <param name="RGBD/CreateOccupancyGrid"          type="string" value="true"/>       
       </node>
       
       <!-- Visualisation RTAB-Map -->
