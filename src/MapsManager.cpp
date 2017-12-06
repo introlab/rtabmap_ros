@@ -110,7 +110,7 @@ void MapsManager::init(ros::NodeHandle & nh, ros::NodeHandle & pnh, const std::s
 #ifdef RTABMAP_OCTOMAP
 	pnh.param("octomap_occupancy_thr", octomapOccupancyThr_, octomapOccupancyThr_);
 	UASSERT(octomapOccupancyThr_>=0.0 && octomapOccupancyThr_<=1.0);
-	octomap_ = new OctoMap(occupancyGrid_->getCellSize(), octomapOccupancyThr_);
+	octomap_ = new OctoMap(occupancyGrid_->getCellSize(), octomapOccupancyThr_, occupancyGrid_->isFullUpdate());
 	pnh.param("octomap_tree_depth", octomapTreeDepth_, octomapTreeDepth_);
 	if(octomapTreeDepth_ > 16)
 	{
@@ -287,7 +287,7 @@ void MapsManager::setParameters(const rtabmap::ParametersMap & parameters)
 		delete octomap_;
 		octomap_ = 0;
 	}
-	octomap_ = new OctoMap(occupancyGrid_->getCellSize(), octomapOccupancyThr_);
+	octomap_ = new OctoMap(occupancyGrid_->getCellSize(), octomapOccupancyThr_, occupancyGrid_->isFullUpdate());
 #endif
 #endif
 }
