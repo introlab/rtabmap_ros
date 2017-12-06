@@ -46,6 +46,8 @@
 	  <param name="RGBD/OptimizeFromGraphEnd" type="string" value="false"/> <!-- Optimize graph from initial node so /map -> /odom transform will be generated -->
 	  <param name="Reg/Force3DoF"             type="string" value="true"/>
 	  <param name="Grid/FromDepth"            type="string" value="false"/>
+          <param name="Mem/STMSize"               type="string" value="30"/>    <!--increased to 30 to avoid adding too many loop closures on just seen locations -->
+          <param name="RGBD/LocalRadius"          type="string" value="5"/>     <!--limit length of proximity detections -->
 	  
 	  <!-- localization mode -->
 	  <param     if="$(arg localization)" name="Mem/IncrementalMemory" type="string" value="false"/>
