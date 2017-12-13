@@ -58,6 +58,7 @@ public:
 	ICPOdometry() :
 		OdometryROS(false, false, true),
 		scanCloudMaxPoints_(0),
+		scanDownsamplingStep_(1),
 		scanVoxelSize_(0.0),
 		scanNormalK_(0),
 		scanNormalRadius_(0.0)
@@ -76,6 +77,7 @@ private:
 		ros::NodeHandle & pnh = getPrivateNodeHandle();
 
 		pnh.param("scan_cloud_max_points",  scanCloudMaxPoints_, scanCloudMaxPoints_);
+		pnh.param("scan_downsampling_step", scanDownsamplingStep_, scanDownsamplingStep_);
 		pnh.param("scan_voxel_size", scanVoxelSize_, scanVoxelSize_);
 		pnh.param("scan_normal_k", scanNormalK_, scanNormalK_);
 		if(pnh.hasParam("scan_cloud_normal_k") && !pnh.hasParam("scan_normal_k"))
@@ -86,10 +88,11 @@ private:
 		}
 		pnh.param("scan_normal_radius", scanNormalRadius_, scanNormalRadius_);
 
-		NODELET_INFO("IcpOdometry: scan_cloud_max_points = %d", scanCloudMaxPoints_);
-		NODELET_INFO("IcpOdometry: scan_voxel_size       = %f", scanVoxelSize_);
-		NODELET_INFO("IcpOdometry: scan_normal_k         = %d", scanNormalK_);
-		NODELET_INFO("IcpOdometry: scan_normal_radius    = %f", scanNormalRadius_);
+		NODELET_INFO("IcpOdometry: scan_cloud_max_points  = %d", scanCloudMaxPoints_);
+		NODELET_INFO("IcpOdometry: scan_downsampling_step = %d", scanDownsamplingStep_);
+		NODELET_INFO("IcpOdometry: scan_voxel_size        = %f", scanVoxelSize_);
+		NODELET_INFO("IcpOdometry: scan_normal_k          = %d", scanNormalK_);
+		NODELET_INFO("IcpOdometry: scan_normal_radius     = %f", scanNormalRadius_);
 
 		scan_sub_ = nh.subscribe("scan", 1, &ICPOdometry::callbackScan, this);
 		cloud_sub_ = nh.subscribe("scan_cloud", 1, &ICPOdometry::callbackCloud, this);
@@ -106,6 +109,24 @@ private:
 		uInsert(parameters, ParametersPair(Parameters::kRegStrategy(), "1"));
 
 		ros::NodeHandle & pnh = getPrivateNodeHandle();
+		iter = parameters.find(Parameters::kIcpDownsamplingStep());
+		if(iter != parameters.end())
+		{
+			int value = uStr2Int(iter->second);
+			if(value > 1)
+			{
+				if(!pnh.hasParam("scan_downsampling_step"))
+				{
+					ROS_WARN("IcpOdometry: Transferring value %s of \"%s\" to ros parameter \"scan_downsampling_step\" for convenience. \"%s\" is set to 0.", iter->second.c_str(), iter->first.c_str(), iter->first.c_str());
+					scanDownsamplingStep_ = value;
+					iter->second = "1";
+				}
+				else
+				{
+					ROS_WARN("IcpOdometry: Both parameter \"%s\" and ros parameter \"scan_downsampling_step\" are set.", iter->first.c_str());
+				}
+			}
+		}
 		iter = parameters.find(Parameters::kIcpVoxelSize());
 		if(iter != parameters.end())
 		{
@@ -176,6 +197,11 @@ private:
 		int maxLaserScans = (int)scanMsg->ranges.size();
 		if(pclScan->size())
 		{
+			if(scanDownsamplingStep_ > 1)
+			{
+				pclScan = util3d::downsample(pclScan, scanDownsamplingStep_);
+				maxLaserScans /= scanDownsamplingStep_;
+			}
 			if(scanVoxelSize_ > 0.0f)
 			{
 				float pointsBeforeFiltering = (float)pclScan->size();
@@ -245,6 +271,11 @@ private:
 		{
 			pcl::PointCloud<pcl::PointNormal>::Ptr pclScan(new pcl::PointCloud<pcl::PointNormal>);
 			pcl::fromROSMsg(*cloudMsg, *pclScan);
+			if(pclScan->size() && scanDownsamplingStep_ > 1)
+			{
+				pclScan = util3d::downsample(pclScan, scanDownsamplingStep_);
+				maxLaserScans /= scanDownsamplingStep_;
+			}
 			if(!pclScan->is_dense)
 			{
 				pclScan = util3d::removeNaNNormalsFromPointCloud(pclScan);
@@ -255,6 +286,11 @@ private:
 		{
 			pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
 			pcl::fromROSMsg(*cloudMsg, *pclScan);
+			if(pclScan->size() && scanDownsamplingStep_ > 1)
+			{
+				pclScan = util3d::downsample(pclScan, scanDownsamplingStep_);
+				maxLaserScans /= scanDownsamplingStep_;
+			}
 			if(!pclScan->is_dense)
 			{
 				pclScan = util3d::removeNaNFromPointCloud(pclScan);
@@ -306,6 +342,7 @@ private:
 	ros::Subscriber scan_sub_;
 	ros::Subscriber cloud_sub_;
 	int scanCloudMaxPoints_;
+	int scanDownsamplingStep_;
 	double scanVoxelSize_;
 	int scanNormalK_;
 	double scanNormalRadius_;

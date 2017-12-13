@@ -18,7 +18,7 @@ find_package(rviz)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
-find_package(RTABMap 0.14.0 REQUIRED)
+find_package(RTABMap 0.15.3 REQUIRED)
 
 find_package(OpenCV REQUIRED)
 

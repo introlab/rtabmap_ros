@@ -127,6 +127,8 @@ private:
 	bool stereoParams_;
 	bool visParams_;
 	bool icpParams_;
+	rtabmap::Transform guess_;
+	double guessStamp_;
 };
 
 }
