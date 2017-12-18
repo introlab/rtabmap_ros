@@ -531,13 +531,17 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 		}
 
 		// local map / reference frame
-		if(odomLocalMap_.getNumSubscribers() && odometry_->getType() == Odometry::kTypeF2M)
+		if(odomLocalMap_.getNumSubscribers() && !info.localMap.empty())
 		{
-			pcl::PointCloud<pcl::PointXYZ> cloud;
-			const std::multimap<int, cv::Point3f> & map = ((OdometryF2M*)odometry_)->getMap().getWords3();
-			for(std::multimap<int, cv::Point3f>::const_iterator iter=map.begin(); iter!=map.end(); ++iter)
+			pcl::PointCloud<pcl::PointXYZRGB> cloud;
+			for(std::map<int, cv::Point3f>::const_iterator iter=info.localMap.begin(); iter!=info.localMap.end(); ++iter)
 			{
-				cloud.push_back(pcl::PointXYZ(iter->second.x, iter->second.y, iter->second.z));
+				bool inlier = info.words.find(iter->first) != info.words.end();
+				pcl::PointXYZRGB pt(inlier?0:255, 255, 0);
+				pt.x = iter->second.x;
+				pt.y = iter->second.y;
+				pt.z = iter->second.z;
+				cloud.push_back(pt);
 			}
 			sensor_msgs::PointCloud2 cloudMsg;
 			pcl::toROSMsg(cloud, cloudMsg);

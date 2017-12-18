@@ -82,7 +82,7 @@
   <arg name="visual_odometry"          default="true"/>          <!-- Launch rtabmap visual odometry node -->
   <arg name="icp_odometry"             default="false"/>         <!-- Launch rtabmap icp odometry node -->
   <arg name="odom_topic"               default="odom"/>          <!-- Odometry topic name -->
-  <arg name="vo_frame_id"              default="odom"/>
+  <arg name="vo_frame_id"              default="$(arg odom_topic)"/> <!-- Visual/Icp odometry frame ID for TF -->
   <arg name="odom_tf_angular_variance" default="1"/>             <!-- If TF is used to get odometry, this is the default angular variance -->
   <arg name="odom_tf_linear_variance"  default="1"/>             <!-- If TF is used to get odometry, this is the default linear variance -->
   <arg name="odom_args"                default=""/>              <!-- More arguments for odometry (overwrite same parameters in rtabmap_args) -->
@@ -135,8 +135,8 @@
           <remap from="rgb/image"       to="$(arg rgb_topic_relay)"/>
           <remap from="depth/image"     to="$(arg depth_topic_relay)"/>
           <remap from="rgb/camera_info" to="$(arg camera_info_topic)"/>
-          
           <remap from="rgbd_image"      to="$(arg rgbd_topic)"/>
+          <remap from="odom"            to="$(arg odom_topic)"/>
       
           <param name="frame_id"                    type="string" value="$(arg frame_id)"/>
           <param name="odom_frame_id"               type="string" value="$(arg vo_frame_id)"/>
@@ -158,6 +158,7 @@
           <remap from="right/image_rect"       to="$(arg right_image_topic_relay)"/>
           <remap from="left/camera_info"       to="$(arg left_camera_info_topic)"/>
           <remap from="right/camera_info"      to="$(arg right_camera_info_topic)"/>
+          <remap from="odom"                   to="$(arg odom_topic)"/>
       
           <param name="frame_id"                    type="string" value="$(arg frame_id)"/>
           <param name="odom_frame_id"               type="string" value="$(arg vo_frame_id)"/>
@@ -178,6 +179,7 @@
     <node if="$(arg icp_odometry)" pkg="rtabmap_ros" type="icp_odometry" name="icp_odometry" output="$(arg output)" args="$(arg rtabmap_args) $(arg odom_args)" launch-prefix="$(arg launch_prefix)">
       <remap from="scan"                   to="$(arg scan_topic)"/>
       <remap from="scan_cloud"             to="$(arg scan_cloud_topic)"/>
+      <remap from="odom"                   to="$(arg odom_topic)"/>
       
       <param name="frame_id"                    type="string" value="$(arg frame_id)"/>
       <param name="odom_frame_id"               type="string" value="$(arg vo_frame_id)"/>
@@ -190,7 +192,6 @@
       <param name="guess_min_translation"       type="double" value="$(arg odom_guess_min_translation)"/>
       <param name="guess_min_rotation"          type="double" value="$(arg odom_guess_min_rotation)"/>
     </node>
-    
   
     <!-- Visual SLAM (robot side) -->
     <!-- args: "delete_db_on_start" and "udebug" -->

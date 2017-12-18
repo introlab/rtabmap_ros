@@ -359,6 +359,8 @@ install(TARGETS
    map_assembler
    map_optimizer
    data_player
+   odom_msg_to_tf
+   pointcloud_to_depthimage
    camera
    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
@@ -374,6 +376,8 @@ install(TARGETS
    map_assembler
    map_optimizer
    data_player
+   odom_msg_to_tf
+   pointcloud_to_depthimage
    camera
    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
