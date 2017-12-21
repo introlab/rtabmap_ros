@@ -82,10 +82,10 @@ private:
 		info_sub_.subscribe(rgb_nh, "camera_info_in", 1);
 		odom_sub_.subscribe(nh, "odom_in", 1);
 
-		imagePub_ = rgb_it.advertise("image_out", 10);
-		imageDepthPub_ = depth_it.advertise("image_out", 10);
-		infoPub_ = rgb_nh.advertise<sensor_msgs::CameraInfo>("camera_info_out", 10);
-		odomPub_ = nh.advertise<nav_msgs::Odometry>("odom_out", 10);
+		imagePub_ = rgb_it.advertise("image_out", 1);
+		imageDepthPub_ = depth_it.advertise("image_out", 1);
+		infoPub_ = rgb_nh.advertise<sensor_msgs::CameraInfo>("camera_info_out", 1);
+		odomPub_ = nh.advertise<nav_msgs::Odometry>("odom_out", 1);
 	};
 
 	void callback(const sensor_msgs::ImageConstPtr& image,

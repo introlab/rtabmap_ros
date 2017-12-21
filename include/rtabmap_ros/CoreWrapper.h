@@ -44,6 +44,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <rtabmap/core/Parameters.h>
 #include <rtabmap/core/Rtabmap.h>
+#include <rtabmap/core/OdometryInfo.h>
 
 #include "rtabmap_ros/GetMap.h"
 #include "rtabmap_ros/ListLabels.h"
@@ -129,7 +130,8 @@ private:
 			const rtabmap::SensorData & data,
 			const rtabmap::Transform & odom = rtabmap::Transform(),
 			const std::string & odomFrameId = "",
-			const cv::Mat & odomCovariance = cv::Mat::eye(6,6,CV_64FC1));
+			const cv::Mat & odomCovariance = cv::Mat::eye(6,6,CV_64FC1),
+			const rtabmap::OdometryInfo & odomInfo = rtabmap::OdometryInfo());
 
 	bool updateRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool resetRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);

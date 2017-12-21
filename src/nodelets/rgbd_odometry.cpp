@@ -242,7 +242,7 @@ private:
 			}
 			else
 			{
-				rgbdSub_ = nh.subscribe("rgbd_image", queueSize_, &RGBDOdometry::callbackRGBD, this);
+				rgbdSub_ = nh.subscribe("rgbd_image", 1, &RGBDOdometry::callbackRGBD, this);
 
 				subscribedTopicsMsg =
 						uFormat("\n%s subscribed to:\n   %s",

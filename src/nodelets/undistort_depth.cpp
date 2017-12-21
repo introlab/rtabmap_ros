@@ -61,9 +61,7 @@ private:
 		ros::NodeHandle & nh = getNodeHandle();
 		ros::NodeHandle & pnh = getPrivateNodeHandle();
 
-		int queueSize = 10;
 		std::string modelPath;
-		pnh.param("queue_size", queueSize, queueSize);
 		pnh.param("model", modelPath, modelPath);
 
 		if(modelPath.empty())
@@ -79,7 +77,7 @@ private:
 		else
 		{
 			image_transport::ImageTransport it(nh);
-			sub_ = it.subscribe("depth", queueSize, &UndistortDepth::callback, this);
+			sub_ = it.subscribe("depth", 1, &UndistortDepth::callback, this);
 			pub_ = it.advertise(uFormat("%s_undistorted", nh.resolveName("depth").c_str()), 1);
 		}
 	}

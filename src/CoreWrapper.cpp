@@ -1118,11 +1118,18 @@ void CoreWrapper::commonDepthCallbackImpl(
 	}
 	globalPose_.header.stamp = ros::Time(0);
 
+	OdometryInfo odomInfo;
+	if(odomInfoMsg.get())
+	{
+		odomInfo = odomInfoFromROS(*odomInfoMsg);
+	}
+
 	process(lastPoseStamp_,
 			data,
 			lastPose_,
 			odomFrameId,
-			covariance_);
+			covariance_,
+			odomInfo);
 	covariance_ = cv::Mat();
 }
 
@@ -1305,11 +1312,18 @@ void CoreWrapper::commonStereoCallback(
 			userData);
 	data.setGroundTruth(groundTruthPose);
 
+	OdometryInfo odomInfo;
+	if(odomInfoMsg.get())
+	{
+		odomInfo = odomInfoFromROS(*odomInfoMsg);
+	}
+
 	process(lastPoseStamp_,
 			data,
 			lastPose_,
 			odomFrameId,
-			covariance_);
+			covariance_,
+			odomInfo);
 
 	covariance_ = cv::Mat();
 }
@@ -1319,7 +1333,8 @@ void CoreWrapper::process(
 		const SensorData & data,
 		const Transform & odom,
 		const std::string & odomFrameId,
-		const cv::Mat & odomCovariance)
+		const cv::Mat & odomCovariance,
+		const OdometryInfo & odomInfo)
 {
 	UTimer timer;
 	if(rtabmap_.isIDsGenerated() || data.id() > 0)
@@ -1346,7 +1361,42 @@ void CoreWrapper::process(
 			}
 		}
 
-		if(rtabmap_.process(data, odom, covariance))
+		std::map<std::string, float> externalStats;
+		std::vector<float> odomVelocity;
+		if(odomInfo.timeEstimation != 0.0f)
+		{
+			externalStats.insert(std::make_pair("Odometry/LocalBundle/ms", odomInfo.localBundleTime*1000.0f));
+			externalStats.insert(std::make_pair("Odometry/LocalBundleConstraints/", odomInfo.localBundleConstraints));
+			externalStats.insert(std::make_pair("Odometry/LocalBundleOutliers/", odomInfo.localBundleOutliers));
+			externalStats.insert(std::make_pair("Odometry/TotalTime/ms", odomInfo.timeEstimation*1000.0f));
+			externalStats.insert(std::make_pair("Odometry/Registration/ms", odomInfo.reg.totalTime*1000.0f));
+			float speed = 0.0f;
+			if(odomInfo.interval>0.0)
+				speed = odomInfo.transform.x()/odomInfo.interval*3.6;
+			externalStats.insert(std::make_pair("Odometry/Speed/kph", speed));
+			externalStats.insert(std::make_pair("Odometry/Inliers/", odomInfo.reg.inliers));
+			externalStats.insert(std::make_pair("Odometry/Features/", odomInfo.features));
+			externalStats.insert(std::make_pair("Odometry/DistanceTravelled/m", odomInfo.distanceTravelled));
+			externalStats.insert(std::make_pair("Odometry/KeyFrameAdded/", odomInfo.keyFrameAdded));
+			externalStats.insert(std::make_pair("Odometry/LocalKeyFrames/", odomInfo.localKeyFrames));
+			externalStats.insert(std::make_pair("Odometry/LocalMapSize/", odomInfo.localMapSize));
+			externalStats.insert(std::make_pair("Odometry/LocalScanMapSize/", odomInfo.localScanMapSize));
+
+			if(odomInfo.interval>0.0)
+			{
+				odomVelocity.resize(6);
+				float x,y,z,roll,pitch,yaw;
+				odomInfo.transform.getTranslationAndEulerAngles(x,y,z,roll,pitch,yaw);
+				odomVelocity[0] = x/odomInfo.interval;
+				odomVelocity[1] = y/odomInfo.interval;
+				odomVelocity[2] = z/odomInfo.interval;
+				odomVelocity[3] = roll/odomInfo.interval;
+				odomVelocity[4] = pitch/odomInfo.interval;
+				odomVelocity[5] = yaw/odomInfo.interval;
+			}
+		}
+
+		if(rtabmap_.process(data, odom, covariance, odomVelocity, externalStats))
 		{
 			timeRtabmap = timer.ticks();
 			mapToOdomMutex_.lock();
