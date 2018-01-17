@@ -291,7 +291,7 @@
     <remap from="cloud"             to="voxel_cloud" />
 
     <param name="decimation"  type="double" value="2"/>
-    <param name="voxel_size"  type="double" value="0.02"/>
+    <param name="voxel_size"  type="double" value="0.0"/>
     <param name="approx_sync" type="bool"   value="$(arg approx_sync)"/>
   </node>
 
