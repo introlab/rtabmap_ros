@@ -45,8 +45,8 @@
   <arg name="args"                    default=""/>              <!-- delete_db_on_start, udebug -->
   <arg name="rtabmap_args"            default="$(arg args)"/>   <!-- deprecated, use "args" argument -->
   <arg name="launch_prefix"           default=""/>              <!-- for debugging purpose, it fills launch-prefix tag of the nodes -->
-  <arg name="output"                  default="screen"/>        <!--Control node output (screen or log)-->
-  
+  <arg name="output"                  default="screen"/>        <!-- Control node output (screen or log) -->
+
   <!-- if timestamps of the input topics are synchronized using approximate or exact time policy-->
   <arg     if="$(arg stereo)" name="approx_sync"  default="false"/>
   <arg unless="$(arg stereo)" name="approx_sync"  default="true"/>         
@@ -68,6 +68,7 @@
   <arg name="approx_rgbd_sync"        default="true"/>          <!-- false=exact synchronization -->
   <arg name="subscribe_rgbd"          default="$(arg rgbd_sync)"/>
   <arg name="rgbd_topic"              default="rgbd_image" />
+  <arg name="depth_scale"             default="1.0" />
   
   <arg name="compressed"              default="false"/>         <!-- If you want to subscribe to compressed image topics -->
   <arg name="rgb_image_transport"     default="compressed"/>    <!-- Common types: compressed, theora (see "rosrun image_transport list_transports") -->
@@ -125,6 +126,7 @@
       <remap from="rgbd_image"      to="$(arg rgbd_topic)"/>
       <param name="approx_sync"     type="bool"   value="$(arg approx_rgbd_sync)"/>
       <param name="queue_size"      type="int"    value="$(arg queue_size)"/>
+      <param name="depth_scale"     type="double" value="$(arg depth_scale)"/>
     </node>
     
     <!-- Visual odometry -->
@@ -291,7 +293,7 @@
     <remap from="cloud"             to="voxel_cloud" />
 
     <param name="decimation"  type="double" value="2"/>
-    <param name="voxel_size"  type="double" value="0.0"/>
+    <param name="voxel_size"  type="double" value="0.02"/>
     <param name="approx_sync" type="bool"   value="$(arg approx_sync)"/>
   </node>
 

@@ -68,7 +68,7 @@ public:
 			const ros::Time & stamp,
 			const std::string & mapFrameId);
 
-	cv::Mat generateGridMap(
+	cv::Mat getGridMap(
 			const std::map<int, rtabmap::Transform> & filteredPoses,
 			float & xMin,
 			float & yMin,

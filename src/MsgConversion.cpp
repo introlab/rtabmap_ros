@@ -919,6 +919,7 @@ rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::OdomInfo & msg)
 	info.stamp = msg.stamp;
 	info.interval = msg.interval;
 	info.distanceTravelled = msg.distanceTravelled;
+	info.memoryUsage = msg.memoryUsage;
 
 	info.type = msg.type;
 
@@ -975,6 +976,7 @@ void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_ros::OdomInfo & m
 	msg.stamp = info.stamp;
 	msg.interval = info.interval;
 	msg.distanceTravelled = info.distanceTravelled;
+	msg.memoryUsage = info.memoryUsage;
 
 	msg.type = info.type;
 

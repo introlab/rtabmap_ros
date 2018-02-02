@@ -22,6 +22,7 @@ float32 timeParticleFiltering
 float32 stamp
 float32 interval
 float32 distanceTravelled
+int32 memoryUsage # MB
 
 geometry_msgs/Transform transform
 geometry_msgs/Transform transformFiltered

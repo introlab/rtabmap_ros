@@ -57,6 +57,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/OccupancyGrid.h>
 #include <rtabmap/core/DBDriver.h>
 #include <rtabmap/core/Registration.h>
+#include <rtabmap/core/Graph.h>
 
 #ifdef WITH_OCTOMAP_ROS
 #ifdef RTABMAP_OCTOMAP
@@ -111,6 +112,7 @@ CoreWrapper::CoreWrapper() :
 		odomSensorSync_(false),
 		rate_(Parameters::defaultRtabmapDetectionRate()),
 		createIntermediateNodes_(Parameters::defaultRtabmapCreateIntermediateNodes()),
+		maxMappingNodes_(Parameters::defaultGridGlobalMaxNodes()),
 		time_(ros::Time::now()),
 		previousStamp_(0),
 		mbClient_("move_base", true)
@@ -425,6 +427,14 @@ void CoreWrapper::onInit()
 		if(createIntermediateNodes_)
 		{
 			NODELET_INFO("Create intermediate nodes");
+		}
+	}
+	if(parameters_.find(Parameters::kGridGlobalMaxNodes()) != parameters_.end())
+	{
+		Parameters::parse(parameters_, Parameters::kGridGlobalMaxNodes(), maxMappingNodes_);
+		if(maxMappingNodes_>0)
+		{
+			NODELET_INFO("Max mapping nodes = %d", maxMappingNodes_);
 		}
 	}
 
@@ -780,8 +790,8 @@ bool CoreWrapper::odomUpdate(const nav_msgs::OdometryConstPtr & odomMsg)
 		if(!odom.isNull())
 		{
 			cv::Mat covariance;
-			float variance = odomMsg->twist.covariance[0];
-			if(variance == BAD_COVARIANCE)
+			double variance = odomMsg->twist.covariance[0];
+			if(variance == BAD_COVARIANCE || variance <= 0.0f)
 			{
 				//use the one of the pose
 				covariance = cv::Mat(6,6,CV_64FC1, (void*)odomMsg->pose.covariance.data()).clone();
@@ -1381,6 +1391,7 @@ void CoreWrapper::process(
 			externalStats.insert(std::make_pair("Odometry/LocalKeyFrames/", odomInfo.localKeyFrames));
 			externalStats.insert(std::make_pair("Odometry/LocalMapSize/", odomInfo.localMapSize));
 			externalStats.insert(std::make_pair("Odometry/LocalScanMapSize/", odomInfo.localScanMapSize));
+			externalStats.insert(std::make_pair("Odometry/RAM_usage/MB", odomInfo.memoryUsage));
 
 			if(odomInfo.interval>0.0)
 			{
@@ -1394,6 +1405,11 @@ void CoreWrapper::process(
 				odomVelocity[4] = pitch/odomInfo.interval;
 				odomVelocity[5] = yaw/odomInfo.interval;
 			}
+		}
+		if(rtabmapROSStats_.size())
+		{
+			externalStats.insert(rtabmapROSStats_.begin(), rtabmapROSStats_.end());
+			rtabmapROSStats_.clear();
 		}
 
 		if(rtabmap_.process(data, odom, covariance, odomVelocity, externalStats))
@@ -1426,7 +1442,41 @@ void CoreWrapper::process(
 					SensorData tmpData = data;
 					tmpData.setId(-1);
 					tmpSignature.insert(std::make_pair(-1, Signature(-1, -1, 0, data.stamp(), "", odom, Transform(), tmpData)));
-					filteredPoses.insert(std::make_pair(-1, rtabmap_.getMapCorrection()*odom));
+					filteredPoses.insert(std::make_pair(-1, mapToOdom_*odom));
+				}
+
+				if(maxMappingNodes_ > 0 && filteredPoses.size()>1)
+				{
+					std::map<int, Transform> nearestPoses;
+					std::vector<int> nodes = graph::findNearestNodes(filteredPoses, mapToOdom_*odom, maxMappingNodes_);
+					for(std::vector<int>::iterator iter=nodes.begin(); iter!=nodes.end(); ++iter)
+					{
+						std::map<int, Transform>::iterator pter = filteredPoses.find(*iter);
+						if(pter != filteredPoses.end())
+						{
+							nearestPoses.insert(*pter);
+						}
+					}
+					//add negative and make sure those on a planned path are not filtered
+					std::set<int> onPath;
+					if(rtabmap_.getPath().size())
+					{
+						std::vector<int> nextNodes = rtabmap_.getPathNextNodes();
+						onPath.insert(nextNodes.begin(), nextNodes.end());
+					}
+					for(std::map<int, Transform>::iterator iter=filteredPoses.begin(); iter!=filteredPoses.end(); ++iter)
+					{
+						if(iter->first < 0 || onPath.find(iter->first) != onPath.end())
+						{
+							nearestPoses.insert(*iter);
+						}
+						else if(onPath.empty())
+						{
+							break;
+						}
+					}
+
+					filteredPoses = nearestPoses;
 				}
 
 				// Update maps
@@ -1528,6 +1578,11 @@ void CoreWrapper::process(
 				timePublishMaps,
 				(int)rtabmap_.getLocalOptimizedPoses().size(),
 				rtabmap_.getWMSize()+rtabmap_.getSTMSize());
+		rtabmapROSStats_.insert(std::make_pair(std::string("RtabmapROS/HasSubscribers/"), mapsManager_.hasSubscribers()?1:0));
+		rtabmapROSStats_.insert(std::make_pair(std::string("RtabmapROS/TimeRtabmap/ms"), timeRtabmap*1000.0f));
+		rtabmapROSStats_.insert(std::make_pair(std::string("RtabmapROS/TimeUpdatingMaps/ms"), timeUpdateMaps*1000.0f));
+		rtabmapROSStats_.insert(std::make_pair(std::string("RtabmapROS/TimePublishing/ms"), timePublishMaps*1000.0f));
+		rtabmapROSStats_.insert(std::make_pair(std::string("RtabmapROS/TimeTotal/ms"), (timeRtabmap+timeUpdateMaps+timePublishMaps)*1000.0f));
 	}
 	else if(!rtabmap_.isIDsGenerated())
 	{
@@ -1964,9 +2019,24 @@ bool CoreWrapper::getGridMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::
 
 bool CoreWrapper::getMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::GetMap::Response &res)
 {
-	std::map<int, rtabmap::Transform> filteredPoses;
+	std::map<int, rtabmap::Transform> filteredPoses = rtabmap_.getLocalOptimizedPoses();
+	if(maxMappingNodes_ > 0 && filteredPoses.size()>1)
+	{
+		std::map<int, Transform> nearestPoses;
+		std::vector<int> nodes = graph::findNearestNodes(filteredPoses, filteredPoses.rbegin()->second, maxMappingNodes_);
+		for(std::vector<int>::iterator iter=nodes.begin(); iter!=nodes.end(); ++iter)
+		{
+			std::map<int, Transform>::iterator pter = filteredPoses.find(*iter);
+			if(pter != filteredPoses.end())
+			{
+				nearestPoses.insert(*pter);
+			}
+		}
+		filteredPoses = nearestPoses;
+	}
+
 	filteredPoses = mapsManager_.updateMapCaches(
-			rtabmap_.getLocalOptimizedPoses(),
+			filteredPoses,
 			rtabmap_.getMemory(),
 			true,
 			false);
@@ -1974,7 +2044,7 @@ bool CoreWrapper::getMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::GetM
 	{
 		// create the grid map
 		float xMin=0.0f, yMin=0.0f, gridCellSize = 0.05f;
-		cv::Mat pixels = mapsManager_.generateGridMap(filteredPoses, xMin, yMin, gridCellSize);
+		cv::Mat pixels = mapsManager_.getGridMap(filteredPoses, xMin, yMin, gridCellSize);
 
 		if(!pixels.empty())
 		{
@@ -2072,11 +2142,24 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 
 		if(!req.graphOnly && mapsManager_.hasSubscribers())
 		{
-			std::map<int, Transform> filteredPoses;
+			std::map<int, Transform> filteredPoses = poses;
+			if(maxMappingNodes_ > 0 && poses.size()>1)
+			{
+				std::map<int, Transform> nearestPoses;
+				std::vector<int> nodes = graph::findNearestNodes(filteredPoses, filteredPoses.rbegin()->second, maxMappingNodes_);
+				for(std::vector<int>::iterator iter=nodes.begin(); iter!=nodes.end(); ++iter)
+				{
+					std::map<int, Transform>::iterator pter = filteredPoses.find(*iter);
+					if(pter != filteredPoses.end())
+					{
+						nearestPoses.insert(*pter);
+					}
+				}
+			}
 			if(signatures.size())
 			{
 				filteredPoses = mapsManager_.updateMapCaches(
-						poses,
+						filteredPoses,
 						rtabmap_.getMemory(),
 						false,
 						false,
@@ -2084,7 +2167,7 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 			}
 			else
 			{
-				filteredPoses = mapsManager_.getFilteredPoses(poses);
+				filteredPoses = mapsManager_.getFilteredPoses(filteredPoses);
 			}
 			mapsManager_.publishMaps(filteredPoses, now, mapFrameId_);
 		}
@@ -2602,6 +2685,21 @@ bool CoreWrapper::octomapBinaryCallback(
 	res.map.header.stamp = ros::Time::now();
 
 	std::map<int, Transform> poses = rtabmap_.getLocalOptimizedPoses();
+	if(maxMappingNodes_ > 0 && poses.size()>1)
+	{
+		std::map<int, Transform> nearestPoses;
+		std::vector<int> nodes = graph::findNearestNodes(poses, poses.rbegin()->second, maxMappingNodes_);
+		for(std::vector<int>::iterator iter=nodes.begin(); iter!=nodes.end(); ++iter)
+		{
+			std::map<int, Transform>::iterator pter = poses.find(*iter);
+			if(pter != poses.end())
+			{
+				nearestPoses.insert(*pter);
+			}
+		}
+		poses = nearestPoses;
+	}
+
 	poses = mapsManager_.updateMapCaches(poses, rtabmap_.getMemory(), false, true);
 
 	const rtabmap::OctoMap * octomap = mapsManager_.getOctomap();
@@ -2618,6 +2716,21 @@ bool CoreWrapper::octomapFullCallback(
 	res.map.header.stamp = ros::Time::now();
 
 	std::map<int, Transform> poses = rtabmap_.getLocalOptimizedPoses();
+	if(maxMappingNodes_ > 0 && poses.size()>1)
+	{
+		std::map<int, Transform> nearestPoses;
+		std::vector<int> nodes = graph::findNearestNodes(poses, poses.rbegin()->second, maxMappingNodes_);
+		for(std::vector<int>::iterator iter=nodes.begin(); iter!=nodes.end(); ++iter)
+		{
+			std::map<int, Transform>::iterator pter = poses.find(*iter);
+			if(pter != poses.end())
+			{
+				nearestPoses.insert(*pter);
+			}
+		}
+		poses = nearestPoses;
+	}
+
 	poses = mapsManager_.updateMapCaches(poses, rtabmap_.getMemory(), false, true);
 
 	const rtabmap::OctoMap * octomap = mapsManager_.getOctomap();

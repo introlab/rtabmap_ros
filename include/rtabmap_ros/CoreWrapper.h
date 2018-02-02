@@ -183,6 +183,7 @@ private:
 	rtabmap::Transform lastPublishedMetricGoal_;
 	bool latestNodeWasReached_;
 	rtabmap::ParametersMap parameters_;
+	std::map<std::string, float> rtabmapROSStats_;
 
 	std::string frameId_;
 	std::string odomFrameId_;
@@ -274,6 +275,7 @@ private:
 	bool odomSensorSync_;
 	float rate_;
 	bool createIntermediateNodes_;
+	int maxMappingNodes_;
 	ros::Time time_;
 	ros::Time previousStamp_;
 };

@@ -58,6 +58,7 @@ class RGBDSync : public nodelet::Nodelet
 {
 public:
 	RGBDSync() :
+		depthScale_(1.0),
 		warningThread_(0),
 		callbackCalled_(false),
 		approxSyncDepth_(0),
@@ -89,8 +90,11 @@ private:
 		bool approxSync = true;
 		pnh.param("approx_sync", approxSync, approxSync);
 		pnh.param("queue_size", queueSize, queueSize);
+		pnh.param("depth_scale", depthScale_, depthScale_);
 
-		NODELET_INFO("Approximate time sync = %s", approxSync?"true":"false");
+		NODELET_INFO("%s: approx_sync = %s", getName().c_str(), approxSync?"true":"false");
+		NODELET_INFO("%s: queue_size  = %d", getName().c_str(), queueSize);
+		NODELET_INFO("%s: depth_scale = %f", getName().c_str(), depthScale_);
 
 		rgbdImagePub_ = nh.advertise<rtabmap_ros::RGBDImage>("rgbd_image", 1);
 		rgbdImageCompressedPub_ = nh.advertise<rtabmap_ros::RGBDImage>("rgbd_image/compressed", 1);
@@ -172,7 +176,14 @@ private:
 				cv_bridge::CvImageConstPtr imageDepthPtr = cv_bridge::toCvShare(depth);
 				ROS_ASSERT(imageDepthPtr->image.type() == CV_32FC1 || imageDepthPtr->image.type() == CV_16UC1);
 				msgCompressed.depthCompressed.header = imageDepthPtr->header;
-				msgCompressed.depthCompressed.data = rtabmap::compressImage(imageDepthPtr->image, ".png");
+				if(depthScale_ != 1.0)
+				{
+					msgCompressed.depthCompressed.data = rtabmap::compressImage(imageDepthPtr->image*depthScale_, ".png");
+				}
+				else
+				{
+					msgCompressed.depthCompressed.data = rtabmap::compressImage(imageDepthPtr->image, ".png");
+				}
 				msgCompressed.depthCompressed.format = "png";
 
 				rgbdImageCompressedPub_.publish(msgCompressed);
@@ -181,13 +192,23 @@ private:
 			if(rgbdImagePub_.getNumSubscribers())
 			{
 				msg.rgb = *image;
-				msg.depth = *depth;
+				if(depthScale_ != 1.0)
+				{
+					cv_bridge::CvImagePtr imageDepthPtr = cv_bridge::toCvCopy(depth);
+					imageDepthPtr->image*=depthScale_;
+					msg.depth = *imageDepthPtr->toImageMsg();
+				}
+				else
+				{
+					msg.depth = *depth;
+				}
 				rgbdImagePub_.publish(msg);
 			}
 		}
 	}
 
 private:
+	double depthScale_;
 	boost::thread * warningThread_;
 	bool callbackCalled_;
 
