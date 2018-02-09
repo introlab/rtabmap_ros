@@ -50,6 +50,7 @@
       
       <param name="RGBD/CreateOccupancyGrid" type="string" value="false"/>
       <param name="Optimizer/PriorsIgnored" type="string" value="false"/>
+      <param name="Optimizer/Strategy" type="string" value="1"/>
 	
       <remap from="rgb/image" to="/camera/rgb/image_color"/>
       <remap from="depth/image" to="/camera/depth/image"/>
