@@ -7,7 +7,6 @@ modification, are permitted provided that the following conditions are met:
     * Redistributions of source code must retain the above copyright
       notice, this list of conditions and the following disclaimer.
     * Redistributions in binary form must reproduce the above copyright
-      notice, this list of conditions and the following disclaimer in the
       documentation and/or other materials provided with the distribution.
     * Neither the name of the Universite de Sherbrooke nor the
       names of its contributors may be used to endorse or promote products
@@ -110,7 +109,7 @@ void MapsManager::init(ros::NodeHandle & nh, ros::NodeHandle & pnh, const std::s
 #ifdef RTABMAP_OCTOMAP
 	pnh.param("octomap_occupancy_thr", octomapOccupancyThr_, octomapOccupancyThr_);
 	UASSERT(octomapOccupancyThr_>=0.0 && octomapOccupancyThr_<=1.0);
-	octomap_ = new OctoMap(occupancyGrid_->getCellSize(), octomapOccupancyThr_, occupancyGrid_->isFullUpdate());
+	octomap_ = new OctoMap(occupancyGrid_->getCellSize(), octomapOccupancyThr_, occupancyGrid_->isFullUpdate(), occupancyGrid_->getUpdateError());
 	pnh.param("octomap_tree_depth", octomapTreeDepth_, octomapTreeDepth_);
 	if(octomapTreeDepth_ > 16)
 	{
@@ -287,7 +286,7 @@ void MapsManager::setParameters(const rtabmap::ParametersMap & parameters)
 		delete octomap_;
 		octomap_ = 0;
 	}
-	octomap_ = new OctoMap(occupancyGrid_->getCellSize(), octomapOccupancyThr_, occupancyGrid_->isFullUpdate());
+	octomap_ = new OctoMap(occupancyGrid_->getCellSize(), octomapOccupancyThr_, occupancyGrid_->isFullUpdate(), occupancyGrid_->getUpdateError());
 #endif
 #endif
 }
@@ -469,7 +468,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 					{
 						UDEBUG("Adding grid map %d to cache...", iter->first);
 						cv::Point3f viewPoint;
-						cv::Mat ground, obstacles;
+						cv::Mat ground, obstacles, emptyCells;
 						if(iter->first > 0)
 						{
 							cv::Mat rgb, depth, scan;
@@ -494,20 +493,21 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 									!occupancyGrid_->isGridFromDepth() && generateGrid?&scan:0,
 									0,
 									generateGrid?0:&ground,
-									generateGrid?0:&obstacles);
+									generateGrid?0:&obstacles,
+									generateGrid?0:&emptyCells);
 
 							if(generateGrid)
 							{
 								Signature tmp(data);
 								tmp.setPose(iter->second);
-								occupancyGrid_->createLocalMap(tmp, ground, obstacles, viewPoint);
-								uInsert(gridMaps_, std::make_pair(iter->first, std::make_pair(ground, obstacles)));
+								occupancyGrid_->createLocalMap(tmp, ground, obstacles, emptyCells, viewPoint);
+								uInsert(gridMaps_, std::make_pair(iter->first, std::make_pair(std::make_pair(ground, obstacles), emptyCells)));
 								uInsert(gridMapsViewpoints_, std::make_pair(iter->first, viewPoint));
 							}
 							else
 							{
 								viewPoint = data.gridViewPoint();
-								uInsert(gridMaps_, std::make_pair(iter->first, std::make_pair(ground, obstacles)));
+								uInsert(gridMaps_, std::make_pair(iter->first, std::make_pair(std::make_pair(ground, obstacles), emptyCells)));
 								uInsert(gridMapsViewpoints_, std::make_pair(iter->first, viewPoint));
 							}
 						}
@@ -533,20 +533,21 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 								!occupancyGrid_->isGridFromDepth() && generateGrid?&scan:0,
 								0,
 								generateGrid?0:&ground,
-								generateGrid?0:&obstacles);
+								generateGrid?0:&obstacles,
+								generateGrid?0:&emptyCells);
 
 							if(generateGrid)
 							{
 								Signature tmp(data);
 								tmp.setPose(iter->second);
-								occupancyGrid_->createLocalMap(tmp, ground, obstacles, viewPoint);
-								uInsert(gridMaps_, std::make_pair(iter->first, std::make_pair(ground, obstacles)));
+								occupancyGrid_->createLocalMap(tmp, ground, obstacles, emptyCells, viewPoint);
+								uInsert(gridMaps_,  std::make_pair(iter->first, std::make_pair(std::make_pair(ground, obstacles), emptyCells)));
 								uInsert(gridMapsViewpoints_, std::make_pair(iter->first, viewPoint));
 							}
 							else
 							{
 								viewPoint = data.gridViewPoint();
-								uInsert(gridMaps_, std::make_pair(iter->first, std::make_pair(ground, obstacles)));
+								uInsert(gridMaps_,  std::make_pair(iter->first, std::make_pair(std::make_pair(ground, obstacles), emptyCells)));
 								uInsert(gridMapsViewpoints_, std::make_pair(iter->first, viewPoint));
 							}
 
@@ -569,12 +570,12 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 						(iter->first < 0 ||
 						  occupancyGrid_->addedNodes().find(iter->first) == occupancyGrid_->addedNodes().end()))
 				{
-					std::map<int, std::pair<cv::Mat, cv::Mat> >::iterator mter = gridMaps_.find(iter->first);
+					std::map<int, std::pair<std::pair<cv::Mat, cv::Mat>, cv::Mat> >::iterator mter = gridMaps_.find(iter->first);
 					if(mter != gridMaps_.end())
 					{
-						if(!mter->second.first.empty() || !mter->second.second.empty())
+						if(!mter->second.first.first.empty() || !mter->second.first.second.empty())
 						{
-							occupancyGrid_->addToCache(iter->first, mter->second.first, mter->second.second);
+							occupancyGrid_->addToCache(iter->first, mter->second.first.first, mter->second.first.second, mter->second.second);
 						}
 					}
 				}
@@ -585,16 +586,16 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 						(iter->first < 0 ||
 						  octomap_->addedNodes().find(iter->first) == octomap_->addedNodes().end()))
 				{
-					std::map<int, std::pair<cv::Mat, cv::Mat> >::iterator mter = gridMaps_.find(iter->first);
+					std::map<int, std::pair<std::pair<cv::Mat, cv::Mat>, cv::Mat> >::iterator mter = gridMaps_.find(iter->first);
 					std::map<int, cv::Point3f>::iterator pter = gridMapsViewpoints_.find(iter->first);
 					if(mter != gridMaps_.end() && pter!=gridMapsViewpoints_.end())
 					{
-						if((mter->second.first.empty() || mter->second.first.channels() > 2) &&
-						   (mter->second.second.empty() || mter->second.second.channels() > 2))
+						if((mter->second.first.first.empty() || mter->second.first.first.channels() > 2) &&
+						   (mter->second.first.second.empty() || mter->second.first.second.channels() > 2))
 						{
-							octomap_->addToCache(iter->first, mter->second.first, mter->second.second, pter->second);
+							octomap_->addToCache(iter->first, mter->second.first.first, mter->second.first.second, mter->second.second, pter->second);
 						}
-						else if(!mter->second.first.empty() && !mter->second.second.empty())
+						else if(!mter->second.first.first.empty() && !mter->second.first.second.empty())
 						{
 							ROS_WARN("Node %d: Cannot update octomap with 2D occupancy grids. "
 									"Do \"$ rosrun rtabmap_ros rtabmap --params | grep Grid\" to see "
@@ -627,7 +628,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 		}
 #endif
 #endif
-		for(std::map<int, std::pair<cv::Mat, cv::Mat> >::iterator iter=gridMaps_.begin();
+		for(std::map<int, std::pair<std::pair<cv::Mat, cv::Mat>, cv::Mat> >::iterator iter=gridMaps_.begin();
 			iter!=gridMaps_.end();)
 		{
 			if(!uContains(poses, iter->first))
@@ -885,16 +886,16 @@ void MapsManager::publishMaps(
 
 		for(std::map<int, Transform>::const_iterator iter = poses.begin(); iter!=poses.end(); ++iter)
 		{
-			std::map<int, std::pair<cv::Mat, cv::Mat> >::iterator jter = gridMaps_.find(iter->first);
+			std::map<int, std::pair<std::pair<cv::Mat, cv::Mat>, cv::Mat> >::iterator jter = gridMaps_.find(iter->first);
 			if(updateGround  && assembledGroundPoses_.find(iter->first) == assembledGroundPoses_.end())
 			{
 				if(iter->first > 0)
 				{
 					assembledGroundPoses_.insert(*iter);
 				}
-				if(jter!=gridMaps_.end() && jter->second.first.cols)
+				if(jter!=gridMaps_.end() && jter->second.first.first.cols)
 				{
-					pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::laserScanToPointCloudRGB(jter->second.first, iter->second, 0, 255, 0);
+					pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::laserScanToPointCloudRGB(jter->second.first.first, iter->second, 0, 255, 0);
 					pcl::PointCloud<pcl::PointXYZRGB>::Ptr subtractedCloud = transformed;
 					if(cloudSubtractFiltering_)
 					{
@@ -939,9 +940,9 @@ void MapsManager::publishMaps(
 				{
 					assembledObstaclePoses_.insert(*iter);
 				}
-				if(jter!=gridMaps_.end() && jter->second.second.cols)
+				if(jter!=gridMaps_.end() && jter->second.first.second.cols)
 				{
-					pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::laserScanToPointCloudRGB(jter->second.second, iter->second, 255, 0, 0);
+					pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::laserScanToPointCloudRGB(jter->second.first.second, iter->second, 255, 0, 0);
 					pcl::PointCloud<pcl::PointXYZRGB>::Ptr subtractedCloud = transformed;
 					if(cloudSubtractFiltering_)
 					{

@@ -48,6 +48,7 @@ uint8[] userData
 # use rtabmap::util3d::uncompressData() from "rtabmap/core/util3d.h"
 uint8[] grid_ground
 uint8[] grid_obstacles
+uint8[] grid_empty_cells
 float32 grid_cell_size
 Point3f grid_view_point
 

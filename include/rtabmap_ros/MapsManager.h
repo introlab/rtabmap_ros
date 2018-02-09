@@ -111,7 +111,7 @@ private:
 
 	std::map<int, rtabmap::Transform> gridPoses_;
 	cv::Mat gridMap_;
-	std::map<int, std::pair<cv::Mat, cv::Mat> > gridMaps_; // <ground, obstacles>
+	std::map<int, std::pair< std::pair<cv::Mat, cv::Mat>, cv::Mat> > gridMaps_; // < <ground, obstacles>, empty cells >
 	std::map<int, cv::Point3f> gridMapsViewpoints_;
 
 	rtabmap::OccupancyGrid * occupancyGrid_;

@@ -735,6 +735,7 @@ rtabmap::Signature nodeDataFromROS(const rtabmap_ros::NodeData & msg)
 	s.sensorData().setOccupancyGrid(
 			compressedMatFromBytes(msg.grid_ground),
 			compressedMatFromBytes(msg.grid_obstacles),
+			compressedMatFromBytes(msg.grid_empty_cells),
 			msg.grid_cell_size,
 			point3fFromROS(msg.grid_view_point));
 	s.sensorData().setGPS(rtabmap::GPS(msg.gps.stamp, msg.gps.longitude, msg.gps.latitude, msg.gps.altitude, msg.gps.error, msg.gps.bearing));
@@ -762,6 +763,7 @@ void nodeDataToROS(const rtabmap::Signature & signature, rtabmap_ros::NodeData &
 	compressedMatToBytes(signature.sensorData().userDataCompressed(), msg.userData);
 	compressedMatToBytes(signature.sensorData().gridGroundCellsCompressed(), msg.grid_ground);
 	compressedMatToBytes(signature.sensorData().gridObstacleCellsCompressed(), msg.grid_obstacles);
+	compressedMatToBytes(signature.sensorData().gridEmptyCellsCompressed(), msg.grid_empty_cells);
 	point3fToROS(signature.sensorData().gridViewPoint(), msg.grid_view_point);
 	msg.grid_cell_size = signature.sensorData().gridCellSize();
 	msg.laserScanMaxPts = signature.sensorData().laserScanInfo().maxPoints();
