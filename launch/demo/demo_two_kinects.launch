@@ -50,16 +50,18 @@
    <!-- sync rgb/depth images per camera -->
    <group ns="camera1">
     <node pkg="nodelet" type="nodelet" name="rgbd_sync" args="load rtabmap_ros/rgbd_sync camera1_nodelet_manager">
-      <remap from="rgb/image"       to="rgb/image_rect_color"/>
-      <remap from="depth/image"     to="depth_registered/image_raw"/>
-      <remap from="rgb/camera_info" to="rgb/camera_info"/>
+      <remap from="rgb/image"         to="rgb/image_rect_color"/>
+      <remap from="depth/image"       to="depth_registered/image_raw"/>
+      <remap from="rgb/camera_info"   to="rgb/camera_info"/>
+      <remap from="depth/camera_info" to="depth_registered/camera_info"/>
     </node>
    </group>
    <group ns="camera2">
     <node pkg="nodelet" type="nodelet" name="rgbd_sync" args="load rtabmap_ros/rgbd_sync camera2_nodelet_manager">
-      <remap from="rgb/image"       to="rgb/image_rect_color"/>
-      <remap from="depth/image"     to="depth_registered/image_raw"/>
-      <remap from="rgb/camera_info" to="rgb/camera_info"/>
+      <remap from="rgb/image"         to="rgb/image_rect_color"/>
+      <remap from="depth/image"       to="depth_registered/image_raw"/>
+      <remap from="rgb/camera_info"   to="rgb/camera_info"/>
+      <remap from="depth/camera_info" to="depth_registered/camera_info"/>
     </node>
    </group>
         

@@ -184,10 +184,10 @@ bool convertRGBDMsgs(
 		double waitForTransform);
 
 bool convertStereoMsg(
-		const sensor_msgs::ImageConstPtr& leftImageMsg,
-		const sensor_msgs::ImageConstPtr& rightImageMsg,
-		const sensor_msgs::CameraInfoConstPtr& leftCamInfoMsg,
-		const sensor_msgs::CameraInfoConstPtr& rightCamInfoMsg,
+		const cv_bridge::CvImageConstPtr& leftImageMsg,
+		const cv_bridge::CvImageConstPtr& rightImageMsg,
+		const sensor_msgs::CameraInfo& leftCamInfoMsg,
+		const sensor_msgs::CameraInfo& rightCamInfoMsg,
 		const std::string & frameId,
 		const std::string & odomFrameId,
 		const ros::Time & odomStamp,

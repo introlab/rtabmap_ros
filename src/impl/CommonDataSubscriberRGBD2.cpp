@@ -39,8 +39,8 @@ namespace rtabmap_ros {
 		rtabmap_ros::toCvShare(image1Msg, imageMsgs[0], depthMsgs[0]); \
 		rtabmap_ros::toCvShare(image2Msg, imageMsgs[1], depthMsgs[1]); \
 		std::vector<sensor_msgs::CameraInfo> cameraInfoMsgs; \
-		cameraInfoMsgs.push_back(image1Msg->cameraInfo); \
-		cameraInfoMsgs.push_back(image2Msg->cameraInfo);
+		cameraInfoMsgs.push_back(image1Msg->rgbCameraInfo); \
+		cameraInfoMsgs.push_back(image2Msg->rgbCameraInfo);
 
 // 2 RGBD
 void CommonDataSubscriber::rgbd2Callback(

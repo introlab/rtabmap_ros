@@ -55,6 +55,7 @@
   <arg name="rgb_topic"               default="/camera/rgb/image_rect_color" />
   <arg name="depth_topic"             default="/camera/depth_registered/image_raw" />
   <arg name="camera_info_topic"       default="/camera/rgb/camera_info" />
+  <arg name="depth_camera_info_topic" default="/camera/depth_registered/camera_info" />
   
   <!-- stereo related topics -->
   <arg name="stereo_namespace"        default="/stereo_camera"/>
@@ -113,22 +114,33 @@
     <group unless="$(arg stereo)">
       <node if="$(arg compressed)" name="republish_rgb" type="republish" pkg="image_transport" args="$(arg rgb_image_transport) in:=$(arg rgb_topic) raw out:=$(arg rgb_topic_relay)" />
       <node if="$(arg compressed)" name="republish_depth" type="republish" pkg="image_transport" args="$(arg depth_image_transport) in:=$(arg depth_topic) raw out:=$(arg depth_topic_relay)" />
+    
+      <node if="$(arg rgbd_sync)" pkg="nodelet" type="nodelet" name="rgbd_sync" args="standalone rtabmap_ros/rgbd_sync" output="$(arg output)">
+        <remap from="rgb/image"       to="$(arg rgb_topic_relay)"/>
+        <remap from="depth/image"     to="$(arg depth_topic_relay)"/>
+        <remap from="rgb/camera_info" to="$(arg camera_info_topic)"/>
+        <remap from="depth/camera_info" to="$(arg depth_camera_info_topic)"/>
+        <remap from="rgbd_image"      to="$(arg rgbd_topic)"/>
+        <param name="approx_sync"     type="bool"   value="$(arg approx_rgbd_sync)"/>
+        <param name="queue_size"      type="int"    value="$(arg queue_size)"/>
+        <param name="depth_scale"     type="double" value="$(arg depth_scale)"/>
+      </node>
     </group>
     <group if="$(arg stereo)">
       <node if="$(arg compressed)" name="republish_left"  type="republish" pkg="image_transport" args="compressed in:=$(arg left_image_topic) raw out:=$(arg left_image_topic_relay)" />
       <node if="$(arg compressed)" name="republish_right" type="republish" pkg="image_transport" args="compressed in:=$(arg right_image_topic) raw out:=$(arg right_image_topic_relay)" />
-    </group>
     
-    <node if="$(arg rgbd_sync)" pkg="nodelet" type="nodelet" name="rgbd_sync" args="standalone rtabmap_ros/rgbd_sync" output="$(arg output)">
-      <remap from="rgb/image"       to="$(arg rgb_topic_relay)"/>
-      <remap from="depth/image"     to="$(arg depth_topic_relay)"/>
-      <remap from="rgb/camera_info" to="$(arg camera_info_topic)"/>
-      <remap from="rgbd_image"      to="$(arg rgbd_topic)"/>
-      <param name="approx_sync"     type="bool"   value="$(arg approx_rgbd_sync)"/>
-      <param name="queue_size"      type="int"    value="$(arg queue_size)"/>
-      <param name="depth_scale"     type="double" value="$(arg depth_scale)"/>
+      <node if="$(arg rgbd_sync)" pkg="nodelet" type="nodelet" name="rgbd_sync" args="standalone rtabmap_ros/rgbd_sync" output="$(arg output)">
+        <remap from="rgb/image"       to="$(arg left_image_topic)"/>
+        <remap from="depth/image"     to="$(arg right_image_topic)"/>
+        <remap from="rgb/camera_info" to="$(arg left_camera_info_topic)"/>
+        <remap from="depth/camera_info" to="$(arg right_camera_info_topic)"/>
+        <remap from="rgbd_image"      to="$(arg rgbd_topic)"/>
+        <param name="approx_sync"     type="bool"   value="$(arg approx_rgbd_sync)"/>
+        <param name="queue_size"      type="int"    value="$(arg queue_size)"/>
     </node>
-    
+    </group>
+        
     <!-- Visual odometry -->
     <group unless="$(arg icp_odometry)">
       <group if="$(arg visual_odometry)">
@@ -161,6 +173,7 @@
           <remap from="right/image_rect"       to="$(arg right_image_topic_relay)"/>
           <remap from="left/camera_info"       to="$(arg left_camera_info_topic)"/>
           <remap from="right/camera_info"      to="$(arg right_camera_info_topic)"/>
+          <remap from="rgbd_image"             to="$(arg rgbd_topic)"/>
           <remap from="odom"                   to="$(arg odom_topic)"/>
       
           <param name="frame_id"                    type="string" value="$(arg frame_id)"/>
@@ -171,6 +184,7 @@
           <param name="approx_sync"                 type="bool"   value="$(arg approx_sync)"/>
           <param name="config_path"                 type="string" value="$(arg cfg)"/>
           <param name="queue_size"                  type="int"    value="$(arg queue_size)"/>
+          <param name="subscribe_rgbd"              type="bool"   value="$(arg subscribe_rgbd)"/>
           <param name="guess_frame_id"              type="string" value="$(arg odom_guess_frame_id)"/>
           <param name="guess_min_translation"       type="double" value="$(arg odom_guess_min_translation)"/>
           <param name="guess_min_rotation"          type="double" value="$(arg odom_guess_min_rotation)"/>
@@ -201,7 +215,7 @@
     <node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="$(arg output)" args="$(arg rtabmap_args)" launch-prefix="$(arg launch_prefix)">
       <param     if="$(arg stereo)" name="subscribe_depth"  type="bool" value="false"/>
       <param unless="$(arg stereo)" name="subscribe_depth"  type="bool" value="true"/>
-      <param unless="$(arg stereo)" name="subscribe_rgbd"  type="bool" value="$(arg subscribe_rgbd)"/>
+      <param name="subscribe_rgbd"       type="bool"   value="$(arg subscribe_rgbd)"/>
       <param name="subscribe_stereo"     type="bool"   value="$(arg stereo)"/>
       <param name="subscribe_scan"       type="bool"   value="$(arg subscribe_scan)"/>
       <param name="subscribe_scan_cloud" type="bool"   value="$(arg subscribe_scan_cloud)"/>
@@ -250,7 +264,7 @@
     <node if="$(arg rtabmapviz)" pkg="rtabmap_ros" type="rtabmapviz" name="rtabmapviz" args="-d $(arg gui_cfg)" output="$(arg output)" launch-prefix="$(arg launch_prefix)">
       <param     if="$(arg stereo)" name="subscribe_depth"  type="bool" value="false"/>
       <param unless="$(arg stereo)" name="subscribe_depth"  type="bool" value="true"/>
-      <param unless="$(arg stereo)" name="subscribe_rgbd"  type="bool" value="$(arg subscribe_rgbd)"/>
+      <param name="subscribe_rgbd"       type="bool"   value="$(arg subscribe_rgbd)"/>
       <param name="subscribe_stereo"     type="bool"   value="$(arg stereo)"/>
       <param name="subscribe_scan"       type="bool"   value="$(arg subscribe_scan)"/>
       <param name="subscribe_scan_cloud" type="bool"   value="$(arg subscribe_scan_cloud)"/>

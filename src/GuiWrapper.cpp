@@ -590,10 +590,11 @@ void GuiWrapper::commonDepthCallback(
 
 void GuiWrapper::commonStereoCallback(
 		const nav_msgs::OdometryConstPtr & odomMsg,
-		const sensor_msgs::ImageConstPtr& leftImageMsg,
-		const sensor_msgs::ImageConstPtr& rightImageMsg,
-		const sensor_msgs::CameraInfoConstPtr& leftCamInfoMsg,
-		const sensor_msgs::CameraInfoConstPtr& rightCamInfoMsg,
+		const rtabmap_ros::UserDataConstPtr & userDataMsg,
+		const cv_bridge::CvImageConstPtr& leftImageMsg,
+		const cv_bridge::CvImageConstPtr& rightImageMsg,
+		const sensor_msgs::CameraInfo& leftCamInfoMsg,
+		const sensor_msgs::CameraInfo& rightCamInfoMsg,
 		const sensor_msgs::LaserScanConstPtr& scan2dMsg,
 		const sensor_msgs::PointCloud2ConstPtr& scan3dMsg,
 		const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg)
@@ -615,7 +616,7 @@ void GuiWrapper::commonStereoCallback(
 		}
 		else
 		{
-			odomHeader = leftCamInfoMsg->header;
+			odomHeader = leftCamInfoMsg.header;
 		}
 		odomHeader.frame_id = odomFrameId_;
 	}
@@ -751,6 +752,7 @@ void GuiWrapper::defaultCallback(const nav_msgs::OdometryConstPtr & odomMsg)
 			rtabmap_ros::UserDataConstPtr(),
 			cv_bridge::CvImageConstPtr(),
 			cv_bridge::CvImageConstPtr(),
+			sensor_msgs::CameraInfo(),
 			sensor_msgs::CameraInfo(),
 			sensor_msgs::LaserScanConstPtr(),
 			sensor_msgs::PointCloud2ConstPtr(),

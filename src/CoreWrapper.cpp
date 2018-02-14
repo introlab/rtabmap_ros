@@ -754,7 +754,7 @@ void CoreWrapper::rgbCallback(
 	sensor_msgs::PointCloud2ConstPtr scan3dMsg; // Null
 	rtabmap_ros::OdomInfoConstPtr odomInfoMsg; // null
 	cv_bridge::CvImageConstPtr depthMsg;// Null
-	commonSingleDepthCallback(odomMsg, userDataMsg, cv_bridge::toCvShare(imageMsg), depthMsg, *cameraInfoMsg, scanMsg, scan3dMsg, odomInfoMsg);
+	commonSingleDepthCallback(odomMsg, userDataMsg, cv_bridge::toCvShare(imageMsg), depthMsg, *cameraInfoMsg, *cameraInfoMsg, scanMsg, scan3dMsg, odomInfoMsg);
 }
 
 void CoreWrapper::rgbOdomCallback(
@@ -767,7 +767,7 @@ void CoreWrapper::rgbOdomCallback(
 	sensor_msgs::PointCloud2ConstPtr scan3dMsg; // null
 	rtabmap_ros::OdomInfoConstPtr odomInfoMsg; // null
 	cv_bridge::CvImageConstPtr depthMsg;// Null
-	commonSingleDepthCallback(odomMsg, userDataMsg, cv_bridge::toCvShare(imageMsg), depthMsg, *cameraInfoMsg, scanMsg, scan3dMsg, odomInfoMsg);
+	commonSingleDepthCallback(odomMsg, userDataMsg, cv_bridge::toCvShare(imageMsg), depthMsg, *cameraInfoMsg, *cameraInfoMsg, scanMsg, scan3dMsg, odomInfoMsg);
 }
 
 bool CoreWrapper::odomUpdate(const nav_msgs::OdometryConstPtr & odomMsg)
@@ -1145,10 +1145,11 @@ void CoreWrapper::commonDepthCallbackImpl(
 
 void CoreWrapper::commonStereoCallback(
 		const nav_msgs::OdometryConstPtr & odomMsg,
-		const sensor_msgs::ImageConstPtr& leftImageMsg,
-		const sensor_msgs::ImageConstPtr& rightImageMsg,
-		const sensor_msgs::CameraInfoConstPtr& leftCamInfoMsg,
-		const sensor_msgs::CameraInfoConstPtr& rightCamInfoMsg,
+		const rtabmap_ros::UserDataConstPtr & userDataMsg,
+		const cv_bridge::CvImageConstPtr& leftImageMsg,
+		const cv_bridge::CvImageConstPtr& rightImageMsg,
+		const sensor_msgs::CameraInfo& leftCamInfoMsg,
+		const sensor_msgs::CameraInfo& rightCamInfoMsg,
 		const sensor_msgs::LaserScanConstPtr& scan2dMsg,
 		const sensor_msgs::PointCloud2ConstPtr& scan3dMsg,
 		const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg)
@@ -1244,9 +1245,9 @@ void CoreWrapper::commonStereoCallback(
 		std::vector<cv_bridge::CvImageConstPtr> rgbImages(1);
 		std::vector<cv_bridge::CvImageConstPtr> depthImages(1);
 		std::vector<sensor_msgs::CameraInfo> cameraInfos(1);
-		rgbImages[0] = cv_bridge::toCvShare(leftImageMsg);
+		rgbImages[0] = leftImageMsg;
 		depthImages[0] = imgDepth;
-		cameraInfos[0] = *leftCamInfoMsg;
+		cameraInfos[0] = leftCamInfoMsg;
 
 		commonDepthCallbackImpl(odomFrameId, rtabmap_ros::UserDataConstPtr(), rgbImages, depthImages, cameraInfos, scan2dMsg, scan3dMsg, odomInfoMsg);
 		return;
@@ -1300,13 +1301,26 @@ void CoreWrapper::commonStereoCallback(
 		}
 	}
 
-	cv::Mat userData = userData_;
-	userData_ = cv::Mat();
-
 	Transform groundTruthPose;
 	if(!groundTruthFrameId_.empty())
 	{
 		groundTruthPose = rtabmap_ros::getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, lastPoseStamp_, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+	}
+
+	cv::Mat userData;
+	if(userDataMsg.get())
+	{
+		userData = rtabmap_ros::userDataFromROS(*userDataMsg);
+		if(!userData_.empty())
+		{
+			NODELET_WARN("Synchronized and asynchronized user data topics cannot be used at the same time. Async user data dropped!");
+			userData_ = cv::Mat();
+		}
+	}
+	else
+	{
+		userData = userData_;
+		userData_ = cv::Mat();
 	}
 
 	SensorData data(scan,

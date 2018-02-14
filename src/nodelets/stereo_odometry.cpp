@@ -85,45 +85,61 @@ private:
 		ros::NodeHandle & pnh = getPrivateNodeHandle();
 
 		bool approxSync = false;
+		bool subscribeRGBD = false;
 		pnh.param("approx_sync", approxSync, approxSync);
 		pnh.param("queue_size", queueSize_, queueSize_);
+		pnh.param("subscribe_rgbd", subscribeRGBD, subscribeRGBD);
 
 		NODELET_INFO("StereoOdometry: approx_sync = %s", approxSync?"true":"false");
 		NODELET_INFO("StereoOdometry: queue_size = %d", queueSize_);
+		NODELET_INFO("StereoOdometry: subscribe_rgbd = %s", subscribeRGBD?"true":"false");
 
-		ros::NodeHandle left_nh(nh, "left");
-		ros::NodeHandle right_nh(nh, "right");
-		ros::NodeHandle left_pnh(pnh, "left");
-		ros::NodeHandle right_pnh(pnh, "right");
-		image_transport::ImageTransport left_it(left_nh);
-		image_transport::ImageTransport right_it(right_nh);
-		image_transport::TransportHints hintsLeft("raw", ros::TransportHints(), left_pnh);
-		image_transport::TransportHints hintsRight("raw", ros::TransportHints(), right_pnh);
-
-		imageRectLeft_.subscribe(left_it, left_nh.resolveName("image_rect"), 1, hintsLeft);
-		imageRectRight_.subscribe(right_it, right_nh.resolveName("image_rect"), 1, hintsRight);
-		cameraInfoLeft_.subscribe(left_nh, "camera_info", 1);
-		cameraInfoRight_.subscribe(right_nh, "camera_info", 1);
-
-		if(approxSync)
+		std::string subscribedTopicsMsg;
+		if(subscribeRGBD)
 		{
-			approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize_), imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_);
-			approxSync_->registerCallback(boost::bind(&StereoOdometry::callback, this, _1, _2, _3, _4));
+			rgbdSub_ = nh.subscribe("rgbd_image", 1, &StereoOdometry::callbackRGBD, this);
+
+			subscribedTopicsMsg =
+					uFormat("\n%s subscribed to:\n   %s",
+					getName().c_str(),
+					rgbdSub_.getTopic().c_str());
 		}
 		else
 		{
-			exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize_), imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_);
-			exactSync_->registerCallback(boost::bind(&StereoOdometry::callback, this, _1, _2, _3, _4));
+			ros::NodeHandle left_nh(nh, "left");
+			ros::NodeHandle right_nh(nh, "right");
+			ros::NodeHandle left_pnh(pnh, "left");
+			ros::NodeHandle right_pnh(pnh, "right");
+			image_transport::ImageTransport left_it(left_nh);
+			image_transport::ImageTransport right_it(right_nh);
+			image_transport::TransportHints hintsLeft("raw", ros::TransportHints(), left_pnh);
+			image_transport::TransportHints hintsRight("raw", ros::TransportHints(), right_pnh);
+
+			imageRectLeft_.subscribe(left_it, left_nh.resolveName("image_rect"), 1, hintsLeft);
+			imageRectRight_.subscribe(right_it, right_nh.resolveName("image_rect"), 1, hintsRight);
+			cameraInfoLeft_.subscribe(left_nh, "camera_info", 1);
+			cameraInfoRight_.subscribe(right_nh, "camera_info", 1);
+
+			if(approxSync)
+			{
+				approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize_), imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_);
+				approxSync_->registerCallback(boost::bind(&StereoOdometry::callback, this, _1, _2, _3, _4));
+			}
+			else
+			{
+				exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize_), imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_);
+				exactSync_->registerCallback(boost::bind(&StereoOdometry::callback, this, _1, _2, _3, _4));
+			}
+
+
+			subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s",
+					getName().c_str(),
+					approxSync?"approx":"exact",
+					imageRectLeft_.getTopic().c_str(),
+					imageRectRight_.getTopic().c_str(),
+					cameraInfoLeft_.getTopic().c_str(),
+					cameraInfoRight_.getTopic().c_str());
 		}
-
-
-		std::string subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s",
-				getName().c_str(),
-				approxSync?"approx":"exact",
-				imageRectLeft_.getTopic().c_str(),
-				imageRectRight_.getTopic().c_str(),
-				cameraInfoLeft_.getTopic().c_str(),
-				cameraInfoRight_.getTopic().c_str());
 		this->startWarningThread(subscribedTopicsMsg, approxSync);
 	}
 
@@ -216,6 +232,84 @@ private:
 		}
 	}
 
+	void callbackRGBD(
+			const rtabmap_ros::RGBDImageConstPtr& image)
+	{
+		callbackCalled();
+		if(!this->isPaused())
+		{
+			cv_bridge::CvImageConstPtr imageRectLeft, imageRectRight;
+			rtabmap_ros::toCvShare(image, imageRectLeft, imageRectRight);
+
+			if(!(imageRectLeft->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
+				 imageRectLeft->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||
+				 imageRectLeft->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
+				 imageRectLeft->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0) ||
+				!(imageRectRight->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
+				  imageRectRight->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||
+				  imageRectRight->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
+				  imageRectRight->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0))
+			{
+				NODELET_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8 (mono8 recommended)");
+				return;
+			}
+
+			ros::Time stamp = imageRectLeft->header.stamp>imageRectRight->header.stamp?imageRectLeft->header.stamp:imageRectRight->header.stamp;
+
+			Transform localTransform = getTransform(this->frameId(), imageRectLeft->header.frame_id, stamp);
+			if(localTransform.isNull())
+			{
+				return;
+			}
+
+			ros::WallTime time = ros::WallTime::now();
+
+			int quality = -1;
+			if(!imageRectLeft->image.empty() && !imageRectRight->image.empty())
+			{
+				rtabmap::StereoCameraModel stereoModel = rtabmap_ros::stereoCameraModelFromROS(image->rgbCameraInfo, image->depthCameraInfo, localTransform);
+				if(stereoModel.baseline() <= 0)
+				{
+					NODELET_FATAL("The stereo baseline (%f) should be positive (baseline=-Tx/fx). We assume a horizontal left/right stereo "
+							  "setup where the Tx (or P(0,3)) is negative in the right camera info msg.", stereoModel.baseline());
+					return;
+				}
+
+				if(stereoModel.baseline() > 10.0)
+				{
+					static bool shown = false;
+					if(!shown)
+					{
+						NODELET_WARN("Detected baseline (%f m) is quite large! Is your "
+								 "right camera_info P(0,3) correctly set? Note that "
+								 "baseline=-P(0,3)/P(0,0). This warning is printed only once.",
+								 stereoModel.baseline());
+						shown = true;
+					}
+				}
+
+				cv_bridge::CvImagePtr ptrImageLeft = cv_bridge::cvtColor(imageRectLeft, "mono8");
+				cv_bridge::CvImagePtr ptrImageRight = cv_bridge::cvtColor(imageRectRight, "mono8");
+
+				UTimer stepTimer;
+				//
+				UDEBUG("localTransform = %s", localTransform.prettyPrint().c_str());
+				rtabmap::SensorData data(
+						ptrImageLeft->image,
+						ptrImageRight->image,
+						stereoModel,
+						0,
+						rtabmap_ros::timestampFromROS(stamp));
+
+				this->processData(data, stamp);
+			}
+			else
+			{
+				NODELET_WARN("Odom: input images empty?!?");
+			}
+		}
+	}
+
 protected:
 	virtual void flushCallbacks()
 	{
@@ -243,6 +337,7 @@ private:
 	message_filters::Synchronizer<MyApproxSyncPolicy> * approxSync_;
 	typedef message_filters::sync_policies::ExactTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo, sensor_msgs::CameraInfo> MyExactSyncPolicy;
 	message_filters::Synchronizer<MyExactSyncPolicy> * exactSync_;
+	ros::Subscriber rgbdSub_;
 	int queueSize_;
 };
 

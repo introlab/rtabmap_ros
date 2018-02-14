@@ -192,12 +192,23 @@ void toCvShare(const rtabmap_ros::RGBDImageConstPtr & image, cv_bridge::CvImageC
 	}
 	else if(!image->depthCompressed.data.empty())
 	{
-		cv_bridge::CvImagePtr ptr = boost::make_shared<cv_bridge::CvImage>();
-		ptr->header = image->depthCompressed.header;
-		ptr->image = rtabmap::uncompressImage(image->depthCompressed.data);
-		ROS_ASSERT(ptr->image.empty() || ptr->image.type() == CV_32FC1 || ptr->image.type() == CV_16UC1);
-		ptr->encoding = ptr->image.empty()?"":ptr->image.type() == CV_32FC1?sensor_msgs::image_encodings::TYPE_32FC1:sensor_msgs::image_encodings::TYPE_16UC1;
-		depth = ptr;
+		if(image->depthCompressed.format.compare("jpg")==0)
+		{
+#ifdef CV_BRIDGE_HYDRO
+			ROS_ERROR("Unsupported compressed image copy, please upgrade at least to ROS Indigo to use this.");
+#else
+			depth = cv_bridge::toCvCopy(image->depthCompressed);
+#endif
+		}
+		else
+		{
+			cv_bridge::CvImagePtr ptr = boost::make_shared<cv_bridge::CvImage>();
+			ptr->header = image->depthCompressed.header;
+			ptr->image = rtabmap::uncompressImage(image->depthCompressed.data);
+			ROS_ASSERT(ptr->image.empty() || ptr->image.type() == CV_32FC1 || ptr->image.type() == CV_16UC1);
+			ptr->encoding = ptr->image.empty()?"":ptr->image.type() == CV_32FC1?sensor_msgs::image_encodings::TYPE_32FC1:sensor_msgs::image_encodings::TYPE_16UC1;
+			depth = ptr;
+		}
 	}
 	else
 	{
@@ -1284,10 +1295,10 @@ bool convertRGBDMsgs(
 }
 
 bool convertStereoMsg(
-		const sensor_msgs::ImageConstPtr& leftImageMsg,
-		const sensor_msgs::ImageConstPtr& rightImageMsg,
-		const sensor_msgs::CameraInfoConstPtr& leftCamInfoMsg,
-		const sensor_msgs::CameraInfoConstPtr& rightCamInfoMsg,
+		const cv_bridge::CvImageConstPtr& leftImageMsg,
+		const cv_bridge::CvImageConstPtr& rightImageMsg,
+		const sensor_msgs::CameraInfo& leftCamInfoMsg,
+		const sensor_msgs::CameraInfo& rightCamInfoMsg,
 		const std::string & frameId,
 		const std::string & odomFrameId,
 		const ros::Time & odomStamp,
@@ -1298,7 +1309,6 @@ bool convertStereoMsg(
 		double waitForTransform)
 {
 	UASSERT(leftImageMsg.get() && rightImageMsg.get());
-	UASSERT(leftCamInfoMsg.get() && rightCamInfoMsg.get());
 
 	if(!(leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
 		leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0 ||
@@ -1319,13 +1329,13 @@ bool convertStereoMsg(
 	if(leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
 	   leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
 	{
-		left = cv_bridge::toCvCopy(leftImageMsg, "mono8")->image;
+		left = cv_bridge::cvtColor(leftImageMsg, "mono8")->image;
 	}
 	else
 	{
-		left = cv_bridge::toCvCopy(leftImageMsg, "bgr8")->image;
+		left = cv_bridge::cvtColor(leftImageMsg, "bgr8")->image;
 	}
-	right = cv_bridge::toCvCopy(rightImageMsg, "mono8")->image;
+	right = cv_bridge::cvtColor(rightImageMsg, "mono8")->image;
 
 	rtabmap::Transform localTransform = getTransform(frameId, leftImageMsg->header.frame_id, leftImageMsg->header.stamp, listener, waitForTransform);
 	if(localTransform.isNull())
@@ -1353,7 +1363,7 @@ bool convertStereoMsg(
 		}
 	}
 
-	stereoModel = rtabmap_ros::stereoCameraModelFromROS(*leftCamInfoMsg, *rightCamInfoMsg, localTransform);
+	stereoModel = rtabmap_ros::stereoCameraModelFromROS(leftCamInfoMsg, rightCamInfoMsg, localTransform);
 
 	if(stereoModel.baseline() > 10.0)
 	{

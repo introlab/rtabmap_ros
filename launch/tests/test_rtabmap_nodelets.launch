@@ -7,7 +7,7 @@
   </include>
   
   <arg name="frame_id"                default="camera_link"/> 
-  <arg name="rtabmap_args"            default=""/>                <!-- delete_db_on_start, udebug -->  
+  <arg name="rtabmap_args"            default="--delete_db_on_start"/>   <!-- delete_db_on_start, udebug -->  
   <arg name="odom_args"               default="$(arg rtabmap_args)"/>
    
   <!-- RGB-D related topics -->
@@ -19,9 +19,10 @@
   
     <!-- Use RGBD synchronization -->
     <node pkg="nodelet" type="nodelet" name="rgbd_sync" args="load rtabmap_ros/rgbd_sync camera_nodelet_manager">
-      <remap from="rgb/image"       to="$(arg rgb_topic)"/>
-      <remap from="depth/image"     to="$(arg depth_topic)"/>
-      <remap from="rgb/camera_info" to="$(arg camera_info_topic)"/>
+      <remap from="rgb/image"         to="$(arg rgb_topic)"/>
+      <remap from="depth/image"       to="$(arg depth_topic)"/>
+      <remap from="rgb/camera_info"   to="$(arg camera_info_topic)"/>
+      <remap from="depth/camera_info" to="$(arg camera_info_topic)"/>
     </node>
   
     <!-- RGB-D Odometry -->

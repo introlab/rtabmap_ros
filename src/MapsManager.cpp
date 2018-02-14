@@ -69,8 +69,7 @@ MapsManager::MapsManager() :
 		assembledGround_(new pcl::PointCloud<pcl::PointXYZRGB>),
 		occupancyGrid_(new OccupancyGrid),
 		octomap_(0),
-		octomapTreeDepth_(16),
-		octomapOccupancyThr_(0.5)
+		octomapTreeDepth_(16)
 {
 }
 
@@ -107,9 +106,7 @@ void MapsManager::init(ros::NodeHandle & nh, ros::NodeHandle & pnh, const std::s
 
 #ifdef WITH_OCTOMAP_ROS
 #ifdef RTABMAP_OCTOMAP
-	pnh.param("octomap_occupancy_thr", octomapOccupancyThr_, octomapOccupancyThr_);
-	UASSERT(octomapOccupancyThr_>=0.0 && octomapOccupancyThr_<=1.0);
-	octomap_ = new OctoMap(occupancyGrid_->getCellSize(), octomapOccupancyThr_, occupancyGrid_->isFullUpdate(), occupancyGrid_->getUpdateError());
+	octomap_ = new OctoMap(occupancyGrid_->getCellSize(), 0.5, occupancyGrid_->isFullUpdate(), occupancyGrid_->getUpdateError());
 	pnh.param("octomap_tree_depth", octomapTreeDepth_, octomapTreeDepth_);
 	if(octomapTreeDepth_ > 16)
 	{
@@ -122,7 +119,6 @@ void MapsManager::init(ros::NodeHandle & nh, ros::NodeHandle & pnh, const std::s
 		octomapTreeDepth_ = 16;
 	}
 	ROS_INFO("%s(maps): octomap_tree_depth         = %d", name.c_str(), octomapTreeDepth_);
-	ROS_INFO("%s(maps): octomap_occupancy_thr      = %f", name.c_str(), octomapOccupancyThr_);
 #endif
 #endif
 
@@ -242,8 +238,8 @@ void MapsManager::backwardCompatibilityParameters(ros::NodeHandle & pnh, Paramet
 
 	// moved
 	parameterMoved(pnh, "cloud_decimation", Parameters::kGridDepthDecimation(), parameters);
-	parameterMoved(pnh, "cloud_max_depth", Parameters::kGridDepthMax(), parameters);
-	parameterMoved(pnh, "cloud_min_depth", Parameters::kGridDepthMin(), parameters);
+	parameterMoved(pnh, "cloud_max_depth", Parameters::kGridRangeMax(), parameters);
+	parameterMoved(pnh, "cloud_min_depth", Parameters::kGridRangeMin(), parameters);
 	parameterMoved(pnh, "cloud_voxel_size", Parameters::kGridCellSize(), parameters);
 	parameterMoved(pnh, "cloud_floor_culling_height", Parameters::kGridMaxGroundHeight(), parameters);
 	parameterMoved(pnh, "cloud_ceiling_culling_height", Parameters::kGridMaxObstacleHeight(), parameters);
@@ -270,6 +266,7 @@ void MapsManager::backwardCompatibilityParameters(ros::NodeHandle & pnh, Paramet
 #ifdef WITH_OCTOMAP_ROS
 #ifdef RTABMAP_OCTOMAP
 	parameterMoved(pnh, "octomap_ground_is_obstacle", Parameters::kGridGroundIsObstacle(), parameters);
+	parameterMoved(pnh, "octomap_occupancy_thr", Parameters::kGridGlobalOctoMapOccupancyThr(), parameters);
 #endif
 #endif
 }
@@ -286,7 +283,7 @@ void MapsManager::setParameters(const rtabmap::ParametersMap & parameters)
 		delete octomap_;
 		octomap_ = 0;
 	}
-	octomap_ = new OctoMap(occupancyGrid_->getCellSize(), octomapOccupancyThr_, occupancyGrid_->isFullUpdate(), occupancyGrid_->getUpdateError());
+	octomap_ = new OctoMap(parameters_);
 #endif
 #endif
 }

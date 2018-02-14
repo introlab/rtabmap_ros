@@ -589,25 +589,39 @@ void CommonDataSubscriber::commonSingleDepthCallback(
 		const rtabmap_ros::UserDataConstPtr & userDataMsg,
 		const cv_bridge::CvImageConstPtr & imageMsg,
 		const cv_bridge::CvImageConstPtr & depthMsg,
-		const sensor_msgs::CameraInfo & cameraInfoMsg,
+		const sensor_msgs::CameraInfo & rgbCameraInfoMsg,
+		const sensor_msgs::CameraInfo & depthCameraInfoMsg,
 		const sensor_msgs::LaserScanConstPtr& scanMsg,
 		const sensor_msgs::PointCloud2ConstPtr& scan3dMsg,
 		const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg)
 {
 	callbackCalled();
-	std::vector<cv_bridge::CvImageConstPtr> imageMsgs;
-	std::vector<cv_bridge::CvImageConstPtr> depthMsgs;
-	std::vector<sensor_msgs::CameraInfo> cameraInfoMsgs;
-	if(imageMsg.get())
+
+	if(depthMsg.get() == 0 ||
+	   depthMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1) == 0 ||
+	   depthMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1) == 0 ||
+	   depthMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
 	{
-		imageMsgs.push_back(imageMsg);
+		std::vector<cv_bridge::CvImageConstPtr> imageMsgs;
+		std::vector<cv_bridge::CvImageConstPtr> depthMsgs;
+		std::vector<sensor_msgs::CameraInfo> cameraInfoMsgs;
+		if(imageMsg.get())
+		{
+			imageMsgs.push_back(imageMsg);
+		}
+		if(depthMsg.get())
+		{
+			depthMsgs.push_back(depthMsg);
+		}
+		cameraInfoMsgs.push_back(rgbCameraInfoMsg);
+		commonDepthCallback(odomMsg, userDataMsg, imageMsgs, depthMsgs, cameraInfoMsgs, scanMsg, scan3dMsg, odomInfoMsg);
 	}
-	if(depthMsg.get())
+	else // assuming stereo
 	{
-		depthMsgs.push_back(depthMsg);
+		commonStereoCallback(odomMsg, userDataMsg, imageMsg, depthMsg, rgbCameraInfoMsg, depthCameraInfoMsg, scanMsg, scan3dMsg, odomInfoMsg);
 	}
-	cameraInfoMsgs.push_back(cameraInfoMsg);
-	commonDepthCallback(odomMsg, userDataMsg, imageMsgs, depthMsgs, cameraInfoMsgs, scanMsg, scan3dMsg, odomInfoMsg);
+
+
 }
 
 } /* namespace rtabmap_ros */

@@ -118,7 +118,6 @@ private:
 
 	rtabmap::OctoMap * octomap_;
 	int octomapTreeDepth_;
-	double octomapOccupancyThr_;
 
 	rtabmap::ParametersMap parameters_;
 };

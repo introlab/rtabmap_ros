@@ -1,13 +1,19 @@
 
 <launch>  
 
+  <!-- Kinect: -->
+  <include file="$(find freenect_launch)/launch/freenect.launch">
+    <arg name="depth_registration" value="true" />
+  </include>
+
   <arg name="compressed" default="false"/>
 
   <group ns="camera">
     <node pkg="nodelet" type="nodelet" name="rgbd_sync" args="load rtabmap_ros/rgbd_sync camera_nodelet_manager">
-      <remap from="rgb/image"       to="rgb/image_rect_color"/>
-      <remap from="depth/image"     to="depth_registered/image_raw"/>
-      <remap from="rgb/camera_info" to="rgb/camera_info"/>
+      <remap from="rgb/image"         to="rgb/image_rect_color"/>
+      <remap from="depth/image"       to="depth_registered/image_raw"/>
+      <remap from="rgb/camera_info"   to="rgb/camera_info"/>
+      <remap from="depth/camera_info" to="depth_registered/camera_info"/>
     </node>
   </group>
 

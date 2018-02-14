@@ -78,10 +78,11 @@ private:
 			const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg);
 	virtual void commonStereoCallback(
 			const nav_msgs::OdometryConstPtr & odomMsg,
-			const sensor_msgs::ImageConstPtr& leftImageMsg,
-			const sensor_msgs::ImageConstPtr& rightImageMsg,
-			const sensor_msgs::CameraInfoConstPtr& leftCamInfoMsg,
-			const sensor_msgs::CameraInfoConstPtr& rightCamInfoMsg,
+			const rtabmap_ros::UserDataConstPtr & userDataMsg,
+			const cv_bridge::CvImageConstPtr& leftImageMsg,
+			const cv_bridge::CvImageConstPtr& rightImageMsg,
+			const sensor_msgs::CameraInfo& leftCamInfoMsg,
+			const sensor_msgs::CameraInfo& rightCamInfoMsg,
 			const sensor_msgs::LaserScanConstPtr& scan2dMsg,
 			const sensor_msgs::PointCloud2ConstPtr& scan3dMsg,
 			const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg);
