@@ -93,17 +93,40 @@ This section shows how to install RTAB-Map ros-pkg on **ROS Hydro/Indigo/Jade/Ki
 ### Update to new version 
 
 ```bash
+###########
+# rtabmap
+###########
 $ cd rtabmap
 $ git pull origin master
 $ cd build
+
+# We want to do a clean re-install to avoid problems if RTAB-Map's minor version has changed.
+
+# If previously installed in ~/catkin_ws/devel:
+$ make uninstall
+# If previously installed in /usr/local:
+$ sudo make uninstall
+
+$ rm -rf ../build/*
+
+# To install in catkin_ws:
+$ cmake -DCMAKE_INSTALL_PREFIX=~/catkin_ws/devel ..
+# Or this to install in /usr/local:
+$ cmake ..
+
 $ make
 $ make install
 # Do "sudo make install" if you installed rtabmap in "/usr/local"
 
+###########
+# rtabmap_ros
+###########
 $ roscd rtabmap_ros
 $ git pull origin master
 $ cd ~/catkin_ws
-$ catkin_make -j1
+# reset cmake cache
+$ rm -rf build/CMakeCache.txt build/rtabmap_ros
+$ catkin_make -j1 --pkg rtabmap_ros
 ```
 
 
