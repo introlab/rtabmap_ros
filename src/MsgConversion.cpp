@@ -717,10 +717,10 @@ rtabmap::Signature nodeDataFromROS(const rtabmap_ros::NodeData & msg)
 			transformFromPoseMsg(msg.groundTruthPose),
 			stereoModel.isValidForProjection()?
 				rtabmap::SensorData(
-					compressedMatFromBytes(msg.laserScan),
-					rtabmap::LaserScanInfo(
+					rtabmap::LaserScan(compressedMatFromBytes(msg.laserScan),
 							msg.laserScanMaxPts,
 							msg.laserScanMaxRange,
+							(rtabmap::LaserScan::Format)msg.laserScanFormat,
 							transformFromGeometryMsg(msg.laserScanLocalTransform)),
 					compressedMatFromBytes(msg.image),
 					compressedMatFromBytes(msg.depth),
@@ -729,10 +729,10 @@ rtabmap::Signature nodeDataFromROS(const rtabmap_ros::NodeData & msg)
 					msg.stamp,
 					compressedMatFromBytes(msg.userData)):
 				rtabmap::SensorData(
-					compressedMatFromBytes(msg.laserScan),
-					rtabmap::LaserScanInfo(
+					rtabmap::LaserScan(compressedMatFromBytes(msg.laserScan),
 							msg.laserScanMaxPts,
 							msg.laserScanMaxRange,
+							(rtabmap::LaserScan::Format)msg.laserScanFormat,
 							transformFromGeometryMsg(msg.laserScanLocalTransform)),
 					compressedMatFromBytes(msg.image),
 					compressedMatFromBytes(msg.depth),
@@ -770,16 +770,17 @@ void nodeDataToROS(const rtabmap::Signature & signature, rtabmap_ros::NodeData &
 	msg.gps.bearing = signature.sensorData().gps().bearing();
 	compressedMatToBytes(signature.sensorData().imageCompressed(), msg.image);
 	compressedMatToBytes(signature.sensorData().depthOrRightCompressed(), msg.depth);
-	compressedMatToBytes(signature.sensorData().laserScanCompressed(), msg.laserScan);
+	compressedMatToBytes(signature.sensorData().laserScanCompressed().data(), msg.laserScan);
 	compressedMatToBytes(signature.sensorData().userDataCompressed(), msg.userData);
 	compressedMatToBytes(signature.sensorData().gridGroundCellsCompressed(), msg.grid_ground);
 	compressedMatToBytes(signature.sensorData().gridObstacleCellsCompressed(), msg.grid_obstacles);
 	compressedMatToBytes(signature.sensorData().gridEmptyCellsCompressed(), msg.grid_empty_cells);
 	point3fToROS(signature.sensorData().gridViewPoint(), msg.grid_view_point);
 	msg.grid_cell_size = signature.sensorData().gridCellSize();
-	msg.laserScanMaxPts = signature.sensorData().laserScanInfo().maxPoints();
-	msg.laserScanMaxRange = signature.sensorData().laserScanInfo().maxRange();
-	transformToGeometryMsg(signature.sensorData().laserScanInfo().localTransform(), msg.laserScanLocalTransform);
+	msg.laserScanMaxPts = signature.sensorData().laserScanCompressed().maxPoints();
+	msg.laserScanMaxRange = signature.sensorData().laserScanCompressed().maxRange();
+	msg.laserScanFormat = signature.sensorData().laserScanCompressed().format();
+	transformToGeometryMsg(signature.sensorData().laserScanCompressed().localTransform(), msg.laserScanLocalTransform);
 	msg.baseline = 0;
 	if(signature.sensorData().cameraModels().size())
 	{
@@ -958,7 +959,7 @@ rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::OdomInfo & msg)
 		info.localMap.insert(std::make_pair(msg.localMapKeys[i], point3fFromROS(msg.localMapValues[i])));
 	}
 
-	info.localScanMap = rtabmap::uncompressData(msg.localScanMap);
+	info.localScanMap = rtabmap::LaserScan::backwardCompatibility(rtabmap::uncompressData(msg.localScanMap));
 
 	return info;
 }
@@ -1009,7 +1010,7 @@ void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_ros::OdomInfo & m
 	msg.localMapKeys = uKeys(info.localMap);
 	points3fToROS(uValues(info.localMap), msg.localMapValues);
 
-	msg.localScanMap = rtabmap::compressData(info.localScanMap);
+	msg.localScanMap = rtabmap::compressData(info.localScanMap.data());
 }
 
 cv::Mat userDataFromROS(const rtabmap_ros::UserData & dataMsg)

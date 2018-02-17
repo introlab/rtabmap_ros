@@ -38,6 +38,7 @@ geometry_msgs/Transform[] localTransform
 uint8[] laserScan
 int32 laserScanMaxPts
 float32 laserScanMaxRange
+int32 laserScanFormat
 geometry_msgs/Transform laserScanLocalTransform
 
 # compressed user data

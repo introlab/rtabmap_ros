@@ -1033,7 +1033,7 @@ void CoreWrapper::commonDepthCallbackImpl(
 		if(rtabmap_.getMemory() && uStrNumCmp(rtabmap_.getMemory()->getDatabaseVersion(), "0.11.10") < 0)
 		{
 			// backward compatibility, project 2D scan in /base_link frame
-			scan = util3d::transformLaserScan(scan, scanLocalTransform);
+			scan = util3d::transformLaserScan(LaserScan::backwardCompatibility(scan), scanLocalTransform).data();
 			scanLocalTransform = Transform::getIdentity();
 		}
 	}
@@ -1076,8 +1076,7 @@ void CoreWrapper::commonDepthCallbackImpl(
 		userData_ = cv::Mat();
 	}
 
-	SensorData data(scan,
-			LaserScanInfo(
+	SensorData data(LaserScan::backwardCompatibility(scan,
 					scan2dMsg.get() != 0?(int)scan2dMsg->ranges.size():(genScan_?genMaxScanPts:scan3dMsg.get() != 0?scanCloudMaxPoints_:0),
 					scan2dMsg.get() != 0?scan2dMsg->range_max:(genScan_?genScanMaxDepth_:0.0f),
 					scanLocalTransform),
@@ -1280,7 +1279,7 @@ void CoreWrapper::commonStereoCallback(
 		if(rtabmap_.getMemory() && uStrNumCmp(rtabmap_.getMemory()->getDatabaseVersion(), "0.11.10") < 0)
 		{
 			// backward compatibility, project 2D scan in /base_link frame
-			scan = util3d::transformLaserScan(scan, scanLocalTransform);
+			scan = util3d::transformLaserScan(LaserScan::backwardCompatibility(scan), scanLocalTransform).data();
 			scanLocalTransform = Transform::getIdentity();
 		}
 	}
@@ -1323,8 +1322,7 @@ void CoreWrapper::commonStereoCallback(
 		userData_ = cv::Mat();
 	}
 
-	SensorData data(scan,
-			LaserScanInfo(
+	SensorData data(LaserScan::backwardCompatibility(scan,
 					scan2dMsg.get() != 0?(int)scan2dMsg->ranges.size():scan3dMsg.get() != 0?scanCloudMaxPoints_:0,
 					scan2dMsg.get() != 0?scan2dMsg->range_max:0,
 					scanLocalTransform),
@@ -1451,7 +1449,7 @@ void CoreWrapper::process(
 					rtabmap_.getMemory()->getLastSignatureId() != filteredPoses.rbegin()->first ||
 					rtabmap_.getMemory()->getLastWorkingSignature() == 0 ||
 					rtabmap_.getMemory()->getLastWorkingSignature()->sensorData().gridCellSize() == 0 ||
-					(!mapsManager_.getOccupancyGrid()->isGridFromDepth() && data.laserScanRaw().channels() == 2)) // 2d laser scan would fill empty space for latest data
+					(!mapsManager_.getOccupancyGrid()->isGridFromDepth() && data.laserScanRaw().is2d())) // 2d laser scan would fill empty space for latest data
 				{
 					SensorData tmpData = data;
 					tmpData.setId(-1);

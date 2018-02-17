@@ -468,7 +468,8 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 						cv::Mat ground, obstacles, emptyCells;
 						if(iter->first > 0)
 						{
-							cv::Mat rgb, depth, scan;
+							cv::Mat rgb, depth;
+							LaserScan scan;
 							bool generateGrid = data.gridCellSize() == 0.0f;
 							static bool warningShown = false;
 							if(occupancySavedInDB && generateGrid && !warningShown)
@@ -522,7 +523,8 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 								occupancyGrid_->parseParameters(parameters);
 							}
 
-							cv::Mat rgb, depth, scan;
+							cv::Mat rgb, depth;
+							LaserScan scan;
 							bool generateGrid = data.gridCellSize() == 0.0f || (unknownSpaceFilled != negativeScanEmptyRayTracing_ && negativeScanEmptyRayTracing_);
 							data.uncompressData(
 								occupancyGrid_->isGridFromDepth() && generateGrid?&rgb:0,
@@ -892,7 +894,7 @@ void MapsManager::publishMaps(
 				}
 				if(jter!=gridMaps_.end() && jter->second.first.first.cols)
 				{
-					pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::laserScanToPointCloudRGB(jter->second.first.first, iter->second, 0, 255, 0);
+					pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::laserScanToPointCloudRGB(LaserScan::backwardCompatibility(jter->second.first.first), iter->second, 0, 255, 0);
 					pcl::PointCloud<pcl::PointXYZRGB>::Ptr subtractedCloud = transformed;
 					if(cloudSubtractFiltering_)
 					{
@@ -939,7 +941,7 @@ void MapsManager::publishMaps(
 				}
 				if(jter!=gridMaps_.end() && jter->second.first.second.cols)
 				{
-					pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::laserScanToPointCloudRGB(jter->second.first.second, iter->second, 255, 0, 0);
+					pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::laserScanToPointCloudRGB(LaserScan::backwardCompatibility(jter->second.first.second), iter->second, 255, 0, 0);
 					pcl::PointCloud<pcl::PointXYZRGB>::Ptr subtractedCloud = transformed;
 					if(cloudSubtractFiltering_)
 					{

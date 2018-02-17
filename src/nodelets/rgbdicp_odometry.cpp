@@ -402,8 +402,7 @@ private:
 				}
 
 				rtabmap::SensorData data(
-						scan,
-						LaserScanInfo(
+						LaserScan::backwardCompatibility(scan,
 								scanMsg.get() != 0 || cloudMsg.get() != 0?maxLaserScans:0,
 								scanMsg.get() != 0?scanMsg->range_max:0,
 								localScanTransform),

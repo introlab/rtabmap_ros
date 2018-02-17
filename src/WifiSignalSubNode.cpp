@@ -30,6 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <ros/subscriber.h>
 
 #include <rtabmap/utilite/UStl.h>
+#include <rtabmap/utilite/ULogger.h>
 #include <rtabmap/core/util3d_transforms.h>
 
 #include <rtabmap_ros/MapData.h>

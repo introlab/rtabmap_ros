@@ -232,8 +232,7 @@ private:
 		}
 
 		rtabmap::SensorData data(
-				scan,
-				LaserScanInfo(maxLaserScans, scanMsg->range_max, localScanTransform),
+				LaserScan::backwardCompatibility(scan, maxLaserScans, scanMsg->range_max, localScanTransform),
 				cv::Mat(),
 				cv::Mat(),
 				CameraModel(),
@@ -321,8 +320,7 @@ private:
 		}
 
 		rtabmap::SensorData data(
-				scan,
-				LaserScanInfo(maxLaserScans, 0, localScanTransform),
+				LaserScan::backwardCompatibility(scan, maxLaserScans, 0, localScanTransform),
 				cv::Mat(),
 				cv::Mat(),
 				CameraModel(),

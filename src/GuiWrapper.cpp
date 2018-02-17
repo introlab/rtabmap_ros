@@ -572,8 +572,7 @@ void GuiWrapper::commonDepthCallback(
 	info.reg.covariance = covariance;
 	rtabmap::OdometryEvent odomEvent(
 		rtabmap::SensorData(
-				scan,
-				LaserScanInfo(
+				LaserScan::backwardCompatibility(scan,
 						scan2dMsg.get()?(int)scan2dMsg->ranges.size():0,
 						scan2dMsg.get()?(int)scan2dMsg->range_max:0,
 						scanLocalTransform),
@@ -728,8 +727,7 @@ void GuiWrapper::commonStereoCallback(
 	info.reg.covariance = covariance;
 	rtabmap::OdometryEvent odomEvent(
 		rtabmap::SensorData(
-				scan,
-				LaserScanInfo(
+				LaserScan::backwardCompatibility(scan,
 						scan2dMsg.get()?(int)scan2dMsg->ranges.size():0,
 						scan2dMsg.get()?(int)scan2dMsg->range_max:0,
 						scanLocalTransform),
