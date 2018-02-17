@@ -31,6 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <zlib.h>
 #include <ros/ros.h>
 #include <rtabmap/core/util3d.h>
+#include <rtabmap/core/util3d_transforms.h>
 #include <rtabmap/core/util3d_filtering.h>
 #include <rtabmap/core/Compression.h>
 #include <rtabmap/utilite/UStl.h>
@@ -1010,7 +1011,7 @@ void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_ros::OdomInfo & m
 	msg.localMapKeys = uKeys(info.localMap);
 	points3fToROS(uValues(info.localMap), msg.localMapValues);
 
-	msg.localScanMap = rtabmap::compressData(info.localScanMap.data());
+	msg.localScanMap = rtabmap::compressData(rtabmap::util3d::transformLaserScan(info.localScanMap, info.localScanMap.localTransform()).data());
 }
 
 cv::Mat userDataFromROS(const rtabmap_ros::UserData & dataMsg)
