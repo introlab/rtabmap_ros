@@ -55,7 +55,7 @@
   <arg name="rgb_topic"               default="/camera/rgb/image_rect_color" />
   <arg name="depth_topic"             default="/camera/depth_registered/image_raw" />
   <arg name="camera_info_topic"       default="/camera/rgb/camera_info" />
-  <arg name="depth_camera_info_topic" default="/camera/depth_registered/camera_info" />
+  <arg name="depth_camera_info_topic" default="$(arg camera_info_topic)" />
   
   <!-- stereo related topics -->
   <arg name="stereo_namespace"        default="/stereo_camera"/>

@@ -275,10 +275,6 @@ private:
 				pclScan = util3d::downsample(pclScan, scanDownsamplingStep_);
 				maxLaserScans /= scanDownsamplingStep_;
 			}
-			if(!pclScan->is_dense)
-			{
-				pclScan = util3d::removeNaNNormalsFromPointCloud(pclScan);
-			}
 			scan = util3d::laserScanFromPointCloud(*pclScan);
 		}
 		else

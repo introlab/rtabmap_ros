@@ -600,12 +600,12 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 			sensor_msgs::PointCloud2 cloudMsg;
 			if(info.localScanMap.hasNormals())
 			{
-				pcl::PointCloud<pcl::PointNormal>::Ptr cloud = util3d::laserScanToPointCloudNormal(info.localScanMap);
+				pcl::PointCloud<pcl::PointNormal>::Ptr cloud = util3d::laserScanToPointCloudNormal(info.localScanMap, info.localScanMap.localTransform());
 				pcl::toROSMsg(*cloud, cloudMsg);
 			}
 			else
 			{
-				pcl::PointCloud<pcl::PointXYZ>::Ptr cloud = util3d::laserScanToPointCloud(info.localScanMap);
+				pcl::PointCloud<pcl::PointXYZ>::Ptr cloud = util3d::laserScanToPointCloud(info.localScanMap, info.localScanMap.localTransform());
 				pcl::toROSMsg(*cloud, cloudMsg);
 			}
 
