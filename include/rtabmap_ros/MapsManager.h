@@ -97,6 +97,8 @@ private:
 	ros::Publisher octoMapPubBin_;
 	ros::Publisher octoMapPubFull_;
 	ros::Publisher octoMapCloud_;
+	ros::Publisher octoMapGroundCloud_;
+	ros::Publisher octoMapObstacleCloud_;
 	ros::Publisher octoMapEmptySpace_;
 	ros::Publisher octoMapProj_;
 

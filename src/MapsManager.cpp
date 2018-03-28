@@ -152,6 +152,8 @@ void MapsManager::init(ros::NodeHandle & nh, ros::NodeHandle & pnh, const std::s
 	octoMapPubBin_ = nht->advertise<octomap_msgs::Octomap>("octomap_binary", 1, latch);
 	octoMapPubFull_ = nht->advertise<octomap_msgs::Octomap>("octomap_full", 1, latch);
 	octoMapCloud_ = nht->advertise<sensor_msgs::PointCloud2>("octomap_occupied_space", 1, latch);
+	octoMapObstacleCloud_ = nht->advertise<sensor_msgs::PointCloud2>("octomap_obstacles", 1, latch);
+	octoMapGroundCloud_ = nht->advertise<sensor_msgs::PointCloud2>("octomap_ground", 1, latch);
 	octoMapEmptySpace_ = nht->advertise<sensor_msgs::PointCloud2>("octomap_empty_space", 1, latch);
 	octoMapProj_ = nht->advertise<nav_msgs::OccupancyGrid>("octomap_grid", 1, latch);
 #endif
@@ -319,6 +321,8 @@ bool MapsManager::hasSubscribers() const
 			octoMapPubBin_.getNumSubscribers() != 0 ||
 			octoMapPubFull_.getNumSubscribers() != 0 ||
 			octoMapCloud_.getNumSubscribers() != 0 ||
+			octoMapObstacleCloud_.getNumSubscribers() != 0 ||
+			octoMapGroundCloud_.getNumSubscribers() != 0 ||
 			octoMapEmptySpace_.getNumSubscribers() != 0 ||
 			octoMapProj_.getNumSubscribers() != 0;
 }
@@ -349,6 +353,8 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 				octoMapPubBin_.getNumSubscribers() != 0 ||
 				octoMapPubFull_.getNumSubscribers() != 0 ||
 				octoMapCloud_.getNumSubscribers() != 0 ||
+				octoMapObstacleCloud_.getNumSubscribers() != 0 ||
+				octoMapGroundCloud_.getNumSubscribers() != 0 ||
 				octoMapEmptySpace_.getNumSubscribers() != 0 ||
 				octoMapProj_.getNumSubscribers() != 0;
 
@@ -1049,6 +1055,8 @@ void MapsManager::publishMaps(
 	if(octoMapPubBin_.getNumSubscribers() ||
 			octoMapPubFull_.getNumSubscribers() ||
 			octoMapCloud_.getNumSubscribers() ||
+			octoMapObstacleCloud_.getNumSubscribers() ||
+			octoMapGroundCloud_.getNumSubscribers() ||
 			octoMapEmptySpace_.getNumSubscribers() ||
 			octoMapProj_.getNumSubscribers())
 	{
@@ -1068,21 +1076,44 @@ void MapsManager::publishMaps(
 			msg.header.stamp = stamp;
 			octoMapPubFull_.publish(msg);
 		}
-		if(octoMapCloud_.getNumSubscribers() || octoMapEmptySpace_.getNumSubscribers())
+		if(octoMapCloud_.getNumSubscribers() ||
+			octoMapObstacleCloud_.getNumSubscribers() ||
+			octoMapGroundCloud_.getNumSubscribers() ||
+			octoMapEmptySpace_.getNumSubscribers())
 		{
 			sensor_msgs::PointCloud2 msg;
 			pcl::IndicesPtr obstacleIndices(new std::vector<int>);
 			pcl::IndicesPtr emptyIndices(new std::vector<int>);
-			pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = octomap_->createCloud(octomapTreeDepth_, obstacleIndices.get(), emptyIndices.get());
+			pcl::IndicesPtr groundIndices(new std::vector<int>);
+			pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = octomap_->createCloud(octomapTreeDepth_, obstacleIndices.get(), emptyIndices.get(), groundIndices.get());
 
 			if(octoMapCloud_.getNumSubscribers())
+			{
+				pcl::PointCloud<pcl::PointXYZRGB> cloudOccupiedSpace;
+				pcl::IndicesPtr indices = util3d::concatenate(obstacleIndices, groundIndices);
+				pcl::copyPointCloud(*cloud, *indices, cloudOccupiedSpace);
+				pcl::toROSMsg(cloudOccupiedSpace, msg);
+				msg.header.frame_id = mapFrameId;
+				msg.header.stamp = stamp;
+				octoMapCloud_.publish(msg);
+			}
+			if(octoMapObstacleCloud_.getNumSubscribers())
 			{
 				pcl::PointCloud<pcl::PointXYZRGB> cloudObstacles;
 				pcl::copyPointCloud(*cloud, *obstacleIndices, cloudObstacles);
 				pcl::toROSMsg(cloudObstacles, msg);
 				msg.header.frame_id = mapFrameId;
 				msg.header.stamp = stamp;
-				octoMapCloud_.publish(msg);
+				octoMapObstacleCloud_.publish(msg);
+			}
+			if(octoMapGroundCloud_.getNumSubscribers())
+			{
+				pcl::PointCloud<pcl::PointXYZRGB> cloudGround;
+				pcl::copyPointCloud(*cloud, *groundIndices, cloudGround);
+				pcl::toROSMsg(cloudGround, msg);
+				msg.header.frame_id = mapFrameId;
+				msg.header.stamp = stamp;
+				octoMapGroundCloud_.publish(msg);
 			}
 			if(octoMapEmptySpace_.getNumSubscribers())
 			{
