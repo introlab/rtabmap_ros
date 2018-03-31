@@ -527,7 +527,10 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 			odom.twist.covariance.at(35) = setTwist?info.reg.covariance.at<double>(5,5):BAD_COVARIANCE; // yawyaw
 
 			//publish the message
-			odomPub_.publish(odom);
+			if(setTwist || publishNullWhenLost_)
+			{
+				odomPub_.publish(odom);
+			}
 		}
 
 		// local map / reference frame
