@@ -346,6 +346,13 @@ void CoreWrapper::onInit()
 				Parameters::kGridFromDepth().c_str());
 		parameters_.insert(ParametersPair(Parameters::kGridFromDepth(), "false"));
 	}
+	if((subscribeScan2d || subscribeScan3d) && parameters_.find(Parameters::kGridRangeMax()) == parameters_.end())
+	{
+		NODELET_INFO("Setting \"%s\" parameter to 0 (default %f) as \"subscribe_scan\" or \"subscribe_scan_cloud\" is true.",
+				Parameters::kGridRangeMax().c_str(),
+				Parameters::defaultGridRangeMax());
+		parameters_.insert(ParametersPair(Parameters::kGridRangeMax(), "0"));
+	}
 	int regStrategy = Parameters::defaultRegStrategy();
 	Parameters::parse(parameters_, Parameters::kRegStrategy(), regStrategy);
 	if(subscribeScan2d &&
@@ -464,6 +471,16 @@ void CoreWrapper::onInit()
 
 	// Init RTAB-Map
 	rtabmap_.init(parameters_, databasePath_);
+
+	if(rtabmap_.getMemory())
+	{
+		float xMin, yMin, gridCellSize;
+		cv::Mat map = rtabmap_.getMemory()->load2DMap(xMin, yMin, gridCellSize);
+		if(!map.empty())
+		{
+			mapsManager_.set2DMap(map, xMin, yMin, gridCellSize, rtabmap_.getLocalOptimizedPoses());
+		}
+	}
 
 	if(databasePath_.size() && rtabmap_.getMemory())
 	{
@@ -623,6 +640,17 @@ CoreWrapper::~CoreWrapper()
 	nh.deleteParam("is_rtabmap_paused");
 
 	printf("rtabmap: Saving database/long-term memory... (located at %s)\n", databasePath_.c_str());
+	if(rtabmap_.getMemory())
+	{
+		// save the grid map
+		float xMin=0.0f, yMin=0.0f, gridCellSize = 0.05f;
+		cv::Mat pixels = mapsManager_.getGridMap(xMin, yMin, gridCellSize);
+		if(!pixels.empty())
+		{
+			rtabmap_.getMemory()->save2DMap(pixels, xMin, yMin, gridCellSize);
+		}
+	}
+
 	rtabmap_.close();
 	printf("rtabmap: Saving database/long-term memory...done! (located at %s, %ld MB)\n", databasePath_.c_str(), UFile::length(databasePath_)/(1024*1024));
 }
@@ -2031,57 +2059,33 @@ bool CoreWrapper::getGridMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::
 
 bool CoreWrapper::getMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::GetMap::Response &res)
 {
-	std::map<int, rtabmap::Transform> filteredPoses = rtabmap_.getLocalOptimizedPoses();
-	if(maxMappingNodes_ > 0 && filteredPoses.size()>1)
+	// create the grid map
+	float xMin=0.0f, yMin=0.0f, gridCellSize = 0.05f;
+	cv::Mat pixels = mapsManager_.getGridMap(xMin, yMin, gridCellSize);
+
+	if(!pixels.empty())
 	{
-		std::map<int, Transform> nearestPoses;
-		std::vector<int> nodes = graph::findNearestNodes(filteredPoses, filteredPoses.rbegin()->second, maxMappingNodes_);
-		for(std::vector<int>::iterator iter=nodes.begin(); iter!=nodes.end(); ++iter)
-		{
-			std::map<int, Transform>::iterator pter = filteredPoses.find(*iter);
-			if(pter != filteredPoses.end())
-			{
-				nearestPoses.insert(*pter);
-			}
-		}
-		filteredPoses = nearestPoses;
-	}
+		//init
+		res.map.info.resolution = gridCellSize;
+		res.map.info.origin.position.x = 0.0;
+		res.map.info.origin.position.y = 0.0;
+		res.map.info.origin.position.z = 0.0;
+		res.map.info.origin.orientation.x = 0.0;
+		res.map.info.origin.orientation.y = 0.0;
+		res.map.info.origin.orientation.z = 0.0;
+		res.map.info.origin.orientation.w = 1.0;
 
-	filteredPoses = mapsManager_.updateMapCaches(
-			filteredPoses,
-			rtabmap_.getMemory(),
-			true,
-			false);
-	if(filteredPoses.size())
-	{
-		// create the grid map
-		float xMin=0.0f, yMin=0.0f, gridCellSize = 0.05f;
-		cv::Mat pixels = mapsManager_.getGridMap(filteredPoses, xMin, yMin, gridCellSize);
+		res.map.info.width = pixels.cols;
+		res.map.info.height = pixels.rows;
+		res.map.info.origin.position.x = xMin;
+		res.map.info.origin.position.y = yMin;
+		res.map.data.resize(res.map.info.width * res.map.info.height);
 
-		if(!pixels.empty())
-		{
-			//init
-			res.map.info.resolution = gridCellSize;
-			res.map.info.origin.position.x = 0.0;
-			res.map.info.origin.position.y = 0.0;
-			res.map.info.origin.position.z = 0.0;
-			res.map.info.origin.orientation.x = 0.0;
-			res.map.info.origin.orientation.y = 0.0;
-			res.map.info.origin.orientation.z = 0.0;
-			res.map.info.origin.orientation.w = 1.0;
+		memcpy(res.map.data.data(), pixels.data, res.map.info.width * res.map.info.height);
 
-			res.map.info.width = pixels.cols;
-			res.map.info.height = pixels.rows;
-			res.map.info.origin.position.x = xMin;
-			res.map.info.origin.position.y = yMin;
-			res.map.data.resize(res.map.info.width * res.map.info.height);
-
-			memcpy(res.map.data.data(), pixels.data, res.map.info.width * res.map.info.height);
-
-			res.map.header.frame_id = mapFrameId_;
-			res.map.header.stamp = ros::Time::now();
-			return true;
-		}
+		res.map.header.frame_id = mapFrameId_;
+		res.map.header.stamp = ros::Time::now();
+		return true;
 	}
 	return false;
 }

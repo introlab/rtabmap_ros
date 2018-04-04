@@ -18,9 +18,12 @@ find_package(rviz)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
-find_package(RTABMap 0.16.3 REQUIRED)
+find_package(RTABMap 0.17.0 REQUIRED)
 
 find_package(OpenCV REQUIRED)
+
+find_package(PCL 1.7 REQUIRED)
+add_definitions(${PCL_DEFINITIONS}) # To include -march=native if set
 
 #Qt stuff
 # If librtabmap_gui.so is found, rtabmapviz will be built

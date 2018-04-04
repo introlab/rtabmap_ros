@@ -52,6 +52,7 @@ public:
 	bool hasSubscribers() const;
 	void backwardCompatibilityParameters(ros::NodeHandle & pnh, rtabmap::ParametersMap & parameters) const;
 	void setParameters(const rtabmap::ParametersMap & parameters);
+	void set2DMap(const cv::Mat & map, float xMin, float yMin, float cellSize, const std::map<int, rtabmap::Transform> & poses);
 
 	std::map<int, rtabmap::Transform> getFilteredPoses(
 			const std::map<int, rtabmap::Transform> & poses);
@@ -69,7 +70,6 @@ public:
 			const std::string & mapFrameId);
 
 	cv::Mat getGridMap(
-			const std::map<int, rtabmap::Transform> & filteredPoses,
 			float & xMin,
 			float & yMin,
 			float & gridCellSize);

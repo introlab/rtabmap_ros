@@ -290,6 +290,11 @@ void MapsManager::setParameters(const rtabmap::ParametersMap & parameters)
 #endif
 }
 
+void MapsManager::set2DMap(const cv::Mat & map, float xMin, float yMin, float cellSize, const std::map<int, rtabmap::Transform> & poses)
+{
+	occupancyGrid_->setMap(map, xMin, yMin, cellSize, poses);
+}
+
 void MapsManager::clear()
 {
 	gridMaps_.clear();
@@ -1195,7 +1200,7 @@ void MapsManager::publishMaps(
 
 		// create the grid map
 		float xMin=0.0f, yMin=0.0f, gridCellSize = 0.05f;
-		cv::Mat pixels = this->getGridMap(poses, xMin, yMin, gridCellSize);
+		cv::Mat pixels = this->getGridMap(xMin, yMin, gridCellSize);
 
 		if(!pixels.empty())
 		{
@@ -1244,7 +1249,6 @@ void MapsManager::publishMaps(
 }
 
 cv::Mat MapsManager::getGridMap(
-		const std::map<int, rtabmap::Transform> & poses,
 		float & xMin,
 		float & yMin,
 		float & gridCellSize)
