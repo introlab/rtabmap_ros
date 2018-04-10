@@ -45,13 +45,13 @@ IF(RTABMAP_GUI OR rviz_FOUND)
       ENDIF()
    ENDIF()   
 ENDIF(RTABMAP_GUI OR rviz_FOUND)
-
-## We also use Ogre
-include($ENV{ROS_ROOT}/core/rosbuild/FindPkgConfig.cmake)
-pkg_check_modules(OGRE OGRE)
-include_directories( ${OGRE_INCLUDE_DIRS} )
-link_directories( ${OGRE_LIBRARY_DIRS} )
-
+IF(rviz_FOUND)
+   ## We also use Ogre for rviz plugins
+   include($ENV{ROS_ROOT}/core/rosbuild/FindPkgConfig.cmake)
+   pkg_check_modules(OGRE OGRE)
+   include_directories( ${OGRE_INCLUDE_DIRS} )
+   link_directories( ${OGRE_LIBRARY_DIRS} )
+ENDIF(rviz_FOUND)
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
