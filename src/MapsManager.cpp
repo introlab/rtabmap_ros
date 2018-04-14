@@ -258,7 +258,6 @@ void MapsManager::backwardCompatibilityParameters(ros::NodeHandle & pnh, Paramet
 	parameterMoved(pnh, "proj_detect_flat_obstacles", Parameters::kGridFlatObstacleDetected(), parameters);
 	parameterMoved(pnh, "proj_map_frame", Parameters::kGridMapFrameProjection(), parameters);
 	parameterMoved(pnh, "grid_unknown_space_filled", Parameters::kGridScan2dUnknownSpaceFilled(), parameters);
-	parameterMoved(pnh, "grid_unknown_space_filled_max_range", Parameters::kGridScan2dMaxFilledRange(), parameters);
 	parameterMoved(pnh, "grid_cell_size", Parameters::kGridCellSize(), parameters);
 	parameterMoved(pnh, "grid_incremental", Parameters::kGridGlobalFullUpdate(), parameters);
 	parameterMoved(pnh, "grid_size", Parameters::kGridGlobalMinSize(), parameters);
