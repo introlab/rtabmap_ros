@@ -495,7 +495,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 										"save them back in the database for next sessions. This warning is only shown once.",
 										data.id(), Parameters::kRGBDCreateOccupancyGrid().c_str());
 							}
-							if(occupancySavedInDB)
+							if(memory && occupancySavedInDB)
 							{
 								// if we are here, it is because we loaded a database with old nodes not having occupancy grid set
 								// try reload again
