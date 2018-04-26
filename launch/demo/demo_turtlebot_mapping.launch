@@ -87,6 +87,8 @@
 	  <param name="Optimizer/Slam2D"             type="string" value="true"/>
 	  <param name="Reg/Force3DoF"                type="string" value="true"/>
 	  <param name="GridGlobal/MinSize"           type="string" value="20"/>
+          <param name="RGBD/OptimizeMaxError"        type="string" value="0.1"/>
+
 	  
 	  <!-- localization mode -->
 	  <param     if="$(arg localization)" name="Mem/IncrementalMemory" type="string" value="false"/>
