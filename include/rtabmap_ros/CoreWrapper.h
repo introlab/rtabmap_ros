@@ -121,6 +121,8 @@ private:
 	void userDataAsyncCallback(const rtabmap_ros::UserDataConstPtr & dataMsg);
 	void globalPoseAsyncCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr & globalPoseMsg);
 
+	void initialPoseCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr & msg);
+
 	void goalCommonCallback(int id, const std::string & label, const rtabmap::Transform & pose, const ros::Time & stamp, double * planningTime = 0);
 	void goalCallback(const geometry_msgs::PoseStampedConstPtr & msg);
 	void goalNodeCallback(const rtabmap_ros::GoalConstPtr & msg);
@@ -198,6 +200,7 @@ private:
 	bool waitForTransform_;
 	double waitForTransformDuration_;
 	bool useActionForGoal_;
+	bool useSavedMap_;
 	bool genScan_;
 	double genScanMaxDepth_;
 	double genScanMinDepth_;
@@ -213,6 +216,7 @@ private:
 	ros::Publisher mapGraphPub_;
 	ros::Publisher labelsPub_;
 	ros::Publisher mapPathPub_;
+	ros::Subscriber initialPoseSub_;
 
 	//Planning stuff
 	ros::Subscriber goalSub_;

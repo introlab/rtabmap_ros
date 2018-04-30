@@ -99,6 +99,7 @@ CoreWrapper::CoreWrapper() :
 		waitForTransform_(true),
 		waitForTransformDuration_(0.2), // 200 ms
 		useActionForGoal_(false),
+		useSavedMap_(true),
 		genScan_(false),
 		genScanMaxDepth_(4.0),
 		genScanMinDepth_(0.0),
@@ -158,6 +159,7 @@ void CoreWrapper::onInit()
 	pnh.param("wait_for_transform",  waitForTransform_, waitForTransform_);
 	pnh.param("wait_for_transform_duration",  waitForTransformDuration_, waitForTransformDuration_);
 	pnh.param("use_action_for_goal", useActionForGoal_, useActionForGoal_);
+	pnh.param("use_saved_map", useSavedMap_, useSavedMap_);
 	pnh.param("gen_scan",            genScan_, genScan_);
 	pnh.param("gen_scan_max_depth",  genScanMaxDepth_, genScanMaxDepth_);
 	pnh.param("gen_scan_min_depth",  genScanMinDepth_, genScanMinDepth_);
@@ -208,6 +210,7 @@ void CoreWrapper::onInit()
 	mapGraphPub_ = nh.advertise<rtabmap_ros::MapGraph>("mapGraph", 1);
 	labelsPub_ = nh.advertise<visualization_msgs::MarkerArray>("labels", 1);
 	mapPathPub_ = nh.advertise<nav_msgs::Path>("mapPath", 1);
+	initialPoseSub_ = nh.subscribe("initialpose", 1, &CoreWrapper::initialPoseCallback, this);
 
 	// planning topics
 	goalSub_ = nh.subscribe("goal", 1, &CoreWrapper::goalCallback, this);
@@ -472,7 +475,7 @@ void CoreWrapper::onInit()
 	// Init RTAB-Map
 	rtabmap_.init(parameters_, databasePath_);
 
-	if(rtabmap_.getMemory())
+	if(rtabmap_.getMemory() && useSavedMap_)
 	{
 		float xMin, yMin, gridCellSize;
 		cv::Mat map = rtabmap_.getMemory()->load2DMap(xMin, yMin, gridCellSize);
@@ -1660,6 +1663,18 @@ void CoreWrapper::globalPoseAsyncCallback(const geometry_msgs::PoseWithCovarianc
 	{
 		globalPose_ = *globalPoseMsg;
 	}
+}
+
+void CoreWrapper::initialPoseCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr & msg)
+{
+	Transform intialPose = rtabmap_ros::transformFromPoseMsg(msg->pose.pose);
+	if(intialPose.isNull())
+	{
+		NODELET_ERROR("Pose received is null!");
+		return;
+	}
+
+	rtabmap_.setInitialPose(intialPose);
 }
 
 void CoreWrapper::goalCommonCallback(

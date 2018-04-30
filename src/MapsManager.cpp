@@ -433,6 +433,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 		}
 
 		bool longUpdate = false;
+		UTimer longUpdateTimer;
 		if(filteredPoses.size() > 20)
 		{
 			if(updateGridCache && gridMaps_.size() < 5)
@@ -685,7 +686,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 
 		if(longUpdate)
 		{
-			ROS_WARN("Map(s) updated!");
+			ROS_WARN("Map(s) updated! (%f s)", longUpdateTimer.ticks());
 		}
 	}
 
