@@ -129,14 +129,34 @@ private:
 			++iter)
 		{
 			std::string vStr;
+			bool vBool;
+			int vInt;
+			double vDouble;
+			std::string paramValue;
 			if(pnh.getParam(iter->first, vStr))
+			{
+				paramValue = vStr;
+			}
+			else if(pnh.getParam(iter->first, vBool))
+			{
+				paramValue = uBool2Str(vBool);
+			}
+			else if(pnh.getParam(iter->first, vDouble))
+			{
+				paramValue = uNumber2Str(vDouble);
+			}
+			else if(pnh.getParam(iter->first, vInt))
+			{
+				paramValue = uNumber2Str(vInt);
+			}
+			if(!paramValue.empty())
 			{
 				if(iter->second.first)
 				{
 					// can be migrated
-					uInsert(parameters, rtabmap::ParametersPair(iter->second.second, vStr));
+					uInsert(parameters, rtabmap::ParametersPair(iter->second.second, paramValue));
 					NODELET_ERROR("obstacles_detection: Parameter name changed: \"%s\" -> \"%s\". Please update your launch file accordingly. Value \"%s\" is still set to the new parameter name.",
-							iter->first.c_str(), iter->second.second.c_str(), vStr.c_str());
+							iter->first.c_str(), iter->second.second.c_str(), paramValue.c_str());
 				}
 				else
 				{
