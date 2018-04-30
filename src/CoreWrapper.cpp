@@ -478,6 +478,7 @@ void CoreWrapper::onInit()
 		cv::Mat map = rtabmap_.getMemory()->load2DMap(xMin, yMin, gridCellSize);
 		if(!map.empty())
 		{
+			NODELET_INFO("rtabmap: 2D occupancy grid map loaded.\n");
 			mapsManager_.set2DMap(map, xMin, yMin, gridCellSize, rtabmap_.getLocalOptimizedPoses());
 		}
 	}
@@ -647,6 +648,7 @@ CoreWrapper::~CoreWrapper()
 		cv::Mat pixels = mapsManager_.getGridMap(xMin, yMin, gridCellSize);
 		if(!pixels.empty())
 		{
+			printf("rtabmap: 2D occupancy grid map saved.\n");
 			rtabmap_.getMemory()->save2DMap(pixels, xMin, yMin, gridCellSize);
 		}
 	}

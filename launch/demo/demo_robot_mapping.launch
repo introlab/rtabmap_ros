@@ -44,10 +44,11 @@
 	  <param name="Reg/Strategy"              type="string" value="1"/>     <!-- 0=Visual, 1=ICP, 2=Visual+ICP -->
 	  <param name="Vis/InlierDistance"        type="string" value="0.1"/>   <!-- 3D visual words correspondence distance -->
 	  <param name="RGBD/OptimizeFromGraphEnd" type="string" value="false"/> <!-- Optimize graph from initial node so /map -> /odom transform will be generated -->
-	  <param name="Reg/Force3DoF"             type="string" value="true"/>
-	  <param name="Grid/FromDepth"            type="string" value="false"/>
-          <param name="Mem/STMSize"               type="string" value="30"/>    <!--increased to 30 to avoid adding too many loop closures on just seen locations -->
-          <param name="RGBD/LocalRadius"          type="string" value="5"/>     <!--limit length of proximity detections -->
+	  <param name="RGBD/OptimizeMaxError"     type="string" value="2.0"/>	<!-- Reject any loop closure causing large errors (>2x link's covariance) in the map -->
+	  <param name="Reg/Force3DoF"             type="string" value="true"/>  <!-- 2D SLAM -->
+	  <param name="Grid/FromDepth"            type="string" value="false"/> <!-- Create 2D occupancy grid from laser scan -->
+	  <param name="Mem/STMSize"               type="string" value="30"/>    <!-- increased to 30 to avoid adding too many loop closures on just seen locations -->
+	  <param name="RGBD/LocalRadius"          type="string" value="5"/>     <!-- limit length of proximity detections -->
 	  
 	  <!-- localization mode -->
 	  <param     if="$(arg localization)" name="Mem/IncrementalMemory" type="string" value="false"/>
