@@ -17,7 +17,7 @@
    <!-- Choose visualization -->
    <arg name="rviz" default="true" />
    <arg name="rtabmapviz" default="false" />
-   <arg name="local_bundle" default="false" />
+   <arg name="local_bundle" default="true" />
     
    <param name="use_sim_time" type="bool" value="True"/>
    
@@ -56,10 +56,11 @@
          <param name="Vis/MaxDepth"       type="string" value="0"/>
          <param name="Odom/GuessMotion" type="string" value="true"/>
          <param name="Vis/MinInliers"     type="string" value="10"/>
-         <param if="$(arg local_bundle)" name="OdomF2M/BundleAdjustment" type="string" value="1"/>
+         <param unless="$(arg local_bundle)" name="OdomF2M/BundleAdjustment" type="string" value="0"/>
          <param name="OdomF2M/MaxSize"    type="string" value="1000"/> 
          <param name="GFTT/MinDistance"   type="string" value="10"/>
          <param name="GFTT/QualityLevel"  type="string" value="0.00001"/> 
+         <param name="GFTT/QualityLevel"  type="string" value="0.00001"/>
       </node>
    
       <!-- Visual SLAM: args: "delete_db_on_start" and "udebug" -->

@@ -52,10 +52,10 @@
 	<param name="Kp/MaxFeatures"             type="string" value="400"/>
 	<param name="Reg/Force3DoF"              type="string" value="true"/> 
 	<param name="RGBD/OptimizeMaxError"      type="string" value="0.25"/>
-        <param name="Optimizer/Strategy"         type="string" value="0"/>  <!-- TORO is the most stable for multi-session mapping -->
-        <param name="Optimizer/Iterations"       type="string" value="100"/> 
-        <param name="Kp/IncrementalFlann"        type="string" value="false"/>  <!-- Referred paper didn't use incremental FLANN -->
-        <param name="Grid/FromDepth"             type="string" value="false"/>
+	<param name="Optimizer/Strategy"         type="string" value="0"/>  <!-- TORO is the most stable for multi-session mapping -->
+	<param name="Optimizer/Iterations"       type="string" value="100"/> 
+	<param name="Kp/IncrementalFlann"        type="string" value="false"/>  <!-- Referred paper didn't use incremental FLANN -->
+	<param name="Grid/FromDepth"             type="string" value="false"/>
   </node>
   
   <!-- Visualisation RTAB-Map -->

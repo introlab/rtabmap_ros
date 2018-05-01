@@ -33,7 +33,7 @@
 	  <param name="RGBD/ProximityBySpace"     type="string" value="true"/>  <!-- Proximity detection (using estimated position) with locations in WM -->
 	  <param name="Mem/BadSignaturesIgnored"  type="string" value="false"/> <!-- Don't ignore bad images for 3D node creation (e.g. white walls) -->
 	  <param name="Reg/Strategy"              type="string" value="1"/>     <!-- Registration strategy: 0=visual, 1=ICP, 2=visual+ICP -->
-	  <param name="Icp/CorrespondenceRatio"   type="string" value="0.3"/>
+	  <param name="Icp/CorrespondenceRatio"   type="string" value="0.2"/>
 	  <param name="Icp/Iterations"            type="string" value="30"/>
 	  <param name="Icp/VoxelSize"             type="string" value="0.025"/>
 	  <param name="Vis/MinInliers"            type="string" value="10"/>    <!-- 3D visual words minimum inliers to accept loop closure -->
