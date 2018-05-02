@@ -119,7 +119,6 @@
         <remap from="rgb/image"       to="$(arg rgb_topic_relay)"/>
         <remap from="depth/image"     to="$(arg depth_topic_relay)"/>
         <remap from="rgb/camera_info" to="$(arg camera_info_topic)"/>
-        <remap from="depth/camera_info" to="$(arg depth_camera_info_topic)"/>
         <remap from="rgbd_image"      to="$(arg rgbd_topic)"/>
         <param name="approx_sync"     type="bool"   value="$(arg approx_rgbd_sync)"/>
         <param name="queue_size"      type="int"    value="$(arg queue_size)"/>
@@ -130,11 +129,11 @@
       <node if="$(arg compressed)" name="republish_left"  type="republish" pkg="image_transport" args="compressed in:=$(arg left_image_topic) raw out:=$(arg left_image_topic_relay)" />
       <node if="$(arg compressed)" name="republish_right" type="republish" pkg="image_transport" args="compressed in:=$(arg right_image_topic) raw out:=$(arg right_image_topic_relay)" />
     
-      <node if="$(arg rgbd_sync)" pkg="nodelet" type="nodelet" name="rgbd_sync" args="standalone rtabmap_ros/rgbd_sync" output="$(arg output)">
-        <remap from="rgb/image"       to="$(arg left_image_topic)"/>
-        <remap from="depth/image"     to="$(arg right_image_topic)"/>
-        <remap from="rgb/camera_info" to="$(arg left_camera_info_topic)"/>
-        <remap from="depth/camera_info" to="$(arg right_camera_info_topic)"/>
+      <node if="$(arg rgbd_sync)" pkg="nodelet" type="nodelet" name="rgbd_sync" args="standalone rtabmap_ros/stereo_sync" output="$(arg output)">
+        <remap from="left/image_rect"   to="$(arg left_image_topic)"/>
+        <remap from="right/image_rect"  to="$(arg right_image_topic)"/>
+        <remap from="left/camera_info"  to="$(arg left_camera_info_topic)"/>
+        <remap from="right/camera_info" to="$(arg right_camera_info_topic)"/>
         <remap from="rgbd_image"      to="$(arg rgbd_topic)"/>
         <param name="approx_sync"     type="bool"   value="$(arg approx_rgbd_sync)"/>
         <param name="queue_size"      type="int"    value="$(arg queue_size)"/>

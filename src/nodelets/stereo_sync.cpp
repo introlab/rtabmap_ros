@@ -54,23 +54,22 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace rtabmap_ros
 {
 
-class RGBDSync : public nodelet::Nodelet
+class StereoSync : public nodelet::Nodelet
 {
 public:
-	RGBDSync() :
-		depthScale_(1.0),
+	StereoSync() :
 		warningThread_(0),
 		callbackCalled_(false),
-		approxSyncDepth_(0),
-		exactSyncDepth_(0)
+		approxSync_(0),
+		exactSync_(0)
 	{}
 
-	virtual ~RGBDSync()
+	virtual ~StereoSync()
 	{
-		if(approxSyncDepth_)
-			delete approxSyncDepth_;
-		if(exactSyncDepth_)
-			delete exactSyncDepth_;
+		if(approxSync_)
+			delete approxSync_;
+		if(exactSync_)
+			delete exactSync_;
 
 		if(warningThread_)
 		{
@@ -87,50 +86,50 @@ private:
 		ros::NodeHandle & pnh = getPrivateNodeHandle();
 
 		int queueSize = 10;
-		bool approxSync = true;
+		bool approxSync = false;
 		pnh.param("approx_sync", approxSync, approxSync);
 		pnh.param("queue_size", queueSize, queueSize);
-		pnh.param("depth_scale", depthScale_, depthScale_);
 
 		NODELET_INFO("%s: approx_sync = %s", getName().c_str(), approxSync?"true":"false");
 		NODELET_INFO("%s: queue_size  = %d", getName().c_str(), queueSize);
-		NODELET_INFO("%s: depth_scale = %f", getName().c_str(), depthScale_);
 
 		rgbdImagePub_ = nh.advertise<rtabmap_ros::RGBDImage>("rgbd_image", 1);
 		rgbdImageCompressedPub_ = nh.advertise<rtabmap_ros::RGBDImage>("rgbd_image/compressed", 1);
 
 		if(approxSync)
 		{
-			approxSyncDepth_ = new message_filters::Synchronizer<MyApproxSyncDepthPolicy>(MyApproxSyncDepthPolicy(queueSize), imageSub_, imageDepthSub_, cameraInfoSub_);
-			approxSyncDepth_->registerCallback(boost::bind(&RGBDSync::callback, this, _1, _2, _3));
+			approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize), imageLeftSub_, imageRightSub_, cameraInfoLeftSub_, cameraInfoRightSub_);
+			approxSync_->registerCallback(boost::bind(&StereoSync::callback, this, _1, _2, _3, _4));
 		}
 		else
 		{
-			exactSyncDepth_ = new message_filters::Synchronizer<MyExactSyncDepthPolicy>(MyExactSyncDepthPolicy(queueSize), imageSub_, imageDepthSub_, cameraInfoSub_);
-			exactSyncDepth_->registerCallback(boost::bind(&RGBDSync::callback, this, _1, _2, _3));
+			exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize), imageLeftSub_, imageRightSub_, cameraInfoLeftSub_, cameraInfoRightSub_);
+			exactSync_->registerCallback(boost::bind(&StereoSync::callback, this, _1, _2, _3, _4));
 		}
 
-		ros::NodeHandle rgb_nh(nh, "rgb");
-		ros::NodeHandle depth_nh(nh, "depth");
-		ros::NodeHandle rgb_pnh(pnh, "rgb");
-		ros::NodeHandle depth_pnh(pnh, "depth");
-		image_transport::ImageTransport rgb_it(rgb_nh);
-		image_transport::ImageTransport depth_it(depth_nh);
-		image_transport::TransportHints hintsRgb("raw", ros::TransportHints(), rgb_pnh);
-		image_transport::TransportHints hintsDepth("raw", ros::TransportHints(), depth_pnh);
+		ros::NodeHandle left_nh(nh, "left");
+		ros::NodeHandle right_nh(nh, "right");
+		ros::NodeHandle left_pnh(pnh, "left");
+		ros::NodeHandle right_pnh(pnh, "right");
+		image_transport::ImageTransport rgb_it(left_nh);
+		image_transport::ImageTransport depth_it(right_nh);
+		image_transport::TransportHints hintsRgb("raw", ros::TransportHints(), left_pnh);
+		image_transport::TransportHints hintsDepth("raw", ros::TransportHints(), right_pnh);
 
-		imageSub_.subscribe(rgb_it, rgb_nh.resolveName("image"), 1, hintsRgb);
-		imageDepthSub_.subscribe(depth_it, depth_nh.resolveName("image"), 1, hintsDepth);
-		cameraInfoSub_.subscribe(rgb_nh, "camera_info", 1);
+		imageLeftSub_.subscribe(rgb_it, left_nh.resolveName("image_rect"), 1, hintsRgb);
+		imageRightSub_.subscribe(depth_it, right_nh.resolveName("image_rect"), 1, hintsDepth);
+		cameraInfoLeftSub_.subscribe(left_nh, "camera_info", 1);
+		cameraInfoRightSub_.subscribe(right_nh, "camera_info", 1);
 
-		std::string subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s",
+		std::string subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s",
 							getName().c_str(),
 							approxSync?"approx":"exact",
-							imageSub_.getTopic().c_str(),
-							imageDepthSub_.getTopic().c_str(),
-							cameraInfoSub_.getTopic().c_str());
+							imageLeftSub_.getTopic().c_str(),
+							imageRightSub_.getTopic().c_str(),
+							cameraInfoLeftSub_.getTopic().c_str(),
+							cameraInfoRightSub_.getTopic().c_str());
 
-		warningThread_ = new boost::thread(boost::bind(&RGBDSync::warningLoop, this, subscribedTopicsMsg, approxSync));
+		warningThread_ = new boost::thread(boost::bind(&StereoSync::warningLoop, this, subscribedTopicsMsg, approxSync));
 		NODELET_INFO("%s", subscribedTopicsMsg.c_str());
 	}
 
@@ -154,78 +153,61 @@ private:
 	}
 
 	void callback(
-			  const sensor_msgs::ImageConstPtr& image,
-			  const sensor_msgs::ImageConstPtr& depth,
-			  const sensor_msgs::CameraInfoConstPtr& cameraInfo)
+			  const sensor_msgs::ImageConstPtr& imageLeft,
+			  const sensor_msgs::ImageConstPtr& imageRight,
+			  const sensor_msgs::CameraInfoConstPtr& cameraInfoLeft,
+			  const sensor_msgs::CameraInfoConstPtr& cameraInfoRight)
 	{
 		callbackCalled_ = true;
 		if(rgbdImagePub_.getNumSubscribers() || rgbdImageCompressedPub_.getNumSubscribers())
 		{
 			rtabmap_ros::RGBDImage msg;
-			msg.header.frame_id = cameraInfo->header.frame_id;
-			msg.header.stamp = image->header.stamp>depth->header.stamp?image->header.stamp:depth->header.stamp;
-			msg.rgbCameraInfo = *cameraInfo;
-			msg.depthCameraInfo = *cameraInfo;
+			msg.header.frame_id = cameraInfoLeft->header.frame_id;
+			msg.header.stamp = imageLeft->header.stamp>imageRight->header.stamp?imageLeft->header.stamp:imageRight->header.stamp;
+			msg.rgbCameraInfo = *cameraInfoLeft;
+			msg.depthCameraInfo = *cameraInfoRight;
 
 			if(rgbdImageCompressedPub_.getNumSubscribers())
 			{
 				rtabmap_ros::RGBDImage msgCompressed = msg;
 
-				cv_bridge::CvImageConstPtr imagePtr = cv_bridge::toCvShare(image);
+				cv_bridge::CvImageConstPtr imagePtr = cv_bridge::toCvShare(imageLeft);
 				imagePtr->toCompressedImageMsg(msgCompressed.rgbCompressed, cv_bridge::JPG);
 
-				cv_bridge::CvImageConstPtr imageDepthPtr = cv_bridge::toCvShare(depth);
-				msgCompressed.depthCompressed.header = imageDepthPtr->header;
-				if(depthScale_ != 1.0)
-				{
-					msgCompressed.depthCompressed.data = rtabmap::compressImage(imageDepthPtr->image*depthScale_, ".png");
-				}
-				else
-				{
-					msgCompressed.depthCompressed.data = rtabmap::compressImage(imageDepthPtr->image, ".png");
-				}
-				msgCompressed.depthCompressed.format = "png";
+				cv_bridge::CvImageConstPtr imageDepthPtr = cv_bridge::toCvShare(imageRight);
+				imageDepthPtr->toCompressedImageMsg(msgCompressed.depthCompressed, cv_bridge::JPG);
 
 				rgbdImageCompressedPub_.publish(msgCompressed);
 			}
 
 			if(rgbdImagePub_.getNumSubscribers())
 			{
-				msg.rgb = *image;
-				if(depthScale_ != 1.0)
-				{
-					cv_bridge::CvImagePtr imageDepthPtr = cv_bridge::toCvCopy(depth);
-					imageDepthPtr->image*=depthScale_;
-					msg.depth = *imageDepthPtr->toImageMsg();
-				}
-				else
-				{
-					msg.depth = *depth;
-				}
+				msg.rgb = *imageLeft;
+				msg.depth = *imageRight;
 				rgbdImagePub_.publish(msg);
 			}
 		}
 	}
 
 private:
-	double depthScale_;
 	boost::thread * warningThread_;
 	bool callbackCalled_;
 
 	ros::Publisher rgbdImagePub_;
 	ros::Publisher rgbdImageCompressedPub_;
 
-	image_transport::SubscriberFilter imageSub_;
-	image_transport::SubscriberFilter imageDepthSub_;
-	message_filters::Subscriber<sensor_msgs::CameraInfo> cameraInfoSub_;
+	image_transport::SubscriberFilter imageLeftSub_;
+	image_transport::SubscriberFilter imageRightSub_;
+	message_filters::Subscriber<sensor_msgs::CameraInfo> cameraInfoLeftSub_;
+	message_filters::Subscriber<sensor_msgs::CameraInfo> cameraInfoRightSub_;
 
-	typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo> MyApproxSyncDepthPolicy;
-	message_filters::Synchronizer<MyApproxSyncDepthPolicy> * approxSyncDepth_;
+	typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo, sensor_msgs::CameraInfo> MyApproxSyncPolicy;
+	message_filters::Synchronizer<MyApproxSyncPolicy> * approxSync_;
 
-	typedef message_filters::sync_policies::ExactTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo> MyExactSyncDepthPolicy;
-	message_filters::Synchronizer<MyExactSyncDepthPolicy> * exactSyncDepth_;
+	typedef message_filters::sync_policies::ExactTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo, sensor_msgs::CameraInfo> MyExactSyncPolicy;
+	message_filters::Synchronizer<MyExactSyncPolicy> * exactSync_;
 };
 
-PLUGINLIB_EXPORT_CLASS(rtabmap_ros::RGBDSync, nodelet::Nodelet);
+PLUGINLIB_EXPORT_CLASS(rtabmap_ros::StereoSync, nodelet::Nodelet);
 }
 

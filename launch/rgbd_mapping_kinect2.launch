@@ -29,27 +29,9 @@
    <arg name="rtabmapviz_cfg"          default="-d $(find rtabmap_ros)/launch/config/rgbd_gui.ini" />
    <arg name="rviz_cfg"                default="-d $(find rtabmap_ros)/launch/config/rgbd.rviz" />
   
-   <!-- ODOMETRY MAIN ARGUMENTS: 
-        -"strategy"        : Strategy: Frame-to-Map 1=Frame-To-Frame
-        -"feature"         : Feature type: 0=SURF 1=SIFT 2=ORB 3=FAST/FREAK 4=FAST/BRIEF 5=GFTT/FREAK 6=GFTT/BRIEF 7=BRISK
-        -"nn"              : Nearest neighbor strategy : 0=Linear, 1=FLANN_KDTREE, 2=FLANN_LSH, 3=BRUTEFORCE 
-                             Set to 1 for float descriptor like SIFT/SURF                  
-                             Set to 3 for binary descriptor like ORB/FREAK/BRIEF/BRISK  
-        -"max_depth"       : Maximum features depth (m)  
-        -"min_inliers"     : Minimum visual correspondences to accept a transformation (m)  
-        -"inlier_distance" : RANSAC maximum inliers distance (m)  
-        -"local_map"       : Local map size: number of unique features to keep track 
-        -"odom_info_data"  : Fill odometry info messages with inliers/outliers data.
-    -->
-   <arg name="strategy" default="0" />
-   <arg name="feature" default="6" />
-   <arg name="nn" default="3" />
-   <arg name="max_depth" default="10.0" />
-   <arg name="min_inliers" default="20" />
-   <arg name="inlier_distance" default="0.02" />
-   <arg name="local_map" default="1000" />
-   <arg name="gftt_max_corners" default="1000" />
-   <arg name="gftt_min_distance" default="7" />
+   <!-- slightly increase default parameters for larger images (qhd=720p) -->
+   <arg name="gftt_block_size" default="5" /> 
+   <arg name="gftt_min_distance" default="5" /> 
         
   <group ns="rtabmap">
   
@@ -60,17 +42,9 @@
       <remap from="rgb/camera_info" to="/kinect2/$(arg resolution)/camera_info"/>
 
       <param name="frame_id" type="string" value="$(arg frame_id)"/>
-      <param name="approx_sync" type="bool" value="true"/>
+      <param name="approx_sync" type="bool" value="false"/>
 	  
-      <param name="Odom/Strategy" type="string" value="$(arg strategy)"/> 
-      <param name="Vis/FeatureType" type="string" value="$(arg feature)"/>  
-      <param name="Vis/CorNNType" type="string" value="$(arg nn)"/>
-      <param name="Vis/MaxDepth" type="string" value="$(arg max_depth)"/>  
-      <param name="Vis/MinInliers" type="string" value="$(arg min_inliers)"/> 
-      <param name="Vis/InlierDistance" type="string" value="$(arg inlier_distance)"/>       
-      <param name="OdomF2M/MaxSize" type="string" value="$(arg local_map)"/>
-      <param name="Odom/FillInfoData" type="string" value="$(arg rtabmapviz)"/>
-      <param name="Vis/MaxFeatures" type="string" value="$(arg gftt_max_corners)"/>
+	  <param name="GFTT/BlockSize" type="string" value="$(arg gftt_block_size)"/>
       <param name="GFTT/MinDistance" type="string" value="$(arg gftt_min_distance)"/>
     </node>
   
@@ -84,17 +58,17 @@
       <remap from="depth/image" to="/kinect2/$(arg resolution)/image_depth_rect"/>
       <remap from="rgb/camera_info" to="/kinect2/$(arg resolution)/camera_info"/>
 
-      <param name="approx_sync" type="bool" value="true"/>
-
-      <param name="Vis/MinInliers" type="string" value="$(arg min_inliers)"/>
-      <param name="Vis/InlierDistance" type="string" value="$(arg inlier_distance)"/>
+      <param name="approx_sync" type="bool" value="false"/>
+      
+      <param name="GFTT/BlockSize" type="string" value="$(arg gftt_block_size)"/>
+      <param name="GFTT/MinDistance" type="string" value="$(arg gftt_min_distance)"/>
     </node>
   
     <!-- Visualisation RTAB-Map -->
     <node if="$(arg rtabmapviz)" pkg="rtabmap_ros" type="rtabmapviz" name="rtabmapviz" args="$(arg rtabmapviz_cfg)" output="screen">
       <param name="subscribe_depth" type="bool" value="true"/>
       <param name="subscribe_odom_info" type="bool" value="true"/>
-      <param name="approx_sync" type="bool" value="true"/>
+      <param name="approx_sync" type="bool" value="false"/>
       <param name="frame_id" type="string" value="$(arg frame_id)"/>
     
       <remap from="rgb/image" to="/kinect2/$(arg resolution)/image_color_rect"/>
@@ -115,7 +89,7 @@
 
     <remap from="odom_in"             to="rtabmap/odom"/>
 
-    <param name="approx_sync" type="bool" value="true"/>
+    <param name="approx_sync" type="bool" value="false"/>
     
     <remap from="rgb/image_out"       to="data_odom_sync/image"/>
     <remap from="depth/image_out"     to="data_odom_sync/depth"/>

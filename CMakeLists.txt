@@ -184,7 +184,7 @@ SET(rtabmap_ros_lib_src
 )
 
 IF(${cv_bridge_VERSION_MAJOR} GREATER 1 OR ${cv_bridge_VERSION_MINOR} GREATER 10)
-   SET(rtabmap_ros_lib_src ${rtabmap_ros_lib_src} src/nodelets/rgbd_sync.cpp)
+   SET(rtabmap_ros_lib_src ${rtabmap_ros_lib_src} src/nodelets/rgbd_sync.cpp src/nodelets/stereo_sync.cpp)
 ELSE()
    ADD_DEFINITIONS("-DCV_BRIDGE_HYDRO")
 ENDIF()   

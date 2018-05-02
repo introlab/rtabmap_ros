@@ -53,7 +53,6 @@
       <remap from="rgb/image"         to="rgb/image_rect_color"/>
       <remap from="depth/image"       to="depth_registered/image_raw"/>
       <remap from="rgb/camera_info"   to="rgb/camera_info"/>
-      <remap from="depth/camera_info" to="depth_registered/camera_info"/>
     </node>
    </group>
    <group ns="camera2">
@@ -61,7 +60,6 @@
       <remap from="rgb/image"         to="rgb/image_rect_color"/>
       <remap from="depth/image"       to="depth_registered/image_raw"/>
       <remap from="rgb/camera_info"   to="rgb/camera_info"/>
-      <remap from="depth/camera_info" to="depth_registered/camera_info"/>
     </node>
    </group>
         

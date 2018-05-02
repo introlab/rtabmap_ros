@@ -18,6 +18,7 @@
    <arg name="rviz" default="true" />
    <arg name="rtabmapviz" default="false" />
    <arg name="local_bundle" default="true" />
+   <arg name="stereo_sync" default="false" />
     
    <param name="use_sim_time" type="bool" value="True"/>
    
@@ -27,8 +28,6 @@
 
    <!-- Run the ROS package stereo_image_proc for image rectification -->
    <group ns="/stereo_camera" >
-      <node pkg="nodelet" type="nodelet" name="stereo_nodelet"  args="manager"/>
-   
       <node pkg="stereo_image_proc" type="stereo_image_proc" name="stereo_image_proc">
          <remap from="left/image_raw"    to="left/image_raw_throttle_relay"/>
          <remap from="left/camera_info"  to="left/camera_info_throttle"/>
@@ -36,6 +35,13 @@
          <remap from="right/camera_info" to="right/camera_info_throttle"/>
          <param name="disparity_range" value="128"/>
       </node>
+      
+      <node if="$(arg stereo_sync)" pkg="nodelet" type="nodelet" name="stereo_sync" args="standalone rtabmap_ros/stereo_sync">
+      <remap from="left/image_rect"   to="left/image_rect_color"/>
+      <remap from="right/image_rect"   to="right/image_rect"/>
+      <remap from="left/camera_info"   to="left/camera_info_throttle"/>
+      <remap from="right/camera_info"   to="right/camera_info_throttle"/>
+    </node>
    </group>
               
    <group ns="rtabmap">   
@@ -46,10 +52,12 @@
          <remap from="right/image_rect"      to="/stereo_camera/right/image_rect"/>
          <remap from="left/camera_info"      to="/stereo_camera/left/camera_info_throttle"/>
          <remap from="right/camera_info"     to="/stereo_camera/right/camera_info_throttle"/>
+         <remap from="rgbd_image"            to="/stereo_camera/rgbd_image"/>
          <remap from="odom"                  to="/stereo_odometry"/>
 
-         <param name="frame_id"      type="string" value="base_footprint"/>
-         <param name="odom_frame_id" type="string" value="odom"/>
+         <param name="subscribe_rgbd"  type="bool" value="$(arg stereo_sync)"/>
+         <param name="frame_id"        type="string" value="base_footprint"/>
+         <param name="odom_frame_id"   type="string" value="odom"/>
 
          <param name="Odom/Strategy"      type="string" value="0"/> <!-- 0=Frame-to-Map, 1=Frame=to=Frame -->
          <param name="Vis/EstimationType" type="string" value="1"/> <!-- 0=3D->3D 1=3D->2D (PnP) -->
@@ -66,13 +74,15 @@
       <!-- Visual SLAM: args: "delete_db_on_start" and "udebug" -->
       <node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="screen" args="--delete_db_on_start">
          <param name="frame_id"         type="string" value="base_footprint"/>
-         <param name="subscribe_stereo" type="bool" value="true"/>
+         <param unless="$(arg stereo_sync)" name="subscribe_stereo" type="bool" value="true"/>
          <param name="subscribe_depth"  type="bool" value="false"/>
+         <param name="subscribe_rgbd"      type="bool" value="$(arg stereo_sync)"/>
 
          <remap from="left/image_rect"   to="/stereo_camera/left/image_rect_color"/>
          <remap from="right/image_rect"  to="/stereo_camera/right/image_rect"/>
          <remap from="left/camera_info"  to="/stereo_camera/left/camera_info_throttle"/>
          <remap from="right/camera_info" to="/stereo_camera/right/camera_info_throttle"/>
+         <remap from="rgbd_image"        to="/stereo_camera/rgbd_image"/>
 
          <remap from="odom" to="/stereo_odometry"/>
 
@@ -92,8 +102,9 @@
       
       <!-- Visualisation RTAB-Map -->
       <node if="$(arg rtabmapviz)" pkg="rtabmap_ros" type="rtabmapviz" name="rtabmapviz" args="-d $(find rtabmap_ros)/launch/config/rgbd_gui.ini" output="screen">
-         <param name="subscribe_stereo"    type="bool" value="true"/>
+         <param unless="$(arg stereo_sync)" name="subscribe_stereo"    type="bool" value="true"/>
          <param name="subscribe_odom_info" type="bool" value="true"/>
+         <param name="subscribe_rgbd"      type="bool" value="$(arg stereo_sync)"/>
          <param name="queue_size"          type="int" value="10"/>
          <param name="frame_id"            type="string" value="base_footprint"/>
          
@@ -101,6 +112,7 @@
          <remap from="right/image_rect"  to="/stereo_camera/right/image_rect"/>
          <remap from="left/camera_info"  to="/stereo_camera/left/camera_info_throttle"/>
          <remap from="right/camera_info" to="/stereo_camera/right/camera_info_throttle"/>
+         <remap from="rgbd_image"          to="/stereo_camera/rgbd_image"/>
          <remap from="odom_info"         to="odom_info"/>
          <remap from="odom"              to="/stereo_odometry"/>
          <remap from="mapData"           to="mapData"/>

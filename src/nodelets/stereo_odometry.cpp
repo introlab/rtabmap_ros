@@ -172,7 +172,8 @@ private:
 				  imageRectRight->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
 				  imageRectRight->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0))
 			{
-				NODELET_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8 (mono8 recommended)");
+				NODELET_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8 (mono8 recommended), received types are %s (left) and %s (right)",
+						imageRectLeft->encoding.c_str(), imageRectRight->encoding.c_str());
 				return;
 			}
 
@@ -250,7 +251,8 @@ private:
 				  imageRectRight->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
 				  imageRectRight->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0))
 			{
-				NODELET_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8 (mono8 recommended)");
+				NODELET_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8 (mono8 recommended), received types are %s (left) and %s (right)",
+						imageRectLeft->encoding.c_str(), imageRectRight->encoding.c_str());
 				return;
 			}
 
