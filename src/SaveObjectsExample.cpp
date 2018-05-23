@@ -155,7 +155,6 @@ public:
                             double stampB = nextNode->first;
                             UASSERT(stamp>=stampA && stamp <=stampB);
 
-                            rtabmap::Transform v = poseA.inverse() * poseB;
                             double ratio = (stamp-stampA)/(stampB-stampA);
                             rtabmap::Transform robotPose = poseA.interpolate(ratio, poseB);
 
