@@ -4,7 +4,8 @@
 <include file="$(find rtabmap_ros)/launch/demo/demo_stereo_outdoor.launch"/>
 
 <group ns="/stereo_camera" >
-    <node pkg="nodelet" type="nodelet" name="disparity2cloud" args="load rtabmap_ros/point_cloud_xyz stereo_nodelet">
+    <node pkg="nodelet" type="nodelet" name="obstacles_manager" args="manager"/>
+    <node pkg="nodelet" type="nodelet" name="disparity2cloud" args="load rtabmap_ros/point_cloud_xyz obstacles_manager">
 		<remap from="disparity/image"       to="disparity"/>
 		<remap from="disparity/camera_info" to="right/camera_info_throttle"/>
 		<remap from="cloud"                 to="cloudXYZ"/>
@@ -14,7 +15,7 @@
 		<param name="max_depth" type="double" value="4"/>
 	</node>
 	
-	<node pkg="nodelet" type="nodelet" name="obstacles_detection" args="load rtabmap_ros/obstacles_detection stereo_nodelet">
+	<node pkg="nodelet" type="nodelet" name="obstacles_detection" args="load rtabmap_ros/obstacles_detection obstacles_manager">
 	    <remap from="cloud" to="cloudXYZ"/>
 
 		<param name="frame_id" type="string" value="base_footprint"/>		
