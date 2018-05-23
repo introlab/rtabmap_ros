@@ -1117,6 +1117,7 @@ void CoreWrapper::commonDepthCallbackImpl(
 	if(userDataMsg.get())
 	{
 		userData = rtabmap_ros::userDataFromROS(*userDataMsg);
+		UScopeMutex lock(userDataMutex_);
 		if(!userData_.empty())
 		{
 			NODELET_WARN("Synchronized and asynchronized user data topics cannot be used at the same time. Async user data dropped!");
@@ -1125,6 +1126,7 @@ void CoreWrapper::commonDepthCallbackImpl(
 	}
 	else
 	{
+		UScopeMutex lock(userDataMutex_);
 		userData = userData_;
 		userData_ = cv::Mat();
 	}
@@ -1363,6 +1365,7 @@ void CoreWrapper::commonStereoCallback(
 	if(userDataMsg.get())
 	{
 		userData = rtabmap_ros::userDataFromROS(*userDataMsg);
+		UScopeMutex lock(userDataMutex_);
 		if(!userData_.empty())
 		{
 			NODELET_WARN("Synchronized and asynchronized user data topics cannot be used at the same time. Async user data dropped!");
@@ -1371,6 +1374,7 @@ void CoreWrapper::commonStereoCallback(
 	}
 	else
 	{
+		UScopeMutex lock(userDataMutex_);
 		userData = userData_;
 		userData_ = cv::Mat();
 	}
@@ -1663,6 +1667,7 @@ void CoreWrapper::userDataAsyncCallback(const rtabmap_ros::UserDataConstPtr & da
 {
 	if(!paused_)
 	{
+		UScopeMutex lock(userDataMutex_);
 		if(!userData_.empty())
 		{
 			ROS_WARN("Overwriting previous user data set. Asynchronous user "
@@ -1670,10 +1675,7 @@ void CoreWrapper::userDataAsyncCallback(const rtabmap_ros::UserDataConstPtr & da
 					"lower rate than map update rate (current %s=%f).",
 					Parameters::kRtabmapDetectionRate().c_str(), rate_);
 		}
-		else
-		{
-			userData_ = rtabmap_ros::userDataFromROS(*dataMsg);
-		}
+		userData_ = rtabmap_ros::userDataFromROS(*dataMsg);
 	}
 }
 
@@ -1912,8 +1914,10 @@ bool CoreWrapper::resetRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empt
 	latestNodeWasReached_ = false;
 	mapsManager_.clear();
 	previousStamp_ = ros::Time(0);
-	userData_ = cv::Mat();
 	globalPose_.header.stamp = ros::Time(0);
+	userDataMutex_.lock();
+	userData_ = cv::Mat();
+	userDataMutex_.unlock();
 	return true;
 }
 
@@ -1967,7 +1971,9 @@ bool CoreWrapper::backupDatabaseCallback(std_srvs::Empty::Request&, std_srvs::Em
 	currentMetricGoal_.setNull();
 	lastPublishedMetricGoal_.setNull();
 	latestNodeWasReached_ = false;
+	userDataMutex_.lock();
 	userData_ = cv::Mat();
+	userDataMutex_.unlock();
 	globalPose_.header.stamp = ros::Time(0);
 
 	NODELET_INFO("Backup: Saving \"%s\" to \"%s\"...", databasePath_.c_str(), (databasePath_+".back").c_str());

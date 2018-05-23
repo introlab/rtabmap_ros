@@ -272,6 +272,7 @@ private:
 
 	ros::Subscriber userDataAsyncSub_;
 	cv::Mat userData_;
+	UMutex userDataMutex_;
 
 	ros::Subscriber globalPoseAsyncSub_;
 	geometry_msgs::PoseWithCovarianceStamped globalPose_;

@@ -4,13 +4,17 @@
   <!-- Choose visualization -->
   <arg name="rviz" default="true" />
   <arg name="rtabmapviz" default="false" /> 
+  <arg name="save_objects" default="false"/>
+  <arg name="localization" default="false"/>
+  <arg     if="$(arg localization)" name="rtabmap_args" default=""/>
+  <arg unless="$(arg localization)" name="rtabmap_args" default="--delete_db_on_start"/>
 
   <param name="use_sim_time" type="bool" value="True"/>
   
   <!-- SLAM (robot side) -->
   <!-- args: "delete_db_on_start" and "udebug" -->
   <group ns="rtabmap">
-    <node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="screen" args="--delete_db_on_start">
+    <node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="screen" args="$(arg rtabmap_args)">
 	  <param name="frame_id" type="string" value="base_footprint"/>
 	
 	  <param name="subscribe_depth" type="bool" value="true"/>
@@ -18,6 +22,7 @@
 	
 	  <remap from="odom" to="/base_controller/odom"/>
 	  <remap from="scan" to="/base_scan"/>
+	  <remap if="$(arg save_objects)" from="user_data_async" to="/objectsData"/>
 
 	  <remap from="rgb/image"       to="/camera/data_throttled_image"/>
   	  <remap from="depth/image"     to="/camera/data_throttled_image_depth"/>
@@ -46,6 +51,7 @@
 	  <param name="Mem/NotLinkedNodesKept"    type="string" value="false"/>
 	  <param name="Optimizer/Slam2D"          type="string" value="true"/>
 	  <param name="Reg/Force3DoF"             type="string" value="true"/>   
+	  <param if="$(arg localization)" name="Mem/IncrementalMemory" type="string" value="false"/>
     </node>
     
     <!-- Visualisation RTAB-Map -->
@@ -100,6 +106,12 @@
 
     <param name="rgb/image_transport"              type="string" value="compressed"/>
     <param name="depth_registered/image_transport" type="string" value="compressedDepth"/>
+  </node>
+  
+  <!-- Save objects to database example -->
+  <node if="$(arg save_objects)" name="save_objects_example" pkg="rtabmap_ros" type="save_objects_example" output="screen">
+    <remap from="mapData" to="/rtabmap/mapData"/>
+    <param name="frame_id" value="base_footprint"/>
   </node>
 
 </launch>

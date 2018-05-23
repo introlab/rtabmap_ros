@@ -15,6 +15,7 @@ find_package(catkin REQUIRED COMPONENTS
 find_package(costmap_2d)
 find_package(octomap_ros)
 find_package(rviz)
+find_package(find_object_2d)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -122,6 +123,9 @@ ENDIF(octomap_ros_FOUND)
 IF(rviz_FOUND)		
    SET(optional_dependencies ${optional_dependencies} rviz)		
 ENDIF(rviz_FOUND)
+IF(find_object_2d_FOUND)		
+   SET(optional_dependencies ${optional_dependencies} find_object_2d)		
+ENDIF(find_object_2d_FOUND)	
 
 catkin_package(
   INCLUDE_DIRS include
@@ -309,6 +313,14 @@ add_executable(wifi_signal_pub src/WifiSignalPubNode.cpp)
 target_link_libraries(wifi_signal_pub rtabmap_ros ${Libraries})
 add_executable(wifi_signal_sub src/WifiSignalSubNode.cpp)
 target_link_libraries(wifi_signal_sub rtabmap_ros ${Libraries})
+
+# If find_object_2d is found, add save objects example
+IF(find_object_2d_FOUND)
+MESSAGE(STATUS "WITH find_object_2d")
+include_directories(${find_object_2d_INCLUDE_DIRS})
+add_executable(save_objects_example src/SaveObjectsExample.cpp)
+target_link_libraries(save_objects_example rtabmap_ros ${Libraries} ${find_object_2d_LIBRARIES})
+ENDIF(find_object_2d_FOUND)
 
 add_executable(camera src/CameraNode.cpp)
 add_dependencies(camera ${${PROJECT_NAME}_EXPORTED_TARGETS})
