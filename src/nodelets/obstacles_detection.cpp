@@ -32,6 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
+#include <pcl/filters/filter.h>
 
 #include <tf/transform_listener.h>
 
@@ -289,6 +290,11 @@ private:
 
 		pcl::PointCloud<pcl::PointXYZ>::Ptr inputCloud(new pcl::PointCloud<pcl::PointXYZ>);
 		pcl::fromROSMsg(*cloudMsg, *inputCloud);
+		if(inputCloud->isOrganized())
+		{
+			std::vector<int> indices;
+			pcl::removeNaNFromPointCloud(*inputCloud, *inputCloud, indices);
+		}
 
 		//Common variables for all strategies
 		pcl::IndicesPtr ground, obstacles;
@@ -372,6 +378,10 @@ private:
 					}
 				}
 			}
+		}
+		else
+		{
+			ROS_WARN("obstacles_detection: Input cloud is empty! (%d x %d, is_dense=%d)", cloudMsg->width, cloudMsg->height, cloudMsg->is_dense?1:0);
 		}
 
 		if(groundPub_.getNumSubscribers())
