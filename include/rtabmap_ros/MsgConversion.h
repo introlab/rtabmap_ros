@@ -72,6 +72,7 @@ rtabmap::Transform transformFromPoseMsg(const geometry_msgs::Pose & msg);
 
 void toCvCopy(const rtabmap_ros::RGBDImage & image, cv_bridge::CvImagePtr & rgb, cv_bridge::CvImagePtr & depth);
 void toCvShare(const rtabmap_ros::RGBDImageConstPtr & image, cv_bridge::CvImageConstPtr & rgb, cv_bridge::CvImageConstPtr & depth);
+rtabmap::SensorData rgbdImageFromROS(const rtabmap_ros::RGBDImageConstPtr & image);
 
 // copy data
 void compressedMatToBytes(const cv::Mat & compressed, std::vector<unsigned char> & bytes);

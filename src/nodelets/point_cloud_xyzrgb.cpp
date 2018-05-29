@@ -191,6 +191,8 @@ private:
 
 		cloudPub_ = nh.advertise<sensor_msgs::PointCloud2>("cloud", 1);
 
+		rgbdImageSub_ = nh.subscribe("rgbd_image", 1, &PointCloudXYZRGB::rgbdImageCallback, this);
+
 		if(approxSync)
 		{
 
@@ -437,6 +439,32 @@ private:
 		}
 	}
 
+	void rgbdImageCallback(const rtabmap_ros::RGBDImageConstPtr & image)
+	{
+		if(cloudPub_.getNumSubscribers())
+		{
+			ros::WallTime time = ros::WallTime::now();
+
+			rtabmap::SensorData data = rtabmap_ros::rgbdImageFromROS(image);
+			pcl::PointCloud<pcl::PointXYZRGB>::Ptr pclCloud;
+			pcl::IndicesPtr indices(new std::vector<int>);
+			if(data.isValid())
+			{
+				pclCloud = rtabmap::util3d::cloudRGBFromSensorData(
+						data,
+						decimation_,
+						maxDepth_,
+						minDepth_,
+						indices.get(),
+						stereoBMParameters_);
+
+				processAndPublish(pclCloud, indices, image->header);
+			}
+
+			NODELET_DEBUG("point_cloud_xyzrgb from rgbd_image time = %f s", (ros::WallTime::now() - time).toSec());
+		}
+	}
+
 	void processAndPublish(pcl::PointCloud<pcl::PointXYZRGB>::Ptr & pclCloud, pcl::IndicesPtr & indices, const std_msgs::Header & header)
 	{
 		if(indices->size() && voxelSize_ > 0.0)
@@ -503,6 +531,8 @@ private:
 	rtabmap::ParametersMap stereoBMParameters_;
 
 	ros::Publisher cloudPub_;
+
+	ros::Subscriber rgbdImageSub_;
 
 	image_transport::SubscriberFilter imageSub_;
 	image_transport::SubscriberFilter imageDepthSub_;

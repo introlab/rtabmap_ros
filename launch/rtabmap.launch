@@ -73,7 +73,7 @@
   
   <arg name="compressed"              default="false"/>         <!-- If you want to subscribe to compressed image topics -->
   <arg name="rgb_image_transport"     default="compressed"/>    <!-- Common types: compressed, theora (see "rosrun image_transport list_transports") -->
-  <arg name="depth_image_transport"   default="compressedDepth"/>  <!-- Common types: compressed, theora (see "rosrun image_transport list_transports") -->
+  <arg name="depth_image_transport"   default="compressedDepth"/>  <!-- Depth compatible types: compressedDepth (see "rosrun image_transport list_transports") -->
    
   <arg name="subscribe_scan"          default="false"/>
   <arg name="scan_topic"              default="/scan"/>
@@ -112,34 +112,48 @@
      
     <!-- relays -->
     <group unless="$(arg stereo)">
-      <node if="$(arg compressed)" name="republish_rgb" type="republish" pkg="image_transport" args="$(arg rgb_image_transport) in:=$(arg rgb_topic) raw out:=$(arg rgb_topic_relay)" />
-      <node if="$(arg compressed)" name="republish_depth" type="republish" pkg="image_transport" args="$(arg depth_image_transport) in:=$(arg depth_topic) raw out:=$(arg depth_topic_relay)" />
-    
-      <node if="$(arg rgbd_sync)" pkg="nodelet" type="nodelet" name="rgbd_sync" args="standalone rtabmap_ros/rgbd_sync" output="$(arg output)">
-        <remap from="rgb/image"       to="$(arg rgb_topic_relay)"/>
-        <remap from="depth/image"     to="$(arg depth_topic_relay)"/>
-        <remap from="rgb/camera_info" to="$(arg camera_info_topic)"/>
-        <remap from="rgbd_image"      to="$(arg rgbd_topic)"/>
-        <param name="approx_sync"     type="bool"   value="$(arg approx_rgbd_sync)"/>
-        <param name="queue_size"      type="int"    value="$(arg queue_size)"/>
-        <param name="depth_scale"     type="double" value="$(arg depth_scale)"/>
-      </node>
+      <group unless="$(arg subscribe_rgbd)">
+        <node if="$(arg compressed)" name="republish_rgb" type="republish" pkg="image_transport" args="$(arg rgb_image_transport) in:=$(arg rgb_topic) raw out:=$(arg rgb_topic_relay)" />
+        <node if="$(arg compressed)" name="republish_depth" type="republish" pkg="image_transport" args="$(arg depth_image_transport) in:=$(arg depth_topic) raw out:=$(arg depth_topic_relay)" />
+      </group>
+      <group if="$(arg rgbd_sync)">
+        <node if="$(arg compressed)" name="republish_rgb" type="republish" pkg="image_transport" args="$(arg rgb_image_transport) in:=$(arg rgb_topic) raw out:=$(arg rgb_topic_relay)" />
+        <node if="$(arg compressed)" name="republish_depth" type="republish" pkg="image_transport" args="$(arg depth_image_transport) in:=$(arg depth_topic) raw out:=$(arg depth_topic_relay)" />
+        <node pkg="nodelet" type="nodelet" name="rgbd_sync" args="standalone rtabmap_ros/rgbd_sync" output="$(arg output)">
+          <remap from="rgb/image"       to="$(arg rgb_topic_relay)"/>
+          <remap from="depth/image"     to="$(arg depth_topic_relay)"/>
+          <remap from="rgb/camera_info" to="$(arg camera_info_topic)"/>
+          <remap from="rgbd_image"      to="$(arg rgbd_topic)"/>
+          <param name="approx_sync"     type="bool"   value="$(arg approx_rgbd_sync)"/>
+          <param name="queue_size"      type="int"    value="$(arg queue_size)"/>
+          <param name="depth_scale"     type="double" value="$(arg depth_scale)"/>
+        </node>
+      </group>
     </group>
     <group if="$(arg stereo)">
-      <node if="$(arg compressed)" name="republish_left"  type="republish" pkg="image_transport" args="compressed in:=$(arg left_image_topic) raw out:=$(arg left_image_topic_relay)" />
-      <node if="$(arg compressed)" name="republish_right" type="republish" pkg="image_transport" args="compressed in:=$(arg right_image_topic) raw out:=$(arg right_image_topic_relay)" />
-    
-      <node if="$(arg rgbd_sync)" pkg="nodelet" type="nodelet" name="rgbd_sync" args="standalone rtabmap_ros/stereo_sync" output="$(arg output)">
-        <remap from="left/image_rect"   to="$(arg left_image_topic)"/>
-        <remap from="right/image_rect"  to="$(arg right_image_topic)"/>
-        <remap from="left/camera_info"  to="$(arg left_camera_info_topic)"/>
-        <remap from="right/camera_info" to="$(arg right_camera_info_topic)"/>
-        <remap from="rgbd_image"      to="$(arg rgbd_topic)"/>
-        <param name="approx_sync"     type="bool"   value="$(arg approx_rgbd_sync)"/>
-        <param name="queue_size"      type="int"    value="$(arg queue_size)"/>
-    </node>
+      <group unless="$(arg subscribe_rgbd)">
+        <node if="$(arg compressed)" name="republish_left"  type="republish" pkg="image_transport" args="$(arg rgb_image_transport) in:=$(arg left_image_topic) raw out:=$(arg left_image_topic_relay)" />
+        <node if="$(arg compressed)" name="republish_right" type="republish" pkg="image_transport" args="$(arg rgb_image_transport) in:=$(arg right_image_topic) raw out:=$(arg right_image_topic_relay)" />
+      </group>
+      <group if="$(arg rgbd_sync)">
+        <node if="$(arg compressed)" name="republish_left"  type="republish" pkg="image_transport" args="$(arg rgb_image_transport) in:=$(arg left_image_topic) raw out:=$(arg left_image_topic_relay)" />
+        <node if="$(arg compressed)" name="republish_right" type="republish" pkg="image_transport" args="$(arg rgb_image_transport) in:=$(arg right_image_topic) raw out:=$(arg right_image_topic_relay)" />
+        <node pkg="nodelet" type="nodelet" name="rgbd_sync" args="standalone rtabmap_ros/stereo_sync" output="$(arg output)">
+          <remap from="left/image_rect"   to="$(arg left_image_topic_relay)"/>
+          <remap from="right/image_rect"  to="$(arg right_image_topic_relay)"/>
+          <remap from="left/camera_info"  to="$(arg left_camera_info_topic)"/>
+          <remap from="right/camera_info" to="$(arg right_camera_info_topic)"/>
+          <remap from="rgbd_image"      to="$(arg rgbd_topic)"/>
+          <param name="approx_sync"     type="bool"   value="$(arg approx_rgbd_sync)"/>
+          <param name="queue_size"      type="int"    value="$(arg queue_size)"/>
+        </node>
+      </group>
     </group>
-        
+    
+    <group unless="$(arg rgbd_sync)">
+       <node if="$(arg subscribe_rgbd)" name="republish_rgbd_image"  type="relay" pkg="topic_tools" args="$(arg rgbd_topic) $(arg rgbd_topic)_relay" />
+    </group>
+
     <!-- Visual odometry -->
     <group unless="$(arg icp_odometry)">
       <group if="$(arg visual_odometry)">
@@ -149,7 +163,8 @@
           <remap from="rgb/image"       to="$(arg rgb_topic_relay)"/>
           <remap from="depth/image"     to="$(arg depth_topic_relay)"/>
           <remap from="rgb/camera_info" to="$(arg camera_info_topic)"/>
-          <remap from="rgbd_image"      to="$(arg rgbd_topic)"/>
+          <remap     if="$(arg rgbd_sync)" from="rgbd_image" to="$(arg rgbd_topic)"/>
+          <remap unless="$(arg rgbd_sync)" from="rgbd_image" to="$(arg rgbd_topic)_relay"/>
           <remap from="odom"            to="$(arg odom_topic)"/>
       
           <param name="frame_id"                    type="string" value="$(arg frame_id)"/>
@@ -172,7 +187,8 @@
           <remap from="right/image_rect"       to="$(arg right_image_topic_relay)"/>
           <remap from="left/camera_info"       to="$(arg left_camera_info_topic)"/>
           <remap from="right/camera_info"      to="$(arg right_camera_info_topic)"/>
-          <remap from="rgbd_image"             to="$(arg rgbd_topic)"/>
+          <remap     if="$(arg rgbd_sync)" from="rgbd_image" to="$(arg rgbd_topic)"/>
+          <remap unless="$(arg rgbd_sync)" from="rgbd_image" to="$(arg rgbd_topic)_relay"/>
           <remap from="odom"                   to="$(arg odom_topic)"/>
       
           <param name="frame_id"                    type="string" value="$(arg frame_id)"/>
@@ -240,7 +256,8 @@
       <remap from="depth/image"     to="$(arg depth_topic_relay)"/>
       <remap from="rgb/camera_info" to="$(arg camera_info_topic)"/>
       
-      <remap from="rgbd_image"      to="$(arg rgbd_topic)"/>
+      <remap     if="$(arg rgbd_sync)" from="rgbd_image" to="$(arg rgbd_topic)"/>
+      <remap unless="$(arg rgbd_sync)" from="rgbd_image" to="$(arg rgbd_topic)_relay"/>
 	
       <remap from="left/image_rect"        to="$(arg left_image_topic_relay)"/>
       <remap from="right/image_rect"       to="$(arg right_image_topic_relay)"/>
@@ -279,7 +296,8 @@
       <remap from="depth/image"     to="$(arg depth_topic_relay)"/>
       <remap from="rgb/camera_info" to="$(arg camera_info_topic)"/>
       
-      <remap from="rgbd_image"      to="$(arg rgbd_topic)"/>
+      <remap     if="$(arg rgbd_sync)" from="rgbd_image" to="$(arg rgbd_topic)"/>
+      <remap unless="$(arg rgbd_sync)" from="rgbd_image" to="$(arg rgbd_topic)_relay"/>
       
       <remap from="left/image_rect"        to="$(arg left_image_topic_relay)"/>
       <remap from="right/image_rect"       to="$(arg right_image_topic_relay)"/>
@@ -295,14 +313,16 @@
   
   <!-- Visualization RVIZ -->
   <node if="$(arg rviz)" pkg="rviz" type="rviz" name="rviz" args="-d $(arg rviz_cfg)"/>
-  <node if="$(arg rviz)" pkg="nodelet" type="nodelet" name="points_xyzrgb" args="standalone rtabmap_ros/point_cloud_xyzrgb">
-    <remap from="left/image"        to="$(arg left_image_topic_relay)"/>
-    <remap from="right/image"       to="$(arg right_image_topic_relay)"/>
-    <remap from="left/camera_info"  to="$(arg left_camera_info_topic)"/>
-    <remap from="right/camera_info" to="$(arg right_camera_info_topic)"/>
-    <remap from="rgb/image"         to="$(arg rgb_topic_relay)"/>
-    <remap from="depth/image"       to="$(arg depth_topic_relay)"/>
-    <remap from="rgb/camera_info"   to="$(arg camera_info_topic)"/>
+  <node if="$(arg rviz)" pkg="nodelet" type="nodelet" name="points_xyzrgb" args="standalone rtabmap_ros/point_cloud_xyzrgb" output="$(arg output)">
+    <remap if="$(arg stereo)" from="left/image"        to="$(arg left_image_topic_relay)"/>
+    <remap if="$(arg stereo)" from="right/image"       to="$(arg right_image_topic_relay)"/>
+    <remap if="$(arg stereo)" from="left/camera_info"  to="$(arg left_camera_info_topic)"/>
+    <remap if="$(arg stereo)" from="right/camera_info" to="$(arg right_camera_info_topic)"/>
+    <remap unless="$(arg subscribe_rgbd)" from="rgb/image"         to="$(arg rgb_topic_relay)"/>
+    <remap unless="$(arg subscribe_rgbd)" from="depth/image"       to="$(arg depth_topic_relay)"/>
+    <remap unless="$(arg subscribe_rgbd)" from="rgb/camera_info"   to="$(arg camera_info_topic)"/>
+    <remap     if="$(arg rgbd_sync)" from="rgbd_image" to="$(arg rgbd_topic)"/>
+    <remap unless="$(arg rgbd_sync)" from="rgbd_image" to="$(arg rgbd_topic)_relay"/>
     <remap from="cloud"             to="voxel_cloud" />
 
     <param name="decimation"  type="double" value="4"/>

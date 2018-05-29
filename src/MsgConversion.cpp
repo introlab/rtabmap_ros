@@ -176,7 +176,7 @@ void toCvShare(const rtabmap_ros::RGBDImageConstPtr & image, cv_bridge::CvImageC
 	else if(!image->rgbCompressed.data.empty())
 	{
 #ifdef CV_BRIDGE_HYDRO
-                ROS_ERROR("Unsupported compressed image copy, please upgrade at least to ROS Indigo to use this.");
+		ROS_ERROR("Unsupported compressed image copy, please upgrade at least to ROS Indigo to use this.");
 #else
 		rgb = cv_bridge::toCvCopy(image->rgbCompressed);
 #endif
@@ -216,6 +216,138 @@ void toCvShare(const rtabmap_ros::RGBDImageConstPtr & image, cv_bridge::CvImageC
 		// empty
 		depth = boost::make_shared<cv_bridge::CvImage>();
 	}
+}
+
+rtabmap::SensorData rgbdImageFromROS(const rtabmap_ros::RGBDImageConstPtr & image)
+{
+	rtabmap::SensorData data;
+	cv_bridge::CvImageConstPtr imageMsg;
+	cv_bridge::CvImageConstPtr depthMsg;
+	toCvShare(image, imageMsg, depthMsg);
+
+	rtabmap::StereoCameraModel stereoModel = stereoCameraModelFromROS(image->rgbCameraInfo, image->depthCameraInfo, rtabmap::Transform::getIdentity());
+
+	if(stereoModel.isValidForProjection())
+	{
+		cv_bridge::CvImageConstPtr imageRectLeft = imageMsg;
+		cv_bridge::CvImageConstPtr imageRectRight = depthMsg;
+		if(!(imageRectLeft->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
+			 imageRectLeft->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||
+			 imageRectLeft->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
+			 imageRectLeft->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0) ||
+			!(imageRectRight->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
+			  imageRectRight->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||
+			  imageRectRight->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
+			  imageRectRight->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0))
+		{
+			ROS_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8 (mono8 recommended), received types are %s (left) and %s (right)",
+					imageRectLeft->encoding.c_str(), imageRectRight->encoding.c_str());
+			return data;
+		}
+
+		if(!imageRectLeft->image.empty() && !imageRectRight->image.empty())
+		{
+			if(stereoModel.baseline() > 10.0)
+			{
+				static bool shown = false;
+				if(!shown)
+				{
+					ROS_WARN("Detected baseline (%f m) is quite large! Is your "
+							 "right camera_info P(0,3) correctly set? Note that "
+							 "baseline=-P(0,3)/P(0,0). This warning is printed only once.",
+							 stereoModel.baseline());
+					shown = true;
+				}
+			}
+
+			cv::Mat left, right;
+			if(imageRectLeft->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
+			   imageRectLeft->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
+			{
+				left = cv_bridge::cvtColor(imageRectLeft, "mono8")->image;
+			}
+			else
+			{
+				left = cv_bridge::cvtColor(imageRectLeft, "bgr8")->image;
+			}
+			right = cv_bridge::cvtColor(imageRectRight, "mono8")->image;
+
+			//
+
+			data = rtabmap::SensorData(
+					left,
+					right,
+					stereoModel,
+					0,
+					rtabmap_ros::timestampFromROS(image->header.stamp));
+		}
+		else
+		{
+			ROS_WARN("Odom: input images empty?!?");
+		}
+	}
+	else //depth
+	{
+		ros::Time higherStamp;
+		int imageWidth = imageMsg->image.cols;
+		int imageHeight = imageMsg->image.rows;
+		int depthWidth = depthMsg->image.cols;
+		int depthHeight = depthMsg->image.rows;
+
+		UASSERT_MSG(
+			imageWidth % depthWidth == 0 && imageHeight % depthHeight == 0 &&
+			imageWidth/depthWidth == imageHeight/depthHeight,
+			uFormat("rgb=%dx%d depth=%dx%d", imageWidth, imageHeight, depthWidth, depthHeight).c_str());
+
+		cv::Mat rgb;
+		cv::Mat depth;
+		rtabmap::CameraModel cameraModels;
+
+		if(!(imageMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) ==0 ||
+			 imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
+			 imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||
+			 imageMsg->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
+			 imageMsg->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0 ||
+			 imageMsg->encoding.compare(sensor_msgs::image_encodings::BGRA8) == 0 ||
+			 imageMsg->encoding.compare(sensor_msgs::image_encodings::RGBA8) == 0 ||
+			 imageMsg->encoding.compare(sensor_msgs::image_encodings::BAYER_GRBG8) == 0) ||
+			!(depthMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1) == 0 ||
+			 depthMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1) == 0 ||
+			 depthMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0))
+		{
+			ROS_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8,bgra8,rgba8 and "
+			"image_depth=32FC1,16UC1,mono16. Current rgb=%s and depth=%s",
+				imageMsg->encoding.c_str(),
+				depthMsg->encoding.c_str());
+			return data;
+		}
+
+		cv_bridge::CvImageConstPtr ptrImage = imageMsg;
+		if(imageMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0 ||
+			imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
+			imageMsg->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0)
+		{
+			// do nothing
+		}
+		else if(imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
+		{
+			ptrImage = cv_bridge::cvtColor(imageMsg, "mono8");
+		}
+		else
+		{
+			ptrImage = cv_bridge::cvtColor(imageMsg, "bgr8");
+		}
+
+		cv_bridge::CvImageConstPtr ptrDepth = depthMsg;
+		data = rtabmap::SensorData(
+				ptrImage->image,
+				ptrDepth->image,
+				rtabmap_ros::cameraModelFromROS(image->rgbCameraInfo),
+				0,
+				rtabmap_ros::timestampFromROS(image->header.stamp));
+	}
+
+	return data;
 }
 
 void compressedMatToBytes(const cv::Mat & compressed, std::vector<unsigned char> & bytes)
