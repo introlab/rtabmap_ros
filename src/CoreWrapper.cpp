@@ -210,6 +210,7 @@ void CoreWrapper::onInit()
 	mapGraphPub_ = nh.advertise<rtabmap_ros::MapGraph>("mapGraph", 1);
 	labelsPub_ = nh.advertise<visualization_msgs::MarkerArray>("labels", 1);
 	mapPathPub_ = nh.advertise<nav_msgs::Path>("mapPath", 1);
+	localizationPosePub_ = nh.advertise<geometry_msgs::PoseWithCovarianceStamped>("localization_pose", 1);
 	initialPoseSub_ = nh.subscribe("initialpose", 1, &CoreWrapper::initialPoseCallback, this);
 
 	// planning topics
@@ -1497,6 +1498,18 @@ void CoreWrapper::process(
 			{
 				// Publish local graph, info
 				this->publishStats(stamp);
+				if(localizationPosePub_.getNumSubscribers() &&
+					!rtabmap_.getStatistics().localizationCovariance().empty())
+				{
+					geometry_msgs::PoseWithCovarianceStamped poseMsg;
+					poseMsg.header.frame_id = mapFrameId_;
+					poseMsg.header.stamp = stamp;
+					rtabmap_ros::transformToPoseMsg(mapToOdom_*odom, poseMsg.pose.pose);
+					poseMsg.pose.covariance;
+					const cv::Mat & cov = rtabmap_.getStatistics().localizationCovariance();
+					memcpy(poseMsg.pose.covariance.data(), cov.data, cov.total()*sizeof(double));
+					localizationPosePub_.publish(poseMsg);
+				}
 				std::map<int, rtabmap::Transform> filteredPoses = rtabmap_.getLocalOptimizedPoses();
 
 				// create a tmp signature with latest sensory data if latest signature was ignored

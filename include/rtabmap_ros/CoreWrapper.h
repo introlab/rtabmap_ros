@@ -216,6 +216,7 @@ private:
 	ros::Publisher mapGraphPub_;
 	ros::Publisher labelsPub_;
 	ros::Publisher mapPathPub_;
+	ros::Publisher localizationPosePub_;
 	ros::Subscriber initialPoseSub_;
 
 	//Planning stuff

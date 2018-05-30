@@ -19,7 +19,7 @@ find_package(find_object_2d)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
-find_package(RTABMap 0.17.0 REQUIRED)
+find_package(RTABMap 0.17.2 REQUIRED)
 
 find_package(OpenCV REQUIRED)
 
