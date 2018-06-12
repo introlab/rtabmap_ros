@@ -84,7 +84,7 @@ private:
 
 	virtual void onInit();
 
-	bool odomUpdate(const nav_msgs::OdometryConstPtr & odomMsg);
+	bool odomUpdate(const nav_msgs::OdometryConstPtr & odomMsg, ros::Time stamp);
 	bool odomTFUpdate(const ros::Time & stamp); // TF odom
 
 	virtual void commonDepthCallback(

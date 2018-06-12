@@ -824,11 +824,26 @@ void CoreWrapper::rgbOdomCallback(
 	commonSingleDepthCallback(odomMsg, userDataMsg, cv_bridge::toCvShare(imageMsg), depthMsg, *cameraInfoMsg, *cameraInfoMsg, scanMsg, scan3dMsg, odomInfoMsg);
 }
 
-bool CoreWrapper::odomUpdate(const nav_msgs::OdometryConstPtr & odomMsg)
+bool CoreWrapper::odomUpdate(const nav_msgs::OdometryConstPtr & odomMsg, ros::Time stamp)
 {
 	if(!paused_)
 	{
-		Transform odom = rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose);
+		Transform odom = rtabmap_ros::getTransform(odomMsg->header.frame_id, frameId_, stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+		if(odom.isNull())
+		{
+			static bool shown = false;
+			if(!shown)
+			{
+				NODELET_WARN("We received odometry message, but we cannot get the "
+						"corresponding TF %s->%s at data stamp %fs (odom msg stamp is %fs). Make sure TF of odometry is "
+						"also published to get more accurate pose estimation. This "
+						"warning is only printed once.", odomMsg->header.frame_id.c_str(), frameId_.c_str(), stamp.toSec(), odomMsg->header.stamp.toSec());
+				shown = true;
+			}
+			odom = rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose);
+			stamp = odomMsg->header.stamp;
+		}
+
 		if(!lastPose_.isIdentity() && !odom.isNull() && (odom.isIdentity() || (odomMsg->pose.covariance[0] >= BAD_COVARIANCE && odomMsg->twist.covariance[0] >= BAD_COVARIANCE)))
 		{
 			UWARN("Odometry is reset (identity pose or high variance (%f) detected). Increment map id!", MAX(odomMsg->pose.covariance[0], odomMsg->twist.covariance[0]));
@@ -838,7 +853,7 @@ bool CoreWrapper::odomUpdate(const nav_msgs::OdometryConstPtr & odomMsg)
 
 		lastPoseIntermediate_ = false;
 		lastPose_ = odom;
-		lastPoseStamp_ = odomMsg->header.stamp;
+		lastPoseStamp_ = stamp;
 
 		// Only update variance if odom is not null
 		if(!odom.isNull())
@@ -872,8 +887,8 @@ bool CoreWrapper::odomUpdate(const nav_msgs::OdometryConstPtr & odomMsg)
 		bool ignoreFrame = false;
 		if(rate_>0.0f)
 		{
-			if((previousStamp_.toSec() > 0.0 && odomMsg->header.stamp.toSec() > previousStamp_.toSec() && odomMsg->header.stamp - previousStamp_ < ros::Duration(1.0f/rate_)) ||
-			   ((previousStamp_.toSec() <= 0.0 || odomMsg->header.stamp.toSec() <= previousStamp_.toSec()) && ros::Time::now() - time_ < ros::Duration(1.0f/rate_)))
+			if((previousStamp_.toSec() > 0.0 && stamp.toSec() > previousStamp_.toSec() && stamp - previousStamp_ < ros::Duration(1.0f/rate_)) ||
+			   ((previousStamp_.toSec() <= 0.0 || stamp.toSec() <= previousStamp_.toSec()) && ros::Time::now() - time_ < ros::Duration(1.0f/rate_)))
 			{
 				ignoreFrame = true;
 			}
@@ -892,7 +907,7 @@ bool CoreWrapper::odomUpdate(const nav_msgs::OdometryConstPtr & odomMsg)
 		else if(!ignoreFrame)
 		{
 			time_ = ros::Time::now();
-			previousStamp_ = odomMsg->header.stamp;
+			previousStamp_ = stamp;
 		}
 
 		return true;
@@ -967,7 +982,21 @@ void CoreWrapper::commonDepthCallback(
 	if(odomMsg.get())
 	{
 		odomFrameId = odomMsg->header.frame_id;
-		if(!odomUpdate(odomMsg))
+		if(scan2dMsg.get())
+		{
+			if(!odomUpdate(odomMsg, scan2dMsg->header.stamp))
+			{
+				return;
+			}
+		}
+		else if(scan3dMsg.get())
+		{
+			if(!odomUpdate(odomMsg, scan3dMsg->header.stamp))
+			{
+				return;
+			}
+		}
+		else if(imageMsgs.size() == 0 || imageMsgs[0].get() == 0 || !odomUpdate(odomMsg, imageMsgs[0]->header.stamp))
 		{
 			return;
 		}
@@ -986,13 +1015,11 @@ void CoreWrapper::commonDepthCallback(
 			return;
 		}
 	}
-	else
+	else if(imageMsgs.size() == 0 || imageMsgs[0].get() == 0 || !odomTFUpdate(imageMsgs[0]->header.stamp))
 	{
-		if(imageMsgs.size() == 0 || imageMsgs[0].get() == 0 || !odomTFUpdate(imageMsgs[0]->header.stamp))
-		{
-			return;
-		}
+		return;
 	}
+
 	commonDepthCallbackImpl(odomFrameId,
 			userDataMsg,
 			imageMsgs,
@@ -1213,7 +1240,21 @@ void CoreWrapper::commonStereoCallback(
 	if(odomMsg.get())
 	{
 		odomFrameId = odomMsg->header.frame_id;
-		if(!odomUpdate(odomMsg))
+		if(scan2dMsg.get())
+		{
+			if(!odomUpdate(odomMsg, scan2dMsg->header.stamp))
+			{
+				return;
+			}
+		}
+		else if(scan3dMsg.get())
+		{
+			if(!odomUpdate(odomMsg, scan3dMsg->header.stamp))
+			{
+				return;
+			}
+		}
+		else if(leftImageMsg.get() == 0 || !odomUpdate(odomMsg, leftImageMsg->header.stamp))
 		{
 			return;
 		}
@@ -1232,12 +1273,9 @@ void CoreWrapper::commonStereoCallback(
 			return;
 		}
 	}
-	else
+	else if(leftImageMsg.get() == 0 || !odomTFUpdate(leftImageMsg->header.stamp))
 	{
-		if(leftImageMsg.get() == 0 || !odomTFUpdate(leftImageMsg->header.stamp))
-		{
-			return;
-		}
+		return;
 	}
 
 	cv::Mat left;
