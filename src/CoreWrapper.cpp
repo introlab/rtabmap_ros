@@ -828,20 +828,27 @@ bool CoreWrapper::odomUpdate(const nav_msgs::OdometryConstPtr & odomMsg, ros::Ti
 {
 	if(!paused_)
 	{
-		Transform odom = rtabmap_ros::getTransform(odomMsg->header.frame_id, frameId_, stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
-		if(odom.isNull())
+		Transform odom = rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose);
+		if(!odom.isNull())
 		{
-			static bool shown = false;
-			if(!shown)
+			Transform odomTF = rtabmap_ros::getTransform(odomMsg->header.frame_id, frameId_, stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+			if(odomTF.isNull())
 			{
-				NODELET_WARN("We received odometry message, but we cannot get the "
-						"corresponding TF %s->%s at data stamp %fs (odom msg stamp is %fs). Make sure TF of odometry is "
-						"also published to get more accurate pose estimation. This "
-						"warning is only printed once.", odomMsg->header.frame_id.c_str(), frameId_.c_str(), stamp.toSec(), odomMsg->header.stamp.toSec());
-				shown = true;
+				static bool shown = false;
+				if(!shown)
+				{
+					NODELET_WARN("We received odometry message, but we cannot get the "
+							"corresponding TF %s->%s at data stamp %fs (odom msg stamp is %fs). Make sure TF of odometry is "
+							"also published to get more accurate pose estimation. This "
+							"warning is only printed once.", odomMsg->header.frame_id.c_str(), frameId_.c_str(), stamp.toSec(), odomMsg->header.stamp.toSec());
+					shown = true;
+				}
+				stamp = odomMsg->header.stamp;
 			}
-			odom = rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose);
-			stamp = odomMsg->header.stamp;
+			else
+			{
+				odom = odomTF;
+			}
 		}
 
 		if(!lastPose_.isIdentity() && !odom.isNull() && (odom.isIdentity() || (odomMsg->pose.covariance[0] >= BAD_COVARIANCE && odomMsg->twist.covariance[0] >= BAD_COVARIANCE)))
