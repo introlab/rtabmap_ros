@@ -2401,7 +2401,7 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 	return true;
 }
 
-bool CoreWrapper::getPlanCallback(nav_msgs::GetPlan::Request  &req, nav_msgs::GetPlan::Response &res)
+bool CoreWrapper::getPlanCallback(nav_msgs::GetPlan::Request &req, nav_msgs::GetPlan::Response &res)
 {
 	Transform pose = rtabmap_ros::transformFromPoseMsg(req.goal.pose);
 	UTimer timer;
@@ -2420,7 +2420,7 @@ bool CoreWrapper::getPlanCallback(nav_msgs::GetPlan::Request  &req, nav_msgs::Ge
 			pose = t * pose;
 		}
 
-		if(rtabmap_.computePath(pose))
+		if(rtabmap_.computePath(pose, req.tolerance))
 		{
 			NODELET_INFO("Planning: Time computing path = %f s", timer.ticks());
 			const std::vector<std::pair<int, Transform> > & poses = rtabmap_.getPath();
