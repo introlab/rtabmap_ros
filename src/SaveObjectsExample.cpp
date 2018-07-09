@@ -29,7 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <tf/transform_listener.h>
 #include <find_object_2d/ObjectsStamped.h>
 #include <rtabmap/utilite/UConversion.h>
-#include <opencv2/core.hpp>
+#include <opencv2/core/core.hpp>
 #include <rtabmap_ros/UserData.h>
 #include <rtabmap_ros/MsgConversion.h>
 #include <rtabmap/core/Compression.h>

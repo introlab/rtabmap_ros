@@ -526,6 +526,7 @@ void CoreWrapper::onInit()
 	getGridMapSrv_ = nh.advertiseService("get_grid_map", &CoreWrapper::getGridMapCallback, this);
 	getProjMapSrv_ = nh.advertiseService("get_proj_map", &CoreWrapper::getProjMapCallback, this);
 	publishMapDataSrv_ = nh.advertiseService("publish_map", &CoreWrapper::publishMapCallback, this);
+	getPlanSrv_ = nh.advertiseService("get_plan", &CoreWrapper::getPlanCallback, this);
 	setGoalSrv_ = nh.advertiseService("set_goal", &CoreWrapper::setGoalCallback, this);
 	cancelGoalSrv_ = nh.advertiseService("cancel_goal", &CoreWrapper::cancelGoalCallback, this);
 	setLabelSrv_ = nh.advertiseService("set_label", &CoreWrapper::setLabelCallback, this);
@@ -2397,6 +2398,74 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 		UWARN("No subscribers, don't need to publish!");
 	}
 
+	return true;
+}
+
+bool CoreWrapper::getPlanCallback(nav_msgs::GetPlan::Request  &req, nav_msgs::GetPlan::Response &res)
+{
+	Transform pose = rtabmap_ros::transformFromPoseMsg(req.goal.pose);
+	UTimer timer;
+	if(!pose.isNull())
+	{
+		// transform goal in /map frame
+		if(mapFrameId_.compare(req.goal.header.frame_id) != 0)
+		{
+			Transform t = rtabmap_ros::getTransform(mapFrameId_, req.goal.header.frame_id, req.goal.header.stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+			if(t.isNull())
+			{
+				NODELET_ERROR("Cannot transform goal pose from \"%s\" frame to \"%s\" frame!",
+						req.goal.header.frame_id.c_str(), mapFrameId_.c_str());
+				return true;
+			}
+			pose = t * pose;
+		}
+
+		if(rtabmap_.computePath(pose))
+		{
+			NODELET_INFO("Planning: Time computing path = %f s", timer.ticks());
+			const std::vector<std::pair<int, Transform> > & poses = rtabmap_.getPath();
+			res.plan.header.frame_id = mapFrameId_;
+			res.plan.header.stamp = ros::Time::now();
+			if(poses.size() == 0)
+			{
+				NODELET_WARN("Planning: Goal already reached (RGBD/GoalReachedRadius=%fm).",
+						rtabmap_.getGoalReachedRadius());
+				// just set the goal directly
+				res.plan.poses.resize(1);
+				rtabmap_ros::transformToPoseMsg(pose, res.plan.poses[0].pose);
+			}
+			else
+			{
+				res.plan.poses.resize(poses.size());
+				int oi = 0;
+				for(std::vector<std::pair<int, Transform> >::const_iterator iter=poses.begin(); iter!=poses.end(); ++iter)
+				{
+					res.plan.poses[oi].header = res.plan.header;
+					rtabmap_ros::transformToPoseMsg(iter->second, res.plan.poses[oi].pose);
+					++oi;
+				}
+				if(!rtabmap_.getPathTransformToGoal().isIdentity())
+				{
+					res.plan.poses.resize(res.plan.poses.size()+1);
+					Transform p = rtabmap_.getPath().back().second*rtabmap_.getPathTransformToGoal();
+					rtabmap_ros::transformToPoseMsg(p, res.plan.poses[res.plan.poses.size()-1].pose);
+				}
+
+				// Just output the path on screen
+				std::stringstream stream;
+				for(std::vector<std::pair<int, Transform> >::const_iterator iter=poses.begin(); iter!=poses.end(); ++iter)
+				{
+					if(iter != poses.begin())
+					{
+						stream << " ";
+					}
+					stream << iter->first;
+				}
+				NODELET_INFO("Planned path: [%s]", stream.str().c_str());
+			}
+		}
+		rtabmap_.clearPath(0);
+	}
 	return true;
 }
 
