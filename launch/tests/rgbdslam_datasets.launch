@@ -5,7 +5,7 @@
    $ wget http://vision.in.tum.de/rgbd/dataset/freiburg3/rgbd_dataset_freiburg3_long_office_household.bag
    $ rosbag decompress rgbd_dataset_freiburg3_long_office_household.bag
 
-   $ roslaunch rtabmap_ros rgbdslam_datasets.launch feature=6
+   $ roslaunch rtabmap_ros rgbdslam_datasets.launch
    $ rosbag play -.-clock rgbd_dataset_freiburg3_long_office_household.bag
    -->
    
@@ -30,13 +30,8 @@
       <remap from="odom" to="vis_odom"/>
 	  
       <param name="Odom/Strategy" type="string" value="0"/>      <!-- 0=Frame-to-Map, 1=Frame-to-KeyFrame -->
-      <param name="Vis/CorType" type="string" value="0"/>        <!-- 0=features matching 1=Optical Flow -->
-      <param name="Vis/EstimationType" type="string" value="0"/> <!-- 0=3D->3D, 1=3D->2D (PnP) -->
       <param name="Odom/FillInfoData" type="string" value="$(arg rtabmapviz)"/>
-      <param name="Vis/MaxDepth" type="string" value="4"/>
-      <param name="Vis/CorNNDR" type="string" value="0.6"/>
       <param name="Odom/ResetCountdown" type="string" value="15"/> 
-      <param name="Odom/KeyFrameThr" type="string" value="0.5"/>
 
       <param name="odom_frame_id" type="string" value="vis_odom"/>
       <param name="frame_id" type="string" value="kinect"/>
@@ -57,10 +52,6 @@
       <param name="subscribe_laserScan" type="bool" value="false"/>
       
       <param name="Rtabmap/StartNewMapOnLoopClosure" type="string" value="true"/>
-      <param name="Vis/EstimationType" type="string" value="0"/>
-      <param name="Vis/MaxDepth" type="string" value="4"/>
-      <param name="RGBD/LoopClosureReextractFeatures" type="string" value="false"/>
-      <param name="Mem/RawDescriptorsKept" type="string" value="true"/>
       <param name="Kp/DetectorStrategy" type="string" value="0"/>
       <param name="RGBD/CreateOccupancyGrid" type="string" value="false"/>
       <param name="Rtabmap/CreateIntermediateNodes" type="string" value="true"/>
