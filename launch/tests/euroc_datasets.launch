@@ -1,0 +1,42 @@
+<launch>
+
+<param name="use_sim_time" value="true"/>
+
+<group ns="stereo_camera">
+
+  <node pkg="rtabmap_ros" type="yaml_to_camera_info.py" name="yaml_to_camera_info_left">
+    <param name="yaml_path" value="$(find rtabmap_ros)/launch/calibration/euroc_left.yaml"/>
+    <remap from="image" to="/cam0/image_raw"/>
+    <remap from="camera_info" to="left/camera_info"/>
+  </node>
+  <node pkg="rtabmap_ros" type="yaml_to_camera_info.py" name="yaml_to_camera_info_right">
+    <param name="yaml_path" value="$(find rtabmap_ros)/launch/calibration/euroc_right.yaml"/>
+    <remap from="image" to="/cam1/image_raw"/>
+    <remap from="camera_info" to="right/camera_info"/>
+  </node>
+
+  <node pkg="stereo_image_proc" type="stereo_image_proc" name="stereo_image_proc">
+    <remap from="left/image_raw"    to="/cam0/image_raw"/>
+    <remap from="right/image_raw"   to="/cam1/image_raw"/>
+  </node>
+
+</group>
+
+<node pkg="tf" type="static_transform_publisher" name="camera_base_link" args="0.009811 0.064677 -0.021640 -1.596576 -0.014866 -1.566656 base_link cam0 100"/>  
+<node pkg="tf" type="static_transform_publisher" name="leica_base_link" args="0.120209 -0.0184772 -0.0748903 0 0 0 leica base_link_gt 100"/>  
+
+<node pkg="rtabmap_ros" type="point_to_tf.py" name="point_to_tf">
+  <remap from="point" to="/leica/position"/>
+  <param name="frame_id" value="leica"/>
+  <param name="fixed_frame_id" value="world"/>
+</node>
+
+<include file="$(find rtabmap_ros)/launch/rtabmap.launch">
+   <arg name="rtabmap_args" value="--delete_db_on_start --RGBD/CreateOccupancyGrid false --Rtabmap/DetectionRate 1"/>
+   <arg name="stereo" value="true"/>
+   <arg name="frame_id" value="base_link"/>
+   <arg name="ground_truth_frame_id" value="world"/>
+   <arg name="ground_truth_base_frame_id" value="base_link_gt"/>
+</include>
+
+</launch>
