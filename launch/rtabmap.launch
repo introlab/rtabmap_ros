@@ -91,7 +91,8 @@
   <arg name="odom_sensor_sync"         default="false"/>
   <arg name="odom_guess_frame_id"        default=""/>
   <arg name="odom_guess_min_translation" default="0"/>
-  <arg name="odom_guess_min_rotation"    default="0"/>  
+  <arg name="odom_guess_min_rotation"    default="0"/> 
+  <arg name="imu_topic"                default="/imu"/>          <!-- only used with VIO approaches -->
   
   <arg name="subscribe_user_data"      default="false"/>             <!-- user data synchronized subscription -->
   <arg name="user_data_topic"          default="/user_data"/>
@@ -190,6 +191,7 @@
           <remap     if="$(arg rgbd_sync)" from="rgbd_image" to="$(arg rgbd_topic)"/>
           <remap unless="$(arg rgbd_sync)" from="rgbd_image" to="$(arg rgbd_topic)_relay"/>
           <remap from="odom"                   to="$(arg odom_topic)"/>
+          <remap from="imu"                    to="$(arg imu_topic)"/>
       
           <param name="frame_id"                    type="string" value="$(arg frame_id)"/>
           <param name="odom_frame_id"               type="string" value="$(arg vo_frame_id)"/>
@@ -227,7 +229,7 @@
   
     <!-- Visual SLAM (robot side) -->
     <!-- args: "delete_db_on_start" and "udebug" -->
-    <node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="$(arg output)" args="$(arg rtabmap_args)" launch-prefix="$(arg launch_prefix)">
+    <node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="$(arg output)" args="$(arg rtabmap_args)" launch-prefix="">
       <param     if="$(arg stereo)" name="subscribe_depth"  type="bool" value="false"/>
       <param unless="$(arg stereo)" name="subscribe_depth"  type="bool" value="true"/>
       <param name="subscribe_rgbd"       type="bool"   value="$(arg subscribe_rgbd)"/>

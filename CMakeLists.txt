@@ -1,6 +1,17 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(rtabmap_ros)
 
+# Policy CMP0043 introduced in cmake version 3.0 IGNORES the use of COMPILE_DEFINITIONS suffixed variables, e.g. COMPILE_DEFINITIONS_DEBUG
+# Set to OLD behavior until minimum cmake version >= 2.8.10 (version that COMPILE_DEFINITIONS can be set by generator expressions instead)
+if (POLICY CMP0043)
+	cmake_policy(SET CMP0043 OLD)
+endif (POLICY CMP0043)
+# Policy CMP0042 introduced in cmake version 3.0 enables the use of @rpath in an install name via MACOSX_RPATH by default
+# Set to OLD behavior so that all versions use the same behavior, or until minimum cmake version >= 2.8.12 (version where @rpath is available)
+if (POLICY CMP0042)
+	cmake_policy(SET CMP0042 OLD)
+endif (POLICY CMP0042)
+
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
@@ -19,7 +30,7 @@ find_package(find_object_2d)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
-find_package(RTABMap 0.17.2 REQUIRED)
+find_package(RTABMap 0.17.4 REQUIRED)
 
 find_package(OpenCV REQUIRED)
 

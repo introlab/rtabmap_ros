@@ -18,7 +18,7 @@ def callback(point):
 
 if __name__ == "__main__":
 
-    rospy.init_node("yaml_to_camera_info", anonymous=True)
+    rospy.init_node("point_to_tf", anonymous=True)
 
     frame_id = rospy.get_param('~frame_id', 'point')
     fixed_frame_id = rospy.get_param('~fixed_frame_id', 'world')

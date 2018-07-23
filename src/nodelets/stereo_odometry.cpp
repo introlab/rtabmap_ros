@@ -38,6 +38,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/image_encodings.h>
+#include <sensor_msgs/Imu.h>
 
 #include <image_geometry/stereo_camera_model.h>
 
@@ -49,6 +50,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/utilite/UTimer.h>
 #include <rtabmap/utilite/UStl.h>
 #include <rtabmap/utilite/UConversion.h>
+#include <rtabmap/core/Odometry.h>
 
 using namespace rtabmap;
 
@@ -140,6 +142,15 @@ private:
 					cameraInfoLeft_.getTopic().c_str(),
 					cameraInfoRight_.getTopic().c_str());
 		}
+
+		int odomStrategy = 0;
+		Parameters::parse(this->parameters(), Parameters::kOdomStrategy(), odomStrategy);
+		if(odomStrategy == Odometry::kTypeOkvis || odomStrategy == Odometry::kTypeMSCKF)
+		{
+			imuSub_ = nh.subscribe("imu", queueSize_*5, &StereoOdometry::callbackIMU, this);
+			NODELET_INFO("VIO approach selected, subscribing to IMU topic %s", imuSub_.getTopic().c_str());
+		}
+
 		this->startWarningThread(subscribedTopicsMsg, approxSync);
 	}
 
@@ -184,8 +195,6 @@ private:
 			{
 				return;
 			}
-
-			ros::WallTime time = ros::WallTime::now();
 
 			int quality = -1;
 			if(imageRectLeft->data.size() && imageRectRight->data.size())
@@ -312,6 +321,36 @@ private:
 		}
 	}
 
+	void callbackIMU(
+			const sensor_msgs::ImuConstPtr& msg)
+	{
+		if(!this->isPaused())
+		{
+			double stamp = msg->header.stamp.toSec();
+			rtabmap::Transform localTransform = rtabmap::Transform::getIdentity();
+			if(this->frameId().compare(msg->header.frame_id) != 0)
+			{
+				localTransform = getTransform(this->frameId(), msg->header.frame_id, msg->header.stamp);
+			}
+			if(localTransform.isNull())
+			{
+				ROS_ERROR("Could not transform IMU msg from frame \"%s\" to frame \"%s\", TF not available at time %f",
+						msg->header.frame_id.c_str(), this->frameId().c_str(), stamp);
+				return;
+			}
+
+			IMU imu(
+					cv::Vec3d(msg->angular_velocity.x, msg->angular_velocity.y, msg->angular_velocity.z),
+					cv::Mat(3,3,CV_64FC1,(void*)msg->angular_velocity_covariance.data()).clone(),
+					cv::Vec3d(msg->linear_acceleration.x, msg->linear_acceleration.y, msg->linear_acceleration.z),
+					cv::Mat(3,3,CV_64FC1,(void*)msg->linear_acceleration_covariance.data()).clone(),
+					localTransform);
+
+			SensorData data(imu, 0, stamp);
+			this->processData(data, msg->header.stamp);
+		}
+	}
+
 protected:
 	virtual void flushCallbacks()
 	{
@@ -340,6 +379,7 @@ private:
 	typedef message_filters::sync_policies::ExactTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo, sensor_msgs::CameraInfo> MyExactSyncPolicy;
 	message_filters::Synchronizer<MyExactSyncPolicy> * exactSync_;
 	ros::Subscriber rgbdSub_;
+	ros::Subscriber imuSub_;
 	int queueSize_;
 };
 

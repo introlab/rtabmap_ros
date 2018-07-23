@@ -2,6 +2,12 @@
 
 <param name="use_sim_time" value="true"/>
 
+<arg name="cfg" default=""/>
+<arg name="MH_seq" default="false"/> <!-- For MH sequences, the ground truth is coming from a different topic -->
+<arg name="rtabmapviz" default="true"/>
+<arg name="rviz" default="false"/>
+
+<!-- Image rectification and publishing synchronized camera_info-->
 <group ns="stereo_camera">
 
   <node pkg="rtabmap_ros" type="yaml_to_camera_info.py" name="yaml_to_camera_info_left">
@@ -22,21 +28,36 @@
 
 </group>
 
-<node pkg="tf" type="static_transform_publisher" name="camera_base_link" args="0.009811 0.064677 -0.021640 -1.596576 -0.014866 -1.566656 base_link cam0 100"/>  
-<node pkg="tf" type="static_transform_publisher" name="leica_base_link" args="0.120209 -0.0184772 -0.0748903 0 0 0 leica base_link_gt 100"/>  
+<!-- TF frames -->
+<node pkg="tf" type="static_transform_publisher" name="imu_base_link" args="0 0 0 3.1415926 -1.570796 0 base_link imu4 5"/>
+<node pkg="tf" type="static_transform_publisher" name="camera_imu_link" args="-0.021640 -0.064677 0.009811 1.555925 0.025777 0.003757 imu4 cam0 50"/>  
+<node     if="$(arg MH_seq)" pkg="tf" type="static_transform_publisher" name="leica_base_link" args="0.120209 -0.0184772 -0.0748903 0 0 0 leica base_link_gt 100"/> 
+<node unless="$(arg MH_seq)" pkg="tf" type="static_transform_publisher" name="vicon_base_link" args="0.120209 -0.0184772 -0.0748903 0 0 0 vicon/firefly_sbx/firefly_sbx base_link_gt 100"/>
 
-<node pkg="rtabmap_ros" type="point_to_tf.py" name="point_to_tf">
+<node     if="$(arg MH_seq)" pkg="rtabmap_ros" type="point_to_tf.py" name="point_to_tf">
   <remap from="point" to="/leica/position"/>
   <param name="frame_id" value="leica"/>
   <param name="fixed_frame_id" value="world"/>
 </node>
+<node unless="$(arg MH_seq)" pkg="rtabmap_ros" type="transform_to_tf.py" name="transform_to_tf">
+  <remap from="transform" to="/vicon/firefly_sbx/firefly_sbx"/>
+  <param name="frame_id" value="world"/>
+  <param name="child_frame_id" value="vicon/firefly_sbx/firefly_sbx"/>
+</node>
+<node pkg="tf" type="static_transform_publisher" name="world_to_map" args="0.0 0.0 0.0 0.0 0.0 0.0 /world /map 100" />
 
+<!-- RTAB-Map -->
 <include file="$(find rtabmap_ros)/launch/rtabmap.launch">
    <arg name="rtabmap_args" value="--delete_db_on_start --RGBD/CreateOccupancyGrid false --Rtabmap/DetectionRate 1"/>
    <arg name="stereo" value="true"/>
    <arg name="frame_id" value="base_link"/>
+   <arg name="wait_for_transform" value="0.01"/>
    <arg name="ground_truth_frame_id" value="world"/>
    <arg name="ground_truth_base_frame_id" value="base_link_gt"/>
+   <arg name="cfg" value="$(arg cfg)"/>
+   <arg name="imu_topic" value="/imu0"/>
+   <arg name="rtabmapviz" value="$(arg rtabmapviz)"/>
+   <arg name="rviz" value="$(arg rviz)"/>
 </include>
 
 </launch>

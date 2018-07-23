@@ -192,6 +192,7 @@ void OdometryROS::onInit()
 
 	//parameters
 	parameters_ = Parameters::getDefaultOdometryParameters(stereoParams_, visParams_, icpParams_);
+	parameters_.insert(*Parameters::getDefaultParameters().find(Parameters::kRtabmapImagesAlreadyRectified()));
 	if(!configPath.empty())
 	{
 		if(UFile::exists(configPath.c_str()))
@@ -377,24 +378,27 @@ Transform OdometryROS::getTransform(const std::string & fromFrameId, const std::
 
 void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 {
-	if(odometry_->getPose().isIdentity() &&
-	   !groundTruthFrameId_.empty())
+	if(!data.imageRaw().empty())
 	{
-		// sync with the first value of the ground truth
-		Transform initialPose = getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, stamp);
-		if(initialPose.isNull())
+		if(odometry_->getPose().isIdentity() &&
+		   !groundTruthFrameId_.empty())
 		{
-			NODELET_WARN("Ground truth frames \"%s\" -> \"%s\" are set but failed to "
-					"get them, odometry won't be synchronized with ground truth.",
-					groundTruthFrameId_.c_str(), groundTruthBaseFrameId_.c_str());
-		}
-		else
-		{
-			NODELET_INFO( "Initializing odometry pose to %s (from \"%s\" -> \"%s\")",
-					initialPose.prettyPrint().c_str(),
-					groundTruthFrameId_.c_str(),
-					groundTruthBaseFrameId_.c_str());
-			odometry_->reset(initialPose);
+			// sync with the first value of the ground truth
+			Transform initialPose = getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, stamp);
+			if(initialPose.isNull())
+			{
+				NODELET_WARN("Ground truth frames \"%s\" -> \"%s\" are set but failed to "
+						"get them, odometry won't be synchronized with ground truth.",
+						groundTruthFrameId_.c_str(), groundTruthBaseFrameId_.c_str());
+			}
+			else
+			{
+				NODELET_INFO( "Initializing odometry pose to %s (from \"%s\" -> \"%s\")",
+						initialPose.prettyPrint().c_str(),
+						groundTruthFrameId_.c_str(),
+						groundTruthBaseFrameId_.c_str());
+				odometry_->reset(initialPose);
+			}
 		}
 	}
 
@@ -617,6 +621,10 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 			odomLocalScanMap_.publish(cloudMsg);
 		}
 	}
+	else if(data.imageRaw().empty() && !data.imu().empty())
+	{
+		return;
+	}
 	else if(publishNullWhenLost_)
 	{
 		//NODELET_WARN( "Odometry lost!");
@@ -676,22 +684,24 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 		odomInfoPub_.publish(infoMsg);
 	}
 
-	if(visParams_)
+	if(!data.imageRaw().empty())
 	{
-		if(icpParams_)
+		if(visParams_)
 		{
-			NODELET_INFO( "Odom: quality=%d, ratio=%f, std dev=%fm|%frad, update time=%fs", info.reg.inliers, info.reg.icpInliersRatio, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (ros::WallTime::now()-time).toSec());
+			if(icpParams_)
+			{
+				NODELET_INFO( "Odom: quality=%d, ratio=%f, std dev=%fm|%frad, update time=%fs", info.reg.inliers, info.reg.icpInliersRatio, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (ros::WallTime::now()-time).toSec());
+			}
+			else
+			{
+				NODELET_INFO( "Odom: quality=%d, std dev=%fm|%frad, update time=%fs", info.reg.inliers, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (ros::WallTime::now()-time).toSec());
+			}
 		}
 		else
 		{
-			NODELET_INFO( "Odom: quality=%d, std dev=%fm|%frad, update time=%fs", info.reg.inliers, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (ros::WallTime::now()-time).toSec());
+			NODELET_INFO( "Odom: ratio=%f, std dev=%fm|%frad, update time=%fs", info.reg.icpInliersRatio, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (ros::WallTime::now()-time).toSec());
 		}
 	}
-	else
-	{
-		NODELET_INFO( "Odom: ratio=%f, std dev=%fm|%frad, update time=%fs", info.reg.icpInliersRatio, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (ros::WallTime::now()-time).toSec());
-	}
-
 }
 
 bool OdometryROS::reset(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
