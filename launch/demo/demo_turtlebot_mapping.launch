@@ -31,6 +31,7 @@
   <arg name="rtabmapviz"        default="false"/>
   <arg name="localization"      default="false"/>
   <arg name="simulation"        default="false"/>
+  <arg name="sw_registered"     default="false"/>
   <arg     if="$(arg localization)" name="args"  default=""/>
   <arg unless="$(arg localization)" name="args"  default="--delete_db_on_start"/>
 
@@ -47,7 +48,10 @@
   -->
   
   <!-- Navigation stuff (move_base) -->
-  <include unless="$(arg simulation)" file="$(find turtlebot_bringup)/launch/3dsensor.launch"/>
+  <include unless="$(arg simulation)" file="$(find turtlebot_bringup)/launch/3dsensor.launch">
+     <arg     if="$(arg sw_registered)" name="depth_registration" value="false"/>
+     <arg unless="$(arg sw_registered)" name="depth_registration" value="true"/>
+  </include>
   <include file="$(find turtlebot_navigation)/launch/includes/move_base.launch.xml"/>
   
   <!-- Mapping -->
