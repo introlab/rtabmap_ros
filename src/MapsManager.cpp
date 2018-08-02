@@ -289,9 +289,52 @@ void MapsManager::setParameters(const rtabmap::ParametersMap & parameters)
 #endif
 }
 
-void MapsManager::set2DMap(const cv::Mat & map, float xMin, float yMin, float cellSize, const std::map<int, rtabmap::Transform> & poses)
+void MapsManager::set2DMap(
+		const cv::Mat & map,
+		float xMin,
+		float yMin,
+		float cellSize,
+		const std::map<int, rtabmap::Transform> & poses,
+		const rtabmap::Memory * memory)
 {
 	occupancyGrid_->setMap(map, xMin, yMin, cellSize, poses);
+	//update cache in case the map should be updated
+	if(memory)
+	{
+		for(std::map<int, rtabmap::Transform>::const_iterator iter=poses.begin(); iter!=poses.end(); ++iter)
+		{
+			std::map<int, std::pair< std::pair<cv::Mat, cv::Mat>, cv::Mat> >::iterator jter = gridMaps_.find(iter->first);
+			if(!uContains(gridMaps_, iter->first))
+			{
+				rtabmap::SensorData data;
+				data = memory->getSignatureDataConst(iter->first, false, false, false, true);
+				if(data.gridCellSize() == 0.0f)
+				{
+					ROS_WARN("Local occupancy grid doesn't exist for node %d", iter->first);
+				}
+				else
+				{
+					cv::Mat ground, obstacles, emptyCells;
+					data.uncompressData(
+							0,
+							0,
+							0,
+							0,
+							&ground,
+							&obstacles,
+							&emptyCells);
+
+					uInsert(gridMaps_, std::make_pair(iter->first, std::make_pair(std::make_pair(ground, obstacles), emptyCells)));
+					uInsert(gridMapsViewpoints_, std::make_pair(iter->first, data.gridViewPoint()));
+					occupancyGrid_->addToCache(iter->first, ground, obstacles, emptyCells);
+				}
+			}
+			else
+			{
+				occupancyGrid_->addToCache(iter->first, jter->second.first.first, jter->second.first.second, jter->second.second);
+			}
+		}
+	}
 }
 
 void MapsManager::clear()

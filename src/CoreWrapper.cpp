@@ -502,8 +502,8 @@ void CoreWrapper::onInit()
 		cv::Mat map = rtabmap_.getMemory()->load2DMap(xMin, yMin, gridCellSize);
 		if(!map.empty())
 		{
-			NODELET_INFO("rtabmap: 2D occupancy grid map loaded.\n");
-			mapsManager_.set2DMap(map, xMin, yMin, gridCellSize, rtabmap_.getLocalOptimizedPoses());
+			NODELET_INFO("rtabmap: 2D occupancy grid map loaded (%dx%d).", map.cols, map.rows);
+			mapsManager_.set2DMap(map, xMin, yMin, gridCellSize, rtabmap_.getLocalOptimizedPoses(), rtabmap_.getMemory());
 		}
 	}
 
