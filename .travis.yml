@@ -17,6 +17,7 @@ install:
     - sudo sh -c 'echo "deb http://packages.ros.org/ros/ubuntu trusty main" > /etc/apt/sources.list.d/ros-latest.list'
     - wget http://packages.ros.org/ros.key -O - | sudo apt-key add -
     - sudo apt-get update
+    - sudo apt-get install dpkg
     - sudo apt-get -y install ros-indigo-ros-base libpcl-1.7-all libfreenect-dev ros-indigo-libg2o ros-indigo-octomap libopenni2-dev ros-indigo-costmap-2d ros-indigo-octomap-ros ros-indigo-rviz ros-indigo-cv-bridge ros-indigo-move-base-msgs ros-indigo-costmap-2d ros-indigo-image-geometry ros-indigo-message-filters ros-indigo-image-transport ros-indigo-eigen-conversions ros-indigo-stereo-msgs ros-indigo-nav-msgs ros-indigo-sensor-msgs ros-indigo-tf-conversions ros-indigo-laser-geometry ros-indigo-pcl-conversions ros-indigo-pcl-ros ros-indigo-dynamic-reconfigure ros-indigo-nodelet
 
 script: 
