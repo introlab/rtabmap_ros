@@ -1,7 +1,27 @@
 <launch>
 
+<!-- 
+Examples:
+   F2M (default VO):
+      $ roslaunch rtabmap_ros euroc_datasets.launch
+      $ rosbag play -.-clock V1_01_easy.bag
+
+      For MH sequences, we should set MH_seq to true because the ground truth source is different.
+      $ roslaunch rtabmap_ros euroc_datasets.launch MH_seq:=true
+      $ rosbag play -.-clock MH_01_easy.bag
+
+   MSCKF (VIO):
+      $ roslaunch rtabmap_ros euroc_datasets.launch args:="-d RGBD/CreateOccupancyGrid false Odom/Strategy 8"
+      $ rosbag play -.-clock V1_01_easy.bag
+
+      We need to ignore the first 24 seconds for correct VIO initialization (drone should not move).
+      $ roslaunch rtabmap_ros euroc_datasets.launch args:="-d RGBD/CreateOccupancyGrid false Odom/Strategy 8" MH_seq:=true
+      $ rosbag play -.-clock -s 24 MH_01_easy.bag
+-->
+
 <param name="use_sim_time" value="true"/>
 
+<arg name="args" default="-d --RGBD/CreateOccupancyGrid false"/>
 <arg name="cfg" default=""/>
 <arg name="MH_seq" default="false"/> <!-- For MH sequences, the ground truth is coming from a different topic -->
 <arg name="rtabmapviz" default="true"/>
@@ -48,7 +68,7 @@
 
 <!-- RTAB-Map -->
 <include file="$(find rtabmap_ros)/launch/rtabmap.launch">
-   <arg name="rtabmap_args" value="--delete_db_on_start --RGBD/CreateOccupancyGrid false --Rtabmap/DetectionRate 1"/>
+   <arg name="args" value="$(arg args)"/>
    <arg name="stereo" value="true"/>
    <arg name="frame_id" value="base_link"/>
    <arg name="wait_for_transform" value="0.01"/>
