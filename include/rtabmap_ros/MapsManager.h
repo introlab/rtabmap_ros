@@ -74,6 +74,11 @@ public:
 			float & yMin,
 			float & gridCellSize);
 
+	cv::Mat getGridProbMap(
+			float & xMin,
+			float & yMin,
+			float & gridCellSize);
+
 	const rtabmap::OctoMap * getOctomap() const {return octomap_;}
 	const rtabmap::OccupancyGrid * getOccupancyGrid() const {return occupancyGrid_;}
 
@@ -93,6 +98,7 @@ private:
 	ros::Publisher cloudObstaclesPub_;
 	ros::Publisher projMapPub_;
 	ros::Publisher gridMapPub_;
+	ros::Publisher gridProbMapPub_;
 	ros::Publisher scanMapPub_;
 	ros::Publisher octoMapPubBin_;
 	ros::Publisher octoMapPubFull_;

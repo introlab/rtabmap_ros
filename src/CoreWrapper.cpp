@@ -523,6 +523,7 @@ void CoreWrapper::onInit()
 	setModeMappingSrv_ = nh.advertiseService("set_mode_mapping", &CoreWrapper::setModeMappingCallback, this);
 	getMapDataSrv_ = nh.advertiseService("get_map_data", &CoreWrapper::getMapDataCallback, this);
 	getMapSrv_ = nh.advertiseService("get_map", &CoreWrapper::getMapCallback, this);
+	getProbMapSrv_ = nh.advertiseService("get_prob_map", &CoreWrapper::getProbMapCallback, this);
 	getGridMapSrv_ = nh.advertiseService("get_grid_map", &CoreWrapper::getGridMapCallback, this);
 	getProjMapSrv_ = nh.advertiseService("get_proj_map", &CoreWrapper::getProjMapCallback, this);
 	publishMapDataSrv_ = nh.advertiseService("publish_map", &CoreWrapper::publishMapCallback, this);
@@ -2164,6 +2165,39 @@ bool CoreWrapper::getMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::GetM
 	// create the grid map
 	float xMin=0.0f, yMin=0.0f, gridCellSize = 0.05f;
 	cv::Mat pixels = mapsManager_.getGridMap(xMin, yMin, gridCellSize);
+
+	if(!pixels.empty())
+	{
+		//init
+		res.map.info.resolution = gridCellSize;
+		res.map.info.origin.position.x = 0.0;
+		res.map.info.origin.position.y = 0.0;
+		res.map.info.origin.position.z = 0.0;
+		res.map.info.origin.orientation.x = 0.0;
+		res.map.info.origin.orientation.y = 0.0;
+		res.map.info.origin.orientation.z = 0.0;
+		res.map.info.origin.orientation.w = 1.0;
+
+		res.map.info.width = pixels.cols;
+		res.map.info.height = pixels.rows;
+		res.map.info.origin.position.x = xMin;
+		res.map.info.origin.position.y = yMin;
+		res.map.data.resize(res.map.info.width * res.map.info.height);
+
+		memcpy(res.map.data.data(), pixels.data, res.map.info.width * res.map.info.height);
+
+		res.map.header.frame_id = mapFrameId_;
+		res.map.header.stamp = ros::Time::now();
+		return true;
+	}
+	return false;
+}
+
+bool CoreWrapper::getProbMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::GetMap::Response &res)
+{
+	// create the grid map
+	float xMin=0.0f, yMin=0.0f, gridCellSize = 0.05f;
+	cv::Mat pixels = mapsManager_.getGridProbMap(xMin, yMin, gridCellSize);
 
 	if(!pixels.empty())
 	{

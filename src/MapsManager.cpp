@@ -139,6 +139,7 @@ void MapsManager::init(ros::NodeHandle & nh, ros::NodeHandle & pnh, const std::s
 		nht = &pnh;
 	}
 	gridMapPub_ = nht->advertise<nav_msgs::OccupancyGrid>("grid_map", 1, latch);
+	gridProbMapPub_ = nht->advertise<nav_msgs::OccupancyGrid>("grid_prob_map", 1, latch);
 	cloudMapPub_ = nht->advertise<sensor_msgs::PointCloud2>("cloud_map", 1, latch);
 	cloudObstaclesPub_ = nht->advertise<sensor_msgs::PointCloud2>("cloud_obstacles", 1, latch);
 	cloudGroundPub_ = nht->advertise<sensor_msgs::PointCloud2>("cloud_ground", 1, latch);
@@ -267,7 +268,7 @@ void MapsManager::backwardCompatibilityParameters(ros::NodeHandle & pnh, Paramet
 #ifdef WITH_OCTOMAP_ROS
 #ifdef RTABMAP_OCTOMAP
 	parameterMoved(pnh, "octomap_ground_is_obstacle", Parameters::kGridGroundIsObstacle(), parameters);
-	parameterMoved(pnh, "octomap_occupancy_thr", Parameters::kGridGlobalOctoMapOccupancyThr(), parameters);
+	parameterMoved(pnh, "octomap_occupancy_thr", Parameters::kGridGlobalOccupancyThr(), parameters);
 #endif
 #endif
 }
@@ -364,6 +365,7 @@ bool MapsManager::hasSubscribers() const
 			cloudGroundPub_.getNumSubscribers() != 0 ||
 			projMapPub_.getNumSubscribers() != 0 ||
 			gridMapPub_.getNumSubscribers() != 0 ||
+			gridProbMapPub_.getNumSubscribers() != 0 ||
 			scanMapPub_.getNumSubscribers() != 0 ||
 			octoMapPubBin_.getNumSubscribers() != 0 ||
 			octoMapPubFull_.getNumSubscribers() != 0 ||
@@ -406,7 +408,8 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 				octoMapProj_.getNumSubscribers() != 0;
 
 		updateGrid = projMapPub_.getNumSubscribers() != 0 ||
-				gridMapPub_.getNumSubscribers() != 0;
+				gridMapPub_.getNumSubscribers() != 0 ||
+				gridProbMapPub_.getNumSubscribers() != 0;
 
 		updateGridCache = updateOctomap || updateGrid ||
 				cloudMapPub_.getNumSubscribers() != 0 ||
@@ -1228,7 +1231,7 @@ void MapsManager::publishMaps(
 #endif
 #endif
 
-	if(gridMapPub_.getNumSubscribers() || projMapPub_.getNumSubscribers())
+	if(gridMapPub_.getNumSubscribers() || projMapPub_.getNumSubscribers() || gridProbMapPub_.getNumSubscribers())
 	{
 		if(projMapPub_.getNumSubscribers())
 		{
@@ -1247,46 +1250,88 @@ void MapsManager::publishMaps(
 			}
 		}
 
-		// create the grid map
-		float xMin=0.0f, yMin=0.0f, gridCellSize = 0.05f;
-		cv::Mat pixels = this->getGridMap(xMin, yMin, gridCellSize);
-
-		if(!pixels.empty())
+		if(gridProbMapPub_.getNumSubscribers())
 		{
-			//init
-			nav_msgs::OccupancyGrid map;
-			map.info.resolution = gridCellSize;
-			map.info.origin.position.x = 0.0;
-			map.info.origin.position.y = 0.0;
-			map.info.origin.position.z = 0.0;
-			map.info.origin.orientation.x = 0.0;
-			map.info.origin.orientation.y = 0.0;
-			map.info.origin.orientation.z = 0.0;
-			map.info.origin.orientation.w = 1.0;
-
-			map.info.width = pixels.cols;
-			map.info.height = pixels.rows;
-			map.info.origin.position.x = xMin;
-			map.info.origin.position.y = yMin;
-			map.data.resize(map.info.width * map.info.height);
-
-			memcpy(map.data.data(), pixels.data, map.info.width * map.info.height);
-
-			map.header.frame_id = mapFrameId;
-			map.header.stamp = stamp;
-
-			if(gridMapPub_.getNumSubscribers())
+			// create the grid map
+			float xMin=0.0f, yMin=0.0f, gridCellSize = 0.05f;
+			cv::Mat pixels = this->getGridProbMap(xMin, yMin, gridCellSize);
+			if(!pixels.empty())
 			{
-				gridMapPub_.publish(map);
+				//init
+				nav_msgs::OccupancyGrid map;
+				map.info.resolution = gridCellSize;
+				map.info.origin.position.x = 0.0;
+				map.info.origin.position.y = 0.0;
+				map.info.origin.position.z = 0.0;
+				map.info.origin.orientation.x = 0.0;
+				map.info.origin.orientation.y = 0.0;
+				map.info.origin.orientation.z = 0.0;
+				map.info.origin.orientation.w = 1.0;
+
+				map.info.width = pixels.cols;
+				map.info.height = pixels.rows;
+				map.info.origin.position.x = xMin;
+				map.info.origin.position.y = yMin;
+				map.data.resize(map.info.width * map.info.height);
+
+				memcpy(map.data.data(), pixels.data, map.info.width * map.info.height);
+
+				map.header.frame_id = mapFrameId;
+				map.header.stamp = stamp;
+
+				if(gridProbMapPub_.getNumSubscribers())
+				{
+					gridProbMapPub_.publish(map);
+				}
 			}
-			if(projMapPub_.getNumSubscribers())
+			else if(poses.size())
 			{
-				projMapPub_.publish(map);
+				ROS_WARN("Grid map is empty! (local maps=%d)", (int)gridMaps_.size());
 			}
 		}
-		else if(poses.size())
+		if(gridMapPub_.getNumSubscribers() || projMapPub_.getNumSubscribers())
 		{
-			ROS_WARN("Grid map is empty! (local maps=%d)", (int)gridMaps_.size());
+			// create the grid map
+			float xMin=0.0f, yMin=0.0f, gridCellSize = 0.05f;
+			cv::Mat pixels = this->getGridMap(xMin, yMin, gridCellSize);
+
+			if(!pixels.empty())
+			{
+				//init
+				nav_msgs::OccupancyGrid map;
+				map.info.resolution = gridCellSize;
+				map.info.origin.position.x = 0.0;
+				map.info.origin.position.y = 0.0;
+				map.info.origin.position.z = 0.0;
+				map.info.origin.orientation.x = 0.0;
+				map.info.origin.orientation.y = 0.0;
+				map.info.origin.orientation.z = 0.0;
+				map.info.origin.orientation.w = 1.0;
+
+				map.info.width = pixels.cols;
+				map.info.height = pixels.rows;
+				map.info.origin.position.x = xMin;
+				map.info.origin.position.y = yMin;
+				map.data.resize(map.info.width * map.info.height);
+
+				memcpy(map.data.data(), pixels.data, map.info.width * map.info.height);
+
+				map.header.frame_id = mapFrameId;
+				map.header.stamp = stamp;
+
+				if(gridMapPub_.getNumSubscribers())
+				{
+					gridMapPub_.publish(map);
+				}
+				if(projMapPub_.getNumSubscribers())
+				{
+					projMapPub_.publish(map);
+				}
+			}
+			else if(poses.size())
+			{
+				ROS_WARN("Grid map is empty! (local maps=%d)", (int)gridMaps_.size());
+			}
 		}
 	}
 
@@ -1304,5 +1349,14 @@ cv::Mat MapsManager::getGridMap(
 {
 	gridCellSize = occupancyGrid_->getCellSize();
 	return occupancyGrid_->getMap(xMin, yMin);
+}
+
+cv::Mat MapsManager::getGridProbMap(
+		float & xMin,
+		float & yMin,
+		float & gridCellSize)
+{
+	gridCellSize = occupancyGrid_->getCellSize();
+	return occupancyGrid_->getProbMap(xMin, yMin);
 }
 
