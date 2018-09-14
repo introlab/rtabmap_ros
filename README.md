@@ -90,6 +90,35 @@ This section shows how to install RTAB-Map ros-pkg on **ROS Hydro/Indigo/Jade/Ki
     ```
     * Use `catkin_make -j1` if compilation requires more RAM than you have (e.g., some files require up to ~1.8 GB to build).
 
+## Build from source for NVidia Jetson with OpenCV 4 Tegra
+To use `rtabmap_ros` on Jetson, you can follow the instructions above if you don't care if OpenCV is built for Tegra. However, if you want `rtabmap` to use OpenCV 4 Tegra, we must re-build [vision_opencv](https://github.com/ros-perception/vision_opencv) stack from source too to avoid conflicts with [vision_opencv](https://github.com/ros-perception/vision_opencv) stack binaries from ros (which are linked on a not optimized version of OpenCV). Here are the steps:
+1. Install [JetPack](https://developer.nvidia.com/embedded/jetpack) with OpenCV on the Jetson.
+2. Do steps 1.2 and 1.3 from http://wiki.ros.org/kinetic/Installation/Ubuntu
+3. Install non-opencv dependent ros packages:
+
+    * `sudo apt-get install ros-kinetic-ros-base ros-kinetic-image-transport ros-kinetic-tf ros-kinetic-tf-conversions ros-kinetic-eigen-conversions ros-kinetic-laser-geometry ros-kinetic-pcl-conversions ros-kinetic-pcl-ros ros-kinetic-move-base-msgs ros-kinetic-rviz ros-kinetic-octomap-ros ros-kinetic-move-base`
+4. Do step 1.6 from http://wiki.ros.org/kinetic/Installation/Ubuntu
+5. [Create your catkin workspace](http://wiki.ros.org/ROS/Tutorials/InstallingandConfiguringROSEnvironment#Create_a_ROS_Workspace)
+6. Install RTAB-Map standalone libraries. Add `-DCMAKE_INSTALL_PREFIX=~/catkin_ws/devel` to `cmake` command below if you want to install in your Catkin's devel folder without `sudo`. **Do not clone in your Catkin workspace**.
+ 
+    ```bash
+    $ cd ~
+    $ git clone https://github.com/introlab/rtabmap.git rtabmap
+    $ cd rtabmap/build
+    $ cmake ..  [<---double dots included]
+    $ make
+    $ sudo make install
+    ```
+7. Clone [vision_opencv](https://github.com/ros-perception/vision_opencv), [image_transport_plugins](https://github.com/ros-perception/image_transport_plugins) and `rtabmap_ros` packages in your catkin_ws:
+
+   ```
+    $ cd ~/catkin_ws
+    $ git clone https://github.com/ros-perception/vision_opencv src/vision_opencv
+    $ git clone https://github.com/ros-perception/image_transport_plugins.git src/image_transport_plugins
+    $ git clone https://github.com/introlab/rtabmap_ros.git src/rtabmap_ros src/rtabmap_ros
+    $ catkin_make -j1
+    ```
+    
 ### Update to new version 
 
 ```bash
