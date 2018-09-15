@@ -119,14 +119,14 @@ To use `rtabmap_ros` on Jetson, you can follow the instructions above if you don
     ```
 10. Clone [vision_opencv](https://github.com/ros-perception/vision_opencv), [image_transport_plugins](https://github.com/ros-perception/image_transport_plugins) and `rtabmap_ros` packages in your catkin_ws:
 
-   ```
+   ```bash
     $ cd ~/catkin_ws
     $ git clone https://github.com/ros-perception/vision_opencv src/vision_opencv
     $ git clone https://github.com/ros-perception/image_transport_plugins.git src/image_transport_plugins
     $ git clone https://github.com/introlab/rtabmap_ros.git src/rtabmap_ros src/rtabmap_ros
-    $ catkin_make -j1
-    ```
-    
+    $ catkin_make -j2
+   ```
+
 ### Update to new version 
 
 ```bash
