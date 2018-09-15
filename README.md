@@ -68,10 +68,7 @@ This section shows how to install RTAB-Map ros-pkg on **ROS Hydro/Indigo/Jade/Ki
         git clone https://bitbucket.org/gtborg/gtsam.git
         ```
 
-    * [Freenect2](https://github.com/OpenKinect/libfreenect2): Follow installation instructions from [here](https://github.com/OpenKinect/libfreenect2#debianubuntu-1404-perhaps-earlier).
-
 2. Install RTAB-Map standalone libraries. Add `-DCMAKE_INSTALL_PREFIX=~/catkin_ws/devel` to `cmake` command below if you want to install in your Catkin's devel folder without `sudo`. **Do not clone in your Catkin workspace**.
- 
     ```bash
     $ cd ~
     $ git clone https://github.com/introlab/rtabmap.git rtabmap
@@ -96,10 +93,21 @@ To use `rtabmap_ros` on Jetson, you can follow the instructions above if you don
 2. Do steps 1.2 and 1.3 from http://wiki.ros.org/kinetic/Installation/Ubuntu
 3. Install non-opencv dependent ros packages:
 
-    * `sudo apt-get install ros-kinetic-ros-base ros-kinetic-image-transport ros-kinetic-tf ros-kinetic-tf-conversions ros-kinetic-eigen-conversions ros-kinetic-laser-geometry ros-kinetic-pcl-conversions ros-kinetic-pcl-ros ros-kinetic-move-base-msgs ros-kinetic-rviz ros-kinetic-octomap-ros ros-kinetic-move-base`
+    * `sudo apt-get install ros-kinetic-ros-base ros-kinetic-image-transport ros-kinetic-tf ros-kinetic-tf-conversions ros-kinetic-eigen-conversions ros-kinetic-laser-geometry ros-kinetic-pcl-conversions ros-kinetic-pcl-ros ros-kinetic-move-base-msgs ros-kinetic-rviz ros-kinetic-octomap-ros ros-kinetic-move-base libhdf5-openmpi-dev libsuitesparse-dev`
 4. Do step 1.6 from http://wiki.ros.org/kinetic/Installation/Ubuntu
 5. [Create your catkin workspace](http://wiki.ros.org/ROS/Tutorials/InstallingandConfiguringROSEnvironment#Create_a_ROS_Workspace)
-6. Install RTAB-Map standalone libraries. Add `-DCMAKE_INSTALL_PREFIX=~/catkin_ws/devel` to `cmake` command below if you want to install in your Catkin's devel folder without `sudo`. **Do not clone in your Catkin workspace**.
+6. *Optional:* Install g2o and/or GTSAM dependencies as above (increase visual odometry accuracy and graph optimization).
+7. To avoid [libGL undefined errors](https://devtalk.nvidia.com/default/topic/1007290/jetson-tx2/building-opencv-with-opengl-support-/post/5141945/#5141945):
+     ```
+     $ cd /usr/lib/aarch64-linux-gnu/
+     $ sudo ln -sf tegra/libGL.so libGL.so
+     ```
+8. To avoid [libvtkproj4 errors](https://github.com/PointCloudLibrary/pcl/issues/1594#issuecomment-283873617):
+    ```
+    $ sudo ln -s /usr/lib/aarch64-linux-gnu/libvtkCommonCore-6.2.so /usr/lib/libvtkproj4.so
+    $ sudo ln -s /usr/lib/aarch64-linux-gnu/libvtkCommonCore-6.2.so /usr/lib/aarch64-linux-gnu/libvtkproj4-6.2.so.6.2.0
+    ```
+9. Install RTAB-Map standalone libraries. Add `-DCMAKE_INSTALL_PREFIX=~/catkin_ws/devel` to `cmake` command below if you want to install in your Catkin's devel folder without `sudo`. **Do not clone in your Catkin workspace**.
  
     ```bash
     $ cd ~
@@ -109,7 +117,7 @@ To use `rtabmap_ros` on Jetson, you can follow the instructions above if you don
     $ make
     $ sudo make install
     ```
-7. Clone [vision_opencv](https://github.com/ros-perception/vision_opencv), [image_transport_plugins](https://github.com/ros-perception/image_transport_plugins) and `rtabmap_ros` packages in your catkin_ws:
+10. Clone [vision_opencv](https://github.com/ros-perception/vision_opencv), [image_transport_plugins](https://github.com/ros-perception/image_transport_plugins) and `rtabmap_ros` packages in your catkin_ws:
 
    ```
     $ cd ~/catkin_ws
