@@ -112,8 +112,8 @@
       <param name="rgb/image_transport"   type="string" value="compressed"/>
       <param name="depth/image_transport" type="string" value="compressedDepth"/>
 
-      <!-- As hector doesn't provide compatible covariance in the odometry topic, don't use the topic and fix the covariance -->
-      <param if="$(arg hector)" name="odom_frame_id"            type="string" value="hector_map"/>
+      <!-- As hector doesn't provide compatible covariance in the odometry topic -->
+      <param if="$(arg hector)" name="odom_frame_id" type="string" value="hector_map"/>
 
       <remap unless="$(arg hector)" from="odom" to="/scanmatch_odom"/>
       <param unless="$(arg hector)" name="subscribe_odom_info" type="bool" value="true"/>
