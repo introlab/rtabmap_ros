@@ -87,7 +87,7 @@ This section shows how to install RTAB-Map ros-pkg on **ROS Hydro/Indigo/Jade/Ki
     ```
     * Use `catkin_make -j1` if compilation requires more RAM than you have (e.g., some files require up to ~1.8 GB to build).
 
-## Build from source for NVidia Jetson with OpenCV 4 Tegra
+## Build from source for Nvidia Jetson with OpenCV 4 Tegra
 To use `rtabmap_ros` on Jetson, you can follow the instructions above if you don't care if OpenCV is built for Tegra. However, if you want `rtabmap` to use OpenCV 4 Tegra, we must re-build [vision_opencv](https://github.com/ros-perception/vision_opencv) stack from source too to avoid conflicts with [vision_opencv](https://github.com/ros-perception/vision_opencv) stack binaries from ros (which are linked on a not optimized version of OpenCV). Here are the steps:
 1. Install [JetPack](https://developer.nvidia.com/embedded/jetpack) with OpenCV on the Jetson.
 2. Do steps 1.2 and 1.3 from http://wiki.ros.org/kinetic/Installation/Ubuntu
