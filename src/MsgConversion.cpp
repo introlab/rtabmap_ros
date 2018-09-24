@@ -570,19 +570,32 @@ rtabmap::CameraModel cameraModelFromROS(
 		const sensor_msgs::CameraInfo & camInfo,
 		const rtabmap::Transform & localTransform)
 {
-	cv::Mat D;
-	if(camInfo.D.size())
-	{
-		D = cv::Mat(1, camInfo.D.size(), CV_64FC1);
-		memcpy(D.data, camInfo.D.data(), D.cols*sizeof(double));
-	}
-
 	cv:: Mat K;
 	UASSERT(camInfo.K.empty() || camInfo.K.size() == 9);
 	if(!camInfo.K.empty())
 	{
 		K = cv::Mat(3, 3, CV_64FC1);
 		memcpy(K.data, camInfo.K.elems, 9*sizeof(double));
+	}
+
+	cv::Mat D;
+	if(camInfo.D.size())
+	{
+		if(camInfo.D.size()>=4 &&
+		   (uStrContains(camInfo.distortion_model, "fisheye") ||
+		    uStrContains(camInfo.distortion_model, "equidistant")))
+		{
+			D = cv::Mat::zeros(1, 6, CV_64FC1);
+			D.at<double>(0,0) = camInfo.D[0];
+			D.at<double>(0,1) = camInfo.D[1];
+			D.at<double>(0,4) = camInfo.D[2];
+			D.at<double>(0,5) = camInfo.D[3];
+		}
+		else
+		{
+			D = cv::Mat(1, camInfo.D.size(), CV_64FC1);
+			memcpy(D.data, camInfo.D.data(), D.cols*sizeof(double));
+		}
 	}
 
 	cv:: Mat R;
@@ -611,9 +624,6 @@ void cameraModelToROS(
 		const rtabmap::CameraModel & model,
 		sensor_msgs::CameraInfo & camInfo)
 {
-	camInfo.D = std::vector<double>(model.D_raw().cols);
-	memcpy(camInfo.D.data(), model.D_raw().data, model.D_raw().cols*sizeof(double));
-
 	UASSERT(model.K_raw().empty() || model.K_raw().total() == 9);
 	if(model.K_raw().empty())
 	{
@@ -622,6 +632,29 @@ void cameraModelToROS(
 	else
 	{
 		memcpy(camInfo.K.elems, model.K_raw().data, 9*sizeof(double));
+	}
+
+	if(camInfo.D.size() == 6)
+	{
+		camInfo.D = std::vector<double>(4);
+		camInfo.D[0] = model.D_raw().at<double>(0,0);
+		camInfo.D[1] = model.D_raw().at<double>(0,1);
+		camInfo.D[2] = model.D_raw().at<double>(0,4);
+		camInfo.D[3] = model.D_raw().at<double>(0,5);
+		camInfo.distortion_model = "equidistant"; // fisheye
+	}
+	else
+	{
+		camInfo.D = std::vector<double>(model.D_raw().cols);
+		memcpy(camInfo.D.data(), model.D_raw().data, model.D_raw().cols*sizeof(double));
+		if(camInfo.D.size() > 5)
+		{
+			camInfo.distortion_model = "rational_polynomial";
+		}
+		else
+		{
+			camInfo.distortion_model = "plumb_bob";
+		}
 	}
 
 	UASSERT(model.R().empty() || model.R().total() == 9);
@@ -644,14 +677,6 @@ void cameraModelToROS(
 		memcpy(camInfo.P.elems, model.P().data, 12*sizeof(double));
 	}
 
-	if(camInfo.D.size() > 5)
-	{
-		camInfo.distortion_model = "rational_polynomial";
-	}
-	else
-	{
-		camInfo.distortion_model = "plumb_bob";
-	}
 	camInfo.binning_x = 1;
 	camInfo.binning_y = 1;
 	camInfo.roi.width = model.imageWidth();
