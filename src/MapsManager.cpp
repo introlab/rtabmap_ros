@@ -863,6 +863,7 @@ void MapsManager::publishMaps(
 
 		if(graphGroundOptimized || graphObstacleOptimized)
 		{
+			ROS_INFO("Graph has changed, updating clouds...");
 			UTimer t;
 			cv::Mat tmpGroundPts;
 			cv::Mat tmpObstaclePts;

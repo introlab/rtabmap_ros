@@ -2257,11 +2257,6 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 					req.global);
 		}
 
-		if(poses.size() && poses.size() != signatures.size())
-		{
-			NODELET_WARN("poses and signatures are not the same size!? %d vs %d", (int)poses.size(), (int)signatures.size());
-		}
-
 		ros::Time now = ros::Time::now();
 		if(mapDataPub_.getNumSubscribers())
 		{
