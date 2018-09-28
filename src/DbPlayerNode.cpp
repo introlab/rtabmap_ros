@@ -109,8 +109,7 @@ int main(int argc, char** argv)
 	pnh.param("start_id", startId, startId);
 
 	// based on URG-04LX
-	double scanHeight, scanAngleMin, scanAngleMax, scanAngleIncrement, scanTime, scanRangeMin, scanRangeMax;
-	pnh.param<double>("scan_height", scanHeight, 0.3);
+	double scanAngleMin, scanAngleMax, scanAngleIncrement, scanTime, scanRangeMin, scanRangeMax;
 	pnh.param<double>("scan_angle_min", scanAngleMin, -M_PI / 2.0);
 	pnh.param<double>("scan_angle_max", scanAngleMax, M_PI / 2.0);
 	pnh.param<double>("scan_angle_increment", scanAngleIncrement, M_PI / 360.0);
@@ -305,7 +304,7 @@ int main(int argc, char** argv)
 				baseToLaserScan.child_frame_id = scanFrameId;
 				baseToLaserScan.header.frame_id = frameId;
 				baseToLaserScan.header.stamp = time;
-				rtabmap_ros::transformToGeometryMsg(rtabmap::Transform(0,0,scanHeight,0,0,0), baseToLaserScan.transform);
+				rtabmap_ros::transformToGeometryMsg(odom.data().laserScanCompressed().localTransform(), baseToLaserScan.transform);
 				tfBroadcaster.sendTransform(baseToLaserScan);
 			}
 		}
