@@ -110,12 +110,12 @@ int main(int argc, char** argv)
 
 	// based on URG-04LX
 	double scanAngleMin, scanAngleMax, scanAngleIncrement, scanTime, scanRangeMin, scanRangeMax;
-	pnh.param<double>("scan_angle_min", scanAngleMin, -M_PI / 2.0);
-	pnh.param<double>("scan_angle_max", scanAngleMax, M_PI / 2.0);
-	pnh.param<double>("scan_angle_increment", scanAngleIncrement, M_PI / 360.0);
-	pnh.param<double>("scan_time", scanTime, 1.0 / 10.0);
-	pnh.param<double>("scan_range_min", scanRangeMin, 0.02);
-	pnh.param<double>("scan_range_max", scanRangeMax, 6.0);
+	pnh.param<double>("scan_angle_min", scanAngleMin, -M_PI);
+	pnh.param<double>("scan_angle_max", scanAngleMax, M_PI);
+	pnh.param<double>("scan_angle_increment", scanAngleIncrement, M_PI / 720.0);
+	pnh.param<double>("scan_time", scanTime, 0);
+	pnh.param<double>("scan_range_min", scanRangeMin, 0.0);
+	pnh.param<double>("scan_range_max", scanRangeMax, 60);
 
 	ROS_INFO("frame_id = %s", frameId.c_str());
 	ROS_INFO("odom_frame_id = %s", odomFrameId.c_str());
