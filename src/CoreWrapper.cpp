@@ -59,7 +59,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/Registration.h>
 #include <rtabmap/core/Graph.h>
 
-#ifdef WITH_OCTOMAP_ROS
+#ifdef WITH_OCTOMAP_MSGS
 #ifdef RTABMAP_OCTOMAP
 #include <octomap_msgs/conversions.h>
 #include <rtabmap/core/OctoMap.h>
@@ -532,7 +532,7 @@ void CoreWrapper::onInit()
 	cancelGoalSrv_ = nh.advertiseService("cancel_goal", &CoreWrapper::cancelGoalCallback, this);
 	setLabelSrv_ = nh.advertiseService("set_label", &CoreWrapper::setLabelCallback, this);
 	listLabelsSrv_ = nh.advertiseService("list_labels", &CoreWrapper::listLabelsCallback, this);
-#ifdef WITH_OCTOMAP_ROS
+#ifdef WITH_OCTOMAP_MSGS
 #ifdef RTABMAP_OCTOMAP
 	octomapBinarySrv_ = nh.advertiseService("octomap_binary", &CoreWrapper::octomapBinaryCallback, this);
 	octomapFullSrv_ = nh.advertiseService("octomap_full", &CoreWrapper::octomapFullCallback, this);
@@ -2889,7 +2889,7 @@ void CoreWrapper::publishGlobalPath(const ros::Time & stamp)
 	}
 }
 
-#ifdef WITH_OCTOMAP_ROS
+#ifdef WITH_OCTOMAP_MSGS
 #ifdef RTABMAP_OCTOMAP
 bool CoreWrapper::octomapBinaryCallback(
 		octomap_msgs::GetOctomap::Request  &req,

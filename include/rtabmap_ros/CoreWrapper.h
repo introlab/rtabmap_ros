@@ -57,7 +57,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "MapsManager.h"
 
-#ifdef WITH_OCTOMAP_ROS
+#ifdef WITH_OCTOMAP_MSGS
 #include <octomap_msgs/GetOctomap.h>
 #endif
 
@@ -160,7 +160,7 @@ private:
 	bool cancelGoalCallback(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res);
 	bool setLabelCallback(rtabmap_ros::SetLabel::Request& req, rtabmap_ros::SetLabel::Response& res);
 	bool listLabelsCallback(rtabmap_ros::ListLabels::Request& req, rtabmap_ros::ListLabels::Response& res);
-#ifdef WITH_OCTOMAP_ROS
+#ifdef WITH_OCTOMAP_MSGS
 	bool octomapBinaryCallback(octomap_msgs::GetOctomap::Request  &req, octomap_msgs::GetOctomap::Response &res);
 	bool octomapFullCallback(octomap_msgs::GetOctomap::Request  &req, octomap_msgs::GetOctomap::Response &res);
 #endif
@@ -256,7 +256,7 @@ private:
 	ros::ServiceServer cancelGoalSrv_;
 	ros::ServiceServer setLabelSrv_;
 	ros::ServiceServer listLabelsSrv_;
-#ifdef WITH_OCTOMAP_ROS
+#ifdef WITH_OCTOMAP_MSGS
 	ros::ServiceServer octomapBinarySrv_;
 	ros::ServiceServer octomapFullSrv_;
 #endif

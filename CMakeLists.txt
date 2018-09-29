@@ -24,7 +24,7 @@ find_package(catkin REQUIRED COMPONENTS
 
 # Optional components
 find_package(costmap_2d)
-find_package(octomap_ros)
+find_package(octomap_msgs)
 find_package(rviz)
 find_package(find_object_2d)
 
@@ -128,9 +128,9 @@ SET(optional_dependencies "")
 IF(costmap_2d_FOUND)		
    SET(optional_dependencies ${optional_dependencies} costmap_2d)		
 ENDIF(costmap_2d_FOUND)		
-IF(octomap_ros_FOUND)		
-   SET(optional_dependencies ${optional_dependencies} octomap_ros)		
-ENDIF(octomap_ros_FOUND)		
+IF(octomap_msgs_FOUND)		
+   SET(optional_dependencies ${optional_dependencies} octomap_msgs)		
+ENDIF(octomap_msgs_FOUND)		
 IF(rviz_FOUND)		
    SET(optional_dependencies ${optional_dependencies} rviz)		
 ENDIF(rviz_FOUND)
@@ -219,17 +219,17 @@ SET(rtabmap_ros_lib_src
 ENDIF(costmap_2d_FOUND)
 
 # If octomap is found, add definition
-IF(octomap_ros_FOUND)
-MESSAGE(STATUS "WITH octomap")
+IF(octomap_msgs_FOUND)
+MESSAGE(STATUS "WITH octomap_msgs")
 include_directories(
-  ${octomap_ros_INCLUDE_DIRS}
+  ${octomap_msgs_INCLUDE_DIRS}
 )
 SET(Libraries
-  ${octomap_ros_LIBRARIES}
+  ${octomap_msgs_LIBRARIES}
   ${Libraries}
 )
-ADD_DEFINITIONS("-DWITH_OCTOMAP_ROS")
-ENDIF(octomap_ros_FOUND)
+ADD_DEFINITIONS("-DWITH_OCTOMAP_MSGS")
+ENDIF(octomap_msgs_FOUND)
 
 IF(QT4_FOUND OR Qt5_FOUND)
 SET(Libraries 

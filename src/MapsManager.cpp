@@ -46,7 +46,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <pcl_conversions/pcl_conversions.h>
 
-#ifdef WITH_OCTOMAP_ROS
+#ifdef WITH_OCTOMAP_MSGS
 #ifdef RTABMAP_OCTOMAP
 #include <octomap_msgs/conversions.h>
 #include <octomap/ColorOcTree.h>
@@ -104,7 +104,7 @@ void MapsManager::init(ros::NodeHandle & nh, ros::NodeHandle & pnh, const std::s
 	ROS_INFO("%s(maps): cloud_subtract_filtering   = %s", name.c_str(), cloudSubtractFiltering_?"true":"false");
 	ROS_INFO("%s(maps): cloud_subtract_filtering_min_neighbors = %d", name.c_str(), cloudSubtractFilteringMinNeighbors_);
 
-#ifdef WITH_OCTOMAP_ROS
+#ifdef WITH_OCTOMAP_MSGS
 #ifdef RTABMAP_OCTOMAP
 	octomap_ = new OctoMap(occupancyGrid_->getCellSize(), 0.5, occupancyGrid_->isFullUpdate(), occupancyGrid_->getUpdateError());
 	pnh.param("octomap_tree_depth", octomapTreeDepth_, octomapTreeDepth_);
@@ -148,7 +148,7 @@ void MapsManager::init(ros::NodeHandle & nh, ros::NodeHandle & pnh, const std::s
 	projMapPub_ = nht->advertise<nav_msgs::OccupancyGrid>("proj_map", 1, latch);
 	scanMapPub_ = nht->advertise<sensor_msgs::PointCloud2>("scan_map", 1, latch);
 
-#ifdef WITH_OCTOMAP_ROS
+#ifdef WITH_OCTOMAP_MSGS
 #ifdef RTABMAP_OCTOMAP
 	octoMapPubBin_ = nht->advertise<octomap_msgs::Octomap>("octomap_binary", 1, latch);
 	octoMapPubFull_ = nht->advertise<octomap_msgs::Octomap>("octomap_full", 1, latch);
@@ -166,7 +166,7 @@ MapsManager::~MapsManager() {
 
 	delete occupancyGrid_;
 
-#ifdef WITH_OCTOMAP_ROS
+#ifdef WITH_OCTOMAP_MSGS
 #ifdef RTABMAP_OCTOMAP
 	if(octomap_)
 	{
@@ -265,7 +265,7 @@ void MapsManager::backwardCompatibilityParameters(ros::NodeHandle & pnh, Paramet
 	parameterMoved(pnh, "grid_eroded", Parameters::kGridGlobalEroded(), parameters);
 	parameterMoved(pnh, "grid_footprint_radius", Parameters::kGridGlobalFootprintRadius(), parameters);
 
-#ifdef WITH_OCTOMAP_ROS
+#ifdef WITH_OCTOMAP_MSGS
 #ifdef RTABMAP_OCTOMAP
 	parameterMoved(pnh, "octomap_ground_is_obstacle", Parameters::kGridGroundIsObstacle(), parameters);
 	parameterMoved(pnh, "octomap_occupancy_thr", Parameters::kGridGlobalOccupancyThr(), parameters);
@@ -278,7 +278,7 @@ void MapsManager::setParameters(const rtabmap::ParametersMap & parameters)
 	parameters_ = parameters;
 	occupancyGrid_->parseParameters(parameters_);
 
-#ifdef WITH_OCTOMAP_ROS
+#ifdef WITH_OCTOMAP_MSGS
 #ifdef RTABMAP_OCTOMAP
 	if(octomap_)
 	{
@@ -351,7 +351,7 @@ void MapsManager::clear()
 	groundClouds_.clear();
 	obstacleClouds_.clear();
 	occupancyGrid_->clear();
-#ifdef WITH_OCTOMAP_ROS
+#ifdef WITH_OCTOMAP_MSGS
 #ifdef RTABMAP_OCTOMAP
 	octomap_->clear();
 #endif
@@ -418,7 +418,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 				scanMapPub_.getNumSubscribers() != 0;
 	}
 
-#ifndef WITH_OCTOMAP_ROS
+#ifndef WITH_OCTOMAP_MSGS
 	updateOctomap = false;
 #endif
 #ifndef RTABMAP_OCTOMAP
@@ -487,7 +487,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 				ROS_WARN("Many occupancy grids should be loaded (~%d), this may take a while to update the map(s)...", int(filteredPoses.size()-gridMaps_.size()));
 				longUpdate = true;
 			}
-#ifdef WITH_OCTOMAP_ROS
+#ifdef WITH_OCTOMAP_MSGS
 #ifdef RTABMAP_OCTOMAP
 			if(updateOctomap && octomap_->addedNodes().size() < 5)
 			{
@@ -642,7 +642,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 					}
 				}
 
-#ifdef WITH_OCTOMAP_ROS
+#ifdef WITH_OCTOMAP_MSGS
 #ifdef RTABMAP_OCTOMAP
 				if(updateOctomap &&
 						(iter->first < 0 ||
@@ -680,7 +680,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 			occupancyGrid_->update(filteredPoses);
 		}
 
-#ifdef WITH_OCTOMAP_ROS
+#ifdef WITH_OCTOMAP_MSGS
 #ifdef RTABMAP_OCTOMAP
 		if(updateOctomap)
 		{
@@ -1108,7 +1108,7 @@ void MapsManager::publishMaps(
 		obstacleClouds_.clear();
 	}
 
-#ifdef WITH_OCTOMAP_ROS
+#ifdef WITH_OCTOMAP_MSGS
 #ifdef RTABMAP_OCTOMAP
 	if(octoMapPubBin_.getNumSubscribers() ||
 			octoMapPubFull_.getNumSubscribers() ||
