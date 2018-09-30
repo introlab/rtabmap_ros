@@ -31,6 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/LaserScan.h>
 #include <sensor_msgs/CameraInfo.h>
+#include <rosgraph_msgs/Clock.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <nav_msgs/Odometry.h>
 #include <cv_bridge/cv_bridge.h>
@@ -86,6 +87,14 @@ int main(int argc, char** argv)
 	//ULogger::setLevel(ULogger::kDebug);
 	//ULogger::setEventLevel(ULogger::kWarning);
 
+	bool publishClock = false;
+	for(int i=1;i<argc;++i)
+	{
+		if(strcmp(argv[i], "--clock") == 0)
+		{
+			publishClock = true;
+		}
+	}
 
 	ros::NodeHandle nh;
 	ros::NodeHandle pnh("~");
@@ -98,6 +107,7 @@ int main(int argc, char** argv)
 	std::string databasePath = "";
 	bool publishTf = true;
 	int startId = 0;
+	bool useDbStamps = true;
 
 	pnh.param("frame_id", frameId, frameId);
 	pnh.param("odom_frame_id", odomFrameId, odomFrameId);
@@ -108,7 +118,7 @@ int main(int argc, char** argv)
 	pnh.param("publish_tf", publishTf, publishTf);
 	pnh.param("start_id", startId, startId);
 
-	// based on URG-04LX
+	// A general 360 lidar with 0.5 deg increment
 	double scanAngleMin, scanAngleMax, scanAngleIncrement, scanTime, scanRangeMin, scanRangeMax;
 	pnh.param<double>("scan_angle_min", scanAngleMin, -M_PI);
 	pnh.param<double>("scan_angle_max", scanAngleMax, M_PI);
@@ -124,6 +134,7 @@ int main(int argc, char** argv)
 	ROS_INFO("rate = %f", rate);
 	ROS_INFO("publish_tf = %s", publishTf?"true":"false");
 	ROS_INFO("start_id = %d", startId);
+	ROS_INFO("Publish clock (--clock): %s", publishClock?"true":"false");
 
 	if(databasePath.empty())
 	{
@@ -159,7 +170,13 @@ int main(int argc, char** argv)
 	ros::Publisher rightCamInfoPub;
 	ros::Publisher odometryPub;
 	ros::Publisher scanPub;
+	ros::Publisher clockPub;
 	tf2_ros::TransformBroadcaster tfBroadcaster;
+
+	if(publishClock)
+	{
+		clockPub = nh.advertise<rosgraph_msgs::Clock>("/clock", 1);
+	}
 
 	UTimer timer;
 	rtabmap::CameraInfo cameraInfo;
@@ -172,7 +189,14 @@ int main(int argc, char** argv)
 	{
 		ROS_INFO("Reading sensor data %d...", odom.data().id());
 
-		ros::Time time = ros::Time::now();
+		ros::Time time(odom.data().stamp());
+
+		if(publishClock)
+		{
+			rosgraph_msgs::Clock msg;
+			msg.clock = time;
+			clockPub.publish(msg);
+		}
 
 		sensor_msgs::CameraInfo camInfoA; //rgb or left
 		sensor_msgs::CameraInfo camInfoB; //depth or right
@@ -263,7 +287,16 @@ int main(int argc, char** argv)
 
 		if(!odom.data().laserScanRaw().isEmpty())
 		{
-			if(scanPub.getTopic().empty()) scanPub = nh.advertise<sensor_msgs::LaserScan>("scan", 1);
+			if(scanPub.getTopic().empty())
+			{
+				scanPub = nh.advertise<sensor_msgs::LaserScan>("scan", 1);
+				ROS_INFO("Scan will be published with those parameters:");
+				ROS_INFO("  scan_angle_min=%f", scanAngleMin);
+				ROS_INFO("  scan_angle_max=%f", scanAngleMax);
+				ROS_INFO("  scan_angle_increment=%f", scanAngleIncrement);
+				ROS_INFO("  scan_range_min=%f", scanRangeMin);
+				ROS_INFO("  scan_range_max=%f", scanRangeMax);
+			}
 		}
 
 		// publish transforms first

@@ -114,7 +114,6 @@ CoreWrapper::CoreWrapper() :
 		rate_(Parameters::defaultRtabmapDetectionRate()),
 		createIntermediateNodes_(Parameters::defaultRtabmapCreateIntermediateNodes()),
 		maxMappingNodes_(Parameters::defaultGridGlobalMaxNodes()),
-		time_(ros::Time::now()),
 		previousStamp_(0),
 		mbClient_("move_base", true)
 {
@@ -741,14 +740,21 @@ void CoreWrapper::defaultCallback(const sensor_msgs::ImageConstPtr & imageMsg)
 {
 	if(!paused_)
 	{
+		ros::Time stamp = imageMsg->header.stamp;
+		if(stamp.toSec() == 0.0)
+		{
+			ROS_WARN("A null stamp has been detected in the input topic. Make sure the stamp is set.");
+			return;
+		}
+
 		if(rate_>0.0f)
 		{
-			if(ros::Time::now() - time_ < ros::Duration(1.0f/rate_))
+			if(previousStamp_.toSec() > 0.0 && stamp.toSec() > previousStamp_.toSec() && stamp - previousStamp_ < ros::Duration(1.0f/rate_))
 			{
 				return;
 			}
 		}
-		time_ = ros::Time::now();
+		previousStamp_ = stamp;
 
 		if(!(imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
 			 imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||
@@ -894,10 +900,14 @@ bool CoreWrapper::odomUpdate(const nav_msgs::OdometryConstPtr & odomMsg, ros::Ti
 
 		// Throttle
 		bool ignoreFrame = false;
+		if(stamp.toSec() == 0.0)
+		{
+			ROS_WARN("A null stamp has been detected in the input topics. Make sure the stamp in all input topics is set.");
+			ignoreFrame = true;
+		}
 		if(rate_>0.0f)
 		{
-			if((previousStamp_.toSec() > 0.0 && stamp.toSec() > previousStamp_.toSec() && stamp - previousStamp_ < ros::Duration(1.0f/rate_)) ||
-			   ((previousStamp_.toSec() <= 0.0 || stamp.toSec() <= previousStamp_.toSec()) && ros::Time::now() - time_ < ros::Duration(1.0f/rate_)))
+			if(previousStamp_.toSec() > 0.0 && stamp.toSec() > previousStamp_.toSec() && stamp - previousStamp_ < ros::Duration(1.0f/rate_))
 			{
 				ignoreFrame = true;
 			}
@@ -915,7 +925,6 @@ bool CoreWrapper::odomUpdate(const nav_msgs::OdometryConstPtr & odomMsg, ros::Ti
 		}
 		else if(!ignoreFrame)
 		{
-			time_ = ros::Time::now();
 			previousStamp_ = stamp;
 		}
 
@@ -947,10 +956,14 @@ bool CoreWrapper::odomTFUpdate(const ros::Time & stamp)
 		lastPoseStamp_ = stamp;
 
 		bool ignoreFrame = false;
+		if(stamp.toSec() == 0.0)
+		{
+			ROS_WARN("A null stamp has been detected in the input topics. Make sure the stamp in all input topics is set.");
+			ignoreFrame = true;
+		}
 		if(rate_>0.0f)
 		{
-			if((previousStamp_.toSec() > 0.0 && stamp.toSec() > previousStamp_.toSec() && stamp - previousStamp_ < ros::Duration(1.0f/rate_)) ||
-			   ((previousStamp_.toSec() <= 0.0 || stamp.toSec() <= previousStamp_.toSec()) && ros::Time::now() - time_ < ros::Duration(1.0f/rate_)))
+			if(previousStamp_.toSec() > 0.0 && stamp.toSec() > previousStamp_.toSec() && stamp - previousStamp_ < ros::Duration(1.0f/rate_))
 			{
 				ignoreFrame = true;
 			}
@@ -968,7 +981,6 @@ bool CoreWrapper::odomTFUpdate(const ros::Time & stamp)
 		}
 		else if(!ignoreFrame)
 		{
-			time_ = ros::Time::now();
 			previousStamp_ = stamp;
 		}
 

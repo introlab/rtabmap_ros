@@ -288,7 +288,6 @@ private:
 	float rate_;
 	bool createIntermediateNodes_;
 	int maxMappingNodes_;
-	ros::Time time_;
 	ros::Time previousStamp_;
 };
 

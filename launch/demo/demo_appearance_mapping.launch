@@ -27,7 +27,9 @@
 		<param name="Mem/STMSize"                    type="string" value="15"/>     <!-- 15 locations in short-term memory -->
 		<param name="Mem/RehearsalIdUpdatedToNewOne" type="string" value="true"/>   <!-- On merging, update to new ID-->
 		<param name="Mem/BadSignaturesIgnored"       type="string" value="true"/>
+		<param name="Mem/UseOdomFeatures"            type="string" value="false"/>
 		<param name="Kp/DetectorStrategy"            type="string" value="0"/>      <!-- use SURF -->
+		<param name="SURF/HessianThreshold"          type="string" value="100"/>
 		
 		<!-- localization mode -->
 	    <param     if="$(arg localization)" name="Mem/IncrementalMemory" type="string" value="false"/>
