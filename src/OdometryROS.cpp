@@ -37,8 +37,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <cv_bridge/cv_bridge.h>
 
 #include <rtabmap/core/Rtabmap.h>
-#include <rtabmap/core/OdometryF2M.h>
-#include <rtabmap/core/OdometryF2F.h>
+#include <rtabmap/core/odometry/OdometryF2M.h>
+#include <rtabmap/core/odometry/OdometryF2F.h>
 #include <rtabmap/core/util3d.h>
 #include <rtabmap/core/util3d_transforms.h>
 #include <rtabmap/core/Memory.h>
