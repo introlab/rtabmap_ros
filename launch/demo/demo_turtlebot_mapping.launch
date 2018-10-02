@@ -64,13 +64,21 @@
 	  <param name="subscribe_depth"     type="bool"   value="true"/>
 	  <param name="subscribe_scan"      type="bool"   value="true"/>
 	  <param name="map_negative_poses_ignored" type="bool" value="true"/>
+
+          <!-- When sending goals on /rtabmap/goal topic, use actionlib to communicate with move_base --> 
+	  <param name="use_action_for_goal" type="bool" value="true"/>
+          <remap from="move_base"            to="/move_base"/>
 	
 	  <!-- inputs -->
 	  <remap from="scan"            to="/scan"/>
 	  <remap from="rgb/image"       to="$(arg rgb_topic)"/>
   	  <remap from="depth/image"     to="$(arg depth_topic)"/>
   	  <remap from="rgb/camera_info" to="$(arg camera_info_topic)"/>
-	  <remap unless="$(arg rgbd_odometry)" from="odom" to="/odom"/>
+
+          <!-- Fix odom covariance as in simulation the covariance in /odom topic is high (0.1 for linear and 0.05 for angular) -->
+          <param unless="$(arg rgbd_odometry)" name="odom_frame_id" value="odom"/>
+          <param unless="$(arg rgbd_odometry)" name="odom_tf_linear_variance" value="0.001"/>
+          <param unless="$(arg rgbd_odometry)" name="odom_tf_angular_variance" value="0.001"/>
   	  
   	  <!-- output -->
   	  <remap from="grid_map" to="/map"/>
@@ -88,10 +96,8 @@
 	  <param name="RGBD/ProximityPathMaxNeighbors" type="string" value="0"/> 
 	  <param name="Rtabmap/TimeThr"              type="string" value="700"/>
 	  <param name="Mem/RehearsalSimilarity"      type="string" value="0.30"/>
-	  <param name="Optimizer/Slam2D"             type="string" value="true"/>
 	  <param name="Reg/Force3DoF"                type="string" value="true"/>
 	  <param name="GridGlobal/MinSize"           type="string" value="20"/>
-          <param name="RGBD/OptimizeMaxError"        type="string" value="0.1"/>
 
 	  
 	  <!-- localization mode -->

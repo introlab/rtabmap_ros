@@ -115,7 +115,7 @@ CoreWrapper::CoreWrapper() :
 		createIntermediateNodes_(Parameters::defaultRtabmapCreateIntermediateNodes()),
 		maxMappingNodes_(Parameters::defaultGridGlobalMaxNodes()),
 		previousStamp_(0),
-		mbClient_("move_base", true)
+		mbClient_(0)
 {
 	globalPose_.header.stamp = ros::Time(0);
 }
@@ -680,6 +680,8 @@ CoreWrapper::~CoreWrapper()
 
 	rtabmap_.close();
 	printf("rtabmap: Saving database/long-term memory...done! (located at %s, %ld MB)\n", databasePath_.c_str(), UFile::length(databasePath_)/(1024*1024));
+
+	delete mbClient_;
 }
 
 void CoreWrapper::loadParameters(const std::string & configFile, ParametersMap & parameters)
@@ -1645,9 +1647,9 @@ void CoreWrapper::process(
 						else
 						{
 							NODELET_WARN("Planning: Plan failed!");
-							if(mbClient_.isServerConnected())
+							if(mbClient_ && mbClient_->isServerConnected())
 							{
-								mbClient_.cancelGoal();
+								mbClient_->cancelGoal();
 							}
 						}
 						if(goalReachedPub_.getNumSubscribers())
@@ -2542,9 +2544,9 @@ bool CoreWrapper::cancelGoalCallback(std_srvs::Empty::Request& req, std_srvs::Em
 			goalReachedPub_.publish(result);
 		}
 	}
-	if(mbClient_.isServerConnected())
+	if(mbClient_ && mbClient_->isServerConnected())
 	{
-		mbClient_.cancelGoal();
+		mbClient_->cancelGoal();
 	}
 
 	return true;
@@ -2753,17 +2755,21 @@ void CoreWrapper::publishCurrentGoal(const ros::Time & stamp)
 
 		if(useActionForGoal_)
 		{
-			if(!mbClient_.isServerConnected())
+			if(mbClient_ == 0 || !mbClient_->isServerConnected())
 			{
 				NODELET_INFO("Connecting to move_base action server...");
-				mbClient_.waitForServer(ros::Duration(5.0));
+				if(mbClient_ == 0)
+				{
+					mbClient_ = new MoveBaseClient("move_base", true);
+				}
+				mbClient_->waitForServer(ros::Duration(5.0));
 			}
-			if(mbClient_.isServerConnected())
+			if(mbClient_ && mbClient_->isServerConnected())
 			{
 				move_base_msgs::MoveBaseGoal goal;
 				goal.target_pose = poseMsg;
 
-				mbClient_.sendGoal(goal,
+				mbClient_->sendGoal(goal,
 						boost::bind(&CoreWrapper::goalDoneCb, this, _1, _2),
 						boost::bind(&CoreWrapper::goalActiveCb, this),
 						boost::bind(&CoreWrapper::goalFeedbackCb, this, _1));
@@ -2771,7 +2777,7 @@ void CoreWrapper::publishCurrentGoal(const ros::Time & stamp)
 			}
 			else
 			{
-				NODELET_ERROR("Cannot connect to move_base action server!");
+				NODELET_ERROR("Cannot connect to move_base action server (called \"%s\")!", this->getNodeHandle().resolveName("move_base").c_str());
 			}
 		}
 		if(nextMetricGoalPub_.getNumSubscribers())

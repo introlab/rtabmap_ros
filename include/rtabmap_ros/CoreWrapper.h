@@ -261,7 +261,7 @@ private:
 	ros::ServiceServer octomapFullSrv_;
 #endif
 
-	MoveBaseClient mbClient_;
+	MoveBaseClient * mbClient_;
 
 	boost::thread* transformThread_;
 	bool tfThreadRunning_;
