@@ -245,7 +245,7 @@ private:
 				 depth->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1)==0 ||
 				 depth->encoding.compare(sensor_msgs::image_encodings::MONO16)==0))
 			{
-				NODELET_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8 (mono8 "
+				NODELET_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8,rgba8,bgra8 (mono8 "
 						  "recommended) and image_depth=16UC1,32FC1,mono16. Types detected: %s %s",
 						image->encoding.c_str(), depth->encoding.c_str());
 				return;
