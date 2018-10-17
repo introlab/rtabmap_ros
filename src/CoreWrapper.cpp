@@ -238,6 +238,18 @@ void CoreWrapper::onInit()
 	}
 
 	ParametersMap allParameters = Parameters::getDefaultParameters();
+	// remove Odom parameters
+	for(ParametersMap::iterator iter=allParameters.begin(); iter!=allParameters.end();)
+	{
+		if(iter->first.find("Odom") == 0)
+		{
+			allParameters.erase(iter++);
+		}
+		else
+		{
+			++iter;
+		}
+	}
 	uInsert(allParameters, ParametersPair(Parameters::kRGBDCreateOccupancyGrid(), "true")); // default true in ROS
 	char * rosHomePath = getenv("ROS_HOME");
 	std::string workingDir = rosHomePath?rosHomePath:UDirectory::homeDir()+"/.ros";
@@ -245,6 +257,17 @@ void CoreWrapper::onInit()
 
 	// load parameters
 	loadParameters(configPath_, parameters_);
+	for(ParametersMap::iterator iter=parameters_.begin(); iter!=parameters_.end();)
+	{
+		if(iter->first.find("Odom") == 0)
+		{
+			parameters_.erase(iter++);
+		}
+		else
+		{
+			++iter;
+		}
+	}
 
 	// update parameters with user input parameters (private)
 	for(ParametersMap::iterator iter=allParameters.begin(); iter!=allParameters.end(); ++iter)
