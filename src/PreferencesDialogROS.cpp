@@ -103,7 +103,9 @@ bool PreferencesDialogROS::readCoreSettings(const QString & filePath)
 			else
 			{
 				// use default one
-				this->setParameter(rtabmap::Parameters::kRtabmapWorkingDirectory(), (QDir::homePath()+"/.ros").toStdString());
+				char * rosHomePath = getenv("ROS_HOME");
+				std::string workingDir = rosHomePath?rosHomePath:(QDir::homePath()+"/.ros").toStdString();
+				this->setParameter(rtabmap::Parameters::kRtabmapWorkingDirectory(), workingDir);
 			}
 			settings.endGroup();
 		}

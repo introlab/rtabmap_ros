@@ -93,7 +93,6 @@ CoreWrapper::CoreWrapper() :
 		groundTruthFrameId_(""), // e.g., "world"
 		groundTruthBaseFrameId_(""), // e.g., "base_link_gt"
 		configPath_(""),
-		databasePath_(UDirectory::homeDir()+"/.ros/"+rtabmap::Parameters::getDefaultDatabaseName()),
 		odomDefaultAngVariance_(1.0),
 		odomDefaultLinVariance_(1.0),
 		waitForTransform_(true),
@@ -117,6 +116,9 @@ CoreWrapper::CoreWrapper() :
 		previousStamp_(0),
 		mbClient_(0)
 {
+	char * rosHomePath = getenv("ROS_HOME");
+	std::string workingDir = rosHomePath?rosHomePath:UDirectory::homeDir()+"/.ros";
+	databasePath_ = workingDir+"/"+rtabmap::Parameters::getDefaultDatabaseName();
 	globalPose_.header.stamp = ros::Time(0);
 }
 
@@ -237,7 +239,9 @@ void CoreWrapper::onInit()
 
 	ParametersMap allParameters = Parameters::getDefaultParameters();
 	uInsert(allParameters, ParametersPair(Parameters::kRGBDCreateOccupancyGrid(), "true")); // default true in ROS
-	uInsert(allParameters, ParametersPair(Parameters::kRtabmapWorkingDirectory(), UDirectory::homeDir()+"/.ros")); // change default to ~/.ros
+	char * rosHomePath = getenv("ROS_HOME");
+	std::string workingDir = rosHomePath?rosHomePath:UDirectory::homeDir()+"/.ros";
+	uInsert(allParameters, ParametersPair(Parameters::kRtabmapWorkingDirectory(), workingDir)); // change default to ~/.ros
 
 	// load parameters
 	loadParameters(configPath_, parameters_);
