@@ -423,7 +423,7 @@ private:
 			}
 			else
 			{
-				NODELET_ERROR("Some Depth images are not the same type!");
+				NODELET_ERROR("Some Depth images are not the same type! %d vs %d", subDepth.type(), depth.type());
 				return;
 			}
 
