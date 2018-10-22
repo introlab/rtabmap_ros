@@ -12,7 +12,7 @@
   <include file="$(find freenect_launch)/launch/freenect.launch">
     <arg name="depth_registration" value="True" />
     <arg name="camera" value="camera2" />
-    <arg name="device_id" value="#1" />
+    <arg name="device_id" value="#2" />
   </include>
 
   <!-- Frames: Kinects are placed at 90 degrees, clockwise -->
