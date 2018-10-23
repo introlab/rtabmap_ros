@@ -936,7 +936,7 @@ void nodeDataToROS(const rtabmap::Signature & signature, rtabmap_ros::NodeData &
 	point3fToROS(signature.sensorData().gridViewPoint(), msg.grid_view_point);
 	msg.grid_cell_size = signature.sensorData().gridCellSize();
 	msg.laserScanMaxPts = signature.sensorData().laserScanCompressed().maxPoints();
-	msg.laserScanMaxRange = signature.sensorData().laserScanCompressed().maxRange();
+	msg.laserScanMaxRange = signature.sensorData().laserScanCompressed().rangeMax();
 	msg.laserScanFormat = signature.sensorData().laserScanCompressed().format();
 	transformToGeometryMsg(signature.sensorData().laserScanCompressed().localTransform(), msg.laserScanLocalTransform);
 	msg.baseline = 0;

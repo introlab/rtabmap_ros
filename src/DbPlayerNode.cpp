@@ -119,11 +119,10 @@ int main(int argc, char** argv)
 	pnh.param("start_id", startId, startId);
 
 	// A general 360 lidar with 0.5 deg increment
-	double scanAngleMin, scanAngleMax, scanAngleIncrement, scanTime, scanRangeMin, scanRangeMax;
+	double scanAngleMin, scanAngleMax, scanAngleIncrement, scanRangeMin, scanRangeMax;
 	pnh.param<double>("scan_angle_min", scanAngleMin, -M_PI);
 	pnh.param<double>("scan_angle_max", scanAngleMax, M_PI);
 	pnh.param<double>("scan_angle_increment", scanAngleIncrement, M_PI / 720.0);
-	pnh.param<double>("scan_time", scanTime, 0);
 	pnh.param<double>("scan_range_min", scanRangeMin, 0.0);
 	pnh.param<double>("scan_range_max", scanRangeMax, 60);
 
@@ -170,6 +169,7 @@ int main(int argc, char** argv)
 	ros::Publisher rightCamInfoPub;
 	ros::Publisher odometryPub;
 	ros::Publisher scanPub;
+	ros::Publisher scanCloudPub;
 	ros::Publisher clockPub;
 	tf2_ros::TransformBroadcaster tfBroadcaster;
 
@@ -287,15 +287,27 @@ int main(int argc, char** argv)
 
 		if(!odom.data().laserScanRaw().isEmpty())
 		{
-			if(scanPub.getTopic().empty())
+			if(scanPub.getTopic().empty() && odom.data().laserScanRaw().is2d())
 			{
 				scanPub = nh.advertise<sensor_msgs::LaserScan>("scan", 1);
-				ROS_INFO("Scan will be published with those parameters:");
-				ROS_INFO("  scan_angle_min=%f", scanAngleMin);
-				ROS_INFO("  scan_angle_max=%f", scanAngleMax);
-				ROS_INFO("  scan_angle_increment=%f", scanAngleIncrement);
-				ROS_INFO("  scan_range_min=%f", scanRangeMin);
-				ROS_INFO("  scan_range_max=%f", scanRangeMax);
+				if(odom.data().laserScanRaw().angleIncrement() > 0.0f)
+				{
+					ROS_INFO("Scan will be published.");
+				}
+				else
+				{
+					ROS_INFO("Scan will be published with those parameters:");
+					ROS_INFO("  scan_angle_min=%f", scanAngleMin);
+					ROS_INFO("  scan_angle_max=%f", scanAngleMax);
+					ROS_INFO("  scan_angle_increment=%f", scanAngleIncrement);
+					ROS_INFO("  scan_range_min=%f", scanRangeMin);
+					ROS_INFO("  scan_range_max=%f", scanRangeMax);
+				}
+			}
+			else if(scanCloudPub.getTopic().empty())
+			{
+				scanCloudPub = nh.advertise<sensor_msgs::PointCloud2>("scan_cloud", 1);
+				ROS_INFO("Scan cloud will be published.");
 			}
 		}
 
@@ -331,7 +343,7 @@ int main(int argc, char** argv)
 				tfBroadcaster.sendTransform(odomToBase);
 			}
 
-			if(!scanPub.getTopic().empty())
+			if(!scanPub.getTopic().empty() || !scanCloudPub.getTopic().empty())
 			{
 				geometry_msgs::TransformStamped baseToLaserScan;
 				baseToLaserScan.child_frame_id = scanFrameId;
@@ -444,44 +456,63 @@ int main(int argc, char** argv)
 			rightCamInfoPub.publish(camInfoB);
 		}
 
-		if(scanPub.getNumSubscribers() && !odom.data().laserScanRaw().isEmpty())
+		if(!odom.data().laserScanRaw().isEmpty())
 		{
-			//inspired from pointcloud_to_laserscan package
-			sensor_msgs::LaserScan msg;
-			msg.header.frame_id = scanFrameId;
-			msg.header.stamp = time;
-
-			msg.angle_min = scanAngleMin;
-			msg.angle_max = scanAngleMax;
-			msg.angle_increment = scanAngleIncrement;
-			msg.time_increment = 0.0;
-			msg.scan_time = scanTime;
-			msg.range_min = scanRangeMin;
-			msg.range_max = scanRangeMax;
-
-			uint32_t rangesSize = std::ceil((msg.angle_max - msg.angle_min) / msg.angle_increment);
-			msg.ranges.assign(rangesSize, 0.0);
-
-			const cv::Mat & scan = odom.data().laserScanRaw().data();
-			for (int i=0; i<scan.cols; ++i)
+			if(scanPub.getNumSubscribers() && odom.data().laserScanRaw().is2d())
 			{
-				const float * ptr = scan.ptr<float>(0,i);
-				double range = hypot(ptr[0], ptr[1]);
-				if (range >= scanRangeMin && range <=scanRangeMax)
+				//inspired from pointcloud_to_laserscan package
+				sensor_msgs::LaserScan msg;
+				msg.header.frame_id = scanFrameId;
+				msg.header.stamp = time;
+
+				msg.angle_min = scanAngleMin;
+				msg.angle_max = scanAngleMax;
+				msg.angle_increment = scanAngleIncrement;
+				msg.time_increment = 0.0;
+				msg.scan_time = 0;
+				msg.range_min = scanRangeMin;
+				msg.range_max = scanRangeMax;
+				if(odom.data().laserScanRaw().angleIncrement() > 0.0f)
 				{
-					double angle = atan2(ptr[1], ptr[0]);
-					if (angle >= msg.angle_min && angle <= msg.angle_max)
+					msg.angle_min = odom.data().laserScanRaw().angleMin();
+					msg.angle_max = odom.data().laserScanRaw().angleMax();
+					msg.angle_increment = odom.data().laserScanRaw().angleIncrement();
+					msg.range_min = odom.data().laserScanRaw().rangeMin();
+					msg.range_max = odom.data().laserScanRaw().rangeMax();
+				}
+
+				uint32_t rangesSize = std::ceil((msg.angle_max - msg.angle_min) / msg.angle_increment);
+				msg.ranges.assign(rangesSize, 0.0);
+
+				const cv::Mat & scan = odom.data().laserScanRaw().data();
+				for (int i=0; i<scan.cols; ++i)
+				{
+					const float * ptr = scan.ptr<float>(0,i);
+					double range = hypot(ptr[0], ptr[1]);
+					if (range >= msg.range_min && range <=msg.range_max)
 					{
-						int index = (angle - msg.angle_min) / msg.angle_increment;
-						if (index>=0 && index<rangesSize && (range < msg.ranges[index] || msg.ranges[index]==0))
+						double angle = atan2(ptr[1], ptr[0]);
+						if (angle >= msg.angle_min && angle <= msg.angle_max)
 						{
-							msg.ranges[index] = range;
+							int index = (angle - msg.angle_min) / msg.angle_increment;
+							if (index>=0 && index<rangesSize && (range < msg.ranges[index] || msg.ranges[index]==0))
+							{
+								msg.ranges[index] = range;
+							}
 						}
 					}
 				}
-			}
 
-			scanPub.publish(msg);
+				scanPub.publish(msg);
+			}
+			else if(scanCloudPub.getNumSubscribers())
+			{
+				sensor_msgs::PointCloud2 msg;
+				pcl_conversions::moveFromPCL(*rtabmap::util3d::laserScanToPointCloud2(odom.data().laserScanRaw()), msg);
+				msg.header.frame_id = scanFrameId;
+				msg.header.stamp = time;
+				scanCloudPub.publish(msg);
+			}
 		}
 
 		if(odom.data().userDataRaw().type() == CV_8SC1 &&

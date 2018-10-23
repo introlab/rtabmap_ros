@@ -1209,10 +1209,18 @@ void CoreWrapper::commonDepthCallbackImpl(
 		userData_ = cv::Mat();
 	}
 
-	SensorData data(LaserScan::backwardCompatibility(scan,
-					scan2dMsg.get() != 0?(int)scan2dMsg->ranges.size():(genScan_?genMaxScanPts:scan3dMsg.get() != 0?scanCloudMaxPoints_:0),
-					scan2dMsg.get() != 0?scan2dMsg->range_max:(genScan_?genScanMaxDepth_:0.0f),
-					scanLocalTransform),
+	SensorData data(scan2dMsg.get() !=0?
+					LaserScan::backwardCompatibility(scan,
+							scan2dMsg->range_min,
+							scan2dMsg->range_max,
+							scan2dMsg->angle_min,
+							scan2dMsg->angle_max,
+							scan2dMsg->angle_increment,
+							scanLocalTransform):
+					LaserScan::backwardCompatibility(scan,
+							genScan_?genMaxScanPts:scan3dMsg.get() != 0?scanCloudMaxPoints_:0,
+							genScan_?genScanMaxDepth_:0.0f,
+							scanLocalTransform),
 			rgb,
 			depth,
 			cameraModels,
@@ -1468,10 +1476,18 @@ void CoreWrapper::commonStereoCallback(
 		userData_ = cv::Mat();
 	}
 
-	SensorData data(LaserScan::backwardCompatibility(scan,
-					scan2dMsg.get() != 0?(int)scan2dMsg->ranges.size():scan3dMsg.get() != 0?scanCloudMaxPoints_:0,
-					scan2dMsg.get() != 0?scan2dMsg->range_max:0,
-					scanLocalTransform),
+	SensorData data(scan2dMsg.get() != 0?
+					LaserScan::backwardCompatibility(scan,
+							scan2dMsg->range_min,
+							scan2dMsg->range_max,
+							scan2dMsg->angle_min,
+							scan2dMsg->angle_max,
+							scan2dMsg->angle_increment,
+							scanLocalTransform):
+					LaserScan::backwardCompatibility(scan,
+							scan3dMsg.get() != 0?scanCloudMaxPoints_:0,
+							0,
+							scanLocalTransform),
 			left,
 			right,
 			stereoModel,

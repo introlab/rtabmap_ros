@@ -30,7 +30,7 @@ find_package(find_object_2d)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
-find_package(RTABMap 0.17.7 REQUIRED)
+find_package(RTABMap 0.18.0 REQUIRED)
 
 find_package(OpenCV REQUIRED)
 
@@ -231,13 +231,6 @@ SET(Libraries
 ADD_DEFINITIONS("-DWITH_OCTOMAP_MSGS")
 ENDIF(octomap_msgs_FOUND)
 
-IF(QT4_FOUND OR Qt5_FOUND)
-SET(Libraries 
-   ${Libraries}
-   ${QT_LIBRARIES}
-)
-ENDIF(QT4_FOUND OR Qt5_FOUND)
-
 # If rviz is found, add plugins
 IF(rviz_FOUND)
 MESSAGE(STATUS "WITH rviz")
@@ -351,7 +344,7 @@ ELSE()
 ENDIF()
 
 add_executable(data_player src/DbPlayerNode.cpp)
-target_link_libraries(data_player rtabmap_ros ${QT_LIBRARIES} ${Libraries})
+target_link_libraries(data_player rtabmap_ros ${Libraries})
 
 add_executable(odom_msg_to_tf src/OdomMsgToTFNode.cpp)
 target_link_libraries(odom_msg_to_tf rtabmap_ros ${Libraries})
