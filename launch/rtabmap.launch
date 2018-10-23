@@ -98,6 +98,8 @@
   <arg name="user_data_topic"          default="/user_data"/>
   <arg name="user_data_async_topic"    default="/user_data_async" /> <!-- user data async subscription (rate should be lower than map update rate) -->
   
+  <arg name="gps_topic"                default="/gps/fix" />         <!-- gps async subscription -->
+  
   <!-- These arguments should not be modified directly, see referred topics without "_relay" suffix above -->
   <arg if="$(arg compressed)"     name="rgb_topic_relay"           default="$(arg rgb_topic)_relay"/>
   <arg unless="$(arg compressed)" name="rgb_topic_relay"           default="$(arg rgb_topic)"/>
@@ -270,6 +272,7 @@
       <remap from="scan_cloud"             to="$(arg scan_cloud_topic)"/>
       <remap from="user_data"              to="$(arg user_data_topic)"/>
       <remap from="user_data_async"        to="$(arg user_data_async_topic)"/>
+      <remap from="gps/fix"                to="$(arg gps_topic)"/>
       <remap from="odom"                   to="$(arg odom_topic)"/>
       
       <!-- localization mode -->

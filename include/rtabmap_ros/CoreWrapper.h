@@ -39,6 +39,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <std_msgs/Empty.h>
 #include <std_msgs/Int32.h>
+#include <sensor_msgs/NavSatFix.h>
 #include <nav_msgs/GetMap.h>
 #include <nav_msgs/GetPlan.h>
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
@@ -121,6 +122,7 @@ private:
 
 	void userDataAsyncCallback(const rtabmap_ros::UserDataConstPtr & dataMsg);
 	void globalPoseAsyncCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr & globalPoseMsg);
+	void gpsFixAsyncCallback(const sensor_msgs::NavSatFixConstPtr & gpsFixMsg);
 
 	void initialPoseCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr & msg);
 
@@ -282,6 +284,8 @@ private:
 
 	ros::Subscriber globalPoseAsyncSub_;
 	geometry_msgs::PoseWithCovarianceStamped globalPose_;
+	ros::Subscriber gpsFixAsyncSub_;
+	rtabmap::GPS gps_;
 
 	bool stereoToDepth_;
 	bool odomSensorSync_;

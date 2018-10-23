@@ -31,6 +31,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/LaserScan.h>
 #include <sensor_msgs/CameraInfo.h>
+#include <sensor_msgs/NavSatFix.h>
+#include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <rosgraph_msgs/Clock.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <nav_msgs/Odometry.h>
@@ -170,6 +172,8 @@ int main(int argc, char** argv)
 	ros::Publisher odometryPub;
 	ros::Publisher scanPub;
 	ros::Publisher scanCloudPub;
+	ros::Publisher globalPosePub;
+	ros::Publisher gpsFixPub;
 	ros::Publisher clockPub;
 	tf2_ros::TransformBroadcaster tfBroadcaster;
 
@@ -311,6 +315,26 @@ int main(int argc, char** argv)
 			}
 		}
 
+		if(!odom.data().globalPose().isNull() &&
+			odom.data().globalPoseCovariance().cols==6 &&
+			odom.data().globalPoseCovariance().rows==6)
+		{
+			if(globalPosePub.getTopic().empty())
+			{
+				globalPosePub = nh.advertise<geometry_msgs::PoseWithCovarianceStamped>("global_pose", 1);
+				ROS_INFO("Global pose will be published.");
+			}
+		}
+
+		if(odom.data().gps().stamp() > 0.0)
+		{
+			if(gpsFixPub.getTopic().empty())
+			{
+				gpsFixPub = nh.advertise<sensor_msgs::NavSatFix>("gps/fix", 1);
+				ROS_INFO("GPS will be published.");
+			}
+		}
+
 		// publish transforms first
 		if(publishTf)
 		{
@@ -370,6 +394,33 @@ int main(int argc, char** argv)
 				memcpy(odomMsg.pose.covariance.begin(), odom.covariance().data, 36*sizeof(double));
 				odometryPub.publish(odomMsg);
 			}
+		}
+
+		// Publish async topics first (so that they can catched by rtabmap before the image topics)
+		if(globalPosePub.getNumSubscribers() > 0 &&
+			!odom.data().globalPose().isNull() &&
+			odom.data().globalPoseCovariance().cols==6 &&
+			odom.data().globalPoseCovariance().rows==6)
+		{
+			geometry_msgs::PoseWithCovarianceStamped msg;
+			rtabmap_ros::transformToPoseMsg(odom.data().globalPose(), msg.pose.pose);
+			memcpy(msg.pose.covariance.data(), odom.data().globalPoseCovariance().data, 36*sizeof(double));
+			msg.header.frame_id = frameId;
+			msg.header.stamp = time;
+			globalPosePub.publish(msg);
+		}
+
+		if(odom.data().gps().stamp() > 0.0)
+		{
+			sensor_msgs::NavSatFix msg;
+			msg.longitude = odom.data().gps().longitude();
+			msg.latitude = odom.data().gps().latitude();
+			msg.altitude = odom.data().gps().altitude();
+			msg.position_covariance_type = sensor_msgs::NavSatFix::COVARIANCE_TYPE_DIAGONAL_KNOWN;
+			msg.position_covariance.at(0) = msg.position_covariance.at(4) = msg.position_covariance.at(8)= odom.data().gps().error()* odom.data().gps().error();
+			msg.header.frame_id = frameId;
+			msg.header.stamp.fromSec(odom.data().gps().stamp());
+			gpsFixPub.publish(msg);
 		}
 
 		if(type >= 0)

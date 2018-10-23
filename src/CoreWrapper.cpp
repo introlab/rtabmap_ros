@@ -669,6 +669,7 @@ void CoreWrapper::onInit()
 
 	userDataAsyncSub_ = nh.subscribe("user_data_async", 1, &CoreWrapper::userDataAsyncCallback, this);
 	globalPoseAsyncSub_ = nh.subscribe("global_pose", 1, &CoreWrapper::globalPoseAsyncCallback, this);
+	gpsFixAsyncSub_ = nh.subscribe("gps/fix", 1, &CoreWrapper::gpsFixAsyncCallback, this);
 }
 
 CoreWrapper::~CoreWrapper()
@@ -1268,6 +1269,12 @@ void CoreWrapper::commonDepthCallbackImpl(
 	}
 	globalPose_.header.stamp = ros::Time(0);
 
+	if(gps_.stamp() > 0.0)
+	{
+		data.setGPS(gps_);
+	}
+	gps_ = rtabmap::GPS();
+
 	OdometryInfo odomInfo;
 	if(odomInfoMsg.get())
 	{
@@ -1495,6 +1502,51 @@ void CoreWrapper::commonStereoCallback(
 			rtabmap_ros::timestampFromROS(lastPoseStamp_),
 			userData);
 	data.setGroundTruth(groundTruthPose);
+
+	//global pose
+	if(!globalPose_.header.stamp.isZero())
+	{
+		// assume sensor is fixed
+		Transform sensorToBase = rtabmap_ros::getTransform(
+				globalPose_.header.frame_id,
+				frameId_,
+				lastPoseStamp_,
+				tfListener_,
+				waitForTransform_?waitForTransformDuration_:0.0);
+		if(!sensorToBase.isNull())
+		{
+			Transform globalPose = rtabmap_ros::transformFromPoseMsg(globalPose_.pose.pose);
+			globalPose *= sensorToBase; // transform global pose from sensor frame to robot base frame
+
+			// Correction of the global pose accounting the odometry movement since we received it
+			Transform correction = rtabmap_ros::getTransform(
+					frameId_,
+					odomFrameId,
+					globalPose_.header.stamp,
+					lastPoseStamp_,
+					tfListener_,
+					waitForTransform_?waitForTransformDuration_:0.0);
+			if(!correction.isNull())
+			{
+				globalPose *= correction;
+			}
+			else
+			{
+				NODELET_WARN("Could not adjust global pose accordingly to latest odometry pose. "
+						"If odometry is small since it received the global pose and "
+						"covariance is large, this should not be a problem.");
+			}
+			cv::Mat globalPoseCovariance = cv::Mat(6,6, CV_64FC1, (void*)globalPose_.pose.covariance.data()).clone();
+			data.setGlobalPose(globalPose, globalPoseCovariance);
+		}
+	}
+	globalPose_.header.stamp = ros::Time(0);
+
+	if(gps_.stamp() > 0.0)
+	{
+		data.setGPS(gps_);
+	}
+	gps_ = rtabmap::GPS();
 
 	OdometryInfo odomInfo;
 	if(odomInfoMsg.get())
@@ -1804,6 +1856,30 @@ void CoreWrapper::globalPoseAsyncCallback(const geometry_msgs::PoseWithCovarianc
 	}
 }
 
+void CoreWrapper::gpsFixAsyncCallback(const sensor_msgs::NavSatFixConstPtr & gpsFixMsg)
+{
+	if(!paused_)
+	{
+		double error = 10.0;
+		if(gpsFixMsg->position_covariance_type != sensor_msgs::NavSatFix::COVARIANCE_TYPE_UNKNOWN)
+		{
+			double variance = uMax3(gpsFixMsg->position_covariance.at(0), gpsFixMsg->position_covariance.at(4), gpsFixMsg->position_covariance.at(8));
+			if(variance>0.0)
+			{
+				error = sqrt(variance);
+			}
+		}
+		gps_ = rtabmap::GPS(
+				gpsFixMsg->header.stamp.toSec(),
+				gpsFixMsg->longitude,
+				gpsFixMsg->latitude,
+				gpsFixMsg->altitude,
+				error,
+				0);
+	}
+}
+
+
 void CoreWrapper::initialPoseCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr & msg)
 {
 	Transform intialPose = rtabmap_ros::transformFromPoseMsg(msg->pose.pose);
@@ -2032,6 +2108,7 @@ bool CoreWrapper::resetRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empt
 	mapsManager_.clear();
 	previousStamp_ = ros::Time(0);
 	globalPose_.header.stamp = ros::Time(0);
+	gps_ = rtabmap::GPS();
 	userDataMutex_.lock();
 	userData_ = cv::Mat();
 	userDataMutex_.unlock();
@@ -2092,6 +2169,7 @@ bool CoreWrapper::backupDatabaseCallback(std_srvs::Empty::Request&, std_srvs::Em
 	userData_ = cv::Mat();
 	userDataMutex_.unlock();
 	globalPose_.header.stamp = ros::Time(0);
+	gps_ = rtabmap::GPS();
 
 	NODELET_INFO("Backup: Saving \"%s\" to \"%s\"...", databasePath_.c_str(), (databasePath_+".back").c_str());
 	UFile::copy(databasePath_, databasePath_+".back");
