@@ -105,7 +105,7 @@ int main(int argc, char** argv)
 	std::string odomFrameId = "odom";
 	std::string cameraFrameId = "camera_optical_link";
 	std::string scanFrameId = "base_laser_link";
-	double rate = -1.0f;
+	double rate = 1.0f;
 	std::string databasePath = "";
 	bool publishTf = true;
 	int startId = 0;
@@ -115,7 +115,7 @@ int main(int argc, char** argv)
 	pnh.param("odom_frame_id", odomFrameId, odomFrameId);
 	pnh.param("camera_frame_id", cameraFrameId, cameraFrameId);
 	pnh.param("scan_frame_id", scanFrameId, scanFrameId);
-	pnh.param("rate", rate, rate); // Set -1 to use database stamps
+	pnh.param("rate", rate, rate); // Ratio of the database stamps
 	pnh.param("database", databasePath, databasePath);
 	pnh.param("publish_tf", publishTf, publishTf);
 	pnh.param("start_id", startId, startId);
@@ -149,7 +149,7 @@ int main(int argc, char** argv)
 	}
 	ROS_INFO("database = %s", databasePath.c_str());
 
-	rtabmap::DBReader reader(databasePath, rate, false, false, false, startId);
+	rtabmap::DBReader reader(databasePath, -rate, false, false, false, startId);
 	if(!reader.init())
 	{
 		ROS_ERROR("Cannot open database \"%s\".", databasePath.c_str());
