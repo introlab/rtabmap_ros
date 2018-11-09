@@ -212,7 +212,10 @@ void GuiWrapper::infoMapCallback(
 
 	stat.setMapCorrection(mapToOdom);
 	stat.setPoses(poses);
-	stat.setSignatures(signatures);
+	if(signatures.size())
+	{
+		stat.setLastSignatureData(signatures.rbegin()->second);
+	}
 	stat.setConstraints(links);
 
 	this->post(new RtabmapEvent(stat));
