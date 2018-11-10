@@ -159,12 +159,14 @@ include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/include
   ${RTABMap_INCLUDE_DIRS}
   ${OpenCV_INCLUDE_DIRS}
+  ${PCL_INCLUDE_DIRS}
   ${catkin_INCLUDE_DIRS}
 )
 
 # libraries
 SET(Libraries
    ${OpenCV_LIBRARIES}
+   ${PCL_LIBRARIES}
    ${catkin_LIBRARIES}
    ${RTABMap_LIBRARIES}
 )
@@ -295,43 +297,54 @@ add_dependencies(rtabmap_ros ${${PROJECT_NAME}_EXPORTED_TARGETS})
 add_executable(rtabmap src/CoreNode.cpp)
 target_link_libraries(rtabmap ${Libraries})
 
-add_executable(rgbd_odometry src/RGBDOdometryNode.cpp)
-target_link_libraries(rgbd_odometry ${Libraries})
+add_executable(rtabmap_rgbd_odometry src/RGBDOdometryNode.cpp)
+target_link_libraries(rtabmap_rgbd_odometry ${Libraries})
+set_target_properties(rtabmap_rgbd_odometry PROPERTIES OUTPUT_NAME "rgbd_odometry")
 
-add_executable(stereo_odometry src/StereoOdometryNode.cpp)
-target_link_libraries(stereo_odometry ${Libraries})
+add_executable(rtabmap_stereo_odometry src/StereoOdometryNode.cpp)
+target_link_libraries(rtabmap_stereo_odometry ${Libraries})
+set_target_properties(rtabmap_stereo_odometry PROPERTIES OUTPUT_NAME "stereo_odometry")
 
-add_executable(rgbdicp_odometry src/RGBDICPOdometryNode.cpp)
-target_link_libraries(rgbdicp_odometry ${Libraries})
+add_executable(rtabmap_rgbdicp_odometry src/RGBDICPOdometryNode.cpp)
+target_link_libraries(rtabmap_rgbdicp_odometry ${Libraries})
+set_target_properties(rtabmap_rgbdicp_odometry PROPERTIES OUTPUT_NAME "rgbdicp_odometry")
 
-add_executable(icp_odometry src/ICPOdometryNode.cpp)
-target_link_libraries(icp_odometry ${Libraries})
+add_executable(rtabmap_icp_odometry src/ICPOdometryNode.cpp)
+target_link_libraries(rtabmap_icp_odometry ${Libraries})
+set_target_properties(rtabmap_icp_odometry PROPERTIES OUTPUT_NAME "icp_odometry")
 
-add_executable(map_optimizer src/MapOptimizerNode.cpp)
-target_link_libraries(map_optimizer rtabmap_ros ${Libraries})
+add_executable(rtabmap_map_optimizer src/MapOptimizerNode.cpp)
+target_link_libraries(rtabmap_map_optimizer rtabmap_ros ${Libraries})
+set_target_properties(rtabmap_map_optimizer PROPERTIES OUTPUT_NAME "map_optimizer")
 
-add_executable(map_assembler src/MapAssemblerNode.cpp)
-target_link_libraries(map_assembler rtabmap_ros ${Libraries})
+add_executable(rtabmap_map_assembler src/MapAssemblerNode.cpp)
+target_link_libraries(rtabmap_map_assembler rtabmap_ros ${Libraries})
+set_target_properties(rtabmap_map_assembler PROPERTIES OUTPUT_NAME "map_assembler")
 
-add_executable(wifi_signal_pub src/WifiSignalPubNode.cpp)
-target_link_libraries(wifi_signal_pub rtabmap_ros ${Libraries})
-add_executable(wifi_signal_sub src/WifiSignalSubNode.cpp)
-target_link_libraries(wifi_signal_sub rtabmap_ros ${Libraries})
+add_executable(rtabmap_wifi_signal_pub src/WifiSignalPubNode.cpp)
+target_link_libraries(rtabmap_wifi_signal_pub rtabmap_ros ${Libraries})
+set_target_properties(rtabmap_wifi_signal_pub PROPERTIES OUTPUT_NAME "wifi_signal_pub")
+add_executable(rtabmap_wifi_signal_sub src/WifiSignalSubNode.cpp)
+target_link_libraries(rtabmap_wifi_signal_sub rtabmap_ros ${Libraries})
+set_target_properties(rtabmap_wifi_signal_sub PROPERTIES OUTPUT_NAME "wifi_signal_sub")
 
 # If find_object_2d is found, add save objects example
 IF(find_object_2d_FOUND)
 MESSAGE(STATUS "WITH find_object_2d")
 include_directories(${find_object_2d_INCLUDE_DIRS})
-add_executable(save_objects_example src/SaveObjectsExample.cpp)
-target_link_libraries(save_objects_example rtabmap_ros ${Libraries} ${find_object_2d_LIBRARIES})
+add_executable(rtabmap_save_objects_example src/SaveObjectsExample.cpp)
+target_link_libraries(rtabmap_save_objects_example rtabmap_ros ${Libraries} ${find_object_2d_LIBRARIES})
+set_target_properties(rtabmap_save_objects_example PROPERTIES OUTPUT_NAME "save_objects_example")
 ENDIF(find_object_2d_FOUND)
 
-add_executable(camera src/CameraNode.cpp)
-add_dependencies(camera ${${PROJECT_NAME}_EXPORTED_TARGETS})
-target_link_libraries(camera ${Libraries})
+add_executable(rtabmap_camera src/CameraNode.cpp)
+add_dependencies(rtabmap_camera ${${PROJECT_NAME}_EXPORTED_TARGETS})
+target_link_libraries(rtabmap_camera ${Libraries})
+set_target_properties(rtabmap_camera PROPERTIES OUTPUT_NAME "camera")
 
-add_executable(stereo_camera src/StereoCameraNode.cpp)
-target_link_libraries(stereo_camera rtabmap_ros ${Libraries})
+add_executable(rtabmap_stereo_camera src/StereoCameraNode.cpp)
+target_link_libraries(rtabmap_stereo_camera rtabmap_ros ${Libraries})
+set_target_properties(rtabmap_stereo_camera PROPERTIES OUTPUT_NAME "stereo_camera")
 
 IF(RTABMAP_GUI)
     add_executable(rtabmapviz src/GuiNode.cpp src/GuiWrapper.cpp src/PreferencesDialogROS.cpp)
@@ -343,14 +356,17 @@ ELSE()
     MESSAGE(WARNING "Found RTAB-Map built without its GUI library. Node rtabmapviz will not be built!")
 ENDIF()
 
-add_executable(data_player src/DbPlayerNode.cpp)
-target_link_libraries(data_player rtabmap_ros ${Libraries})
+add_executable(rtabmap_data_player src/DbPlayerNode.cpp)
+target_link_libraries(rtabmap_data_player rtabmap_ros ${Libraries})
+set_target_properties(rtabmap_data_player PROPERTIES OUTPUT_NAME "data_player")
 
-add_executable(odom_msg_to_tf src/OdomMsgToTFNode.cpp)
-target_link_libraries(odom_msg_to_tf rtabmap_ros ${Libraries})
+add_executable(rtabmap_odom_msg_to_tf src/OdomMsgToTFNode.cpp)
+target_link_libraries(rtabmap_odom_msg_to_tf rtabmap_ros ${Libraries})
+set_target_properties(rtabmap_odom_msg_to_tf PROPERTIES OUTPUT_NAME "odom_msg_to_tf")
 
-add_executable(pointcloud_to_depthimage src/PointCloudToDepthImageNode.cpp)
-target_link_libraries(pointcloud_to_depthimage rtabmap_ros ${Libraries})
+add_executable(rtabmap_pointcloud_to_depthimage src/PointCloudToDepthImageNode.cpp)
+target_link_libraries(rtabmap_pointcloud_to_depthimage rtabmap_ros ${Libraries})
+set_target_properties(rtabmap_pointcloud_to_depthimage PROPERTIES OUTPUT_NAME "pointcloud_to_depthimage")
 
 #############
 ## Install ##
@@ -372,16 +388,16 @@ install(TARGETS
    rtabmap_ros 
    rtabmap 
    rtabmapviz 
-   rgbd_odometry 
-   icp_odometry
-   rgbdicp_odometry 
-   stereo_odometry
-   map_assembler
-   map_optimizer
-   data_player
-   odom_msg_to_tf
-   pointcloud_to_depthimage
-   camera
+   rtabmap_rgbd_odometry 
+   rtabmap_icp_odometry
+   rtabmap_rgbdicp_odometry 
+   rtabmap_stereo_odometry
+   rtabmap_map_assembler
+   rtabmap_map_optimizer
+   rtabmap_data_player
+   rtabmap_odom_msg_to_tf
+   rtabmap_pointcloud_to_depthimage
+   rtabmap_camera
    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
@@ -390,16 +406,16 @@ install(TARGETS
  install(TARGETS 
    rtabmap_ros 
    rtabmap 
-   rgbd_odometry 
-   icp_odometry
-   rgbdicp_odometry 
-   stereo_odometry
-   map_assembler
-   map_optimizer
-   data_player
-   odom_msg_to_tf
-   pointcloud_to_depthimage
-   camera
+   rtabmap_rgbd_odometry 
+   rtabmap_icp_odometry
+   rtabmap_rgbdicp_odometry 
+   rtabmap_stereo_odometry
+   rtabmap_map_assembler
+   rtabmap_map_optimizer
+   rtabmap_data_player
+   rtabmap_odom_msg_to_tf
+   rtabmap_pointcloud_to_depthimage
+   rtabmap_camera
    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
