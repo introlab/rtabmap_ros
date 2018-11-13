@@ -314,18 +314,18 @@ target_link_libraries(rtabmap_icp_odometry ${Libraries})
 set_target_properties(rtabmap_icp_odometry PROPERTIES OUTPUT_NAME "icp_odometry")
 
 add_executable(rtabmap_map_optimizer src/MapOptimizerNode.cpp)
-target_link_libraries(rtabmap_map_optimizer rtabmap_ros ${Libraries})
+target_link_libraries(rtabmap_map_optimizer rtabmap_ros)
 set_target_properties(rtabmap_map_optimizer PROPERTIES OUTPUT_NAME "map_optimizer")
 
 add_executable(rtabmap_map_assembler src/MapAssemblerNode.cpp)
-target_link_libraries(rtabmap_map_assembler rtabmap_ros ${Libraries})
+target_link_libraries(rtabmap_map_assembler rtabmap_ros)
 set_target_properties(rtabmap_map_assembler PROPERTIES OUTPUT_NAME "map_assembler")
 
 add_executable(rtabmap_wifi_signal_pub src/WifiSignalPubNode.cpp)
-target_link_libraries(rtabmap_wifi_signal_pub rtabmap_ros ${Libraries})
+target_link_libraries(rtabmap_wifi_signal_pub rtabmap_ros)
 set_target_properties(rtabmap_wifi_signal_pub PROPERTIES OUTPUT_NAME "wifi_signal_pub")
 add_executable(rtabmap_wifi_signal_sub src/WifiSignalSubNode.cpp)
-target_link_libraries(rtabmap_wifi_signal_sub rtabmap_ros ${Libraries})
+target_link_libraries(rtabmap_wifi_signal_sub rtabmap_ros)
 set_target_properties(rtabmap_wifi_signal_sub PROPERTIES OUTPUT_NAME "wifi_signal_sub")
 
 # If find_object_2d is found, add save objects example
@@ -333,7 +333,7 @@ IF(find_object_2d_FOUND)
 MESSAGE(STATUS "WITH find_object_2d")
 include_directories(${find_object_2d_INCLUDE_DIRS})
 add_executable(rtabmap_save_objects_example src/SaveObjectsExample.cpp)
-target_link_libraries(rtabmap_save_objects_example rtabmap_ros ${Libraries} ${find_object_2d_LIBRARIES})
+target_link_libraries(rtabmap_save_objects_example rtabmap_ros ${find_object_2d_LIBRARIES})
 set_target_properties(rtabmap_save_objects_example PROPERTIES OUTPUT_NAME "save_objects_example")
 ENDIF(find_object_2d_FOUND)
 
@@ -343,12 +343,12 @@ target_link_libraries(rtabmap_camera ${Libraries})
 set_target_properties(rtabmap_camera PROPERTIES OUTPUT_NAME "camera")
 
 add_executable(rtabmap_stereo_camera src/StereoCameraNode.cpp)
-target_link_libraries(rtabmap_stereo_camera rtabmap_ros ${Libraries})
+target_link_libraries(rtabmap_stereo_camera rtabmap_ros)
 set_target_properties(rtabmap_stereo_camera PROPERTIES OUTPUT_NAME "stereo_camera")
 
 IF(RTABMAP_GUI)
     add_executable(rtabmapviz src/GuiNode.cpp src/GuiWrapper.cpp src/PreferencesDialogROS.cpp)
-    target_link_libraries(rtabmapviz rtabmap_ros ${QT_LIBRARIES} ${Libraries})
+    target_link_libraries(rtabmapviz rtabmap_ros ${QT_LIBRARIES})
     IF(Qt5_FOUND)
         QT5_USE_MODULES(rtabmapviz Widgets Core Gui)
     ENDIF()
@@ -357,15 +357,15 @@ ELSE()
 ENDIF()
 
 add_executable(rtabmap_data_player src/DbPlayerNode.cpp)
-target_link_libraries(rtabmap_data_player rtabmap_ros ${Libraries})
+target_link_libraries(rtabmap_data_player rtabmap_ros)
 set_target_properties(rtabmap_data_player PROPERTIES OUTPUT_NAME "data_player")
 
 add_executable(rtabmap_odom_msg_to_tf src/OdomMsgToTFNode.cpp)
-target_link_libraries(rtabmap_odom_msg_to_tf rtabmap_ros ${Libraries})
+target_link_libraries(rtabmap_odom_msg_to_tf rtabmap_ros)
 set_target_properties(rtabmap_odom_msg_to_tf PROPERTIES OUTPUT_NAME "odom_msg_to_tf")
 
 add_executable(rtabmap_pointcloud_to_depthimage src/PointCloudToDepthImageNode.cpp)
-target_link_libraries(rtabmap_pointcloud_to_depthimage rtabmap_ros ${Libraries})
+target_link_libraries(rtabmap_pointcloud_to_depthimage rtabmap_ros)
 set_target_properties(rtabmap_pointcloud_to_depthimage PROPERTIES OUTPUT_NAME "pointcloud_to_depthimage")
 
 #############
