@@ -666,6 +666,22 @@ void CoreWrapper::onInit()
 			NODELET_INFO("\n%s subscribed to:\n   %s", getName().c_str(), defaultSub_.getTopic().c_str());
 		}
 	}
+	else if(!this->isSubscribedToDepth() && !this->isSubscribedToStereo() && !this->isSubscribedToRGBD() &&
+			(this->isSubscribedToScan2d() || this->isSubscribedToScan3d()))
+	{
+		ROS_WARN("Subscribing to laser scan but no image subscription is enabled, bag-of-words loop closure detection will be disabled...");
+		int kpMaxFeatures = Parameters::defaultKpMaxFeatures();
+		int registrationStrategy = Parameters::defaultRegStrategy();
+		Parameters::parse(parameters_, Parameters::kKpMaxFeatures(), kpMaxFeatures);
+		Parameters::parse(parameters_, Parameters::kRegStrategy(), registrationStrategy);
+		if(kpMaxFeatures!= -1 || registrationStrategy != 1)
+		{
+			uInsert(parameters_, ParametersPair(Parameters::kKpMaxFeatures(), "-1"));
+			uInsert(parameters_, ParametersPair(Parameters::kRegStrategy(), "1"));
+			ROS_WARN("Setting %s=-1 (bag-of-words disabled) and %s=1 (ICP)", Parameters::kKpMaxFeatures().c_str(), Parameters::kRegStrategy().c_str());
+			rtabmap_.parseParameters(parameters_);
+		}
+	}
 
 	userDataAsyncSub_ = nh.subscribe("user_data_async", 1, &CoreWrapper::userDataAsyncCallback, this);
 	globalPoseAsyncSub_ = nh.subscribe("global_pose", 1, &CoreWrapper::globalPoseAsyncCallback, this);
@@ -1499,6 +1515,220 @@ void CoreWrapper::commonStereoCallback(
 			right,
 			stereoModel,
 			lastPoseIntermediate_?-1:leftImageMsg->header.seq,
+			rtabmap_ros::timestampFromROS(lastPoseStamp_),
+			userData);
+	data.setGroundTruth(groundTruthPose);
+
+	//global pose
+	if(!globalPose_.header.stamp.isZero())
+	{
+		// assume sensor is fixed
+		Transform sensorToBase = rtabmap_ros::getTransform(
+				globalPose_.header.frame_id,
+				frameId_,
+				lastPoseStamp_,
+				tfListener_,
+				waitForTransform_?waitForTransformDuration_:0.0);
+		if(!sensorToBase.isNull())
+		{
+			Transform globalPose = rtabmap_ros::transformFromPoseMsg(globalPose_.pose.pose);
+			globalPose *= sensorToBase; // transform global pose from sensor frame to robot base frame
+
+			// Correction of the global pose accounting the odometry movement since we received it
+			Transform correction = rtabmap_ros::getTransform(
+					frameId_,
+					odomFrameId,
+					globalPose_.header.stamp,
+					lastPoseStamp_,
+					tfListener_,
+					waitForTransform_?waitForTransformDuration_:0.0);
+			if(!correction.isNull())
+			{
+				globalPose *= correction;
+			}
+			else
+			{
+				NODELET_WARN("Could not adjust global pose accordingly to latest odometry pose. "
+						"If odometry is small since it received the global pose and "
+						"covariance is large, this should not be a problem.");
+			}
+			cv::Mat globalPoseCovariance = cv::Mat(6,6, CV_64FC1, (void*)globalPose_.pose.covariance.data()).clone();
+			data.setGlobalPose(globalPose, globalPoseCovariance);
+		}
+	}
+	globalPose_.header.stamp = ros::Time(0);
+
+	if(gps_.stamp() > 0.0)
+	{
+		data.setGPS(gps_);
+	}
+	gps_ = rtabmap::GPS();
+
+	OdometryInfo odomInfo;
+	if(odomInfoMsg.get())
+	{
+		odomInfo = odomInfoFromROS(*odomInfoMsg);
+	}
+
+	process(lastPoseStamp_,
+			data,
+			lastPose_,
+			odomFrameId,
+			covariance_,
+			odomInfo);
+
+	covariance_ = cv::Mat();
+}
+
+void CoreWrapper::commonLaserScanCallback(
+		const nav_msgs::OdometryConstPtr & odomMsg,
+		const rtabmap_ros::UserDataConstPtr & userDataMsg,
+		const sensor_msgs::LaserScanConstPtr& scan2dMsg,
+		const sensor_msgs::PointCloud2ConstPtr& scan3dMsg,
+		const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg)
+{
+	UASSERT(scan2dMsg.get() || scan3dMsg.get());
+	std::string odomFrameId = odomFrameId_;
+	if(odomMsg.get())
+	{
+		odomFrameId = odomMsg->header.frame_id;
+		if(scan2dMsg.get())
+		{
+			if(!odomUpdate(odomMsg, scan2dMsg->header.stamp))
+			{
+				return;
+			}
+		}
+		else if(scan3dMsg.get())
+		{
+			if(!odomUpdate(odomMsg, scan3dMsg->header.stamp))
+			{
+				return;
+			}
+		}
+		else
+		{
+			return;
+		}
+	}
+	else if(scan2dMsg.get())
+	{
+		if(!odomTFUpdate(scan2dMsg->header.stamp))
+		{
+			return;
+		}
+	}
+	else if(scan3dMsg.get())
+	{
+		if(!odomTFUpdate(scan3dMsg->header.stamp))
+		{
+			return;
+		}
+	}
+	else
+	{
+		return;
+	}
+
+	cv::Mat scan;
+	Transform scanLocalTransform = Transform::getIdentity();
+	if(scan2dMsg.get() != 0)
+	{
+		if(!rtabmap_ros::convertScanMsg(
+				scan2dMsg,
+				frameId_,
+				odomSensorSync_?odomFrameId:"",
+				lastPoseStamp_,
+				scan,
+				scanLocalTransform,
+				tfListener_,
+				waitForTransform_?waitForTransformDuration_:0))
+		{
+			NODELET_ERROR("Could not convert laser scan msg! Aborting rtabmap update...");
+			return;
+		}
+		Transform zAxis(0,0,1,0,0,0);
+		if((scanLocalTransform.rotation()*zAxis).z() < 0)
+		{
+			cv::Mat flipScan;
+			cv::flip(scan, flipScan, 1);
+			scan = flipScan;
+		}
+		if(rtabmap_.getMemory() && uStrNumCmp(rtabmap_.getMemory()->getDatabaseVersion(), "0.11.10") < 0)
+		{
+			// backward compatibility, project 2D scan in /base_link frame
+			scan = util3d::transformLaserScan(LaserScan::backwardCompatibility(scan), scanLocalTransform).data();
+			scanLocalTransform = Transform::getIdentity();
+		}
+	}
+	else if(scan3dMsg.get() != 0)
+	{
+		if(!rtabmap_ros::convertScan3dMsg(
+				scan3dMsg,
+				frameId_,
+				odomSensorSync_?odomFrameId:"",
+				lastPoseStamp_,
+				scan,
+				scanLocalTransform,
+				tfListener_,
+				waitForTransform_?waitForTransformDuration_:0))
+		{
+			NODELET_ERROR("Could not convert 3d laser scan msg! Aborting rtabmap update...");
+			return;
+		}
+	}
+
+	Transform groundTruthPose;
+	if(!groundTruthFrameId_.empty())
+	{
+		groundTruthPose = rtabmap_ros::getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, lastPoseStamp_, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+	}
+
+	cv::Mat userData;
+	if(userDataMsg.get())
+	{
+		userData = rtabmap_ros::userDataFromROS(*userDataMsg);
+		UScopeMutex lock(userDataMutex_);
+		if(!userData_.empty())
+		{
+			NODELET_WARN("Synchronized and asynchronized user data topics cannot be used at the same time. Async user data dropped!");
+			userData_ = cv::Mat();
+		}
+	}
+	else
+	{
+		UScopeMutex lock(userDataMutex_);
+		userData = userData_;
+		userData_ = cv::Mat();
+	}
+
+	cv::Mat rgb = cv::Mat::zeros(2,1,CV_8UC1);
+	cv::Mat depth = cv::Mat::zeros(2,1,CV_16UC1);
+	CameraModel model(
+			1,
+			1,
+			0.5,
+			1,
+			Transform::getIdentity(),
+			0,
+			cv::Size(1,2));
+
+	SensorData data(scan2dMsg.get() != 0?
+					LaserScan::backwardCompatibility(scan,
+							scan2dMsg->range_min,
+							scan2dMsg->range_max,
+							scan2dMsg->angle_min,
+							scan2dMsg->angle_max,
+							scan2dMsg->angle_increment,
+							scanLocalTransform):
+					LaserScan::backwardCompatibility(scan,
+							scan3dMsg.get() != 0?scanCloudMaxPoints_:0,
+							0,
+							scanLocalTransform),
+			rgb,
+			depth,
+			model,
+			lastPoseIntermediate_?-1:scan2dMsg.get() != 0?scan2dMsg->header.seq:scan3dMsg->header.seq,
 			rtabmap_ros::timestampFromROS(lastPoseStamp_),
 			userData);
 	data.setGroundTruth(groundTruthPose);

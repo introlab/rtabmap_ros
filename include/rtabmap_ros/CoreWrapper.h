@@ -99,14 +99,14 @@ private:
 				const sensor_msgs::PointCloud2ConstPtr& scan3dMsg,
 				const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg);
 	void commonDepthCallbackImpl(
-			const std::string & odomFrameId,
-			const rtabmap_ros::UserDataConstPtr & userDataMsg,
-			const std::vector<cv_bridge::CvImageConstPtr> & imageMsgs,
-			const std::vector<cv_bridge::CvImageConstPtr> & depthMsgs,
-			const std::vector<sensor_msgs::CameraInfo> & cameraInfoMsgs,
-			const sensor_msgs::LaserScanConstPtr& scan2dMsg,
-			const sensor_msgs::PointCloud2ConstPtr& scan3dMsg,
-			const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg);
+				const std::string & odomFrameId,
+				const rtabmap_ros::UserDataConstPtr & userDataMsg,
+				const std::vector<cv_bridge::CvImageConstPtr> & imageMsgs,
+				const std::vector<cv_bridge::CvImageConstPtr> & depthMsgs,
+				const std::vector<sensor_msgs::CameraInfo> & cameraInfoMsgs,
+				const sensor_msgs::LaserScanConstPtr& scan2dMsg,
+				const sensor_msgs::PointCloud2ConstPtr& scan3dMsg,
+				const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg);
 	virtual void commonStereoCallback(
 				const nav_msgs::OdometryConstPtr & odomMsg,
 				const rtabmap_ros::UserDataConstPtr & userDataMsg,
@@ -114,6 +114,12 @@ private:
 				const cv_bridge::CvImageConstPtr& rightImageMsg,
 				const sensor_msgs::CameraInfo& leftCamInfoMsg,
 				const sensor_msgs::CameraInfo& rightCamInfoMsg,
+				const sensor_msgs::LaserScanConstPtr& scanMsg,
+				const sensor_msgs::PointCloud2ConstPtr& scan3dMsg,
+				const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg);
+	virtual void commonLaserScanCallback(
+				const nav_msgs::OdometryConstPtr & odomMsg,
+				const rtabmap_ros::UserDataConstPtr & userDataMsg,
 				const sensor_msgs::LaserScanConstPtr& scanMsg,
 				const sensor_msgs::PointCloud2ConstPtr& scan3dMsg,
 				const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg);

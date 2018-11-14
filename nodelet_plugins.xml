@@ -1,12 +1,4 @@
-<library path="lib/librtabmap_ros"> 
-
-  <class name="rtabmap_ros/rtabmap" 
-         type="rtabmap_ros::CoreWrapper" 
-         base_class_type="nodelet::Nodelet">
-    <description>
-      This is my nodelet.
-    </description>
-  </class>
+<library path="lib/librtabmap_plugins"> 
 
   <class name="rtabmap_ros/rgbd_odometry" 
          type="rtabmap_ros::RGBDOdometry" 
@@ -144,5 +136,16 @@
     </description>
   </class>
 
+</library>
+
+<library path="lib/librtabmap_sync"> 
+
+  <class name="rtabmap_ros/rtabmap" 
+         type="rtabmap_ros::CoreWrapper" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
 </library>
 

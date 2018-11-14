@@ -192,6 +192,17 @@ void OdometryROS::onInit()
 
 	//parameters
 	parameters_ = Parameters::getDefaultOdometryParameters(stereoParams_, visParams_, icpParams_);
+	if(icpParams_)
+	{
+		if(!visParams_)
+		{
+			uInsert(parameters_, ParametersPair(Parameters::kRegStrategy(), "1"));
+		}
+		else
+		{
+			uInsert(parameters_, ParametersPair(Parameters::kRegStrategy(), "2"));
+		}
+	}
 	parameters_.insert(*Parameters::getDefaultParameters().find(Parameters::kRtabmapImagesAlreadyRectified()));
 	if(!configPath.empty())
 	{

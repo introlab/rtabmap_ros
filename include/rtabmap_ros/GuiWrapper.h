@@ -86,6 +86,12 @@ private:
 			const sensor_msgs::LaserScanConstPtr& scan2dMsg,
 			const sensor_msgs::PointCloud2ConstPtr& scan3dMsg,
 			const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg);
+	virtual void commonLaserScanCallback(
+			const nav_msgs::OdometryConstPtr & odomMsg,
+			const rtabmap_ros::UserDataConstPtr & userDataMsg,
+			const sensor_msgs::LaserScanConstPtr& scan2dMsg,
+			const sensor_msgs::PointCloud2ConstPtr& scan3dMsg,
+			const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg);
 
 	void defaultCallback(const nav_msgs::OdometryConstPtr & odomMsg);
 

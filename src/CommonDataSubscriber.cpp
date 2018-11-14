@@ -206,7 +206,29 @@ CommonDataSubscriber::CommonDataSubscriber(bool gui) :
 		SYNC_INIT(rgbd4OdomDataScan3d),
 		SYNC_INIT(rgbd4OdomDataInfo),
 		SYNC_INIT(rgbd4OdomDataScan2dInfo),
-		SYNC_INIT(rgbd4OdomDataScan3dInfo)
+		SYNC_INIT(rgbd4OdomDataScan3dInfo),
+
+		// Scan
+		SYNC_INIT(scan2dInfo),
+		SYNC_INIT(scan3dInfo),
+
+		// Scan + Odom
+		SYNC_INIT(odomScan2d),
+		SYNC_INIT(odomScan3d),
+		SYNC_INIT(odomScan2dInfo),
+		SYNC_INIT(odomScan3dInfo),
+
+		// Scan + User Data
+		SYNC_INIT(dataScan2d),
+		SYNC_INIT(dataScan3d),
+		SYNC_INIT(dataScan2dInfo),
+		SYNC_INIT(dataScan3dInfo),
+
+		// Scan + Odom + User Data
+		SYNC_INIT(odomDataScan2d),
+		SYNC_INIT(odomDataScan3d),
+		SYNC_INIT(odomDataScan2dInfo),
+		SYNC_INIT(odomDataScan3dInfo)
 
 {
 }
@@ -256,8 +278,7 @@ void CommonDataSubscriber::setupCallbacks(ros::NodeHandle & nh, ros::NodeHandle 
 	{
 		if(!subscribedToDepth_ && !subscribedToStereo_ && !subscribedToRGBD_)
 		{
-			ROS_WARN("When subscribing to laser scan, you should subscribe to depth, stereo or rgbd too. Subscribing to depth by default...");
-			subscribedToDepth_ = true;
+			approxSync_ = false; // default for scan: exact sync
 		}
 	}
 	if(subscribedToStereo_)
@@ -373,7 +394,20 @@ void CommonDataSubscriber::setupCallbacks(ros::NodeHandle & nh, ros::NodeHandle 
 					approxSync_);
 		}
 	}
-	if(subscribedToDepth_ || subscribedToStereo_ || subscribedToRGBD_)
+	else if(subscribeScan2d || subscribeScan3d)
+	{
+		setupScanCallbacks(
+					nh,
+					pnh,
+					subscribeScan2d,
+					subscribeOdom,
+					subscribeUserData,
+					subscribeOdomInfo,
+					queueSize_,
+					approxSync_);
+	}
+
+	if(subscribedToDepth_ || subscribedToStereo_ || subscribedToRGBD_ || subscribedToScan2d_ || subscribedToScan3d_)
 	{
 		warningThread_ = new boost::thread(boost::bind(&CommonDataSubscriber::warningLoop, this));
 		ROS_INFO("%s", subscribedTopicsMsg_.c_str());
@@ -556,6 +590,28 @@ CommonDataSubscriber::~CommonDataSubscriber()
 	SYNC_DEL(rgbd4OdomDataScan2dInfo);
 	SYNC_DEL(rgbd4OdomDataScan3dInfo);
 
+	// Scan
+	SYNC_DEL(scan2dInfo);
+	SYNC_DEL(scan3dInfo);
+
+	// Scan + Odom
+	SYNC_DEL(odomScan2d);
+	SYNC_DEL(odomScan3d);
+	SYNC_DEL(odomScan2dInfo);
+	SYNC_DEL(odomScan3dInfo);
+
+	// Scan + User Data
+	SYNC_DEL(dataScan2d);
+	SYNC_DEL(dataScan3d);
+	SYNC_DEL(dataScan2dInfo);
+	SYNC_DEL(dataScan3dInfo);
+
+	// Scan + Odom + User Data
+	SYNC_DEL(odomDataScan2d);
+	SYNC_DEL(odomDataScan3d);
+	SYNC_DEL(odomDataScan2dInfo);
+	SYNC_DEL(odomDataScan3dInfo);
+
 	for(unsigned int i=0; i<rgbdSubs_.size(); ++i)
 	{
 		delete rgbdSubs_[i];
@@ -620,8 +676,6 @@ void CommonDataSubscriber::commonSingleDepthCallback(
 	{
 		commonStereoCallback(odomMsg, userDataMsg, imageMsg, depthMsg, rgbCameraInfoMsg, depthCameraInfoMsg, scanMsg, scan3dMsg, odomInfoMsg);
 	}
-
-
 }
 
 } /* namespace rtabmap_ros */

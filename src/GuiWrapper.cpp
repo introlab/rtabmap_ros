@@ -745,6 +745,149 @@ void GuiWrapper::commonStereoCallback(
 	QMetaObject::invokeMethod(mainWindow_, "processOdometry", Q_ARG(rtabmap::OdometryEvent, odomEvent), Q_ARG(bool, ignoreData));
 }
 
+void GuiWrapper::commonLaserScanCallback(
+		const nav_msgs::OdometryConstPtr & odomMsg,
+		const rtabmap_ros::UserDataConstPtr & userDataMsg,
+		const sensor_msgs::LaserScanConstPtr& scan2dMsg,
+		const sensor_msgs::PointCloud2ConstPtr& scan3dMsg,
+		const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg)
+{
+	UASSERT(scan2dMsg.get() || scan3dMsg.get());
+
+	std_msgs::Header odomHeader;
+	if(odomMsg.get())
+	{
+		odomHeader = odomMsg->header;
+	}
+	else
+	{
+		if(scan2dMsg.get())
+		{
+			odomHeader = scan2dMsg->header;
+		}
+		else if(scan3dMsg.get())
+		{
+			odomHeader = scan3dMsg->header;
+		}
+		else
+		{
+			return;
+		}
+		odomHeader.frame_id = odomFrameId_;
+	}
+
+	Transform odomT = rtabmap_ros::getTransform(odomHeader.frame_id, frameId_, odomHeader.stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0);
+	cv::Mat covariance = cv::Mat::eye(6,6,CV_64FC1);
+	if(odomMsg.get())
+	{
+		UASSERT(odomMsg->twist.covariance.size() == 36);
+		if(odomMsg->twist.covariance[0] != 0 &&
+			 odomMsg->twist.covariance[7] != 0 &&
+			 odomMsg->twist.covariance[14] != 0 &&
+			 odomMsg->twist.covariance[21] != 0 &&
+			 odomMsg->twist.covariance[28] != 0 &&
+			 odomMsg->twist.covariance[35] != 0)
+		{
+			covariance = cv::Mat(6,6,CV_64FC1,(void*)odomMsg->twist.covariance.data()).clone();
+		}
+	}
+	if(odomHeader.frame_id.empty())
+	{
+		ROS_ERROR("Odometry frame not set!?");
+		return;
+	}
+
+	cv::Mat scan;
+	Transform scanLocalTransform = Transform::getIdentity();
+	rtabmap::OdometryInfo info;
+	bool ignoreData = false;
+
+	// limit 10 Hz max
+	if(UTimer::now() - lastOdomInfoUpdateTime_ > 0.1 &&
+	   !mainWindow_->isProcessingOdometry() &&
+	   !mainWindow_->isProcessingStatistics())
+	{
+		lastOdomInfoUpdateTime_ = UTimer::now();
+
+		if(scan2dMsg.get() != 0)
+		{
+			if(!rtabmap_ros::convertScanMsg(
+					scan2dMsg,
+					frameId_,
+					odomSensorSync_?odomHeader.frame_id:"",
+					odomHeader.stamp,
+					scan,
+					scanLocalTransform,
+					tfListener_,
+					waitForTransform_?waitForTransformDuration_:0))
+			{
+				ROS_ERROR("Could not convert laser scan msg! Aborting rtabmapviz update...");
+				return;
+			}
+		}
+		else if(scan3dMsg.get() != 0)
+		{
+			if(!rtabmap_ros::convertScan3dMsg(
+					scan3dMsg,
+					frameId_,
+					odomSensorSync_?odomHeader.frame_id:"",
+					odomHeader.stamp,
+					scan,
+					scanLocalTransform,
+					tfListener_,
+					waitForTransform_?waitForTransformDuration_:0))
+			{
+				ROS_ERROR("Could not convert 3d laser scan msg! Aborting rtabmapviz update...");
+				return;
+			}
+		}
+
+		if(odomInfoMsg.get())
+		{
+			info = rtabmap_ros::odomInfoFromROS(*odomInfoMsg);
+		}
+		ignoreData = false;
+	}
+	else if(odomInfoMsg.get())
+	{
+		info = rtabmap_ros::odomInfoFromROS(*odomInfoMsg).copyWithoutData();
+		ignoreData = true;
+	}
+	else
+	{
+		// don't update GUI odom stuff if we don't use visual odometry
+		return;
+	}
+
+	cv::Mat rgb = cv::Mat::zeros(2,1,CV_8UC1);
+	cv::Mat depth = cv::Mat::zeros(2,1,CV_16UC1);
+	CameraModel model(
+			1,
+			1,
+			0.5,
+			1,
+			Transform::getIdentity(),
+			0,
+			cv::Size(1,2));
+
+	info.reg.covariance = covariance;
+	rtabmap::OdometryEvent odomEvent(
+		rtabmap::SensorData(
+				LaserScan::backwardCompatibility(scan,
+						scan2dMsg.get()?(int)scan2dMsg->ranges.size():0,
+						scan2dMsg.get()?(int)scan2dMsg->range_max:0,
+						scanLocalTransform),
+				rgb,
+				depth,
+				model,
+				odomHeader.seq,
+				rtabmap_ros::timestampFromROS(odomHeader.stamp)),
+		odomMsg.get()?rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose):odomT,
+		info);
+
+	QMetaObject::invokeMethod(mainWindow_, "processOdometry", Q_ARG(rtabmap::OdometryEvent, odomEvent), Q_ARG(bool, ignoreData));
+}
+
 // With odom msg
 void GuiWrapper::defaultCallback(const nav_msgs::OdometryConstPtr & odomMsg)
 {

@@ -65,7 +65,7 @@ public:
 	bool isSubscribedToScan2d() const {return subscribedToScan2d_;}
 	bool isSubscribedToScan3d() const {return subscribedToScan3d_;}
 	bool isSubscribedToOdomInfo() const {return subscribedToOdomInfo_;}
-	bool isDataSubscribed() const {return isSubscribedToDepth() || isSubscribedToStereo() || isSubscribedToRGBD();}
+	bool isDataSubscribed() const {return isSubscribedToDepth() || isSubscribedToStereo() || isSubscribedToRGBD() || isSubscribedToScan2d() || isSubscribedToScan3d();}
 	int rgbdCameras() const {return isSubscribedToRGBD()?(int)rgbdSubs_.size():0;}
 	int getQueueSize() const {return queueSize_;}
 	bool isApproxSync() const {return approxSync_;}
@@ -88,6 +88,12 @@ protected:
 				const cv_bridge::CvImageConstPtr& rightImageMsg,
 				const sensor_msgs::CameraInfo& leftCamInfoMsg,
 				const sensor_msgs::CameraInfo& rightCamInfoMsg,
+				const sensor_msgs::LaserScanConstPtr& scanMsg,
+				const sensor_msgs::PointCloud2ConstPtr& scan3dMsg,
+				const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg) = 0;
+	virtual void commonLaserScanCallback(
+				const nav_msgs::OdometryConstPtr & odomMsg,
+				const rtabmap_ros::UserDataConstPtr & userDataMsg,
 				const sensor_msgs::LaserScanConstPtr& scanMsg,
 				const sensor_msgs::PointCloud2ConstPtr& scan3dMsg,
 				const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg) = 0;
@@ -163,6 +169,15 @@ private:
 			bool subscribeOdomInfo,
 			int queueSize,
 			bool approxSync);
+	void setupScanCallbacks(
+			ros::NodeHandle & nh,
+			ros::NodeHandle & pnh,
+			bool scan2dTopic,
+			bool subscribeOdom,
+			bool subscribeUserData,
+			bool subscribeOdomInfo,
+			int queueSize,
+			bool approxSync);
 
 protected:
 	std::string subscribedTopicsMsg_;
@@ -200,6 +215,9 @@ private:
 	message_filters::Subscriber<sensor_msgs::LaserScan> scanSub_;
 	message_filters::Subscriber<sensor_msgs::PointCloud2> scan3dSub_;
 	message_filters::Subscriber<rtabmap_ros::OdomInfo> odomInfoSub_;
+
+	ros::Subscriber scan2dSubOnly_;
+	ros::Subscriber scan3dSubOnly_;
 
 	// RGB + Depth
 	DATA_SYNCS3(depth, sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo);
@@ -369,6 +387,29 @@ private:
 	DATA_SYNCS8(rgbd4OdomDataScan2dInfo, nav_msgs::Odometry, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::LaserScan, rtabmap_ros::OdomInfo);
 	DATA_SYNCS8(rgbd4OdomDataScan3dInfo, nav_msgs::Odometry, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::PointCloud2, rtabmap_ros::OdomInfo);
 
+	// Scan
+	void scan2dCallback(const sensor_msgs::LaserScanConstPtr&);
+	void scan3dCallback(const sensor_msgs::PointCloud2ConstPtr&);
+	DATA_SYNCS2(scan2dInfo, sensor_msgs::LaserScan, rtabmap_ros::OdomInfo);
+	DATA_SYNCS2(scan3dInfo, sensor_msgs::PointCloud2, rtabmap_ros::OdomInfo);
+
+	// Scan + Odom
+	DATA_SYNCS2(odomScan2d, nav_msgs::Odometry, sensor_msgs::LaserScan);
+	DATA_SYNCS2(odomScan3d, nav_msgs::Odometry, sensor_msgs::PointCloud2);
+	DATA_SYNCS3(odomScan2dInfo, nav_msgs::Odometry, sensor_msgs::LaserScan, rtabmap_ros::OdomInfo);
+	DATA_SYNCS3(odomScan3dInfo, nav_msgs::Odometry, sensor_msgs::PointCloud2, rtabmap_ros::OdomInfo);
+
+	// Scan + User Data
+	DATA_SYNCS2(dataScan2d, rtabmap_ros::UserData, sensor_msgs::LaserScan);
+	DATA_SYNCS2(dataScan3d, rtabmap_ros::UserData, sensor_msgs::PointCloud2);
+	DATA_SYNCS3(dataScan2dInfo, rtabmap_ros::UserData, sensor_msgs::LaserScan, rtabmap_ros::OdomInfo);
+	DATA_SYNCS3(dataScan3dInfo, rtabmap_ros::UserData, sensor_msgs::PointCloud2, rtabmap_ros::OdomInfo);
+
+	// Scan + Odom + User Data
+	DATA_SYNCS3(odomDataScan2d, nav_msgs::Odometry, rtabmap_ros::UserData, sensor_msgs::LaserScan);
+	DATA_SYNCS3(odomDataScan3d, nav_msgs::Odometry, rtabmap_ros::UserData, sensor_msgs::PointCloud2);
+	DATA_SYNCS4(odomDataScan2dInfo, nav_msgs::Odometry, rtabmap_ros::UserData, sensor_msgs::LaserScan, rtabmap_ros::OdomInfo);
+	DATA_SYNCS4(odomDataScan3dInfo, nav_msgs::Odometry, rtabmap_ros::UserData, sensor_msgs::PointCloud2, rtabmap_ros::OdomInfo);
 };
 
 } /* namespace rtabmap_ros */

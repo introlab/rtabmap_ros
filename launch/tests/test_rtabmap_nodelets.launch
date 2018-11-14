@@ -42,6 +42,9 @@
     <!-- Visualisation -->
     <node pkg="rtabmap_ros" type="rtabmapviz" name="rtabmapviz" output="screen">
       <param name="frame_id" type="string" value="$(arg frame_id)"/>
+      <param name="subscribe_rgbd"  type="bool"   value="true"/>
+      <param name="subscribe_odom_info"  type="bool"   value="true"/>
+      <param name="approx_sync"     type="bool"   value="false"/>
     </node>
     
   </group>
