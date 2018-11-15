@@ -316,7 +316,7 @@ private:
 					obstacles,
 					&flatObstacles);
 
-			if(cloud->size() && (ground->size() || obstacles->size()))
+			if(cloud->size() && ((ground.get() && ground->size()) || (obstacles.get() && obstacles->size())))
 			{
 				if(groundPub_.getNumSubscribers() &&
 						ground.get() && ground->size())
