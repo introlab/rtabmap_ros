@@ -635,7 +635,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 					std::map<int, std::pair<std::pair<cv::Mat, cv::Mat>, cv::Mat> >::iterator mter = gridMaps_.find(iter->first);
 					if(mter != gridMaps_.end())
 					{
-						if(!mter->second.first.first.empty() || !mter->second.first.second.empty())
+						if(!mter->second.first.first.empty() || !mter->second.first.second.empty() || !mter->second.second.empty())
 						{
 							occupancyGrid_->addToCache(iter->first, mter->second.first.first, mter->second.first.second, mter->second.second);
 						}
@@ -653,11 +653,12 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 					if(mter != gridMaps_.end() && pter!=gridMapsViewpoints_.end())
 					{
 						if((mter->second.first.first.empty() || mter->second.first.first.channels() > 2) &&
-						   (mter->second.first.second.empty() || mter->second.first.second.channels() > 2))
+						   (mter->second.first.second.empty() || mter->second.first.second.channels() > 2) &&
+						   (mter->second.second.empty() || mter->second.second.channels() > 2))
 						{
 							octomap_->addToCache(iter->first, mter->second.first.first, mter->second.first.second, mter->second.second, pter->second);
 						}
-						else if(!mter->second.first.first.empty() && !mter->second.first.second.empty())
+						else if(!mter->second.first.first.empty() && !mter->second.first.second.empty() && !mter->second.second.empty())
 						{
 							ROS_WARN("Node %d: Cannot update octomap with 2D occupancy grids. "
 									"Do \"$ rosrun rtabmap_ros rtabmap --params | grep Grid\" to see "
