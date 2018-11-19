@@ -2337,7 +2337,6 @@ bool CoreWrapper::resetRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empt
 	lastPublishedMetricGoal_.setNull();
 	latestNodeWasReached_ = false;
 	mapsManager_.clear();
-	labels_.clear();
 	previousStamp_ = ros::Time(0);
 	globalPose_.header.stamp = ros::Time(0);
 	gps_ = rtabmap::GPS();
@@ -3001,12 +3000,6 @@ void CoreWrapper::publishStats(const ros::Time & stamp)
 	{
 		if(stats.poses().size())
 		{
-			// update labels buffer
-			if(stats.getLastSignatureData().id() > 0 && !stats.getLastSignatureData().getLabel().empty())
-			{
-				labels_.insert(std::make_pair(stats.getLastSignatureData().id(), stats.getLastSignatureData().getLabel()));
-			}
-
 			visualization_msgs::MarkerArray markers;
 			nav_msgs::Path path;
 			if(pubPath)
@@ -3018,11 +3011,11 @@ void CoreWrapper::publishStats(const ros::Time & stamp)
 				poseIter!=stats.poses().end();
 				++poseIter)
 			{
-				if(pubLabels)
+				if(pubLabels && rtabmap_.getMemory())
 				{
 					// Add labels
-					std::map<int, std::string>::iterator lter = labels_.find(poseIter->first);
-					if(lter != labels_.end() && !lter->second.empty())
+					std::map<int, std::string>::const_iterator lter = rtabmap_.getMemory()->getAllLabels().find(poseIter->first);
+					if(lter != rtabmap_.getMemory()->getAllLabels().end() && !lter->second.empty())
 					{
 						visualization_msgs::Marker marker;
 						marker.header.frame_id = mapFrameId_;

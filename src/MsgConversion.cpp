@@ -394,24 +394,34 @@ void infoFromROS(const rtabmap_ros::Info & info, rtabmap::Statistics & stat)
 		mapIntFloat.insert(std::pair<int, float>(info.posteriorKeys.at(i), info.posteriorValues.at(i)));
 	}
 	stat.setPosterior(mapIntFloat);
+
 	mapIntFloat.clear();
 	for(unsigned int i=0; i<info.likelihoodKeys.size() && i<info.likelihoodValues.size(); ++i)
 	{
 		mapIntFloat.insert(std::pair<int, float>(info.likelihoodKeys.at(i), info.likelihoodValues.at(i)));
 	}
 	stat.setLikelihood(mapIntFloat);
+
 	mapIntFloat.clear();
 	for(unsigned int i=0; i<info.rawLikelihoodKeys.size() && i<info.rawLikelihoodValues.size(); ++i)
 	{
 		mapIntFloat.insert(std::pair<int, float>(info.rawLikelihoodKeys.at(i), info.rawLikelihoodValues.at(i)));
 	}
 	stat.setRawLikelihood(mapIntFloat);
+
 	std::map<int, int> mapIntInt;
 	for(unsigned int i=0; i<info.weightsKeys.size() && i<info.weightsValues.size(); ++i)
 	{
 		mapIntInt.insert(std::pair<int, int>(info.weightsKeys.at(i), info.weightsValues.at(i)));
 	}
 	stat.setWeights(mapIntInt);
+
+	std::map<int, std::string> mapIntStr;
+	for(unsigned int i=0; i<info.labelsKeys.size() && i<info.labelsValues.size(); ++i)
+	{
+		mapIntStr.insert(std::pair<int, std::string>(info.labelsKeys.at(i), info.labelsValues.at(i)));
+	}
+	stat.setLabels(mapIntStr);
 
 	stat.setLocalPath(info.localPath);
 	stat.setCurrentGoalId(info.currentGoalId);
@@ -443,6 +453,8 @@ void infoToROS(const rtabmap::Statistics & stats, rtabmap_ros::Info & info)
 		info.rawLikelihoodValues = uValues(stats.rawLikelihood());
 		info.weightsKeys = uKeys(stats.weights());
 		info.weightsValues = uValues(stats.weights());
+		info.labelsKeys = uKeys(stats.labels());
+		info.labelsValues = uValues(stats.labels());
 		info.localPath = stats.localPath();
 		info.currentGoalId = stats.currentGoalId();
 

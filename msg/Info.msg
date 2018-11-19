@@ -30,6 +30,10 @@ float32[] rawLikelihoodValues
 int32[] weightsKeys
 int32[] weightsValues
 
+# std::map<int, std::string> labels;
+int32[] labelsKeys
+string[] labelsValues
+
 # std::map<std::string, float> stats
 string[] statsKeys
 float32[] statsValues

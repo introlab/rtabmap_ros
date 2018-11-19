@@ -198,7 +198,6 @@ private:
 	bool latestNodeWasReached_;
 	rtabmap::ParametersMap parameters_;
 	std::map<std::string, float> rtabmapROSStats_;
-	std::map<int, std::string> labels_;
 
 	std::string frameId_;
 	std::string odomFrameId_;
