@@ -90,9 +90,9 @@ private:
 
 		NODELET_INFO("IcpOdometry: scan_cloud_max_points  = %d", scanCloudMaxPoints_);
 		NODELET_INFO("IcpOdometry: scan_downsampling_step = %d", scanDownsamplingStep_);
-		NODELET_INFO("IcpOdometry: scan_voxel_size        = %f", scanVoxelSize_);
+		NODELET_INFO("IcpOdometry: scan_voxel_size        = %f m", scanVoxelSize_);
 		NODELET_INFO("IcpOdometry: scan_normal_k          = %d", scanNormalK_);
-		NODELET_INFO("IcpOdometry: scan_normal_radius     = %f", scanNormalRadius_);
+		NODELET_INFO("IcpOdometry: scan_normal_radius     = %f m", scanNormalRadius_);
 
 		scan_sub_ = nh.subscribe("scan", 1, &ICPOdometry::callbackScan, this);
 		cloud_sub_ = nh.subscribe("scan_cloud", 1, &ICPOdometry::callbackCloud, this);
@@ -175,6 +175,11 @@ private:
 
 	void callbackScan(const sensor_msgs::LaserScanConstPtr& scanMsg)
 	{
+		if(this->isPaused())
+		{
+			return;
+		}
+
 		// make sure the frame of the laser is updated too
 		Transform localScanTransform = getTransform(this->frameId(),
 				scanMsg->header.frame_id,
@@ -244,6 +249,10 @@ private:
 
 	void callbackCloud(const sensor_msgs::PointCloud2ConstPtr& cloudMsg)
 	{
+		if(this->isPaused())
+		{
+			return;
+		}
 		cv::Mat scan;
 		bool containNormals = false;
 		if(scanVoxelSize_ == 0.0f)

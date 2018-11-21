@@ -129,6 +129,8 @@ private:
 	bool icpParams_;
 	rtabmap::Transform guess_;
 	double guessStamp_;
+	double previousStamp_;
+	double expectedUpdateRate_;
 };
 
 }

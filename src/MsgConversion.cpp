@@ -1122,6 +1122,8 @@ rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::OdomInfo & msg)
 
 	info.transform = transformFromGeometryMsg(msg.transform);
 	info.transformFiltered = transformFromGeometryMsg(msg.transformFiltered);
+	info.transformGroundTruth = transformFromGeometryMsg(msg.transformGroundTruth);
+	info.guessVelocity = transformFromGeometryMsg(msg.guessVelocity);
 
 	UASSERT(msg.localMapKeys.size() == msg.localMapValues.size());
 	for(unsigned int i=0; i<msg.localMapKeys.size(); ++i)
@@ -1176,6 +1178,8 @@ void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_ros::OdomInfo & m
 
 	transformToGeometryMsg(info.transform, msg.transform);
 	transformToGeometryMsg(info.transformFiltered, msg.transformFiltered);
+	transformToGeometryMsg(info.transformGroundTruth, msg.transformGroundTruth);
+	transformToGeometryMsg(info.guessVelocity, msg.guessVelocity);
 
 	msg.localMapKeys = uKeys(info.localMap);
 	points3fToROS(uValues(info.localMap), msg.localMapValues);

@@ -78,7 +78,9 @@ OdometryROS::OdometryROS(bool stereoParams, bool visParams, bool icpParams) :
 	stereoParams_(stereoParams),
 	visParams_(visParams),
 	icpParams_(icpParams),
-	guessStamp_(0.0)
+	guessStamp_(0.0),
+	previousStamp_(0.0),
+	expectedUpdateRate_(0.0)
 {
 
 }
@@ -146,6 +148,8 @@ void OdometryROS::onInit()
 	pnh.param("guess_min_translation", guessMinTranslation_, guessMinTranslation_);
 	pnh.param("guess_min_rotation", guessMinRotation_, guessMinRotation_);
 
+	pnh.param("expected_update_rate", expectedUpdateRate_, expectedUpdateRate_);
+
 	if(publishTf_ && !guessFrameId_.empty() && guessFrameId_.compare(odomFrameId_) == 0)
 	{
 		NODELET_WARN( "\"publish_tf\" and \"guess_frame_id\" cannot be used "
@@ -166,6 +170,7 @@ void OdometryROS::onInit()
 	NODELET_INFO("Odometry: guess_frame_id         = %s", guessFrameId_.c_str());
 	NODELET_INFO("Odometry: guess_min_translation  = %f", guessMinTranslation_);
 	NODELET_INFO("Odometry: guess_min_rotation     = %f", guessMinRotation_);
+	NODELET_INFO("Odometry: expected_update_rate   = %f Hz", expectedUpdateRate_);
 
 	configPath = uReplaceChar(configPath, '~', UDirectory::homeDir());
 	if(configPath.size() && configPath.at(0) != '/')
@@ -389,26 +394,53 @@ Transform OdometryROS::getTransform(const std::string & fromFrameId, const std::
 
 void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 {
-	if(!data.imageRaw().empty())
+	if(!data.imageRaw().empty() || !data.laserScanRaw().isEmpty())
 	{
-		if(odometry_->getPose().isIdentity() &&
-		   !groundTruthFrameId_.empty())
+		if(previousStamp_>0.0 && previousStamp_ >= stamp.toSec())
 		{
-			// sync with the first value of the ground truth
-			Transform initialPose = getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, stamp);
-			if(initialPose.isNull())
+			static bool warned = false;
+			if(!warned)
 			{
-				NODELET_WARN("Ground truth frames \"%s\" -> \"%s\" are set but failed to "
-						"get them, odometry won't be synchronized with ground truth.",
-						groundTruthFrameId_.c_str(), groundTruthBaseFrameId_.c_str());
+				NODELET_WARN("Odometry: Detected not valid consecutive stamps (previous=%fs new=%fs). New stamp should be always greater than previous stamp. This new data is ignored. This message will appear only once.",
+						previousStamp_, stamp.toSec());
+				warned = true;
 			}
-			else
+			return;
+		}
+		else if(expectedUpdateRate_ > 0 &&
+		  previousStamp_ > 0 &&
+		  (stamp.toSec()-previousStamp_) < 1.0/expectedUpdateRate_)
+		{
+			NODELET_WARN("Odometry: Aborting odometry update, higher frame rate detected (%f Hz) than the expected one (%f Hz). (stamps: previous=%fs new=%fs)",
+					1.0/(stamp.toSec()-previousStamp_), expectedUpdateRate_, previousStamp_, stamp.toSec());
+			return;
+		}
+	}
+
+	Transform groundTruth;
+	if(!groundTruthFrameId_.empty())
+	{
+		groundTruth = getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, stamp);
+
+		if(!data.imageRaw().empty() || !data.laserScanRaw().isEmpty())
+		{
+			if(odometry_->getPose().isIdentity())
 			{
-				NODELET_INFO( "Initializing odometry pose to %s (from \"%s\" -> \"%s\")",
-						initialPose.prettyPrint().c_str(),
-						groundTruthFrameId_.c_str(),
-						groundTruthBaseFrameId_.c_str());
-				odometry_->reset(initialPose);
+				// sync with the first value of the ground truth
+				if(groundTruth.isNull())
+				{
+					NODELET_WARN("Ground truth frames \"%s\" -> \"%s\" are set but failed to "
+							"get them, odometry won't be initialized with ground truth.",
+							groundTruthFrameId_.c_str(), groundTruthBaseFrameId_.c_str());
+				}
+				else
+				{
+					NODELET_INFO( "Initializing odometry pose to %s (from \"%s\" -> \"%s\")",
+							groundTruth.prettyPrint().c_str(),
+							groundTruthFrameId_.c_str(),
+							groundTruthBaseFrameId_.c_str());
+					odometry_->reset(groundTruth);
+				}
 			}
 		}
 	}
@@ -463,6 +495,10 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 	ros::WallTime time = ros::WallTime::now();
 	rtabmap::OdometryInfo info;
 	SensorData dataCpy = data;
+	if(!groundTruth.isNull())
+	{
+		dataCpy.setGroundTruth(groundTruth);
+	}
 	rtabmap::Transform pose = odometry_->process(dataCpy, guess_, &info);
 	guess_.setNull();
 	if(!pose.isNull())
@@ -632,7 +668,7 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 			odomLocalScanMap_.publish(cloudMsg);
 		}
 	}
-	else if(data.imageRaw().empty() && !data.imu().empty())
+	else if(data.imageRaw().empty() && data.laserScanRaw().isEmpty() && !data.imu().empty())
 	{
 		return;
 	}
@@ -695,7 +731,7 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 		odomInfoPub_.publish(infoMsg);
 	}
 
-	if(!data.imageRaw().empty())
+	if(!data.imageRaw().empty() || !data.laserScanRaw().isEmpty())
 	{
 		if(visParams_)
 		{
@@ -708,11 +744,12 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 				NODELET_INFO( "Odom: quality=%d, std dev=%fm|%frad, update time=%fs", info.reg.inliers, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (ros::WallTime::now()-time).toSec());
 			}
 		}
-		else
+		else // if(icpParams_)
 		{
 			NODELET_INFO( "Odom: ratio=%f, std dev=%fm|%frad, update time=%fs", info.reg.icpInliersRatio, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (ros::WallTime::now()-time).toSec());
 		}
 	}
+	previousStamp_ = stamp.toSec();
 }
 
 bool OdometryROS::reset(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
@@ -721,6 +758,7 @@ bool OdometryROS::reset(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 	odometry_->reset();
 	guess_.setNull();
 	guessStamp_ = 0.0;
+	previousStamp_ = 0.0;
 	resetCurrentCount_ = resetCountdown_;
 	this->flushCallbacks();
 	return true;
@@ -733,6 +771,7 @@ bool OdometryROS::resetToPose(rtabmap_ros::ResetPose::Request& req, rtabmap_ros:
 	odometry_->reset(pose);
 	guess_.setNull();
 	guessStamp_ = 0.0;
+	previousStamp_ = 0.0;
 	resetCurrentCount_ = resetCountdown_;
 	this->flushCallbacks();
 	return true;
@@ -742,12 +781,12 @@ bool OdometryROS::pause(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
 	if(paused_)
 	{
-		NODELET_WARN( "visual_odometry: Already paused!");
+		NODELET_WARN( "Odometry: Already paused!");
 	}
 	else
 	{
 		paused_ = true;
-		NODELET_INFO( "visual_odometry: paused!");
+		NODELET_INFO( "Odometry: paused!");
 	}
 	return true;
 }
@@ -756,12 +795,12 @@ bool OdometryROS::resume(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
 	if(!paused_)
 	{
-		NODELET_WARN( "visual_odometry: Already running!");
+		NODELET_WARN( "Odometry: Already running!");
 	}
 	else
 	{
 		paused_ = false;
-		NODELET_INFO( "visual_odometry: resumed!");
+		NODELET_INFO( "Odometry: resumed!");
 	}
 	return true;
 }
