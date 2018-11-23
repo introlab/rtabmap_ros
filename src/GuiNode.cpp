@@ -38,8 +38,7 @@ ros::AsyncSpinner * spinner = 0;
 
 void my_handler(int s){
 	ROS_INFO("rtabmapviz: ctrl-c catched! Exiting Qt app...");
-	spinner->stop();
-	exit(-1);
+	app->exit(-1);
 }
 
 int main(int argc, char** argv)

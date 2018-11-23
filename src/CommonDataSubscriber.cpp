@@ -617,6 +617,23 @@ CommonDataSubscriber::~CommonDataSubscriber()
 		delete rgbdSubs_[i];
 	}
 	rgbdSubs_.clear();
+
+	//clear params
+	ros::NodeHandle pnh("~");
+	pnh.deleteParam("subscribe_depth");
+	pnh.deleteParam("subscribe_laserScan");
+	pnh.deleteParam("subscribe_scan");
+	pnh.deleteParam("subscribe_scan_cloud");
+	pnh.deleteParam("subscribe_stereo");
+	pnh.deleteParam("subscribe_rgbd");
+	pnh.deleteParam("subscribe_odom_info");
+	pnh.deleteParam("subscribe_user_data");
+	pnh.deleteParam("odom_frame_id");
+	pnh.deleteParam("rgbd_cameras");
+	pnh.deleteParam("depth_cameras");
+	pnh.deleteParam("queue_size");
+	pnh.deleteParam("approx_sync");
+	pnh.deleteParam("stereo_approx_sync");
 }
 
 void CommonDataSubscriber::warningLoop()
