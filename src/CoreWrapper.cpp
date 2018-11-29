@@ -2068,12 +2068,15 @@ void CoreWrapper::userDataAsyncCallback(const rtabmap_ros::UserDataConstPtr & da
 	if(!paused_)
 	{
 		UScopeMutex lock(userDataMutex_);
-		if(!userData_.empty())
+		static bool warningShow = false;
+		if(!userData_.empty() && !warningShow)
 		{
-			ROS_WARN("Overwriting previous user data set. Asynchronous user "
-					"data input topic should be used with user data published at "
-					"lower rate than map update rate (current %s=%f).",
+			ROS_WARN("Overwriting previous user data set. When asynchronous user "
+					"data input topic rate is higher than "
+					"map update rate (current %s=%f), only latest data is saved "
+					"in the next node created. This message will is shown only once.",
 					Parameters::kRtabmapDetectionRate().c_str(), rate_);
+			warningShow = true;
 		}
 		userData_ = rtabmap_ros::userDataFromROS(*dataMsg);
 	}

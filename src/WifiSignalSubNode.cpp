@@ -62,6 +62,7 @@ inline int dBm2Quality(int dBm)
 
 ros::Publisher wifiSignalCloudPub;
 std::map<double, int> wifiLevels;
+std::map<double, int> nodeStamps_;
 
 void mapDataCallback(const rtabmap_ros::MapDataConstPtr & mapDataMsg)
 {
@@ -73,26 +74,43 @@ void mapDataCallback(const rtabmap_ros::MapDataConstPtr & mapDataMsg)
 	std::map<int, rtabmap::Signature> signatures;
 	rtabmap_ros::mapDataFromROS(*mapDataMsg, poses, links, signatures, mapToOdom);
 
-	std::map<double, int> nodeStamps; // <stamp, id>
+	// handle the case where we can receive only latest data, or if all data are published
 	for(std::map<int, rtabmap::Signature>::iterator iter=signatures.begin(); iter!=signatures.end(); ++iter)
 	{
-		cv::Mat data;
-		iter->second.sensorData().uncompressDataConst(0 ,0, 0, &data);
+		int id = iter->first;
+		rtabmap::Signature & node = iter->second;
 
-		if(data.type() == CV_64FC1 && data.rows == 1 && data.cols == 2)
-		{
-			// format [int level, double stamp], see wifi_signal_pub_node.cpp
-			int level = data.at<double>(0);
-			double stamp = data.at<double>(1);
-			wifiLevels.insert(std::make_pair(stamp, level));
-		}
-		else if(!data.empty())
-		{
-			ROS_ERROR("Wrong user data format for wifi signal.");
-		}
+		nodeStamps_.insert(std::make_pair(node.getStamp(), node.id()));
 
-		// Sort stamps by stamps->id
-		nodeStamps.insert(std::make_pair(iter->second.getStamp(), iter->first));
+		if(!node.sensorData().userDataCompressed().empty())
+		{
+			cv::Mat data;
+			node.sensorData().uncompressDataConst(0 ,0, 0, &data);
+
+			if(data.type() == CV_64FC1 && data.rows == 1 && data.cols == 2)
+			{
+				// format [int level, double stamp], see wifi_signal_pub_node.cpp
+				int level = data.at<double>(0);
+				double stamp = data.at<double>(1);
+				wifiLevels.insert(std::make_pair(stamp, level));
+			}
+			else if(!data.empty())
+			{
+				ROS_ERROR("Wrong user data format for wifi signal.");
+			}
+		}
+	}
+
+	// for the logic below, we should keep only stamps for
+	// nodes still in the graph (in case nodes are ignored when not moving)
+	std::map<double, int> nodeStamps;
+	for(std::map<double, int>::iterator iter=nodeStamps_.begin(); iter!=nodeStamps_.end(); ++iter)
+	{
+		std::map<int, rtabmap::Transform>::const_iterator jter = poses.find(iter->second);
+		if(jter != poses.end())
+		{
+			nodeStamps.insert(*iter);
+		}
 	}
 
 	if(wifiLevels.size() == 0)
