@@ -32,6 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <tf/transform_listener.h>
 #include <geometry_msgs/Transform.h>
 #include <geometry_msgs/Pose.h>
+#include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <sensor_msgs/CameraInfo.h>
 #include <sensor_msgs/LaserScan.h>
 #include <sensor_msgs/Image.h>
@@ -149,6 +150,16 @@ void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_ros::OdomInfo & m
 
 cv::Mat userDataFromROS(const rtabmap_ros::UserData & dataMsg);
 void userDataToROS(const cv::Mat & data, rtabmap_ros::UserData & dataMsg, bool compress);
+
+rtabmap::Landmarks landmarksFromROS(
+		const std::map<int, geometry_msgs::PoseWithCovarianceStamped> & tags,
+		const std::string & frameId,
+		const std::string & odomFrameId,
+		const ros::Time & odomStamp,
+		tf::TransformListener & listener,
+		double waitForTransform,
+		double defaultLinVariance,
+		double defaultAngVariance);
 
 inline double timestampFromROS(const ros::Time & stamp) {return double(stamp.sec) + double(stamp.nsec)/1000000000.0;}
 

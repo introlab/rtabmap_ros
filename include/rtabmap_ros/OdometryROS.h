@@ -128,7 +128,7 @@ private:
 	bool visParams_;
 	bool icpParams_;
 	rtabmap::Transform guess_;
-	double guessStamp_;
+	rtabmap::Transform guessPreviousPose_;
 	double previousStamp_;
 	double expectedUpdateRate_;
 };

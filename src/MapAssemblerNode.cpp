@@ -197,9 +197,9 @@ public:
 		{
 			Signature tmpS = nodes_.at(poses.rbegin()->first);
 			SensorData tmpData = tmpS.sensorData();
-			tmpData.setId(-1);
-			uInsert(nodes_, std::make_pair(-1, Signature(-1, -1, 0, tmpS.getStamp(), "", tmpS.getPose(), Transform(), tmpData)));
-			poses.insert(std::make_pair(-1, poses.rbegin()->second));
+			tmpData.setId(0);
+			uInsert(nodes_, std::make_pair(0, Signature(0, -1, 0, tmpS.getStamp(), "", tmpS.getPose(), Transform(), tmpData)));
+			poses.insert(std::make_pair(0, poses.rbegin()->second));
 		}
 
 		// Update maps

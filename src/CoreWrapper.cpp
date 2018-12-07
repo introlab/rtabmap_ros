@@ -93,8 +93,10 @@ CoreWrapper::CoreWrapper() :
 		groundTruthFrameId_(""), // e.g., "world"
 		groundTruthBaseFrameId_(""), // e.g., "base_link_gt"
 		configPath_(""),
-		odomDefaultAngVariance_(1.0),
-		odomDefaultLinVariance_(1.0),
+		odomDefaultAngVariance_(0.001),
+		odomDefaultLinVariance_(0.001),
+		landmarkDefaultAngVariance_(0.001),
+		landmarkDefaultLinVariance_(0.001),
 		waitForTransform_(true),
 		waitForTransformDuration_(0.2), // 200 ms
 		useActionForGoal_(false),
@@ -157,6 +159,8 @@ void CoreWrapper::onInit()
 	pnh.param("tf_tolerance",        tfTolerance, tfTolerance);
 	pnh.param("odom_tf_angular_variance", odomDefaultAngVariance_, odomDefaultAngVariance_);
 	pnh.param("odom_tf_linear_variance", odomDefaultLinVariance_, odomDefaultLinVariance_);
+	pnh.param("landmark_angular_variance", landmarkDefaultAngVariance_, landmarkDefaultAngVariance_);
+	pnh.param("landmark_linear_variance", landmarkDefaultLinVariance_, landmarkDefaultLinVariance_);
 	pnh.param("wait_for_transform",  waitForTransform_, waitForTransform_);
 	pnh.param("wait_for_transform_duration",  waitForTransformDuration_, waitForTransformDuration_);
 	pnh.param("use_action_for_goal", useActionForGoal_, useActionForGoal_);
@@ -687,6 +691,9 @@ void CoreWrapper::onInit()
 	userDataAsyncSub_ = nh.subscribe("user_data_async", 1, &CoreWrapper::userDataAsyncCallback, this);
 	globalPoseAsyncSub_ = nh.subscribe("global_pose", 1, &CoreWrapper::globalPoseAsyncCallback, this);
 	gpsFixAsyncSub_ = nh.subscribe("gps/fix", 1, &CoreWrapper::gpsFixAsyncCallback, this);
+#ifdef WITH_APRILTAGS2_ROS
+	tagDetectionsSub_ = nh.subscribe("tag_detections", 1, &CoreWrapper::tagDetectionsAsyncCallback, this);
+#endif
 }
 
 CoreWrapper::~CoreWrapper()
@@ -1292,6 +1299,22 @@ void CoreWrapper::commonDepthCallbackImpl(
 	}
 	gps_ = rtabmap::GPS();
 
+	//tag detections
+	Landmarks landmarks = rtabmap_ros::landmarksFromROS(
+			tags_,
+			frameId_,
+			odomFrameId,
+			lastPoseStamp_,
+			tfListener_,
+			waitForTransform_?waitForTransformDuration_:0,
+			landmarkDefaultLinVariance_,
+			landmarkDefaultAngVariance_);
+	tags_.clear();
+	if(!landmarks.empty())
+	{
+		data.setLandmarks(landmarks);
+	}
+
 	OdometryInfo odomInfo;
 	if(odomInfoMsg.get())
 	{
@@ -1565,6 +1588,22 @@ void CoreWrapper::commonStereoCallback(
 	}
 	gps_ = rtabmap::GPS();
 
+	//tag detections
+	Landmarks landmarks = rtabmap_ros::landmarksFromROS(
+			tags_,
+			frameId_,
+			odomFrameId,
+			lastPoseStamp_,
+			tfListener_,
+			waitForTransform_?waitForTransformDuration_:0,
+			landmarkDefaultLinVariance_,
+			landmarkDefaultAngVariance_);
+	tags_.clear();
+	if(!landmarks.empty())
+	{
+		data.setLandmarks(landmarks);
+	}
+
 	OdometryInfo odomInfo;
 	if(odomInfoMsg.get())
 	{
@@ -1785,6 +1824,22 @@ void CoreWrapper::commonLaserScanCallback(
 		odomInfo = odomInfoFromROS(*odomInfoMsg);
 	}
 
+	//tag detections
+	Landmarks landmarks = rtabmap_ros::landmarksFromROS(
+			tags_,
+			frameId_,
+			odomFrameId,
+			lastPoseStamp_,
+			tfListener_,
+			waitForTransform_?waitForTransformDuration_:0,
+			landmarkDefaultLinVariance_,
+			landmarkDefaultAngVariance_);
+	tags_.clear();
+	if(!landmarks.empty())
+	{
+		data.setLandmarks(landmarks);
+	}
+
 	process(lastPoseStamp_,
 			data,
 			lastPose_,
@@ -1897,7 +1952,7 @@ void CoreWrapper::process(
 					memcpy(poseMsg.pose.covariance.data(), cov.data, cov.total()*sizeof(double));
 					localizationPosePub_.publish(poseMsg);
 				}
-				std::map<int, rtabmap::Transform> filteredPoses = rtabmap_.getLocalOptimizedPoses();
+				std::map<int, rtabmap::Transform> filteredPoses(rtabmap_.getLocalOptimizedPoses().lower_bound(1), rtabmap_.getLocalOptimizedPoses().end());
 
 				// create a tmp signature with latest sensory data if latest signature was ignored
 				std::map<int, rtabmap::Signature> tmpSignature;
@@ -1909,9 +1964,9 @@ void CoreWrapper::process(
 					(!mapsManager_.getOccupancyGrid()->isGridFromDepth() && data.laserScanRaw().is2d())) // 2d laser scan would fill empty space for latest data
 				{
 					SensorData tmpData = data;
-					tmpData.setId(-1);
-					tmpSignature.insert(std::make_pair(-1, Signature(-1, -1, 0, data.stamp(), "", odom, Transform(), tmpData)));
-					filteredPoses.insert(std::make_pair(-1, mapToOdom_*odom));
+					tmpData.setId(0);
+					tmpSignature.insert(std::make_pair(0, Signature(0, -1, 0, data.stamp(), "", odom, Transform(), tmpData)));
+					filteredPoses.insert(std::make_pair(0, mapToOdom_*odom));
 				}
 
 				if(maxMappingNodes_ > 0 && filteredPoses.size()>1)
@@ -1926,7 +1981,7 @@ void CoreWrapper::process(
 							nearestPoses.insert(*pter);
 						}
 					}
-					//add negative and make sure those on a planned path are not filtered
+					//add latest/zero and make sure those on a planned path are not filtered
 					std::set<int> onPath;
 					if(rtabmap_.getPath().size())
 					{
@@ -1935,7 +1990,7 @@ void CoreWrapper::process(
 					}
 					for(std::map<int, Transform>::iterator iter=filteredPoses.begin(); iter!=filteredPoses.end(); ++iter)
 					{
-						if(iter->first < 0 || onPath.find(iter->first) != onPath.end())
+						if(iter->first == 0 || onPath.find(iter->first) != onPath.end())
 						{
 							nearestPoses.insert(*iter);
 						}
@@ -2113,6 +2168,22 @@ void CoreWrapper::gpsFixAsyncCallback(const sensor_msgs::NavSatFixConstPtr & gps
 	}
 }
 
+#ifdef WITH_APRILTAGS2_ROS
+void CoreWrapper::tagDetectionsAsyncCallback(const apriltags2_ros::AprilTagDetectionArray & tagDetections)
+{
+	if(!paused_)
+	{
+		for(unsigned int i=0; i<tagDetections.detections.size(); ++i)
+		{
+			if(tagDetections.detections[i].id.size() == 1)
+			{
+				uInsert(tags_, std::make_pair(tagDetections.detections[i].id[0], tagDetections.detections[i].pose));
+			}
+		}
+	}
+}
+#endif
+
 
 void CoreWrapper::initialPoseCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr & msg)
 {
@@ -2142,7 +2213,11 @@ void CoreWrapper::goalCommonCallback(
 
 	if(id > 0)
 	{
-		NODELET_INFO("Planning: set goal %d", id);
+		NODELET_INFO("Planning: set goal to node %d", id);
+	}
+	else if(id < 0)
+	{
+		NODELET_INFO("Planning: set goal to landmark %d", id);
 	}
 	else if(!pose.isNull())
 	{
@@ -2155,7 +2230,7 @@ void CoreWrapper::goalCommonCallback(
 	}
 
 	bool success = false;
-	if((id > 0 && rtabmap_.computePath(id, true)) ||
+	if((id != 0 && rtabmap_.computePath(id, true)) ||
 	   (!pose.isNull() && rtabmap_.computePath(pose)))
 	{
 		if(planningTime)
@@ -2231,6 +2306,10 @@ void CoreWrapper::goalCommonCallback(
 		{
 			NODELET_ERROR("Planning: Could not plan to node %d! The node is not in map's graph (look for warnings before this message for more details).", id);
 		}
+		else if(id < 0)
+		{
+			NODELET_ERROR("Planning: Could not plan to landmark %d! The landmark is not in map's graph (look for warnings before this message for more details).", id);
+		}
 		else
 		{
 			NODELET_ERROR("Planning: Node id should be > 0 !");
@@ -2280,7 +2359,7 @@ void CoreWrapper::goalCallback(const geometry_msgs::PoseStampedConstPtr & msg)
 
 void CoreWrapper::goalNodeCallback(const rtabmap_ros::GoalConstPtr & msg)
 {
-	if(msg->node_id <= 0 && msg->node_label.empty())
+	if(msg->node_id == 0 && msg->node_label.empty())
 	{
 		NODELET_ERROR("Node id or label should be set!");
 		return;
@@ -2343,6 +2422,7 @@ bool CoreWrapper::resetRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empt
 	previousStamp_ = ros::Time(0);
 	globalPose_.header.stamp = ros::Time(0);
 	gps_ = rtabmap::GPS();
+	tags_.clear();
 	userDataMutex_.lock();
 	userData_ = cv::Mat();
 	userDataMutex_.unlock();
@@ -2404,6 +2484,7 @@ bool CoreWrapper::backupDatabaseCallback(std_srvs::Empty::Request&, std_srvs::Em
 	userDataMutex_.unlock();
 	globalPose_.header.stamp = ros::Time(0);
 	gps_ = rtabmap::GPS();
+	tags_.clear();
 
 	NODELET_INFO("Backup: Saving \"%s\" to \"%s\"...", databasePath_.c_str(), (databasePath_+".back").c_str());
 	UFile::copy(databasePath_, databasePath_+".back");
@@ -2658,8 +2739,8 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 
 		if(!req.graphOnly && mapsManager_.hasSubscribers())
 		{
-			std::map<int, Transform> filteredPoses = poses;
-			if(maxMappingNodes_ > 0 && poses.size()>1)
+			std::map<int, Transform> filteredPoses(poses.lower_bound(1), poses.end());
+			if(maxMappingNodes_ > 0 && filteredPoses.size()>1)
 			{
 				std::map<int, Transform> nearestPoses;
 				std::vector<int> nodes = graph::findNearestNodes(filteredPoses, filteredPoses.rbegin()->second, maxMappingNodes_);
@@ -3046,6 +3127,7 @@ void CoreWrapper::publishStats(const ros::Time & stamp)
 
 						markers.markers.push_back(marker);
 					}
+
 					// Add node ids
 					visualization_msgs::Marker marker;
 					marker.header.frame_id = mapFrameId_;

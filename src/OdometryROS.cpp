@@ -36,7 +36,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <cv_bridge/cv_bridge.h>
 
-#include <rtabmap/core/Rtabmap.h>
 #include <rtabmap/core/odometry/OdometryF2M.h>
 #include <rtabmap/core/odometry/OdometryF2F.h>
 #include <rtabmap/core/util3d.h>
@@ -78,7 +77,6 @@ OdometryROS::OdometryROS(bool stereoParams, bool visParams, bool icpParams) :
 	stereoParams_(stereoParams),
 	visParams_(visParams),
 	icpParams_(icpParams),
-	guessStamp_(0.0),
 	previousStamp_(0.0),
 	expectedUpdateRate_(0.0)
 {
@@ -448,8 +446,8 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 	Transform guessCurrentPose;
 	if(!guessFrameId_.empty())
 	{
-		Transform previousPose = this->getTransform(guessFrameId_, frameId_, guessStamp_>0.0?ros::Time(guessStamp_):stamp);
 		guessCurrentPose = this->getTransform(guessFrameId_, frameId_, stamp);
+		Transform previousPose = guessPreviousPose_.isNull()?guessCurrentPose:guessPreviousPose_;
 		if(!previousPose.isNull() && !guessCurrentPose.isNull())
 		{
 			if(guess_.isNull())
@@ -460,7 +458,7 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 			{
 				guess_ = guess_ * previousPose.inverse() * guessCurrentPose;
 			}
-			if(guessStamp_>0.0 && (guessMinTranslation_ > 0.0 || guessMinRotation_ > 0.0))
+			if(!guessPreviousPose_.isNull() && (guessMinTranslation_ > 0.0 || guessMinRotation_ > 0.0))
 			{
 				float x,y,z,roll,pitch,yaw;
 				guess_.getTranslationAndEulerAngles(x,y,z,roll,pitch,yaw);
@@ -478,11 +476,11 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 						rtabmap_ros::transformToGeometryMsg(correction, correctionMsg.transform);
 						tfBroadcaster_.sendTransform(correctionMsg);
 					}
-					guessStamp_ = stamp.toSec();
+					guessPreviousPose_ = guessCurrentPose;
 					return;
 				}
 			}
-			guessStamp_ = stamp.toSec();
+			guessPreviousPose_ = guessCurrentPose;
 		}
 		else
 		{
@@ -557,11 +555,11 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 			odom.pose.covariance.at(35) = info.reg.covariance.at<double>(5,5)*2; // yawyaw
 
 			//set velocity
-			bool setTwist = !odometry_->previousVelocityTransform().isNull();
+			bool setTwist = !odometry_->getVelocityGuess().isNull();
 			if(setTwist)
 			{
 				float x,y,z,roll,pitch,yaw;
-				odometry_->previousVelocityTransform().getTranslationAndEulerAngles(x,y,z,roll,pitch,yaw);
+				odometry_->getVelocityGuess().getTranslationAndEulerAngles(x,y,z,roll,pitch,yaw);
 				odom.twist.twist.linear.x = x;
 				odom.twist.twist.linear.y = y;
 				odom.twist.twist.linear.z = z;
@@ -757,7 +755,7 @@ bool OdometryROS::reset(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 	NODELET_INFO( "visual_odometry: reset odom!");
 	odometry_->reset();
 	guess_.setNull();
-	guessStamp_ = 0.0;
+	guessPreviousPose_.setNull();
 	previousStamp_ = 0.0;
 	resetCurrentCount_ = resetCountdown_;
 	this->flushCallbacks();
@@ -770,7 +768,7 @@ bool OdometryROS::resetToPose(rtabmap_ros::ResetPose::Request& req, rtabmap_ros:
 	NODELET_INFO( "visual_odometry: reset odom to pose %s!", pose.prettyPrint().c_str());
 	odometry_->reset(pose);
 	guess_.setNull();
-	guessStamp_ = 0.0;
+	guessPreviousPose_.setNull();
 	previousStamp_ = 0.0;
 	resetCurrentCount_ = resetCountdown_;
 	this->flushCallbacks();

@@ -140,7 +140,7 @@ public:
 
         if(nodeToObjects_.size())
         {
-            for(std::map<int, rtabmap::Transform>::iterator iter=poses.begin(); iter!=poses.end(); ++iter)
+            for(std::map<int, rtabmap::Transform>::iterator iter=poses.lower_bound(1); iter!=poses.end(); ++iter)
             {
                 if(nodeToObjects_.find(iter->first) != nodeToObjects_.end())
                 {

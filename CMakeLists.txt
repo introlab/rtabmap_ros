@@ -25,12 +25,13 @@ find_package(catkin REQUIRED COMPONENTS
 # Optional components
 find_package(costmap_2d)
 find_package(octomap_msgs)
+find_package(apriltags2_ros)
 find_package(rviz)
 find_package(find_object_2d)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
-find_package(RTABMap 0.18.2 REQUIRED)
+find_package(RTABMap 0.18.3 REQUIRED)
 
 find_package(OpenCV REQUIRED)
 
@@ -130,7 +131,7 @@ IF(costmap_2d_FOUND)
 ENDIF(costmap_2d_FOUND)		
 IF(octomap_msgs_FOUND)		
    SET(optional_dependencies ${optional_dependencies} octomap_msgs)		
-ENDIF(octomap_msgs_FOUND)		
+ENDIF(octomap_msgs_FOUND)			
 IF(rviz_FOUND)		
    SET(optional_dependencies ${optional_dependencies} rviz)		
 ENDIF(rviz_FOUND)
@@ -239,6 +240,19 @@ SET(Libraries
 )
 ADD_DEFINITIONS("-DWITH_OCTOMAP_MSGS")
 ENDIF(octomap_msgs_FOUND)
+
+# If apriltags2_ros is found, add definition
+IF(apriltags2_ros_FOUND)
+MESSAGE(STATUS "WITH apriltags2_ros")
+include_directories(
+  ${apriltags2_ros_INCLUDE_DIRS}
+)
+SET(Libraries
+  ${apriltags2_ros_LIBRARIES}
+  ${Libraries}
+)
+ADD_DEFINITIONS("-DWITH_APRILTAGS2_ROS")
+ENDIF(apriltags2_ros_FOUND)
 
 # If rviz is found, add plugins
 IF(rviz_FOUND)

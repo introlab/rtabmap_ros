@@ -1233,6 +1233,69 @@ void userDataToROS(const cv::Mat & data, rtabmap_ros::UserData & dataMsg, bool c
 	}
 }
 
+rtabmap::Landmarks landmarksFromROS(
+		const std::map<int, geometry_msgs::PoseWithCovarianceStamped> & tags,
+		const std::string & frameId,
+		const std::string & odomFrameId,
+		const ros::Time & odomStamp,
+		tf::TransformListener & listener,
+		double waitForTransform,
+		double defaultLinVariance,
+		double defaultAngVariance)
+{
+	//tag detections
+	rtabmap::Landmarks landmarks;
+	for(std::map<int, geometry_msgs::PoseWithCovarianceStamped>::const_iterator iter=tags.begin(); iter!=tags.end(); ++iter)
+	{
+		rtabmap::Transform baseToCamera = rtabmap_ros::getTransform(
+				frameId,
+				iter->second.header.frame_id,
+				iter->second.header.stamp,
+				listener,
+				waitForTransform);
+
+		if(baseToCamera.isNull())
+		{
+			ROS_ERROR("Cannot transform tag pose from \"%s\" frame to \"%s\" frame!",
+					iter->second.header.frame_id.c_str(), frameId.c_str());
+			continue;
+		}
+
+		rtabmap::Transform baseToTag = baseToCamera * transformFromPoseMsg(iter->second.pose.pose);
+
+		if(!baseToTag.isNull())
+		{
+			// Correction of the global pose accounting the odometry movement since we received it
+			rtabmap::Transform correction = rtabmap_ros::getTransform(
+					frameId,
+					odomFrameId,
+					iter->second.header.stamp,
+					odomStamp,
+					listener,
+					waitForTransform);
+			if(!correction.isNull())
+			{
+				baseToTag = correction * baseToTag;
+			}
+			else
+			{
+				ROS_WARN("Could not adjust tag pose accordingly to latest odometry pose. "
+						"If odometry is small since it received the tag pose and "
+						"covariance is large, this should not be a problem.");
+			}
+			cv::Mat covariance = cv::Mat(6,6, CV_64FC1, (void*)iter->second.pose.covariance.data()).clone();
+			if(covariance.empty() || !uIsFinite(covariance.at<double>(0,0)) || covariance.at<double>(0,0)<=0.0f)
+			{
+				covariance = cv::Mat::eye(6,6,CV_64FC1);
+				covariance(cv::Range(0,3), cv::Range(0,3)) *= defaultLinVariance;
+				covariance(cv::Range(3,6), cv::Range(3,6)) *= defaultAngVariance;
+			}
+			landmarks.insert(std::make_pair(iter->first, rtabmap::Landmark(iter->first, baseToTag, covariance)));
+		}
+	}
+	return landmarks;
+}
+
 rtabmap::Transform getTransform(
 		const std::string & fromFrameId,
 		const std::string & toFrameId,

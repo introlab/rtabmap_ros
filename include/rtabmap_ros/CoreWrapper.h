@@ -62,6 +62,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <octomap_msgs/GetOctomap.h>
 #endif
 
+#ifdef WITH_APRILTAGS2_ROS
+#include <apriltags2_ros/AprilTagDetectionArray.h>
+#endif
+
 #include <actionlib/client/simple_action_client.h>
 #include <move_base_msgs/MoveBaseAction.h>
 #include <move_base_msgs/MoveBaseActionGoal.h>
@@ -129,6 +133,9 @@ private:
 	void userDataAsyncCallback(const rtabmap_ros::UserDataConstPtr & dataMsg);
 	void globalPoseAsyncCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr & globalPoseMsg);
 	void gpsFixAsyncCallback(const sensor_msgs::NavSatFixConstPtr & gpsFixMsg);
+#ifdef WITH_APRILTAGS2_ROS
+	void tagDetectionsAsyncCallback(const apriltags2_ros::AprilTagDetectionArray & tagDetections);
+#endif
 
 	void initialPoseCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr & msg);
 
@@ -208,6 +215,8 @@ private:
 	std::string databasePath_;
 	double odomDefaultAngVariance_;
 	double odomDefaultLinVariance_;
+	double landmarkDefaultAngVariance_;
+	double landmarkDefaultLinVariance_;
 	bool waitForTransform_;
 	double waitForTransformDuration_;
 	bool useActionForGoal_;
@@ -292,6 +301,8 @@ private:
 	geometry_msgs::PoseWithCovarianceStamped globalPose_;
 	ros::Subscriber gpsFixAsyncSub_;
 	rtabmap::GPS gps_;
+	ros::Subscriber tagDetectionsSub_;
+	std::map<int, geometry_msgs::PoseWithCovarianceStamped> tags_;
 
 	bool stereoToDepth_;
 	bool odomSensorSync_;

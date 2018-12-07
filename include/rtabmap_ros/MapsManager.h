@@ -90,8 +90,8 @@ private:
 	double mapFilterRadius_;
 	double mapFilterAngle_;
 	bool mapCacheCleanup_;
-	bool negativePosesIgnored_;
-	bool negativeScanEmptyRayTracing_;
+	bool alwaysUpdateMap_;
+	bool scanEmptyRayTracing_;
 
 	ros::Publisher cloudMapPub_;
 	ros::Publisher cloudGroundPub_;
