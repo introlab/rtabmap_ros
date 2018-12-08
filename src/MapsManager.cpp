@@ -488,7 +488,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 			filteredPoses = poses;
 		}
 
-		if(alwaysUpdateMap_)
+		if(!alwaysUpdateMap_)
 		{
 			filteredPoses.erase(0);
 		}
