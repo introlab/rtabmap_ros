@@ -366,7 +366,7 @@ IF(find_object_2d_FOUND)
 MESSAGE(STATUS "WITH find_object_2d")
 include_directories(${find_object_2d_INCLUDE_DIRS})
 add_executable(rtabmap_save_objects_example src/SaveObjectsExample.cpp)
-target_link_libraries(rtabmap_save_objects_example rtabmap_ros ${find_object_2d_LIBRARIES})
+target_link_libraries(rtabmap_save_objects_example ${Libraries} rtabmap_ros ${find_object_2d_LIBRARIES})
 set_target_properties(rtabmap_save_objects_example PROPERTIES OUTPUT_NAME "save_objects_example")
 ENDIF(find_object_2d_FOUND)
 
