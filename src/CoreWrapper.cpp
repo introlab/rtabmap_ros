@@ -2175,7 +2175,7 @@ void CoreWrapper::tagDetectionsAsyncCallback(const apriltags2_ros::AprilTagDetec
 	{
 		for(unsigned int i=0; i<tagDetections.detections.size(); ++i)
 		{
-			if(tagDetections.detections[i].id.size() == 1)
+			if(tagDetections.detections[i].id.size() >= 1)
 			{
 				uInsert(tags_, std::make_pair(tagDetections.detections[i].id[0], tagDetections.detections[i].pose));
 			}
