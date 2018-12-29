@@ -1,0 +1,54 @@
+diff --git a/ethzasl_icp_mapper/launch/2D_scans/icp.yaml b/ethzasl_icp_mapper/launch/2D_scans/icp.yaml
+index 67820e7..aec1839 100644
+--- a/ethzasl_icp_mapper/launch/2D_scans/icp.yaml
++++ b/ethzasl_icp_mapper/launch/2D_scans/icp.yaml
+@@ -1,12 +1,12 @@
+ matcher:
+   KDTreeMatcher:
+-    maxDist: 1.0
++    maxDist: 1
+     knn: 5
+     epsilon: 3.16
+ 
+ outlierFilters:
+   - TrimmedDistOutlierFilter:
+-     ratio: 0.85
++     ratio: 0.95
+   - SurfaceNormalOutlierFilter:
+      maxAngle: 0.42
+ 
+@@ -25,7 +25,11 @@ transformationCheckers:
+       maxTranslationNorm: 5.00
+ 
+ inspector:
+-# VTKFileInspector
++# VTKFileInspector:
++#   baseFileName : debug--
++#   dumpDataLinks : 1
++#   dumpReading : 1
++#   dumpReference : 1
+  NullInspector
+ 
+ logger:
+diff --git a/libpointmatcher_ros/src/point_cloud.cpp b/libpointmatcher_ros/src/point_cloud.cpp
+index b77651d..8eb1f6c 100644
+--- a/libpointmatcher_ros/src/point_cloud.cpp
++++ b/libpointmatcher_ros/src/point_cloud.cpp
+@@ -449,7 +449,7 @@ namespace PointMatcher_ros
+         try
+         {
+           listener->transformPoint(
+-						fixedFrame,
++						pin.header.frame_id,
+             rosMsg.header.stamp,
+             pin,
+             fixedFrame,
+@@ -459,7 +459,7 @@ namespace PointMatcher_ros
+           if(addObservationDirection)
+           {
+             listener->transformPoint(
+-                fixedFrame,
++                s_in.header.frame_id,
+                 curTime,
+                 s_in,
+                 fixedFrame,

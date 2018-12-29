@@ -1,0 +1,118 @@
+diff --git a/src/slam_karto.cpp b/src/slam_karto.cpp
+index 712a9ca..0c0d885 100644
+--- a/src/slam_karto.cpp
++++ b/src/slam_karto.cpp
+@@ -68,7 +68,7 @@ class SlamKarto
+     bool updateMap();
+     void publishTransform();
+     void publishLoop(double transform_publish_period);
+-    void publishGraphVisualization();
++    void publishGraphVisualization(const ros::Time & stamp);
+ 
+     // ROS handles
+     ros::NodeHandle node_;
+@@ -435,16 +435,22 @@ SlamKarto::getOdomPose(karto::Pose2& karto_pose, const ros::Time& t)
+ }
+ 
+ void
+-SlamKarto::publishGraphVisualization()
++SlamKarto::publishGraphVisualization(const ros::Time & stamp)
+ {
+   std::vector<float> graph;
+   solver_->getGraph(graph);
+ 
++  std::vector<karto::LocalizedRangeScan*> scans = mapper_->GetAllProcessedScans();
++
++  if(scans.empty())
++  {
++	  return;
++  }
+   visualization_msgs::MarkerArray marray;
+ 
+   visualization_msgs::Marker m;
+   m.header.frame_id = "map";
+-  m.header.stamp = ros::Time::now();
++  m.header.stamp = stamp;
+   m.id = 0;
+   m.ns = "karto";
+   m.type = visualization_msgs::Marker::SPHERE;
+@@ -462,7 +468,7 @@ SlamKarto::publishGraphVisualization()
+ 
+   visualization_msgs::Marker edge;
+   edge.header.frame_id = "map";
+-  edge.header.stamp = ros::Time::now();
++  edge.header.stamp = ros::Time(scans.back()->GetTime());
+   edge.action = visualization_msgs::Marker::ADD;
+   edge.ns = "karto";
+   edge.id = 0;
+@@ -477,14 +483,14 @@ SlamKarto::publishGraphVisualization()
+ 
+   m.action = visualization_msgs::Marker::ADD;
+   uint id = 0;
+-  for (uint i=0; i<graph.size()/2; i++) 
++  for (uint i=0; i<scans.size(); i++)
+   {
+     m.id = id;
+-    m.pose.position.x = graph[2*i];
+-    m.pose.position.y = graph[2*i+1];
++    m.pose.position.x = scans[i]->GetCorrectedPose().GetX();
++    m.pose.position.y = scans[i]->GetCorrectedPose().GetY();
+     marray.markers.push_back(visualization_msgs::Marker(m));
+     id++;
+-
++/*
+     if(i>0)
+     {
+       edge.points.clear();
+@@ -500,15 +506,15 @@ SlamKarto::publishGraphVisualization()
+ 
+       marray.markers.push_back(visualization_msgs::Marker(edge));
+       id++;
+-    }
++    }*/
+   }
+-
++/*
+   m.action = visualization_msgs::Marker::DELETE;
+   for (; id < marker_count_; id++) 
+   {
+     m.id = id;
+     marray.markers.push_back(visualization_msgs::Marker(m));
+-  }
++  }*/
+ 
+   marker_count_ = marray.markers.size();
+ 
+@@ -537,12 +543,14 @@ SlamKarto::laserCallback(const sensor_msgs::LaserScan::ConstPtr& scan)
+   karto::Pose2 odom_pose;
+   if(addScan(laser, scan, odom_pose))
+   {
+-    ROS_DEBUG("added scan at pose: %.3f %.3f %.3f", 
++    ROS_INFO("added scan at pose: %.3f %.3f %.3f", 
+               odom_pose.GetX(),
+               odom_pose.GetY(),
+               odom_pose.GetHeading());
+ 
+-    publishGraphVisualization();
++    publishGraphVisualization(scan->header.stamp);
++
++    ROS_INFO("published markers");
+ 
+     if(!got_map_ || 
+        (scan->header.stamp - last_map_update) > map_update_interval_)
+diff --git a/src/spa_solver.cpp b/src/spa_solver.cpp
+index 5d9a962..6a65211 100644
+--- a/src/spa_solver.cpp
++++ b/src/spa_solver.cpp
+@@ -46,9 +46,9 @@ void SpaSolver::Compute()
+ 
+   typedef std::vector<sba::Node2d, Eigen::aligned_allocator<sba::Node2d> > NodeVector;
+ 
+-  ROS_INFO("Calling doSPA for loop closure");
++  //ROS_INFO("Calling doSPA for loop closure");
+   m_Spa.doSPA(40);
+-  ROS_INFO("Finished doSPA for loop closure");
++  //ROS_INFO("Finished doSPA for loop closure");
+   NodeVector nodes = m_Spa.getNodes();
+   forEach(NodeVector, &nodes)
+   {

@@ -1,0 +1,29 @@
+
+<launch>
+	<param name="use_sim_time" value="true"/>
+	<group ns="/wide_stereo" >
+	    	<node pkg="nodelet" type="nodelet" name="stereo_throttle" args="standalone rtabmap_ros/stereo_throttle">
+		    <remap from="left/image"        to="left/image_raw"/>
+		    <remap from="right/image"       to="right/image_raw"/>
+		    <remap from="left/camera_info"  to="left/camera_info"/>
+		    <remap from="right/camera_info" to="right/camera_info"/>
+		    
+		    <param name="queue_size" type="int" value="10"/>
+		    <param name="rate" type="double" value="15"/>
+		</node>
+	</group>
+
+	<group ns="camera">
+	    <node pkg="nodelet" type="nodelet" name="data_throttle" args="standalone rtabmap_ros/data_throttle">
+	      <param name="rate" type="double" value="15.0"/>
+	   
+	      <remap from="rgb/image_in"       to="rgb/image_raw"/>
+	      <remap from="depth/image_in"     to="depth/image_raw"/>
+	      <remap from="rgb/camera_info_in" to="rgb/camera_info"/>
+	    
+	      <remap from="rgb/image_out"       to="rgb/image_raw_throttle"/>
+	      <remap from="depth/image_out"     to="depth/image_raw_throttle"/>
+	      <remap from="rgb/camera_info_out" to="rgb/camera_info_throttle"/>
+	    </node>  
+	</group> 
+</launch>
