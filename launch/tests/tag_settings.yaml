@@ -1,0 +1,14 @@
+# AprilTags 2 code parameters
+# Find descriptions in apriltags2/include/apriltag.h:struct apriltag_detector
+#                      apriltags2/include/apriltag.h:struct apriltag_family
+tag_family:        'tag36h11' # options: tag36h11, tag36h10, tag25h9, tag25h7, tag16h5
+tag_border:        1          # default: 1
+tag_threads:       2          # default: 2
+tag_decimate:      1.0        # default: 1.0
+tag_blur:          0.0        # default: 0.0
+tag_refine_edges:  1          # default: 1
+tag_refine_decode: 0          # default: 0
+tag_refine_pose:   0          # default: 0
+tag_debug:         0          # default: 0
+# Other parameters
+publish_tf:        true       # default: false
