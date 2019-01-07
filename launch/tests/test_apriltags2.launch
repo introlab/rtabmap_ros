@@ -1,5 +1,5 @@
 <launch>
-  <!-- Print on the file tag_bundle1.png (with GIMP: set width in Image Settings to 180.00mm) -->
+  <!-- Print on the file tag_bundle1.png (with GIMP: set size in Image Settings to 160x240mm) -->
   <!-- Definition of the tag bundle is tags.yaml, make sure the camera is calibrated or adjust the size of the tag if needed -->
   <!-- The TF published by apriltags_ros should match the point cloud created by the camera -->
   <!-- Change Optimizer/Strategy below between 1 (g2o) and 2 (GTSAM), and tag_angular_variance between 0.005 (optimize rotation) and 9999 (optimize only tag's XYZ) -->
