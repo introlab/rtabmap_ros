@@ -4,7 +4,7 @@ import sys
 from std_msgs.msg import Bool
 from rtabmap_ros.msg import Goal
 
-pub = rospy.Publisher('/rtabmap/goal_node', Goal, queue_size=1)
+pub = rospy.Publisher('rtabmap/goal_node', Goal, queue_size=1)
 waypoints = []
 currentIndex = 0
 waitingTime = 1.0
@@ -41,13 +41,15 @@ def callback(data):
 
 def main():
     rospy.init_node('patrol', anonymous=False)
-    rospy.Subscriber("/rtabmap/goal_reached", Bool, callback)
+    sub = rospy.Subscriber("rtabmap/goal_reached", Bool, callback)
     global waitingTime
     waitingTime = rospy.get_param('~time', waitingTime)
     rospy.sleep(1.) # make sure that subscribers have seen this node before sending a goal
 
     rospy.loginfo(rospy.get_caller_id() + ": Waypoints: [%s]", str(waypoints).strip('[]'))
     rospy.loginfo(rospy.get_caller_id() + ": time: %f", waitingTime)
+    rospy.loginfo(rospy.get_caller_id() + ": publish goal on %s", pub.resolved_name)
+    rospy.loginfo(rospy.get_caller_id() + ": receive goal status on %s", sub.resolved_name)
 
     # send the first goal
     msg = Goal()

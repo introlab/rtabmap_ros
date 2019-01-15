@@ -2033,15 +2033,19 @@ void CoreWrapper::process(
 								mbClient_->cancelGoal();
 							}
 						}
-						if(goalReachedPub_.getNumSubscribers())
+						// Don't send status yet, let move_base finish reaching the goal
+						if(mbClient_ == 0 || rtabmap_.getPathStatus() <= 0)
 						{
-							std_msgs::Bool result;
-							result.data = rtabmap_.getPathStatus() > 0;
-							goalReachedPub_.publish(result);
+							if(goalReachedPub_.getNumSubscribers())
+							{
+								std_msgs::Bool result;
+								result.data = rtabmap_.getPathStatus() > 0;
+								goalReachedPub_.publish(result);
+							}
+							currentMetricGoal_.setNull();
+							lastPublishedMetricGoal_.setNull();
+							latestNodeWasReached_ = false;
 						}
-						currentMetricGoal_.setNull();
-						lastPublishedMetricGoal_.setNull();
-						latestNodeWasReached_ = false;
 					}
 					else
 					{

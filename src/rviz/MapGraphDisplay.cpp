@@ -131,7 +131,7 @@ void MapGraphDisplay::processMessage( const rtabmap_ros::MapGraph::ConstPtr& msg
 
 		manual_object->estimateVertexCount(links.size() * 2);
 		manual_object->begin( "BaseWhiteNoLighting", Ogre::RenderOperation::OT_LINE_LIST );
-		for(std::map<int, rtabmap::Link>::iterator iter=links.begin(); iter!=links.end(); ++iter)
+		for(std::multimap<int, rtabmap::Link>::iterator iter=links.begin(); iter!=links.end(); ++iter)
 		{
 			std::map<int, rtabmap::Transform>::iterator poseIterFrom = poses.find(iter->second.from());
 			std::map<int, rtabmap::Transform>::iterator poseIterTo = poses.find(iter->second.to());
