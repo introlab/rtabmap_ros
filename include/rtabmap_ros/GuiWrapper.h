@@ -108,6 +108,7 @@ private:
 	bool waitForTransform_;
 	double waitForTransformDuration_;
 	bool odomSensorSync_;
+	double maxOdomUpdateRate_;
 	tf::TransformListener tfListener_;
 
 	message_filters::Subscriber<rtabmap_ros::Info> infoTopic_;

@@ -144,6 +144,9 @@ private:
 	{
 		if(depthImage32Pub_.getNumSubscribers() > 0 || depthImage16Pub_.getNumSubscribers() > 0)
 		{
+			double cloudStamp = pointCloud2Msg->header.stamp.toSec();
+			double infoStamp = cameraInfoMsg->header.stamp.toSec();
+
 			rtabmap::Transform cloudDisplacement = rtabmap::Transform::getIdentity();
 			if(!fixedFrameId_.empty())
 			{
@@ -220,6 +223,17 @@ private:
 				depthImage.encoding = sensor_msgs::image_encodings::TYPE_16UC1;
 				depthImage.image = rtabmap::util2d::cvtDepthFromFloat(depthImage.image);
 				depthImage16Pub_.publish(depthImage.toImageMsg());
+			}
+
+			if( cloudStamp != pointCloud2Msg->header.stamp.toSec() ||
+				infoStamp != cameraInfoMsg->header.stamp.toSec())
+			{
+				NODELET_ERROR("Input stamps changed between the beginning and the end of the callback! Make "
+						"sure the node publishing the topics doesn't override the same data after publishing them. A "
+						"solution is to use this node within another nodelet manager. Stamps: "
+						"cloud=%f->%f info=%f->%f",
+						cloudStamp, pointCloud2Msg->header.stamp.toSec(),
+						infoStamp, cameraInfoMsg->header.stamp.toSec());
 			}
 		}
 	}

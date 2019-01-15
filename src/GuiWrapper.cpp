@@ -70,6 +70,7 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 		waitForTransform_(true),
 		waitForTransformDuration_(0.2), // 200 ms
 		odomSensorSync_(false),
+		maxOdomUpdateRate_(10),
 		cameraNodeName_(""),
 		lastOdomInfoUpdateTime_(0)
 {
@@ -110,6 +111,7 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 	pnh.param("wait_for_transform", waitForTransform_, waitForTransform_);
 	pnh.param("wait_for_transform_duration",  waitForTransformDuration_, waitForTransformDuration_);
 	pnh.param("odom_sensor_sync", odomSensorSync_, odomSensorSync_);
+	pnh.param("max_odom_update_rate", maxOdomUpdateRate_, maxOdomUpdateRate_);
 	pnh.param("camera_node_name", cameraNodeName_, cameraNodeName_); // used to pause the rtabmap_ros/camera when pausing the process
 	pnh.param("init_cache_path", initCachePath, initCachePath);
 	if(initCachePath.size())
@@ -496,9 +498,11 @@ void GuiWrapper::commonDepthCallback(
 	rtabmap::OdometryInfo info;
 	bool ignoreData = false;
 
-	if(UTimer::now() - lastOdomInfoUpdateTime_ > 0.1 &&
+	// limit update rate
+	if(maxOdomUpdateRate_<=0.0 ||
+	   (UTimer::now() - lastOdomInfoUpdateTime_ > 1.0/maxOdomUpdateRate_ &&
 	   !mainWindow_->isProcessingOdometry() &&
-	   !mainWindow_->isProcessingStatistics())
+	   !mainWindow_->isProcessingStatistics()))
 	{
 		lastOdomInfoUpdateTime_ = UTimer::now();
 
@@ -652,10 +656,11 @@ void GuiWrapper::commonStereoCallback(
 	rtabmap::OdometryInfo info;
 	bool ignoreData = false;
 
-	// limit 10 Hz max
-	if(UTimer::now() - lastOdomInfoUpdateTime_ > 0.1 &&
+	// limit update rate
+	if(maxOdomUpdateRate_<=0.0 ||
+	   (UTimer::now() - lastOdomInfoUpdateTime_ > 1.0/maxOdomUpdateRate_ &&
 	   !mainWindow_->isProcessingOdometry() &&
-	   !mainWindow_->isProcessingStatistics())
+	   !mainWindow_->isProcessingStatistics()))
 	{
 		lastOdomInfoUpdateTime_ = UTimer::now();
 
@@ -802,10 +807,11 @@ void GuiWrapper::commonLaserScanCallback(
 	rtabmap::OdometryInfo info;
 	bool ignoreData = false;
 
-	// limit 10 Hz max
-	if(UTimer::now() - lastOdomInfoUpdateTime_ > 0.1 &&
+	// limit update rate
+	if(maxOdomUpdateRate_<=0.0 ||
+	   (UTimer::now() - lastOdomInfoUpdateTime_ > 1.0/maxOdomUpdateRate_ &&
 	   !mainWindow_->isProcessingOdometry() &&
-	   !mainWindow_->isProcessingStatistics())
+	   !mainWindow_->isProcessingStatistics()))
 	{
 		lastOdomInfoUpdateTime_ = UTimer::now();
 
@@ -850,6 +856,16 @@ void GuiWrapper::commonLaserScanCallback(
 	}
 	else if(odomInfoMsg.get())
 	{
+		//just get scan local transform to adjust camera frame
+		if(scan2dMsg.get() != 0)
+		{
+			scanLocalTransform = getTransform(frameId_, scan2dMsg->header.frame_id, scan2dMsg->header.stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0);
+		}
+		else if(scan3dMsg.get() != 0)
+		{
+			scanLocalTransform = getTransform(frameId_, scan3dMsg->header.frame_id, scan3dMsg->header.stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0);
+		}
+
 		info = rtabmap_ros::odomInfoFromROS(*odomInfoMsg).copyWithoutData();
 		ignoreData = true;
 	}
@@ -866,17 +882,22 @@ void GuiWrapper::commonLaserScanCallback(
 			1,
 			0.5,
 			1,
-			Transform::getIdentity(),
+			scanLocalTransform*Transform(0,0,1,0, -1,0,0,0, 0,-1,0,0),
 			0,
 			cv::Size(1,2));
 
 	info.reg.covariance = covariance;
 	rtabmap::OdometryEvent odomEvent(
 		rtabmap::SensorData(
-				LaserScan::backwardCompatibility(scan,
-						scan2dMsg.get()?(int)scan2dMsg->ranges.size():0,
-						scan2dMsg.get()?(int)scan2dMsg->range_max:0,
-						scanLocalTransform),
+				scan2dMsg.get() != 0?
+					LaserScan::backwardCompatibility(scan,
+							scan2dMsg->range_min,
+							scan2dMsg->range_max,
+							scan2dMsg->angle_min,
+							scan2dMsg->angle_max,
+							scan2dMsg->angle_increment,
+							scanLocalTransform):
+					LaserScan::backwardCompatibility(scan,0,0,scanLocalTransform),
 				rgb,
 				depth,
 				model,

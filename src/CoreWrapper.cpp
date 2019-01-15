@@ -1749,7 +1749,7 @@ void CoreWrapper::commonLaserScanCallback(
 			1,
 			0.5,
 			1,
-			Transform::getIdentity(),
+			scanLocalTransform*Transform(0,0,1,0, -1,0,0,0, 0,-1,0,0),
 			0,
 			cv::Size(1,2));
 

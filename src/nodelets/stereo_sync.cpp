@@ -161,6 +161,11 @@ private:
 		callbackCalled_ = true;
 		if(rgbdImagePub_.getNumSubscribers() || rgbdImageCompressedPub_.getNumSubscribers())
 		{
+			double leftStamp = imageLeft->header.stamp.toSec();
+			double rightStamp = imageRight->header.stamp.toSec();
+			double leftInfoStamp = cameraInfoLeft->header.stamp.toSec();
+			double rightInfoStamp = cameraInfoRight->header.stamp.toSec();
+
 			rtabmap_ros::RGBDImage msg;
 			msg.header.frame_id = cameraInfoLeft->header.frame_id;
 			msg.header.stamp = imageLeft->header.stamp>imageRight->header.stamp?imageLeft->header.stamp:imageRight->header.stamp;
@@ -185,6 +190,21 @@ private:
 				msg.rgb = *imageLeft;
 				msg.depth = *imageRight;
 				rgbdImagePub_.publish(msg);
+			}
+
+			if( leftStamp != imageLeft->header.stamp.toSec() ||
+				rightStamp != imageRight->header.stamp.toSec() ||
+				leftInfoStamp != cameraInfoLeft->header.stamp.toSec() ||
+				rightInfoStamp != cameraInfoRight->header.stamp.toSec())
+			{
+				NODELET_ERROR("Input stamps changed between the beginning and the end of the callback! Make "
+						"sure the node publishing the topics doesn't override the same data after publishing them. A "
+						"solution is to use this node within another nodelet manager. Stamps: "
+						"left%f->%f right=%f->%f info_left=%f->%f info_right=%f->%f",
+						leftStamp, imageLeft->header.stamp.toSec(),
+						rightStamp, imageRight->header.stamp.toSec(),
+						leftInfoStamp, cameraInfoLeft->header.stamp.toSec(),
+						rightInfoStamp, cameraInfoRight->header.stamp.toSec());
 			}
 		}
 	}

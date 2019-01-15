@@ -140,38 +140,10 @@ private:
 
 		last_update_ = ros::Time::now();
 
-		if(imagePub_.getNumSubscribers())
-		{
-			if(decimation_ > 1)
-			{
-				cv_bridge::CvImageConstPtr imagePtr = cv_bridge::toCvShare(image);
-				cv_bridge::CvImage out;
-				out.header = imagePtr->header;
-				out.encoding = imagePtr->encoding;
-				out.image = rtabmap::util2d::decimate(imagePtr->image, decimation_);
-				imagePub_.publish(out.toImageMsg());
-			}
-			else
-			{
-				imagePub_.publish(image);
-			}
-		}
-		if(imageDepthPub_.getNumSubscribers())
-		{
-			if(decimation_ > 1)
-			{
-				cv_bridge::CvImageConstPtr imagePtr = cv_bridge::toCvShare(imageDepth);
-				cv_bridge::CvImage out;
-				out.header = imagePtr->header;
-				out.encoding = imagePtr->encoding;
-				out.image = rtabmap::util2d::decimate(imagePtr->image, decimation_);
-				imageDepthPub_.publish(out.toImageMsg());
-			}
-			else
-			{
-				imageDepthPub_.publish(imageDepth);
-			}
-		}
+		double rgbStamp = image->header.stamp.toSec();
+		double depthStamp = imageDepth->header.stamp.toSec();
+		double infoStamp = camInfo->header.stamp.toSec();
+
 		if(infoPub_.getNumSubscribers())
 		{
 			if(decimation_ > 1)
@@ -195,6 +167,52 @@ private:
 			{
 				infoPub_.publish(camInfo);
 			}
+		}
+		if(imagePub_.getNumSubscribers())
+		{
+			if(decimation_ > 1)
+			{
+				cv_bridge::CvImageConstPtr imagePtr = cv_bridge::toCvShare(image);
+				cv_bridge::CvImage out;
+				out.header = imagePtr->header;
+				out.encoding = imagePtr->encoding;
+				out.image = rtabmap::util2d::decimate(imagePtr->image, decimation_);
+				imagePub_.publish(out.toImageMsg());
+			}
+			else
+			{
+				imagePub_.publish(image);
+			}
+		}
+
+		if(imageDepthPub_.getNumSubscribers())
+		{
+			if(decimation_ > 1)
+			{
+				cv_bridge::CvImageConstPtr imagePtr = cv_bridge::toCvShare(imageDepth);
+				cv_bridge::CvImage out;
+				out.header = imagePtr->header;
+				out.encoding = imagePtr->encoding;
+				out.image = rtabmap::util2d::decimate(imagePtr->image, decimation_);
+				imageDepthPub_.publish(out.toImageMsg());
+			}
+			else
+			{
+				imageDepthPub_.publish(imageDepth);
+			}
+		}
+
+		if( rgbStamp != image->header.stamp.toSec() ||
+			depthStamp != imageDepth->header.stamp.toSec() ||
+			infoStamp != camInfo->header.stamp.toSec())
+		{
+			NODELET_ERROR("Input stamps changed between the beginning and the end of the callback! Make "
+					"sure the node publishing the topics doesn't override the same data after publishing them. A "
+					"solution is to use this node within another nodelet manager. Stamps: "
+					"rgb=%f->%f depth=%f->%f info=%f->%f",
+					rgbStamp, image->header.stamp.toSec(),
+					depthStamp, imageDepth->header.stamp.toSec(),
+					infoStamp, camInfo->header.stamp.toSec());
 		}
 	}
 

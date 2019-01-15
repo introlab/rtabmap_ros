@@ -138,38 +138,11 @@ private:
 
 		last_update_ = ros::Time::now();
 
-		if(imageLeftPub_.getNumSubscribers())
-		{
-			if(decimation_ > 1)
-			{
-				cv_bridge::CvImageConstPtr imagePtr = cv_bridge::toCvShare(imageLeft);
-				cv_bridge::CvImage out;
-				out.header = imagePtr->header;
-				out.encoding = imagePtr->encoding;
-				out.image = rtabmap::util2d::decimate(imagePtr->image, decimation_);
-				imageLeftPub_.publish(out.toImageMsg());
-			}
-			else
-			{
-				imageLeftPub_.publish(imageLeft);
-			}
-		}
-		if(imageRightPub_.getNumSubscribers())
-		{
-			if(decimation_ > 1)
-			{
-				cv_bridge::CvImageConstPtr imagePtr = cv_bridge::toCvShare(imageRight);
-				cv_bridge::CvImage out;
-				out.header = imagePtr->header;
-				out.encoding = imagePtr->encoding;
-				out.image = rtabmap::util2d::decimate(imagePtr->image, decimation_);
-				imageRightPub_.publish(out.toImageMsg());
-			}
-			else
-			{
-				imageRightPub_.publish(imageRight);
-			}
-		}
+		double leftStamp = imageLeft->header.stamp.toSec();
+		double rightStamp = imageRight->header.stamp.toSec();
+		double leftInfoStamp = camInfoLeft->header.stamp.toSec();
+		double rightInfoStamp = camInfoRight->header.stamp.toSec();
+
 		if(infoLeftPub_.getNumSubscribers())
 		{
 			if(decimation_ > 1)
@@ -219,6 +192,55 @@ private:
 			{
 				infoRightPub_.publish(camInfoRight);
 			}
+		}
+
+
+		if(imageLeftPub_.getNumSubscribers())
+		{
+			if(decimation_ > 1)
+			{
+				cv_bridge::CvImageConstPtr imagePtr = cv_bridge::toCvShare(imageLeft);
+				cv_bridge::CvImage out;
+				out.header = imagePtr->header;
+				out.encoding = imagePtr->encoding;
+				out.image = rtabmap::util2d::decimate(imagePtr->image, decimation_);
+				imageLeftPub_.publish(out.toImageMsg());
+			}
+			else
+			{
+				imageLeftPub_.publish(imageLeft);
+			}
+		}
+		if(imageRightPub_.getNumSubscribers())
+		{
+			if(decimation_ > 1)
+			{
+				cv_bridge::CvImageConstPtr imagePtr = cv_bridge::toCvShare(imageRight);
+				cv_bridge::CvImage out;
+				out.header = imagePtr->header;
+				out.encoding = imagePtr->encoding;
+				out.image = rtabmap::util2d::decimate(imagePtr->image, decimation_);
+				imageRightPub_.publish(out.toImageMsg());
+			}
+			else
+			{
+				imageRightPub_.publish(imageRight);
+			}
+		}
+
+		if( leftStamp != imageLeft->header.stamp.toSec() ||
+			rightStamp != imageRight->header.stamp.toSec() ||
+			leftInfoStamp != camInfoLeft->header.stamp.toSec() ||
+			rightInfoStamp != camInfoRight->header.stamp.toSec())
+		{
+			NODELET_ERROR("Input stamps changed between the beginning and the end of the callback! Make "
+					"sure the node publishing the topics doesn't override the same data after publishing them. A "
+					"solution is to use this node within another nodelet manager. Stamps: "
+					"left%f->%f right=%f->%f info_left=%f->%f info_right=%f->%f",
+					leftStamp, imageLeft->header.stamp.toSec(),
+					rightStamp, imageRight->header.stamp.toSec(),
+					leftInfoStamp, camInfoLeft->header.stamp.toSec(),
+					rightInfoStamp, camInfoRight->header.stamp.toSec());
 		}
 	}
 
