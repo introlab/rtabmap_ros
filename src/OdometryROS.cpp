@@ -67,6 +67,7 @@ OdometryROS::OdometryROS(bool stereoParams, bool visParams, bool icpParams) :
 	guessFrameId_(""),
 	guessMinTranslation_(0.0),
 	guessMinRotation_(0.0),
+	guessMinTime_(0.0),
 	publishTf_(true),
 	waitForTransform_(true),
 	waitForTransformDuration_(0.1), // 100 ms
@@ -147,6 +148,7 @@ void OdometryROS::onInit()
 	pnh.param("guess_frame_id", guessFrameId_, guessFrameId_); // odometry guess frame
 	pnh.param("guess_min_translation", guessMinTranslation_, guessMinTranslation_);
 	pnh.param("guess_min_rotation", guessMinRotation_, guessMinRotation_);
+	pnh.param("guess_min_time", guessMinTime_, guessMinTime_);
 
 	pnh.param("expected_update_rate", expectedUpdateRate_, expectedUpdateRate_);
 
@@ -172,6 +174,7 @@ void OdometryROS::onInit()
 	NODELET_INFO("Odometry: guess_frame_id         = %s", guessFrameId_.c_str());
 	NODELET_INFO("Odometry: guess_min_translation  = %f", guessMinTranslation_);
 	NODELET_INFO("Odometry: guess_min_rotation     = %f", guessMinRotation_);
+	NODELET_INFO("Odometry: guess_min_time         = %f", guessMinTime_);
 	NODELET_INFO("Odometry: expected_update_rate   = %f Hz", expectedUpdateRate_);
 	NODELET_INFO("Odometry: wait_imu_to_init       = %s", waitIMUToinit_?"true":"false");
 
@@ -556,7 +559,8 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 				float x,y,z,roll,pitch,yaw;
 				guess_.getTranslationAndEulerAngles(x,y,z,roll,pitch,yaw);
 				if((guessMinTranslation_ <= 0.0 || uMax3(fabs(x), fabs(y), fabs(z)) < guessMinTranslation_) &&
-				   (guessMinRotation_ <= 0.0 || uMax3(fabs(roll), fabs(pitch), fabs(yaw)) < guessMinRotation_))
+				   (guessMinRotation_ <= 0.0 || uMax3(fabs(roll), fabs(pitch), fabs(yaw)) < guessMinRotation_) &&
+				   (guessMinTime_ <= 0.0 || (previousStamp_>0.0 && stamp.toSec()-previousStamp_ < guessMinTime_)))
 				{
 					// Ignore odometry update, we didn't move enough
 					if(publishTf_)

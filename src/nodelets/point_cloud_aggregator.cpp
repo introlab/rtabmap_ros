@@ -6,6 +6,7 @@
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
+#include <pcl/io/pcd_io.h>
 
 #include <pcl_ros/transforms.h>
 
@@ -68,6 +69,7 @@ private:
 		bool approx=true;
 		pnh.param("queue_size", queueSize, queueSize);
 		pnh.param("frame_id", frameId_, frameId_);
+		pnh.param("fixed_frame_id", fixedFrameId_, fixedFrameId_);
 		pnh.param("approx_sync", approx, approx);
 		pnh.param("count", count, count);
 
@@ -198,17 +200,51 @@ private:
 
 			for(unsigned int i=1; i<cloudMsgs.size(); ++i)
 			{
+				rtabmap::Transform cloudDisplacement;
+				bool notsync = false;
+				if(!fixedFrameId_.empty() &&
+				   cloudMsgs[0]->header.stamp != cloudMsgs[i]->header.stamp)
+				{
+					// approx sync
+					cloudDisplacement = rtabmap_ros::getTransform(
+							frameId, //sourceTargetFrame
+							fixedFrameId_, //fixedFrame
+							cloudMsgs[i]->header.stamp, //stampSource
+							cloudMsgs[0]->header.stamp, //stampTarget
+							tfListener_,
+							0.1);
+					notsync = true;
+				}
+
 				pcl::PCLPointCloud2 cloud2;
 				if(frameId.compare(cloudMsgs[i]->header.frame_id) != 0)
 				{
 					sensor_msgs::PointCloud2 tmp;
 					pcl_ros::transformPointCloud(frameId, *cloudMsgs[i], tmp, tfListener_);
-					pcl_conversions::toPCL(tmp, cloud2);
+					if(!cloudDisplacement.isNull())
+					{
+						sensor_msgs::PointCloud2 tmp2;
+						pcl_ros::transformPointCloud(cloudDisplacement.toEigen4f(), tmp, tmp2);
+						pcl_conversions::toPCL(tmp2, cloud2);
+					}
+					else
+					{
+						pcl_conversions::toPCL(tmp, cloud2);
+					}
+
 				}
 				else
 				{
-					pcl_conversions::toPCL(*cloudMsgs[i], cloud2);
-					frameId = cloudMsgs[i]->header.frame_id;
+					if(!cloudDisplacement.isNull())
+					{
+						sensor_msgs::PointCloud2 tmp;
+						pcl_ros::transformPointCloud(cloudDisplacement.toEigen4f(), *cloudMsgs[i], tmp);
+						pcl_conversions::toPCL(tmp, cloud2);
+					}
+					else
+					{
+						pcl_conversions::toPCL(*cloudMsgs[i], cloud2);
+					}
 				}
 
 				pcl::PCLPointCloud2 tmp_output;
@@ -266,6 +302,7 @@ private:
 	ros::Publisher cloudPub_;
 
 	std::string frameId_;
+	std::string fixedFrameId_;
 	tf::TransformListener tfListener_;
 };
 

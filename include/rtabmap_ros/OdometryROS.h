@@ -103,6 +103,7 @@ private:
 	std::string guessFrameId_;
 	double guessMinTranslation_;
 	double guessMinRotation_;
+	double guessMinTime_;
 	bool publishTf_;
 	bool waitForTransform_;
 	double waitForTransformDuration_;
