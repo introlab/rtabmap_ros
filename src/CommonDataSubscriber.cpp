@@ -36,7 +36,7 @@ CommonDataSubscriber::CommonDataSubscriber(bool gui) :
 		callbackCalled_(false),
 		subscribedToDepth_(!gui),
 		subscribedToStereo_(false),
-		subscribedToRGB_(false),
+		subscribedToRGB_(!gui),
 		subscribedToOdom_(false),
 		subscribedToRGBD_(false),
 		subscribedToScan2d_(false),
@@ -300,25 +300,27 @@ void CommonDataSubscriber::setupCallbacks(
 	pnh.param("subscribe_odom_info", subscribeOdomInfo, subscribeOdomInfo);
 	pnh.param("subscribe_user_data", subscribeUserData, subscribeUserData);
 	pnh.param("subscribe_odom",      subscribeOdom, subscribeOdom);
-	if(subscribedToDepth_ && subscribedToRGB_)
-	{
-		ROS_WARN("rtabmap: Parameters subscribe_depth and subscribe_rgb cannot be true at the same time. Parameters subscribe_rgb is set to false.");
-		subscribedToRGB_ = false;
-	}
-	if(subscribedToStereo_ && subscribedToRGB_)
-	{
-		ROS_WARN("rtabmap: Parameters subscribe_stereo and subscribe_rgb cannot be true at the same time. Parameter subscribe_rgb is set to false.");
-		subscribedToRGB_ = false;
-	}
 	if(subscribedToDepth_ && subscribedToStereo_)
 	{
 		ROS_WARN("rtabmap: Parameters subscribe_depth and subscribe_stereo cannot be true at the same time. Parameter subscribe_depth is set to false.");
 		subscribedToDepth_ = false;
+		subscribedToRGB_ = false;
+	}
+	if(subscribedToRGB_ && subscribedToStereo_)
+	{
+		ROS_WARN("rtabmap: Parameters subscribe_stereo and subscribe_rgb cannot be true at the same time. Parameter subscribe_rgb is set to false.");
+		subscribedToRGB_ = false;
 	}
 	if(subscribedToDepth_ && subscribedToRGBD_)
 	{
 		ROS_WARN("rtabmap: Parameters subscribe_depth and subscribe_rgbd cannot be true at the same time. Parameter subscribe_depth is set to false.");
 		subscribedToDepth_ = false;
+		subscribedToRGB_ = false;
+	}
+	if(subscribedToRGB_ && subscribedToRGBD_)
+	{
+		ROS_WARN("rtabmap: Parameters subscribe_rgb and subscribe_rgbd cannot be true at the same time. Parameter subscribe_rgb is set to false.");
+		subscribedToRGB_ = false;
 	}
 	if(subscribedToStereo_ && subscribedToRGBD_)
 	{

@@ -13,6 +13,7 @@
 	<!-- args: "delete_db_on_start" and "udebug" -->
 	<node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="screen" args="$(arg rtabmap_args)">
 	
+	    <param name="subscribe_rgb"       type="bool" value="false"/>    <!-- must be false for appearance-based mode -->
 	    <param name="subscribe_depth"     type="bool" value="false"/>    <!-- must be false for appearance-based mode -->
         <param name="subscribe_odom"      type="bool" value="false"/>    <!-- must be false for appearance-based mode -->
         <param name="queue_size"          type="int" value="10"/>
