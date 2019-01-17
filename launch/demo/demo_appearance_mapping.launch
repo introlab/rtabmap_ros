@@ -14,7 +14,7 @@
 	<node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="screen" args="$(arg rtabmap_args)">
 	
 	    <param name="subscribe_depth"     type="bool" value="false"/>    <!-- must be false for appearance-based mode -->
-        <param name="subscribe_laserScan" type="bool" value="false"/>    <!-- must be false for appearance-based mode -->
+        <param name="subscribe_odom"      type="bool" value="false"/>    <!-- must be false for appearance-based mode -->
         <param name="queue_size"          type="int" value="10"/>
     
         <remap from="rgb/image" to="/image"/>                             <!-- connect to "image" topic of the camera below -->
@@ -39,6 +39,7 @@
 	
 	<!-- visualization of the "infoEx" topic sent by rtabmap node -->
 	<node name="rtabmapviz" pkg="rtabmap_ros" type="rtabmapviz" output="screen" args="-d $(find rtabmap_ros)/launch/config/appearance_gui.ini">
+	    <param name="subscribe_odom"      type="bool" value="false"/>    <!-- must be false for appearance-based mode -->
 	    
 	    <!-- This enables the GUI to pause a rtabmap_ros/camera when action "pause" is checked. -->
 	    <!-- NOTE: It is specific to rtabmap_ros/camera. Action "pause" in the GUI will still pause the rtabmap node. -->

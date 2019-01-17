@@ -174,14 +174,6 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 	goalReachedTopic_ = nh.subscribe("goal_reached", 1, &GuiWrapper::goalReachedCallback, this);
 
 	setupCallbacks(nh, pnh, ros::this_node::getName()); // do it at the end
-	if(!this->isDataSubscribed())
-	{
-		defaultSub_ = nh.subscribe("odom", queueSize_, &GuiWrapper::defaultCallback, this);
-
-		ROS_INFO("\n%s subscribed to:\n   %s",
-				ros::this_node::getName().c_str(),
-				defaultSub_.getTopic().c_str());
-	}
 }
 
 GuiWrapper::~GuiWrapper()
@@ -437,7 +429,7 @@ void GuiWrapper::commonDepthCallback(
 		const sensor_msgs::PointCloud2ConstPtr& scan3dMsg,
 		const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg)
 {
-	UASSERT(imageMsgs.size() == 0 || (imageMsgs.size() == depthMsgs.size() && imageMsgs.size() == cameraInfoMsgs.size()));
+	UASSERT(imageMsgs.size() == 0 || (imageMsgs.size() == cameraInfoMsgs.size()));
 
 	std_msgs::Header odomHeader;
 	if(odomMsg.get())
@@ -506,7 +498,7 @@ void GuiWrapper::commonDepthCallback(
 	{
 		lastOdomInfoUpdateTime_ = UTimer::now();
 
-		if(imageMsgs.size() && imageMsgs[0].get() && depthMsgs[0].get())
+		if(imageMsgs.size() && imageMsgs[0].get() && depthMsgs.size() && depthMsgs[0].get())
 		{
 			if(!rtabmap_ros::convertRGBDMsgs(
 					imageMsgs,
@@ -909,19 +901,87 @@ void GuiWrapper::commonLaserScanCallback(
 	QMetaObject::invokeMethod(mainWindow_, "processOdometry", Q_ARG(rtabmap::OdometryEvent, odomEvent), Q_ARG(bool, ignoreData));
 }
 
-// With odom msg
-void GuiWrapper::defaultCallback(const nav_msgs::OdometryConstPtr & odomMsg)
+void GuiWrapper::commonOdomCallback(
+		const nav_msgs::OdometryConstPtr & odomMsg,
+		const rtabmap_ros::UserDataConstPtr & userDataMsg,
+		const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg)
 {
-	this->commonSingleDepthCallback(
-			odomMsg,
-			rtabmap_ros::UserDataConstPtr(),
-			cv_bridge::CvImageConstPtr(),
-			cv_bridge::CvImageConstPtr(),
-			sensor_msgs::CameraInfo(),
-			sensor_msgs::CameraInfo(),
-			sensor_msgs::LaserScanConstPtr(),
-			sensor_msgs::PointCloud2ConstPtr(),
-			rtabmap_ros::OdomInfoConstPtr());
+	UASSERT(odomMsg.get());
+
+	std_msgs::Header odomHeader = odomMsg->header;
+
+	Transform odomT = rtabmap_ros::getTransform(odomHeader.frame_id, frameId_, odomHeader.stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0);
+	cv::Mat covariance = cv::Mat::eye(6,6,CV_64FC1);
+	if(odomMsg.get())
+	{
+		UASSERT(odomMsg->twist.covariance.size() == 36);
+		if(odomMsg->twist.covariance[0] != 0 &&
+			 odomMsg->twist.covariance[7] != 0 &&
+			 odomMsg->twist.covariance[14] != 0 &&
+			 odomMsg->twist.covariance[21] != 0 &&
+			 odomMsg->twist.covariance[28] != 0 &&
+			 odomMsg->twist.covariance[35] != 0)
+		{
+			covariance = cv::Mat(6,6,CV_64FC1,(void*)odomMsg->twist.covariance.data()).clone();
+		}
+	}
+	if(odomHeader.frame_id.empty())
+	{
+		ROS_ERROR("Odometry frame not set!?");
+		return;
+	}
+
+	rtabmap::OdometryInfo info;
+	bool ignoreData = false;
+
+	// limit update rate
+	if(maxOdomUpdateRate_<=0.0 ||
+	   (UTimer::now() - lastOdomInfoUpdateTime_ > 1.0/maxOdomUpdateRate_ &&
+	   !mainWindow_->isProcessingOdometry() &&
+	   !mainWindow_->isProcessingStatistics()))
+	{
+		lastOdomInfoUpdateTime_ = UTimer::now();
+
+		if(odomInfoMsg.get())
+		{
+			info = rtabmap_ros::odomInfoFromROS(*odomInfoMsg);
+		}
+		ignoreData = false;
+	}
+	else if(odomInfoMsg.get())
+	{
+		info = rtabmap_ros::odomInfoFromROS(*odomInfoMsg).copyWithoutData();
+		ignoreData = true;
+	}
+	else
+	{
+		// don't update GUI odom stuff if we don't use visual odometry
+		return;
+	}
+
+	cv::Mat rgb = cv::Mat::zeros(2,1,CV_8UC1);
+	cv::Mat depth = cv::Mat::zeros(2,1,CV_16UC1);
+	CameraModel model(
+			1,
+			1,
+			0.5,
+			1,
+			Transform(0,0,1,0, -1,0,0,0, 0,-1,0,0),
+			0,
+			cv::Size(1,2));
+
+	info.reg.covariance = covariance;
+	rtabmap::OdometryEvent odomEvent(
+		rtabmap::SensorData(
+				rgb,
+				depth,
+				model,
+				odomHeader.seq,
+				rtabmap_ros::timestampFromROS(odomHeader.stamp)),
+		odomMsg.get()?rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose):odomT,
+		info);
+
+	QMetaObject::invokeMethod(mainWindow_, "processOdometry", Q_ARG(rtabmap::OdometryEvent, odomEvent), Q_ARG(bool, ignoreData));
 }
 
 }

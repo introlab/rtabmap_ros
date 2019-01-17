@@ -176,11 +176,13 @@ SET(rtabmap_sync_lib_src
    src/CommonDataSubscriber.cpp
    src/impl/CommonDataSubscriberDepth.cpp
    src/impl/CommonDataSubscriberStereo.cpp
+   src/impl/CommonDataSubscriberRGB.cpp
    src/impl/CommonDataSubscriberRGBD.cpp
    src/impl/CommonDataSubscriberRGBD2.cpp
    src/impl/CommonDataSubscriberRGBD3.cpp
    src/impl/CommonDataSubscriberRGBD4.cpp
    src/impl/CommonDataSubscriberScan.cpp
+   src/impl/CommonDataSubscriberOdom.cpp
    src/CoreWrapper.cpp # we put CoreWrapper here instead of plugins lib to avoid long compilation time on plugins lib
 )
   

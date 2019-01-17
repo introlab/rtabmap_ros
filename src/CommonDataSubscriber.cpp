@@ -36,6 +36,8 @@ CommonDataSubscriber::CommonDataSubscriber(bool gui) :
 		callbackCalled_(false),
 		subscribedToDepth_(!gui),
 		subscribedToStereo_(false),
+		subscribedToRGB_(false),
+		subscribedToOdom_(false),
 		subscribedToRGBD_(false),
 		subscribedToScan2d_(false),
 		subscribedToScan3d_(false),
@@ -80,6 +82,38 @@ CommonDataSubscriber::CommonDataSubscriber(bool gui) :
 		// Stereo + Odom
 		SYNC_INIT(stereoOdom),
 		SYNC_INIT(stereoOdomInfo),
+
+		// RGB-only
+		SYNC_INIT(rgb),
+		SYNC_INIT(rgbScan2d),
+		SYNC_INIT(rgbScan3d),
+		SYNC_INIT(rgbInfo),
+		SYNC_INIT(rgbScan2dInfo),
+		SYNC_INIT(rgbScan3dInfo),
+
+		// RGB-only + Odom
+		SYNC_INIT(rgbOdom),
+		SYNC_INIT(rgbOdomScan2d),
+		SYNC_INIT(rgbOdomScan3d),
+		SYNC_INIT(rgbOdomInfo),
+		SYNC_INIT(rgbOdomScan2dInfo),
+		SYNC_INIT(rgbOdomScan3dInfo),
+
+		// RGB-only + User Data
+		SYNC_INIT(rgbData),
+		SYNC_INIT(rgbDataScan2d),
+		SYNC_INIT(rgbDataScan3d),
+		SYNC_INIT(rgbDataInfo),
+		SYNC_INIT(rgbDataScan2dInfo),
+		SYNC_INIT(rgbDataScan3dInfo),
+
+		// RGB-only + Odom + User Data
+		SYNC_INIT(rgbOdomData),
+		SYNC_INIT(rgbOdomDataScan2d),
+		SYNC_INIT(rgbOdomDataScan3d),
+		SYNC_INIT(rgbOdomDataInfo),
+		SYNC_INIT(rgbOdomDataScan2dInfo),
+		SYNC_INIT(rgbOdomDataScan3dInfo),
 
 		// 1 RGBD
 		SYNC_INIT(rgbdScan2d),
@@ -228,17 +262,27 @@ CommonDataSubscriber::CommonDataSubscriber(bool gui) :
 		SYNC_INIT(odomDataScan2d),
 		SYNC_INIT(odomDataScan3d),
 		SYNC_INIT(odomDataScan2dInfo),
-		SYNC_INIT(odomDataScan3dInfo)
+		SYNC_INIT(odomDataScan3dInfo),
+
+		// Odom
+		SYNC_INIT(odomInfo),
+		// Odom + User Data
+		SYNC_INIT(odomData),
+		SYNC_INIT(odomDataInfo)
 
 {
 }
 
-void CommonDataSubscriber::setupCallbacks(ros::NodeHandle & nh, ros::NodeHandle & pnh, const std::string & name)
+void CommonDataSubscriber::setupCallbacks(
+		ros::NodeHandle & nh,
+		ros::NodeHandle & pnh,
+		const std::string & name)
 {
 	bool subscribeScan2d = false;
 	bool subscribeScan3d = false;
 	bool subscribeOdomInfo = false;
 	bool subscribeUserData = false;
+	bool subscribeOdom = true;
 	int rgbdCameras = 1;
 	name_ = name;
 
@@ -248,12 +292,24 @@ void CommonDataSubscriber::setupCallbacks(ros::NodeHandle & nh, ros::NodeHandle 
 	{
 		ROS_WARN("rtabmap: \"subscribe_laserScan\" parameter is deprecated, use \"subscribe_scan\" instead. The scan topic is still subscribed.");
 	}
+	pnh.param("subscribe_rgb",       subscribedToRGB_, subscribedToRGB_);
 	pnh.param("subscribe_scan",      subscribeScan2d, subscribeScan2d);
 	pnh.param("subscribe_scan_cloud", subscribeScan3d, subscribeScan3d);
 	pnh.param("subscribe_stereo",    subscribedToStereo_, subscribedToStereo_);
 	pnh.param("subscribe_rgbd",      subscribedToRGBD_, subscribedToRGBD_);
 	pnh.param("subscribe_odom_info", subscribeOdomInfo, subscribeOdomInfo);
 	pnh.param("subscribe_user_data", subscribeUserData, subscribeUserData);
+	pnh.param("subscribe_odom",      subscribeOdom, subscribeOdom);
+	if(subscribedToDepth_ && subscribedToRGB_)
+	{
+		ROS_WARN("rtabmap: Parameters subscribe_depth and subscribe_rgb cannot be true at the same time. Parameters subscribe_rgb is set to false.");
+		subscribedToRGB_ = false;
+	}
+	if(subscribedToStereo_ && subscribedToRGB_)
+	{
+		ROS_WARN("rtabmap: Parameters subscribe_stereo and subscribe_rgb cannot be true at the same time. Parameter subscribe_rgb is set to false.");
+		subscribedToRGB_ = false;
+	}
 	if(subscribedToDepth_ && subscribedToStereo_)
 	{
 		ROS_WARN("rtabmap: Parameters subscribe_depth and subscribe_stereo cannot be true at the same time. Parameter subscribe_depth is set to false.");
@@ -276,7 +332,7 @@ void CommonDataSubscriber::setupCallbacks(ros::NodeHandle & nh, ros::NodeHandle 
 	}
 	if(subscribeScan2d || subscribeScan3d)
 	{
-		if(!subscribedToDepth_ && !subscribedToStereo_ && !subscribedToRGBD_)
+		if(!subscribedToDepth_ && !subscribedToStereo_ && !subscribedToRGBD_ && !subscribedToRGB_)
 		{
 			approxSync_ = false; // default for scan: exact sync
 		}
@@ -315,13 +371,13 @@ void CommonDataSubscriber::setupCallbacks(ros::NodeHandle & nh, ros::NodeHandle 
 	ROS_INFO("%s: rgbd_cameras = %d", name.c_str(), rgbdCameras);
 	ROS_INFO("%s: approx_sync   = %s", name.c_str(), approxSync_?"true":"false");
 
-	bool subscribeOdom = odomFrameId.empty();
+	subscribedToOdom_ = odomFrameId.empty() && subscribeOdom;
 	if(subscribedToDepth_)
 	{
 		setupDepthCallbacks(
 				nh,
 				pnh,
-				subscribeOdom,
+				subscribedToOdom_,
 				subscribeUserData,
 				subscribeScan2d,
 				subscribeScan3d,
@@ -334,7 +390,20 @@ void CommonDataSubscriber::setupCallbacks(ros::NodeHandle & nh, ros::NodeHandle 
 		setupStereoCallbacks(
 				nh,
 				pnh,
-				subscribeOdom,
+				subscribedToOdom_,
+				subscribeOdomInfo,
+				queueSize_,
+				approxSync_);
+	}
+	else if(subscribedToRGB_)
+	{
+		setupRGBCallbacks(
+				nh,
+				pnh,
+				subscribedToOdom_,
+				subscribeUserData,
+				subscribeScan2d,
+				subscribeScan3d,
 				subscribeOdomInfo,
 				queueSize_,
 				approxSync_);
@@ -346,7 +415,7 @@ void CommonDataSubscriber::setupCallbacks(ros::NodeHandle & nh, ros::NodeHandle 
 			setupRGBD4Callbacks(
 					nh,
 					pnh,
-					subscribeOdom,
+					subscribedToOdom_,
 					subscribeUserData,
 					subscribeScan2d,
 					subscribeScan3d,
@@ -359,7 +428,7 @@ void CommonDataSubscriber::setupCallbacks(ros::NodeHandle & nh, ros::NodeHandle 
 			setupRGBD3Callbacks(
 					nh,
 					pnh,
-					subscribeOdom,
+					subscribedToOdom_,
 					subscribeUserData,
 					subscribeScan2d,
 					subscribeScan3d,
@@ -372,7 +441,7 @@ void CommonDataSubscriber::setupCallbacks(ros::NodeHandle & nh, ros::NodeHandle 
 			setupRGBD2Callbacks(
 					nh,
 					pnh,
-					subscribeOdom,
+					subscribedToOdom_,
 					subscribeUserData,
 					subscribeScan2d,
 					subscribeScan3d,
@@ -385,7 +454,7 @@ void CommonDataSubscriber::setupCallbacks(ros::NodeHandle & nh, ros::NodeHandle 
 			setupRGBDCallbacks(
 					nh,
 					pnh,
-					subscribeOdom,
+					subscribedToOdom_,
 					subscribeUserData,
 					subscribeScan2d,
 					subscribeScan3d,
@@ -400,14 +469,24 @@ void CommonDataSubscriber::setupCallbacks(ros::NodeHandle & nh, ros::NodeHandle 
 					nh,
 					pnh,
 					subscribeScan2d,
-					subscribeOdom,
+					subscribedToOdom_,
+					subscribeUserData,
+					subscribeOdomInfo,
+					queueSize_,
+					approxSync_);
+	}
+	else if(subscribedToOdom_)
+	{
+		setupOdomCallbacks(
+					nh,
+					pnh,
 					subscribeUserData,
 					subscribeOdomInfo,
 					queueSize_,
 					approxSync_);
 	}
 
-	if(subscribedToDepth_ || subscribedToStereo_ || subscribedToRGBD_ || subscribedToScan2d_ || subscribedToScan3d_)
+	if(subscribedToDepth_ || subscribedToStereo_ || subscribedToRGBD_ || subscribedToScan2d_ || subscribedToScan3d_ || subscribedToRGB_ || subscribedToOdom_)
 	{
 		warningThread_ = new boost::thread(boost::bind(&CommonDataSubscriber::warningLoop, this));
 		ROS_INFO("%s", subscribedTopicsMsg_.c_str());
@@ -462,6 +541,38 @@ CommonDataSubscriber::~CommonDataSubscriber()
 	// Stereo + Odom
 	SYNC_DEL(stereoOdom);
 	SYNC_DEL(stereoOdomInfo);
+
+	// RGB-only
+	SYNC_DEL(rgb);
+	SYNC_DEL(rgbScan2d);
+	SYNC_DEL(rgbScan3d);
+	SYNC_DEL(rgbInfo);
+	SYNC_DEL(rgbScan2dInfo);
+	SYNC_DEL(rgbScan3dInfo);
+
+	// RGB-only + Odom
+	SYNC_DEL(rgbOdom);
+	SYNC_DEL(rgbOdomScan2d);
+	SYNC_DEL(rgbOdomScan3d);
+	SYNC_DEL(rgbOdomInfo);
+	SYNC_DEL(rgbOdomScan2dInfo);
+	SYNC_DEL(rgbOdomScan3dInfo);
+
+	// RGB-only + User Data
+	SYNC_DEL(rgbData);
+	SYNC_DEL(rgbDataScan2d);
+	SYNC_DEL(rgbDataScan3d);
+	SYNC_DEL(rgbDataInfo);
+	SYNC_DEL(rgbDataScan2dInfo);
+	SYNC_DEL(rgbDataScan3dInfo);
+
+	// RGB-only + Odom + User Data
+	SYNC_DEL(rgbOdomData);
+	SYNC_DEL(rgbOdomDataScan2d);
+	SYNC_DEL(rgbOdomDataScan3d);
+	SYNC_DEL(rgbOdomDataInfo);
+	SYNC_DEL(rgbOdomDataScan2dInfo);
+	SYNC_DEL(rgbOdomDataScan3dInfo);
 
 	// 1 RGBD
 	SYNC_DEL(rgbdScan2d);
@@ -612,6 +723,13 @@ CommonDataSubscriber::~CommonDataSubscriber()
 	SYNC_DEL(odomDataScan2dInfo);
 	SYNC_DEL(odomDataScan3dInfo);
 
+	// Odom
+	SYNC_DEL(odomInfo);
+	// Odom + User Data
+	SYNC_DEL(odomData);
+	SYNC_DEL(odomDataInfo);
+
+
 	for(unsigned int i=0; i<rgbdSubs_.size(); ++i)
 	{
 		delete rgbdSubs_[i];
@@ -625,6 +743,7 @@ CommonDataSubscriber::~CommonDataSubscriber()
 	pnh.deleteParam("subscribe_scan");
 	pnh.deleteParam("subscribe_scan_cloud");
 	pnh.deleteParam("subscribe_stereo");
+	pnh.deleteParam("subscribe_rgb");
 	pnh.deleteParam("subscribe_rgbd");
 	pnh.deleteParam("subscribe_odom_info");
 	pnh.deleteParam("subscribe_user_data");

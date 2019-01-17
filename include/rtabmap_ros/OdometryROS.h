@@ -88,7 +88,7 @@ private:
 	virtual void updateParameters(rtabmap::ParametersMap & parameters) {}
 
 	void callbackIMU(const sensor_msgs::ImuConstPtr& msg);
-	void reset(const rtabmap::Transform & pose = rtabmap::Transform());
+	void reset(const rtabmap::Transform & pose = rtabmap::Transform::getIdentity());
 
 private:
 	rtabmap::Odometry * odometry_;

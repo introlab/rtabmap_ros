@@ -93,6 +93,11 @@ private:
 			const sensor_msgs::PointCloud2ConstPtr& scan3dMsg,
 			const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg);
 
+	virtual void commonOdomCallback(
+			const nav_msgs::OdometryConstPtr & odomMsg,
+			const rtabmap_ros::UserDataConstPtr & userDataMsg,
+			const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg);
+
 	void defaultCallback(const nav_msgs::OdometryConstPtr & odomMsg);
 
 	void processRequestedMap(const rtabmap_ros::MapData & map);
@@ -117,8 +122,6 @@ private:
 	message_filters::Subscriber<rtabmap_ros::Goal> goalTopic_;
 	message_filters::Subscriber<nav_msgs::Path> pathTopic_;
 	ros::Subscriber goalReachedTopic_;
-
-	ros::Subscriber defaultSub_; // odometry only
 
 	typedef message_filters::sync_policies::ExactTime<
 			rtabmap_ros::Info,

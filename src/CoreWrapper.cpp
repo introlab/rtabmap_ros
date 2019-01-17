@@ -108,8 +108,6 @@ CoreWrapper::CoreWrapper() :
 		mapToOdom_(rtabmap::Transform::getIdentity()),
 		transformThread_(0),
 		tfThreadRunning_(false),
-		SYNC_INIT(rgb),
-		SYNC_INIT(rgbOdom),
 		stereoToDepth_(false),
 		odomSensorSync_(false),
 		rate_(Parameters::defaultRtabmapDetectionRate()),
@@ -592,98 +590,49 @@ void CoreWrapper::onInit()
 	if(!this->isDataSubscribed())
 	{
 		bool isRGBD = uStr2Bool(parameters_.at(Parameters::kRGBDEnabled()).c_str());
-		bool incremental = uStr2Bool(parameters_.at(Parameters::kMemIncrementalMemory()).c_str());
-		if(isRGBD && !incremental)
+		if(isRGBD)
 		{
-			NODELET_INFO("\"%s\" is true and \"%s\" is false, subscribing to RGB + camera info...",
-					Parameters::kRGBDEnabled().c_str(),
-					Parameters::kMemIncrementalMemory().c_str());
-			ros::NodeHandle rgb_nh(nh, "rgb");
-			ros::NodeHandle rgb_pnh(pnh, "rgb");
-			image_transport::ImageTransport rgb_it(rgb_nh);
-			image_transport::TransportHints hintsRgb("raw", ros::TransportHints(), rgb_pnh);
-			rgbSub_.subscribe(rgb_it, rgb_nh.resolveName("image"), 1, hintsRgb);
-			rgbCameraInfoSub_.subscribe(rgb_nh, "camera_info", 1);
-
-			std::string odomFrameId;
-			pnh.getParam("odom_frame_id", odomFrameId);
-			if(!odomFrameId.empty())
-			{
-				// odom from TF
-				if(isApproxSync())
-				{
-					rgbApproximateSync_ = new message_filters::Synchronizer<rgbApproximateSyncPolicy>(
-							rgbApproximateSyncPolicy(getQueueSize()), rgbSub_, rgbCameraInfoSub_);
-					rgbApproximateSync_->registerCallback(boost::bind(&CoreWrapper::rgbCallback, this, _1, _2));
-				}
-				else
-				{
-					rgbExactSync_ = new message_filters::Synchronizer<rgbExactSyncPolicy>(
-							rgbExactSyncPolicy(getQueueSize()), rgbSub_, rgbCameraInfoSub_);
-					rgbExactSync_->registerCallback(boost::bind(&CoreWrapper::rgbCallback, this, _1, _2));
-				}
-				NODELET_INFO("\n%s subscribed to:\n   %s\n   %s",
-						getName().c_str(),
-						rgbSub_.getTopic().c_str(),
-						rgbCameraInfoSub_.getTopic().c_str());
-			}
-			else
-			{
-				rgbOdomSub_.subscribe(nh, "odom", 1);
-				if(isApproxSync())
-				{
-					rgbOdomApproximateSync_ = new message_filters::Synchronizer<rgbOdomApproximateSyncPolicy>(
-							rgbOdomApproximateSyncPolicy(getQueueSize()), rgbSub_, rgbCameraInfoSub_, rgbOdomSub_);
-					rgbOdomApproximateSync_->registerCallback(boost::bind(&CoreWrapper::rgbOdomCallback, this, _1, _2, _3));
-				}
-				else
-				{
-					rgbOdomExactSync_ = new message_filters::Synchronizer<rgbOdomExactSyncPolicy>(
-							rgbOdomExactSyncPolicy(getQueueSize()), rgbSub_, rgbCameraInfoSub_, rgbOdomSub_);
-					rgbOdomExactSync_->registerCallback(boost::bind(&CoreWrapper::rgbOdomCallback, this, _1, _2, _3));
-				}
-				NODELET_INFO("\n%s subscribed to:\n   %s\n   %s\n   %s",
-						getName().c_str(),
-						rgbSub_.getTopic().c_str(),
-						rgbCameraInfoSub_.getTopic().c_str(),
-						rgbOdomSub_.getTopic().c_str());
-			}
+			NODELET_WARN("ROS param subscribe_depth, subscribe_stereo and subscribe_rgbd are false, but RTAB-Map "
+					  "parameter \"%s\" is true! Please set subscribe_depth, subscribe_stereo or subscribe_rgbd "
+					  "to true to use rtabmap node for RGB-D SLAM, set \"%s\" to false for loop closure "
+					  "detection on images-only or set subscribe_rgb to true to localize a single RGB camera against pre-built 3D map.",
+					  Parameters::kRGBDEnabled().c_str(),
+					  Parameters::kRGBDEnabled().c_str());
 		}
-		else
-		{
-			if(isRGBD)
-			{
-				NODELET_WARN("ROS param subscribe_depth, subscribe_stereo and subscribe_rgbd are false, but RTAB-Map "
-						  "parameter \"%s\" and \"%s\" are true! Please set subscribe_depth, subscribe_stereo or subscribe_rgbd "
-						  "to true to use rtabmap node for RGB-D SLAM, set \"%s\" to false for loop closure "
-						  "detection on images-only or set \"%s\" to false to localize a single RGB camera against pre-built 3D map.",
-						  Parameters::kRGBDEnabled().c_str(),
-						  Parameters::kMemIncrementalMemory().c_str(),
-						  Parameters::kRGBDEnabled().c_str(),
-						  Parameters::kMemIncrementalMemory().c_str());
-			}
-			ros::NodeHandle rgb_nh(nh, "rgb");
-			ros::NodeHandle rgb_pnh(pnh, "rgb");
-			image_transport::ImageTransport rgb_it(rgb_nh);
-			image_transport::TransportHints hintsRgb("raw", ros::TransportHints(), rgb_pnh);
-			defaultSub_ = rgb_it.subscribe("image", 1, &CoreWrapper::defaultCallback, this);
+		ros::NodeHandle rgb_nh(nh, "rgb");
+		ros::NodeHandle rgb_pnh(pnh, "rgb");
+		image_transport::ImageTransport rgb_it(rgb_nh);
+		image_transport::TransportHints hintsRgb("raw", ros::TransportHints(), rgb_pnh);
+		defaultSub_ = rgb_it.subscribe("image", 1, &CoreWrapper::defaultCallback, this);
 
-			NODELET_INFO("\n%s subscribed to:\n   %s", getName().c_str(), defaultSub_.getTopic().c_str());
-		}
+		NODELET_INFO("\n%s subscribed to:\n   %s", getName().c_str(), defaultSub_.getTopic().c_str());
 	}
-	else if(!this->isSubscribedToDepth() && !this->isSubscribedToStereo() && !this->isSubscribedToRGBD() &&
-			(this->isSubscribedToScan2d() || this->isSubscribedToScan3d()))
+	else if(!this->isSubscribedToDepth() &&
+			!this->isSubscribedToStereo() &&
+			!this->isSubscribedToRGBD() &&
+			!this->isSubscribedToRGB() &&
+			(this->isSubscribedToScan2d() || this->isSubscribedToScan3d() || this->isSubscribedToOdom()))
 	{
-		ROS_WARN("Subscribing to laser scan but no image subscription is enabled, bag-of-words loop closure detection will be disabled...");
+		ROS_WARN("There is no image subscription, bag-of-words loop closure detection will be disabled...");
 		int kpMaxFeatures = Parameters::defaultKpMaxFeatures();
 		int registrationStrategy = Parameters::defaultRegStrategy();
 		Parameters::parse(parameters_, Parameters::kKpMaxFeatures(), kpMaxFeatures);
 		Parameters::parse(parameters_, Parameters::kRegStrategy(), registrationStrategy);
-		if(kpMaxFeatures!= -1 || registrationStrategy != 1)
+		bool updateParams = false;
+		if(kpMaxFeatures!= -1)
 		{
 			uInsert(parameters_, ParametersPair(Parameters::kKpMaxFeatures(), "-1"));
+			ROS_WARN("Setting %s=-1 (bag-of-words disabled)", Parameters::kKpMaxFeatures().c_str());
+			updateParams = true;
+		}
+		if((this->isSubscribedToScan2d() || this->isSubscribedToScan3d()) && registrationStrategy != 1)
+		{
 			uInsert(parameters_, ParametersPair(Parameters::kRegStrategy(), "1"));
-			ROS_WARN("Setting %s=-1 (bag-of-words disabled) and %s=1 (ICP)", Parameters::kKpMaxFeatures().c_str(), Parameters::kRegStrategy().c_str());
+			ROS_WARN("Setting %s=1 (ICP)", Parameters::kRegStrategy().c_str());
+			updateParams = true;
+		}
+		if(updateParams)
+		{
 			rtabmap_.parseParameters(parameters_);
 		}
 	}
@@ -704,9 +653,6 @@ CoreWrapper::~CoreWrapper()
 		transformThread_->join();
 		delete transformThread_;
 	}
-
-	SYNC_DEL(rgb);
-	SYNC_DEL(rgbOdom);
 
 	this->saveParameters(configPath_);
 
@@ -857,33 +803,6 @@ void CoreWrapper::defaultCallback(const sensor_msgs::ImageConstPtr & imageMsg)
 				timer.ticks(),
 				rtabmap_.getWMSize()+rtabmap_.getSTMSize());
 	}
-}
-
-
-void CoreWrapper::rgbCallback(
-		const sensor_msgs::ImageConstPtr& imageMsg,
-		const sensor_msgs::CameraInfoConstPtr& cameraInfoMsg)
-{
-	rtabmap_ros::UserDataConstPtr userDataMsg; // Null
-	nav_msgs::OdometryConstPtr odomMsg; // Null
-	sensor_msgs::LaserScanConstPtr scanMsg; // Null
-	sensor_msgs::PointCloud2ConstPtr scan3dMsg; // Null
-	rtabmap_ros::OdomInfoConstPtr odomInfoMsg; // null
-	cv_bridge::CvImageConstPtr depthMsg;// Null
-	commonSingleDepthCallback(odomMsg, userDataMsg, cv_bridge::toCvShare(imageMsg), depthMsg, *cameraInfoMsg, *cameraInfoMsg, scanMsg, scan3dMsg, odomInfoMsg);
-}
-
-void CoreWrapper::rgbOdomCallback(
-		const sensor_msgs::ImageConstPtr& imageMsg,
-		const sensor_msgs::CameraInfoConstPtr& cameraInfoMsg,
-		const nav_msgs::OdometryConstPtr & odomMsg)
-{
-	rtabmap_ros::UserDataConstPtr userDataMsg; // Null
-	sensor_msgs::LaserScanConstPtr scanMsg; // Null
-	sensor_msgs::PointCloud2ConstPtr scan3dMsg; // null
-	rtabmap_ros::OdomInfoConstPtr odomInfoMsg; // null
-	cv_bridge::CvImageConstPtr depthMsg;// Null
-	commonSingleDepthCallback(odomMsg, userDataMsg, cv_bridge::toCvShare(imageMsg), depthMsg, *cameraInfoMsg, *cameraInfoMsg, scanMsg, scan3dMsg, odomInfoMsg);
 }
 
 bool CoreWrapper::odomUpdate(const nav_msgs::OdometryConstPtr & odomMsg, ros::Time stamp)
@@ -1769,6 +1688,141 @@ void CoreWrapper::commonLaserScanCallback(
 			depth,
 			model,
 			lastPoseIntermediate_?-1:scan2dMsg.get() != 0?scan2dMsg->header.seq:scan3dMsg->header.seq,
+			rtabmap_ros::timestampFromROS(lastPoseStamp_),
+			userData);
+	data.setGroundTruth(groundTruthPose);
+
+	//global pose
+	if(!globalPose_.header.stamp.isZero())
+	{
+		// assume sensor is fixed
+		Transform sensorToBase = rtabmap_ros::getTransform(
+				globalPose_.header.frame_id,
+				frameId_,
+				lastPoseStamp_,
+				tfListener_,
+				waitForTransform_?waitForTransformDuration_:0.0);
+		if(!sensorToBase.isNull())
+		{
+			Transform globalPose = rtabmap_ros::transformFromPoseMsg(globalPose_.pose.pose);
+			globalPose *= sensorToBase; // transform global pose from sensor frame to robot base frame
+
+			// Correction of the global pose accounting the odometry movement since we received it
+			Transform correction = rtabmap_ros::getTransform(
+					frameId_,
+					odomFrameId,
+					globalPose_.header.stamp,
+					lastPoseStamp_,
+					tfListener_,
+					waitForTransform_?waitForTransformDuration_:0.0);
+			if(!correction.isNull())
+			{
+				globalPose *= correction;
+			}
+			else
+			{
+				NODELET_WARN("Could not adjust global pose accordingly to latest odometry pose. "
+						"If odometry is small since it received the global pose and "
+						"covariance is large, this should not be a problem.");
+			}
+			cv::Mat globalPoseCovariance = cv::Mat(6,6, CV_64FC1, (void*)globalPose_.pose.covariance.data()).clone();
+			data.setGlobalPose(globalPose, globalPoseCovariance);
+		}
+	}
+	globalPose_.header.stamp = ros::Time(0);
+
+	if(gps_.stamp() > 0.0)
+	{
+		data.setGPS(gps_);
+	}
+	gps_ = rtabmap::GPS();
+
+	OdometryInfo odomInfo;
+	if(odomInfoMsg.get())
+	{
+		odomInfo = odomInfoFromROS(*odomInfoMsg);
+	}
+
+	//tag detections
+	Landmarks landmarks = rtabmap_ros::landmarksFromROS(
+			tags_,
+			frameId_,
+			odomFrameId,
+			lastPoseStamp_,
+			tfListener_,
+			waitForTransform_?waitForTransformDuration_:0,
+			landmarkDefaultLinVariance_,
+			landmarkDefaultAngVariance_);
+	tags_.clear();
+	if(!landmarks.empty())
+	{
+		data.setLandmarks(landmarks);
+	}
+
+	process(lastPoseStamp_,
+			data,
+			lastPose_,
+			odomFrameId,
+			covariance_,
+			odomInfo);
+
+	covariance_ = cv::Mat();
+}
+
+void CoreWrapper::commonOdomCallback(
+		const nav_msgs::OdometryConstPtr & odomMsg,
+		const rtabmap_ros::UserDataConstPtr & userDataMsg,
+		const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg)
+{
+	UASSERT(odomMsg.get());
+	std::string odomFrameId = odomFrameId_;
+
+	odomFrameId = odomMsg->header.frame_id;
+	if(!odomUpdate(odomMsg, odomMsg->header.stamp))
+	{
+		return;
+	}
+
+	Transform groundTruthPose;
+	if(!groundTruthFrameId_.empty())
+	{
+		groundTruthPose = rtabmap_ros::getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, lastPoseStamp_, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+	}
+
+	cv::Mat userData;
+	if(userDataMsg.get())
+	{
+		userData = rtabmap_ros::userDataFromROS(*userDataMsg);
+		UScopeMutex lock(userDataMutex_);
+		if(!userData_.empty())
+		{
+			NODELET_WARN("Synchronized and asynchronized user data topics cannot be used at the same time. Async user data dropped!");
+			userData_ = cv::Mat();
+		}
+	}
+	else
+	{
+		UScopeMutex lock(userDataMutex_);
+		userData = userData_;
+		userData_ = cv::Mat();
+	}
+
+	cv::Mat rgb = cv::Mat::zeros(2,1,CV_8UC1);
+	cv::Mat depth = cv::Mat::zeros(2,1,CV_16UC1);
+	CameraModel model(
+			1,
+			1,
+			0.5,
+			1,
+			Transform(0,0,1,0, -1,0,0,0, 0,-1,0,0),
+			0,
+			cv::Size(1,2));
+
+	SensorData data(
+			rgb,
+			depth,
+			model,
+			lastPoseIntermediate_?-1:odomMsg->header.seq,
 			rtabmap_ros::timestampFromROS(lastPoseStamp_),
 			userData);
 	data.setGroundTruth(groundTruthPose);
