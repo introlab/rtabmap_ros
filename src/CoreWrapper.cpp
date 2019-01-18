@@ -2098,6 +2098,7 @@ void CoreWrapper::process(
 							}
 							currentMetricGoal_.setNull();
 							lastPublishedMetricGoal_.setNull();
+							goalFrameId_.clear();
 							latestNodeWasReached_ = false;
 						}
 					}
@@ -2113,7 +2114,16 @@ void CoreWrapper::process(
 								   rtabmap_.getLastLocalizationPose().getDistance(currentMetricGoal_) < rtabmap_.getLocalRadius())
 								{
 									latestNodeWasReached_ = true;
-									currentMetricGoal_ *= rtabmap_.getPathTransformToGoal();
+									Transform goalLocalTransform = Transform::getIdentity();
+									if(!goalFrameId_.empty() && goalFrameId_.compare(frameId_) != 0)
+									{
+										Transform localT = rtabmap_ros::getTransform(frameId_, goalFrameId_, ros::Time::now(), tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+										if(!localT.isNull())
+										{
+											goalLocalTransform = localT.inverse().to3DoF();
+										}
+									}
+									currentMetricGoal_ *= rtabmap_.getPathTransformToGoal()*goalLocalTransform;
 								}
 							}
 
@@ -2139,6 +2149,7 @@ void CoreWrapper::process(
 							}
 							currentMetricGoal_.setNull();
 							lastPublishedMetricGoal_.setNull();
+							goalFrameId_.clear();
 							latestNodeWasReached_ = false;
 						}
 					}
@@ -2260,6 +2271,7 @@ void CoreWrapper::initialPoseCallback(const geometry_msgs::PoseWithCovarianceSta
 void CoreWrapper::goalCommonCallback(
 		int id,
 		const std::string & label,
+		const std::string & frameId,
 		const Transform & pose,
 		const ros::Time & stamp,
 		double * planningTime)
@@ -2302,6 +2314,7 @@ void CoreWrapper::goalCommonCallback(
 
 		currentMetricGoal_.setNull();
 		lastPublishedMetricGoal_.setNull();
+		goalFrameId_.clear();
 		latestNodeWasReached_ = false;
 		if(poses.size() == 0)
 		{
@@ -2322,6 +2335,7 @@ void CoreWrapper::goalCommonCallback(
 			if(!currentMetricGoal_.isNull())
 			{
 				NODELET_INFO("Planning: Path successfully created (size=%d)", (int)poses.size());
+				goalFrameId_ = frameId;
 
 				// Adjust the target pose relative to last node
 				if(rtabmap_.getPathCurrentGoalId() == rtabmap_.getPath().back().first && rtabmap_.getLocalOptimizedPoses().size())
@@ -2329,7 +2343,16 @@ void CoreWrapper::goalCommonCallback(
 					if(rtabmap_.getLastLocalizationPose().getDistance(currentMetricGoal_) < rtabmap_.getLocalRadius())
 					{
 						latestNodeWasReached_ = true;
-						currentMetricGoal_ *= rtabmap_.getPathTransformToGoal();
+						Transform goalLocalTransform = Transform::getIdentity();
+						if(!goalFrameId_.empty() && goalFrameId_.compare(frameId_) != 0)
+						{
+							Transform localT = rtabmap_ros::getTransform(frameId_, goalFrameId_, stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+							if(!localT.isNull())
+							{
+								goalLocalTransform = localT.inverse().to3DoF();
+							}
+						}
+						currentMetricGoal_ *= rtabmap_.getPathTransformToGoal() * goalLocalTransform;
 					}
 				}
 
@@ -2414,7 +2437,7 @@ void CoreWrapper::goalCallback(const geometry_msgs::PoseStampedConstPtr & msg)
 		targetPose = t * targetPose;
 	}
 
-	goalCommonCallback(0, "", targetPose, msg->header.stamp);
+	goalCommonCallback(0, "", "", targetPose, msg->header.stamp);
 }
 
 void CoreWrapper::goalNodeCallback(const rtabmap_ros::GoalConstPtr & msg)
@@ -2424,7 +2447,7 @@ void CoreWrapper::goalNodeCallback(const rtabmap_ros::GoalConstPtr & msg)
 		NODELET_ERROR("Node id or label should be set!");
 		return;
 	}
-	goalCommonCallback(msg->node_id, msg->node_label, Transform(), msg->header.stamp);
+	goalCommonCallback(msg->node_id, msg->node_label, msg->frame_id, Transform(), msg->header.stamp);
 }
 
 bool CoreWrapper::updateRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
@@ -2477,6 +2500,7 @@ bool CoreWrapper::resetRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empt
 	lastPoseIntermediate_ = false;
 	currentMetricGoal_.setNull();
 	lastPublishedMetricGoal_.setNull();
+	goalFrameId_.clear();
 	latestNodeWasReached_ = false;
 	mapsManager_.clear();
 	previousStamp_ = ros::Time(0);
@@ -2538,6 +2562,7 @@ bool CoreWrapper::backupDatabaseCallback(std_srvs::Empty::Request&, std_srvs::Em
 	lastPose_.setIdentity();
 	currentMetricGoal_.setNull();
 	lastPublishedMetricGoal_.setNull();
+	goalFrameId_.clear();
 	latestNodeWasReached_ = false;
 	userDataMutex_.lock();
 	userData_ = cv::Mat();
@@ -3011,7 +3036,7 @@ bool CoreWrapper::getPlanCallback(nav_msgs::GetPlan::Request &req, nav_msgs::Get
 bool CoreWrapper::setGoalCallback(rtabmap_ros::SetGoal::Request& req, rtabmap_ros::SetGoal::Response& res)
 {
 	double planningTime = 0.0;
-	goalCommonCallback(req.node_id, req.node_label, Transform(), ros::Time::now(), &planningTime);
+	goalCommonCallback(req.node_id, req.node_label, req.frame_id, Transform(), ros::Time::now(), &planningTime);
 	const std::vector<std::pair<int, Transform> > & path = rtabmap_.getPath();
 	res.path_ids.resize(path.size());
 	res.path_poses.resize(path.size());
@@ -3032,6 +3057,7 @@ bool CoreWrapper::cancelGoalCallback(std_srvs::Empty::Request& req, std_srvs::Em
 		rtabmap_.clearPath(0);
 		currentMetricGoal_.setNull();
 		lastPublishedMetricGoal_.setNull();
+		goalFrameId_.clear();
 		latestNodeWasReached_ = false;
 		if(goalReachedPub_.getNumSubscribers())
 		{
@@ -3331,6 +3357,7 @@ void CoreWrapper::goalDoneCb(const actionlib::SimpleClientGoalState& state,
 		rtabmap_.clearPath(1);
 		currentMetricGoal_.setNull();
 		lastPublishedMetricGoal_.setNull();
+		goalFrameId_.clear();
 		latestNodeWasReached_ = false;
 	}
 }
@@ -3395,10 +3422,20 @@ void CoreWrapper::publishGlobalPath(const ros::Time & stamp)
 				rtabmap_ros::transformToPoseMsg(t*iter->second, path.poses[oi].pose);
 				++oi;
 			}
-			if(!rtabmap_.getPathTransformToGoal().isIdentity())
+			Transform goalLocalTransform = Transform::getIdentity();
+			if(!goalFrameId_.empty() && goalFrameId_.compare(frameId_) != 0)
+			{
+				Transform localT = rtabmap_ros::getTransform(frameId_, goalFrameId_, stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+				if(!localT.isNull())
+				{
+					goalLocalTransform = localT.inverse().to3DoF();
+				}
+			}
+
+			if(!rtabmap_.getPathTransformToGoal().isIdentity() && !goalLocalTransform.isIdentity())
 			{
 				path.poses.resize(path.poses.size()+1);
-				Transform p = t * rtabmap_.getPath().back().second*rtabmap_.getPathTransformToGoal();
+				Transform p = t * rtabmap_.getPath().back().second*rtabmap_.getPathTransformToGoal() * goalLocalTransform;
 				rtabmap_ros::transformToPoseMsg(p, path.poses[path.poses.size()-1].pose);
 			}
 			globalPathPub_.publish(path);

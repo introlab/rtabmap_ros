@@ -143,7 +143,12 @@ private:
 
 	void initialPoseCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr & msg);
 
-	void goalCommonCallback(int id, const std::string & label, const rtabmap::Transform & pose, const ros::Time & stamp, double * planningTime = 0);
+	void goalCommonCallback(int id,
+			const std::string & label,
+			const std::string & frameId,
+			const rtabmap::Transform & pose,
+			const ros::Time & stamp,
+			double * planningTime = 0);
 	void goalCallback(const geometry_msgs::PoseStampedConstPtr & msg);
 	void goalNodeCallback(const rtabmap_ros::GoalConstPtr & msg);
 	void updateGoal(const ros::Time & stamp);
@@ -250,6 +255,7 @@ private:
 	ros::Publisher goalReachedPub_;
 	ros::Publisher globalPathPub_;
 	ros::Publisher localPathPub_;
+	std::string goalFrameId_;
 
 	tf2_ros::TransformBroadcaster tfBroadcaster_;
 	tf::TransformListener tfListener_;

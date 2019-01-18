@@ -8,10 +8,12 @@ pub = rospy.Publisher('rtabmap/goal_node', Goal, queue_size=1)
 waypoints = []
 currentIndex = 0
 waitingTime = 1.0
+frameId = ""
 
 def callback(data):
     global currentIndex
     global waitingTime
+    global frameId
     if data.data:
         rospy.loginfo(rospy.get_caller_id() + ": Goal '%s' reached! Publishing next goal in %.1f sec...", waypoints[currentIndex], waitingTime)
     else:
@@ -23,6 +25,7 @@ def callback(data):
     rospy.sleep(waitingTime)
 
     msg = Goal()
+    msg.frame_id = frameId
     try:
         int(waypoints[currentIndex])
         is_dig = True
@@ -43,7 +46,9 @@ def main():
     rospy.init_node('patrol', anonymous=False)
     sub = rospy.Subscriber("rtabmap/goal_reached", Bool, callback)
     global waitingTime
+    global frameId
     waitingTime = rospy.get_param('~time', waitingTime)
+    frameId = rospy.get_param('~frame_id', frameId)
     rospy.sleep(1.) # make sure that subscribers have seen this node before sending a goal
 
     rospy.loginfo(rospy.get_caller_id() + ": Waypoints: [%s]", str(waypoints).strip('[]'))
@@ -74,7 +79,7 @@ def main():
 
 if __name__ == '__main__':
     if len(sys.argv) < 3:
-        print("usage: patrol.py waypointA waypointB waypointC ... [_time:=1] [topic remaps] (at least 2 waypoints, can be node id, landmark or label)")
+        print("usage: patrol.py waypointA waypointB waypointC ... [_time:=1 frame_id:=base_footprint] [topic remaps] (at least 2 waypoints, can be node id, landmark or label)")
     else:
         waypoints = sys.argv[1:] 
         waypoints = [x for x in waypoints if not x.startswith('/') and not x.startswith('_')]
