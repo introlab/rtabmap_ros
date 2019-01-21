@@ -58,6 +58,7 @@ def main():
 
     # send the first goal
     msg = Goal()
+    msg.frame_id = frameId
     try:
         int(waypoints[currentIndex])
         is_dig = True
