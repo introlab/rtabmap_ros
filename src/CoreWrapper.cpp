@@ -34,6 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <nav_msgs/Path.h>
 #include <std_msgs/Int32MultiArray.h>
 #include <std_msgs/Bool.h>
+#include <geometry_msgs/PoseArray.h>
 #include <sensor_msgs/image_encodings.h>
 #include <cv_bridge/cv_bridge.h>
 #include <pcl/io/io.h>
@@ -212,6 +213,7 @@ void CoreWrapper::onInit()
 	infoPub_ = nh.advertise<rtabmap_ros::Info>("info", 1);
 	mapDataPub_ = nh.advertise<rtabmap_ros::MapData>("mapData", 1);
 	mapGraphPub_ = nh.advertise<rtabmap_ros::MapGraph>("mapGraph", 1);
+	landmarksPub_ = nh.advertise<geometry_msgs::PoseArray>("landmarks", 1);
 	labelsPub_ = nh.advertise<visualization_msgs::MarkerArray>("labels", 1);
 	mapPathPub_ = nh.advertise<nav_msgs::Path>("mapPath", 1);
 	localizationPosePub_ = nh.advertise<geometry_msgs::PoseWithCovarianceStamped>("localization_pose", 1);
@@ -2074,22 +2076,24 @@ void CoreWrapper::process(
 				{
 					if(rtabmap_.getPath().size() == 0)
 					{
-						if(rtabmap_.getPathStatus() > 0)
-						{
-							// Goal reached
-							NODELET_INFO("Planning: Publishing goal reached!");
-						}
-						else
-						{
-							NODELET_WARN("Planning: Plan failed!");
-							if(mbClient_ && mbClient_->isServerConnected())
-							{
-								mbClient_->cancelGoal();
-							}
-						}
-						// Don't send status yet, let move_base finish reaching the goal
+						// Don't send status yet if move_base actionlib is used unless it failed,
+						// let move_base finish reaching the goal
 						if(mbClient_ == 0 || rtabmap_.getPathStatus() <= 0)
 						{
+							if(rtabmap_.getPathStatus() > 0)
+							{
+								// Goal reached
+								NODELET_INFO("Planning: Publishing goal reached!");
+							}
+							else if(rtabmap_.getPathStatus() <= 0)
+							{
+								NODELET_WARN("Planning: Plan failed!");
+								if(mbClient_ && mbClient_->isServerConnected())
+								{
+									mbClient_->cancelGoal();
+								}
+							}
+
 							if(goalReachedPub_.getNumSubscribers())
 							{
 								std_msgs::Bool result;
@@ -2421,6 +2425,12 @@ void CoreWrapper::goalCallback(const geometry_msgs::PoseStampedConstPtr & msg)
 	if(targetPose.isNull())
 	{
 		NODELET_ERROR("Pose received is null!");
+		if(goalReachedPub_.getNumSubscribers())
+		{
+			std_msgs::Bool result;
+			result.data = false;
+			goalReachedPub_.publish(result);
+		}
 		return;
 	}
 
@@ -2432,6 +2442,12 @@ void CoreWrapper::goalCallback(const geometry_msgs::PoseStampedConstPtr & msg)
 		{
 			NODELET_ERROR("Cannot transform goal pose from \"%s\" frame to \"%s\" frame!",
 					msg->header.frame_id.c_str(), mapFrameId_.c_str());
+			if(goalReachedPub_.getNumSubscribers())
+			{
+				std_msgs::Bool result;
+				result.data = false;
+				goalReachedPub_.publish(result);
+			}
 			return;
 		}
 		targetPose = t * targetPose;
@@ -2445,6 +2461,12 @@ void CoreWrapper::goalNodeCallback(const rtabmap_ros::GoalConstPtr & msg)
 	if(msg->node_id == 0 && msg->node_label.empty())
 	{
 		NODELET_ERROR("Node id or label should be set!");
+		if(goalReachedPub_.getNumSubscribers())
+		{
+			std_msgs::Bool result;
+			result.data = false;
+			goalReachedPub_.publish(result);
+		}
 		return;
 	}
 	goalCommonCallback(msg->node_id, msg->node_label, msg->frame_id, Transform(), msg->header.stamp);
@@ -2822,6 +2844,54 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 			mapGraphPub_.publish(msg);
 		}
 
+		bool pubLabels = labelsPub_.getNumSubscribers();
+		visualization_msgs::MarkerArray markers;
+		if((landmarksPub_.getNumSubscribers() || pubLabels) && !poses.empty() && poses.begin()->first < 0)
+		{
+			geometry_msgs::PoseArrayPtr msg(new geometry_msgs::PoseArray);
+			msg->header.stamp = now;
+			msg->header.frame_id = mapFrameId_;
+			for(std::map<int, Transform>::const_iterator iter=poses.begin(); iter!=poses.end() && iter->first<0; ++iter)
+			{
+				geometry_msgs::Pose p;
+				rtabmap_ros::transformToPoseMsg(iter->second, p);
+				msg->poses.push_back(p);
+
+				if(pubLabels)
+				{
+					// Add landmark ids
+					visualization_msgs::Marker marker;
+					marker.header.frame_id = mapFrameId_;
+					marker.header.stamp = now;
+					marker.ns = "landmarks";
+					marker.id = iter->first;
+					marker.action = visualization_msgs::Marker::ADD;
+					marker.pose.position.x = iter->second.x();
+					marker.pose.position.y = iter->second.y();
+					marker.pose.position.z = iter->second.z();
+					marker.pose.orientation.x = 0.0;
+					marker.pose.orientation.y = 0.0;
+					marker.pose.orientation.z = 0.0;
+					marker.pose.orientation.w = 1.0;
+					marker.scale.x = 1;
+					marker.scale.y = 1;
+					marker.scale.z = 0.35;
+					marker.color.a = 0.5;
+					marker.color.r = 1.0;
+					marker.color.g = 1.0;
+					marker.color.b = 0.0;
+					marker.lifetime = ros::Duration(2.0f/rate_);
+
+					marker.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
+					marker.text = uNumber2Str(iter->first);
+
+					markers.markers.push_back(marker);
+				}
+			}
+
+			landmarksPub_.publish(msg);
+		}
+
 		if(!req.graphOnly && mapsManager_.hasSubscribers())
 		{
 			std::map<int, Transform> filteredPoses(poses.lower_bound(1), poses.end());
@@ -2854,13 +2924,11 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 			mapsManager_.publishMaps(filteredPoses, now, mapFrameId_);
 		}
 
-		bool pubLabels = labelsPub_.getNumSubscribers();
 		bool pubPath = mapPathPub_.getNumSubscribers();
 		if(pubLabels || pubPath)
 		{
 			if(poses.size() && signatures.size())
 			{
-				visualization_msgs::MarkerArray markers;
 				nav_msgs::Path path;
 				if(pubPath)
 				{
@@ -2883,7 +2951,7 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 								marker.header.frame_id = mapFrameId_;
 								marker.header.stamp = now;
 								marker.ns = "labels";
-								marker.id = -iter->first;
+								marker.id = iter->first;
 								marker.action = visualization_msgs::Marker::ADD;
 								marker.pose.position.x = poseIter->second.x();
 								marker.pose.position.y = poseIter->second.y();
@@ -3165,12 +3233,58 @@ void CoreWrapper::publishStats(const ros::Time & stamp)
 	}
 
 	bool pubLabels = labelsPub_.getNumSubscribers();
+	visualization_msgs::MarkerArray markers;
+	if((landmarksPub_.getNumSubscribers() || pubLabels) && !stats.poses().empty() && stats.poses().begin()->first < 0)
+	{
+		geometry_msgs::PoseArrayPtr msg(new geometry_msgs::PoseArray);
+		msg->header.stamp = stamp;
+		msg->header.frame_id = mapFrameId_;
+		for(std::map<int, Transform>::const_iterator iter=stats.poses().begin(); iter!=stats.poses().end() && iter->first<0; ++iter)
+		{
+			geometry_msgs::Pose p;
+			rtabmap_ros::transformToPoseMsg(iter->second, p);
+			msg->poses.push_back(p);
+
+			if(pubLabels)
+			{
+				// Add landmark ids
+				visualization_msgs::Marker marker;
+				marker.header.frame_id = mapFrameId_;
+				marker.header.stamp = stamp;
+				marker.ns = "landmarks";
+				marker.id = iter->first;
+				marker.action = visualization_msgs::Marker::ADD;
+				marker.pose.position.x = iter->second.x();
+				marker.pose.position.y = iter->second.y();
+				marker.pose.position.z = iter->second.z();
+				marker.pose.orientation.x = 0.0;
+				marker.pose.orientation.y = 0.0;
+				marker.pose.orientation.z = 0.0;
+				marker.pose.orientation.w = 1.0;
+				marker.scale.x = 1;
+				marker.scale.y = 1;
+				marker.scale.z = 0.35;
+				marker.color.a = 0.7;
+				marker.color.r = 0.0;
+				marker.color.g = 1.0;
+				marker.color.b = 0.0;
+				marker.lifetime = ros::Duration(2.0f/rate_);
+
+				marker.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
+				marker.text = uNumber2Str(iter->first);
+
+				markers.markers.push_back(marker);
+			}
+		}
+
+		landmarksPub_.publish(msg);
+	}
+
 	bool pubPath = mapPathPub_.getNumSubscribers();
 	if(pubLabels || pubPath)
 	{
 		if(stats.poses().size())
 		{
-			visualization_msgs::MarkerArray markers;
 			nav_msgs::Path path;
 			if(pubPath)
 			{

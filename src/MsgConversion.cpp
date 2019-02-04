@@ -1247,6 +1247,11 @@ rtabmap::Landmarks landmarksFromROS(
 	rtabmap::Landmarks landmarks;
 	for(std::map<int, geometry_msgs::PoseWithCovarianceStamped>::const_iterator iter=tags.begin(); iter!=tags.end(); ++iter)
 	{
+		if(iter->first <=0)
+		{
+			ROS_ERROR("Invalid landmark received! IDs should be > 0 (it is %d). Ignoring this landmark.", iter->first);
+			continue;
+		}
 		rtabmap::Transform baseToCamera = rtabmap_ros::getTransform(
 				frameId,
 				iter->second.header.frame_id,

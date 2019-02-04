@@ -243,6 +243,7 @@ private:
 	ros::Publisher infoPub_;
 	ros::Publisher mapDataPub_;
 	ros::Publisher mapGraphPub_;
+	ros::Publisher landmarksPub_;
 	ros::Publisher labelsPub_;
 	ros::Publisher mapPathPub_;
 	ros::Publisher localizationPosePub_;
