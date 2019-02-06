@@ -1071,8 +1071,7 @@ void CoreWrapper::commonDepthCallbackImpl(
 		}
 	}
 
-	cv::Mat scan;
-	Transform scanLocalTransform = Transform::getIdentity();
+	LaserScan scan;
 	bool genMaxScanPts = 0;
 	if(scan2dMsg.get() == 0 && scan3dMsg.get() == 0 && !depth.empty() && genScan_)
 	{
@@ -1083,7 +1082,7 @@ void CoreWrapper::commonDepthCallbackImpl(
 				genScanMaxDepth_,
 				genScanMinDepth_);
 		genMaxScanPts += depth.cols;
-		scan = rtabmap::util3d::laserScan2dFromPointCloud(*scanCloud2d);
+		scan = LaserScan(rtabmap::util3d::laserScan2dFromPointCloud(*scanCloud2d), 0, genScanMaxDepth_, LaserScan::kXY);
 	}
 	else if(scan2dMsg.get() != 0)
 	{
@@ -1093,25 +1092,13 @@ void CoreWrapper::commonDepthCallbackImpl(
 				odomSensorSync_?odomFrameId:"",
 				lastPoseStamp_,
 				scan,
-				scanLocalTransform,
 				tfListener_,
-				waitForTransform_?waitForTransformDuration_:0))
+				waitForTransform_?waitForTransformDuration_:0,
+				// backward compatibility, project 2D scan in /base_link frame
+				rtabmap_.getMemory() && uStrNumCmp(rtabmap_.getMemory()->getDatabaseVersion(), "0.11.10") < 0))
 		{
 			NODELET_ERROR("Could not convert laser scan msg! Aborting rtabmap update...");
 			return;
-		}
-		Transform zAxis(0,0,1,0,0,0);
-		if((scanLocalTransform.rotation()*zAxis).z() < 0)
-		{
-			cv::Mat flipScan;
-			cv::flip(scan, flipScan, 1);
-			scan = flipScan;
-		}
-		if(rtabmap_.getMemory() && uStrNumCmp(rtabmap_.getMemory()->getDatabaseVersion(), "0.11.10") < 0)
-		{
-			// backward compatibility, project 2D scan in /base_link frame
-			scan = util3d::transformLaserScan(LaserScan::backwardCompatibility(scan), scanLocalTransform).data();
-			scanLocalTransform = Transform::getIdentity();
 		}
 	}
 	else if(scan3dMsg.get() != 0)
@@ -1122,9 +1109,9 @@ void CoreWrapper::commonDepthCallbackImpl(
 				odomSensorSync_?odomFrameId:"",
 				lastPoseStamp_,
 				scan,
-				scanLocalTransform,
 				tfListener_,
-				waitForTransform_?waitForTransformDuration_:0))
+				waitForTransform_?waitForTransformDuration_:0,
+				scanCloudMaxPoints_))
 		{
 			NODELET_ERROR("Could not convert 3d laser scan msg! Aborting rtabmap update...");
 			return;
@@ -1155,18 +1142,8 @@ void CoreWrapper::commonDepthCallbackImpl(
 		userData_ = cv::Mat();
 	}
 
-	SensorData data(scan2dMsg.get() !=0?
-					LaserScan::backwardCompatibility(scan,
-							scan2dMsg->range_min,
-							scan2dMsg->range_max,
-							scan2dMsg->angle_min,
-							scan2dMsg->angle_max,
-							scan2dMsg->angle_increment,
-							scanLocalTransform):
-					LaserScan::backwardCompatibility(scan,
-							genScan_?genMaxScanPts:scan3dMsg.get() != 0?scanCloudMaxPoints_:0,
-							genScan_?genScanMaxDepth_:0.0f,
-							scanLocalTransform),
+	SensorData data(
+			scan,
 			rgb,
 			depth,
 			cameraModels,
@@ -1372,8 +1349,7 @@ void CoreWrapper::commonStereoCallback(
 		return;
 	}
 
-	cv::Mat scan;
-	Transform scanLocalTransform = Transform::getIdentity();
+	LaserScan scan;
 	if(scan2dMsg.get() != 0)
 	{
 		if(!rtabmap_ros::convertScanMsg(
@@ -1382,25 +1358,13 @@ void CoreWrapper::commonStereoCallback(
 				odomSensorSync_?odomFrameId:"",
 				lastPoseStamp_,
 				scan,
-				scanLocalTransform,
 				tfListener_,
-				waitForTransform_?waitForTransformDuration_:0))
+				waitForTransform_?waitForTransformDuration_:0,
+				// backward compatibility, project 2D scan in /base_link frame
+				rtabmap_.getMemory() && uStrNumCmp(rtabmap_.getMemory()->getDatabaseVersion(), "0.11.10") < 0))
 		{
 			NODELET_ERROR("Could not convert laser scan msg! Aborting rtabmap update...");
 			return;
-		}
-		Transform zAxis(0,0,1,0,0,0);
-		if((scanLocalTransform.rotation()*zAxis).z() < 0)
-		{
-			cv::Mat flipScan;
-			cv::flip(scan, flipScan, 1);
-			scan = flipScan;
-		}
-		if(rtabmap_.getMemory() && uStrNumCmp(rtabmap_.getMemory()->getDatabaseVersion(), "0.11.10") < 0)
-		{
-			// backward compatibility, project 2D scan in /base_link frame
-			scan = util3d::transformLaserScan(LaserScan::backwardCompatibility(scan), scanLocalTransform).data();
-			scanLocalTransform = Transform::getIdentity();
 		}
 	}
 	else if(scan3dMsg.get() != 0)
@@ -1411,9 +1375,9 @@ void CoreWrapper::commonStereoCallback(
 				odomSensorSync_?odomFrameId:"",
 				lastPoseStamp_,
 				scan,
-				scanLocalTransform,
 				tfListener_,
-				waitForTransform_?waitForTransformDuration_:0))
+				waitForTransform_?waitForTransformDuration_:0,
+				scanCloudMaxPoints_))
 		{
 			NODELET_ERROR("Could not convert 3d laser scan msg! Aborting rtabmap update...");
 			return;
@@ -1444,18 +1408,8 @@ void CoreWrapper::commonStereoCallback(
 		userData_ = cv::Mat();
 	}
 
-	SensorData data(scan2dMsg.get() != 0?
-					LaserScan::backwardCompatibility(scan,
-							scan2dMsg->range_min,
-							scan2dMsg->range_max,
-							scan2dMsg->angle_min,
-							scan2dMsg->angle_max,
-							scan2dMsg->angle_increment,
-							scanLocalTransform):
-					LaserScan::backwardCompatibility(scan,
-							scan3dMsg.get() != 0?scanCloudMaxPoints_:0,
-							0,
-							scanLocalTransform),
+	SensorData data(
+			scan,
 			left,
 			right,
 			stereoModel,
@@ -1591,8 +1545,7 @@ void CoreWrapper::commonLaserScanCallback(
 		return;
 	}
 
-	cv::Mat scan;
-	Transform scanLocalTransform = Transform::getIdentity();
+	LaserScan scan;
 	if(scan2dMsg.get() != 0)
 	{
 		if(!rtabmap_ros::convertScanMsg(
@@ -1601,25 +1554,13 @@ void CoreWrapper::commonLaserScanCallback(
 				odomSensorSync_?odomFrameId:"",
 				lastPoseStamp_,
 				scan,
-				scanLocalTransform,
 				tfListener_,
-				waitForTransform_?waitForTransformDuration_:0))
+				waitForTransform_?waitForTransformDuration_:0,
+				// backward compatibility, project 2D scan in /base_link frame
+				rtabmap_.getMemory() && uStrNumCmp(rtabmap_.getMemory()->getDatabaseVersion(), "0.11.10") < 0))
 		{
 			NODELET_ERROR("Could not convert laser scan msg! Aborting rtabmap update...");
 			return;
-		}
-		Transform zAxis(0,0,1,0,0,0);
-		if((scanLocalTransform.rotation()*zAxis).z() < 0)
-		{
-			cv::Mat flipScan;
-			cv::flip(scan, flipScan, 1);
-			scan = flipScan;
-		}
-		if(rtabmap_.getMemory() && uStrNumCmp(rtabmap_.getMemory()->getDatabaseVersion(), "0.11.10") < 0)
-		{
-			// backward compatibility, project 2D scan in /base_link frame
-			scan = util3d::transformLaserScan(LaserScan::backwardCompatibility(scan), scanLocalTransform).data();
-			scanLocalTransform = Transform::getIdentity();
 		}
 	}
 	else if(scan3dMsg.get() != 0)
@@ -1630,9 +1571,9 @@ void CoreWrapper::commonLaserScanCallback(
 				odomSensorSync_?odomFrameId:"",
 				lastPoseStamp_,
 				scan,
-				scanLocalTransform,
 				tfListener_,
-				waitForTransform_?waitForTransformDuration_:0))
+				waitForTransform_?waitForTransformDuration_:0,
+				scanCloudMaxPoints_))
 		{
 			NODELET_ERROR("Could not convert 3d laser scan msg! Aborting rtabmap update...");
 			return;
@@ -1670,22 +1611,12 @@ void CoreWrapper::commonLaserScanCallback(
 			1,
 			0.5,
 			1,
-			scanLocalTransform*Transform(0,0,1,0, -1,0,0,0, 0,-1,0,0),
+			scan.localTransform()*Transform(0,0,1,0, -1,0,0,0, 0,-1,0,0),
 			0,
 			cv::Size(1,2));
 
-	SensorData data(scan2dMsg.get() != 0?
-					LaserScan::backwardCompatibility(scan,
-							scan2dMsg->range_min,
-							scan2dMsg->range_max,
-							scan2dMsg->angle_min,
-							scan2dMsg->angle_max,
-							scan2dMsg->angle_increment,
-							scanLocalTransform):
-					LaserScan::backwardCompatibility(scan,
-							scan3dMsg.get() != 0?scanCloudMaxPoints_:0,
-							0,
-							scanLocalTransform),
+	SensorData data(
+			scan,
 			rgb,
 			depth,
 			model,

@@ -485,8 +485,7 @@ void GuiWrapper::commonDepthCallback(
 	cv::Mat rgb;
 	cv::Mat depth;
 	std::vector<CameraModel> cameraModels;
-	cv::Mat scan;
-	Transform scanLocalTransform = Transform::getIdentity();
+	LaserScan scan;
 	rtabmap::OdometryInfo info;
 	bool ignoreData = false;
 
@@ -526,7 +525,6 @@ void GuiWrapper::commonDepthCallback(
 					odomSensorSync_?odomHeader.frame_id:"",
 					odomHeader.stamp,
 					scan,
-					scanLocalTransform,
 					tfListener_,
 					waitForTransform_?waitForTransformDuration_:0))
 			{
@@ -542,7 +540,6 @@ void GuiWrapper::commonDepthCallback(
 					odomSensorSync_?odomHeader.frame_id:"",
 					odomHeader.stamp,
 					scan,
-					scanLocalTransform,
 					tfListener_,
 					waitForTransform_?waitForTransformDuration_:0))
 			{
@@ -571,10 +568,7 @@ void GuiWrapper::commonDepthCallback(
 	info.reg.covariance = covariance;
 	rtabmap::OdometryEvent odomEvent(
 		rtabmap::SensorData(
-				LaserScan::backwardCompatibility(scan,
-						scan2dMsg.get()?(int)scan2dMsg->ranges.size():0,
-						scan2dMsg.get()?(int)scan2dMsg->range_max:0,
-						scanLocalTransform),
+				scan,
 				rgb,
 				depth,
 				cameraModels,
@@ -642,8 +636,7 @@ void GuiWrapper::commonStereoCallback(
 
 	cv::Mat left;
 	cv::Mat right;
-	cv::Mat scan;
-	Transform scanLocalTransform = Transform::getIdentity();
+	LaserScan scan;
 	rtabmap::StereoCameraModel stereoModel;
 	rtabmap::OdometryInfo info;
 	bool ignoreData = false;
@@ -682,7 +675,6 @@ void GuiWrapper::commonStereoCallback(
 					odomSensorSync_?odomHeader.frame_id:"",
 					odomHeader.stamp,
 					scan,
-					scanLocalTransform,
 					tfListener_,
 					waitForTransform_?waitForTransformDuration_:0))
 			{
@@ -698,7 +690,6 @@ void GuiWrapper::commonStereoCallback(
 					odomSensorSync_?odomHeader.frame_id:"",
 					odomHeader.stamp,
 					scan,
-					scanLocalTransform,
 					tfListener_,
 					waitForTransform_?waitForTransformDuration_:0))
 			{
@@ -727,10 +718,7 @@ void GuiWrapper::commonStereoCallback(
 	info.reg.covariance = covariance;
 	rtabmap::OdometryEvent odomEvent(
 		rtabmap::SensorData(
-				LaserScan::backwardCompatibility(scan,
-						scan2dMsg.get()?(int)scan2dMsg->ranges.size():0,
-						scan2dMsg.get()?(int)scan2dMsg->range_max:0,
-						scanLocalTransform),
+				scan,
 				left,
 				right,
 				stereoModel,
@@ -794,10 +782,10 @@ void GuiWrapper::commonLaserScanCallback(
 		return;
 	}
 
-	cv::Mat scan;
-	Transform scanLocalTransform = Transform::getIdentity();
+	LaserScan scan;
 	rtabmap::OdometryInfo info;
 	bool ignoreData = false;
+	Transform fakeCameraLocalTransform = Transform::getIdentity();
 
 	// limit update rate
 	if(maxOdomUpdateRate_<=0.0 ||
@@ -815,7 +803,6 @@ void GuiWrapper::commonLaserScanCallback(
 					odomSensorSync_?odomHeader.frame_id:"",
 					odomHeader.stamp,
 					scan,
-					scanLocalTransform,
 					tfListener_,
 					waitForTransform_?waitForTransformDuration_:0))
 			{
@@ -831,7 +818,6 @@ void GuiWrapper::commonLaserScanCallback(
 					odomSensorSync_?odomHeader.frame_id:"",
 					odomHeader.stamp,
 					scan,
-					scanLocalTransform,
 					tfListener_,
 					waitForTransform_?waitForTransformDuration_:0))
 			{
@@ -851,11 +837,11 @@ void GuiWrapper::commonLaserScanCallback(
 		//just get scan local transform to adjust camera frame
 		if(scan2dMsg.get() != 0)
 		{
-			scanLocalTransform = getTransform(frameId_, scan2dMsg->header.frame_id, scan2dMsg->header.stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0);
+			fakeCameraLocalTransform = getTransform(frameId_, scan2dMsg->header.frame_id, scan2dMsg->header.stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0);
 		}
 		else if(scan3dMsg.get() != 0)
 		{
-			scanLocalTransform = getTransform(frameId_, scan3dMsg->header.frame_id, scan3dMsg->header.stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0);
+			fakeCameraLocalTransform = getTransform(frameId_, scan3dMsg->header.frame_id, scan3dMsg->header.stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0);
 		}
 
 		info = rtabmap_ros::odomInfoFromROS(*odomInfoMsg).copyWithoutData();
@@ -874,22 +860,14 @@ void GuiWrapper::commonLaserScanCallback(
 			1,
 			0.5,
 			1,
-			scanLocalTransform*Transform(0,0,1,0, -1,0,0,0, 0,-1,0,0),
+			fakeCameraLocalTransform*Transform(0,0,1,0, -1,0,0,0, 0,-1,0,0),
 			0,
 			cv::Size(1,2));
 
 	info.reg.covariance = covariance;
 	rtabmap::OdometryEvent odomEvent(
 		rtabmap::SensorData(
-				scan2dMsg.get() != 0?
-					LaserScan::backwardCompatibility(scan,
-							scan2dMsg->range_min,
-							scan2dMsg->range_max,
-							scan2dMsg->angle_min,
-							scan2dMsg->angle_max,
-							scan2dMsg->angle_increment,
-							scanLocalTransform):
-					LaserScan::backwardCompatibility(scan,0,0,scanLocalTransform),
+				scan,
 				rgb,
 				depth,
 				model,

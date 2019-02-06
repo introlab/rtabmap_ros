@@ -1633,10 +1633,10 @@ bool convertScanMsg(
 		const std::string & frameId,
 		const std::string & odomFrameId,
 		const ros::Time & odomStamp,
-		cv::Mat & scan,
-		rtabmap::Transform & scanLocalTransform,
+		rtabmap::LaserScan & scan,
 		tf::TransformListener & listener,
-		double waitForTransform)
+		double waitForTransform,
+		bool outputInFrameId)
 {
 	// make sure the frame of the laser is updated too
 	rtabmap::Transform tmpT = getTransform(
@@ -1650,7 +1650,7 @@ bool convertScanMsg(
 		return false;
 	}
 
-	scanLocalTransform = getTransform(
+	rtabmap::Transform scanLocalTransform = getTransform(
 			frameId,
 			scan2dMsg->header.frame_id,
 			scan2dMsg->header.stamp,
@@ -1665,9 +1665,6 @@ bool convertScanMsg(
 	sensor_msgs::PointCloud2 scanOut;
 	laser_geometry::LaserProjection projection;
 	projection.transformLaserScanToPointCloud(odomFrameId.empty()?frameId:odomFrameId, *scan2dMsg, scanOut, listener);
-	pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
-	pcl::fromROSMsg(scanOut, *pclScan);
-	pclScan->is_dense = true;
 
 	//transform back in laser frame
 	rtabmap::Transform laserToOdom = getTransform(
@@ -1703,7 +1700,56 @@ bool convertScanMsg(
 		}
 	}
 
-	scan = rtabmap::util3d::laserScan2dFromPointCloud(*pclScan, laserToOdom); // put back in laser frame
+	if(outputInFrameId)
+	{
+		laserToOdom *= scanLocalTransform;
+	}
+
+	bool containIntensity = false;
+	for(unsigned int i=0; i<scanOut.fields.size(); ++i)
+	{
+		if(scanOut.fields[i].name.compare("intensity") == 0)
+		{
+			containIntensity = true;
+		}
+	}
+
+	rtabmap::LaserScan::Format format;
+	cv::Mat data;
+	if(containIntensity)
+	{
+		pcl::PointCloud<pcl::PointXYZI>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZI>);
+		pcl::fromROSMsg(scanOut, *pclScan);
+		pclScan->is_dense = true;
+		data = rtabmap::util3d::laserScan2dFromPointCloud(*pclScan, laserToOdom); // put back in laser frame
+		format = rtabmap::LaserScan::kXYI;
+	}
+	else
+	{
+		pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
+		pcl::fromROSMsg(scanOut, *pclScan);
+		pclScan->is_dense = true;
+		data = rtabmap::util3d::laserScan2dFromPointCloud(*pclScan, laserToOdom); // put back in laser frame
+		format = rtabmap::LaserScan::kXY;
+	}
+
+	rtabmap::Transform zAxis(0,0,1,0,0,0);
+	if((scanLocalTransform.rotation()*zAxis).z() < 0)
+	{
+		cv::Mat flipScan;
+		cv::flip(data, flipScan, 1);
+		data = flipScan;
+	}
+
+	scan = rtabmap::LaserScan(
+			data,
+			format,
+			scan2dMsg->range_min,
+			scan2dMsg->range_max,
+			scan2dMsg->angle_min,
+			scan2dMsg->angle_max,
+			scan2dMsg->angle_increment,
+			outputInFrameId?rtabmap::Transform::getIdentity():scanLocalTransform);
 
 	return true;
 }
@@ -1713,13 +1759,15 @@ bool convertScan3dMsg(
 		const std::string & frameId,
 		const std::string & odomFrameId,
 		const ros::Time & odomStamp,
-		cv::Mat & scan,
-		rtabmap::Transform & scanLocalTransform,
+		rtabmap::LaserScan & scan,
 		tf::TransformListener & listener,
-		double waitForTransform)
+		double waitForTransform,
+		int maxPoints,
+		float maxRange)
 {
 	bool containNormals = false;
 	bool containColors = false;
+	bool containIntensity = false;
 	for(unsigned int i=0; i<scan3dMsg->fields.size(); ++i)
 	{
 		if(scan3dMsg->fields[i].name.compare("normal_x") == 0)
@@ -1730,9 +1778,13 @@ bool convertScan3dMsg(
 		{
 			containColors = true;
 		}
+		if(scan3dMsg->fields[i].name.compare("intensity") == 0)
+		{
+			containIntensity = true;
+		}
 	}
 
-	scanLocalTransform = getTransform(frameId, scan3dMsg->header.frame_id, scan3dMsg->header.stamp, listener, waitForTransform);
+	rtabmap::Transform scanLocalTransform = getTransform(frameId, scan3dMsg->header.frame_id, scan3dMsg->header.stamp, listener, waitForTransform);
 	if(scanLocalTransform.isNull())
 	{
 		ROS_ERROR("TF of received scan cloud at time %fs is not set, aborting rtabmap update.", scan3dMsg->header.stamp.toSec());
@@ -1770,7 +1822,17 @@ bool convertScan3dMsg(
 			{
 				pclScan = rtabmap::util3d::removeNaNNormalsFromPointCloud(pclScan);
 			}
-			scan = rtabmap::util3d::laserScanFromPointCloud(*pclScan);
+			scan = rtabmap::LaserScan(rtabmap::util3d::laserScanFromPointCloud(*pclScan), maxPoints, maxRange, rtabmap::LaserScan::kXYZRGBNormal, scanLocalTransform);
+		}
+		else if(containIntensity)
+		{
+			pcl::PointCloud<pcl::PointXYZINormal>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZINormal>);
+			pcl::fromROSMsg(*scan3dMsg, *pclScan);
+			if(!pclScan->is_dense)
+			{
+				pclScan = rtabmap::util3d::removeNaNNormalsFromPointCloud(pclScan);
+			}
+			scan = rtabmap::LaserScan(rtabmap::util3d::laserScanFromPointCloud(*pclScan), maxPoints, maxRange, rtabmap::LaserScan::kXYZINormal, scanLocalTransform);
 		}
 		else
 		{
@@ -1780,7 +1842,7 @@ bool convertScan3dMsg(
 			{
 				pclScan = rtabmap::util3d::removeNaNNormalsFromPointCloud(pclScan);
 			}
-			scan = rtabmap::util3d::laserScanFromPointCloud(*pclScan);
+			scan = rtabmap::LaserScan(rtabmap::util3d::laserScanFromPointCloud(*pclScan), maxPoints, maxRange, rtabmap::LaserScan::kXYZNormal, scanLocalTransform);
 		}
 	}
 	else
@@ -1793,8 +1855,17 @@ bool convertScan3dMsg(
 			{
 				pclScan = rtabmap::util3d::removeNaNFromPointCloud(pclScan);
 			}
-
-			scan = rtabmap::util3d::laserScanFromPointCloud(*pclScan);
+			scan = rtabmap::LaserScan(rtabmap::util3d::laserScanFromPointCloud(*pclScan), maxPoints, maxRange, rtabmap::LaserScan::kXYZRGB, scanLocalTransform);
+		}
+		else if(containIntensity)
+		{
+			pcl::PointCloud<pcl::PointXYZI>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZI>);
+			pcl::fromROSMsg(*scan3dMsg, *pclScan);
+			if(!pclScan->is_dense)
+			{
+				pclScan = rtabmap::util3d::removeNaNFromPointCloud(pclScan);
+			}
+			scan = rtabmap::LaserScan(rtabmap::util3d::laserScanFromPointCloud(*pclScan), maxPoints, maxRange, rtabmap::LaserScan::kXYZI, scanLocalTransform);
 		}
 		else
 		{
@@ -1804,8 +1875,7 @@ bool convertScan3dMsg(
 			{
 				pclScan = rtabmap::util3d::removeNaNFromPointCloud(pclScan);
 			}
-
-			scan = rtabmap::util3d::laserScanFromPointCloud(*pclScan);
+			scan = rtabmap::LaserScan(rtabmap::util3d::laserScanFromPointCloud(*pclScan), maxPoints, maxRange, rtabmap::LaserScan::kXYZ, scanLocalTransform);
 		}
 	}
 	return true;

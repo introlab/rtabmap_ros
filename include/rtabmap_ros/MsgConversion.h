@@ -214,20 +214,21 @@ bool convertScanMsg(
 		const std::string & frameId,
 		const std::string & odomFrameId,
 		const ros::Time & odomStamp,
-		cv::Mat & scan,
-		rtabmap::Transform & scanLocalTransform,
+		rtabmap::LaserScan & scan,
 		tf::TransformListener & listener,
-		double waitForTransform);
+		double waitForTransform,
+		bool outputInFrameId = false);
 
 bool convertScan3dMsg(
 		const sensor_msgs::PointCloud2ConstPtr & scan3dMsg,
 		const std::string & frameId,
 		const std::string & odomFrameId,
 		const ros::Time & odomStamp,
-		cv::Mat & scan,
-		rtabmap::Transform & scanLocalTransform,
+		rtabmap::LaserScan & scan,
 		tf::TransformListener & listener,
-		double waitForTransform);
+		double waitForTransform,
+		int maxPoints = 0,
+		float maxRange = 0.0f);
 
 }
 
