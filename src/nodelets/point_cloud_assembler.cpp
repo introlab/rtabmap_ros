@@ -110,11 +110,12 @@ private:
 								getName().c_str(),
 								syncCloudSub_.getTopic().c_str(),
 								syncOdomSub_.getTopic().c_str());
+
+			warningThread_ = new boost::thread(boost::bind(&PointCloudAssembler::warningLoop, this, subscribedTopicsMsg));
 		}
 
 		cloudPub_ = nh.advertise<sensor_msgs::PointCloud2>("assembled_cloud", 1);
 
-		warningThread_ = new boost::thread(boost::bind(&PointCloudAssembler::warningLoop, this, subscribedTopicsMsg));
 		NODELET_INFO("%s", subscribedTopicsMsg.c_str());
 	}
 
@@ -122,6 +123,7 @@ private:
 			const sensor_msgs::PointCloud2ConstPtr & cloudMsg,
 			const nav_msgs::OdometryConstPtr & odomMsg)
 	{
+		callbackCalled_ = true;
 		rtabmap::Transform odom = rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose);
 		if(!odom.isNull())
 		{
