@@ -112,6 +112,14 @@
     </description>
   </class>
   
+  <class name="rtabmap_ros/point_cloud_assembler" 
+         type="rtabmap_ros::PointCloudAssembler" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
+  
   <class name="rtabmap_ros/rgbd_sync" 
          type="rtabmap_ros::RGBDSync" 
          base_class_type="nodelet::Nodelet">
