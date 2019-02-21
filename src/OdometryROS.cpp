@@ -343,7 +343,7 @@ void OdometryROS::onInit()
 
 	odomStrategy_ = 0;
 	Parameters::parse(this->parameters(), Parameters::kOdomStrategy(), odomStrategy_);
-	if(waitIMUToinit_ || odomStrategy_ == Odometry::kTypeF2F || odomStrategy_ == Odometry::kTypeF2F)
+	if(waitIMUToinit_ || odomStrategy_ == Odometry::kTypeMSCKF || odomStrategy_ == Odometry::kTypeOkvis)
 	{
 		int queueSize = 10;
 		pnh.param("queue_size", queueSize, queueSize);
