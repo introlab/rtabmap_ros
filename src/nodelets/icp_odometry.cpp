@@ -96,6 +96,8 @@ private:
 
 		scan_sub_ = nh.subscribe("scan", 1, &ICPOdometry::callbackScan, this);
 		cloud_sub_ = nh.subscribe("scan_cloud", 1, &ICPOdometry::callbackCloud, this);
+
+		filtered_scan_pub_ = nh.advertise<sensor_msgs::PointCloud2>("odom_filtered_input_scan", 1);
 	}
 
 	virtual void updateParameters(ParametersMap & parameters)
@@ -229,10 +231,26 @@ private:
 				pcl::PointCloud<pcl::PointNormal>::Ptr pclScanNormal(new pcl::PointCloud<pcl::PointNormal>);
 				pcl::concatenateFields(*pclScan, *normals, *pclScanNormal);
 				scan = util3d::laserScan2dFromPointCloud(*pclScanNormal);
+
+				if(filtered_scan_pub_.getNumSubscribers())
+				{
+					sensor_msgs::PointCloud2 msg;
+					pcl::toROSMsg(*pclScanNormal, msg);
+					msg.header = scanMsg->header;
+					filtered_scan_pub_.publish(msg);
+				}
 			}
 			else
 			{
 				scan = util3d::laserScan2dFromPointCloud(*pclScan);
+
+				if(filtered_scan_pub_.getNumSubscribers())
+				{
+					sensor_msgs::PointCloud2 msg;
+					pcl::toROSMsg(*pclScan, msg);
+					msg.header = scanMsg->header;
+					filtered_scan_pub_.publish(msg);
+				}
 			}
 		}
 
@@ -285,6 +303,13 @@ private:
 				maxLaserScans /= scanDownsamplingStep_;
 			}
 			scan = util3d::laserScanFromPointCloud(*pclScan);
+			if(filtered_scan_pub_.getNumSubscribers())
+			{
+				sensor_msgs::PointCloud2 msg;
+				pcl::toROSMsg(*pclScan, msg);
+				msg.header = cloudMsg->header;
+				filtered_scan_pub_.publish(msg);
+			}
 		}
 		else
 		{
@@ -316,10 +341,26 @@ private:
 					pcl::PointCloud<pcl::PointNormal>::Ptr pclScanNormal(new pcl::PointCloud<pcl::PointNormal>);
 					pcl::concatenateFields(*pclScan, *normals, *pclScanNormal);
 					scan = util3d::laserScanFromPointCloud(*pclScanNormal);
+
+					if(filtered_scan_pub_.getNumSubscribers())
+					{
+						sensor_msgs::PointCloud2 msg;
+						pcl::toROSMsg(*pclScanNormal, msg);
+						msg.header = cloudMsg->header;
+						filtered_scan_pub_.publish(msg);
+					}
 				}
 				else
 				{
 					scan = util3d::laserScanFromPointCloud(*pclScan);
+
+					if(filtered_scan_pub_.getNumSubscribers())
+					{
+						sensor_msgs::PointCloud2 msg;
+						pcl::toROSMsg(*pclScan, msg);
+						msg.header = cloudMsg->header;
+						filtered_scan_pub_.publish(msg);
+					}
 				}
 			}
 		}
@@ -344,6 +385,7 @@ protected:
 private:
 	ros::Subscriber scan_sub_;
 	ros::Subscriber cloud_sub_;
+	ros::Publisher filtered_scan_pub_;
 	int scanCloudMaxPoints_;
 	int scanDownsamplingStep_;
 	double scanVoxelSize_;
