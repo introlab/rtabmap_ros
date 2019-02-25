@@ -785,7 +785,7 @@ void GuiWrapper::commonLaserScanCallback(
 	LaserScan scan;
 	rtabmap::OdometryInfo info;
 	bool ignoreData = false;
-	Transform fakeCameraLocalTransform = Transform::getIdentity();
+	Transform fakeCameraLocalTransform;
 
 	// limit update rate
 	if(maxOdomUpdateRate_<=0.0 ||
@@ -853,14 +853,14 @@ void GuiWrapper::commonLaserScanCallback(
 		return;
 	}
 
-	cv::Mat rgb = cv::Mat::zeros(2,1,CV_8UC1);
-	cv::Mat depth = cv::Mat::zeros(2,1,CV_16UC1);
+	cv::Mat rgb;
+	cv::Mat depth;
 	CameraModel model(
 			1,
 			1,
 			0.5,
 			1,
-			fakeCameraLocalTransform*Transform(0,0,1,0, -1,0,0,0, 0,-1,0,0),
+			(fakeCameraLocalTransform.isNull()?scan.localTransform():fakeCameraLocalTransform)*Transform(0,0,1,0, -1,0,0,0, 0,-1,0,0),
 			0,
 			cv::Size(1,2));
 
