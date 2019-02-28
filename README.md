@@ -27,6 +27,12 @@ RTAB-Map is released as binaries in the ROS distribution.
     ```
     $ sudo apt-get install ros-indigo-rtabmap-ros
     ```
+    * For armhf architecture, `ros-indigo-rtabmap-ros` is not available. Install `ros-indigo-rtabmap` and build from source `rtabmap_ros` using the `indigo-devel` branch.
+        ```
+        $ cd catkin_ws
+        $ git clone -b indigo-devel https://github.com/introlab/rtabmap_ros.git src/rtabmap_ros
+        $ catkin_make -j1
+        ```
 * Hydro:
     ```
     $ sudo apt-get install ros-hydro-rtabmap-ros
