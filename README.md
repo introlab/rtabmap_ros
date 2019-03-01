@@ -59,7 +59,7 @@ $ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/ros/kinetic/lib/x86_64-linux-gnu
     $ docker commit ros-melodic-rtabmap ros:melodic-rtabmap
     # exit container...
     ```
-    * Note that we could build rtabmap from source in the container if we want latest version, following instructions below. Just make sure to do "`echo "source /catkin_ws/devel/setup.bash" >> ~/.bashrc`" in the container so that the following example can still work as is.
+    * Note that we could build rtabmap from source in the container if we want latest version, following instructions below. Just make sure to do "`echo "source ~/catkin_ws/devel/setup.bash" >> ~/.bashrc`" in the container so that the following example can still work as is.
 
 * The following example show to launch a camera on host computer and run our pre-built rtabmap container. All examples from [RGB-D tutorial](http://wiki.ros.org/rtabmap_ros/Tutorials/HandHeldMapping) and [stereo tutorial](http://wiki.ros.org/rtabmap_ros/Tutorials/StereoHandHeldMapping) should work using rtabmap from the container instead. Launch camera on host computer (set ROS_IP as the IP used for docker):
     ```bash
