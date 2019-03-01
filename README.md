@@ -47,36 +47,7 @@ $ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/ros/kinetic/lib/x86_64-linux-gnu
 
 ### Docker
 
-* Install rtabmap inside an official ros docker image (example with melodic):
-    ```bash
-    $ docker pull ros:melodic-perception
-    $ docker run -it --rm --name=ros-melodic-rtabmap ros:melodic-perception
-    
-    # Indide the container:
-    $ apt update && apt install -y ros-melodic-rtabmap-ros && echo "source /opt/ros/melodic/setup.bash" >> ~/.bashrc
-    
-    # Before exiting the container, commit from another terminal on host:
-    $ docker commit ros-melodic-rtabmap ros:melodic-rtabmap
-    # exit container...
-    ```
-    * Note that we could build rtabmap from source in the container if we want latest version, following instructions below. Just make sure to do "`echo "source ~/catkin_ws/devel/setup.bash" >> ~/.bashrc`" in the container so that the following example can still work as is.
-
-* The following example show to launch a camera on host computer and run our pre-built rtabmap container. All examples from [RGB-D tutorial](http://wiki.ros.org/rtabmap_ros/Tutorials/HandHeldMapping) and [stereo tutorial](http://wiki.ros.org/rtabmap_ros/Tutorials/StereoHandHeldMapping) should work using rtabmap from the container instead. Launch camera on host computer (set ROS_IP as the IP used for docker):
-    ```bash
-    $ export ROS_IP=172.17.0.1 && roslaunch openni2_launch openni2.launch depth_registration:=true
-    # In another terminal, launch rtabmapviz or RVIZ. We do visualization 
-    # on host computer to avoid GPU problems with the container:
-    $ export ROS_NAMESPACE=rtabmap && rosrun rtabmap_ros rtabmapviz _frame_id:=camera_link
-    ```
-
-* Launch rtabmap from inside the container, saving the database on host `~/.ros/rtabmap.db`:
-    ```bash
-   $ docker run -it --rm \
-     --env ROS_MASTER_URI=http://172.17.0.1:11311 --env ROS_IP=172.17.0.2 \
-     -v ~/.ros:/root  \
-     ros:melodic-rtabmap \
-     roslaunch rtabmap_ros rtabmap.launch rtabmapviz:=false database_path:=/root/rtabmap.db rtabmap_args:="--delete_db_on_start"
-   ```
+* Go to [docker](https://github.com/introlab/rtabmap_ros/tree/master/docker) directory for an example.
 
 
 ## Build from source

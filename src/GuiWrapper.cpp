@@ -937,8 +937,8 @@ void GuiWrapper::commonOdomCallback(
 		return;
 	}
 
-	cv::Mat rgb = cv::Mat::zeros(2,1,CV_8UC1);
-	cv::Mat depth = cv::Mat::zeros(2,1,CV_16UC1);
+	cv::Mat rgb;
+	cv::Mat depth;
 	CameraModel model(
 			1,
 			1,
