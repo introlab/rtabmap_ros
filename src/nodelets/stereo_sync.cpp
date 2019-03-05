@@ -58,6 +58,7 @@ class StereoSync : public nodelet::Nodelet
 {
 public:
 	StereoSync() :
+		compressedRate_(0),
 		warningThread_(0),
 		callbackCalled_(false),
 		approxSync_(0),
@@ -89,9 +90,11 @@ private:
 		bool approxSync = false;
 		pnh.param("approx_sync", approxSync, approxSync);
 		pnh.param("queue_size", queueSize, queueSize);
+		pnh.param("compressed_rate", compressedRate_, compressedRate_);
 
 		NODELET_INFO("%s: approx_sync = %s", getName().c_str(), approxSync?"true":"false");
 		NODELET_INFO("%s: queue_size  = %d", getName().c_str(), queueSize);
+		NODELET_INFO("%s: compressed_rate = %f", getName().c_str(), compressedRate_);
 
 		rgbdImagePub_ = nh.advertise<rtabmap_ros::RGBDImage>("rgbd_image", 1);
 		rgbdImageCompressedPub_ = nh.advertise<rtabmap_ros::RGBDImage>("rgbd_image/compressed", 1);
@@ -174,15 +177,30 @@ private:
 
 			if(rgbdImageCompressedPub_.getNumSubscribers())
 			{
-				rtabmap_ros::RGBDImage msgCompressed = msg;
+				bool publishCompressed = true;
+				if (compressedRate_ > 0.0)
+				{
+					if ( lastCompressedPublished_ + ros::Duration(1.0/compressedRate_) > ros::Time::now())
+					{
+						NODELET_DEBUG("throttle last update at %f skipping", lastCompressedPublished_.toSec());
+						publishCompressed = false;
+					}
+				}
 
-				cv_bridge::CvImageConstPtr imagePtr = cv_bridge::toCvShare(imageLeft);
-				imagePtr->toCompressedImageMsg(msgCompressed.rgbCompressed, cv_bridge::JPG);
+				if(publishCompressed)
+				{
+					lastCompressedPublished_ = ros::Time::now();
 
-				cv_bridge::CvImageConstPtr imageDepthPtr = cv_bridge::toCvShare(imageRight);
-				imageDepthPtr->toCompressedImageMsg(msgCompressed.depthCompressed, cv_bridge::JPG);
+					rtabmap_ros::RGBDImage msgCompressed = msg;
 
-				rgbdImageCompressedPub_.publish(msgCompressed);
+					cv_bridge::CvImageConstPtr imagePtr = cv_bridge::toCvShare(imageLeft);
+					imagePtr->toCompressedImageMsg(msgCompressed.rgbCompressed, cv_bridge::JPG);
+
+					cv_bridge::CvImageConstPtr imageDepthPtr = cv_bridge::toCvShare(imageRight);
+					imageDepthPtr->toCompressedImageMsg(msgCompressed.depthCompressed, cv_bridge::JPG);
+
+					rgbdImageCompressedPub_.publish(msgCompressed);
+				}
 			}
 
 			if(rgbdImagePub_.getNumSubscribers())
@@ -210,8 +228,10 @@ private:
 	}
 
 private:
+	double compressedRate_;
 	boost::thread * warningThread_;
 	bool callbackCalled_;
+	ros::Time lastCompressedPublished_;
 
 	ros::Publisher rgbdImagePub_;
 	ros::Publisher rgbdImageCompressedPub_;
