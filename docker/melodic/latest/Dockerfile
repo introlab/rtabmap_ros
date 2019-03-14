@@ -10,6 +10,8 @@ RUN rm /bin/sh && ln -s /bin/bash /bin/sh
 
 WORKDIR /root/
 
+ARG CACHE_DATE=2016-01-01
+
 RUN git clone https://github.com/introlab/rtabmap.git
 
 # Build RTAB-Map project
