@@ -46,6 +46,7 @@
   <arg name="rtabmap_args"            default="$(arg args)"/>   <!-- deprecated, use "args" argument -->
   <arg name="launch_prefix"           default=""/>              <!-- for debugging purpose, it fills launch-prefix tag of the nodes -->
   <arg name="output"                  default="screen"/>        <!-- Control node output (screen or log) -->
+  <arg name="publish_tf_map"          default="true"/>
 
   <!-- if timestamps of the input topics are synchronized using approximate or exact time policy-->
   <arg     if="$(arg stereo)" name="approx_sync"  default="false"/>
@@ -85,6 +86,7 @@
   <arg name="icp_odometry"             default="false"/>         <!-- Launch rtabmap icp odometry node -->
   <arg name="odom_topic"               default="odom"/>          <!-- Odometry topic name -->
   <arg name="vo_frame_id"              default="$(arg odom_topic)"/> <!-- Visual/Icp odometry frame ID for TF -->
+  <arg name="publish_tf_odom"          default="true"/>
   <arg name="odom_tf_angular_variance" default="1"/>             <!-- If TF is used to get odometry, this is the default angular variance -->
   <arg name="odom_tf_linear_variance"  default="1"/>             <!-- If TF is used to get odometry, this is the default linear variance -->
   <arg name="odom_args"                default=""/>              <!-- More arguments for odometry (overwrite same parameters in rtabmap_args) -->
@@ -184,6 +186,7 @@
       
           <param name="frame_id"                    type="string" value="$(arg frame_id)"/>
           <param name="odom_frame_id"               type="string" value="$(arg vo_frame_id)"/>
+          <param name="publish_tf"                  type="bool"   value="$(arg publish_tf_odom)"/>
           <param name="ground_truth_frame_id"       type="string" value="$(arg ground_truth_frame_id)"/>
           <param name="ground_truth_base_frame_id"  type="string" value="$(arg ground_truth_base_frame_id)"/>
           <param name="wait_for_transform_duration" type="double" value="$(arg wait_for_transform)"/>
@@ -208,6 +211,7 @@
       
           <param name="frame_id"                    type="string" value="$(arg frame_id)"/>
           <param name="odom_frame_id"               type="string" value="$(arg vo_frame_id)"/>
+          <param name="publish_tf"                  type="bool"   value="$(arg publish_tf_odom)"/>
           <param name="ground_truth_frame_id"       type="string" value="$(arg ground_truth_frame_id)"/>
           <param name="ground_truth_base_frame_id"  type="string" value="$(arg ground_truth_base_frame_id)"/>
           <param name="wait_for_transform_duration" type="double" value="$(arg wait_for_transform)"/>
@@ -230,6 +234,7 @@
       
       <param name="frame_id"                    type="string" value="$(arg frame_id)"/>
       <param name="odom_frame_id"               type="string" value="$(arg vo_frame_id)"/>
+      <param name="publish_tf"                  type="bool"   value="$(arg publish_tf_odom)"/>
       <param name="ground_truth_frame_id"       type="string" value="$(arg ground_truth_frame_id)"/>
       <param name="ground_truth_base_frame_id"  type="string" value="$(arg ground_truth_base_frame_id)"/>
       <param name="wait_for_transform_duration" type="double" value="$(arg wait_for_transform)"/>
@@ -255,6 +260,7 @@
       <param name="frame_id"             type="string" value="$(arg frame_id)"/>
       <param name="map_frame_id"         type="string" value="$(arg map_frame_id)"/>
       <param name="odom_frame_id"        type="string" value="$(arg odom_frame_id)"/>
+      <param name="publish_tf"           type="bool"   value="$(arg publish_tf_map)"/>
       <param name="ground_truth_frame_id"       type="string" value="$(arg ground_truth_frame_id)"/>
       <param name="ground_truth_base_frame_id"  type="string" value="$(arg ground_truth_base_frame_id)"/>
       <param name="odom_tf_angular_variance" type="double" value="$(arg odom_tf_angular_variance)"/>
