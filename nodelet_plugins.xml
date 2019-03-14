@@ -152,6 +152,14 @@
     </description>
   </class>
 
+  <class name="rtabmap_ros/imu_to_tf" 
+         type="rtabmap_ros::ImuToTF" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
+
 </library>
 
 <library path="lib/librtabmap_sync"> 

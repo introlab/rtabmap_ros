@@ -209,6 +209,7 @@ SET(rtabmap_plugins_lib_src
    src/nodelets/point_cloud_aggregator.cpp
    src/nodelets/point_cloud_assembler.cpp
    src/nodelets/undistort_depth.cpp
+   src/nodelets/imu_to_tf.cpp
 )
 
 IF(${cv_bridge_VERSION_MAJOR} GREATER 1 OR ${cv_bridge_VERSION_MINOR} GREATER 10)
@@ -364,6 +365,10 @@ set_target_properties(rtabmap_map_optimizer PROPERTIES OUTPUT_NAME "map_optimize
 add_executable(rtabmap_map_assembler src/MapAssemblerNode.cpp)
 target_link_libraries(rtabmap_map_assembler rtabmap_ros)
 set_target_properties(rtabmap_map_assembler PROPERTIES OUTPUT_NAME "map_assembler")
+
+add_executable(rtabmap_imu_to_tf src/ImuToTFNode.cpp)
+target_link_libraries(rtabmap_imu_to_tf ${Libraries})
+set_target_properties(rtabmap_imu_to_tf PROPERTIES OUTPUT_NAME "imu_to_tf")
 
 add_executable(rtabmap_wifi_signal_pub src/WifiSignalPubNode.cpp)
 target_link_libraries(rtabmap_wifi_signal_pub rtabmap_ros)
