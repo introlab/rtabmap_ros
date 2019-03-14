@@ -5,14 +5,16 @@
     Hand-held 3D lidar mapping example using only a Ouster OS-1 (no camera).
     Prerequisities: rtabmap should be built with libpointmatcher
     Example:
-     $ roslaunch rtabmap_ros test_ouster.launch
+     $ roslaunch rtabmap_ros test_ouster.launch os1_hostname:=os1-XXXXXXXXXXXX.local os1_udp_dest:=192.168.1.XXX
      $ rosrun rviz rviz -f map
      $ Show TF and /rtabmap/cloud_map topics
+    ISSUE: You may have to reset odometry after receiving the first cloud if the map looks tilted. The problem seems 
+           coming from the first cloud sent by os1_cloud_node, which may be poorly synchronized with IMU data.
     -->
 
     <!-- Required: -->
-    <arg name="os1_hostname"  default=""/>
-    <arg name="os1_udp_dest"  default=""/>
+    <arg name="os1_hostname"/>
+    <arg name="os1_udp_dest"/>
 
     <arg name="frame_id" default="os1_sensor"/>
     <arg name="rtabmapviz"    default="true"/>
@@ -107,7 +109,7 @@
         <param name="Grid/GroundIsObstacle"          type="string" value="true"/>
 
         <!-- ICP parameters -->
-        <param name="Icp/VoxelSize"                  type="string" value="0.3"/>
+        <param name="Icp/VoxelSize"                  type="string" value="0.2"/>
         <param name="Icp/PointToPlaneK"              type="string" value="20"/>
         <param name="Icp/PointToPlaneRadius"         type="string" value="0"/>
         <param name="Icp/PointToPlane"               type="string" value="false"/>

@@ -291,7 +291,13 @@ private:
 			ROS_ERROR("TF of received scan cloud at time %fs is not set, aborting rtabmap update.", cloudMsg->header.stamp.toSec());
 			return;
 		}
-
+		if(scanCloudMaxPoints_ == 0 && cloudMsg->height > 1)
+		{
+			scanCloudMaxPoints_ = cloudMsg->height * cloudMsg->width;
+			NODELET_WARN("IcpOdometry: \"scan_cloud_max_points\" is not set but input "
+					"cloud is not dense, for convenience it will be set to %d (%dx%d)",
+					scanCloudMaxPoints_, cloudMsg->width, cloudMsg->height);
+		}
 		int maxLaserScans = scanCloudMaxPoints_;
 		if(containNormals)
 		{
