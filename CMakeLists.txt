@@ -91,6 +91,7 @@ add_message_files(
    RGBDImage.msg
    UserData.msg
    GPS.msg
+   Path.msg
 )
 
 ## Generate services in the 'srv' folder

@@ -256,6 +256,8 @@ private:
 	ros::Publisher goalReachedPub_;
 	ros::Publisher globalPathPub_;
 	ros::Publisher localPathPub_;
+	ros::Publisher globalPathNodesPub_;
+	ros::Publisher localPathNodesPub_;
 	std::string goalFrameId_;
 
 	tf2_ros::TransformBroadcaster tfBroadcaster_;
