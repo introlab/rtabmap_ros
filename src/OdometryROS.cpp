@@ -343,7 +343,10 @@ void OdometryROS::onInit()
 
 	odomStrategy_ = 0;
 	Parameters::parse(this->parameters(), Parameters::kOdomStrategy(), odomStrategy_);
-	if(waitIMUToinit_ || odomStrategy_ == Odometry::kTypeMSCKF || odomStrategy_ == Odometry::kTypeOkvis)
+	if(waitIMUToinit_ ||
+		odomStrategy_ == Odometry::kTypeMSCKF ||
+		odomStrategy_ == Odometry::kTypeOkvis ||
+		odomStrategy_ == Odometry::kTypeVINS)
 	{
 		int queueSize = 10;
 		pnh.param("queue_size", queueSize, queueSize);
@@ -414,6 +417,7 @@ void OdometryROS::callbackIMU(const sensor_msgs::ImuConstPtr& msg)
 	{
 		if(odomStrategy_ != Odometry::kTypeOkvis &&
 		   odomStrategy_ != Odometry::kTypeMSCKF &&
+		   odomStrategy_ != Odometry::kTypeVINS &&
 		   !odometry_->getPose().isIdentity())
 		{
 			// For non-inertial odometry approaches, IMU is only used to initialize the initial orientation below
@@ -441,7 +445,8 @@ void OdometryROS::callbackIMU(const sensor_msgs::ImuConstPtr& msg)
 				localTransform);
 
 		if(odomStrategy_ != Odometry::kTypeOkvis &&
-		   odomStrategy_ != Odometry::kTypeMSCKF)
+		   odomStrategy_ != Odometry::kTypeMSCKF &&
+		   odomStrategy_ != Odometry::kTypeVINS)
 		{
 			if(!odometry_->getPose().isIdentity())
 			{

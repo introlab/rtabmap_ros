@@ -17,6 +17,10 @@ Examples:
       We need to ignore the first 24 seconds for correct VIO initialization (drone should not move).
       $ roslaunch rtabmap_ros euroc_datasets.launch args:="-d RGBD/CreateOccupancyGrid false Odom/Strategy 8" MH_seq:=true
       $ rosbag play -.-clock -s 24 MH_01_easy.bag
+
+   VINS (VIO):
+      $ roslaunch rtabmap_ros euroc_datasets.launch args:="-d RGBD/CreateOccupancyGrid false Odom/Strategy 9 OdomVINS/ConfigPath ~/catkin_ws/src/VINS-Fusion/config/euroc/euroc_stereo_imu_config.yaml" MH_seq:=true raw_images_for_odom:=true
+      $ rosbag play -.-clock MH_01_easy.bag
 -->
 
 <param name="use_sim_time" value="true"/>
@@ -24,6 +28,8 @@ Examples:
 <arg name="args" default="-d --RGBD/CreateOccupancyGrid false"/>
 <arg name="cfg" default=""/>
 <arg name="MH_seq" default="false"/> <!-- For MH sequences, the ground truth is coming from a different topic -->
+<arg name="raw_images_for_odom" default="false"/>
+<arg name="record_ground_truth" default="true"/>
 <arg name="rtabmapviz" default="true"/>
 <arg name="rviz" default="false"/>
 
@@ -37,11 +43,12 @@ Examples:
   </node>
   <node pkg="rtabmap_ros" type="yaml_to_camera_info.py" name="yaml_to_camera_info_right">
     <param name="yaml_path" value="$(find rtabmap_ros)/launch/calibration/euroc_right.yaml"/>
+    <param name="frame_id" value="cam1"/>
     <remap from="image" to="/cam1/image_raw"/>
     <remap from="camera_info" to="right/camera_info"/>
   </node>
 
-  <node pkg="stereo_image_proc" type="stereo_image_proc" name="stereo_image_proc">
+  <node unless="$(arg raw_images_for_odom)" pkg="stereo_image_proc" type="stereo_image_proc" name="stereo_image_proc">
     <remap from="left/image_raw"    to="/cam0/image_raw"/>
     <remap from="right/image_raw"   to="/cam1/image_raw"/>
   </node>
@@ -50,7 +57,8 @@ Examples:
 
 <!-- TF frames -->
 <node pkg="tf" type="static_transform_publisher" name="imu_base_link" args="0 0 0 3.1415926 -1.570796 0 base_link imu4 5"/>
-<node pkg="tf" type="static_transform_publisher" name="camera_imu_link" args="-0.021640 -0.064677 0.009811 1.555925 0.025777 0.003757 imu4 cam0 50"/>  
+<node pkg="tf" type="static_transform_publisher" name="cam0_imu_link" args="-0.021640 -0.064677 0.009811 1.555925 0.025777 0.003757 imu4 cam0 50"/>
+<node pkg="tf" type="static_transform_publisher" name="cam1_imu_link" args="-0.019844 0.045369 0.007862 1.558237 0.025393 0.017907 imu4 cam1 50"/>  
 <node     if="$(arg MH_seq)" pkg="tf" type="static_transform_publisher" name="leica_base_link" args="0.120209 -0.0184772 -0.0748903 0 0 0 leica base_link_gt 100"/> 
 <node unless="$(arg MH_seq)" pkg="tf" type="static_transform_publisher" name="vicon_base_link" args="0.120209 -0.0184772 -0.0748903 0 0 0 vicon/firefly_sbx/firefly_sbx base_link_gt 100"/>
 
@@ -68,12 +76,16 @@ Examples:
 
 <!-- RTAB-Map -->
 <include file="$(find rtabmap_ros)/launch/rtabmap.launch">
-   <arg name="args" value="$(arg args)"/>
+   <arg     if="$(arg raw_images_for_odom)" name="rtabmap_args" value="$(arg args) --Rtabmap/ImagesAlreadyRectified false"/>
+   <arg unless="$(arg raw_images_for_odom)" name="rtabmap_args" value="$(arg args)"/>
+   <arg     if="$(arg raw_images_for_odom)" name="odom_args" value="--Rtabmap/ImagesAlreadyRectified false"/>
+   <arg     if="$(arg raw_images_for_odom)" name="left_image_topic" value="/cam0/image_raw"/>
+   <arg     if="$(arg raw_images_for_odom)" name="right_image_topic" value="/cam1/image_raw"/>
    <arg name="stereo" value="true"/>
    <arg name="frame_id" value="base_link"/>
    <arg name="wait_for_transform" value="0.01"/>
-   <arg name="ground_truth_frame_id" value="world"/>
-   <arg name="ground_truth_base_frame_id" value="base_link_gt"/>
+   <arg if="$(arg record_ground_truth)" name="ground_truth_frame_id" value="world"/>
+   <arg if="$(arg record_ground_truth)" name="ground_truth_base_frame_id" value="base_link_gt"/>
    <arg name="cfg" value="$(arg cfg)"/>
    <arg name="imu_topic" value="/imu0"/>
    <arg name="rtabmapviz" value="$(arg rtabmapviz)"/>

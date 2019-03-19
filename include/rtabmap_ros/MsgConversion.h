@@ -113,7 +113,14 @@ void cameraModelToROS(
 rtabmap::StereoCameraModel stereoCameraModelFromROS(
 		const sensor_msgs::CameraInfo & leftCamInfo,
 		const sensor_msgs::CameraInfo & rightCamInfo,
-		const rtabmap::Transform & localTransform = rtabmap::Transform::getIdentity());
+		const rtabmap::Transform & localTransform = rtabmap::Transform::getIdentity(),
+		const rtabmap::Transform & stereoTransform = rtabmap::Transform());
+rtabmap::StereoCameraModel stereoCameraModelFromROS(
+		const sensor_msgs::CameraInfo & leftCamInfo,
+		const sensor_msgs::CameraInfo & rightCamInfo,
+		const std::string & frameId,
+		tf::TransformListener & listener,
+		double waitForTransform);
 
 void mapDataFromROS(
 		const rtabmap_ros::MapData & msg,

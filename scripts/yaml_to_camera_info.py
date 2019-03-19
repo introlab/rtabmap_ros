@@ -21,7 +21,10 @@ def yaml_to_CameraInfo(yaml_fname):
 def callback(image):
     global publisher
     global camera_info_msg
+    global frameId
     camera_info_msg.header = image.header
+    if frameId:
+        camera_info_msg.header.frame_id = frameId
     publisher.publish(camera_info_msg)
 
 if __name__ == "__main__":
@@ -33,6 +36,7 @@ if __name__ == "__main__":
         print 'yaml_path parameter should be set to path of the calibration file!'
         sys.exit(1)
 
+    frameId = rospy.get_param('~frame_id', '')
     camera_info_msg = yaml_to_CameraInfo(yaml_path)
     
     publisher = rospy.Publisher("camera_info", CameraInfo, queue_size=1)

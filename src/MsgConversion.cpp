@@ -700,13 +700,44 @@ void cameraModelToROS(
 rtabmap::StereoCameraModel stereoCameraModelFromROS(
 		const sensor_msgs::CameraInfo & leftCamInfo,
 		const sensor_msgs::CameraInfo & rightCamInfo,
-		const rtabmap::Transform & localTransform)
+		const rtabmap::Transform & localTransform,
+		const rtabmap::Transform & stereoTransform)
 {
 	return rtabmap::StereoCameraModel(
 			"ros",
 			cameraModelFromROS(leftCamInfo, localTransform),
 			cameraModelFromROS(rightCamInfo, localTransform),
-			rtabmap::Transform());
+			stereoTransform);
+}
+rtabmap::StereoCameraModel stereoCameraModelFromROS(
+		const sensor_msgs::CameraInfo & leftCamInfo,
+		const sensor_msgs::CameraInfo & rightCamInfo,
+		const std::string & frameId,
+		tf::TransformListener & listener,
+		double waitForTransform)
+{
+	rtabmap::Transform localTransform = getTransform(
+			frameId,
+			leftCamInfo.header.frame_id,
+			leftCamInfo.header.stamp,
+			listener,
+			waitForTransform);
+	if(localTransform.isNull())
+	{
+		return rtabmap::StereoCameraModel();
+	}
+
+	rtabmap::Transform stereoTransform = getTransform(
+			leftCamInfo.header.frame_id,
+			rightCamInfo.header.frame_id,
+			leftCamInfo.header.stamp,
+			listener,
+			waitForTransform);
+	if(stereoTransform.isNull())
+	{
+		return rtabmap::StereoCameraModel();
+	}
+	return stereoCameraModelFromROS(leftCamInfo, rightCamInfo, localTransform, stereoTransform);
 }
 
 void mapDataFromROS(

@@ -194,10 +194,27 @@ private:
 			int quality = -1;
 			if(imageRectLeft->data.size() && imageRectRight->data.size())
 			{
-				rtabmap::StereoCameraModel stereoModel = rtabmap_ros::stereoCameraModelFromROS(*cameraInfoLeft, *cameraInfoRight, localTransform);
-				if(stereoModel.baseline() <= 0)
+				bool alreadyRectified = true;
+				Parameters::parse(parameters(), Parameters::kRtabmapImagesAlreadyRectified(), alreadyRectified);
+				rtabmap::Transform stereoTransform;
+				if(!alreadyRectified)
 				{
-					NODELET_FATAL("The stereo baseline (%f) should be positive (baseline=-Tx/fx). We assume a horizontal left/right stereo "
+					stereoTransform = getTransform(
+							cameraInfoLeft->header.frame_id,
+							cameraInfoRight->header.frame_id,
+							cameraInfoLeft->header.stamp);
+					if(stereoTransform.isNull())
+					{
+						NODELET_ERROR("Parameter %s is false but we cannot get TF between the two cameras!", Parameters::kRtabmapImagesAlreadyRectified().c_str());
+						return;
+					}
+				}
+
+				rtabmap::StereoCameraModel stereoModel = rtabmap_ros::stereoCameraModelFromROS(*cameraInfoLeft, *cameraInfoRight, localTransform, stereoTransform);
+
+				if(alreadyRectified && stereoModel.baseline() <= 0)
+				{
+					NODELET_ERROR("The stereo baseline (%f) should be positive (baseline=-Tx/fx). We assume a horizontal left/right stereo "
 							  "setup where the Tx (or P(0,3)) is negative in the right camera info msg.", stereoModel.baseline());
 					return;
 				}
