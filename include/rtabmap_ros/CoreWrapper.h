@@ -54,6 +54,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtabmap_ros/SetGoal.h"
 #include "rtabmap_ros/SetLabel.h"
 #include "rtabmap_ros/Goal.h"
+#include "rtabmap_ros/GetPlan.h"
 #include "rtabmap_ros/CommonDataSubscriber.h"
 
 #include "MapsManager.h"
@@ -180,6 +181,7 @@ private:
 	bool getGridMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::GetMap::Response &res);
 	bool publishMapCallback(rtabmap_ros::PublishMap::Request&, rtabmap_ros::PublishMap::Response&);
 	bool getPlanCallback(nav_msgs::GetPlan::Request  &req, nav_msgs::GetPlan::Response &res);
+	bool getPlanNodesCallback(rtabmap_ros::GetPlan::Request  &req, rtabmap_ros::GetPlan::Response &res);
 	bool setGoalCallback(rtabmap_ros::SetGoal::Request& req, rtabmap_ros::SetGoal::Response& res);
 	bool cancelGoalCallback(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res);
 	bool setLabelCallback(rtabmap_ros::SetLabel::Request& req, rtabmap_ros::SetLabel::Response& res);
@@ -282,6 +284,7 @@ private:
 	ros::ServiceServer getGridMapSrv_;
 	ros::ServiceServer publishMapDataSrv_;
 	ros::ServiceServer getPlanSrv_;
+	ros::ServiceServer getPlanNodesSrv_;
 	ros::ServiceServer setGoalSrv_;
 	ros::ServiceServer cancelGoalSrv_;
 	ros::ServiceServer setLabelSrv_;

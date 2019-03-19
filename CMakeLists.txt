@@ -103,6 +103,7 @@ add_message_files(
    ResetPose.srv
    SetGoal.srv
    SetLabel.srv
+   GetPlan.srv
  )
 
 ## Generate added messages and services with any dependencies listed here
