@@ -68,8 +68,11 @@ MapsManager::MapsManager() :
 		assembledObstacles_(new pcl::PointCloud<pcl::PointXYZRGB>),
 		assembledGround_(new pcl::PointCloud<pcl::PointXYZRGB>),
 		occupancyGrid_(new OccupancyGrid),
+		gridUpdated_(true),
 		octomap_(0),
-		octomapTreeDepth_(16)
+		octomapTreeDepth_(16),
+		octomapUpdated_(true),
+		latching_(true)
 {
 }
 
@@ -147,8 +150,7 @@ void MapsManager::init(ros::NodeHandle & nh, ros::NodeHandle & pnh, const std::s
 	// If true, the last message published on
 	// the map topics will be saved and sent to new subscribers when they
 	// connect
-	bool latch = true;
-	pnh.param("latch", latch, latch);
+	pnh.param("latch", latching_, latching_);
 
 	// mapping topics
 	ros::NodeHandle * nht;
@@ -160,25 +162,40 @@ void MapsManager::init(ros::NodeHandle & nh, ros::NodeHandle & pnh, const std::s
 	{
 		nht = &pnh;
 	}
-	gridMapPub_ = nht->advertise<nav_msgs::OccupancyGrid>("grid_map", 1, latch);
-	gridProbMapPub_ = nht->advertise<nav_msgs::OccupancyGrid>("grid_prob_map", 1, latch);
-	cloudMapPub_ = nht->advertise<sensor_msgs::PointCloud2>("cloud_map", 1, latch);
-	cloudObstaclesPub_ = nht->advertise<sensor_msgs::PointCloud2>("cloud_obstacles", 1, latch);
-	cloudGroundPub_ = nht->advertise<sensor_msgs::PointCloud2>("cloud_ground", 1, latch);
+	latched_.clear();
+	gridMapPub_ = nht->advertise<nav_msgs::OccupancyGrid>("grid_map", 1, latching_);
+	latched_.insert(std::make_pair((void*)&gridMapPub_, false));
+	gridProbMapPub_ = nht->advertise<nav_msgs::OccupancyGrid>("grid_prob_map", 1, latching_);
+	latched_.insert(std::make_pair((void*)&gridProbMapPub_, false));
+	cloudMapPub_ = nht->advertise<sensor_msgs::PointCloud2>("cloud_map", 1, latching_);
+	latched_.insert(std::make_pair((void*)&cloudMapPub_, false));
+	cloudObstaclesPub_ = nht->advertise<sensor_msgs::PointCloud2>("cloud_obstacles", 1, latching_);
+	latched_.insert(std::make_pair((void*)&cloudObstaclesPub_, false));
+	cloudGroundPub_ = nht->advertise<sensor_msgs::PointCloud2>("cloud_ground", 1, latching_);
+	latched_.insert(std::make_pair((void*)&cloudGroundPub_, false));
 
 	// deprecated
-	projMapPub_ = nht->advertise<nav_msgs::OccupancyGrid>("proj_map", 1, latch);
-	scanMapPub_ = nht->advertise<sensor_msgs::PointCloud2>("scan_map", 1, latch);
+	projMapPub_ = nht->advertise<nav_msgs::OccupancyGrid>("proj_map", 1, latching_);
+	latched_.insert(std::make_pair((void*)&projMapPub_, false));
+	scanMapPub_ = nht->advertise<sensor_msgs::PointCloud2>("scan_map", 1, latching_);
+	latched_.insert(std::make_pair((void*)&scanMapPub_, false));
 
 #ifdef WITH_OCTOMAP_MSGS
 #ifdef RTABMAP_OCTOMAP
-	octoMapPubBin_ = nht->advertise<octomap_msgs::Octomap>("octomap_binary", 1, latch);
-	octoMapPubFull_ = nht->advertise<octomap_msgs::Octomap>("octomap_full", 1, latch);
-	octoMapCloud_ = nht->advertise<sensor_msgs::PointCloud2>("octomap_occupied_space", 1, latch);
-	octoMapObstacleCloud_ = nht->advertise<sensor_msgs::PointCloud2>("octomap_obstacles", 1, latch);
-	octoMapGroundCloud_ = nht->advertise<sensor_msgs::PointCloud2>("octomap_ground", 1, latch);
-	octoMapEmptySpace_ = nht->advertise<sensor_msgs::PointCloud2>("octomap_empty_space", 1, latch);
-	octoMapProj_ = nht->advertise<nav_msgs::OccupancyGrid>("octomap_grid", 1, latch);
+	octoMapPubBin_ = nht->advertise<octomap_msgs::Octomap>("octomap_binary", 1, latching_);
+	latched_.insert(std::make_pair((void*)&octoMapPubBin_, false));
+	octoMapPubFull_ = nht->advertise<octomap_msgs::Octomap>("octomap_full", 1, latching_);
+	latched_.insert(std::make_pair((void*)&octoMapPubFull_, false));
+	octoMapCloud_ = nht->advertise<sensor_msgs::PointCloud2>("octomap_occupied_space", 1, latching_);
+	latched_.insert(std::make_pair((void*)&octoMapCloud_, false));
+	octoMapObstacleCloud_ = nht->advertise<sensor_msgs::PointCloud2>("octomap_obstacles", 1, latching_);
+	latched_.insert(std::make_pair((void*)&octoMapObstacleCloud_, false));
+	octoMapGroundCloud_ = nht->advertise<sensor_msgs::PointCloud2>("octomap_ground", 1, latching_);
+	latched_.insert(std::make_pair((void*)&octoMapGroundCloud_, false));
+	octoMapEmptySpace_ = nht->advertise<sensor_msgs::PointCloud2>("octomap_empty_space", 1, latching_);
+	latched_.insert(std::make_pair((void*)&octoMapEmptySpace_, false));
+	octoMapProj_ = nht->advertise<nav_msgs::OccupancyGrid>("octomap_grid", 1, latching_);
+	latched_.insert(std::make_pair((void*)&octoMapProj_, false));
 #endif
 #endif
 }
@@ -378,6 +395,10 @@ void MapsManager::clear()
 	octomap_->clear();
 #endif
 #endif
+	for(std::map<void*, bool>::iterator iter=latched_.begin(); iter!=latched_.end(); ++iter)
+	{
+		iter->second = false;
+	}
 }
 
 bool MapsManager::hasSubscribers() const
@@ -446,6 +467,9 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 #ifndef RTABMAP_OCTOMAP
 	updateOctomap = false;
 #endif
+
+	gridUpdated_ = updateGrid;
+	octomapUpdated_ = updateOctomap;
 
 
 	UDEBUG("Updating map caches...");
@@ -686,7 +710,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 
 		if(updateGrid)
 		{
-			occupancyGrid_->update(filteredPoses);
+			gridUpdated_ = occupancyGrid_->update(filteredPoses);
 		}
 
 #ifdef WITH_OCTOMAP_MSGS
@@ -694,7 +718,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 		if(updateOctomap)
 		{
 			UTimer time;
-			octomap_->update(filteredPoses);
+			octomapUpdated_ = octomap_->update(filteredPoses);
 			ROS_INFO("Octomap update time = %fs", time.ticks());
 		}
 #endif
@@ -1071,37 +1095,51 @@ void MapsManager::publishMaps(
 		ROS_INFO("Assembled %d obstacle and %d ground clouds (%d points, %fs)",
 				countObstacles, countGrounds, (int)(assembledGround_->size() + assembledObstacles_->size()), time.ticks());
 
-		if(cloudGroundPub_.getNumSubscribers())
+		if( countGrounds > 0 ||
+			countObstacles > 0 ||
+			!latching_ ||
+			(assembledGround_->empty() && assembledObstacles_->empty()) ||
+			(cloudGroundPub_.getNumSubscribers() && !latched_.at(&cloudGroundPub_)) ||
+			(cloudObstaclesPub_.getNumSubscribers() && !latched_.at(&cloudObstaclesPub_)) ||
+			(cloudMapPub_.getNumSubscribers() && !latched_.at(&cloudMapPub_)) ||
+			(scanMapPub_.getNumSubscribers() && !latched_.at(&scanMapPub_)))
 		{
-			sensor_msgs::PointCloud2::Ptr cloudMsg(new sensor_msgs::PointCloud2);
-			pcl::toROSMsg(*assembledGround_, *cloudMsg);
-			cloudMsg->header.stamp = stamp;
-			cloudMsg->header.frame_id = mapFrameId;
-			cloudGroundPub_.publish(cloudMsg);
-		}
-		if(cloudObstaclesPub_.getNumSubscribers())
-		{
-			sensor_msgs::PointCloud2::Ptr cloudMsg(new sensor_msgs::PointCloud2);
-			pcl::toROSMsg(*assembledObstacles_, *cloudMsg);
-			cloudMsg->header.stamp = stamp;
-			cloudMsg->header.frame_id = mapFrameId;
-			cloudObstaclesPub_.publish(cloudMsg);
-		}
-		if(cloudMapPub_.getNumSubscribers() || scanMapPub_.getNumSubscribers())
-		{
-			pcl::PointCloud<pcl::PointXYZRGB> cloud = *assembledObstacles_ + *assembledGround_;
-			sensor_msgs::PointCloud2::Ptr cloudMsg(new sensor_msgs::PointCloud2);
-			pcl::toROSMsg(cloud, *cloudMsg);
-			cloudMsg->header.stamp = stamp;
-			cloudMsg->header.frame_id = mapFrameId;
-
-			if(cloudMapPub_.getNumSubscribers())
+			if(cloudGroundPub_.getNumSubscribers())
 			{
-				cloudMapPub_.publish(cloudMsg);
+				sensor_msgs::PointCloud2::Ptr cloudMsg(new sensor_msgs::PointCloud2);
+				pcl::toROSMsg(*assembledGround_, *cloudMsg);
+				cloudMsg->header.stamp = stamp;
+				cloudMsg->header.frame_id = mapFrameId;
+				cloudGroundPub_.publish(cloudMsg);
+				latched_.at(&cloudGroundPub_) = true;
 			}
-			if(scanMapPub_.getNumSubscribers())
+			if(cloudObstaclesPub_.getNumSubscribers())
 			{
-				scanMapPub_.publish(cloudMsg);
+				sensor_msgs::PointCloud2::Ptr cloudMsg(new sensor_msgs::PointCloud2);
+				pcl::toROSMsg(*assembledObstacles_, *cloudMsg);
+				cloudMsg->header.stamp = stamp;
+				cloudMsg->header.frame_id = mapFrameId;
+				cloudObstaclesPub_.publish(cloudMsg);
+				latched_.at(&cloudObstaclesPub_) = true;
+			}
+			if(cloudMapPub_.getNumSubscribers() || scanMapPub_.getNumSubscribers())
+			{
+				pcl::PointCloud<pcl::PointXYZRGB> cloud = *assembledObstacles_ + *assembledGround_;
+				sensor_msgs::PointCloud2::Ptr cloudMsg(new sensor_msgs::PointCloud2);
+				pcl::toROSMsg(cloud, *cloudMsg);
+				cloudMsg->header.stamp = stamp;
+				cloudMsg->header.frame_id = mapFrameId;
+
+				if(cloudMapPub_.getNumSubscribers())
+				{
+					cloudMapPub_.publish(cloudMsg);
+					latched_.at(&cloudMapPub_) = true;
+				}
+				if(scanMapPub_.getNumSubscribers())
+				{
+					scanMapPub_.publish(cloudMsg);
+					latched_.at(&scanMapPub_) = true;
+				}
 			}
 		}
 	}
@@ -1116,16 +1154,34 @@ void MapsManager::publishMaps(
 		groundClouds_.clear();
 		obstacleClouds_.clear();
 	}
+	if(cloudMapPub_.getNumSubscribers() == 0)
+	{
+		latched_.at(&cloudMapPub_) = false;
+	}
+	if(scanMapPub_.getNumSubscribers() == 0)
+	{
+		latched_.at(&scanMapPub_) = false;
+	}
+	if(cloudGroundPub_.getNumSubscribers() == 0)
+	{
+		latched_.at(&cloudGroundPub_) = false;
+	}
+	if(cloudObstaclesPub_.getNumSubscribers() == 0)
+	{
+		latched_.at(&cloudObstaclesPub_) = false;
+	}
 
 #ifdef WITH_OCTOMAP_MSGS
 #ifdef RTABMAP_OCTOMAP
-	if(octoMapPubBin_.getNumSubscribers() ||
-			octoMapPubFull_.getNumSubscribers() ||
-			octoMapCloud_.getNumSubscribers() ||
-			octoMapObstacleCloud_.getNumSubscribers() ||
-			octoMapGroundCloud_.getNumSubscribers() ||
-			octoMapEmptySpace_.getNumSubscribers() ||
-			octoMapProj_.getNumSubscribers())
+	if( octomapUpdated_ ||
+		!latching_ ||
+		(octoMapPubBin_.getNumSubscribers() && !latched_.at(&octoMapPubBin_)) ||
+		(octoMapPubFull_.getNumSubscribers() && !latched_.at(&octoMapPubFull_)) ||
+		(octoMapCloud_.getNumSubscribers() && !latched_.at(&octoMapCloud_)) ||
+		(octoMapObstacleCloud_.getNumSubscribers() && !latched_.at(&octoMapObstacleCloud_)) ||
+		(octoMapGroundCloud_.getNumSubscribers() && !latched_.at(&octoMapGroundCloud_)) ||
+		(octoMapEmptySpace_.getNumSubscribers() && !latched_.at(&octoMapEmptySpace_)) ||
+		(octoMapProj_.getNumSubscribers() && !latched_.at(&octoMapProj_)))
 	{
 		if(octoMapPubBin_.getNumSubscribers())
 		{
@@ -1134,6 +1190,7 @@ void MapsManager::publishMaps(
 			msg.header.frame_id = mapFrameId;
 			msg.header.stamp = stamp;
 			octoMapPubBin_.publish(msg);
+			latched_.at(&octoMapPubBin_) = true;
 		}
 		if(octoMapPubFull_.getNumSubscribers())
 		{
@@ -1142,6 +1199,7 @@ void MapsManager::publishMaps(
 			msg.header.frame_id = mapFrameId;
 			msg.header.stamp = stamp;
 			octoMapPubFull_.publish(msg);
+			latched_.at(&octoMapPubFull_) = true;
 		}
 		if(octoMapCloud_.getNumSubscribers() ||
 			octoMapObstacleCloud_.getNumSubscribers() ||
@@ -1163,6 +1221,7 @@ void MapsManager::publishMaps(
 				msg.header.frame_id = mapFrameId;
 				msg.header.stamp = stamp;
 				octoMapCloud_.publish(msg);
+				latched_.at(&octoMapCloud_) = true;
 			}
 			if(octoMapObstacleCloud_.getNumSubscribers())
 			{
@@ -1172,6 +1231,7 @@ void MapsManager::publishMaps(
 				msg.header.frame_id = mapFrameId;
 				msg.header.stamp = stamp;
 				octoMapObstacleCloud_.publish(msg);
+				latched_.at(&octoMapObstacleCloud_) = true;
 			}
 			if(octoMapGroundCloud_.getNumSubscribers())
 			{
@@ -1181,6 +1241,7 @@ void MapsManager::publishMaps(
 				msg.header.frame_id = mapFrameId;
 				msg.header.stamp = stamp;
 				octoMapGroundCloud_.publish(msg);
+				latched_.at(&octoMapGroundCloud_) = true;
 			}
 			if(octoMapEmptySpace_.getNumSubscribers())
 			{
@@ -1190,6 +1251,7 @@ void MapsManager::publishMaps(
 				msg.header.frame_id = mapFrameId;
 				msg.header.stamp = stamp;
 				octoMapEmptySpace_.publish(msg);
+				latched_.at(&octoMapEmptySpace_) = true;
 			}
 		}
 		if(octoMapProj_.getNumSubscribers())
@@ -1223,6 +1285,7 @@ void MapsManager::publishMaps(
 				map.header.stamp = stamp;
 
 				octoMapProj_.publish(map);
+				latched_.at(&octoMapProj_) = true;
 			}
 			else if(poses.size())
 			{
@@ -1234,14 +1297,56 @@ void MapsManager::publishMaps(
 			}
 		}
 	}
-	else if(mapCacheCleanup_)
+
+	if( mapCacheCleanup_ &&
+		octoMapPubBin_.getNumSubscribers() == 0 &&
+		octoMapPubFull_.getNumSubscribers() == 0 &&
+		octoMapCloud_.getNumSubscribers() == 0 &&
+		octoMapObstacleCloud_.getNumSubscribers() == 0 &&
+		octoMapGroundCloud_.getNumSubscribers() == 0 &&
+		octoMapEmptySpace_.getNumSubscribers() == 0 &&
+		octoMapProj_.getNumSubscribers() == 0)
 	{
 		octomap_->clear();
 	}
+
+	if(octoMapPubBin_.getNumSubscribers() == 0)
+	{
+		latched_.at(&octoMapPubBin_) = false;
+	}
+	if(octoMapPubFull_.getNumSubscribers() == 0)
+	{
+		latched_.at(&octoMapPubFull_) = false;
+	}
+	if(octoMapCloud_.getNumSubscribers() == 0)
+	{
+		latched_.at(&octoMapCloud_) = false;
+	}
+	if(octoMapObstacleCloud_.getNumSubscribers() == 0)
+	{
+		latched_.at(&octoMapObstacleCloud_) = false;
+	}
+	if(octoMapGroundCloud_.getNumSubscribers() == 0)
+	{
+		latched_.at(&octoMapGroundCloud_) = false;
+	}
+	if(octoMapEmptySpace_.getNumSubscribers() == 0)
+	{
+		latched_.at(&octoMapEmptySpace_) = false;
+	}
+	if(octoMapProj_.getNumSubscribers() == 0)
+	{
+		latched_.at(&octoMapProj_) = false;
+	}
+
 #endif
 #endif
 
-	if(gridMapPub_.getNumSubscribers() || projMapPub_.getNumSubscribers() || gridProbMapPub_.getNumSubscribers())
+	if( gridUpdated_ ||
+		!latching_ ||
+		(gridMapPub_.getNumSubscribers() && !latched_.at(&gridMapPub_)) ||
+		(projMapPub_.getNumSubscribers() && !latched_.at(&projMapPub_)) ||
+		(gridProbMapPub_.getNumSubscribers() && !latched_.at(&gridProbMapPub_)))
 	{
 		if(projMapPub_.getNumSubscribers())
 		{
@@ -1292,6 +1397,7 @@ void MapsManager::publishMaps(
 				if(gridProbMapPub_.getNumSubscribers())
 				{
 					gridProbMapPub_.publish(map);
+					latched_.at(&gridProbMapPub_) = true;
 				}
 			}
 			else if(poses.size())
@@ -1332,10 +1438,12 @@ void MapsManager::publishMaps(
 				if(gridMapPub_.getNumSubscribers())
 				{
 					gridMapPub_.publish(map);
+					latched_.at(&gridMapPub_) = true;
 				}
 				if(projMapPub_.getNumSubscribers())
 				{
 					projMapPub_.publish(map);
+					latched_.at(&projMapPub_) = true;
 				}
 			}
 			else if(poses.size())
@@ -1343,6 +1451,19 @@ void MapsManager::publishMaps(
 				ROS_WARN("Grid map is empty! (local maps=%d)", (int)gridMaps_.size());
 			}
 		}
+	}
+
+	if(gridMapPub_.getNumSubscribers() == 0)
+	{
+		latched_.at(&gridMapPub_) = false;
+	}
+	if(projMapPub_.getNumSubscribers() == 0)
+	{
+		latched_.at(&projMapPub_) = false;
+	}
+	if(gridProbMapPub_.getNumSubscribers() == 0)
+	{
+		latched_.at(&gridProbMapPub_) = false;
 	}
 
 	if(!this->hasSubscribers() && mapCacheCleanup_)

@@ -123,11 +123,16 @@ private:
 	std::map<int, cv::Point3f> gridMapsViewpoints_;
 
 	rtabmap::OccupancyGrid * occupancyGrid_;
+	bool gridUpdated_;
 
 	rtabmap::OctoMap * octomap_;
 	int octomapTreeDepth_;
+	bool octomapUpdated_;
 
 	rtabmap::ParametersMap parameters_;
+
+	bool latching_;
+	std::map<void*, bool> latched_;
 };
 
 #endif /* MAPSMANAGER_H_ */
