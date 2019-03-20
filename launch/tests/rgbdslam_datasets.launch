@@ -4,6 +4,8 @@
    <!-- Example to run rgbd datasets:
    $ wget http://vision.in.tum.de/rgbd/dataset/freiburg3/rgbd_dataset_freiburg3_long_office_household.bag
    $ rosbag decompress rgbd_dataset_freiburg3_long_office_household.bag
+   $ wget https://gist.githubusercontent.com/matlabbe/897b775c38836ed8069a1397485ab024/raw/6287ce3def8231945326efead0c8a7730bf6a3d5/tum_rename_world_kinect_frame.py
+   $ python tum_rename_world_kinect_frame.py rgbd_dataset_freiburg3_long_office_household.bag
 
    $ roslaunch rtabmap_ros rgbdslam_datasets.launch
    $ rosbag play -.-clock rgbd_dataset_freiburg3_long_office_household.bag
@@ -27,30 +29,23 @@
       <remap from="rgb/image"       to="/camera/rgb/image_color"/>
       <remap from="depth/image"     to="/camera/depth/image"/>
       <remap from="rgb/camera_info" to="/camera/rgb/camera_info"/>
-      <remap from="odom" to="vis_odom"/>
 	  
       <param name="Odom/Strategy" type="string" value="0"/>      <!-- 0=Frame-to-Map, 1=Frame-to-KeyFrame -->
       <param name="Odom/FillInfoData" type="string" value="$(arg rtabmapviz)"/>
       <param name="Odom/ResetCountdown" type="string" value="15"/> 
 
-      <param name="odom_frame_id" type="string" value="vis_odom"/>
       <param name="frame_id" type="string" value="kinect"/>
-      <param name="publish_tf" type="bool" value="false"/>
       <param name="queue_size" type="int" value="30"/>
       <param name="wait_for_transform" type="bool" value="true"/>
       <param name="ground_truth_frame_id" type="string" value="world"/>
-    </node>
-    <!-- rename the child frame of odometry -->
-    <node name="odom_msg_to_tf" pkg="rtabmap_ros" type="odom_msg_to_tf">
-      <param name="frame_id" type="string" value="kinect_est"/>
+      <param name="ground_truth_base_frame_id" type="string" value="kinect_gt"/>
     </node>
     
     <!-- Visual SLAM -->
     <!-- args: "delete_db_on_start" and "udebug" -->
     <node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="screen" args="--delete_db_on_start">
       <param name="subscribe_depth" type="bool" value="true"/>
-      <param name="subscribe_laserScan" type="bool" value="false"/>
-      
+     
       <param name="Rtabmap/StartNewMapOnLoopClosure" type="string" value="true"/>
       <param name="Kp/DetectorStrategy" type="string" value="0"/>
       <param name="RGBD/CreateOccupancyGrid" type="string" value="false"/>
@@ -58,11 +53,11 @@
 
       <param name="frame_id" type="string" value="kinect"/>
       <param name="ground_truth_frame_id" type="string" value="world"/> 
+      <param name="ground_truth_base_frame_id" type="string" value="kinect_gt"/>
 	
       <remap from="rgb/image" to="/camera/rgb/image_color"/>
       <remap from="depth/image" to="/camera/depth/image"/>
       <remap from="rgb/camera_info" to="/camera/rgb/camera_info"/>
-      <remap from="odom" to="vis_odom"/>
 
       <param name="queue_size" type="int" value="30"/>
     </node>
@@ -70,7 +65,6 @@
     <!-- Visualisation  -->
     <node if="$(arg rtabmapviz)" pkg="rtabmap_ros" type="rtabmapviz" name="rtabmapviz" args="-d $(find rtabmap_ros)/launch/config/rgbd_gui.ini" output="screen">
       <param name="subscribe_depth" type="bool" value="true"/>
-      <param name="subscribe_laserScan" type="bool" value="false"/>
       <param name="subscribe_odom_info" type="bool" value="true"/>
       <param name="queue_size" type="int" value="30"/>
       
@@ -79,7 +73,6 @@
       <remap from="rgb/image" to="/camera/rgb/image_color"/>
       <remap from="depth/image" to="/camera/depth/image"/>
       <remap from="rgb/camera_info" to="/camera/rgb/camera_info"/>
-      <remap from="odom" to="vis_odom"/>
     </node>
         
   </group>
