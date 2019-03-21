@@ -18,8 +18,16 @@ Examples:
       $ roslaunch rtabmap_ros euroc_datasets.launch args:="-d RGBD/CreateOccupancyGrid false Odom/Strategy 8" MH_seq:=true
       $ rosbag play -.-clock -s 24 MH_01_easy.bag
 
+   OKVIS (VIO):
+      $ roslaunch rtabmap_ros euroc_datasets.launch args:="-d RGBD/CreateOccupancyGrid false Odom/Strategy 6 OdomOKVIS/ConfigPath ~/okvis/config/config_fpga_p2_euroc.yaml" MH_seq:=true raw_images_for_odom:=true
+      $ rosbag play -.-clock MH_01_easy.bag
+
    VINS (VIO):
       $ roslaunch rtabmap_ros euroc_datasets.launch args:="-d RGBD/CreateOccupancyGrid false Odom/Strategy 9 OdomVINS/ConfigPath ~/catkin_ws/src/VINS-Fusion/config/euroc/euroc_stereo_imu_config.yaml" MH_seq:=true raw_images_for_odom:=true
+      $ rosbag play -.-clock MH_01_easy.bag
+
+   VINS (VO):
+      $ roslaunch rtabmap_ros euroc_datasets.launch args:="-d RGBD/CreateOccupancyGrid false Odom/Strategy 9 OdomVINS/ConfigPath ~/catkin_ws/src/VINS-Fusion/config/euroc/euroc_stereo_config.yaml" MH_seq:=true raw_images_for_odom:=true
       $ rosbag play -.-clock MH_01_easy.bag
 -->
 
@@ -29,7 +37,7 @@ Examples:
 <arg name="cfg" default=""/>
 <arg name="MH_seq" default="false"/> <!-- For MH sequences, the ground truth is coming from a different topic -->
 <arg name="raw_images_for_odom" default="false"/>
-<arg name="record_ground_truth" default="true"/>
+<arg name="record_ground_truth" default="false"/>
 <arg name="rtabmapviz" default="true"/>
 <arg name="rviz" default="false"/>
 

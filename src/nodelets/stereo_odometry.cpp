@@ -200,8 +200,8 @@ private:
 				if(!alreadyRectified)
 				{
 					stereoTransform = getTransform(
-							cameraInfoLeft->header.frame_id,
 							cameraInfoRight->header.frame_id,
+							cameraInfoLeft->header.frame_id,
 							cameraInfoLeft->header.stamp);
 					if(stereoTransform.isNull())
 					{

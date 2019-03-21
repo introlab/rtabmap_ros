@@ -497,13 +497,8 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 	{
 		if(previousStamp_>0.0 && previousStamp_ >= stamp.toSec())
 		{
-			static bool warned = false;
-			if(!warned)
-			{
-				NODELET_WARN("Odometry: Detected not valid consecutive stamps (previous=%fs new=%fs). New stamp should be always greater than previous stamp. This new data is ignored. This message will appear only once.",
-						previousStamp_, stamp.toSec());
-				warned = true;
-			}
+			NODELET_WARN("Odometry: Detected not valid consecutive stamps (previous=%fs new=%fs). New stamp should be always greater than previous stamp. This new data is ignored. This message will appear only once.",
+					previousStamp_, stamp.toSec());
 			return;
 		}
 		else if(expectedUpdateRate_ > 0 &&
@@ -848,8 +843,8 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 		{
 			NODELET_INFO( "Odom: ratio=%f, std dev=%fm|%frad, update time=%fs", info.reg.icpInliersRatio, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (ros::WallTime::now()-time).toSec());
 		}
+		previousStamp_ = stamp.toSec();
 	}
-	previousStamp_ = stamp.toSec();
 }
 
 bool OdometryROS::reset(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
