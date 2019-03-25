@@ -2975,23 +2975,27 @@ bool CoreWrapper::getPlanCallback(nav_msgs::GetPlan::Request &req, nav_msgs::Get
 	if(!pose.isNull())
 	{
 		// transform goal in /map frame
+		Transform coordinateTransform = Transform::getIdentity();
 		if(mapFrameId_.compare(req.goal.header.frame_id) != 0)
 		{
-			Transform t = rtabmap_ros::getTransform(mapFrameId_, req.goal.header.frame_id, req.goal.header.stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
-			if(t.isNull())
+			coordinateTransform = rtabmap_ros::getTransform(mapFrameId_, req.goal.header.frame_id, req.goal.header.stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+			if(coordinateTransform.isNull())
 			{
 				NODELET_ERROR("Cannot transform goal pose from \"%s\" frame to \"%s\" frame!",
 						req.goal.header.frame_id.c_str(), mapFrameId_.c_str());
 				return false;
 			}
-			pose = t * pose;
+			pose = coordinateTransform * pose;
 		}
+
+		// To convert back the poses in goal frame
+		coordinateTransform = coordinateTransform.inverse();
 
 		if(rtabmap_.computePath(pose, req.tolerance))
 		{
 			NODELET_INFO("Planning: Time computing path = %f s", timer.ticks());
 			const std::vector<std::pair<int, Transform> > & poses = rtabmap_.getPath();
-			res.plan.header.frame_id = mapFrameId_;
+			res.plan.header.frame_id = req.goal.header.frame_id;
 			res.plan.header.stamp = req.goal.header.stamp;
 			if(poses.size() == 0)
 			{
@@ -2999,7 +3003,7 @@ bool CoreWrapper::getPlanCallback(nav_msgs::GetPlan::Request &req, nav_msgs::Get
 						rtabmap_.getGoalReachedRadius());
 				// just set the goal directly
 				res.plan.poses.resize(1);
-				rtabmap_ros::transformToPoseMsg(pose, res.plan.poses[0].pose);
+				rtabmap_ros::transformToPoseMsg(coordinateTransform*pose, res.plan.poses[0].pose);
 			}
 			else
 			{
@@ -3008,7 +3012,7 @@ bool CoreWrapper::getPlanCallback(nav_msgs::GetPlan::Request &req, nav_msgs::Get
 				for(std::vector<std::pair<int, Transform> >::const_iterator iter=poses.begin(); iter!=poses.end(); ++iter)
 				{
 					res.plan.poses[oi].header = res.plan.header;
-					rtabmap_ros::transformToPoseMsg(iter->second, res.plan.poses[oi].pose);
+					rtabmap_ros::transformToPoseMsg(coordinateTransform*iter->second, res.plan.poses[oi].pose);
 					++oi;
 				}
 				if(!rtabmap_.getPathTransformToGoal().isIdentity())
@@ -3016,7 +3020,7 @@ bool CoreWrapper::getPlanCallback(nav_msgs::GetPlan::Request &req, nav_msgs::Get
 					res.plan.poses.resize(res.plan.poses.size()+1);
 					res.plan.poses[res.plan.poses.size()-1].header = res.plan.header;
 					Transform p = rtabmap_.getPath().back().second*rtabmap_.getPathTransformToGoal();
-					rtabmap_ros::transformToPoseMsg(p, res.plan.poses[res.plan.poses.size()-1].pose);
+					rtabmap_ros::transformToPoseMsg(coordinateTransform*p, res.plan.poses[res.plan.poses.size()-1].pose);
 				}
 
 				// Just output the path on screen
@@ -3043,23 +3047,25 @@ bool CoreWrapper::getPlanNodesCallback(rtabmap_ros::GetPlan::Request &req, rtabm
 	UTimer timer;
 	if(req.goal_node > 0 || !pose.isNull())
 	{
-		if(req.goal_node <= 0)
+		Transform coordinateTransform = Transform::getIdentity();
+		// transform goal in /map frame
+		if(mapFrameId_.compare(req.goal.header.frame_id) != 0)
 		{
-			// transform goal in /map frame
-			if(mapFrameId_.compare(req.goal.header.frame_id) != 0)
+			coordinateTransform = rtabmap_ros::getTransform(mapFrameId_, req.goal.header.frame_id, req.goal.header.stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+			if(coordinateTransform.isNull())
 			{
-				Transform t = rtabmap_ros::getTransform(mapFrameId_, req.goal.header.frame_id, req.goal.header.stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
-				if(t.isNull())
-				{
-					NODELET_ERROR("Cannot transform goal pose from \"%s\" frame to \"%s\" frame!",
-							req.goal.header.frame_id.c_str(), mapFrameId_.c_str());
-					return false;
-				}
-				pose = t * pose;
+				NODELET_ERROR("Cannot transform goal pose from \"%s\" frame to \"%s\" frame!",
+						req.goal.header.frame_id.c_str(), mapFrameId_.c_str());
+				return false;
+			}
+			if(!pose.isNull())
+			{
+				pose = coordinateTransform * pose;
 			}
 		}
 
-
+		// To convert back the poses in goal frame
+		coordinateTransform = coordinateTransform.inverse();
 
 		if((req.goal_node > 0 && rtabmap_.computePath(req.goal_node, req.tolerance)) ||
 		   (req.goal_node <= 0 && rtabmap_.computePath(pose, req.tolerance)))
@@ -3077,7 +3083,7 @@ bool CoreWrapper::getPlanNodesCallback(rtabmap_ros::GetPlan::Request &req, rtabm
 					// just set the goal directly
 					res.plan.poses.resize(1);
 					res.plan.nodeIds.resize(1);
-					rtabmap_ros::transformToPoseMsg(pose, res.plan.poses[0]);
+					rtabmap_ros::transformToPoseMsg(coordinateTransform*pose, res.plan.poses[0]);
 					res.plan.nodeIds[0] = 0;
 				}
 			}
@@ -3088,7 +3094,7 @@ bool CoreWrapper::getPlanNodesCallback(rtabmap_ros::GetPlan::Request &req, rtabm
 				int oi = 0;
 				for(std::vector<std::pair<int, Transform> >::const_iterator iter=poses.begin(); iter!=poses.end(); ++iter)
 				{
-					rtabmap_ros::transformToPoseMsg(iter->second, res.plan.poses[oi]);
+					rtabmap_ros::transformToPoseMsg(coordinateTransform*iter->second, res.plan.poses[oi]);
 					res.plan.nodeIds[oi] = iter->first;
 					++oi;
 				}
@@ -3097,7 +3103,7 @@ bool CoreWrapper::getPlanNodesCallback(rtabmap_ros::GetPlan::Request &req, rtabm
 					res.plan.poses.resize(res.plan.poses.size()+1);
 					res.plan.nodeIds.resize(res.plan.nodeIds.size()+1);
 					Transform p = rtabmap_.getPath().back().second*rtabmap_.getPathTransformToGoal();
-					rtabmap_ros::transformToPoseMsg(p, res.plan.poses[res.plan.poses.size()-1]);
+					rtabmap_ros::transformToPoseMsg(coordinateTransform*p, res.plan.poses[res.plan.poses.size()-1]);
 					res.plan.nodeIds[res.plan.nodeIds.size()-1] = 0;
 				}
 
