@@ -228,16 +228,14 @@ private:
 			}
 
 			if( rgbStamp != image->header.stamp.toSec() ||
-				depthStamp != depth->header.stamp.toSec() ||
-				infoStamp != cameraInfo->header.stamp.toSec())
+				depthStamp != depth->header.stamp.toSec())
 			{
 				NODELET_ERROR("Input stamps changed between the beginning and the end of the callback! Make "
 						"sure the node publishing the topics doesn't override the same data after publishing them. A "
 						"solution is to use this node within another nodelet manager. Stamps: "
-						"rgb=%f->%f depth=%f->%f info=%f->%f",
+						"rgb=%f->%f depth=%f->%f",
 						rgbStamp, image->header.stamp.toSec(),
-						depthStamp, depth->header.stamp.toSec(),
-						infoStamp, cameraInfo->header.stamp.toSec());
+						depthStamp, depth->header.stamp.toSec());
 			}
 		}
 	}
