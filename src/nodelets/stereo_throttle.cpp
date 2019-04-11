@@ -229,18 +229,14 @@ private:
 		}
 
 		if( leftStamp != imageLeft->header.stamp.toSec() ||
-			rightStamp != imageRight->header.stamp.toSec() ||
-			leftInfoStamp != camInfoLeft->header.stamp.toSec() ||
-			rightInfoStamp != camInfoRight->header.stamp.toSec())
+			rightStamp != imageRight->header.stamp.toSec())
 		{
 			NODELET_ERROR("Input stamps changed between the beginning and the end of the callback! Make "
 					"sure the node publishing the topics doesn't override the same data after publishing them. A "
 					"solution is to use this node within another nodelet manager. Stamps: "
-					"left%f->%f right=%f->%f info_left=%f->%f info_right=%f->%f",
+					"left%f->%f right=%f->%f",
 					leftStamp, imageLeft->header.stamp.toSec(),
-					rightStamp, imageRight->header.stamp.toSec(),
-					leftInfoStamp, camInfoLeft->header.stamp.toSec(),
-					rightInfoStamp, camInfoRight->header.stamp.toSec());
+					rightStamp, imageRight->header.stamp.toSec());
 		}
 	}
 
