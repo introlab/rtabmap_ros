@@ -369,8 +369,15 @@ void CommonDataSubscriber::setupCallbacks(
 		rgbdCameras = 1;
 	}
 
+	ROS_INFO("%s: subscribe_depth = %s", name.c_str(), subscribedToDepth_?"true":"false");
+	ROS_INFO("%s: subscribe_rgb = %s", name.c_str(), subscribedToRGB_?"true":"false");
+	ROS_INFO("%s: subscribe_stereo = %s", name.c_str(), subscribedToStereo_?"true":"false");
+	ROS_INFO("%s: subscribe_rgbd = %s (rgbd_cameras=%d)", name.c_str(), subscribedToRGBD_?"true":"false", rgbdCameras);
+	ROS_INFO("%s: subscribe_odom_info = %s", name.c_str(), subscribeOdomInfo?"true":"false");
+	ROS_INFO("%s: subscribe_user_data = %s", name.c_str(), subscribeUserData?"true":"false");
+	ROS_INFO("%s: subscribe_scan = %s", name.c_str(), subscribeScan2d?"true":"false");
+	ROS_INFO("%s: subscribe_scan_cloud = %s", name.c_str(), subscribeScan3d?"true":"false");
 	ROS_INFO("%s: queue_size    = %d", name.c_str(), queueSize_);
-	ROS_INFO("%s: rgbd_cameras = %d", name.c_str(), rgbdCameras);
 	ROS_INFO("%s: approx_sync   = %s", name.c_str(), approxSync_?"true":"false");
 
 	subscribedToOdom_ = odomFrameId.empty() && subscribeOdom;
