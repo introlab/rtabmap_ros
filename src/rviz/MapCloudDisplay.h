@@ -108,6 +108,7 @@ public:
 	rviz::EnumProperty* xyz_transformer_property_;
 	rviz::EnumProperty* color_transformer_property_;
 	rviz::EnumProperty* style_property_;
+	rviz::BoolProperty* cloud_from_scan_;
 	rviz::IntProperty* cloud_decimation_;
 	rviz::FloatProperty* cloud_max_depth_;
 	rviz::FloatProperty* cloud_min_depth_;

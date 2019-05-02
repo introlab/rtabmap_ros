@@ -37,6 +37,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <geometry_msgs/PoseArray.h>
 #include <sensor_msgs/image_encodings.h>
 #include <cv_bridge/cv_bridge.h>
+#include <pcl_conversions/pcl_conversions.h>
 #include <pcl/io/io.h>
 
 #include <visualization_msgs/MarkerArray.h>
@@ -217,6 +218,9 @@ void CoreWrapper::onInit()
 	landmarksPub_ = nh.advertise<geometry_msgs::PoseArray>("landmarks", 1);
 	labelsPub_ = nh.advertise<visualization_msgs::MarkerArray>("labels", 1);
 	mapPathPub_ = nh.advertise<nav_msgs::Path>("mapPath", 1);
+	localGridObstacle_ = nh.advertise<sensor_msgs::PointCloud2>("local_grid_obstacle", 1);
+	localGridEmpty_ = nh.advertise<sensor_msgs::PointCloud2>("local_grid_empty", 1);
+	localGridGround_ = nh.advertise<sensor_msgs::PointCloud2>("local_grid_ground", 1);
 	localizationPosePub_ = nh.advertise<geometry_msgs::PoseWithCovarianceStamped>("localization_pose", 1);
 	initialPoseSub_ = nh.subscribe("initialpose", 1, &CoreWrapper::initialPoseCallback, this);
 
@@ -3255,6 +3259,34 @@ void CoreWrapper::publishStats(const ros::Time & stamp)
 			*msg);
 
 		mapGraphPub_.publish(msg);
+	}
+
+	if(localGridObstacle_.getNumSubscribers() && !stats.getLastSignatureData().sensorData().gridObstacleCellsRaw().empty())
+	{
+		pcl::PCLPointCloud2::Ptr cloud = rtabmap::util3d::laserScanToPointCloud2(LaserScan::backwardCompatibility(stats.getLastSignatureData().sensorData().gridObstacleCellsRaw()));
+		sensor_msgs::PointCloud2 msg;
+		pcl_conversions::moveFromPCL(*cloud, msg);
+		msg.header.stamp = stamp;
+		msg.header.frame_id = frameId_;
+		localGridObstacle_.publish(msg);
+	}
+	if(localGridEmpty_.getNumSubscribers() && !stats.getLastSignatureData().sensorData().gridEmptyCellsRaw().empty())
+	{
+		pcl::PCLPointCloud2::Ptr cloud = rtabmap::util3d::laserScanToPointCloud2(LaserScan::backwardCompatibility(stats.getLastSignatureData().sensorData().gridEmptyCellsRaw()));
+		sensor_msgs::PointCloud2 msg;
+		pcl_conversions::moveFromPCL(*cloud, msg);
+		msg.header.stamp = stamp;
+		msg.header.frame_id = frameId_;
+		localGridEmpty_.publish(msg);
+	}
+	if(localGridGround_.getNumSubscribers() && !stats.getLastSignatureData().sensorData().gridGroundCellsRaw().empty())
+	{
+		pcl::PCLPointCloud2::Ptr cloud = rtabmap::util3d::laserScanToPointCloud2(LaserScan::backwardCompatibility(stats.getLastSignatureData().sensorData().gridGroundCellsRaw()));
+		sensor_msgs::PointCloud2 msg;
+		pcl_conversions::moveFromPCL(*cloud, msg);
+		msg.header.stamp = stamp;
+		msg.header.frame_id = frameId_;
+		localGridGround_.publish(msg);
 	}
 
 	bool pubLabels = labelsPub_.getNumSubscribers();

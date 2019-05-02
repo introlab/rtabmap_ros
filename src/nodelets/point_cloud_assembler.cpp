@@ -65,6 +65,8 @@ public:
 		callbackCalled_(false),
 		exactSync_(0),
 		maxClouds_(1),
+		skipClouds_(0),
+		cloudsSkipped_(0),
 		fixedFrameId_("odom")
 	{}
 
@@ -90,7 +92,10 @@ private:
 		pnh.param("queue_size", queueSize, queueSize);
 		pnh.param("fixed_frame_id", fixedFrameId_, fixedFrameId_);
 		pnh.param("max_clouds", maxClouds_, maxClouds_);
+		pnh.param("skip_clouds", skipClouds_, skipClouds_);
 		ROS_ASSERT(maxClouds_>0);
+
+		cloudsSkipped_ = skipClouds_;
 
 		std::string subscribedTopicsMsg;
 		if(!fixedFrameId_.empty())
@@ -141,39 +146,48 @@ private:
 	{
 		if(cloudPub_.getNumSubscribers())
 		{
-			sensor_msgs::PointCloud2Ptr cpy(new sensor_msgs::PointCloud2);
-			*cpy = *cloudMsg;
-			clouds_.push_back(cpy);
-
-			if((int)clouds_.size() >= maxClouds_)
+			if(skipClouds_<=0 || cloudsSkipped_ >= skipClouds_)
 			{
-				pcl::PCLPointCloud2Ptr assembled(new pcl::PCLPointCloud2);
-				pcl_conversions::toPCL(*clouds_.back(), *assembled);
+				cloudsSkipped_ = 0;
 
-				for(size_t i=0; i<clouds_.size()-1; ++i)
+				sensor_msgs::PointCloud2Ptr cpy(new sensor_msgs::PointCloud2);
+				*cpy = *cloudMsg;
+				clouds_.push_back(cpy);
+
+				if((int)clouds_.size() >= maxClouds_)
 				{
-					rtabmap::Transform t = rtabmap_ros::getTransform(
-							clouds_[i]->header.frame_id, //sourceTargetFrame
-							fixedFrameId_, //fixedFrame
-							clouds_[i]->header.stamp, //stampSource
-							clouds_.back()->header.stamp, //stampTarget
-							tfListener_,
-							0.1);
+					pcl::PCLPointCloud2Ptr assembled(new pcl::PCLPointCloud2);
+					pcl_conversions::toPCL(*clouds_.back(), *assembled);
 
-					sensor_msgs::PointCloud2 output;
-					pcl_ros::transformPointCloud(t.toEigen4f(), *clouds_[i], output);
-					pcl::PCLPointCloud2 output2;
-					pcl_conversions::toPCL(output, output2);
-					pcl::PCLPointCloud2Ptr assembledTmp(new pcl::PCLPointCloud2);
-					pcl::concatenatePointCloud(*assembled, output2, *assembledTmp);
-					assembled = assembledTmp;
+					for(size_t i=0; i<clouds_.size()-1; ++i)
+					{
+						rtabmap::Transform t = rtabmap_ros::getTransform(
+								clouds_[i]->header.frame_id, //sourceTargetFrame
+								fixedFrameId_, //fixedFrame
+								clouds_[i]->header.stamp, //stampSource
+								clouds_.back()->header.stamp, //stampTarget
+								tfListener_,
+								0.1);
+
+						sensor_msgs::PointCloud2 output;
+						pcl_ros::transformPointCloud(t.toEigen4f(), *clouds_[i], output);
+						pcl::PCLPointCloud2 output2;
+						pcl_conversions::toPCL(output, output2);
+						pcl::PCLPointCloud2Ptr assembledTmp(new pcl::PCLPointCloud2);
+						pcl::concatenatePointCloud(*assembled, output2, *assembledTmp);
+						assembled = assembledTmp;
+					}
+
+					sensor_msgs::PointCloud2 rosCloud;
+					pcl_conversions::moveFromPCL(*assembled, rosCloud);
+					rosCloud.header = cloudMsg->header;
+					cloudPub_.publish(rosCloud);
+					clouds_.clear();
 				}
-
-				sensor_msgs::PointCloud2 rosCloud;
-				pcl_conversions::moveFromPCL(*assembled, rosCloud);
-				rosCloud.header = cloudMsg->header;
-				cloudPub_.publish(rosCloud);
-				clouds_.clear();
+			}
+			else
+			{
+				++cloudsSkipped_;
 			}
 		}
 	}
@@ -208,6 +222,8 @@ private:
 	message_filters::Subscriber<nav_msgs::Odometry> syncOdomSub_;
 
 	int maxClouds_;
+	int skipClouds_;
+	int cloudsSkipped_;
 	std::string fixedFrameId_;
 	tf::TransformListener tfListener_;
 

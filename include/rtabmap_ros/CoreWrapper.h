@@ -248,6 +248,9 @@ private:
 	ros::Publisher landmarksPub_;
 	ros::Publisher labelsPub_;
 	ros::Publisher mapPathPub_;
+	ros::Publisher localGridObstacle_;
+	ros::Publisher localGridEmpty_;
+	ros::Publisher localGridGround_;
 	ros::Publisher localizationPosePub_;
 	ros::Subscriber initialPoseSub_;
 
