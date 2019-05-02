@@ -280,7 +280,6 @@ void MapCloudDisplay::processMapData(const rtabmap_ros::MapData& map)
 
 		// Always refresh the cloud if there are data
 		rtabmap::Signature s = rtabmap_ros::nodeDataFromROS(map.nodes[i]);
-		ROS_WARN("s.sensorData().laserScanCompressed()=%d", s.sensorData().laserScanCompressed().size());
 		if((fromDepth &&
 			!s.sensorData().imageCompressed().empty() &&
 		    !s.sensorData().depthOrRightCompressed().empty() &&
@@ -410,6 +409,7 @@ void MapCloudDisplay::updateTransformers( const sensor_msgs::PointCloud2ConstPtr
 	bool cur_xyz_valid = false;
 	bool cur_color_valid = false;
 	bool has_rgb_transformer = false;
+	bool has_intensity_transformer = false;
 	M_TransformerInfo::iterator trans_it = transformers_.begin();
 	M_TransformerInfo::iterator trans_end = transformers_.end();
 	for(;trans_it != trans_end; ++trans_it)
@@ -438,6 +438,10 @@ void MapCloudDisplay::updateTransformers( const sensor_msgs::PointCloud2ConstPtr
 			{
 				has_rgb_transformer = true;
 			}
+			else if (name == "Intensity")
+			{
+				has_intensity_transformer = true;
+			}
 			color_transformer_property_->addOptionStd( name );
 		}
 	}
@@ -457,6 +461,10 @@ void MapCloudDisplay::updateTransformers( const sensor_msgs::PointCloud2ConstPtr
 			if (has_rgb_transformer)
 			{
 				color_transformer_property_->setStringStd( "RGB8" );
+			}
+			else if (has_intensity_transformer)
+			{
+				color_transformer_property_->setStringStd( "Intensity" );
 			}
 			else
 			{

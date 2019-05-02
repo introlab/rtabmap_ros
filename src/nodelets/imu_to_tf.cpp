@@ -85,9 +85,8 @@ private:
 				}
 
 				tf::StampedTransform tmp;
-				tfListener_.lookupTransform(baseFrameId_, msg->header.frame_id, msg->header.stamp, tmp);
-				tmp *= st;
-				st.setRotation(tmp.getRotation());
+				tfListener_.lookupTransform(msg->header.frame_id, baseFrameId_, msg->header.stamp, tmp);
+				st *= tmp;
 				st.child_frame_id_ = baseFrameId_;
 			}
 			catch(tf::TransformException & ex)
