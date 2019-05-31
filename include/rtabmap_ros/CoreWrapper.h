@@ -43,6 +43,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <nav_msgs/GetMap.h>
 #include <nav_msgs/GetPlan.h>
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
+#include <sensor_msgs/Imu.h>
 
 #include <rtabmap/core/Parameters.h>
 #include <rtabmap/core/Rtabmap.h>
@@ -141,6 +142,7 @@ private:
 #ifdef WITH_APRILTAGS2_ROS
 	void tagDetectionsAsyncCallback(const apriltags2_ros::AprilTagDetectionArray & tagDetections);
 #endif
+	void imuAsyncCallback(const sensor_msgs::ImuConstPtr & tagDetections);
 
 	void initialPoseCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr & msg);
 
@@ -156,7 +158,7 @@ private:
 
 	void process(
 			const ros::Time & stamp,
-			const rtabmap::SensorData & data,
+			rtabmap::SensorData & data,
 			const rtabmap::Transform & odom = rtabmap::Transform(),
 			const std::string & odomFrameId = "",
 			const cv::Mat & odomCovariance = cv::Mat::eye(6,6,CV_64FC1),
@@ -315,6 +317,8 @@ private:
 	rtabmap::GPS gps_;
 	ros::Subscriber tagDetectionsSub_;
 	std::map<int, geometry_msgs::PoseWithCovarianceStamped> tags_;
+	ros::Subscriber imuSub_;
+	std::map<double, rtabmap::Transform> imus_;
 
 	bool stereoToDepth_;
 	bool odomSensorSync_;

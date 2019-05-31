@@ -71,6 +71,7 @@ int main(int argc, char** argv)
 	// Now wait for application to finish
 	int r = app->exec();// MUST be called by the Main Thread
 
+	ROS_INFO("rtabmapviz stopping spinner...");
 	spinner->stop();
 	delete spinner;
 

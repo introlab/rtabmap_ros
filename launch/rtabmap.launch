@@ -94,7 +94,8 @@
   <arg name="odom_guess_frame_id"        default=""/>
   <arg name="odom_guess_min_translation" default="0"/>
   <arg name="odom_guess_min_rotation"    default="0"/> 
-  <arg name="imu_topic"                default="/imu"/>          <!-- only used with VIO approaches -->
+  <arg name="imu_topic"                default="/imu/data"/>          <!-- only used with VIO approaches -->
+  <arg name="wait_imu_to_init"         default="false"/>
   
   <arg name="subscribe_user_data"      default="false"/>             <!-- user data synchronized subscription -->
   <arg name="user_data_topic"          default="/user_data"/>
@@ -190,6 +191,7 @@
           <param name="ground_truth_frame_id"       type="string" value="$(arg ground_truth_frame_id)"/>
           <param name="ground_truth_base_frame_id"  type="string" value="$(arg ground_truth_base_frame_id)"/>
           <param name="wait_for_transform_duration" type="double" value="$(arg wait_for_transform)"/>
+          <param name="wait_imu_to_init"            type="bool"   value="$(arg wait_imu_to_init)"/>
           <param name="approx_sync"                 type="bool"   value="$(arg approx_sync)"/>
           <param name="config_path"                 type="string" value="$(arg cfg)"/>
           <param name="queue_size"                  type="int"    value="$(arg queue_size)"/>
@@ -215,6 +217,7 @@
           <param name="ground_truth_frame_id"       type="string" value="$(arg ground_truth_frame_id)"/>
           <param name="ground_truth_base_frame_id"  type="string" value="$(arg ground_truth_base_frame_id)"/>
           <param name="wait_for_transform_duration" type="double" value="$(arg wait_for_transform)"/>
+          <param name="wait_imu_to_init"            type="bool"   value="$(arg wait_imu_to_init)"/>
           <param name="approx_sync"                 type="bool"   value="$(arg approx_sync)"/>
           <param name="config_path"                 type="string" value="$(arg cfg)"/>
           <param name="queue_size"                  type="int"    value="$(arg queue_size)"/>
@@ -238,6 +241,7 @@
       <param name="ground_truth_frame_id"       type="string" value="$(arg ground_truth_frame_id)"/>
       <param name="ground_truth_base_frame_id"  type="string" value="$(arg ground_truth_base_frame_id)"/>
       <param name="wait_for_transform_duration" type="double" value="$(arg wait_for_transform)"/>
+      <param name="wait_imu_to_init"            type="bool"   value="$(arg wait_imu_to_init)"/>
       <param name="config_path"                 type="string" value="$(arg cfg)"/>
       <param name="queue_size"                  type="int"    value="$(arg queue_size)"/>
       <param name="guess_frame_id"              type="string" value="$(arg odom_guess_frame_id)"/>
@@ -293,6 +297,7 @@
       <remap from="gps/fix"                to="$(arg gps_topic)"/>
       <remap from="tag_detections"         to="$(arg tag_topic)"/>
       <remap from="odom"                   to="$(arg odom_topic)"/>
+      <remap from="imu"                    to="$(arg imu_topic)"/>
       
       <!-- localization mode -->
       <param     if="$(arg localization)" name="Mem/IncrementalMemory" type="string" value="false"/>

@@ -653,6 +653,7 @@ void CoreWrapper::onInit()
 #ifdef WITH_APRILTAGS2_ROS
 	tagDetectionsSub_ = nh.subscribe("tag_detections", 1, &CoreWrapper::tagDetectionsAsyncCallback, this);
 #endif
+	imuSub_ = nh.subscribe("imu", 100, &CoreWrapper::imuAsyncCallback, this);
 }
 
 CoreWrapper::~CoreWrapper()
@@ -1126,12 +1127,6 @@ void CoreWrapper::commonDepthCallbackImpl(
 		}
 	}
 
-	Transform groundTruthPose;
-	if(!groundTruthFrameId_.empty())
-	{
-		groundTruthPose = rtabmap_ros::getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, lastPoseStamp_, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
-	}
-
 	cv::Mat userData;
 	if(userDataMsg.get())
 	{
@@ -1158,68 +1153,6 @@ void CoreWrapper::commonDepthCallbackImpl(
 			lastPoseIntermediate_?-1:imageMsgs[0]->header.seq,
 			rtabmap_ros::timestampFromROS(lastPoseStamp_),
 			userData);
-	data.setGroundTruth(groundTruthPose);
-
-	//global pose
-	if(!globalPose_.header.stamp.isZero())
-	{
-		// assume sensor is fixed
-		Transform sensorToBase = rtabmap_ros::getTransform(
-				globalPose_.header.frame_id,
-				frameId_,
-				lastPoseStamp_,
-				tfListener_,
-				waitForTransform_?waitForTransformDuration_:0.0);
-		if(!sensorToBase.isNull())
-		{
-			Transform globalPose = rtabmap_ros::transformFromPoseMsg(globalPose_.pose.pose);
-			globalPose *= sensorToBase; // transform global pose from sensor frame to robot base frame
-
-			// Correction of the global pose accounting the odometry movement since we received it
-			Transform correction = rtabmap_ros::getTransform(
-					frameId_,
-					odomFrameId,
-					globalPose_.header.stamp,
-					lastPoseStamp_,
-					tfListener_,
-					waitForTransform_?waitForTransformDuration_:0.0);
-			if(!correction.isNull())
-			{
-				globalPose *= correction;
-			}
-			else
-			{
-				NODELET_WARN("Could not adjust global pose accordingly to latest odometry pose. "
-						"If odometry is small since it received the global pose and "
-						"covariance is large, this should not be a problem.");
-			}
-			cv::Mat globalPoseCovariance = cv::Mat(6,6, CV_64FC1, (void*)globalPose_.pose.covariance.data()).clone();
-			data.setGlobalPose(globalPose, globalPoseCovariance);
-		}
-	}
-	globalPose_.header.stamp = ros::Time(0);
-
-	if(gps_.stamp() > 0.0)
-	{
-		data.setGPS(gps_);
-	}
-	gps_ = rtabmap::GPS();
-
-	//tag detections
-	Landmarks landmarks = rtabmap_ros::landmarksFromROS(
-			tags_,
-			frameId_,
-			odomFrameId,
-			lastPoseStamp_,
-			tfListener_,
-			waitForTransform_?waitForTransformDuration_:0,
-			landmarkDefaultLinVariance_,
-			landmarkDefaultAngVariance_);
-	tags_.clear();
-	if(!landmarks.empty())
-	{
-		data.setLandmarks(landmarks);
-	}
 
 	OdometryInfo odomInfo;
 	if(odomInfoMsg.get())
@@ -1392,12 +1325,6 @@ void CoreWrapper::commonStereoCallback(
 		}
 	}
 
-	Transform groundTruthPose;
-	if(!groundTruthFrameId_.empty())
-	{
-		groundTruthPose = rtabmap_ros::getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, lastPoseStamp_, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
-	}
-
 	cv::Mat userData;
 	if(userDataMsg.get())
 	{
@@ -1424,68 +1351,6 @@ void CoreWrapper::commonStereoCallback(
 			lastPoseIntermediate_?-1:leftImageMsg->header.seq,
 			rtabmap_ros::timestampFromROS(lastPoseStamp_),
 			userData);
-	data.setGroundTruth(groundTruthPose);
-
-	//global pose
-	if(!globalPose_.header.stamp.isZero())
-	{
-		// assume sensor is fixed
-		Transform sensorToBase = rtabmap_ros::getTransform(
-				globalPose_.header.frame_id,
-				frameId_,
-				lastPoseStamp_,
-				tfListener_,
-				waitForTransform_?waitForTransformDuration_:0.0);
-		if(!sensorToBase.isNull())
-		{
-			Transform globalPose = rtabmap_ros::transformFromPoseMsg(globalPose_.pose.pose);
-			globalPose *= sensorToBase; // transform global pose from sensor frame to robot base frame
-
-			// Correction of the global pose accounting the odometry movement since we received it
-			Transform correction = rtabmap_ros::getTransform(
-					frameId_,
-					odomFrameId,
-					globalPose_.header.stamp,
-					lastPoseStamp_,
-					tfListener_,
-					waitForTransform_?waitForTransformDuration_:0.0);
-			if(!correction.isNull())
-			{
-				globalPose *= correction;
-			}
-			else
-			{
-				NODELET_WARN("Could not adjust global pose accordingly to latest odometry pose. "
-						"If odometry is small since it received the global pose and "
-						"covariance is large, this should not be a problem.");
-			}
-			cv::Mat globalPoseCovariance = cv::Mat(6,6, CV_64FC1, (void*)globalPose_.pose.covariance.data()).clone();
-			data.setGlobalPose(globalPose, globalPoseCovariance);
-		}
-	}
-	globalPose_.header.stamp = ros::Time(0);
-
-	if(gps_.stamp() > 0.0)
-	{
-		data.setGPS(gps_);
-	}
-	gps_ = rtabmap::GPS();
-
-	//tag detections
-	Landmarks landmarks = rtabmap_ros::landmarksFromROS(
-			tags_,
-			frameId_,
-			odomFrameId,
-			lastPoseStamp_,
-			tfListener_,
-			waitForTransform_?waitForTransformDuration_:0,
-			landmarkDefaultLinVariance_,
-			landmarkDefaultAngVariance_);
-	tags_.clear();
-	if(!landmarks.empty())
-	{
-		data.setLandmarks(landmarks);
-	}
 
 	OdometryInfo odomInfo;
 	if(odomInfoMsg.get())
@@ -1588,12 +1453,6 @@ void CoreWrapper::commonLaserScanCallback(
 		}
 	}
 
-	Transform groundTruthPose;
-	if(!groundTruthFrameId_.empty())
-	{
-		groundTruthPose = rtabmap_ros::getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, lastPoseStamp_, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
-	}
-
 	cv::Mat userData;
 	if(userDataMsg.get())
 	{
@@ -1631,73 +1490,11 @@ void CoreWrapper::commonLaserScanCallback(
 			lastPoseIntermediate_?-1:scan2dMsg.get() != 0?scan2dMsg->header.seq:scan3dMsg->header.seq,
 			rtabmap_ros::timestampFromROS(lastPoseStamp_),
 			userData);
-	data.setGroundTruth(groundTruthPose);
-
-	//global pose
-	if(!globalPose_.header.stamp.isZero())
-	{
-		// assume sensor is fixed
-		Transform sensorToBase = rtabmap_ros::getTransform(
-				globalPose_.header.frame_id,
-				frameId_,
-				lastPoseStamp_,
-				tfListener_,
-				waitForTransform_?waitForTransformDuration_:0.0);
-		if(!sensorToBase.isNull())
-		{
-			Transform globalPose = rtabmap_ros::transformFromPoseMsg(globalPose_.pose.pose);
-			globalPose *= sensorToBase; // transform global pose from sensor frame to robot base frame
-
-			// Correction of the global pose accounting the odometry movement since we received it
-			Transform correction = rtabmap_ros::getTransform(
-					frameId_,
-					odomFrameId,
-					globalPose_.header.stamp,
-					lastPoseStamp_,
-					tfListener_,
-					waitForTransform_?waitForTransformDuration_:0.0);
-			if(!correction.isNull())
-			{
-				globalPose *= correction;
-			}
-			else
-			{
-				NODELET_WARN("Could not adjust global pose accordingly to latest odometry pose. "
-						"If odometry is small since it received the global pose and "
-						"covariance is large, this should not be a problem.");
-			}
-			cv::Mat globalPoseCovariance = cv::Mat(6,6, CV_64FC1, (void*)globalPose_.pose.covariance.data()).clone();
-			data.setGlobalPose(globalPose, globalPoseCovariance);
-		}
-	}
-	globalPose_.header.stamp = ros::Time(0);
-
-	if(gps_.stamp() > 0.0)
-	{
-		data.setGPS(gps_);
-	}
-	gps_ = rtabmap::GPS();
 
 	OdometryInfo odomInfo;
 	if(odomInfoMsg.get())
 	{
 		odomInfo = odomInfoFromROS(*odomInfoMsg);
-	}
-
-	//tag detections
-	Landmarks landmarks = rtabmap_ros::landmarksFromROS(
-			tags_,
-			frameId_,
-			odomFrameId,
-			lastPoseStamp_,
-			tfListener_,
-			waitForTransform_?waitForTransformDuration_:0,
-			landmarkDefaultLinVariance_,
-			landmarkDefaultAngVariance_);
-	tags_.clear();
-	if(!landmarks.empty())
-	{
-		data.setLandmarks(landmarks);
 	}
 
 	process(lastPoseStamp_,
@@ -1722,12 +1519,6 @@ void CoreWrapper::commonOdomCallback(
 	if(!odomUpdate(odomMsg, odomMsg->header.stamp))
 	{
 		return;
-	}
-
-	Transform groundTruthPose;
-	if(!groundTruthFrameId_.empty())
-	{
-		groundTruthPose = rtabmap_ros::getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, lastPoseStamp_, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
 	}
 
 	cv::Mat userData;
@@ -1766,73 +1557,11 @@ void CoreWrapper::commonOdomCallback(
 			lastPoseIntermediate_?-1:odomMsg->header.seq,
 			rtabmap_ros::timestampFromROS(lastPoseStamp_),
 			userData);
-	data.setGroundTruth(groundTruthPose);
-
-	//global pose
-	if(!globalPose_.header.stamp.isZero())
-	{
-		// assume sensor is fixed
-		Transform sensorToBase = rtabmap_ros::getTransform(
-				globalPose_.header.frame_id,
-				frameId_,
-				lastPoseStamp_,
-				tfListener_,
-				waitForTransform_?waitForTransformDuration_:0.0);
-		if(!sensorToBase.isNull())
-		{
-			Transform globalPose = rtabmap_ros::transformFromPoseMsg(globalPose_.pose.pose);
-			globalPose *= sensorToBase; // transform global pose from sensor frame to robot base frame
-
-			// Correction of the global pose accounting the odometry movement since we received it
-			Transform correction = rtabmap_ros::getTransform(
-					frameId_,
-					odomFrameId,
-					globalPose_.header.stamp,
-					lastPoseStamp_,
-					tfListener_,
-					waitForTransform_?waitForTransformDuration_:0.0);
-			if(!correction.isNull())
-			{
-				globalPose *= correction;
-			}
-			else
-			{
-				NODELET_WARN("Could not adjust global pose accordingly to latest odometry pose. "
-						"If odometry is small since it received the global pose and "
-						"covariance is large, this should not be a problem.");
-			}
-			cv::Mat globalPoseCovariance = cv::Mat(6,6, CV_64FC1, (void*)globalPose_.pose.covariance.data()).clone();
-			data.setGlobalPose(globalPose, globalPoseCovariance);
-		}
-	}
-	globalPose_.header.stamp = ros::Time(0);
-
-	if(gps_.stamp() > 0.0)
-	{
-		data.setGPS(gps_);
-	}
-	gps_ = rtabmap::GPS();
 
 	OdometryInfo odomInfo;
 	if(odomInfoMsg.get())
 	{
 		odomInfo = odomInfoFromROS(*odomInfoMsg);
-	}
-
-	//tag detections
-	Landmarks landmarks = rtabmap_ros::landmarksFromROS(
-			tags_,
-			frameId_,
-			odomFrameId,
-			lastPoseStamp_,
-			tfListener_,
-			waitForTransform_?waitForTransformDuration_:0,
-			landmarkDefaultLinVariance_,
-			landmarkDefaultAngVariance_);
-	tags_.clear();
-	if(!landmarks.empty())
-	{
-		data.setLandmarks(landmarks);
 	}
 
 	process(lastPoseStamp_,
@@ -1847,7 +1576,7 @@ void CoreWrapper::commonOdomCallback(
 
 void CoreWrapper::process(
 		const ros::Time & stamp,
-		const SensorData & data,
+		SensorData & data,
 		const Transform & odom,
 		const std::string & odomFrameId,
 		const cv::Mat & odomCovariance,
@@ -1856,6 +1585,96 @@ void CoreWrapper::process(
 	UTimer timer;
 	if(rtabmap_.isIDsGenerated() || data.id() > 0)
 	{
+		//Add async stuff
+		Transform groundTruthPose;
+		if(!groundTruthFrameId_.empty())
+		{
+			groundTruthPose = rtabmap_ros::getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, lastPoseStamp_, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+		}
+		data.setGroundTruth(groundTruthPose);
+
+		//global pose
+		if(!globalPose_.header.stamp.isZero())
+		{
+			// assume sensor is fixed
+			Transform sensorToBase = rtabmap_ros::getTransform(
+					globalPose_.header.frame_id,
+					frameId_,
+					lastPoseStamp_,
+					tfListener_,
+					waitForTransform_?waitForTransformDuration_:0.0);
+			if(!sensorToBase.isNull())
+			{
+				Transform globalPose = rtabmap_ros::transformFromPoseMsg(globalPose_.pose.pose);
+				globalPose *= sensorToBase; // transform global pose from sensor frame to robot base frame
+
+				// Correction of the global pose accounting the odometry movement since we received it
+				Transform correction = rtabmap_ros::getTransform(
+						frameId_,
+						odomFrameId,
+						globalPose_.header.stamp,
+						lastPoseStamp_,
+						tfListener_,
+						waitForTransform_?waitForTransformDuration_:0.0);
+				if(!correction.isNull())
+				{
+					globalPose *= correction;
+				}
+				else
+				{
+					NODELET_WARN("Could not adjust global pose accordingly to latest odometry pose. "
+							"If odometry is small since it received the global pose and "
+							"covariance is large, this should not be a problem.");
+				}
+				cv::Mat globalPoseCovariance = cv::Mat(6,6, CV_64FC1, (void*)globalPose_.pose.covariance.data()).clone();
+				data.setGlobalPose(globalPose, globalPoseCovariance);
+			}
+		}
+		globalPose_.header.stamp = ros::Time(0);
+
+		if(gps_.stamp() > 0.0)
+		{
+			data.setGPS(gps_);
+		}
+		gps_ = rtabmap::GPS();
+
+		//tag detections
+		Landmarks landmarks = rtabmap_ros::landmarksFromROS(
+				tags_,
+				frameId_,
+				odomFrameId,
+				lastPoseStamp_,
+				tfListener_,
+				waitForTransform_?waitForTransformDuration_:0,
+				landmarkDefaultLinVariance_,
+				landmarkDefaultAngVariance_);
+		tags_.clear();
+		if(!landmarks.empty())
+		{
+			data.setLandmarks(landmarks);
+		}
+
+		// IMU
+		if(!imus_.empty())
+		{
+			double stampDiff = 0.0;
+			Transform t = Transform::getClosestTransform(imus_, data.stamp(), &stampDiff);
+			if(!t.isNull() && stampDiff == 0.0)
+			{
+				Eigen::Quaterniond q = t.getQuaterniond();
+				data.setIMU(IMU(cv::Vec4d(q.x(), q.y(), q.z(), q.w()), cv::Mat::eye(3,3,CV_64FC1),
+						cv::Vec3d(), cv::Mat(),
+						cv::Vec3d(), cv::Mat(),
+						Transform::getIdentity()));
+			}
+			else
+			{
+				ROS_WARN("We are receiving imu data (buffer=%d), but cannot interpolate "
+						"imu transform at time %f (closest is at %f). IMU won't be added to graph.",
+						(int)imus_.size(), data.stamp(), stampDiff);
+			}
+		}
+
 		double timeRtabmap = 0.0;
 		double timeUpdateMaps = 0.0;
 		double timePublishMaps = 0.0;
@@ -2198,6 +2017,37 @@ void CoreWrapper::tagDetectionsAsyncCallback(const apriltags2_ros::AprilTagDetec
 }
 #endif
 
+void CoreWrapper::imuAsyncCallback(const sensor_msgs::ImuConstPtr & msg)
+{
+	if(!paused_)
+	{
+		if(msg->orientation.x == 0 && msg->orientation.y == 0 && msg->orientation.z == 0 && msg->orientation.w == 0)
+		{
+			UERROR("IMU received doesn't have orientation set, it is ignored.");
+		}
+		else
+		{
+			double stamp = msg->header.stamp.toSec();
+			rtabmap::Transform localTransform = rtabmap::Transform::getIdentity();
+			if(frameId_.compare(msg->header.frame_id) != 0)
+			{
+				localTransform = getTransform(frameId_, msg->header.frame_id, msg->header.stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+				if(localTransform.isNull())
+				{
+					return;
+				}
+			}
+
+			Transform orientation(0,0,0, msg->orientation.x, msg->orientation.y, msg->orientation.z, msg->orientation.w);
+			imus_.insert(std::make_pair(msg->header.stamp.toSec(), orientation*localTransform.inverse()));
+			if(imus_.size() > 1000)
+			{
+				imus_.erase(imus_.begin());
+			}
+		}
+	}
+}
+
 
 void CoreWrapper::initialPoseCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr & msg)
 {
@@ -2471,6 +2321,7 @@ bool CoreWrapper::resetRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empt
 	userDataMutex_.lock();
 	userData_ = cv::Mat();
 	userDataMutex_.unlock();
+	imus_.clear();
 	return true;
 }
 

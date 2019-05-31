@@ -343,10 +343,7 @@ void OdometryROS::onInit()
 
 	odomStrategy_ = 0;
 	Parameters::parse(this->parameters(), Parameters::kOdomStrategy(), odomStrategy_);
-	if(waitIMUToinit_ ||
-		odomStrategy_ == Odometry::kTypeMSCKF ||
-		odomStrategy_ == Odometry::kTypeOkvis ||
-		odomStrategy_ == Odometry::kTypeVINS)
+	if(waitIMUToinit_ || odometry_->canProcessIMU())
 	{
 		int queueSize = 10;
 		pnh.param("queue_size", queueSize, queueSize);
@@ -415,9 +412,7 @@ void OdometryROS::callbackIMU(const sensor_msgs::ImuConstPtr& msg)
 {
 	if(!this->isPaused())
 	{
-		if(odomStrategy_ != Odometry::kTypeOkvis &&
-		   odomStrategy_ != Odometry::kTypeMSCKF &&
-		   odomStrategy_ != Odometry::kTypeVINS &&
+		if(!odometry_->canProcessIMU() &&
 		   !odometry_->getPose().isIdentity())
 		{
 			// For non-inertial odometry approaches, IMU is only used to initialize the initial orientation below
@@ -437,16 +432,15 @@ void OdometryROS::callbackIMU(const sensor_msgs::ImuConstPtr& msg)
 			return;
 		}
 
-		IMU imu(
+		IMU imu(cv::Vec4d(msg->orientation.x, msg->orientation.y, msg->orientation.z, msg->orientation.w),
+				cv::Mat(3,3,CV_64FC1,(void*)msg->orientation_covariance.data()).clone(),
 				cv::Vec3d(msg->angular_velocity.x, msg->angular_velocity.y, msg->angular_velocity.z),
 				cv::Mat(3,3,CV_64FC1,(void*)msg->angular_velocity_covariance.data()).clone(),
 				cv::Vec3d(msg->linear_acceleration.x, msg->linear_acceleration.y, msg->linear_acceleration.z),
 				cv::Mat(3,3,CV_64FC1,(void*)msg->linear_acceleration_covariance.data()).clone(),
 				localTransform);
 
-		if(odomStrategy_ != Odometry::kTypeOkvis &&
-		   odomStrategy_ != Odometry::kTypeMSCKF &&
-		   odomStrategy_ != Odometry::kTypeVINS)
+		if(!odometry_->canProcessIMU())
 		{
 			if(!odometry_->getPose().isIdentity())
 			{
@@ -454,27 +448,39 @@ void OdometryROS::callbackIMU(const sensor_msgs::ImuConstPtr& msg)
 				return;
 			}
 
-			if(	imu.linearAcceleration()[0]!=0.0 &&
-				imu.linearAcceleration()[1]!=0.0 &&
-				imu.linearAcceleration()[2]!=0.0 &&
-				!imu.localTransform().isNull())
+			// align with gravity
+			if(!imu.localTransform().isNull())
 			{
-				// align with gravity
-				Eigen::Vector3f n(imu.linearAcceleration()[0], imu.linearAcceleration()[1], imu.linearAcceleration()[2]);
-				n = imu.localTransform().rotation().toEigen3f() * n;
-				n.normalize();
-				Eigen::Vector3f z(0,0,1);
-				//get rotation from z to n;
-				Eigen::Matrix3f R;
-				R = Eigen::Quaternionf().setFromTwoVectors(n,z);
-				Transform rotation(
-						R(0,0), R(0,1), R(0,2), 0,
-						R(1,0), R(1,1), R(1,2), 0,
-						R(2,0), R(2,1), R(2,2), 0);
-				this->reset(rotation);
-				float r,p,y;
-				rotation.getEulerAngles(r,p,y);
-				NODELET_WARN("odometry: Initialized odometry orientation with IMU (rpy = %f %f %f).", r,p,y);
+				if(imu.orientation()[0] != 0 || imu.orientation()[1] != 0 || imu.orientation()[2] != 0 || imu.orientation()[3] != 0)
+				{
+					Transform rotation(0,0,0, imu.orientation()[0], imu.orientation()[1], imu.orientation()[2], imu.orientation()[3]);
+					rotation = rotation * imu.localTransform().rotation().inverse();
+					this->reset(rotation);
+					float r,p,y;
+					rotation.getEulerAngles(r,p,y);
+					NODELET_WARN("odometry: Initialized odometry with IMU's orientation (rpy = %f %f %f).", r,p,y);
+				}
+				else if(imu.linearAcceleration()[0]!=0.0 &&
+					imu.linearAcceleration()[1]!=0.0 &&
+					imu.linearAcceleration()[2]!=0.0 &&
+					!imu.localTransform().isNull())
+				{
+					Eigen::Vector3f n(imu.linearAcceleration()[0], imu.linearAcceleration()[1], imu.linearAcceleration()[2]);
+					n = imu.localTransform().rotation().toEigen3f() * n;
+					n.normalize();
+					Eigen::Vector3f z(0,0,1);
+					//get rotation from z to n;
+					Eigen::Matrix3f R;
+					R = Eigen::Quaternionf().setFromTwoVectors(n,z);
+					Transform rotation(
+							R(0,0), R(0,1), R(0,2), 0,
+							R(1,0), R(1,1), R(1,2), 0,
+							R(2,0), R(2,1), R(2,2), 0);
+					this->reset(rotation);
+					float r,p,y;
+					rotation.getEulerAngles(r,p,y);
+					NODELET_WARN("odometry: Initialized odometry with IMU's accelerometer (rpy = %f %f %f).", r,p,y);
+				}
 			}
 		}
 		else
@@ -493,6 +499,7 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 		return;
 	}
 
+	Transform groundTruth;
 	if(!data.imageRaw().empty() || !data.laserScanRaw().isEmpty())
 	{
 		if(previousStamp_>0.0 && previousStamp_ >= stamp.toSec())
@@ -509,35 +516,35 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 					1.0/(stamp.toSec()-previousStamp_), expectedUpdateRate_, previousStamp_, stamp.toSec());
 			return;
 		}
-	}
 
-	Transform groundTruth;
-	if(!groundTruthFrameId_.empty())
-	{
-		groundTruth = getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, stamp);
-
-		if(!data.imageRaw().empty() || !data.laserScanRaw().isEmpty())
+		if(!groundTruthFrameId_.empty())
 		{
-			if(odometry_->getPose().isIdentity())
+			groundTruth = getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, stamp);
+
+			if(!data.imageRaw().empty() || !data.laserScanRaw().isEmpty())
 			{
-				// sync with the first value of the ground truth
-				if(groundTruth.isNull())
+				if(odometry_->getPose().isIdentity())
 				{
-					NODELET_WARN("Ground truth frames \"%s\" -> \"%s\" are set but failed to "
-							"get them, odometry won't be initialized with ground truth.",
-							groundTruthFrameId_.c_str(), groundTruthBaseFrameId_.c_str());
-				}
-				else
-				{
-					NODELET_INFO( "Initializing odometry pose to %s (from \"%s\" -> \"%s\")",
-							groundTruth.prettyPrint().c_str(),
-							groundTruthFrameId_.c_str(),
-							groundTruthBaseFrameId_.c_str());
-					odometry_->reset(groundTruth);
+					// sync with the first value of the ground truth
+					if(groundTruth.isNull())
+					{
+						NODELET_WARN("Ground truth frames \"%s\" -> \"%s\" are set but failed to "
+								"get them, odometry won't be initialized with ground truth.",
+								groundTruthFrameId_.c_str(), groundTruthBaseFrameId_.c_str());
+					}
+					else
+					{
+						NODELET_INFO( "Initializing odometry pose to %s (from \"%s\" -> \"%s\")",
+								groundTruth.prettyPrint().c_str(),
+								groundTruthFrameId_.c_str(),
+								groundTruthBaseFrameId_.c_str());
+						odometry_->reset(groundTruth);
+					}
 				}
 			}
 		}
 	}
+
 
 	Transform guessCurrentPose;
 	if(!guessFrameId_.empty())
