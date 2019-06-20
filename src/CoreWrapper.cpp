@@ -650,7 +650,7 @@ void CoreWrapper::onInit()
 	userDataAsyncSub_ = nh.subscribe("user_data_async", 1, &CoreWrapper::userDataAsyncCallback, this);
 	globalPoseAsyncSub_ = nh.subscribe("global_pose", 1, &CoreWrapper::globalPoseAsyncCallback, this);
 	gpsFixAsyncSub_ = nh.subscribe("gps/fix", 1, &CoreWrapper::gpsFixAsyncCallback, this);
-#ifdef WITH_APRILTAGS2_ROS
+#ifdef WITH_APRILTAG_ROS
 	tagDetectionsSub_ = nh.subscribe("tag_detections", 1, &CoreWrapper::tagDetectionsAsyncCallback, this);
 #endif
 	imuSub_ = nh.subscribe("imu", 100, &CoreWrapper::imuAsyncCallback, this);
@@ -1999,8 +1999,8 @@ void CoreWrapper::gpsFixAsyncCallback(const sensor_msgs::NavSatFixConstPtr & gps
 	}
 }
 
-#ifdef WITH_APRILTAGS2_ROS
-void CoreWrapper::tagDetectionsAsyncCallback(const apriltags2_ros::AprilTagDetectionArray & tagDetections)
+#ifdef WITH_APRILTAG_ROS
+void CoreWrapper::tagDetectionsAsyncCallback(const apriltag_ros::AprilTagDetectionArray & tagDetections)
 {
 	if(!paused_)
 	{

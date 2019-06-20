@@ -25,7 +25,7 @@ find_package(catkin REQUIRED COMPONENTS
 # Optional components
 find_package(costmap_2d)
 find_package(octomap_msgs)
-find_package(apriltags2_ros)
+find_package(apriltag_ros)
 find_package(rviz)
 find_package(find_object_2d)
 
@@ -247,18 +247,18 @@ SET(Libraries
 ADD_DEFINITIONS("-DWITH_OCTOMAP_MSGS")
 ENDIF(octomap_msgs_FOUND)
 
-# If apriltags2_ros is found, add definition
-IF(apriltags2_ros_FOUND)
-MESSAGE(STATUS "WITH apriltags2_ros")
+# If apriltag_ros is found, add definition
+IF(apriltag_ros_FOUND)
+MESSAGE(STATUS "WITH apriltag_ros")
 include_directories(
-  ${apriltags2_ros_INCLUDE_DIRS}
+  ${apriltag_ros_INCLUDE_DIRS}
 )
 SET(Libraries
-  ${apriltags2_ros_LIBRARIES}
+  ${apriltag_ros_LIBRARIES}
   ${Libraries}
 )
-ADD_DEFINITIONS("-DWITH_APRILTAGS2_ROS")
-ENDIF(apriltags2_ros_FOUND)
+ADD_DEFINITIONS("-DWITH_APRILTAG_ROS")
+ENDIF(apriltag_ros_FOUND)
 
 # If rviz is found, add plugins
 IF(rviz_FOUND)

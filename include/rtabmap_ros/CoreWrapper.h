@@ -64,8 +64,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <octomap_msgs/GetOctomap.h>
 #endif
 
-#ifdef WITH_APRILTAGS2_ROS
-#include <apriltags2_ros/AprilTagDetectionArray.h>
+#ifdef WITH_APRILTAG_ROS
+#include <apriltag_ros/AprilTagDetectionArray.h>
 #endif
 
 #include <actionlib/client/simple_action_client.h>
@@ -139,8 +139,8 @@ private:
 	void userDataAsyncCallback(const rtabmap_ros::UserDataConstPtr & dataMsg);
 	void globalPoseAsyncCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr & globalPoseMsg);
 	void gpsFixAsyncCallback(const sensor_msgs::NavSatFixConstPtr & gpsFixMsg);
-#ifdef WITH_APRILTAGS2_ROS
-	void tagDetectionsAsyncCallback(const apriltags2_ros::AprilTagDetectionArray & tagDetections);
+#ifdef WITH_APRILTAG_ROS
+	void tagDetectionsAsyncCallback(const apriltag_ros::AprilTagDetectionArray & tagDetections);
 #endif
 	void imuAsyncCallback(const sensor_msgs::ImuConstPtr & tagDetections);
 
