@@ -67,6 +67,7 @@ public:
 		maxClouds_(1),
 		skipClouds_(0),
 		cloudsSkipped_(0),
+		waitForTransformDuration_(0.1),
 		fixedFrameId_("odom")
 	{}
 
@@ -89,10 +90,12 @@ private:
 		ros::NodeHandle & pnh = getPrivateNodeHandle();
 
 		int queueSize = 5;
+
 		pnh.param("queue_size", queueSize, queueSize);
 		pnh.param("fixed_frame_id", fixedFrameId_, fixedFrameId_);
 		pnh.param("max_clouds", maxClouds_, maxClouds_);
 		pnh.param("skip_clouds", skipClouds_, skipClouds_);
+		pnh.param("wait_for_transform_duration", waitForTransformDuration_, waitForTransformDuration_);
 		ROS_ASSERT(maxClouds_>0);
 
 		cloudsSkipped_ = skipClouds_;
@@ -167,7 +170,14 @@ private:
 								clouds_[i]->header.stamp, //stampSource
 								clouds_.back()->header.stamp, //stampTarget
 								tfListener_,
-								0.1);
+								waitForTransformDuration_);
+
+						if(t.isNull())
+						{
+							ROS_ERROR("Cloud not transform all clouds! Resetting...");
+							clouds_.clear();
+							return;
+						}
 
 						sensor_msgs::PointCloud2 output;
 						pcl_ros::transformPointCloud(t.toEigen4f(), *clouds_[i], output);
@@ -224,6 +234,7 @@ private:
 	int maxClouds_;
 	int skipClouds_;
 	int cloudsSkipped_;
+	double waitForTransformDuration_;
 	std::string fixedFrameId_;
 	tf::TransformListener tfListener_;
 
