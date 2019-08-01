@@ -45,6 +45,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <message_filters/sync_policies/exact_time.h>
 
 #include <rtabmap_ros/MsgConversion.h>
+#include <rtabmap/core/util3d.h>
+#include <rtabmap/core/util3d_filtering.h>
 
 namespace rtabmap_ros
 {
@@ -68,6 +70,8 @@ public:
 		skipClouds_(0),
 		cloudsSkipped_(0),
 		waitForTransformDuration_(0.1),
+		rangeMin_(0),
+		rangeMax_(0),
 		fixedFrameId_("odom")
 	{}
 
@@ -96,6 +100,8 @@ private:
 		pnh.param("max_clouds", maxClouds_, maxClouds_);
 		pnh.param("skip_clouds", skipClouds_, skipClouds_);
 		pnh.param("wait_for_transform_duration", waitForTransformDuration_, waitForTransformDuration_);
+		pnh.param("range_min", rangeMin_, rangeMin_);
+		pnh.param("range_max", rangeMax_, rangeMax_);
 		ROS_ASSERT(maxClouds_>0);
 
 		cloudsSkipped_ = skipClouds_;
@@ -179,12 +185,24 @@ private:
 							return;
 						}
 
-						sensor_msgs::PointCloud2 output;
-						pcl_ros::transformPointCloud(t.toEigen4f(), *clouds_[i], output);
-						pcl::PCLPointCloud2 output2;
-						pcl_conversions::toPCL(output, output2);
 						pcl::PCLPointCloud2Ptr assembledTmp(new pcl::PCLPointCloud2);
-						pcl::concatenatePointCloud(*assembled, output2, *assembledTmp);
+						if(rangeMin_ > 0.0 || rangeMax_ > 0.0)
+						{
+							pcl::PCLPointCloud2 output2;
+							pcl_conversions::toPCL(*clouds_[i], output2);
+							rtabmap::LaserScan scan = rtabmap::util3d::laserScanFromPointCloud(output2);
+							scan = rtabmap::util3d::rangeFiltering(scan, rangeMin_, rangeMax_);
+							pcl::concatenatePointCloud(*assembled, *rtabmap::util3d::laserScanToPointCloud2(scan, t), *assembledTmp);
+						}
+						else
+						{
+							sensor_msgs::PointCloud2 output;
+							pcl_ros::transformPointCloud(t.toEigen4f(), *clouds_[i], output);
+							pcl::PCLPointCloud2 output2;
+							pcl_conversions::toPCL(output, output2);
+							pcl::concatenatePointCloud(*assembled, output2, *assembledTmp);
+						}
+
 						assembled = assembledTmp;
 					}
 
@@ -235,6 +253,8 @@ private:
 	int skipClouds_;
 	int cloudsSkipped_;
 	double waitForTransformDuration_;
+	double rangeMin_;
+	double rangeMax_;
 	std::string fixedFrameId_;
 	tf::TransformListener tfListener_;
 

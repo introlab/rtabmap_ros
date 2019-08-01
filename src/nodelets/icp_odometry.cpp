@@ -59,6 +59,8 @@ public:
 		OdometryROS(false, false, true),
 		scanCloudMaxPoints_(0),
 		scanDownsamplingStep_(1),
+		scanRangeMin_(0),
+		scanRangeMax_(0),
 		scanVoxelSize_(0.0),
 		scanNormalK_(0),
 		scanNormalRadius_(0.0)
@@ -78,8 +80,10 @@ private:
 
 		pnh.param("scan_cloud_max_points",  scanCloudMaxPoints_, scanCloudMaxPoints_);
 		pnh.param("scan_downsampling_step", scanDownsamplingStep_, scanDownsamplingStep_);
-		pnh.param("scan_voxel_size", scanVoxelSize_, scanVoxelSize_);
-		pnh.param("scan_normal_k", scanNormalK_, scanNormalK_);
+		pnh.param("scan_range_min",         scanRangeMin_, scanRangeMin_);
+		pnh.param("scan_range_max",         scanRangeMax_, scanRangeMax_);
+		pnh.param("scan_voxel_size",        scanVoxelSize_, scanVoxelSize_);
+		pnh.param("scan_normal_k",          scanNormalK_, scanNormalK_);
 		if(pnh.hasParam("scan_cloud_normal_k") && !pnh.hasParam("scan_normal_k"))
 		{
 			ROS_WARN("rtabmap: Parameter \"scan_cloud_normal_k\" has been renamed to \"scan_normal_k\". "
@@ -90,6 +94,8 @@ private:
 
 		NODELET_INFO("IcpOdometry: scan_cloud_max_points  = %d", scanCloudMaxPoints_);
 		NODELET_INFO("IcpOdometry: scan_downsampling_step = %d", scanDownsamplingStep_);
+		NODELET_INFO("IcpOdometry: scan_range_min         = %f m", scanRangeMin_);
+		NODELET_INFO("IcpOdometry: scan_range_max         = %f m", scanRangeMax_);
 		NODELET_INFO("IcpOdometry: scan_voxel_size        = %f m", scanVoxelSize_);
 		NODELET_INFO("IcpOdometry: scan_normal_k          = %d", scanNormalK_);
 		NODELET_INFO("IcpOdometry: scan_normal_radius     = %f m", scanNormalRadius_);
@@ -119,13 +125,49 @@ private:
 			{
 				if(!pnh.hasParam("scan_downsampling_step"))
 				{
-					ROS_WARN("IcpOdometry: Transferring value %s of \"%s\" to ros parameter \"scan_downsampling_step\" for convenience. \"%s\" is set to 0.", iter->second.c_str(), iter->first.c_str(), iter->first.c_str());
+					ROS_WARN("IcpOdometry: Transferring value %s of \"%s\" to ros parameter \"scan_downsampling_step\" for convenience. \"%s\" is set to 1.", iter->second.c_str(), iter->first.c_str(), iter->first.c_str());
 					scanDownsamplingStep_ = value;
 					iter->second = "1";
 				}
 				else
 				{
 					ROS_WARN("IcpOdometry: Both parameter \"%s\" and ros parameter \"scan_downsampling_step\" are set.", iter->first.c_str());
+				}
+			}
+		}
+		iter = parameters.find(Parameters::kIcpRangeMin());
+		if(iter != parameters.end())
+		{
+			int value = uStr2Int(iter->second);
+			if(value > 1)
+			{
+				if(!pnh.hasParam("scan_range_min"))
+				{
+					ROS_WARN("IcpOdometry: Transferring value %s of \"%s\" to ros parameter \"scan_range_min\" for convenience. \"%s\" is set to 0.", iter->second.c_str(), iter->first.c_str(), iter->first.c_str());
+					scanRangeMin_ = value;
+					iter->second = "0";
+				}
+				else
+				{
+					ROS_WARN("IcpOdometry: Both parameter \"%s\" and ros parameter \"scan_range_min\" are set.", iter->first.c_str());
+				}
+			}
+		}
+		iter = parameters.find(Parameters::kIcpRangeMax());
+		if(iter != parameters.end())
+		{
+			int value = uStr2Int(iter->second);
+			if(value > 1)
+			{
+				if(!pnh.hasParam("scan_range_max"))
+				{
+					ROS_WARN("IcpOdometry: Transferring value %s of \"%s\" to ros parameter \"scan_range_max\" for convenience. \"%s\" is set to 0.", iter->second.c_str(), iter->first.c_str(), iter->first.c_str());
+					scanRangeMax_ = value;
+					iter->second = "0";
+				}
+				else
+				{
+					ROS_WARN("IcpOdometry: Both parameter \"%s\" and ros parameter \"scan_range_max\" are set.", iter->first.c_str());
 				}
 			}
 		}
@@ -371,8 +413,14 @@ private:
 			}
 		}
 
+		LaserScan laserScan = LaserScan::backwardCompatibility(scan, maxLaserScans, 0, localScanTransform);
+		if(scanRangeMin_ > 0 || scanRangeMax_ > 0)
+		{
+			laserScan = util3d::rangeFiltering(laserScan, scanRangeMin_, scanRangeMax_);
+		}
+
 		rtabmap::SensorData data(
-				LaserScan::backwardCompatibility(scan, maxLaserScans, 0, localScanTransform),
+				laserScan,
 				cv::Mat(),
 				cv::Mat(),
 				CameraModel(),
@@ -394,6 +442,8 @@ private:
 	ros::Publisher filtered_scan_pub_;
 	int scanCloudMaxPoints_;
 	int scanDownsamplingStep_;
+	double scanRangeMin_;
+	double scanRangeMax_;
 	double scanVoxelSize_;
 	int scanNormalK_;
 	double scanNormalRadius_;
