@@ -2009,7 +2009,15 @@ void CoreWrapper::tagDetectionsAsyncCallback(const apriltag_ros::AprilTagDetecti
 			if(tagDetections.detections[i].id.size() >= 1)
 			{
 				geometry_msgs::PoseWithCovarianceStamped p = tagDetections.detections[i].pose;
-				p.header.frame_id = tagDetections.header.frame_id; // make sure we pass frame_id of parent
+				p.header = tagDetections.header;
+				if(!tagDetections.detections[i].pose.header.frame_id.empty())
+				{
+					p.header.frame_id = tagDetections.detections[i].pose.header.frame_id;
+				}
+				if(!tagDetections.detections[i].pose.header.stamp.isZero())
+				{
+					p.header.stamp = tagDetections.detections[i].pose.header.stamp;
+				}
 				uInsert(tags_, std::make_pair(tagDetections.detections[i].id[0], p));
 			}
 		}

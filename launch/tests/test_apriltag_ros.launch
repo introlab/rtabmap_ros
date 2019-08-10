@@ -2,11 +2,11 @@
   <!-- Print on the file tag_bundle1.png (with GIMP: set size in Image Settings to 160x240mm) -->
   <!-- Definition of the tag bundle is tags.yaml, make sure the camera is calibrated or adjust the size of the tag if needed -->
   <!-- The TF published by apriltag_ros should match the point cloud created by the camera -->
-  <!-- Change Optimizer/Strategy below between 1 (g2o) and 2 (GTSAM), and tag_angular_variance between 0.005 (optimize rotation) and 9999 (optimize only tag's XYZ) -->
+  <!-- Change Optimizer/Strategy below between 1 (g2o) and 2 (GTSAM), and landmark_angular_variance between 0.005 (optimize rotation) and 9999 (optimize only tag's XYZ) -->
 
   <!-- $ roslaunch realsense2_camera rs_camera.launch align_depth:=true -->
   <!-- $ roslaunch rtabmap_ros test_apriltag_ros.launch rgb_topic:=/camera/color/image_raw camera_info_topic:=/camera/color/camera_info -->
-  <!-- $ roslaunch rtabmap_ros rtabmap.launch depth_topic:=/camera/aligned_depth_to_color/image_raw rgb_topic:=/camera/color/image_raw camera_info_topic:=/camera/color/camera_info rviz:=true rtabmapviz:=false args:="-d -Optimizer/Strategy 1" tag_angular_variance:=9999 -->
+  <!-- $ roslaunch rtabmap_ros rtabmap.launch depth_topic:=/camera/aligned_depth_to_color/image_raw rgb_topic:=/camera/color/image_raw camera_info_topic:=/camera/color/camera_info rviz:=true rtabmapviz:=false args:="-d -Optimizer/Strategy 1" landmark_angular_variance:=9999 -->
 
   <arg name="camera_frame_id"         default="camera_color_optical_frame"/>
   <arg name="rgb_topic"               default="/camera/rgb/image_rect_color" />
