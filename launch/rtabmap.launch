@@ -184,6 +184,7 @@
           <remap from="rgb/camera_info" to="$(arg camera_info_topic)"/>
           <remap from="rgbd_image"      to="$(arg rgbd_topic_relay)"/>
           <remap from="odom"            to="$(arg odom_topic)"/>
+          <remap from="imu"             to="$(arg imu_topic)"/>
       
           <param name="frame_id"                    type="string" value="$(arg frame_id)"/>
           <param name="odom_frame_id"               type="string" value="$(arg vo_frame_id)"/>
@@ -234,6 +235,7 @@
       <remap from="scan"                   to="$(arg scan_topic)"/>
       <remap from="scan_cloud"             to="$(arg scan_cloud_topic)"/>
       <remap from="odom"                   to="$(arg odom_topic)"/>
+      <remap from="imu"                    to="$(arg imu_topic)"/>
       
       <param name="frame_id"                    type="string" value="$(arg frame_id)"/>
       <param name="odom_frame_id"               type="string" value="$(arg vo_frame_id)"/>
