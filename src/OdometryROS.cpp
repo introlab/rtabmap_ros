@@ -81,7 +81,8 @@ OdometryROS::OdometryROS(bool stereoParams, bool visParams, bool icpParams) :
 	previousStamp_(0.0),
 	expectedUpdateRate_(0.0),
 	odomStrategy_(Parameters::defaultOdomStrategy()),
-	waitIMUToinit_(false)
+	waitIMUToinit_(false),
+	imuProcessed_(false)
 {
 
 }
@@ -487,13 +488,14 @@ void OdometryROS::callbackIMU(const sensor_msgs::ImuConstPtr& msg)
 		{
 			SensorData data(imu, 0, stamp);
 			this->processData(data, msg->header.stamp);
+			imuProcessed_ = true;
 		}
 	}
 }
 
 void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 {
-	if(waitIMUToinit_ && odometry_->framesProcessed() == 0 && odometry_->getPose().isIdentity() && data.imu().empty())
+	if((waitIMUToinit_ && !imuProcessed_) && odometry_->framesProcessed() == 0 && odometry_->getPose().isIdentity() && data.imu().empty())
 	{
 		NODELET_WARN("odometry: waiting imu to initialize orientation (wait_imu_to_init=true)");
 		return;
@@ -876,6 +878,7 @@ void OdometryROS::reset(const Transform & pose)
 	guessPreviousPose_.setNull();
 	previousStamp_ = 0.0;
 	resetCurrentCount_ = resetCountdown_;
+	imuProcessed_ = false;
 	this->flushCallbacks();
 }
 

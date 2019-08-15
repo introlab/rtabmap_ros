@@ -11,23 +11,23 @@ Examples:
       $ rosbag play -.-clock MH_01_easy.bag
 
    MSCKF (VIO):
-      $ roslaunch rtabmap_ros euroc_datasets.launch args:="--Odom/Strategy 8"
+      $ roslaunch rtabmap_ros euroc_datasets.launch args:="Odom/Strategy 8"
       $ rosbag play -.-clock V1_01_easy.bag
 
       We need to ignore the first 24 seconds for correct VIO initialization (drone should not move).
-      $ roslaunch rtabmap_ros euroc_datasets.launch args:="--Odom/Strategy 8" MH_seq:=true
+      $ roslaunch rtabmap_ros euroc_datasets.launch args:="Odom/Strategy 8" MH_seq:=true
       $ rosbag play -.-clock -s 24 MH_01_easy.bag
 
    OKVIS (VIO):
-      $ roslaunch rtabmap_ros euroc_datasets.launch args:="--Odom/Strategy 6 OdomOKVIS/ConfigPath ~/okvis/config/config_fpga_p2_euroc.yaml" MH_seq:=true raw_images_for_odom:=true
+      $ roslaunch rtabmap_ros euroc_datasets.launch args:="Odom/Strategy 6 OdomOKVIS/ConfigPath ~/okvis/config/config_fpga_p2_euroc.yaml" MH_seq:=true raw_images_for_odom:=true
       $ rosbag play -.-clock MH_01_easy.bag
 
    VINS (VIO):
-      $ roslaunch rtabmap_ros euroc_datasets.launch args:="--Odom/Strategy 9 OdomVINS/ConfigPath ~/catkin_ws/src/VINS-Fusion/config/euroc/euroc_stereo_imu_config.yaml" MH_seq:=true raw_images_for_odom:=true
+      $ roslaunch rtabmap_ros euroc_datasets.launch args:="Odom/Strategy 9 OdomVINS/ConfigPath ~/catkin_ws/src/VINS-Fusion/config/euroc/euroc_stereo_imu_config.yaml" MH_seq:=true raw_images_for_odom:=true
       $ rosbag play -.-clock MH_01_easy.bag
 
    VINS (VO):
-      $ roslaunch rtabmap_ros euroc_datasets.launch args:="--Odom/Strategy 9 OdomVINS/ConfigPath ~/catkin_ws/src/VINS-Fusion/config/euroc/euroc_stereo_config.yaml" MH_seq:=true raw_images_for_odom:=true
+      $ roslaunch rtabmap_ros euroc_datasets.launch args:="Odom/Strategy 9 OdomVINS/ConfigPath ~/catkin_ws/src/VINS-Fusion/config/euroc/euroc_stereo_config.yaml" MH_seq:=true raw_images_for_odom:=true
       $ rosbag play -.-clock MH_01_easy.bag
 -->
 
@@ -99,8 +99,8 @@ Examples:
 
 <!-- RTAB-Map -->
 <include file="$(find rtabmap_ros)/launch/rtabmap.launch">
-   <arg     if="$(arg raw_images_for_odom)" name="rtabmap_args" value="$(arg args) --Rtabmap/ImagesAlreadyRectified false"/>
-   <arg unless="$(arg raw_images_for_odom)" name="rtabmap_args" value="$(arg args)"/>
+   <arg     if="$(arg raw_images_for_odom)" name="rtabmap_args" value="$(arg common_args) --Rtabmap/ImagesAlreadyRectified false"/>
+   <arg unless="$(arg raw_images_for_odom)" name="rtabmap_args" value="$(arg common_args)"/>
    <arg     if="$(arg raw_images_for_odom)" name="odom_args" value="--Rtabmap/ImagesAlreadyRectified false"/>
    <arg     if="$(arg raw_images_for_odom)" name="left_image_topic" value="/cam0/image_raw"/>
    <arg     if="$(arg raw_images_for_odom)" name="right_image_topic" value="/cam1/image_raw"/>

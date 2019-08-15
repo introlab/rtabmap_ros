@@ -139,6 +139,7 @@ private:
 	double expectedUpdateRate_;
 	int odomStrategy_;
 	bool waitIMUToinit_;
+	bool imuProcessed_;
 };
 
 }

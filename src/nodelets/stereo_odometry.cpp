@@ -365,7 +365,6 @@ private:
 	typedef message_filters::sync_policies::ExactTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo, sensor_msgs::CameraInfo> MyExactSyncPolicy;
 	message_filters::Synchronizer<MyExactSyncPolicy> * exactSync_;
 	ros::Subscriber rgbdSub_;
-	ros::Subscriber imuSub_;
 	int queueSize_;
 };
 
