@@ -52,6 +52,44 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/OdometryEvent.h>
 #include <cmath>
 
+#include <sys/ioctl.h>
+#include <termios.h>
+bool spacehit()
+{
+	bool charAvailable = true;
+	bool hit = false;
+	while(charAvailable)
+	{
+		termios term;
+		tcgetattr(0, &term);
+
+		termios term2 = term;
+		term2.c_lflag &= ~ICANON;
+		term2.c_lflag &= ~ECHO;
+		term2.c_lflag &= ~ISIG;
+		term2.c_cc[VMIN] = 0;
+		term2.c_cc[VTIME] = 0;
+		tcsetattr(0, TCSANOW, &term2);
+
+		int c = getchar();
+		if(c != EOF)
+		{
+			if(c == ' ')
+			{
+				hit = true;
+			}
+		}
+		else
+		{
+			charAvailable = false;
+		}
+
+		tcsetattr(0, TCSANOW, &term);
+	}
+
+    return hit;
+}
+
 bool paused = false;
 bool pauseCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
@@ -597,8 +635,25 @@ int main(int argc, char** argv)
 
 		ros::spinOnce();
 
-		while(ros::ok() && paused)
+		while(ros::ok())
 		{
+			if (spacehit()) {
+				paused = !paused;
+				if(paused)
+				{
+					ROS_INFO("paused!");
+				}
+				else
+				{
+					ROS_INFO("resumed!");
+				}
+			}
+
+			if(!paused)
+			{
+				break;
+			}
+
 			uSleep(100);
 			ros::spinOnce();
 		}
