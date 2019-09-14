@@ -455,6 +455,8 @@ install(TARGETS
    rtabmap_odom_msg_to_tf
    rtabmap_pointcloud_to_depthimage
    rtabmap_camera
+   rtabmap_rgbd_sync
+   rtabmap_rgbd_relay
    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
@@ -475,6 +477,8 @@ install(TARGETS
    rtabmap_odom_msg_to_tf
    rtabmap_pointcloud_to_depthimage
    rtabmap_camera
+   rtabmap_rgbd_sync
+   rtabmap_rgbd_relay
    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
