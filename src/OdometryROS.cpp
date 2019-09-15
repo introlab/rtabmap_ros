@@ -82,7 +82,8 @@ OdometryROS::OdometryROS(bool stereoParams, bool visParams, bool icpParams) :
 	expectedUpdateRate_(0.0),
 	odomStrategy_(Parameters::defaultOdomStrategy()),
 	waitIMUToinit_(false),
-	imuProcessed_(false)
+	imuProcessed_(false),
+	lastImuReceivedStamp_(0.0)
 {
 
 }
@@ -489,6 +490,13 @@ void OdometryROS::callbackIMU(const sensor_msgs::ImuConstPtr& msg)
 			SensorData data(imu, 0, stamp);
 			this->processData(data, msg->header.stamp);
 			imuProcessed_ = true;
+			lastImuReceivedStamp_ = stamp;
+
+			if(bufferedData_.isValid() && stamp >= bufferedData_.stamp())
+			{
+				processData(bufferedData_, ros::Time(bufferedData_.stamp()));
+			}
+			bufferedData_ = SensorData();
 		}
 	}
 }
@@ -504,6 +512,17 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 	Transform groundTruth;
 	if(!data.imageRaw().empty() || !data.laserScanRaw().isEmpty())
 	{
+		if(odometry_->canProcessIMU() && data.imu().empty() && lastImuReceivedStamp_>0.0 && data.stamp() > lastImuReceivedStamp_)
+		{
+			//NODELET_WARN("Data received is more recent than last imu received, waiting for imu update to process it.");
+			if(bufferedData_.isValid())
+			{
+				NODELET_ERROR("Overwriting previous data! Make sure IMU is published faster than data rate.");
+			}
+			bufferedData_ = data;
+			return;
+		}
+
 		if(previousStamp_>0.0 && previousStamp_ >= stamp.toSec())
 		{
 			NODELET_WARN("Odometry: Detected not valid consecutive stamps (previous=%fs new=%fs). New stamp should be always greater than previous stamp. This new data is ignored. This message will appear only once.",
@@ -879,6 +898,8 @@ void OdometryROS::reset(const Transform & pose)
 	previousStamp_ = 0.0;
 	resetCurrentCount_ = resetCountdown_;
 	imuProcessed_ = false;
+	bufferedData_= SensorData();
+	lastImuReceivedStamp_=0.0;
 	this->flushCallbacks();
 }
 
