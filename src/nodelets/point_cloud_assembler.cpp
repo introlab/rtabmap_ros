@@ -33,6 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/io/pcd_io.h>
+#include <pcl/filters/voxel_grid.h>
 
 #include <pcl_ros/transforms.h>
 
@@ -72,6 +73,7 @@ public:
 		waitForTransformDuration_(0.1),
 		rangeMin_(0),
 		rangeMax_(0),
+		voxelSize_(0),
 		fixedFrameId_("odom")
 	{}
 
@@ -102,6 +104,7 @@ private:
 		pnh.param("wait_for_transform_duration", waitForTransformDuration_, waitForTransformDuration_);
 		pnh.param("range_min", rangeMin_, rangeMin_);
 		pnh.param("range_max", rangeMax_, rangeMax_);
+		pnh.param("voxel_size", voxelSize_, voxelSize_);
 		ROS_ASSERT(maxClouds_>0);
 
 		cloudsSkipped_ = skipClouds_;
@@ -191,7 +194,10 @@ private:
 							pcl::PCLPointCloud2 output2;
 							pcl_conversions::toPCL(*clouds_[i], output2);
 							rtabmap::LaserScan scan = rtabmap::util3d::laserScanFromPointCloud(output2);
-							scan = rtabmap::util3d::rangeFiltering(scan, rangeMin_, rangeMax_);
+							if(rangeMin_ > 0.0 || rangeMax_ > 0.0)
+							{
+								scan = rtabmap::util3d::rangeFiltering(scan, rangeMin_, rangeMax_);
+							}
 							pcl::concatenatePointCloud(*assembled, *rtabmap::util3d::laserScanToPointCloud2(scan, t), *assembledTmp);
 						}
 						else
@@ -207,7 +213,19 @@ private:
 					}
 
 					sensor_msgs::PointCloud2 rosCloud;
-					pcl_conversions::moveFromPCL(*assembled, rosCloud);
+					if(voxelSize_>0.0)
+					{
+						pcl::VoxelGrid<pcl::PCLPointCloud2> filter;
+						filter.setLeafSize(voxelSize_, voxelSize_, voxelSize_);
+						filter.setInputCloud(assembled);
+						pcl::PCLPointCloud2Ptr output(new pcl::PCLPointCloud2);
+						filter.filter(*output);
+						pcl_conversions::moveFromPCL(*output, rosCloud);
+					}
+					else
+					{
+						pcl_conversions::moveFromPCL(*assembled, rosCloud);
+					}
 					rosCloud.header = cloudMsg->header;
 					cloudPub_.publish(rosCloud);
 					clouds_.clear();
@@ -255,6 +273,7 @@ private:
 	double waitForTransformDuration_;
 	double rangeMin_;
 	double rangeMax_;
+	double voxelSize_;
 	std::string fixedFrameId_;
 	tf::TransformListener tfListener_;
 
