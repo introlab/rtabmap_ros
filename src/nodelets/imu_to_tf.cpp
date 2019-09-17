@@ -40,7 +40,8 @@ class ImuToTF : public nodelet::Nodelet
 {
 public:
 	ImuToTF() :
-		fixedFrameId_("odom")
+		fixedFrameId_("odom"),
+		waitForTransformDuration_(0.1)
 	{}
 
 	virtual ~ImuToTF()
@@ -55,6 +56,7 @@ private:
 
 		pnh.param("fixed_frame_id", fixedFrameId_, fixedFrameId_);
 		pnh.param("base_frame_id", baseFrameId_, baseFrameId_);
+		pnh.param("wait_for_transform_duration", waitForTransformDuration_, waitForTransformDuration_);
 		NODELET_INFO("fixed_frame_id: %s", fixedFrameId_.c_str());
 		NODELET_INFO("base_frame_id: %s", baseFrameId_.c_str());
 
@@ -77,7 +79,7 @@ private:
 			try
 			{
 				std::string errorMsg;
-				if(!tfListener_.waitForTransform(baseFrameId_, msg->header.frame_id, msg->header.stamp, ros::Duration(0.1), ros::Duration(0.01), &errorMsg))
+				if(!tfListener_.waitForTransform(baseFrameId_, msg->header.frame_id, msg->header.stamp, ros::Duration(waitForTransformDuration_), ros::Duration(0.01), &errorMsg))
 				{
 					NODELET_ERROR("Could not get transform from %s to %s after %f seconds (for stamp=%f)! Error=\"%s\".",
 							baseFrameId_.c_str(), msg->header.frame_id.c_str(), 0.1, msg->header.stamp.toSec(), errorMsg.c_str());
@@ -110,6 +112,7 @@ private:
 	std::string fixedFrameId_;
 	std::string baseFrameId_;
 	tf::TransformListener tfListener_;
+	double waitForTransformDuration_;
 };
 
 
