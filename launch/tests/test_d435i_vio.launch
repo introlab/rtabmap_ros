@@ -19,15 +19,17 @@
    <remap from="/imu/data"     to="/rtabmap/imu"/>
 </node>
 
+<node pkg="topic_tools" type="throttle" name="imu_throttle" args="messages /rtabmap/imu 100.0"/>
+
 <!-- RTAB-Map: depth mode -->
 <!-- We have to launch stereo_odometry externally from rtabmap.launch so that rtabmap can use RGB-D input -->
 <group ns="rtabmap">
-<node if="$(arg depth_mode)" pkg="rtabmap_ros" type="stereo_odometry" name="stereo_odometry" args="--Optimizer/GravitySigma 0.3 --Odom/Strategy 9 --OdomVINS/ConfigPath $(find vins)/../config/realsense_d435i/realsense_stereo_imu_config.yaml">
+<node if="$(arg depth_mode)" pkg="rtabmap_ros" type="stereo_odometry" name="stereo_odometry" args="--Optimizer/GravitySigma 0.3 --Odom/Strategy 9 --OdomVINS/ConfigPath $(find vins)/../config/realsense_d435i/realsense_stereo_imu_config.yaml --Rtabmap/ImagesAlreadyRectified false" output="screen">
    <remap from="left/image_rect"   to="/camera/infra1/image_rect_raw"/>
    <remap from="right/image_rect"  to="/camera/infra2/image_rect_raw"/>
    <remap from="left/camera_info"  to="/camera/infra1/camera_info"/>
    <remap from="right/camera_info" to="/camera/infra2/camera_info"/>
-   <remap from="imu"               to="/rtabmap/imu"/>
+   <remap from="imu"               to="/rtabmap/imu_throttle"/>
    <param name="frame_id"          value="camera_link"/>
    <param name="wait_imu_to_init"  value="true"/>
 </node>
@@ -39,7 +41,7 @@
    <arg name="camera_info_topic" value="/camera/color/camera_info"/>
    <arg name="visual_odometry"   value="false"/>
    <arg name="frame_id"          value="camera_link"/>
-   <arg name="imu_topic"         value="/rtabmap/imu"/>
+   <arg name="imu_topic"         value="/rtabmap/imu_throttle"/>
    <arg name="rtabmapviz"        value="$(arg rtabmapviz)"/>
    <arg name="rviz"              value="$(arg rviz)"/>
 </include>
@@ -47,13 +49,14 @@
 <!-- RTAB-Map: Stereo mode -->
 <include unless="$(arg depth_mode)" file="$(find rtabmap_ros)/launch/rtabmap.launch">
    <arg name="rtabmap_args"            value="--delete_db_on_start --Optimizer/GravitySigma 0.3 --Odom/Strategy 9 --OdomVINS/ConfigPath $(find vins)/../config/realsense_d435i/realsense_stereo_imu_config.yaml"/>
+   <arg name="odom_args"               value="--Rtabmap/ImagesAlreadyRectified false"/>
    <arg name="left_image_topic"        value="/camera/infra1/image_rect_raw"/>
    <arg name="right_image_topic"       value="/camera/infra2/image_rect_raw"/>
    <arg name="left_camera_info_topic"  value="/camera/infra1/camera_info"/>
    <arg name="right_camera_info_topic" value="/camera/infra2/camera_info"/>
    <arg name="stereo"                  value="true"/>
    <arg name="frame_id"                value="camera_link"/>
-   <arg name="imu_topic"               value="/rtabmap/imu"/>
+   <arg name="imu_topic"               value="/rtabmap/imu_throttle"/>
    <arg name="wait_imu_to_init"        value="true"/>
    <arg name="rtabmapviz"              value="$(arg rtabmapviz)"/>
    <arg name="rviz"                    value="$(arg rviz)"/>
