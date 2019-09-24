@@ -23,8 +23,8 @@
     <param if="$(arg use_sim_time)" name="use_sim_time" value="true"/>
     
     <!-- Ouster -->
-    <remap from="/os1_cloud_node/imu" to="/os1_cloud_node/imu/data_raw"/>
-    <include file="$(find ouster_ros)/os1.launch">
+    <remap unless="$(arg use_sim_time)" from="/os1_cloud_node/imu" to="/os1_cloud_node/imu/data_raw"/>
+    <include unless="$(arg use_sim_time)" file="$(find ouster_ros)/os1.launch">
       <arg name="os1_hostname" value="$(arg os1_hostname)"/>
       <arg name="os1_udp_dest" value="$(arg os1_udp_dest)"/>
       <arg     if="$(arg scan_20_hz)" name="lidar_mode" value="1024x20"/>
