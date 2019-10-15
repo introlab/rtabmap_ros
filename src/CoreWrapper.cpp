@@ -475,7 +475,7 @@ void CoreWrapper::onInit()
 			}
 		}
 	}
-
+	ParametersMap modifiedParameters = parameters_;
 	// Add all other parameters (not copied if already exists)
 	parameters_.insert(allParameters.begin(), allParameters.end());
 
@@ -592,7 +592,7 @@ void CoreWrapper::onInit()
 	}
 	else if(publishTf)
 	{
-		UWARN("Graph optimization is disabled (%s=0), the tf between frame \"%s\" and odometry frame will not be published. You can safely ignore this warning if you are using map_optimizer node.",
+		NODELET_WARN("Graph optimization is disabled (%s=0), the tf between frame \"%s\" and odometry frame will not be published. You can safely ignore this warning if you are using map_optimizer node.",
 				Parameters::kOptimizerIterations().c_str(), mapFrameId_.c_str());
 	}
 
@@ -623,7 +623,7 @@ void CoreWrapper::onInit()
 			!this->isSubscribedToRGB() &&
 			(this->isSubscribedToScan2d() || this->isSubscribedToScan3d() || this->isSubscribedToOdom()))
 	{
-		ROS_WARN("There is no image subscription, bag-of-words loop closure detection will be disabled...");
+		NODELET_WARN("There is no image subscription, bag-of-words loop closure detection will be disabled...");
 		int kpMaxFeatures = Parameters::defaultKpMaxFeatures();
 		int registrationStrategy = Parameters::defaultRegStrategy();
 		Parameters::parse(parameters_, Parameters::kKpMaxFeatures(), kpMaxFeatures);
@@ -632,14 +632,30 @@ void CoreWrapper::onInit()
 		if(kpMaxFeatures!= -1)
 		{
 			uInsert(parameters_, ParametersPair(Parameters::kKpMaxFeatures(), "-1"));
-			ROS_WARN("Setting %s=-1 (bag-of-words disabled)", Parameters::kKpMaxFeatures().c_str());
+			NODELET_WARN("Setting %s=-1 (bag-of-words disabled)", Parameters::kKpMaxFeatures().c_str());
 			updateParams = true;
 		}
 		if((this->isSubscribedToScan2d() || this->isSubscribedToScan3d()) && registrationStrategy != 1)
 		{
 			uInsert(parameters_, ParametersPair(Parameters::kRegStrategy(), "1"));
-			ROS_WARN("Setting %s=1 (ICP)", Parameters::kRegStrategy().c_str());
+			NODELET_WARN("Setting %s=1 (ICP)", Parameters::kRegStrategy().c_str());
 			updateParams = true;
+
+			if(this->isSubscribedToScan2d())
+			{
+				if(modifiedParameters.find(Parameters::kRGBDProximityPathMaxNeighbors()) == modifiedParameters.end())
+				{
+					NODELET_WARN("Setting \"%s\" parameter to 10 (default 0) as \"subscribe_scan\" is "
+							"true and \"%s\" uses ICP. Proximity detection by space will be also done by merging close "
+							"scans. To disable, set \"%s\" to 0. To suppress this warning, "
+							"add <param name=\"%s\" type=\"string\" value=\"10\"/>",
+							Parameters::kRGBDProximityPathMaxNeighbors().c_str(),
+							Parameters::kRegStrategy().c_str(),
+							Parameters::kRGBDProximityPathMaxNeighbors().c_str(),
+							Parameters::kRGBDProximityPathMaxNeighbors().c_str());
+					uInsert(parameters_, ParametersPair(Parameters::kRGBDProximityPathMaxNeighbors(), "10"));
+				}
+			}
 		}
 		if(updateParams)
 		{
