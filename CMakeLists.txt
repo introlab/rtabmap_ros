@@ -129,7 +129,10 @@ generate_dynamic_reconfigure_options(cfg/Camera.cfg)
 
 SET(optional_dependencies "")		
 IF(costmap_2d_FOUND)		
-   SET(optional_dependencies ${optional_dependencies} costmap_2d)		
+   SET(optional_dependencies ${optional_dependencies} costmap_2d)
+   IF(${costmap_2d_VERSION_MAJOR} GREATER 1 OR ${costmap_2d_VERSION_MINOR} GREATER 15)
+       ADD_DEFINITIONS("-DCOSTMAP_2D_POINTCLOUD2")
+   ENDIF(${costmap_2d_VERSION_MAJOR} GREATER 1 OR ${costmap_2d_VERSION_MINOR} GREATER 15)
 ENDIF(costmap_2d_FOUND)		
 IF(octomap_msgs_FOUND)		
    SET(optional_dependencies ${optional_dependencies} octomap_msgs)		
@@ -230,6 +233,7 @@ SET(Libraries
   )
 SET(rtabmap_plugins_lib_src
   src/costmap_2d/static_layer.cpp
+  src/costmap_2d/voxel_layer.cpp
   ${rtabmap_plugins_lib_src}
   )
 ENDIF(costmap_2d_FOUND)
