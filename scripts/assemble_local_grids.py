@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
-# Similar to map_assembler node, this minimal python example shows how 
-# to reconstruct the obstacle map by subscribing only to 
+# Similar to map_assembler node, this minimal python example shows how
+# to reconstruct the obstacle map by subscribing only to
 # graph and latest data added to map (for constant network bandwidth usage).
 
 import rospy
@@ -31,26 +31,25 @@ def callback(graph, cloud):
     nodeId = graph.posesId[-1]
     pose = graph.poses[-1]
     size = cloud.width
-    
+
     posesDict[nodeId] = pose
     cloudsDict[nodeId] = cloud
-    
-    # Update pose of our buffered clouds. 
+
+    # Update pose of our buffered clouds.
     # Check also if the clouds have moved because of a loop closure. If so, we have to update the rendering.
     maxDiff = 0
-    updateWholeMap = False
     for i in range(0,len(graph.posesId)):
         if graph.posesId[i] in posesDict:
             currentPose = posesDict[graph.posesId[i]].position
             newPose = graph.poses[i].position
             diff = max([abs(currentPose.x-newPose.x), abs(currentPose.y-newPose.y), abs(currentPose.z-newPose.z)])
-            if maxDiff < diff: 
+            if maxDiff < diff:
                 maxDiff = diff
         else:
             rospy.loginfo("Old node %d not found in cache, creating an empty cloud.", graph.posesId[i])
             posesDict[graph.posesId[i]] = graph.poses[i]
             cloudsDict[graph.posesId[i]] = PointCloud2()
-    
+
     # If we don't move, some nodes would be removed from the graph, so remove them from our buffered clouds.
     newGraph = Set(graph.posesId)
     totalPoints = 0
@@ -60,8 +59,8 @@ def callback(graph, cloud):
             cloudsDict.pop(p)
         else:
             totalPoints = totalPoints + cloudsDict[p].width
-        
-    if maxDiff > 0.1: 
+
+    if maxDiff > 0.1:
         # if any node moved more than 10 cm, request an update of the assembled map so far
         newAssembledCloud = PointCloud2()
         rospy.loginfo("Map has been optimized! maxDiff=%.3fm, re-updating the whole map...", maxDiff)
@@ -92,11 +91,15 @@ def callback(graph, cloud):
             assembledCloud.data = assembledCloud.data + transformedCloud.data
             assembledCloud.width = assembledCloud.width + transformedCloud.width
             assembledCloud.row_step = assembledCloud.row_step + transformedCloud.row_step
-    
+
     updateTime = rospy.get_time() - begin
-    
-    rospy.loginfo("Received node %d (%d pts) at xyz=%.2f %.2f %.2f, q_xyzw=%.2f %.2f %.2f %.2f (Map: Nodes=%d Points=%d Assembled=%d Update=%.0fms)", nodeId, size, pose.position.x, pose.position.y, pose.position.z, pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w, len(cloudsDict), totalPoints, assembledCloud.width, updateTime*1000)
-    
+
+    rospy.loginfo("Received node %d (%d pts) at xyz=%.2f %.2f %.2f, q_xyzw=%.2f %.2f %.2f %.2f (Map: Nodes=%d Points=%d Assembled=%d Update=%.0fms)", 
+        nodeId, size,
+        pose.position.x, pose.position.y, pose.position.z,
+        pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w,
+        len(cloudsDict), totalPoints, assembledCloud.width, updateTime*1000)
+
     assembledCloud.header = graph.header
     pub.publish(assembledCloud)
 
