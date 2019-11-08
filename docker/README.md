@@ -1,10 +1,10 @@
 ### Docker
 
-* Available images (https://hub.docker.com/repository/docker/introlab3it/rtabmap_ros):
+* Available images on [introlab3it/rtabmap_ros](https://hub.docker.com/r/introlab3it/rtabmap_ros/):
     ```
-    introlab3it/rtabmap_ros:indigo-latest
-    introlab3it/rtabmap_ros:kinetic-latest
-    introlab3it/rtabmap_ros:melodic-latest
+    indigo-latest
+    kinetic-latest
+    melodic-latest
     ```
     * Those images are automatically built from latest version of `rtabmap` and `rtabmap_ros` from source.
 
