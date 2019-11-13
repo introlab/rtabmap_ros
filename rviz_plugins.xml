@@ -1,4 +1,4 @@
-<library path="lib/librtabmap_plugins">
+<library path="lib/librtabmap_rviz_plugins">
   <class name="rtabmap_ros/MapCloud"
          type="rtabmap_ros::MapCloudDisplay"
          base_class_type="rviz::Display">

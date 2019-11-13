@@ -41,6 +41,7 @@ script:
     - cd ../../catkin_ws
     - source devel/setup.bash
     - catkin_make
+    - catkin_make install
 
 notifications:
   email:
