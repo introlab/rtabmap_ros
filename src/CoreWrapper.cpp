@@ -2459,6 +2459,7 @@ bool CoreWrapper::resetRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empt
 	userData_ = cv::Mat();
 	userDataMutex_.unlock();
 	imus_.clear();
+	interOdoms_.clear();
 	return true;
 }
 
