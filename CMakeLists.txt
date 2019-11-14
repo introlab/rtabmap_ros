@@ -4,12 +4,12 @@ project(rtabmap_ros)
 # Policy CMP0043 introduced in cmake version 3.0 IGNORES the use of COMPILE_DEFINITIONS suffixed variables, e.g. COMPILE_DEFINITIONS_DEBUG
 # Set to OLD behavior until minimum cmake version >= 2.8.10 (version that COMPILE_DEFINITIONS can be set by generator expressions instead)
 if (POLICY CMP0043)
-	cmake_policy(SET CMP0043 OLD)
+    cmake_policy(SET CMP0043 OLD)
 endif (POLICY CMP0043)
 # Policy CMP0042 introduced in cmake version 3.0 enables the use of @rpath in an install name via MACOSX_RPATH by default
 # Set to OLD behavior so that all versions use the same behavior, or until minimum cmake version >= 2.8.12 (version where @rpath is available)
 if (POLICY CMP0042)
-	cmake_policy(SET CMP0042 OLD)
+    cmake_policy(SET CMP0042 OLD)
 endif (POLICY CMP0042)
 
 ## Find catkin macros and libraries
@@ -58,13 +58,6 @@ IF(RTABMAP_GUI OR rviz_FOUND)
       ENDIF()
    ENDIF()   
 ENDIF(RTABMAP_GUI OR rviz_FOUND)
-IF(rviz_FOUND)
-   ## We also use Ogre for rviz plugins
-   include($ENV{ROS_ROOT}/core/rosbuild/FindPkgConfig.cmake)
-   pkg_check_modules(OGRE OGRE)
-   include_directories( ${OGRE_INCLUDE_DIRS} )
-   link_directories( ${OGRE_LIBRARY_DIRS} )
-ENDIF(rviz_FOUND)
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
@@ -127,22 +120,19 @@ generate_dynamic_reconfigure_options(cfg/Camera.cfg)
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 
-SET(optional_dependencies "")		
-IF(costmap_2d_FOUND)		
+SET(optional_dependencies "")
+IF(costmap_2d_FOUND)
    SET(optional_dependencies ${optional_dependencies} costmap_2d)
-   IF(${costmap_2d_VERSION_MAJOR} GREATER 1 OR ${costmap_2d_VERSION_MINOR} GREATER 15)
-       ADD_DEFINITIONS("-DCOSTMAP_2D_POINTCLOUD2")
-   ENDIF(${costmap_2d_VERSION_MAJOR} GREATER 1 OR ${costmap_2d_VERSION_MINOR} GREATER 15)
-ENDIF(costmap_2d_FOUND)		
-IF(octomap_msgs_FOUND)		
-   SET(optional_dependencies ${optional_dependencies} octomap_msgs)		
-ENDIF(octomap_msgs_FOUND)			
-IF(rviz_FOUND)		
-   SET(optional_dependencies ${optional_dependencies} rviz)		
+ENDIF(costmap_2d_FOUND)
+IF(octomap_msgs_FOUND)
+   SET(optional_dependencies ${optional_dependencies} octomap_msgs)
+ENDIF(octomap_msgs_FOUND)
+IF(rviz_FOUND)
+   SET(optional_dependencies ${optional_dependencies} rviz)
 ENDIF(rviz_FOUND)
-IF(find_object_2d_FOUND)		
-   SET(optional_dependencies ${optional_dependencies} find_object_2d)		
-ENDIF(find_object_2d_FOUND)	
+IF(find_object_2d_FOUND)
+   SET(optional_dependencies ${optional_dependencies} find_object_2d)
+ENDIF(find_object_2d_FOUND)
 
 catkin_package(
   INCLUDE_DIRS include
@@ -223,21 +213,6 @@ ELSE()
    ADD_DEFINITIONS("-DCV_BRIDGE_HYDRO")
 ENDIF()   
 
-# If costmap_2d is found, add the plugin
-IF(costmap_2d_FOUND)
-MESSAGE(STATUS "WITH costmap_2d")
-include_directories(${costmap_2d_INCLUDE_DIRS})
-SET(Libraries
-  ${costmap_2d_LIBRARIES}
-  ${Libraries}
-  )
-SET(rtabmap_plugins_lib_src
-  src/costmap_2d/static_layer.cpp
-  src/costmap_2d/voxel_layer.cpp
-  ${rtabmap_plugins_lib_src}
-  )
-ENDIF(costmap_2d_FOUND)
-
 # If octomap is found, add definition
 IF(octomap_msgs_FOUND)
 MESSAGE(STATUS "WITH octomap_msgs")
@@ -264,51 +239,6 @@ SET(Libraries
 ADD_DEFINITIONS("-DWITH_APRILTAG_ROS")
 ENDIF(apriltag_ros_FOUND)
 
-# If rviz is found, add plugins
-IF(rviz_FOUND)
-MESSAGE(STATUS "WITH rviz")
-include_directories(
-  ${rviz_INCLUDE_DIRS}
-)
-SET(Libraries
-  ${Libraries}
-  ${rviz_LIBRARIES}
-  ${rviz_DEFAULT_PLUGIN_LIBRARIES}
-)
-
-## RVIZ plugin
-IF(QT4_FOUND)
-qt4_wrap_cpp(MOC_FILES
-  src/rviz/MapCloudDisplay.h
-  src/rviz/MapGraphDisplay.h
-  src/rviz/InfoDisplay.h
-  src/rviz/OrbitOrientedViewController.h
-)
-ELSE()
-qt5_wrap_cpp(MOC_FILES
-  src/rviz/MapCloudDisplay.h
-  src/rviz/MapGraphDisplay.h
-  src/rviz/InfoDisplay.h
-  src/rviz/OrbitOrientedViewController.h
-)
-ENDIF()
-
-# tf:message_filters, mixing boost and Qt signals
-set_property(
-   SOURCE src/rviz/MapCloudDisplay.cpp src/rviz/MapGraphDisplay.cpp src/rviz/InfoDisplay.cpp src/rviz/OrbitOrientedViewController.cpp
-   PROPERTY COMPILE_DEFINITIONS QT_NO_KEYWORDS
-)
-
-SET(rtabmap_plugins_lib_src
-   ${rtabmap_plugins_lib_src}
-   src/rviz/MapCloudDisplay.cpp
-   src/rviz/MapGraphDisplay.cpp
-   src/rviz/InfoDisplay.cpp
-   src/rviz/OrbitOrientedViewController.cpp
-   ${MOC_FILES}
-)
-ENDIF(rviz_FOUND)
-
 ############################
 ## Declare a cpp library
 ############################
@@ -331,9 +261,6 @@ target_link_libraries(rtabmap_ros
 target_link_libraries(rtabmap_plugins
   rtabmap_ros
 )
-IF(Qt5_FOUND)
-    QT5_USE_MODULES(rtabmap_plugins Widgets Core Gui)
-ENDIF(Qt5_FOUND)
 add_dependencies(rtabmap_ros ${${PROJECT_NAME}_EXPORTED_TARGETS})
 add_dependencies(rtabmap_plugins ${${PROJECT_NAME}_EXPORTED_TARGETS})
 
@@ -385,11 +312,11 @@ set_target_properties(rtabmap_wifi_signal_sub PROPERTIES OUTPUT_NAME "wifi_signa
 
 # If find_object_2d is found, add save objects example
 IF(find_object_2d_FOUND)
-MESSAGE(STATUS "WITH find_object_2d")
-include_directories(${find_object_2d_INCLUDE_DIRS})
-add_executable(rtabmap_save_objects_example src/SaveObjectsExample.cpp)
-target_link_libraries(rtabmap_save_objects_example ${Libraries} rtabmap_ros ${find_object_2d_LIBRARIES})
-set_target_properties(rtabmap_save_objects_example PROPERTIES OUTPUT_NAME "save_objects_example")
+    MESSAGE(STATUS "WITH find_object_2d")
+    include_directories(${find_object_2d_INCLUDE_DIRS})
+    add_executable(rtabmap_save_objects_example src/SaveObjectsExample.cpp)
+    target_link_libraries(rtabmap_save_objects_example ${Libraries} rtabmap_ros ${find_object_2d_LIBRARIES})
+    set_target_properties(rtabmap_save_objects_example PROPERTIES OUTPUT_NAME "save_objects_example")
 ENDIF(find_object_2d_FOUND)
 
 add_executable(rtabmap_camera src/CameraNode.cpp)
@@ -423,6 +350,80 @@ add_executable(rtabmap_pointcloud_to_depthimage src/PointCloudToDepthImageNode.c
 target_link_libraries(rtabmap_pointcloud_to_depthimage ${Libraries})
 set_target_properties(rtabmap_pointcloud_to_depthimage PROPERTIES OUTPUT_NAME "pointcloud_to_depthimage")
 
+# If rviz is found, add plugins
+IF(rviz_FOUND)
+
+    ## We also use Ogre for rviz plugins
+    include($ENV{ROS_ROOT}/core/rosbuild/FindPkgConfig.cmake)
+    pkg_check_modules(OGRE OGRE)
+    include_directories( ${OGRE_INCLUDE_DIRS} )
+    link_directories( ${OGRE_LIBRARY_DIRS} )
+
+    MESSAGE(STATUS "WITH rviz")
+    include_directories(
+      ${rviz_INCLUDE_DIRS}
+    )
+    SET(Libraries
+      ${Libraries}
+      ${rviz_LIBRARIES}
+      ${rviz_DEFAULT_PLUGIN_LIBRARIES}
+    )
+    
+    ## RVIZ plugin
+    IF(QT4_FOUND)
+    qt4_wrap_cpp(MOC_FILES
+      src/rviz/MapCloudDisplay.h
+      src/rviz/MapGraphDisplay.h
+      src/rviz/InfoDisplay.h
+      src/rviz/OrbitOrientedViewController.h
+    )
+    ELSE()
+    qt5_wrap_cpp(MOC_FILES
+      src/rviz/MapCloudDisplay.h
+      src/rviz/MapGraphDisplay.h
+      src/rviz/InfoDisplay.h
+      src/rviz/OrbitOrientedViewController.h
+    )
+    ENDIF()
+    
+    # tf:message_filters, mixing boost and Qt signals
+    set_property(
+       SOURCE src/rviz/MapCloudDisplay.cpp src/rviz/MapGraphDisplay.cpp src/rviz/InfoDisplay.cpp src/rviz/OrbitOrientedViewController.cpp
+       PROPERTY COMPILE_DEFINITIONS QT_NO_KEYWORDS
+    )
+    add_library(rtabmap_rviz_plugins
+       src/rviz/MapCloudDisplay.cpp
+       src/rviz/MapGraphDisplay.cpp
+       src/rviz/InfoDisplay.cpp
+       src/rviz/OrbitOrientedViewController.cpp
+       ${MOC_FILES}
+    )
+    target_link_libraries(rtabmap_rviz_plugins
+      rtabmap_ros
+    )
+    IF(Qt5_FOUND)
+        QT5_USE_MODULES(rtabmap_rviz_plugins Widgets Core Gui)
+    ENDIF(Qt5_FOUND)
+    add_dependencies(rtabmap_rviz_plugins ${${PROJECT_NAME}_EXPORTED_TARGETS})
+
+ENDIF(rviz_FOUND)
+
+# If costmap_2d is found, add the plugins
+IF(costmap_2d_FOUND)
+    MESSAGE(STATUS "WITH costmap_2d")
+    IF(${costmap_2d_VERSION_MAJOR} GREATER 1 OR ${costmap_2d_VERSION_MINOR} GREATER 15)
+      ADD_DEFINITIONS("-DCOSTMAP_2D_POINTCLOUD2")
+    ENDIF(${costmap_2d_VERSION_MAJOR} GREATER 1 OR ${costmap_2d_VERSION_MINOR} GREATER 15)
+    include_directories(${costmap_2d_INCLUDE_DIRS})
+    add_library(rtabmap_costmap_plugins
+       src/costmap_2d/static_layer.cpp
+       src/costmap_2d/voxel_layer.cpp
+    )
+    target_link_libraries(rtabmap_costmap_plugins
+      ${costmap_2d_LIBRARIES}
+    )
+ENDIF(costmap_2d_FOUND)
+
 #############
 ## Install ##
 #############
@@ -442,13 +443,11 @@ install(PROGRAMS
 )
 
 ## Mark executables and/or libraries for installation
-IF(RTABMAP_GUI)
 install(TARGETS 
    rtabmap_sync
    rtabmap_ros
    rtabmap_plugins 
    rtabmap 
-   rtabmapviz 
    rtabmap_rgbd_odometry 
    rtabmap_icp_odometry
    rtabmap_rgbdicp_odometry 
@@ -464,30 +463,15 @@ install(TARGETS
    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
- )
- ELSE() # without rtabmapviz
- install(TARGETS 
-   rtabmap_sync
-   rtabmap_ros
-   rtabmap_plugins 
-   rtabmap 
-   rtabmap_rgbd_odometry 
-   rtabmap_icp_odometry
-   rtabmap_rgbdicp_odometry 
-   rtabmap_stereo_odometry
-   rtabmap_map_assembler
-   rtabmap_map_optimizer
-   rtabmap_data_player
-   rtabmap_odom_msg_to_tf
-   rtabmap_pointcloud_to_depthimage
-   rtabmap_camera
-   rtabmap_rgbd_sync
-   rtabmap_rgbd_relay
-   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
- )
- ENDIF()
+)
+IF(RTABMAP_GUI)
+    install(TARGETS 
+       rtabmapviz
+       ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+       LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+       RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+     )
+ENDIF(RTABMAP_GUI)
 
 ## Mark cpp header files for installation
 install(DIRECTORY include/${PROJECT_NAME}/
@@ -515,15 +499,32 @@ install(DIRECTORY
 ## install plugins/nodelets xml
 install(FILES
    nodelet_plugins.xml
-   plugin_description.xml
-   costmap_plugins.xml
    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )
+IF(rviz_FOUND)
+    install(TARGETS 
+       rtabmap_rviz_plugins
+       ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+       LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+       RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+     )
+    install(FILES
+       rviz_plugins.xml
+       DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+    )
+ENDIF(rviz_FOUND)
+
 IF(costmap_2d_FOUND)
-install(FILES
-   costmap_plugins.xml
-   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-)
+    install(TARGETS 
+       rtabmap_costmap_plugins
+       ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+       LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+       RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+     )
+    install(FILES
+       costmap_plugins.xml
+       DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+    )
 ENDIF(costmap_2d_FOUND)
 
 #############

@@ -82,7 +82,7 @@
 
   <export>
 	<nodelet plugin="${prefix}/nodelet_plugins.xml" />
-	<rviz plugin="${prefix}/plugin_description.xml"/>
+	<rviz plugin="${prefix}/rviz_plugins.xml"/>
     <costmap_2d plugin="${prefix}/costmap_plugins.xml"/>
   </export>
 </package>

@@ -143,6 +143,7 @@ private:
 	void tagDetectionsAsyncCallback(const apriltag_ros::AprilTagDetectionArray & tagDetections);
 #endif
 	void imuAsyncCallback(const sensor_msgs::ImuConstPtr & tagDetections);
+	void interOdomCallback(const nav_msgs::OdometryConstPtr & msg);
 
 	void initialPoseCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr & msg);
 
@@ -319,6 +320,8 @@ private:
 	std::map<int, geometry_msgs::PoseWithCovarianceStamped> tags_;
 	ros::Subscriber imuSub_;
 	std::map<double, rtabmap::Transform> imus_;
+	ros::Subscriber interOdomSub_;
+	std::list<nav_msgs::Odometry> interOdoms_;
 
 	bool stereoToDepth_;
 	bool odomSensorSync_;

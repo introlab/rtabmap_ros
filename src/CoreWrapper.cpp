@@ -516,6 +516,11 @@ void CoreWrapper::onInit()
 		if(createIntermediateNodes_)
 		{
 			NODELET_INFO("Create intermediate nodes");
+			if(rate_ == 0.0f)
+			{
+				NODELET_INFO("Subscribe to inter odom messges");
+				interOdomSub_ = nh.subscribe("inter_odom", 1, &CoreWrapper::interOdomCallback, this);
+			}
 		}
 	}
 	if(parameters_.find(Parameters::kGridGlobalMaxNodes()) != parameters_.end())
@@ -1632,6 +1637,75 @@ void CoreWrapper::process(
 	UTimer timer;
 	if(rtabmap_.isIDsGenerated() || data.id() > 0)
 	{
+		// Add intermediate nodes?
+		for(std::list<nav_msgs::Odometry>::iterator iter=interOdoms_.begin(); iter!=interOdoms_.end();)
+		{
+			if(iter->header.stamp < lastPoseStamp_)
+			{
+				Transform interOdom = rtabmap_ros::transformFromPoseMsg(iter->pose.pose);
+				if(!interOdom.isNull())
+				{
+					cv::Mat covariance;
+					double variance = iter->twist.covariance[0];
+					if(variance == BAD_COVARIANCE || variance <= 0.0f)
+					{
+						//use the one of the pose
+						covariance = cv::Mat(6,6,CV_64FC1, (void*)iter->pose.covariance.data()).clone();
+						covariance /= 2.0;
+					}
+					else
+					{
+						covariance = cv::Mat(6,6,CV_64FC1, (void*)iter->twist.covariance.data()).clone();
+					}
+					if(!uIsFinite(covariance.at<double>(0,0)) || covariance.at<double>(0,0)<=0.0f)
+					{
+						covariance = cv::Mat::eye(6,6,CV_64FC1);
+						if(odomDefaultLinVariance_ > 0.0f)
+						{
+							covariance.at<double>(0,0) = odomDefaultLinVariance_;
+							covariance.at<double>(1,1) = odomDefaultLinVariance_;
+							covariance.at<double>(2,2) = odomDefaultLinVariance_;
+						}
+						if(odomDefaultAngVariance_ > 0.0f)
+						{
+							covariance.at<double>(3,3) = odomDefaultAngVariance_;
+							covariance.at<double>(4,4) = odomDefaultAngVariance_;
+							covariance.at<double>(5,5) = odomDefaultAngVariance_;
+						}
+					}
+
+					cv::Mat rgb = cv::Mat::zeros(2,1,CV_8UC1);
+					cv::Mat depth = cv::Mat::zeros(2,1,CV_16UC1);
+					CameraModel model(
+							1,
+							1,
+							0.5,
+							1,
+							Transform(0,0,1,0, -1,0,0,0, 0,-1,0,0),
+							0,
+							cv::Size(1,2));
+					SensorData interData(rgb, depth, model, -1, rtabmap_ros::timestampFromROS(iter->header.stamp));
+					Transform gt;
+					if(!groundTruthFrameId_.empty())
+					{
+						gt = rtabmap_ros::getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, iter->header.stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+					}
+					interData.setGroundTruth(gt);
+					rtabmap_.process(interData, interOdom, covariance);
+				}
+				interOdoms_.erase(iter++);
+			}
+			else if(iter->header.stamp == lastPoseStamp_)
+			{
+				interOdoms_.erase(iter++);
+				break;
+			}
+			else
+			{
+				break;
+			}
+		}
+
 		//Add async stuff
 		Transform groundTruthPose;
 		if(!groundTruthFrameId_.empty())
@@ -2103,6 +2177,14 @@ void CoreWrapper::imuAsyncCallback(const sensor_msgs::ImuConstPtr & msg)
 	}
 }
 
+void CoreWrapper::interOdomCallback(const nav_msgs::OdometryConstPtr & msg)
+{
+	if(!paused_)
+	{
+		interOdoms_.push_back(*msg);
+	}
+}
+
 
 void CoreWrapper::initialPoseCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr & msg)
 {
@@ -2377,6 +2459,7 @@ bool CoreWrapper::resetRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empt
 	userData_ = cv::Mat();
 	userDataMutex_.unlock();
 	imus_.clear();
+	interOdoms_.clear();
 	return true;
 }
 
