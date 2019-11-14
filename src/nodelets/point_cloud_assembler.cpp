@@ -67,7 +67,8 @@ public:
 		warningThread_(0),
 		callbackCalled_(false),
 		exactSync_(0),
-		maxClouds_(1),
+		maxClouds_(0),
+		assemblingTime_(0),
 		skipClouds_(0),
 		cloudsSkipped_(0),
 		waitForTransformDuration_(0.1),
@@ -100,12 +101,13 @@ private:
 		pnh.param("queue_size", queueSize, queueSize);
 		pnh.param("fixed_frame_id", fixedFrameId_, fixedFrameId_);
 		pnh.param("max_clouds", maxClouds_, maxClouds_);
+		pnh.param("assembling_time", assemblingTime_, assemblingTime_);
 		pnh.param("skip_clouds", skipClouds_, skipClouds_);
 		pnh.param("wait_for_transform_duration", waitForTransformDuration_, waitForTransformDuration_);
 		pnh.param("range_min", rangeMin_, rangeMin_);
 		pnh.param("range_max", rangeMax_, rangeMax_);
 		pnh.param("voxel_size", voxelSize_, voxelSize_);
-		ROS_ASSERT(maxClouds_>0);
+		ROS_ASSERT(maxClouds_>=0);
 
 		cloudsSkipped_ = skipClouds_;
 
@@ -166,7 +168,8 @@ private:
 				*cpy = *cloudMsg;
 				clouds_.push_back(cpy);
 
-				if((int)clouds_.size() >= maxClouds_)
+				if( (int)clouds_.size() >= maxClouds_  && maxClouds_ != 0  
+					|| (double)(*cpy).header.stamp.toSec() >= (double)clouds_[0]->header.stamp.toSec() + assemblingTime_ )
 				{
 					pcl::PCLPointCloud2Ptr assembled(new pcl::PCLPointCloud2);
 					pcl_conversions::toPCL(*clouds_.back(), *assembled);
@@ -270,6 +273,7 @@ private:
 	int maxClouds_;
 	int skipClouds_;
 	int cloudsSkipped_;
+	double assemblingTime_;
 	double waitForTransformDuration_;
 	double rangeMin_;
 	double rangeMax_;
