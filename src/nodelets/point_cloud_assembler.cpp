@@ -107,7 +107,7 @@ private:
 		pnh.param("range_min", rangeMin_, rangeMin_);
 		pnh.param("range_max", rangeMax_, rangeMax_);
 		pnh.param("voxel_size", voxelSize_, voxelSize_);
-		ROS_ASSERT(maxClouds_>=0);
+		ROS_ASSERT(maxClouds_>=0 && assemblingTime_ >=0);
 
 		cloudsSkipped_ = skipClouds_;
 
@@ -168,8 +168,9 @@ private:
 				*cpy = *cloudMsg;
 				clouds_.push_back(cpy);
 
-				if( (int)clouds_.size() >= maxClouds_  && maxClouds_ != 0  
-					|| (double)(*cpy).header.stamp.toSec() >= (double)clouds_[0]->header.stamp.toSec() + assemblingTime_ )
+				if(  (int)clouds_.size() >= maxClouds_ && maxClouds_ != 0 
+					|| 
+					 (double)(*cpy).header.stamp.toSec() >= (double)clouds_[0]->header.stamp.toSec() + assemblingTime_ && assemblingTime_ != 0.0 )
 				{
 					pcl::PCLPointCloud2Ptr assembled(new pcl::PCLPointCloud2);
 					pcl_conversions::toPCL(*clouds_.back(), *assembled);
@@ -204,7 +205,7 @@ private:
 							pcl::concatenatePointCloud(*assembled, *rtabmap::util3d::laserScanToPointCloud2(scan, t), *assembledTmp);
 						}
 						else
-						{
+						{	
 							sensor_msgs::PointCloud2 output;
 							pcl_ros::transformPointCloud(t.toEigen4f(), *clouds_[i], output);
 							pcl::PCLPointCloud2 output2;
