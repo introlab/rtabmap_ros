@@ -324,7 +324,7 @@ private:
 	std::map<double, rtabmap::Transform> imus_;
 
 	ros::Subscriber interOdomSub_;
-	std::list<std::pair<nav_msgs::Odometry, rtabmap_ros::OdomInfo>> interOdoms_;
+	std::list<std::pair<nav_msgs::Odometry, rtabmap_ros::OdomInfo> > interOdoms_;
 	message_filters::Subscriber<nav_msgs::Odometry> interOdomSyncSub_;
 	message_filters::Subscriber<rtabmap_ros::OdomInfo> interOdomInfoSyncSub_;
 	typedef message_filters::sync_policies::ExactTime<nav_msgs::Odometry, rtabmap_ros::OdomInfo> MyExactInterOdomSyncPolicy;
