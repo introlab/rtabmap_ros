@@ -13,7 +13,7 @@ matrix:
         - wget http://packages.ros.org/ros.key -O - | sudo apt-key add -
         - sudo apt-get update
         - sudo apt-get install dpkg
-        - sudo apt-get -y install ros-indigo-rtabmap
+        - sudo apt-get -y install ros-indigo-ros-base ros-indigo-rtabmap
         - sudo apt-get -y remove ros-indigo-rtabmap
 
       script: 
@@ -45,7 +45,7 @@ matrix:
         - wget http://packages.ros.org/ros.key -O - | sudo apt-key add -
         - sudo apt-get update
         - sudo apt-get install dpkg
-        - sudo apt-get -y install ros-kinetic-rtabmap
+        - sudo apt-get -y install ros-kinetic-ros-base ros-kinetic-rtabmap
         - sudo apt-get -y remove ros-kinetic-rtabmap
 
       script: 
@@ -77,7 +77,7 @@ matrix:
         - wget http://packages.ros.org/ros.key -O - | sudo apt-key add -
         - sudo apt-get update
         - sudo apt-get install dpkg
-        - sudo apt-get -y install ros-melodic-rtabmap
+        - sudo apt-get -y install ros-melodic-ros-base ros-melodic-rtabmap
         - sudo apt-get -y remove ros-melodic-rtabmap
 
       script: 
