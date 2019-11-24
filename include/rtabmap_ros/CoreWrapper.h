@@ -57,6 +57,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtabmap_ros/Goal.h"
 #include "rtabmap_ros/GetPlan.h"
 #include "rtabmap_ros/CommonDataSubscriber.h"
+#include "rtabmap_ros/OdomInfo.h"
 
 #include "MapsManager.h"
 
@@ -144,6 +145,7 @@ private:
 #endif
 	void imuAsyncCallback(const sensor_msgs::ImuConstPtr & tagDetections);
 	void interOdomCallback(const nav_msgs::OdometryConstPtr & msg);
+	void interOdomInfoCallback(const nav_msgs::OdometryConstPtr & msg1, const rtabmap_ros::OdomInfoConstPtr & msg2);
 
 	void initialPoseCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr & msg);
 
@@ -320,8 +322,13 @@ private:
 	std::map<int, geometry_msgs::PoseWithCovarianceStamped> tags_;
 	ros::Subscriber imuSub_;
 	std::map<double, rtabmap::Transform> imus_;
+
 	ros::Subscriber interOdomSub_;
-	std::list<nav_msgs::Odometry> interOdoms_;
+	std::list<std::pair<nav_msgs::Odometry, rtabmap_ros::OdomInfo>> interOdoms_;
+	message_filters::Subscriber<nav_msgs::Odometry> interOdomSyncSub_;
+	message_filters::Subscriber<rtabmap_ros::OdomInfo> interOdomInfoSyncSub_;
+	typedef message_filters::sync_policies::ExactTime<nav_msgs::Odometry, rtabmap_ros::OdomInfo> MyExactInterOdomSyncPolicy;
+	message_filters::Synchronizer<MyExactInterOdomSyncPolicy> * interOdomSync_;
 
 	bool stereoToDepth_;
 	bool odomSensorSync_;
