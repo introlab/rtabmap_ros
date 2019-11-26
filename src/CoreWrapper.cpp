@@ -1713,23 +1713,7 @@ void CoreWrapper::process(
 					if(iter->second.timeEstimation != 0.0f)
 					{
 						OdometryInfo info = odomInfoFromROS(iter->second);
-						externalStats.insert(std::make_pair("Odometry/LocalBundle/ms", info.localBundleTime*1000.0f));
-						externalStats.insert(std::make_pair("Odometry/LocalBundleConstraints/", info.localBundleConstraints));
-						externalStats.insert(std::make_pair("Odometry/LocalBundleOutliers/", info.localBundleOutliers));
-						externalStats.insert(std::make_pair("Odometry/TotalTime/ms", info.timeEstimation*1000.0f));
-						externalStats.insert(std::make_pair("Odometry/Registration/ms", info.reg.totalTime*1000.0f));
-						float speed = 0.0f;
-						if(info.interval>0.0)
-							speed = info.transform.x()/info.interval*3.6;
-						externalStats.insert(std::make_pair("Odometry/Speed/kph", speed));
-						externalStats.insert(std::make_pair("Odometry/Inliers/", info.reg.inliers));
-						externalStats.insert(std::make_pair("Odometry/Features/", info.features));
-						externalStats.insert(std::make_pair("Odometry/DistanceTravelled/m", info.distanceTravelled));
-						externalStats.insert(std::make_pair("Odometry/KeyFrameAdded/", info.keyFrameAdded));
-						externalStats.insert(std::make_pair("Odometry/LocalKeyFrames/", info.localKeyFrames));
-						externalStats.insert(std::make_pair("Odometry/LocalMapSize/", info.localMapSize));
-						externalStats.insert(std::make_pair("Odometry/LocalScanMapSize/", info.localScanMapSize));
-						externalStats.insert(std::make_pair("Odometry/RAM_usage/MB", info.memoryUsage));
+						externalStats = rtabmap_ros::odomInfoToStatistics(info);
 
 						if(info.interval>0.0)
 						{
@@ -1876,23 +1860,7 @@ void CoreWrapper::process(
 		std::vector<float> odomVelocity;
 		if(odomInfo.timeEstimation != 0.0f)
 		{
-			externalStats.insert(std::make_pair("Odometry/LocalBundle/ms", odomInfo.localBundleTime*1000.0f));
-			externalStats.insert(std::make_pair("Odometry/LocalBundleConstraints/", odomInfo.localBundleConstraints));
-			externalStats.insert(std::make_pair("Odometry/LocalBundleOutliers/", odomInfo.localBundleOutliers));
-			externalStats.insert(std::make_pair("Odometry/TotalTime/ms", odomInfo.timeEstimation*1000.0f));
-			externalStats.insert(std::make_pair("Odometry/Registration/ms", odomInfo.reg.totalTime*1000.0f));
-			float speed = 0.0f;
-			if(odomInfo.interval>0.0)
-				speed = odomInfo.transform.x()/odomInfo.interval*3.6;
-			externalStats.insert(std::make_pair("Odometry/Speed/kph", speed));
-			externalStats.insert(std::make_pair("Odometry/Inliers/", odomInfo.reg.inliers));
-			externalStats.insert(std::make_pair("Odometry/Features/", odomInfo.features));
-			externalStats.insert(std::make_pair("Odometry/DistanceTravelled/m", odomInfo.distanceTravelled));
-			externalStats.insert(std::make_pair("Odometry/KeyFrameAdded/", odomInfo.keyFrameAdded));
-			externalStats.insert(std::make_pair("Odometry/LocalKeyFrames/", odomInfo.localKeyFrames));
-			externalStats.insert(std::make_pair("Odometry/LocalMapSize/", odomInfo.localMapSize));
-			externalStats.insert(std::make_pair("Odometry/LocalScanMapSize/", odomInfo.localScanMapSize));
-			externalStats.insert(std::make_pair("Odometry/RAM_usage/MB", odomInfo.memoryUsage));
+			externalStats = rtabmap_ros::odomInfoToStatistics(odomInfo);
 
 			if(odomInfo.interval>0.0)
 			{

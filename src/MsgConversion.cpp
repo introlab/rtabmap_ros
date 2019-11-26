@@ -1110,6 +1110,48 @@ void nodeInfoToROS(const rtabmap::Signature & signature, rtabmap_ros::NodeData &
 	transformToPoseMsg(signature.getGroundTruthPose(), msg.groundTruthPose);
 }
 
+std::map<std::string, float> odomInfoToStatistics(const rtabmap::OdometryInfo & info)
+{
+	std::map<std::string, float> stats;
+
+	stats.insert(std::make_pair("Odometry/TimeRegistration/ms", info.reg.totalTime*1000.0f));
+	stats.insert(std::make_pair("Odometry/RAM_usage/MB", info.memoryUsage));
+
+	// Based on rtabmap/MainWindow.cpp
+	stats.insert(std::make_pair("Odometry/Features/", info.features));
+	stats.insert(std::make_pair("Odometry/Matches/", info.reg.matches));
+	stats.insert(std::make_pair("Odometry/MatchesRatio/", info.features<=0?0.0f:float(info.reg.inliers)/float(info.features)));
+	stats.insert(std::make_pair("Odometry/Inliers/", info.reg.inliers));
+	stats.insert(std::make_pair("Odometry/InliersMeanDistance/m", info.reg.inliersMeanDistance));
+	stats.insert(std::make_pair("Odometry/InliersDistribution/", info.reg.inliersDistribution));
+	stats.insert(std::make_pair("Odometry/InliersRatio/", info.reg.inliers));
+	stats.insert(std::make_pair("Odometry/ICPInliersRatio/", info.reg.icpInliersRatio));
+	stats.insert(std::make_pair("Odometry/ICPRotation/rad", info.reg.icpRotation));
+	stats.insert(std::make_pair("Odometry/ICPTranslation/m", info.reg.icpTranslation));
+	stats.insert(std::make_pair("Odometry/ICPStructuralComplexity/", info.reg.icpStructuralComplexity));
+	stats.insert(std::make_pair("Odometry/StdDevLin/", sqrt((float)info.reg.covariance.at<double>(0,0))));
+	stats.insert(std::make_pair("Odometry/StdDevAng/", sqrt((float)info.reg.covariance.at<double>(5,5))));
+	stats.insert(std::make_pair("Odometry/VarianceLin/", (float)info.reg.covariance.at<double>(0,0)));
+	stats.insert(std::make_pair("Odometry/VarianceAng/", (float)info.reg.covariance.at<double>(5,5)));
+	stats.insert(std::make_pair("Odometry/TimeEstimation/ms", info.timeEstimation*1000.0f));
+	stats.insert(std::make_pair("Odometry/TimeFiltering/ms", info.timeParticleFiltering*1000.0f));
+	stats.insert(std::make_pair("Odometry/LocalMapSize/", info.localMapSize));
+	stats.insert(std::make_pair("Odometry/LocalScanMapSize/", info.localScanMapSize));
+	stats.insert(std::make_pair("Odometry/LocalKeyFrames/", info.localKeyFrames));
+	stats.insert(std::make_pair("Odometry/LocalBundleOutliers/", info.localBundleOutliers));
+	stats.insert(std::make_pair("Odometry/LocalBundleConstraints/", info.localBundleConstraints));
+	stats.insert(std::make_pair("Odometry/LocalBundleTime/ms", info.localBundleTime*1000.0f));
+	stats.insert(std::make_pair("Odometry/KeyFrameAdded/", info.keyFrameAdded?1.0f:0.0f));
+	stats.insert(std::make_pair("Odometry/Interval/ms", (float)info.interval));
+	float speed = 0.0f;
+	if(info.interval>0.0)
+		speed = info.transform.x()/info.interval*3.6;
+	stats.insert(std::make_pair("Odometry/Speed/kph", speed));
+	stats.insert(std::make_pair("Odometry/Distance/m", info.distanceTravelled));
+
+	return stats;
+}
+
 rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::OdomInfo & msg)
 {
 	rtabmap::OdometryInfo info;

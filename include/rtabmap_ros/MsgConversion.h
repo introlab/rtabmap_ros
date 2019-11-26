@@ -152,6 +152,7 @@ void nodeDataToROS(const rtabmap::Signature & signature, rtabmap_ros::NodeData &
 rtabmap::Signature nodeInfoFromROS(const rtabmap_ros::NodeData & msg);
 void nodeInfoToROS(const rtabmap::Signature & signature, rtabmap_ros::NodeData & msg);
 
+std::map<std::string, float> odomInfoToStatistics(const rtabmap::OdometryInfo & info);
 rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::OdomInfo & msg);
 void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_ros::OdomInfo & msg);
 
