@@ -52,7 +52,8 @@ public:
 	ObstaclesDetection() :
 		frameId_("base_link"),
 		waitForTransform_(false),
-		mapFrameProjection_(rtabmap::Parameters::defaultGridMapFrameProjection())
+		mapFrameProjection_(rtabmap::Parameters::defaultGridMapFrameProjection()),
+		warned_(false)
 	{}
 
 	virtual ~ObstaclesDetection()
@@ -108,6 +109,9 @@ private:
 		ROS_DEBUG("_"); // not sure why, but all NODELET_*** log are not shown if a normal ROS_*** is not called!?
 		ros::NodeHandle & nh = getNodeHandle();
 		ros::NodeHandle & pnh = getPrivateNodeHandle();
+
+		ULogger::setType(ULogger::kTypeConsole);
+		ULogger::setLevel(ULogger::kWarning);
 
 		int queueSize = 10;
 		pnh.param("queue_size", queueSize, queueSize);
@@ -295,6 +299,17 @@ private:
 			std::vector<int> indices;
 			pcl::removeNaNFromPointCloud(*inputCloud, *inputCloud, indices);
 		}
+		else if(!inputCloud->is_dense && inputCloud->height == 1)
+		{
+			if(!warned_)
+			{
+				NODELET_WARN("Detected possible wrong format of point cloud \"%s\", it is "
+						"indicated that it is not dense, but there is only one row. "
+						"Assuming it is dense... This message will only appear once.", cloudSub_.getTopic().c_str());
+				warned_ = true;
+			}
+			inputCloud->is_dense = true;
+		}
 
 		//Common variables for all strategies
 		pcl::IndicesPtr ground, obstacles;
@@ -425,6 +440,7 @@ private:
 
 	rtabmap::OccupancyGrid grid_;
 	bool mapFrameProjection_;
+	bool warned_;
 
 	tf::TransformListener tfListener_;
 

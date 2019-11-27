@@ -200,13 +200,22 @@ private:
 			pcl_conversions::toPCL(*pointCloud2Msg, *cloud);
 
 			cv_bridge::CvImage depthImage;
-			depthImage.image = rtabmap::util3d::projectCloudToCamera(model.imageSize(), model.K(), cloud, model.localTransform());
 
-			if(fillHolesSize_ > 0 && fillIterations_ > 0)
+			if(cloud->data.empty())
 			{
-				for(int i=0; i<fillIterations_;++i)
+				ROS_WARN("Received an empty cloud on topic \"%s\"! A depth image with all zeros is returned.", pointCloudSub_.getTopic().c_str());
+				depthImage.image = cv::Mat::zeros(model.imageSize(), CV_32FC1);
+			}
+			else
+			{
+				depthImage.image = rtabmap::util3d::projectCloudToCamera(model.imageSize(), model.K(), cloud, model.localTransform());
+
+				if(fillHolesSize_ > 0 && fillIterations_ > 0)
 				{
-					depthImage.image = rtabmap::util2d::fillDepthHoles(depthImage.image, fillHolesSize_, fillHolesError_);
+					for(int i=0; i<fillIterations_;++i)
+					{
+						depthImage.image = rtabmap::util2d::fillDepthHoles(depthImage.image, fillHolesSize_, fillHolesError_);
+					}
 				}
 			}
 
