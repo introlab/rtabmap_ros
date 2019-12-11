@@ -73,6 +73,7 @@ public:
 
 	virtual ~ICPOdometry()
 	{
+		plugins_.clear();
 	}
 
 private:
@@ -103,6 +104,13 @@ private:
 					boost::shared_ptr<rtabmap_ros::PluginInterface> plugin = plugin_loader_.createInstance(type);
 					plugins_.push_back(plugin);
 					plugin->initialize(pluginName, pnh);
+					if(!plugin->isEnabled())
+					{
+						NODELET_WARN("Plugin: %s is not enabled, filtering will not occur. \"enabled_\" member "
+									 "should be managed in subclasses. This can be ignored if the "
+									 "plugin should really be initialized as disabled.",
+									 plugin->getName().c_str());
+					}
 				}
 				catch(pluginlib::PluginlibException & ex) {
 					ROS_ERROR("Failed to load plugin %s. Error: %s", pluginName.c_str(), ex.what());
@@ -347,29 +355,25 @@ private:
 			if (plugins_[0]->isEnabled())
 			{
 				cloudMsg = plugins_[0]->filterPointCloud(*pointCloudMsg);
-			} else
-				{
-					NODELET_WARN("Plugin: %s is not enabled, filtering will not occur."
-								 " Make sure to set enabled_ to true once initialization is done.",
-								 plugins_[0]->getName().c_str());
-					cloudMsg = *pointCloudMsg;
-				}
+			}
+			else
+			{
+				cloudMsg = *pointCloudMsg;
+			}
 
 			if (plugins_.size() > 1)
 			{
 				for (int i = 1; i < plugins_.size(); i++) {
-					if (plugins_[i]->isEnabled())
+					if (plugins_[i]->isEnabled()) {
 						cloudMsg = plugins_[i]->filterPointCloud(cloudMsg);
-					else
-						NODELET_WARN("Plugin: %s is not enabled, filtering will not occur."
-									 " Make sure to set enabled_ to true once initialization is done.",
-									 plugins_[i]->getName().c_str());
+					}
 				}
 			}
-		} else
-			{
-			cloudMsg = *pointCloudMsg;
-			}
+		}
+		else
+		{
+		cloudMsg = *pointCloudMsg;
+		}
 
 		cv::Mat scan;
 		bool containNormals = false;
