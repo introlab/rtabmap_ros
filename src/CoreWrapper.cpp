@@ -524,7 +524,7 @@ void CoreWrapper::onInit()
 				if(interOdomInfo)
 				{
 					NODELET_INFO("Subscribe to inter odom + info messages");
-					interOdomSync_ = new message_filters::Synchronizer<MyExactInterOdomSyncPolicy>(MyExactInterOdomSyncPolicy(queueSize_), interOdomSyncSub_, interOdomInfoSyncSub_);
+					interOdomSync_ = new message_filters::Synchronizer<MyExactInterOdomSyncPolicy>(MyExactInterOdomSyncPolicy(100), interOdomSyncSub_, interOdomInfoSyncSub_);
 					interOdomSync_->registerCallback(boost::bind(&CoreWrapper::interOdomInfoCallback, this, _1, _2));
 					interOdomSyncSub_.subscribe(nh, "inter_odom", 1);
 					interOdomInfoSyncSub_.subscribe(nh, "inter_odom_info", 1);
@@ -532,7 +532,7 @@ void CoreWrapper::onInit()
 				else
 				{
 					NODELET_INFO("Subscribe to inter odom messages");
-					interOdomSub_ = nh.subscribe("inter_odom", 1, &CoreWrapper::interOdomCallback, this);
+					interOdomSub_ = nh.subscribe("inter_odom", 100, &CoreWrapper::interOdomCallback, this);
 				}
 
 			}
