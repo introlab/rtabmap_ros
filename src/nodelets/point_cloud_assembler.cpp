@@ -46,6 +46,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <message_filters/sync_policies/exact_time.h>
 
 #include <rtabmap_ros/MsgConversion.h>
+#include <rtabmap_ros/OdomInfo.h>
 #include <rtabmap/core/util3d.h>
 #include <rtabmap/core/util3d_filtering.h>
 
@@ -67,6 +68,7 @@ public:
 		warningThread_(0),
 		callbackCalled_(false),
 		exactSync_(0),
+		exactInfoSync_(0),
 		maxClouds_(0),
 		assemblingTime_(0),
 		skipClouds_(0),
@@ -81,6 +83,7 @@ public:
 	virtual ~PointCloudAssembler()
 	{
 		delete exactSync_;
+		delete exactInfoSync_;
 
 		if(warningThread_)
 		{
@@ -97,6 +100,7 @@ private:
 		ros::NodeHandle & pnh = getPrivateNodeHandle();
 
 		int queueSize = 5;
+		bool subscribeOdomInfo = false;
 
 		pnh.param("queue_size", queueSize, queueSize);
 		pnh.param("fixed_frame_id", fixedFrameId_, fixedFrameId_);
@@ -107,6 +111,7 @@ private:
 		pnh.param("range_min", rangeMin_, rangeMin_);
 		pnh.param("range_max", rangeMax_, rangeMax_);
 		pnh.param("voxel_size", voxelSize_, voxelSize_);
+		pnh.param("subscribe_odom_info", subscribeOdomInfo, subscribeOdomInfo);
 		ROS_ASSERT(maxClouds_>0 || assemblingTime_ >0.0);
 
 		cloudsSkipped_ = skipClouds_;
@@ -118,6 +123,21 @@ private:
 			subscribedTopicsMsg = uFormat("\n%s subscribed to %s",
 								getName().c_str(),
 								cloudSub_.getTopic().c_str());
+		}
+		else if(subscribeOdomInfo)
+		{
+			syncCloudSub_.subscribe(nh, "cloud", 1);
+			syncOdomSub_.subscribe(nh, "odom", 1);
+			syncOdomInfoSub_.subscribe(nh, "odom_info", 1);
+			exactInfoSync_ = new message_filters::Synchronizer<syncInfoPolicy>(syncInfoPolicy(queueSize), syncCloudSub_, syncOdomSub_, syncOdomInfoSub_);
+			exactInfoSync_->registerCallback(boost::bind(&rtabmap_ros::PointCloudAssembler::callbackCloudOdomInfo, this, _1, _2, _3));
+			subscribedTopicsMsg = uFormat("\n%s subscribed to (exact sync):\n   %s,\n   %s",
+								getName().c_str(),
+								syncCloudSub_.getTopic().c_str(),
+								syncOdomSub_.getTopic().c_str(),
+								syncOdomInfoSub_.getTopic().c_str());
+
+			warningThread_ = new boost::thread(boost::bind(&PointCloudAssembler::warningLoop, this, subscribedTopicsMsg));
 		}
 		else
 		{
@@ -148,6 +168,32 @@ private:
 		{
 			fixedFrameId_ = odomMsg->header.frame_id;
 			callbackCloud(cloudMsg);
+		}
+		else
+		{
+			NODELET_WARN("Reseting point cloud assembler as null odometry has been received.");
+			clouds_.clear();
+		}
+	}
+
+	void callbackCloudOdomInfo(
+			const sensor_msgs::PointCloud2ConstPtr & cloudMsg,
+			const nav_msgs::OdometryConstPtr & odomMsg,
+			const rtabmap_ros::OdomInfoConstPtr & odomInfoMsg)
+	{
+		callbackCalled_ = true;
+		rtabmap::Transform odom = rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose);
+		if(!odom.isNull())
+		{
+			if(odomInfoMsg->keyFrameAdded)
+			{
+				fixedFrameId_ = odomMsg->header.frame_id;
+				callbackCloud(cloudMsg);
+			}
+			else
+			{
+				NODELET_INFO("Skipping non keyframe...");
+			}
 		}
 		else
 		{
@@ -267,9 +313,12 @@ private:
 	ros::Publisher cloudPub_;
 
 	typedef message_filters::sync_policies::ExactTime<sensor_msgs::PointCloud2, nav_msgs::Odometry> syncPolicy;
+	typedef message_filters::sync_policies::ExactTime<sensor_msgs::PointCloud2, nav_msgs::Odometry, rtabmap_ros::OdomInfo> syncInfoPolicy;
 	message_filters::Synchronizer<syncPolicy>* exactSync_;
+	message_filters::Synchronizer<syncInfoPolicy>* exactInfoSync_;
 	message_filters::Subscriber<sensor_msgs::PointCloud2> syncCloudSub_;
 	message_filters::Subscriber<nav_msgs::Odometry> syncOdomSub_;
+	message_filters::Subscriber<rtabmap_ros::OdomInfo> syncOdomInfoSub_;
 
 	int maxClouds_;
 	int skipClouds_;

@@ -273,7 +273,7 @@ private:
 		sensor_msgs::PointCloud2 scanOut;
 		laser_geometry::LaserProjection projection;
 		projection.transformLaserScanToPointCloud(scanMsg->header.frame_id, *scanMsg, scanOut, this->tfListener());
-		pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
+		pcl::PointCloud<pcl::PointXYZI>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZI>);
 		pcl::fromROSMsg(scanOut, *pclScan);
 		pclScan->is_dense = true;
 
@@ -305,7 +305,7 @@ private:
 				{
 					normals = util3d::computeFastOrganizedNormals2D(pclScan, scanNormalK_, scanNormalRadius_);
 				}
-				pcl::PointCloud<pcl::PointNormal>::Ptr pclScanNormal(new pcl::PointCloud<pcl::PointNormal>);
+				pcl::PointCloud<pcl::PointXYZINormal>::Ptr pclScanNormal(new pcl::PointCloud<pcl::PointXYZINormal>);
 				pcl::concatenateFields(*pclScan, *normals, *pclScanNormal);
 				scan = util3d::laserScan2dFromPointCloud(*pclScanNormal);
 
@@ -405,7 +405,7 @@ private:
 		int maxLaserScans = scanCloudMaxPoints_;
 		if(containNormals)
 		{
-			pcl::PointCloud<pcl::PointNormal>::Ptr pclScan(new pcl::PointCloud<pcl::PointNormal>);
+			pcl::PointCloud<pcl::PointXYZINormal>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZINormal>);
 			pcl::fromROSMsg(cloudMsg, *pclScan);
 			if(pclScan->size() && scanDownsamplingStep_ > 1)
 			{
@@ -423,7 +423,7 @@ private:
 		}
 		else
 		{
-			pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
+			pcl::PointCloud<pcl::PointXYZI>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZI>);
 			pcl::fromROSMsg(cloudMsg, *pclScan);
 			if(pclScan->size() && scanDownsamplingStep_ > 1)
 			{
@@ -448,7 +448,7 @@ private:
 				{
 					//compute normals
 					pcl::PointCloud<pcl::Normal>::Ptr normals = util3d::computeNormals(pclScan, scanNormalK_, scanNormalRadius_);
-					pcl::PointCloud<pcl::PointNormal>::Ptr pclScanNormal(new pcl::PointCloud<pcl::PointNormal>);
+					pcl::PointCloud<pcl::PointXYZINormal>::Ptr pclScanNormal(new pcl::PointCloud<pcl::PointXYZINormal>);
 					pcl::concatenateFields(*pclScan, *normals, *pclScanNormal);
 					scan = util3d::laserScanFromPointCloud(*pclScanNormal);
 
