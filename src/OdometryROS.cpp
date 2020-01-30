@@ -27,10 +27,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "rtabmap_ros/OdometryROS.h"
 
-#include <sensor_msgs/Image.h>
-#include <sensor_msgs/image_encodings.h>
-#include <sensor_msgs/PointCloud2.h>
-#include <nav_msgs/Odometry.h>
+#include <sensor_msgs/msg/image.hpp>
+#include <sensor_msgs/image_encodings.hpp>
+#include <sensor_msgs/msg/point_cloud2.hpp>
+#include <nav_msgs/msg/odometry.hpp>
 
 #include <pcl_conversions/pcl_conversions.h>
 
@@ -43,7 +43,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/Memory.h>
 #include <rtabmap/core/Signature.h>
 #include "rtabmap_ros/MsgConversion.h"
-#include "rtabmap_ros/OdomInfo.h"
+#include "rtabmap_ros/msg/odom_info.hpp"
 #include "rtabmap/utilite/UConversion.h"
 #include "rtabmap/utilite/ULogger.h"
 #include "rtabmap/utilite/UStl.h"
@@ -56,7 +56,12 @@ using namespace rtabmap;
 
 namespace rtabmap_ros {
 
-OdometryROS::OdometryROS(bool stereoParams, bool visParams, bool icpParams) :
+OdometryROS::OdometryROS(const rclcpp::NodeOptions & options) :
+		OdometryROS("odometry", options)
+	{}
+
+OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & options) :
+	Node(name, options),
 	odometry_(0),
 	warningThread_(0),
 	callbackCalled_(false),
@@ -69,23 +74,99 @@ OdometryROS::OdometryROS(bool stereoParams, bool visParams, bool icpParams) :
 	guessMinRotation_(0.0),
 	guessMinTime_(0.0),
 	publishTf_(true),
-	waitForTransform_(true),
-	waitForTransformDuration_(0.1), // 100 ms
+	waitForTransform_(0.1), // 100 ms
 	publishNullWhenLost_(true),
 	paused_(false),
 	resetCountdown_(0),
 	resetCurrentCount_(0),
-	stereoParams_(stereoParams),
-	visParams_(visParams),
-	icpParams_(icpParams),
 	previousStamp_(0.0),
 	expectedUpdateRate_(0.0),
 	odomStrategy_(Parameters::defaultOdomStrategy()),
 	waitIMUToinit_(false),
 	imuProcessed_(false),
-	lastImuReceivedStamp_(0.0)
+	lastImuReceivedStamp_(0.0),
+	configPath_(),
+	initialPose_(Transform::getIdentity())
 {
+	odomPub_ = create_publisher<nav_msgs::msg::Odometry>("odom", 1);
+	odomInfoPub_ = create_publisher<rtabmap_ros::msg::OdomInfo>("odom_info", 1);
+	odomLocalMap_ = create_publisher<sensor_msgs::msg::PointCloud2>("odom_local_map", 1);
+	odomLocalScanMap_ = create_publisher<sensor_msgs::msg::PointCloud2>("odom_local_scan_map", 1);
+	odomLastFrame_ = create_publisher<sensor_msgs::msg::PointCloud2>("odom_last_frame", 1);
 
+	tfBuffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
+	//auto timer_interface = std::make_shared<tf2_ros::CreateTimerROS>(
+	//	this->get_node_base_interface(),
+	//	this->get_node_timers_interface());
+	//tfBuffer_->setCreateTimerInterface(timer_interface);
+	tfListener_ = std::make_shared<tf2_ros::TransformListener>(*tfBuffer_);
+	tfBroadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
+
+	std::string initialPoseStr;
+	frameId_ = this->declare_parameter("frame_id", frameId_);
+	odomFrameId_ = this->declare_parameter("odom_frame_id", odomFrameId_);
+	publishTf_ = this->declare_parameter("publish_tf", publishTf_);
+
+	waitForTransform_ = this->declare_parameter("wait_for_transform", waitForTransform_);
+	initialPoseStr = this->declare_parameter("initial_pose", initialPoseStr); // "x y z roll pitch yaw"
+	groundTruthFrameId_ = this->declare_parameter("ground_truth_frame_id", groundTruthFrameId_);
+	groundTruthBaseFrameId_ = this->declare_parameter("ground_truth_base_frame_id", frameId_);
+	configPath_ = this->declare_parameter("config_path", configPath_);
+	publishNullWhenLost_ = this->declare_parameter("publish_null_when_lost", publishNullWhenLost_);
+
+	guessFrameId_ = this->declare_parameter("guess_frame_id", guessFrameId_);
+	guessMinTranslation_ = this->declare_parameter("guess_min_translation", guessMinTranslation_);
+	guessMinRotation_ = this->declare_parameter("guess_min_rotation", guessMinRotation_);
+	guessMinTime_ = this->declare_parameter("guess_min_time", guessMinTime_);
+
+	expectedUpdateRate_ = this->declare_parameter("expected_update_rate", expectedUpdateRate_);
+
+	waitIMUToinit_ = this->declare_parameter("wait_imu_to_init", waitIMUToinit_);
+
+	if(publishTf_ && !guessFrameId_.empty() && guessFrameId_.compare(odomFrameId_) == 0)
+	{
+		RCLCPP_WARN(this->get_logger(), "\"publish_tf\" and \"guess_frame_id\" cannot be used "
+				"at the same time if \"guess_frame_id\" and \"odom_frame_id\" "
+				"are the same frame (value=\"%s\"). \"guess_frame_id\" is disabled.", odomFrameId_.c_str());
+		guessFrameId_.clear();
+	}
+	RCLCPP_INFO(this->get_logger(), "Odometry: frame_id               = %s", frameId_.c_str());
+	RCLCPP_INFO(this->get_logger(), "Odometry: odom_frame_id          = %s", odomFrameId_.c_str());
+	RCLCPP_INFO(this->get_logger(), "Odometry: publish_tf             = %s", publishTf_?"true":"false");
+	RCLCPP_INFO(this->get_logger(), "Odometry: wait_for_transform     = %f", waitForTransform_);
+	RCLCPP_INFO(this->get_logger(), "Odometry: initial_pose           = %s", initialPose_.prettyPrint().c_str());
+	RCLCPP_INFO(this->get_logger(), "Odometry: ground_truth_frame_id  = %s", groundTruthFrameId_.c_str());
+	RCLCPP_INFO(this->get_logger(), "Odometry: ground_truth_base_frame_id = %s", groundTruthBaseFrameId_.c_str());
+	RCLCPP_INFO(this->get_logger(), "Odometry: config_path            = %s", configPath_.c_str());
+	RCLCPP_INFO(this->get_logger(), "Odometry: publish_null_when_lost = %s", publishNullWhenLost_?"true":"false");
+	RCLCPP_INFO(this->get_logger(), "Odometry: guess_frame_id         = %s", guessFrameId_.c_str());
+	RCLCPP_INFO(this->get_logger(), "Odometry: guess_min_translation  = %f", guessMinTranslation_);
+	RCLCPP_INFO(this->get_logger(), "Odometry: guess_min_rotation     = %f", guessMinRotation_);
+	RCLCPP_INFO(this->get_logger(), "Odometry: guess_min_time         = %f", guessMinTime_);
+	RCLCPP_INFO(this->get_logger(), "Odometry: expected_update_rate   = %f Hz", expectedUpdateRate_);
+	RCLCPP_INFO(this->get_logger(), "Odometry: wait_imu_to_init       = %s", waitIMUToinit_?"true":"false");
+
+	configPath_ = uReplaceChar(configPath_, '~', UDirectory::homeDir());
+	if(configPath_.size() && configPath_.at(0) != '/')
+	{
+		configPath_ = UDirectory::currentDir(true) + configPath_;
+	}
+
+	if(initialPoseStr.size())
+	{
+		std::vector<std::string> values = uListToVector(uSplit(initialPoseStr, ' '));
+		if(values.size() == 6)
+		{
+			initialPose_ = Transform(
+					uStr2Float(values[0]), uStr2Float(values[1]), uStr2Float(values[2]),
+					uStr2Float(values[3]), uStr2Float(values[4]), uStr2Float(values[5]));
+		}
+		else
+		{
+			RCLCPP_ERROR(this->get_logger(), "Wrong initial_pose format: %s (should be \"x y z roll pitch yaw\" with angle in radians). "
+					  "Identity will be used...", initialPoseStr.c_str());
+		}
+	}
 }
 
 OdometryROS::~OdometryROS()
@@ -96,112 +177,15 @@ OdometryROS::~OdometryROS()
 		warningThread_->join();
 		delete warningThread_;
 	}
-	ros::NodeHandle & pnh = getPrivateNodeHandle();
-	if(pnh.ok())
-	{
-		for(ParametersMap::iterator iter=parameters_.begin(); iter!=parameters_.end(); ++iter)
-		{
-			pnh.deleteParam(iter->first);
-		}
-	}
 
 	delete odometry_;
 }
 
-void OdometryROS::onInit()
+void OdometryROS::init(bool stereoParams, bool visParams, bool icpParams)
 {
-	ros::NodeHandle & nh = getNodeHandle();
-	ros::NodeHandle & pnh = getPrivateNodeHandle();
-
-	odomPub_ = nh.advertise<nav_msgs::Odometry>("odom", 1);
-	odomInfoPub_ = nh.advertise<rtabmap_ros::OdomInfo>("odom_info", 1);
-	odomLocalMap_ = nh.advertise<sensor_msgs::PointCloud2>("odom_local_map", 1);
-	odomLocalScanMap_ = nh.advertise<sensor_msgs::PointCloud2>("odom_local_scan_map", 1);
-	odomLastFrame_ = nh.advertise<sensor_msgs::PointCloud2>("odom_last_frame", 1);
-
-	Transform initialPose = Transform::getIdentity();
-	std::string initialPoseStr;
-	std::string configPath;
-	pnh.param("frame_id", frameId_, frameId_);
-	pnh.param("odom_frame_id", odomFrameId_, odomFrameId_);
-	pnh.param("publish_tf", publishTf_, publishTf_);
-	if(pnh.hasParam("tf_prefix"))
-	{
-		NODELET_ERROR("tf_prefix parameter has been removed, use directly odom_frame_id and frame_id parameters.");
-	}
-	pnh.param("wait_for_transform", waitForTransform_, waitForTransform_);
-	pnh.param("wait_for_transform_duration",  waitForTransformDuration_, waitForTransformDuration_);
-	pnh.param("initial_pose", initialPoseStr, initialPoseStr); // "x y z roll pitch yaw"
-	pnh.param("ground_truth_frame_id", groundTruthFrameId_, groundTruthFrameId_);
-	pnh.param("ground_truth_base_frame_id", groundTruthBaseFrameId_, frameId_);
-	pnh.param("config_path", configPath, configPath);
-	pnh.param("publish_null_when_lost", publishNullWhenLost_, publishNullWhenLost_);
-	if(pnh.hasParam("guess_from_tf"))
-	{
-		if(!pnh.hasParam("guess_frame_id"))
-		{
-			NODELET_ERROR("Parameter \"guess_from_tf\" doesn't exist anymore, it is enabled if \"guess_frame_id\" is set.");
-		}
-		else
-		{
-			NODELET_WARN("Parameter \"guess_from_tf\" doesn't exist anymore, it is enabled if \"guess_frame_id\" is set.");
-		}
-	}
-	pnh.param("guess_frame_id", guessFrameId_, guessFrameId_); // odometry guess frame
-	pnh.param("guess_min_translation", guessMinTranslation_, guessMinTranslation_);
-	pnh.param("guess_min_rotation", guessMinRotation_, guessMinRotation_);
-	pnh.param("guess_min_time", guessMinTime_, guessMinTime_);
-
-	pnh.param("expected_update_rate", expectedUpdateRate_, expectedUpdateRate_);
-
-	pnh.param("wait_imu_to_init", waitIMUToinit_, waitIMUToinit_);
-
-	if(publishTf_ && !guessFrameId_.empty() && guessFrameId_.compare(odomFrameId_) == 0)
-	{
-		NODELET_WARN( "\"publish_tf\" and \"guess_frame_id\" cannot be used "
-				"at the same time if \"guess_frame_id\" and \"odom_frame_id\" "
-				"are the same frame (value=\"%s\"). \"guess_frame_id\" is disabled.", odomFrameId_.c_str());
-		guessFrameId_.clear();
-	}
-	NODELET_INFO("Odometry: frame_id               = %s", frameId_.c_str());
-	NODELET_INFO("Odometry: odom_frame_id          = %s", odomFrameId_.c_str());
-	NODELET_INFO("Odometry: publish_tf             = %s", publishTf_?"true":"false");
-	NODELET_INFO("Odometry: wait_for_transform     = %s", waitForTransform_?"true":"false");
-	NODELET_INFO("Odometry: wait_for_transform_duration  = %f", waitForTransformDuration_);
-	NODELET_INFO("Odometry: initial_pose           = %s", initialPose.prettyPrint().c_str());
-	NODELET_INFO("Odometry: ground_truth_frame_id  = %s", groundTruthFrameId_.c_str());
-	NODELET_INFO("Odometry: ground_truth_base_frame_id = %s", groundTruthBaseFrameId_.c_str());
-	NODELET_INFO("Odometry: config_path            = %s", configPath.c_str());
-	NODELET_INFO("Odometry: publish_null_when_lost = %s", publishNullWhenLost_?"true":"false");
-	NODELET_INFO("Odometry: guess_frame_id         = %s", guessFrameId_.c_str());
-	NODELET_INFO("Odometry: guess_min_translation  = %f", guessMinTranslation_);
-	NODELET_INFO("Odometry: guess_min_rotation     = %f", guessMinRotation_);
-	NODELET_INFO("Odometry: guess_min_time         = %f", guessMinTime_);
-	NODELET_INFO("Odometry: expected_update_rate   = %f Hz", expectedUpdateRate_);
-	NODELET_INFO("Odometry: wait_imu_to_init       = %s", waitIMUToinit_?"true":"false");
-
-	configPath = uReplaceChar(configPath, '~', UDirectory::homeDir());
-	if(configPath.size() && configPath.at(0) != '/')
-	{
-		configPath = UDirectory::currentDir(true) + configPath;
-	}
-
-	if(initialPoseStr.size())
-	{
-		std::vector<std::string> values = uListToVector(uSplit(initialPoseStr, ' '));
-		if(values.size() == 6)
-		{
-			initialPose = Transform(
-					uStr2Float(values[0]), uStr2Float(values[1]), uStr2Float(values[2]),
-					uStr2Float(values[3]), uStr2Float(values[4]), uStr2Float(values[5]));
-		}
-		else
-		{
-			NODELET_ERROR( "Wrong initial_pose format: %s (should be \"x y z roll pitch yaw\" with angle in radians). "
-					  "Identity will be used...", initialPoseStr.c_str());
-		}
-	}
-
+	stereoParams_ = stereoParams;
+	visParams_ = visParams;
+	icpParams_ = icpParams;
 
 	//parameters
 	parameters_ = Parameters::getDefaultOdometryParameters(stereoParams_, visParams_, icpParams_);
@@ -217,13 +201,13 @@ void OdometryROS::onInit()
 		}
 	}
 	parameters_.insert(*Parameters::getDefaultParameters().find(Parameters::kRtabmapImagesAlreadyRectified()));
-	if(!configPath.empty())
+	if(!configPath_.empty())
 	{
-		if(UFile::exists(configPath.c_str()))
+		if(UFile::exists(configPath_.c_str()))
 		{
-			NODELET_INFO( "Odometry: Loading parameters from %s", configPath.c_str());
+			RCLCPP_INFO(this->get_logger(), "Odometry: Loading parameters from %s", configPath_.c_str());
 			rtabmap::ParametersMap allParameters;
-			Parameters::readINI(configPath.c_str(), allParameters);
+			Parameters::readINI(configPath_.c_str(), allParameters);
 			// only update odometry parameters
 			for(ParametersMap::iterator iter=parameters_.begin(); iter!=parameters_.end(); ++iter)
 			{
@@ -236,57 +220,42 @@ void OdometryROS::onInit()
 		}
 		else
 		{
-			NODELET_ERROR( "Config file \"%s\" not found!", configPath.c_str());
+			RCLCPP_ERROR(this->get_logger(), "Config file \"%s\" not found!", configPath_.c_str());
 		}
 	}
+
 	for(rtabmap::ParametersMap::iterator iter=parameters_.begin(); iter!=parameters_.end(); ++iter)
 	{
-		std::string vStr;
-		bool vBool;
-		int vInt;
-		double vDouble;
-		if(pnh.getParam(iter->first, vStr))
+		rclcpp::Parameter parameter;
+		if(get_parameter(iter->first, parameter))
 		{
-			NODELET_INFO( "Setting odometry parameter \"%s\"=\"%s\"", iter->first.c_str(), vStr.c_str());
+			std::string vStr = parameter.as_string();
+			RCLCPP_INFO(this->get_logger(), "Setting odometry parameter \"%s\"=\"%s\"", iter->first.c_str(), vStr.c_str());
 			iter->second = vStr;
-		}
-		else if(pnh.getParam(iter->first, vBool))
-		{
-			NODELET_INFO( "Setting odometry parameter \"%s\"=\"%s\"", iter->first.c_str(), uBool2Str(vBool).c_str());
-			iter->second = uBool2Str(vBool);
-		}
-		else if(pnh.getParam(iter->first, vDouble))
-		{
-			NODELET_INFO( "Setting odometry parameter \"%s\"=\"%s\"", iter->first.c_str(), uNumber2Str(vDouble).c_str());
-			iter->second = uNumber2Str(vDouble);
-		}
-		else if(pnh.getParam(iter->first, vInt))
-		{
-			NODELET_INFO( "Setting odometry parameter \"%s\"=\"%s\"", iter->first.c_str(), uNumber2Str(vInt).c_str());
-			iter->second = uNumber2Str(vInt);
 		}
 
 		if(iter->first.compare(Parameters::kVisMinInliers()) == 0 && atoi(iter->second.c_str()) < 8)
 		{
-			NODELET_WARN( "Parameter min_inliers must be >= 8, setting to 8...");
+			RCLCPP_WARN(this->get_logger(), "Parameter min_inliers must be >= 8, setting to 8...");
 			iter->second = uNumber2Str(8);
 		}
 	}
 
-	std::vector<std::string> argList = getMyArgv();
-	char * argv[argList.size()];
+	std::vector<std::string> argList = this->get_node_options().arguments();
+	char ** argv = new char*[argList.size()];
 	for(unsigned int i=0; i<argList.size(); ++i)
 	{
 		argv[i] = &argList[i].at(0);
 	}
 
 	rtabmap::ParametersMap parameters = rtabmap::Parameters::parseArguments(argList.size(), argv);
+	delete[] argv;
 	for(rtabmap::ParametersMap::iterator iter=parameters.begin(); iter!=parameters.end(); ++iter)
 	{
 		rtabmap::ParametersMap::iterator jter = parameters_.find(iter->first);
 		if(jter!=parameters_.end())
 		{
-			NODELET_INFO( "Update odometry parameter \"%s\"=\"%s\" from arguments", iter->first.c_str(), iter->second.c_str());
+			RCLCPP_INFO(this->get_logger(), "Update odometry parameter \"%s\"=\"%s\" from arguments", iter->first.c_str(), iter->second.c_str());
 			jter->second = iter->second;
 		}
 	}
@@ -296,26 +265,27 @@ void OdometryROS::onInit()
 		iter!=Parameters::getRemovedParameters().end();
 		++iter)
 	{
-		std::string vStr;
-		if(pnh.getParam(iter->first, vStr))
+		rclcpp::Parameter parameter;
+		if(get_parameter(iter->first, parameter))
 		{
+			std::string vStr = parameter.as_string();
 			if(iter->second.first && parameters_.find(iter->second.second) != parameters_.end())
 			{
 				// can be migrated
 				parameters_.at(iter->second.second)= vStr;
-				NODELET_WARN( "Odometry: Parameter name changed: \"%s\" -> \"%s\". Please update your launch file accordingly. Value \"%s\" is still set to the new parameter name.",
+				RCLCPP_WARN(this->get_logger(), "Odometry: Parameter name changed: \"%s\" -> \"%s\". Please update your launch file accordingly. Value \"%s\" is still set to the new parameter name.",
 						iter->first.c_str(), iter->second.second.c_str(), vStr.c_str());
 			}
 			else
 			{
 				if(iter->second.second.empty())
 				{
-					NODELET_ERROR( "Odometry: Parameter \"%s\" doesn't exist anymore!",
+					RCLCPP_ERROR(this->get_logger(), "Odometry: Parameter \"%s\" doesn't exist anymore!",
 							iter->first.c_str());
 				}
 				else
 				{
-					NODELET_ERROR( "Odometry: Parameter \"%s\" doesn't exist anymore! You may look at this similar parameter: \"%s\"",
+					RCLCPP_ERROR(this->get_logger(), "Odometry: Parameter \"%s\" doesn't exist anymore! You may look at this similar parameter: \"%s\"",
 							iter->first.c_str(), iter->second.second.c_str());
 				}
 			}
@@ -328,29 +298,29 @@ void OdometryROS::onInit()
 	this->updateParameters(parameters_);
 
 	odometry_ = Odometry::create(parameters_);
-	if(!initialPose.isIdentity())
+	if(!initialPose_.isIdentity())
 	{
-		odometry_->reset(initialPose);
+		odometry_->reset(initialPose_);
 	}
 
-	resetSrv_ = nh.advertiseService("reset_odom", &OdometryROS::reset, this);
-	resetToPoseSrv_ = nh.advertiseService("reset_odom_to_pose", &OdometryROS::resetToPose, this);
-	pauseSrv_ = nh.advertiseService("pause_odom", &OdometryROS::pause, this);
-	resumeSrv_ = nh.advertiseService("resume_odom", &OdometryROS::resume, this);
+	resetSrv_ = this->create_service<std_srvs::srv::Empty>("reset_odom", std::bind(&OdometryROS::resetOdom, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	resetToPoseSrv_ = this->create_service<rtabmap_ros::srv::ResetPose>("reset_odom_to_pose", std::bind(&OdometryROS::resetToPose, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	pauseSrv_ = this->create_service<std_srvs::srv::Empty>("pause_odom", std::bind(&OdometryROS::pause, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	resumeSrv_ = this->create_service<std_srvs::srv::Empty>("resume_odom", std::bind(&OdometryROS::resume, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
-	setLogDebugSrv_ = pnh.advertiseService("log_debug", &OdometryROS::setLogDebug, this);
-	setLogInfoSrv_ = pnh.advertiseService("log_info", &OdometryROS::setLogInfo, this);
-	setLogWarnSrv_ = pnh.advertiseService("log_warning", &OdometryROS::setLogWarn, this);
-	setLogErrorSrv_ = pnh.advertiseService("log_error", &OdometryROS::setLogError, this);
+	setLogDebugSrv_ = this->create_service<std_srvs::srv::Empty>("log_debug", std::bind(&OdometryROS::setLogDebug, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	setLogInfoSrv_ = this->create_service<std_srvs::srv::Empty>("log_info", std::bind(&OdometryROS::setLogInfo, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	setLogWarnSrv_ = this->create_service<std_srvs::srv::Empty>("log_warning", std::bind(&OdometryROS::setLogWarn, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	setLogErrorSrv_ = this->create_service<std_srvs::srv::Empty>("log_error", std::bind(&OdometryROS::setLogError, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
 	odomStrategy_ = 0;
 	Parameters::parse(this->parameters(), Parameters::kOdomStrategy(), odomStrategy_);
 	if(waitIMUToinit_ || odometry_->canProcessIMU())
 	{
 		int queueSize = 10;
-		pnh.param("queue_size", queueSize, queueSize);
-		imuSub_ = nh.subscribe("imu", queueSize*5, &OdometryROS::callbackIMU, this);
-		NODELET_INFO("odometry: Subscribing to IMU topic %s", imuSub_.getTopic().c_str());
+		queueSize = this->declare_parameter("queue_size", queueSize);
+		imuSub_ = create_subscription<sensor_msgs::msg::Imu>("imu", queueSize*5, std::bind(&OdometryROS::callbackIMU, this, std::placeholders::_1));
+		RCLCPP_INFO(this->get_logger(), "odometry: Subscribing to IMU topic %s", imuSub_->get_topic_name());
 	}
 
 	onOdomInit();
@@ -358,59 +328,29 @@ void OdometryROS::onInit()
 
 void OdometryROS::startWarningThread(const std::string & subscribedTopicsMsg, bool approxSync)
 {
-	warningThread_ = new boost::thread(boost::bind(&OdometryROS::warningLoop, this, subscribedTopicsMsg, approxSync));
-	NODELET_INFO("%s", subscribedTopicsMsg.c_str());
-}
+	RCLCPP_INFO(this->get_logger(), "%s", subscribedTopicsMsg.c_str());
 
-void OdometryROS::warningLoop(const std::string & subscribedTopicsMsg, bool approxSync)
-{
-	ros::Duration r(5.0);
-	while(!callbackCalled_)
-	{
-		r.sleep();
-		if(!callbackCalled_)
+	subscribedTopicsMsg_ = subscribedTopicsMsg;
+	warningThread_ = new std::thread([&](){
+		rclcpp::Rate r(1.0/5.0);
+		while(!callbackCalled_)
 		{
-			ROS_WARN("%s: Did not receive data since 5 seconds! Make sure the input topics are "
-					"published (\"$ rostopic hz my_topic\") and the timestamps in their "
-					"header are set. %s%s",
-					getName().c_str(),
-					approxSync?"":"Parameter \"approx_sync\" is false, which means that input "
-						"topics should have all the exact timestamp for the callback to be called.",
-					subscribedTopicsMsg.c_str());
-		}
-	}
-}
-
-Transform OdometryROS::getTransform(const std::string & fromFrameId, const std::string & toFrameId, const ros::Time & stamp) const
-{
-	// TF ready?
-	Transform transform;
-	try
-	{
-		if(waitForTransform_ && !stamp.isZero() && waitForTransformDuration_ > 0.0)
-		{
-			//if(!tfBuffer_.canTransform(fromFrameId, toFrameId, stamp, ros::Duration(1)))
-			std::string errorMsg;
-			if(!tfListener_.waitForTransform(fromFrameId, toFrameId, stamp, ros::Duration(waitForTransformDuration_), ros::Duration(0.01), &errorMsg))
+			r.sleep();
+			if(!callbackCalled_)
 			{
-				NODELET_WARN( "odometry: Could not get transform from %s to %s (stamp=%f) after %f seconds (\"wait_for_transform_duration\"=%f)! Error=\"%s\"",
-						fromFrameId.c_str(), toFrameId.c_str(), stamp.toSec(), waitForTransformDuration_, waitForTransformDuration_, errorMsg.c_str());
-				return transform;
+				RCLCPP_WARN(this->get_logger(), "%s: Did not receive data since 5 seconds! Make sure the input topics are "
+						"published (\"$ rostopic hz my_topic\") and the timestamps in their "
+						"header are set. %s%s",
+						this->get_name(),
+						approxSync?"":"Parameter \"approx_sync\" is false, which means that input "
+							"topics should have all the exact timestamp for the callback to be called.",
+							subscribedTopicsMsg_.c_str());
 			}
 		}
-
-		tf::StampedTransform tmp;
-		tfListener_.lookupTransform(fromFrameId, toFrameId, stamp, tmp);
-		transform = rtabmap_ros::transformFromTF(tmp);
-	}
-	catch(tf::TransformException & ex)
-	{
-		NODELET_WARN( "%s",ex.what());
-	}
-	return transform;
+	});
 }
 
-void OdometryROS::callbackIMU(const sensor_msgs::ImuConstPtr& msg)
+void OdometryROS::callbackIMU(const sensor_msgs::msg::Imu::SharedPtr msg)
 {
 	if(!this->isPaused())
 	{
@@ -421,15 +361,15 @@ void OdometryROS::callbackIMU(const sensor_msgs::ImuConstPtr& msg)
 			return;
 		}
 
-		double stamp = msg->header.stamp.toSec();
+		double stamp = timestampFromROS(msg->header.stamp);
 		rtabmap::Transform localTransform = rtabmap::Transform::getIdentity();
 		if(this->frameId().compare(msg->header.frame_id) != 0)
 		{
-			localTransform = getTransform(this->frameId(), msg->header.frame_id, msg->header.stamp);
+			localTransform = getTransform(this->frameId(), msg->header.frame_id, msg->header.stamp, *tfBuffer_, waitForTransform_);
 		}
 		if(localTransform.isNull())
 		{
-			ROS_ERROR("Could not transform IMU msg from frame \"%s\" to frame \"%s\", TF not available at time %f",
+			RCLCPP_ERROR(this->get_logger(), "Could not transform IMU msg from frame \"%s\" to frame \"%s\", TF not available at time %f",
 					msg->header.frame_id.c_str(), this->frameId().c_str(), stamp);
 			return;
 		}
@@ -460,7 +400,7 @@ void OdometryROS::callbackIMU(const sensor_msgs::ImuConstPtr& msg)
 					this->reset(rotation);
 					float r,p,y;
 					rotation.getEulerAngles(r,p,y);
-					NODELET_WARN("odometry: Initialized odometry with IMU's orientation (rpy = %f %f %f).", r,p,y);
+					RCLCPP_WARN(this->get_logger(), "odometry: Initialized odometry with IMU's orientation (rpy = %f %f %f).", r,p,y);
 				}
 				else if(imu.linearAcceleration()[0]!=0.0 &&
 					imu.linearAcceleration()[1]!=0.0 &&
@@ -481,7 +421,7 @@ void OdometryROS::callbackIMU(const sensor_msgs::ImuConstPtr& msg)
 					this->reset(rotation);
 					float r,p,y;
 					rotation.getEulerAngles(r,p,y);
-					NODELET_WARN("odometry: Initialized odometry with IMU's accelerometer (rpy = %f %f %f).", r,p,y);
+					RCLCPP_WARN(this->get_logger(), "odometry: Initialized odometry with IMU's accelerometer (rpy = %f %f %f).", r,p,y);
 				}
 			}
 		}
@@ -494,18 +434,18 @@ void OdometryROS::callbackIMU(const sensor_msgs::ImuConstPtr& msg)
 
 			if(bufferedData_.isValid() && stamp >= bufferedData_.stamp())
 			{
-				processData(bufferedData_, ros::Time(bufferedData_.stamp()));
+				processData(bufferedData_, rclcpp::Time(bufferedData_.stamp()*10e9));
 			}
 			bufferedData_ = SensorData();
 		}
 	}
 }
 
-void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
+void OdometryROS::processData(const SensorData & data, const rclcpp::Time & stamp)
 {
 	if((waitIMUToinit_ && !imuProcessed_) && odometry_->framesProcessed() == 0 && odometry_->getPose().isIdentity() && data.imu().empty())
 	{
-		NODELET_WARN("odometry: waiting imu to initialize orientation (wait_imu_to_init=true)");
+		RCLCPP_WARN(this->get_logger(), "odometry: waiting imu to initialize orientation (wait_imu_to_init=true)");
 		return;
 	}
 
@@ -514,33 +454,33 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 	{
 		if(odometry_->canProcessIMU() && data.imu().empty() && lastImuReceivedStamp_>0.0 && data.stamp() > lastImuReceivedStamp_)
 		{
-			//NODELET_WARN("Data received is more recent than last imu received, waiting for imu update to process it.");
+			//RCLCPP_WARN(this->get_logger(), "Data received is more recent than last imu received, waiting for imu update to process it.");
 			if(bufferedData_.isValid())
 			{
-				NODELET_ERROR("Overwriting previous data! Make sure IMU is published faster than data rate.");
+				RCLCPP_ERROR(this->get_logger(), "Overwriting previous data! Make sure IMU is published faster than data rate.");
 			}
 			bufferedData_ = data;
 			return;
 		}
 
-		if(previousStamp_>0.0 && previousStamp_ >= stamp.toSec())
+		if(previousStamp_>0.0 && previousStamp_ >= stamp.seconds())
 		{
-			NODELET_WARN("Odometry: Detected not valid consecutive stamps (previous=%fs new=%fs). New stamp should be always greater than previous stamp. This new data is ignored. This message will appear only once.",
-					previousStamp_, stamp.toSec());
+			RCLCPP_WARN(this->get_logger(), "Odometry: Detected not valid consecutive stamps (previous=%fs new=%fs). New stamp should be always greater than previous stamp. This new data is ignored. This message will appear only once.",
+					previousStamp_, stamp.seconds());
 			return;
 		}
 		else if(expectedUpdateRate_ > 0 &&
 		  previousStamp_ > 0 &&
-		  (stamp.toSec()-previousStamp_) < 1.0/expectedUpdateRate_)
+		  (stamp.seconds()-previousStamp_) < 1.0/expectedUpdateRate_)
 		{
-			NODELET_WARN("Odometry: Aborting odometry update, higher frame rate detected (%f Hz) than the expected one (%f Hz). (stamps: previous=%fs new=%fs)",
-					1.0/(stamp.toSec()-previousStamp_), expectedUpdateRate_, previousStamp_, stamp.toSec());
+			RCLCPP_WARN(this->get_logger(), "Odometry: Aborting odometry update, higher frame rate detected (%f Hz) than the expected one (%f Hz). (stamps: previous=%fs new=%fs)",
+					1.0/(stamp.seconds()-previousStamp_), expectedUpdateRate_, previousStamp_, stamp.seconds());
 			return;
 		}
 
 		if(!groundTruthFrameId_.empty())
 		{
-			groundTruth = getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, stamp);
+			groundTruth = getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, stamp, *tfBuffer_, waitForTransform_);
 
 			if(!data.imageRaw().empty() || !data.laserScanRaw().isEmpty())
 			{
@@ -549,13 +489,13 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 					// sync with the first value of the ground truth
 					if(groundTruth.isNull())
 					{
-						NODELET_WARN("Ground truth frames \"%s\" -> \"%s\" are set but failed to "
+						RCLCPP_WARN(this->get_logger(), "Ground truth frames \"%s\" -> \"%s\" are set but failed to "
 								"get them, odometry won't be initialized with ground truth.",
 								groundTruthFrameId_.c_str(), groundTruthBaseFrameId_.c_str());
 					}
 					else
 					{
-						NODELET_INFO( "Initializing odometry pose to %s (from \"%s\" -> \"%s\")",
+						RCLCPP_INFO(this->get_logger(), "Initializing odometry pose to %s (from \"%s\" -> \"%s\")",
 								groundTruth.prettyPrint().c_str(),
 								groundTruthFrameId_.c_str(),
 								groundTruthBaseFrameId_.c_str());
@@ -570,7 +510,7 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 	Transform guessCurrentPose;
 	if(!guessFrameId_.empty())
 	{
-		guessCurrentPose = this->getTransform(guessFrameId_, frameId_, stamp);
+		guessCurrentPose = getTransform(guessFrameId_, frameId_, stamp, *tfBuffer_, waitForTransform_);
 		Transform previousPose = guessPreviousPose_.isNull()?guessCurrentPose:guessPreviousPose_;
 		if(!previousPose.isNull() && !guessCurrentPose.isNull())
 		{
@@ -588,18 +528,18 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 				guess_.getTranslationAndEulerAngles(x,y,z,roll,pitch,yaw);
 				if((guessMinTranslation_ <= 0.0 || uMax3(fabs(x), fabs(y), fabs(z)) < guessMinTranslation_) &&
 				   (guessMinRotation_ <= 0.0 || uMax3(fabs(roll), fabs(pitch), fabs(yaw)) < guessMinRotation_) &&
-				   (guessMinTime_ <= 0.0 || (previousStamp_>0.0 && stamp.toSec()-previousStamp_ < guessMinTime_)))
+				   (guessMinTime_ <= 0.0 || (previousStamp_>0.0 && stamp.seconds()-previousStamp_ < guessMinTime_)))
 				{
 					// Ignore odometry update, we didn't move enough
 					if(publishTf_)
 					{
-						geometry_msgs::TransformStamped correctionMsg;
+						geometry_msgs::msg::TransformStamped correctionMsg;
 						correctionMsg.child_frame_id = guessFrameId_;
 						correctionMsg.header.frame_id = odomFrameId_;
 						correctionMsg.header.stamp = stamp;
 						Transform correction = odometry_->getPose() * guess_ * guessCurrentPose.inverse();
 						rtabmap_ros::transformToGeometryMsg(correction, correctionMsg.transform);
-						tfBroadcaster_.sendTransform(correctionMsg);
+						tfBroadcaster_->sendTransform(correctionMsg);
 					}
 					guessPreviousPose_ = guessCurrentPose;
 					return;
@@ -609,13 +549,13 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 		}
 		else
 		{
-			NODELET_ERROR("\"guess_from_tf\" is true, but guess cannot be computed between frames \"%s\" -> \"%s\". Aborting odometry update...", guessFrameId_.c_str(), frameId_.c_str());
+			RCLCPP_ERROR(this->get_logger(), "\"guess_from_tf\" is true, but guess cannot be computed between frames \"%s\" -> \"%s\". Aborting odometry update...", guessFrameId_.c_str(), frameId_.c_str());
 			return;
 		}
 	}
 
 	// process data
-	ros::WallTime time = ros::WallTime::now();
+	rclcpp::Time timeStart = now();
 	rtabmap::OdometryInfo info;
 	SensorData dataCpy = data;
 	if(!groundTruth.isNull())
@@ -631,7 +571,7 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 		//*********************
 		// Update odometry
 		//*********************
-		geometry_msgs::TransformStamped poseMsg;
+		geometry_msgs::msg::TransformStamped poseMsg;
 		poseMsg.child_frame_id = frameId_;
 		poseMsg.header.frame_id = odomFrameId_;
 		poseMsg.header.stamp = stamp;
@@ -642,24 +582,24 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 			if(!guessFrameId_.empty())
 			{
 				//publish correction of actual odometry so we have /odom -> /odom_guess -> /base_link
-				geometry_msgs::TransformStamped correctionMsg;
+				geometry_msgs::msg::TransformStamped correctionMsg;
 				correctionMsg.child_frame_id = guessFrameId_;
 				correctionMsg.header.frame_id = odomFrameId_;
 				correctionMsg.header.stamp = stamp;
 				Transform correction = pose * guessCurrentPose.inverse();
 				rtabmap_ros::transformToGeometryMsg(correction, correctionMsg.transform);
-				tfBroadcaster_.sendTransform(correctionMsg);
+				tfBroadcaster_->sendTransform(correctionMsg);
 			}
 			else
 			{
-				tfBroadcaster_.sendTransform(poseMsg);
+				tfBroadcaster_->sendTransform(poseMsg);
 			}
 		}
 
-		if(odomPub_.getNumSubscribers())
+		if(odomPub_->get_subscription_count())
 		{
 			//next, we'll publish the odometry message over ROS
-			nav_msgs::Odometry odom;
+			nav_msgs::msg::Odometry odom;
 			odom.header.stamp = stamp; // use corresponding time stamp to image
 			odom.header.frame_id = odomFrameId_;
 			odom.child_frame_id = frameId_;
@@ -703,12 +643,12 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 			//publish the message
 			if(setTwist || publishNullWhenLost_)
 			{
-				odomPub_.publish(odom);
+				odomPub_->publish(odom);
 			}
 		}
 
 		// local map / reference frame
-		if(odomLocalMap_.getNumSubscribers() && !info.localMap.empty())
+		if(odomLocalMap_->get_subscription_count() && !info.localMap.empty())
 		{
 			pcl::PointCloud<pcl::PointXYZRGB> cloud;
 			for(std::map<int, cv::Point3f>::const_iterator iter=info.localMap.begin(); iter!=info.localMap.end(); ++iter)
@@ -720,14 +660,14 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 				pt.z = iter->second.z;
 				cloud.push_back(pt);
 			}
-			sensor_msgs::PointCloud2 cloudMsg;
+			sensor_msgs::msg::PointCloud2 cloudMsg;
 			pcl::toROSMsg(cloud, cloudMsg);
 			cloudMsg.header.stamp = stamp; // use corresponding time stamp to image
 			cloudMsg.header.frame_id = odomFrameId_;
-			odomLocalMap_.publish(cloudMsg);
+			odomLocalMap_->publish(cloudMsg);
 		}
 
-		if(odomLastFrame_.getNumSubscribers())
+		if(odomLastFrame_->get_subscription_count())
 		{
 			// check which type of Odometry is using
 			if(odometry_->getType() == Odometry::kTypeF2M) // If it's Frame to Map Odometry
@@ -743,11 +683,11 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 						cloud.push_back(pcl::PointXYZ(pt.x, pt.y, pt.z));
 					}
 
-					sensor_msgs::PointCloud2 cloudMsg;
+					sensor_msgs::msg::PointCloud2 cloudMsg;
 					pcl::toROSMsg(cloud, cloudMsg);
 					cloudMsg.header.stamp = stamp; // use corresponding time stamp to image
 					cloudMsg.header.frame_id = odomFrameId_;
-					odomLastFrame_.publish(cloudMsg);
+					odomLastFrame_->publish(cloudMsg);
 				}
 			}
 			else if(odometry_->getType() == Odometry::kTypeF2F) // if Using Frame to Frame Odometry
@@ -763,18 +703,18 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 						cv::Point3f pt = util3d::transformPoint(iter->second, pose);
 						cloud.push_back(pcl::PointXYZ(pt.x, pt.y, pt.z));
 					}
-					sensor_msgs::PointCloud2 cloudMsg;
+					sensor_msgs::msg::PointCloud2 cloudMsg;
 					pcl::toROSMsg(cloud, cloudMsg);
 					cloudMsg.header.stamp = stamp; // use corresponding time stamp to image
 					cloudMsg.header.frame_id = odomFrameId_;
-					odomLastFrame_.publish(cloudMsg);
+					odomLastFrame_->publish(cloudMsg);
 				}
 			}
 		}
 
-		if(odomLocalScanMap_.getNumSubscribers() && !info.localScanMap.isEmpty())
+		if(odomLocalScanMap_->get_subscription_count() && !info.localScanMap.isEmpty())
 		{
-			sensor_msgs::PointCloud2 cloudMsg;
+			sensor_msgs::msg::PointCloud2 cloudMsg;
 			if(info.localScanMap.hasNormals())
 			{
 				pcl::PointCloud<pcl::PointNormal>::Ptr cloud = util3d::laserScanToPointCloudNormal(info.localScanMap, info.localScanMap.localTransform());
@@ -788,7 +728,7 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 
 			cloudMsg.header.stamp = stamp; // use corresponding time stamp to image
 			cloudMsg.header.frame_id = odomFrameId_;
-			odomLocalScanMap_.publish(cloudMsg);
+			odomLocalScanMap_->publish(cloudMsg);
 		}
 	}
 	else if(data.imageRaw().empty() && data.laserScanRaw().isEmpty() && !data.imu().empty())
@@ -797,10 +737,10 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 	}
 	else if(publishNullWhenLost_)
 	{
-		//NODELET_WARN( "Odometry lost!");
+		//RCLCPP_WARN(this->get_logger(), "Odometry lost!");
 
 		//send null pose to notify that odometry is lost
-		nav_msgs::Odometry odom;
+		nav_msgs::msg::Odometry odom;
 		odom.header.stamp = stamp; // use corresponding time stamp to image
 		odom.header.frame_id = odomFrameId_;
 		odom.child_frame_id = frameId_;
@@ -818,26 +758,26 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 		odom.twist.covariance.at(35) = BAD_COVARIANCE; // yawyaw
 
 		//publish the message
-		odomPub_.publish(odom);
+		odomPub_->publish(odom);
 	}
 
 	if(pose.isNull() && resetCurrentCount_ > 0)
 	{
-		NODELET_WARN( "Odometry lost! Odometry will be reset after next %d consecutive unsuccessful odometry updates...", resetCurrentCount_);
+		RCLCPP_WARN(this->get_logger(), "Odometry lost! Odometry will be reset after next %d consecutive unsuccessful odometry updates...", resetCurrentCount_);
 
 		--resetCurrentCount_;
 		if(resetCurrentCount_ == 0)
 		{
 			// Check TF to see if sensor fusion is used (e.g., the output of robot_localization)
-			Transform tfPose = this->getTransform(odomFrameId_, frameId_, stamp);
+			Transform tfPose = getTransform(odomFrameId_, frameId_, stamp, *tfBuffer_, waitForTransform_);
 			if(tfPose.isNull())
 			{
-				NODELET_WARN( "Odometry automatically reset to latest computed pose!");
+				RCLCPP_WARN(this->get_logger(), "Odometry automatically reset to latest computed pose!");
 				odometry_->reset(odometry_->getPose());
 			}
 			else
 			{
-				NODELET_WARN( "Odometry automatically reset to latest odometry pose available from TF (%s->%s)!",
+				RCLCPP_WARN(this->get_logger(), "Odometry automatically reset to latest odometry pose available from TF (%s->%s)!",
 						odomFrameId_.c_str(), frameId_.c_str());
 				odometry_->reset(tfPose);
 			}
@@ -845,13 +785,13 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 		}
 	}
 
-	if(odomInfoPub_.getNumSubscribers())
+	if(odomInfoPub_->get_subscription_count())
 	{
-		rtabmap_ros::OdomInfo infoMsg;
+		rtabmap_ros::msg::OdomInfo infoMsg;
 		odomInfoToROS(info, infoMsg);
 		infoMsg.header.stamp = stamp; // use corresponding time stamp to image
 		infoMsg.header.frame_id = odomFrameId_;
-		odomInfoPub_.publish(infoMsg);
+		odomInfoPub_->publish(infoMsg);
 	}
 
 	if(!data.imageRaw().empty() || !data.laserScanRaw().isEmpty())
@@ -860,34 +800,38 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 		{
 			if(icpParams_)
 			{
-				NODELET_INFO( "Odom: quality=%d, ratio=%f, std dev=%fm|%frad, update time=%fs", info.reg.inliers, info.reg.icpInliersRatio, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (ros::WallTime::now()-time).toSec());
+				RCLCPP_INFO(this->get_logger(), "Odom: quality=%d, ratio=%f, std dev=%fm|%frad, update time=%fs", info.reg.inliers, info.reg.icpInliersRatio, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (now()-timeStart).seconds());
 			}
 			else
 			{
-				NODELET_INFO( "Odom: quality=%d, std dev=%fm|%frad, update time=%fs", info.reg.inliers, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (ros::WallTime::now()-time).toSec());
+				RCLCPP_INFO(this->get_logger(), "Odom: quality=%d, std dev=%fm|%frad, update time=%fs", info.reg.inliers, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (now()-timeStart).seconds());
 			}
 		}
 		else // if(icpParams_)
 		{
-			NODELET_INFO( "Odom: ratio=%f, std dev=%fm|%frad, update time=%fs", info.reg.icpInliersRatio, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (ros::WallTime::now()-time).toSec());
+			RCLCPP_INFO(this->get_logger(), "Odom: ratio=%f, std dev=%fm|%frad, update time=%fs", info.reg.icpInliersRatio, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (now()-timeStart).seconds());
 		}
-		previousStamp_ = stamp.toSec();
+		previousStamp_ = stamp.seconds();
 	}
 }
 
-bool OdometryROS::reset(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+void OdometryROS::resetOdom(
+		const std::shared_ptr<rmw_request_id_t>,
+		const std::shared_ptr<std_srvs::srv::Empty::Request>,
+		std::shared_ptr<std_srvs::srv::Empty::Response>)
 {
-	NODELET_INFO( "visual_odometry: reset odom!");
+	RCLCPP_INFO(this->get_logger(), "visual_odometry: reset odom!");
 	reset();
-	return true;
 }
 
-bool OdometryROS::resetToPose(rtabmap_ros::ResetPose::Request& req, rtabmap_ros::ResetPose::Response&)
+void OdometryROS::resetToPose(
+		const std::shared_ptr<rmw_request_id_t>,
+		const std::shared_ptr<rtabmap_ros::srv::ResetPose::Request> req,
+		std::shared_ptr<rtabmap_ros::srv::ResetPose::Response>)
 {
-	Transform pose(req.x, req.y, req.z, req.roll, req.pitch, req.yaw);
-	NODELET_INFO( "visual_odometry: reset odom to pose %s!", pose.prettyPrint().c_str());
+	Transform pose(req->x, req->y, req->z, req->roll, req->pitch, req->yaw);
+	RCLCPP_INFO(this->get_logger(), "visual_odometry: reset odom to pose %s!", pose.prettyPrint().c_str());
 	reset(pose);
-	return true;
 }
 
 void OdometryROS::reset(const Transform & pose)
@@ -903,58 +847,77 @@ void OdometryROS::reset(const Transform & pose)
 	this->flushCallbacks();
 }
 
-bool OdometryROS::pause(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+void OdometryROS::pause(
+		const std::shared_ptr<rmw_request_id_t>,
+		const std::shared_ptr<std_srvs::srv::Empty::Request>,
+		std::shared_ptr<std_srvs::srv::Empty::Response>)
 {
 	if(paused_)
 	{
-		NODELET_WARN( "Odometry: Already paused!");
+		RCLCPP_WARN(this->get_logger(), "Odometry: Already paused!");
 	}
 	else
 	{
 		paused_ = true;
-		NODELET_INFO( "Odometry: paused!");
+		RCLCPP_INFO(this->get_logger(), "Odometry: paused!");
 	}
-	return true;
 }
 
-bool OdometryROS::resume(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+void OdometryROS::resume(
+		const std::shared_ptr<rmw_request_id_t>,
+		const std::shared_ptr<std_srvs::srv::Empty::Request>,
+		std::shared_ptr<std_srvs::srv::Empty::Response>)
 {
 	if(!paused_)
 	{
-		NODELET_WARN( "Odometry: Already running!");
+		RCLCPP_WARN(this->get_logger(), "Odometry: Already running!");
 	}
 	else
 	{
 		paused_ = false;
-		NODELET_INFO( "Odometry: resumed!");
+		RCLCPP_INFO(this->get_logger(), "Odometry: resumed!");
 	}
-	return true;
 }
 
-bool OdometryROS::setLogDebug(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+void OdometryROS::setLogDebug(
+		const std::shared_ptr<rmw_request_id_t>,
+		const std::shared_ptr<std_srvs::srv::Empty::Request>,
+		std::shared_ptr<std_srvs::srv::Empty::Response>)
 {
-	NODELET_INFO( "visual_odometry: Set log level to Debug");
+	RCLCPP_INFO(this->get_logger(), "visual_odometry: Set log level to Debug");
 	ULogger::setLevel(ULogger::kDebug);
-	return true;
 }
-bool OdometryROS::setLogInfo(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+void OdometryROS::setLogInfo(
+		const std::shared_ptr<rmw_request_id_t>,
+		const std::shared_ptr<std_srvs::srv::Empty::Request>,
+		std::shared_ptr<std_srvs::srv::Empty::Response>)
 {
-	NODELET_INFO( "visual_odometry: Set log level to Info");
+	RCLCPP_INFO(this->get_logger(), "visual_odometry: Set log level to Info");
 	ULogger::setLevel(ULogger::kInfo);
-	return true;
 }
-bool OdometryROS::setLogWarn(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+void OdometryROS::setLogWarn(
+		const std::shared_ptr<rmw_request_id_t>,
+		const std::shared_ptr<std_srvs::srv::Empty::Request>,
+		std::shared_ptr<std_srvs::srv::Empty::Response>)
 {
-	NODELET_INFO( "visual_odometry: Set log level to Warning");
+	RCLCPP_INFO(this->get_logger(), "visual_odometry: Set log level to Warning");
 	ULogger::setLevel(ULogger::kWarning);
-	return true;
 }
-bool OdometryROS::setLogError(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+void OdometryROS::setLogError(
+		const std::shared_ptr<rmw_request_id_t>,
+		const std::shared_ptr<std_srvs::srv::Empty::Request>,
+		std::shared_ptr<std_srvs::srv::Empty::Response>)
 {
-	NODELET_INFO( "visual_odometry: Set log level to Error");
+	RCLCPP_INFO(this->get_logger(), "visual_odometry: Set log level to Error");
 	ULogger::setLevel(ULogger::kError);
-	return true;
 }
 
 
 }
+
+#include "rclcpp_components/register_node_macro.hpp"
+
+// Register the component with class_loader.
+// This acts as a sort of entry point, allowing the component to be discoverable when its library
+// is being loaded into a running process.
+RCLCPP_COMPONENTS_REGISTER_NODE(rtabmap_ros::OdometryROS)

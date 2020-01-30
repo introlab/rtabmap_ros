@@ -25,25 +25,18 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "ros/ros.h"
-#include <rtabmap/core/Parameters.h>
-#include <rtabmap/utilite/ULogger.h>
-#include <rtabmap/utilite/UDirectory.h>
+#include "rtabmap_ros/CoreWrapper.h"
+#include "rclcpp/rclcpp.hpp"
 #include <rtabmap/utilite/UStl.h>
-#include <rtabmap/utilite/UFile.h>
-#include <rtabmap/core/Version.h>
-#include "nodelet/loader.h"
+#include <rtabmap/utilite/UDirectory.h>
 
 int main(int argc, char** argv)
 {
-	ROS_INFO("Starting node...");
-
 	ULogger::setType(ULogger::kTypeConsole);
 	ULogger::setLevel(ULogger::kWarning);
 
-	ros::init(argc, argv, "rtabmap");
-
-	nodelet::V_string nargv;
+	// process "--params" argument
+	std::vector<std::string> arguments;
 	for(int i=1;i<argc;++i)
 	{
 		if(strcmp(argv[i], "--params") == 0 || strcmp(argv[i], "--params-all") == 0)
@@ -81,19 +74,18 @@ int main(int argc, char** argv)
 						"]" <<
 						std::endl;
 			}
-			ROS_WARN("Node will now exit after showing default RTAB-Map parameters because "
+			UWARN("Node will now exit after showing default RTAB-Map parameters because "
 					 "argument \"--params\" is detected!");
 			exit(0);
 		}
-		nargv.push_back(argv[i]);
+		arguments.push_back(argv[i]);
 	}
 
-	nodelet::Loader nodelet;
-	nodelet::M_string remap(ros::names::getRemappings());
-	std::string nodelet_name = ros::this_node::getName();
-	nodelet.load(nodelet_name, "rtabmap_ros/rtabmap", remap, nargv);
-	ROS_INFO("rtabmap %s started...", RTABMAP_VERSION);
-	ros::spin();
-
+	rclcpp::init(argc, argv);
+	rclcpp::NodeOptions options;
+	options.arguments(arguments);
+	UINFO("rtabmap %s started...", RTABMAP_VERSION);
+	rclcpp::spin(std::make_shared<rtabmap_ros::CoreWrapper>(options));
+	rclcpp::shutdown();
 	return 0;
 }

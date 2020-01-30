@@ -3,41 +3,41 @@
 # RTAB-Map info with statistics 
 ########################################
 
-Header header
+std_msgs/Header header
 
-int32 refId
-int32 loopClosureId
-int32 proximityDetectionId
+int32 ref_id
+int32 loop_closure_id
+int32 proximity_detection_id
 
-geometry_msgs/Transform loopClosureTransform
+geometry_msgs/Transform loop_closure_transform
 
 ####
 # For statistics...
 ####
 # std::map<int, float> posterior;
-int32[] posteriorKeys
-float32[] posteriorValues
+int32[] posterior_keys
+float32[] posterior_values
 
 # std::map<int, float> likelihood;
-int32[] likelihoodKeys
-float32[] likelihoodValues
+int32[] likelihood_keys
+float32[] likelihood_values
 
-# std::map<int, float> rawLikelihood;
-int32[] rawLikelihoodKeys
-float32[] rawLikelihoodValues
+# std::map<int, float> raw_likelihood;
+int32[] raw_likelihood_keys
+float32[] raw_likelihood_values
 
 # std::map<int, int> weights;
-int32[] weightsKeys
-int32[] weightsValues
+int32[] weights_keys
+int32[] weights_values
 
 # std::map<int, std::string> labels;
-int32[] labelsKeys
-string[] labelsValues
+int32[] labels_keys
+string[] labels_values
 
 # std::map<std::string, float> stats
-string[] statsKeys
-float32[] statsValues
+string[] stats_keys
+float32[] stats_values
 
-# std::vector<int> localPath
-int32[] localPath
-int32 currentGoalId
+# std::vector<int> local_path
+int32[] local_path
+int32 current_goal_id

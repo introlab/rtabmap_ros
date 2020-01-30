@@ -26,10 +26,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #include <rtabmap_ros/CommonDataSubscriber.h>
+#include <rtabmap/utilite/ULogger.h>
 
 namespace rtabmap_ros {
 
-CommonDataSubscriber::CommonDataSubscriber(bool gui) :
+CommonDataSubscriber::CommonDataSubscriber(rclcpp::Node& node, bool gui) :
 		queueSize_(10),
 		approxSync_(true),
 		warningThread_(0),
@@ -42,6 +43,8 @@ CommonDataSubscriber::CommonDataSubscriber(bool gui) :
 		subscribedToScan2d_(false),
 		subscribedToScan3d_(false),
 		subscribedToOdomInfo_(false),
+		subscribedToUserData_(false),
+		rgbdCameras_(1),
 
 		// RGB + Depth
 		SYNC_INIT(depth),
@@ -271,68 +274,53 @@ CommonDataSubscriber::CommonDataSubscriber(bool gui) :
 		SYNC_INIT(odomDataInfo)
 
 {
-}
-
-void CommonDataSubscriber::setupCallbacks(
-		ros::NodeHandle & nh,
-		ros::NodeHandle & pnh,
-		const std::string & name)
-{
-	bool subscribeScan2d = false;
-	bool subscribeScan3d = false;
-	bool subscribeOdomInfo = false;
-	bool subscribeUserData = false;
 	bool subscribeOdom = true;
-	int rgbdCameras = 1;
-	name_ = name;
+	name_ = node.get_name();
 
 	// ROS related parameters (private)
-	pnh.param("subscribe_depth",     subscribedToDepth_, subscribedToDepth_);
-	if(pnh.getParam("subscribe_laserScan", subscribeScan2d) && subscribeScan2d)
-	{
-		ROS_WARN("rtabmap: \"subscribe_laserScan\" parameter is deprecated, use \"subscribe_scan\" instead. The scan topic is still subscribed.");
-	}
-	pnh.param("subscribe_rgb",       subscribedToRGB_, subscribedToRGB_);
-	pnh.param("subscribe_scan",      subscribeScan2d, subscribeScan2d);
-	pnh.param("subscribe_scan_cloud", subscribeScan3d, subscribeScan3d);
-	pnh.param("subscribe_stereo",    subscribedToStereo_, subscribedToStereo_);
-	pnh.param("subscribe_rgbd",      subscribedToRGBD_, subscribedToRGBD_);
-	pnh.param("subscribe_odom_info", subscribeOdomInfo, subscribeOdomInfo);
-	pnh.param("subscribe_user_data", subscribeUserData, subscribeUserData);
-	pnh.param("subscribe_odom",      subscribeOdom, subscribeOdom);
+	subscribedToDepth_ = node.declare_parameter("subscribe_depth", subscribedToDepth_);
+	subscribedToRGB_ = node.declare_parameter("subscribe_rgb", subscribedToRGB_);
+	subscribedToScan2d_ = node.declare_parameter("subscribe_scan", subscribedToScan2d_);
+	subscribedToScan3d_ = node.declare_parameter("subscribe_scan_cloud", subscribedToScan3d_);
+	subscribedToStereo_ = node.declare_parameter("subscribe_stereo", subscribedToStereo_);
+	subscribedToRGBD_ = node.declare_parameter("subscribe_rgbd", subscribedToRGBD_);
+	subscribedToOdomInfo_ = node.declare_parameter("subscribe_odom_info", subscribedToOdomInfo_);
+	subscribedToUserData_ = node.declare_parameter("subscribe_user_data", subscribedToUserData_);
+	subscribeOdom = node.declare_parameter("subscribe_odom", subscribeOdom);
+
 	if(subscribedToDepth_ && subscribedToStereo_)
 	{
-		ROS_WARN("rtabmap: Parameters subscribe_depth and subscribe_stereo cannot be true at the same time. Parameter subscribe_depth is set to false.");
+		RCLCPP_WARN(node.get_logger(), "rtabmap: Parameters subscribe_depth and subscribe_stereo cannot be true at the same time. Parameter subscribe_depth is set to false.");
 		subscribedToDepth_ = false;
 		subscribedToRGB_ = false;
 	}
 	if(subscribedToRGB_ && subscribedToStereo_)
 	{
-		ROS_WARN("rtabmap: Parameters subscribe_stereo and subscribe_rgb cannot be true at the same time. Parameter subscribe_rgb is set to false.");
+		RCLCPP_WARN(node.get_logger(), "rtabmap: Parameters subscribe_stereo and subscribe_rgb cannot be true at the same time. Parameter subscribe_rgb is set to false.");
 		subscribedToRGB_ = false;
 	}
 	if(subscribedToDepth_ && subscribedToRGBD_)
 	{
-		ROS_WARN("rtabmap: Parameters subscribe_depth and subscribe_rgbd cannot be true at the same time. Parameter subscribe_depth is set to false.");
+		RCLCPP_WARN(node.get_logger(), "rtabmap: Parameters subscribe_depth and subscribe_rgbd cannot be true at the same time. Parameter subscribe_depth is set to false.");
 		subscribedToDepth_ = false;
 		subscribedToRGB_ = false;
 	}
 	if(subscribedToRGB_ && subscribedToRGBD_)
 	{
-		ROS_WARN("rtabmap: Parameters subscribe_rgb and subscribe_rgbd cannot be true at the same time. Parameter subscribe_rgb is set to false.");
+		RCLCPP_WARN(node.get_logger(), "rtabmap: Parameters subscribe_rgb and subscribe_rgbd cannot be true at the same time. Parameter subscribe_rgb is set to false.");
 		subscribedToRGB_ = false;
 	}
 	if(subscribedToStereo_ && subscribedToRGBD_)
 	{
-		ROS_WARN("rtabmap: Parameters subscribe_stereo and subscribe_rgbd cannot be true at the same time. Parameter subscribe_stereo is set to false.");
+		RCLCPP_WARN(node.get_logger(), "rtabmap: Parameters subscribe_stereo and subscribe_rgbd cannot be true at the same time. Parameter subscribe_stereo is set to false.");
 		subscribedToStereo_ = false;
 	}
-	if(subscribeScan2d && subscribeScan3d)
+	if(subscribedToScan2d_ && subscribedToScan3d_)
 	{
-		ROS_WARN("rtabmap: Parameters subscribe_scan and subscribe_scan_cloud cannot be true at the same time. Parameter subscribe_scan_cloud is set to false.");
-		subscribeScan3d = false;
+		RCLCPP_WARN(node.get_logger(), "rtabmap: Parameters subscribe_scan and subscribe_scan_cloud cannot be true at the same time. Parameter subscribe_scan_cloud is set to false.");
+		subscribedToScan3d_ = false;
 	}
-	if(subscribeScan2d || subscribeScan3d)
+	if(subscribedToScan2d_ || subscribedToScan3d_)
 	{
 		if(!subscribedToDepth_ && !subscribedToStereo_ && !subscribedToRGBD_ && !subscribedToRGB_)
 		{
@@ -345,160 +333,159 @@ void CommonDataSubscriber::setupCallbacks(
 	}
 
 	std::string odomFrameId;
-	pnh.getParam("odom_frame_id", odomFrameId);
-	pnh.param("rgbd_cameras",       rgbdCameras, rgbdCameras);
-	if(pnh.hasParam("depth_cameras"))
+	odomFrameId = node.declare_parameter("odom_frame_id", odomFrameId);
+	rgbdCameras_ = node.declare_parameter("rgbd_cameras", rgbdCameras_);
+	queueSize_ = node.declare_parameter("queue_size", queueSize_);
+	approxSync_ = node.declare_parameter("approx_sync", approxSync_);
+
+	if(rgbdCameras_ <= 0 && subscribedToRGBD_)
 	{
-		ROS_ERROR("\"depth_cameras\" parameter doesn't exist anymore. It is replaced by \"rgbd_cameras\" used when \"subscribe_rgbd\" is true.");
-	}
-	pnh.param("queue_size",          queueSize_, queueSize_);
-	if(pnh.hasParam("stereo_approx_sync") && !pnh.hasParam("approx_sync"))
-	{
-		ROS_WARN("Parameter \"stereo_approx_sync\" has been renamed "
-				 "to \"approx_sync\"! Your value is still copied to "
-				 "corresponding parameter.");
-		pnh.param("stereo_approx_sync", approxSync_, approxSync_);
-	}
-	else
-	{
-		pnh.param("approx_sync", approxSync_, approxSync_);
+		rgbdCameras_ = 1;
 	}
 
-	if(rgbdCameras <= 0 && subscribedToRGBD_)
-	{
-		rgbdCameras = 1;
-	}
-
-	ROS_INFO("%s: subscribe_depth = %s", name.c_str(), subscribedToDepth_?"true":"false");
-	ROS_INFO("%s: subscribe_rgb = %s", name.c_str(), subscribedToRGB_?"true":"false");
-	ROS_INFO("%s: subscribe_stereo = %s", name.c_str(), subscribedToStereo_?"true":"false");
-	ROS_INFO("%s: subscribe_rgbd = %s (rgbd_cameras=%d)", name.c_str(), subscribedToRGBD_?"true":"false", rgbdCameras);
-	ROS_INFO("%s: subscribe_odom_info = %s", name.c_str(), subscribeOdomInfo?"true":"false");
-	ROS_INFO("%s: subscribe_user_data = %s", name.c_str(), subscribeUserData?"true":"false");
-	ROS_INFO("%s: subscribe_scan = %s", name.c_str(), subscribeScan2d?"true":"false");
-	ROS_INFO("%s: subscribe_scan_cloud = %s", name.c_str(), subscribeScan3d?"true":"false");
-	ROS_INFO("%s: queue_size    = %d", name.c_str(), queueSize_);
-	ROS_INFO("%s: approx_sync   = %s", name.c_str(), approxSync_?"true":"false");
+	RCLCPP_INFO(node.get_logger(), "%s: subscribe_depth = %s", name_.c_str(), subscribedToDepth_?"true":"false");
+	RCLCPP_INFO(node.get_logger(), "%s: subscribe_rgb = %s", name_.c_str(), subscribedToRGB_?"true":"false");
+	RCLCPP_INFO(node.get_logger(), "%s: subscribe_stereo = %s", name_.c_str(), subscribedToStereo_?"true":"false");
+	RCLCPP_INFO(node.get_logger(), "%s: subscribe_rgbd = %s (rgbd_cameras=%d)", name_.c_str(), subscribedToRGBD_?"true":"false", rgbdCameras_);
+	RCLCPP_INFO(node.get_logger(), "%s: subscribe_odom_info = %s", name_.c_str(), subscribedToOdomInfo_?"true":"false");
+	RCLCPP_INFO(node.get_logger(), "%s: subscribe_user_data = %s", name_.c_str(), subscribedToUserData_?"true":"false");
+	RCLCPP_INFO(node.get_logger(), "%s: subscribe_scan = %s", name_.c_str(), subscribedToScan2d_?"true":"false");
+	RCLCPP_INFO(node.get_logger(), "%s: subscribe_scan_cloud = %s", name_.c_str(), subscribedToScan3d_?"true":"false");
+	RCLCPP_INFO(node.get_logger(), "%s: queue_size    = %d", name_.c_str(), queueSize_);
+	RCLCPP_INFO(node.get_logger(), "%s: approx_sync   = %s", name_.c_str(), approxSync_?"true":"false");
 
 	subscribedToOdom_ = odomFrameId.empty() && subscribeOdom;
+}
+
+void CommonDataSubscriber::setupCallbacks(rclcpp::Node & node)
+{
 	if(subscribedToDepth_)
 	{
 		setupDepthCallbacks(
-				nh,
-				pnh,
+				node,
 				subscribedToOdom_,
-				subscribeUserData,
-				subscribeScan2d,
-				subscribeScan3d,
-				subscribeOdomInfo,
+				subscribedToUserData_,
+				subscribedToScan2d_,
+				subscribedToScan3d_,
+				subscribedToOdomInfo_,
 				queueSize_,
 				approxSync_);
 	}
 	else if(subscribedToStereo_)
 	{
 		setupStereoCallbacks(
-				nh,
-				pnh,
+				node,
 				subscribedToOdom_,
-				subscribeOdomInfo,
+				subscribedToOdomInfo_,
 				queueSize_,
 				approxSync_);
 	}
 	else if(subscribedToRGB_)
 	{
 		setupRGBCallbacks(
-				nh,
-				pnh,
+				node,
 				subscribedToOdom_,
-				subscribeUserData,
-				subscribeScan2d,
-				subscribeScan3d,
-				subscribeOdomInfo,
+				subscribedToUserData_,
+				subscribedToScan2d_,
+				subscribedToScan3d_,
+				subscribedToOdomInfo_,
 				queueSize_,
 				approxSync_);
 	}
 	else if(subscribedToRGBD_)
 	{
-		if(rgbdCameras == 4)
+		if(rgbdCameras_ == 4)
 		{
 			setupRGBD4Callbacks(
-					nh,
-					pnh,
+					node,
 					subscribedToOdom_,
-					subscribeUserData,
-					subscribeScan2d,
-					subscribeScan3d,
-					subscribeOdomInfo,
+					subscribedToUserData_,
+					subscribedToScan2d_,
+					subscribedToScan3d_,
+					subscribedToOdomInfo_,
 					queueSize_,
 					approxSync_);
 		}
-		else if(rgbdCameras == 3)
+		else if(rgbdCameras_ == 3)
 		{
 			setupRGBD3Callbacks(
-					nh,
-					pnh,
+					node,
 					subscribedToOdom_,
-					subscribeUserData,
-					subscribeScan2d,
-					subscribeScan3d,
-					subscribeOdomInfo,
+					subscribedToUserData_,
+					subscribedToScan2d_,
+					subscribedToScan3d_,
+					subscribedToOdomInfo_,
 					queueSize_,
 					approxSync_);
 		}
-		else if(rgbdCameras == 2)
+		else if(rgbdCameras_ == 2)
 		{
 			setupRGBD2Callbacks(
-					nh,
-					pnh,
+					node,
 					subscribedToOdom_,
-					subscribeUserData,
-					subscribeScan2d,
-					subscribeScan3d,
-					subscribeOdomInfo,
+					subscribedToUserData_,
+					subscribedToScan2d_,
+					subscribedToScan3d_,
+					subscribedToOdomInfo_,
 					queueSize_,
 					approxSync_);
 		}
 		else
 		{
 			setupRGBDCallbacks(
-					nh,
-					pnh,
+					node,
 					subscribedToOdom_,
-					subscribeUserData,
-					subscribeScan2d,
-					subscribeScan3d,
-					subscribeOdomInfo,
+					subscribedToUserData_,
+					subscribedToScan2d_,
+					subscribedToScan3d_,
+					subscribedToOdomInfo_,
 					queueSize_,
 					approxSync_);
 		}
 	}
-	else if(subscribeScan2d || subscribeScan3d)
+	else if(subscribedToScan2d_ || subscribedToScan3d_)
 	{
 		setupScanCallbacks(
-					nh,
-					pnh,
-					subscribeScan2d,
+					node,
+					subscribedToScan2d_,
 					subscribedToOdom_,
-					subscribeUserData,
-					subscribeOdomInfo,
+					subscribedToUserData_,
+					subscribedToOdomInfo_,
 					queueSize_,
 					approxSync_);
 	}
 	else if(subscribedToOdom_)
 	{
 		setupOdomCallbacks(
-					nh,
-					pnh,
-					subscribeUserData,
-					subscribeOdomInfo,
+					node,
+					subscribedToUserData_,
+					subscribedToOdomInfo_,
 					queueSize_,
 					approxSync_);
 	}
 
 	if(subscribedToDepth_ || subscribedToStereo_ || subscribedToRGBD_ || subscribedToScan2d_ || subscribedToScan3d_ || subscribedToRGB_ || subscribedToOdom_)
 	{
-		warningThread_ = new boost::thread(boost::bind(&CommonDataSubscriber::warningLoop, this));
-		ROS_INFO("%s", subscribedTopicsMsg_.c_str());
+		warningThread_ = new std::thread([&](){
+			rclcpp::Rate r(1/5.0);
+			while(!callbackCalled_)
+			{
+				r.sleep();
+				if(!callbackCalled_)
+				{
+					RCLCPP_WARN(node.get_logger(), "%s: Did not receive data since 5 seconds! Make sure the input topics are "
+							"published (\"$ rostopic hz my_topic\") and the timestamps in their "
+							"header are set. If topics are coming from different computers, make sure "
+							"the clocks of the computers are synchronized (\"ntpdate\"). %s%s",
+							name_.c_str(),
+							approxSync_?
+									uFormat("If topics are not published at the same rate, you could increase \"queue_size\" parameter (current=%d).", queueSize_).c_str():
+									"Parameter \"approx_sync\" is false, which means that input topics should have all the exact timestamp for the callback to be called.",
+							subscribedTopicsMsg_.c_str());
+				}
+			}
+		});
+		RCLCPP_INFO(node.get_logger(), "%s", subscribedTopicsMsg_.c_str());
 	}
 }
 
@@ -744,57 +731,18 @@ CommonDataSubscriber::~CommonDataSubscriber()
 		delete rgbdSubs_[i];
 	}
 	rgbdSubs_.clear();
-
-	//clear params
-	ros::NodeHandle pnh("~");
-	pnh.deleteParam("subscribe_depth");
-	pnh.deleteParam("subscribe_laserScan");
-	pnh.deleteParam("subscribe_scan");
-	pnh.deleteParam("subscribe_scan_cloud");
-	pnh.deleteParam("subscribe_stereo");
-	pnh.deleteParam("subscribe_rgb");
-	pnh.deleteParam("subscribe_rgbd");
-	pnh.deleteParam("subscribe_odom_info");
-	pnh.deleteParam("subscribe_user_data");
-	pnh.deleteParam("odom_frame_id");
-	pnh.deleteParam("rgbd_cameras");
-	pnh.deleteParam("depth_cameras");
-	pnh.deleteParam("queue_size");
-	pnh.deleteParam("approx_sync");
-	pnh.deleteParam("stereo_approx_sync");
-}
-
-void CommonDataSubscriber::warningLoop()
-{
-	ros::Duration r(5.0);
-	while(!callbackCalled_)
-	{
-		r.sleep();
-		if(!callbackCalled_)
-		{
-			ROS_WARN("%s: Did not receive data since 5 seconds! Make sure the input topics are "
-					"published (\"$ rostopic hz my_topic\") and the timestamps in their "
-					"header are set. If topics are coming from different computers, make sure "
-					"the clocks of the computers are synchronized (\"ntpdate\"). %s%s",
-					name_.c_str(),
-					approxSync_?
-							uFormat("If topics are not published at the same rate, you could increase \"queue_size\" parameter (current=%d).", queueSize_).c_str():
-							"Parameter \"approx_sync\" is false, which means that input topics should have all the exact timestamp for the callback to be called.",
-					subscribedTopicsMsg_.c_str());
-		}
-	}
 }
 
 void CommonDataSubscriber::commonSingleDepthCallback(
-		const nav_msgs::OdometryConstPtr & odomMsg,
-		const rtabmap_ros::UserDataConstPtr & userDataMsg,
+		const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
+		const rtabmap_ros::msg::UserData::ConstSharedPtr & userDataMsg,
 		const cv_bridge::CvImageConstPtr & imageMsg,
 		const cv_bridge::CvImageConstPtr & depthMsg,
-		const sensor_msgs::CameraInfo & rgbCameraInfoMsg,
-		const sensor_msgs::CameraInfo & depthCameraInfoMsg,
-		const sensor_msgs::LaserScanConstPtr& scanMsg,
-		const sensor_msgs::PointCloud2ConstPtr& scan3dMsg,
-		const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg)
+		const sensor_msgs::msg::CameraInfo & rgbCameraInfoMsg,
+		const sensor_msgs::msg::CameraInfo & depthCameraInfoMsg,
+		const sensor_msgs::msg::LaserScan::ConstSharedPtr& scanMsg,
+		const sensor_msgs::msg::PointCloud2::ConstSharedPtr& scan3dMsg,
+		const rtabmap_ros::msg::OdomInfo::ConstSharedPtr& odomInfoMsg)
 {
 	callbackCalled();
 
@@ -805,7 +753,7 @@ void CommonDataSubscriber::commonSingleDepthCallback(
 	{
 		std::vector<cv_bridge::CvImageConstPtr> imageMsgs;
 		std::vector<cv_bridge::CvImageConstPtr> depthMsgs;
-		std::vector<sensor_msgs::CameraInfo> cameraInfoMsgs;
+		std::vector<sensor_msgs::msg::CameraInfo> cameraInfoMsgs;
 		if(imageMsg.get())
 		{
 			imageMsgs.push_back(imageMsg);

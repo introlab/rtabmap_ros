@@ -28,19 +28,19 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtabmap_ros/CoreWrapper.h"
 
 #include <stdio.h>
-#include <ros/ros.h>
-#include "pluginlib/class_list_macros.h"
+#include <thread>
+#include <rclcpp/rclcpp.hpp>
 
-#include <nav_msgs/Path.h>
-#include <std_msgs/Int32MultiArray.h>
-#include <std_msgs/Bool.h>
-#include <geometry_msgs/PoseArray.h>
-#include <sensor_msgs/image_encodings.h>
+#include <nav_msgs/msg/path.hpp>
+#include <std_msgs/msg/int32_multi_array.hpp>
+#include <std_msgs/msg/bool.hpp>
+#include <geometry_msgs/msg/pose_array.hpp>
+#include <sensor_msgs/image_encodings.hpp>
 #include <cv_bridge/cv_bridge.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/io/io.h>
 
-#include <visualization_msgs/MarkerArray.h>
+#include <visualization_msgs/msg/marker_array.hpp>
 
 #include <rtabmap/utilite/UTimer.h>
 #include <rtabmap/utilite/UDirectory.h>
@@ -71,12 +71,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define BAD_COVARIANCE 9999
 
 //msgs
-#include "rtabmap_ros/Info.h"
-#include "rtabmap_ros/MapData.h"
-#include "rtabmap_ros/MapGraph.h"
-#include "rtabmap_ros/GetMap.h"
-#include "rtabmap_ros/PublishMap.h"
-#include "rtabmap_ros/Path.h"
+#include "rtabmap_ros/msg/info.hpp"
+#include "rtabmap_ros/msg/map_data.hpp"
+#include "rtabmap_ros/msg/map_graph.hpp"
+#include "rtabmap_ros/srv/get_map.hpp"
+#include "rtabmap_ros/srv/publish_map.hpp"
+#include "rtabmap_ros/msg/path.hpp"
 
 #include "rtabmap_ros/MsgConversion.h"
 
@@ -84,8 +84,9 @@ using namespace rtabmap;
 
 namespace rtabmap_ros {
 
-CoreWrapper::CoreWrapper() :
-		CommonDataSubscriber(false),
+CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
+		Node("rtabmap", options),
+		CommonDataSubscriber(*this, false),
 		paused_(false),
 		lastPose_(Transform::getIdentity()),
 		lastPoseIntermediate_(false),
@@ -100,8 +101,7 @@ CoreWrapper::CoreWrapper() :
 		odomDefaultLinVariance_(0.001),
 		landmarkDefaultAngVariance_(0.001),
 		landmarkDefaultLinVariance_(0.001),
-		waitForTransform_(true),
-		waitForTransformDuration_(0.2), // 200 ms
+		waitForTransform_(0.2),// 200 ms
 		useActionForGoal_(false),
 		useSavedMap_(true),
 		genScan_(false),
@@ -111,133 +111,110 @@ CoreWrapper::CoreWrapper() :
 		mapToOdom_(rtabmap::Transform::getIdentity()),
 		transformThread_(0),
 		tfThreadRunning_(false),
-		stereoToDepth_(false),
 		interOdomSync_(0),
+		stereoToDepth_(false),
 		odomSensorSync_(false),
 		rate_(Parameters::defaultRtabmapDetectionRate()),
 		createIntermediateNodes_(Parameters::defaultRtabmapCreateIntermediateNodes()),
 		maxMappingNodes_(Parameters::defaultGridGlobalMaxNodes()),
-		previousStamp_(0),
-		mbClient_(0)
+		previousStamp_(0)
+#ifdef WITH_MOVE_BASE_MSGS
+,		mbClient_(0)
+#endif
 {
 	char * rosHomePath = getenv("ROS_HOME");
 	std::string workingDir = rosHomePath?rosHomePath:UDirectory::homeDir()+"/.ros";
 	databasePath_ = workingDir+"/"+rtabmap::Parameters::getDefaultDatabaseName();
-	globalPose_.header.stamp = ros::Time(0);
-}
+	globalPose_.header.stamp = rclcpp::Time(0);
 
-void CoreWrapper::onInit()
-{
-	ros::NodeHandle & nh = getNodeHandle();
-	ros::NodeHandle & pnh = getPrivateNodeHandle();
+	mapsManager_.init(*this, this->get_name(), true);
 
-	mapsManager_.init(nh, pnh, getName(), true);
+	tfBuffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
+	//auto timer_interface = std::make_shared<tf2_ros::CreateTimerROS>(
+	//	this->get_node_base_interface(),
+	//	this->get_node_timers_interface());
+	//tfBuffer_->setCreateTimerInterface(timer_interface);
+	tfListener_ = std::make_shared<tf2_ros::TransformListener>(*tfBuffer_);
+	tfBroadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
 
 	bool publishTf = true;
 	double tfDelay = 0.05; // 20 Hz
 	double tfTolerance = 0.1; // 100 ms
 
-	pnh.param("config_path",         configPath_, configPath_);
-	pnh.param("database_path",       databasePath_, databasePath_);
+	configPath_ = this->declare_parameter("config_path", configPath_);
+	databasePath_ = this->declare_parameter("database_path", databasePath_);
 
-	pnh.param("frame_id",            frameId_, frameId_);
-	pnh.param("odom_frame_id",       odomFrameId_, odomFrameId_); // set to use odom from TF
-	pnh.param("map_frame_id",        mapFrameId_, mapFrameId_);
-	pnh.param("ground_truth_frame_id", groundTruthFrameId_, groundTruthFrameId_);
-	pnh.param("ground_truth_base_frame_id", groundTruthBaseFrameId_, frameId_);
-	if(pnh.hasParam("depth_cameras") && !pnh.hasParam("depth_cameras"))
-	{
-		NODELET_ERROR("\"depth_cameras\" parameter doesn't exist "
-				"anymore! It is replaced by \"rgbd_cameras\" parameter "
-				"used when \"subscribe_rgbd\" is true");
-	}
+	frameId_ = this->declare_parameter("frame_id", frameId_);
+	this->get_parameter_or("odom_frame_id", odomFrameId_, odomFrameId_); // already declared in CommonDataSubscriber
+	mapFrameId_ = this->declare_parameter("map_frame_id", mapFrameId_);
+	groundTruthFrameId_ = this->declare_parameter("ground_truth_frame_id", groundTruthFrameId_);
+	groundTruthBaseFrameId_ = this->declare_parameter("ground_truth_base_frame_id", frameId_);
 
-	pnh.param("publish_tf",          publishTf, publishTf);
-	pnh.param("tf_delay",            tfDelay, tfDelay);
-	if(pnh.hasParam("tf_prefix"))
-	{
-		ROS_ERROR("tf_prefix parameter has been removed, use directly map_frame_id, odom_frame_id and frame_id parameters.");
-	}
-	pnh.param("tf_tolerance",        tfTolerance, tfTolerance);
-	pnh.param("odom_tf_angular_variance", odomDefaultAngVariance_, odomDefaultAngVariance_);
-	pnh.param("odom_tf_linear_variance", odomDefaultLinVariance_, odomDefaultLinVariance_);
-	pnh.param("landmark_angular_variance", landmarkDefaultAngVariance_, landmarkDefaultAngVariance_);
-	pnh.param("landmark_linear_variance", landmarkDefaultLinVariance_, landmarkDefaultLinVariance_);
-	pnh.param("wait_for_transform",  waitForTransform_, waitForTransform_);
-	pnh.param("wait_for_transform_duration",  waitForTransformDuration_, waitForTransformDuration_);
-	pnh.param("use_action_for_goal", useActionForGoal_, useActionForGoal_);
-	pnh.param("use_saved_map", useSavedMap_, useSavedMap_);
-	pnh.param("gen_scan",            genScan_, genScan_);
-	pnh.param("gen_scan_max_depth",  genScanMaxDepth_, genScanMaxDepth_);
-	pnh.param("gen_scan_min_depth",  genScanMinDepth_, genScanMinDepth_);
-	pnh.param("scan_cloud_max_points",  scanCloudMaxPoints_, scanCloudMaxPoints_);
-	if(pnh.hasParam("scan_cloud_normal_k"))
-	{
-		ROS_WARN("rtabmap: Parameter \"scan_cloud_normal_k\" has been removed. RTAB-Map's parameter \"%s\" should be used instead. "
-				"The value is copied. Use \"%s\" to avoid this warning.",
-				Parameters::kMemLaserScanNormalK().c_str(),
-				Parameters::kMemLaserScanNormalK().c_str());
-		double value;
-		pnh.getParam("scan_cloud_normal_k", value);
-		uInsert(parameters_, ParametersPair(Parameters::kMemLaserScanNormalK(), uNumber2Str(value)));
-	}
-	pnh.param("stereo_to_depth", stereoToDepth_, stereoToDepth_);
-	pnh.param("odom_sensor_sync", odomSensorSync_, odomSensorSync_);
-	if(pnh.hasParam("flip_scan"))
-	{
-		NODELET_WARN("Parameter \"flip_scan\" doesn't exist anymore. Rtabmap now "
-				"detects automatically if the laser is upside down with /tf, then if so, it "
-				"switches scan values.");
-	}
+	publishTf = this->declare_parameter("publish_tf", publishTf);
+	tfDelay = this->declare_parameter("tf_delay", tfDelay);
+	tfTolerance = this->declare_parameter("tf_tolerance", tfTolerance);
 
-	NODELET_INFO("rtabmap: frame_id      = %s", frameId_.c_str());
+	odomDefaultAngVariance_ = this->declare_parameter("odom_tf_angular_variance", odomDefaultAngVariance_);
+	odomDefaultLinVariance_ = this->declare_parameter("odom_tf_linear_variance", odomDefaultLinVariance_);
+
+	landmarkDefaultAngVariance_ = this->declare_parameter("landmark_angular_variance", landmarkDefaultAngVariance_);
+	landmarkDefaultLinVariance_ = this->declare_parameter("landmark_linear_variance", landmarkDefaultLinVariance_);
+
+	waitForTransform_ = this->declare_parameter("wait_for_transform", waitForTransform_);
+#ifdef WITH_MOVE_BASE_MSGS
+	useActionForGoal_ = this->declare_parameter("use_action_for_goal", useActionForGoal_);
+#endif
+	useSavedMap_ = this->declare_parameter("use_saved_map", useSavedMap_);
+	genScan_ = this->declare_parameter("gen_scan", genScan_);
+	genScanMaxDepth_ = this->declare_parameter("gen_scan_max_depth", genScanMaxDepth_);
+	genScanMinDepth_ = this->declare_parameter("gen_scan_min_depth", genScanMinDepth_);
+	scanCloudMaxPoints_ = this->declare_parameter("scan_cloud_max_points", scanCloudMaxPoints_);
+
+	stereoToDepth_ = this->declare_parameter("stereo_to_depth", stereoToDepth_);
+	odomSensorSync_ = this->declare_parameter("odom_sensor_sync", odomSensorSync_);
+
+	RCLCPP_INFO(this->get_logger(), "rtabmap: frame_id      = %s", frameId_.c_str());
 	if(!odomFrameId_.empty())
 	{
-		NODELET_INFO("rtabmap: odom_frame_id = %s", odomFrameId_.c_str());
+		RCLCPP_INFO(this->get_logger(), "rtabmap: odom_frame_id = %s", odomFrameId_.c_str());
 	}
 	if(!groundTruthFrameId_.empty())
 	{
-		NODELET_INFO("rtabmap: ground_truth_frame_id = %s -> ground_truth_base_frame_id = %s",
+		RCLCPP_INFO(this->get_logger(), "rtabmap: ground_truth_frame_id = %s -> ground_truth_base_frame_id = %s",
 				groundTruthFrameId_.c_str(),
 				groundTruthBaseFrameId_.c_str());
 	}
-	NODELET_INFO("rtabmap: map_frame_id  = %s", mapFrameId_.c_str());
-	NODELET_INFO("rtabmap: use_action_for_goal  = %s", useActionForGoal_?"true":"false");
-	NODELET_INFO("rtabmap: tf_delay      = %f", tfDelay);
-	NODELET_INFO("rtabmap: tf_tolerance  = %f", tfTolerance);
-	NODELET_INFO("rtabmap: odom_sensor_sync   = %s", odomSensorSync_?"true":"false");
-	bool subscribeStereo = false;
-	pnh.param("subscribe_stereo",      subscribeStereo, subscribeStereo);
-	if(subscribeStereo)
+	RCLCPP_INFO(this->get_logger(), "rtabmap: map_frame_id  = %s", mapFrameId_.c_str());
+	RCLCPP_INFO(this->get_logger(), "rtabmap: use_action_for_goal  = %s", useActionForGoal_?"true":"false");
+	RCLCPP_INFO(this->get_logger(), "rtabmap: tf_delay      = %f", tfDelay);
+	RCLCPP_INFO(this->get_logger(), "rtabmap: tf_tolerance  = %f", tfTolerance);
+	RCLCPP_INFO(this->get_logger(), "rtabmap: odom_sensor_sync   = %s", odomSensorSync_?"true":"false");
+	if(this->isSubscribedToStereo())
 	{
-		NODELET_INFO("rtabmap: stereo_to_depth = %s", stereoToDepth_?"true":"false");
+		RCLCPP_INFO(this->get_logger(), "rtabmap: stereo_to_depth = %s", stereoToDepth_?"true":"false");
 	}
 
-	infoPub_ = nh.advertise<rtabmap_ros::Info>("info", 1);
-	mapDataPub_ = nh.advertise<rtabmap_ros::MapData>("mapData", 1);
-	mapGraphPub_ = nh.advertise<rtabmap_ros::MapGraph>("mapGraph", 1);
-	landmarksPub_ = nh.advertise<geometry_msgs::PoseArray>("landmarks", 1);
-	labelsPub_ = nh.advertise<visualization_msgs::MarkerArray>("labels", 1);
-	mapPathPub_ = nh.advertise<nav_msgs::Path>("mapPath", 1);
-	localGridObstacle_ = nh.advertise<sensor_msgs::PointCloud2>("local_grid_obstacle", 1);
-	localGridEmpty_ = nh.advertise<sensor_msgs::PointCloud2>("local_grid_empty", 1);
-	localGridGround_ = nh.advertise<sensor_msgs::PointCloud2>("local_grid_ground", 1);
-	localizationPosePub_ = nh.advertise<geometry_msgs::PoseWithCovarianceStamped>("localization_pose", 1);
-	initialPoseSub_ = nh.subscribe("initialpose", 1, &CoreWrapper::initialPoseCallback, this);
+	infoPub_ = this->create_publisher<rtabmap_ros::msg::Info>("info", 1);
+	mapDataPub_ = this->create_publisher<rtabmap_ros::msg::MapData>("mapData", 1);
+	mapGraphPub_ = this->create_publisher<rtabmap_ros::msg::MapGraph>("mapGraph", 1);
+	landmarksPub_ = this->create_publisher<geometry_msgs::msg::PoseArray>("landmarks", 1);
+	labelsPub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>("labels", 1);
+	mapPathPub_ = this->create_publisher<nav_msgs::msg::Path>("mapPath", 1);
+	localGridObstacle_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("local_grid_obstacle", 1);
+	localGridEmpty_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("local_grid_empty", 1);
+	localGridGround_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("local_grid_ground", 1);
+	localizationPosePub_ = this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("localization_pose", 1);
+	initialPoseSub_ = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>("initialpose", 1, std::bind(&CoreWrapper::initialPoseCallback, this, std::placeholders::_1));
 
 	// planning topics
-	goalSub_ = nh.subscribe("goal", 1, &CoreWrapper::goalCallback, this);
-	goalNodeSub_ = nh.subscribe("goal_node", 1, &CoreWrapper::goalNodeCallback, this);
-	nextMetricGoalPub_ = nh.advertise<geometry_msgs::PoseStamped>("goal_out", 1);
-	goalReachedPub_ = nh.advertise<std_msgs::Bool>("goal_reached", 1);
-	globalPathPub_ = nh.advertise<nav_msgs::Path>("global_path", 1);
-	localPathPub_ = nh.advertise<nav_msgs::Path>("local_path", 1);
-	globalPathNodesPub_ = nh.advertise<rtabmap_ros::Path>("global_path_nodes", 1);
-	localPathNodesPub_ = nh.advertise<rtabmap_ros::Path>("local_path_nodes", 1);
-
-	ros::Publisher nextMetricGoal_;
-	ros::Publisher goalReached_;
-	ros::Publisher path_;
+	goalSub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>("goal", 1, std::bind(&CoreWrapper::goalCallback, this, std::placeholders::_1));
+	goalNodeSub_ = this->create_subscription<rtabmap_ros::msg::Goal>("goal_node", 1, std::bind(&CoreWrapper::goalNodeCallback, this, std::placeholders::_1));
+	nextMetricGoalPub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("goal_out", 1);
+	goalReachedPub_ = this->create_publisher<std_msgs::msg::Bool>("goal_reached", 1);
+	globalPathPub_ = this->create_publisher<nav_msgs::msg::Path>("global_path", 1);
+	localPathPub_ = this->create_publisher<nav_msgs::msg::Path>("local_path", 1);
+	globalPathNodesPub_ = this->create_publisher<rtabmap_ros::msg::Path>("global_path_nodes", 1);
+	localPathNodesPub_ = this->create_publisher<rtabmap_ros::msg::Path>("local_path_nodes", 1);
 
 	configPath_ = uReplaceChar(configPath_, '~', UDirectory::homeDir());
 	databasePath_ = uReplaceChar(databasePath_, '~', UDirectory::homeDir());
@@ -264,8 +241,6 @@ void CoreWrapper::onInit()
 		}
 	}
 	uInsert(allParameters, ParametersPair(Parameters::kRGBDCreateOccupancyGrid(), "true")); // default true in ROS
-	char * rosHomePath = getenv("ROS_HOME");
-	std::string workingDir = rosHomePath?rosHomePath:UDirectory::homeDir()+"/.ros";
 	uInsert(allParameters, ParametersPair(Parameters::kRtabmapWorkingDirectory(), workingDir)); // change default to ~/.ros
 
 	// load parameters
@@ -282,16 +257,14 @@ void CoreWrapper::onInit()
 		}
 	}
 
-	// update parameters with user input parameters (private)
+	// declare parameters
+	this->declare_parameter("is_rtabmap_paused", paused_);
 	for(ParametersMap::iterator iter=allParameters.begin(); iter!=allParameters.end(); ++iter)
 	{
-		std::string vStr;
-		bool vBool;
-		int vInt;
-		double vDouble;
-		if(pnh.getParam(iter->first, vStr))
+		std::string vStr = this->declare_parameter(iter->first, iter->second);
+		if(vStr.compare(iter->second)!=0)
 		{
-			NODELET_INFO("Setting RTAB-Map parameter \"%s\"=\"%s\"", iter->first.c_str(), vStr.c_str());
+			RCLCPP_INFO(this->get_logger(), "Setting RTAB-Map parameter \"%s\"=\"%s\"", iter->first.c_str(), vStr.c_str());
 
 			if(iter->first.compare(Parameters::kRtabmapWorkingDirectory()) == 0)
 			{
@@ -303,26 +276,11 @@ void CoreWrapper::onInit()
 			}
 			uInsert(parameters_, ParametersPair(iter->first, vStr));
 		}
-		else if(pnh.getParam(iter->first, vBool))
-		{
-			NODELET_INFO("Setting RTAB-Map parameter \"%s\"=\"%s\"", iter->first.c_str(), uBool2Str(vBool).c_str());
-			uInsert(parameters_, ParametersPair(iter->first, uBool2Str(vBool)));
-		}
-		else if(pnh.getParam(iter->first, vDouble))
-		{
-			NODELET_INFO("Setting RTAB-Map parameter \"%s\"=\"%s\"", iter->first.c_str(), uNumber2Str(vDouble).c_str());
-			uInsert(parameters_, ParametersPair(iter->first, uNumber2Str(vDouble)));
-		}
-		else if(pnh.getParam(iter->first, vInt))
-		{
-			NODELET_INFO("Setting RTAB-Map parameter \"%s\"=\"%s\"", iter->first.c_str(), uNumber2Str(vInt).c_str());
-			uInsert(parameters_, ParametersPair(iter->first, uNumber2Str(vInt)));
-		}
 	}
 
 	//parse input arguments
-	std::vector<std::string> argList = getMyArgv();
-	char * argv[argList.size()];
+	std::vector<std::string> argList = get_node_options().arguments();
+	char ** argv = new char*[argList.size()];
 	bool deleteDbOnStart = false;
 	for(unsigned int i=0; i<argList.size(); ++i)
 	{
@@ -333,10 +291,11 @@ void CoreWrapper::onInit()
 		}
 	}
 	rtabmap::ParametersMap parameters = rtabmap::Parameters::parseArguments(argList.size(), argv);
+	delete[] argv;
 	for(ParametersMap::const_iterator iter=parameters.begin(); iter!=parameters.end(); ++iter)
 	{
 		uInsert(parameters_, ParametersPair(iter->first, iter->second));
-		NODELET_INFO("Update RTAB-Map parameter \"%s\"=\"%s\" from arguments", iter->first.c_str(), iter->second.c_str());
+		RCLCPP_INFO(this->get_logger(), "Update RTAB-Map parameter \"%s\"=\"%s\" from arguments", iter->first.c_str(), iter->second.c_str());
 	}
 
 	// Backward compatibility
@@ -344,26 +303,11 @@ void CoreWrapper::onInit()
 		iter!=Parameters::getRemovedParameters().end();
 		++iter)
 	{
-		std::string vStr;
-		bool vBool;
-		int vInt;
-		double vDouble;
 		std::string paramValue;
-		if(pnh.getParam(iter->first, vStr))
+		rclcpp::Parameter parameter;
+		if(get_parameter(iter->first, parameter))
 		{
-			paramValue = vStr;
-		}
-		else if(pnh.getParam(iter->first, vBool))
-		{
-			paramValue = uBool2Str(vBool);
-		}
-		else if(pnh.getParam(iter->first, vDouble))
-		{
-			paramValue = uNumber2Str(vDouble);
-		}
-		else if(pnh.getParam(iter->first, vInt))
-		{
-			paramValue = uNumber2Str(vInt);
+			paramValue = parameter.as_string();
 		}
 		if(!paramValue.empty())
 		{
@@ -371,19 +315,19 @@ void CoreWrapper::onInit()
 			{
 				// can be migrated
 				uInsert(parameters_, ParametersPair(iter->second.second, paramValue));
-				NODELET_WARN("Rtabmap: Parameter name changed: \"%s\" -> \"%s\". Please update your launch file accordingly. Value \"%s\" is still set to the new parameter name.",
+				RCLCPP_WARN(this->get_logger(), "Rtabmap: Parameter name changed: \"%s\" -> \"%s\". Please update your launch file accordingly. Value \"%s\" is still set to the new parameter name.",
 						iter->first.c_str(), iter->second.second.c_str(), paramValue.c_str());
 			}
 			else
 			{
 				if(iter->second.second.empty())
 				{
-					NODELET_ERROR("Rtabmap: Parameter \"%s\" doesn't exist anymore!",
+					RCLCPP_ERROR(this->get_logger(), "Rtabmap: Parameter \"%s\" doesn't exist anymore!",
 							iter->first.c_str());
 				}
 				else
 				{
-					NODELET_ERROR("Rtabmap: Parameter \"%s\" doesn't exist anymore! You may look at this similar parameter: \"%s\"",
+					RCLCPP_ERROR(this->get_logger(), "Rtabmap: Parameter \"%s\" doesn't exist anymore! You may look at this similar parameter: \"%s\"",
 							iter->first.c_str(), iter->second.second.c_str());
 				}
 			}
@@ -391,15 +335,14 @@ void CoreWrapper::onInit()
 	}
 
 	// Backward compatibility (MapsManager)
-	mapsManager_.backwardCompatibilityParameters(pnh, parameters_);
+	mapsManager_.backwardCompatibilityParameters(*this, parameters_);
 
-	bool subscribeScan2d = false;
-	bool subscribeScan3d = false;
-	pnh.param("subscribe_scan",      subscribeScan2d, subscribeScan2d);
-	pnh.param("subscribe_scan_cloud", subscribeScan3d, subscribeScan3d);
+	bool subscribeScan2d = this->isSubscribedToScan2d();
+	bool subscribeScan3d = this->isSubscribedToScan3d();
+	this->get_parameter_or("subscribe_scan_cloud", subscribeScan3d, subscribeScan3d);
 	if((subscribeScan2d || subscribeScan3d) && parameters_.find(Parameters::kGridFromDepth()) == parameters_.end())
 	{
-		NODELET_WARN("Setting \"%s\" parameter to false (default true) as \"subscribe_scan\" or \"subscribe_scan_cloud\" is "
+		RCLCPP_WARN(this->get_logger(), "Setting \"%s\" parameter to false (default true) as \"subscribe_scan\" or \"subscribe_scan_cloud\" is "
 				"true. The occupancy grid map will be constructed from "
 				"laser scans. To get occupancy grid map from cloud projection, set \"%s\" "
 				"to true. To suppress this warning, "
@@ -411,14 +354,14 @@ void CoreWrapper::onInit()
 	}
 	if((subscribeScan2d || subscribeScan3d) && parameters_.find(Parameters::kGridRangeMax()) == parameters_.end())
 	{
-		NODELET_INFO("Setting \"%s\" parameter to 0 (default %f) as \"subscribe_scan\" or \"subscribe_scan_cloud\" is true.",
+		RCLCPP_INFO(this->get_logger(), "Setting \"%s\" parameter to 0 (default %f) as \"subscribe_scan\" or \"subscribe_scan_cloud\" is true.",
 				Parameters::kGridRangeMax().c_str(),
 				Parameters::defaultGridRangeMax());
 		parameters_.insert(ParametersPair(Parameters::kGridRangeMax(), "0"));
 	}
 	if(subscribeScan3d && parameters_.find(Parameters::kIcpPointToPlaneRadius()) == parameters_.end())
 	{
-		NODELET_INFO("Setting \"%s\" parameter to 0 (default %f) as \"subscribe_scan_cloud\" is true.",
+		RCLCPP_INFO(this->get_logger(), "Setting \"%s\" parameter to 0 (default %f) as \"subscribe_scan_cloud\" is true.",
 				Parameters::kIcpPointToPlaneRadius().c_str(),
 				Parameters::defaultIcpPointToPlaneRadius());
 		parameters_.insert(ParametersPair(Parameters::kIcpPointToPlaneRadius(), "0"));
@@ -430,7 +373,7 @@ void CoreWrapper::onInit()
 	{
 		if(subscribeScan2d)
 		{
-			NODELET_WARN("Setting \"%s\" parameter to 10 (default 0) as \"subscribe_scan\" is "
+			RCLCPP_WARN(this->get_logger(), "Setting \"%s\" parameter to 10 (default 0) as \"subscribe_scan\" is "
 					"true and \"%s\" uses ICP. Proximity detection by space will be also done by merging close "
 					"scans. To disable, set \"%s\" to 0. To suppress this warning, "
 					"add <param name=\"%s\" type=\"string\" value=\"10\"/>",
@@ -442,7 +385,7 @@ void CoreWrapper::onInit()
 		}
 		else if(subscribeScan3d)
 		{
-			NODELET_WARN("Setting \"%s\" parameter to 1 (default 0) as \"subscribe_scan_cloud\" is "
+			RCLCPP_WARN(this->get_logger(), "Setting \"%s\" parameter to 1 (default 0) as \"subscribe_scan_cloud\" is "
 					"true and \"%s\" uses ICP. To disable, set \"%s\" to 0. To suppress this warning, "
 					"add <param name=\"%s\" type=\"string\" value=\"1\"/>",
 					Parameters::kRGBDProximityPathMaxNeighbors().c_str(),
@@ -455,13 +398,11 @@ void CoreWrapper::onInit()
 
 	int estimationType = Parameters::defaultVisEstimationType();
 	Parameters::parse(parameters_, Parameters::kVisEstimationType(), estimationType);
-	int cameras = 0;
-	bool subscribeRGBD = false;
-	pnh.param("rgbd_cameras", cameras, cameras);
-	pnh.param("subscribe_rgbd", subscribeRGBD, subscribeRGBD);
+	int cameras = this->rgbdCameras();
+	bool subscribeRGBD = this->isSubscribedToRGBD();
 	if(subscribeRGBD && cameras> 1 && estimationType>0)
 	{
-		NODELET_WARN("Setting \"%s\" parameter to 0 (%d is not supported "
+		RCLCPP_WARN(this->get_logger(), "Setting \"%s\" parameter to 0 (%d is not supported "
 				"for multi-cameras) as \"subscribe_rgbd\" is "
 				"true and \"rgbd_cameras\">1. Set \"%s\" to 0 to suppress this warning.",
 				Parameters::kVisEstimationType().c_str(),
@@ -491,7 +432,7 @@ void CoreWrapper::onInit()
 				allParameters.find(iter->first) != allParameters.end() &&
 				allParameters.find(iter->first)->second.compare(iter->second) !=0)
 			{
-				NODELET_INFO("Update RTAB-Map parameter \"%s\"=\"%s\" from database", iter->first.c_str(), iter->second.c_str());
+				RCLCPP_INFO(this->get_logger(), "Update RTAB-Map parameter \"%s\"=\"%s\" from database", iter->first.c_str(), iter->second.c_str());
 				parameters_.insert(*iter);
 			}
 		}
@@ -500,39 +441,40 @@ void CoreWrapper::onInit()
 	// Add all other parameters (not copied if already exists)
 	parameters_.insert(allParameters.begin(), allParameters.end());
 
-	// set public parameters
-	nh.setParam("is_rtabmap_paused", paused_);
-	for(ParametersMap::iterator iter=parameters_.begin(); iter!=parameters_.end(); ++iter)
+	// Update declared parameters
+	std::vector<rclcpp::Parameter> rosParameters;
+	for(ParametersMap::iterator iter=allParameters.begin(); iter!=allParameters.end(); ++iter)
 	{
-		nh.setParam(iter->first, iter->second);
+		rosParameters.push_back(rclcpp::Parameter(iter->first, iter->second));
 	}
+	this->set_parameters(rosParameters);
+
 	if(parameters_.find(Parameters::kRtabmapDetectionRate()) != parameters_.end())
 	{
 		Parameters::parse(parameters_, Parameters::kRtabmapDetectionRate(), rate_);
-		NODELET_INFO("RTAB-Map detection rate = %f Hz", rate_);
+		RCLCPP_INFO(this->get_logger(), "RTAB-Map detection rate = %f Hz", rate_);
 	}
 	if(parameters_.find(Parameters::kRtabmapCreateIntermediateNodes()) != parameters_.end())
 	{
 		Parameters::parse(parameters_, Parameters::kRtabmapCreateIntermediateNodes(), createIntermediateNodes_);
 		if(createIntermediateNodes_)
 		{
-			NODELET_INFO("Create intermediate nodes");
+			RCLCPP_INFO(this->get_logger(), "Create intermediate nodes");
 			if(rate_ == 0.0f)
 			{
 				bool interOdomInfo = false;
-				pnh.getParam("subscribe_inter_odom_info", interOdomInfo);
-				if(interOdomInfo)
+				if(get_parameter("subscribe_inter_odom_info", interOdomInfo))
 				{
-					NODELET_INFO("Subscribe to inter odom + info messages");
+					RCLCPP_INFO(this->get_logger(), "Subscribe to inter odom + info messages");
 					interOdomSync_ = new message_filters::Synchronizer<MyExactInterOdomSyncPolicy>(MyExactInterOdomSyncPolicy(100), interOdomSyncSub_, interOdomInfoSyncSub_);
-					interOdomSync_->registerCallback(boost::bind(&CoreWrapper::interOdomInfoCallback, this, _1, _2));
-					interOdomSyncSub_.subscribe(nh, "inter_odom", 1);
-					interOdomInfoSyncSub_.subscribe(nh, "inter_odom_info", 1);
+					interOdomSync_->registerCallback(std::bind(&CoreWrapper::interOdomInfoCallback, this, std::placeholders::_1, std::placeholders::_2));
+					interOdomSyncSub_.subscribe(this, "inter_odom");
+					interOdomInfoSyncSub_.subscribe(this, "inter_odom_info");
 				}
 				else
 				{
-					NODELET_INFO("Subscribe to inter odom messages");
-					interOdomSub_ = nh.subscribe("inter_odom", 100, &CoreWrapper::interOdomCallback, this);
+					RCLCPP_INFO(this->get_logger(), "Subscribe to inter odom messages");
+					interOdomSub_ = this->create_subscription<nav_msgs::msg::Odometry>("inter_odom", 100, std::bind(&CoreWrapper::interOdomCallback, this, std::placeholders::_1));
 				}
 
 			}
@@ -543,30 +485,25 @@ void CoreWrapper::onInit()
 		Parameters::parse(parameters_, Parameters::kGridGlobalMaxNodes(), maxMappingNodes_);
 		if(maxMappingNodes_>0)
 		{
-			NODELET_INFO("Max mapping nodes = %d", maxMappingNodes_);
+			RCLCPP_INFO(this->get_logger(), "Max mapping nodes = %d", maxMappingNodes_);
 		}
-	}
-
-	if(paused_)
-	{
-		NODELET_WARN("Node paused... don't forget to call service \"resume\" to start rtabmap.");
 	}
 
 	if(deleteDbOnStart)
 	{
 		if(UFile::erase(databasePath_) == 0)
 		{
-			NODELET_INFO("rtabmap: Deleted database \"%s\" (--delete_db_on_start or -d are set).", databasePath_.c_str());
+			RCLCPP_INFO(this->get_logger(), "rtabmap: Deleted database \"%s\" (--delete_db_on_start or -d are set).", databasePath_.c_str());
 		}
 	}
 
 	if(databasePath_.size())
 	{
-		NODELET_INFO("rtabmap: Using database from \"%s\" (%ld MB).", databasePath_.c_str(), UFile::length(databasePath_)/(1024*1024));
+		RCLCPP_INFO(this->get_logger(), "rtabmap: Using database from \"%s\" (%ld MB).", databasePath_.c_str(), UFile::length(databasePath_)/(1024*1024));
 	}
 	else
 	{
-		NODELET_INFO("rtabmap: database_path parameter not set, the map will not be saved.");
+		RCLCPP_INFO(this->get_logger(), "rtabmap: database_path parameter not set, the map will not be saved.");
 	}
 
 	mapsManager_.setParameters(parameters_);
@@ -580,82 +517,101 @@ void CoreWrapper::onInit()
 		cv::Mat map = rtabmap_.getMemory()->load2DMap(xMin, yMin, gridCellSize);
 		if(!map.empty())
 		{
-			NODELET_INFO("rtabmap: 2D occupancy grid map loaded (%dx%d).", map.cols, map.rows);
+			RCLCPP_INFO(this->get_logger(), "rtabmap: 2D occupancy grid map loaded (%dx%d).", map.cols, map.rows);
 			mapsManager_.set2DMap(map, xMin, yMin, gridCellSize, rtabmap_.getLocalOptimizedPoses(), rtabmap_.getMemory());
 		}
 	}
 
 	if(databasePath_.size() && rtabmap_.getMemory())
 	{
-		NODELET_INFO("rtabmap: Database version = \"%s\".", rtabmap_.getMemory()->getDatabaseVersion().c_str());
+		RCLCPP_INFO(this->get_logger(), "rtabmap: Database version = \"%s\".", rtabmap_.getMemory()->getDatabaseVersion().c_str());
 	}
 
 	// setup services
-	updateSrv_ = nh.advertiseService("update_parameters", &CoreWrapper::updateRtabmapCallback, this);
-	resetSrv_ = nh.advertiseService("reset", &CoreWrapper::resetRtabmapCallback, this);
-	pauseSrv_ = nh.advertiseService("pause", &CoreWrapper::pauseRtabmapCallback, this);
-	resumeSrv_ = nh.advertiseService("resume", &CoreWrapper::resumeRtabmapCallback, this);
-	triggerNewMapSrv_ = nh.advertiseService("trigger_new_map", &CoreWrapper::triggerNewMapCallback, this);
-	backupDatabase_ = nh.advertiseService("backup", &CoreWrapper::backupDatabaseCallback, this);
-	setModeLocalizationSrv_ = nh.advertiseService("set_mode_localization", &CoreWrapper::setModeLocalizationCallback, this);
-	setModeMappingSrv_ = nh.advertiseService("set_mode_mapping", &CoreWrapper::setModeMappingCallback, this);
-	getMapDataSrv_ = nh.advertiseService("get_map_data", &CoreWrapper::getMapDataCallback, this);
-	getMapSrv_ = nh.advertiseService("get_map", &CoreWrapper::getMapCallback, this);
-	getProbMapSrv_ = nh.advertiseService("get_prob_map", &CoreWrapper::getProbMapCallback, this);
-	getGridMapSrv_ = nh.advertiseService("get_grid_map", &CoreWrapper::getGridMapCallback, this);
-	getProjMapSrv_ = nh.advertiseService("get_proj_map", &CoreWrapper::getProjMapCallback, this);
-	publishMapDataSrv_ = nh.advertiseService("publish_map", &CoreWrapper::publishMapCallback, this);
-	getPlanSrv_ = nh.advertiseService("get_plan", &CoreWrapper::getPlanCallback, this);
-	getPlanNodesSrv_ = nh.advertiseService("get_plan_nodes", &CoreWrapper::getPlanNodesCallback, this);
-	setGoalSrv_ = nh.advertiseService("set_goal", &CoreWrapper::setGoalCallback, this);
-	cancelGoalSrv_ = nh.advertiseService("cancel_goal", &CoreWrapper::cancelGoalCallback, this);
-	setLabelSrv_ = nh.advertiseService("set_label", &CoreWrapper::setLabelCallback, this);
-	listLabelsSrv_ = nh.advertiseService("list_labels", &CoreWrapper::listLabelsCallback, this);
+	resetSrv_ = this->create_service<std_srvs::srv::Empty>("reset", std::bind(&CoreWrapper::resetRtabmapCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	pauseSrv_ = this->create_service<std_srvs::srv::Empty>("pause", std::bind(&CoreWrapper::pauseRtabmapCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	resumeSrv_ = this->create_service<std_srvs::srv::Empty>("resume", std::bind(&CoreWrapper::resumeRtabmapCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	triggerNewMapSrv_ = this->create_service<std_srvs::srv::Empty>("trigger_new_map", std::bind(&CoreWrapper::triggerNewMapCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	backupDatabase_ = this->create_service<std_srvs::srv::Empty>("backup", std::bind(&CoreWrapper::backupDatabaseCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	setModeLocalizationSrv_ = this->create_service<std_srvs::srv::Empty>("set_mode_localization", std::bind(&CoreWrapper::setModeLocalizationCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	setModeMappingSrv_ = this->create_service<std_srvs::srv::Empty>("set_mode_mapping", std::bind(&CoreWrapper::setModeMappingCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	getMapDataSrv_ = this->create_service<rtabmap_ros::srv::GetMap>("get_map_data", std::bind(&CoreWrapper::getMapDataCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	getMapSrv_ = this->create_service<nav_msgs::srv::GetMap>("get_map", std::bind(&CoreWrapper::getMapCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	getProbMapSrv_ = this->create_service<nav_msgs::srv::GetMap>("get_prob_map", std::bind(&CoreWrapper::getProbMapCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	publishMapDataSrv_ = this->create_service<rtabmap_ros::srv::PublishMap>("publish_map", std::bind(&CoreWrapper::publishMapCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	getPlanSrv_ = this->create_service<nav_msgs::srv::GetPlan>("get_plan", std::bind(&CoreWrapper::getPlanCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	getPlanNodesSrv_ = this->create_service<rtabmap_ros::srv::GetPlan>("get_plan_nodes", std::bind(&CoreWrapper::getPlanNodesCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	setGoalSrv_ = this->create_service<rtabmap_ros::srv::SetGoal>("set_goal", std::bind(&CoreWrapper::setGoalCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+
+	cancelGoalSrv_ = this->create_service<std_srvs::srv::Empty>("cancel_goal", std::bind(&CoreWrapper::cancelGoalCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	setLabelSrv_ = this->create_service<rtabmap_ros::srv::SetLabel>("set_label", std::bind(&CoreWrapper::setLabelCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	listLabelsSrv_ = this->create_service<rtabmap_ros::srv::ListLabels>("list_labels", std::bind(&CoreWrapper::listLabelsCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+
 #ifdef WITH_OCTOMAP_MSGS
 #ifdef RTABMAP_OCTOMAP
-	octomapBinarySrv_ = nh.advertiseService("octomap_binary", &CoreWrapper::octomapBinaryCallback, this);
-	octomapFullSrv_ = nh.advertiseService("octomap_full", &CoreWrapper::octomapFullCallback, this);
+	octomapBinarySrv_ = this->create_service<std_srvs::srv::Empty>("octomap_binary", std::bind(&CoreWrapper::octomapBinaryCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	octomapFullSrv_ = this->create_service<std_srvs::srv::Empty>("octomap_full", std::bind(&CoreWrapper::octomapFullCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 #endif
 #endif
 	//private services
-	setLogDebugSrv_ = pnh.advertiseService("log_debug", &CoreWrapper::setLogDebug, this);
-	setLogInfoSrv_ = pnh.advertiseService("log_info", &CoreWrapper::setLogInfo, this);
-	setLogWarnSrv_ = pnh.advertiseService("log_warning", &CoreWrapper::setLogWarn, this);
-	setLogErrorSrv_ = pnh.advertiseService("log_error", &CoreWrapper::setLogError, this);
+	setLogDebugSrv_ = this->create_service<std_srvs::srv::Empty>("log_debug", std::bind(&CoreWrapper::setLogDebug, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	setLogInfoSrv_ = this->create_service<std_srvs::srv::Empty>("log_info", std::bind(&CoreWrapper::setLogInfo, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	setLogWarnSrv_ = this->create_service<std_srvs::srv::Empty>("log_warning", std::bind(&CoreWrapper::setLogWarn, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	setLogErrorSrv_ = this->create_service<std_srvs::srv::Empty>("log_error", std::bind(&CoreWrapper::setLogError, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
 	int optimizeIterations = 0;
 	Parameters::parse(parameters_, Parameters::kOptimizerIterations(), optimizeIterations);
 	if(publishTf && optimizeIterations != 0)
 	{
 		tfThreadRunning_ = true;
-		transformThread_ = new boost::thread(boost::bind(&CoreWrapper::publishLoop, this, tfDelay, tfTolerance));
+		transformThread_ = new std::thread([&](){
+			if(tfDelay == 0)
+				return;
+			rclcpp::Rate r(1.0 / tfDelay);
+			while(tfThreadRunning_)
+			{
+				if(!odomFrameId_.empty())
+				{
+					mapToOdomMutex_.lock();
+					rclcpp::Time tfExpiration = now() + rclcpp::Duration(tfTolerance*10e9);
+					geometry_msgs::msg::TransformStamped msg;
+					msg.child_frame_id = odomFrameId_;
+					msg.header.frame_id = mapFrameId_;
+					msg.header.stamp = tfExpiration;
+					rtabmap_ros::transformToGeometryMsg(mapToOdom_, msg.transform);
+					tfBroadcaster_->sendTransform(msg);
+					mapToOdomMutex_.unlock();
+				}
+				r.sleep();
+			}
+		});
 	}
 	else if(publishTf)
 	{
-		NODELET_WARN("Graph optimization is disabled (%s=0), the tf between frame \"%s\" and odometry frame will not be published. You can safely ignore this warning if you are using map_optimizer node.",
+		RCLCPP_WARN(this->get_logger(), "Graph optimization is disabled (%s=0), the tf between frame \"%s\" and odometry frame will not be published. You can safely ignore this warning if you are using map_optimizer node.",
 				Parameters::kOptimizerIterations().c_str(), mapFrameId_.c_str());
 	}
 
-	setupCallbacks(nh, pnh, getName()); // do it at the end
+	RCLCPP_INFO(this->get_logger(), "Setup callbacks");
+	setupCallbacks(*this); // do it at the end
 	if(!this->isDataSubscribed())
 	{
 		bool isRGBD = uStr2Bool(parameters_.at(Parameters::kRGBDEnabled()).c_str());
 		if(isRGBD)
 		{
-			NODELET_WARN("ROS param subscribe_depth, subscribe_stereo and subscribe_rgbd are false, but RTAB-Map "
+			RCLCPP_WARN(this->get_logger(), "ROS param subscribe_depth, subscribe_stereo and subscribe_rgbd are false, but RTAB-Map "
 					  "parameter \"%s\" is true! Please set subscribe_depth, subscribe_stereo or subscribe_rgbd "
 					  "to true to use rtabmap node for RGB-D SLAM, set \"%s\" to false for loop closure "
 					  "detection on images-only or set subscribe_rgb to true to localize a single RGB camera against pre-built 3D map.",
 					  Parameters::kRGBDEnabled().c_str(),
 					  Parameters::kRGBDEnabled().c_str());
 		}
-		ros::NodeHandle rgb_nh(nh, "rgb");
-		ros::NodeHandle rgb_pnh(pnh, "rgb");
-		image_transport::ImageTransport rgb_it(rgb_nh);
-		image_transport::TransportHints hintsRgb("raw", ros::TransportHints(), rgb_pnh);
-		defaultSub_ = rgb_it.subscribe("image", 1, &CoreWrapper::defaultCallback, this);
+		auto node = rclcpp::Node::make_shared("rtabmap");
+		image_transport::TransportHints hints(this);
+		defaultSub_ = image_transport::create_subscription(node.get(), "image", std::bind(&CoreWrapper::defaultCallback, this, std::placeholders::_1), hints.getTransport());
 
-		NODELET_INFO("\n%s subscribed to:\n   %s", getName().c_str(), defaultSub_.getTopic().c_str());
+
+		RCLCPP_INFO(this->get_logger(), "\n%s subscribed to:\n   %s", get_name(), defaultSub_.getTopic().c_str());
 	}
 	else if(!this->isSubscribedToDepth() &&
 			!this->isSubscribedToStereo() &&
@@ -663,7 +619,7 @@ void CoreWrapper::onInit()
 			!this->isSubscribedToRGB() &&
 			(this->isSubscribedToScan2d() || this->isSubscribedToScan3d() || this->isSubscribedToOdom()))
 	{
-		NODELET_WARN("There is no image subscription, bag-of-words loop closure detection will be disabled...");
+		RCLCPP_WARN(this->get_logger(), "There is no image subscription, bag-of-words loop closure detection will be disabled...");
 		int kpMaxFeatures = Parameters::defaultKpMaxFeatures();
 		int registrationStrategy = Parameters::defaultRegStrategy();
 		Parameters::parse(parameters_, Parameters::kKpMaxFeatures(), kpMaxFeatures);
@@ -672,20 +628,20 @@ void CoreWrapper::onInit()
 		if(kpMaxFeatures!= -1)
 		{
 			uInsert(parameters_, ParametersPair(Parameters::kKpMaxFeatures(), "-1"));
-			NODELET_WARN("Setting %s=-1 (bag-of-words disabled)", Parameters::kKpMaxFeatures().c_str());
+			RCLCPP_WARN(this->get_logger(), "Setting %s=-1 (bag-of-words disabled)", Parameters::kKpMaxFeatures().c_str());
 			updateParams = true;
 		}
 		if((this->isSubscribedToScan2d() || this->isSubscribedToScan3d()) && registrationStrategy != 1)
 		{
 			uInsert(parameters_, ParametersPair(Parameters::kRegStrategy(), "1"));
-			NODELET_WARN("Setting %s=1 (ICP)", Parameters::kRegStrategy().c_str());
+			RCLCPP_WARN(this->get_logger(), "Setting %s=1 (ICP)", Parameters::kRegStrategy().c_str());
 			updateParams = true;
 
 			if(modifiedParameters.find(Parameters::kRGBDProximityPathMaxNeighbors()) == modifiedParameters.end())
 			{
 				if(this->isSubscribedToScan2d())
 				{
-					NODELET_WARN("Setting \"%s\" parameter to 10 (default 0) as \"subscribe_scan\" is "
+					RCLCPP_WARN(this->get_logger(), "Setting \"%s\" parameter to 10 (default 0) as \"subscribe_scan\" is "
 							"true and \"%s\" uses ICP. Proximity detection by space will be also done by merging close "
 							"scans. To disable, set \"%s\" to 0. To suppress this warning, "
 							"add <param name=\"%s\" type=\"string\" value=\"10\"/>",
@@ -697,7 +653,7 @@ void CoreWrapper::onInit()
 				}
 				else if(this->isSubscribedToScan3d())
 				{
-					NODELET_WARN("Setting \"%s\" parameter to 1 (default 0) as \"subscribe_scan_cloud\" is "
+					RCLCPP_WARN(this->get_logger(), "Setting \"%s\" parameter to 1 (default 0) as \"subscribe_scan_cloud\" is "
 							"true and \"%s\" uses ICP. To disable, set \"%s\" to 0. To suppress this warning, "
 							"add <param name=\"%s\" type=\"string\" value=\"1\"/>",
 							Parameters::kRGBDProximityPathMaxNeighbors().c_str(),
@@ -714,13 +670,40 @@ void CoreWrapper::onInit()
 		}
 	}
 
-	userDataAsyncSub_ = nh.subscribe("user_data_async", 1, &CoreWrapper::userDataAsyncCallback, this);
-	globalPoseAsyncSub_ = nh.subscribe("global_pose", 1, &CoreWrapper::globalPoseAsyncCallback, this);
-	gpsFixAsyncSub_ = nh.subscribe("gps/fix", 1, &CoreWrapper::gpsFixAsyncCallback, this);
+	userDataAsyncSub_ = this->create_subscription<rtabmap_ros::msg::UserData>("user_data_async", 1, std::bind(&CoreWrapper::userDataAsyncCallback, this, std::placeholders::_1));
+	globalPoseAsyncSub_ = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>("global_pose", 1, std::bind(&CoreWrapper::globalPoseAsyncCallback, this, std::placeholders::_1));
+	gpsFixAsyncSub_ = this->create_subscription<sensor_msgs::msg::NavSatFix>("gps/fix", 1, std::bind(&CoreWrapper::gpsFixAsyncCallback, this, std::placeholders::_1));
 #ifdef WITH_APRILTAG_ROS
-	tagDetectionsSub_ = nh.subscribe("tag_detections", 1, &CoreWrapper::tagDetectionsAsyncCallback, this);
+	tagDetectionsSub_ = this->create_subscription<apriltag_ros::msg::AprilTagDetectionArray>("tag_detections", 1, std::bind(&CoreWrapper::tagDetectionsAsyncCallback, this, std::placeholders::_1));
 #endif
-	imuSub_ = nh.subscribe("imu", 100, &CoreWrapper::imuAsyncCallback, this);
+	imuSub_ = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>("imu", 100, std::bind(&CoreWrapper::imuAsyncCallback, this, std::placeholders::_1));
+
+	parametersClient_ = std::make_shared<rclcpp::SyncParametersClient>(this);
+	auto on_parameter_event_callback =
+			[this](const rcl_interfaces::msg::ParameterEvent::SharedPtr event) -> void
+			{
+				for(size_t i=0; i<event->changed_parameters.size(); ++i)
+				{
+					std::string key = event->changed_parameters[i].name;
+					if(parameters_.find(key) != parameters_.end())
+					{
+						std::string vStr = event->changed_parameters[i].value.string_value;
+						RCLCPP_INFO(this->get_logger(), "Setting RTAB-Map parameter \"%s\"=\"%s\"", key.c_str(), vStr.c_str());
+						parameters_.at(key) = vStr;
+					}
+				}
+				RCLCPP_INFO(this->get_logger(), "rtabmap: Updating parameters");
+				if(parameters_.find(Parameters::kRtabmapDetectionRate()) != parameters_.end())
+				{
+					rate_ = uStr2Float(parameters_.at(Parameters::kRtabmapDetectionRate()));
+					RCLCPP_INFO(this->get_logger(), "RTAB-Map rate detection = %f Hz", rate_);
+				}
+				rtabmap_.parseParameters(parameters_);
+				mapsManager_.setParameters(parameters_);
+			};
+
+	// Setup callback for changes to parameters.
+	parameterEventSub_ = parametersClient_->on_parameter_event(on_parameter_event_callback);
 }
 
 CoreWrapper::~CoreWrapper()
@@ -733,13 +716,6 @@ CoreWrapper::~CoreWrapper()
 	}
 
 	this->saveParameters(configPath_);
-
-	ros::NodeHandle nh;
-	for(ParametersMap::iterator iter=parameters_.begin(); iter!=parameters_.end(); ++iter)
-	{
-		nh.deleteParam(iter->first);
-	}
-	nh.deleteParam("is_rtabmap_paused");
 
 	printf("rtabmap: Saving database/long-term memory... (located at %s)\n", databasePath_.c_str());
 	if(rtabmap_.getMemory())
@@ -758,17 +734,19 @@ CoreWrapper::~CoreWrapper()
 	printf("rtabmap: Saving database/long-term memory...done! (located at %s, %ld MB)\n", databasePath_.c_str(), UFile::length(databasePath_)/(1024*1024));
 
 	delete interOdomSync_;
+#ifdef WITH_MOVE_BASE_MSGS
 	delete mbClient_;
+#endif
 }
 
 void CoreWrapper::loadParameters(const std::string & configFile, ParametersMap & parameters)
 {
 	if(!configFile.empty())
 	{
-		NODELET_INFO("Loading parameters from %s", configFile.c_str());
+		RCLCPP_INFO(this->get_logger(), "Loading parameters from %s", configFile.c_str());
 		if(!UFile::exists(configFile.c_str()))
 		{
-			NODELET_WARN("Config file doesn't exist! It will be generated...");
+			RCLCPP_WARN(this->get_logger(), "Config file doesn't exist! It will be generated...");
 		}
 		Parameters::readINI(configFile.c_str(), parameters);
 	}
@@ -788,47 +766,24 @@ void CoreWrapper::saveParameters(const std::string & configFile)
 	}
 	else
 	{
-		NODELET_INFO("Parameters are not saved! (No configuration file provided...)");
+		RCLCPP_INFO(this->get_logger(), "Parameters are not saved! (No configuration file provided...)");
 	}
 }
 
-void CoreWrapper::publishLoop(double tfDelay, double tfTolerance)
-{
-	if(tfDelay == 0)
-		return;
-	ros::Rate r(1.0 / tfDelay);
-	while(tfThreadRunning_)
-	{
-		if(!odomFrameId_.empty())
-		{
-			mapToOdomMutex_.lock();
-			ros::Time tfExpiration = ros::Time::now() + ros::Duration(tfTolerance);
-			geometry_msgs::TransformStamped msg;
-			msg.child_frame_id = odomFrameId_;
-			msg.header.frame_id = mapFrameId_;
-			msg.header.stamp = tfExpiration;
-			rtabmap_ros::transformToGeometryMsg(mapToOdom_, msg.transform);
-			tfBroadcaster_.sendTransform(msg);
-			mapToOdomMutex_.unlock();
-		}
-		r.sleep();
-	}
-}
-
-void CoreWrapper::defaultCallback(const sensor_msgs::ImageConstPtr & imageMsg)
+void CoreWrapper::defaultCallback(const sensor_msgs::msg::Image::ConstSharedPtr imageMsg)
 {
 	if(!paused_)
 	{
-		ros::Time stamp = imageMsg->header.stamp;
-		if(stamp.toSec() == 0.0)
+		rclcpp::Time stamp = imageMsg->header.stamp;
+		if(stamp.seconds() == 0.0)
 		{
-			ROS_WARN("A null stamp has been detected in the input topic. Make sure the stamp is set.");
+			RCLCPP_WARN(this->get_logger(), "A null stamp has been detected in the input topic. Make sure the stamp is set.");
 			return;
 		}
 
 		if(rate_>0.0f)
 		{
-			if(previousStamp_.toSec() > 0.0 && stamp.toSec() > previousStamp_.toSec() && stamp - previousStamp_ < ros::Duration(1.0f/rate_))
+			if(previousStamp_.seconds() > 0.0 && stamp.seconds() > previousStamp_.seconds() && stamp - previousStamp_ < rclcpp::Duration(1.0f/rate_))
 			{
 				return;
 			}
@@ -840,7 +795,7 @@ void CoreWrapper::defaultCallback(const sensor_msgs::ImageConstPtr & imageMsg)
 			 imageMsg->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
 			 imageMsg->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0))
 		{
-			NODELET_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8");
+			RCLCPP_ERROR(this->get_logger(), "Input type must be image=mono8,mono16,rgb8,bgr8");
 			return;
 		}
 
@@ -857,26 +812,26 @@ void CoreWrapper::defaultCallback(const sensor_msgs::ImageConstPtr & imageMsg)
 
 		// process data
 		UTimer timer;
-		if(rtabmap_.isIDsGenerated() || ptrImage->header.seq > 0)
+		if(rtabmap_.isIDsGenerated())
 		{
-			if(!rtabmap_.process(ptrImage->image.clone(), ptrImage->header.seq))
+			if(!rtabmap_.process(ptrImage->image.clone()))
 			{
-				NODELET_WARN("RTAB-Map could not process the data received! (ROS id = %d)", ptrImage->header.seq);
+				RCLCPP_WARN(this->get_logger(), "RTAB-Map could not process the data received!");
 			}
 			else
 			{
-				this->publishStats(ros::Time::now());
+				this->publishStats(now());
 			}
 		}
 		else if(!rtabmap_.isIDsGenerated())
 		{
-			NODELET_WARN("Ignoring received image because its sequence ID=0. Please "
+			RCLCPP_WARN(this->get_logger(), "Ignoring received image because its sequence ID=0. Please "
 					 "set \"Mem/GenerateIds\"=\"true\" to ignore ros generated sequence id. "
 					 "Use only \"Mem/GenerateIds\"=\"false\" for once-time run of RTAB-Map and "
 					 "when you need to have IDs output of RTAB-map synchronised with the source "
 					 "image sequence ID.");
 		}
-		NODELET_INFO("rtabmap: Update rate=%fs, Limit=%fs, Processing time = %fs (%d local nodes)",
+		RCLCPP_INFO(this->get_logger(), "rtabmap: Update rate=%fs, Limit=%fs, Processing time = %fs (%d local nodes)",
 				1.0f/rate_,
 				rtabmap_.getTimeThreshold()/1000.0f,
 				timer.ticks(),
@@ -884,26 +839,26 @@ void CoreWrapper::defaultCallback(const sensor_msgs::ImageConstPtr & imageMsg)
 	}
 }
 
-bool CoreWrapper::odomUpdate(const nav_msgs::OdometryConstPtr & odomMsg, ros::Time stamp)
+bool CoreWrapper::odomUpdate(const nav_msgs::msg::Odometry & odomMsg, rclcpp::Time stamp)
 {
 	if(!paused_)
 	{
-		Transform odom = rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose);
+		Transform odom = rtabmap_ros::transformFromPoseMsg(odomMsg.pose.pose);
 		if(!odom.isNull())
 		{
-			Transform odomTF = rtabmap_ros::getTransform(odomMsg->header.frame_id, frameId_, stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+			Transform odomTF = rtabmap_ros::getTransform(odomMsg.header.frame_id, frameId_, stamp, *tfBuffer_, waitForTransform_);
 			if(odomTF.isNull())
 			{
 				static bool shown = false;
 				if(!shown)
 				{
-					NODELET_WARN("We received odometry message, but we cannot get the "
+					RCLCPP_WARN(this->get_logger(), "We received odometry message, but we cannot get the "
 							"corresponding TF %s->%s at data stamp %fs (odom msg stamp is %fs). Make sure TF of odometry is "
 							"also published to get more accurate pose estimation. This "
-							"warning is only printed once.", odomMsg->header.frame_id.c_str(), frameId_.c_str(), stamp.toSec(), odomMsg->header.stamp.toSec());
+							"warning is only printed once.", odomMsg.header.frame_id.c_str(), frameId_.c_str(), stamp.seconds(), timestampFromROS(odomMsg.header.stamp));
 					shown = true;
 				}
-				stamp = odomMsg->header.stamp;
+				stamp = odomMsg.header.stamp;
 			}
 			else
 			{
@@ -911,9 +866,9 @@ bool CoreWrapper::odomUpdate(const nav_msgs::OdometryConstPtr & odomMsg, ros::Ti
 			}
 		}
 
-		if(!lastPose_.isIdentity() && !odom.isNull() && (odom.isIdentity() || (odomMsg->pose.covariance[0] >= BAD_COVARIANCE && odomMsg->twist.covariance[0] >= BAD_COVARIANCE)))
+		if(!lastPose_.isIdentity() && !odom.isNull() && (odom.isIdentity() || (odomMsg.pose.covariance[0] >= BAD_COVARIANCE && odomMsg.twist.covariance[0] >= BAD_COVARIANCE)))
 		{
-			UWARN("Odometry is reset (identity pose or high variance (%f) detected). Increment map id!", MAX(odomMsg->pose.covariance[0], odomMsg->twist.covariance[0]));
+			UWARN("Odometry is reset (identity pose or high variance (%f) detected). Increment map id!", MAX(odomMsg.pose.covariance[0], odomMsg.twist.covariance[0]));
 			rtabmap_.triggerNewMap();
 			covariance_ = cv::Mat();
 		}
@@ -926,16 +881,16 @@ bool CoreWrapper::odomUpdate(const nav_msgs::OdometryConstPtr & odomMsg, ros::Ti
 		if(!odom.isNull())
 		{
 			cv::Mat covariance;
-			double variance = odomMsg->twist.covariance[0];
+			double variance = odomMsg.twist.covariance[0];
 			if(variance == BAD_COVARIANCE || variance <= 0.0f)
 			{
 				//use the one of the pose
-				covariance = cv::Mat(6,6,CV_64FC1, (void*)odomMsg->pose.covariance.data()).clone();
+				covariance = cv::Mat(6,6,CV_64FC1, (void*)odomMsg.pose.covariance.data()).clone();
 				covariance /= 2.0;
 			}
 			else
 			{
-				covariance = cv::Mat(6,6,CV_64FC1, (void*)odomMsg->twist.covariance.data()).clone();
+				covariance = cv::Mat(6,6,CV_64FC1, (void*)odomMsg.twist.covariance.data()).clone();
 			}
 
 			if(uIsFinite(covariance.at<double>(0,0)) &&
@@ -952,14 +907,14 @@ bool CoreWrapper::odomUpdate(const nav_msgs::OdometryConstPtr & odomMsg, ros::Ti
 
 		// Throttle
 		bool ignoreFrame = false;
-		if(stamp.toSec() == 0.0)
+		if(stamp.seconds() == 0.0)
 		{
-			ROS_WARN("A null stamp has been detected in the input topics. Make sure the stamp in all input topics is set.");
+			RCLCPP_WARN(this->get_logger(), "A null stamp has been detected in the input topics. Make sure the stamp in all input topics is set.");
 			ignoreFrame = true;
 		}
 		if(rate_>0.0f)
 		{
-			if(previousStamp_.toSec() > 0.0 && stamp.toSec() > previousStamp_.toSec() && stamp - previousStamp_ < ros::Duration(1.0f/rate_))
+			if(previousStamp_.seconds() > 0.0 && stamp.seconds() > previousStamp_.seconds() && stamp.seconds() - previousStamp_.seconds() < 1.0f/rate_)
 			{
 				ignoreFrame = true;
 			}
@@ -985,12 +940,12 @@ bool CoreWrapper::odomUpdate(const nav_msgs::OdometryConstPtr & odomMsg, ros::Ti
 	return false;
 }
 
-bool CoreWrapper::odomTFUpdate(const ros::Time & stamp)
+bool CoreWrapper::odomTFUpdate(const rclcpp::Time & stamp)
 {
 	if(!paused_)
 	{
 		// Odom TF ready?
-		Transform odom = rtabmap_ros::getTransform(odomFrameId_, frameId_, stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+		Transform odom = rtabmap_ros::getTransform(odomFrameId_, frameId_, stamp, *tfBuffer_, waitForTransform_);
 		if(odom.isNull())
 		{
 			return false;
@@ -1008,14 +963,14 @@ bool CoreWrapper::odomTFUpdate(const ros::Time & stamp)
 		lastPoseStamp_ = stamp;
 
 		bool ignoreFrame = false;
-		if(stamp.toSec() == 0.0)
+		if(stamp.seconds() == 0.0)
 		{
-			ROS_WARN("A null stamp has been detected in the input topics. Make sure the stamp in all input topics is set.");
+			RCLCPP_WARN(this->get_logger(), "A null stamp has been detected in the input topics. Make sure the stamp in all input topics is set.");
 			ignoreFrame = true;
 		}
 		if(rate_>0.0f)
 		{
-			if(previousStamp_.toSec() > 0.0 && stamp.toSec() > previousStamp_.toSec() && stamp - previousStamp_ < ros::Duration(1.0f/rate_))
+			if(previousStamp_.seconds() > 0.0 && stamp.seconds() > previousStamp_.seconds() && stamp.seconds() - previousStamp_.seconds() < 1.0f/rate_)
 			{
 				ignoreFrame = true;
 			}
@@ -1042,14 +997,14 @@ bool CoreWrapper::odomTFUpdate(const ros::Time & stamp)
 }
 
 void CoreWrapper::commonDepthCallback(
-		const nav_msgs::OdometryConstPtr & odomMsg,
-		const rtabmap_ros::UserDataConstPtr & userDataMsg,
+		const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
+		const rtabmap_ros::msg::UserData::ConstSharedPtr & userDataMsg,
 		const std::vector<cv_bridge::CvImageConstPtr> & imageMsgs,
 		const std::vector<cv_bridge::CvImageConstPtr> & depthMsgs,
-		const std::vector<sensor_msgs::CameraInfo> & cameraInfoMsgs,
-		const sensor_msgs::LaserScanConstPtr& scan2dMsg,
-		const sensor_msgs::PointCloud2ConstPtr& scan3dMsg,
-		const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg)
+		const std::vector<sensor_msgs::msg::CameraInfo> & cameraInfoMsgs,
+		const sensor_msgs::msg::LaserScan::ConstSharedPtr& scan2dMsg,
+		const sensor_msgs::msg::PointCloud2::ConstSharedPtr& scan3dMsg,
+		const rtabmap_ros::msg::OdomInfo::ConstSharedPtr& odomInfoMsg)
 {
 	std::string odomFrameId = odomFrameId_;
 	if(odomMsg.get())
@@ -1057,19 +1012,19 @@ void CoreWrapper::commonDepthCallback(
 		odomFrameId = odomMsg->header.frame_id;
 		if(scan2dMsg.get())
 		{
-			if(!odomUpdate(odomMsg, scan2dMsg->header.stamp))
+			if(!odomUpdate(*odomMsg, scan2dMsg->header.stamp))
 			{
 				return;
 			}
 		}
 		else if(scan3dMsg.get())
 		{
-			if(!odomUpdate(odomMsg, scan3dMsg->header.stamp))
+			if(!odomUpdate(*odomMsg, scan3dMsg->header.stamp))
 			{
 				return;
 			}
 		}
-		else if(imageMsgs.size() == 0 || imageMsgs[0].get() == 0 || !odomUpdate(odomMsg, imageMsgs[0]->header.stamp))
+		else if(imageMsgs.size() == 0 || imageMsgs[0].get() == 0 || !odomUpdate(*odomMsg, imageMsgs[0]->header.stamp))
 		{
 			return;
 		}
@@ -1105,13 +1060,13 @@ void CoreWrapper::commonDepthCallback(
 
 void CoreWrapper::commonDepthCallbackImpl(
 		const std::string & odomFrameId,
-		const rtabmap_ros::UserDataConstPtr & userDataMsg,
+		const rtabmap_ros::msg::UserData::ConstSharedPtr & userDataMsg,
 		const std::vector<cv_bridge::CvImageConstPtr> & imageMsgs,
 		const std::vector<cv_bridge::CvImageConstPtr> & depthMsgs,
-		const std::vector<sensor_msgs::CameraInfo> & cameraInfoMsgs,
-		const sensor_msgs::LaserScanConstPtr& scan2dMsg,
-		const sensor_msgs::PointCloud2ConstPtr& scan3dMsg,
-		const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg)
+		const std::vector<sensor_msgs::msg::CameraInfo> & cameraInfoMsgs,
+		const sensor_msgs::msg::LaserScan::ConstSharedPtr& scan2dMsg,
+		const sensor_msgs::msg::PointCloud2::ConstSharedPtr& scan3dMsg,
+		const rtabmap_ros::msg::OdomInfo::ConstSharedPtr& odomInfoMsg)
 {
 	cv::Mat rgb;
 	cv::Mat depth;
@@ -1126,10 +1081,10 @@ void CoreWrapper::commonDepthCallbackImpl(
 			rgb,
 			depth,
 			cameraModels,
-			tfListener_,
-			waitForTransform_?waitForTransformDuration_:0.0))
+			*tfBuffer_,
+			waitForTransform_))
 	{
-		NODELET_ERROR("Could not convert rgb/depth msgs! Aborting rtabmap update...");
+		RCLCPP_ERROR(this->get_logger(), "Could not convert rgb/depth msgs! Aborting rtabmap update...");
 		return;
 	}
 
@@ -1140,7 +1095,7 @@ void CoreWrapper::commonDepthCallbackImpl(
 		static bool shown = false;
 		if(!shown)
 		{
-			NODELET_WARN("Save depth data to 16 bits format: depth type detected is "
+			RCLCPP_WARN(this->get_logger(), "Save depth data to 16 bits format: depth type detected is "
 				  "32FC1, use 16UC1 depth format to avoid this conversion "
 				  "(or set parameter \"Mem/SaveDepth16Format=false\" to use "
 				  "32bits format). This message is only printed once...");
@@ -1164,33 +1119,33 @@ void CoreWrapper::commonDepthCallbackImpl(
 	else if(scan2dMsg.get() != 0)
 	{
 		if(!rtabmap_ros::convertScanMsg(
-				scan2dMsg,
+				*scan2dMsg,
 				frameId_,
 				odomSensorSync_?odomFrameId:"",
 				lastPoseStamp_,
 				scan,
-				tfListener_,
-				waitForTransform_?waitForTransformDuration_:0,
+				*tfBuffer_,
+				waitForTransform_,
 				// backward compatibility, project 2D scan in /base_link frame
 				rtabmap_.getMemory() && uStrNumCmp(rtabmap_.getMemory()->getDatabaseVersion(), "0.11.10") < 0))
 		{
-			NODELET_ERROR("Could not convert laser scan msg! Aborting rtabmap update...");
+			RCLCPP_ERROR(this->get_logger(), "Could not convert laser scan msg! Aborting rtabmap update...");
 			return;
 		}
 	}
 	else if(scan3dMsg.get() != 0)
 	{
 		if(!rtabmap_ros::convertScan3dMsg(
-				scan3dMsg,
+				*scan3dMsg,
 				frameId_,
 				odomSensorSync_?odomFrameId:"",
 				lastPoseStamp_,
 				scan,
-				tfListener_,
-				waitForTransform_?waitForTransformDuration_:0,
+				*tfBuffer_,
+				waitForTransform_,
 				scanCloudMaxPoints_))
 		{
-			NODELET_ERROR("Could not convert 3d laser scan msg! Aborting rtabmap update...");
+			RCLCPP_ERROR(this->get_logger(), "Could not convert 3d laser scan msg! Aborting rtabmap update...");
 			return;
 		}
 	}
@@ -1202,7 +1157,7 @@ void CoreWrapper::commonDepthCallbackImpl(
 		UScopeMutex lock(userDataMutex_);
 		if(!userData_.empty())
 		{
-			NODELET_WARN("Synchronized and asynchronized user data topics cannot be used at the same time. Async user data dropped!");
+			RCLCPP_WARN(this->get_logger(), "Synchronized and asynchronized user data topics cannot be used at the same time. Async user data dropped!");
 			userData_ = cv::Mat();
 		}
 	}
@@ -1218,7 +1173,7 @@ void CoreWrapper::commonDepthCallbackImpl(
 			rgb,
 			depth,
 			cameraModels,
-			lastPoseIntermediate_?-1:imageMsgs[0]->header.seq,
+			lastPoseIntermediate_?-1:0,
 			rtabmap_ros::timestampFromROS(lastPoseStamp_),
 			userData);
 
@@ -1238,15 +1193,15 @@ void CoreWrapper::commonDepthCallbackImpl(
 }
 
 void CoreWrapper::commonStereoCallback(
-		const nav_msgs::OdometryConstPtr & odomMsg,
-		const rtabmap_ros::UserDataConstPtr & userDataMsg,
+		const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
+		const rtabmap_ros::msg::UserData::ConstSharedPtr & userDataMsg,
 		const cv_bridge::CvImageConstPtr& leftImageMsg,
 		const cv_bridge::CvImageConstPtr& rightImageMsg,
-		const sensor_msgs::CameraInfo& leftCamInfoMsg,
-		const sensor_msgs::CameraInfo& rightCamInfoMsg,
-		const sensor_msgs::LaserScanConstPtr& scan2dMsg,
-		const sensor_msgs::PointCloud2ConstPtr& scan3dMsg,
-		const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg)
+		const sensor_msgs::msg::CameraInfo& leftCamInfoMsg,
+		const sensor_msgs::msg::CameraInfo& rightCamInfoMsg,
+		const sensor_msgs::msg::LaserScan::ConstSharedPtr& scan2dMsg,
+		const sensor_msgs::msg::PointCloud2::ConstSharedPtr& scan3dMsg,
+		const rtabmap_ros::msg::OdomInfo::ConstSharedPtr& odomInfoMsg)
 {
 	std::string odomFrameId = odomFrameId_;
 	if(odomMsg.get())
@@ -1254,19 +1209,19 @@ void CoreWrapper::commonStereoCallback(
 		odomFrameId = odomMsg->header.frame_id;
 		if(scan2dMsg.get())
 		{
-			if(!odomUpdate(odomMsg, scan2dMsg->header.stamp))
+			if(!odomUpdate(*odomMsg, scan2dMsg->header.stamp))
 			{
 				return;
 			}
 		}
 		else if(scan3dMsg.get())
 		{
-			if(!odomUpdate(odomMsg, scan3dMsg->header.stamp))
+			if(!odomUpdate(*odomMsg, scan3dMsg->header.stamp))
 			{
 				return;
 			}
 		}
-		else if(leftImageMsg.get() == 0 || !odomUpdate(odomMsg, leftImageMsg->header.stamp))
+		else if(leftImageMsg.get() == 0 || !odomUpdate(*odomMsg, leftImageMsg->header.stamp))
 		{
 			return;
 		}
@@ -1304,10 +1259,10 @@ void CoreWrapper::commonStereoCallback(
 			left,
 			right,
 			stereoModel,
-			tfListener_,
-			waitForTransform_?waitForTransformDuration_:0.0))
+			*tfBuffer_,
+			waitForTransform_))
 	{
-		NODELET_ERROR("Could not convert stereo msgs! Aborting rtabmap update...");
+		RCLCPP_ERROR(this->get_logger(), "Could not convert stereo msgs! Aborting rtabmap update...");
 		return;
 	}
 
@@ -1320,7 +1275,7 @@ void CoreWrapper::commonStereoCallback(
 				parameters_);
 		if(disparity.empty())
 		{
-			NODELET_ERROR("Could not compute disparity image (\"stereo_to_depth\" is true)!");
+			RCLCPP_ERROR(this->get_logger(), "Could not compute disparity image (\"stereo_to_depth\" is true)!");
 			return;
 		}
 		cv::Mat depth = rtabmap::util2d::depthFromDisparity(
@@ -1330,7 +1285,7 @@ void CoreWrapper::commonStereoCallback(
 
 		if(depth.empty())
 		{
-			NODELET_ERROR("Could not compute depth image (\"stereo_to_depth\" is true)!");
+			RCLCPP_ERROR(this->get_logger(), "Could not compute depth image (\"stereo_to_depth\" is true)!");
 			return;
 		}
 		UASSERT(depth.type() == CV_16UC1 || depth.type() == CV_32FC1);
@@ -1349,12 +1304,12 @@ void CoreWrapper::commonStereoCallback(
 		imgDepth->header = leftImageMsg->header;
 		std::vector<cv_bridge::CvImageConstPtr> rgbImages(1);
 		std::vector<cv_bridge::CvImageConstPtr> depthImages(1);
-		std::vector<sensor_msgs::CameraInfo> cameraInfos(1);
+		std::vector<sensor_msgs::msg::CameraInfo> cameraInfos(1);
 		rgbImages[0] = leftImageMsg;
 		depthImages[0] = imgDepth;
 		cameraInfos[0] = leftCamInfoMsg;
 
-		commonDepthCallbackImpl(odomFrameId, rtabmap_ros::UserDataConstPtr(), rgbImages, depthImages, cameraInfos, scan2dMsg, scan3dMsg, odomInfoMsg);
+		commonDepthCallbackImpl(odomFrameId, rtabmap_ros::msg::UserData::SharedPtr(), rgbImages, depthImages, cameraInfos, scan2dMsg, scan3dMsg, odomInfoMsg);
 		return;
 	}
 
@@ -1362,33 +1317,33 @@ void CoreWrapper::commonStereoCallback(
 	if(scan2dMsg.get() != 0)
 	{
 		if(!rtabmap_ros::convertScanMsg(
-				scan2dMsg,
+				*scan2dMsg,
 				frameId_,
 				odomSensorSync_?odomFrameId:"",
 				lastPoseStamp_,
 				scan,
-				tfListener_,
-				waitForTransform_?waitForTransformDuration_:0,
+				*tfBuffer_,
+				waitForTransform_,
 				// backward compatibility, project 2D scan in /base_link frame
 				rtabmap_.getMemory() && uStrNumCmp(rtabmap_.getMemory()->getDatabaseVersion(), "0.11.10") < 0))
 		{
-			NODELET_ERROR("Could not convert laser scan msg! Aborting rtabmap update...");
+			RCLCPP_ERROR(this->get_logger(), "Could not convert laser scan msg! Aborting rtabmap update...");
 			return;
 		}
 	}
 	else if(scan3dMsg.get() != 0)
 	{
 		if(!rtabmap_ros::convertScan3dMsg(
-				scan3dMsg,
+				*scan3dMsg,
 				frameId_,
 				odomSensorSync_?odomFrameId:"",
 				lastPoseStamp_,
 				scan,
-				tfListener_,
-				waitForTransform_?waitForTransformDuration_:0,
+				*tfBuffer_,
+				waitForTransform_,
 				scanCloudMaxPoints_))
 		{
-			NODELET_ERROR("Could not convert 3d laser scan msg! Aborting rtabmap update...");
+			RCLCPP_ERROR(this->get_logger(), "Could not convert 3d laser scan msg! Aborting rtabmap update...");
 			return;
 		}
 	}
@@ -1400,7 +1355,7 @@ void CoreWrapper::commonStereoCallback(
 		UScopeMutex lock(userDataMutex_);
 		if(!userData_.empty())
 		{
-			NODELET_WARN("Synchronized and asynchronized user data topics cannot be used at the same time. Async user data dropped!");
+			RCLCPP_WARN(this->get_logger(), "Synchronized and asynchronized user data topics cannot be used at the same time. Async user data dropped!");
 			userData_ = cv::Mat();
 		}
 	}
@@ -1416,7 +1371,7 @@ void CoreWrapper::commonStereoCallback(
 			left,
 			right,
 			stereoModel,
-			lastPoseIntermediate_?-1:leftImageMsg->header.seq,
+			lastPoseIntermediate_?-1:0,
 			rtabmap_ros::timestampFromROS(lastPoseStamp_),
 			userData);
 
@@ -1437,11 +1392,11 @@ void CoreWrapper::commonStereoCallback(
 }
 
 void CoreWrapper::commonLaserScanCallback(
-		const nav_msgs::OdometryConstPtr & odomMsg,
-		const rtabmap_ros::UserDataConstPtr & userDataMsg,
-		const sensor_msgs::LaserScanConstPtr& scan2dMsg,
-		const sensor_msgs::PointCloud2ConstPtr& scan3dMsg,
-		const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg)
+		const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
+		const rtabmap_ros::msg::UserData::ConstSharedPtr & userDataMsg,
+		const sensor_msgs::msg::LaserScan::ConstSharedPtr& scan2dMsg,
+		const sensor_msgs::msg::PointCloud2::ConstSharedPtr& scan3dMsg,
+		const rtabmap_ros::msg::OdomInfo::ConstSharedPtr& odomInfoMsg)
 {
 	UASSERT(scan2dMsg.get() || scan3dMsg.get());
 	std::string odomFrameId = odomFrameId_;
@@ -1450,14 +1405,14 @@ void CoreWrapper::commonLaserScanCallback(
 		odomFrameId = odomMsg->header.frame_id;
 		if(scan2dMsg.get())
 		{
-			if(!odomUpdate(odomMsg, scan2dMsg->header.stamp))
+			if(!odomUpdate(*odomMsg, scan2dMsg->header.stamp))
 			{
 				return;
 			}
 		}
 		else if(scan3dMsg.get())
 		{
-			if(!odomUpdate(odomMsg, scan3dMsg->header.stamp))
+			if(!odomUpdate(*odomMsg, scan3dMsg->header.stamp))
 			{
 				return;
 			}
@@ -1490,33 +1445,33 @@ void CoreWrapper::commonLaserScanCallback(
 	if(scan2dMsg.get() != 0)
 	{
 		if(!rtabmap_ros::convertScanMsg(
-				scan2dMsg,
+				*scan2dMsg,
 				frameId_,
 				odomSensorSync_?odomFrameId:"",
 				lastPoseStamp_,
 				scan,
-				tfListener_,
-				waitForTransform_?waitForTransformDuration_:0,
+				*tfBuffer_,
+				waitForTransform_,
 				// backward compatibility, project 2D scan in /base_link frame
 				rtabmap_.getMemory() && uStrNumCmp(rtabmap_.getMemory()->getDatabaseVersion(), "0.11.10") < 0))
 		{
-			NODELET_ERROR("Could not convert laser scan msg! Aborting rtabmap update...");
+			RCLCPP_ERROR(this->get_logger(), "Could not convert laser scan msg! Aborting rtabmap update...");
 			return;
 		}
 	}
 	else if(scan3dMsg.get() != 0)
 	{
 		if(!rtabmap_ros::convertScan3dMsg(
-				scan3dMsg,
+				*scan3dMsg,
 				frameId_,
 				odomSensorSync_?odomFrameId:"",
 				lastPoseStamp_,
 				scan,
-				tfListener_,
-				waitForTransform_?waitForTransformDuration_:0,
+				*tfBuffer_,
+				waitForTransform_,
 				scanCloudMaxPoints_))
 		{
-			NODELET_ERROR("Could not convert 3d laser scan msg! Aborting rtabmap update...");
+			RCLCPP_ERROR(this->get_logger(), "Could not convert 3d laser scan msg! Aborting rtabmap update...");
 			return;
 		}
 	}
@@ -1528,7 +1483,7 @@ void CoreWrapper::commonLaserScanCallback(
 		UScopeMutex lock(userDataMutex_);
 		if(!userData_.empty())
 		{
-			NODELET_WARN("Synchronized and asynchronized user data topics cannot be used at the same time. Async user data dropped!");
+			RCLCPP_WARN(this->get_logger(), "Synchronized and asynchronized user data topics cannot be used at the same time. Async user data dropped!");
 			userData_ = cv::Mat();
 		}
 	}
@@ -1555,7 +1510,7 @@ void CoreWrapper::commonLaserScanCallback(
 			rgb,
 			depth,
 			model,
-			lastPoseIntermediate_?-1:scan2dMsg.get() != 0?scan2dMsg->header.seq:scan3dMsg->header.seq,
+			lastPoseIntermediate_?-1:0,
 			rtabmap_ros::timestampFromROS(lastPoseStamp_),
 			userData);
 
@@ -1576,15 +1531,15 @@ void CoreWrapper::commonLaserScanCallback(
 }
 
 void CoreWrapper::commonOdomCallback(
-		const nav_msgs::OdometryConstPtr & odomMsg,
-		const rtabmap_ros::UserDataConstPtr & userDataMsg,
-		const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg)
+		const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
+		const rtabmap_ros::msg::UserData::ConstSharedPtr & userDataMsg,
+		const rtabmap_ros::msg::OdomInfo::ConstSharedPtr& odomInfoMsg)
 {
 	UASSERT(odomMsg.get());
 	std::string odomFrameId = odomFrameId_;
 
 	odomFrameId = odomMsg->header.frame_id;
-	if(!odomUpdate(odomMsg, odomMsg->header.stamp))
+	if(!odomUpdate(*odomMsg, odomMsg->header.stamp))
 	{
 		return;
 	}
@@ -1596,7 +1551,7 @@ void CoreWrapper::commonOdomCallback(
 		UScopeMutex lock(userDataMutex_);
 		if(!userData_.empty())
 		{
-			NODELET_WARN("Synchronized and asynchronized user data topics cannot be used at the same time. Async user data dropped!");
+			RCLCPP_WARN(this->get_logger(), "Synchronized and asynchronized user data topics cannot be used at the same time. Async user data dropped!");
 			userData_ = cv::Mat();
 		}
 	}
@@ -1622,7 +1577,7 @@ void CoreWrapper::commonOdomCallback(
 			rgb,
 			depth,
 			model,
-			lastPoseIntermediate_?-1:odomMsg->header.seq,
+			lastPoseIntermediate_?-1:0,
 			rtabmap_ros::timestampFromROS(lastPoseStamp_),
 			userData);
 
@@ -1643,7 +1598,7 @@ void CoreWrapper::commonOdomCallback(
 }
 
 void CoreWrapper::process(
-		const ros::Time & stamp,
+		const rclcpp::Time & stamp,
 		SensorData & data,
 		const Transform & odom,
 		const std::string & odomFrameId,
@@ -1654,9 +1609,9 @@ void CoreWrapper::process(
 	if(rtabmap_.isIDsGenerated() || data.id() > 0)
 	{
 		// Add intermediate nodes?
-		for(std::list<std::pair<nav_msgs::Odometry, rtabmap_ros::OdomInfo> >::iterator iter=interOdoms_.begin(); iter!=interOdoms_.end();)
+		for(std::list<std::pair<nav_msgs::msg::Odometry, rtabmap_ros::msg::OdomInfo> >::iterator iter=interOdoms_.begin(); iter!=interOdoms_.end();)
 		{
-			if(iter->first.header.stamp < lastPoseStamp_)
+			if(rclcpp::Time(iter->first.header.stamp.sec, iter->first.header.stamp.nanosec) < lastPoseStamp_)
 			{
 				Transform interOdom = rtabmap_ros::transformFromPoseMsg(iter->first.pose.pose);
 				if(!interOdom.isNull())
@@ -1704,13 +1659,13 @@ void CoreWrapper::process(
 					Transform gt;
 					if(!groundTruthFrameId_.empty())
 					{
-						gt = rtabmap_ros::getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, iter->first.header.stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+						gt = rtabmap_ros::getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, iter->first.header.stamp, *tfBuffer_, waitForTransform_);
 					}
 					interData.setGroundTruth(gt);
 
 					std::map<std::string, float> externalStats;
 					std::vector<float> odomVelocity;
-					if(iter->second.timeEstimation != 0.0f)
+					if(iter->second.time_estimation != 0.0f)
 					{
 						OdometryInfo info = odomInfoFromROS(iter->second);
 						externalStats = rtabmap_ros::odomInfoToStatistics(info);
@@ -1748,20 +1703,20 @@ void CoreWrapper::process(
 		Transform groundTruthPose;
 		if(!groundTruthFrameId_.empty())
 		{
-			groundTruthPose = rtabmap_ros::getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, lastPoseStamp_, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+			groundTruthPose = rtabmap_ros::getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, lastPoseStamp_, *tfBuffer_, waitForTransform_);
 		}
 		data.setGroundTruth(groundTruthPose);
 
 		//global pose
-		if(!globalPose_.header.stamp.isZero())
+		if(globalPose_.header.stamp.sec != 0 || globalPose_.header.stamp.nanosec != 0)
 		{
 			// assume sensor is fixed
 			Transform sensorToBase = rtabmap_ros::getTransform(
 					globalPose_.header.frame_id,
 					frameId_,
 					lastPoseStamp_,
-					tfListener_,
-					waitForTransform_?waitForTransformDuration_:0.0);
+					*tfBuffer_,
+					waitForTransform_);
 			if(!sensorToBase.isNull())
 			{
 				Transform globalPose = rtabmap_ros::transformFromPoseMsg(globalPose_.pose.pose);
@@ -1771,17 +1726,17 @@ void CoreWrapper::process(
 				Transform correction = rtabmap_ros::getTransform(
 						frameId_,
 						odomFrameId,
-						globalPose_.header.stamp,
+						rclcpp::Time(globalPose_.header.stamp.sec, globalPose_.header.stamp.nanosec),
 						lastPoseStamp_,
-						tfListener_,
-						waitForTransform_?waitForTransformDuration_:0.0);
+						*tfBuffer_,
+						waitForTransform_);
 				if(!correction.isNull())
 				{
 					globalPose *= correction;
 				}
 				else
 				{
-					NODELET_WARN("Could not adjust global pose accordingly to latest odometry pose. "
+					RCLCPP_WARN(this->get_logger(), "Could not adjust global pose accordingly to latest odometry pose. "
 							"If odometry is small since it received the global pose and "
 							"covariance is large, this should not be a problem.");
 				}
@@ -1789,7 +1744,7 @@ void CoreWrapper::process(
 				data.setGlobalPose(globalPose, globalPoseCovariance);
 			}
 		}
-		globalPose_.header.stamp = ros::Time(0);
+		globalPose_.header.stamp = rclcpp::Time(0);
 
 		if(gps_.stamp() > 0.0)
 		{
@@ -1803,8 +1758,8 @@ void CoreWrapper::process(
 				frameId_,
 				odomFrameId,
 				lastPoseStamp_,
-				tfListener_,
-				waitForTransform_?waitForTransformDuration_:0,
+				*tfBuffer_,
+				waitForTransform_,
 				landmarkDefaultLinVariance_,
 				landmarkDefaultAngVariance_);
 		tags_.clear();
@@ -1828,7 +1783,7 @@ void CoreWrapper::process(
 			}
 			else
 			{
-				ROS_WARN("We are receiving imu data (buffer=%d), but cannot interpolate "
+				RCLCPP_WARN(this->get_logger(), "We are receiving imu data (buffer=%d), but cannot interpolate "
 						"imu transform at time %f (closest is at %f). IMU won't be added to graph.",
 						(int)imus_.size(), data.stamp(), stampDiff);
 			}
@@ -1891,23 +1846,22 @@ void CoreWrapper::process(
 
 			if(data.id() < 0)
 			{
-				NODELET_INFO("Intermediate node added");
+				RCLCPP_INFO(this->get_logger(), "Intermediate node added");
 			}
 			else
 			{
 				// Publish local graph, info
 				this->publishStats(stamp);
-				if(localizationPosePub_.getNumSubscribers() &&
+				if(localizationPosePub_->get_subscription_count() &&
 					!rtabmap_.getStatistics().localizationCovariance().empty())
 				{
-					geometry_msgs::PoseWithCovarianceStamped poseMsg;
+					geometry_msgs::msg::PoseWithCovarianceStamped poseMsg;
 					poseMsg.header.frame_id = mapFrameId_;
 					poseMsg.header.stamp = stamp;
 					rtabmap_ros::transformToPoseMsg(mapToOdom_*odom, poseMsg.pose.pose);
-					poseMsg.pose.covariance;
 					const cv::Mat & cov = rtabmap_.getStatistics().localizationCovariance();
 					memcpy(poseMsg.pose.covariance.data(), cov.data, cov.total()*sizeof(double));
-					localizationPosePub_.publish(poseMsg);
+					localizationPosePub_->publish(poseMsg);
 				}
 				std::map<int, rtabmap::Transform> filteredPoses(rtabmap_.getLocalOptimizedPoses().lower_bound(1), rtabmap_.getLocalOptimizedPoses().end());
 
@@ -1977,6 +1931,7 @@ void CoreWrapper::process(
 				{
 					if(rtabmap_.getPath().size() == 0)
 					{
+#ifdef WITH_MOVE_BASE_MSGS
 						// Don't send status yet if move_base actionlib is used unless it failed,
 						// let move_base finish reaching the goal
 						if(mbClient_ == 0 || rtabmap_.getPathStatus() <= 0)
@@ -1984,28 +1939,29 @@ void CoreWrapper::process(
 							if(rtabmap_.getPathStatus() > 0)
 							{
 								// Goal reached
-								NODELET_INFO("Planning: Publishing goal reached!");
+								RCLCPP_INFO(this->get_logger(), "Planning: Publishing goal reached!");
 							}
 							else if(rtabmap_.getPathStatus() <= 0)
 							{
-								NODELET_WARN("Planning: Plan failed!");
+								RCLCPP_WARN(this->get_logger(), "Planning: Plan failed!");
 								if(mbClient_ && mbClient_->isServerConnected())
 								{
 									mbClient_->cancelGoal();
 								}
 							}
 
-							if(goalReachedPub_.getNumSubscribers())
+							if(goalReachedPub_->get_subscription_count())
 							{
-								std_msgs::Bool result;
+								std_msgs::msg::Bool result;
 								result.data = rtabmap_.getPathStatus() > 0;
-								goalReachedPub_.publish(result);
+								goalReachedPub_->publish(result);
 							}
 							currentMetricGoal_.setNull();
 							lastPublishedMetricGoal_.setNull();
 							goalFrameId_.clear();
 							latestNodeWasReached_ = false;
 						}
+#endif
 					}
 					else
 					{
@@ -2022,7 +1978,7 @@ void CoreWrapper::process(
 									Transform goalLocalTransform = Transform::getIdentity();
 									if(!goalFrameId_.empty() && goalFrameId_.compare(frameId_) != 0)
 									{
-										Transform localT = rtabmap_ros::getTransform(frameId_, goalFrameId_, ros::Time::now(), tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+										Transform localT = rtabmap_ros::getTransform(frameId_, goalFrameId_, now(), *tfBuffer_, waitForTransform_);
 										if(!localT.isNull())
 										{
 											goalLocalTransform = localT.inverse().to3DoF();
@@ -2043,14 +1999,14 @@ void CoreWrapper::process(
 						}
 						else
 						{
-							NODELET_ERROR("Planning: Local map broken, current goal id=%d (the robot may have moved to far from planned nodes)",
+							RCLCPP_ERROR(this->get_logger(), "Planning: Local map broken, current goal id=%d (the robot may have moved to far from planned nodes)",
 									rtabmap_.getPathCurrentGoalId());
 							rtabmap_.clearPath(-1);
-							if(goalReachedPub_.getNumSubscribers())
+							if(goalReachedPub_->get_subscription_count())
 							{
-								std_msgs::Bool result;
+								std_msgs::msg::Bool result;
 								result.data = false;
-								goalReachedPub_.publish(result);
+								goalReachedPub_->publish(result);
 							}
 							currentMetricGoal_.setNull();
 							lastPublishedMetricGoal_.setNull();
@@ -2067,7 +2023,7 @@ void CoreWrapper::process(
 		{
 			timeRtabmap = timer.ticks();
 		}
-		NODELET_INFO("rtabmap (%d): Rate=%.2fs, Limit=%.3fs, RTAB-Map=%.4fs, Maps update=%.4fs pub=%.4fs (local map=%d, WM=%d)",
+		RCLCPP_INFO(this->get_logger(), "rtabmap (%d): Rate=%.2fs, Limit=%.3fs, RTAB-Map=%.4fs, Maps update=%.4fs pub=%.4fs (local map=%d, WM=%d)",
 				rtabmap_.getLastLocationId(),
 				rate_>0?1.0f/rate_:0,
 				rtabmap_.getTimeThreshold()/1000.0f,
@@ -2084,7 +2040,7 @@ void CoreWrapper::process(
 	}
 	else if(!rtabmap_.isIDsGenerated())
 	{
-		NODELET_WARN("Ignoring received image because its sequence ID=0. Please "
+		RCLCPP_WARN(this->get_logger(), "Ignoring received image because its sequence ID=0. Please "
 				 "set \"Mem/GenerateIds\"=\"true\" to ignore ros generated sequence id. "
 				 "Use only \"Mem/GenerateIds\"=\"false\" for once-time run of RTAB-Map and "
 				 "when you need to have IDs output of RTAB-map synchronized with the source "
@@ -2092,7 +2048,7 @@ void CoreWrapper::process(
 	}
 }
 
-void CoreWrapper::userDataAsyncCallback(const rtabmap_ros::UserDataConstPtr & dataMsg)
+void CoreWrapper::userDataAsyncCallback(const rtabmap_ros::msg::UserData::SharedPtr dataMsg)
 {
 	if(!paused_)
 	{
@@ -2100,7 +2056,7 @@ void CoreWrapper::userDataAsyncCallback(const rtabmap_ros::UserDataConstPtr & da
 		static bool warningShow = false;
 		if(!userData_.empty() && !warningShow)
 		{
-			ROS_WARN("Overwriting previous user data set. When asynchronous user "
+			RCLCPP_WARN(this->get_logger(), "Overwriting previous user data set. When asynchronous user "
 					"data input topic rate is higher than "
 					"map update rate (current %s=%f), only latest data is saved "
 					"in the next node created. This message will is shown only once.",
@@ -2111,7 +2067,7 @@ void CoreWrapper::userDataAsyncCallback(const rtabmap_ros::UserDataConstPtr & da
 	}
 }
 
-void CoreWrapper::globalPoseAsyncCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr & globalPoseMsg)
+void CoreWrapper::globalPoseAsyncCallback(const geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr globalPoseMsg)
 {
 	if(!paused_)
 	{
@@ -2119,12 +2075,12 @@ void CoreWrapper::globalPoseAsyncCallback(const geometry_msgs::PoseWithCovarianc
 	}
 }
 
-void CoreWrapper::gpsFixAsyncCallback(const sensor_msgs::NavSatFixConstPtr & gpsFixMsg)
+void CoreWrapper::gpsFixAsyncCallback(const sensor_msgs::msg::NavSatFix::SharedPtr gpsFixMsg)
 {
 	if(!paused_)
 	{
 		double error = 10.0;
-		if(gpsFixMsg->position_covariance_type != sensor_msgs::NavSatFix::COVARIANCE_TYPE_UNKNOWN)
+		if(gpsFixMsg->position_covariance_type != sensor_msgs::msg::NavSatFix::COVARIANCE_TYPE_UNKNOWN)
 		{
 			double variance = uMax3(gpsFixMsg->position_covariance.at(0), gpsFixMsg->position_covariance.at(4), gpsFixMsg->position_covariance.at(8));
 			if(variance>0.0)
@@ -2133,7 +2089,7 @@ void CoreWrapper::gpsFixAsyncCallback(const sensor_msgs::NavSatFixConstPtr & gps
 			}
 		}
 		gps_ = rtabmap::GPS(
-				gpsFixMsg->header.stamp.toSec(),
+				timestampFromROS(gpsFixMsg->header.stamp),
 				gpsFixMsg->longitude,
 				gpsFixMsg->latitude,
 				gpsFixMsg->altitude,
@@ -2143,7 +2099,7 @@ void CoreWrapper::gpsFixAsyncCallback(const sensor_msgs::NavSatFixConstPtr & gps
 }
 
 #ifdef WITH_APRILTAG_ROS
-void CoreWrapper::tagDetectionsAsyncCallback(const apriltag_ros::AprilTagDetectionArray & tagDetections)
+void CoreWrapper::tagDetectionsAsyncCallback(const apriltag_ros::AprilTagDetectionArray tagDetections)
 {
 	if(!paused_)
 	{
@@ -2151,7 +2107,7 @@ void CoreWrapper::tagDetectionsAsyncCallback(const apriltag_ros::AprilTagDetecti
 		{
 			if(tagDetections.detections[i].id.size() >= 1)
 			{
-				geometry_msgs::PoseWithCovarianceStamped p = tagDetections.detections[i].pose;
+				geometry_msgs::msg::PoseWithCovarianceStamped p = tagDetections.detections[i].pose;
 				p.header = tagDetections.header;
 				if(!tagDetections.detections[i].pose.header.frame_id.empty())
 				{
@@ -2168,7 +2124,7 @@ void CoreWrapper::tagDetectionsAsyncCallback(const apriltag_ros::AprilTagDetecti
 }
 #endif
 
-void CoreWrapper::imuAsyncCallback(const sensor_msgs::ImuConstPtr & msg)
+void CoreWrapper::imuAsyncCallback(const sensor_msgs::msg::Imu::SharedPtr msg)
 {
 	if(!paused_)
 	{
@@ -2178,11 +2134,11 @@ void CoreWrapper::imuAsyncCallback(const sensor_msgs::ImuConstPtr & msg)
 		}
 		else
 		{
-			double stamp = msg->header.stamp.toSec();
+			double stamp = timestampFromROS(msg->header.stamp);
 			rtabmap::Transform localTransform = rtabmap::Transform::getIdentity();
 			if(frameId_.compare(msg->header.frame_id) != 0)
 			{
-				localTransform = getTransform(frameId_, msg->header.frame_id, msg->header.stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+				localTransform = getTransform(frameId_, msg->header.frame_id, msg->header.stamp, *tfBuffer_, waitForTransform_);
 				if(localTransform.isNull())
 				{
 					return;
@@ -2190,7 +2146,7 @@ void CoreWrapper::imuAsyncCallback(const sensor_msgs::ImuConstPtr & msg)
 			}
 
 			Transform orientation(0,0,0, msg->orientation.x, msg->orientation.y, msg->orientation.z, msg->orientation.w);
-			imus_.insert(std::make_pair(msg->header.stamp.toSec(), orientation*localTransform.inverse()));
+			imus_.insert(std::make_pair(stamp, orientation*localTransform.inverse()));
 			if(imus_.size() > 1000)
 			{
 				imus_.erase(imus_.begin());
@@ -2199,15 +2155,15 @@ void CoreWrapper::imuAsyncCallback(const sensor_msgs::ImuConstPtr & msg)
 	}
 }
 
-void CoreWrapper::interOdomCallback(const nav_msgs::OdometryConstPtr & msg)
+void CoreWrapper::interOdomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
 {
 	if(!paused_)
 	{
-		interOdoms_.push_back(std::make_pair(*msg, rtabmap_ros::OdomInfo()));
+		interOdoms_.push_back(std::make_pair(*msg, rtabmap_ros::msg::OdomInfo()));
 	}
 }
 
-void CoreWrapper::interOdomInfoCallback(const nav_msgs::OdometryConstPtr & msg1, const rtabmap_ros::OdomInfoConstPtr & msg2)
+void CoreWrapper::interOdomInfoCallback(const nav_msgs::msg::Odometry::ConstSharedPtr & msg1, const rtabmap_ros::msg::OdomInfo::ConstSharedPtr & msg2)
 {
 	if(!paused_)
 	{
@@ -2216,12 +2172,12 @@ void CoreWrapper::interOdomInfoCallback(const nav_msgs::OdometryConstPtr & msg1,
 }
 
 
-void CoreWrapper::initialPoseCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr & msg)
+void CoreWrapper::initialPoseCallback(const geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr msg)
 {
 	Transform intialPose = rtabmap_ros::transformFromPoseMsg(msg->pose.pose);
 	if(intialPose.isNull())
 	{
-		NODELET_ERROR("Pose received is null!");
+		RCLCPP_ERROR(this->get_logger(), "Pose received is null!");
 		return;
 	}
 
@@ -2233,7 +2189,7 @@ void CoreWrapper::goalCommonCallback(
 		const std::string & label,
 		const std::string & frameId,
 		const Transform & pose,
-		const ros::Time & stamp,
+		const rclcpp::Time & stamp,
 		double * planningTime)
 {
 	UTimer timer;
@@ -2245,15 +2201,15 @@ void CoreWrapper::goalCommonCallback(
 
 	if(id > 0)
 	{
-		NODELET_INFO("Planning: set goal to node %d", id);
+		RCLCPP_INFO(this->get_logger(), "Planning: set goal to node %d", id);
 	}
 	else if(id < 0)
 	{
-		NODELET_INFO("Planning: set goal to landmark %d", id);
+		RCLCPP_INFO(this->get_logger(), "Planning: set goal to landmark %d", id);
 	}
 	else if(!pose.isNull())
 	{
-		NODELET_INFO("Planning: set goal %s", pose.prettyPrint().c_str());
+		RCLCPP_INFO(this->get_logger(), "Planning: set goal %s", pose.prettyPrint().c_str());
 	}
 
 	if(planningTime)
@@ -2269,7 +2225,7 @@ void CoreWrapper::goalCommonCallback(
 		{
 			*planningTime = timer.elapsed();
 		}
-		NODELET_INFO("Planning: Time computing path = %f s", timer.ticks());
+		RCLCPP_INFO(this->get_logger(), "Planning: Time computing path = %f s", timer.ticks());
 		const std::vector<std::pair<int, Transform> > & poses = rtabmap_.getPath();
 
 		currentMetricGoal_.setNull();
@@ -2278,14 +2234,14 @@ void CoreWrapper::goalCommonCallback(
 		latestNodeWasReached_ = false;
 		if(poses.size() == 0)
 		{
-			NODELET_WARN("Planning: Goal already reached (RGBD/GoalReachedRadius=%fm).",
+			RCLCPP_WARN(this->get_logger(), "Planning: Goal already reached (RGBD/GoalReachedRadius=%fm).",
 					rtabmap_.getGoalReachedRadius());
 			rtabmap_.clearPath(1);
-			if(goalReachedPub_.getNumSubscribers())
+			if(goalReachedPub_->get_subscription_count())
 			{
-				std_msgs::Bool result;
+				std_msgs::msg::Bool result;
 				result.data = true;
-				goalReachedPub_.publish(result);
+				goalReachedPub_->publish(result);
 			}
 			success = true;
 		}
@@ -2294,7 +2250,7 @@ void CoreWrapper::goalCommonCallback(
 			currentMetricGoal_ = rtabmap_.getPose(rtabmap_.getPathCurrentGoalId());
 			if(!currentMetricGoal_.isNull())
 			{
-				NODELET_INFO("Planning: Path successfully created (size=%d)", (int)poses.size());
+				RCLCPP_INFO(this->get_logger(), "Planning: Path successfully created (size=%d)", (int)poses.size());
 				goalFrameId_ = frameId;
 
 				// Adjust the target pose relative to last node
@@ -2306,7 +2262,7 @@ void CoreWrapper::goalCommonCallback(
 						Transform goalLocalTransform = Transform::getIdentity();
 						if(!goalFrameId_.empty() && goalFrameId_.compare(frameId_) != 0)
 						{
-							Transform localT = rtabmap_ros::getTransform(frameId_, goalFrameId_, stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+							Transform localT = rtabmap_ros::getTransform(frameId_, goalFrameId_, stamp, *tfBuffer_, waitForTransform_);
 							if(!localT.isNull())
 							{
 								goalLocalTransform = localT.inverse().to3DoF();
@@ -2330,62 +2286,62 @@ void CoreWrapper::goalCommonCallback(
 					}
 					stream << iter->first;
 				}
-				NODELET_INFO("Global path: [%s]", stream.str().c_str());
+				RCLCPP_INFO(this->get_logger(), "Global path: [%s]", stream.str().c_str());
 				success=true;
 			}
 			else
 			{
-				NODELET_ERROR("Pose of node %d not found!? Cannot send a metric goal...", rtabmap_.getPathCurrentGoalId());
+				RCLCPP_ERROR(this->get_logger(), "Pose of node %d not found!? Cannot send a metric goal...", rtabmap_.getPathCurrentGoalId());
 			}
 		}
 	}
 	else if(!label.empty())
 	{
-		NODELET_ERROR("Planning: Node with label \"%s\" not found!", label.c_str());
+		RCLCPP_ERROR(this->get_logger(), "Planning: Node with label \"%s\" not found!", label.c_str());
 	}
 	else if(pose.isNull())
 	{
 		if(id > 0)
 		{
-			NODELET_ERROR("Planning: Could not plan to node %d! The node is not in map's graph (look for warnings before this message for more details).", id);
+			RCLCPP_ERROR(this->get_logger(), "Planning: Could not plan to node %d! The node is not in map's graph (look for warnings before this message for more details).", id);
 		}
 		else if(id < 0)
 		{
-			NODELET_ERROR("Planning: Could not plan to landmark %d! The landmark is not in map's graph (look for warnings before this message for more details).", id);
+			RCLCPP_ERROR(this->get_logger(), "Planning: Could not plan to landmark %d! The landmark is not in map's graph (look for warnings before this message for more details).", id);
 		}
 		else
 		{
-			NODELET_ERROR("Planning: Node id should be > 0 !");
+			RCLCPP_ERROR(this->get_logger(), "Planning: Node id should be > 0 !");
 		}
 	}
 	else
 	{
-		NODELET_ERROR("Planning: A node near the goal's pose not found! The pose may be to far from the graph (RGBD/LocalRadius=%f m)", rtabmap_.getLocalRadius());
+		RCLCPP_ERROR(this->get_logger(), "Planning: A node near the goal's pose not found! The pose may be to far from the graph (RGBD/LocalRadius=%f m)", rtabmap_.getLocalRadius());
 	}
 
 	if(!success)
 	{
 		rtabmap_.clearPath(-1);
-		if(goalReachedPub_.getNumSubscribers())
+		if(goalReachedPub_->get_subscription_count())
 		{
-			std_msgs::Bool result;
+			std_msgs::msg::Bool result;
 			result.data = false;
-			goalReachedPub_.publish(result);
+			goalReachedPub_->publish(result);
 		}
 	}
 }
 
-void CoreWrapper::goalCallback(const geometry_msgs::PoseStampedConstPtr & msg)
+void CoreWrapper::goalCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
 {
 	Transform targetPose = rtabmap_ros::transformFromPoseMsg(msg->pose);
 	if(targetPose.isNull())
 	{
-		NODELET_ERROR("Pose received is null!");
-		if(goalReachedPub_.getNumSubscribers())
+		RCLCPP_ERROR(this->get_logger(), "Pose received is null!");
+		if(goalReachedPub_->get_subscription_count())
 		{
-			std_msgs::Bool result;
+			std_msgs::msg::Bool result;
 			result.data = false;
-			goalReachedPub_.publish(result);
+			goalReachedPub_->publish(result);
 		}
 		return;
 	}
@@ -2393,16 +2349,16 @@ void CoreWrapper::goalCallback(const geometry_msgs::PoseStampedConstPtr & msg)
 	// transform goal in /map frame
 	if(mapFrameId_.compare(msg->header.frame_id) != 0)
 	{
-		Transform t = rtabmap_ros::getTransform(mapFrameId_, msg->header.frame_id, msg->header.stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+		Transform t = rtabmap_ros::getTransform(mapFrameId_, msg->header.frame_id, msg->header.stamp, *tfBuffer_, waitForTransform_);
 		if(t.isNull())
 		{
-			NODELET_ERROR("Cannot transform goal pose from \"%s\" frame to \"%s\" frame!",
+			RCLCPP_ERROR(this->get_logger(), "Cannot transform goal pose from \"%s\" frame to \"%s\" frame!",
 					msg->header.frame_id.c_str(), mapFrameId_.c_str());
-			if(goalReachedPub_.getNumSubscribers())
+			if(goalReachedPub_->get_subscription_count())
 			{
-				std_msgs::Bool result;
+				std_msgs::msg::Bool result;
 				result.data = false;
-				goalReachedPub_.publish(result);
+				goalReachedPub_->publish(result);
 			}
 			return;
 		}
@@ -2412,66 +2368,28 @@ void CoreWrapper::goalCallback(const geometry_msgs::PoseStampedConstPtr & msg)
 	goalCommonCallback(0, "", "", targetPose, msg->header.stamp);
 }
 
-void CoreWrapper::goalNodeCallback(const rtabmap_ros::GoalConstPtr & msg)
+void CoreWrapper::goalNodeCallback(const rtabmap_ros::msg::Goal::SharedPtr msg)
 {
 	if(msg->node_id == 0 && msg->node_label.empty())
 	{
-		NODELET_ERROR("Node id or label should be set!");
-		if(goalReachedPub_.getNumSubscribers())
+		RCLCPP_ERROR(this->get_logger(), "Node id or label should be set!");
+		if(goalReachedPub_->get_subscription_count())
 		{
-			std_msgs::Bool result;
+			std_msgs::msg::Bool result;
 			result.data = false;
-			goalReachedPub_.publish(result);
+			goalReachedPub_->publish(result);
 		}
 		return;
 	}
 	goalCommonCallback(msg->node_id, msg->node_label, msg->frame_id, Transform(), msg->header.stamp);
 }
 
-bool CoreWrapper::updateRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+void CoreWrapper::resetRtabmapCallback(
+		const std::shared_ptr<rmw_request_id_t>,
+		const std::shared_ptr<std_srvs::srv::Empty::Request>,
+		std::shared_ptr<std_srvs::srv::Empty::Response>)
 {
-	ros::NodeHandle nh;
-	for(rtabmap::ParametersMap::iterator iter=parameters_.begin(); iter!=parameters_.end(); ++iter)
-	{
-		std::string vStr;
-		bool vBool;
-		int vInt;
-		double vDouble;
-		if(nh.getParam(iter->first, vStr))
-		{
-			NODELET_INFO("Setting RTAB-Map parameter \"%s\"=\"%s\"", iter->first.c_str(), vStr.c_str());
-			iter->second = vStr;
-		}
-		else if(nh.getParam(iter->first, vBool))
-		{
-			NODELET_INFO("Setting RTAB-Map parameter \"%s\"=\"%s\"", iter->first.c_str(), uBool2Str(vBool).c_str());
-			iter->second = uBool2Str(vBool);
-		}
-		else if(nh.getParam(iter->first, vInt))
-		{
-			NODELET_INFO("Setting RTAB-Map parameter \"%s\"=\"%s\"", iter->first.c_str(), uNumber2Str(vInt).c_str());
-			iter->second = uNumber2Str(vInt).c_str();
-		}
-		else if(nh.getParam(iter->first, vDouble))
-		{
-			NODELET_INFO("Setting RTAB-Map parameter \"%s\"=\"%s\"", iter->first.c_str(), uNumber2Str(vDouble).c_str());
-			iter->second = uNumber2Str(vDouble).c_str();
-		}
-	}
-	NODELET_INFO("rtabmap: Updating parameters");
-	if(parameters_.find(Parameters::kRtabmapDetectionRate()) != parameters_.end())
-	{
-		rate_ = uStr2Float(parameters_.at(Parameters::kRtabmapDetectionRate()));
-		NODELET_INFO("RTAB-Map rate detection = %f Hz", rate_);
-	}
-	rtabmap_.parseParameters(parameters_);
-	mapsManager_.setParameters(parameters_);
-	return true;
-}
-
-bool CoreWrapper::resetRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
-{
-	NODELET_INFO("rtabmap: Reset");
+	RCLCPP_INFO(this->get_logger(), "rtabmap: Reset");
 	rtabmap_.resetMemory();
 	covariance_ = cv::Mat();
 	lastPose_.setIdentity();
@@ -2481,8 +2399,8 @@ bool CoreWrapper::resetRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empt
 	goalFrameId_.clear();
 	latestNodeWasReached_ = false;
 	mapsManager_.clear();
-	previousStamp_ = ros::Time(0);
-	globalPose_.header.stamp = ros::Time(0);
+	previousStamp_ = rclcpp::Time(0);
+	globalPose_.header.stamp = rclcpp::Time(0);
 	gps_ = rtabmap::GPS();
 	tags_.clear();
 	userDataMutex_.lock();
@@ -2490,53 +2408,59 @@ bool CoreWrapper::resetRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empt
 	userDataMutex_.unlock();
 	imus_.clear();
 	interOdoms_.clear();
-	return true;
 }
 
-bool CoreWrapper::pauseRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+void CoreWrapper::pauseRtabmapCallback(
+		const std::shared_ptr<rmw_request_id_t>,
+		const std::shared_ptr<std_srvs::srv::Empty::Request>,
+		std::shared_ptr<std_srvs::srv::Empty::Response>)
 {
 	if(paused_)
 	{
-		NODELET_WARN("rtabmap: Already paused!");
+		RCLCPP_WARN(this->get_logger(), "rtabmap: Already paused!");
 	}
 	else
 	{
 		paused_ = true;
-		NODELET_INFO("rtabmap: paused!");
-		ros::NodeHandle nh;
-		nh.setParam("is_rtabmap_paused", true);
+		RCLCPP_INFO(this->get_logger(), "rtabmap: paused!");
+		set_parameter(rclcpp::Parameter("is_rtabmap_paused", true));
 	}
-	return true;
 }
 
-bool CoreWrapper::resumeRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+void CoreWrapper::resumeRtabmapCallback(
+		const std::shared_ptr<rmw_request_id_t>,
+		const std::shared_ptr<std_srvs::srv::Empty::Request>,
+		std::shared_ptr<std_srvs::srv::Empty::Response>)
 {
 	if(!paused_)
 	{
-		NODELET_WARN("rtabmap: Already running!");
+		RCLCPP_WARN(this->get_logger(), "rtabmap: Already running!");
 	}
 	else
 	{
 		paused_ = false;
-		NODELET_INFO("rtabmap: resumed!");
-		ros::NodeHandle nh;
-		nh.setParam("is_rtabmap_paused", false);
+		RCLCPP_INFO(this->get_logger(), "rtabmap: resumed!");
+		set_parameter(rclcpp::Parameter("is_rtabmap_paused", false));
 	}
-	return true;
 }
 
-bool CoreWrapper::triggerNewMapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+void CoreWrapper::triggerNewMapCallback(
+		const std::shared_ptr<rmw_request_id_t>,
+		const std::shared_ptr<std_srvs::srv::Empty::Request>,
+		std::shared_ptr<std_srvs::srv::Empty::Response>)
 {
-	NODELET_INFO("rtabmap: Trigger new map");
+	RCLCPP_INFO(this->get_logger(), "rtabmap: Trigger new map");
 	rtabmap_.triggerNewMap();
-	return true;
 }
 
-bool CoreWrapper::backupDatabaseCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+void CoreWrapper::backupDatabaseCallback(
+		const std::shared_ptr<rmw_request_id_t>,
+		const std::shared_ptr<std_srvs::srv::Empty::Request>,
+		std::shared_ptr<std_srvs::srv::Empty::Response>)
 {
-	NODELET_INFO("Backup: Saving memory...");
+	RCLCPP_INFO(this->get_logger(), "Backup: Saving memory...");
 	rtabmap_.close();
-	NODELET_INFO("Backup: Saving memory... done!");
+	RCLCPP_INFO(this->get_logger(), "Backup: Saving memory... done!");
 
 	covariance_ = cv::Mat();
 	lastPose_.setIdentity();
@@ -2547,85 +2471,96 @@ bool CoreWrapper::backupDatabaseCallback(std_srvs::Empty::Request&, std_srvs::Em
 	userDataMutex_.lock();
 	userData_ = cv::Mat();
 	userDataMutex_.unlock();
-	globalPose_.header.stamp = ros::Time(0);
+	globalPose_.header.stamp = rclcpp::Time(0);
 	gps_ = rtabmap::GPS();
 	tags_.clear();
 
-	NODELET_INFO("Backup: Saving \"%s\" to \"%s\"...", databasePath_.c_str(), (databasePath_+".back").c_str());
+	RCLCPP_INFO(this->get_logger(), "Backup: Saving \"%s\" to \"%s\"...", databasePath_.c_str(), (databasePath_+".back").c_str());
 	UFile::copy(databasePath_, databasePath_+".back");
-	NODELET_INFO("Backup: Saving \"%s\" to \"%s\"... done!", databasePath_.c_str(), (databasePath_+".back").c_str());
+	RCLCPP_INFO(this->get_logger(), "Backup: Saving \"%s\" to \"%s\"... done!", databasePath_.c_str(), (databasePath_+".back").c_str());
 
-	NODELET_INFO("Backup: Reloading memory...");
+	RCLCPP_INFO(this->get_logger(), "Backup: Reloading memory...");
 	rtabmap_.init(parameters_, databasePath_);
-	NODELET_INFO("Backup: Reloading memory... done!");
-
-	return true;
+	RCLCPP_INFO(this->get_logger(), "Backup: Reloading memory... done!");
 }
 
-bool CoreWrapper::setModeLocalizationCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+void CoreWrapper::setModeLocalizationCallback(
+		const std::shared_ptr<rmw_request_id_t>,
+		const std::shared_ptr<std_srvs::srv::Empty::Request>,
+		std::shared_ptr<std_srvs::srv::Empty::Response>)
 {
-	NODELET_INFO("rtabmap: Set localization mode");
+	RCLCPP_INFO(this->get_logger(), "rtabmap: Set localization mode");
 	rtabmap::ParametersMap parameters;
 	parameters.insert(rtabmap::ParametersPair(rtabmap::Parameters::kMemIncrementalMemory(), "false"));
-	ros::NodeHandle & nh = getNodeHandle();
-	nh.setParam(rtabmap::Parameters::kMemIncrementalMemory(), "false");
+	set_parameter(rclcpp::Parameter(rtabmap::Parameters::kMemIncrementalMemory(), "false"));
 	rtabmap_.parseParameters(parameters);
-	return true;
 }
 
-bool CoreWrapper::setModeMappingCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+void CoreWrapper::setModeMappingCallback(
+		const std::shared_ptr<rmw_request_id_t>,
+		const std::shared_ptr<std_srvs::srv::Empty::Request>,
+		std::shared_ptr<std_srvs::srv::Empty::Response>)
 {
-	NODELET_INFO("rtabmap: Set mapping mode");
+	RCLCPP_INFO(this->get_logger(), "rtabmap: Set mapping mode");
 	rtabmap::ParametersMap parameters;
 	parameters.insert(rtabmap::ParametersPair(rtabmap::Parameters::kMemIncrementalMemory(), "true"));
-	ros::NodeHandle & nh = getNodeHandle();
-	nh.setParam(rtabmap::Parameters::kMemIncrementalMemory(), "true");
+	set_parameter(rclcpp::Parameter(rtabmap::Parameters::kMemIncrementalMemory(), "true"));
 	rtabmap_.parseParameters(parameters);
-	return true;
 }
 
-bool CoreWrapper::setLogDebug(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+void CoreWrapper::setLogDebug(
+		const std::shared_ptr<rmw_request_id_t>,
+		const std::shared_ptr<std_srvs::srv::Empty::Request>,
+		std::shared_ptr<std_srvs::srv::Empty::Response>)
 {
-	NODELET_INFO("rtabmap: Set log level to Debug");
+	RCLCPP_INFO(this->get_logger(), "rtabmap: Set log level to Debug");
 	ULogger::setLevel(ULogger::kDebug);
-	return true;
 }
-bool CoreWrapper::setLogInfo(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+void CoreWrapper::setLogInfo(
+		const std::shared_ptr<rmw_request_id_t>,
+		const std::shared_ptr<std_srvs::srv::Empty::Request>,
+		std::shared_ptr<std_srvs::srv::Empty::Response>)
 {
-	NODELET_INFO("rtabmap: Set log level to Info");
+	RCLCPP_INFO(this->get_logger(), "rtabmap: Set log level to Info");
 	ULogger::setLevel(ULogger::kInfo);
-	return true;
 }
-bool CoreWrapper::setLogWarn(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+void CoreWrapper::setLogWarn(
+		const std::shared_ptr<rmw_request_id_t>,
+		const std::shared_ptr<std_srvs::srv::Empty::Request>,
+		std::shared_ptr<std_srvs::srv::Empty::Response>)
 {
-	NODELET_INFO("rtabmap: Set log level to Warning");
+	RCLCPP_INFO(this->get_logger(), "rtabmap: Set log level to Warning");
 	ULogger::setLevel(ULogger::kWarning);
-	return true;
 }
-bool CoreWrapper::setLogError(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+void CoreWrapper::setLogError(
+		const std::shared_ptr<rmw_request_id_t>,
+		const std::shared_ptr<std_srvs::srv::Empty::Request>,
+		std::shared_ptr<std_srvs::srv::Empty::Response>)
 {
-	NODELET_INFO("rtabmap: Set log level to Error");
+	RCLCPP_INFO(this->get_logger(), "rtabmap: Set log level to Error");
 	ULogger::setLevel(ULogger::kError);
-	return true;
 }
 
-bool CoreWrapper::getMapDataCallback(rtabmap_ros::GetMap::Request& req, rtabmap_ros::GetMap::Response& res)
+void CoreWrapper::getMapDataCallback(
+		const std::shared_ptr<rmw_request_id_t>,
+		const std::shared_ptr<rtabmap_ros::srv::GetMap::Request> req,
+		std::shared_ptr<rtabmap_ros::srv::GetMap::Response> res)
 {
-	NODELET_INFO("rtabmap: Getting map (global=%s optimized=%s graphOnly=%s)...",
-			req.global?"true":"false",
-			req.optimized?"true":"false",
-			req.graphOnly?"true":"false");
+	RCLCPP_INFO(this->get_logger(), "rtabmap: Getting map (global=%s optimized=%s graphOnly=%s)...",
+			req->global?"true":"false",
+			req->optimized?"true":"false",
+			req->graph_only?"true":"false");
 	std::map<int, Signature> signatures;
 	std::map<int, Transform> poses;
 	std::multimap<int, rtabmap::Link> constraints;
 
-	if(req.graphOnly)
+	if(req->graph_only)
 	{
 		rtabmap_.getGraph(
 				poses,
 				constraints,
-				req.optimized,
-				req.global,
+				req->optimized,
+				req->global,
 				&signatures);
 	}
 	else
@@ -2634,8 +2569,8 @@ bool CoreWrapper::getMapDataCallback(rtabmap_ros::GetMap::Request& req, rtabmap_
 				signatures,
 				poses,
 				constraints,
-				req.optimized,
-				req.global);
+				req->optimized,
+				req->global);
 	}
 
 	//RGB-D SLAM data
@@ -2643,39 +2578,16 @@ bool CoreWrapper::getMapDataCallback(rtabmap_ros::GetMap::Request& req, rtabmap_
 		constraints,
 		signatures,
 		mapToOdom_,
-		res.data);
+		res->data);
 
-	res.data.header.stamp = ros::Time::now();
-	res.data.header.frame_id = mapFrameId_;
-
-	return true;
+	res->data.header.stamp = now();
+	res->data.header.frame_id = mapFrameId_;
 }
 
-bool CoreWrapper::getProjMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::GetMap::Response &res)
-{
-	if(parameters_.find(Parameters::kGridFromDepth()) != parameters_.end() &&
-		!uStr2Bool(parameters_.at(Parameters::kGridFromDepth())))
-	{
-		NODELET_WARN("/get_proj_map service is deprecated! Call /get_grid_map service "
-					"instead with <param name=\"%s\" type=\"string\" value=\"true\"/>. "
-					"Do \"$ rosrun rtabmap_ros rtabmap --params | grep Grid\" to see "
-					"all occupancy grid parameters.",
-					Parameters::kGridFromDepth().c_str());
-	}
-	else
-	{
-		NODELET_WARN("/get_proj_map service is deprecated! Call /get_grid_map service instead.");
-	}
-	return getGridMapCallback(req, res);
-}
-
-bool CoreWrapper::getGridMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::GetMap::Response &res)
-{
-	NODELET_WARN("/get_grid_map service is deprecated! Call /get_map service instead.");
-	return getMapCallback(req, res);
-}
-
-bool CoreWrapper::getMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::GetMap::Response &res)
+void CoreWrapper::getMapCallback(
+		const std::shared_ptr<rmw_request_id_t>,
+		const std::shared_ptr<nav_msgs::srv::GetMap::Request>,
+		std::shared_ptr<nav_msgs::srv::GetMap::Response> res)
 {
 	// create the grid map
 	float xMin=0.0f, yMin=0.0f, gridCellSize = 0.05f;
@@ -2684,31 +2596,32 @@ bool CoreWrapper::getMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::GetM
 	if(!pixels.empty())
 	{
 		//init
-		res.map.info.resolution = gridCellSize;
-		res.map.info.origin.position.x = 0.0;
-		res.map.info.origin.position.y = 0.0;
-		res.map.info.origin.position.z = 0.0;
-		res.map.info.origin.orientation.x = 0.0;
-		res.map.info.origin.orientation.y = 0.0;
-		res.map.info.origin.orientation.z = 0.0;
-		res.map.info.origin.orientation.w = 1.0;
+		res->map.info.resolution = gridCellSize;
+		res->map.info.origin.position.x = 0.0;
+		res->map.info.origin.position.y = 0.0;
+		res->map.info.origin.position.z = 0.0;
+		res->map.info.origin.orientation.x = 0.0;
+		res->map.info.origin.orientation.y = 0.0;
+		res->map.info.origin.orientation.z = 0.0;
+		res->map.info.origin.orientation.w = 1.0;
 
-		res.map.info.width = pixels.cols;
-		res.map.info.height = pixels.rows;
-		res.map.info.origin.position.x = xMin;
-		res.map.info.origin.position.y = yMin;
-		res.map.data.resize(res.map.info.width * res.map.info.height);
+		res->map.info.width = pixels.cols;
+		res->map.info.height = pixels.rows;
+		res->map.info.origin.position.x = xMin;
+		res->map.info.origin.position.y = yMin;
+		res->map.data.resize(res->map.info.width * res->map.info.height);
 
-		memcpy(res.map.data.data(), pixels.data, res.map.info.width * res.map.info.height);
+		memcpy(res->map.data.data(), pixels.data, res->map.info.width * res->map.info.height);
 
-		res.map.header.frame_id = mapFrameId_;
-		res.map.header.stamp = ros::Time::now();
-		return true;
+		res->map.header.frame_id = mapFrameId_;
+		res->map.header.stamp = now();
 	}
-	return false;
 }
 
-bool CoreWrapper::getProbMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::GetMap::Response &res)
+void CoreWrapper::getProbMapCallback(
+		const std::shared_ptr<rmw_request_id_t>,
+		const std::shared_ptr<nav_msgs::srv::GetMap::Request>,
+		std::shared_ptr<nav_msgs::srv::GetMap::Response> res)
 {
 	// create the grid map
 	float xMin=0.0f, yMin=0.0f, gridCellSize = 0.05f;
@@ -2717,49 +2630,50 @@ bool CoreWrapper::getProbMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::
 	if(!pixels.empty())
 	{
 		//init
-		res.map.info.resolution = gridCellSize;
-		res.map.info.origin.position.x = 0.0;
-		res.map.info.origin.position.y = 0.0;
-		res.map.info.origin.position.z = 0.0;
-		res.map.info.origin.orientation.x = 0.0;
-		res.map.info.origin.orientation.y = 0.0;
-		res.map.info.origin.orientation.z = 0.0;
-		res.map.info.origin.orientation.w = 1.0;
+		res->map.info.resolution = gridCellSize;
+		res->map.info.origin.position.x = 0.0;
+		res->map.info.origin.position.y = 0.0;
+		res->map.info.origin.position.z = 0.0;
+		res->map.info.origin.orientation.x = 0.0;
+		res->map.info.origin.orientation.y = 0.0;
+		res->map.info.origin.orientation.z = 0.0;
+		res->map.info.origin.orientation.w = 1.0;
 
-		res.map.info.width = pixels.cols;
-		res.map.info.height = pixels.rows;
-		res.map.info.origin.position.x = xMin;
-		res.map.info.origin.position.y = yMin;
-		res.map.data.resize(res.map.info.width * res.map.info.height);
+		res->map.info.width = pixels.cols;
+		res->map.info.height = pixels.rows;
+		res->map.info.origin.position.x = xMin;
+		res->map.info.origin.position.y = yMin;
+		res->map.data.resize(res->map.info.width * res->map.info.height);
 
-		memcpy(res.map.data.data(), pixels.data, res.map.info.width * res.map.info.height);
+		memcpy(res->map.data.data(), pixels.data, res->map.info.width * res->map.info.height);
 
-		res.map.header.frame_id = mapFrameId_;
-		res.map.header.stamp = ros::Time::now();
-		return true;
+		res->map.header.frame_id = mapFrameId_;
+		res->map.header.stamp = now();
 	}
-	return false;
 }
 
-bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtabmap_ros::PublishMap::Response& res)
+void CoreWrapper::publishMapCallback(
+		const std::shared_ptr<rmw_request_id_t>,
+		const std::shared_ptr<rtabmap_ros::srv::PublishMap::Request> req,
+		std::shared_ptr<rtabmap_ros::srv::PublishMap::Response>)
 {
-	NODELET_INFO("rtabmap: Publishing map...");
+	RCLCPP_INFO(this->get_logger(), "rtabmap: Publishing map...");
 
-	if(mapDataPub_.getNumSubscribers() ||
-	   (!req.graphOnly && mapsManager_.hasSubscribers()) ||
-	   (req.graphOnly && (labelsPub_.getNumSubscribers() || mapGraphPub_.getNumSubscribers() || mapPathPub_.getNumSubscribers())))
+	if(mapDataPub_->get_subscription_count() ||
+	   (!req->graph_only && mapsManager_.hasSubscribers()) ||
+	   (req->graph_only && (labelsPub_->get_subscription_count() || mapGraphPub_->get_subscription_count() || mapPathPub_->get_subscription_count())))
 	{
 		std::map<int, Transform> poses;
 		std::multimap<int, rtabmap::Link> constraints;
 		std::map<int, Signature > signatures;
 
-		if(req.graphOnly)
+		if(req->graph_only)
 		{
 			rtabmap_.getGraph(
 					poses,
 					constraints,
-					req.optimized,
-					req.global,
+					req->optimized,
+					req->global,
 					&signatures);
 		}
 		else
@@ -2768,15 +2682,15 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 					signatures,
 					poses,
 					constraints,
-					req.optimized,
-					req.global);
+					req->optimized,
+					req->global);
 		}
 
-		ros::Time now = ros::Time::now();
-		if(mapDataPub_.getNumSubscribers())
+		rclcpp::Time stampNow = now();
+		if(mapDataPub_->get_subscription_count())
 		{
-			rtabmap_ros::MapDataPtr msg(new rtabmap_ros::MapData);
-			msg->header.stamp = now;
+			rtabmap_ros::msg::MapData::UniquePtr msg(new rtabmap_ros::msg::MapData);
+			msg->header.stamp = stampNow;
 			msg->header.frame_id = mapFrameId_;
 
 			rtabmap_ros::mapDataToROS(poses,
@@ -2785,13 +2699,13 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 				mapToOdom_,
 				*msg);
 
-			mapDataPub_.publish(msg);
+			mapDataPub_->publish(std::move(msg));
 		}
 
-		if(mapGraphPub_.getNumSubscribers())
+		if(mapGraphPub_->get_subscription_count())
 		{
-			rtabmap_ros::MapGraphPtr msg(new rtabmap_ros::MapGraph);
-			msg->header.stamp = now;
+			rtabmap_ros::msg::MapGraph::UniquePtr msg(new rtabmap_ros::msg::MapGraph);
+			msg->header.stamp = stampNow;
 			msg->header.frame_id = mapFrameId_;
 
 			rtabmap_ros::mapGraphToROS(poses,
@@ -2799,31 +2713,31 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 				mapToOdom_,
 				*msg);
 
-			mapGraphPub_.publish(msg);
+			mapGraphPub_->publish(std::move(msg));
 		}
 
-		bool pubLabels = labelsPub_.getNumSubscribers();
-		visualization_msgs::MarkerArray markers;
-		if((landmarksPub_.getNumSubscribers() || pubLabels) && !poses.empty() && poses.begin()->first < 0)
+		bool pubLabels = labelsPub_->get_subscription_count();
+		visualization_msgs::msg::MarkerArray markers;
+		if((landmarksPub_->get_subscription_count() || pubLabels) && !poses.empty() && poses.begin()->first < 0)
 		{
-			geometry_msgs::PoseArrayPtr msg(new geometry_msgs::PoseArray);
-			msg->header.stamp = now;
+			geometry_msgs::msg::PoseArray::UniquePtr msg(new geometry_msgs::msg::PoseArray);
+			msg->header.stamp = stampNow;
 			msg->header.frame_id = mapFrameId_;
 			for(std::map<int, Transform>::const_iterator iter=poses.begin(); iter!=poses.end() && iter->first<0; ++iter)
 			{
-				geometry_msgs::Pose p;
+				geometry_msgs::msg::Pose p;
 				rtabmap_ros::transformToPoseMsg(iter->second, p);
 				msg->poses.push_back(p);
 
 				if(pubLabels)
 				{
 					// Add landmark ids
-					visualization_msgs::Marker marker;
+					visualization_msgs::msg::Marker marker;
 					marker.header.frame_id = mapFrameId_;
-					marker.header.stamp = now;
+					marker.header.stamp = stampNow;
 					marker.ns = "landmarks";
 					marker.id = iter->first;
-					marker.action = visualization_msgs::Marker::ADD;
+					marker.action = visualization_msgs::msg::Marker::ADD;
 					marker.pose.position.x = iter->second.x();
 					marker.pose.position.y = iter->second.y();
 					marker.pose.position.z = iter->second.z();
@@ -2838,19 +2752,19 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 					marker.color.r = 1.0;
 					marker.color.g = 1.0;
 					marker.color.b = 0.0;
-					marker.lifetime = ros::Duration(2.0f/rate_);
+					marker.lifetime = rclcpp::Duration(2.0f/rate_);
 
-					marker.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
+					marker.type = visualization_msgs::msg::Marker::TEXT_VIEW_FACING;
 					marker.text = uNumber2Str(iter->first);
 
 					markers.markers.push_back(marker);
 				}
 			}
 
-			landmarksPub_.publish(msg);
+			landmarksPub_->publish(std::move(msg));
 		}
 
-		if(!req.graphOnly && mapsManager_.hasSubscribers())
+		if(!req->graph_only && mapsManager_.hasSubscribers())
 		{
 			std::map<int, Transform> filteredPoses(poses.lower_bound(1), poses.end());
 			if(maxMappingNodes_ > 0 && filteredPoses.size()>1)
@@ -2879,15 +2793,15 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 			{
 				filteredPoses = mapsManager_.getFilteredPoses(filteredPoses);
 			}
-			mapsManager_.publishMaps(filteredPoses, now, mapFrameId_);
+			mapsManager_.publishMaps(filteredPoses, stampNow, mapFrameId_);
 		}
 
-		bool pubPath = mapPathPub_.getNumSubscribers();
+		bool pubPath = mapPathPub_->get_subscription_count();
 		if(pubLabels || pubPath)
 		{
 			if(poses.size() && signatures.size())
 			{
-				nav_msgs::Path path;
+				nav_msgs::msg::Path path;
 				if(pubPath)
 				{
 					path.poses.resize(poses.size());
@@ -2905,12 +2819,12 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 							// Add labels
 							if(!iter->second.getLabel().empty())
 							{
-								visualization_msgs::Marker marker;
+								visualization_msgs::msg::Marker marker;
 								marker.header.frame_id = mapFrameId_;
-								marker.header.stamp = now;
+								marker.header.stamp = stampNow;
 								marker.ns = "labels";
 								marker.id = iter->first;
-								marker.action = visualization_msgs::Marker::ADD;
+								marker.action = visualization_msgs::msg::Marker::ADD;
 								marker.pose.position.x = poseIter->second.x();
 								marker.pose.position.y = poseIter->second.y();
 								marker.pose.position.z = poseIter->second.z();
@@ -2926,18 +2840,18 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 								marker.color.g = 0.0;
 								marker.color.b = 0.0;
 
-								marker.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
+								marker.type = visualization_msgs::msg::Marker::TEXT_VIEW_FACING;
 								marker.text = iter->second.getLabel();
 
 								markers.markers.push_back(marker);
 							}
 							// Add node ids
-							visualization_msgs::Marker marker;
+							visualization_msgs::msg::Marker marker;
 							marker.header.frame_id = mapFrameId_;
-							marker.header.stamp = now;
+							marker.header.stamp = stampNow;
 							marker.ns = "ids";
 							marker.id = iter->first;
-							marker.action = visualization_msgs::Marker::ADD;
+							marker.action = visualization_msgs::msg::Marker::ADD;
 							marker.pose.position.x = poseIter->second.x();
 							marker.pose.position.y = poseIter->second.y();
 							marker.pose.position.z = poseIter->second.z();
@@ -2952,9 +2866,9 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 							marker.color.r = 1.0;
 							marker.color.g = 1.0;
 							marker.color.b = 1.0;
-							marker.lifetime = ros::Duration(2.0f/rate_);
+							marker.lifetime = rclcpp::Duration(2.0f/rate_);
 
-							marker.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
+							marker.type = visualization_msgs::msg::Marker::TEXT_VIEW_FACING;
 							marker.text = uNumber2Str(iter->first);
 
 							markers.markers.push_back(marker);
@@ -2963,7 +2877,7 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 						{
 							rtabmap_ros::transformToPoseMsg(poseIter->second, path.poses.at(oi).pose);
 							path.poses.at(oi).header.frame_id = mapFrameId_;
-							path.poses.at(oi).header.stamp = ros::Time(iter->second.getStamp());
+							path.poses.at(oi).header.stamp = rclcpp::Time(iter->second.getStamp());
 							++oi;
 						}
 					}
@@ -2971,14 +2885,14 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 
 				if(pubLabels && markers.markers.size())
 				{
-					labelsPub_.publish(markers);
+					labelsPub_->publish(markers);
 				}
 				if(pubPath && oi)
 				{
 					path.header.frame_id = mapFrameId_;
-					path.header.stamp = now;
+					path.header.stamp = stampNow;
 					path.poses.resize(oi);
-					mapPathPub_.publish(path);
+					mapPathPub_->publish(path);
 				}
 			}
 		}
@@ -2987,26 +2901,27 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 	{
 		UWARN("No subscribers, don't need to publish!");
 	}
-
-	return true;
 }
 
-bool CoreWrapper::getPlanCallback(nav_msgs::GetPlan::Request &req, nav_msgs::GetPlan::Response &res)
+void CoreWrapper::getPlanCallback(
+		const std::shared_ptr<rmw_request_id_t>,
+		const std::shared_ptr<nav_msgs::srv::GetPlan::Request> req,
+		std::shared_ptr<nav_msgs::srv::GetPlan::Response> res)
 {
-	Transform pose = rtabmap_ros::transformFromPoseMsg(req.goal.pose);
+	Transform pose = rtabmap_ros::transformFromPoseMsg(req->goal.pose);
 	UTimer timer;
 	if(!pose.isNull())
 	{
 		// transform goal in /map frame
 		Transform coordinateTransform = Transform::getIdentity();
-		if(mapFrameId_.compare(req.goal.header.frame_id) != 0)
+		if(mapFrameId_.compare(req->goal.header.frame_id) != 0)
 		{
-			coordinateTransform = rtabmap_ros::getTransform(mapFrameId_, req.goal.header.frame_id, req.goal.header.stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+			coordinateTransform = rtabmap_ros::getTransform(mapFrameId_, req->goal.header.frame_id, rclcpp::Time(req->goal.header.stamp.sec, req->goal.header.stamp.nanosec), *tfBuffer_, waitForTransform_);
 			if(coordinateTransform.isNull())
 			{
-				NODELET_ERROR("Cannot transform goal pose from \"%s\" frame to \"%s\" frame!",
-						req.goal.header.frame_id.c_str(), mapFrameId_.c_str());
-				return false;
+				RCLCPP_ERROR(this->get_logger(), "Cannot transform goal pose from \"%s\" frame to \"%s\" frame!",
+						req->goal.header.frame_id.c_str(), mapFrameId_.c_str());
+				return;
 			}
 			pose = coordinateTransform * pose;
 		}
@@ -3014,36 +2929,36 @@ bool CoreWrapper::getPlanCallback(nav_msgs::GetPlan::Request &req, nav_msgs::Get
 		// To convert back the poses in goal frame
 		coordinateTransform = coordinateTransform.inverse();
 
-		if(rtabmap_.computePath(pose, req.tolerance))
+		if(rtabmap_.computePath(pose, req->tolerance))
 		{
-			NODELET_INFO("Planning: Time computing path = %f s", timer.ticks());
+			RCLCPP_INFO(this->get_logger(), "Planning: Time computing path = %f s", timer.ticks());
 			const std::vector<std::pair<int, Transform> > & poses = rtabmap_.getPath();
-			res.plan.header.frame_id = req.goal.header.frame_id;
-			res.plan.header.stamp = req.goal.header.stamp;
+			res->plan.header.frame_id = req->goal.header.frame_id;
+			res->plan.header.stamp = req->goal.header.stamp;
 			if(poses.size() == 0)
 			{
-				NODELET_WARN("Planning: Goal already reached (RGBD/GoalReachedRadius=%fm).",
+				RCLCPP_WARN(this->get_logger(), "Planning: Goal already reached (RGBD/GoalReachedRadius=%fm).",
 						rtabmap_.getGoalReachedRadius());
 				// just set the goal directly
-				res.plan.poses.resize(1);
-				rtabmap_ros::transformToPoseMsg(coordinateTransform*pose, res.plan.poses[0].pose);
+				res->plan.poses.resize(1);
+				rtabmap_ros::transformToPoseMsg(coordinateTransform*pose, res->plan.poses[0].pose);
 			}
 			else
 			{
-				res.plan.poses.resize(poses.size());
+				res->plan.poses.resize(poses.size());
 				int oi = 0;
 				for(std::vector<std::pair<int, Transform> >::const_iterator iter=poses.begin(); iter!=poses.end(); ++iter)
 				{
-					res.plan.poses[oi].header = res.plan.header;
-					rtabmap_ros::transformToPoseMsg(coordinateTransform*iter->second, res.plan.poses[oi].pose);
+					res->plan.poses[oi].header = res->plan.header;
+					rtabmap_ros::transformToPoseMsg(coordinateTransform*iter->second, res->plan.poses[oi].pose);
 					++oi;
 				}
 				if(!rtabmap_.getPathTransformToGoal().isIdentity())
 				{
-					res.plan.poses.resize(res.plan.poses.size()+1);
-					res.plan.poses[res.plan.poses.size()-1].header = res.plan.header;
+					res->plan.poses.resize(res->plan.poses.size()+1);
+					res->plan.poses[res->plan.poses.size()-1].header = res->plan.header;
 					Transform p = rtabmap_.getPath().back().second*rtabmap_.getPathTransformToGoal();
-					rtabmap_ros::transformToPoseMsg(coordinateTransform*p, res.plan.poses[res.plan.poses.size()-1].pose);
+					rtabmap_ros::transformToPoseMsg(coordinateTransform*p, res->plan.poses[res->plan.poses.size()-1].pose);
 				}
 
 				// Just output the path on screen
@@ -3056,30 +2971,32 @@ bool CoreWrapper::getPlanCallback(nav_msgs::GetPlan::Request &req, nav_msgs::Get
 					}
 					stream << iter->first;
 				}
-				NODELET_INFO("Planned path: [%s]", stream.str().c_str());
+				RCLCPP_INFO(this->get_logger(), "Planned path: [%s]", stream.str().c_str());
 			}
 		}
 		rtabmap_.clearPath(0);
 	}
-	return true;
 }
 
-bool CoreWrapper::getPlanNodesCallback(rtabmap_ros::GetPlan::Request &req, rtabmap_ros::GetPlan::Response &res)
+void CoreWrapper::getPlanNodesCallback(
+		const std::shared_ptr<rmw_request_id_t>,
+		const std::shared_ptr<rtabmap_ros::srv::GetPlan::Request> req,
+		std::shared_ptr<rtabmap_ros::srv::GetPlan::Response> res)
 {
-	Transform pose = rtabmap_ros::transformFromPoseMsg(req.goal.pose);
+	Transform pose = rtabmap_ros::transformFromPoseMsg(req->goal.pose);
 	UTimer timer;
-	if(req.goal_node > 0 || !pose.isNull())
+	if(req->goal_node > 0 || !pose.isNull())
 	{
 		Transform coordinateTransform = Transform::getIdentity();
 		// transform goal in /map frame
-		if(mapFrameId_.compare(req.goal.header.frame_id) != 0)
+		if(mapFrameId_.compare(req->goal.header.frame_id) != 0)
 		{
-			coordinateTransform = rtabmap_ros::getTransform(mapFrameId_, req.goal.header.frame_id, req.goal.header.stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+			coordinateTransform = rtabmap_ros::getTransform(mapFrameId_, req->goal.header.frame_id, req->goal.header.stamp, *tfBuffer_, waitForTransform_);
 			if(coordinateTransform.isNull())
 			{
-				NODELET_ERROR("Cannot transform goal pose from \"%s\" frame to \"%s\" frame!",
-						req.goal.header.frame_id.c_str(), mapFrameId_.c_str());
-				return false;
+				RCLCPP_ERROR(this->get_logger(), "Cannot transform goal pose from \"%s\" frame to \"%s\" frame!",
+						req->goal.header.frame_id.c_str(), mapFrameId_.c_str());
+				return;
 			}
 			if(!pose.isNull())
 			{
@@ -3090,44 +3007,51 @@ bool CoreWrapper::getPlanNodesCallback(rtabmap_ros::GetPlan::Request &req, rtabm
 		// To convert back the poses in goal frame
 		coordinateTransform = coordinateTransform.inverse();
 
-		if((req.goal_node > 0 && rtabmap_.computePath(req.goal_node, req.tolerance)) ||
-		   (req.goal_node <= 0 && rtabmap_.computePath(pose, req.tolerance)))
+		if((req->goal_node > 0 && rtabmap_.computePath(req->goal_node, req->tolerance)) ||
+		   (req->goal_node <= 0 && rtabmap_.computePath(pose, req->tolerance)))
 		{
-			NODELET_INFO("Planning: Time computing path = %f s", timer.ticks());
+			RCLCPP_INFO(this->get_logger(), "Planning: Time computing path = %f s", timer.ticks());
 			const std::vector<std::pair<int, Transform> > & poses = rtabmap_.getPath();
-			res.plan.header.frame_id = mapFrameId_;
-			res.plan.header.stamp = req.goal_node > 0?ros::Time::now():req.goal.header.stamp;
+			res->plan.header.frame_id = mapFrameId_;
+			if(req->goal_node > 0)
+			{
+				res->plan.header.stamp = now();
+			}
+			else
+			{
+				res->plan.header.stamp = req->goal.header.stamp;
+			}
 			if(poses.size() == 0)
 			{
-				NODELET_WARN("Planning: Goal already reached (RGBD/GoalReachedRadius=%fm).",
+				RCLCPP_WARN(this->get_logger(), "Planning: Goal already reached (RGBD/GoalReachedRadius=%fm).",
 						rtabmap_.getGoalReachedRadius());
 				if(!pose.isNull())
 				{
 					// just set the goal directly
-					res.plan.poses.resize(1);
-					res.plan.nodeIds.resize(1);
-					rtabmap_ros::transformToPoseMsg(coordinateTransform*pose, res.plan.poses[0]);
-					res.plan.nodeIds[0] = 0;
+					res->plan.poses.resize(1);
+					res->plan.node_ids.resize(1);
+					rtabmap_ros::transformToPoseMsg(coordinateTransform*pose, res->plan.poses[0]);
+					res->plan.node_ids[0] = 0;
 				}
 			}
 			else
 			{
-				res.plan.poses.resize(poses.size());
-				res.plan.nodeIds.resize(poses.size());
+				res->plan.poses.resize(poses.size());
+				res->plan.node_ids.resize(poses.size());
 				int oi = 0;
 				for(std::vector<std::pair<int, Transform> >::const_iterator iter=poses.begin(); iter!=poses.end(); ++iter)
 				{
-					rtabmap_ros::transformToPoseMsg(coordinateTransform*iter->second, res.plan.poses[oi]);
-					res.plan.nodeIds[oi] = iter->first;
+					rtabmap_ros::transformToPoseMsg(coordinateTransform*iter->second, res->plan.poses[oi]);
+					res->plan.node_ids[oi] = iter->first;
 					++oi;
 				}
 				if(!rtabmap_.getPathTransformToGoal().isIdentity())
 				{
-					res.plan.poses.resize(res.plan.poses.size()+1);
-					res.plan.nodeIds.resize(res.plan.nodeIds.size()+1);
+					res->plan.poses.resize(res->plan.poses.size()+1);
+					res->plan.node_ids.resize(res->plan.node_ids.size()+1);
 					Transform p = rtabmap_.getPath().back().second*rtabmap_.getPathTransformToGoal();
-					rtabmap_ros::transformToPoseMsg(coordinateTransform*p, res.plan.poses[res.plan.poses.size()-1]);
-					res.plan.nodeIds[res.plan.nodeIds.size()-1] = 0;
+					rtabmap_ros::transformToPoseMsg(coordinateTransform*p, res->plan.poses[res->plan.poses.size()-1]);
+					res->plan.node_ids[res->plan.node_ids.size()-1] = 0;
 				}
 
 				// Just output the path on screen
@@ -3140,113 +3064,121 @@ bool CoreWrapper::getPlanNodesCallback(rtabmap_ros::GetPlan::Request &req, rtabm
 					}
 					stream << iter->first;
 				}
-				NODELET_INFO("Planned path: [%s]", stream.str().c_str());
+				RCLCPP_INFO(this->get_logger(), "Planned path: [%s]", stream.str().c_str());
 			}
 		}
 		rtabmap_.clearPath(0);
 	}
-	return true;
 }
 
-bool CoreWrapper::setGoalCallback(rtabmap_ros::SetGoal::Request& req, rtabmap_ros::SetGoal::Response& res)
+void CoreWrapper::setGoalCallback(
+		const std::shared_ptr<rmw_request_id_t>,
+		const std::shared_ptr<rtabmap_ros::srv::SetGoal::Request> req,
+		std::shared_ptr<rtabmap_ros::srv::SetGoal::Response> res)
 {
 	double planningTime = 0.0;
-	goalCommonCallback(req.node_id, req.node_label, req.frame_id, Transform(), ros::Time::now(), &planningTime);
+	goalCommonCallback(req->node_id, req->node_label, req->frame_id, Transform(), now(), &planningTime);
 	const std::vector<std::pair<int, Transform> > & path = rtabmap_.getPath();
-	res.path_ids.resize(path.size());
-	res.path_poses.resize(path.size());
-	res.planning_time = planningTime;
+	res->path_ids.resize(path.size());
+	res->path_poses.resize(path.size());
+	res->planning_time = planningTime;
 	for(unsigned int i=0; i<path.size(); ++i)
 	{
-		res.path_ids[i] = path[i].first;
-		rtabmap_ros::transformToPoseMsg(path[i].second, res.path_poses[i]);
+		res->path_ids[i] = path[i].first;
+		rtabmap_ros::transformToPoseMsg(path[i].second, res->path_poses[i]);
 	}
-	return true;
 }
 
-bool CoreWrapper::cancelGoalCallback(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res)
+void CoreWrapper::cancelGoalCallback(
+		const std::shared_ptr<rmw_request_id_t>,
+		const std::shared_ptr<std_srvs::srv::Empty::Request>,
+		std::shared_ptr<std_srvs::srv::Empty::Response>)
 {
 	if(rtabmap_.getPath().size())
 	{
-		NODELET_WARN("Goal cancelled!");
+		RCLCPP_WARN(this->get_logger(), "Goal cancelled!");
 		rtabmap_.clearPath(0);
 		currentMetricGoal_.setNull();
 		lastPublishedMetricGoal_.setNull();
 		goalFrameId_.clear();
 		latestNodeWasReached_ = false;
-		if(goalReachedPub_.getNumSubscribers())
+		if(goalReachedPub_->get_subscription_count())
 		{
-			std_msgs::Bool result;
+			std_msgs::msg::Bool result;
 			result.data = false;
-			goalReachedPub_.publish(result);
+			goalReachedPub_->publish(result);
 		}
 	}
+#ifdef WITH_MOVE_BASE_MSGS
 	if(mbClient_ && mbClient_->isServerConnected())
 	{
 		mbClient_->cancelGoal();
 	}
-
-	return true;
+#endif
 }
 
-bool CoreWrapper::setLabelCallback(rtabmap_ros::SetLabel::Request& req, rtabmap_ros::SetLabel::Response& res)
+void CoreWrapper::setLabelCallback(
+		const std::shared_ptr<rmw_request_id_t>,
+		const std::shared_ptr<rtabmap_ros::srv::SetLabel::Request> req,
+		std::shared_ptr<rtabmap_ros::srv::SetLabel::Response>)
 {
-	if(rtabmap_.labelLocation(req.node_id, req.node_label))
+	if(rtabmap_.labelLocation(req->node_id, req->node_label))
 	{
-		if(req.node_id > 0)
+		if(req->node_id > 0)
 		{
-			NODELET_INFO("Set label \"%s\" to node %d", req.node_label.c_str(), req.node_id);
+			RCLCPP_INFO(this->get_logger(), "Set label \"%s\" to node %d", req->node_label.c_str(), req->node_id);
 		}
 		else
 		{
-			NODELET_INFO("Set label \"%s\" to last node", req.node_label.c_str());
+			RCLCPP_INFO(this->get_logger(), "Set label \"%s\" to last node", req->node_label.c_str());
 		}
 	}
 	else
 	{
-		if(req.node_id > 0)
+		if(req->node_id > 0)
 		{
-			NODELET_ERROR("Could not set label \"%s\" to node %d", req.node_label.c_str(), req.node_id);
+			RCLCPP_ERROR(this->get_logger(), "Could not set label \"%s\" to node %d", req->node_label.c_str(), req->node_id);
 		}
 		else
 		{
-			NODELET_ERROR("Could not set label \"%s\" to last node", req.node_label.c_str());
+			RCLCPP_ERROR(this->get_logger(), "Could not set label \"%s\" to last node", req->node_label.c_str());
 		}
 	}
-	return true;
 }
 
-bool CoreWrapper::listLabelsCallback(rtabmap_ros::ListLabels::Request& req, rtabmap_ros::ListLabels::Response& res)
+void CoreWrapper::listLabelsCallback(
+		const std::shared_ptr<rmw_request_id_t>,
+		const std::shared_ptr<rtabmap_ros::srv::ListLabels::Request>,
+		std::shared_ptr<rtabmap_ros::srv::ListLabels::Response> res)
 {
 	if(rtabmap_.getMemory())
 	{
 		std::map<int, std::string> labels = rtabmap_.getMemory()->getAllLabels();
-		res.ids = uKeys(labels);
-		res.labels = uValues(labels);
-		NODELET_INFO("List labels service: %d labels found.", (int)res.labels.size());
+		res->ids = uKeys(labels);
+		res->labels = uValues(labels);
+		RCLCPP_INFO(this->get_logger(), "List labels service: %d labels found.", (int)res->labels.size());
 	}
-	return true;
 }
 
-void CoreWrapper::publishStats(const ros::Time & stamp)
+void CoreWrapper::publishStats(const rclcpp::Time & stamp)
 {
 	UDEBUG("Publishing stats...");
 	const rtabmap::Statistics & stats = rtabmap_.getStatistics();
 
-	if(infoPub_.getNumSubscribers())
+	if(infoPub_->get_subscription_count())
 	{
-		//NODELET_INFO("Sending RtabmapInfo msg (last_id=%d)...", stat.refImageId());
-		rtabmap_ros::InfoPtr msg(new rtabmap_ros::Info);
+		//RCLCPP_INFO(this->get_logger(), "Sending RtabmapInfo msg (last_id=%d)...", stat.refImageId());
+		rtabmap_ros::msg::Info::UniquePtr msg(new rtabmap_ros::msg::Info);
 		msg->header.stamp = stamp;
 		msg->header.frame_id = mapFrameId_;
 
 		rtabmap_ros::infoToROS(stats, *msg);
-		infoPub_.publish(msg);
+		infoPub_->publish(std::move(msg));
 	}
 
-	if(mapDataPub_.getNumSubscribers())
+	if(mapDataPub_->get_subscription_count())
 	{
-		rtabmap_ros::MapDataPtr msg(new rtabmap_ros::MapData);
+		rtabmap_ros::msg::MapData::UniquePtr msg(new rtabmap_ros::msg::MapData);
 		msg->header.stamp = stamp;
 		msg->header.frame_id = mapFrameId_;
 
@@ -3262,12 +3194,12 @@ void CoreWrapper::publishStats(const ros::Time & stamp)
 			stats.mapCorrection(),
 			*msg);
 
-		mapDataPub_.publish(msg);
+		mapDataPub_->publish(std::move(msg));
 	}
 
-	if(mapGraphPub_.getNumSubscribers())
+	if(mapGraphPub_->get_subscription_count())
 	{
-		rtabmap_ros::MapGraphPtr msg(new rtabmap_ros::MapGraph);
+		rtabmap_ros::msg::MapGraph::UniquePtr msg(new rtabmap_ros::msg::MapGraph);
 		msg->header.stamp = stamp;
 		msg->header.frame_id = mapFrameId_;
 
@@ -3277,59 +3209,59 @@ void CoreWrapper::publishStats(const ros::Time & stamp)
 			stats.mapCorrection(),
 			*msg);
 
-		mapGraphPub_.publish(msg);
+		mapGraphPub_->publish(std::move(msg));
 	}
 
-	if(localGridObstacle_.getNumSubscribers() && !stats.getLastSignatureData().sensorData().gridObstacleCellsRaw().empty())
+	if(localGridObstacle_->get_subscription_count() && !stats.getLastSignatureData().sensorData().gridObstacleCellsRaw().empty())
 	{
 		pcl::PCLPointCloud2::Ptr cloud = rtabmap::util3d::laserScanToPointCloud2(LaserScan::backwardCompatibility(stats.getLastSignatureData().sensorData().gridObstacleCellsRaw()));
-		sensor_msgs::PointCloud2 msg;
-		pcl_conversions::moveFromPCL(*cloud, msg);
-		msg.header.stamp = stamp;
-		msg.header.frame_id = frameId_;
-		localGridObstacle_.publish(msg);
+		sensor_msgs::msg::PointCloud2::UniquePtr msg(new sensor_msgs::msg::PointCloud2);
+		pcl_conversions::moveFromPCL(*cloud, *msg);
+		msg->header.stamp = stamp;
+		msg->header.frame_id = frameId_;
+		localGridObstacle_->publish(std::move(msg));
 	}
-	if(localGridEmpty_.getNumSubscribers() && !stats.getLastSignatureData().sensorData().gridEmptyCellsRaw().empty())
+	if(localGridEmpty_->get_subscription_count() && !stats.getLastSignatureData().sensorData().gridEmptyCellsRaw().empty())
 	{
 		pcl::PCLPointCloud2::Ptr cloud = rtabmap::util3d::laserScanToPointCloud2(LaserScan::backwardCompatibility(stats.getLastSignatureData().sensorData().gridEmptyCellsRaw()));
-		sensor_msgs::PointCloud2 msg;
-		pcl_conversions::moveFromPCL(*cloud, msg);
-		msg.header.stamp = stamp;
-		msg.header.frame_id = frameId_;
-		localGridEmpty_.publish(msg);
+		sensor_msgs::msg::PointCloud2::UniquePtr msg(new sensor_msgs::msg::PointCloud2);
+		pcl_conversions::moveFromPCL(*cloud, *msg);
+		msg->header.stamp = stamp;
+		msg->header.frame_id = frameId_;
+		localGridEmpty_->publish(std::move(msg));
 	}
-	if(localGridGround_.getNumSubscribers() && !stats.getLastSignatureData().sensorData().gridGroundCellsRaw().empty())
+	if(localGridGround_->get_subscription_count() && !stats.getLastSignatureData().sensorData().gridGroundCellsRaw().empty())
 	{
 		pcl::PCLPointCloud2::Ptr cloud = rtabmap::util3d::laserScanToPointCloud2(LaserScan::backwardCompatibility(stats.getLastSignatureData().sensorData().gridGroundCellsRaw()));
-		sensor_msgs::PointCloud2 msg;
-		pcl_conversions::moveFromPCL(*cloud, msg);
-		msg.header.stamp = stamp;
-		msg.header.frame_id = frameId_;
-		localGridGround_.publish(msg);
+		sensor_msgs::msg::PointCloud2::UniquePtr msg(new sensor_msgs::msg::PointCloud2);
+		pcl_conversions::moveFromPCL(*cloud, *msg);
+		msg->header.stamp = stamp;
+		msg->header.frame_id = frameId_;
+		localGridGround_->publish(std::move(msg));
 	}
 
-	bool pubLabels = labelsPub_.getNumSubscribers();
-	visualization_msgs::MarkerArray markers;
-	if((landmarksPub_.getNumSubscribers() || pubLabels) && !stats.poses().empty() && stats.poses().begin()->first < 0)
+	bool pubLabels = labelsPub_->get_subscription_count();
+	visualization_msgs::msg::MarkerArray markers;
+	if((landmarksPub_->get_subscription_count() || pubLabels) && !stats.poses().empty() && stats.poses().begin()->first < 0)
 	{
-		geometry_msgs::PoseArrayPtr msg(new geometry_msgs::PoseArray);
+		geometry_msgs::msg::PoseArray::UniquePtr msg(new geometry_msgs::msg::PoseArray);
 		msg->header.stamp = stamp;
 		msg->header.frame_id = mapFrameId_;
 		for(std::map<int, Transform>::const_iterator iter=stats.poses().begin(); iter!=stats.poses().end() && iter->first<0; ++iter)
 		{
-			geometry_msgs::Pose p;
+			geometry_msgs::msg::Pose p;
 			rtabmap_ros::transformToPoseMsg(iter->second, p);
 			msg->poses.push_back(p);
 
 			if(pubLabels)
 			{
 				// Add landmark ids
-				visualization_msgs::Marker marker;
+				visualization_msgs::msg::Marker marker;
 				marker.header.frame_id = mapFrameId_;
 				marker.header.stamp = stamp;
 				marker.ns = "landmarks";
 				marker.id = iter->first;
-				marker.action = visualization_msgs::Marker::ADD;
+				marker.action = visualization_msgs::msg::Marker::ADD;
 				marker.pose.position.x = iter->second.x();
 				marker.pose.position.y = iter->second.y();
 				marker.pose.position.z = iter->second.z();
@@ -3344,24 +3276,24 @@ void CoreWrapper::publishStats(const ros::Time & stamp)
 				marker.color.r = 0.0;
 				marker.color.g = 1.0;
 				marker.color.b = 0.0;
-				marker.lifetime = ros::Duration(2.0f/rate_);
+				marker.lifetime = rclcpp::Duration(2.0f/rate_);
 
-				marker.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
+				marker.type = visualization_msgs::msg::Marker::TEXT_VIEW_FACING;
 				marker.text = uNumber2Str(iter->first);
 
 				markers.markers.push_back(marker);
 			}
 		}
 
-		landmarksPub_.publish(msg);
+		landmarksPub_->publish(std::move(msg));
 	}
 
-	bool pubPath = mapPathPub_.getNumSubscribers();
+	bool pubPath = mapPathPub_->get_subscription_count();
 	if(pubLabels || pubPath)
 	{
 		if(stats.poses().size())
 		{
-			nav_msgs::Path path;
+			nav_msgs::msg::Path path;
 			if(pubPath)
 			{
 				path.poses.resize(stats.poses().size());
@@ -3377,12 +3309,12 @@ void CoreWrapper::publishStats(const ros::Time & stamp)
 					std::map<int, std::string>::const_iterator lter = rtabmap_.getMemory()->getAllLabels().find(poseIter->first);
 					if(lter != rtabmap_.getMemory()->getAllLabels().end() && !lter->second.empty())
 					{
-						visualization_msgs::Marker marker;
+						visualization_msgs::msg::Marker marker;
 						marker.header.frame_id = mapFrameId_;
 						marker.header.stamp = stamp;
 						marker.ns = "labels";
 						marker.id = -poseIter->first;
-						marker.action = visualization_msgs::Marker::ADD;
+						marker.action = visualization_msgs::msg::Marker::ADD;
 						marker.pose.position.x = poseIter->second.x();
 						marker.pose.position.y = poseIter->second.y();
 						marker.pose.position.z = poseIter->second.z();
@@ -3398,19 +3330,19 @@ void CoreWrapper::publishStats(const ros::Time & stamp)
 						marker.color.g = 0.0;
 						marker.color.b = 0.0;
 
-						marker.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
+						marker.type = visualization_msgs::msg::Marker::TEXT_VIEW_FACING;
 						marker.text = lter->second;
 
 						markers.markers.push_back(marker);
 					}
 
 					// Add node ids
-					visualization_msgs::Marker marker;
+					visualization_msgs::msg::Marker marker;
 					marker.header.frame_id = mapFrameId_;
 					marker.header.stamp = stamp;
 					marker.ns = "ids";
 					marker.id = poseIter->first;
-					marker.action = visualization_msgs::Marker::ADD;
+					marker.action = visualization_msgs::msg::Marker::ADD;
 					marker.pose.position.x = poseIter->second.x();
 					marker.pose.position.y = poseIter->second.y();
 					marker.pose.position.z = poseIter->second.z();
@@ -3425,9 +3357,9 @@ void CoreWrapper::publishStats(const ros::Time & stamp)
 					marker.color.r = 1.0;
 					marker.color.g = 1.0;
 					marker.color.b = 1.0;
-					marker.lifetime = ros::Duration(2.0f/rate_);
+					marker.lifetime = rclcpp::Duration(2.0f/rate_);
 
-					marker.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
+					marker.type = visualization_msgs::msg::Marker::TEXT_VIEW_FACING;
 					marker.text = uNumber2Str(poseIter->first);
 
 					markers.markers.push_back(marker);
@@ -3443,41 +3375,41 @@ void CoreWrapper::publishStats(const ros::Time & stamp)
 
 			if(pubLabels && markers.markers.size())
 			{
-				labelsPub_.publish(markers);
+				labelsPub_->publish(markers);
 			}
 			if(pubPath && oi)
 			{
 				path.header.frame_id = mapFrameId_;
 				path.header.stamp = stamp;
 				path.poses.resize(oi);
-				mapPathPub_.publish(path);
+				mapPathPub_->publish(path);
 			}
 		}
 	}
 }
 
-void CoreWrapper::publishCurrentGoal(const ros::Time & stamp)
+void CoreWrapper::publishCurrentGoal(const rclcpp::Time & stamp)
 {
 	if(!currentMetricGoal_.isNull() && currentMetricGoal_ != lastPublishedMetricGoal_)
 	{
-		NODELET_INFO("Publishing next goal: %d -> %s",
+		RCLCPP_INFO(this->get_logger(), "Publishing next goal: %d -> %s",
 				rtabmap_.getPathCurrentGoalId(), currentMetricGoal_.prettyPrint().c_str());
 
-		geometry_msgs::PoseStamped poseMsg;
+		geometry_msgs::msg::PoseStamped poseMsg;
 		poseMsg.header.frame_id = mapFrameId_;
 		poseMsg.header.stamp = stamp;
 		rtabmap_ros::transformToPoseMsg(currentMetricGoal_, poseMsg.pose);
-
+#ifdef WITH_MOVE_BASE_MSGS
 		if(useActionForGoal_)
 		{
 			if(mbClient_ == 0 || !mbClient_->isServerConnected())
 			{
-				NODELET_INFO("Connecting to move_base action server...");
+				RCLCPP_INFO(this->get_logger(), "Connecting to move_base action server...");
 				if(mbClient_ == 0)
 				{
 					mbClient_ = new MoveBaseClient("move_base", true);
 				}
-				mbClient_->waitForServer(ros::Duration(5.0));
+				mbClient_->waitForServer(rclcpp::Duration(5.0));
 			}
 			if(mbClient_ && mbClient_->isServerConnected())
 			{
@@ -3492,12 +3424,13 @@ void CoreWrapper::publishCurrentGoal(const ros::Time & stamp)
 			}
 			else
 			{
-				NODELET_ERROR("Cannot connect to move_base action server (called \"%s\")!", this->getNodeHandle().resolveName("move_base").c_str());
+				RCLCPP_ERROR(this->get_logger(), "Cannot connect to move_base action server (called \"%s\")!", this->getNodeHandle().resolveName("move_base").c_str());
 			}
 		}
-		if(nextMetricGoalPub_.getNumSubscribers())
+#endif
+		if(nextMetricGoalPub_->get_subscription_count())
 		{
-			nextMetricGoalPub_.publish(poseMsg);
+			nextMetricGoalPub_->publish(poseMsg);
 			if(!useActionForGoal_)
 			{
 				lastPublishedMetricGoal_ = currentMetricGoal_;
@@ -3506,9 +3439,10 @@ void CoreWrapper::publishCurrentGoal(const ros::Time & stamp)
 	}
 }
 
+#ifdef WITH_MOVE_BASE_MSGS
 // Called once when the goal completes
 void CoreWrapper::goalDoneCb(const actionlib::SimpleClientGoalState& state,
-             const move_base_msgs::MoveBaseResultConstPtr& result)
+             const move_base_msgs::MoveBaseResult::SharedPtr& result)
 {
 	bool ignore = false;
 	if(!currentMetricGoal_.isNull())
@@ -3519,26 +3453,26 @@ void CoreWrapper::goalDoneCb(const actionlib::SimpleClientGoalState& state,
 				rtabmap_.getPathCurrentGoalId() != rtabmap_.getPath().back().first &&
 				(!uContains(rtabmap_.getLocalOptimizedPoses(), rtabmap_.getPath().back().first) || !latestNodeWasReached_))
 			{
-				NODELET_WARN("Planning: move_base reached current goal but it is not "
+				RCLCPP_WARN(this->get_logger(), "Planning: move_base reached current goal but it is not "
 						 "the last one planned by rtabmap. A new goal should be sent when "
 						 "rtabmap will be able to retrieve next locations on the path.");
 				ignore = true;
 			}
 			else
 			{
-				NODELET_INFO("Planning: move_base success!");
+				RCLCPP_INFO(this->get_logger(), "Planning: move_base success!");
 			}
 		}
 		else
 		{
-			NODELET_ERROR("Planning: move_base failed for some reason. Aborting the plan...");
+			RCLCPP_ERROR(this->get_logger(), "Planning: move_base failed for some reason. Aborting the plan...");
 		}
 
-		if(!ignore && goalReachedPub_.getNumSubscribers())
+		if(!ignore && goalReachedPub_->get_subscription_count())
 		{
-			std_msgs::Bool result;
+			std_msgs::msg::Bool result;
 			result.data = state == actionlib::SimpleClientGoalState::SUCCEEDED;
-			goalReachedPub_.publish(result);
+			goalReachedPub_->publish(result);
 		}
 	}
 
@@ -3555,31 +3489,32 @@ void CoreWrapper::goalDoneCb(const actionlib::SimpleClientGoalState& state,
 // Called once when the goal becomes active
 void CoreWrapper::goalActiveCb()
 {
-	//NODELET_INFO("Planning: Goal just went active");
+	//RCLCPP_INFO(this->get_logger(), "Planning: Goal just went active");
 }
 
 // Called every time feedback is received for the goal
-void CoreWrapper::goalFeedbackCb(const move_base_msgs::MoveBaseFeedbackConstPtr& feedback)
+void CoreWrapper::goalFeedbackCb(const move_base_msgs::MoveBaseFeedback::SharedPtr& feedback)
 {
 	//Transform basePosition = rtabmap_ros::transformFromPoseMsg(feedback->base_position.pose);
-	//NODELET_INFO("Planning: feedback base_position = %s", basePosition.prettyPrint().c_str());
+	//RCLCPP_INFO(this->get_logger(), "Planning: feedback base_position = %s", basePosition.prettyPrint().c_str());
 }
+#endif
 
-void CoreWrapper::publishLocalPath(const ros::Time & stamp)
+void CoreWrapper::publishLocalPath(const rclcpp::Time & stamp)
 {
 	if(rtabmap_.getPath().size())
 	{
 		std::vector<std::pair<int, Transform> > poses = rtabmap_.getPathNextPoses();
 		if(poses.size())
 		{
-			if(localPathPub_.getNumSubscribers() || localPathNodesPub_.getNumSubscribers())
+			if(localPathPub_->get_subscription_count() || localPathNodesPub_->get_subscription_count())
 			{
-				nav_msgs::Path path;
-				rtabmap_ros::Path pathNodes;
+				nav_msgs::msg::Path path;
+				rtabmap_ros::msg::Path pathNodes;
 				path.header.frame_id = pathNodes.header.frame_id = mapFrameId_;
 				path.header.stamp = pathNodes.header.stamp = stamp;
 				path.poses.resize(poses.size());
-				pathNodes.nodeIds.resize(poses.size());
+				pathNodes.node_ids.resize(poses.size());
 				pathNodes.poses.resize(poses.size());
 				int oi = 0;
 				for(std::vector<std::pair<int, Transform> >::iterator iter=poses.begin(); iter!=poses.end(); ++iter)
@@ -3587,25 +3522,25 @@ void CoreWrapper::publishLocalPath(const ros::Time & stamp)
 					path.poses[oi].header = path.header;
 					rtabmap_ros::transformToPoseMsg(iter->second, path.poses[oi].pose);
 					pathNodes.poses[oi] = path.poses[oi].pose;
-					pathNodes.nodeIds[oi] = iter->first;
+					pathNodes.node_ids[oi] = iter->first;
 					++oi;
 				}
-				if(localPathPub_.getNumSubscribers())
+				if(localPathPub_->get_subscription_count())
 				{
-					localPathPub_.publish(path);
+					localPathPub_->publish(path);
 				}
-				if(localPathNodesPub_.getNumSubscribers())
+				if(localPathNodesPub_->get_subscription_count())
 				{
-					localPathNodesPub_.publish(pathNodes);
+					localPathNodesPub_->publish(pathNodes);
 				}
 			}
 		}
 	}
 }
 
-void CoreWrapper::publishGlobalPath(const ros::Time & stamp)
+void CoreWrapper::publishGlobalPath(const rclcpp::Time & stamp)
 {
-	if((globalPathPub_.getNumSubscribers() || globalPathNodesPub_.getNumSubscribers()) && rtabmap_.getPath().size())
+	if((globalPathPub_->get_subscription_count() || globalPathNodesPub_->get_subscription_count()) && rtabmap_.getPath().size())
 	{
 		Transform pose = uValue(rtabmap_.getLocalOptimizedPoses(), rtabmap_.getPathCurrentGoalId(), Transform());
 		if(!pose.isNull() && rtabmap_.getPathCurrentGoalIndex() < rtabmap_.getPath().size())
@@ -3613,12 +3548,12 @@ void CoreWrapper::publishGlobalPath(const ros::Time & stamp)
 			// transform the global path in the goal referential
 			Transform t = pose * rtabmap_.getPath().at(rtabmap_.getPathCurrentGoalIndex()).second.inverse();
 
-			nav_msgs::Path path;
-			rtabmap_ros::Path pathNodes;
+			nav_msgs::msg::Path path;
+			rtabmap_ros::msg::Path pathNodes;
 			path.header.frame_id = pathNodes.header.frame_id = mapFrameId_;
 			path.header.stamp = pathNodes.header.stamp = stamp;
 			path.poses.resize(rtabmap_.getPath().size());
-			pathNodes.nodeIds.resize(rtabmap_.getPath().size());
+			pathNodes.node_ids.resize(rtabmap_.getPath().size());
 			pathNodes.poses.resize(rtabmap_.getPath().size());
 			int oi = 0;
 			for(std::vector<std::pair<int, Transform> >::const_iterator iter=rtabmap_.getPath().begin(); iter!=rtabmap_.getPath().end(); ++iter)
@@ -3626,13 +3561,13 @@ void CoreWrapper::publishGlobalPath(const ros::Time & stamp)
 				path.poses[oi].header = path.header;
 				rtabmap_ros::transformToPoseMsg(t*iter->second, path.poses[oi].pose);
 				pathNodes.poses[oi] = path.poses[oi].pose;
-				pathNodes.nodeIds[oi] = iter->first;
+				pathNodes.node_ids[oi] = iter->first;
 				++oi;
 			}
 			Transform goalLocalTransform = Transform::getIdentity();
 			if(!goalFrameId_.empty() && goalFrameId_.compare(frameId_) != 0)
 			{
-				Transform localT = rtabmap_ros::getTransform(frameId_, goalFrameId_, stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+				Transform localT = rtabmap_ros::getTransform(frameId_, goalFrameId_, stamp, *tfBuffer_, waitForTransform_);
 				if(!localT.isNull())
 				{
 					goalLocalTransform = localT.inverse().to3DoF();
@@ -3643,20 +3578,20 @@ void CoreWrapper::publishGlobalPath(const ros::Time & stamp)
 			{
 				path.poses.resize(path.poses.size()+1);
 				path.poses[path.poses.size()-1].header = path.header;
-				pathNodes.nodeIds.resize(pathNodes.nodeIds.size()+1);
+				pathNodes.node_ids.resize(pathNodes.node_ids.size()+1);
 				pathNodes.poses.resize(pathNodes.poses.size()+1);
 				Transform p = t * rtabmap_.getPath().back().second*rtabmap_.getPathTransformToGoal() * goalLocalTransform;
 				rtabmap_ros::transformToPoseMsg(p, path.poses[path.poses.size()-1].pose);
 				pathNodes.poses[pathNodes.poses.size()-1] = path.poses[path.poses.size()-1].pose;
-				pathNodes.nodeIds[pathNodes.nodeIds.size()-1] = 0;
+				pathNodes.node_ids[pathNodes.node_ids.size()-1] = 0;
 			}
-			if(globalPathPub_.getNumSubscribers())
+			if(globalPathPub_->get_subscription_count())
 			{
-				globalPathPub_.publish(path);
+				globalPathPub_->publish(path);
 			}
-			if(globalPathNodesPub_.getNumSubscribers())
+			if(globalPathNodesPub_->get_subscription_count())
 			{
-				globalPathNodesPub_.publish(pathNodes);
+				globalPathNodesPub_->publish(pathNodes);
 			}
 		}
 	}
@@ -3668,9 +3603,9 @@ bool CoreWrapper::octomapBinaryCallback(
 		octomap_msgs::GetOctomap::Request  &req,
 		octomap_msgs::GetOctomap::Response &res)
 {
-	NODELET_INFO("Sending binary map data on service request");
-	res.map.header.frame_id = mapFrameId_;
-	res.map.header.stamp = ros::Time::now();
+	RCLCPP_INFO(this->get_logger(), "Sending binary map data on service request");
+	res->map.header.frame_id = mapFrameId_;
+	res->map.header.stamp = now();
 
 	std::map<int, Transform> poses = rtabmap_.getLocalOptimizedPoses();
 	if(maxMappingNodes_ > 0 && poses.size()>1)
@@ -3691,7 +3626,7 @@ bool CoreWrapper::octomapBinaryCallback(
 	poses = mapsManager_.updateMapCaches(poses, rtabmap_.getMemory(), false, true);
 
 	const rtabmap::OctoMap * octomap = mapsManager_.getOctomap();
-	bool success = octomap->octree()->size() && octomap_msgs::binaryMapToMsg(*octomap->octree(), res.map);
+	bool success = octomap->octree()->size() && octomap_msgs::binaryMapToMsg(*octomap->octree(), res->map);
 	return success;
 }
 
@@ -3699,9 +3634,9 @@ bool CoreWrapper::octomapFullCallback(
 		octomap_msgs::GetOctomap::Request  &req,
 		octomap_msgs::GetOctomap::Response &res)
 {
-	NODELET_INFO("Sending full map data on service request");
-	res.map.header.frame_id = mapFrameId_;
-	res.map.header.stamp = ros::Time::now();
+	RCLCPP_INFO(this->get_logger(), "Sending full map data on service request");
+	res->map.header.frame_id = mapFrameId_;
+	res->map.header.stamp = now();
 
 	std::map<int, Transform> poses = rtabmap_.getLocalOptimizedPoses();
 	if(maxMappingNodes_ > 0 && poses.size()>1)
@@ -3722,12 +3657,18 @@ bool CoreWrapper::octomapFullCallback(
 	poses = mapsManager_.updateMapCaches(poses, rtabmap_.getMemory(), false, true);
 
 	const rtabmap::OctoMap * octomap = mapsManager_.getOctomap();
-	bool success = octomap->octree()->size() && octomap_msgs::fullMapToMsg(*octomap->octree(), res.map);
+	bool success = octomap->octree()->size() && octomap_msgs::fullMapToMsg(*octomap->octree(), res->map);
 	return success;
 }
 #endif
 #endif
 
-PLUGINLIB_EXPORT_CLASS(rtabmap_ros::CoreWrapper, nodelet::Nodelet);
 
 }
+
+#include "rclcpp_components/register_node_macro.hpp"
+
+// Register the component with class_loader.
+// This acts as a sort of entry point, allowing the component to be discoverable when its library
+// is being loaded into a running process.
+RCLCPP_COMPONENTS_REGISTER_NODE(rtabmap_ros::CoreWrapper)

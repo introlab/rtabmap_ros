@@ -25,23 +25,14 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "ros/ros.h"
-#include "nodelet/loader.h"
+#include <memory>
+#include "rtabmap_ros/rgbd_relay.hpp"
+#include "rclcpp/rclcpp.hpp"
 
 int main(int argc, char **argv)
 {
-	ros::init(argc, argv, "rgbd_relay");
-
-	nodelet::V_string nargv;
-	for(int i=1;i<argc;++i)
-	{
-		nargv.push_back(argv[i]);
-	}
-
-	nodelet::Loader nodelet;
-	nodelet::M_string remap(ros::names::getRemappings());
-	std::string nodelet_name = ros::this_node::getName();
-	nodelet.load(nodelet_name, "rtabmap_ros/rgbd_relay", remap, nargv);
-	ros::spin();
+	rclcpp::init(argc, argv);
+	rclcpp::spin(std::make_shared<rtabmap_ros::RGBDRelay>(rclcpp::NodeOptions()));
+	rclcpp::shutdown();
 	return 0;
 }

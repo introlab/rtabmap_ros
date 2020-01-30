@@ -41,9 +41,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <pcl/search/kdtree.h>
 
-#include <nav_msgs/OccupancyGrid.h>
-#include <ros/ros.h>
-
 #include <pcl_conversions/pcl_conversions.h>
 
 #ifdef WITH_OCTOMAP_MSGS
@@ -72,134 +69,90 @@ MapsManager::MapsManager() :
 		octomap_(0),
 		octomapTreeDepth_(16),
 		octomapUpdated_(true),
-		latching_(true)
+		latching_(false)
 {
 }
 
-void MapsManager::init(ros::NodeHandle & nh, ros::NodeHandle & pnh, const std::string & name, bool usePublicNamespace)
+void MapsManager::init(rclcpp::Node & node, const std::string & name, bool)
 {
 	// common map stuff
-	pnh.param("map_filter_radius", mapFilterRadius_, mapFilterRadius_);
-	pnh.param("map_filter_angle", mapFilterAngle_, mapFilterAngle_);
-	pnh.param("map_cleanup", mapCacheCleanup_, mapCacheCleanup_);
+	mapFilterRadius_ = node.declare_parameter("map_filter_radius", rclcpp::ParameterValue(mapFilterRadius_)).get<double>();
+	mapFilterAngle_ = node.declare_parameter("map_filter_angle", rclcpp::ParameterValue(mapFilterAngle_)).get<double>();
+	mapCacheCleanup_ = node.declare_parameter("map_cleanup", rclcpp::ParameterValue(mapCacheCleanup_)).get<bool>();
+	alwaysUpdateMap_ = node.declare_parameter("map_always_update", rclcpp::ParameterValue(alwaysUpdateMap_)).get<bool>();
 
-	if(pnh.hasParam("map_negative_poses_ignored"))
-	{
-		ROS_WARN("Parameter \"map_negative_poses_ignored\" has been "
-				"removed. Use \"map_always_update\" instead.");
-		if(!pnh.hasParam("map_always_update"))
-		{
-			bool negPosesIgnored;
-			pnh.getParam("map_negative_poses_ignored", negPosesIgnored);
-			alwaysUpdateMap_ = !negPosesIgnored;
-		}
-	}
-	pnh.param("map_always_update", alwaysUpdateMap_, alwaysUpdateMap_);
-
-	if(pnh.hasParam("map_negative_scan_empty_ray_tracing"))
-	{
-		ROS_WARN("Parameter \"map_negative_scan_empty_ray_tracing\" has been "
-				"removed. Use \"map_empty_ray_tracing\" instead.");
-		if(!pnh.hasParam("map_empty_ray_tracing"))
-		{
-			pnh.getParam("map_negative_scan_empty_ray_tracing", scanEmptyRayTracing_);
-		}
-	}
-	pnh.param("map_empty_ray_tracing", scanEmptyRayTracing_, scanEmptyRayTracing_);
-
-	if(pnh.hasParam("scan_output_voxelized"))
-	{
-		ROS_WARN("Parameter \"scan_output_voxelized\" has been "
-				"removed. Use \"cloud_output_voxelized\" instead.");
-		if(!pnh.hasParam("cloud_output_voxelized"))
-		{
-			pnh.getParam("scan_output_voxelized", cloudOutputVoxelized_);
-		}
-	}
-	pnh.param("cloud_output_voxelized", cloudOutputVoxelized_, cloudOutputVoxelized_);
-	pnh.param("cloud_subtract_filtering", cloudSubtractFiltering_, cloudSubtractFiltering_);
-	pnh.param("cloud_subtract_filtering_min_neighbors", cloudSubtractFilteringMinNeighbors_, cloudSubtractFilteringMinNeighbors_);
-
-	ROS_INFO("%s(maps): map_filter_radius          = %f", name.c_str(), mapFilterRadius_);
-	ROS_INFO("%s(maps): map_filter_angle           = %f", name.c_str(), mapFilterAngle_);
-	ROS_INFO("%s(maps): map_cleanup                = %s", name.c_str(), mapCacheCleanup_?"true":"false");
-	ROS_INFO("%s(maps): map_always_update          = %s", name.c_str(), alwaysUpdateMap_?"true":"false");
-	ROS_INFO("%s(maps): map_empty_ray_tracing      = %s", name.c_str(), scanEmptyRayTracing_?"true":"false");
-	ROS_INFO("%s(maps): cloud_output_voxelized     = %s", name.c_str(), cloudOutputVoxelized_?"true":"false");
-	ROS_INFO("%s(maps): cloud_subtract_filtering   = %s", name.c_str(), cloudSubtractFiltering_?"true":"false");
-	ROS_INFO("%s(maps): cloud_subtract_filtering_min_neighbors = %d", name.c_str(), cloudSubtractFilteringMinNeighbors_);
-
-#ifdef WITH_OCTOMAP_MSGS
-#ifdef RTABMAP_OCTOMAP
-	octomap_ = new OctoMap(occupancyGrid_->getCellSize(), 0.5, occupancyGrid_->isFullUpdate(), occupancyGrid_->getUpdateError());
-	pnh.param("octomap_tree_depth", octomapTreeDepth_, octomapTreeDepth_);
-	if(octomapTreeDepth_ > 16)
-	{
-		ROS_WARN("octomap_tree_depth maximum is 16");
-		octomapTreeDepth_ = 16;
-	}
-	else if(octomapTreeDepth_ < 0)
-	{
-		ROS_WARN("octomap_tree_depth cannot be negative, set to 16 instead");
-		octomapTreeDepth_ = 16;
-	}
-	ROS_INFO("%s(maps): octomap_tree_depth         = %d", name.c_str(), octomapTreeDepth_);
-#endif
-#endif
+	scanEmptyRayTracing_ = node.declare_parameter("map_empty_ray_tracing", rclcpp::ParameterValue(scanEmptyRayTracing_)).get<bool>();
+	cloudOutputVoxelized_ = node.declare_parameter("cloud_output_voxelized", rclcpp::ParameterValue(cloudOutputVoxelized_)).get<bool>();
+	cloudSubtractFiltering_ = node.declare_parameter("cloud_subtract_filtering", rclcpp::ParameterValue(cloudSubtractFiltering_)).get<bool>();
+	cloudSubtractFilteringMinNeighbors_ = node.declare_parameter("cloud_subtract_filtering_min_neighbors", rclcpp::ParameterValue(cloudSubtractFilteringMinNeighbors_)).get<int>();
 
 	// If true, the last message published on
 	// the map topics will be saved and sent to new subscribers when they
 	// connect
-	pnh.param("latch", latching_, latching_);
+	latching_ = node.declare_parameter("latch", rclcpp::ParameterValue(latching_)).get<bool>();
 
-	// mapping topics
-	ros::NodeHandle * nht;
-	if(usePublicNamespace)
-	{
-		nht = &nh;
-	}
-	else
-	{
-		nht = &pnh;
-	}
-	latched_.clear();
-	gridMapPub_ = nht->advertise<nav_msgs::OccupancyGrid>("grid_map", 1, latching_);
-	latched_.insert(std::make_pair((void*)&gridMapPub_, false));
-	gridProbMapPub_ = nht->advertise<nav_msgs::OccupancyGrid>("grid_prob_map", 1, latching_);
-	latched_.insert(std::make_pair((void*)&gridProbMapPub_, false));
-	cloudMapPub_ = nht->advertise<sensor_msgs::PointCloud2>("cloud_map", 1, latching_);
-	latched_.insert(std::make_pair((void*)&cloudMapPub_, false));
-	cloudObstaclesPub_ = nht->advertise<sensor_msgs::PointCloud2>("cloud_obstacles", 1, latching_);
-	latched_.insert(std::make_pair((void*)&cloudObstaclesPub_, false));
-	cloudGroundPub_ = nht->advertise<sensor_msgs::PointCloud2>("cloud_ground", 1, latching_);
-	latched_.insert(std::make_pair((void*)&cloudGroundPub_, false));
-
-	// deprecated
-	projMapPub_ = nht->advertise<nav_msgs::OccupancyGrid>("proj_map", 1, latching_);
-	latched_.insert(std::make_pair((void*)&projMapPub_, false));
-	scanMapPub_ = nht->advertise<sensor_msgs::PointCloud2>("scan_map", 1, latching_);
-	latched_.insert(std::make_pair((void*)&scanMapPub_, false));
+	RCLCPP_INFO(node.get_logger(), "%s(maps): map_filter_radius          = %f", name.c_str(), mapFilterRadius_);
+	RCLCPP_INFO(node.get_logger(), "%s(maps): map_filter_angle           = %f", name.c_str(), mapFilterAngle_);
+	RCLCPP_INFO(node.get_logger(), "%s(maps): map_cleanup                = %s", name.c_str(), mapCacheCleanup_?"true":"false");
+	RCLCPP_INFO(node.get_logger(), "%s(maps): map_always_update          = %s", name.c_str(), alwaysUpdateMap_?"true":"false");
+	RCLCPP_INFO(node.get_logger(), "%s(maps): map_empty_ray_tracing      = %s", name.c_str(), scanEmptyRayTracing_?"true":"false");
+	RCLCPP_INFO(node.get_logger(), "%s(maps): cloud_output_voxelized     = %s", name.c_str(), cloudOutputVoxelized_?"true":"false");
+	RCLCPP_INFO(node.get_logger(), "%s(maps): cloud_subtract_filtering   = %s", name.c_str(), cloudSubtractFiltering_?"true":"false");
+	RCLCPP_INFO(node.get_logger(), "%s(maps): cloud_subtract_filtering_min_neighbors = %d", name.c_str(), cloudSubtractFilteringMinNeighbors_);
 
 #ifdef WITH_OCTOMAP_MSGS
 #ifdef RTABMAP_OCTOMAP
-	octoMapPubBin_ = nht->advertise<octomap_msgs::Octomap>("octomap_binary", 1, latching_);
+	octomap_ = new OctoMap(occupancyGrid_->getCellSize(), 0.5, occupancyGrid_->isFullUpdate(), occupancyGrid_->getUpdateError());
+	node.param("octomap_tree_depth", octomapTreeDepth_, octomapTreeDepth_);
+	if(octomapTreeDepth_ > 16)
+	{
+		RCLCPP_WARN(node.get_logger(), "octomap_tree_depth maximum is 16");
+		octomapTreeDepth_ = 16;
+	}
+	else if(octomapTreeDepth_ < 0)
+	{
+		RCLCPP_WARN(node.get_logger(), "octomap_tree_depth cannot be negative, set to 16 instead");
+		octomapTreeDepth_ = 16;
+	}
+	RCLCPP_INFO(node.get_logger(), "%s(maps): octomap_tree_depth         = %d", name.c_str(), octomapTreeDepth_);
+#endif
+#endif
+
+
+
+	// mapping topics
+	latched_.clear();
+	gridMapPub_ = node.create_publisher<nav_msgs::msg::OccupancyGrid>("map", 1); // FIXME latching option in ROS2?
+	latched_.insert(std::make_pair((void*)&gridMapPub_, false));
+	gridProbMapPub_ = node.create_publisher<nav_msgs::msg::OccupancyGrid>("grid_prob_map", 1); // FIXME latching option in ROS2?
+	latched_.insert(std::make_pair((void*)&gridProbMapPub_, false));
+	cloudMapPub_ = node.create_publisher<sensor_msgs::msg::PointCloud2>("cloud_map", 1); // FIXME latching option in ROS2?
+	latched_.insert(std::make_pair((void*)&cloudMapPub_, false));
+	cloudObstaclesPub_ = node.create_publisher<sensor_msgs::msg::PointCloud2>("cloud_obstacles", 1); // FIXME latching option in ROS2?
+	latched_.insert(std::make_pair((void*)&cloudObstaclesPub_, false));
+	cloudGroundPub_ = node.create_publisher<sensor_msgs::msg::PointCloud2>("cloud_ground", 1); // FIXME latching option in ROS2?
+	latched_.insert(std::make_pair((void*)&cloudGroundPub_, false));
+
+#ifdef WITH_OCTOMAP_MSGS
+#ifdef RTABMAP_OCTOMAP
+	octoMapPubBin_ = node.create_publisher<octomap_msgs::Octomap>("octomap_binary", 1, latching_);
 	latched_.insert(std::make_pair((void*)&octoMapPubBin_, false));
-	octoMapPubFull_ = nht->advertise<octomap_msgs::Octomap>("octomap_full", 1, latching_);
+	octoMapPubFull_ = node.create_publisher<octomap_msgs::Octomap>("octomap_full", 1, latching_);
 	latched_.insert(std::make_pair((void*)&octoMapPubFull_, false));
-	octoMapCloud_ = nht->advertise<sensor_msgs::PointCloud2>("octomap_occupied_space", 1, latching_);
+#endif
+#endif
+	octoMapCloud_ = node.create_publisher<sensor_msgs::msg::PointCloud2>("octomap_occupied_space", 1); // FIXME latching option in ROS2?
 	latched_.insert(std::make_pair((void*)&octoMapCloud_, false));
-	octoMapFrontierCloud_ = nht->advertise<sensor_msgs::PointCloud2>("octomap_global_frontier_space", 1, latching_);
+	octoMapFrontierCloud_ = node.create_publisher<sensor_msgs::msg::PointCloud2>("octomap_global_frontier_space", 1); // FIXME latching option in ROS2?
 	latched_.insert(std::make_pair((void*)&octoMapFrontierCloud_, false));
-	octoMapObstacleCloud_ = nht->advertise<sensor_msgs::PointCloud2>("octomap_obstacles", 1, latching_);
+	octoMapObstacleCloud_ = node.create_publisher<sensor_msgs::msg::PointCloud2>("octomap_obstacles", 1); // FIXME latching option in ROS2?
 	latched_.insert(std::make_pair((void*)&octoMapObstacleCloud_, false));
-	octoMapGroundCloud_ = nht->advertise<sensor_msgs::PointCloud2>("octomap_ground", 1, latching_);
+	octoMapGroundCloud_ = node.create_publisher<sensor_msgs::msg::PointCloud2>("octomap_ground", 1); // FIXME latching option in ROS2?
 	latched_.insert(std::make_pair((void*)&octoMapGroundCloud_, false));
-	octoMapEmptySpace_ = nht->advertise<sensor_msgs::PointCloud2>("octomap_empty_space", 1, latching_);
+	octoMapEmptySpace_ = node.create_publisher<sensor_msgs::msg::PointCloud2>("octomap_empty_space", 1); // FIXME latching option in ROS2?
 	latched_.insert(std::make_pair((void*)&octoMapEmptySpace_, false));
-	octoMapProj_ = nht->advertise<nav_msgs::OccupancyGrid>("octomap_grid", 1, latching_);
+	octoMapProj_ = node.create_publisher<nav_msgs::msg::OccupancyGrid>("octomap_grid", 1); // FIXME latching option in ROS2?
 	latched_.insert(std::make_pair((void*)&octoMapProj_, false));
-#endif
-#endif
 }
 
 MapsManager::~MapsManager() {
@@ -219,97 +172,65 @@ MapsManager::~MapsManager() {
 }
 
 void parameterMoved(
-		ros::NodeHandle & nh,
+		rclcpp::Node & node,
 		const std::string & rosName,
 		const std::string & parameterName,
 		ParametersMap & parameters)
 {
-	if(nh.hasParam(rosName))
+	rclcpp::Parameter p;
+	if(node.get_parameter(rosName, p))
 	{
 		ParametersMap::const_iterator iter = Parameters::getDefaultParameters().find(parameterName);
 		if(iter != Parameters::getDefaultParameters().end())
 		{
-			ROS_WARN("Parameter \"%s\" has moved from "
+			RCLCPP_WARN(node.get_logger(), "Parameter \"%s\" has moved from "
 					 "rtabmap_ros to rtabmap library. Use "
-					 "parameter \"%s\" instead. The value is still "
+					 "parameter \"%s\" instead. The value \"\" is still "
 					 "copied to new parameter name.",
 					 rosName.c_str(),
-					 parameterName.c_str());
-			std::string type = Parameters::getType(parameterName);
-			if(type.compare("float") || type.compare("double"))
-			{
-				double v = uStr2Double(iter->second);
-				nh.getParam(rosName, v);
-				parameters.insert(ParametersPair(parameterName, uNumber2Str(v)));
-			}
-			else if(type.compare("int") || type.compare("unsigned int"))
-			{
-				int v = uStr2Int(iter->second);
-				nh.getParam(rosName, v);
-				parameters.insert(ParametersPair(parameterName, uNumber2Str(v)));
-			}
-			else if(type.compare("bool"))
-			{
-				bool v = uStr2Bool(iter->second);
-				nh.getParam(rosName, v);
-				if(rosName.compare("grid_incremental") == 0)
-				{
-					v = !v; // new parameter is called kGridGlobalFullUpdate(), which is the inverse
-				}
-				parameters.insert(ParametersPair(parameterName, uNumber2Str(v)));
-
-			}
-			else
-			{
-				ROS_ERROR("Not handled type \"%s\" for parameter \"%s\"", type.c_str(), parameterName.c_str());
-			}
+					 parameterName.c_str(),
+					 p.value_to_string().c_str());
+			parameters.insert(ParametersPair(parameterName, p.value_to_string()));
 		}
 		else
 		{
-			ROS_ERROR("Parameter \"%s\" not found in default parameters.", parameterName.c_str());
+			RCLCPP_ERROR(node.get_logger(), "Parameter \"%s\" not found in default parameters.", parameterName.c_str());
 		}
 	}
 }
 
-void MapsManager::backwardCompatibilityParameters(ros::NodeHandle & pnh, ParametersMap & parameters) const
+void MapsManager::backwardCompatibilityParameters(rclcpp::Node & node, ParametersMap & parameters) const
 {
-	// removed
-	if(pnh.hasParam("cloud_frustum_culling"))
-	{
-		ROS_WARN("Parameter \"cloud_frustum_culling\" has been removed. OctoMap topics "
-				"already do it. You can remove it from your launch file.");
-	}
-
 	// moved
-	parameterMoved(pnh, "cloud_decimation", Parameters::kGridDepthDecimation(), parameters);
-	parameterMoved(pnh, "cloud_max_depth", Parameters::kGridRangeMax(), parameters);
-	parameterMoved(pnh, "cloud_min_depth", Parameters::kGridRangeMin(), parameters);
-	parameterMoved(pnh, "cloud_voxel_size", Parameters::kGridCellSize(), parameters);
-	parameterMoved(pnh, "cloud_floor_culling_height", Parameters::kGridMaxGroundHeight(), parameters);
-	parameterMoved(pnh, "cloud_ceiling_culling_height", Parameters::kGridMaxObstacleHeight(), parameters);
-	parameterMoved(pnh, "cloud_noise_filtering_radius", Parameters::kGridNoiseFilteringRadius(), parameters);
-	parameterMoved(pnh, "cloud_noise_filtering_min_neighbors", Parameters::kGridNoiseFilteringMinNeighbors(), parameters);
-	parameterMoved(pnh, "scan_decimation", Parameters::kGridScanDecimation(), parameters);
-	parameterMoved(pnh, "scan_voxel_size", Parameters::kGridCellSize(), parameters);
-	parameterMoved(pnh, "proj_max_ground_angle", Parameters::kGridMaxGroundAngle(), parameters);
-	parameterMoved(pnh, "proj_min_cluster_size", Parameters::kGridMinClusterSize(), parameters);
-	parameterMoved(pnh, "proj_max_height", Parameters::kGridMaxObstacleHeight(), parameters);
-	parameterMoved(pnh, "proj_max_obstacles_height", Parameters::kGridMaxObstacleHeight(), parameters);
-	parameterMoved(pnh, "proj_max_ground_height", Parameters::kGridMaxGroundHeight(), parameters);
+	parameterMoved(node, "cloud_decimation", Parameters::kGridDepthDecimation(), parameters);
+	parameterMoved(node, "cloud_max_depth", Parameters::kGridRangeMax(), parameters);
+	parameterMoved(node, "cloud_min_depth", Parameters::kGridRangeMin(), parameters);
+	parameterMoved(node, "cloud_voxel_size", Parameters::kGridCellSize(), parameters);
+	parameterMoved(node, "cloud_floor_culling_height", Parameters::kGridMaxGroundHeight(), parameters);
+	parameterMoved(node, "cloud_ceiling_culling_height", Parameters::kGridMaxObstacleHeight(), parameters);
+	parameterMoved(node, "cloud_noise_filtering_radius", Parameters::kGridNoiseFilteringRadius(), parameters);
+	parameterMoved(node, "cloud_noise_filtering_min_neighbors", Parameters::kGridNoiseFilteringMinNeighbors(), parameters);
+	parameterMoved(node, "scan_decimation", Parameters::kGridScanDecimation(), parameters);
+	parameterMoved(node, "scan_voxel_size", Parameters::kGridCellSize(), parameters);
+	parameterMoved(node, "proj_max_ground_angle", Parameters::kGridMaxGroundAngle(), parameters);
+	parameterMoved(node, "proj_min_cluster_size", Parameters::kGridMinClusterSize(), parameters);
+	parameterMoved(node, "proj_max_height", Parameters::kGridMaxObstacleHeight(), parameters);
+	parameterMoved(node, "proj_max_obstacles_height", Parameters::kGridMaxObstacleHeight(), parameters);
+	parameterMoved(node, "proj_max_ground_height", Parameters::kGridMaxGroundHeight(), parameters);
 
-	parameterMoved(pnh, "proj_detect_flat_obstacles", Parameters::kGridFlatObstacleDetected(), parameters);
-	parameterMoved(pnh, "proj_map_frame", Parameters::kGridMapFrameProjection(), parameters);
-	parameterMoved(pnh, "grid_unknown_space_filled", Parameters::kGridScan2dUnknownSpaceFilled(), parameters);
-	parameterMoved(pnh, "grid_cell_size", Parameters::kGridCellSize(), parameters);
-	parameterMoved(pnh, "grid_incremental", Parameters::kGridGlobalFullUpdate(), parameters);
-	parameterMoved(pnh, "grid_size", Parameters::kGridGlobalMinSize(), parameters);
-	parameterMoved(pnh, "grid_eroded", Parameters::kGridGlobalEroded(), parameters);
-	parameterMoved(pnh, "grid_footprint_radius", Parameters::kGridGlobalFootprintRadius(), parameters);
+	parameterMoved(node, "proj_detect_flat_obstacles", Parameters::kGridFlatObstacleDetected(), parameters);
+	parameterMoved(node, "proj_map_frame", Parameters::kGridMapFrameProjection(), parameters);
+	parameterMoved(node, "grid_unknown_space_filled", Parameters::kGridScan2dUnknownSpaceFilled(), parameters);
+	parameterMoved(node, "grid_cell_size", Parameters::kGridCellSize(), parameters);
+	parameterMoved(node, "grid_incremental", Parameters::kGridGlobalFullUpdate(), parameters);
+	parameterMoved(node, "grid_size", Parameters::kGridGlobalMinSize(), parameters);
+	parameterMoved(node, "grid_eroded", Parameters::kGridGlobalEroded(), parameters);
+	parameterMoved(node, "grid_footprint_radius", Parameters::kGridGlobalFootprintRadius(), parameters);
 
 #ifdef WITH_OCTOMAP_MSGS
 #ifdef RTABMAP_OCTOMAP
-	parameterMoved(pnh, "octomap_ground_is_obstacle", Parameters::kGridGroundIsObstacle(), parameters);
-	parameterMoved(pnh, "octomap_occupancy_thr", Parameters::kGridGlobalOccupancyThr(), parameters);
+	parameterMoved(node, "octomap_ground_is_obstacle", Parameters::kGridGroundIsObstacle(), parameters);
+	parameterMoved(node, "octomap_occupancy_thr", Parameters::kGridGlobalOccupancyThr(), parameters);
 #endif
 #endif
 }
@@ -352,7 +273,7 @@ void MapsManager::set2DMap(
 				data = memory->getSignatureDataConst(iter->first, false, false, false, true);
 				if(data.gridCellSize() == 0.0f)
 				{
-					ROS_WARN("Local occupancy grid doesn't exist for node %d", iter->first);
+					UWARN("Local occupancy grid doesn't exist for node %d", iter->first);
 				}
 				else
 				{
@@ -405,21 +326,17 @@ void MapsManager::clear()
 
 bool MapsManager::hasSubscribers() const
 {
-	return  cloudMapPub_.getNumSubscribers() != 0 ||
-			cloudObstaclesPub_.getNumSubscribers() != 0 ||
-			cloudGroundPub_.getNumSubscribers() != 0 ||
-			projMapPub_.getNumSubscribers() != 0 ||
-			gridMapPub_.getNumSubscribers() != 0 ||
-			gridProbMapPub_.getNumSubscribers() != 0 ||
-			scanMapPub_.getNumSubscribers() != 0 ||
-			octoMapPubBin_.getNumSubscribers() != 0 ||
-			octoMapPubFull_.getNumSubscribers() != 0 ||
-			octoMapCloud_.getNumSubscribers() != 0 ||
-			octoMapFrontierCloud_.getNumSubscribers() != 0 ||
-			octoMapObstacleCloud_.getNumSubscribers() != 0 ||
-			octoMapGroundCloud_.getNumSubscribers() != 0 ||
-			octoMapEmptySpace_.getNumSubscribers() != 0 ||
-			octoMapProj_.getNumSubscribers() != 0;
+	return  cloudMapPub_->get_subscription_count() != 0 ||
+			cloudObstaclesPub_->get_subscription_count() != 0 ||
+			cloudGroundPub_->get_subscription_count() != 0 ||
+			gridMapPub_->get_subscription_count() != 0 ||
+			gridProbMapPub_->get_subscription_count() != 0 ||
+			octoMapCloud_->get_subscription_count() != 0 ||
+			octoMapFrontierCloud_->get_subscription_count() != 0 ||
+			octoMapObstacleCloud_->get_subscription_count() != 0 ||
+			octoMapGroundCloud_->get_subscription_count() != 0 ||
+			octoMapEmptySpace_->get_subscription_count() != 0 ||
+			octoMapProj_->get_subscription_count() != 0;
 }
 
 std::map<int, Transform> MapsManager::getFilteredPoses(const std::map<int, Transform> & poses)
@@ -445,24 +362,20 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 	{
 		//  all false, update only those where we have subscribers
 		updateOctomap =
-				octoMapPubBin_.getNumSubscribers() != 0 ||
-				octoMapPubFull_.getNumSubscribers() != 0 ||
-				octoMapCloud_.getNumSubscribers() != 0 ||
-				octoMapFrontierCloud_.getNumSubscribers() != 0 ||
-				octoMapObstacleCloud_.getNumSubscribers() != 0 ||
-				octoMapGroundCloud_.getNumSubscribers() != 0 ||
-				octoMapEmptySpace_.getNumSubscribers() != 0 ||
-				octoMapProj_.getNumSubscribers() != 0;
+				octoMapCloud_->get_subscription_count() != 0 ||
+				octoMapFrontierCloud_->get_subscription_count() != 0 ||
+				octoMapObstacleCloud_->get_subscription_count() != 0 ||
+				octoMapGroundCloud_->get_subscription_count() != 0 ||
+				octoMapEmptySpace_->get_subscription_count() != 0 ||
+				octoMapProj_->get_subscription_count() != 0;
 
-		updateGrid = projMapPub_.getNumSubscribers() != 0 ||
-				gridMapPub_.getNumSubscribers() != 0 ||
-				gridProbMapPub_.getNumSubscribers() != 0;
+		updateGrid = gridMapPub_->get_subscription_count() != 0 ||
+				gridProbMapPub_->get_subscription_count() != 0;
 
 		updateGridCache = updateOctomap || updateGrid ||
-				cloudMapPub_.getNumSubscribers() != 0 ||
-				cloudObstaclesPub_.getNumSubscribers() != 0 ||
-				cloudGroundPub_.getNumSubscribers() != 0 ||
-				scanMapPub_.getNumSubscribers() != 0;
+				cloudMapPub_->get_subscription_count() != 0 ||
+				cloudObstaclesPub_->get_subscription_count() != 0 ||
+				cloudGroundPub_->get_subscription_count() != 0;
 	}
 
 #ifndef WITH_OCTOMAP_MSGS
@@ -480,7 +393,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 
 	if(!memory && signatures.size() == 0)
 	{
-		ROS_ERROR("Memory and signatures should not be both null!?");
+		UERROR("Memory and signatures should not be both null!?");
 		return std::map<int, rtabmap::Transform>();
 	}
 
@@ -527,14 +440,14 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 		{
 			if(updateGridCache && gridMaps_.size() < 5)
 			{
-				ROS_WARN("Many occupancy grids should be loaded (~%d), this may take a while to update the map(s)...", int(filteredPoses.size()-gridMaps_.size()));
+				UWARN("Many occupancy grids should be loaded (~%d), this may take a while to update the map(s)...", int(filteredPoses.size()-gridMaps_.size()));
 				longUpdate = true;
 			}
 #ifdef WITH_OCTOMAP_MSGS
 #ifdef RTABMAP_OCTOMAP
 			if(updateOctomap && octomap_->addedNodes().size() < 5)
 			{
-				ROS_WARN("Many clouds should be added to octomap (~%d), this may take a while to update the map(s)...", int(filteredPoses.size()-octomap_->addedNodes().size()));
+				UWARN("Many clouds should be added to octomap (~%d), this may take a while to update the map(s)...", int(filteredPoses.size()-octomap_->addedNodes().size()));
 				longUpdate = true;
 			}
 #endif
@@ -696,7 +609,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 						}
 						else if(!mter->second.first.first.empty() && !mter->second.first.second.empty() && !mter->second.second.empty())
 						{
-							ROS_WARN("Node %d: Cannot update octomap with 2D occupancy grids. "
+							UWARN(node.get_logger(), "Node %d: Cannot update octomap with 2D occupancy grids. "
 									"Do \"$ rosrun rtabmap_ros rtabmap --params | grep Grid\" to see "
 									"all occupancy grid parameters.",
 									iter->first);
@@ -708,7 +621,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 			}
 			else
 			{
-				ROS_ERROR("Pose null for node %d", iter->first);
+				UERROR("Pose null for node %d", iter->first);
 			}
 		}
 
@@ -723,7 +636,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 		{
 			UTimer time;
 			octomapUpdated_ = octomap_->update(filteredPoses);
-			ROS_INFO("Octomap update time = %fs", time.ticks());
+			UINFO("Octomap update time = %fs", time.ticks());
 		}
 #endif
 #endif
@@ -769,7 +682,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 
 		if(longUpdate)
 		{
-			ROS_WARN("Map(s) updated! (%f s)", longUpdateTimer.ticks());
+			UWARN("Map(s) updated! (%f s)", longUpdateTimer.ticks());
 		}
 	}
 
@@ -794,7 +707,7 @@ pcl::PointCloud<pcl::PointXYZRGB>::Ptr subtractFiltering(
 		std::vector<std::vector<float> > kDistances;
 		cv::Mat pt = (cv::Mat_<float>(1, 3) << cloud->at(i).x, cloud->at(i).y, cloud->at(i).z);
 		substractCloudIndex.radiusSearch(pt, kIndices, kDistances, radiusSearch, minNeighborsInRadius, 32, 0, false);
-		if(kIndices.size() == 1 && kIndices[0].size() < minNeighborsInRadius)
+		if(kIndices.size() == 1 && int(kIndices[0].size()) < minNeighborsInRadius)
 		{
 			output->at(oi++) = cloud->at(i);
 		}
@@ -805,46 +718,26 @@ pcl::PointCloud<pcl::PointXYZRGB>::Ptr subtractFiltering(
 
 void MapsManager::publishMaps(
 		const std::map<int, rtabmap::Transform> & poses,
-		const ros::Time & stamp,
+		const rclcpp::Time & stamp,
 		const std::string & mapFrameId)
 {
 	UDEBUG("Publishing maps...");
 
 	// publish maps
-	if(cloudMapPub_.getNumSubscribers() ||
-	   scanMapPub_.getNumSubscribers() ||
-	   cloudObstaclesPub_.getNumSubscribers() ||
-	   cloudGroundPub_.getNumSubscribers())
+	if(cloudMapPub_->get_subscription_count() ||
+	   cloudObstaclesPub_->get_subscription_count() ||
+	   cloudGroundPub_->get_subscription_count())
 	{
 		// generate the assembled cloud!
 		UTimer time;
 
-		if(scanMapPub_.getNumSubscribers())
-		{
-			if(parameters_.find(Parameters::kGridFromDepth()) != parameters_.end() &&
-				uStr2Bool(parameters_.at(Parameters::kGridFromDepth())))
-			{
-				ROS_WARN("/scan_map topic is deprecated! Subscribe to /cloud_map topic "
-						"instead with <param name=\"%s\" type=\"string\" value=\"false\"/>. "
-						"Do \"$ rosrun rtabmap_ros rtabmap --params | grep Grid\" to see "
-						"all occupancy grid parameters.",
-						Parameters::kGridFromDepth().c_str());
-			}
-			else
-			{
-				ROS_WARN("/scan_map topic is deprecated! Subscribe to /cloud_map topic instead.");
-			}
-		}
-
 		// detect if the graph has changed, if so, recreate the clouds
 		bool graphGroundOptimized = false;
 		bool graphObstacleOptimized = false;
-		bool updateGround = cloudMapPub_.getNumSubscribers() ||
-				   scanMapPub_.getNumSubscribers() ||
-				   cloudGroundPub_.getNumSubscribers();
-		bool updateObstacles = cloudMapPub_.getNumSubscribers() ||
-				   scanMapPub_.getNumSubscribers() ||
-				   cloudObstaclesPub_.getNumSubscribers();
+		bool updateGround = cloudMapPub_->get_subscription_count()  ||
+				   cloudGroundPub_->get_subscription_count();
+		bool updateObstacles = cloudMapPub_->get_subscription_count()  ||
+				   cloudObstaclesPub_->get_subscription_count();
 		bool graphGroundChanged = updateGround;
 		bool graphObstacleChanged = updateObstacles;
 		for(std::map<int, Transform>::const_iterator iter=poses.lower_bound(0); iter!=poses.end(); ++iter)
@@ -900,7 +793,7 @@ void MapsManager::publishMaps(
 
 		if(graphGroundOptimized || graphObstacleOptimized)
 		{
-			ROS_INFO("Graph has changed, updating clouds...");
+			UINFO("Graph has changed, updating clouds...");
 			UTimer t;
 			cv::Mat tmpGroundPts;
 			cv::Mat tmpObstaclePts;
@@ -1096,53 +989,47 @@ void MapsManager::publishMaps(
 			}
 		}
 
-		ROS_INFO("Assembled %d obstacle and %d ground clouds (%d points, %fs)",
+		UINFO("Assembled %d obstacle and %d ground clouds (%d points, %fs)",
 				countObstacles, countGrounds, (int)(assembledGround_->size() + assembledObstacles_->size()), time.ticks());
 
 		if( countGrounds > 0 ||
 			countObstacles > 0 ||
 			!latching_ ||
 			(assembledGround_->empty() && assembledObstacles_->empty()) ||
-			(cloudGroundPub_.getNumSubscribers() && !latched_.at(&cloudGroundPub_)) ||
-			(cloudObstaclesPub_.getNumSubscribers() && !latched_.at(&cloudObstaclesPub_)) ||
-			(cloudMapPub_.getNumSubscribers() && !latched_.at(&cloudMapPub_)) ||
-			(scanMapPub_.getNumSubscribers() && !latched_.at(&scanMapPub_)))
+			(cloudGroundPub_->get_subscription_count() && !latched_.at(&cloudGroundPub_)) ||
+			(cloudObstaclesPub_->get_subscription_count() && !latched_.at(&cloudObstaclesPub_)) ||
+			(cloudMapPub_->get_subscription_count() && !latched_.at(&cloudMapPub_)))
 		{
-			if(cloudGroundPub_.getNumSubscribers())
+			if(cloudGroundPub_->get_subscription_count())
 			{
-				sensor_msgs::PointCloud2::Ptr cloudMsg(new sensor_msgs::PointCloud2);
+				sensor_msgs::msg::PointCloud2::UniquePtr cloudMsg(new sensor_msgs::msg::PointCloud2);
 				pcl::toROSMsg(*assembledGround_, *cloudMsg);
 				cloudMsg->header.stamp = stamp;
 				cloudMsg->header.frame_id = mapFrameId;
-				cloudGroundPub_.publish(cloudMsg);
+				cloudGroundPub_->publish(std::move(cloudMsg));
 				latched_.at(&cloudGroundPub_) = true;
 			}
-			if(cloudObstaclesPub_.getNumSubscribers())
+			if(cloudObstaclesPub_->get_subscription_count())
 			{
-				sensor_msgs::PointCloud2::Ptr cloudMsg(new sensor_msgs::PointCloud2);
+				sensor_msgs::msg::PointCloud2::UniquePtr cloudMsg(new sensor_msgs::msg::PointCloud2);
 				pcl::toROSMsg(*assembledObstacles_, *cloudMsg);
 				cloudMsg->header.stamp = stamp;
 				cloudMsg->header.frame_id = mapFrameId;
-				cloudObstaclesPub_.publish(cloudMsg);
+				cloudObstaclesPub_->publish(std::move(cloudMsg));
 				latched_.at(&cloudObstaclesPub_) = true;
 			}
-			if(cloudMapPub_.getNumSubscribers() || scanMapPub_.getNumSubscribers())
+			if(cloudMapPub_->get_subscription_count())
 			{
 				pcl::PointCloud<pcl::PointXYZRGB> cloud = *assembledObstacles_ + *assembledGround_;
-				sensor_msgs::PointCloud2::Ptr cloudMsg(new sensor_msgs::PointCloud2);
+				sensor_msgs::msg::PointCloud2::UniquePtr cloudMsg(new sensor_msgs::msg::PointCloud2);
 				pcl::toROSMsg(cloud, *cloudMsg);
 				cloudMsg->header.stamp = stamp;
 				cloudMsg->header.frame_id = mapFrameId;
 
-				if(cloudMapPub_.getNumSubscribers())
+				if(cloudMapPub_->get_subscription_count())
 				{
-					cloudMapPub_.publish(cloudMsg);
+					cloudMapPub_->publish(std::move(cloudMsg));
 					latched_.at(&cloudMapPub_) = true;
-				}
-				if(scanMapPub_.getNumSubscribers())
-				{
-					scanMapPub_.publish(cloudMsg);
-					latched_.at(&scanMapPub_) = true;
 				}
 			}
 		}
@@ -1158,19 +1045,15 @@ void MapsManager::publishMaps(
 		groundClouds_.clear();
 		obstacleClouds_.clear();
 	}
-	if(cloudMapPub_.getNumSubscribers() == 0)
+	if(cloudMapPub_->get_subscription_count() == 0)
 	{
 		latched_.at(&cloudMapPub_) = false;
 	}
-	if(scanMapPub_.getNumSubscribers() == 0)
-	{
-		latched_.at(&scanMapPub_) = false;
-	}
-	if(cloudGroundPub_.getNumSubscribers() == 0)
+	if(cloudGroundPub_->get_subscription_count() == 0)
 	{
 		latched_.at(&cloudGroundPub_) = false;
 	}
-	if(cloudObstaclesPub_.getNumSubscribers() == 0)
+	if(cloudObstaclesPub_->get_subscription_count() == 0)
 	{
 		latched_.at(&cloudObstaclesPub_) = false;
 	}
@@ -1179,47 +1062,47 @@ void MapsManager::publishMaps(
 #ifdef RTABMAP_OCTOMAP
 	if( octomapUpdated_ ||
 		!latching_ ||
-		(octoMapPubBin_.getNumSubscribers() && !latched_.at(&octoMapPubBin_)) ||
-		(octoMapPubFull_.getNumSubscribers() && !latched_.at(&octoMapPubFull_)) ||
-		(octoMapCloud_.getNumSubscribers() && !latched_.at(&octoMapCloud_)) ||
-		(octoMapFrontierCloud_.getNumSubscribers() && !latched_.at(&octoMapFrontierCloud_)) ||
-		(octoMapObstacleCloud_.getNumSubscribers() && !latched_.at(&octoMapObstacleCloud_)) ||
-		(octoMapGroundCloud_.getNumSubscribers() && !latched_.at(&octoMapGroundCloud_)) ||
-		(octoMapEmptySpace_.getNumSubscribers() && !latched_.at(&octoMapEmptySpace_)) ||
-		(octoMapProj_.getNumSubscribers() && !latched_.at(&octoMapProj_)))
+		(octoMapPubBin_->get_subscription_count() && !latched_.at(&octoMapPubBin_)) ||
+		(octoMapPubFull_->get_subscription_count() && !latched_.at(&octoMapPubFull_)) ||
+		(octoMapCloud_->get_subscription_count() && !latched_.at(&octoMapCloud_)) ||
+		(octoMapFrontierCloud_->get_subscription_count() && !latched_.at(&octoMapFrontierCloud_)) ||
+		(octoMapObstacleCloud_->get_subscription_count() && !latched_.at(&octoMapObstacleCloud_)) ||
+		(octoMapGroundCloud_->get_subscription_count() && !latched_.at(&octoMapGroundCloud_)) ||
+		(octoMapEmptySpace_->get_subscription_count() && !latched_.at(&octoMapEmptySpace_)) ||
+		(octoMapProj_->get_subscription_count() && !latched_.at(&octoMapProj_)))
 	{
-		if(octoMapPubBin_.getNumSubscribers())
+		if(octoMapPubBin_->get_subscription_count())
 		{
 			octomap_msgs::Octomap msg;
 			octomap_msgs::binaryMapToMsg(*octomap_->octree(), msg);
 			msg.header.frame_id = mapFrameId;
 			msg.header.stamp = stamp;
-			octoMapPubBin_.publish(msg);
+			octoMapPubBin_->publish(msg);
 			latched_.at(&octoMapPubBin_) = true;
 		}
-		if(octoMapPubFull_.getNumSubscribers())
+		if(octoMapPubFull_->get_subscription_count())
 		{
 			octomap_msgs::Octomap msg;
 			octomap_msgs::fullMapToMsg(*octomap_->octree(), msg);
 			msg.header.frame_id = mapFrameId;
 			msg.header.stamp = stamp;
-			octoMapPubFull_.publish(msg);
+			octoMapPubFull_->publish(msg);
 			latched_.at(&octoMapPubFull_) = true;
 		}
-		if(octoMapCloud_.getNumSubscribers() ||
-			octoMapFrontierCloud_.getNumSubscribers() ||
-			octoMapObstacleCloud_.getNumSubscribers() ||
-			octoMapGroundCloud_.getNumSubscribers() ||
-			octoMapEmptySpace_.getNumSubscribers())
+		if(octoMapCloud_->get_subscription_count() ||
+			octoMapFrontierCloud_->get_subscription_count() ||
+			octoMapObstacleCloud_->get_subscription_count() ||
+			octoMapGroundCloud_->get_subscription_count() ||
+			octoMapEmptySpace_->get_subscription_count())
 		{
-			sensor_msgs::PointCloud2 msg;
+			sensor_msgs::msg::PointCloud2 msg;
 			pcl::IndicesPtr obstacleIndices(new std::vector<int>);
 			pcl::IndicesPtr frontierIndices(new std::vector<int>);
 			pcl::IndicesPtr emptyIndices(new std::vector<int>);
 			pcl::IndicesPtr groundIndices(new std::vector<int>);
 			pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = octomap_->createCloud(octomapTreeDepth_, obstacleIndices.get(), emptyIndices.get(), groundIndices.get(), true, frontierIndices.get());
 
-			if(octoMapCloud_.getNumSubscribers())
+			if(octoMapCloud_->get_subscription_count())
 			{
 				pcl::PointCloud<pcl::PointXYZRGB> cloudOccupiedSpace;
 				pcl::IndicesPtr indices = util3d::concatenate(obstacleIndices, groundIndices);
@@ -1227,51 +1110,51 @@ void MapsManager::publishMaps(
 				pcl::toROSMsg(cloudOccupiedSpace, msg);
 				msg.header.frame_id = mapFrameId;
 				msg.header.stamp = stamp;
-				octoMapCloud_.publish(msg);
+				octoMapCloud_->publish(msg);
 				latched_.at(&octoMapCloud_) = true;
 			}
-			if(octoMapFrontierCloud_.getNumSubscribers())
+			if(octoMapFrontierCloud_->get_subscription_count())
 			{
 				pcl::PointCloud<pcl::PointXYZRGB> cloudFrontier;
 				pcl::copyPointCloud(*cloud, *frontierIndices, cloudFrontier);
 				pcl::toROSMsg(cloudFrontier, msg);
 				msg.header.frame_id = mapFrameId;
 				msg.header.stamp = stamp;
-				octoMapFrontierCloud_.publish(msg);
+				octoMapFrontierCloud_->publish(msg);
 				latched_.at(&octoMapFrontierCloud_) = true;
 			}
-			if(octoMapObstacleCloud_.getNumSubscribers())
+			if(octoMapObstacleCloud_->get_subscription_count())
 			{
 				pcl::PointCloud<pcl::PointXYZRGB> cloudObstacles;
 				pcl::copyPointCloud(*cloud, *obstacleIndices, cloudObstacles);
 				pcl::toROSMsg(cloudObstacles, msg);
 				msg.header.frame_id = mapFrameId;
 				msg.header.stamp = stamp;
-				octoMapObstacleCloud_.publish(msg);
+				octoMapObstacleCloud_->publish(msg);
 				latched_.at(&octoMapObstacleCloud_) = true;
 			}
-			if(octoMapGroundCloud_.getNumSubscribers())
+			if(octoMapGroundCloud_->get_subscription_count())
 			{
 				pcl::PointCloud<pcl::PointXYZRGB> cloudGround;
 				pcl::copyPointCloud(*cloud, *groundIndices, cloudGround);
 				pcl::toROSMsg(cloudGround, msg);
 				msg.header.frame_id = mapFrameId;
 				msg.header.stamp = stamp;
-				octoMapGroundCloud_.publish(msg);
+				octoMapGroundCloud_->publish(msg);
 				latched_.at(&octoMapGroundCloud_) = true;
 			}
-			if(octoMapEmptySpace_.getNumSubscribers())
+			if(octoMapEmptySpace_->get_subscription_count())
 			{
 				pcl::PointCloud<pcl::PointXYZRGB> cloudEmptySpace;
 				pcl::copyPointCloud(*cloud, *emptyIndices, cloudEmptySpace);
 				pcl::toROSMsg(cloudEmptySpace, msg);
 				msg.header.frame_id = mapFrameId;
 				msg.header.stamp = stamp;
-				octoMapEmptySpace_.publish(msg);
+				octoMapEmptySpace_->publish(msg);
 				latched_.at(&octoMapEmptySpace_) = true;
 			}
 		}
-		if(octoMapProj_.getNumSubscribers())
+		if(octoMapProj_->get_subscription_count())
 		{
 			// create the projection map
 			float xMin=0.0f, yMin=0.0f, gridCellSize = 0.05f;
@@ -1301,12 +1184,12 @@ void MapsManager::publishMaps(
 				map.header.frame_id = mapFrameId;
 				map.header.stamp = stamp;
 
-				octoMapProj_.publish(map);
+				octoMapProj_->publish(map);
 				latched_.at(&octoMapProj_) = true;
 			}
 			else if(poses.size())
 			{
-				ROS_WARN("Octomap projection map is empty! (poses=%d octomap nodes=%d). "
+				RCLCPP_WARN(node.get_logger(), "Octomap projection map is empty! (poses=%d octomap nodes=%d). "
 						"Make sure you activated \"%s\" and \"%s\" to true. "
 						"See \"$ rosrun rtabmap_ros rtabmap --params | grep Grid\" for more info.",
 						(int)poses.size(), (int)octomap_->octree()->size(),
@@ -1316,47 +1199,47 @@ void MapsManager::publishMaps(
 	}
 
 	if( mapCacheCleanup_ &&
-		octoMapPubBin_.getNumSubscribers() == 0 &&
-		octoMapPubFull_.getNumSubscribers() == 0 &&
-		octoMapCloud_.getNumSubscribers() == 0 &&
-		octoMapFrontierCloud_.getNumSubscribers() == 0 &&
-		octoMapObstacleCloud_.getNumSubscribers() == 0 &&
-		octoMapGroundCloud_.getNumSubscribers() == 0 &&
-		octoMapEmptySpace_.getNumSubscribers() == 0 &&
-		octoMapProj_.getNumSubscribers() == 0)
+		octoMapPubBin_->get_subscription_count() == 0 &&
+		octoMapPubFull_->get_subscription_count() == 0 &&
+		octoMapCloud_->get_subscription_count() == 0 &&
+		octoMapFrontierCloud_->get_subscription_count() == 0 &&
+		octoMapObstacleCloud_->get_subscription_count() == 0 &&
+		octoMapGroundCloud_->get_subscription_count() == 0 &&
+		octoMapEmptySpace_->get_subscription_count() == 0 &&
+		octoMapProj_->get_subscription_count() == 0)
 	{
 		octomap_->clear();
 	}
 
-	if(octoMapPubBin_.getNumSubscribers() == 0)
+	if(octoMapPubBin_->get_subscription_count() == 0)
 	{
 		latched_.at(&octoMapPubBin_) = false;
 	}
-	if(octoMapPubFull_.getNumSubscribers() == 0)
+	if(octoMapPubFull_->get_subscription_count() == 0)
 	{
 		latched_.at(&octoMapPubFull_) = false;
 	}
-	if(octoMapCloud_.getNumSubscribers() == 0)
+	if(octoMapCloud_->get_subscription_count() == 0)
 	{
 		latched_.at(&octoMapCloud_) = false;
 	}
-	if(octoMapFrontierCloud_.getNumSubscribers() == 0)
+	if(octoMapFrontierCloud_->get_subscription_count() == 0)
 	{
 		latched_.at(&octoMapFrontierCloud_) = false;
 	}
-	if(octoMapObstacleCloud_.getNumSubscribers() == 0)
+	if(octoMapObstacleCloud_->get_subscription_count() == 0)
 	{
 		latched_.at(&octoMapObstacleCloud_) = false;
 	}
-	if(octoMapGroundCloud_.getNumSubscribers() == 0)
+	if(octoMapGroundCloud_->get_subscription_count() == 0)
 	{
 		latched_.at(&octoMapGroundCloud_) = false;
 	}
-	if(octoMapEmptySpace_.getNumSubscribers() == 0)
+	if(octoMapEmptySpace_->get_subscription_count() == 0)
 	{
 		latched_.at(&octoMapEmptySpace_) = false;
 	}
-	if(octoMapProj_.getNumSubscribers() == 0)
+	if(octoMapProj_->get_subscription_count() == 0)
 	{
 		latched_.at(&octoMapProj_) = false;
 	}
@@ -1366,28 +1249,10 @@ void MapsManager::publishMaps(
 
 	if( gridUpdated_ ||
 		!latching_ ||
-		(gridMapPub_.getNumSubscribers() && !latched_.at(&gridMapPub_)) ||
-		(projMapPub_.getNumSubscribers() && !latched_.at(&projMapPub_)) ||
-		(gridProbMapPub_.getNumSubscribers() && !latched_.at(&gridProbMapPub_)))
+		(gridMapPub_->get_subscription_count() && !latched_.at(&gridMapPub_)) ||
+		(gridProbMapPub_->get_subscription_count() && !latched_.at(&gridProbMapPub_)))
 	{
-		if(projMapPub_.getNumSubscribers())
-		{
-			if(parameters_.find(Parameters::kGridFromDepth()) != parameters_.end() &&
-				!uStr2Bool(parameters_.at(Parameters::kGridFromDepth())))
-			{
-				ROS_WARN("/proj_map topic is deprecated! Subscribe to /grid_map topic "
-						"instead with <param name=\"%s\" type=\"string\" value=\"true\"/>. "
-						"Do \"$ rosrun rtabmap_ros rtabmap --params | grep Grid\" to see "
-						"all occupancy grid parameters.",
-						Parameters::kGridFromDepth().c_str());
-			}
-			else
-			{
-				ROS_WARN("/proj_map topic is deprecated! Subscribe to /grid_map topic instead.");
-			}
-		}
-
-		if(gridProbMapPub_.getNumSubscribers())
+		if(gridProbMapPub_->get_subscription_count())
 		{
 			// create the grid map
 			float xMin=0.0f, yMin=0.0f, gridCellSize = 0.05f;
@@ -1395,7 +1260,7 @@ void MapsManager::publishMaps(
 			if(!pixels.empty())
 			{
 				//init
-				nav_msgs::OccupancyGrid map;
+				nav_msgs::msg::OccupancyGrid map;
 				map.info.resolution = gridCellSize;
 				map.info.origin.position.x = 0.0;
 				map.info.origin.position.y = 0.0;
@@ -1416,18 +1281,18 @@ void MapsManager::publishMaps(
 				map.header.frame_id = mapFrameId;
 				map.header.stamp = stamp;
 
-				if(gridProbMapPub_.getNumSubscribers())
+				if(gridProbMapPub_->get_subscription_count())
 				{
-					gridProbMapPub_.publish(map);
+					gridProbMapPub_->publish(map);
 					latched_.at(&gridProbMapPub_) = true;
 				}
 			}
 			else if(poses.size())
 			{
-				ROS_WARN("Grid map is empty! (local maps=%d)", (int)gridMaps_.size());
+				UWARN("Grid map is empty! (local maps=%d)", (int)gridMaps_.size());
 			}
 		}
-		if(gridMapPub_.getNumSubscribers() || projMapPub_.getNumSubscribers())
+		if(gridMapPub_->get_subscription_count())
 		{
 			// create the grid map
 			float xMin=0.0f, yMin=0.0f, gridCellSize = 0.05f;
@@ -1436,7 +1301,7 @@ void MapsManager::publishMaps(
 			if(!pixels.empty())
 			{
 				//init
-				nav_msgs::OccupancyGrid map;
+				nav_msgs::msg::OccupancyGrid map;
 				map.info.resolution = gridCellSize;
 				map.info.origin.position.x = 0.0;
 				map.info.origin.position.y = 0.0;
@@ -1457,33 +1322,21 @@ void MapsManager::publishMaps(
 				map.header.frame_id = mapFrameId;
 				map.header.stamp = stamp;
 
-				if(gridMapPub_.getNumSubscribers())
-				{
-					gridMapPub_.publish(map);
-					latched_.at(&gridMapPub_) = true;
-				}
-				if(projMapPub_.getNumSubscribers())
-				{
-					projMapPub_.publish(map);
-					latched_.at(&projMapPub_) = true;
-				}
+				gridMapPub_->publish(map);
+				latched_.at(&gridMapPub_) = true;
 			}
 			else if(poses.size())
 			{
-				ROS_WARN("Grid map is empty! (local maps=%d)", (int)gridMaps_.size());
+				UWARN("Grid map is empty! (local maps=%d)", (int)gridMaps_.size());
 			}
 		}
 	}
 
-	if(gridMapPub_.getNumSubscribers() == 0)
+	if(gridMapPub_->get_subscription_count() == 0)
 	{
 		latched_.at(&gridMapPub_) = false;
 	}
-	if(projMapPub_.getNumSubscribers() == 0)
-	{
-		latched_.at(&projMapPub_) = false;
-	}
-	if(gridProbMapPub_.getNumSubscribers() == 0)
+	if(gridProbMapPub_->get_subscription_count() == 0)
 	{
 		latched_.at(&gridProbMapPub_) = false;
 	}

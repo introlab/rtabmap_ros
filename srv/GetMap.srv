@@ -1,7 +1,7 @@
 #request
 bool global
 bool optimized
-bool graphOnly
+bool graph_only
 ---
 #response
 MapData data

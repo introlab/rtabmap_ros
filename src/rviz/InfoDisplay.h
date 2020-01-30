@@ -28,15 +28,23 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef INFO_DISPLAY_H
 #define INFO_DISPLAY_H
 
-#include <rtabmap_ros/Info.h>
+#include <memory>
+#include <set>
+#include <string>
+#include <vector>
+#include <utility>
 
-#include <rviz/message_filter_display.h>
+#include <rtabmap_ros/visibility.h>
+#include <rtabmap_ros/msg/info.hpp>
+
+#include <rviz_common/display.hpp>
+#include "rviz_common/message_filter_display.hpp"
 #include <rtabmap/core/Transform.h>
 
 namespace rtabmap_ros
 {
 
-class InfoDisplay: public rviz::MessageFilterDisplay<rtabmap_ros::Info>
+class RTABMAP_ROS_PUBLIC InfoDisplay: public rviz_common::MessageFilterDisplay<rtabmap_ros::msg::Info>
 {
 Q_OBJECT
 public:
@@ -51,18 +59,15 @@ protected:
 	virtual void onInitialize();
 
 	/** @brief Process a single message.  Overridden from MessageFilterDisplay. */
-	virtual void processMessage( const rtabmap_ros::InfoConstPtr& cloud );
+	virtual void processMessage( const rtabmap_ros::msg::Info::ConstSharedPtr cloud );
 
 private:
-	ros::AsyncSpinner spinner_;
-	ros::CallbackQueue cbqueue_;
-
 	QString info_;
 	int globalCount_;
 	int localCount_;
 	std::map<std::string, float> statistics_;
 	rtabmap::Transform loopTransform_;
-	boost::mutex info_mutex_;
+	std::mutex info_mutex_;
 };
 
 } // namespace rtabmap_ros

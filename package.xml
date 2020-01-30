@@ -1,5 +1,6 @@
 <?xml version="1.0"?>
-<package>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
   <name>rtabmap_ros</name>
   <version>0.19.3</version>
   <description>RTAB-Map's ros-pkg. RTAB-Map is a RGB-D SLAM approach with real-time constraints.</description>
@@ -9,12 +10,21 @@
   <url type="bugtracker">https://github.com/introlab/rtabmap_ros/issues</url>
   <url type="repository">https://github.com/introlab/rtabmap_ros</url>
 
-  <buildtool_depend>catkin</buildtool_depend>
-  <buildtool_depend>genmsg</buildtool_depend>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <build_depend>builtin_interfaces</build_depend>
+  <build_depend>rosidl_default_generators</build_depend>
+  <exec_depend>builtin_interfaces</exec_depend>
+  <exec_depend>rosidl_default_runtime</exec_depend>
+  <member_of_group>rosidl_interface_packages</member_of_group>
   
   <build_depend>cv_bridge</build_depend>
-  <build_depend>roscpp</build_depend>
-  <build_depend>rospy</build_depend>
+  <build_depend>rclcpp</build_depend>
+  <build_depend>rclcpp_components</build_depend>
+  <build_depend>rclpy</build_depend>
   <build_depend>sensor_msgs</build_depend>
   <build_depend>std_msgs</build_depend>
   <build_depend>std_srvs</build_depend>
@@ -24,67 +34,49 @@
   <build_depend>visualization_msgs</build_depend>
   <build_depend>rosgraph_msgs</build_depend>
   <build_depend>image_transport</build_depend>
-  <build_depend>tf</build_depend>
-  <build_depend>tf_conversions</build_depend>
+  <build_depend>tf2</build_depend>
   <build_depend>tf2_ros</build_depend>
-  <build_depend>eigen_conversions</build_depend>
   <build_depend>laser_geometry</build_depend>
   <build_depend>pcl_conversions</build_depend>
-  <build_depend>pcl_ros</build_depend>
-  <build_depend>nodelet</build_depend>
-  <build_depend>dynamic_reconfigure</build_depend>
-  <build_depend>rviz</build_depend>
   <build_depend>message_filters</build_depend>
   <build_depend>class_loader</build_depend>
   <build_depend>rtabmap</build_depend>
-  <build_depend>move_base_msgs</build_depend>
-  <build_depend>costmap_2d</build_depend>
-  <build_depend>octomap_msgs</build_depend>
+  <build_depend>octomap</build_depend>
   <build_depend>image_geometry</build_depend>
-  <build_depend>find_object_2d</build_depend>
-  <build_depend>message_generation</build_depend>
   <build_depend>pluginlib</build_depend>
 
-  <run_depend>cv_bridge</run_depend>
-  <run_depend>roscpp</run_depend>
-  <run_depend>rospy</run_depend>
-  <run_depend>sensor_msgs</run_depend>
-  <run_depend>std_msgs</run_depend>
-  <run_depend>std_srvs</run_depend>
-  <run_depend>nav_msgs</run_depend>
-  <run_depend>stereo_msgs</run_depend>
-  <run_depend>geometry_msgs</run_depend>
-  <run_depend>visualization_msgs</run_depend>
-  <run_depend>rosgraph_msgs</run_depend>
-  <run_depend>image_transport</run_depend>
-  <run_depend>compressed_depth_image_transport</run_depend>
-  <run_depend>compressed_image_transport</run_depend>
-  <run_depend>tf</run_depend>
-  <run_depend>tf_conversions</run_depend>
-  <run_depend>tf2_ros</run_depend>
-  <run_depend>eigen_conversions</run_depend>
-  <run_depend>laser_geometry</run_depend>
-  <run_depend>pcl_conversions</run_depend>
-  <run_depend>pcl_ros</run_depend>
-  <run_depend>nodelet</run_depend>
-  <run_depend>dynamic_reconfigure</run_depend>
-  <run_depend>rviz</run_depend>
-  <run_depend>message_filters</run_depend>
-  <run_depend>class_loader</run_depend>
-  <run_depend>rtabmap</run_depend>
-  <run_depend>move_base_msgs</run_depend>
-  <run_depend>costmap_2d</run_depend>
-  <run_depend>octomap_msgs</run_depend>
-  <run_depend>image_geometry</run_depend>
-  <run_depend>find_object_2d</run_depend>
-  <run_depend>message_runtime</run_depend>
-  <run_depend>pluginlib</run_depend>
+  <exec_depend>cv_bridge</exec_depend>
+  <exec_depend>rclcpp</exec_depend>
+  <exec_depend>rclcpp_components</exec_depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>std_srvs</exec_depend>
+  <exec_depend>nav_msgs</exec_depend>
+  <exec_depend>stereo_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>visualization_msgs</exec_depend>
+  <exec_depend>rosgraph_msgs</exec_depend>
+  <exec_depend>image_transport</exec_depend>
+  <exec_depend>compressed_depth_image_transport</exec_depend>
+  <exec_depend>compressed_image_transport</exec_depend>
+  <exec_depend>tf2</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>laser_geometry</exec_depend>
+  <exec_depend>pcl_conversions</exec_depend>
+  <exec_depend>message_filters</exec_depend>
+  <exec_depend>class_loader</exec_depend>
+  <exec_depend>rtabmap</exec_depend>
+  <exec_depend>octomap</exec_depend>
+  <exec_depend>image_geometry</exec_depend>
+  <exec_depend>find_object_2d</exec_depend>
+  <exec_depend>message_runtime</exec_depend>
+  <exec_depend>pluginlib</exec_depend>
 
   <build_depend>libpcl-all-dev</build_depend>
 
   <export>
-	<nodelet plugin="${prefix}/nodelet_plugins.xml" />
-	<rviz plugin="${prefix}/rviz_plugins.xml"/>
-        <costmap_2d plugin="${prefix}/costmap_plugins.xml"/>
+	<build_type>ament_cmake</build_type>
+    <!-- costmap_2d plugin="${prefix}/costmap_plugins.xml"/-->
   </export>
 </package>

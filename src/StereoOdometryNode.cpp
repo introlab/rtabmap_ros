@@ -25,19 +25,16 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "ros/ros.h"
-#include "nodelet/loader.h"
-#include <rtabmap/utilite/ULogger.h>
-#include <rtabmap/core/Parameters.h>
+#include "rtabmap_ros/stereo_odometry.hpp"
+#include "rclcpp/rclcpp.hpp"
 
 int main(int argc, char **argv)
 {
 	ULogger::setType(ULogger::kTypeConsole);
 	ULogger::setLevel(ULogger::kWarning);
-	ros::init(argc, argv, "stereo_odometry");
 
 	// process "--params" argument
-	nodelet::V_string nargv;
+	std::vector<std::string> arguments;
 	for(int i=1;i<argc;++i)
 	{
 		if(strcmp(argv[i], "--params") == 0)
@@ -54,7 +51,7 @@ int main(int argc, char **argv)
 						"]" <<
 						std::endl;
 			}
-			ROS_WARN("Node will now exit after showing default odometry parameters because "
+			UWARN("Node will now exit after showing default odometry parameters because "
 					 "argument \"--params\" is detected!");
 			exit(0);
 		}
@@ -66,14 +63,14 @@ int main(int argc, char **argv)
 		{
 			ULogger::setLevel(ULogger::kInfo);
 		}
-		nargv.push_back(argv[i]);
+		arguments.push_back(argv[i]);
 
 	}
 
-	nodelet::Loader nodelet;
-	nodelet::M_string remap(ros::names::getRemappings());
-	std::string nodelet_name = ros::this_node::getName();
-	nodelet.load(nodelet_name, "rtabmap_ros/stereo_odometry", remap, nargv);
-	ros::spin();
+	rclcpp::init(argc, argv);
+	rclcpp::NodeOptions options;
+	options.arguments(arguments);
+	rclcpp::spin(std::make_shared<rtabmap_ros::StereoOdometry>(options));
+	rclcpp::shutdown();
 	return 0;
 }

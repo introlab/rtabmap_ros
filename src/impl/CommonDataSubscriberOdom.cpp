@@ -30,62 +30,61 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace rtabmap_ros {
 
 void CommonDataSubscriber::odomCallback(
-		const nav_msgs::OdometryConstPtr& odomMsg)
+		const nav_msgs::msg::Odometry::ConstSharedPtr odomMsg)
 {
 	callbackCalled();
-	rtabmap_ros::UserDataConstPtr userDataMsg; // Null
-	sensor_msgs::PointCloud2ConstPtr scan3dMsg; // Null
-	rtabmap_ros::OdomInfoConstPtr odomInfoMsg; // null
+	rtabmap_ros::msg::UserData::SharedPtr userDataMsg; // Null
+	sensor_msgs::msg::PointCloud2::SharedPtr scan3dMsg; // Null
+	rtabmap_ros::msg::OdomInfo::SharedPtr odomInfoMsg; // null
 	commonOdomCallback(odomMsg, userDataMsg, odomInfoMsg);
 }
 void CommonDataSubscriber::odomInfoCallback(
-		const nav_msgs::OdometryConstPtr& odomMsg,
-		const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg)
+		const nav_msgs::msg::Odometry::ConstSharedPtr odomMsg,
+		const rtabmap_ros::msg::OdomInfo::ConstSharedPtr odomInfoMsg)
 {
 	callbackCalled();
-	rtabmap_ros::UserDataConstPtr userDataMsg; // Null
-	sensor_msgs::LaserScanConstPtr scan2dMsg; // Null
+	rtabmap_ros::msg::UserData::SharedPtr userDataMsg; // Null
+	sensor_msgs::msg::LaserScan::SharedPtr scan2dMsg; // Null
 	commonOdomCallback(odomMsg, userDataMsg, odomInfoMsg);
 }
 void CommonDataSubscriber::odomDataCallback(
-		const nav_msgs::OdometryConstPtr& odomMsg,
-		const rtabmap_ros::UserDataConstPtr & userDataMsg)
+		const nav_msgs::msg::Odometry::ConstSharedPtr odomMsg,
+		const rtabmap_ros::msg::UserData::ConstSharedPtr userDataMsg)
 {
 	callbackCalled();
-	rtabmap_ros::OdomInfoConstPtr odomInfoMsg; // null
+	rtabmap_ros::msg::OdomInfo::SharedPtr odomInfoMsg; // null
 	commonOdomCallback(odomMsg, userDataMsg, odomInfoMsg);
 }
 void CommonDataSubscriber::odomDataInfoCallback(
-		const nav_msgs::OdometryConstPtr& odomMsg,
-		const rtabmap_ros::UserDataConstPtr & userDataMsg,
-		const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg)
+		const nav_msgs::msg::Odometry::ConstSharedPtr odomMsg,
+		const rtabmap_ros::msg::UserData::ConstSharedPtr userDataMsg,
+		const rtabmap_ros::msg::OdomInfo::ConstSharedPtr odomInfoMsg)
 {
 	callbackCalled();
-	sensor_msgs::PointCloud2ConstPtr scan3dMsg; // Null
+	sensor_msgs::msg::PointCloud2::SharedPtr scan3dMsg; // Null
 	commonOdomCallback(odomMsg, userDataMsg, odomInfoMsg);
 }
 
 void CommonDataSubscriber::setupOdomCallbacks(
-		ros::NodeHandle & nh,
-		ros::NodeHandle & pnh,
+		rclcpp::Node& node,
 		bool subscribeUserData,
 		bool subscribeOdomInfo,
 		int queueSize,
 		bool approxSync)
 {
-	ROS_INFO("Setup scan callback");
+	RCLCPP_INFO(node.get_logger(), "Setup scan callback");
 
 	if(subscribeUserData || subscribeOdomInfo)
 	{
-		odomSub_.subscribe(nh, "odom", 1);
+		odomSub_.subscribe(&node, "odom", rmw_qos_profile_sensor_data);
 
 		if(subscribeUserData)
 		{
-			userDataSub_.subscribe(nh, "user_data", 1);
+			userDataSub_.subscribe(&node, "user_data", rmw_qos_profile_sensor_data);
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(nh, "odom_info", 1);
+				odomInfoSub_.subscribe(&node, "odom_info", rmw_qos_profile_sensor_data);
 				SYNC_DECL3(odomDataInfo, approxSync, queueSize, odomSub_, userDataSub_, odomInfoSub_);
 			}
 			else
@@ -96,17 +95,17 @@ void CommonDataSubscriber::setupOdomCallbacks(
 		else if(subscribeOdomInfo)
 		{
 			subscribedToOdomInfo_ = true;
-			odomInfoSub_.subscribe(nh, "odom_info", 1);
+			odomInfoSub_.subscribe(&node, "odom_info", rmw_qos_profile_sensor_data);
 			SYNC_DECL2(odomInfo, approxSync, queueSize, odomSub_, odomInfoSub_);
 		}
 	}
 	else
 	{
-		odomSubOnly_ = nh.subscribe("odom", 1, &CommonDataSubscriber::odomCallback, this);
+		odomSubOnly_ = node.create_subscription<nav_msgs::msg::Odometry>("odom", rclcpp::SensorDataQoS(), std::bind(&CommonDataSubscriber::odomCallback, this, std::placeholders::_1));
 		subscribedTopicsMsg_ =
 				uFormat("\n%s subscribed to:\n   %s",
-				ros::this_node::getName().c_str(),
-				odomSubOnly_.getTopic().c_str());
+				node.get_name(),
+				odomSubOnly_->get_topic_name());
 	}
 }
 

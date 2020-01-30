@@ -25,40 +25,24 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include <ros/ros.h>
-#include <pluginlib/class_list_macros.h>
-#include <nodelet/nodelet.h>
-#include <ros/publisher.h>
-#include <ros/subscriber.h>
+#include <rtabmap_ros/pointcloud_to_depthimage.hpp>
 
 #include <rtabmap_ros/MsgConversion.h>
 #include <rtabmap/core/util3d.h>
 #include <rtabmap/core/util2d.h>
 #include <rtabmap/utilite/ULogger.h>
 
-#include <sensor_msgs/PointCloud2.h>
-#include <sensor_msgs/Image.h>
-#include <sensor_msgs/image_encodings.h>
-#include <sensor_msgs/CameraInfo.h>
-
-#include <image_transport/image_transport.h>
+#include <sensor_msgs/image_encodings.hpp>
 
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
 
-#include <message_filters/sync_policies/approximate_time.h>
-#include <message_filters/sync_policies/exact_time.h>
-#include <message_filters/subscriber.h>
-
 namespace rtabmap_ros
 {
 
-class PointCloudToDepthImage : public nodelet::Nodelet
-{
-public:
-	PointCloudToDepthImage() :
-		listener_(0),
+PointCloudToDepthImage::PointCloudToDepthImage(const rclcpp::NodeOptions & options) :
+		Node("pointcloud_to_depthimage", options),
 		waitForTransform_(0.1),
 		fillHolesSize_ (0),
 		fillHolesError_(0.1),
@@ -66,205 +50,184 @@ public:
 		decimation_(1),
 		approxSync_(0),
 		exactSync_(0)
-			{}
+{
+	tfBuffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
+	//auto timer_interface = std::make_shared<tf2_ros::CreateTimerROS>(
+	//	this->get_node_base_interface(),
+	//	this->get_node_timers_interface());
+	//tfBuffer_->setCreateTimerInterface(timer_interface);
+	tfListener_ = std::make_shared<tf2_ros::TransformListener>(*tfBuffer_);
 
-	virtual ~PointCloudToDepthImage()
+	int queueSize = 10;
+	bool approx = true;
+	queueSize = this->declare_parameter("queue_size", queueSize);
+	fixedFrameId_ = this->declare_parameter("fixed_frame_id", fixedFrameId_);
+	waitForTransform_ = this->declare_parameter("wait_for_transform", waitForTransform_);
+	fillHolesSize_ = this->declare_parameter("fill_holes_size", fillHolesSize_);
+	fillHolesError_ = this->declare_parameter("fill_holes_error", fillHolesError_);
+	fillIterations_ = this->declare_parameter("fill_iterations", fillIterations_);
+	decimation_ = this->declare_parameter("decimation", decimation_);
+	approx = this->declare_parameter("approx", approx);
+
+	if(fixedFrameId_.empty() && approx)
 	{
-		delete listener_;
-		if(approxSync_)
-		{
-			delete approxSync_;
-		}
-		if(exactSync_)
-		{
-			delete exactSync_;
-		}
+		RCLCPP_FATAL(this->get_logger(), "fixed_frame_id should be set when using approximate "
+				"time synchronization (approx=true)! If the robot "
+				"is moving, it could be \"odom\". If not moving, it "
+				"could be \"base_link\".");
 	}
 
-private:
-	virtual void onInit()
+	RCLCPP_INFO(this->get_logger(), "Params:");
+	RCLCPP_INFO(this->get_logger(), "  approx=%s", approx?"true":"false");
+	RCLCPP_INFO(this->get_logger(), "  queue_size=%d", queueSize);
+	RCLCPP_INFO(this->get_logger(), "  fixed_frame_id=%s", fixedFrameId_.c_str());
+	RCLCPP_INFO(this->get_logger(), "  wait_for_transform=%fs", waitForTransform_);
+	RCLCPP_INFO(this->get_logger(), "  fill_holes_size=%d pixels (0=disabled)", fillHolesSize_);
+	RCLCPP_INFO(this->get_logger(), "  fill_holes_error=%f", fillHolesError_);
+	RCLCPP_INFO(this->get_logger(), "  fill_iterations=%d", fillIterations_);
+	RCLCPP_INFO(this->get_logger(), "  decimation=%d", decimation_);
+
+	auto node = rclcpp::Node::make_shared(this->get_name());
+	image_transport::ImageTransport it(node);
+	depthImage16Pub_ = it.advertise("image_raw", 1); // 16 bits unsigned in mm
+	depthImage32Pub_ = it.advertise("image", 1);// 32 bits float in meters
+
+	if(approx)
 	{
-		listener_ = new tf::TransformListener();
-
-		ros::NodeHandle & nh = getNodeHandle();
-		ros::NodeHandle & pnh = getPrivateNodeHandle();
-
-		int queueSize = 10;
-		bool approx = true;
-		pnh.param("queue_size", queueSize, queueSize);
-		pnh.param("fixed_frame_id", fixedFrameId_, fixedFrameId_);
-		pnh.param("wait_for_transform", waitForTransform_, waitForTransform_);
-		pnh.param("fill_holes_size", fillHolesSize_, fillHolesSize_);
-		pnh.param("fill_holes_error", fillHolesError_, fillHolesError_);
-		pnh.param("fill_iterations", fillIterations_, fillIterations_);
-		pnh.param("decimation", decimation_, decimation_);
-		pnh.param("approx", approx, approx);
-
-		if(fixedFrameId_.empty() && approx)
-		{
-			ROS_FATAL("fixed_frame_id should be set when using approximate "
-					"time synchronization (approx=true)! If the robot "
-					"is moving, it could be \"odom\". If not moving, it "
-					"could be \"base_link\".");
-		}
-
-		ROS_INFO("Params:");
-		ROS_INFO("  approx=%s", approx?"true":"false");
-		ROS_INFO("  queue_size=%d", queueSize);
-		ROS_INFO("  fixed_frame_id=%s", fixedFrameId_.c_str());
-		ROS_INFO("  wait_for_transform=%fs", waitForTransform_);
-		ROS_INFO("  fill_holes_size=%d pixels (0=disabled)", fillHolesSize_);
-		ROS_INFO("  fill_holes_error=%f", fillHolesError_);
-		ROS_INFO("  fill_iterations=%d", fillIterations_);
-		ROS_INFO("  decimation=%d", decimation_);
-
-		image_transport::ImageTransport it(nh);
-		depthImage16Pub_ = it.advertise("image_raw", 1); // 16 bits unsigned in mm
-		depthImage32Pub_ = it.advertise("image", 1);     // 32 bits float in meters
-
-		if(approx)
-		{
-			approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize), pointCloudSub_, cameraInfoSub_);
-			approxSync_->registerCallback(boost::bind(&PointCloudToDepthImage::callback, this, _1, _2));
-		}
-		else
-		{
-			fixedFrameId_.clear();
-			exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize), pointCloudSub_, cameraInfoSub_);
-			exactSync_->registerCallback(boost::bind(&PointCloudToDepthImage::callback, this, _1, _2));
-		}
-
-		pointCloudSub_.subscribe(nh, "cloud", 1);
-		cameraInfoSub_.subscribe(nh, "camera_info", 1);
+		approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize), pointCloudSub_, cameraInfoSub_);
+		approxSync_->registerCallback(std::bind(&PointCloudToDepthImage::callback, this, std::placeholders::_1, std::placeholders::_2));
+	}
+	else
+	{
+		fixedFrameId_.clear();
+		exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize), pointCloudSub_, cameraInfoSub_);
+		exactSync_->registerCallback(std::bind(&PointCloudToDepthImage::callback, this, std::placeholders::_1, std::placeholders::_2));
 	}
 
-	void callback(
-			const sensor_msgs::PointCloud2ConstPtr & pointCloud2Msg,
-			const sensor_msgs::CameraInfoConstPtr & cameraInfoMsg)
+	pointCloudSub_.subscribe(this, "cloud", rmw_qos_profile_sensor_data);
+	cameraInfoSub_.subscribe(this, "camera_info", rmw_qos_profile_sensor_data);
+}
+
+PointCloudToDepthImage::~PointCloudToDepthImage()
+{
+	delete approxSync_;
+	delete exactSync_;
+}
+
+void PointCloudToDepthImage::callback(
+		const sensor_msgs::msg::PointCloud2::ConstSharedPtr pointCloud2Msg,
+		const sensor_msgs::msg::CameraInfo::ConstSharedPtr cameraInfoMsg)
+{
+	if(depthImage32Pub_.getNumSubscribers() > 0 || depthImage16Pub_.getNumSubscribers() > 0)
 	{
-		if(depthImage32Pub_.getNumSubscribers() > 0 || depthImage16Pub_.getNumSubscribers() > 0)
+		double cloudStamp = timestampFromROS(pointCloud2Msg->header.stamp);
+		double infoStamp = timestampFromROS(cameraInfoMsg->header.stamp);
+
+		rtabmap::Transform cloudDisplacement = rtabmap::Transform::getIdentity();
+		if(!fixedFrameId_.empty())
 		{
-			double cloudStamp = pointCloud2Msg->header.stamp.toSec();
-			double infoStamp = cameraInfoMsg->header.stamp.toSec();
-
-			rtabmap::Transform cloudDisplacement = rtabmap::Transform::getIdentity();
-			if(!fixedFrameId_.empty())
-			{
-				// approx sync
-				cloudDisplacement = rtabmap_ros::getTransform(
-						pointCloud2Msg->header.frame_id,
-						fixedFrameId_,
-						pointCloud2Msg->header.stamp,
-						cameraInfoMsg->header.stamp,
-						*listener_,
-						waitForTransform_);
-			}
-
-			if(cloudDisplacement.isNull())
-			{
-				return;
-			}
-
-			rtabmap::Transform cloudToCamera = rtabmap_ros::getTransform(
+			// approx sync
+			cloudDisplacement = rtabmap_ros::getTransform(
 					pointCloud2Msg->header.frame_id,
-					cameraInfoMsg->header.frame_id,
+					fixedFrameId_,
+					pointCloud2Msg->header.stamp,
 					cameraInfoMsg->header.stamp,
-					*listener_,
+					*tfBuffer_,
 					waitForTransform_);
+		}
 
-			if(cloudToCamera.isNull())
+		if(cloudDisplacement.isNull())
+		{
+			return;
+		}
+
+		rtabmap::Transform cloudToCamera = rtabmap_ros::getTransform(
+				pointCloud2Msg->header.frame_id,
+				cameraInfoMsg->header.frame_id,
+				cameraInfoMsg->header.stamp,
+				*tfBuffer_,
+				waitForTransform_);
+
+		if(cloudToCamera.isNull())
+		{
+			return;
+		}
+
+		rtabmap::Transform localTransform = cloudDisplacement.inverse()*cloudToCamera;
+
+		rtabmap::CameraModel model = rtabmap_ros::cameraModelFromROS(*cameraInfoMsg, localTransform);
+
+		if(decimation_ > 1)
+		{
+			if(model.imageWidth()%decimation_ == 0 && model.imageHeight()%decimation_ == 0)
 			{
-				return;
-			}
-
-			rtabmap::Transform localTransform = cloudDisplacement.inverse()*cloudToCamera;
-
-			rtabmap::CameraModel model = rtabmap_ros::cameraModelFromROS(*cameraInfoMsg, localTransform);
-
-			if(decimation_ > 1)
-			{
-				if(model.imageWidth()%decimation_ == 0 && model.imageHeight()%decimation_ == 0)
-				{
-					model = model.scaled(1.0f/float(decimation_));
-				}
-				else
-				{
-					ROS_ERROR("decimation (%d) not valid for image size %dx%d",
-							decimation_,
-							model.imageWidth(),
-							model.imageHeight());
-				}
-			}
-
-			pcl::PCLPointCloud2::Ptr cloud(new pcl::PCLPointCloud2);
-			pcl_conversions::toPCL(*pointCloud2Msg, *cloud);
-
-			cv_bridge::CvImage depthImage;
-
-			if(cloud->data.empty())
-			{
-				ROS_WARN("Received an empty cloud on topic \"%s\"! A depth image with all zeros is returned.", pointCloudSub_.getTopic().c_str());
-				depthImage.image = cv::Mat::zeros(model.imageSize(), CV_32FC1);
+				model = model.scaled(1.0f/float(decimation_));
 			}
 			else
 			{
-				depthImage.image = rtabmap::util3d::projectCloudToCamera(model.imageSize(), model.K(), cloud, model.localTransform());
-
-				if(fillHolesSize_ > 0 && fillIterations_ > 0)
-				{
-					for(int i=0; i<fillIterations_;++i)
-					{
-						depthImage.image = rtabmap::util2d::fillDepthHoles(depthImage.image, fillHolesSize_, fillHolesError_);
-					}
-				}
-			}
-
-			depthImage.header = cameraInfoMsg->header;
-
-			if(depthImage32Pub_.getNumSubscribers())
-			{
-				depthImage.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
-				depthImage32Pub_.publish(depthImage.toImageMsg());
-			}
-
-			if(depthImage16Pub_.getNumSubscribers())
-			{
-				depthImage.encoding = sensor_msgs::image_encodings::TYPE_16UC1;
-				depthImage.image = rtabmap::util2d::cvtDepthFromFloat(depthImage.image);
-				depthImage16Pub_.publish(depthImage.toImageMsg());
-			}
-
-			if( cloudStamp != pointCloud2Msg->header.stamp.toSec() ||
-				infoStamp != cameraInfoMsg->header.stamp.toSec())
-			{
-				NODELET_ERROR("Input stamps changed between the beginning and the end of the callback! Make "
-						"sure the node publishing the topics doesn't override the same data after publishing them. A "
-						"solution is to use this node within another nodelet manager. Stamps: "
-						"cloud=%f->%f info=%f->%f",
-						cloudStamp, pointCloud2Msg->header.stamp.toSec(),
-						infoStamp, cameraInfoMsg->header.stamp.toSec());
+				RCLCPP_ERROR(this->get_logger(), "decimation (%d) not valid for image size %dx%d",
+						decimation_,
+						model.imageWidth(),
+						model.imageHeight());
 			}
 		}
+
+		pcl::PCLPointCloud2::Ptr cloud(new pcl::PCLPointCloud2);
+		pcl_conversions::toPCL(*pointCloud2Msg, *cloud);
+
+		cv_bridge::CvImage depthImage;
+
+		if(cloud->data.empty())
+		{
+			RCLCPP_WARN(this->get_logger(), "Received an empty cloud on topic \"%s\"! A depth image with all zeros is returned.", pointCloudSub_.getTopic().c_str());
+			depthImage.image = cv::Mat::zeros(model.imageSize(), CV_32FC1);
+		}
+		else
+		{
+			depthImage.image = rtabmap::util3d::projectCloudToCamera(model.imageSize(), model.K(), cloud, model.localTransform());
+
+			if(fillHolesSize_ > 0 && fillIterations_ > 0)
+			{
+				for(int i=0; i<fillIterations_;++i)
+				{
+					depthImage.image = rtabmap::util2d::fillDepthHoles(depthImage.image, fillHolesSize_, fillHolesError_);
+				}
+			}
+		}
+
+		depthImage.header = cameraInfoMsg->header;
+
+		if(depthImage32Pub_.getNumSubscribers())
+		{
+			depthImage.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
+			depthImage32Pub_.publish(depthImage.toImageMsg());
+		}
+
+		if(depthImage16Pub_.getNumSubscribers())
+		{
+			depthImage.encoding = sensor_msgs::image_encodings::TYPE_16UC1;
+			depthImage.image = rtabmap::util2d::cvtDepthFromFloat(depthImage.image);
+			depthImage16Pub_.publish(depthImage.toImageMsg());
+		}
+
+		if( cloudStamp != timestampFromROS(pointCloud2Msg->header.stamp) ||
+			infoStamp != timestampFromROS(cameraInfoMsg->header.stamp))
+		{
+			RCLCPP_ERROR(this->get_logger(), "Input stamps changed between the beginning and the end of the callback! Make "
+					"sure the node publishing the topics doesn't override the same data after publishing them. A "
+					"solution is to use this node within another nodelet manager. Stamps: "
+					"cloud=%f->%f info=%f->%f",
+					cloudStamp, timestampFromROS(pointCloud2Msg->header.stamp),
+					infoStamp, timestampFromROS(cameraInfoMsg->header.stamp));
+		}
 	}
-
-private:
-	image_transport::Publisher depthImage16Pub_;
-	image_transport::Publisher depthImage32Pub_;
-	message_filters::Subscriber<sensor_msgs::PointCloud2> pointCloudSub_;
-	message_filters::Subscriber<sensor_msgs::CameraInfo> cameraInfoSub_;
-	std::string fixedFrameId_;
-	tf::TransformListener * listener_;
-	double waitForTransform_;
-	int fillHolesSize_;
-	double fillHolesError_;
-	int fillIterations_;
-	int decimation_;
-
-	typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::PointCloud2, sensor_msgs::CameraInfo> MyApproxSyncPolicy;
-	message_filters::Synchronizer<MyApproxSyncPolicy> * approxSync_;
-	typedef message_filters::sync_policies::ExactTime<sensor_msgs::PointCloud2, sensor_msgs::CameraInfo> MyExactSyncPolicy;
-	message_filters::Synchronizer<MyExactSyncPolicy> * exactSync_;
-};
-
-PLUGINLIB_EXPORT_CLASS(rtabmap_ros::PointCloudToDepthImage, nodelet::Nodelet);
 }
+
+}
+
+#include "rclcpp_components/register_node_macro.hpp"
+
+// Register the component with class_loader.
+// This acts as a sort of entry point, allowing the component to be discoverable when its library
+// is being loaded into a running process.
+RCLCPP_COMPONENTS_REGISTER_NODE(rtabmap_ros::PointCloudToDepthImage)

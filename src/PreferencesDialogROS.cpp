@@ -35,15 +35,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <QLabel>
 #include <rtabmap/core/RtabmapEvent.h>
 #include <QMessageBox>
-#include <ros/exceptions.h>
 #include <rtabmap/utilite/UStl.h>
 
 using namespace rtabmap;
 
-PreferencesDialogROS::PreferencesDialogROS(const QString & configFile) :
-		configFile_(configFile)
+PreferencesDialogROS::PreferencesDialogROS(rclcpp::Node * node, const QString & configFile) :
+		configFile_(configFile),
+		node_(node)
 {
-
+	UASSERT(node_);
 }
 
 PreferencesDialogROS::~PreferencesDialogROS()
@@ -65,7 +65,7 @@ QString PreferencesDialogROS::getTmpIniFilePath() const
 	return QDir::homePath()+"/.ros/"+QFileInfo(configFile_).fileName()+".tmp";
 }
 
-void PreferencesDialogROS::readCameraSettings(const QString & filePath)
+void PreferencesDialogROS::readCameraSettings(const QString &)
 {
 	this->setInputRate(0);
 }
@@ -83,10 +83,8 @@ bool PreferencesDialogROS::readCoreSettings(const QString & filePath)
 		path = filePath;
 	}
 
-	ros::NodeHandle nh;
-	ROS_INFO("%s", this->getParamMessage().toStdString().c_str());
-	bool validParameters = true;
-	int readCount = 0;
+	auto node = std::make_shared<rclcpp::Node>("rtabmapviz");
+	RCLCPP_INFO(node->get_logger(), "%s", this->getParamMessage().toStdString().c_str());
 	rtabmap::ParametersMap parameters = rtabmap::Parameters::getDefaultParameters();
 	// remove Odom parameters
 	for(ParametersMap::iterator iter=parameters.begin(); iter!=parameters.end();)
@@ -100,6 +98,8 @@ bool PreferencesDialogROS::readCoreSettings(const QString & filePath)
 			++iter;
 		}
 	}
+
+	std::vector<std::string> rosParameters;
 	for(rtabmap::ParametersMap::iterator i=parameters.begin(); i!=parameters.end(); ++i)
 	{
 		if(i->first.compare(rtabmap::Parameters::kRtabmapWorkingDirectory()) == 0)
@@ -123,31 +123,42 @@ bool PreferencesDialogROS::readCoreSettings(const QString & filePath)
 		}
 		else
 		{
-			std::string value;
-			if(nh.getParam(i->first,value))
-			{
-				PreferencesDialog::setParameter(i->first, value);
+			rosParameters.push_back(i->first);
+		}
+	}
+
+	auto client = std::make_shared<rclcpp::AsyncParametersClient>(node, "rtabmap");
+	if (!client->wait_for_service(std::chrono::seconds(5))) {
+		RCLCPP_ERROR(node->get_logger(), "Can't call rtabmap parameters service, is the node running?");
+	}
+	int readCount = 0;
+	if(client->service_is_ready())
+	{
+		auto parameters = client->get_parameters(rosParameters);
+		if (rclcpp::spin_until_future_complete(node, parameters, std::chrono::seconds(5)) ==
+				rclcpp::executor::FutureReturnCode::SUCCESS)
+		{
+			for (auto & parameter : parameters.get()) {
+				const std::string & key = parameter.get_name();
+				std::string value = parameter.value_to_string();
+				PreferencesDialog::setParameter(key, value);
 				++readCount;
-			}
-			else
-			{
-				validParameters = false;
 			}
 		}
 	}
 
-	ROS_INFO("Parameters read = %d", readCount);
+	RCLCPP_INFO(node->get_logger(), "Parameters read = %d", readCount);
 
-	if(validParameters)
+	if(readCount>0)
 	{
-		ROS_INFO("Parameters successfully read.");
+		RCLCPP_INFO(node->get_logger(), "Parameters successfully read.");
 	}
 	else
 	{
 		if(this->isVisible())
 		{
-			QString warning = tr("Failed to get some RTAB-Map parameters from ROS server, the rtabmap node may be not started or some parameters won't work...");
-			ROS_WARN("%s", warning.toStdString().c_str());
+			QString warning = tr("Failed to get RTAB-Map parameters from ROS server, the rtabmap node may be not started or some parameters won't work...");
+			RCLCPP_WARN(node->get_logger(), "%s", warning.toStdString().c_str());
 			QMessageBox::warning(this, tr("Can't read parameters from ROS server."), warning);
 		}
 		return false;

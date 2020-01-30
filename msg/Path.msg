@@ -1,6 +1,6 @@
 
-Header header
+std_msgs/Header header
 
-int32[] nodeIds
+int32[] node_ids
 geometry_msgs/Pose[] poses
 

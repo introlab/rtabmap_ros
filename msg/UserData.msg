@@ -1,5 +1,5 @@
 
-Header header
+std_msgs/Header header
 
 # OpenCV matrix containing the user data. A matrix of type CV_8UC1 
 # with 1 row is considered to be compressed (with rtabmap::compressData() method).
