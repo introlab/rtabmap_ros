@@ -1,7 +1,7 @@
 rtabmap_ros
 ===========
 
-RTAB-Map's ROS2 package (branch `ros2`). **IN CONSTRUCTION**: currently most nodes are ported to ROS2, however they are not all tested yet. The interface is the same than on ROS1 (parameters and topic names should still match ROS1 documentation on [rtabmap_ros](http://wiki.ros.org/rtabmap_ros)). See `launch/ros2` subfolder for some ROS2 examples with turtlebot3 in simulation (tested under ROS2 Eloquent distro).
+RTAB-Map's ROS2 package (branch `ros2`). **UNDER CONSTRUCTION**: currently most nodes are ported to ROS2, however they are not all tested yet. The interface is the same than on ROS1 (parameters and topic names should still match ROS1 documentation on [rtabmap_ros](http://wiki.ros.org/rtabmap_ros)). See `launch/ros2` subfolder for some ROS2 examples with turtlebot3 in simulation (tested under ROS2 Eloquent distro).
 
 # Installation 
 
