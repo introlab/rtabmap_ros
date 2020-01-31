@@ -9,6 +9,9 @@ For the RTAB-Map libraries and standalone application, visit [RTAB-Map's home pa
 
 # Installation 
 
+## ROS2 distribution
+**Under construction**: see [ros2 branch](https://github.com/introlab/rtabmap_ros/tree/ros2#rtabmap_ros).
+
 ## ROS distribution 
 RTAB-Map is released as binaries in the ROS distribution.
 * Melodic
