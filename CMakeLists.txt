@@ -97,6 +97,7 @@ add_message_files(
    SetGoal.srv
    SetLabel.srv
    GetPlan.srv
+   AddLink.srv
  )
 
 ## Generate added messages and services with any dependencies listed here
@@ -319,6 +320,10 @@ IF(find_object_2d_FOUND)
     target_link_libraries(rtabmap_save_objects_example ${Libraries} rtabmap_ros ${find_object_2d_LIBRARIES})
     set_target_properties(rtabmap_save_objects_example PROPERTIES OUTPUT_NAME "save_objects_example")
 ENDIF(find_object_2d_FOUND)
+
+add_executable(rtabmap_external_loop_detectionexample src/ExternalLoopDetectionExample.cpp)
+target_link_libraries(rtabmap_external_loop_detectionexample ${Libraries} rtabmap_ros)
+set_target_properties(rtabmap_external_loop_detectionexample PROPERTIES OUTPUT_NAME "external_loop_detection_example")
 
 add_executable(rtabmap_camera src/CameraNode.cpp)
 add_dependencies(rtabmap_camera ${${PROJECT_NAME}_EXPORTED_TARGETS})

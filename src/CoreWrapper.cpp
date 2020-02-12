@@ -611,6 +611,7 @@ void CoreWrapper::onInit()
 	cancelGoalSrv_ = nh.advertiseService("cancel_goal", &CoreWrapper::cancelGoalCallback, this);
 	setLabelSrv_ = nh.advertiseService("set_label", &CoreWrapper::setLabelCallback, this);
 	listLabelsSrv_ = nh.advertiseService("list_labels", &CoreWrapper::listLabelsCallback, this);
+	addLinkSrv_ = nh.advertiseService("add_link", &CoreWrapper::addLinkCallback, this);
 #ifdef WITH_OCTOMAP_MSGS
 #ifdef RTABMAP_OCTOMAP
 	octomapBinarySrv_ = nh.advertiseService("octomap_binary", &CoreWrapper::octomapBinaryCallback, this);
@@ -3226,6 +3227,17 @@ bool CoreWrapper::listLabelsCallback(rtabmap_ros::ListLabels::Request& req, rtab
 		NODELET_INFO("List labels service: %d labels found.", (int)res.labels.size());
 	}
 	return true;
+}
+
+bool CoreWrapper::addLinkCallback(rtabmap_ros::AddLink::Request& req, rtabmap_ros::AddLink::Response&)
+{
+	if(rtabmap_.getMemory())
+	{
+		ROS_INFO("Adding external link %d -> %d", req.link.fromId, req.link.toId);
+		rtabmap_.addLink(linkFromROS(req.link));
+		return true;
+	}
+	return false;
 }
 
 void CoreWrapper::publishStats(const ros::Time & stamp)

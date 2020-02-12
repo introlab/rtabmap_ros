@@ -889,9 +889,9 @@ rtabmap::Signature nodeDataFromROS(const rtabmap_ros::NodeData & msg)
 	{
 		// multi-cameras model
 		if(msg.fx.size() &&
-		   msg.fx.size() == msg.fy.size(),
-		   msg.fx.size() == msg.cx.size(),
-		   msg.fx.size() == msg.cy.size(),
+		   msg.fx.size() == msg.fy.size() &&
+		   msg.fx.size() == msg.cx.size() &&
+		   msg.fx.size() == msg.cy.size() &&
 		   msg.fx.size() == msg.localTransform.size())
 		{
 			for(unsigned int i=0; i<msg.fx.size(); ++i)
