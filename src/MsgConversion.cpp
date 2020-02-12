@@ -40,7 +40,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <image_geometry/pinhole_camera_model.h>
 #include <image_geometry/stereo_camera_model.h>
 #include <sensor_msgs/image_encodings.hpp>
-#include <sensor_msgs/PointField.h>
+#include <sensor_msgs/msg/point_field.hpp>
 #include <geometry_msgs/msg/transform.hpp>
 #include <laser_geometry/laser_geometry.hpp>
 #include <rtabmap/core/util3d_surface.h>
@@ -1939,9 +1939,9 @@ transformPointCloud (
     return;
   }
 
-  if (in.fields[x_idx].datatype != sensor_msgs::PointField::FLOAT32 ||
-      in.fields[y_idx].datatype != sensor_msgs::PointField::FLOAT32 ||
-      in.fields[z_idx].datatype != sensor_msgs::PointField::FLOAT32)
+  if (in.fields[x_idx].datatype != sensor_msgs::msg::PointField::FLOAT32 ||
+      in.fields[y_idx].datatype != sensor_msgs::msg::PointField::FLOAT32 ||
+      in.fields[z_idx].datatype != sensor_msgs::msg::PointField::FLOAT32)
   {
 	  UERROR ("X-Y-Z coordinates not floats. Currently only floats are supported.");
     return;
