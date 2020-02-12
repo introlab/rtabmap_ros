@@ -220,7 +220,7 @@ SET(rtabmap_plugins_lib_src
     src/nodelets/pointcloud_to_depthimage.cpp 
     src/nodelets/obstacles_detection.cpp
 #   src/nodelets/obstacles_detection_old.cpp
-#   src/nodelets/point_cloud_aggregator.cpp
+    src/nodelets/point_cloud_aggregator.cpp
 #   src/nodelets/point_cloud_assembler.cpp
 #   src/nodelets/undistort_depth.cpp
 #   src/nodelets/imu_to_tf.cpp
@@ -284,6 +284,7 @@ rclcpp_components_register_nodes(rtabmap_plugins "rtabmap_ros::PointCloudXYZ")
 rclcpp_components_register_nodes(rtabmap_plugins "rtabmap_ros::PointCloudXYZRGB")
 rclcpp_components_register_nodes(rtabmap_plugins "rtabmap_ros::PointCloudToDepthImage")
 rclcpp_components_register_nodes(rtabmap_plugins "rtabmap_ros::ObstaclesDetection")
+rclcpp_components_register_nodes(rtabmap_plugins "rtabmap_ros::PointCloudAggregator")
 
 rclcpp_components_register_nodes(rtabmap_sync "rtabmap_ros::CoreWrapper")
 
@@ -339,6 +340,11 @@ add_executable(rtabmap_obstacles_detection src/ObstaclesDetectionNode.cpp)
 ament_target_dependencies(rtabmap_obstacles_detection ${Libraries})
 target_link_libraries(rtabmap_obstacles_detection rtabmap_plugins ${RTABMap_LIBRARIES})
 set_target_properties(rtabmap_obstacles_detection PROPERTIES OUTPUT_NAME "obstacles_detection")
+
+add_executable(rtabmap_point_cloud_aggregator src/PointCloudAggregatorNode.cpp)
+ament_target_dependencies(rtabmap_point_cloud_aggregator ${Libraries})
+target_link_libraries(rtabmap_point_cloud_aggregator rtabmap_plugins ${RTABMap_LIBRARIES})
+set_target_properties(rtabmap_point_cloud_aggregator PROPERTIES OUTPUT_NAME "point_cloud_aggregator")
 
 #add_executable(rtabmap_map_optimizer src/MapOptimizerNode.cpp)
 #ament_target_dependencies(rtabmap_map_optimizer rtabmap_ros)
@@ -572,6 +578,7 @@ install(TARGETS
    rtabmap_point_cloud_xyz
    rtabmap_point_cloud_xyzrgb
    rtabmap_obstacles_detection
+   rtabmap_point_cloud_aggregator
 #   rtabmap_camera
    rtabmap_rgbd_sync
    rtabmap_stereo_sync
