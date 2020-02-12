@@ -40,7 +40,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap_ros/msg/map_data.hpp>
 #include <rtabmap/core/Transform.h>
 
-#include <pluginlib/class_loader.h>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 
 #include "rviz_common/message_filter_display.hpp"

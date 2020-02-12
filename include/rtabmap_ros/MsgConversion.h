@@ -238,6 +238,11 @@ bool convertScan3dMsg(
 		int maxPoints = 0,
 		float maxRange = 0.0f);
 
+// Missing function in ros2 (from old pcl_ros)
+void transformPointCloud (
+		const Eigen::Matrix4f &transform,
+		const sensor_msgs::msg::PointCloud2 &in,
+        sensor_msgs::msg::PointCloud2 &out);
 }
 
 #endif /* MSGCONVERSION_H_ */
