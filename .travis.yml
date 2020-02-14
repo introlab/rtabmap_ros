@@ -17,9 +17,10 @@ matrix:
       script: 
         - source /opt/ros/eloquent/setup.bash
         - cd ..
-        - mkdir -p ros2_ws
+        - mkdir -p ros2_ws/src
         - cd ros2_ws
         - colcon build
+        - source install/setup.bash
         - cd ..
         - mv rtabmap_ros ros2_ws/src/.
         - git clone https://github.com/introlab/rtabmap.git
@@ -29,7 +30,6 @@ matrix:
         - make
         - make install
         - cd ../../ros2_ws
-        - source install/setup.bash
         
         - colcon build --parallel-workers 3
         - colcon build install
