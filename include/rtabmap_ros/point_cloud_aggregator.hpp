@@ -33,8 +33,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
 
-#include <sensor_msgs/PointCloud2.h>
-
 #include <message_filters/sync_policies/approximate_time.h>
 #include <message_filters/subscriber.h>
 #include <message_filters/sync_policies/exact_time.h>
