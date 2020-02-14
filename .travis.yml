@@ -17,7 +17,10 @@ matrix:
       script: 
         - source /opt/ros/eloquent/setup.bash
         - cd ..
-        - mkdir -p ros2_ws/src
+        - mkdir -p ros2_ws
+        - cd ros2_ws
+        - colcon build
+        - cd ..
         - mv rtabmap_ros ros2_ws/src/.
         - git clone https://github.com/introlab/rtabmap.git
         - cd rtabmap
