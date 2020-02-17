@@ -15,19 +15,24 @@ matrix:
         - sudo apt-get -y install ros-eloquent-desktop ros-eloquent-message-filters ros-eloquent-image-transport ros-eloquent-pcl-conversions python3-colcon-common-extensions
 
       script: 
+        - pwd
         - source /opt/ros/eloquent/setup.bash
         - cd ..
         - mkdir -p ros2_ws/src
         - cd ros2_ws
+        - colcon build
         - cd ..
         - mv rtabmap_ros ros2_ws/src/.
         - git clone https://github.com/introlab/rtabmap.git
         - cd rtabmap
         - mkdir -p build && cd build
-        - cmake .. 
+        - cmake -DCMAKE_INSTALL_PREFIX=~/build/introlab/ros2_ws/install .. 
         - make
         - make install
         - cd ../../ros2_ws
+        - source install/setup.bash
+        - export PATH=~/build/introlab/ros2_ws/install/bin:$PATH
+        - env
         - colcon build --parallel-workers 3
         - colcon build install
         
