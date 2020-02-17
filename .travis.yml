@@ -33,7 +33,7 @@ matrix:
         - source install/setup.bash
         - export PATH=~/build/introlab/ros2_ws/install/bin:$PATH
         - env
-        - colcon build --parallel-workers 3 --log-level debug
+        - colcon build --parallel-workers 3
         
 notifications:
   email:
