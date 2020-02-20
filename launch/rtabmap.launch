@@ -52,7 +52,7 @@
 
   <!-- if timestamps of the input topics are synchronized using approximate or exact time policy-->
   <arg     if="$(arg stereo)" name="approx_sync"  default="false"/>
-  <arg unless="$(arg stereo)" name="approx_sync"  default="true"/>         
+  <arg unless="$(arg stereo)" name="approx_sync"  default="$(arg depth)"/>         
    
   <!-- RGB-D related topics -->
   <arg name="rgb_topic"               default="/camera/rgb/image_rect_color" />
