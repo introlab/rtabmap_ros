@@ -204,6 +204,7 @@ void OdometryROS::onInit()
 
 
 	//parameters
+	ROS_INFO("Odometry: stereoParams_=%d visParams_=%d icpParams_=%d", stereoParams_?1:0, visParams_?1:0, icpParams_?1:0);
 	parameters_ = Parameters::getDefaultOdometryParameters(stereoParams_, visParams_, icpParams_);
 	if(icpParams_)
 	{
@@ -288,6 +289,10 @@ void OdometryROS::onInit()
 		{
 			NODELET_INFO( "Update odometry parameter \"%s\"=\"%s\" from arguments", iter->first.c_str(), iter->second.c_str());
 			jter->second = iter->second;
+		}
+		else
+		{
+			NODELET_INFO( "Odometry: Ignored parameter \"%s\"=\"%s\" from arguments", iter->first.c_str(), iter->second.c_str());
 		}
 	}
 
