@@ -402,6 +402,13 @@ private:
 					"cloud is not dense, for convenience it will be set to %d (%dx%d)",
 					scanCloudMaxPoints_, cloudMsg.width, cloudMsg.height);
 		}
+		else if(cloudMsg.height > 1 && scanCloudMaxPoints_ != cloudMsg.height * cloudMsg.width)
+		{
+			NODELET_WARN("IcpOdometry: \"scan_cloud_max_points\" is set to %d but input "
+					"cloud is not dense and has a size of %d (%dx%d), setting to this later size.",
+					scanCloudMaxPoints_, cloudMsg.width *cloudMsg.height, cloudMsg.width, cloudMsg.height);
+			scanCloudMaxPoints_ = cloudMsg.width *cloudMsg.height;
+		}
 		int maxLaserScans = scanCloudMaxPoints_;
 		if(containNormals)
 		{
@@ -410,7 +417,14 @@ private:
 			if(pclScan->size() && scanDownsamplingStep_ > 1)
 			{
 				pclScan = util3d::downsample(pclScan, scanDownsamplingStep_);
-				maxLaserScans /= scanDownsamplingStep_;
+				if(pclScan->height>1)
+				{
+					maxLaserScans = pclScan->height * pclScan->width;
+				}
+				else
+				{
+					maxLaserScans /= scanDownsamplingStep_;
+				}
 			}
 			scan = util3d::laserScanFromPointCloud(*pclScan);
 			if(filtered_scan_pub_.getNumSubscribers())
@@ -428,7 +442,14 @@ private:
 			if(pclScan->size() && scanDownsamplingStep_ > 1)
 			{
 				pclScan = util3d::downsample(pclScan, scanDownsamplingStep_);
-				maxLaserScans /= scanDownsamplingStep_;
+				if(pclScan->height>1)
+				{
+					maxLaserScans = pclScan->height * pclScan->width;
+				}
+				else
+				{
+					maxLaserScans /= scanDownsamplingStep_;
+				}
 			}
 			if(!pclScan->is_dense)
 			{
