@@ -896,14 +896,21 @@ rtabmap::Signature nodeDataFromROS(const rtabmap_ros::NodeData & msg)
 		{
 			for(unsigned int i=0; i<msg.fx.size(); ++i)
 			{
-				models.push_back(rtabmap::CameraModel(
-						msg.fx[i],
-						msg.fy[i],
-						msg.cx[i],
-						msg.cy[i],
-						transformFromGeometryMsg(msg.localTransform[i]),
-						0.0,
-						cv::Size(msg.width[i], msg.height[i])));
+				if(msg.fx[i] == 0)
+				{
+					models.push_back(rtabmap::CameraModel());
+				}
+				else
+				{
+					models.push_back(rtabmap::CameraModel(
+							msg.fx[i],
+							msg.fy[i],
+							msg.cx[i],
+							msg.cy[i],
+							transformFromGeometryMsg(msg.localTransform[i]),
+							0.0,
+							cv::Size(msg.width[i], msg.height[i])));
+				}
 			}
 		}
 	}
