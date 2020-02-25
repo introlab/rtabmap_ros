@@ -88,7 +88,8 @@ private:
 
 				tf::StampedTransform tmp;
 				tfListener_.lookupTransform(msg->header.frame_id, baseFrameId_, msg->header.stamp, tmp);
-				st *= tmp;
+				tf::Transform t = tmp.inverse()*st*tmp;
+				st.setRotation(t.getRotation());
 				st.child_frame_id_ = baseFrameId_;
 			}
 			catch(tf::TransformException & ex)
