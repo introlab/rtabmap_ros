@@ -500,12 +500,6 @@ void CoreWrapper::onInit()
 	// Add all other parameters (not copied if already exists)
 	parameters_.insert(allParameters.begin(), allParameters.end());
 
-	// set public parameters
-	nh.setParam("is_rtabmap_paused", paused_);
-	for(ParametersMap::iterator iter=parameters_.begin(); iter!=parameters_.end(); ++iter)
-	{
-		nh.setParam(iter->first, iter->second);
-	}
 	if(parameters_.find(Parameters::kRtabmapDetectionRate()) != parameters_.end())
 	{
 		Parameters::parse(parameters_, Parameters::kRtabmapDetectionRate(), rate_);
@@ -713,6 +707,13 @@ void CoreWrapper::onInit()
 		{
 			rtabmap_.parseParameters(parameters_);
 		}
+	}
+
+	// set public parameters
+	nh.setParam("is_rtabmap_paused", paused_);
+	for(ParametersMap::iterator iter=parameters_.begin(); iter!=parameters_.end(); ++iter)
+	{
+		nh.setParam(iter->first, iter->second);
 	}
 
 	userDataAsyncSub_ = nh.subscribe("user_data_async", 1, &CoreWrapper::userDataAsyncCallback, this);
