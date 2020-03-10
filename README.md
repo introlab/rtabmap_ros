@@ -110,8 +110,8 @@ To use `rtabmap_ros` on Jetson, you can follow the instructions above if you don
 1. Install [JetPack](https://developer.nvidia.com/embedded/jetpack) with OpenCV on the Jetson.
 2. Do steps 1.2 and 1.3 from http://wiki.ros.org/kinetic/Installation/Ubuntu
 3. Install non-opencv dependent ros packages:
-
-    * `sudo apt-get install ros-kinetic-ros-base ros-kinetic-image-transport ros-kinetic-tf ros-kinetic-tf-conversions ros-kinetic-eigen-conversions ros-kinetic-laser-geometry ros-kinetic-pcl-conversions ros-kinetic-pcl-ros ros-kinetic-move-base-msgs ros-kinetic-rviz ros-kinetic-octomap-ros ros-kinetic-move-base libhdf5-openmpi-dev libsuitesparse-dev`
+    * Jetpack 3: `sudo apt-get install ros-kinetic-ros-base ros-kinetic-image-transport ros-kinetic-tf ros-kinetic-tf-conversions ros-kinetic-eigen-conversions ros-kinetic-laser-geometry ros-kinetic-pcl-conversions ros-kinetic-pcl-ros ros-kinetic-move-base-msgs ros-kinetic-rviz ros-kinetic-octomap-ros ros-kinetic-move-base libhdf5-openmpi-dev libsuitesparse-dev`
+    * Jetpack 4: `sudo apt-get install ros-melodic-ros-base ros-melodic-image-transport ros-melodic-tf ros-melodic-tf-conversions ros-melodic-eigen-conversions ros-melodic-laser-geometry ros-melodic-pcl-conversions ros-melodic-pcl-ros ros-melodic-move-base-msgs ros-melodic-rviz ros-melodic-octomap-ros ros-melodic-move-base libhdf5-openmpi-dev libsuitesparse-dev`
 4. Do step 1.6 from http://wiki.ros.org/kinetic/Installation/Ubuntu
 5. [Create your catkin workspace](http://wiki.ros.org/ROS/Tutorials/InstallingandConfiguringROSEnvironment#Create_a_ROS_Workspace)
 6. *Optional:* Install g2o and/or GTSAM dependencies as above (increase visual odometry and graph optimization accuracy).
