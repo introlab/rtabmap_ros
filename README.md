@@ -115,11 +115,15 @@ To use `rtabmap_ros` on Jetson, you can follow the instructions above if you don
 4. Do step 1.6 from http://wiki.ros.org/kinetic/Installation/Ubuntu
 5. [Create your catkin workspace](http://wiki.ros.org/ROS/Tutorials/InstallingandConfiguringROSEnvironment#Create_a_ROS_Workspace)
 6. *Optional:* Install g2o and/or GTSAM dependencies as above (increase visual odometry and graph optimization accuracy).
-7. To avoid [libGL undefined errors](https://devtalk.nvidia.com/default/topic/1007290/jetson-tx2/building-opencv-with-opengl-support-/post/5141945/#5141945) (**this step may not be required on Jetpack 4**):
+7. To avoid [libGL undefined errors](https://devtalk.nvidia.com/default/topic/1007290/jetson-tx2/building-opencv-with-opengl-support-/post/5141945/#5141945):
      ```
      $ cd /usr/lib/aarch64-linux-gnu/
+     # Jetpack 3:
      $ sudo ln -sf tegra/libGL.so libGL.so
+     # Jetpack 4:
+     sudo ln -sf libGL.so.1.0.0 libGL.so
      ```
+     
 8. To avoid [libvtkproj4 errors](https://github.com/PointCloudLibrary/pcl/issues/1594#issuecomment-283873617) (**this step may not be required on Jetpack 4**):
     ```
     $ sudo ln -s /usr/lib/aarch64-linux-gnu/libvtkCommonCore-6.2.so /usr/lib/libvtkproj4.so
