@@ -52,6 +52,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/OdometryEvent.h>
 #include <cmath>
 
+#ifndef _WIN32
 #include <sys/ioctl.h>
 #include <termios.h>
 bool spacehit()
@@ -89,6 +90,7 @@ bool spacehit()
 
     return hit;
 }
+#endif
 
 bool paused = false;
 bool pauseCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
@@ -637,6 +639,7 @@ int main(int argc, char** argv)
 
 		while(ros::ok())
 		{
+#ifndef _WIN32
 			if (spacehit()) {
 				paused = !paused;
 				if(paused)
@@ -648,6 +651,7 @@ int main(int argc, char** argv)
 					ROS_INFO("resumed!");
 				}
 			}
+#endif
 
 			if(!paused)
 			{

@@ -275,13 +275,14 @@ void OdometryROS::onInit()
 	}
 
 	std::vector<std::string> argList = getMyArgv();
-	char * argv[argList.size()];
+	char ** argv = new char*[argList.size()];
 	for(unsigned int i=0; i<argList.size(); ++i)
 	{
 		argv[i] = &argList[i].at(0);
 	}
 
 	rtabmap::ParametersMap parameters = rtabmap::Parameters::parseArguments(argList.size(), argv);
+	delete [] argv;
 	for(rtabmap::ParametersMap::iterator iter=parameters.begin(); iter!=parameters.end(); ++iter)
 	{
 		rtabmap::ParametersMap::iterator jter = parameters_.find(iter->first);

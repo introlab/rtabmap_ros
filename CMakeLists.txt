@@ -35,8 +35,31 @@ find_package(RTABMap 0.19.5 REQUIRED)
 
 find_package(OpenCV REQUIRED)
 
-find_package(PCL 1.7 REQUIRED)
+IF(RTABMAP_GUI)
+FIND_PACKAGE(PCL 1.7 REQUIRED QUIET COMPONENTS common io kdtree search surface filters registration sample_consensus segmentation visualization)
+ELSE()
+FIND_PACKAGE(PCL 1.7 REQUIRED QUIET COMPONENTS common io kdtree search surface filters registration sample_consensus segmentation )
+ENDIF()
 add_definitions(${PCL_DEFINITIONS}) # To include -march=native if set
+
+IF(WIN32)
+add_compile_options(-bigobj)
+ENDIF(WIN32)
+
+IF(WIN32)
+option(RTABMAP_SYNC_MULTI_RGBD "Build with multi RGBD camera synchronization support"  OFF)
+ELSE()
+option(RTABMAP_SYNC_MULTI_RGBD "Build with multi RGBD camera synchronization support"  ON)
+ENDIF()
+option(RTABMAP_SYNC_USER_DATA "Build with input user data support"  OFF)
+MESSAGE(STATUS "RTABMAP_SYNC_MULTI_RGBD = ${RTABMAP_SYNC_MULTI_RGBD}")
+MESSAGE(STATUS "RTABMAP_SYNC_USER_DATA  = ${RTABMAP_SYNC_USER_DATA}")
+IF(RTABMAP_SYNC_MULTI_RGBD)
+add_definitions("-DRTABMAP_SYNC_MULTI_RGBD")
+ENDIF(RTABMAP_SYNC_MULTI_RGBD)
+IF(RTABMAP_SYNC_USER_DATA)
+add_definitions("-DRTABMAP_SYNC_USER_DATA")
+ENDIF(RTABMAP_SYNC_USER_DATA)
 
 #Qt stuff
 # If librtabmap_gui.so is found, rtabmapviz will be built
@@ -174,13 +197,18 @@ SET(rtabmap_sync_lib_src
    src/impl/CommonDataSubscriberStereo.cpp
    src/impl/CommonDataSubscriberRGB.cpp
    src/impl/CommonDataSubscriberRGBD.cpp
-   src/impl/CommonDataSubscriberRGBD2.cpp
-   src/impl/CommonDataSubscriberRGBD3.cpp
-   src/impl/CommonDataSubscriberRGBD4.cpp
    src/impl/CommonDataSubscriberScan.cpp
    src/impl/CommonDataSubscriberOdom.cpp
    src/CoreWrapper.cpp # we put CoreWrapper here instead of plugins lib to avoid long compilation time on plugins lib
 )
+IF(RTABMAP_SYNC_MULTI_RGBD)
+  SET(rtabmap_sync_lib_src
+    ${rtabmap_sync_lib_src}
+    src/impl/CommonDataSubscriberRGBD2.cpp
+    src/impl/CommonDataSubscriberRGBD3.cpp
+    src/impl/CommonDataSubscriberRGBD4.cpp
+  )
+ENDIF(RTABMAP_SYNC_MULTI_RGBD)
   
 SET(rtabmap_ros_lib_src
    src/MsgConversion.cpp
@@ -305,9 +333,11 @@ add_executable(rtabmap_imu_to_tf src/ImuToTFNode.cpp)
 target_link_libraries(rtabmap_imu_to_tf ${Libraries})
 set_target_properties(rtabmap_imu_to_tf PROPERTIES OUTPUT_NAME "imu_to_tf")
 
+IF(NOT WIN32)
 add_executable(rtabmap_wifi_signal_pub src/WifiSignalPubNode.cpp)
 target_link_libraries(rtabmap_wifi_signal_pub rtabmap_ros)
 set_target_properties(rtabmap_wifi_signal_pub PROPERTIES OUTPUT_NAME "wifi_signal_pub")
+ENDIF(NOT WIN32)
 add_executable(rtabmap_wifi_signal_sub src/WifiSignalSubNode.cpp)
 target_link_libraries(rtabmap_wifi_signal_sub rtabmap_ros)
 set_target_properties(rtabmap_wifi_signal_sub PROPERTIES OUTPUT_NAME "wifi_signal_sub")
@@ -377,35 +407,67 @@ IF(rviz_FOUND)
     
     ## RVIZ plugin
     IF(QT4_FOUND)
-    qt4_wrap_cpp(MOC_FILES
-      src/rviz/MapCloudDisplay.h
-      src/rviz/MapGraphDisplay.h
-      src/rviz/InfoDisplay.h
-      src/rviz/OrbitOrientedViewController.h
-    )
+	  IF(WIN32)
+        qt4_wrap_cpp(MOC_FILES
+          src/rviz/MapCloudDisplay.h
+          src/rviz/MapGraphDisplay.h
+          src/rviz/InfoDisplay.h
+        )
+	  ELSE()
+	    qt4_wrap_cpp(MOC_FILES
+          src/rviz/MapCloudDisplay.h
+          src/rviz/MapGraphDisplay.h
+          src/rviz/InfoDisplay.h
+          src/rviz/OrbitOrientedViewController.h
+        )
+	  ENDIF()
     ELSE()
-    qt5_wrap_cpp(MOC_FILES
-      src/rviz/MapCloudDisplay.h
-      src/rviz/MapGraphDisplay.h
-      src/rviz/InfoDisplay.h
-      src/rviz/OrbitOrientedViewController.h
-    )
+	  IF(WIN32)
+        qt5_wrap_cpp(MOC_FILES
+          src/rviz/MapCloudDisplay.h
+          src/rviz/MapGraphDisplay.h
+          src/rviz/InfoDisplay.h
+        )
+	  ELSE()
+	    qt5_wrap_cpp(MOC_FILES
+          src/rviz/MapCloudDisplay.h
+          src/rviz/MapGraphDisplay.h
+          src/rviz/InfoDisplay.h
+          src/rviz/OrbitOrientedViewController.h
+        )
+	  ENDIF()
     ENDIF()
     
     # tf:message_filters, mixing boost and Qt signals
-    set_property(
-       SOURCE src/rviz/MapCloudDisplay.cpp src/rviz/MapGraphDisplay.cpp src/rviz/InfoDisplay.cpp src/rviz/OrbitOrientedViewController.cpp
-       PROPERTY COMPILE_DEFINITIONS QT_NO_KEYWORDS
-    )
-    add_library(rtabmap_rviz_plugins
-       src/rviz/MapCloudDisplay.cpp
+	IF(WIN32)
+      set_property(
+        SOURCE src/rviz/MapCloudDisplay.cpp src/rviz/MapGraphDisplay.cpp src/rviz/InfoDisplay.cpp
+        PROPERTY COMPILE_DEFINITIONS QT_NO_KEYWORDS
+      )
+	ELSE()
+	  set_property(
+        SOURCE src/rviz/MapCloudDisplay.cpp src/rviz/MapGraphDisplay.cpp src/rviz/InfoDisplay.cpp src/rviz/OrbitOrientedViewController.cpp
+        PROPERTY COMPILE_DEFINITIONS QT_NO_KEYWORDS
+      )
+	ENDIF()
+	SET(SRC_FILES 
+	   src/rviz/MapCloudDisplay.cpp
        src/rviz/MapGraphDisplay.cpp
        src/rviz/InfoDisplay.cpp
-       src/rviz/OrbitOrientedViewController.cpp
        ${MOC_FILES}
+	)
+	IF(NOT WIN32)
+	  SET(SRC_FILES 
+	    ${SRC_FILES} 
+	    src/rviz/OrbitOrientedViewController.cpp
+	  )
+	ENDIF(NOT WIN32)
+    add_library(rtabmap_rviz_plugins
+       ${SRC_FILES}
     )
     target_link_libraries(rtabmap_rviz_plugins
       rtabmap_ros
+	  ${Libraries}
     )
     IF(Qt5_FOUND)
         QT5_USE_MODULES(rtabmap_rviz_plugins Widgets Core Gui)

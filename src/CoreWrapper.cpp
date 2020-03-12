@@ -241,6 +241,7 @@ void CoreWrapper::onInit()
 
 	configPath_ = uReplaceChar(configPath_, '~', UDirectory::homeDir());
 	databasePath_ = uReplaceChar(databasePath_, '~', UDirectory::homeDir());
+#ifndef _WIN32
 	if(configPath_.size() && configPath_.at(0) != '/')
 	{
 		configPath_ = UDirectory::currentDir(true) + configPath_;
@@ -249,6 +250,7 @@ void CoreWrapper::onInit()
 	{
 		databasePath_ = UDirectory::currentDir(true) + databasePath_;
 	}
+#endif
 
 	ParametersMap allParameters = Parameters::getDefaultParameters();
 	// remove Odom parameters
@@ -322,7 +324,7 @@ void CoreWrapper::onInit()
 
 	//parse input arguments
 	std::vector<std::string> argList = getMyArgv();
-	char * argv[argList.size()];
+	char ** argv = new char*[argList.size()];
 	bool deleteDbOnStart = false;
 	for(unsigned int i=0; i<argList.size(); ++i)
 	{
@@ -333,6 +335,7 @@ void CoreWrapper::onInit()
 		}
 	}
 	rtabmap::ParametersMap parameters = rtabmap::Parameters::parseArguments(argList.size(), argv);
+	delete [] argv;
 	for(ParametersMap::const_iterator iter=parameters.begin(); iter!=parameters.end(); ++iter)
 	{
 		uInsert(parameters_, ParametersPair(iter->first, iter->second));

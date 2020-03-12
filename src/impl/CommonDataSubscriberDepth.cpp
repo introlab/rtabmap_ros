@@ -177,6 +177,7 @@ void CommonDataSubscriber::depthOdomScan3dInfoCallback(
 	commonSingleDepthCallback(odomMsg, userDataMsg, cv_bridge::toCvShare(imageMsg), cv_bridge::toCvShare(depthMsg), *cameraInfoMsg, *cameraInfoMsg, scan2dMsg, scanMsg, odomInfoMsg);
 }
 
+#ifdef RTABMAP_SYNC_USER_DATA
 // RGB + Depth + User Data
 void CommonDataSubscriber::depthDataCallback(
 		const rtabmap_ros::UserDataConstPtr & userDataMsg,
@@ -324,6 +325,7 @@ void CommonDataSubscriber::depthOdomDataScan3dInfoCallback(
 	sensor_msgs::LaserScanConstPtr scan2dMsg; // Null
 	commonSingleDepthCallback(odomMsg, userDataMsg, cv_bridge::toCvShare(imageMsg), cv_bridge::toCvShare(depthMsg), *cameraInfoMsg, *cameraInfoMsg, scan2dMsg, scanMsg, odomInfoMsg);
 }
+#endif
 
 void CommonDataSubscriber::setupDepthCallbacks(
 		ros::NodeHandle & nh,
@@ -353,6 +355,7 @@ void CommonDataSubscriber::setupDepthCallbacks(
 	imageDepthSub_.subscribe(depth_it, depth_nh.resolveName("image"), 1, hintsDepth);
 	cameraInfoSub_.subscribe(rgb_nh, "camera_info", 1);
 
+#ifdef RTABMAP_SYNC_USER_DATA
 	if(subscribeOdom && subscribeUserData)
 	{
 		odomSub_.subscribe(nh, "odom", 1);
@@ -399,7 +402,9 @@ void CommonDataSubscriber::setupDepthCallbacks(
 			SYNC_DECL5(depthOdomData, approxSync, queueSize, odomSub_, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_);
 		}
 	}
-	else if(subscribeOdom)
+	else 
+#endif
+	if(subscribeOdom)
 	{
 		odomSub_.subscribe(nh, "odom", 1);
 
@@ -444,6 +449,7 @@ void CommonDataSubscriber::setupDepthCallbacks(
 			SYNC_DECL4(depthOdom, approxSync, queueSize, odomSub_, imageSub_, imageDepthSub_, cameraInfoSub_);
 		}
 	}
+#ifdef RTABMAP_SYNC_USER_DATA
 	else if(subscribeUserData)
 	{
 		userDataSub_.subscribe(nh, "user_data", 1);
@@ -490,6 +496,7 @@ void CommonDataSubscriber::setupDepthCallbacks(
 			SYNC_DECL4(depthData, approxSync, queueSize, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_);
 		}
 	}
+#endif
 	else
 	{
 		if(subscribeScan2d)
