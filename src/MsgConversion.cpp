@@ -1788,9 +1788,20 @@ bool convertScanMsg(
 	bool containIntensity = false;
 	for(unsigned int i=0; i<scanOut.fields.size(); ++i)
 	{
-		if(scanOut.fields[i].name.compare("intensity") == 0)
+		if(scanOut.fields[i].datatype == sensor_msgs::PointField::FLOAT32)
 		{
 			containIntensity = true;
+		}
+		else
+		{
+			static bool warningShown = false;
+			if(!warningShown)
+			{
+				ROS_WARN("The input scan cloud has an \"intensity\" field "
+						"but the datatype (%d) is not supported. Intensity will be ignored. "
+						"This message is only shown once.", scanOut.fields[i].datatype);
+				warningShown = true;
+			}
 		}
 	}
 
@@ -1860,7 +1871,21 @@ bool convertScan3dMsg(
 		}
 		if(scan3dMsg->fields[i].name.compare("intensity") == 0)
 		{
-			containIntensity = true;
+			if(scan3dMsg->fields[i].datatype == sensor_msgs::PointField::FLOAT32)
+			{
+				containIntensity = true;
+			}
+			else
+			{
+				static bool warningShown = false;
+				if(!warningShown)
+				{
+					ROS_WARN("The input scan cloud has an \"intensity\" field "
+							"but the datatype (%d) is not supported. Intensity will be ignored. "
+							"This message is only shown once.", scan3dMsg->fields[i].datatype);
+					warningShown = true;
+				}
+			}
 		}
 	}
 
