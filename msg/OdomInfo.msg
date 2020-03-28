@@ -8,6 +8,7 @@ float32 icpInliersRatio
 float32 icpRotation
 float32 icpTranslation
 float32 icpStructuralComplexity
+int32 icpCorrespondences
 float64[36] covariance
 int32 features
 int32 localMapSize

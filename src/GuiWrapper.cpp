@@ -476,6 +476,18 @@ void GuiWrapper::commonDepthCallback(
 			covariance = cv::Mat(6,6,CV_64FC1,(void*)odomMsg->twist.covariance.data()).clone();
 		}
 	}
+	else if(odomInfoMsg.get() && odomInfoMsg->covariance.size() == 36)
+	{
+		if(odomInfoMsg->covariance[0] != 0 &&
+			 odomInfoMsg->covariance[7] != 0 &&
+			 odomInfoMsg->covariance[14] != 0 &&
+			 odomInfoMsg->covariance[21] != 0 &&
+			 odomInfoMsg->covariance[28] != 0 &&
+			 odomInfoMsg->covariance[35] != 0)
+		{
+			covariance = cv::Mat(6,6,CV_64FC1,(void*)odomInfoMsg->covariance.data()).clone();
+		}
+	}
 	if(odomHeader.frame_id.empty())
 	{
 		ROS_ERROR("Odometry frame not set!?");
@@ -628,6 +640,18 @@ void GuiWrapper::commonStereoCallback(
 			covariance = cv::Mat(6,6,CV_64FC1,(void*)odomMsg->twist.covariance.data()).clone();
 		}
 	}
+	else if(odomInfoMsg.get() && odomInfoMsg->covariance.size() == 36)
+	{
+		if(odomInfoMsg->covariance[0] != 0 &&
+			 odomInfoMsg->covariance[7] != 0 &&
+			 odomInfoMsg->covariance[14] != 0 &&
+			 odomInfoMsg->covariance[21] != 0 &&
+			 odomInfoMsg->covariance[28] != 0 &&
+			 odomInfoMsg->covariance[35] != 0)
+		{
+			covariance = cv::Mat(6,6,CV_64FC1,(void*)odomInfoMsg->covariance.data()).clone();
+		}
+	}
 	if(odomHeader.frame_id.empty())
 	{
 		ROS_ERROR("Odometry frame not set!?");
@@ -774,6 +798,18 @@ void GuiWrapper::commonLaserScanCallback(
 			 odomMsg->twist.covariance[35] != 0)
 		{
 			covariance = cv::Mat(6,6,CV_64FC1,(void*)odomMsg->twist.covariance.data()).clone();
+		}
+	}
+	else if(odomInfoMsg.get() && odomInfoMsg->covariance.size() == 36)
+	{
+		if(odomInfoMsg->covariance[0] != 0 &&
+			 odomInfoMsg->covariance[7] != 0 &&
+			 odomInfoMsg->covariance[14] != 0 &&
+			 odomInfoMsg->covariance[21] != 0 &&
+			 odomInfoMsg->covariance[28] != 0 &&
+			 odomInfoMsg->covariance[35] != 0)
+		{
+			covariance = cv::Mat(6,6,CV_64FC1,(void*)odomInfoMsg->covariance.data()).clone();
 		}
 	}
 	if(odomHeader.frame_id.empty())

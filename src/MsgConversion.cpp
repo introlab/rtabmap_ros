@@ -1136,6 +1136,7 @@ std::map<std::string, float> odomInfoToStatistics(const rtabmap::OdometryInfo & 
 	stats.insert(std::make_pair("Odometry/ICPRotation/rad", info.reg.icpRotation));
 	stats.insert(std::make_pair("Odometry/ICPTranslation/m", info.reg.icpTranslation));
 	stats.insert(std::make_pair("Odometry/ICPStructuralComplexity/", info.reg.icpStructuralComplexity));
+	stats.insert(std::make_pair("Odometry/ICPCorrespondences/", info.reg.icpCorrespondences));
 	stats.insert(std::make_pair("Odometry/StdDevLin/", sqrt((float)info.reg.covariance.at<double>(0,0))));
 	stats.insert(std::make_pair("Odometry/StdDevAng/", sqrt((float)info.reg.covariance.at<double>(5,5))));
 	stats.insert(std::make_pair("Odometry/VarianceLin/", (float)info.reg.covariance.at<double>(0,0)));
@@ -1150,11 +1151,25 @@ std::map<std::string, float> odomInfoToStatistics(const rtabmap::OdometryInfo & 
 	stats.insert(std::make_pair("Odometry/LocalBundleTime/ms", info.localBundleTime*1000.0f));
 	stats.insert(std::make_pair("Odometry/KeyFrameAdded/", info.keyFrameAdded?1.0f:0.0f));
 	stats.insert(std::make_pair("Odometry/Interval/ms", (float)info.interval));
+	float dist = info.transform.getNorm();
 	float speed = 0.0f;
 	if(info.interval>0.0)
-		speed = info.transform.x()/info.interval*3.6;
-	stats.insert(std::make_pair("Odometry/Speed/kph", speed));
+		speed = dist/info.interval;
+	stats.insert(std::make_pair("Odometry/T/m", dist));
+	stats.insert(std::make_pair("Odometry/Speed/kph", speed*3.6));
+	stats.insert(std::make_pair("Odometry/Speed/mph", speed*2.237));
+	stats.insert(std::make_pair("Odometry/Speed/mps", speed));
 	stats.insert(std::make_pair("Odometry/Distance/m", info.distanceTravelled));
+	if(!info.transformGroundTruth.isNull())
+	{
+		dist = info.transformGroundTruth.getNorm();
+		if(info.interval>0.0)
+			speed = dist/info.interval;
+		stats.insert(std::make_pair("Odometry/TG/m", dist));
+		stats.insert(std::make_pair("Odometry/SpeedG/kph", speed*3.6));
+		stats.insert(std::make_pair("Odometry/SpeedG/mph", speed*2.237));
+		stats.insert(std::make_pair("Odometry/SpeedG/mps", speed));
+	}
 
 	return stats;
 }
@@ -1169,6 +1184,7 @@ rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::OdomInfo & msg)
 	info.reg.icpRotation = msg.icpRotation;
 	info.reg.icpTranslation = msg.icpTranslation;
 	info.reg.icpStructuralComplexity = msg.icpStructuralComplexity;
+	info.reg.icpCorrespondences = msg.icpCorrespondences;
 	info.reg.covariance = cv::Mat(6,6,CV_64FC1, (void*)msg.covariance.data()).clone();
 	info.features = msg.features;
 	info.localMapSize = msg.localMapSize;
@@ -1225,6 +1241,7 @@ void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_ros::OdomInfo & m
 	msg.icpRotation = info.reg.icpRotation;
 	msg.icpTranslation = info.reg.icpTranslation;
 	msg.icpStructuralComplexity = info.reg.icpStructuralComplexity;
+	msg.icpCorrespondences = info.reg.icpCorrespondences;
 	if(info.reg.covariance.type() == CV_64FC1 && info.reg.covariance.cols == 6 && info.reg.covariance.rows == 6)
 	{
 		memcpy(msg.covariance.data(), info.reg.covariance.data, 36*sizeof(double));
