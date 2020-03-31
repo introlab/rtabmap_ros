@@ -1151,26 +1151,57 @@ std::map<std::string, float> odomInfoToStatistics(const rtabmap::OdometryInfo & 
 	stats.insert(std::make_pair("Odometry/LocalBundleTime/ms", info.localBundleTime*1000.0f));
 	stats.insert(std::make_pair("Odometry/KeyFrameAdded/", info.keyFrameAdded?1.0f:0.0f));
 	stats.insert(std::make_pair("Odometry/Interval/ms", (float)info.interval));
-	float dist = info.transform.getNorm();
-	float speed = 0.0f;
-	if(info.interval>0.0)
-		speed = dist/info.interval;
-	stats.insert(std::make_pair("Odometry/T/m", dist));
-	stats.insert(std::make_pair("Odometry/Speed/kph", speed*3.6));
-	stats.insert(std::make_pair("Odometry/Speed/mph", speed*2.237));
-	stats.insert(std::make_pair("Odometry/Speed/mps", speed));
 	stats.insert(std::make_pair("Odometry/Distance/m", info.distanceTravelled));
+
+	float x,y,z,roll,pitch,yaw;
+	float dist = 0.0f, speed=0.0f;
+	if(!info.transform.isNull())
+	{
+		info.transform.getTranslationAndEulerAngles(x,y,z,roll,pitch,yaw);
+		dist = info.transform.getNorm();
+		stats.insert(std::make_pair("Odometry/T/m", dist));
+		stats.insert(std::make_pair("Odometry/Tx/m", x));
+		stats.insert(std::make_pair("Odometry/Ty/m", y));
+		stats.insert(std::make_pair("Odometry/Tz/m", z));
+		stats.insert(std::make_pair("Odometry/Troll/deg", roll*180.0/CV_PI));
+		stats.insert(std::make_pair("Odometry/Tpitch/deg", pitch*180.0/CV_PI));
+		stats.insert(std::make_pair("Odometry/Tyaw/deg", yaw*180.0/CV_PI));
+
+		if(info.interval>0.0)
+		{
+			speed = dist/info.interval;
+			stats.insert(std::make_pair("Odometry/Speed/kph", speed*3.6));
+			stats.insert(std::make_pair("Odometry/Speed/mph", speed*2.237));
+			stats.insert(std::make_pair("Odometry/Speed/mps", speed));
+		}
+	}
 	if(!info.transformGroundTruth.isNull())
 	{
-		dist = info.transformGroundTruth.getNorm();
-		if(info.interval>0.0)
-			speed = dist/info.interval;
-		stats.insert(std::make_pair("Odometry/TG/m", dist));
-		stats.insert(std::make_pair("Odometry/SpeedG/kph", speed*3.6));
-		stats.insert(std::make_pair("Odometry/SpeedG/mph", speed*2.237));
-		stats.insert(std::make_pair("Odometry/SpeedG/mps", speed));
-	}
+		if(!info.transform.isNull())
+		{
+			rtabmap::Transform diff = info.transformGroundTruth.inverse()*info.transform;
+			stats.insert(std::make_pair("Odometry/TG_error_lin/m", diff.getNorm()));
+			stats.insert(std::make_pair("Odometry/TG_error_ang/deg", diff.getAngle()*180.0/CV_PI));
+		}
 
+		info.transformGroundTruth.getTranslationAndEulerAngles(x,y,z,roll,pitch,yaw);
+		dist = info.transformGroundTruth.getNorm();
+		stats.insert(std::make_pair("Odometry/TG/m", dist));
+		stats.insert(std::make_pair("Odometry/TGx/m", x));
+		stats.insert(std::make_pair("Odometry/TGy/m", y));
+		stats.insert(std::make_pair("Odometry/TGz/m", z));
+		stats.insert(std::make_pair("Odometry/TGroll/deg", roll*180.0/CV_PI));
+		stats.insert(std::make_pair("Odometry/TGpitch/deg", pitch*180.0/CV_PI));
+		stats.insert(std::make_pair("Odometry/TGyaw/deg", yaw*180.0/CV_PI));
+
+		if(info.interval>0.0)
+		{
+			speed = dist/info.interval;
+			stats.insert(std::make_pair("Odometry/SpeedG/kph", speed*3.6));
+			stats.insert(std::make_pair("Odometry/SpeedG/mph", speed*2.237));
+			stats.insert(std::make_pair("Odometry/SpeedG/mps", speed));
+		}
+	}
 	return stats;
 }
 
