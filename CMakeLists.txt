@@ -117,10 +117,11 @@ find_package(rviz_default_plugins REQUIRED)
  )
 
 ## Generate messages and services
- rosidl_generate_interfaces(rtabmap_msgs
+ rosidl_generate_interfaces(${PROJECT_NAME}_msgs
    ${msg_files}
    ${srv_files}
    DEPENDENCIES geometry_msgs std_msgs sensor_msgs std_srvs visualization_msgs image_geometry
+   LIBRARY_NAME ${PROJECT_NAME}
  )
 ament_export_dependencies(rosidl_default_runtime)
 
@@ -270,9 +271,9 @@ target_link_libraries(rtabmap_ros ${RTABMap_LIBRARIES})
 target_link_libraries(rtabmap_sync rtabmap_ros ${RTABMap_LIBRARIES})
 target_link_libraries(rtabmap_plugins rtabmap_ros ${RTABMap_LIBRARIES})
 
-rosidl_target_interfaces(rtabmap_ros rtabmap_msgs "rosidl_typesupport_cpp")
-rosidl_target_interfaces(rtabmap_sync rtabmap_msgs "rosidl_typesupport_cpp")
-rosidl_target_interfaces(rtabmap_plugins rtabmap_msgs "rosidl_typesupport_cpp")
+rosidl_target_interfaces(rtabmap_ros ${PROJECT_NAME}_msgs "rosidl_typesupport_cpp")
+rosidl_target_interfaces(rtabmap_sync ${PROJECT_NAME}_msgs "rosidl_typesupport_cpp")
+rosidl_target_interfaces(rtabmap_plugins ${PROJECT_NAME}_msgs "rosidl_typesupport_cpp")
 
 rclcpp_components_register_nodes(rtabmap_plugins "rtabmap_ros::RGBDOdometry")
 rclcpp_components_register_nodes(rtabmap_plugins "rtabmap_ros::StereoOdometry")
@@ -421,34 +422,34 @@ get_rmw_typesupport(typesupport_impls "${rmw_implementation}" LANGUAGE "cpp")
 
 foreach(typesupport_impl ${typesupport_impls})
   rosidl_target_interfaces(rtabmap_rgbd_odometry
-    rtabmap_msgs ${typesupport_impl}
+    ${PROJECT_NAME}_msgs ${typesupport_impl}
   )
   rosidl_target_interfaces(rtabmap_stereo_odometry
-    rtabmap_msgs ${typesupport_impl}
+    ${PROJECT_NAME}_msgs ${typesupport_impl}
   )
   rosidl_target_interfaces(rtabmap_icp_odometry
-    rtabmap_msgs ${typesupport_impl}
+    ${PROJECT_NAME}_msgs ${typesupport_impl}
   )
   rosidl_target_interfaces(rtabmap_rgbd_relay
-    rtabmap_msgs ${typesupport_impl}
+    ${PROJECT_NAME}_msgs ${typesupport_impl}
   )
   rosidl_target_interfaces(rtabmap_rgbd_sync
-    rtabmap_msgs ${typesupport_impl}
+    ${PROJECT_NAME}_msgs ${typesupport_impl}
   )
   rosidl_target_interfaces(rtabmap_stereo_sync
-    rtabmap_msgs ${typesupport_impl}
+    ${PROJECT_NAME}_msgs ${typesupport_impl}
   )
   rosidl_target_interfaces(rtabmap_pointcloud_to_depthimage
-    rtabmap_msgs ${typesupport_impl}
+    ${PROJECT_NAME}_msgs ${typesupport_impl}
   )
   rosidl_target_interfaces(rtabmap_point_cloud_xyzrgb
-    rtabmap_msgs ${typesupport_impl}
+    ${PROJECT_NAME}_msgs ${typesupport_impl}
   )
   rosidl_target_interfaces(rtabmap
-    rtabmap_msgs ${typesupport_impl}
+    ${PROJECT_NAME}_msgs ${typesupport_impl}
   )
   rosidl_target_interfaces(rtabmapviz
-    rtabmap_msgs ${typesupport_impl}
+    ${PROJECT_NAME}_msgs ${typesupport_impl}
   )
 endforeach()
 
@@ -507,7 +508,7 @@ IF(rviz_default_plugins_FOUND)
 
     foreach(typesupport_impl ${typesupport_impls})
 	  rosidl_target_interfaces(rtabmap_rviz_plugins
-	    rtabmap_msgs ${typesupport_impl}
+	    ${PROJECT_NAME}_msgs ${typesupport_impl}
 	  )
     endforeach()
     
