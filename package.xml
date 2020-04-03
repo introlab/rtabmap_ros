@@ -53,6 +53,7 @@
   <exec_depend>std_msgs</exec_depend>
   <exec_depend>std_srvs</exec_depend>
   <exec_depend>nav_msgs</exec_depend>
+  <exec_depend>nav2_common</exec_depend>
   <exec_depend>stereo_msgs</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>visualization_msgs</exec_depend>
@@ -70,7 +71,6 @@
   <exec_depend>octomap</exec_depend>
   <exec_depend>image_geometry</exec_depend>
   <exec_depend>find_object_2d</exec_depend>
-  <exec_depend>message_runtime</exec_depend>
   <exec_depend>pluginlib</exec_depend>
 
   <build_depend>libpcl-all-dev</build_depend>
