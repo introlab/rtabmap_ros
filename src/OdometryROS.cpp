@@ -462,6 +462,7 @@ void OdometryROS::callbackIMU(const sensor_msgs::ImuConstPtr& msg)
 				if(imu.orientation()[0] != 0 || imu.orientation()[1] != 0 || imu.orientation()[2] != 0 || imu.orientation()[3] != 0)
 				{
 					Transform rotation(0,0,0, imu.orientation()[0], imu.orientation()[1], imu.orientation()[2], imu.orientation()[3]);
+					// orientation includes roll and pitch but not yaw in local transform
 					rotation = Transform(0,0,imu.localTransform().theta()) * rotation * imu.localTransform().rotation().inverse();
 					this->reset(rotation);
 					float r,p,y;

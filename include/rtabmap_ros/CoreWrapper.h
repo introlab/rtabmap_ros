@@ -325,6 +325,7 @@ private:
 	std::map<int, geometry_msgs::PoseWithCovarianceStamped> tags_;
 	ros::Subscriber imuSub_;
 	std::map<double, rtabmap::Transform> imus_;
+	std::string imuFrameId_;
 
 	ros::Subscriber interOdomSub_;
 	std::list<std::pair<nav_msgs::Odometry, rtabmap_ros::OdomInfo> > interOdoms_;

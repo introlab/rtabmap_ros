@@ -1821,21 +1821,34 @@ void CoreWrapper::process(
 		// IMU
 		if(!imus_.empty())
 		{
-			double stampDiff = 0.0;
-			Transform t = Transform::getClosestTransform(imus_, data.stamp(), &stampDiff);
-			if(!t.isNull() && stampDiff == 0.0)
+			Transform t = Transform::getTransform(imus_, data.stamp());
+			if(!t.isNull())
 			{
-				Eigen::Quaterniond q = t.getQuaterniond();
-				data.setIMU(IMU(cv::Vec4d(q.x(), q.y(), q.z(), q.w()), cv::Mat::eye(3,3,CV_64FC1),
-						cv::Vec3d(), cv::Mat(),
-						cv::Vec3d(), cv::Mat(),
-						Transform::getIdentity()));
+				// get local transform
+				rtabmap::Transform localTransform;
+				if(frameId_.compare(imuFrameId_) != 0)
+				{
+					localTransform = getTransform(frameId_, imuFrameId_, ros::Time(data.stamp()), tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+				}
+				else
+				{
+					localTransform = rtabmap::Transform::getIdentity();
+				}
+
+				if(!localTransform.isNull())
+				{
+					Eigen::Quaterniond q = t.getQuaterniond();
+					data.setIMU(IMU(cv::Vec4d(q.x(), q.y(), q.z(), q.w()), cv::Mat::eye(3,3,CV_64FC1),
+							cv::Vec3d(), cv::Mat(),
+							cv::Vec3d(), cv::Mat(),
+							localTransform));
+				}
 			}
 			else
 			{
 				ROS_WARN("We are receiving imu data (buffer=%d), but cannot interpolate "
-						"imu transform at time %f (closest is at %f). IMU won't be added to graph.",
-						(int)imus_.size(), data.stamp(), stampDiff);
+						"imu transform at time %f. IMU won't be added to graph.",
+						(int)imus_.size(), data.stamp());
 			}
 		}
 
@@ -2183,22 +2196,26 @@ void CoreWrapper::imuAsyncCallback(const sensor_msgs::ImuConstPtr & msg)
 		}
 		else
 		{
-			double stamp = msg->header.stamp.toSec();
-			rtabmap::Transform localTransform = rtabmap::Transform::getIdentity();
-			if(frameId_.compare(msg->header.frame_id) != 0)
-			{
-				localTransform = getTransform(frameId_, msg->header.frame_id, msg->header.stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
-				if(localTransform.isNull())
-				{
-					return;
-				}
-			}
-
 			Transform orientation(0,0,0, msg->orientation.x, msg->orientation.y, msg->orientation.z, msg->orientation.w);
-			imus_.insert(std::make_pair(msg->header.stamp.toSec(), orientation*localTransform.inverse()));
+			imus_.insert(std::make_pair(msg->header.stamp.toSec(), orientation));
 			if(imus_.size() > 1000)
 			{
 				imus_.erase(imus_.begin());
+			}
+			if(!imuFrameId_.empty() && imuFrameId_.compare(msg->header.frame_id) != 0)
+			{
+				ROS_ERROR("IMU frame_id has changed from %s to %s! Are "
+						"multiple nodes publishing "
+						"on same topic %s? IMU buffer is cleared!",
+						imuFrameId_.c_str(),
+						msg->header.frame_id.c_str(),
+						imuSub_.getTopic().c_str());
+				imus_.clear();
+				imuFrameId_.clear();
+			}
+			else
+			{
+				imuFrameId_ = msg->header.frame_id;
 			}
 		}
 	}
@@ -2494,6 +2511,7 @@ bool CoreWrapper::resetRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empt
 	userData_ = cv::Mat();
 	userDataMutex_.unlock();
 	imus_.clear();
+	imuFrameId_.clear();
 	interOdoms_.clear();
 	return true;
 }
