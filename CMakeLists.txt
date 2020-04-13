@@ -386,6 +386,10 @@ add_executable(rtabmap_pointcloud_to_depthimage src/PointCloudToDepthImageNode.c
 target_link_libraries(rtabmap_pointcloud_to_depthimage ${Libraries})
 set_target_properties(rtabmap_pointcloud_to_depthimage PROPERTIES OUTPUT_NAME "pointcloud_to_depthimage")
 
+add_executable(rtabmap_point_cloud_assembler src/PointCloudAssemblerNode.cpp)
+target_link_libraries(rtabmap_point_cloud_assembler ${Libraries})
+set_target_properties(rtabmap_point_cloud_assembler PROPERTIES OUTPUT_NAME "point_cloud_assembler")
+
 # If rviz is found, add plugins
 IF(rviz_FOUND)
 
@@ -530,6 +534,7 @@ install(TARGETS
    rtabmap_data_player
    rtabmap_odom_msg_to_tf
    rtabmap_pointcloud_to_depthimage
+   rtabmap_point_cloud_assembler
    rtabmap_camera
    rtabmap_rgbd_sync
    rtabmap_rgbd_relay
