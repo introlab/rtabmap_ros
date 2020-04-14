@@ -1136,6 +1136,7 @@ std::map<std::string, float> odomInfoToStatistics(const rtabmap::OdometryInfo & 
 	stats.insert(std::make_pair("Odometry/ICPRotation/rad", info.reg.icpRotation));
 	stats.insert(std::make_pair("Odometry/ICPTranslation/m", info.reg.icpTranslation));
 	stats.insert(std::make_pair("Odometry/ICPStructuralComplexity/", info.reg.icpStructuralComplexity));
+	stats.insert(std::make_pair("Odometry/ICPStructuralDistribution/", info.reg.icpStructuralDistribution));
 	stats.insert(std::make_pair("Odometry/ICPCorrespondences/", info.reg.icpCorrespondences));
 	stats.insert(std::make_pair("Odometry/StdDevLin/", sqrt((float)info.reg.covariance.at<double>(0,0))));
 	stats.insert(std::make_pair("Odometry/StdDevAng/", sqrt((float)info.reg.covariance.at<double>(5,5))));
@@ -1215,6 +1216,7 @@ rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::OdomInfo & msg)
 	info.reg.icpRotation = msg.icpRotation;
 	info.reg.icpTranslation = msg.icpTranslation;
 	info.reg.icpStructuralComplexity = msg.icpStructuralComplexity;
+	info.reg.icpStructuralDistribution = msg.icpStructuralDistribution;
 	info.reg.icpCorrespondences = msg.icpCorrespondences;
 	info.reg.covariance = cv::Mat(6,6,CV_64FC1, (void*)msg.covariance.data()).clone();
 	info.features = msg.features;
@@ -1272,6 +1274,7 @@ void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_ros::OdomInfo & m
 	msg.icpRotation = info.reg.icpRotation;
 	msg.icpTranslation = info.reg.icpTranslation;
 	msg.icpStructuralComplexity = info.reg.icpStructuralComplexity;
+	msg.icpStructuralDistribution = info.reg.icpStructuralDistribution;
 	msg.icpCorrespondences = info.reg.icpCorrespondences;
 	if(info.reg.covariance.type() == CV_64FC1 && info.reg.covariance.cols == 6 && info.reg.covariance.rows == 6)
 	{
