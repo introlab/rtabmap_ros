@@ -72,7 +72,9 @@
   <arg name="approx_rgbd_sync"        default="true"/>          <!-- false=exact synchronization -->
   <arg name="subscribe_rgbd"          default="$(arg rgbd_sync)"/>
   <arg name="rgbd_topic"              default="rgbd_image" />
-  <arg name="depth_scale"             default="1.0" />
+  <arg name="depth_scale"             default="1.0" />         <!-- Deprecated, use rgbd_depth_scale instead -->
+  <arg name="rgbd_depth_scale"        default="$(arg depth_scale)" />
+  <arg name="rgbd_decimation"         default="1" />
   
   <arg name="compressed"              default="false"/>         <!-- If you want to subscribe to compressed image topics -->
   <arg name="rgb_image_transport"     default="compressed"/>    <!-- Common types: compressed, theora (see "rosrun image_transport list_transports") -->
@@ -141,7 +143,8 @@
           <remap from="rgbd_image"      to="$(arg rgbd_topic_relay)"/>
           <param name="approx_sync"     type="bool"   value="$(arg approx_rgbd_sync)"/>
           <param name="queue_size"      type="int"    value="$(arg queue_size)"/>
-          <param name="depth_scale"     type="double" value="$(arg depth_scale)"/>
+          <param name="depth_scale"     type="double" value="$(arg rgbd_depth_scale)"/>
+          <param name="decimation"     type="double" value="$(arg rgbd_decimation)"/>
         </node>
       </group>
     </group>
