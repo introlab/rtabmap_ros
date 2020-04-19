@@ -102,6 +102,11 @@
   <arg name="imu_topic"                default="/imu/data"/>          <!-- only used with VIO approaches -->
   <arg name="wait_imu_to_init"         default="false"/>
   
+  <arg name="scan_cloud_assembling"              default="false"/>
+  <arg name="scan_cloud_assembling_time"         default="1"/>
+  <arg name="scan_cloud_assembling_fixed_frame"  default=""/>
+  <arg name="scan_cloud_assembling_voxel_size"   default="0.05"/>
+  
   <arg name="subscribe_user_data"      default="false"/>             <!-- user data synchronized subscription -->
   <arg name="user_data_topic"          default="/user_data"/>
   <arg name="user_data_async_topic"    default="/user_data_async" /> <!-- user data async subscription (rate should be lower than map update rate) -->
@@ -257,6 +262,16 @@
       <param name="guess_min_rotation"          type="double" value="$(arg odom_guess_min_rotation)"/>
       <param name="scan_cloud_max_points"       type="int"    value="$(arg scan_cloud_max_points)"/>
     </node>
+    
+    <node if="$(arg scan_cloud_assembling)" pkg="rtabmap_ros" type="point_cloud_assembler" name="point_cloud_assembler" output="screen">
+      <remap     if="$(arg scan_cloud_filtered)" from="cloud" to="odom_filtered_input_scan"/>
+      <remap unless="$(arg scan_cloud_filtered)" from="cloud" to="$(arg scan_cloud_topic)"/>
+
+      <remap from="odom"            to="$(arg odom_topic)"/>
+      <param name="assembling_time" type="double" value="$(arg scan_cloud_assembling_time)"/>
+      <param name="fixed_frame_id"  type="string" value="$(arg scan_cloud_assembling_fixed_frame)"/>
+      <param name="voxel_size"      type="double" value="$(arg scan_cloud_assembling_voxel_size)"/>
+    </node>
   
     <!-- Visual SLAM (robot side) -->
     <!-- args: "delete_db_on_start" and "udebug" -->
@@ -301,8 +316,9 @@
       <remap from="right/camera_info"      to="$(arg right_camera_info_topic)"/>
       
       <remap from="scan"                   to="$(arg scan_topic)"/>
-      <remap     if="$(arg scan_cloud_filtered)" from="scan_cloud" to="odom_filtered_input_scan"/>
-      <remap unless="$(arg scan_cloud_filtered)" from="scan_cloud" to="$(arg scan_cloud_topic)"/>
+      <remap if="$(eval scan_cloud_assembling)" from="scan_cloud" to="assembled_cloud"/>
+      <remap if="$(eval scan_cloud_filtered and not scan_cloud_assembling)" from="scan_cloud" to="odom_filtered_input_scan"/>
+      <remap if="$(eval not scan_cloud_filtered and not scan_cloud_assembling)" from="scan_cloud" to="$(arg scan_cloud_topic)"/>
       <remap from="user_data"              to="$(arg user_data_topic)"/>
       <remap from="user_data_async"        to="$(arg user_data_async_topic)"/>
       <remap from="gps/fix"                to="$(arg gps_topic)"/>

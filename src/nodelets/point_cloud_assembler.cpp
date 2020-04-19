@@ -116,6 +116,17 @@ private:
 		pnh.param("subscribe_odom_info", subscribeOdomInfo, subscribeOdomInfo);
 		ROS_ASSERT(maxClouds_>0 || assemblingTime_ >0.0);
 
+		ROS_INFO("%s: queue_size=%d", getName().c_str(), queueSize);
+		ROS_INFO("%s: fixed_frame_id=%s", getName().c_str(), fixedFrameId_.c_str());
+		ROS_INFO("%s: max_clouds=%d", getName().c_str(), maxClouds_);
+		ROS_INFO("%s: assembling_time=%fs", getName().c_str(), assemblingTime_);
+		ROS_INFO("%s: skip_clouds=%d", getName().c_str(), skipClouds_);
+		ROS_INFO("%s: circular_buffer=%s", getName().c_str(), circularBuffer_?"true":"false");
+		ROS_INFO("%s: wait_for_transform_duration=%f", getName().c_str(), waitForTransformDuration_);
+		ROS_INFO("%s: range_min=%f", getName().c_str(), rangeMin_);
+		ROS_INFO("%s: range_max=%f", getName().c_str(), rangeMax_);
+		ROS_INFO("%s: voxel_size=%fm", getName().c_str(), voxelSize_);
+
 		cloudsSkipped_ = skipClouds_;
 
 		std::string subscribedTopicsMsg;
