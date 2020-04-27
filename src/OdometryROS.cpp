@@ -630,9 +630,9 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 		dataCpy.setGroundTruth(groundTruth);
 	}
 	rtabmap::Transform pose = odometry_->process(dataCpy, guess_, &info);
-	guess_.setNull();
 	if(!pose.isNull())
 	{
+		guess_.setNull();
 		resetCurrentCount_ = resetCountdown_;
 
 		//*********************
