@@ -469,7 +469,7 @@ private:
 			std::vector<cv_bridge::CvImageConstPtr> depthMsgs(1);
 			std::vector<sensor_msgs::CameraInfo> infoMsgs;
 			rtabmap_ros::toCvShare(image, imageMsgs[0], depthMsgs[0]);
-			infoMsgs.push_back(image->rgbCameraInfo);
+			infoMsgs.push_back(image->rgb_camera_info);
 
 			this->commonCallback(imageMsgs, depthMsgs, infoMsgs);
 		}
@@ -487,8 +487,8 @@ private:
 			std::vector<sensor_msgs::CameraInfo> infoMsgs;
 			rtabmap_ros::toCvShare(image, imageMsgs[0], depthMsgs[0]);
 			rtabmap_ros::toCvShare(image2, imageMsgs[1], depthMsgs[1]);
-			infoMsgs.push_back(image->rgbCameraInfo);
-			infoMsgs.push_back(image2->rgbCameraInfo);
+			infoMsgs.push_back(image->rgb_camera_info);
+			infoMsgs.push_back(image2->rgb_camera_info);
 
 			this->commonCallback(imageMsgs, depthMsgs, infoMsgs);
 		}
@@ -508,9 +508,9 @@ private:
 			rtabmap_ros::toCvShare(image, imageMsgs[0], depthMsgs[0]);
 			rtabmap_ros::toCvShare(image2, imageMsgs[1], depthMsgs[1]);
 			rtabmap_ros::toCvShare(image3, imageMsgs[2], depthMsgs[2]);
-			infoMsgs.push_back(image->rgbCameraInfo);
-			infoMsgs.push_back(image2->rgbCameraInfo);
-			infoMsgs.push_back(image3->rgbCameraInfo);
+			infoMsgs.push_back(image->rgb_camera_info);
+			infoMsgs.push_back(image2->rgb_camera_info);
+			infoMsgs.push_back(image3->rgb_camera_info);
 
 			this->commonCallback(imageMsgs, depthMsgs, infoMsgs);
 		}
@@ -532,10 +532,10 @@ private:
 			rtabmap_ros::toCvShare(image2, imageMsgs[1], depthMsgs[1]);
 			rtabmap_ros::toCvShare(image3, imageMsgs[2], depthMsgs[2]);
 			rtabmap_ros::toCvShare(image4, imageMsgs[3], depthMsgs[3]);
-			infoMsgs.push_back(image->rgbCameraInfo);
-			infoMsgs.push_back(image2->rgbCameraInfo);
-			infoMsgs.push_back(image3->rgbCameraInfo);
-			infoMsgs.push_back(image4->rgbCameraInfo);
+			infoMsgs.push_back(image->rgb_camera_info);
+			infoMsgs.push_back(image2->rgb_camera_info);
+			infoMsgs.push_back(image3->rgb_camera_info);
+			infoMsgs.push_back(image4->rgb_camera_info);
 
 			this->commonCallback(imageMsgs, depthMsgs, infoMsgs);
 		}

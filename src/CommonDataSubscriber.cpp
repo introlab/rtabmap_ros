@@ -41,40 +41,49 @@ CommonDataSubscriber::CommonDataSubscriber(bool gui) :
 		subscribedToRGBD_(false),
 		subscribedToScan2d_(false),
 		subscribedToScan3d_(false),
+		subscribedToScanDescriptor_(false),
 		subscribedToOdomInfo_(false),
 
 		// RGB + Depth
 		SYNC_INIT(depth),
 		SYNC_INIT(depthScan2d),
 		SYNC_INIT(depthScan3d),
+		SYNC_INIT(depthScanDesc),
 		SYNC_INIT(depthInfo),
 		SYNC_INIT(depthScan2dInfo),
 		SYNC_INIT(depthScan3dInfo),
+		SYNC_INIT(depthScanDescInfo),
 
 		// RGB + Depth + Odom
 		SYNC_INIT(depthOdom),
 		SYNC_INIT(depthOdomScan2d),
 		SYNC_INIT(depthOdomScan3d),
+		SYNC_INIT(depthOdomScanDesc),
 		SYNC_INIT(depthOdomInfo),
 		SYNC_INIT(depthOdomScan2dInfo),
 		SYNC_INIT(depthOdomScan3dInfo),
+		SYNC_INIT(depthOdomScanDescInfo),
 
 #ifdef RTABMAP_SYNC_USER_DATA
 		// RGB + Depth + User Data
 		SYNC_INIT(depthData),
 		SYNC_INIT(depthDataScan2d),
 		SYNC_INIT(depthDataScan3d),
+		SYNC_INIT(depthDataScanDesc),
 		SYNC_INIT(depthDataInfo),
 		SYNC_INIT(depthDataScan2dInfo),
 		SYNC_INIT(depthDataScan3dInfo),
+		SYNC_INIT(depthDataScanDescInfo),
 
 		// RGB + Depth + Odom + User Data
 		SYNC_INIT(depthOdomData),
 		SYNC_INIT(depthOdomDataScan2d),
 		SYNC_INIT(depthOdomDataScan3d),
+		SYNC_INIT(depthOdomDataScanDesc),
 		SYNC_INIT(depthOdomDataInfo),
 		SYNC_INIT(depthOdomDataScan2dInfo),
 		SYNC_INIT(depthOdomDataScan3dInfo),
+		SYNC_INIT(depthOdomDataScanDescInfo),
 #endif
 
 		// Stereo
@@ -89,66 +98,82 @@ CommonDataSubscriber::CommonDataSubscriber(bool gui) :
 		SYNC_INIT(rgb),
 		SYNC_INIT(rgbScan2d),
 		SYNC_INIT(rgbScan3d),
+		SYNC_INIT(rgbScanDesc),
 		SYNC_INIT(rgbInfo),
 		SYNC_INIT(rgbScan2dInfo),
 		SYNC_INIT(rgbScan3dInfo),
+		SYNC_INIT(rgbScanDescInfo),
 
 		// RGB-only + Odom
 		SYNC_INIT(rgbOdom),
 		SYNC_INIT(rgbOdomScan2d),
 		SYNC_INIT(rgbOdomScan3d),
+		SYNC_INIT(rgbOdomScanDesc),
 		SYNC_INIT(rgbOdomInfo),
 		SYNC_INIT(rgbOdomScan2dInfo),
 		SYNC_INIT(rgbOdomScan3dInfo),
+		SYNC_INIT(rgbOdomScanDescInfo),
 
 #ifdef RTABMAP_SYNC_USER_DATA
 		// RGB-only + User Data
 		SYNC_INIT(rgbData),
 		SYNC_INIT(rgbDataScan2d),
 		SYNC_INIT(rgbDataScan3d),
+		SYNC_INIT(rgbDataScanDesc),
 		SYNC_INIT(rgbDataInfo),
 		SYNC_INIT(rgbDataScan2dInfo),
 		SYNC_INIT(rgbDataScan3dInfo),
+		SYNC_INIT(rgbDataScanDescInfo),
 
 		// RGB-only + Odom + User Data
 		SYNC_INIT(rgbOdomData),
 		SYNC_INIT(rgbOdomDataScan2d),
 		SYNC_INIT(rgbOdomDataScan3d),
+		SYNC_INIT(rgbOdomDataScanDesc),
 		SYNC_INIT(rgbOdomDataInfo),
 		SYNC_INIT(rgbOdomDataScan2dInfo),
 		SYNC_INIT(rgbOdomDataScan3dInfo),
+		SYNC_INIT(rgbOdomDataScanDescInfo),
 #endif
 		// 1 RGBD
 		SYNC_INIT(rgbdScan2d),
 		SYNC_INIT(rgbdScan3d),
+		SYNC_INIT(rgbdScanDesc),
 		SYNC_INIT(rgbdInfo),
 		SYNC_INIT(rgbdScan2dInfo),
 		SYNC_INIT(rgbdScan3dInfo),
+		SYNC_INIT(rgbdScanDescInfo),
 
 		// 1 RGBD + Odom
 		SYNC_INIT(rgbdOdom),
 		SYNC_INIT(rgbdOdomScan2d),
 		SYNC_INIT(rgbdOdomScan3d),
+		SYNC_INIT(rgbdOdomScanDesc),
 		SYNC_INIT(rgbdOdomInfo),
 		SYNC_INIT(rgbdOdomScan2dInfo),
 		SYNC_INIT(rgbdOdomScan3dInfo),
+		SYNC_INIT(rgbdOdomScanDescInfo),
 
 #ifdef RTABMAP_SYNC_USER_DATA
 		// 1 RGBD + User Data
 		SYNC_INIT(rgbdData),
 		SYNC_INIT(rgbdDataScan2d),
 		SYNC_INIT(rgbdDataScan3d),
+		SYNC_INIT(rgbdDataScanDesc),
 		SYNC_INIT(rgbdDataInfo),
 		SYNC_INIT(rgbdDataScan2dInfo),
 		SYNC_INIT(rgbdDataScan3dInfo),
+		SYNC_INIT(rgbdDataScanDescInfo),
 
 		// 1 RGBD + Odom + User Data
 		SYNC_INIT(rgbdOdomData),
 		SYNC_INIT(rgbdOdomDataScan2d),
 		SYNC_INIT(rgbdOdomDataScan3d),
+		SYNC_INIT(rgbdOdomDataScanDesc),
 		SYNC_INIT(rgbdOdomDataInfo),
 		SYNC_INIT(rgbdOdomDataScan2dInfo),
 		SYNC_INIT(rgbdOdomDataScan3dInfo),
+		SYNC_INIT(rgbdOdomDataScanDescInfo),
 #endif
 
 #ifdef RTABMAP_SYNC_MULTI_RGBD
@@ -156,127 +181,158 @@ CommonDataSubscriber::CommonDataSubscriber(bool gui) :
 		SYNC_INIT(rgbd2),
 		SYNC_INIT(rgbd2Scan2d),
 		SYNC_INIT(rgbd2Scan3d),
+		SYNC_INIT(rgbd2ScanDesc),
 		SYNC_INIT(rgbd2Info),
 		SYNC_INIT(rgbd2Scan2dInfo),
 		SYNC_INIT(rgbd2Scan3dInfo),
+		SYNC_INIT(rgbd2ScanDescInfo),
 
 		// 2 RGBD + Odom
 		SYNC_INIT(rgbd2Odom),
 		SYNC_INIT(rgbd2OdomScan2d),
 		SYNC_INIT(rgbd2OdomScan3d),
+		SYNC_INIT(rgbd2OdomScanDesc),
 		SYNC_INIT(rgbd2OdomInfo),
 		SYNC_INIT(rgbd2OdomScan2dInfo),
 		SYNC_INIT(rgbd2OdomScan3dInfo),
+		SYNC_INIT(rgbd2OdomScanDescInfo),
 
 #ifdef RTABMAP_SYNC_USER_DATA
 		// 2 RGBD + User Data
 		SYNC_INIT(rgbd2Data),
 		SYNC_INIT(rgbd2DataScan2d),
 		SYNC_INIT(rgbd2DataScan3d),
+		SYNC_INIT(rgbd2DataScanDesc),
 		SYNC_INIT(rgbd2DataInfo),
 		SYNC_INIT(rgbd2DataScan2dInfo),
 		SYNC_INIT(rgbd2DataScan3dInfo),
+		SYNC_INIT(rgbd2DataScanDescInfo),
 
 		// 2 RGBD + Odom + User Data
 		SYNC_INIT(rgbd2OdomData),
 		SYNC_INIT(rgbd2OdomDataScan2d),
 		SYNC_INIT(rgbd2OdomDataScan3d),
+		SYNC_INIT(rgbd2OdomDataScanDesc),
 		SYNC_INIT(rgbd2OdomDataInfo),
 		SYNC_INIT(rgbd2OdomDataScan2dInfo),
 		SYNC_INIT(rgbd2OdomDataScan3dInfo),
+		SYNC_INIT(rgbd2OdomDataScanDescInfo),
 #endif
 
 		// 3 RGBD
 		SYNC_INIT(rgbd3),
 		SYNC_INIT(rgbd3Scan2d),
 		SYNC_INIT(rgbd3Scan3d),
+		SYNC_INIT(rgbd3ScanDesc),
 		SYNC_INIT(rgbd3Info),
 		SYNC_INIT(rgbd3Scan2dInfo),
 		SYNC_INIT(rgbd3Scan3dInfo),
+		SYNC_INIT(rgbd3ScanDescInfo),
 
 		// 3 RGBD + Odom
 		SYNC_INIT(rgbd3Odom),
 		SYNC_INIT(rgbd3OdomScan2d),
 		SYNC_INIT(rgbd3OdomScan3d),
+		SYNC_INIT(rgbd3OdomScanDesc),
 		SYNC_INIT(rgbd3OdomInfo),
 		SYNC_INIT(rgbd3OdomScan2dInfo),
 		SYNC_INIT(rgbd3OdomScan3dInfo),
+		SYNC_INIT(rgbd3OdomScanDescInfo),
 
 #ifdef RTABMAP_SYNC_USER_DATA
 		// 3 RGBD + User Data
 		SYNC_INIT(rgbd3Data),
 		SYNC_INIT(rgbd3DataScan2d),
 		SYNC_INIT(rgbd3DataScan3d),
+		SYNC_INIT(rgbd3DataScanDesc),
 		SYNC_INIT(rgbd3DataInfo),
 		SYNC_INIT(rgbd3DataScan2dInfo),
 		SYNC_INIT(rgbd3DataScan3dInfo),
+		SYNC_INIT(rgbd3DataScanDescInfo),
 
 		// 3 RGBD + Odom + User Data
 		SYNC_INIT(rgbd3OdomData),
 		SYNC_INIT(rgbd3OdomDataScan2d),
 		SYNC_INIT(rgbd3OdomDataScan3d),
+		SYNC_INIT(rgbd3OdomDataScanDesc),
 		SYNC_INIT(rgbd3OdomDataInfo),
 		SYNC_INIT(rgbd3OdomDataScan2dInfo),
 		SYNC_INIT(rgbd3OdomDataScan3dInfo),
+		SYNC_INIT(rgbd3OdomDataScanDescInfo),
 #endif
 
 		// 4 RGBD
 		SYNC_INIT(rgbd4),
 		SYNC_INIT(rgbd4Scan2d),
 		SYNC_INIT(rgbd4Scan3d),
+		SYNC_INIT(rgbd4ScanDesc),
 		SYNC_INIT(rgbd4Info),
 		SYNC_INIT(rgbd4Scan2dInfo),
 		SYNC_INIT(rgbd4Scan3dInfo),
+		SYNC_INIT(rgbd4ScanDescInfo),
 
 		// 4 RGBD + Odom
 		SYNC_INIT(rgbd4Odom),
 		SYNC_INIT(rgbd4OdomScan2d),
 		SYNC_INIT(rgbd4OdomScan3d),
+		SYNC_INIT(rgbd4OdomScanDesc),
 		SYNC_INIT(rgbd4OdomInfo),
 		SYNC_INIT(rgbd4OdomScan2dInfo),
 		SYNC_INIT(rgbd4OdomScan3dInfo),
+		SYNC_INIT(rgbd4OdomScanDescInfo),
 
 #ifdef RTABMAP_SYNC_USER_DATA
 		// 4 RGBD + User Data
 		SYNC_INIT(rgbd4Data),
 		SYNC_INIT(rgbd4DataScan2d),
 		SYNC_INIT(rgbd4DataScan3d),
+		SYNC_INIT(rgbd4DataScanDesc),
 		SYNC_INIT(rgbd4DataInfo),
 		SYNC_INIT(rgbd4DataScan2dInfo),
 		SYNC_INIT(rgbd4DataScan3dInfo),
+		SYNC_INIT(rgbd4DataScanDescInfo),
 
 		// 4 RGBD + Odom + User Data
 		SYNC_INIT(rgbd4OdomData),
 		SYNC_INIT(rgbd4OdomDataScan2d),
 		SYNC_INIT(rgbd4OdomDataScan3d),
+		SYNC_INIT(rgbd4OdomDataScanDesc),
 		SYNC_INIT(rgbd4OdomDataInfo),
 		SYNC_INIT(rgbd4OdomDataScan2dInfo),
 		SYNC_INIT(rgbd4OdomDataScan3dInfo),
+		SYNC_INIT(rgbd4OdomDataScanDescInfo),
 #endif
 #endif // RTABMAP_SYNC_MULTI_RGBD
 
 		// Scan
 		SYNC_INIT(scan2dInfo),
 		SYNC_INIT(scan3dInfo),
+		SYNC_INIT(scanDescInfo),
 
 		// Scan + Odom
 		SYNC_INIT(odomScan2d),
 		SYNC_INIT(odomScan3d),
+		SYNC_INIT(odomScanDesc),
 		SYNC_INIT(odomScan2dInfo),
 		SYNC_INIT(odomScan3dInfo),
+		SYNC_INIT(odomScanDescInfo),
 
 #ifdef RTABMAP_SYNC_USER_DATA
 		// Scan + User Data
 		SYNC_INIT(dataScan2d),
 		SYNC_INIT(dataScan3d),
+		SYNC_INIT(dataScanDesc),
 		SYNC_INIT(dataScan2dInfo),
 		SYNC_INIT(dataScan3dInfo),
+		SYNC_INIT(dataScanDescInfo),
 
 		// Scan + Odom + User Data
 		SYNC_INIT(odomDataScan2d),
 		SYNC_INIT(odomDataScan3d),
+		SYNC_INIT(odomDataScanDesc),
 		SYNC_INIT(odomDataScan2dInfo),
 		SYNC_INIT(odomDataScan3dInfo),
+		SYNC_INIT(odomDataScanDescInfo),
 #endif
 
 		// Odom
@@ -298,6 +354,7 @@ void CommonDataSubscriber::setupCallbacks(
 {
 	bool subscribeScan2d = false;
 	bool subscribeScan3d = false;
+	bool subscribeScanDesc = false;
 	bool subscribeOdomInfo = false;
 	bool subscribeUserData = false;
 	bool subscribeOdom = true;
@@ -313,6 +370,7 @@ void CommonDataSubscriber::setupCallbacks(
 	pnh.param("subscribe_rgb",       subscribedToRGB_, subscribedToRGB_);
 	pnh.param("subscribe_scan",      subscribeScan2d, subscribeScan2d);
 	pnh.param("subscribe_scan_cloud", subscribeScan3d, subscribeScan3d);
+	pnh.param("subscribe_scan_descriptor", subscribeScanDesc, subscribeScanDesc);
 	pnh.param("subscribe_stereo",    subscribedToStereo_, subscribedToStereo_);
 	pnh.param("subscribe_rgbd",      subscribedToRGBD_, subscribedToRGBD_);
 	pnh.param("subscribe_odom_info", subscribeOdomInfo, subscribeOdomInfo);
@@ -359,7 +417,17 @@ void CommonDataSubscriber::setupCallbacks(
 		ROS_WARN("rtabmap: Parameters subscribe_scan and subscribe_scan_cloud cannot be true at the same time. Parameter subscribe_scan_cloud is set to false.");
 		subscribeScan3d = false;
 	}
-	if(subscribeScan2d || subscribeScan3d)
+	if(subscribeScan2d && subscribeScanDesc)
+	{
+		ROS_WARN("rtabmap: Parameters subscribe_scan and subscribe_scan_descriptor cannot be true at the same time. Parameter subscribe_scan is set to false.");
+		subscribeScan2d = false;
+	}
+	if(subscribeScan3d && subscribeScanDesc)
+	{
+		ROS_WARN("rtabmap: Parameters subscribe_scan_cloud and subscribe_scan_descriptor cannot be true at the same time. Parameter subscribe_scan_cloud is set to false.");
+		subscribeScan3d = false;
+	}
+	if(subscribeScan2d || subscribeScan3d || subscribeScanDesc)
 	{
 		if(!subscribedToDepth_ && !subscribedToStereo_ && !subscribedToRGBD_ && !subscribedToRGB_)
 		{
@@ -404,6 +472,7 @@ void CommonDataSubscriber::setupCallbacks(
 	ROS_INFO("%s: subscribe_user_data = %s", name.c_str(), subscribeUserData?"true":"false");
 	ROS_INFO("%s: subscribe_scan = %s", name.c_str(), subscribeScan2d?"true":"false");
 	ROS_INFO("%s: subscribe_scan_cloud = %s", name.c_str(), subscribeScan3d?"true":"false");
+	ROS_INFO("%s: subscribe_scan_descriptor = %s", name.c_str(), subscribeScanDesc?"true":"false");
 	ROS_INFO("%s: queue_size    = %d", name.c_str(), queueSize_);
 	ROS_INFO("%s: approx_sync   = %s", name.c_str(), approxSync_?"true":"false");
 
@@ -417,6 +486,7 @@ void CommonDataSubscriber::setupCallbacks(
 				subscribeUserData,
 				subscribeScan2d,
 				subscribeScan3d,
+				subscribeScanDesc,
 				subscribeOdomInfo,
 				queueSize_,
 				approxSync_);
@@ -440,6 +510,7 @@ void CommonDataSubscriber::setupCallbacks(
 				subscribeUserData,
 				subscribeScan2d,
 				subscribeScan3d,
+				subscribeScanDesc,
 				subscribeOdomInfo,
 				queueSize_,
 				approxSync_);
@@ -456,6 +527,7 @@ void CommonDataSubscriber::setupCallbacks(
 					subscribeUserData,
 					subscribeScan2d,
 					subscribeScan3d,
+					subscribeScanDesc,
 					subscribeOdomInfo,
 					queueSize_,
 					approxSync_);
@@ -469,6 +541,7 @@ void CommonDataSubscriber::setupCallbacks(
 					subscribeUserData,
 					subscribeScan2d,
 					subscribeScan3d,
+					subscribeScanDesc,
 					subscribeOdomInfo,
 					queueSize_,
 					approxSync_);
@@ -482,6 +555,7 @@ void CommonDataSubscriber::setupCallbacks(
 					subscribeUserData,
 					subscribeScan2d,
 					subscribeScan3d,
+					subscribeScanDesc,
 					subscribeOdomInfo,
 					queueSize_,
 					approxSync_);
@@ -501,17 +575,19 @@ void CommonDataSubscriber::setupCallbacks(
 					subscribeUserData,
 					subscribeScan2d,
 					subscribeScan3d,
+					subscribeScanDesc,
 					subscribeOdomInfo,
 					queueSize_,
 					approxSync_);
 		}
 	}
-	else if(subscribeScan2d || subscribeScan3d)
+	else if(subscribeScan2d || subscribeScan3d || subscribeScanDesc)
 	{
 		setupScanCallbacks(
 					nh,
 					pnh,
 					subscribeScan2d,
+					subscribeScanDesc,
 					subscribedToOdom_,
 					subscribeUserData,
 					subscribeOdomInfo,
@@ -529,7 +605,7 @@ void CommonDataSubscriber::setupCallbacks(
 					approxSync_);
 	}
 
-	if(subscribedToDepth_ || subscribedToStereo_ || subscribedToRGBD_ || subscribedToScan2d_ || subscribedToScan3d_ || subscribedToRGB_ || subscribedToOdom_)
+	if(subscribedToDepth_ || subscribedToStereo_ || subscribedToRGBD_ || subscribedToScan2d_ || subscribedToScan3d_ || subscribedToScanDescriptor_ || subscribedToRGB_ || subscribedToOdom_)
 	{
 		warningThread_ = new boost::thread(boost::bind(&CommonDataSubscriber::warningLoop, this));
 		ROS_INFO("%s", subscribedTopicsMsg_.c_str());
@@ -549,34 +625,42 @@ CommonDataSubscriber::~CommonDataSubscriber()
 	SYNC_DEL(depth);
 	SYNC_DEL(depthScan2d);
 	SYNC_DEL(depthScan3d);
+	SYNC_DEL(depthScanDesc);
 	SYNC_DEL(depthInfo);
 	SYNC_DEL(depthScan2dInfo);
 	SYNC_DEL(depthScan3dInfo);
+	SYNC_DEL(depthScanDescInfo);
 
 	// RGB + Depth + Odom
 	SYNC_DEL(depthOdom);
 	SYNC_DEL(depthOdomScan2d);
 	SYNC_DEL(depthOdomScan3d);
+	SYNC_DEL(depthOdomScanDesc);
 	SYNC_DEL(depthOdomInfo);
 	SYNC_DEL(depthOdomScan2dInfo);
 	SYNC_DEL(depthOdomScan3dInfo);
+	SYNC_DEL(depthOdomScanDescInfo);
 
 #ifdef RTABMAP_SYNC_USER_DATA
 	// RGB + Depth + User Data
 	SYNC_DEL(depthData);
 	SYNC_DEL(depthDataScan2d);
 	SYNC_DEL(depthDataScan3d);
+	SYNC_DEL(depthDataScanDesc);
 	SYNC_DEL(depthDataInfo);
 	SYNC_DEL(depthDataScan2dInfo);
 	SYNC_DEL(depthDataScan3dInfo);
+	SYNC_DEL(depthDataScanDescInfo);
 
 	// RGB + Depth + Odom + User Data
 	SYNC_DEL(depthOdomData);
 	SYNC_DEL(depthOdomDataScan2d);
 	SYNC_DEL(depthOdomDataScan3d);
+	SYNC_DEL(depthOdomDataScanDesc);
 	SYNC_DEL(depthOdomDataInfo);
 	SYNC_DEL(depthOdomDataScan2dInfo);
 	SYNC_DEL(depthOdomDataScan3dInfo);
+	SYNC_DEL(depthOdomDataScanDescInfo);
 #endif
 
 	// Stereo
@@ -591,67 +675,83 @@ CommonDataSubscriber::~CommonDataSubscriber()
 	SYNC_DEL(rgb);
 	SYNC_DEL(rgbScan2d);
 	SYNC_DEL(rgbScan3d);
+	SYNC_DEL(rgbScanDesc);
 	SYNC_DEL(rgbInfo);
 	SYNC_DEL(rgbScan2dInfo);
 	SYNC_DEL(rgbScan3dInfo);
+	SYNC_DEL(rgbScanDescInfo);
 
 	// RGB-only + Odom
 	SYNC_DEL(rgbOdom);
 	SYNC_DEL(rgbOdomScan2d);
 	SYNC_DEL(rgbOdomScan3d);
+	SYNC_DEL(rgbOdomScanDesc);
 	SYNC_DEL(rgbOdomInfo);
 	SYNC_DEL(rgbOdomScan2dInfo);
 	SYNC_DEL(rgbOdomScan3dInfo);
+	SYNC_DEL(rgbOdomScanDescInfo);
 
 #ifdef RTABMAP_SYNC_USER_DATA
 	// RGB-only + User Data
 	SYNC_DEL(rgbData);
 	SYNC_DEL(rgbDataScan2d);
 	SYNC_DEL(rgbDataScan3d);
+	SYNC_DEL(rgbDataScanDesc);
 	SYNC_DEL(rgbDataInfo);
 	SYNC_DEL(rgbDataScan2dInfo);
 	SYNC_DEL(rgbDataScan3dInfo);
+	SYNC_DEL(rgbDataScanDescInfo);
 
 	// RGB-only + Odom + User Data
 	SYNC_DEL(rgbOdomData);
 	SYNC_DEL(rgbOdomDataScan2d);
 	SYNC_DEL(rgbOdomDataScan3d);
+	SYNC_DEL(rgbOdomDataScanDesc);
 	SYNC_DEL(rgbOdomDataInfo);
 	SYNC_DEL(rgbOdomDataScan2dInfo);
 	SYNC_DEL(rgbOdomDataScan3dInfo);
+	SYNC_DEL(rgbOdomDataScanDescInfo);
 #endif
 
 	// 1 RGBD
 	SYNC_DEL(rgbdScan2d);
 	SYNC_DEL(rgbdScan3d);
+	SYNC_DEL(rgbdScanDesc);
 	SYNC_DEL(rgbdInfo);
 	SYNC_DEL(rgbdScan2dInfo);
 	SYNC_DEL(rgbdScan3dInfo);
+	SYNC_DEL(rgbdScanDescInfo);
 
 	// 1 RGBD + Odom
 	SYNC_DEL(rgbdOdom);
 	SYNC_DEL(rgbdOdomScan2d);
 	SYNC_DEL(rgbdOdomScan3d);
+	SYNC_DEL(rgbdOdomScanDesc);
 	SYNC_DEL(rgbdOdomInfo);
 	SYNC_DEL(rgbdOdomScan2dInfo);
 	SYNC_DEL(rgbdOdomScan3dInfo);
+	SYNC_DEL(rgbdOdomScanDescInfo);
 
 #ifdef RTABMAP_SYNC_USER_DATA
 	// 1 RGBD + User Data
 	SYNC_DEL(rgbdData);
 	SYNC_DEL(rgbdDataScan2d);
 	SYNC_DEL(rgbdDataScan3d);
+	SYNC_DEL(rgbdDataScanDesc);
 	SYNC_DEL(rgbdDataInfo);
 	SYNC_DEL(rgbdDataScan2dInfo);
 	SYNC_DEL(rgbdDataScan3dInfo);
+	SYNC_DEL(rgbdDataScanDescInfo);
 
 	// 1 RGBD + Odom + User Data
 	SYNC_DEL(rgbdOdomData);
 	SYNC_DEL(rgbdOdomDataScan2d);
 	SYNC_DEL(rgbdOdomDataScan3d);
+	SYNC_DEL(rgbdOdomDataScanDesc);
 	SYNC_DEL(rgbdOdomDataInfo);
 	SYNC_DEL(rgbdOdomDataScan2dInfo);
 	SYNC_DEL(rgbdOdomDataScan3dInfo);
+	SYNC_DEL(rgbdOdomDataScanDescInfo);
 #endif
 
 #ifdef RTABMAP_SYNC_MULTI_RGBD
@@ -659,102 +759,126 @@ CommonDataSubscriber::~CommonDataSubscriber()
 	SYNC_DEL(rgbd2);
 	SYNC_DEL(rgbd2Scan2d);
 	SYNC_DEL(rgbd2Scan3d);
+	SYNC_DEL(rgbd2ScanDesc);
 	SYNC_DEL(rgbd2Info);
 	SYNC_DEL(rgbd2Scan2dInfo);
 	SYNC_DEL(rgbd2Scan3dInfo);
+	SYNC_DEL(rgbd2ScanDescInfo);
 
 	// 2 RGBD + Odom
 	SYNC_DEL(rgbd2Odom);
 	SYNC_DEL(rgbd2OdomScan2d);
 	SYNC_DEL(rgbd2OdomScan3d);
+	SYNC_DEL(rgbd2OdomScanDesc);
 	SYNC_DEL(rgbd2OdomInfo);
 	SYNC_DEL(rgbd2OdomScan2dInfo);
 	SYNC_DEL(rgbd2OdomScan3dInfo);
+	SYNC_DEL(rgbd2OdomScanDescInfo);
 
 #ifdef RTABMAP_SYNC_USER_DATA
 	// 2 RGBD + User Data
 	SYNC_DEL(rgbd2Data);
 	SYNC_DEL(rgbd2DataScan2d);
 	SYNC_DEL(rgbd2DataScan3d);
+	SYNC_DEL(rgbd2DataScanDesc);
 	SYNC_DEL(rgbd2DataInfo);
 	SYNC_DEL(rgbd2DataScan2dInfo);
 	SYNC_DEL(rgbd2DataScan3dInfo);
+	SYNC_DEL(rgbd2DataScanDescInfo);
 
 	// 2 RGBD + Odom + User Data
 	SYNC_DEL(rgbd2OdomData);
 	SYNC_DEL(rgbd2OdomDataScan2d);
 	SYNC_DEL(rgbd2OdomDataScan3d);
+	SYNC_DEL(rgbd2OdomDataScanDesc);
 	SYNC_DEL(rgbd2OdomDataInfo);
 	SYNC_DEL(rgbd2OdomDataScan2dInfo);
 	SYNC_DEL(rgbd2OdomDataScan3dInfo);
+	SYNC_DEL(rgbd2OdomDataScanDescInfo);
 #endif
 
 	// 3 RGBD
 	SYNC_DEL(rgbd3);
 	SYNC_DEL(rgbd3Scan2d);
 	SYNC_DEL(rgbd3Scan3d);
+	SYNC_DEL(rgbd3ScanDesc);
 	SYNC_DEL(rgbd3Info);
 	SYNC_DEL(rgbd3Scan2dInfo);
 	SYNC_DEL(rgbd3Scan3dInfo);
+	SYNC_DEL(rgbd3ScanDescInfo);
 
 	// 3 RGBD + Odom
 	SYNC_DEL(rgbd3Odom);
 	SYNC_DEL(rgbd3OdomScan2d);
 	SYNC_DEL(rgbd3OdomScan3d);
+	SYNC_DEL(rgbd3OdomScanDesc);
 	SYNC_DEL(rgbd3OdomInfo);
 	SYNC_DEL(rgbd3OdomScan2dInfo);
 	SYNC_DEL(rgbd3OdomScan3dInfo);
+	SYNC_DEL(rgbd3OdomScanDescInfo);
 
 #ifdef RTABMAP_SYNC_USER_DATA
 	// 3 RGBD + User Data
 	SYNC_DEL(rgbd3Data);
 	SYNC_DEL(rgbd3DataScan2d);
 	SYNC_DEL(rgbd3DataScan3d);
+	SYNC_DEL(rgbd3DataScanDesc);
 	SYNC_DEL(rgbd3DataInfo);
 	SYNC_DEL(rgbd3DataScan2dInfo);
 	SYNC_DEL(rgbd3DataScan3dInfo);
+	SYNC_DEL(rgbd3DataScanDescInfo);
 
 	// 3 RGBD + Odom + User Data
 	SYNC_DEL(rgbd3OdomData);
 	SYNC_DEL(rgbd3OdomDataScan2d);
 	SYNC_DEL(rgbd3OdomDataScan3d);
+	SYNC_DEL(rgbd3OdomDataScanDesc);
 	SYNC_DEL(rgbd3OdomDataInfo);
 	SYNC_DEL(rgbd3OdomDataScan2dInfo);
 	SYNC_DEL(rgbd3OdomDataScan3dInfo);
+	SYNC_DEL(rgbd3OdomDataScanDescInfo);
 #endif
 
 	// 4 RGBD
 	SYNC_DEL(rgbd4);
 	SYNC_DEL(rgbd4Scan2d);
 	SYNC_DEL(rgbd4Scan3d);
+	SYNC_DEL(rgbd4ScanDesc);
 	SYNC_DEL(rgbd4Info);
 	SYNC_DEL(rgbd4Scan2dInfo);
 	SYNC_DEL(rgbd4Scan3dInfo);
+	SYNC_DEL(rgbd4ScanDescInfo);
 
 	// 4 RGBD + Odom
 	SYNC_DEL(rgbd4Odom);
 	SYNC_DEL(rgbd4OdomScan2d);
 	SYNC_DEL(rgbd4OdomScan3d);
+	SYNC_DEL(rgbd4OdomScanDesc);
 	SYNC_DEL(rgbd4OdomInfo);
 	SYNC_DEL(rgbd4OdomScan2dInfo);
 	SYNC_DEL(rgbd4OdomScan3dInfo);
+	SYNC_DEL(rgbd4OdomScanDescInfo);
 
 #ifdef RTABMAP_SYNC_USER_DATA
 	// 4 RGBD + User Data
 	SYNC_DEL(rgbd4Data);
 	SYNC_DEL(rgbd4DataScan2d);
 	SYNC_DEL(rgbd4DataScan3d);
+	SYNC_DEL(rgbd4DataScanDesc);
 	SYNC_DEL(rgbd4DataInfo);
 	SYNC_DEL(rgbd4DataScan2dInfo);
 	SYNC_DEL(rgbd4DataScan3dInfo);
+	SYNC_DEL(rgbd4DataScanDescInfo);
 
 	// 4 RGBD + Odom + User Data
 	SYNC_DEL(rgbd4OdomData);
 	SYNC_DEL(rgbd4OdomDataScan2d);
 	SYNC_DEL(rgbd4OdomDataScan3d);
+	SYNC_DEL(rgbd4OdomDataScanDesc);
 	SYNC_DEL(rgbd4OdomDataInfo);
 	SYNC_DEL(rgbd4OdomDataScan2dInfo);
 	SYNC_DEL(rgbd4OdomDataScan3dInfo);
+	SYNC_DEL(rgbd4OdomDataScanDescInfo);
 #endif
 #endif //RTABMAP_SYNC_MULTI_RGBD
 
@@ -765,21 +889,27 @@ CommonDataSubscriber::~CommonDataSubscriber()
 	// Scan + Odom
 	SYNC_DEL(odomScan2d);
 	SYNC_DEL(odomScan3d);
+	SYNC_DEL(odomScanDesc);
 	SYNC_DEL(odomScan2dInfo);
 	SYNC_DEL(odomScan3dInfo);
+	SYNC_DEL(odomScanDescInfo);
 
 #ifdef RTABMAP_SYNC_USER_DATA
 	// Scan + User Data
 	SYNC_DEL(dataScan2d);
 	SYNC_DEL(dataScan3d);
+	SYNC_DEL(dataScanDesc);
 	SYNC_DEL(dataScan2dInfo);
 	SYNC_DEL(dataScan3dInfo);
+	SYNC_DEL(dataScanDescInfo);
 
 	// Scan + Odom + User Data
 	SYNC_DEL(odomDataScan2d);
 	SYNC_DEL(odomDataScan3d);
+	SYNC_DEL(odomDataScanDesc);
 	SYNC_DEL(odomDataScan2dInfo);
 	SYNC_DEL(odomDataScan3dInfo);
+	SYNC_DEL(odomDataScanDescInfo);
 #endif
 
 	// Odom
@@ -844,11 +974,22 @@ void CommonDataSubscriber::commonSingleDepthCallback(
 		const cv_bridge::CvImageConstPtr & depthMsg,
 		const sensor_msgs::CameraInfo & rgbCameraInfoMsg,
 		const sensor_msgs::CameraInfo & depthCameraInfoMsg,
-		const sensor_msgs::LaserScanConstPtr& scanMsg,
-		const sensor_msgs::PointCloud2ConstPtr& scan3dMsg,
-		const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg)
+		const sensor_msgs::LaserScan& scanMsg,
+		const sensor_msgs::PointCloud2& scan3dMsg,
+		const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg,
+		const std::vector<rtabmap_ros::GlobalDescriptor> & globalDescriptorMsgs,
+		const std::vector<rtabmap_ros::KeyPoint> & localKeyPoints,
+		const std::vector<rtabmap_ros::Point3f> & localPoints3d,
+		const cv::Mat & localDescriptors)
 {
 	callbackCalled();
+
+	std::vector<std::vector<rtabmap_ros::KeyPoint> > localKeyPointsMsgs;
+	localKeyPointsMsgs.push_back(localKeyPoints);
+	std::vector<std::vector<rtabmap_ros::Point3f> > localPoints3dMsgs;
+	localPoints3dMsgs.push_back(localPoints3d);
+	std::vector<cv::Mat> localDescriptorsMsgs;
+	localDescriptorsMsgs.push_back(localDescriptors);
 
 	if(depthMsg.get() == 0 ||
 	   depthMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1) == 0 ||
@@ -867,11 +1008,36 @@ void CommonDataSubscriber::commonSingleDepthCallback(
 			depthMsgs.push_back(depthMsg);
 		}
 		cameraInfoMsgs.push_back(rgbCameraInfoMsg);
-		commonDepthCallback(odomMsg, userDataMsg, imageMsgs, depthMsgs, cameraInfoMsgs, scanMsg, scan3dMsg, odomInfoMsg);
+		commonDepthCallback(
+				odomMsg,
+				userDataMsg,
+				imageMsgs,
+				depthMsgs,
+				cameraInfoMsgs,
+				scanMsg,
+				scan3dMsg,
+				odomInfoMsg,
+				globalDescriptorMsgs,
+				localKeyPointsMsgs,
+				localPoints3dMsgs,
+				localDescriptorsMsgs);
 	}
 	else // assuming stereo
 	{
-		commonStereoCallback(odomMsg, userDataMsg, imageMsg, depthMsg, rgbCameraInfoMsg, depthCameraInfoMsg, scanMsg, scan3dMsg, odomInfoMsg);
+		commonStereoCallback(
+				odomMsg,
+				userDataMsg,
+				imageMsg,
+				depthMsg,
+				rgbCameraInfoMsg,
+				depthCameraInfoMsg,
+				scanMsg,
+				scan3dMsg,
+				odomInfoMsg,
+				globalDescriptorMsgs,
+				localKeyPointsMsgs,
+				localPoints3dMsgs,
+				localDescriptorsMsgs);
 	}
 }
 

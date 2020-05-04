@@ -193,13 +193,13 @@ private:
 				sensor_msgs::CameraInfo info;
 				rtabmap_ros::cameraModelToROS(model.scaled(1.0f/float(decimation_)), info);
 				info.header = cameraInfo->header;
-				msg.rgbCameraInfo = info;
-				msg.depthCameraInfo = info;
+				msg.rgb_camera_info = info;
+				msg.depth_camera_info = info;
 			}
 			else
 			{
-				msg.rgbCameraInfo = *cameraInfo;
-				msg.depthCameraInfo = *cameraInfo;
+				msg.rgb_camera_info = *cameraInfo;
+				msg.depth_camera_info = *cameraInfo;
 			}
 
 			cv::Mat rgbMat;
@@ -238,19 +238,19 @@ private:
 
 					rtabmap_ros::RGBDImage msgCompressed;
 					msgCompressed.header = msg.header;
-					msgCompressed.rgbCameraInfo = msg.rgbCameraInfo;
-					msgCompressed.depthCameraInfo = msg.depthCameraInfo;
+					msgCompressed.rgb_camera_info = msg.rgb_camera_info;
+					msgCompressed.depth_camera_info = msg.depth_camera_info;
 
 					cv_bridge::CvImage cvImg;
 					cvImg.header = image->header;
 					cvImg.image = rgbMat;
 					cvImg.encoding = image->encoding;
-					cvImg.toCompressedImageMsg(msgCompressed.rgbCompressed, cv_bridge::JPG);
+					cvImg.toCompressedImageMsg(msgCompressed.rgb_compressed, cv_bridge::JPG);
 
-					msgCompressed.depthCompressed.header = imageDepthPtr->header;
-					msgCompressed.depthCompressed.data = rtabmap::compressImage(depthMat, ".png");
+					msgCompressed.depth_compressed.header = imageDepthPtr->header;
+					msgCompressed.depth_compressed.data = rtabmap::compressImage(depthMat, ".png");
 
-					msgCompressed.depthCompressed.format = "png";
+					msgCompressed.depth_compressed.format = "png";
 
 					rgbdImageCompressedPub_.publish(msgCompressed);
 				}

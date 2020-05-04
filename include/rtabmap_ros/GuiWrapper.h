@@ -73,9 +73,13 @@ private:
 			const std::vector<cv_bridge::CvImageConstPtr> & imageMsgs,
 			const std::vector<cv_bridge::CvImageConstPtr> & depthMsgs,
 			const std::vector<sensor_msgs::CameraInfo> & cameraInfoMsgs,
-			const sensor_msgs::LaserScanConstPtr& scan2dMsg,
-			const sensor_msgs::PointCloud2ConstPtr& scan3dMsg,
-			const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg);
+			const sensor_msgs::LaserScan& scan2dMsg,
+			const sensor_msgs::PointCloud2& scan3dMsg,
+			const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg,
+			const std::vector<rtabmap_ros::GlobalDescriptor> & globalDescriptorMsgs = std::vector<rtabmap_ros::GlobalDescriptor>(),
+			const std::vector<std::vector<rtabmap_ros::KeyPoint> > & localKeyPoints = std::vector<std::vector<rtabmap_ros::KeyPoint> >(),
+			const std::vector<std::vector<rtabmap_ros::Point3f> > & localPoints3d = std::vector<std::vector<rtabmap_ros::Point3f> >(),
+			const std::vector<cv::Mat> & localDescriptors = std::vector<cv::Mat>());
 	virtual void commonStereoCallback(
 			const nav_msgs::OdometryConstPtr & odomMsg,
 			const rtabmap_ros::UserDataConstPtr & userDataMsg,
@@ -83,15 +87,20 @@ private:
 			const cv_bridge::CvImageConstPtr& rightImageMsg,
 			const sensor_msgs::CameraInfo& leftCamInfoMsg,
 			const sensor_msgs::CameraInfo& rightCamInfoMsg,
-			const sensor_msgs::LaserScanConstPtr& scan2dMsg,
-			const sensor_msgs::PointCloud2ConstPtr& scan3dMsg,
-			const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg);
+			const sensor_msgs::LaserScan& scan2dMsg,
+			const sensor_msgs::PointCloud2& scan3dMsg,
+			const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg,
+			const std::vector<rtabmap_ros::GlobalDescriptor> & globalDescriptorMsgs = std::vector<rtabmap_ros::GlobalDescriptor>(),
+			const std::vector<std::vector<rtabmap_ros::KeyPoint> > & localKeyPoints = std::vector<std::vector<rtabmap_ros::KeyPoint> >(),
+			const std::vector<std::vector<rtabmap_ros::Point3f> > & localPoints3d = std::vector<std::vector<rtabmap_ros::Point3f> >(),
+			const std::vector<cv::Mat> & localDescriptors = std::vector<cv::Mat>());
 	virtual void commonLaserScanCallback(
 			const nav_msgs::OdometryConstPtr & odomMsg,
 			const rtabmap_ros::UserDataConstPtr & userDataMsg,
-			const sensor_msgs::LaserScanConstPtr& scan2dMsg,
-			const sensor_msgs::PointCloud2ConstPtr& scan3dMsg,
-			const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg);
+			const sensor_msgs::LaserScan& scan2dMsg,
+			const sensor_msgs::PointCloud2& scan3dMsg,
+			const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg,
+			const rtabmap_ros::GlobalDescriptor & globalDescriptor = rtabmap_ros::GlobalDescriptor());
 
 	virtual void commonOdomCallback(
 			const nav_msgs::OdometryConstPtr & odomMsg,

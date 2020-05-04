@@ -98,17 +98,17 @@ private:
 
 			rtabmap_ros::RGBDImage output;
 			output.header = input->header;
-			output.rgbCameraInfo = input->rgbCameraInfo;
-			output.depthCameraInfo = input->depthCameraInfo;
+			output.rgb_camera_info = input->rgb_camera_info;
+			output.depth_camera_info = input->depth_camera_info;
 
-			rtabmap::StereoCameraModel stereoModel = stereoCameraModelFromROS(input->rgbCameraInfo, input->depthCameraInfo, rtabmap::Transform::getIdentity());
+			rtabmap::StereoCameraModel stereoModel = stereoCameraModelFromROS(input->rgb_camera_info, input->depth_camera_info, rtabmap::Transform::getIdentity());
 
 			if(compress_)
 			{
-				if(!input->rgbCompressed.data.empty())
+				if(!input->rgb_compressed.data.empty())
 				{
 					// already compressed, just copy pointer
-					output.rgbCompressed = input->rgbCompressed;
+					output.rgb_compressed = input->rgb_compressed;
 				}
 				else if(!input->rgb.data.empty())
 				{
@@ -116,14 +116,14 @@ private:
 					ROS_ERROR("Unsupported compressed image copy, please upgrade at least to ROS Indigo to use this.");
 #else
 					cv_bridge::CvImageConstPtr rgb = cv_bridge::toCvShare(input->rgb, input);
-					rgb->toCompressedImageMsg(output.rgbCompressed, cv_bridge::JPG);
+					rgb->toCompressedImageMsg(output.rgb_compressed, cv_bridge::JPG);
 #endif
 				}
 
-				if(!input->depthCompressed.data.empty())
+				if(!input->depth_compressed.data.empty())
 				{
 					// already compressed, just copy pointer
-					output.depthCompressed = input->depthCompressed;
+					output.depth_compressed = input->depth_compressed;
 				}
 				else if(!input->depth.data.empty())
 				{
@@ -131,14 +131,14 @@ private:
 					{
 						// right stereo image
 						cv_bridge::CvImageConstPtr imageRightPtr = cv_bridge::toCvShare(input->depth, input);
-						imageRightPtr->toCompressedImageMsg(output.depthCompressed, cv_bridge::JPG);
+						imageRightPtr->toCompressedImageMsg(output.depth_compressed, cv_bridge::JPG);
 					}
 					else
 					{
 						// depth image
 						cv_bridge::CvImageConstPtr imageDepthPtr = cv_bridge::toCvShare(input->depth, input);
-						output.depthCompressed.data = rtabmap::compressImage(imageDepthPtr->image, ".png");
-						output.depthCompressed.format = "png";
+						output.depth_compressed.data = rtabmap::compressImage(imageDepthPtr->image, ".png");
+						output.depth_compressed.format = "png";
 					}
 				}
 			}
@@ -149,12 +149,12 @@ private:
 					// already raw, just copy pointer
 					output.rgb = input->rgb;
 				}
-				if(!input->rgbCompressed.data.empty())
+				if(!input->rgb_compressed.data.empty())
 				{
 #ifdef CV_BRIDGE_HYDRO
 					ROS_ERROR("Unsupported compressed image copy, please upgrade at least to ROS Indigo to use this.");
 #else
-					cv_bridge::toCvCopy(input->rgbCompressed)->toImageMsg(output.rgb);
+					cv_bridge::toCvCopy(input->rgb_compressed)->toImageMsg(output.rgb);
 #endif
 				}
 
@@ -163,21 +163,21 @@ private:
 					// already raw, just copy pointer
 					output.depth = input->depth;
 				}
-				else if(input->depthCompressed.format.compare("jpg")==0)
+				else if(input->depth_compressed.format.compare("jpg")==0)
 				{
 					// right stereo image
 #ifdef CV_BRIDGE_HYDRO
 					ROS_ERROR("Unsupported compressed image copy, please upgrade at least to ROS Indigo to use this.");
 #else
-					cv_bridge::toCvCopy(input->depthCompressed)->toImageMsg(output.depth);
+					cv_bridge::toCvCopy(input->depth_compressed)->toImageMsg(output.depth);
 #endif
 				}
 				else
 				{
 					// dpeth image
 					cv_bridge::CvImagePtr ptr = boost::make_shared<cv_bridge::CvImage>();
-					ptr->header = input->depthCompressed.header;
-					ptr->image = rtabmap::uncompressImage(input->depthCompressed.data);
+					ptr->header = input->depth_compressed.header;
+					ptr->image = rtabmap::uncompressImage(input->depth_compressed.data);
 					ROS_ASSERT(ptr->image.empty() || ptr->image.type() == CV_32FC1 || ptr->image.type() == CV_16UC1);
 					ptr->encoding = ptr->image.empty()?"":ptr->image.type() == CV_32FC1?sensor_msgs::image_encodings::TYPE_32FC1:sensor_msgs::image_encodings::TYPE_16UC1;
 					ptr->toImageMsg(output.depth);

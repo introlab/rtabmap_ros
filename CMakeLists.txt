@@ -31,7 +31,7 @@ find_package(find_object_2d)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
-find_package(RTABMap 0.19.5 REQUIRED)
+find_package(RTABMap 0.20.0 REQUIRED)
 
 find_package(OpenCV REQUIRED)
 
@@ -46,11 +46,7 @@ IF(WIN32)
 add_compile_options(-bigobj)
 ENDIF(WIN32)
 
-IF(WIN32)
 option(RTABMAP_SYNC_MULTI_RGBD "Build with multi RGBD camera synchronization support"  OFF)
-ELSE()
-option(RTABMAP_SYNC_MULTI_RGBD "Build with multi RGBD camera synchronization support"  ON)
-ENDIF()
 option(RTABMAP_SYNC_USER_DATA "Build with input user data support"  OFF)
 MESSAGE(STATUS "RTABMAP_SYNC_MULTI_RGBD = ${RTABMAP_SYNC_MULTI_RGBD}")
 MESSAGE(STATUS "RTABMAP_SYNC_USER_DATA  = ${RTABMAP_SYNC_USER_DATA}")
@@ -96,6 +92,8 @@ add_message_files(
    FILES
    Info.msg
    KeyPoint.msg
+   GlobalDescriptor.msg
+   ScanDescriptor.msg
    MapData.msg
    MapGraph.msg
    NodeData.msg

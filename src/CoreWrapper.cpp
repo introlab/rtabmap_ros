@@ -1052,24 +1052,28 @@ void CoreWrapper::commonDepthCallback(
 		const std::vector<cv_bridge::CvImageConstPtr> & imageMsgs,
 		const std::vector<cv_bridge::CvImageConstPtr> & depthMsgs,
 		const std::vector<sensor_msgs::CameraInfo> & cameraInfoMsgs,
-		const sensor_msgs::LaserScanConstPtr& scan2dMsg,
-		const sensor_msgs::PointCloud2ConstPtr& scan3dMsg,
-		const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg)
+		const sensor_msgs::LaserScan& scan2dMsg,
+		const sensor_msgs::PointCloud2& scan3dMsg,
+		const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg,
+		const std::vector<rtabmap_ros::GlobalDescriptor> & globalDescriptorMsgs,
+		const std::vector<std::vector<rtabmap_ros::KeyPoint> > & localKeyPoints,
+		const std::vector<std::vector<rtabmap_ros::Point3f> > & localPoints3d,
+		const std::vector<cv::Mat> & localDescriptors)
 {
 	std::string odomFrameId = odomFrameId_;
 	if(odomMsg.get())
 	{
 		odomFrameId = odomMsg->header.frame_id;
-		if(scan2dMsg.get())
+		if(!scan2dMsg.ranges.empty())
 		{
-			if(!odomUpdate(odomMsg, scan2dMsg->header.stamp))
+			if(!odomUpdate(odomMsg, scan2dMsg.header.stamp))
 			{
 				return;
 			}
 		}
-		else if(scan3dMsg.get())
+		else if(!scan3dMsg.data.empty())
 		{
-			if(!odomUpdate(odomMsg, scan3dMsg->header.stamp))
+			if(!odomUpdate(odomMsg, scan3dMsg.header.stamp))
 			{
 				return;
 			}
@@ -1079,16 +1083,16 @@ void CoreWrapper::commonDepthCallback(
 			return;
 		}
 	}
-	else if(scan2dMsg.get())
+	else if(!scan2dMsg.ranges.empty())
 	{
-		if(!odomTFUpdate(scan2dMsg->header.stamp))
+		if(!odomTFUpdate(scan2dMsg.header.stamp))
 		{
 			return;
 		}
 	}
-	else if(scan3dMsg.get())
+	else if(!scan3dMsg.data.empty())
 	{
-		if(!odomTFUpdate(scan3dMsg->header.stamp))
+		if(!odomTFUpdate(scan3dMsg.header.stamp))
 		{
 			return;
 		}
@@ -1105,7 +1109,11 @@ void CoreWrapper::commonDepthCallback(
 			cameraInfoMsgs,
 			scan2dMsg,
 			scan3dMsg,
-			odomInfoMsg);
+			odomInfoMsg,
+			globalDescriptorMsgs,
+			localKeyPoints,
+			localPoints3d,
+			localDescriptors);
 }
 
 void CoreWrapper::commonDepthCallbackImpl(
@@ -1114,9 +1122,13 @@ void CoreWrapper::commonDepthCallbackImpl(
 		const std::vector<cv_bridge::CvImageConstPtr> & imageMsgs,
 		const std::vector<cv_bridge::CvImageConstPtr> & depthMsgs,
 		const std::vector<sensor_msgs::CameraInfo> & cameraInfoMsgs,
-		const sensor_msgs::LaserScanConstPtr& scan2dMsg,
-		const sensor_msgs::PointCloud2ConstPtr& scan3dMsg,
-		const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg)
+		const sensor_msgs::LaserScan& scan2dMsg,
+		const sensor_msgs::PointCloud2& scan3dMsg,
+		const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg,
+		const std::vector<rtabmap_ros::GlobalDescriptor> & globalDescriptorMsgs,
+		const std::vector<std::vector<rtabmap_ros::KeyPoint> > & localKeyPoints,
+		const std::vector<std::vector<rtabmap_ros::Point3f> > & localPoints3d,
+		const std::vector<cv::Mat> & localDescriptors)
 {
 	cv::Mat rgb;
 	cv::Mat depth;
@@ -1155,7 +1167,7 @@ void CoreWrapper::commonDepthCallbackImpl(
 
 	LaserScan scan;
 	bool genMaxScanPts = 0;
-	if(scan2dMsg.get() == 0 && scan3dMsg.get() == 0 && !depth.empty() && genScan_)
+	if(!scan2dMsg.ranges.empty() && !scan3dMsg.data.empty() && !depth.empty() && genScan_)
 	{
 		pcl::PointCloud<pcl::PointXYZ>::Ptr scanCloud2d(new pcl::PointCloud<pcl::PointXYZ>);
 		*scanCloud2d = util3d::laserScanFromDepthImages(
@@ -1166,7 +1178,7 @@ void CoreWrapper::commonDepthCallbackImpl(
 		genMaxScanPts += depth.cols;
 		scan = LaserScan(rtabmap::util3d::laserScan2dFromPointCloud(*scanCloud2d), 0, genScanMaxDepth_, LaserScan::kXY);
 	}
-	else if(scan2dMsg.get() != 0)
+	else if(!scan2dMsg.ranges.empty())
 	{
 		if(!rtabmap_ros::convertScanMsg(
 				scan2dMsg,
@@ -1183,7 +1195,7 @@ void CoreWrapper::commonDepthCallbackImpl(
 			return;
 		}
 	}
-	else if(scan3dMsg.get() != 0)
+	else if(!scan3dMsg.data.empty())
 	{
 		if(!rtabmap_ros::convertScan3dMsg(
 				scan3dMsg,
@@ -1233,6 +1245,11 @@ void CoreWrapper::commonDepthCallbackImpl(
 		odomInfo = odomInfoFromROS(*odomInfoMsg);
 	}
 
+	if(!globalDescriptorMsgs.empty())
+	{
+		data.setGlobalDescriptors(rtabmap_ros::globalDescriptorsFromROS(globalDescriptorMsgs));
+	}
+
 	process(lastPoseStamp_,
 			data,
 			lastPose_,
@@ -1249,24 +1266,28 @@ void CoreWrapper::commonStereoCallback(
 		const cv_bridge::CvImageConstPtr& rightImageMsg,
 		const sensor_msgs::CameraInfo& leftCamInfoMsg,
 		const sensor_msgs::CameraInfo& rightCamInfoMsg,
-		const sensor_msgs::LaserScanConstPtr& scan2dMsg,
-		const sensor_msgs::PointCloud2ConstPtr& scan3dMsg,
-		const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg)
+		const sensor_msgs::LaserScan& scan2dMsg,
+		const sensor_msgs::PointCloud2& scan3dMsg,
+		const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg,
+		const std::vector<rtabmap_ros::GlobalDescriptor> & globalDescriptorMsgs,
+		const std::vector<std::vector<rtabmap_ros::KeyPoint> > & localKeyPoints,
+		const std::vector<std::vector<rtabmap_ros::Point3f> > & localPoints3d,
+		const std::vector<cv::Mat> & localDescriptors)
 {
 	std::string odomFrameId = odomFrameId_;
 	if(odomMsg.get())
 	{
 		odomFrameId = odomMsg->header.frame_id;
-		if(scan2dMsg.get())
+		if(!scan2dMsg.ranges.empty())
 		{
-			if(!odomUpdate(odomMsg, scan2dMsg->header.stamp))
+			if(!odomUpdate(odomMsg, scan2dMsg.header.stamp))
 			{
 				return;
 			}
 		}
-		else if(scan3dMsg.get())
+		else if(!scan3dMsg.data.empty())
 		{
-			if(!odomUpdate(odomMsg, scan3dMsg->header.stamp))
+			if(!odomUpdate(odomMsg, scan3dMsg.header.stamp))
 			{
 				return;
 			}
@@ -1276,16 +1297,16 @@ void CoreWrapper::commonStereoCallback(
 			return;
 		}
 	}
-	else if(scan2dMsg.get())
+	else if(!scan2dMsg.ranges.empty())
 	{
-		if(!odomTFUpdate(scan2dMsg->header.stamp))
+		if(!odomTFUpdate(scan2dMsg.header.stamp))
 		{
 			return;
 		}
 	}
-	else if(scan3dMsg.get())
+	else if(!scan3dMsg.data.empty())
 	{
-		if(!odomTFUpdate(scan3dMsg->header.stamp))
+		if(!odomTFUpdate(scan3dMsg.header.stamp))
 		{
 			return;
 		}
@@ -1359,12 +1380,17 @@ void CoreWrapper::commonStereoCallback(
 		depthImages[0] = imgDepth;
 		cameraInfos[0] = leftCamInfoMsg;
 
-		commonDepthCallbackImpl(odomFrameId, rtabmap_ros::UserDataConstPtr(), rgbImages, depthImages, cameraInfos, scan2dMsg, scan3dMsg, odomInfoMsg);
+		commonDepthCallbackImpl(odomFrameId,
+				rtabmap_ros::UserDataConstPtr(),
+				rgbImages, depthImages, cameraInfos,
+				scan2dMsg, scan3dMsg,
+				odomInfoMsg,
+				globalDescriptorMsgs, localKeyPoints, localPoints3d, localDescriptors);
 		return;
 	}
 
 	LaserScan scan;
-	if(scan2dMsg.get() != 0)
+	if(!scan2dMsg.ranges.empty())
 	{
 		if(!rtabmap_ros::convertScanMsg(
 				scan2dMsg,
@@ -1381,7 +1407,7 @@ void CoreWrapper::commonStereoCallback(
 			return;
 		}
 	}
-	else if(scan3dMsg.get() != 0)
+	else if(!scan3dMsg.data.empty())
 	{
 		if(!rtabmap_ros::convertScan3dMsg(
 				scan3dMsg,
@@ -1431,6 +1457,11 @@ void CoreWrapper::commonStereoCallback(
 		odomInfo = odomInfoFromROS(*odomInfoMsg);
 	}
 
+	if(!globalDescriptorMsgs.empty())
+	{
+		data.setGlobalDescriptors(rtabmap_ros::globalDescriptorsFromROS(globalDescriptorMsgs));
+	}
+
 	process(lastPoseStamp_,
 			data,
 			lastPose_,
@@ -1444,25 +1475,25 @@ void CoreWrapper::commonStereoCallback(
 void CoreWrapper::commonLaserScanCallback(
 		const nav_msgs::OdometryConstPtr & odomMsg,
 		const rtabmap_ros::UserDataConstPtr & userDataMsg,
-		const sensor_msgs::LaserScanConstPtr& scan2dMsg,
-		const sensor_msgs::PointCloud2ConstPtr& scan3dMsg,
-		const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg)
+		const sensor_msgs::LaserScan& scan2dMsg,
+		const sensor_msgs::PointCloud2& scan3dMsg,
+		const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg,
+		const rtabmap_ros::GlobalDescriptor & globalDescriptor)
 {
-	UASSERT(scan2dMsg.get() || scan3dMsg.get());
 	std::string odomFrameId = odomFrameId_;
 	if(odomMsg.get())
 	{
 		odomFrameId = odomMsg->header.frame_id;
-		if(scan2dMsg.get())
+		if(!scan2dMsg.ranges.empty())
 		{
-			if(!odomUpdate(odomMsg, scan2dMsg->header.stamp))
+			if(!odomUpdate(odomMsg, scan2dMsg.header.stamp))
 			{
 				return;
 			}
 		}
-		else if(scan3dMsg.get())
+		else if(!scan3dMsg.data.empty())
 		{
-			if(!odomUpdate(odomMsg, scan3dMsg->header.stamp))
+			if(!odomUpdate(odomMsg, scan3dMsg.header.stamp))
 			{
 				return;
 			}
@@ -1472,16 +1503,16 @@ void CoreWrapper::commonLaserScanCallback(
 			return;
 		}
 	}
-	else if(scan2dMsg.get())
+	else if(!scan2dMsg.ranges.empty())
 	{
-		if(!odomTFUpdate(scan2dMsg->header.stamp))
+		if(!odomTFUpdate(scan2dMsg.header.stamp))
 		{
 			return;
 		}
 	}
-	else if(scan3dMsg.get())
+	else if(!scan3dMsg.data.empty())
 	{
-		if(!odomTFUpdate(scan3dMsg->header.stamp))
+		if(!odomTFUpdate(scan3dMsg.header.stamp))
 		{
 			return;
 		}
@@ -1492,7 +1523,7 @@ void CoreWrapper::commonLaserScanCallback(
 	}
 
 	LaserScan scan;
-	if(scan2dMsg.get() != 0)
+	if(!scan2dMsg.ranges.empty())
 	{
 		if(!rtabmap_ros::convertScanMsg(
 				scan2dMsg,
@@ -1509,7 +1540,7 @@ void CoreWrapper::commonLaserScanCallback(
 			return;
 		}
 	}
-	else if(scan3dMsg.get() != 0)
+	else if(!scan3dMsg.data.empty())
 	{
 		if(!rtabmap_ros::convertScan3dMsg(
 				scan3dMsg,
@@ -1560,7 +1591,7 @@ void CoreWrapper::commonLaserScanCallback(
 			rgb,
 			depth,
 			model,
-			lastPoseIntermediate_?-1:scan2dMsg.get() != 0?scan2dMsg->header.seq:scan3dMsg->header.seq,
+			lastPoseIntermediate_?-1:!scan2dMsg.ranges.empty()?scan2dMsg.header.seq:scan3dMsg.header.seq,
 			rtabmap_ros::timestampFromROS(lastPoseStamp_),
 			userData);
 
@@ -1568,6 +1599,11 @@ void CoreWrapper::commonLaserScanCallback(
 	if(odomInfoMsg.get())
 	{
 		odomInfo = odomInfoFromROS(*odomInfoMsg);
+	}
+
+	if(!globalDescriptor.data.empty())
+	{
+		data.addGlobalDescriptor(rtabmap_ros::globalDescriptorFromROS(globalDescriptor));
 	}
 
 	process(lastPoseStamp_,
