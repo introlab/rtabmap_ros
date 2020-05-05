@@ -15,7 +15,7 @@ endif (POLICY CMP0042)
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
-find_package(catkin REQUIRED COMPONENTS 
+find_package(catkin REQUIRED COMPONENTS
              cv_bridge roscpp rospy sensor_msgs std_msgs std_srvs nav_msgs geometry_msgs visualization_msgs
              image_transport tf tf_conversions tf2_ros eigen_conversions laser_geometry pcl_conversions 
              pcl_ros nodelet dynamic_reconfigure message_filters class_loader rosgraph_msgs
@@ -119,6 +119,7 @@ add_message_files(
    SetLabel.srv
    GetPlan.srv
    AddLink.srv
+   GetNodeData.srv
  )
 
 ## Generate added messages and services with any dependencies listed here

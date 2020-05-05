@@ -596,6 +596,7 @@ void CoreWrapper::onInit()
 	backupDatabase_ = nh.advertiseService("backup", &CoreWrapper::backupDatabaseCallback, this);
 	setModeLocalizationSrv_ = nh.advertiseService("set_mode_localization", &CoreWrapper::setModeLocalizationCallback, this);
 	setModeMappingSrv_ = nh.advertiseService("set_mode_mapping", &CoreWrapper::setModeMappingCallback, this);
+	getNodeDataSrv_ = nh.advertiseService("get_node_data", &CoreWrapper::getNodeDataCallback, this);
 	getMapDataSrv_ = nh.advertiseService("get_map_data", &CoreWrapper::getMapDataCallback, this);
 	getMapSrv_ = nh.advertiseService("get_map", &CoreWrapper::getMapCallback, this);
 	getProbMapSrv_ = nh.advertiseService("get_prob_map", &CoreWrapper::getProbMapCallback, this);
@@ -2666,6 +2667,32 @@ bool CoreWrapper::setLogError(std_srvs::Empty::Request&, std_srvs::Empty::Respon
 	NODELET_INFO("rtabmap: Set log level to Error");
 	ULogger::setLevel(ULogger::kError);
 	return true;
+}
+
+bool CoreWrapper::getNodeDataCallback(rtabmap_ros::GetNodeData::Request& req, rtabmap_ros::GetNodeData::Response& res)
+{
+	NODELET_INFO("rtabmap: Getting node data (%d node(s), images=%s scan=%s grid=%s user_data=%s)...",
+			(int)req.ids.size(),
+			req.images?"true":"false",
+			req.scan?"true":"false",
+			req.grid?"true":"false",
+			req.user_data?"true":"false");
+
+	for(size_t i=0; i<req.ids.size(); ++i)
+	{
+
+		int id = req.ids[i];
+		Signature s = rtabmap_.getSignatureCopy(id, req.images, req.scan, req.user_data, req.grid);
+
+		if(s.id()>0)
+		{
+			NodeData msg;
+			rtabmap_ros::nodeDataToROS(s, msg);
+			res.data.push_back(msg);
+		}
+	}
+
+	return !res.data.empty();
 }
 
 bool CoreWrapper::getMapDataCallback(rtabmap_ros::GetMap::Request& req, rtabmap_ros::GetMap::Response& res)

@@ -49,6 +49,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/Rtabmap.h>
 #include <rtabmap/core/OdometryInfo.h>
 
+#include "rtabmap_ros/GetNodeData.h"
 #include "rtabmap_ros/GetMap.h"
 #include "rtabmap_ros/ListLabels.h"
 #include "rtabmap_ros/PublishMap.h"
@@ -193,6 +194,7 @@ private:
 	bool setLogInfo(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool setLogWarn(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool setLogError(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
+	bool getNodeDataCallback(rtabmap_ros::GetNodeData::Request& req, rtabmap_ros::GetNodeData::Response& res);
 	bool getMapDataCallback(rtabmap_ros::GetMap::Request& req, rtabmap_ros::GetMap::Response& res);
 	bool getMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::GetMap::Response &res);
 	bool getProbMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::GetMap::Response &res);
@@ -300,6 +302,7 @@ private:
 	ros::ServiceServer setLogInfoSrv_;
 	ros::ServiceServer setLogWarnSrv_;
 	ros::ServiceServer setLogErrorSrv_;
+	ros::ServiceServer getNodeDataSrv_;
 	ros::ServiceServer getMapDataSrv_;
 	ros::ServiceServer getProjMapSrv_;
 	ros::ServiceServer getMapSrv_;
