@@ -2705,24 +2705,16 @@ bool CoreWrapper::getMapDataCallback(rtabmap_ros::GetMap::Request& req, rtabmap_
 	std::map<int, Transform> poses;
 	std::multimap<int, rtabmap::Link> constraints;
 
-	if(req.graphOnly)
-	{
-		rtabmap_.getGraph(
-				poses,
-				constraints,
-				req.optimized,
-				req.global,
-				&signatures);
-	}
-	else
-	{
-		rtabmap_.get3DMap(
-				signatures,
-				poses,
-				constraints,
-				req.optimized,
-				req.global);
-	}
+	rtabmap_.getGraph(
+			poses,
+			constraints,
+			req.optimized,
+			req.global,
+			&signatures,
+			!req.graphOnly,
+			!req.graphOnly,
+			!req.graphOnly,
+			!req.graphOnly);
 
 	//RGB-D SLAM data
 	rtabmap_ros::mapDataToROS(poses,
@@ -2839,24 +2831,16 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 		std::multimap<int, rtabmap::Link> constraints;
 		std::map<int, Signature > signatures;
 
-		if(req.graphOnly)
-		{
-			rtabmap_.getGraph(
-					poses,
-					constraints,
-					req.optimized,
-					req.global,
-					&signatures);
-		}
-		else
-		{
-			rtabmap_.get3DMap(
-					signatures,
-					poses,
-					constraints,
-					req.optimized,
-					req.global);
-		}
+		rtabmap_.getGraph(
+				poses,
+				constraints,
+				req.optimized,
+				req.global,
+				&signatures,
+				!req.graphOnly,
+				!req.graphOnly,
+				!req.graphOnly,
+				!req.graphOnly);
 
 		ros::Time now = ros::Time::now();
 		if(mapDataPub_.getNumSubscribers())
