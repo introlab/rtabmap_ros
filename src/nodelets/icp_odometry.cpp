@@ -332,7 +332,7 @@ private:
 		}
 
 		rtabmap::SensorData data(
-				LaserScan::backwardCompatibility(scan, maxLaserScans, scanMsg->range_max, localScanTransform),
+				LaserScan(scan, maxLaserScans, scanMsg->range_max, scan.channels()==6?LaserScan::kXYINormal:LaserScan::kXYI, localScanTransform),
 				cv::Mat(),
 				cv::Mat(),
 				CameraModel(),
@@ -496,7 +496,7 @@ private:
 			}
 		}
 
-		LaserScan laserScan = LaserScan::backwardCompatibility(scan, maxLaserScans, 0, localScanTransform);
+		LaserScan laserScan(scan, maxLaserScans, 0, scan.channels()==7?LaserScan::kXYZINormal:LaserScan::kXYZI, localScanTransform);
 		if(scanRangeMin_ > 0 || scanRangeMax_ > 0)
 		{
 			laserScan = util3d::rangeFiltering(laserScan, scanRangeMin_, scanRangeMax_);
