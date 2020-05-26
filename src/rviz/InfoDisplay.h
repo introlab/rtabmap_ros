@@ -32,6 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <rviz/message_filter_display.h>
 #include <rtabmap/core/Transform.h>
+#include <ros/callback_queue.h>
 
 namespace rtabmap_ros
 {

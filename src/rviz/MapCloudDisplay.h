@@ -40,6 +40,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <pluginlib/class_loader.h>
 #include <sensor_msgs/PointCloud2.h>
 
+#include <ros/callback_queue.h>
+
 #include <rviz/ogre_helpers/point_cloud.h>
 #include <rviz/message_filter_display.h>
 #include <rviz/default_plugin/point_cloud_transformer.h>
