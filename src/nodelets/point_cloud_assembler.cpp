@@ -243,7 +243,11 @@ private:
 					pcl_conversions::toPCL(*cloudMsg, *newCloud);
 					rtabmap::LaserScan scan = rtabmap::util3d::laserScanFromPointCloud(*newCloud);
 					scan = rtabmap::util3d::commonFiltering(scan, 1, rangeMin_, rangeMax_, voxelSize_);
+#if PCL_VERSION_COMPARE(>=, 1, 10, 0)
+					std::uint64_t stamp = newCloud->header.stamp;
+#else
 					pcl::uint64_t stamp = newCloud->header.stamp;
+#endif
 					newCloud = rtabmap::util3d::laserScanToPointCloud2(scan, t);
 					newCloud->header.stamp = stamp;
 				}
@@ -256,10 +260,17 @@ private:
 
 				clouds_.push_back(newCloud);
 
+#if PCL_VERSION_COMPARE(>=, 1, 10, 0)
+				bool reachedMaxSize =
+						((int)clouds_.size() >= maxClouds_ && maxClouds_ > 0)
+						||
+						((*newCloud).header.stamp >= clouds_.front()->header.stamp + static_cast<std::uint64_t>(assemblingTime_*1000000.0) && assemblingTime_ > 0.0);
+#else
 				bool reachedMaxSize =
 						((int)clouds_.size() >= maxClouds_ && maxClouds_ > 0)
 						||
 						((*newCloud).header.stamp >= clouds_.front()->header.stamp + static_cast<pcl::uint64_t>(assemblingTime_*1000000.0) && assemblingTime_ > 0.0);
+#endif
 
 				if( circularBuffer_ || reachedMaxSize )
 				{
@@ -273,7 +284,11 @@ private:
 						else
 						{
 							pcl::PCLPointCloud2Ptr assembledTmp(new pcl::PCLPointCloud2);
+#if PCL_VERSION_COMPARE(>=, 1, 10, 0)
+							pcl::concatenate(*assembled, *(*iter), *assembledTmp);
+#else
 							pcl::concatenatePointCloud(*assembled, *(*iter), *assembledTmp);
+#endif
 							assembled = assembledTmp;
 						}
 					}
