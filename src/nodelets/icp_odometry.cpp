@@ -273,24 +273,77 @@ private:
 		sensor_msgs::PointCloud2 scanOut;
 		laser_geometry::LaserProjection projection;
 		projection.transformLaserScanToPointCloud(scanMsg->header.frame_id, *scanMsg, scanOut, this->tfListener());
-		pcl::PointCloud<pcl::PointXYZI>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZI>);
-		pcl::fromROSMsg(scanOut, *pclScan);
-		pclScan->is_dense = true;
+
+		bool hasIntensity = false;
+		for(unsigned int i=0; i<scanOut.fields.size(); ++i)
+		{
+			if(scanOut.fields[i].name.compare("intensity") == 0)
+			{
+				if(scanOut.fields[i].datatype == sensor_msgs::PointField::FLOAT32)
+				{
+					hasIntensity = true;
+				}
+				else
+				{
+					static bool warningShown = false;
+					if(!warningShown)
+					{
+						ROS_WARN("The input scan cloud has an \"intensity\" field "
+								"but the datatype (%d) is not supported. Intensity will be ignored. "
+								"This message is only shown once.", scanOut.fields[i].datatype);
+						warningShown = true;
+					}
+				}
+			}
+		}
+
+		pcl::PointCloud<pcl::PointXYZI>::Ptr pclScanI(new pcl::PointCloud<pcl::PointXYZI>);
+		pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
+
+		if(hasIntensity)
+		{
+			pcl::fromROSMsg(scanOut, *pclScanI);
+			pclScanI->is_dense = true;
+		}
+		else
+		{
+			pcl::fromROSMsg(scanOut, *pclScan);
+			pclScan->is_dense = true;
+		}
 
 		cv::Mat scan;
 		int maxLaserScans = (int)scanMsg->ranges.size();
-		if(pclScan->size())
+		if(!pclScan->empty() || !pclScanI->empty())
 		{
 			if(scanDownsamplingStep_ > 1)
 			{
-				pclScan = util3d::downsample(pclScan, scanDownsamplingStep_);
+				if(hasIntensity)
+				{
+					pclScanI = util3d::downsample(pclScanI, scanDownsamplingStep_);
+				}
+				else
+				{
+					pclScan = util3d::downsample(pclScan, scanDownsamplingStep_);
+				}
 				maxLaserScans /= scanDownsamplingStep_;
 			}
 			if(scanVoxelSize_ > 0.0f)
 			{
-				float pointsBeforeFiltering = (float)pclScan->size();
-				pclScan = util3d::voxelize(pclScan, scanVoxelSize_);
-				float ratio = float(pclScan->size()) / pointsBeforeFiltering;
+				float pointsBeforeFiltering;
+				float pointsAfterFiltering;
+				if(hasIntensity)
+				{
+					pointsBeforeFiltering = (float)pclScanI->size();
+					pclScanI = util3d::voxelize(pclScanI, scanVoxelSize_);
+					pointsAfterFiltering = (float)pclScanI->size();
+				}
+				else
+				{
+					pointsBeforeFiltering = (float)pclScan->size();
+					pclScan = util3d::voxelize(pclScan, scanVoxelSize_);
+					pointsAfterFiltering = (float)pclScan->size();
+				}
+				float ratio = pointsAfterFiltering / pointsBeforeFiltering;
 				maxLaserScans = int(float(maxLaserScans) * ratio);
 			}
 			if(scanNormalK_ > 0 || scanNormalRadius_>0.0f)
@@ -299,32 +352,78 @@ private:
 				pcl::PointCloud<pcl::Normal>::Ptr normals;
 				if(scanVoxelSize_ > 0.0f)
 				{
-					normals = util3d::computeNormals2D(pclScan, scanNormalK_, scanNormalRadius_);
+					if(hasIntensity)
+					{
+						normals = util3d::computeNormals2D(pclScanI, scanNormalK_, scanNormalRadius_);
+					}
+					else
+					{
+						normals = util3d::computeNormals2D(pclScan, scanNormalK_, scanNormalRadius_);
+					}
 				}
 				else
 				{
-					normals = util3d::computeFastOrganizedNormals2D(pclScan, scanNormalK_, scanNormalRadius_);
+					if(hasIntensity)
+					{
+						normals = util3d::computeFastOrganizedNormals2D(pclScanI, scanNormalK_, scanNormalRadius_);
+					}
+					else
+					{
+						normals = util3d::computeFastOrganizedNormals2D(pclScan, scanNormalK_, scanNormalRadius_);
+					}
 				}
-				pcl::PointCloud<pcl::PointXYZINormal>::Ptr pclScanNormal(new pcl::PointCloud<pcl::PointXYZINormal>);
-				pcl::concatenateFields(*pclScan, *normals, *pclScanNormal);
-				scan = util3d::laserScan2dFromPointCloud(*pclScanNormal);
+				pcl::PointCloud<pcl::PointXYZINormal>::Ptr pclScanINormal;
+				pcl::PointCloud<pcl::PointXYZINormal>::Ptr pclScanNormal;
+				if(hasIntensity)
+				{
+					pclScanINormal.reset(new pcl::PointCloud<pcl::PointXYZINormal>);
+					pcl::concatenateFields(*pclScanI, *normals, *pclScanINormal);
+					scan = util3d::laserScan2dFromPointCloud(*pclScanINormal);
+				}
+				else
+				{
+					pclScanNormal.reset(new pcl::PointCloud<pcl::PointXYZINormal>);
+					pcl::concatenateFields(*pclScan, *normals, *pclScanNormal);
+					scan = util3d::laserScan2dFromPointCloud(*pclScanNormal);
+				}
 
 				if(filtered_scan_pub_.getNumSubscribers())
 				{
 					sensor_msgs::PointCloud2 msg;
-					pcl::toROSMsg(*pclScanNormal, msg);
+					if(hasIntensity)
+					{
+						pcl::toROSMsg(*pclScanINormal, msg);
+					}
+					else
+					{
+						pcl::toROSMsg(*pclScanNormal, msg);
+					}
 					msg.header = scanMsg->header;
 					filtered_scan_pub_.publish(msg);
 				}
 			}
 			else
 			{
-				scan = util3d::laserScan2dFromPointCloud(*pclScan);
+				if(hasIntensity)
+				{
+					scan = util3d::laserScan2dFromPointCloud(*pclScanI);
+				}
+				else
+				{
+					scan = util3d::laserScan2dFromPointCloud(*pclScan);
+				}
 
 				if(filtered_scan_pub_.getNumSubscribers())
 				{
 					sensor_msgs::PointCloud2 msg;
-					pcl::toROSMsg(*pclScan, msg);
+					if(hasIntensity)
+					{
+						pcl::toROSMsg(*pclScanI, msg);
+					}
+					else
+					{
+						pcl::toROSMsg(*pclScan, msg);
+					}
 					msg.header = scanMsg->header;
 					filtered_scan_pub_.publish(msg);
 				}
@@ -332,7 +431,11 @@ private:
 		}
 
 		rtabmap::SensorData data(
-				LaserScan(scan, maxLaserScans, scanMsg->range_max, scan.channels()==6?LaserScan::kXYINormal:LaserScan::kXYI, localScanTransform),
+				LaserScan(scan, maxLaserScans, scanMsg->range_max,
+						scan.channels()==6?LaserScan::kXYINormal:
+						scan.channels()==5?LaserScan::kXYNormal:
+						scan.channels()==3?LaserScan::kXYI:LaserScan::kXY,
+						localScanTransform),
 				cv::Mat(),
 				cv::Mat(),
 				CameraModel(),
@@ -376,15 +479,34 @@ private:
 		}
 
 		cv::Mat scan;
-		bool containNormals = false;
+		bool hasNormals = false;
+		bool hasIntensity = false;
 		if(scanVoxelSize_ == 0.0f)
 		{
 			for(unsigned int i=0; i<cloudMsg.fields.size(); ++i)
 			{
 				if(cloudMsg.fields[i].name.compare("normal_x") == 0)
 				{
-					containNormals = true;
+					hasNormals = true;
 					break;
+				}
+				if(cloudMsg.fields[i].name.compare("intensity") == 0)
+				{
+					if(cloudMsg.fields[i].datatype == sensor_msgs::PointField::FLOAT32)
+					{
+						hasIntensity = true;
+					}
+					else
+					{
+						static bool warningShown = false;
+						if(!warningShown)
+						{
+							ROS_WARN("The input scan cloud has an \"intensity\" field "
+									"but the datatype (%d) is not supported. Intensity will be ignored. "
+									"This message is only shown once.", cloudMsg.fields[i].datatype);
+							warningShown = true;
+						}
+					}
 				}
 			}
 		}
@@ -410,7 +532,7 @@ private:
 			scanCloudMaxPoints_ = cloudMsg.width *cloudMsg.height;
 		}
 		int maxLaserScans = scanCloudMaxPoints_;
-		if(containNormals)
+		if(hasNormals && hasIntensity)
 		{
 			pcl::PointCloud<pcl::PointXYZINormal>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZINormal>);
 			pcl::fromROSMsg(cloudMsg, *pclScan);
@@ -435,7 +557,32 @@ private:
 				filtered_scan_pub_.publish(msg);
 			}
 		}
-		else
+		else if(hasNormals)
+		{
+			pcl::PointCloud<pcl::PointNormal>::Ptr pclScan(new pcl::PointCloud<pcl::PointNormal>);
+			pcl::fromROSMsg(cloudMsg, *pclScan);
+			if(pclScan->size() && scanDownsamplingStep_ > 1)
+			{
+				pclScan = util3d::downsample(pclScan, scanDownsamplingStep_);
+				if(pclScan->height>1)
+				{
+					maxLaserScans = pclScan->height * pclScan->width;
+				}
+				else
+				{
+					maxLaserScans /= scanDownsamplingStep_;
+				}
+			}
+			scan = util3d::laserScanFromPointCloud(*pclScan);
+			if(filtered_scan_pub_.getNumSubscribers())
+			{
+				sensor_msgs::PointCloud2 msg;
+				pcl::toROSMsg(*pclScan, msg);
+				msg.header = cloudMsg.header;
+				filtered_scan_pub_.publish(msg);
+			}
+		}
+		else if(hasIntensity)
 		{
 			pcl::PointCloud<pcl::PointXYZI>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZI>);
 			pcl::fromROSMsg(cloudMsg, *pclScan);
@@ -495,8 +642,72 @@ private:
 				}
 			}
 		}
+		else
+		{
+			pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
+			pcl::fromROSMsg(cloudMsg, *pclScan);
+			if(pclScan->size() && scanDownsamplingStep_ > 1)
+			{
+				pclScan = util3d::downsample(pclScan, scanDownsamplingStep_);
+				if(pclScan->height>1)
+				{
+					maxLaserScans = pclScan->height * pclScan->width;
+				}
+				else
+				{
+					maxLaserScans /= scanDownsamplingStep_;
+				}
+			}
+			if(!pclScan->is_dense)
+			{
+				pclScan = util3d::removeNaNFromPointCloud(pclScan);
+			}
 
-		LaserScan laserScan(scan, maxLaserScans, 0, scan.channels()==7?LaserScan::kXYZINormal:LaserScan::kXYZI, localScanTransform);
+			if(pclScan->size())
+			{
+				if(scanVoxelSize_ > 0.0f)
+				{
+					float pointsBeforeFiltering = (float)pclScan->size();
+					pclScan = util3d::voxelize(pclScan, scanVoxelSize_);
+					float ratio = float(pclScan->size()) / pointsBeforeFiltering;
+					maxLaserScans = int(float(maxLaserScans) * ratio);
+				}
+				if(scanNormalK_ > 0 || scanNormalRadius_>0.0f)
+				{
+					//compute normals
+					pcl::PointCloud<pcl::Normal>::Ptr normals = util3d::computeNormals(pclScan, scanNormalK_, scanNormalRadius_);
+					pcl::PointCloud<pcl::PointNormal>::Ptr pclScanNormal(new pcl::PointCloud<pcl::PointNormal>);
+					pcl::concatenateFields(*pclScan, *normals, *pclScanNormal);
+					scan = util3d::laserScanFromPointCloud(*pclScanNormal);
+
+					if(filtered_scan_pub_.getNumSubscribers())
+					{
+						sensor_msgs::PointCloud2 msg;
+						pcl::toROSMsg(*pclScanNormal, msg);
+						msg.header = cloudMsg.header;
+						filtered_scan_pub_.publish(msg);
+					}
+				}
+				else
+				{
+					scan = util3d::laserScanFromPointCloud(*pclScan);
+
+					if(filtered_scan_pub_.getNumSubscribers())
+					{
+						sensor_msgs::PointCloud2 msg;
+						pcl::toROSMsg(*pclScan, msg);
+						msg.header = cloudMsg.header;
+						filtered_scan_pub_.publish(msg);
+					}
+				}
+			}
+		}
+
+		LaserScan laserScan(scan, maxLaserScans, 0,
+				scan.channels()==7?LaserScan::kXYZINormal:
+				scan.channels()==6?LaserScan::kXYZNormal:
+				scan.channels()==4?LaserScan::kXYZI:LaserScan::kXYZ,
+				localScanTransform);
 		if(scanRangeMin_ > 0 || scanRangeMax_ > 0)
 		{
 			laserScan = util3d::rangeFiltering(laserScan, scanRangeMin_, scanRangeMax_);

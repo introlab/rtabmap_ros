@@ -1873,29 +1873,32 @@ bool convertScanMsg(
 		laserToOdom *= scanLocalTransform;
 	}
 
-	bool containIntensity = false;
+	bool hasIntensity = false;
 	for(unsigned int i=0; i<scanOut.fields.size(); ++i)
 	{
-		if(scanOut.fields[i].datatype == sensor_msgs::PointField::FLOAT32)
+		if(scanOut.fields[i].name.compare("intensity") == 0)
 		{
-			containIntensity = true;
-		}
-		else
-		{
-			static bool warningShown = false;
-			if(!warningShown)
+			if(scanOut.fields[i].datatype == sensor_msgs::PointField::FLOAT32)
 			{
-				ROS_WARN("The input scan cloud has an \"intensity\" field "
-						"but the datatype (%d) is not supported. Intensity will be ignored. "
-						"This message is only shown once.", scanOut.fields[i].datatype);
-				warningShown = true;
+				hasIntensity = true;
+			}
+			else
+			{
+				static bool warningShown = false;
+				if(!warningShown)
+				{
+					ROS_WARN("The input scan cloud has an \"intensity\" field "
+							"but the datatype (%d) is not supported. Intensity will be ignored. "
+							"This message is only shown once.", scanOut.fields[i].datatype);
+					warningShown = true;
+				}
 			}
 		}
 	}
 
 	rtabmap::LaserScan::Format format;
 	cv::Mat data;
-	if(containIntensity)
+	if(hasIntensity)
 	{
 		pcl::PointCloud<pcl::PointXYZI>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZI>);
 		pcl::fromROSMsg(scanOut, *pclScan);
@@ -1944,24 +1947,24 @@ bool convertScan3dMsg(
 		int maxPoints,
 		float maxRange)
 {
-	bool containNormals = false;
-	bool containColors = false;
-	bool containIntensity = false;
+	bool hasNormals = false;
+	bool hasColors = false;
+	bool hasIntensity = false;
 	for(unsigned int i=0; i<scan3dMsg.fields.size(); ++i)
 	{
 		if(scan3dMsg.fields[i].name.compare("normal_x") == 0)
 		{
-			containNormals = true;
+			hasNormals = true;
 		}
 		if(scan3dMsg.fields[i].name.compare("rgb") == 0 || scan3dMsg.fields[i].name.compare("rgba") == 0)
 		{
-			containColors = true;
+			hasColors = true;
 		}
 		if(scan3dMsg.fields[i].name.compare("intensity") == 0)
 		{
 			if(scan3dMsg.fields[i].datatype == sensor_msgs::PointField::FLOAT32)
 			{
-				containIntensity = true;
+				hasIntensity = true;
 			}
 			else
 			{
@@ -2005,9 +2008,9 @@ bool convertScan3dMsg(
 		}
 	}
 
-	if(containNormals)
+	if(hasNormals)
 	{
-		if(containColors)
+		if(hasColors)
 		{
 			pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZRGBNormal>);
 			pcl::fromROSMsg(scan3dMsg, *pclScan);
@@ -2017,7 +2020,7 @@ bool convertScan3dMsg(
 			}
 			scan = rtabmap::LaserScan(rtabmap::util3d::laserScanFromPointCloud(*pclScan), maxPoints, maxRange, rtabmap::LaserScan::kXYZRGBNormal, scanLocalTransform);
 		}
-		else if(containIntensity)
+		else if(hasIntensity)
 		{
 			pcl::PointCloud<pcl::PointXYZINormal>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZINormal>);
 			pcl::fromROSMsg(scan3dMsg, *pclScan);
@@ -2040,7 +2043,7 @@ bool convertScan3dMsg(
 	}
 	else
 	{
-		if(containColors)
+		if(hasColors)
 		{
 			pcl::PointCloud<pcl::PointXYZRGB>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZRGB>);
 			pcl::fromROSMsg(scan3dMsg, *pclScan);
@@ -2050,7 +2053,7 @@ bool convertScan3dMsg(
 			}
 			scan = rtabmap::LaserScan(rtabmap::util3d::laserScanFromPointCloud(*pclScan), maxPoints, maxRange, rtabmap::LaserScan::kXYZRGB, scanLocalTransform);
 		}
-		else if(containIntensity)
+		else if(hasIntensity)
 		{
 			pcl::PointCloud<pcl::PointXYZI>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZI>);
 			pcl::fromROSMsg(scan3dMsg, *pclScan);
