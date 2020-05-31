@@ -25,6 +25,8 @@ float32 stamp
 float32 interval
 float32 distanceTravelled
 int32 memoryUsage # MB
+float32 gravityRollError
+float32 gravityPitchError
 
 geometry_msgs/Transform transform
 geometry_msgs/Transform transformFiltered

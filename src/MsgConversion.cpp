@@ -1270,6 +1270,8 @@ rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::OdomInfo & msg)
 	info.interval = msg.interval;
 	info.distanceTravelled = msg.distanceTravelled;
 	info.memoryUsage = msg.memoryUsage;
+	info.gravityRollError = msg.gravityRollError;
+	info.gravityPitchError = msg.gravityPitchError;
 
 	info.type = msg.type;
 
@@ -1331,6 +1333,8 @@ void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_ros::OdomInfo & m
 	msg.interval = info.interval;
 	msg.distanceTravelled = info.distanceTravelled;
 	msg.memoryUsage = info.memoryUsage;
+	msg.gravityRollError = info.gravityRollError;
+	msg.gravityPitchError = info.gravityPitchError;
 
 	msg.type = info.type;
 
