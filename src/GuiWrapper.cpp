@@ -899,13 +899,13 @@ void GuiWrapper::commonLaserScanCallback(
 	cv::Mat rgb;
 	cv::Mat depth;
 	CameraModel model(
-			1,
-			1,
-			0.5,
-			1,
+			2,
+			2,
+			2,
+			1.5,
 			(fakeCameraLocalTransform.isNull()?scan.localTransform():fakeCameraLocalTransform)*Transform(0,0,1,0, -1,0,0,0, 0,-1,0,0),
 			0,
-			cv::Size(1,2));
+			cv::Size(4,3));
 
 	info.reg.covariance = covariance;
 	rtabmap::OdometryEvent odomEvent(
@@ -983,13 +983,13 @@ void GuiWrapper::commonOdomCallback(
 	cv::Mat rgb;
 	cv::Mat depth;
 	CameraModel model(
-			1,
-			1,
-			0.5,
-			1,
+			2,
+			2,
+			2,
+			1.5,
 			Transform(0,0,1,0, -1,0,0,0, 0,-1,0,0),
 			0,
-			cv::Size(1,2));
+			cv::Size(4,3));
 
 	info.reg.covariance = covariance;
 	rtabmap::OdometryEvent odomEvent(

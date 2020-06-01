@@ -1576,16 +1576,16 @@ void CoreWrapper::commonLaserScanCallback(
 		userData_ = cv::Mat();
 	}
 
-	cv::Mat rgb = cv::Mat::zeros(2,1,CV_8UC1);
-	cv::Mat depth = cv::Mat::zeros(2,1,CV_16UC1);
+	cv::Mat rgb = cv::Mat::zeros(3,4,CV_8UC1);
+	cv::Mat depth = cv::Mat::zeros(3,4,CV_16UC1);
 	CameraModel model(
-			1,
-			1,
-			0.5,
-			1,
+			2,
+			2,
+			2,
+			1.5,
 			scan.localTransform()*Transform(0,0,1,0, -1,0,0,0, 0,-1,0,0),
 			0,
-			cv::Size(1,2));
+			cv::Size(4,3));
 
 	SensorData data(
 			scan,
@@ -1649,16 +1649,16 @@ void CoreWrapper::commonOdomCallback(
 		userData_ = cv::Mat();
 	}
 
-	cv::Mat rgb = cv::Mat::zeros(2,1,CV_8UC1);
-	cv::Mat depth = cv::Mat::zeros(2,1,CV_16UC1);
+	cv::Mat rgb = cv::Mat::zeros(3,4,CV_8UC1);
+	cv::Mat depth = cv::Mat::zeros(3,4,CV_16UC1);
 	CameraModel model(
-			1,
-			1,
-			0.5,
-			1,
+			2,
+			2,
+			2,
+			1.5,
 			Transform(0,0,1,0, -1,0,0,0, 0,-1,0,0),
 			0,
-			cv::Size(1,2));
+			cv::Size(4,3));
 
 	SensorData data(
 			rgb,
@@ -1732,16 +1732,16 @@ void CoreWrapper::process(
 						}
 					}
 
-					cv::Mat rgb = cv::Mat::zeros(2,1,CV_8UC1);
-					cv::Mat depth = cv::Mat::zeros(2,1,CV_16UC1);
+					cv::Mat rgb = cv::Mat::zeros(3,4,CV_8UC1);
+					cv::Mat depth = cv::Mat::zeros(3,4,CV_16UC1);
 					CameraModel model(
-							1,
-							1,
-							0.5,
-							1,
+							2,
+							2,
+							2,
+							1.5,
 							Transform(0,0,1,0, -1,0,0,0, 0,-1,0,0),
 							0,
-							cv::Size(1,2));
+							cv::Size(4,3));
 					SensorData interData(rgb, depth, model, -1, rtabmap_ros::timestampFromROS(iter->first.header.stamp));
 					Transform gt;
 					if(!groundTruthFrameId_.empty())
