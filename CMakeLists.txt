@@ -509,14 +509,25 @@ ENDIF(costmap_2d_FOUND)
 
 ## Mark executable scripts (Python etc.) for installation
 ## in contrast to setup.py, you can choose the destination
-install(PROGRAMS
-  scripts/patrol.py
-  scripts/objects_to_tags.py
-  scripts/point_to_tf.py
-  scripts/transform_to_tf.py
-  scripts/yaml_to_camera_info.py
-  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-)
+if(COMMAND catkin_install_python) # ROS Noetic
+  catkin_install_python(PROGRAMS
+    scripts/patrol.py
+    scripts/objects_to_tags.py
+    scripts/point_to_tf.py
+    scripts/transform_to_tf.py
+    scripts/yaml_to_camera_info.py
+    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+  )
+else() # prior to ROS Noetic
+  install(PROGRAMS
+    scripts/patrol.py
+    scripts/objects_to_tags.py
+    scripts/point_to_tf.py
+    scripts/transform_to_tf.py
+    scripts/yaml_to_camera_info.py
+    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+  )
+endif()
 
 ## Mark executables and/or libraries for installation
 install(TARGETS 
