@@ -113,13 +113,17 @@ void transformToPoseMsg(const rtabmap::Transform & transform, geometry_msgs::Pos
 	}
 }
 
-rtabmap::Transform transformFromPoseMsg(const geometry_msgs::Pose & msg)
+rtabmap::Transform transformFromPoseMsg(const geometry_msgs::Pose & msg, bool ignoreRotationIfNotSet)
 {
 	if(msg.orientation.w == 0 &&
 		msg.orientation.x == 0 &&
 		msg.orientation.y == 0 &&
-		msg.orientation.z ==0)
+		msg.orientation.z == 0)
 	{
+		if(ignoreRotationIfNotSet)
+		{
+			return rtabmap::Transform(msg.position.x, msg.position.y, msg.position.z, 0, 0, 0);
+		}
 		return rtabmap::Transform();
 	}
 	Eigen::Affine3d tfPose;

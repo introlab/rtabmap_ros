@@ -70,7 +70,7 @@ void transformToGeometryMsg(const rtabmap::Transform & transform, geometry_msgs:
 rtabmap::Transform transformFromGeometryMsg(const geometry_msgs::Transform & msg);
 
 void transformToPoseMsg(const rtabmap::Transform & transform, geometry_msgs::Pose & msg);
-rtabmap::Transform transformFromPoseMsg(const geometry_msgs::Pose & msg);
+rtabmap::Transform transformFromPoseMsg(const geometry_msgs::Pose & msg, bool ignoreRotationIfNotSet = false);
 
 void toCvCopy(const rtabmap_ros::RGBDImage & image, cv_bridge::CvImagePtr & rgb, cv_bridge::CvImagePtr & depth);
 void toCvShare(const rtabmap_ros::RGBDImageConstPtr & image, cv_bridge::CvImageConstPtr & rgb, cv_bridge::CvImageConstPtr & depth);

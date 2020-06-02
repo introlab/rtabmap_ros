@@ -2436,21 +2436,10 @@ void CoreWrapper::goalCommonCallback(
 
 void CoreWrapper::goalCallback(const geometry_msgs::PoseStampedConstPtr & msg)
 {
-	Transform targetPose = rtabmap_ros::transformFromPoseMsg(msg->pose);
-	if(targetPose.isNull())
-	{
-		NODELET_ERROR("Pose received is null!");
-		if(goalReachedPub_.getNumSubscribers())
-		{
-			std_msgs::Bool result;
-			result.data = false;
-			goalReachedPub_.publish(result);
-		}
-		return;
-	}
+	Transform targetPose = rtabmap_ros::transformFromPoseMsg(msg->pose, true);
 
 	// transform goal in /map frame
-	if(mapFrameId_.compare(msg->header.frame_id) != 0)
+	if(!msg->header.frame_id.empty() && mapFrameId_.compare(msg->header.frame_id) != 0)
 	{
 		Transform t = rtabmap_ros::getTransform(mapFrameId_, msg->header.frame_id, msg->header.stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
 		if(t.isNull())
@@ -2467,6 +2456,7 @@ void CoreWrapper::goalCallback(const geometry_msgs::PoseStampedConstPtr & msg)
 		}
 		targetPose = t * targetPose;
 	}
+	// else assume map frame if not set
 
 	goalCommonCallback(0, "", "", targetPose, msg->header.stamp);
 }
@@ -3063,13 +3053,13 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 
 bool CoreWrapper::getPlanCallback(nav_msgs::GetPlan::Request &req, nav_msgs::GetPlan::Response &res)
 {
-	Transform pose = rtabmap_ros::transformFromPoseMsg(req.goal.pose);
+	Transform pose = rtabmap_ros::transformFromPoseMsg(req.goal.pose, true);
 	UTimer timer;
 	if(!pose.isNull())
 	{
 		// transform goal in /map frame
 		Transform coordinateTransform = Transform::getIdentity();
-		if(mapFrameId_.compare(req.goal.header.frame_id) != 0)
+		if(!req.goal.header.frame_id.empty() && mapFrameId_.compare(req.goal.header.frame_id) != 0)
 		{
 			coordinateTransform = rtabmap_ros::getTransform(mapFrameId_, req.goal.header.frame_id, req.goal.header.stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
 			if(coordinateTransform.isNull())
@@ -3080,6 +3070,7 @@ bool CoreWrapper::getPlanCallback(nav_msgs::GetPlan::Request &req, nav_msgs::Get
 			}
 			pose = coordinateTransform * pose;
 		}
+		//else assume map frame if not set
 
 		// To convert back the poses in goal frame
 		coordinateTransform = coordinateTransform.inverse();
@@ -3136,13 +3127,17 @@ bool CoreWrapper::getPlanCallback(nav_msgs::GetPlan::Request &req, nav_msgs::Get
 
 bool CoreWrapper::getPlanNodesCallback(rtabmap_ros::GetPlan::Request &req, rtabmap_ros::GetPlan::Response &res)
 {
-	Transform pose = rtabmap_ros::transformFromPoseMsg(req.goal.pose);
+	Transform pose;
+	if(req.goal_node <= 0)
+	{
+		pose = rtabmap_ros::transformFromPoseMsg(req.goal.pose, true);
+	}
 	UTimer timer;
 	if(req.goal_node > 0 || !pose.isNull())
 	{
 		Transform coordinateTransform = Transform::getIdentity();
 		// transform goal in /map frame
-		if(mapFrameId_.compare(req.goal.header.frame_id) != 0)
+		if(!pose.isNull() && !req.goal.header.frame_id.empty() && mapFrameId_.compare(req.goal.header.frame_id) != 0)
 		{
 			coordinateTransform = rtabmap_ros::getTransform(mapFrameId_, req.goal.header.frame_id, req.goal.header.stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
 			if(coordinateTransform.isNull())
@@ -3156,6 +3151,7 @@ bool CoreWrapper::getPlanNodesCallback(rtabmap_ros::GetPlan::Request &req, rtabm
 				pose = coordinateTransform * pose;
 			}
 		}
+		//else assume map frame if not set
 
 		// To convert back the poses in goal frame
 		coordinateTransform = coordinateTransform.inverse();
