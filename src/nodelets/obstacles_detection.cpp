@@ -75,6 +75,9 @@ ObstaclesDetection::ObstaclesDetection(const rclcpp::NodeOptions & options) :
 
 	grid_.parseParameters(gridParameters);
 
+	tfBuffer_ = std::make_shared< tf2_ros::Buffer >(this->get_clock());
+	tfListener_ = std::make_shared< tf2_ros::TransformListener >(*tfBuffer_);
+
 	cloudSub_ = create_subscription<sensor_msgs::msg::PointCloud2>("cloud", rclcpp::SensorDataQoS(), std::bind(&ObstaclesDetection::callback, this, std::placeholders::_1));
 
 	groundPub_ = create_publisher<sensor_msgs::msg::PointCloud2>("ground", 1);
