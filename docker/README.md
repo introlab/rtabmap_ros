@@ -18,11 +18,22 @@
     $ export ROS_NAMESPACE=rtabmap && rosrun rtabmap_ros rtabmapviz _frame_id:=camera_link
     ```
 
-* Launch `rtabmap` from inside the container (no gui), saving the database on host `~/.ros/rtabmap.db`:
+* Launch `rtabmap` from inside the container (**no gui**), saving the database on host `~/.ros/rtabmap.db`:
     ```bash
     $ docker run -it --rm \
      --env ROS_MASTER_URI=http://172.17.0.1:11311 --env ROS_IP=172.17.0.2 \
      -v ~/.ros:/root  \
      introlab3it/rtabmap_ros:kinetic-latest \
      roslaunch rtabmap_ros rtabmap.launch rtabmapviz:=false database_path:=/root/rtabmap.db rtabmap_args:="--delete_db_on_start"
+   ```
+   
+ * Launch `rtabmap` from inside the container (**with gui**, follow those [instructions](https://github.com/introlab/rtabmap/wiki/Installation#rtab-map-desktop-ubuntu-1604) to build a `rtabmap_ros3d` image with your GPU driver), saving the database on host `~/.ros/rtabmap.db`:
+    ```bash
+    $ xhost +
+    $ docker run -it --rm \
+     --privileged -e "DISPLAY=unix$DISPLAY" -v="/tmp/.X11-unix:/tmp/.X11-unix:rw" \
+     --env ROS_MASTER_URI=http://172.17.0.1:11311 --env ROS_IP=172.17.0.2 \
+     -v ~/.ros:/root  \
+     rtabmap_ros3d \
+     roslaunch rtabmap_ros rtabmap.launch database_path:=/root/rtabmap.db rtabmap_args:="--delete_db_on_start"
    ```
