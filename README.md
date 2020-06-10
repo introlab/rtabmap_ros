@@ -61,8 +61,8 @@ This section shows how to install RTAB-Map ros-pkg on **ROS Hydro/Indigo/Jade/Ki
  0. Required dependencies
      * The easiest way to get all them (Qt, PCL, VTK, OpenCV, ...) is to install/uninstall rtabmap binaries:
           ```bash
-          $ sudo apt-get install ros-melodic-rtabmap ros-noetic-rtabmap-ros
-          $ sudo apt-get remove ros-melodic-rtabmap ros-noetic-rtabmap-ros
+          $ sudo apt-get install ros-noetic-rtabmap ros-noetic-rtabmap-ros
+          $ sudo apt-get remove ros-noetic-rtabmap ros-noetic-rtabmap-ros
           ```
  
  1. Optional dependencies
