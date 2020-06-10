@@ -5,6 +5,7 @@
     indigo, indigo-latest
     kinetic, kinetic-latest
     melodic, melodic-latest
+    noetic, noetic-latest
     ```
     * The `-latest` images are automatically built from latest version of `rtabmap` and `rtabmap_ros` from source. The other images have the same version than the binaries released on ROS. 
 
