@@ -27,7 +27,7 @@
      roslaunch rtabmap_ros rtabmap.launch rtabmapviz:=false database_path:=/root/rtabmap.db rtabmap_args:="--delete_db_on_start"
    ```
    
- * Launch `rtabmap` from inside the container (**with gui**, if you have a nvidia GPU, follow those [instructions](http://wiki.ros.org/docker/Tutorials/Hardware%20Acceleration#nvidia-docker2) with nvidia-docker2 using one of the images above instead of the ros image example, or for older computers and other GPUs try those [instructions](https://github.com/introlab/rtabmap/wiki/Installation#rtab-map-desktop-ubuntu-1604) to build a `rtabmap_ros3d` image with your GPU driver), saving the database on host `~/.ros/rtabmap.db`:
+ * Launch `rtabmap` from inside the container (**with gui**, if you have a nvidia GPU, follow those [instructions](http://wiki.ros.org/docker/Tutorials/Hardware%20Acceleration#nvidia-docker2) with nvidia-docker2 using one of the images above instead of the ros image example, or for other GPUs try the intel/AMD [instructions](http://wiki.ros.org/action/fullsearch/docker/Tutorials/Hardware%20Acceleration) to build a `rtabmap_ros3d` image with your GPU driver), saving the database on host `~/.ros/rtabmap.db`:
 
    * With [nvidia-docker2 approach](http://wiki.ros.org/docker/Tutorials/Hardware%20Acceleration#nvidia-docker2), we would have this Dockerfile:
        ```docker
