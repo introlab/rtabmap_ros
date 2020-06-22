@@ -34,6 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/io/pcd_io.h>
 #include <pcl/filters/voxel_grid.h>
+#include <pcl/filters/radius_outlier_removal.h>
 
 #include <pcl_ros/transforms.h>
 
@@ -78,6 +79,8 @@ public:
 		rangeMin_(0),
 		rangeMax_(0),
 		voxelSize_(0),
+		noiseRadius_(0),
+		noiseMinNeighbors_(5),
 		fixedFrameId_("odom")
 	{}
 
@@ -113,6 +116,8 @@ private:
 		pnh.param("range_min", rangeMin_, rangeMin_);
 		pnh.param("range_max", rangeMax_, rangeMax_);
 		pnh.param("voxel_size", voxelSize_, voxelSize_);
+		pnh.param("noise_radius", noiseRadius_, noiseRadius_);
+		pnh.param("noise_min_neighbors", noiseMinNeighbors_, noiseMinNeighbors_);
 		pnh.param("subscribe_odom_info", subscribeOdomInfo, subscribeOdomInfo);
 		ROS_ASSERT(maxClouds_>0 || assemblingTime_ >0.0);
 
@@ -126,6 +131,8 @@ private:
 		ROS_INFO("%s: range_min=%f", getName().c_str(), rangeMin_);
 		ROS_INFO("%s: range_max=%f", getName().c_str(), rangeMax_);
 		ROS_INFO("%s: voxel_size=%fm", getName().c_str(), voxelSize_);
+		ROS_INFO("%s: noise_radius=%fm", getName().c_str(), noiseRadius_);
+		ROS_INFO("%s: noise_min_neighbors=%d", getName().c_str(), noiseMinNeighbors_);
 
 		cloudsSkipped_ = skipClouds_;
 
@@ -303,6 +310,16 @@ private:
 						filter.filter(*output);
 						assembled = output;
 					}
+					if(noiseRadius_>0.0 && noiseMinNeighbors_>0)
+					{
+						pcl::RadiusOutlierRemoval<pcl::PCLPointCloud2> filter;
+						filter.setRadiusSearch(noiseRadius_);
+						filter.setMinNeighborsInRadius(noiseMinNeighbors_);
+						filter.setInputCloud(assembled);
+						pcl::PCLPointCloud2Ptr output(new pcl::PCLPointCloud2);
+						filter.filter(*output);
+						assembled = output;
+					}
 
 					pcl_conversions::moveFromPCL(*assembled, rosCloud);
 					pcl_ros::transformPointCloud(t.toEigen4f().inverse(), rosCloud, rosCloud);
@@ -370,6 +387,8 @@ private:
 	double rangeMin_;
 	double rangeMax_;
 	double voxelSize_;
+	double noiseRadius_;
+	int noiseMinNeighbors_;
 	std::string fixedFrameId_;
 	tf::TransformListener tfListener_;
 
