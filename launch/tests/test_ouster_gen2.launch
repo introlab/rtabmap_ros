@@ -19,11 +19,11 @@
     <arg name="frame_id" default="os_sensor"/>
     <arg name="rtabmapviz"    default="true"/>
     <arg name="scan_20_hz"    default="true"/>
+    <arg name="voxel_size"    default="0.15"/> <!-- indoor: 0.1 to 0.3, outdoor: 0.3 to 0.5 --> 
     <arg name="use_sim_time"  default="false"/>
     <param if="$(arg use_sim_time)" name="use_sim_time" value="true"/>
     
     <!-- Ouster -->
-    <remap unless="$(arg use_sim_time)" from="/os_cloud_node/imu" to="/os_cloud_node/imu/data_raw"/>
     <include unless="$(arg use_sim_time)" file="$(find ouster_ros)/ouster.launch">
       <arg name="sensor_hostname" value="$(arg sensor_hostname)"/>
       <arg name="udp_dest" value="$(arg udp_dest)"/>
@@ -34,7 +34,8 @@
 
     <!-- IMU orientation estimation and publish tf accordingly to os_sensor frame -->
     <node pkg="nodelet" type="nodelet" name="imu_nodelet_manager" args="manager">
-      <remap from="imu" to="/os_cloud_node/imu"/>
+      <remap from="imu/data_raw" to="/os_cloud_node/imu"/>
+      <remap from="imu/data" to="/os_cloud_node/imu/data"/>
     </node>
     <node pkg="nodelet" type="nodelet" name="imu_filter" args="load imu_filter_madgwick/ImuFilterNodelet imu_nodelet_manager">
       <param name="use_mag" value="false"/>
@@ -62,7 +63,7 @@
         <!-- ICP parameters -->
         <param name="Icp/PointToPlane"        type="string" value="true"/>
         <param name="Icp/Iterations"          type="string" value="10"/>
-        <param name="Icp/VoxelSize"           type="string" value="0.2"/>
+        <param name="Icp/VoxelSize"           type="string" value="$(arg voxel_size)"/>
         <param name="Icp/DownsamplingStep"    type="string" value="1"/> <!-- cannot be increased with ring-like lidar -->
         <param name="Icp/Epsilon"             type="string" value="0.001"/>
         <param name="Icp/PointToPlaneK"       type="string" value="20"/>
@@ -76,7 +77,7 @@
         <!-- Odom parameters -->       
         <param name="Odom/ScanKeyFrameThr"       type="string" value="0.95"/>
         <param name="Odom/Strategy"              type="string" value="0"/>
-        <param name="OdomF2M/ScanSubtractRadius" type="string" value="0.2"/>
+        <param name="OdomF2M/ScanSubtractRadius" type="string" value="$(arg voxel_size)"/>
         <param name="OdomF2M/ScanMaxSize"        type="string" value="15000"/>      
       </node>
 
@@ -88,6 +89,7 @@
         <param name="approx_sync"          type="bool" value="false"/>
         
         <remap from="scan_cloud" to="/os_cloud_node/points"/>
+        <remap from="imu"        to="/os_cloud_node/imu/data"/>
      
         <!-- RTAB-Map's parameters -->
         <param name="Rtabmap/DetectionRate"          type="string" value="1"/>  
@@ -95,6 +97,7 @@
         <param name="RGBD/ProximityBySpace"          type="string" value="true"/>
         <param name="RGBD/ProximityMaxGraphDepth"    type="string" value="0"/>
         <param name="RGBD/ProximityPathMaxNeighbors" type="string" value="1"/>
+        <param name="RGBD/LocalRadius"               type="string" value="2"/>
         <param name="RGBD/AngularUpdate"             type="string" value="0.05"/>
         <param name="RGBD/LinearUpdate"              type="string" value="0.05"/>
         <param name="Mem/NotLinkedNodesKept"         type="string" value="false"/>
@@ -104,23 +107,25 @@
         <!-- param name="Mem/LaserScanRadius"        type="string" value="0"/ -->
         
         <param name="Reg/Strategy"                   type="string" value="1"/> 
+        <param name="Optimizer/GravitySigma"         type="string" value="0.5"/>
+        <param name="Optimizer/Strategy"             type="string" value="1"/> 
         <param name="Grid/CellSize"                  type="string" value="0.1"/>
         <param name="Grid/RangeMax"                  type="string" value="20"/>
         <param name="Grid/ClusterRadius"             type="string" value="1"/>
         <param name="Grid/GroundIsObstacle"          type="string" value="true"/>
 
         <!-- ICP parameters -->
-        <param name="Icp/VoxelSize"                  type="string" value="0.3"/>
+        <param name="Icp/VoxelSize"                  type="string" value="$(arg voxel_size)"/>
         <param name="Icp/PointToPlaneK"              type="string" value="20"/>
         <param name="Icp/PointToPlaneRadius"         type="string" value="0"/>
-        <param name="Icp/PointToPlane"               type="string" value="false"/>
+        <param name="Icp/PointToPlane"               type="string" value="true"/>
         <param name="Icp/Iterations"                 type="string" value="10"/>
         <param name="Icp/Epsilon"                    type="string" value="0.001"/>
         <param name="Icp/MaxTranslation"             type="string" value="3"/>
         <param name="Icp/MaxCorrespondenceDistance"  type="string" value="1"/>
         <param name="Icp/PM"                         type="string" value="true"/> 
         <param name="Icp/PMOutlierRatio"             type="string" value="0.7"/>
-        <param name="Icp/CorrespondenceRatio"        type="string" value="0.4"/>
+        <param name="Icp/CorrespondenceRatio"        type="string" value="0.2"/>
       </node>
 
       <node if="$(arg rtabmapviz)" name="rtabmapviz" pkg="rtabmap_ros" type="rtabmapviz" output="screen">
