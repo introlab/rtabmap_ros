@@ -74,8 +74,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtabmap_ros/Info.h"
 #include "rtabmap_ros/MapData.h"
 #include "rtabmap_ros/MapGraph.h"
-#include "rtabmap_ros/GetMap.h"
-#include "rtabmap_ros/PublishMap.h"
 #include "rtabmap_ros/Path.h"
 
 #include "rtabmap_ros/MsgConversion.h"
@@ -601,6 +599,7 @@ void CoreWrapper::onInit()
 	setModeMappingSrv_ = nh.advertiseService("set_mode_mapping", &CoreWrapper::setModeMappingCallback, this);
 	getNodeDataSrv_ = nh.advertiseService("get_node_data", &CoreWrapper::getNodeDataCallback, this);
 	getMapDataSrv_ = nh.advertiseService("get_map_data", &CoreWrapper::getMapDataCallback, this);
+	getMapData2Srv_ = nh.advertiseService("get_map_data2", &CoreWrapper::getMapData2Callback, this);
 	getMapSrv_ = nh.advertiseService("get_map", &CoreWrapper::getMapCallback, this);
 	getProbMapSrv_ = nh.advertiseService("get_prob_map", &CoreWrapper::getProbMapCallback, this);
 	getGridMapSrv_ = nh.advertiseService("get_grid_map", &CoreWrapper::getGridMapCallback, this);
@@ -2675,7 +2674,7 @@ bool CoreWrapper::getNodeDataCallback(rtabmap_ros::GetNodeData::Request& req, rt
 	{
 
 		int id = req.ids[i];
-		Signature s = rtabmap_.getSignatureCopy(id, req.images, req.scan, req.user_data, req.grid);
+		Signature s = rtabmap_.getSignatureCopy(id, req.images, req.scan, req.user_data, req.grid, true, true);
 
 		if(s.id()>0)
 		{
@@ -2708,6 +2707,45 @@ bool CoreWrapper::getMapDataCallback(rtabmap_ros::GetMap::Request& req, rtabmap_
 			!req.graphOnly,
 			!req.graphOnly,
 			!req.graphOnly);
+
+	//RGB-D SLAM data
+	rtabmap_ros::mapDataToROS(poses,
+		constraints,
+		signatures,
+		mapToOdom_,
+		res.data);
+
+	res.data.header.stamp = ros::Time::now();
+	res.data.header.frame_id = mapFrameId_;
+
+	return true;
+}
+
+bool CoreWrapper::getMapData2Callback(rtabmap_ros::GetMap2::Request& req, rtabmap_ros::GetMap2::Response& res)
+{
+	NODELET_INFO("rtabmap: Getting map (global=%s optimized=%s with_images=%s with_scans=%s with_user_data=%s with_grids=%s)...",
+			req.global?"true":"false",
+			req.optimized?"true":"false",
+			req.with_images?"true":"false",
+			req.with_scans?"true":"false",
+			req.with_user_data?"true":"false",
+			req.with_grids?"true":"false");
+	std::map<int, Signature> signatures;
+	std::map<int, Transform> poses;
+	std::multimap<int, rtabmap::Link> constraints;
+
+	rtabmap_.getGraph(
+			poses,
+			constraints,
+			req.optimized,
+			req.global,
+			&signatures,
+			req.with_images,
+			req.with_scans,
+			req.with_user_data,
+			req.with_grids,
+			req.with_words,
+			req.with_global_descriptors);
 
 	//RGB-D SLAM data
 	rtabmap_ros::mapDataToROS(poses,
