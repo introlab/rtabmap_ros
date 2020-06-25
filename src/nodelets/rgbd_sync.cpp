@@ -136,7 +136,7 @@ private:
 		imageDepthSub_.subscribe(depth_it, depth_nh.resolveName("image"), 1, hintsDepth);
 		cameraInfoSub_.subscribe(rgb_nh, "camera_info", 1);
 
-		std::string subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s",
+		std::string subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s \\\n   %s \\\n   %s",
 							getName().c_str(),
 							approxSync?"approx":"exact",
 							imageSub_.getTopic().c_str(),

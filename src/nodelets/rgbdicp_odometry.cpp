@@ -181,7 +181,7 @@ private:
 				exactScanSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackScan, this, _1, _2, _3, _4));
 			}
 
-			subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s, \n   %s",
+			subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s \\\n   %s \\\n   %s \\\n   %s",
 					getName().c_str(),
 					approxSync?"approx":"exact",
 					image_mono_sub_.getTopic().c_str(),

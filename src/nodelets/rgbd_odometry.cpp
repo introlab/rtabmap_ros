@@ -176,7 +176,7 @@ private:
 								rgbd_image2_sub_);
 						exactSync2_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD2, this, _1, _2));
 					}
-					subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s",
+					subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s \\\n   %s",
 							getName().c_str(),
 							approxSync?"approx":"exact",
 							rgbd_image1_sub_.getTopic().c_str(),
@@ -202,7 +202,7 @@ private:
 								rgbd_image3_sub_);
 						exactSync3_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD3, this, _1, _2, _3));
 					}
-					subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s",
+					subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s \\\n   %s \\\n   %s",
 							getName().c_str(),
 							approxSync?"approx":"exact",
 							rgbd_image1_sub_.getTopic().c_str(),
@@ -231,7 +231,7 @@ private:
 								rgbd_image4_sub_);
 						exactSync4_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD4, this, _1, _2, _3, _4));
 					}
-					subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s",
+					subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s \\\n   %s \\\n   %s \\\n   %s",
 							getName().c_str(),
 							approxSync?"approx":"exact",
 							rgbd_image1_sub_.getTopic().c_str(),
@@ -276,7 +276,7 @@ private:
 				exactSync_->registerCallback(boost::bind(&RGBDOdometry::callback, this, _1, _2, _3));
 			}
 
-			subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s",
+			subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s \\\n   %s \\\n   %s",
 					getName().c_str(),
 					approxSync?"approx":"exact",
 					image_mono_sub_.getTopic().c_str(),
