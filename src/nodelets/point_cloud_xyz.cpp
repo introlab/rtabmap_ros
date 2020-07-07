@@ -291,10 +291,11 @@ private:
 		if(indices->size() && voxelSize_ > 0.0)
 		{
 			pclCloud = rtabmap::util3d::voxelize(pclCloud, indices, voxelSize_);
+			pclCloud->is_dense = true;
 		}
 
 		// Do radius filtering after voxel filtering ( a lot faster)
-		if(pclCloud->size() && noiseFilterRadius_ > 0.0 && noiseFilterMinNeighbors_ > 0)
+		if(!pclCloud->empty() && (pclCloud->is_dense || !indices->empty()) && noiseFilterRadius_ > 0.0 && noiseFilterMinNeighbors_ > 0)
 		{
 			if(pclCloud->is_dense)
 			{
@@ -310,7 +311,7 @@ private:
 		}
 
 		sensor_msgs::PointCloud2 rosCloud;
-		if(pclCloud->size() && (normalK_ > 0 || normalRadius_ > 0.0f))
+		if(!pclCloud->empty() && (pclCloud->is_dense || !indices->empty()) && (normalK_ > 0 || normalRadius_ > 0.0f))
 		{
 			//compute normals
 			pcl::PointCloud<pcl::Normal>::Ptr normals = rtabmap::util3d::computeNormals(pclCloud, normalK_, normalRadius_);
