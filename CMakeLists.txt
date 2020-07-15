@@ -516,6 +516,7 @@ catkin_install_python(PROGRAMS
   scripts/point_to_tf.py
   scripts/transform_to_tf.py
   scripts/yaml_to_camera_info.py
+  scripts/wifi_signal_pub.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
@@ -538,6 +539,7 @@ install(TARGETS
    rtabmap_camera
    rtabmap_rgbd_sync
    rtabmap_rgbd_relay
+   rtabmap_wifi_signal_sub
    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
