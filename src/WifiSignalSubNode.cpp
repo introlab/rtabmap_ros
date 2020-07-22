@@ -45,6 +45,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 bool hueSymbol = false;
 int min_dbm = -100;
 int max_dbm = -50;
+bool autoScale = false;
 
 // A percentage value that represents the signal quality
 // of the network. WLAN_SIGNAL_QUALITY is of type ULONG.
@@ -187,6 +188,23 @@ void mapDataCallback(const rtabmap_ros::MapDataConstPtr & mapDataMsg)
 	float min=0,max=0;
 	for(std::map<double, int>::iterator iter=wifiLevels.begin(); iter!=wifiLevels.end(); ++iter, ++id)
 	{
+		if(min == 0.0f || min > iter->second)
+		{
+			min = iter->second;
+		}
+		if(max == 0.0f || max < iter->second)
+		{
+			max = iter->second;
+		}
+	}
+	ROS_INFO("Min/Max dBm = %f %f", min, max);
+	if(autoScale && min<0 && min < max)
+	{
+		min_dbm = min;
+		max_dbm = max;
+	}
+	for(std::map<double, int>::iterator iter=wifiLevels.begin(); iter!=wifiLevels.end(); ++iter, ++id)
+	{
 		// The Wifi value may be taken between two nodes, interpolate its position.
 		double stampWifi = iter->first;
 		std::map<double, int>::iterator previousNode = nodeStamps.lower_bound(stampWifi); // lower bound of the stamp
@@ -215,15 +233,6 @@ void mapDataCallback(const rtabmap_ros::MapDataConstPtr & mapDataMsg)
 			v.z()*=ratio;
 
 			rtabmap::Transform wifiPose = (poseA*v).translation(); // rip off the rotation
-
-			if(min == 0.0f || min > iter->second)
-			{
-				min = iter->second;
-			}
-			if(max == 0.0f || max < iter->second)
-			{
-				max = iter->second;
-			}
 
 			pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZRGB>);
 			if(hueSymbol)
@@ -279,7 +288,6 @@ void mapDataCallback(const rtabmap_ros::MapDataConstPtr & mapDataMsg)
 			}
 		}
 	}
-	ROS_INFO("Min/Max dBm = %f %f", min, max);
 
 	if(assembledWifiSignals->size())
 	{
@@ -300,6 +308,7 @@ int main(int argc, char** argv)
 	pnh.param("hue_symbol", hueSymbol, hueSymbol);
 	pnh.param("min", min_dbm, min_dbm);
 	pnh.param("max", max_dbm, max_dbm);
+	pnh.param("auto", autoScale, autoScale);
 
 	wifiSignalCloudPub = nh.advertise<sensor_msgs::PointCloud2>("wifi_signals", 1);
 	ros::Subscriber mapDataSub = nh.subscribe("/rtabmap/mapData", 1, mapDataCallback);
