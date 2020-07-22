@@ -106,6 +106,7 @@ add_message_files(
    UserData.msg
    GPS.msg
    Path.msg
+   EnvSensor.msg
 )
 
 ## Generate services in the 'srv' folder

@@ -98,6 +98,11 @@ void globalDescriptorToROS(const rtabmap::GlobalDescriptor & desc, rtabmap_ros::
 std::vector<rtabmap::GlobalDescriptor> globalDescriptorsFromROS(const std::vector<rtabmap_ros::GlobalDescriptor> & msg);
 void globalDescriptorsToROS(const std::vector<rtabmap::GlobalDescriptor> & desc, std::vector<rtabmap_ros::GlobalDescriptor> & msg);
 
+rtabmap::EnvSensor envSensorFromROS(const rtabmap_ros::EnvSensor & msg);
+void envSensorToROS(const rtabmap::EnvSensor & sensor, rtabmap_ros::EnvSensor & msg);
+rtabmap::EnvSensors envSensorsFromROS(const std::vector<rtabmap_ros::EnvSensor> & msg);
+void envSensorsToROS(const rtabmap::EnvSensors & sensors, std::vector<rtabmap_ros::EnvSensor> & msg);
+
 cv::Point2f point2fFromROS(const rtabmap_ros::Point2f & msg);
 void point2fToROS(const cv::Point2f & kpt, rtabmap_ros::Point2f & msg);
 

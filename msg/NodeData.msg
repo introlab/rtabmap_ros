@@ -64,3 +64,5 @@ Point3f[] wordPts
 uint8[] wordDescriptors
 
 GlobalDescriptor[] globalDescriptors
+
+EnvSensor[] env_sensors

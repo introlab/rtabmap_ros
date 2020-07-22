@@ -566,6 +566,46 @@ void globalDescriptorsToROS(const std::vector<rtabmap::GlobalDescriptor> & desc,
 	}
 }
 
+rtabmap::EnvSensor envSensorFromROS(const rtabmap_ros::EnvSensor & msg)
+{
+	return rtabmap::EnvSensor((rtabmap::EnvSensor::Type)msg.type, msg.value, timestampFromROS(msg.header.stamp));
+}
+
+void envSensorToROS(const rtabmap::EnvSensor & sensor, rtabmap_ros::EnvSensor & msg)
+{
+	msg.type = sensor.type();
+	msg.value = sensor.value();
+	msg.header.stamp = ros::Time(sensor.stamp());
+}
+
+rtabmap::EnvSensors envSensorsFromROS(const std::vector<rtabmap_ros::EnvSensor> & msg)
+{
+	rtabmap::EnvSensors v;
+	if(!msg.empty())
+	{
+		for(unsigned int i=0; i<msg.size(); ++i)
+		{
+			rtabmap::EnvSensor s = envSensorFromROS(msg[i]);
+			v.insert(std::make_pair(s.type(), envSensorFromROS(msg[i])));
+		}
+	}
+	return v;
+}
+
+void envSensorsToROS(const rtabmap::EnvSensors & sensors, std::vector<rtabmap_ros::EnvSensor> & msg)
+{
+	msg.clear();
+	if(!sensors.empty())
+	{
+		msg.resize(sensors.size());
+		int i=0;
+		for(rtabmap::EnvSensors::const_iterator iter=sensors.begin(); iter!=sensors.end(); ++iter)
+		{
+			envSensorToROS(iter->second, msg[i++]);
+		}
+	}
+}
+
 cv::Point2f point2fFromROS(const rtabmap_ros::Point2f & msg)
 {
 	return cv::Point2f(msg.x, msg.y);
@@ -994,6 +1034,7 @@ rtabmap::Signature nodeDataFromROS(const rtabmap_ros::NodeData & msg)
 	s.setWords3(words3D);
 	s.setWordsDescriptors(wordsDescriptors);
 	s.sensorData().setGlobalDescriptors(rtabmap_ros::globalDescriptorsFromROS(msg.globalDescriptors));
+	s.sensorData().setEnvSensors(rtabmap_ros::envSensorsFromROS(msg.env_sensors));
 	s.sensorData().setOccupancyGrid(
 			compressedMatFromBytes(msg.grid_ground),
 			compressedMatFromBytes(msg.grid_obstacles),
@@ -1132,6 +1173,7 @@ void nodeDataToROS(const rtabmap::Signature & signature, rtabmap_ros::NodeData &
 	}
 
 	rtabmap_ros::globalDescriptorsToROS(signature.sensorData().globalDescriptors(), msg.globalDescriptors);
+	rtabmap_ros::envSensorsToROS(signature.sensorData().envSensors(), msg.env_sensors);
 }
 
 rtabmap::Signature nodeInfoFromROS(const rtabmap_ros::NodeData & msg)
