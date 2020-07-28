@@ -81,7 +81,7 @@ ENDIF(RTABMAP_GUI OR rviz_FOUND)
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
 ## See http://ros.org/doc/api/catkin/html/user_guide/setup_dot_py.html
-# catkin_python_setup()
+catkin_python_setup()
 
 #######################################
 ## Declare ROS messages and services ##
@@ -517,6 +517,7 @@ catkin_install_python(PROGRAMS
   scripts/point_to_tf.py
   scripts/transform_to_tf.py
   scripts/yaml_to_camera_info.py
+  scripts/netvlad_tf_ros.py
   scripts/wifi_signal_pub.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
