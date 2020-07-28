@@ -612,6 +612,7 @@ install(FILES
     launch/ros2/turtlebot3_scan.launch.py
     launch/ros2/turtlebot3_rgbd.launch.py
     launch/ros2/turtlebot3_rgbd_sync.launch.py
+    launch/ros2/realsense_d400.launch.py
 #   launch/rtabmap.launch
 #   launch/rgbd_mapping.launch
 #   launch/stereo_mapping.launch
