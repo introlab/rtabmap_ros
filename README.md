@@ -16,11 +16,11 @@ For the RTAB-Map libraries and standalone application, visit [RTAB-Map's home pa
 RTAB-Map is released as binaries in the ROS distribution.
 * Noetic
     ```
-    $ sudo apt-get install ros-noetic-rtabmap-ros
+    $ sudo apt install ros-noetic-rtabmap-ros
     ```
 * Melodic
     ```
-    $ sudo apt-get install ros-melodic-rtabmap-ros
+    $ sudo apt install ros-melodic-rtabmap-ros
     ```
 * Kinetic
     ```
