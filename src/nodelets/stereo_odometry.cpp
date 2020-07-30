@@ -212,6 +212,36 @@ private:
 
 				rtabmap::StereoCameraModel stereoModel = rtabmap_ros::stereoCameraModelFromROS(*cameraInfoLeft, *cameraInfoRight, localTransform, stereoTransform);
 
+				if(stereoModel.baseline() == 0 && alreadyRectified)
+				{
+					stereoTransform = getTransform(
+							cameraInfoLeft->header.frame_id,
+							cameraInfoRight->header.frame_id,
+							cameraInfoLeft->header.stamp);
+
+					if(!stereoTransform.isNull() && stereoTransform.x()>0)
+					{
+						static bool warned = false;
+						if(!warned)
+						{
+							ROS_WARN("Right camera info doesn't have Tx set but we are assuming that stereo images are already rectified (see %s parameter). While not "
+									"recommended, we used TF to get the baseline (%s->%s = %fm) for convenience (e.g., D400 ir stereo issue). It is preferred to feed "
+									"a valid right camera info if stereo images are already rectified. This message is only printed once...",
+									rtabmap::Parameters::kRtabmapImagesAlreadyRectified().c_str(),
+									cameraInfoRight->header.frame_id.c_str(), cameraInfoLeft->header.frame_id.c_str(), stereoTransform.x());
+							warned = true;
+						}
+						stereoModel = rtabmap::StereoCameraModel(
+								stereoModel.left().fx(),
+								stereoModel.left().fy(),
+								stereoModel.left().cx(),
+								stereoModel.left().cy(),
+								stereoTransform.x(),
+								stereoModel.localTransform(),
+								stereoModel.left().imageSize());
+					}
+				}
+
 				if(alreadyRectified && stereoModel.baseline() <= 0)
 				{
 					NODELET_ERROR("The stereo baseline (%f) should be positive (baseline=-Tx/fx). We assume a horizontal left/right stereo "

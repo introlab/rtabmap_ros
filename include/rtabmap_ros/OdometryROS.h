@@ -141,7 +141,7 @@ private:
 	int odomStrategy_;
 	bool waitIMUToinit_;
 	bool imuProcessed_;
-	double lastImuReceivedStamp_;
+	std::map<double, rtabmap::IMU> imus_;
 	rtabmap::SensorData bufferedData_;
 };
 

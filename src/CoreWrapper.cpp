@@ -115,6 +115,7 @@ CoreWrapper::CoreWrapper() :
 		rate_(Parameters::defaultRtabmapDetectionRate()),
 		createIntermediateNodes_(Parameters::defaultRtabmapCreateIntermediateNodes()),
 		maxMappingNodes_(Parameters::defaultGridGlobalMaxNodes()),
+		alreadyRectifiedImages_(Parameters::defaultRtabmapImagesAlreadyRectified()),
 		previousStamp_(0),
 		mbClient_(0)
 {
@@ -543,6 +544,10 @@ void CoreWrapper::onInit()
 		{
 			NODELET_INFO("Max mapping nodes = %d", maxMappingNodes_);
 		}
+	}
+	if(parameters_.find(Parameters::kRtabmapImagesAlreadyRectified()) != parameters_.end())
+	{
+		Parameters::parse(parameters_, Parameters::kRtabmapImagesAlreadyRectified(), alreadyRectifiedImages_);
 	}
 
 	if(paused_)
@@ -1334,7 +1339,8 @@ void CoreWrapper::commonStereoCallback(
 			right,
 			stereoModel,
 			tfListener_,
-			waitForTransform_?waitForTransformDuration_:0.0))
+			waitForTransform_?waitForTransformDuration_:0.0,
+			alreadyRectifiedImages_))
 	{
 		NODELET_ERROR("Could not convert stereo msgs! Aborting rtabmap update...");
 		return;

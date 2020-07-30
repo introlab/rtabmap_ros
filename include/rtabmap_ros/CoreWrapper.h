@@ -358,6 +358,7 @@ private:
 	float rate_;
 	bool createIntermediateNodes_;
 	int maxMappingNodes_;
+	bool alreadyRectifiedImages_;
 	ros::Time previousStamp_;
 };
 

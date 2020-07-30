@@ -227,7 +227,8 @@ bool convertStereoMsg(
 		cv::Mat & right,
 		rtabmap::StereoCameraModel & stereoModel,
 		tf::TransformListener & listener,
-		double waitForTransform);
+		double waitForTransform,
+		bool alreadyRectified);
 
 bool convertScanMsg(
 		const sensor_msgs::LaserScan & scan2dMsg,

@@ -693,7 +693,8 @@ void GuiWrapper::commonStereoCallback(
 				right,
 				stereoModel,
 				tfListener_,
-				waitForTransform_?waitForTransformDuration_:0.0))
+				waitForTransform_?waitForTransformDuration_:0.0,
+				true))
 		{
 			ROS_ERROR("Could not convert stereo msgs! Aborting rtabmapviz update...");
 			return;

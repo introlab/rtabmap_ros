@@ -1767,7 +1767,8 @@ bool convertStereoMsg(
 		cv::Mat & right,
 		rtabmap::StereoCameraModel & stereoModel,
 		tf::TransformListener & listener,
-		double waitForTransform)
+		double waitForTransform,
+		bool alreadyRectified)
 {
 	UASSERT(leftImageMsg.get() && rightImageMsg.get());
 
@@ -1841,6 +1842,41 @@ bool convertStereoMsg(
 					 "This warning is printed only once.",
 					 stereoModel.baseline());
 			shown = true;
+		}
+	}
+	else if(stereoModel.baseline() == 0 && alreadyRectified)
+	{
+		rtabmap::Transform stereoTransform = getTransform(
+				leftCamInfoMsg.header.frame_id,
+				rightCamInfoMsg.header.frame_id,
+				leftCamInfoMsg.header.stamp,
+				listener,
+				waitForTransform);
+		if(stereoTransform.isNull() || stereoTransform.x()<=0)
+		{
+			ROS_WARN("We cannot estimated the baseline of the rectified images with tf! (%s->%s = %s)",
+					rightCamInfoMsg.header.frame_id.c_str(), leftCamInfoMsg.header.frame_id.c_str(), stereoTransform.prettyPrint().c_str());
+		}
+		else
+		{
+			static bool warned = false;
+			if(!warned)
+			{
+				ROS_WARN("Right camera info doesn't have Tx set but we are assuming that stereo images are already rectified (see %s parameter). While not "
+						"recommended, we used TF to get the baseline (%s->%s = %fm) for convenience (e.g., D400 ir stereo issue). It is preferred to feed "
+						"a valid right camera info if stereo images are already rectified. This message is only printed once...",
+						rtabmap::Parameters::kRtabmapImagesAlreadyRectified().c_str(),
+						rightCamInfoMsg.header.frame_id.c_str(), leftCamInfoMsg.header.frame_id.c_str(), stereoTransform.x());
+				warned = true;
+			}
+			stereoModel = rtabmap::StereoCameraModel(
+					stereoModel.left().fx(),
+					stereoModel.left().fy(),
+					stereoModel.left().cx(),
+					stereoModel.left().cy(),
+					stereoTransform.x(),
+					stereoModel.localTransform(),
+					stereoModel.left().imageSize());
 		}
 	}
 	return true;
