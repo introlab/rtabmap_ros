@@ -2792,6 +2792,10 @@ bool CoreWrapper::getGridMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::
 
 bool CoreWrapper::getMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::GetMap::Response &res)
 {
+	// Make sure grid map cache is up to date (in case there is no subscriber on map topics)
+	std::map<int, Transform> poses = rtabmap_.getLocalOptimizedPoses();
+	mapsManager_.updateMapCaches(poses, rtabmap_.getMemory(), true, false);
+
 	// create the grid map
 	float xMin=0.0f, yMin=0.0f, gridCellSize = 0.05f;
 	cv::Mat pixels = mapsManager_.getGridMap(xMin, yMin, gridCellSize);
@@ -2820,11 +2824,19 @@ bool CoreWrapper::getMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::GetM
 		res.map.header.stamp = ros::Time::now();
 		return true;
 	}
+	else
+	{
+		NODELET_WARN("rtabmap: The map is empty!");
+	}
 	return false;
 }
 
 bool CoreWrapper::getProbMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::GetMap::Response &res)
 {
+	// Make sure grid map cache is up to date (in case there is no subscriber on map topics)
+	std::map<int, Transform> poses = rtabmap_.getLocalOptimizedPoses();
+	mapsManager_.updateMapCaches(poses, rtabmap_.getMemory(), true, false);
+
 	// create the grid map
 	float xMin=0.0f, yMin=0.0f, gridCellSize = 0.05f;
 	cv::Mat pixels = mapsManager_.getGridProbMap(xMin, yMin, gridCellSize);
@@ -2852,6 +2864,10 @@ bool CoreWrapper::getProbMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::
 		res.map.header.frame_id = mapFrameId_;
 		res.map.header.stamp = ros::Time::now();
 		return true;
+	}
+	else
+	{
+		NODELET_WARN("rtabmap: The map is empty!");
 	}
 	return false;
 }
@@ -3812,7 +3828,7 @@ bool CoreWrapper::octomapBinaryCallback(
 		poses = nearestPoses;
 	}
 
-	poses = mapsManager_.updateMapCaches(poses, rtabmap_.getMemory(), false, true);
+	mapsManager_.updateMapCaches(poses, rtabmap_.getMemory(), false, true);
 
 	const rtabmap::OctoMap * octomap = mapsManager_.getOctomap();
 	bool success = octomap->octree()->size() && octomap_msgs::binaryMapToMsg(*octomap->octree(), res.map);
@@ -3843,7 +3859,7 @@ bool CoreWrapper::octomapFullCallback(
 		poses = nearestPoses;
 	}
 
-	poses = mapsManager_.updateMapCaches(poses, rtabmap_.getMemory(), false, true);
+	mapsManager_.updateMapCaches(poses, rtabmap_.getMemory(), false, true);
 
 	const rtabmap::OctoMap * octomap = mapsManager_.getOctomap();
 	bool success = octomap->octree()->size() && octomap_msgs::fullMapToMsg(*octomap->octree(), res.map);
