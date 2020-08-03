@@ -2219,10 +2219,32 @@ void CoreWrapper::tagDetectionsAsyncCallback(const apriltag_ros::AprilTagDetecti
 				if(!tagDetections.detections[i].pose.header.frame_id.empty())
 				{
 					p.header.frame_id = tagDetections.detections[i].pose.header.frame_id;
+
+					static bool warned = false;
+					if(!warned &&
+						!tagDetections.header.frame_id.empty() &&
+						tagDetections.detections[i].pose.header.frame_id.compare(tagDetections.header.frame_id)!=0)
+					{
+						NODELET_WARN("frame_id set for individual tag detections (%s) doesn't match the frame_id of the message (%s), "
+								"the resulting pose of the tag may be wrong. This message is only printed once.",
+								tagDetections.detections[i].pose.header.frame_id.c_str(), tagDetections.header.frame_id.c_str());
+						warned = true;
+					}
 				}
 				if(!tagDetections.detections[i].pose.header.stamp.isZero())
 				{
 					p.header.stamp = tagDetections.detections[i].pose.header.stamp;
+
+					static bool warned = false;
+					if(!warned &&
+						!tagDetections.header.stamp.isZero() &&
+						tagDetections.detections[i].pose.header.stamp != tagDetections.header.stamp)
+					{
+						NODELET_WARN("stamp set for individual tag detections (%f) doesn't match the stamp of the message (%f), "
+								"the resulting pose of the tag may be wrongly interpolated. This message is only printed once.",
+								tagDetections.detections[i].pose.header.stamp.toSec(), tagDetections.header.stamp.toSec());
+						warned = true;
+					}
 				}
 				uInsert(tags_, std::make_pair(tagDetections.detections[i].id[0], p));
 			}
