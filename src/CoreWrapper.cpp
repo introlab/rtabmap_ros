@@ -2650,6 +2650,7 @@ bool CoreWrapper::setModeLocalizationCallback(std_srvs::Empty::Request&, std_srv
 	ros::NodeHandle & nh = getNodeHandle();
 	nh.setParam(rtabmap::Parameters::kMemIncrementalMemory(), "false");
 	rtabmap_.parseParameters(parameters);
+	NODELET_INFO("rtabmap: Localization mode enabled!");
 	return true;
 }
 
@@ -2661,6 +2662,7 @@ bool CoreWrapper::setModeMappingCallback(std_srvs::Empty::Request&, std_srvs::Em
 	ros::NodeHandle & nh = getNodeHandle();
 	nh.setParam(rtabmap::Parameters::kMemIncrementalMemory(), "true");
 	rtabmap_.parseParameters(parameters);
+	NODELET_INFO("rtabmap: Mapping mode enabled!");
 	return true;
 }
 
