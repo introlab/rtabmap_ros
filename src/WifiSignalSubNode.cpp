@@ -241,7 +241,10 @@ void mapDataCallback(const rtabmap_ros::MapDataConstPtr & mapDataMsg)
 				int quality = dBm2Quality(iter->second)*120/100;
 				float r,g,b;
 				HSVtoRGB(&r,&g,&b,quality,1,1);
-				pcl::PointXYZRGB anchor(r*255, g*255, b*255);
+				pcl::PointXYZRGB anchor;
+				anchor.r = r*255;
+				anchor.g = g*255;
+				anchor.b = b*255;
 				cloud->push_back(anchor);
 			}
 			else
@@ -272,7 +275,8 @@ void mapDataCallback(const rtabmap_ros::MapDataConstPtr & mapDataMsg)
 					}
 					cloud->push_back(pt);
 				}
-				pcl::PointXYZRGB anchor(255, 0, 0);
+				pcl::PointXYZRGB anchor;
+				anchor.r = 255;
 				cloud->push_back(anchor);
 			}
 
