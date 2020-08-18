@@ -487,7 +487,7 @@ void CommonDataSubscriber::setupDepthCallbacks(
 #ifdef RTABMAP_SYNC_USER_DATA
 	if(subscribeOdom && subscribeUserData)
 	{
-		odomSub_.subscribe(nh, "odom", 1);
+		odomSub_.subscribe(nh, "odom", queueSize);
 		userDataSub_.subscribe(nh, "user_data", 1);
 
 		if(subscribeScanDesc)
@@ -497,7 +497,7 @@ void CommonDataSubscriber::setupDepthCallbacks(
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(nh, "odom_info", 1);
+				odomInfoSub_.subscribe(nh, "odom_info", queueSize);
 				SYNC_DECL7(depthOdomDataScanDescInfo, approxSync, queueSize, odomSub_, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scanDescSub_, odomInfoSub_);
 			}
 			else
@@ -512,7 +512,7 @@ void CommonDataSubscriber::setupDepthCallbacks(
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(nh, "odom_info", 1);
+				odomInfoSub_.subscribe(nh, "odom_info", queueSize);
 				SYNC_DECL7(depthOdomDataScan2dInfo, approxSync, queueSize, odomSub_, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scanSub_, odomInfoSub_);
 			}
 			else
@@ -527,7 +527,7 @@ void CommonDataSubscriber::setupDepthCallbacks(
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(nh, "odom_info", 1);
+				odomInfoSub_.subscribe(nh, "odom_info", queueSize);
 				SYNC_DECL7(depthOdomDataScan3dInfo, approxSync, queueSize, odomSub_, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scan3dSub_, odomInfoSub_);
 			}
 			else
@@ -538,7 +538,7 @@ void CommonDataSubscriber::setupDepthCallbacks(
 		else if(subscribeOdomInfo)
 		{
 			subscribedToOdomInfo_ = true;
-			odomInfoSub_.subscribe(nh, "odom_info", 1);
+			odomInfoSub_.subscribe(nh, "odom_info", queueSize);
 			SYNC_DECL6(depthOdomDataInfo, approxSync, queueSize, odomSub_, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, odomInfoSub_);
 		}
 		else
@@ -550,7 +550,7 @@ void CommonDataSubscriber::setupDepthCallbacks(
 #endif
 	if(subscribeOdom)
 	{
-		odomSub_.subscribe(nh, "odom", 1);
+		odomSub_.subscribe(nh, "odom", queueSize);
 
 		if(subscribeScanDesc)
 		{
@@ -559,7 +559,7 @@ void CommonDataSubscriber::setupDepthCallbacks(
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(nh, "odom_info", 1);
+				odomInfoSub_.subscribe(nh, "odom_info", queueSize);
 				SYNC_DECL6(depthOdomScanDescInfo, approxSync, queueSize, odomSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scanDescSub_, odomInfoSub_);
 			}
 			else
@@ -574,7 +574,7 @@ void CommonDataSubscriber::setupDepthCallbacks(
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(nh, "odom_info", 1);
+				odomInfoSub_.subscribe(nh, "odom_info", queueSize);
 				SYNC_DECL6(depthOdomScan2dInfo, approxSync, queueSize, odomSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scanSub_, odomInfoSub_);
 			}
 			else
@@ -589,7 +589,7 @@ void CommonDataSubscriber::setupDepthCallbacks(
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(nh, "odom_info", 1);
+				odomInfoSub_.subscribe(nh, "odom_info", queueSize);
 				SYNC_DECL6(depthOdomScan3dInfo, approxSync, queueSize, odomSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scan3dSub_, odomInfoSub_);
 			}
 			else
@@ -600,7 +600,7 @@ void CommonDataSubscriber::setupDepthCallbacks(
 		else if(subscribeOdomInfo)
 		{
 			subscribedToOdomInfo_ = true;
-			odomInfoSub_.subscribe(nh, "odom_info", 1);
+			odomInfoSub_.subscribe(nh, "odom_info", queueSize);
 			SYNC_DECL5(depthOdomInfo, approxSync, queueSize, odomSub_, imageSub_, imageDepthSub_, cameraInfoSub_, odomInfoSub_);
 		}
 		else
@@ -621,7 +621,7 @@ void CommonDataSubscriber::setupDepthCallbacks(
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(nh, "odom_info", 1);
+				odomInfoSub_.subscribe(nh, "odom_info", queueSize);
 				SYNC_DECL6(depthDataScanDescInfo, approxSync, queueSize, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scanDescSub_, odomInfoSub_);
 			}
 			else
@@ -637,7 +637,7 @@ void CommonDataSubscriber::setupDepthCallbacks(
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(nh, "odom_info", 1);
+				odomInfoSub_.subscribe(nh, "odom_info", queueSize);
 				SYNC_DECL6(depthDataScan2dInfo, approxSync, queueSize, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scanSub_, odomInfoSub_);
 			}
 			else
@@ -652,7 +652,7 @@ void CommonDataSubscriber::setupDepthCallbacks(
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(nh, "odom_info", 1);
+				odomInfoSub_.subscribe(nh, "odom_info", queueSize);
 				SYNC_DECL6(depthDataScan3dInfo, approxSync, queueSize, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scan3dSub_, odomInfoSub_);
 			}
 			else
@@ -663,7 +663,7 @@ void CommonDataSubscriber::setupDepthCallbacks(
 		else if(subscribeOdomInfo)
 		{
 			subscribedToOdomInfo_ = true;
-			odomInfoSub_.subscribe(nh, "odom_info", 1);
+			odomInfoSub_.subscribe(nh, "odom_info", queueSize);
 			SYNC_DECL5(depthDataInfo, approxSync, queueSize, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, odomInfoSub_);
 		}
 		else
@@ -681,7 +681,7 @@ void CommonDataSubscriber::setupDepthCallbacks(
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(nh, "odom_info", 1);
+				odomInfoSub_.subscribe(nh, "odom_info", queueSize);
 				SYNC_DECL5(depthScanDescInfo, approxSync, queueSize, imageSub_, imageDepthSub_, cameraInfoSub_, scanDescSub_, odomInfoSub_);
 			}
 			else
@@ -696,7 +696,7 @@ void CommonDataSubscriber::setupDepthCallbacks(
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(nh, "odom_info", 1);
+				odomInfoSub_.subscribe(nh, "odom_info", queueSize);
 				SYNC_DECL5(depthScan2dInfo, approxSync, queueSize, imageSub_, imageDepthSub_, cameraInfoSub_, scanSub_, odomInfoSub_);
 			}
 			else
@@ -711,7 +711,7 @@ void CommonDataSubscriber::setupDepthCallbacks(
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(nh, "odom_info", 1);
+				odomInfoSub_.subscribe(nh, "odom_info", queueSize);
 				SYNC_DECL5(depthScan3dInfo, approxSync, queueSize, imageSub_, imageDepthSub_, cameraInfoSub_, scan3dSub_, odomInfoSub_);
 			}
 			else
@@ -722,7 +722,7 @@ void CommonDataSubscriber::setupDepthCallbacks(
 		else if(subscribeOdomInfo)
 		{
 			subscribedToOdomInfo_ = true;
-			odomInfoSub_.subscribe(nh, "odom_info", 1);
+			odomInfoSub_.subscribe(nh, "odom_info", queueSize);
 			SYNC_DECL4(depthInfo, approxSync, queueSize, imageSub_, imageDepthSub_, cameraInfoSub_, odomInfoSub_);
 		}
 		else

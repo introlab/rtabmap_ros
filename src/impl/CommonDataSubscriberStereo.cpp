@@ -115,12 +115,12 @@ void CommonDataSubscriber::setupStereoCallbacks(
 
 	if(subscribeOdom)
 	{
-		odomSub_.subscribe(nh, "odom", 1);
+		odomSub_.subscribe(nh, "odom", queueSize);
 
 		if(subscribeOdomInfo)
 		{
 			subscribedToOdomInfo_ = true;
-			odomInfoSub_.subscribe(nh, "odom_info", 1);
+			odomInfoSub_.subscribe(nh, "odom_info", queueSize);
 			SYNC_DECL6(stereoOdomInfo, approxSync, queueSize, odomSub_, imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_, odomInfoSub_);
 		}
 		else
@@ -133,7 +133,7 @@ void CommonDataSubscriber::setupStereoCallbacks(
 		if(subscribeOdomInfo)
 		{
 			subscribedToOdomInfo_ = true;
-			odomInfoSub_.subscribe(nh, "odom_info", 1);
+			odomInfoSub_.subscribe(nh, "odom_info", queueSize);
 			SYNC_DECL5(stereoInfo, approxSync, queueSize, imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_, odomInfoSub_);
 		}
 		else

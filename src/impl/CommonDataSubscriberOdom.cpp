@@ -79,7 +79,7 @@ void CommonDataSubscriber::setupOdomCallbacks(
 
 	if(subscribeUserData || subscribeOdomInfo)
 	{
-		odomSub_.subscribe(nh, "odom", 1);
+		odomSub_.subscribe(nh, "odom", queueSize);
 
 #ifdef RTABMAP_SYNC_USER_DATA
 		if(subscribeUserData)
@@ -88,7 +88,7 @@ void CommonDataSubscriber::setupOdomCallbacks(
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(nh, "odom_info", 1);
+				odomInfoSub_.subscribe(nh, "odom_info", queueSize);
 				SYNC_DECL3(odomDataInfo, approxSync, queueSize, odomSub_, userDataSub_, odomInfoSub_);
 			}
 			else
@@ -101,7 +101,7 @@ void CommonDataSubscriber::setupOdomCallbacks(
 		if(subscribeOdomInfo)
 		{
 			subscribedToOdomInfo_ = true;
-			odomInfoSub_.subscribe(nh, "odom_info", 1);
+			odomInfoSub_.subscribe(nh, "odom_info", queueSize);
 			SYNC_DECL2(odomInfo, approxSync, queueSize, odomSub_, odomInfoSub_);
 		}
 	}

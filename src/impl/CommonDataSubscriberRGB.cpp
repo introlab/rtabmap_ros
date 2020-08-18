@@ -481,7 +481,7 @@ void CommonDataSubscriber::setupRGBCallbacks(
 #ifdef RTABMAP_SYNC_USER_DATA
 	if(subscribeOdom && subscribeUserData)
 	{
-		odomSub_.subscribe(nh, "odom", 1);
+		odomSub_.subscribe(nh, "odom", queueSize);
 		userDataSub_.subscribe(nh, "user_data", 1);
 
 		if(subscribeScanDesc)
@@ -491,7 +491,7 @@ void CommonDataSubscriber::setupRGBCallbacks(
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(nh, "odom_info", 1);
+				odomInfoSub_.subscribe(nh, "odom_info", queueSize);
 				SYNC_DECL6(rgbOdomDataScanDescInfo, approxSync, queueSize, odomSub_, userDataSub_, imageSub_, cameraInfoSub_, scanDescSub_, odomInfoSub_);
 			}
 			else
@@ -506,7 +506,7 @@ void CommonDataSubscriber::setupRGBCallbacks(
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(nh, "odom_info", 1);
+				odomInfoSub_.subscribe(nh, "odom_info", queueSize);
 				SYNC_DECL6(rgbOdomDataScan2dInfo, approxSync, queueSize, odomSub_, userDataSub_, imageSub_, cameraInfoSub_, scanSub_, odomInfoSub_);
 			}
 			else
@@ -521,7 +521,7 @@ void CommonDataSubscriber::setupRGBCallbacks(
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(nh, "odom_info", 1);
+				odomInfoSub_.subscribe(nh, "odom_info", queueSize);
 				SYNC_DECL6(rgbOdomDataScan3dInfo, approxSync, queueSize, odomSub_, userDataSub_, imageSub_, cameraInfoSub_, scan3dSub_, odomInfoSub_);
 			}
 			else
@@ -532,7 +532,7 @@ void CommonDataSubscriber::setupRGBCallbacks(
 		else if(subscribeOdomInfo)
 		{
 			subscribedToOdomInfo_ = true;
-			odomInfoSub_.subscribe(nh, "odom_info", 1);
+			odomInfoSub_.subscribe(nh, "odom_info", queueSize);
 			SYNC_DECL5(rgbOdomDataInfo, approxSync, queueSize, odomSub_, userDataSub_, imageSub_, cameraInfoSub_, odomInfoSub_);
 		}
 		else
@@ -544,7 +544,7 @@ void CommonDataSubscriber::setupRGBCallbacks(
 #endif		
 	if(subscribeOdom)
 	{
-		odomSub_.subscribe(nh, "odom", 1);
+		odomSub_.subscribe(nh, "odom", queueSize);
 
 		if(subscribeScanDesc)
 		{
@@ -553,7 +553,7 @@ void CommonDataSubscriber::setupRGBCallbacks(
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(nh, "odom_info", 1);
+				odomInfoSub_.subscribe(nh, "odom_info", queueSize);
 				SYNC_DECL5(rgbOdomScanDescInfo, approxSync, queueSize, odomSub_, imageSub_, cameraInfoSub_, scanDescSub_, odomInfoSub_);
 			}
 			else
@@ -568,7 +568,7 @@ void CommonDataSubscriber::setupRGBCallbacks(
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(nh, "odom_info", 1);
+				odomInfoSub_.subscribe(nh, "odom_info", queueSize);
 				SYNC_DECL5(rgbOdomScan2dInfo, approxSync, queueSize, odomSub_, imageSub_, cameraInfoSub_, scanSub_, odomInfoSub_);
 			}
 			else
@@ -583,7 +583,7 @@ void CommonDataSubscriber::setupRGBCallbacks(
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(nh, "odom_info", 1);
+				odomInfoSub_.subscribe(nh, "odom_info", queueSize);
 				SYNC_DECL5(rgbOdomScan3dInfo, approxSync, queueSize, odomSub_, imageSub_, cameraInfoSub_, scan3dSub_, odomInfoSub_);
 			}
 			else
@@ -594,7 +594,7 @@ void CommonDataSubscriber::setupRGBCallbacks(
 		else if(subscribeOdomInfo)
 		{
 			subscribedToOdomInfo_ = true;
-			odomInfoSub_.subscribe(nh, "odom_info", 1);
+			odomInfoSub_.subscribe(nh, "odom_info", queueSize);
 			SYNC_DECL4(rgbOdomInfo, approxSync, queueSize, odomSub_, imageSub_, cameraInfoSub_, odomInfoSub_);
 		}
 		else
@@ -615,7 +615,7 @@ void CommonDataSubscriber::setupRGBCallbacks(
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(nh, "odom_info", 1);
+				odomInfoSub_.subscribe(nh, "odom_info", queueSize);
 				SYNC_DECL5(rgbDataScanDescInfo, approxSync, queueSize, userDataSub_, imageSub_, cameraInfoSub_, scanDescSub_, odomInfoSub_);
 			}
 			else
@@ -631,7 +631,7 @@ void CommonDataSubscriber::setupRGBCallbacks(
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(nh, "odom_info", 1);
+				odomInfoSub_.subscribe(nh, "odom_info", queueSize);
 				SYNC_DECL5(rgbDataScan2dInfo, approxSync, queueSize, userDataSub_, imageSub_, cameraInfoSub_, scanSub_, odomInfoSub_);
 			}
 			else
@@ -646,7 +646,7 @@ void CommonDataSubscriber::setupRGBCallbacks(
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(nh, "odom_info", 1);
+				odomInfoSub_.subscribe(nh, "odom_info", queueSize);
 				SYNC_DECL5(rgbDataScan3dInfo, approxSync, queueSize, userDataSub_, imageSub_, cameraInfoSub_, scan3dSub_, odomInfoSub_);
 			}
 			else
@@ -657,7 +657,7 @@ void CommonDataSubscriber::setupRGBCallbacks(
 		else if(subscribeOdomInfo)
 		{
 			subscribedToOdomInfo_ = true;
-			odomInfoSub_.subscribe(nh, "odom_info", 1);
+			odomInfoSub_.subscribe(nh, "odom_info", queueSize);
 			SYNC_DECL4(rgbDataInfo, approxSync, queueSize, userDataSub_, imageSub_, cameraInfoSub_, odomInfoSub_);
 		}
 		else
@@ -675,7 +675,7 @@ void CommonDataSubscriber::setupRGBCallbacks(
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(nh, "odom_info", 1);
+				odomInfoSub_.subscribe(nh, "odom_info", queueSize);
 				SYNC_DECL4(rgbScanDescInfo, approxSync, queueSize, imageSub_, cameraInfoSub_, scanDescSub_, odomInfoSub_);
 			}
 			else
@@ -690,7 +690,7 @@ void CommonDataSubscriber::setupRGBCallbacks(
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(nh, "odom_info", 1);
+				odomInfoSub_.subscribe(nh, "odom_info", queueSize);
 				SYNC_DECL4(rgbScan2dInfo, approxSync, queueSize, imageSub_, cameraInfoSub_, scanSub_, odomInfoSub_);
 			}
 			else
@@ -705,7 +705,7 @@ void CommonDataSubscriber::setupRGBCallbacks(
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(nh, "odom_info", 1);
+				odomInfoSub_.subscribe(nh, "odom_info", queueSize);
 				SYNC_DECL4(rgbScan3dInfo, approxSync, queueSize, imageSub_, cameraInfoSub_, scan3dSub_, odomInfoSub_);
 			}
 			else
@@ -716,7 +716,7 @@ void CommonDataSubscriber::setupRGBCallbacks(
 		else if(subscribeOdomInfo)
 		{
 			subscribedToOdomInfo_ = true;
-			odomInfoSub_.subscribe(nh, "odom_info", 1);
+			odomInfoSub_.subscribe(nh, "odom_info", queueSize);
 			SYNC_DECL3(rgbInfo, approxSync, queueSize, imageSub_, cameraInfoSub_, odomInfoSub_);
 		}
 		else
