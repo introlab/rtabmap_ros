@@ -2900,6 +2900,8 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 {
 	NODELET_INFO("rtabmap: Publishing map...");
 
+	ros::Time now = ros::Time::now();
+
 	if(mapDataPub_.getNumSubscribers() ||
 	   (!req.graphOnly && mapsManager_.hasSubscribers()) ||
 	   (req.graphOnly && (labelsPub_.getNumSubscribers() || mapGraphPub_.getNumSubscribers() || mapPathPub_.getNumSubscribers())))
@@ -2919,7 +2921,6 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 				!req.graphOnly,
 				!req.graphOnly);
 
-		ros::Time now = ros::Time::now();
 		if(mapDataPub_.getNumSubscribers())
 		{
 			rtabmap_ros::MapDataPtr msg(new rtabmap_ros::MapData);
@@ -2997,36 +2998,44 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 			landmarksPub_.publish(msg);
 		}
 
-		if(!req.graphOnly && mapsManager_.hasSubscribers())
+		if(!req.graphOnly)
 		{
-			std::map<int, Transform> filteredPoses(poses.lower_bound(1), poses.end());
-			if(maxMappingNodes_ > 0 && filteredPoses.size()>1)
+			if(mapsManager_.hasSubscribers())
 			{
-				std::map<int, Transform> nearestPoses;
-				std::vector<int> nodes = graph::findNearestNodes(filteredPoses, filteredPoses.rbegin()->second, maxMappingNodes_);
-				for(std::vector<int>::iterator iter=nodes.begin(); iter!=nodes.end(); ++iter)
+				std::map<int, Transform> filteredPoses(poses.lower_bound(1), poses.end());
+				if(maxMappingNodes_ > 0 && filteredPoses.size()>1)
 				{
-					std::map<int, Transform>::iterator pter = filteredPoses.find(*iter);
-					if(pter != filteredPoses.end())
+					std::map<int, Transform> nearestPoses;
+					std::vector<int> nodes = graph::findNearestNodes(filteredPoses, filteredPoses.rbegin()->second, maxMappingNodes_);
+					for(std::vector<int>::iterator iter=nodes.begin(); iter!=nodes.end(); ++iter)
 					{
-						nearestPoses.insert(*pter);
+						std::map<int, Transform>::iterator pter = filteredPoses.find(*iter);
+						if(pter != filteredPoses.end())
+						{
+							nearestPoses.insert(*pter);
+						}
 					}
 				}
-			}
-			if(signatures.size())
-			{
-				filteredPoses = mapsManager_.updateMapCaches(
-						filteredPoses,
-						rtabmap_.getMemory(),
-						false,
-						false,
-						signatures);
+				if(signatures.size())
+				{
+					filteredPoses = mapsManager_.updateMapCaches(
+							filteredPoses,
+							rtabmap_.getMemory(),
+							false,
+							false,
+							signatures);
+				}
+				else
+				{
+					filteredPoses = mapsManager_.getFilteredPoses(filteredPoses);
+				}
+				mapsManager_.publishMaps(filteredPoses, now, mapFrameId_);
 			}
 			else
 			{
-				filteredPoses = mapsManager_.getFilteredPoses(filteredPoses);
+				// this will cleanup the cache if there are no subscribers
+				mapsManager_.publishMaps(std::map<int, Transform>(), now, mapFrameId_);
 			}
-			mapsManager_.publishMaps(filteredPoses, now, mapFrameId_);
 		}
 
 		bool pubPath = mapPathPub_.getNumSubscribers();
@@ -3133,6 +3142,11 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 	else
 	{
 		UWARN("No subscribers, don't need to publish!");
+		if(!req.graphOnly)
+		{
+			// this will cleanup the cache if there are no subscribers
+			mapsManager_.publishMaps(std::map<int, Transform>(), now, mapFrameId_);
+		}
 	}
 
 	return true;
