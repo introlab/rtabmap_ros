@@ -84,7 +84,7 @@ void CommonDataSubscriber::setupOdomCallbacks(
 #ifdef RTABMAP_SYNC_USER_DATA
 		if(subscribeUserData)
 		{
-			userDataSub_.subscribe(nh, "user_data", 1);
+			userDataSub_.subscribe(nh, "user_data", queueSize);
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
@@ -107,7 +107,7 @@ void CommonDataSubscriber::setupOdomCallbacks(
 	}
 	else
 	{
-		odomSubOnly_ = nh.subscribe("odom", 1, &CommonDataSubscriber::odomCallback, this);
+		odomSubOnly_ = nh.subscribe("odom", queueSize, &CommonDataSubscriber::odomCallback, this);
 		subscribedTopicsMsg_ =
 				uFormat("\n%s subscribed to:\n   %s",
 				ros::this_node::getName().c_str(),

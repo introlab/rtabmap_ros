@@ -285,24 +285,24 @@ void CommonDataSubscriber::setupScanCallbacks(
 		if(scanDescTopic)
 		{
 			subscribedToScanDescriptor_ = true;
-			scanDescSub_.subscribe(nh, "scan_descriptor", 1);
+			scanDescSub_.subscribe(nh, "scan_descriptor", queueSize);
 		}
 		else if(scan2dTopic)
 		{
 			subscribedToScan2d_ = true;
-			scanSub_.subscribe(nh, "scan", 1);
+			scanSub_.subscribe(nh, "scan", queueSize);
 		}
 		else
 		{
 			subscribedToScan3d_ = true;
-			scan3dSub_.subscribe(nh, "scan_cloud", 1);
+			scan3dSub_.subscribe(nh, "scan_cloud", queueSize);
 		}
 
 #ifdef RTABMAP_SYNC_USER_DATA
 		if(subscribeOdom && subscribeUserData)
 		{
 			odomSub_.subscribe(nh, "odom", queueSize);
-			userDataSub_.subscribe(nh, "user_data", 1);
+			userDataSub_.subscribe(nh, "user_data", queueSize);
 
 			if(scanDescTopic)
 			{
@@ -393,7 +393,7 @@ void CommonDataSubscriber::setupScanCallbacks(
 #ifdef RTABMAP_SYNC_USER_DATA
 		else if(subscribeUserData)
 		{
-			userDataSub_.subscribe(nh, "user_data", 1);
+			userDataSub_.subscribe(nh, "user_data", queueSize);
 
 			if(scanDescTopic)
 			{
@@ -459,7 +459,7 @@ void CommonDataSubscriber::setupScanCallbacks(
 		if(scanDescTopic)
 		{
 			subscribedToScanDescriptor_ = true;
-			scanDescSubOnly_ = nh.subscribe("scan_descriptor", 1, &CommonDataSubscriber::scanDescCallback, this);
+			scanDescSubOnly_ = nh.subscribe("scan_descriptor", queueSize, &CommonDataSubscriber::scanDescCallback, this);
 			subscribedTopicsMsg_ =
 					uFormat("\n%s subscribed to:\n   %s",
 					ros::this_node::getName().c_str(),
@@ -468,7 +468,7 @@ void CommonDataSubscriber::setupScanCallbacks(
 		else if(scan2dTopic)
 		{
 			subscribedToScan2d_ = true;
-			scan2dSubOnly_ = nh.subscribe("scan", 1, &CommonDataSubscriber::scan2dCallback, this);
+			scan2dSubOnly_ = nh.subscribe("scan", queueSize, &CommonDataSubscriber::scan2dCallback, this);
 			subscribedTopicsMsg_ =
 					uFormat("\n%s subscribed to:\n   %s",
 					ros::this_node::getName().c_str(),
@@ -477,7 +477,7 @@ void CommonDataSubscriber::setupScanCallbacks(
 		else
 		{
 			subscribedToScan3d_ = true;
-			scan3dSubOnly_ = nh.subscribe("scan_cloud", 1, &CommonDataSubscriber::scan3dCallback, this);
+			scan3dSubOnly_ = nh.subscribe("scan_cloud", queueSize, &CommonDataSubscriber::scan3dCallback, this);
 			subscribedTopicsMsg_ =
 					uFormat("\n%s subscribed to:\n   %s",
 					ros::this_node::getName().c_str(),

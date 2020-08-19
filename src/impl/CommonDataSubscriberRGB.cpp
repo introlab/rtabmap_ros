@@ -475,19 +475,19 @@ void CommonDataSubscriber::setupRGBCallbacks(
 	image_transport::ImageTransport rgb_it(rgb_nh);
 	image_transport::TransportHints hintsRgb("raw", ros::TransportHints(), rgb_pnh);
 
-	imageSub_.subscribe(rgb_it, rgb_nh.resolveName("image"), 1, hintsRgb);
-	cameraInfoSub_.subscribe(rgb_nh, "camera_info", 1);
+	imageSub_.subscribe(rgb_it, rgb_nh.resolveName("image"), queueSize, hintsRgb);
+	cameraInfoSub_.subscribe(rgb_nh, "camera_info", queueSize);
 
 #ifdef RTABMAP_SYNC_USER_DATA
 	if(subscribeOdom && subscribeUserData)
 	{
 		odomSub_.subscribe(nh, "odom", queueSize);
-		userDataSub_.subscribe(nh, "user_data", 1);
+		userDataSub_.subscribe(nh, "user_data", queueSize);
 
 		if(subscribeScanDesc)
 		{
 			subscribedToScanDescriptor_ = true;
-			scanDescSub_.subscribe(nh, "scan_descriptor", 1);
+			scanDescSub_.subscribe(nh, "scan_descriptor", queueSize);
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
@@ -502,7 +502,7 @@ void CommonDataSubscriber::setupRGBCallbacks(
 		else if(subscribeScan2d)
 		{
 			subscribedToScan2d_ = true;
-			scanSub_.subscribe(nh, "scan", 1);
+			scanSub_.subscribe(nh, "scan", queueSize);
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
@@ -517,7 +517,7 @@ void CommonDataSubscriber::setupRGBCallbacks(
 		else if(subscribeScan3d)
 		{
 			subscribedToScan3d_ = true;
-			scan3dSub_.subscribe(nh, "scan_cloud", 1);
+			scan3dSub_.subscribe(nh, "scan_cloud", queueSize);
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
@@ -549,7 +549,7 @@ void CommonDataSubscriber::setupRGBCallbacks(
 		if(subscribeScanDesc)
 		{
 			subscribedToScanDescriptor_ = true;
-			scanDescSub_.subscribe(nh, "scan_descriptor", 1);
+			scanDescSub_.subscribe(nh, "scan_descriptor", queueSize);
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
@@ -564,7 +564,7 @@ void CommonDataSubscriber::setupRGBCallbacks(
 		else if(subscribeScan2d)
 		{
 			subscribedToScan2d_ = true;
-			scanSub_.subscribe(nh, "scan", 1);
+			scanSub_.subscribe(nh, "scan", queueSize);
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
@@ -579,7 +579,7 @@ void CommonDataSubscriber::setupRGBCallbacks(
 		else if(subscribeScan3d)
 		{
 			subscribedToScan3d_ = true;
-			scan3dSub_.subscribe(nh, "scan_cloud", 1);
+			scan3dSub_.subscribe(nh, "scan_cloud", queueSize);
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
@@ -605,12 +605,12 @@ void CommonDataSubscriber::setupRGBCallbacks(
 #ifdef RTABMAP_SYNC_USER_DATA
 	else if(subscribeUserData)
 	{
-		userDataSub_.subscribe(nh, "user_data", 1);
+		userDataSub_.subscribe(nh, "user_data", queueSize);
 
 		if(subscribeScanDesc)
 		{
 			subscribedToScanDescriptor_ = true;
-			scanDescSub_.subscribe(nh, "scan_descriptor", 1);
+			scanDescSub_.subscribe(nh, "scan_descriptor", queueSize);
 
 			if(subscribeOdomInfo)
 			{
@@ -626,7 +626,7 @@ void CommonDataSubscriber::setupRGBCallbacks(
 		else if(subscribeScan2d)
 		{
 			subscribedToScan2d_ = true;
-			scanSub_.subscribe(nh, "scan", 1);
+			scanSub_.subscribe(nh, "scan", queueSize);
 
 			if(subscribeOdomInfo)
 			{
@@ -642,7 +642,7 @@ void CommonDataSubscriber::setupRGBCallbacks(
 		else if(subscribeScan3d)
 		{
 			subscribedToScan3d_ = true;
-			scan3dSub_.subscribe(nh, "scan_cloud", 1);
+			scan3dSub_.subscribe(nh, "scan_cloud", queueSize);
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
@@ -671,7 +671,7 @@ void CommonDataSubscriber::setupRGBCallbacks(
 		if(subscribeScanDesc)
 		{
 			subscribedToScanDescriptor_ = true;
-			scanDescSub_.subscribe(nh, "scan_descriptor", 1);
+			scanDescSub_.subscribe(nh, "scan_descriptor", queueSize);
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
@@ -686,7 +686,7 @@ void CommonDataSubscriber::setupRGBCallbacks(
 		else if(subscribeScan2d)
 		{
 			subscribedToScan2d_ = true;
-			scanSub_.subscribe(nh, "scan", 1);
+			scanSub_.subscribe(nh, "scan", queueSize);
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
@@ -701,7 +701,7 @@ void CommonDataSubscriber::setupRGBCallbacks(
 		else if(subscribeScan3d)
 		{
 			subscribedToScan3d_ = true;
-			scan3dSub_.subscribe(nh, "scan_cloud", 1);
+			scan3dSub_.subscribe(nh, "scan_cloud", queueSize);
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
