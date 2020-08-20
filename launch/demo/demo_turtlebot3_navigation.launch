@@ -31,7 +31,7 @@
   </include>
 
   <group ns="rtabmap">
-    <node pkg="rtabmap_ros" type="rgbd_sync" name="rgbd_sync" output="screen">
+    <node if="$(eval model=='waffle')" pkg="rtabmap_ros" type="rgbd_sync" name="rgbd_sync" output="screen">
       <remap from="rgb/image"         to="/camera/rgb/image_raw"/>
       <remap from="depth/image"       to="/camera/depth/image_raw"/>
       <remap from="rgb/camera_info"   to="/camera/rgb/camera_info"/>
