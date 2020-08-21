@@ -55,7 +55,7 @@
         <param name="Icp/MaxTranslation"      type="string" value="0.5"/>         
       </node>
 
-      <node name="rtabmapviz" pkg="rtabmap_ros" type="rtabmapviz" output="screen">
+      <node if="$(arg rtabmapviz)" name="rtabmapviz" pkg="rtabmap_ros" type="rtabmapviz" output="screen">
         <param name="frame_id" type="string" value="camera_base"/>
         <param name="subscribe_rgb" type="bool" value="false"/>
         <param name="subscribe_depth" type="bool" value="false"/>
