@@ -2700,9 +2700,12 @@ bool CoreWrapper::getNodeDataCallback(rtabmap_ros::GetNodeData::Request& req, rt
 			req.grid?"true":"false",
 			req.user_data?"true":"false");
 
+	if(req.ids.empty() && rtabmap_.getMemory() && rtabmap_.getMemory()->getLastWorkingSignature())
+	{
+		req.ids.push_back(rtabmap_.getMemory()->getLastWorkingSignature()->id());
+	}
 	for(size_t i=0; i<req.ids.size(); ++i)
 	{
-
 		int id = req.ids[i];
 		Signature s = rtabmap_.getSignatureCopy(id, req.images, req.scan, req.user_data, req.grid, true, true);
 
