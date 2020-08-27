@@ -500,6 +500,9 @@ IF(costmap_2d_FOUND)
     target_link_libraries(rtabmap_costmap_plugins2
       ${costmap_2d_LIBRARIES}
     )
+    add_executable(rtabmap_costmap_voxel_markers src/costmap_2d/voxel_markers.cpp)
+    target_link_libraries(rtabmap_costmap_voxel_markers ${costmap_2d_LIBRARIES})
+    set_target_properties(rtabmap_costmap_voxel_markers PROPERTIES OUTPUT_NAME "voxel_markers")
 ENDIF(costmap_2d_FOUND)
 
 #############
@@ -600,6 +603,7 @@ IF(costmap_2d_FOUND)
     install(TARGETS 
        rtabmap_costmap_plugins
        rtabmap_costmap_plugins2
+       rtabmap_costmap_voxel_markers
        ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
        LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
        RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

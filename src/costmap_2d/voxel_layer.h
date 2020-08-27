@@ -54,8 +54,6 @@
 #include <costmap_2d/obstacle_layer.h>
 #include <voxel_grid/voxel_grid.h>
 
-using costmap_2d::VoxelPluginConfig;
-
 namespace rtabmap_ros
 {
 
@@ -65,7 +63,6 @@ public:
   VoxelLayer() :
       voxel_grid_(0, 0, 0)
   {
-
     costmap_ = NULL;  // this is the unsigned char* member of parent class's parent class Costmap2D.
   }
 
@@ -83,18 +80,19 @@ public:
   virtual void matchSize();
   virtual void reset();
 
+
 protected:
   virtual void setupDynamicReconfigure(ros::NodeHandle& nh);
 
   virtual void resetMaps();
 
 private:
-  void reconfigureCB(VoxelPluginConfig &config, uint32_t level);
+  void reconfigureCB(costmap_2d::VoxelPluginConfig &config, uint32_t level);
   void clearNonLethal(double wx, double wy, double w_size_x, double w_size_y, bool clear_no_info);
   virtual void raytraceFreespace(const costmap_2d::Observation& clearing_observation, double* min_x, double* min_y,
                                  double* max_x, double* max_y);
 
-  dynamic_reconfigure::Server<VoxelPluginConfig> *voxel_dsrv_;
+  dynamic_reconfigure::Server<costmap_2d::VoxelPluginConfig> *voxel_dsrv_;
 
   bool publish_voxel_;
   std::string robot_base_frame_;
@@ -109,11 +107,9 @@ private:
   {
     if (wx < origin_x_ || wy < origin_y_ || wz < origin_z_)
       return false;
-
     mx = ((wx - origin_x_) / resolution_);
     my = ((wy - origin_y_) / resolution_);
     mz = ((wz - origin_z_) / z_resolution_);
-
     if (mx < size_x_ && my < size_y_ && mz < size_z_)
       return true;
 
@@ -168,7 +164,6 @@ private:
                        unsigned int dm_lower_left_y, unsigned int dm_size_x, unsigned int region_size_x,
                        unsigned int region_size_y, int z_shift)
     {
-
         // we'll first need to compute the starting points for each map
         // this is like getting voxel column. We are not taking into account the z position of the voxel
         data_type* sm_index = source_map + (sm_lower_left_y * sm_size_x + sm_lower_left_x);
@@ -181,18 +176,24 @@ private:
         for (unsigned int i = 0; i < region_size_y; ++i)
         {
             memcpy(dm_index, sm_index, region_size_x * sizeof(data_type));
-            for (unsigned int j = 0; j < dm_size_x; j++) {
-                if (z_shift > 0) {
-                    dm_index[j] = ((dm_index[j] & marked_bits_mask) >> z_shift & marked_bits_mask) |
-                                  ((~((data_type) 0) << sizeof(data_type) * 4 - z_shift) |
-                                   (dm_index[j] & unknown_bits_mask) >> z_shift) & unknown_bits_mask;
+            for (unsigned int j = 0; j < region_size_x; j++) {
+            	// known marked: 11 = 2 bits, unknown: 01 = 1 bit, known free: 00 = 0 bits
+				if (z_shift > 0) {
+					dm_index[j] =
+							// Shift marked cells, insert zeros for new unknowns
+							((dm_index[j] & marked_bits_mask) >> z_shift & marked_bits_mask) |
+							// Shift empty/unknown cells, insert ones for new unknowns
+						    (((dm_index[j] & unknown_bits_mask) >> z_shift | (~((data_type) 0) << sizeof(data_type) * 4 - z_shift)) & unknown_bits_mask);
 
-                } else if (z_shift < 0) {
-                    dm_index[j] = (dm_index[j] & marked_bits_mask) << z_shift * -1 |
-                                  (dm_index[j] << z_shift * -1 & unknown_bits_mask |
-                                   ~(~((unsigned int) 0) << z_shift * -1));
-                }
-            }
+				} else if (z_shift < 0) {
+					dm_index[j] =
+							// Shift marked cells, insert zeros for new unknowns
+							(dm_index[j] & marked_bits_mask) << z_shift * -1 |
+							// Shift empty/unknown cells, insert ones for new unknowns
+						    ((dm_index[j] << z_shift * -1 & unknown_bits_mask) | ~(~((data_type) 0) << z_shift * -1));
+				}
+			}
+
             dm_index += dm_size_x;
             sm_index += sm_size_x;
         }

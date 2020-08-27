@@ -48,10 +48,8 @@ using costmap_2d::NO_INFORMATION;
 using costmap_2d::LETHAL_OBSTACLE;
 using costmap_2d::FREE_SPACE;
 
-using costmap_2d::Costmap2D;
 using costmap_2d::ObservationBuffer;
 using costmap_2d::Observation;
-using costmap_2d::VoxelGrid;
 
 
 namespace rtabmap_ros
@@ -62,22 +60,23 @@ void VoxelLayer::onInitialize()
   ObstacleLayer::onInitialize();
   ros::NodeHandle private_nh("~/" + name_);
   
-  std::string costmap_name_ = name_.substr(0, name_.find("/"));
-  ros::NodeHandle pnh("~/" + costmap_name_);
+  std::string costmap_name = name_.substr(0, name_.find("/"));
+  ros::NodeHandle pnh("~/" + costmap_name);
 
   private_nh.param("publish_voxel_map", publish_voxel_, false);
-  pnh.param("robot_frame", robot_base_frame_, std::string("base_link"));
+  // param from parent costmap group
+  pnh.param("robot_base_frame", robot_base_frame_, std::string("base_link"));
 
   if (publish_voxel_)
-    voxel_pub_ = private_nh.advertise <VoxelGrid > ("voxel_grid", 1);
+    voxel_pub_ = private_nh.advertise < costmap_2d::VoxelGrid > ("voxel_grid", 1);
 
   clearing_endpoints_pub_ = private_nh.advertise<sensor_msgs::PointCloud>("clearing_endpoints", 1);
 }
 
 void VoxelLayer::setupDynamicReconfigure(ros::NodeHandle& nh)
 {
-  voxel_dsrv_ = new dynamic_reconfigure::Server<VoxelPluginConfig>(nh);
-  dynamic_reconfigure::Server<VoxelPluginConfig>::CallbackType cb = boost::bind(
+  voxel_dsrv_ = new dynamic_reconfigure::Server<costmap_2d::VoxelPluginConfig>(nh);
+  dynamic_reconfigure::Server<costmap_2d::VoxelPluginConfig>::CallbackType cb = boost::bind(
       &VoxelLayer::reconfigureCB, this, _1, _2);
   voxel_dsrv_->setCallback(cb);
 }
@@ -88,7 +87,7 @@ VoxelLayer::~VoxelLayer()
     delete voxel_dsrv_;
 }
 
-void VoxelLayer::reconfigureCB(VoxelPluginConfig &config, uint32_t level)
+void VoxelLayer::reconfigureCB(costmap_2d::VoxelPluginConfig &config, uint32_t level)
 {
   enabled_ = config.enabled;
   footprint_clearing_enabled_ = config.footprint_clearing_enabled;
@@ -106,7 +105,7 @@ void VoxelLayer::matchSize()
 {
   ObstacleLayer::matchSize();
   voxel_grid_.resize(size_x_, size_y_, size_z_);
- // ROS_ASSERT(voxel_grid_.sizeX() == size_x_ && voxel_grid_.sizeY() == size_y_ && voxel_grid_.sizeZ() == size_z_);
+  ROS_ASSERT(voxel_grid_.sizeX() == size_x_ && voxel_grid_.sizeY() == size_y_);
 }
 
 void VoxelLayer::reset()
@@ -126,13 +125,10 @@ void VoxelLayer::resetMaps()
 void VoxelLayer::updateBounds(double robot_x, double robot_y, double robot_yaw, double* min_x,
                                        double* min_y, double* max_x, double* max_y)
 {
-  if (rolling_window_) {
-      updateOrigin(robot_x - getSizeInMetersX() / 2, robot_y - getSizeInMetersY() / 2 );
-  }
-
+  if (rolling_window_)
+    updateOrigin(robot_x - getSizeInMetersX() / 2, robot_y - getSizeInMetersY() / 2);
   if (!enabled_)
     return;
-
   useExtraBounds(min_x, min_y, max_x, max_y);
 
   bool current = true;
@@ -195,7 +191,7 @@ void VoxelLayer::updateBounds(double robot_x, double robot_y, double robot_yaw, 
 
   if (publish_voxel_)
   {
-    VoxelGrid grid_msg;
+    costmap_2d::VoxelGrid grid_msg;
     unsigned int size = voxel_grid_.sizeX() * voxel_grid_.sizeY();
     grid_msg.size_x = voxel_grid_.sizeX();
     grid_msg.size_y = voxel_grid_.sizeY();
@@ -404,86 +400,89 @@ void VoxelLayer::raytraceFreespace(const Observation& clearing_observation, doub
 
 void VoxelLayer::updateOrigin(double new_origin_x, double new_origin_y)
 {
-    int cell_oz;
-    // get the global pose of the robot
-    try
-    {
-        geometry_msgs::TransformStamped transformStamped;
+  int cell_oz;
+  // get the global pose of the robot
+  try
+  {
+      geometry_msgs::TransformStamped transformStamped;
 #ifdef COSTMAP_2D_POINTCLOUD2
-        transformStamped = tf_->lookupTransform(global_frame_, robot_base_frame_, ros::Time(0));
+      transformStamped = tf_->lookupTransform(global_frame_, robot_base_frame_, ros::Time(0));
 #else
-        tf::StampedTransform stampedTransform;
-        tf_->lookupTransform(global_frame_, robot_base_frame_, ros::Time(0), stampedTransform);
-        tf::transformStampedTFToMsg(stampedTransform, transformStamped);
+      tf::StampedTransform stampedTransform;
+      tf_->lookupTransform(global_frame_, robot_base_frame_, ros::Time(0), stampedTransform);
+      tf::transformStampedTFToMsg(stampedTransform, transformStamped);
 #endif
-        const double robot_z = transformStamped.transform.translation.z;
-        const double z_grid_height = z_resolution_ * size_z_;
-        const double new_origin_z = robot_z - z_grid_height / 2;
-        cell_oz = int((new_origin_z - origin_z_) / z_resolution_);
-    }
+      const double robot_z = transformStamped.transform.translation.z;
+      const double z_grid_height = z_resolution_ * size_z_;
+      const double new_origin_z = robot_z - z_grid_height / 2;
+      cell_oz = int((new_origin_z - origin_z_) / z_resolution_);
+  }
 #ifdef COSTMAP_2D_POINTCLOUD2
-    catch (tf2::TransformException& ex)
+  catch (tf2::TransformException& ex)
 #else
-    catch(tf::TransformException& ex)
+  catch(tf::TransformException& ex)
 #endif
-    {
-        ROS_ERROR("%s", ex.what());
-        // If the robot pose is not detected, the origin_z_ will remain the same.
-        cell_oz = 0;
-    }
+  {
+      ROS_ERROR("%s", ex.what());
+      // If the robot pose is not detected, the origin_z_ will remain the same.
+      cell_oz = 0;
+  }
 
-    // project the new origin into the grid
-    int cell_ox, cell_oy;
-    cell_ox = int((new_origin_x - origin_x_) / resolution_);
-    cell_oy = int((new_origin_y - origin_y_) / resolution_);
+  // project the new origin into the grid
+  int cell_ox, cell_oy;
+  cell_ox = int((new_origin_x - origin_x_) / resolution_);
+  cell_oy = int((new_origin_y - origin_y_) / resolution_);
 
-    // compute the associated world coordinates for the origin cell
-    // because we want to keep things grid-aligned
-    double new_grid_ox, new_grid_oy, new_grid_oz;
-    new_grid_ox = origin_x_ + cell_ox * resolution_;
-    new_grid_oy = origin_y_ + cell_oy * resolution_;
-    new_grid_oz = origin_z_ + cell_oz * z_resolution_;
+  // compute the associated world coordinates for the origin cell
+  // because we want to keep things grid-aligned
+  double new_grid_ox, new_grid_oy, new_grid_oz;
+  new_grid_ox = origin_x_ + cell_ox * resolution_;
+  new_grid_oy = origin_y_ + cell_oy * resolution_;
+  new_grid_oz = origin_z_ + cell_oz * z_resolution_;
 
-    // to avoid casting from unsigned int to int a bunch of times
-    int size_x = size_x_;
-    int size_y = size_y_;
+  // to avoid casting from unsigned int to int a bunch of times
+  int size_x = size_x_;
+  int size_y = size_y_;
 
-    // we need to compute the overlap of the new and existing windows
-    int lower_left_x, lower_left_y, upper_right_x, upper_right_y;
-    lower_left_x = std::min(std::max(cell_ox, 0), size_x);
-    lower_left_y = std::min(std::max(cell_oy, 0), size_y);
-    upper_right_x = std::min(std::max(cell_ox + size_x, 0), size_x);
-    upper_right_y = std::min(std::max(cell_oy + size_y, 0), size_y);
+  // we need to compute the overlap of the new and existing windows
+  int lower_left_x, lower_left_y, upper_right_x, upper_right_y;
+  lower_left_x = std::min(std::max(cell_ox, 0), size_x);
+  lower_left_y = std::min(std::max(cell_oy, 0), size_y);
+  upper_right_x = std::min(std::max(cell_ox + size_x, 0), size_x);
+  upper_right_y = std::min(std::max(cell_oy + size_y, 0), size_y);
 
-    unsigned int cell_size_x = upper_right_x - lower_left_x;
-    unsigned int cell_size_y = upper_right_y - lower_left_y;
+  unsigned int cell_size_x = upper_right_x - lower_left_x;
+  unsigned int cell_size_y = upper_right_y - lower_left_y;
 
-    // we need a map to store the obstacles in the window temporarily
-    //unsigned char* local_map = new unsigned char[cell_size_x * cell_size_y];
-    unsigned int* local_voxel_map = new unsigned int[cell_size_x * cell_size_y];
-    unsigned int* voxel_map = voxel_grid_.getData();
+  // we need a map to store the obstacles in the window temporarily
+  unsigned char* local_map = new unsigned char[cell_size_x * cell_size_y];
+  unsigned int* local_voxel_map = new unsigned int[cell_size_x * cell_size_y];
+  unsigned int* voxel_map = voxel_grid_.getData();
 
-    // copy the local window in the costmap to the local map
-    copyMapRegion(voxel_map, lower_left_x, lower_left_y, size_x_, local_voxel_map, 0, 0, cell_size_x, cell_size_x,
+  // copy the local window in the costmap to the local map
+  copyMapRegion(costmap_, lower_left_x, lower_left_y, size_x_, local_map, 0, 0, cell_size_x, cell_size_x, cell_size_y);
+  copyMapRegion(voxel_map, lower_left_x, lower_left_y, size_x_, local_voxel_map, 0, 0, cell_size_x, cell_size_x,
                 cell_size_y);
 
-    // we'll reset our maps to unknown space if appropriate
-    resetMaps();
+  // we'll reset our maps to unknown space if appropriate
+  resetMaps();
 
-    // update the origin with the appropriate world coordinates
-    origin_x_ = new_grid_ox;
-    origin_y_ = new_grid_oy;
-    origin_z_ = new_grid_oz;
+  // update the origin with the appropriate world coordinates
+  origin_x_ = new_grid_ox;
+  origin_y_ = new_grid_oy;
+  origin_z_ = new_grid_oz;
 
-    // compute the starting cell location for copying data back in
-    int start_x = lower_left_x - cell_ox;
-    int start_y = lower_left_y - cell_oy;
+  // compute the starting cell location for copying data back in
+  int start_x = lower_left_x - cell_ox;
+  int start_y = lower_left_y - cell_oy;
 
-    // now we want to copy the overlapping information back into the map, but in its new location
-    copyMapRegion3D(local_voxel_map, 0, 0, cell_size_x, voxel_map, start_x, start_y, size_x_, cell_size_x, cell_size_y, cell_oz);
+  // now we want to copy the overlapping information back into the map, but in its new location
+  copyMapRegion(local_map, 0, 0, cell_size_x, costmap_, start_x, start_y, size_x_, cell_size_x, cell_size_y);
+  copyMapRegion3D(local_voxel_map, 0, 0, cell_size_x, voxel_map, start_x, start_y, size_x_, cell_size_x, cell_size_y, cell_oz);
 
-    // make sure to clean up
-    delete[] local_voxel_map;
+  // make sure to clean up
+  delete[] local_map;
+  delete[] local_voxel_map;
 }
 
 }  // namespace rtabmap_ros
