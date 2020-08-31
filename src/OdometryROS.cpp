@@ -530,7 +530,7 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 			// keep in cache to process later when we will receive imu msgs
 			if(bufferedData_.isValid())
 			{
-				NODELET_ERROR("Overwriting previous data! Make sure IMU is published faster than data rate.");
+				NODELET_ERROR("Overwriting previous data! Make sure IMU is published faster than data rate. (last image stamp buffered=%f and new one is %f, last imu stamp received=%f)", bufferedData_.stamp(), data.stamp(), imus_.empty()?0:imus_.rbegin()->first);
 			}
 			bufferedData_ = data;
 			return;
