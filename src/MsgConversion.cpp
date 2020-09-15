@@ -445,6 +445,7 @@ void infoToROS(const rtabmap::Statistics & stats, rtabmap_ros::Info & info)
 	info.refId = stats.refImageId();
 	info.loopClosureId = stats.loopClosureId();
 	info.proximityDetectionId = stats.proximityDetectionId();
+	info.landmarkId =  static_cast<int>(uValue(stats.data(), rtabmap::Statistics::kLoopLandmark_detected(), 0.0f));
 
 	rtabmap_ros::transformToGeometryMsg(stats.loopClosureTransform(), info.loopClosureTransform);
 

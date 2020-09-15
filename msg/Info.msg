@@ -8,6 +8,7 @@ Header header
 int32 refId
 int32 loopClosureId
 int32 proximityDetectionId
+int32 landmarkId
 
 geometry_msgs/Transform loopClosureTransform
 
