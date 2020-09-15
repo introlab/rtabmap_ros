@@ -2966,12 +2966,12 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 
 		bool pubLabels = labelsPub_.getNumSubscribers();
 		visualization_msgs::MarkerArray markers;
-		if((landmarksPub_.getNumSubscribers() || pubLabels) && !poses.empty() && poses.begin()->first < 0)
+		if((landmarksPub_.getNumSubscribers() || pubLabels) && !poses.empty() && poses.begin()->first > 0)
 		{
 			geometry_msgs::PoseArrayPtr msg(new geometry_msgs::PoseArray);
 			msg->header.stamp = now;
 			msg->header.frame_id = mapFrameId_;
-			for(std::map<int, Transform>::const_iterator iter=poses.begin(); iter!=poses.end() && iter->first<0; ++iter)
+			for(std::map<int, Transform>::const_iterator iter=poses.begin(); iter!=poses.end() && iter->first>0; ++iter)
 			{
 				geometry_msgs::Pose p;
 				rtabmap_ros::transformToPoseMsg(iter->second, p);
@@ -3502,12 +3502,12 @@ void CoreWrapper::publishStats(const ros::Time & stamp)
 
 	bool pubLabels = labelsPub_.getNumSubscribers();
 	visualization_msgs::MarkerArray markers;
-	if((landmarksPub_.getNumSubscribers() || pubLabels) && !stats.poses().empty() && stats.poses().begin()->first < 0)
+	if((landmarksPub_.getNumSubscribers() || pubLabels) && !stats.poses().empty() && stats.poses().begin()->first > 0)
 	{
 		geometry_msgs::PoseArrayPtr msg(new geometry_msgs::PoseArray);
 		msg->header.stamp = stamp;
 		msg->header.frame_id = mapFrameId_;
-		for(std::map<int, Transform>::const_iterator iter=stats.poses().begin(); iter!=stats.poses().end() && iter->first<0; ++iter)
+		for(std::map<int, Transform>::const_iterator iter=stats.poses().begin(); iter!=stats.poses().end() && iter->first>0; ++iter)
 		{
 			geometry_msgs::Pose p;
 			rtabmap_ros::transformToPoseMsg(iter->second, p);
