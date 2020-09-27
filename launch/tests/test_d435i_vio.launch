@@ -1,6 +1,8 @@
 <launch>
 
-<!-- Example usage of RTAB-Map with VINS-Fusion support for realsense D435i -->
+<!-- Example usage of RTAB-Map with VINS-Fusion support for realsense D435i.
+     Make sure to disable the IR emitter or put a tape on the IR emitter to 
+     avoid VINS tracking the fixed IR points (that would cause large drifts) -->
 
 <arg name="rtabmapviz" default="true"/>
 <arg name="rviz"       default="false"/>
