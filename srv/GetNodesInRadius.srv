@@ -1,0 +1,21 @@
+#request
+
+# If target pose and node_id are all zeros, poses 
+# around the latest node in the graph are returned.
+# If node_id is not zero, target pose is ignored.
+
+# Node id
+int32 node_id
+
+# Target pose:
+float32 x
+float32 y
+float32 z
+
+# Radius, <=0 means that RGBD/LocalRadius will be used
+float32 radius
+
+---
+#response
+int32[] ids
+geometry_msgs/Pose[] poses

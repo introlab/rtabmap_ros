@@ -61,6 +61,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtabmap_ros/CommonDataSubscriber.h"
 #include "rtabmap_ros/OdomInfo.h"
 #include "rtabmap_ros/AddLink.h"
+#include "rtabmap_ros/GetNodesInRadius.h"
 
 #include "MapsManager.h"
 
@@ -210,6 +211,7 @@ private:
 	bool setLabelCallback(rtabmap_ros::SetLabel::Request& req, rtabmap_ros::SetLabel::Response& res);
 	bool listLabelsCallback(rtabmap_ros::ListLabels::Request& req, rtabmap_ros::ListLabels::Response& res);
 	bool addLinkCallback(rtabmap_ros::AddLink::Request&, rtabmap_ros::AddLink::Response&);
+	bool getNodesInRadiusCallback(rtabmap_ros::GetNodesInRadius::Request&, rtabmap_ros::GetNodesInRadius::Response&);
 #ifdef WITH_OCTOMAP_MSGS
 	bool octomapBinaryCallback(octomap_msgs::GetOctomap::Request  &req, octomap_msgs::GetOctomap::Response &res);
 	bool octomapFullCallback(octomap_msgs::GetOctomap::Request  &req, octomap_msgs::GetOctomap::Response &res);
@@ -319,6 +321,7 @@ private:
 	ros::ServiceServer setLabelSrv_;
 	ros::ServiceServer listLabelsSrv_;
 	ros::ServiceServer addLinkSrv_;
+	ros::ServiceServer getNodesInRadiusSrv_;
 #ifdef WITH_OCTOMAP_MSGS
 	ros::ServiceServer octomapBinarySrv_;
 	ros::ServiceServer octomapFullSrv_;
