@@ -654,7 +654,9 @@ void OdometryROS::processData(const SensorData & data, const rclcpp::Time & stam
 			for(std::map<int, cv::Point3f>::const_iterator iter=info.localMap.begin(); iter!=info.localMap.end(); ++iter)
 			{
 				bool inlier = info.words.find(iter->first) != info.words.end();
-				pcl::PointXYZRGB pt(inlier?0:255, 255, 0);
+				pcl::PointXYZRGB pt;
+				pt.r = inlier?0:255;
+				pt.g = 255;
 				pt.x = iter->second.x;
 				pt.y = iter->second.y;
 				pt.z = iter->second.z;

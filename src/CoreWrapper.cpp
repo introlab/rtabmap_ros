@@ -1883,10 +1883,10 @@ void CoreWrapper::process(
 				if(maxMappingNodes_ > 0 && filteredPoses.size()>1)
 				{
 					std::map<int, Transform> nearestPoses;
-					std::vector<int> nodes = graph::findNearestNodes(filteredPoses, mapToOdom_*odom, maxMappingNodes_);
-					for(std::vector<int>::iterator iter=nodes.begin(); iter!=nodes.end(); ++iter)
+					std::map<int, float> nodes = graph::findNearestNodes(filteredPoses, mapToOdom_*odom, maxMappingNodes_);
+					for(std::map<int, float>::iterator iter=nodes.begin(); iter!=nodes.end(); ++iter)
 					{
-						std::map<int, Transform>::iterator pter = filteredPoses.find(*iter);
+						std::map<int, Transform>::iterator pter = filteredPoses.find(iter->first);
 						if(pter != filteredPoses.end())
 						{
 							nearestPoses.insert(*pter);
@@ -2770,10 +2770,10 @@ void CoreWrapper::publishMapCallback(
 			if(maxMappingNodes_ > 0 && filteredPoses.size()>1)
 			{
 				std::map<int, Transform> nearestPoses;
-				std::vector<int> nodes = graph::findNearestNodes(filteredPoses, filteredPoses.rbegin()->second, maxMappingNodes_);
-				for(std::vector<int>::iterator iter=nodes.begin(); iter!=nodes.end(); ++iter)
+				std::map<int, float> nodes = graph::findNearestNodes(filteredPoses, filteredPoses.rbegin()->second, maxMappingNodes_);
+				for(std::map<int, float>::iterator iter=nodes.begin(); iter!=nodes.end(); ++iter)
 				{
-					std::map<int, Transform>::iterator pter = filteredPoses.find(*iter);
+					std::map<int, Transform>::iterator pter = filteredPoses.find(iter->first);
 					if(pter != filteredPoses.end())
 					{
 						nearestPoses.insert(*pter);
