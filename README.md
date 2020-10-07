@@ -22,8 +22,10 @@ RTAB-Map's ROS2 package (branch `ros2`). **UNDER CONSTRUCTION**: currently most 
     ```
 
 # Example
-    ```bash
-    $ ros2 launch turtlebot3_gazebo turtlebot3_world.launch.py
-    $ ros2 launch rtabmap_ros turtlebot3_scan.launch.py
-    ```
+```bash
+$ export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:~/ros2_ws/src/turtlebot3_simulations/turtlebot3_gazebo/models
+$ export TURTLEBOT3_MODEL=waffle
+$ ros2 launch turtlebot3_gazebo turtlebot3_world.launch.py
+$ ros2 launch rtabmap_ros turtlebot3_scan.launch.py
+```
 
