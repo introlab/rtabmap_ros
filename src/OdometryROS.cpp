@@ -72,7 +72,6 @@ OdometryROS::OdometryROS(bool stereoParams, bool visParams, bool icpParams) :
 	waitForTransform_(true),
 	waitForTransformDuration_(0.1), // 100 ms
 	publishNullWhenLost_(true),
-	// publishOdomInfo_(true),
 	paused_(false),
 	resetCountdown_(0),
 	resetCurrentCount_(0),
@@ -900,20 +899,22 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 
 	if(!data.imageRaw().empty() || !data.laserScanRaw().isEmpty())
 	{
-		if(visParams_ && publishOdomInfo_)
-		{
-			if(icpParams_)
+		if(publishOdomInfo_){
+			if(visParams_)
 			{
-				NODELET_INFO( "Odom: quality=%d, ratio=%f, std dev=%fm|%frad, update time=%fs", info.reg.inliers, info.reg.icpInliersRatio, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (ros::WallTime::now()-time).toSec());
+				if(icpParams_)
+				{
+					NODELET_INFO( "Odom: quality=%d, ratio=%f, std dev=%fm|%frad, update time=%fs", info.reg.inliers, info.reg.icpInliersRatio, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (ros::WallTime::now()-time).toSec());
+				}
+				else
+				{
+					NODELET_INFO( "Odom: quality=%d, std dev=%fm|%frad, update time=%fs", info.reg.inliers, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (ros::WallTime::now()-time).toSec());
+				}
 			}
-			else
+			else  // if(icpParams_)
 			{
-				NODELET_INFO( "Odom: quality=%d, std dev=%fm|%frad, update time=%fs", info.reg.inliers, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (ros::WallTime::now()-time).toSec());
+				NODELET_INFO( "Odom: ratio=%f, std dev=%fm|%frad, update time=%fs", info.reg.icpInliersRatio, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (ros::WallTime::now()-time).toSec());
 			}
-		}
-		else if(publishOdomInfo_) // if(icpParams_)
-		{
-			NODELET_INFO( "Odom: ratio=%f, std dev=%fm|%frad, update time=%fs", info.reg.icpInliersRatio, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (ros::WallTime::now()-time).toSec());
 		}
 		previousStamp_ = stamp.toSec();
 	}
