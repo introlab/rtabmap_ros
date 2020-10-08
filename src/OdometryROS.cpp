@@ -83,7 +83,8 @@ OdometryROS::OdometryROS(bool stereoParams, bool visParams, bool icpParams) :
 	maxUpdateRate_(0.0),
 	odomStrategy_(Parameters::defaultOdomStrategy()),
 	waitIMUToinit_(false),
-	imuProcessed_(false)
+	imuProcessed_(false),
+	printOdomInfo_(true)
 {
 
 }
@@ -136,7 +137,7 @@ void OdometryROS::onInit()
 	pnh.param("ground_truth_base_frame_id", groundTruthBaseFrameId_, frameId_);
 	pnh.param("config_path", configPath, configPath);
 	pnh.param("publish_null_when_lost", publishNullWhenLost_, publishNullWhenLost_);
-	pnh.param("print_odom_info", printOdomInfo_, printOdomInfo_);
+	pnh.param("print_odom_info", printOdomInfo_, printOdomInfo_); // print odom stats, std dev 
 	if(pnh.hasParam("guess_from_tf"))
 	{
 		if(!pnh.hasParam("guess_frame_id"))
