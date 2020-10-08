@@ -136,7 +136,7 @@ void OdometryROS::onInit()
 	pnh.param("ground_truth_base_frame_id", groundTruthBaseFrameId_, frameId_);
 	pnh.param("config_path", configPath, configPath);
 	pnh.param("publish_null_when_lost", publishNullWhenLost_, publishNullWhenLost_);
-	pnh.param("publish_odom_info", publishOdomInfo_, publishOdomInfo_);
+	pnh.param("print_odom_info", printOdomInfo_, printOdomInfo_);
 	if(pnh.hasParam("guess_from_tf"))
 	{
 		if(!pnh.hasParam("guess_frame_id"))
@@ -899,7 +899,7 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 
 	if(!data.imageRaw().empty() || !data.laserScanRaw().isEmpty())
 	{
-		if(publishOdomInfo_){
+		if(printOdomInfo_){
 			if(visParams_)
 			{
 				if(icpParams_)
