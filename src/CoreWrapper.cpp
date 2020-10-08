@@ -617,6 +617,7 @@ void CoreWrapper::onInit()
 	setLabelSrv_ = nh.advertiseService("set_label", &CoreWrapper::setLabelCallback, this);
 	listLabelsSrv_ = nh.advertiseService("list_labels", &CoreWrapper::listLabelsCallback, this);
 	addLinkSrv_ = nh.advertiseService("add_link", &CoreWrapper::addLinkCallback, this);
+	getNodesInRadiusSrv_ = nh.advertiseService("get_nodes_in_radius", &CoreWrapper::getNodesInRadiusCallback, this);
 #ifdef WITH_OCTOMAP_MSGS
 #ifdef RTABMAP_OCTOMAP
 	octomapBinarySrv_ = nh.advertiseService("octomap_binary", &CoreWrapper::octomapBinaryCallback, this);
@@ -1992,10 +1993,10 @@ void CoreWrapper::process(
 				if(maxMappingNodes_ > 0 && filteredPoses.size()>1)
 				{
 					std::map<int, Transform> nearestPoses;
-					std::vector<int> nodes = graph::findNearestNodes(filteredPoses, mapToOdom_*odom, maxMappingNodes_);
-					for(std::vector<int>::iterator iter=nodes.begin(); iter!=nodes.end(); ++iter)
+					std::map<int, float> nodes = graph::findNearestNodes(filteredPoses, mapToOdom_*odom, maxMappingNodes_);
+					for(std::map<int, float>::iterator iter=nodes.begin(); iter!=nodes.end(); ++iter)
 					{
-						std::map<int, Transform>::iterator pter = filteredPoses.find(*iter);
+						std::map<int, Transform>::iterator pter = filteredPoses.find(iter->first);
 						if(pter != filteredPoses.end())
 						{
 							nearestPoses.insert(*pter);
@@ -3020,10 +3021,10 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 				if(maxMappingNodes_ > 0 && filteredPoses.size()>1)
 				{
 					std::map<int, Transform> nearestPoses;
-					std::vector<int> nodes = graph::findNearestNodes(filteredPoses, filteredPoses.rbegin()->second, maxMappingNodes_);
-					for(std::vector<int>::iterator iter=nodes.begin(); iter!=nodes.end(); ++iter)
+					std::map<int, float> nodes = graph::findNearestNodes(filteredPoses, filteredPoses.rbegin()->second, maxMappingNodes_);
+					for(std::map<int, float>::iterator iter=nodes.begin(); iter!=nodes.end(); ++iter)
 					{
-						std::map<int, Transform>::iterator pter = filteredPoses.find(*iter);
+						std::map<int, Transform>::iterator pter = filteredPoses.find(iter->first);
 						if(pter != filteredPoses.end())
 						{
 							nearestPoses.insert(*pter);
@@ -3418,6 +3419,35 @@ bool CoreWrapper::addLinkCallback(rtabmap_ros::AddLink::Request& req, rtabmap_ro
 		return true;
 	}
 	return false;
+}
+
+bool CoreWrapper::getNodesInRadiusCallback(rtabmap_ros::GetNodesInRadius::Request& req, rtabmap_ros::GetNodesInRadius::Response& res)
+{
+	ROS_INFO("Get nodes in radius (%f): node_id=%d pose=(%f,%f,%f)", req.radius, req.node_id, req.x, req.y, req.z);
+	std::map<int, Transform> poses;
+	if(req.node_id != 0 || (req.x == 0.0f && req.y == 0.0f && req.z == 0.0f))
+	{
+		poses = rtabmap_.getNodesInRadius(req.node_id, req.radius);
+	}
+	else
+	{
+		poses = rtabmap_.getNodesInRadius(Transform(req.x, req.y, req.z, 0,0,0), req.radius);
+	}
+
+	//Optimized graph
+	res.ids.resize(poses.size());
+	res.poses.resize(poses.size());
+	int index = 0;
+	for(std::map<int, rtabmap::Transform>::const_iterator iter = poses.begin();
+		iter != poses.end();
+		++iter)
+	{
+		res.ids[index] = iter->first;
+		transformToPoseMsg(iter->second, res.poses[index]);
+		++index;
+	}
+
+	return true;
 }
 
 void CoreWrapper::publishStats(const ros::Time & stamp)
@@ -3868,10 +3898,10 @@ bool CoreWrapper::octomapBinaryCallback(
 	if(maxMappingNodes_ > 0 && poses.size()>1)
 	{
 		std::map<int, Transform> nearestPoses;
-		std::vector<int> nodes = graph::findNearestNodes(poses, poses.rbegin()->second, maxMappingNodes_);
-		for(std::vector<int>::iterator iter=nodes.begin(); iter!=nodes.end(); ++iter)
+		std::map<int, float> nodes = graph::findNearestNodes(poses, poses.rbegin()->second, maxMappingNodes_);
+		for(std::map<int, float>::iterator iter=nodes.begin(); iter!=nodes.end(); ++iter)
 		{
-			std::map<int, Transform>::iterator pter = poses.find(*iter);
+			std::map<int, Transform>::iterator pter = poses.find(iter->first);
 			if(pter != poses.end())
 			{
 				nearestPoses.insert(*pter);
@@ -3899,10 +3929,10 @@ bool CoreWrapper::octomapFullCallback(
 	if(maxMappingNodes_ > 0 && poses.size()>1)
 	{
 		std::map<int, Transform> nearestPoses;
-		std::vector<int> nodes = graph::findNearestNodes(poses, poses.rbegin()->second, maxMappingNodes_);
-		for(std::vector<int>::iterator iter=nodes.begin(); iter!=nodes.end(); ++iter)
+		std::map<int, float> nodes = graph::findNearestNodes(poses, poses.rbegin()->second, maxMappingNodes_);
+		for(std::map<int, float>::iterator iter=nodes.begin(); iter!=nodes.end(); ++iter)
 		{
-			std::map<int, Transform>::iterator pter = poses.find(*iter);
+			std::map<int, Transform>::iterator pter = poses.find(iter->first);
 			if(pter != poses.end())
 			{
 				nearestPoses.insert(*pter);

@@ -31,7 +31,7 @@ find_package(find_object_2d)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
-find_package(RTABMap 0.20.2 REQUIRED)
+find_package(RTABMap 0.20.4 REQUIRED)
 
 find_package(OpenCV REQUIRED)
 
@@ -122,6 +122,7 @@ add_message_files(
    GetPlan.srv
    AddLink.srv
    GetNodeData.srv
+   GetNodesInRadius.srv
  )
 
 ## Generate added messages and services with any dependencies listed here
