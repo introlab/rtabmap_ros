@@ -72,6 +72,7 @@ OdometryROS::OdometryROS(bool stereoParams, bool visParams, bool icpParams) :
 	waitForTransform_(true),
 	waitForTransformDuration_(0.1), // 100 ms
 	publishNullWhenLost_(true),
+	// publishOdomInfo_(true),
 	paused_(false),
 	resetCountdown_(0),
 	resetCurrentCount_(0),
@@ -136,6 +137,7 @@ void OdometryROS::onInit()
 	pnh.param("ground_truth_base_frame_id", groundTruthBaseFrameId_, frameId_);
 	pnh.param("config_path", configPath, configPath);
 	pnh.param("publish_null_when_lost", publishNullWhenLost_, publishNullWhenLost_);
+	pnh.param("publish_odom_info", publishOdomInfo_, publishOdomInfo_);
 	if(pnh.hasParam("guess_from_tf"))
 	{
 		if(!pnh.hasParam("guess_frame_id"))
@@ -898,7 +900,7 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 
 	if(!data.imageRaw().empty() || !data.laserScanRaw().isEmpty())
 	{
-		if(visParams_)
+		if(visParams_ && publishOdomInfo_)
 		{
 			if(icpParams_)
 			{
@@ -909,7 +911,7 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 				NODELET_INFO( "Odom: quality=%d, std dev=%fm|%frad, update time=%fs", info.reg.inliers, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (ros::WallTime::now()-time).toSec());
 			}
 		}
-		else // if(icpParams_)
+		else if(publishOdomInfo_) // if(icpParams_)
 		{
 			NODELET_INFO( "Odom: ratio=%f, std dev=%fm|%frad, update time=%fs", info.reg.icpInliersRatio, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (ros::WallTime::now()-time).toSec());
 		}

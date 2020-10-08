@@ -108,6 +108,7 @@ private:
 	bool waitForTransform_;
 	double waitForTransformDuration_;
 	bool publishNullWhenLost_;
+	bool publishOdomInfo_;
 	rtabmap::ParametersMap parameters_;
 
 	ros::Publisher odomPub_;
