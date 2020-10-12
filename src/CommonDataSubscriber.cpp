@@ -89,10 +89,13 @@ CommonDataSubscriber::CommonDataSubscriber(bool gui) :
 		// Stereo
 		SYNC_INIT(stereo),
 		SYNC_INIT(stereoInfo),
+		SYNC_INIT(stereoScan),
 
 		// Stereo + Odom
 		SYNC_INIT(stereoOdom),
 		SYNC_INIT(stereoOdomInfo),
+		SYNC_INIT(stereoScanOdom),
+		SYNC_INIT(stereoScanOdomInfo),
 		
 		// RGB-only
 		SYNC_INIT(rgb),
@@ -473,6 +476,7 @@ void CommonDataSubscriber::setupCallbacks(
 	ROS_INFO("%s: subscribe_scan = %s", name.c_str(), subscribeScan2d?"true":"false");
 	ROS_INFO("%s: subscribe_scan_cloud = %s", name.c_str(), subscribeScan3d?"true":"false");
 	ROS_INFO("%s: subscribe_scan_descriptor = %s", name.c_str(), subscribeScanDesc?"true":"false");
+	ROS_INFO("%s: subscribe_odom = %s", name.c_str(), subscribeOdom?"true":"false");
 	ROS_INFO("%s: queue_size    = %d", name.c_str(), queueSize_);
 	ROS_INFO("%s: approx_sync   = %s", name.c_str(), approxSync_?"true":"false");
 
@@ -497,6 +501,10 @@ void CommonDataSubscriber::setupCallbacks(
 				nh,
 				pnh,
 				subscribedToOdom_,
+				subscribeUserData,
+				subscribeScan2d,
+				subscribeScan3d,
+				subscribeScanDesc,
 				subscribeOdomInfo,
 				queueSize_,
 				approxSync_);
@@ -666,10 +674,13 @@ CommonDataSubscriber::~CommonDataSubscriber()
 	// Stereo
 	SYNC_DEL(stereo);
 	SYNC_DEL(stereoInfo);
+	SYNC_DEL(stereoScan);
 
 	// Stereo + Odom
 	SYNC_DEL(stereoOdom);
 	SYNC_DEL(stereoOdomInfo);
+	SYNC_DEL(stereoScanOdom);
+	SYNC_DEL(stereoScanOdomInfo);
 	
 	// RGB-only
 	SYNC_DEL(rgb);

@@ -598,6 +598,17 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 								generateGrid?0:&obstacles,
 								generateGrid?0:&emptyCells);
 
+						if ((updateGrid == true) && (updateOctomap == false) && (obstacles.channels() == 3)) {
+							cv::Mat obstacle2D(1, obstacles.cols, CV_32FC2);
+							for (int i = 0; i < obstacles.cols; ++i) {
+								const float * vi = obstacles.ptr<float>(0, i);
+								float * vo = obstacle2D.ptr<float>(0, i);
+								vo[0] = vi[0];
+								vo[1] = vi[1];
+							}
+							obstacles = obstacle2D;
+						}
+
 						if(generateGrid)
 						{
 							Signature tmp(data);

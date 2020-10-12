@@ -150,6 +150,10 @@ private:
 			ros::NodeHandle & nh,
 			ros::NodeHandle & pnh,
 			bool subscribeOdom,
+			bool subscribeUserData,
+			bool subscribeScan2d,
+			bool subscribeScan3d,
+			bool subscribeScanDesc,
 			bool subscribeOdomInfo,
 			int queueSize,
 			bool approxSync);
@@ -319,10 +323,13 @@ private:
 	// Stereo
 	DATA_SYNCS4(stereo, sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo, sensor_msgs::CameraInfo);
 	DATA_SYNCS5(stereoInfo, sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo, sensor_msgs::CameraInfo, rtabmap_ros::OdomInfo);
+	DATA_SYNCS5(stereoScan, sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo, sensor_msgs::CameraInfo, sensor_msgs::LaserScan);
 
 	// Stereo + Odom
 	DATA_SYNCS5(stereoOdom, nav_msgs::Odometry, sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo, sensor_msgs::CameraInfo);
 	DATA_SYNCS6(stereoOdomInfo, nav_msgs::Odometry, sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo, sensor_msgs::CameraInfo, rtabmap_ros::OdomInfo);
+	DATA_SYNCS7(stereoScanOdomInfo, nav_msgs::Odometry, sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo, sensor_msgs::CameraInfo, sensor_msgs::LaserScan, rtabmap_ros::OdomInfo);
+	DATA_SYNCS6(stereoScanOdom, nav_msgs::Odometry, sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo, sensor_msgs::CameraInfo, sensor_msgs::LaserScan);
 
 	// RGB-only
 	DATA_SYNCS2(rgb, sensor_msgs::Image, sensor_msgs::CameraInfo);
