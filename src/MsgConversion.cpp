@@ -821,30 +821,33 @@ void mapGraphToROS(
 rtabmap::Signature nodeDataFromROS(const rtabmap_ros::msg::NodeData & msg)
 {
 	//Features stuff...
-	std::multimap<int, cv::KeyPoint> words;
-	std::multimap<int, cv::Point3f> words3D;
-	std::multimap<int, cv::Mat> wordsDescriptors;
+	std::multimap<int, int> words;
+	std::vector<cv::KeyPoint> wordsKpts;
+	std::vector<cv::Point3f> words3D;
+	cv::Mat wordsDescriptors;
 	pcl::PointCloud<pcl::PointXYZ> cloud;
-	cv::Mat descriptors;
 	if(msg.word_pts.data.size() &&
 	   msg.word_pts.height*msg.word_pts.width == msg.word_ids.size())
 	{
 		pcl::fromROSMsg(msg.word_pts, cloud);
-		descriptors = rtabmap::uncompressData(msg.descriptors);
+		wordsDescriptors = rtabmap::uncompressData(msg.descriptors);
+		if(wordsDescriptors.rows != (int)msg.word_ids.size())
+		{
+			wordsDescriptors = cv::Mat();	
+		}
 	}
 
-	for(unsigned int i=0; i<msg.word_ids.size() && i<msg.word_kpts.size(); ++i)
+	for(size_t i=0; i<msg.word_ids.size(); ++i)
 	{
-		cv::KeyPoint pt = keypointFromROS(msg.word_kpts.at(i));
-		int wordId = msg.word_ids.at(i);
-		words.insert(std::make_pair(wordId, pt));
+		words.insert(std::make_pair(msg.word_ids.at(i), words.size()));
+		if(i<msg.word_kpts.size())
+		{
+			cv::KeyPoint pt = keypointFromROS(msg.word_kpts.at(i));
+			wordsKpts.push_back(pt);
+		}
 		if(i< cloud.size())
 		{
-			words3D.insert(std::make_pair(wordId, cv::Point3f(cloud[i].x, cloud[i].y, cloud[i].z)));
-		}
-		if(int(i) < descriptors.rows)
-		{
-			wordsDescriptors.insert(std::make_pair(wordId, descriptors.row(i).clone()));
+			words3D.push_back(cv::Point3f(cloud[i].x, cloud[i].y, cloud[i].z));
 		}
 	}
 
@@ -932,9 +935,7 @@ rtabmap::Signature nodeDataFromROS(const rtabmap_ros::msg::NodeData & msg)
 					msg.id,
 					msg.stamp,
 					compressedMatFromBytes(msg.user_data)));
-	s.setWords(words);
-	s.setWords3(words3D);
-	s.setWordsDescriptors(wordsDescriptors);
+	s.setWords(words, wordsKpts, words3D, wordsDescriptors);
 	s.sensorData().setOccupancyGrid(
 			compressedMatFromBytes(msg.grid_ground),
 			compressedMatFromBytes(msg.grid_obstacles),
@@ -1009,13 +1010,13 @@ void nodeDataToROS(const rtabmap::Signature & signature, rtabmap_ros::msg::NodeD
 
 	//Features stuff...
 	msg.word_ids = uKeys(signature.getWords());
-	msg.word_kpts.resize(signature.getWords().size());
+	msg.word_kpts.resize(signature.getWordsKpts().size());
 	int index = 0;
-	for(std::multimap<int, cv::KeyPoint>::const_iterator jter=signature.getWords().begin();
-		jter!=signature.getWords().end();
+	for(std::vector<cv::KeyPoint>::const_iterator jter=signature.getWordsKpts().begin();
+		jter!=signature.getWordsKpts().end();
 		++jter)
 	{
-		keypointToROS(jter->second, msg.word_kpts.at(index++));
+		keypointToROS(*jter, msg.word_kpts.at(index++));
 	}
 
 	if(signature.getWords3().size() && signature.getWords3().size() == signature.getWords().size())
@@ -1023,13 +1024,13 @@ void nodeDataToROS(const rtabmap::Signature & signature, rtabmap_ros::msg::NodeD
 		pcl::PointCloud<pcl::PointXYZ> cloud;
 		cloud.resize(signature.getWords3().size());
 		index = 0;
-		for(std::multimap<int, cv::Point3f>::const_iterator jter=signature.getWords3().begin();
+		for(std::vector<cv::Point3f>::const_iterator jter=signature.getWords3().begin();
 			jter!=signature.getWords3().end();
 			++jter)
 		{
-			cloud[index].x = jter->second.x;
-			cloud[index].y = jter->second.y;
-			cloud[index++].z = jter->second.z;
+			cloud[index].x = jter->x;
+			cloud[index].y = jter->y;
+			cloud[index++].z = jter->z;
 		}
 		pcl::toROSMsg(cloud, msg.word_pts);
 	}
@@ -1040,40 +1041,15 @@ void nodeDataToROS(const rtabmap::Signature & signature, rtabmap_ros::msg::NodeD
 				(int)signature.getWords3().size());
 	}
 
-	if(signature.getWordsDescriptors().size() && signature.getWordsDescriptors().size() == signature.getWords().size())
+	if(signature.getWordsDescriptors().rows && signature.getWordsDescriptors().rows == (int)signature.getWords().size())
 	{
-		cv::Mat descriptors(
-				signature.getWordsDescriptors().size(),
-				signature.getWordsDescriptors().begin()->second.cols,
-				signature.getWordsDescriptors().begin()->second.type());
-		index = 0;
-		bool valid = true;
-		for(std::multimap<int, cv::Mat>::const_iterator jter=signature.getWordsDescriptors().begin();
-			jter!=signature.getWordsDescriptors().end() && valid;
-			++jter)
-		{
-			if(jter->second.cols == descriptors.cols &&
-				jter->second.type() == descriptors.type())
-			{
-				jter->second.copyTo(descriptors.row(index++));
-			}
-			else
-			{
-				valid = false;
-				UERROR("Some descriptors have different type/size! Cannot copy them...");
-			}
-		}
-
-		if(valid)
-		{
-			msg.descriptors = rtabmap::compressData(descriptors);
-		}
+		msg.descriptors = rtabmap::compressData(signature.getWordsDescriptors());
 	}
-	else if(signature.getWordsDescriptors().size())
+	else if(signature.getWordsDescriptors().rows)
 	{
 		UERROR("Words and descriptors must have the same size (%d vs %d)!",
 				(int)signature.getWords().size(),
-				(int)signature.getWordsDescriptors().size());
+				signature.getWordsDescriptors().rows);
 	}
 }
 

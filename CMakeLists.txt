@@ -53,7 +53,7 @@ find_package(image_geometry REQUIRED)
 #find_package(find_object_2d)
 
 ## System dependencies are found with CMake's conventions
-find_package(RTABMap 0.20.0 REQUIRED)
+find_package(RTABMap 0.20.5 REQUIRED)
 find_package(Boost REQUIRED COMPONENTS system) # dependencies from PCL
 find_package(PCL 1.7 REQUIRED COMPONENTS kdtree) #This crashes idl generation if all components are found?! see https://github.com/ros2/rosidl/issues/402#issuecomment-565586908
 

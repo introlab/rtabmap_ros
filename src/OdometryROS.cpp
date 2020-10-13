@@ -674,14 +674,14 @@ void OdometryROS::processData(const SensorData & data, const rclcpp::Time & stam
 			// check which type of Odometry is using
 			if(odometry_->getType() == Odometry::kTypeF2M) // If it's Frame to Map Odometry
 			{
-				const std::multimap<int, cv::Point3f> & words3  = ((OdometryF2M*)odometry_)->getLastFrame().getWords3();
+				const std::vector<cv::Point3f> & words3  = ((OdometryF2M*)odometry_)->getLastFrame().getWords3();
 				if(words3.size())
 				{
 					pcl::PointCloud<pcl::PointXYZ> cloud;
-					for(std::multimap<int, cv::Point3f>::const_iterator iter=words3.begin(); iter!=words3.end(); ++iter)
+					for(std::vector<cv::Point3f>::const_iterator iter=words3.begin(); iter!=words3.end(); ++iter)
 					{
 						// transform to odom frame
-						cv::Point3f pt = util3d::transformPoint(iter->second, pose);
+						cv::Point3f pt = util3d::transformPoint(*iter, pose);
 						cloud.push_back(pcl::PointXYZ(pt.x, pt.y, pt.z));
 					}
 
@@ -699,10 +699,10 @@ void OdometryROS::processData(const SensorData & data, const rclcpp::Time & stam
 				if(refFrame.getWords3().size())
 				{
 					pcl::PointCloud<pcl::PointXYZ> cloud;
-					for(std::multimap<int, cv::Point3f>::const_iterator iter=refFrame.getWords3().begin(); iter!=refFrame.getWords3().end(); ++iter)
+					for(std::vector<cv::Point3f>::const_iterator iter=refFrame.getWords3().begin(); iter!=refFrame.getWords3().end(); ++iter)
 					{
 						// transform to odom frame
-						cv::Point3f pt = util3d::transformPoint(iter->second, pose);
+						cv::Point3f pt = util3d::transformPoint(*iter, pose);
 						cloud.push_back(pcl::PointXYZ(pt.x, pt.y, pt.z));
 					}
 					sensor_msgs::msg::PointCloud2 cloudMsg;
