@@ -142,7 +142,7 @@ private:
 	bool waitIMUToinit_;
 	bool imuProcessed_;
 	std::map<double, rtabmap::IMU> imus_;
-	rtabmap::SensorData bufferedData_;
+	std::pair<rtabmap::SensorData, ros::Time> bufferedData_;
 };
 
 }

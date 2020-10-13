@@ -498,11 +498,11 @@ void OdometryROS::callbackIMU(const sensor_msgs::ImuConstPtr& msg)
 		{
 			imus_.insert(std::make_pair(stamp, imu));
 			
-			if(bufferedData_.isValid() && stamp > bufferedData_.stamp())
+			if(bufferedData_.first.isValid() && stamp > bufferedData_.first.stamp())
 			{
-				SensorData data = bufferedData_;
-				bufferedData_ = SensorData();
-				processData(data, ros::Time(data.stamp()));
+				SensorData data = bufferedData_.first;
+				bufferedData_.first = SensorData();
+				processData(data, bufferedData_.second);
 			}
 			
 			if(imus_.size() > 1000)
@@ -528,11 +528,15 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 			//NODELET_WARN("No imu received with higher stamp than last image (%f)! Buffering this image until we get more imu msgs...", stamp.toSec());
 		
 			// keep in cache to process later when we will receive imu msgs
-			if(bufferedData_.isValid())
+			if(bufferedData_.first.isValid())
 			{
-				NODELET_ERROR("Overwriting previous data! Make sure IMU is published faster than data rate. (last image stamp buffered=%f and new one is %f, last imu stamp received=%f)", bufferedData_.stamp(), data.stamp(), imus_.empty()?0:imus_.rbegin()->first);
+				NODELET_ERROR("Overwriting previous data! Make sure IMU is "
+						"published faster than data rate. (last image stamp "
+						"buffered=%f and new one is %f, last imu stamp received=%f)",
+						bufferedData_.first.stamp(), data.stamp(), imus_.empty()?0:imus_.rbegin()->first);
 			}
-			bufferedData_ = data;
+			bufferedData_.first = data;
+			bufferedData_.second = stamp;
 			return;
 		}
 		// process all imu data up to current image stamp (or just after so that underlying odom approach can do interpolation of imu at image stamp)
@@ -774,14 +778,14 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 			// check which type of Odometry is using
 			if(odometry_->getType() == Odometry::kTypeF2M) // If it's Frame to Map Odometry
 			{
-				const std::multimap<int, cv::Point3f> & words3  = ((OdometryF2M*)odometry_)->getLastFrame().getWords3();
+				const std::vector<cv::Point3f> & words3  = ((OdometryF2M*)odometry_)->getLastFrame().getWords3();
 				if(words3.size())
 				{
 					pcl::PointCloud<pcl::PointXYZ> cloud;
-					for(std::multimap<int, cv::Point3f>::const_iterator iter=words3.begin(); iter!=words3.end(); ++iter)
+					for(std::vector<cv::Point3f>::const_iterator iter=words3.begin(); iter!=words3.end(); ++iter)
 					{
 						// transform to odom frame
-						cv::Point3f pt = util3d::transformPoint(iter->second, pose);
+						cv::Point3f pt = util3d::transformPoint(*iter, pose);
 						cloud.push_back(pcl::PointXYZ(pt.x, pt.y, pt.z));
 					}
 
@@ -799,10 +803,10 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 				if(refFrame.getWords3().size())
 				{
 					pcl::PointCloud<pcl::PointXYZ> cloud;
-					for(std::multimap<int, cv::Point3f>::const_iterator iter=refFrame.getWords3().begin(); iter!=refFrame.getWords3().end(); ++iter)
+					for(std::vector<cv::Point3f>::const_iterator iter=refFrame.getWords3().begin(); iter!=refFrame.getWords3().end(); ++iter)
 					{
 						// transform to odom frame
-						cv::Point3f pt = util3d::transformPoint(iter->second, pose);
+						cv::Point3f pt = util3d::transformPoint(*iter, pose);
 						cloud.push_back(pcl::PointXYZ(pt.x, pt.y, pt.z));
 					}
 					sensor_msgs::PointCloud2 cloudMsg;
@@ -940,7 +944,7 @@ void OdometryROS::reset(const Transform & pose)
 	previousStamp_ = 0.0;
 	resetCurrentCount_ = resetCountdown_;
 	imuProcessed_ = false;
-	bufferedData_= SensorData();
+	bufferedData_.first= SensorData();
 	imus_.clear();
 	this->flushCallbacks();
 }

@@ -7,6 +7,7 @@
 <arg name="rtabmapviz" default="true"/>
 <arg name="rviz"       default="false"/>
 <arg name="depth_mode" default="true"/>
+<arg name="odom_strategy" default="9"/> <!-- default VINS -->
 <arg name="unite_imu_method" default="copy"/> <!-- "copy" or "linear_interpolation" -->
 
 <include file="$(find realsense2_camera)/launch/rs_camera.launch">
@@ -32,7 +33,7 @@
 <!-- RTAB-Map: depth mode -->
 <!-- We have to launch stereo_odometry externally from rtabmap.launch so that rtabmap can use RGB-D input -->
 <group ns="rtabmap">
-<node if="$(arg depth_mode)" pkg="rtabmap_ros" type="stereo_odometry" name="stereo_odometry" args="--Optimizer/GravitySigma 0.3 --Odom/Strategy 9 --OdomVINS/ConfigPath $(find vins)/../config/realsense_d435i/realsense_stereo_imu_config.yaml" output="screen">
+<node if="$(arg depth_mode)" pkg="rtabmap_ros" type="stereo_odometry" name="stereo_odometry" args="--Optimizer/GravitySigma 0.3 --Odom/Strategy $(arg odom_strategy) --OdomVINS/ConfigPath $(find vins)/../config/realsense_d435i/realsense_stereo_imu_config.yaml" output="screen">
    <remap from="left/image_rect"   to="/camera/infra1/image_rect_raw"/>
    <remap from="right/image_rect"  to="/camera/infra2/image_rect_raw"/>
    <remap from="left/camera_info"  to="/camera/infra1/camera_info"/>
@@ -57,7 +58,7 @@
 
 <!-- RTAB-Map: Stereo mode -->
 <include unless="$(arg depth_mode)" file="$(find rtabmap_ros)/launch/rtabmap.launch">
-   <arg name="rtabmap_args"            value="--delete_db_on_start --Optimizer/GravitySigma 0.3 --Odom/Strategy 9 --OdomVINS/ConfigPath $(find vins)/../config/realsense_d435i/realsense_stereo_imu_config.yaml"/>
+   <arg name="rtabmap_args"            value="--delete_db_on_start --Optimizer/GravitySigma 0.3 --Odom/Strategy $(arg odom_strategy) --OdomVINS/ConfigPath $(find vins)/../config/realsense_d435i/realsense_stereo_imu_config.yaml"/>
    <arg name="left_image_topic"        value="/camera/infra1/image_rect_raw"/>
    <arg name="right_image_topic"       value="/camera/infra2/image_rect_raw"/>
    <arg name="left_camera_info_topic"  value="/camera/infra1/camera_info"/>

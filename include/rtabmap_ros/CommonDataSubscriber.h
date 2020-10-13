@@ -72,6 +72,7 @@ public:
 	int rgbdCameras() const {return isSubscribedToRGBD()?(int)rgbdSubs_.size():0;}
 	int getQueueSize() const {return queueSize_;}
 	bool isApproxSync() const {return approxSync_;}
+	const std::string & name() const {return name_;}
 
 protected:
 	void setupCallbacks(
