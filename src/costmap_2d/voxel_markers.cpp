@@ -144,6 +144,20 @@ void voxelCallback(const ros::Publisher& pub, const costmap_2d::VoxelGridConstPt
   ROS_DEBUG("Published %d markers in %f seconds", num_markers, (end - start).toSec());
 }
 
+ros::Publisher pub;
+ros::Subscriber sub;
+void connectCb()
+{
+	ros::NodeHandle n;
+	sub = n.subscribe < costmap_2d::VoxelGrid > ("voxel_grid", 1, boost::bind(voxelCallback, pub, _1));
+}
+
+void disconnectCb()
+{
+	if(pub.getNumSubscribers()==0)
+		sub.shutdown();
+}
+
 int main(int argc, char** argv)
 {
   ros::init(argc, argv, "3d_markers");
@@ -158,8 +172,10 @@ int main(int argc, char** argv)
 
   ROS_DEBUG("Startup");
 
-  ros::Publisher pub = n.advertise < visualization_msgs::Marker > ("visualization_marker", 1);
-  ros::Subscriber sub = n.subscribe < costmap_2d::VoxelGrid > ("voxel_grid", 1, boost::bind(voxelCallback, pub, _1));
+  ros::SubscriberStatusCallback connect_cb = boost::bind(connectCb);
+  ros::SubscriberStatusCallback disconnect_cb = boost::bind(disconnectCb);
+
+  pub = n.advertise < visualization_msgs::Marker > ("visualization_marker", 1, connect_cb, disconnect_cb);
   g_marker_ns = n.resolveName("voxel_grid");
 
   ros::spin();
