@@ -209,6 +209,8 @@ IF(RTABMAP_SYNC_MULTI_RGBD)
     src/impl/CommonDataSubscriberRGBD2.cpp
     src/impl/CommonDataSubscriberRGBD3.cpp
     src/impl/CommonDataSubscriberRGBD4.cpp
+    src/impl/CommonDataSubscriberRGBD5.cpp
+    src/impl/CommonDataSubscriberRGBD6.cpp
   )
 ENDIF(RTABMAP_SYNC_MULTI_RGBD)
   
@@ -240,7 +242,7 @@ SET(rtabmap_plugins_lib_src
 )
 
 IF(${cv_bridge_VERSION_MAJOR} GREATER 1 OR ${cv_bridge_VERSION_MINOR} GREATER 10)
-   SET(rtabmap_plugins_lib_src ${rtabmap_plugins_lib_src} src/nodelets/rgbd_sync.cpp src/nodelets/stereo_sync.cpp src/nodelets/rgbd_relay.cpp)
+   SET(rtabmap_plugins_lib_src ${rtabmap_plugins_lib_src} src/nodelets/rgbd_sync.cpp src/nodelets/stereo_sync.cpp src/nodelets/rgb_sync.cpp src/nodelets/rgbd_relay.cpp)
 ELSE()
    ADD_DEFINITIONS("-DCV_BRIDGE_HYDRO")
 ENDIF()   
@@ -318,6 +320,14 @@ set_target_properties(rtabmap_icp_odometry PROPERTIES OUTPUT_NAME "icp_odometry"
 add_executable(rtabmap_rgbd_sync src/RGBDSyncNode.cpp)
 target_link_libraries(rtabmap_rgbd_sync ${Libraries})
 set_target_properties(rtabmap_rgbd_sync PROPERTIES OUTPUT_NAME "rgbd_sync")
+
+add_executable(rtabmap_stereo_sync src/StereoSyncNode.cpp)
+target_link_libraries(rtabmap_stereo_sync ${Libraries})
+set_target_properties(rtabmap_stereo_sync PROPERTIES OUTPUT_NAME "stereo_sync")
+
+add_executable(rtabmap_rgb_sync src/RGBSyncNode.cpp)
+target_link_libraries(rtabmap_rgb_sync ${Libraries})
+set_target_properties(rtabmap_rgb_sync PROPERTIES OUTPUT_NAME "rgb_sync")
 
 add_executable(rtabmap_rgbd_relay src/RGBDRelayNode.cpp)
 target_link_libraries(rtabmap_rgbd_relay ${Libraries})

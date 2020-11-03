@@ -81,7 +81,8 @@ public:
 		voxelSize_(0),
 		noiseRadius_(0),
 		noiseMinNeighbors_(5),
-		fixedFrameId_("odom")
+		fixedFrameId_("odom"),
+		frameId_("")
 	{}
 
 	virtual ~PointCloudAssembler()
@@ -108,6 +109,7 @@ private:
 
 		pnh.param("queue_size", queueSize, queueSize);
 		pnh.param("fixed_frame_id", fixedFrameId_, fixedFrameId_);
+		pnh.param("frame_id", frameId_, frameId_);
 		pnh.param("max_clouds", maxClouds_, maxClouds_);
 		pnh.param("assembling_time", assemblingTime_, assemblingTime_);
 		pnh.param("skip_clouds", skipClouds_, skipClouds_);
@@ -123,6 +125,7 @@ private:
 
 		ROS_INFO("%s: queue_size=%d", getName().c_str(), queueSize);
 		ROS_INFO("%s: fixed_frame_id=%s", getName().c_str(), fixedFrameId_.c_str());
+		ROS_INFO("%s: frame_id=%s", getName().c_str(), frameId_.c_str());
 		ROS_INFO("%s: max_clouds=%d", getName().c_str(), maxClouds_);
 		ROS_INFO("%s: assembling_time=%fs", getName().c_str(), assemblingTime_);
 		ROS_INFO("%s: skip_clouds=%d", getName().c_str(), skipClouds_);
@@ -139,7 +142,7 @@ private:
 		std::string subscribedTopicsMsg;
 		if(!fixedFrameId_.empty())
 		{
-			cloudSub_ = nh.subscribe("cloud", 1, &PointCloudAssembler::callbackCloud, this);
+			cloudSub_ = nh.subscribe("cloud", queueSize, &PointCloudAssembler::callbackCloud, this);
 			subscribedTopicsMsg = uFormat("\n%s subscribed to %s",
 								getName().c_str(),
 								cloudSub_.getTopic().c_str());
@@ -322,9 +325,29 @@ private:
 					}
 
 					pcl_conversions::moveFromPCL(*assembled, rosCloud);
+					if(!frameId_.empty())
+					{
+						// transform in target frame_id instead of sensor frame
+						t = rtabmap_ros::getTransform(
+								fixedFrameId_, //fromFrame
+								frameId_, //toFrame
+								cloudMsg->header.stamp,
+								tfListener_,
+								waitForTransformDuration_);
+						if(t.isNull())
+						{
+							ROS_ERROR("Cloud not transform back assembled clouds in target frame \"%s\"! Resetting...", frameId_.c_str());
+							clouds_.clear();
+							return;
+						}
+					}
 					pcl_ros::transformPointCloud(t.toEigen4f().inverse(), rosCloud, rosCloud);
 
 					rosCloud.header = cloudMsg->header;
+					if(!frameId_.empty())
+					{
+						rosCloud.header.frame_id = frameId_;
+					}
 					cloudPub_.publish(rosCloud);
 					if(circularBuffer_)
 					{
@@ -390,6 +413,7 @@ private:
 	double noiseRadius_;
 	int noiseMinNeighbors_;
 	std::string fixedFrameId_;
+	std::string frameId_;
 	tf::TransformListener tfListener_;
 
 	std::list<pcl::PCLPointCloud2::Ptr> clouds_;

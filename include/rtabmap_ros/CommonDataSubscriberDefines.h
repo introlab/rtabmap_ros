@@ -247,7 +247,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 					PREFIX##ExactSyncPolicy(QUEUE_SIZE), SUB0, SUB1, SUB2, SUB3, SUB4, SUB5, SUB6, SUB7); \
 			PREFIX##ExactSync_->registerCallback(boost::bind(&CommonDataSubscriber::PREFIX##Callback, this, _1, _2, _3, _4, _5, _6, _7, _8)); \
 		} \
-		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s \\\n   %s \\\n   %s \\\n   %s \\\n   %s \\\n   %s \\\n   %s", \
+		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s \\\n   %s \\\n   %s \\\n   %s \\\n   %s \\\n   %s \\\n   %s \\\n   %s", \
 				name_.c_str(), \
 				APPROX?"approx":"exact", \
 				SUB0.getTopic().c_str(), \

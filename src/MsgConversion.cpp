@@ -145,11 +145,6 @@ void toCvCopy(const rtabmap_ros::RGBDImage & image, cv_bridge::CvImagePtr & rgb,
 		rgb = cv_bridge::toCvCopy(image.rgb_compressed);
 #endif
 	}
-	else
-	{
-		// empty
-		rgb = boost::make_shared<cv_bridge::CvImage>();
-	}
 
 	if(!image.depth.data.empty())
 	{
@@ -163,11 +158,6 @@ void toCvCopy(const rtabmap_ros::RGBDImage & image, cv_bridge::CvImagePtr & rgb,
 		ROS_ASSERT(ptr->image.empty() || ptr->image.type() == CV_32FC1 || ptr->image.type() == CV_16UC1);
 		ptr->encoding = ptr->image.empty()?"":ptr->image.type() == CV_32FC1?sensor_msgs::image_encodings::TYPE_32FC1:sensor_msgs::image_encodings::TYPE_16UC1;
 		depth = ptr;
-	}
-	else
-	{
-		// empty
-		depth = boost::make_shared<cv_bridge::CvImage>();
 	}
 }
 
@@ -184,11 +174,6 @@ void toCvShare(const rtabmap_ros::RGBDImageConstPtr & image, cv_bridge::CvImageC
 #else
 		rgb = cv_bridge::toCvCopy(image->rgb_compressed);
 #endif
-	}
-	else
-	{
-		// empty
-		rgb = boost::make_shared<cv_bridge::CvImage>();
 	}
 
 	if(!image->depth.data.empty())
@@ -214,11 +199,6 @@ void toCvShare(const rtabmap_ros::RGBDImageConstPtr & image, cv_bridge::CvImageC
 			ptr->encoding = ptr->image.empty()?"":ptr->image.type() == CV_32FC1?sensor_msgs::image_encodings::TYPE_32FC1:sensor_msgs::image_encodings::TYPE_16UC1;
 			depth = ptr;
 		}
-	}
-	else
-	{
-		// empty
-		depth = boost::make_shared<cv_bridge::CvImage>();
 	}
 }
 
@@ -1626,7 +1606,8 @@ bool convertRGBDMsgs(
 			 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0 ||
 			 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::BGRA8) == 0 ||
 			 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::RGBA8) == 0 ||
-			 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::BAYER_GRBG8) == 0))
+			 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::BAYER_GRBG8) == 0 ||
+			 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::BAYER_RGGB8) == 0))
 		{
 
 			ROS_ERROR("Input rgb type must be image=mono8,mono16,rgb8,bgr8,bgra8,rgba8. Current rgb=%s",
