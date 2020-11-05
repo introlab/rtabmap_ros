@@ -63,7 +63,8 @@ public:
 		rtabmap_ros::OdometryROS(true, true, false),
 		approxSync_(0),
 		exactSync_(0),
-		queueSize_(5)
+		queueSize_(5),
+		keepColor_(false)
 	{
 	}
 
@@ -90,10 +91,12 @@ private:
 		pnh.param("approx_sync", approxSync, approxSync);
 		pnh.param("queue_size", queueSize_, queueSize_);
 		pnh.param("subscribe_rgbd", subscribeRGBD, subscribeRGBD);
+		pnh.param("keep_color", keepColor_, keepColor_);
 
 		NODELET_INFO("StereoOdometry: approx_sync = %s", approxSync?"true":"false");
 		NODELET_INFO("StereoOdometry: queue_size = %d", queueSize_);
 		NODELET_INFO("StereoOdometry: subscribe_rgbd = %s", subscribeRGBD?"true":"false");
+		NODELET_INFO("StereoOdometry: keep_color = %s", keepColor_?"true":"false");
 
 		std::string subscribedTopicsMsg;
 		if(subscribeRGBD)
@@ -261,8 +264,10 @@ private:
 						shown = true;
 					}
 				}
-
-				cv_bridge::CvImagePtr ptrImageLeft = cv_bridge::toCvCopy(imageRectLeft, "mono8");
+				cv_bridge::CvImagePtr ptrImageLeft = cv_bridge::toCvCopy(imageRectLeft,
+						imageRectLeft->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0 ||
+						imageRectLeft->encoding.compare(sensor_msgs::image_encodings::MONO8)==0?"":
+							keepColor_ && imageRectLeft->encoding.compare(sensor_msgs::image_encodings::MONO16)!=0?"bgr8":"mono8");
 				cv_bridge::CvImagePtr ptrImageRight = cv_bridge::toCvCopy(imageRectRight, "mono8");
 
 				UTimer stepTimer;
@@ -275,7 +280,7 @@ private:
 						0,
 						rtabmap_ros::timestampFromROS(stamp));
 
-				this->processData(data, stamp);
+				this->processData(data, stamp, imageRectLeft->header.frame_id);
 			}
 			else
 			{
@@ -392,7 +397,19 @@ private:
 					}
 				}
 
-				cv_bridge::CvImagePtr ptrImageLeft = cv_bridge::cvtColor(imageRectLeft, "mono8");
+				cv_bridge::CvImageConstPtr ptrImageLeft = imageRectLeft;
+				if(imageRectLeft->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) !=0 &&
+				   imageRectLeft->encoding.compare(sensor_msgs::image_encodings::MONO8) != 0)
+				{
+					if(keepColor_ && imageRectLeft->encoding.compare(sensor_msgs::image_encodings::MONO16) != 0)
+					{
+						ptrImageLeft = cv_bridge::cvtColor(imageRectLeft, "bgr8");
+					}
+					else
+					{
+						ptrImageLeft = cv_bridge::cvtColor(imageRectLeft, "mono8");
+					}
+				}
 				cv_bridge::CvImagePtr ptrImageRight = cv_bridge::cvtColor(imageRectRight, "mono8");
 
 				UTimer stepTimer;
@@ -405,7 +422,7 @@ private:
 						0,
 						rtabmap_ros::timestampFromROS(stamp));
 
-				this->processData(data, stamp);
+				this->processData(data, stamp, image->header.frame_id);
 			}
 			else
 			{
@@ -443,6 +460,7 @@ private:
 	message_filters::Synchronizer<MyExactSyncPolicy> * exactSync_;
 	ros::Subscriber rgbdSub_;
 	int queueSize_;
+	bool keepColor_;
 };
 
 PLUGINLIB_EXPORT_CLASS(rtabmap_ros::StereoOdometry, nodelet::Nodelet);

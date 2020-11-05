@@ -1021,9 +1021,9 @@ void CommonDataSubscriber::commonSingleDepthCallback(
 				scan3dMsg,
 				odomInfoMsg,
 				globalDescriptorMsgs,
-				localKeyPointsMsgs,
-				localPoints3dMsgs,
-				localDescriptorsMsgs);
+				localKeyPoints,
+				localPoints3d,
+				localDescriptors);
 	}
 }
 

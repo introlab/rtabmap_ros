@@ -57,7 +57,7 @@ public:
 	OdometryROS(bool stereoParams, bool visParams, bool icpParams);
 	virtual ~OdometryROS();
 
-	void processData(const rtabmap::SensorData & data, const ros::Time & stamp);
+	void processData(const rtabmap::SensorData & data, const ros::Time & stamp, const std::string & sensorFrameId);
 
 	bool reset(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool resetToPose(rtabmap_ros::ResetPose::Request&, rtabmap_ros::ResetPose::Response&);
@@ -115,6 +115,7 @@ private:
 	ros::Publisher odomLocalMap_;
 	ros::Publisher odomLocalScanMap_;
 	ros::Publisher odomLastFrame_;
+	ros::Publisher odomRgbdImagePub_;
 	ros::ServiceServer resetSrv_;
 	ros::ServiceServer resetToPoseSrv_;
 	ros::ServiceServer pauseSrv_;
@@ -142,7 +143,7 @@ private:
 	bool waitIMUToinit_;
 	bool imuProcessed_;
 	std::map<double, rtabmap::IMU> imus_;
-	std::pair<rtabmap::SensorData, ros::Time> bufferedData_;
+	std::pair<rtabmap::SensorData, std::pair<ros::Time, std::string> > bufferedData_;
 };
 
 }

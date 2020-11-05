@@ -1135,13 +1135,16 @@ void CoreWrapper::commonDepthCallbackImpl(
 		const sensor_msgs::PointCloud2& scan3dMsg,
 		const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg,
 		const std::vector<rtabmap_ros::GlobalDescriptor> & globalDescriptorMsgs,
-		const std::vector<std::vector<rtabmap_ros::KeyPoint> > & localKeyPoints,
-		const std::vector<std::vector<rtabmap_ros::Point3f> > & localPoints3d,
-		const std::vector<cv::Mat> & localDescriptors)
+		const std::vector<std::vector<rtabmap_ros::KeyPoint> > & localKeyPointsMsgs,
+		const std::vector<std::vector<rtabmap_ros::Point3f> > & localPoints3dMsgs,
+		const std::vector<cv::Mat> & localDescriptorsMsgs)
 {
 	cv::Mat rgb;
 	cv::Mat depth;
 	std::vector<rtabmap::CameraModel> cameraModels;
+	std::vector<cv::KeyPoint> keypoints;
+	std::vector<cv::Point3f> points;
+	cv::Mat descriptors;
 	if(!rtabmap_ros::convertRGBDMsgs(
 			imageMsgs,
 			depthMsgs,
@@ -1153,7 +1156,13 @@ void CoreWrapper::commonDepthCallbackImpl(
 			depth,
 			cameraModels,
 			tfListener_,
-			waitForTransform_?waitForTransformDuration_:0.0))
+			waitForTransform_?waitForTransformDuration_:0.0,
+			localKeyPointsMsgs,
+			localPoints3dMsgs,
+			localDescriptorsMsgs,
+			&keypoints,
+			&points,
+			&descriptors))
 	{
 		NODELET_ERROR("Could not convert rgb/depth msgs! Aborting rtabmap update...");
 		return;
@@ -1259,6 +1268,13 @@ void CoreWrapper::commonDepthCallbackImpl(
 		data.setGlobalDescriptors(rtabmap_ros::globalDescriptorsFromROS(globalDescriptorMsgs));
 	}
 
+	if(!keypoints.empty())
+	{
+		UASSERT(points.empty() || points.size() == keypoints.size());
+		UASSERT(descriptors.empty() || descriptors.rows == (int)keypoints.size());
+		data.setFeatures(keypoints, points, descriptors);
+	}
+
 	process(lastPoseStamp_,
 			data,
 			lastPose_,
@@ -1279,9 +1295,9 @@ void CoreWrapper::commonStereoCallback(
 		const sensor_msgs::PointCloud2& scan3dMsg,
 		const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg,
 		const std::vector<rtabmap_ros::GlobalDescriptor> & globalDescriptorMsgs,
-		const std::vector<std::vector<rtabmap_ros::KeyPoint> > & localKeyPoints,
-		const std::vector<std::vector<rtabmap_ros::Point3f> > & localPoints3d,
-		const std::vector<cv::Mat> & localDescriptors)
+		const std::vector<rtabmap_ros::KeyPoint> & localKeyPointsMsg,
+		const std::vector<rtabmap_ros::Point3f> & localPoints3dMsg,
+		const cv::Mat & localDescriptorsMsg)
 {
 	std::string odomFrameId = odomFrameId_;
 	if(odomMsg.get())
@@ -1390,12 +1406,27 @@ void CoreWrapper::commonStereoCallback(
 		depthImages[0] = imgDepth;
 		cameraInfos[0] = leftCamInfoMsg;
 
+		std::vector<std::vector<rtabmap_ros::KeyPoint> > localKeyPointsMsgs;
+		std::vector<std::vector<rtabmap_ros::Point3f> > localPoints3dMsgs;
+		std::vector<cv::Mat> localDescriptorsMsgs;
+		if(!localKeyPointsMsg.empty())
+		{
+			localKeyPointsMsgs.push_back(localKeyPointsMsg);
+		}
+		if(!localPoints3dMsg.empty())
+		{
+			localPoints3dMsgs.push_back(localPoints3dMsg);
+		}
+		if(!localDescriptorsMsg.empty())
+		{
+			localDescriptorsMsgs.push_back(localDescriptorsMsg);
+		}
 		commonDepthCallbackImpl(odomFrameId,
 				rtabmap_ros::UserDataConstPtr(),
 				rgbImages, depthImages, cameraInfos,
 				scan2dMsg, scan3dMsg,
 				odomInfoMsg,
-				globalDescriptorMsgs, localKeyPoints, localPoints3d, localDescriptors);
+				globalDescriptorMsgs, localKeyPointsMsgs, localPoints3dMsgs, localDescriptorsMsgs);
 		return;
 	}
 
@@ -1470,6 +1501,24 @@ void CoreWrapper::commonStereoCallback(
 	if(!globalDescriptorMsgs.empty())
 	{
 		data.setGlobalDescriptors(rtabmap_ros::globalDescriptorsFromROS(globalDescriptorMsgs));
+	}
+
+	std::vector<cv::KeyPoint> keypoints;
+	std::vector<cv::Point3f> points;
+	if(!localKeyPointsMsg.empty())
+	{
+		keypoints = rtabmap_ros::keypointsFromROS(localKeyPointsMsg);
+	}
+	if(!localPoints3dMsg.empty())
+	{
+		// Points should be in base frame
+		points = rtabmap_ros::points3fFromROS(localPoints3dMsg, stereoModel.localTransform().inverse());
+	}
+	if(!keypoints.empty())
+	{
+		UASSERT(points.empty() || points.size() == keypoints.size());
+		UASSERT(localDescriptorsMsg.empty() || localDescriptorsMsg.rows == (int)keypoints.size());
+		data.setFeatures(keypoints, points, localDescriptorsMsg);
 	}
 
 	process(lastPoseStamp_,

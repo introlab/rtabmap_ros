@@ -118,6 +118,7 @@ void OdometryROS::onInit()
 	odomLocalMap_ = nh.advertise<sensor_msgs::PointCloud2>("odom_local_map", 1);
 	odomLocalScanMap_ = nh.advertise<sensor_msgs::PointCloud2>("odom_local_scan_map", 1);
 	odomLastFrame_ = nh.advertise<sensor_msgs::PointCloud2>("odom_last_frame", 1);
+	odomRgbdImagePub_ = nh.advertise<rtabmap_ros::RGBDImage>("odom_rgbd_image", 1);
 
 	Transform initialPose = Transform::getIdentity();
 	std::string initialPoseStr;
@@ -502,7 +503,7 @@ void OdometryROS::callbackIMU(const sensor_msgs::ImuConstPtr& msg)
 			{
 				SensorData data = bufferedData_.first;
 				bufferedData_.first = SensorData();
-				processData(data, bufferedData_.second);
+				processData(data, bufferedData_.second.first, bufferedData_.second.second);
 			}
 			
 			if(imus_.size() > 1000)
@@ -513,7 +514,7 @@ void OdometryROS::callbackIMU(const sensor_msgs::ImuConstPtr& msg)
 	}
 }
 
-void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
+void OdometryROS::processData(const SensorData & data, const ros::Time & stamp, const std::string & sensorFrameId)
 {
 	if((waitIMUToinit_ && !imuProcessed_) && odometry_->framesProcessed() == 0 && odometry_->getPose().isIdentity() && imus_.empty())
 	{
@@ -536,7 +537,8 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 						bufferedData_.first.stamp(), data.stamp(), imus_.empty()?0:imus_.rbegin()->first);
 			}
 			bufferedData_.first = data;
-			bufferedData_.second = stamp;
+			bufferedData_.second.first = stamp;
+			bufferedData_.second.second = sensorFrameId;
 			return;
 		}
 		// process all imu data up to current image stamp (or just after so that underlying odom approach can do interpolation of imu at image stamp)
@@ -898,6 +900,22 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 		infoMsg.header.stamp = stamp; // use corresponding time stamp to image
 		infoMsg.header.frame_id = odomFrameId_;
 		odomInfoPub_.publish(infoMsg);
+	}
+
+	if(!data.imageRaw().empty() && odomRgbdImagePub_.getNumSubscribers())
+	{
+		if(!sensorFrameId.empty())
+		{
+			rtabmap_ros::RGBDImage msg;
+			rtabmap_ros::rgbdImageToROS(dataCpy, msg, sensorFrameId);
+			msg.header.stamp = stamp; // use corresponding time stamp to image
+			msg.header.frame_id = sensorFrameId;
+			odomRgbdImagePub_.publish(msg);
+		}
+		else
+		{
+			ROS_WARN("Sensor frame not set, cannot convert SensorData to RGBDImage");
+		}
 	}
 
 	if(!data.imageRaw().empty() || !data.laserScanRaw().isEmpty())

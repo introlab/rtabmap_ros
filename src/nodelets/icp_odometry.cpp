@@ -442,7 +442,7 @@ private:
 				0,
 				rtabmap_ros::timestampFromROS(scanMsg->header.stamp));
 
-		this->processData(data, scanMsg->header.stamp);
+		this->processData(data, scanMsg->header.stamp, "");
 	}
 
 	void callbackCloud(const sensor_msgs::PointCloud2ConstPtr& pointCloudMsg)
@@ -721,7 +721,7 @@ private:
 				0,
 				rtabmap_ros::timestampFromROS(cloudMsg.header.stamp));
 
-		this->processData(data, cloudMsg.header.stamp);
+		this->processData(data, cloudMsg.header.stamp, cloudMsg.header.frame_id);
 	}
 
 protected:
