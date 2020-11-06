@@ -261,6 +261,11 @@ private:
 	bool genScan_;
 	double genScanMaxDepth_;
 	double genScanMinDepth_;
+	bool genDepth_;
+	int genDepthDecimation_;
+	int genDepthFillHolesSize_;
+	int genDepthFillIterations_;
+	double genDepthFillHolesError_;
 	int scanCloudMaxPoints_;
 
 	rtabmap::Transform mapToOdom_;

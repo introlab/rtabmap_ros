@@ -105,6 +105,11 @@ CoreWrapper::CoreWrapper() :
 		genScan_(false),
 		genScanMaxDepth_(4.0),
 		genScanMinDepth_(0.0),
+		genDepth_(false),
+		genDepthDecimation_(1),
+		genDepthFillHolesSize_(0),
+		genDepthFillIterations_(1),
+		genDepthFillHolesError_(0.1),
 		scanCloudMaxPoints_(0),
 		mapToOdom_(rtabmap::Transform::getIdentity()),
 		transformThread_(0),
@@ -169,6 +174,11 @@ void CoreWrapper::onInit()
 	pnh.param("gen_scan",            genScan_, genScan_);
 	pnh.param("gen_scan_max_depth",  genScanMaxDepth_, genScanMaxDepth_);
 	pnh.param("gen_scan_min_depth",  genScanMinDepth_, genScanMinDepth_);
+	pnh.param("gen_depth",                  genDepth_, genDepth_);
+	pnh.param("gen_depth_decimation",       genDepthDecimation_, genDepthDecimation_);
+	pnh.param("gen_depth_fill_holes_size",  genDepthFillHolesSize_, genDepthFillHolesSize_);
+	pnh.param("gen_depth_fill_iterations",  genDepthFillIterations_, genDepthFillIterations_);
+	pnh.param("gen_depth_fill_holes_error", genDepthFillHolesError_, genDepthFillHolesError_);
 	pnh.param("scan_cloud_max_points",  scanCloudMaxPoints_, scanCloudMaxPoints_);
 	if(pnh.hasParam("scan_cloud_normal_k"))
 	{
@@ -1227,6 +1237,47 @@ void CoreWrapper::commonDepthCallbackImpl(
 		{
 			NODELET_ERROR("Could not convert 3d laser scan msg! Aborting rtabmap update...");
 			return;
+		}
+
+		ROS_WARN("%d %d %d %d", rgb.empty()?1:0, depth.empty()?1:0, scan.isEmpty()?1:0, genDepth_?1:0);
+		if(!rgb.empty() && depth.empty() && !scan.isEmpty() && genDepth_)
+		{
+			for(size_t i=0; i<cameraModels.size(); ++i)
+			{
+				rtabmap::CameraModel model = cameraModels[i];
+				if(genDepthDecimation_ > 1)
+				{
+					if(model.imageWidth()%genDepthDecimation_ == 0 && model.imageHeight()%genDepthDecimation_ == 0)
+					{
+						model = model.scaled(1.0f/float(genDepthDecimation_));
+					}
+					else
+					{
+						ROS_ERROR("decimation (%d) not valid for image size %dx%d! Aborting depth generation from scan...",
+								genDepthDecimation_,
+								model.imageWidth(),
+								model.imageHeight());
+						depth = cv::Mat();
+						break;
+					}
+				}
+
+				cv::Mat depthProjected = rtabmap::util3d::projectCloudToCamera(model.imageSize(), model.K(), scan.data(), model.localTransform());
+
+				if(genDepthFillHolesSize_ > 0 && genDepthFillIterations_ > 0)
+				{
+					for(int i=0; i<genDepthFillIterations_;++i)
+					{
+						depthProjected = rtabmap::util2d::fillDepthHoles(depthProjected, genDepthFillHolesSize_, genDepthFillHolesError_);
+					}
+				}
+
+				if(depth.empty())
+				{
+					depth = cv::Mat::zeros(model.imageHeight(), model.imageWidth()*cameraModels.size(), CV_32FC1);
+				}
+				depthProjected.copyTo(depth.colRange(i*model.imageWidth(), (i+1)*model.imageWidth()));
+			}
 		}
 	}
 
