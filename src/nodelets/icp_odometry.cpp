@@ -67,7 +67,9 @@ public:
 		scanVoxelSize_(0.0),
 		scanNormalK_(0),
 		scanNormalRadius_(0.0),
-		plugin_loader_("rtabmap_ros", "rtabmap_ros::PluginInterface")
+		plugin_loader_("rtabmap_ros", "rtabmap_ros::PluginInterface"),
+		scanReceived_(false),
+		cloudReceived_(false)
 	{
 	}
 
@@ -254,6 +256,16 @@ private:
 
 	void callbackScan(const sensor_msgs::LaserScanConstPtr& scanMsg)
 	{
+		if(cloudReceived_)
+		{
+			ROS_ERROR("%s is already receiving clouds on \"%s\", but also "
+					"just received a scan on \"%s\". Both subscribers cannot be "
+					"used at the same time! Disabling scan subscriber.",
+					this->getName().c_str(), cloud_sub_.getTopic().c_str(), scan_sub_.getTopic().c_str());
+			scan_sub_.shutdown();
+			return;
+		}
+		scanReceived_ = true;
 		if(this->isPaused())
 		{
 			return;
@@ -447,6 +459,16 @@ private:
 
 	void callbackCloud(const sensor_msgs::PointCloud2ConstPtr& pointCloudMsg)
 	{
+		if(scanReceived_)
+		{
+			ROS_ERROR("%s is already receiving scans on \"%s\", but also "
+					"just received a cloud on \"%s\". Both subscribers cannot be "
+					"used at the same time! Disabling cloud subscriber.",
+					this->getName().c_str(), scan_sub_.getTopic().c_str(), cloud_sub_.getTopic().c_str());
+			cloud_sub_.shutdown();
+			return;
+		}
+		cloudReceived_ = true;
 		if(this->isPaused())
 		{
 			return;
@@ -743,6 +765,8 @@ private:
 	double scanNormalRadius_;
 	std::vector<boost::shared_ptr<rtabmap_ros::PluginInterface> > plugins_;
 	pluginlib::ClassLoader<rtabmap_ros::PluginInterface> plugin_loader_;
+	bool scanReceived_ = false;
+	bool cloudReceived_ = false;
 
 };
 
