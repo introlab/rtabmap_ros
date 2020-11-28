@@ -50,6 +50,7 @@ Point3f[] localMapValues
 # compressed local scan map data
 # use rtabmap::util3d::uncompressData() from "rtabmap/core/util3d.h"
 uint8[] localScanMap
+int32 localScanMapFormat
 
 # F2F odometry
 #   std::vector<cv::Point2f> refCorners;

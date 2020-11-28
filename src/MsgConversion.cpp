@@ -1437,8 +1437,7 @@ rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::OdomInfo & msg)
 		info.localMap.insert(std::make_pair(msg.localMapKeys[i], point3fFromROS(msg.localMapValues[i])));
 	}
 
-	info.localScanMap = rtabmap::LaserScan::backwardCompatibility(rtabmap::uncompressData(msg.localScanMap));
-
+	info.localScanMap = rtabmap::LaserScan(rtabmap::uncompressData(msg.localScanMap), 0, 0, (rtabmap::LaserScan::Format)msg.localScanMapFormat);
 	return info;
 }
 
@@ -1495,6 +1494,7 @@ void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_ros::OdomInfo & m
 	points3fToROS(uValues(info.localMap), msg.localMapValues);
 
 	msg.localScanMap = rtabmap::compressData(rtabmap::util3d::transformLaserScan(info.localScanMap, info.localScanMap.localTransform()).data());
+	msg.localScanMapFormat = info.localScanMap.format();
 }
 
 cv::Mat userDataFromROS(const rtabmap_ros::UserData & dataMsg)
