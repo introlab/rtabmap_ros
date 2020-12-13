@@ -182,7 +182,8 @@ private:
 			const rtabmap::Transform & odom = rtabmap::Transform(),
 			const std::string & odomFrameId = "",
 			const cv::Mat & odomCovariance = cv::Mat::eye(6,6,CV_64FC1),
-			const rtabmap::OdometryInfo & odomInfo = rtabmap::OdometryInfo());
+			const rtabmap::OdometryInfo & odomInfo = rtabmap::OdometryInfo(),
+			double timeMsgConversion = 0.0);
 
 	bool updateRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool resetRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);

@@ -1149,6 +1149,7 @@ void CoreWrapper::commonDepthCallbackImpl(
 		const std::vector<std::vector<rtabmap_ros::Point3f> > & localPoints3dMsgs,
 		const std::vector<cv::Mat> & localDescriptorsMsgs)
 {
+	UTimer timerConversion;
 	cv::Mat rgb;
 	cv::Mat depth;
 	std::vector<rtabmap::CameraModel> cameraModels;
@@ -1331,7 +1332,8 @@ void CoreWrapper::commonDepthCallbackImpl(
 			lastPose_,
 			odomFrameId,
 			covariance_,
-			odomInfo);
+			odomInfo,
+			timerConversion.ticks());
 	covariance_ = cv::Mat();
 }
 
@@ -1350,6 +1352,7 @@ void CoreWrapper::commonStereoCallback(
 		const std::vector<rtabmap_ros::Point3f> & localPoints3dMsg,
 		const cv::Mat & localDescriptorsMsg)
 {
+	UTimer timerConversion;
 	std::string odomFrameId = odomFrameId_;
 	if(odomMsg.get())
 	{
@@ -1577,7 +1580,8 @@ void CoreWrapper::commonStereoCallback(
 			lastPose_,
 			odomFrameId,
 			covariance_,
-			odomInfo);
+			odomInfo,
+			timerConversion.ticks());
 
 	covariance_ = cv::Mat();
 }
@@ -1590,6 +1594,7 @@ void CoreWrapper::commonLaserScanCallback(
 		const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg,
 		const rtabmap_ros::GlobalDescriptor & globalDescriptor)
 {
+	UTimer timerConversion;
 	std::string odomFrameId = odomFrameId_;
 	if(odomMsg.get())
 	{
@@ -1721,7 +1726,8 @@ void CoreWrapper::commonLaserScanCallback(
 			lastPose_,
 			odomFrameId,
 			covariance_,
-			odomInfo);
+			odomInfo,
+			timerConversion.ticks());
 
 	covariance_ = cv::Mat();
 }
@@ -1731,6 +1737,7 @@ void CoreWrapper::commonOdomCallback(
 		const rtabmap_ros::UserDataConstPtr & userDataMsg,
 		const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg)
 {
+	UTimer timerConversion;
 	UASSERT(odomMsg.get());
 	std::string odomFrameId = odomFrameId_;
 
@@ -1788,7 +1795,8 @@ void CoreWrapper::commonOdomCallback(
 			lastPose_,
 			odomFrameId,
 			covariance_,
-			odomInfo);
+			odomInfo,
+			timerConversion.ticks());
 
 	covariance_ = cv::Mat();
 }
@@ -1799,7 +1807,8 @@ void CoreWrapper::process(
 		const Transform & odom,
 		const std::string & odomFrameId,
 		const cv::Mat & odomCovariance,
-		const OdometryInfo & odomInfo)
+		const OdometryInfo & odomInfo,
+		double timeMsgConversion)
 {
 	UTimer timer;
 	if(rtabmap_.isIDsGenerated() || data.id() > 0)
@@ -2231,20 +2240,22 @@ void CoreWrapper::process(
 		{
 			timeRtabmap = timer.ticks();
 		}
-		NODELET_INFO("rtabmap (%d): Rate=%.2fs, Limit=%.3fs, RTAB-Map=%.4fs, Maps update=%.4fs pub=%.4fs (local map=%d, WM=%d)",
+		NODELET_INFO("rtabmap (%d): Rate=%.2fs, Limit=%.3fs, Conversion=%.4fs, RTAB-Map=%.4fs, Maps update=%.4fs pub=%.4fs (local map=%d, WM=%d)",
 				rtabmap_.getLastLocationId(),
 				rate_>0?1.0f/rate_:0,
 				rtabmap_.getTimeThreshold()/1000.0f,
+				timeMsgConversion,
 				timeRtabmap,
 				timeUpdateMaps,
 				timePublishMaps,
 				(int)rtabmap_.getLocalOptimizedPoses().size(),
 				rtabmap_.getWMSize()+rtabmap_.getSTMSize());
 		rtabmapROSStats_.insert(std::make_pair(std::string("RtabmapROS/HasSubscribers/"), mapsManager_.hasSubscribers()?1:0));
+		rtabmapROSStats_.insert(std::make_pair(std::string("RtabmapROS/TimeMsgConversion/ms"), timeMsgConversion*1000.0f));
 		rtabmapROSStats_.insert(std::make_pair(std::string("RtabmapROS/TimeRtabmap/ms"), timeRtabmap*1000.0f));
 		rtabmapROSStats_.insert(std::make_pair(std::string("RtabmapROS/TimeUpdatingMaps/ms"), timeUpdateMaps*1000.0f));
 		rtabmapROSStats_.insert(std::make_pair(std::string("RtabmapROS/TimePublishing/ms"), timePublishMaps*1000.0f));
-		rtabmapROSStats_.insert(std::make_pair(std::string("RtabmapROS/TimeTotal/ms"), (timeRtabmap+timeUpdateMaps+timePublishMaps)*1000.0f));
+		rtabmapROSStats_.insert(std::make_pair(std::string("RtabmapROS/TimeTotal/ms"), (timeMsgConversion+timeRtabmap+timeUpdateMaps+timePublishMaps)*1000.0f));
 	}
 	else if(!rtabmap_.isIDsGenerated())
 	{
