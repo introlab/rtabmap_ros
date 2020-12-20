@@ -86,6 +86,7 @@ void MapCloudDisplay::CloudInfo::clear()
 
 MapCloudDisplay::MapCloudDisplay()
   : spinner_(1, &cbqueue_),
+	lastCloudAdded_(-1),
     new_xyz_transformer_(false),
     new_color_transformer_(false),
     needs_retransform_(false),
@@ -648,6 +649,8 @@ void MapCloudDisplay::update( float wall_dt, float ros_dt )
 {
 	rviz::PointCloud::RenderMode mode = (rviz::PointCloud::RenderMode) style_property_->getOptionInt();
 
+	int lastCloudAdded = -1;
+
 	if (needs_retransform_)
 	{
 		retransform();
@@ -687,6 +690,7 @@ void MapCloudDisplay::update( float wall_dt, float ros_dt )
 
 				cloud_infos_.erase(it->first);
 				cloud_infos_.insert(*it);
+				lastCloudAdded = it->first;
 			}
 
 			new_cloud_infos_.clear();
@@ -761,14 +765,32 @@ void MapCloudDisplay::update( float wall_dt, float ros_dt )
 				}
 			}
 			//hide not used clouds
-			for(std::map<int, CloudInfoPtr>::iterator iter = cloud_infos_.begin(); iter!=cloud_infos_.end(); ++iter)
+			for(std::map<int, CloudInfoPtr>::iterator iter = cloud_infos_.begin(); iter!=cloud_infos_.end();)
 			{
 				if(current_map_.find(iter->first) == current_map_.end())
 				{
-					iter->second->scene_node_->setVisible(false);
+					if(iter->first == lastCloudAdded_)
+					{
+						// remove from cache, the node has been discarded
+						cloud_infos_.erase(iter++);
+						lastCloudAdded_ = -1;
+					}
+					else
+					{
+						iter->second->scene_node_->setVisible(false);
+						++iter;
+					}
+				}
+				else
+				{
+					++iter;
 				}
 			}
 		}
+	}
+	if(lastCloudAdded>0)
+	{
+		lastCloudAdded_ = lastCloudAdded;
 	}
 
 	this->setStatusStd(rviz::StatusProperty::Ok, "Points", tr("%1").arg(totalPoints).toStdString());
@@ -777,6 +799,7 @@ void MapCloudDisplay::update( float wall_dt, float ros_dt )
 
 void MapCloudDisplay::reset()
 {
+	lastCloudAdded_ = -1;
 	{
 		boost::mutex::scoped_lock lock(new_clouds_mutex_);
 		cloud_infos_.clear();

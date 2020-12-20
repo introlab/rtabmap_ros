@@ -72,6 +72,7 @@ public:
 	int rgbdCameras() const {return isSubscribedToRGBD()?(int)rgbdSubs_.size():0;}
 	int getQueueSize() const {return queueSize_;}
 	bool isApproxSync() const {return approxSync_;}
+	const std::string & name() const {return name_;}
 
 protected:
 	void setupCallbacks(
@@ -102,9 +103,9 @@ protected:
 				const sensor_msgs::PointCloud2& scan3dMsg,
 				const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg,
 				const std::vector<rtabmap_ros::GlobalDescriptor> & globalDescriptorMsgs = std::vector<rtabmap_ros::GlobalDescriptor>(),
-				const std::vector<std::vector<rtabmap_ros::KeyPoint> > & localKeyPoints = std::vector<std::vector<rtabmap_ros::KeyPoint> >(),
-				const std::vector<std::vector<rtabmap_ros::Point3f> > & localPoints3d = std::vector<std::vector<rtabmap_ros::Point3f> >(),
-				const std::vector<cv::Mat> & localDescriptors = std::vector<cv::Mat>()) = 0;
+				const std::vector<rtabmap_ros::KeyPoint> & localKeyPoints = std::vector<rtabmap_ros::KeyPoint>(),
+				const std::vector<rtabmap_ros::Point3f> & localPoints3d = std::vector<rtabmap_ros::Point3f>(),
+				const cv::Mat & localDescriptors = cv::Mat()) = 0;
 	virtual void commonLaserScanCallback(
 				const nav_msgs::OdometryConstPtr & odomMsg,
 				const rtabmap_ros::UserDataConstPtr & userDataMsg,
@@ -209,6 +210,28 @@ private:
 			bool subscribeOdomInfo,
 			int queueSize,
 			bool approxSync); 
+	void setupRGBD5Callbacks(
+			ros::NodeHandle & nh,
+			ros::NodeHandle & pnh,
+			bool subscribeOdom,
+			bool subscribeUserData,
+			bool subscribeScan2d,
+			bool subscribeScan3d,
+			bool subscribeScanDesc,
+			bool subscribeOdomInfo,
+			int queueSize,
+			bool approxSync);
+	void setupRGBD6Callbacks(
+			ros::NodeHandle & nh,
+			ros::NodeHandle & pnh,
+			bool subscribeOdom,
+			bool subscribeUserData,
+			bool subscribeScan2d,
+			bool subscribeScan3d,
+			bool subscribeScanDesc,
+			bool subscribeOdomInfo,
+			int queueSize,
+			bool approxSync);
 #endif
 	void setupScanCallbacks(
 			ros::NodeHandle & nh,
@@ -372,9 +395,6 @@ private:
 	DATA_SYNCS2(rgbdScan3d, rtabmap_ros::RGBDImage, sensor_msgs::PointCloud2)
 	DATA_SYNCS2(rgbdScanDesc, rtabmap_ros::RGBDImage, rtabmap_ros::ScanDescriptor);
 	DATA_SYNCS2(rgbdInfo, rtabmap_ros::RGBDImage, rtabmap_ros::OdomInfo);
-	DATA_SYNCS3(rgbdScan2dInfo, rtabmap_ros::RGBDImage, sensor_msgs::LaserScan, rtabmap_ros::OdomInfo);
-	DATA_SYNCS3(rgbdScan3dInfo, rtabmap_ros::RGBDImage, sensor_msgs::PointCloud2, rtabmap_ros::OdomInfo);
-	DATA_SYNCS3(rgbdScanDescInfo, rtabmap_ros::RGBDImage, rtabmap_ros::ScanDescriptor, rtabmap_ros::OdomInfo);
 
 	// 1 RGBD + Odom
 	DATA_SYNCS2(rgbdOdom, nav_msgs::Odometry, rtabmap_ros::RGBDImage);
@@ -382,9 +402,6 @@ private:
 	DATA_SYNCS3(rgbdOdomScan3d, nav_msgs::Odometry, rtabmap_ros::RGBDImage, sensor_msgs::PointCloud2);
 	DATA_SYNCS3(rgbdOdomScanDesc, nav_msgs::Odometry, rtabmap_ros::RGBDImage, rtabmap_ros::ScanDescriptor);
 	DATA_SYNCS3(rgbdOdomInfo, nav_msgs::Odometry, rtabmap_ros::RGBDImage, rtabmap_ros::OdomInfo);
-	DATA_SYNCS4(rgbdOdomScan2dInfo, nav_msgs::Odometry, rtabmap_ros::RGBDImage, sensor_msgs::LaserScan, rtabmap_ros::OdomInfo);
-	DATA_SYNCS4(rgbdOdomScan3dInfo, nav_msgs::Odometry, rtabmap_ros::RGBDImage, sensor_msgs::PointCloud2, rtabmap_ros::OdomInfo);
-	DATA_SYNCS4(rgbdOdomScanDescInfo, nav_msgs::Odometry, rtabmap_ros::RGBDImage, rtabmap_ros::ScanDescriptor, rtabmap_ros::OdomInfo);
 
 #ifdef RTABMAP_SYNC_USER_DATA
 	// 1 RGBD + User Data
@@ -393,9 +410,6 @@ private:
 	DATA_SYNCS3(rgbdDataScan3d, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, sensor_msgs::PointCloud2);
 	DATA_SYNCS3(rgbdDataScanDesc, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::ScanDescriptor);
 	DATA_SYNCS3(rgbdDataInfo, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::OdomInfo);
-	DATA_SYNCS4(rgbdDataScan2dInfo, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, sensor_msgs::LaserScan, rtabmap_ros::OdomInfo);
-	DATA_SYNCS4(rgbdDataScan3dInfo, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, sensor_msgs::PointCloud2, rtabmap_ros::OdomInfo);
-	DATA_SYNCS4(rgbdDataScanDescInfo, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::ScanDescriptor, rtabmap_ros::OdomInfo);
 
 	// 1 RGBD + Odom + User Data
 	DATA_SYNCS3(rgbdOdomData, nav_msgs::Odometry, rtabmap_ros::UserData, rtabmap_ros::RGBDImage);
@@ -403,9 +417,6 @@ private:
 	DATA_SYNCS4(rgbdOdomDataScan3d, nav_msgs::Odometry, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, sensor_msgs::PointCloud2);
 	DATA_SYNCS4(rgbdOdomDataScanDesc, nav_msgs::Odometry, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::ScanDescriptor);
 	DATA_SYNCS4(rgbdOdomDataInfo, nav_msgs::Odometry, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::OdomInfo);
-	DATA_SYNCS5(rgbdOdomDataScan2dInfo, nav_msgs::Odometry, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, sensor_msgs::LaserScan, rtabmap_ros::OdomInfo);
-	DATA_SYNCS5(rgbdOdomDataScan3dInfo, nav_msgs::Odometry, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, sensor_msgs::PointCloud2, rtabmap_ros::OdomInfo);
-	DATA_SYNCS5(rgbdOdomDataScanDescInfo, nav_msgs::Odometry, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::ScanDescriptor, rtabmap_ros::OdomInfo);
 #endif
 
 #ifdef RTABMAP_SYNC_MULTI_RGBD
@@ -415,9 +426,6 @@ private:
 	DATA_SYNCS3(rgbd2Scan3d, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::PointCloud2);
 	DATA_SYNCS3(rgbd2ScanDesc, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::ScanDescriptor);
 	DATA_SYNCS3(rgbd2Info, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::OdomInfo);
-	DATA_SYNCS4(rgbd2Scan2dInfo, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::LaserScan, rtabmap_ros::OdomInfo);
-	DATA_SYNCS4(rgbd2Scan3dInfo, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::PointCloud2, rtabmap_ros::OdomInfo);
-	DATA_SYNCS4(rgbd2ScanDescInfo, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::ScanDescriptor, rtabmap_ros::OdomInfo);
 
 	// 2 RGBD + Odom
 	DATA_SYNCS3(rgbd2Odom, nav_msgs::Odometry, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage);
@@ -425,9 +433,6 @@ private:
 	DATA_SYNCS4(rgbd2OdomScan3d, nav_msgs::Odometry, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::PointCloud2);
 	DATA_SYNCS4(rgbd2OdomScanDesc, nav_msgs::Odometry, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::ScanDescriptor);
 	DATA_SYNCS4(rgbd2OdomInfo, nav_msgs::Odometry, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::OdomInfo);
-	DATA_SYNCS5(rgbd2OdomScan2dInfo, nav_msgs::Odometry, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::LaserScan, rtabmap_ros::OdomInfo);
-	DATA_SYNCS5(rgbd2OdomScan3dInfo, nav_msgs::Odometry, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::PointCloud2, rtabmap_ros::OdomInfo);
-	DATA_SYNCS5(rgbd2OdomScanDescInfo, nav_msgs::Odometry, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::ScanDescriptor, rtabmap_ros::OdomInfo);
 
 #ifdef RTABMAP_SYNC_USER_DATA
 	// 2 RGBD + User Data
@@ -436,9 +441,6 @@ private:
 	DATA_SYNCS4(rgbd2DataScan3d, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::PointCloud2);
 	DATA_SYNCS4(rgbd2DataScanDesc, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::ScanDescriptor);
 	DATA_SYNCS4(rgbd2DataInfo, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::OdomInfo);
-	DATA_SYNCS5(rgbd2DataScan2dInfo, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::LaserScan, rtabmap_ros::OdomInfo);
-	DATA_SYNCS5(rgbd2DataScan3dInfo, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::PointCloud2, rtabmap_ros::OdomInfo);
-	DATA_SYNCS5(rgbd2DataScanDescInfo, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::ScanDescriptor, rtabmap_ros::OdomInfo);
 
 	// 2 RGBD + Odom + User Data
 	DATA_SYNCS4(rgbd2OdomData, nav_msgs::Odometry, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage);
@@ -446,9 +448,6 @@ private:
 	DATA_SYNCS5(rgbd2OdomDataScan3d, nav_msgs::Odometry, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::PointCloud2);
 	DATA_SYNCS5(rgbd2OdomDataScanDesc, nav_msgs::Odometry, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::ScanDescriptor);
 	DATA_SYNCS5(rgbd2OdomDataInfo, nav_msgs::Odometry, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::OdomInfo);
-	DATA_SYNCS6(rgbd2OdomDataScan2dInfo, nav_msgs::Odometry, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::LaserScan, rtabmap_ros::OdomInfo);
-	DATA_SYNCS6(rgbd2OdomDataScan3dInfo, nav_msgs::Odometry, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::PointCloud2, rtabmap_ros::OdomInfo);
-	DATA_SYNCS6(rgbd2OdomDataScanDescInfo, nav_msgs::Odometry, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::ScanDescriptor, rtabmap_ros::OdomInfo);
 #endif
 
 	// 3 RGBD
@@ -457,9 +456,6 @@ private:
 	DATA_SYNCS4(rgbd3Scan3d, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::PointCloud2);
 	DATA_SYNCS4(rgbd3ScanDesc, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::ScanDescriptor);
 	DATA_SYNCS4(rgbd3Info, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::OdomInfo);
-	DATA_SYNCS5(rgbd3Scan2dInfo, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::LaserScan, rtabmap_ros::OdomInfo);
-	DATA_SYNCS5(rgbd3Scan3dInfo, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::PointCloud2, rtabmap_ros::OdomInfo);
-	DATA_SYNCS5(rgbd3ScanDescInfo, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::ScanDescriptor, rtabmap_ros::OdomInfo);
 
 	// 3 RGBD + Odom
 	DATA_SYNCS4(rgbd3Odom, nav_msgs::Odometry, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage);
@@ -467,9 +463,6 @@ private:
 	DATA_SYNCS5(rgbd3OdomScan3d, nav_msgs::Odometry, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::PointCloud2);
 	DATA_SYNCS5(rgbd3OdomScanDesc, nav_msgs::Odometry, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::ScanDescriptor);
 	DATA_SYNCS5(rgbd3OdomInfo, nav_msgs::Odometry, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::OdomInfo);
-	DATA_SYNCS6(rgbd3OdomScan2dInfo, nav_msgs::Odometry, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::LaserScan, rtabmap_ros::OdomInfo);
-	DATA_SYNCS6(rgbd3OdomScan3dInfo, nav_msgs::Odometry, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::PointCloud2, rtabmap_ros::OdomInfo);
-	DATA_SYNCS6(rgbd3OdomScanDescInfo, nav_msgs::Odometry, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::ScanDescriptor, rtabmap_ros::OdomInfo);
 
 #ifdef RTABMAP_SYNC_USER_DATA
 	// 3 RGBD + User Data
@@ -478,9 +471,6 @@ private:
 	DATA_SYNCS5(rgbd3DataScan3d, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::PointCloud2);
 	DATA_SYNCS5(rgbd3DataScanDesc, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::ScanDescriptor);
 	DATA_SYNCS5(rgbd3DataInfo, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::OdomInfo);
-	DATA_SYNCS6(rgbd3DataScan2dInfo, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::LaserScan, rtabmap_ros::OdomInfo);
-	DATA_SYNCS6(rgbd3DataScan3dInfo, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::PointCloud2, rtabmap_ros::OdomInfo);
-	DATA_SYNCS6(rgbd3DataScanDescInfo, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::ScanDescriptor, rtabmap_ros::OdomInfo);
 
 	// 3 RGBD + Odom + User Data
 	DATA_SYNCS5(rgbd3OdomData, nav_msgs::Odometry, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage);
@@ -488,9 +478,6 @@ private:
 	DATA_SYNCS6(rgbd3OdomDataScan3d, nav_msgs::Odometry, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::PointCloud2);
 	DATA_SYNCS6(rgbd3OdomDataScanDesc, nav_msgs::Odometry, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::ScanDescriptor);
 	DATA_SYNCS6(rgbd3OdomDataInfo, nav_msgs::Odometry, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::OdomInfo);
-	DATA_SYNCS7(rgbd3OdomDataScan2dInfo, nav_msgs::Odometry, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::LaserScan, rtabmap_ros::OdomInfo);
-	DATA_SYNCS7(rgbd3OdomDataScan3dInfo, nav_msgs::Odometry, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::PointCloud2, rtabmap_ros::OdomInfo);
-	DATA_SYNCS7(rgbd3OdomDataScanDescInfo, nav_msgs::Odometry, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::ScanDescriptor, rtabmap_ros::OdomInfo);
 #endif
 
 	// 4 RGBD
@@ -499,9 +486,6 @@ private:
 	DATA_SYNCS5(rgbd4Scan3d, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::PointCloud2);
 	DATA_SYNCS5(rgbd4ScanDesc, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::ScanDescriptor);
 	DATA_SYNCS5(rgbd4Info, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::OdomInfo);
-	DATA_SYNCS6(rgbd4Scan2dInfo, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::LaserScan, rtabmap_ros::OdomInfo);
-	DATA_SYNCS6(rgbd4Scan3dInfo, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::PointCloud2, rtabmap_ros::OdomInfo);
-	DATA_SYNCS6(rgbd4ScanDescInfo, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::ScanDescriptor, rtabmap_ros::OdomInfo);
 
 	// 4 RGBD + Odom
 	DATA_SYNCS5(rgbd4Odom, nav_msgs::Odometry, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage);
@@ -509,9 +493,6 @@ private:
 	DATA_SYNCS6(rgbd4OdomScan3d, nav_msgs::Odometry, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::PointCloud2);
 	DATA_SYNCS6(rgbd4OdomScanDesc, nav_msgs::Odometry, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::ScanDescriptor);
 	DATA_SYNCS6(rgbd4OdomInfo, nav_msgs::Odometry, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::OdomInfo);
-	DATA_SYNCS7(rgbd4OdomScan2dInfo, nav_msgs::Odometry, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::LaserScan, rtabmap_ros::OdomInfo);
-	DATA_SYNCS7(rgbd4OdomScan3dInfo, nav_msgs::Odometry, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::PointCloud2, rtabmap_ros::OdomInfo);
-	DATA_SYNCS7(rgbd4OdomScanDescInfo, nav_msgs::Odometry, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::ScanDescriptor, rtabmap_ros::OdomInfo);
 
 #ifdef RTABMAP_SYNC_USER_DATA
 	// 4 RGBD + User Data
@@ -520,9 +501,6 @@ private:
 	DATA_SYNCS6(rgbd4DataScan3d, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::PointCloud2);
 	DATA_SYNCS6(rgbd4DataScanDesc, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::ScanDescriptor);
 	DATA_SYNCS6(rgbd4DataInfo, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::OdomInfo);
-	DATA_SYNCS7(rgbd4DataScan2dInfo, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::LaserScan, rtabmap_ros::OdomInfo);
-	DATA_SYNCS7(rgbd4DataScan3dInfo, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::PointCloud2, rtabmap_ros::OdomInfo);
-	DATA_SYNCS7(rgbd4DataScanDescInfo, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::ScanDescriptor, rtabmap_ros::OdomInfo);
 
 	// 4 RGBD + Odom + User Data
 	DATA_SYNCS6(rgbd4OdomData, nav_msgs::Odometry, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage);
@@ -530,10 +508,36 @@ private:
 	DATA_SYNCS7(rgbd4OdomDataScan3d, nav_msgs::Odometry, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::PointCloud2);
 	DATA_SYNCS7(rgbd4OdomDataScanDesc, nav_msgs::Odometry, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::ScanDescriptor);
 	DATA_SYNCS7(rgbd4OdomDataInfo, nav_msgs::Odometry, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::OdomInfo);
-	DATA_SYNCS8(rgbd4OdomDataScan2dInfo, nav_msgs::Odometry, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::LaserScan, rtabmap_ros::OdomInfo);
-	DATA_SYNCS8(rgbd4OdomDataScan3dInfo, nav_msgs::Odometry, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::PointCloud2, rtabmap_ros::OdomInfo);
-	DATA_SYNCS8(rgbd4OdomDataScanDescInfo, nav_msgs::Odometry, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::ScanDescriptor, rtabmap_ros::OdomInfo);
 #endif
+
+	// 5 RGBD
+	DATA_SYNCS5(rgbd5, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage);
+	DATA_SYNCS6(rgbd5Scan2d, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::LaserScan);
+	DATA_SYNCS6(rgbd5Scan3d, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::PointCloud2);
+	DATA_SYNCS6(rgbd5ScanDesc, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::ScanDescriptor);
+	DATA_SYNCS6(rgbd5Info, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::OdomInfo);
+
+	// 5 RGBD + Odom
+	DATA_SYNCS6(rgbd5Odom, nav_msgs::Odometry, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage);
+	DATA_SYNCS7(rgbd5OdomScan2d, nav_msgs::Odometry, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::LaserScan);
+	DATA_SYNCS7(rgbd5OdomScan3d, nav_msgs::Odometry, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::PointCloud2);
+	DATA_SYNCS7(rgbd5OdomScanDesc, nav_msgs::Odometry, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::ScanDescriptor);
+	DATA_SYNCS7(rgbd5OdomInfo, nav_msgs::Odometry, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::OdomInfo);
+
+	// 6 RGBD
+	DATA_SYNCS6(rgbd6, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage);
+	DATA_SYNCS7(rgbd6Scan2d, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::LaserScan);
+	DATA_SYNCS7(rgbd6Scan3d, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::PointCloud2);
+	DATA_SYNCS7(rgbd6ScanDesc, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::ScanDescriptor);
+	DATA_SYNCS7(rgbd6Info, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::OdomInfo);
+
+	// 6 RGBD + Odom
+	DATA_SYNCS7(rgbd6Odom, nav_msgs::Odometry, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage);
+	DATA_SYNCS8(rgbd6OdomScan2d, nav_msgs::Odometry, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::LaserScan);
+	DATA_SYNCS8(rgbd6OdomScan3d, nav_msgs::Odometry, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, sensor_msgs::PointCloud2);
+	DATA_SYNCS8(rgbd6OdomScanDesc, nav_msgs::Odometry, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::ScanDescriptor);
+	DATA_SYNCS8(rgbd6OdomInfo, nav_msgs::Odometry, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::OdomInfo);
+
 #endif //RTABMAP_SYNC_MULTI_RGBD
 
 	// Scan

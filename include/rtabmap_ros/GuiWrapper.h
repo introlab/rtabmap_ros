@@ -91,9 +91,9 @@ private:
 			const sensor_msgs::PointCloud2& scan3dMsg,
 			const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg,
 			const std::vector<rtabmap_ros::GlobalDescriptor> & globalDescriptorMsgs = std::vector<rtabmap_ros::GlobalDescriptor>(),
-			const std::vector<std::vector<rtabmap_ros::KeyPoint> > & localKeyPoints = std::vector<std::vector<rtabmap_ros::KeyPoint> >(),
-			const std::vector<std::vector<rtabmap_ros::Point3f> > & localPoints3d = std::vector<std::vector<rtabmap_ros::Point3f> >(),
-			const std::vector<cv::Mat> & localDescriptors = std::vector<cv::Mat>());
+			const std::vector<rtabmap_ros::KeyPoint> & localKeyPoints = std::vector<rtabmap_ros::KeyPoint>(),
+			const std::vector<rtabmap_ros::Point3f> & localPoints3d = std::vector<rtabmap_ros::Point3f>(),
+			const cv::Mat & localDescriptors = cv::Mat());
 	virtual void commonLaserScanCallback(
 			const nav_msgs::OdometryConstPtr & odomMsg,
 			const rtabmap_ros::UserDataConstPtr & userDataMsg,

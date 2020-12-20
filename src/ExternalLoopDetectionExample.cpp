@@ -201,18 +201,15 @@ int main(int argc, char** argv)
 		int addedNodes = 0;
 		for(size_t i=0; i<mapRes.data.nodes.size(); ++i)
 		{
-			if(poses.find(mapRes.data.nodes.at(i).id) != poses.end())
+			rtabmap::Signature s = rtabmap_ros::nodeDataFromROS(mapRes.data.nodes.at(i));
+			rtabmap::SensorData compressedData = s.sensorData();
+			s.sensorData().uncompressData();
+			if(loopClosureDetector.process(s.sensorData(), rtabmap::Transform()))
 			{
-				rtabmap::Signature s = rtabmap_ros::nodeDataFromROS(mapRes.data.nodes.at(i));
-				rtabmap::SensorData compressedData = s.sensorData();
-				s.sensorData().uncompressData();
-				if(loopClosureDetector.process(s.sensorData(), rtabmap::Transform()))
-				{
-					localData.insert(std::make_pair(
-							loopClosureDetector.getStatistics().getLastSignatureData().id(),
-							compressedData));
-					++addedNodes;
-				}
+				localData.insert(std::make_pair(
+						loopClosureDetector.getStatistics().getLastSignatureData().id(),
+						compressedData));
+				++addedNodes;
 			}
 		}
 		ROS_INFO("Added %d/%d nodes to memory! Vocabulary size=%d",

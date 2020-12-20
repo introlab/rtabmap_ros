@@ -50,13 +50,15 @@ class MapAssembler
 {
 
 public:
-	MapAssembler(int & argc, char** argv)
+	MapAssembler(int & argc, char** argv) :
+		localGridsRegenerated_(false)
 	{
 		ros::NodeHandle pnh("~");
 		ros::NodeHandle nh;
 
 		std::string configPath;
 		pnh.param("config_path", configPath, configPath);
+		pnh.param("regenerate_local_grids", localGridsRegenerated_, localGridsRegenerated_);
 
 		//parameters
 		rtabmap::ParametersMap parameters;
@@ -188,7 +190,12 @@ public:
 			   msg->nodes[i].depth.size() ||
 			   msg->nodes[i].laserScan.size())
 			{
-				uInsert(nodes_, std::make_pair(msg->nodes[i].id, rtabmap_ros::nodeDataFromROS(msg->nodes[i])));
+				Signature data = rtabmap_ros::nodeDataFromROS(msg->nodes[i]);
+				if(localGridsRegenerated_)
+				{
+					data.sensorData().setOccupancyGrid(cv::Mat(), cv::Mat(), cv::Mat(), 0, cv::Point3f());
+				}
+				uInsert(nodes_, std::make_pair(msg->nodes[i].id, data));
 			}
 		}
 
@@ -229,6 +236,8 @@ private:
 	ros::Subscriber mapDataTopic_;
 
 	ros::ServiceServer resetService_;
+
+	bool localGridsRegenerated_;
 };
 
 

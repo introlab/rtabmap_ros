@@ -83,8 +83,7 @@ OdometryROS::OdometryROS(bool stereoParams, bool visParams, bool icpParams) :
 	maxUpdateRate_(0.0),
 	odomStrategy_(Parameters::defaultOdomStrategy()),
 	waitIMUToinit_(false),
-	imuProcessed_(false),
-	lastImuReceivedStamp_(0.0)
+	imuProcessed_(false)
 {
 
 }
@@ -119,6 +118,7 @@ void OdometryROS::onInit()
 	odomLocalMap_ = nh.advertise<sensor_msgs::PointCloud2>("odom_local_map", 1);
 	odomLocalScanMap_ = nh.advertise<sensor_msgs::PointCloud2>("odom_local_scan_map", 1);
 	odomLastFrame_ = nh.advertise<sensor_msgs::PointCloud2>("odom_last_frame", 1);
+	odomRgbdImagePub_ = nh.advertise<rtabmap_ros::RGBDImage>("odom_rgbd_image", 1);
 
 	Transform initialPose = Transform::getIdentity();
 	std::string initialPoseStr;
@@ -497,42 +497,70 @@ void OdometryROS::callbackIMU(const sensor_msgs::ImuConstPtr& msg)
 		}
 		else
 		{
-			SensorData data(imu, 0, stamp);
-			this->processData(data, msg->header.stamp);
-			imuProcessed_ = true;
-			lastImuReceivedStamp_ = stamp;
-
-			if(bufferedData_.isValid() && stamp >= bufferedData_.stamp())
+			imus_.insert(std::make_pair(stamp, imu));
+			
+			if(bufferedData_.first.isValid() && stamp > bufferedData_.first.stamp())
 			{
-				processData(bufferedData_, ros::Time(bufferedData_.stamp()));
+				SensorData data = bufferedData_.first;
+				bufferedData_.first = SensorData();
+				processData(data, bufferedData_.second.first, bufferedData_.second.second);
 			}
-			bufferedData_ = SensorData();
+			
+			if(imus_.size() > 1000)
+			{
+				imus_.erase(imus_.begin());
+			}
 		}
 	}
 }
 
-void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
+void OdometryROS::processData(const SensorData & data, const ros::Time & stamp, const std::string & sensorFrameId)
 {
-	if((waitIMUToinit_ && !imuProcessed_) && odometry_->framesProcessed() == 0 && odometry_->getPose().isIdentity() && data.imu().empty())
+	if((waitIMUToinit_ && !imuProcessed_) && odometry_->framesProcessed() == 0 && odometry_->getPose().isIdentity() && imus_.empty())
 	{
 		NODELET_WARN("odometry: waiting imu to initialize orientation (wait_imu_to_init=true)");
 		return;
 	}
 
+	if(odometry_->canProcessIMU())
+	{
+		if(waitIMUToinit_ && (imus_.empty() || imus_.rbegin()->first<stamp.toSec()))
+		{
+			//NODELET_WARN("No imu received with higher stamp than last image (%f)! Buffering this image until we get more imu msgs...", stamp.toSec());
+		
+			// keep in cache to process later when we will receive imu msgs
+			if(bufferedData_.first.isValid())
+			{
+				NODELET_ERROR("Overwriting previous data! Make sure IMU is "
+						"published faster than data rate. (last image stamp "
+						"buffered=%f and new one is %f, last imu stamp received=%f)",
+						bufferedData_.first.stamp(), data.stamp(), imus_.empty()?0:imus_.rbegin()->first);
+			}
+			bufferedData_.first = data;
+			bufferedData_.second.first = stamp;
+			bufferedData_.second.second = sensorFrameId;
+			return;
+		}
+		// process all imu data up to current image stamp (or just after so that underlying odom approach can do interpolation of imu at image stamp)
+		std::map<double, rtabmap::IMU>::iterator iterEnd = imus_.lower_bound(stamp.toSec());
+		if(iterEnd!= imus_.end())
+		{
+			++iterEnd;
+		}
+		for(std::map<double, rtabmap::IMU>::iterator iter=imus_.begin(); iter!=iterEnd;)
+		{
+			//NODELET_WARN("img callback: process imu   %f", iter->first);
+			SensorData dataIMU(iter->second, 0, iter->first);
+			odometry_->process(dataIMU);
+			imus_.erase(iter++);
+			imuProcessed_ = true;
+		}
+	}
+	//NODELET_WARN("img callback: process image %f", stamp.toSec());
+
 	Transform groundTruth;
 	if(!data.imageRaw().empty() || !data.laserScanRaw().isEmpty())
 	{
-		if(odometry_->canProcessIMU() && data.imu().empty() && lastImuReceivedStamp_>0.0 && data.stamp() > lastImuReceivedStamp_)
-		{
-			//NODELET_WARN("Data received is more recent than last imu received, waiting for imu update to process it.");
-			if(bufferedData_.isValid())
-			{
-				NODELET_ERROR("Overwriting previous data! Make sure IMU is published faster than data rate.");
-			}
-			bufferedData_ = data;
-			return;
-		}
-
 		if(previousStamp_>0.0 && previousStamp_ >= stamp.toSec())
 		{
 			NODELET_WARN("Odometry: Detected not valid consecutive stamps (previous=%fs new=%fs). New stamp should be always greater than previous stamp. This new data is ignored. This message will appear only once.",
@@ -732,7 +760,9 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 			for(std::map<int, cv::Point3f>::const_iterator iter=info.localMap.begin(); iter!=info.localMap.end(); ++iter)
 			{
 				bool inlier = info.words.find(iter->first) != info.words.end();
-				pcl::PointXYZRGB pt(inlier?0:255, 255, 0);
+				pcl::PointXYZRGB pt;
+				pt.r = inlier?0:255;
+				pt.g = 255;
 				pt.x = iter->second.x;
 				pt.y = iter->second.y;
 				pt.z = iter->second.z;
@@ -750,14 +780,14 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 			// check which type of Odometry is using
 			if(odometry_->getType() == Odometry::kTypeF2M) // If it's Frame to Map Odometry
 			{
-				const std::multimap<int, cv::Point3f> & words3  = ((OdometryF2M*)odometry_)->getLastFrame().getWords3();
+				const std::vector<cv::Point3f> & words3  = ((OdometryF2M*)odometry_)->getLastFrame().getWords3();
 				if(words3.size())
 				{
 					pcl::PointCloud<pcl::PointXYZ> cloud;
-					for(std::multimap<int, cv::Point3f>::const_iterator iter=words3.begin(); iter!=words3.end(); ++iter)
+					for(std::vector<cv::Point3f>::const_iterator iter=words3.begin(); iter!=words3.end(); ++iter)
 					{
 						// transform to odom frame
-						cv::Point3f pt = util3d::transformPoint(iter->second, pose);
+						cv::Point3f pt = util3d::transformPoint(*iter, pose);
 						cloud.push_back(pcl::PointXYZ(pt.x, pt.y, pt.z));
 					}
 
@@ -775,10 +805,10 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 				if(refFrame.getWords3().size())
 				{
 					pcl::PointCloud<pcl::PointXYZ> cloud;
-					for(std::multimap<int, cv::Point3f>::const_iterator iter=refFrame.getWords3().begin(); iter!=refFrame.getWords3().end(); ++iter)
+					for(std::vector<cv::Point3f>::const_iterator iter=refFrame.getWords3().begin(); iter!=refFrame.getWords3().end(); ++iter)
 					{
 						// transform to odom frame
-						cv::Point3f pt = util3d::transformPoint(iter->second, pose);
+						cv::Point3f pt = util3d::transformPoint(*iter, pose);
 						cloud.push_back(pcl::PointXYZ(pt.x, pt.y, pt.z));
 					}
 					sensor_msgs::PointCloud2 cloudMsg;
@@ -793,9 +823,19 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 		if(odomLocalScanMap_.getNumSubscribers() && !info.localScanMap.isEmpty())
 		{
 			sensor_msgs::PointCloud2 cloudMsg;
-			if(info.localScanMap.hasNormals())
+			if(info.localScanMap.hasNormals() && info.localScanMap.hasIntensity())
+			{
+				pcl::PointCloud<pcl::PointXYZINormal>::Ptr cloud = util3d::laserScanToPointCloudINormal(info.localScanMap, info.localScanMap.localTransform());
+				pcl::toROSMsg(*cloud, cloudMsg);
+			}
+			else if(info.localScanMap.hasNormals())
 			{
 				pcl::PointCloud<pcl::PointNormal>::Ptr cloud = util3d::laserScanToPointCloudNormal(info.localScanMap, info.localScanMap.localTransform());
+				pcl::toROSMsg(*cloud, cloudMsg);
+			}
+			else if(info.localScanMap.hasIntensity())
+			{
+				pcl::PointCloud<pcl::PointXYZI>::Ptr cloud = util3d::laserScanToPointCloudI(info.localScanMap, info.localScanMap.localTransform());
 				pcl::toROSMsg(*cloud, cloudMsg);
 			}
 			else
@@ -872,6 +912,22 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp)
 		odomInfoPub_.publish(infoMsg);
 	}
 
+	if(!data.imageRaw().empty() && odomRgbdImagePub_.getNumSubscribers())
+	{
+		if(!sensorFrameId.empty())
+		{
+			rtabmap_ros::RGBDImage msg;
+			rtabmap_ros::rgbdImageToROS(dataCpy, msg, sensorFrameId);
+			msg.header.stamp = stamp; // use corresponding time stamp to image
+			msg.header.frame_id = sensorFrameId;
+			odomRgbdImagePub_.publish(msg);
+		}
+		else
+		{
+			ROS_WARN("Sensor frame not set, cannot convert SensorData to RGBDImage");
+		}
+	}
+
 	if(!data.imageRaw().empty() || !data.laserScanRaw().isEmpty())
 	{
 		if(visParams_)
@@ -916,8 +972,8 @@ void OdometryROS::reset(const Transform & pose)
 	previousStamp_ = 0.0;
 	resetCurrentCount_ = resetCountdown_;
 	imuProcessed_ = false;
-	bufferedData_= SensorData();
-	lastImuReceivedStamp_=0.0;
+	bufferedData_.first= SensorData();
+	imus_.clear();
 	this->flushCallbacks();
 }
 

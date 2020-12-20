@@ -108,19 +108,19 @@ void CommonDataSubscriber::setupStereoCallbacks(
 	image_transport::TransportHints hintsLeft("raw", ros::TransportHints(), left_pnh);
 	image_transport::TransportHints hintsRight("raw", ros::TransportHints(), right_pnh);
 
-	imageRectLeft_.subscribe(left_it, left_nh.resolveName("image_rect"), 1, hintsLeft);
-	imageRectRight_.subscribe(right_it, right_nh.resolveName("image_rect"), 1, hintsRight);
-	cameraInfoLeft_.subscribe(left_nh, "camera_info", 1);
-	cameraInfoRight_.subscribe(right_nh, "camera_info", 1);
+	imageRectLeft_.subscribe(left_it, left_nh.resolveName("image_rect"), queueSize, hintsLeft);
+	imageRectRight_.subscribe(right_it, right_nh.resolveName("image_rect"), queueSize, hintsRight);
+	cameraInfoLeft_.subscribe(left_nh, "camera_info", queueSize);
+	cameraInfoRight_.subscribe(right_nh, "camera_info", queueSize);
 
 	if(subscribeOdom)
 	{
-		odomSub_.subscribe(nh, "odom", 1);
+		odomSub_.subscribe(nh, "odom", queueSize);
 
 		if(subscribeOdomInfo)
 		{
 			subscribedToOdomInfo_ = true;
-			odomInfoSub_.subscribe(nh, "odom_info", 1);
+			odomInfoSub_.subscribe(nh, "odom_info", queueSize);
 			SYNC_DECL6(stereoOdomInfo, approxSync, queueSize, odomSub_, imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_, odomInfoSub_);
 		}
 		else
@@ -133,7 +133,7 @@ void CommonDataSubscriber::setupStereoCallbacks(
 		if(subscribeOdomInfo)
 		{
 			subscribedToOdomInfo_ = true;
-			odomInfoSub_.subscribe(nh, "odom_info", 1);
+			odomInfoSub_.subscribe(nh, "odom_info", queueSize);
 			SYNC_DECL5(stereoInfo, approxSync, queueSize, imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_, odomInfoSub_);
 		}
 		else

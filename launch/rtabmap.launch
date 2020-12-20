@@ -110,6 +110,8 @@
   <arg name="scan_cloud_assembling_time"         default="1"/>
   <arg name="scan_cloud_assembling_fixed_frame"  default=""/>
   <arg name="scan_cloud_assembling_voxel_size"   default="0.05"/>
+  <arg name="scan_cloud_assembling_noise_radius"   default="0.0"/>    <!-- 0=disabled -->
+  <arg name="scan_cloud_assembling_noise_min_neighbors"   default="5"/>
   
   <arg name="subscribe_user_data"      default="false"/>             <!-- user data synchronized subscription -->
   <arg name="user_data_topic"          default="/user_data"/>
@@ -281,6 +283,8 @@
       <param name="assembling_time" type="double" value="$(arg scan_cloud_assembling_time)"/>
       <param name="fixed_frame_id"  type="string" value="$(arg scan_cloud_assembling_fixed_frame)"/>
       <param name="voxel_size"      type="double" value="$(arg scan_cloud_assembling_voxel_size)"/>
+      <param name="noise_radius"        type="double" value="$(arg scan_cloud_assembling_noise_radius)"/>
+      <param name="noise_min_neighbors" type="int"    value="$(arg scan_cloud_assembling_noise_min_neighbors)"/>
     </node>
   
     <!-- Visual SLAM (robot side) -->
@@ -372,9 +376,10 @@
       <remap from="left/camera_info"       to="$(arg left_camera_info_topic)"/>
       <remap from="right/camera_info"      to="$(arg right_camera_info_topic)"/>
       
-      <remap from="scan"                   to="$(arg scan_topic)"/>
-      <remap     if="$(arg scan_cloud_filtered)" from="scan_cloud" to="odom_filtered_input_scan"/>
-      <remap unless="$(arg scan_cloud_filtered)" from="scan_cloud" to="$(arg scan_cloud_topic)"/>
+      <remap     if="$(arg icp_odometry)" from="scan" to="odom_filtered_input_scan"/>
+      <remap unless="$(arg icp_odometry)" from="scan" to="$(arg scan_topic)"/>
+      <remap     if="$(arg icp_odometry)" from="scan_cloud" to="odom_filtered_input_scan"/>
+      <remap unless="$(arg icp_odometry)" from="scan_cloud" to="$(arg scan_cloud_topic)"/>
       <remap from="scan_descriptor"        to="$(arg scan_descriptor_topic)"/>
       <remap from="odom"                   to="$(arg odom_topic)"/>
     </node>

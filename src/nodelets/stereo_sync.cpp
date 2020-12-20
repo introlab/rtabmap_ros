@@ -124,7 +124,7 @@ private:
 		cameraInfoLeftSub_.subscribe(left_nh, "camera_info", 1);
 		cameraInfoRightSub_.subscribe(right_nh, "camera_info", 1);
 
-		std::string subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s",
+		std::string subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s \\\n   %s \\\n   %s \\\n   %s",
 							getName().c_str(),
 							approxSync?"approx":"exact",
 							imageLeftSub_.getTopic().c_str(),

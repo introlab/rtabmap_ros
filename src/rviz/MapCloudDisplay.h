@@ -174,6 +174,8 @@ private:
 	std::map<int, rtabmap::Transform> current_map_;
 	boost::mutex current_map_mutex_;
 
+	int lastCloudAdded_;
+
 	struct TransformerInfo
 	{
 		rviz::PointCloudTransformerPtr transformer;

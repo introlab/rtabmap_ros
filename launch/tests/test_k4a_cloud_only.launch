@@ -1,0 +1,70 @@
+<launch>
+  
+    <arg name="rtabmapviz"    default="true"/>
+   
+    <include file="$(find azure_kinect_ros_driver)/launch/driver.launch">
+       <arg name="point_cloud" value="false"/>
+       <arg name="rgb_point_cloud" value="false"/>
+       <arg name="fps" value="15"/>
+    </include>
+   
+    <group ns="rtabmap">
+    
+      <node pkg="nodelet" type="nodelet" name="points_xyz" args="standalone rtabmap_ros/point_cloud_xyz" output="screen">
+        <remap from="depth/image"       to="/depth_to_rgb/image_raw"/>
+        <remap from="depth/camera_info" to="/depth_to_rgb/camera_info"/>
+        <remap from="cloud"             to="voxel_cloud" />
+
+        <param name="decimation"  type="double" value="4"/>
+        <param name="voxel_size"  type="double" value="0.05"/>
+        <param name="max_depth"   type="double" value="5"/>
+        <param name="normal_k"    type="int"    value="10"/>
+        <param name="approx_sync" type="bool"   value="false"/>
+      </node>
+    
+      <node pkg="rtabmap_ros" type="icp_odometry" name="icp_odometry" output="screen">
+        <remap from="scan_cloud" to="voxel_cloud"/>
+        <param name="frame_id" type="string" value="camera_base"/>  
+
+        <!-- ICP parameters -->
+        <param name="Icp/PointToPlane"        type="string" value="true"/>
+        <param name="Icp/PM"                  type="string" value="true"/> 
+        <param name="Icp/PMOutlierRatio"      type="string" value="0.7"/>  
+
+        <!-- Odom parameters -->       
+        <param name="OdomF2M/ScanSubtractRadius" type="string" value="0.05"/>
+        <param name="OdomF2M/ScanMaxSize"        type="string" value="5000"/>      
+      </node>
+
+      <node pkg="rtabmap_ros" type="rtabmap" name="rtabmap" output="screen" args="-d">	  
+        <param name="frame_id"             type="string" value="camera_base"/>  
+        <param name="subscribe_depth"      type="bool" value="false"/>
+        <param name="subscribe_rgb"        type="bool" value="false"/>
+        <param name="subscribe_scan_cloud" type="bool" value="true"/>
+        <param name="approx_sync"          type="bool" value="false"/>
+        
+        <remap from="scan_cloud" to="voxel_cloud"/>
+     
+        <param name="RGBD/ProximityPathMaxNeighbors" type="string" value="0"/> 
+        <param name="RGBD/ProximityOdomGuess"        type="string" value="true"/> 
+          
+        <!-- ICP parameters -->
+        <param name="Icp/PointToPlane"        type="string" value="true"/>
+        <param name="Icp/PM"                  type="string" value="true"/> 
+        <param name="Icp/PMOutlierRatio"      type="string" value="0.7"/>
+        <param name="Icp/MaxTranslation"      type="string" value="0.5"/>         
+      </node>
+
+      <node if="$(arg rtabmapviz)" name="rtabmapviz" pkg="rtabmap_ros" type="rtabmapviz" output="screen">
+        <param name="frame_id" type="string" value="camera_base"/>
+        <param name="subscribe_rgb" type="bool" value="false"/>
+        <param name="subscribe_depth" type="bool" value="false"/>
+        <param name="subscribe_odom_info" type="bool" value="true"/>
+        <param name="subscribe_scan_cloud" type="bool" value="true"/>
+        <param name="approx_sync" type="bool" value="false"/>
+        <remap from="scan_cloud" to="voxel_cloud"/>
+      </node>
+
+  </group>
+
+</launch>

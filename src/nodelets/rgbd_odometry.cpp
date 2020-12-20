@@ -69,7 +69,8 @@ public:
 		exactSync3_(0),
 		approxSync4_(0),
 		exactSync4_(0),
-		queueSize_(5)
+		queueSize_(5),
+		keepColor_(false)
 	{
 	}
 
@@ -136,11 +137,13 @@ private:
 		{
 			NODELET_FATAL("Only 4 cameras maximum supported yet.");
 		}
+		pnh.param("keep_color", keepColor_, keepColor_);
 
 		NODELET_INFO("RGBDOdometry: approx_sync    = %s", approxSync?"true":"false");
 		NODELET_INFO("RGBDOdometry: queue_size     = %d", queueSize_);
 		NODELET_INFO("RGBDOdometry: subscribe_rgbd = %s", subscribeRGBD?"true":"false");
 		NODELET_INFO("RGBDOdometry: rgbd_cameras   = %d", rgbdCameras);
+		NODELET_INFO("RGBDOdometry: keep_color     = %s", keepColor_?"true":"false");
 
 		std::string subscribedTopicsMsg;
 		if(subscribeRGBD)
@@ -176,7 +179,7 @@ private:
 								rgbd_image2_sub_);
 						exactSync2_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD2, this, _1, _2));
 					}
-					subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s",
+					subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s \\\n   %s",
 							getName().c_str(),
 							approxSync?"approx":"exact",
 							rgbd_image1_sub_.getTopic().c_str(),
@@ -202,7 +205,7 @@ private:
 								rgbd_image3_sub_);
 						exactSync3_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD3, this, _1, _2, _3));
 					}
-					subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s",
+					subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s \\\n   %s \\\n   %s",
 							getName().c_str(),
 							approxSync?"approx":"exact",
 							rgbd_image1_sub_.getTopic().c_str(),
@@ -231,7 +234,7 @@ private:
 								rgbd_image4_sub_);
 						exactSync4_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD4, this, _1, _2, _3, _4));
 					}
-					subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s",
+					subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s \\\n   %s \\\n   %s \\\n   %s",
 							getName().c_str(),
 							approxSync?"approx":"exact",
 							rgbd_image1_sub_.getTopic().c_str(),
@@ -276,7 +279,7 @@ private:
 				exactSync_->registerCallback(boost::bind(&RGBDOdometry::callback, this, _1, _2, _3));
 			}
 
-			subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s",
+			subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s \\\n   %s \\\n   %s",
 					getName().c_str(),
 					approxSync?"approx":"exact",
 					image_mono_sub_.getTopic().c_str(),
@@ -391,7 +394,14 @@ private:
 			if(rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) !=0 &&
 			   rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) != 0)
 			{
-				ptrImage = cv_bridge::cvtColor(rgbImages[i], "mono8");
+				if(keepColor_ && rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) != 0)
+				{
+					ptrImage = cv_bridge::cvtColor(rgbImages[i], "bgr8");
+				}
+				else
+				{
+					ptrImage = cv_bridge::cvtColor(rgbImages[i], "mono8");
+				}
 			}
 
 			cv_bridge::CvImageConstPtr ptrDepth = depthImages[i];
@@ -437,7 +447,7 @@ private:
 				0,
 				rtabmap_ros::timestampFromROS(higherStamp));
 
-		this->processData(data, higherStamp);
+		this->processData(data, higherStamp, rgbImages.size()==1?rgbImages[0]->header.frame_id:"");
 	}
 
 	void callback(
@@ -647,6 +657,7 @@ private:
 	typedef message_filters::sync_policies::ExactTime<rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage, rtabmap_ros::RGBDImage> MyExactSync4Policy;
 	message_filters::Synchronizer<MyExactSync4Policy> * exactSync4_;
 	int queueSize_;
+	bool keepColor_;
 };
 
 PLUGINLIB_EXPORT_CLASS(rtabmap_ros::RGBDOdometry, nodelet::Nodelet);

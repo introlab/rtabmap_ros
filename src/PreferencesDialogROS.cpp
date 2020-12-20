@@ -131,6 +131,7 @@ bool PreferencesDialogROS::readCoreSettings(const QString & filePath)
 			}
 			else
 			{
+				ROS_WARN("Parameter %s not found", i->first.c_str());
 				validParameters = false;
 			}
 		}

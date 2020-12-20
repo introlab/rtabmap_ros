@@ -1149,6 +1149,26 @@ void MapsManager::publishMaps(
 	}
 	else if(mapCacheCleanup_)
 	{
+		if(!groundClouds_.empty() || !obstacleClouds_.empty())
+		{
+			size_t totalBytes = 0;
+			for(std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr >::iterator iter=groundClouds_.begin();iter!=groundClouds_.end();++iter)
+			{
+				totalBytes += sizeof(int) + iter->second->points.size()*sizeof(pcl::PointXYZRGB);
+			}
+			for(std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr >::iterator iter=obstacleClouds_.begin();iter!=obstacleClouds_.end();++iter)
+			{
+				totalBytes += sizeof(int) + iter->second->points.size()*sizeof(pcl::PointXYZRGB);
+			}
+			totalBytes += (assembledGround_->size() + assembledObstacles_->size()) *sizeof(pcl::PointXYZRGB);
+			totalBytes += (assembledGroundPoses_.size() + assembledObstaclePoses_.size()) * 13*sizeof(float);
+			totalBytes += assembledGroundIndex_.indexedFeatures()*assembledGroundIndex_.featuresDim() * sizeof(float);
+			totalBytes += assembledObstacleIndex_.indexedFeatures()*assembledObstacleIndex_.featuresDim() * sizeof(float);
+			ROS_INFO("MapsManager: cleanup point clouds (%ld points, %ld cached clouds, ~%ld MB)...",
+					assembledGround_->size()+assembledObstacles_->size(),
+					groundClouds_.size()+obstacleClouds_.size(),
+					totalBytes/1048576);
+		}
 		assembledGround_->clear();
 		assembledObstacles_->clear();
 		assembledGroundPoses_.clear();
@@ -1325,6 +1345,12 @@ void MapsManager::publishMaps(
 		octoMapEmptySpace_.getNumSubscribers() == 0 &&
 		octoMapProj_.getNumSubscribers() == 0)
 	{
+		if(octomap_->octree()->getNumLeafNodes()>0)
+		{
+			ROS_INFO("MapsManager: cleanup octomap (%ld leaf nodes, ~%ld MB)...",
+					octomap_->octree()->getNumLeafNodes(),
+					octomap_->octree()->memoryUsage()/1048576);
+		}
 		octomap_->clear();
 	}
 
@@ -1490,6 +1516,19 @@ void MapsManager::publishMaps(
 
 	if(!this->hasSubscribers() && mapCacheCleanup_)
 	{
+		if(!gridMaps_.empty())
+		{
+			size_t totalBytes = 0;
+			for(std::map<int, std::pair< std::pair<cv::Mat, cv::Mat>, cv::Mat> >::iterator iter=gridMaps_.begin(); iter!=gridMaps_.end(); ++iter)
+			{
+				totalBytes+= sizeof(int)+
+						iter->second.first.first.total()*iter->second.first.first.elemSize() +
+						iter->second.first.second.total()*iter->second.first.second.elemSize() +
+						iter->second.second.total()*iter->second.second.elemSize();
+			}
+			totalBytes += gridMapsViewpoints_.size()*sizeof(int) + gridMapsViewpoints_.size() * sizeof(cv::Point3f);
+			ROS_INFO("MapsManager: cleanup %ld grid maps (~%ld MB)...", gridMaps_.size(), totalBytes/1048576);
+		}
 		gridMaps_.clear();
 		gridMapsViewpoints_.clear();
 	}
