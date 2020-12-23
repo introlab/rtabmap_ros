@@ -105,6 +105,7 @@
   <arg name="odom_expected_rate"       default="0"/>
   <arg name="imu_topic"                default="/imu/data"/>          <!-- only used with VIO approaches -->
   <arg name="wait_imu_to_init"         default="false"/>
+  <arg name="use_odom_features"        default="false"/>
   
   <arg name="scan_cloud_assembling"              default="false"/>
   <arg name="scan_cloud_assembling_time"         default="1"/>
@@ -167,7 +168,7 @@
       <group if="$(arg rgbd_sync)">
         <node if="$(arg compressed)" name="republish_left"  type="republish" pkg="image_transport" args="$(arg rgb_image_transport) in:=$(arg left_image_topic) raw out:=$(arg left_image_topic_relay)" />
         <node if="$(arg compressed)" name="republish_right" type="republish" pkg="image_transport" args="$(arg rgb_image_transport) in:=$(arg right_image_topic) raw out:=$(arg right_image_topic_relay)" />
-        <node pkg="nodelet" type="nodelet" name="rgbd_sync" args="standalone rtabmap_ros/stereo_sync" output="$(arg output)">
+        <node pkg="nodelet" type="nodelet" name="stereo_sync" args="standalone rtabmap_ros/stereo_sync" output="$(arg output)">
           <remap from="left/image_rect"   to="$(arg left_image_topic_relay)"/>
           <remap from="right/image_rect"  to="$(arg right_image_topic_relay)"/>
           <remap from="left/camera_info"  to="$(arg left_camera_info_topic)"/>
@@ -219,6 +220,7 @@
           <param name="guess_min_rotation"          type="double" value="$(arg odom_guess_min_rotation)"/>
           <param name="expected_update_rate"        type="double" value="$(arg odom_expected_rate)"/>
           <param name="max_update_rate"             type="double" value="$(arg odom_max_rate)"/>
+          <param name="keep_color"                  type="bool"   value="$(arg use_odom_features)"/>
         </node>
 
         <!-- Stereo Odometry -->
@@ -247,6 +249,7 @@
           <param name="guess_min_rotation"          type="double" value="$(arg odom_guess_min_rotation)"/>
           <param name="expected_update_rate"        type="double" value="$(arg odom_expected_rate)"/>
           <param name="max_update_rate"             type="double" value="$(arg odom_max_rate)"/>
+          <param name="keep_color"                  type="bool"   value="$(arg use_odom_features)"/>
         </node>
       </group>
     </group>
@@ -293,7 +296,7 @@
       <param     if="$(arg stereo)" name="subscribe_depth"  type="bool" value="false"/>
       <param unless="$(arg stereo)" name="subscribe_depth"  type="bool" value="$(arg depth)"/>
       <param name="subscribe_rgb"        type="bool"   value="$(arg depth)"/>
-      <param name="subscribe_rgbd"       type="bool"   value="$(arg subscribe_rgbd)"/>
+      <param name="subscribe_rgbd"       type="bool"   value="$(eval subscribe_rgbd or use_odom_features)"/>
       <param name="subscribe_stereo"     type="bool"   value="$(arg stereo)"/>
       <param name="subscribe_scan"       type="bool"   value="$(arg subscribe_scan)"/>
       <param name="subscribe_scan_cloud" type="bool"   value="$(arg subscribe_scan_cloud)"/>
@@ -312,7 +315,7 @@
       <param name="odom_sensor_sync"         type="bool"   value="$(arg odom_sensor_sync)"/>
       <param name="wait_for_transform_duration"  type="double"   value="$(arg wait_for_transform)"/>
       <param name="database_path"        type="string" value="$(arg database_path)"/>
-      <param name="approx_sync"          type="bool"   value="$(arg approx_sync)"/>
+      <param name="approx_sync"          type="bool"   value="$(eval approx_sync and not use_odom_features)"/>
       <param name="config_path"          type="string" value="$(arg cfg)"/>
       <param name="queue_size"           type="int" value="$(arg queue_size)"/>
       <param name="scan_cloud_max_points"     type="int" value="$(arg scan_cloud_max_points)"/>
@@ -323,7 +326,8 @@
       <remap from="depth/image"     to="$(arg depth_topic_relay)"/>
       <remap from="rgb/camera_info" to="$(arg camera_info_topic)"/>
       
-      <remap from="rgbd_image"      to="$(arg rgbd_topic_relay)"/>
+      <remap     if="$(arg use_odom_features)" from="rgbd_image" to="odom_rgbd_image"/>
+      <remap unless="$(arg use_odom_features)" from="rgbd_image" to="$(arg rgbd_topic_relay)"/>
 	
       <remap from="left/image_rect"        to="$(arg left_image_topic_relay)"/>
       <remap from="right/image_rect"       to="$(arg right_image_topic_relay)"/>
@@ -352,7 +356,7 @@
     <node if="$(arg rtabmapviz)" pkg="rtabmap_ros" type="rtabmapviz" name="rtabmapviz" args="-d $(arg gui_cfg)" output="$(arg output)" launch-prefix="$(arg launch_prefix)">
       <param     if="$(arg stereo)" name="subscribe_depth"  type="bool" value="false"/>
       <param unless="$(arg stereo)" name="subscribe_depth"  type="bool" value="$(arg depth)"/>
-      <param name="subscribe_rgbd"       type="bool"   value="$(arg subscribe_rgbd)"/>
+      <param name="subscribe_rgbd"       type="bool"   value="$(eval subscribe_rgbd or use_odom_features)"/>
       <param name="subscribe_stereo"     type="bool"   value="$(arg stereo)"/>
       <param name="subscribe_scan"       type="bool"   value="$(arg subscribe_scan)"/>
       <param name="subscribe_scan_cloud" type="bool"   value="$(arg subscribe_scan_cloud)"/>
@@ -363,13 +367,14 @@
       <param name="odom_frame_id"        type="string" value="$(arg odom_frame_id)"/>
       <param name="wait_for_transform_duration" type="double"   value="$(arg wait_for_transform)"/>
       <param name="queue_size"           type="int"    value="$(arg queue_size)"/>
-      <param name="approx_sync"          type="bool"   value="$(arg approx_sync)"/>
+      <param name="approx_sync"          type="bool"   value="$(eval approx_sync and not use_odom_features)"/>
     
       <remap from="rgb/image"       to="$(arg rgb_topic_relay)"/>
       <remap from="depth/image"     to="$(arg depth_topic_relay)"/>
       <remap from="rgb/camera_info" to="$(arg camera_info_topic)"/>
       
-      <remap from="rgbd_image"      to="$(arg rgbd_topic_relay)"/>
+      <remap     if="$(arg use_odom_features)" from="rgbd_image" to="odom_rgbd_image"/>
+      <remap unless="$(arg use_odom_features)" from="rgbd_image" to="$(arg rgbd_topic_relay)"/>
       
       <remap from="left/image_rect"        to="$(arg left_image_topic_relay)"/>
       <remap from="right/image_rect"       to="$(arg right_image_topic_relay)"/>

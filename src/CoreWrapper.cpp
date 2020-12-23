@@ -1566,7 +1566,7 @@ void CoreWrapper::commonStereoCallback(
 	if(!localPoints3dMsg.empty())
 	{
 		// Points should be in base frame
-		points = rtabmap_ros::points3fFromROS(localPoints3dMsg, stereoModel.localTransform().inverse());
+		points = rtabmap_ros::points3fFromROS(localPoints3dMsg, stereoModel.localTransform());
 	}
 	if(!keypoints.empty())
 	{
