@@ -100,6 +100,10 @@ private:
 			output.header = input->header;
 			output.rgb_camera_info = input->rgb_camera_info;
 			output.depth_camera_info = input->depth_camera_info;
+			output.key_points = input->key_points;
+			output.points = input->points;
+			output.descriptors = input->descriptors;
+			output.global_descriptor = input->global_descriptor;
 
 			rtabmap::StereoCameraModel stereoModel = stereoCameraModelFromROS(input->rgb_camera_info, input->depth_camera_info, rtabmap::Transform::getIdentity());
 
@@ -174,7 +178,7 @@ private:
 				}
 				else
 				{
-					// dpeth image
+					// depth image
 					cv_bridge::CvImagePtr ptr = boost::make_shared<cv_bridge::CvImage>();
 					ptr->header = input->depth_compressed.header;
 					ptr->image = rtabmap::uncompressImage(input->depth_compressed.data);
