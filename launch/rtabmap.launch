@@ -88,6 +88,7 @@
   <arg name="scan_descriptor_topic"   default="/scan_descriptor"/>
   <arg name="scan_cloud_max_points"   default="0"/>
   <arg name="scan_cloud_filtered"     default="false"/> <!-- use filtered cloud from icp_odometry for mapping -->
+  <arg name="gen_scan"                default="false"/> <!-- only works with depth image and if not subscribing to scan topic-->
    
   <arg name="visual_odometry"          default="true"/>          <!-- Launch rtabmap visual odometry node -->
   <arg name="icp_odometry"             default="false"/>         <!-- Launch rtabmap icp odometry node -->
@@ -308,6 +309,7 @@
       <param name="map_frame_id"         type="string" value="$(arg map_frame_id)"/>
       <param name="odom_frame_id"        type="string" value="$(arg odom_frame_id)"/>
       <param name="publish_tf"           type="bool"   value="$(arg publish_tf_map)"/>
+      <param name="gen_scan"             type="bool"   value="$(arg gen_scan)"/>
       <param name="ground_truth_frame_id"       type="string" value="$(arg ground_truth_frame_id)"/>
       <param name="ground_truth_base_frame_id"  type="string" value="$(arg ground_truth_base_frame_id)"/>
       <param name="odom_tf_angular_variance" type="double" value="$(arg odom_tf_angular_variance)"/>
