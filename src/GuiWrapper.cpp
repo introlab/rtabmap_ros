@@ -835,7 +835,6 @@ void GuiWrapper::commonLaserScanCallback(
 	LaserScan scan;
 	rtabmap::OdometryInfo info;
 	bool ignoreData = false;
-	Transform fakeCameraLocalTransform;
 
 	// limit update rate
 	if(maxOdomUpdateRate_<=0.0 ||
@@ -884,16 +883,6 @@ void GuiWrapper::commonLaserScanCallback(
 	}
 	else if(odomInfoMsg.get())
 	{
-		//just get scan local transform to adjust camera frame
-		if(!scan2dMsg.ranges.empty())
-		{
-			fakeCameraLocalTransform = getTransform(frameId, scan2dMsg.header.frame_id, scan2dMsg.header.stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0);
-		}
-		else if(!scan3dMsg.data.empty())
-		{
-			fakeCameraLocalTransform = getTransform(frameId, scan3dMsg.header.frame_id, scan3dMsg.header.stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0);
-		}
-
 		info = rtabmap_ros::odomInfoFromROS(*odomInfoMsg).copyWithoutData();
 		ignoreData = true;
 	}
@@ -903,24 +892,13 @@ void GuiWrapper::commonLaserScanCallback(
 		return;
 	}
 
-	cv::Mat rgb;
-	cv::Mat depth;
-	CameraModel model(
-			2,
-			2,
-			2,
-			1.5,
-			(fakeCameraLocalTransform.isNull()?scan.localTransform():fakeCameraLocalTransform)*Transform(0,0,1,0, -1,0,0,0, 0,-1,0,0),
-			0,
-			cv::Size(4,3));
-
 	info.reg.covariance = covariance;
 	rtabmap::OdometryEvent odomEvent(
 		rtabmap::SensorData(
 				scan,
-				rgb,
-				depth,
-				model,
+				cv::Mat(),
+				cv::Mat(),
+				CameraModel(),
 				odomHeader.seq,
 				rtabmap_ros::timestampFromROS(odomHeader.stamp)),
 		odomMsg.get()?rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose):odomT,
@@ -987,23 +965,12 @@ void GuiWrapper::commonOdomCallback(
 		return;
 	}
 
-	cv::Mat rgb;
-	cv::Mat depth;
-	CameraModel model(
-			2,
-			2,
-			2,
-			1.5,
-			Transform(0,0,1,0, -1,0,0,0, 0,-1,0,0),
-			0,
-			cv::Size(4,3));
-
 	info.reg.covariance = covariance;
 	rtabmap::OdometryEvent odomEvent(
 		rtabmap::SensorData(
-				rgb,
-				depth,
-				model,
+				cv::Mat(),
+				cv::Mat(),
+				CameraModel(),
 				odomHeader.seq,
 				rtabmap_ros::timestampFromROS(odomHeader.stamp)),
 		odomMsg.get()?rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose):odomT,

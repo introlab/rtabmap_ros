@@ -1262,7 +1262,7 @@ void CoreWrapper::commonDepthCallbackImpl(
 			return;
 		}
 
-		ROS_WARN("%d %d %d %d", rgb.empty()?1:0, depth.empty()?1:0, scan.isEmpty()?1:0, genDepth_?1:0);
+		ROS_DEBUG("%d %d %d %d", rgb.empty()?1:0, depth.empty()?1:0, scan.isEmpty()?1:0, genDepth_?1:0);
 		if(!rgb.empty() && depth.empty() && !scan.isEmpty() && genDepth_)
 		{
 			for(size_t i=0; i<cameraModels.size(); ++i)
@@ -1285,13 +1285,20 @@ void CoreWrapper::commonDepthCallbackImpl(
 					}
 				}
 
-				cv::Mat depthProjected = rtabmap::util3d::projectCloudToCamera(model.imageSize(), model.K(), scan.data(), model.localTransform());
+				cv::Mat depthProjected = util3d::projectCloudToCamera(
+						model.imageSize(),
+						model.K(),
+						scan.data(),
+						scan.localTransform().inverse()*model.localTransform());
 
 				if(genDepthFillHolesSize_ > 0 && genDepthFillIterations_ > 0)
 				{
 					for(int i=0; i<genDepthFillIterations_;++i)
 					{
-						depthProjected = rtabmap::util2d::fillDepthHoles(depthProjected, genDepthFillHolesSize_, genDepthFillHolesError_);
+						depthProjected = util2d::fillDepthHoles(
+								depthProjected,
+								genDepthFillHolesSize_,
+								genDepthFillHolesError_);
 					}
 				}
 
@@ -1712,22 +1719,11 @@ void CoreWrapper::commonLaserScanCallback(
 		userData_ = cv::Mat();
 	}
 
-	cv::Mat rgb = cv::Mat::zeros(3,4,CV_8UC1);
-	cv::Mat depth = cv::Mat::zeros(3,4,CV_16UC1);
-	CameraModel model(
-			2,
-			2,
-			2,
-			1.5,
-			scan.localTransform()*Transform(0,0,1,0, -1,0,0,0, 0,-1,0,0),
-			0,
-			cv::Size(4,3));
-
 	SensorData data(
 			scan,
-			rgb,
-			depth,
-			model,
+			cv::Mat(),
+			cv::Mat(),
+			CameraModel(),
 			lastPoseIntermediate_?-1:!scan2dMsg.ranges.empty()?scan2dMsg.header.seq:scan3dMsg.header.seq,
 			rtabmap_ros::timestampFromROS(lastPoseStamp_),
 			userData);
@@ -1787,21 +1783,10 @@ void CoreWrapper::commonOdomCallback(
 		userData_ = cv::Mat();
 	}
 
-	cv::Mat rgb = cv::Mat::zeros(3,4,CV_8UC1);
-	cv::Mat depth = cv::Mat::zeros(3,4,CV_16UC1);
-	CameraModel model(
-			2,
-			2,
-			2,
-			1.5,
-			Transform(0,0,1,0, -1,0,0,0, 0,-1,0,0),
-			0,
-			cv::Size(4,3));
-
 	SensorData data(
-			rgb,
-			depth,
-			model,
+			cv::Mat(),
+			cv::Mat(),
+			CameraModel(),
 			lastPoseIntermediate_?-1:odomMsg->header.seq,
 			rtabmap_ros::timestampFromROS(lastPoseStamp_),
 			userData);
@@ -1872,17 +1857,7 @@ void CoreWrapper::process(
 						}
 					}
 
-					cv::Mat rgb = cv::Mat::zeros(3,4,CV_8UC1);
-					cv::Mat depth = cv::Mat::zeros(3,4,CV_16UC1);
-					CameraModel model(
-							2,
-							2,
-							2,
-							1.5,
-							Transform(0,0,1,0, -1,0,0,0, 0,-1,0,0),
-							0,
-							cv::Size(4,3));
-					SensorData interData(rgb, depth, model, -1, rtabmap_ros::timestampFromROS(iter->first.header.stamp));
+					SensorData interData(cv::Mat(), cv::Mat(), CameraModel(), -1, rtabmap_ros::timestampFromROS(iter->first.header.stamp));
 					Transform gt;
 					if(!groundTruthFrameId_.empty())
 					{
