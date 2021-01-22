@@ -440,7 +440,14 @@ void GuiWrapper::commonDepthCallback(
 	if(odomMsg.get())
 	{
 		odomHeader = odomMsg->header;
-		frameId = odomMsg->child_frame_id;
+		if(!odomMsg->child_frame_id.empty())
+		{
+			frameId = odomMsg->child_frame_id;
+		}
+		else
+		{
+			ROS_WARN("Received odom topic with child_frame_id not set! Using \"%s\" as base frame.", frameId_.c_str());
+		}
 	}
 	else
 	{
@@ -618,7 +625,14 @@ void GuiWrapper::commonStereoCallback(
 	if(odomMsg.get())
 	{
 		odomHeader = odomMsg->header;
-		frameId = odomMsg->child_frame_id;
+		if(!odomMsg->child_frame_id.empty())
+		{
+			frameId = odomMsg->child_frame_id;
+		}
+		else
+		{
+			ROS_WARN("Received odom topic with child_frame_id not set! Using \"%s\" as base frame.", frameId_.c_str());
+		}
 	}
 	else
 	{
@@ -780,7 +794,14 @@ void GuiWrapper::commonLaserScanCallback(
 	if(odomMsg.get())
 	{
 		odomHeader = odomMsg->header;
-		frameId = odomMsg->child_frame_id;
+		if(!odomMsg->child_frame_id.empty())
+		{
+			frameId = odomMsg->child_frame_id;
+		}
+		else
+		{
+			ROS_WARN("Received odom topic with child_frame_id not set! Using \"%s\" as base frame.", frameId_.c_str());
+		}
 	}
 	else
 	{
