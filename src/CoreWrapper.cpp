@@ -2652,6 +2652,11 @@ bool CoreWrapper::updateRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Emp
 		rate_ = uStr2Float(parameters_.at(Parameters::kRtabmapDetectionRate()));
 		NODELET_INFO("RTAB-Map rate detection = %f Hz", rate_);
 	}
+	if(parameters_.find(Parameters::kRtabmapCreateIntermediateNodes()) != parameters_.end())
+	{
+		createIntermediateNodes_ = uStr2Bool(parameters_.at(Parameters::kRtabmapCreateIntermediateNodes()));
+		NODELET_INFO("Create intermediate nodes = %s", createIntermediateNodes_?"true":"false");
+	}
 	rtabmap_.parseParameters(parameters_);
 	mapsManager_.setParameters(parameters_);
 	return true;
