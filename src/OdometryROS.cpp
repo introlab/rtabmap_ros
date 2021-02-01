@@ -617,7 +617,18 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp, 
 	if(!guessFrameId_.empty())
 	{
 		guessCurrentPose = this->getTransform(guessFrameId_, frameId_, stamp);
-		Transform previousPose = guessPreviousPose_.isNull()?guessCurrentPose:guessPreviousPose_;
+
+		Transform previousPose = guessPreviousPose_;
+		if(guessPreviousPose_.isNull())
+		{
+			previousPose = guessCurrentPose;
+			if(!guessCurrentPose.isNull() && odometry_->getPose().isIdentity())
+			{
+				ROS_INFO("Odometry: init pose with guess %s", guessCurrentPose.prettyPrint().c_str());
+				odometry_->reset(guessCurrentPose);
+			}
+		}
+
 		if(!previousPose.isNull() && !guessCurrentPose.isNull())
 		{
 			if(guess_.isNull())
