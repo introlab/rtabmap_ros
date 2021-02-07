@@ -2102,7 +2102,7 @@ bool convertScanMsg(
 		pcl::PointCloud<pcl::PointXYZI>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZI>);
 		pcl::fromROSMsg(scanOut, *pclScan);
 		pclScan->is_dense = true;
-		data = rtabmap::util3d::laserScan2dFromPointCloud(*pclScan, laserToOdom); // put back in laser frame
+		data = rtabmap::util3d::laserScan2dFromPointCloud(*pclScan, laserToOdom).data(); // put back in laser frame
 		format = rtabmap::LaserScan::kXYI;
 	}
 	else
@@ -2110,7 +2110,7 @@ bool convertScanMsg(
 		pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
 		pcl::fromROSMsg(scanOut, *pclScan);
 		pclScan->is_dense = true;
-		data = rtabmap::util3d::laserScan2dFromPointCloud(*pclScan, laserToOdom); // put back in laser frame
+		data = rtabmap::util3d::laserScan2dFromPointCloud(*pclScan, laserToOdom).data(); // put back in laser frame
 		format = rtabmap::LaserScan::kXY;
 	}
 
@@ -2217,7 +2217,7 @@ bool convertScan3dMsg(
 			{
 				pclScan = rtabmap::util3d::removeNaNNormalsFromPointCloud(pclScan);
 			}
-			scan = rtabmap::LaserScan(rtabmap::util3d::laserScanFromPointCloud(*pclScan), maxPoints, maxRange, rtabmap::LaserScan::kXYZRGBNormal, scanLocalTransform);
+			scan = rtabmap::LaserScan(rtabmap::util3d::laserScanFromPointCloud(*pclScan), maxPoints, maxRange, scanLocalTransform);
 		}
 		else if(hasIntensity)
 		{
@@ -2227,7 +2227,7 @@ bool convertScan3dMsg(
 			{
 				pclScan = rtabmap::util3d::removeNaNNormalsFromPointCloud(pclScan);
 			}
-			scan = rtabmap::LaserScan(rtabmap::util3d::laserScanFromPointCloud(*pclScan), maxPoints, maxRange, rtabmap::LaserScan::kXYZINormal, scanLocalTransform);
+			scan = rtabmap::LaserScan(rtabmap::util3d::laserScanFromPointCloud(*pclScan), maxPoints, maxRange, scanLocalTransform);
 		}
 		else
 		{
@@ -2237,7 +2237,7 @@ bool convertScan3dMsg(
 			{
 				pclScan = rtabmap::util3d::removeNaNNormalsFromPointCloud(pclScan);
 			}
-			scan = rtabmap::LaserScan(rtabmap::util3d::laserScanFromPointCloud(*pclScan), maxPoints, maxRange, rtabmap::LaserScan::kXYZNormal, scanLocalTransform);
+			scan = rtabmap::LaserScan(rtabmap::util3d::laserScanFromPointCloud(*pclScan), maxPoints, maxRange, scanLocalTransform);
 		}
 	}
 	else
@@ -2250,7 +2250,7 @@ bool convertScan3dMsg(
 			{
 				pclScan = rtabmap::util3d::removeNaNFromPointCloud(pclScan);
 			}
-			scan = rtabmap::LaserScan(rtabmap::util3d::laserScanFromPointCloud(*pclScan), maxPoints, maxRange, rtabmap::LaserScan::kXYZRGB, scanLocalTransform);
+			scan = rtabmap::LaserScan(rtabmap::util3d::laserScanFromPointCloud(*pclScan), maxPoints, maxRange, scanLocalTransform);
 		}
 		else if(hasIntensity)
 		{
@@ -2260,7 +2260,7 @@ bool convertScan3dMsg(
 			{
 				pclScan = rtabmap::util3d::removeNaNFromPointCloud(pclScan);
 			}
-			scan = rtabmap::LaserScan(rtabmap::util3d::laserScanFromPointCloud(*pclScan), maxPoints, maxRange, rtabmap::LaserScan::kXYZI, scanLocalTransform);
+			scan = rtabmap::LaserScan(rtabmap::util3d::laserScanFromPointCloud(*pclScan), maxPoints, maxRange, scanLocalTransform);
 		}
 		else
 		{
@@ -2270,7 +2270,7 @@ bool convertScan3dMsg(
 			{
 				pclScan = rtabmap::util3d::removeNaNFromPointCloud(pclScan);
 			}
-			scan = rtabmap::LaserScan(rtabmap::util3d::laserScanFromPointCloud(*pclScan), maxPoints, maxRange, rtabmap::LaserScan::kXYZ, scanLocalTransform);
+			scan = rtabmap::LaserScan(rtabmap::util3d::laserScanFromPointCloud(*pclScan), maxPoints, maxRange, scanLocalTransform);
 		}
 	}
 	return true;

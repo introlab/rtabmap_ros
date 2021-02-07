@@ -286,7 +286,7 @@ private:
 								keepColor_ && image->encoding.compare(sensor_msgs::image_encodings::MONO16)!=0?"bgr8":"mono8");
 				cv_bridge::CvImagePtr ptrDepth = cv_bridge::toCvCopy(depth);
 
-				cv::Mat scan;
+				LaserScan scan;
 				Transform localScanTransform = Transform::getIdentity();
 				int maxLaserScans = 0;
 				if(scanMsg.get() != 0)
@@ -408,7 +408,7 @@ private:
 				}
 
 				rtabmap::SensorData data(
-						LaserScan::backwardCompatibility(scan,
+						LaserScan(scan,
 								scanMsg.get() != 0 || cloudMsg.get() != 0?maxLaserScans:0,
 								scanMsg.get() != 0?scanMsg->range_max:0,
 								localScanTransform),

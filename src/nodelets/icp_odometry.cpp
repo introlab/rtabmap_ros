@@ -339,7 +339,7 @@ private:
 			pclScan->is_dense = true;
 		}
 
-		cv::Mat scan;
+		LaserScan scan;
 		int maxLaserScans = (int)scanMsg->ranges.size();
 		if(!pclScan->empty() || !pclScanI->empty())
 		{
@@ -401,7 +401,7 @@ private:
 					}
 				}
 				pcl::PointCloud<pcl::PointXYZINormal>::Ptr pclScanINormal;
-				pcl::PointCloud<pcl::PointXYZINormal>::Ptr pclScanNormal;
+				pcl::PointCloud<pcl::PointNormal>::Ptr pclScanNormal;
 				if(hasIntensity)
 				{
 					pclScanINormal.reset(new pcl::PointCloud<pcl::PointXYZINormal>);
@@ -410,7 +410,7 @@ private:
 				}
 				else
 				{
-					pclScanNormal.reset(new pcl::PointCloud<pcl::PointXYZINormal>);
+					pclScanNormal.reset(new pcl::PointCloud<pcl::PointNormal>);
 					pcl::concatenateFields(*pclScan, *normals, *pclScanNormal);
 					scan = util3d::laserScan2dFromPointCloud(*pclScanNormal);
 				}
@@ -459,10 +459,9 @@ private:
 		}
 
 		rtabmap::SensorData data(
-				LaserScan(scan, maxLaserScans, scanMsg->range_max,
-						scan.channels()==6?LaserScan::kXYINormal:
-						scan.channels()==5?LaserScan::kXYNormal:
-						scan.channels()==3?LaserScan::kXYI:LaserScan::kXY,
+				LaserScan(scan,
+						maxLaserScans,
+						scanMsg->range_max,
 						localScanTransform),
 				cv::Mat(),
 				cv::Mat(),
@@ -516,7 +515,7 @@ private:
 			cloudMsg = *pointCloudMsg;
 		}
 
-		cv::Mat scan;
+		LaserScan scan;
 		bool hasNormals = false;
 		bool hasIntensity = false;
 		for(unsigned int i=0; i<cloudMsg.fields.size(); ++i)
@@ -738,10 +737,9 @@ private:
 			}
 		}
 
-		LaserScan laserScan(scan, maxLaserScans, 0,
-				scan.channels()==7?LaserScan::kXYZINormal:
-				scan.channels()==6?LaserScan::kXYZNormal:
-				scan.channels()==4?LaserScan::kXYZI:LaserScan::kXYZ,
+		LaserScan laserScan(scan,
+				maxLaserScans,
+				0,
 				localScanTransform);
 		if(scanRangeMin_ > 0 || scanRangeMax_ > 0)
 		{
