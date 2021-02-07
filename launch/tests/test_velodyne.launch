@@ -72,6 +72,7 @@
         <param name="approx_sync"          type="bool" value="false"/>
         
         <remap from="scan_cloud" to="assembled_cloud"/>
+        <remap from="imu" to="$(arg imu_topic)"/>
      
         <!-- RTAB-Map's parameters -->
         <param name="Rtabmap/DetectionRate"          type="string" value="1"/>  
@@ -92,6 +93,7 @@
         <param name="Grid/RangeMax"                  type="string" value="20"/>
         <param name="Grid/ClusterRadius"             type="string" value="1"/>
         <param name="Grid/GroundIsObstacle"          type="string" value="true"/>
+        <param name="Optimizer/GravitySigma"         type="string" value="0.3"/>
 
         <!-- ICP parameters -->
         <param name="Icp/VoxelSize"                  type="string" value="0.2"/>
