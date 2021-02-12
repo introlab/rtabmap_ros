@@ -2102,11 +2102,7 @@ void CoreWrapper::process(
 					std::map<int, float> nodes = graph::findNearestNodes(filteredPoses, mapToOdom_*odom, maxMappingNodes_);
 					for(std::map<int, float>::iterator iter=nodes.begin(); iter!=nodes.end(); ++iter)
 					{
-						std::map<int, Transform>::iterator pter = filteredPoses.find(iter->first);
-						if(pter != filteredPoses.end())
-						{
-							nearestPoses.insert(*pter);
-						}
+						nearestPoses.insert(*filteredPoses.find(iter->first));
 					}
 					//add latest/zero and make sure those on a planned path are not filtered
 					std::set<int> onPath;
