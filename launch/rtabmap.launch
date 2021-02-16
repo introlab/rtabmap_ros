@@ -360,8 +360,9 @@
       <param unless="$(arg stereo)" name="subscribe_depth"  type="bool" value="$(arg depth)"/>
       <param name="subscribe_rgbd"       type="bool"   value="$(eval subscribe_rgbd or use_odom_features)"/>
       <param name="subscribe_stereo"     type="bool"   value="$(arg stereo)"/>
-      <param name="subscribe_scan"       type="bool"   value="$(arg subscribe_scan)"/>
-      <param name="subscribe_scan_cloud" type="bool"   value="$(arg subscribe_scan_cloud)"/>
+      <param unless="$(arg icp_odometry)" name="subscribe_scan"       type="bool"   value="$(arg subscribe_scan)"/>
+      <param     if="$(arg icp_odometry)" name="subscribe_scan_cloud" type="bool"   value="$(eval subscribe_scan or subscribe_scan_cloud)"/>
+      <param unless="$(arg icp_odometry)" name="subscribe_scan_cloud" type="bool"   value="$(arg subscribe_scan_cloud)"/>
       <param name="subscribe_scan_descriptor" type="bool" value="$(arg subscribe_scan_descriptor)"/>
       <param if="$(arg visual_odometry)" name="subscribe_odom_info" type="bool" value="true"/>
       <param if="$(arg icp_odometry)"    name="subscribe_odom_info" type="bool" value="true"/>
@@ -383,7 +384,6 @@
       <remap from="left/camera_info"       to="$(arg left_camera_info_topic)"/>
       <remap from="right/camera_info"      to="$(arg right_camera_info_topic)"/>
       
-      <remap     if="$(arg icp_odometry)" from="scan" to="odom_filtered_input_scan"/>
       <remap unless="$(arg icp_odometry)" from="scan" to="$(arg scan_topic)"/>
       <remap     if="$(arg icp_odometry)" from="scan_cloud" to="odom_filtered_input_scan"/>
       <remap unless="$(arg icp_odometry)" from="scan_cloud" to="$(arg scan_cloud_topic)"/>
