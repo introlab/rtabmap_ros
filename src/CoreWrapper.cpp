@@ -121,6 +121,7 @@ CoreWrapper::CoreWrapper() :
 		createIntermediateNodes_(Parameters::defaultRtabmapCreateIntermediateNodes()),
 		maxMappingNodes_(Parameters::defaultGridGlobalMaxNodes()),
 		alreadyRectifiedImages_(Parameters::defaultRtabmapImagesAlreadyRectified()),
+		twoDMapping_(Parameters::defaultRegForce3DoF()),
 		previousStamp_(0),
 		mbClient_(0)
 {
@@ -580,6 +581,10 @@ void CoreWrapper::onInit()
 	if(parameters_.find(Parameters::kRtabmapImagesAlreadyRectified()) != parameters_.end())
 	{
 		Parameters::parse(parameters_, Parameters::kRtabmapImagesAlreadyRectified(), alreadyRectifiedImages_);
+	}
+	if(parameters_.find(Parameters::kRegForce3DoF()) != parameters_.end())
+	{
+		Parameters::parse(parameters_, Parameters::kRegForce3DoF(), twoDMapping_);
 	}
 
 	if(paused_)
@@ -1227,7 +1232,7 @@ void CoreWrapper::commonDepthCallbackImpl(
 				genScanMaxDepth_,
 				genScanMinDepth_);
 		genMaxScanPts += depth.cols;
-		scan = LaserScan(rtabmap::util3d::laserScan2dFromPointCloud(*scanCloud2d), 0, genScanMaxDepth_, LaserScan::kXY);
+		scan = LaserScan(rtabmap::util3d::laserScan2dFromPointCloud(*scanCloud2d), 0, genScanMaxDepth_);
 	}
 	else if(!scan2dMsg.ranges.empty())
 	{
@@ -1856,6 +1861,13 @@ void CoreWrapper::process(
 							covariance.at<double>(5,5) = odomDefaultAngVariance_;
 						}
 					}
+					else if(twoDMapping_)
+					{
+						// If 2d mapping, make sure all diagonal values of the covariance that even not used are not null.
+						covariance.at<double>(2,2) = covariance.at<double>(2,2)!=0?covariance.at<double>(2,2):1;
+						covariance.at<double>(3,3) = covariance.at<double>(3,3)!=0?covariance.at<double>(3,3):1;
+						covariance.at<double>(4,4) = covariance.at<double>(4,4)!=0?covariance.at<double>(4,4):1;
+					}
 
 					SensorData interData(cv::Mat(), cv::Mat(), CameraModel(), -1, rtabmap_ros::timestampFromROS(iter->first.header.stamp));
 					Transform gt;
@@ -2024,6 +2036,13 @@ void CoreWrapper::process(
 				covariance.at<double>(4,4) = odomDefaultAngVariance_;
 				covariance.at<double>(5,5) = odomDefaultAngVariance_;
 			}
+		}
+		else if(twoDMapping_)
+		{
+			// If 2d mapping, make sure all diagonal values of the covariance that even not used are not null.
+			covariance.at<double>(2,2) = covariance.at<double>(2,2)!=0?covariance.at<double>(2,2):1;
+			covariance.at<double>(3,3) = covariance.at<double>(3,3)!=0?covariance.at<double>(3,3):1;
+			covariance.at<double>(4,4) = covariance.at<double>(4,4)!=0?covariance.at<double>(4,4):1;
 		}
 
 		std::map<std::string, float> externalStats;
@@ -2652,6 +2671,21 @@ bool CoreWrapper::updateRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Emp
 	{
 		createIntermediateNodes_ = uStr2Bool(parameters_.at(Parameters::kRtabmapCreateIntermediateNodes()));
 		NODELET_INFO("Create intermediate nodes = %s", createIntermediateNodes_?"true":"false");
+	}
+	if(parameters_.find(Parameters::kGridGlobalMaxNodes()) != parameters_.end())
+	{
+		maxMappingNodes_ = uStr2Int(parameters_.at(Parameters::kGridGlobalMaxNodes()));
+		NODELET_INFO("Max mapping nodes = %d", maxMappingNodes_);
+	}
+	if(parameters_.find(Parameters::kRtabmapImagesAlreadyRectified()) != parameters_.end())
+	{
+		alreadyRectifiedImages_ = uStr2Bool(parameters_.at(Parameters::kRtabmapImagesAlreadyRectified()));
+		NODELET_INFO("Already rectified images = %s", alreadyRectifiedImages_?"true":"false");
+	}
+	if(parameters_.find(Parameters::kRegForce3DoF()) != parameters_.end())
+	{
+		twoDMapping_= uStr2Bool(parameters_.at(Parameters::kRegForce3DoF()));
+		NODELET_INFO("2D mapping = %s", twoDMapping_?"true":"false");
 	}
 	rtabmap_.parseParameters(parameters_);
 	mapsManager_.setParameters(parameters_);
