@@ -368,6 +368,7 @@ private:
 	bool createIntermediateNodes_;
 	int maxMappingNodes_;
 	bool alreadyRectifiedImages_;
+	bool twoDMapping_;
 	ros::Time previousStamp_;
 };
 
