@@ -119,7 +119,8 @@ CoreWrapper::CoreWrapper() :
 		odomSensorSync_(false),
 		rate_(Parameters::defaultRtabmapDetectionRate()),
 		createIntermediateNodes_(Parameters::defaultRtabmapCreateIntermediateNodes()),
-		maxMappingNodes_(Parameters::defaultGridGlobalMaxNodes()),
+		mappingMaxNodes_(Parameters::defaultGridGlobalMaxNodes()),
+		mappingAltitudeDelta_(Parameters::defaultGridGlobalAltitudeDelta()),
 		alreadyRectifiedImages_(Parameters::defaultRtabmapImagesAlreadyRectified()),
 		twoDMapping_(Parameters::defaultRegForce3DoF()),
 		previousStamp_(0),
@@ -572,10 +573,18 @@ void CoreWrapper::onInit()
 	}
 	if(parameters_.find(Parameters::kGridGlobalMaxNodes()) != parameters_.end())
 	{
-		Parameters::parse(parameters_, Parameters::kGridGlobalMaxNodes(), maxMappingNodes_);
-		if(maxMappingNodes_>0)
+		Parameters::parse(parameters_, Parameters::kGridGlobalMaxNodes(), mappingMaxNodes_);
+		if(mappingMaxNodes_>0)
 		{
-			NODELET_INFO("Max mapping nodes = %d", maxMappingNodes_);
+			NODELET_INFO("Max mapping nodes = %d", mappingMaxNodes_);
+		}
+	}
+	if(parameters_.find(Parameters::kGridGlobalAltitudeDelta()) != parameters_.end())
+	{
+		Parameters::parse(parameters_, Parameters::kGridGlobalAltitudeDelta(), mappingAltitudeDelta_);
+		if(mappingAltitudeDelta_>0.0)
+		{
+			NODELET_INFO("Mapping altitude delta = %f", mappingAltitudeDelta_);
 		}
 	}
 	if(parameters_.find(Parameters::kRtabmapImagesAlreadyRectified()) != parameters_.end())
@@ -2115,14 +2124,10 @@ void CoreWrapper::process(
 					filteredPoses.insert(std::make_pair(0, mapToOdom_*odom));
 				}
 
-				if(maxMappingNodes_ > 0 && filteredPoses.size()>1)
+				if((mappingMaxNodes_ > 0 || mappingAltitudeDelta_>0.0) && filteredPoses.size()>1)
 				{
-					std::map<int, Transform> nearestPoses;
-					std::map<int, float> nodes = graph::findNearestNodes(filteredPoses, mapToOdom_*odom, maxMappingNodes_);
-					for(std::map<int, float>::iterator iter=nodes.begin(); iter!=nodes.end(); ++iter)
-					{
-						nearestPoses.insert(*filteredPoses.find(iter->first));
-					}
+					std::map<int, Transform> nearestPoses = filterNodesToAssemble(filteredPoses, mapToOdom_*odom);
+
 					//add latest/zero and make sure those on a planned path are not filtered
 					std::set<int> onPath;
 					if(rtabmap_.getPath().size())
@@ -2277,6 +2282,36 @@ void CoreWrapper::process(
 				 "when you need to have IDs output of RTAB-map synchronized with the source "
 				 "image sequence ID.");
 	}
+}
+
+std::map<int, Transform> CoreWrapper::filterNodesToAssemble(
+		const std::map<int, Transform> & nodes,
+		const Transform & currentPose)
+{
+	std::map<int, Transform> output;
+	if(mappingMaxNodes_ > 0)
+	{
+		std::map<int, float> nodesDist = graph::findNearestNodes(nodes, currentPose, mappingMaxNodes_);
+		for(std::map<int, float>::iterator iter=nodesDist.begin(); iter!=nodesDist.end(); ++iter)
+		{
+			if(mappingAltitudeDelta_<=0.0 ||
+			   fabs(nodes.at(iter->first).z()-currentPose.z())<mappingAltitudeDelta_)
+			{
+				output.insert(*nodes.find(iter->first));
+			}
+		}
+	}
+	else // mappingAltitudeDelta_>0.0
+	{
+		for(std::map<int, Transform>::const_iterator iter=nodes.begin(); iter!=nodes.end(); ++iter)
+		{
+			if(fabs(iter->second.z()-currentPose.z())<mappingAltitudeDelta_)
+			{
+				output.insert(*iter);
+			}
+		}
+	}
+	return output;
 }
 
 void CoreWrapper::userDataAsyncCallback(const rtabmap_ros::UserDataConstPtr & dataMsg)
@@ -2674,8 +2709,13 @@ bool CoreWrapper::updateRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Emp
 	}
 	if(parameters_.find(Parameters::kGridGlobalMaxNodes()) != parameters_.end())
 	{
-		maxMappingNodes_ = uStr2Int(parameters_.at(Parameters::kGridGlobalMaxNodes()));
-		NODELET_INFO("Max mapping nodes = %d", maxMappingNodes_);
+		mappingMaxNodes_ = uStr2Int(parameters_.at(Parameters::kGridGlobalMaxNodes()));
+		NODELET_INFO("Max mapping nodes = %d", mappingMaxNodes_);
+	}
+	if(parameters_.find(Parameters::kGridGlobalAltitudeDelta()) != parameters_.end())
+	{
+		mappingAltitudeDelta_ = uStr2Float(parameters_.at(Parameters::kGridGlobalAltitudeDelta()));
+		NODELET_INFO("Mapping altitude delta = %f", mappingAltitudeDelta_);
 	}
 	if(parameters_.find(Parameters::kRtabmapImagesAlreadyRectified()) != parameters_.end())
 	{
@@ -3161,18 +3201,9 @@ bool CoreWrapper::publishMapCallback(rtabmap_ros::PublishMap::Request& req, rtab
 			if(mapsManager_.hasSubscribers())
 			{
 				std::map<int, Transform> filteredPoses(poses.lower_bound(1), poses.end());
-				if(maxMappingNodes_ > 0 && filteredPoses.size()>1)
+				if((mappingMaxNodes_ > 0 || mappingAltitudeDelta_>0.0) && filteredPoses.size()>1)
 				{
-					std::map<int, Transform> nearestPoses;
-					std::map<int, float> nodes = graph::findNearestNodes(filteredPoses, filteredPoses.rbegin()->second, maxMappingNodes_);
-					for(std::map<int, float>::iterator iter=nodes.begin(); iter!=nodes.end(); ++iter)
-					{
-						std::map<int, Transform>::iterator pter = filteredPoses.find(iter->first);
-						if(pter != filteredPoses.end())
-						{
-							nearestPoses.insert(*pter);
-						}
-					}
+					std::map<int, Transform> nearestPoses = filterNodesToAssemble(filteredPoses, filteredPoses.rbegin()->second);
 				}
 				if(signatures.size())
 				{
@@ -4038,19 +4069,9 @@ bool CoreWrapper::octomapBinaryCallback(
 	res.map.header.stamp = ros::Time::now();
 
 	std::map<int, Transform> poses = rtabmap_.getLocalOptimizedPoses();
-	if(maxMappingNodes_ > 0 && poses.size()>1)
+	if((mappingMaxNodes_ > 0 || mappingAltitudeDelta_>0.0) && poses.size()>1)
 	{
-		std::map<int, Transform> nearestPoses;
-		std::map<int, float> nodes = graph::findNearestNodes(poses, poses.rbegin()->second, maxMappingNodes_);
-		for(std::map<int, float>::iterator iter=nodes.begin(); iter!=nodes.end(); ++iter)
-		{
-			std::map<int, Transform>::iterator pter = poses.find(iter->first);
-			if(pter != poses.end())
-			{
-				nearestPoses.insert(*pter);
-			}
-		}
-		poses = nearestPoses;
+		poses = filterNodesToAssemble(poses, poses.rbegin()->second);
 	}
 
 	mapsManager_.updateMapCaches(poses, rtabmap_.getMemory(), false, true);
@@ -4069,19 +4090,9 @@ bool CoreWrapper::octomapFullCallback(
 	res.map.header.stamp = ros::Time::now();
 
 	std::map<int, Transform> poses = rtabmap_.getLocalOptimizedPoses();
-	if(maxMappingNodes_ > 0 && poses.size()>1)
+	if((mappingMaxNodes_ > 0 || mappingAltitudeDelta_>0.0) && poses.size()>1)
 	{
-		std::map<int, Transform> nearestPoses;
-		std::map<int, float> nodes = graph::findNearestNodes(poses, poses.rbegin()->second, maxMappingNodes_);
-		for(std::map<int, float>::iterator iter=nodes.begin(); iter!=nodes.end(); ++iter)
-		{
-			std::map<int, Transform>::iterator pter = poses.find(iter->first);
-			if(pter != poses.end())
-			{
-				nearestPoses.insert(*pter);
-			}
-		}
-		poses = nearestPoses;
+		poses = filterNodesToAssemble(poses, poses.rbegin()->second);
 	}
 
 	mapsManager_.updateMapCaches(poses, rtabmap_.getMemory(), false, true);

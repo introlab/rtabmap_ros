@@ -184,6 +184,9 @@ private:
 			const cv::Mat & odomCovariance = cv::Mat::eye(6,6,CV_64FC1),
 			const rtabmap::OdometryInfo & odomInfo = rtabmap::OdometryInfo(),
 			double timeMsgConversion = 0.0);
+	std::map<int, rtabmap::Transform> filterNodesToAssemble(
+			const std::map<int, rtabmap::Transform> & nodes,
+			const rtabmap::Transform & currentPose);
 
 	bool updateRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool resetRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
@@ -366,7 +369,8 @@ private:
 	bool odomSensorSync_;
 	float rate_;
 	bool createIntermediateNodes_;
-	int maxMappingNodes_;
+	int mappingMaxNodes_;
+	double mappingAltitudeDelta_;
 	bool alreadyRectifiedImages_;
 	bool twoDMapping_;
 	ros::Time previousStamp_;
