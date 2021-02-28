@@ -37,6 +37,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <QMessageBox>
 #include <ros/exceptions.h>
 #include <rtabmap/utilite/UStl.h>
+#include <rtabmap/utilite/UTimer.h>
 
 using namespace rtabmap;
 
@@ -84,7 +85,7 @@ bool PreferencesDialogROS::readCoreSettings(const QString & filePath)
 	}
 
 	ros::NodeHandle nh;
-	ROS_INFO("%s", this->getParamMessage().toStdString().c_str());
+	ROS_INFO("rtabmapviz: %s", this->getParamMessage().toStdString().c_str());
 	bool validParameters = true;
 	int readCount = 0;
 	rtabmap::ParametersMap parameters = rtabmap::Parameters::getDefaultParameters();
@@ -100,6 +101,27 @@ bool PreferencesDialogROS::readCoreSettings(const QString & filePath)
 			++iter;
 		}
 	}
+
+	// Wait rtabmap parameters to appear (if gui noe has been launched at the same time than rtabmap)
+	if(!this->isVisible())
+	{
+		double stamp = UTimer::now();
+		std::string tmp;
+		bool warned = false;
+		while(!nh.getParam(Parameters::kRtabmapDetectionRate(),tmp) && UTimer::now()-stamp < 5.0)
+		{
+			if(!warned)
+			{
+				ROS_INFO("rtabmapviz: Cannot get rtabmap's parameters, waiting max 5 seconds in case the node has just been launched.");
+				warned = true;
+			}
+		}
+		if(warned && UTimer::now()-stamp < 5.0)
+		{
+			ROS_INFO("rtabmapviz: rtabmap's parameters seem now there! continuing...");
+		}
+	}
+
 	for(rtabmap::ParametersMap::iterator i=parameters.begin(); i!=parameters.end(); ++i)
 	{
 		if(i->first.compare(rtabmap::Parameters::kRtabmapWorkingDirectory()) == 0)
@@ -131,17 +153,17 @@ bool PreferencesDialogROS::readCoreSettings(const QString & filePath)
 			}
 			else
 			{
-				ROS_WARN("Parameter %s not found", i->first.c_str());
+				ROS_WARN("rtabmapviz: Parameter %s not found", i->first.c_str());
 				validParameters = false;
 			}
 		}
 	}
 
-	ROS_INFO("Parameters read = %d", readCount);
+	ROS_INFO("rtabmapviz: Parameters read = %d", readCount);
 
 	if(validParameters)
 	{
-		ROS_INFO("Parameters successfully read.");
+		ROS_INFO("rtabmapviz: Parameters successfully read.");
 	}
 	else
 	{
