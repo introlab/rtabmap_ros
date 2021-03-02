@@ -227,9 +227,9 @@ void OdometryROS::init(bool stereoParams, bool visParams, bool icpParams)
 	for(rtabmap::ParametersMap::iterator iter=parameters_.begin(); iter!=parameters_.end(); ++iter)
 	{
 		rclcpp::Parameter parameter;
-		if(get_parameter(iter->first, parameter))
+		std::string vStr = this->declare_parameter(iter->first, iter->second); 
+	 	if(vStr.compare(iter->second)!=0)
 		{
-			std::string vStr = parameter.as_string();
 			RCLCPP_INFO(this->get_logger(), "Setting odometry parameter \"%s\"=\"%s\"", iter->first.c_str(), vStr.c_str());
 			iter->second = vStr;
 		}
