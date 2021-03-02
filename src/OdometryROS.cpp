@@ -354,7 +354,7 @@ void OdometryROS::onInit()
 
 	odomStrategy_ = 0;
 	Parameters::parse(this->parameters(), Parameters::kOdomStrategy(), odomStrategy_);
-	if(waitIMUToinit_ || odometry_->canProcessIMU())
+	if(waitIMUToinit_)
 	{
 		int queueSize = 10;
 		pnh.param("queue_size", queueSize, queueSize);
@@ -423,13 +423,6 @@ void OdometryROS::callbackIMU(const sensor_msgs::ImuConstPtr& msg)
 {
 	if(!this->isPaused())
 	{
-		if(!odometry_->canProcessIMU() &&
-		   !odometry_->getPose().isIdentity())
-		{
-			// For non-inertial odometry approaches, IMU is only used to initialize the initial orientation below
-			return;
-		}
-
 		double stamp = msg->header.stamp.toSec();
 		rtabmap::Transform localTransform = rtabmap::Transform::getIdentity();
 		if(this->frameId().compare(msg->header.frame_id) != 0)
@@ -451,65 +444,18 @@ void OdometryROS::callbackIMU(const sensor_msgs::ImuConstPtr& msg)
 				cv::Mat(3,3,CV_64FC1,(void*)msg->linear_acceleration_covariance.data()).clone(),
 				localTransform);
 
-		if(!odometry_->canProcessIMU())
-		{
-			if(!odometry_->getPose().isIdentity())
-			{
-				// For these approaches, IMU is only used to initialize the initial orientation
-				return;
-			}
+		imus_.insert(std::make_pair(stamp, imu));
 
-			// align with gravity
-			if(!imu.localTransform().isNull())
-			{
-				if(imu.orientation()[0] != 0 || imu.orientation()[1] != 0 || imu.orientation()[2] != 0 || imu.orientation()[3] != 0)
-				{
-					Transform rotation(0,0,0, imu.orientation()[0], imu.orientation()[1], imu.orientation()[2], imu.orientation()[3]);
-					// orientation includes roll and pitch but not yaw in local transform
-					rotation = Transform(0,0,imu.localTransform().theta()) * rotation * imu.localTransform().rotation().inverse();
-					this->reset(rotation);
-					float r,p,y;
-					rotation.getEulerAngles(r,p,y);
-					NODELET_WARN("odometry: Initialized odometry with IMU's orientation (rpy = %f %f %f).", r,p,y);
-				}
-				else if(imu.linearAcceleration()[0]!=0.0 &&
-					imu.linearAcceleration()[1]!=0.0 &&
-					imu.linearAcceleration()[2]!=0.0 &&
-					!imu.localTransform().isNull())
-				{
-					Eigen::Vector3f n(imu.linearAcceleration()[0], imu.linearAcceleration()[1], imu.linearAcceleration()[2]);
-					n = imu.localTransform().rotation().toEigen3f() * n;
-					n.normalize();
-					Eigen::Vector3f z(0,0,1);
-					//get rotation from z to n;
-					Eigen::Matrix3f R;
-					R = Eigen::Quaternionf().setFromTwoVectors(n,z);
-					Transform rotation(
-							R(0,0), R(0,1), R(0,2), 0,
-							R(1,0), R(1,1), R(1,2), 0,
-							R(2,0), R(2,1), R(2,2), 0);
-					this->reset(rotation);
-					float r,p,y;
-					rotation.getEulerAngles(r,p,y);
-					NODELET_WARN("odometry: Initialized odometry with IMU's accelerometer (rpy = %f %f %f).", r,p,y);
-				}
-			}
-		}
-		else
+		if(bufferedData_.first.isValid() && stamp > bufferedData_.first.stamp())
 		{
-			imus_.insert(std::make_pair(stamp, imu));
-			
-			if(bufferedData_.first.isValid() && stamp > bufferedData_.first.stamp())
-			{
-				SensorData data = bufferedData_.first;
-				bufferedData_.first = SensorData();
-				processData(data, bufferedData_.second.first, bufferedData_.second.second);
-			}
-			
-			if(imus_.size() > 1000)
-			{
-				imus_.erase(imus_.begin());
-			}
+			SensorData data = bufferedData_.first;
+			bufferedData_.first = SensorData();
+			processData(data, bufferedData_.second.first, bufferedData_.second.second);
+		}
+
+		if(imus_.size() > 1000)
+		{
+			imus_.erase(imus_.begin());
 		}
 	}
 }
@@ -518,44 +464,42 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp, 
 {
 	if((waitIMUToinit_ && !imuProcessed_) && odometry_->framesProcessed() == 0 && odometry_->getPose().isIdentity() && imus_.empty())
 	{
-		NODELET_WARN("odometry: waiting imu to initialize orientation (wait_imu_to_init=true)");
+		NODELET_WARN("odometry: waiting imu (%s) to initialize orientation (wait_imu_to_init=true)", imuSub_.getTopic().c_str());
 		return;
 	}
 
-	if(odometry_->canProcessIMU())
+	if(waitIMUToinit_ && (imus_.empty() || imus_.rbegin()->first<stamp.toSec()))
 	{
-		if(waitIMUToinit_ && (imus_.empty() || imus_.rbegin()->first<stamp.toSec()))
+		//NODELET_WARN("No imu received with higher stamp than last image (%f)! Buffering this image until we get more imu msgs...", stamp.toSec());
+
+		// keep in cache to process later when we will receive imu msgs
+		if(bufferedData_.first.isValid())
 		{
-			//NODELET_WARN("No imu received with higher stamp than last image (%f)! Buffering this image until we get more imu msgs...", stamp.toSec());
-		
-			// keep in cache to process later when we will receive imu msgs
-			if(bufferedData_.first.isValid())
-			{
-				NODELET_ERROR("Overwriting previous data! Make sure IMU is "
-						"published faster than data rate. (last image stamp "
-						"buffered=%f and new one is %f, last imu stamp received=%f)",
-						bufferedData_.first.stamp(), data.stamp(), imus_.empty()?0:imus_.rbegin()->first);
-			}
-			bufferedData_.first = data;
-			bufferedData_.second.first = stamp;
-			bufferedData_.second.second = sensorFrameId;
-			return;
+			NODELET_ERROR("Overwriting previous data! Make sure IMU is "
+					"published faster than data rate. (last image stamp "
+					"buffered=%f and new one is %f, last imu stamp received=%f)",
+					bufferedData_.first.stamp(), data.stamp(), imus_.empty()?0:imus_.rbegin()->first);
 		}
-		// process all imu data up to current image stamp (or just after so that underlying odom approach can do interpolation of imu at image stamp)
-		std::map<double, rtabmap::IMU>::iterator iterEnd = imus_.lower_bound(stamp.toSec());
-		if(iterEnd!= imus_.end())
-		{
-			++iterEnd;
-		}
-		for(std::map<double, rtabmap::IMU>::iterator iter=imus_.begin(); iter!=iterEnd;)
-		{
-			//NODELET_WARN("img callback: process imu   %f", iter->first);
-			SensorData dataIMU(iter->second, 0, iter->first);
-			odometry_->process(dataIMU);
-			imus_.erase(iter++);
-			imuProcessed_ = true;
-		}
+		bufferedData_.first = data;
+		bufferedData_.second.first = stamp;
+		bufferedData_.second.second = sensorFrameId;
+		return;
 	}
+	// process all imu data up to current image stamp (or just after so that underlying odom approach can do interpolation of imu at image stamp)
+	std::map<double, rtabmap::IMU>::iterator iterEnd = imus_.lower_bound(stamp.toSec());
+	if(iterEnd!= imus_.end())
+	{
+		++iterEnd;
+	}
+	for(std::map<double, rtabmap::IMU>::iterator iter=imus_.begin(); iter!=iterEnd;)
+	{
+		//NODELET_WARN("img callback: process imu   %f", iter->first);
+		SensorData dataIMU(iter->second, 0, iter->first);
+		odometry_->process(dataIMU);
+		imus_.erase(iter++);
+		imuProcessed_ = true;
+	}
+
 	//NODELET_WARN("img callback: process image %f", stamp.toSec());
 
 	Transform groundTruth;
