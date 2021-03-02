@@ -315,7 +315,7 @@ void OdometryROS::init(bool stereoParams, bool visParams, bool icpParams)
 
 	odomStrategy_ = 0;
 	Parameters::parse(this->parameters(), Parameters::kOdomStrategy(), odomStrategy_);
-	if(waitIMUToinit_ || odometry_->canProcessIMU())
+	if(waitIMUToinit_ || odometry_->canProcessAsyncIMU())
 	{
 		int queueSize = 10;
 		queueSize = this->declare_parameter("queue_size", queueSize);
@@ -354,7 +354,7 @@ void OdometryROS::callbackIMU(const sensor_msgs::msg::Imu::SharedPtr msg)
 {
 	if(!this->isPaused())
 	{
-		if(!odometry_->canProcessIMU() &&
+		if(!odometry_->canProcessAsyncIMU() &&
 		   !odometry_->getPose().isIdentity())
 		{
 			// For non-inertial odometry approaches, IMU is only used to initialize the initial orientation below
@@ -382,7 +382,7 @@ void OdometryROS::callbackIMU(const sensor_msgs::msg::Imu::SharedPtr msg)
 				cv::Mat(3,3,CV_64FC1,(void*)msg->linear_acceleration_covariance.data()).clone(),
 				localTransform);
 
-		if(!odometry_->canProcessIMU())
+		if(!odometry_->canProcessAsyncIMU())
 		{
 			if(!odometry_->getPose().isIdentity())
 			{
@@ -452,7 +452,7 @@ void OdometryROS::processData(const SensorData & data, const rclcpp::Time & stam
 	Transform groundTruth;
 	if(!data.imageRaw().empty() || !data.laserScanRaw().isEmpty())
 	{
-		if(odometry_->canProcessIMU() && data.imu().empty() && lastImuReceivedStamp_>0.0 && data.stamp() > lastImuReceivedStamp_)
+		if(odometry_->canProcessAsyncIMU() && data.imu().empty() && lastImuReceivedStamp_>0.0 && data.stamp() > lastImuReceivedStamp_)
 		{
 			//RCLCPP_WARN(this->get_logger(), "Data received is more recent than last imu received, waiting for imu update to process it.");
 			if(bufferedData_.isValid())

@@ -285,7 +285,7 @@ void ICPOdometry::callbackScan(const sensor_msgs::msg::LaserScan::SharedPtr scan
 			}
 			pcl::PointCloud<pcl::PointNormal>::Ptr pclScanNormal(new pcl::PointCloud<pcl::PointNormal>);
 			pcl::concatenateFields(*pclScan, *normals, *pclScanNormal);
-			scan = util3d::laserScan2dFromPointCloud(*pclScanNormal);
+			scan = util3d::laserScan2dFromPointCloud(*pclScanNormal).data();
 
 			if(filtered_scan_pub_->get_subscription_count())
 			{
@@ -297,7 +297,7 @@ void ICPOdometry::callbackScan(const sensor_msgs::msg::LaserScan::SharedPtr scan
 		}
 		else
 		{
-			scan = util3d::laserScan2dFromPointCloud(*pclScan);
+			scan = util3d::laserScan2dFromPointCloud(*pclScan).data();
 
 			if(filtered_scan_pub_->get_subscription_count())
 			{
@@ -390,7 +390,7 @@ void ICPOdometry::callbackCloud(const sensor_msgs::msg::PointCloud2::SharedPtr p
 			pclScan = util3d::downsample(pclScan, scanDownsamplingStep_);
 			maxLaserScans /= scanDownsamplingStep_;
 		}
-		scan = util3d::laserScanFromPointCloud(*pclScan);
+		scan = util3d::laserScanFromPointCloud(*pclScan).data();
 		if(filtered_scan_pub_->get_subscription_count())
 		{
 			sensor_msgs::msg::PointCloud2::UniquePtr msg(new sensor_msgs::msg::PointCloud2);
@@ -428,7 +428,7 @@ void ICPOdometry::callbackCloud(const sensor_msgs::msg::PointCloud2::SharedPtr p
 				pcl::PointCloud<pcl::Normal>::Ptr normals = util3d::computeNormals(pclScan, scanNormalK_, scanNormalRadius_);
 				pcl::PointCloud<pcl::PointNormal>::Ptr pclScanNormal(new pcl::PointCloud<pcl::PointNormal>);
 				pcl::concatenateFields(*pclScan, *normals, *pclScanNormal);
-				scan = util3d::laserScanFromPointCloud(*pclScanNormal);
+				scan = util3d::laserScanFromPointCloud(*pclScanNormal).data();
 
 				if(filtered_scan_pub_->get_subscription_count())
 				{
@@ -440,7 +440,7 @@ void ICPOdometry::callbackCloud(const sensor_msgs::msg::PointCloud2::SharedPtr p
 			}
 			else
 			{
-				scan = util3d::laserScanFromPointCloud(*pclScan);
+				scan = util3d::laserScanFromPointCloud(*pclScan).data();
 
 				if(filtered_scan_pub_->get_subscription_count())
 				{

@@ -13,6 +13,7 @@ RTAB-Map's ROS2 package (branch `ros2`). **UNDER CONSTRUCTION**: currently most 
     $ cmake ..
     $ make -j4
     $ sudo make install
+    $ sudo ldconfig
     ```
 * RTAB-Map ROS2 package:
     ```bash
