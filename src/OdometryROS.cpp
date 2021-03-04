@@ -610,7 +610,7 @@ void OdometryROS::processData(const SensorData & data, const ros::Time & stamp, 
 		}
 		else
 		{
-			NODELET_ERROR("\"guess_from_tf\" is true, but guess cannot be computed between frames \"%s\" -> \"%s\". Aborting odometry update...", guessFrameId_.c_str(), frameId_.c_str());
+			NODELET_ERROR("\"guess_frame_id\" is set, but guess cannot be computed between frames \"%s\" -> \"%s\". Aborting odometry update...", guessFrameId_.c_str(), frameId_.c_str());
 			return;
 		}
 	}
