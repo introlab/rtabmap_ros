@@ -550,7 +550,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 				rtabmap::SensorData data;
 				if(updateGridCache && (iter->first == 0 || !uContains(gridMaps_, iter->first)))
 				{
-					UDEBUG("Data required for %d", iter->first);
+					ROS_DEBUG("Data required for %d", iter->first);
 					std::map<int, rtabmap::Signature>::const_iterator findIter = signatures.find(iter->first);
 					if(findIter != signatures.end())
 					{
@@ -561,7 +561,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 						data = memory->getNodeData(iter->first, occupancyGrid_->isGridFromDepth() && !occupancySavedInDB, !occupancyGrid_->isGridFromDepth() && !occupancySavedInDB, false, true);
 					}
 
-					UDEBUG("Adding grid map %d to cache...", iter->first);
+					ROS_DEBUG("Adding grid map %d to cache...", iter->first);
 					cv::Point3f viewPoint;
 					cv::Mat ground, obstacles, emptyCells;
 					if(iter->first > 0)
@@ -808,7 +808,7 @@ void MapsManager::publishMaps(
 		const ros::Time & stamp,
 		const std::string & mapFrameId)
 {
-	UDEBUG("Publishing maps...");
+	ROS_DEBUG("Publishing maps... poses=%d", (int)poses.size());
 
 	// publish maps
 	if(cloudMapPub_.getNumSubscribers() ||
@@ -847,7 +847,8 @@ void MapsManager::publishMaps(
 				   cloudObstaclesPub_.getNumSubscribers();
 		bool graphGroundChanged = updateGround;
 		bool graphObstacleChanged = updateObstacles;
-		for(std::map<int, Transform>::const_iterator iter=poses.lower_bound(0); iter!=poses.end(); ++iter)
+		float updateErrorSqr = occupancyGrid_->getUpdateError()*occupancyGrid_->getUpdateError();
+		for(std::map<int, Transform>::const_iterator iter=poses.lower_bound(1); iter!=poses.end(); ++iter)
 		{
 			std::map<int, Transform>::const_iterator jter;
 			if(updateGround)
@@ -857,7 +858,7 @@ void MapsManager::publishMaps(
 				{
 					graphGroundChanged = false;
 					UASSERT(!iter->second.isNull() && !jter->second.isNull());
-					if(iter->second.getDistanceSquared(jter->second) > 0.0001)
+					if(iter->second.getDistanceSquared(jter->second) > updateErrorSqr)
 					{
 						graphGroundOptimized = true;
 					}
@@ -870,7 +871,7 @@ void MapsManager::publishMaps(
 				{
 					graphObstacleChanged = false;
 					UASSERT(!iter->second.isNull() && !jter->second.isNull());
-					if(iter->second.getDistanceSquared(jter->second) > 0.0001)
+					if(iter->second.getDistanceSquared(jter->second) > updateErrorSqr)
 					{
 						graphObstacleOptimized = true;
 					}
@@ -904,65 +905,66 @@ void MapsManager::publishMaps(
 			UTimer t;
 			cv::Mat tmpGroundPts;
 			cv::Mat tmpObstaclePts;
-			for(std::map<int, Transform>::const_iterator iter = poses.begin(); iter!=poses.end(); ++iter)
+			for(std::map<int, Transform>::const_iterator iter = poses.lower_bound(1); iter!=poses.end(); ++iter)
 			{
-				if(iter->first > 0)
+				if(updateGround  &&
+				   (graphGroundOptimized || assembledGroundPoses_.find(iter->first) == assembledGroundPoses_.end()))
 				{
-					if(updateGround  &&
-					   (graphGroundOptimized || assembledGroundPoses_.find(iter->first) == assembledGroundPoses_.end()))
+					std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr >::iterator kter=groundClouds_.find(iter->first);
+					if(kter != groundClouds_.end() && kter->second->size())
 					{
 						assembledGroundPoses_.insert(*iter);
-						std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr >::iterator kter=groundClouds_.find(iter->first);
-						if(kter != groundClouds_.end() && kter->second->size())
+						pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::transformPointCloud(kter->second, iter->second);
+						*assembledGround_+=*transformed;
+						if(cloudSubtractFiltering_)
 						{
-							pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::transformPointCloud(kter->second, iter->second);
-							*assembledGround_+=*transformed;
-							if(cloudSubtractFiltering_)
+							for(unsigned int i=0; i<transformed->size(); ++i)
 							{
-								for(unsigned int i=0; i<transformed->size(); ++i)
+								if(tmpGroundPts.empty())
 								{
-									if(tmpGroundPts.empty())
-									{
-										tmpGroundPts = (cv::Mat_<float>(1, 3) << transformed->at(i).x, transformed->at(i).y, transformed->at(i).z);
-										tmpGroundPts.reserve(previousIndexedGroundSize>0?previousIndexedGroundSize:100);
-									}
-									else
-									{
-										cv::Mat pt = (cv::Mat_<float>(1, 3) << transformed->at(i).x, transformed->at(i).y, transformed->at(i).z);
-										tmpGroundPts.push_back(pt);
-									}
+									tmpGroundPts = (cv::Mat_<float>(1, 3) << transformed->at(i).x, transformed->at(i).y, transformed->at(i).z);
+									tmpGroundPts.reserve(previousIndexedGroundSize>0?previousIndexedGroundSize:100);
+								}
+								else
+								{
+									cv::Mat pt = (cv::Mat_<float>(1, 3) << transformed->at(i).x, transformed->at(i).y, transformed->at(i).z);
+									tmpGroundPts.push_back(pt);
 								}
 							}
-							++countGrounds;
 						}
+						++countGrounds;
 					}
-					if(updateObstacles  &&
-					   (graphObstacleOptimized || assembledObstaclePoses_.find(iter->first) == assembledObstaclePoses_.end()))
+				}
+				if(updateObstacles  &&
+				   (graphObstacleOptimized || assembledObstaclePoses_.find(iter->first) == assembledObstaclePoses_.end()))
+				{
+					std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr >::iterator kter=obstacleClouds_.find(iter->first);
+					if(kter != obstacleClouds_.end() && kter->second->size())
 					{
 						assembledObstaclePoses_.insert(*iter);
-						std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr >::iterator kter=obstacleClouds_.find(iter->first);
-						if(kter != obstacleClouds_.end() && kter->second->size())
+						pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::transformPointCloud(kter->second, iter->second);
+						*assembledObstacles_+=*transformed;
+						if(cloudSubtractFiltering_)
 						{
-							pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::transformPointCloud(kter->second, iter->second);
-							*assembledObstacles_+=*transformed;
-							if(cloudSubtractFiltering_)
+							for(unsigned int i=0; i<transformed->size(); ++i)
 							{
-								for(unsigned int i=0; i<transformed->size(); ++i)
+								if(tmpObstaclePts.empty())
 								{
-									if(tmpObstaclePts.empty())
-									{
-										tmpObstaclePts = (cv::Mat_<float>(1, 3) << transformed->at(i).x, transformed->at(i).y, transformed->at(i).z);
-										tmpObstaclePts.reserve(previousIndexedObstacleSize>0?previousIndexedObstacleSize:100);
-									}
-									else
-									{
-										cv::Mat pt = (cv::Mat_<float>(1, 3) << transformed->at(i).x, transformed->at(i).y, transformed->at(i).z);
-										tmpObstaclePts.push_back(pt);
-									}
+									tmpObstaclePts = (cv::Mat_<float>(1, 3) << transformed->at(i).x, transformed->at(i).y, transformed->at(i).z);
+									tmpObstaclePts.reserve(previousIndexedObstacleSize>0?previousIndexedObstacleSize:100);
+								}
+								else
+								{
+									cv::Mat pt = (cv::Mat_<float>(1, 3) << transformed->at(i).x, transformed->at(i).y, transformed->at(i).z);
+									tmpObstaclePts.push_back(pt);
 								}
 							}
-							++countObstacles;
 						}
+						++countObstacles;
+					}
+					else
+					{
+						std::map<int, std::pair<std::pair<cv::Mat, cv::Mat>, cv::Mat> >::iterator jter = gridMaps_.find(iter->first);
 					}
 				}
 			}
@@ -977,11 +979,11 @@ void MapsManager::publishMaps(
 				assembledObstacleIndex_.buildKDTreeSingleIndex(tmpObstaclePts, 15);
 			}
 			double indexingTime = t.ticks();
-			UINFO("Graph optimized! Time recreating clouds (%d ground, %d obstacles) = %f s (indexing %fs)", countGrounds, countObstacles, addingPointsTime+indexingTime, indexingTime);
+			ROS_INFO("Graph optimized! Time recreating clouds (%d ground, %d obstacles) = %f s (indexing %fs)", countGrounds, countObstacles, addingPointsTime+indexingTime, indexingTime);
 		}
 		else if(graphGroundChanged || graphObstacleChanged)
 		{
-			UWARN("Graph has changed! The whole cloud is regenerated.");
+			ROS_WARN("Graph has changed! The whole cloud is regenerated.");
 		}
 
 		for(std::map<int, Transform>::const_iterator iter = poses.begin(); iter!=poses.end(); ++iter)
