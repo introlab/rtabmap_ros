@@ -162,6 +162,7 @@ public:
 			}
 		}
 
+		ROS_INFO("%s: regenerate_local_grids          = %s", ros::this_node::getName().c_str(), localGridsRegenerated_?"true":"false");
 		mapsManager_.init(nh, pnh, ros::this_node::getName(), false);
 		mapsManager_.backwardCompatibilityParameters(pnh, parameters);
 		mapsManager_.setParameters(parameters);

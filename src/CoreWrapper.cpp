@@ -623,20 +623,39 @@ void CoreWrapper::onInit()
 	// Init RTAB-Map
 	rtabmap_.init(parameters_, databasePath_);
 
-	if(rtabmap_.getMemory() && useSavedMap_)
+	if(rtabmap_.getMemory())
 	{
-		float xMin, yMin, gridCellSize;
-		cv::Mat map = rtabmap_.getMemory()->load2DMap(xMin, yMin, gridCellSize);
-		if(!map.empty())
+		if(useSavedMap_ && !rtabmap_.getMemory()->isIncremental())
 		{
-			NODELET_INFO("rtabmap: 2D occupancy grid map loaded (%dx%d).", map.cols, map.rows);
-			mapsManager_.set2DMap(map, xMin, yMin, gridCellSize, rtabmap_.getLocalOptimizedPoses(), rtabmap_.getMemory());
+			float xMin, yMin, gridCellSize;
+			cv::Mat map = rtabmap_.getMemory()->load2DMap(xMin, yMin, gridCellSize);
+			if(!map.empty())
+			{
+				NODELET_INFO("rtabmap: 2D occupancy grid map loaded (%dx%d).", map.cols, map.rows);
+				mapsManager_.set2DMap(map, xMin, yMin, gridCellSize, rtabmap_.getLocalOptimizedPoses(), rtabmap_.getMemory());
+			}
 		}
-	}
 
-	if(databasePath_.size() && rtabmap_.getMemory())
-	{
-		NODELET_INFO("rtabmap: Database version = \"%s\".", rtabmap_.getMemory()->getDatabaseVersion().c_str());
+		if(rtabmap_.getMemory()->getWorkingMem().size()>1)
+		{
+			NODELET_INFO("rtabmap: Working Memory = %d, Local map = %d.",
+					(int)rtabmap_.getMemory()->getWorkingMem().size()-1,
+					(int)rtabmap_.getLocalOptimizedPoses().size());
+		}
+
+		if(databasePath_.size())
+		{
+			NODELET_INFO("rtabmap: Database version = \"%s\".", rtabmap_.getMemory()->getDatabaseVersion().c_str());
+		}
+
+		if(rtabmap_.getMemory()->isIncremental())
+		{
+			NODELET_INFO("rtabmap: SLAM mode (%s=true)", Parameters::kMemIncrementalMemory().c_str());
+		}
+		else
+		{
+			NODELET_INFO("rtabmap: Localization mode (%s=false)", Parameters::kMemIncrementalMemory().c_str());
+		}
 	}
 
 	// setup services

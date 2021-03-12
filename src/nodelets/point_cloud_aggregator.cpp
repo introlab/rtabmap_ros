@@ -70,7 +70,8 @@ public:
 		exactSync3_(0),
 		approxSync3_(0),
 		exactSync2_(0),
-		approxSync2_(0)
+		approxSync2_(0),
+		waitForTransformDuration_(0.1)
 	{}
 
 	virtual ~PointCloudAggregator()
@@ -104,6 +105,7 @@ private:
 		pnh.param("fixed_frame_id", fixedFrameId_, fixedFrameId_);
 		pnh.param("approx_sync", approx, approx);
 		pnh.param("count", count, count);
+		pnh.param("wait_for_transform_duration", waitForTransformDuration_, waitForTransformDuration_);
 
 		cloudSub_1_.subscribe(nh, "cloud1", 1);
 		cloudSub_2_.subscribe(nh, "cloud2", 1);
@@ -233,7 +235,6 @@ private:
 			for(unsigned int i=1; i<cloudMsgs.size(); ++i)
 			{
 				rtabmap::Transform cloudDisplacement;
-				bool notsync = false;
 				if(!fixedFrameId_.empty() &&
 				   cloudMsgs[0]->header.stamp != cloudMsgs[i]->header.stamp)
 				{
@@ -244,8 +245,7 @@ private:
 							cloudMsgs[i]->header.stamp, //stampSource
 							cloudMsgs[0]->header.stamp, //stampTarget
 							tfListener_,
-							0.1);
-					notsync = true;
+							waitForTransformDuration_);
 				}
 
 				pcl::PCLPointCloud2 cloud2;
@@ -335,6 +335,7 @@ private:
 
 	std::string frameId_;
 	std::string fixedFrameId_;
+	double waitForTransformDuration_;
 	tf::TransformListener tfListener_;
 };
 
