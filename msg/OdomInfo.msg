@@ -31,7 +31,7 @@ float32 gravityPitchError
 geometry_msgs/Transform transform
 geometry_msgs/Transform transformFiltered
 geometry_msgs/Transform transformGroundTruth
-geometry_msgs/Transform guessVelocity
+geometry_msgs/Transform guess
 
 # 0=F2M, 1=F2F
 int32 type
