@@ -1,4 +1,4 @@
-
+<!-- -->
 <launch>
 
   <!-- HECTOR MAPPING VERSION: use this with ROS bag demo_mapping_no_odom.bag generated  -->
@@ -21,9 +21,15 @@
 
   <!-- Example with camera or not -->
   <arg name="camera" default="true" />
-
-  <!-- Example with camera or not -->
-
+  
+  <!-- Limit lidar range if > 0 (has effect only when hector:=false) -->
+  <arg name="max_range" default="0" />
+  
+  <!-- Point to Plane ICP? (has effect only when hector:=false) -->
+  <arg name="p2n" default="true" />
+  
+  <!-- Use libpointmatcher for ICP? (has effect only when hector:=false) -->
+  <arg name="pm" default="true" />
 
   <param name="use_sim_time" type="bool" value="True"/>
   
@@ -67,13 +73,18 @@
      <param if="$(arg odom_guess)" name="odom_frame_id"   type="string" value="icp_odom"/>
      <param if="$(arg odom_guess)" name="guess_frame_id"  type="string" value="odom"/>
      
-     <param name="Icp/PointToPlane"  type="string" value="true"/>
      <param name="Icp/VoxelSize"     type="string" value="0.05"/>
+     <param name="Icp/RangeMax"      type="string" value="$(arg max_range)"/>
      <param name="Icp/Epsilon"       type="string" value="0.001"/>
-     <param name="Icp/PointToPlaneK"  type="string" value="5"/>
-     <param name="Icp/PointToPlaneRadius"  type="string" value="0.3"/>
+     <param unless="$(arg odom_guess)" name="Icp/MaxTranslation" type="string" value="0"/> <!-- can be set to reject large ICP jumps -->
+     <param if="$(arg p2n)" name="Icp/PointToPlane"  type="string" value="true"/>
+     <param if="$(arg p2n)" name="Icp/PointToPlaneK"  type="string" value="5"/>
+     <param if="$(arg p2n)" name="Icp/PointToPlaneRadius"  type="string" value="0.3"/>
+     <param unless="$(arg p2n)" name="Icp/PointToPlane"  type="string" value="false"/>
+     <param unless="$(arg p2n)" name="Icp/PointToPlaneK"  type="string" value="0"/>
+     <param unless="$(arg p2n)" name="Icp/PointToPlaneRadius"  type="string" value="0"/>
      <param name="Icp/MaxCorrespondenceDistance" type="string" value="0.1"/>
-     <param name="Icp/PM"             type="string" value="true"/> <!-- use libpointmatcher to handle PointToPlane with 2d scans-->
+     <param name="Icp/PM"             type="string" value="$(arg pm)"/> <!-- use libpointmatcher to handle PointToPlane with 2d scans-->
      <param name="Icp/PMOutlierRatio" type="string" value="0.85"/>
      <param name="Odom/Strategy"        type="string" value="0"/>
      <param name="Odom/GuessMotion"     type="string" value="true"/>
@@ -116,6 +127,8 @@
       <param name="RGBD/ProximityBySpace"    type="string" value="true"/>
       <param name="Icp/CorrespondenceRatio"  type="string" value="0.2"/>
       <param name="Icp/VoxelSize"            type="string" value="0.05"/>
+      <param name="Icp/RangeMax"             type="string" value="$(arg max_range)"/>
+      <param name="Grid/RangeMax"            type="string" value="$(arg max_range)"/>
     </node>
     
     <!-- Visualisation RTAB-Map -->

@@ -418,7 +418,10 @@ private:
 						0,
 						rtabmap_ros::timestampFromROS(stamp));
 
-				this->processData(data, stamp, image->header.frame_id);
+				std_msgs::Header header;
+				header.stamp = stamp;
+				header.frame_id = image->header.frame_id;
+				this->processData(data, header);
 			}
 		}
 	}

@@ -280,7 +280,10 @@ private:
 						0,
 						rtabmap_ros::timestampFromROS(stamp));
 
-				this->processData(data, stamp, imageRectLeft->header.frame_id);
+				std_msgs::Header header;
+				header.stamp = stamp;
+				header.frame_id = imageRectLeft->header.frame_id;
+				this->processData(data, header);
 			}
 			else
 			{
@@ -422,7 +425,10 @@ private:
 						0,
 						rtabmap_ros::timestampFromROS(stamp));
 
-				this->processData(data, stamp, image->header.frame_id);
+				std_msgs::Header header;
+				header.stamp = stamp;
+				header.frame_id = image->header.frame_id;
+				this->processData(data, header);
 			}
 			else
 			{

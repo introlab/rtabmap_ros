@@ -447,7 +447,10 @@ private:
 				0,
 				rtabmap_ros::timestampFromROS(higherStamp));
 
-		this->processData(data, higherStamp, rgbImages.size()==1?rgbImages[0]->header.frame_id:"");
+		std_msgs::Header header;
+		header.stamp = higherStamp;
+		header.frame_id = rgbImages.size()==1?rgbImages[0]->header.frame_id:"";
+		this->processData(data, header);
 	}
 
 	void callback(

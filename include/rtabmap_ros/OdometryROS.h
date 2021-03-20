@@ -57,7 +57,7 @@ public:
 	OdometryROS(bool stereoParams, bool visParams, bool icpParams);
 	virtual ~OdometryROS();
 
-	void processData(const rtabmap::SensorData & data, const ros::Time & stamp, const std::string & sensorFrameId);
+	void processData(rtabmap::SensorData & data, const std_msgs::Header & header);
 
 	bool reset(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool resetToPose(rtabmap_ros::ResetPose::Request&, rtabmap_ros::ResetPose::Response&);
@@ -80,6 +80,7 @@ protected:
 
 	virtual void flushCallbacks() = 0;
 	tf::TransformListener & tfListener() {return tfListener_;}
+	virtual void postProcessData(const rtabmap::SensorData & data, const std_msgs::Header & header) const {}
 
 private:
 	void warningLoop(const std::string & subscribedTopicsMsg, bool approxSync);
@@ -143,7 +144,7 @@ private:
 	bool waitIMUToinit_;
 	bool imuProcessed_;
 	std::map<double, rtabmap::IMU> imus_;
-	std::pair<rtabmap::SensorData, std::pair<ros::Time, std::string> > bufferedData_;
+	std::pair<rtabmap::SensorData, std_msgs::Header > bufferedData_;
 };
 
 }
