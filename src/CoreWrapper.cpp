@@ -1909,7 +1909,7 @@ void CoreWrapper::process(
 					std::vector<float> odomVelocity;
 					if(iter->second.timeEstimation != 0.0f)
 					{
-						OdometryInfo info = odomInfoFromROS(iter->second);
+						OdometryInfo info = odomInfoFromROS(iter->second, true);
 						externalStats = rtabmap_ros::odomInfoToStatistics(info);
 
 						if(info.interval>0.0)
@@ -2098,6 +2098,7 @@ void CoreWrapper::process(
 			rtabmapROSStats_.clear();
 		}
 
+		timeMsgConversion += timer.ticks();
 		if(rtabmap_.process(data, odom, covariance, odomVelocity, externalStats))
 		{
 			timeRtabmap = timer.ticks();

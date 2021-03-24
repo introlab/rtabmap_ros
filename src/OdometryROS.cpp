@@ -115,6 +115,7 @@ void OdometryROS::onInit()
 
 	odomPub_ = nh.advertise<nav_msgs::Odometry>("odom", 1);
 	odomInfoPub_ = nh.advertise<rtabmap_ros::OdomInfo>("odom_info", 1);
+	odomInfoLitePub_ = nh.advertise<rtabmap_ros::OdomInfo>("odom_info_lite", 1);
 	odomLocalMap_ = nh.advertise<sensor_msgs::PointCloud2>("odom_local_map", 1);
 	odomLocalScanMap_ = nh.advertise<sensor_msgs::PointCloud2>("odom_local_scan_map", 1);
 	odomLastFrame_ = nh.advertise<sensor_msgs::PointCloud2>("odom_last_frame", 1);
@@ -856,13 +857,25 @@ void OdometryROS::processData(SensorData & data, const std_msgs::Header & header
 		}
 	}
 
-	if(odomInfoPub_.getNumSubscribers())
+	if(odomInfoPub_.getNumSubscribers() || odomInfoLitePub_.getNumSubscribers())
 	{
 		rtabmap_ros::OdomInfo infoMsg;
 		odomInfoToROS(info, infoMsg);
 		infoMsg.header.stamp = header.stamp; // use corresponding time stamp to image
 		infoMsg.header.frame_id = odomFrameId_;
 		odomInfoPub_.publish(infoMsg);
+
+		infoMsg.wordInliers.clear();
+		infoMsg.wordMatches.clear();
+		infoMsg.wordsKeys.clear();
+		infoMsg.wordsValues.clear();
+		infoMsg.refCorners.clear();
+		infoMsg.newCorners.clear();
+		infoMsg.cornerInliers.clear();
+		infoMsg.localMapKeys.clear();
+		infoMsg.localMapValues.clear();
+		infoMsg.localScanMap.clear();
+		odomInfoLitePub_.publish(infoMsg);
 	}
 
 	if(!data.imageRaw().empty() && odomRgbdImagePub_.getNumSubscribers())

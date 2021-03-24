@@ -113,6 +113,7 @@ private:
 
 	ros::Publisher odomPub_;
 	ros::Publisher odomInfoPub_;
+	ros::Publisher odomInfoLitePub_;
 	ros::Publisher odomLocalMap_;
 	ros::Publisher odomLocalScanMap_;
 	ros::Publisher odomLastFrame_;

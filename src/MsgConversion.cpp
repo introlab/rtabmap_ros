@@ -1381,7 +1381,7 @@ std::map<std::string, float> odomInfoToStatistics(const rtabmap::OdometryInfo & 
 	return stats;
 }
 
-rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::OdomInfo & msg)
+rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::OdomInfo & msg, bool ignoreData)
 {
 	rtabmap::OdometryInfo info;
 	info.lost = msg.lost;
@@ -1413,31 +1413,34 @@ rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::OdomInfo & msg)
 
 	info.type = msg.type;
 
-	UASSERT(msg.wordsKeys.size() == msg.wordsValues.size());
-	for(unsigned int i=0; i<msg.wordsKeys.size(); ++i)
-	{
-		info.words.insert(std::make_pair(msg.wordsKeys[i], keypointFromROS(msg.wordsValues[i])));
-	}
-
 	info.reg.matchesIDs = msg.wordMatches;
 	info.reg.inliersIDs = msg.wordInliers;
 
-	info.refCorners = points2fFromROS(msg.refCorners);
-	info.newCorners = points2fFromROS(msg.newCorners);
-	info.cornerInliers = msg.cornerInliers;
-
-	info.transform = transformFromGeometryMsg(msg.transform);
-	info.transformFiltered = transformFromGeometryMsg(msg.transformFiltered);
-	info.transformGroundTruth = transformFromGeometryMsg(msg.transformGroundTruth);
-	info.guess = transformFromGeometryMsg(msg.guess);
-
-	UASSERT(msg.localMapKeys.size() == msg.localMapValues.size());
-	for(unsigned int i=0; i<msg.localMapKeys.size(); ++i)
+	if(!ignoreData)
 	{
-		info.localMap.insert(std::make_pair(msg.localMapKeys[i], point3fFromROS(msg.localMapValues[i])));
-	}
+		UASSERT(msg.wordsKeys.size() == msg.wordsValues.size());
+		for(unsigned int i=0; i<msg.wordsKeys.size(); ++i)
+		{
+			info.words.insert(std::make_pair(msg.wordsKeys[i], keypointFromROS(msg.wordsValues[i])));
+		}
 
-	info.localScanMap = rtabmap::LaserScan(rtabmap::uncompressData(msg.localScanMap), 0, 0, (rtabmap::LaserScan::Format)msg.localScanMapFormat);
+		info.refCorners = points2fFromROS(msg.refCorners);
+		info.newCorners = points2fFromROS(msg.newCorners);
+		info.cornerInliers = msg.cornerInliers;
+
+		info.transform = transformFromGeometryMsg(msg.transform);
+		info.transformFiltered = transformFromGeometryMsg(msg.transformFiltered);
+		info.transformGroundTruth = transformFromGeometryMsg(msg.transformGroundTruth);
+		info.guess = transformFromGeometryMsg(msg.guess);
+
+		UASSERT(msg.localMapKeys.size() == msg.localMapValues.size());
+		for(unsigned int i=0; i<msg.localMapKeys.size(); ++i)
+		{
+			info.localMap.insert(std::make_pair(msg.localMapKeys[i], point3fFromROS(msg.localMapValues[i])));
+		}
+
+		info.localScanMap = rtabmap::LaserScan(rtabmap::uncompressData(msg.localScanMap), 0, 0, (rtabmap::LaserScan::Format)msg.localScanMapFormat);
+	}
 	return info;
 }
 

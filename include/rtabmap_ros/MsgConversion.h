@@ -168,7 +168,7 @@ rtabmap::Signature nodeInfoFromROS(const rtabmap_ros::NodeData & msg);
 void nodeInfoToROS(const rtabmap::Signature & signature, rtabmap_ros::NodeData & msg);
 
 std::map<std::string, float> odomInfoToStatistics(const rtabmap::OdometryInfo & info);
-rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::OdomInfo & msg);
+rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::OdomInfo & msg, bool ignoreData = false);
 void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_ros::OdomInfo & msg);
 
 cv::Mat userDataFromROS(const rtabmap_ros::UserData & dataMsg);
