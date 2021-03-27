@@ -62,6 +62,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtabmap_ros/OdomInfo.h"
 #include "rtabmap_ros/AddLink.h"
 #include "rtabmap_ros/GetNodesInRadius.h"
+#include "rtabmap_ros/LoadDatabase.h"
 
 #include "MapsManager.h"
 
@@ -192,6 +193,7 @@ private:
 	bool resetRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool pauseRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool resumeRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
+	bool loadDatabaseCallback(rtabmap_ros::LoadDatabase::Request&, rtabmap_ros::LoadDatabase::Response&);
 	bool triggerNewMapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool backupDatabaseCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool setModeLocalizationCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
@@ -307,6 +309,7 @@ private:
 	ros::ServiceServer resetSrv_;
 	ros::ServiceServer pauseSrv_;
 	ros::ServiceServer resumeSrv_;
+	ros::ServiceServer loadDatabaseSrv_;
 	ros::ServiceServer triggerNewMapSrv_;
 	ros::ServiceServer backupDatabase_;
 	ros::ServiceServer setModeLocalizationSrv_;

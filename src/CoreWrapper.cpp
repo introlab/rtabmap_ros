@@ -663,6 +663,7 @@ void CoreWrapper::onInit()
 	resetSrv_ = nh.advertiseService("reset", &CoreWrapper::resetRtabmapCallback, this);
 	pauseSrv_ = nh.advertiseService("pause", &CoreWrapper::pauseRtabmapCallback, this);
 	resumeSrv_ = nh.advertiseService("resume", &CoreWrapper::resumeRtabmapCallback, this);
+	loadDatabaseSrv_ = nh.advertiseService("load_database", &CoreWrapper::loadDatabaseCallback, this);
 	triggerNewMapSrv_ = nh.advertiseService("trigger_new_map", &CoreWrapper::triggerNewMapCallback, this);
 	backupDatabase_ = nh.advertiseService("backup", &CoreWrapper::backupDatabaseCallback, this);
 	setModeLocalizationSrv_ = nh.advertiseService("set_mode_localization", &CoreWrapper::setModeLocalizationCallback, this);
@@ -2774,6 +2775,10 @@ bool CoreWrapper::resetRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empt
 	imus_.clear();
 	imuFrameId_.clear();
 	interOdoms_.clear();
+	mapToOdomMutex_.lock();
+	mapToOdom_.setIdentity();
+	mapToOdomMutex_.unlock();
+
 	return true;
 }
 
@@ -2807,6 +2812,138 @@ bool CoreWrapper::resumeRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Emp
 		nh.setParam("is_rtabmap_paused", false);
 	}
 	return true;
+}
+
+bool CoreWrapper::loadDatabaseCallback(rtabmap_ros::LoadDatabase::Request& req, rtabmap_ros::LoadDatabase::Response&)
+{
+	NODELET_INFO("LoadDatabase: Loading database (%s, clear=%s)...", req.database_path.c_str(), req.clear?"true":"false");
+	std::string newDatabasePath = uReplaceChar(req.database_path, '~', UDirectory::homeDir());
+	std::string dir = UDirectory::getDir(newDatabasePath);
+	if(!UDirectory::exists(dir))
+	{
+		ROS_ERROR("Directory %s doesn't exist! Cannot load database \"%s\"", newDatabasePath.c_str(), dir.c_str());
+		return false;
+	}
+
+	if(UFile::exists(newDatabasePath) && req.clear)
+	{
+		UFile::erase(newDatabasePath);
+	}
+
+	// Close old database
+	NODELET_INFO("LoadDatabase: Saving current map (%s)...", databasePath_.c_str());
+	if(rtabmap_.getMemory())
+	{
+		// save the grid map
+		float xMin=0.0f, yMin=0.0f, gridCellSize = 0.05f;
+		cv::Mat pixels = mapsManager_.getGridMap(xMin, yMin, gridCellSize);
+		if(!pixels.empty())
+		{
+			printf("rtabmap: 2D occupancy grid map saved.\n");
+			rtabmap_.getMemory()->save2DMap(pixels, xMin, yMin, gridCellSize);
+		}
+	}
+	rtabmap_.close();
+	NODELET_INFO("LoadDatabase: Saving current map (%s, %ld MB)... done!", databasePath_.c_str(), UFile::length(databasePath_)/(1024*1024));
+
+	covariance_ = cv::Mat();
+	lastPose_.setIdentity();
+	lastPoseIntermediate_ = false;
+	currentMetricGoal_.setNull();
+	lastPublishedMetricGoal_.setNull();
+	goalFrameId_.clear();
+	latestNodeWasReached_ = false;
+	mapsManager_.clear();
+	previousStamp_ = ros::Time(0);
+	globalPose_.header.stamp = ros::Time(0);
+	gps_ = rtabmap::GPS();
+	tags_.clear();
+	userDataMutex_.lock();
+	userData_ = cv::Mat();
+	userDataMutex_.unlock();
+	imus_.clear();
+	imuFrameId_.clear();
+	interOdoms_.clear();
+	mapToOdomMutex_.lock();
+	mapToOdom_.setIdentity();
+	mapToOdomMutex_.unlock();
+
+	// Open new database
+	databasePath_ = newDatabasePath;
+
+	// modify default parameters with those in the database
+	if(!req.clear && UFile::exists(databasePath_))
+	{
+		ParametersMap dbParameters;
+		rtabmap::DBDriver * driver = rtabmap::DBDriver::create();
+		if(driver->openConnection(databasePath_))
+		{
+			dbParameters = driver->getLastParameters(); // parameter migration is already done
+		}
+		delete driver;
+		for(ParametersMap::iterator iter=dbParameters.begin(); iter!=dbParameters.end(); ++iter)
+		{
+			if(iter->first.compare(Parameters::kRtabmapWorkingDirectory()) == 0)
+			{
+				// ignore working directory
+				continue;
+			}
+			if(parameters_.find(iter->first) == parameters_.end() &&
+				parameters_.find(iter->first)->second.compare(iter->second) !=0)
+			{
+				NODELET_WARN("RTAB-Map parameter \"%s\" from database (%s) is different "
+						"from the current used one (%s). We still keep the "
+						"current parameter value (%s). If you want to switch between databases "
+						"with different configurations, restart rtabmap node instead of using this service.",
+						iter->first.c_str(), iter->second.c_str(),
+						parameters_.find(iter->first)->second.c_str(),
+						parameters_.find(iter->first)->second.c_str());
+			}
+		}
+	}
+
+	NODELET_INFO("LoadDatabase: Loading database...");
+	rtabmap_.init(parameters_, databasePath_);
+	NODELET_INFO("LoadDatabase: Loading database... done!");
+
+	if(rtabmap_.getMemory())
+	{
+		if(useSavedMap_ && !rtabmap_.getMemory()->isIncremental())
+		{
+			float xMin, yMin, gridCellSize;
+			cv::Mat map = rtabmap_.getMemory()->load2DMap(xMin, yMin, gridCellSize);
+			if(!map.empty())
+			{
+				NODELET_INFO("LoadDatabase: 2D occupancy grid map loaded (%dx%d).", map.cols, map.rows);
+				mapsManager_.set2DMap(map, xMin, yMin, gridCellSize, rtabmap_.getLocalOptimizedPoses(), rtabmap_.getMemory());
+			}
+		}
+
+		if(rtabmap_.getMemory()->getWorkingMem().size()>1)
+		{
+			NODELET_INFO("LoadDatabase: Working Memory = %d, Local map = %d.",
+					(int)rtabmap_.getMemory()->getWorkingMem().size()-1,
+					(int)rtabmap_.getLocalOptimizedPoses().size());
+		}
+
+		if(databasePath_.size())
+		{
+			NODELET_INFO("LoadDatabase: Database version = \"%s\".", rtabmap_.getMemory()->getDatabaseVersion().c_str());
+		}
+
+		if(rtabmap_.getMemory()->isIncremental())
+		{
+			NODELET_INFO("LoadDatabase: SLAM mode (%s=true)", Parameters::kMemIncrementalMemory().c_str());
+		}
+		else
+		{
+			NODELET_INFO("LoadDatabase: Localization mode (%s=false)", Parameters::kMemIncrementalMemory().c_str());
+		}
+
+		return true;
+	}
+
+	return false;
 }
 
 bool CoreWrapper::triggerNewMapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)

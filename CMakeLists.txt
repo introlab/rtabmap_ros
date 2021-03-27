@@ -123,6 +123,7 @@ add_message_files(
    AddLink.srv
    GetNodeData.srv
    GetNodesInRadius.srv
+   LoadDatabase.srv
  )
 
 ## Generate added messages and services with any dependencies listed here
