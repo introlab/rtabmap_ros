@@ -148,6 +148,19 @@ bool PreferencesDialogROS::readCoreSettings(const QString & filePath)
 			std::string value;
 			if(nh.getParam(i->first,value))
 			{
+				//backward compatibility
+				if(i->first.compare(Parameters::kIcpStrategy()) == 0)
+				{
+					if(value.compare("true") == 0)
+					{
+						value =  "1";
+					}
+					else if(value.compare("false") == 0)
+					{
+						value =  "0";
+					}
+				}
+
 				PreferencesDialog::setParameter(i->first, value);
 				++readCount;
 			}
