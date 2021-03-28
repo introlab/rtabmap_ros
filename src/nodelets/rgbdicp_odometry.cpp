@@ -343,6 +343,8 @@ private:
 				}
 				else if(cloudMsg.get() != 0)
 				{
+					UASSERT(cloudMsg->data.size() == cloudMsg->row_step*cloudMsg->height);
+
 					bool containNormals = false;
 					if(scanVoxelSize_ == 0.0f)
 					{

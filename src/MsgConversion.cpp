@@ -2149,6 +2149,8 @@ bool convertScan3dMsg(
 		int maxPoints,
 		float maxRange)
 {
+	UASSERT(scan3dMsg.data.size() == scan3dMsg.row_step*scan3dMsg.height);
+
 	bool hasNormals = false;
 	bool hasColors = false;
 	bool hasIntensity = false;

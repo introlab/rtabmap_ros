@@ -449,6 +449,8 @@ private:
 
 	void callbackCloud(const sensor_msgs::PointCloud2ConstPtr& pointCloudMsg)
 	{
+		UASSERT(pointCloudMsg->data.size() == pointCloudMsg->row_step*pointCloudMsg->height);
+		
 		if(scanReceived_)
 		{
 			ROS_ERROR("%s is already receiving scans on \"%s\", but also "

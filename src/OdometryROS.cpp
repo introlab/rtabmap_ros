@@ -507,7 +507,8 @@ void OdometryROS::processData(SensorData & data, const std_msgs::Header & header
 	{
 		if(previousStamp_>0.0 && previousStamp_ >= header.stamp.toSec())
 		{
-			NODELET_WARN("Odometry: Detected not valid consecutive stamps (previous=%fs new=%fs). New stamp should be always greater than previous stamp. This new data is ignored. This message will appear only once.",
+			NODELET_WARN("Odometry: Detected not valid consecutive stamps (previous=%fs new=%fs). "
+					"New stamp should be always greater than previous stamp. This new data is ignored.",
 					previousStamp_, header.stamp.toSec());
 			return;
 		}
