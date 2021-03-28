@@ -2149,7 +2149,8 @@ bool convertScan3dMsg(
 		int maxPoints,
 		float maxRange)
 {
-	UASSERT(scan3dMsg.data.size() == scan3dMsg.row_step*scan3dMsg.height);
+	UASSERT_MSG(scan3dMsg.data.size() == scan3dMsg.row_step*scan3dMsg.height,
+			uFormat("data=%d row_step=%d height=%d", scan3dMsg.data.size(), scan3dMsg.row_step, scan3dMsg.height).c_str());
 
 	bool hasNormals = false;
 	bool hasColors = false;

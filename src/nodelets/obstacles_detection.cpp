@@ -292,6 +292,9 @@ private:
 			}
 		}
 
+		UASSERT_MSG(cloudMsg->data.size() == cloudMsg->row_step*cloudMsg->height,
+				uFormat("data=%d row_step=%d height=%d", cloudMsg->data.size(), cloudMsg->row_step, cloudMsg->height).c_str());
+
 		pcl::PointCloud<pcl::PointXYZ>::Ptr inputCloud(new pcl::PointCloud<pcl::PointXYZ>);
 		pcl::fromROSMsg(*cloudMsg, *inputCloud);
 		if(inputCloud->isOrganized())

@@ -229,6 +229,9 @@ private:
 	{
 		if(cloudPub_.getNumSubscribers())
 		{
+			UASSERT_MSG(cloudMsg->data.size() == cloudMsg->row_step*cloudMsg->height,
+					uFormat("data=%d row_step=%d height=%d", cloudMsg->data.size(), cloudMsg->row_step, cloudMsg->height).c_str());
+
 			if(skipClouds_<=0 || cloudsSkipped_ >= skipClouds_)
 			{
 				cloudsSkipped_ = 0;
@@ -268,6 +271,12 @@ private:
 					pcl_conversions::toPCL(output, *newCloud);
 				}
 
+				if(!newCloud->is_dense)
+				{
+					// remove nans
+					newCloud = rtabmap::util3d::removeNaNFromPointCloud(newCloud);
+				}
+
 				clouds_.push_back(newCloud);
 
 #if PCL_VERSION_COMPARE(>=, 1, 10, 0)
@@ -299,6 +308,8 @@ private:
 #else
 							pcl::concatenatePointCloud(*assembled, *(*iter), *assembledTmp);
 #endif
+							//Make sure row_step is the sum of both
+							assembledTmp->row_step = assembled->row_step + (*iter)->row_step;
 							assembled = assembledTmp;
 						}
 					}

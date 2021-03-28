@@ -449,7 +449,8 @@ private:
 
 	void callbackCloud(const sensor_msgs::PointCloud2ConstPtr& pointCloudMsg)
 	{
-		UASSERT(pointCloudMsg->data.size() == pointCloudMsg->row_step*pointCloudMsg->height);
+		UASSERT_MSG(pointCloudMsg->data.size() == pointCloudMsg->row_step*pointCloudMsg->height,
+				uFormat("data=%d row_step=%d height=%d", pointCloudMsg->data.size(), pointCloudMsg->row_step, pointCloudMsg->height).c_str());
 		
 		if(scanReceived_)
 		{
