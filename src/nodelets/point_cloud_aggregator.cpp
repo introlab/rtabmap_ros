@@ -49,6 +49,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <rtabmap_ros/MsgConversion.h>
 #include <rtabmap/utilite/UConversion.h>
+#include <rtabmap/core/util3d_filtering.h>
 
 namespace rtabmap_ros
 {
@@ -217,18 +218,18 @@ private:
 		ROS_ASSERT(cloudMsgs.size() > 1);
 		if(cloudPub_.getNumSubscribers())
 		{
-			pcl::PCLPointCloud2 output;
+			pcl::PCLPointCloud2::Ptr output(new pcl::PCLPointCloud2);
 
 			std::string frameId = frameId_;
 			if(!frameId.empty() && frameId.compare(cloudMsgs[0]->header.frame_id) != 0)
 			{
 				sensor_msgs::PointCloud2 tmp;
 				pcl_ros::transformPointCloud(frameId, *cloudMsgs[0], tmp, tfListener_);
-				pcl_conversions::toPCL(tmp, output);
+				pcl_conversions::toPCL(tmp, *output);
 			}
 			else
 			{
-				pcl_conversions::toPCL(*cloudMsgs[0], output);
+				pcl_conversions::toPCL(*cloudMsgs[0], *output);
 				frameId = cloudMsgs[0]->header.frame_id;
 			}
 
@@ -248,7 +249,7 @@ private:
 							waitForTransformDuration_);
 				}
 
-				pcl::PCLPointCloud2 cloud2;
+				pcl::PCLPointCloud2::Ptr cloud2(new pcl::PCLPointCloud2);
 				if(frameId.compare(cloudMsgs[i]->header.frame_id) != 0)
 				{
 					sensor_msgs::PointCloud2 tmp;
@@ -257,11 +258,11 @@ private:
 					{
 						sensor_msgs::PointCloud2 tmp2;
 						pcl_ros::transformPointCloud(cloudDisplacement.toEigen4f(), tmp, tmp2);
-						pcl_conversions::toPCL(tmp2, cloud2);
+						pcl_conversions::toPCL(tmp2, *cloud2);
 					}
 					else
 					{
-						pcl_conversions::toPCL(tmp, cloud2);
+						pcl_conversions::toPCL(tmp, *cloud2);
 					}
 
 				}
@@ -271,21 +272,33 @@ private:
 					{
 						sensor_msgs::PointCloud2 tmp;
 						pcl_ros::transformPointCloud(cloudDisplacement.toEigen4f(), *cloudMsgs[i], tmp);
-						pcl_conversions::toPCL(tmp, cloud2);
+						pcl_conversions::toPCL(tmp, *cloud2);
 					}
 					else
 					{
-						pcl_conversions::toPCL(*cloudMsgs[i], cloud2);
+						pcl_conversions::toPCL(*cloudMsgs[i], *cloud2);
 					}
 				}
 
-				pcl::PCLPointCloud2 tmp_output;
-				pcl::concatenatePointCloud(output, cloud2, tmp_output);
+				if(!cloud2->is_dense)
+				{
+					// remove nans
+					cloud2 = rtabmap::util3d::removeNaNFromPointCloud(cloud2);
+				}
+
+				pcl::PCLPointCloud2::Ptr tmp_output(new pcl::PCLPointCloud2);
+#if PCL_VERSION_COMPARE(>=, 1, 10, 0)
+				pcl::concatenate(*output, *cloud2, *tmp_output);
+#else
+				pcl::concatenatePointCloud(*output, *cloud2, *tmp_output);
+#endif
+				//Make sure row_step is the sum of both
+				tmp_output->row_step = output->row_step + cloud2->row_step;
 				output = tmp_output;
 			}
 
 			sensor_msgs::PointCloud2 rosCloud;
-			pcl_conversions::moveFromPCL(output, rosCloud);
+			pcl_conversions::moveFromPCL(*output, rosCloud);
 			rosCloud.header.stamp = cloudMsgs[0]->header.stamp;
 			rosCloud.header.frame_id = frameId;
 			cloudPub_.publish(rosCloud);
