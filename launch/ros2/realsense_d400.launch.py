@@ -2,7 +2,7 @@
 #   A realsense D400 series
 #   Install realsense2 ros2 package (refactor branch)
 # Example:
-#   $ ros2 run realsense_node realsense_node
+#   $ ros2 launch realsense2_camera rs_launch.py align_depth:=true
 #   $ ros2 launch rtabmap_ros realsense_d400.launch.py
 
 from launch import LaunchDescription
