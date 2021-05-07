@@ -6,39 +6,6 @@ compiler:
 
 matrix:
   include:
-
-    - dist: trusty
-      install:
-        - sudo sh -c 'echo "deb http://packages.ros.org/ros/ubuntu trusty main" > /etc/apt/sources.list.d/ros-latest.list'
-        - wget http://packages.ros.org/ros.key -O - | sudo apt-key add -
-        - sudo apt-get update
-        - sudo apt-get install dpkg
-        - sudo apt-get -y install ros-indigo-rtabmap-ros
-        - sudo apt-get -y remove ros-indigo-rtabmap
-
-      script: 
-        - source /opt/ros/indigo/setup.bash
-        - export PYTHONPATH=$PYTHONPATH:/usr/lib/python2.7/dist-packages
-        - cd ..
-        - mkdir -p catkin_ws/src
-        - cd catkin_ws/src
-        - catkin_init_workspace
-        - cd ..
-        - catkin_make
-        - cd ..
-        - mv rtabmap_ros catkin_ws/src/.
-        - git clone https://github.com/introlab/rtabmap.git
-        - cd rtabmap
-        - if [ "$TRAVIS_BRANCH" = "devel" ]; then git checkout devel; fi
-        - mkdir -p build && cd build
-        - cmake -DCMAKE_INSTALL_PREFIX=~/build/introlab/catkin_ws/devel .. 
-        - make
-        - make install
-        - cd ../../catkin_ws
-        - source devel/setup.bash
-        - catkin_make
-        - catkin_make install
-
     - dist: xenial
       install:
         - sudo sh -c 'echo "deb http://packages.ros.org/ros/ubuntu xenial main" > /etc/apt/sources.list.d/ros-latest.list'
