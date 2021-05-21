@@ -37,6 +37,7 @@
   
   <arg name="frame_id"                default="camera_link"/>     <!-- Fixed frame id, you may set "base_link" or "base_footprint" if they are published -->
   <arg name="odom_frame_id"           default=""/>                <!-- If set, TF is used to get odometry instead of the topic -->
+  <arg name="odom_frame_id_init"      default=""/>                <!-- If set, TF map->odom is published even if no odometry topic has been received yet. The frame id should match the one in the topic. -->
   <arg name="map_frame_id"            default="map"/>
   <arg name="ground_truth_frame_id"   default=""/>     <!-- e.g., "world" -->
   <arg name="ground_truth_base_frame_id" default=""/>  <!-- e.g., "tracker", a fake frame matching the frame "frame_id" (but on different TF tree) -->
@@ -310,6 +311,7 @@
       <param name="frame_id"             type="string" value="$(arg frame_id)"/>
       <param name="map_frame_id"         type="string" value="$(arg map_frame_id)"/>
       <param name="odom_frame_id"        type="string" value="$(arg odom_frame_id)"/>
+      <param name="odom_frame_id_init"   type="string" value="$(arg odom_frame_id_init)"/>
       <param name="publish_tf"           type="bool"   value="$(arg publish_tf_map)"/>
       <param name="gen_scan"             type="bool"   value="$(arg gen_scan)"/>
       <param name="ground_truth_frame_id"       type="string" value="$(arg ground_truth_frame_id)"/>
