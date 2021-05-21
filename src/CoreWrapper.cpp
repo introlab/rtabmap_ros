@@ -1873,7 +1873,12 @@ void CoreWrapper::process(
 		{
 			if(iter->first.header.stamp < lastPoseStamp_)
 			{
-				Transform interOdom = rtabmap_ros::transformFromPoseMsg(iter->first.pose.pose);
+				Transform interOdom;
+				if(!rtabmap_.getLocalOptimizedPoses().empty())
+				{
+					// add intermediate poses only if the current local graph is not empty
+					interOdom = rtabmap_ros::transformFromPoseMsg(iter->first.pose.pose);
+				}
 				if(!interOdom.isNull())
 				{
 					cv::Mat covariance;
