@@ -14,6 +14,7 @@
     <arg name="use_imu"       default="false"/> <!-- Assuming IMU fixed to lidar with /velodyne -> /imu_link TF -->
     <arg name="imu_topic"     default="/imu/data"/>
     <arg name="scan_20_hz"    default="false"/> <!-- If we launch the velodyne with "rpm:=1200" argument -->
+    <arg name="organize_cloud" default="false"/>
     <arg name="use_sim_time"  default="false"/>
     <param if="$(arg use_sim_time)" name="use_sim_time" value="true"/>
     
@@ -22,6 +23,7 @@
     <include file="$(find velodyne_pointcloud)/launch/VLP16_points.launch">
        <arg     if="$(arg scan_20_hz)" name="rpm" value="1200"/>
        <arg unless="$(arg scan_20_hz)" name="rpm" value="600"/>
+       <arg name="organize_cloud" value="$(arg organize_cloud)"/>
     </include>
     
     <!-- IMU orientation estimation and publish tf accordingly to os1_sensor frame -->
