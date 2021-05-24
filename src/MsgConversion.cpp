@@ -369,7 +369,6 @@ rtabmap::SensorData rgbdImageFromROS(const rtabmap_ros::RGBDImageConstPtr & imag
 		int depthHeight = depthMsg->image.rows;
 
 		UASSERT_MSG(
-			imageWidth % depthWidth == 0 && imageHeight % depthHeight == 0 &&
 			imageWidth/depthWidth == imageHeight/depthHeight,
 			uFormat("rgb=%dx%d depth=%dx%d", imageWidth, imageHeight, depthWidth, depthHeight).c_str());
 
@@ -1731,7 +1730,6 @@ bool convertRGBDMsgs(
 	if(depthMsgs.size())
 	{
 		UASSERT_MSG(
-				imageWidth % depthWidth == 0 && imageHeight % depthHeight == 0 &&
 				imageWidth/depthWidth == imageHeight/depthHeight,
 				uFormat("rgb=%dx%d depth=%dx%d", imageWidth, imageHeight, depthWidth, depthHeight).c_str());
 	}

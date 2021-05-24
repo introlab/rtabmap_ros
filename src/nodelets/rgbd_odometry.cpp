@@ -331,7 +331,6 @@ private:
 		int depthHeight = depthImages[0]->image.rows;
 
 		UASSERT_MSG(
-			imageWidth % depthWidth == 0 && imageHeight % depthHeight == 0 &&
 			imageWidth/depthWidth == imageHeight/depthHeight,
 			uFormat("rgb=%dx%d depth=%dx%d", imageWidth, imageHeight, depthWidth, depthHeight).c_str());
 
