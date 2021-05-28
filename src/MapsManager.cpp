@@ -69,7 +69,7 @@ MapsManager::MapsManager() :
 		assembledGround_(new pcl::PointCloud<pcl::PointXYZRGB>),
 		occupancyGrid_(new OccupancyGrid),
 		gridUpdated_(true),
-		octomap_(0),
+		octomap_(new OctoMap),
 		octomapTreeDepth_(16),
 		octomapUpdated_(true),
 		latching_(true)
@@ -131,11 +131,7 @@ void MapsManager::init(ros::NodeHandle & nh, ros::NodeHandle & pnh, const std::s
 
 #ifdef WITH_OCTOMAP_MSGS
 #ifdef RTABMAP_OCTOMAP
-	
-    pnh.param("octomap_frontier_flood_fill", octomap_frontier_flood_fill_, false);
     pnh.param("octomap_tree_depth", octomapTreeDepth_, octomapTreeDepth_);
-   
-    
    	if(octomapTreeDepth_ > 16)
 	{
 		ROS_WARN("octomap_tree_depth maximum is 16");
@@ -147,10 +143,6 @@ void MapsManager::init(ros::NodeHandle & nh, ros::NodeHandle & pnh, const std::s
 		octomapTreeDepth_ = 16;
 	}
 	ROS_INFO("%s(maps): octomap_tree_depth         = %d", name.c_str(), octomapTreeDepth_);
-   
-
-    octomap_ = new OctoMap(occupancyGrid_->getCellSize(), 0.5, occupancyGrid_->isFullUpdate(), occupancyGrid_->getUpdateError(), octomap_frontier_flood_fill_, octomapTreeDepth_);
-
 #endif
 #endif
 

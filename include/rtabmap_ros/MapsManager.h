@@ -128,7 +128,6 @@ private:
 
 	rtabmap::OctoMap * octomap_;
 	int octomapTreeDepth_;
-	bool octomap_frontier_flood_fill_;
 	bool octomapUpdated_;
 
 	rtabmap::ParametersMap parameters_;
