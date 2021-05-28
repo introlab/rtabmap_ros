@@ -142,12 +142,14 @@ void CoreWrapper::onInit()
 	bool publishTf = true;
 	double tfDelay = 0.05; // 20 Hz
 	double tfTolerance = 0.1; // 100 ms
+	std::string odomFrameIdInit;
 
 	pnh.param("config_path",         configPath_, configPath_);
 	pnh.param("database_path",       databasePath_, databasePath_);
 
 	pnh.param("frame_id",            frameId_, frameId_);
 	pnh.param("odom_frame_id",       odomFrameId_, odomFrameId_); // set to use odom from TF
+	pnh.param("odom_frame_id_init",  odomFrameIdInit, odomFrameIdInit); // set to publish map->odom TF before receiving odom topic
 	pnh.param("map_frame_id",        mapFrameId_, mapFrameId_);
 	pnh.param("ground_truth_frame_id", groundTruthFrameId_, groundTruthFrameId_);
 	pnh.param("ground_truth_base_frame_id", groundTruthBaseFrameId_, frameId_);
@@ -156,6 +158,18 @@ void CoreWrapper::onInit()
 		NODELET_ERROR("\"depth_cameras\" parameter doesn't exist "
 				"anymore! It is replaced by \"rgbd_cameras\" parameter "
 				"used when \"subscribe_rgbd\" is true");
+	}
+	if(!odomFrameIdInit.empty())
+	{
+		if(odomFrameId_.empty())
+		{
+			ROS_INFO("rtabmap: odom_frame_id_init = %s", odomFrameIdInit.c_str());
+			odomFrameId_ = odomFrameIdInit;
+		}
+		else
+		{
+			ROS_WARN("odom_frame_id_init (%s) is ignored if odom_frame_id (%s) is set.", odomFrameIdInit.c_str(), odomFrameId_.c_str());
+		}
 	}
 
 	pnh.param("publish_tf",          publishTf, publishTf);
@@ -1859,7 +1873,12 @@ void CoreWrapper::process(
 		{
 			if(iter->first.header.stamp < lastPoseStamp_)
 			{
-				Transform interOdom = rtabmap_ros::transformFromPoseMsg(iter->first.pose.pose);
+				Transform interOdom;
+				if(!rtabmap_.getLocalOptimizedPoses().empty())
+				{
+					// add intermediate poses only if the current local graph is not empty
+					interOdom = rtabmap_ros::transformFromPoseMsg(iter->first.pose.pose);
+				}
 				if(!interOdom.isNull())
 				{
 					cv::Mat covariance;
@@ -2105,6 +2124,15 @@ void CoreWrapper::process(
 			timeRtabmap = timer.ticks();
 			mapToOdomMutex_.lock();
 			mapToOdom_ = rtabmap_.getMapCorrection();
+
+			if(!odomFrameId.empty() && !odomFrameId_.empty() && odomFrameId_.compare(odomFrameId)!=0)
+			{
+				ROS_ERROR("Odometry received doesn't have same frame_id "
+						  "than the one previously set (old=%s, new=%s). "
+						  "Are there multiple nodes publishing on same odometry topic name? "
+						  "The new frame_id is now used.", odomFrameId_.c_str(), odomFrameId.c_str());
+			}
+
 			odomFrameId_ = odomFrameId;
 			mapToOdomMutex_.unlock();
 
