@@ -16,13 +16,22 @@
          3) 6DoF mapping with 3D LiDAR and RGB-D camera and ICP odometry (with wheel odometry as guess)
             $ roslaunch rtabmap_ros demo_husky.launch lidar3d:=true slam2d:=false camera:=true icp_odometry:=true
          
-         4) 3DoF mapping with 2D LiDAR
+         4) 3DoF mapping with 3D LiDAR
+            $ roslaunch rtabmap_ros demo_husky.launch lidar3d:=true slam2d:=true
+         
+         5) 3DoF mapping with 3D LiDAR and RGB-D camera
+            $ roslaunch rtabmap_ros demo_husky.launch lidar3d:=true slam2d:=true camera:=true
+            
+         6) 3DoF mapping with 3D LiDAR and RGB-D camera and ICP odometry (with wheel odometry as guess)
+            $ roslaunch rtabmap_ros demo_husky.launch lidar3d:=true slam2d:=true camera:=true icp_odometry:=true
+            
+         7) 3DoF mapping with 2D LiDAR
             $ roslaunch rtabmap_ros demo_husky.launch lidar2d:=true slam2d:=true
          
-         5) 3DoF mapping with 2D LiDAR and RGB-D camera
+         8) 3DoF mapping with 2D LiDAR and RGB-D camera
             $ roslaunch rtabmap_ros demo_husky.launch lidar2d:=true slam2d:=true camera:=true
             
-         6) 6DoF mapping with 3D LiDAR and RGB-D camera and ICP odometry (with wheel odometry as guess)
+         9) 3DoF mapping with 3D LiDAR and RGB-D camera and ICP odometry (with wheel odometry as guess)
             $ roslaunch rtabmap_ros demo_husky.launch lidar2d:=true slam2d:=true camera:=true icp_odometry:=true
             
        Issues:
