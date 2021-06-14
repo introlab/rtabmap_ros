@@ -104,11 +104,9 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 	mainWindow_->setMonitoringState(paused);
 
 	// To receive odometry events
-	std::string tfPrefix;
 	std::string initCachePath;
 	pnh.param("frame_id", frameId_, frameId_);
 	pnh.param("odom_frame_id", odomFrameId_, odomFrameId_); // set to use odom from TF
-	pnh.param("tf_prefix", tfPrefix, tfPrefix);
 	pnh.param("wait_for_transform", waitForTransform_, waitForTransform_);
 	pnh.param("wait_for_transform_duration",  waitForTransformDuration_, waitForTransformDuration_);
 	pnh.param("odom_sensor_sync", odomSensorSync_, odomSensorSync_);
@@ -142,16 +140,9 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 		QMetaObject::invokeMethod(mainWindow_, "updateCacheFromDatabase", Q_ARG(QString, QString(initCachePath.c_str())));
 	}
 
-	if(!tfPrefix.empty())
+	if(pnh.hasParam("tf_prefix"))
 	{
-		if(!frameId_.empty())
-		{
-			frameId_ = tfPrefix + "/" + frameId_;
-		}
-		if(!odomFrameId_.empty())
-		{
-			odomFrameId_ = tfPrefix + "/" + odomFrameId_;
-		}
+		ROS_ERROR("tf_prefix parameter has been removed, use directly odom_frame_id and frame_id parameters.");
 	}
 
 	UEventsManager::addHandler(this);
