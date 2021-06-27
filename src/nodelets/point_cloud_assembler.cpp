@@ -75,6 +75,8 @@ public:
 		skipClouds_(0),
 		cloudsSkipped_(0),
 		circularBuffer_(false),
+		linearUpdate_(0),
+		angularUpdate_(0),
 		waitForTransformDuration_(0.1),
 		rangeMin_(0),
 		rangeMax_(0),
@@ -114,6 +116,8 @@ private:
 		pnh.param("assembling_time", assemblingTime_, assemblingTime_);
 		pnh.param("skip_clouds", skipClouds_, skipClouds_);
 		pnh.param("circular_buffer", circularBuffer_, circularBuffer_);
+		pnh.param("linear_update", linearUpdate_, linearUpdate_);
+		pnh.param("angular_update", angularUpdate_, angularUpdate_);
 		pnh.param("wait_for_transform_duration", waitForTransformDuration_, waitForTransformDuration_);
 		pnh.param("range_min", rangeMin_, rangeMin_);
 		pnh.param("range_max", rangeMax_, rangeMax_);
@@ -121,7 +125,6 @@ private:
 		pnh.param("noise_radius", noiseRadius_, noiseRadius_);
 		pnh.param("noise_min_neighbors", noiseMinNeighbors_, noiseMinNeighbors_);
 		pnh.param("subscribe_odom_info", subscribeOdomInfo, subscribeOdomInfo);
-		ROS_ASSERT(maxClouds_>0 || assemblingTime_ >0.0);
 
 		ROS_INFO("%s: queue_size=%d", getName().c_str(), queueSize);
 		ROS_INFO("%s: fixed_frame_id=%s", getName().c_str(), fixedFrameId_.c_str());
@@ -130,12 +133,20 @@ private:
 		ROS_INFO("%s: assembling_time=%fs", getName().c_str(), assemblingTime_);
 		ROS_INFO("%s: skip_clouds=%d", getName().c_str(), skipClouds_);
 		ROS_INFO("%s: circular_buffer=%s", getName().c_str(), circularBuffer_?"true":"false");
+		ROS_INFO("%s: linear_update=%f m", getName().c_str(), linearUpdate_);
+		ROS_INFO("%s: angular_update=%f rad", getName().c_str(), angularUpdate_);
 		ROS_INFO("%s: wait_for_transform_duration=%f", getName().c_str(), waitForTransformDuration_);
 		ROS_INFO("%s: range_min=%f", getName().c_str(), rangeMin_);
 		ROS_INFO("%s: range_max=%f", getName().c_str(), rangeMax_);
 		ROS_INFO("%s: voxel_size=%fm", getName().c_str(), voxelSize_);
 		ROS_INFO("%s: noise_radius=%fm", getName().c_str(), noiseRadius_);
 		ROS_INFO("%s: noise_min_neighbors=%d", getName().c_str(), noiseMinNeighbors_);
+
+		if(maxClouds_==0 && assemblingTime_ ==0.0)
+		{
+			ROS_ERROR("point_cloud_assembler: max_cloud or assembling_time parameters should be set!");
+			exit(-1);
+		}
 
 		cloudsSkipped_ = skipClouds_;
 
@@ -236,18 +247,33 @@ private:
 			{
 				cloudsSkipped_ = 0;
 
-				rtabmap::Transform t = rtabmap_ros::getTransform(
+				rtabmap::Transform pose = rtabmap_ros::getTransform(
 						fixedFrameId_, //fromFrame
 						cloudMsg->header.frame_id, //toFrame
 						cloudMsg->header.stamp,
 						tfListener_,
 						waitForTransformDuration_);
 
-				if(t.isNull())
+				if(pose.isNull())
 				{
 					ROS_ERROR("Cloud not transform all clouds! Resetting...");
 					clouds_.clear();
 					return;
+				}
+
+				bool isMoving = true;
+				if(!previousPose_.isNull() && (linearUpdate_>0 || angularUpdate_>0))
+				{
+					rtabmap::Transform delta = previousPose_.inverse()*pose;
+					float roll, pitch, yaw;
+					delta.getEulerAngles(roll, pitch, yaw);
+					isMoving = fabs(delta.x()) > linearUpdate_ ||
+									fabs(delta.y()) > linearUpdate_ ||
+									fabs(delta.z()) > linearUpdate_ ||
+									(angularUpdate_>0.0f && (
+										fabs(roll) > angularUpdate_ ||
+										fabs(pitch) > angularUpdate_ ||
+										fabs(yaw) > angularUpdate_));
 				}
 
 				pcl::PCLPointCloud2::Ptr newCloud(new pcl::PCLPointCloud2);
@@ -261,13 +287,13 @@ private:
 #else
 					pcl::uint64_t stamp = newCloud->header.stamp;
 #endif
-					newCloud = rtabmap::util3d::laserScanToPointCloud2(scan, t);
+					newCloud = rtabmap::util3d::laserScanToPointCloud2(scan, pose);
 					newCloud->header.stamp = stamp;
 				}
 				else
 				{
 					sensor_msgs::PointCloud2 output;
-					pcl_ros::transformPointCloud(t.toEigen4f(), *cloudMsg, output);
+					pcl_ros::transformPointCloud(pose.toEigen4f(), *cloudMsg, output);
 					pcl_conversions::toPCL(output, *newCloud);
 				}
 
@@ -336,6 +362,7 @@ private:
 					}
 
 					pcl_conversions::moveFromPCL(*assembled, rosCloud);
+					rtabmap::Transform t = pose;
 					if(!frameId_.empty())
 					{
 						// transform in target frame_id instead of sensor frame
@@ -362,15 +389,32 @@ private:
 					cloudPub_.publish(rosCloud);
 					if(circularBuffer_)
 					{
-						if(reachedMaxSize)
+						if(!isMoving)
 						{
-							clouds_.pop_front();
+							clouds_.pop_back();
+						}
+						else
+						{
+							previousPose_ = pose;
+							if(reachedMaxSize)
+							{
+								clouds_.pop_front();
+							}
 						}
 					}
 					else
 					{
 						clouds_.clear();
+						previousPose_.setNull();
 					}
+				}
+				else if(!isMoving)
+				{
+					clouds_.pop_back();
+				}
+				else
+				{
+					previousPose_ = pose;
 				}
 			}
 			else
@@ -416,6 +460,8 @@ private:
 	int skipClouds_;
 	int cloudsSkipped_;
 	bool circularBuffer_;
+	double linearUpdate_;
+	double angularUpdate_;
 	double assemblingTime_;
 	double waitForTransformDuration_;
 	double rangeMin_;
@@ -426,6 +472,7 @@ private:
 	std::string fixedFrameId_;
 	std::string frameId_;
 	tf::TransformListener tfListener_;
+	rtabmap::Transform previousPose_;
 
 	std::list<pcl::PCLPointCloud2::Ptr> clouds_;
 };

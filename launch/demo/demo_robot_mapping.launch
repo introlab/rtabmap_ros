@@ -56,7 +56,7 @@
 	  <param name="Icp/CorrespondenceRatio"   type="string" value="0.2"/>   <!-- minimum scan overlap to accept loop closure -->
 	  <param name="Icp/PM"                    type="string" value="false"/>
 	  <param name="Icp/PointToPlane"          type="string" value="false"/>
-	  <param name="Icp/MaxCorrespondenceDistance"  type="string" value="0.05"/>
+	  <param name="Icp/MaxCorrespondenceDistance"  type="string" value="0.15"/>
 	  <param name="Icp/VoxelSize"             type="string" value="0.05"/>
 	  
 	  <!-- localization mode -->
