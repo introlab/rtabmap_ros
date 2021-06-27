@@ -2207,39 +2207,6 @@ bool convertScan3dMsg(
 	UASSERT_MSG(scan3dMsg.data.size() == scan3dMsg.row_step*scan3dMsg.height,
 			uFormat("data=%d row_step=%d height=%d", scan3dMsg.data.size(), scan3dMsg.row_step, scan3dMsg.height).c_str());
 
-	bool hasNormals = false;
-	bool hasColors = false;
-	bool hasIntensity = false;
-	for(unsigned int i=0; i<scan3dMsg.fields.size(); ++i)
-	{
-		if(scan3dMsg.fields[i].name.compare("normal_x") == 0)
-		{
-			hasNormals = true;
-		}
-		if(scan3dMsg.fields[i].name.compare("rgb") == 0 || scan3dMsg.fields[i].name.compare("rgba") == 0)
-		{
-			hasColors = true;
-		}
-		if(scan3dMsg.fields[i].name.compare("intensity") == 0)
-		{
-			if(scan3dMsg.fields[i].datatype == sensor_msgs::PointField::FLOAT32)
-			{
-				hasIntensity = true;
-			}
-			else
-			{
-				static bool warningShown = false;
-				if(!warningShown)
-				{
-					ROS_WARN("The input scan cloud has an \"intensity\" field "
-							"but the datatype (%d) is not supported. Intensity will be ignored. "
-							"This message is only shown once.", scan3dMsg.fields[i].datatype);
-					warningShown = true;
-				}
-			}
-		}
-	}
-
 	rtabmap::Transform scanLocalTransform = getTransform(frameId, scan3dMsg.header.frame_id, scan3dMsg.header.stamp, listener, waitForTransform);
 	if(scanLocalTransform.isNull())
 	{
@@ -2267,73 +2234,8 @@ bool convertScan3dMsg(
 			scanLocalTransform = sensorT * scanLocalTransform;
 		}
 	}
-
-	if(hasNormals)
-	{
-		if(hasColors)
-		{
-			pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZRGBNormal>);
-			pcl::fromROSMsg(scan3dMsg, *pclScan);
-			if(!pclScan->is_dense)
-			{
-				pclScan = rtabmap::util3d::removeNaNNormalsFromPointCloud(pclScan);
-			}
-			scan = rtabmap::LaserScan(rtabmap::util3d::laserScanFromPointCloud(*pclScan), maxPoints, maxRange, scanLocalTransform);
-		}
-		else if(hasIntensity)
-		{
-			pcl::PointCloud<pcl::PointXYZINormal>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZINormal>);
-			pcl::fromROSMsg(scan3dMsg, *pclScan);
-			if(!pclScan->is_dense)
-			{
-				pclScan = rtabmap::util3d::removeNaNNormalsFromPointCloud(pclScan);
-			}
-			scan = rtabmap::LaserScan(rtabmap::util3d::laserScanFromPointCloud(*pclScan), maxPoints, maxRange, scanLocalTransform);
-		}
-		else
-		{
-			pcl::PointCloud<pcl::PointNormal>::Ptr pclScan(new pcl::PointCloud<pcl::PointNormal>);
-			pcl::fromROSMsg(scan3dMsg, *pclScan);
-			if(!pclScan->is_dense)
-			{
-				pclScan = rtabmap::util3d::removeNaNNormalsFromPointCloud(pclScan);
-			}
-			scan = rtabmap::LaserScan(rtabmap::util3d::laserScanFromPointCloud(*pclScan), maxPoints, maxRange, scanLocalTransform);
-		}
-	}
-	else
-	{
-		if(hasColors)
-		{
-			pcl::PointCloud<pcl::PointXYZRGB>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZRGB>);
-			pcl::fromROSMsg(scan3dMsg, *pclScan);
-			if(!pclScan->is_dense)
-			{
-				pclScan = rtabmap::util3d::removeNaNFromPointCloud(pclScan);
-			}
-			scan = rtabmap::LaserScan(rtabmap::util3d::laserScanFromPointCloud(*pclScan), maxPoints, maxRange, scanLocalTransform);
-		}
-		else if(hasIntensity)
-		{
-			pcl::PointCloud<pcl::PointXYZI>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZI>);
-			pcl::fromROSMsg(scan3dMsg, *pclScan);
-			if(!pclScan->is_dense)
-			{
-				pclScan = rtabmap::util3d::removeNaNFromPointCloud(pclScan);
-			}
-			scan = rtabmap::LaserScan(rtabmap::util3d::laserScanFromPointCloud(*pclScan), maxPoints, maxRange, scanLocalTransform);
-		}
-		else
-		{
-			pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
-			pcl::fromROSMsg(scan3dMsg, *pclScan);
-			if(!pclScan->is_dense)
-			{
-				pclScan = rtabmap::util3d::removeNaNFromPointCloud(pclScan);
-			}
-			scan = rtabmap::LaserScan(rtabmap::util3d::laserScanFromPointCloud(*pclScan), maxPoints, maxRange, scanLocalTransform);
-		}
-	}
+	scan = rtabmap::util3d::laserScanFromPointCloud(scan3dMsg);
+	scan = rtabmap::LaserScan(scan, maxPoints, maxRange, scanLocalTransform);
 	return true;
 }
 
