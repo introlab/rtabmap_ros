@@ -1718,41 +1718,51 @@ bool convertRGBDMsgs(
 		std::vector<cv::Point3f> * localPoints3d,
 		cv::Mat * localDescriptors)
 {
-	UASSERT(imageMsgs.size()>0 &&
-			(imageMsgs.size() == depthMsgs.size() || depthMsgs.empty()) &&
-			imageMsgs.size() == cameraInfoMsgs.size());
+	UASSERT(!cameraInfoMsgs.empty()>0 &&
+			(cameraInfoMsgs.size() == imageMsgs.size() || imageMsgs.empty()) &&
+			(cameraInfoMsgs.size() == depthMsgs.size() || depthMsgs.empty()));
 
-	int imageWidth = imageMsgs[0]->image.cols;
-	int imageHeight = imageMsgs[0]->image.rows;
+	int imageWidth = imageMsgs.size()?imageMsgs[0]->image.cols:cameraInfoMsgs[0].width;
+	int imageHeight = imageMsgs.size()?imageMsgs[0]->image.rows:cameraInfoMsgs[0].height;
 	int depthWidth = depthMsgs.size()?depthMsgs[0]->image.cols:0;
 	int depthHeight = depthMsgs.size()?depthMsgs[0]->image.rows:0;
 
-	if(depthMsgs.size())
+	if(!depthMsgs.empty())
 	{
 		UASSERT_MSG(
 				imageWidth/depthWidth == imageHeight/depthHeight,
 				uFormat("rgb=%dx%d depth=%dx%d", imageWidth, imageHeight, depthWidth, depthHeight).c_str());
 	}
 
-	int cameraCount = imageMsgs.size();
-	for(unsigned int i=0; i<imageMsgs.size(); ++i)
+	int cameraCount = cameraInfoMsgs.size();
+	for(unsigned int i=0; i<cameraInfoMsgs.size(); ++i)
 	{
-		if(!(imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) == 0 ||
-			 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
-			 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||
-			 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
-			 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0 ||
-			 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::BGRA8) == 0 ||
-			 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::RGBA8) == 0 ||
-			 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::BAYER_GRBG8) == 0 ||
-			 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::BAYER_RGGB8) == 0))
+		if(!imageMsgs.empty())
 		{
+			if(!(imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) == 0 ||
+				 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
+				 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||
+				 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
+				 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0 ||
+				 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::BGRA8) == 0 ||
+				 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::RGBA8) == 0 ||
+				 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::BAYER_GRBG8) == 0 ||
+				 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::BAYER_RGGB8) == 0))
+			{
 
-			ROS_ERROR("Input rgb type must be image=mono8,mono16,rgb8,bgr8,bgra8,rgba8. Current rgb=%s",
-					imageMsgs[i]->encoding.c_str());
-			return false;
+				ROS_ERROR("Input rgb type must be image=mono8,mono16,rgb8,bgr8,bgra8,rgba8. Current rgb=%s",
+						imageMsgs[i]->encoding.c_str());
+				return false;
+			}
+
+			UASSERT_MSG(imageMsgs[i]->image.cols == imageWidth && imageMsgs[i]->image.rows == imageHeight,
+						uFormat("imageWidth=%d vs %d imageHeight=%d vs %d",
+								imageWidth,
+								imageMsgs[i]->image.cols,
+								imageHeight,
+								imageMsgs[i]->image.rows).c_str());
 		}
-		 if(depthMsgs.size() &&
+		 if(!depthMsgs.empty() &&
 			 !(depthMsgs[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1) == 0 ||
 			   depthMsgs[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1) == 0 ||
 			   depthMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0))
@@ -1762,14 +1772,9 @@ bool convertRGBDMsgs(
 			return false;
 		}
 
-		UASSERT_MSG(imageMsgs[i]->image.cols == imageWidth && imageMsgs[i]->image.rows == imageHeight,
-				uFormat("imageWidth=%d vs %d imageHeight=%d vs %d",
-						imageWidth,
-						imageMsgs[i]->image.cols,
-						imageHeight,
-						imageMsgs[i]->image.rows).c_str());
+
 		ros::Time stamp;
-		if(depthMsgs.size())
+		if(!depthMsgs.empty())
 		{
 			UASSERT_MSG(depthMsgs[i]->image.cols == depthWidth && depthMsgs[i]->image.rows == depthHeight,
 					uFormat("depthWidth=%d vs %d imageHeight=%d vs %d",
@@ -1779,13 +1784,17 @@ bool convertRGBDMsgs(
 							depthMsgs[i]->image.rows).c_str());
 			stamp = depthMsgs[i]->header.stamp;
 		}
-		else
+		else if(!imageMsgs.empty())
 		{
 			stamp = imageMsgs[i]->header.stamp;
 		}
+		else
+		{
+			stamp = cameraInfoMsgs[i].header.stamp;
+		}
 
 		// use depth's stamp so that geometry is sync to odom, use rgb frame as we assume depth is registered (normally depth msg should have same frame than rgb)
-		rtabmap::Transform localTransform = rtabmap_ros::getTransform(frameId, imageMsgs[i]->header.frame_id, stamp, listener, waitForTransform);
+		rtabmap::Transform localTransform = rtabmap_ros::getTransform(frameId, !imageMsgs.empty()?imageMsgs[i]->header.frame_id:cameraInfoMsgs[i].header.frame_id, stamp, listener, waitForTransform);
 		if(localTransform.isNull())
 		{
 			ROS_ERROR("TF of received image %d at time %fs is not set!", i, stamp.toSec());
@@ -1813,38 +1822,41 @@ bool convertRGBDMsgs(
 			}
 		}
 
-		cv_bridge::CvImageConstPtr ptrImage = imageMsgs[i];
-		if(imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0 ||
-		   imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
-		   imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0)
+		if(!imageMsgs.empty())
 		{
-			// do nothing
-		}
-		else if(imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
-		{
-			ptrImage = cv_bridge::cvtColor(imageMsgs[i], "mono8");
-		}
-		else
-		{
-			ptrImage = cv_bridge::cvtColor(imageMsgs[i], "bgr8");
+			cv_bridge::CvImageConstPtr ptrImage = imageMsgs[i];
+			if(imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0 ||
+			   imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
+			   imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0)
+			{
+				// do nothing
+			}
+			else if(imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
+			{
+				ptrImage = cv_bridge::cvtColor(imageMsgs[i], "mono8");
+			}
+			else
+			{
+				ptrImage = cv_bridge::cvtColor(imageMsgs[i], "bgr8");
+			}
+
+			// initialize
+			if(rgb.empty())
+			{
+				rgb = cv::Mat(imageHeight, imageWidth*cameraCount, ptrImage->image.type());
+			}
+			if(ptrImage->image.type() == rgb.type())
+			{
+				ptrImage->image.copyTo(cv::Mat(rgb, cv::Rect(i*imageWidth, 0, imageWidth, imageHeight)));
+			}
+			else
+			{
+				ROS_ERROR("Some RGB images are not the same type!");
+				return false;
+			}
 		}
 
-		// initialize
-		if(rgb.empty())
-		{
-			rgb = cv::Mat(imageHeight, imageWidth*cameraCount, ptrImage->image.type());
-		}
-		if(ptrImage->image.type() == rgb.type())
-		{
-			ptrImage->image.copyTo(cv::Mat(rgb, cv::Rect(i*imageWidth, 0, imageWidth, imageHeight)));
-		}
-		else
-		{
-			ROS_ERROR("Some RGB images are not the same type!");
-			return false;
-		}
-
-		if(depthMsgs.size())
+		if(!depthMsgs.empty())
 		{
 			cv_bridge::CvImageConstPtr ptrDepth = depthMsgs[i];
 			cv::Mat subDepth = ptrDepth->image;
@@ -1867,16 +1879,16 @@ bool convertRGBDMsgs(
 
 		cameraModels.push_back(rtabmap_ros::cameraModelFromROS(cameraInfoMsgs[i], localTransform));
 
-		if(localKeyPoints && localKeyPointsMsgs.size() == imageMsgs.size())
+		if(localKeyPoints && localKeyPointsMsgs.size() == cameraInfoMsgs.size())
 		{
 			rtabmap_ros::keypointsFromROS(localKeyPointsMsgs[i], *localKeyPoints, imageWidth*i);
 		}
-		if(localPoints3d && localPoints3dMsgs.size() == imageMsgs.size())
+		if(localPoints3d && localPoints3dMsgs.size() == cameraInfoMsgs.size())
 		{
 			// Points should be in base frame
 			rtabmap_ros::points3fFromROS(localPoints3dMsgs[i], *localPoints3d, localTransform);
 		}
-		if(localDescriptors && localDescriptorsMsgs.size() == imageMsgs.size())
+		if(localDescriptors && localDescriptorsMsgs.size() == cameraInfoMsgs.size())
 		{
 			localDescriptors->push_back(localDescriptorsMsgs[i]);
 		}

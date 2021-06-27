@@ -1167,7 +1167,7 @@ void CoreWrapper::commonDepthCallback(
 				return;
 			}
 		}
-		else if(imageMsgs.size() == 0 || imageMsgs[0].get() == 0 || !odomUpdate(odomMsg, imageMsgs[0]->header.stamp))
+		else if(cameraInfoMsgs.size() == 0 || !odomUpdate(odomMsg, cameraInfoMsgs[0].header.stamp))
 		{
 			return;
 		}
@@ -1186,7 +1186,7 @@ void CoreWrapper::commonDepthCallback(
 			return;
 		}
 	}
-	else if(imageMsgs.size() == 0 || imageMsgs[0].get() == 0 || !odomTFUpdate(imageMsgs[0]->header.stamp))
+	else if(cameraInfoMsgs.size() == 0 || !odomTFUpdate(cameraInfoMsgs[0].header.stamp))
 	{
 		return;
 	}
@@ -1382,7 +1382,7 @@ void CoreWrapper::commonDepthCallbackImpl(
 			rgb,
 			depth,
 			cameraModels,
-			lastPoseIntermediate_?-1:imageMsgs[0]->header.seq,
+			lastPoseIntermediate_?-1:!cameraInfoMsgs.empty()?cameraInfoMsgs[0].header.seq:0,
 			rtabmap_ros::timestampFromROS(lastPoseStamp_),
 			userData);
 
