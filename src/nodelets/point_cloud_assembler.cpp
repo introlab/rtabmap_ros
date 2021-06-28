@@ -42,6 +42,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <nav_msgs/Odometry.h>
 #include <sensor_msgs/PointCloud2.h>
+#include <sensor_msgs/point_cloud2_iterator.h>
 
 #include <message_filters/subscriber.h>
 #include <message_filters/sync_policies/exact_time.h>
@@ -83,6 +84,7 @@ public:
 		voxelSize_(0),
 		noiseRadius_(0),
 		noiseMinNeighbors_(5),
+		removeZ_(false),
 		fixedFrameId_("odom"),
 		frameId_("")
 	{}
@@ -124,6 +126,7 @@ private:
 		pnh.param("voxel_size", voxelSize_, voxelSize_);
 		pnh.param("noise_radius", noiseRadius_, noiseRadius_);
 		pnh.param("noise_min_neighbors", noiseMinNeighbors_, noiseMinNeighbors_);
+		pnh.param("remove_z", removeZ_, removeZ_);
 		pnh.param("subscribe_odom_info", subscribeOdomInfo, subscribeOdomInfo);
 
 		ROS_INFO("%s: queue_size=%d", getName().c_str(), queueSize);
@@ -141,6 +144,7 @@ private:
 		ROS_INFO("%s: voxel_size=%fm", getName().c_str(), voxelSize_);
 		ROS_INFO("%s: noise_radius=%fm", getName().c_str(), noiseRadius_);
 		ROS_INFO("%s: noise_min_neighbors=%d", getName().c_str(), noiseMinNeighbors_);
+		ROS_INFO("%s: remove_z=%s", getName().c_str(), removeZ_?"true":"false");
 
 		if(maxClouds_==0 && assemblingTime_ ==0.0)
 		{
@@ -234,6 +238,50 @@ private:
 			NODELET_WARN("Reseting point cloud assembler as null odometry has been received.");
 			clouds_.clear();
 		}
+	}
+
+	sensor_msgs::PointCloud2 removeField(const sensor_msgs::PointCloud2 & input, const std::string & field)
+	{
+		sensor_msgs::PointCloud2 output;
+		int offset = 0;
+		std::vector<int> inputFieldIndex;
+		for(size_t i=0; i<input.fields.size(); ++i)
+		{
+			if(input.fields[i].name.compare(field) == 0)
+			{
+				continue;
+			}
+			else
+			{
+				sensor_msgs::PointField outputField = input.fields[i];
+				outputField.offset = offset;
+				offset += outputField.count * sizeOfPointField(outputField.datatype);
+				output.fields.push_back(outputField);
+				inputFieldIndex.push_back(i);
+			}
+		}
+		output.header = input.header;
+		output.height = input.height;
+		output.width = input.width;
+		output.is_bigendian = input.is_bigendian;
+		output.is_dense = input.is_dense;
+		output.point_step = offset;
+		output.row_step = output.width * output.point_step;
+		output.data.resize(output.height*output.row_step);
+		int total = output.height*output.width;
+		for(int i=0; i<total; ++i)
+		{
+			// for each point, copy fields
+			int oi = i*output.point_step;
+			int pi = i*input.point_step;
+			for(size_t j=0;j<output.fields.size(); ++j)
+			{
+				memcpy(&output.data[oi + output.fields[j].offset],
+					   &input.data[pi + input.fields[inputFieldIndex[j]].offset],
+					   output.fields[j].count * sizeOfPointField(output.fields[j].datatype));
+			}
+		}
+		return output;
 	}
 
 	void callbackCloud(const sensor_msgs::PointCloud2ConstPtr & cloudMsg)
@@ -381,6 +429,11 @@ private:
 					}
 					pcl_ros::transformPointCloud(t.toEigen4f().inverse(), rosCloud, rosCloud);
 
+					if(removeZ_)
+					{
+						rosCloud = removeField(rosCloud, "z");
+					}
+
 					rosCloud.header = cloudMsg->header;
 					if(!frameId_.empty())
 					{
@@ -469,6 +522,7 @@ private:
 	double voxelSize_;
 	double noiseRadius_;
 	int noiseMinNeighbors_;
+	bool removeZ_;
 	std::string fixedFrameId_;
 	std::string frameId_;
 	tf::TransformListener tfListener_;
