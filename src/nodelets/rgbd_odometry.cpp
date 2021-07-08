@@ -162,6 +162,10 @@ private:
 				{
 					rgbd_image4_sub_.subscribe(nh, "rgbd_image3", 1);
 				}
+				if(rgbdCameras >= 5)
+				{
+					rgbd_image5_sub_.subscribe(nh, "rgbd_image4", 1);
+				}
 
 				if(rgbdCameras == 2)
 				{
@@ -268,13 +272,14 @@ private:
                                                                 rgbd_image5_sub_);
 						exactSync5_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD5, this, _1, _2, _3, _4, _5));
 					}
-					subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s \\\n   %s \\\n   %s \\\n   %s",
+					subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s \\\n  %s \\\n  %s \\\n   %s \\\n   %s",
 							getName().c_str(),
 							approxSync?"approx":"exact",
 							rgbd_image1_sub_.getTopic().c_str(),
 							rgbd_image2_sub_.getTopic().c_str(),
 							rgbd_image3_sub_.getTopic().c_str(),
-							rgbd_image4_sub_.getTopic().c_str());
+							rgbd_image4_sub_.getTopic().c_str(),
+                                                        rgbd_image5_sub_.getTopic().c_str());
 				}
 
 			}
@@ -605,7 +610,7 @@ private:
 			rtabmap_ros::toCvShare(image2, imageMsgs[1], depthMsgs[1]);
 			rtabmap_ros::toCvShare(image3, imageMsgs[2], depthMsgs[2]);
 			rtabmap_ros::toCvShare(image4, imageMsgs[3], depthMsgs[3]);
-			rtabmap_ros::toCvShare(image4, imageMsgs[4], depthMsgs[4]);
+			rtabmap_ros::toCvShare(image5, imageMsgs[4], depthMsgs[4]);
 			infoMsgs.push_back(image->rgb_camera_info);
 			infoMsgs.push_back(image2->rgb_camera_info);
 			infoMsgs.push_back(image3->rgb_camera_info);
