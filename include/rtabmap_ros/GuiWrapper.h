@@ -30,6 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <rtabmap_ros/visibility.h>
 #include <rclcpp/rclcpp.hpp>
+#include <rclcpp/executor.hpp>
 #include "rtabmap_ros/msg/info.hpp"
 #include "rtabmap_ros/msg/map_data.hpp"
 #include "rtabmap_ros/msg/odom_info.hpp"

@@ -136,7 +136,7 @@ bool PreferencesDialogROS::readCoreSettings(const QString & filePath)
 	{
 		auto parameters = client->get_parameters(rosParameters);
 		if (rclcpp::spin_until_future_complete(node, parameters, std::chrono::seconds(5)) ==
-				rclcpp::executor::FutureReturnCode::SUCCESS)
+				rclcpp::FutureReturnCode::SUCCESS)
 		{
 			for (auto & parameter : parameters.get()) {
 				const std::string & key = parameter.get_name();
@@ -191,4 +191,3 @@ void PreferencesDialogROS::writeCoreSettings(const QString & filePath) const
 		}
 	}
 }
-
