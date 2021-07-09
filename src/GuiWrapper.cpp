@@ -238,7 +238,7 @@ bool GuiWrapper::callEmptyService(const std::string & name)
 		auto result_future = client->async_send_request(request);
 		auto node = rclcpp::Node::make_shared("rtabmapviz");
 		if (rclcpp::spin_until_future_complete(node, result_future) !=
-				rclcpp::executor::FutureReturnCode::SUCCESS)
+				rclcpp::FutureReturnCode::SUCCESS)
 		{
 			RCLCPP_ERROR(this->get_logger(),
 					"Can't call \"%s\" service.", name.c_str());
@@ -267,7 +267,7 @@ bool GuiWrapper::callMapDataService(const std::string & name, bool global, bool 
 		request->graph_only = graphOnly;
 		auto result_future = client->async_send_request(request);
 		auto node = rclcpp::Node::make_shared("rtabmapviz");
-		if (rclcpp::spin_until_future_complete(node, result_future) != rclcpp::executor::FutureReturnCode::SUCCESS)
+		if (rclcpp::spin_until_future_complete(node, result_future) != rclcpp::FutureReturnCode::SUCCESS)
 		{
 			RCLCPP_ERROR(this->get_logger(), "Service \"%s\" failed to get the data.", name.c_str());
 		}
@@ -317,7 +317,7 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 				auto results = client->set_parameters(rosParameters);
 				// Wait for the results.
 				if (rclcpp::spin_until_future_complete(node, results, std::chrono::seconds(5)) !=
-						rclcpp::executor::FutureReturnCode::SUCCESS)
+						rclcpp::FutureReturnCode::SUCCESS)
 				{
 					RCLCPP_ERROR(this->get_logger(), "Failed to set rtabmap parameters!");
 				}
@@ -410,7 +410,7 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 				auto result_future = client->async_send_request(request);
 				auto node = rclcpp::Node::make_shared("rtabmapviz");
 				if (rclcpp::spin_until_future_complete(node, result_future) !=
-						rclcpp::executor::FutureReturnCode::SUCCESS)
+						rclcpp::FutureReturnCode::SUCCESS)
 				{
 					RCLCPP_ERROR(this->get_logger(), "Can't call \"set_goal\" service.");
 				}
@@ -453,7 +453,7 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 				auto result_future = client->async_send_request(request);
 				auto node = rclcpp::Node::make_shared("rtabmapviz");
 				if (rclcpp::spin_until_future_complete(node, result_future) !=
-						rclcpp::executor::FutureReturnCode::SUCCESS)
+						rclcpp::FutureReturnCode::SUCCESS)
 				{
 					RCLCPP_ERROR(this->get_logger(), "Can't call \"set_label\" service.");
 				}

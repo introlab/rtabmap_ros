@@ -29,6 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define PREFERENCESDIALOGROS_H_
 
 #include <rclcpp/rclcpp.hpp>
+#include <rclcpp/executor.hpp>
 #include <rtabmap/gui/PreferencesDialog.h>
 
 using namespace rtabmap;

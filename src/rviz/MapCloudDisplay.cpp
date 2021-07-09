@@ -506,7 +506,7 @@ void MapCloudDisplay::downloadMap()
 			request->optimized = true;
 			request->graph_only = false;
 			auto result_future = client->async_send_request(request);
-			if (rclcpp::spin_until_future_complete(node, result_future) != rclcpp::executor::FutureReturnCode::SUCCESS)
+			if (rclcpp::spin_until_future_complete(node, result_future) != rclcpp::FutureReturnCode::SUCCESS)
 			{
 				RCLCPP_ERROR(node->get_logger(), "Service \"get_map_data\" failed to get the data.");
 			}
@@ -573,7 +573,7 @@ void MapCloudDisplay::downloadGraph()
 			request->optimized = true;
 			request->graph_only = true;
 			auto result_future = client->async_send_request(request);
-			if (rclcpp::spin_until_future_complete(node, result_future) != rclcpp::executor::FutureReturnCode::SUCCESS)
+			if (rclcpp::spin_until_future_complete(node, result_future) != rclcpp::FutureReturnCode::SUCCESS)
 			{
 				RCLCPP_ERROR(node->get_logger(), "Service \"get_map_data\" failed to get the data.");
 			}
