@@ -65,6 +65,7 @@
   <exec_depend>compressed_depth_image_transport</exec_depend>
   <exec_depend>compressed_image_transport</exec_depend>
   <exec_depend>tf2</exec_depend>
+  <exec_depend>tf2_eigen</exec_depend>
   <exec_depend>tf2_ros</exec_depend>
   <exec_depend>laser_geometry</exec_depend>
   <exec_depend>pcl_conversions</exec_depend>

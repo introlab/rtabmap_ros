@@ -34,6 +34,7 @@ find_package(geometry_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(image_transport REQUIRED)
 find_package(tf2 REQUIRED)
+find_package(tf2_eigen REQUIRED)
 find_package(tf2_ros REQUIRED)
 #find_package(eigen_conversions REQUIRED)
 find_package(laser_geometry REQUIRED)
@@ -177,6 +178,7 @@ SET(Libraries
    geometry_msgs
    image_transport
    tf2
+   tf2_eigen
    tf2_ros
    laser_geometry
    message_filters
