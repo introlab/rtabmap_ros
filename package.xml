@@ -57,6 +57,7 @@
   <run_depend>visualization_msgs</run_depend>
   <run_depend>rosgraph_msgs</run_depend>
   <run_depend>image_transport</run_depend>
+  <run_depend>theora_image_transport</run_depend>
   <run_depend>compressed_depth_image_transport</run_depend>
   <run_depend>compressed_image_transport</run_depend>
   <run_depend>tf</run_depend>
