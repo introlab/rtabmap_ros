@@ -5,21 +5,13 @@ RTAB-Map's ROS2 package (branch `ros2`). **UNDER CONSTRUCTION**: currently most 
 
 # Installation 
 
-* RTAB-Map library:
-   ```bash
-    $ cd ~
-    $ git clone https://github.com/introlab/rtabmap.git rtabmap
-    $ cd rtabmap/build
-    $ cmake ..
-    $ make -j4
-    $ sudo make install
-    $ sudo ldconfig
-    ```
 * RTAB-Map ROS2 package:
     ```bash
     $ cd ~/ros2_ws
+    $ git clone https://github.com/introlab/rtabmap.git src/rtabmap
     $ git clone --branch ros2 https://github.com/introlab/rtabmap_ros.git src/rtabmap_ros
-    $ colcon build
+    $ export MAKEFLAGS="-j6" # Can be ignored if you have a lot of RAM
+    $ colcon build 
     ```
 
 # Example
