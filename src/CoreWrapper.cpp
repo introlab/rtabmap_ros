@@ -279,7 +279,19 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 	}
 
 	//parse input arguments
-	std::vector<std::string> argList = get_node_options().arguments();
+	std::vector<std::string> tmpList = get_node_options().arguments();
+	std::vector<std::string> argList;
+	for(unsigned int i=0; i<tmpList.size(); ++i)
+	{
+	    // Issue with ros2 launch files in which we cannot pass a 
+	    // list of strings as argument (they will appear in same string)
+	    std::list<std::string> v = uSplit(tmpList[i]);
+	    for(std::list<std::string>::iterator iter=v.begin(); iter!=v.end(); ++iter)
+	    {
+	        argList.push_back(*iter);
+	    }
+	}
+	
 	char ** argv = new char*[argList.size()];
 	bool deleteDbOnStart = false;
 	for(unsigned int i=0; i<argList.size(); ++i)

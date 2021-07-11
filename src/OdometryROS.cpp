@@ -76,6 +76,7 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	publishTf_(true),
 	waitForTransform_(0.1), // 100 ms
 	publishNullWhenLost_(true),
+	queueSize_(5),
 	paused_(false),
 	resetCountdown_(0),
 	resetCurrentCount_(0),
@@ -122,6 +123,9 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	expectedUpdateRate_ = this->declare_parameter("expected_update_rate", expectedUpdateRate_);
 
 	waitIMUToinit_ = this->declare_parameter("wait_imu_to_init", waitIMUToinit_);
+	
+	queueSize_ = this->declare_parameter("queue_size", queueSize_);
+
 
 	if(publishTf_ && !guessFrameId_.empty() && guessFrameId_.compare(odomFrameId_) == 0)
 	{
@@ -145,6 +149,7 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	RCLCPP_INFO(this->get_logger(), "Odometry: guess_min_time         = %f", guessMinTime_);
 	RCLCPP_INFO(this->get_logger(), "Odometry: expected_update_rate   = %f Hz", expectedUpdateRate_);
 	RCLCPP_INFO(this->get_logger(), "Odometry: wait_imu_to_init       = %s", waitIMUToinit_?"true":"false");
+	RCLCPP_INFO(this->get_logger(), "Odometry: queue_size             = %s", queueSize_?"true":"false");
 
 	configPath_ = uReplaceChar(configPath_, '~', UDirectory::homeDir());
 	if(configPath_.size() && configPath_.at(0) != '/')
@@ -241,7 +246,19 @@ void OdometryROS::init(bool stereoParams, bool visParams, bool icpParams)
 		}
 	}
 
-	std::vector<std::string> argList = this->get_node_options().arguments();
+	std::vector<std::string> tmpList = this->get_node_options().arguments();
+	std::vector<std::string> argList;
+	for(unsigned int i=0; i<tmpList.size(); ++i)
+	{
+	    // Issue with ros2 launch files in which we cannot pass a 
+	    // list of strings as argument (they will appear in same string)
+	    std::list<std::string> v = uSplit(tmpList[i]);
+	    for(std::list<std::string>::iterator iter=v.begin(); iter!=v.end(); ++iter)
+	    {
+	        argList.push_back(*iter);
+	    }
+	}
+	
 	char ** argv = new char*[argList.size()];
 	for(unsigned int i=0; i<argList.size(); ++i)
 	{
@@ -315,11 +332,10 @@ void OdometryROS::init(bool stereoParams, bool visParams, bool icpParams)
 
 	odomStrategy_ = 0;
 	Parameters::parse(this->parameters(), Parameters::kOdomStrategy(), odomStrategy_);
+
 	if(waitIMUToinit_ || odometry_->canProcessAsyncIMU())
 	{
-		int queueSize = 10;
-		queueSize = this->declare_parameter("queue_size", queueSize);
-		imuSub_ = create_subscription<sensor_msgs::msg::Imu>("imu", queueSize*5, std::bind(&OdometryROS::callbackIMU, this, std::placeholders::_1));
+		imuSub_ = create_subscription<sensor_msgs::msg::Imu>("imu", queueSize_*5, std::bind(&OdometryROS::callbackIMU, this, std::placeholders::_1));
 		RCLCPP_INFO(this->get_logger(), "odometry: Subscribing to IMU topic %s", imuSub_->get_topic_name());
 	}
 

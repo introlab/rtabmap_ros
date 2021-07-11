@@ -49,8 +49,7 @@ namespace rtabmap_ros
 StereoOdometry::StereoOdometry(const rclcpp::NodeOptions & options) :
 		rtabmap_ros::OdometryROS("stereo_odometry", options),
 		approxSync_(0),
-		exactSync_(0),
-		queueSize_(5)
+		exactSync_(0)
 {
 	OdometryROS::init(true, true, false);
 }
@@ -66,11 +65,9 @@ void StereoOdometry::onOdomInit()
 	bool approxSync = false;
 	bool subscribeRGBD = false;
 	approxSync = this->declare_parameter("approx_sync", approxSync);
-	queueSize_ = this->declare_parameter("queue_size", queueSize_);
 	subscribeRGBD = this->declare_parameter("subscribe_rgbd", subscribeRGBD);
 
 	RCLCPP_INFO(this->get_logger(), "StereoOdometry: approx_sync = %s", approxSync?"true":"false");
-	RCLCPP_INFO(this->get_logger(), "StereoOdometry: queue_size = %d", queueSize_);
 	RCLCPP_INFO(this->get_logger(), "StereoOdometry: subscribe_rgbd = %s", subscribeRGBD?"true":"false");
 
 	std::string subscribedTopicsMsg;
@@ -93,12 +90,12 @@ void StereoOdometry::onOdomInit()
 
 		if(approxSync)
 		{
-			approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize_), imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_);
+			approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize()), imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_);
 			approxSync_->registerCallback(std::bind(&StereoOdometry::callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 		}
 		else
 		{
-			exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize_), imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_);
+			exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize()), imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_);
 			exactSync_->registerCallback(std::bind(&StereoOdometry::callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 		}
 
@@ -311,13 +308,13 @@ void StereoOdometry::flushCallbacks()
 	if(approxSync_)
 	{
 		delete approxSync_;
-		approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize_), imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_);
+		approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize()), imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_);
 		approxSync_->registerCallback(boost::bind(&StereoOdometry::callback, this, _1, _2, _3, _4));
 	}
 	if(exactSync_)
 	{
 		delete exactSync_;
-		exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize_), imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_);
+		exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize()), imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_);
 		exactSync_->registerCallback(boost::bind(&StereoOdometry::callback, this, _1, _2, _3, _4));
 	}
 }

@@ -114,7 +114,6 @@ private:
 	message_filters::Synchronizer<MyApproxSync4Policy> * approxSync4_;
 	typedef message_filters::sync_policies::ExactTime<rtabmap_ros::msg::RGBDImage, rtabmap_ros::msg::RGBDImage, rtabmap_ros::msg::RGBDImage, rtabmap_ros::msg::RGBDImage> MyExactSync4Policy;
 	message_filters::Synchronizer<MyExactSync4Policy> * exactSync4_;
-	int queueSize_;
 };
 
 }

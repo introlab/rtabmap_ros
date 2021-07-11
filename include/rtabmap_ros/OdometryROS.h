@@ -85,6 +85,7 @@ protected:
 	virtual void flushCallbacks() {}
 	tf2_ros::Buffer & tfBuffer() {return *tfBuffer_;}
 	const double & waitForTransform() const {return waitForTransform_;}
+	const int & queueSize() const {return queueSize_;}
 
 private:
 	void warningLoop(const std::string & subscribedTopicsMsg, bool approxSync);
@@ -113,6 +114,7 @@ private:
 	bool publishTf_;
 	double waitForTransform_;
 	bool publishNullWhenLost_;
+	int queueSize_;
 	rtabmap::ParametersMap parameters_;
 
 	rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odomPub_;

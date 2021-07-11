@@ -53,8 +53,7 @@ RGBDOdometry::RGBDOdometry(const rclcpp::NodeOptions & options) :
 		approxSync3_(0),
 		exactSync3_(0),
 		approxSync4_(0),
-		exactSync4_(0),
-		queueSize_(5)
+		exactSync4_(0)
 {
 	OdometryROS::init(false, true, false);
 }
@@ -77,7 +76,6 @@ void RGBDOdometry::onOdomInit()
 	bool approxSync = true;
 	bool subscribeRGBD = false;
 	approxSync = this->declare_parameter("approx_sync", approxSync);
-	queueSize_ = this->declare_parameter("queue_size", queueSize_);
 	subscribeRGBD = this->declare_parameter("subscribe_rgbd", subscribeRGBD);
 	rgbdCameras = this->declare_parameter("rgbd_cameras", rgbdCameras);
 	if(rgbdCameras <= 0)
@@ -90,7 +88,6 @@ void RGBDOdometry::onOdomInit()
 	}
 
 	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: approx_sync    = %s", approxSync?"true":"false");
-	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: queue_size     = %d", queueSize_);
 	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: subscribe_rgbd = %s", subscribeRGBD?"true":"false");
 	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: rgbd_cameras   = %d", rgbdCameras);
 
@@ -115,7 +112,7 @@ void RGBDOdometry::onOdomInit()
 				if(approxSync)
 				{
 					approxSync2_ = new message_filters::Synchronizer<MyApproxSync2Policy>(
-							MyApproxSync2Policy(queueSize_),
+							MyApproxSync2Policy(queueSize()),
 							rgbd_image1_sub_,
 							rgbd_image2_sub_);
 					approxSync2_->registerCallback(std::bind(&RGBDOdometry::callbackRGBD2, this, std::placeholders::_1, std::placeholders::_2));
@@ -123,7 +120,7 @@ void RGBDOdometry::onOdomInit()
 				else
 				{
 					exactSync2_ = new message_filters::Synchronizer<MyExactSync2Policy>(
-							MyExactSync2Policy(queueSize_),
+							MyExactSync2Policy(queueSize()),
 							rgbd_image1_sub_,
 							rgbd_image2_sub_);
 					exactSync2_->registerCallback(std::bind(&RGBDOdometry::callbackRGBD2, this, std::placeholders::_1, std::placeholders::_2));
@@ -139,7 +136,7 @@ void RGBDOdometry::onOdomInit()
 				if(approxSync)
 				{
 					approxSync3_ = new message_filters::Synchronizer<MyApproxSync3Policy>(
-							MyApproxSync3Policy(queueSize_),
+							MyApproxSync3Policy(queueSize()),
 							rgbd_image1_sub_,
 							rgbd_image2_sub_,
 							rgbd_image3_sub_);
@@ -148,7 +145,7 @@ void RGBDOdometry::onOdomInit()
 				else
 				{
 					exactSync3_ = new message_filters::Synchronizer<MyExactSync3Policy>(
-							MyExactSync3Policy(queueSize_),
+							MyExactSync3Policy(queueSize()),
 							rgbd_image1_sub_,
 							rgbd_image2_sub_,
 							rgbd_image3_sub_);
@@ -166,7 +163,7 @@ void RGBDOdometry::onOdomInit()
 				if(approxSync)
 				{
 					approxSync4_ = new message_filters::Synchronizer<MyApproxSync4Policy>(
-							MyApproxSync4Policy(queueSize_),
+							MyApproxSync4Policy(queueSize()),
 							rgbd_image1_sub_,
 							rgbd_image2_sub_,
 							rgbd_image3_sub_,
@@ -176,7 +173,7 @@ void RGBDOdometry::onOdomInit()
 				else
 				{
 					exactSync4_ = new message_filters::Synchronizer<MyExactSync4Policy>(
-							MyExactSync4Policy(queueSize_),
+							MyExactSync4Policy(queueSize()),
 							rgbd_image1_sub_,
 							rgbd_image2_sub_,
 							rgbd_image3_sub_,
@@ -211,12 +208,12 @@ void RGBDOdometry::onOdomInit()
 
 		if(approxSync)
 		{
-			approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_);
+			approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize()), image_mono_sub_, image_depth_sub_, info_sub_);
 			approxSync_->registerCallback(std::bind(&RGBDOdometry::callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 		}
 		else
 		{
-			exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_);
+			exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize()), image_mono_sub_, image_depth_sub_, info_sub_);
 			exactSync_->registerCallback(std::bind(&RGBDOdometry::callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 		}
 
@@ -490,20 +487,20 @@ void RGBDOdometry::flushCallbacks()
 	if(approxSync_)
 	{
 		delete approxSync_;
-		approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_);
+		approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize()), image_mono_sub_, image_depth_sub_, info_sub_);
 		approxSync_->registerCallback(std::bind(&RGBDOdometry::callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 	}
 	if(exactSync_)
 	{
 		delete exactSync_;
-		exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_);
+		exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize()), image_mono_sub_, image_depth_sub_, info_sub_);
 		exactSync_->registerCallback(std::bind(&RGBDOdometry::callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 	}
 	if(approxSync2_)
 	{
 		delete approxSync2_;
 		approxSync2_ = new message_filters::Synchronizer<MyApproxSync2Policy>(
-				MyApproxSync2Policy(queueSize_),
+				MyApproxSync2Policy(queueSize()),
 				rgbd_image1_sub_,
 				rgbd_image2_sub_);
 		approxSync2_->registerCallback(std::bind(&RGBDOdometry::callbackRGBD2, this, std::placeholders::_1, std::placeholders::_2));
@@ -512,7 +509,7 @@ void RGBDOdometry::flushCallbacks()
 	{
 		delete exactSync2_;
 		exactSync2_ = new message_filters::Synchronizer<MyExactSync2Policy>(
-				MyExactSync2Policy(queueSize_),
+				MyExactSync2Policy(queueSize()),
 				rgbd_image1_sub_,
 				rgbd_image2_sub_);
 		exactSync2_->registerCallback(std::bind(&RGBDOdometry::callbackRGBD2, this, std::placeholders::_1, std::placeholders::_2));
@@ -521,7 +518,7 @@ void RGBDOdometry::flushCallbacks()
 	{
 		delete approxSync3_;
 		approxSync3_ = new message_filters::Synchronizer<MyApproxSync3Policy>(
-				MyApproxSync3Policy(queueSize_),
+				MyApproxSync3Policy(queueSize()),
 				rgbd_image1_sub_,
 				rgbd_image2_sub_,
 				rgbd_image3_sub_);
@@ -531,7 +528,7 @@ void RGBDOdometry::flushCallbacks()
 	{
 		delete exactSync3_;
 		exactSync3_ = new message_filters::Synchronizer<MyExactSync3Policy>(
-				MyExactSync3Policy(queueSize_),
+				MyExactSync3Policy(queueSize()),
 				rgbd_image1_sub_,
 				rgbd_image2_sub_,
 				rgbd_image3_sub_);
@@ -541,7 +538,7 @@ void RGBDOdometry::flushCallbacks()
 	{
 		delete approxSync4_;
 		approxSync4_ = new message_filters::Synchronizer<MyApproxSync4Policy>(
-				MyApproxSync4Policy(queueSize_),
+				MyApproxSync4Policy(queueSize()),
 				rgbd_image1_sub_,
 				rgbd_image2_sub_,
 				rgbd_image3_sub_,
@@ -552,7 +549,7 @@ void RGBDOdometry::flushCallbacks()
 	{
 		delete exactSync4_;
 		exactSync4_ = new message_filters::Synchronizer<MyExactSync4Policy>(
-				MyExactSync4Policy(queueSize_),
+				MyExactSync4Policy(queueSize()),
 				rgbd_image1_sub_,
 				rgbd_image2_sub_,
 				rgbd_image3_sub_,
