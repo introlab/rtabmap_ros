@@ -37,18 +37,18 @@ def generate_launch_description():
 
         # Nodes to launch
         Node(
-            package='rtabmap_ros', node_executable='rgbd_sync', output='screen',
+            package='rtabmap_ros', executable='rgbd_sync', output='screen',
             parameters=[{'approx_sync':True, 'use_sim_time':use_sim_time}],
             remappings=remappings),
 
         Node(
-            package='rtabmap_ros', node_executable='rtabmap', output='screen',
+            package='rtabmap_ros', executable='rtabmap', output='screen',
             parameters=parameters,
             remappings=remappings,
             arguments=['-d']),
 
         Node(
-            package='rtabmap_ros', node_executable='rtabmapviz', output='screen',
+            package='rtabmap_ros', executable='rtabmapviz', output='screen',
             parameters=parameters,
             remappings=remappings),
     ])
