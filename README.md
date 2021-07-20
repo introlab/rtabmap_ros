@@ -1,4 +1,4 @@
-rtabmap_ros [![Build Status](https://travis-ci.org/introlab/rtabmap_ros.svg?branch=master)](https://travis-ci.org/introlab/rtabmap_ros)
+rtabmap_ros [![Build Status](https://travis-ci.com/introlab/rtabmap_ros.svg?branch=master)](https://travis-ci.com/introlab/rtabmap_ros)
 ===========
 
 RTAB-Map's ROS package.
