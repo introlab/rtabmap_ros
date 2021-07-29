@@ -41,7 +41,7 @@ namespace rtabmap_ros
 {
 
 PointCloudAssembler::PointCloudAssembler(const rclcpp::NodeOptions & options) :
-	Node("pointcloud_to_depthimage", options),
+	Node("point_cloud_assembler", options),
 	warningThread_(0),
 	callbackCalled_(false),
 	exactSync_(0),

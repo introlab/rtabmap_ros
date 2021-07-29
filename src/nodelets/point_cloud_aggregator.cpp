@@ -39,7 +39,7 @@ namespace rtabmap_ros
 {
 
 PointCloudAggregator::PointCloudAggregator(const rclcpp::NodeOptions & options) :
-	Node("pointcloud_to_depthimage", options),
+	Node("point_cloud_aggregator", options),
 	warningThread_(0),
 	callbackCalled_(false),
 	exactSync4_(0),
