@@ -175,7 +175,7 @@ cv::Mat userDataFromROS(const rtabmap_ros::UserData & dataMsg);
 void userDataToROS(const cv::Mat & data, rtabmap_ros::UserData & dataMsg, bool compress);
 
 rtabmap::Landmarks landmarksFromROS(
-		const std::map<int, geometry_msgs::PoseWithCovarianceStamped> & tags,
+		const std::map<int, std::pair<geometry_msgs::PoseWithCovarianceStamped, float> > & tags,
 		const std::string & frameId,
 		const std::string & odomFrameId,
 		const ros::Time & odomStamp,

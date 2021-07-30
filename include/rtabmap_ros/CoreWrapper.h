@@ -356,7 +356,7 @@ private:
 	ros::Subscriber gpsFixAsyncSub_;
 	rtabmap::GPS gps_;
 	ros::Subscriber tagDetectionsSub_;
-	std::map<int, geometry_msgs::PoseWithCovarianceStamped> tags_;
+	std::map<int, std::pair<geometry_msgs::PoseWithCovarianceStamped, float> > tags_; // id, <pose, size>
 	ros::Subscriber imuSub_;
 	std::map<double, rtabmap::Transform> imus_;
 	std::string imuFrameId_;

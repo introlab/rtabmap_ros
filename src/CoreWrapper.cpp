@@ -1912,9 +1912,9 @@ void CoreWrapper::process(
 					else if(twoDMapping_)
 					{
 						// If 2d mapping, make sure all diagonal values of the covariance that even not used are not null.
-						covariance.at<double>(2,2) = covariance.at<double>(2,2)!=0?covariance.at<double>(2,2):1;
-						covariance.at<double>(3,3) = covariance.at<double>(3,3)!=0?covariance.at<double>(3,3):1;
-						covariance.at<double>(4,4) = covariance.at<double>(4,4)!=0?covariance.at<double>(4,4):1;
+						covariance.at<double>(2,2) = uIsFinite(covariance.at<double>(2,2)) && covariance.at<double>(2,2)!=0?covariance.at<double>(2,2):1;
+						covariance.at<double>(3,3) = uIsFinite(covariance.at<double>(3,3)) && covariance.at<double>(3,3)!=0?covariance.at<double>(3,3):1;
+						covariance.at<double>(4,4) = uIsFinite(covariance.at<double>(4,4)) && covariance.at<double>(4,4)!=0?covariance.at<double>(4,4):1;
 					}
 
 					SensorData interData(cv::Mat(), cv::Mat(), CameraModel(), -1, rtabmap_ros::timestampFromROS(iter->first.header.stamp));
@@ -2088,9 +2088,9 @@ void CoreWrapper::process(
 		else if(twoDMapping_)
 		{
 			// If 2d mapping, make sure all diagonal values of the covariance that even not used are not null.
-			covariance.at<double>(2,2) = covariance.at<double>(2,2)!=0?covariance.at<double>(2,2):1;
-			covariance.at<double>(3,3) = covariance.at<double>(3,3)!=0?covariance.at<double>(3,3):1;
-			covariance.at<double>(4,4) = covariance.at<double>(4,4)!=0?covariance.at<double>(4,4):1;
+			covariance.at<double>(2,2) = uIsFinite(covariance.at<double>(2,2)) && covariance.at<double>(2,2)!=0?covariance.at<double>(2,2):1;
+			covariance.at<double>(3,3) = uIsFinite(covariance.at<double>(3,3)) && covariance.at<double>(3,3)!=0?covariance.at<double>(3,3):1;
+			covariance.at<double>(4,4) = uIsFinite(covariance.at<double>(4,4)) && covariance.at<double>(4,4)!=0?covariance.at<double>(4,4):1;
 		}
 
 		std::map<std::string, float> externalStats;
@@ -2454,7 +2454,9 @@ void CoreWrapper::tagDetectionsAsyncCallback(const apriltag_ros::AprilTagDetecti
 						warned = true;
 					}
 				}
-				uInsert(tags_, std::make_pair(tagDetections.detections[i].id[0], p));
+				uInsert(tags_,
+						std::make_pair(tagDetections.detections[i].id[0],
+								std::make_pair(p, tagDetections.detections[i].size.size()==1?(float)tagDetections.detections[i].size[0]:0.0f)));
 			}
 		}
 	}
