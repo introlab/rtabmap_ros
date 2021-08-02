@@ -163,38 +163,43 @@ void toCvCopy(const rtabmap_ros::RGBDImage & image, cv_bridge::CvImagePtr & rgb,
 
 void toCvShare(const rtabmap_ros::RGBDImageConstPtr & image, cv_bridge::CvImageConstPtr & rgb, cv_bridge::CvImageConstPtr & depth)
 {
-	if(!image->rgb.data.empty())
+	toCvShare(*image, image, rgb, depth);
+}
+
+void toCvShare(const rtabmap_ros::RGBDImage & image, const boost::shared_ptr<void const>& trackedObject, cv_bridge::CvImageConstPtr & rgb, cv_bridge::CvImageConstPtr & depth)
+{
+	if(!image.rgb.data.empty())
 	{
-		rgb = cv_bridge::toCvShare(image->rgb, image);
+		rgb = cv_bridge::toCvShare(image.rgb, trackedObject);
 	}
-	else if(!image->rgb_compressed.data.empty())
+	else if(!image.rgb_compressed.data.empty())
 	{
 #ifdef CV_BRIDGE_HYDRO
 		ROS_ERROR("Unsupported compressed image copy, please upgrade at least to ROS Indigo to use this.");
 #else
-		rgb = cv_bridge::toCvCopy(image->rgb_compressed);
+		rgb = cv_bridge::toCvCopy(image.rgb_compressed);
 #endif
 	}
 
-	if(!image->depth.data.empty())
+	if(!image.depth.data.empty())
 	{
-		depth = cv_bridge::toCvShare(image->depth, image);
+		depth = cv_bridge::toCvShare(image.depth, trackedObject);
 	}
-	else if(!image->depth_compressed.data.empty())
+	else if(!image.depth_compressed.data.empty())
 	{
-		if(image->depth_compressed.format.compare("jpg")==0)
+		if(image.depth_compressed.format.compare("jpg")==0)
 		{
 #ifdef CV_BRIDGE_HYDRO
 			ROS_ERROR("Unsupported compressed image copy, please upgrade at least to ROS Indigo to use this.");
 #else
-			depth = cv_bridge::toCvCopy(image->depth_compressed);
+			depth = cv_bridge::toCvCopy(image.depth_compressed);
 #endif
 		}
 		else
 		{
 			cv_bridge::CvImagePtr ptr = boost::make_shared<cv_bridge::CvImage>();
-			ptr->header = image->depth_compressed.header;
-			ptr->image = rtabmap::uncompressImage(image->depth_compressed.data);
+			ptr->header = image.depth_compressed.header;
+			ptr->image = rtabmap::uncompressImage(image.depth_compressed.data);
 			ROS_ASSERT(ptr->image.empty() || ptr->image.type() == CV_32FC1 || ptr->image.type() == CV_16UC1);
 			ptr->encoding = ptr->image.empty()?"":ptr->image.type() == CV_32FC1?sensor_msgs::image_encodings::TYPE_32FC1:sensor_msgs::image_encodings::TYPE_16UC1;
 			depth = ptr;

@@ -89,11 +89,11 @@ void CommonDataSubscriber::setupOdomCallbacks(
 			{
 				subscribedToOdomInfo_ = true;
 				odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-				SYNC_DECL3(odomDataInfo, approxSync, queueSize, odomSub_, userDataSub_, odomInfoSub_);
+				SYNC_DECL3(CommonDataSubscriber, odomDataInfo, approxSync, queueSize, odomSub_, userDataSub_, odomInfoSub_);
 			}
 			else
 			{
-				SYNC_DECL2(odomData, approxSync, queueSize, odomSub_, userDataSub_);
+				SYNC_DECL2(CommonDataSubscriber, odomData, approxSync, queueSize, odomSub_, userDataSub_);
 			}
 		}
 		else 
@@ -102,7 +102,7 @@ void CommonDataSubscriber::setupOdomCallbacks(
 		{
 			subscribedToOdomInfo_ = true;
 			odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-			SYNC_DECL2(odomInfo, approxSync, queueSize, odomSub_, odomInfoSub_);
+			SYNC_DECL2(CommonDataSubscriber, odomInfo, approxSync, queueSize, odomSub_, odomInfoSub_);
 		}
 	}
 	else

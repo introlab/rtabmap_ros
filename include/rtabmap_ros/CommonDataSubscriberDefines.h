@@ -105,18 +105,18 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 	if(PREFIX##ExactSync_) delete PREFIX##ExactSync_;
 
 // Sync declarations
-#define SYNC_DECL2(PREFIX, APPROX, QUEUE_SIZE, SUB0, SUB1) \
+#define SYNC_DECL2(CLASS, PREFIX, APPROX, QUEUE_SIZE, SUB0, SUB1) \
 		if(APPROX) \
 		{ \
 			PREFIX##ApproximateSync_ = new message_filters::Synchronizer<PREFIX##ApproximateSyncPolicy>( \
 					PREFIX##ApproximateSyncPolicy(QUEUE_SIZE), SUB0, SUB1); \
-			PREFIX##ApproximateSync_->registerCallback(boost::bind(&CommonDataSubscriber::PREFIX##Callback, this, _1, _2)); \
+			PREFIX##ApproximateSync_->registerCallback(boost::bind(&CLASS::PREFIX##Callback, this, _1, _2)); \
 		} \
 		else \
 		{ \
 			PREFIX##ExactSync_ = new message_filters::Synchronizer<PREFIX##ExactSyncPolicy>( \
 					PREFIX##ExactSyncPolicy(QUEUE_SIZE), SUB0, SUB1); \
-			PREFIX##ExactSync_->registerCallback(boost::bind(&CommonDataSubscriber::PREFIX##Callback, this, _1, _2)); \
+			PREFIX##ExactSync_->registerCallback(boost::bind(&CLASS::PREFIX##Callback, this, _1, _2)); \
 		} \
 		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s \\\n   %s", \
 				name_.c_str(), \
@@ -124,18 +124,18 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 				SUB0.getTopic().c_str(), \
 				SUB1.getTopic().c_str());
 
-#define SYNC_DECL3(PREFIX, APPROX, QUEUE_SIZE, SUB0, SUB1, SUB2) \
+#define SYNC_DECL3(CLASS, PREFIX, APPROX, QUEUE_SIZE, SUB0, SUB1, SUB2) \
 		if(APPROX) \
 		{ \
 			PREFIX##ApproximateSync_ = new message_filters::Synchronizer<PREFIX##ApproximateSyncPolicy>( \
 					PREFIX##ApproximateSyncPolicy(QUEUE_SIZE), SUB0, SUB1, SUB2); \
-			PREFIX##ApproximateSync_->registerCallback(boost::bind(&CommonDataSubscriber::PREFIX##Callback, this, _1, _2, _3)); \
+			PREFIX##ApproximateSync_->registerCallback(boost::bind(&CLASS::PREFIX##Callback, this, _1, _2, _3)); \
 		} \
 		else \
 		{ \
 			PREFIX##ExactSync_ = new message_filters::Synchronizer<PREFIX##ExactSyncPolicy>( \
 					PREFIX##ExactSyncPolicy(QUEUE_SIZE), SUB0, SUB1, SUB2); \
-			PREFIX##ExactSync_->registerCallback(boost::bind(&CommonDataSubscriber::PREFIX##Callback, this, _1, _2, _3)); \
+			PREFIX##ExactSync_->registerCallback(boost::bind(&CLASS::PREFIX##Callback, this, _1, _2, _3)); \
 		} \
 		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s \\\n   %s \\\n   %s", \
 				name_.c_str(), \
@@ -144,18 +144,18 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 				SUB1.getTopic().c_str(), \
 				SUB2.getTopic().c_str());
 
-#define SYNC_DECL4(PREFIX, APPROX, QUEUE_SIZE, SUB0, SUB1, SUB2, SUB3) \
+#define SYNC_DECL4(CLASS, PREFIX, APPROX, QUEUE_SIZE, SUB0, SUB1, SUB2, SUB3) \
 		if(APPROX) \
 		{ \
 			PREFIX##ApproximateSync_ = new message_filters::Synchronizer<PREFIX##ApproximateSyncPolicy>( \
 					PREFIX##ApproximateSyncPolicy(QUEUE_SIZE), SUB0, SUB1, SUB2, SUB3); \
-			PREFIX##ApproximateSync_->registerCallback(boost::bind(&CommonDataSubscriber::PREFIX##Callback, this, _1, _2, _3, _4)); \
+			PREFIX##ApproximateSync_->registerCallback(boost::bind(&CLASS::PREFIX##Callback, this, _1, _2, _3, _4)); \
 		} \
 		else \
 		{ \
 			PREFIX##ExactSync_ = new message_filters::Synchronizer<PREFIX##ExactSyncPolicy>( \
 					PREFIX##ExactSyncPolicy(QUEUE_SIZE), SUB0, SUB1, SUB2, SUB3); \
-			PREFIX##ExactSync_->registerCallback(boost::bind(&CommonDataSubscriber::PREFIX##Callback, this, _1, _2, _3, _4)); \
+			PREFIX##ExactSync_->registerCallback(boost::bind(&CLASS::PREFIX##Callback, this, _1, _2, _3, _4)); \
 		} \
 		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s \\\n   %s \\\n   %s \\\n   %s", \
 				name_.c_str(), \
@@ -165,18 +165,18 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 				SUB2.getTopic().c_str(), \
 				SUB3.getTopic().c_str());
 
-#define SYNC_DECL5(PREFIX, APPROX, QUEUE_SIZE, SUB0, SUB1, SUB2, SUB3, SUB4) \
+#define SYNC_DECL5(CLASS, PREFIX, APPROX, QUEUE_SIZE, SUB0, SUB1, SUB2, SUB3, SUB4) \
 		if(APPROX) \
 		{ \
 			PREFIX##ApproximateSync_ = new message_filters::Synchronizer<PREFIX##ApproximateSyncPolicy>( \
 					PREFIX##ApproximateSyncPolicy(QUEUE_SIZE), SUB0, SUB1, SUB2, SUB3, SUB4); \
-			PREFIX##ApproximateSync_->registerCallback(boost::bind(&CommonDataSubscriber::PREFIX##Callback, this, _1, _2, _3, _4, _5)); \
+			PREFIX##ApproximateSync_->registerCallback(boost::bind(&CLASS::PREFIX##Callback, this, _1, _2, _3, _4, _5)); \
 		} \
 		else \
 		{ \
 			PREFIX##ExactSync_ = new message_filters::Synchronizer<PREFIX##ExactSyncPolicy>( \
 					PREFIX##ExactSyncPolicy(QUEUE_SIZE), SUB0, SUB1, SUB2, SUB3, SUB4); \
-			PREFIX##ExactSync_->registerCallback(boost::bind(&CommonDataSubscriber::PREFIX##Callback, this, _1, _2, _3, _4, _5)); \
+			PREFIX##ExactSync_->registerCallback(boost::bind(&CLASS::PREFIX##Callback, this, _1, _2, _3, _4, _5)); \
 		} \
 		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s \\\n   %s \\\n   %s \\\n   %s \\\n   %s", \
 				name_.c_str(), \
@@ -187,18 +187,18 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 				SUB3.getTopic().c_str(), \
 				SUB4.getTopic().c_str());
 
-#define SYNC_DECL6(PREFIX, APPROX, QUEUE_SIZE, SUB0, SUB1, SUB2, SUB3, SUB4, SUB5) \
+#define SYNC_DECL6(CLASS, PREFIX, APPROX, QUEUE_SIZE, SUB0, SUB1, SUB2, SUB3, SUB4, SUB5) \
 		if(APPROX) \
 		{ \
 			PREFIX##ApproximateSync_ = new message_filters::Synchronizer<PREFIX##ApproximateSyncPolicy>( \
 					PREFIX##ApproximateSyncPolicy(QUEUE_SIZE), SUB0, SUB1, SUB2, SUB3, SUB4, SUB5); \
-			PREFIX##ApproximateSync_->registerCallback(boost::bind(&CommonDataSubscriber::PREFIX##Callback, this, _1, _2, _3, _4, _5, _6)); \
+			PREFIX##ApproximateSync_->registerCallback(boost::bind(&CLASS::PREFIX##Callback, this, _1, _2, _3, _4, _5, _6)); \
 		} \
 		else \
 		{ \
 			PREFIX##ExactSync_ = new message_filters::Synchronizer<PREFIX##ExactSyncPolicy>( \
 					PREFIX##ExactSyncPolicy(QUEUE_SIZE), SUB0, SUB1, SUB2, SUB3, SUB4, SUB5); \
-			PREFIX##ExactSync_->registerCallback(boost::bind(&CommonDataSubscriber::PREFIX##Callback, this, _1, _2, _3, _4, _5, _6)); \
+			PREFIX##ExactSync_->registerCallback(boost::bind(&CLASS::PREFIX##Callback, this, _1, _2, _3, _4, _5, _6)); \
 		} \
 		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s \\\n   %s \\\n   %s \\\n   %s \\\n   %s \\\n   %s", \
 				name_.c_str(), \
@@ -210,18 +210,18 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 				SUB4.getTopic().c_str(), \
 				SUB5.getTopic().c_str());
 
-#define SYNC_DECL7(PREFIX, APPROX, QUEUE_SIZE, SUB0, SUB1, SUB2, SUB3, SUB4, SUB5, SUB6) \
+#define SYNC_DECL7(CLASS, PREFIX, APPROX, QUEUE_SIZE, SUB0, SUB1, SUB2, SUB3, SUB4, SUB5, SUB6) \
 		if(APPROX) \
 		{ \
 			PREFIX##ApproximateSync_ = new message_filters::Synchronizer<PREFIX##ApproximateSyncPolicy>( \
 					PREFIX##ApproximateSyncPolicy(QUEUE_SIZE), SUB0, SUB1, SUB2, SUB3, SUB4, SUB5, SUB6); \
-			PREFIX##ApproximateSync_->registerCallback(boost::bind(&CommonDataSubscriber::PREFIX##Callback, this, _1, _2, _3, _4, _5, _6, _7)); \
+			PREFIX##ApproximateSync_->registerCallback(boost::bind(&CLASS::PREFIX##Callback, this, _1, _2, _3, _4, _5, _6, _7)); \
 		} \
 		else \
 		{ \
 			PREFIX##ExactSync_ = new message_filters::Synchronizer<PREFIX##ExactSyncPolicy>( \
 					PREFIX##ExactSyncPolicy(QUEUE_SIZE), SUB0, SUB1, SUB2, SUB3, SUB4, SUB5, SUB6); \
-			PREFIX##ExactSync_->registerCallback(boost::bind(&CommonDataSubscriber::PREFIX##Callback, this, _1, _2, _3, _4, _5, _6, _7)); \
+			PREFIX##ExactSync_->registerCallback(boost::bind(&CLASS::PREFIX##Callback, this, _1, _2, _3, _4, _5, _6, _7)); \
 		} \
 		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s \\\n   %s \\\n   %s \\\n   %s \\\n   %s \\\n   %s \\\n   %s", \
 				name_.c_str(), \
@@ -234,18 +234,18 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 				SUB5.getTopic().c_str(), \
 				SUB6.getTopic().c_str());
 
-#define SYNC_DECL8(PREFIX, APPROX, QUEUE_SIZE, SUB0, SUB1, SUB2, SUB3, SUB4, SUB5, SUB6, SUB7) \
+#define SYNC_DECL8(CLASS, PREFIX, APPROX, QUEUE_SIZE, SUB0, SUB1, SUB2, SUB3, SUB4, SUB5, SUB6, SUB7) \
 		if(APPROX) \
 		{ \
 			PREFIX##ApproximateSync_ = new message_filters::Synchronizer<PREFIX##ApproximateSyncPolicy>( \
 					PREFIX##ApproximateSyncPolicy(QUEUE_SIZE), SUB0, SUB1, SUB2, SUB3, SUB4, SUB5, SUB6, SUB7); \
-			PREFIX##ApproximateSync_->registerCallback(boost::bind(&CommonDataSubscriber::PREFIX##Callback, this, _1, _2, _3, _4, _5, _6, _7, _8)); \
+			PREFIX##ApproximateSync_->registerCallback(boost::bind(&CLASS::PREFIX##Callback, this, _1, _2, _3, _4, _5, _6, _7, _8)); \
 		} \
 		else \
 		{ \
 			PREFIX##ExactSync_ = new message_filters::Synchronizer<PREFIX##ExactSyncPolicy>( \
 					PREFIX##ExactSyncPolicy(QUEUE_SIZE), SUB0, SUB1, SUB2, SUB3, SUB4, SUB5, SUB6, SUB7); \
-			PREFIX##ExactSync_->registerCallback(boost::bind(&CommonDataSubscriber::PREFIX##Callback, this, _1, _2, _3, _4, _5, _6, _7, _8)); \
+			PREFIX##ExactSync_->registerCallback(boost::bind(&CLASS::PREFIX##Callback, this, _1, _2, _3, _4, _5, _6, _7, _8)); \
 		} \
 		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s \\\n   %s \\\n   %s \\\n   %s \\\n   %s \\\n   %s \\\n   %s \\\n   %s", \
 				name_.c_str(), \

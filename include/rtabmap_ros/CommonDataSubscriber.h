@@ -46,6 +46,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <nav_msgs/Odometry.h>
 
 #include <rtabmap_ros/RGBDImage.h>
+#include <rtabmap_ros/RGBDImages.h>
 #include <rtabmap_ros/UserData.h>
 #include <rtabmap_ros/OdomInfo.h>
 #include <rtabmap_ros/ScanDescriptor.h>
@@ -176,6 +177,17 @@ private:
 			bool subscribeOdomInfo,
 			int queueSize,
 			bool approxSync);
+	void setupRGBDXCallbacks(
+			ros::NodeHandle & nh,
+			ros::NodeHandle & pnh,
+			bool subscribeOdom,
+			bool subscribeUserData,
+			bool subscribeScan2d,
+			bool subscribeScan3d,
+			bool subscribeScanDesc,
+			bool subscribeOdomInfo,
+			int queueSize,
+			bool approxSync);
 #ifdef RTABMAP_SYNC_MULTI_RGBD
 	void setupRGBD2Callbacks(
 			ros::NodeHandle & nh,
@@ -278,6 +290,8 @@ private:
 	//for rgbd callback
 	ros::Subscriber rgbdSub_;
 	std::vector<message_filters::Subscriber<rtabmap_ros::RGBDImage>*> rgbdSubs_;
+	ros::Subscriber rgbdXSubOnly_;
+	message_filters::Subscriber<rtabmap_ros::RGBDImages> rgbdXSub_;
 
 	//stereo callback
 	image_transport::SubscriberFilter imageRectLeft_;
@@ -417,6 +431,36 @@ private:
 	DATA_SYNCS4(rgbdOdomDataScan3d, nav_msgs::Odometry, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, sensor_msgs::PointCloud2);
 	DATA_SYNCS4(rgbdOdomDataScanDesc, nav_msgs::Odometry, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::ScanDescriptor);
 	DATA_SYNCS4(rgbdOdomDataInfo, nav_msgs::Odometry, rtabmap_ros::UserData, rtabmap_ros::RGBDImage, rtabmap_ros::OdomInfo);
+#endif
+
+	// X RGBD
+	void rgbdXCallback(const rtabmap_ros::RGBDImagesConstPtr&);
+	DATA_SYNCS2(rgbdXScan2d, rtabmap_ros::RGBDImages, sensor_msgs::LaserScan);
+	DATA_SYNCS2(rgbdXScan3d, rtabmap_ros::RGBDImages, sensor_msgs::PointCloud2)
+	DATA_SYNCS2(rgbdXScanDesc, rtabmap_ros::RGBDImages, rtabmap_ros::ScanDescriptor);
+	DATA_SYNCS2(rgbdXInfo, rtabmap_ros::RGBDImages, rtabmap_ros::OdomInfo);
+
+	// X RGBD + Odom
+	DATA_SYNCS2(rgbdXOdom, nav_msgs::Odometry, rtabmap_ros::RGBDImages);
+	DATA_SYNCS3(rgbdXOdomScan2d, nav_msgs::Odometry, rtabmap_ros::RGBDImages, sensor_msgs::LaserScan);
+	DATA_SYNCS3(rgbdXOdomScan3d, nav_msgs::Odometry, rtabmap_ros::RGBDImages, sensor_msgs::PointCloud2);
+	DATA_SYNCS3(rgbdXOdomScanDesc, nav_msgs::Odometry, rtabmap_ros::RGBDImages, rtabmap_ros::ScanDescriptor);
+	DATA_SYNCS3(rgbdXOdomInfo, nav_msgs::Odometry, rtabmap_ros::RGBDImages, rtabmap_ros::OdomInfo);
+
+#ifdef RTABMAP_SYNC_USER_DATA
+	// X RGBD + User Data
+	DATA_SYNCS2(rgbdXData, rtabmap_ros::UserData, rtabmap_ros::RGBDImages);
+	DATA_SYNCS3(rgbdXDataScan2d, rtabmap_ros::UserData, rtabmap_ros::RGBDImages, sensor_msgs::LaserScan);
+	DATA_SYNCS3(rgbdXDataScan3d, rtabmap_ros::UserData, rtabmap_ros::RGBDImages, sensor_msgs::PointCloud2);
+	DATA_SYNCS3(rgbdXDataScanDesc, rtabmap_ros::UserData, rtabmap_ros::RGBDImages, rtabmap_ros::ScanDescriptor);
+	DATA_SYNCS3(rgbdXDataInfo, rtabmap_ros::UserData, rtabmap_ros::RGBDImages, rtabmap_ros::OdomInfo);
+
+	// X RGBD + Odom + User Data
+	DATA_SYNCS3(rgbdXOdomData, nav_msgs::Odometry, rtabmap_ros::UserData, rtabmap_ros::RGBDImages);
+	DATA_SYNCS4(rgbdXOdomDataScan2d, nav_msgs::Odometry, rtabmap_ros::UserData, rtabmap_ros::RGBDImages, sensor_msgs::LaserScan);
+	DATA_SYNCS4(rgbdXOdomDataScan3d, nav_msgs::Odometry, rtabmap_ros::UserData, rtabmap_ros::RGBDImages, sensor_msgs::PointCloud2);
+	DATA_SYNCS4(rgbdXOdomDataScanDesc, nav_msgs::Odometry, rtabmap_ros::UserData, rtabmap_ros::RGBDImages, rtabmap_ros::ScanDescriptor);
+	DATA_SYNCS4(rgbdXOdomDataInfo, nav_msgs::Odometry, rtabmap_ros::UserData, rtabmap_ros::RGBDImages, rtabmap_ros::OdomInfo);
 #endif
 
 #ifdef RTABMAP_SYNC_MULTI_RGBD
