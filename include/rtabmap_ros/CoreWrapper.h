@@ -233,6 +233,10 @@ private:
 	std::string groundTruthBaseFrameId_;
 	std::string configPath_;
 	std::string databasePath_;
+
+	double tfDelay;
+	double tfTolerance;
+
 	double odomDefaultAngVariance_;
 	double odomDefaultLinVariance_;
 	double landmarkDefaultAngVariance_;

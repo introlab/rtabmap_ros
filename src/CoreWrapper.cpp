@@ -138,8 +138,8 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 	tfBroadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
 
 	bool publishTf = true;
-	double tfDelay = 0.05; // 20 Hz
-	double tfTolerance = 0.1; // 100 ms
+	tfDelay = 0.05; // 20 Hz
+	tfTolerance = 0.1; // 100 ms
 
 	configPath_ = this->declare_parameter("config_path", configPath_);
 	databasePath_ = this->declare_parameter("database_path", databasePath_);
