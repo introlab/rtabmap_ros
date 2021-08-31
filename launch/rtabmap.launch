@@ -119,9 +119,12 @@
   <arg name="use_odom_features"        default="false"/>
   
   <arg name="scan_cloud_assembling"              default="false"/>
-  <arg name="scan_cloud_assembling_time"         default="1"/>
+  <arg name="scan_cloud_assembling_time"         default="1"/>      <!-- max_clouds and time should not be set at the same time -->
+  <arg name="scan_cloud_assembling_max_clouds"   default="0"/>      <!-- max_clouds and time should not be set at the same time -->
   <arg name="scan_cloud_assembling_fixed_frame"  default=""/>
   <arg name="scan_cloud_assembling_voxel_size"   default="0.05"/>
+  <arg name="scan_cloud_assembling_range_min"    default="0.0"/>    <!-- 0=disabled -->
+  <arg name="scan_cloud_assembling_range_max"    default="0.0"/>    <!-- 0=disabled -->
   <arg name="scan_cloud_assembling_noise_radius"   default="0.0"/>    <!-- 0=disabled -->
   <arg name="scan_cloud_assembling_noise_min_neighbors"   default="5"/>
   
@@ -289,14 +292,17 @@
       <param name="max_update_rate"             type="double" value="$(arg odom_max_rate)"/>
     </node>
     
-    <node if="$(arg scan_cloud_assembling)" pkg="rtabmap_ros" type="point_cloud_assembler" name="point_cloud_assembler" output="screen">
+    <node if="$(arg scan_cloud_assembling)" pkg="rtabmap_ros" type="point_cloud_assembler" name="point_cloud_assembler" output="$(arg output)">
       <remap     if="$(arg scan_cloud_filtered)" from="cloud" to="odom_filtered_input_scan"/>
       <remap unless="$(arg scan_cloud_filtered)" from="cloud" to="$(arg scan_cloud_topic)"/>
 
       <remap from="odom"            to="$(arg odom_topic)"/>
       <param name="assembling_time" type="double" value="$(arg scan_cloud_assembling_time)"/>
+      <param name="max_clouds"      type="int"    value="$(arg scan_cloud_assembling_max_clouds)"/>
       <param name="fixed_frame_id"  type="string" value="$(arg scan_cloud_assembling_fixed_frame)"/>
       <param name="voxel_size"      type="double" value="$(arg scan_cloud_assembling_voxel_size)"/>
+      <param name="range_min"       type="double" value="$(arg scan_cloud_assembling_range_min)"/>
+      <param name="range_max"       type="double" value="$(arg scan_cloud_assembling_range_max)"/>
       <param name="noise_radius"        type="double" value="$(arg scan_cloud_assembling_noise_radius)"/>
       <param name="noise_min_neighbors" type="int"    value="$(arg scan_cloud_assembling_noise_min_neighbors)"/>
     </node>
@@ -331,7 +337,7 @@
       <param name="approx_sync"          type="bool"   value="$(eval approx_sync and not use_odom_features)"/>
       <param name="config_path"          type="string" value="$(arg cfg)"/>
       <param name="queue_size"           type="int" value="$(arg queue_size)"/>
-      <param name="scan_cloud_max_points"     type="int" value="$(arg scan_cloud_max_points)"/>
+      <param if="$(eval not scan_cloud_filtered and not scan_cloud_assembling)" name="scan_cloud_max_points" type="int" value="$(arg scan_cloud_max_points)"/>
       <param name="landmark_linear_variance"   type="double" value="$(arg tag_linear_variance)"/>
       <param name="landmark_angular_variance"  type="double" value="$(arg tag_angular_variance)"/> 
       <param name="gen_depth"                  type="bool"   value="$(arg gen_depth)" />
