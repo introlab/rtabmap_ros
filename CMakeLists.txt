@@ -46,6 +46,13 @@ IF(WIN32)
 add_compile_options(-bigobj)
 ENDIF(WIN32)
 
+# kinetic issue, rtabmap now requires at least c++11
+include(CheckCXXCompilerFlag)
+CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
+IF(COMPILER_SUPPORTS_CXX11)
+  set(CMAKE_CXX_STANDARD 11)
+ENDIF(COMPILER_SUPPORTS_CXX11)
+
 option(RTABMAP_SYNC_MULTI_RGBD "Build with multi RGBD camera synchronization support"  OFF)
 option(RTABMAP_SYNC_USER_DATA "Build with input user data support"  OFF)
 MESSAGE(STATUS "RTABMAP_SYNC_MULTI_RGBD = ${RTABMAP_SYNC_MULTI_RGBD}")
