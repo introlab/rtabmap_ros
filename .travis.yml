@@ -6,17 +6,17 @@ compiler:
 
 matrix:
   include:
-    - dist: bionic
+    - dist: focal
       install:
         - sudo apt update && sudo apt install curl gnupg2 lsb-release 
         - curl -s https://raw.githubusercontent.com/ros/rosdistro/master/ros.asc | sudo apt-key add -
         - sudo sh -c 'echo "deb [arch=amd64,arm64] http://packages.ros.org/ros2/ubuntu `lsb_release -cs` main" > /etc/apt/sources.list.d/ros2-latest.list'
         - sudo apt update
-        - sudo apt-get -y install ros-eloquent-desktop ros-eloquent-message-filters ros-eloquent-image-transport ros-eloquent-pcl-conversions python3-colcon-common-extensions
+        - sudo apt-get -y install ros-foxy-desktop ros-foxy-message-filters ros-foxy-image-transport ros-foxy-pcl-conversions python3-colcon-common-extensions
 
       script: 
         - pwd
-        - source /opt/ros/eloquent/setup.bash
+        - source /opt/ros/foxy/setup.bash
         - cd ..
         - mkdir -p ros2_ws/src
         - cd ros2_ws
