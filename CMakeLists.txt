@@ -47,11 +47,17 @@ add_compile_options(-bigobj)
 ENDIF(WIN32)
 
 # kinetic issue, rtabmap now requires at least c++11
+if("$ENV{ROS_DISTRO}" STREQUAL "kinetic")
 include(CheckCXXCompilerFlag)
+CHECK_CXX_COMPILER_FLAG("-std=c++14" COMPILER_SUPPORTS_CXX14)
 CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
-IF(COMPILER_SUPPORTS_CXX11)
+IF(COMPILER_SUPPORTS_CXX14)
+  set(CMAKE_CXX_STANDARD 14)
+ELSEIF(COMPILER_SUPPORTS_CXX11)
   set(CMAKE_CXX_STANDARD 11)
-ENDIF(COMPILER_SUPPORTS_CXX11)
+ENDIF()
+endif()
+
 
 option(RTABMAP_SYNC_MULTI_RGBD "Build with multi RGBD camera synchronization support"  OFF)
 option(RTABMAP_SYNC_USER_DATA "Build with input user data support"  OFF)
