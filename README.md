@@ -1,4 +1,4 @@
-rtabmap_ros [![Build Status](https://travis-ci.com/introlab/rtabmap_ros.svg?branch=master)](https://travis-ci.com/introlab/rtabmap_ros)
+rtabmap_ros [![Build Status](https://github.com/introlab/rtabmap_ros/actions/workflows/cmake.yml/badge.svg)](https://github.com/introlab/rtabmap_ros/actions/workflows/cmake.yml)
 ===========
 
 RTAB-Map's ROS package.
