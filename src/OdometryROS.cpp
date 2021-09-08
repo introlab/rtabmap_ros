@@ -96,14 +96,6 @@ OdometryROS::~OdometryROS()
 		warningThread_->join();
 		delete warningThread_;
 	}
-	ros::NodeHandle & pnh = getPrivateNodeHandle();
-	if(pnh.ok())
-	{
-		for(ParametersMap::iterator iter=parameters_.begin(); iter!=parameters_.end(); ++iter)
-		{
-			pnh.deleteParam(iter->first);
-		}
-	}
 
 	delete odometry_;
 }
@@ -330,6 +322,12 @@ void OdometryROS::onInit()
 				}
 			}
 		}
+	}
+
+	// set private parameters
+	for(ParametersMap::iterator iter=parameters_.begin(); iter!=parameters_.end(); ++iter)
+	{
+		pnh.setParam(iter->first, iter->second);
 	}
 
 	Parameters::parse(parameters_, Parameters::kOdomResetCountdown(), resetCountdown_);

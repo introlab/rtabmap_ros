@@ -41,8 +41,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace rtabmap;
 
-PreferencesDialogROS::PreferencesDialogROS(const QString & configFile) :
-		configFile_(configFile)
+PreferencesDialogROS::PreferencesDialogROS(const QString & configFile, const std::string & rtabmapNodeName) :
+		configFile_(configFile),
+		rtabmapNodeName_(rtabmapNodeName)
 {
 
 }
@@ -84,7 +85,7 @@ bool PreferencesDialogROS::readCoreSettings(const QString & filePath)
 		path = filePath;
 	}
 
-	ros::NodeHandle nh;
+	ros::NodeHandle rnh(rtabmapNodeName_);
 	ROS_INFO("rtabmapviz: %s", this->getParamMessage().toStdString().c_str());
 	bool validParameters = true;
 	int readCount = 0;
@@ -108,7 +109,7 @@ bool PreferencesDialogROS::readCoreSettings(const QString & filePath)
 		double stamp = UTimer::now();
 		std::string tmp;
 		bool warned = false;
-		while(!nh.getParam(Parameters::kRtabmapDetectionRate(),tmp) && UTimer::now()-stamp < 5.0)
+		while(!rnh.getParam(Parameters::kRtabmapDetectionRate(),tmp) && UTimer::now()-stamp < 5.0)
 		{
 			if(!warned)
 			{
@@ -146,7 +147,7 @@ bool PreferencesDialogROS::readCoreSettings(const QString & filePath)
 		else
 		{
 			std::string value;
-			if(nh.getParam(i->first,value))
+			if(rnh.getParam(i->first,value))
 			{
 				//backward compatibility
 				if(i->first.compare(Parameters::kIcpStrategy()) == 0)

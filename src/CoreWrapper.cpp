@@ -610,6 +610,7 @@ void CoreWrapper::onInit()
 		Parameters::parse(parameters_, Parameters::kRegForce3DoF(), twoDMapping_);
 	}
 
+	pnh.param("is_rtabmap_paused", paused_);
 	if(paused_)
 	{
 		NODELET_WARN("Node paused... don't forget to call service \"resume\" to start rtabmap.");
@@ -801,11 +802,10 @@ void CoreWrapper::onInit()
 		}
 	}
 
-	// set public parameters
-	nh.setParam("is_rtabmap_paused", paused_);
+	// set private parameters
 	for(ParametersMap::iterator iter=parameters_.begin(); iter!=parameters_.end(); ++iter)
 	{
-		nh.setParam(iter->first, iter->second);
+		pnh.setParam(iter->first, iter->second);
 	}
 
 	userDataAsyncSub_ = nh.subscribe("user_data_async", 1, &CoreWrapper::userDataAsyncCallback, this);
@@ -827,13 +827,6 @@ CoreWrapper::~CoreWrapper()
 	}
 
 	this->saveParameters(configPath_);
-
-	ros::NodeHandle nh;
-	for(ParametersMap::iterator iter=parameters_.begin(); iter!=parameters_.end(); ++iter)
-	{
-		nh.deleteParam(iter->first);
-	}
-	nh.deleteParam("is_rtabmap_paused");
 
 	printf("rtabmap: Saving database/long-term memory... (located at %s)\n", databasePath_.c_str());
 	if(rtabmap_.getMemory())
@@ -2719,29 +2712,29 @@ void CoreWrapper::goalNodeCallback(const rtabmap_ros::GoalConstPtr & msg)
 
 bool CoreWrapper::updateRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
-	ros::NodeHandle nh;
+	ros::NodeHandle pnh("~");
 	for(rtabmap::ParametersMap::iterator iter=parameters_.begin(); iter!=parameters_.end(); ++iter)
 	{
 		std::string vStr;
 		bool vBool;
 		int vInt;
 		double vDouble;
-		if(nh.getParam(iter->first, vStr))
+		if(pnh.getParam(iter->first, vStr))
 		{
 			NODELET_INFO("Setting RTAB-Map parameter \"%s\"=\"%s\"", iter->first.c_str(), vStr.c_str());
 			iter->second = vStr;
 		}
-		else if(nh.getParam(iter->first, vBool))
+		else if(pnh.getParam(iter->first, vBool))
 		{
 			NODELET_INFO("Setting RTAB-Map parameter \"%s\"=\"%s\"", iter->first.c_str(), uBool2Str(vBool).c_str());
 			iter->second = uBool2Str(vBool);
 		}
-		else if(nh.getParam(iter->first, vInt))
+		else if(pnh.getParam(iter->first, vInt))
 		{
 			NODELET_INFO("Setting RTAB-Map parameter \"%s\"=\"%s\"", iter->first.c_str(), uNumber2Str(vInt).c_str());
 			iter->second = uNumber2Str(vInt).c_str();
 		}
-		else if(nh.getParam(iter->first, vDouble))
+		else if(pnh.getParam(iter->first, vDouble))
 		{
 			NODELET_INFO("Setting RTAB-Map parameter \"%s\"=\"%s\"", iter->first.c_str(), uNumber2Str(vDouble).c_str());
 			iter->second = uNumber2Str(vDouble).c_str();
@@ -2822,8 +2815,8 @@ bool CoreWrapper::pauseRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empt
 	{
 		paused_ = true;
 		NODELET_INFO("rtabmap: paused!");
-		ros::NodeHandle nh;
-		nh.setParam("is_rtabmap_paused", true);
+		ros::NodeHandle pnh("~");
+		pnh.setParam("is_rtabmap_paused", true);
 	}
 	return true;
 }
@@ -2838,8 +2831,8 @@ bool CoreWrapper::resumeRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Emp
 	{
 		paused_ = false;
 		NODELET_INFO("rtabmap: resumed!");
-		ros::NodeHandle nh;
-		nh.setParam("is_rtabmap_paused", false);
+		ros::NodeHandle pnh("~");
+		pnh.setParam("is_rtabmap_paused", false);
 	}
 	return true;
 }

@@ -51,6 +51,7 @@
   <arg name="gdb"                     default="false"/>         <!-- Launch nodes in gdb for debugging (apt install xterm gdb) -->
   <arg     if="$(arg gdb)" name="launch_prefix" default="xterm -e gdb -q -ex run --args"/>
   <arg unless="$(arg gdb)" name="launch_prefix" default=""/>
+  <arg name="clear_params"            default="true"/>
   <arg name="output"                  default="screen"/>        <!-- Control node output (screen or log) -->
   <arg name="publish_tf_map"          default="true"/>
 
@@ -162,7 +163,7 @@
       <group if="$(arg rgbd_sync)">
         <node if="$(arg compressed)" name="republish_rgb" type="republish" pkg="image_transport" args="$(arg rgb_image_transport) in:=$(arg rgb_topic) raw out:=$(arg rgb_topic_relay)" />
         <node if="$(arg compressed)" name="republish_depth" type="republish" pkg="image_transport" args="$(arg depth_image_transport) in:=$(arg depth_topic) raw out:=$(arg depth_topic_relay)" />
-        <node pkg="nodelet" type="nodelet" name="rgbd_sync" args="standalone rtabmap_ros/rgbd_sync" output="$(arg output)">
+        <node pkg="nodelet" type="nodelet" name="rgbd_sync" args="standalone rtabmap_ros/rgbd_sync" clear_params="$(arg clear_params)" output="$(arg output)">
           <remap from="rgb/image"       to="$(arg rgb_topic_relay)"/>
           <remap from="depth/image"     to="$(arg depth_topic_relay)"/>
           <remap from="rgb/camera_info" to="$(arg camera_info_topic)"/>
@@ -182,7 +183,7 @@
       <group if="$(arg rgbd_sync)">
         <node if="$(arg compressed)" name="republish_left"  type="republish" pkg="image_transport" args="$(arg rgb_image_transport) in:=$(arg left_image_topic) raw out:=$(arg left_image_topic_relay)" />
         <node if="$(arg compressed)" name="republish_right" type="republish" pkg="image_transport" args="$(arg rgb_image_transport) in:=$(arg right_image_topic) raw out:=$(arg right_image_topic_relay)" />
-        <node pkg="nodelet" type="nodelet" name="stereo_sync" args="standalone rtabmap_ros/stereo_sync" output="$(arg output)">
+        <node pkg="nodelet" type="nodelet" name="stereo_sync" args="standalone rtabmap_ros/stereo_sync" clear_params="$(arg clear_params)" output="$(arg output)">
           <remap from="left/image_rect"   to="$(arg left_image_topic_relay)"/>
           <remap from="right/image_rect"  to="$(arg right_image_topic_relay)"/>
           <remap from="left/camera_info"  to="$(arg left_camera_info_topic)"/>
@@ -196,7 +197,7 @@
     
     <group unless="$(arg rgbd_sync)">
        <group if="$(arg subscribe_rgbd)">
-         <node name="republish_rgbd_image"  type="rgbd_relay" pkg="rtabmap_ros">
+         <node name="republish_rgbd_image"  type="rgbd_relay" pkg="rtabmap_ros" clear_params="$(arg clear_params)">
            <remap     if="$(arg compressed)" from="rgbd_image" to="$(arg rgbd_topic)/compressed"/>
            <remap     if="$(arg compressed)" from="$(arg rgbd_topic)/compressed_relay" to="$(arg rgbd_topic_relay)"/>
            <remap unless="$(arg compressed)" from="rgbd_image" to="$(arg rgbd_topic)"/>
@@ -210,7 +211,7 @@
       <group if="$(arg visual_odometry)">
       
         <!-- RGB-D Odometry -->
-        <node unless="$(arg stereo)" pkg="rtabmap_ros" type="rgbd_odometry" name="rgbd_odometry" output="$(arg output)" args="$(arg rtabmap_args) $(arg odom_args)" launch-prefix="$(arg launch_prefix)">
+        <node unless="$(arg stereo)" pkg="rtabmap_ros" type="rgbd_odometry" name="rgbd_odometry" clear_params="$(arg clear_params)" output="$(arg output)" args="$(arg rtabmap_args) $(arg odom_args)" launch-prefix="$(arg launch_prefix)">
           <remap from="rgb/image"       to="$(arg rgb_topic_relay)"/>
           <remap from="depth/image"     to="$(arg depth_topic_relay)"/>
           <remap from="rgb/camera_info" to="$(arg camera_info_topic)"/>
@@ -238,7 +239,7 @@
         </node>
 
         <!-- Stereo Odometry -->
-        <node if="$(arg stereo)" pkg="rtabmap_ros" type="stereo_odometry" name="stereo_odometry" output="$(arg output)" args="$(arg rtabmap_args) $(arg odom_args)" launch-prefix="$(arg launch_prefix)">
+        <node if="$(arg stereo)" pkg="rtabmap_ros" type="stereo_odometry" name="stereo_odometry" clear_params="$(arg clear_params)" output="$(arg output)" args="$(arg rtabmap_args) $(arg odom_args)" launch-prefix="$(arg launch_prefix)">
           <remap from="left/image_rect"        to="$(arg left_image_topic_relay)"/>
           <remap from="right/image_rect"       to="$(arg right_image_topic_relay)"/>
           <remap from="left/camera_info"       to="$(arg left_camera_info_topic)"/>
@@ -269,7 +270,7 @@
     </group>
     
     <!-- ICP Odometry -->
-    <node if="$(arg icp_odometry)" pkg="rtabmap_ros" type="icp_odometry" name="icp_odometry" output="$(arg output)" args="$(arg rtabmap_args) $(arg odom_args)" launch-prefix="$(arg launch_prefix)">
+    <node if="$(arg icp_odometry)" pkg="rtabmap_ros" type="icp_odometry" name="icp_odometry" clear_params="$(arg clear_params)" output="$(arg output)" args="$(arg rtabmap_args) $(arg odom_args)" launch-prefix="$(arg launch_prefix)">
       <remap from="scan"                   to="$(arg scan_topic)"/>
       <remap from="scan_cloud"             to="$(arg scan_cloud_topic)"/>
       <remap from="odom"                   to="$(arg odom_topic)"/>
@@ -292,7 +293,7 @@
       <param name="max_update_rate"             type="double" value="$(arg odom_max_rate)"/>
     </node>
     
-    <node if="$(arg scan_cloud_assembling)" pkg="rtabmap_ros" type="point_cloud_assembler" name="point_cloud_assembler" output="$(arg output)">
+    <node if="$(arg scan_cloud_assembling)" pkg="rtabmap_ros" type="point_cloud_assembler" name="point_cloud_assembler" clear_params="$(arg clear_params)" output="$(arg output)">
       <remap     if="$(arg scan_cloud_filtered)" from="cloud" to="odom_filtered_input_scan"/>
       <remap unless="$(arg scan_cloud_filtered)" from="cloud" to="$(arg scan_cloud_topic)"/>
 
@@ -309,7 +310,7 @@
   
     <!-- Visual SLAM (robot side) -->
     <!-- args: "delete_db_on_start" and "udebug" -->
-    <node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="$(arg output)" args="$(arg rtabmap_args)" launch-prefix="$(arg launch_prefix)">
+    <node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" clear_params="$(arg clear_params)" output="$(arg output)" args="$(arg rtabmap_args)" launch-prefix="$(arg launch_prefix)">
       <param     if="$(arg stereo)" name="subscribe_depth"  type="bool" value="false"/>
       <param unless="$(arg stereo)" name="subscribe_depth"  type="bool" value="$(arg depth)"/>
       <param name="subscribe_rgb"        type="bool"   value="$(arg subscribe_rgb)"/>
@@ -377,7 +378,7 @@
     </node>
   
     <!-- Visualisation RTAB-Map -->
-    <node if="$(arg rtabmapviz)" pkg="rtabmap_ros" type="rtabmapviz" name="rtabmapviz" args="-d $(arg gui_cfg)" output="$(arg output)" launch-prefix="$(arg launch_prefix)">
+    <node if="$(arg rtabmapviz)" pkg="rtabmap_ros" type="rtabmapviz" name="rtabmapviz" args="-d $(arg gui_cfg)" clear_params="$(arg clear_params)" output="$(arg output)" launch-prefix="$(arg launch_prefix)">
       <param     if="$(arg stereo)" name="subscribe_depth"  type="bool" value="false"/>
       <param unless="$(arg stereo)" name="subscribe_depth"  type="bool" value="$(arg depth)"/>
       <param name="subscribe_rgb"        type="bool"   value="$(arg subscribe_rgb)"/>
@@ -418,7 +419,7 @@
   
   <!-- Visualization RVIZ -->
   <node if="$(arg rviz)" pkg="rviz" type="rviz" name="rviz" args="-d $(arg rviz_cfg)"/>
-  <node if="$(arg rviz)" pkg="nodelet" type="nodelet" name="points_xyzrgb" args="standalone rtabmap_ros/point_cloud_xyzrgb" output="$(arg output)">
+  <node if="$(arg rviz)" pkg="nodelet" type="nodelet" name="points_xyzrgb" args="standalone rtabmap_ros/point_cloud_xyzrgb" clear_params="$(arg clear_params)" output="$(arg output)">
     <remap if="$(arg stereo)" from="left/image"        to="$(arg left_image_topic_relay)"/>
     <remap if="$(arg stereo)" from="right/image"       to="$(arg right_image_topic_relay)"/>
     <remap if="$(arg stereo)" from="left/camera_info"  to="$(arg left_camera_info_topic)"/>
