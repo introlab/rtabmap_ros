@@ -40,20 +40,21 @@ jobs:
         
     - uses: actions/checkout@v2
       with:
-        path: 'catkin_ws/src/rtabmap_ros'
-        
-    - uses: actions/checkout@v2
-      with:
         repository: 'introlab/rtabmap'
         path: 'rtabmap'
         
     - name: Setup catkin workspace
       run: | 
         source /opt/ros/${{ matrix.ros_distro }}/setup.bash
+        mkdir -p ${{github.workspace}}/catkin_ws/src
         cd ${{github.workspace}}/catkin_ws/src
         catkin_init_workspace
         cd ..
         catkin_make
+        
+    - uses: actions/checkout@v2
+      with:
+        path: 'catkin_ws/src/rtabmap_ros'
         
     - name: Build latest rtabmap library
       run: |
