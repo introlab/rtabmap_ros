@@ -60,7 +60,7 @@ jobs:
       run: |
         source /opt/ros/${{ matrix.ros_distro }}/setup.bash
         cd ${{github.workspace}}/rtabmap
-        cmake -B $build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_INSTALL_PREFIX=${{github.workspace}}/catkin_ws/devel
+        cmake -B build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_INSTALL_PREFIX=${{github.workspace}}/catkin_ws/devel
         cmake --build build --config ${{env.BUILD_TYPE}} --target install
 
     - name: caktkin_make CMake
