@@ -1,0 +1,24 @@
+#  Cleanup local grids service
+# 
+#     Clear empty space from local occupancy grids 
+#     (and laser scans) based on the current optimized global 2d grid map.
+#     If the map needs to be regenerated in the future (e.g., when
+#     we re-use the map in SLAM mode), removed obstacles won't reappear.
+#     Use this with care and only when you know that the map doesn't have errors, 
+#     otherwise some real obstacles/walls may be cleared if there is too much 
+#     drift in the map.
+#
+
+# Radius in cells around empty cell without obstacles to clear underlying obstacles, default 1 cell if not set.
+int32 radius
+
+# Filter also the scans, default false if not set.
+# The filtered laser scans will be used for localization,
+# so if dynamic obstacles have been removed, localization won't try to
+# match them anymore. Filtering the laser scans cannot be reverted, 
+# but grids can (see DatabaseViewer->Edit menu).
+bool filter_scans
+
+---
+# return the number of grids or scans modified, -1 if there is an error
+int32 modified

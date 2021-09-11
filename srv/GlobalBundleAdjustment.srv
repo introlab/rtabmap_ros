@@ -1,0 +1,22 @@
+# Global Bundle Adjustment service
+#
+#       Perform global bundle adjustment. Note that as soon as the map 
+#       is modified again, the graph is re-optimized the standard way (without SBA).
+#       It then makes only sense to use this after a mapping run (and after a call 
+#       to /rtabmap/pause) when you know that the robot will restart in localization 
+#       mode the next time, or at the beginning of the localization session.
+#
+
+# Optimizer type (0=g2o, 1=CVSBA), default 0
+int32 type
+
+# Iterations,        default 0 (use Optimizer/Iterations already loaded in the node)
+int32 iterations
+
+# Pixel variance,    default 0 (use g2o/PixelVariance already loaded in the node)
+float32 pixel_variance
+
+# Use vocabulary matches, default false (rematch all features between frames)
+bool voc_matches
+---
+# return false if failure

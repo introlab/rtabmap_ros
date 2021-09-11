@@ -60,6 +60,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/DBDriver.h>
 #include <rtabmap/core/Registration.h>
 #include <rtabmap/core/Graph.h>
+#include <rtabmap/core/Optimizer.h>
 
 #ifdef WITH_OCTOMAP_MSGS
 #ifdef RTABMAP_OCTOMAP
@@ -610,7 +611,7 @@ void CoreWrapper::onInit()
 		Parameters::parse(parameters_, Parameters::kRegForce3DoF(), twoDMapping_);
 	}
 
-	pnh.param("is_rtabmap_paused", paused_);
+	paused_ = pnh.param("is_rtabmap_paused", paused_);
 	if(paused_)
 	{
 		NODELET_WARN("Node paused... don't forget to call service \"resume\" to start rtabmap.");
@@ -640,7 +641,7 @@ void CoreWrapper::onInit()
 
 	if(rtabmap_.getMemory())
 	{
-		if(useSavedMap_ && !rtabmap_.getMemory()->isIncremental())
+		if(useSavedMap_)
 		{
 			float xMin, yMin, gridCellSize;
 			cv::Mat map = rtabmap_.getMemory()->load2DMap(xMin, yMin, gridCellSize);
@@ -681,6 +682,9 @@ void CoreWrapper::onInit()
 	loadDatabaseSrv_ = nh.advertiseService("load_database", &CoreWrapper::loadDatabaseCallback, this);
 	triggerNewMapSrv_ = nh.advertiseService("trigger_new_map", &CoreWrapper::triggerNewMapCallback, this);
 	backupDatabase_ = nh.advertiseService("backup", &CoreWrapper::backupDatabaseCallback, this);
+	detectMoreLoopClosuresSrv_ = nh.advertiseService("detect_more_loop_closures", &CoreWrapper::detectMoreLoopClosuresCallback, this);
+	globalBundleAdjustmentSrv_ = nh.advertiseService("global_bundle_adjustment", &CoreWrapper::globalBundleAdjustmentCallback, this);
+	cleanupLocalGridsSrv_ = nh.advertiseService("cleanup_local_grids", &CoreWrapper::cleanupLocalGridsCallback, this);
 	setModeLocalizationSrv_ = nh.advertiseService("set_mode_localization", &CoreWrapper::setModeLocalizationCallback, this);
 	setModeMappingSrv_ = nh.advertiseService("set_mode_mapping", &CoreWrapper::setModeMappingCallback, this);
 	getNodeDataSrv_ = nh.advertiseService("get_node_data", &CoreWrapper::getNodeDataCallback, this);
@@ -3015,6 +3019,207 @@ bool CoreWrapper::backupDatabaseCallback(std_srvs::Empty::Request&, std_srvs::Em
 	NODELET_INFO("Backup: Reloading memory... done!");
 
 	return true;
+}
+
+void CoreWrapper::republishMaps()
+{
+	ros::Time stamp = ros::Time::now();
+	mapsManager_.publishMaps(rtabmap_.getLocalOptimizedPoses(), stamp, mapFrameId_);
+
+	if(mapDataPub_.getNumSubscribers())
+	{
+		rtabmap_ros::MapDataPtr msg(new rtabmap_ros::MapData);
+		msg->header.stamp = stamp;
+		msg->header.frame_id = mapFrameId_;
+
+		rtabmap_ros::mapDataToROS(
+			rtabmap_.getLocalOptimizedPoses(),
+			rtabmap_.getLocalConstraints(),
+			std::map<int, Signature>(),
+			rtabmap_.getMapCorrection(),
+			*msg);
+
+		mapDataPub_.publish(msg);
+	}
+
+	if(mapGraphPub_.getNumSubscribers())
+	{
+		rtabmap_ros::MapGraphPtr msg(new rtabmap_ros::MapGraph);
+		msg->header.stamp = stamp;
+		msg->header.frame_id = mapFrameId_;
+
+		rtabmap_ros::mapGraphToROS(
+		rtabmap_.getLocalOptimizedPoses(),
+		rtabmap_.getLocalConstraints(),
+		rtabmap_.getMapCorrection(),
+		*msg);
+
+		mapGraphPub_.publish(msg);
+	}
+}
+
+bool CoreWrapper::detectMoreLoopClosuresCallback(rtabmap_ros::DetectMoreLoopClosures::Request& req, rtabmap_ros::DetectMoreLoopClosures::Response& res)
+{
+	NODELET_WARN("Detect more loop closures service called");
+
+	UTimer timer;
+	float clusterRadiusMax = 1;
+	float clusterRadiusMin = 0;
+	float clusterAngle = 0;
+	int iterations = 1;
+	bool intraSession = true;
+	bool interSession = true;
+	if(req.cluster_radius_max > 0.0f)
+	{
+		clusterRadiusMax = req.cluster_radius_max;
+	}
+	if(req.cluster_radius_min >= 0.0f)
+	{
+		clusterRadiusMin = req.cluster_radius_min;
+	}
+	if(req.cluster_angle >= 0.0f)
+	{
+		clusterAngle = req.cluster_angle;
+	}
+	if(req.iterations >= 1.0f)
+	{
+		iterations = (int)req.iterations;
+	}
+	if(req.intra_only)
+	{
+		interSession = false;
+	}
+	else if(req.inter_only)
+	{
+		intraSession = false;
+	}
+	NODELET_WARN("Post-Processing service called: Detecting more loop closures "
+			"(max radius=%f, min radius=%f, angle=%f, iterations=%d, intra=%s, inter=%s)...",
+			clusterRadiusMax,
+			clusterRadiusMin,
+			clusterAngle,
+			iterations,
+			intraSession?"true":"false",
+			interSession?"true":"false");
+	res.detected = rtabmap_.detectMoreLoopClosures(
+			clusterRadiusMax,
+			clusterAngle*M_PI/180.0,
+			iterations,
+			intraSession,
+			interSession,
+			0,
+			clusterRadiusMin);
+	if(res.detected<0)
+	{
+		NODELET_ERROR("Post-Processing: Detecting more loop closures failed!");
+	}
+	else
+	{
+		NODELET_WARN("Post-Processing: Detected %d loop closures! (%fs)", res.detected, timer.ticks());
+
+		if(res.detected>0)
+		{
+			republishMaps();
+		}
+		return true;
+	}
+	return false;
+}
+
+bool CoreWrapper::cleanupLocalGridsCallback(rtabmap_ros::CleanupLocalGrids::Request& req, rtabmap_ros::CleanupLocalGrids::Response& res)
+{
+	NODELET_WARN("Cleanup local grids service called");
+	UTimer timer;
+	int radius = 1;
+	bool filterScans = false;
+	if(req.radius > 1.0f)
+	{
+		radius = (int)req.radius;
+	}
+	filterScans = req.filter_scans;
+	float xMin, yMin, gridCellSize;
+	cv::Mat map = mapsManager_.getGridMap(xMin, yMin, gridCellSize);
+	if(map.empty())
+	{
+		NODELET_ERROR("Post-Processing: Cleanup local grids failed! There is no optimized map.");
+		return false;
+	}
+	std::map<int, Transform> poses = rtabmap_.getLocalOptimizedPoses();
+	NODELET_WARN("Post-Processing: Cleanup local grids... (radius=%d, filter scans=%s)",
+			radius,
+			filterScans?"true":"false");
+	res.modified = rtabmap_.cleanupLocalGrids(poses, map, xMin, yMin, gridCellSize, radius, filterScans);
+	if(res.modified<0)
+	{
+		NODELET_ERROR("Post-Processing: Cleanup local grids failed!");
+	}
+	else
+	{
+		if(filterScans)
+		{
+			NODELET_WARN("Post-Processing: %d grids and scans modified! (%fs)", res.modified, timer.ticks());
+		}
+		else
+		{
+			NODELET_WARN("Post-Processing: %d grids modified! (%fs)", res.modified, timer.ticks());
+		}
+		if(res.modified > 0)
+		{
+			// We should update MapsManager's cache with the modifications
+			mapsManager_.clear();
+			mapsManager_.set2DMap(map, xMin, yMin, gridCellSize, rtabmap_.getLocalOptimizedPoses(), rtabmap_.getMemory());
+
+			republishMaps();
+		}
+		return true;
+	}
+
+	return false;
+}
+bool CoreWrapper::globalBundleAdjustmentCallback(rtabmap_ros::GlobalBundleAdjustment::Request& req, rtabmap_ros::GlobalBundleAdjustment::Response& res)
+{
+	NODELET_WARN("Global bundle adjustment service called");
+
+	UTimer timer;
+	int optimizer = (int)Optimizer::kTypeG2O; // g2o
+	int iterations = Parameters::defaultOptimizerIterations();
+	float pixelVariance = Parameters::defaultg2oPixelVariance();
+	bool rematchFeatures = true;
+	Parameters::parse(parameters_, Parameters::kOptimizerIterations(), iterations);
+	Parameters::parse(parameters_, Parameters::kg2oPixelVariance(), pixelVariance);
+	if(req.type == 1.0f)
+	{
+		optimizer = (int)Optimizer::kTypeCVSBA;
+	}
+	if(req.iterations >= 1.0f)
+	{
+		iterations = req.iterations;
+	}
+	if(req.pixel_variance > 0.0f)
+	{
+		pixelVariance = req.pixel_variance;
+	}
+	rematchFeatures = !req.voc_matches;
+
+	NODELET_WARN("Post-Processing: Global Bundle Adjustment... "
+			"(Optimizer=%s, iterations=%d, pixel variance=%f, rematch=%s)...",
+			optimizer==Optimizer::kTypeG2O?"g2o":"cvsba",
+			iterations,
+			pixelVariance,
+			rematchFeatures?"true":"false");
+	bool success = rtabmap_.globalBundleAdjustment((Optimizer::Type)optimizer, iterations, pixelVariance, rematchFeatures);
+	if(!success)
+	{
+		NODELET_ERROR("Post-Processing: Global Bundle Adjustment failed!");
+	}
+	else
+	{
+		NODELET_WARN("Post-Processing: Global Bundle Adjustment... done! (%fs)", timer.ticks());
+		republishMaps();
+		return true;
+	}
+
+	return false;
 }
 
 bool CoreWrapper::setModeLocalizationCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)

@@ -63,6 +63,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtabmap_ros/AddLink.h"
 #include "rtabmap_ros/GetNodesInRadius.h"
 #include "rtabmap_ros/LoadDatabase.h"
+#include "rtabmap_ros/DetectMoreLoopClosures.h"
+#include "rtabmap_ros/GlobalBundleAdjustment.h"
+#include "rtabmap_ros/CleanupLocalGrids.h"
 
 #include "MapsManager.h"
 
@@ -189,6 +192,8 @@ private:
 			const std::map<int, rtabmap::Transform> & nodes,
 			const rtabmap::Transform & currentPose);
 
+	void republishMaps();
+
 	bool updateRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool resetRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool pauseRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
@@ -196,6 +201,9 @@ private:
 	bool loadDatabaseCallback(rtabmap_ros::LoadDatabase::Request&, rtabmap_ros::LoadDatabase::Response&);
 	bool triggerNewMapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool backupDatabaseCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
+	bool detectMoreLoopClosuresCallback(rtabmap_ros::DetectMoreLoopClosures::Request&, rtabmap_ros::DetectMoreLoopClosures::Response&);
+	bool globalBundleAdjustmentCallback(rtabmap_ros::GlobalBundleAdjustment::Request&, rtabmap_ros::GlobalBundleAdjustment::Response&);
+	bool cleanupLocalGridsCallback(rtabmap_ros::CleanupLocalGrids::Request&, rtabmap_ros::CleanupLocalGrids::Response&);
 	bool setModeLocalizationCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool setModeMappingCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool setLogDebug(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
@@ -312,6 +320,9 @@ private:
 	ros::ServiceServer loadDatabaseSrv_;
 	ros::ServiceServer triggerNewMapSrv_;
 	ros::ServiceServer backupDatabase_;
+	ros::ServiceServer detectMoreLoopClosuresSrv_;
+	ros::ServiceServer globalBundleAdjustmentSrv_;
+	ros::ServiceServer cleanupLocalGridsSrv_;
 	ros::ServiceServer setModeLocalizationSrv_;
 	ros::ServiceServer setModeMappingSrv_;
 	ros::ServiceServer setLogDebugSrv_;

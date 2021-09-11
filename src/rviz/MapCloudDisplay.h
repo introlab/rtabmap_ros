@@ -119,6 +119,7 @@ public:
 	rviz::FloatProperty* cloud_filter_ceiling_height_;
 	rviz::FloatProperty* node_filtering_radius_;
 	rviz::FloatProperty* node_filtering_angle_;
+	rviz::StringProperty * download_namespace;
 	rviz::BoolProperty* download_map_;
 	rviz::BoolProperty* download_graph_;
 
@@ -145,6 +146,7 @@ protected:
 	virtual void processMessage( const rtabmap_ros::MapDataConstPtr& cloud );
 
 private:
+	void downloadMap(bool graphOnly);
 	void processMapData(const rtabmap_ros::MapData& map);
 
 	/**
