@@ -135,6 +135,7 @@ private Q_SLOTS:
 	void setXyzTransformerOptions( EnumProperty* prop );
 	void setColorTransformerOptions( EnumProperty* prop );
 	void updateCloudParameters();
+	void downloadNamespaceChanged();
 	void downloadMap();
 	void downloadGraph();
 
@@ -167,6 +168,7 @@ private:
 private:
 	ros::AsyncSpinner spinner_;
 	ros::CallbackQueue cbqueue_;
+	ros::Publisher republishNodeDataPub_;
 
 	std::map<int, CloudInfoPtr> cloud_infos_;
 
@@ -175,6 +177,7 @@ private:
 
 	std::map<int, rtabmap::Transform> current_map_;
 	boost::mutex current_map_mutex_;
+	bool current_map_updated_;
 
 	int lastCloudAdded_;
 
