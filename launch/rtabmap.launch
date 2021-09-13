@@ -84,10 +84,14 @@
   <arg name="compressed"              default="false"/>         <!-- If you want to subscribe to compressed image topics -->
   <arg name="rgb_image_transport"     default="compressed"/>    <!-- Common types: compressed, theora (see "rosrun image_transport list_transports") -->
   <arg name="depth_image_transport"   default="compressedDepth"/>  <!-- Depth compatible types: compressedDepth (see "rosrun image_transport list_transports") -->
+  
+  <arg name="gen_cloud"               default="false"/> <!-- only works with depth image and if not subscribing to scan_cloud topic-->
+  <arg name="gen_cloud_decimation"    default="4"/>
+  <arg name="gen_cloud_voxel"         default="0.05"/>
    
   <arg name="subscribe_scan"          default="false"/>
   <arg name="scan_topic"              default="/scan"/>
-  <arg name="subscribe_scan_cloud"    default="false"/>
+  <arg name="subscribe_scan_cloud"    default="$(arg gen_cloud)"/>
   <arg name="scan_cloud_topic"        default="/scan_cloud"/>
   <arg name="subscribe_scan_descriptor" default="false"/>
   <arg name="scan_descriptor_topic"   default="/scan_descriptor"/>
@@ -205,6 +209,16 @@
          </node>
       </group>
     </group>
+    
+    <node pkg="nodelet" type="nodelet" name="gen_cloud_from_depth" args="standalone rtabmap_ros/point_cloud_xyz" clear_params="$(arg clear_params)" output="$(arg output)">
+      <remap from="depth/image"       to="$(arg depth_topic_relay)"/>
+      <remap from="depth/camera_info" to="$(arg camera_info_topic)"/>
+      <remap from="cloud"             to="$(arg scan_cloud_topic)" />
+
+      <param name="decimation"  type="double" value="$(arg gen_cloud_decimation)"/>
+      <param name="voxel_size"  type="double" value="$(arg gen_cloud_voxel)"/>
+      <param name="approx_sync" type="bool"   value="false"/>
+    </node>
 
     <!-- Visual odometry -->
     <group unless="$(arg icp_odometry)">
