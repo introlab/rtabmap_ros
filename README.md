@@ -1,4 +1,4 @@
-rtabmap_ros [![Build Status](https://github.com/introlab/rtabmap_ros/actions/workflows/cmake.yml/badge.svg)](https://github.com/introlab/rtabmap_ros/actions/workflows/cmake.yml)
+rtabmap_ros [![Build Status](https://github.com/introlab/rtabmap_ros/actions/workflows/ros1.yml/badge.svg)](https://github.com/introlab/rtabmap_ros/actions/workflows/ros1.yml)
 ===========
 
 RTAB-Map's ROS package.
