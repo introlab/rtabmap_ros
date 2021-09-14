@@ -1,4 +1,4 @@
-name: CMake
+name: ros1
 
 on:
   push:
@@ -63,7 +63,7 @@ jobs:
         cmake -B build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_INSTALL_PREFIX=${{github.workspace}}/catkin_ws/devel
         cmake --build build --config ${{env.BUILD_TYPE}} --target install
 
-    - name: caktkin_make CMake
+    - name: caktkin_make
       run: |
         source /opt/ros/${{ matrix.ros_distro }}/setup.bash
         source ${{github.workspace}}/catkin_ws/devel/setup.bash
