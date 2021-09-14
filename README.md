@@ -1,4 +1,4 @@
-rtabmap_ros [![Build Status](https://travis-ci.com/introlab/rtabmap_ros.svg?branch=ros2)](https://travis-ci.com/introlab/rtabmap_ros)
+rtabmap_ros [![Build Status](https://github.com/introlab/rtabmap_ros/actions/workflows/ros2.yml/badge.svg)](https://github.com/introlab/rtabmap_ros/actions/workflows/ros2.yml)
 ===========
 
 RTAB-Map's ROS2 package (branch `ros2`). **UNDER CONSTRUCTION**: currently most nodes are ported to ROS2, however they are not all tested yet. The interface is the same than on ROS1 (parameters and topic names should still match ROS1 documentation on [rtabmap_ros](http://wiki.ros.org/rtabmap_ros)). See `launch/ros2` subfolder for some ROS2 examples with turtlebot3 in simulation (requires at least ROS2 Foxy).
