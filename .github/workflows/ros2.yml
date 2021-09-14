@@ -34,7 +34,7 @@ jobs:
         sudo apt-get -y install ros-${{ matrix.ros_distro }}-rtabmap
         sudo apt-get -y remove ros-${{ matrix.ros_distro }}-rtabmap
                 
-    - name: Setup catkin workspace
+    - name: Setup ros2 workspace
       run: | 
         source /opt/ros/${{ matrix.ros_distro }}/setup.bash
         mkdir -p ${{github.workspace}}/ros2_ws/src
@@ -54,4 +54,4 @@ jobs:
       run: |
         source /opt/ros/${{ matrix.ros_distro }}/setup.bash
         cd ${{github.workspace}}/ros2_ws
-        colcon build
+        colcon build --event-handlers console_direct+
