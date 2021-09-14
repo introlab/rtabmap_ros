@@ -210,7 +210,7 @@
       </group>
     </group>
     
-    <node pkg="nodelet" type="nodelet" name="gen_cloud_from_depth" args="standalone rtabmap_ros/point_cloud_xyz" clear_params="$(arg clear_params)" output="$(arg output)">
+    <node if="$(arg gen_cloud)" pkg="nodelet" type="nodelet" name="gen_cloud_from_depth" args="standalone rtabmap_ros/point_cloud_xyz" clear_params="$(arg clear_params)" output="$(arg output)">
       <remap from="depth/image"       to="$(arg depth_topic_relay)"/>
       <remap from="depth/camera_info" to="$(arg camera_info_topic)"/>
       <remap from="cloud"             to="$(arg scan_cloud_topic)" />
