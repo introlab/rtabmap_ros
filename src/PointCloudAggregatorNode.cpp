@@ -25,34 +25,18 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef PREFERENCESDIALOGROS_H_
-#define PREFERENCESDIALOGROS_H_
+#include "ros/ros.h"
+#include "nodelet/loader.h"
 
-#include <ros/ros.h>
-#include <rtabmap/gui/PreferencesDialog.h>
-
-using namespace rtabmap;
-
-class PreferencesDialogROS : public PreferencesDialog
+int main(int argc, char **argv)
 {
-public:
-	PreferencesDialogROS(const QString & configFile, const std::string & rtabmapNodeName);
-	virtual ~PreferencesDialogROS();
+	ros::init(argc, argv, "point_cloud_aggregator");
 
-	virtual QString getIniFilePath() const;
-	virtual QString getTmpIniFilePath() const;
-
-protected:
-	virtual QString getParamMessage();
-
-	virtual void readCameraSettings(const QString & filePath);
-	virtual bool readCoreSettings(const QString & filePath);
-	virtual void writeCameraSettings(const QString & filePath) const {}
-	virtual void writeCoreSettings(const QString & filePath) const;
-
-private:
-	QString configFile_;
-	std::string rtabmapNodeName_;
-};
-
-#endif /* PREFERENCESDIALOGROS_H_ */
+	nodelet::Loader nodelet;
+	nodelet::V_string nargv;
+	nodelet::M_string remap(ros::names::getRemappings());
+	std::string nodelet_name = ros::this_node::getName();
+	nodelet.load(nodelet_name, "rtabmap_ros/point_cloud_aggregator", remap, nargv);
+	ros::spin();
+	return 0;
+}

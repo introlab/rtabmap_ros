@@ -535,7 +535,7 @@ private:
 					"cloud is not dense, for convenience it will be set to %d (%dx%d)",
 					scanCloudMaxPoints_, cloudMsg.width, cloudMsg.height);
 		}
-		else if(cloudMsg.height > 1 && scanCloudMaxPoints_ != cloudMsg.height * cloudMsg.width)
+		else if(cloudMsg.height > 1 && scanCloudMaxPoints_ < cloudMsg.height * cloudMsg.width)
 		{
 			NODELET_WARN("IcpOdometry: \"scan_cloud_max_points\" is set to %d but input "
 					"cloud is not dense and has a size of %d (%dx%d), setting to this later size.",

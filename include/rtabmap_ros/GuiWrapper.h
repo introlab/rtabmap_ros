@@ -117,6 +117,7 @@ private:
 	rtabmap::MainWindow * mainWindow_;
 	std::string cameraNodeName_;
 	double lastOdomInfoUpdateTime_;
+	std::string rtabmapNodeName_;
 
 	// odometry subscription stuffs
 	std::string frameId_;

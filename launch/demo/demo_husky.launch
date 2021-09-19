@@ -82,11 +82,13 @@
     
     <!-- 2D LiDAR -->
     <arg name="subscribe_scan"  value="$(arg lidar2d)" />
-    <arg name="scan_topic"      value="/scan" />
+    <arg     if="$(arg lidar2d)" name="scan_topic"  value="/scan" />
+    <arg unless="$(arg lidar2d)" name="scan_topic"  value="/scan_not_used" />
     
     <!-- 3D LiDAR -->
     <arg name="subscribe_scan_cloud"  value="$(arg lidar3d)" />
-    <arg name="scan_cloud_topic"      value="/velodyne_points" />
+    <arg     if="$(arg lidar3d)" name="scan_cloud_topic" value="/velodyne_points" />
+    <arg unless="$(arg lidar3d)" name="scan_cloud_topic" value="/scan_cloud_not_used" />
     
     <!-- If camera is used -->
     <arg name="depth"             value="$(eval camera and not depth_from_lidar)" />

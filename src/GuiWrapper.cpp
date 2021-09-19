@@ -72,7 +72,8 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 		odomSensorSync_(false),
 		maxOdomUpdateRate_(10),
 		cameraNodeName_(""),
-		lastOdomInfoUpdateTime_(0)
+		lastOdomInfoUpdateTime_(0),
+		rtabmapNodeName_("rtabmap")
 {
 	ros::NodeHandle nh;
 	ros::NodeHandle pnh("~");
@@ -93,14 +94,18 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 
 	configFile.replace('~', QDir::homePath());
 
+	pnh.param("rtabmap", rtabmapNodeName_, rtabmapNodeName_);
+
 	ROS_INFO("rtabmapviz: Using configuration from \"%s\"", configFile.toStdString().c_str());
 	uSleep(500);
-	prefDialog_ = new PreferencesDialogROS(configFile);
+	prefDialog_ = new PreferencesDialogROS(configFile, rtabmapNodeName_);
 	mainWindow_ = new MainWindow(prefDialog_);
 	mainWindow_->setWindowTitle(mainWindow_->windowTitle()+" [ROS]");
 	mainWindow_->show();
+
 	bool paused = false;
-	nh.param("is_rtabmap_paused", paused, paused);
+	ros::NodeHandle rnh(rtabmapNodeName_);
+	rnh.param("is_rtabmap_paused", paused, paused);
 	mainWindow_->setMonitoringState(paused);
 
 	// To receive odometry events
@@ -249,13 +254,13 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 		const rtabmap::ParametersMap & defaultParameters = rtabmap::Parameters::getDefaultParameters();
 		rtabmap::ParametersMap parameters = ((rtabmap::ParamEvent *)anEvent)->getParameters();
 		bool modified = false;
-		ros::NodeHandle nh;
+		ros::NodeHandle rnh(rtabmapNodeName_);
 		for(rtabmap::ParametersMap::iterator i=parameters.begin(); i!=parameters.end(); ++i)
 		{
 			//save only parameters with valid names
 			if(defaultParameters.find((*i).first) != defaultParameters.end())
 			{
-				nh.setParam((*i).first, (*i).second);
+				rnh.setParam((*i).first, (*i).second);
 				modified = true;
 			}
 			else if((*i).first.find('/') != (*i).first.npos)

@@ -163,38 +163,43 @@ void toCvCopy(const rtabmap_ros::RGBDImage & image, cv_bridge::CvImagePtr & rgb,
 
 void toCvShare(const rtabmap_ros::RGBDImageConstPtr & image, cv_bridge::CvImageConstPtr & rgb, cv_bridge::CvImageConstPtr & depth)
 {
-	if(!image->rgb.data.empty())
+	toCvShare(*image, image, rgb, depth);
+}
+
+void toCvShare(const rtabmap_ros::RGBDImage & image, const boost::shared_ptr<void const>& trackedObject, cv_bridge::CvImageConstPtr & rgb, cv_bridge::CvImageConstPtr & depth)
+{
+	if(!image.rgb.data.empty())
 	{
-		rgb = cv_bridge::toCvShare(image->rgb, image);
+		rgb = cv_bridge::toCvShare(image.rgb, trackedObject);
 	}
-	else if(!image->rgb_compressed.data.empty())
+	else if(!image.rgb_compressed.data.empty())
 	{
 #ifdef CV_BRIDGE_HYDRO
 		ROS_ERROR("Unsupported compressed image copy, please upgrade at least to ROS Indigo to use this.");
 #else
-		rgb = cv_bridge::toCvCopy(image->rgb_compressed);
+		rgb = cv_bridge::toCvCopy(image.rgb_compressed);
 #endif
 	}
 
-	if(!image->depth.data.empty())
+	if(!image.depth.data.empty())
 	{
-		depth = cv_bridge::toCvShare(image->depth, image);
+		depth = cv_bridge::toCvShare(image.depth, trackedObject);
 	}
-	else if(!image->depth_compressed.data.empty())
+	else if(!image.depth_compressed.data.empty())
 	{
-		if(image->depth_compressed.format.compare("jpg")==0)
+		if(image.depth_compressed.format.compare("jpg")==0)
 		{
 #ifdef CV_BRIDGE_HYDRO
 			ROS_ERROR("Unsupported compressed image copy, please upgrade at least to ROS Indigo to use this.");
 #else
-			depth = cv_bridge::toCvCopy(image->depth_compressed);
+			depth = cv_bridge::toCvCopy(image.depth_compressed);
 #endif
 		}
 		else
 		{
 			cv_bridge::CvImagePtr ptr = boost::make_shared<cv_bridge::CvImage>();
-			ptr->header = image->depth_compressed.header;
-			ptr->image = rtabmap::uncompressImage(image->depth_compressed.data);
+			ptr->header = image.depth_compressed.header;
+			ptr->image = rtabmap::uncompressImage(image.depth_compressed.data);
 			ROS_ASSERT(ptr->image.empty() || ptr->image.type() == CV_32FC1 || ptr->image.type() == CV_16UC1);
 			ptr->encoding = ptr->image.empty()?"":ptr->image.type() == CV_32FC1?sensor_msgs::image_encodings::TYPE_32FC1:sensor_msgs::image_encodings::TYPE_16UC1;
 			depth = ptr;
@@ -802,6 +807,25 @@ rtabmap::CameraModel cameraModelFromROS(
 			D.at<double>(0,1) = camInfo.D[1];
 			D.at<double>(0,4) = camInfo.D[2];
 			D.at<double>(0,5) = camInfo.D[3];
+		}
+		else if(camInfo.D.size()>8)
+		{
+			bool zerosAfter8 = true;
+			for(size_t i=8; i<camInfo.D.size() && zerosAfter8; ++i)
+			{
+				if(camInfo.D[i] != 0.0)
+				{
+					zerosAfter8 = false;
+				}
+			}
+			static bool warned = false;
+			if(!zerosAfter8 && !warned)
+			{
+				ROS_WARN("Camera info conversion: Distortion model is larger than 8, coefficients after 8 are ignored. This message is only shown once.");
+				warned = true;
+			}
+			D = cv::Mat(1, 8, CV_64FC1);
+			memcpy(D.data, camInfo.D.data(), D.cols*sizeof(double));
 		}
 		else
 		{
@@ -1561,7 +1585,7 @@ void userDataToROS(const cv::Mat & data, rtabmap_ros::UserData & dataMsg, bool c
 }
 
 rtabmap::Landmarks landmarksFromROS(
-		const std::map<int, geometry_msgs::PoseWithCovarianceStamped> & tags,
+		const std::map<int, std::pair<geometry_msgs::PoseWithCovarianceStamped, float> > & tags,
 		const std::string & frameId,
 		const std::string & odomFrameId,
 		const ros::Time & odomStamp,
@@ -1572,7 +1596,7 @@ rtabmap::Landmarks landmarksFromROS(
 {
 	//tag detections
 	rtabmap::Landmarks landmarks;
-	for(std::map<int, geometry_msgs::PoseWithCovarianceStamped>::const_iterator iter=tags.begin(); iter!=tags.end(); ++iter)
+	for(std::map<int, std::pair<geometry_msgs::PoseWithCovarianceStamped, float> >::const_iterator iter=tags.begin(); iter!=tags.end(); ++iter)
 	{
 		if(iter->first <=0)
 		{
@@ -1581,19 +1605,19 @@ rtabmap::Landmarks landmarksFromROS(
 		}
 		rtabmap::Transform baseToCamera = rtabmap_ros::getTransform(
 				frameId,
-				iter->second.header.frame_id,
-				iter->second.header.stamp,
+				iter->second.first.header.frame_id,
+				iter->second.first.header.stamp,
 				listener,
 				waitForTransform);
 
 		if(baseToCamera.isNull())
 		{
 			ROS_ERROR("Cannot transform tag pose from \"%s\" frame to \"%s\" frame!",
-					iter->second.header.frame_id.c_str(), frameId.c_str());
+					iter->second.first.header.frame_id.c_str(), frameId.c_str());
 			continue;
 		}
 
-		rtabmap::Transform baseToTag = baseToCamera * transformFromPoseMsg(iter->second.pose.pose);
+		rtabmap::Transform baseToTag = baseToCamera * transformFromPoseMsg(iter->second.first.pose.pose);
 
 		if(!baseToTag.isNull())
 		{
@@ -1601,7 +1625,7 @@ rtabmap::Landmarks landmarksFromROS(
 			rtabmap::Transform correction = rtabmap_ros::getTransform(
 					frameId,
 					odomFrameId,
-					iter->second.header.stamp,
+					iter->second.first.header.stamp,
 					odomStamp,
 					listener,
 					waitForTransform);
@@ -1615,14 +1639,14 @@ rtabmap::Landmarks landmarksFromROS(
 						"If odometry is small since it received the tag pose and "
 						"covariance is large, this should not be a problem.");
 			}
-			cv::Mat covariance = cv::Mat(6,6, CV_64FC1, (void*)iter->second.pose.covariance.data()).clone();
+			cv::Mat covariance = cv::Mat(6,6, CV_64FC1, (void*)iter->second.first.pose.covariance.data()).clone();
 			if(covariance.empty() || !uIsFinite(covariance.at<double>(0,0)) || covariance.at<double>(0,0)<=0.0f)
 			{
 				covariance = cv::Mat::eye(6,6,CV_64FC1);
 				covariance(cv::Range(0,3), cv::Range(0,3)) *= defaultLinVariance;
 				covariance(cv::Range(3,6), cv::Range(3,6)) *= defaultAngVariance;
 			}
-			landmarks.insert(std::make_pair(iter->first, rtabmap::Landmark(iter->first, baseToTag, covariance)));
+			landmarks.insert(std::make_pair(iter->first, rtabmap::Landmark(iter->first, iter->second.second, baseToTag, covariance)));
 		}
 	}
 	return landmarks;

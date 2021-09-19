@@ -310,11 +310,11 @@ void CommonDataSubscriber::setupScanCallbacks(
 				{
 					subscribedToOdomInfo_ = true;
 					odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-					SYNC_DECL4(odomDataScanDescInfo, approxSync, queueSize, odomSub_, userDataSub_, scanDescSub_, odomInfoSub_);
+					SYNC_DECL4(CommonDataSubscriber, odomDataScanDescInfo, approxSync, queueSize, odomSub_, userDataSub_, scanDescSub_, odomInfoSub_);
 				}
 				else
 				{
-					SYNC_DECL3(odomDataScanDesc, approxSync, queueSize, odomSub_, userDataSub_, scanDescSub_);
+					SYNC_DECL3(CommonDataSubscriber, odomDataScanDesc, approxSync, queueSize, odomSub_, userDataSub_, scanDescSub_);
 				}
 			}
 			else if(scan2dTopic)
@@ -323,11 +323,11 @@ void CommonDataSubscriber::setupScanCallbacks(
 				{
 					subscribedToOdomInfo_ = true;
 					odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-					SYNC_DECL4(odomDataScan2dInfo, approxSync, queueSize, odomSub_, userDataSub_, scanSub_, odomInfoSub_);
+					SYNC_DECL4(CommonDataSubscriber, odomDataScan2dInfo, approxSync, queueSize, odomSub_, userDataSub_, scanSub_, odomInfoSub_);
 				}
 				else
 				{
-					SYNC_DECL3(odomDataScan2d, approxSync, queueSize, odomSub_, userDataSub_, scanSub_);
+					SYNC_DECL3(CommonDataSubscriber, odomDataScan2d, approxSync, queueSize, odomSub_, userDataSub_, scanSub_);
 				}
 			}
 			else
@@ -336,11 +336,11 @@ void CommonDataSubscriber::setupScanCallbacks(
 				{
 					subscribedToOdomInfo_ = true;
 					odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-					SYNC_DECL4(odomDataScan3dInfo, approxSync, queueSize, odomSub_, userDataSub_, scan3dSub_, odomInfoSub_);
+					SYNC_DECL4(CommonDataSubscriber, odomDataScan3dInfo, approxSync, queueSize, odomSub_, userDataSub_, scan3dSub_, odomInfoSub_);
 				}
 				else
 				{
-					SYNC_DECL3(odomDataScan3d, approxSync, queueSize, odomSub_, userDataSub_, scan3dSub_);
+					SYNC_DECL3(CommonDataSubscriber, odomDataScan3d, approxSync, queueSize, odomSub_, userDataSub_, scan3dSub_);
 				}
 			}
 		}
@@ -356,11 +356,11 @@ void CommonDataSubscriber::setupScanCallbacks(
 				{
 					subscribedToOdomInfo_ = true;
 					odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-					SYNC_DECL3(odomScanDescInfo, approxSync, queueSize, odomSub_, scanDescSub_, odomInfoSub_);
+					SYNC_DECL3(CommonDataSubscriber, odomScanDescInfo, approxSync, queueSize, odomSub_, scanDescSub_, odomInfoSub_);
 				}
 				else
 				{
-					SYNC_DECL2(odomScanDesc, approxSync, queueSize, odomSub_, scanDescSub_);
+					SYNC_DECL2(CommonDataSubscriber, odomScanDesc, approxSync, queueSize, odomSub_, scanDescSub_);
 				}
 			}
 			else if(scan2dTopic)
@@ -369,11 +369,11 @@ void CommonDataSubscriber::setupScanCallbacks(
 				{
 					subscribedToOdomInfo_ = true;
 					odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-					SYNC_DECL3(odomScan2dInfo, approxSync, queueSize, odomSub_, scanSub_, odomInfoSub_);
+					SYNC_DECL3(CommonDataSubscriber, odomScan2dInfo, approxSync, queueSize, odomSub_, scanSub_, odomInfoSub_);
 				}
 				else
 				{
-					SYNC_DECL2(odomScan2d, approxSync, queueSize, odomSub_, scanSub_);
+					SYNC_DECL2(CommonDataSubscriber, odomScan2d, approxSync, queueSize, odomSub_, scanSub_);
 				}
 			}
 			else
@@ -382,11 +382,11 @@ void CommonDataSubscriber::setupScanCallbacks(
 				{
 					subscribedToOdomInfo_ = true;
 					odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-					SYNC_DECL3(odomScan3dInfo, approxSync, queueSize, odomSub_, scan3dSub_, odomInfoSub_);
+					SYNC_DECL3(CommonDataSubscriber, odomScan3dInfo, approxSync, queueSize, odomSub_, scan3dSub_, odomInfoSub_);
 				}
 				else
 				{
-					SYNC_DECL2(odomScan3d, approxSync, queueSize, odomSub_, scan3dSub_);
+					SYNC_DECL2(CommonDataSubscriber, odomScan3d, approxSync, queueSize, odomSub_, scan3dSub_);
 				}
 			}
 		}
@@ -401,11 +401,11 @@ void CommonDataSubscriber::setupScanCallbacks(
 				{
 					subscribedToOdomInfo_ = true;
 					odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-					SYNC_DECL3(dataScanDescInfo, approxSync, queueSize, userDataSub_, scanDescSub_, odomInfoSub_);
+					SYNC_DECL3(CommonDataSubscriber, dataScanDescInfo, approxSync, queueSize, userDataSub_, scanDescSub_, odomInfoSub_);
 				}
 				else
 				{
-					SYNC_DECL2(dataScanDesc, approxSync, queueSize, userDataSub_, scanDescSub_);
+					SYNC_DECL2(CommonDataSubscriber, dataScanDesc, approxSync, queueSize, userDataSub_, scanDescSub_);
 				}
 			}
 			else if(scan2dTopic)
@@ -418,7 +418,7 @@ void CommonDataSubscriber::setupScanCallbacks(
 				}
 				else
 				{
-					SYNC_DECL2(dataScan2d, approxSync, queueSize, userDataSub_, scanSub_);
+					SYNC_DECL2(CommonDataSubscriber, dataScan2d, approxSync, queueSize, userDataSub_, scanSub_);
 				}
 			}
 			else
@@ -427,11 +427,11 @@ void CommonDataSubscriber::setupScanCallbacks(
 				{
 					subscribedToOdomInfo_ = true;
 					odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-					SYNC_DECL3(dataScan3dInfo, approxSync, queueSize, userDataSub_, scan3dSub_, odomInfoSub_);
+					SYNC_DECL3(CommonDataSubscriber, dataScan3dInfo, approxSync, queueSize, userDataSub_, scan3dSub_, odomInfoSub_);
 				}
 				else
 				{
-					SYNC_DECL2(dataScan3d, approxSync, queueSize, userDataSub_, scan3dSub_);
+					SYNC_DECL2(CommonDataSubscriber, dataScan3d, approxSync, queueSize, userDataSub_, scan3dSub_);
 				}
 			}
 		}
@@ -442,15 +442,15 @@ void CommonDataSubscriber::setupScanCallbacks(
 			odomInfoSub_.subscribe(nh, "odom_info", queueSize);
 			if(scanDescTopic)
 			{
-				SYNC_DECL2(scanDescInfo, approxSync, queueSize, scanDescSub_, odomInfoSub_);
+				SYNC_DECL2(CommonDataSubscriber, scanDescInfo, approxSync, queueSize, scanDescSub_, odomInfoSub_);
 			}
 			else if(scan2dTopic)
 			{
-				SYNC_DECL2(scan2dInfo, approxSync, queueSize, scanSub_, odomInfoSub_);
+				SYNC_DECL2(CommonDataSubscriber, scan2dInfo, approxSync, queueSize, scanSub_, odomInfoSub_);
 			}
 			else
 			{
-				SYNC_DECL2(scan3dInfo, approxSync, queueSize, scan3dSub_, odomInfoSub_);
+				SYNC_DECL2(CommonDataSubscriber, scan3dInfo, approxSync, queueSize, scan3dSub_, odomInfoSub_);
 			}
 		}
 	}

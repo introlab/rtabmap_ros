@@ -1,0 +1,72 @@
+name: ros1
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+env:
+  # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
+  BUILD_TYPE: Release
+
+jobs:
+  build:
+    # The CMake configure and build commands are platform agnostic and should work equally
+    # well on Windows or Mac.  You can convert this to a matrix build if you need
+    # cross-platform coverage.
+    # See: https://docs.github.com/en/free-pro-team@latest/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
+    name: Build on ros ${{ matrix.ros_distro }} and ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-20.04, ubuntu-18.04]
+        include:
+        - os: ubuntu-20.04
+          ros_distro: 'noetic'
+        - os: ubuntu-18.04
+          ros_distro: 'melodic'
+
+    steps:   
+    - uses: ros-tooling/setup-ros@v0.2
+      with:
+        required-ros-distributions: ${{ matrix.ros_distro }}
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get -y install ros-${{ matrix.ros_distro }}-rtabmap-ros
+        sudo apt-get -y remove ros-${{ matrix.ros_distro }}-rtabmap
+        
+    - uses: actions/checkout@v2
+      with:
+        repository: 'introlab/rtabmap'
+        path: 'rtabmap'
+        
+    - name: Setup catkin workspace
+      run: | 
+        source /opt/ros/${{ matrix.ros_distro }}/setup.bash
+        mkdir -p ${{github.workspace}}/catkin_ws/src
+        cd ${{github.workspace}}/catkin_ws/src
+        catkin_init_workspace
+        cd ..
+        catkin_make
+        
+    - uses: actions/checkout@v2
+      with:
+        path: 'catkin_ws/src/rtabmap_ros'
+        
+    - name: Build latest rtabmap library
+      run: |
+        source /opt/ros/${{ matrix.ros_distro }}/setup.bash
+        cd ${{github.workspace}}/rtabmap
+        cmake -B build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_INSTALL_PREFIX=${{github.workspace}}/catkin_ws/devel
+        cmake --build build --config ${{env.BUILD_TYPE}} --target install
+
+    - name: caktkin_make
+      run: |
+        source /opt/ros/${{ matrix.ros_distro }}/setup.bash
+        source ${{github.workspace}}/catkin_ws/devel/setup.bash
+        cd ${{github.workspace}}/catkin_ws
+        catkin_make
+        catkin_make install     

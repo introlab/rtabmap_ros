@@ -51,6 +51,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap_ros/OdomInfo.h>
 #include <rtabmap/core/util3d.h>
 #include <rtabmap/core/util3d_filtering.h>
+#include <rtabmap/core/Version.h>
 
 namespace rtabmap_ros
 {
@@ -391,12 +392,52 @@ private:
 					sensor_msgs::PointCloud2 rosCloud;
 					if(voxelSize_>0.0)
 					{
-						pcl::VoxelGrid<pcl::PCLPointCloud2> filter;
-						filter.setLeafSize(voxelSize_, voxelSize_, voxelSize_);
-						filter.setInputCloud(assembled);
-						pcl::PCLPointCloud2Ptr output(new pcl::PCLPointCloud2);
-						filter.filter(*output);
-						assembled = output;
+						// estimate if there would be an overflow
+						int x_idx=-1, y_idx=-1, z_idx=-1;
+						for (std::size_t d = 0; d < assembled->fields.size (); ++d)
+						{
+							if (assembled->fields[d].name.compare("x")==0)
+								x_idx = d;
+							if (assembled->fields[d].name.compare("y")==0)
+								y_idx = d;
+							if (assembled->fields[d].name.compare("z")==0)
+								z_idx = d;
+						}
+						bool overflow = false;
+						if(x_idx>=0 && y_idx>=0 && z_idx>=0) {
+							Eigen::Vector4f min_p, max_p;
+							pcl::getMinMax3D(assembled, x_idx, y_idx, z_idx, min_p, max_p);
+							float inverseVoxelSize = 1.0f/voxelSize_;
+							std::int64_t dx = static_cast<std::int64_t>((max_p[0] - min_p[0]) * inverseVoxelSize)+1;
+							std::int64_t dy = static_cast<std::int64_t>((max_p[1] - min_p[1]) * inverseVoxelSize)+1;
+							std::int64_t dz = static_cast<std::int64_t>((max_p[2] - min_p[2]) * inverseVoxelSize)+1;
+
+							if ((dx*dy*dz) > static_cast<std::int64_t>(std::numeric_limits<std::int32_t>::max()))
+							{
+								overflow = true;
+							}
+						}
+						if(overflow)
+						{
+							rtabmap::LaserScan scan = rtabmap::util3d::laserScanFromPointCloud(*assembled);
+							scan = rtabmap::util3d::commonFiltering(scan, 1, 0, 0, voxelSize_);
+#if PCL_VERSION_COMPARE(>=, 1, 10, 0)
+							std::uint64_t stamp = assembled->header.stamp;
+#else
+							pcl::uint64_t stamp = assembled->header.stamp;
+#endif
+							assembled = rtabmap::util3d::laserScanToPointCloud2(scan);
+							assembled->header.stamp = stamp;
+						}
+						else
+						{
+							pcl::VoxelGrid<pcl::PCLPointCloud2> filter;
+							filter.setLeafSize(voxelSize_, voxelSize_, voxelSize_);
+							filter.setInputCloud(assembled);
+							pcl::PCLPointCloud2Ptr output(new pcl::PCLPointCloud2);
+							filter.filter(*output);
+							assembled = output;
+						}
 					}
 					if(noiseRadius_>0.0 && noiseMinNeighbors_>0)
 					{
