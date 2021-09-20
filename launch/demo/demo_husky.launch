@@ -5,6 +5,8 @@
        $ export HUSKY_URDF_EXTRAS=$(rospack find rtabmap_ros)/launch/config/husky_velodyne_extra.urdf.xacro
        $ roslaunch husky_gazebo husky_playpen.launch realsense_enabled:=true
        $ roslaunch husky_viz view_robot.launch 
+
+       For ICP odometry examples, rtabmap should be built with libpointmatcher.
        
        Examples:
          1) 6DoF mapping with 3D LiDAR
