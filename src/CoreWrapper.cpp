@@ -3429,9 +3429,9 @@ void CoreWrapper::publishCurrentGoal(const rclcpp::Time & stamp)
 				goal.target_pose = poseMsg;
 
 				mbClient_->sendGoal(goal,
-						boost::bind(&CoreWrapper::goalDoneCb, this, _1, _2),
-						boost::bind(&CoreWrapper::goalActiveCb, this),
-						boost::bind(&CoreWrapper::goalFeedbackCb, this, _1));
+						std::bind(&CoreWrapper::goalDoneCb, this, std::placeholders::_1, std::placeholders::_2),
+						std::bind(&CoreWrapper::goalActiveCb, this),
+						std::bind(&CoreWrapper::goalFeedbackCb, this, std::placeholders::_1));
 				lastPublishedMetricGoal_ = currentMetricGoal_;
 			}
 			else
