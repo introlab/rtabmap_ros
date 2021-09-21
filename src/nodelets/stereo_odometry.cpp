@@ -309,13 +309,13 @@ void StereoOdometry::flushCallbacks()
 	{
 		delete approxSync_;
 		approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize()), imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_);
-		approxSync_->registerCallback(boost::bind(&StereoOdometry::callback, this, _1, _2, _3, _4));
+		approxSync_->registerCallback(std::bind(&StereoOdometry::callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 	}
 	if(exactSync_)
 	{
 		delete exactSync_;
 		exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize()), imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_);
-		exactSync_->registerCallback(boost::bind(&StereoOdometry::callback, this, _1, _2, _3, _4));
+		exactSync_->registerCallback(std::bind(&StereoOdometry::callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 	}
 }
 
