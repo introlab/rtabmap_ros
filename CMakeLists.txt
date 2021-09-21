@@ -79,9 +79,9 @@ IF(RTABMAP_GUI OR rviz_default_plugins_FOUND)
    ENDIF()   
 ENDIF(RTABMAP_GUI OR rviz_default_plugins_FOUND)
 
-find_package(rviz_common REQUIRED)
-find_package(rviz_rendering REQUIRED)
-find_package(rviz_default_plugins REQUIRED)
+find_package(rviz_common)
+find_package(rviz_rendering)
+find_package(rviz_default_plugins)
 
 
 #######################################
@@ -450,9 +450,11 @@ foreach(typesupport_impl ${typesupport_impls})
   rosidl_target_interfaces(rtabmap
     ${PROJECT_NAME}_msgs ${typesupport_impl}
   )
-  rosidl_target_interfaces(rtabmapviz
-    ${PROJECT_NAME}_msgs ${typesupport_impl}
-  )
+  IF(RTABMAP_GUI)
+    rosidl_target_interfaces(rtabmapviz
+      ${PROJECT_NAME}_msgs ${typesupport_impl}
+    )
+  ENDIF()
 endforeach()
 
 # If rviz is found, add plugins
