@@ -20,6 +20,10 @@
     
     <arg name="frame_id" default="velodyne"/>
     
+    <arg name="resolution" default="0.1"/> <!-- set 0.1-0.3 for indoor, set 0.3-0.5 for outdoor -->
+    
+    <arg name="floam"    default="false"/> <!-- RTAB-Map should be built with FLOAM http://official-rtab-map-forum.206.s1.nabble.com/icp-odometry-with-LOAM-crash-tp8261p8563.html -->
+    
     <include file="$(find velodyne_pointcloud)/launch/VLP16_points.launch">
        <arg     if="$(arg scan_20_hz)" name="rpm" value="1200"/>
        <arg unless="$(arg scan_20_hz)" name="rpm" value="600"/>
@@ -48,7 +52,8 @@
         <!-- ICP parameters -->
         <param name="Icp/PointToPlane"        type="string" value="true"/>
         <param name="Icp/Iterations"          type="string" value="10"/>
-        <param name="Icp/VoxelSize"           type="string" value="0.2"/>
+        <param     if="$(arg floam)" name="Icp/VoxelSize" type="string" value="0"/>
+        <param unless="$(arg floam)" name="Icp/VoxelSize" type="string" value="$(arg resolution)"/>
         <param name="Icp/DownsamplingStep"    type="string" value="1"/> <!-- cannot be increased with ring-like lidar -->
         <param name="Icp/Epsilon"             type="string" value="0.001"/>
         <param name="Icp/PointToPlaneK"       type="string" value="20"/>
@@ -61,9 +66,12 @@
 
         <!-- Odom parameters -->       
         <param name="Odom/ScanKeyFrameThr"       type="string" value="0.9"/>
-        <param name="Odom/Strategy"              type="string" value="0"/>
-        <param name="OdomF2M/ScanSubtractRadius" type="string" value="0.2"/>
-        <param name="OdomF2M/ScanMaxSize"        type="string" value="15000"/>      
+        <param     if="$(arg floam)" name="Odom/Strategy" type="string" value="11"/>
+        <param unless="$(arg floam)" name="Odom/Strategy" type="string" value="0"/>
+        <param name="OdomF2M/ScanSubtractRadius" type="string" value="$(arg resolution)"/>
+        <param name="OdomF2M/ScanMaxSize"        type="string" value="15000"/>
+        <param name="OdomLOAM/Sensor" type="string" value="0"/> <!-- select VLP16 format -->
+        <param name="OdomLOAM/Resolution" type="string" value="$(arg resolution)"/>
       </node>
 
       <node pkg="rtabmap_ros" type="rtabmap" name="rtabmap" output="screen" args="-d">	  
@@ -98,7 +106,7 @@
         <param name="Optimizer/GravitySigma"         type="string" value="0.3"/>
 
         <!-- ICP parameters -->
-        <param name="Icp/VoxelSize"                  type="string" value="0.2"/>
+        <param name="Icp/VoxelSize"                  type="string" value="$(arg resolution)"/>
         <param name="Icp/PointToPlaneK"              type="string" value="20"/>
         <param name="Icp/PointToPlaneRadius"         type="string" value="0"/>
         <param name="Icp/PointToPlane"               type="string" value="true"/>
