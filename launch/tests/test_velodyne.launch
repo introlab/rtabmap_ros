@@ -21,6 +21,7 @@
     
     <arg name="frame_id" default="velodyne"/>
     <arg name="queue_size" default="1"/> <!-- Set to 100 for kitti dataset to make sure all scans are processed -->
+    <arg name="loop_ratio" default="0.4"/> <!-- Set to 0.2 for kitti -->
     
     <arg name="resolution" default="0.1"/> <!-- set 0.1-0.3 for indoor, set 0.3-0.5 for outdoor (0.4 for kitti) -->
     
@@ -119,7 +120,7 @@
         <param name="Icp/MaxCorrespondenceDistance"  type="string" value="1"/>
         <param name="Icp/PM"                         type="string" value="true"/> 
         <param name="Icp/PMOutlierRatio"             type="string" value="0.7"/>
-        <param name="Icp/CorrespondenceRatio"        type="string" value="0.4"/>
+        <param name="Icp/CorrespondenceRatio"        type="string" value="$(arg loop_ratio)"/>
       </node>
 
       <node if="$(arg rtabmapviz)" name="rtabmapviz" pkg="rtabmap_ros" type="rtabmapviz" output="screen">
