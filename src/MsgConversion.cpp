@@ -1477,12 +1477,14 @@ rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::OdomInfo & msg, bool ig
 			info.localMap.insert(std::make_pair(msg.localMapKeys[i], point3fFromROS(msg.localMapValues[i])));
 		}
 
-		info.localScanMap = rtabmap::LaserScan(rtabmap::uncompressData(msg.localScanMap), 0, 0, (rtabmap::LaserScan::Format)msg.localScanMapFormat);
+		pcl::PCLPointCloud2 cloud;
+		pcl_conversions::toPCL(msg.localScanMap, cloud);
+		info.localScanMap = rtabmap::util3d::laserScanFromPointCloud(cloud);
 	}
 	return info;
 }
 
-void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_ros::OdomInfo & msg)
+void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_ros::OdomInfo & msg, bool ignoreData)
 {
 	msg.lost = info.lost;
 	msg.matches = info.reg.matches;
@@ -1516,26 +1518,28 @@ void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_ros::OdomInfo & m
 
 	msg.type = info.type;
 
-	msg.wordsKeys = uKeys(info.words);
-	keypointsToROS(uValues(info.words), msg.wordsValues);
-
-	msg.wordMatches = info.reg.matchesIDs;
-	msg.wordInliers = info.reg.inliersIDs;
-
-	points2fToROS(info.refCorners, msg.refCorners);
-	points2fToROS(info.newCorners, msg.newCorners);
-	msg.cornerInliers = info.cornerInliers;
-
 	transformToGeometryMsg(info.transform, msg.transform);
 	transformToGeometryMsg(info.transformFiltered, msg.transformFiltered);
 	transformToGeometryMsg(info.transformGroundTruth, msg.transformGroundTruth);
 	transformToGeometryMsg(info.guess, msg.guess);
 
-	msg.localMapKeys = uKeys(info.localMap);
-	points3fToROS(uValues(info.localMap), msg.localMapValues);
+	if(!ignoreData)
+	{
+		msg.wordsKeys = uKeys(info.words);
+		keypointsToROS(uValues(info.words), msg.wordsValues);
 
-	msg.localScanMap = rtabmap::compressData(rtabmap::util3d::transformLaserScan(info.localScanMap, info.localScanMap.localTransform()).data());
-	msg.localScanMapFormat = info.localScanMap.format();
+		msg.wordMatches = info.reg.matchesIDs;
+		msg.wordInliers = info.reg.inliersIDs;
+
+		points2fToROS(info.refCorners, msg.refCorners);
+		points2fToROS(info.newCorners, msg.newCorners);
+		msg.cornerInliers = info.cornerInliers;
+
+		msg.localMapKeys = uKeys(info.localMap);
+		points3fToROS(uValues(info.localMap), msg.localMapValues);
+
+		pcl_conversions::moveFromPCL(*rtabmap::util3d::laserScanToPointCloud2(info.localScanMap, info.localScanMap.localTransform()), msg.localScanMap);
+	}
 }
 
 cv::Mat userDataFromROS(const rtabmap_ros::UserData & dataMsg)

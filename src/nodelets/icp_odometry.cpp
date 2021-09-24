@@ -86,6 +86,8 @@ private:
 		ros::NodeHandle & nh = getNodeHandle();
 		ros::NodeHandle & pnh = getPrivateNodeHandle();
 
+		int queueSize = 1;
+		pnh.param("queue_size",  queueSize, queueSize);
 		pnh.param("scan_cloud_max_points",  scanCloudMaxPoints_, scanCloudMaxPoints_);
 		pnh.param("scan_downsampling_step", scanDownsamplingStep_, scanDownsamplingStep_);
 		pnh.param("scan_range_min",  scanRangeMin_, scanRangeMin_);
@@ -131,6 +133,7 @@ private:
 			pnh.param("scan_cloud_normal_k", scanNormalK_, scanNormalK_);
 		}
 
+		NODELET_INFO("IcpOdometry: queue_size             = %d", queueSize);
 		NODELET_INFO("IcpOdometry: scan_cloud_max_points  = %d", scanCloudMaxPoints_);
 		NODELET_INFO("IcpOdometry: scan_downsampling_step = %d", scanDownsamplingStep_);
 		NODELET_INFO("IcpOdometry: scan_range_min         = %f m", scanRangeMin_);
@@ -140,8 +143,8 @@ private:
 		NODELET_INFO("IcpOdometry: scan_normal_radius     = %f m", scanNormalRadius_);
 		NODELET_INFO("IcpOdometry: scan_normal_ground_up  = %f", scanNormalGroundUp_);
 
-		scan_sub_ = nh.subscribe("scan", 1, &ICPOdometry::callbackScan, this);
-		cloud_sub_ = nh.subscribe("scan_cloud", 1, &ICPOdometry::callbackCloud, this);
+		scan_sub_ = nh.subscribe("scan", queueSize, &ICPOdometry::callbackScan, this);
+		cloud_sub_ = nh.subscribe("scan_cloud", queueSize, &ICPOdometry::callbackCloud, this);
 
 		filtered_scan_pub_ = nh.advertise<sensor_msgs::PointCloud2>("odom_filtered_input_scan", 1);
 	}

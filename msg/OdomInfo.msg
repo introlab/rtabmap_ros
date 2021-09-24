@@ -47,10 +47,8 @@ int32[] wordInliers
 int32[] localMapKeys
 Point3f[] localMapValues
 
-# compressed local scan map data
-# use rtabmap::util3d::uncompressData() from "rtabmap/core/util3d.h"
-uint8[] localScanMap
-int32 localScanMapFormat
+# local scan map data
+sensor_msgs/PointCloud2 localScanMap
 
 # F2F odometry
 #   std::vector<cv::Point2f> refCorners;
