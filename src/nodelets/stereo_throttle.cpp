@@ -100,12 +100,12 @@ private:
 		if(approxSync)
 		{
 			approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize), imageLeft_, imageRight_, cameraInfoLeft_, cameraInfoRight_);
-			approxSync_->registerCallback(boost::bind(&StereoThrottleNodelet::callback, this, _1, _2, _3, _4));
+			approxSync_->registerCallback(std::bind(&StereoThrottleNodelet::callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 		}
 		else
 		{
 			exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize), imageLeft_, imageRight_, cameraInfoLeft_, cameraInfoRight_);
-			exactSync_->registerCallback(boost::bind(&StereoThrottleNodelet::callback, this, _1, _2, _3, _4));
+			exactSync_->registerCallback(std::bind(&StereoThrottleNodelet::callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 		}
 
 		imageLeft_.subscribe(left_it, left_nh.resolveName("image"), 1, hintsLeft);

@@ -75,7 +75,7 @@ private:
 		private_nh.param("queue_size", queueSize, queueSize);
 
 		sync_ = new message_filters::Synchronizer<MySyncPolicy>(MySyncPolicy(queueSize), image_sub_, image_depth_sub_, info_sub_, odom_sub_);
-		sync_->registerCallback(boost::bind(&DataOdomSyncNodelet::callback, this, _1, _2, _3, _4));
+		sync_->registerCallback(std::bind(&DataOdomSyncNodelet::callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 
 		image_sub_.subscribe(rgb_it, rgb_nh.resolveName("image_in"), 1, hintsRgb);
 		image_depth_sub_.subscribe(depth_it, depth_nh.resolveName("image_in"), 1, hintsDepth);

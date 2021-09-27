@@ -109,8 +109,8 @@ void StaticLayer::onInitialize()
   }
 
   dsrv_ = new dynamic_reconfigure::Server<costmap_2d::GenericPluginConfig>(nh);
-  dynamic_reconfigure::Server<costmap_2d::GenericPluginConfig>::CallbackType cb = boost::bind(
-      &StaticLayer::reconfigureCB, this, _1, _2);
+  dynamic_reconfigure::Server<costmap_2d::GenericPluginConfig>::CallbackType cb = std::bind(
+      &StaticLayer::reconfigureCB, this, std::placeholders::_1, std::placeholders::_2);
   dsrv_->setCallback(cb);
 }
 
