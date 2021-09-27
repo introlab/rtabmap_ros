@@ -293,7 +293,7 @@ private:
 				pcl::concatenatePointCloud(*output, *cloud2, *tmp_output);
 #endif
 				//Make sure row_step is the sum of both
-				tmp_output->row_step = output->row_step + cloud2->row_step;
+				tmp_output->row_step = tmp_output->width * tmp_output->point_step;
 				output = tmp_output;
 			}
 
