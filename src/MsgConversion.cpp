@@ -1439,6 +1439,14 @@ rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::OdomInfo & msg, bool ig
 	info.localBundleOutliers = msg.localBundleOutliers;
 	info.localBundleConstraints = msg.localBundleConstraints;
 	info.localBundleTime = msg.localBundleTime;
+	UASSERT(msg.localBundleModels.size() == msg.localBundleIds.size());
+	UASSERT(msg.localBundleModels.size() == msg.localBundleModelTransforms.size());
+	UASSERT(msg.localBundleModels.size() == msg.localBundlePoses.size());
+	for(size_t i=0; i<msg.localBundleIds.size(); ++i)
+	{
+		info.localBundleModels.insert(std::make_pair(msg.localBundleIds[i], cameraModelFromROS(msg.localBundleModels[i], transformFromGeometryMsg(msg.localBundleModelTransforms[i]))));
+		info.localBundlePoses.insert(std::make_pair(msg.localBundleIds[i], transformFromPoseMsg(msg.localBundlePoses[i])));
+	}
 	info.keyFrameAdded = msg.keyFrameAdded;
 	info.timeEstimation = msg.timeEstimation;
 	info.timeParticleFiltering =  msg.timeParticleFiltering;
@@ -1506,6 +1514,23 @@ void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_ros::OdomInfo & m
 	msg.localBundleOutliers = info.localBundleOutliers;
 	msg.localBundleConstraints = info.localBundleConstraints;
 	msg.localBundleTime = info.localBundleTime;
+	UASSERT(info.localBundleModels.size() == info.localBundlePoses.size());
+	for(std::map<int, rtabmap::CameraModel>::const_iterator iter=info.localBundleModels.begin();
+		iter!=info.localBundleModels.end();
+		++iter)
+	{
+		msg.localBundleIds.push_back(iter->first);
+		sensor_msgs::CameraInfo camInfo;
+		cameraModelToROS(iter->second, camInfo);
+		msg.localBundleModels.push_back(camInfo);
+		geometry_msgs::Transform localT;
+		transformToGeometryMsg(iter->second.localTransform(), localT);
+		msg.localBundleModelTransforms.push_back(localT);
+		UASSERT(info.localBundlePoses.find(iter->first)!=info.localBundlePoses.end());
+		geometry_msgs::Pose pose;
+		transformToPoseMsg(info.localBundlePoses.at(iter->first), pose);
+		msg.localBundlePoses.push_back(pose);
+	}
 	msg.keyFrameAdded = info.keyFrameAdded;
 	msg.timeEstimation = info.timeEstimation;
 	msg.timeParticleFiltering =  info.timeParticleFiltering;
