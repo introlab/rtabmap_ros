@@ -33,7 +33,7 @@ if __name__ == "__main__":
 
     yaml_path = rospy.get_param('~yaml_path', '')
     if not yaml_path:
-        print 'yaml_path parameter should be set to path of the calibration file!'
+        print('yaml_path parameter should be set to path of the calibration file!')
         sys.exit(1)
 
     frameId = rospy.get_param('~frame_id', '')
