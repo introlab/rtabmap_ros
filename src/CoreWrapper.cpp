@@ -60,6 +60,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/DBDriver.h>
 #include <rtabmap/core/Registration.h>
 #include <rtabmap/core/Graph.h>
+#include <rtabmap/core/Optimizer.h>
 
 #ifdef WITH_OCTOMAP_MSGS
 #ifdef RTABMAP_OCTOMAP
@@ -124,7 +125,8 @@ CoreWrapper::CoreWrapper() :
 		alreadyRectifiedImages_(Parameters::defaultRtabmapImagesAlreadyRectified()),
 		twoDMapping_(Parameters::defaultRegForce3DoF()),
 		previousStamp_(0),
-		mbClient_(0)
+		mbClient_(0),
+		maxNodesRepublished_(2)
 {
 	char * rosHomePath = getenv("ROS_HOME");
 	std::string workingDir = rosHomePath?rosHomePath:UDirectory::homeDir()+"/.ros";
@@ -187,6 +189,7 @@ void CoreWrapper::onInit()
 	pnh.param("wait_for_transform_duration",  waitForTransformDuration_, waitForTransformDuration_);
 	pnh.param("use_action_for_goal", useActionForGoal_, useActionForGoal_);
 	pnh.param("use_saved_map", useSavedMap_, useSavedMap_);
+	pnh.param("max_nodes_republished", maxNodesRepublished_, maxNodesRepublished_);
 	pnh.param("gen_scan",            genScan_, genScan_);
 	pnh.param("gen_scan_max_depth",  genScanMaxDepth_, genScanMaxDepth_);
 	pnh.param("gen_scan_min_depth",  genScanMinDepth_, genScanMinDepth_);
@@ -610,6 +613,7 @@ void CoreWrapper::onInit()
 		Parameters::parse(parameters_, Parameters::kRegForce3DoF(), twoDMapping_);
 	}
 
+	paused_ = pnh.param("is_rtabmap_paused", paused_);
 	if(paused_)
 	{
 		NODELET_WARN("Node paused... don't forget to call service \"resume\" to start rtabmap.");
@@ -639,7 +643,7 @@ void CoreWrapper::onInit()
 
 	if(rtabmap_.getMemory())
 	{
-		if(useSavedMap_ && !rtabmap_.getMemory()->isIncremental())
+		if(useSavedMap_)
 		{
 			float xMin, yMin, gridCellSize;
 			cv::Mat map = rtabmap_.getMemory()->load2DMap(xMin, yMin, gridCellSize);
@@ -680,6 +684,9 @@ void CoreWrapper::onInit()
 	loadDatabaseSrv_ = nh.advertiseService("load_database", &CoreWrapper::loadDatabaseCallback, this);
 	triggerNewMapSrv_ = nh.advertiseService("trigger_new_map", &CoreWrapper::triggerNewMapCallback, this);
 	backupDatabase_ = nh.advertiseService("backup", &CoreWrapper::backupDatabaseCallback, this);
+	detectMoreLoopClosuresSrv_ = nh.advertiseService("detect_more_loop_closures", &CoreWrapper::detectMoreLoopClosuresCallback, this);
+	globalBundleAdjustmentSrv_ = nh.advertiseService("global_bundle_adjustment", &CoreWrapper::globalBundleAdjustmentCallback, this);
+	cleanupLocalGridsSrv_ = nh.advertiseService("cleanup_local_grids", &CoreWrapper::cleanupLocalGridsCallback, this);
 	setModeLocalizationSrv_ = nh.advertiseService("set_mode_localization", &CoreWrapper::setModeLocalizationCallback, this);
 	setModeMappingSrv_ = nh.advertiseService("set_mode_mapping", &CoreWrapper::setModeMappingCallback, this);
 	getNodeDataSrv_ = nh.advertiseService("get_node_data", &CoreWrapper::getNodeDataCallback, this);
@@ -801,11 +808,10 @@ void CoreWrapper::onInit()
 		}
 	}
 
-	// set public parameters
-	nh.setParam("is_rtabmap_paused", paused_);
+	// set private parameters
 	for(ParametersMap::iterator iter=parameters_.begin(); iter!=parameters_.end(); ++iter)
 	{
-		nh.setParam(iter->first, iter->second);
+		pnh.setParam(iter->first, iter->second);
 	}
 
 	userDataAsyncSub_ = nh.subscribe("user_data_async", 1, &CoreWrapper::userDataAsyncCallback, this);
@@ -815,6 +821,7 @@ void CoreWrapper::onInit()
 	tagDetectionsSub_ = nh.subscribe("tag_detections", 1, &CoreWrapper::tagDetectionsAsyncCallback, this);
 #endif
 	imuSub_ = nh.subscribe("imu", 100, &CoreWrapper::imuAsyncCallback, this);
+	republishNodeDataSub_ = nh.subscribe("republish_node_data", 100, &CoreWrapper::republishNodeDataCallback, this);
 }
 
 CoreWrapper::~CoreWrapper()
@@ -827,13 +834,6 @@ CoreWrapper::~CoreWrapper()
 	}
 
 	this->saveParameters(configPath_);
-
-	ros::NodeHandle nh;
-	for(ParametersMap::iterator iter=parameters_.begin(); iter!=parameters_.end(); ++iter)
-	{
-		nh.deleteParam(iter->first);
-	}
-	nh.deleteParam("is_rtabmap_paused");
 
 	printf("rtabmap: Saving database/long-term memory... (located at %s)\n", databasePath_.c_str());
 	if(rtabmap_.getMemory())
@@ -1167,7 +1167,7 @@ void CoreWrapper::commonDepthCallback(
 				return;
 			}
 		}
-		else if(imageMsgs.size() == 0 || imageMsgs[0].get() == 0 || !odomUpdate(odomMsg, imageMsgs[0]->header.stamp))
+		else if(cameraInfoMsgs.size() == 0 || !odomUpdate(odomMsg, cameraInfoMsgs[0].header.stamp))
 		{
 			return;
 		}
@@ -1186,7 +1186,7 @@ void CoreWrapper::commonDepthCallback(
 			return;
 		}
 	}
-	else if(imageMsgs.size() == 0 || imageMsgs[0].get() == 0 || !odomTFUpdate(imageMsgs[0]->header.stamp))
+	else if(cameraInfoMsgs.size() == 0 || !odomTFUpdate(cameraInfoMsgs[0].header.stamp))
 	{
 		return;
 	}
@@ -1382,7 +1382,7 @@ void CoreWrapper::commonDepthCallbackImpl(
 			rgb,
 			depth,
 			cameraModels,
-			lastPoseIntermediate_?-1:imageMsgs[0]->header.seq,
+			lastPoseIntermediate_?-1:!cameraInfoMsgs.empty()?cameraInfoMsgs[0].header.seq:0,
 			rtabmap_ros::timestampFromROS(lastPoseStamp_),
 			userData);
 
@@ -1912,9 +1912,9 @@ void CoreWrapper::process(
 					else if(twoDMapping_)
 					{
 						// If 2d mapping, make sure all diagonal values of the covariance that even not used are not null.
-						covariance.at<double>(2,2) = covariance.at<double>(2,2)!=0?covariance.at<double>(2,2):1;
-						covariance.at<double>(3,3) = covariance.at<double>(3,3)!=0?covariance.at<double>(3,3):1;
-						covariance.at<double>(4,4) = covariance.at<double>(4,4)!=0?covariance.at<double>(4,4):1;
+						covariance.at<double>(2,2) = uIsFinite(covariance.at<double>(2,2)) && covariance.at<double>(2,2)!=0?covariance.at<double>(2,2):1;
+						covariance.at<double>(3,3) = uIsFinite(covariance.at<double>(3,3)) && covariance.at<double>(3,3)!=0?covariance.at<double>(3,3):1;
+						covariance.at<double>(4,4) = uIsFinite(covariance.at<double>(4,4)) && covariance.at<double>(4,4)!=0?covariance.at<double>(4,4):1;
 					}
 
 					SensorData interData(cv::Mat(), cv::Mat(), CameraModel(), -1, rtabmap_ros::timestampFromROS(iter->first.header.stamp));
@@ -2088,9 +2088,9 @@ void CoreWrapper::process(
 		else if(twoDMapping_)
 		{
 			// If 2d mapping, make sure all diagonal values of the covariance that even not used are not null.
-			covariance.at<double>(2,2) = covariance.at<double>(2,2)!=0?covariance.at<double>(2,2):1;
-			covariance.at<double>(3,3) = covariance.at<double>(3,3)!=0?covariance.at<double>(3,3):1;
-			covariance.at<double>(4,4) = covariance.at<double>(4,4)!=0?covariance.at<double>(4,4):1;
+			covariance.at<double>(2,2) = uIsFinite(covariance.at<double>(2,2)) && covariance.at<double>(2,2)!=0?covariance.at<double>(2,2):1;
+			covariance.at<double>(3,3) = uIsFinite(covariance.at<double>(3,3)) && covariance.at<double>(3,3)!=0?covariance.at<double>(3,3):1;
+			covariance.at<double>(4,4) = uIsFinite(covariance.at<double>(4,4)) && covariance.at<double>(4,4)!=0?covariance.at<double>(4,4):1;
 		}
 
 		std::map<std::string, float> externalStats;
@@ -2454,7 +2454,9 @@ void CoreWrapper::tagDetectionsAsyncCallback(const apriltag_ros::AprilTagDetecti
 						warned = true;
 					}
 				}
-				uInsert(tags_, std::make_pair(tagDetections.detections[i].id[0], p));
+				uInsert(tags_,
+						std::make_pair(tagDetections.detections[i].id[0],
+								std::make_pair(p, tagDetections.detections[i].size.size()==1?(float)tagDetections.detections[i].size[0]:0.0f)));
 			}
 		}
 	}
@@ -2492,6 +2494,26 @@ void CoreWrapper::imuAsyncCallback(const sensor_msgs::ImuConstPtr & msg)
 			{
 				imuFrameId_ = msg->header.frame_id;
 			}
+		}
+	}
+}
+
+void CoreWrapper::republishNodeDataCallback(const std_msgs::Int32MultiArray::ConstPtr& msg)
+{
+	if(maxNodesRepublished_>0)
+	{
+		nodesToRepublish_.insert(msg->data.begin(), msg->data.end());
+	}
+	else
+	{
+		static bool warned = false;
+		if(!warned)
+		{
+			NODELET_WARN("A node is requesting some node data "
+					"to be republished after the next update, "
+					"but parameter \"max_nodes_republished\" is not over 0, "
+					"ignoring the call. This warning is only printed once.");
+			warned = true;
 		}
 	}
 }
@@ -2717,29 +2739,29 @@ void CoreWrapper::goalNodeCallback(const rtabmap_ros::GoalConstPtr & msg)
 
 bool CoreWrapper::updateRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
-	ros::NodeHandle nh;
+	ros::NodeHandle pnh("~");
 	for(rtabmap::ParametersMap::iterator iter=parameters_.begin(); iter!=parameters_.end(); ++iter)
 	{
 		std::string vStr;
 		bool vBool;
 		int vInt;
 		double vDouble;
-		if(nh.getParam(iter->first, vStr))
+		if(pnh.getParam(iter->first, vStr))
 		{
 			NODELET_INFO("Setting RTAB-Map parameter \"%s\"=\"%s\"", iter->first.c_str(), vStr.c_str());
 			iter->second = vStr;
 		}
-		else if(nh.getParam(iter->first, vBool))
+		else if(pnh.getParam(iter->first, vBool))
 		{
 			NODELET_INFO("Setting RTAB-Map parameter \"%s\"=\"%s\"", iter->first.c_str(), uBool2Str(vBool).c_str());
 			iter->second = uBool2Str(vBool);
 		}
-		else if(nh.getParam(iter->first, vInt))
+		else if(pnh.getParam(iter->first, vInt))
 		{
 			NODELET_INFO("Setting RTAB-Map parameter \"%s\"=\"%s\"", iter->first.c_str(), uNumber2Str(vInt).c_str());
 			iter->second = uNumber2Str(vInt).c_str();
 		}
-		else if(nh.getParam(iter->first, vDouble))
+		else if(pnh.getParam(iter->first, vDouble))
 		{
 			NODELET_INFO("Setting RTAB-Map parameter \"%s\"=\"%s\"", iter->first.c_str(), uNumber2Str(vDouble).c_str());
 			iter->second = uNumber2Str(vDouble).c_str();
@@ -2806,6 +2828,7 @@ bool CoreWrapper::resetRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empt
 	mapToOdomMutex_.lock();
 	mapToOdom_.setIdentity();
 	mapToOdomMutex_.unlock();
+	nodesToRepublish_.clear();
 
 	return true;
 }
@@ -2820,8 +2843,8 @@ bool CoreWrapper::pauseRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empt
 	{
 		paused_ = true;
 		NODELET_INFO("rtabmap: paused!");
-		ros::NodeHandle nh;
-		nh.setParam("is_rtabmap_paused", true);
+		ros::NodeHandle pnh("~");
+		pnh.setParam("is_rtabmap_paused", true);
 	}
 	return true;
 }
@@ -2836,8 +2859,8 @@ bool CoreWrapper::resumeRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Emp
 	{
 		paused_ = false;
 		NODELET_INFO("rtabmap: resumed!");
-		ros::NodeHandle nh;
-		nh.setParam("is_rtabmap_paused", false);
+		ros::NodeHandle pnh("~");
+		pnh.setParam("is_rtabmap_paused", false);
 	}
 	return true;
 }
@@ -2895,6 +2918,7 @@ bool CoreWrapper::loadDatabaseCallback(rtabmap_ros::LoadDatabase::Request& req, 
 	mapToOdomMutex_.lock();
 	mapToOdom_.setIdentity();
 	mapToOdomMutex_.unlock();
+	nodesToRepublish_.clear();
 
 	// Open new database
 	databasePath_ = newDatabasePath;
@@ -3010,6 +3034,7 @@ bool CoreWrapper::backupDatabaseCallback(std_srvs::Empty::Request&, std_srvs::Em
 	globalPose_.header.stamp = ros::Time(0);
 	gps_ = rtabmap::GPS();
 	tags_.clear();
+	nodesToRepublish_.clear();
 
 	NODELET_INFO("Backup: Saving \"%s\" to \"%s\"...", databasePath_.c_str(), (databasePath_+".back").c_str());
 	UFile::copy(databasePath_, databasePath_+".back");
@@ -3020,6 +3045,207 @@ bool CoreWrapper::backupDatabaseCallback(std_srvs::Empty::Request&, std_srvs::Em
 	NODELET_INFO("Backup: Reloading memory... done!");
 
 	return true;
+}
+
+void CoreWrapper::republishMaps()
+{
+	ros::Time stamp = ros::Time::now();
+	mapsManager_.publishMaps(rtabmap_.getLocalOptimizedPoses(), stamp, mapFrameId_);
+
+	if(mapDataPub_.getNumSubscribers())
+	{
+		rtabmap_ros::MapDataPtr msg(new rtabmap_ros::MapData);
+		msg->header.stamp = stamp;
+		msg->header.frame_id = mapFrameId_;
+
+		rtabmap_ros::mapDataToROS(
+			rtabmap_.getLocalOptimizedPoses(),
+			rtabmap_.getLocalConstraints(),
+			std::map<int, Signature>(),
+			rtabmap_.getMapCorrection(),
+			*msg);
+
+		mapDataPub_.publish(msg);
+	}
+
+	if(mapGraphPub_.getNumSubscribers())
+	{
+		rtabmap_ros::MapGraphPtr msg(new rtabmap_ros::MapGraph);
+		msg->header.stamp = stamp;
+		msg->header.frame_id = mapFrameId_;
+
+		rtabmap_ros::mapGraphToROS(
+		rtabmap_.getLocalOptimizedPoses(),
+		rtabmap_.getLocalConstraints(),
+		rtabmap_.getMapCorrection(),
+		*msg);
+
+		mapGraphPub_.publish(msg);
+	}
+}
+
+bool CoreWrapper::detectMoreLoopClosuresCallback(rtabmap_ros::DetectMoreLoopClosures::Request& req, rtabmap_ros::DetectMoreLoopClosures::Response& res)
+{
+	NODELET_WARN("Detect more loop closures service called");
+
+	UTimer timer;
+	float clusterRadiusMax = 1;
+	float clusterRadiusMin = 0;
+	float clusterAngle = 0;
+	int iterations = 1;
+	bool intraSession = true;
+	bool interSession = true;
+	if(req.cluster_radius_max > 0.0f)
+	{
+		clusterRadiusMax = req.cluster_radius_max;
+	}
+	if(req.cluster_radius_min >= 0.0f)
+	{
+		clusterRadiusMin = req.cluster_radius_min;
+	}
+	if(req.cluster_angle >= 0.0f)
+	{
+		clusterAngle = req.cluster_angle;
+	}
+	if(req.iterations >= 1.0f)
+	{
+		iterations = (int)req.iterations;
+	}
+	if(req.intra_only)
+	{
+		interSession = false;
+	}
+	else if(req.inter_only)
+	{
+		intraSession = false;
+	}
+	NODELET_WARN("Post-Processing service called: Detecting more loop closures "
+			"(max radius=%f, min radius=%f, angle=%f, iterations=%d, intra=%s, inter=%s)...",
+			clusterRadiusMax,
+			clusterRadiusMin,
+			clusterAngle,
+			iterations,
+			intraSession?"true":"false",
+			interSession?"true":"false");
+	res.detected = rtabmap_.detectMoreLoopClosures(
+			clusterRadiusMax,
+			clusterAngle*M_PI/180.0,
+			iterations,
+			intraSession,
+			interSession,
+			0,
+			clusterRadiusMin);
+	if(res.detected<0)
+	{
+		NODELET_ERROR("Post-Processing: Detecting more loop closures failed!");
+	}
+	else
+	{
+		NODELET_WARN("Post-Processing: Detected %d loop closures! (%fs)", res.detected, timer.ticks());
+
+		if(res.detected>0)
+		{
+			republishMaps();
+		}
+		return true;
+	}
+	return false;
+}
+
+bool CoreWrapper::cleanupLocalGridsCallback(rtabmap_ros::CleanupLocalGrids::Request& req, rtabmap_ros::CleanupLocalGrids::Response& res)
+{
+	NODELET_WARN("Cleanup local grids service called");
+	UTimer timer;
+	int radius = 1;
+	bool filterScans = false;
+	if(req.radius > 1.0f)
+	{
+		radius = (int)req.radius;
+	}
+	filterScans = req.filter_scans;
+	float xMin, yMin, gridCellSize;
+	cv::Mat map = mapsManager_.getGridMap(xMin, yMin, gridCellSize);
+	if(map.empty())
+	{
+		NODELET_ERROR("Post-Processing: Cleanup local grids failed! There is no optimized map.");
+		return false;
+	}
+	std::map<int, Transform> poses = rtabmap_.getLocalOptimizedPoses();
+	NODELET_WARN("Post-Processing: Cleanup local grids... (radius=%d, filter scans=%s)",
+			radius,
+			filterScans?"true":"false");
+	res.modified = rtabmap_.cleanupLocalGrids(poses, map, xMin, yMin, gridCellSize, radius, filterScans);
+	if(res.modified<0)
+	{
+		NODELET_ERROR("Post-Processing: Cleanup local grids failed!");
+	}
+	else
+	{
+		if(filterScans)
+		{
+			NODELET_WARN("Post-Processing: %d grids and scans modified! (%fs)", res.modified, timer.ticks());
+		}
+		else
+		{
+			NODELET_WARN("Post-Processing: %d grids modified! (%fs)", res.modified, timer.ticks());
+		}
+		if(res.modified > 0)
+		{
+			// We should update MapsManager's cache with the modifications
+			mapsManager_.clear();
+			mapsManager_.set2DMap(map, xMin, yMin, gridCellSize, rtabmap_.getLocalOptimizedPoses(), rtabmap_.getMemory());
+
+			republishMaps();
+		}
+		return true;
+	}
+
+	return false;
+}
+bool CoreWrapper::globalBundleAdjustmentCallback(rtabmap_ros::GlobalBundleAdjustment::Request& req, rtabmap_ros::GlobalBundleAdjustment::Response& res)
+{
+	NODELET_WARN("Global bundle adjustment service called");
+
+	UTimer timer;
+	int optimizer = (int)Optimizer::kTypeG2O; // g2o
+	int iterations = Parameters::defaultOptimizerIterations();
+	float pixelVariance = Parameters::defaultg2oPixelVariance();
+	bool rematchFeatures = true;
+	Parameters::parse(parameters_, Parameters::kOptimizerIterations(), iterations);
+	Parameters::parse(parameters_, Parameters::kg2oPixelVariance(), pixelVariance);
+	if(req.type == 1.0f)
+	{
+		optimizer = (int)Optimizer::kTypeCVSBA;
+	}
+	if(req.iterations >= 1.0f)
+	{
+		iterations = req.iterations;
+	}
+	if(req.pixel_variance > 0.0f)
+	{
+		pixelVariance = req.pixel_variance;
+	}
+	rematchFeatures = !req.voc_matches;
+
+	NODELET_WARN("Post-Processing: Global Bundle Adjustment... "
+			"(Optimizer=%s, iterations=%d, pixel variance=%f, rematch=%s)...",
+			optimizer==Optimizer::kTypeG2O?"g2o":"cvsba",
+			iterations,
+			pixelVariance,
+			rematchFeatures?"true":"false");
+	bool success = rtabmap_.globalBundleAdjustment((Optimizer::Type)optimizer, iterations, pixelVariance, rematchFeatures);
+	if(!success)
+	{
+		NODELET_ERROR("Post-Processing: Global Bundle Adjustment failed!");
+	}
+	else
+	{
+		NODELET_WARN("Post-Processing: Global Bundle Adjustment... done! (%fs)", timer.ticks());
+		republishMaps();
+		return true;
+	}
+
+	return false;
 }
 
 bool CoreWrapper::setModeLocalizationCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
@@ -3835,6 +4061,58 @@ void CoreWrapper::publishStats(const ros::Time & stamp)
 		if(stats.getLastSignatureData().id() > 0)
 		{
 			signatures.insert(std::make_pair(stats.getLastSignatureData().id(), stats.getLastSignatureData()));
+		}
+
+		if(nodesToRepublish_.size() && !rtabmap_.getLastLocalizationPose().isNull())
+		{
+			// Republish data from closest nodes of the current localization
+			std::map<int, Transform> nodesOnly(rtabmap_.getLocalOptimizedPoses().lower_bound(1), rtabmap_.getLocalOptimizedPoses().end());
+			int id = rtabmap::graph::findNearestNode(nodesOnly, rtabmap_.getLastLocalizationPose());
+			if(id>0)
+			{
+				std::map<int, int> ids = rtabmap_.getMemory()->getNeighborsId(id, 0, 0, false, false, true);
+				std::map<int, int> missingIds;
+				for(std::map<int, int>::iterator iter=ids.begin(); iter!=ids.end(); ++iter)
+				{
+					if(nodesToRepublish_.find(iter->first) != nodesToRepublish_.end())
+					{
+						missingIds.insert(std::make_pair(iter->second, iter->first));
+					}
+				}
+
+				if(nodesToRepublish_.size() != missingIds.size())
+				{
+					// remove requested nodes not anymore in the graph
+					for(std::set<int>::iterator iter=nodesToRepublish_.begin(); iter!=nodesToRepublish_.end();)
+					{
+						if(ids.find(*iter) == ids.end())
+						{
+							iter = nodesToRepublish_.erase(iter);
+						}
+						else
+						{
+							++iter;
+						}
+					}
+				}
+
+				int loaded = 0;
+				std::stringstream stream;
+				for(std::map<int, int>::iterator iter=missingIds.begin(); iter!=missingIds.end() && loaded<maxNodesRepublished_; ++iter)
+				{
+					signatures.insert(std::make_pair(iter->second, rtabmap_.getMemory()->getNodeData(iter->second, true, true, true, true)));
+					nodesToRepublish_.erase(iter->second);
+					++loaded;
+					stream << iter->second << " ";
+				}
+				if(loaded)
+				{
+					NODELET_WARN("Republishing data of requested node(s) %sfrom \"%s\" input topic (max_nodes_republished=%d)",
+							stream.str().c_str(),
+							republishNodeDataSub_.getTopic().c_str(),
+							maxNodesRepublished_);
+				}
+			}
 		}
 		rtabmap_ros::mapDataToROS(
 			stats.poses(),

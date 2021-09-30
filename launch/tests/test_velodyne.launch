@@ -14,14 +14,26 @@
     <arg name="use_imu"       default="false"/> <!-- Assuming IMU fixed to lidar with /velodyne -> /imu_link TF -->
     <arg name="imu_topic"     default="/imu/data"/>
     <arg name="scan_20_hz"    default="false"/> <!-- If we launch the velodyne with "rpm:=1200" argument -->
+    <arg name="organize_cloud" default="false"/>
+    <arg name="scan_topic"    default="/velodyne_points"/>
     <arg name="use_sim_time"  default="false"/>
     <param if="$(arg use_sim_time)" name="use_sim_time" value="true"/>
     
     <arg name="frame_id" default="velodyne"/>
+    <arg name="queue_size" default="1"/> <!-- Set to 100 for kitti dataset to make sure all scans are processed -->
+    <arg name="loop_ratio" default="0.4"/> <!-- Set to 0.2 for kitti -->
     
-    <include file="$(find velodyne_pointcloud)/launch/VLP16_points.launch">
+    <arg name="resolution" default="0.1"/> <!-- set 0.1-0.3 for indoor, set 0.3-0.5 for outdoor (0.4 for kitti) -->
+    <arg name="iterations" default="10"/>
+    <arg name="ground_normals_up" default="false"/> <!-- set to true when velodyne is always horizontal to ground (car, kitti) -->
+    
+    <arg name="floam"    default="false"/> <!-- RTAB-Map should be built with FLOAM http://official-rtab-map-forum.206.s1.nabble.com/icp-odometry-with-LOAM-crash-tp8261p8563.html -->
+    <arg name="floam_sensor" default="0"/> <!-- 0=16 rings (VLP16), 1=32 rings, 2=64 rings (kitti dataset) -->
+    
+    <include unless="$(arg use_sim_time)" file="$(find velodyne_pointcloud)/launch/VLP16_points.launch">
        <arg     if="$(arg scan_20_hz)" name="rpm" value="1200"/>
        <arg unless="$(arg scan_20_hz)" name="rpm" value="600"/>
+       <arg name="organize_cloud" value="$(arg organize_cloud)"/>
     </include>
     
     <!-- IMU orientation estimation and publish tf accordingly to os1_sensor frame -->
@@ -33,9 +45,11 @@
 
     <group ns="rtabmap">
       <node pkg="rtabmap_ros" type="icp_odometry" name="icp_odometry" output="screen">
-        <remap from="scan_cloud" to="/velodyne_points"/>
+        <remap from="scan_cloud" to="$(arg scan_topic)"/>
         <param name="frame_id"        type="string" value="$(arg frame_id)"/>  
         <param name="odom_frame_id"   type="string" value="odom"/>
+        <param name="queue_size"      type="int"    value="$(arg queue_size)"/>
+        <param name="wait_for_transform_duration" type="double" value="0.2"/>
         <param     if="$(arg scan_20_hz)" name="expected_update_rate" type="double" value="25"/>
         <param unless="$(arg scan_20_hz)" name="expected_update_rate" type="double" value="15"/>
 
@@ -45,23 +59,29 @@
      
         <!-- ICP parameters -->
         <param name="Icp/PointToPlane"        type="string" value="true"/>
-        <param name="Icp/Iterations"          type="string" value="10"/>
-        <param name="Icp/VoxelSize"           type="string" value="0.2"/>
+        <param name="Icp/Iterations"          type="string" value="$(arg iterations)"/>
+        <param     if="$(arg floam)" name="Icp/VoxelSize" type="string" value="0"/>
+        <param unless="$(arg floam)" name="Icp/VoxelSize" type="string" value="$(arg resolution)"/>
         <param name="Icp/DownsamplingStep"    type="string" value="1"/> <!-- cannot be increased with ring-like lidar -->
         <param name="Icp/Epsilon"             type="string" value="0.001"/>
-        <param name="Icp/PointToPlaneK"       type="string" value="20"/>
+        <param     if="$(arg floam)" name="Icp/PointToPlaneK" type="string" value="0"/>
+        <param unless="$(arg floam)" name="Icp/PointToPlaneK" type="string" value="20"/>
         <param name="Icp/PointToPlaneRadius"  type="string" value="0"/>
         <param name="Icp/MaxTranslation"      type="string" value="2"/>
-        <param name="Icp/MaxCorrespondenceDistance" type="string" value="1"/>
+        <param name="Icp/MaxCorrespondenceDistance" type="string" value="$(eval resolution*10)"/>
         <param name="Icp/PM"                  type="string" value="true"/> 
         <param name="Icp/PMOutlierRatio"      type="string" value="0.7"/>
         <param name="Icp/CorrespondenceRatio" type="string" value="0.01"/>  
+        <param if="$(arg ground_normals_up)" name="Icp/PointToPlaneGroundNormalsUp"  type="string" value="0.8"/>
 
         <!-- Odom parameters -->       
         <param name="Odom/ScanKeyFrameThr"       type="string" value="0.9"/>
-        <param name="Odom/Strategy"              type="string" value="0"/>
-        <param name="OdomF2M/ScanSubtractRadius" type="string" value="0.2"/>
-        <param name="OdomF2M/ScanMaxSize"        type="string" value="15000"/>      
+        <param     if="$(arg floam)" name="Odom/Strategy" type="string" value="11"/>
+        <param unless="$(arg floam)" name="Odom/Strategy" type="string" value="0"/>
+        <param name="OdomF2M/ScanSubtractRadius" type="string" value="$(arg resolution)"/>
+        <param name="OdomF2M/ScanMaxSize"        type="string" value="15000"/>
+        <param name="OdomLOAM/Sensor"            type="string" value="$(arg floam_sensor)"/> 
+        <param name="OdomLOAM/Resolution"        type="string" value="$(arg resolution)"/>
       </node>
 
       <node pkg="rtabmap_ros" type="rtabmap" name="rtabmap" output="screen" args="-d">	  
@@ -70,6 +90,7 @@
         <param name="subscribe_rgb"        type="bool" value="false"/>
         <param name="subscribe_scan_cloud" type="bool" value="true"/>
         <param name="approx_sync"          type="bool" value="false"/>
+        <param name="wait_for_transform_duration" type="double" value="0.2"/>
         
         <remap from="scan_cloud" to="assembled_cloud"/>
         <remap from="imu" to="$(arg imu_topic)"/>
@@ -84,29 +105,27 @@
         <param name="RGBD/LinearUpdate"              type="string" value="0.05"/>
         <param name="Mem/NotLinkedNodesKept"         type="string" value="false"/>
         <param name="Mem/STMSize"                    type="string" value="30"/>
-        <!-- param name="Mem/LaserScanVoxelSize"     type="string" value="0.1"/ -->
-        <!-- param name="Mem/LaserScanNormalK"       type="string" value="10"/ -->
-        <!-- param name="Mem/LaserScanRadius"        type="string" value="0"/ -->
+        <param name="Mem/LaserScanNormalK"           type="string" value="20"/>
         
         <param name="Reg/Strategy"                   type="string" value="1"/> 
-        <param name="Grid/CellSize"                  type="string" value="0.1"/>
+        <param name="Grid/CellSize"                  type="string" value="$(arg resolution)"/>
         <param name="Grid/RangeMax"                  type="string" value="20"/>
         <param name="Grid/ClusterRadius"             type="string" value="1"/>
         <param name="Grid/GroundIsObstacle"          type="string" value="true"/>
         <param name="Optimizer/GravitySigma"         type="string" value="0.3"/>
 
         <!-- ICP parameters -->
-        <param name="Icp/VoxelSize"                  type="string" value="0.2"/>
+        <param name="Icp/VoxelSize"                  type="string" value="0"/> <!-- already voxelized by point_cloud_assembler below -->
         <param name="Icp/PointToPlaneK"              type="string" value="20"/>
         <param name="Icp/PointToPlaneRadius"         type="string" value="0"/>
         <param name="Icp/PointToPlane"               type="string" value="true"/>
-        <param name="Icp/Iterations"                 type="string" value="10"/>
+        <param name="Icp/Iterations"                 type="string" value="$(arg iterations)"/>
         <param name="Icp/Epsilon"                    type="string" value="0.001"/>
         <param name="Icp/MaxTranslation"             type="string" value="3"/>
-        <param name="Icp/MaxCorrespondenceDistance"  type="string" value="1"/>
+        <param name="Icp/MaxCorrespondenceDistance"  type="string" value="$(eval resolution*10)"/>
         <param name="Icp/PM"                         type="string" value="true"/> 
         <param name="Icp/PMOutlierRatio"             type="string" value="0.7"/>
-        <param name="Icp/CorrespondenceRatio"        type="string" value="0.4"/>
+        <param name="Icp/CorrespondenceRatio"        type="string" value="$(arg loop_ratio)"/>
       </node>
 
       <node if="$(arg rtabmapviz)" name="rtabmapviz" pkg="rtabmap_ros" type="rtabmapviz" output="screen">
@@ -115,15 +134,18 @@
         <param name="subscribe_odom_info" type="bool" value="true"/>
         <param name="subscribe_scan_cloud" type="bool" value="true"/>
         <param name="approx_sync" type="bool" value="false"/>
-        <remap from="scan_cloud" to="/velodyne_points"/>
+        <remap from="scan_cloud" to="odom_filtered_input_scan"/>
+        <remap from="odom_info" to="odom_info"/>
       </node>
 
       <node pkg="nodelet" type="nodelet" name="point_cloud_assembler" args="standalone rtabmap_ros/point_cloud_assembler" output="screen">
-        <remap from="cloud"           to="/velodyne_points"/>
+        <remap from="cloud"           to="$(arg scan_topic)"/>
         <remap from="odom"            to="odom"/>
         <param     if="$(arg scan_20_hz)" name="max_clouds"      type="int"    value="20" />
         <param unless="$(arg scan_20_hz)" name="max_clouds"      type="int"    value="10" />
         <param name="fixed_frame_id"  type="string" value="" />
+        <param name="voxel_size"      type="double" value="$(arg resolution)" />
+        <param name="queue_size"      type="int"    value="$(arg queue_size)" />
       </node>
   </group>
 

@@ -72,7 +72,8 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 		odomSensorSync_(false),
 		maxOdomUpdateRate_(10),
 		cameraNodeName_(""),
-		lastOdomInfoUpdateTime_(0)
+		lastOdomInfoUpdateTime_(0),
+		rtabmapNodeName_("rtabmap")
 {
 	ros::NodeHandle nh;
 	ros::NodeHandle pnh("~");
@@ -93,22 +94,24 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 
 	configFile.replace('~', QDir::homePath());
 
+	pnh.param("rtabmap", rtabmapNodeName_, rtabmapNodeName_);
+
 	ROS_INFO("rtabmapviz: Using configuration from \"%s\"", configFile.toStdString().c_str());
 	uSleep(500);
-	prefDialog_ = new PreferencesDialogROS(configFile);
+	prefDialog_ = new PreferencesDialogROS(configFile, rtabmapNodeName_);
 	mainWindow_ = new MainWindow(prefDialog_);
 	mainWindow_->setWindowTitle(mainWindow_->windowTitle()+" [ROS]");
 	mainWindow_->show();
+
 	bool paused = false;
-	nh.param("is_rtabmap_paused", paused, paused);
+	ros::NodeHandle rnh(rtabmapNodeName_);
+	rnh.param("is_rtabmap_paused", paused, paused);
 	mainWindow_->setMonitoringState(paused);
 
 	// To receive odometry events
-	std::string tfPrefix;
 	std::string initCachePath;
 	pnh.param("frame_id", frameId_, frameId_);
 	pnh.param("odom_frame_id", odomFrameId_, odomFrameId_); // set to use odom from TF
-	pnh.param("tf_prefix", tfPrefix, tfPrefix);
 	pnh.param("wait_for_transform", waitForTransform_, waitForTransform_);
 	pnh.param("wait_for_transform_duration",  waitForTransformDuration_, waitForTransformDuration_);
 	pnh.param("odom_sensor_sync", odomSensorSync_, odomSensorSync_);
@@ -142,16 +145,9 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 		QMetaObject::invokeMethod(mainWindow_, "updateCacheFromDatabase", Q_ARG(QString, QString(initCachePath.c_str())));
 	}
 
-	if(!tfPrefix.empty())
+	if(pnh.hasParam("tf_prefix"))
 	{
-		if(!frameId_.empty())
-		{
-			frameId_ = tfPrefix + "/" + frameId_;
-		}
-		if(!odomFrameId_.empty())
-		{
-			odomFrameId_ = tfPrefix + "/" + odomFrameId_;
-		}
+		ROS_ERROR("tf_prefix parameter has been removed, use directly odom_frame_id and frame_id parameters.");
 	}
 
 	UEventsManager::addHandler(this);
@@ -258,13 +254,13 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 		const rtabmap::ParametersMap & defaultParameters = rtabmap::Parameters::getDefaultParameters();
 		rtabmap::ParametersMap parameters = ((rtabmap::ParamEvent *)anEvent)->getParameters();
 		bool modified = false;
-		ros::NodeHandle nh;
+		ros::NodeHandle rnh(rtabmapNodeName_);
 		for(rtabmap::ParametersMap::iterator i=parameters.begin(); i!=parameters.end(); ++i)
 		{
 			//save only parameters with valid names
 			if(defaultParameters.find((*i).first) != defaultParameters.end())
 			{
-				nh.setParam((*i).first, (*i).second);
+				rnh.setParam((*i).first, (*i).second);
 				modified = true;
 			}
 			else if((*i).first.find('/') != (*i).first.npos)

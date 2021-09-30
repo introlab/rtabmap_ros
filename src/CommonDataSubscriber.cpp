@@ -163,6 +163,34 @@ CommonDataSubscriber::CommonDataSubscriber(bool gui) :
 		SYNC_INIT(rgbdOdomDataScanDesc),
 		SYNC_INIT(rgbdOdomDataInfo),
 #endif
+		// X RGBD
+		SYNC_INIT(rgbdXScan2d),
+		SYNC_INIT(rgbdXScan3d),
+		SYNC_INIT(rgbdXScanDesc),
+		SYNC_INIT(rgbdXInfo),
+
+		// X RGBD + Odom
+		SYNC_INIT(rgbdXOdom),
+		SYNC_INIT(rgbdXOdomScan2d),
+		SYNC_INIT(rgbdXOdomScan3d),
+		SYNC_INIT(rgbdXOdomScanDesc),
+		SYNC_INIT(rgbdXOdomInfo),
+
+#ifdef RTABMAP_SYNC_USER_DATA
+		// X RGBD + User Data
+		SYNC_INIT(rgbdXData),
+		SYNC_INIT(rgbdXDataScan2d),
+		SYNC_INIT(rgbdXDataScan3d),
+		SYNC_INIT(rgbdXDataScanDesc),
+		SYNC_INIT(rgbdXDataInfo),
+
+		// X RGBD + Odom + User Data
+		SYNC_INIT(rgbdXOdomData),
+		SYNC_INIT(rgbdXOdomDataScan2d),
+		SYNC_INIT(rgbdXOdomDataScan3d),
+		SYNC_INIT(rgbdXOdomDataScanDesc),
+		SYNC_INIT(rgbdXOdomDataInfo),
+#endif
 
 #ifdef RTABMAP_SYNC_MULTI_RGBD
 		// 2 RGBD
@@ -438,11 +466,6 @@ void CommonDataSubscriber::setupCallbacks(
 		pnh.param("approx_sync", approxSync_, approxSync_);
 	}
 
-	if(rgbdCameras <= 0 && subscribedToRGBD_)
-	{
-		rgbdCameras = 1;
-	}
-
 	ROS_INFO("%s: subscribe_depth = %s", name.c_str(), subscribedToDepth_?"true":"false");
 	ROS_INFO("%s: subscribe_rgb = %s", name.c_str(), subscribedToRGB_?"true":"false");
 	ROS_INFO("%s: subscribe_stereo = %s", name.c_str(), subscribedToStereo_?"true":"false");
@@ -496,9 +519,30 @@ void CommonDataSubscriber::setupCallbacks(
 	}
 	else if(subscribedToRGBD_)
 	{
-#ifdef RTABMAP_SYNC_MULTI_RGBD
-		if(rgbdCameras == 6)
+		if(rgbdCameras == 0)
 		{
+			setupRGBDXCallbacks(
+					nh,
+					pnh,
+					subscribedToOdom_,
+					subscribeUserData,
+					subscribeScan2d,
+					subscribeScan3d,
+					subscribeScanDesc,
+					subscribeOdomInfo,
+					queueSize_,
+					approxSync_);
+		}
+#ifdef RTABMAP_SYNC_MULTI_RGBD
+		else if(rgbdCameras >= 6)
+		{
+			if(rgbdCameras > 6)
+			{
+				ROS_ERROR("Cannot synchronize more than 6 rgbd topics (rgbd_cameras is set to %d). Set "
+						"rgbd_cameras=0 to use RGBDImages interface instead, then "
+						"synchronize RGBDImage topics yourself.", rgbdCameras);
+			}
+
 			setupRGBD6Callbacks(
 					nh,
 					pnh,
@@ -570,7 +614,10 @@ void CommonDataSubscriber::setupCallbacks(
 #else
 		if(rgbdCameras>1)
 		{
-			ROS_FATAL("Cannot synchronize more than 1 rgbd topic (rtabmap_ros has been built without RTABMAP_SYNC_MULTI_RGBD option)");
+			ROS_FATAL("Cannot synchronize more than 1 rgbd topic (rtabmap_ros has "
+					"been built without RTABMAP_SYNC_MULTI_RGBD option). Set rgbd_cameras=0 to "
+					"use RGBDImages interface instead without recompiling with RTABMAP_SYNC_MULTI_RGBD, "
+					"but you will have to synchronize RGBDImage topics yourself.");
 		}
 #endif
 		else
@@ -749,6 +796,35 @@ CommonDataSubscriber::~CommonDataSubscriber()
 	SYNC_DEL(rgbdOdomDataInfo);
 #endif
 
+	// X RGBD
+	SYNC_DEL(rgbdXScan2d);
+	SYNC_DEL(rgbdXScan3d);
+	SYNC_DEL(rgbdXScanDesc);
+	SYNC_DEL(rgbdXInfo);
+
+	// X RGBD + Odom
+	SYNC_DEL(rgbdXOdom);
+	SYNC_DEL(rgbdXOdomScan2d);
+	SYNC_DEL(rgbdXOdomScan3d);
+	SYNC_DEL(rgbdXOdomScanDesc);
+	SYNC_DEL(rgbdXOdomInfo);
+
+#ifdef RTABMAP_SYNC_USER_DATA
+	// X RGBD + User Data
+	SYNC_DEL(rgbdXData);
+	SYNC_DEL(rgbdXDataScan2d);
+	SYNC_DEL(rgbdXDataScan3d);
+	SYNC_DEL(rgbdXDataScanDesc);
+	SYNC_DEL(rgbdXDataInfo);
+
+	// X RGBD + Odom + User Data
+	SYNC_DEL(rgbdXOdomData);
+	SYNC_DEL(rgbdXOdomDataScan2d);
+	SYNC_DEL(rgbdXOdomDataScan3d);
+	SYNC_DEL(rgbdXOdomDataScanDesc);
+	SYNC_DEL(rgbdXOdomDataInfo);
+#endif
+
 #ifdef RTABMAP_SYNC_MULTI_RGBD
 	// 2 RGBD
 	SYNC_DEL(rgbd2);
@@ -912,24 +988,6 @@ CommonDataSubscriber::~CommonDataSubscriber()
 		delete rgbdSubs_[i];
 	}
 	rgbdSubs_.clear();
-
-	//clear params
-	ros::NodeHandle pnh("~");
-	pnh.deleteParam("subscribe_depth");
-	pnh.deleteParam("subscribe_laserScan");
-	pnh.deleteParam("subscribe_scan");
-	pnh.deleteParam("subscribe_scan_cloud");
-	pnh.deleteParam("subscribe_stereo");
-	pnh.deleteParam("subscribe_rgb");
-	pnh.deleteParam("subscribe_rgbd");
-	pnh.deleteParam("subscribe_odom_info");
-	pnh.deleteParam("subscribe_user_data");
-	pnh.deleteParam("odom_frame_id");
-	pnh.deleteParam("rgbd_cameras");
-	pnh.deleteParam("depth_cameras");
-	pnh.deleteParam("queue_size");
-	pnh.deleteParam("approx_sync");
-	pnh.deleteParam("stereo_approx_sync");
 }
 
 void CommonDataSubscriber::warningLoop()

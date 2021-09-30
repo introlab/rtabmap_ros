@@ -69,7 +69,7 @@ MapsManager::MapsManager() :
 		assembledGround_(new pcl::PointCloud<pcl::PointXYZRGB>),
 		occupancyGrid_(new OccupancyGrid),
 		gridUpdated_(true),
-		octomap_(0),
+		octomap_(new OctoMap),
 		octomapTreeDepth_(16),
 		octomapUpdated_(true),
 		latching_(true)
@@ -131,11 +131,8 @@ void MapsManager::init(ros::NodeHandle & nh, ros::NodeHandle & pnh, const std::s
 
 #ifdef WITH_OCTOMAP_MSGS
 #ifdef RTABMAP_OCTOMAP
-	octomap_ = new OctoMap(occupancyGrid_->getCellSize(), 0.5, occupancyGrid_->isFullUpdate(), occupancyGrid_->getUpdateError());
-	pnh.param("octomap_tree_depth", octomapTreeDepth_, octomapTreeDepth_);
-    pnh.param("octomap_frontier_flood_fill", octomap_frontier_flood_fill_, false);
-
-	if(octomapTreeDepth_ > 16)
+    pnh.param("octomap_tree_depth", octomapTreeDepth_, octomapTreeDepth_);
+   	if(octomapTreeDepth_ > 16)
 	{
 		ROS_WARN("octomap_tree_depth maximum is 16");
 		octomapTreeDepth_ = 16;
@@ -1241,7 +1238,7 @@ void MapsManager::publishMaps(
 			pcl::IndicesPtr frontierIndices(new std::vector<int>);
 			pcl::IndicesPtr emptyIndices(new std::vector<int>);
 			pcl::IndicesPtr groundIndices(new std::vector<int>);
-			pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = octomap_->createCloud(octomapTreeDepth_, obstacleIndices.get(), emptyIndices.get(), groundIndices.get(), true, frontierIndices.get(),0,octomap_frontier_flood_fill_);
+			pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = octomap_->createCloud(octomapTreeDepth_, obstacleIndices.get(), emptyIndices.get(), groundIndices.get(), true, frontierIndices.get(),0);
 
 			if(octoMapCloud_.getNumSubscribers())
 			{

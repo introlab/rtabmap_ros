@@ -39,6 +39,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <std_msgs/Empty.h>
 #include <std_msgs/Int32.h>
+#include "std_msgs/Int32MultiArray.h"
 #include <sensor_msgs/NavSatFix.h>
 #include <nav_msgs/GetMap.h>
 #include <nav_msgs/GetPlan.h>
@@ -63,6 +64,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtabmap_ros/AddLink.h"
 #include "rtabmap_ros/GetNodesInRadius.h"
 #include "rtabmap_ros/LoadDatabase.h"
+#include "rtabmap_ros/DetectMoreLoopClosures.h"
+#include "rtabmap_ros/GlobalBundleAdjustment.h"
+#include "rtabmap_ros/CleanupLocalGrids.h"
 
 #include "MapsManager.h"
 
@@ -162,6 +166,7 @@ private:
 	void tagDetectionsAsyncCallback(const apriltag_ros::AprilTagDetectionArray & tagDetections);
 #endif
 	void imuAsyncCallback(const sensor_msgs::ImuConstPtr & tagDetections);
+	void republishNodeDataCallback(const std_msgs::Int32MultiArray::ConstPtr& msg);
 	void interOdomCallback(const nav_msgs::OdometryConstPtr & msg);
 	void interOdomInfoCallback(const nav_msgs::OdometryConstPtr & msg1, const rtabmap_ros::OdomInfoConstPtr & msg2);
 
@@ -196,6 +201,9 @@ private:
 	bool loadDatabaseCallback(rtabmap_ros::LoadDatabase::Request&, rtabmap_ros::LoadDatabase::Response&);
 	bool triggerNewMapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool backupDatabaseCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
+	bool detectMoreLoopClosuresCallback(rtabmap_ros::DetectMoreLoopClosures::Request&, rtabmap_ros::DetectMoreLoopClosures::Response&);
+	bool globalBundleAdjustmentCallback(rtabmap_ros::GlobalBundleAdjustment::Request&, rtabmap_ros::GlobalBundleAdjustment::Response&);
+	bool cleanupLocalGridsCallback(rtabmap_ros::CleanupLocalGrids::Request&, rtabmap_ros::CleanupLocalGrids::Response&);
 	bool setModeLocalizationCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool setModeMappingCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool setLogDebug(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
@@ -235,6 +243,7 @@ private:
 	void goalFeedbackCb(const move_base_msgs::MoveBaseFeedbackConstPtr& feedback);
 	void publishLocalPath(const ros::Time & stamp);
 	void publishGlobalPath(const ros::Time & stamp);
+	void republishMaps();
 
 private:
 	rtabmap::Rtabmap rtabmap_;
@@ -312,6 +321,9 @@ private:
 	ros::ServiceServer loadDatabaseSrv_;
 	ros::ServiceServer triggerNewMapSrv_;
 	ros::ServiceServer backupDatabase_;
+	ros::ServiceServer detectMoreLoopClosuresSrv_;
+	ros::ServiceServer globalBundleAdjustmentSrv_;
+	ros::ServiceServer cleanupLocalGridsSrv_;
 	ros::ServiceServer setModeLocalizationSrv_;
 	ros::ServiceServer setModeMappingSrv_;
 	ros::ServiceServer setLogDebugSrv_;
@@ -356,10 +368,11 @@ private:
 	ros::Subscriber gpsFixAsyncSub_;
 	rtabmap::GPS gps_;
 	ros::Subscriber tagDetectionsSub_;
-	std::map<int, geometry_msgs::PoseWithCovarianceStamped> tags_;
+	std::map<int, std::pair<geometry_msgs::PoseWithCovarianceStamped, float> > tags_; // id, <pose, size>
 	ros::Subscriber imuSub_;
 	std::map<double, rtabmap::Transform> imus_;
 	std::string imuFrameId_;
+	ros::Subscriber republishNodeDataSub_;
 
 	ros::Subscriber interOdomSub_;
 	std::list<std::pair<nav_msgs::Odometry, rtabmap_ros::OdomInfo> > interOdoms_;
@@ -377,6 +390,8 @@ private:
 	bool alreadyRectifiedImages_;
 	bool twoDMapping_;
 	ros::Time previousStamp_;
+	std::set<int> nodesToRepublish_;
+	int maxNodesRepublished_;
 };
 
 }
