@@ -128,8 +128,8 @@ void RGBDOdometry::onOdomInit()
 				subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s",
 						get_name(),
 						approxSync?"approx":"exact",
-						rgbd_image1_sub_.getTopic().c_str(),
-						rgbd_image2_sub_.getTopic().c_str());
+						rgbd_image1_sub_.getSubscriber()->get_topic_name(),
+						rgbd_image2_sub_.getSubscriber()->get_topic_name());
 			}
 			else if(rgbdCameras == 3)
 			{
@@ -154,9 +154,9 @@ void RGBDOdometry::onOdomInit()
 				subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s",
 						get_name(),
 						approxSync?"approx":"exact",
-						rgbd_image1_sub_.getTopic().c_str(),
-						rgbd_image2_sub_.getTopic().c_str(),
-						rgbd_image3_sub_.getTopic().c_str());
+						rgbd_image1_sub_.getSubscriber()->get_topic_name(),
+						rgbd_image2_sub_.getSubscriber()->get_topic_name(),
+						rgbd_image3_sub_.getSubscriber()->get_topic_name());
 			}
 			else if(rgbdCameras == 4)
 			{
@@ -183,10 +183,10 @@ void RGBDOdometry::onOdomInit()
 				subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s",
 						get_name(),
 						approxSync?"approx":"exact",
-						rgbd_image1_sub_.getTopic().c_str(),
-						rgbd_image2_sub_.getTopic().c_str(),
-						rgbd_image3_sub_.getTopic().c_str(),
-						rgbd_image4_sub_.getTopic().c_str());
+						rgbd_image1_sub_.getSubscriber()->get_topic_name(),
+						rgbd_image2_sub_.getSubscriber()->get_topic_name(),
+						rgbd_image3_sub_.getSubscriber()->get_topic_name(),
+						rgbd_image4_sub_.getSubscriber()->get_topic_name());
 			}
 		}
 		else
@@ -220,9 +220,9 @@ void RGBDOdometry::onOdomInit()
 		subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s",
 				get_name(),
 				approxSync?"approx":"exact",
-				image_mono_sub_.getTopic().c_str(),
-				image_depth_sub_.getTopic().c_str(),
-				info_sub_.getTopic().c_str());
+				image_mono_sub_.getSubscriber().getTopic().c_str(),
+				image_depth_sub_.getSubscriber().getTopic().c_str(),
+				info_sub_.getSubscriber()->get_topic_name());
 	}
 	this->startWarningThread(subscribedTopicsMsg, approxSync);
 }

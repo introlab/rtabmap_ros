@@ -29,7 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define INCLUDE_RTABMAP_ROS_COMMONDATASUBSCRIBERIMPL_H_
 
 #include <rtabmap/utilite/UConversion.h>
-
+#include <rtabmap_ros/GetTopicName.h>
 
 #define DATA_SYNC2(PREFIX, SYNC_NAME, MSG0, MSG1) \
 	typedef message_filters::sync_policies::SYNC_NAME##Time<MSG0, MSG1> PREFIX##SYNC_NAME##SyncPolicy; \
@@ -122,8 +122,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s", \
 				name_.c_str(), \
 				APPROX?"approx":"exact", \
-				SUB0.getTopic().c_str(), \
-				SUB1.getTopic().c_str());
+				getTopicName(SUB0.getSubscriber()).c_str(), \
+				getTopicName(SUB1.getSubscriber()).c_str());
 
 #define SYNC_DECL3(PREFIX, APPROX, QUEUE_SIZE, SUB0, SUB1, SUB2) \
 		if(APPROX) \
@@ -141,9 +141,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s", \
 				name_.c_str(), \
 				APPROX?"approx":"exact", \
-				SUB0.getTopic().c_str(), \
-				SUB1.getTopic().c_str(), \
-				SUB2.getTopic().c_str());
+				getTopicName(SUB0.getSubscriber()).c_str(), \
+				getTopicName(SUB1.getSubscriber()).c_str(), \
+				getTopicName(SUB2.getSubscriber()).c_str());
 
 #define SYNC_DECL4(PREFIX, APPROX, QUEUE_SIZE, SUB0, SUB1, SUB2, SUB3) \
 		if(APPROX) \
@@ -161,10 +161,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s", \
 				name_.c_str(), \
 				APPROX?"approx":"exact", \
-				SUB0.getTopic().c_str(), \
-				SUB1.getTopic().c_str(), \
-				SUB2.getTopic().c_str(), \
-				SUB3.getTopic().c_str());
+				getTopicName(SUB0.getSubscriber()).c_str(), \
+				getTopicName(SUB1.getSubscriber()).c_str(), \
+				getTopicName(SUB2.getSubscriber()).c_str(), \
+				getTopicName(SUB3.getSubscriber()).c_str());
 
 #define SYNC_DECL5(PREFIX, APPROX, QUEUE_SIZE, SUB0, SUB1, SUB2, SUB3, SUB4) \
 		if(APPROX) \
@@ -182,11 +182,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s,\n   %s", \
 				name_.c_str(), \
 				approxSync?"approx":"exact", \
-				SUB0.getTopic().c_str(), \
-				SUB1.getTopic().c_str(), \
-				SUB2.getTopic().c_str(), \
-				SUB3.getTopic().c_str(), \
-				SUB4.getTopic().c_str());
+				getTopicName(SUB0.getSubscriber()).c_str(), \
+				getTopicName(SUB1.getSubscriber()).c_str(), \
+				getTopicName(SUB2.getSubscriber()).c_str(), \
+				getTopicName(SUB3.getSubscriber()).c_str(), \
+				getTopicName(SUB4.getSubscriber()).c_str());
 
 #define SYNC_DECL6(PREFIX, APPROX, QUEUE_SIZE, SUB0, SUB1, SUB2, SUB3, SUB4, SUB5) \
 		if(APPROX) \
@@ -204,12 +204,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s,\n   %s,\n   %s", \
 				name_.c_str(), \
 				APPROX?"approx":"exact", \
-				SUB0.getTopic().c_str(), \
-				SUB1.getTopic().c_str(), \
-				SUB2.getTopic().c_str(), \
-				SUB3.getTopic().c_str(), \
-				SUB4.getTopic().c_str(), \
-				SUB5.getTopic().c_str());
+				getTopicName(SUB0.getSubscriber()).c_str(), \
+				getTopicName(SUB1.getSubscriber()).c_str(), \
+				getTopicName(SUB2.getSubscriber()).c_str(), \
+				getTopicName(SUB3.getSubscriber()).c_str(), \
+				getTopicName(SUB4.getSubscriber()).c_str(), \
+				getTopicName(SUB5.getSubscriber()).c_str());
 
 #define SYNC_DECL7(PREFIX, APPROX, QUEUE_SIZE, SUB0, SUB1, SUB2, SUB3, SUB4, SUB5, SUB6) \
 		if(APPROX) \
@@ -227,13 +227,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s,\n   %s,\n   %s,\n   %s", \
 				name_.c_str(), \
 				APPROX?"approx":"exact", \
-				SUB0.getTopic().c_str(), \
-				SUB1.getTopic().c_str(), \
-				SUB2.getTopic().c_str(), \
-				SUB3.getTopic().c_str(), \
-				SUB4.getTopic().c_str(), \
-				SUB5.getTopic().c_str(), \
-				SUB6.getTopic().c_str());
+				getTopicName(SUB0.getSubscriber()).c_str(), \
+				getTopicName(SUB1.getSubscriber()).c_str(), \
+				getTopicName(SUB2.getSubscriber()).c_str(), \
+				getTopicName(SUB3.getSubscriber()).c_str(), \
+				getTopicName(SUB4.getSubscriber()).c_str(), \
+				getTopicName(SUB5.getSubscriber()).c_str(), \
+				getTopicName(SUB6.getSubscriber()).c_str());
 
 #define SYNC_DECL8(PREFIX, APPROX, QUEUE_SIZE, SUB0, SUB1, SUB2, SUB3, SUB4, SUB5, SUB6, SUB7) \
 		if(APPROX) \
@@ -251,14 +251,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s,\n   %s,\n   %s,\n   %s", \
 				name_.c_str(), \
 				APPROX?"approx":"exact", \
-				SUB0.getTopic().c_str(), \
-				SUB1.getTopic().c_str(), \
-				SUB2.getTopic().c_str(), \
-				SUB3.getTopic().c_str(), \
-				SUB4.getTopic().c_str(), \
-				SUB5.getTopic().c_str(), \
-				SUB6.getTopic().c_str(), \
-				SUB7.getTopic().c_str());
+				getTopicName(SUB0.getSubscriber()).c_str(), \
+				getTopicName(SUB1.getSubscriber()).c_str(), \
+				getTopicName(SUB2.getSubscriber()).c_str(), \
+				getTopicName(SUB3.getSubscriber()).c_str(), \
+				getTopicName(SUB4.getSubscriber()).c_str(), \
+				getTopicName(SUB5.getSubscriber()).c_str(), \
+				getTopicName(SUB6.getSubscriber()).c_str(), \
+				getTopicName(SUB7.getSubscriber()).c_str());
 
 
 #endif /* INCLUDE_RTABMAP_ROS_COMMONDATASUBSCRIBERIMPL_H_ */

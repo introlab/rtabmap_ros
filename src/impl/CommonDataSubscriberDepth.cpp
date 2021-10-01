@@ -341,7 +341,7 @@ void CommonDataSubscriber::setupDepthCallbacks(
 	imageSub_.subscribe(&node, "rgb/image", hints.getTransport(), rmw_qos_profile_sensor_data);
 	imageDepthSub_.subscribe(&node, "depth/image", hints.getTransport(), rmw_qos_profile_sensor_data);
 	cameraInfoSub_.subscribe(&node, "rgb/camera_info", rmw_qos_profile_sensor_data);
-
+	
 	if(subscribeOdom && subscribeUserData)
 	{
 		odomSub_.subscribe(&node, "odom", rmw_qos_profile_sensor_data);

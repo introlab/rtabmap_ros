@@ -103,10 +103,10 @@ void StereoOdometry::onOdomInit()
 		subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s",
 				get_name(),
 				approxSync?"approx":"exact",
-				imageRectLeft_.getTopic().c_str(),
-				imageRectRight_.getTopic().c_str(),
-				cameraInfoLeft_.getTopic().c_str(),
-				cameraInfoRight_.getTopic().c_str());
+				imageRectLeft_.getSubscriber().getTopic().c_str(),
+				imageRectRight_.getSubscriber().getTopic().c_str(),
+				cameraInfoLeft_.getSubscriber()->get_topic_name(),
+				cameraInfoRight_.getSubscriber()->get_topic_name());
 	}
 
 	this->startWarningThread(subscribedTopicsMsg, approxSync);

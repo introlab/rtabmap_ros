@@ -2,7 +2,10 @@
 #   Install Turtlebot3 packages
 # Example:
 #   $ ros2 launch turtlebot3_gazebo turtlebot3_world.launch.py
+#
 #   $ ros2 launch rtabmap_ros turtlebot3_scan.launch.py
+#   OR
+#   $ ros2 launch rtabmap_ros rtabmap.launch.py visual_odometry:=false frame_id:=base_footprint subscribe_scan:=true depth:=false approx_sync:=true odom_topic:=/odom args:="-d" use_sim_time:=true
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable
@@ -27,8 +30,6 @@ def generate_launch_description():
           ('scan', '/scan')]
 
     return LaunchDescription([
-        # Set env var to print messages to stdout immediately
-        SetEnvironmentVariable('RCUTILS_CONSOLE_STDOUT_LINE_BUFFERED', '1'),
 
         # Launch arguments
         DeclareLaunchArgument(

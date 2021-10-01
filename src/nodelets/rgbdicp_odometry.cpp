@@ -162,10 +162,10 @@ private:
 			subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s, \n   %s",
 					getName().c_str(),
 					approxSync?"approx":"exact",
-					image_mono_sub_.getTopic().c_str(),
-					image_depth_sub_.getTopic().c_str(),
-					info_sub_.getTopic().c_str(),
-					cloud_sub_.getTopic().c_str());
+					image_mono_sub_.getSubscriber().getTopic().c_str(),
+					image_depth_sub_.getSubscriber().getTopic().c_str(),
+					info_sub_.getSubscriber()->get_topic_name(),
+					cloud_sub_.getSubscriber()->get_topic_name());
 		}
 		else
 		{
@@ -184,10 +184,10 @@ private:
 			subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s, \n   %s",
 					getName().c_str(),
 					approxSync?"approx":"exact",
-					image_mono_sub_.getTopic().c_str(),
-					image_depth_sub_.getTopic().c_str(),
-					info_sub_.getTopic().c_str(),
-					scan_sub_.getTopic().c_str());
+					image_mono_sub_.getSubscriber().getTopic().c_str(),
+					image_depth_sub_.getSubscriber().getTopic().c_str(),
+					info_sub_.getSubscriber()->get_topic_name(),
+					scan_sub_.getSubscriber()->get_topic_name());
 		}
 		this->startWarningThread(subscribedTopicsMsg, approxSync);
 	}

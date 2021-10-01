@@ -3,7 +3,10 @@
 #   Install https://github.com/mlherd/ros2_turtlebot3_waffle_intel_realsense
 # Example:
 #   $ ros2 launch turtlebot3_gazebo turtlebot3_world.launch.py
+#
 #   $ ros2 launch rtabmap_ros turtlebot3_rgbd.launch.py
+#   OR
+#   $ ros2 launch rtabmap_ros rtabmap.launch.py visual_odometry:=false frame_id:=base_footprint odom_topic:=/odom args:="-d" use_sim_time:=true rgb_topic:=/intel_realsense_r200_depth/image_raw depth_topic:=/intel_realsense_r200_depth/depth/image_raw camera_info_topic:=/intel_realsense_r200_depth/camera_info approx_sync:=true
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable
@@ -25,8 +28,6 @@ def generate_launch_description():
           ('depth/image', '/intel_realsense_r200_depth/depth/image_raw')]
 
     return LaunchDescription([
-        # Set env var to print messages to stdout immediately
-        SetEnvironmentVariable('RCUTILS_CONSOLE_STDOUT_LINE_BUFFERED', '1'),
 
         # Launch arguments
         DeclareLaunchArgument(

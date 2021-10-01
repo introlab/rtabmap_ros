@@ -82,9 +82,9 @@ RGBDSync::RGBDSync(const rclcpp::NodeOptions & options) :
 	subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s",
 						get_name(),
 						approxSync?"approx":"exact",
-						imageSub_.getTopic().c_str(),
-						imageDepthSub_.getTopic().c_str(),
-						cameraInfoSub_.getTopic().c_str());
+						imageSub_.getSubscriber().getTopic().c_str(),
+						imageDepthSub_.getSubscriber().getTopic().c_str(),
+						cameraInfoSub_.getSubscriber()->get_topic_name());
 
 	RCLCPP_INFO(this->get_logger(), "%s", subscribedTopicsMsg_.c_str());
 

@@ -81,10 +81,10 @@ StereoSync::StereoSync(const rclcpp::NodeOptions & options) :
 	subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s",
 						get_name(),
 						approxSync?"approx":"exact",
-						imageLeftSub_.getTopic().c_str(),
-						imageRightSub_.getTopic().c_str(),
-						cameraInfoLeftSub_.getTopic().c_str(),
-						cameraInfoRightSub_.getTopic().c_str());
+						imageLeftSub_.getSubscriber().getTopic().c_str(),
+						imageRightSub_.getSubscriber().getTopic().c_str(),
+						cameraInfoLeftSub_.getSubscriber()->get_topic_name(),
+						cameraInfoRightSub_.getSubscriber()->get_topic_name());
 
 	RCLCPP_INFO(this->get_logger(), "%s", subscribedTopicsMsg_.c_str());
 

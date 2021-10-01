@@ -4,6 +4,7 @@ from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable, LogInf
 from launch.substitutions import LaunchConfiguration, ThisLaunchFileDir, PythonExpression
 from launch.conditions import IfCondition, UnlessCondition
 from launch_ros.actions import Node
+from launch_ros.actions import SetParameter
 from typing import Text
 
 #Based on https://answers.ros.org/question/363763/ros2-how-best-to-conditionally-include-a-prefix-in-a-launchpy-file/
@@ -14,7 +15,7 @@ class ConditionalText(Substitution):
         self.condition = condition
 
     def perform(self, context: 'LaunchContext') -> Text:
-        if self.condition:
+        if self.condition == True or self.condition == 'true' or self.condition == 'True':
             return self.text_if
         else:
             return self.text_else
@@ -38,11 +39,14 @@ def launch_setup(context, *args, **kwargs):
         DeclareLaunchArgument('subscribe_rgb', default_value=LaunchConfiguration('depth'), description=''),
         
         #These arguments should not be modified directly, see referred topics without "_relay" suffix above
-        DeclareLaunchArgument('rgb_topic_relay',      default_value=ConditionalText(''.join([LaunchConfiguration('rgb_topic').perform(context), "_relay"]), LaunchConfiguration('rgb_topic').perform(context), LaunchConfiguration('compressed')), description='Should not be modified manually!'),
-        DeclareLaunchArgument('depth_topic_relay',      default_value=ConditionalText(''.join([LaunchConfiguration('depth_topic').perform(context), "_relay"]), LaunchConfiguration('depth_topic').perform(context), LaunchConfiguration('compressed')), description='Should not be modified manually!'),
-        DeclareLaunchArgument('left_image_topic_relay',      default_value=ConditionalText(''.join([LaunchConfiguration('left_image_topic').perform(context), "_relay"]), LaunchConfiguration('left_image_topic').perform(context), LaunchConfiguration('compressed')), description='Should not be modified manually!'),
-        DeclareLaunchArgument('right_image_topic_relay',      default_value=ConditionalText(''.join([LaunchConfiguration('right_image_topic').perform(context), "_relay"]), LaunchConfiguration('right_image_topic'), LaunchConfiguration('compressed')), description='Should not be modified manually!'),
-        DeclareLaunchArgument('rgbd_topic_relay',      default_value=ConditionalText(LaunchConfiguration('rgbd_topic').perform(context), ''.join([LaunchConfiguration('rgbd_topic').perform(context), "_relay"]), LaunchConfiguration('rgbd_sync')), description='Should not be modified manually!'),
+        DeclareLaunchArgument('rgb_topic_relay',      default_value=ConditionalText(''.join([LaunchConfiguration('rgb_topic').perform(context), "_relay"]), ''.join(LaunchConfiguration('rgb_topic').perform(context)), LaunchConfiguration('compressed').perform(context)), description='Should not be modified manually!'),
+        DeclareLaunchArgument('depth_topic_relay',      default_value=ConditionalText(''.join([LaunchConfiguration('depth_topic').perform(context), "_relay"]), ''.join(LaunchConfiguration('depth_topic').perform(context)), LaunchConfiguration('compressed').perform(context)), description='Should not be modified manually!'),
+        DeclareLaunchArgument('left_image_topic_relay',      default_value=ConditionalText(''.join([LaunchConfiguration('left_image_topic').perform(context), "_relay"]), ''.join(LaunchConfiguration('left_image_topic').perform(context)), LaunchConfiguration('compressed').perform(context)), description='Should not be modified manually!'),
+        DeclareLaunchArgument('right_image_topic_relay',      default_value=ConditionalText(''.join([LaunchConfiguration('right_image_topic').perform(context), "_relay"]), ''.join(LaunchConfiguration('right_image_topic').perform(context)), LaunchConfiguration('compressed').perform(context)), description='Should not be modified manually!'),
+        DeclareLaunchArgument('rgbd_topic_relay',      default_value=ConditionalText(''.join(LaunchConfiguration('rgbd_topic').perform(context)), ''.join([LaunchConfiguration('rgbd_topic').perform(context), "_relay"]), LaunchConfiguration('rgbd_sync').perform(context)), description='Should not be modified manually!'),
+    
+        SetParameter(name='use_sim_time', value=LaunchConfiguration('use_sim_time')),
+        # 'use_sim_time' will be set on all nodes following the line above
     
         # Relays RGB-Depth
         Node(
@@ -299,8 +303,6 @@ def launch_setup(context, *args, **kwargs):
 
 def generate_launch_description():
     return LaunchDescription([
-        # Set env var to print messages to stdout immediately
-        SetEnvironmentVariable('RCUTILS_CONSOLE_STDOUT_LINE_BUFFERED', '1'),
         
         # Arguments
         DeclareLaunchArgument('stereo', default_value='false', description='Use stereo input instead of RGB-D.'),
@@ -308,13 +310,15 @@ def generate_launch_description():
         DeclareLaunchArgument('localization', default_value='false', description='Launch in localization mode.'),
         DeclareLaunchArgument('rtabmapviz',   default_value='true',  description='Launch RTAB-Map UI (optional).'),
         
+        DeclareLaunchArgument('use_sim_time', default_value='false', description='Use simulation (Gazebo) clock if true'),
+        
         # Config files
         DeclareLaunchArgument('cfg',     default_value='',                        description='To change RTAB-Map\'s parameters, set the path of config file (*.ini) generated by the standalone app.'),
         DeclareLaunchArgument('gui_cfg', default_value='~/.ros/rtabmap_gui.ini',  description='Configuration path of rtabmapviz.'),
         
         DeclareLaunchArgument('frame_id',       default_value='base_link',          description='Fixed frame id of the robot (base frame), you may set "base_link" or "base_footprint" if they are published. For camera-only config, this could be "camera_link".'),
         DeclareLaunchArgument('odom_frame_id',  default_value='',                   description='If set, TF is used to get odometry instead of the topic.'),
-        DeclareLaunchArgument('map_frame_id',   default_value='',                   description='Output map frame id (TF).'),
+        DeclareLaunchArgument('map_frame_id',   default_value='map',                description='Output map frame id (TF).'),
         DeclareLaunchArgument('publish_tf_map', default_value='true',               description='Publish TF between map and odomerty.'),
         DeclareLaunchArgument('namespace',      default_value='rtabmap',            description=''),
         DeclareLaunchArgument('database_path',  default_value='~/.ros/rtabmap.db',  description='Where is the map saved/loaded.'),
@@ -349,9 +353,9 @@ def generate_launch_description():
         DeclareLaunchArgument('depth_scale',      default_value='1.0',        description=''),
         
         # Image topic compression
-        DeclareLaunchArgument('compressed',      default_value='false', description='If you want to subscribe to compressed image topics'),
-        DeclareLaunchArgument('rgb_image_transport',      default_value='compressed', description='Common types: compressed, theora (see "rosrun image_transport list_transports")'),
-        DeclareLaunchArgument('depth_image_transport',      default_value='compressedDepth', description='Depth compatible types: compressedDepth (see "rosrun image_transport list_transports")'),
+        DeclareLaunchArgument('compressed',            default_value='false', description='If you want to subscribe to compressed image topics'),
+        DeclareLaunchArgument('rgb_image_transport',   default_value='compressed', description='Common types: compressed, theora (see "rosrun image_transport list_transports")'),
+        DeclareLaunchArgument('depth_image_transport', default_value='compressedDepth', description='Depth compatible types: compressedDepth (see "rosrun image_transport list_transports")'),
        
         # LiDAR
         DeclareLaunchArgument('subscribe_scan',       default_value='false',       description=''),
