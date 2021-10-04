@@ -91,6 +91,7 @@ PointCloudToDepthImage::PointCloudToDepthImage(const rclcpp::NodeOptions & optio
 	image_transport::ImageTransport it(node);
 	depthImage16Pub_ = it.advertise("image_raw", 1); // 16 bits unsigned in mm
 	depthImage32Pub_ = it.advertise("image", 1);// 32 bits float in meters
+	pointCloudTransformedPub_ = create_publisher<sensor_msgs::msg::PointCloud2>("cloud_transformed", 1);
 
 	if(approx)
 	{
@@ -104,8 +105,8 @@ PointCloudToDepthImage::PointCloudToDepthImage(const rclcpp::NodeOptions & optio
 		exactSync_->registerCallback(std::bind(&PointCloudToDepthImage::callback, this, std::placeholders::_1, std::placeholders::_2));
 	}
 
-	pointCloudSub_.subscribe(this, "cloud", rmw_qos_profile_sensor_data);
-	cameraInfoSub_.subscribe(this, "camera_info", rmw_qos_profile_sensor_data);
+	pointCloudSub_.subscribe(this, "cloud");
+	cameraInfoSub_.subscribe(this, "camera_info");
 }
 
 PointCloudToDepthImage::~PointCloudToDepthImage()
@@ -130,8 +131,8 @@ void PointCloudToDepthImage::callback(
 			cloudDisplacement = rtabmap_ros::getTransform(
 					pointCloud2Msg->header.frame_id,
 					fixedFrameId_,
-					pointCloud2Msg->header.stamp,
 					cameraInfoMsg->header.stamp,
+					pointCloud2Msg->header.stamp,
 					*tfBuffer_,
 					waitForTransform_);
 		}
@@ -153,7 +154,7 @@ void PointCloudToDepthImage::callback(
 			return;
 		}
 
-		rtabmap::Transform localTransform = cloudDisplacement.inverse()*cloudToCamera;
+		rtabmap::Transform localTransform = cloudDisplacement*cloudToCamera;
 
 		rtabmap::CameraModel model = rtabmap_ros::cameraModelFromROS(*cameraInfoMsg, localTransform);
 
@@ -171,6 +172,9 @@ void PointCloudToDepthImage::callback(
 						model.imageHeight());
 			}
 		}
+
+		UASSERT_MSG(pointCloud2Msg->data.size() == pointCloud2Msg->row_step*pointCloud2Msg->height,
+						uFormat("data=%d row_step=%d height=%d", pointCloud2Msg->data.size(), pointCloud2Msg->row_step, pointCloud2Msg->height).c_str());
 
 		pcl::PCLPointCloud2::Ptr cloud(new pcl::PCLPointCloud2);
 		pcl_conversions::toPCL(*pointCloud2Msg, *cloud);
@@ -191,6 +195,14 @@ void PointCloudToDepthImage::callback(
 				for(int i=0; i<fillIterations_;++i)
 				{
 					depthImage.image = rtabmap::util2d::fillDepthHoles(depthImage.image, fillHolesSize_, fillHolesError_);
+				}
+
+				if(pointCloudTransformedPub_->get_subscription_count()>0)
+				{
+					sensor_msgs::msg::PointCloud2 pointCloud2Out;
+					transformPointCloud(model.localTransform().inverse().toEigen4f(), *pointCloud2Msg, pointCloud2Out);
+					pointCloud2Out.header = cameraInfoMsg->header;
+					pointCloudTransformedPub_->publish(pointCloud2Out);
 				}
 			}
 		}

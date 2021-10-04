@@ -43,12 +43,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <pcl_conversions/pcl_conversions.h>
 
-#ifdef WITH_OCTOMAP_MSGS
 #ifdef RTABMAP_OCTOMAP
+#ifdef WITH_OCTOMAP_MSGS
 #include <octomap_msgs/conversions.h>
+#endif
 #include <octomap/ColorOcTree.h>
 #include <rtabmap/core/OctoMap.h>
-#endif
 #endif
 
 using namespace rtabmap;
@@ -66,7 +66,9 @@ MapsManager::MapsManager() :
 		assembledGround_(new pcl::PointCloud<pcl::PointXYZRGB>),
 		occupancyGrid_(new OccupancyGrid),
 		gridUpdated_(true),
-		octomap_(0),
+#ifdef RTABMAP_OCTOMAP
+		octomap_(new OctoMap),
+#endif
 		octomapTreeDepth_(16),
 		octomapUpdated_(true),
 		latching_(false)
@@ -102,8 +104,7 @@ void MapsManager::init(rclcpp::Node & node, const std::string & name, bool)
 
 #ifdef WITH_OCTOMAP_MSGS
 #ifdef RTABMAP_OCTOMAP
-	octomap_ = new OctoMap(occupancyGrid_->getCellSize(), 0.5, occupancyGrid_->isFullUpdate(), occupancyGrid_->getUpdateError());
-	node.param("octomap_tree_depth", octomapTreeDepth_, octomapTreeDepth_);
+	octomapTreeDepth_ = node.declare_parameter("octomap_tree_depth", rclcpp::ParameterValue(octomapTreeDepth_)).get<int>();
 	if(octomapTreeDepth_ > 16)
 	{
 		RCLCPP_WARN(node.get_logger(), "octomap_tree_depth maximum is 16");
@@ -133,13 +134,12 @@ void MapsManager::init(rclcpp::Node & node, const std::string & name, bool)
 	cloudGroundPub_ = node.create_publisher<sensor_msgs::msg::PointCloud2>("cloud_ground", 1); // FIXME latching option in ROS2?
 	latched_.insert(std::make_pair((void*)&cloudGroundPub_, false));
 
-#ifdef WITH_OCTOMAP_MSGS
 #ifdef RTABMAP_OCTOMAP
-	octoMapPubBin_ = node.create_publisher<octomap_msgs::Octomap>("octomap_binary", 1, latching_);
+#ifdef WITH_OCTOMAP_MSGS
+	octoMapPubBin_ = node.create_publisher<octomap_msgs::msg::Octomap>("octomap_binary", 1);
 	latched_.insert(std::make_pair((void*)&octoMapPubBin_, false));
-	octoMapPubFull_ = node.create_publisher<octomap_msgs::Octomap>("octomap_full", 1, latching_);
+	octoMapPubFull_ = node.create_publisher<octomap_msgs::msg::Octomap>("octomap_full", 1);
 	latched_.insert(std::make_pair((void*)&octoMapPubFull_, false));
-#endif
 #endif
 	octoMapCloud_ = node.create_publisher<sensor_msgs::msg::PointCloud2>("octomap_occupied_space", 1); // FIXME latching option in ROS2?
 	latched_.insert(std::make_pair((void*)&octoMapCloud_, false));
@@ -153,6 +153,7 @@ void MapsManager::init(rclcpp::Node & node, const std::string & name, bool)
 	latched_.insert(std::make_pair((void*)&octoMapEmptySpace_, false));
 	octoMapProj_ = node.create_publisher<nav_msgs::msg::OccupancyGrid>("octomap_grid", 1); // FIXME latching option in ROS2?
 	latched_.insert(std::make_pair((void*)&octoMapProj_, false));
+#endif
 }
 
 MapsManager::~MapsManager() {
@@ -160,14 +161,12 @@ MapsManager::~MapsManager() {
 
 	delete occupancyGrid_;
 
-#ifdef WITH_OCTOMAP_MSGS
 #ifdef RTABMAP_OCTOMAP
 	if(octomap_)
 	{
 		delete octomap_;
 		octomap_ = 0;
 	}
-#endif
 #endif
 }
 
@@ -227,11 +226,9 @@ void MapsManager::backwardCompatibilityParameters(rclcpp::Node & node, Parameter
 	parameterMoved(node, "grid_eroded", Parameters::kGridGlobalEroded(), parameters);
 	parameterMoved(node, "grid_footprint_radius", Parameters::kGridGlobalFootprintRadius(), parameters);
 
-#ifdef WITH_OCTOMAP_MSGS
 #ifdef RTABMAP_OCTOMAP
 	parameterMoved(node, "octomap_ground_is_obstacle", Parameters::kGridGroundIsObstacle(), parameters);
 	parameterMoved(node, "octomap_occupancy_thr", Parameters::kGridGlobalOccupancyThr(), parameters);
-#endif
 #endif
 }
 
@@ -240,7 +237,6 @@ void MapsManager::setParameters(const rtabmap::ParametersMap & parameters)
 	parameters_ = parameters;
 	occupancyGrid_->parseParameters(parameters_);
 
-#ifdef WITH_OCTOMAP_MSGS
 #ifdef RTABMAP_OCTOMAP
 	if(octomap_)
 	{
@@ -248,7 +244,6 @@ void MapsManager::setParameters(const rtabmap::ParametersMap & parameters)
 		octomap_ = 0;
 	}
 	octomap_ = new OctoMap(parameters_);
-#endif
 #endif
 }
 
@@ -313,10 +308,8 @@ void MapsManager::clear()
 	groundClouds_.clear();
 	obstacleClouds_.clear();
 	occupancyGrid_->clear();
-#ifdef WITH_OCTOMAP_MSGS
 #ifdef RTABMAP_OCTOMAP
 	octomap_->clear();
-#endif
 #endif
 	for(std::map<void*, bool>::iterator iter=latched_.begin(); iter!=latched_.end(); ++iter)
 	{
@@ -378,10 +371,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 				cloudGroundPub_->get_subscription_count() != 0;
 	}
 
-#ifndef WITH_OCTOMAP_MSGS
-	updateOctomap = false;
-#endif
-#ifndef RTABMAP_OCTOMAP
+#if !defined(WITH_OCTOMAP_MSGS) and !defined(RTABMAP_OCTOMAP)
 	updateOctomap = false;
 #endif
 
@@ -443,14 +433,12 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 				UWARN("Many occupancy grids should be loaded (~%d), this may take a while to update the map(s)...", int(filteredPoses.size()-gridMaps_.size()));
 				longUpdate = true;
 			}
-#ifdef WITH_OCTOMAP_MSGS
 #ifdef RTABMAP_OCTOMAP
 			if(updateOctomap && octomap_->addedNodes().size() < 5)
 			{
 				UWARN("Many clouds should be added to octomap (~%d), this may take a while to update the map(s)...", int(filteredPoses.size()-octomap_->addedNodes().size()));
 				longUpdate = true;
 			}
-#endif
 #endif
 		}
 
@@ -591,7 +579,6 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 					}
 				}
 
-#ifdef WITH_OCTOMAP_MSGS
 #ifdef RTABMAP_OCTOMAP
 				if(updateOctomap &&
 						(iter->first == 0 ||
@@ -609,14 +596,13 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 						}
 						else if(!mter->second.first.first.empty() && !mter->second.first.second.empty() && !mter->second.second.empty())
 						{
-							UWARN(node.get_logger(), "Node %d: Cannot update octomap with 2D occupancy grids. "
+							UWARN("Node %d: Cannot update octomap with 2D occupancy grids. "
 									"Do \"$ rosrun rtabmap_ros rtabmap --params | grep Grid\" to see "
 									"all occupancy grid parameters.",
 									iter->first);
 						}
 					}
 				}
-#endif
 #endif
 			}
 			else
@@ -630,7 +616,6 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 			gridUpdated_ = occupancyGrid_->update(filteredPoses);
 		}
 
-#ifdef WITH_OCTOMAP_MSGS
 #ifdef RTABMAP_OCTOMAP
 		if(updateOctomap)
 		{
@@ -638,7 +623,6 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 			octomapUpdated_ = octomap_->update(filteredPoses);
 			UINFO("Octomap update time = %fs", time.ticks());
 		}
-#endif
 #endif
 		for(std::map<int, std::pair<std::pair<cv::Mat, cv::Mat>, cv::Mat> >::iterator iter=gridMaps_.begin();
 			iter!=gridMaps_.end();)
@@ -721,7 +705,7 @@ void MapsManager::publishMaps(
 		const rclcpp::Time & stamp,
 		const std::string & mapFrameId)
 {
-	UDEBUG("Publishing maps...");
+	UDEBUG("Publishing maps... poses=%d", (int)poses.size());
 
 	// publish maps
 	if(cloudMapPub_->get_subscription_count() ||
@@ -740,7 +724,8 @@ void MapsManager::publishMaps(
 				   cloudObstaclesPub_->get_subscription_count();
 		bool graphGroundChanged = updateGround;
 		bool graphObstacleChanged = updateObstacles;
-		for(std::map<int, Transform>::const_iterator iter=poses.lower_bound(0); iter!=poses.end(); ++iter)
+		float updateErrorSqr = occupancyGrid_->getUpdateError()*occupancyGrid_->getUpdateError();
+		for(std::map<int, Transform>::const_iterator iter=poses.lower_bound(1); iter!=poses.end(); ++iter)
 		{
 			std::map<int, Transform>::const_iterator jter;
 			if(updateGround)
@@ -750,7 +735,7 @@ void MapsManager::publishMaps(
 				{
 					graphGroundChanged = false;
 					UASSERT(!iter->second.isNull() && !jter->second.isNull());
-					if(iter->second.getDistanceSquared(jter->second) > 0.0001)
+					if(iter->second.getDistanceSquared(jter->second) > updateErrorSqr)
 					{
 						graphGroundOptimized = true;
 					}
@@ -763,7 +748,7 @@ void MapsManager::publishMaps(
 				{
 					graphObstacleChanged = false;
 					UASSERT(!iter->second.isNull() && !jter->second.isNull());
-					if(iter->second.getDistanceSquared(jter->second) > 0.0001)
+					if(iter->second.getDistanceSquared(jter->second) > updateErrorSqr)
 					{
 						graphObstacleOptimized = true;
 					}
@@ -797,65 +782,66 @@ void MapsManager::publishMaps(
 			UTimer t;
 			cv::Mat tmpGroundPts;
 			cv::Mat tmpObstaclePts;
-			for(std::map<int, Transform>::const_iterator iter = poses.begin(); iter!=poses.end(); ++iter)
+			for(std::map<int, Transform>::const_iterator iter = poses.lower_bound(1); iter!=poses.end(); ++iter)
 			{
-				if(iter->first > 0)
+				if(updateGround  &&
+				   (graphGroundOptimized || assembledGroundPoses_.find(iter->first) == assembledGroundPoses_.end()))
 				{
-					if(updateGround  &&
-					   (graphGroundOptimized || assembledGroundPoses_.find(iter->first) == assembledGroundPoses_.end()))
+					std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr >::iterator kter=groundClouds_.find(iter->first);
+					if(kter != groundClouds_.end() && kter->second->size())
 					{
 						assembledGroundPoses_.insert(*iter);
-						std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr >::iterator kter=groundClouds_.find(iter->first);
-						if(kter != groundClouds_.end() && kter->second->size())
+						pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::transformPointCloud(kter->second, iter->second);
+						*assembledGround_+=*transformed;
+						if(cloudSubtractFiltering_)
 						{
-							pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::transformPointCloud(kter->second, iter->second);
-							*assembledGround_+=*transformed;
-							if(cloudSubtractFiltering_)
+							for(unsigned int i=0; i<transformed->size(); ++i)
 							{
-								for(unsigned int i=0; i<transformed->size(); ++i)
+								if(tmpGroundPts.empty())
 								{
-									if(tmpGroundPts.empty())
-									{
-										tmpGroundPts = (cv::Mat_<float>(1, 3) << transformed->at(i).x, transformed->at(i).y, transformed->at(i).z);
-										tmpGroundPts.reserve(previousIndexedGroundSize>0?previousIndexedGroundSize:100);
-									}
-									else
-									{
-										cv::Mat pt = (cv::Mat_<float>(1, 3) << transformed->at(i).x, transformed->at(i).y, transformed->at(i).z);
-										tmpGroundPts.push_back(pt);
-									}
+									tmpGroundPts = (cv::Mat_<float>(1, 3) << transformed->at(i).x, transformed->at(i).y, transformed->at(i).z);
+									tmpGroundPts.reserve(previousIndexedGroundSize>0?previousIndexedGroundSize:100);
+								}
+								else
+								{
+									cv::Mat pt = (cv::Mat_<float>(1, 3) << transformed->at(i).x, transformed->at(i).y, transformed->at(i).z);
+									tmpGroundPts.push_back(pt);
 								}
 							}
-							++countGrounds;
 						}
+						++countGrounds;
 					}
-					if(updateObstacles  &&
-					   (graphObstacleOptimized || assembledObstaclePoses_.find(iter->first) == assembledObstaclePoses_.end()))
+				}
+				if(updateObstacles  &&
+				   (graphObstacleOptimized || assembledObstaclePoses_.find(iter->first) == assembledObstaclePoses_.end()))
+				{
+					std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr >::iterator kter=obstacleClouds_.find(iter->first);
+					if(kter != obstacleClouds_.end() && kter->second->size())
 					{
 						assembledObstaclePoses_.insert(*iter);
-						std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr >::iterator kter=obstacleClouds_.find(iter->first);
-						if(kter != obstacleClouds_.end() && kter->second->size())
+						pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::transformPointCloud(kter->second, iter->second);
+						*assembledObstacles_+=*transformed;
+						if(cloudSubtractFiltering_)
 						{
-							pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::transformPointCloud(kter->second, iter->second);
-							*assembledObstacles_+=*transformed;
-							if(cloudSubtractFiltering_)
+							for(unsigned int i=0; i<transformed->size(); ++i)
 							{
-								for(unsigned int i=0; i<transformed->size(); ++i)
+								if(tmpObstaclePts.empty())
 								{
-									if(tmpObstaclePts.empty())
-									{
-										tmpObstaclePts = (cv::Mat_<float>(1, 3) << transformed->at(i).x, transformed->at(i).y, transformed->at(i).z);
-										tmpObstaclePts.reserve(previousIndexedObstacleSize>0?previousIndexedObstacleSize:100);
-									}
-									else
-									{
-										cv::Mat pt = (cv::Mat_<float>(1, 3) << transformed->at(i).x, transformed->at(i).y, transformed->at(i).z);
-										tmpObstaclePts.push_back(pt);
-									}
+									tmpObstaclePts = (cv::Mat_<float>(1, 3) << transformed->at(i).x, transformed->at(i).y, transformed->at(i).z);
+									tmpObstaclePts.reserve(previousIndexedObstacleSize>0?previousIndexedObstacleSize:100);
+								}
+								else
+								{
+									cv::Mat pt = (cv::Mat_<float>(1, 3) << transformed->at(i).x, transformed->at(i).y, transformed->at(i).z);
+									tmpObstaclePts.push_back(pt);
 								}
 							}
-							++countObstacles;
 						}
+						++countObstacles;
+					}
+					else
+					{
+						//std::map<int, std::pair<std::pair<cv::Mat, cv::Mat>, cv::Mat> >::iterator jter = gridMaps_.find(iter->first);
 					}
 				}
 			}
@@ -1036,6 +1022,26 @@ void MapsManager::publishMaps(
 	}
 	else if(mapCacheCleanup_)
 	{
+		if(!groundClouds_.empty() || !obstacleClouds_.empty())
+		{
+			size_t totalBytes = 0;
+			for(std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr >::iterator iter=groundClouds_.begin();iter!=groundClouds_.end();++iter)
+			{
+				totalBytes += sizeof(int) + iter->second->points.size()*sizeof(pcl::PointXYZRGB);
+			}
+			for(std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr >::iterator iter=obstacleClouds_.begin();iter!=obstacleClouds_.end();++iter)
+			{
+				totalBytes += sizeof(int) + iter->second->points.size()*sizeof(pcl::PointXYZRGB);
+			}
+			totalBytes += (assembledGround_->size() + assembledObstacles_->size()) *sizeof(pcl::PointXYZRGB);
+			totalBytes += (assembledGroundPoses_.size() + assembledObstaclePoses_.size()) * 13*sizeof(float);
+			totalBytes += assembledGroundIndex_.indexedFeatures()*assembledGroundIndex_.featuresDim() * sizeof(float);
+			totalBytes += assembledObstacleIndex_.indexedFeatures()*assembledObstacleIndex_.featuresDim() * sizeof(float);
+			UINFO("MapsManager: cleanup point clouds (%ld points, %ld cached clouds, ~%ld MB)...",
+					assembledGround_->size()+assembledObstacles_->size(),
+					groundClouds_.size()+obstacleClouds_.size(),
+					totalBytes/1048576);
+		}
 		assembledGround_->clear();
 		assembledObstacles_->clear();
 		assembledGroundPoses_.clear();
@@ -1058,12 +1064,13 @@ void MapsManager::publishMaps(
 		latched_.at(&cloudObstaclesPub_) = false;
 	}
 
-#ifdef WITH_OCTOMAP_MSGS
 #ifdef RTABMAP_OCTOMAP
 	if( octomapUpdated_ ||
 		!latching_ ||
+#ifdef WITH_OCTOMAP_MSGS
 		(octoMapPubBin_->get_subscription_count() && !latched_.at(&octoMapPubBin_)) ||
 		(octoMapPubFull_->get_subscription_count() && !latched_.at(&octoMapPubFull_)) ||
+#endif
 		(octoMapCloud_->get_subscription_count() && !latched_.at(&octoMapCloud_)) ||
 		(octoMapFrontierCloud_->get_subscription_count() && !latched_.at(&octoMapFrontierCloud_)) ||
 		(octoMapObstacleCloud_->get_subscription_count() && !latched_.at(&octoMapObstacleCloud_)) ||
@@ -1071,9 +1078,10 @@ void MapsManager::publishMaps(
 		(octoMapEmptySpace_->get_subscription_count() && !latched_.at(&octoMapEmptySpace_)) ||
 		(octoMapProj_->get_subscription_count() && !latched_.at(&octoMapProj_)))
 	{
+#ifdef WITH_OCTOMAP_MSGS
 		if(octoMapPubBin_->get_subscription_count())
 		{
-			octomap_msgs::Octomap msg;
+			octomap_msgs::msg::Octomap msg;
 			octomap_msgs::binaryMapToMsg(*octomap_->octree(), msg);
 			msg.header.frame_id = mapFrameId;
 			msg.header.stamp = stamp;
@@ -1082,13 +1090,14 @@ void MapsManager::publishMaps(
 		}
 		if(octoMapPubFull_->get_subscription_count())
 		{
-			octomap_msgs::Octomap msg;
+			octomap_msgs::msg::Octomap msg;
 			octomap_msgs::fullMapToMsg(*octomap_->octree(), msg);
 			msg.header.frame_id = mapFrameId;
 			msg.header.stamp = stamp;
 			octoMapPubFull_->publish(msg);
 			latched_.at(&octoMapPubFull_) = true;
 		}
+#endif
 		if(octoMapCloud_->get_subscription_count() ||
 			octoMapFrontierCloud_->get_subscription_count() ||
 			octoMapObstacleCloud_->get_subscription_count() ||
@@ -1100,7 +1109,7 @@ void MapsManager::publishMaps(
 			pcl::IndicesPtr frontierIndices(new std::vector<int>);
 			pcl::IndicesPtr emptyIndices(new std::vector<int>);
 			pcl::IndicesPtr groundIndices(new std::vector<int>);
-			pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = octomap_->createCloud(octomapTreeDepth_, obstacleIndices.get(), emptyIndices.get(), groundIndices.get(), true, frontierIndices.get());
+			pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = octomap_->createCloud(octomapTreeDepth_, obstacleIndices.get(), emptyIndices.get(), groundIndices.get(), true, frontierIndices.get(),0);
 
 			if(octoMapCloud_->get_subscription_count())
 			{
@@ -1163,7 +1172,7 @@ void MapsManager::publishMaps(
 			if(!pixels.empty())
 			{
 				//init
-				nav_msgs::OccupancyGrid map;
+				nav_msgs::msg::OccupancyGrid map;
 				map.info.resolution = gridCellSize;
 				map.info.origin.position.x = 0.0;
 				map.info.origin.position.y = 0.0;
@@ -1189,7 +1198,7 @@ void MapsManager::publishMaps(
 			}
 			else if(poses.size())
 			{
-				RCLCPP_WARN(node.get_logger(), "Octomap projection map is empty! (poses=%d octomap nodes=%d). "
+				UWARN("Octomap projection map is empty! (poses=%d octomap nodes=%d). "
 						"Make sure you activated \"%s\" and \"%s\" to true. "
 						"See \"$ rosrun rtabmap_ros rtabmap --params | grep Grid\" for more info.",
 						(int)poses.size(), (int)octomap_->octree()->size(),
@@ -1199,8 +1208,10 @@ void MapsManager::publishMaps(
 	}
 
 	if( mapCacheCleanup_ &&
+#ifdef WITH_OCTOMAP_MSGS
 		octoMapPubBin_->get_subscription_count() == 0 &&
 		octoMapPubFull_->get_subscription_count() == 0 &&
+#endif
 		octoMapCloud_->get_subscription_count() == 0 &&
 		octoMapFrontierCloud_->get_subscription_count() == 0 &&
 		octoMapObstacleCloud_->get_subscription_count() == 0 &&
@@ -1208,9 +1219,15 @@ void MapsManager::publishMaps(
 		octoMapEmptySpace_->get_subscription_count() == 0 &&
 		octoMapProj_->get_subscription_count() == 0)
 	{
+		if(octomap_->octree()->getNumLeafNodes()>0)
+		{
+			UINFO("MapsManager: cleanup octomap (%ld leaf nodes, ~%ld MB)...",
+					octomap_->octree()->getNumLeafNodes(),
+					octomap_->octree()->memoryUsage()/1048576);
+		}
 		octomap_->clear();
 	}
-
+#ifdef WITH_OCTOMAP_MSGS
 	if(octoMapPubBin_->get_subscription_count() == 0)
 	{
 		latched_.at(&octoMapPubBin_) = false;
@@ -1219,6 +1236,7 @@ void MapsManager::publishMaps(
 	{
 		latched_.at(&octoMapPubFull_) = false;
 	}
+#endif
 	if(octoMapCloud_->get_subscription_count() == 0)
 	{
 		latched_.at(&octoMapCloud_) = false;
@@ -1244,7 +1262,6 @@ void MapsManager::publishMaps(
 		latched_.at(&octoMapProj_) = false;
 	}
 
-#endif
 #endif
 
 	if( gridUpdated_ ||
@@ -1343,6 +1360,19 @@ void MapsManager::publishMaps(
 
 	if(!this->hasSubscribers() && mapCacheCleanup_)
 	{
+		if(!gridMaps_.empty())
+		{
+			size_t totalBytes = 0;
+			for(std::map<int, std::pair< std::pair<cv::Mat, cv::Mat>, cv::Mat> >::iterator iter=gridMaps_.begin(); iter!=gridMaps_.end(); ++iter)
+			{
+				totalBytes+= sizeof(int)+
+						iter->second.first.first.total()*iter->second.first.first.elemSize() +
+						iter->second.first.second.total()*iter->second.first.second.elemSize() +
+						iter->second.second.total()*iter->second.second.elemSize();
+			}
+			totalBytes += gridMapsViewpoints_.size()*sizeof(int) + gridMapsViewpoints_.size() * sizeof(cv::Point3f);
+			UINFO("MapsManager: cleanup %ld grid maps (~%ld MB)...", gridMaps_.size(), totalBytes/1048576);
+		}
 		gridMaps_.clear();
 		gridMapsViewpoints_.clear();
 	}

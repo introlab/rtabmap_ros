@@ -36,6 +36,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sensor_msgs/msg/camera_info.hpp>
 #include <sensor_msgs/msg/laser_scan.hpp>
 #include <sensor_msgs/msg/image.hpp>
+#include <sensor_msgs/msg/point_cloud2.hpp>
 
 #include <opencv2/opencv.hpp>
 #include <opencv2/features2d/features2d.hpp>
@@ -69,10 +70,12 @@ void transformToGeometryMsg(const rtabmap::Transform & transform, geometry_msgs:
 rtabmap::Transform transformFromGeometryMsg(const geometry_msgs::msg::Transform & msg);
 
 void transformToPoseMsg(const rtabmap::Transform & transform, geometry_msgs::msg::Pose & msg);
-rtabmap::Transform transformFromPoseMsg(const geometry_msgs::msg::Pose & msg);
+rtabmap::Transform transformFromPoseMsg(const geometry_msgs::msg::Pose & msg, bool ignoreRotationIfNotSet = false);
 
 void toCvCopy(const rtabmap_ros::msg::RGBDImage & image, cv_bridge::CvImagePtr & rgb, cv_bridge::CvImagePtr & depth);
 void toCvShare(const rtabmap_ros::msg::RGBDImage::ConstSharedPtr & image, cv_bridge::CvImageConstPtr & rgb, cv_bridge::CvImageConstPtr & depth);
+void toCvShare(const rtabmap_ros::msg::RGBDImage & image, const std::shared_ptr<void const>& trackedObject, cv_bridge::CvImageConstPtr & rgb, cv_bridge::CvImageConstPtr & depth);
+void rgbdImageToROS(const rtabmap::SensorData & data, rtabmap_ros::msg::RGBDImage & msg, const std::string & sensorFrameId);
 rtabmap::SensorData rgbdImageFromROS(const rtabmap_ros::msg::RGBDImage::ConstSharedPtr & image);
 
 // copy data
@@ -89,7 +92,19 @@ cv::KeyPoint keypointFromROS(const rtabmap_ros::msg::KeyPoint & msg);
 void keypointToROS(const cv::KeyPoint & kpt, rtabmap_ros::msg::KeyPoint & msg);
 
 std::vector<cv::KeyPoint> keypointsFromROS(const std::vector<rtabmap_ros::msg::KeyPoint> & msg);
+void keypointsFromROS(const std::vector<rtabmap_ros::msg::KeyPoint> & msg, std::vector<cv::KeyPoint> & kpts, int xShift=0);
 void keypointsToROS(const std::vector<cv::KeyPoint> & kpts, std::vector<rtabmap_ros::msg::KeyPoint> & msg);
+
+rtabmap::GlobalDescriptor globalDescriptorFromROS(const rtabmap_ros::msg::GlobalDescriptor & msg);
+void globalDescriptorToROS(const rtabmap::GlobalDescriptor & desc, rtabmap_ros::msg::GlobalDescriptor & msg);
+
+std::vector<rtabmap::GlobalDescriptor> globalDescriptorsFromROS(const std::vector<rtabmap_ros::msg::GlobalDescriptor> & msg);
+void globalDescriptorsToROS(const std::vector<rtabmap::GlobalDescriptor> & desc, std::vector<rtabmap_ros::msg::GlobalDescriptor> & msg);
+
+rtabmap::EnvSensor envSensorFromROS(const rtabmap_ros::msg::EnvSensor & msg);
+void envSensorToROS(const rtabmap::EnvSensor & sensor, rtabmap_ros::msg::EnvSensor & msg);
+rtabmap::EnvSensors envSensorsFromROS(const std::vector<rtabmap_ros::msg::EnvSensor> & msg);
+void envSensorsToROS(const rtabmap::EnvSensors & sensors, std::vector<rtabmap_ros::msg::EnvSensor> & msg);
 
 cv::Point2f point2fFromROS(const rtabmap_ros::msg::Point2f & msg);
 void point2fToROS(const cv::Point2f & kpt, rtabmap_ros::msg::Point2f & msg);
@@ -100,8 +115,9 @@ void points2fToROS(const std::vector<cv::Point2f> & kpts, std::vector<rtabmap_ro
 cv::Point3f point3fFromROS(const rtabmap_ros::msg::Point3f & msg);
 void point3fToROS(const cv::Point3f & kpt, rtabmap_ros::msg::Point3f & msg);
 
-std::vector<cv::Point3f> points3fFromROS(const std::vector<rtabmap_ros::msg::Point3f> & msg);
-void points3fToROS(const std::vector<cv::Point3f> & kpts, std::vector<rtabmap_ros::msg::Point3f> & msg);
+std::vector<cv::Point3f> points3fFromROS(const std::vector<rtabmap_ros::msg::Point3f> & msg, const rtabmap::Transform & transform = rtabmap::Transform());
+void points3fFromROS(const std::vector<rtabmap_ros::msg::Point3f> & msg, std::vector<cv::Point3f> & points3, const rtabmap::Transform & transform = rtabmap::Transform());
+void points3fToROS(const std::vector<cv::Point3f> & kpts, std::vector<rtabmap_ros::msg::Point3f> & msg, const rtabmap::Transform & transform = rtabmap::Transform());
 
 rtabmap::CameraModel cameraModelFromROS(
 		const sensor_msgs::msg::CameraInfo & camInfo,
@@ -153,14 +169,14 @@ rtabmap::Signature nodeInfoFromROS(const rtabmap_ros::msg::NodeData & msg);
 void nodeInfoToROS(const rtabmap::Signature & signature, rtabmap_ros::msg::NodeData & msg);
 
 std::map<std::string, float> odomInfoToStatistics(const rtabmap::OdometryInfo & info);
-rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::msg::OdomInfo & msg);
-void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_ros::msg::OdomInfo & msg);
+rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::msg::OdomInfo & msg, bool ignoreData = false);
+void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_ros::msg::OdomInfo & msg, bool ignoreData = false);
 
 cv::Mat userDataFromROS(const rtabmap_ros::msg::UserData & dataMsg);
 void userDataToROS(const cv::Mat & data, rtabmap_ros::msg::UserData & dataMsg, bool compress);
 
 rtabmap::Landmarks landmarksFromROS(
-		const std::map<int, geometry_msgs::msg::PoseWithCovarianceStamped> & tags,
+		const std::map<int, std::pair<geometry_msgs::msg::PoseWithCovarianceStamped, float> > & tags,
 		const std::string & frameId,
 		const std::string & odomFrameId,
 		const rclcpp::Time & odomStamp,
@@ -170,6 +186,7 @@ rtabmap::Landmarks landmarksFromROS(
 		double defaultAngVariance);
 
 inline double timestampFromROS(const rclcpp::Time & stamp) {return double(stamp.seconds()) + double(stamp.nanoseconds())/1000000000.0;}
+inline rclcpp::Time timestampToROS(const double & t) {uint32_t sec= (uint32_t)floor(t); return rclcpp::Time(sec, (uint32_t)std::round((t-sec) * 1e9));}
 
 // common stuff
 rtabmap::Transform getTransform(
@@ -201,7 +218,13 @@ bool convertRGBDMsgs(
 		cv::Mat & depth,
 		std::vector<rtabmap::CameraModel> & cameraModels,
 		tf2_ros::Buffer & tfBuffer,
-		double waitForTransform);
+		double waitForTransform,
+		const std::vector<std::vector<rtabmap_ros::msg::KeyPoint> > & localKeyPointsMsgs = std::vector<std::vector<rtabmap_ros::msg::KeyPoint> >(),
+		const std::vector<std::vector<rtabmap_ros::msg::Point3f> > & localPoints3dMsgs = std::vector<std::vector<rtabmap_ros::msg::Point3f> >(),
+		const std::vector<cv::Mat> & localDescriptorsMsgs = std::vector<cv::Mat>(),
+		std::vector<cv::KeyPoint> * localKeyPoints = 0,
+		std::vector<cv::Point3f> * localPoints3d = 0,
+		cv::Mat * localDescriptors = 0);
 
 bool convertStereoMsg(
 		const cv_bridge::CvImageConstPtr& leftImageMsg,
@@ -215,10 +238,11 @@ bool convertStereoMsg(
 		cv::Mat & right,
 		rtabmap::StereoCameraModel & stereoModel,
 		tf2_ros::Buffer & tfBuffer,
-		double waitForTransform);
+		double waitForTransform,
+		bool alreadyRectified);
 
 bool convertScanMsg(
-		const sensor_msgs::msg::LaserScan& scan2dMsg,
+		const sensor_msgs::msg::LaserScan & scan2dMsg,
 		const std::string & frameId,
 		const std::string & odomFrameId,
 		const rclcpp::Time & odomStamp,
@@ -243,6 +267,30 @@ void transformPointCloud (
 		const Eigen::Matrix4f &transform,
 		const sensor_msgs::msg::PointCloud2 &in,
         sensor_msgs::msg::PointCloud2 &out);
+
+/** Return the size of a datatype (which is an enum of sensor_msgs::PointField::) in bytes
+ * @param datatype one of the enums of sensor_msgs::PointField::
+ * Note: Missing function in ros2 (from old pcl_ros)
+ */
+inline int sizeOfPointField(int datatype)
+{
+  if ((datatype == sensor_msgs::msg::PointField::INT8) || (datatype == sensor_msgs::msg::PointField::UINT8))
+    return 1;
+  else if ((datatype == sensor_msgs::msg::PointField::INT16) || (datatype == sensor_msgs::msg::PointField::UINT16))
+    return 2;
+  else if ((datatype == sensor_msgs::msg::PointField::INT32) || (datatype == sensor_msgs::msg::PointField::UINT32) ||
+      (datatype == sensor_msgs::msg::PointField::FLOAT32))
+    return 4;
+  else if (datatype == sensor_msgs::msg::PointField::FLOAT64)
+    return 8;
+  else
+  {
+    std::stringstream err;
+    err << "PointField of type " << datatype << " does not exist";
+    throw std::runtime_error(err.str());
+  }
+  return -1;
+}
 }
 
 #endif /* MSGCONVERSION_H_ */

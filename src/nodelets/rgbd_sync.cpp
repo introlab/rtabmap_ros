@@ -34,6 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <opencv2/highgui/highgui.hpp>
 
 #include "rtabmap/core/Compression.h"
+#include "rtabmap/core/util2d.h"
 #include "rtabmap/utilite/UConversion.h"
 #include "rtabmap_ros/MsgConversion.h"
 
@@ -43,7 +44,9 @@ namespace rtabmap_ros
 RGBDSync::RGBDSync(const rclcpp::NodeOptions & options) :
 	Node("rgbd_sync", options),
 	depthScale_(1.0),
+	decimation_(1),
 	compressedRate_(0),
+	warningThread_(0),
 	callbackCalled_(false),
 	approxSyncDepth_(0),
 	exactSyncDepth_(0)
@@ -53,11 +56,18 @@ RGBDSync::RGBDSync(const rclcpp::NodeOptions & options) :
 	approxSync = this->declare_parameter("approx_sync", approxSync);
 	queueSize = this->declare_parameter("queue_size", queueSize);
 	depthScale_ = this->declare_parameter("depth_scale", depthScale_);
+	decimation_ = this->declare_parameter("decimation", decimation_);
 	compressedRate_ = this->declare_parameter("compressed_rate", compressedRate_);
+
+	if(decimation_<1)
+	{
+		decimation_ = 1;
+	}
 
 	RCLCPP_INFO(this->get_logger(), "%s: approx_sync = %s", get_name(), approxSync?"true":"false");
 	RCLCPP_INFO(this->get_logger(), "%s: queue_size  = %d", get_name(), queueSize);
 	RCLCPP_INFO(this->get_logger(), "%s: depth_scale = %f", get_name(), depthScale_);
+	RCLCPP_INFO(this->get_logger(), "%s: decimation = %d", get_name(), decimation_);
 	RCLCPP_INFO(this->get_logger(), "%s: compressed_rate = %f", get_name(), compressedRate_);
 
 	rgbdImagePub_ = this->create_publisher<rtabmap_ros::msg::RGBDImage>("rgbd_image", 1);
@@ -75,9 +85,9 @@ RGBDSync::RGBDSync(const rclcpp::NodeOptions & options) :
 	}
 
 	image_transport::TransportHints hints(this);
-	imageSub_.subscribe(this, "rgb/image", hints.getTransport(), rmw_qos_profile_sensor_data);
-	imageDepthSub_.subscribe(this, "depth/image", hints.getTransport(), rmw_qos_profile_sensor_data);
-	cameraInfoSub_.subscribe(this, "rgb/camera_info", rmw_qos_profile_sensor_data);
+	imageSub_.subscribe(this, "rgb/image", hints.getTransport());
+	imageDepthSub_.subscribe(this, "depth/image", hints.getTransport());
+	cameraInfoSub_.subscribe(this, "rgb/camera_info");
 
 	subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s",
 						get_name(),
@@ -131,8 +141,44 @@ void RGBDSync::callback(
 		rtabmap_ros::msg::RGBDImage::UniquePtr msg(new rtabmap_ros::msg::RGBDImage);
 		msg->header.frame_id = cameraInfo->header.frame_id;
 		msg->header.stamp = rgbStamp>depthStamp?image->header.stamp:depth->header.stamp;
-		msg->rgb_camera_info = *cameraInfo;
-		msg->depth_camera_info = *cameraInfo;
+		if(decimation_>1 && !(depth->width % decimation_ == 0 && depth->height % decimation_ == 0))
+		{
+			RCLCPP_WARN(this->get_logger(), "Decimation of depth images should be exact (decimation=%d, size=(%d,%d))! "
+				   "Images won't be resized.", decimation_, depth->width, depth->height);
+			decimation_ = 1;
+		}
+		if(decimation_>1)
+		{
+			rtabmap::CameraModel model = rtabmap_ros::cameraModelFromROS(*cameraInfo);
+			sensor_msgs::msg::CameraInfo info;
+			rtabmap_ros::cameraModelToROS(model.scaled(1.0f/float(decimation_)), info);
+			info.header = cameraInfo->header;
+			msg->rgb_camera_info = info;
+			msg->depth_camera_info = info;
+		}
+		else
+		{
+			msg->rgb_camera_info = *cameraInfo;
+			msg->depth_camera_info = *cameraInfo;
+		}
+
+		cv::Mat rgbMat;
+		cv::Mat depthMat;
+		cv_bridge::CvImageConstPtr imagePtr = cv_bridge::toCvShare(image);
+		cv_bridge::CvImageConstPtr imageDepthPtr = cv_bridge::toCvShare(depth);
+		rgbMat = imagePtr->image;
+		depthMat = imageDepthPtr->image;
+
+		if(decimation_>1)
+		{
+			rgbMat = rtabmap::util2d::decimate(rgbMat, decimation_);
+			depthMat = rtabmap::util2d::decimate(depthMat, decimation_);
+		}
+
+		if(depthScale_ != 1.0)
+		{
+			depthMat*=depthScale_;
+		}
 
 		if(rgbdImageCompressedPub_->get_subscription_count())
 		{
@@ -151,21 +197,19 @@ void RGBDSync::callback(
 				lastCompressedPublished_ = now();
 
 				rtabmap_ros::msg::RGBDImage::UniquePtr msgCompressed(new rtabmap_ros::msg::RGBDImage);
-				*msgCompressed = *msg;
+				msgCompressed->header = msg->header;
+				msgCompressed->rgb_camera_info = msg->rgb_camera_info;
+				msgCompressed->depth_camera_info = msg->depth_camera_info;
 
-				cv_bridge::CvImageConstPtr imagePtr = cv_bridge::toCvShare(image);
-				imagePtr->toCompressedImageMsg(msgCompressed->rgb_compressed, cv_bridge::JPG);
+				cv_bridge::CvImage cvImg;
+				cvImg.header = image->header;
+				cvImg.image = rgbMat;
+				cvImg.encoding = image->encoding;
+				cvImg.toCompressedImageMsg(msgCompressed->rgb_compressed, cv_bridge::JPG);
 
-				cv_bridge::CvImageConstPtr imageDepthPtr = cv_bridge::toCvShare(depth);
 				msgCompressed->depth_compressed.header = imageDepthPtr->header;
-				if(depthScale_ != 1.0)
-				{
-					msgCompressed->depth_compressed.data = rtabmap::compressImage(imageDepthPtr->image*depthScale_, ".png");
-				}
-				else
-				{
-					msgCompressed->depth_compressed.data = rtabmap::compressImage(imageDepthPtr->image, ".png");
-				}
+				msgCompressed->depth_compressed.data = rtabmap::compressImage(depthMat, ".png");
+
 				msgCompressed->depth_compressed.format = "png";
 
 				rgbdImageCompressedPub_->publish(std::move(msgCompressed));
@@ -174,17 +218,18 @@ void RGBDSync::callback(
 
 		if(rgbdImagePub_->get_subscription_count())
 		{
-			msg->rgb = *image;
-			if(depthScale_ != 1.0)
-			{
-				cv_bridge::CvImagePtr imageDepthPtr = cv_bridge::toCvCopy(depth);
-				imageDepthPtr->image*=depthScale_;
-				msg->depth = *imageDepthPtr->toImageMsg();
-			}
-			else
-			{
-				msg->depth = *depth;
-			}
+			cv_bridge::CvImage cvImg;
+			cvImg.header = image->header;
+			cvImg.image = rgbMat;
+			cvImg.encoding = image->encoding;
+			cvImg.toImageMsg(msg->rgb);
+
+			cv_bridge::CvImage cvDepth;
+			cvDepth.header = depth->header;
+			cvDepth.image = depthMat;
+			cvDepth.encoding = depth->encoding;
+			cvDepth.toImageMsg(msg->depth);
+
 			rgbdImagePub_->publish(std::move(msg));
 		}
 

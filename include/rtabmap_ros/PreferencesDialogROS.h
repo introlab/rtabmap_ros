@@ -37,7 +37,7 @@ using namespace rtabmap;
 class PreferencesDialogROS : public PreferencesDialog
 {
 public:
-	PreferencesDialogROS(rclcpp::Node * node, const QString & configFile);
+	PreferencesDialogROS(rclcpp::Node * node, const QString & configFile, const std::string & rtabmapNodeName);
 	virtual ~PreferencesDialogROS();
 
 	virtual QString getIniFilePath() const;
@@ -54,6 +54,7 @@ protected:
 private:
 	QString configFile_;
 	rclcpp::Node * node_;
+	std::string rtabmapNodeName_;
 };
 
 #endif /* PREFERENCESDIALOGROS_H_ */

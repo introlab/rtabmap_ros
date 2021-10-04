@@ -51,6 +51,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace rtabmap
 {
 	class MainWindow;
+	class PreferencesDialog;
 }
 
 class QApplication;
@@ -78,9 +79,13 @@ private:
 			const std::vector<cv_bridge::CvImageConstPtr> & imageMsgs,
 			const std::vector<cv_bridge::CvImageConstPtr> & depthMsgs,
 			const std::vector<sensor_msgs::msg::CameraInfo> & cameraInfoMsgs,
-			const sensor_msgs::msg::LaserScan::ConstSharedPtr& scanMsg,
-			const sensor_msgs::msg::PointCloud2::ConstSharedPtr& scan3dMsg,
-			const rtabmap_ros::msg::OdomInfo::ConstSharedPtr& odomInfoMsg);
+			const sensor_msgs::msg::LaserScan & scanMsg,
+			const sensor_msgs::msg::PointCloud2 & scan3dMsg,
+			const rtabmap_ros::msg::OdomInfo::ConstSharedPtr& odomInfoMsg,
+			const std::vector<rtabmap_ros::msg::GlobalDescriptor> & globalDescriptorMsgs = std::vector<rtabmap_ros::msg::GlobalDescriptor>(),
+			const std::vector<std::vector<rtabmap_ros::msg::KeyPoint> > & localKeyPoints = std::vector<std::vector<rtabmap_ros::msg::KeyPoint> >(),
+			const std::vector<std::vector<rtabmap_ros::msg::Point3f> > & localPoints3d = std::vector<std::vector<rtabmap_ros::msg::Point3f> >(),
+			const std::vector<cv::Mat> & localDescriptors = std::vector<cv::Mat>());
 	virtual void commonStereoCallback(
 			const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
 			const rtabmap_ros::msg::UserData::ConstSharedPtr & userDataMsg,
@@ -88,15 +93,20 @@ private:
 			const cv_bridge::CvImageConstPtr& rightImageMsg,
 			const sensor_msgs::msg::CameraInfo& leftCamInfoMsg,
 			const sensor_msgs::msg::CameraInfo& rightCamInfoMsg,
-			const sensor_msgs::msg::LaserScan::ConstSharedPtr& scan2dMsg,
-			const sensor_msgs::msg::PointCloud2::ConstSharedPtr& scan3dMsg,
-			const rtabmap_ros::msg::OdomInfo::ConstSharedPtr& odomInfoMsg);
+			const sensor_msgs::msg::LaserScan & scan2dMsg,
+			const sensor_msgs::msg::PointCloud2 & scan3dMsg,
+			const rtabmap_ros::msg::OdomInfo::ConstSharedPtr& odomInfoMsg,
+			const std::vector<rtabmap_ros::msg::GlobalDescriptor> & globalDescriptorMsgs = std::vector<rtabmap_ros::msg::GlobalDescriptor>(),
+			const std::vector<rtabmap_ros::msg::KeyPoint> & localKeyPoints = std::vector<rtabmap_ros::msg::KeyPoint>(),
+			const std::vector<rtabmap_ros::msg::Point3f> & localPoints3d = std::vector<rtabmap_ros::msg::Point3f>(),
+			const cv::Mat & localDescriptors = cv::Mat());
 	virtual void commonLaserScanCallback(
 			const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
 			const rtabmap_ros::msg::UserData::ConstSharedPtr & userDataMsg,
-			const sensor_msgs::msg::LaserScan::ConstSharedPtr& scan2dMsg,
-			const sensor_msgs::msg::PointCloud2::ConstSharedPtr& scan3dMsg,
-			const rtabmap_ros::msg::OdomInfo::ConstSharedPtr& odomInfoMsg);
+			const sensor_msgs::msg::LaserScan & scan2dMsg,
+			const sensor_msgs::msg::PointCloud2 & scan3dMsg,
+			const rtabmap_ros::msg::OdomInfo::ConstSharedPtr& odomInfoMsg,
+			const rtabmap_ros::msg::GlobalDescriptor & globalDescriptor = rtabmap_ros::msg::GlobalDescriptor());
 
 	virtual void commonOdomCallback(
 			const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
@@ -110,9 +120,11 @@ private:
 	bool callMapDataService(const std::string & name, bool global, bool optimized, bool graphOnly);
 
 private:
+	rtabmap::PreferencesDialog * prefDialog_;
 	rtabmap::MainWindow * mainWindow_;
 	std::string cameraNodeName_;
 	double lastOdomInfoUpdateTime_;
+	std::string rtabmapNodeName_;
 
 	// odometry subscription stuffs
 	std::string frameId_;

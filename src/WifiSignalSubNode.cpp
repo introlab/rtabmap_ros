@@ -42,6 +42,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
 
+bool hueSymbol = false;
+int min_dbm = -100;
+int max_dbm = -50;
+bool autoScale = false;
+
 // A percentage value that represents the signal quality
 // of the network. WLAN_SIGNAL_QUALITY is of type ULONG.
 // This member contains a value between 0 and 100. A value
@@ -52,12 +57,63 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 inline int dBm2Quality(int dBm)
 {
 	// dBm to Quality:
-    if(dBm <= -100)
+    if(dBm <= min_dbm)
         return 0;
-    else if(dBm >= -50)
+    else if(dBm >= max_dbm)
     	return 100;
     else
-    	return 2 * (dBm + 100);
+    {
+    	return -(dBm-min_dbm)*100/(min_dbm-max_dbm);
+    }
+}
+
+void HSVtoRGB( float *r, float *g, float *b, float h, float s, float v )
+{
+	int i;
+	float f, p, q, t;
+	if( s == 0 ) {
+		// achromatic (grey)
+		*r = *g = *b = v;
+		return;
+	}
+	h /= 60;			// sector 0 to 5
+	i = floor( h );
+	f = h - i;			// factorial part of h
+	p = v * ( 1 - s );
+	q = v * ( 1 - s * f );
+	t = v * ( 1 - s * ( 1 - f ) );
+	switch( i ) {
+		case 0:
+			*r = v;
+			*g = t;
+			*b = p;
+			break;
+		case 1:
+			*r = q;
+			*g = v;
+			*b = p;
+			break;
+		case 2:
+			*r = p;
+			*g = v;
+			*b = t;
+			break;
+		case 3:
+			*r = p;
+			*g = q;
+			*b = v;
+			break;
+		case 4:
+			*r = t;
+			*g = p;
+			*b = v;
+			break;
+		default:		// case 5:
+			*r = v;
+			*g = p;
+			*b = q;
+			break;
+	}
 }
 
 ros::Publisher wifiSignalCloudPub;
@@ -82,7 +138,12 @@ void mapDataCallback(const rtabmap_ros::MapDataConstPtr & mapDataMsg)
 
 		nodeStamps_.insert(std::make_pair(node.getStamp(), node.id()));
 
-		if(!node.sensorData().userDataCompressed().empty())
+		if(node.sensorData().envSensors().find(rtabmap::EnvSensor::kWifiSignalStrength) != node.sensorData().envSensors().end())
+		{
+			rtabmap::EnvSensor sensor = node.sensorData().envSensors().at(rtabmap::EnvSensor::kWifiSignalStrength);
+			wifiLevels.insert(std::make_pair(sensor.stamp()>0.0?sensor.stamp():iter->second.getStamp(), sensor.value()));
+		}
+		else if(!node.sensorData().userDataCompressed().empty())
 		{
 			cv::Mat data;
 			node.sensorData().uncompressDataConst(0 ,0, 0, &data);
@@ -124,6 +185,24 @@ void mapDataCallback(const rtabmap_ros::MapDataConstPtr & mapDataMsg)
 
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr assembledWifiSignals(new pcl::PointCloud<pcl::PointXYZRGB>);
 	int id = 0;
+	float min=0,max=0;
+	for(std::map<double, int>::iterator iter=wifiLevels.begin(); iter!=wifiLevels.end(); ++iter, ++id)
+	{
+		if(min == 0.0f || min > iter->second)
+		{
+			min = iter->second;
+		}
+		if(max == 0.0f || max < iter->second)
+		{
+			max = iter->second;
+		}
+	}
+	ROS_INFO("Min/Max dBm = %f %f", min, max);
+	if(autoScale && min<0 && min < max)
+	{
+		min_dbm = min;
+		max_dbm = max;
+	}
 	for(std::map<double, int>::iterator iter=wifiLevels.begin(); iter!=wifiLevels.end(); ++iter, ++id)
 	{
 		// The Wifi value may be taken between two nodes, interpolate its position.
@@ -155,34 +234,51 @@ void mapDataCallback(const rtabmap_ros::MapDataConstPtr & mapDataMsg)
 
 			rtabmap::Transform wifiPose = (poseA*v).translation(); // rip off the rotation
 
-			// Make a line with points
-			int quality = dBm2Quality(iter->second)/10;
 			pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZRGB>);
-			for(int i=0; i<10; ++i)
+			if(hueSymbol)
 			{
-				// 2 cm between each points
-				// the number of points depends on the dBm (which varies from -30 (near) to -80 (far))
-				pcl::PointXYZRGB pt;
-				pt.z = float(i+1)*0.02f;
-				if(i<quality)
-				{
-					// green
-					pt.g = 255;
-					if(i<7)
-					{
-						// yellow
-						pt.r = 255;
-					}
-				}
-				else
-				{
-					// gray
-					pt.r = pt.g = pt.b = 100;
-				}
-				cloud->push_back(pt);
+				// scale between red -> yellow -> green
+				int quality = dBm2Quality(iter->second)*120/100;
+				float r,g,b;
+				HSVtoRGB(&r,&g,&b,quality,1,1);
+				pcl::PointXYZRGB anchor;
+				anchor.r = r*255;
+				anchor.g = g*255;
+				anchor.b = b*255;
+				cloud->push_back(anchor);
 			}
-			pcl::PointXYZRGB anchor(255, 0, 0);
-			cloud->push_back(anchor);
+			else
+			{
+
+				// Make a line with points
+				int quality = dBm2Quality(iter->second)/10;
+				for(int i=0; i<10; ++i)
+				{
+					// 2 cm between each points
+					// the number of points depends on the dBm (which varies from -30 (near) to -80 (far))
+					pcl::PointXYZRGB pt;
+					pt.z = float(i+1)*0.02f;
+					if(i<quality)
+					{
+						// green
+						pt.g = 255;
+						if(i<7)
+						{
+							// yellow
+							pt.r = 255;
+						}
+					}
+					else
+					{
+						// gray
+						pt.r = pt.g = pt.b = 100;
+					}
+					cloud->push_back(pt);
+				}
+				pcl::PointXYZRGB anchor;
+				anchor.r = 255;
+				cloud->push_back(anchor);
+			}
 
 			cloud = rtabmap::util3d::transformPointCloud(cloud, wifiPose);
 
@@ -213,9 +309,10 @@ int main(int argc, char** argv)
 	ros::NodeHandle nh;
 	ros::NodeHandle pnh("~");
 
-	std::string interface = "wlan0";
-	double rateHz = 0.5; // Hz
-	std::string frameId = "base_link";
+	pnh.param("hue_symbol", hueSymbol, hueSymbol);
+	pnh.param("min", min_dbm, min_dbm);
+	pnh.param("max", max_dbm, max_dbm);
+	pnh.param("auto", autoScale, autoScale);
 
 	wifiSignalCloudPub = nh.advertise<sensor_msgs::PointCloud2>("wifi_signals", 1);
 	ros::Subscriber mapDataSub = nh.subscribe("/rtabmap/mapData", 1, mapDataCallback);

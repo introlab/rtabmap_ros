@@ -47,6 +47,7 @@ void CommonDataSubscriber::odomInfoCallback(
 	sensor_msgs::msg::LaserScan::SharedPtr scan2dMsg; // Null
 	commonOdomCallback(odomMsg, userDataMsg, odomInfoMsg);
 }
+#ifdef RTABMAP_SYNC_USER_DATA
 void CommonDataSubscriber::odomDataCallback(
 		const nav_msgs::msg::Odometry::ConstSharedPtr odomMsg,
 		const rtabmap_ros::msg::UserData::ConstSharedPtr userDataMsg)
@@ -64,6 +65,7 @@ void CommonDataSubscriber::odomDataInfoCallback(
 	sensor_msgs::msg::PointCloud2::SharedPtr scan3dMsg; // Null
 	commonOdomCallback(odomMsg, userDataMsg, odomInfoMsg);
 }
+#endif
 
 void CommonDataSubscriber::setupOdomCallbacks(
 		rclcpp::Node& node,
@@ -76,32 +78,35 @@ void CommonDataSubscriber::setupOdomCallbacks(
 
 	if(subscribeUserData || subscribeOdomInfo)
 	{
-		odomSub_.subscribe(&node, "odom", rmw_qos_profile_sensor_data);
+		odomSub_.subscribe(&node, "odom");
 
+#ifdef RTABMAP_SYNC_USER_DATA
 		if(subscribeUserData)
 		{
-			userDataSub_.subscribe(&node, "user_data", rmw_qos_profile_sensor_data);
+			userDataSub_.subscribe(&node, "user_data");
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(&node, "odom_info", rmw_qos_profile_sensor_data);
-				SYNC_DECL3(odomDataInfo, approxSync, queueSize, odomSub_, userDataSub_, odomInfoSub_);
+				odomInfoSub_.subscribe(&node, "odom_info");
+				SYNC_DECL3(CommonDataSubscriber, odomDataInfo, approxSync, queueSize, odomSub_, userDataSub_, odomInfoSub_);
 			}
 			else
 			{
-				SYNC_DECL2(odomData, approxSync, queueSize, odomSub_, userDataSub_);
+				SYNC_DECL2(CommonDataSubscriber, odomData, approxSync, queueSize, odomSub_, userDataSub_);
 			}
 		}
-		else if(subscribeOdomInfo)
+		else 
+#endif
+		if(subscribeOdomInfo)
 		{
 			subscribedToOdomInfo_ = true;
-			odomInfoSub_.subscribe(&node, "odom_info", rmw_qos_profile_sensor_data);
-			SYNC_DECL2(odomInfo, approxSync, queueSize, odomSub_, odomInfoSub_);
+			odomInfoSub_.subscribe(&node, "odom_info");
+			SYNC_DECL2(CommonDataSubscriber, odomInfo, approxSync, queueSize, odomSub_, odomInfoSub_);
 		}
 	}
 	else
 	{
-		odomSubOnly_ = node.create_subscription<nav_msgs::msg::Odometry>("odom", rclcpp::SensorDataQoS(), std::bind(&CommonDataSubscriber::odomCallback, this, std::placeholders::_1));
+		odomSubOnly_ = node.create_subscription<nav_msgs::msg::Odometry>("odom", 5, std::bind(&CommonDataSubscriber::odomCallback, this, std::placeholders::_1));
 		subscribedTopicsMsg_ =
 				uFormat("\n%s subscribed to:\n   %s",
 				node.get_name(),

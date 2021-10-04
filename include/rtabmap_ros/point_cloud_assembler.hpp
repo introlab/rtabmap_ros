@@ -61,6 +61,11 @@ public:
 	virtual ~PointCloudAssembler();
 
 private:
+	void callbackCloudOdomInfo(
+				const sensor_msgs::msg::PointCloud2::ConstSharedPtr cloudMsg,
+				const nav_msgs::msg::Odometry::ConstSharedPtr odomMsg,
+				const rtabmap_ros::msg::OdomInfo::ConstSharedPtr odomInfoMsg);
+
 	void callbackCloudOdom(
 			const sensor_msgs::msg::PointCloud2::ConstSharedPtr cloudMsg,
 			const nav_msgs::msg::Odometry::ConstSharedPtr odomMsg);
@@ -75,24 +80,36 @@ private:
 	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr cloudPub_;
 
 	typedef message_filters::sync_policies::ExactTime<sensor_msgs::msg::PointCloud2, nav_msgs::msg::Odometry> syncPolicy;
+	typedef message_filters::sync_policies::ExactTime<sensor_msgs::msg::PointCloud2, nav_msgs::msg::Odometry, rtabmap_ros::msg::OdomInfo> syncInfoPolicy;
 	message_filters::Synchronizer<syncPolicy>* exactSync_;
+	message_filters::Synchronizer<syncInfoPolicy>* exactInfoSync_;
 	message_filters::Subscriber<sensor_msgs::msg::PointCloud2> syncCloudSub_;
 	message_filters::Subscriber<nav_msgs::msg::Odometry> syncOdomSub_;
+	message_filters::Subscriber<rtabmap_ros::msg::OdomInfo> syncOdomInfoSub_;
 
 	int maxClouds_;
 	int skipClouds_;
 	int cloudsSkipped_;
+	bool circularBuffer_;
+	double linearUpdate_;
+	double angularUpdate_;
 	double assemblingTime_;
-	double waitForTransformDuration_;
+	double waitForTransform_;
 	double rangeMin_;
 	double rangeMax_;
 	double voxelSize_;
+	double noiseRadius_;
+	int noiseMinNeighbors_;
+	bool removeZ_;
 	std::string fixedFrameId_;
+	std::string frameId_;
 	std::shared_ptr<tf2_ros::Buffer> tfBuffer_;
 	std::shared_ptr<tf2_ros::TransformListener> tfListener_;
+	rtabmap::Transform previousPose_;
 
-	std::vector<sensor_msgs::msg::PointCloud2::SharedPtr> clouds_;
+	std::list<pcl::PCLPointCloud2::Ptr> clouds_;
+
+	std::string subscribedTopicsMsg_;
 };
 
 }
-

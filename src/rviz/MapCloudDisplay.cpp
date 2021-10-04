@@ -87,6 +87,8 @@ const std::string MapCloudDisplay::message_status_name_ = "Message";  // NOLINT 
 
 MapCloudDisplay::MapCloudDisplay()
   : auto_size_(false),
+	current_map_updated_(false),
+    lastCloudAdded_(-1),
     new_xyz_transformer_(false),
     new_color_transformer_(false),
     needs_retransform_(false),
@@ -186,6 +188,8 @@ MapCloudDisplay::MapCloudDisplay()
 	node_filtering_angle_->setMin( 0.0f );
 	node_filtering_angle_->setMax( 359.0f );
 
+	download_namespace = new rviz_common::properties::StringProperty("Download namespace", "rtabmap", "Namespace used to call Download services below", this, SLOT( downloadNamespaceChanged() ), this);
+
 	download_map_ = new rviz_common::properties::BoolProperty( "Download map", false,
 										 "Download the optimized global map using rtabmap/GetMap service. This will force to re-create all clouds.",
 										 this, SLOT( downloadMap() ), this );
@@ -193,6 +197,7 @@ MapCloudDisplay::MapCloudDisplay()
 	download_graph_ = new rviz_common::properties::BoolProperty( "Download graph", false,
 											 "Download the optimized global graph (without cloud data) using rtabmap/GetMap service.",
 											 this, SLOT( downloadGraph() ), this );
+	downloadNamespaceChanged();
 }
 
 
@@ -373,6 +378,7 @@ void MapCloudDisplay::processMapData(const rtabmap_ros::msg::MapData& map)
 	{
 		std::unique_lock<std::mutex> lock(current_map_mutex_);
 		current_map_ = poses;
+		current_map_updated_ = true;
 	}
 }
 
@@ -482,38 +488,47 @@ void MapCloudDisplay::updateCloudParameters()
 	// do nothing... only take effect on next generated clouds
 }
 
-void MapCloudDisplay::downloadMap()
+void MapCloudDisplay::downloadMap(bool graphOnly)
 {
-	if(download_map_->getBool())
+	RCLCPP_ERROR(rviz_ros_node_.lock()->get_raw_node()->get_logger(), "MapCloud plugin: DownloadMap still not working on ros2");
+	return;
+	// FIXME: ros2 seg fault:
+	/*
+	auto request = std::make_shared<rtabmap_ros::srv::GetMap::Request>();
+	request->global = true;
+	request->optimized = true;
+	request->graph_only = graphOnly;
+	std::string rtabmapNs = download_namespace->getStdString();
+	std::string srvName = uFormat("%s/get_map_data", rtabmapNs.c_str());
+	QMessageBox * messageBox = new QMessageBox(
+			QMessageBox::NoIcon,
+			tr("Calling \"%1\" service...").arg(srvName.c_str()),
+			tr("Downloading the map... please wait (rviz could become gray!)"),
+			QMessageBox::NoButton);
+	messageBox->setAttribute(Qt::WA_DeleteOnClose, true);
+	messageBox->show();
+	QApplication::processEvents();
+	uSleep(100); // hack make sure the text in the QMessageBox is shown...
+	QApplication::processEvents();
+	
+	auto client = rviz_ros_node_.lock()->get_raw_node()->create_client<rtabmap_ros::srv::GetMap>(srvName);
+	if(client->wait_for_service(std::chrono::seconds(2)))
 	{
-		QMessageBox * messageBox = new QMessageBox(
-				QMessageBox::NoIcon,
-				tr("Calling \"%1\" service...").arg("get_map_data"),
-				tr("Downloading the map... please wait (rviz could become gray!)"),
-				QMessageBox::NoButton);
-		messageBox->setAttribute(Qt::WA_DeleteOnClose, true);
-		messageBox->show();
-		QApplication::processEvents();
-		uSleep(100); // hack make sure the text in the QMessageBox is shown...
-		QApplication::processEvents();
-
-		auto node = rclcpp::Node::make_shared(rviz_ros_node_.lock()->get_node_name());
-		 auto client = node->create_client<rtabmap_ros::srv::GetMap>("get_map_data");
-		if(client->wait_for_service(std::chrono::seconds(2)))
-		{
-			auto request = std::make_shared<rtabmap_ros::srv::GetMap::Request>();
-			request->global = true;
-			request->optimized = true;
-			request->graph_only = false;
-			auto result_future = client->async_send_request(request);
-			if (rclcpp::spin_until_future_complete(node, result_future) != rclcpp::FutureReturnCode::SUCCESS)
+		using ServiceResponseFuture =
+				rclcpp::Client<rtabmap_ros::srv::GetMap>::SharedFuture;
+		auto response_received_callback = [this, &graphOnly, &messageBox](ServiceResponseFuture future) {
+			auto result = future.get();
+			if(graphOnly)
 			{
-				RCLCPP_ERROR(node->get_logger(), "Service \"get_map_data\" failed to get the data.");
+				messageBox->setText(tr("Updating the map (%1 nodes downloaded)...").arg(result->data.graph.poses.size()));
+				QApplication::processEvents();
+				processMapData(result->data);
+				messageBox->setText(tr("Updating the map (%1 nodes downloaded)... done!").arg(result->data.graph.poses.size()));
+
+				QTimer::singleShot(1000, messageBox, SLOT(close()));
 			}
 			else
 			{
-				auto result = result_future.get();
-
 				messageBox->setText(tr("Creating all clouds (%1 poses and %2 clouds downloaded)...")
 						.arg(result->data.graph.poses.size()).arg(result->data.nodes.size()));
 				QApplication::processEvents();
@@ -524,17 +539,36 @@ void MapCloudDisplay::downloadMap()
 
 				QTimer::singleShot(1000, messageBox, SLOT(close()));
 			}
-		}
-		else
-		{
-			std::string msg = uFormat("MapCloudDisplay: Can't call \"get_map_data\" service. "
-					  "Tip: if rtabmap node is not in rtabmap namespace, you can remap the service "
-					  "to \"get_map_data\" in the launch "
-					  "file like: <remap from=\"get_map_data\" to=\"/rtabmap/get_map_data\"/>.");
-			RVIZ_COMMON_LOG_ERROR(msg);
-			messageBox->setText(msg.c_str());
-		}
+		};
+		auto result_future = client->async_send_request(request, response_received_callback);
+		result_future.wait();
+	}
+	else
+	{
+		std::string msg = uFormat("MapCloudDisplay: Cannot call \"%s\" service. "
+				  "Tip: if rtabmap node is not in \"%s\" namespace, you can "
+				  "change the \"Download namespace\" option.",
+				  srvName.c_str(),
+				  rtabmapNs.c_str());
+		RVIZ_COMMON_LOG_ERROR(msg);
+		messageBox->setText(msg.c_str());
+	}
+	*/
+}
 
+void MapCloudDisplay::downloadNamespaceChanged()
+{
+	std::string rtabmapNs = download_namespace->getStdString();
+	std::string topicName = uFormat("%s/republish_node_data", rtabmapNs.c_str());
+	// FIXME: ros2 seg fault:
+	//republishNodeDataPub_ = rviz_ros_node_.lock()->get_raw_node()->create_publisher<std_msgs::msg::Int32MultiArray>(topicName, 1);
+}
+
+void MapCloudDisplay::downloadMap()
+{
+	if(download_map_->getBool())
+	{
+		downloadMap(false);
 		download_map_->blockSignals(true);
 		download_map_->setBool(false);
 		download_map_->blockSignals(false);
@@ -553,52 +587,7 @@ void MapCloudDisplay::downloadGraph()
 {
 	if(download_graph_->getBool())
 	{
-		QMessageBox * messageBox = new QMessageBox(
-				QMessageBox::NoIcon,
-				tr("Calling \"%1\" service...").arg("get_map_data"),
-				tr("Downloading the map... please wait (rviz could become gray!)"),
-				QMessageBox::NoButton);
-		messageBox->setAttribute(Qt::WA_DeleteOnClose, true);
-		messageBox->show();
-		QApplication::processEvents();
-		uSleep(100); // hack make sure the text in the QMessageBox is shown...
-		QApplication::processEvents();
-
-		auto node = rclcpp::Node::make_shared(rviz_ros_node_.lock()->get_node_name());
-		 auto client = node->create_client<rtabmap_ros::srv::GetMap>("get_map_data");
-		if(client->wait_for_service(std::chrono::seconds(2)))
-		{
-			auto request = std::make_shared<rtabmap_ros::srv::GetMap::Request>();
-			request->global = true;
-			request->optimized = true;
-			request->graph_only = true;
-			auto result_future = client->async_send_request(request);
-			if (rclcpp::spin_until_future_complete(node, result_future) != rclcpp::FutureReturnCode::SUCCESS)
-			{
-				RCLCPP_ERROR(node->get_logger(), "Service \"get_map_data\" failed to get the data.");
-			}
-			else
-			{
-				auto result = result_future.get();
-
-				messageBox->setText(tr("Updating the map (%1 nodes downloaded)...").arg(result->data.graph.poses.size()));
-				QApplication::processEvents();
-				processMapData(result->data);
-				messageBox->setText(tr("Updating the map (%1 nodes downloaded)... done!").arg(result->data.graph.poses.size()));
-
-				QTimer::singleShot(1000, messageBox, SLOT(close()));
-			}
-		}
-		else
-		{
-			std::string msg = uFormat("MapCloudDisplay: Can't call \"get_map_data\" service. "
-					  "Tip: if rtabmap node is not in rtabmap namespace, you can remap the service "
-					  "to \"get_map_data\" in the launch "
-					  "file like: <remap from=\"get_map_data\" to=\"rtabmap/get_map_data\"/>");
-			RVIZ_COMMON_LOG_ERROR(msg);
-			messageBox->setText(msg.c_str());
-		}
-
+		downloadMap(true);
 		download_graph_->blockSignals(true);
 		download_graph_->setBool(false);
 		download_graph_->blockSignals(false);
@@ -621,6 +610,8 @@ void MapCloudDisplay::causeRetransform()
 void MapCloudDisplay::update( float, float )
 {
 	auto mode = static_cast<rviz_rendering::PointCloud::RenderMode>(style_property_->getOptionInt());
+
+	int lastCloudAdded = -1;
 
 	if (needs_retransform_)
 	{
@@ -663,6 +654,7 @@ void MapCloudDisplay::update( float, float )
 
 				cloud_infos_.erase(it->first);
 				cloud_infos_.insert(*it);
+				lastCloudAdded = it->first;
 			}
 
 			new_cloud_infos_.clear();
@@ -701,6 +693,7 @@ void MapCloudDisplay::update( float, float )
 		std::unique_lock<std::mutex> lock(current_map_mutex_);
 		if(!current_map_.empty())
 		{
+			std::vector<int> missingNodes;
 			for (std::map<int, rtabmap::Transform>::iterator it=current_map_.begin(); it != current_map_.end(); ++it)
 			{
 				std::map<int, CloudInfoPtr>::iterator cloudInfoIt = cloud_infos_.find(it->first);
@@ -732,20 +725,52 @@ void MapCloudDisplay::update( float, float )
 					}
 					else
 					{
-						RVIZ_COMMON_LOG_ERROR(uFormat("MapCloudDisplay: Could not update pose of node %d", it->first));
+						RVIZ_COMMON_LOG_ERROR(uFormat("MapCloudDisplay: Could not update pose of node %d (cannot transform pose in target frame id \"%s\", set fixed frame in global options to \"%s\")", 
+								it->first,
+								cloudInfoIt->second->message_->header.frame_id.c_str(),
+								cloudInfoIt->second->message_->header.frame_id.c_str()));
 					}
-
+				}
+				else if(it->first>0 && current_map_updated_)
+				{
+					missingNodes.push_back(it->first);
 				}
 			}
 			//hide not used clouds
-			for(std::map<int, CloudInfoPtr>::iterator iter = cloud_infos_.begin(); iter!=cloud_infos_.end(); ++iter)
+			for(std::map<int, CloudInfoPtr>::iterator iter = cloud_infos_.begin(); iter!=cloud_infos_.end();)
 			{
 				if(current_map_.find(iter->first) == current_map_.end())
 				{
-					iter->second->scene_node_->setVisible(false);
+					if(iter->first == lastCloudAdded_)
+					{
+						// remove from cache, the node has been discarded
+						cloud_infos_.erase(iter++);
+						lastCloudAdded_ = -1;
+					}
+					else
+					{
+						iter->second->scene_node_->setVisible(false);
+						++iter;
+					}
+				}
+				else
+				{
+					++iter;
 				}
 			}
+
+			if(!missingNodes.empty() && republishNodeDataPub_.get())
+			{
+				std_msgs::msg::Int32MultiArray::UniquePtr msg(new std_msgs::msg::Int32MultiArray);
+				msg->data = missingNodes;
+				republishNodeDataPub_->publish(std::move(msg));
+			}
 		}
+		current_map_updated_ = false;
+	}
+	if(lastCloudAdded>0)
+	{
+		lastCloudAdded_ = lastCloudAdded;
 	}
 
 	this->setStatusStd(rviz_common::properties::StatusProperty::Ok, "Points", tr("%1").arg(totalPoints).toStdString());
@@ -754,6 +779,7 @@ void MapCloudDisplay::update( float, float )
 
 void MapCloudDisplay::reset()
 {
+	lastCloudAdded_ = -1;
 	{
 		std::unique_lock<std::mutex> lock(new_clouds_mutex_);
 		cloud_infos_.clear();
@@ -762,6 +788,7 @@ void MapCloudDisplay::reset()
 	{
 		std::unique_lock<std::mutex> lock(current_map_mutex_);
 		current_map_.clear();
+		current_map_updated_ = false;
 	}
 }
 

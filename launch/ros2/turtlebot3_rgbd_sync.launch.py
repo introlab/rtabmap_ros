@@ -2,11 +2,13 @@
 #   Install Turtlebot3 packages
 #   Install https://github.com/mlherd/ros2_turtlebot3_waffle_intel_realsense
 # Example:
+#   $ export TURTLEBOT3_MODEL=waffle
 #   $ ros2 launch turtlebot3_gazebo turtlebot3_world.launch.py
+#   $ ros2 run turtlebot3_teleop teleop_keyboard
 #
 #   $ ros2 launch rtabmap_ros turtlebot3_rgbd_sync.launch.py
 #   OR
-#   $ ros2 launch rtabmap_ros rtabmap.launch.py visual_odometry:=false frame_id:=base_footprint subscribe_scan:=true  approx_sync:=true odom_topic:=/odom args:="-d" use_sim_time:=true rgbd_sync:=true rgb_topic:=/intel_realsense_r200_depth/image_raw depth_topic:=/intel_realsense_r200_depth/depth/image_raw camera_info_topic:=/intel_realsense_r200_depth/camera_info
+#   $ ros2 launch rtabmap_ros rtabmap.launch.py visual_odometry:=false frame_id:=base_footprint subscribe_scan:=true  approx_sync:=true odom_topic:=/odom args:="-d --RGBD/NeighborLinkRefining true --Reg/Strategy 1" use_sim_time:=true rgbd_sync:=true rgb_topic:=/intel_realsense_r200_depth/image_raw depth_topic:=/intel_realsense_r200_depth/depth/image_raw camera_info_topic:=/intel_realsense_r200_depth/camera_info
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable
@@ -22,7 +24,9 @@ def generate_launch_description():
           'frame_id':'base_footprint',
           'use_sim_time':use_sim_time,
           'subscribe_rgbd':True,
-          'subscribe_scan':True}]
+          'subscribe_scan':True,
+          'Reg/Strategy':'1',
+          'RGBD/NeighborLinkRefining':'True'}]
 
     remappings=[
           ('rgb/image', '/intel_realsense_r200_depth/image_raw'),

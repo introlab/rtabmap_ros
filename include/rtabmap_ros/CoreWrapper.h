@@ -39,6 +39,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <std_msgs/msg/empty.hpp>
 #include <std_msgs/msg/int32.hpp>
+#include <std_msgs/msg/int32_multi_array.hpp>
 #include <std_msgs/msg/bool.hpp>
 #include <sensor_msgs/msg/nav_sat_fix.hpp>
 #include <sensor_msgs/msg/imu.hpp>
@@ -52,7 +53,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/Rtabmap.h>
 #include <rtabmap/core/OdometryInfo.h>
 
+#include "rtabmap_ros/srv/get_node_data.hpp"
 #include "rtabmap_ros/srv/get_map.hpp"
+#include "rtabmap_ros/srv/get_map2.hpp"
 #include "rtabmap_ros/srv/list_labels.hpp"
 #include "rtabmap_ros/srv/publish_map.hpp"
 #include "rtabmap_ros/srv/set_goal.hpp"
@@ -63,25 +66,26 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "rtabmap_ros/msg/odom_info.hpp"
 #include "rtabmap_ros/msg/info.hpp"
+#include "rtabmap_ros/srv/get_nodes_in_radius.hpp"
+#include "rtabmap_ros/srv/load_database.hpp"
+#include "rtabmap_ros/srv/detect_more_loop_closures.hpp"
+#include "rtabmap_ros/srv/global_bundle_adjustment.hpp"
+#include "rtabmap_ros/srv/cleanup_local_grids.hpp"
+#include "rtabmap_ros/srv/add_link.hpp"
 
 #include "MapsManager.h"
 
 #ifdef WITH_OCTOMAP_MSGS
-#include <octomap_msgs/GetOctomap.h>
+#include <octomap_msgs/srv/get_octomap.hpp>
 #endif
 
-#ifdef WITH_APRILTAG_ROS
-#include <apriltag_ros/msg/april_tag_detection_array.hpp>
+#ifdef WITH_APRILTAG_MSGS
+#include <apriltag_msgs/msg/april_tag_detection_array.hpp>
 #endif
 
 #ifdef WITH_MOVE_BASE_MSGS
-#include <actionlib/client/simple_action_client.h>
-#include <move_base_msgs/MoveBaseAction.h>
-#include <move_base_msgs/MoveBaseActionGoal.h>
-#include <move_base_msgs/MoveBaseActionResult.h>
-#include <move_base_msgs/MoveBaseActionFeedback.h>
-#include <actionlib_msgs/GoalStatusArray.h>
-typedef actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> MoveBaseClient;
+#include <move_base_msgs/action/move_base.hpp>
+#include <rclcpp_action/rclcpp_action.hpp>
 #endif
 
 namespace rtabmap {
@@ -107,18 +111,26 @@ private:
 				const std::vector<cv_bridge::CvImageConstPtr> & imageMsgs,
 				const std::vector<cv_bridge::CvImageConstPtr> & depthMsgs,
 				const std::vector<sensor_msgs::msg::CameraInfo> & cameraInfoMsgs,
-				const sensor_msgs::msg::LaserScan::ConstSharedPtr& scanMsg,
-				const sensor_msgs::msg::PointCloud2::ConstSharedPtr& scan3dMsg,
-				const rtabmap_ros::msg::OdomInfo::ConstSharedPtr& odomInfoMsg);
+				const sensor_msgs::msg::LaserScan & scanMsg,
+				const sensor_msgs::msg::PointCloud2 & scan3dMsg,
+				const rtabmap_ros::msg::OdomInfo::ConstSharedPtr& odomInfoMsg,
+				const std::vector<rtabmap_ros::msg::GlobalDescriptor> & globalDescriptorMsgs = std::vector<rtabmap_ros::msg::GlobalDescriptor>(),
+				const std::vector<std::vector<rtabmap_ros::msg::KeyPoint> > & localKeyPoints = std::vector<std::vector<rtabmap_ros::msg::KeyPoint> >(),
+				const std::vector<std::vector<rtabmap_ros::msg::Point3f> > & localPoints3d = std::vector<std::vector<rtabmap_ros::msg::Point3f> >(),
+				const std::vector<cv::Mat> & localDescriptors = std::vector<cv::Mat>());
 	void commonDepthCallbackImpl(
 				const std::string & odomFrameId,
 				const rtabmap_ros::msg::UserData::ConstSharedPtr & userDataMsg,
 				const std::vector<cv_bridge::CvImageConstPtr> & imageMsgs,
 				const std::vector<cv_bridge::CvImageConstPtr> & depthMsgs,
 				const std::vector<sensor_msgs::msg::CameraInfo> & cameraInfoMsgs,
-				const sensor_msgs::msg::LaserScan::ConstSharedPtr& scan2dMsg,
-				const sensor_msgs::msg::PointCloud2::ConstSharedPtr& scan3dMsg,
-				const rtabmap_ros::msg::OdomInfo::ConstSharedPtr& odomInfoMsg);
+				const sensor_msgs::msg::LaserScan & scan2dMsg,
+				const sensor_msgs::msg::PointCloud2 & scan3dMsg,
+				const rtabmap_ros::msg::OdomInfo::ConstSharedPtr& odomInfoMsg,
+				const std::vector<rtabmap_ros::msg::GlobalDescriptor> & globalDescriptorMsgs,
+				const std::vector<std::vector<rtabmap_ros::msg::KeyPoint> > & localKeyPoints,
+				const std::vector<std::vector<rtabmap_ros::msg::Point3f> > & localPoints3d,
+				const std::vector<cv::Mat> & localDescriptors);
 	virtual void commonStereoCallback(
 				const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
 				const rtabmap_ros::msg::UserData::ConstSharedPtr & userDataMsg,
@@ -126,15 +138,20 @@ private:
 				const cv_bridge::CvImageConstPtr& rightImageMsg,
 				const sensor_msgs::msg::CameraInfo& leftCamInfoMsg,
 				const sensor_msgs::msg::CameraInfo& rightCamInfoMsg,
-				const sensor_msgs::msg::LaserScan::ConstSharedPtr& scanMsg,
-				const sensor_msgs::msg::PointCloud2::ConstSharedPtr& scan3dMsg,
-				const rtabmap_ros::msg::OdomInfo::ConstSharedPtr& odomInfoMsg);
+				const sensor_msgs::msg::LaserScan & scanMsg,
+				const sensor_msgs::msg::PointCloud2 & scan3dMsg,
+				const rtabmap_ros::msg::OdomInfo::ConstSharedPtr& odomInfoMsg,
+				const std::vector<rtabmap_ros::msg::GlobalDescriptor> & globalDescriptorMsgs = std::vector<rtabmap_ros::msg::GlobalDescriptor>(),
+				const std::vector<rtabmap_ros::msg::KeyPoint> & localKeyPoints = std::vector<rtabmap_ros::msg::KeyPoint>(),
+				const std::vector<rtabmap_ros::msg::Point3f> & localPoints3d = std::vector<rtabmap_ros::msg::Point3f>(),
+				const cv::Mat & localDescriptors = cv::Mat());
 	virtual void commonLaserScanCallback(
 				const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
 				const rtabmap_ros::msg::UserData::ConstSharedPtr & userDataMsg,
-				const sensor_msgs::msg::LaserScan::ConstSharedPtr& scanMsg,
-				const sensor_msgs::msg::PointCloud2::ConstSharedPtr& scan3dMsg,
-				const rtabmap_ros::msg::OdomInfo::ConstSharedPtr& odomInfoMsg);
+				const sensor_msgs::msg::LaserScan & scanMsg,
+				const sensor_msgs::msg::PointCloud2 & scan3dMsg,
+				const rtabmap_ros::msg::OdomInfo::ConstSharedPtr& odomInfoMsg,
+				const rtabmap_ros::msg::GlobalDescriptor & globalDescriptor = rtabmap_ros::msg::GlobalDescriptor());
 	virtual void commonOdomCallback(
 			const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
 			const rtabmap_ros::msg::UserData::ConstSharedPtr & userDataMsg,
@@ -145,10 +162,11 @@ private:
 	void userDataAsyncCallback(const rtabmap_ros::msg::UserData::SharedPtr dataMsg);
 	void globalPoseAsyncCallback(const geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr globalPoseMsg);
 	void gpsFixAsyncCallback(const sensor_msgs::msg::NavSatFix::SharedPtr gpsFixMsg);
-#ifdef WITH_APRILTAG_ROS
-	void tagDetectionsAsyncCallback(const apriltag_ros::AprilTagDetectionArray tagDetections);
+#ifdef WITH_APRILTAG_MSGS
+	void tagDetectionsAsyncCallback(const apriltag_msgs::msg::AprilTagDetectionArray::SharedPtr tagDetections);
 #endif
 	void imuAsyncCallback(const sensor_msgs::msg::Imu::SharedPtr msg);
+	void republishNodeDataCallback(const std_msgs::msg::Int32MultiArray::ConstSharedPtr msg);
 	void interOdomCallback(const nav_msgs::msg::Odometry::SharedPtr msg);
 	void interOdomInfoCallback(const nav_msgs::msg::Odometry::ConstSharedPtr & msg1, const rtabmap_ros::msg::OdomInfo::ConstSharedPtr & msg2);
 
@@ -170,24 +188,33 @@ private:
 			const rtabmap::Transform & odom = rtabmap::Transform(),
 			const std::string & odomFrameId = "",
 			const cv::Mat & odomCovariance = cv::Mat::eye(6,6,CV_64FC1),
-			const rtabmap::OdometryInfo & odomInfo = rtabmap::OdometryInfo());
+			const rtabmap::OdometryInfo & odomInfo = rtabmap::OdometryInfo(),
+			double timeMsgConversion = 0.0);
+	std::map<int, rtabmap::Transform> filterNodesToAssemble(
+			const std::map<int, rtabmap::Transform> & nodes,
+			const rtabmap::Transform & currentPose);
 
+	void updateRtabmapCallback(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<std_srvs::srv::Empty::Request>, std::shared_ptr<std_srvs::srv::Empty::Response>);
 	void resetRtabmapCallback(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<std_srvs::srv::Empty::Request>, std::shared_ptr<std_srvs::srv::Empty::Response>);
 	void pauseRtabmapCallback(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<std_srvs::srv::Empty::Request>, std::shared_ptr<std_srvs::srv::Empty::Response>);
 	void resumeRtabmapCallback(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<std_srvs::srv::Empty::Request>, std::shared_ptr<std_srvs::srv::Empty::Response>);
+	void loadDatabaseCallback(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<rtabmap_ros::srv::LoadDatabase::Request>, std::shared_ptr<rtabmap_ros::srv::LoadDatabase::Response>);
 	void triggerNewMapCallback(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<std_srvs::srv::Empty::Request>, std::shared_ptr<std_srvs::srv::Empty::Response>);
 	void backupDatabaseCallback(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<std_srvs::srv::Empty::Request>, std::shared_ptr<std_srvs::srv::Empty::Response>);
+	void detectMoreLoopClosuresCallback(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<rtabmap_ros::srv::DetectMoreLoopClosures::Request>, std::shared_ptr<rtabmap_ros::srv::DetectMoreLoopClosures::Response>);
+	void globalBundleAdjustmentCallback(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<rtabmap_ros::srv::GlobalBundleAdjustment::Request>, std::shared_ptr<rtabmap_ros::srv::GlobalBundleAdjustment::Response>);
+	void cleanupLocalGridsCallback(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<rtabmap_ros::srv::CleanupLocalGrids::Request>, std::shared_ptr<rtabmap_ros::srv::CleanupLocalGrids::Response>);
 	void setModeLocalizationCallback(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<std_srvs::srv::Empty::Request>, std::shared_ptr<std_srvs::srv::Empty::Response>);
 	void setModeMappingCallback(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<std_srvs::srv::Empty::Request>, std::shared_ptr<std_srvs::srv::Empty::Response>);
 	void setLogDebug(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<std_srvs::srv::Empty::Request>, std::shared_ptr<std_srvs::srv::Empty::Response>);
 	void setLogInfo(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<std_srvs::srv::Empty::Request>, std::shared_ptr<std_srvs::srv::Empty::Response>);
 	void setLogWarn(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<std_srvs::srv::Empty::Request>, std::shared_ptr<std_srvs::srv::Empty::Response>);
 	void setLogError(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<std_srvs::srv::Empty::Request>, std::shared_ptr<std_srvs::srv::Empty::Response>);
+	void getNodeDataCallback(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<rtabmap_ros::srv::GetNodeData::Request>, std::shared_ptr<rtabmap_ros::srv::GetNodeData::Response>);
 	void getMapDataCallback(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<rtabmap_ros::srv::GetMap::Request>, std::shared_ptr<rtabmap_ros::srv::GetMap::Response>);
+	void getMapData2Callback(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<rtabmap_ros::srv::GetMap2::Request>, std::shared_ptr<rtabmap_ros::srv::GetMap2::Response>);
 	void getMapCallback(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<nav_msgs::srv::GetMap::Request>, std::shared_ptr<nav_msgs::srv::GetMap::Response>);
 	void getProbMapCallback(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<nav_msgs::srv::GetMap::Request>, std::shared_ptr<nav_msgs::srv::GetMap::Response>);
-	void getProjMapCallback(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<nav_msgs::srv::GetMap::Request>, std::shared_ptr<nav_msgs::srv::GetMap::Response>);
-	void getGridMapCallback(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<nav_msgs::srv::GetMap::Request>, std::shared_ptr<nav_msgs::srv::GetMap::Response>);
 	void publishMapCallback(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<rtabmap_ros::srv::PublishMap::Request>, std::shared_ptr<rtabmap_ros::srv::PublishMap::Response>);
 	void getPlanCallback(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<nav_msgs::srv::GetPlan::Request>, std::shared_ptr<nav_msgs::srv::GetPlan::Response>);
 	void getPlanNodesCallback(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<rtabmap_ros::srv::GetPlan::Request>, std::shared_ptr<rtabmap_ros::srv::GetPlan::Response>);
@@ -195,9 +222,11 @@ private:
 	void cancelGoalCallback(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<std_srvs::srv::Empty::Request>, std::shared_ptr<std_srvs::srv::Empty::Response>);
 	void setLabelCallback(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<rtabmap_ros::srv::SetLabel::Request>, std::shared_ptr<rtabmap_ros::srv::SetLabel::Response>);
 	void listLabelsCallback(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<rtabmap_ros::srv::ListLabels::Request>, std::shared_ptr<rtabmap_ros::srv::ListLabels::Response> res);
+	void addLinkCallback(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<rtabmap_ros::srv::AddLink::Request>, std::shared_ptr<rtabmap_ros::srv::AddLink::Response> res);
+	void getNodesInRadiusCallback(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<rtabmap_ros::srv::GetNodesInRadius::Request>, std::shared_ptr<rtabmap_ros::srv::GetNodesInRadius::Response> res);
 #ifdef WITH_OCTOMAP_MSGS
-	void octomapBinaryCallback(const std::shared_ptr<rmw_request_id_t>, octomap_msgs::GetOctomap::Request>, std::shared_ptr<octomap_msgs::GetOctomap::Response>);
-	void octomapFullCallback(const std::shared_ptr<rmw_request_id_t>, octomap_msgs::GetOctomap::Request>, std::shared_ptr<octomap_msgs::GetOctomap::Response>);
+	void octomapBinaryCallback(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<octomap_msgs::srv::GetOctomap::Request>, std::shared_ptr<octomap_msgs::srv::GetOctomap::Response>);
+	void octomapFullCallback(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<octomap_msgs::srv::GetOctomap::Request>, std::shared_ptr<octomap_msgs::srv::GetOctomap::Response>);
 #endif
 
 	void loadParameters(const std::string & configFile, rtabmap::ParametersMap & parameters);
@@ -206,12 +235,15 @@ private:
 	void publishStats(const rclcpp::Time & stamp);
 	void publishCurrentGoal(const rclcpp::Time & stamp);
 #ifdef WITH_MOVE_BASE_MSGS
-	void goalDoneCb(const actionlib::SimpleClientGoalState& state, const move_base_msgs::MoveBaseResult::SharedPtr& result);
-	void goalActiveCb();
-	void goalFeedbackCb(const move_base_msgs::MoveBaseFeedback::SharedPtr& feedback);
+	using MoveBase = move_base_msgs::action::MoveBase;
+	using GoalHandleMoveBase = rclcpp_action::ClientGoalHandle<MoveBase>;
+	void goalResponseCallback(std::shared_future<GoalHandleMoveBase::SharedPtr> future);
+	void feedbackCallback(GoalHandleMoveBase::SharedPtr, const std::shared_ptr<const MoveBase::Feedback> feedback);
+	void resultCallback(const GoalHandleMoveBase::WrappedResult & result);
 #endif
 	void publishLocalPath(const rclcpp::Time & stamp);
 	void publishGlobalPath(const rclcpp::Time & stamp);
+	void republishMaps();
 
 private:
 	rtabmap::Rtabmap rtabmap_;
@@ -247,6 +279,11 @@ private:
 	bool genScan_;
 	double genScanMaxDepth_;
 	double genScanMinDepth_;
+	bool genDepth_;
+	int genDepthDecimation_;
+	int genDepthFillHolesSize_;
+	int genDepthFillIterations_;
+	double genDepthFillHolesError_;
 	int scanCloudMaxPoints_;
 
 	rtabmap::Transform mapToOdom_;
@@ -284,18 +321,25 @@ private:
 	rclcpp::SyncParametersClient::SharedPtr parametersClient_;
 	rclcpp::Subscription<rcl_interfaces::msg::ParameterEvent>::SharedPtr parameterEventSub_;
 
+	rclcpp::Service<std_srvs::srv::Empty>::SharedPtr updateSrv_;
 	rclcpp::Service<std_srvs::srv::Empty>::SharedPtr resetSrv_;
 	rclcpp::Service<std_srvs::srv::Empty>::SharedPtr pauseSrv_;
 	rclcpp::Service<std_srvs::srv::Empty>::SharedPtr resumeSrv_;
+	rclcpp::Service<rtabmap_ros::srv::LoadDatabase>::SharedPtr loadDatabaseSrv_;
 	rclcpp::Service<std_srvs::srv::Empty>::SharedPtr triggerNewMapSrv_;
 	rclcpp::Service<std_srvs::srv::Empty>::SharedPtr backupDatabase_;
+	rclcpp::Service<rtabmap_ros::srv::DetectMoreLoopClosures>::SharedPtr detectMoreLoopClosuresSrv_;
+	rclcpp::Service<rtabmap_ros::srv::GlobalBundleAdjustment>::SharedPtr globalBundleAdjustmentSrv_;
+	rclcpp::Service<rtabmap_ros::srv::CleanupLocalGrids>::SharedPtr cleanupLocalGridsSrv_;
 	rclcpp::Service<std_srvs::srv::Empty>::SharedPtr setModeLocalizationSrv_;
 	rclcpp::Service<std_srvs::srv::Empty>::SharedPtr setModeMappingSrv_;
 	rclcpp::Service<std_srvs::srv::Empty>::SharedPtr setLogDebugSrv_;
 	rclcpp::Service<std_srvs::srv::Empty>::SharedPtr setLogInfoSrv_;
 	rclcpp::Service<std_srvs::srv::Empty>::SharedPtr setLogWarnSrv_;
 	rclcpp::Service<std_srvs::srv::Empty>::SharedPtr setLogErrorSrv_;
+	rclcpp::Service<rtabmap_ros::srv::GetNodeData>::SharedPtr getNodeDataSrv_;
 	rclcpp::Service<rtabmap_ros::srv::GetMap>::SharedPtr getMapDataSrv_;
+	rclcpp::Service<rtabmap_ros::srv::GetMap2>::SharedPtr getMapData2Srv_;
 	rclcpp::Service<nav_msgs::srv::GetMap>::SharedPtr getMapSrv_;
 	rclcpp::Service<nav_msgs::srv::GetMap>::SharedPtr getProbMapSrv_;
 	rclcpp::Service<rtabmap_ros::srv::PublishMap>::SharedPtr publishMapDataSrv_;
@@ -305,13 +349,15 @@ private:
 	rclcpp::Service<std_srvs::srv::Empty>::SharedPtr cancelGoalSrv_;
 	rclcpp::Service<rtabmap_ros::srv::SetLabel>::SharedPtr setLabelSrv_;
 	rclcpp::Service<rtabmap_ros::srv::ListLabels>::SharedPtr listLabelsSrv_;
-
+	rclcpp::Service<rtabmap_ros::srv::AddLink>::SharedPtr addLinkSrv_;
+	rclcpp::Service<rtabmap_ros::srv::GetNodesInRadius>::SharedPtr getNodesInRadiusSrv_;
 #ifdef WITH_OCTOMAP_MSGS
-	rclcpp::Service<std_srvs::srv::Empty>::SharedPtr octomapBinarySrv_;
-	rclcpp::Service<std_srvs::srv::Empty>::SharedPtr octomapFullSrv_;
+	rclcpp::Service<octomap_msgs::srv::GetOctomap>::SharedPtr octomapBinarySrv_;
+	rclcpp::Service<octomap_msgs::srv::GetOctomap>::SharedPtr octomapFullSrv_;
 #endif
-
-//	MoveBaseClient * mbClient_;
+#ifdef WITH_MOVE_BASE_MSGS
+	rclcpp_action::Client<MoveBase>::SharedPtr moveBaseClient_;
+#endif
 
 	std::thread* transformThread_;
 	bool tfThreadRunning_;
@@ -327,12 +373,14 @@ private:
 	geometry_msgs::msg::PoseWithCovarianceStamped globalPose_;
 	rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr gpsFixAsyncSub_;
 	rtabmap::GPS gps_;
-#ifdef WITH_APRILTAG_ROS
-	rclcpp::Subscription<apriltag_ros::AprilTagDetectionArray>::SharedPtr tagDetectionsSub_;
+#ifdef WITH_APRILTAG_MSGS
+	rclcpp::Subscription<apriltag_msgs::msg::AprilTagDetectionArray>::SharedPtr tagDetectionsSub_;
 #endif
-	std::map<int, geometry_msgs::msg::PoseWithCovarianceStamped> tags_;
+	std::map<int, std::pair<geometry_msgs::msg::PoseWithCovarianceStamped, float> > tags_; // id, <pose, size>
 	rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imuSub_;
 	std::map<double, rtabmap::Transform> imus_;
+	std::string imuFrameId_;
+	rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr republishNodeDataSub_;
 
 	rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr interOdomSub_;
 	std::list<std::pair<nav_msgs::msg::Odometry, rtabmap_ros::msg::OdomInfo> > interOdoms_;
@@ -345,8 +393,13 @@ private:
 	bool odomSensorSync_;
 	float rate_;
 	bool createIntermediateNodes_;
-	int maxMappingNodes_;
+	int mappingMaxNodes_;
+	double mappingAltitudeDelta_;
+	bool alreadyRectifiedImages_;
+	bool twoDMapping_;
 	rclcpp::Time previousStamp_;
+	std::set<int> nodesToRepublish_;
+	int maxNodesRepublished_;
 };
 
 }

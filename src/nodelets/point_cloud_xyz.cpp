@@ -133,11 +133,11 @@ PointCloudXYZ::PointCloudXYZ(const rclcpp::NodeOptions & options) :
 	cloudPub_ = create_publisher<sensor_msgs::msg::PointCloud2>("cloud", 1);
 
 	image_transport::TransportHints hints(this);
-	imageDepthSub_.subscribe(this, "depth/image", hints.getTransport(), rmw_qos_profile_sensor_data);
-	cameraInfoSub_.subscribe(this, "depth/camera_info", rmw_qos_profile_sensor_data);
+	imageDepthSub_.subscribe(this, "depth/image", hints.getTransport());
+	cameraInfoSub_.subscribe(this, "depth/camera_info");
 
-	disparitySub_.subscribe(this, "disparity/image", rmw_qos_profile_sensor_data);
-	disparityCameraInfoSub_.subscribe(this, "disparity/camera_info", rmw_qos_profile_sensor_data);
+	disparitySub_.subscribe(this, "disparity/image");
+	disparityCameraInfoSub_.subscribe(this, "disparity/camera_info");
 }
 
 PointCloudXYZ::~PointCloudXYZ()
@@ -240,10 +240,11 @@ void PointCloudXYZ::processAndPublish(pcl::PointCloud<pcl::PointXYZ>::Ptr & pclC
 	if(indices->size() && voxelSize_ > 0.0)
 	{
 		pclCloud = rtabmap::util3d::voxelize(pclCloud, indices, voxelSize_);
+		pclCloud->is_dense = true;
 	}
 
 	// Do radius filtering after voxel filtering ( a lot faster)
-	if(pclCloud->size() && noiseFilterRadius_ > 0.0 && noiseFilterMinNeighbors_ > 0)
+	if(!pclCloud->empty() && (pclCloud->is_dense || !indices->empty()) && noiseFilterRadius_ > 0.0 && noiseFilterMinNeighbors_ > 0)
 	{
 		if(pclCloud->is_dense)
 		{
@@ -259,7 +260,7 @@ void PointCloudXYZ::processAndPublish(pcl::PointCloud<pcl::PointXYZ>::Ptr & pclC
 	}
 
 	sensor_msgs::msg::PointCloud2::UniquePtr rosCloud(new sensor_msgs::msg::PointCloud2);
-	if(pclCloud->size() && (normalK_ > 0 || normalRadius_ > 0.0f))
+if(!pclCloud->empty() && (pclCloud->is_dense || !indices->empty()) && (normalK_ > 0 || normalRadius_ > 0.0f))
 	{
 		//compute normals
 		pcl::PointCloud<pcl::Normal>::Ptr normals = rtabmap::util3d::computeNormals(pclCloud, normalK_, normalRadius_);

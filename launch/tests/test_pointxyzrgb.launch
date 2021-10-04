@@ -19,10 +19,23 @@
     <remap from="rgb/image"       to="rgb/image_out"/>
     <remap from="depth/image"     to="depth/image_out"/>
     <remap from="rgb/camera_info" to="rgb/camera_info_out"/>
-    <remap from="cloud"           to="/voxel_cloud" />
+    <remap from="cloud"           to="/voxel_cloud_xyzrgb" />
 
     <param name="voxel_size" type="double" value="0.02"/>
     <param name="decimation" type="int" value="2"/>
+    <param name="noise_filter_radius" type="double" value="0.05"/>
+    <param name="normal_k" type="int" value="6"/>
+  </node>
+  
+  <node pkg="nodelet" type="nodelet" name="points_xyz" args="load rtabmap_ros/point_cloud_xyz camera_nodelet_manager">
+    <remap from="depth/image"     to="depth/image_out"/>
+    <remap from="depth/camera_info" to="rgb/camera_info_out"/>
+    <remap from="cloud"           to="/voxel_cloud_xyz" />
+
+    <param name="voxel_size" type="double" value="0.02"/>
+    <param name="decimation" type="int" value="2"/>
+    <param name="noise_filter_radius" type="double" value="0.05"/>
+    <param name="normal_k" type="int" value="6"/>
   </node>
   </group>
 

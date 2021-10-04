@@ -1,0 +1,53 @@
+
+<launch>
+
+  <!-- Kinect: -->
+  <include file="$(find freenect_launch)/launch/freenect.launch">
+    <arg name="depth_registration" value="true" />
+  </include>
+  
+  <arg name="frame_id"                default="camera_link"/> 
+  <arg name="rtabmap_args"            default="--delete_db_on_start"/>   <!-- delete_db_on_start, udebug -->  
+  <arg name="odom_args"               default="$(arg rtabmap_args)"/>
+   
+  <!-- RGB-D related topics -->
+  <arg name="rgb_topic"               default="/camera/rgb/image_rect_color" />
+  <arg name="depth_topic"             default="/camera/depth_registered/image_raw" />
+  <arg name="camera_info_topic"       default="/camera/rgb/camera_info" />
+ 
+  <group ns="camera"> 
+  
+    <!-- Use RGBD synchronization -->
+    <node pkg="nodelet" type="nodelet" name="rgbd_sync" args="load rtabmap_ros/rgbd_sync camera_nodelet_manager">
+      <remap from="rgb/image"         to="$(arg rgb_topic)"/>
+      <remap from="depth/image"       to="$(arg depth_topic)"/>
+      <remap from="rgb/camera_info"   to="$(arg camera_info_topic)"/>
+    </node>
+  
+    <!-- RGB-D Odometry -->
+      <node pkg="nodelet" type="nodelet" name="rgbd_odometry" args="load rtabmap_ros/rgbd_odometry camera_nodelet_manager $(arg odom_args)">
+        <param name="frame_id"        type="string" value="$(arg frame_id)"/>
+        <param name="subscribe_depth" type="bool"   value="false"/>
+        <param name="subscribe_rgbd"  type="bool"   value="true"/>
+        <param name="keep_color"      type="bool"   value="true"/>
+      </node>
+  
+    <!-- RTAB-Map -->
+    <node pkg="rtabmap_ros" type="rtabmap" name="rtabmap" args="$(arg rtabmap_args)" output="screen">
+      <param name="frame_id"        type="string" value="$(arg frame_id)"/>
+      <param name="subscribe_rgbd"  type="bool"   value="true"/>
+      <param name="approx_sync"     type="bool"   value="false"/>
+      <remap from="rgbd_image" to="odom_rgbd_image"/>
+    </node>
+  
+    <!-- Visualisation -->
+    <node pkg="rtabmap_ros" type="rtabmapviz" name="rtabmapviz" output="screen">
+      <param name="frame_id" type="string" value="$(arg frame_id)"/>
+      <param name="subscribe_rgbd"  type="bool"   value="true"/>
+      <param name="subscribe_odom_info"  type="bool"   value="true"/>
+      <param name="approx_sync"     type="bool"   value="false"/>
+    </node>
+    
+  </group>
+
+</launch>

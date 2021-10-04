@@ -2,7 +2,7 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>rtabmap_ros</name>
-  <version>0.20.0</version>
+  <version>0.20.14</version>
   <description>RTAB-Map's ros-pkg. RTAB-Map is a RGB-D SLAM approach with real-time constraints.</description>
   <maintainer email="matlabbe@gmail.com">Mathieu Labbe</maintainer>
   <author>Mathieu Labbe</author>
@@ -42,11 +42,13 @@
   <build_depend>class_loader</build_depend>
   <build_depend>rtabmap</build_depend>
   <build_depend>octomap</build_depend>
+  <build_depend>octomap_msgs</build_depend>
   <build_depend>image_geometry</build_depend>
   <build_depend>pluginlib</build_depend>
   <build_depend>rviz_common</build_depend>
   <build_depend>rviz_rendering</build_depend>
   <build_depend>rviz_default_plugins</build_depend>
+  <build_depend>move_base_msgs</build_depend>
 
   <exec_depend>cv_bridge</exec_depend>
   <exec_depend>rclcpp</exec_depend>
@@ -73,17 +75,18 @@
   <exec_depend>class_loader</exec_depend>
   <exec_depend>rtabmap</exec_depend>
   <exec_depend>octomap</exec_depend>
+  <exec_depend>octomap_msgs</exec_depend>
   <exec_depend>image_geometry</exec_depend>
   <exec_depend>find_object_2d</exec_depend>
   <exec_depend>pluginlib</exec_depend>
   <exec_depend>rviz_common</exec_depend>
   <exec_depend>rviz_rendering</exec_depend>
   <exec_depend>rviz_default_plugins</exec_depend>
+  <exec_depend>move_base_msgs</exec_depend>
 
   <build_depend>libpcl-all-dev</build_depend>
 
   <export>
 	<build_type>ament_cmake</build_type>
-    <!-- costmap_2d plugin="${prefix}/costmap_plugins.xml"/-->
   </export>
 </package>

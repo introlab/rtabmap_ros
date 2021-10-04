@@ -36,11 +36,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/RtabmapEvent.h>
 #include <QMessageBox>
 #include <rtabmap/utilite/UStl.h>
+#include <rtabmap/utilite/UTimer.h>
 
 using namespace rtabmap;
 
-PreferencesDialogROS::PreferencesDialogROS(rclcpp::Node * node, const QString & configFile) :
+PreferencesDialogROS::PreferencesDialogROS(rclcpp::Node * node, const QString & configFile, const std::string & rtabmapNodeName) :
 		configFile_(configFile),
+		rtabmapNodeName_(rtabmapNodeName),
 		node_(node)
 {
 	UASSERT(node_);
@@ -127,7 +129,7 @@ bool PreferencesDialogROS::readCoreSettings(const QString & filePath)
 		}
 	}
 
-	auto client = std::make_shared<rclcpp::AsyncParametersClient>(node, "rtabmap");
+	auto client = std::make_shared<rclcpp::AsyncParametersClient>(node, rtabmapNodeName_);
 	if (!client->wait_for_service(std::chrono::seconds(5))) {
 		RCLCPP_ERROR(node->get_logger(), "Can't call rtabmap parameters service, is the node running?");
 	}

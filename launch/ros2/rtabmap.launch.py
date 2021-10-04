@@ -1,3 +1,7 @@
+#
+# To avoid log buffering:
+# "stdbuf -o L ros2 launch rtabmap_ros rtabmap.launch.py ..."
+#
 
 from launch import LaunchDescription, Substitution, LaunchContext
 from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable, LogInfo, OpaqueFunction
@@ -137,7 +141,7 @@ def launch_setup(context, *args, **kwargs):
                 "publish_tf": LaunchConfiguration('publish_tf_odom'),
                 "ground_truth_frame_id": LaunchConfiguration('ground_truth_frame_id'),
                 "ground_truth_base_frame_id": LaunchConfiguration('ground_truth_base_frame_id'),
-                "wait_for_transform_duration": LaunchConfiguration('wait_for_transform'),
+                "wait_for_transform": LaunchConfiguration('wait_for_transform'),
                 "wait_imu_to_init": LaunchConfiguration('wait_imu_to_init'),
                 "approx_sync": LaunchConfiguration('approx_sync'),
                 "config_path": LaunchConfiguration('cfg'),
@@ -167,7 +171,7 @@ def launch_setup(context, *args, **kwargs):
                 "publish_tf": LaunchConfiguration('publish_tf_odom'),
                 "ground_truth_frame_id": LaunchConfiguration('ground_truth_frame_id'),
                 "ground_truth_base_frame_id": LaunchConfiguration('ground_truth_base_frame_id'),
-                "wait_for_transform_duration": LaunchConfiguration('wait_for_transform'),
+                "wait_for_transform": LaunchConfiguration('wait_for_transform'),
                 "wait_imu_to_init": LaunchConfiguration('wait_imu_to_init'),
                 "approx_sync": LaunchConfiguration('approx_sync'),
                 "config_path": LaunchConfiguration('cfg'),
@@ -198,7 +202,7 @@ def launch_setup(context, *args, **kwargs):
                 "publish_tf": LaunchConfiguration('publish_tf_odom'),
                 "ground_truth_frame_id": LaunchConfiguration('ground_truth_frame_id'),
                 "ground_truth_base_frame_id": LaunchConfiguration('ground_truth_base_frame_id'),
-                "wait_for_transform_duration": LaunchConfiguration('wait_for_transform'),
+                "wait_for_transform": LaunchConfiguration('wait_for_transform'),
                 "wait_imu_to_init": LaunchConfiguration('wait_imu_to_init'),
                 "approx_sync": LaunchConfiguration('approx_sync'),
                 "config_path": LaunchConfiguration('cfg'),
@@ -235,7 +239,7 @@ def launch_setup(context, *args, **kwargs):
                 "odom_tf_angular_variance": LaunchConfiguration('odom_tf_angular_variance'),
                 "odom_tf_linear_variance": LaunchConfiguration('odom_tf_linear_variance'),
                 "odom_sensor_sync": LaunchConfiguration('odom_sensor_sync'),
-                "wait_for_transform_duration": LaunchConfiguration('wait_for_transform'),
+                "wait_for_transform": LaunchConfiguration('wait_for_transform'),
                 "database_path": LaunchConfiguration('database_path'),
                 "approx_sync": LaunchConfiguration('approx_sync'),
                 "config_path": LaunchConfiguration('cfg'),
@@ -280,7 +284,7 @@ def launch_setup(context, *args, **kwargs):
                 "subscribe_odom_info": ConditionalBool(True, False, IfCondition(PythonExpression(["'", LaunchConfiguration('icp_odometry'), "' == 'true' or '", LaunchConfiguration('visual_odometry'), "' == 'true'"]))._predicate_func(context)).perform(context),
                 "frame_id": LaunchConfiguration('frame_id'),
                 "odom_frame_id": LaunchConfiguration('odom_frame_id'),
-                "wait_for_transform_duration": LaunchConfiguration('wait_for_transform'),
+                "wait_for_transform": LaunchConfiguration('wait_for_transform'),
                 "approx_sync": LaunchConfiguration('approx_sync'),
                 "queue_size": LaunchConfiguration('queue_size')
             }],

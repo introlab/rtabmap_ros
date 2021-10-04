@@ -34,6 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap_ros/MsgConversion.h>
 #include <rtabmap/utilite/UConversion.h>
 #include <rtabmap/utilite/ULogger.h>
+#include <rtabmap/core/util3d_filtering.h>
 
 namespace rtabmap_ros
 {
@@ -47,9 +48,9 @@ PointCloudAggregator::PointCloudAggregator(const rclcpp::NodeOptions & options) 
 	exactSync3_(0),
 	approxSync3_(0),
 	exactSync2_(0),
-	approxSync2_(0)
+	approxSync2_(0),
+	waitForTransform_(0.1)
 {
-
 	tfBuffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
 	//auto timer_interface = std::make_shared<tf2_ros::CreateTimerROS>(
 	//	this->get_node_base_interface(),
@@ -65,17 +66,18 @@ PointCloudAggregator::PointCloudAggregator(const rclcpp::NodeOptions & options) 
 	fixedFrameId_ = this->declare_parameter("fixed_frame_id", fixedFrameId_);
 	approx = this->declare_parameter("approx_sync", approx);
 	count = this->declare_parameter("count", count);
+	waitForTransform_ = this->declare_parameter("wait_for_transform", waitForTransform_);
 
 	cloudPub_ = create_publisher<sensor_msgs::msg::PointCloud2>("combined_cloud", 1);
 
-	cloudSub_1_.subscribe(this, "cloud1", rmw_qos_profile_sensor_data);
-	cloudSub_2_.subscribe(this, "cloud2", rmw_qos_profile_sensor_data);
+	cloudSub_1_.subscribe(this, "cloud1");
+	cloudSub_2_.subscribe(this, "cloud2");
 
 	std::string subscribedTopicsMsg;
 	if(count == 4)
 	{
-		cloudSub_3_.subscribe(this, "cloud3", rmw_qos_profile_sensor_data);
-		cloudSub_4_.subscribe(this, "cloud4", rmw_qos_profile_sensor_data);
+		cloudSub_3_.subscribe(this, "cloud3");
+		cloudSub_4_.subscribe(this, "cloud4");
 		if(approx)
 		{
 			approxSync4_ = new message_filters::Synchronizer<ApproxSync4Policy>(ApproxSync4Policy(queueSize), cloudSub_1_, cloudSub_2_, cloudSub_3_, cloudSub_4_);
@@ -96,7 +98,7 @@ PointCloudAggregator::PointCloudAggregator(const rclcpp::NodeOptions & options) 
 	}
 	else if(count == 3)
 	{
-		cloudSub_3_.subscribe(this, "cloud3", rmw_qos_profile_sensor_data);
+		cloudSub_3_.subscribe(this, "cloud3");
 		if(approx)
 		{
 			approxSync3_ = new message_filters::Synchronizer<ApproxSync3Policy>(ApproxSync3Policy(queueSize), cloudSub_1_, cloudSub_2_, cloudSub_3_);
@@ -209,23 +211,23 @@ void PointCloudAggregator::combineClouds(const std::vector<sensor_msgs::msg::Poi
 	UASSERT(cloudMsgs.size() > 1);
 	if(cloudPub_->get_subscription_count())
 	{
-		pcl::PCLPointCloud2 output;
+		pcl::PCLPointCloud2::Ptr output(new pcl::PCLPointCloud2);
 
 		std::string frameId = frameId_;
 		if(!frameId.empty() && frameId.compare(cloudMsgs[0]->header.frame_id) != 0)
 		{
 			sensor_msgs::msg::PointCloud2 tmp;
-			rtabmap::Transform t = rtabmap_ros::getTransform(frameId, cloudMsgs[0]->header.frame_id, cloudMsgs[0]->header.stamp, *tfBuffer_, 0.1);
+			rtabmap::Transform t = rtabmap_ros::getTransform(frameId, cloudMsgs[0]->header.frame_id, cloudMsgs[0]->header.stamp, *tfBuffer_, waitForTransform_);
 			if(t.isNull())
 			{
 				return;
 			}
 			rtabmap_ros::transformPointCloud(t.toEigen4f(), *cloudMsgs[0], tmp);
-			pcl_conversions::toPCL(tmp, output);
+			pcl_conversions::toPCL(tmp, *output);
 		}
 		else
 		{
-			pcl_conversions::toPCL(*cloudMsgs[0], output);
+			pcl_conversions::toPCL(*cloudMsgs[0], *output);
 			frameId = cloudMsgs[0]->header.frame_id;
 		}
 
@@ -242,26 +244,25 @@ void PointCloudAggregator::combineClouds(const std::vector<sensor_msgs::msg::Poi
 						cloudMsgs[i]->header.stamp, //stampSource
 						cloudMsgs[0]->header.stamp, //stampTarget
 						*tfBuffer_,
-						0.1);
+						waitForTransform_);
 			}
 
-			pcl::PCLPointCloud2 cloud2;
+			pcl::PCLPointCloud2::Ptr cloud2(new pcl::PCLPointCloud2);
 			if(frameId.compare(cloudMsgs[i]->header.frame_id) != 0)
 			{
 				sensor_msgs::msg::PointCloud2 tmp;
-				rtabmap::Transform t = rtabmap_ros::getTransform(frameId, cloudMsgs[i]->header.frame_id, cloudMsgs[i]->header.stamp, *tfBuffer_, 0.1);
+				rtabmap::Transform t = rtabmap_ros::getTransform(frameId, cloudMsgs[i]->header.frame_id, cloudMsgs[i]->header.stamp, *tfBuffer_, waitForTransform_);
 				rtabmap_ros::transformPointCloud(t.toEigen4f(), *cloudMsgs[i], tmp);
 				if(!cloudDisplacement.isNull())
 				{
 					sensor_msgs::msg::PointCloud2 tmp2;
 					rtabmap_ros::transformPointCloud(cloudDisplacement.toEigen4f(), tmp, tmp2);
-					pcl_conversions::toPCL(tmp2, cloud2);
+					pcl_conversions::toPCL(tmp2, *cloud2);
 				}
 				else
 				{
-					pcl_conversions::toPCL(tmp, cloud2);
+					pcl_conversions::toPCL(tmp, *cloud2);
 				}
-
 			}
 			else
 			{
@@ -269,21 +270,33 @@ void PointCloudAggregator::combineClouds(const std::vector<sensor_msgs::msg::Poi
 				{
 					sensor_msgs::msg::PointCloud2 tmp;
 					rtabmap_ros::transformPointCloud(cloudDisplacement.toEigen4f(), *cloudMsgs[i], tmp);
-					pcl_conversions::toPCL(tmp, cloud2);
+					pcl_conversions::toPCL(tmp, *cloud2);
 				}
 				else
 				{
-					pcl_conversions::toPCL(*cloudMsgs[i], cloud2);
+					pcl_conversions::toPCL(*cloudMsgs[i], *cloud2);
 				}
 			}
 
-			pcl::PCLPointCloud2 tmp_output;
-			pcl::concatenatePointCloud(output, cloud2, tmp_output);
+			if(!cloud2->is_dense)
+			{
+				// remove nans
+				cloud2 = rtabmap::util3d::removeNaNFromPointCloud(cloud2);
+			}
+
+			pcl::PCLPointCloud2::Ptr tmp_output(new pcl::PCLPointCloud2);
+#if PCL_VERSION_COMPARE(>=, 1, 10, 0)
+			pcl::concatenate(*output, *cloud2, *tmp_output);
+#else
+			pcl::concatenatePointCloud(*output, *cloud2, *tmp_output);
+#endif
+			//Make sure row_step is the sum of both
+			tmp_output->row_step = tmp_output->width * tmp_output->point_step;
 			output = tmp_output;
 		}
 
 		sensor_msgs::msg::PointCloud2::UniquePtr rosCloud(new sensor_msgs::msg::PointCloud2);
-		pcl_conversions::moveFromPCL(output, *rosCloud);
+		pcl_conversions::moveFromPCL(*output, *rosCloud);
 		rosCloud->header.stamp = cloudMsgs[0]->header.stamp;
 		rosCloud->header.frame_id = frameId;
 		cloudPub_->publish(std::move(rosCloud));

@@ -85,6 +85,7 @@ private:
   rviz_common::properties::ColorProperty* color_neighbor_merged_property_;
   rviz_common::properties::ColorProperty* color_global_property_;
   rviz_common::properties::ColorProperty* color_local_property_;
+  rviz_common::properties::ColorProperty* color_landmark_property_;
   rviz_common::properties::ColorProperty* color_user_property_;
   rviz_common::properties::ColorProperty* color_virtual_property_;
   rviz_common::properties::FloatProperty* alpha_property_;

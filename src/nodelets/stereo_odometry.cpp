@@ -49,7 +49,9 @@ namespace rtabmap_ros
 StereoOdometry::StereoOdometry(const rclcpp::NodeOptions & options) :
 		rtabmap_ros::OdometryROS("stereo_odometry", options),
 		approxSync_(0),
-		exactSync_(0)
+		exactSync_(0),
+		queueSize_(5),
+		keepColor_(false)
 {
 	OdometryROS::init(true, true, false);
 }
@@ -65,15 +67,19 @@ void StereoOdometry::onOdomInit()
 	bool approxSync = false;
 	bool subscribeRGBD = false;
 	approxSync = this->declare_parameter("approx_sync", approxSync);
+	queueSize_ = this->declare_parameter("queue_size", queueSize_);
 	subscribeRGBD = this->declare_parameter("subscribe_rgbd", subscribeRGBD);
+	keepColor_ = this->declare_parameter("keep_color", keepColor_);
 
 	RCLCPP_INFO(this->get_logger(), "StereoOdometry: approx_sync = %s", approxSync?"true":"false");
+	RCLCPP_INFO(this->get_logger(), "StereoOdometry: queue_size  = %d", queueSize_);
 	RCLCPP_INFO(this->get_logger(), "StereoOdometry: subscribe_rgbd = %s", subscribeRGBD?"true":"false");
+	RCLCPP_INFO(this->get_logger(), "StereoOdometry: keep_color     = %s", keepColor_?"true":"false");
 
 	std::string subscribedTopicsMsg;
 	if(subscribeRGBD)
 	{
-		rgbdSub_ = create_subscription<rtabmap_ros::msg::RGBDImage>("rgbd_image", rclcpp::SensorDataQoS(), std::bind(&StereoOdometry::callbackRGBD, this, std::placeholders::_1));
+		rgbdSub_ = create_subscription<rtabmap_ros::msg::RGBDImage>("rgbd_image", 5, std::bind(&StereoOdometry::callbackRGBD, this, std::placeholders::_1));
 
 		subscribedTopicsMsg =
 				uFormat("\n%s subscribed to:\n   %s",
@@ -83,22 +89,21 @@ void StereoOdometry::onOdomInit()
 	else
 	{
 		image_transport::TransportHints hints(this);
-		imageRectLeft_.subscribe(this, "left/image_rect", hints.getTransport(), rmw_qos_profile_sensor_data);
-		imageRectRight_.subscribe(this, "right/image_rect", hints.getTransport(), rmw_qos_profile_sensor_data);
-		cameraInfoLeft_.subscribe(this, "left/camera_info", rmw_qos_profile_sensor_data);
-		cameraInfoRight_.subscribe(this, "right/camera_info", rmw_qos_profile_sensor_data);
+		imageRectLeft_.subscribe(this, "left/image_rect", hints.getTransport());
+		imageRectRight_.subscribe(this, "right/image_rect", hints.getTransport());
+		cameraInfoLeft_.subscribe(this, "left/camera_info");
+		cameraInfoRight_.subscribe(this, "right/camera_info");
 
 		if(approxSync)
 		{
-			approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize()), imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_);
+			approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize_), imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_);
 			approxSync_->registerCallback(std::bind(&StereoOdometry::callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 		}
 		else
 		{
-			exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize()), imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_);
+			exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize_), imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_);
 			exactSync_->registerCallback(std::bind(&StereoOdometry::callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 		}
-
 
 		subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s",
 				get_name(),
@@ -132,13 +137,15 @@ void StereoOdometry::callback(
 	callbackCalled();
 	if(!this->isPaused())
 	{
-		if(!(imageRectLeft->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
+		if(!(imageRectLeft->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) ==0 ||
+			 imageRectLeft->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
 			 imageRectLeft->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||
 			 imageRectLeft->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
 			 imageRectLeft->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0 ||
 			 imageRectLeft->encoding.compare(sensor_msgs::image_encodings::BGRA8) == 0 ||
 			 imageRectLeft->encoding.compare(sensor_msgs::image_encodings::RGBA8) == 0) ||
-			!(imageRectRight->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
+			!(imageRectRight->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) ==0 ||
+			  imageRectRight->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
 			  imageRectRight->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||
 			  imageRectRight->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
 			  imageRectRight->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0 ||
@@ -180,6 +187,38 @@ void StereoOdometry::callback(
 
 			rtabmap::StereoCameraModel stereoModel = rtabmap_ros::stereoCameraModelFromROS(*cameraInfoLeft, *cameraInfoRight, localTransform, stereoTransform);
 
+			if(stereoModel.baseline() == 0 && alreadyRectified)
+			{
+				stereoTransform = getTransform(
+						cameraInfoLeft->header.frame_id,
+						cameraInfoRight->header.frame_id,
+						cameraInfoLeft->header.stamp,
+						tfBuffer(),
+						waitForTransform());
+
+				if(!stereoTransform.isNull() && stereoTransform.x()>0)
+				{
+					static bool warned = false;
+					if(!warned)
+					{
+						RCLCPP_WARN(this->get_logger(), "Right camera info doesn't have Tx set but we are assuming that stereo images are already rectified (see %s parameter). While not "
+								"recommended, we used TF to get the baseline (%s->%s = %fm) for convenience (e.g., D400 ir stereo issue). It is preferred to feed "
+								"a valid right camera info if stereo images are already rectified. This message is only printed once...",
+								rtabmap::Parameters::kRtabmapImagesAlreadyRectified().c_str(),
+								cameraInfoRight->header.frame_id.c_str(), cameraInfoLeft->header.frame_id.c_str(), stereoTransform.x());
+						warned = true;
+					}
+					stereoModel = rtabmap::StereoCameraModel(
+							stereoModel.left().fx(),
+							stereoModel.left().fy(),
+							stereoModel.left().cx(),
+							stereoModel.left().cy(),
+							stereoTransform.x(),
+							stereoModel.localTransform(),
+							stereoModel.left().imageSize());
+				}
+			}
+
 			if(alreadyRectified && stereoModel.baseline() <= 0)
 			{
 				RCLCPP_ERROR(this->get_logger(), "The stereo baseline (%f) should be positive (baseline=-Tx/fx). We assume a horizontal left/right stereo "
@@ -200,8 +239,13 @@ void StereoOdometry::callback(
 				}
 			}
 
-			cv_bridge::CvImagePtr ptrImageLeft = cv_bridge::toCvCopy(imageRectLeft, "mono8");
-			cv_bridge::CvImagePtr ptrImageRight = cv_bridge::toCvCopy(imageRectRight, "mono8");
+			cv_bridge::CvImagePtr ptrImageLeft = cv_bridge::toCvCopy(imageRectLeft,
+					imageRectLeft->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0 ||
+					imageRectLeft->encoding.compare(sensor_msgs::image_encodings::MONO8)==0?"":
+						keepColor_ && imageRectLeft->encoding.compare(sensor_msgs::image_encodings::MONO16)!=0?"bgr8":"mono8");
+			cv_bridge::CvImagePtr ptrImageRight = cv_bridge::toCvCopy(imageRectRight,
+					imageRectRight->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0 ||
+					imageRectRight->encoding.compare(sensor_msgs::image_encodings::MONO8)==0?"":"mono8");
 
 			UTimer stepTimer;
 			//
@@ -213,7 +257,10 @@ void StereoOdometry::callback(
 					0,
 					rtabmap_ros::timestampFromROS(stamp));
 
-			this->processData(data, stamp);
+			std_msgs::msg::Header header;
+			header.stamp = stamp;
+			header.frame_id = imageRectLeft->header.frame_id;
+			this->processData(data, header);
 		}
 		else
 		{
@@ -231,13 +278,15 @@ void StereoOdometry::callbackRGBD(
 		cv_bridge::CvImageConstPtr imageRectLeft, imageRectRight;
 		rtabmap_ros::toCvShare(image, imageRectLeft, imageRectRight);
 
-		if(!(imageRectLeft->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
+		if(!(imageRectLeft->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) ==0 ||
+			 imageRectLeft->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
 			 imageRectLeft->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||
 			 imageRectLeft->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
 			 imageRectLeft->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0 ||
 			 imageRectLeft->encoding.compare(sensor_msgs::image_encodings::BGRA8) == 0 ||
 			 imageRectLeft->encoding.compare(sensor_msgs::image_encodings::RGBA8) == 0) ||
-			!(imageRectRight->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
+			!(imageRectRight->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) ==0 ||
+			  imageRectRight->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
 			  imageRectRight->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||
 			  imageRectRight->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
 			  imageRectRight->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0 ||
@@ -259,8 +308,59 @@ void StereoOdometry::callbackRGBD(
 
 		if(!imageRectLeft->image.empty() && !imageRectRight->image.empty())
 		{
+			bool alreadyRectified = true;
+			Parameters::parse(parameters(), Parameters::kRtabmapImagesAlreadyRectified(), alreadyRectified);
+			rtabmap::Transform stereoTransform;
+			if(!alreadyRectified)
+			{
+				stereoTransform = getTransform(
+						image->depth_camera_info.header.frame_id,
+						image->rgb_camera_info.header.frame_id,
+						image->rgb_camera_info.header.stamp,
+						tfBuffer(),
+						waitForTransform());
+				if(stereoTransform.isNull())
+				{
+					RCLCPP_ERROR(this->get_logger(), "Parameter %s is false but we cannot get TF between the two cameras!", Parameters::kRtabmapImagesAlreadyRectified().c_str());
+					return;
+				}
+			}
+
 			rtabmap::StereoCameraModel stereoModel = rtabmap_ros::stereoCameraModelFromROS(image->rgb_camera_info, image->depth_camera_info, localTransform);
-			if(stereoModel.baseline() <= 0)
+
+			if(stereoModel.baseline() == 0 && alreadyRectified)
+			{
+				stereoTransform = getTransform(
+						image->rgb_camera_info.header.frame_id,
+						image->depth_camera_info.header.frame_id,
+						image->rgb_camera_info.header.stamp,
+						tfBuffer(),
+						waitForTransform());
+
+				if(!stereoTransform.isNull() && stereoTransform.x()>0)
+				{
+					static bool warned = false;
+					if(!warned)
+					{
+						RCLCPP_WARN(get_logger(), "Right camera info doesn't have Tx set but we are assuming that stereo images are already rectified (see %s parameter). While not "
+								"recommended, we used TF to get the baseline (%s->%s = %fm) for convenience (e.g., D400 ir stereo issue). It is preferred to feed "
+								"a valid right camera info if stereo images are already rectified. This message is only printed once...",
+								rtabmap::Parameters::kRtabmapImagesAlreadyRectified().c_str(),
+								image->depth_camera_info.header.frame_id.c_str(), image->rgb_camera_info.header.frame_id.c_str(), stereoTransform.x());
+						warned = true;
+					}
+					stereoModel = rtabmap::StereoCameraModel(
+							stereoModel.left().fx(),
+							stereoModel.left().fy(),
+							stereoModel.left().cx(),
+							stereoModel.left().cy(),
+							stereoTransform.x(),
+							stereoModel.localTransform(),
+							stereoModel.left().imageSize());
+				}
+			}
+
+			if(alreadyRectified && stereoModel.baseline() <= 0)
 			{
 				RCLCPP_FATAL(this->get_logger(), "The stereo baseline (%f) should be positive (baseline=-Tx/fx). We assume a horizontal left/right stereo "
 						  "setup where the Tx (or P(0,3)) is negative in the right camera info msg.", stereoModel.baseline());
@@ -280,8 +380,25 @@ void StereoOdometry::callbackRGBD(
 				}
 			}
 
-			cv_bridge::CvImagePtr ptrImageLeft = cv_bridge::cvtColor(imageRectLeft, "mono8");
-			cv_bridge::CvImagePtr ptrImageRight = cv_bridge::cvtColor(imageRectRight, "mono8");
+			cv_bridge::CvImageConstPtr ptrImageLeft = imageRectLeft;
+			if(imageRectLeft->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) !=0 &&
+			   imageRectLeft->encoding.compare(sensor_msgs::image_encodings::MONO8) != 0)
+			{
+				if(keepColor_ && imageRectLeft->encoding.compare(sensor_msgs::image_encodings::MONO16) != 0)
+				{
+					ptrImageLeft = cv_bridge::cvtColor(imageRectLeft, "bgr8");
+				}
+				else
+				{
+					ptrImageLeft = cv_bridge::cvtColor(imageRectLeft, "mono8");
+				}
+			}
+			cv_bridge::CvImageConstPtr ptrImageRight = imageRectRight;
+			if(imageRectLeft->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) !=0 &&
+			   imageRectLeft->encoding.compare(sensor_msgs::image_encodings::MONO8) != 0)
+			{
+				ptrImageRight = cv_bridge::cvtColor(imageRectRight, "mono8");
+			}
 
 			UTimer stepTimer;
 			//
@@ -293,7 +410,10 @@ void StereoOdometry::callbackRGBD(
 					0,
 					rtabmap_ros::timestampFromROS(stamp));
 
-			this->processData(data, stamp);
+			std_msgs::msg::Header header;
+			header.stamp = stamp;
+			header.frame_id = image->header.frame_id;
+			this->processData(data, header);
 		}
 		else
 		{
@@ -308,13 +428,13 @@ void StereoOdometry::flushCallbacks()
 	if(approxSync_)
 	{
 		delete approxSync_;
-		approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize()), imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_);
+		approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize_), imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_);
 		approxSync_->registerCallback(std::bind(&StereoOdometry::callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 	}
 	if(exactSync_)
 	{
 		delete exactSync_;
-		exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize()), imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_);
+		exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize_), imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_);
 		exactSync_->registerCallback(std::bind(&StereoOdometry::callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 	}
 }

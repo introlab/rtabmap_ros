@@ -37,6 +37,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <nav_msgs/msg/occupancy_grid.hpp>
 
+#ifdef RTABMAP_OCTOMAP
+#ifdef WITH_OCTOMAP_MSGS
+#include <octomap_msgs/msg/octomap.hpp>
+#endif
+#endif
+
 namespace rtabmap {
 class OctoMap;
 class Memory;
@@ -80,7 +86,9 @@ public:
 			float & yMin,
 			float & gridCellSize);
 
+#ifdef RTABMAP_OCTOMAP
 	const rtabmap::OctoMap * getOctomap() const {return octomap_;}
+#endif
 	const rtabmap::OccupancyGrid * getOccupancyGrid() const {return occupancyGrid_;}
 
 private:
@@ -99,11 +107,10 @@ private:
 	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr cloudObstaclesPub_;
 	rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr gridMapPub_;
 	rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr gridProbMapPub_;
-#ifdef WITH_OCTOMAP_MSGS
 #ifdef RTABMAP_OCTOMAP
-	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr octoMapPubBin_;
-	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr octoMapPubFull_;
-#endif
+#ifdef WITH_OCTOMAP_MSGS
+	rclcpp::Publisher<octomap_msgs::msg::Octomap>::SharedPtr octoMapPubBin_;
+	rclcpp::Publisher<octomap_msgs::msg::Octomap>::SharedPtr octoMapPubFull_;
 #endif
 	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr octoMapCloud_;
 	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr octoMapFrontierCloud_;
@@ -111,6 +118,7 @@ private:
 	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr octoMapObstacleCloud_;
 	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr octoMapEmptySpace_;
 	rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr octoMapProj_;
+#endif
 
 	std::map<int, rtabmap::Transform> assembledGroundPoses_;
 	std::map<int, rtabmap::Transform> assembledObstaclePoses_;
@@ -129,7 +137,9 @@ private:
 	rtabmap::OccupancyGrid * occupancyGrid_;
 	bool gridUpdated_;
 
+#ifdef RTABMAP_OCTOMAP
 	rtabmap::OctoMap * octomap_;
+#endif
 	int octomapTreeDepth_;
 	bool octomapUpdated_;
 

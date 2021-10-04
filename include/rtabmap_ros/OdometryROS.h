@@ -41,6 +41,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sensor_msgs/msg/point_cloud2.hpp>
 
 #include <rtabmap_ros/msg/odom_info.hpp>
+#include <rtabmap_ros/msg/rgbd_image.hpp>
 #include <rtabmap_ros/srv/reset_pose.hpp>
 #include <rtabmap/core/SensorData.h>
 #include <rtabmap/core/Parameters.h>
@@ -61,7 +62,7 @@ public:
 	explicit OdometryROS(const std::string & name, const rclcpp::NodeOptions & options);
 	virtual ~OdometryROS();
 
-	void processData(const rtabmap::SensorData & data, const rclcpp::Time & stamp);
+	void processData(rtabmap::SensorData & data, const std_msgs::msg::Header & header);
 
 	void resetOdom(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<std_srvs::srv::Empty::Request>, std::shared_ptr<std_srvs::srv::Empty::Response>);
 	void resetToPose(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<rtabmap_ros::srv::ResetPose::Request>, std::shared_ptr<rtabmap_ros::srv::ResetPose::Response>);
@@ -82,10 +83,10 @@ protected:
 	void startWarningThread(const std::string & subscribedTopicsMsg, bool approxSync);
 	void callbackCalled() {callbackCalled_ = true;}
 
-	virtual void flushCallbacks() {}
+	virtual void flushCallbacks() {};
 	tf2_ros::Buffer & tfBuffer() {return *tfBuffer_;}
 	const double & waitForTransform() const {return waitForTransform_;}
-	const int & queueSize() const {return queueSize_;}
+	virtual void postProcessData(const rtabmap::SensorData & /*data*/, const std_msgs::msg::Header & /*header*/) const {}
 
 private:
 	void warningLoop(const std::string & subscribedTopicsMsg, bool approxSync);
@@ -114,14 +115,15 @@ private:
 	bool publishTf_;
 	double waitForTransform_;
 	bool publishNullWhenLost_;
-	int queueSize_;
 	rtabmap::ParametersMap parameters_;
 
 	rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odomPub_;
 	rclcpp::Publisher<rtabmap_ros::msg::OdomInfo>::SharedPtr odomInfoPub_;
+	rclcpp::Publisher<rtabmap_ros::msg::OdomInfo>::SharedPtr odomInfoLitePub_;
 	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr odomLocalMap_;
 	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr odomLocalScanMap_;
 	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr odomLastFrame_;
+	rclcpp::Publisher<rtabmap_ros::msg::RGBDImage>::SharedPtr odomRgbdImagePub_;
 
 	rclcpp::Service<std_srvs::srv::Empty>::SharedPtr resetSrv_;
 	rclcpp::Service<rtabmap_ros::srv::ResetPose>::SharedPtr resetToPoseSrv_;
@@ -147,11 +149,12 @@ private:
 	rtabmap::Transform guessPreviousPose_;
 	double previousStamp_;
 	double expectedUpdateRate_;
+	double maxUpdateRate_;
 	int odomStrategy_;
 	bool waitIMUToinit_;
 	bool imuProcessed_;
-	double lastImuReceivedStamp_;
-	rtabmap::SensorData bufferedData_;
+	std::map<double, rtabmap::IMU> imus_;
+	std::pair<rtabmap::SensorData, std_msgs::msg::Header > bufferedData_;
 	std::string configPath_;
 	rtabmap::Transform initialPose_;
 };

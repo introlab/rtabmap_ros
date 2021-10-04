@@ -49,8 +49,6 @@ ObstaclesDetection::ObstaclesDetection(const rclcpp::NodeOptions & options) :
 	ULogger::setType(ULogger::kTypeConsole);
 	ULogger::setLevel(ULogger::kWarning);
 
-	int queueSize = 10;
-	queueSize = this->declare_parameter("queue_size", queueSize);
 	frameId_ = this->declare_parameter("frame_id", frameId_);
 	mapFrameId_ = this->declare_parameter("map_frame_id", mapFrameId_);
 	waitForTransform_ = this->declare_parameter("wait_for_transform", waitForTransform_);
@@ -78,11 +76,11 @@ ObstaclesDetection::ObstaclesDetection(const rclcpp::NodeOptions & options) :
 	tfBuffer_ = std::make_shared< tf2_ros::Buffer >(this->get_clock());
 	tfListener_ = std::make_shared< tf2_ros::TransformListener >(*tfBuffer_);
 
-	cloudSub_ = create_subscription<sensor_msgs::msg::PointCloud2>("cloud", rclcpp::SensorDataQoS(), std::bind(&ObstaclesDetection::callback, this, std::placeholders::_1));
+	cloudSub_ = create_subscription<sensor_msgs::msg::PointCloud2>("cloud", 5, std::bind(&ObstaclesDetection::callback, this, std::placeholders::_1));
 
-	groundPub_ = create_publisher<sensor_msgs::msg::PointCloud2>("ground", 1);
-	obstaclesPub_ = create_publisher<sensor_msgs::msg::PointCloud2>("obstacles", 1);
-	projObstaclesPub_ = create_publisher<sensor_msgs::msg::PointCloud2>("proj_obstacles", 1);
+	groundPub_ = create_publisher<sensor_msgs::msg::PointCloud2>("ground", 5);
+	obstaclesPub_ = create_publisher<sensor_msgs::msg::PointCloud2>("obstacles", 5);
+	projObstaclesPub_ = create_publisher<sensor_msgs::msg::PointCloud2>("proj_obstacles", 5);
 }
 
 
@@ -102,6 +100,7 @@ void ObstaclesDetection::callback(const sensor_msgs::msg::PointCloud2::ConstShar
 	if(localTransform.isNull())
 	{
 		RCLCPP_ERROR(this->get_logger(), "Failed to get transform between %s and %s frames", frameId_.c_str(), cloudMsg->header.frame_id.c_str());
+		return;
 	}
 
 	rtabmap::Transform pose = rtabmap::Transform::getIdentity();
@@ -114,6 +113,9 @@ void ObstaclesDetection::callback(const sensor_msgs::msg::PointCloud2::ConstShar
 			return;
 		}
 	}
+
+	UASSERT_MSG(cloudMsg->data.size() == cloudMsg->row_step*cloudMsg->height,
+			uFormat("data=%d row_step=%d height=%d", cloudMsg->data.size(), cloudMsg->row_step, cloudMsg->height).c_str());
 
 	pcl::PointCloud<pcl::PointXYZ>::Ptr inputCloud(new pcl::PointCloud<pcl::PointXYZ>);
 	pcl::fromROSMsg(*cloudMsg, *inputCloud);

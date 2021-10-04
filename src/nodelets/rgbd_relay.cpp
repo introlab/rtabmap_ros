@@ -51,7 +51,7 @@ RGBDRelay::RGBDRelay(const rclcpp::NodeOptions & options) :
 	compress_ = this->declare_parameter("compress", compress_);
 	uncompress_ = this->declare_parameter("uncompress", uncompress_);
 
-	rgbdImageSub_ = create_subscription<rtabmap_ros::msg::RGBDImage>("rgbd_image", rclcpp::SensorDataQoS(), std::bind(&RGBDRelay::callback, this, std::placeholders::_1));
+	rgbdImageSub_ = create_subscription<rtabmap_ros::msg::RGBDImage>("rgbd_image", 5, std::bind(&RGBDRelay::callback, this, std::placeholders::_1));
 	rgbdImagePub_ = create_publisher<rtabmap_ros::msg::RGBDImage>("rgbd_image_relay", 1);
 }
 
@@ -70,8 +70,12 @@ void RGBDRelay::callback(const rtabmap_ros::msg::RGBDImage::SharedPtr input) con
 		output->header = input->header;
 		output->rgb_camera_info = input->rgb_camera_info;
 		output->depth_camera_info = input->depth_camera_info;
+		output->key_points = input->key_points;
+		output->points = input->points;
+		output->descriptors = input->descriptors;
+		output->global_descriptor = input->global_descriptor;
 
-		rtabmap::StereoCameraModel stereoModel;// = stereoCameraModelFromROS(input->rgb_camera_info, input->depth_camera_info, rtabmap::Transform::getIdentity());
+		rtabmap::StereoCameraModel stereoModel = stereoCameraModelFromROS(input->rgb_camera_info, input->depth_camera_info, rtabmap::Transform::getIdentity());
 
 		if(compress_)
 		{

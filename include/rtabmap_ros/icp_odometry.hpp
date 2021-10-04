@@ -61,6 +61,7 @@ private:
 
 protected:
 	virtual void flushCallbacks();
+	void postProcessData(const SensorData & data, const std_msgs::msg::Header & header) const;
 
 private:
 	rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub_;
@@ -73,8 +74,11 @@ private:
 	double scanVoxelSize_;
 	int scanNormalK_;
 	double scanNormalRadius_;
+	double scanNormalGroundUp_;
 	//std::vector<std::shared_ptr<rtabmap_ros::PluginInterface> > plugins_;
 	//pluginlib::ClassLoader<rtabmap_ros::PluginInterface> plugin_loader_;
+	bool scanReceived_ = false;
+	bool cloudReceived_ = false;
 
 };
 

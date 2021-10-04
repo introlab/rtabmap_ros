@@ -58,12 +58,13 @@ public:
 
 private:
 	double depthScale_;
+	int decimation_;
 	double compressedRate_;
+	std::thread * warningThread_;
 	bool callbackCalled_;
 
 	rclcpp::Time lastCompressedPublished_;
 
-	std::thread * warningThread_;
 	std::string subscribedTopicsMsg_;
 
 	rclcpp::Publisher<rtabmap_ros::msg::RGBDImage>::SharedPtr rgbdImagePub_;

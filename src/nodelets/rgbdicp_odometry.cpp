@@ -73,6 +73,7 @@ public:
 		approxCloudSync_(0),
 		exactCloudSync_(0),
 		queueSize_(5),
+		keepColor_(false),
 		scanCloudMaxPoints_(0),
 		scanVoxelSize_(0.0),
 		scanNormalK_(0),
@@ -122,6 +123,7 @@ private:
 			pnh.param("scan_cloud_normal_k", scanNormalK_, scanNormalK_);
 		}
 		pnh.param("scan_normal_radius", scanNormalRadius_, scanNormalRadius_);
+		pnh.param("keep_color", keepColor_, keepColor_);
 
 		NODELET_INFO("RGBDIcpOdometry: approx_sync           = %s", approxSync?"true":"false");
 		NODELET_INFO("RGBDIcpOdometry: queue_size            = %d", queueSize_);
@@ -130,6 +132,7 @@ private:
 		NODELET_INFO("RGBDIcpOdometry: scan_voxel_size       = %f", scanVoxelSize_);
 		NODELET_INFO("RGBDIcpOdometry: scan_normal_k         = %d", scanNormalK_);
 		NODELET_INFO("RGBDIcpOdometry: scan_normal_radius    = %f", scanNormalRadius_);
+		NODELET_INFO("RGBDIcpOdometry: keep_color            = %s", keepColor_?"true":"false");
 
 		ros::NodeHandle rgb_nh(nh, "rgb");
 		ros::NodeHandle depth_nh(nh, "depth");
@@ -181,7 +184,7 @@ private:
 				exactScanSync_->registerCallback(std::bind(&RGBDICPOdometry::callbackScan, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 			}
 
-			subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s, \n   %s",
+			subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s \\\n   %s \\\n   %s \\\n   %s",
 					getName().c_str(),
 					approxSync?"approx":"exact",
 					image_mono_sub_.getSubscriber().getTopic().c_str(),
@@ -277,10 +280,13 @@ private:
 			if(image->data.size() && depth->data.size() && cameraInfo->K[4] != 0)
 			{
 				rtabmap::CameraModel rtabmapModel = rtabmap_ros::cameraModelFromROS(*cameraInfo, localTransform);
-				cv_bridge::CvImagePtr ptrImage = cv_bridge::toCvCopy(image, image->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0?"":"mono8");
+				cv_bridge::CvImagePtr ptrImage = cv_bridge::toCvCopy(image,
+						image->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0 ||
+						image->encoding.compare(sensor_msgs::image_encodings::MONO8)==0?"":
+								keepColor_ && image->encoding.compare(sensor_msgs::image_encodings::MONO16)!=0?"bgr8":"mono8");
 				cv_bridge::CvImagePtr ptrDepth = cv_bridge::toCvCopy(depth);
 
-				cv::Mat scan;
+				LaserScan scan;
 				Transform localScanTransform = Transform::getIdentity();
 				int maxLaserScans = 0;
 				if(scanMsg.get() != 0)
@@ -337,6 +343,10 @@ private:
 				}
 				else if(cloudMsg.get() != 0)
 				{
+					UASSERT_MSG(cloudMsg->data.size() == cloudMsg->row_step*cloudMsg->height,
+							uFormat("data=%d row_step=%d height=%d", cloudMsg->data.size(), cloudMsg->row_step, cloudMsg->height).c_str());
+
+
 					bool containNormals = false;
 					if(scanVoxelSize_ == 0.0f)
 					{
@@ -402,7 +412,7 @@ private:
 				}
 
 				rtabmap::SensorData data(
-						LaserScan::backwardCompatibility(scan,
+						LaserScan(scan,
 								scanMsg.get() != 0 || cloudMsg.get() != 0?maxLaserScans:0,
 								scanMsg.get() != 0?scanMsg->range_max:0,
 								localScanTransform),
@@ -412,7 +422,10 @@ private:
 						0,
 						rtabmap_ros::timestampFromROS(stamp));
 
-				this->processData(data, stamp);
+				std_msgs::Header header;
+				header.stamp = stamp;
+				header.frame_id = image->header.frame_id;
+				this->processData(data, header);
 			}
 		}
 	}
@@ -462,6 +475,7 @@ private:
 	typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo, sensor_msgs::PointCloud2> MyExactCloudSyncPolicy;
 	message_filters::Synchronizer<MyExactCloudSyncPolicy> * exactCloudSync_;
 	int queueSize_;
+	bool keepColor_;
 	int scanCloudMaxPoints_;
 	double scanVoxelSize_;
 	int scanNormalK_;

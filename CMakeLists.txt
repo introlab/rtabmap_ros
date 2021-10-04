@@ -49,12 +49,13 @@ find_package(image_geometry REQUIRED)
 
 # Optional components
 #find_package(costmap_2d)
-#find_package(octomap_msgs)
-#find_package(apriltag_ros)
+find_package(octomap_msgs)
+#find_package(apriltag_msgs)
 #find_package(find_object_2d)
+find_package(move_base_msgs)
 
 ## System dependencies are found with CMake's conventions
-find_package(RTABMap 0.20.5 REQUIRED)
+find_package(RTABMap 0.20.14 REQUIRED)
 find_package(Boost REQUIRED COMPONENTS system) # dependencies from PCL
 find_package(PCL 1.7 REQUIRED COMPONENTS kdtree) #This crashes idl generation if all components are found?! see https://github.com/ros2/rosidl/issues/402#issuecomment-565586908
 
@@ -62,6 +63,34 @@ find_package(PCL 1.7 REQUIRED COMPONENTS kdtree) #This crashes idl generation if
 find_package(rviz_common)
 find_package(rviz_rendering)
 find_package(rviz_default_plugins)
+
+IF(WIN32)
+add_compile_options(-bigobj)
+ENDIF(WIN32)
+
+# kinetic issue, rtabmap now requires at least c++11
+if("$ENV{ROS_DISTRO}" STREQUAL "kinetic")
+include(CheckCXXCompilerFlag)
+CHECK_CXX_COMPILER_FLAG("-std=c++14" COMPILER_SUPPORTS_CXX14)
+CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
+IF(COMPILER_SUPPORTS_CXX14)
+  set(CMAKE_CXX_STANDARD 14)
+ELSEIF(COMPILER_SUPPORTS_CXX11)
+  set(CMAKE_CXX_STANDARD 11)
+ENDIF()
+endif()
+
+
+option(RTABMAP_SYNC_MULTI_RGBD "Build with multi RGBD camera synchronization support"  OFF)
+option(RTABMAP_SYNC_USER_DATA "Build with input user data support"  OFF)
+MESSAGE(STATUS "RTABMAP_SYNC_MULTI_RGBD = ${RTABMAP_SYNC_MULTI_RGBD}")
+MESSAGE(STATUS "RTABMAP_SYNC_USER_DATA  = ${RTABMAP_SYNC_USER_DATA}")
+IF(RTABMAP_SYNC_MULTI_RGBD)
+add_definitions("-DRTABMAP_SYNC_MULTI_RGBD")
+ENDIF(RTABMAP_SYNC_MULTI_RGBD)
+IF(RTABMAP_SYNC_USER_DATA)
+add_definitions("-DRTABMAP_SYNC_USER_DATA")
+ENDIF(RTABMAP_SYNC_USER_DATA)
 
 #Qt stuff
 # If librtabmap_gui.so is found, rtabmapviz will be built
@@ -92,6 +121,8 @@ ENDIF(RTABMAP_GUI OR rviz_default_plugins_FOUND)
  set(msg_files
    "msg/Info.msg"
    "msg/KeyPoint.msg"
+   "msg/GlobalDescriptor.msg"
+   "msg/ScanDescriptor.msg"
    "msg/MapData.msg"
    "msg/MapGraph.msg"
    "msg/NodeData.msg"
@@ -101,20 +132,30 @@ ENDIF(RTABMAP_GUI OR rviz_default_plugins_FOUND)
    "msg/Point3f.msg"
    "msg/Goal.msg"
    "msg/RGBDImage.msg"
+   "msg/RGBDImages.msg"
    "msg/UserData.msg"
    "msg/GPS.msg"
    "msg/Path.msg"
+   "msg/EnvSensor.msg"
  )
 
 # declare the service files to generate code for
  set(srv_files
    "srv/GetMap.srv"
+   "srv/GetMap2.srv"
    "srv/ListLabels.srv"
    "srv/PublishMap.srv"
    "srv/ResetPose.srv"
    "srv/SetGoal.srv"
    "srv/SetLabel.srv"
    "srv/GetPlan.srv"
+   "srv/AddLink.srv"
+   "srv/GetNodeData.srv"
+   "srv/GetNodesInRadius.srv"
+   "srv/LoadDatabase.srv"
+   "srv/DetectMoreLoopClosures.srv"
+   "srv/GlobalBundleAdjustment.srv"
+   "srv/CleanupLocalGrids.srv"
  )
 
 ## Generate messages and services
@@ -186,6 +227,7 @@ SET(Libraries
    visualization_msgs
    image_geometry
    stereo_msgs
+   move_base_msgs
 )
 
 SET(rtabmap_sync_lib_src
@@ -194,13 +236,21 @@ SET(rtabmap_sync_lib_src
    src/impl/CommonDataSubscriberStereo.cpp
    src/impl/CommonDataSubscriberRGB.cpp
    src/impl/CommonDataSubscriberRGBD.cpp
-   src/impl/CommonDataSubscriberRGBD2.cpp
-   src/impl/CommonDataSubscriberRGBD3.cpp
-   src/impl/CommonDataSubscriberRGBD4.cpp
+   src/impl/CommonDataSubscriberRGBDX.cpp
    src/impl/CommonDataSubscriberScan.cpp
    src/impl/CommonDataSubscriberOdom.cpp
    src/CoreWrapper.cpp # we put CoreWrapper here instead of plugins lib to avoid long compilation time on plugins lib
 )
+IF(RTABMAP_SYNC_MULTI_RGBD)
+  SET(rtabmap_sync_lib_src
+    ${rtabmap_sync_lib_src}
+    src/impl/CommonDataSubscriberRGBD2.cpp
+    src/impl/CommonDataSubscriberRGBD3.cpp
+    src/impl/CommonDataSubscriberRGBD4.cpp
+    src/impl/CommonDataSubscriberRGBD5.cpp
+    src/impl/CommonDataSubscriberRGBD6.cpp
+  )
+ENDIF(RTABMAP_SYNC_MULTI_RGBD)
   
 SET(rtabmap_ros_lib_src
    src/MsgConversion.cpp
@@ -227,36 +277,51 @@ SET(rtabmap_plugins_lib_src
     src/nodelets/point_cloud_assembler.cpp
 #   src/nodelets/undistort_depth.cpp
 #   src/nodelets/imu_to_tf.cpp
+    src/nodelets/rgbdx_sync.cpp
     src/nodelets/rgbd_sync.cpp 
     src/nodelets/stereo_sync.cpp 
+    src/nodelets/rgb_sync.cpp 
     src/nodelets/rgbd_relay.cpp
 )
 
 # If octomap is found, add definition
-#IF(octomap_msgs_FOUND)
-#MESSAGE(STATUS "WITH octomap_msgs")
-#include_directories(
-#  ${octomap_msgs_INCLUDE_DIRS}
-#)
-#SET(Libraries
-#  octomap_msgs
-#  ${Libraries}
-#)
-#ADD_DEFINITIONS("-DWITH_OCTOMAP_MSGS")
-#ENDIF(octomap_msgs_FOUND)
+IF(octomap_msgs_FOUND)
+MESSAGE(STATUS "WITH octomap_msgs")
+include_directories(
+  ${octomap_msgs_INCLUDE_DIRS}
+)
+SET(Libraries
+  octomap_msgs
+  ${Libraries}
+)
+ADD_DEFINITIONS("-DWITH_OCTOMAP_MSGS")
+ENDIF(octomap_msgs_FOUND)
 
-# If apriltag_ros is found, add definition
-#IF(apriltag_ros_FOUND)
-#MESSAGE(STATUS "WITH apriltag_ros")
+# If apriltag_msgs is found, add definition
+#IF(apriltag_msgs_FOUND)
+#MESSAGE(STATUS "WITH apriltag_msgs")
 #include_directories(
-#  ${apriltag_ros_INCLUDE_DIRS}
+#  ${apriltag_msgs_INCLUDE_DIRS}
 #)
 #SET(Libraries
-#  apriltag_ros
+#  apriltag_msgs
 #  ${Libraries}
 #)
-#ADD_DEFINITIONS("-DWITH_APRILTAG_ROS")
-#ENDIF(apriltag_ros_FOUND)
+#ADD_DEFINITIONS("-DWITH_APRILTAG_MSGS")
+#ENDIF(apriltag_msgs_FOUND)
+
+# If move_base_msgs is found, add definition
+IF(octomap_msgs_FOUND)
+MESSAGE(STATUS "WITH move_base_msgs")
+include_directories(
+  ${move_base_msgs_INCLUDE_DIRS}
+)
+SET(Libraries
+  move_base_msgs
+  ${Libraries}
+)
+ADD_DEFINITIONS("-DWITH_MOVE_BASE_MSGS")
+ENDIF(move_base_msgs_FOUND)
 
 ############################
 ## Declare a cpp library
@@ -320,10 +385,20 @@ ament_target_dependencies(rtabmap_rgbd_sync ${Libraries})
 target_link_libraries(rtabmap_rgbd_sync rtabmap_plugins ${RTABMap_LIBRARIES})
 set_target_properties(rtabmap_rgbd_sync PROPERTIES OUTPUT_NAME "rgbd_sync")
 
+add_executable(rtabmap_rgbdx_sync src/RGBDXSyncNode.cpp)
+ament_target_dependencies(rtabmap_rgbdx_sync ${Libraries})
+target_link_libraries(rtabmap_rgbdx_sync rtabmap_plugins ${RTABMap_LIBRARIES})
+set_target_properties(rtabmap_rgbdx_sync PROPERTIES OUTPUT_NAME "rgbdx_sync")
+
 add_executable(rtabmap_stereo_sync src/StereoSyncNode.cpp)
 ament_target_dependencies(rtabmap_stereo_sync ${Libraries})
 target_link_libraries(rtabmap_stereo_sync rtabmap_plugins ${RTABMap_LIBRARIES})
 set_target_properties(rtabmap_stereo_sync PROPERTIES OUTPUT_NAME "stereo_sync")
+
+add_executable(rtabmap_rgb_sync src/RGBSyncNode.cpp)
+ament_target_dependencies(rtabmap_rgb_sync ${Libraries})
+target_link_libraries(rtabmap_rgb_sync rtabmap_plugins ${RTABMap_LIBRARIES})
+set_target_properties(rtabmap_rgb_sync PROPERTIES OUTPUT_NAME "rgb_sync")
 
 add_executable(rtabmap_rgbd_relay src/RGBDRelayNode.cpp)
 ament_target_dependencies(rtabmap_rgbd_relay ${Libraries})
@@ -383,6 +458,11 @@ set_target_properties(rtabmap_point_cloud_assembler PROPERTIES OUTPUT_NAME "poin
 #    set_target_properties(rtabmap_save_objects_example PROPERTIES OUTPUT_NAME "save_objects_example")
 #ENDIF(find_object_2d_FOUND)
 
+#add_executable(rtabmap_external_loop_detectionexample src/ExternalLoopDetectionExample.cpp)
+#add_dependencies(rtabmap_external_loop_detectionexample ${${PROJECT_NAME}_EXPORTED_TARGETS})
+#ament_target_dependencies(rtabmap_external_loop_detectionexample ${Libraries} rtabmap_ros)
+#set_target_properties(rtabmap_external_loop_detectionexample PROPERTIES OUTPUT_NAME "external_loop_detection_example")
+
 #add_executable(rtabmap_camera src/CameraNode.cpp)
 #add_dependencies(rtabmap_camera ${${PROJECT_NAME}_EXPORTED_TARGETS})
 #ament_target_dependencies(rtabmap_camera ${Libraries})
@@ -436,6 +516,12 @@ foreach(typesupport_impl ${typesupport_impls})
     ${PROJECT_NAME}_msgs ${typesupport_impl}
   )
   rosidl_target_interfaces(rtabmap_rgbd_sync
+    ${PROJECT_NAME}_msgs ${typesupport_impl}
+  )
+  rosidl_target_interfaces(rtabmap_rgbdx_sync
+    ${PROJECT_NAME}_msgs ${typesupport_impl}
+  )
+  rosidl_target_interfaces(rtabmap_rgb_sync
     ${PROJECT_NAME}_msgs ${typesupport_impl}
   )
   rosidl_target_interfaces(rtabmap_stereo_sync
@@ -546,6 +632,9 @@ ENDIF(rviz_default_plugins_FOUND)
 #    ament_target_dependencies(rtabmap_costmap_plugins2
 #      ${costmap_2d_LIBRARIES}
 #    )
+#    add_executable(rtabmap_costmap_voxel_markers src/costmap_2d/voxel_markers.cpp)
+#    ament_target_dependencies(rtabmap_costmap_voxel_markers ${costmap_2d_LIBRARIES})
+#    set_target_properties(rtabmap_costmap_voxel_markers PROPERTIES OUTPUT_NAME "voxel_markers")
 #ENDIF(costmap_2d_FOUND)
 
 #############
@@ -563,6 +652,8 @@ ENDIF(rviz_default_plugins_FOUND)
 #  scripts/point_to_tf.py
 #  scripts/transform_to_tf.py
 #  scripts/yaml_to_camera_info.py
+#  scripts/netvlad_tf_ros.py
+#  scripts/wifi_signal_pub.py
 #  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 #)
 
@@ -593,8 +684,11 @@ install(TARGETS
    rtabmap_point_cloud_assembler
 #   rtabmap_camera
    rtabmap_rgbd_sync
+   rtabmap_rgbdx_sync
    rtabmap_stereo_sync
+   rtabmap_rgb_sync
    rtabmap_rgbd_relay
+#   rtabmap_wifi_signal_sub
    DESTINATION lib/${PROJECT_NAME}
 )
 IF(RTABMAP_GUI)
@@ -651,6 +745,7 @@ ENDIF(rviz_default_plugins_FOUND)
 #    install(TARGETS 
 #       rtabmap_costmap_plugins
 #       rtabmap_costmap_plugins2
+#       rtabmap_costmap_voxel_markers
 #      DESTINATION lib
 #     )
 #    install(FILES

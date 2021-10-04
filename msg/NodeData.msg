@@ -33,12 +33,13 @@ float32 baseline
 # local transform (/base_link -> /camera_link)
 geometry_msgs/Transform[] local_transform
 
-# compressed 2D laser scan in /base_link frame
+# compressed 2D or 3D laser scan
 # use rtabmap::util3d::uncompressData() from "rtabmap/core/util3d.h"
 uint8[] laser_scan
 int32 laser_scan_max_pts
 float32 laser_scan_max_range
 int32 laser_scan_format
+# local transform (/base_link -> /base_laser)
 geometry_msgs/Transform laser_scan_local_transform
 
 # compressed user data
@@ -54,11 +55,14 @@ float32 grid_cell_size
 Point3f grid_view_point
 
 # std::multimap<wordId, cv::Keypoint>
-# std::multimap<wordId, pcl::PointXYZ>
+# std::multimap<wordId, cv::Point3f>
 int32[] word_ids
 KeyPoint[] word_kpts
-sensor_msgs/PointCloud2 word_pts
-
+Point3f[] word_pts
 # compressed descriptors
 # use rtabmap::util3d::uncompressData() from "rtabmap/core/util3d.h"
-uint8[] descriptors
+uint8[] word_descriptors
+
+GlobalDescriptor[] global_descriptors
+
+EnvSensor[] env_sensors

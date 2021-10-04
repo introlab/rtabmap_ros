@@ -49,6 +49,8 @@ MapGraphDisplay::MapGraphDisplay()
 	                                       "Color to draw global loop closure links.", this );
 	color_local_property_ = new rviz_common::properties::ColorProperty( "Local loop closure", Qt::yellow,
 	                                       "Color to draw local loop closure links.", this );
+	color_landmark_property_ = new rviz_common::properties::ColorProperty( "Landmark", Qt::darkGreen,
+	                                       "Color to draw landmark links.", this );
 	color_user_property_ = new rviz_common::properties::ColorProperty( "User", Qt::red,
 	                                       "Color to draw user links.", this );
 	color_virtual_property_ = new rviz_common::properties::ColorProperty( "Virtual", Qt::magenta,
@@ -147,6 +149,10 @@ void MapGraphDisplay::processMessage( const rtabmap_ros::msg::MapGraph::ConstSha
 				else if(iter->second.type() == rtabmap::Link::kLocalSpaceClosure || iter->second.type() == rtabmap::Link::kLocalTimeClosure)
 				{
 					color = color_local_property_->getOgreColor();
+				}
+				else if(iter->second.type() == rtabmap::Link::kLandmark)
+				{
+					color = color_landmark_property_->getOgreColor();
 				}
 				else
 				{

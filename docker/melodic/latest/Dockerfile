@@ -8,6 +8,6 @@ RUN source /ros_entrypoint.sh && \
     catkin_init_workspace && \
     git clone https://github.com/introlab/rtabmap_ros.git && \
     cd .. && \
-    catkin_make -j1 -DCMAKE_INSTALL_PREFIX=/opt/ros/melodic install && \
+    catkin_make -j1 -DRTABMAP_SYNC_MULTI_RGBD=ON -DCMAKE_INSTALL_PREFIX=/opt/ros/melodic install && \
     cd && \
     rm -rf catkin_ws

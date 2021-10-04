@@ -73,10 +73,10 @@ StereoSync::StereoSync(const rclcpp::NodeOptions & options) :
 	}
 
 	image_transport::TransportHints hints(this);
-	imageLeftSub_.subscribe(this, "left/image_rect", hints.getTransport(), rmw_qos_profile_sensor_data);
-	imageRightSub_.subscribe(this, "right/image_rect", hints.getTransport(), rmw_qos_profile_sensor_data);
-	cameraInfoLeftSub_.subscribe(this, "left/camera_info", rmw_qos_profile_sensor_data);
-	cameraInfoRightSub_.subscribe(this, "right/camera_info", rmw_qos_profile_sensor_data);
+	imageLeftSub_.subscribe(this, "left/image_rect", hints.getTransport());
+	imageRightSub_.subscribe(this, "right/image_rect", hints.getTransport());
+	cameraInfoLeftSub_.subscribe(this, "left/camera_info");
+	cameraInfoRightSub_.subscribe(this, "right/camera_info");
 
 	subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s",
 						get_name(),

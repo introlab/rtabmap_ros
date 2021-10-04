@@ -39,8 +39,8 @@ void CommonDataSubscriber::stereoCallback(
 	callbackCalled();
 	nav_msgs::msg::Odometry::SharedPtr odomMsg; // Null
 	rtabmap_ros::msg::UserData::SharedPtr userDataMsg; // Null
-	sensor_msgs::msg::LaserScan::SharedPtr scanMsg; // null
-	sensor_msgs::msg::PointCloud2::SharedPtr scan3dMsg; // null
+	sensor_msgs::msg::LaserScan scanMsg; // null
+	sensor_msgs::msg::PointCloud2 scan3dMsg; // Null
 	rtabmap_ros::msg::OdomInfo::SharedPtr odomInfoMsg; // null
 	commonStereoCallback(odomMsg, userDataMsg, cv_bridge::toCvShare(leftImageMsg), cv_bridge::toCvShare(rightImageMsg), *leftCamInfoMsg, *rightCamInfoMsg, scanMsg, scan3dMsg, odomInfoMsg);
 }
@@ -54,8 +54,8 @@ void CommonDataSubscriber::stereoInfoCallback(
 	callbackCalled();
 	nav_msgs::msg::Odometry::SharedPtr odomMsg; // Null
 	rtabmap_ros::msg::UserData::SharedPtr userDataMsg; // Null
-	sensor_msgs::msg::LaserScan::SharedPtr scan2dMsg; // null
-	sensor_msgs::msg::PointCloud2::SharedPtr scan3dMsg; // null
+	sensor_msgs::msg::LaserScan scan2dMsg; // Null
+	sensor_msgs::msg::PointCloud2 scan3dMsg; // Null
 	commonStereoCallback(odomMsg, userDataMsg, cv_bridge::toCvShare(leftImageMsg), cv_bridge::toCvShare(rightImageMsg), *leftCamInfoMsg, *rightCamInfoMsg, scan2dMsg, scan3dMsg, odomInfoMsg);
 }
 
@@ -69,8 +69,8 @@ void CommonDataSubscriber::stereoOdomCallback(
 {
 	callbackCalled();
 	rtabmap_ros::msg::UserData::SharedPtr userDataMsg; // Null
-	sensor_msgs::msg::LaserScan::SharedPtr scanMsg; // Null
-	sensor_msgs::msg::PointCloud2::SharedPtr scan3dMsg; // null
+	sensor_msgs::msg::LaserScan scanMsg; // null
+	sensor_msgs::msg::PointCloud2 scan3dMsg; // Null
 	rtabmap_ros::msg::OdomInfo::SharedPtr odomInfoMsg; // null
 	commonStereoCallback(odomMsg, userDataMsg, cv_bridge::toCvShare(leftImageMsg), cv_bridge::toCvShare(rightImageMsg), *leftCamInfoMsg, *rightCamInfoMsg, scanMsg, scan3dMsg, odomInfoMsg);
 }
@@ -84,8 +84,8 @@ void CommonDataSubscriber::stereoOdomInfoCallback(
 {
 	callbackCalled();
 	rtabmap_ros::msg::UserData::SharedPtr userDataMsg; // Null
-	sensor_msgs::msg::LaserScan::SharedPtr scan2dMsg; // Null
-	sensor_msgs::msg::PointCloud2::SharedPtr scan3dMsg; // Null
+	sensor_msgs::msg::LaserScan scan2dMsg; // Null
+	sensor_msgs::msg::PointCloud2 scan3dMsg; // Null
 	commonStereoCallback(odomMsg, userDataMsg, cv_bridge::toCvShare(leftImageMsg), cv_bridge::toCvShare(rightImageMsg), *leftCamInfoMsg, *rightCamInfoMsg, scan2dMsg, scan3dMsg, odomInfoMsg);
 }
 
@@ -99,24 +99,24 @@ void CommonDataSubscriber::setupStereoCallbacks(
 	RCLCPP_INFO(node.get_logger(), "Setup stereo callback");
 
 	image_transport::TransportHints hints(&node);
-	imageRectLeft_.subscribe(&node, "left/image_rect", hints.getTransport(), rmw_qos_profile_sensor_data);
-	imageRectRight_.subscribe(&node, "right/image_rect", hints.getTransport(), rmw_qos_profile_sensor_data);
-	cameraInfoLeft_.subscribe(&node, "left/camera_info", rmw_qos_profile_sensor_data);
-	cameraInfoRight_.subscribe(&node, "right/camera_info", rmw_qos_profile_sensor_data);
+	imageRectLeft_.subscribe(&node, "left/image_rect", hints.getTransport());
+	imageRectRight_.subscribe(&node, "right/image_rect", hints.getTransport());
+	cameraInfoLeft_.subscribe(&node, "left/camera_info");
+	cameraInfoRight_.subscribe(&node, "right/camera_info");
 
 	if(subscribeOdom)
 	{
-		odomSub_.subscribe(&node, "odom", rmw_qos_profile_sensor_data);
+		odomSub_.subscribe(&node, "odom");
 
 		if(subscribeOdomInfo)
 		{
 			subscribedToOdomInfo_ = true;
-			odomInfoSub_.subscribe(&node, "odom_info", rmw_qos_profile_sensor_data);
-			SYNC_DECL6(stereoOdomInfo, approxSync, queueSize, odomSub_, imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_, odomInfoSub_);
+			odomInfoSub_.subscribe(&node, "odom_info");
+			SYNC_DECL6(CommonDataSubscriber, stereoOdomInfo, approxSync, queueSize, odomSub_, imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_, odomInfoSub_);
 		}
 		else
 		{
-			SYNC_DECL5(stereoOdom, approxSync, queueSize, odomSub_, imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_);
+			SYNC_DECL5(CommonDataSubscriber, stereoOdom, approxSync, queueSize, odomSub_, imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_);
 		}
 	}
 	else
@@ -124,12 +124,12 @@ void CommonDataSubscriber::setupStereoCallbacks(
 		if(subscribeOdomInfo)
 		{
 			subscribedToOdomInfo_ = true;
-			odomInfoSub_.subscribe(&node, "odom_info", rmw_qos_profile_sensor_data);
-			SYNC_DECL5(stereoInfo, approxSync, queueSize, imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_, odomInfoSub_);
+			odomInfoSub_.subscribe(&node, "odom_info");
+			SYNC_DECL5(CommonDataSubscriber, stereoInfo, approxSync, queueSize, imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_, odomInfoSub_);
 		}
 		else
 		{
-			SYNC_DECL4(stereo, approxSync, queueSize, imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_);
+			SYNC_DECL4(CommonDataSubscriber, stereo, approxSync, queueSize, imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_);
 		}
 	}
 }

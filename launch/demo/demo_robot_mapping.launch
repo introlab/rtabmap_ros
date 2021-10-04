@@ -48,12 +48,16 @@
 	  <param name="Reg/Strategy"              type="string" value="1"/>     <!-- 0=Visual, 1=ICP, 2=Visual+ICP -->
 	  <param name="Vis/MinInliers"        type="string" value="12"/>   <!-- 3D visual words correspondence distance -->
 	  <param name="RGBD/OptimizeFromGraphEnd" type="string" value="false"/> <!-- Optimize graph from initial node so /map -> /odom transform will be generated -->
-	  <param name="RGBD/OptimizeMaxError"     type="string" value="3"/>	    <!-- Reject any loop closure causing large errors (>3x link's covariance) in the map -->
+	  <param name="RGBD/OptimizeMaxError"     type="string" value="4"/>	    <!-- Reject any loop closure causing large errors (>3x link's covariance) in the map -->
 	  <param name="Reg/Force3DoF"             type="string" value="true"/>  <!-- 2D SLAM -->
 	  <param name="Grid/FromDepth"            type="string" value="false"/> <!-- Create 2D occupancy grid from laser scan -->
 	  <param name="Mem/STMSize"               type="string" value="30"/>    <!-- increased to 30 to avoid adding too many loop closures on just seen locations -->
 	  <param name="RGBD/LocalRadius"          type="string" value="5"/>     <!-- limit length of proximity detections -->
-	  <param name="Icp/CorrespondenceRatio"   type="string" value="0.4"/>   <!-- minimum scan overlap to accept loop closure -->
+	  <param name="Icp/CorrespondenceRatio"   type="string" value="0.2"/>   <!-- minimum scan overlap to accept loop closure -->
+	  <param name="Icp/PM"                    type="string" value="false"/>
+	  <param name="Icp/PointToPlane"          type="string" value="false"/>
+	  <param name="Icp/MaxCorrespondenceDistance"  type="string" value="0.15"/>
+	  <param name="Icp/VoxelSize"             type="string" value="0.05"/>
 	  
 	  <!-- localization mode -->
 	  <param     if="$(arg localization)" name="Mem/IncrementalMemory" type="string" value="false"/>

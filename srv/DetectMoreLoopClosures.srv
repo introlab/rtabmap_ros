@@ -1,0 +1,27 @@
+# Detect more loop closures service
+#
+#     Based on the current optimized graph, 
+#     this process will try to find more nodes corresponding with each 
+#     other, and thus finding more loop closures to add to graph.
+# 
+
+# Cluster radius (m),     default 1 m if not set
+float32 cluster_radius_max
+
+# Cluster radius min (m), default 0 m if not set
+float32 cluster_radius_min
+
+# Cluster angle (deg),    default 0 deg if not set
+float32 cluster_angle
+
+# Iterations,             default 1 if not set
+int32 iterations
+
+# Add only intra session loop closures
+bool intra_only
+
+# Add only inter session loop closures
+bool inter_only
+---
+# return the number of loop closures detected, or -1 if it failed.
+int32 detected

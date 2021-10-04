@@ -1,0 +1,177 @@
+
+<launch>
+  
+    <!-- 
+    Hand-held 3D lidar mapping example using only a Ouster GEN2 (no camera).
+    Prerequisities: rtabmap should be built with libpointmatcher
+    
+    Example:
+    
+      $ roslaunch rtabmap_ros test_ouster_gen2.launch sensor_hostname:=os-XXXXXXXXXXXX.local udp_dest:=192.168.1.XXX
+      $ rosrun rviz rviz -f map
+      RVIZ: Show TF and /rtabmap/cloud_map topics
+    
+    ISSUE: You may have to reset odometry after receiving the first cloud if the map looks tilted. The problem seems 
+           coming from the first cloud sent by os_cloud_node, which may be poorly synchronized with IMU data.
+           
+    PTP mode (synchronize timestamp with host computer time)
+    
+      * Install:
+      
+        $ sudo apt install linuxptp httpie
+        $ printf "[global]\ntx_timestamp_timeout 10\n" >> ~/os.conf
+      
+      * Running:
+     
+        (replace "XXXXXXXXXXXX" by your ouster serial, as well as XXX by its IP address)
+        (replace "eth0" by the network interface used to communicate with ouster)
+       
+        $ http PUT http://os-XXXXXXXXXXXX.local/api/v1/time/ptp/profile <<< '"default-relaxed"'
+        $ sudo ptp4l -i eth0 -m -f ~/os.conf -S
+        $ roslaunch rtabmap_ros test_ouster_gen2.launch sensor_hostname:=os-XXXXXXXXXXXX.local udp_dest:=192.168.1.XXX ptp:=true
+       
+    -->
+
+    <arg name="use_sim_time"  default="false"/>
+
+    <!-- Required: -->
+    <arg unless="$(arg use_sim_time)" name="sensor_hostname"/>
+    <arg unless="$(arg use_sim_time)" name="udp_dest"/>
+
+    <arg name="frame_id"      default="os_sensor"/>
+    <arg name="rtabmapviz"    default="true"/>
+    <arg name="scan_20_hz"    default="true"/>
+    <arg name="voxel_size"    default="0.15"/>           <!-- indoor: 0.1 to 0.3, outdoor: 0.3 to 0.5 --> 
+    <arg name="assemble"      default="false"/>
+    <arg name="ptp"           default="false"/>          <!-- See comments in header to start before launching the launch -->
+    <arg name="distortion_correction"  default="false"/> <!-- Requires this pull request: https://github.com/ouster-lidar/ouster_example/pull/245 -->
+    
+    <param if="$(arg use_sim_time)" name="use_sim_time" value="true"/>
+    
+    <!-- Ouster -->
+    <include unless="$(arg use_sim_time)" file="$(find ouster_ros)/ouster.launch">
+      <arg name="sensor_hostname" value="$(arg sensor_hostname)"/>
+      <arg name="udp_dest" value="$(arg udp_dest)"/>
+      <arg name="image" value="true"/>
+      <arg     if="$(arg scan_20_hz)" name="lidar_mode" value="1024x20"/>
+      <arg unless="$(arg scan_20_hz)" name="lidar_mode" value="1024x10"/>
+      <arg if="$(arg ptp)" name="timestamp_mode" value="TIME_FROM_PTP_1588"/>
+      <arg if="$(arg distortion_correction)" name="fixed_frame_id" value="$(arg frame_id)_stabilized"/>
+    </include>
+
+    <!-- IMU orientation estimation and publish tf accordingly to os_sensor frame -->
+    <node pkg="nodelet" type="nodelet" name="imu_nodelet_manager" args="manager">
+      <remap from="imu/data_raw" to="/os_cloud_node/imu"/>
+      <remap from="imu/data" to="/os_cloud_node/imu/data"/>
+    </node>
+    <node pkg="nodelet" type="nodelet" name="imu_filter" args="load imu_filter_madgwick/ImuFilterNodelet imu_nodelet_manager">
+      <param name="use_mag" value="false"/>
+      <param name="world_frame" value="enu"/>
+      <param name="publish_tf" value="false"/>
+    </node>
+    <node pkg="nodelet" type="nodelet" name="imu_to_tf" args="load rtabmap_ros/imu_to_tf imu_nodelet_manager">
+      <remap from="imu/data" to="/os_cloud_node/imu/data"/>
+      <param name="fixed_frame_id" value="$(arg frame_id)_stabilized"/>
+      <param name="base_frame_id" value="$(arg frame_id)"/>
+    </node> 
+
+    <group ns="rtabmap">
+      <node pkg="rtabmap_ros" type="icp_odometry" name="icp_odometry" output="screen">
+        <remap from="scan_cloud" to="/os_cloud_node/points"/>
+        <remap from="imu"        to="/os_cloud_node/imu/data"/>
+        <param name="frame_id"        type="string" value="$(arg frame_id)"/>  
+        <param name="odom_frame_id"   type="string" value="odom"/>
+        <param     if="$(arg scan_20_hz)" name="expected_update_rate" type="double" value="25"/>
+        <param unless="$(arg scan_20_hz)" name="expected_update_rate" type="double" value="15"/>
+
+        <param name="guess_frame_id"   type="string" value="$(arg frame_id)_stabilized"/>
+        <param name="wait_imu_to_init" type="bool" value="true"/>
+     
+        <!-- ICP parameters -->
+        <param name="Icp/PointToPlane"        type="string" value="true"/>
+        <param name="Icp/Iterations"          type="string" value="10"/>
+        <param name="Icp/VoxelSize"           type="string" value="$(arg voxel_size)"/>
+        <param name="Icp/DownsamplingStep"    type="string" value="1"/> <!-- cannot be increased with ring-like lidar -->
+        <param name="Icp/Epsilon"             type="string" value="0.001"/>
+        <param name="Icp/PointToPlaneK"       type="string" value="20"/>
+        <param name="Icp/PointToPlaneRadius"  type="string" value="0"/>
+        <param name="Icp/MaxTranslation"      type="string" value="2"/>
+        <param name="Icp/MaxCorrespondenceDistance" type="string" value="1"/>
+        <param name="Icp/PM"                  type="string" value="true"/> 
+        <param name="Icp/PMOutlierRatio"      type="string" value="0.1"/>
+        <param name="Icp/CorrespondenceRatio" type="string" value="0.01"/>
+
+        <!-- Odom parameters -->       
+        <param name="Odom/ScanKeyFrameThr"       type="string" value="0.95"/>
+        <param name="Odom/Strategy"              type="string" value="0"/>
+        <param name="OdomF2M/ScanSubtractRadius" type="string" value="$(arg voxel_size)"/>
+        <param name="OdomF2M/ScanMaxSize"        type="string" value="15000"/>      
+      </node>
+
+      <node pkg="rtabmap_ros" type="rtabmap" name="rtabmap" output="screen" args="-d">	  
+        <param name="frame_id"             type="string" value="$(arg frame_id)"/>  
+        <param name="subscribe_depth"      type="bool" value="false"/>
+        <param name="subscribe_rgb"        type="bool" value="false"/>
+        <param name="subscribe_scan_cloud" type="bool" value="true"/>
+        <param name="approx_sync"          type="bool" value="false"/>
+        
+        <remap     if="$(arg assemble)" from="scan_cloud" to="assembled_cloud"/>
+        <remap unless="$(arg assemble)" from="scan_cloud" to="/os_cloud_node/points"/>
+        <remap from="imu"        to="/os_cloud_node/imu/data"/>
+     
+        <!-- RTAB-Map's parameters -->
+        <param     if="$(arg assemble)" name="Rtabmap/DetectionRate" type="string" value="0"/> <!-- already set 1 Hz in point_cloud_assembler -->
+        <param unless="$(arg assemble)" name="Rtabmap/DetectionRate" type="string" value="1"/>  
+        <param name="RGBD/NeighborLinkRefining"      type="string" value="false"/>
+        <param name="RGBD/ProximityBySpace"          type="string" value="true"/>
+        <param name="RGBD/ProximityMaxGraphDepth"    type="string" value="0"/>
+        <param name="RGBD/ProximityPathMaxNeighbors" type="string" value="1"/>
+        <param name="RGBD/LocalRadius"               type="string" value="2"/>
+        <param name="RGBD/AngularUpdate"             type="string" value="0.05"/>
+        <param name="RGBD/LinearUpdate"              type="string" value="0.05"/>
+        <param name="Mem/NotLinkedNodesKept"         type="string" value="false"/>
+        <param name="Mem/STMSize"                    type="string" value="30"/>
+        <!-- param name="Mem/LaserScanVoxelSize"     type="string" value="0.1"/ -->
+        <!-- param name="Mem/LaserScanNormalK"       type="string" value="10"/ -->
+        <!-- param name="Mem/LaserScanRadius"        type="string" value="0"/ -->
+        
+        <param name="Reg/Strategy"                   type="string" value="1"/> 
+        <param name="Optimizer/GravitySigma"         type="string" value="0.5"/>
+        <param name="Optimizer/Strategy"             type="string" value="1"/> 
+        <param name="Grid/CellSize"                  type="string" value="0.1"/>
+        <param name="Grid/RangeMax"                  type="string" value="20"/>
+        <param name="Grid/ClusterRadius"             type="string" value="1"/>
+        <param name="Grid/GroundIsObstacle"          type="string" value="true"/>
+
+        <!-- ICP parameters -->
+        <param name="Icp/VoxelSize"                  type="string" value="$(arg voxel_size)"/>
+        <param name="Icp/PointToPlaneK"              type="string" value="20"/>
+        <param name="Icp/PointToPlaneRadius"         type="string" value="0"/>
+        <param name="Icp/PointToPlane"               type="string" value="true"/>
+        <param name="Icp/Iterations"                 type="string" value="10"/>
+        <param name="Icp/Epsilon"                    type="string" value="0.001"/>
+        <param name="Icp/MaxTranslation"             type="string" value="3"/>
+        <param name="Icp/MaxCorrespondenceDistance"  type="string" value="1"/>
+        <param name="Icp/PM"                         type="string" value="true"/> 
+        <param name="Icp/PMOutlierRatio"             type="string" value="0.7"/>
+        <param name="Icp/CorrespondenceRatio"        type="string" value="0.2"/>
+      </node>
+      
+      <node if="$(arg assemble)" pkg="rtabmap_ros" type="point_cloud_assembler" name="point_cloud_assembler" output="screen">
+        <remap from="cloud"           to="/os_cloud_node/points"/>
+        <remap from="odom"            to="odom"/>
+        <param name="assembling_time" type="double" value="1" />
+        <param name="fixed_frame_id"  type="string" value="" />
+      </node>
+
+      <node if="$(arg rtabmapviz)" name="rtabmapviz" pkg="rtabmap_ros" type="rtabmapviz" output="screen">
+        <param name="frame_id" type="string" value="$(arg frame_id)"/>
+        <param name="odom_frame_id" type="string" value="odom"/>
+        <param name="subscribe_odom_info" type="bool" value="true"/>
+        <param name="subscribe_scan_cloud" type="bool" value="true"/>
+        <param name="approx_sync" type="bool" value="false"/>
+        <remap from="scan_cloud" to="/os_cloud_node/points"/>
+      </node>
+  </group>
+
+</launch>

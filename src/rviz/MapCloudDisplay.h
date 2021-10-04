@@ -46,6 +46,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rviz_default_plugins/displays/pointcloud/point_cloud_selection_handler.hpp"
 #include "rviz_default_plugins/displays/pointcloud/point_cloud_transformer.hpp"
 #include "rviz_default_plugins/displays/pointcloud/point_cloud_transformer_factory.hpp"
+#include <std_msgs/msg/int32_multi_array.hpp>
 
 #endif
 
@@ -126,6 +127,7 @@ public:
 	rviz_common::properties::FloatProperty* cloud_filter_ceiling_height_;
 	rviz_common::properties::FloatProperty* node_filtering_radius_;
 	rviz_common::properties::FloatProperty* node_filtering_angle_;
+	rviz_common::properties::StringProperty* download_namespace;
 	rviz_common::properties::BoolProperty* download_map_;
 	rviz_common::properties::BoolProperty* download_graph_;
 
@@ -141,6 +143,7 @@ private Q_SLOTS:
 	void setXyzTransformerOptions( rviz_common::properties::EnumProperty* prop );
 	void setColorTransformerOptions( rviz_common::properties::EnumProperty* prop );
 	void updateCloudParameters();
+	void downloadNamespaceChanged();
 	void downloadMap();
 	void downloadGraph();
 
@@ -149,6 +152,7 @@ protected:
 	virtual void processMessage( const rtabmap_ros::msg::MapData::ConstSharedPtr cloud );
 	void onInitialize();
 private:
+	void downloadMap(bool graphOnly);
 	void processMapData(const rtabmap_ros::msg::MapData& map);
 
 	/**
@@ -171,6 +175,8 @@ private:
 	void fillTransformerOptions( rviz_common::properties::EnumProperty* prop, uint32_t mask );
 
 private:
+	rclcpp::Publisher<std_msgs::msg::Int32MultiArray>::SharedPtr republishNodeDataPub_;
+	
 	std::map<int, CloudInfoPtr> cloud_infos_;
 
 	std::map<int, CloudInfoPtr> new_cloud_infos_;
@@ -178,6 +184,9 @@ private:
 
 	std::map<int, rtabmap::Transform> current_map_;
 	std::mutex current_map_mutex_;
+	bool current_map_updated_;
+
+	int lastCloudAdded_;
 
 	struct TransformerInfo
 	{

@@ -8,12 +8,16 @@ std_msgs/Header header
 int32 ref_id
 int32 loop_closure_id
 int32 proximity_detection_id
+int32 landmark_id
 
 geometry_msgs/Transform loop_closure_transform
 
 ####
 # For statistics...
 ####
+# State (node IDs) of the current Working Memory (including STM)
+int32[] wm_state
+
 # std::map<int, float> posterior;
 int32[] posterior_keys
 float32[] posterior_values

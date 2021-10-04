@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <xacro:include filename="$(find velodyne_description)/urdf/VLP-16.urdf.xacro"/>
+  <xacro:VLP-16 parent="base_laser_mount" name="velodyne" topic="velodyne_points" gpu="true" organize_cloud="true">
+    <origin xyz="0.025 0 0.175" rpy="0 0 0" />
+  </xacro:VLP-16>
+  
+</robot>

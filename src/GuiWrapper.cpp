@@ -67,6 +67,7 @@ GuiWrapper::GuiWrapper(const rclcpp::NodeOptions & options) :
 		mainWindow_(0),
 		cameraNodeName_(""),
 		lastOdomInfoUpdateTime_(0),
+		rtabmapNodeName_("rtabmap"),
 		frameId_("base_link"),
 		odomFrameId_(""),
 		waitForTransform_(0.2), // 200 ms
@@ -96,11 +97,15 @@ GuiWrapper::GuiWrapper(const rclcpp::NodeOptions & options) :
 
 	configFile.replace('~', QDir::homePath());
 
+	rtabmapNodeName_ = this->declare_parameter("rtabmap", rtabmapNodeName_);
+
 	RCLCPP_INFO(this->get_logger(), "rtabmapviz: Using configuration from \"%s\"", configFile.toStdString().c_str());
 	uSleep(500);
-	mainWindow_ = new MainWindow(new PreferencesDialogROS(this, configFile));
+	prefDialog_ = new PreferencesDialogROS(this, configFile, rtabmapNodeName_);
+	mainWindow_ = new MainWindow(prefDialog_);
 	mainWindow_->setWindowTitle(mainWindow_->windowTitle()+" [ROS]");
 	mainWindow_->show();
+
 	bool paused = false;
 	paused = this->declare_parameter("is_rtabmap_paused", paused);
 	mainWindow_->setMonitoringState(paused);
@@ -108,11 +113,11 @@ GuiWrapper::GuiWrapper(const rclcpp::NodeOptions & options) :
 	// To receive odometry events
 	std::string initCachePath;
 	frameId_ = this->declare_parameter("frame_id", frameId_);
-	this->get_parameter_or("odom_frame_id", odomFrameId_, odomFrameId_); // already declared in CommonDataSubscriber
+	this->get_parameter_or("odom_frame_id", odomFrameId_, odomFrameId_); // set to use odom from TF, ros2: already declared in CommonDataSubscriber
 	waitForTransform_ = this->declare_parameter("wait_for_transform", waitForTransform_);
 	odomSensorSync_ = this->declare_parameter("odom_sensor_sync", odomSensorSync_);
 	maxOdomUpdateRate_ = this->declare_parameter("max_odom_update_rate", maxOdomUpdateRate_);
-	cameraNodeName_ = this->declare_parameter("camera_node_name", cameraNodeName_);
+	cameraNodeName_ = this->declare_parameter("camera_node_name", cameraNodeName_); // used to pause the rtabmap_ros/camera when pausing the process
 	initCachePath = this->declare_parameter("init_cache_path", initCachePath);
 	if(initCachePath.size())
 	{
@@ -135,22 +140,22 @@ GuiWrapper::GuiWrapper(const rclcpp::NodeOptions & options) :
 	UEventsManager::addHandler(this);
 	UEventsManager::addHandler(mainWindow_);
 
-	infoTopic_.subscribe(this, "info", rmw_qos_profile_sensor_data);
-	mapDataTopic_.subscribe(this, "mapData", rmw_qos_profile_sensor_data);
+	infoTopic_.subscribe(this, "info");
+	mapDataTopic_.subscribe(this, "mapData");
 	infoMapSync_ = new message_filters::Synchronizer<MyInfoMapSyncPolicy>(
 			MyInfoMapSyncPolicy(this->getQueueSize()),
 			infoTopic_,
 			mapDataTopic_);
 	infoMapSync_->registerCallback(std::bind(&GuiWrapper::infoMapCallback, this, std::placeholders::_1, std::placeholders::_2));
 
-	goalTopic_.subscribe(this, "goal_node", rmw_qos_profile_sensor_data);
-	pathTopic_.subscribe(this, "global_path", rmw_qos_profile_sensor_data);
+	goalTopic_.subscribe(this, "goal_node");
+	pathTopic_.subscribe(this, "global_path");
 	goalPathSync_ = new message_filters::Synchronizer<MyGoalPathSyncPolicy>(
 			MyGoalPathSyncPolicy(this->getQueueSize()),
 			goalTopic_,
 			pathTopic_);
 	goalPathSync_->registerCallback(std::bind(&GuiWrapper::goalPathCallback, this, std::placeholders::_1, std::placeholders::_2));
-	goalReachedTopic_ = this->create_subscription<std_msgs::msg::Bool>("goal_reached", rclcpp::SensorDataQoS(), std::bind(&GuiWrapper::goalReachedCallback, this, std::placeholders::_1));
+	goalReachedTopic_ = this->create_subscription<std_msgs::msg::Bool>("goal_reached", 5, std::bind(&GuiWrapper::goalReachedCallback, this, std::placeholders::_1));
 
 	setupCallbacks(*this); // do it at the end
 }
@@ -236,18 +241,8 @@ bool GuiWrapper::callEmptyService(const std::string & name)
 	{
 		auto request = std::make_shared<std_srvs::srv::Empty::Request>();
 		auto result_future = client->async_send_request(request);
-		auto node = rclcpp::Node::make_shared("rtabmapviz");
-		if (rclcpp::spin_until_future_complete(node, result_future) !=
-				rclcpp::FutureReturnCode::SUCCESS)
-		{
-			RCLCPP_ERROR(this->get_logger(),
-					"Can't call \"%s\" service.", name.c_str());
-			return false;
-		}
-		else
-		{
-			return true;
-		}
+		result_future.wait();
+		return true;
 	}
 	else
 	{
@@ -265,18 +260,16 @@ bool GuiWrapper::callMapDataService(const std::string & name, bool global, bool 
 		request->global = global;
 		request->optimized = optimized;
 		request->graph_only = graphOnly;
-		auto result_future = client->async_send_request(request);
-		auto node = rclcpp::Node::make_shared("rtabmapviz");
-		if (rclcpp::spin_until_future_complete(node, result_future) != rclcpp::FutureReturnCode::SUCCESS)
-		{
-			RCLCPP_ERROR(this->get_logger(), "Service \"%s\" failed to get the data.", name.c_str());
-		}
-		else
-		{
-			auto result = result_future.get();
+
+		using ServiceResponseFuture =
+		  rclcpp::Client<rtabmap_ros::srv::GetMap>::SharedFuture;
+		auto response_received_callback = [this](ServiceResponseFuture future) {
+			auto result = future.get();
 			processRequestedMap(result->data);
-			return true;
-		}
+		  };
+		auto result_future = client->async_send_request(request, response_received_callback);
+		result_future.wait();
+		return true;
 	}
 	else
 	{
@@ -308,19 +301,13 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 		if(rosParameters.size())
 		{
 			RCLCPP_INFO(this->get_logger(), "Parameters updated");
-			auto client = std::make_shared<rclcpp::AsyncParametersClient>(this, "rtabmap");
+			auto client = std::make_shared<rclcpp::AsyncParametersClient>(this, rtabmapNodeName_);
 			if (!client->wait_for_service(std::chrono::seconds(5))) {
 				RCLCPP_ERROR(this->get_logger(), "Can't call rtabmap parameters service, is the node running?");
 			}
 			else
 			{
 				auto results = client->set_parameters(rosParameters);
-				// Wait for the results.
-				if (rclcpp::spin_until_future_complete(node, results, std::chrono::seconds(5)) !=
-						rclcpp::FutureReturnCode::SUCCESS)
-				{
-					RCLCPP_ERROR(this->get_logger(), "Failed to set rtabmap parameters!");
-				}
 			}
 		}
 
@@ -407,16 +394,11 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 				auto request = std::make_shared<rtabmap_ros::srv::SetGoal::Request>();
 				request->node_id = !cmdEvent->value1().isStr()?cmdEvent->value1().toInt():0;
 				request->node_label = cmdEvent->value1().isStr()?cmdEvent->value1().toStr():"";
-				auto result_future = client->async_send_request(request);
-				auto node = rclcpp::Node::make_shared("rtabmapviz");
-				if (rclcpp::spin_until_future_complete(node, result_future) !=
-						rclcpp::FutureReturnCode::SUCCESS)
-				{
-					RCLCPP_ERROR(this->get_logger(), "Can't call \"set_goal\" service.");
-				}
-				else
-				{
-					auto result = result_future.get();
+
+				using ServiceResponseFuture =
+				  rclcpp::Client<rtabmap_ros::srv::SetGoal>::SharedFuture;
+				auto response_received_callback = [this, &request](ServiceResponseFuture future) {
+					auto result = future.get();
 					UASSERT(result->path_ids.size() == result->path_poses.size());
 					std::vector<std::pair<int, Transform> > poses(result->path_poses.size());
 					for(unsigned int i=0; i<result->path_poses.size(); ++i)
@@ -425,7 +407,9 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 						poses[i].second = rtabmap_ros::transformFromPoseMsg(result->path_poses[i]);
 					}
 					this->post(new RtabmapGlobalPathEvent(request->node_id, request->node_label, poses, result->planning_time));
-				}
+				  };
+				auto result_future = client->async_send_request(request, response_received_callback);
+				result_future.wait();
 			}
 			else
 			{
@@ -451,12 +435,7 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 				request->node_id = cmdEvent->value2().isUndef()?0:cmdEvent->value2().toInt();
 				request->node_label = cmdEvent->value1().toStr();
 				auto result_future = client->async_send_request(request);
-				auto node = rclcpp::Node::make_shared("rtabmapviz");
-				if (rclcpp::spin_until_future_complete(node, result_future) !=
-						rclcpp::FutureReturnCode::SUCCESS)
-				{
-					RCLCPP_ERROR(this->get_logger(), "Can't call \"set_label\" service.");
-				}
+				result_future.wait();
 			}
 			else
 			{
@@ -484,26 +463,39 @@ void GuiWrapper::commonDepthCallback(
 		const std::vector<cv_bridge::CvImageConstPtr> & imageMsgs,
 		const std::vector<cv_bridge::CvImageConstPtr> & depthMsgs,
 		const std::vector<sensor_msgs::msg::CameraInfo> & cameraInfoMsgs,
-		const sensor_msgs::msg::LaserScan::ConstSharedPtr& scan2dMsg,
-		const sensor_msgs::msg::PointCloud2::ConstSharedPtr& scan3dMsg,
-		const rtabmap_ros::msg::OdomInfo::ConstSharedPtr& odomInfoMsg)
+		const sensor_msgs::msg::LaserScan & scan2dMsg,
+		const sensor_msgs::msg::PointCloud2 & scan3dMsg,
+		const rtabmap_ros::msg::OdomInfo::ConstSharedPtr& odomInfoMsg,
+		const std::vector<rtabmap_ros::msg::GlobalDescriptor> &,
+		const std::vector<std::vector<rtabmap_ros::msg::KeyPoint> > &,
+		const std::vector<std::vector<rtabmap_ros::msg::Point3f> > &,
+		const std::vector<cv::Mat> &)
 {
 	UASSERT(imageMsgs.size() == 0 || (imageMsgs.size() == cameraInfoMsgs.size()));
 
 	std_msgs::msg::Header odomHeader;
+	std::string frameId = frameId_;
 	if(odomMsg.get())
 	{
 		odomHeader = odomMsg->header;
+		if(!odomMsg->child_frame_id.empty())
+		{
+			frameId = odomMsg->child_frame_id;
+		}
+		else
+		{
+			RCLCPP_WARN(get_logger(), "Received odom topic with child_frame_id not set! Using \"%s\" as base frame.", frameId_.c_str());
+		}
 	}
 	else
 	{
-		if(scan2dMsg.get())
+		if(!scan2dMsg.ranges.empty())
 		{
-			odomHeader = scan2dMsg->header;
+			odomHeader = scan2dMsg.header;
 		}
-		else if(scan3dMsg.get())
+		else if(!scan3dMsg.data.empty())
 		{
-			odomHeader = scan3dMsg->header;
+			odomHeader = scan3dMsg.header;
 		}
 		else if(cameraInfoMsgs.size())
 		{
@@ -535,6 +527,18 @@ void GuiWrapper::commonDepthCallback(
 			covariance = cv::Mat(6,6,CV_64FC1,(void*)odomMsg->twist.covariance.data()).clone();
 		}
 	}
+	else if(odomInfoMsg.get() && odomInfoMsg->covariance.size() == 36)
+	{
+		if(odomInfoMsg->covariance[0] != 0 &&
+			 odomInfoMsg->covariance[7] != 0 &&
+			 odomInfoMsg->covariance[14] != 0 &&
+			 odomInfoMsg->covariance[21] != 0 &&
+			 odomInfoMsg->covariance[28] != 0 &&
+			 odomInfoMsg->covariance[35] != 0)
+		{
+			covariance = cv::Mat(6,6,CV_64FC1,(void*)odomInfoMsg->covariance.data()).clone();
+		}
+	}
 	if(odomHeader.frame_id.empty())
 	{
 		RCLCPP_ERROR(this->get_logger(), "Odometry frame not set!?");
@@ -562,7 +566,7 @@ void GuiWrapper::commonDepthCallback(
 					imageMsgs,
 					depthMsgs,
 					cameraInfoMsgs,
-					frameId_,
+					frameId,
 					odomSensorSync_?odomHeader.frame_id:"",
 					odomHeader.stamp,
 					rgb,
@@ -576,11 +580,11 @@ void GuiWrapper::commonDepthCallback(
 			}
 		}
 
-		if(scan2dMsg.get() != 0)
+		if(!scan2dMsg.ranges.empty())
 		{
 			if(!rtabmap_ros::convertScanMsg(
-					*scan2dMsg,
-					frameId_,
+					scan2dMsg,
+					frameId,
 					odomSensorSync_?odomHeader.frame_id:"",
 					odomHeader.stamp,
 					scan,
@@ -591,11 +595,11 @@ void GuiWrapper::commonDepthCallback(
 				return;
 			}
 		}
-		else if(scan3dMsg.get() != 0)
+		else if(!scan3dMsg.data.empty())
 		{
 			if(!rtabmap_ros::convertScan3dMsg(
-					*scan3dMsg,
-					frameId_,
+					scan3dMsg,
+					frameId,
 					odomSensorSync_?odomHeader.frame_id:"",
 					odomHeader.stamp,
 					scan,
@@ -646,24 +650,37 @@ void GuiWrapper::commonStereoCallback(
 		const cv_bridge::CvImageConstPtr& rightImageMsg,
 		const sensor_msgs::msg::CameraInfo& leftCamInfoMsg,
 		const sensor_msgs::msg::CameraInfo& rightCamInfoMsg,
-		const sensor_msgs::msg::LaserScan::ConstSharedPtr& scan2dMsg,
-		const sensor_msgs::msg::PointCloud2::ConstSharedPtr& scan3dMsg,
-		const rtabmap_ros::msg::OdomInfo::ConstSharedPtr& odomInfoMsg)
+		const sensor_msgs::msg::LaserScan & scan2dMsg,
+		const sensor_msgs::msg::PointCloud2 & scan3dMsg,
+		const rtabmap_ros::msg::OdomInfo::ConstSharedPtr& odomInfoMsg,
+		const std::vector<rtabmap_ros::msg::GlobalDescriptor> &,
+		const std::vector<rtabmap_ros::msg::KeyPoint> &,
+		const std::vector<rtabmap_ros::msg::Point3f> &,
+		const cv::Mat &)
 {
 	std_msgs::msg::Header odomHeader;
+	std::string frameId = frameId_;
 	if(odomMsg.get())
 	{
 		odomHeader = odomMsg->header;
+		if(!odomMsg->child_frame_id.empty())
+		{
+			frameId = odomMsg->child_frame_id;
+		}
+		else
+		{
+			RCLCPP_WARN(get_logger(), "Received odom topic with child_frame_id not set! Using \"%s\" as base frame.", frameId_.c_str());
+		}
 	}
 	else
 	{
-		if(scan2dMsg.get())
+		if(!scan2dMsg.ranges.empty())
 		{
-			odomHeader = scan2dMsg->header;
+			odomHeader = scan2dMsg.header;
 		}
-		else if(scan3dMsg.get())
+		else if(!scan3dMsg.data.empty())
 		{
-			odomHeader = scan3dMsg->header;
+			odomHeader = scan3dMsg.header;
 		}
 		else
 		{
@@ -687,6 +704,18 @@ void GuiWrapper::commonStereoCallback(
 			covariance = cv::Mat(6,6,CV_64FC1,(void*)odomMsg->twist.covariance.data()).clone();
 		}
 	}
+	else if(odomInfoMsg.get() && odomInfoMsg->covariance.size() == 36)
+	{
+		if(odomInfoMsg->covariance[0] != 0 &&
+			 odomInfoMsg->covariance[7] != 0 &&
+			 odomInfoMsg->covariance[14] != 0 &&
+			 odomInfoMsg->covariance[21] != 0 &&
+			 odomInfoMsg->covariance[28] != 0 &&
+			 odomInfoMsg->covariance[35] != 0)
+		{
+			covariance = cv::Mat(6,6,CV_64FC1,(void*)odomInfoMsg->covariance.data()).clone();
+		}
+	}
 	if(odomHeader.frame_id.empty())
 	{
 		RCLCPP_ERROR(this->get_logger(), "Odometry frame not set!?");
@@ -708,29 +737,34 @@ void GuiWrapper::commonStereoCallback(
 	{
 		lastOdomInfoUpdateTime_ = UTimer::now();
 
+		ParametersMap allParameters = prefDialog_->getAllParameters();
+		bool imagesAlreadyRectified = Parameters::defaultRtabmapImagesAlreadyRectified();
+		Parameters::parse(allParameters, Parameters::kRtabmapImagesAlreadyRectified(), imagesAlreadyRectified);
+
 		if(!rtabmap_ros::convertStereoMsg(
 				leftImageMsg,
 				rightImageMsg,
 				leftCamInfoMsg,
 				rightCamInfoMsg,
-				frameId_,
+				frameId,
 				odomSensorSync_?odomHeader.frame_id:"",
 				odomHeader.stamp,
 				left,
 				right,
 				stereoModel,
 				*tfBuffer_,
-				waitForTransform_))
+				waitForTransform_,
+				imagesAlreadyRectified))
 		{
 			RCLCPP_ERROR(this->get_logger(), "Could not convert stereo msgs! Aborting rtabmapviz update...");
 			return;
 		}
 
-		if(scan2dMsg.get() != 0)
+		if(!scan2dMsg.ranges.empty())
 		{
 			if(!rtabmap_ros::convertScanMsg(
-					*scan2dMsg,
-					frameId_,
+					scan2dMsg,
+					frameId,
 					odomSensorSync_?odomHeader.frame_id:"",
 					odomHeader.stamp,
 					scan,
@@ -741,11 +775,11 @@ void GuiWrapper::commonStereoCallback(
 				return;
 			}
 		}
-		else if(scan3dMsg.get() != 0)
+		else if(!scan3dMsg.data.empty())
 		{
 			if(!rtabmap_ros::convertScan3dMsg(
-					*scan3dMsg,
-					frameId_,
+					scan3dMsg,
+					frameId,
 					odomSensorSync_?odomHeader.frame_id:"",
 					odomHeader.stamp,
 					scan,
@@ -792,26 +826,34 @@ void GuiWrapper::commonStereoCallback(
 void GuiWrapper::commonLaserScanCallback(
 		const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
 		const rtabmap_ros::msg::UserData::ConstSharedPtr &,
-		const sensor_msgs::msg::LaserScan::ConstSharedPtr& scan2dMsg,
-		const sensor_msgs::msg::PointCloud2::ConstSharedPtr& scan3dMsg,
-		const rtabmap_ros::msg::OdomInfo::ConstSharedPtr& odomInfoMsg)
+		const sensor_msgs::msg::LaserScan & scan2dMsg,
+		const sensor_msgs::msg::PointCloud2 & scan3dMsg,
+		const rtabmap_ros::msg::OdomInfo::ConstSharedPtr& odomInfoMsg,
+		const rtabmap_ros::msg::GlobalDescriptor &)
 {
-	UASSERT(scan2dMsg.get() || scan3dMsg.get());
-
 	std_msgs::msg::Header odomHeader;
+	std::string frameId = frameId_;
 	if(odomMsg.get())
 	{
 		odomHeader = odomMsg->header;
+		if(!odomMsg->child_frame_id.empty())
+		{
+			frameId = odomMsg->child_frame_id;
+		}
+		else
+		{
+			RCLCPP_WARN(get_logger(), "Received odom topic with child_frame_id not set! Using \"%s\" as base frame.", frameId_.c_str());
+		}
 	}
 	else
 	{
-		if(scan2dMsg.get())
+		if(!scan2dMsg.ranges.empty())
 		{
-			odomHeader = scan2dMsg->header;
+			odomHeader = scan2dMsg.header;
 		}
-		else if(scan3dMsg.get())
+		else if(!scan3dMsg.data.empty())
 		{
-			odomHeader = scan3dMsg->header;
+			odomHeader = scan3dMsg.header;
 		}
 		else
 		{
@@ -835,6 +877,18 @@ void GuiWrapper::commonLaserScanCallback(
 			covariance = cv::Mat(6,6,CV_64FC1,(void*)odomMsg->twist.covariance.data()).clone();
 		}
 	}
+	else if(odomInfoMsg.get() && odomInfoMsg->covariance.size() == 36)
+	{
+		if(odomInfoMsg->covariance[0] != 0 &&
+			 odomInfoMsg->covariance[7] != 0 &&
+			 odomInfoMsg->covariance[14] != 0 &&
+			 odomInfoMsg->covariance[21] != 0 &&
+			 odomInfoMsg->covariance[28] != 0 &&
+			 odomInfoMsg->covariance[35] != 0)
+		{
+			covariance = cv::Mat(6,6,CV_64FC1,(void*)odomInfoMsg->covariance.data()).clone();
+		}
+	}
 	if(odomHeader.frame_id.empty())
 	{
 		RCLCPP_ERROR(this->get_logger(), "Odometry frame not set!?");
@@ -844,7 +898,6 @@ void GuiWrapper::commonLaserScanCallback(
 	LaserScan scan;
 	rtabmap::OdometryInfo info;
 	bool ignoreData = false;
-	Transform fakeCameraLocalTransform;
 
 	// limit update rate
 	if(maxOdomUpdateRate_<=0.0 ||
@@ -854,11 +907,11 @@ void GuiWrapper::commonLaserScanCallback(
 	{
 		lastOdomInfoUpdateTime_ = UTimer::now();
 
-		if(scan2dMsg.get() != 0)
+		if(!scan2dMsg.ranges.empty())
 		{
 			if(!rtabmap_ros::convertScanMsg(
-					*scan2dMsg,
-					frameId_,
+					scan2dMsg,
+					frameId,
 					odomSensorSync_?odomHeader.frame_id:"",
 					odomHeader.stamp,
 					scan,
@@ -869,11 +922,11 @@ void GuiWrapper::commonLaserScanCallback(
 				return;
 			}
 		}
-		else if(scan3dMsg.get() != 0)
+		else if(!scan3dMsg.data.empty())
 		{
 			if(!rtabmap_ros::convertScan3dMsg(
-					*scan3dMsg,
-					frameId_,
+					scan3dMsg,
+					frameId,
 					odomSensorSync_?odomHeader.frame_id:"",
 					odomHeader.stamp,
 					scan,
@@ -893,16 +946,6 @@ void GuiWrapper::commonLaserScanCallback(
 	}
 	else if(odomInfoMsg.get())
 	{
-		//just get scan local transform to adjust camera frame
-		if(scan2dMsg.get() != 0)
-		{
-			fakeCameraLocalTransform = getTransform(frameId_, scan2dMsg->header.frame_id, scan2dMsg->header.stamp, *tfBuffer_, waitForTransform_);
-		}
-		else if(scan3dMsg.get() != 0)
-		{
-			fakeCameraLocalTransform = getTransform(frameId_, scan3dMsg->header.frame_id, scan3dMsg->header.stamp, *tfBuffer_, waitForTransform_);
-		}
-
 		info = rtabmap_ros::odomInfoFromROS(*odomInfoMsg).copyWithoutData();
 		ignoreData = true;
 	}
@@ -912,24 +955,13 @@ void GuiWrapper::commonLaserScanCallback(
 		return;
 	}
 
-	cv::Mat rgb;
-	cv::Mat depth;
-	CameraModel model(
-			1,
-			1,
-			0.5,
-			1,
-			(fakeCameraLocalTransform.isNull()?scan.localTransform():fakeCameraLocalTransform)*Transform(0,0,1,0, -1,0,0,0, 0,-1,0,0),
-			0,
-			cv::Size(1,2));
-
 	info.reg.covariance = covariance;
 	rtabmap::OdometryEvent odomEvent(
 		rtabmap::SensorData(
 				scan,
-				rgb,
-				depth,
-				model,
+				cv::Mat(),
+				cv::Mat(),
+				CameraModel(),
 				0,
 				rtabmap_ros::timestampFromROS(odomHeader.stamp)),
 		odomMsg.get()?rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose):odomT,
@@ -947,7 +979,7 @@ void GuiWrapper::commonOdomCallback(
 
 	std_msgs::msg::Header odomHeader = odomMsg->header;
 
-	Transform odomT = rtabmap_ros::getTransform(odomHeader.frame_id, frameId_, odomHeader.stamp, *tfBuffer_, waitForTransform_);
+	Transform odomT = rtabmap_ros::getTransform(odomHeader.frame_id, odomMsg->child_frame_id, odomHeader.stamp, *tfBuffer_, waitForTransform_);
 	cv::Mat covariance = cv::Mat::eye(6,6,CV_64FC1);
 	if(odomMsg.get())
 	{
@@ -996,23 +1028,12 @@ void GuiWrapper::commonOdomCallback(
 		return;
 	}
 
-	cv::Mat rgb;
-	cv::Mat depth;
-	CameraModel model(
-			1,
-			1,
-			0.5,
-			1,
-			Transform(0,0,1,0, -1,0,0,0, 0,-1,0,0),
-			0,
-			cv::Size(1,2));
-
 	info.reg.covariance = covariance;
 	rtabmap::OdometryEvent odomEvent(
 		rtabmap::SensorData(
-				rgb,
-				depth,
-				model,
+				cv::Mat(),
+				cv::Mat(),
+				CameraModel(),
 				0,
 				rtabmap_ros::timestampFromROS(odomHeader.stamp)),
 		odomMsg.get()?rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose):odomT,

@@ -8,6 +8,8 @@ float32 icp_inliers_ratio
 float32 icp_rotation
 float32 icp_translation
 float32 icp_structural_complexity
+float32 icp_structural_distribution
+int32 icp_correspondences
 float64[36] covariance
 int32 features
 int32 local_map_size
@@ -24,10 +26,23 @@ float32 interval
 float32 distance_travelled
 int32 memory_usage # MB
 
+float32 gravity_roll_error
+float32 gravity_pitch_error
+
+# Local bundle camera ids
+int32[] local_bundle_ids
+
+# Local bundle camera models
+sensor_msgs/CameraInfo[] local_bundle_models
+geometry_msgs/Transform[] local_bundle_model_transforms
+
+# Local bundle camera poses
+geometry_msgs/Pose[] local_bundle_poses
+
 geometry_msgs/Transform transform
 geometry_msgs/Transform transform_filtered
 geometry_msgs/Transform transform_ground_truth
-geometry_msgs/Transform guess_velocity
+geometry_msgs/Transform guess
 
 # 0=F2M, 1=F2F
 int32 type
@@ -43,9 +58,8 @@ int32[] word_inliers
 int32[] local_map_keys
 Point3f[] local_map_values
 
-# compressed local scan map data
-# use rtabmap::util3d::uncompressData() from "rtabmap/core/util3d.h"
-uint8[] local_scan_map
+# local scan map data
+sensor_msgs/PointCloud2 local_scan_map
 
 # F2F odometry
 #   std::vector<cv::Point2f> ref_corners;
