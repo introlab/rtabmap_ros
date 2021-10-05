@@ -253,7 +253,7 @@ void CommonDataSubscriber::rgbd5OdomInfoCallback(
 void CommonDataSubscriber::setupRGBD5Callbacks(
 		rclcpp::Node& node,
 		bool subscribeOdom,
-		bool subscribeUserData,
+		bool /*subscribeUserData*/,
 		bool subscribeScan2d,
 		bool subscribeScan3d,
 		bool subscribeScanDesc,

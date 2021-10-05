@@ -398,6 +398,7 @@ void OdometryROS::callbackIMU(const sensor_msgs::msg::Imu::SharedPtr msg)
 				localTransform);
 
 		imus_.insert(std::make_pair(stamp, imu));
+		//RCLCPP_WARN(get_logger(), "Received imu: %f", stamp);
 
 		if(bufferedData_.first.isValid() && stamp > bufferedData_.first.stamp())
 		{
@@ -423,7 +424,7 @@ void OdometryROS::processData(SensorData & data, const std_msgs::msg::Header & h
 
 	if(waitIMUToinit_ && (imus_.empty() || imus_.rbegin()->first < timestampFromROS(header.stamp)))
 	{
-		//NODELET_WARN("No imu received with higher stamp than last image (%f)! Buffering this image until we get more imu msgs...", stamp.toSec());
+		//RCLCPP_WARN(get_logger(), "No imu received with higher stamp than last image (%f)! Buffering this image until we get more imu msgs...", timestampFromROS(header.stamp));
 
 		// keep in cache to process later when we will receive imu msgs
 		if(bufferedData_.first.isValid())
@@ -452,7 +453,7 @@ void OdometryROS::processData(SensorData & data, const std_msgs::msg::Header & h
 		imuProcessed_ = true;
 	}
 
-	//NODELET_WARN("img callback: process image %f", stamp.toSec());
+	//RCLCPP_WARN(get_logger(), "img callback: process image %f", timestampFromROS(header.stamp));
 
 	Transform groundTruth;
 	if(!data.imageRaw().empty() || !data.laserScanRaw().isEmpty())

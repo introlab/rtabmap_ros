@@ -257,7 +257,7 @@ bool GuiWrapper::callMapDataService(const std::string & name, bool global, bool 
 	if(client->wait_for_service(std::chrono::seconds(2)))
 	{
 		auto request = std::make_shared<rtabmap_ros::srv::GetMap::Request>();
-		request->global = global;
+		request->global_map = global;
 		request->optimized = optimized;
 		request->graph_only = graphOnly;
 

@@ -41,6 +41,7 @@ def launch_setup(context, *args, **kwargs):
     return [
         DeclareLaunchArgument('depth', default_value=ConditionalText('false', 'true', IfCondition(PythonExpression(["'", LaunchConfiguration('stereo'), "' == 'true'"]))._predicate_func(context)), description=''),
         DeclareLaunchArgument('subscribe_rgb', default_value=LaunchConfiguration('depth'), description=''),
+        DeclareLaunchArgument('args',  default_value=LaunchConfiguration('rtabmap_args'), description='Can be used to pass RTAB-Map\'s parameters or other flags like --udebug and --delete_db_on_start/-d'),
         
         #These arguments should not be modified directly, see referred topics without "_relay" suffix above
         DeclareLaunchArgument('rgb_topic_relay',      default_value=ConditionalText(''.join([LaunchConfiguration('rgb_topic').perform(context), "_relay"]), ''.join(LaunchConfiguration('rgb_topic').perform(context)), LaunchConfiguration('compressed').perform(context)), description='Should not be modified manually!'),
@@ -328,7 +329,7 @@ def generate_launch_description():
         DeclareLaunchArgument('database_path',  default_value='~/.ros/rtabmap.db',  description='Where is the map saved/loaded.'),
         DeclareLaunchArgument('queue_size',     default_value='10',                 description=''),
         DeclareLaunchArgument('wait_for_transform', default_value='0.2',            description=''),
-        DeclareLaunchArgument('args',           default_value='',                   description='Can be used to pass RTAB-Map\'s parameters or other flags like --udebug and --delete_db_on_start/-d'),
+        DeclareLaunchArgument('rtabmap_args',   default_value='',                   description='Backward compatibility, use "args" instead.'),
         DeclareLaunchArgument('launch_prefix',  default_value='',                   description='For debugging purpose, it fills prefix tag of the nodes, e.g., "xterm -e gdb -ex run --args"'),
         DeclareLaunchArgument('output',         default_value='screen',             description='Control node output (screen or log).'),
         
@@ -374,8 +375,8 @@ def generate_launch_description():
         DeclareLaunchArgument('odom_topic',                 default_value='odom',  description='Odometry topic name.'),
         DeclareLaunchArgument('vo_frame_id',                default_value=LaunchConfiguration('odom_topic'), description='Visual/Icp odometry frame ID for TF.'),
         DeclareLaunchArgument('publish_tf_odom',            default_value='true',  description=''),
-        DeclareLaunchArgument('odom_tf_angular_variance',   default_value='1.0',   description='If TF is used to get odometry, this is the default angular variance'),
-        DeclareLaunchArgument('odom_tf_linear_variance',    default_value='1.0',   description='If TF is used to get odometry, this is the default linear variance'),
+        DeclareLaunchArgument('odom_tf_angular_variance',   default_value='0.01',    description='If TF is used to get odometry, this is the default angular variance'),
+        DeclareLaunchArgument('odom_tf_linear_variance',    default_value='0.001',   description='If TF is used to get odometry, this is the default linear variance'),
         DeclareLaunchArgument('odom_args',                  default_value='',      description='More arguments for odometry (overwrite same parameters in rtabmap_args).'),
         DeclareLaunchArgument('odom_sensor_sync',           default_value='false', description=''),
         DeclareLaunchArgument('odom_guess_frame_id',        default_value='',      description=''),

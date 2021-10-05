@@ -784,7 +784,7 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 #ifdef WITH_APRILTAG_MSGS
 	tagDetectionsSub_ = this->create_subscription<apriltag_ros::msg::AprilTagDetectionArray>("tag_detections", 5, std::bind(&CoreWrapper::tagDetectionsAsyncCallback, this, std::placeholders::_1));
 #endif
-	imuSub_ = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>("imu", 100, std::bind(&CoreWrapper::imuAsyncCallback, this, std::placeholders::_1));
+	imuSub_ = this->create_subscription<sensor_msgs::msg::Imu>("imu", 100, std::bind(&CoreWrapper::imuAsyncCallback, this, std::placeholders::_1));
 	republishNodeDataSub_ = this->create_subscription<std_msgs::msg::Int32MultiArray>("republish_node_data", 5, std::bind(&CoreWrapper::republishNodeDataCallback, this, std::placeholders::_1));
 
 	parametersClient_ = std::make_shared<rclcpp::SyncParametersClient>(this);
@@ -875,7 +875,7 @@ void CoreWrapper::saveParameters(const std::string & configFile)
 	}
 	else
 	{
-		RCLCPP_INFO(this->get_logger(), "Parameters are not saved! (No configuration file provided...)");
+		RCLCPP_INFO(this->get_logger(), "Parameters are not saved (No configuration file provided...)");
 	}
 }
 
@@ -3306,7 +3306,7 @@ void CoreWrapper::getMapDataCallback(
 		std::shared_ptr<rtabmap_ros::srv::GetMap::Response> res)
 {
 	RCLCPP_INFO(this->get_logger(), "rtabmap: Getting map (global=%s optimized=%s graphOnly=%s)...",
-			req->global?"true":"false",
+			req->global_map?"true":"false",
 			req->optimized?"true":"false",
 			req->graph_only?"true":"false");
 	std::map<int, Signature> signatures;
@@ -3317,7 +3317,7 @@ void CoreWrapper::getMapDataCallback(
 			poses,
 			constraints,
 			req->optimized,
-			req->global,
+			req->global_map,
 			&signatures,
 			!req->graph_only,
 			!req->graph_only,
@@ -3341,7 +3341,7 @@ void CoreWrapper::getMapData2Callback(
 		std::shared_ptr<rtabmap_ros::srv::GetMap2::Response> res)
 {
 	RCLCPP_INFO(get_logger(), "rtabmap: Getting map (global=%s optimized=%s with_images=%s with_scans=%s with_user_data=%s with_grids=%s)...",
-			req->global?"true":"false",
+			req->global_map?"true":"false",
 			req->optimized?"true":"false",
 			req->with_images?"true":"false",
 			req->with_scans?"true":"false",
@@ -3355,7 +3355,7 @@ void CoreWrapper::getMapData2Callback(
 			poses,
 			constraints,
 			req->optimized,
-			req->global,
+			req->global_map,
 			&signatures,
 			req->with_images,
 			req->with_scans,
@@ -3480,7 +3480,7 @@ void CoreWrapper::publishMapCallback(
 				poses,
 				constraints,
 				req->optimized,
-				req->global,
+				req->global_map,
 				&signatures,
 				!req->graph_only,
 				!req->graph_only,

@@ -270,7 +270,7 @@ void CommonDataSubscriber::rgbd6OdomInfoCallback(
 void CommonDataSubscriber::setupRGBD6Callbacks(
 		rclcpp::Node& node,
 		bool subscribeOdom,
-		bool subscribeUserData,
+		bool /*subscribeUserData*/,
 		bool subscribeScan2d,
 		bool subscribeScan3d,
 		bool subscribeScanDesc,

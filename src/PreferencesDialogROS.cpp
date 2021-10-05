@@ -42,8 +42,8 @@ using namespace rtabmap;
 
 PreferencesDialogROS::PreferencesDialogROS(rclcpp::Node * node, const QString & configFile, const std::string & rtabmapNodeName) :
 		configFile_(configFile),
-		rtabmapNodeName_(rtabmapNodeName),
-		node_(node)
+		node_(node),
+		rtabmapNodeName_(rtabmapNodeName)
 {
 	UASSERT(node_);
 }

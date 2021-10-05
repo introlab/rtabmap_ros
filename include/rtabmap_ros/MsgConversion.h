@@ -185,8 +185,8 @@ rtabmap::Landmarks landmarksFromROS(
 		double defaultLinVariance,
 		double defaultAngVariance);
 
-inline double timestampFromROS(const rclcpp::Time & stamp) {return double(stamp.seconds()) + double(stamp.nanoseconds())/1000000000.0;}
-inline rclcpp::Time timestampToROS(const double & t) {uint32_t sec= (uint32_t)floor(t); return rclcpp::Time(sec, (uint32_t)std::round((t-sec) * 1e9));}
+inline double timestampFromROS(const rclcpp::Time & stamp) {return stamp.seconds();}
+inline rclcpp::Time timestampToROS(const double & t) {int32_t sec= (int32_t)floor(t); return rclcpp::Time(sec, (uint32_t)std::round((t-sec) * 1e9));}
 
 // common stuff
 rtabmap::Transform getTransform(
