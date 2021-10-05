@@ -3333,6 +3333,10 @@ void CoreWrapper::getMapDataCallback(
 
 	res->data.header.stamp = now();
 	res->data.header.frame_id = mapFrameId_;
+	RCLCPP_INFO(this->get_logger(), "rtabmap: Getting map (global=%s optimized=%s graphOnly=%s)...done!",
+			req->global_map?"true":"false",
+			req->optimized?"true":"false",
+			req->graph_only?"true":"false");
 }
 
 void CoreWrapper::getMapData2Callback(

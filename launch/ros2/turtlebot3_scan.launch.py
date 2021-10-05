@@ -26,7 +26,9 @@ def generate_launch_description():
           'subscribe_scan':True,
           'approx_sync':True,
           'Reg/Strategy':'1',
-          'RGBD/NeighborLinkRefining':'True'}]
+          'RGBD/NeighborLinkRefining':'True',
+          'Optimizer/GravitySigma':'0' # Disable imu constraints (we are already in 2D)
+    }]
 
     remappings=[
           ('scan', '/scan')]

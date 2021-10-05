@@ -22,7 +22,9 @@ def generate_launch_description():
     parameters=[{
           'frame_id':'base_footprint',
           'use_sim_time':use_sim_time,
-          'subscribe_depth':True}]
+          'subscribe_depth':True,
+          'Optimizer/GravitySigma':'0' # Disable imu constraints (we are already in 2D)
+    }]
 
     remappings=[
           ('rgb/image', '/intel_realsense_r200_depth/image_raw'),

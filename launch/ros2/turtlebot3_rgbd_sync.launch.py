@@ -25,8 +25,11 @@ def generate_launch_description():
           'use_sim_time':use_sim_time,
           'subscribe_rgbd':True,
           'subscribe_scan':True,
+          # RTAB-Map's parameters should be strings:
           'Reg/Strategy':'1',
-          'RGBD/NeighborLinkRefining':'True'}]
+          'RGBD/NeighborLinkRefining':'True',
+          'Optimizer/GravitySigma':'0' # Disable imu constraints (we are already in 2D)
+    }]
 
     remappings=[
           ('rgb/image', '/intel_realsense_r200_depth/image_raw'),

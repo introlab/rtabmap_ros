@@ -705,24 +705,24 @@ install(DIRECTORY include/${PROJECT_NAME}/
 )
 
 ## Mark other files for installation (e.g. launch and bag files, etc.)
-install(FILES
-    launch/ros2/turtlebot3_scan.launch.py
-    launch/ros2/turtlebot3_rgbd.launch.py
-    launch/ros2/turtlebot3_rgbd_sync.launch.py
-    launch/ros2/realsense_d400.launch.py
-    launch/ros2/rtabmap.launch.py
+#install(FILES
+#   launch/ros2/turtlebot3_scan.launch.py
+#   launch/ros2/turtlebot3_rgbd.launch.py
+#   launch/ros2/turtlebot3_rgbd_sync.launch.py
+#   launch/ros2/realsense_d400.launch.py
+#   launch/ros2/rtabmap.launch.py
 #   launch/rgbd_mapping.launch
 #   launch/stereo_mapping.launch
 #   launch/data_recorder.launch
 #   launch/rgbd_mapping_kinect2.launch
-   DESTINATION share/${PROJECT_NAME}/launch
-)
-#install(DIRECTORY 
-#   launch/config
-#   launch/data
-#   launch/demo
 #   DESTINATION share/${PROJECT_NAME}/launch
 #)
+install(DIRECTORY 
+   launch/ros2/.
+#   launch/data
+#   launch/demo
+   DESTINATION share/${PROJECT_NAME}/launch
+)
 
 ## install plugins/nodelets xml
 #install(FILES
