@@ -227,7 +227,6 @@ SET(Libraries
    visualization_msgs
    image_geometry
    stereo_msgs
-   move_base_msgs
 )
 
 SET(rtabmap_sync_lib_src
@@ -311,7 +310,7 @@ ENDIF(octomap_msgs_FOUND)
 #ENDIF(apriltag_msgs_FOUND)
 
 # If move_base_msgs is found, add definition
-IF(octomap_msgs_FOUND)
+IF(move_base_msgs_FOUND)
 MESSAGE(STATUS "WITH move_base_msgs")
 include_directories(
   ${move_base_msgs_INCLUDE_DIRS}
