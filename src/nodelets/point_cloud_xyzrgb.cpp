@@ -333,7 +333,7 @@ void PointCloudXYZRGB::stereoCallback(
 			imageRight->encoding.compare(sensor_msgs::image_encodings::RGBA8) == 0 ||
 			imageRight->encoding.compare(sensor_msgs::image_encodings::BGRA8) == 0))
 	{
-		RCLCPP_ERROR(this->get_logger(), "Input type must be image=mono8,mono16,rgb8,bgr8 (enc=%s)", imageLeft->encoding.c_str());
+		RCLCPP_ERROR(this->get_logger(), "Input type must be image=mono8,mono16,rgb8,bgr8,rgba8,bgra8 (enc=%s)", imageLeft->encoding.c_str());
 		return;
 	}
 
