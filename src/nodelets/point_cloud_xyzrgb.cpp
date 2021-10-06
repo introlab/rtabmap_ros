@@ -390,13 +390,17 @@ private:
 		if(!(imageLeft->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
 				imageLeft->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0 ||
 				imageLeft->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
-				imageLeft->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0) ||
+				imageLeft->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0 ||
+				imageLeft->encoding.compare(sensor_msgs::image_encodings::BGRA8) == 0 ||
+				imageLeft->encoding.compare(sensor_msgs::image_encodings::RGBA8) == 0) ||
 			!(imageRight->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
 				imageRight->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0 ||
 				imageRight->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
-				imageRight->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0))
+				imageRight->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0 ||
+				imageRight->encoding.compare(sensor_msgs::image_encodings::BGRA8) == 0 ||
+				imageRight->encoding.compare(sensor_msgs::image_encodings::RGBA8) == 0))
 		{
-			NODELET_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8 (enc=%s)", imageLeft->encoding.c_str());
+			NODELET_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8,rgba8,bgra8 (enc=%s)", imageLeft->encoding.c_str());
 			return;
 		}
 
