@@ -323,13 +323,17 @@ bool MapsManager::hasSubscribers() const
 			cloudObstaclesPub_->get_subscription_count() != 0 ||
 			cloudGroundPub_->get_subscription_count() != 0 ||
 			gridMapPub_->get_subscription_count() != 0 ||
-			gridProbMapPub_->get_subscription_count() != 0 ||
+			gridProbMapPub_->get_subscription_count() != 0
+#ifdef WITH_OCTOMAP_MSGS
+			||
 			octoMapCloud_->get_subscription_count() != 0 ||
 			octoMapFrontierCloud_->get_subscription_count() != 0 ||
 			octoMapObstacleCloud_->get_subscription_count() != 0 ||
 			octoMapGroundCloud_->get_subscription_count() != 0 ||
 			octoMapEmptySpace_->get_subscription_count() != 0 ||
-			octoMapProj_->get_subscription_count() != 0;
+			octoMapProj_->get_subscription_count() != 0
+#endif
+			;
 }
 
 std::map<int, Transform> MapsManager::getFilteredPoses(const std::map<int, Transform> & poses)
@@ -354,6 +358,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 	if(!updateGrid && !updateOctomap)
 	{
 		//  all false, update only those where we have subscribers
+#ifdef WITH_OCTOMAP_MSGS
 		updateOctomap =
 				octoMapCloud_->get_subscription_count() != 0 ||
 				octoMapFrontierCloud_->get_subscription_count() != 0 ||
@@ -361,6 +366,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 				octoMapGroundCloud_->get_subscription_count() != 0 ||
 				octoMapEmptySpace_->get_subscription_count() != 0 ||
 				octoMapProj_->get_subscription_count() != 0;
+#endif
 
 		updateGrid = gridMapPub_->get_subscription_count() != 0 ||
 				gridProbMapPub_->get_subscription_count() != 0;

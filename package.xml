@@ -77,7 +77,6 @@
   <exec_depend>octomap</exec_depend>
   <exec_depend>octomap_msgs</exec_depend>
   <exec_depend>image_geometry</exec_depend>
-  <exec_depend>find_object_2d</exec_depend>
   <exec_depend>pluginlib</exec_depend>
   <exec_depend>rviz_common</exec_depend>
   <exec_depend>rviz_rendering</exec_depend>
