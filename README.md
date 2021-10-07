@@ -91,7 +91,7 @@ This section shows how to install RTAB-Map ros-pkg on **ROS Hydro/Indigo/Jade/Ki
     ```bash
     $ cd ~/catkin_ws
     $ git clone https://github.com/introlab/rtabmap_ros.git src/rtabmap_ros
-    $ catkin_make -j1
+    $ catkin_make -j4
     ```
     * Use `catkin_make -j1` if compilation requires more RAM than you have (e.g., some files require up to ~2 GB to build depending on gcc version).
     * Options:
@@ -99,8 +99,8 @@ This section shows how to install RTAB-Map ros-pkg on **ROS Hydro/Indigo/Jade/Ki
         * Add `-DRTABMAP_SYNC_USER_DATA=ON` to `catkin_make` if you plan to use user data synchronized topics.
 
 ## Build from source for Nvidia Jetson
-For **Jetpack 4** (Ubuntu 18.04 with ROS Melodic), see this [post](https://github.com/introlab/rtabmap/issues/427#issuecomment-608052821).
-For **Jetpack 3** (Ubuntu 16.04 with ROS Kinetic), see this [post](https://github.com/introlab/rtabmap_ros/issues/655).
+ * For **Jetpack 4** (Ubuntu 18.04 with ROS Melodic), see this [post](https://github.com/introlab/rtabmap/issues/427#issuecomment-608052821).
+ * For **Jetpack 3** (Ubuntu 16.04 with ROS Kinetic), see this [post](https://github.com/introlab/rtabmap_ros/issues/655).
 
 
 ### Update to new version 
