@@ -40,7 +40,7 @@ $ ros2 launch rtabmap_ros rtabmap.launch.py \
     $ git clone https://github.com/introlab/rtabmap.git src/rtabmap
     $ git clone --branch ros2 https://github.com/introlab/rtabmap_ros.git src/rtabmap_ros
     $ export MAKEFLAGS="-j6" # Can be ignored if you have a lot of RAM
-    $ colcon build 
+    $ colcon build --symlink-install
     ```
 
 # Example with Turtlebot3

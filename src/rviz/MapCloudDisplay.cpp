@@ -489,7 +489,7 @@ void MapCloudDisplay::updateCloudParameters()
 	// do nothing... only take effect on next generated clouds
 }
 
-void MapCloudDisplay::downloadMap(bool graphOnly)
+void MapCloudDisplay::downloadMap(bool /*graphOnly*/)
 {
 	RCLCPP_ERROR(rviz_ros_node_.lock()->get_raw_node()->get_logger(), "MapCloud plugin: DownloadMap still not working on ros2");
 	return;
@@ -718,7 +718,7 @@ void MapCloudDisplay::update( float, float )
 										 0, 0, 0, 1);
 						frameTransform = frameTransform * pose;
 						Ogre::Vector3 posePosition = frameTransform.getTrans();
-						Ogre::Quaternion poseOrientation = frameTransform.extractQuaternion();
+						Ogre::Quaternion poseOrientation(frameTransform.linear());
 						poseOrientation.normalise();
 
 						cloudInfoIt->second->scene_node_->setPosition(posePosition);

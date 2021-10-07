@@ -272,14 +272,22 @@ void CommonDataSubscriber::setupScanCallbacks(
 		bool scan2dTopic,
 		bool scanDescTopic,
 		bool subscribeOdom,
+#ifdef RTABMAP_SYNC_USER_DATA
 		bool subscribeUserData,
+#else
+		bool,
+#endif
 		bool subscribeOdomInfo,
 		int queueSize,
 		bool approxSync)
 {
 	RCLCPP_INFO(node.get_logger(), "Setup scan callback");
 
-	if(subscribeOdom || subscribeUserData || subscribeOdomInfo)
+	if(subscribeOdom ||
+#ifdef RTABMAP_SYNC_USER_DATA
+		subscribeUserData ||
+#endif
+		subscribeOdomInfo)
 	{
 		if(scanDescTopic)
 		{

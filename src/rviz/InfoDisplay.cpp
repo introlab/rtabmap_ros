@@ -81,7 +81,7 @@ void InfoDisplay::processMessage( const rtabmap_ros::msg::Info::ConstSharedPtr m
 	this->emitTimeSignal(msg->header.stamp);
 }
 
-void InfoDisplay::update( float wall_dt, float ros_dt )
+void InfoDisplay::update( float /*wall_dt*/, float /*ros_dt*/ )
 {
 	{
 		std::unique_lock<std::mutex> lock(info_mutex_);
@@ -122,5 +122,5 @@ void InfoDisplay::reset()
 
 } // namespace rtabmap_ros
 
-#include <pluginlib/class_list_macros.h>
+#include <pluginlib/class_list_macros.hpp>
 PLUGINLIB_EXPORT_CLASS( rtabmap_ros::InfoDisplay, rviz_common::Display )

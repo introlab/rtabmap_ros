@@ -458,7 +458,11 @@ void CommonDataSubscriber::rgbOdomDataScanDescInfoCallback(
 void CommonDataSubscriber::setupRGBCallbacks(
 		rclcpp::Node& node,
 		bool subscribeOdom,
+#ifdef RTABMAP_SYNC_USER_DATA
 		bool subscribeUserData,
+#else
+		bool,
+#endif
 		bool subscribeScan2d,
 		bool subscribeScan3d,
 		bool subscribeScanDesc,
