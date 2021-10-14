@@ -3233,7 +3233,7 @@ bool CoreWrapper::globalBundleAdjustmentCallback(rtabmap_ros::GlobalBundleAdjust
 			iterations,
 			pixelVariance,
 			rematchFeatures?"true":"false");
-	bool success = rtabmap_.globalBundleAdjustment((Optimizer::Type)optimizer, iterations, pixelVariance, rematchFeatures);
+	bool success = rtabmap_.globalBundleAdjustment((Optimizer::Type)optimizer, rematchFeatures, iterations, pixelVariance);
 	if(!success)
 	{
 		NODELET_ERROR("Post-Processing: Global Bundle Adjustment failed!");
