@@ -3199,7 +3199,7 @@ void CoreWrapper::globalBundleAdjustmentCallback(
 			iterations,
 			pixelVariance,
 			rematchFeatures?"true":"false");
-	bool success = rtabmap_.globalBundleAdjustment((Optimizer::Type)optimizer, iterations, pixelVariance, rematchFeatures);
+	bool success = rtabmap_.globalBundleAdjustment((Optimizer::Type)optimizer, rematchFeatures, iterations, pixelVariance);
 	if(!success)
 	{
 		RCLCPP_ERROR(get_logger(), "Post-Processing: Global Bundle Adjustment failed!");

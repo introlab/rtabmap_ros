@@ -43,6 +43,11 @@ $ ros2 launch rtabmap_ros rtabmap.launch.py \
     $ colcon build --symlink-install
     ```
 
+* To build with `rgbd_cameras>1` support and/or `subscribe_user_data` support:
+    ```bash
+    $ colcon build --symlink-install --cmake-args -DRTABMAP_SYNC_MULTI_RGBD=ON -DRTABMAP_SYNC_USER_DATA=ON
+    ```
+
 # Example with Turtlebot3
 
 1. Launch Turtlebot3 simulator:
