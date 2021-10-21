@@ -69,7 +69,11 @@ MapsManager::MapsManager() :
 		assembledGround_(new pcl::PointCloud<pcl::PointXYZRGB>),
 		occupancyGrid_(new OccupancyGrid),
 		gridUpdated_(true),
+#ifdef WITH_OCTOMAP_MSGS
+#ifdef RTABMAP_OCTOMAP
 		octomap_(new OctoMap),
+#endif
+#endif
 		octomapTreeDepth_(16),
 		octomapUpdated_(true),
 		latching_(true)
