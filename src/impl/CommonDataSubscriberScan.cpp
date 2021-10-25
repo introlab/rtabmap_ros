@@ -414,7 +414,7 @@ void CommonDataSubscriber::setupScanCallbacks(
 				{
 					subscribedToOdomInfo_ = true;
 					odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-					SYNC_DECL3(dataScan2dInfo, approxSync, queueSize, userDataSub_, scanSub_, odomInfoSub_);
+					SYNC_DECL3(CommonDataSubscriber, dataScan2dInfo, approxSync, queueSize, userDataSub_, scanSub_, odomInfoSub_);
 				}
 				else
 				{
