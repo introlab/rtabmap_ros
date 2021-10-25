@@ -159,11 +159,10 @@ ENDIF(RTABMAP_GUI OR rviz_default_plugins_FOUND)
  )
 
 ## Generate messages and services
- rosidl_generate_interfaces(${PROJECT_NAME}_msgs
+ rosidl_generate_interfaces(${PROJECT_NAME}
    ${msg_files}
    ${srv_files}
    DEPENDENCIES geometry_msgs std_msgs sensor_msgs std_srvs visualization_msgs image_geometry
-   LIBRARY_NAME ${PROJECT_NAME}
  )
 ament_export_dependencies(rosidl_default_runtime)
 
@@ -325,21 +324,21 @@ ENDIF(move_base_msgs_FOUND)
 ############################
 ## Declare a cpp library
 ############################
-add_library(rtabmap_ros SHARED ${rtabmap_ros_lib_src})
+add_library(rtabmap_common SHARED ${rtabmap_ros_lib_src})
 add_library(rtabmap_sync SHARED ${rtabmap_sync_lib_src})
 add_library(rtabmap_plugins SHARED ${rtabmap_plugins_lib_src})
 
-ament_target_dependencies(rtabmap_ros ${Libraries})
+ament_target_dependencies(rtabmap_common ${Libraries})
 ament_target_dependencies(rtabmap_sync ${Libraries})
 ament_target_dependencies(rtabmap_plugins ${Libraries})
 
-target_link_libraries(rtabmap_ros ${RTABMap_LIBRARIES})
-target_link_libraries(rtabmap_sync rtabmap_ros ${RTABMap_LIBRARIES})
-target_link_libraries(rtabmap_plugins rtabmap_ros ${RTABMap_LIBRARIES})
+target_link_libraries(rtabmap_common ${RTABMap_LIBRARIES})
+target_link_libraries(rtabmap_sync rtabmap_common ${RTABMap_LIBRARIES})
+target_link_libraries(rtabmap_plugins rtabmap_common ${RTABMap_LIBRARIES})
 
-rosidl_target_interfaces(rtabmap_ros ${PROJECT_NAME}_msgs "rosidl_typesupport_cpp")
-rosidl_target_interfaces(rtabmap_sync ${PROJECT_NAME}_msgs "rosidl_typesupport_cpp")
-rosidl_target_interfaces(rtabmap_plugins ${PROJECT_NAME}_msgs "rosidl_typesupport_cpp")
+rosidl_target_interfaces(rtabmap_common ${PROJECT_NAME} "rosidl_typesupport_cpp")
+rosidl_target_interfaces(rtabmap_sync ${PROJECT_NAME} "rosidl_typesupport_cpp")
+rosidl_target_interfaces(rtabmap_plugins ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 rclcpp_components_register_nodes(rtabmap_plugins "rtabmap_ros::RGBDOdometry")
 rclcpp_components_register_nodes(rtabmap_plugins "rtabmap_ros::StereoOdometry")
@@ -358,7 +357,7 @@ rclcpp_components_register_nodes(rtabmap_sync "rtabmap_ros::CoreWrapper")
 
 add_executable(rtabmap src/CoreNode.cpp)
 ament_target_dependencies(rtabmap ${Libraries})
-target_link_libraries(rtabmap rtabmap_sync rtabmap_ros ${RTABMap_LIBRARIES} ${Boost_LIBRARIES} ${PCL_LBRARIES})
+target_link_libraries(rtabmap rtabmap_sync rtabmap_common ${RTABMap_LIBRARIES} ${Boost_LIBRARIES} ${PCL_LBRARIES})
 
 add_executable(rtabmap_rgbd_odometry src/RGBDOdometryNode.cpp)
 ament_target_dependencies(rtabmap_rgbd_odometry ${Libraries})
@@ -430,11 +429,11 @@ target_link_libraries(rtabmap_point_cloud_assembler rtabmap_plugins ${RTABMap_LI
 set_target_properties(rtabmap_point_cloud_assembler PROPERTIES OUTPUT_NAME "point_cloud_assembler")
 
 #add_executable(rtabmap_map_optimizer src/MapOptimizerNode.cpp)
-#ament_target_dependencies(rtabmap_map_optimizer rtabmap_ros)
+#ament_target_dependencies(rtabmap_map_optimizer rtabmap_common)
 #set_target_properties(rtabmap_map_optimizer PROPERTIES OUTPUT_NAME "map_optimizer")
 
 #add_executable(rtabmap_map_assembler src/MapAssemblerNode.cpp)
-#ament_target_dependencies(rtabmap_map_assembler rtabmap_ros)
+#ament_target_dependencies(rtabmap_map_assembler rtabmap_common)
 #set_target_properties(rtabmap_map_assembler PROPERTIES OUTPUT_NAME "map_assembler")
 
 #add_executable(rtabmap_imu_to_tf src/ImuToTFNode.cpp)
@@ -442,10 +441,10 @@ set_target_properties(rtabmap_point_cloud_assembler PROPERTIES OUTPUT_NAME "poin
 #set_target_properties(rtabmap_imu_to_tf PROPERTIES OUTPUT_NAME "imu_to_tf")
 
 #add_executable(rtabmap_wifi_signal_pub src/WifiSignalPubNode.cpp)
-#ament_target_dependencies(rtabmap_wifi_signal_pub rtabmap_ros)
+#ament_target_dependencies(rtabmap_wifi_signal_pub rtabmap_common)
 #set_target_properties(rtabmap_wifi_signal_pub PROPERTIES OUTPUT_NAME "wifi_signal_pub")
 #add_executable(rtabmap_wifi_signal_sub src/WifiSignalSubNode.cpp)
-#ament_target_dependencies(rtabmap_wifi_signal_sub rtabmap_ros)
+#ament_target_dependencies(rtabmap_wifi_signal_sub rtabmap_common)
 #set_target_properties(rtabmap_wifi_signal_sub PROPERTIES OUTPUT_NAME "wifi_signal_sub")
 
 # If find_object_2d is found, add save objects example
@@ -453,13 +452,13 @@ set_target_properties(rtabmap_point_cloud_assembler PROPERTIES OUTPUT_NAME "poin
 #    MESSAGE(STATUS "WITH find_object_2d")
 #    include_directories(${find_object_2d_INCLUDE_DIRS})
 #    add_executable(rtabmap_save_objects_example src/SaveObjectsExample.cpp)
-#    ament_target_dependencies(rtabmap_save_objects_example ${Libraries} rtabmap_ros ${find_object_2d_LIBRARIES})
+#    ament_target_dependencies(rtabmap_save_objects_example ${Libraries} rtabmap_common ${find_object_2d_LIBRARIES})
 #    set_target_properties(rtabmap_save_objects_example PROPERTIES OUTPUT_NAME "save_objects_example")
 #ENDIF(find_object_2d_FOUND)
 
 #add_executable(rtabmap_external_loop_detectionexample src/ExternalLoopDetectionExample.cpp)
 #add_dependencies(rtabmap_external_loop_detectionexample ${${PROJECT_NAME}_EXPORTED_TARGETS})
-#ament_target_dependencies(rtabmap_external_loop_detectionexample ${Libraries} rtabmap_ros)
+#ament_target_dependencies(rtabmap_external_loop_detectionexample ${Libraries} rtabmap_common)
 #set_target_properties(rtabmap_external_loop_detectionexample PROPERTIES OUTPUT_NAME "external_loop_detection_example")
 
 #add_executable(rtabmap_camera src/CameraNode.cpp)
@@ -468,13 +467,13 @@ set_target_properties(rtabmap_point_cloud_assembler PROPERTIES OUTPUT_NAME "poin
 #set_target_properties(rtabmap_camera PROPERTIES OUTPUT_NAME "camera")
 
 #add_executable(rtabmap_stereo_camera src/StereoCameraNode.cpp)
-#ament_target_dependencies(rtabmap_stereo_camera rtabmap_ros)
+#ament_target_dependencies(rtabmap_stereo_camera rtabmap_common)
 #set_target_properties(rtabmap_stereo_camera PROPERTIES OUTPUT_NAME "stereo_camera")
 
 IF(RTABMAP_GUI)
     add_executable(rtabmapviz src/GuiNode.cpp src/GuiWrapper.cpp src/PreferencesDialogROS.cpp)
     ament_target_dependencies(rtabmapviz ${Libraries})
-    target_link_libraries(rtabmapviz rtabmap_sync rtabmap_ros ${RTABMap_LIBRARIES} ${Boost_LIBRARIES} ${PCL_LBRARIES} ${QT_LIBRARIES})
+    target_link_libraries(rtabmapviz rtabmap_sync rtabmap_common ${RTABMap_LIBRARIES} ${Boost_LIBRARIES} ${PCL_LBRARIES} ${QT_LIBRARIES})
     IF(Qt5_FOUND)
         QT5_USE_MODULES(rtabmapviz Widgets Core Gui)
     ENDIF()
@@ -483,11 +482,11 @@ ELSE()
 ENDIF()
 
 #add_executable(rtabmap_data_player src/DbPlayerNode.cpp)
-#ament_target_dependencies(rtabmap_data_player rtabmap_ros)
+#ament_target_dependencies(rtabmap_data_player rtabmap_common)
 #set_target_properties(rtabmap_data_player PROPERTIES OUTPUT_NAME "data_player")
 
 #add_executable(rtabmap_odom_msg_to_tf src/OdomMsgToTFNode.cpp)
-#ament_target_dependencies(rtabmap_odom_msg_to_tf rtabmap_ros)
+#ament_target_dependencies(rtabmap_odom_msg_to_tf rtabmap_common)
 #set_target_properties(rtabmap_odom_msg_to_tf PROPERTIES OUTPUT_NAME "odom_msg_to_tf")
 
 add_executable(rtabmap_pointcloud_to_depthimage src/PointCloudToDepthImageNode.cpp)
@@ -503,41 +502,41 @@ get_rmw_typesupport(typesupport_impls "${rmw_implementation}" LANGUAGE "cpp")
 
 foreach(typesupport_impl ${typesupport_impls})
   rosidl_target_interfaces(rtabmap_rgbd_odometry
-    ${PROJECT_NAME}_msgs ${typesupport_impl}
+    ${PROJECT_NAME} ${typesupport_impl}
   )
   rosidl_target_interfaces(rtabmap_stereo_odometry
-    ${PROJECT_NAME}_msgs ${typesupport_impl}
+    ${PROJECT_NAME} ${typesupport_impl}
   )
   rosidl_target_interfaces(rtabmap_icp_odometry
-    ${PROJECT_NAME}_msgs ${typesupport_impl}
+    ${PROJECT_NAME} ${typesupport_impl}
   )
   rosidl_target_interfaces(rtabmap_rgbd_relay
-    ${PROJECT_NAME}_msgs ${typesupport_impl}
+    ${PROJECT_NAME} ${typesupport_impl}
   )
   rosidl_target_interfaces(rtabmap_rgbd_sync
-    ${PROJECT_NAME}_msgs ${typesupport_impl}
+    ${PROJECT_NAME} ${typesupport_impl}
   )
   rosidl_target_interfaces(rtabmap_rgbdx_sync
-    ${PROJECT_NAME}_msgs ${typesupport_impl}
+    ${PROJECT_NAME} ${typesupport_impl}
   )
   rosidl_target_interfaces(rtabmap_rgb_sync
-    ${PROJECT_NAME}_msgs ${typesupport_impl}
+    ${PROJECT_NAME} ${typesupport_impl}
   )
   rosidl_target_interfaces(rtabmap_stereo_sync
-    ${PROJECT_NAME}_msgs ${typesupport_impl}
+    ${PROJECT_NAME} ${typesupport_impl}
   )
   rosidl_target_interfaces(rtabmap_pointcloud_to_depthimage
-    ${PROJECT_NAME}_msgs ${typesupport_impl}
+    ${PROJECT_NAME} ${typesupport_impl}
   )
   rosidl_target_interfaces(rtabmap_point_cloud_xyzrgb
-    ${PROJECT_NAME}_msgs ${typesupport_impl}
+    ${PROJECT_NAME} ${typesupport_impl}
   )
   rosidl_target_interfaces(rtabmap
-    ${PROJECT_NAME}_msgs ${typesupport_impl}
+    ${PROJECT_NAME} ${typesupport_impl}
   )
   IF(RTABMAP_GUI)
     rosidl_target_interfaces(rtabmapviz
-      ${PROJECT_NAME}_msgs ${typesupport_impl}
+      ${PROJECT_NAME} ${typesupport_impl}
     )
   ENDIF()
 endforeach()
@@ -590,14 +589,14 @@ IF(rviz_default_plugins_FOUND)
       rviz_default_plugins
     )
     #ament_export_interfaces(rtabmap_rviz_plugins HAS_LIBRARY_TARGET)
-    target_link_libraries(rtabmap_rviz_plugins rtabmap_ros)
+    target_link_libraries(rtabmap_rviz_plugins rtabmap_common)
     IF(Qt5_FOUND)
         QT5_USE_MODULES(rtabmap_rviz_plugins Widgets Core Gui)
     ENDIF(Qt5_FOUND)
 
     foreach(typesupport_impl ${typesupport_impls})
 	  rosidl_target_interfaces(rtabmap_rviz_plugins
-	    ${PROJECT_NAME}_msgs ${typesupport_impl}
+	    ${PROJECT_NAME} ${typesupport_impl}
 	  )
     endforeach()
     
@@ -659,7 +658,7 @@ ENDIF(rviz_default_plugins_FOUND)
 ## Mark executables and/or libraries for installation
 install(TARGETS 
    rtabmap_sync
-   rtabmap_ros
+   rtabmap_common
    rtabmap_plugins 
    ARCHIVE DESTINATION lib
    LIBRARY DESTINATION lib
