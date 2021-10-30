@@ -301,7 +301,12 @@ void OdometryROS::onInit()
 		std::string vStr;
 		if(pnh.getParam(iter->first, vStr))
 		{
-			if(iter->second.first && parameters_.find(iter->second.second) != parameters_.end())
+			if(!iter->second.second.empty() && parameters_.find(iter->second.second)!=parameters_.end())
+			{
+				NODELET_WARN("Rtabmap: Parameter name changed: \"%s\" -> \"%s\". The new parameter is already used with value \"%s\", ignoring the old one with value \"%s\".",
+						iter->first.c_str(), iter->second.second.c_str(), parameters_.find(iter->second.second)->second.c_str(), vStr.c_str());
+			}
+			else if(iter->second.first && parameters_.find(iter->second.second) != parameters_.end())
 			{
 				// can be migrated
 				parameters_.at(iter->second.second)= vStr;

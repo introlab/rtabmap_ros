@@ -420,7 +420,12 @@ void CoreWrapper::onInit()
 		}
 		if(!paramValue.empty())
 		{
-			if(iter->second.first)
+			if(!iter->second.second.empty() && parameters_.find(iter->second.second)!=parameters_.end())
+			{
+				NODELET_WARN("Rtabmap: Parameter name changed: \"%s\" -> \"%s\". The new parameter is already used with value \"%s\", ignoring the old one with value \"%s\".",
+						iter->first.c_str(), iter->second.second.c_str(), parameters_.find(iter->second.second)->second.c_str(), paramValue.c_str());
+			}
+			else if(iter->second.first)
 			{
 				// can be migrated
 				uInsert(parameters_, ParametersPair(iter->second.second, paramValue));
@@ -450,26 +455,26 @@ void CoreWrapper::onInit()
 	bool subscribeScan3d = false;
 	pnh.param("subscribe_scan",      subscribeScan2d, subscribeScan2d);
 	pnh.param("subscribe_scan_cloud", subscribeScan3d, subscribeScan3d);
-	bool gridFromDepth = Parameters::defaultGridFromDepth();
-	if((subscribeScan2d || subscribeScan3d || genScan_) && parameters_.find(Parameters::kGridFromDepth()) == parameters_.end())
+	int gridSensor = Parameters::defaultGridSensor();
+	if((subscribeScan2d || subscribeScan3d || genScan_) && parameters_.find(Parameters::kGridSensor()) == parameters_.end())
 	{
-		NODELET_WARN("Setting \"%s\" parameter to false (default true) as \"subscribe_scan\", \"subscribe_scan_cloud\" or \"gen_scan\" is "
+		NODELET_WARN("Setting \"%s\" parameter to 0 (default 1) as \"subscribe_scan\", \"subscribe_scan_cloud\" or \"gen_scan\" is "
 				"true. The occupancy grid map will be constructed from "
-				"laser scans. To get occupancy grid map from cloud projection, set \"%s\" "
-				"to true. To suppress this warning, "
-				"add <param name=\"%s\" type=\"string\" value=\"false\"/>",
-				Parameters::kGridFromDepth().c_str(),
-				Parameters::kGridFromDepth().c_str(),
-				Parameters::kGridFromDepth().c_str());
-		parameters_.insert(ParametersPair(Parameters::kGridFromDepth(), "false"));
+				"laser scans. To get occupancy grid map from camera's cloud projection, set \"%s\" "
+				"to 1. To suppress this warning, "
+				"add <param name=\"%s\" type=\"string\" value=\"0\"/>",
+				Parameters::kGridSensor().c_str(),
+				Parameters::kGridSensor().c_str(),
+				Parameters::kGridSensor().c_str());
+		parameters_.insert(ParametersPair(Parameters::kGridSensor(), "0"));
 	}
-	Parameters::parse(parameters_, Parameters::kGridFromDepth(), gridFromDepth);
-	if((subscribeScan2d || subscribeScan3d || genScan_) && parameters_.find(Parameters::kGridRangeMax()) == parameters_.end() && !gridFromDepth)
+	Parameters::parse(parameters_, Parameters::kGridSensor(), gridSensor);
+	if((subscribeScan2d || subscribeScan3d || genScan_) && parameters_.find(Parameters::kGridRangeMax()) == parameters_.end() && gridSensor==0)
 	{
-		NODELET_INFO("Setting \"%s\" parameter to 0 (default %f) as \"subscribe_scan\", \"subscribe_scan_cloud\" or \"gen_scan\" is true and %s is false.",
+		NODELET_INFO("Setting \"%s\" parameter to 0 (default %f) as \"subscribe_scan\", \"subscribe_scan_cloud\" or \"gen_scan\" is true and %s is 0.",
 				Parameters::kGridRangeMax().c_str(),
 				Parameters::defaultGridRangeMax(),
-				Parameters::kGridFromDepth().c_str());
+				Parameters::kGridSensor().c_str());
 		parameters_.insert(ParametersPair(Parameters::kGridRangeMax(), "0"));
 	}
 	if(subscribeScan3d && parameters_.find(Parameters::kIcpPointToPlaneRadius()) == parameters_.end())
@@ -3401,14 +3406,14 @@ bool CoreWrapper::getMapData2Callback(rtabmap_ros::GetMap2::Request& req, rtabma
 
 bool CoreWrapper::getProjMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::GetMap::Response &res)
 {
-	if(parameters_.find(Parameters::kGridFromDepth()) != parameters_.end() &&
-		!uStr2Bool(parameters_.at(Parameters::kGridFromDepth())))
+	if(parameters_.find(Parameters::kGridSensor()) != parameters_.end() &&
+		uStr2Int(parameters_.at(Parameters::kGridSensor()))==0)
 	{
 		NODELET_WARN("/get_proj_map service is deprecated! Call /get_grid_map service "
-					"instead with <param name=\"%s\" type=\"string\" value=\"true\"/>. "
+					"instead with <param name=\"%s\" type=\"string\" value=\"1\"/>. "
 					"Do \"$ rosrun rtabmap_ros rtabmap --params | grep Grid\" to see "
 					"all occupancy grid parameters.",
-					Parameters::kGridFromDepth().c_str());
+					Parameters::kGridSensor().c_str());
 	}
 	else
 	{
