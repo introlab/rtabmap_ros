@@ -377,7 +377,12 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 		}
 		if(!paramValue.empty())
 		{
-			if(iter->second.first)
+			if(!iter->second.second.empty() && parameters_.find(iter->second.second)!=parameters_.end())
+			{
+				RCLCPP_WARN(this->get_logger(), "Rtabmap: Parameter name changed: \"%s\" -> \"%s\". The new parameter is already used with value \"%s\", ignoring the old one with value \"%s\".",
+						iter->first.c_str(), iter->second.second.c_str(), parameters_.find(iter->second.second)->second.c_str(), paramValue.c_str());
+			}
+			else if(iter->second.first)
 			{
 				// can be migrated
 				uInsert(parameters_, ParametersPair(iter->second.second, paramValue));
@@ -403,26 +408,26 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 	// Backward compatibility (MapsManager)
 	mapsManager_.backwardCompatibilityParameters(*this, parameters_);
 
-	bool gridFromDepth = Parameters::defaultGridFromDepth();
-	if((this->isSubscribedToScan2d() || this->isSubscribedToScan3d() || genScan_) && parameters_.find(Parameters::kGridFromDepth()) == parameters_.end())
+	int gridSensor = Parameters::defaultGridSensor();
+	if((this->isSubscribedToScan2d() || this->isSubscribedToScan3d() || genScan_) && parameters_.find(Parameters::kGridSensor()) == parameters_.end())
 	{
-		RCLCPP_WARN(this->get_logger(), "Setting \"%s\" parameter to false (default true) as \"subscribe_scan\" or \"subscribe_scan_cloud\" or \"gen_scan\" is "
+		RCLCPP_WARN(this->get_logger(), "Setting \"%s\" parameter to 0 (default 1) as \"subscribe_scan\" or \"subscribe_scan_cloud\" or \"gen_scan\" is "
 				"true. The occupancy grid map will be constructed from "
 				"laser scans. To get occupancy grid map from cloud projection, set \"%s\" "
 				"to true. To suppress this warning, "
-				"add <param name=\"%s\" type=\"string\" value=\"false\"/>",
-				Parameters::kGridFromDepth().c_str(),
-				Parameters::kGridFromDepth().c_str(),
-				Parameters::kGridFromDepth().c_str());
-		parameters_.insert(ParametersPair(Parameters::kGridFromDepth(), "false"));
+				"add <param name=\"%s\" type=\"string\" value=\"0\"/>",
+				Parameters::kGridSensor().c_str(),
+				Parameters::kGridSensor().c_str(),
+				Parameters::kGridSensor().c_str());
+		parameters_.insert(ParametersPair(Parameters::kGridSensor(), "0"));
 	}
-	Parameters::parse(parameters_, Parameters::kGridFromDepth(), gridFromDepth);
-	if((this->isSubscribedToScan2d() || this->isSubscribedToScan3d() || genScan_) && parameters_.find(Parameters::kGridRangeMax()) == parameters_.end() && !gridFromDepth)
+	Parameters::parse(parameters_, Parameters::kGridSensor(), gridSensor);
+	if((this->isSubscribedToScan2d() || this->isSubscribedToScan3d() || genScan_) && parameters_.find(Parameters::kGridRangeMax()) == parameters_.end() && gridSensor==0)
 	{
-		RCLCPP_INFO(this->get_logger(), "Setting \"%s\" parameter to 0 (default %f) as \"subscribe_scan\" or \"subscribe_scan_cloud\" or \"gen_scan\" is true.",
+		RCLCPP_INFO(this->get_logger(), "Setting \"%s\" parameter to 0 (default %f) as \"subscribe_scan\" or \"subscribe_scan_cloud\" or \"gen_scan\" is true and %s is 0.",
 				Parameters::kGridRangeMax().c_str(),
 				Parameters::defaultGridRangeMax(),
-				Parameters::kGridFromDepth().c_str());
+				Parameters::kGridSensor().c_str());
 		parameters_.insert(ParametersPair(Parameters::kGridRangeMax(), "0"));
 	}
 	if(this->isSubscribedToScan3d() && parameters_.find(Parameters::kIcpPointToPlaneRadius()) == parameters_.end())

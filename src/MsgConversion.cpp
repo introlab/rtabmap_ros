@@ -1074,7 +1074,7 @@ rtabmap::Signature nodeDataFromROS(const rtabmap_ros::msg::NodeData & msg)
 	{
 		UERROR("Word IDs and 3D points should be the same size (%d, %d)!", (int)msg.word_ids.size(), (int)msg.word_pts.size());
 	}
-	if(wordsDescriptors.rows != (int)msg.word_ids.size())
+	if(!wordsDescriptors.empty() && wordsDescriptors.rows != (int)msg.word_ids.size())
 	{
 		UERROR("Word IDs and descriptors should be the same size (%d, %d)!", (int)msg.word_ids.size(), wordsDescriptors.rows);
 		wordsDescriptors = cv::Mat();

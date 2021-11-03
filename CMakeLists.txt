@@ -55,7 +55,7 @@ find_package(octomap_msgs)
 find_package(move_base_msgs)
 
 ## System dependencies are found with CMake's conventions
-find_package(RTABMap 0.20.14 REQUIRED)
+find_package(RTABMap 0.20.15 REQUIRED)
 find_package(Boost REQUIRED COMPONENTS system) # dependencies from PCL
 find_package(PCL 1.7 REQUIRED COMPONENTS kdtree) #This crashes idl generation if all components are found?! see https://github.com/ros2/rosidl/issues/402#issuecomment-565586908
 

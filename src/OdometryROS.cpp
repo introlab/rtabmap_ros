@@ -291,7 +291,12 @@ void OdometryROS::init(bool stereoParams, bool visParams, bool icpParams)
 		if(get_parameter(iter->first, parameter))
 		{
 			std::string vStr = parameter.as_string();
-			if(iter->second.first && parameters_.find(iter->second.second) != parameters_.end())
+			if(!iter->second.second.empty() && parameters_.find(iter->second.second)!=parameters_.end())
+			{
+				RCLCPP_WARN(this->get_logger(), "Odometry: Parameter name changed: \"%s\" -> \"%s\". The new parameter is already used with value \"%s\", ignoring the old one with value \"%s\".",
+						iter->first.c_str(), iter->second.second.c_str(), parameters_.find(iter->second.second)->second.c_str(), vStr.c_str());
+			}
+			else if(iter->second.first && parameters_.find(iter->second.second) != parameters_.end())
 			{
 				// can be migrated
 				parameters_.at(iter->second.second)= vStr;

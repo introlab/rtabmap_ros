@@ -180,7 +180,20 @@ void StereoOdometry::callback(
 						waitForTransform());
 				if(stereoTransform.isNull())
 				{
-					RCLCPP_ERROR(this->get_logger(), "Parameter %s is false but we cannot get TF between the two cameras!", Parameters::kRtabmapImagesAlreadyRectified().c_str());
+					RCLCPP_ERROR(this->get_logger(), "Parameter %s is false but we cannot get TF between the two cameras! (between frames %s and %s)",
+							Parameters::kRtabmapImagesAlreadyRectified().c_str(),
+							cameraInfoRight->header.frame_id.c_str(),
+							cameraInfoLeft->header.frame_id.c_str());
+					return;
+				}
+				else if(stereoTransform.isIdentity())
+				{
+					RCLCPP_ERROR(this->get_logger(), "Parameter %s is false but we cannot get a valid TF between the two cameras! "
+							"Identity transform returned between left and right cameras. Verify that if TF between "
+							"the cameras is valid: \"rosrun tf tf_echo %s %s\".",
+							Parameters::kRtabmapImagesAlreadyRectified().c_str(),
+							cameraInfoRight->header.frame_id.c_str(),
+							cameraInfoLeft->header.frame_id.c_str());
 					return;
 				}
 			}
