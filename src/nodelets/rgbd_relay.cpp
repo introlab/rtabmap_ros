@@ -48,11 +48,13 @@ RGBDRelay::RGBDRelay(const rclcpp::NodeOptions & options) :
 	compress_(false),
 	uncompress_(false)
 {
+	int qos = 0;
+	qos = this->declare_parameter("qos", qos);
 	compress_ = this->declare_parameter("compress", compress_);
 	uncompress_ = this->declare_parameter("uncompress", uncompress_);
 
-	rgbdImageSub_ = create_subscription<rtabmap_ros::msg::RGBDImage>("rgbd_image", 5, std::bind(&RGBDRelay::callback, this, std::placeholders::_1));
-	rgbdImagePub_ = create_publisher<rtabmap_ros::msg::RGBDImage>("rgbd_image_relay", 1);
+	rgbdImageSub_ = create_subscription<rtabmap_ros::msg::RGBDImage>("rgbd_image", rclcpp::QoS(5).reliability((rmw_qos_reliability_policy_t)qos), std::bind(&RGBDRelay::callback, this, std::placeholders::_1));
+	rgbdImagePub_ = create_publisher<rtabmap_ros::msg::RGBDImage>("rgbd_image_relay", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos));
 }
 
 void RGBDRelay::callback(const rtabmap_ros::msg::RGBDImage::SharedPtr input) const

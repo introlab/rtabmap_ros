@@ -713,7 +713,7 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 		}
 		auto node = rclcpp::Node::make_shared("rtabmap");
 		image_transport::TransportHints hints(this);
-		defaultSub_ = image_transport::create_subscription(node.get(), "image", std::bind(&CoreWrapper::defaultCallback, this, std::placeholders::_1), hints.getTransport());
+		defaultSub_ = image_transport::create_subscription(node.get(), "image", std::bind(&CoreWrapper::defaultCallback, this, std::placeholders::_1), hints.getTransport(), rclcpp::QoS(queueSize_).reliability((rmw_qos_reliability_policy_t)qosImage_).get_rmw_qos_profile());
 
 
 		RCLCPP_INFO(this->get_logger(), "\n%s subscribed to:\n   %s", get_name(), defaultSub_.getTopic().c_str());
@@ -783,13 +783,17 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 	}
 	this->set_parameters(rosParameters);
 
-	userDataAsyncSub_ = this->create_subscription<rtabmap_ros::msg::UserData>("user_data_async", 5, std::bind(&CoreWrapper::userDataAsyncCallback, this, std::placeholders::_1));
+	int qosGPS = 0;
+	int qosIMU = 0;
+	qosGPS = this->declare_parameter("qos_gps", qosGPS);
+	qosIMU = this->declare_parameter("qos_imu", qosIMU);
+	userDataAsyncSub_ = this->create_subscription<rtabmap_ros::msg::UserData>("user_data_async", rclcpp::QoS(5).reliability((rmw_qos_reliability_policy_t)qosUserData_), std::bind(&CoreWrapper::userDataAsyncCallback, this, std::placeholders::_1));
 	globalPoseAsyncSub_ = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>("global_pose", 5, std::bind(&CoreWrapper::globalPoseAsyncCallback, this, std::placeholders::_1));
-	gpsFixAsyncSub_ = this->create_subscription<sensor_msgs::msg::NavSatFix>("gps/fix", 5, std::bind(&CoreWrapper::gpsFixAsyncCallback, this, std::placeholders::_1));
+	gpsFixAsyncSub_ = this->create_subscription<sensor_msgs::msg::NavSatFix>("gps/fix", rclcpp::QoS(5).reliability((rmw_qos_reliability_policy_t)qosGPS), std::bind(&CoreWrapper::gpsFixAsyncCallback, this, std::placeholders::_1));
 #ifdef WITH_APRILTAG_MSGS
 	tagDetectionsSub_ = this->create_subscription<apriltag_ros::msg::AprilTagDetectionArray>("tag_detections", 5, std::bind(&CoreWrapper::tagDetectionsAsyncCallback, this, std::placeholders::_1));
 #endif
-	imuSub_ = this->create_subscription<sensor_msgs::msg::Imu>("imu", 100, std::bind(&CoreWrapper::imuAsyncCallback, this, std::placeholders::_1));
+	imuSub_ = this->create_subscription<sensor_msgs::msg::Imu>("imu", rclcpp::QoS(100).reliability((rmw_qos_reliability_policy_t)qosIMU), std::bind(&CoreWrapper::imuAsyncCallback, this, std::placeholders::_1));
 	republishNodeDataSub_ = this->create_subscription<std_msgs::msg::Int32MultiArray>("republish_node_data", 5, std::bind(&CoreWrapper::republishNodeDataCallback, this, std::placeholders::_1));
 
 	parametersClient_ = std::make_shared<rclcpp::SyncParametersClient>(this);

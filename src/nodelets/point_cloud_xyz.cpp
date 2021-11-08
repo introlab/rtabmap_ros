@@ -63,10 +63,13 @@ PointCloudXYZ::PointCloudXYZ(const rclcpp::NodeOptions & options) :
 		exactSyncDisparity_(0)
 {
 	int queueSize = 10;
+	int qos = 0;
 	bool approxSync = true;
 	std::string roiStr;
 	approxSync = this->declare_parameter("approx_sync", approxSync);
 	queueSize = this->declare_parameter("queue_size", queueSize);
+	qos = this->declare_parameter("qos", qos);
+	int qosCamInfo = this->declare_parameter("qos_camera_info", qos);
 	maxDepth_ = this->declare_parameter("max_depth", maxDepth_);
 	minDepth_ = this->declare_parameter("min_depth", minDepth_);
 	voxelSize_ = this->declare_parameter("voxel_size", voxelSize_);
@@ -130,14 +133,14 @@ PointCloudXYZ::PointCloudXYZ(const rclcpp::NodeOptions & options) :
 		exactSyncDisparity_->registerCallback(std::bind(&PointCloudXYZ::callbackDisparity, this, std::placeholders::_1, std::placeholders::_2));
 	}
 
-	cloudPub_ = create_publisher<sensor_msgs::msg::PointCloud2>("cloud", 1);
+	cloudPub_ = create_publisher<sensor_msgs::msg::PointCloud2>("cloud", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos));
 
 	image_transport::TransportHints hints(this);
-	imageDepthSub_.subscribe(this, "depth/image", hints.getTransport());
-	cameraInfoSub_.subscribe(this, "depth/camera_info");
+	imageDepthSub_.subscribe(this, "depth/image", hints.getTransport(), rclcpp::QoS(queueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	cameraInfoSub_.subscribe(this, "depth/camera_info", rclcpp::QoS(queueSize).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile());
 
-	disparitySub_.subscribe(this, "disparity/image");
-	disparityCameraInfoSub_.subscribe(this, "disparity/camera_info");
+	disparitySub_.subscribe(this, "disparity/image", rclcpp::QoS(queueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	disparityCameraInfoSub_.subscribe(this, "disparity/camera_info", rclcpp::QoS(queueSize).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile());
 }
 
 PointCloudXYZ::~PointCloudXYZ()

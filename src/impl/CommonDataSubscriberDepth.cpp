@@ -473,24 +473,24 @@ void CommonDataSubscriber::setupDepthCallbacks(
 	RCLCPP_INFO(node.get_logger(), "Setup depth callback");
 
 	image_transport::TransportHints hints(&node);
-	imageSub_.subscribe(&node, "rgb/image", hints.getTransport());
-	imageDepthSub_.subscribe(&node, "depth/image", hints.getTransport());
-	cameraInfoSub_.subscribe(&node, "rgb/camera_info");
+	imageSub_.subscribe(&node, "rgb/image", hints.getTransport(), rclcpp::QoS(queueSize).reliability(qosImage_).get_rmw_qos_profile());
+	imageDepthSub_.subscribe(&node, "depth/image", hints.getTransport(), rclcpp::QoS(queueSize).reliability(qosImage_).get_rmw_qos_profile());
+	cameraInfoSub_.subscribe(&node, "rgb/camera_info", rclcpp::QoS(queueSize).reliability(qosCameraInfo_).get_rmw_qos_profile());
 	
 #ifdef RTABMAP_SYNC_USER_DATA
 	if(subscribeOdom && subscribeUserData)
 	{
-		odomSub_.subscribe(&node, "odom");
-		userDataSub_.subscribe(&node, "user_data");
+		odomSub_.subscribe(&node, "odom", rclcpp::QoS(queueSize).reliability(qosOdom_).get_rmw_qos_profile());
+		userDataSub_.subscribe(&node, "user_data", rclcpp::QoS(queueSize).reliability(qosUserData_).get_rmw_qos_profile());
 
 		if(subscribeScanDesc)
 		{
 			subscribedToScanDescriptor_ = true;
-			scanDescSub_.subscribe(&node, "scan_descriptor");
+			scanDescSub_.subscribe(&node, "scan_descriptor", rclcpp::QoS(queueSize).reliability(qosScan_).get_rmw_qos_profile());
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(&node, "odom_info");
+				odomInfoSub_.subscribe(&node, "odom_info", rclcpp::QoS(queueSize).reliability(qosOdom_).get_rmw_qos_profile());
 				SYNC_DECL7(CommonDataSubscriber, depthOdomDataScanDescInfo, approxSync, queueSize, odomSub_, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scanDescSub_, odomInfoSub_);
 			}
 			else
@@ -501,11 +501,11 @@ void CommonDataSubscriber::setupDepthCallbacks(
 		else if(subscribeScan2d)
 		{
 			subscribedToScan2d_ = true;
-			scanSub_.subscribe(&node, "scan");
+			scanSub_.subscribe(&node, "scan", rclcpp::QoS(queueSize).reliability(qosScan_).get_rmw_qos_profile());
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(&node, "odom_info");
+				odomInfoSub_.subscribe(&node, "odom_info", rclcpp::QoS(queueSize).reliability(qosOdom_).get_rmw_qos_profile());
 				SYNC_DECL7(CommonDataSubscriber, depthOdomDataScan2dInfo, approxSync, queueSize, odomSub_, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scanSub_, odomInfoSub_);
 			}
 			else
@@ -516,11 +516,11 @@ void CommonDataSubscriber::setupDepthCallbacks(
 		else if(subscribeScan3d)
 		{
 			subscribedToScan3d_ = true;
-			scan3dSub_.subscribe(&node, "scan_cloud");
+			scan3dSub_.subscribe(&node, "scan_cloud", rclcpp::QoS(queueSize).reliability(qosScan_).get_rmw_qos_profile());
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(&node, "odom_info");
+				odomInfoSub_.subscribe(&node, "odom_info", rclcpp::QoS(queueSize).reliability(qosOdom_).get_rmw_qos_profile());
 				SYNC_DECL7(CommonDataSubscriber, depthOdomDataScan3dInfo, approxSync, queueSize, odomSub_, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scan3dSub_, odomInfoSub_);
 			}
 			else
@@ -531,7 +531,7 @@ void CommonDataSubscriber::setupDepthCallbacks(
 		else if(subscribeOdomInfo)
 		{
 			subscribedToOdomInfo_ = true;
-			odomInfoSub_.subscribe(&node, "odom_info");
+			odomInfoSub_.subscribe(&node, "odom_info", rclcpp::QoS(queueSize).reliability(qosOdom_).get_rmw_qos_profile());
 			SYNC_DECL6(CommonDataSubscriber, depthOdomDataInfo, approxSync, queueSize, odomSub_, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, odomInfoSub_);
 		}
 		else
@@ -543,16 +543,16 @@ void CommonDataSubscriber::setupDepthCallbacks(
 #endif
 	if(subscribeOdom)
 	{
-		odomSub_.subscribe(&node, "odom");
+		odomSub_.subscribe(&node, "odom", rclcpp::QoS(queueSize).reliability(qosOdom_).get_rmw_qos_profile());
 
 		if(subscribeScanDesc)
 		{
 			subscribedToScanDescriptor_ = true;
-			scanDescSub_.subscribe(&node, "scan_descriptor");
+			scanDescSub_.subscribe(&node, "scan_descriptor", rclcpp::QoS(queueSize).reliability(qosScan_).get_rmw_qos_profile());
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(&node, "odom_info");
+				odomInfoSub_.subscribe(&node, "odom_info", rclcpp::QoS(queueSize).reliability(qosOdom_).get_rmw_qos_profile());
 				SYNC_DECL6(CommonDataSubscriber, depthOdomScanDescInfo, approxSync, queueSize, odomSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scanDescSub_, odomInfoSub_);
 			}
 			else
@@ -563,11 +563,11 @@ void CommonDataSubscriber::setupDepthCallbacks(
 		else if(subscribeScan2d)
 		{
 			subscribedToScan2d_ = true;
-			scanSub_.subscribe(&node, "scan");
+			scanSub_.subscribe(&node, "scan", rclcpp::QoS(queueSize).reliability(qosScan_).get_rmw_qos_profile());
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(&node, "odom_info");
+				odomInfoSub_.subscribe(&node, "odom_info", rclcpp::QoS(queueSize).reliability(qosOdom_).get_rmw_qos_profile());
 				SYNC_DECL6(CommonDataSubscriber, depthOdomScan2dInfo, approxSync, queueSize, odomSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scanSub_, odomInfoSub_);
 			}
 			else
@@ -578,11 +578,11 @@ void CommonDataSubscriber::setupDepthCallbacks(
 		else if(subscribeScan3d)
 		{
 			subscribedToScan3d_ = true;
-			scan3dSub_.subscribe(&node, "scan_cloud");
+			scan3dSub_.subscribe(&node, "scan_cloud", rclcpp::QoS(queueSize).reliability(qosScan_).get_rmw_qos_profile());
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(&node, "odom_info");
+				odomInfoSub_.subscribe(&node, "odom_info", rclcpp::QoS(queueSize).reliability(qosOdom_).get_rmw_qos_profile());
 				SYNC_DECL6(CommonDataSubscriber, depthOdomScan3dInfo, approxSync, queueSize, odomSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scan3dSub_, odomInfoSub_);
 			}
 			else
@@ -593,7 +593,7 @@ void CommonDataSubscriber::setupDepthCallbacks(
 		else if(subscribeOdomInfo)
 		{
 			subscribedToOdomInfo_ = true;
-			odomInfoSub_.subscribe(&node, "odom_info");
+			odomInfoSub_.subscribe(&node, "odom_info", rclcpp::QoS(queueSize).reliability(qosOdom_).get_rmw_qos_profile());
 			SYNC_DECL5(CommonDataSubscriber, depthOdomInfo, approxSync, queueSize, odomSub_, imageSub_, imageDepthSub_, cameraInfoSub_, odomInfoSub_);
 		}
 		else
@@ -604,17 +604,17 @@ void CommonDataSubscriber::setupDepthCallbacks(
 #ifdef RTABMAP_SYNC_USER_DATA
 	else if(subscribeUserData)
 	{
-		userDataSub_.subscribe(&node, "user_data");
+		userDataSub_.subscribe(&node, "user_data", rclcpp::QoS(queueSize).reliability(qosUserData_).get_rmw_qos_profile());
 
 		if(subscribeScanDesc)
 		{
 			subscribedToScanDescriptor_ = true;
-			scanDescSub_.subscribe(&node, "scan_descriptor");
+			scanDescSub_.subscribe(&node, "scan_descriptor", rclcpp::QoS(queueSize).reliability(qosScan_).get_rmw_qos_profile());
 
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(&node, "odom_info");
+				odomInfoSub_.subscribe(&node, "odom_info", rclcpp::QoS(queueSize).reliability(qosOdom_).get_rmw_qos_profile());
 				SYNC_DECL6(CommonDataSubscriber, depthDataScanDescInfo, approxSync, queueSize, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scanDescSub_, odomInfoSub_);
 			}
 			else
@@ -625,12 +625,12 @@ void CommonDataSubscriber::setupDepthCallbacks(
 		else if(subscribeScan2d)
 		{
 			subscribedToScan2d_ = true;
-			scanSub_.subscribe(&node, "scan");
+			scanSub_.subscribe(&node, "scan", rclcpp::QoS(queueSize).reliability(qosScan_).get_rmw_qos_profile());
 
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(&node, "odom_info");
+				odomInfoSub_.subscribe(&node, "odom_info", rclcpp::QoS(queueSize).reliability(qosOdom_).get_rmw_qos_profile());
 				SYNC_DECL6(CommonDataSubscriber, depthDataScan2dInfo, approxSync, queueSize, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scanSub_, odomInfoSub_);
 			}
 			else
@@ -641,11 +641,11 @@ void CommonDataSubscriber::setupDepthCallbacks(
 		else if(subscribeScan3d)
 		{
 			subscribedToScan3d_ = true;
-			scan3dSub_.subscribe(&node, "scan_cloud");
+			scan3dSub_.subscribe(&node, "scan_cloud", rclcpp::QoS(queueSize).reliability(qosScan_).get_rmw_qos_profile());
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(&node, "odom_info");
+				odomInfoSub_.subscribe(&node, "odom_info", rclcpp::QoS(queueSize).reliability(qosOdom_).get_rmw_qos_profile());
 				SYNC_DECL6(CommonDataSubscriber, depthDataScan3dInfo, approxSync, queueSize, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scan3dSub_, odomInfoSub_);
 			}
 			else
@@ -656,7 +656,7 @@ void CommonDataSubscriber::setupDepthCallbacks(
 		else if(subscribeOdomInfo)
 		{
 			subscribedToOdomInfo_ = true;
-			odomInfoSub_.subscribe(&node, "odom_info");
+			odomInfoSub_.subscribe(&node, "odom_info", rclcpp::QoS(queueSize).reliability(qosOdom_).get_rmw_qos_profile());
 			SYNC_DECL5(CommonDataSubscriber, depthDataInfo, approxSync, queueSize, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, odomInfoSub_);
 		}
 		else
@@ -670,11 +670,11 @@ void CommonDataSubscriber::setupDepthCallbacks(
 		if(subscribeScanDesc)
 		{
 			subscribedToScanDescriptor_ = true;
-			scanDescSub_.subscribe(&node, "scan_descriptor");
+			scanDescSub_.subscribe(&node, "scan_descriptor", rclcpp::QoS(queueSize).reliability(qosScan_).get_rmw_qos_profile());
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(&node, "odom_info");
+				odomInfoSub_.subscribe(&node, "odom_info", rclcpp::QoS(queueSize).reliability(qosOdom_).get_rmw_qos_profile());
 				SYNC_DECL5(CommonDataSubscriber, depthScanDescInfo, approxSync, queueSize, imageSub_, imageDepthSub_, cameraInfoSub_, scanDescSub_, odomInfoSub_);
 			}
 			else
@@ -685,11 +685,11 @@ void CommonDataSubscriber::setupDepthCallbacks(
 		else if(subscribeScan2d)
 		{
 			subscribedToScan2d_ = true;
-			scanSub_.subscribe(&node, "scan");
+			scanSub_.subscribe(&node, "scan", rclcpp::QoS(queueSize).reliability(qosScan_).get_rmw_qos_profile());
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(&node, "odom_info");
+				odomInfoSub_.subscribe(&node, "odom_info", rclcpp::QoS(queueSize).reliability(qosOdom_).get_rmw_qos_profile());
 				SYNC_DECL5(CommonDataSubscriber, depthScan2dInfo, approxSync, queueSize, imageSub_, imageDepthSub_, cameraInfoSub_, scanSub_, odomInfoSub_);
 			}
 			else
@@ -700,11 +700,11 @@ void CommonDataSubscriber::setupDepthCallbacks(
 		else if(subscribeScan3d)
 		{
 			subscribedToScan3d_ = true;
-			scan3dSub_.subscribe(&node, "scan_cloud");
+			scan3dSub_.subscribe(&node, "scan_cloud", rclcpp::QoS(queueSize).reliability(qosScan_).get_rmw_qos_profile());
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(&node, "odom_info");
+				odomInfoSub_.subscribe(&node, "odom_info", rclcpp::QoS(queueSize).reliability(qosOdom_).get_rmw_qos_profile());
 				SYNC_DECL5(CommonDataSubscriber, depthScan3dInfo, approxSync, queueSize, imageSub_, imageDepthSub_, cameraInfoSub_, scan3dSub_, odomInfoSub_);
 			}
 			else
@@ -715,7 +715,7 @@ void CommonDataSubscriber::setupDepthCallbacks(
 		else if(subscribeOdomInfo)
 		{
 			subscribedToOdomInfo_ = true;
-			odomInfoSub_.subscribe(&node, "odom_info");
+			odomInfoSub_.subscribe(&node, "odom_info", rclcpp::QoS(queueSize).reliability(qosOdom_).get_rmw_qos_profile());
 			SYNC_DECL4(CommonDataSubscriber, depthInfo, approxSync, queueSize, imageSub_, imageDepthSub_, cameraInfoSub_, odomInfoSub_);
 		}
 		else

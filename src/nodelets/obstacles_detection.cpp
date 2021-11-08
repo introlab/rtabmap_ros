@@ -52,6 +52,8 @@ ObstaclesDetection::ObstaclesDetection(const rclcpp::NodeOptions & options) :
 	frameId_ = this->declare_parameter("frame_id", frameId_);
 	mapFrameId_ = this->declare_parameter("map_frame_id", mapFrameId_);
 	waitForTransform_ = this->declare_parameter("wait_for_transform", waitForTransform_);
+	int qos = 0;
+	qos = this->declare_parameter("qos", qos);
 
 	rtabmap::ParametersMap gridParameters = rtabmap::Parameters::getDefaultParameters("Grid");
 	for(rtabmap::ParametersMap::iterator iter=gridParameters.begin(); iter!=gridParameters.end(); ++iter)
@@ -76,11 +78,11 @@ ObstaclesDetection::ObstaclesDetection(const rclcpp::NodeOptions & options) :
 	tfBuffer_ = std::make_shared< tf2_ros::Buffer >(this->get_clock());
 	tfListener_ = std::make_shared< tf2_ros::TransformListener >(*tfBuffer_);
 
-	cloudSub_ = create_subscription<sensor_msgs::msg::PointCloud2>("cloud", 5, std::bind(&ObstaclesDetection::callback, this, std::placeholders::_1));
+	groundPub_ = create_publisher<sensor_msgs::msg::PointCloud2>("ground", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos));
+	obstaclesPub_ = create_publisher<sensor_msgs::msg::PointCloud2>("obstacles", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos));
+	projObstaclesPub_ = create_publisher<sensor_msgs::msg::PointCloud2>("proj_obstacles", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos));
 
-	groundPub_ = create_publisher<sensor_msgs::msg::PointCloud2>("ground", 5);
-	obstaclesPub_ = create_publisher<sensor_msgs::msg::PointCloud2>("obstacles", 5);
-	projObstaclesPub_ = create_publisher<sensor_msgs::msg::PointCloud2>("proj_obstacles", 5);
+	cloudSub_ = create_subscription<sensor_msgs::msg::PointCloud2>("cloud", rclcpp::QoS(5).reliability((rmw_qos_reliability_policy_t)qos), std::bind(&ObstaclesDetection::callback, this, std::placeholders::_1));
 }
 
 

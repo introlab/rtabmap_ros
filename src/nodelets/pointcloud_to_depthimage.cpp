@@ -59,8 +59,11 @@ PointCloudToDepthImage::PointCloudToDepthImage(const rclcpp::NodeOptions & optio
 	tfListener_ = std::make_shared<tf2_ros::TransformListener>(*tfBuffer_);
 
 	int queueSize = 10;
+	int qos = 0;
 	bool approx = true;
 	queueSize = this->declare_parameter("queue_size", queueSize);
+	qos = this->declare_parameter("qos", qos);
+	int qosCamInfo = this->declare_parameter("qos_camera_info", qos);
 	fixedFrameId_ = this->declare_parameter("fixed_frame_id", fixedFrameId_);
 	waitForTransform_ = this->declare_parameter("wait_for_transform", waitForTransform_);
 	fillHolesSize_ = this->declare_parameter("fill_holes_size", fillHolesSize_);
@@ -89,9 +92,9 @@ PointCloudToDepthImage::PointCloudToDepthImage(const rclcpp::NodeOptions & optio
 
 	auto node = rclcpp::Node::make_shared(this->get_name());
 	image_transport::ImageTransport it(node);
-	depthImage16Pub_ = it.advertise("image_raw", 1); // 16 bits unsigned in mm
-	depthImage32Pub_ = it.advertise("image", 1);// 32 bits float in meters
-	pointCloudTransformedPub_ = create_publisher<sensor_msgs::msg::PointCloud2>("cloud_transformed", 1);
+	depthImage16Pub_ = image_transport::create_camera_publisher(node.get(), "image_raw", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile()); // 16 bits unsigned in mm
+	depthImage32Pub_ = image_transport::create_camera_publisher(node.get(), "image", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());// 32 bits float in meters
+	pointCloudTransformedPub_ = create_publisher<sensor_msgs::msg::PointCloud2>("cloud_transformed", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos));
 
 	if(approx)
 	{
@@ -105,8 +108,8 @@ PointCloudToDepthImage::PointCloudToDepthImage(const rclcpp::NodeOptions & optio
 		exactSync_->registerCallback(std::bind(&PointCloudToDepthImage::callback, this, std::placeholders::_1, std::placeholders::_2));
 	}
 
-	pointCloudSub_.subscribe(this, "cloud");
-	cameraInfoSub_.subscribe(this, "camera_info");
+	pointCloudSub_.subscribe(this, "cloud", rclcpp::QoS(queueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	cameraInfoSub_.subscribe(this, "camera_info", rclcpp::QoS(queueSize).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile());
 }
 
 PointCloudToDepthImage::~PointCloudToDepthImage()
@@ -212,14 +215,14 @@ void PointCloudToDepthImage::callback(
 		if(depthImage32Pub_.getNumSubscribers())
 		{
 			depthImage.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
-			depthImage32Pub_.publish(depthImage.toImageMsg());
+			depthImage32Pub_.publish(depthImage.toImageMsg(), cameraInfoMsg);
 		}
 
 		if(depthImage16Pub_.getNumSubscribers())
 		{
 			depthImage.encoding = sensor_msgs::image_encodings::TYPE_16UC1;
 			depthImage.image = rtabmap::util2d::cvtDepthFromFloat(depthImage.image);
-			depthImage16Pub_.publish(depthImage.toImageMsg());
+			depthImage16Pub_.publish(depthImage.toImageMsg(), cameraInfoMsg);
 		}
 
 		if( cloudStamp != timestampFromROS(pointCloud2Msg->header.stamp) ||

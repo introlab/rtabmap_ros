@@ -248,6 +248,11 @@ private:
 protected:
 	std::string subscribedTopicsMsg_;
 	int queueSize_;
+	rmw_qos_reliability_policy_t qosOdom_;
+	rmw_qos_reliability_policy_t qosImage_;
+	rmw_qos_reliability_policy_t qosCameraInfo_;
+	rmw_qos_reliability_policy_t qosScan_;
+	rmw_qos_reliability_policy_t qosUserData_;
 
 private:
 	bool approxSync_;

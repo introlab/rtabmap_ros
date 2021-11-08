@@ -267,15 +267,15 @@ void CommonDataSubscriber::setupRGBD5Callbacks(
 	for(int i=0; i<5; ++i)
 	{
 		rgbdSubs_[i] = new message_filters::Subscriber<rtabmap_ros::msg::RGBDImage>;
-		rgbdSubs_[i]->subscribe(&node, uFormat("rgbd_image%d", i));
+		rgbdSubs_[i]->subscribe(&node, uFormat("rgbd_image%d", i), rclcpp::QoS(queueSize).reliability(qosImage_).get_rmw_qos_profile());
 	}
 	if(subscribeOdom)
 	{
-		odomSub_.subscribe(&node, "odom");
+		odomSub_.subscribe(&node, "odom", rclcpp::QoS(queueSize).reliability(qosOdom_).get_rmw_qos_profile());
 		if(subscribeScanDesc)
 		{
 			subscribedToScanDescriptor_ = true;
-			scanDescSub_.subscribe(&node, "scan_descriptor");
+			scanDescSub_.subscribe(&node, "scan_descriptor", rclcpp::QoS(queueSize).reliability(qosScan_).get_rmw_qos_profile());
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = false;
@@ -286,7 +286,7 @@ void CommonDataSubscriber::setupRGBD5Callbacks(
 		else if(subscribeScan2d)
 		{
 			subscribedToScan2d_ = true;
-			scanSub_.subscribe(&node, "scan");
+			scanSub_.subscribe(&node, "scan", rclcpp::QoS(queueSize).reliability(qosScan_).get_rmw_qos_profile());
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = false;
@@ -297,7 +297,7 @@ void CommonDataSubscriber::setupRGBD5Callbacks(
 		else if(subscribeScan3d)
 		{
 			subscribedToScan3d_ = true;
-			scan3dSub_.subscribe(&node, "scan_cloud");
+			scan3dSub_.subscribe(&node, "scan_cloud", rclcpp::QoS(queueSize).reliability(qosScan_).get_rmw_qos_profile());
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = false;
@@ -308,7 +308,7 @@ void CommonDataSubscriber::setupRGBD5Callbacks(
 		else if(subscribeOdomInfo)
 		{
 			subscribedToOdomInfo_ = true;
-			odomInfoSub_.subscribe(&node, "odom_info");
+			odomInfoSub_.subscribe(&node, "odom_info", rclcpp::QoS(queueSize).reliability(qosOdom_).get_rmw_qos_profile());
 			SYNC_DECL7(CommonDataSubscriber, rgbd5OdomInfo, approxSync, queueSize, odomSub_, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), (*rgbdSubs_[3]), (*rgbdSubs_[4]), odomInfoSub_);
 		}
 		else
@@ -321,7 +321,7 @@ void CommonDataSubscriber::setupRGBD5Callbacks(
 		if(subscribeScanDesc)
 		{
 			subscribedToScanDescriptor_ = true;
-			scanDescSub_.subscribe(&node, "scan_descriptor");
+			scanDescSub_.subscribe(&node, "scan_descriptor", rclcpp::QoS(queueSize).reliability(qosScan_).get_rmw_qos_profile());
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = false;
@@ -332,7 +332,7 @@ void CommonDataSubscriber::setupRGBD5Callbacks(
 		else if(subscribeScan2d)
 		{
 			subscribedToScan2d_ = true;
-			scanSub_.subscribe(&node, "scan");
+			scanSub_.subscribe(&node, "scan", rclcpp::QoS(queueSize).reliability(qosScan_).get_rmw_qos_profile());
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = false;
@@ -343,7 +343,7 @@ void CommonDataSubscriber::setupRGBD5Callbacks(
 		else if(subscribeScan3d)
 		{
 			subscribedToScan3d_ = true;
-			scan3dSub_.subscribe(&node, "scan_cloud");
+			scan3dSub_.subscribe(&node, "scan_cloud", rclcpp::QoS(queueSize).reliability(qosScan_).get_rmw_qos_profile());
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = false;
@@ -354,7 +354,7 @@ void CommonDataSubscriber::setupRGBD5Callbacks(
 		else if(subscribeOdomInfo)
 		{
 			subscribedToOdomInfo_ = true;
-			odomInfoSub_.subscribe(&node, "odom_info");
+			odomInfoSub_.subscribe(&node, "odom_info", rclcpp::QoS(queueSize).reliability(qosOdom_).get_rmw_qos_profile());
 			SYNC_DECL6(CommonDataSubscriber, rgbd5Info, approxSync, queueSize, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), (*rgbdSubs_[3]), (*rgbdSubs_[4]), odomInfoSub_);
 		}
 		else

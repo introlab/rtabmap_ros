@@ -45,6 +45,13 @@ def launch_setup(context, *args, **kwargs):
         DeclareLaunchArgument('depth', default_value=ConditionalText('false', 'true', IfCondition(PythonExpression(["'", LaunchConfiguration('stereo'), "' == 'true'"]))._predicate_func(context)), description=''),
         DeclareLaunchArgument('subscribe_rgb', default_value=LaunchConfiguration('depth'), description=''),
         DeclareLaunchArgument('args',  default_value=LaunchConfiguration('rtabmap_args'), description='Can be used to pass RTAB-Map\'s parameters or other flags like --udebug and --delete_db_on_start/-d'),
+        DeclareLaunchArgument('qos_image',       default_value=LaunchConfiguration('qos'), description='Specific QoS used for image input data: 0=system default, 1=Reliable, 2=Best Effort.'),
+        DeclareLaunchArgument('qos_camera_info', default_value=LaunchConfiguration('qos'), description='Specific QoS used for camera info input data: 0=system default, 1=Reliable, 2=Best Effort.'),
+        DeclareLaunchArgument('qos_scan',        default_value=LaunchConfiguration('qos'), description='Specific QoS used for scan input data: 0=system default, 1=Reliable, 2=Best Effort.'),
+        DeclareLaunchArgument('qos_odom',        default_value=LaunchConfiguration('qos'), description='Specific QoS used for odometry input data: 0=system default, 1=Reliable, 2=Best Effort.'),
+        DeclareLaunchArgument('qos_user_data',   default_value=LaunchConfiguration('qos'), description='Specific QoS used for user input data: 0=system default, 1=Reliable, 2=Best Effort.'),
+        DeclareLaunchArgument('qos_imu',         default_value=LaunchConfiguration('qos'), description='Specific QoS used for imu input data: 0=system default, 1=Reliable, 2=Best Effort.'),
+        DeclareLaunchArgument('qos_gps',         default_value=LaunchConfiguration('qos'), description='Specific QoS used for gps input data: 0=system default, 1=Reliable, 2=Best Effort.'),
         
         #These arguments should not be modified directly, see referred topics without "_relay" suffix above
         DeclareLaunchArgument('rgb_topic_relay',      default_value=ConditionalText(''.join([LaunchConfiguration('rgb_topic').perform(context), "_relay"]), ''.join(LaunchConfiguration('rgb_topic').perform(context)), LaunchConfiguration('compressed').perform(context)), description='Should not be modified manually!'),
@@ -79,6 +86,8 @@ def launch_setup(context, *args, **kwargs):
             parameters=[{
                 "approx_sync": LaunchConfiguration('approx_rgbd_sync'),
                 "queue_size": LaunchConfiguration('queue_size'),
+                "qos": LaunchConfiguration('qos_image'),
+                "qos_camera_info": LaunchConfiguration('qos_camera_info'),
                 "depth_scale": LaunchConfiguration('depth_scale')}],
             remappings=[
                 ("rgb/image", LaunchConfiguration('rgb_topic_relay')),
@@ -109,7 +118,9 @@ def launch_setup(context, *args, **kwargs):
             condition=IfCondition(PythonExpression(["'", LaunchConfiguration('stereo'), "' == 'true' and '", LaunchConfiguration('rgbd_sync'), "' == 'true'"])),
             parameters=[{
                 "approx_sync": LaunchConfiguration('approx_rgbd_sync'),
-                "queue_size": LaunchConfiguration('queue_size')}],
+                "queue_size": LaunchConfiguration('queue_size'),
+                "qos": LaunchConfiguration('qos_image'),
+                "qos_camera_info": LaunchConfiguration('qos_camera_info')}],
             remappings=[
                 ("left/image_rect", LaunchConfiguration('left_image_topic_relay')),
                 ("right/image_rect", LaunchConfiguration('right_image_topic_relay')),
@@ -129,7 +140,8 @@ def launch_setup(context, *args, **kwargs):
             package='rtabmap_ros', executable='rgbd_relay', output="screen",
             condition=IfCondition(PythonExpression(["'", LaunchConfiguration('rgbd_sync'), "' != 'true' and '", LaunchConfiguration('subscribe_rgbd'), "' == 'true' and '", LaunchConfiguration('compressed'), "' == 'true'"])),
             parameters=[{
-                "uncompress": True}],
+                "uncompress": True,
+                "qos": LaunchConfiguration('qos_image')}],
             remappings=[
                 ("rgbd_image", [LaunchConfiguration('rgbd_topic'), "/compressed"]),
                 ([LaunchConfiguration('rgbd_topic'), "/compressed_relay"], LaunchConfiguration('rgbd_topic_relay'))],
@@ -150,6 +162,9 @@ def launch_setup(context, *args, **kwargs):
                 "approx_sync": LaunchConfiguration('approx_sync'),
                 "config_path": LaunchConfiguration('cfg'),
                 "queue_size": LaunchConfiguration('queue_size'),
+                "qos": LaunchConfiguration('qos_image'),
+                "qos_camera_info": LaunchConfiguration('qos_camera_info'),
+                "qos_imu": LaunchConfiguration('qos_imu'),
                 "subscribe_rgbd": LaunchConfiguration('subscribe_rgbd'),
                 "guess_frame_id": LaunchConfiguration('odom_guess_frame_id'),
                 "guess_min_translation": LaunchConfiguration('odom_guess_min_translation'),
@@ -180,6 +195,9 @@ def launch_setup(context, *args, **kwargs):
                 "approx_sync": LaunchConfiguration('approx_sync'),
                 "config_path": LaunchConfiguration('cfg'),
                 "queue_size": LaunchConfiguration('queue_size'),
+                "qos": LaunchConfiguration('qos_image'),
+                "qos_camera_info": LaunchConfiguration('qos_camera_info'),
+                "qos_imu": LaunchConfiguration('qos_imu'),
                 "subscribe_rgbd": LaunchConfiguration('subscribe_rgbd'),
                 "guess_frame_id": LaunchConfiguration('odom_guess_frame_id'),
                 "guess_min_translation": LaunchConfiguration('odom_guess_min_translation'),
@@ -211,6 +229,8 @@ def launch_setup(context, *args, **kwargs):
                 "approx_sync": LaunchConfiguration('approx_sync'),
                 "config_path": LaunchConfiguration('cfg'),
                 "queue_size": LaunchConfiguration('queue_size'),
+                "qos": LaunchConfiguration('qos_image'),
+                "qos_imu": LaunchConfiguration('qos_imu'),
                 "guess_frame_id": LaunchConfiguration('odom_guess_frame_id'),
                 "guess_min_translation": LaunchConfiguration('odom_guess_min_translation'),
                 "guess_min_rotation": LaunchConfiguration('odom_guess_min_rotation')}],
@@ -248,6 +268,13 @@ def launch_setup(context, *args, **kwargs):
                 "approx_sync": LaunchConfiguration('approx_sync'),
                 "config_path": LaunchConfiguration('cfg'),
                 "queue_size": LaunchConfiguration('queue_size'),
+                "qos_image": LaunchConfiguration('qos_image'),
+                "qos_scan": LaunchConfiguration('qos_scan'),
+                "qos_odom": LaunchConfiguration('qos_odom'),
+                "qos_camera_info": LaunchConfiguration('qos_camera_info'),
+                "qos_imu": LaunchConfiguration('qos_imu'),
+                "qos_gps": LaunchConfiguration('qos_gps'),
+                "qos_user_data": LaunchConfiguration('qos_user_data'),
                 "scan_normal_k": LaunchConfiguration('scan_normal_k'),
                 "landmark_linear_variance": LaunchConfiguration('tag_linear_variance'),
                 "landmark_angular_variance": LaunchConfiguration('tag_angular_variance'),
@@ -290,7 +317,12 @@ def launch_setup(context, *args, **kwargs):
                 "odom_frame_id": LaunchConfiguration('odom_frame_id'),
                 "wait_for_transform": LaunchConfiguration('wait_for_transform'),
                 "approx_sync": LaunchConfiguration('approx_sync'),
-                "queue_size": LaunchConfiguration('queue_size')
+                "queue_size": LaunchConfiguration('queue_size'),
+                "qos_image": LaunchConfiguration('qos_image'),
+                "qos_scan": LaunchConfiguration('qos_scan'),
+                "qos_odom": LaunchConfiguration('qos_odom'),
+                "qos_camera_info": LaunchConfiguration('qos_camera_info'),
+                "qos_user_data": LaunchConfiguration('qos_user_data')
             }],
             remappings=[
                 ("rgb/image", LaunchConfiguration('rgb_topic_relay')),
@@ -361,6 +393,7 @@ def generate_launch_description():
         DeclareLaunchArgument('namespace',      default_value='rtabmap',            description=''),
         DeclareLaunchArgument('database_path',  default_value='~/.ros/rtabmap.db',  description='Where is the map saved/loaded.'),
         DeclareLaunchArgument('queue_size',     default_value='10',                 description=''),
+        DeclareLaunchArgument('qos',            default_value='2',                  description='General QoS used for sensor input data: 0=system default, 1=Reliable, 2=Best Effort.'),
         DeclareLaunchArgument('wait_for_transform', default_value='0.2',            description=''),
         DeclareLaunchArgument('rtabmap_args',   default_value='',                   description='Backward compatibility, use "args" instead.'),
         DeclareLaunchArgument('launch_prefix',  default_value='',                   description='For debugging purpose, it fills prefix tag of the nodes, e.g., "xterm -e gdb -ex run --args"'),

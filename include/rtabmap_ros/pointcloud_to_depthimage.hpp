@@ -57,8 +57,8 @@ private:
 			const sensor_msgs::msg::CameraInfo::ConstSharedPtr cameraInfoMsg);
 
 private:
-	image_transport::Publisher depthImage16Pub_;
-	image_transport::Publisher depthImage32Pub_;
+	image_transport::CameraPublisher depthImage16Pub_;
+	image_transport::CameraPublisher depthImage32Pub_;
 	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pointCloudTransformedPub_;
 	message_filters::Subscriber<sensor_msgs::msg::PointCloud2> pointCloudSub_;
 	message_filters::Subscriber<sensor_msgs::msg::CameraInfo> cameraInfoSub_;

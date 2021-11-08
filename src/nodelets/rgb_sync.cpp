@@ -51,16 +51,21 @@ RGBSync::RGBSync(const rclcpp::NodeOptions & options) :
 {
 	int queueSize = 10;
 	bool approxSync = true;
+	int qos = 0;
 	approxSync = this->declare_parameter("approx_sync", approxSync);
 	queueSize = this->declare_parameter("queue_size", queueSize);
+	qos = this->declare_parameter("qos", qos);
+	int qosCaminfo = this->declare_parameter("qos_camera_info", qos);
 	compressedRate_ = this->declare_parameter("compressed_rate", compressedRate_);
 
 	RCLCPP_INFO(this->get_logger(), "%s: approx_sync = %s", get_name(), approxSync?"true":"false");
 	RCLCPP_INFO(this->get_logger(), "%s: queue_size  = %d", get_name(), queueSize);
+	RCLCPP_INFO(this->get_logger(), "%s: qos         = %d", get_name(), qos);
+	RCLCPP_INFO(this->get_logger(), "%s: qos_camera_info = %d", get_name(), qosCaminfo);
 	RCLCPP_INFO(this->get_logger(), "%s: compressed_rate = %f", get_name(), compressedRate_);
 
-	rgbdImagePub_ = this->create_publisher<rtabmap_ros::msg::RGBDImage>("rgbd_image", 1);
-	rgbdImageCompressedPub_ = this->create_publisher<rtabmap_ros::msg::RGBDImage>("rgbd_image/compressed", 1);
+	rgbdImagePub_ = this->create_publisher<rtabmap_ros::msg::RGBDImage>("rgbd_image", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos));
+	rgbdImageCompressedPub_ = this->create_publisher<rtabmap_ros::msg::RGBDImage>("rgbd_image/compressed", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos));
 
 	if(approxSync)
 	{
@@ -74,8 +79,8 @@ RGBSync::RGBSync(const rclcpp::NodeOptions & options) :
 	}
 
 	image_transport::TransportHints hints(this);
-	imageSub_.subscribe(this, "rgb/image", hints.getTransport());
-	cameraInfoSub_.subscribe(this, "rgb/camera_info");
+	imageSub_.subscribe(this, "rgb/image", hints.getTransport(), rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	cameraInfoSub_.subscribe(this, "rgb/camera_info", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qosCaminfo).get_rmw_qos_profile());
 
 	subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s",
 						get_name(),

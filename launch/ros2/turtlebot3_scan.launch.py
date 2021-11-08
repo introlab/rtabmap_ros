@@ -17,6 +17,7 @@ from launch_ros.actions import Node
 def generate_launch_description():
 
     use_sim_time = LaunchConfiguration('use_sim_time')
+    qos = LaunchConfiguration('qos')
 
     parameters=[{
           'frame_id':'base_footprint',
@@ -25,6 +26,8 @@ def generate_launch_description():
           'subscribe_rgb':False,
           'subscribe_scan':True,
           'approx_sync':True,
+          'qos_scan':qos,
+          'qos_imu':qos,
           'Reg/Strategy':'1',
           'RGBD/NeighborLinkRefining':'True',
           'Optimizer/GravitySigma':'0' # Disable imu constraints (we are already in 2D)
@@ -39,6 +42,10 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'use_sim_time', default_value='true',
             description='Use simulation (Gazebo) clock if true'),
+        
+        DeclareLaunchArgument(
+            'qos', default_value='2',
+            description='QoS used for input sensor topics'),
 
         # Nodes to launch
         Node(

@@ -14,7 +14,9 @@ $ roslaunch rtabmap_ros rtabmap.launch \
     depth_topic:=/zed/zed_node/depth/depth_registered \
     camera_info_topic:=/zed/zed_node/rgb/camera_info \
     frame_id:=base_link \
-    approx_sync:=false
+    approx_sync:=false \
+    wait_imu_to_init:=true \
+    imu_topic:=/zed_node/imu/data
 ```
 
 The ROS2 equivalent is (with those [lines](https://github.com/stereolabs/zed-ros2-wrapper/blob/b512dce6ad4565f4770273995b147122e735ca0f/zed_wrapper/config/common.yaml#L58-L60) set to false to avoid TF conflicts):
@@ -28,9 +30,12 @@ $ ros2 launch rtabmap_ros rtabmap.launch.py \
     depth_topic:=/zed/zed_node/depth/depth_registered \
     camera_info_topic:=/zed/zed_node/rgb/camera_info \
     frame_id:=base_link \
-    approx_sync:=false
+    approx_sync:=false \
+    wait_imu_to_init:=true \
+    imu_topic:=/zed/zed_node/imu/data \
+    qos:=1
 ```
-
+`qos` (Quality of Service) argument should match the published topics QoS (1=RELIABLE, 2=BEST EFFORT). ROS1 was always RELIABLE.
 
 # Installation 
 
@@ -39,7 +44,7 @@ $ ros2 launch rtabmap_ros rtabmap.launch.py \
     $ cd ~/ros2_ws
     $ git clone https://github.com/introlab/rtabmap.git src/rtabmap
     $ git clone --branch ros2 https://github.com/introlab/rtabmap_ros.git src/rtabmap_ros
-    $ export MAKEFLAGS="-j6" # Can be ignored if you have a lot of RAM
+    $ export MAKEFLAGS="-j6" # Can be ignored if you have a lot of RAM (>16GB)
     $ colcon build --symlink-install
     ```
 
@@ -71,6 +76,7 @@ $ ros2 launch rtabmap_ros rtabmap.launch.py \
        approx_sync:=true \
        odom_topic:=/odom \
        scan_topic:=/scan \
+       qos:=2 \
        args:="-d --RGBD/NeighborLinkRefining true --Reg/Strategy 1" \
        use_sim_time:=true
     ```

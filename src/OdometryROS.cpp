@@ -76,6 +76,7 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	publishTf_(true),
 	waitForTransform_(0.1), // 100 ms
 	publishNullWhenLost_(true),
+	qos_(RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT),
 	paused_(false),
 	resetCountdown_(0),
 	resetCurrentCount_(0),
@@ -88,13 +89,16 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	configPath_(),
 	initialPose_(Transform::getIdentity())
 {
-	odomPub_ = create_publisher<nav_msgs::msg::Odometry>("odom", 1);
-	odomInfoPub_ = create_publisher<rtabmap_ros::msg::OdomInfo>("odom_info", 1);
-	odomInfoLitePub_ = create_publisher<rtabmap_ros::msg::OdomInfo>("odom_info_lite", 1);
-	odomLocalMap_ = create_publisher<sensor_msgs::msg::PointCloud2>("odom_local_map", 1);
-	odomLocalScanMap_ = create_publisher<sensor_msgs::msg::PointCloud2>("odom_local_scan_map", 1);
-	odomLastFrame_ = create_publisher<sensor_msgs::msg::PointCloud2>("odom_last_frame", 1);
-	odomRgbdImagePub_ = create_publisher<rtabmap_ros::msg::RGBDImage>("odom_rgbd_image", 1);
+	int qos = this->declare_parameter("qos", (int)qos_);
+	qos_ = (rmw_qos_reliability_policy_t)qos;
+
+	odomPub_ = create_publisher<nav_msgs::msg::Odometry>("odom", rclcpp::QoS(1).reliability(qos_));
+	odomInfoPub_ = create_publisher<rtabmap_ros::msg::OdomInfo>("odom_info", rclcpp::QoS(1).reliability(qos_));
+	odomInfoLitePub_ = create_publisher<rtabmap_ros::msg::OdomInfo>("odom_info_lite", rclcpp::QoS(1).reliability(qos_));
+	odomLocalMap_ = create_publisher<sensor_msgs::msg::PointCloud2>("odom_local_map", rclcpp::QoS(1).reliability(qos_));
+	odomLocalScanMap_ = create_publisher<sensor_msgs::msg::PointCloud2>("odom_local_scan_map", rclcpp::QoS(1).reliability(qos_));
+	odomLastFrame_ = create_publisher<sensor_msgs::msg::PointCloud2>("odom_last_frame", rclcpp::QoS(1).reliability(qos_));
+	odomRgbdImagePub_ = create_publisher<rtabmap_ros::msg::RGBDImage>("odom_rgbd_image", rclcpp::QoS(1).reliability(qos_));
 
 	tfBuffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
 	//auto timer_interface = std::make_shared<tf2_ros::CreateTimerROS>(
@@ -346,8 +350,10 @@ void OdometryROS::init(bool stereoParams, bool visParams, bool icpParams)
 	{
 		int queueSize = 10;
 		this->get_parameter_or("queue_size", queueSize, queueSize);
-		imuSub_ = create_subscription<sensor_msgs::msg::Imu>("imu", queueSize*5, std::bind(&OdometryROS::callbackIMU, this, std::placeholders::_1));
+		int qosImu = this->declare_parameter("qos_imu", (int)qos_);
+		imuSub_ = create_subscription<sensor_msgs::msg::Imu>("imu", rclcpp::QoS(queueSize*5).reliability((rmw_qos_reliability_policy_t)qosImu), std::bind(&OdometryROS::callbackIMU, this, std::placeholders::_1));
 		RCLCPP_INFO(this->get_logger(), "odometry: Subscribing to IMU topic %s", imuSub_->get_topic_name());
+		RCLCPP_INFO(this->get_logger(), "odometry: qos_imu = %d", qosImu);
 	}
 
 	onOdomInit();

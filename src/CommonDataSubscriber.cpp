@@ -374,6 +374,17 @@ CommonDataSubscriber::CommonDataSubscriber(rclcpp::Node & node, bool gui) :
 	odomFrameId_ = node.declare_parameter("odom_frame_id", odomFrameId_);
 	rgbdCameras_ = node.declare_parameter("rgbd_cameras", rgbdCameras_);
 	queueSize_ = node.declare_parameter("queue_size", queueSize_);
+
+	int qosOdom = node.declare_parameter("qos_odom", 0);
+	int qosImage = node.declare_parameter("qos_image", 0);
+	int qosCameraInfo = node.declare_parameter("qos_camera_info", qosImage);
+	int qosScan = node.declare_parameter("qos_scan", 0);
+	int qosUserData = node.declare_parameter("qos_user_data", 0);
+	qosOdom_ = (rmw_qos_reliability_policy_t)qosOdom;
+	qosImage_ = (rmw_qos_reliability_policy_t)qosImage;
+	qosCameraInfo_ = (rmw_qos_reliability_policy_t)qosCameraInfo;
+	qosScan_ = (rmw_qos_reliability_policy_t)qosScan;
+	qosUserData_ = (rmw_qos_reliability_policy_t)qosUserData;
 }
 
 void CommonDataSubscriber::setupCallbacks(rclcpp::Node & node)
@@ -452,8 +463,13 @@ void CommonDataSubscriber::setupCallbacks(rclcpp::Node & node)
 	RCLCPP_INFO(node.get_logger(), "%s: subscribe_scan = %s", name_.c_str(), subscribedToScan2d_?"true":"false");
 	RCLCPP_INFO(node.get_logger(), "%s: subscribe_scan_cloud = %s", name_.c_str(), subscribedToScan3d_?"true":"false");
 	RCLCPP_INFO(node.get_logger(), "%s: subscribe_scan_descriptor = %s", name_.c_str(), subscribedToScanDescriptor_?"true":"false");
-	RCLCPP_INFO(node.get_logger(), "%s: queue_size    = %d", name_.c_str(), queueSize_);
-	RCLCPP_INFO(node.get_logger(), "%s: approx_sync   = %s", name_.c_str(), approxSync_?"true":"false");
+	RCLCPP_INFO(node.get_logger(), "%s: queue_size      = %d", name_.c_str(), queueSize_);
+	RCLCPP_INFO(node.get_logger(), "%s: qos_image       = %d", name_.c_str(), qosImage_);
+	RCLCPP_INFO(node.get_logger(), "%s: qos_camera_info = %d", name_.c_str(), qosCameraInfo_);
+	RCLCPP_INFO(node.get_logger(), "%s: qos_scan        = %d", name_.c_str(), qosScan_);
+	RCLCPP_INFO(node.get_logger(), "%s: qos_odom        = %d", name_.c_str(), qosOdom_);
+	RCLCPP_INFO(node.get_logger(), "%s: qos_user_data   = %d", name_.c_str(), qosUserData_);
+	RCLCPP_INFO(node.get_logger(), "%s: approx_sync     = %s", name_.c_str(), approxSync_?"true":"false");
 
 	subscribedToOdom_ = odomFrameId_.empty() && subscribedToOdom_;
 	if(subscribedToDepth_)

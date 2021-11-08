@@ -19,12 +19,16 @@ from launch_ros.actions import Node
 def generate_launch_description():
 
     use_sim_time = LaunchConfiguration('use_sim_time')
+    qos = LaunchConfiguration('qos')
 
     parameters=[{
           'frame_id':'base_footprint',
           'use_sim_time':use_sim_time,
           'subscribe_rgbd':True,
           'subscribe_scan':True,
+          'qos_scan':qos,
+          'qos_image':qos,
+          'qos_imu':qos,
           # RTAB-Map's parameters should be strings:
           'Reg/Strategy':'1',
           'RGBD/NeighborLinkRefining':'True',
@@ -42,11 +46,15 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'use_sim_time', default_value='true',
             description='Use simulation (Gazebo) clock if true'),
+        
+        DeclareLaunchArgument(
+            'qos', default_value='2',
+            description='QoS used for input sensor topics'),
 
         # Nodes to launch
         Node(
             package='rtabmap_ros', executable='rgbd_sync', output='screen',
-            parameters=[{'approx_sync':True, 'use_sim_time':use_sim_time}],
+            parameters=[{'approx_sync':True, 'use_sim_time':use_sim_time, 'qos':qos}],
             remappings=remappings),
 
         Node(

@@ -82,6 +82,7 @@ protected:
 	void init(bool stereoParams, bool visParams, bool icpParams);
 	void startWarningThread(const std::string & subscribedTopicsMsg, bool approxSync);
 	void callbackCalled() {callbackCalled_ = true;}
+	rmw_qos_reliability_policy_t qos() const {return qos_;}
 
 	virtual void flushCallbacks() {};
 	tf2_ros::Buffer & tfBuffer() {return *tfBuffer_;}
@@ -115,6 +116,7 @@ private:
 	bool publishTf_;
 	double waitForTransform_;
 	bool publishNullWhenLost_;
+	rmw_qos_reliability_policy_t qos_;
 	rtabmap::ParametersMap parameters_;
 
 	rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odomPub_;

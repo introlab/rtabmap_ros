@@ -47,15 +47,18 @@ RGBDXSync::RGBDXSync(const rclcpp::NodeOptions & options) :
 	int queueSize = 10;
 	bool approxSync = true;
 	int rgbdCameras = 2;
+	int qos = 0;
 	approxSync = this->declare_parameter("approx_sync", approxSync);
 	queueSize = this->declare_parameter("queue_size", queueSize);
+	qos = this->declare_parameter("qos", qos);
 	rgbdCameras = this->declare_parameter("rgbd_cameras", rgbdCameras);
 
 	RCLCPP_INFO(this->get_logger(), "%s: approx_sync  = %s", get_name(), approxSync?"true":"false");
 	RCLCPP_INFO(this->get_logger(), "%s: queue_size   = %d", get_name(), queueSize);
+	RCLCPP_INFO(this->get_logger(), "%s: qos          = %d", get_name(), qos);
 	RCLCPP_INFO(this->get_logger(), "%s: rgbd_cameras = %d", get_name(), rgbdCameras);
 
-	rgbdImagesPub_ = this->create_publisher<rtabmap_ros::msg::RGBDImages>("rgbd_images", 1);
+	rgbdImagesPub_ = this->create_publisher<rtabmap_ros::msg::RGBDImages>("rgbd_images", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos));
 
 	UASSERT(rgbdCameras>=2 && rgbdCameras<=8);
 
@@ -63,7 +66,7 @@ RGBDXSync::RGBDXSync(const rclcpp::NodeOptions & options) :
 	for(int i=0; i<rgbdCameras; ++i)
 	{
 		rgbdSubs_[i] = new message_filters::Subscriber<rtabmap_ros::msg::RGBDImage>;
-		rgbdSubs_[i]->subscribe(this, uFormat("rgbd_image%d", i));
+		rgbdSubs_[i]->subscribe(this, uFormat("rgbd_image%d", i), rclcpp::QoS(queueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
 	}
 
 	std::string name_ = get_name();

@@ -61,23 +61,25 @@ PointCloudAggregator::PointCloudAggregator(const rclcpp::NodeOptions & options) 
 	int queueSize = 5;
 	int count = 2;
 	bool approx=true;
+	int qos;
 	queueSize = this->declare_parameter("queue_size", queueSize);
+	qos = this->declare_parameter("queue_size", qos);
 	frameId_ = this->declare_parameter("frame_id", frameId_);
 	fixedFrameId_ = this->declare_parameter("fixed_frame_id", fixedFrameId_);
 	approx = this->declare_parameter("approx_sync", approx);
 	count = this->declare_parameter("count", count);
 	waitForTransform_ = this->declare_parameter("wait_for_transform", waitForTransform_);
 
-	cloudPub_ = create_publisher<sensor_msgs::msg::PointCloud2>("combined_cloud", 1);
+	cloudPub_ = create_publisher<sensor_msgs::msg::PointCloud2>("combined_cloud", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos));
 
-	cloudSub_1_.subscribe(this, "cloud1");
-	cloudSub_2_.subscribe(this, "cloud2");
+	cloudSub_1_.subscribe(this, "cloud1", rclcpp::QoS(queueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	cloudSub_2_.subscribe(this, "cloud2", rclcpp::QoS(queueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
 
 	std::string subscribedTopicsMsg;
 	if(count == 4)
 	{
-		cloudSub_3_.subscribe(this, "cloud3");
-		cloudSub_4_.subscribe(this, "cloud4");
+		cloudSub_3_.subscribe(this, "cloud3", rclcpp::QoS(queueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+		cloudSub_4_.subscribe(this, "cloud4", rclcpp::QoS(queueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
 		if(approx)
 		{
 			approxSync4_ = new message_filters::Synchronizer<ApproxSync4Policy>(ApproxSync4Policy(queueSize), cloudSub_1_, cloudSub_2_, cloudSub_3_, cloudSub_4_);
@@ -98,7 +100,7 @@ PointCloudAggregator::PointCloudAggregator(const rclcpp::NodeOptions & options) 
 	}
 	else if(count == 3)
 	{
-		cloudSub_3_.subscribe(this, "cloud3");
+		cloudSub_3_.subscribe(this, "cloud3", rclcpp::QoS(queueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
 		if(approx)
 		{
 			approxSync3_ = new message_filters::Synchronizer<ApproxSync3Policy>(ApproxSync3Policy(queueSize), cloudSub_1_, cloudSub_2_, cloudSub_3_);
