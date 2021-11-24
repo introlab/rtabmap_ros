@@ -82,7 +82,7 @@ This section shows how to install RTAB-Map ros-pkg on **ROS Hydro/Indigo/Jade/Ki
     $ git clone https://github.com/introlab/rtabmap.git rtabmap
     $ cd rtabmap/build
     $ cmake ..  [<---double dots included]
-    $ make
+    $ make -j6
     $ sudo make install
     ```
 
