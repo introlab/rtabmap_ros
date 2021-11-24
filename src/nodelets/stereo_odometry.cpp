@@ -396,32 +396,39 @@ void StereoOdometry::callbackRGBD(
 				}
 			}
 
-			cv_bridge::CvImageConstPtr ptrImageLeft = imageRectLeft;
+			cv::Mat left;
 			if(imageRectLeft->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) !=0 &&
 			   imageRectLeft->encoding.compare(sensor_msgs::image_encodings::MONO8) != 0)
 			{
 				if(keepColor_ && imageRectLeft->encoding.compare(sensor_msgs::image_encodings::MONO16) != 0)
 				{
-					ptrImageLeft = cv_bridge::cvtColor(imageRectLeft, "bgr8");
+					left = cv_bridge::cvtColor(imageRectLeft, "bgr8")->image;
 				}
 				else
 				{
-					ptrImageLeft = cv_bridge::cvtColor(imageRectLeft, "mono8");
+					left = cv_bridge::cvtColor(imageRectLeft, "mono8")->image;
 				}
 			}
-			cv_bridge::CvImageConstPtr ptrImageRight = imageRectRight;
+			else
+			{
+				left = imageRectLeft->image.clone();
+			}
+			cv::Mat right;
 			if(imageRectLeft->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) !=0 &&
 			   imageRectLeft->encoding.compare(sensor_msgs::image_encodings::MONO8) != 0)
 			{
-				ptrImageRight = cv_bridge::cvtColor(imageRectRight, "mono8");
+				right = cv_bridge::cvtColor(imageRectRight, "mono8")->image;
+			}
+			else
+			{
+				right = imageRectRight->image.clone();
 			}
 
-			UTimer stepTimer;
 			//
 			UDEBUG("localTransform = %s", localTransform.prettyPrint().c_str());
 			rtabmap::SensorData data(
-					ptrImageLeft->image,
-					ptrImageRight->image,
+					left,
+					right,
 					stereoModel,
 					0,
 					rtabmap_ros::timestampFromROS(stamp));

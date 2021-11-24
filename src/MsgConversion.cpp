@@ -1979,7 +1979,7 @@ bool convertStereoMsg(
 	if(leftImageMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) == 0 ||
 	   leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0)
 	{
-		left = leftImageMsg->image;
+		left = leftImageMsg->image.clone();
 	}
 	else if(leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
 	{
@@ -1992,7 +1992,7 @@ bool convertStereoMsg(
 	if(rightImageMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) == 0 ||
 	   rightImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0)
 	{
-		right = rightImageMsg->image;
+		right = rightImageMsg->image.clone();
 	}
 	else
 	{
