@@ -825,6 +825,9 @@ void CoreWrapper::onInit()
 #ifdef WITH_APRILTAG_ROS
 	tagDetectionsSub_ = nh.subscribe("tag_detections", 1, &CoreWrapper::tagDetectionsAsyncCallback, this);
 #endif
+#ifdef WITH_FIDUCIAL_MSGS
+	fiducialTransfromsSub_ = nh.subscribe("fiducial_transforms", 1, &CoreWrapper::fiducialDetectionsAsyncCallback, this);
+#endif
 	imuSub_ = nh.subscribe("imu", 100, &CoreWrapper::imuAsyncCallback, this);
 	republishNodeDataSub_ = nh.subscribe("republish_node_data", 100, &CoreWrapper::republishNodeDataCallback, this);
 }
@@ -2463,6 +2466,27 @@ void CoreWrapper::tagDetectionsAsyncCallback(const apriltag_ros::AprilTagDetecti
 						std::make_pair(tagDetections.detections[i].id[0],
 								std::make_pair(p, tagDetections.detections[i].size.size()==1?(float)tagDetections.detections[i].size[0]:0.0f)));
 			}
+		}
+	}
+}
+#endif
+
+#ifdef WITH_FIDUCIAL_MSGS
+void CoreWrapper::fiducialDetectionsAsyncCallback(const fiducial_msgs::FiducialTransformArray & fiducialDetections)
+{
+	if(!paused_)
+	{
+		for(unsigned int i=0; i<fiducialDetections.transforms.size(); ++i)
+		{
+			geometry_msgs::PoseWithCovarianceStamped p;
+			p.pose.pose.orientation = fiducialDetections.transforms[i].transform.rotation;
+			p.pose.pose.position.x = fiducialDetections.transforms[i].transform.translation.x;
+			p.pose.pose.position.y = fiducialDetections.transforms[i].transform.translation.y;
+			p.pose.pose.position.z = fiducialDetections.transforms[i].transform.translation.z;
+			p.header = fiducialDetections.header;
+			uInsert(tags_,
+					std::make_pair(fiducialDetections.transforms[i].fiducial_id,
+							std::make_pair(p, 0.0f)));
 		}
 	}
 }
