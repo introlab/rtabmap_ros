@@ -63,7 +63,7 @@ PointCloudAggregator::PointCloudAggregator(const rclcpp::NodeOptions & options) 
 	bool approx=true;
 	int qos;
 	queueSize = this->declare_parameter("queue_size", queueSize);
-	qos = this->declare_parameter("queue_size", qos);
+	qos = this->declare_parameter("qos", qos);
 	frameId_ = this->declare_parameter("frame_id", frameId_);
 	fixedFrameId_ = this->declare_parameter("fixed_frame_id", fixedFrameId_);
 	approx = this->declare_parameter("approx_sync", approx);
