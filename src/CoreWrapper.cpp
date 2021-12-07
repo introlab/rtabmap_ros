@@ -993,7 +993,10 @@ bool CoreWrapper::odomUpdate(const nav_msgs::OdometryConstPtr & odomMsg, ros::Ti
 		Transform odom = rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose);
 		if(!odom.isNull())
 		{
-			Transform odomTF = rtabmap_ros::getTransform(odomMsg->header.frame_id, frameId_, stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+			Transform odomTF;
+			if(!stamp.isZero()) {
+				odomTF = rtabmap_ros::getTransform(odomMsg->header.frame_id, frameId_, stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+			}
 			if(odomTF.isNull())
 			{
 				static bool shown = false;
