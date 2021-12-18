@@ -266,6 +266,7 @@ void CoreWrapper::onInit()
 	infoPub_ = nh.advertise<rtabmap_ros::Info>("info", 1);
 	mapDataPub_ = nh.advertise<rtabmap_ros::MapData>("mapData", 1);
 	mapGraphPub_ = nh.advertise<rtabmap_ros::MapGraph>("mapGraph", 1);
+	odomCachePub_ = nh.advertise<rtabmap_ros::MapGraph>("mapOdomCache", 1);
 	landmarksPub_ = nh.advertise<geometry_msgs::PoseArray>("landmarks", 1);
 	labelsPub_ = nh.advertise<visualization_msgs::MarkerArray>("labels", 1);
 	mapPathPub_ = nh.advertise<nav_msgs::Path>("mapPath", 1);
@@ -4169,6 +4170,40 @@ void CoreWrapper::publishStats(const ros::Time & stamp)
 			*msg);
 
 		mapGraphPub_.publish(msg);
+	}
+
+	if(odomCachePub_.getNumSubscribers())
+	{
+		rtabmap_ros::MapGraphPtr msg(new rtabmap_ros::MapGraph);
+		msg->header.stamp = stamp;
+		msg->header.frame_id = mapFrameId_;
+
+		// For visualization of the constraints (MapGraph rviz plugin), we should include target nodes from the map
+		std::map<int, Transform> poses = stats.odomCachePoses();
+		// transform in map frame
+		for(std::map<int, Transform>::iterator iter=poses.begin();
+			iter!=poses.end();
+			++iter)
+		{
+			iter->second = stats.mapCorrection() * iter->second;
+		}
+		for(std::multimap<int, rtabmap::Link>::const_iterator iter=stats.odomCacheConstraints().begin();
+			iter!=stats.odomCacheConstraints().end();
+			++iter)
+		{
+			std::map<int, Transform>::const_iterator pter = stats.poses().find(iter->second.to());
+			if(pter != stats.poses().end())
+			{
+				poses.insert(*pter);
+			}
+		}
+		rtabmap_ros::mapGraphToROS(
+			poses,
+			stats.odomCacheConstraints(),
+			stats.mapCorrection(),
+			*msg);
+
+		odomCachePub_.publish(msg);
 	}
 
 	if(localGridObstacle_.getNumSubscribers() && !stats.getLastSignatureData().sensorData().gridObstacleCellsRaw().empty())
