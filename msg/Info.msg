@@ -45,3 +45,6 @@ float32[] stats_values
 # std::vector<int> local_path
 int32[] local_path
 int32 current_goal_id
+
+# std::vector<int> odomCache
+MapGraph odom_cache

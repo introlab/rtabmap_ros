@@ -513,6 +513,13 @@ void infoFromROS(const rtabmap_ros::msg::Info & info, rtabmap::Statistics & stat
 	stat.setLocalPath(info.local_path);
 	stat.setCurrentGoalId(info.current_goal_id);
 
+	std::map<int, rtabmap::Transform> poses;
+	std::multimap<int, rtabmap::Link> constraints;
+	rtabmap::Transform t;
+	mapGraphFromROS(info.odom_cache, poses, constraints, t);
+	stat.setOdomCachePoses(poses);
+	stat.setOdomCacheConstraints(constraints);
+
 	// Statistics data
 	for(unsigned int i=0; i<info.stats_keys.size() && i<info.stats_values.size(); i++)
 	{
@@ -548,6 +555,7 @@ void infoToROS(const rtabmap::Statistics & stats, rtabmap_ros::msg::Info & info)
 		info.labels_values = uValues(stats.labels());
 		info.local_path = stats.localPath();
 		info.current_goal_id = stats.currentGoalId();
+		mapGraphToROS(stats.odomCachePoses(), stats.odomCacheConstraints(), stats.mapCorrection(), info.odom_cache);
 
 		// Statistics data
 		info.stats_keys = uKeys(stats.data());

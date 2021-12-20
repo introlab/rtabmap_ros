@@ -88,6 +88,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rclcpp_action/rclcpp_action.hpp>
 #endif
 
+//#define WITH_FIDUCIAL_MSGS
+#ifdef WITH_FIDUCIAL_MSGS
+#include <fiducial_msgs/FiducialTransformArray.h>
+#endif
+
 namespace rtabmap {
 class StereoDense;
 }
@@ -164,6 +169,9 @@ private:
 	void gpsFixAsyncCallback(const sensor_msgs::msg::NavSatFix::SharedPtr gpsFixMsg);
 #ifdef WITH_APRILTAG_MSGS
 	void tagDetectionsAsyncCallback(const apriltag_msgs::msg::AprilTagDetectionArray::SharedPtr tagDetections);
+#endif
+#ifdef WITH_FIDUCIAL_MSGS
+	void fiducialDetectionsAsyncCallback(const fiducial_msgs::msgs::FiducialTransformArray::SharedPtr fiducialDetections);
 #endif
 	void imuAsyncCallback(const sensor_msgs::msg::Imu::SharedPtr msg);
 	void republishNodeDataCallback(const std_msgs::msg::Int32MultiArray::ConstSharedPtr msg);
@@ -294,6 +302,7 @@ private:
 	rclcpp::Publisher<rtabmap_ros::msg::Info>::SharedPtr infoPub_;
 	rclcpp::Publisher<rtabmap_ros::msg::MapData>::SharedPtr mapDataPub_;
 	rclcpp::Publisher<rtabmap_ros::msg::MapGraph>::SharedPtr mapGraphPub_;
+	rclcpp::Publisher<rtabmap_ros::msg::MapGraph>::SharedPtr odomCachePub_;
 	rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr landmarksPub_;
 	rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr labelsPub_;
 	rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr mapPathPub_;
@@ -376,8 +385,12 @@ private:
 #ifdef WITH_APRILTAG_MSGS
 	rclcpp::Subscription<apriltag_msgs::msg::AprilTagDetectionArray>::SharedPtr tagDetectionsSub_;
 #endif
+#ifdef WITH_FIDUCIAL_MSGS
+	rclcpp::Subscription<fiducial_msgs::msg::FiducialTransformArray>::SharedPtr fiducialTransfromsSub_;
+#endif
 	std::map<int, std::pair<geometry_msgs::msg::PoseWithCovarianceStamped, float> > tags_; // id, <pose, size>
 	rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imuSub_;
+
 	std::map<double, rtabmap::Transform> imus_;
 	std::string imuFrameId_;
 	rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr republishNodeDataSub_;

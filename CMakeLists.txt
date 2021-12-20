@@ -53,6 +53,7 @@ find_package(octomap_msgs)
 #find_package(apriltag_msgs)
 #find_package(find_object_2d)
 find_package(move_base_msgs)
+#find_package(fiducial_msgs)
 
 ## System dependencies are found with CMake's conventions
 find_package(RTABMap 0.20.15 REQUIRED)
@@ -320,6 +321,19 @@ SET(Libraries
 )
 ADD_DEFINITIONS("-DWITH_MOVE_BASE_MSGS")
 ENDIF(move_base_msgs_FOUND)
+
+# If fiducial_msgs is found, add definition
+IF(fiducial_msgs_FOUND)
+MESSAGE(STATUS "WITH fiducial_msgs")
+include_directories(
+  ${fiducial_msgs_INCLUDE_DIRS}
+)
+SET(Libraries
+  ${fiducial_msgs_LIBRARIES}
+  ${Libraries}
+)
+ADD_DEFINITIONS("-DWITH_FIDUCIAL_MSGS")
+ENDIF(fiducial_msgs_FOUND)
 
 ############################
 ## Declare a cpp library

@@ -142,6 +142,7 @@
   <arg name="tag_topic"                default="/tag_detections" />  <!-- apriltags async subscription -->
   <arg name="tag_linear_variance"      default="0.0001" />
   <arg name="tag_angular_variance"     default="9999" />             <!-- >=9999 means ignore rotation in optimization, when rotation estimation of the tag is not reliable -->
+  <arg name="fiducial_topic"           default="/fiducial_transforms" />  <!-- aruco_detect async subscription, use tag_linear_variance and tag_angular_variance to set covriance -->
   
   <!-- These arguments should not be modified directly, see referred topics without "_relay" suffix above -->
   <arg if="$(arg compressed)"     name="rgb_topic_relay"           default="$(arg rgb_topic)_relay"/>
@@ -382,6 +383,7 @@
       <remap from="user_data_async"        to="$(arg user_data_async_topic)"/>
       <remap from="gps/fix"                to="$(arg gps_topic)"/>
       <remap from="tag_detections"         to="$(arg tag_topic)"/>
+      <remap from="fiducial_transforms"    to="$(arg fiducial_topic)"/>
       <remap from="odom"                   to="$(arg odom_topic)"/>
       <remap from="imu"                    to="$(arg imu_topic)"/>
       
