@@ -296,6 +296,7 @@ def launch_setup(context, *args, **kwargs):
                 ("user_data_async", LaunchConfiguration('user_data_async_topic')),
                 ("gps/fix", LaunchConfiguration('gps_topic')),
                 ("tag_detections", LaunchConfiguration('tag_topic')),
+                ("fiducial_transforms", LaunchConfiguration('fiducial_topic')),
                 ("odom", LaunchConfiguration('odom_topic')),
                 ("imu", LaunchConfiguration('imu_topic'))],
             arguments=[LaunchConfiguration("args")],
@@ -465,6 +466,7 @@ def generate_launch_description():
         DeclareLaunchArgument('tag_topic',            default_value='/tag_detections', description='AprilTag topic async subscription. This is used for SLAM graph optimization and loop closure detection. Landmark poses are also published accordingly to current optimized map.'),
         DeclareLaunchArgument('tag_linear_variance',  default_value='0.0001',          description=''),
         DeclareLaunchArgument('tag_angular_variance', default_value='9999.0',            description='>=9999 means rotation is ignored in optimization, when rotation estimation of the tag is not reliable or not computed.'),
+        DeclareLaunchArgument('fiducial_topic',       default_value='/fiducial_transforms', description='aruco_detect async subscription, use tag_linear_variance and tag_angular_variance to set covariance.'),
         OpaqueFunction(function=launch_setup)
     ])
 

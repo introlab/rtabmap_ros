@@ -245,6 +245,7 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 	infoPub_ = this->create_publisher<rtabmap_ros::msg::Info>("info", 1);
 	mapDataPub_ = this->create_publisher<rtabmap_ros::msg::MapData>("mapData", 1);
 	mapGraphPub_ = this->create_publisher<rtabmap_ros::msg::MapGraph>("mapGraph", 1);
+	odomCachePub_ = this->create_publisher<rtabmap_ros::msg::MapGraph>("mapOdomCache", 1);
 	landmarksPub_ = this->create_publisher<geometry_msgs::msg::PoseArray>("landmarks", 1);
 	labelsPub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>("labels", 1);
 	mapPathPub_ = this->create_publisher<nav_msgs::msg::Path>("mapPath", 1);
@@ -793,6 +794,9 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 #ifdef WITH_APRILTAG_MSGS
 	tagDetectionsSub_ = this->create_subscription<apriltag_ros::msg::AprilTagDetectionArray>("tag_detections", 5, std::bind(&CoreWrapper::tagDetectionsAsyncCallback, this, std::placeholders::_1));
 #endif
+#ifdef WITH_FIDUCIAL_MSGS
+	fiducialTransfromsSub_ = this->create_subscription<fiducial_msgs::msg::FiducialTransformArray>("fiducial_transforms", 5, std::bind(&CoreWrapper::fiducialDetectionsAsyncCallback, this, std::placeholders::_1));
+#endif
 	imuSub_ = this->create_subscription<sensor_msgs::msg::Imu>("imu", rclcpp::QoS(100).reliability((rmw_qos_reliability_policy_t)qosIMU), std::bind(&CoreWrapper::imuAsyncCallback, this, std::placeholders::_1));
 	republishNodeDataSub_ = this->create_subscription<std_msgs::msg::Int32MultiArray>("republish_node_data", 5, std::bind(&CoreWrapper::republishNodeDataCallback, this, std::placeholders::_1));
 
@@ -964,7 +968,10 @@ bool CoreWrapper::odomUpdate(const nav_msgs::msg::Odometry & odomMsg, rclcpp::Ti
 		Transform odom = rtabmap_ros::transformFromPoseMsg(odomMsg.pose.pose);
 		if(!odom.isNull())
 		{
-			Transform odomTF = rtabmap_ros::getTransform(odomMsg.header.frame_id, frameId_, stamp, *tfBuffer_, waitForTransform_);
+			Transform odomTF;
+			if(!stamp.seconds() == 0.0) {
+				odomTF = rtabmap_ros::getTransform(odomMsg.header.frame_id, frameId_, stamp, *tfBuffer_, waitForTransform_);
+			}
 			if(odomTF.isNull())
 			{
 				static bool shown = false;
@@ -2437,6 +2444,27 @@ void CoreWrapper::tagDetectionsAsyncCallback(const apriltag_msgs::msg::AprilTagD
 						std::make_pair(tagDetections->detections[i].id[0],
 								std::make_pair(p, tagDetections->detections[i].size.size()==1?(float)tagDetections->detections[i].size[0]:0.0f)));
 			}
+		}
+	}
+}
+#endif
+
+#ifdef WITH_FIDUCIAL_MSGS
+void CoreWrapper::fiducialDetectionsAsyncCallback(const fiducial_msgs::msg::FiducialTransformArray::SharedPtr fiducialDetections)
+{
+	if(!paused_)
+	{
+		for(unsigned int i=0; i<fiducialDetections.transforms.size(); ++i)
+		{
+			geometry_msgs::PoseWithCovarianceStamped p;
+			p.pose.pose.orientation = fiducialDetections.transforms[i].transform.rotation;
+			p.pose.pose.position.x = fiducialDetections.transforms[i].transform.translation.x;
+			p.pose.pose.position.y = fiducialDetections.transforms[i].transform.translation.y;
+			p.pose.pose.position.z = fiducialDetections.transforms[i].transform.translation.z;
+			p.header = fiducialDetections.header;
+			uInsert(tags_,
+					std::make_pair(fiducialDetections.transforms[i].fiducial_id,
+							std::make_pair(p, 0.0f)));
 		}
 	}
 }
@@ -4126,6 +4154,40 @@ void CoreWrapper::publishStats(const rclcpp::Time & stamp)
 			*msg);
 
 		mapGraphPub_->publish(std::move(msg));
+	}
+
+	if(odomCachePub_->get_subscription_count())
+	{
+		rtabmap_ros::msg::MapGraph::UniquePtr msg(new rtabmap_ros::msg::MapGraph);
+		msg->header.stamp = stamp;
+		msg->header.frame_id = mapFrameId_;
+
+		// For visualization of the constraints (MapGraph rviz plugin), we should include target nodes from the map
+		std::map<int, Transform> poses = stats.odomCachePoses();
+		// transform in map frame
+		for(std::map<int, Transform>::iterator iter=poses.begin();
+			iter!=poses.end();
+			++iter)
+		{
+			iter->second = stats.mapCorrection() * iter->second;
+		}
+		for(std::multimap<int, rtabmap::Link>::const_iterator iter=stats.odomCacheConstraints().begin();
+			iter!=stats.odomCacheConstraints().end();
+			++iter)
+		{
+			std::map<int, Transform>::const_iterator pter = stats.poses().find(iter->second.to());
+			if(pter != stats.poses().end())
+			{
+				poses.insert(*pter);
+			}
+		}
+		rtabmap_ros::mapGraphToROS(
+			poses,
+			stats.odomCacheConstraints(),
+			stats.mapCorrection(),
+			*msg);
+
+		odomCachePub_->publish(std::move(msg));
 	}
 
 	if(localGridObstacle_->get_subscription_count() && !stats.getLastSignatureData().sensorData().gridObstacleCellsRaw().empty())
