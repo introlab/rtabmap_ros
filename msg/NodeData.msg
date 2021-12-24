@@ -54,9 +54,11 @@ uint8[] grid_empty_cells
 float32 grid_cell_size
 Point3f grid_view_point
 
-# std::multimap<wordId, cv::Keypoint>
-# std::multimap<wordId, cv::Point3f>
-int32[] wordIds
+# std::multimap<wordId, index>
+# std::vector<cv::Keypoint>
+# std::vector<cv::Point3f>
+int32[] wordIdKeys
+int32[] wordIdValues
 KeyPoint[] wordKpts
 Point3f[] wordPts
 # compressed descriptors

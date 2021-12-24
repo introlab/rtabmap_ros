@@ -1067,31 +1067,45 @@ rtabmap::Signature nodeDataFromROS(const rtabmap_ros::NodeData & msg)
 	std::vector<cv::Point3f> words3D;
 	cv::Mat wordsDescriptors = rtabmap::uncompressData(msg.wordDescriptors);
 
-	if(!msg.wordKpts.empty() && msg.wordKpts.size() != msg.wordIds.size())
+	if(msg.wordIdKeys.size() != msg.wordIdValues.size())
 	{
-		ROS_ERROR("Word IDs and 2D keypoints should be the same size (%d, %d)!", (int)msg.wordIds.size(), (int)msg.wordKpts.size());
+		ROS_ERROR("Word ID keys and values should be the same size (%d, %d)!", (int)msg.wordIdKeys.size(), (int)msg.wordIdValues.size());
 	}
-	if(!msg.wordPts.empty() && msg.wordPts.size() != msg.wordIds.size())
+	if(!msg.wordKpts.empty() && msg.wordKpts.size() != msg.wordIdKeys.size())
 	{
-		ROS_ERROR("Word IDs and 3D points should be the same size (%d, %d)!", (int)msg.wordIds.size(), (int)msg.wordPts.size());
+		ROS_ERROR("Word IDs and 2D keypoints should be the same size (%d, %d)!", (int)msg.wordIdKeys.size(), (int)msg.wordKpts.size());
 	}
-	if(!wordsDescriptors.empty() && wordsDescriptors.rows != (int)msg.wordIds.size())
+	if(!msg.wordPts.empty() && msg.wordPts.size() != msg.wordIdKeys.size())
 	{
-		ROS_ERROR("Word IDs and descriptors should be the same size (%d, %d)!", (int)msg.wordIds.size(), wordsDescriptors.rows);
+		ROS_ERROR("Word IDs and 3D points should be the same size (%d, %d)!", (int)msg.wordIdKeys.size(), (int)msg.wordPts.size());
+	}
+	if(!wordsDescriptors.empty() && wordsDescriptors.rows != (int)msg.wordIdKeys.size())
+	{
+		ROS_ERROR("Word IDs and descriptors should be the same size (%d, %d)!", (int)msg.wordIdKeys.size(), wordsDescriptors.rows);
 		wordsDescriptors = cv::Mat();
 	}
 
-	for(unsigned int i=0; i<msg.wordIds.size(); ++i)
+	if(msg.wordIdKeys.size() == msg.wordIdValues.size())
 	{
-		words.insert(std::make_pair(msg.wordIds.at(i), words.size())); // ID to index
-		if(msg.wordIds.size() == msg.wordKpts.size())
+		for(unsigned int i=0; i<msg.wordIdKeys.size(); ++i)
 		{
-			cv::KeyPoint pt = keypointFromROS(msg.wordKpts.at(i));
-			wordsKpts.push_back(pt);
-		}
-		if(msg.wordIds.size() == msg.wordPts.size())
-		{
-			words3D.push_back(point3fFromROS(msg.wordPts[i]));
+			words.insert(std::make_pair(msg.wordIdKeys.at(i), msg.wordIdValues.at(i))); // ID to index
+			if(msg.wordIdKeys.size() == msg.wordKpts.size())
+			{
+				if(wordsKpts.empty())
+				{
+					wordsKpts.reserve(msg.wordKpts.size());
+				}
+				wordsKpts.push_back(keypointFromROS(msg.wordKpts.at(i)));
+			}
+			if(msg.wordIdKeys.size() == msg.wordPts.size())
+			{
+				if(words3D.empty())
+				{
+					words3D.reserve(msg.wordPts.size());
+				}
+				words3D.push_back(point3fFromROS(msg.wordPts[i]));
+			}
 		}
 	}
 
@@ -1257,43 +1271,47 @@ void nodeDataToROS(const rtabmap::Signature & signature, rtabmap_ros::NodeData &
 	}
 
 	//Features stuff...
-	msg.wordIds = uKeys(signature.getWords());
-	if(!signature.getWordsKpts().empty())
+	if(!signature.getWordsKpts().empty() &&
+		signature.getWords().size() != signature.getWordsKpts().size())
 	{
-		if(msg.wordIds.size() == signature.getWordsKpts().size())
-		{
-			msg.wordKpts.resize(signature.getWordsKpts().size());
-		}
-		else
-		{
-			ROS_ERROR("Word IDs and 2D keypoints must have the same size (%d vs %d)!",
-					(int)signature.getWords().size(),
-					(int)signature.getWordsKpts().size());
-		}
+		ROS_ERROR("Word IDs and 2D keypoints must have the same size (%d vs %d)!",
+				(int)signature.getWords().size(),
+				(int)signature.getWordsKpts().size());
 	}
 
-	if(!signature.getWords3().empty())
+	if(!signature.getWords3().empty() &&
+	   signature.getWords().size() != signature.getWords3().size())
 	{
-		if(msg.wordIds.size() == signature.getWords3().size())
-		{
-			msg.wordPts.resize(signature.getWords3().size());
-		}
-		else
-		{
-			ROS_ERROR("Word IDs and 3D points must have the same size (%d vs %d)!",
-					(int)signature.getWords().size(),
-					(int)signature.getWords3().size());
-		}
+		ROS_ERROR("Word IDs and 3D points must have the same size (%d vs %d)!",
+				(int)signature.getWords().size(),
+				(int)signature.getWords3().size());
 	}
-	if(!msg.wordKpts.empty() || !msg.wordPts.empty())
+	int i=0;
+	msg.wordIdKeys.resize(signature.getWords().size());
+	msg.wordIdValues.resize(signature.getWords().size());
+	for(std::multimap<int, int>::const_iterator iter=signature.getWords().begin();
+		iter!=signature.getWords().end();
+		++iter)
 	{
-		for(size_t i=0; i<msg.wordIds.size(); ++i)
+		msg.wordIdKeys.at(i) = iter->first;
+		msg.wordIdValues.at(i) = iter->second;
+		if(signature.getWordsKpts().size() == signature.getWords().size())
 		{
-			if(!msg.wordKpts.empty())
-				keypointToROS(signature.getWordsKpts().at(i), msg.wordKpts.at(i));
-			if(!msg.wordPts.empty())
-				point3fToROS(signature.getWords3().at(i), msg.wordPts[i]);
+			if(msg.wordKpts.empty())
+			{
+				msg.wordKpts.resize(signature.getWords().size());
+			}
+			keypointToROS(signature.getWordsKpts().at(i), msg.wordKpts.at(i));
 		}
+		if(signature.getWords3().size() == signature.getWords().size())
+		{
+			if(msg.wordPts.empty())
+			{
+				msg.wordPts.resize(signature.getWords().size());
+			}
+			point3fToROS(signature.getWords3().at(i), msg.wordPts.at(i));
+		}
+		++i;
 	}
 
 	if(!signature.getWordsDescriptors().empty())
