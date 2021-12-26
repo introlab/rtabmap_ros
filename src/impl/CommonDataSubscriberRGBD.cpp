@@ -545,7 +545,14 @@ void CommonDataSubscriber::setupRGBDCallbacks(
 {
 	ROS_INFO("Setup rgbd callback");
 
-	if(subscribeOdom || subscribeUserData || subscribeScan2d || subscribeScan3d || subscribeOdomInfo)
+	if(subscribeOdom ||
+#ifdef RTABMAP_SYNC_USER_DATA
+	   subscribeUserData ||
+#endif
+	   subscribeScan2d ||
+	   subscribeScan3d ||
+	   subscribeScanDesc ||
+	   subscribeOdomInfo)
 	{
 		rgbdSubs_.resize(1);
 		rgbdSubs_[0] = new message_filters::Subscriber<rtabmap_ros::RGBDImage>;

@@ -266,6 +266,7 @@ void CoreWrapper::onInit()
 	infoPub_ = nh.advertise<rtabmap_ros::Info>("info", 1);
 	mapDataPub_ = nh.advertise<rtabmap_ros::MapData>("mapData", 1);
 	mapGraphPub_ = nh.advertise<rtabmap_ros::MapGraph>("mapGraph", 1);
+	odomCachePub_ = nh.advertise<rtabmap_ros::MapGraph>("mapOdomCache", 1);
 	landmarksPub_ = nh.advertise<geometry_msgs::PoseArray>("landmarks", 1);
 	labelsPub_ = nh.advertise<visualization_msgs::MarkerArray>("labels", 1);
 	mapPathPub_ = nh.advertise<nav_msgs::Path>("mapPath", 1);
@@ -420,7 +421,12 @@ void CoreWrapper::onInit()
 		}
 		if(!paramValue.empty())
 		{
-			if(iter->second.first)
+			if(!iter->second.second.empty() && parameters_.find(iter->second.second)!=parameters_.end())
+			{
+				NODELET_WARN("Rtabmap: Parameter name changed: \"%s\" -> \"%s\". The new parameter is already used with value \"%s\", ignoring the old one with value \"%s\".",
+						iter->first.c_str(), iter->second.second.c_str(), parameters_.find(iter->second.second)->second.c_str(), paramValue.c_str());
+			}
+			else if(iter->second.first)
 			{
 				// can be migrated
 				uInsert(parameters_, ParametersPair(iter->second.second, paramValue));
@@ -450,26 +456,26 @@ void CoreWrapper::onInit()
 	bool subscribeScan3d = false;
 	pnh.param("subscribe_scan",      subscribeScan2d, subscribeScan2d);
 	pnh.param("subscribe_scan_cloud", subscribeScan3d, subscribeScan3d);
-	bool gridFromDepth = Parameters::defaultGridFromDepth();
-	if((subscribeScan2d || subscribeScan3d || genScan_) && parameters_.find(Parameters::kGridFromDepth()) == parameters_.end())
+	int gridSensor = Parameters::defaultGridSensor();
+	if((subscribeScan2d || subscribeScan3d || genScan_) && parameters_.find(Parameters::kGridSensor()) == parameters_.end())
 	{
-		NODELET_WARN("Setting \"%s\" parameter to false (default true) as \"subscribe_scan\", \"subscribe_scan_cloud\" or \"gen_scan\" is "
+		NODELET_WARN("Setting \"%s\" parameter to 0 (default 1) as \"subscribe_scan\", \"subscribe_scan_cloud\" or \"gen_scan\" is "
 				"true. The occupancy grid map will be constructed from "
-				"laser scans. To get occupancy grid map from cloud projection, set \"%s\" "
-				"to true. To suppress this warning, "
-				"add <param name=\"%s\" type=\"string\" value=\"false\"/>",
-				Parameters::kGridFromDepth().c_str(),
-				Parameters::kGridFromDepth().c_str(),
-				Parameters::kGridFromDepth().c_str());
-		parameters_.insert(ParametersPair(Parameters::kGridFromDepth(), "false"));
+				"laser scans. To get occupancy grid map from camera's cloud projection, set \"%s\" "
+				"to 1. To suppress this warning, "
+				"add <param name=\"%s\" type=\"string\" value=\"0\"/>",
+				Parameters::kGridSensor().c_str(),
+				Parameters::kGridSensor().c_str(),
+				Parameters::kGridSensor().c_str());
+		parameters_.insert(ParametersPair(Parameters::kGridSensor(), "0"));
 	}
-	Parameters::parse(parameters_, Parameters::kGridFromDepth(), gridFromDepth);
-	if((subscribeScan2d || subscribeScan3d || genScan_) && parameters_.find(Parameters::kGridRangeMax()) == parameters_.end() && !gridFromDepth)
+	Parameters::parse(parameters_, Parameters::kGridSensor(), gridSensor);
+	if((subscribeScan2d || subscribeScan3d || genScan_) && parameters_.find(Parameters::kGridRangeMax()) == parameters_.end() && gridSensor==0)
 	{
-		NODELET_INFO("Setting \"%s\" parameter to 0 (default %f) as \"subscribe_scan\", \"subscribe_scan_cloud\" or \"gen_scan\" is true and %s is false.",
+		NODELET_INFO("Setting \"%s\" parameter to 0 (default %f) as \"subscribe_scan\", \"subscribe_scan_cloud\" or \"gen_scan\" is true and %s is 0.",
 				Parameters::kGridRangeMax().c_str(),
 				Parameters::defaultGridRangeMax(),
-				Parameters::kGridFromDepth().c_str());
+				Parameters::kGridSensor().c_str());
 		parameters_.insert(ParametersPair(Parameters::kGridRangeMax(), "0"));
 	}
 	if(subscribeScan3d && parameters_.find(Parameters::kIcpPointToPlaneRadius()) == parameters_.end())
@@ -820,6 +826,9 @@ void CoreWrapper::onInit()
 #ifdef WITH_APRILTAG_ROS
 	tagDetectionsSub_ = nh.subscribe("tag_detections", 1, &CoreWrapper::tagDetectionsAsyncCallback, this);
 #endif
+#ifdef WITH_FIDUCIAL_MSGS
+	fiducialTransfromsSub_ = nh.subscribe("fiducial_transforms", 1, &CoreWrapper::fiducialDetectionsAsyncCallback, this);
+#endif
 	imuSub_ = nh.subscribe("imu", 100, &CoreWrapper::imuAsyncCallback, this);
 	republishNodeDataSub_ = nh.subscribe("republish_node_data", 100, &CoreWrapper::republishNodeDataCallback, this);
 }
@@ -985,7 +994,10 @@ bool CoreWrapper::odomUpdate(const nav_msgs::OdometryConstPtr & odomMsg, ros::Ti
 		Transform odom = rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose);
 		if(!odom.isNull())
 		{
-			Transform odomTF = rtabmap_ros::getTransform(odomMsg->header.frame_id, frameId_, stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+			Transform odomTF;
+			if(!stamp.isZero()) {
+				odomTF = rtabmap_ros::getTransform(odomMsg->header.frame_id, frameId_, stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+			}
 			if(odomTF.isNull())
 			{
 				static bool shown = false;
@@ -2463,6 +2475,27 @@ void CoreWrapper::tagDetectionsAsyncCallback(const apriltag_ros::AprilTagDetecti
 }
 #endif
 
+#ifdef WITH_FIDUCIAL_MSGS
+void CoreWrapper::fiducialDetectionsAsyncCallback(const fiducial_msgs::FiducialTransformArray & fiducialDetections)
+{
+	if(!paused_)
+	{
+		for(unsigned int i=0; i<fiducialDetections.transforms.size(); ++i)
+		{
+			geometry_msgs::PoseWithCovarianceStamped p;
+			p.pose.pose.orientation = fiducialDetections.transforms[i].transform.rotation;
+			p.pose.pose.position.x = fiducialDetections.transforms[i].transform.translation.x;
+			p.pose.pose.position.y = fiducialDetections.transforms[i].transform.translation.y;
+			p.pose.pose.position.z = fiducialDetections.transforms[i].transform.translation.z;
+			p.header = fiducialDetections.header;
+			uInsert(tags_,
+					std::make_pair(fiducialDetections.transforms[i].fiducial_id,
+							std::make_pair(p, 0.0f)));
+		}
+	}
+}
+#endif
+
 void CoreWrapper::imuAsyncCallback(const sensor_msgs::ImuConstPtr & msg)
 {
 	if(!paused_)
@@ -3233,7 +3266,7 @@ bool CoreWrapper::globalBundleAdjustmentCallback(rtabmap_ros::GlobalBundleAdjust
 			iterations,
 			pixelVariance,
 			rematchFeatures?"true":"false");
-	bool success = rtabmap_.globalBundleAdjustment((Optimizer::Type)optimizer, iterations, pixelVariance, rematchFeatures);
+	bool success = rtabmap_.globalBundleAdjustment((Optimizer::Type)optimizer, rematchFeatures, iterations, pixelVariance);
 	if(!success)
 	{
 		NODELET_ERROR("Post-Processing: Global Bundle Adjustment failed!");
@@ -3401,14 +3434,14 @@ bool CoreWrapper::getMapData2Callback(rtabmap_ros::GetMap2::Request& req, rtabma
 
 bool CoreWrapper::getProjMapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::GetMap::Response &res)
 {
-	if(parameters_.find(Parameters::kGridFromDepth()) != parameters_.end() &&
-		!uStr2Bool(parameters_.at(Parameters::kGridFromDepth())))
+	if(parameters_.find(Parameters::kGridSensor()) != parameters_.end() &&
+		uStr2Int(parameters_.at(Parameters::kGridSensor()))==0)
 	{
 		NODELET_WARN("/get_proj_map service is deprecated! Call /get_grid_map service "
-					"instead with <param name=\"%s\" type=\"string\" value=\"true\"/>. "
+					"instead with <param name=\"%s\" type=\"string\" value=\"1\"/>. "
 					"Do \"$ rosrun rtabmap_ros rtabmap --params | grep Grid\" to see "
 					"all occupancy grid parameters.",
-					Parameters::kGridFromDepth().c_str());
+					Parameters::kGridSensor().c_str());
 	}
 	else
 	{
@@ -4137,6 +4170,40 @@ void CoreWrapper::publishStats(const ros::Time & stamp)
 			*msg);
 
 		mapGraphPub_.publish(msg);
+	}
+
+	if(odomCachePub_.getNumSubscribers())
+	{
+		rtabmap_ros::MapGraphPtr msg(new rtabmap_ros::MapGraph);
+		msg->header.stamp = stamp;
+		msg->header.frame_id = mapFrameId_;
+
+		// For visualization of the constraints (MapGraph rviz plugin), we should include target nodes from the map
+		std::map<int, Transform> poses = stats.odomCachePoses();
+		// transform in map frame
+		for(std::map<int, Transform>::iterator iter=poses.begin();
+			iter!=poses.end();
+			++iter)
+		{
+			iter->second = stats.mapCorrection() * iter->second;
+		}
+		for(std::multimap<int, rtabmap::Link>::const_iterator iter=stats.odomCacheConstraints().begin();
+			iter!=stats.odomCacheConstraints().end();
+			++iter)
+		{
+			std::map<int, Transform>::const_iterator pter = stats.poses().find(iter->second.to());
+			if(pter != stats.poses().end())
+			{
+				poses.insert(*pter);
+			}
+		}
+		rtabmap_ros::mapGraphToROS(
+			poses,
+			stats.odomCacheConstraints(),
+			stats.mapCorrection(),
+			*msg);
+
+		odomCachePub_.publish(msg);
 	}
 
 	if(localGridObstacle_.getNumSubscribers() && !stats.getLastSignatureData().sensorData().gridObstacleCellsRaw().empty())

@@ -28,10 +28,11 @@ find_package(octomap_msgs)
 find_package(apriltag_ros)
 find_package(rviz)
 find_package(find_object_2d)
+find_package(fiducial_msgs)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
-find_package(RTABMap 0.20.14 REQUIRED)
+find_package(RTABMap 0.20.15 REQUIRED)
 
 find_package(OpenCV REQUIRED)
 
@@ -292,6 +293,19 @@ SET(Libraries
 )
 ADD_DEFINITIONS("-DWITH_APRILTAG_ROS")
 ENDIF(apriltag_ros_FOUND)
+
+# If fiducial_msgs is found, add definition
+IF(fiducial_msgs_FOUND)
+MESSAGE(STATUS "WITH fiducial_msgs")
+include_directories(
+  ${fiducial_msgs_INCLUDE_DIRS}
+)
+SET(Libraries
+  ${fiducial_msgs_LIBRARIES}
+  ${Libraries}
+)
+ADD_DEFINITIONS("-DWITH_FIDUCIAL_MSGS")
+ENDIF(fiducial_msgs_FOUND)
 
 ############################
 ## Declare a cpp library

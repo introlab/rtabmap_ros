@@ -28,6 +28,16 @@ int32 memoryUsage # MB
 float32 gravityRollError
 float32 gravityPitchError
 
+# Local bundle camera ids
+int32[] localBundleIds
+
+# Local bundle camera models
+sensor_msgs/CameraInfo[] localBundleModels
+geometry_msgs/Transform[] localBundleModelTransforms
+
+# Local bundle camera poses
+geometry_msgs/Pose[] localBundlePoses
+
 geometry_msgs/Transform transform
 geometry_msgs/Transform transformFiltered
 geometry_msgs/Transform transformGroundTruth

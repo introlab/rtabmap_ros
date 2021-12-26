@@ -210,7 +210,20 @@ private:
 							cameraInfoLeft->header.stamp);
 					if(stereoTransform.isNull())
 					{
-						NODELET_ERROR("Parameter %s is false but we cannot get TF between the two cameras!", Parameters::kRtabmapImagesAlreadyRectified().c_str());
+						NODELET_ERROR("Parameter %s is false but we cannot get TF between the two cameras! (between frames %s and %s)",
+								Parameters::kRtabmapImagesAlreadyRectified().c_str(),
+								cameraInfoRight->header.frame_id.c_str(),
+								cameraInfoLeft->header.frame_id.c_str());
+						return;
+					}
+					else if(stereoTransform.isIdentity())
+					{
+						NODELET_ERROR("Parameter %s is false but we cannot get a valid TF between the two cameras! "
+								"Identity transform returned between left and right cameras. Verify that if TF between "
+								"the cameras is valid: \"rosrun tf tf_echo %s %s\".",
+								Parameters::kRtabmapImagesAlreadyRectified().c_str(),
+								cameraInfoRight->header.frame_id.c_str(),
+								cameraInfoLeft->header.frame_id.c_str());
 						return;
 					}
 				}
@@ -406,32 +419,40 @@ private:
 					}
 				}
 
-				cv_bridge::CvImageConstPtr ptrImageLeft = imageRectLeft;
+				cv::Mat left;
 				if(imageRectLeft->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) !=0 &&
 				   imageRectLeft->encoding.compare(sensor_msgs::image_encodings::MONO8) != 0)
 				{
 					if(keepColor_ && imageRectLeft->encoding.compare(sensor_msgs::image_encodings::MONO16) != 0)
 					{
-						ptrImageLeft = cv_bridge::cvtColor(imageRectLeft, "bgr8");
+						left = cv_bridge::cvtColor(imageRectLeft, "bgr8")->image;
 					}
 					else
 					{
-						ptrImageLeft = cv_bridge::cvtColor(imageRectLeft, "mono8");
+						left = cv_bridge::cvtColor(imageRectLeft, "mono8")->image;
 					}
 				}
-				cv_bridge::CvImageConstPtr ptrImageRight = imageRectRight;
+				else
+				{
+					left = imageRectLeft->image.clone();
+				}
+				cv::Mat right;
 				if(imageRectLeft->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) !=0 &&
 				   imageRectLeft->encoding.compare(sensor_msgs::image_encodings::MONO8) != 0)
 				{
-					ptrImageRight = cv_bridge::cvtColor(imageRectRight, "mono8");
+					right = cv_bridge::cvtColor(imageRectRight, "mono8")->image;
+				}
+				else
+				{
+					right = imageRectRight->image.clone();
 				}
 
 				UTimer stepTimer;
 				//
 				UDEBUG("localTransform = %s", localTransform.prettyPrint().c_str());
 				rtabmap::SensorData data(
-						ptrImageLeft->image,
-						ptrImageRight->image,
+						left,
+						right,
 						stereoModel,
 						0,
 						rtabmap_ros::timestampFromROS(stamp));

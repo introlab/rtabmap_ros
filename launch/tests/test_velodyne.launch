@@ -1,4 +1,4 @@
-
+<!-- -->
 <launch>
   
     <!-- 
@@ -18,15 +18,25 @@
     <arg name="scan_topic"    default="/velodyne_points"/>
     <arg name="use_sim_time"  default="false"/>
     <param if="$(arg use_sim_time)" name="use_sim_time" value="true"/>
+
+    <arg name="frame_id"        default="velodyne"/>
+    <arg name="queue_size"      default="10"/> <!-- Set to 100 for kitti dataset to make sure all scans are processed -->
+    <arg name="queue_size_odom" default="1"/>  <!-- Set to 100 for kitti dataset to make sure all scans are processed -->
+    <arg name="loop_ratio"      default="0.2"/>
+
+    <arg name="resolution"         default="0.1"/> <!-- set 0.1-0.3 for indoor, set 0.3-0.5 for outdoor (0.4 for kitti) -->
+    <arg name="iterations"         default="10"/>
     
-    <arg name="frame_id" default="velodyne"/>
-    <arg name="queue_size" default="1"/> <!-- Set to 100 for kitti dataset to make sure all scans are processed -->
-    <arg name="loop_ratio" default="0.4"/> <!-- Set to 0.2 for kitti -->
+    <!-- Grid parameters -->
+    <arg name="ground_is_obstacle" default="true"/>
+    <arg name="grid_max_range"     default="20"/>
     
-    <arg name="resolution" default="0.1"/> <!-- set 0.1-0.3 for indoor, set 0.3-0.5 for outdoor (0.4 for kitti) -->
-    <arg name="iterations" default="10"/>
-    <arg name="ground_normals_up" default="false"/> <!-- set to true when velodyne is always horizontal to ground (car, kitti) -->
+    <!-- For F2M Odometry -->
+    <arg name="ground_normals_up" default="false"/> <!-- set to true when velodyne is always horizontal to ground (ground robot, car, kitti) -->
+    <arg name="local_map_size"    default="15000"/>
+    <arg name="key_frame_thr"     default="0.8"/>
     
+    <!-- For FLOAM Odometry -->
     <arg name="floam"    default="false"/> <!-- RTAB-Map should be built with FLOAM http://official-rtab-map-forum.206.s1.nabble.com/icp-odometry-with-LOAM-crash-tp8261p8563.html -->
     <arg name="floam_sensor" default="0"/> <!-- 0=16 rings (VLP16), 1=32 rings, 2=64 rings (kitti dataset) -->
     
@@ -48,7 +58,7 @@
         <remap from="scan_cloud" to="$(arg scan_topic)"/>
         <param name="frame_id"        type="string" value="$(arg frame_id)"/>  
         <param name="odom_frame_id"   type="string" value="odom"/>
-        <param name="queue_size"      type="int"    value="$(arg queue_size)"/>
+        <param name="queue_size"      type="int"    value="$(arg queue_size_odom)"/>
         <param name="wait_for_transform_duration" type="double" value="0.2"/>
         <param     if="$(arg scan_20_hz)" name="expected_update_rate" type="double" value="25"/>
         <param unless="$(arg scan_20_hz)" name="expected_update_rate" type="double" value="15"/>
@@ -75,13 +85,15 @@
         <param if="$(arg ground_normals_up)" name="Icp/PointToPlaneGroundNormalsUp"  type="string" value="0.8"/>
 
         <!-- Odom parameters -->       
-        <param name="Odom/ScanKeyFrameThr"       type="string" value="0.9"/>
+        <param name="Odom/ScanKeyFrameThr"       type="string" value="$(arg key_frame_thr)"/>
         <param     if="$(arg floam)" name="Odom/Strategy" type="string" value="11"/>
         <param unless="$(arg floam)" name="Odom/Strategy" type="string" value="0"/>
         <param name="OdomF2M/ScanSubtractRadius" type="string" value="$(arg resolution)"/>
-        <param name="OdomF2M/ScanMaxSize"        type="string" value="15000"/>
+        <param name="OdomF2M/ScanMaxSize"        type="string" value="$(arg local_map_size)"/>
         <param name="OdomLOAM/Sensor"            type="string" value="$(arg floam_sensor)"/> 
         <param name="OdomLOAM/Resolution"        type="string" value="$(arg resolution)"/>
+        <param     if="$(arg scan_20_hz)" name="OdomLOAM/ScanPeriod" type="string" value="0.05"/>
+        <param unless="$(arg scan_20_hz)" name="OdomLOAM/ScanPeriod" type="string" value="0.1"/>
       </node>
 
       <node pkg="rtabmap_ros" type="rtabmap" name="rtabmap" output="screen" args="-d">	  
@@ -109,9 +121,9 @@
         
         <param name="Reg/Strategy"                   type="string" value="1"/> 
         <param name="Grid/CellSize"                  type="string" value="$(arg resolution)"/>
-        <param name="Grid/RangeMax"                  type="string" value="20"/>
+        <param name="Grid/RangeMax"                  type="string" value="$(arg grid_max_range)"/>
         <param name="Grid/ClusterRadius"             type="string" value="1"/>
-        <param name="Grid/GroundIsObstacle"          type="string" value="true"/>
+        <param name="Grid/GroundIsObstacle"          type="string" value="$(arg ground_is_obstacle)"/>
         <param name="Optimizer/GravitySigma"         type="string" value="0.3"/>
 
         <!-- ICP parameters -->

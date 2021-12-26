@@ -110,8 +110,8 @@
   <arg name="odom_topic"               default="odom"/>          <!-- Odometry topic name -->
   <arg name="vo_frame_id"              default="$(arg odom_topic)"/> <!-- Visual/Icp odometry frame ID for TF -->
   <arg name="publish_tf_odom"          default="true"/>
-  <arg name="odom_tf_angular_variance" default="1"/>             <!-- If TF is used to get odometry, this is the default angular variance -->
-  <arg name="odom_tf_linear_variance"  default="1"/>             <!-- If TF is used to get odometry, this is the default linear variance -->
+  <arg name="odom_tf_angular_variance" default="0.001"/>         <!-- If TF is used to get odometry, this is the default angular variance -->
+  <arg name="odom_tf_linear_variance"  default="0.001"/>         <!-- If TF is used to get odometry, this is the default linear variance -->
   <arg name="odom_args"                default=""/>              <!-- More arguments for odometry (overwrite same parameters in rtabmap_args) -->
   <arg name="odom_sensor_sync"         default="false"/>
   <arg name="odom_guess_frame_id"        default=""/>
@@ -142,6 +142,7 @@
   <arg name="tag_topic"                default="/tag_detections" />  <!-- apriltags async subscription -->
   <arg name="tag_linear_variance"      default="0.0001" />
   <arg name="tag_angular_variance"     default="9999" />             <!-- >=9999 means ignore rotation in optimization, when rotation estimation of the tag is not reliable -->
+  <arg name="fiducial_topic"           default="/fiducial_transforms" />  <!-- aruco_detect async subscription, use tag_linear_variance and tag_angular_variance to set covriance -->
   
   <!-- These arguments should not be modified directly, see referred topics without "_relay" suffix above -->
   <arg if="$(arg compressed)"     name="rgb_topic_relay"           default="$(arg rgb_topic)_relay"/>
@@ -382,6 +383,7 @@
       <remap from="user_data_async"        to="$(arg user_data_async_topic)"/>
       <remap from="gps/fix"                to="$(arg gps_topic)"/>
       <remap from="tag_detections"         to="$(arg tag_topic)"/>
+      <remap from="fiducial_transforms"    to="$(arg fiducial_topic)"/>
       <remap from="odom"                   to="$(arg odom_topic)"/>
       <remap from="imu"                    to="$(arg imu_topic)"/>
       
