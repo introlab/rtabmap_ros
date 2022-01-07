@@ -68,5 +68,5 @@ jobs:
         source /opt/ros/${{ matrix.ros_distro }}/setup.bash
         source ${{github.workspace}}/catkin_ws/devel/setup.bash
         cd ${{github.workspace}}/catkin_ws
-        catkin_make
+        catkin_make -DSETUPTOOLS_DEB_LAYOUT=OFF
         catkin_make install     
