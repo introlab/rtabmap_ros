@@ -52,8 +52,8 @@
   <exec_depend>theora_image_transport</exec_depend>
 
   <export>
-	<nodelet plugin="${prefix}/nodelet_plugins.xml" />
-	<rviz plugin="${prefix}/rviz_plugins.xml"/>
-	<costmap_2d plugin="${prefix}/costmap_plugins.xml"/>
+    <nodelet plugin="${prefix}/nodelet_plugins.xml" />
+    <rviz plugin="${prefix}/rviz_plugins.xml"/>
+    <costmap_2d plugin="${prefix}/costmap_plugins.xml"/>
   </export>
 </package>
