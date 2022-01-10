@@ -11,7 +11,7 @@
 
   <buildtool_depend>catkin</buildtool_depend>
   <buildtool_depend>genmsg</buildtool_depend>
-  
+
   <build_depend>cv_bridge</build_depend>
   <build_depend>roscpp</build_depend>
   <build_depend>rospy</build_depend>
@@ -45,6 +45,7 @@
   <build_depend>message_generation</build_depend>
   <build_depend>pluginlib</build_depend>
   <build_depend>apriltag_ros</build_depend>
+  <build_depend>libpointmatcher</build_depend>
 
   <run_depend>cv_bridge</run_depend>
   <run_depend>roscpp</run_depend>
@@ -82,6 +83,7 @@
   <run_depend>message_runtime</run_depend>
   <run_depend>pluginlib</run_depend>
   <run_depend>apriltag_ros</run_depend>
+  <run_depend>libpointmatcher</run_depend>
 
   <build_depend>libpcl-all-dev</build_depend>
 
