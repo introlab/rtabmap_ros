@@ -11,7 +11,7 @@
 #   $ ros2 launch rtabmap_ros rtabmap.launch.py visual_odometry:=false frame_id:=base_footprint odom_topic:=/odom args:="-d" use_sim_time:=true rgb_topic:=/intel_realsense_r200_depth/image_raw depth_topic:=/intel_realsense_r200_depth/depth/image_raw camera_info_topic:=/intel_realsense_r200_depth/camera_info approx_sync:=true
 #
 #   Navigation (install nav2_bringup package):
-#     $ ros2 launch rtabmap_ros nav2_bringup_launch.py use_sim_time:=True
+#     $ ros2 launch nav2_bringup navigation_launch.py use_sim_time:=True
 #     $ ros2 launch nav2_bringup rviz_launch.py
 #
 #   Teleop:
