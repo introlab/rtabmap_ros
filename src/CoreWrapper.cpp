@@ -183,9 +183,7 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 	landmarkDefaultLinVariance_ = this->declare_parameter("landmark_linear_variance", landmarkDefaultLinVariance_);
 
 	waitForTransform_ = this->declare_parameter("wait_for_transform", waitForTransform_);
-#ifdef WITH_MOVE_BASE_MSGS
 	useActionForGoal_ = this->declare_parameter("use_action_for_goal", useActionForGoal_);
-#endif
 	useSavedMap_ = this->declare_parameter("use_saved_map", useSavedMap_);
 	maxNodesRepublished_ = this->declare_parameter("max_nodes_republished", maxNodesRepublished_);
 	genScan_ = this->declare_parameter("gen_scan", genScan_);
@@ -969,7 +967,7 @@ bool CoreWrapper::odomUpdate(const nav_msgs::msg::Odometry & odomMsg, rclcpp::Ti
 		if(!odom.isNull())
 		{
 			Transform odomTF;
-			if(!stamp.seconds() == 0.0) {
+			if(stamp.seconds() != 0.0) {
 				odomTF = rtabmap_ros::getTransform(odomMsg.header.frame_id, frameId_, stamp, *tfBuffer_, waitForTransform_);
 			}
 			if(odomTF.isNull())
@@ -2200,10 +2198,9 @@ void CoreWrapper::process(
 				{
 					if(rtabmap_.getPath().size() == 0)
 					{
-#ifdef WITH_MOVE_BASE_MSGS
-						// Don't send status yet if move_base actionlib is used unless it failed,
-						// let move_base finish reaching the goal
-						if(moveBaseClient_ == 0 || rtabmap_.getPathStatus() <= 0)
+						// Don't send status yet if nav2 actionlib is used unless it failed,
+						// let nav2 finish reaching the goal
+						if(nav2Client_ == 0 || rtabmap_.getPathStatus() <= 0)
 						{
 							if(rtabmap_.getPathStatus() > 0)
 							{
@@ -2213,9 +2210,9 @@ void CoreWrapper::process(
 							else if(rtabmap_.getPathStatus() <= 0)
 							{
 								RCLCPP_WARN(this->get_logger(), "Planning: Plan failed!");
-								if(moveBaseClient_.get()!=NULL && moveBaseClient_->action_server_is_ready())
+								if(nav2Client_.get()!=NULL && nav2Client_->action_server_is_ready())
 								{
-									moveBaseClient_->async_cancel_all_goals();
+									nav2Client_->async_cancel_all_goals();
 								}
 							}
 
@@ -2230,7 +2227,6 @@ void CoreWrapper::process(
 							goalFrameId_.clear();
 							latestNodeWasReached_ = false;
 						}
-#endif
 					}
 					else
 					{
@@ -3960,12 +3956,11 @@ void CoreWrapper::cancelGoalCallback(
 			goalReachedPub_->publish(result);
 		}
 	}
-#ifdef WITH_MOVE_BASE_MSGS
-	if(moveBaseClient_.get() != NULL && moveBaseClient_->action_server_is_ready())
+
+	if(nav2Client_.get() != NULL && nav2Client_->action_server_is_ready())
 	{
-		moveBaseClient_->async_cancel_all_goals();
+		nav2Client_->async_cancel_all_goals();
 	}
-#endif
 }
 
 void CoreWrapper::setLabelCallback(
@@ -4377,43 +4372,37 @@ void CoreWrapper::publishCurrentGoal(const rclcpp::Time & stamp)
 		poseMsg.header.frame_id = mapFrameId_;
 		poseMsg.header.stamp = stamp;
 		rtabmap_ros::transformToPoseMsg(currentMetricGoal_, poseMsg.pose);
-#ifdef WITH_MOVE_BASE_MSGS
 		if(useActionForGoal_)
 		{
-			if(moveBaseClient_.get() == NULL || !moveBaseClient_->action_server_is_ready())
+			if(nav2Client_.get() == NULL || !nav2Client_->action_server_is_ready())
 			{
-				RCLCPP_INFO(this->get_logger(), "Connecting to move_base action server...");
-				if(moveBaseClient_.get() == NULL)
+				RCLCPP_INFO(this->get_logger(), "Connecting to navigate_to_pose action server...");
+				if(nav2Client_.get() == NULL)
 				{
-					moveBaseClient_ = rclcpp_action::create_client<MoveBase>(
+					nav2Client_ = rclcpp_action::create_client<NavigateToPose>(
 					      this,
-					      "move_base");
+					      "navigate_to_pose");
 				}
-				if (!moveBaseClient_->wait_for_action_server(std::chrono::duration<double>(5.0))) {
-				  RCLCPP_ERROR(this->get_logger(), " move_base action server not available after waiting 5 seconds");
+				if (!nav2Client_->wait_for_action_server(std::chrono::duration<double>(5.0))) {
+				  RCLCPP_ERROR(this->get_logger(), " navigate_to_pose action server not available after waiting 5 seconds");
 				}
 			}
-			if(moveBaseClient_.get() != NULL && moveBaseClient_->action_server_is_ready())
+			if(nav2Client_.get() != NULL && nav2Client_->action_server_is_ready())
 			{
-				MoveBase::Goal goal_msg;
-				goal_msg.target_pose = poseMsg;
+				NavigateToPose::Goal goal_msg;
+				goal_msg.pose = poseMsg;
 
-				auto send_goal_options = rclcpp_action::Client<MoveBase>::SendGoalOptions();
-				send_goal_options.goal_response_callback =
-				  std::bind(&CoreWrapper::goalResponseCallback, this, std::placeholders::_1);
-				send_goal_options.feedback_callback =
-				  std::bind(&CoreWrapper::feedbackCallback, this, std::placeholders::_1, std::placeholders::_2);
-				send_goal_options.result_callback =
-				  std::bind(&CoreWrapper::resultCallback, this, std::placeholders::_1);
-				moveBaseClient_->async_send_goal(goal_msg, send_goal_options);
+				auto send_goal_options = rclcpp_action::Client<NavigateToPose>::SendGoalOptions();
+				send_goal_options.goal_response_callback = std::bind(&CoreWrapper::goalResponseCallback, this, std::placeholders::_1);
+				send_goal_options.result_callback = std::bind(&CoreWrapper::resultCallback, this, std::placeholders::_1);
+				nav2Client_->async_send_goal(goal_msg, send_goal_options);
 				lastPublishedMetricGoal_ = currentMetricGoal_;
 			}
 			else
 			{
-				RCLCPP_ERROR(this->get_logger(), "Cannot connect to move_base action server!");
+				RCLCPP_ERROR(this->get_logger(), "Cannot connect to navigate_to_pose action server!");
 			}
 		}
-#endif
 		if(nextMetricGoalPub_->get_subscription_count())
 		{
 			nextMetricGoalPub_->publish(poseMsg);
@@ -4425,9 +4414,8 @@ void CoreWrapper::publishCurrentGoal(const rclcpp::Time & stamp)
 	}
 }
 
-#ifdef WITH_MOVE_BASE_MSGS
 void CoreWrapper::goalResponseCallback(
-		std::shared_future<GoalHandleMoveBase::SharedPtr> future)
+		std::shared_future<GoalHandleNav2::SharedPtr> future)
 {
 	auto goal_handle = future.get();
 	if (!goal_handle) {
@@ -4442,15 +4430,8 @@ void CoreWrapper::goalResponseCallback(
 	}
 }
 
-void CoreWrapper::feedbackCallback(
-		GoalHandleMoveBase::SharedPtr,
-		const std::shared_ptr<const MoveBase::Feedback>)
-{
-	// do nothing special
-}
-
 void CoreWrapper::resultCallback(
-		const GoalHandleMoveBase::WrappedResult & result)
+		const GoalHandleNav2::WrappedResult & result)
 {
 	bool ignore = false;
 	if(!currentMetricGoal_.isNull())
@@ -4461,19 +4442,21 @@ void CoreWrapper::resultCallback(
 				rtabmap_.getPathCurrentGoalId() != rtabmap_.getPath().back().first &&
 				(!uContains(rtabmap_.getLocalOptimizedPoses(), rtabmap_.getPath().back().first) || !latestNodeWasReached_))
 			{
-				RCLCPP_WARN(this->get_logger(), "Planning: move_base reached current goal but it is not "
+				RCLCPP_WARN(this->get_logger(), "Planning: nav2 reached current goal but it is not "
 						 "the last one planned by rtabmap. A new goal should be sent when "
 						 "rtabmap will be able to retrieve next locations on the path.");
 				ignore = true;
 			}
 			else
 			{
-				RCLCPP_INFO(this->get_logger(), "Planning: move_base success!");
+				RCLCPP_INFO(this->get_logger(), "Planning: nav2 success!");
 			}
 		}
 		else
 		{
-			RCLCPP_ERROR(this->get_logger(), "Planning: move_base failed for some reason. Aborting the plan...");
+			RCLCPP_ERROR(this->get_logger(), "Planning: nav2 failed for some reason: %s. Aborting the plan...",
+					result.code==rclcpp_action::ResultCode::ABORTED?"Aborted":
+					result.code==rclcpp_action::ResultCode::CANCELED?"Canceled":"Unkown");
 		}
 
 		if(!ignore && goalReachedPub_->get_subscription_count())
@@ -4493,7 +4476,6 @@ void CoreWrapper::resultCallback(
 		latestNodeWasReached_ = false;
 	}
 }
-#endif
 
 void CoreWrapper::publishLocalPath(const rclcpp::Time & stamp)
 {

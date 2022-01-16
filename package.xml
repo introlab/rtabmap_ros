@@ -49,6 +49,7 @@
   <build_depend>rviz_common</build_depend>
   <build_depend>rviz_rendering</build_depend>
   <build_depend>rviz_default_plugins</build_depend>
+  <build_depend>nav2_msgs</build_depend>
 
   <exec_depend>cv_bridge</exec_depend>
   <exec_depend>rclcpp</exec_depend>
@@ -81,6 +82,7 @@
   <exec_depend>rviz_common</exec_depend>
   <exec_depend>rviz_rendering</exec_depend>
   <exec_depend>rviz_default_plugins</exec_depend>
+  <exec_depend>nav2_msgs</exec_depend>
 
   <build_depend>libpcl-all-dev</build_depend>
 

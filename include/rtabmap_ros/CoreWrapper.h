@@ -83,10 +83,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <apriltag_msgs/msg/april_tag_detection_array.hpp>
 #endif
 
-#ifdef WITH_MOVE_BASE_MSGS
-#include <move_base_msgs/action/move_base.hpp>
+#include <nav2_msgs/action/navigate_to_pose.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
-#endif
 
 //#define WITH_FIDUCIAL_MSGS
 #ifdef WITH_FIDUCIAL_MSGS
@@ -105,6 +103,9 @@ public:
 	RTABMAP_ROS_PUBLIC
 	explicit CoreWrapper(const rclcpp::NodeOptions & options);
 	virtual ~CoreWrapper();
+
+	using NavigateToPose = nav2_msgs::action::NavigateToPose;
+	using GoalHandleNav2 = rclcpp_action::ClientGoalHandle<NavigateToPose>;
 
 private:
 	bool odomUpdate(const nav_msgs::msg::Odometry & odomMsg, rclcpp::Time stamp);
@@ -242,13 +243,10 @@ private:
 
 	void publishStats(const rclcpp::Time & stamp);
 	void publishCurrentGoal(const rclcpp::Time & stamp);
-#ifdef WITH_MOVE_BASE_MSGS
-	using MoveBase = move_base_msgs::action::MoveBase;
-	using GoalHandleMoveBase = rclcpp_action::ClientGoalHandle<MoveBase>;
-	void goalResponseCallback(std::shared_future<GoalHandleMoveBase::SharedPtr> future);
-	void feedbackCallback(GoalHandleMoveBase::SharedPtr, const std::shared_ptr<const MoveBase::Feedback> feedback);
-	void resultCallback(const GoalHandleMoveBase::WrappedResult & result);
-#endif
+
+	void goalResponseCallback(std::shared_future<GoalHandleNav2::SharedPtr> future);
+	void resultCallback(const GoalHandleNav2::WrappedResult & result);
+
 	void publishLocalPath(const rclcpp::Time & stamp);
 	void publishGlobalPath(const rclcpp::Time & stamp);
 	void republishMaps();
@@ -364,9 +362,7 @@ private:
 	rclcpp::Service<octomap_msgs::srv::GetOctomap>::SharedPtr octomapBinarySrv_;
 	rclcpp::Service<octomap_msgs::srv::GetOctomap>::SharedPtr octomapFullSrv_;
 #endif
-#ifdef WITH_MOVE_BASE_MSGS
-	rclcpp_action::Client<MoveBase>::SharedPtr moveBaseClient_;
-#endif
+	rclcpp_action::Client<NavigateToPose>::SharedPtr nav2Client_;
 
 	std::thread* transformThread_;
 	bool tfThreadRunning_;
