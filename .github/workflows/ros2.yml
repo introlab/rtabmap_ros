@@ -31,7 +31,7 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get -y install ros-${{ matrix.ros_distro }}-rtabmap
+        sudo apt-get -y install ros-${{ matrix.ros_distro }}-rtabmap ros-${{ matrix.ros_distro }}-nav2-msgs
         sudo apt-get -y remove ros-${{ matrix.ros_distro }}-rtabmap
                 
     - name: Setup ros2 workspace
