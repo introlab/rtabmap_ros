@@ -4084,7 +4084,6 @@ bool CoreWrapper::getNodesInRadiusCallback(rtabmap_ros::GetNodesInRadius::Reques
 		iter != poses.end();
 		++iter)
 	{
-		UERROR("add %d", iter->first);
 		res.ids[index] = iter->first;
 		transformToPoseMsg(iter->second, res.poses[index]);
 		UASSERT(dists.find(iter->first) != dists.end());
