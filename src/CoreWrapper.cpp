@@ -530,8 +530,10 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 					RCLCPP_INFO(this->get_logger(), "Subscribe to inter odom + info messages");
 					interOdomSync_ = new message_filters::Synchronizer<MyExactInterOdomSyncPolicy>(MyExactInterOdomSyncPolicy(100), interOdomSyncSub_, interOdomInfoSyncSub_);
 					interOdomSync_->registerCallback(std::bind(&CoreWrapper::interOdomInfoCallback, this, std::placeholders::_1, std::placeholders::_2));
-					interOdomSyncSub_.subscribe(this, "inter_odom");
-					interOdomInfoSyncSub_.subscribe(this, "inter_odom_info");
+					rmw_qos_profile_t qos = rmw_qos_profile_default;
+					qos.depth = 100;
+					interOdomSyncSub_.subscribe(this, "inter_odom", qos);
+					interOdomInfoSyncSub_.subscribe(this, "inter_odom_info", qos);
 				}
 				else
 				{
@@ -648,6 +650,7 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 	cancelGoalSrv_ = this->create_service<std_srvs::srv::Empty>("cancel_goal", std::bind(&CoreWrapper::cancelGoalCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 	setLabelSrv_ = this->create_service<rtabmap_ros::srv::SetLabel>("set_label", std::bind(&CoreWrapper::setLabelCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 	listLabelsSrv_ = this->create_service<rtabmap_ros::srv::ListLabels>("list_labels", std::bind(&CoreWrapper::listLabelsCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	removeLabelSrv_ = this->create_service<rtabmap_ros::srv::RemoveLabel>("remove_label", std::bind(&CoreWrapper::removeLabelCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 	addLinkSrv_ = this->create_service<rtabmap_ros::srv::AddLink>("add_link", std::bind(&CoreWrapper::addLinkCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 	getNodesInRadiusSrv_ = this->create_service<rtabmap_ros::srv::GetNodesInRadius>("get_nodes_in_radius", std::bind(&CoreWrapper::getNodesInRadiusCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
@@ -2322,7 +2325,7 @@ std::map<int, Transform> CoreWrapper::filterNodesToAssemble(
 	std::map<int, Transform> output;
 	if(mappingMaxNodes_ > 0)
 	{
-		std::map<int, float> nodesDist = graph::findNearestNodes(nodes, currentPose, mappingMaxNodes_);
+		std::map<int, float> nodesDist = graph::findNearestNodes(currentPose, nodes, 0, 0, mappingMaxNodes_);
 		for(std::map<int, float>::iterator iter=nodesDist.begin(); iter!=nodesDist.end(); ++iter)
 		{
 			if(mappingAltitudeDelta_<=0.0 ||
@@ -4006,6 +4009,29 @@ void CoreWrapper::listLabelsCallback(
 	}
 }
 
+void CoreWrapper::removeLabelCallback(
+		const std::shared_ptr<rmw_request_id_t>,
+		const std::shared_ptr<rtabmap_ros::srv::RemoveLabel::Request> req,
+		std::shared_ptr<rtabmap_ros::srv::RemoveLabel::Response>)
+{
+	if(rtabmap_.getMemory())
+	{
+		int id = rtabmap_.getMemory()->getSignatureIdByLabel(req->label, true);
+		if(id == 0)
+		{
+			RCLCPP_WARN(this->get_logger(), "Label \"%s\" not found in the map, cannot remove it!", req->label.c_str());
+		}
+		else if(!rtabmap_.labelLocation(id, ""))
+		{
+			RCLCPP_ERROR(this->get_logger(), "Failed removing label \"%s\".", req->label.c_str());
+		}
+		else
+		{
+			RCLCPP_INFO(this->get_logger(), "Removed label \"%s\".", req->label.c_str());
+		}
+	}
+}
+
 void CoreWrapper::addLinkCallback(const std::shared_ptr<rmw_request_id_t>,
 		const std::shared_ptr<rtabmap_ros::srv::AddLink::Request> req,
 		std::shared_ptr<rtabmap_ros::srv::AddLink::Response>)
@@ -4024,18 +4050,20 @@ void CoreWrapper::getNodesInRadiusCallback(
 {
 	RCLCPP_INFO(get_logger(), "Get nodes in radius (%f): node_id=%d pose=(%f,%f,%f)", req->radius, req->node_id, req->x, req->y, req->z);
 	std::map<int, Transform> poses;
+	std::map<int, float> dists;
 	if(req->node_id != 0 || (req->x == 0.0f && req->y == 0.0f && req->z == 0.0f))
 	{
-		poses = rtabmap_.getNodesInRadius(req->node_id, req->radius);
+		poses = rtabmap_.getNodesInRadius(req->node_id, req->radius, req->k, &dists);
 	}
 	else
 	{
-		poses = rtabmap_.getNodesInRadius(Transform(req->x, req->y, req->z, 0,0,0), req->radius);
+		poses = rtabmap_.getNodesInRadius(Transform(req->x, req->y, req->z, 0,0,0), req->radius, req->k, &dists);
 	}
 
 	//Optimized graph
 	res->ids.resize(poses.size());
 	res->poses.resize(poses.size());
+	res->dists_sqr.resize(poses.size());
 	int index = 0;
 	for(std::map<int, rtabmap::Transform>::const_iterator iter = poses.begin();
 		iter != poses.end();
@@ -4043,6 +4071,8 @@ void CoreWrapper::getNodesInRadiusCallback(
 	{
 		res->ids[index] = iter->first;
 		transformToPoseMsg(iter->second, res->poses[index]);
+		UASSERT(dists.find(iter->first) != dists.end());
+		res->dists_sqr[index] = dists.at(iter->first);
 		++index;
 	}
 }

@@ -60,6 +60,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtabmap_ros/srv/publish_map.hpp"
 #include "rtabmap_ros/srv/set_goal.hpp"
 #include "rtabmap_ros/srv/set_label.hpp"
+#include "rtabmap_ros/srv/remove_label.hpp"
 #include "rtabmap_ros/msg/goal.hpp"
 #include "rtabmap_ros/srv/get_plan.hpp"
 #include "rtabmap_ros/CommonDataSubscriber.h"
@@ -231,6 +232,7 @@ private:
 	void cancelGoalCallback(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<std_srvs::srv::Empty::Request>, std::shared_ptr<std_srvs::srv::Empty::Response>);
 	void setLabelCallback(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<rtabmap_ros::srv::SetLabel::Request>, std::shared_ptr<rtabmap_ros::srv::SetLabel::Response>);
 	void listLabelsCallback(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<rtabmap_ros::srv::ListLabels::Request>, std::shared_ptr<rtabmap_ros::srv::ListLabels::Response> res);
+	void removeLabelCallback(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<rtabmap_ros::srv::RemoveLabel::Request>, std::shared_ptr<rtabmap_ros::srv::RemoveLabel::Response> res);
 	void addLinkCallback(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<rtabmap_ros::srv::AddLink::Request>, std::shared_ptr<rtabmap_ros::srv::AddLink::Response> res);
 	void getNodesInRadiusCallback(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<rtabmap_ros::srv::GetNodesInRadius::Request>, std::shared_ptr<rtabmap_ros::srv::GetNodesInRadius::Response> res);
 #ifdef WITH_OCTOMAP_MSGS
@@ -356,6 +358,7 @@ private:
 	rclcpp::Service<std_srvs::srv::Empty>::SharedPtr cancelGoalSrv_;
 	rclcpp::Service<rtabmap_ros::srv::SetLabel>::SharedPtr setLabelSrv_;
 	rclcpp::Service<rtabmap_ros::srv::ListLabels>::SharedPtr listLabelsSrv_;
+	rclcpp::Service<rtabmap_ros::srv::RemoveLabel>::SharedPtr removeLabelSrv_;
 	rclcpp::Service<rtabmap_ros::srv::AddLink>::SharedPtr addLinkSrv_;
 	rclcpp::Service<rtabmap_ros::srv::GetNodesInRadius>::SharedPtr getNodesInRadiusSrv_;
 #ifdef WITH_OCTOMAP_MSGS

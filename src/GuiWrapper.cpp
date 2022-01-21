@@ -51,6 +51,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtabmap_ros/MsgConversion.h"
 #include "rtabmap_ros/srv/set_goal.hpp"
 #include "rtabmap_ros/srv/set_label.hpp"
+#include "rtabmap_ros/srv/remove_label.hpp"
 #include "rtabmap_ros/PreferencesDialogROS.h"
 
 float max3( const float& a, const float& b, const float& c)
@@ -440,6 +441,22 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 			else
 			{
 				RCLCPP_WARN(this->get_logger(), "Service \"set_label\" not available.");
+			}
+		}
+		else if(cmd == rtabmap::RtabmapEventCmd::kCmdRemoveLabel)
+		{
+			UASSERT(cmdEvent->value1().isStr());
+			auto client = this->create_client<rtabmap_ros::srv::RemoveLabel>("remove_label");
+			if(client->wait_for_service(std::chrono::seconds(1)))
+			{
+				auto request = std::make_shared<rtabmap_ros::srv::RemoveLabel::Request>();
+				request->label = cmdEvent->value1().toStr();
+				auto result_future = client->async_send_request(request);
+				result_future.wait();
+			}
+			else
+			{
+				RCLCPP_WARN(this->get_logger(), "Service \"remove_label\" not available.");
 			}
 		}
 		else

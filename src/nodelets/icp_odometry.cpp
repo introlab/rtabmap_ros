@@ -159,8 +159,8 @@ void ICPOdometry::updateParameters(ParametersMap & parameters)
 	iter = parameters.find(Parameters::kIcpRangeMin());
 	if(iter != parameters.end())
 	{
-		int value = uStr2Int(iter->second);
-		if(value > 1)
+		float value = uStr2Float(iter->second);
+		if(value != 0.0f)
 		{
 			if(!this->has_parameter("scan_range_min"))
 			{
@@ -177,8 +177,8 @@ void ICPOdometry::updateParameters(ParametersMap & parameters)
 	iter = parameters.find(Parameters::kIcpRangeMax());
 	if(iter != parameters.end())
 	{
-		int value = uStr2Int(iter->second);
-		if(value > 1)
+		float value = uStr2Float(iter->second);
+		if(value != 0.0f)
 		{
 			if(!this->has_parameter("scan_range_max"))
 			{
@@ -210,6 +210,11 @@ void ICPOdometry::updateParameters(ParametersMap & parameters)
 			}
 		}
 	}
+	else if(this->has_parameter("scan_voxel_size"))
+	{
+		RCLCPP_INFO(this->get_logger(), "IcpOdometry: scan_voxel_size is set (%f), setting %s to 0", scanVoxelSize_, Parameters::kIcpVoxelSize().c_str());
+		parameters.insert(ParametersPair(Parameters::kIcpVoxelSize(), "0"));
+	}
 	iter = parameters.find(Parameters::kIcpPointToPlaneK());
 	if(iter != parameters.end())
 	{
@@ -221,7 +226,17 @@ void ICPOdometry::updateParameters(ParametersMap & parameters)
 				RCLCPP_WARN(this->get_logger(), "IcpOdometry: Transferring value %s of \"%s\" to ros parameter \"scan_normal_k\" for convenience.", iter->second.c_str(), iter->first.c_str());
 				scanNormalK_ = value;
 			}
+			else
+			{
+				RCLCPP_INFO(this->get_logger(), "IcpOdometry: scan_normal_k is set (%d), setting %s to same value.", scanNormalK_, Parameters::kIcpPointToPlaneK().c_str());
+				iter->second = uNumber2Str(scanNormalK_);
+			}
 		}
+	}
+	else if(this->has_parameter("scan_normal_k"))
+	{
+		RCLCPP_INFO(this->get_logger(), "IcpOdometry: scan_normal_k is set (%d), setting %s to same value.", scanNormalK_, Parameters::kIcpPointToPlaneK().c_str());
+		parameters.insert(ParametersPair(Parameters::kIcpPointToPlaneK(), uNumber2Str(scanNormalK_)));
 	}
 	iter = parameters.find(Parameters::kIcpPointToPlaneRadius());
 	if(iter != parameters.end())
@@ -234,20 +249,40 @@ void ICPOdometry::updateParameters(ParametersMap & parameters)
 				RCLCPP_WARN(this->get_logger(), "IcpOdometry: Transferring value %s of \"%s\" to ros parameter \"scan_normal_radius\" for convenience.", iter->second.c_str(), iter->first.c_str());
 				scanNormalRadius_ = value;
 			}
-		}
-		iter = parameters.find(Parameters::kIcpPointToPlaneGroundNormalsUp());
-		if(iter != parameters.end())
-		{
-			float value = uStr2Float(iter->second);
-			if(value != 0.0f)
+			else
 			{
-				if(!this->has_parameter("scan_normal_ground_up"))
-				{
-					RCLCPP_WARN(get_logger(), "IcpOdometry: Transferring value %s of \"%s\" to ros parameter \"scan_normal_ground_up\" for convenience.", iter->second.c_str(), iter->first.c_str());
-					scanNormalGroundUp_ = value;
-				}
+				RCLCPP_INFO(this->get_logger(), "IcpOdometry: scan_normal_radius is set (%f), setting %s to same value.", scanNormalRadius_, Parameters::kIcpPointToPlaneRadius().c_str());
+				iter->second = uNumber2Str(scanNormalK_);
 			}
 		}
+	}
+	else if(this->has_parameter("scan_normal_radius"))
+	{
+		RCLCPP_INFO(this->get_logger(), "IcpOdometry: scan_normal_radius is set (%f), setting %s to same value.", scanNormalRadius_, Parameters::kIcpPointToPlaneRadius().c_str());
+		parameters.insert(ParametersPair(Parameters::kIcpPointToPlaneRadius(), uNumber2Str(scanNormalRadius_)));
+	}
+	iter = parameters.find(Parameters::kIcpPointToPlaneGroundNormalsUp());
+	if(iter != parameters.end())
+	{
+		float value = uStr2Float(iter->second);
+		if(value != 0.0f)
+		{
+			if(!this->has_parameter("scan_normal_ground_up"))
+			{
+				RCLCPP_WARN(get_logger(), "IcpOdometry: Transferring value %s of \"%s\" to ros parameter \"scan_normal_ground_up\" for convenience.", iter->second.c_str(), iter->first.c_str());
+				scanNormalGroundUp_ = value;
+			}
+			else
+			{
+				RCLCPP_INFO(this->get_logger(), "IcpOdometry: scan_normal_ground_up is set (%f), setting %s to same value.", scanNormalGroundUp_, Parameters::kIcpPointToPlaneGroundNormalsUp().c_str());
+				iter->second = uNumber2Str(scanNormalK_);
+			}
+		}
+	}
+	else if(this->has_parameter("scan_normal_ground_up"))
+	{
+		RCLCPP_INFO(this->get_logger(), "IcpOdometry: scan_normal_ground_up is set (%f), setting %s to same value.", scanNormalGroundUp_, Parameters::kIcpPointToPlaneGroundNormalsUp().c_str());
+		parameters.insert(ParametersPair(Parameters::kIcpPointToPlaneGroundNormalsUp(), uNumber2Str(scanNormalGroundUp_)));
 	}
 }
 
