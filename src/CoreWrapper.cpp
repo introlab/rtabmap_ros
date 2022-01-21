@@ -709,6 +709,7 @@ void CoreWrapper::onInit()
 	cancelGoalSrv_ = nh.advertiseService("cancel_goal", &CoreWrapper::cancelGoalCallback, this);
 	setLabelSrv_ = nh.advertiseService("set_label", &CoreWrapper::setLabelCallback, this);
 	listLabelsSrv_ = nh.advertiseService("list_labels", &CoreWrapper::listLabelsCallback, this);
+	removeLabelSrv_ = nh.advertiseService("remove_label", &CoreWrapper::removeLabelCallback, this);
 	addLinkSrv_ = nh.advertiseService("add_link", &CoreWrapper::addLinkCallback, this);
 	getNodesInRadiusSrv_ = nh.advertiseService("get_nodes_in_radius", &CoreWrapper::getNodesInRadiusCallback, this);
 #ifdef WITH_OCTOMAP_MSGS
@@ -2352,7 +2353,7 @@ std::map<int, Transform> CoreWrapper::filterNodesToAssemble(
 	std::map<int, Transform> output;
 	if(mappingMaxNodes_ > 0)
 	{
-		std::map<int, float> nodesDist = graph::findNearestNodes(nodes, currentPose, mappingMaxNodes_);
+		std::map<int, float> nodesDist = graph::findNearestNodes(currentPose, nodes, 0, 0, mappingMaxNodes_);
 		for(std::map<int, float>::iterator iter=nodesDist.begin(); iter!=nodesDist.end(); ++iter)
 		{
 			if(mappingAltitudeDelta_<=0.0 ||
@@ -4028,6 +4029,27 @@ bool CoreWrapper::listLabelsCallback(rtabmap_ros::ListLabels::Request& req, rtab
 	return true;
 }
 
+bool CoreWrapper::removeLabelCallback(rtabmap_ros::RemoveLabel::Request& req, rtabmap_ros::RemoveLabel::Response& res)
+{
+	if(rtabmap_.getMemory())
+	{
+		int id = rtabmap_.getMemory()->getSignatureIdByLabel(req.label, true);
+		if(id == 0)
+		{
+			NODELET_WARN("Label \"%s\" not found in the map, cannot remove it!", req.label.c_str());
+		}
+		else if(!rtabmap_.labelLocation(id, ""))
+		{
+			NODELET_ERROR("Failed removing label \"%s\".", req.label.c_str());
+		}
+		else
+		{
+			NODELET_INFO("Removed label \"%s\".", req.label.c_str());
+		}
+	}
+	return true;
+}
+
 bool CoreWrapper::addLinkCallback(rtabmap_ros::AddLink::Request& req, rtabmap_ros::AddLink::Response&)
 {
 	if(rtabmap_.getMemory())
@@ -4043,25 +4065,30 @@ bool CoreWrapper::getNodesInRadiusCallback(rtabmap_ros::GetNodesInRadius::Reques
 {
 	ROS_INFO("Get nodes in radius (%f): node_id=%d pose=(%f,%f,%f)", req.radius, req.node_id, req.x, req.y, req.z);
 	std::map<int, Transform> poses;
+	std::map<int, float> dists;
 	if(req.node_id != 0 || (req.x == 0.0f && req.y == 0.0f && req.z == 0.0f))
 	{
-		poses = rtabmap_.getNodesInRadius(req.node_id, req.radius);
+		poses = rtabmap_.getNodesInRadius(req.node_id, req.radius, req.k, &dists);
 	}
 	else
 	{
-		poses = rtabmap_.getNodesInRadius(Transform(req.x, req.y, req.z, 0,0,0), req.radius);
+		poses = rtabmap_.getNodesInRadius(Transform(req.x, req.y, req.z, 0,0,0), req.radius, req.k, &dists);
 	}
 
 	//Optimized graph
 	res.ids.resize(poses.size());
 	res.poses.resize(poses.size());
+	res.distsSqr.resize(poses.size());
 	int index = 0;
 	for(std::map<int, rtabmap::Transform>::const_iterator iter = poses.begin();
 		iter != poses.end();
 		++iter)
 	{
+		UERROR("add %d", iter->first);
 		res.ids[index] = iter->first;
 		transformToPoseMsg(iter->second, res.poses[index]);
+		UASSERT(dists.find(iter->first) != dists.end());
+		res.distsSqr[index] = dists.at(iter->first);
 		++index;
 	}
 

@@ -1,7 +1,11 @@
 #request
 
-# If target pose and node_id are all zeros, poses 
-# around the latest node in the graph are returned.
+# In mapping mode (Mem/IncrementalMemory=true), if target pose 
+#   and node_id are all zeros, poses around the latest node 
+#   in the graph are returned.
+# In localization mode (Mem/IncrementalMemory=false), if target pose 
+#   and node_id are all zeros, poses around the latest localization 
+#   pose are returned.
 # If node_id is not zero, target pose is ignored.
 
 # Node id
@@ -12,10 +16,16 @@ float32 x
 float32 y
 float32 z
 
-# Radius, <=0 means that RGBD/LocalRadius will be used
+# Radius, <=0 means that RGBD/LocalRadius will be used 
+# if k is also 0. If k>0 and a radius of 0 means all nearest 
+# poses up to k.
 float32 radius
+
+# Maximum number of nearest poses
+int32 k
 
 ---
 #response
 int32[] ids
 geometry_msgs/Pose[] poses
+float32[] distsSqr

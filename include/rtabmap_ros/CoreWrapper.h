@@ -57,6 +57,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtabmap_ros/PublishMap.h"
 #include "rtabmap_ros/SetGoal.h"
 #include "rtabmap_ros/SetLabel.h"
+#include "rtabmap_ros/RemoveLabel.h"
 #include "rtabmap_ros/Goal.h"
 #include "rtabmap_ros/GetPlan.h"
 #include "rtabmap_ros/CommonDataSubscriber.h"
@@ -232,6 +233,7 @@ private:
 	bool cancelGoalCallback(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res);
 	bool setLabelCallback(rtabmap_ros::SetLabel::Request& req, rtabmap_ros::SetLabel::Response& res);
 	bool listLabelsCallback(rtabmap_ros::ListLabels::Request& req, rtabmap_ros::ListLabels::Response& res);
+	bool removeLabelCallback(rtabmap_ros::RemoveLabel::Request& req, rtabmap_ros::RemoveLabel::Response& res);
 	bool addLinkCallback(rtabmap_ros::AddLink::Request&, rtabmap_ros::AddLink::Response&);
 	bool getNodesInRadiusCallback(rtabmap_ros::GetNodesInRadius::Request&, rtabmap_ros::GetNodesInRadius::Response&);
 #ifdef WITH_OCTOMAP_MSGS
@@ -353,6 +355,7 @@ private:
 	ros::ServiceServer cancelGoalSrv_;
 	ros::ServiceServer setLabelSrv_;
 	ros::ServiceServer listLabelsSrv_;
+	ros::ServiceServer removeLabelSrv_;
 	ros::ServiceServer addLinkSrv_;
 	ros::ServiceServer getNodesInRadiusSrv_;
 #ifdef WITH_OCTOMAP_MSGS

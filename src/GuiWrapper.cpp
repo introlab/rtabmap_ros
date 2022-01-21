@@ -52,6 +52,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtabmap_ros/GetMap.h"
 #include "rtabmap_ros/SetGoal.h"
 #include "rtabmap_ros/SetLabel.h"
+#include "rtabmap_ros/RemoveLabel.h"
 #include "rtabmap_ros/PreferencesDialogROS.h"
 
 float max3( const float& a, const float& b, const float& c)
@@ -398,6 +399,16 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 			if(!ros::service::call("set_label", setLabelSrv))
 			{
 				ROS_ERROR("Can't call \"set_label\" service");
+			}
+		}
+		else if(cmd == rtabmap::RtabmapEventCmd::kCmdRemoveLabel)
+		{
+			UASSERT(cmdEvent->value1().isStr());
+			rtabmap_ros::RemoveLabel removeLabelSrv;
+			removeLabelSrv.request.label = cmdEvent->value1().toStr();
+			if(!ros::service::call("remove_label", removeLabelSrv))
+			{
+				ROS_ERROR("Can't call \"remove_label\" service");
 			}
 		}
 		else
