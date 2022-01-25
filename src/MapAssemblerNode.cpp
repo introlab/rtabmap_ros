@@ -74,6 +74,8 @@ public:
 		uInsert(parameters, rtabmap::Parameters::getDefaultParameters("Grid"));
 		uInsert(parameters, rtabmap::Parameters::getDefaultParameters("GridGlobal"));
 		uInsert(parameters, rtabmap::Parameters::getDefaultParameters("StereoBM"));
+		uInsert(parameters, rtabmap::Parameters::getDefaultParameters("StereoSGBM"));
+		uInsert(parameters, rtabmap::ParametersPair(rtabmap::Parameters::kIcpPointToPlaneGroundNormalsUp(), uNumber2Str(rtabmap::Parameters::defaultIcpPointToPlaneGroundNormalsUp())));
 		if(!configPath.empty())
 		{
 			if(UFile::exists(configPath.c_str()))
@@ -374,6 +376,8 @@ int main(int argc, char** argv)
 			uInsert(parameters, rtabmap::Parameters::getDefaultParameters("Grid"));
 			uInsert(parameters, rtabmap::Parameters::getDefaultParameters("GridGlobal"));
 			uInsert(parameters, rtabmap::Parameters::getDefaultParameters("StereoBM"));
+			uInsert(parameters, rtabmap::Parameters::getDefaultParameters("StereoSGBM"));
+			uInsert(parameters, rtabmap::ParametersPair(rtabmap::Parameters::kIcpPointToPlaneGroundNormalsUp(), uNumber2Str(rtabmap::Parameters::defaultIcpPointToPlaneGroundNormalsUp())));
 			for(rtabmap::ParametersMap::iterator iter=parameters.begin(); iter!=parameters.end(); ++iter)
 			{
 				std::string str = "Param: " + iter->first + " = \"" + iter->second + "\"";

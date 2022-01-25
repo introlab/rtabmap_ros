@@ -175,6 +175,9 @@ private:
 	std::map<int, CloudInfoPtr> new_cloud_infos_;
 	boost::mutex new_clouds_mutex_;
 
+	std::set<int> nodeDataReceived_;
+	bool fromScan_;
+
 	std::map<int, rtabmap::Transform> current_map_;
 	boost::mutex current_map_mutex_;
 	bool current_map_updated_;

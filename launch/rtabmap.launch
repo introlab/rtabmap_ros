@@ -321,6 +321,7 @@
       <param name="range_max"       type="double" value="$(arg scan_cloud_assembling_range_max)"/>
       <param name="noise_radius"        type="double" value="$(arg scan_cloud_assembling_noise_radius)"/>
       <param name="noise_min_neighbors" type="int"    value="$(arg scan_cloud_assembling_noise_min_neighbors)"/>
+      <param name="wait_for_transform_duration" type="double" value="$(arg wait_for_transform)"/>
     </node>
   
     <!-- Visual SLAM (robot side) -->

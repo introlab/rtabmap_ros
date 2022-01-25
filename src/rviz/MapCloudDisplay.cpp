@@ -137,6 +137,7 @@ MapCloudDisplay::MapCloudDisplay()
 	cloud_from_scan_ = new rviz::BoolProperty( "Cloud from scan", false,
 										 "Create the cloud from laser scans instead of the RGB-D/Stereo images.",
 										 this, SLOT( updateCloudParameters() ), this );
+	fromScan_ = cloud_from_scan_->getBool();
 
 	cloud_decimation_ = new rviz::IntProperty( "Cloud decimation", 4,
 										 "Decimation of the input RGB and depth images before creating the cloud.",
@@ -281,6 +282,7 @@ void MapCloudDisplay::processMapData(const rtabmap_ros::MapData& map)
 
 	// Add new clouds...
 	bool fromDepth = !cloud_from_scan_->getBool();
+	std::set<int> nodeDataReceived;
 	for(unsigned int i=0; i<map.nodes.size() && i<map.nodes.size(); ++i)
 	{
 		int id = map.nodes[i].id;
@@ -378,6 +380,7 @@ void MapCloudDisplay::processMapData(const rtabmap_ros::MapData& map)
 				}
 			}
 		}
+		nodeDataReceived.insert(id);
 	}
 
 	// Update graph
@@ -392,6 +395,7 @@ void MapCloudDisplay::processMapData(const rtabmap_ros::MapData& map)
 		boost::mutex::scoped_lock lock(current_map_mutex_);
 		current_map_ = poses;
 		current_map_updated_ = true;
+		nodeDataReceived_.insert(nodeDataReceived.begin(), nodeDataReceived.end());
 	}
 }
 
@@ -531,7 +535,14 @@ void MapCloudDisplay::updateBillboardSize()
 
 void MapCloudDisplay::updateCloudParameters()
 {
-	// do nothing... only take effect on next generated clouds
+	// do nothing for most parameters... only take effect on next generated clouds
+
+	// if we change the kind of map, clear
+	if(fromScan_ != cloud_from_scan_->getBool())
+	{
+		reset();
+	}
+	fromScan_ = cloud_from_scan_->getBool();
 }
 
 void MapCloudDisplay::downloadMap(bool graphOnly)
@@ -758,7 +769,7 @@ void MapCloudDisplay::update( float wall_dt, float ros_dt )
 								cloudInfoIt->second->message_->header.frame_id.c_str());
 					}
 				}
-				else if(it->first>0 && current_map_updated_)
+				else if(it->first>0 && current_map_updated_&& nodeDataReceived_.find(it->first) == nodeDataReceived_.end())
 				{
 					missingNodes.push_back(it->first);
 				}
@@ -816,6 +827,7 @@ void MapCloudDisplay::reset()
 		boost::mutex::scoped_lock lock(current_map_mutex_);
 		current_map_.clear();
 		current_map_updated_ = false;
+		nodeDataReceived_.clear();
 	}
 	MFDClass::reset();
 }
