@@ -235,6 +235,12 @@ void GuiWrapper::goalReachedCallback(
 
 void GuiWrapper::processRequestedMap(const rtabmap_ros::MapData & map)
 {
+	// Make sure parameters are loaded
+	if(((PreferencesDialogROS*)prefDialog_)->hasAllParameters())
+	{
+		QMetaObject::invokeMethod(((PreferencesDialogROS*)prefDialog_), "readRtabmapNodeParameters");
+	}
+
 	std::map<int, Signature> signatures;
 	std::map<int, Transform> poses;
 	std::multimap<int, rtabmap::Link> constraints;

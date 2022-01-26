@@ -741,6 +741,7 @@ void MapCloudDisplay::update( float wall_dt, float ros_dt )
 					cloudInfoIt->second->pose_ = it->second;
 					Ogre::Vector3 framePosition;
 					Ogre::Quaternion frameOrientation;
+					std::string error;
 					if (context_->getFrameManager()->getTransform(cloudInfoIt->second->message_->header, framePosition, frameOrientation))
 					{
 						// Multiply frame with pose
@@ -761,11 +762,12 @@ void MapCloudDisplay::update( float wall_dt, float ros_dt )
 						cloudInfoIt->second->scene_node_->setVisible(true);
 						++totalNodesShown;
 					}
-					else
+					else if(context_->getFrameManager()->frameHasProblems(cloudInfoIt->second->message_->header.frame_id, cloudInfoIt->second->message_->header.stamp, error))
 					{
-						ROS_ERROR("MapCloudDisplay: Could not update pose of node %d (cannot transform pose in target frame id \"%s\", set fixed frame in global options to \"%s\")",
+						ROS_ERROR("MapCloudDisplay: Could not update pose of node %d (cannot transform pose in target frame id \"%s\" (reason=%s), set fixed frame in global options to \"%s\")",
 								it->first,
 								cloudInfoIt->second->message_->header.frame_id.c_str(),
+								error.c_str(),
 								cloudInfoIt->second->message_->header.frame_id.c_str());
 					}
 				}

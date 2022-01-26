@@ -38,6 +38,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <ros/exceptions.h>
 #include <rtabmap/utilite/UStl.h>
 #include <rtabmap/utilite/UTimer.h>
+#include <rtabmap/utilite/UThread.h>
 
 using namespace rtabmap;
 
@@ -67,6 +68,11 @@ QString PreferencesDialogROS::getTmpIniFilePath() const
 	return QDir::homePath()+"/.ros/"+QFileInfo(configFile_).fileName()+".tmp";
 }
 
+void PreferencesDialogROS::readRtabmapNodeParameters()
+{
+	readCoreSettings(getTmpIniFilePath());
+}
+
 void PreferencesDialogROS::readCameraSettings(const QString & filePath)
 {
 	this->setInputRate(0);
@@ -75,6 +81,32 @@ void PreferencesDialogROS::readCameraSettings(const QString & filePath)
 QString PreferencesDialogROS::getParamMessage()
 {
 	return tr("Reading parameters from the ROS server...");
+}
+
+bool PreferencesDialogROS::hasAllParameters()
+{
+	ros::NodeHandle nh(rtabmapNodeName_);
+	rtabmap::ParametersMap parameters = rtabmap::Parameters::getDefaultParameters();
+	for(rtabmap::ParametersMap::const_iterator i=parameters.begin(); i!=parameters.end(); ++i)
+	{
+		if(i->first.compare(rtabmap::Parameters::kRtabmapWorkingDirectory()) != 0 && !nh.hasParam(i->first))
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+bool PreferencesDialogROS::hasAllParameters(const ros::NodeHandle & nh, const rtabmap::ParametersMap & parameters)
+{
+	for(rtabmap::ParametersMap::const_iterator i=parameters.begin(); i!=parameters.end(); ++i)
+	{
+		if(i->first.compare(rtabmap::Parameters::kRtabmapWorkingDirectory()) != 0 && !nh.hasParam(i->first))
+		{
+			return false;
+		}
+	}
+	return true;
 }
 
 bool PreferencesDialogROS::readCoreSettings(const QString & filePath)
@@ -103,23 +135,31 @@ bool PreferencesDialogROS::readCoreSettings(const QString & filePath)
 		}
 	}
 
-	// Wait rtabmap parameters to appear (if gui noe has been launched at the same time than rtabmap)
+	// Wait rtabmap parameters to appear (if gui node has been launched at the same time than rtabmap)
 	if(!this->isVisible())
 	{
 		double stamp = UTimer::now();
 		std::string tmp;
 		bool warned = false;
-		while(!rnh.getParam(Parameters::kRtabmapDetectionRate(),tmp) && UTimer::now()-stamp < 5.0)
+		while(!hasAllParameters(rnh, parameters) && UTimer::now()-stamp < 5.0)
 		{
 			if(!warned)
 			{
 				ROS_INFO("rtabmapviz: Cannot get rtabmap's parameters, waiting max 5 seconds in case the node has just been launched.");
 				warned = true;
 			}
+			uSleep(100);
 		}
-		if(warned && UTimer::now()-stamp < 5.0)
+		if(warned)
 		{
-			ROS_INFO("rtabmapviz: rtabmap's parameters seem now there! continuing...");
+			if(UTimer::now()-stamp < 5.0)
+			{
+				ROS_INFO("rtabmapviz: rtabmap's parameters seem now there! continuing...");
+			}
+			else
+			{
+				ROS_WARN("rtabmapviz: rtabmap's parameters seem not all there yet! continuing with those there if some...");
+			}
 		}
 	}
 

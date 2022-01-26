@@ -41,9 +41,14 @@ public:
 
 	virtual QString getIniFilePath() const;
 	virtual QString getTmpIniFilePath() const;
+	bool hasAllParameters();
+
+public slots:
+	void readRtabmapNodeParameters();
 
 protected:
 	virtual QString getParamMessage();
+	bool hasAllParameters(const ros::NodeHandle & nh, const rtabmap::ParametersMap & parameters);
 
 	virtual void readCameraSettings(const QString & filePath);
 	virtual bool readCoreSettings(const QString & filePath);
