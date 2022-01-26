@@ -35,6 +35,39 @@
     <arg name="rviz"       default="true" />
     <arg name="light"      default="false" /> <!-- Don't record all scans if false -->
     <arg name="altitude"   default="0" /> <!-- assemble occupancy grids by altitude (radius in meters, 0=disabled) --> 
+    <arg name="localization"   default="false" />
+
+    <!-- Common parameters -->
+    <arg name="common_args" value="
+                --Rtabmap/DetectionRate 2
+                --Mem/STMSize 30
+                --Mem/LaserScanNormalK 10
+                --OdomF2M/ScanMaxSize 30000
+                --Odom/ScanKeyFrameThr 0.6
+                --Icp/VoxelSize $(arg cell_size)
+                --Icp/Iterations 10
+                --Icp/MaxTranslation 2
+                --Icp/RangeMin 1
+                --Icp/PointToPlaneGroundNormalsUp 0.9
+                --Icp/PointToPlaneRadius 0
+                --Icp/MaxCorrespondenceDistance 1
+                --Grid/ClusterRadius 1
+                --Grid/RangeMax 20
+                --Grid/RangeMin 2
+                --Grid/RayTracing true
+                --Grid/CellSize $(arg cell_size)
+                --Grid/PreVoxelFiltering false
+                --Grid/3D false
+                --Grid/DepthRoiRatios '0 0 0 0.3'
+                --Grid/MaxObstacleHeight 4
+                --Kp/RoiRatios '0 0 0 0.3'
+                --Vis/RoiRatios '0 0 0 0.3'
+                --RGBD/LinearUpdate 0.2
+                --RGBD/OptimizeMaxError 1
+                --GridGlobal/AltitudeDelta $(arg altitude)"/>
+
+    <arg     if="$(arg localization)" name="clear_db" value="" />
+    <arg unless="$(arg localization)" name="clear_db" value="-d" />
 
     <!-- RTAB-Map -->
     <remap from="/catvehicle/grid_map" to="/catvehicle/map"/>
@@ -42,11 +75,17 @@
         <arg name="namespace" value="catvehicle"/>
 
         <!-- LiDAR SLAM parameters -->
-        <arg     if="$(arg lidar)" name="args" value="-d --Rtabmap/DetectionRate 2 --Reg/Strategy 1 --OdomF2M/ScanMaxSize 30000 --Odom/ScanKeyFrameThr 0.6 --Icp/VoxelSize $(arg cell_size) --Icp/Iterations 10 --Icp/MaxTranslation 1 --Icp/RangeMin 1 --Icp/PointToPlaneGroundNormalsUp 0.9 --Icp/PointToPlaneRadius 0 --Icp/MaxCorrespondenceDistance 1 --Grid/ClusterRadius 1 --Grid/RangeMax 20 --Grid/RangeMin 1 --Grid/RayTracing true --Grid/CellSize $(arg cell_size) --Mem/LaserScanNormalK 10 --Grid/PreVoxelFiltering false --Grid/3D false --Kp/RoiRatios '0 0 0 0.3' --Vis/RoiRatios '0 0 0 0.3' --RGBD/LinearUpdate 0.2 --Grid/MaxObstacleHeight 4 --GridGlobal/AltitudeDelta $(arg altitude)"/>
+        <arg     if="$(arg lidar)" name="args" value="$(arg clear_db) $(arg common_args)
+                --Reg/Strategy 1"/>
         
         <!-- Visual SLAM parameters -->
-        <arg unless="$(arg lidar)" name="args" value="-d --Rtabmap/DetectionRate 2 --Reg/Strategy 0 --Icp/VoxelSize $(arg cell_size) --Grid/ClusterRadius 1 --Grid/RangeMax 20 --Grid/RangeMin 2 --Grid/RayTracing true --Grid/CellSize $(arg cell_size) --Grid/3D false --Kp/RoiRatios '0 0 0 0.3' --Vis/RoiRatios '0 0 0 0.3' --Grid/DepthRoiRatios '0 0 0 0.3' --Grid/NormalsSegmentation false --Grid/MaxObstacleHeight 4 --Grid/MaxGroundHeight 0.7 --Grid/NoiseFilteringRadius 0.5 --GridGlobal/AltitudeDelta $(arg altitude)"/>
+        <arg unless="$(arg lidar)" name="args" value="$(arg clear_db) $(arg common_args)
+                --Reg/Strategy 0
+                --Grid/NormalsSegmentation false
+                --Grid/MaxGroundHeight 0.7
+                --Grid/NoiseFilteringRadius 0.5"/>
 
+        <arg name="localization" value="$(arg localization)"/>        
         <arg name="subscribe_scan_cloud" value="$(arg lidar)"/>
         <arg name="stereo"            value="$(arg camera)"/>
         <arg unless="$(arg camera)" name="depth"          value="false"/>
@@ -78,7 +117,7 @@
         <arg name="scan_cloud_assembling_fixed_frame" value="catvehicle/lidar_odom"/>
         <arg name="scan_cloud_assembling_range_max"   value="60"/>
         <arg name="scan_cloud_assembling_voxel_size"  value="$(arg cell_size)"/>
-        <arg name="scan_cloud_assembling_range_min"   value="1"/>
+        <arg name="scan_cloud_assembling_range_min"   value="2"/>
     </include>
 
     <node if="$(arg rviz)" pkg="rviz" type="rviz" name="rviz" args="-d $(find catvehicle)/config/catvehicle.rviz"/>
