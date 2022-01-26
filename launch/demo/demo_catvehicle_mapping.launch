@@ -120,5 +120,5 @@
         <arg name="scan_cloud_assembling_range_min"   value="2"/>
     </include>
 
-    <node if="$(arg rviz)" pkg="rviz" type="rviz" name="rviz" args="-d $(find catvehicle)/config/catvehicle.rviz"/>
+    <node if="$(arg rviz)" pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap_ros)/launch/config/catvehicle.rviz"/>
 </launch> 
