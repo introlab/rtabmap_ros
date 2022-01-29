@@ -42,6 +42,10 @@ public:
 
 	virtual QString getIniFilePath() const;
 	virtual QString getTmpIniFilePath() const;
+	bool hasAllParameters();
+
+public slots:
+	void readRtabmapNodeParameters();
 
 protected:
 	virtual QString getParamMessage();

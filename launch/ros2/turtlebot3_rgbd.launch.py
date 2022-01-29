@@ -1,6 +1,22 @@
 # Requirements:
 #   Install Turtlebot3 packages
-#   Install https://github.com/mlherd/ros2_turtlebot3_waffle_intel_realsense
+#   Modify turtlebot3_waffle SDF:
+#     1) Edit turtlebot3_gazebo/models/turtlebot3_waffle/model.sdf
+#     2) Add
+#          <joint name="camera_rgb_optical_joint" type="fixed">
+#            <parent>camera_rgb_frame</parent>
+#            <child>camera_rgb_optical_frame</child>
+#            <pose>0 0 0 -1.57079632679 0 -1.57079632679</pose>
+#            <axis>
+#              <xyz>0 0 1</xyz>
+#            </axis>
+#          </joint> 
+#     3) Rename <link name="camera_rgb_frame"> to <link name="camera_rgb_optical_frame">
+#     4) Add <link name="camera_rgb_frame"/>
+#     5) Change <sensor name="camera" type="camera"> to <sensor name="camera" type="depth">
+#     6) Change image width/height from 1920x1080 to 640x480
+#     7) Note that we can increase min scan range from 0.12 to 0.2 to avoid having scans 
+#        hitting the robot itself
 # Example:
 #   $ export TURTLEBOT3_MODEL=waffle
 #   $ ros2 launch turtlebot3_gazebo turtlebot3_world.launch.py
@@ -8,7 +24,7 @@
 #   SLAM:
 #   $ ros2 launch rtabmap_ros turtlebot3_rgbd.launch.py
 #   OR
-#   $ ros2 launch rtabmap_ros rtabmap.launch.py visual_odometry:=false frame_id:=base_footprint odom_topic:=/odom args:="-d" use_sim_time:=true rgb_topic:=/intel_realsense_r200_depth/image_raw depth_topic:=/intel_realsense_r200_depth/depth/image_raw camera_info_topic:=/intel_realsense_r200_depth/camera_info approx_sync:=true
+#   $ ros2 launch rtabmap_ros rtabmap.launch.py visual_odometry:=false frame_id:=base_footprint odom_topic:=/odom args:="-d" use_sim_time:=true rgb_topic:=/camera/image_raw depth_topic:=/camera/depth/image_raw camera_info_topic:=/camera/camera_info approx_sync:=true
 #
 #   Navigation (install nav2_bringup package):
 #     $ ros2 launch nav2_bringup navigation_launch.py use_sim_time:=True
@@ -41,9 +57,9 @@ def generate_launch_description():
     }
 
     remappings=[
-          ('rgb/image', '/intel_realsense_r200_depth/image_raw'),
-          ('rgb/camera_info', '/intel_realsense_r200_depth/camera_info'),
-          ('depth/image', '/intel_realsense_r200_depth/depth/image_raw')]
+          ('rgb/image', '/camera/image_raw'),
+          ('rgb/camera_info', '/camera/camera_info'),
+          ('depth/image', '/camera/depth/image_raw')]
 
     return LaunchDescription([
 

@@ -26,6 +26,8 @@
     <arg name="lidar3d_ray_tracing" default="true" />
     <arg name="lidar3d_grid3d"      default="true" />
 
+    <arg name="camera"              default="true" />
+
     <!-- Load Robot Description -->
     <arg name="model" default="$(find carter_description)/urdf/carter.urdf"/>
     <param name="robot_description" textfile="$(arg model)" />
@@ -33,17 +35,19 @@
     <!-- Lidar 3D based on demo_husky.launch -->
     <arg     if="$(arg lidar3d)" name="cell_size" default="0.2" />
     <arg unless="$(arg lidar3d)" name="cell_size" default="0.05" />
-    <arg     if="$(arg lidar3d)" name="args3d" value="--Icp/Iterations 10 --Icp/PointToPlaneGroundNormalsUp 0.9 --Icp/PointToPlaneRadius 0 --Icp/MaxCorrespondenceDistance 1 --Grid/ClusterRadius 1 --Grid/RangeMax 10 --Grid/RayTracing $(arg lidar3d_ray_tracing) --Grid/CellSize $(arg cell_size) --Mem/LaserScanNormalK --Grid/3D $(arg lidar3d_grid3d)" />
+    <arg     if="$(arg lidar3d)" name="args3d" value="--Icp/Iterations 10 --Icp/PointToPlaneGroundNormalsUp 0.9 --Icp/PointToPlaneRadius 0 --Icp/MaxCorrespondenceDistance 1 --Grid/ClusterRadius 1 --Grid/RangeMax 10 --Grid/RayTracing $(arg lidar3d_ray_tracing) --Grid/CellSize $(arg cell_size) --Mem/LaserScanNormalK 10 --Grid/3D $(arg lidar3d_grid3d)" />
     <arg unless="$(arg lidar3d)" name="args3d" value="--Grid/RangeMax 10" /> <!-- 2d scan, use default params -->
 
     <!-- RTAB-Map -->
     <remap from="/rtabmap/grid_map" to="/map"/>
     <include file="$(find rtabmap_ros)/launch/rtabmap.launch">
-        <arg     if="$(arg localization)" name="args" value="--Reg/Strategy 1 --Reg/Force3DoF true --RGBD/NeighborLinkRefining true $(arg args3d)"/>
-        <arg unless="$(arg localization)" name="args" value="-d --Reg/Strategy 1 --Reg/Force3DoF true --RGBD/NeighborLinkRefining true $(arg args3d)"/>
+        <arg     if="$(arg localization)" name="args" value="--Reg/Strategy 1 --Reg/Force3DoF true --RGBD/NeighborLinkRefining true --Icp/MaxTranslation 0.5 $(arg args3d)  --Kp/MaxFeatures -1 --RGBD/ProximityBySpace false --Rtabmap/DetectionRate 3"/>
+        <arg unless="$(arg localization)" name="args" value="-d --Reg/Strategy 1 --Reg/Force3DoF true --RGBD/NeighborLinkRefining true --Icp/MaxTranslation 0.5 $(arg args3d)"/>
         <arg name="localization"      value="$(arg localization)"/>
         <arg     if="$(arg lidar3d)" name="subscribe_scan_cloud" value="true"/>
         <arg unless="$(arg lidar3d)" name="subscribe_scan" value="true"/>
+        <arg name="subscribe_depth"   value="$(arg camera)"/>
+        <arg name="subscribe_rgb"     value="$(arg camera)"/>
         <arg name="visual_odometry"   value="false"/>
         <arg name="odom_topic"        value="/odom"/>
         <arg name="frame_id"          value="base_link"/>
@@ -55,6 +59,9 @@
         <arg name="rgbd_sync"         value="true"/>
         <arg name="approx_rgbd_sync"  value="false"/>
         <arg name="use_sim_time"      value="true"/>
+        <arg name="tag_linear_variance" value="0.01"/>
+        <arg name="tag_angular_variance" value="1"/>
+        
 
         <arg name="scan_cloud_assembling"             value="$(arg lidar3d)"/>
         <arg name="scan_cloud_assembling_fixed_frame" value="odom"/>

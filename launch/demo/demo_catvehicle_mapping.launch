@@ -1,0 +1,124 @@
+<?xml version="1.0"?>
+<launch>
+    <!-- 1) Make sure rtabmap is built with libpointmatcher for lidar:=true option (lidar SLAM)
+
+         2) Install https://github.com/jmscslgroup/catvehicle
+            We need a stereo camera and velodyne point cloud looking like the real 
+            sensor (ring-like pattern), so we have to modifiy the default catvehicle 
+            urdf. First we have to install velodyne_simulator package to have the 
+            right gazebo plugin and copy this modified velodyne config: 
+               * sudo apt install ros-$ROS_DISTRO-velodyne-simulator
+               * cp ~/catkin_ws/src/rtabmap_ros/launch/config/catvehicle_velodyne_points.gazebo ~/catkin_ws/src/catvehicle/urdf/.
+            Secondly, we have to modify the triclops config to make it stereo:
+               * cp ~/catkin_ws/src/rtabmap_ros/launch/config/catvehicle_triclops.gazebo ~/catkin_ws/src/catvehicle/urdf/.
+            Set world->map frame instead of world->odom frame here:
+               * https://github.com/jmscslgroup/catvehicle/blob/f58cc64103538bc93cd42dd30f59c4b937151f88/launch/catvehicle.launch#L104
+
+         3) roslaunch catvehicle catvehicle_city.launch gui:=true
+         4) roslaunch catvehicle catvehicle_spawn.launch velodyne_points:=true triclops:=true Z:=5
+         5) roslaunch catvehicle joystick.launch
+         6) SLAM, 3 choices:
+            A) LiDAR-SLAM + Visual loop closure detection: 
+              roslaunch rtabmap_ros demo_catvehicle_mapping.launch
+            B) LiDAR-SLAM without camera: 
+              roslaunch rtabmap_ros demo_catvehicle_mapping.launch camera:=false
+            C) Visual-SLAM without lidar: 
+              roslaunch rtabmap_ros demo_catvehicle_mapping.launch lidar:=false
+
+         Note: Gazebo real-time factor should be equal or below 1. If it is over 1, 
+               in gazebo client, select Physics, then change real time update rate to 500.
+    -->
+    <arg name="camera"     default="true" />
+    <arg name="lidar"      default="true" />
+    <arg name="cell_size"  default="0.2" />
+    <arg name="rtabmapviz" default="true" />
+    <arg name="rviz"       default="true" />
+    <arg name="light"      default="false" /> <!-- Don't record all scans if false -->
+    <arg name="altitude"   default="0" /> <!-- assemble occupancy grids by altitude (radius in meters, 0=disabled) --> 
+    <arg name="localization"   default="false" />
+
+    <!-- Common parameters -->
+    <arg name="common_args" value="
+                --Rtabmap/DetectionRate 2
+                --Mem/STMSize 30
+                --Mem/LaserScanNormalK 10
+                --OdomF2M/ScanMaxSize 30000
+                --Odom/ScanKeyFrameThr 0.6
+                --Icp/VoxelSize $(arg cell_size)
+                --Icp/Iterations 10
+                --Icp/MaxTranslation 2
+                --Icp/RangeMin 1
+                --Icp/PointToPlaneGroundNormalsUp 0.9
+                --Icp/PointToPlaneRadius 0
+                --Icp/MaxCorrespondenceDistance 1
+                --Grid/ClusterRadius 1
+                --Grid/RangeMax 20
+                --Grid/RangeMin 2
+                --Grid/RayTracing true
+                --Grid/CellSize $(arg cell_size)
+                --Grid/PreVoxelFiltering false
+                --Grid/3D false
+                --Grid/DepthRoiRatios '0 0 0 0.3'
+                --Grid/MaxObstacleHeight 4
+                --Kp/RoiRatios '0 0 0 0.3'
+                --Vis/RoiRatios '0 0 0 0.3'
+                --RGBD/LinearUpdate 0.2
+                --RGBD/OptimizeMaxError 1
+                --GridGlobal/AltitudeDelta $(arg altitude)"/>
+
+    <arg     if="$(arg localization)" name="clear_db" value="" />
+    <arg unless="$(arg localization)" name="clear_db" value="-d" />
+
+    <!-- RTAB-Map -->
+    <remap from="/catvehicle/grid_map" to="/catvehicle/map"/>
+    <include file="$(find rtabmap_ros)/launch/rtabmap.launch">
+        <arg name="namespace" value="catvehicle"/>
+
+        <!-- LiDAR SLAM parameters -->
+        <arg     if="$(arg lidar)" name="args" value="$(arg clear_db) $(arg common_args)
+                --Reg/Strategy 1"/>
+        
+        <!-- Visual SLAM parameters -->
+        <arg unless="$(arg lidar)" name="args" value="$(arg clear_db) $(arg common_args)
+                --Reg/Strategy 0
+                --Grid/NormalsSegmentation false
+                --Grid/MaxGroundHeight 0.7
+                --Grid/NoiseFilteringRadius 0.5"/>
+
+        <arg name="localization" value="$(arg localization)"/>        
+        <arg name="subscribe_scan_cloud" value="$(arg lidar)"/>
+        <arg name="stereo"            value="$(arg camera)"/>
+        <arg unless="$(arg camera)" name="depth"          value="false"/>
+        <arg unless="$(arg camera)" name="subscribe_rgb"  value="false"/>
+        <arg     if="$(arg lidar)" name="icp_odometry"    value="true"/>
+        <arg unless="$(arg lidar)" name="visual_odometry" value="true"/>
+
+        <arg     if="$(arg lidar)" name="odom_topic" value="lidar_odom"/>
+        <arg unless="$(arg lidar)" name="odom_topic" value="visual_odom"/>
+        
+        <arg name="odom_guess_frame_id" value="catvehicle/odom"/>
+        <arg name="frame_id"            value="catvehicle/base_link"/>
+        <arg name="map_frame_id"        value="catvehicle/map"/>
+        <arg     if="$(arg lidar)" name="vo_frame_id" value="catvehicle/lidar_odom"/>
+        <arg unless="$(arg lidar)" name="vo_frame_id" value="catvehicle/visual_odom"/>
+        
+        <arg name="stereo_namespace"  value="/catvehicle/triclops"/>
+        <arg name="right_image_topic" value="/catvehicle/triclops/right/image_rect_color"/>
+        <arg name="scan_cloud_topic"  value="/catvehicle/velodyne_points"/>
+        <arg name="rgbd_sync"         value="$(arg camera)"/>
+        <arg name="approx_rgbd_sync"  value="false"/>
+        <arg name="approx_sync"       value="$(eval camera and lidar)"/>
+        <arg name="use_sim_time"      value="true"/>
+        <arg name="wait_for_transform" value="0.3"/>
+
+        <arg name="rtabmapviz"      value="$(arg rtabmapviz)"/>
+
+        <arg name="scan_cloud_assembling"             value="$(eval lidar and not light)"/>
+        <arg name="scan_cloud_assembling_fixed_frame" value="catvehicle/lidar_odom"/>
+        <arg name="scan_cloud_assembling_range_max"   value="60"/>
+        <arg name="scan_cloud_assembling_voxel_size"  value="$(arg cell_size)"/>
+        <arg name="scan_cloud_assembling_range_min"   value="2"/>
+    </include>
+
+    <node if="$(arg rviz)" pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap_ros)/launch/config/catvehicle.rviz"/>
+</launch> 

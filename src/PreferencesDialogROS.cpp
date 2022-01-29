@@ -37,6 +37,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <QMessageBox>
 #include <rtabmap/utilite/UStl.h>
 #include <rtabmap/utilite/UTimer.h>
+#include <rtabmap/utilite/UThread.h>
 
 using namespace rtabmap;
 
@@ -67,6 +68,11 @@ QString PreferencesDialogROS::getTmpIniFilePath() const
 	return QDir::homePath()+"/.ros/"+QFileInfo(configFile_).fileName()+".tmp";
 }
 
+void PreferencesDialogROS::readRtabmapNodeParameters()
+{
+	readCoreSettings(getTmpIniFilePath());
+}
+
 void PreferencesDialogROS::readCameraSettings(const QString &)
 {
 	this->setInputRate(0);
@@ -75,6 +81,13 @@ void PreferencesDialogROS::readCameraSettings(const QString &)
 QString PreferencesDialogROS::getParamMessage()
 {
 	return tr("Reading parameters from the ROS server...");
+}
+
+bool PreferencesDialogROS::hasAllParameters()
+{
+	auto node = std::make_shared<rclcpp::Node>("rtabmapviz");
+	auto client = std::make_shared<rclcpp::AsyncParametersClient>(node, rtabmapNodeName_);
+	return client->service_is_ready();
 }
 
 bool PreferencesDialogROS::readCoreSettings(const QString & filePath)
@@ -102,6 +115,7 @@ bool PreferencesDialogROS::readCoreSettings(const QString & filePath)
 	}
 
 	std::vector<std::string> rosParameters;
+
 	for(rtabmap::ParametersMap::iterator i=parameters.begin(); i!=parameters.end(); ++i)
 	{
 		if(i->first.compare(rtabmap::Parameters::kRtabmapWorkingDirectory()) == 0)

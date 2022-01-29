@@ -80,4 +80,11 @@ $ ros2 launch rtabmap_ros rtabmap.launch.py \
        args:="-d --RGBD/NeighborLinkRefining true --Reg/Strategy 1" \
        use_sim_time:=true
     ```
+
+3. Launch navigation (`nav2_bringup` package should be installed):
+    ```
+    $ ros2 launch nav2_bringup navigation_launch.py use_sim_time:=True
+    $ ros2 launch nav2_bringup rviz_launch.py
+    ```
+    
 See [launch/ros2](https://github.com/introlab/rtabmap_ros/tree/ros2/launch/ros2) subfolder for some other ROS2 examples with turtlebot3 in simulation and a RGB-D camera.

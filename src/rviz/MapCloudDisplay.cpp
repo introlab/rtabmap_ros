@@ -137,6 +137,7 @@ MapCloudDisplay::MapCloudDisplay()
 	cloud_from_scan_ = new rviz_common::properties::BoolProperty( "Cloud from scan", false,
 										 "Create the cloud from laser scans instead of the RGB-D/Stereo images.",
 										 this, SLOT( updateCloudParameters() ), this );
+	fromScan_ = cloud_from_scan_->getBool();
 
 	cloud_decimation_ = new rviz_common::properties::IntProperty( "Cloud decimation", 4,
 										 "Decimation of the input RGB and depth images before creating the cloud.",
@@ -269,6 +270,7 @@ void MapCloudDisplay::processMapData(const rtabmap_ros::msg::MapData& map)
 
 	// Add new clouds...
 	bool fromDepth = !cloud_from_scan_->getBool();
+	std::set<int> nodeDataReceived;
 	for(unsigned int i=0; i<map.nodes.size() && i<map.nodes.size(); ++i)
 	{
 		int id = map.nodes[i].id;
@@ -366,6 +368,7 @@ void MapCloudDisplay::processMapData(const rtabmap_ros::msg::MapData& map)
 				}
 			}
 		}
+		nodeDataReceived.insert(id);
 	}
 
 	// Update graph
@@ -380,6 +383,7 @@ void MapCloudDisplay::processMapData(const rtabmap_ros::msg::MapData& map)
 		std::unique_lock<std::mutex> lock(current_map_mutex_);
 		current_map_ = poses;
 		current_map_updated_ = true;
+		nodeDataReceived_.insert(nodeDataReceived.begin(), nodeDataReceived.end());
 	}
 }
 
@@ -486,7 +490,14 @@ void MapCloudDisplay::updateBillboardSize()
 
 void MapCloudDisplay::updateCloudParameters()
 {
-	// do nothing... only take effect on next generated clouds
+	// do nothing for most parameters... only take effect on next generated clouds
+
+	// if we change the kind of map, clear
+	if(fromScan_ != cloud_from_scan_->getBool())
+	{
+		reset();
+	}
+	fromScan_ = cloud_from_scan_->getBool();
 }
 
 void MapCloudDisplay::downloadMap(bool /*graphOnly*/)
@@ -706,7 +717,8 @@ void MapCloudDisplay::update( float, float )
 					cloudInfoIt->second->pose_ = it->second;
 					Ogre::Vector3 framePosition;
 					Ogre::Quaternion frameOrientation;
-					if (context_->getFrameManager()->getTransform(cloudInfoIt->second->message_->header.frame_id, framePosition, frameOrientation))
+					std::string error;
+					if (context_->getFrameManager()->getTransform(cloudInfoIt->second->message_->header.frame_id, cloudInfoIt->second->message_->header.stamp, framePosition, frameOrientation))
 					{
 						// Multiply frame with pose
 						Ogre::Matrix4 frameTransform;
@@ -726,15 +738,16 @@ void MapCloudDisplay::update( float, float )
 						cloudInfoIt->second->scene_node_->setVisible(true);
 						++totalNodesShown;
 					}
-					else
+					else if(context_->getFrameManager()->transformHasProblems(cloudInfoIt->second->message_->header.frame_id, cloudInfoIt->second->message_->header.stamp, error))
 					{
-						RVIZ_COMMON_LOG_ERROR(uFormat("MapCloudDisplay: Could not update pose of node %d (cannot transform pose in target frame id \"%s\", set fixed frame in global options to \"%s\")", 
+						RVIZ_COMMON_LOG_ERROR(uFormat("MapCloudDisplay: Could not update pose of node %d (cannot transform pose in target frame id \"%s\" (reason=%s), set fixed frame in global options to \"%s\")",
 								it->first,
 								cloudInfoIt->second->message_->header.frame_id.c_str(),
+								error.c_str(),
 								cloudInfoIt->second->message_->header.frame_id.c_str()));
 					}
 				}
-				else if(it->first>0 && current_map_updated_)
+				else if(it->first>0 && current_map_updated_&& nodeDataReceived_.find(it->first) == nodeDataReceived_.end())
 				{
 					missingNodes.push_back(it->first);
 				}
@@ -792,6 +805,7 @@ void MapCloudDisplay::reset()
 		std::unique_lock<std::mutex> lock(current_map_mutex_);
 		current_map_.clear();
 		current_map_updated_ = false;
+		nodeDataReceived_.clear();
 	}
 }
 
