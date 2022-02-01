@@ -34,7 +34,7 @@ find_package(fiducial_msgs)
 # find_package(Boost REQUIRED COMPONENTS system)
 find_package(RTABMap 0.20.18 REQUIRED)
 
-find_package(OpenCV REQUIRED)
+find_package(OpenCV REQUIRED QUIET COMPONENTS core calib3d imgproc highgui stitching optflow photo OPTIONAL_COMPONENTS aruco xfeatures2d nonfree gpu cudafeatures2d)
 
 IF(RTABMAP_GUI)
 FIND_PACKAGE(PCL 1.7 REQUIRED QUIET COMPONENTS common io kdtree search surface filters registration sample_consensus segmentation visualization)
