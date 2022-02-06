@@ -538,7 +538,11 @@ void OdometryROS::processData(SensorData & data, const std_msgs::Header & header
 
 			if(!data.imageRaw().empty() || !data.laserScanRaw().isEmpty())
 			{
-				if(odometry_->getPose().isIdentity())
+				// Use only XYZ to handle the case odometry was previously initialized with IMU,
+				// we assume that the ground truth contains also a real initial orientation
+				float x,y,z;
+				odometry_->getPose().getTranslation(x, y, z);
+				if(x==0.0f && y==0.0f && z==0.0f)
 				{
 					// sync with the first value of the ground truth
 					if(groundTruth.isNull())

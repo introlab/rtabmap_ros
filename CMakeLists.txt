@@ -576,6 +576,7 @@ catkin_install_python(PROGRAMS
   scripts/yaml_to_camera_info.py
   scripts/netvlad_tf_ros.py
   scripts/wifi_signal_pub.py
+  scripts/gazebo_ground_truth.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
