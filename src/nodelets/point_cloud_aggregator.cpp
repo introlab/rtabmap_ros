@@ -72,7 +72,8 @@ public:
 		approxSync3_(0),
 		exactSync2_(0),
 		approxSync2_(0),
-		waitForTransformDuration_(0.1)
+		waitForTransformDuration_(0.1),
+		xyzOutput_(false)
 	{}
 
 	virtual ~PointCloudAggregator()
@@ -107,6 +108,7 @@ private:
 		pnh.param("approx_sync", approx, approx);
 		pnh.param("count", count, count);
 		pnh.param("wait_for_transform_duration", waitForTransformDuration_, waitForTransformDuration_);
+		pnh.param("xyz_output", xyzOutput_, xyzOutput_);
 
 		cloudSub_1_.subscribe(nh, "cloud1", 1);
 		cloudSub_2_.subscribe(nh, "cloud2", 1);
@@ -233,6 +235,42 @@ private:
 				frameId = cloudMsgs[0]->header.frame_id;
 			}
 
+			if(xyzOutput_ && !output->data.empty())
+			{
+				// convert only if not already XYZ cloud
+				bool hasField[4] = {false};
+				for(size_t i=0; i<output->fields.size(); ++i)
+				{
+					if(output->fields[i].name.compare("x") == 0)
+					{
+						hasField[0] = true;
+					}
+					else if(output->fields[i].name.compare("y") == 0)
+					{
+						hasField[1] = true;
+					}
+					else if(output->fields[i].name.compare("z") == 0)
+					{
+						hasField[2] = true;
+					}
+					else
+					{
+						hasField[3] = true; // other
+						break;
+					}
+				}
+				if(hasField[0] && hasField[1] && hasField[2] && !hasField[3])
+				{
+					// do nothing, already XYZ
+				}
+				else
+				{
+					pcl::PointCloud<pcl::PointXYZ> cloudxyz;
+					pcl::fromPCLPointCloud2(*output, cloudxyz);
+					pcl::toPCLPointCloud2(cloudxyz, *output);
+				}
+			}
+
 			for(unsigned int i=1; i<cloudMsgs.size(); ++i)
 			{
 				rtabmap::Transform cloudDisplacement;
@@ -286,15 +324,71 @@ private:
 					cloud2 = rtabmap::util3d::removeNaNFromPointCloud(cloud2);
 				}
 
-				pcl::PCLPointCloud2::Ptr tmp_output(new pcl::PCLPointCloud2);
+				if(xyzOutput_ && !cloud2->data.empty())
+				{
+					// convert only if not already XYZ cloud
+					bool hasField[4] = {false};
+					for(size_t i=0; i<cloud2->fields.size(); ++i)
+					{
+						if(cloud2->fields[i].name.compare("x") == 0)
+						{
+							hasField[0] = true;
+						}
+						else if(cloud2->fields[i].name.compare("y") == 0)
+						{
+							hasField[1] = true;
+						}
+						else if(cloud2->fields[i].name.compare("z") == 0)
+						{
+							hasField[2] = true;
+						}
+						else
+						{
+							hasField[3] = true; // other
+							break;
+						}
+					}
+					if(hasField[0] && hasField[1] && hasField[2] && !hasField[3])
+					{
+						// do nothing, already XYZ
+					}
+					else
+					{
+						pcl::PointCloud<pcl::PointXYZ> cloudxyz;
+						pcl::fromPCLPointCloud2(*cloud2, cloudxyz);
+						pcl::toPCLPointCloud2(cloudxyz, *cloud2);
+					}
+				}
+
+				if(output->data.empty())
+				{
+					output = cloud2;
+				}
+				else if(!cloud2->data.empty())
+				{
+
+					if(output->fields.size() != cloud2->fields.size())
+					{
+						ROS_WARN("%s: Input topics don't have all the "
+								"same number of fields (cloud1=%d, cloud%d=%d), concatenation "
+								"may fails. You can enable \"xyz_output\" option "
+								"to convert all inputs to XYZ.",
+								getName().c_str(),
+								(int)output->fields.size(),
+								i+1,
+								(int)output->fields.size());
+					}
+
+					pcl::PCLPointCloud2::Ptr tmp_output(new pcl::PCLPointCloud2);
 #if PCL_VERSION_COMPARE(>=, 1, 10, 0)
-				pcl::concatenate(*output, *cloud2, *tmp_output);
+					pcl::concatenate(*output, *cloud2, *tmp_output);
 #else
-				pcl::concatenatePointCloud(*output, *cloud2, *tmp_output);
+					pcl::concatenatePointCloud(*output, *cloud2, *tmp_output);
 #endif
-				//Make sure row_step is the sum of both
-				tmp_output->row_step = tmp_output->width * tmp_output->point_step;
-				output = tmp_output;
+					//Make sure row_step is the sum of both
+					tmp_output->row_step = tmp_output->width * tmp_output->point_step;
+					output = tmp_output;
+				}
 			}
 
 			sensor_msgs::PointCloud2 rosCloud;
@@ -349,6 +443,7 @@ private:
 	std::string frameId_;
 	std::string fixedFrameId_;
 	double waitForTransformDuration_;
+	bool xyzOutput_;
 	tf::TransformListener tfListener_;
 };
 
