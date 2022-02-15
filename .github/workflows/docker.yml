@@ -26,7 +26,7 @@ jobs:
           docker_platforms: |
             linux/amd64
             linux/arm64
-            linux/arm/v7
+#            linux/arm/v7
         - docker_tag: melodic-latest
           docker_path: 'melodic/latest'
           docker_platforms: |
@@ -37,7 +37,7 @@ jobs:
           docker_platforms: |
             linux/amd64
             linux/arm64
-            linux/arm/v7
+#            linux/arm/v7
         - docker_tag: noetic-latest
           docker_path: 'noetic/latest'
           docker_platforms: |
