@@ -195,6 +195,7 @@ private:
 			const ros::Time & stamp,
 			rtabmap::SensorData & data,
 			const rtabmap::Transform & odom = rtabmap::Transform(),
+			const std::vector<float> & odomVelocity = std::vector<float>(),
 			const std::string & odomFrameId = "",
 			const cv::Mat & odomCovariance = cv::Mat::eye(6,6,CV_64FC1),
 			const rtabmap::OdometryInfo & odomInfo = rtabmap::OdometryInfo(),
@@ -260,6 +261,7 @@ private:
 	bool paused_;
 	rtabmap::Transform lastPose_;
 	ros::Time lastPoseStamp_;
+	std::vector<float> lastPoseVelocity_;
 	bool lastPoseIntermediate_;
 	cv::Mat covariance_;
 	rtabmap::Transform currentMetricGoal_;
