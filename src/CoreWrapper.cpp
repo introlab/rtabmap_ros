@@ -1028,6 +1028,13 @@ bool CoreWrapper::odomUpdate(const nav_msgs::OdometryConstPtr & odomMsg, ros::Ti
 		lastPoseIntermediate_ = false;
 		lastPose_ = odom;
 		lastPoseStamp_ = stamp;
+		lastPoseVelocity_.resize(6);
+		lastPoseVelocity_[0] = odomMsg->twist.twist.linear.x;
+		lastPoseVelocity_[1] = odomMsg->twist.twist.linear.y;
+		lastPoseVelocity_[2] = odomMsg->twist.twist.linear.z;
+		lastPoseVelocity_[3] = odomMsg->twist.twist.angular.x;
+		lastPoseVelocity_[4] = odomMsg->twist.twist.angular.y;
+		lastPoseVelocity_[5] = odomMsg->twist.twist.angular.z;
 
 		// Only update variance if odom is not null
 		if(!odom.isNull())
@@ -1113,6 +1120,7 @@ bool CoreWrapper::odomTFUpdate(const ros::Time & stamp)
 		lastPoseIntermediate_ = false;
 		lastPose_ = odom;
 		lastPoseStamp_ = stamp;
+		lastPoseVelocity_.clear();
 
 		bool ignoreFrame = false;
 		if(stamp.toSec() == 0.0)
@@ -1420,6 +1428,7 @@ void CoreWrapper::commonDepthCallbackImpl(
 	process(lastPoseStamp_,
 			data,
 			lastPose_,
+			lastPoseVelocity_,
 			odomFrameId,
 			covariance_,
 			odomInfo,
@@ -1668,6 +1677,7 @@ void CoreWrapper::commonStereoCallback(
 	process(lastPoseStamp_,
 			data,
 			lastPose_,
+			lastPoseVelocity_,
 			odomFrameId,
 			covariance_,
 			odomInfo,
@@ -1803,6 +1813,7 @@ void CoreWrapper::commonLaserScanCallback(
 	process(lastPoseStamp_,
 			data,
 			lastPose_,
+			lastPoseVelocity_,
 			odomFrameId,
 			covariance_,
 			odomInfo,
@@ -1861,6 +1872,7 @@ void CoreWrapper::commonOdomCallback(
 	process(lastPoseStamp_,
 			data,
 			lastPose_,
+			lastPoseVelocity_,
 			odomFrameId,
 			covariance_,
 			odomInfo,
@@ -1873,6 +1885,7 @@ void CoreWrapper::process(
 		const ros::Time & stamp,
 		SensorData & data,
 		const Transform & odom,
+		const std::vector<float> & odomVelocityIn,
 		const std::string & odomFrameId,
 		const cv::Mat & odomCovariance,
 		const OdometryInfo & odomInfo,
@@ -1957,6 +1970,16 @@ void CoreWrapper::process(
 							odomVelocity[4] = pitch/info.interval;
 							odomVelocity[5] = yaw/info.interval;
 						}
+					}
+					if(odomVelocity.empty())
+					{
+						odomVelocity.resize(6);
+						odomVelocity[0] = iter->first.twist.twist.linear.x;
+						odomVelocity[1] = iter->first.twist.twist.linear.y;
+						odomVelocity[2] = iter->first.twist.twist.linear.z;
+						odomVelocity[3] = iter->first.twist.twist.angular.x;
+						odomVelocity[4] = iter->first.twist.twist.angular.y;
+						odomVelocity[5] = iter->first.twist.twist.angular.z;
 					}
 
 					rtabmap_.process(interData, interOdom, covariance, odomVelocity, externalStats);
@@ -2124,6 +2147,10 @@ void CoreWrapper::process(
 				odomVelocity[4] = pitch/odomInfo.interval;
 				odomVelocity[5] = yaw/odomInfo.interval;
 			}
+		}
+		if(odomVelocity.empty())
+		{
+			odomVelocity = odomVelocityIn;
 		}
 		if(rtabmapROSStats_.size())
 		{
@@ -2843,6 +2870,7 @@ bool CoreWrapper::resetRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empt
 	rtabmap_.resetMemory();
 	covariance_ = cv::Mat();
 	lastPose_.setIdentity();
+	lastPoseVelocity_.clear();
 	lastPoseIntermediate_ = false;
 	currentMetricGoal_.setNull();
 	lastPublishedMetricGoal_.setNull();
@@ -2933,6 +2961,7 @@ bool CoreWrapper::loadDatabaseCallback(rtabmap_ros::LoadDatabase::Request& req, 
 
 	covariance_ = cv::Mat();
 	lastPose_.setIdentity();
+	lastPoseVelocity_.clear();
 	lastPoseIntermediate_ = false;
 	currentMetricGoal_.setNull();
 	lastPublishedMetricGoal_.setNull();
@@ -3058,6 +3087,7 @@ bool CoreWrapper::backupDatabaseCallback(std_srvs::Empty::Request&, std_srvs::Em
 
 	covariance_ = cv::Mat();
 	lastPose_.setIdentity();
+	lastPoseVelocity_.clear();
 	currentMetricGoal_.setNull();
 	lastPublishedMetricGoal_.setNull();
 	goalFrameId_.clear();
