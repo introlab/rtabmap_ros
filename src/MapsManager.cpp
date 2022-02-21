@@ -325,15 +325,17 @@ bool MapsManager::hasSubscribers() const
 			gridMapPub_->get_subscription_count() != 0 ||
 			gridProbMapPub_->get_subscription_count() != 0
 #ifdef RTABMAP_OCTOMAP
-#ifdef WITH_OCTOMAP_MSGS
 			||
+#ifdef WITH_OCTOMAP_MSGS
+			octoMapPubBin_->get_subscription_count() != 0 ||
+			octoMapPubFull_->get_subscription_count() != 0 ||
+#endif
 			octoMapCloud_->get_subscription_count() != 0 ||
 			octoMapFrontierCloud_->get_subscription_count() != 0 ||
 			octoMapObstacleCloud_->get_subscription_count() != 0 ||
 			octoMapGroundCloud_->get_subscription_count() != 0 ||
 			octoMapEmptySpace_->get_subscription_count() != 0 ||
 			octoMapProj_->get_subscription_count() != 0
-#endif
 #endif
 			;
 }
@@ -361,15 +363,17 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 	{
 		//  all false, update only those where we have subscribers
 #ifdef RTABMAP_OCTOMAP
-#ifdef WITH_OCTOMAP_MSGS
 		updateOctomap =
+#ifdef WITH_OCTOMAP_MSGS
+				octoMapPubBin_->get_subscription_count() != 0 ||
+				octoMapPubFull_->get_subscription_count() != 0 ||
+#endif
 				octoMapCloud_->get_subscription_count() != 0 ||
 				octoMapFrontierCloud_->get_subscription_count() != 0 ||
 				octoMapObstacleCloud_->get_subscription_count() != 0 ||
 				octoMapGroundCloud_->get_subscription_count() != 0 ||
 				octoMapEmptySpace_->get_subscription_count() != 0 ||
 				octoMapProj_->get_subscription_count() != 0;
-#endif
 #endif
 
 		updateGrid = gridMapPub_->get_subscription_count() != 0 ||
