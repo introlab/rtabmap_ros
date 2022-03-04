@@ -103,7 +103,9 @@ private:
 		int queueSize = 10;
 		bool approxSync = true;
 		std::string roiStr;
+		double approxSyncMaxInterval = 0.0;
 		pnh.param("approx_sync", approxSync, approxSync);
+		pnh.param("approx_sync_max_interval", approxSyncMaxInterval, approxSyncMaxInterval);
 		pnh.param("queue_size", queueSize, queueSize);
 		pnh.param("max_depth", maxDepth_, maxDepth_);
 		pnh.param("min_depth", minDepth_, minDepth_);
@@ -170,9 +172,13 @@ private:
 		if(approxSync)
 		{
 			approxSyncDepth_ = new message_filters::Synchronizer<MyApproxSyncDepthPolicy>(MyApproxSyncDepthPolicy(queueSize), imageDepthSub_, cameraInfoSub_);
+			if(approxSyncMaxInterval > 0.0)
+				approxSyncDepth_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
 			approxSyncDepth_->registerCallback(boost::bind(&PointCloudXYZ::callback, this, _1, _2));
 
 			approxSyncDisparity_ = new message_filters::Synchronizer<MyApproxSyncDisparityPolicy>(MyApproxSyncDisparityPolicy(queueSize), disparitySub_, disparityCameraInfoSub_);
+			if(approxSyncMaxInterval > 0.0)
+				approxSyncDisparity_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
 			approxSyncDisparity_->registerCallback(boost::bind(&PointCloudXYZ::callbackDisparity, this, _1, _2));
 		}
 		else

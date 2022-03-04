@@ -102,10 +102,12 @@ private:
 		int queueSize = 5;
 		int count = 2;
 		bool approx=true;
+		double approxSyncMaxInterval = 0.0;
 		pnh.param("queue_size", queueSize, queueSize);
 		pnh.param("frame_id", frameId_, frameId_);
 		pnh.param("fixed_frame_id", fixedFrameId_, fixedFrameId_);
 		pnh.param("approx_sync", approx, approx);
+		pnh.param("approx_sync_max_interval", approxSyncMaxInterval, approxSyncMaxInterval);
 		pnh.param("count", count, count);
 		pnh.param("wait_for_transform_duration", waitForTransformDuration_, waitForTransformDuration_);
 		pnh.param("xyz_output", xyzOutput_, xyzOutput_);
@@ -121,6 +123,8 @@ private:
 			if(approx)
 			{
 				approxSync4_ = new message_filters::Synchronizer<ApproxSync4Policy>(ApproxSync4Policy(queueSize), cloudSub_1_, cloudSub_2_, cloudSub_3_, cloudSub_4_);
+				if(approxSyncMaxInterval > 0.0)
+					approxSync4_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
 				approxSync4_->registerCallback(boost::bind(&rtabmap_ros::PointCloudAggregator::clouds4_callback, this, _1, _2, _3, _4));
 			}
 			else
@@ -128,9 +132,10 @@ private:
 				exactSync4_ = new message_filters::Synchronizer<ExactSync4Policy>(ExactSync4Policy(queueSize), cloudSub_1_, cloudSub_2_, cloudSub_3_, cloudSub_4_);
 				exactSync4_->registerCallback(boost::bind(&rtabmap_ros::PointCloudAggregator::clouds4_callback, this, _1, _2, _3, _4));
 			}
-			subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s",
+			subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s,\n   %s,\n   %s,\n   %s",
 					getName().c_str(),
 					approx?"approx":"exact",
+					approx&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
 					cloudSub_1_.getTopic().c_str(),
 					cloudSub_2_.getTopic().c_str(),
 					cloudSub_3_.getTopic().c_str(),
@@ -142,6 +147,8 @@ private:
 			if(approx)
 			{
 				approxSync3_ = new message_filters::Synchronizer<ApproxSync3Policy>(ApproxSync3Policy(queueSize), cloudSub_1_, cloudSub_2_, cloudSub_3_);
+				if(approxSyncMaxInterval > 0.0)
+					approxSync3_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
 				approxSync3_->registerCallback(boost::bind(&rtabmap_ros::PointCloudAggregator::clouds3_callback, this, _1, _2, _3));
 			}
 			else
@@ -149,9 +156,10 @@ private:
 				exactSync3_ = new message_filters::Synchronizer<ExactSync3Policy>(ExactSync3Policy(queueSize), cloudSub_1_, cloudSub_2_, cloudSub_3_);
 				exactSync3_->registerCallback(boost::bind(&rtabmap_ros::PointCloudAggregator::clouds3_callback, this, _1, _2, _3));
 			}
-			subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s",
+			subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s,\n   %s,\n   %s",
 					getName().c_str(),
 					approx?"approx":"exact",
+					approx&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
 					cloudSub_1_.getTopic().c_str(),
 					cloudSub_2_.getTopic().c_str(),
 					cloudSub_3_.getTopic().c_str());
@@ -161,6 +169,8 @@ private:
 			if(approx)
 			{
 				approxSync2_ = new message_filters::Synchronizer<ApproxSync2Policy>(ApproxSync2Policy(queueSize), cloudSub_1_, cloudSub_2_);
+				if(approxSyncMaxInterval > 0.0)
+					approxSync2_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
 				approxSync2_->registerCallback(boost::bind(&rtabmap_ros::PointCloudAggregator::clouds2_callback, this, _1, _2));
 			}
 			else
@@ -168,9 +178,10 @@ private:
 				exactSync2_ = new message_filters::Synchronizer<ExactSync2Policy>(ExactSync2Policy(queueSize), cloudSub_1_, cloudSub_2_);
 				exactSync2_->registerCallback(boost::bind(&rtabmap_ros::PointCloudAggregator::clouds2_callback, this, _1, _2));
 			}
-			subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s",
+			subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s,\n   %s",
 					getName().c_str(),
 					approx?"approx":"exact",
+					approx&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
 					cloudSub_1_.getTopic().c_str(),
 					cloudSub_2_.getTopic().c_str());
 		}

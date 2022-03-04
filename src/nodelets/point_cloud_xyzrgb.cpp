@@ -111,7 +111,9 @@ private:
 		int queueSize = 10;
 		bool approxSync = true;
 		std::string roiStr;
+		double approxSyncMaxInterval = 0.0;
 		pnh.param("approx_sync", approxSync, approxSync);
+		pnh.param("approx_sync_max_interval", approxSyncMaxInterval, approxSyncMaxInterval);
 		pnh.param("queue_size", queueSize, queueSize);
 		pnh.param("max_depth", maxDepth_, maxDepth_);
 		pnh.param("min_depth", minDepth_, minDepth_);
@@ -195,14 +197,19 @@ private:
 
 		if(approxSync)
 		{
-
 			approxSyncDepth_ = new message_filters::Synchronizer<MyApproxSyncDepthPolicy>(MyApproxSyncDepthPolicy(queueSize), imageSub_, imageDepthSub_, cameraInfoSub_);
+			if(approxSyncMaxInterval > 0.0)
+				approxSyncDepth_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
 			approxSyncDepth_->registerCallback(boost::bind(&PointCloudXYZRGB::depthCallback, this, _1, _2, _3));
 
 			approxSyncDisparity_ = new message_filters::Synchronizer<MyApproxSyncDisparityPolicy>(MyApproxSyncDisparityPolicy(queueSize), imageLeft_, imageDisparitySub_, cameraInfoLeft_);
+			if(approxSyncMaxInterval > 0.0)
+				approxSyncDisparity_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
 			approxSyncDisparity_->registerCallback(boost::bind(&PointCloudXYZRGB::disparityCallback, this, _1, _2, _3));
 
 			approxSyncStereo_ = new message_filters::Synchronizer<MyApproxSyncStereoPolicy>(MyApproxSyncStereoPolicy(queueSize), imageLeft_, imageRight_, cameraInfoLeft_, cameraInfoRight_);
+			if(approxSyncMaxInterval > 0.0)
+				approxSyncStereo_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
 			approxSyncStereo_->registerCallback(boost::bind(&PointCloudXYZRGB::stereoCallback, this, _1, _2, _3, _4));
 		}
 		else

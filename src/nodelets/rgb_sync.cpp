@@ -88,11 +88,15 @@ private:
 
 		int queueSize = 10;
 		bool approxSync = false;
+		double approxSyncMaxInterval = 0.0;
 		pnh.param("approx_sync", approxSync, approxSync);
+		pnh.param("approx_sync_max_interval", approxSyncMaxInterval, approxSyncMaxInterval);
 		pnh.param("queue_size", queueSize, queueSize);
 		pnh.param("compressed_rate", compressedRate_, compressedRate_);
 
 		NODELET_INFO("%s: approx_sync = %s", getName().c_str(), approxSync?"true":"false");
+		if(approxSync)
+			NODELET_INFO("%s: approx_sync_max_interval = %f", getName().c_str(), approxSyncMaxInterval);
 		NODELET_INFO("%s: queue_size  = %d", getName().c_str(), queueSize);
 		NODELET_INFO("%s: compressed_rate = %f", getName().c_str(), compressedRate_);
 
@@ -102,6 +106,8 @@ private:
 		if(approxSync)
 		{
 			approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize), imageSub_, cameraInfoSub_);
+			if(approxSyncMaxInterval > 0.0)
+				approxSync_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
 			approxSync_->registerCallback(boost::bind(&RgbSync::callback, this, _1, _2));
 		}
 		else
@@ -118,9 +124,10 @@ private:
 		imageSub_.subscribe(rgb_it, rgb_nh.resolveName("image_rect"), 1, hintsRgb);
 		cameraInfoSub_.subscribe(rgb_nh, "camera_info", 1);
 
-		std::string subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s \\\n   %s",
+		std::string subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s \\\n   %s",
 							getName().c_str(),
 							approxSync?"approx":"exact",
+							approxSync&&approxSyncMaxInterval!=std::numeric_limits<double>::max()?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
 							imageSub_.getTopic().c_str(),
 							cameraInfoSub_.getTopic().c_str());
 
