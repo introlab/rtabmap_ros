@@ -44,6 +44,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <cv_bridge/cv_bridge.h>
 
 #include "rtabmap_ros/MsgConversion.h"
+#include <rtabmap_ros/RGBDImages.h>
 
 #include <rtabmap/core/util3d.h>
 #include <rtabmap/core/util2d.h>
@@ -79,6 +80,7 @@ public:
 	virtual ~RGBDOdometry()
 	{
 		rgbdSub_.shutdown();
+		rgbdxSub_.shutdown();
 		if(approxSync_)
 		{
 			delete approxSync_;
@@ -133,13 +135,13 @@ private:
 			ROS_ERROR("\"depth_cameras\" parameter doesn't exist anymore. It is replaced by \"rgbd_cameras\" with the \"rgbd_image\" input topics. \"subscribe_rgbd\" should be also set to true.");
 		}
 		pnh.param("rgbd_cameras", rgbdCameras, rgbdCameras);
-		if(rgbdCameras <= 0)
+		if(rgbdCameras < 0)
 		{
-			rgbdCameras = 1;
+			rgbdCameras = 0;
 		}
 		if(rgbdCameras > 5)
 		{
-			NODELET_FATAL("Only 5 cameras maximum supported yet.");
+			NODELET_FATAL("Only 5 cameras maximum supported yet. Set 0 to use rgbd_images input (for which rgbdx_sync node can sync up to 8 cameras).");
 		}
 		pnh.param("keep_color", keepColor_, keepColor_);
 
@@ -298,6 +300,15 @@ private:
                                                         rgbd_image5_sub_.getTopic().c_str());
 				}
 
+			}
+			else if(rgbdCameras == 0)
+			{
+				rgbdxSub_ = nh.subscribe("rgbd_images", 1, &RGBDOdometry::callbackRGBDX, this);
+
+				subscribedTopicsMsg =
+						uFormat("\n%s subscribed to:\n   %s",
+						getName().c_str(),
+						rgbdxSub_.getTopic().c_str());
 			}
 			else
 			{
@@ -582,6 +593,30 @@ private:
 		}
 	}
 
+	void callbackRGBDX(
+			const rtabmap_ros::RGBDImagesConstPtr& images)
+	{
+		callbackCalled();
+		if(!this->isPaused())
+		{
+			if(images->rgbd_images.empty())
+			{
+				NODELET_ERROR("Input topic \"%s\" doesn't contain any image(s)!", rgbdxSub_.getTopic().c_str());
+				return;
+			}
+			std::vector<cv_bridge::CvImageConstPtr> imageMsgs(images->rgbd_images.size());
+			std::vector<cv_bridge::CvImageConstPtr> depthMsgs(images->rgbd_images.size());
+			std::vector<sensor_msgs::CameraInfo> infoMsgs;
+			for(size_t i=0; i<images->rgbd_images.size(); ++i)
+			{
+				rtabmap_ros::toCvShare(images->rgbd_images[i], images, imageMsgs[i], depthMsgs[i]);
+				infoMsgs.push_back(images->rgbd_images[i].rgb_camera_info);
+			}
+
+			this->commonCallback(imageMsgs, depthMsgs, infoMsgs);
+		}
+	}
+
 	void callbackRGBD2(
 			const rtabmap_ros::RGBDImageConstPtr& image,
 			const rtabmap_ros::RGBDImageConstPtr& image2)
@@ -784,6 +819,7 @@ private:
 	message_filters::Subscriber<sensor_msgs::CameraInfo> info_sub_;
 
 	ros::Subscriber rgbdSub_;
+	ros::Subscriber rgbdxSub_;
 	message_filters::Subscriber<rtabmap_ros::RGBDImage> rgbd_image1_sub_;
 	message_filters::Subscriber<rtabmap_ros::RGBDImage> rgbd_image2_sub_;
 	message_filters::Subscriber<rtabmap_ros::RGBDImage> rgbd_image3_sub_;
