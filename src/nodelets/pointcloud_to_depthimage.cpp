@@ -123,6 +123,7 @@ private:
 		depthImage16Pub_ = it.advertise("image_raw", 1); // 16 bits unsigned in mm
 		depthImage32Pub_ = it.advertise("image", 1);     // 32 bits float in meters
 		pointCloudTransformedPub_ = nh.advertise<sensor_msgs::PointCloud2>(nh.resolveName("cloud")+"_transformed", 1);
+		cameraInfoPub_ = nh.advertise<sensor_msgs::PointCloud2>(nh.resolveName("camera_info")+"_depth", 1);
 
 		if(approx)
 		{
@@ -182,12 +183,15 @@ private:
 			rtabmap::Transform localTransform = cloudDisplacement*cloudToCamera;
 
 			rtabmap::CameraModel model = rtabmap_ros::cameraModelFromROS(*cameraInfoMsg, localTransform);
-
+			sensor_msgs::CameraInfo cameraInfoMsgOut = *cameraInfoMsg;
 			if(decimation_ > 1)
 			{
 				if(model.imageWidth()%decimation_ == 0 && model.imageHeight()%decimation_ == 0)
 				{
-					model = model.scaled(1.0f/float(decimation_));
+					float scale = 1.0f/float(decimation_);
+					model = model.scaled(scale);
+
+					rtabmap_ros::cameraModelToROS(model, cameraInfoMsgOut);
 				}
 				else
 				{
@@ -257,12 +261,18 @@ private:
 						cloudStamp, pointCloud2Msg->header.stamp.toSec(),
 						infoStamp, cameraInfoMsg->header.stamp.toSec());
 			}
+
+			if(cameraInfoPub_.getNumSubscribers())
+			{
+				rtabmap_ros::cameraModelToROS(model, cameraInfoMsgOut);
+			}
 		}
 	}
 
 private:
 	image_transport::Publisher depthImage16Pub_;
 	image_transport::Publisher depthImage32Pub_;
+	ros::Publisher cameraInfoPub_;
 	ros::Publisher pointCloudTransformedPub_;
 	message_filters::Subscriber<sensor_msgs::PointCloud2> pointCloudSub_;
 	message_filters::Subscriber<sensor_msgs::CameraInfo> cameraInfoSub_;

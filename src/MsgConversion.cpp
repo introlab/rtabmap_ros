@@ -878,7 +878,7 @@ void cameraModelToROS(
 		memcpy(camInfo.K.elems, model.K_raw().data, 9*sizeof(double));
 	}
 
-	if(camInfo.D.size() == 6)
+	if(model.D_raw().total() == 6)
 	{
 		camInfo.D = std::vector<double>(4);
 		camInfo.D[0] = model.D_raw().at<double>(0,0);
