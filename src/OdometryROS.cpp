@@ -848,20 +848,29 @@ void OdometryROS::processData(SensorData & data, const std_msgs::Header & header
 		--resetCurrentCount_;
 		if(resetCurrentCount_ == 0)
 		{
-			// Check TF to see if sensor fusion is used (e.g., the output of robot_localization)
-			Transform tfPose = this->getTransform(odomFrameId_, frameId_, header.stamp);
-			if(tfPose.isNull())
+			if(!guess_.isNull())
 			{
-				NODELET_WARN( "Odometry automatically reset to latest computed pose!");
-				odometry_->reset(odometry_->getPose());
+				NODELET_WARN( "Odometry automatically reset based on latest guess available from TF (%s->%s, moved %s since got lost)!",
+						guessFrameId_.c_str(), frameId_.c_str(), guess_.prettyPrint().c_str());
+				odometry_->reset(odometry_->getPose() * guess_);
+				guess_.setNull();
 			}
 			else
 			{
-				NODELET_WARN( "Odometry automatically reset to latest odometry pose available from TF (%s->%s)!",
-						odomFrameId_.c_str(), frameId_.c_str());
-				odometry_->reset(tfPose);
+				// Check TF to see if sensor fusion is used (e.g., the output of robot_localization)
+				Transform tfPose = this->getTransform(odomFrameId_, frameId_, header.stamp);
+				if(tfPose.isNull())
+				{
+					NODELET_WARN( "Odometry automatically reset to latest computed pose!");
+					odometry_->reset(odometry_->getPose());
+				}
+				else
+				{
+					NODELET_WARN( "Odometry automatically reset to latest odometry pose available from TF (%s->%s)!",
+							odomFrameId_.c_str(), frameId_.c_str());
+					odometry_->reset(odometry_->getPose());
+				}
 			}
-
 		}
 	}
 
