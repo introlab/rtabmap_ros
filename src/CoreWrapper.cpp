@@ -4159,8 +4159,8 @@ void CoreWrapper::publishStats(const ros::Time & stamp)
 			int id = rtabmap::graph::findNearestNode(nodesOnly, rtabmap_.getLastLocalizationPose());
 			if(id>0)
 			{
-				std::map<int, int> ids = rtabmap_.getMemory()->getNeighborsId(id, 0, 0, false, false, true);
-				std::map<int, int> missingIds;
+				std::map<int, int> ids = rtabmap_.getMemory()->getNeighborsId(id, 0, 0, true, false, true);
+				std::multimap<int, int> missingIds;
 				for(std::map<int, int>::iterator iter=ids.begin(); iter!=ids.end(); ++iter)
 				{
 					if(nodesToRepublish_.find(iter->first) != nodesToRepublish_.end())
@@ -4187,7 +4187,7 @@ void CoreWrapper::publishStats(const ros::Time & stamp)
 
 				int loaded = 0;
 				std::stringstream stream;
-				for(std::map<int, int>::iterator iter=missingIds.begin(); iter!=missingIds.end() && loaded<maxNodesRepublished_; ++iter)
+				for(std::multimap<int, int>::iterator iter=missingIds.begin(); iter!=missingIds.end() && loaded<maxNodesRepublished_; ++iter)
 				{
 					signatures.insert(std::make_pair(iter->second, rtabmap_.getMemory()->getNodeData(iter->second, true, true, true, true)));
 					nodesToRepublish_.erase(iter->second);
