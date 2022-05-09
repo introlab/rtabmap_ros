@@ -106,12 +106,12 @@ private:
 			approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize), imageLeft_, imageRight_, cameraInfoLeft_, cameraInfoRight_);
 			if(approxSyncMaxInterval>0.0)
 				approxSync_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
-			approxSync_->registerCallback(boost::bind(&StereoThrottleNodelet::callback, this, _1, _2, _3, _4));
+			approxSync_->registerCallback(boost::bind(&StereoThrottleNodelet::callback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 		}
 		else
 		{
 			exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize), imageLeft_, imageRight_, cameraInfoLeft_, cameraInfoRight_);
-			exactSync_->registerCallback(boost::bind(&StereoThrottleNodelet::callback, this, _1, _2, _3, _4));
+			exactSync_->registerCallback(boost::bind(&StereoThrottleNodelet::callback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 		}
 
 		imageLeft_.subscribe(left_it, left_nh.resolveName("image"), 1, hintsLeft);

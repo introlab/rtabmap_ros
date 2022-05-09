@@ -111,12 +111,12 @@ private:
 			approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize), image_sub_, image_depth_sub_, info_sub_);
 			if(approxSyncMaxInterval > 0.0)
 				approxSync_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
-			approxSync_->registerCallback(boost::bind(&DataThrottleNodelet::callback, this, _1, _2, _3));
+			approxSync_->registerCallback(boost::bind(&DataThrottleNodelet::callback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3));
 		}
 		else
 		{
 			exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize), image_sub_, image_depth_sub_, info_sub_);
-			exactSync_->registerCallback(boost::bind(&DataThrottleNodelet::callback, this, _1, _2, _3));
+			exactSync_->registerCallback(boost::bind(&DataThrottleNodelet::callback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3));
 		}
 
 		image_sub_.subscribe(rgb_it, rgb_nh.resolveName("image_in"), 1, hintsRgb);

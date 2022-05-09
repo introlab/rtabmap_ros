@@ -160,12 +160,12 @@ private:
 				approxCloudSync_ = new message_filters::Synchronizer<MyApproxCloudSyncPolicy>(MyApproxCloudSyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_, cloud_sub_);
 				if(approxSyncMaxInterval > 0.0)
 					approxCloudSync_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
-				approxCloudSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackCloud, this, _1, _2, _3, _4));
+				approxCloudSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackCloud, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 			}
 			else
 			{
 				exactCloudSync_ = new message_filters::Synchronizer<MyExactCloudSyncPolicy>(MyExactCloudSyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_, cloud_sub_);
-				exactCloudSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackCloud, this, _1, _2, _3, _4));
+				exactCloudSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackCloud, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 			}
 
 			subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s,\n   %s,\n   %s, \n   %s",
@@ -185,12 +185,12 @@ private:
 				approxScanSync_ = new message_filters::Synchronizer<MyApproxScanSyncPolicy>(MyApproxScanSyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_, scan_sub_);
 				if(approxSyncMaxInterval > 0.0)
 					approxScanSync_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
-				approxScanSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackScan, this, _1, _2, _3, _4));
+				approxScanSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackScan, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 			}
 			else
 			{
 				exactScanSync_ = new message_filters::Synchronizer<MyExactScanSyncPolicy>(MyExactScanSyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_, scan_sub_);
-				exactScanSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackScan, this, _1, _2, _3, _4));
+				exactScanSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackScan, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 			}
 
 			subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s \\\n   %s \\\n   %s \\\n   %s",
@@ -460,25 +460,25 @@ protected:
 		{
 			delete approxScanSync_;
 			approxScanSync_ = new message_filters::Synchronizer<MyApproxScanSyncPolicy>(MyApproxScanSyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_, scan_sub_);
-			approxScanSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackScan, this, _1, _2, _3, _4));
+			approxScanSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackScan, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 		}
 		if(exactScanSync_)
 		{
 			delete exactScanSync_;
 			exactScanSync_ = new message_filters::Synchronizer<MyExactScanSyncPolicy>(MyExactScanSyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_, scan_sub_);
-			exactScanSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackScan, this, _1, _2, _3, _4));
+			exactScanSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackScan, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 		}
 		if(approxCloudSync_)
 		{
 			delete approxCloudSync_;
 			approxCloudSync_ = new message_filters::Synchronizer<MyApproxCloudSyncPolicy>(MyApproxCloudSyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_, cloud_sub_);
-			approxCloudSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackCloud, this, _1, _2, _3, _4));
+			approxCloudSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackCloud, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 		}
 		if(exactCloudSync_)
 		{
 			delete exactCloudSync_;
 			exactCloudSync_ = new message_filters::Synchronizer<MyExactCloudSyncPolicy>(MyExactCloudSyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_, cloud_sub_);
-			exactCloudSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackCloud, this, _1, _2, _3, _4));
+			exactCloudSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackCloud, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 		}
 	}
 

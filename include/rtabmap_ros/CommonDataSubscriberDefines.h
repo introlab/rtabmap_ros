@@ -110,13 +110,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 		{ \
 			PREFIX##ApproximateSync_ = new message_filters::Synchronizer<PREFIX##ApproximateSyncPolicy>( \
 					PREFIX##ApproximateSyncPolicy(QUEUE_SIZE), SUB0, SUB1); \
-			PREFIX##ApproximateSync_->registerCallback(boost::bind(&CLASS::PREFIX##Callback, this, _1, _2)); \
+			PREFIX##ApproximateSync_->registerCallback(boost::bind(&CLASS::PREFIX##Callback, this, boost::placeholders::_1, boost::placeholders::_2)); \
 		} \
 		else \
 		{ \
 			PREFIX##ExactSync_ = new message_filters::Synchronizer<PREFIX##ExactSyncPolicy>( \
 					PREFIX##ExactSyncPolicy(QUEUE_SIZE), SUB0, SUB1); \
-			PREFIX##ExactSync_->registerCallback(boost::bind(&CLASS::PREFIX##Callback, this, _1, _2)); \
+			PREFIX##ExactSync_->registerCallback(boost::bind(&CLASS::PREFIX##Callback, this, boost::placeholders::_1, boost::placeholders::_2)); \
 		} \
 		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s \\\n   %s", \
 				name_.c_str(), \
@@ -129,13 +129,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 		{ \
 			PREFIX##ApproximateSync_ = new message_filters::Synchronizer<PREFIX##ApproximateSyncPolicy>( \
 					PREFIX##ApproximateSyncPolicy(QUEUE_SIZE), SUB0, SUB1, SUB2); \
-			PREFIX##ApproximateSync_->registerCallback(boost::bind(&CLASS::PREFIX##Callback, this, _1, _2, _3)); \
+			PREFIX##ApproximateSync_->registerCallback(boost::bind(&CLASS::PREFIX##Callback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3)); \
 		} \
 		else \
 		{ \
 			PREFIX##ExactSync_ = new message_filters::Synchronizer<PREFIX##ExactSyncPolicy>( \
 					PREFIX##ExactSyncPolicy(QUEUE_SIZE), SUB0, SUB1, SUB2); \
-			PREFIX##ExactSync_->registerCallback(boost::bind(&CLASS::PREFIX##Callback, this, _1, _2, _3)); \
+			PREFIX##ExactSync_->registerCallback(boost::bind(&CLASS::PREFIX##Callback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3)); \
 		} \
 		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s \\\n   %s \\\n   %s", \
 				name_.c_str(), \
@@ -149,13 +149,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 		{ \
 			PREFIX##ApproximateSync_ = new message_filters::Synchronizer<PREFIX##ApproximateSyncPolicy>( \
 					PREFIX##ApproximateSyncPolicy(QUEUE_SIZE), SUB0, SUB1, SUB2, SUB3); \
-			PREFIX##ApproximateSync_->registerCallback(boost::bind(&CLASS::PREFIX##Callback, this, _1, _2, _3, _4)); \
+			PREFIX##ApproximateSync_->registerCallback(boost::bind(&CLASS::PREFIX##Callback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4)); \
 		} \
 		else \
 		{ \
 			PREFIX##ExactSync_ = new message_filters::Synchronizer<PREFIX##ExactSyncPolicy>( \
 					PREFIX##ExactSyncPolicy(QUEUE_SIZE), SUB0, SUB1, SUB2, SUB3); \
-			PREFIX##ExactSync_->registerCallback(boost::bind(&CLASS::PREFIX##Callback, this, _1, _2, _3, _4)); \
+			PREFIX##ExactSync_->registerCallback(boost::bind(&CLASS::PREFIX##Callback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4)); \
 		} \
 		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s \\\n   %s \\\n   %s \\\n   %s", \
 				name_.c_str(), \
@@ -170,13 +170,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 		{ \
 			PREFIX##ApproximateSync_ = new message_filters::Synchronizer<PREFIX##ApproximateSyncPolicy>( \
 					PREFIX##ApproximateSyncPolicy(QUEUE_SIZE), SUB0, SUB1, SUB2, SUB3, SUB4); \
-			PREFIX##ApproximateSync_->registerCallback(boost::bind(&CLASS::PREFIX##Callback, this, _1, _2, _3, _4, _5)); \
+			PREFIX##ApproximateSync_->registerCallback(boost::bind(&CLASS::PREFIX##Callback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4, boost::placeholders::_5)); \
 		} \
 		else \
 		{ \
 			PREFIX##ExactSync_ = new message_filters::Synchronizer<PREFIX##ExactSyncPolicy>( \
 					PREFIX##ExactSyncPolicy(QUEUE_SIZE), SUB0, SUB1, SUB2, SUB3, SUB4); \
-			PREFIX##ExactSync_->registerCallback(boost::bind(&CLASS::PREFIX##Callback, this, _1, _2, _3, _4, _5)); \
+			PREFIX##ExactSync_->registerCallback(boost::bind(&CLASS::PREFIX##Callback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4, boost::placeholders::_5)); \
 		} \
 		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s \\\n   %s \\\n   %s \\\n   %s \\\n   %s", \
 				name_.c_str(), \
@@ -192,13 +192,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 		{ \
 			PREFIX##ApproximateSync_ = new message_filters::Synchronizer<PREFIX##ApproximateSyncPolicy>( \
 					PREFIX##ApproximateSyncPolicy(QUEUE_SIZE), SUB0, SUB1, SUB2, SUB3, SUB4, SUB5); \
-			PREFIX##ApproximateSync_->registerCallback(boost::bind(&CLASS::PREFIX##Callback, this, _1, _2, _3, _4, _5, _6)); \
+			PREFIX##ApproximateSync_->registerCallback(boost::bind(&CLASS::PREFIX##Callback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4, boost::placeholders::_5, boost::placeholders::_6)); \
 		} \
 		else \
 		{ \
 			PREFIX##ExactSync_ = new message_filters::Synchronizer<PREFIX##ExactSyncPolicy>( \
 					PREFIX##ExactSyncPolicy(QUEUE_SIZE), SUB0, SUB1, SUB2, SUB3, SUB4, SUB5); \
-			PREFIX##ExactSync_->registerCallback(boost::bind(&CLASS::PREFIX##Callback, this, _1, _2, _3, _4, _5, _6)); \
+			PREFIX##ExactSync_->registerCallback(boost::bind(&CLASS::PREFIX##Callback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4, boost::placeholders::_5, boost::placeholders::_6)); \
 		} \
 		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s \\\n   %s \\\n   %s \\\n   %s \\\n   %s \\\n   %s", \
 				name_.c_str(), \
@@ -215,13 +215,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 		{ \
 			PREFIX##ApproximateSync_ = new message_filters::Synchronizer<PREFIX##ApproximateSyncPolicy>( \
 					PREFIX##ApproximateSyncPolicy(QUEUE_SIZE), SUB0, SUB1, SUB2, SUB3, SUB4, SUB5, SUB6); \
-			PREFIX##ApproximateSync_->registerCallback(boost::bind(&CLASS::PREFIX##Callback, this, _1, _2, _3, _4, _5, _6, _7)); \
+			PREFIX##ApproximateSync_->registerCallback(boost::bind(&CLASS::PREFIX##Callback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4, boost::placeholders::_5, boost::placeholders::_6, boost::placeholders::_7)); \
 		} \
 		else \
 		{ \
 			PREFIX##ExactSync_ = new message_filters::Synchronizer<PREFIX##ExactSyncPolicy>( \
 					PREFIX##ExactSyncPolicy(QUEUE_SIZE), SUB0, SUB1, SUB2, SUB3, SUB4, SUB5, SUB6); \
-			PREFIX##ExactSync_->registerCallback(boost::bind(&CLASS::PREFIX##Callback, this, _1, _2, _3, _4, _5, _6, _7)); \
+			PREFIX##ExactSync_->registerCallback(boost::bind(&CLASS::PREFIX##Callback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4, boost::placeholders::_5, boost::placeholders::_6, boost::placeholders::_7)); \
 		} \
 		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s \\\n   %s \\\n   %s \\\n   %s \\\n   %s \\\n   %s \\\n   %s", \
 				name_.c_str(), \
@@ -239,13 +239,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 		{ \
 			PREFIX##ApproximateSync_ = new message_filters::Synchronizer<PREFIX##ApproximateSyncPolicy>( \
 					PREFIX##ApproximateSyncPolicy(QUEUE_SIZE), SUB0, SUB1, SUB2, SUB3, SUB4, SUB5, SUB6, SUB7); \
-			PREFIX##ApproximateSync_->registerCallback(boost::bind(&CLASS::PREFIX##Callback, this, _1, _2, _3, _4, _5, _6, _7, _8)); \
+			PREFIX##ApproximateSync_->registerCallback(boost::bind(&CLASS::PREFIX##Callback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4, boost::placeholders::_5, boost::placeholders::_6, boost::placeholders::_7, boost::placeholders::_8)); \
 		} \
 		else \
 		{ \
 			PREFIX##ExactSync_ = new message_filters::Synchronizer<PREFIX##ExactSyncPolicy>( \
 					PREFIX##ExactSyncPolicy(QUEUE_SIZE), SUB0, SUB1, SUB2, SUB3, SUB4, SUB5, SUB6, SUB7); \
-			PREFIX##ExactSync_->registerCallback(boost::bind(&CLASS::PREFIX##Callback, this, _1, _2, _3, _4, _5, _6, _7, _8)); \
+			PREFIX##ExactSync_->registerCallback(boost::bind(&CLASS::PREFIX##Callback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4, boost::placeholders::_5, boost::placeholders::_6, boost::placeholders::_7, boost::placeholders::_8)); \
 		} \
 		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s \\\n   %s \\\n   %s \\\n   %s \\\n   %s \\\n   %s \\\n   %s \\\n   %s", \
 				name_.c_str(), \

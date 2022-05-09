@@ -108,12 +108,12 @@ private:
 			approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize), imageSub_, cameraInfoSub_);
 			if(approxSyncMaxInterval > 0.0)
 				approxSync_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
-			approxSync_->registerCallback(boost::bind(&RgbSync::callback, this, _1, _2));
+			approxSync_->registerCallback(boost::bind(&RgbSync::callback, this, boost::placeholders::_1, boost::placeholders::_2));
 		}
 		else
 		{
 			exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize), imageSub_, cameraInfoSub_);
-			exactSync_->registerCallback(boost::bind(&RgbSync::callback, this, _1, _2));
+			exactSync_->registerCallback(boost::bind(&RgbSync::callback, this, boost::placeholders::_1, boost::placeholders::_2));
 		}
 
 		ros::NodeHandle rgb_nh(nh, "rgb");

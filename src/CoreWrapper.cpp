@@ -581,7 +581,7 @@ void CoreWrapper::onInit()
 				{
 					NODELET_INFO("Subscribe to inter odom + info messages");
 					interOdomSync_ = new message_filters::Synchronizer<MyExactInterOdomSyncPolicy>(MyExactInterOdomSyncPolicy(100), interOdomSyncSub_, interOdomInfoSyncSub_);
-					interOdomSync_->registerCallback(boost::bind(&CoreWrapper::interOdomInfoCallback, this, _1, _2));
+					interOdomSync_->registerCallback(boost::bind(&CoreWrapper::interOdomInfoCallback, this, boost::placeholders::_1, boost::placeholders::_2));
 					interOdomSyncSub_.subscribe(nh, "inter_odom", 100);
 					interOdomInfoSyncSub_.subscribe(nh, "inter_odom_info", 100);
 				}
@@ -4467,9 +4467,9 @@ void CoreWrapper::publishCurrentGoal(const ros::Time & stamp)
 				goal.target_pose = poseMsg;
 
 				mbClient_->sendGoal(goal,
-						boost::bind(&CoreWrapper::goalDoneCb, this, _1, _2),
+						boost::bind(&CoreWrapper::goalDoneCb, this, boost::placeholders::_1, boost::placeholders::_2),
 						boost::bind(&CoreWrapper::goalActiveCb, this),
-						boost::bind(&CoreWrapper::goalFeedbackCb, this, _1));
+						boost::bind(&CoreWrapper::goalFeedbackCb, this, boost::placeholders::_1));
 				lastPublishedMetricGoal_ = currentMetricGoal_;
 			}
 			else
