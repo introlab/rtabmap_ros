@@ -449,7 +449,10 @@ set_target_properties(rtabmap_point_cloud_assembler PROPERTIES OUTPUT_NAME "poin
 IF(rviz_FOUND)
 
     ## We also use Ogre for rviz plugins
-    include($ENV{ROS_ROOT}/core/rosbuild/FindPkgConfig.cmake)
+    # this file doesn't exist post-noetic, but pkg_check_modules still works
+    IF(EXISTS $ENV{ROS_ROOT}/core/rosbuild/FindPkgConfig.cmake)
+      include($ENV{ROS_ROOT}/core/rosbuild/FindPkgConfig.cmake)
+    ENDIF()
     pkg_check_modules(OGRE OGRE)
     include_directories( ${OGRE_INCLUDE_DIRS} )
     link_directories( ${OGRE_LIBRARY_DIRS} )
