@@ -149,7 +149,7 @@ ros::Subscriber sub;
 void connectCb()
 {
 	ros::NodeHandle n;
-	sub = n.subscribe < costmap_2d::VoxelGrid > ("voxel_grid", 1, boost::bind(voxelCallback, pub, _1));
+	sub = n.subscribe < costmap_2d::VoxelGrid > ("voxel_grid", 1, boost::bind(voxelCallback, pub, boost::placeholders::_1));
 }
 
 void disconnectCb()

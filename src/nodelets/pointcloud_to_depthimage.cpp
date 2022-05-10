@@ -129,13 +129,13 @@ private:
 		if(approx)
 		{
 			approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize), pointCloudSub_, cameraInfoSub_);
-			approxSync_->registerCallback(boost::bind(&PointCloudToDepthImage::callback, this, _1, _2));
+			approxSync_->registerCallback(boost::bind(&PointCloudToDepthImage::callback, this, boost::placeholders::_1, boost::placeholders::_2));
 		}
 		else
 		{
 			fixedFrameId_.clear();
 			exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize), pointCloudSub_, cameraInfoSub_);
-			exactSync_->registerCallback(boost::bind(&PointCloudToDepthImage::callback, this, _1, _2));
+			exactSync_->registerCallback(boost::bind(&PointCloudToDepthImage::callback, this, boost::placeholders::_1, boost::placeholders::_2));
 		}
 
 		pointCloudSub_.subscribe(nh, "cloud", 1);

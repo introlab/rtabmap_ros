@@ -183,7 +183,7 @@ private:
 								rgbd_image2_sub_);
 						if(approxSyncMaxInterval > 0.0)
 							approxSync2_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
-						approxSync2_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD2, this, _1, _2));
+						approxSync2_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD2, this, boost::placeholders::_1, boost::placeholders::_2));
 					}
 					else
 					{
@@ -191,7 +191,7 @@ private:
 								MyExactSync2Policy(queueSize_),
 								rgbd_image1_sub_,
 								rgbd_image2_sub_);
-						exactSync2_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD2, this, _1, _2));
+						exactSync2_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD2, this, boost::placeholders::_1, boost::placeholders::_2));
 					}
 					subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s \\\n   %s",
 							getName().c_str(),
@@ -211,7 +211,7 @@ private:
 								rgbd_image3_sub_);
 						if(approxSyncMaxInterval > 0.0)
 							approxSync3_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
-						approxSync3_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD3, this, _1, _2, _3));
+						approxSync3_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD3, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3));
 					}
 					else
 					{
@@ -220,7 +220,7 @@ private:
 								rgbd_image1_sub_,
 								rgbd_image2_sub_,
 								rgbd_image3_sub_);
-						exactSync3_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD3, this, _1, _2, _3));
+						exactSync3_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD3, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3));
 					}
 					subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s \\\n   %s \\\n   %s",
 							getName().c_str(),
@@ -242,7 +242,7 @@ private:
 								rgbd_image4_sub_);
 						if(approxSyncMaxInterval > 0.0)
 							approxSync4_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
-						approxSync4_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD4, this, _1, _2, _3, _4));
+						approxSync4_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD4, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 					}
 					else
 					{
@@ -252,7 +252,7 @@ private:
 								rgbd_image2_sub_,
 								rgbd_image3_sub_,
 								rgbd_image4_sub_);
-						exactSync4_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD4, this, _1, _2, _3, _4));
+						exactSync4_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD4, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 					}
 					subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s \\\n   %s \\\n   %s \\\n   %s",
 							getName().c_str(),
@@ -276,7 +276,7 @@ private:
                                 rgbd_image5_sub_);
 						if(approxSyncMaxInterval > 0.0)
 							approxSync5_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
-						approxSync5_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD5, this, _1, _2, _3, _4, _5));
+						approxSync5_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD5, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4, boost::placeholders::_5));
 					}
 					else
 					{
@@ -287,7 +287,7 @@ private:
 								rgbd_image3_sub_,
 								rgbd_image4_sub_,
 								rgbd_image5_sub_);
-						exactSync5_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD5, this, _1, _2, _3, _4, _5));
+						exactSync5_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD5, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4, boost::placeholders::_5));
 					}
 					subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s \\\n  %s \\\n  %s \\\n   %s \\\n   %s",
 							getName().c_str(),
@@ -340,12 +340,12 @@ private:
 				approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_);
 				if(approxSyncMaxInterval > 0.0)
 					approxSync_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
-				approxSync_->registerCallback(boost::bind(&RGBDOdometry::callback, this, _1, _2, _3));
+				approxSync_->registerCallback(boost::bind(&RGBDOdometry::callback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3));
 			}
 			else
 			{
 				exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_);
-				exactSync_->registerCallback(boost::bind(&RGBDOdometry::callback, this, _1, _2, _3));
+				exactSync_->registerCallback(boost::bind(&RGBDOdometry::callback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3));
 			}
 
 			subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s \\\n   %s \\\n   %s",
@@ -719,13 +719,13 @@ protected:
 		{
 			delete approxSync_;
 			approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_);
-			approxSync_->registerCallback(boost::bind(&RGBDOdometry::callback, this, _1, _2, _3));
+			approxSync_->registerCallback(boost::bind(&RGBDOdometry::callback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3));
 		}
 		if(exactSync_)
 		{
 			delete exactSync_;
 			exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_);
-			exactSync_->registerCallback(boost::bind(&RGBDOdometry::callback, this, _1, _2, _3));
+			exactSync_->registerCallback(boost::bind(&RGBDOdometry::callback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3));
 		}
 		if(approxSync2_)
 		{
@@ -734,7 +734,7 @@ protected:
 					MyApproxSync2Policy(queueSize_),
 					rgbd_image1_sub_,
 					rgbd_image2_sub_);
-			approxSync2_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD2, this, _1, _2));
+			approxSync2_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD2, this, boost::placeholders::_1, boost::placeholders::_2));
 		}
 		if(exactSync2_)
 		{
@@ -743,7 +743,7 @@ protected:
 					MyExactSync2Policy(queueSize_),
 					rgbd_image1_sub_,
 					rgbd_image2_sub_);
-			exactSync2_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD2, this, _1, _2));
+			exactSync2_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD2, this, boost::placeholders::_1, boost::placeholders::_2));
 		}
 		if(approxSync3_)
 		{
@@ -753,7 +753,7 @@ protected:
 					rgbd_image1_sub_,
 					rgbd_image2_sub_,
 					rgbd_image3_sub_);
-			approxSync3_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD3, this, _1, _2, _3));
+			approxSync3_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD3, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3));
 		}
 		if(exactSync3_)
 		{
@@ -763,7 +763,7 @@ protected:
 					rgbd_image1_sub_,
 					rgbd_image2_sub_,
 					rgbd_image3_sub_);
-			exactSync3_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD3, this, _1, _2, _3));
+			exactSync3_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD3, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3));
 		}
 		if(approxSync4_)
 		{
@@ -774,7 +774,7 @@ protected:
 					rgbd_image2_sub_,
 					rgbd_image3_sub_,
 					rgbd_image4_sub_);
-			approxSync4_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD4, this, _1, _2, _3, _4));
+			approxSync4_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD4, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 		}
 		if(exactSync4_)
 		{
@@ -785,7 +785,7 @@ protected:
 					rgbd_image2_sub_,
 					rgbd_image3_sub_,
 					rgbd_image4_sub_);
-			exactSync4_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD4, this, _1, _2, _3, _4));
+			exactSync4_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD4, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 		}
 		if(approxSync5_)
 		{
@@ -797,7 +797,7 @@ protected:
 					rgbd_image3_sub_,
 					rgbd_image4_sub_,
                                         rgbd_image5_sub_);
-			approxSync5_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD5, this, _1, _2, _3, _4, _5));
+			approxSync5_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD5, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4, boost::placeholders::_5));
 		}
 		if(exactSync5_)
 		{
@@ -809,7 +809,7 @@ protected:
 					rgbd_image3_sub_,
 					rgbd_image4_sub_,
                                         rgbd_image5_sub_);
-			exactSync5_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD5, this, _1, _2, _3, _4, _5));
+			exactSync5_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD5, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4, boost::placeholders::_5));
 		}
 	}
 

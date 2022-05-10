@@ -160,7 +160,7 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 			MyInfoMapSyncPolicy(this->getQueueSize()),
 			infoTopic_,
 			mapDataTopic_);
-	infoMapSync_->registerCallback(boost::bind(&GuiWrapper::infoMapCallback, this, _1, _2));
+	infoMapSync_->registerCallback(boost::bind(&GuiWrapper::infoMapCallback, this, boost::placeholders::_1, boost::placeholders::_2));
 
 	goalTopic_.subscribe(nh, "goal_node", 1);
 	pathTopic_.subscribe(nh, "global_path", 1);
@@ -168,7 +168,7 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 			MyGoalPathSyncPolicy(this->getQueueSize()),
 			goalTopic_,
 			pathTopic_);
-	goalPathSync_->registerCallback(boost::bind(&GuiWrapper::goalPathCallback, this, _1, _2));
+	goalPathSync_->registerCallback(boost::bind(&GuiWrapper::goalPathCallback, this, boost::placeholders::_1, boost::placeholders::_2));
 	goalReachedTopic_ = nh.subscribe("goal_reached", 1, &GuiWrapper::goalReachedCallback, this);
 
 	setupCallbacks(nh, pnh, ros::this_node::getName()); // do it at the end

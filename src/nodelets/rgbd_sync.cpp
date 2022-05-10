@@ -121,12 +121,12 @@ private:
 			approxSyncDepth_ = new message_filters::Synchronizer<MyApproxSyncDepthPolicy>(MyApproxSyncDepthPolicy(queueSize), imageSub_, imageDepthSub_, cameraInfoSub_);
 			if(approxSyncMaxInterval > 0.0)
 				approxSyncDepth_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
-			approxSyncDepth_->registerCallback(boost::bind(&RGBDSync::callback, this, _1, _2, _3));
+			approxSyncDepth_->registerCallback(boost::bind(&RGBDSync::callback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3));
 		}
 		else
 		{
 			exactSyncDepth_ = new message_filters::Synchronizer<MyExactSyncDepthPolicy>(MyExactSyncDepthPolicy(queueSize), imageSub_, imageDepthSub_, cameraInfoSub_);
-			exactSyncDepth_->registerCallback(boost::bind(&RGBDSync::callback, this, _1, _2, _3));
+			exactSyncDepth_->registerCallback(boost::bind(&RGBDSync::callback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3));
 		}
 
 		ros::NodeHandle rgb_nh(nh, "rgb");

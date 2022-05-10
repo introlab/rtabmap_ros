@@ -108,12 +108,12 @@ private:
 			approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize), imageLeftSub_, imageRightSub_, cameraInfoLeftSub_, cameraInfoRightSub_);
 			if(approxSyncMaxInterval>0.0)
 				approxSync_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
-			approxSync_->registerCallback(boost::bind(&StereoSync::callback, this, _1, _2, _3, _4));
+			approxSync_->registerCallback(boost::bind(&StereoSync::callback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 		}
 		else
 		{
 			exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize), imageLeftSub_, imageRightSub_, cameraInfoLeftSub_, cameraInfoRightSub_);
-			exactSync_->registerCallback(boost::bind(&StereoSync::callback, this, _1, _2, _3, _4));
+			exactSync_->registerCallback(boost::bind(&StereoSync::callback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 		}
 
 		ros::NodeHandle left_nh(nh, "left");
