@@ -62,11 +62,10 @@ jobs:
         name: Build and push
         uses: docker/build-push-action@v2
         with:
-          context: ./docker/${{ matrix.docker_path }}
+          context: .
           push: true
           platforms: ${{ matrix.docker_platforms }}
-          build-args: |
-            CACHE_DATE=${{ github.head_ref }}.${{ github.sha }}
+          file: ./docker/${{ matrix.docker_path }}/Dockerfile
           tags: introlab3it/rtabmap_ros:${{ matrix.docker_tag }}
           cache-from: type=registry,ref=introlab3it/rtabmap_ros:${{ matrix.docker_tag }}
           cache-to: type=inline
