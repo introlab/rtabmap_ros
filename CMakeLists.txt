@@ -603,6 +603,7 @@ install(TARGETS
    rtabmap_rgbd_sync
    rtabmap_rgbdx_sync
    rtabmap_rgbd_relay
+   rtabmap_stereo_sync
    rtabmap_wifi_signal_sub
    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
