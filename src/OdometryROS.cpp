@@ -815,30 +815,45 @@ void OdometryROS::processData(SensorData & data, const std_msgs::Header & header
 	{
 		return;
 	}
-	else if(publishNullWhenLost_)
+	else // pose is null / lost
 	{
-		//NODELET_WARN( "Odometry lost!");
+		if(publishNullWhenLost_)
+		{
+			//NODELET_WARN( "Odometry lost!");
 
-		//send null pose to notify that odometry is lost
-		nav_msgs::Odometry odom;
-		odom.header.stamp = header.stamp; // use corresponding time stamp to image
-		odom.header.frame_id = odomFrameId_;
-		odom.child_frame_id = frameId_;
-		odom.pose.covariance.at(0) = BAD_COVARIANCE;  // xx
-		odom.pose.covariance.at(7) = BAD_COVARIANCE;  // yy
-		odom.pose.covariance.at(14) = BAD_COVARIANCE; // zz
-		odom.pose.covariance.at(21) = BAD_COVARIANCE; // rr
-		odom.pose.covariance.at(28) = BAD_COVARIANCE; // pp
-		odom.pose.covariance.at(35) = BAD_COVARIANCE; // yawyaw
-		odom.twist.covariance.at(0) = BAD_COVARIANCE;  // xx
-		odom.twist.covariance.at(7) = BAD_COVARIANCE;  // yy
-		odom.twist.covariance.at(14) = BAD_COVARIANCE; // zz
-		odom.twist.covariance.at(21) = BAD_COVARIANCE; // rr
-		odom.twist.covariance.at(28) = BAD_COVARIANCE; // pp
-		odom.twist.covariance.at(35) = BAD_COVARIANCE; // yawyaw
+			//send null pose to notify that odometry is lost
+			nav_msgs::Odometry odom;
+			odom.header.stamp = header.stamp; // use corresponding time stamp to image
+			odom.header.frame_id = odomFrameId_;
+			odom.child_frame_id = frameId_;
+			odom.pose.covariance.at(0) = BAD_COVARIANCE;  // xx
+			odom.pose.covariance.at(7) = BAD_COVARIANCE;  // yy
+			odom.pose.covariance.at(14) = BAD_COVARIANCE; // zz
+			odom.pose.covariance.at(21) = BAD_COVARIANCE; // rr
+			odom.pose.covariance.at(28) = BAD_COVARIANCE; // pp
+			odom.pose.covariance.at(35) = BAD_COVARIANCE; // yawyaw
+			odom.twist.covariance.at(0) = BAD_COVARIANCE;  // xx
+			odom.twist.covariance.at(7) = BAD_COVARIANCE;  // yy
+			odom.twist.covariance.at(14) = BAD_COVARIANCE; // zz
+			odom.twist.covariance.at(21) = BAD_COVARIANCE; // rr
+			odom.twist.covariance.at(28) = BAD_COVARIANCE; // pp
+			odom.twist.covariance.at(35) = BAD_COVARIANCE; // yawyaw
 
-		//publish the message
-		odomPub_.publish(odom);
+			//publish the message
+			odomPub_.publish(odom);
+		}
+
+		// Publish the Tf correction using guess pose directly so that TF tree is not broken when vo is lost
+		if(publishTf_ && !guess_.isNull())
+		{
+			geometry_msgs::TransformStamped correctionMsg;
+			correctionMsg.child_frame_id = guessFrameId_;
+			correctionMsg.header.frame_id = odomFrameId_;
+			correctionMsg.header.stamp = header.stamp;
+			Transform correction = odometry_->getPose() * guess_ * guessCurrentPose.inverse();
+			rtabmap_ros::transformToGeometryMsg(correction, correctionMsg.transform);
+			tfBroadcaster_.sendTransform(correctionMsg);
+		}
 	}
 
 	if(pose.isNull() && resetCurrentCount_ > 0)
