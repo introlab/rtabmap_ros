@@ -122,6 +122,8 @@ add_message_files(
    GPS.msg
    Path.msg
    EnvSensor.msg
+   CameraModel.msg
+   CameraModels.msg
 )
 
 ## Generate services in the 'srv' folder

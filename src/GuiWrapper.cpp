@@ -523,7 +523,7 @@ void GuiWrapper::commonDepthCallback(
 
 	cv::Mat rgb;
 	cv::Mat depth;
-	std::vector<CameraModel> cameraModels;
+	std::vector<rtabmap::CameraModel> cameraModels;
 	LaserScan scan;
 	rtabmap::OdometryInfo info;
 	bool ignoreData = false;
@@ -937,7 +937,7 @@ void GuiWrapper::commonLaserScanCallback(
 				scan,
 				cv::Mat(),
 				cv::Mat(),
-				CameraModel(),
+				rtabmap::CameraModel(),
 				odomHeader.seq,
 				rtabmap_ros::timestampFromROS(odomHeader.stamp)),
 		odomMsg.get()?rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose):odomT,
@@ -1009,7 +1009,7 @@ void GuiWrapper::commonOdomCallback(
 		rtabmap::SensorData(
 				cv::Mat(),
 				cv::Mat(),
-				CameraModel(),
+				rtabmap::CameraModel(),
 				odomHeader.seq,
 				rtabmap_ros::timestampFromROS(odomHeader.stamp)),
 		odomMsg.get()?rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose):odomT,

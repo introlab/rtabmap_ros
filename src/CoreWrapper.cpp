@@ -521,16 +521,6 @@ void CoreWrapper::onInit()
 	bool subscribeRGBD = false;
 	pnh.param("rgbd_cameras", cameras, cameras);
 	pnh.param("subscribe_rgbd", subscribeRGBD, subscribeRGBD);
-	if(subscribeRGBD && cameras> 1 && estimationType>0)
-	{
-		NODELET_WARN("Setting \"%s\" parameter to 0 (%d is not supported "
-				"for multi-cameras) as \"subscribe_rgbd\" is "
-				"true and \"rgbd_cameras\">1. Set \"%s\" to 0 to suppress this warning.",
-				Parameters::kVisEstimationType().c_str(),
-				estimationType,
-				Parameters::kVisEstimationType().c_str());
-		uInsert(parameters_, ParametersPair(Parameters::kVisEstimationType(), "0"));
-	}
 
 	// modify default parameters with those in the database
 	if(!deleteDbOnStart)
@@ -1794,7 +1784,7 @@ void CoreWrapper::commonLaserScanCallback(
 			scan,
 			cv::Mat(),
 			cv::Mat(),
-			CameraModel(),
+			rtabmap::CameraModel(),
 			lastPoseIntermediate_?-1:!scan2dMsg.ranges.empty()?scan2dMsg.header.seq:scan3dMsg.header.seq,
 			rtabmap_ros::timestampFromROS(lastPoseStamp_),
 			userData);
@@ -1858,7 +1848,7 @@ void CoreWrapper::commonOdomCallback(
 	SensorData data(
 			cv::Mat(),
 			cv::Mat(),
-			CameraModel(),
+			rtabmap::CameraModel(),
 			lastPoseIntermediate_?-1:odomMsg->header.seq,
 			rtabmap_ros::timestampFromROS(lastPoseStamp_),
 			userData);
@@ -1943,7 +1933,7 @@ void CoreWrapper::process(
 						covariance.at<double>(4,4) = uIsFinite(covariance.at<double>(4,4)) && covariance.at<double>(4,4)!=0?covariance.at<double>(4,4):1;
 					}
 
-					SensorData interData(cv::Mat(), cv::Mat(), CameraModel(), -1, rtabmap_ros::timestampFromROS(iter->first.header.stamp));
+					SensorData interData(cv::Mat(), cv::Mat(), rtabmap::CameraModel(), -1, rtabmap_ros::timestampFromROS(iter->first.header.stamp));
 					Transform gt;
 					if(!groundTruthFrameId_.empty())
 					{
