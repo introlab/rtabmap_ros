@@ -113,6 +113,14 @@ public:
 		{
 			delete exactSync4_;
 		}
+		if(approxSync5_)
+		{
+			delete approxSync5_;
+		}
+		if(exactSync5_)
+		{
+			delete exactSync5_;
+		}
 	}
 
 private:
@@ -397,9 +405,7 @@ private:
 		int cameraCount = rgbImages.size();
 		cv::Mat rgb;
 		cv::Mat depth;
-		pcl::PointCloud<pcl::PointXYZ> scanCloud;
 		std::vector<rtabmap::CameraModel> cameraModels;
-		double stampDiff = 0;
 		for(unsigned int i=0; i<rgbImages.size(); ++i)
 		{
 			if(!(rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) ==0 ||
@@ -488,7 +494,6 @@ private:
 			}
 
 			cv_bridge::CvImageConstPtr ptrDepth = depthImages[i];
-			cv::Mat subDepth = ptrDepth->image;
 
 			// initialize
 			if(rgb.empty())
@@ -497,7 +502,7 @@ private:
 			}
 			if(depth.empty())
 			{
-				depth = cv::Mat(depthHeight, depthWidth*cameraCount, subDepth.type());
+				depth = cv::Mat(depthHeight, depthWidth*cameraCount, ptrDepth->image.type());
 			}
 
 			if(ptrImage->image.type() == rgb.type())
@@ -506,17 +511,17 @@ private:
 			}
 			else
 			{
-				NODELET_ERROR("Some RGB images are not the same type!");
+				NODELET_ERROR("Some RGB images are not the same type! %d vs %d", ptrImage->image.type(), rgb.type());
 				return;
 			}
 
-			if(subDepth.type() == depth.type())
+			if(ptrDepth->image.type() == depth.type())
 			{
-				subDepth.copyTo(cv::Mat(depth, cv::Rect(i*depthWidth, 0, depthWidth, depthHeight)));
+				ptrDepth->image.copyTo(cv::Mat(depth, cv::Rect(i*depthWidth, 0, depthWidth, depthHeight)));
 			}
 			else
 			{
-				NODELET_ERROR("Some Depth images are not the same type! %d vs %d", subDepth.type(), depth.type());
+				NODELET_ERROR("Some Depth images are not the same type! %d vs %d", ptrDepth->image.type(), depth.type());
 				return;
 			}
 
