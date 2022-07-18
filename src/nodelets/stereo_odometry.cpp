@@ -566,7 +566,7 @@ private:
 						imageRight->header.stamp.toSec());
 			}
 
-			this->commonCallback(leftMsgs, leftMsgs, leftInfoMsgs, rightInfoMsgs);
+			this->commonCallback(leftMsgs, rightMsgs, leftInfoMsgs, rightInfoMsgs);
 		}
 	}
 
