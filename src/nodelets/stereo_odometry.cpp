@@ -480,7 +480,7 @@ private:
 				if(rightImages[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) !=0 &&
 				   rightImages[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) != 0)
 				{
-					ptrRight = cv_bridge::cvtColor(leftImages[i], "mono8");
+					ptrRight = cv_bridge::cvtColor(rightImages[i], "mono8");
 				}
 
 				// initialize
