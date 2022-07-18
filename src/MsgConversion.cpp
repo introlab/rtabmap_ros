@@ -2025,18 +2025,13 @@ bool convertRGBDMsgs(
 			{
 				cv_bridge::CvImageConstPtr ptrImage = depthMsgs[i];
 				if( depthMsgs[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0 ||
-					depthMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
-					depthMsgs[i]->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0)
+					depthMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0)
 				{
 					// do nothing
 				}
-				else if(depthMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
-				{
-					ptrImage = cv_bridge::cvtColor(depthMsgs[i], "mono8");
-				}
 				else
 				{
-					ptrImage = cv_bridge::cvtColor(depthMsgs[i], "bgr8");
+					ptrImage = cv_bridge::cvtColor(depthMsgs[i], "mono8");
 				}
 
 				// initialize

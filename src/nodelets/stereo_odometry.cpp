@@ -96,7 +96,7 @@ private:
 		bool approxSync = false;
 		bool subscribeRGBD = false;
 		double approxSyncMaxInterval = 0.0;
-		int rgbdCameras;
+		int rgbdCameras = 1;
 		pnh.param("approx_sync", approxSync, approxSync);
 		pnh.param("approx_sync_max_interval", approxSyncMaxInterval, approxSyncMaxInterval);
 		pnh.param("queue_size", queueSize_, queueSize_);

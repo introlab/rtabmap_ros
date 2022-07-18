@@ -1267,6 +1267,8 @@ void CoreWrapper::commonMultiCameraCallbackImpl(
 		NODELET_ERROR("Could not convert rgb/depth msgs! Aborting rtabmap update...");
 		return;
 	}
+	UDEBUG("cameraModels=%ld stereoCameraModels=%ld", cameraModels.size(), stereoCameraModels.size());
+	UDEBUG("rgb=%dx%d(type=%d), depth/right=%dx%d(type=%d)", rgb.rows, rgb.cols, rgb.type(), depth.rows, depth.cols, depth.type());
 
 	if(stereoCameraModels.size() && stereoToDepth_)
 	{
