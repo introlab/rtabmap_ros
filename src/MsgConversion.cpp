@@ -232,14 +232,14 @@ void rgbdImageToROS(const rtabmap::SensorData & data, rtabmap_ros::msg::RGBDImag
 		msg.rgb_camera_info.header = header;
 		localTransform = data.cameraModels().front().localTransform();
 	}
-	else
+	else if(data.stereoCameraModels().size() == 1)
 	{
 		//stereo
-		rtabmap_ros::cameraModelToROS(data.stereoCameraModel().left(), msg.rgb_camera_info);
-		rtabmap_ros::cameraModelToROS(data.stereoCameraModel().right(), msg.depth_camera_info);
+		rtabmap_ros::cameraModelToROS(data.stereoCameraModels()[0].left(), msg.rgb_camera_info);
+		rtabmap_ros::cameraModelToROS(data.stereoCameraModels()[0].right(), msg.depth_camera_info);
 		msg.rgb_camera_info.header = header;
 		msg.depth_camera_info.header = header;
-		localTransform = data.stereoCameraModel().localTransform();
+		localTransform = data.stereoCameraModels()[0].localTransform();
 	}
 
 	if(!data.imageRaw().empty())
@@ -1264,17 +1264,17 @@ void nodeDataToROS(const rtabmap::Signature & signature, rtabmap_ros::msg::NodeD
 			transformToGeometryMsg(signature.sensorData().cameraModels()[i].localTransform(), msg.local_transform[i]);
 		}
 	}
-	else if(signature.sensorData().stereoCameraModel().isValidForProjection())
+	else if(signature.sensorData().stereoCameraModels().size()==1)
 	{
-		msg.fx.push_back(signature.sensorData().stereoCameraModel().left().fx());
-		msg.fy.push_back(signature.sensorData().stereoCameraModel().left().fy());
-		msg.cx.push_back(signature.sensorData().stereoCameraModel().left().cx());
-		msg.cy.push_back(signature.sensorData().stereoCameraModel().left().cy());
-		msg.width.push_back(signature.sensorData().stereoCameraModel().left().imageWidth());
-		msg.height.push_back(signature.sensorData().stereoCameraModel().left().imageHeight());
-		msg.baseline = signature.sensorData().stereoCameraModel().baseline();
+		msg.fx.push_back(signature.sensorData().stereoCameraModels()[0].left().fx());
+		msg.fy.push_back(signature.sensorData().stereoCameraModels()[0].left().fy());
+		msg.cx.push_back(signature.sensorData().stereoCameraModels()[0].left().cx());
+		msg.cy.push_back(signature.sensorData().stereoCameraModels()[0].left().cy());
+		msg.width.push_back(signature.sensorData().stereoCameraModels()[0].left().imageWidth());
+		msg.height.push_back(signature.sensorData().stereoCameraModels()[0].left().imageHeight());
+		msg.baseline = signature.sensorData().stereoCameraModels()[0].baseline();
 		msg.local_transform.resize(1);
-		transformToGeometryMsg(signature.sensorData().stereoCameraModel().left().localTransform(), msg.local_transform[0]);
+		transformToGeometryMsg(signature.sensorData().stereoCameraModels()[0].left().localTransform(), msg.local_transform[0]);
 	}
 
 	//Features stuff...
@@ -1477,7 +1477,9 @@ rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::msg::OdomInfo & msg, bo
 	UASSERT(msg.local_bundle_models.size() == msg.local_bundle_poses.size());
 	for(size_t i=0; i<msg.local_bundle_ids.size(); ++i)
 	{
-		info.localBundleModels.insert(std::make_pair(msg.local_bundle_ids[i], cameraModelFromROS(msg.local_bundle_models[i], transformFromGeometryMsg(msg.local_bundle_model_transforms[i]))));
+		std::vector<rtabmap::CameraModel> models;
+		models.push_back(cameraModelFromROS(msg.local_bundle_models[i], transformFromGeometryMsg(msg.local_bundle_model_transforms[i])));
+		info.localBundleModels.insert(std::make_pair(msg.local_bundle_ids[i], models));
 		info.localBundlePoses.insert(std::make_pair(msg.local_bundle_ids[i], transformFromPoseMsg(msg.local_bundle_poses[i])));
 	}
 	info.keyFrameAdded = msg.key_frame_added;
@@ -1548,21 +1550,24 @@ void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_ros::msg::OdomInf
 	msg.local_bundle_constraints = info.localBundleConstraints;
 	msg.local_bundle_time = info.localBundleTime;
 	UASSERT(info.localBundleModels.size() == info.localBundlePoses.size());
-	for(std::map<int, rtabmap::CameraModel>::const_iterator iter=info.localBundleModels.begin();
+	for(std::map<int, std::vector<rtabmap::CameraModel> >::const_iterator iter=info.localBundleModels.begin();
 		iter!=info.localBundleModels.end();
 		++iter)
 	{
-		msg.local_bundle_ids.push_back(iter->first);
-		sensor_msgs::msg::CameraInfo camInfo;
-		cameraModelToROS(iter->second, camInfo);
-		msg.local_bundle_models.push_back(camInfo);
-		geometry_msgs::msg::Transform localT;
-		transformToGeometryMsg(iter->second.localTransform(), localT);
-		msg.local_bundle_model_transforms.push_back(localT);
-		UASSERT(info.localBundlePoses.find(iter->first)!=info.localBundlePoses.end());
-		geometry_msgs::msg::Pose pose;
-		transformToPoseMsg(info.localBundlePoses.at(iter->first), pose);
-		msg.local_bundle_poses.push_back(pose);
+		if(iter->second.size())
+		{
+			msg.local_bundle_ids.push_back(iter->first);
+			sensor_msgs::msg::CameraInfo camInfo;
+			cameraModelToROS(iter->second[0], camInfo);
+			msg.local_bundle_models.push_back(camInfo);
+			geometry_msgs::msg::Transform localT;
+			transformToGeometryMsg(iter->second[0].localTransform(), localT);
+			msg.local_bundle_model_transforms.push_back(localT);
+			UASSERT(info.localBundlePoses.find(iter->first)!=info.localBundlePoses.end());
+			geometry_msgs::msg::Pose pose;
+			transformToPoseMsg(info.localBundlePoses.at(iter->first), pose);
+			msg.local_bundle_poses.push_back(pose);
+		}
 	}
 	msg.key_frame_added = info.keyFrameAdded;
 	msg.time_estimation = info.timeEstimation;
