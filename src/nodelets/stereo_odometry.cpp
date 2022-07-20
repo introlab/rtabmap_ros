@@ -302,7 +302,10 @@ private:
 			const std::vector<sensor_msgs::CameraInfo>& leftCameraInfos,
 			const std::vector<sensor_msgs::CameraInfo>& rightCameraInfos)
 	{
-		ROS_ASSERT(rgbImages.size() > 0 && rgbImages.size() == depthImages.size() && rgbImages.size() == cameraInfos.size());
+		UASSERT(leftImages.size() > 0 &&
+				leftImages.size() == rightImages.size() &&
+				leftImages.size() == leftCameraInfos.size() &&
+				rightImages.size() == rightCameraInfos.size());
 		ros::Time higherStamp;
 		int leftWidth = leftImages[0]->image.cols;
 		int leftHeight = leftImages[0]->image.rows;
