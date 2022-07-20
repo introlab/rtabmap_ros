@@ -86,13 +86,20 @@ int main(int argc, char** argv)
 			cv::resize(data.rightRaw(), imageRight.image, cv::Size(0,0), scale, scale, CV_INTER_AREA);
 			imageRightPub.publish(imageRight.toImageMsg());
 
-			sensor_msgs::CameraInfo infoLeft, infoRight;
-			rtabmap_ros::cameraModelToROS(data.stereoCameraModel().left().scaled(scale), infoLeft);
-			rtabmap_ros::cameraModelToROS(data.stereoCameraModel().right().scaled(scale), infoRight);
-			infoLeft.header = imageLeft.header;
-			infoRight.header = imageLeft.header;
-			infoLeftPub.publish(infoLeft);
-			infoRightPub.publish(infoRight);
+			if(data.stereoCameraModels().size())
+			{
+				sensor_msgs::CameraInfo infoLeft, infoRight;
+				rtabmap_ros::cameraModelToROS(data.stereoCameraModels()[0].left().scaled(scale), infoLeft);
+				rtabmap_ros::cameraModelToROS(data.stereoCameraModels()[0].right().scaled(scale), infoRight);
+				infoLeft.header = imageLeft.header;
+				infoRight.header = imageLeft.header;
+				infoLeftPub.publish(infoLeft);
+				infoRightPub.publish(infoRight);
+			}
+			else
+			{
+				ROS_ERROR("No calibration loaded!");
+			}
 
 			ros::spinOnce();
 		}

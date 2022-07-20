@@ -433,12 +433,13 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 	return false;
 }
 
-void GuiWrapper::commonDepthCallback(
+void GuiWrapper::commonMultiCameraCallback(
 		const nav_msgs::OdometryConstPtr & odomMsg,
 		const rtabmap_ros::UserDataConstPtr & userDataMsg,
 		const std::vector<cv_bridge::CvImageConstPtr> & imageMsgs,
 		const std::vector<cv_bridge::CvImageConstPtr> & depthMsgs,
 		const std::vector<sensor_msgs::CameraInfo> & cameraInfoMsgs,
+		const std::vector<sensor_msgs::CameraInfo> & depthCameraInfoMsgs,
 		const sensor_msgs::LaserScan& scan2dMsg,
 		const sensor_msgs::PointCloud2& scan3dMsg,
 		const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg,
@@ -523,7 +524,8 @@ void GuiWrapper::commonDepthCallback(
 
 	cv::Mat rgb;
 	cv::Mat depth;
-	std::vector<CameraModel> cameraModels;
+	std::vector<rtabmap::CameraModel> cameraModels;
+	std::vector<rtabmap::StereoCameraModel> stereoCameraModels;
 	LaserScan scan;
 	rtabmap::OdometryInfo info;
 	bool ignoreData = false;
@@ -538,18 +540,25 @@ void GuiWrapper::commonDepthCallback(
 
 		if(imageMsgs.size() && imageMsgs[0].get() && depthMsgs.size() && depthMsgs[0].get())
 		{
+			ParametersMap allParameters = prefDialog_->getAllParameters();
+			bool imagesAlreadyRectified = Parameters::defaultRtabmapImagesAlreadyRectified();
+			Parameters::parse(allParameters, Parameters::kRtabmapImagesAlreadyRectified(), imagesAlreadyRectified);
+
 			if(!rtabmap_ros::convertRGBDMsgs(
 					imageMsgs,
 					depthMsgs,
 					cameraInfoMsgs,
+					depthCameraInfoMsgs,
 					frameId,
 					odomSensorSync_?odomHeader.frame_id:"",
 					odomHeader.stamp,
 					rgb,
 					depth,
 					cameraModels,
+					stereoCameraModels,
 					tfListener_,
-					waitForTransform_?waitForTransformDuration_:0.0))
+					waitForTransform_?waitForTransformDuration_:0.0,
+					imagesAlreadyRectified))
 			{
 				ROS_ERROR("Could not convert rgb/depth msgs! Aborting rtabmapviz update...");
 				return;
@@ -606,13 +615,21 @@ void GuiWrapper::commonDepthCallback(
 
 	info.reg.covariance = covariance;
 	rtabmap::OdometryEvent odomEvent(
-		rtabmap::SensorData(
-				scan,
-				rgb,
-				depth,
-				cameraModels,
-				odomHeader.seq,
-				rtabmap_ros::timestampFromROS(odomHeader.stamp)),
+			!stereoCameraModels.empty()?
+				rtabmap::SensorData(
+						scan,
+						rgb,
+						depth,
+						stereoCameraModels,
+						odomHeader.seq,
+						rtabmap_ros::timestampFromROS(odomHeader.stamp)):
+				rtabmap::SensorData(
+						scan,
+						rgb,
+						depth,
+						cameraModels,
+						odomHeader.seq,
+						rtabmap_ros::timestampFromROS(odomHeader.stamp)),
 		odomMsg.get()?rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose):odomT,
 		info);
 
@@ -937,7 +954,7 @@ void GuiWrapper::commonLaserScanCallback(
 				scan,
 				cv::Mat(),
 				cv::Mat(),
-				CameraModel(),
+				rtabmap::CameraModel(),
 				odomHeader.seq,
 				rtabmap_ros::timestampFromROS(odomHeader.stamp)),
 		odomMsg.get()?rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose):odomT,
@@ -1009,7 +1026,7 @@ void GuiWrapper::commonOdomCallback(
 		rtabmap::SensorData(
 				cv::Mat(),
 				cv::Mat(),
-				CameraModel(),
+				rtabmap::CameraModel(),
 				odomHeader.seq,
 				rtabmap_ros::timestampFromROS(odomHeader.stamp)),
 		odomMsg.get()?rtabmap_ros::transformFromPoseMsg(odomMsg->pose.pose):odomT,

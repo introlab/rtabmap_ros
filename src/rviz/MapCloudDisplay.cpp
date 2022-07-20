@@ -292,7 +292,7 @@ void MapCloudDisplay::processMapData(const rtabmap_ros::MapData& map)
 		if((fromDepth &&
 			!s.sensorData().imageCompressed().empty() &&
 		    !s.sensorData().depthOrRightCompressed().empty() &&
-		    (s.sensorData().cameraModels().size() || s.sensorData().stereoCameraModel().isValidForProjection())) ||
+		    (s.sensorData().cameraModels().size() || s.sensorData().stereoCameraModels().size())) ||
 		   (!fromDepth && !s.sensorData().laserScanCompressed().isEmpty()))
 		{
 			cv::Mat image, depth;

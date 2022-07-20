@@ -478,7 +478,7 @@ private:
 						localScanTransform),
 				cv::Mat(),
 				cv::Mat(),
-				CameraModel(),
+				rtabmap::CameraModel(),
 				0,
 				rtabmap_ros::timestampFromROS(scanMsg->header.stamp));
 
@@ -724,7 +724,7 @@ private:
 				laserScan,
 				cv::Mat(),
 				cv::Mat(),
-				CameraModel(),
+				rtabmap::CameraModel(),
 				0,
 				rtabmap_ros::timestampFromROS(cloudMsg.header.stamp));
 

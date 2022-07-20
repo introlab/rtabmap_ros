@@ -32,8 +32,7 @@ float32 gravityPitchError
 int32[] localBundleIds
 
 # Local bundle camera models
-sensor_msgs/CameraInfo[] localBundleModels
-geometry_msgs/Transform[] localBundleModelTransforms
+CameraModels[] localBundleModels
 
 # Local bundle camera poses
 geometry_msgs/Pose[] localBundlePoses
