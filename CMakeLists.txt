@@ -32,7 +32,7 @@ find_package(fiducial_msgs)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
-find_package(RTABMap 0.20.18 REQUIRED)
+find_package(RTABMap 0.20.20 REQUIRED)
 
 find_package(OpenCV REQUIRED QUIET COMPONENTS core calib3d imgproc highgui stitching optflow photo video OPTIONAL_COMPONENTS aruco xfeatures2d nonfree gpu cudafeatures2d)
 
