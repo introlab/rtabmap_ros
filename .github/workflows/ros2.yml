@@ -31,7 +31,7 @@ jobs:
           os: ubuntu-22.04
 
     steps:   
-    - uses: ros-tooling/setup-ros@v0.2
+    - uses: ros-tooling/setup-ros@v0.4
       with:
         required-ros-distributions: ${{ matrix.ros_distro }}
     
