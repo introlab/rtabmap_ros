@@ -190,7 +190,7 @@ void RGBDSync::callback(
 			bool publishCompressed = true;
 			if (compressedRate_ > 0.0)
 			{
-				if ( lastCompressedPublished_ + rclcpp::Duration(1.0/compressedRate_) > now())
+				if ( lastCompressedPublished_ + rclcpp::Duration::from_seconds(1.0/compressedRate_) > now())
 				{
 					RCLCPP_DEBUG(this->get_logger(), "throttle last update at %f skipping", lastCompressedPublished_.seconds());
 					publishCompressed = false;
