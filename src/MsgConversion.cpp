@@ -2139,7 +2139,7 @@ bool convertScanMsg(
 	rtabmap::Transform tmpT = getTransform(
 			odomFrameId.empty()?frameId:odomFrameId,
 			scan2dMsg.header.frame_id,
-			rclcpp::Time(scan2dMsg.header.stamp.sec, scan2dMsg.header.stamp.nanosec) + rclcpp::Duration(scan2dMsg.ranges.size()*scan2dMsg.time_increment*10e9),
+			rclcpp::Time(scan2dMsg.header.stamp.sec, scan2dMsg.header.stamp.nanosec) + rclcpp::Duration::from_seconds(scan2dMsg.ranges.size()*scan2dMsg.time_increment*10e9),
 			tfBuffer,
 			waitForTransform);
 	if(tmpT.isNull())

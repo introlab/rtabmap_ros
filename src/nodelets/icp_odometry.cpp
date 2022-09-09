@@ -306,7 +306,7 @@ void ICPOdometry::callbackScan(const sensor_msgs::msg::LaserScan::SharedPtr scan
 	// make sure the frame of the laser is updated too
 	Transform localScanTransform = getTransform(this->frameId(),
 			scanMsg->header.frame_id,
-			rclcpp::Time(scanMsg->header.stamp.sec, scanMsg->header.stamp.nanosec) + rclcpp::Duration(scanMsg->ranges.size()*scanMsg->time_increment*10e9),
+			rclcpp::Time(scanMsg->header.stamp.sec, scanMsg->header.stamp.nanosec) + rclcpp::Duration::from_seconds(scanMsg->ranges.size()*scanMsg->time_increment*10e9),
 			tfBuffer(), waitForTransform());
 	if(localScanTransform.isNull())
 	{

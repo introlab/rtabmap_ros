@@ -245,8 +245,11 @@ private:
 
 	void publishStats(const rclcpp::Time & stamp);
 	void publishCurrentGoal(const rclcpp::Time & stamp);
-
+#ifdef NAV_MSGS_FOXY
 	void goalResponseCallback(std::shared_future<GoalHandleNav2::SharedPtr> future);
+#else
+        void goalResponseCallback(const GoalHandleNav2::SharedPtr & goal_handle);
+#endif
 	void resultCallback(const GoalHandleNav2::WrappedResult & result);
 
 	void publishLocalPath(const rclcpp::Time & stamp);

@@ -680,7 +680,7 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 				if(!odomFrameId_.empty())
 				{
 					mapToOdomMutex_.lock();
-					rclcpp::Time tfExpiration = now() + rclcpp::Duration(tfTolerance*10e9);
+					rclcpp::Time tfExpiration = now() + rclcpp::Duration::from_seconds(tfTolerance*10e9);
 					geometry_msgs::msg::TransformStamped msg;
 					msg.child_frame_id = odomFrameId_;
 					msg.header.frame_id = mapFrameId_;
@@ -906,7 +906,7 @@ void CoreWrapper::defaultCallback(const sensor_msgs::msg::Image::ConstSharedPtr 
 
 		if(rate_>0.0f)
 		{
-			if(previousStamp_.seconds() > 0.0 && stamp.seconds() > previousStamp_.seconds() && stamp - previousStamp_ < rclcpp::Duration(1.0f/rate_))
+			if(previousStamp_.seconds() > 0.0 && stamp.seconds() > previousStamp_.seconds() && stamp - previousStamp_ < rclcpp::Duration::from_seconds(1.0f/rate_))
 			{
 				return;
 			}
@@ -3592,7 +3592,7 @@ void CoreWrapper::publishMapCallback(
 					marker.color.r = 1.0;
 					marker.color.g = 1.0;
 					marker.color.b = 0.0;
-					marker.lifetime = rclcpp::Duration(2.0f/rate_);
+					marker.lifetime = rclcpp::Duration::from_seconds(2.0f/rate_);
 
 					marker.type = visualization_msgs::msg::Marker::TEXT_VIEW_FACING;
 					marker.text = uNumber2Str(iter->first);
@@ -3705,7 +3705,7 @@ void CoreWrapper::publishMapCallback(
 							marker.color.r = 1.0;
 							marker.color.g = 1.0;
 							marker.color.b = 1.0;
-							marker.lifetime = rclcpp::Duration(2.0f/rate_);
+							marker.lifetime = rclcpp::Duration::from_seconds(2.0f/rate_);
 
 							marker.type = visualization_msgs::msg::Marker::TEXT_VIEW_FACING;
 							marker.text = uNumber2Str(iter->first);
@@ -4279,7 +4279,7 @@ void CoreWrapper::publishStats(const rclcpp::Time & stamp)
 				marker.color.r = 0.0;
 				marker.color.g = 1.0;
 				marker.color.b = 0.0;
-				marker.lifetime = rclcpp::Duration(2.0f/rate_);
+				marker.lifetime = rclcpp::Duration::from_seconds(2.0f/rate_);
 
 				marker.type = visualization_msgs::msg::Marker::TEXT_VIEW_FACING;
 				marker.text = uNumber2Str(iter->first);
@@ -4360,7 +4360,7 @@ void CoreWrapper::publishStats(const rclcpp::Time & stamp)
 					marker.color.r = 1.0;
 					marker.color.g = 1.0;
 					marker.color.b = 1.0;
-					marker.lifetime = rclcpp::Duration(2.0f/rate_);
+					marker.lifetime = rclcpp::Duration::from_seconds(2.0f/rate_);
 
 					marker.type = visualization_msgs::msg::Marker::TEXT_VIEW_FACING;
 					marker.text = uNumber2Str(poseIter->first);
@@ -4445,9 +4445,14 @@ void CoreWrapper::publishCurrentGoal(const rclcpp::Time & stamp)
 }
 
 void CoreWrapper::goalResponseCallback(
+#ifdef NAV_MSGS_FOXY
 		std::shared_future<GoalHandleNav2::SharedPtr> future)
 {
-	auto goal_handle = future.get();
+        auto goal_handle = future.get();
+#else
+               const GoalHandleNav2::SharedPtr & goal_handle)
+{
+#endif
 	if (!goal_handle) {
 		RCLCPP_ERROR(this->get_logger(), "Goal was rejected by server");
 		rtabmap_.clearPath(1);
