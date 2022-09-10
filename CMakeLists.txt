@@ -82,7 +82,7 @@ ELSEIF(COMPILER_SUPPORTS_CXX11)
 ENDIF()
 endif()
 
-IF(${nav2_msgs_VERSION_MAJOR} EQUAL 0 AND (${nav2_msgs_VERSION_MINOR} LESS 4 OR (${nav2_msgs_VERSION_MINOR} EQUAL 4 AND ${nav2_msgs_VERSION_PATCH} LESS 7)))
+IF(${nav2_msgs_VERSION_MAJOR} EQUAL 0)
    ADD_DEFINITIONS("-DNAV_MSGS_FOXY")
 ENDIF()
 
@@ -357,7 +357,7 @@ else()
   rosidl_target_interfaces(rtabmap_plugins ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
   function(rosidl_get_typesupport_target var generate_interfaces_target typesupport_name)
-    rosidl_target_interfaces(var generate_interfaces_target typesupport_name)
+    rosidl_target_interfaces(${var} ${generate_interfaces_target} ${typesupport_name})
   endfunction()
 endif()
 
