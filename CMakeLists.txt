@@ -361,6 +361,7 @@ else()
   function(rosidl_get_typesupport_target var generate_interfaces_target typesupport_name)
     rosidl_target_interfaces(${var} ${generate_interfaces_target} ${typesupport_name})
   endfunction()
+  add_definitions(-DPRE_ROS_HUMBLE)
 endif()
 
 rclcpp_components_register_nodes(rtabmap_plugins "rtabmap_ros::RGBDOdometry")
