@@ -78,10 +78,10 @@ StereoSync::StereoSync(const rclcpp::NodeOptions & options) :
 	}
 
 	image_transport::TransportHints hints(this);
-	imageLeftSub_.subscribe(this, "left/image_rect", hints.getTransport(), rclcpp::QoS(queueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
-	imageRightSub_.subscribe(this, "right/image_rect", hints.getTransport(), rclcpp::QoS(queueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
-	cameraInfoLeftSub_.subscribe(this, "left/camera_info"), rclcpp::QoS(queueSize).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile();
-	cameraInfoRightSub_.subscribe(this, "right/camera_info", rclcpp::QoS(queueSize).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile());
+	imageLeftSub_.subscribe(this, "left/image_rect", hints.getTransport(), rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	imageRightSub_.subscribe(this, "right/image_rect", hints.getTransport(), rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	cameraInfoLeftSub_.subscribe(this, "left/camera_info"), rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile();
+	cameraInfoRightSub_.subscribe(this, "right/camera_info", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile());
 
 	subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s",
 						get_name(),

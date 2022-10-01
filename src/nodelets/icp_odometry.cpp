@@ -71,8 +71,6 @@ ICPOdometry::~ICPOdometry()
 
 void ICPOdometry::onOdomInit()
 {
-	int queueSize = 1;
-	queueSize = this->declare_parameter("queue_size", queueSize);
 	scanCloudMaxPoints_ = this->declare_parameter("scan_cloud_max_points", scanCloudMaxPoints_);
 	scanDownsamplingStep_ = this->declare_parameter("scan_downsampling_step", scanDownsamplingStep_);
 	scanRangeMin_ = this->declare_parameter("scan_range_min", scanRangeMin_);
@@ -111,7 +109,6 @@ void ICPOdometry::onOdomInit()
 		}
 	}*/
 
-	RCLCPP_INFO(this->get_logger(), "IcpOdometry: queue_size             = %d", queueSize);
 	RCLCPP_INFO(this->get_logger(), "IcpOdometry: qos                    = %d", (int)qos());
 	RCLCPP_INFO(this->get_logger(), "IcpOdometry: scan_cloud_max_points  = %d", scanCloudMaxPoints_);
 	RCLCPP_INFO(this->get_logger(), "IcpOdometry: scan_downsampling_step = %d", scanDownsamplingStep_);
@@ -122,8 +119,8 @@ void ICPOdometry::onOdomInit()
 	RCLCPP_INFO(this->get_logger(), "IcpOdometry: scan_normal_radius     = %f m", scanNormalRadius_);
 	RCLCPP_INFO(this->get_logger(), "IcpOdometry: scan_normal_ground_up  = %f", scanNormalGroundUp_);
 
-	scan_sub_ = create_subscription<sensor_msgs::msg::LaserScan>("scan", rclcpp::QoS(queueSize).reliability((rmw_qos_reliability_policy_t)qos()), std::bind(&ICPOdometry::callbackScan, this, std::placeholders::_1));
-	cloud_sub_ = create_subscription<sensor_msgs::msg::PointCloud2>("scan_cloud", rclcpp::QoS(queueSize).reliability((rmw_qos_reliability_policy_t)qos()), std::bind(&ICPOdometry::callbackCloud, this, std::placeholders::_1));
+	scan_sub_ = create_subscription<sensor_msgs::msg::LaserScan>("scan", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos()), std::bind(&ICPOdometry::callbackScan, this, std::placeholders::_1));
+	cloud_sub_ = create_subscription<sensor_msgs::msg::PointCloud2>("scan_cloud", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos()), std::bind(&ICPOdometry::callbackCloud, this, std::placeholders::_1));
 
 	filtered_scan_pub_ = create_publisher<sensor_msgs::msg::PointCloud2>("odom_filtered_input_scan", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos()));
 }
@@ -306,7 +303,7 @@ void ICPOdometry::callbackScan(const sensor_msgs::msg::LaserScan::SharedPtr scan
 	// make sure the frame of the laser is updated too
 	Transform localScanTransform = getTransform(this->frameId(),
 			scanMsg->header.frame_id,
-			rclcpp::Time(scanMsg->header.stamp.sec, scanMsg->header.stamp.nanosec) + rclcpp::Duration::from_seconds(scanMsg->ranges.size()*scanMsg->time_increment*10e9),
+			rclcpp::Time(scanMsg->header.stamp.sec, scanMsg->header.stamp.nanosec) + rclcpp::Duration::from_seconds(scanMsg->ranges.size()*scanMsg->time_increment),
 			tfBuffer(), waitForTransform());
 	if(localScanTransform.isNull())
 	{

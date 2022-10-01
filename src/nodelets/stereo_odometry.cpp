@@ -82,7 +82,7 @@ void StereoOdometry::onOdomInit()
 	std::string subscribedTopicsMsg;
 	if(subscribeRGBD)
 	{
-		rgbdSub_ = create_subscription<rtabmap_ros::msg::RGBDImage>("rgbd_image", rclcpp::QoS(queueSize_).reliability((rmw_qos_reliability_policy_t)qos()), std::bind(&StereoOdometry::callbackRGBD, this, std::placeholders::_1));
+		rgbdSub_ = create_subscription<rtabmap_ros::msg::RGBDImage>("rgbd_image", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos()), std::bind(&StereoOdometry::callbackRGBD, this, std::placeholders::_1));
 
 		subscribedTopicsMsg =
 				uFormat("\n%s subscribed to:\n   %s",
@@ -92,10 +92,10 @@ void StereoOdometry::onOdomInit()
 	else
 	{
 		image_transport::TransportHints hints(this);
-		imageRectLeft_.subscribe(this, "left/image_rect", hints.getTransport(), rclcpp::QoS(queueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile());
-		imageRectRight_.subscribe(this, "right/image_rect", hints.getTransport(), rclcpp::QoS(queueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile());
-		cameraInfoLeft_.subscribe(this, "left/camera_info", rclcpp::QoS(queueSize_).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile());
-		cameraInfoRight_.subscribe(this, "right/camera_info", rclcpp::QoS(queueSize_).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile());
+		imageRectLeft_.subscribe(this, "left/image_rect", hints.getTransport(), rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile());
+		imageRectRight_.subscribe(this, "right/image_rect", hints.getTransport(), rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile());
+		cameraInfoLeft_.subscribe(this, "left/camera_info", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile());
+		cameraInfoRight_.subscribe(this, "right/camera_info", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile());
 
 		if(approxSync)
 		{

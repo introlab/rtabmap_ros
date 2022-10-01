@@ -124,20 +124,20 @@ PointCloudAssembler::PointCloudAssembler(const rclcpp::NodeOptions & options) :
 
 	cloudsSkipped_ = skipClouds_;
 
-	cloudPub_ = create_publisher<sensor_msgs::msg::PointCloud2>("assembled_cloud", rclcpp::QoS(queueSize).reliability((rmw_qos_reliability_policy_t)qos));
+	cloudPub_ = create_publisher<sensor_msgs::msg::PointCloud2>("assembled_cloud", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos));
 
 	if(!fixedFrameId_.empty())
 	{
-		cloudSub_ = create_subscription<sensor_msgs::msg::PointCloud2>("cloud", rclcpp::QoS(queueSize).reliability((rmw_qos_reliability_policy_t)qos), std::bind(&PointCloudAssembler::callbackCloud, this, std::placeholders::_1));
+		cloudSub_ = create_subscription<sensor_msgs::msg::PointCloud2>("cloud", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos), std::bind(&PointCloudAssembler::callbackCloud, this, std::placeholders::_1));
 		subscribedTopicsMsg_ = uFormat("\n%s subscribed to %s",
 							get_name(),
 							cloudSub_->get_topic_name());
 	}
 	else if(subscribeOdomInfo)
 	{
-		syncCloudSub_.subscribe(this, "cloud", rclcpp::QoS(queueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
-		syncOdomSub_.subscribe(this, "odom", rclcpp::QoS(queueSize).reliability((rmw_qos_reliability_policy_t)qosOdom).get_rmw_qos_profile());
-		syncOdomInfoSub_.subscribe(this, "odom_info", rclcpp::QoS(queueSize).reliability((rmw_qos_reliability_policy_t)qosOdom).get_rmw_qos_profile());
+		syncCloudSub_.subscribe(this, "cloud", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+		syncOdomSub_.subscribe(this, "odom", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qosOdom).get_rmw_qos_profile());
+		syncOdomInfoSub_.subscribe(this, "odom_info", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qosOdom).get_rmw_qos_profile());
 		exactInfoSync_ = new message_filters::Synchronizer<syncInfoPolicy>(syncInfoPolicy(queueSize), syncCloudSub_, syncOdomSub_, syncOdomInfoSub_);
 		exactInfoSync_->registerCallback(std::bind(&rtabmap_ros::PointCloudAssembler::callbackCloudOdomInfo, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (exact sync):\n   %s,\n   %s",
@@ -148,8 +148,8 @@ PointCloudAssembler::PointCloudAssembler(const rclcpp::NodeOptions & options) :
 	}
 	else
 	{
-		syncCloudSub_.subscribe(this, "cloud", rclcpp::QoS(queueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
-		syncOdomSub_.subscribe(this, "odom", rclcpp::QoS(queueSize).reliability((rmw_qos_reliability_policy_t)qosOdom).get_rmw_qos_profile());
+		syncCloudSub_.subscribe(this, "cloud", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+		syncOdomSub_.subscribe(this, "odom", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qosOdom).get_rmw_qos_profile());
 		exactSync_ = new message_filters::Synchronizer<syncPolicy>(syncPolicy(queueSize), syncCloudSub_, syncOdomSub_);
 		exactSync_->registerCallback(std::bind(&rtabmap_ros::PointCloudAssembler::callbackCloudOdom, this, std::placeholders::_1, std::placeholders::_2));
 		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (exact sync):\n   %s,\n   %s",

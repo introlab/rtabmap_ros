@@ -680,7 +680,7 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 				if(!odomFrameId_.empty())
 				{
 					mapToOdomMutex_.lock();
-					rclcpp::Time tfExpiration = now() + rclcpp::Duration::from_seconds(tfTolerance*10e9);
+					rclcpp::Time tfExpiration = now() + rclcpp::Duration::from_seconds(tfTolerance);
 					geometry_msgs::msg::TransformStamped msg;
 					msg.child_frame_id = odomFrameId_;
 					msg.header.frame_id = mapFrameId_;

@@ -82,7 +82,7 @@ ObstaclesDetection::ObstaclesDetection(const rclcpp::NodeOptions & options) :
 	obstaclesPub_ = create_publisher<sensor_msgs::msg::PointCloud2>("obstacles", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos));
 	projObstaclesPub_ = create_publisher<sensor_msgs::msg::PointCloud2>("proj_obstacles", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos));
 
-	cloudSub_ = create_subscription<sensor_msgs::msg::PointCloud2>("cloud", rclcpp::QoS(5).reliability((rmw_qos_reliability_policy_t)qos), std::bind(&ObstaclesDetection::callback, this, std::placeholders::_1));
+	cloudSub_ = create_subscription<sensor_msgs::msg::PointCloud2>("cloud", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos), std::bind(&ObstaclesDetection::callback, this, std::placeholders::_1));
 }
 
 
