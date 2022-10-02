@@ -52,7 +52,7 @@ namespace rtabmap_ros {
 		cameraInfoMsgs.push_back(image4Msg->rgb_camera_info); \
 		cameraInfoMsgs.push_back(image5Msg->rgb_camera_info); \
 		cameraInfoMsgs.push_back(image6Msg->rgb_camera_info); \
-		std::vector<sensor_msgs::CameraInfo> depthCameraInfoMsgs; \
+		std::vector<sensor_msgs::msg::CameraInfo> depthCameraInfoMsgs; \
 		depthCameraInfoMsgs.push_back(image1Msg->depth_camera_info); \
 		depthCameraInfoMsgs.push_back(image2Msg->depth_camera_info); \
 		depthCameraInfoMsgs.push_back(image3Msg->depth_camera_info); \
@@ -127,7 +127,7 @@ void CommonDataSubscriber::rgbd6Scan2dCallback(
 	rtabmap_ros::msg::UserData::ConstSharedPtr userDataMsg; // Null
 	sensor_msgs::msg::PointCloud2 scan3dMsg; // null
 	rtabmap_ros::msg::OdomInfo::ConstSharedPtr odomInfoMsg; // null
-	commonMultiCameraCallback(odomMsg, userDataMsg, imageMsgs, depthMsgs, cameraInfoMsgs, *scanMsg, scan3dMsg, odomInfoMsg, globalDescriptorMsgs, localKeyPoints, localPoints3d, localDescriptors);
+	commonMultiCameraCallback(odomMsg, userDataMsg, imageMsgs, depthMsgs, cameraInfoMsgs, depthCameraInfoMsgs, *scanMsg, scan3dMsg, odomInfoMsg, globalDescriptorMsgs, localKeyPoints, localPoints3d, localDescriptors);
 }
 void CommonDataSubscriber::rgbd6Scan3dCallback(
 		const rtabmap_ros::msg::RGBDImage::ConstSharedPtr image1Msg,
@@ -217,7 +217,7 @@ void CommonDataSubscriber::rgbd6OdomScan2dCallback(
 	rtabmap_ros::msg::UserData::ConstSharedPtr userDataMsg; // Null
 	sensor_msgs::msg::PointCloud2 scan3dMsg; // null
 	rtabmap_ros::msg::OdomInfo::ConstSharedPtr odomInfoMsg; // null
-	commonMultiCameraCallback(odomMsg, userDataMsg, imageMsgs, depthMsgs, cameraInfoMsgs, *scanMsg, scan3dMsg, odomInfoMsg, globalDescriptorMsgs, localKeyPoints, localPoints3d, localDescriptors);
+	commonMultiCameraCallback(odomMsg, userDataMsg, imageMsgs, depthMsgs, cameraInfoMsgs, depthCameraInfoMsgs, *scanMsg, scan3dMsg, odomInfoMsg, globalDescriptorMsgs, localKeyPoints, localPoints3d, localDescriptors);
 }
 void CommonDataSubscriber::rgbd6OdomScan3dCallback(
 		const nav_msgs::msg::Odometry::ConstSharedPtr odomMsg,
