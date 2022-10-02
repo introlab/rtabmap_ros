@@ -75,33 +75,20 @@ public:
 
 protected:
 	void setupCallbacks(rclcpp::Node & node);
-	virtual void commonDepthCallback(
+	virtual void commonMultiCameraCallback(
 				const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
 				const rtabmap_ros::msg::UserData::ConstSharedPtr & userDataMsg,
 				const std::vector<cv_bridge::CvImageConstPtr> & imageMsgs,
 				const std::vector<cv_bridge::CvImageConstPtr> & depthMsgs,
 				const std::vector<sensor_msgs::msg::CameraInfo> & cameraInfoMsgs,
-				const sensor_msgs::msg::LaserScan & scanMsg,
-				const sensor_msgs::msg::PointCloud2 & scan3dMsg,
+				const std::vector<sensor_msgs::msg::CameraInfo> & depthCameraInfoMsgs,
+				const sensor_msgs::msg::LaserScan& scanMsg,
+				const sensor_msgs::msg::PointCloud2& scan3dMsg,
 				const rtabmap_ros::msg::OdomInfo::ConstSharedPtr& odomInfoMsg,
 				const std::vector<rtabmap_ros::msg::GlobalDescriptor> & globalDescriptorMsgs = std::vector<rtabmap_ros::msg::GlobalDescriptor>(),
 				const std::vector<std::vector<rtabmap_ros::msg::KeyPoint> > & localKeyPoints = std::vector<std::vector<rtabmap_ros::msg::KeyPoint> >(),
 				const std::vector<std::vector<rtabmap_ros::msg::Point3f> > & localPoints3d = std::vector<std::vector<rtabmap_ros::msg::Point3f> >(),
 				const std::vector<cv::Mat> & localDescriptors = std::vector<cv::Mat>()) = 0;
-	virtual void commonStereoCallback(
-				const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
-				const rtabmap_ros::msg::UserData::ConstSharedPtr & userDataMsg,
-				const cv_bridge::CvImageConstPtr& leftImageMsg,
-				const cv_bridge::CvImageConstPtr& rightImageMsg,
-				const sensor_msgs::msg::CameraInfo& leftCamInfoMsg,
-				const sensor_msgs::msg::CameraInfo& rightCamInfoMsg,
-				const sensor_msgs::msg::LaserScan & scanMsg,
-				const sensor_msgs::msg::PointCloud2 & scan3dMsg,
-				const rtabmap_ros::msg::OdomInfo::ConstSharedPtr& odomInfoMsg,
-				const std::vector<rtabmap_ros::msg::GlobalDescriptor> & globalDescriptorMsgs = std::vector<rtabmap_ros::msg::GlobalDescriptor>(),
-				const std::vector<rtabmap_ros::msg::KeyPoint> & localKeyPoints = std::vector<rtabmap_ros::msg::KeyPoint>(),
-				const std::vector<rtabmap_ros::msg::Point3f> & localPoints3d = std::vector<rtabmap_ros::msg::Point3f>(),
-				const cv::Mat & localDescriptors = cv::Mat()) = 0;
 	virtual void commonLaserScanCallback(
 				const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
 				const rtabmap_ros::msg::UserData::ConstSharedPtr & userDataMsg,
@@ -114,7 +101,7 @@ protected:
 				const rtabmap_ros::msg::UserData::ConstSharedPtr & userDataMsg,
 				const rtabmap_ros::msg::OdomInfo::ConstSharedPtr& odomInfoMsg) = 0;
 
-	void commonSingleDepthCallback(
+	void commonSingleCameraCallback(
 				const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
 				const rtabmap_ros::msg::UserData::ConstSharedPtr & userDataMsg,
 				const cv_bridge::CvImageConstPtr & imageMsg,

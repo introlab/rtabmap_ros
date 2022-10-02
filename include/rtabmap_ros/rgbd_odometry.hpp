@@ -39,6 +39,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <sensor_msgs/msg/image.hpp>
 #include <rtabmap_ros/msg/rgbd_image.hpp>
+#include <rtabmap_ros/msg/rgbd_images.hpp>
 
 #include <cv_bridge/cv_bridge.h>
 
@@ -65,6 +66,9 @@ private:
 			const sensor_msgs::msg::Image::ConstSharedPtr image,
 			const sensor_msgs::msg::Image::ConstSharedPtr depth,
 			const sensor_msgs::msg::CameraInfo::ConstSharedPtr cameraInfo);
+
+	void callbackRGBDX(
+			const rtabmap_ros::msg::RGBDImages::ConstSharedPtr images);
 
 	void callbackRGBD(
 			const rtabmap_ros::msg::RGBDImage::ConstSharedPtr image);
@@ -100,6 +104,7 @@ private:
 	message_filters::Subscriber<sensor_msgs::msg::CameraInfo> info_sub_;
 
 	rclcpp::Subscription<rtabmap_ros::msg::RGBDImage>::SharedPtr rgbdSub_;
+	rclcpp::Subscription<rtabmap_ros::msg::RGBDImages>::SharedPtr rgbdxSub_;
 	message_filters::Subscriber<rtabmap_ros::msg::RGBDImage> rgbd_image1_sub_;
 	message_filters::Subscriber<rtabmap_ros::msg::RGBDImage> rgbd_image2_sub_;
 	message_filters::Subscriber<rtabmap_ros::msg::RGBDImage> rgbd_image3_sub_;

@@ -36,13 +36,12 @@ void CommonDataSubscriber::stereoCallback(
 	   const sensor_msgs::msg::CameraInfo::ConstSharedPtr leftCamInfoMsg,
 	   const sensor_msgs::msg::CameraInfo::ConstSharedPtr rightCamInfoMsg)
 {
-	callbackCalled();
 	nav_msgs::msg::Odometry::SharedPtr odomMsg; // Null
 	rtabmap_ros::msg::UserData::SharedPtr userDataMsg; // Null
 	sensor_msgs::msg::LaserScan scanMsg; // null
 	sensor_msgs::msg::PointCloud2 scan3dMsg; // Null
 	rtabmap_ros::msg::OdomInfo::SharedPtr odomInfoMsg; // null
-	commonStereoCallback(odomMsg, userDataMsg, cv_bridge::toCvShare(leftImageMsg), cv_bridge::toCvShare(rightImageMsg), *leftCamInfoMsg, *rightCamInfoMsg, scanMsg, scan3dMsg, odomInfoMsg);
+	commonSingleCameraCallback(odomMsg, userDataMsg, cv_bridge::toCvShare(leftImageMsg), cv_bridge::toCvShare(rightImageMsg), *leftCamInfoMsg, *rightCamInfoMsg, scanMsg, scan3dMsg, odomInfoMsg);
 }
 void CommonDataSubscriber::stereoInfoCallback(
 		const sensor_msgs::msg::Image::ConstSharedPtr leftImageMsg,
@@ -56,7 +55,7 @@ void CommonDataSubscriber::stereoInfoCallback(
 	rtabmap_ros::msg::UserData::SharedPtr userDataMsg; // Null
 	sensor_msgs::msg::LaserScan scan2dMsg; // Null
 	sensor_msgs::msg::PointCloud2 scan3dMsg; // Null
-	commonStereoCallback(odomMsg, userDataMsg, cv_bridge::toCvShare(leftImageMsg), cv_bridge::toCvShare(rightImageMsg), *leftCamInfoMsg, *rightCamInfoMsg, scan2dMsg, scan3dMsg, odomInfoMsg);
+	commonSingleCameraCallback(odomMsg, userDataMsg, cv_bridge::toCvShare(leftImageMsg), cv_bridge::toCvShare(rightImageMsg), *leftCamInfoMsg, *rightCamInfoMsg, scan2dMsg, scan3dMsg, odomInfoMsg);
 }
 
 // Stereo + Odom
@@ -72,7 +71,7 @@ void CommonDataSubscriber::stereoOdomCallback(
 	sensor_msgs::msg::LaserScan scanMsg; // null
 	sensor_msgs::msg::PointCloud2 scan3dMsg; // Null
 	rtabmap_ros::msg::OdomInfo::SharedPtr odomInfoMsg; // null
-	commonStereoCallback(odomMsg, userDataMsg, cv_bridge::toCvShare(leftImageMsg), cv_bridge::toCvShare(rightImageMsg), *leftCamInfoMsg, *rightCamInfoMsg, scanMsg, scan3dMsg, odomInfoMsg);
+	commonSingleCameraCallback(odomMsg, userDataMsg, cv_bridge::toCvShare(leftImageMsg), cv_bridge::toCvShare(rightImageMsg), *leftCamInfoMsg, *rightCamInfoMsg, scanMsg, scan3dMsg, odomInfoMsg);
 }
 void CommonDataSubscriber::stereoOdomInfoCallback(
 		const nav_msgs::msg::Odometry::ConstSharedPtr odomMsg,
@@ -86,7 +85,7 @@ void CommonDataSubscriber::stereoOdomInfoCallback(
 	rtabmap_ros::msg::UserData::SharedPtr userDataMsg; // Null
 	sensor_msgs::msg::LaserScan scan2dMsg; // Null
 	sensor_msgs::msg::PointCloud2 scan3dMsg; // Null
-	commonStereoCallback(odomMsg, userDataMsg, cv_bridge::toCvShare(leftImageMsg), cv_bridge::toCvShare(rightImageMsg), *leftCamInfoMsg, *rightCamInfoMsg, scan2dMsg, scan3dMsg, odomInfoMsg);
+	commonSingleCameraCallback(odomMsg, userDataMsg, cv_bridge::toCvShare(leftImageMsg), cv_bridge::toCvShare(rightImageMsg), *leftCamInfoMsg, *rightCamInfoMsg, scan2dMsg, scan3dMsg, odomInfoMsg);
 }
 
 void CommonDataSubscriber::setupStereoCallbacks(

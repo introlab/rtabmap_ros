@@ -53,8 +53,10 @@ RGBDSync::RGBDSync(const rclcpp::NodeOptions & options) :
 {
 	int queueSize = 10;
 	bool approxSync = true;
+	double approxSyncMaxInterval = 0.0;
 	int qos = 0;
 	approxSync = this->declare_parameter("approx_sync", approxSync);
+	approxSyncMaxInterval = this->declare_parameter("approx_sync_max_interval", approxSyncMaxInterval);
 	queueSize = this->declare_parameter("queue_size", queueSize);
 	qos = this->declare_parameter("qos", qos);
 	int qosCamInfo = this->declare_parameter("qos_camera_info", qos);
@@ -68,6 +70,8 @@ RGBDSync::RGBDSync(const rclcpp::NodeOptions & options) :
 	}
 
 	RCLCPP_INFO(this->get_logger(), "%s: approx_sync = %s", get_name(), approxSync?"true":"false");
+	if(approxSync)
+		RCLCPP_INFO(this->get_logger(), "%s: approx_sync_max_interval = %f", get_name(), approxSyncMaxInterval);
 	RCLCPP_INFO(this->get_logger(), "%s: queue_size  = %d", get_name(), queueSize);
 	RCLCPP_INFO(this->get_logger(), "%s: qos         = %d", get_name(), qos);
 	RCLCPP_INFO(this->get_logger(), "%s: qos_camera_info = %d", get_name(), qosCamInfo);
@@ -81,6 +85,8 @@ RGBDSync::RGBDSync(const rclcpp::NodeOptions & options) :
 	if(approxSync)
 	{
 		approxSyncDepth_ = new message_filters::Synchronizer<MyApproxSyncDepthPolicy>(MyApproxSyncDepthPolicy(queueSize), imageSub_, imageDepthSub_, cameraInfoSub_);
+		if(approxSyncMaxInterval > 0.0)
+			approxSyncDepth_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval));
 		approxSyncDepth_->registerCallback(std::bind(&RGBDSync::callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 	}
 	else
@@ -94,9 +100,10 @@ RGBDSync::RGBDSync(const rclcpp::NodeOptions & options) :
 	imageDepthSub_.subscribe(this, "depth/image", hints.getTransport(), rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
 	cameraInfoSub_.subscribe(this, "rgb/camera_info", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile());
 
-	subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s",
+	subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync%s):\n   %s,\n   %s,\n   %s",
 						get_name(),
 						approxSync?"approx":"exact",
+						approxSync&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
 						imageSub_.getSubscriber().getTopic().c_str(),
 						imageDepthSub_.getSubscriber().getTopic().c_str(),
 						cameraInfoSub_.getSubscriber()->get_topic_name());
@@ -142,6 +149,19 @@ void RGBDSync::callback(
 	{
 		double rgbStamp = timestampFromROS(image->header.stamp);
 		double depthStamp = timestampFromROS(depth->header.stamp);
+		double infoStamp = timestampFromROS(cameraInfo->header.stamp);
+
+		double stampDiff = fabs(rgbStamp - depthStamp);
+		if(stampDiff > 0.010)
+		{
+			RCLCPP_WARN(this->get_logger(), "The time difference between rgb and depth frames is "
+					"high (diff=%fs, rgb=%fs, depth=%fs). You may want "
+					"to set approx_sync_max_interval lower than 0.01s to reject spurious bad synchronizations or use "
+					"approx_sync=false if streams have all the exact same timestamp.",
+					stampDiff,
+					rgbStamp,
+					depthStamp);
+		}
 
 		rtabmap_ros::msg::RGBDImage::UniquePtr msg(new rtabmap_ros::msg::RGBDImage);
 		msg->header.frame_id = cameraInfo->header.frame_id;

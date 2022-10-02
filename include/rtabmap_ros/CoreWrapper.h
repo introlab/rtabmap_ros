@@ -112,12 +112,13 @@ private:
 	bool odomUpdate(const nav_msgs::msg::Odometry & odomMsg, rclcpp::Time stamp);
 	bool odomTFUpdate(const rclcpp::Time & stamp); // TF odom
 
-	virtual void commonDepthCallback(
+	virtual void commonMultiCameraCallback(
 				const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
 				const rtabmap_ros::msg::UserData::ConstSharedPtr & userDataMsg,
 				const std::vector<cv_bridge::CvImageConstPtr> & imageMsgs,
 				const std::vector<cv_bridge::CvImageConstPtr> & depthMsgs,
 				const std::vector<sensor_msgs::msg::CameraInfo> & cameraInfoMsgs,
+				const std::vector<sensor_msgs::msg::CameraInfo> & depthCameraInfoMsgs,
 				const sensor_msgs::msg::LaserScan & scanMsg,
 				const sensor_msgs::msg::PointCloud2 & scan3dMsg,
 				const rtabmap_ros::msg::OdomInfo::ConstSharedPtr& odomInfoMsg,
@@ -125,12 +126,13 @@ private:
 				const std::vector<std::vector<rtabmap_ros::msg::KeyPoint> > & localKeyPoints = std::vector<std::vector<rtabmap_ros::msg::KeyPoint> >(),
 				const std::vector<std::vector<rtabmap_ros::msg::Point3f> > & localPoints3d = std::vector<std::vector<rtabmap_ros::msg::Point3f> >(),
 				const std::vector<cv::Mat> & localDescriptors = std::vector<cv::Mat>());
-	void commonDepthCallbackImpl(
+	void commonMultiCameraCallbackImpl(
 				const std::string & odomFrameId,
 				const rtabmap_ros::msg::UserData::ConstSharedPtr & userDataMsg,
 				const std::vector<cv_bridge::CvImageConstPtr> & imageMsgs,
 				const std::vector<cv_bridge::CvImageConstPtr> & depthMsgs,
 				const std::vector<sensor_msgs::msg::CameraInfo> & cameraInfoMsgs,
+				const std::vector<sensor_msgs::msg::CameraInfo> & depthCameraInfoMsgs,
 				const sensor_msgs::msg::LaserScan & scan2dMsg,
 				const sensor_msgs::msg::PointCloud2 & scan3dMsg,
 				const rtabmap_ros::msg::OdomInfo::ConstSharedPtr& odomInfoMsg,
@@ -138,20 +140,6 @@ private:
 				const std::vector<std::vector<rtabmap_ros::msg::KeyPoint> > & localKeyPoints,
 				const std::vector<std::vector<rtabmap_ros::msg::Point3f> > & localPoints3d,
 				const std::vector<cv::Mat> & localDescriptors);
-	virtual void commonStereoCallback(
-				const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
-				const rtabmap_ros::msg::UserData::ConstSharedPtr & userDataMsg,
-				const cv_bridge::CvImageConstPtr& leftImageMsg,
-				const cv_bridge::CvImageConstPtr& rightImageMsg,
-				const sensor_msgs::msg::CameraInfo& leftCamInfoMsg,
-				const sensor_msgs::msg::CameraInfo& rightCamInfoMsg,
-				const sensor_msgs::msg::LaserScan & scanMsg,
-				const sensor_msgs::msg::PointCloud2 & scan3dMsg,
-				const rtabmap_ros::msg::OdomInfo::ConstSharedPtr& odomInfoMsg,
-				const std::vector<rtabmap_ros::msg::GlobalDescriptor> & globalDescriptorMsgs = std::vector<rtabmap_ros::msg::GlobalDescriptor>(),
-				const std::vector<rtabmap_ros::msg::KeyPoint> & localKeyPoints = std::vector<rtabmap_ros::msg::KeyPoint>(),
-				const std::vector<rtabmap_ros::msg::Point3f> & localPoints3d = std::vector<rtabmap_ros::msg::Point3f>(),
-				const cv::Mat & localDescriptors = cv::Mat());
 	virtual void commonLaserScanCallback(
 				const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
 				const rtabmap_ros::msg::UserData::ConstSharedPtr & userDataMsg,
@@ -196,6 +184,7 @@ private:
 			const rclcpp::Time & stamp,
 			rtabmap::SensorData & data,
 			const rtabmap::Transform & odom = rtabmap::Transform(),
+			const std::vector<float> & odomVelocity = std::vector<float>(),
 			const std::string & odomFrameId = "",
 			const cv::Mat & odomCovariance = cv::Mat::eye(6,6,CV_64FC1),
 			const rtabmap::OdometryInfo & odomInfo = rtabmap::OdometryInfo(),
@@ -261,6 +250,7 @@ private:
 	bool paused_;
 	rtabmap::Transform lastPose_;
 	rclcpp::Time lastPoseStamp_;
+	std::vector<float> lastPoseVelocity_;
 	bool lastPoseIntermediate_;
 	cv::Mat covariance_;
 	rtabmap::Transform currentMetricGoal_;

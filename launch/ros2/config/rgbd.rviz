@@ -118,31 +118,29 @@ Visualization Manager:
       Frame Timeout: 15
       Frames:
         All Enabled: true
-        base_link:
-          Value: true
         map:
           Value: true
+        oak-d-base-frame:
+          Value: true
+        oak-d_frame:
+          Value: true
+        oak_imu_frame:
+          Value: true
+        oak_left_camera_frame:
+          Value: true
+        oak_left_camera_optical_frame:
+          Value: true
+        oak_model_origin:
+          Value: true
+        oak_rgb_camera_frame:
+          Value: true
+        oak_rgb_camera_optical_frame:
+          Value: true
+        oak_right_camera_frame:
+          Value: true
+        oak_right_camera_optical_frame:
+          Value: true
         odom:
-          Value: true
-        zed2_baro_link:
-          Value: true
-        zed2_camera_center:
-          Value: true
-        zed2_imu_link:
-          Value: true
-        zed2_left_camera_frame:
-          Value: true
-        zed2_left_camera_optical_frame:
-          Value: true
-        zed2_mag_link:
-          Value: true
-        zed2_right_camera_frame:
-          Value: true
-        zed2_right_camera_optical_frame:
-          Value: true
-        zed2_temp_left_link:
-          Value: true
-        zed2_temp_right_link:
           Value: true
       Marker Scale: 1
       Name: TF
@@ -152,23 +150,20 @@ Visualization Manager:
       Tree:
         map:
           odom:
-            base_link:
-              zed2_camera_center:
-                zed2_baro_link:
+            oak-d-base-frame:
+              oak-d_frame:
+                oak_imu_frame:
                   {}
-                zed2_left_camera_frame:
-                  zed2_imu_link:
+                oak_left_camera_frame:
+                  oak_left_camera_optical_frame:
                     {}
-                  zed2_left_camera_optical_frame:
-                    {}
-                  zed2_temp_left_link:
-                    {}
-                zed2_mag_link:
+                oak_model_origin:
                   {}
-                zed2_right_camera_frame:
-                  zed2_right_camera_optical_frame:
+                oak_rgb_camera_frame:
+                  oak_rgb_camera_optical_frame:
                     {}
-                  zed2_temp_right_link:
+                oak_right_camera_frame:
+                  oak_right_camera_optical_frame:
                     {}
       Update Interval: 0
       Value: true
@@ -300,26 +295,26 @@ Visualization Manager:
   Value: true
   Views:
     Current:
-      Class: rviz_default_plugins/ThirdPersonFollower
-      Distance: 1.8979769945144653
+      Class: rviz_default_plugins/Orbit
+      Distance: 1.935564398765564
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0
-        Y: 0
-        Z: 0
-      Focal Shape Fixed Size: false
+        X: 0.024472296237945557
+        Y: 0.1059575080871582
+        Z: 0.36562198400497437
+      Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.09539937227964401
-      Target Frame: base_link
-      Value: ThirdPersonFollower (rviz_default_plugins)
-      Yaw: 3.110400915145874
+      Pitch: 0.14039947092533112
+      Target Frame: map
+      Value: Orbit (rviz_default_plugins)
+      Yaw: 3.175398111343384
     Saved: ~
 Window Geometry:
   Displays:
@@ -335,5 +330,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1335
-  X: 211
-  Y: 105
+  X: 481
+  Y: 199

@@ -88,18 +88,24 @@ private:
 
 		int queueSize = 5;
 		bool approxSync = false;
+		double approxSyncMaxInterval = 0.0;
 		pnh.param("approx_sync", approxSync, approxSync);
+		pnh.param("approx_sync_max_interval", approxSyncMaxInterval, approxSyncMaxInterval);
 		pnh.param("rate", rate_, rate_);
 		pnh.param("queue_size", queueSize, queueSize);
 		pnh.param("decimation", decimation_, decimation_);
 		ROS_ASSERT(decimation_ >= 1);
-		NODELET_INFO("Rate=%f Hz", rate_);
-		NODELET_INFO("Decimation=%d", decimation_);
-		NODELET_INFO("Approximate time sync = %s", approxSync?"true":"false");
+		NODELET_INFO("rate=%f Hz", rate_);
+		NODELET_INFO("decimation=%d", decimation_);
+		NODELET_INFO("approx_sync = %s", approxSync?"true":"false");
+		if(approxSync)
+			NODELET_INFO("approx_sync_max_interval = %f", approxSyncMaxInterval);
 
 		if(approxSync)
 		{
 			approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize), imageLeft_, imageRight_, cameraInfoLeft_, cameraInfoRight_);
+			if(approxSyncMaxInterval>0.0)
+				approxSync_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
 			approxSync_->registerCallback(std::bind(&StereoThrottleNodelet::callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 		}
 		else

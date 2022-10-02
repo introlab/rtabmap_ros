@@ -11,14 +11,10 @@ jobs:
     
     strategy:
       matrix:
-        docker_tag: [kinetic, kinetic-latest, melodic, melodic-latest, noetic, noetic-latest]
+        docker_tag: [kinetic, melodic, melodic-latest, noetic, noetic-latest]
         include:
         - docker_tag: kinetic
           docker_path: 'kinetic'
-          docker_platforms: |
-            linux/amd64
-        - docker_tag: kinetic-latest
-          docker_path: 'kinetic/latest'
           docker_platforms: |
             linux/amd64
         - docker_tag: melodic
@@ -26,7 +22,7 @@ jobs:
           docker_platforms: |
             linux/amd64
             linux/arm64
-            linux/arm/v7
+#            linux/arm/v7
         - docker_tag: melodic-latest
           docker_path: 'melodic/latest'
           docker_platforms: |
@@ -37,7 +33,7 @@ jobs:
           docker_platforms: |
             linux/amd64
             linux/arm64
-            linux/arm/v7
+#            linux/arm/v7
         - docker_tag: noetic-latest
           docker_path: 'noetic/latest'
           docker_platforms: |
@@ -66,11 +62,10 @@ jobs:
         name: Build and push
         uses: docker/build-push-action@v2
         with:
-          context: ./docker/${{ matrix.docker_path }}
+          context: .
           push: true
           platforms: ${{ matrix.docker_platforms }}
-          build-args: |
-            CACHE_DATE=${{ github.head_ref }}.${{ github.sha }}
+          file: ./docker/${{ matrix.docker_path }}/Dockerfile
           tags: introlab3it/rtabmap_ros:${{ matrix.docker_tag }}
           cache-from: type=registry,ref=introlab3it/rtabmap_ros:${{ matrix.docker_tag }}
           cache-to: type=inline

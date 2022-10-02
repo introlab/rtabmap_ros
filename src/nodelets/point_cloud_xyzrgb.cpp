@@ -69,7 +69,9 @@ PointCloudXYZRGB::PointCloudXYZRGB(const rclcpp::NodeOptions & options) :
 	std::string roiStr;
 	int queueSize = 10;
 	int qos = 0;
+	double approxSyncMaxInterval = 0.0;
 	approxSync = this->declare_parameter("approx_sync", approxSync);
+	approxSyncMaxInterval = this->declare_parameter("approx_sync_max_interval", approxSyncMaxInterval);
 	queueSize = this->declare_parameter("queue_size", queueSize);
 	qos = this->declare_parameter("qos", qos);
 	int qosCamInfo = this->declare_parameter("qos_camera_info", qos);
@@ -139,12 +141,18 @@ PointCloudXYZRGB::PointCloudXYZRGB(const rclcpp::NodeOptions & options) :
 	{
 
 		approxSyncDepth_ = new message_filters::Synchronizer<MyApproxSyncDepthPolicy>(MyApproxSyncDepthPolicy(queueSize), imageSub_, imageDepthSub_, cameraInfoSub_);
+		if(approxSyncMaxInterval > 0.0)
+			approxSyncDepth_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval));
 		approxSyncDepth_->registerCallback(std::bind(&PointCloudXYZRGB::depthCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
 		approxSyncDisparity_ = new message_filters::Synchronizer<MyApproxSyncDisparityPolicy>(MyApproxSyncDisparityPolicy(queueSize), imageLeft_, imageDisparitySub_, cameraInfoLeft_);
+		if(approxSyncMaxInterval > 0.0)
+			approxSyncDisparity_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval));
 		approxSyncDisparity_->registerCallback(std::bind(&PointCloudXYZRGB::disparityCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
 		approxSyncStereo_ = new message_filters::Synchronizer<MyApproxSyncStereoPolicy>(MyApproxSyncStereoPolicy(queueSize), imageLeft_, imageRight_, cameraInfoLeft_, cameraInfoRight_);
+		if(approxSyncMaxInterval > 0.0)
+			approxSyncStereo_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval));
 		approxSyncStereo_->registerCallback(std::bind(&PointCloudXYZRGB::stereoCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 	}
 	else
@@ -224,30 +232,55 @@ void PointCloudXYZRGB::depthCallback(
 
 		cv_bridge::CvImageConstPtr imageDepthPtr = cv_bridge::toCvShare(imageDepth);
 
-		image_geometry::PinholeCameraModel model;
-		model.fromCameraInfo(*cameraInfo);
-
-		UASSERT(imageDepthPtr->image.cols == imagePtr->image.cols);
-		UASSERT(imageDepthPtr->image.rows == imagePtr->image.rows);
+		rtabmap::CameraModel model = cameraModelFromROS(*cameraInfo);
 
 		pcl::PointCloud<pcl::PointXYZRGB>::Ptr pclCloud;
-		cv::Rect roi = rtabmap::util2d::computeRoi(imageDepthPtr->image, roiRatios_);
 
-		rtabmap::CameraModel m(
-				model.fx(),
-				model.fy(),
-				model.cx()-roiRatios_[0]*double(imageDepthPtr->image.cols),
-				model.cy()-roiRatios_[2]*double(imageDepthPtr->image.rows));
+		cv::Mat rgb = imagePtr->image;
+		cv::Mat depth = imageDepthPtr->image;
+		if( roiRatios_.size() == 4 &&
+			((roiRatios_[0] > 0.0f && roiRatios_[0] <= 1.0f) ||
+			 (roiRatios_[1] > 0.0f && roiRatios_[1] <= 1.0f) ||
+			 (roiRatios_[2] > 0.0f && roiRatios_[2] <= 1.0f) ||
+			 (roiRatios_[3] > 0.0f && roiRatios_[3] <= 1.0f)))
+		{
+			cv::Rect roiDepth = rtabmap::util2d::computeRoi(depth, roiRatios_);
+			cv::Rect roiRgb = rtabmap::util2d::computeRoi(rgb, roiRatios_);
+			if(	roiDepth.width%decimation_==0 &&
+				roiDepth.height%decimation_==0 &&
+				roiRgb.width%decimation_==0 &&
+				roiRgb.height%decimation_==0)
+			{
+				depth = cv::Mat(depth, roiDepth);
+				rgb = cv::Mat(rgb, roiRgb);
+				model = model.roi(roiRgb);
+			}
+			else
+			{
+				RCLCPP_ERROR(this->get_logger(), "Cannot apply ROI ratios [%f,%f,%f,%f] because resulting "
+					  "dimension (depth=%dx%d rgb=%dx%d) cannot be divided exactly "
+					  "by decimation parameter (%d). Ignoring ROI ratios...",
+					  roiRatios_[0],
+					  roiRatios_[1],
+					  roiRatios_[2],
+					  roiRatios_[3],
+					  roiDepth.width,
+					  roiDepth.height,
+					  roiRgb.width,
+					  roiRgb.height,
+					  decimation_);
+			}
+		}
+
 		pcl::IndicesPtr indices(new std::vector<int>);
 		pclCloud = rtabmap::util3d::cloudFromDepthRGB(
-				cv::Mat(imagePtr->image, roi),
-				cv::Mat(imageDepthPtr->image, roi),
-				m,
+				rgb,
+				depth,
+				model,
 				decimation_,
 				maxDepth_,
 				minDepth_,
 				indices.get());
-
 
 		processAndPublish(pclCloud, indices, imagePtr->header);
 
@@ -300,6 +333,8 @@ void PointCloudXYZRGB::disparityCallback(
 
 		pcl::PointCloud<pcl::PointXYZRGB>::Ptr pclCloud;
 		rtabmap::CameraModel leftModel = rtabmap_ros::cameraModelFromROS(*cameraInfo);
+		UASSERT(disparity.cols == leftModel.imageWidth() && disparity.rows == leftModel.imageHeight());
+		UASSERT(imagePtr->image.cols == leftModel.imageWidth() && imagePtr->image.rows == leftModel.imageHeight());
 		rtabmap::StereoCameraModel stereoModel(imageDisparity->f, imageDisparity->f, leftModel.cx()-roiRatios_[0]*double(disparity.cols), leftModel.cy()-roiRatios_[2]*double(disparity.rows), imageDisparity->t);
 		pcl::IndicesPtr indices(new std::vector<int>);
 		pclCloud = rtabmap::util3d::cloudFromDisparityRGB(
@@ -397,7 +432,8 @@ void PointCloudXYZRGB::rgbdImageCallback(
 					maxDepth_,
 					minDepth_,
 					indices.get(),
-					stereoBMParameters_);
+					stereoBMParameters_,
+					roiRatios_);
 
 			processAndPublish(pclCloud, indices, image->header);
 		}

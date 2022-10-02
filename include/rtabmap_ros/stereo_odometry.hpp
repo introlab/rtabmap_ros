@@ -37,8 +37,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <image_transport/image_transport.hpp>
 #include <image_transport/subscriber_filter.hpp>
 
+#include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/msg/image.hpp>
 #include <rtabmap_ros/msg/rgbd_image.hpp>
+#include <rtabmap_ros/msg/rgbd_images.hpp>
 
 namespace rtabmap_ros
 {
@@ -54,6 +56,12 @@ private:
 	virtual void updateParameters(rtabmap::ParametersMap & parameters);
 	virtual void onOdomInit();
 
+	void commonCallback(
+			const std::vector<cv_bridge::CvImageConstPtr> & leftImages,
+			const std::vector<cv_bridge::CvImageConstPtr> & rightImages,
+			const std::vector<sensor_msgs::msg::CameraInfo>& leftCameraInfos,
+			const std::vector<sensor_msgs::msg::CameraInfo>& rightCameraInfos);
+
 	void callback(
 			const sensor_msgs::msg::Image::ConstSharedPtr imageRectLeft,
 			const sensor_msgs::msg::Image::ConstSharedPtr imageRectRight,
@@ -62,6 +70,21 @@ private:
 
 	void callbackRGBD(
 			const rtabmap_ros::msg::RGBDImage::ConstSharedPtr image);
+	void callbackRGBDX(
+			const rtabmap_ros::msg::RGBDImages::ConstSharedPtr images);
+	void callbackRGBD2(
+			const rtabmap_ros::msg::RGBDImage::ConstSharedPtr image,
+			const rtabmap_ros::msg::RGBDImage::ConstSharedPtr image2);
+	void callbackRGBD3(
+			const rtabmap_ros::msg::RGBDImage::ConstSharedPtr image,
+			const rtabmap_ros::msg::RGBDImage::ConstSharedPtr image2,
+			const rtabmap_ros::msg::RGBDImage::ConstSharedPtr image3);
+	void callbackRGBD4(
+			const rtabmap_ros::msg::RGBDImage::ConstSharedPtr image,
+			const rtabmap_ros::msg::RGBDImage::ConstSharedPtr image2,
+			const rtabmap_ros::msg::RGBDImage::ConstSharedPtr image3,
+			const rtabmap_ros::msg::RGBDImage::ConstSharedPtr image4);
+
 
 protected:
 	virtual void flushCallbacks();
@@ -71,11 +94,31 @@ private:
 	image_transport::SubscriberFilter imageRectRight_;
 	message_filters::Subscriber<sensor_msgs::msg::CameraInfo> cameraInfoLeft_;
 	message_filters::Subscriber<sensor_msgs::msg::CameraInfo> cameraInfoRight_;
+
+	rclcpp::Subscription<rtabmap_ros::msg::RGBDImage>::SharedPtr rgbdSub_;
+	rclcpp::Subscription<rtabmap_ros::msg::RGBDImages>::SharedPtr rgbdxSub_;
+	message_filters::Subscriber<rtabmap_ros::msg::RGBDImage> rgbd_image1_sub_;
+	message_filters::Subscriber<rtabmap_ros::msg::RGBDImage> rgbd_image2_sub_;
+	message_filters::Subscriber<rtabmap_ros::msg::RGBDImage> rgbd_image3_sub_;
+	message_filters::Subscriber<rtabmap_ros::msg::RGBDImage> rgbd_image4_sub_;
+
 	typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::msg::Image, sensor_msgs::msg::Image, sensor_msgs::msg::CameraInfo, sensor_msgs::msg::CameraInfo> MyApproxSyncPolicy;
 	message_filters::Synchronizer<MyApproxSyncPolicy> * approxSync_;
 	typedef message_filters::sync_policies::ExactTime<sensor_msgs::msg::Image, sensor_msgs::msg::Image, sensor_msgs::msg::CameraInfo, sensor_msgs::msg::CameraInfo> MyExactSyncPolicy;
 	message_filters::Synchronizer<MyExactSyncPolicy> * exactSync_;
-	rclcpp::Subscription<rtabmap_ros::msg::RGBDImage>::SharedPtr rgbdSub_;
+	typedef message_filters::sync_policies::ApproximateTime<rtabmap_ros::msg::RGBDImage, rtabmap_ros::msg::RGBDImage> MyApproxSync2Policy;
+	message_filters::Synchronizer<MyApproxSync2Policy> * approxSync2_;
+	typedef message_filters::sync_policies::ExactTime<rtabmap_ros::msg::RGBDImage, rtabmap_ros::msg::RGBDImage> MyExactSync2Policy;
+	message_filters::Synchronizer<MyExactSync2Policy> * exactSync2_;
+	typedef message_filters::sync_policies::ApproximateTime<rtabmap_ros::msg::RGBDImage, rtabmap_ros::msg::RGBDImage, rtabmap_ros::msg::RGBDImage> MyApproxSync3Policy;
+	message_filters::Synchronizer<MyApproxSync3Policy> * approxSync3_;
+	typedef message_filters::sync_policies::ExactTime<rtabmap_ros::msg::RGBDImage, rtabmap_ros::msg::RGBDImage, rtabmap_ros::msg::RGBDImage> MyExactSync3Policy;
+	message_filters::Synchronizer<MyExactSync3Policy> * exactSync3_;
+	typedef message_filters::sync_policies::ApproximateTime<rtabmap_ros::msg::RGBDImage, rtabmap_ros::msg::RGBDImage, rtabmap_ros::msg::RGBDImage, rtabmap_ros::msg::RGBDImage> MyApproxSync4Policy;
+	message_filters::Synchronizer<MyApproxSync4Policy> * approxSync4_;
+	typedef message_filters::sync_policies::ExactTime<rtabmap_ros::msg::RGBDImage, rtabmap_ros::msg::RGBDImage, rtabmap_ros::msg::RGBDImage, rtabmap_ros::msg::RGBDImage> MyExactSync4Policy;
+	message_filters::Synchronizer<MyExactSync4Policy> * exactSync4_;
+
 	int queueSize_;
 	bool keepColor_;
 };

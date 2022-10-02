@@ -95,6 +95,8 @@ PointCloudToDepthImage::PointCloudToDepthImage(const rclcpp::NodeOptions & optio
 	depthImage16Pub_ = image_transport::create_camera_publisher(node.get(), "image_raw", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile()); // 16 bits unsigned in mm
 	depthImage32Pub_ = image_transport::create_camera_publisher(node.get(), "image", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());// 32 bits float in meters
 	pointCloudTransformedPub_ = create_publisher<sensor_msgs::msg::PointCloud2>("cloud_transformed", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos));
+	cameraInfo16Pub_ = create_publisher<sensor_msgs::msg::CameraInfo>(depthImage16Pub_.getTopic()+"/camera_info", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qosCamInfo));
+	cameraInfo32Pub_ = create_publisher<sensor_msgs::msg::CameraInfo>(depthImage32Pub_.getTopic()+"/camera_info", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qosCamInfo));
 
 	if(approx)
 	{
@@ -160,12 +162,15 @@ void PointCloudToDepthImage::callback(
 		rtabmap::Transform localTransform = cloudDisplacement*cloudToCamera;
 
 		rtabmap::CameraModel model = rtabmap_ros::cameraModelFromROS(*cameraInfoMsg, localTransform);
+		sensor_msgs::msg::CameraInfo cameraInfoMsgOut = *cameraInfoMsg;
 
 		if(decimation_ > 1)
 		{
 			if(model.imageWidth()%decimation_ == 0 && model.imageHeight()%decimation_ == 0)
 			{
-				model = model.scaled(1.0f/float(decimation_));
+				float scale = 1.0f/float(decimation_);
+				model = model.scaled(scale);
+				rtabmap_ros::cameraModelToROS(model, cameraInfoMsgOut);
 			}
 			else
 			{
@@ -216,6 +221,10 @@ void PointCloudToDepthImage::callback(
 		{
 			depthImage.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
 			depthImage32Pub_.publish(depthImage.toImageMsg(), cameraInfoMsg);
+			if(cameraInfo32Pub_->get_subscription_count())
+			{
+				cameraInfo32Pub_->publish(cameraInfoMsgOut);
+			}
 		}
 
 		if(depthImage16Pub_.getNumSubscribers())
@@ -223,6 +232,10 @@ void PointCloudToDepthImage::callback(
 			depthImage.encoding = sensor_msgs::image_encodings::TYPE_16UC1;
 			depthImage.image = rtabmap::util2d::cvtDepthFromFloat(depthImage.image);
 			depthImage16Pub_.publish(depthImage.toImageMsg(), cameraInfoMsg);
+			if(cameraInfo16Pub_->get_subscription_count())
+			{
+				cameraInfo16Pub_->publish(cameraInfoMsgOut);
+			}
 		}
 
 		if( cloudStamp != timestampFromROS(pointCloud2Msg->header.stamp) ||
@@ -237,7 +250,6 @@ void PointCloudToDepthImage::callback(
 		}
 	}
 }
-
 }
 
 #include "rclcpp_components/register_node_macro.hpp"

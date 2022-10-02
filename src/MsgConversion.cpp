@@ -889,7 +889,7 @@ void cameraModelToROS(
 		memcpy(camInfo.k.data(), model.K_raw().data, 9*sizeof(double));
 	}
 
-	if(camInfo.d.size() == 6)
+	if(model.D_raw().total() == 6)
 	{
 		camInfo.d = std::vector<double>(4);
 		camInfo.d[0] = model.D_raw().at<double>(0,0);
@@ -1121,27 +1121,30 @@ rtabmap::Signature nodeDataFromROS(const rtabmap_ros::msg::NodeData & msg)
 		}
 	}
 
-	rtabmap::StereoCameraModel stereoModel;
+	std::vector<rtabmap::StereoCameraModel> stereoModels;
 	std::vector<rtabmap::CameraModel> models;
-	if(msg.baseline > 0.0f)
+	if(msg.baseline.size())
 	{
 		// stereo model
-		if(msg.fx.size() == 1 &&
-		   msg.fy.size() == 1 &&
-		   msg.cx.size() == 1 &&
-		   msg.cy.size() == 1 &&
-		   msg.width.size() == 1 &&
-		   msg.height.size() == 1 &&
-		   msg.local_transform.size() == 1)
+		if(msg.fx.size() == msg.baseline.size() &&
+		   msg.fy.size() == msg.baseline.size() &&
+		   msg.cx.size() == msg.baseline.size() &&
+		   msg.cy.size() == msg.baseline.size() &&
+		   msg.width.size() == msg.baseline.size() &&
+		   msg.height.size() == msg.baseline.size() &&
+		   msg.local_transform.size() == msg.baseline.size())
 		{
-			stereoModel = rtabmap::StereoCameraModel(
-					msg.fx[0],
-					msg.fy[0],
-					msg.cx[0],
-					msg.cy[0],
-					msg.baseline,
-					transformFromGeometryMsg(msg.local_transform[0]),
-					cv::Size(msg.width[0], msg.height[0]));
+			for(unsigned int i=0; i<msg.fx.size(); ++i)
+			{
+				stereoModels.push_back(rtabmap::StereoCameraModel(
+						msg.fx[i],
+						msg.fy[i],
+						msg.cx[i],
+						msg.cy[i],
+						msg.baseline[i],
+						transformFromGeometryMsg(msg.local_transform[i]),
+						cv::Size(msg.width[i], msg.height[i])));
+			}
 		}
 	}
 	else
@@ -1182,7 +1185,7 @@ rtabmap::Signature nodeDataFromROS(const rtabmap_ros::msg::NodeData & msg)
 			msg.label,
 			transformFromPoseMsg(msg.pose),
 			transformFromPoseMsg(msg.ground_truth_pose),
-			stereoModel.isValidForProjection()?
+			stereoModels.size()?
 				rtabmap::SensorData(
 					rtabmap::LaserScan(compressedMatFromBytes(msg.laser_scan),
 							msg.laser_scan_max_pts,
@@ -1191,7 +1194,7 @@ rtabmap::Signature nodeDataFromROS(const rtabmap_ros::msg::NodeData & msg)
 							transformFromGeometryMsg(msg.laser_scan_local_transform)),
 					compressedMatFromBytes(msg.image),
 					compressedMatFromBytes(msg.depth),
-					stereoModel,
+					stereoModels,
 					msg.id,
 					msg.stamp,
 					compressedMatFromBytes(msg.user_data)):
@@ -1248,7 +1251,6 @@ void nodeDataToROS(const rtabmap::Signature & signature, rtabmap_ros::msg::NodeD
 	msg.laser_scan_max_range = signature.sensorData().laserScanCompressed().rangeMax();
 	msg.laser_scan_format = signature.sensorData().laserScanCompressed().format();
 	transformToGeometryMsg(signature.sensorData().laserScanCompressed().localTransform(), msg.laser_scan_local_transform);
-	msg.baseline = 0;
 	if(signature.sensorData().cameraModels().size())
 	{
 		msg.fx.resize(signature.sensorData().cameraModels().size());
@@ -1269,17 +1271,27 @@ void nodeDataToROS(const rtabmap::Signature & signature, rtabmap_ros::msg::NodeD
 			transformToGeometryMsg(signature.sensorData().cameraModels()[i].localTransform(), msg.local_transform[i]);
 		}
 	}
-	else if(signature.sensorData().stereoCameraModels().size()==1)
+	else if(signature.sensorData().stereoCameraModels().size())
 	{
-		msg.fx.push_back(signature.sensorData().stereoCameraModels()[0].left().fx());
-		msg.fy.push_back(signature.sensorData().stereoCameraModels()[0].left().fy());
-		msg.cx.push_back(signature.sensorData().stereoCameraModels()[0].left().cx());
-		msg.cy.push_back(signature.sensorData().stereoCameraModels()[0].left().cy());
-		msg.width.push_back(signature.sensorData().stereoCameraModels()[0].left().imageWidth());
-		msg.height.push_back(signature.sensorData().stereoCameraModels()[0].left().imageHeight());
-		msg.baseline = signature.sensorData().stereoCameraModels()[0].baseline();
-		msg.local_transform.resize(1);
-		transformToGeometryMsg(signature.sensorData().stereoCameraModels()[0].left().localTransform(), msg.local_transform[0]);
+		msg.fx.resize(signature.sensorData().stereoCameraModels().size());
+		msg.fy.resize(signature.sensorData().stereoCameraModels().size());
+		msg.cx.resize(signature.sensorData().stereoCameraModels().size());
+		msg.cy.resize(signature.sensorData().stereoCameraModels().size());
+		msg.width.resize(signature.sensorData().stereoCameraModels().size());
+		msg.height.resize(signature.sensorData().stereoCameraModels().size());
+		msg.baseline.resize(signature.sensorData().stereoCameraModels().size());
+		msg.local_transform.resize(signature.sensorData().stereoCameraModels().size());
+		for(unsigned int i=0; i<signature.sensorData().stereoCameraModels().size(); ++i)
+		{
+			msg.fx[i] = signature.sensorData().stereoCameraModels()[i].left().fx();
+			msg.fy[i] = signature.sensorData().stereoCameraModels()[i].left().fy();
+			msg.cx[i] = signature.sensorData().stereoCameraModels()[i].left().cx();
+			msg.cy[i] = signature.sensorData().stereoCameraModels()[i].left().cy();
+			msg.width[i] = signature.sensorData().stereoCameraModels()[i].left().imageWidth();
+			msg.height[i] = signature.sensorData().stereoCameraModels()[i].left().imageHeight();
+			msg.baseline[i] = signature.sensorData().stereoCameraModels()[i].baseline();
+			transformToGeometryMsg(signature.sensorData().stereoCameraModels()[i].left().localTransform(), msg.local_transform[i]);
+		}
 	}
 
 	//Features stuff...
@@ -1478,12 +1490,14 @@ rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_ros::msg::OdomInfo & msg, bo
 	info.localBundleConstraints = msg.local_bundle_constraints;
 	info.localBundleTime = msg.local_bundle_time;
 	UASSERT(msg.local_bundle_models.size() == msg.local_bundle_ids.size());
-	UASSERT(msg.local_bundle_models.size() == msg.local_bundle_model_transforms.size());
 	UASSERT(msg.local_bundle_models.size() == msg.local_bundle_poses.size());
 	for(size_t i=0; i<msg.local_bundle_ids.size(); ++i)
 	{
 		std::vector<rtabmap::CameraModel> models;
-		models.push_back(cameraModelFromROS(msg.local_bundle_models[i], transformFromGeometryMsg(msg.local_bundle_model_transforms[i])));
+		for(size_t j=0; j<msg.local_bundle_models[i].models.size(); ++j)
+		{
+			models.push_back(cameraModelFromROS(msg.local_bundle_models[i].models[j].camera_info, transformFromGeometryMsg(msg.local_bundle_models[i].models[j].local_transform)));
+		}
 		info.localBundleModels.insert(std::make_pair(msg.local_bundle_ids[i], models));
 		info.localBundlePoses.insert(std::make_pair(msg.local_bundle_ids[i], transformFromPoseMsg(msg.local_bundle_poses[i])));
 	}
@@ -1559,20 +1573,22 @@ void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_ros::msg::OdomInf
 		iter!=info.localBundleModels.end();
 		++iter)
 	{
-		if(iter->second.size())
+		msg.local_bundle_ids.push_back(iter->first);
+
+		UASSERT(info.localBundlePoses.find(iter->first)!=info.localBundlePoses.end());
+		geometry_msgs::msg::Pose pose;
+		transformToPoseMsg(info.localBundlePoses.at(iter->first), pose);
+		msg.local_bundle_poses.push_back(pose);
+
+		rtabmap_ros::msg::CameraModels models;
+		for(size_t i=0; i<iter->second.size(); ++i)
 		{
-			msg.local_bundle_ids.push_back(iter->first);
-			sensor_msgs::msg::CameraInfo camInfo;
-			cameraModelToROS(iter->second[0], camInfo);
-			msg.local_bundle_models.push_back(camInfo);
-			geometry_msgs::msg::Transform localT;
-			transformToGeometryMsg(iter->second[0].localTransform(), localT);
-			msg.local_bundle_model_transforms.push_back(localT);
-			UASSERT(info.localBundlePoses.find(iter->first)!=info.localBundlePoses.end());
-			geometry_msgs::msg::Pose pose;
-			transformToPoseMsg(info.localBundlePoses.at(iter->first), pose);
-			msg.local_bundle_poses.push_back(pose);
+			rtabmap_ros::msg::CameraModel modelMsg;
+			cameraModelToROS(iter->second[i], modelMsg.camera_info);
+			transformToGeometryMsg(iter->second[i].localTransform(), modelMsg.local_transform);
+			models.models.push_back(modelMsg);
 		}
+		msg.local_bundle_models.push_back(models);
 	}
 	msg.key_frame_added = info.keyFrameAdded;
 	msg.time_estimation = info.timeEstimation;
@@ -1782,14 +1798,17 @@ bool convertRGBDMsgs(
 		const std::vector<cv_bridge::CvImageConstPtr> & imageMsgs,
 		const std::vector<cv_bridge::CvImageConstPtr> & depthMsgs,
 		const std::vector<sensor_msgs::msg::CameraInfo> & cameraInfoMsgs,
+		const std::vector<sensor_msgs::msg::CameraInfo> & depthCameraInfoMsgs,
 		const std::string & frameId,
 		const std::string & odomFrameId,
 		const rclcpp::Time & odomStamp,
 		cv::Mat & rgb,
 		cv::Mat & depth,
 		std::vector<rtabmap::CameraModel> & cameraModels,
+		std::vector<rtabmap::StereoCameraModel> & stereoCameraModels,
 		tf2_ros::Buffer & listener,
 		double waitForTransform,
+		bool alreadRectifiedImages,
 		const std::vector<std::vector<rtabmap_ros::msg::KeyPoint> > & localKeyPointsMsgs,
 		const std::vector<std::vector<rtabmap_ros::msg::Point3f> > & localPoints3dMsgs,
 		const std::vector<cv::Mat> & localDescriptorsMsgs,
@@ -1797,16 +1816,41 @@ bool convertRGBDMsgs(
 		std::vector<cv::Point3f> * localPoints3d,
 		cv::Mat * localDescriptors)
 {
-	UASSERT(!cameraInfoMsgs.empty()>0 &&
+	UASSERT(!cameraInfoMsgs.empty() &&
 			(cameraInfoMsgs.size() == imageMsgs.size() || imageMsgs.empty()) &&
-			(cameraInfoMsgs.size() == depthMsgs.size() || depthMsgs.empty()));
+			(cameraInfoMsgs.size() == depthMsgs.size() || depthMsgs.empty()) &&
+			(cameraInfoMsgs.size() == depthCameraInfoMsgs.size() || depthCameraInfoMsgs.empty()));
 
 	int imageWidth = imageMsgs.size()?imageMsgs[0]->image.cols:cameraInfoMsgs[0].width;
 	int imageHeight = imageMsgs.size()?imageMsgs[0]->image.rows:cameraInfoMsgs[0].height;
 	int depthWidth = depthMsgs.size()?depthMsgs[0]->image.cols:0;
 	int depthHeight = depthMsgs.size()?depthMsgs[0]->image.rows:0;
 
-	if(!depthMsgs.empty())
+	bool isDepth = depthMsgs.empty() || (depthMsgs[0].get() != 0 && (
+			depthMsgs[0]->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1) == 0 ||
+			depthMsgs[0]->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1) == 0 ||
+			depthMsgs[0]->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0));
+
+	// Note that right image can be also MONO16, check the camera info if Tx is set, if so assume it is stereo instead
+	if(isDepth &&
+	   !depthMsgs.empty() &&
+	   depthMsgs[0]->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0 &&
+	   cameraInfoMsgs.size() == depthCameraInfoMsgs.size())
+	{
+		isDepth = cameraInfoMsgs[0].p[3] == 0.0 && depthCameraInfoMsgs[0].p[3] == 0.0;
+		static bool warned = false;
+		if(!warned && isDepth)
+		{
+			UWARN("Input depth/left image has encoding \"mono16\" and "
+					"camera info P[3] is null for both cameras, thus image is "
+					"considered a depth image. If the depth image is in "
+					"fact the right image, please convert the right image to "
+					"\"mono8\". This warning is shown only once.");
+			warned = true;
+		}
+	}
+
+	if(isDepth)
 	{
 		UASSERT_MSG(
 				imageWidth/depthWidth == imageHeight/depthHeight,
@@ -1828,7 +1872,7 @@ bool convertRGBDMsgs(
 				 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::BAYER_GRBG8) == 0 ||
 				 imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::BAYER_RGGB8) == 0))
 			{
-				UERROR("Input rgb type must be image=mono8,mono16,rgb8,bgr8,bgra8,rgba8. Current rgb=%s",
+				UERROR("Input rgb/left type must be image=mono8,mono16,rgb8,bgr8,bgra8,rgba8. Current rgb/left=%s",
 						imageMsgs[i]->encoding.c_str());
 				return false;
 			}
@@ -1840,18 +1884,35 @@ bool convertRGBDMsgs(
 								imageHeight,
 								imageMsgs[i]->image.rows).c_str());
 		}
-		 if(!depthMsgs.empty() &&
-			 !(depthMsgs[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1) == 0 ||
-			   depthMsgs[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1) == 0 ||
-			   depthMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0))
+		 if(!depthMsgs.empty())
 		{
-			UERROR("Input depth type must be image_depth=32FC1,16UC1,mono16. Current depth=%s",
-					depthMsgs[i]->encoding.c_str());
-			return false;
+			 if(isDepth &&
+			   !(depthMsgs[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1) == 0 ||
+			     depthMsgs[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1) == 0 ||
+			     depthMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0))
+			 {
+				UERROR("Input depth type must be image_depth=32FC1,16UC1,mono16. Current depth=%s",
+						depthMsgs[i]->encoding.c_str());
+				return false;
+			 }
+			 else if(!isDepth &&
+					  !(depthMsgs[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) == 0 ||
+						depthMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
+						depthMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0 ||
+						depthMsgs[i]->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
+						depthMsgs[i]->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0 ||
+						depthMsgs[i]->encoding.compare(sensor_msgs::image_encodings::BGRA8) == 0 ||
+						depthMsgs[i]->encoding.compare(sensor_msgs::image_encodings::RGBA8) == 0))
+			 {
+				 UERROR("Input right type must be image=mono8,mono16,rgb8,bgr8,bgra8,rgba8. Current right=%s",
+						 depthMsgs[i]->encoding.c_str());
+				return false;
+			 }
 		}
 
+
 		rclcpp::Time stamp;
-		if(!depthMsgs.empty())
+		if(isDepth && !depthMsgs.empty())
 		{
 			UASSERT_MSG(depthMsgs[i]->image.cols == depthWidth && depthMsgs[i]->image.rows == depthHeight,
 					uFormat("depthWidth=%d vs %d imageHeight=%d vs %d",
@@ -1889,8 +1950,8 @@ bool convertRGBDMsgs(
 					waitForTransform);
 			if(sensorT.isNull())
 			{
-				UWARN("Could not get odometry value for depth image stamp (%fs). Latest odometry "
-						"stamp is %fs. The depth image pose will not be synchronized with odometry.", stamp.seconds(), odomStamp.seconds());
+				UWARN("Could not get odometry value for image stamp (%fs). Latest odometry "
+						"stamp is %fs. The image pose will not be synchronized with odometry.", timestampFromROS(stamp), timestampFromROS(odomStamp));
 			}
 			else
 			{
@@ -1928,33 +1989,138 @@ bool convertRGBDMsgs(
 			}
 			else
 			{
-				UERROR("Some RGB images are not the same type!");
+				UERROR("Some RGB/left images are not the same type!");
 				return false;
 			}
 		}
 
 		if(!depthMsgs.empty())
 		{
-			cv_bridge::CvImageConstPtr ptrDepth = depthMsgs[i];
-			cv::Mat subDepth = ptrDepth->image;
-
-			if(depth.empty())
+			if(isDepth)
 			{
-				depth = cv::Mat(depthHeight, depthWidth*cameraCount, subDepth.type());
-			}
+				cv_bridge::CvImageConstPtr ptrDepth = depthMsgs[i];
+				cv::Mat subDepth = ptrDepth->image;
 
-			if(subDepth.type() == depth.type())
-			{
-				subDepth.copyTo(cv::Mat(depth, cv::Rect(i*depthWidth, 0, depthWidth, depthHeight)));
+				if(depth.empty())
+				{
+					depth = cv::Mat(depthHeight, depthWidth*cameraCount, subDepth.type());
+				}
+
+				if(subDepth.type() == depth.type())
+				{
+					subDepth.copyTo(cv::Mat(depth, cv::Rect(i*depthWidth, 0, depthWidth, depthHeight)));
+				}
+				else
+				{
+					UERROR("Some Depth images are not the same type!");
+					return false;
+				}
 			}
 			else
 			{
-				UERROR("Some Depth images are not the same type!");
-				return false;
+				cv_bridge::CvImageConstPtr ptrImage = depthMsgs[i];
+				if( depthMsgs[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0 ||
+					depthMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0)
+				{
+					// do nothing
+				}
+				else
+				{
+					ptrImage = cv_bridge::cvtColor(depthMsgs[i], "mono8");
+				}
+
+				// initialize
+				if(depth.empty())
+				{
+					depth = cv::Mat(depthHeight, depthWidth*cameraCount, ptrImage->image.type());
+				}
+				if(ptrImage->image.type() == depth.type())
+				{
+					ptrImage->image.copyTo(cv::Mat(depth, cv::Rect(i*depthWidth, 0, depthWidth, depthHeight)));
+				}
+				else
+				{
+					UERROR("Some right images are not the same type!");
+					return false;
+				}
 			}
 		}
 
-		cameraModels.push_back(rtabmap_ros::cameraModelFromROS(cameraInfoMsgs[i], localTransform));
+		if(isDepth)
+		{
+			cameraModels.push_back(rtabmap_ros::cameraModelFromROS(cameraInfoMsgs[i], localTransform));
+		}
+		else //stereo
+		{
+			UASSERT(cameraInfoMsgs.size() == depthCameraInfoMsgs.size());
+			rtabmap::Transform stereoTransform;
+			if(!alreadRectifiedImages)
+			{
+				stereoTransform = getTransform(
+						depthCameraInfoMsgs[i].header.frame_id,
+						cameraInfoMsgs[i].header.frame_id,
+						cameraInfoMsgs[i].header.stamp,
+						listener,
+						waitForTransform);
+				if(stereoTransform.isNull())
+				{
+					UERROR("Parameter %s is false but we cannot get TF between the two cameras!", rtabmap::Parameters::kRtabmapImagesAlreadyRectified().c_str());
+					return false;
+				}
+			}
+
+			rtabmap::StereoCameraModel stereoModel = rtabmap_ros::stereoCameraModelFromROS(cameraInfoMsgs[i], depthCameraInfoMsgs[i], localTransform, stereoTransform);
+
+			if(stereoModel.baseline() > 10.0)
+			{
+				static bool shown = false;
+				if(!shown)
+				{
+					UWARN("Detected baseline (%f m) is quite large! Is your "
+							 "right camera_info P(0,3) correctly set? Note that "
+							 "baseline=-P(0,3)/P(0,0). You may need to calibrate your camera. "
+							 "This warning is printed only once.",
+							 stereoModel.baseline());
+					shown = true;
+				}
+			}
+			else if(stereoModel.baseline() == 0 && alreadRectifiedImages)
+			{
+				rtabmap::Transform stereoTransform = getTransform(
+						cameraInfoMsgs[i].header.frame_id,
+						depthCameraInfoMsgs[i].header.frame_id,
+						cameraInfoMsgs[i].header.stamp,
+						listener,
+						waitForTransform);
+				if(stereoTransform.isNull() || stereoTransform.x()<=0)
+				{
+					UWARN("We cannot estimated the baseline of the rectified images with tf! (%s->%s = %s)",
+							depthCameraInfoMsgs[i].header.frame_id.c_str(), cameraInfoMsgs[i].header.frame_id.c_str(), stereoTransform.prettyPrint().c_str());
+				}
+				else
+				{
+					static bool warned = false;
+					if(!warned)
+					{
+						UWARN("Right camera info doesn't have Tx set but we are assuming that stereo images are already rectified (see %s parameter). While not "
+								"recommended, we used TF to get the baseline (%s->%s = %fm) for convenience (e.g., D400 ir stereo issue). It is preferred to feed "
+								"a valid right camera info if stereo images are already rectified. This message is only printed once...",
+								rtabmap::Parameters::kRtabmapImagesAlreadyRectified().c_str(),
+								depthCameraInfoMsgs[i].header.frame_id.c_str(), cameraInfoMsgs[i].header.frame_id.c_str(), stereoTransform.x());
+						warned = true;
+					}
+					stereoModel = rtabmap::StereoCameraModel(
+							stereoModel.left().fx(),
+							stereoModel.left().fy(),
+							stereoModel.left().cx(),
+							stereoModel.left().cy(),
+							stereoTransform.x(),
+							stereoModel.localTransform(),
+							stereoModel.left().imageSize());
+				}
+			}
+			stereoCameraModels.push_back(stereoModel);
+		}
 
 		if(localKeyPoints && localKeyPointsMsgs.size() == cameraInfoMsgs.size())
 		{

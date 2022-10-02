@@ -91,6 +91,7 @@ private:
 	std::string frameId_;
 	std::string fixedFrameId_;
 	double waitForTransform_;
+	bool xyzOutput_;
 	std::shared_ptr<tf2_ros::Buffer> tfBuffer_;
 	std::shared_ptr<tf2_ros::TransformListener> tfListener_;
 };

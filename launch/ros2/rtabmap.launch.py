@@ -85,6 +85,7 @@ def launch_setup(context, *args, **kwargs):
             condition=IfCondition(PythonExpression(["'", LaunchConfiguration('stereo'), "' != 'true' and '", LaunchConfiguration('rgbd_sync'), "' == 'true'"])),
             parameters=[{
                 "approx_sync": LaunchConfiguration('approx_rgbd_sync'),
+                "approx_sync_max_interval": LaunchConfiguration('approx_sync_max_interval'),
                 "queue_size": LaunchConfiguration('queue_size'),
                 "qos": LaunchConfiguration('qos_image'),
                 "qos_camera_info": LaunchConfiguration('qos_camera_info'),
@@ -118,6 +119,7 @@ def launch_setup(context, *args, **kwargs):
             condition=IfCondition(PythonExpression(["'", LaunchConfiguration('stereo'), "' == 'true' and '", LaunchConfiguration('rgbd_sync'), "' == 'true'"])),
             parameters=[{
                 "approx_sync": LaunchConfiguration('approx_rgbd_sync'),
+                "approx_sync_max_interval": LaunchConfiguration('approx_sync_max_interval'),
                 "queue_size": LaunchConfiguration('queue_size'),
                 "qos": LaunchConfiguration('qos_image'),
                 "qos_camera_info": LaunchConfiguration('qos_camera_info')}],
@@ -160,6 +162,7 @@ def launch_setup(context, *args, **kwargs):
                 "wait_for_transform": LaunchConfiguration('wait_for_transform'),
                 "wait_imu_to_init": LaunchConfiguration('wait_imu_to_init'),
                 "approx_sync": LaunchConfiguration('approx_sync'),
+                "approx_sync_max_interval": LaunchConfiguration('approx_sync_max_interval'),
                 "config_path": LaunchConfiguration('cfg').perform(context),
                 "queue_size": LaunchConfiguration('queue_size'),
                 "qos": LaunchConfiguration('qos_image'),
@@ -193,6 +196,7 @@ def launch_setup(context, *args, **kwargs):
                 "wait_for_transform": LaunchConfiguration('wait_for_transform'),
                 "wait_imu_to_init": LaunchConfiguration('wait_imu_to_init'),
                 "approx_sync": LaunchConfiguration('approx_sync'),
+                "approx_sync_max_interval": LaunchConfiguration('approx_sync_max_interval'),
                 "config_path": LaunchConfiguration('cfg').perform(context),
                 "queue_size": LaunchConfiguration('queue_size'),
                 "qos": LaunchConfiguration('qos_image'),
@@ -351,7 +355,8 @@ def launch_setup(context, *args, **kwargs):
             parameters=[{
                 "decimation": 4,
                 "voxel_size": 0.0,
-                "approx_sync": LaunchConfiguration('approx_sync')
+                "approx_sync": LaunchConfiguration('approx_sync'),
+                "approx_sync_max_interval": LaunchConfiguration('approx_sync_max_interval')
             }],
             remappings=[
                 ('left/image', LaunchConfiguration('left_image_topic_relay')),
@@ -403,7 +408,8 @@ def generate_launch_description():
         DeclareLaunchArgument('ground_truth_frame_id',      default_value='', description='e.g., "world"'),
         DeclareLaunchArgument('ground_truth_base_frame_id', default_value='', description='e.g., "tracker", a fake frame matching the frame "frame_id" (but on different TF tree)'),
         
-        DeclareLaunchArgument('approx_sync',  default_value='false',       description='If timestamps of the input topics should be synchronized using approximate or exact time policy.'),
+        DeclareLaunchArgument('approx_sync',  default_value='false',            description='If timestamps of the input topics should be synchronized using approximate or exact time policy.'),
+        DeclareLaunchArgument('approx_sync_max_interval',  default_value='0.0', description='(sec) 0 means infinite interval duration (used with approx_sync=true)'),
 
         # RGB-D related topics
         DeclareLaunchArgument('rgb_topic',           default_value='/camera/rgb/image_rect_color',       description=''),

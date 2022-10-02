@@ -33,8 +33,7 @@ float32 gravity_pitch_error
 int32[] local_bundle_ids
 
 # Local bundle camera models
-sensor_msgs/CameraInfo[] local_bundle_models
-geometry_msgs/Transform[] local_bundle_model_transforms
+CameraModels[] local_bundle_models
 
 # Local bundle camera poses
 geometry_msgs/Pose[] local_bundle_poses

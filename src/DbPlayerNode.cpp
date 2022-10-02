@@ -293,30 +293,37 @@ int main(int argc, char** argv)
 		}
 		else if(!odom.data().rightRaw().empty() && odom.data().rightRaw().type() == CV_8U)
 		{
-			//stereo
-			if(odom.data().stereoCameraModel().isValidForProjection())
+			if(odom.data().stereoCameraModels().size() > 1)
 			{
-				camInfoA.D.resize(8,0);
-
-				camInfoA.P[0] = odom.data().stereoCameraModel().left().fx();
-				camInfoA.K[0] = odom.data().stereoCameraModel().left().fx();
-				camInfoA.P[5] = odom.data().stereoCameraModel().left().fy();
-				camInfoA.K[4] = odom.data().stereoCameraModel().left().fy();
-				camInfoA.P[2] = odom.data().stereoCameraModel().left().cx();
-				camInfoA.K[2] = odom.data().stereoCameraModel().left().cx();
-				camInfoA.P[6] = odom.data().stereoCameraModel().left().cy();
-				camInfoA.K[5] = odom.data().stereoCameraModel().left().cy();
-
-				camInfoB = camInfoA;
-				camInfoB.P[3] = odom.data().stereoCameraModel().right().Tx(); // Right_Tx = -baseline*fx
+				ROS_WARN("Multi-cameras detected in database but this node cannot send multi-images yet...");
 			}
+			else
+			{
+				//stereo
+				if(odom.data().stereoCameraModels()[0].isValidForProjection())
+				{
+					camInfoA.D.resize(8,0);
 
-			type=1;
+					camInfoA.P[0] = odom.data().stereoCameraModels()[0].left().fx();
+					camInfoA.K[0] = odom.data().stereoCameraModels()[0].left().fx();
+					camInfoA.P[5] = odom.data().stereoCameraModels()[0].left().fy();
+					camInfoA.K[4] = odom.data().stereoCameraModels()[0].left().fy();
+					camInfoA.P[2] = odom.data().stereoCameraModels()[0].left().cx();
+					camInfoA.K[2] = odom.data().stereoCameraModels()[0].left().cx();
+					camInfoA.P[6] = odom.data().stereoCameraModels()[0].left().cy();
+					camInfoA.K[5] = odom.data().stereoCameraModels()[0].left().cy();
 
-			if(leftPub.getTopic().empty()) leftPub = it.advertise("left/image", 1);
-			if(rightPub.getTopic().empty()) rightPub = it.advertise("right/image", 1);
-			if(leftCamInfoPub.getTopic().empty()) leftCamInfoPub = nh.advertise<sensor_msgs::CameraInfo>("left/camera_info", 1);
-			if(rightCamInfoPub.getTopic().empty()) rightCamInfoPub = nh.advertise<sensor_msgs::CameraInfo>("right/camera_info", 1);
+					camInfoB = camInfoA;
+					camInfoB.P[3] = odom.data().stereoCameraModels()[0].right().Tx(); // Right_Tx = -baseline*fx
+				}
+
+				type=1;
+
+				if(leftPub.getTopic().empty()) leftPub = it.advertise("left/image", 1);
+				if(rightPub.getTopic().empty()) rightPub = it.advertise("right/image", 1);
+				if(leftCamInfoPub.getTopic().empty()) leftCamInfoPub = nh.advertise<sensor_msgs::CameraInfo>("left/camera_info", 1);
+				if(rightCamInfoPub.getTopic().empty()) rightCamInfoPub = nh.advertise<sensor_msgs::CameraInfo>("right/camera_info", 1);
+			}
 
 		}
 		else
@@ -383,9 +390,9 @@ int main(int argc, char** argv)
 			{
 				localTransform = odom.data().cameraModels()[0].localTransform();
 			}
-			else if(odom.data().stereoCameraModel().isValidForProjection())
+			else if(odom.data().stereoCameraModels().size() == 1)
 			{
-				localTransform = odom.data().stereoCameraModel().left().localTransform();
+				localTransform = odom.data().stereoCameraModels()[0].left().localTransform();
 			}
 			if(!localTransform.isNull())
 			{

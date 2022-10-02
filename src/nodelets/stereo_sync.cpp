@@ -50,14 +50,17 @@ StereoSync::StereoSync(const rclcpp::NodeOptions & options) :
 {
 	int queueSize = 10;
 	bool approxSync = false;
+	double approxSyncMaxInterval = 0.0;
 	int qos = 0;
 	approxSync = this->declare_parameter("approx_sync", approxSync);
+	approxSyncMaxInterval = this->declare_parameter("approx_sync_max_interval", approxSyncMaxInterval);
 	queueSize = this->declare_parameter("queue_size", queueSize);
 	qos = this->declare_parameter("qos", qos);
 	int qosCamInfo = this->declare_parameter("qos_camera_info", qos);
 	compressedRate_ = this->declare_parameter("compressed_rate", compressedRate_);
 
 	RCLCPP_INFO(this->get_logger(), "%s: approx_sync = %s", get_name(), approxSync?"true":"false");
+	RCLCPP_INFO(this->get_logger(), "%s: approx_sync_max_interval = %f", get_name(), approxSyncMaxInterval);
 	RCLCPP_INFO(this->get_logger(), "%s: queue_size  = %d", get_name(), queueSize);
 	RCLCPP_INFO(this->get_logger(), "%s: qos         = %d", get_name(), qos);
 	RCLCPP_INFO(this->get_logger(), "%s: qos_camera_info = %d", get_name(), qosCamInfo);
@@ -69,6 +72,8 @@ StereoSync::StereoSync(const rclcpp::NodeOptions & options) :
 	if(approxSync)
 	{
 		approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize), imageLeftSub_, imageRightSub_, cameraInfoLeftSub_, cameraInfoRightSub_);
+		if(approxSyncMaxInterval>0.0)
+			approxSync_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval));
 		approxSync_->registerCallback(std::bind(&StereoSync::callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 	}
 	else
@@ -83,9 +88,10 @@ StereoSync::StereoSync(const rclcpp::NodeOptions & options) :
 	cameraInfoLeftSub_.subscribe(this, "left/camera_info"), rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile();
 	cameraInfoRightSub_.subscribe(this, "right/camera_info", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile());
 
-	subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s,\n   %s",
+	subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync%s):\n   %s,\n   %s,\n   %s,\n   %s",
 						get_name(),
 						approxSync?"approx":"exact",
+						approxSync&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
 						imageLeftSub_.getSubscriber().getTopic().c_str(),
 						imageRightSub_.getSubscriber().getTopic().c_str(),
 						cameraInfoLeftSub_.getSubscriber()->get_topic_name(),
@@ -134,6 +140,18 @@ void StereoSync::callback(
 	{
 		double leftStamp = timestampFromROS(imageLeft->header.stamp);
 		double rightStamp = timestampFromROS(imageRight->header.stamp);
+
+		double stampDiff = fabs(leftStamp - rightStamp);
+		if(stampDiff > 0.010)
+		{
+			RCLCPP_WARN(this->get_logger(), "The time difference between left and right frames is "
+					"high (diff=%fs, left=%fs, right=%fs). If your left and right cameras are hardware "
+					"synchronized, use approx_sync:=false. Otherwise, you may want "
+					"to set approx_sync_max_interval lower than 0.01s to reject spurious bad synchronizations.",
+					stampDiff,
+					leftStamp,
+					rightStamp);
+		}
 
 		rtabmap_ros::msg::RGBDImage::UniquePtr msg(new rtabmap_ros::msg::RGBDImage);
 		msg->header.frame_id = cameraInfoLeft->header.frame_id;

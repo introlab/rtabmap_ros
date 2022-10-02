@@ -57,7 +57,7 @@ find_package(octomap_msgs)
 #find_package(fiducial_msgs)
 
 ## System dependencies are found with CMake's conventions
-find_package(RTABMap 0.20.18 REQUIRED)
+find_package(RTABMap 0.20.20 REQUIRED)
 find_package(Boost REQUIRED COMPONENTS system) # dependencies from PCL
 find_package(PCL 1.7 REQUIRED COMPONENTS kdtree) #This crashes idl generation if all components are found?! see https://github.com/ros2/rosidl/issues/402#issuecomment-565586908
 
@@ -142,6 +142,8 @@ ENDIF(RTABMAP_GUI OR rviz_default_plugins_FOUND)
    "msg/GPS.msg"
    "msg/Path.msg"
    "msg/EnvSensor.msg"
+   "msg/CameraModel.msg"
+   "msg/CameraModels.msg"
  )
 
 # declare the service files to generate code for
@@ -676,6 +678,7 @@ ENDIF(rviz_default_plugins_FOUND)
 #  scripts/yaml_to_camera_info.py
 #  scripts/netvlad_tf_ros.py
 #  scripts/wifi_signal_pub.py
+#  scripts/gazebo_ground_truth.py
 #  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 #)
 

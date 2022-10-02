@@ -41,12 +41,12 @@
     <!-- RTAB-Map -->
     <remap from="/rtabmap/grid_map" to="/map"/>
     <include file="$(find rtabmap_ros)/launch/rtabmap.launch">
-        <arg     if="$(arg localization)" name="args" value="--Reg/Strategy 1 --Reg/Force3DoF true --RGBD/NeighborLinkRefining true --Icp/MaxTranslation 0.5 $(arg args3d)  --Kp/MaxFeatures -1 --RGBD/ProximityBySpace false --Rtabmap/DetectionRate 3"/>
+        <arg     if="$(arg localization)" name="args" value="--Reg/Strategy 1 --Reg/Force3DoF true --RGBD/NeighborLinkRefining true --Icp/MaxTranslation 0.5 $(arg args3d)"/>
         <arg unless="$(arg localization)" name="args" value="-d --Reg/Strategy 1 --Reg/Force3DoF true --RGBD/NeighborLinkRefining true --Icp/MaxTranslation 0.5 $(arg args3d)"/>
         <arg name="localization"      value="$(arg localization)"/>
         <arg     if="$(arg lidar3d)" name="subscribe_scan_cloud" value="true"/>
         <arg unless="$(arg lidar3d)" name="subscribe_scan" value="true"/>
-        <arg name="subscribe_depth"   value="$(arg camera)"/>
+        <arg name="depth"             value="$(arg camera)"/>
         <arg name="subscribe_rgb"     value="$(arg camera)"/>
         <arg name="visual_odometry"   value="false"/>
         <arg name="odom_topic"        value="/odom"/>
@@ -59,8 +59,8 @@
         <arg name="rgbd_sync"         value="true"/>
         <arg name="approx_rgbd_sync"  value="false"/>
         <arg name="use_sim_time"      value="true"/>
-        <arg name="tag_linear_variance" value="0.01"/>
-        <arg name="tag_angular_variance" value="1"/>
+        <arg name="tag_linear_variance" value="0.1"/>
+        <arg name="tag_angular_variance" value="0.2"/>
         
 
         <arg name="scan_cloud_assembling"             value="$(arg lidar3d)"/>

@@ -167,14 +167,14 @@ MapCloudDisplay::MapCloudDisplay()
 										 "Filter the floor up to maximum height set here "
 										 "(only appropriate for 2D mapping).",
 										 this, SLOT( updateCloudParameters() ), this );
-	cloud_filter_floor_height_->setMin( 0.0f );
+	cloud_filter_floor_height_->setMin( -999.0f );
 	cloud_filter_floor_height_->setMax( 999.0f );
 
 	cloud_filter_ceiling_height_ = new rviz_common::properties::FloatProperty( "Filter ceiling (m)", 0.0f,
 										 "Filter the ceiling at the specified height set here "
 										 "(only appropriate for 2D mapping).",
 										 this, SLOT( updateCloudParameters() ), this );
-	cloud_filter_ceiling_height_->setMin( 0.0f );
+	cloud_filter_ceiling_height_->setMin( -999.0f );
 	cloud_filter_ceiling_height_->setMax( 999.0f );
 
 	node_filtering_radius_ = new rviz_common::properties::FloatProperty( "Node filtering radius (m)", 0.0f,
@@ -308,13 +308,13 @@ void MapCloudDisplay::processMapData(const rtabmap_ros::msg::MapData& map)
 						cloud = rtabmap::util3d::voxelize(cloud, validIndices, cloud_voxel_size_->getFloat());
 					}
 
-					if(cloud_filter_floor_height_->getFloat() > 0.0f || cloud_filter_ceiling_height_->getFloat() > 0.0f)
+					if(cloud_filter_floor_height_->getFloat() != 0.0f || cloud_filter_ceiling_height_->getFloat() != 0.0f)
 					{
 						// convert in /odom frame
 						cloud = rtabmap::util3d::transformPointCloud(cloud, s.getPose());
 						cloud = rtabmap::util3d::passThrough(cloud, "z",
-								cloud_filter_floor_height_->getFloat()>0.0f?cloud_filter_floor_height_->getFloat():-999.0f,
-								cloud_filter_ceiling_height_->getFloat()>0.0f && (cloud_filter_floor_height_->getFloat()<=0.0f || cloud_filter_ceiling_height_->getFloat()>cloud_filter_floor_height_->getFloat())?cloud_filter_ceiling_height_->getFloat():999.0f);
+								cloud_filter_floor_height_->getFloat()!=0.0f?cloud_filter_floor_height_->getFloat():-999.0f,
+								cloud_filter_ceiling_height_->getFloat()!=0.0f && (cloud_filter_floor_height_->getFloat()==0.0f || cloud_filter_ceiling_height_->getFloat()>cloud_filter_floor_height_->getFloat())?cloud_filter_ceiling_height_->getFloat():999.0f);
 						// convert back in /base_link frame
 						cloud = rtabmap::util3d::transformPointCloud(cloud, s.getPose().inverse());
 					}

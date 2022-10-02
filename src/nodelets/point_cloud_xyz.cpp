@@ -66,7 +66,9 @@ PointCloudXYZ::PointCloudXYZ(const rclcpp::NodeOptions & options) :
 	int qos = 0;
 	bool approxSync = true;
 	std::string roiStr;
+	double approxSyncMaxInterval = 0.0;
 	approxSync = this->declare_parameter("approx_sync", approxSync);
+	approxSyncMaxInterval = this->declare_parameter("approx_sync_max_interval", approxSyncMaxInterval);
 	queueSize = this->declare_parameter("queue_size", queueSize);
 	qos = this->declare_parameter("qos", qos);
 	int qosCamInfo = this->declare_parameter("qos_camera_info", qos);
@@ -119,9 +121,13 @@ PointCloudXYZ::PointCloudXYZ(const rclcpp::NodeOptions & options) :
 	if(approxSync)
 	{
 		approxSyncDepth_ = new message_filters::Synchronizer<MyApproxSyncDepthPolicy>(MyApproxSyncDepthPolicy(queueSize), imageDepthSub_, cameraInfoSub_);
+		if(approxSyncMaxInterval > 0.0)
+			approxSyncDepth_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval));
 		approxSyncDepth_->registerCallback(std::bind(&PointCloudXYZ::callback, this, std::placeholders::_1, std::placeholders::_2));
 
 		approxSyncDisparity_ = new message_filters::Synchronizer<MyApproxSyncDisparityPolicy>(MyApproxSyncDisparityPolicy(queueSize), disparitySub_, disparityCameraInfoSub_);
+		if(approxSyncMaxInterval > 0.0)
+			approxSyncDisparity_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval));
 		approxSyncDisparity_->registerCallback(std::bind(&PointCloudXYZ::callbackDisparity, this, std::placeholders::_1, std::placeholders::_2));
 	}
 	else
@@ -151,12 +157,12 @@ PointCloudXYZ::~PointCloudXYZ()
 	delete exactSyncDisparity_;
 }
 void PointCloudXYZ::callback(
-		  const sensor_msgs::msg::Image::ConstSharedPtr depth,
+		  const sensor_msgs::msg::Image::ConstSharedPtr depthMsg,
 		  const sensor_msgs::msg::CameraInfo::ConstSharedPtr cameraInfo)
 {
-	if(depth->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1)!=0 &&
-	   depth->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1)!=0 &&
-	   depth->encoding.compare(sensor_msgs::image_encodings::MONO16)!=0)
+	if(depthMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1)!=0 &&
+	   depthMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1)!=0 &&
+	   depthMsg->encoding.compare(sensor_msgs::image_encodings::MONO16)!=0)
 	{
 		RCLCPP_ERROR(this->get_logger(), "Input type depth=32FC1,16UC1,MONO16");
 		return;
@@ -166,29 +172,68 @@ void PointCloudXYZ::callback(
 	{
 		rclcpp::Time time = now();
 
-		cv_bridge::CvImageConstPtr imageDepthPtr = cv_bridge::toCvShare(depth);
+		cv_bridge::CvImageConstPtr imageDepthPtr = cv_bridge::toCvShare(depthMsg);
 		cv::Rect roi = rtabmap::util2d::computeRoi(imageDepthPtr->image, roiRatios_);
 
-		image_geometry::PinholeCameraModel model;
-		model.fromCameraInfo(*cameraInfo);
+		rtabmap::CameraModel model = cameraModelFromROS(*cameraInfo);
 
 		pcl::PointCloud<pcl::PointXYZ>::Ptr pclCloud;
-		rtabmap::CameraModel m(
-				model.fx(),
-				model.fy(),
-				model.cx()-roiRatios_[0]*double(imageDepthPtr->image.cols),
-				model.cy()-roiRatios_[2]*double(imageDepthPtr->image.rows));
+
+		cv::Mat depth = imageDepthPtr->image;
+		if( roiRatios_.size() == 4 &&
+			((roiRatios_[0] > 0.0f && roiRatios_[0] <= 1.0f) ||
+			 (roiRatios_[1] > 0.0f && roiRatios_[1] <= 1.0f) ||
+			 (roiRatios_[2] > 0.0f && roiRatios_[2] <= 1.0f) ||
+			 (roiRatios_[3] > 0.0f && roiRatios_[3] <= 1.0f)))
+		{
+			cv::Rect roiDepth = rtabmap::util2d::computeRoi(depth, roiRatios_);
+			cv::Rect roiRgb;
+			if(model.imageWidth() && model.imageHeight())
+			{
+				roiRgb = rtabmap::util2d::computeRoi(model.imageSize(), roiRatios_);
+			}
+			if(	roiDepth.width%decimation_==0 &&
+				roiDepth.height%decimation_==0 &&
+				(roiRgb.width != 0 ||
+				   (roiRgb.width%decimation_==0 &&
+					roiRgb.height%decimation_==0)))
+			{
+				depth = cv::Mat(depth, roiDepth);
+				if(model.imageWidth() != 0 && model.imageHeight() != 0)
+				{
+					model = model.roi(roiRgb);
+				}
+				else
+				{
+					model = model.roi(roiDepth);
+				}
+			}
+			else
+			{
+				RCLCPP_ERROR(this->get_logger(), "Cannot apply ROI ratios [%f,%f,%f,%f] because resulting "
+					  "dimension (depth=%dx%d rgb=%dx%d) cannot be divided exactly "
+					  "by decimation parameter (%d). Ignoring ROI ratios...",
+					  roiRatios_[0],
+					  roiRatios_[1],
+					  roiRatios_[2],
+					  roiRatios_[3],
+					  roiDepth.width,
+					  roiDepth.height,
+					  roiRgb.width,
+					  roiRgb.height,
+					  decimation_);
+			}
+		}
 
 		pcl::IndicesPtr indices(new std::vector<int>);
 		pclCloud = rtabmap::util3d::cloudFromDepth(
-				cv::Mat(imageDepthPtr->image, roi),
-				m,
+				depth,
+				model,
 				decimation_,
 				maxDepth_,
 				minDepth_,
 				indices.get());
-		processAndPublish(pclCloud, indices, depth->header);
-
+		processAndPublish(pclCloud, indices, depthMsg->header);
 		RCLCPP_DEBUG(this->get_logger(), "point_cloud_xyz from depth time = %f s", (now() - time).seconds());
 	}
 }
@@ -222,6 +267,7 @@ void PointCloudXYZ::callbackDisparity(
 
 		pcl::PointCloud<pcl::PointXYZ>::Ptr pclCloud;
 		rtabmap::CameraModel leftModel = rtabmap_ros::cameraModelFromROS(*cameraInfo);
+		UASSERT(disparity.cols == leftModel.imageWidth() && disparity.rows == leftModel.imageHeight());
 		rtabmap::StereoCameraModel stereoModel(disparityMsg->f, disparityMsg->f, leftModel.cx()-roiRatios_[0]*double(disparity.cols), leftModel.cy()-roiRatios_[2]*double(disparity.rows), disparityMsg->t);
 		pcl::IndicesPtr indices(new std::vector<int>);
 		pclCloud = rtabmap::util3d::cloudFromDisparity(
@@ -233,7 +279,6 @@ void PointCloudXYZ::callbackDisparity(
 				indices.get());
 
 		processAndPublish(pclCloud, indices, disparityMsg->header);
-
 		RCLCPP_DEBUG(this->get_logger(), "point_cloud_xyz from disparity time = %f s", (now() - time).seconds());
 	}
 }
