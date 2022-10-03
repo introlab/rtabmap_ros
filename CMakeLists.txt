@@ -70,6 +70,8 @@ IF(WIN32)
 add_compile_options(-bigobj)
 ENDIF(WIN32)
 
+MESSAGE(STATUS "ROS_DISTRO=$ENV{ROS_DISTRO}")
+
 # kinetic issue, rtabmap now requires at least c++11
 if("$ENV{ROS_DISTRO}" STREQUAL "kinetic")
 include(CheckCXXCompilerFlag)
