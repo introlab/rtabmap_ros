@@ -46,12 +46,12 @@ ros2 launch rtabmap_ros rtabmap.launch.py \
     git clone https://github.com/introlab/rtabmap.git src/rtabmap
     git clone --branch ros2 https://github.com/introlab/rtabmap_ros.git src/rtabmap_ros
     export MAKEFLAGS="-j6" # Can be ignored if you have a lot of RAM (>16GB)
-    colcon build --symlink-install
+    colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
     ```
 
 * To build with `rgbd_cameras>1` support and/or `subscribe_user_data` support:
     ```bash
-    colcon build --symlink-install --cmake-args -DRTABMAP_SYNC_MULTI_RGBD=ON -DRTABMAP_SYNC_USER_DATA=ON
+    colcon build --symlink-install --cmake-args -DRTABMAP_SYNC_MULTI_RGBD=ON -DRTABMAP_SYNC_USER_DATA=ON -DCMAKE_BUILD_TYPE=Release
     ```
 
 # Example with Turtlebot3
