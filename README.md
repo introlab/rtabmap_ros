@@ -1,4 +1,4 @@
-rtabmap_ros [![Build Status](https://github.com/introlab/rtabmap_ros/actions/workflows/ros1.yml/badge.svg)](https://github.com/introlab/rtabmap_ros/actions/workflows/ros1.yml) [![docker](https://github.com/introlab/rtabmap_ros/actions/workflows/docker.yml/badge.svg)](https://github.com/introlab/rtabmap_ros/actions/workflows/docker.yml)
+rtabmap_ros
 =======
 
 RTAB-Map's ROS package.
@@ -7,6 +7,56 @@ For more information, demos and tutorials about this package, visit [rtabmap_ros
 
 For the RTAB-Map libraries and standalone application, visit [RTAB-Map's home page](http://introlab.github.io/rtabmap) or [RTAB-Map's wiki](https://github.com/introlab/rtabmap/wiki).
 
+#### CI Latest
+
+  <table>
+    <tbody>
+        <tr>
+           <td>ROS 1</td>
+           <td><a href="https://github.com/introlab/rtabmap_ros/actions/workflows/ros1.yml"><img src="https://github.com/introlab/rtabmap_ros/actions/workflows/ros1.yml/badge.svg" alt="Build Status"/> <br> <a href="https://github.com/introlab/rtabmap_ros/actions/workflows/docker.yml"><img src="https://github.com/introlab/rtabmap_ros/actions/workflows/docker.yml/badge.svg" alt="Build Status"/>
+           </td>
+        </tr>
+        <tr>
+           <td>ROS 2</td>
+           <td><a href="https://github.com/introlab/rtabmap_ros/actions/workflows/ros2.yml"><img src="https://github.com/introlab/rtabmap_ros/actions/workflows/ros2.yml/badge.svg" alt="Build Status"/>
+           </td>
+        </tr>
+     </tbody>
+  </table>
+ 
+ #### ROS Binaries
+ 
+ <table>
+    <tbody>
+        <tr>
+           <td rowspan="2">ROS 1</td>
+           <td>Melodic</td>
+            <td><a href="http://build.ros.org/job/Mbin_ubv8_uBv8__rtabmap_ros__ubuntu_bionic_arm64__binary/"><img src="http://build.ros.org/buildStatus/icon?job=Mbin_ubv8_uBv8__rtabmap_ros__ubuntu_bionic_arm64__binary" alt="Build Status"/></td>
+        </tr>
+        <tr>
+            <td>Noetic</td>
+            <td><a href="http://build.ros.org/job/Nbin_ufv8_uFv8__rtabmap_ros__ubuntu_focal_arm64__binary/"><img src="http://build.ros.org/buildStatus/icon?job=Nbin_ufv8_uFv8__rtabmap_ros__ubuntu_focal_arm64__binary" alt="Build Status"/></td>
+        </tr>
+        <tr>
+            <td rowspan="4">ROS 2</td>
+            <td>Foxy</td>
+            <td><a href="http://build.ros2.org/job/Fbin_uF64__rtabmap_ros__ubuntu_focal_amd64__binary/"><img src="http://build.ros2.org/buildStatus/icon?job=Fbin_uF64__rtabmap_ros__ubuntu_focal_amd64__binary" alt="Build Status"/></td>
+        </tr>
+        <tr>
+            <td>Galactic</td>
+            <td><a href="http://build.ros2.org/job/Gbin_uF64__rtabmap_ros__ubuntu_focal_amd64__binary/"><img src="http://build.ros2.org/buildStatus/icon?job=Gbin_uF64__rtabmap_ros__ubuntu_focal_amd64__binary" alt="Build Status"/></td>
+        </tr>
+        <tr>
+            <td>Humble</td>
+            <td><a href="http://build.ros2.org/job/Hbin_uJ64__rtabmap_ros__ubuntu_jammy_amd64__binary/"><img src="http://build.ros2.org/buildStatus/icon?job=Hbin_uJ64__rtabmap_ros__ubuntu_jammy_amd64__binary" alt="Build Status"/></td>
+        </tr>
+        <tr>
+            <td>Rolling</td>
+            <td><a href="http://build.ros2.org/job/Rbin_uJ64__rtabmap_ros__ubuntu_jammy_amd64__binary/"><img src="http://build.ros2.org/buildStatus/icon?job=Rbin_uJ64__rtabmap_ros__ubuntu_jammy_amd64__binary" alt="Build Status"/></td>
+        </tr>
+    </tbody>
+</table>
+
 # Installation 
 
 ## ROS2 distribution
@@ -14,19 +64,15 @@ For the RTAB-Map libraries and standalone application, visit [RTAB-Map's home pa
 
 ## ROS distribution 
 RTAB-Map is released as binaries in the ROS distribution.
-* Noetic
-    ```
-    $ sudo apt install ros-noetic-rtabmap-ros
-    ```
-* Melodic
-    ```
-    $ sudo apt install ros-melodic-rtabmap-ros
-    ```
+
+```bash
+sudo apt install ros-$ROS_DISTRO-rtabmap-ros
+```
 
 When launching `rtabmap_ros`'s nodes, if you have the error `error while loading shared libraries...`, try `ldconfig` or add the next line at the end of your `~/.bashrc` to fix it:
     
 ```bash
-$ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/ros/noetic/lib/x86_64-linux-gnu
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/ros/noetic/lib/x86_64-linux-gnu
 ```
 
 ### Docker
@@ -47,8 +93,8 @@ This section shows how to install RTAB-Map ros-pkg on **ROS Melodic/Noetic** (Ca
  0. Required dependencies
      * The easiest way to get all them (Qt, PCL, VTK, OpenCV, ...) is to install/uninstall rtabmap binaries:
           ```bash
-          $ sudo apt install ros-$ROS_DISTRO-rtabmap ros-$ROS_DISTRO-rtabmap-ros
-          $ sudo apt remove ros-$ROS_DISTRO-rtabmap ros-$ROS_DISTRO-rtabmap-ros
+          sudo apt install ros-$ROS_DISTRO-rtabmap ros-$ROS_DISTRO-rtabmap-ros
+          sudo apt remove ros-$ROS_DISTRO-rtabmap ros-$ROS_DISTRO-rtabmap-ros
           ```
  
  1. Optional dependencies
@@ -63,20 +109,20 @@ This section shows how to install RTAB-Map ros-pkg on **ROS Melodic/Noetic** (Ca
 
 2. Install RTAB-Map standalone libraries. **Do not clone in your Catkin workspace**.
     ```bash
-    $ cd ~
-    $ git clone https://github.com/introlab/rtabmap.git rtabmap
-    $ cd rtabmap/build
-    $ cmake ..  [<---double dots included]
-    $ make -j6
-    $ sudo make install
+    cd ~
+    git clone https://github.com/introlab/rtabmap.git rtabmap
+    cd rtabmap/build
+    cmake ..  [<---double dots included]
+    make -j6
+    sudo make install
     ```
 
 3. Install RTAB-Map ros-pkg in your src folder of your Catkin workspace.
  
     ```bash
-    $ cd ~/catkin_ws
-    $ git clone https://github.com/introlab/rtabmap_ros.git src/rtabmap_ros
-    $ catkin_make -j4
+    cd ~/catkin_ws
+    git clone https://github.com/introlab/rtabmap_ros.git src/rtabmap_ros
+    catkin_make -j4
     ```
     * Use `catkin_make -j1` if compilation requires more RAM than you have (e.g., some files require up to ~2 GB to build depending on gcc version).
     * Options:
@@ -94,21 +140,21 @@ This section shows how to install RTAB-Map ros-pkg on **ROS Melodic/Noetic** (Ca
 ###########
 # rtabmap
 ###########
-$ cd rtabmap
-$ git pull origin master
-$ cd build
-$ make
-$ make install
+cd rtabmap
+git pull origin master
+cd build
+make
+make install
 # Do "sudo make install" if you installed rtabmap in "/usr/local"
 
 ###########
 # rtabmap_ros
 ###########
-$ roscd rtabmap_ros
-$ git pull origin master
-$ roscd
-$ cd ..
-$ catkin_make -j1 --pkg rtabmap_ros
+roscd rtabmap_ros
+git pull origin master
+roscd
+cd ..
+catkin_make -j1 --pkg rtabmap_ros
 ```
 
 
