@@ -37,6 +37,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sensor_msgs/LaserScan.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <pcl_conversions/pcl_conversions.h>
+#include <pcl_ros/transforms.h>
 
 #include "rtabmap_ros/MsgConversion.h"
 #include "rtabmap_ros/PluginInterface.h"
@@ -68,6 +69,8 @@ public:
 		scanNormalK_(0),
 		scanNormalRadius_(0.0),
 		scanNormalGroundUp_(0.0),
+		deskewing_(false),
+		deskewingSlerp_(false),
 		plugin_loader_("rtabmap_ros", "rtabmap_ros::PluginInterface"),
 		scanReceived_(false),
 		cloudReceived_(false)
@@ -96,6 +99,8 @@ private:
 		pnh.param("scan_normal_k",   scanNormalK_, scanNormalK_);
 		pnh.param("scan_normal_radius", scanNormalRadius_, scanNormalRadius_);
 		pnh.param("scan_normal_ground_up", scanNormalGroundUp_, scanNormalGroundUp_);
+		pnh.param("deskewing",  deskewing_, deskewing_);
+		pnh.param("deskewing_slerp",  deskewingSlerp_, deskewingSlerp_);
 
 		if (pnh.hasParam("plugins"))
 		{
@@ -142,6 +147,8 @@ private:
 		NODELET_INFO("IcpOdometry: scan_normal_k          = %d", scanNormalK_);
 		NODELET_INFO("IcpOdometry: scan_normal_radius     = %f m", scanNormalRadius_);
 		NODELET_INFO("IcpOdometry: scan_normal_ground_up  = %f", scanNormalGroundUp_);
+		NODELET_INFO("IcpOdometry: deskewing              = %s", deskewing_?"true":"false");
+		NODELET_INFO("IcpOdometry: deskewing_slerp        = %s", deskewingSlerp_?"true":"false");
 
 		scan_sub_ = nh.subscribe("scan", queueSize, &ICPOdometry::callbackScan, this);
 		cloud_sub_ = nh.subscribe("scan_cloud", queueSize, &ICPOdometry::callbackCloud, this);
@@ -328,7 +335,7 @@ private:
 		// make sure the frame of the laser is updated too
 		Transform localScanTransform = getTransform(this->frameId(),
 				scanMsg->header.frame_id,
-				scanMsg->header.stamp + ros::Duration().fromSec(scanMsg->ranges.size()*scanMsg->time_increment));
+				scanMsg->header.stamp);
 		if(localScanTransform.isNull())
 		{
 			ROS_ERROR("TF of received laser scan topic at time %fs is not set, aborting odometry update.", scanMsg->header.stamp.toSec());
@@ -338,7 +345,35 @@ private:
 		//transform in frameId_ frame
 		sensor_msgs::PointCloud2 scanOut;
 		laser_geometry::LaserProjection projection;
-		projection.transformLaserScanToPointCloud(scanMsg->header.frame_id, *scanMsg, scanOut, this->tfListener());
+
+		if(deskewing_ && !guessFrameId().empty())
+		{
+			projection.transformLaserScanToPointCloud(deskewing_&&!guessFrameId().empty()?guessFrameId():scanMsg->header.frame_id, *scanMsg, scanOut, this->tfListener());
+
+			sensor_msgs::PointCloud2 scanOutDeskewed;
+			if(!pcl_ros::transformPointCloud(scanMsg->header.frame_id, scanOut, scanOutDeskewed, this->tfListener()))
+			{
+				ROS_ERROR("Cannot transform back projected scan from \"%s\" frame to \"%s\" frame at time %fs.",
+						guessFrameId().c_str(), scanMsg->header.frame_id.c_str(), scanMsg->header.stamp.toSec());
+				return;
+			}
+			scanOut = scanOutDeskewed;
+		}
+		else
+		{
+			projection.projectLaser(*scanMsg, scanOut, -1.0, laser_geometry::channel_option::Intensity | laser_geometry::channel_option::Timestamp);
+
+			if(previousStamp() > 0 && !velocityGuess().isNull())
+			{
+				// deskew with constant velocity model
+				sensor_msgs::PointCloud2 scanOutDeskewed;
+				if(!deskew(scanOut, scanOutDeskewed, previousStamp(), velocityGuess()))
+				{
+					ROS_ERROR("Failed to deskew input cloud, aborting odometry update!");
+					return;
+				}
+			}
+		}
 
 		bool hasIntensity = false;
 		for(unsigned int i=0; i<scanOut.fields.size(); ++i)
@@ -529,6 +564,28 @@ private:
 		else
 		{
 			cloudMsg = *pointCloudMsg;
+		}
+
+		if(deskewing_)
+		{
+			if(!guessFrameId().empty())
+			{
+				// deskew with TF
+				if(!deskew(*pointCloudMsg, cloudMsg, guessFrameId(), tfListener(), waitForTransformDuration(), deskewingSlerp_))
+				{
+					ROS_ERROR("Failed to deskew input cloud, aborting odometry update!");
+					return;
+				}
+			}
+			else if(previousStamp() > 0 && !velocityGuess().isNull())
+			{
+				// deskew with constant velocity model
+				if(!deskew(*pointCloudMsg, cloudMsg, previousStamp(), velocityGuess()))
+				{
+					ROS_ERROR("Failed to deskew input cloud, aborting odometry update!");
+					return;
+				}
+			}
 		}
 
 		LaserScan scan;
@@ -760,6 +817,8 @@ private:
 	int scanNormalK_;
 	double scanNormalRadius_;
 	double scanNormalGroundUp_;
+	bool deskewing_;
+	bool deskewingSlerp_;
 	std::vector<boost::shared_ptr<rtabmap_ros::PluginInterface> > plugins_;
 	pluginlib::ClassLoader<rtabmap_ros::PluginInterface> plugin_loader_;
 	bool scanReceived_ = false;

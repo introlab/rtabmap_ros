@@ -263,6 +263,7 @@ SET(rtabmap_plugins_lib_src
    src/nodelets/undistort_depth.cpp
    src/nodelets/imu_to_tf.cpp
    src/nodelets/rgbdx_sync.cpp
+   src/nodelets/lidar_deskewing.cpp
 )
 
 IF(${cv_bridge_VERSION_MAJOR} GREATER 1 OR ${cv_bridge_VERSION_MINOR} GREATER 10)
@@ -385,6 +386,10 @@ set_target_properties(rtabmap_map_assembler PROPERTIES OUTPUT_NAME "map_assemble
 add_executable(rtabmap_imu_to_tf src/ImuToTFNode.cpp)
 target_link_libraries(rtabmap_imu_to_tf ${Libraries})
 set_target_properties(rtabmap_imu_to_tf PROPERTIES OUTPUT_NAME "imu_to_tf")
+
+add_executable(rtabmap_lidar_deskewing src/LidarDeskewingNode.cpp)
+target_link_libraries(rtabmap_lidar_deskewing ${Libraries})
+set_target_properties(rtabmap_lidar_deskewing PROPERTIES OUTPUT_NAME "lidar_deskewing")
 
 IF(NOT WIN32)
 add_executable(rtabmap_wifi_signal_pub src/WifiSignalPubNode.cpp)

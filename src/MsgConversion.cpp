@@ -36,6 +36,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/Compression.h>
 #include <rtabmap/utilite/UStl.h>
 #include <rtabmap/utilite/ULogger.h>
+#include <rtabmap/utilite/UTimer.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <eigen_conversions/eigen_msg.h>
 #include <tf_conversions/tf_eigen.h>
@@ -2485,6 +2486,421 @@ bool convertScan3dMsg(
 	scan = rtabmap::util3d::laserScanFromPointCloud(scan3dMsg);
 	scan = rtabmap::LaserScan(scan, maxPoints, maxRange, scanLocalTransform);
 	return true;
+}
+
+bool deskew_impl(
+		const sensor_msgs::PointCloud2 & input,
+		sensor_msgs::PointCloud2 & output,
+		const std::string & fixedFrameId,
+		tf::TransformListener * listener,
+		double waitForTransform,
+		bool slerp,
+		const rtabmap::Transform & velocity,
+		double previousStamp)
+{
+	if(listener != 0)
+	{
+		if(input.header.frame_id.empty())
+		{
+			ROS_ERROR("Input cloud has empty frame_id!");
+			return false;
+		}
+
+		if(fixedFrameId.empty())
+		{
+			ROS_ERROR("fixedFrameId parameter should be set!");
+			return false;
+		}
+	}
+	else
+	{
+		if(!slerp)
+		{
+			ROS_ERROR("slerp should be true when constant velocity model is used!");
+			return false;
+		}
+
+		if(previousStamp <= 0.0)
+		{
+			ROS_ERROR("previousStamp should be >0 when constant velocity model is used!");
+			return false;
+		}
+
+		if(velocity.isNull())
+		{
+			ROS_ERROR("velocity should be valid when constant velocity model is used!");
+			return false;
+		}
+	}
+
+	int offsetTime = -1;
+	int offsetX = -1;
+	int offsetY = -1;
+	int offsetZ = -1;
+	int timeDatatype = 6;
+	for(size_t i=0; i<input.fields.size(); ++i)
+	{
+		if(input.fields[i].name.compare("t") == 0)
+		{
+			if(offsetTime != -1)
+			{
+				ROS_WARN("The input cloud should have only one of these fields: t, time or stamps. Overriding with %s.", input.fields[i].name.c_str());
+			}
+			offsetTime = input.fields[i].offset;
+			timeDatatype = input.fields[i].datatype;
+		}
+		else if(input.fields[i].name.compare("time") == 0)
+		{
+			if(offsetTime != -1)
+			{
+				ROS_WARN("The input cloud should have only one of these fields: t, time or stamps. Overriding with %s.", input.fields[i].name.c_str());
+			}
+			offsetTime = input.fields[i].offset;
+			timeDatatype = input.fields[i].datatype;
+		}
+		else if(input.fields[i].name.compare("stamps") == 0)
+		{
+			if(offsetTime != -1)
+			{
+				ROS_WARN("The input cloud should have only one of these fields: t, time or stamps. Overriding with %s.", input.fields[i].name.c_str());
+			}
+			offsetTime = input.fields[i].offset;
+			timeDatatype = input.fields[i].datatype;
+		}
+		else if(input.fields[i].name.compare("x") == 0)
+		{
+			ROS_ASSERT(input.fields[i].datatype==7);
+			offsetX = input.fields[i].offset;
+		}
+		else if(input.fields[i].name.compare("y") == 0)
+		{
+			ROS_ASSERT(input.fields[i].datatype==7);
+			offsetY = input.fields[i].offset;
+		}
+		else if(input.fields[i].name.compare("z") == 0)
+		{
+			ROS_ASSERT(input.fields[i].datatype==7);
+			offsetZ = input.fields[i].offset;
+		}
+	}
+
+	if(offsetTime < 0)
+	{
+		ROS_ERROR("Input cloud doesn't have \"t\" or \"time\" field!");
+		return false;
+	}
+	if(offsetX < 0)
+	{
+		ROS_ERROR("Input cloud doesn't have \"x\" field!");
+		return false;
+	}
+	if(offsetY < 0)
+	{
+		ROS_ERROR("Input cloud doesn't have \"y\" field!");
+		return false;
+	}
+	if(offsetZ < 0)
+	{
+		ROS_ERROR("Input cloud doesn't have \"z\" field!");
+		return false;
+	}
+	if(input.height == 0)
+	{
+		ROS_ERROR("Input cloud height is zero!");
+		return false;
+	}
+	if(input.width == 0)
+	{
+		ROS_ERROR("Input cloud width is zero!");
+		return false;
+	}
+
+	bool timeOnColumns = input.width > input.height;
+
+	// Get latest timestamp
+	ros::Time firstStamp;
+	ros::Time lastStamp;
+	if(timeDatatype == 6) // UINT32
+	{
+		unsigned int nsec = *((const unsigned int*)(&input.data[0]+offsetTime));
+		firstStamp = input.header.stamp+ros::Duration(0, nsec);
+		nsec = *((const unsigned int*)(&input.data[timeOnColumns?(input.width-1)*input.point_step:(input.height-1)*input.row_step]+offsetTime));
+		lastStamp = input.header.stamp+ros::Duration(0, nsec);
+	}
+	else if(timeDatatype == 7) // FLOAT32
+	{
+		float sec = *((const float*)(&input.data[0]+offsetTime));
+		firstStamp = input.header.stamp+ros::Duration().fromSec(sec);
+		sec = *((const float*)(&input.data[timeOnColumns?(input.width-1)*input.point_step:(input.height-1)*input.row_step]+offsetTime));
+		lastStamp = input.header.stamp+ros::Duration().fromSec(sec);
+	}
+	else
+	{
+		ROS_ERROR("Not supported time datatype %d!", timeDatatype);
+		return false;
+	}
+
+	if(lastStamp <= firstStamp)
+	{
+		ROS_ERROR("First and last stamps in the scan are the same!");
+		return false;
+	}
+
+	std::string errorMsg;
+	if(listener != 0 &&
+	   waitForTransform>0.0 &&
+	   !listener->waitForTransform(
+			input.header.frame_id,
+			firstStamp,
+			input.header.frame_id,
+			lastStamp,
+			fixedFrameId,
+			ros::Duration(waitForTransform),
+			ros::Duration(0.01),
+			&errorMsg))
+	{
+		ROS_ERROR("Could not estimate motion of %s accordingly to fixed frame %s between stamps %f and %f! (%s)",
+				input.header.frame_id.c_str(),
+				fixedFrameId.c_str(),
+				firstStamp.toSec(),
+				lastStamp.toSec(),
+				errorMsg.c_str());
+		return false;
+	}
+
+	rtabmap::Transform firstPose;
+	rtabmap::Transform lastPose;
+	double scanTime = 0;
+	if(slerp)
+	{
+		if(listener != 0)
+		{
+			firstPose = rtabmap_ros::getTransform(
+					input.header.frame_id,
+					fixedFrameId,
+					firstStamp,
+					input.header.stamp,
+					*listener,
+					0);
+			lastPose = rtabmap_ros::getTransform(
+					input.header.frame_id,
+					fixedFrameId,
+					lastStamp,
+					input.header.stamp,
+					*listener,
+					0);
+		}
+		else
+		{
+			float vx,vy,vz, vroll,vpitch,vyaw;
+			velocity.getTranslationAndEulerAngles(vx,vy,vz, vroll,vpitch,vyaw);
+
+			// We need three poses:
+			//  1- The pose of base frame in odom frame at first stamp
+			//  2- The pose of base frame in odom frame at msg stamp
+			//  3- The pose of base frame in odom frame at last stamp
+			UASSERT(firstStamp.toSec() >= previousStamp);
+			UASSERT(lastStamp.toSec() > previousStamp);
+			double dt1 = firstStamp.toSec() - previousStamp;
+			double dt2 = input.header.stamp.toSec() - previousStamp;
+			double dt3 = lastStamp.toSec() - previousStamp;
+
+			rtabmap::Transform p1(vx*dt1, vy*dt1, vz*dt1, vroll*dt1, vpitch*dt1, vyaw*dt1);
+			rtabmap::Transform p2(vx*dt2, vy*dt2, vz*dt2, vroll*dt2, vpitch*dt2, vyaw*dt2);
+			rtabmap::Transform p3(vx*dt3, vy*dt3, vz*dt3, vroll*dt3, vpitch*dt3, vyaw*dt3);
+
+			// First and last poses are relative to stamp of the msg
+			firstPose = p2.inverse() * p1;
+			lastPose = p2.inverse() * p3;
+		}
+
+		if(firstPose.isNull())
+		{
+			ROS_ERROR("Could not get transform of %s accordingly to %s between stamps %f and %f!",
+					input.header.frame_id.c_str(),
+					fixedFrameId.empty()?"velocity":fixedFrameId.c_str(),
+					firstStamp.toSec(),
+					input.header.stamp.toSec());
+			return false;
+		}
+		if(lastPose.isNull())
+		{
+			ROS_ERROR("Could not get transform of %s accordingly to %s between stamps %f and %f!",
+					input.header.frame_id.c_str(),
+					fixedFrameId.empty()?"velocity":fixedFrameId.c_str(),
+					lastStamp.toSec(),
+					input.header.stamp.toSec());
+			return false;
+		}
+		scanTime = lastStamp.toSec() - firstStamp.toSec();
+	}
+	//else tf will be used to get more accurate transforms
+
+	output = input;
+	ros::Time stamp;
+	UTimer processingTime;
+	if(timeOnColumns)
+	{
+		// ouster point cloud:
+		// t1     t2    ...
+		// ring1  ring1 ...
+		// ring2  ring2 ...
+		// ring3  ring4 ...
+		// ring4  ring3 ...
+		for(size_t u=0; u<output.width; ++u)
+		{
+			if(timeDatatype == 6) // UINT32
+			{
+				unsigned int nsec = *((const unsigned int*)(&output.data[u*output.point_step]+offsetTime));
+				stamp = input.header.stamp+ros::Duration(0, nsec);
+			}
+			else
+			{
+				float sec = *((const float*)(&output.data[u*output.point_step]+offsetTime));
+				stamp = input.header.stamp+ros::Duration().fromSec(sec);
+			}
+
+			rtabmap::Transform transform;
+			if(slerp)
+			{
+				transform = firstPose.interpolate((stamp-firstStamp).toSec() / scanTime, lastPose);
+			}
+			else
+			{
+				transform = rtabmap_ros::getTransform(
+						output.header.frame_id,
+						fixedFrameId,
+						stamp,
+						output.header.stamp,
+						*listener,
+						0);
+				if(transform.isNull())
+				{
+					ROS_ERROR("Could not get transform of %s accordingly to %s between stamps %f and %f!",
+							output.header.frame_id.c_str(),
+							fixedFrameId.c_str(),
+							stamp.toSec(),
+							output.header.stamp.toSec());
+					return false;
+				}
+			}
+
+			for(size_t v=0; v<input.height; ++v)
+			{
+				unsigned char * dataPtr = &output.data[v*output.row_step + u*output.point_step];
+				float & x = *((float*)(dataPtr+offsetX));
+				float & y = *((float*)(dataPtr+offsetY));
+				float & z = *((float*)(dataPtr+offsetZ));
+				pcl::PointXYZ pt(x,y,z);
+				pt = rtabmap::util3d::transformPoint(pt, transform);
+				x = pt.x;
+				y = pt.y;
+				z = pt.z;
+
+				// set delta stamp to zero so that on downstream they know the cloud is deskewed
+				if(timeDatatype == 6) // UINT32
+				{
+					*((unsigned int*)(dataPtr+offsetTime)) = 0;
+				}
+				else
+				{
+					*((float*)(dataPtr+offsetTime)) = 0;
+				}
+			}
+		}
+	}
+	else // time on rows
+	{
+		// velodyne point cloud:
+		// t1     ring1 ring2 ring3 ring4
+		// t2     ring1 ring2 ring3 ring4
+		// t3     ring1 ring2 ring3 ring4
+		// t4     ring1 ring2 ring3 ring4
+		// ...    ...   ...   ...   ...
+		for(size_t v=0; v<output.height; ++v)
+		{
+			if(timeDatatype == 6) // UINT32
+			{
+				unsigned int nsec = *((const unsigned int*)(&output.data[v*output.row_step]+offsetTime));
+				stamp = input.header.stamp+ros::Duration(0, nsec);
+			}
+			else
+			{
+				float sec = *((const float*)(&output.data[v*output.row_step]+offsetTime));
+				stamp = input.header.stamp+ros::Duration().fromSec(sec);
+			}
+
+			rtabmap::Transform transform;
+			if(slerp)
+			{
+				transform = firstPose.interpolate((stamp-firstStamp).toSec() / scanTime, lastPose);
+			}
+			else
+			{
+				transform = rtabmap_ros::getTransform(
+						output.header.frame_id,
+						fixedFrameId,
+						stamp,
+						output.header.stamp,
+						*listener,
+						0);
+				if(transform.isNull())
+				{
+					ROS_ERROR("Could not get transform of %s accordingly to %s between stamps %f and %f!",
+							output.header.frame_id.c_str(),
+							fixedFrameId.c_str(),
+							stamp.toSec(),
+							output.header.stamp.toSec());
+					return false;
+				}
+			}
+
+			for(size_t u=0; u<input.width; ++u)
+			{
+				unsigned char * dataPtr = &output.data[v*output.row_step + u*output.point_step];
+				float & x = *((float*)(dataPtr+offsetX));
+				float & y = *((float*)(dataPtr+offsetY));
+				float & z = *((float*)(dataPtr+offsetZ));
+				pcl::PointXYZ pt(x,y,z);
+				pt = rtabmap::util3d::transformPoint(pt, transform);
+				x = pt.x;
+				y = pt.y;
+				z = pt.z;
+
+				// set delta stamp to zero so that on downstream they know the cloud is deskewed
+				if(timeDatatype == 6) // UINT32
+				{
+					*((unsigned int*)(dataPtr+offsetTime)) = 0;
+				}
+				else
+				{
+					*((float*)(dataPtr+offsetTime)) = 0;
+				}
+			}
+		}
+	}
+	ROS_DEBUG("Lidar deskewing time=%fs", processingTime.elapsed());
+	return true;
+}
+
+bool deskew(
+		const sensor_msgs::PointCloud2 & input,
+		sensor_msgs::PointCloud2 & output,
+		const std::string & fixedFrameId,
+		tf::TransformListener & listener,
+		double waitForTransform,
+		bool slerp)
+{
+	return deskew_impl(input, output, fixedFrameId, &listener, waitForTransform, slerp, rtabmap::Transform(), 0);
+}
+
+bool deskew(
+		const sensor_msgs::PointCloud2 & input,
+		sensor_msgs::PointCloud2 & output,
+		double previousStamp,
+		const rtabmap::Transform & velocity)
+{
+	return deskew_impl(input, output, "", 0, 0, true, velocity, previousStamp);
 }
 
 }

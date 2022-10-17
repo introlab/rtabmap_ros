@@ -70,6 +70,7 @@ public:
 
 	const std::string & frameId() const {return frameId_;}
 	const std::string & odomFrameId() const {return odomFrameId_;}
+	const std::string & guessFrameId() const {return guessFrameId_;}
 	const rtabmap::ParametersMap & parameters() const {return parameters_;}
 	bool isPaused() const {return paused_;}
 	rtabmap::Transform getTransform(const std::string & fromFrameId, const std::string & toFrameId, const ros::Time & stamp) const;
@@ -80,6 +81,9 @@ protected:
 
 	virtual void flushCallbacks() = 0;
 	tf::TransformListener & tfListener() {return tfListener_;}
+	double waitForTransformDuration() const {return waitForTransform_?waitForTransformDuration_:0.0;}
+	rtabmap::Transform velocityGuess() const;
+	double previousStamp() const {return previousStamp_;}
 	virtual void postProcessData(const rtabmap::SensorData & data, const std_msgs::Header & header) const {}
 
 private:

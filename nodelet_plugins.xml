@@ -175,6 +175,14 @@
       This is my nodelet.
     </description>
   </class>
+  
+  <class name="rtabmap_ros/lidar_deskewing" 
+         type="rtabmap_ros::LidarDeskewing" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
 
 </library>
 

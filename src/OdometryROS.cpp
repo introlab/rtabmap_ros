@@ -423,6 +423,15 @@ Transform OdometryROS::getTransform(const std::string & fromFrameId, const std::
 	return transform;
 }
 
+rtabmap::Transform OdometryROS::velocityGuess() const
+{
+	if(odometry_)
+	{
+		return odometry_->getVelocityGuess();
+	}
+	return rtabmap::Transform();
+}
+
 void OdometryROS::callbackIMU(const sensor_msgs::ImuConstPtr& msg)
 {
 	if(!this->isPaused())

@@ -264,6 +264,20 @@ bool convertScan3dMsg(
 		int maxPoints = 0,
 		float maxRange = 0.0f);
 
+bool deskew(
+		const sensor_msgs::PointCloud2 & input,
+		sensor_msgs::PointCloud2 & output,
+		const std::string & fixedFrameId,
+		tf::TransformListener & listener,
+		double waitForTransform,
+		bool slerp = false);
+
+bool deskew(
+		const sensor_msgs::PointCloud2 & input,
+		sensor_msgs::PointCloud2 & output,
+		double previousStamp,
+		const rtabmap::Transform & velocity);
+
 }
 
 #endif /* MSGCONVERSION_H_ */

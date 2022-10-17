@@ -12,14 +12,15 @@
            coming from the first cloud sent by os1_cloud_node, which may be poorly synchronized with IMU data.
     -->
 
-    <!-- Required: -->
-    <arg name="os1_hostname"/>
-    <arg name="os1_udp_dest"/>
+    <arg name="use_sim_time"  default="false"/>
 
-    <arg name="frame_id" default="os1_sensor"/>
+    <!-- Required: -->
+    <arg unless="$(arg use_sim_time)" name="os1_hostname"/>
+    <arg unless="$(arg use_sim_time)" name="os1_udp_dest"/>
+
+    <arg name="frame_id"      default="os1_sensor"/>
     <arg name="rtabmapviz"    default="true"/>
     <arg name="scan_20_hz"    default="true"/>
-    <arg name="use_sim_time"  default="false"/>
     <param if="$(arg use_sim_time)" name="use_sim_time" value="true"/>
     
     <!-- Ouster -->
