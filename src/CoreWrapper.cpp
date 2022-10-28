@@ -125,8 +125,7 @@ CoreWrapper::CoreWrapper() :
 		alreadyRectifiedImages_(Parameters::defaultRtabmapImagesAlreadyRectified()),
 		twoDMapping_(Parameters::defaultRegForce3DoF()),
 		previousStamp_(0),
-		mbClient_(0),
-		maxNodesRepublished_(2)
+		mbClient_(0)
 {
 	char * rosHomePath = getenv("ROS_HOME");
 	std::string workingDir = rosHomePath?rosHomePath:UDirectory::homeDir()+"/.ros";
@@ -189,7 +188,6 @@ void CoreWrapper::onInit()
 	pnh.param("wait_for_transform_duration",  waitForTransformDuration_, waitForTransformDuration_);
 	pnh.param("use_action_for_goal", useActionForGoal_, useActionForGoal_);
 	pnh.param("use_saved_map", useSavedMap_, useSavedMap_);
-	pnh.param("max_nodes_republished", maxNodesRepublished_, maxNodesRepublished_);
 	pnh.param("gen_scan",            genScan_, genScan_);
 	pnh.param("gen_scan_max_depth",  genScanMaxDepth_, genScanMaxDepth_);
 	pnh.param("gen_scan_min_depth",  genScanMinDepth_, genScanMinDepth_);
@@ -2391,22 +2389,7 @@ void CoreWrapper::imuAsyncCallback(const sensor_msgs::ImuConstPtr & msg)
 
 void CoreWrapper::republishNodeDataCallback(const std_msgs::Int32MultiArray::ConstPtr& msg)
 {
-	if(maxNodesRepublished_>0)
-	{
-		nodesToRepublish_.insert(msg->data.begin(), msg->data.end());
-	}
-	else
-	{
-		static bool warned = false;
-		if(!warned)
-		{
-			NODELET_WARN("A node is requesting some node data "
-					"to be republished after the next update, "
-					"but parameter \"max_nodes_republished\" is not over 0, "
-					"ignoring the call. This warning is only printed once.");
-			warned = true;
-		}
-	}
+	rtabmap_.addNodesToRepublish(msg->data);
 }
 
 void CoreWrapper::interOdomCallback(const nav_msgs::OdometryConstPtr & msg)
@@ -2720,7 +2703,6 @@ bool CoreWrapper::resetRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empt
 	mapToOdomMutex_.lock();
 	mapToOdom_.setIdentity();
 	mapToOdomMutex_.unlock();
-	nodesToRepublish_.clear();
 
 	return true;
 }
@@ -2811,7 +2793,6 @@ bool CoreWrapper::loadDatabaseCallback(rtabmap_ros::LoadDatabase::Request& req, 
 	mapToOdomMutex_.lock();
 	mapToOdom_.setIdentity();
 	mapToOdomMutex_.unlock();
-	nodesToRepublish_.clear();
 
 	// Open new database
 	databasePath_ = newDatabasePath;
@@ -2928,7 +2909,6 @@ bool CoreWrapper::backupDatabaseCallback(std_srvs::Empty::Request&, std_srvs::Em
 	globalPose_.header.stamp = ros::Time(0);
 	gps_ = rtabmap::GPS();
 	tags_.clear();
-	nodesToRepublish_.clear();
 
 	NODELET_INFO("Backup: Saving \"%s\" to \"%s\"...", databasePath_.c_str(), (databasePath_+".back").c_str());
 	UFile::copy(databasePath_, databasePath_+".back");
@@ -3982,57 +3962,6 @@ void CoreWrapper::publishStats(const ros::Time & stamp)
 			signatures.insert(std::make_pair(stats.getLastSignatureData().id(), stats.getLastSignatureData()));
 		}
 
-		if(nodesToRepublish_.size() && !rtabmap_.getLastLocalizationPose().isNull())
-		{
-			// Republish data from closest nodes of the current localization
-			std::map<int, Transform> nodesOnly(rtabmap_.getLocalOptimizedPoses().lower_bound(1), rtabmap_.getLocalOptimizedPoses().end());
-			int id = rtabmap::graph::findNearestNode(nodesOnly, rtabmap_.getLastLocalizationPose());
-			if(id>0)
-			{
-				std::map<int, int> ids = rtabmap_.getMemory()->getNeighborsId(id, 0, 0, true, false, true);
-				std::multimap<int, int> missingIds;
-				for(std::map<int, int>::iterator iter=ids.begin(); iter!=ids.end(); ++iter)
-				{
-					if(nodesToRepublish_.find(iter->first) != nodesToRepublish_.end())
-					{
-						missingIds.insert(std::make_pair(iter->second, iter->first));
-					}
-				}
-
-				if(nodesToRepublish_.size() != missingIds.size())
-				{
-					// remove requested nodes not anymore in the graph
-					for(std::set<int>::iterator iter=nodesToRepublish_.begin(); iter!=nodesToRepublish_.end();)
-					{
-						if(ids.find(*iter) == ids.end())
-						{
-							iter = nodesToRepublish_.erase(iter);
-						}
-						else
-						{
-							++iter;
-						}
-					}
-				}
-
-				int loaded = 0;
-				std::stringstream stream;
-				for(std::multimap<int, int>::iterator iter=missingIds.begin(); iter!=missingIds.end() && loaded<maxNodesRepublished_; ++iter)
-				{
-					signatures.insert(std::make_pair(iter->second, rtabmap_.getMemory()->getNodeData(iter->second, true, true, true, true)));
-					nodesToRepublish_.erase(iter->second);
-					++loaded;
-					stream << iter->second << " ";
-				}
-				if(loaded)
-				{
-					NODELET_WARN("Republishing data of requested node(s) %sfrom \"%s\" input topic (max_nodes_republished=%d)",
-							stream.str().c_str(),
-							republishNodeDataSub_.getTopic().c_str(),
-							maxNodesRepublished_);
-				}
-			}
-		}
 		rtabmap_ros::mapDataToROS(
 			stats.poses(),
 			stats.constraints(),

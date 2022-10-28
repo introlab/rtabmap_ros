@@ -129,6 +129,8 @@ private:
 	double maxOdomUpdateRate_;
 	tf::TransformListener tfListener_;
 
+	ros::Publisher republishNodeDataPub_;
+
 	message_filters::Subscriber<rtabmap_ros::Info> infoTopic_;
 	message_filters::Subscriber<rtabmap_ros::MapData> mapDataTopic_;
 

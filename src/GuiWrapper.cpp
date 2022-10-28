@@ -31,6 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <std_srvs/Empty.h>
 #include <std_msgs/Empty.h>
+#include <std_msgs/Int32MultiArray.h>
 
 #include <rtabmap/utilite/UEventsManager.h>
 #include <rtabmap/utilite/UConversion.h>
@@ -154,6 +155,8 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 	UEventsManager::addHandler(this);
 	UEventsManager::addHandler(mainWindow_);
 
+	republishNodeDataPub_ = nh.advertise<std_msgs::Int32MultiArray>("republish_node_data", 1);
+
 	infoTopic_.subscribe(nh, "info", 1);
 	mapDataTopic_.subscribe(nh, "mapData", 1);
 	infoMapSync_ = new message_filters::Synchronizer<MyInfoMapSyncPolicy>(
@@ -204,10 +207,7 @@ void GuiWrapper::infoMapCallback(
 
 	stat.setMapCorrection(mapToOdom);
 	stat.setPoses(poses);
-	if(signatures.size())
-	{
-		stat.setLastSignatureData(signatures.rbegin()->second);
-	}
+	stat.setSignaturesData(signatures);
 	stat.setConstraints(links);
 
 	this->post(new RtabmapEvent(stat));
@@ -416,6 +416,13 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 			{
 				ROS_ERROR("Can't call \"remove_label\" service");
 			}
+		}
+		else if(cmd == rtabmap::RtabmapEventCmd::kCmdRepublishData)
+		{
+			UASSERT(cmdEvent->value1().isIntArray());
+			std_msgs::Int32MultiArray msg;
+			msg.data = cmdEvent->value1().toIntArray();
+			republishNodeDataPub_.publish(msg);
 		}
 		else
 		{

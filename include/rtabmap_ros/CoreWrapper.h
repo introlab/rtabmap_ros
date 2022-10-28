@@ -393,8 +393,6 @@ private:
 	bool alreadyRectifiedImages_;
 	bool twoDMapping_;
 	ros::Time previousStamp_;
-	std::set<int> nodesToRepublish_;
-	int maxNodesRepublished_;
 };
 
 }
