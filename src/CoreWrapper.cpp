@@ -3956,16 +3956,10 @@ void CoreWrapper::publishStats(const ros::Time & stamp)
 		msg->header.stamp = stamp;
 		msg->header.frame_id = mapFrameId_;
 
-		std::map<int, Signature> signatures;
-		if(stats.getLastSignatureData().id() > 0)
-		{
-			signatures.insert(std::make_pair(stats.getLastSignatureData().id(), stats.getLastSignatureData()));
-		}
-
 		rtabmap_ros::mapDataToROS(
 			stats.poses(),
 			stats.constraints(),
-			signatures,
+			stats.getSignaturesData(),
 			stats.mapCorrection(),
 			*msg);
 
