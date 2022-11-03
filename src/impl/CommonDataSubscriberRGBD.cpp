@@ -52,7 +52,7 @@ void CommonDataSubscriber::rgbdCallback(
 		globalDescriptorMsgs.push_back(image1Msg->global_descriptor);
 	}
 
-	commonSingleDepthCallback(odomMsg, userDataMsg, rgb,
+	commonSingleCameraCallback(odomMsg, userDataMsg, rgb,
 			depth, image1Msg->rgb_camera_info, image1Msg->depth_camera_info,
 			scanMsg, scan3dMsg, odomInfoMsg,
 			globalDescriptorMsgs, image1Msg->key_points, image1Msg->points,
@@ -76,7 +76,7 @@ void CommonDataSubscriber::rgbdScan2dCallback(
 		globalDescriptorMsgs.push_back(image1Msg->global_descriptor);
 	}
 
-	commonSingleDepthCallback(odomMsg, userDataMsg, rgb,
+	commonSingleCameraCallback(odomMsg, userDataMsg, rgb,
 			depth, image1Msg->rgb_camera_info, image1Msg->depth_camera_info,
 			*scanMsg, scan3dMsg, odomInfoMsg,
 			globalDescriptorMsgs, image1Msg->key_points, image1Msg->points,
@@ -100,7 +100,7 @@ void CommonDataSubscriber::rgbdScan3dCallback(
 		globalDescriptorMsgs.push_back(image1Msg->global_descriptor);
 	}
 
-	commonSingleDepthCallback(odomMsg, userDataMsg, rgb,
+	commonSingleCameraCallback(odomMsg, userDataMsg, rgb,
 			depth, image1Msg->rgb_camera_info, image1Msg->depth_camera_info,
 			scanMsg, *scan3dMsg, odomInfoMsg,
 			globalDescriptorMsgs, image1Msg->key_points, image1Msg->points,
@@ -123,7 +123,7 @@ void CommonDataSubscriber::rgbdScanDescCallback(
 		globalDescriptorMsgs.push_back(image1Msg->global_descriptor);
 	}
 
-	commonSingleDepthCallback(odomMsg, userDataMsg, rgb,
+	commonSingleCameraCallback(odomMsg, userDataMsg, rgb,
 			depth, image1Msg->rgb_camera_info, image1Msg->depth_camera_info,
 			scanDescMsg->scan, scanDescMsg->scan_cloud, odomInfoMsg,
 			globalDescriptorMsgs, image1Msg->key_points, image1Msg->points,
@@ -147,7 +147,7 @@ void CommonDataSubscriber::rgbdInfoCallback(
 		globalDescriptorMsgs.push_back(image1Msg->global_descriptor);
 	}
 
-	commonSingleDepthCallback(odomMsg, userDataMsg, rgb,
+	commonSingleCameraCallback(odomMsg, userDataMsg, rgb,
 			depth, image1Msg->rgb_camera_info, image1Msg->depth_camera_info,
 			scanMsg, scan3dMsg, odomInfoMsg,
 			globalDescriptorMsgs, image1Msg->key_points, image1Msg->points,
@@ -173,7 +173,7 @@ void CommonDataSubscriber::rgbdOdomCallback(
 		globalDescriptorMsgs.push_back(image1Msg->global_descriptor);
 	}
 
-	commonSingleDepthCallback(odomMsg, userDataMsg, rgb,
+	commonSingleCameraCallback(odomMsg, userDataMsg, rgb,
 			depth, image1Msg->rgb_camera_info, image1Msg->depth_camera_info,
 			scanMsg, scan3dMsg, odomInfoMsg,
 			globalDescriptorMsgs, image1Msg->key_points, image1Msg->points,
@@ -197,7 +197,7 @@ void CommonDataSubscriber::rgbdOdomScan2dCallback(
 		globalDescriptorMsgs.push_back(image1Msg->global_descriptor);
 	}
 
-	commonSingleDepthCallback(odomMsg, userDataMsg, rgb,
+	commonSingleCameraCallback(odomMsg, userDataMsg, rgb,
 			depth, image1Msg->rgb_camera_info, image1Msg->depth_camera_info,
 			*scanMsg, scan3dMsg, odomInfoMsg,
 			globalDescriptorMsgs, image1Msg->key_points, image1Msg->points,
@@ -221,7 +221,7 @@ void CommonDataSubscriber::rgbdOdomScan3dCallback(
 		globalDescriptorMsgs.push_back(image1Msg->global_descriptor);
 	}
 
-	commonSingleDepthCallback(odomMsg, userDataMsg, rgb,
+	commonSingleCameraCallback(odomMsg, userDataMsg, rgb,
 			depth, image1Msg->rgb_camera_info, image1Msg->depth_camera_info,
 			scanMsg, *scan3dMsg, odomInfoMsg,
 			globalDescriptorMsgs, image1Msg->key_points, image1Msg->points,
@@ -248,7 +248,7 @@ void CommonDataSubscriber::rgbdOdomScanDescCallback(
 		globalDescriptorMsgs.push_back(scanDescMsg->global_descriptor);
 	}
 
-	commonSingleDepthCallback(odomMsg, userDataMsg, rgb,
+	commonSingleCameraCallback(odomMsg, userDataMsg, rgb,
 			depth, image1Msg->rgb_camera_info, image1Msg->depth_camera_info,
 			scanDescMsg->scan, scanDescMsg->scan_cloud, odomInfoMsg,
 			globalDescriptorMsgs, image1Msg->key_points, image1Msg->points,
@@ -272,7 +272,7 @@ void CommonDataSubscriber::rgbdOdomInfoCallback(
 		globalDescriptorMsgs.push_back(image1Msg->global_descriptor);
 	}
 
-	commonSingleDepthCallback(odomMsg, userDataMsg, rgb,
+	commonSingleCameraCallback(odomMsg, userDataMsg, rgb,
 			depth, image1Msg->rgb_camera_info, image1Msg->depth_camera_info,
 			scanMsg, scan3dMsg, odomInfoMsg,
 			globalDescriptorMsgs, image1Msg->key_points, image1Msg->points,
@@ -299,7 +299,7 @@ void CommonDataSubscriber::rgbdDataCallback(
 		globalDescriptorMsgs.push_back(image1Msg->global_descriptor);
 	}
 
-	commonSingleDepthCallback(odomMsg, userDataMsg, rgb,
+	commonSingleCameraCallback(odomMsg, userDataMsg, rgb,
 			depth, image1Msg->rgb_camera_info, image1Msg->depth_camera_info,
 			scanMsg, scan3dMsg, odomInfoMsg,
 			globalDescriptorMsgs, image1Msg->key_points, image1Msg->points,
@@ -323,7 +323,7 @@ void CommonDataSubscriber::rgbdDataScan2dCallback(
 		globalDescriptorMsgs.push_back(image1Msg->global_descriptor);
 	}
 
-	commonSingleDepthCallback(odomMsg, userDataMsg, rgb,
+	commonSingleCameraCallback(odomMsg, userDataMsg, rgb,
 			depth, image1Msg->rgb_camera_info, image1Msg->depth_camera_info,
 			*scanMsg, scan3dMsg, odomInfoMsg,
 			globalDescriptorMsgs, image1Msg->key_points, image1Msg->points,
@@ -347,7 +347,7 @@ void CommonDataSubscriber::rgbdDataScan3dCallback(
 		globalDescriptorMsgs.push_back(image1Msg->global_descriptor);
 	}
 
-	commonSingleDepthCallback(odomMsg, userDataMsg, rgb,
+	commonSingleCameraCallback(odomMsg, userDataMsg, rgb,
 			depth, image1Msg->rgb_camera_info, image1Msg->depth_camera_info,
 			scanMsg, *scan3dMsg, odomInfoMsg,
 			globalDescriptorMsgs, image1Msg->key_points, image1Msg->points,
@@ -374,7 +374,7 @@ void CommonDataSubscriber::rgbdDataScanDescCallback(
 		globalDescriptorMsgs.push_back(scanDescMsg->global_descriptor);
 	}
 
-	commonSingleDepthCallback(odomMsg, userDataMsg, rgb,
+	commonSingleCameraCallback(odomMsg, userDataMsg, rgb,
 			depth, image1Msg->rgb_camera_info, image1Msg->depth_camera_info,
 			scanDescMsg->scan, scanDescMsg->scan_cloud, odomInfoMsg,
 			globalDescriptorMsgs, image1Msg->key_points, image1Msg->points,
@@ -398,7 +398,7 @@ void CommonDataSubscriber::rgbdDataInfoCallback(
 		globalDescriptorMsgs.push_back(image1Msg->global_descriptor);
 	}
 
-	commonSingleDepthCallback(odomMsg, userDataMsg, rgb,
+	commonSingleCameraCallback(odomMsg, userDataMsg, rgb,
 			depth, image1Msg->rgb_camera_info, image1Msg->depth_camera_info,
 			scanMsg, *scan3dMsg, odomInfoMsg,
 			globalDescriptorMsgs, image1Msg->key_points, image1Msg->points,
@@ -424,7 +424,7 @@ void CommonDataSubscriber::rgbdOdomDataCallback(
 		globalDescriptorMsgs.push_back(image1Msg->global_descriptor);
 	}
 
-	commonSingleDepthCallback(odomMsg, userDataMsg, rgb,
+	commonSingleCameraCallback(odomMsg, userDataMsg, rgb,
 			depth, image1Msg->rgb_camera_info, image1Msg->depth_camera_info,
 			scanMsg, scan3dMsg, odomInfoMsg,
 			globalDescriptorMsgs, image1Msg->key_points, image1Msg->points,
@@ -448,7 +448,7 @@ void CommonDataSubscriber::rgbdOdomDataScan2dCallback(
 		globalDescriptorMsgs.push_back(image1Msg->global_descriptor);
 	}
 
-	commonSingleDepthCallback(odomMsg, userDataMsg, rgb,
+	commonSingleCameraCallback(odomMsg, userDataMsg, rgb,
 			depth, image1Msg->rgb_camera_info, image1Msg->depth_camera_info,
 			*scanMsg, scan3dMsg, odomInfoMsg,
 			globalDescriptorMsgs, image1Msg->key_points, image1Msg->points,
@@ -472,7 +472,7 @@ void CommonDataSubscriber::rgbdOdomDataScan3dCallback(
 		globalDescriptorMsgs.push_back(image1Msg->global_descriptor);
 	}
 
-	commonSingleDepthCallback(odomMsg, userDataMsg ,rgb,
+	commonSingleCameraCallback(odomMsg, userDataMsg ,rgb,
 			depth, image1Msg->rgb_camera_info, image1Msg->depth_camera_info,
 			scanMsg, *scan3dMsg, odomInfoMsg,
 			globalDescriptorMsgs, image1Msg->key_points, image1Msg->points,
@@ -499,7 +499,7 @@ void CommonDataSubscriber::rgbdOdomDataScanDescCallback(
 		globalDescriptorMsgs.push_back(scanDescMsg->global_descriptor);
 	}
 
-	commonSingleDepthCallback(odomMsg, userDataMsg ,rgb,
+	commonSingleCameraCallback(odomMsg, userDataMsg ,rgb,
 			depth, image1Msg->rgb_camera_info, image1Msg->depth_camera_info,
 			scanDescMsg->scan, scanDescMsg->scan_cloud, odomInfoMsg,
 			globalDescriptorMsgs, image1Msg->key_points, image1Msg->points,
@@ -523,7 +523,7 @@ void CommonDataSubscriber::rgbdOdomDataInfoCallback(
 		globalDescriptorMsgs.push_back(image1Msg->global_descriptor);
 	}
 
-	commonSingleDepthCallback(odomMsg, userDataMsg, rgb,
+	commonSingleCameraCallback(odomMsg, userDataMsg, rgb,
 			depth, image1Msg->rgb_camera_info, image1Msg->depth_camera_info,
 			scanMsg, scan3dMsg, odomInfoMsg,
 			globalDescriptorMsgs, image1Msg->key_points, image1Msg->points,

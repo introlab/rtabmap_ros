@@ -129,6 +129,7 @@ private:
 		pnh.param("noise_min_neighbors", noiseMinNeighbors_, noiseMinNeighbors_);
 		pnh.param("remove_z", removeZ_, removeZ_);
 		pnh.param("subscribe_odom_info", subscribeOdomInfo, subscribeOdomInfo);
+		ROS_ASSERT(maxClouds_>0 || assemblingTime_ >0.0);
 
 		ROS_INFO("%s: queue_size=%d", getName().c_str(), queueSize);
 		ROS_INFO("%s: fixed_frame_id=%s", getName().c_str(), fixedFrameId_.c_str());
@@ -169,7 +170,7 @@ private:
 			syncOdomSub_.subscribe(nh, "odom", 1);
 			syncOdomInfoSub_.subscribe(nh, "odom_info", 1);
 			exactInfoSync_ = new message_filters::Synchronizer<syncInfoPolicy>(syncInfoPolicy(queueSize), syncCloudSub_, syncOdomSub_, syncOdomInfoSub_);
-			exactInfoSync_->registerCallback(boost::bind(&rtabmap_ros::PointCloudAssembler::callbackCloudOdomInfo, this, _1, _2, _3));
+			exactInfoSync_->registerCallback(boost::bind(&rtabmap_ros::PointCloudAssembler::callbackCloudOdomInfo, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3));
 			subscribedTopicsMsg = uFormat("\n%s subscribed to (exact sync):\n   %s,\n   %s",
 								getName().c_str(),
 								syncCloudSub_.getTopic().c_str(),
@@ -183,7 +184,7 @@ private:
 			syncCloudSub_.subscribe(nh, "cloud", 1);
 			syncOdomSub_.subscribe(nh, "odom", 1);
 			exactSync_ = new message_filters::Synchronizer<syncPolicy>(syncPolicy(queueSize), syncCloudSub_, syncOdomSub_);
-			exactSync_->registerCallback(boost::bind(&rtabmap_ros::PointCloudAssembler::callbackCloudOdom, this, _1, _2));
+			exactSync_->registerCallback(boost::bind(&rtabmap_ros::PointCloudAssembler::callbackCloudOdom, this, boost::placeholders::_1, boost::placeholders::_2));
 			subscribedTopicsMsg = uFormat("\n%s subscribed to (exact sync):\n   %s,\n   %s",
 								getName().c_str(),
 								syncCloudSub_.getTopic().c_str(),

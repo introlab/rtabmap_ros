@@ -78,11 +78,15 @@ private:
 		int queueSize = 10;
 		bool approxSync = true;
 		int rgbdCameras = 2;
+		double approxSyncMaxInterval = 0.0;
 		pnh.param("approx_sync", approxSync, approxSync);
+		pnh.param("approx_sync_max_interval", approxSyncMaxInterval, approxSyncMaxInterval);
 		pnh.param("queue_size", queueSize, queueSize);
 		pnh.param("rgbd_cameras", rgbdCameras, rgbdCameras);
 
 		NODELET_INFO("%s: approx_sync  = %s", getName().c_str(), approxSync?"true":"false");
+		if(approxSync)
+			NODELET_INFO("%s: approx_sync_max_interval = %f", getName().c_str(), approxSyncMaxInterval);
 		NODELET_INFO("%s: queue_size   = %d", getName().c_str(), queueSize);
 		NODELET_INFO("%s: rgbd_cameras = %d", getName().c_str(), rgbdCameras);
 
@@ -102,34 +106,63 @@ private:
 		if(rgbdCameras==2)
 		{
 			SYNC_DECL2(RGBDXSync, rgbd2, approxSync, queueSize, (*rgbdSubs_[0]), (*rgbdSubs_[1]));
+			if(approxSync && approxSyncMaxInterval>0.0)
+			{
+				rgbd2ApproximateSync_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
+			}
 		}
 		else if(rgbdCameras==3)
 		{
 			SYNC_DECL3(RGBDXSync, rgbd3, approxSync, queueSize, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]));
+			if(approxSync && approxSyncMaxInterval>0.0)
+			{
+				rgbd3ApproximateSync_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
+			}
 		}
 		else if(rgbdCameras==4)
 		{
 			SYNC_DECL4(RGBDXSync, rgbd4, approxSync, queueSize, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), (*rgbdSubs_[3]));
+			if(approxSync && approxSyncMaxInterval>0.0)
+			{
+				rgbd4ApproximateSync_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
+			}
 		}
 		else if(rgbdCameras==5)
 		{
 			SYNC_DECL5(RGBDXSync, rgbd5, approxSync, queueSize, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), (*rgbdSubs_[3]), (*rgbdSubs_[4]));
+			if(approxSync && approxSyncMaxInterval>0.0)
+			{
+				rgbd5ApproximateSync_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
+			}
 		}
 		else if(rgbdCameras==6)
 		{
 			SYNC_DECL6(RGBDXSync, rgbd6, approxSync, queueSize, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), (*rgbdSubs_[3]), (*rgbdSubs_[4]), (*rgbdSubs_[5]));
+			if(approxSync && approxSyncMaxInterval>0.0)
+			{
+				rgbd6ApproximateSync_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
+			}
 		}
 		else if(rgbdCameras==7)
 		{
 			SYNC_DECL7(RGBDXSync, rgbd7, approxSync, queueSize, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), (*rgbdSubs_[3]), (*rgbdSubs_[4]), (*rgbdSubs_[5]), (*rgbdSubs_[6]));
+			if(approxSync && approxSyncMaxInterval>0.0)
+			{
+				rgbd7ApproximateSync_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
+			}
 		}
 		else if(rgbdCameras==8)
 		{
 			SYNC_DECL8(RGBDXSync, rgbd8, approxSync, queueSize, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), (*rgbdSubs_[3]), (*rgbdSubs_[4]), (*rgbdSubs_[5]), (*rgbdSubs_[6]), (*rgbdSubs_[7]));
+			if(approxSync && approxSyncMaxInterval>0.0)
+			{
+				rgbd8ApproximateSync_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
+			}
 		}
 
 		warningThread_ = new boost::thread(boost::bind(&RGBDXSync::warningLoop, this, subscribedTopicsMsg_, approxSync));
-		NODELET_INFO("%s", subscribedTopicsMsg_.c_str());
+		NODELET_INFO("%s%s", subscribedTopicsMsg_.c_str(),
+				approxSync&&approxSyncMaxInterval!=0.0?uFormat(" (approx sync max interval=%fs)", approxSyncMaxInterval).c_str():"");
 	}
 
 	void warningLoop(const std::string & subscribedTopicsMsg, bool approxSync)

@@ -2,8 +2,8 @@
 
 * Available images on [introlab3it/rtabmap_ros](https://hub.docker.com/r/introlab3it/rtabmap_ros/):
     ```
-    indigo, indigo-latest
-    kinetic, kinetic-latest
+    indigo
+    kinetic
     melodic, melodic-latest
     noetic, noetic-latest
     ```

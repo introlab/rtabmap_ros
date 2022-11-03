@@ -49,6 +49,8 @@
       <param name="Rtabmap/StartNewMapOnLoopClosure" type="string" value="true"/>
       <param name="RGBD/CreateOccupancyGrid" type="string" value="false"/>
       <param name="Rtabmap/CreateIntermediateNodes" type="string" value="true"/>
+      <param name="RGBD/LinearUpdate" type="string" value="0"/>
+      <param name="RGBD/AngularUpdate" type="string" value="0"/>
 
       <param name="frame_id" type="string" value="kinect"/>
       <param name="ground_truth_frame_id" type="string" value="world"/> 

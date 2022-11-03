@@ -103,7 +103,9 @@ private:
 		int queueSize = 10;
 		bool approxSync = true;
 		std::string roiStr;
+		double approxSyncMaxInterval = 0.0;
 		pnh.param("approx_sync", approxSync, approxSync);
+		pnh.param("approx_sync_max_interval", approxSyncMaxInterval, approxSyncMaxInterval);
 		pnh.param("queue_size", queueSize, queueSize);
 		pnh.param("max_depth", maxDepth_, maxDepth_);
 		pnh.param("min_depth", minDepth_, minDepth_);
@@ -170,18 +172,22 @@ private:
 		if(approxSync)
 		{
 			approxSyncDepth_ = new message_filters::Synchronizer<MyApproxSyncDepthPolicy>(MyApproxSyncDepthPolicy(queueSize), imageDepthSub_, cameraInfoSub_);
-			approxSyncDepth_->registerCallback(boost::bind(&PointCloudXYZ::callback, this, _1, _2));
+			if(approxSyncMaxInterval > 0.0)
+				approxSyncDepth_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
+			approxSyncDepth_->registerCallback(boost::bind(&PointCloudXYZ::callback, this, boost::placeholders::_1, boost::placeholders::_2));
 
 			approxSyncDisparity_ = new message_filters::Synchronizer<MyApproxSyncDisparityPolicy>(MyApproxSyncDisparityPolicy(queueSize), disparitySub_, disparityCameraInfoSub_);
-			approxSyncDisparity_->registerCallback(boost::bind(&PointCloudXYZ::callbackDisparity, this, _1, _2));
+			if(approxSyncMaxInterval > 0.0)
+				approxSyncDisparity_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
+			approxSyncDisparity_->registerCallback(boost::bind(&PointCloudXYZ::callbackDisparity, this, boost::placeholders::_1, boost::placeholders::_2));
 		}
 		else
 		{
 			exactSyncDepth_ = new message_filters::Synchronizer<MyExactSyncDepthPolicy>(MyExactSyncDepthPolicy(queueSize), imageDepthSub_, cameraInfoSub_);
-			exactSyncDepth_->registerCallback(boost::bind(&PointCloudXYZ::callback, this, _1, _2));
+			exactSyncDepth_->registerCallback(boost::bind(&PointCloudXYZ::callback, this, boost::placeholders::_1, boost::placeholders::_2));
 
 			exactSyncDisparity_ = new message_filters::Synchronizer<MyExactSyncDisparityPolicy>(MyExactSyncDisparityPolicy(queueSize), disparitySub_, disparityCameraInfoSub_);
-			exactSyncDisparity_->registerCallback(boost::bind(&PointCloudXYZ::callbackDisparity, this, _1, _2));
+			exactSyncDisparity_->registerCallback(boost::bind(&PointCloudXYZ::callbackDisparity, this, boost::placeholders::_1, boost::placeholders::_2));
 		}
 
 		ros::NodeHandle depth_nh(nh, "depth");
@@ -199,12 +205,12 @@ private:
 	}
 
 	void callback(
-			  const sensor_msgs::ImageConstPtr& depth,
+			  const sensor_msgs::ImageConstPtr& depthMsg,
 			  const sensor_msgs::CameraInfoConstPtr& cameraInfo)
 	{
-		if(depth->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1)!=0 &&
-		   depth->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1)!=0 &&
-		   depth->encoding.compare(sensor_msgs::image_encodings::MONO16)!=0)
+		if(depthMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1)!=0 &&
+		   depthMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1)!=0 &&
+		   depthMsg->encoding.compare(sensor_msgs::image_encodings::MONO16)!=0)
 		{
 			NODELET_ERROR("Input type depth=32FC1,16UC1,MONO16");
 			return;
@@ -214,28 +220,68 @@ private:
 		{
 			ros::WallTime time = ros::WallTime::now();
 
-			cv_bridge::CvImageConstPtr imageDepthPtr = cv_bridge::toCvShare(depth);
+			cv_bridge::CvImageConstPtr imageDepthPtr = cv_bridge::toCvShare(depthMsg);
 			cv::Rect roi = rtabmap::util2d::computeRoi(imageDepthPtr->image, roiRatios_);
 
-			image_geometry::PinholeCameraModel model;
-			model.fromCameraInfo(*cameraInfo);
+			rtabmap::CameraModel model = cameraModelFromROS(*cameraInfo);
 
 			pcl::PointCloud<pcl::PointXYZ>::Ptr pclCloud;
-			rtabmap::CameraModel m(
-					model.fx(),
-					model.fy(),
-					model.cx()-roiRatios_[0]*double(imageDepthPtr->image.cols),
-					model.cy()-roiRatios_[2]*double(imageDepthPtr->image.rows));
+
+			cv::Mat depth = imageDepthPtr->image;
+			if( roiRatios_.size() == 4 &&
+				((roiRatios_[0] > 0.0f && roiRatios_[0] <= 1.0f) ||
+				 (roiRatios_[1] > 0.0f && roiRatios_[1] <= 1.0f) ||
+				 (roiRatios_[2] > 0.0f && roiRatios_[2] <= 1.0f) ||
+				 (roiRatios_[3] > 0.0f && roiRatios_[3] <= 1.0f)))
+			{
+				cv::Rect roiDepth = rtabmap::util2d::computeRoi(depth, roiRatios_);
+				cv::Rect roiRgb;
+				if(model.imageWidth() && model.imageHeight())
+				{
+					roiRgb = rtabmap::util2d::computeRoi(model.imageSize(), roiRatios_);
+				}
+				if(	roiDepth.width%decimation_==0 &&
+					roiDepth.height%decimation_==0 &&
+					(roiRgb.width != 0 ||
+					   (roiRgb.width%decimation_==0 &&
+						roiRgb.height%decimation_==0)))
+				{
+					depth = cv::Mat(depth, roiDepth);
+					if(model.imageWidth() != 0 && model.imageHeight() != 0)
+					{
+						model = model.roi(roiRgb);
+					}
+					else
+					{
+						model = model.roi(roiDepth);
+					}
+				}
+				else
+				{
+					NODELET_ERROR("Cannot apply ROI ratios [%f,%f,%f,%f] because resulting "
+						  "dimension (depth=%dx%d rgb=%dx%d) cannot be divided exactly "
+						  "by decimation parameter (%d). Ignoring ROI ratios...",
+						  roiRatios_[0],
+						  roiRatios_[1],
+						  roiRatios_[2],
+						  roiRatios_[3],
+						  roiDepth.width,
+						  roiDepth.height,
+						  roiRgb.width,
+						  roiRgb.height,
+						  decimation_);
+				}
+			}
 
 			pcl::IndicesPtr indices(new std::vector<int>);
 			pclCloud = rtabmap::util3d::cloudFromDepth(
-					cv::Mat(imageDepthPtr->image, roi),
-					m,
+					depth,
+					model,
 					decimation_,
 					maxDepth_,
 					minDepth_,
 					indices.get());
-			processAndPublish(pclCloud, indices, depth->header);
+			processAndPublish(pclCloud, indices, depthMsg->header);
 
 			NODELET_DEBUG("point_cloud_xyz from depth time = %f s", (ros::WallTime::now() - time).toSec());
 		}
@@ -270,6 +316,7 @@ private:
 
 			pcl::PointCloud<pcl::PointXYZ>::Ptr pclCloud;
 			rtabmap::CameraModel leftModel = rtabmap_ros::cameraModelFromROS(*cameraInfo);
+			UASSERT(disparity.cols == leftModel.imageWidth() && disparity.rows == leftModel.imageHeight());
 			rtabmap::StereoCameraModel stereoModel(disparityMsg->f, disparityMsg->f, leftModel.cx()-roiRatios_[0]*double(disparity.cols), leftModel.cy()-roiRatios_[2]*double(disparity.rows), disparityMsg->T);
 			pcl::IndicesPtr indices(new std::vector<int>);
 			pclCloud = rtabmap::util3d::cloudFromDisparity(

@@ -88,11 +88,15 @@ private:
 
 		int queueSize = 10;
 		bool approxSync = false;
+		double approxSyncMaxInterval = 0.0;
 		pnh.param("approx_sync", approxSync, approxSync);
+		if(approxSync)
+			pnh.param("approx_sync_max_interval", approxSyncMaxInterval, approxSyncMaxInterval);
 		pnh.param("queue_size", queueSize, queueSize);
 		pnh.param("compressed_rate", compressedRate_, compressedRate_);
 
 		NODELET_INFO("%s: approx_sync = %s", getName().c_str(), approxSync?"true":"false");
+		NODELET_INFO("%s: approx_sync_max_interval = %f", getName().c_str(), approxSyncMaxInterval);
 		NODELET_INFO("%s: queue_size  = %d", getName().c_str(), queueSize);
 		NODELET_INFO("%s: compressed_rate = %f", getName().c_str(), compressedRate_);
 
@@ -102,12 +106,14 @@ private:
 		if(approxSync)
 		{
 			approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize), imageLeftSub_, imageRightSub_, cameraInfoLeftSub_, cameraInfoRightSub_);
-			approxSync_->registerCallback(boost::bind(&StereoSync::callback, this, _1, _2, _3, _4));
+			if(approxSyncMaxInterval>0.0)
+				approxSync_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
+			approxSync_->registerCallback(boost::bind(&StereoSync::callback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 		}
 		else
 		{
 			exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize), imageLeftSub_, imageRightSub_, cameraInfoLeftSub_, cameraInfoRightSub_);
-			exactSync_->registerCallback(boost::bind(&StereoSync::callback, this, _1, _2, _3, _4));
+			exactSync_->registerCallback(boost::bind(&StereoSync::callback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 		}
 
 		ros::NodeHandle left_nh(nh, "left");
@@ -124,9 +130,10 @@ private:
 		cameraInfoLeftSub_.subscribe(left_nh, "camera_info", 1);
 		cameraInfoRightSub_.subscribe(right_nh, "camera_info", 1);
 
-		std::string subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s \\\n   %s \\\n   %s \\\n   %s",
+		std::string subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s \\\n   %s \\\n   %s \\\n   %s",
 							getName().c_str(),
 							approxSync?"approx":"exact",
+							approxSync&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
 							imageLeftSub_.getTopic().c_str(),
 							imageRightSub_.getTopic().c_str(),
 							cameraInfoLeftSub_.getTopic().c_str(),
@@ -168,6 +175,18 @@ private:
 			double rightStamp = imageRight->header.stamp.toSec();
 			double leftInfoStamp = cameraInfoLeft->header.stamp.toSec();
 			double rightInfoStamp = cameraInfoRight->header.stamp.toSec();
+
+			double stampDiff = fabs(leftStamp - rightStamp);
+			if(stampDiff > 0.010)
+			{
+				NODELET_WARN("The time difference between left and right frames is "
+						"high (diff=%fs, left=%fs, right=%fs). If your left and right cameras are hardware "
+						"synchronized, use approx_sync:=false. Otherwise, you may want "
+						"to set approx_sync_max_interval lower than 0.01s to reject spurious bad synchronizations.",
+						stampDiff,
+						leftStamp,
+						rightStamp);
+			}
 
 			rtabmap_ros::RGBDImage msg;
 			msg.header.frame_id = cameraInfoLeft->header.frame_id;

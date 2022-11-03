@@ -88,24 +88,30 @@ private:
 
 		int queueSize = 5;
 		bool approxSync = false;
+		double approxSyncMaxInterval = 0.0;
 		pnh.param("approx_sync", approxSync, approxSync);
+		pnh.param("approx_sync_max_interval", approxSyncMaxInterval, approxSyncMaxInterval);
 		pnh.param("rate", rate_, rate_);
 		pnh.param("queue_size", queueSize, queueSize);
 		pnh.param("decimation", decimation_, decimation_);
 		ROS_ASSERT(decimation_ >= 1);
-		NODELET_INFO("Rate=%f Hz", rate_);
-		NODELET_INFO("Decimation=%d", decimation_);
-		NODELET_INFO("Approximate time sync = %s", approxSync?"true":"false");
+		NODELET_INFO("rate=%f Hz", rate_);
+		NODELET_INFO("decimation=%d", decimation_);
+		NODELET_INFO("approx_sync = %s", approxSync?"true":"false");
+		if(approxSync)
+			NODELET_INFO("approx_sync_max_interval = %f", approxSyncMaxInterval);
 
 		if(approxSync)
 		{
 			approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize), imageLeft_, imageRight_, cameraInfoLeft_, cameraInfoRight_);
-			approxSync_->registerCallback(boost::bind(&StereoThrottleNodelet::callback, this, _1, _2, _3, _4));
+			if(approxSyncMaxInterval>0.0)
+				approxSync_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
+			approxSync_->registerCallback(boost::bind(&StereoThrottleNodelet::callback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 		}
 		else
 		{
 			exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize), imageLeft_, imageRight_, cameraInfoLeft_, cameraInfoRight_);
-			exactSync_->registerCallback(boost::bind(&StereoThrottleNodelet::callback, this, _1, _2, _3, _4));
+			exactSync_->registerCallback(boost::bind(&StereoThrottleNodelet::callback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 		}
 
 		imageLeft_.subscribe(left_it, left_nh.resolveName("image"), 1, hintsLeft);

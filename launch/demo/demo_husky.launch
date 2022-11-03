@@ -62,11 +62,35 @@
   <arg name="depth_from_lidar" default="false"/>
   
   
-  <arg     if="$(arg lidar3d)" name="cell_size" default="0.2"/>
+  <arg     if="$(arg lidar3d)" name="cell_size" default="0.3"/>
   <arg unless="$(arg lidar3d)" name="cell_size" default="0.05"/>
   
-  <arg if="$(arg lidar2d)" name="lidar_args" default="--Reg/Strategy 1 --RGBD/NeighborLinkRefining true --Grid/CellSize $(arg cell_size) --Icp/PointToPlaneRadius 0"/>
-  <arg if="$(arg lidar3d)" name="lidar_args" default="--Reg/Strategy 1 --RGBD/NeighborLinkRefining true --ICP/PM true --Icp/PMOutlierRatio 0.7 --Icp/VoxelSize $(arg cell_size) --Icp/MaxCorrespondenceDistance 1 --Icp/PointToPlaneGroundNormalsUp 0.9 --Icp/Iterations 10 --Icp/Epsilon 0.001 --OdomF2M/ScanSubtractRadius $(arg cell_size) --OdomF2M/ScanMaxSize 15000 --Grid/ClusterRadius 1 --Grid/RangeMax 20 --Grid/RayTracing $(arg lidar3d_ray_tracing) --Grid/CellSize $(arg cell_size) --Icp/PointToPlaneRadius 0"/>
+  <arg if="$(arg lidar2d)" name="lidar_args" default="
+      --Reg/Strategy 1 
+      --RGBD/NeighborLinkRefining true 
+      --Grid/CellSize $(arg cell_size) 
+      --Icp/PointToPlaneRadius 0 
+      --Icp/MaxTranslation 1"/>
+  
+  <arg if="$(arg lidar3d)" name="lidar_args" default="
+      --Reg/Strategy 1 
+      --RGBD/NeighborLinkRefining true 
+      --ICP/PM true 
+      --Icp/PMOutlierRatio 0.7 
+      --Icp/VoxelSize $(arg cell_size) 
+      --Icp/MaxCorrespondenceDistance 1 
+      --Icp/PointToPlaneGroundNormalsUp 0.9 
+      --Icp/Iterations 10 
+      --Icp/Epsilon 0.001 
+      --OdomF2M/ScanSubtractRadius $(arg cell_size) 
+      --OdomF2M/ScanMaxSize 15000 
+      --Grid/ClusterRadius 1 
+      --Grid/RangeMax 20 
+      --Grid/RayTracing $(arg lidar3d_ray_tracing) 
+      --Grid/CellSize $(arg cell_size) 
+      --Icp/PointToPlaneRadius 0 
+      --Icp/PointToPlaneNormalK 10 
+      --Icp/MaxTranslation 1"/>
 
   <!--- Run rtabmap -->
   <remap from="/rtabmap/grid_map" to="/map"/>

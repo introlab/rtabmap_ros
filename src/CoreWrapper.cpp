@@ -521,16 +521,6 @@ void CoreWrapper::onInit()
 	bool subscribeRGBD = false;
 	pnh.param("rgbd_cameras", cameras, cameras);
 	pnh.param("subscribe_rgbd", subscribeRGBD, subscribeRGBD);
-	if(subscribeRGBD && cameras> 1 && estimationType>0)
-	{
-		NODELET_WARN("Setting \"%s\" parameter to 0 (%d is not supported "
-				"for multi-cameras) as \"subscribe_rgbd\" is "
-				"true and \"rgbd_cameras\">1. Set \"%s\" to 0 to suppress this warning.",
-				Parameters::kVisEstimationType().c_str(),
-				estimationType,
-				Parameters::kVisEstimationType().c_str());
-		uInsert(parameters_, ParametersPair(Parameters::kVisEstimationType(), "0"));
-	}
 
 	// modify default parameters with those in the database
 	if(!deleteDbOnStart)
@@ -581,7 +571,7 @@ void CoreWrapper::onInit()
 				{
 					NODELET_INFO("Subscribe to inter odom + info messages");
 					interOdomSync_ = new message_filters::Synchronizer<MyExactInterOdomSyncPolicy>(MyExactInterOdomSyncPolicy(100), interOdomSyncSub_, interOdomInfoSyncSub_);
-					interOdomSync_->registerCallback(boost::bind(&CoreWrapper::interOdomInfoCallback, this, _1, _2));
+					interOdomSync_->registerCallback(boost::bind(&CoreWrapper::interOdomInfoCallback, this, boost::placeholders::_1, boost::placeholders::_2));
 					interOdomSyncSub_.subscribe(nh, "inter_odom", 100);
 					interOdomInfoSyncSub_.subscribe(nh, "inter_odom_info", 100);
 				}
@@ -1028,6 +1018,13 @@ bool CoreWrapper::odomUpdate(const nav_msgs::OdometryConstPtr & odomMsg, ros::Ti
 		lastPoseIntermediate_ = false;
 		lastPose_ = odom;
 		lastPoseStamp_ = stamp;
+		lastPoseVelocity_.resize(6);
+		lastPoseVelocity_[0] = odomMsg->twist.twist.linear.x;
+		lastPoseVelocity_[1] = odomMsg->twist.twist.linear.y;
+		lastPoseVelocity_[2] = odomMsg->twist.twist.linear.z;
+		lastPoseVelocity_[3] = odomMsg->twist.twist.angular.x;
+		lastPoseVelocity_[4] = odomMsg->twist.twist.angular.y;
+		lastPoseVelocity_[5] = odomMsg->twist.twist.angular.z;
 
 		// Only update variance if odom is not null
 		if(!odom.isNull())
@@ -1113,6 +1110,7 @@ bool CoreWrapper::odomTFUpdate(const ros::Time & stamp)
 		lastPoseIntermediate_ = false;
 		lastPose_ = odom;
 		lastPoseStamp_ = stamp;
+		lastPoseVelocity_.clear();
 
 		bool ignoreFrame = false;
 		if(stamp.toSec() == 0.0)
@@ -1148,12 +1146,13 @@ bool CoreWrapper::odomTFUpdate(const ros::Time & stamp)
 	return false;
 }
 
-void CoreWrapper::commonDepthCallback(
+void CoreWrapper::commonMultiCameraCallback(
 		const nav_msgs::OdometryConstPtr & odomMsg,
 		const rtabmap_ros::UserDataConstPtr & userDataMsg,
 		const std::vector<cv_bridge::CvImageConstPtr> & imageMsgs,
 		const std::vector<cv_bridge::CvImageConstPtr> & depthMsgs,
 		const std::vector<sensor_msgs::CameraInfo> & cameraInfoMsgs,
+		const std::vector<sensor_msgs::CameraInfo> & depthCameraInfoMsgs,
 		const sensor_msgs::LaserScan& scan2dMsg,
 		const sensor_msgs::PointCloud2& scan3dMsg,
 		const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg,
@@ -1204,11 +1203,12 @@ void CoreWrapper::commonDepthCallback(
 		return;
 	}
 
-	commonDepthCallbackImpl(odomFrameId,
+	commonMultiCameraCallbackImpl(odomFrameId,
 			userDataMsg,
 			imageMsgs,
 			depthMsgs,
 			cameraInfoMsgs,
+			depthCameraInfoMsgs,
 			scan2dMsg,
 			scan3dMsg,
 			odomInfoMsg,
@@ -1218,12 +1218,13 @@ void CoreWrapper::commonDepthCallback(
 			localDescriptors);
 }
 
-void CoreWrapper::commonDepthCallbackImpl(
+void CoreWrapper::commonMultiCameraCallbackImpl(
 		const std::string & odomFrameId,
 		const rtabmap_ros::UserDataConstPtr & userDataMsg,
 		const std::vector<cv_bridge::CvImageConstPtr> & imageMsgs,
 		const std::vector<cv_bridge::CvImageConstPtr> & depthMsgs,
 		const std::vector<sensor_msgs::CameraInfo> & cameraInfoMsgs,
+		const std::vector<sensor_msgs::CameraInfo> & depthCameraInfoMsgs,
 		const sensor_msgs::LaserScan& scan2dMsg,
 		const sensor_msgs::PointCloud2& scan3dMsg,
 		const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg,
@@ -1236,21 +1237,26 @@ void CoreWrapper::commonDepthCallbackImpl(
 	cv::Mat rgb;
 	cv::Mat depth;
 	std::vector<rtabmap::CameraModel> cameraModels;
+	std::vector<rtabmap::StereoCameraModel> stereoCameraModels;
 	std::vector<cv::KeyPoint> keypoints;
 	std::vector<cv::Point3f> points;
 	cv::Mat descriptors;
+
 	if(!rtabmap_ros::convertRGBDMsgs(
 			imageMsgs,
 			depthMsgs,
 			cameraInfoMsgs,
+			depthCameraInfoMsgs,
 			frameId_,
 			odomSensorSync_?odomFrameId:"",
 			lastPoseStamp_,
 			rgb,
 			depth,
 			cameraModels,
+			stereoCameraModels,
 			tfListener_,
 			waitForTransform_?waitForTransformDuration_:0.0,
+			alreadyRectifiedImages_,
 			localKeyPointsMsgs,
 			localPoints3dMsgs,
 			localDescriptorsMsgs,
@@ -1260,6 +1266,73 @@ void CoreWrapper::commonDepthCallbackImpl(
 	{
 		NODELET_ERROR("Could not convert rgb/depth msgs! Aborting rtabmap update...");
 		return;
+	}
+	UDEBUG("cameraModels=%ld stereoCameraModels=%ld", cameraModels.size(), stereoCameraModels.size());
+	UDEBUG("rgb=%dx%d(type=%d), depth/right=%dx%d(type=%d)", rgb.rows, rgb.cols, rgb.type(), depth.rows, depth.cols, depth.type());
+
+	if(stereoCameraModels.size() && stereoToDepth_)
+	{
+		UASSERT(depth.type() == CV_8UC1);
+		cv::Mat leftMono;
+		if(rgb.channels() == 3)
+		{
+			cv::cvtColor(rgb, leftMono, CV_BGR2GRAY);
+		}
+		else
+		{
+			leftMono = rgb;
+		}
+		cv::Mat rightMono = depth;
+		depth = cv::Mat();
+
+		UASSERT(int((leftMono.cols/stereoCameraModels.size())*stereoCameraModels.size()) == leftMono.cols);
+		UASSERT(int((rightMono.cols/stereoCameraModels.size())*stereoCameraModels.size()) == rightMono.cols);
+		int subImageWidth = leftMono.cols/stereoCameraModels.size();
+		for(size_t i=0; i<stereoCameraModels.size(); ++i)
+		{
+			cv::Mat left(leftMono, cv::Rect(subImageWidth*i, 0, subImageWidth, leftMono.rows));
+			cv::Mat right(rightMono, cv::Rect(subImageWidth*i, 0, subImageWidth, rightMono.rows));
+
+			// cv::stereoBM() see "$ rosrun rtabmap_ros rtabmap --params | grep StereoBM" for parameters
+			cv::Mat disparity = rtabmap::util2d::disparityFromStereoImages(
+					left,
+					right,
+					parameters_);
+			if(disparity.empty())
+			{
+				NODELET_ERROR("Could not compute disparity image (\"stereo_to_depth\" is true)!");
+				return;
+			}
+			cv::Mat subDepth = rtabmap::util2d::depthFromDisparity(
+							disparity,
+							stereoCameraModels[i].left().fx(),
+							stereoCameraModels[i].baseline());
+
+			if(subDepth.empty())
+			{
+				NODELET_ERROR("Could not compute depth image (\"stereo_to_depth\" is true)!");
+				return;
+			}
+			UASSERT(subDepth.type() == CV_16UC1 || subDepth.type() == CV_32FC1);
+
+			if(depth.empty())
+			{
+				depth = cv::Mat(subDepth.rows, subDepth.cols*stereoCameraModels.size(), subDepth.type());
+			}
+
+			if(subDepth.type() == depth.type())
+			{
+				subDepth.copyTo(cv::Mat(depth, cv::Rect(i*subDepth.cols, 0, subDepth.cols, subDepth.rows)));
+			}
+			else
+			{
+				ROS_ERROR("Some Depth images are not the same type!");
+				return;
+			}
+
+			cameraModels.push_back(stereoCameraModels[i].left());
+		}
+		stereoCameraModels.clear();
 	}
 
 	UASSERT(uContains(parameters_, rtabmap::Parameters::kMemSaveDepth16Format()));
@@ -1279,7 +1352,7 @@ void CoreWrapper::commonDepthCallbackImpl(
 
 	LaserScan scan;
 	bool genMaxScanPts = 0;
-	if(scan2dMsg.ranges.empty() && scan3dMsg.data.empty() && !depth.empty() && genScan_)
+	if(scan2dMsg.ranges.empty() && scan3dMsg.data.empty() && !depth.empty() && stereoCameraModels.empty() && genScan_)
 	{
 		pcl::PointCloud<pcl::PointXYZ>::Ptr scanCloud2d(new pcl::PointCloud<pcl::PointXYZ>);
 		*scanCloud2d = util3d::laserScanFromDepthImages(
@@ -1390,14 +1463,29 @@ void CoreWrapper::commonDepthCallbackImpl(
 		userData_ = cv::Mat();
 	}
 
-	SensorData data(
-			scan,
-			rgb,
-			depth,
-			cameraModels,
-			lastPoseIntermediate_?-1:!cameraInfoMsgs.empty()?cameraInfoMsgs[0].header.seq:0,
-			rtabmap_ros::timestampFromROS(lastPoseStamp_),
-			userData);
+	SensorData data;
+	if(!stereoCameraModels.empty())
+	{
+		data = SensorData(
+				scan,
+				rgb,
+				depth,
+				stereoCameraModels,
+				lastPoseIntermediate_?-1:!cameraInfoMsgs.empty()?cameraInfoMsgs[0].header.seq:0,
+				rtabmap_ros::timestampFromROS(lastPoseStamp_),
+				userData);
+	}
+	else
+	{
+		data = SensorData(
+				scan,
+				rgb,
+				depth,
+				cameraModels,
+				lastPoseIntermediate_?-1:!cameraInfoMsgs.empty()?cameraInfoMsgs[0].header.seq:0,
+				rtabmap_ros::timestampFromROS(lastPoseStamp_),
+				userData);
+	}
 
 	OdometryInfo odomInfo;
 	if(odomInfoMsg.get())
@@ -1420,259 +1508,11 @@ void CoreWrapper::commonDepthCallbackImpl(
 	process(lastPoseStamp_,
 			data,
 			lastPose_,
+			lastPoseVelocity_,
 			odomFrameId,
 			covariance_,
 			odomInfo,
 			timerConversion.ticks());
-	covariance_ = cv::Mat();
-}
-
-void CoreWrapper::commonStereoCallback(
-		const nav_msgs::OdometryConstPtr & odomMsg,
-		const rtabmap_ros::UserDataConstPtr & userDataMsg,
-		const cv_bridge::CvImageConstPtr& leftImageMsg,
-		const cv_bridge::CvImageConstPtr& rightImageMsg,
-		const sensor_msgs::CameraInfo& leftCamInfoMsg,
-		const sensor_msgs::CameraInfo& rightCamInfoMsg,
-		const sensor_msgs::LaserScan& scan2dMsg,
-		const sensor_msgs::PointCloud2& scan3dMsg,
-		const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg,
-		const std::vector<rtabmap_ros::GlobalDescriptor> & globalDescriptorMsgs,
-		const std::vector<rtabmap_ros::KeyPoint> & localKeyPointsMsg,
-		const std::vector<rtabmap_ros::Point3f> & localPoints3dMsg,
-		const cv::Mat & localDescriptorsMsg)
-{
-	UTimer timerConversion;
-	std::string odomFrameId = odomFrameId_;
-	if(odomMsg.get())
-	{
-		odomFrameId = odomMsg->header.frame_id;
-		if(!scan2dMsg.ranges.empty())
-		{
-			if(!odomUpdate(odomMsg, scan2dMsg.header.stamp))
-			{
-				return;
-			}
-		}
-		else if(!scan3dMsg.data.empty())
-		{
-			if(!odomUpdate(odomMsg, scan3dMsg.header.stamp))
-			{
-				return;
-			}
-		}
-		else if(leftImageMsg.get() == 0 || !odomUpdate(odomMsg, leftImageMsg->header.stamp))
-		{
-			return;
-		}
-	}
-	else if(!scan2dMsg.ranges.empty())
-	{
-		if(!odomTFUpdate(scan2dMsg.header.stamp))
-		{
-			return;
-		}
-	}
-	else if(!scan3dMsg.data.empty())
-	{
-		if(!odomTFUpdate(scan3dMsg.header.stamp))
-		{
-			return;
-		}
-	}
-	else if(leftImageMsg.get() == 0 || !odomTFUpdate(leftImageMsg->header.stamp))
-	{
-		return;
-	}
-
-	cv::Mat left;
-	cv::Mat right;
-	StereoCameraModel stereoModel;
-	if(!rtabmap_ros::convertStereoMsg(
-			leftImageMsg,
-			rightImageMsg,
-			leftCamInfoMsg,
-			rightCamInfoMsg,
-			frameId_,
-			odomSensorSync_?odomFrameId:"",
-			lastPoseStamp_,
-			left,
-			right,
-			stereoModel,
-			tfListener_,
-			waitForTransform_?waitForTransformDuration_:0.0,
-			alreadyRectifiedImages_))
-	{
-		NODELET_ERROR("Could not convert stereo msgs! Aborting rtabmap update...");
-		return;
-	}
-
-	if(stereoToDepth_)
-	{
-		// cv::stereoBM() see "$ rosrun rtabmap_ros rtabmap --params | grep StereoBM" for parameters
-		cv::Mat disparity = rtabmap::util2d::disparityFromStereoImages(
-				left,
-				right,
-				parameters_);
-		if(disparity.empty())
-		{
-			NODELET_ERROR("Could not compute disparity image (\"stereo_to_depth\" is true)!");
-			return;
-		}
-		cv::Mat depth = rtabmap::util2d::depthFromDisparity(
-						disparity,
-						stereoModel.left().fx(),
-						stereoModel.baseline());
-
-		if(depth.empty())
-		{
-			NODELET_ERROR("Could not compute depth image (\"stereo_to_depth\" is true)!");
-			return;
-		}
-		UASSERT(depth.type() == CV_16UC1 || depth.type() == CV_32FC1);
-
-		// move to common depth callback
-		cv_bridge::CvImagePtr imgDepth(new cv_bridge::CvImage);
-		if(depth.type() == CV_16UC1)
-		{
-			imgDepth->encoding = sensor_msgs::image_encodings::TYPE_16UC1;
-		}
-		else // CV_32FC1
-		{
-			imgDepth->encoding = sensor_msgs::image_encodings::TYPE_32FC1;
-		}
-		imgDepth->image = depth;
-		imgDepth->header = leftImageMsg->header;
-		std::vector<cv_bridge::CvImageConstPtr> rgbImages(1);
-		std::vector<cv_bridge::CvImageConstPtr> depthImages(1);
-		std::vector<sensor_msgs::CameraInfo> cameraInfos(1);
-		rgbImages[0] = leftImageMsg;
-		depthImages[0] = imgDepth;
-		cameraInfos[0] = leftCamInfoMsg;
-
-		std::vector<std::vector<rtabmap_ros::KeyPoint> > localKeyPointsMsgs;
-		std::vector<std::vector<rtabmap_ros::Point3f> > localPoints3dMsgs;
-		std::vector<cv::Mat> localDescriptorsMsgs;
-		if(!localKeyPointsMsg.empty())
-		{
-			localKeyPointsMsgs.push_back(localKeyPointsMsg);
-		}
-		if(!localPoints3dMsg.empty())
-		{
-			localPoints3dMsgs.push_back(localPoints3dMsg);
-		}
-		if(!localDescriptorsMsg.empty())
-		{
-			localDescriptorsMsgs.push_back(localDescriptorsMsg);
-		}
-		commonDepthCallbackImpl(odomFrameId,
-				rtabmap_ros::UserDataConstPtr(),
-				rgbImages, depthImages, cameraInfos,
-				scan2dMsg, scan3dMsg,
-				odomInfoMsg,
-				globalDescriptorMsgs, localKeyPointsMsgs, localPoints3dMsgs, localDescriptorsMsgs);
-		return;
-	}
-
-	LaserScan scan;
-	if(!scan2dMsg.ranges.empty())
-	{
-		if(!rtabmap_ros::convertScanMsg(
-				scan2dMsg,
-				frameId_,
-				odomSensorSync_?odomFrameId:"",
-				lastPoseStamp_,
-				scan,
-				tfListener_,
-				waitForTransform_?waitForTransformDuration_:0,
-				// backward compatibility, project 2D scan in /base_link frame
-				rtabmap_.getMemory() && uStrNumCmp(rtabmap_.getMemory()->getDatabaseVersion(), "0.11.10") < 0))
-		{
-			NODELET_ERROR("Could not convert laser scan msg! Aborting rtabmap update...");
-			return;
-		}
-	}
-	else if(!scan3dMsg.data.empty())
-	{
-		if(!rtabmap_ros::convertScan3dMsg(
-				scan3dMsg,
-				frameId_,
-				odomSensorSync_?odomFrameId:"",
-				lastPoseStamp_,
-				scan,
-				tfListener_,
-				waitForTransform_?waitForTransformDuration_:0,
-				scanCloudMaxPoints_))
-		{
-			NODELET_ERROR("Could not convert 3d laser scan msg! Aborting rtabmap update...");
-			return;
-		}
-	}
-
-	cv::Mat userData;
-	if(userDataMsg.get())
-	{
-		userData = rtabmap_ros::userDataFromROS(*userDataMsg);
-		UScopeMutex lock(userDataMutex_);
-		if(!userData_.empty())
-		{
-			NODELET_WARN("Synchronized and asynchronized user data topics cannot be used at the same time. Async user data dropped!");
-			userData_ = cv::Mat();
-		}
-	}
-	else
-	{
-		UScopeMutex lock(userDataMutex_);
-		userData = userData_;
-		userData_ = cv::Mat();
-	}
-
-	SensorData data(
-			scan,
-			left,
-			right,
-			stereoModel,
-			lastPoseIntermediate_?-1:leftImageMsg->header.seq,
-			rtabmap_ros::timestampFromROS(lastPoseStamp_),
-			userData);
-
-	OdometryInfo odomInfo;
-	if(odomInfoMsg.get())
-	{
-		odomInfo = odomInfoFromROS(*odomInfoMsg);
-	}
-
-	if(!globalDescriptorMsgs.empty())
-	{
-		data.setGlobalDescriptors(rtabmap_ros::globalDescriptorsFromROS(globalDescriptorMsgs));
-	}
-
-	std::vector<cv::KeyPoint> keypoints;
-	std::vector<cv::Point3f> points;
-	if(!localKeyPointsMsg.empty())
-	{
-		keypoints = rtabmap_ros::keypointsFromROS(localKeyPointsMsg);
-	}
-	if(!localPoints3dMsg.empty())
-	{
-		// Points should be in base frame
-		points = rtabmap_ros::points3fFromROS(localPoints3dMsg, stereoModel.localTransform());
-	}
-	if(!keypoints.empty())
-	{
-		UASSERT(points.empty() || points.size() == keypoints.size());
-		UASSERT(localDescriptorsMsg.empty() || localDescriptorsMsg.rows == (int)keypoints.size());
-		data.setFeatures(keypoints, points, localDescriptorsMsg);
-	}
-
-	process(lastPoseStamp_,
-			data,
-			lastPose_,
-			odomFrameId,
-			covariance_,
-			odomInfo,
-			timerConversion.ticks());
-
 	covariance_ = cv::Mat();
 }
 
@@ -1784,7 +1624,7 @@ void CoreWrapper::commonLaserScanCallback(
 			scan,
 			cv::Mat(),
 			cv::Mat(),
-			CameraModel(),
+			rtabmap::CameraModel(),
 			lastPoseIntermediate_?-1:!scan2dMsg.ranges.empty()?scan2dMsg.header.seq:scan3dMsg.header.seq,
 			rtabmap_ros::timestampFromROS(lastPoseStamp_),
 			userData);
@@ -1803,6 +1643,7 @@ void CoreWrapper::commonLaserScanCallback(
 	process(lastPoseStamp_,
 			data,
 			lastPose_,
+			lastPoseVelocity_,
 			odomFrameId,
 			covariance_,
 			odomInfo,
@@ -1847,7 +1688,7 @@ void CoreWrapper::commonOdomCallback(
 	SensorData data(
 			cv::Mat(),
 			cv::Mat(),
-			CameraModel(),
+			rtabmap::CameraModel(),
 			lastPoseIntermediate_?-1:odomMsg->header.seq,
 			rtabmap_ros::timestampFromROS(lastPoseStamp_),
 			userData);
@@ -1861,6 +1702,7 @@ void CoreWrapper::commonOdomCallback(
 	process(lastPoseStamp_,
 			data,
 			lastPose_,
+			lastPoseVelocity_,
 			odomFrameId,
 			covariance_,
 			odomInfo,
@@ -1873,6 +1715,7 @@ void CoreWrapper::process(
 		const ros::Time & stamp,
 		SensorData & data,
 		const Transform & odom,
+		const std::vector<float> & odomVelocityIn,
 		const std::string & odomFrameId,
 		const cv::Mat & odomCovariance,
 		const OdometryInfo & odomInfo,
@@ -1930,7 +1773,7 @@ void CoreWrapper::process(
 						covariance.at<double>(4,4) = uIsFinite(covariance.at<double>(4,4)) && covariance.at<double>(4,4)!=0?covariance.at<double>(4,4):1;
 					}
 
-					SensorData interData(cv::Mat(), cv::Mat(), CameraModel(), -1, rtabmap_ros::timestampFromROS(iter->first.header.stamp));
+					SensorData interData(cv::Mat(), cv::Mat(), rtabmap::CameraModel(), -1, rtabmap_ros::timestampFromROS(iter->first.header.stamp));
 					Transform gt;
 					if(!groundTruthFrameId_.empty())
 					{
@@ -1957,6 +1800,16 @@ void CoreWrapper::process(
 							odomVelocity[4] = pitch/info.interval;
 							odomVelocity[5] = yaw/info.interval;
 						}
+					}
+					if(odomVelocity.empty())
+					{
+						odomVelocity.resize(6);
+						odomVelocity[0] = iter->first.twist.twist.linear.x;
+						odomVelocity[1] = iter->first.twist.twist.linear.y;
+						odomVelocity[2] = iter->first.twist.twist.linear.z;
+						odomVelocity[3] = iter->first.twist.twist.angular.x;
+						odomVelocity[4] = iter->first.twist.twist.angular.y;
+						odomVelocity[5] = iter->first.twist.twist.angular.z;
 					}
 
 					rtabmap_.process(interData, interOdom, covariance, odomVelocity, externalStats);
@@ -2124,6 +1977,10 @@ void CoreWrapper::process(
 				odomVelocity[4] = pitch/odomInfo.interval;
 				odomVelocity[5] = yaw/odomInfo.interval;
 			}
+		}
+		if(odomVelocity.empty())
+		{
+			odomVelocity = odomVelocityIn;
 		}
 		if(rtabmapROSStats_.size())
 		{
@@ -2843,6 +2700,7 @@ bool CoreWrapper::resetRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empt
 	rtabmap_.resetMemory();
 	covariance_ = cv::Mat();
 	lastPose_.setIdentity();
+	lastPoseVelocity_.clear();
 	lastPoseIntermediate_ = false;
 	currentMetricGoal_.setNull();
 	lastPublishedMetricGoal_.setNull();
@@ -2933,6 +2791,7 @@ bool CoreWrapper::loadDatabaseCallback(rtabmap_ros::LoadDatabase::Request& req, 
 
 	covariance_ = cv::Mat();
 	lastPose_.setIdentity();
+	lastPoseVelocity_.clear();
 	lastPoseIntermediate_ = false;
 	currentMetricGoal_.setNull();
 	lastPublishedMetricGoal_.setNull();
@@ -3058,6 +2917,7 @@ bool CoreWrapper::backupDatabaseCallback(std_srvs::Empty::Request&, std_srvs::Em
 
 	covariance_ = cv::Mat();
 	lastPose_.setIdentity();
+	lastPoseVelocity_.clear();
 	currentMetricGoal_.setNull();
 	lastPublishedMetricGoal_.setNull();
 	goalFrameId_.clear();
@@ -4129,8 +3989,8 @@ void CoreWrapper::publishStats(const ros::Time & stamp)
 			int id = rtabmap::graph::findNearestNode(nodesOnly, rtabmap_.getLastLocalizationPose());
 			if(id>0)
 			{
-				std::map<int, int> ids = rtabmap_.getMemory()->getNeighborsId(id, 0, 0, false, false, true);
-				std::map<int, int> missingIds;
+				std::map<int, int> ids = rtabmap_.getMemory()->getNeighborsId(id, 0, 0, true, false, true);
+				std::multimap<int, int> missingIds;
 				for(std::map<int, int>::iterator iter=ids.begin(); iter!=ids.end(); ++iter)
 				{
 					if(nodesToRepublish_.find(iter->first) != nodesToRepublish_.end())
@@ -4157,7 +4017,7 @@ void CoreWrapper::publishStats(const ros::Time & stamp)
 
 				int loaded = 0;
 				std::stringstream stream;
-				for(std::map<int, int>::iterator iter=missingIds.begin(); iter!=missingIds.end() && loaded<maxNodesRepublished_; ++iter)
+				for(std::multimap<int, int>::iterator iter=missingIds.begin(); iter!=missingIds.end() && loaded<maxNodesRepublished_; ++iter)
 				{
 					signatures.insert(std::make_pair(iter->second, rtabmap_.getMemory()->getNodeData(iter->second, true, true, true, true)));
 					nodesToRepublish_.erase(iter->second);
@@ -4437,9 +4297,9 @@ void CoreWrapper::publishCurrentGoal(const ros::Time & stamp)
 				goal.target_pose = poseMsg;
 
 				mbClient_->sendGoal(goal,
-						boost::bind(&CoreWrapper::goalDoneCb, this, _1, _2),
+						boost::bind(&CoreWrapper::goalDoneCb, this, boost::placeholders::_1, boost::placeholders::_2),
 						boost::bind(&CoreWrapper::goalActiveCb, this),
-						boost::bind(&CoreWrapper::goalFeedbackCb, this, _1));
+						boost::bind(&CoreWrapper::goalFeedbackCb, this, boost::placeholders::_1));
 				lastPublishedMetricGoal_ = currentMetricGoal_;
 			}
 			else

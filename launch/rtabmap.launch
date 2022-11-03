@@ -57,7 +57,8 @@
 
   <!-- if timestamps of the input topics are synchronized using approximate or exact time policy-->
   <arg     if="$(arg stereo)" name="approx_sync"  default="false"/>
-  <arg unless="$(arg stereo)" name="approx_sync"  default="$(arg depth)"/>         
+  <arg unless="$(arg stereo)" name="approx_sync"  default="$(arg depth)"/>     
+  <arg name="approx_sync_max_interval"  default="0"/> <!-- (sec) 0 means infinite interval duration (used with approx_sync=true) -->
    
   <!-- RGB-D related topics -->
   <arg name="rgb_topic"               default="/camera/rgb/image_rect_color" />
@@ -174,6 +175,7 @@
           <remap from="rgb/camera_info" to="$(arg camera_info_topic)"/>
           <remap from="rgbd_image"      to="$(arg rgbd_topic_relay)"/>
           <param name="approx_sync"     type="bool"   value="$(arg approx_rgbd_sync)"/>
+          <param name="approx_sync_max_interval" type="double" value="$(arg approx_sync_max_interval)"/>
           <param name="queue_size"      type="int"    value="$(arg queue_size)"/>
           <param name="depth_scale"     type="double" value="$(arg rgbd_depth_scale)"/>
           <param name="decimation"     type="double" value="$(arg rgbd_decimation)"/>
@@ -195,6 +197,7 @@
           <remap from="right/camera_info" to="$(arg right_camera_info_topic)"/>
           <remap from="rgbd_image"      to="$(arg rgbd_topic_relay)"/>
           <param name="approx_sync"     type="bool"   value="$(arg approx_rgbd_sync)"/>
+          <param name="approx_sync_max_interval" type="double" value="$(arg approx_sync_max_interval)"/>
           <param name="queue_size"      type="int"    value="$(arg queue_size)"/>
         </node>
       </group>
@@ -219,6 +222,7 @@
       <param name="decimation"  type="double" value="$(arg gen_cloud_decimation)"/>
       <param name="voxel_size"  type="double" value="$(arg gen_cloud_voxel)"/>
       <param name="approx_sync" type="bool"   value="false"/>
+      <param name="approx_sync_max_interval" type="double" value="$(arg approx_sync_max_interval)"/>
     </node>
 
     <!-- Visual odometry -->
@@ -242,6 +246,7 @@
           <param name="wait_for_transform_duration" type="double" value="$(arg wait_for_transform)"/>
           <param name="wait_imu_to_init"            type="bool"   value="$(arg wait_imu_to_init)"/>
           <param name="approx_sync"                 type="bool"   value="$(arg approx_sync)"/>
+          <param name="approx_sync_max_interval"    type="double" value="$(arg approx_sync_max_interval)"/>
           <param name="config_path"                 type="string" value="$(arg cfg)"/>
           <param name="queue_size"                  type="int"    value="$(arg queue_size)"/>
           <param name="subscribe_rgbd"              type="bool"   value="$(arg subscribe_rgbd)"/>
@@ -271,6 +276,7 @@
           <param name="wait_for_transform_duration" type="double" value="$(arg wait_for_transform)"/>
           <param name="wait_imu_to_init"            type="bool"   value="$(arg wait_imu_to_init)"/>
           <param name="approx_sync"                 type="bool"   value="$(arg approx_sync)"/>
+          <param name="approx_sync_max_interval"    type="double" value="$(arg approx_sync_max_interval)"/>
           <param name="config_path"                 type="string" value="$(arg cfg)"/>
           <param name="queue_size"                  type="int"    value="$(arg queue_size)"/>
           <param name="subscribe_rgbd"              type="bool"   value="$(arg subscribe_rgbd)"/>
@@ -450,6 +456,7 @@
     <param name="decimation"  type="double" value="4"/>
     <param name="voxel_size"  type="double" value="0.0"/>
     <param name="approx_sync" type="bool"   value="$(arg approx_sync)"/>
+    <param name="approx_sync_max_interval" type="double" value="$(arg approx_sync_max_interval)"/>
   </node>
 
 </launch>

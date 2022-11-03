@@ -68,12 +68,13 @@ private:
 	void goalPathCallback(const rtabmap_ros::GoalConstPtr & goalMsg, const nav_msgs::PathConstPtr & pathMsg);
 	void goalReachedCallback(const std_msgs::BoolConstPtr & value);
 
-	virtual void commonDepthCallback(
+	virtual void commonMultiCameraCallback(
 			const nav_msgs::OdometryConstPtr & odomMsg,
 			const rtabmap_ros::UserDataConstPtr & userDataMsg,
 			const std::vector<cv_bridge::CvImageConstPtr> & imageMsgs,
 			const std::vector<cv_bridge::CvImageConstPtr> & depthMsgs,
 			const std::vector<sensor_msgs::CameraInfo> & cameraInfoMsgs,
+			const std::vector<sensor_msgs::CameraInfo> & depthCameraInfoMsgs,
 			const sensor_msgs::LaserScan& scan2dMsg,
 			const sensor_msgs::PointCloud2& scan3dMsg,
 			const rtabmap_ros::OdomInfoConstPtr& odomInfoMsg,

@@ -32,9 +32,9 @@ find_package(fiducial_msgs)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
-find_package(RTABMap 0.20.18 REQUIRED)
+find_package(RTABMap 0.20.20 REQUIRED)
 
-find_package(OpenCV REQUIRED)
+find_package(OpenCV REQUIRED QUIET COMPONENTS core calib3d imgproc highgui stitching optflow photo video OPTIONAL_COMPONENTS aruco xfeatures2d nonfree gpu cudafeatures2d)
 
 IF(RTABMAP_GUI)
 FIND_PACKAGE(PCL 1.7 REQUIRED QUIET COMPONENTS common io kdtree search surface filters registration sample_consensus segmentation visualization)
@@ -122,6 +122,8 @@ add_message_files(
    GPS.msg
    Path.msg
    EnvSensor.msg
+   CameraModel.msg
+   CameraModels.msg
 )
 
 ## Generate services in the 'srv' folder
@@ -449,7 +451,10 @@ set_target_properties(rtabmap_point_cloud_assembler PROPERTIES OUTPUT_NAME "poin
 IF(rviz_FOUND)
 
     ## We also use Ogre for rviz plugins
-    include($ENV{ROS_ROOT}/core/rosbuild/FindPkgConfig.cmake)
+    # this file doesn't exist post-noetic, but pkg_check_modules still works
+    IF(EXISTS $ENV{ROS_ROOT}/core/rosbuild/FindPkgConfig.cmake)
+      include($ENV{ROS_ROOT}/core/rosbuild/FindPkgConfig.cmake)
+    ENDIF()
     pkg_check_modules(OGRE OGRE)
     include_directories( ${OGRE_INCLUDE_DIRS} )
     link_directories( ${OGRE_LIBRARY_DIRS} )
@@ -576,6 +581,7 @@ catkin_install_python(PROGRAMS
   scripts/yaml_to_camera_info.py
   scripts/netvlad_tf_ros.py
   scripts/wifi_signal_pub.py
+  scripts/gazebo_ground_truth.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
@@ -599,6 +605,7 @@ install(TARGETS
    rtabmap_rgbd_sync
    rtabmap_rgbdx_sync
    rtabmap_rgbd_relay
+   rtabmap_stereo_sync
    rtabmap_wifi_signal_sub
    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}

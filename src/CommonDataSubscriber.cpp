@@ -1011,7 +1011,7 @@ void CommonDataSubscriber::warningLoop()
 	}
 }
 
-void CommonDataSubscriber::commonSingleDepthCallback(
+void CommonDataSubscriber::commonSingleCameraCallback(
 		const nav_msgs::OdometryConstPtr & odomMsg,
 		const rtabmap_ros::UserDataConstPtr & userDataMsg,
 		const cv_bridge::CvImageConstPtr & imageMsg,
@@ -1035,54 +1035,34 @@ void CommonDataSubscriber::commonSingleDepthCallback(
 	std::vector<cv::Mat> localDescriptorsMsgs;
 	localDescriptorsMsgs.push_back(localDescriptors);
 
-	if(depthMsg.get() == 0 ||
-	   depthMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1) == 0 ||
-	   depthMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1) == 0 ||
-	   depthMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
+	std::vector<cv_bridge::CvImageConstPtr> imageMsgs;
+	std::vector<cv_bridge::CvImageConstPtr> depthMsgs;
+	std::vector<sensor_msgs::CameraInfo> cameraInfoMsgs;
+	std::vector<sensor_msgs::CameraInfo> depthCameraInfoMsgs;
+	if(imageMsg.get())
 	{
-		std::vector<cv_bridge::CvImageConstPtr> imageMsgs;
-		std::vector<cv_bridge::CvImageConstPtr> depthMsgs;
-		std::vector<sensor_msgs::CameraInfo> cameraInfoMsgs;
-		if(imageMsg.get())
-		{
-			imageMsgs.push_back(imageMsg);
-		}
-		if(depthMsg.get())
-		{
-			depthMsgs.push_back(depthMsg);
-		}
-		cameraInfoMsgs.push_back(rgbCameraInfoMsg);
-		commonDepthCallback(
-				odomMsg,
-				userDataMsg,
-				imageMsgs,
-				depthMsgs,
-				cameraInfoMsgs,
-				scanMsg,
-				scan3dMsg,
-				odomInfoMsg,
-				globalDescriptorMsgs,
-				localKeyPointsMsgs,
-				localPoints3dMsgs,
-				localDescriptorsMsgs);
+		imageMsgs.push_back(imageMsg);
 	}
-	else // assuming stereo
+	if(depthMsg.get())
 	{
-		commonStereoCallback(
-				odomMsg,
-				userDataMsg,
-				imageMsg,
-				depthMsg,
-				rgbCameraInfoMsg,
-				depthCameraInfoMsg,
-				scanMsg,
-				scan3dMsg,
-				odomInfoMsg,
-				globalDescriptorMsgs,
-				localKeyPoints,
-				localPoints3d,
-				localDescriptors);
+		depthMsgs.push_back(depthMsg);
 	}
+	cameraInfoMsgs.push_back(rgbCameraInfoMsg);
+	depthCameraInfoMsgs.push_back(depthCameraInfoMsg);
+	commonMultiCameraCallback(
+			odomMsg,
+			userDataMsg,
+			imageMsgs,
+			depthMsgs,
+			cameraInfoMsgs,
+			depthCameraInfoMsgs,
+			scanMsg,
+			scan3dMsg,
+			odomInfoMsg,
+			globalDescriptorMsgs,
+			localKeyPointsMsgs,
+			localPoints3dMsgs,
+			localDescriptorsMsgs);
 }
 
 } /* namespace rtabmap_ros */

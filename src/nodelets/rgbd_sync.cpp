@@ -92,7 +92,9 @@ private:
 
 		int queueSize = 10;
 		bool approxSync = true;
+		double approxSyncMaxInterval = 0.0;
 		pnh.param("approx_sync", approxSync, approxSync);
+		pnh.param("approx_sync_max_interval", approxSyncMaxInterval, approxSyncMaxInterval);
 		pnh.param("queue_size", queueSize, queueSize);
 		pnh.param("depth_scale", depthScale_, depthScale_);
 		pnh.param("decimation", decimation_, decimation_);
@@ -104,6 +106,8 @@ private:
 		}
 
 		NODELET_INFO("%s: approx_sync = %s", getName().c_str(), approxSync?"true":"false");
+		if(approxSync)
+			NODELET_INFO("%s: approx_sync_max_interval = %f", getName().c_str(), approxSyncMaxInterval);
 		NODELET_INFO("%s: queue_size  = %d", getName().c_str(), queueSize);
 		NODELET_INFO("%s: depth_scale = %f", getName().c_str(), depthScale_);
 		NODELET_INFO("%s: decimation = %d", getName().c_str(), decimation_);
@@ -115,12 +119,14 @@ private:
 		if(approxSync)
 		{
 			approxSyncDepth_ = new message_filters::Synchronizer<MyApproxSyncDepthPolicy>(MyApproxSyncDepthPolicy(queueSize), imageSub_, imageDepthSub_, cameraInfoSub_);
-			approxSyncDepth_->registerCallback(boost::bind(&RGBDSync::callback, this, _1, _2, _3));
+			if(approxSyncMaxInterval > 0.0)
+				approxSyncDepth_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
+			approxSyncDepth_->registerCallback(boost::bind(&RGBDSync::callback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3));
 		}
 		else
 		{
 			exactSyncDepth_ = new message_filters::Synchronizer<MyExactSyncDepthPolicy>(MyExactSyncDepthPolicy(queueSize), imageSub_, imageDepthSub_, cameraInfoSub_);
-			exactSyncDepth_->registerCallback(boost::bind(&RGBDSync::callback, this, _1, _2, _3));
+			exactSyncDepth_->registerCallback(boost::bind(&RGBDSync::callback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3));
 		}
 
 		ros::NodeHandle rgb_nh(nh, "rgb");
@@ -136,9 +142,10 @@ private:
 		imageDepthSub_.subscribe(depth_it, depth_nh.resolveName("image"), 1, hintsDepth);
 		cameraInfoSub_.subscribe(rgb_nh, "camera_info", 1);
 
-		std::string subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s \\\n   %s \\\n   %s",
+		std::string subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s \\\n   %s \\\n   %s",
 							getName().c_str(),
 							approxSync?"approx":"exact",
+							approxSync&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
 							imageSub_.getTopic().c_str(),
 							imageDepthSub_.getTopic().c_str(),
 							cameraInfoSub_.getTopic().c_str());
@@ -177,6 +184,18 @@ private:
 			double rgbStamp = image->header.stamp.toSec();
 			double depthStamp = depth->header.stamp.toSec();
 			double infoStamp = cameraInfo->header.stamp.toSec();
+
+			double stampDiff = fabs(rgbStamp - depthStamp);
+			if(stampDiff > 0.010)
+			{
+				NODELET_WARN("The time difference between rgb and depth frames is "
+						"high (diff=%fs, rgb=%fs, depth=%fs). You may want "
+						"to set approx_sync_max_interval lower than 0.01s to reject spurious bad synchronizations or use "
+						"approx_sync=false if streams have all the exact same timestamp.",
+						stampDiff,
+						rgbStamp,
+						depthStamp);
+			}
 
 			rtabmap_ros::RGBDImage msg;
 			msg.header.frame_id = cameraInfo->header.frame_id;

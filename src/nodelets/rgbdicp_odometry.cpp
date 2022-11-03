@@ -110,7 +110,9 @@ private:
 
 		bool approxSync = true;
 		bool subscribeScanCloud = false;
+		double approxSyncMaxInterval = 0.0;
 		pnh.param("approx_sync", approxSync, approxSync);
+		pnh.param("approx_sync_max_interval", approxSyncMaxInterval, approxSyncMaxInterval);
 		pnh.param("queue_size", queueSize_, queueSize_);
 		pnh.param("subscribe_scan_cloud", subscribeScanCloud, subscribeScanCloud);
 		pnh.param("scan_cloud_max_points",  scanCloudMaxPoints_, scanCloudMaxPoints_);
@@ -126,6 +128,8 @@ private:
 		pnh.param("keep_color", keepColor_, keepColor_);
 
 		NODELET_INFO("RGBDIcpOdometry: approx_sync           = %s", approxSync?"true":"false");
+		if(approxSync)
+			NODELET_INFO("RGBDIcpOdometry: approx_sync_max_interval = %f", approxSyncMaxInterval);
 		NODELET_INFO("RGBDIcpOdometry: queue_size            = %d", queueSize_);
 		NODELET_INFO("RGBDIcpOdometry: subscribe_scan_cloud  = %s", subscribeScanCloud?"true":"false");
 		NODELET_INFO("RGBDIcpOdometry: scan_cloud_max_points = %d", scanCloudMaxPoints_);
@@ -154,17 +158,20 @@ private:
 			if(approxSync)
 			{
 				approxCloudSync_ = new message_filters::Synchronizer<MyApproxCloudSyncPolicy>(MyApproxCloudSyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_, cloud_sub_);
-				approxCloudSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackCloud, this, _1, _2, _3, _4));
+				if(approxSyncMaxInterval > 0.0)
+					approxCloudSync_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
+				approxCloudSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackCloud, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 			}
 			else
 			{
 				exactCloudSync_ = new message_filters::Synchronizer<MyExactCloudSyncPolicy>(MyExactCloudSyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_, cloud_sub_);
-				exactCloudSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackCloud, this, _1, _2, _3, _4));
+				exactCloudSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackCloud, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 			}
 
-			subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s,\n   %s,\n   %s, \n   %s",
+			subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s,\n   %s,\n   %s, \n   %s",
 					getName().c_str(),
 					approxSync?"approx":"exact",
+					approxSync&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
 					image_mono_sub_.getTopic().c_str(),
 					image_depth_sub_.getTopic().c_str(),
 					info_sub_.getTopic().c_str(),
@@ -176,17 +183,20 @@ private:
 			if(approxSync)
 			{
 				approxScanSync_ = new message_filters::Synchronizer<MyApproxScanSyncPolicy>(MyApproxScanSyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_, scan_sub_);
-				approxScanSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackScan, this, _1, _2, _3, _4));
+				if(approxSyncMaxInterval > 0.0)
+					approxScanSync_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
+				approxScanSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackScan, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 			}
 			else
 			{
 				exactScanSync_ = new message_filters::Synchronizer<MyExactScanSyncPolicy>(MyExactScanSyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_, scan_sub_);
-				exactScanSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackScan, this, _1, _2, _3, _4));
+				exactScanSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackScan, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 			}
 
-			subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync):\n   %s \\\n   %s \\\n   %s \\\n   %s",
+			subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s \\\n   %s \\\n   %s \\\n   %s",
 					getName().c_str(),
 					approxSync?"approx":"exact",
+					approxSync&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
 					image_mono_sub_.getTopic().c_str(),
 					image_depth_sub_.getTopic().c_str(),
 					info_sub_.getTopic().c_str(),
@@ -275,6 +285,18 @@ private:
 			if(localTransform.isNull())
 			{
 				return;
+			}
+
+			double stampDiff = fabs(image->header.stamp.toSec() - depth->header.stamp.toSec());
+			if(stampDiff > 0.010)
+			{
+				NODELET_WARN("The time difference between rgb and depth frames is "
+						"high (diff=%fs, rgb=%fs, depth=%fs). You may want "
+						"to set approx_sync_max_interval lower than 0.01s to reject spurious bad synchronizations or use "
+						"approx_sync=false if streams have all the exact same timestamp.",
+						stampDiff,
+						image->header.stamp.toSec(),
+						depth->header.stamp.toSec());
 			}
 
 			if(image->data.size() && depth->data.size() && cameraInfo->K[4] != 0)
@@ -438,25 +460,25 @@ protected:
 		{
 			delete approxScanSync_;
 			approxScanSync_ = new message_filters::Synchronizer<MyApproxScanSyncPolicy>(MyApproxScanSyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_, scan_sub_);
-			approxScanSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackScan, this, _1, _2, _3, _4));
+			approxScanSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackScan, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 		}
 		if(exactScanSync_)
 		{
 			delete exactScanSync_;
 			exactScanSync_ = new message_filters::Synchronizer<MyExactScanSyncPolicy>(MyExactScanSyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_, scan_sub_);
-			exactScanSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackScan, this, _1, _2, _3, _4));
+			exactScanSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackScan, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 		}
 		if(approxCloudSync_)
 		{
 			delete approxCloudSync_;
 			approxCloudSync_ = new message_filters::Synchronizer<MyApproxCloudSyncPolicy>(MyApproxCloudSyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_, cloud_sub_);
-			approxCloudSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackCloud, this, _1, _2, _3, _4));
+			approxCloudSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackCloud, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 		}
 		if(exactCloudSync_)
 		{
 			delete exactCloudSync_;
 			exactCloudSync_ = new message_filters::Synchronizer<MyExactCloudSyncPolicy>(MyExactCloudSyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_, cloud_sub_);
-			exactCloudSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackCloud, this, _1, _2, _3, _4));
+			exactCloudSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackCloud, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 		}
 	}
 

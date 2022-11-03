@@ -89,6 +89,7 @@ private:
 
 		int queueSize = 10;
 		bool approxSync = true;
+		double approxSyncMaxInterval = 0.0;
 		if(private_nh.getParam("max_rate", rate_))
 		{
 			NODELET_WARN("\"max_rate\" is now known as \"rate\".");
@@ -96,21 +97,26 @@ private:
 		private_nh.param("rate", rate_, rate_);
 		private_nh.param("queue_size", queueSize, queueSize);
 		private_nh.param("approx_sync", approxSync, approxSync);
+		private_nh.param("approx_sync_max_interval", approxSyncMaxInterval, approxSyncMaxInterval);
 		private_nh.param("decimation", decimation_, decimation_);
 		ROS_ASSERT(decimation_ >= 1);
-		NODELET_INFO("Rate=%f Hz", rate_);
-		NODELET_INFO("Decimation=%d", decimation_);
-		NODELET_INFO("Approximate time sync = %s", approxSync?"true":"false");
+		NODELET_INFO("rate=%f Hz", rate_);
+		NODELET_INFO("decimation=%d", decimation_);
+		NODELET_INFO("approx_sync = %s", approxSync?"true":"false");
+		if(approxSync)
+			NODELET_INFO("approx_sync_max_interval = %f", approxSyncMaxInterval);
 
 		if(approxSync)
 		{
 			approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize), image_sub_, image_depth_sub_, info_sub_);
-			approxSync_->registerCallback(boost::bind(&DataThrottleNodelet::callback, this, _1, _2, _3));
+			if(approxSyncMaxInterval > 0.0)
+				approxSync_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
+			approxSync_->registerCallback(boost::bind(&DataThrottleNodelet::callback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3));
 		}
 		else
 		{
 			exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize), image_sub_, image_depth_sub_, info_sub_);
-			exactSync_->registerCallback(boost::bind(&DataThrottleNodelet::callback, this, _1, _2, _3));
+			exactSync_->registerCallback(boost::bind(&DataThrottleNodelet::callback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3));
 		}
 
 		image_sub_.subscribe(rgb_it, rgb_nh.resolveName("image_in"), 1, hintsRgb);
