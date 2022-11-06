@@ -141,6 +141,7 @@ void CoreWrapper::onInit()
 	mapsManager_.init(nh, pnh, getName(), true);
 
 	bool publishTf = true;
+	std::string initialPoseStr;
 	double tfDelay = 0.05; // 20 Hz
 	double tfTolerance = 0.1; // 100 ms
 	std::string odomFrameIdInit;
@@ -186,6 +187,7 @@ void CoreWrapper::onInit()
 	pnh.param("landmark_linear_variance", landmarkDefaultLinVariance_, landmarkDefaultLinVariance_);
 	pnh.param("wait_for_transform",  waitForTransform_, waitForTransform_);
 	pnh.param("wait_for_transform_duration",  waitForTransformDuration_, waitForTransformDuration_);
+	pnh.param("initial_pose",          initialPoseStr, initialPoseStr);
 	pnh.param("use_action_for_goal", useActionForGoal_, useActionForGoal_);
 	pnh.param("use_saved_map", useSavedMap_, useSavedMap_);
 	pnh.param("gen_scan",            genScan_, genScan_);
@@ -228,6 +230,7 @@ void CoreWrapper::onInit()
 				groundTruthBaseFrameId_.c_str());
 	}
 	NODELET_INFO("rtabmap: map_frame_id  = %s", mapFrameId_.c_str());
+	NODELET_INFO("rtabmap: initial_pose  = %s", initialPoseStr.c_str());
 	NODELET_INFO("rtabmap: use_action_for_goal  = %s", useActionForGoal_?"true":"false");
 	NODELET_INFO("rtabmap: tf_delay      = %f", tfDelay);
 	NODELET_INFO("rtabmap: tf_tolerance  = %f", tfTolerance);
@@ -800,6 +803,21 @@ void CoreWrapper::onInit()
 		if(updateParams)
 		{
 			rtabmap_.parseParameters(parameters_);
+		}
+	}
+
+	// Set initial pose if set
+	if(!initialPoseStr.empty())
+	{
+		Transform intialPose = Transform::fromString(initialPoseStr);
+		if(!intialPose.isNull())
+		{
+			NODELET_INFO("Setting initial pose: \"%s\"", intialPose.prettyPrint().c_str());
+			rtabmap_.setInitialPose(intialPose);
+		}
+		else
+		{
+			NODELET_ERROR("Invalid initial_pose: \"%s\"", initialPoseStr.c_str());
 		}
 	}
 

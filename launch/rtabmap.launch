@@ -26,6 +26,7 @@
   
   <!-- Localization-only mode -->
   <arg name="localization"            default="false"/>
+  <arg name="initial_pose"            default=""/>             <!-- Format: "x y z roll pitch yaw" or "x y z qx qy qz qw". Default: see "rtabmap --params | grep RGBD/StartAtOrigin" -->
   
   <!-- sim time for convenience, if playing a rosbag -->
   <arg name="use_sim_time"            default="false"/>
@@ -362,6 +363,7 @@
       <param name="odom_frame_id"        type="string" value="$(arg odom_frame_id)"/>
       <param name="odom_frame_id_init"   type="string" value="$(arg odom_frame_id_init)"/>
       <param name="publish_tf"           type="bool"   value="$(arg publish_tf_map)"/>
+      <param name="initial_pose"         type="string" value="$(arg initial_pose)"/>
       <param name="gen_scan"             type="bool"   value="$(arg gen_scan)"/>
       <param name="ground_truth_frame_id"       type="string" value="$(arg ground_truth_frame_id)"/>
       <param name="ground_truth_base_frame_id"  type="string" value="$(arg ground_truth_base_frame_id)"/>
