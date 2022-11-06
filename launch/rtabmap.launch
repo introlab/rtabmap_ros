@@ -26,7 +26,7 @@
   
   <!-- Localization-only mode -->
   <arg name="localization"            default="false"/>
-  <arg name="initial_pose"            default=""/>             <!-- Format: "x y z roll pitch yaw" or "x y z qx qy qz qw". Default: see "rtabmap --params | grep RGBD/StartAtOrigin" -->
+  <arg name="initial_pose"            default=""/>             <!-- Format: "x y z roll pitch yaw" or "x y z qx qy qz qw". Default: see "RGBD/StartAtOrigin" doc -->
   
   <!-- sim time for convenience, if playing a rosbag -->
   <arg name="use_sim_time"            default="false"/>
