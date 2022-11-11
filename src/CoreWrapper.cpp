@@ -4117,7 +4117,8 @@ void CoreWrapper::publishStats(const ros::Time & stamp)
 			nav_msgs::Path path;
 			if(pubPath)
 			{
-				path.poses.resize(stats.poses().size());
+				// Ignore pose of current location in Localization mode
+				path.poses.resize(stats.poses().size()-(rtabmap_.getMemory()->isIncremental()?0:1));
 			}
 			int oi = 0;
 			for(std::map<int, Transform>::const_iterator poseIter=stats.poses().begin();
@@ -4185,7 +4186,7 @@ void CoreWrapper::publishStats(const ros::Time & stamp)
 
 					markers.markers.push_back(marker);
 				}
-				if(pubPath)
+				if(pubPath && (rtabmap_.getMemory()->isIncremental() || poseIter->first != stats.poses().rbegin()->first))
 				{
 					rtabmap_ros::transformToPoseMsg(poseIter->second, path.poses.at(oi).pose);
 					path.poses.at(oi).header.frame_id = mapFrameId_;
