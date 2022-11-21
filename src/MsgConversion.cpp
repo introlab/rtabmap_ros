@@ -63,7 +63,7 @@ void transformToTF(const rtabmap::Transform & transform, tf2::Transform & tfTran
 	}
 	else
 	{
-		tfTransform = tf2::Transform();
+		tfTransform = tf2::Transform(tf2::Quaternion(0,0,0,0));
 	}
 }
 
@@ -91,6 +91,7 @@ void transformToGeometryMsg(const rtabmap::Transform & transform, geometry_msgs:
 	else
 	{
 		msg = geometry_msgs::msg::Transform();
+		msg.rotation.w = 0; // null
 	}
 }
 
@@ -119,6 +120,7 @@ void transformToPoseMsg(const rtabmap::Transform & transform, geometry_msgs::msg
 	else
 	{
 		msg = geometry_msgs::msg::Pose();
+		msg.orientation.w = 0; // null
 	}
 }
 

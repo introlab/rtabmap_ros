@@ -13,13 +13,14 @@
 
 #   $ ros2 launch rtabmap_ros rgbdslam_datasets.launch.py
 #   $ cd rgbd_dataset_freiburg3_long_office_household_frameid_fixed
-#   $ ros2 bag play rgbd_dataset_freiburg3_long_office_household_frameid_fixed.db3
+#   $ ros2 bag play rgbd_dataset_freiburg3_long_office_household_frameid_fixed.db3 --clock
 
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch_ros.actions import SetParameter
 
 def generate_launch_description():
 
@@ -45,6 +46,9 @@ def generate_launch_description():
 
     return LaunchDescription([
 
+        SetParameter(name='use_sim_time', value=True),
+        # 'use_sim_time' will be set on all nodes following the line above
+
         # Nodes to launch
         Node(
             package='rtabmap_ros', executable='rgbd_odometry', output='screen',
@@ -62,8 +66,8 @@ def generate_launch_description():
             parameters=parameters,
             remappings=remappings),
        
-        # /tf topic is not recognized in ROS2, create a fake tf
+        # /tf topic is missing in the converted ROS2 bag, create a fake tf
         Node(
             package='tf2_ros', executable='static_transform_publisher', output='screen',
-            arguments=['0.0', '0.0', '0.0', '-1.57', '0.0', '-1.57', 'kinect', 'openni_rgb_optical_frame']),
+            arguments=['0.0', '0.0', '0.0', '-1.57079632679', '0.0', '-1.57079632679', 'kinect', 'openni_rgb_optical_frame']),
     ])

@@ -1,32 +1,44 @@
-#!/usr/bin/env python
-import rospy
-import tf
+#!/usr/bin/env python3
+import rclpy
+from rclpy.node import Node
 from geometry_msgs.msg import TransformStamped
+from tf2_ros import TransformBroadcaster
 
-def callback(transform):
-    global br
-    global frame_id
-    global child_frame_id
-    local_frame_id = transform.header.frame_id
-    local_child_frame_id = transform.child_frame_id
-    if not local_frame_id:
-        local_frame_id = frame_id
-    if not local_child_frame_id:
-        local_child_frame_id = child_frame_id
-    br.sendTransform(
-        (transform.transform.translation.x, transform.transform.translation.y, transform.transform.translation.z),
-        (transform.transform.rotation.x, transform.transform.rotation.y, transform.transform.rotation.z, transform.transform.rotation.w),
-        transform.header.stamp,
-        child_frame_id,
-        frame_id)
+class TransformToTf(Node):
+
+    def __init__(self):
+        super().__init__('transform_to_tf')
+        
+        self.declare_parameter('frame_id', 'world')
+        self.declare_parameter('child_frame_id', 'transform')
+        self.frame_id = self.get_parameter('frame_id').get_parameter_value().string_value
+        self.child_frame_id = self.get_parameter('child_frame_id').get_parameter_value().string_value
+
+        self.tf_broadcaster = TransformBroadcaster(self)
+
+        self.subscription = self.create_subscription(
+            TransformStamped,
+            'transform',
+            self.callback,
+            1)
+        self.subscription  # prevent unused variable warning
+
+    def callback(self, t):
+        if not t.header.frame_id:
+            t.header.frame_id = self.frame_id
+        if not t.child_frame_id:
+            t.child_frame_id = self.child_frame_id
+
+        self.tf_broadcaster.sendTransform(t)
+
+
+def main(args=None):
+    rclpy.init(args=args)
+    transform_to_tf = TransformToTf()
+    rclpy.spin(transform_to_tf)
+    transform_to_tf.destroy_node()
+    rclpy.shutdown()
 
 if __name__ == "__main__":
-
-    rospy.init_node("transform_to_tf", anonymous=True)
-
-    frame_id = rospy.get_param('~frame_id', 'world')
-    child_frame_id = rospy.get_param('~child_frame_id', 'transform')
-
-    br = tf.TransformBroadcaster()
-    rospy.Subscriber("transform", TransformStamped, callback, queue_size=1)
-    rospy.spin()
+    main()
+   

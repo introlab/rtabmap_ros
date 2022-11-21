@@ -17,10 +17,12 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(ament_cmake_python REQUIRED)
 find_package(builtin_interfaces REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_components REQUIRED)
+find_package(rclpy REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
@@ -684,6 +686,13 @@ ENDIF(rviz_default_plugins_FOUND)
 #  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 #)
 
+# Install Python executables
+install(PROGRAMS
+  scripts/transform_to_tf.py
+  scripts/yaml_to_camera_info.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 ## Mark executables and/or libraries for installation
 install(TARGETS 
    rtabmap_sync
@@ -747,6 +756,7 @@ install(DIRECTORY include/${PROJECT_NAME}/
 #)
 install(DIRECTORY 
    launch/ros2/.
+   launch/calibration
 #   launch/data
 #   launch/demo
    DESTINATION share/${PROJECT_NAME}/launch
