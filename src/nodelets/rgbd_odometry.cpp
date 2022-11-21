@@ -557,11 +557,11 @@ private:
 			infoMsgs.push_back(*cameraInfo);
 
 			double stampDiff = fabs(image->header.stamp.toSec() - depth->header.stamp.toSec());
-			if(stampDiff > 0.010)
+			if(stampDiff > 0.020)
 			{
 				NODELET_WARN("The time difference between rgb and depth frames is "
 						"high (diff=%fs, rgb=%fs, depth=%fs). You may want "
-						"to set approx_sync_max_interval lower than 0.01s to reject spurious bad synchronizations or use "
+						"to set approx_sync_max_interval lower than 0.02s to reject spurious bad synchronizations or use "
 						"approx_sync=false if streams have all the exact same timestamp.",
 						stampDiff,
 						image->header.stamp.toSec(),
