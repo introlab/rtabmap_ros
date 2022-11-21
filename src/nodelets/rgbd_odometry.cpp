@@ -503,11 +503,11 @@ void RGBDOdometry::callback(
 		infoMsgs.push_back(*cameraInfo);
 
 		double stampDiff = fabs(timestampFromROS(image->header.stamp) - timestampFromROS(depth->header.stamp));
-		if(stampDiff > 0.010)
+		if(stampDiff > 0.020)
 		{
 			RCLCPP_WARN(this->get_logger(), "The time difference between rgb and depth frames is "
 					"high (diff=%fs, rgb=%fs, depth=%fs). You may want "
-					"to set approx_sync_max_interval lower than 0.01s to reject spurious bad synchronizations or use "
+					"to set approx_sync_max_interval lower than 0.02s to reject spurious bad synchronizations or use "
 					"approx_sync=false if streams have all the exact same timestamp.",
 					stampDiff,
 					timestampFromROS(image->header.stamp),
