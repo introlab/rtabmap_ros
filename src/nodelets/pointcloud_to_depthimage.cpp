@@ -65,6 +65,8 @@ public:
 		fillHolesError_(0.1),
 		fillIterations_(1),
 		decimation_(1),
+		upscale_(false),
+		upscaleDepthErrorRatio_(0.02),
 		approxSync_(0),
 		exactSync_(0)
 			{}
@@ -100,6 +102,8 @@ private:
 		pnh.param("fill_iterations", fillIterations_, fillIterations_);
 		pnh.param("decimation", decimation_, decimation_);
 		pnh.param("approx", approx, approx);
+		pnh.param("upscale", upscale_, upscale_);
+		pnh.param("upscale_depth_error_ratio", upscaleDepthErrorRatio_, upscaleDepthErrorRatio_);
 
 		if(fixedFrameId_.empty() && approx)
 		{
@@ -118,6 +122,7 @@ private:
 		ROS_INFO("  fill_holes_error=%f", fillHolesError_);
 		ROS_INFO("  fill_iterations=%d", fillIterations_);
 		ROS_INFO("  decimation=%d", decimation_);
+		ROS_INFO("  upscale=%s (upscale_depth_error_ratio=%f)", upscale_?"true":"false", upscaleDepthErrorRatio_);
 
 		image_transport::ImageTransport it(nh);
 		depthImage16Pub_ = it.advertise("image_raw", 1); // 16 bits unsigned in mm
@@ -239,6 +244,11 @@ private:
 
 			depthImage.header = cameraInfoMsg->header;
 
+			if(decimation_>1 && upscale_)
+			{
+				depthImage.image = rtabmap::util2d::interpolate(depthImage.image, decimation_, upscaleDepthErrorRatio_);
+			}
+
 			if(depthImage32Pub_.getNumSubscribers())
 			{
 				depthImage.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
@@ -288,6 +298,8 @@ private:
 	double fillHolesError_;
 	int fillIterations_;
 	int decimation_;
+	bool upscale_;
+	double upscaleDepthErrorRatio_;
 
 	typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::PointCloud2, sensor_msgs::CameraInfo> MyApproxSyncPolicy;
 	message_filters::Synchronizer<MyApproxSyncPolicy> * approxSync_;
