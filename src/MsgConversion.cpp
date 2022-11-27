@@ -1856,7 +1856,7 @@ bool convertRGBDMsgs(
 		}
 	}
 
-	if(isDepth)
+	if(isDepth && !depthMsgs.empty())
 	{
 		UASSERT_MSG(
 				imageWidth/depthWidth == imageHeight/depthHeight,
