@@ -173,7 +173,6 @@ void PointCloudXYZ::callback(
 		rclcpp::Time time = now();
 
 		cv_bridge::CvImageConstPtr imageDepthPtr = cv_bridge::toCvShare(depthMsg);
-		cv::Rect roi = rtabmap::util2d::computeRoi(imageDepthPtr->image, roiRatios_);
 
 		rtabmap::CameraModel model = cameraModelFromROS(*cameraInfo);
 

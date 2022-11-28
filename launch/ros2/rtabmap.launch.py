@@ -262,6 +262,7 @@ def launch_setup(context, *args, **kwargs):
                 "map_frame_id": LaunchConfiguration('map_frame_id'),
                 "odom_frame_id": LaunchConfiguration('odom_frame_id').perform(context),
                 "publish_tf": LaunchConfiguration('publish_tf_map'),
+                "initial_pose": LaunchConfiguration('initial_pose'),
                 "ground_truth_frame_id": LaunchConfiguration('ground_truth_frame_id').perform(context),
                 "ground_truth_base_frame_id": LaunchConfiguration('ground_truth_base_frame_id').perform(context),
                 "odom_tf_angular_variance": LaunchConfiguration('odom_tf_angular_variance'),
@@ -404,6 +405,7 @@ def generate_launch_description():
         DeclareLaunchArgument('rtabmap_args',   default_value='',                   description='Backward compatibility, use "args" instead.'),
         DeclareLaunchArgument('launch_prefix',  default_value='',                   description='For debugging purpose, it fills prefix tag of the nodes, e.g., "xterm -e gdb -ex run --args"'),
         DeclareLaunchArgument('output',         default_value='screen',             description='Control node output (screen or log).'),
+        DeclareLaunchArgument('initial_pose',   default_value='',                   description='Set an initial pose (only in localization mode). Format: "x y z roll pitch yaw" or "x y z qx qy qz qw". Default: see "RGBD/StartAtOrigin" doc'),
         
         DeclareLaunchArgument('ground_truth_frame_id',      default_value='', description='e.g., "world"'),
         DeclareLaunchArgument('ground_truth_base_frame_id', default_value='', description='e.g., "tracker", a fake frame matching the frame "frame_id" (but on different TF tree)'),

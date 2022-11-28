@@ -40,11 +40,14 @@
 
     <arg name="frame_id"      default="os_sensor"/>
     <arg name="rtabmapviz"    default="true"/>
+    <arg name="deskewing"     default="true"/>
+    <arg name="slerp"         default="false"/>
     <arg name="scan_20_hz"    default="true"/>
     <arg name="voxel_size"    default="0.15"/>           <!-- indoor: 0.1 to 0.3, outdoor: 0.3 to 0.5 --> 
     <arg name="assemble"      default="false"/>
     <arg name="ptp"           default="false"/>          <!-- See comments in header to start before launching the launch -->
-    <arg name="distortion_correction"  default="false"/> <!-- Requires this pull request: https://github.com/ouster-lidar/ouster_example/pull/245 -->
+    <arg name="imu_topic"     default="/os_cloud_node/imu"/>
+    <arg name="scan_topic"    default="/os_cloud_node/points"/>
     
     <param if="$(arg use_sim_time)" name="use_sim_time" value="true"/>
     
@@ -56,13 +59,12 @@
       <arg     if="$(arg scan_20_hz)" name="lidar_mode" value="1024x20"/>
       <arg unless="$(arg scan_20_hz)" name="lidar_mode" value="1024x10"/>
       <arg if="$(arg ptp)" name="timestamp_mode" value="TIME_FROM_PTP_1588"/>
-      <arg if="$(arg distortion_correction)" name="fixed_frame_id" value="$(arg frame_id)_stabilized"/>
     </include>
 
     <!-- IMU orientation estimation and publish tf accordingly to os_sensor frame -->
     <node pkg="nodelet" type="nodelet" name="imu_nodelet_manager" args="manager">
-      <remap from="imu/data_raw" to="/os_cloud_node/imu"/>
-      <remap from="imu/data" to="/os_cloud_node/imu/data"/>
+      <remap from="imu/data_raw" to="$(arg imu_topic)"/>
+      <remap from="imu/data" to="$(arg imu_topic)/filtered"/>
     </node>
     <node pkg="nodelet" type="nodelet" name="imu_filter" args="load imu_filter_madgwick/ImuFilterNodelet imu_nodelet_manager">
       <param name="use_mag" value="false"/>
@@ -70,15 +72,26 @@
       <param name="publish_tf" value="false"/>
     </node>
     <node pkg="nodelet" type="nodelet" name="imu_to_tf" args="load rtabmap_ros/imu_to_tf imu_nodelet_manager">
-      <remap from="imu/data" to="/os_cloud_node/imu/data"/>
+      <remap from="imu/data" to="$(arg imu_topic)/filtered"/>
       <param name="fixed_frame_id" value="$(arg frame_id)_stabilized"/>
       <param name="base_frame_id" value="$(arg frame_id)"/>
     </node> 
+    
+    <!-- Lidar Deskewing -->
+    <node if="$(arg deskewing)" pkg="nodelet" type="nodelet" name="lidar_deskewing" args="standalone rtabmap_ros/lidar_deskewing" output="screen">
+      <param name="wait_for_transform" value="0.01"/>
+      <param name="fixed_frame_id" value="$(arg frame_id)_stabilized"/>
+      <param name="slerp" value="$(arg slerp)"/>
+      <remap from="input_cloud" to="$(arg scan_topic)"/>
+    </node>
+
+    <arg     if="$(arg deskewing)" name="scan_topic_deskewed" default="$(arg scan_topic)/deskewed"/>
+    <arg unless="$(arg deskewing)" name="scan_topic_deskewed" default="$(arg scan_topic)"/>
 
     <group ns="rtabmap">
       <node pkg="rtabmap_ros" type="icp_odometry" name="icp_odometry" output="screen">
-        <remap from="scan_cloud" to="/os_cloud_node/points"/>
-        <remap from="imu"        to="/os_cloud_node/imu/data"/>
+        <remap from="scan_cloud" to="$(arg scan_topic_deskewed)"/>
+        <remap from="imu"        to="$(arg imu_topic)/filtered"/>
         <param name="frame_id"        type="string" value="$(arg frame_id)"/>  
         <param name="odom_frame_id"   type="string" value="odom"/>
         <param     if="$(arg scan_20_hz)" name="expected_update_rate" type="double" value="25"/>
@@ -116,8 +129,8 @@
         <param name="approx_sync"          type="bool" value="false"/>
         
         <remap     if="$(arg assemble)" from="scan_cloud" to="assembled_cloud"/>
-        <remap unless="$(arg assemble)" from="scan_cloud" to="/os_cloud_node/points"/>
-        <remap from="imu"        to="/os_cloud_node/imu/data"/>
+        <remap unless="$(arg assemble)" from="scan_cloud" to="$(arg scan_topic_deskewed)"/>
+        <remap from="imu"        to="$(arg imu_topic)/filtered"/>
      
         <!-- RTAB-Map's parameters -->
         <param     if="$(arg assemble)" name="Rtabmap/DetectionRate" type="string" value="0"/> <!-- already set 1 Hz in point_cloud_assembler -->
@@ -158,7 +171,7 @@
       </node>
       
       <node if="$(arg assemble)" pkg="rtabmap_ros" type="point_cloud_assembler" name="point_cloud_assembler" output="screen">
-        <remap from="cloud"           to="/os_cloud_node/points"/>
+        <remap from="cloud" to="$(arg scan_topic_deskewed)"/>
         <remap from="odom"            to="odom"/>
         <param name="assembling_time" type="double" value="1" />
         <param name="fixed_frame_id"  type="string" value="" />
@@ -170,7 +183,7 @@
         <param name="subscribe_odom_info" type="bool" value="true"/>
         <param name="subscribe_scan_cloud" type="bool" value="true"/>
         <param name="approx_sync" type="bool" value="false"/>
-        <remap from="scan_cloud" to="/os_cloud_node/points"/>
+        <remap from="scan_cloud" to="odom_filtered_input_scan"/>
       </node>
   </group>
 

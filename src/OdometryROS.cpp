@@ -383,6 +383,15 @@ void OdometryROS::startWarningThread(const std::string & subscribedTopicsMsg, bo
 	});
 }
 
+rtabmap::Transform OdometryROS::velocityGuess() const
+{
+	if(odometry_)
+	{
+		return odometry_->getVelocityGuess();
+	}
+	return rtabmap::Transform();
+}
+
 void OdometryROS::callbackIMU(const sensor_msgs::msg::Imu::SharedPtr msg)
 {
 	if(!this->isPaused())

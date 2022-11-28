@@ -403,8 +403,6 @@ private:
 	bool alreadyRectifiedImages_;
 	bool twoDMapping_;
 	rclcpp::Time previousStamp_;
-	std::set<int> nodesToRepublish_;
-	int maxNodesRepublished_;
 };
 
 }

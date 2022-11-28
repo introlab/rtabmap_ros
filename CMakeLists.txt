@@ -59,7 +59,7 @@ find_package(octomap_msgs)
 #find_package(fiducial_msgs)
 
 ## System dependencies are found with CMake's conventions
-find_package(RTABMap 0.20.20 REQUIRED)
+find_package(RTABMap 0.20.22 REQUIRED)
 find_package(Boost REQUIRED COMPONENTS system) # dependencies from PCL
 find_package(PCL 1.7 REQUIRED COMPONENTS kdtree) #This crashes idl generation if all components are found?! see https://github.com/ros2/rosidl/issues/402#issuecomment-565586908
 
@@ -296,6 +296,7 @@ SET(rtabmap_plugins_lib_src
     src/nodelets/stereo_sync.cpp 
     src/nodelets/rgb_sync.cpp 
     src/nodelets/rgbd_relay.cpp
+    src/nodelets/lidar_deskewing.cpp
 )
 
 # If octomap is found, add definition
@@ -455,7 +456,7 @@ set_target_properties(rtabmap_point_cloud_aggregator PROPERTIES OUTPUT_NAME "poi
 
 add_executable(rtabmap_point_cloud_assembler src/PointCloudAssemblerNode.cpp)
 ament_target_dependencies(rtabmap_point_cloud_assembler ${Libraries})
-target_link_libraries(rtabmap_point_cloud_assembler rtabmap_plugins ${RTABMap_LIBRARIES})
+target_link_libraries(rtabmap_point_cloud_assembler rtabmap_plugins)
 set_target_properties(rtabmap_point_cloud_assembler PROPERTIES OUTPUT_NAME "point_cloud_assembler")
 
 #add_executable(rtabmap_map_optimizer src/MapOptimizerNode.cpp)
@@ -470,9 +471,16 @@ set_target_properties(rtabmap_point_cloud_assembler PROPERTIES OUTPUT_NAME "poin
 #ament_target_dependencies(rtabmap_imu_to_tf ${Libraries})
 #set_target_properties(rtabmap_imu_to_tf PROPERTIES OUTPUT_NAME "imu_to_tf")
 
+add_executable(rtabmap_lidar_deskewing src/LidarDeskewingNode.cpp)
+ament_target_dependencies(rtabmap_lidar_deskewing ${Libraries})
+target_link_libraries(rtabmap_lidar_deskewing rtabmap_plugins ${RTABMap_LIBRARIES})
+set_target_properties(rtabmap_lidar_deskewing PROPERTIES OUTPUT_NAME "lidar_deskewing")
+
+#IF(NOT WIN32)
 #add_executable(rtabmap_wifi_signal_pub src/WifiSignalPubNode.cpp)
 #ament_target_dependencies(rtabmap_wifi_signal_pub rtabmap_common)
 #set_target_properties(rtabmap_wifi_signal_pub PROPERTIES OUTPUT_NAME "wifi_signal_pub")
+#ENDIF(NOT WIN32)
 #add_executable(rtabmap_wifi_signal_sub src/WifiSignalSubNode.cpp)
 #ament_target_dependencies(rtabmap_wifi_signal_sub rtabmap_common)
 #set_target_properties(rtabmap_wifi_signal_sub PROPERTIES OUTPUT_NAME "wifi_signal_sub")

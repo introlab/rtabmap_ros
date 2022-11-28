@@ -48,6 +48,8 @@ PointCloudToDepthImage::PointCloudToDepthImage(const rclcpp::NodeOptions & optio
 		fillHolesError_(0.1),
 		fillIterations_(1),
 		decimation_(1),
+		upscale_(false),
+		upscaleDepthErrorRatio_(0.02),
 		approxSync_(0),
 		exactSync_(0)
 {
@@ -71,6 +73,8 @@ PointCloudToDepthImage::PointCloudToDepthImage(const rclcpp::NodeOptions & optio
 	fillIterations_ = this->declare_parameter("fill_iterations", fillIterations_);
 	decimation_ = this->declare_parameter("decimation", decimation_);
 	approx = this->declare_parameter("approx", approx);
+	upscale_ = this->declare_parameter("upscale", upscale_);
+	upscaleDepthErrorRatio_ = this->declare_parameter("upscale_depth_error_ratio", upscaleDepthErrorRatio_);
 
 	if(fixedFrameId_.empty() && approx)
 	{
@@ -89,6 +93,7 @@ PointCloudToDepthImage::PointCloudToDepthImage(const rclcpp::NodeOptions & optio
 	RCLCPP_INFO(this->get_logger(), "  fill_holes_error=%f", fillHolesError_);
 	RCLCPP_INFO(this->get_logger(), "  fill_iterations=%d", fillIterations_);
 	RCLCPP_INFO(this->get_logger(), "  decimation=%d", decimation_);
+	RCLCPP_INFO(this->get_logger(), "  upscale=%s (upscale_depth_error_ratio=%f)", upscale_?"true":"false", upscaleDepthErrorRatio_);
 
 	auto node = rclcpp::Node::make_shared(this->get_name());
 	image_transport::ImageTransport it(node);
@@ -216,6 +221,11 @@ void PointCloudToDepthImage::callback(
 		}
 
 		depthImage.header = cameraInfoMsg->header;
+
+		if(decimation_>1 && upscale_)
+		{
+			depthImage.image = rtabmap::util2d::interpolate(depthImage.image, decimation_, upscaleDepthErrorRatio_);
+		}
 
 		if(depthImage32Pub_.getNumSubscribers())
 		{

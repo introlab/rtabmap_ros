@@ -12,11 +12,18 @@
          Note: carter_2dnav package can be copied to your catkin_ws from:
             $ cp -r ~/.local/share/ov/pkg/isaac_sim-2021.2.0/ros_workspace/src/* ~/catkin_ws/src/.
 
+       Isaac Sim 2021:
          For Lidar 3D Mode (lidar3d:=true), make sure in isaac sim that Carter robot is set with VLP16-like parameters (16 rings):
             Under World -> Carter_ROS -> chassis_link -> carter_lidar -> highLod = True
                                                                       -> verticalFov = 32
                                                                       -> verticalResolution = 2
                                                       -> ROS_lidar    -> pointCloudEnabled = True
+                                                      
+       Isaac Sim 2022 (Action Graph):
+         To enable all camera streams (right, depth left and depth right):
+           1. Stage view -> World-> Carter_ROS, right-click on ROS_Cameras -> Open graph
+           2. For all Branch nodes (green/red icon), select them, then check Compute Node -> Inputs -> Condition checkbox.
+         3D LIDAR: TODO: didn't find how to enable/publish it.
     -->
 
     <param name="use_sim_time" value="true" />
@@ -27,6 +34,7 @@
     <arg name="lidar3d_grid3d"      default="true" />
 
     <arg name="camera"              default="true" />
+    <arg name="stereo"              default="false" /> <!-- RGB-D mode by default -->
 
     <!-- Load Robot Description -->
     <arg name="model" default="$(find carter_description)/urdf/carter.urdf"/>
@@ -46,7 +54,8 @@
         <arg name="localization"      value="$(arg localization)"/>
         <arg     if="$(arg lidar3d)" name="subscribe_scan_cloud" value="true"/>
         <arg unless="$(arg lidar3d)" name="subscribe_scan" value="true"/>
-        <arg name="depth"             value="$(arg camera)"/>
+        <arg name="stereo"            value="$(eval camera and stereo)"/>
+        <arg name="depth"             value="$(eval camera and not stereo)"/>
         <arg name="subscribe_rgb"     value="$(arg camera)"/>
         <arg name="visual_odometry"   value="false"/>
         <arg name="odom_topic"        value="/odom"/>
@@ -54,6 +63,10 @@
         <arg name="depth_topic"       value="/depth_left"/>
         <arg name="rgb_topic"         value="/rgb_left"/>
         <arg name="camera_info_topic" value="/camera_info_left"/>
+        <arg name="left_image_topic"        value="/rgb_left"/>
+        <arg name="left_camera_info_topic"  value="/camera_info_left"/>
+        <arg name="right_image_topic"       value="/rgb_right"/>
+        <arg name="right_camera_info_topic" value="/camera_info_right"/>
         <arg name="scan_topic"        value="/scan"/>
         <arg name="scan_cloud_topic"  value="/point_cloud"/>
         <arg name="rgbd_sync"         value="true"/>

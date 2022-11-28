@@ -126,8 +126,7 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 		mappingAltitudeDelta_(Parameters::defaultGridGlobalAltitudeDelta()),
 		alreadyRectifiedImages_(Parameters::defaultRtabmapImagesAlreadyRectified()),
 		twoDMapping_(Parameters::defaultRegForce3DoF()),
-		previousStamp_(0),
-		maxNodesRepublished_(2)
+		previousStamp_(0)
 {
 	char * rosHomePath = getenv("ROS_HOME");
 	std::string workingDir = rosHomePath?rosHomePath:UDirectory::homeDir()+"/.ros";
@@ -145,6 +144,7 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 	tfBroadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
 
 	bool publishTf = true;
+	std::string initialPoseStr;
 	tfDelay = 0.05; // 20 Hz
 	tfTolerance = 0.1; // 100 ms
 	std::string odomFrameIdInit;
@@ -183,9 +183,9 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 	landmarkDefaultLinVariance_ = this->declare_parameter("landmark_linear_variance", landmarkDefaultLinVariance_);
 
 	waitForTransform_ = this->declare_parameter("wait_for_transform", waitForTransform_);
+	initialPoseStr = this->declare_parameter("initial_pose", initialPoseStr);
 	useActionForGoal_ = this->declare_parameter("use_action_for_goal", useActionForGoal_);
 	useSavedMap_ = this->declare_parameter("use_saved_map", useSavedMap_);
-	maxNodesRepublished_ = this->declare_parameter("max_nodes_republished", maxNodesRepublished_);
 	genScan_ = this->declare_parameter("gen_scan", genScan_);
 	genScanMaxDepth_ = this->declare_parameter("gen_scan_max_depth", genScanMaxDepth_);
 	genScanMinDepth_ = this->declare_parameter("gen_scan_min_depth", genScanMinDepth_);
@@ -211,6 +211,7 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 				groundTruthBaseFrameId_.c_str());
 	}
 	RCLCPP_INFO(this->get_logger(), "rtabmap: map_frame_id  = %s", mapFrameId_.c_str());
+	RCLCPP_INFO(this->get_logger(), "rtabmap: initial_pose  = %s", initialPoseStr.c_str());
 	RCLCPP_INFO(this->get_logger(), "rtabmap: use_action_for_goal  = %s", useActionForGoal_?"true":"false");
 	RCLCPP_INFO(this->get_logger(), "rtabmap: tf_delay      = %f", tfDelay);
 	RCLCPP_INFO(this->get_logger(), "rtabmap: tf_tolerance  = %f", tfTolerance);
@@ -762,6 +763,21 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 		if(updateParams)
 		{
 			rtabmap_.parseParameters(parameters_);
+		}
+	}
+
+	// Set initial pose if set
+	if(!initialPoseStr.empty())
+	{
+		Transform intialPose = Transform::fromString(initialPoseStr);
+		if(!intialPose.isNull())
+		{
+			RCLCPP_INFO(this->get_logger(), "Setting initial pose: \"%s\"", intialPose.prettyPrint().c_str());
+			rtabmap_.setInitialPose(intialPose);
+		}
+		else
+		{
+			RCLCPP_ERROR(this->get_logger(), "Invalid initial_pose: \"%s\"", initialPoseStr.c_str());
 		}
 	}
 
@@ -2361,22 +2377,7 @@ void CoreWrapper::imuAsyncCallback(const sensor_msgs::msg::Imu::SharedPtr msg)
 
 void CoreWrapper::republishNodeDataCallback(const std_msgs::msg::Int32MultiArray::ConstSharedPtr msg)
 {
-	if(maxNodesRepublished_>0)
-	{
-		nodesToRepublish_.insert(msg->data.begin(), msg->data.end());
-	}
-	else
-	{
-		static bool warned = false;
-		if(!warned)
-		{
-			RCLCPP_WARN(get_logger(), "A node is requesting some node data "
-					"to be republished after the next update, "
-					"but parameter \"max_nodes_republished\" is not over 0, "
-					"ignoring the call. This warning is only printed once.");
-			warned = true;
-		}
-	}
+	rtabmap_.addNodesToRepublish(msg->data);
 }
 
 void CoreWrapper::interOdomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
@@ -2681,7 +2682,6 @@ void CoreWrapper::resetRtabmapCallback(
 	mapToOdomMutex_.lock();
 	mapToOdom_.setIdentity();
 	mapToOdomMutex_.unlock();
-	nodesToRepublish_.clear();
 }
 
 void CoreWrapper::pauseRtabmapCallback(
@@ -2775,7 +2775,6 @@ void CoreWrapper::loadDatabaseCallback(
 	mapToOdomMutex_.lock();
 	mapToOdom_.setIdentity();
 	mapToOdomMutex_.unlock();
-	nodesToRepublish_.clear();
 
 	// Open new database
 	databasePath_ = newDatabasePath;
@@ -2893,7 +2892,6 @@ void CoreWrapper::backupDatabaseCallback(
 	globalPose_.header.stamp = rclcpp::Time(0);
 	gps_ = rtabmap::GPS();
 	tags_.clear();
-	nodesToRepublish_.clear();
 
 	RCLCPP_INFO(this->get_logger(), "Backup: Saving \"%s\" to \"%s\"...", databasePath_.c_str(), (databasePath_+".back").c_str());
 	UFile::copy(databasePath_, databasePath_+".back");
@@ -3957,67 +3955,10 @@ void CoreWrapper::publishStats(const rclcpp::Time & stamp)
 		msg->header.stamp = stamp;
 		msg->header.frame_id = mapFrameId_;
 
-		std::map<int, Signature> signatures;
-		if(stats.getLastSignatureData().id() > 0)
-		{
-			signatures.insert(std::make_pair(stats.getLastSignatureData().id(), stats.getLastSignatureData()));
-		}
-
-		if(nodesToRepublish_.size() && !rtabmap_.getLastLocalizationPose().isNull())
-		{
-			// Republish data from closest nodes of the current localization
-			std::map<int, Transform> nodesOnly(rtabmap_.getLocalOptimizedPoses().lower_bound(1), rtabmap_.getLocalOptimizedPoses().end());
-			int id = rtabmap::graph::findNearestNode(nodesOnly, rtabmap_.getLastLocalizationPose());
-			if(id>0)
-			{
-				std::map<int, int> ids = rtabmap_.getMemory()->getNeighborsId(id, 0, 0, true, false, true);
-				std::multimap<int, int> missingIds;
-				for(std::map<int, int>::iterator iter=ids.begin(); iter!=ids.end(); ++iter)
-				{
-					if(nodesToRepublish_.find(iter->first) != nodesToRepublish_.end())
-					{
-						missingIds.insert(std::make_pair(iter->second, iter->first));
-					}
-				}
-
-				if(nodesToRepublish_.size() != missingIds.size())
-				{
-					// remove requested nodes not anymore in the graph
-					for(std::set<int>::iterator iter=nodesToRepublish_.begin(); iter!=nodesToRepublish_.end();)
-					{
-						if(ids.find(*iter) == ids.end())
-						{
-							iter = nodesToRepublish_.erase(iter);
-						}
-						else
-						{
-							++iter;
-						}
-					}
-				}
-
-				int loaded = 0;
-				std::stringstream stream;
-				for(std::multimap<int, int>::iterator iter=missingIds.begin(); iter!=missingIds.end() && loaded<maxNodesRepublished_; ++iter)
-				{
-					signatures.insert(std::make_pair(iter->second, rtabmap_.getMemory()->getNodeData(iter->second, true, true, true, true)));
-					nodesToRepublish_.erase(iter->second);
-					++loaded;
-					stream << iter->second << " ";
-				}
-				if(loaded)
-				{
-					RCLCPP_WARN(get_logger(), "Republishing data of requested node(s) %sfrom \"%s\" input topic (max_nodes_republished=%d)",
-							stream.str().c_str(),
-							republishNodeDataSub_->get_topic_name(),
-							maxNodesRepublished_);
-				}
-			}
-		}
 		rtabmap_ros::mapDataToROS(
 			stats.poses(),
 			stats.constraints(),
-			signatures,
+			stats.getSignaturesData(),
 			stats.mapCorrection(),
 			*msg);
 
@@ -4157,7 +4098,8 @@ void CoreWrapper::publishStats(const rclcpp::Time & stamp)
 			nav_msgs::msg::Path path;
 			if(pubPath)
 			{
-				path.poses.resize(stats.poses().size());
+				// Ignore pose of current location in Localization mode
+				path.poses.resize(stats.poses().size()-(rtabmap_.getMemory()->isIncremental()?0:1));
 			}
 			int oi = 0;
 			for(std::map<int, Transform>::const_iterator poseIter=stats.poses().begin();
@@ -4225,7 +4167,7 @@ void CoreWrapper::publishStats(const rclcpp::Time & stamp)
 
 					markers.markers.push_back(marker);
 				}
-				if(pubPath)
+				if(pubPath && (rtabmap_.getMemory()->isIncremental() || poseIter->first != stats.poses().rbegin()->first))
 				{
 					rtabmap_ros::transformToPoseMsg(poseIter->second, path.poses.at(oi).pose);
 					path.poses.at(oi).header.frame_id = mapFrameId_;

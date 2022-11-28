@@ -72,6 +72,8 @@ private:
 	double fillHolesError_;
 	int fillIterations_;
 	int decimation_;
+	bool upscale_;
+	double upscaleDepthErrorRatio_;
 
 	typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::msg::PointCloud2, sensor_msgs::msg::CameraInfo> MyApproxSyncPolicy;
 	message_filters::Synchronizer<MyApproxSyncPolicy> * approxSync_;

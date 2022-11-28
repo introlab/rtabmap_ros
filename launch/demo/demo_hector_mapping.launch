@@ -69,6 +69,7 @@
      <remap from="odom_info"      to="/rtabmap/odom_info"/>
 	  
      <param name="frame_id"        type="string" value="base_footprint"/>
+     <param name="deskewing"       type="string" value="true"/>
 
      <param if="$(arg odom_guess)" name="odom_frame_id"   type="string" value="icp_odom"/>
      <param if="$(arg odom_guess)" name="guess_frame_id"  type="string" value="odom"/>

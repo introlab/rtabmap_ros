@@ -26,6 +26,7 @@
   
   <!-- Localization-only mode -->
   <arg name="localization"            default="false"/>
+  <arg name="initial_pose"            default=""/>             <!-- Format: "x y z roll pitch yaw" or "x y z qx qy qz qw". Default: see "RGBD/StartAtOrigin" doc -->
   
   <!-- sim time for convenience, if playing a rosbag -->
   <arg name="use_sim_time"            default="false"/>
@@ -96,8 +97,10 @@
   <arg name="scan_cloud_topic"        default="/scan_cloud"/>
   <arg name="subscribe_scan_descriptor" default="false"/>
   <arg name="scan_descriptor_topic"   default="/scan_descriptor"/>
+  <arg name="scan_deskewing"          default="false"/>
+  <arg name="scan_deskewing_slerp"    default="false"/>
   <arg name="scan_cloud_max_points"   default="0"/>
-  <arg name="scan_cloud_filtered"     default="false"/> <!-- use filtered cloud from icp_odometry for mapping -->
+  <arg name="scan_cloud_filtered"     default="$(arg scan_deskewing)"/> <!-- use filtered cloud from icp_odometry for mapping -->
   <arg name="gen_scan"                default="false"/> <!-- only works with depth image and if not subscribing to scan topic-->
   
   <arg name="gen_depth"                  default="false" /> <!-- Generate depth image from scan_cloud -->
@@ -312,6 +315,17 @@
       <param name="scan_cloud_max_points"       type="int"    value="$(arg scan_cloud_max_points)"/>
       <param name="expected_update_rate"        type="double" value="$(arg odom_expected_rate)"/>
       <param name="max_update_rate"             type="double" value="$(arg odom_max_rate)"/>
+      <param name="deskewing"                   type="bool"   value="$(arg scan_deskewing)"/>
+      <param name="deskewing_slerp"             type="bool"   value="$(arg scan_deskewing_slerp)"/>
+    </node>
+    
+    <node if="$(eval not icp_odometry and scan_deskewing and subscribe_scan_cloud)" pkg="rtabmap_ros" type="lidar_deskewing" name="lidar_deskewing" clear_params="$(arg clear_params)" output="$(arg output)">
+      <param name="wait_for_transform" value="$(arg wait_for_transform)"/>
+      <param     if="$(arg visual_odometry)" name="fixed_frame_id" value="$(arg vo_frame_id)"/>
+      <param unless="$(arg visual_odometry)" name="fixed_frame_id" value="$(arg odom_frame_id)"/>
+      <param name="slerp" value="$(arg scan_deskewing_slerp)"/>
+      <remap from="input_cloud" to="$(arg scan_cloud_topic)"/>
+      <remap from="$(arg scan_cloud_topic)/deskewed" to="odom_filtered_input_scan"/>
     </node>
     
     <node if="$(arg scan_cloud_assembling)" pkg="rtabmap_ros" type="point_cloud_assembler" name="point_cloud_assembler" clear_params="$(arg clear_params)" output="$(arg output)">
@@ -349,6 +363,7 @@
       <param name="odom_frame_id"        type="string" value="$(arg odom_frame_id)"/>
       <param name="odom_frame_id_init"   type="string" value="$(arg odom_frame_id_init)"/>
       <param name="publish_tf"           type="bool"   value="$(arg publish_tf_map)"/>
+      <param name="initial_pose"         type="string" value="$(arg initial_pose)"/>
       <param name="gen_scan"             type="bool"   value="$(arg gen_scan)"/>
       <param name="ground_truth_frame_id"       type="string" value="$(arg ground_truth_frame_id)"/>
       <param name="ground_truth_base_frame_id"  type="string" value="$(arg ground_truth_base_frame_id)"/>
@@ -430,10 +445,10 @@
       <remap from="right/image_rect"       to="$(arg right_image_topic_relay)"/>
       <remap from="left/camera_info"       to="$(arg left_camera_info_topic)"/>
       <remap from="right/camera_info"      to="$(arg right_camera_info_topic)"/>
-      
+     
       <remap unless="$(arg icp_odometry)" from="scan" to="$(arg scan_topic)"/>
-      <remap     if="$(arg icp_odometry)" from="scan_cloud" to="odom_filtered_input_scan"/>
-      <remap unless="$(arg icp_odometry)" from="scan_cloud" to="$(arg scan_cloud_topic)"/>
+      <remap     if="$(eval icp_odometry or scan_cloud_filtered)" from="scan_cloud" to="odom_filtered_input_scan"/>
+      <remap unless="$(eval icp_odometry or scan_cloud_filtered)" from="scan_cloud" to="$(arg scan_cloud_topic)"/>
       <remap from="scan_descriptor"        to="$(arg scan_descriptor_topic)"/>
       <remap from="odom"                   to="$(arg odom_topic)"/>
     </node>

@@ -25,63 +25,13 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include "rtabmap_ros/lidar_deskewing.hpp"
 #include "rclcpp/rclcpp.hpp"
 
-#include <rtabmap_ros/OdometryROS.h>
-#include <rtabmap_ros/visibility.h>
-
-//#include <pluginlib/class_list_macros.h>
-//#include <pluginlib/class_loader.hpp>
-
-#include <sensor_msgs/msg/laser_scan.hpp>
-#include <sensor_msgs/msg/point_cloud2.hpp>
-
-//#include "rtabmap_ros/PluginInterface.h"
-
-
-using namespace rtabmap;
-
-namespace rtabmap_ros
+int main(int argc, char **argv)
 {
-
-class ICPOdometry : public rtabmap_ros::OdometryROS
-{
-public:
-	RTABMAP_ROS_PUBLIC
-	explicit ICPOdometry(const rclcpp::NodeOptions & options);
-
-	virtual ~ICPOdometry();
-
-private:
-	virtual void updateParameters(rtabmap::ParametersMap &);
-	virtual void onOdomInit();
-
-	void callbackScan(const sensor_msgs::msg::LaserScan::SharedPtr scanMsg);
-	void callbackCloud(const sensor_msgs::msg::PointCloud2::SharedPtr pointCloudMsg);
-
-protected:
-	virtual void flushCallbacks();
-	void postProcessData(const SensorData & data, const std_msgs::msg::Header & header) const;
-
-private:
-	rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub_;
-	rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr cloud_sub_;
-	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr filtered_scan_pub_;
-	int scanCloudMaxPoints_;
-	int scanDownsamplingStep_;
-	double scanRangeMin_;
-	double scanRangeMax_;
-	double scanVoxelSize_;
-	int scanNormalK_;
-	double scanNormalRadius_;
-	double scanNormalGroundUp_;
-	bool deskewing_;
-	bool deskewingSlerp_;
-	//std::vector<std::shared_ptr<rtabmap_ros::PluginInterface> > plugins_;
-	//pluginlib::ClassLoader<rtabmap_ros::PluginInterface> plugin_loader_;
-	bool scanReceived_ = false;
-	bool cloudReceived_ = false;
-
-};
-
+	rclcpp::init(argc, argv);
+	rclcpp::spin(std::make_shared<rtabmap_ros::LidarDeskewing>(rclcpp::NodeOptions()));
+	rclcpp::shutdown();
+	return 0;
 }

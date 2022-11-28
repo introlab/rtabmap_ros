@@ -44,6 +44,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <geometry_msgs/msg/twist_stamped.hpp>
 #include <nav_msgs/msg/path.hpp>
 #include <std_msgs/msg/bool.hpp>
+#include <std_msgs/msg/int32_multi_array.hpp>
 #include "rtabmap_ros/srv/get_map.hpp"
 
 #include <rtabmap_ros/CommonDataSubscriber.h>
@@ -135,6 +136,8 @@ private:
 	double maxOdomUpdateRate_;
 	std::shared_ptr<tf2_ros::Buffer> tfBuffer_;
 	std::shared_ptr<tf2_ros::TransformListener> tfListener_;
+
+	rclcpp::Publisher<std_msgs::msg::Int32MultiArray>::SharedPtr republishNodeDataPub_;
 
 	message_filters::Subscriber<rtabmap_ros::msg::Info> infoTopic_;
 	message_filters::Subscriber<rtabmap_ros::msg::MapData> mapDataTopic_;
