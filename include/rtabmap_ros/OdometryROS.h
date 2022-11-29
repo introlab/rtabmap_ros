@@ -44,6 +44,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <boost/thread.hpp>
 
+#include "rtabmap_ros/ULogToRosout.h"
+
 namespace rtabmap {
 class Odometry;
 }
@@ -150,6 +152,8 @@ private:
 	bool imuProcessed_;
 	std::map<double, rtabmap::IMU> imus_;
 	std::pair<rtabmap::SensorData, std_msgs::Header > bufferedData_;
+
+	ULogToRosout ulogToRosout_;
 };
 
 }

@@ -151,6 +151,11 @@ void OdometryROS::onInit()
 
 	pnh.param("wait_imu_to_init", waitIMUToinit_, waitIMUToinit_);
 
+	int eventLevel = ULogger::kFatal;
+	pnh.param("log_to_rosout_level", eventLevel, eventLevel);
+	UASSERT(eventLevel >= ULogger::kDebug && eventLevel <= ULogger::kFatal);
+	ULogger::setEventLevel((ULogger::Level)eventLevel);
+
 	if(publishTf_ && !guessFrameId_.empty() && guessFrameId_.compare(odomFrameId_) == 0)
 	{
 		NODELET_WARN( "\"publish_tf\" and \"guess_frame_id\" cannot be used "
@@ -163,6 +168,7 @@ void OdometryROS::onInit()
 	NODELET_INFO("Odometry: publish_tf             = %s", publishTf_?"true":"false");
 	NODELET_INFO("Odometry: wait_for_transform     = %s", waitForTransform_?"true":"false");
 	NODELET_INFO("Odometry: wait_for_transform_duration  = %f", waitForTransformDuration_);
+	NODELET_INFO("Odometry: log_to_rosout_level    = %d", eventLevel);
 	NODELET_INFO("Odometry: initial_pose           = %s", initialPose.prettyPrint().c_str());
 	NODELET_INFO("Odometry: ground_truth_frame_id  = %s", groundTruthFrameId_.c_str());
 	NODELET_INFO("Odometry: ground_truth_base_frame_id = %s", groundTruthBaseFrameId_.c_str());

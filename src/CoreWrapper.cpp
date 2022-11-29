@@ -174,6 +174,11 @@ void CoreWrapper::onInit()
 		}
 	}
 
+	int eventLevel = ULogger::kFatal;
+	pnh.param("log_to_rosout_level", eventLevel, eventLevel);
+	UASSERT(eventLevel >= ULogger::kDebug && eventLevel <= ULogger::kFatal);
+	ULogger::setEventLevel((ULogger::Level)eventLevel);
+
 	pnh.param("publish_tf",          publishTf, publishTf);
 	pnh.param("tf_delay",            tfDelay, tfDelay);
 	if(pnh.hasParam("tf_prefix"))
@@ -230,6 +235,7 @@ void CoreWrapper::onInit()
 				groundTruthBaseFrameId_.c_str());
 	}
 	NODELET_INFO("rtabmap: map_frame_id  = %s", mapFrameId_.c_str());
+	NODELET_INFO("rtabmap: log_to_rosout_level = %d", eventLevel);
 	NODELET_INFO("rtabmap: initial_pose  = %s", initialPoseStr.c_str());
 	NODELET_INFO("rtabmap: use_action_for_goal  = %s", useActionForGoal_?"true":"false");
 	NODELET_INFO("rtabmap: tf_delay      = %f", tfDelay);
