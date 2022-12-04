@@ -1,8 +1,8 @@
 # Requirements:
 #   A realsense D400 series
-#   Install realsense2 ros2 package (refactor branch)
+#   Install realsense2 ros2 package (make sure you have this patch: https://github.com/IntelRealSense/realsense-ros/issues/2564#issuecomment-1336288238)
 # Example:
-#   $ ros2 launch realsense2_camera rs_launch.py align_depth:=true
+#   $ ros2 launch realsense2_camera rs_launch.py align_depth.enable:=true
 #
 #   $ ros2 launch rtabmap_ros realsense_d400.launch.py
 #   OR
