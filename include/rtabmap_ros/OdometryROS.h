@@ -48,6 +48,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <boost/thread.hpp>
 
+#include "rtabmap_ros/ULogToRosout.h"
+
 namespace rtabmap {
 class Odometry;
 }
@@ -162,6 +164,8 @@ private:
 	std::pair<rtabmap::SensorData, std_msgs::msg::Header > bufferedData_;
 	std::string configPath_;
 	rtabmap::Transform initialPose_;
+
+	ULogToRosout ulogToRosout_;
 };
 
 }

@@ -87,7 +87,8 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	waitIMUToinit_(false),
 	imuProcessed_(false),
 	configPath_(),
-	initialPose_(Transform::getIdentity())
+	initialPose_(Transform::getIdentity()),
+	ulogToRosout_(this)
 {
 	int qos = this->declare_parameter("qos", (int)qos_);
 	qos_ = (rmw_qos_reliability_policy_t)qos;
@@ -131,6 +132,11 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	waitIMUToinit_ = this->declare_parameter("wait_imu_to_init", waitIMUToinit_);
 
 
+	int eventLevel = ULogger::kFatal;
+	eventLevel = this->declare_parameter("log_to_rosout_level", eventLevel);
+	UASSERT(eventLevel >= ULogger::kDebug && eventLevel <= ULogger::kFatal);
+	ULogger::setEventLevel((ULogger::Level)eventLevel);
+
 	if(publishTf_ && !guessFrameId_.empty() && guessFrameId_.compare(odomFrameId_) == 0)
 	{
 		RCLCPP_WARN(this->get_logger(), "\"publish_tf\" and \"guess_frame_id\" cannot be used "
@@ -142,6 +148,7 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	RCLCPP_INFO(this->get_logger(), "Odometry: odom_frame_id          = %s", odomFrameId_.c_str());
 	RCLCPP_INFO(this->get_logger(), "Odometry: publish_tf             = %s", publishTf_?"true":"false");
 	RCLCPP_INFO(this->get_logger(), "Odometry: wait_for_transform     = %f", waitForTransform_);
+	RCLCPP_INFO(this->get_logger(), "Odometry: log_to_rosout_level    = %d", eventLevel);
 	RCLCPP_INFO(this->get_logger(), "Odometry: initial_pose           = %s", initialPose_.prettyPrint().c_str());
 	RCLCPP_INFO(this->get_logger(), "Odometry: ground_truth_frame_id  = %s", groundTruthFrameId_.c_str());
 	RCLCPP_INFO(this->get_logger(), "Odometry: ground_truth_base_frame_id = %s", groundTruthBaseFrameId_.c_str());

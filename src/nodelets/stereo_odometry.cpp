@@ -351,7 +351,6 @@ void StereoOdometry::commonCallback(
 			}
 		}
 
-		int quality = -1;
 		if(!leftImages[i]->image.empty() && !rightImages[i]->image.empty())
 		{
 			bool alreadyRectified = true;

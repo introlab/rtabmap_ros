@@ -126,7 +126,8 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 		mappingAltitudeDelta_(Parameters::defaultGridGlobalAltitudeDelta()),
 		alreadyRectifiedImages_(Parameters::defaultRtabmapImagesAlreadyRectified()),
 		twoDMapping_(Parameters::defaultRegForce3DoF()),
-		previousStamp_(0)
+		previousStamp_(0),
+		ulogToRosout_(this)
 {
 	char * rosHomePath = getenv("ROS_HOME");
 	std::string workingDir = rosHomePath?rosHomePath:UDirectory::homeDir()+"/.ros";
@@ -172,6 +173,11 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 		}
 	}
 
+	int eventLevel = ULogger::kFatal;
+	eventLevel = this->declare_parameter("log_to_rosout_level", eventLevel);
+	UASSERT(eventLevel >= ULogger::kDebug && eventLevel <= ULogger::kFatal);
+	ULogger::setEventLevel((ULogger::Level)eventLevel);
+
 	publishTf = this->declare_parameter("publish_tf", publishTf);
 	tfDelay = this->declare_parameter("tf_delay", tfDelay);
 	tfTolerance = this->declare_parameter("tf_tolerance", tfTolerance);
@@ -211,6 +217,7 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 				groundTruthBaseFrameId_.c_str());
 	}
 	RCLCPP_INFO(this->get_logger(), "rtabmap: map_frame_id  = %s", mapFrameId_.c_str());
+	RCLCPP_INFO(this->get_logger(), "rtabmap: log_to_rosout_level  = %d", eventLevel);
 	RCLCPP_INFO(this->get_logger(), "rtabmap: initial_pose  = %s", initialPoseStr.c_str());
 	RCLCPP_INFO(this->get_logger(), "rtabmap: use_action_for_goal  = %s", useActionForGoal_?"true":"false");
 	RCLCPP_INFO(this->get_logger(), "rtabmap: tf_delay      = %f", tfDelay);
