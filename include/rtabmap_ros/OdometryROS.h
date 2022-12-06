@@ -147,6 +147,7 @@ private:
 	double previousStamp_;
 	double expectedUpdateRate_;
 	double maxUpdateRate_;
+	double minUpdateRate_;
 	int odomStrategy_;
 	bool waitIMUToinit_;
 	bool imuProcessed_;
