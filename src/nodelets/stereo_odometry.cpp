@@ -358,35 +358,64 @@ void StereoOdometry::commonCallback(
 			rtabmap::Transform stereoTransform;
 			if(!alreadyRectified)
 			{
-				stereoTransform = rtabmap_ros::getTransform(
-						rightCameraInfos[i].header.frame_id,
-						leftCameraInfos[i].header.frame_id,
-						leftCameraInfos[i].header.stamp,
-						tfBuffer(),
-						waitForTransform());
-				if(stereoTransform.isNull())
+				if(rightCameraInfos[i].header.frame_id.empty() || leftCameraInfos[i].header.frame_id.empty())
 				{
-					RCLCPP_ERROR(this->get_logger(), "Parameter %s is false but we cannot get TF between the two cameras! (between frames %s and %s)",
-							Parameters::kRtabmapImagesAlreadyRectified().c_str(),
-							rightCameraInfos[i].header.frame_id.c_str(),
-							leftCameraInfos[i].header.frame_id.c_str());
-					return;
+					if(rightCameraInfos[i].p[3] == 0.0 && leftCameraInfos[i].p[3] == 0)
+					{
+						RCLCPP_ERROR(this->get_logger(), "Parameter %s is false but the frame_id in one of the camera_info "
+								"topic is empty, so TF between the cameras cannot be computed!",
+								Parameters::kRtabmapImagesAlreadyRectified().c_str());
+						return;
+					}
+					else
+					{
+						static bool warned = false;
+						if(!warned)
+						{
+							RCLCPP_WARN(this->get_logger(), "Parameter %s is false but the frame_id in one of the "
+									"camera_info topic is empty, so TF between the cameras cannot be "
+									"computed! However, the baseline can be computed from the calibration, "
+									"we will use this one instead of TF. This message is only printed once...",
+									Parameters::kRtabmapImagesAlreadyRectified().c_str());
+							warned = true;
+						}
+					}
 				}
-				else if(stereoTransform.isIdentity())
+				else
 				{
-					RCLCPP_ERROR(this->get_logger(), "Parameter %s is false but we cannot get a valid TF between the two cameras! "
-							"Identity transform returned between left and right cameras. Verify that if TF between "
-							"the cameras is valid: \"rosrun tf tf_echo %s %s\".",
-							Parameters::kRtabmapImagesAlreadyRectified().c_str(),
-							rightCameraInfos[i].header.frame_id.c_str(),
-							leftCameraInfos[i].header.frame_id.c_str());
-					return;
+					stereoTransform = rtabmap_ros::getTransform(
+							rightCameraInfos[i].header.frame_id,
+							leftCameraInfos[i].header.frame_id,
+							leftCameraInfos[i].header.stamp,
+							tfBuffer(),
+							waitForTransform());
+					if(stereoTransform.isNull())
+					{
+						RCLCPP_ERROR(this->get_logger(), "Parameter %s is false but we cannot get TF between the two cameras! (between frames %s and %s)",
+								Parameters::kRtabmapImagesAlreadyRectified().c_str(),
+								rightCameraInfos[i].header.frame_id.c_str(),
+								leftCameraInfos[i].header.frame_id.c_str());
+						return;
+					}
+					else if(stereoTransform.isIdentity())
+					{
+						RCLCPP_ERROR(this->get_logger(), "Parameter %s is false but we cannot get a valid TF between the two cameras! "
+								"Identity transform returned between left and right cameras. Verify that if TF between "
+								"the cameras is valid: \"rosrun tf tf_echo %s %s\".",
+								Parameters::kRtabmapImagesAlreadyRectified().c_str(),
+								rightCameraInfos[i].header.frame_id.c_str(),
+								leftCameraInfos[i].header.frame_id.c_str());
+						return;
+					}
 				}
 			}
 
 			rtabmap::StereoCameraModel stereoModel = rtabmap_ros::stereoCameraModelFromROS(leftCameraInfos[i], rightCameraInfos[i], localTransform, stereoTransform);
 
-			if(stereoModel.baseline() == 0 && alreadyRectified)
+			if( stereoModel.baseline() == 0 &&
+				alreadyRectified &&
+				!rightCameraInfos[i].header.frame_id.empty() &&
+				!leftCameraInfos[i].header.frame_id.empty())
 			{
 				stereoTransform = rtabmap_ros::getTransform(
 						leftCameraInfos[i].header.frame_id,

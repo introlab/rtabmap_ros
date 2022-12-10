@@ -83,6 +83,7 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	previousStamp_(0.0),
 	expectedUpdateRate_(0.0),
 	maxUpdateRate_(0.0),
+	minUpdateRate_(0.0),
 	odomStrategy_(Parameters::defaultOdomStrategy()),
 	waitIMUToinit_(false),
 	imuProcessed_(false),
@@ -128,6 +129,7 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 
 	expectedUpdateRate_ = this->declare_parameter("expected_update_rate", expectedUpdateRate_);
 	maxUpdateRate_ = this->declare_parameter("max_update_rate", maxUpdateRate_);
+	minUpdateRate_ = this->declare_parameter("min_update_rate", minUpdateRate_);
 
 	waitIMUToinit_ = this->declare_parameter("wait_imu_to_init", waitIMUToinit_);
 
@@ -160,6 +162,7 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	RCLCPP_INFO(this->get_logger(), "Odometry: guess_min_time         = %f", guessMinTime_);
 	RCLCPP_INFO(this->get_logger(), "Odometry: expected_update_rate   = %f Hz", expectedUpdateRate_);
 	RCLCPP_INFO(this->get_logger(), "Odometry: max_update_rate        = %f Hz", maxUpdateRate_);
+	RCLCPP_INFO(this->get_logger(), "Odometry: min_update_rate        = %f Hz", minUpdateRate_);
 	RCLCPP_INFO(this->get_logger(), "Odometry: wait_imu_to_init       = %s", waitIMUToinit_?"true":"false");
 
 	configPath_ = uReplaceChar(configPath_, '~', UDirectory::homeDir());
@@ -600,6 +603,8 @@ void OdometryROS::processData(SensorData & data, const std_msgs::msg::Header & h
 		}
 	}
 
+	bool tooOldPreviousData = minUpdateRate_ > 0 && previousStamp_ > 0 && (timestampFromROS(header.stamp)-previousStamp_) > 1.0/minUpdateRate_;
+
 	// process data
 	rclcpp::Time timeStart = now();
 	rtabmap::OdometryInfo info;
@@ -607,7 +612,11 @@ void OdometryROS::processData(SensorData & data, const std_msgs::msg::Header & h
 	{
 		data.setGroundTruth(groundTruth);
 	}
-	rtabmap::Transform pose = odometry_->process(data, guess_, &info);
+	rtabmap::Transform pose;
+	if(!tooOldPreviousData)
+	{
+		pose = odometry_->process(data, guess_, &info);
+	}
 	if(!pose.isNull())
 	{
 		guess_.setNull();
@@ -834,12 +843,21 @@ void OdometryROS::processData(SensorData & data, const std_msgs::msg::Header & h
 
 	}
 
-	if(pose.isNull() && resetCurrentCount_ > 0)
+	if(pose.isNull() && (resetCurrentCount_ > 0 || tooOldPreviousData))
 	{
-		RCLCPP_WARN(this->get_logger(), "Odometry lost! Odometry will be reset after next %d consecutive unsuccessful odometry updates...", resetCurrentCount_);
+		if(tooOldPreviousData)
+		{
+			RCLCPP_WARN(this->get_logger(), "Odometry lost! Odometry will be reset because last update "
+					"is %fs too old (>%fs, min_update_rate = %f Hz). Previous data stamp is %f while new data stamp is %f.",
+					timestampFromROS(header.stamp) - previousStamp_, 1.0/minUpdateRate_, minUpdateRate_, previousStamp_, timestampFromROS(header.stamp));
+		}
+		else
+		{
+			RCLCPP_WARN(this->get_logger(), "Odometry lost! Odometry will be reset after next %d consecutive unsuccessful odometry updates...", resetCurrentCount_);
+			--resetCurrentCount_;
+		}
 
-		--resetCurrentCount_;
-		if(resetCurrentCount_ == 0)
+		if(resetCurrentCount_ == 0 || tooOldPreviousData)
 		{
 			if(!guess_.isNull())
 			{
