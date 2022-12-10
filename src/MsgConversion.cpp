@@ -2062,16 +2062,42 @@ bool convertRGBDMsgs(
 			rtabmap::Transform stereoTransform;
 			if(!alreadRectifiedImages)
 			{
-				stereoTransform = getTransform(
-						depthCameraInfoMsgs[i].header.frame_id,
-						cameraInfoMsgs[i].header.frame_id,
-						cameraInfoMsgs[i].header.stamp,
-						listener,
-						waitForTransform);
-				if(stereoTransform.isNull())
+				if(depthCameraInfoMsgs[i].header.frame_id.empty() || cameraInfoMsgs[i].header.frame_id.empty())
 				{
-					ROS_ERROR("Parameter %s is false but we cannot get TF between the two cameras!", rtabmap::Parameters::kRtabmapImagesAlreadyRectified().c_str());
-					return false;
+					if(depthCameraInfoMsgs[i].P[3] == 0.0 && cameraInfoMsgs[i].P[3] == 0)
+					{
+						ROS_ERROR("Parameter %s is false but the frame_id in one of the camera_info "
+								"topic is empty, so TF between the cameras cannot be computed!",
+								rtabmap::Parameters::kRtabmapImagesAlreadyRectified().c_str());
+						return false;
+					}
+					else
+					{
+						static bool warned = false;
+						if(!warned)
+						{
+							ROS_WARN("Parameter %s is false but the frame_id in one of the "
+									"camera_info topic is empty, so TF between the cameras cannot be "
+									"computed! However, the baseline can be computed from the calibration, "
+									"we will use this one instead of TF. This message is only printed once...",
+									rtabmap::Parameters::kRtabmapImagesAlreadyRectified().c_str());
+							warned = true;
+						}
+					}
+				}
+				else
+				{
+					stereoTransform = getTransform(
+							depthCameraInfoMsgs[i].header.frame_id,
+							cameraInfoMsgs[i].header.frame_id,
+							cameraInfoMsgs[i].header.stamp,
+							listener,
+							waitForTransform);
+					if(stereoTransform.isNull())
+					{
+						ROS_ERROR("Parameter %s is false but we cannot get TF between the two cameras!", rtabmap::Parameters::kRtabmapImagesAlreadyRectified().c_str());
+						return false;
+					}
 				}
 			}
 
@@ -2092,16 +2118,28 @@ bool convertRGBDMsgs(
 			}
 			else if(stereoModel.baseline() == 0 && alreadRectifiedImages)
 			{
-				rtabmap::Transform stereoTransform = getTransform(
+				rtabmap::Transform stereoTransform;
+				if( !cameraInfoMsgs[i].header.frame_id.empty() &&
+					!depthCameraInfoMsgs[i].header.frame_id.empty())
+				{
+					stereoTransform = getTransform(
 						cameraInfoMsgs[i].header.frame_id,
 						depthCameraInfoMsgs[i].header.frame_id,
 						cameraInfoMsgs[i].header.stamp,
 						listener,
 						waitForTransform);
+				}
 				if(stereoTransform.isNull() || stereoTransform.x()<=0)
 				{
-					ROS_WARN("We cannot estimated the baseline of the rectified images with tf! (%s->%s = %s)",
-							depthCameraInfoMsgs[i].header.frame_id.c_str(), cameraInfoMsgs[i].header.frame_id.c_str(), stereoTransform.prettyPrint().c_str());
+					if(cameraInfoMsgs[i].header.frame_id.empty() || depthCameraInfoMsgs[i].header.frame_id.empty())
+					{
+						ROS_WARN("We cannot estimated the baseline of the rectified images with tf! (camera_info topics have empty frame_id)");
+					}
+					else
+					{
+						ROS_WARN("We cannot estimated the baseline of the rectified images with tf! (%s->%s = %s)",
+								depthCameraInfoMsgs[i].header.frame_id.c_str(), cameraInfoMsgs[i].header.frame_id.c_str(), stereoTransform.prettyPrint().c_str());
+					}
 				}
 				else
 				{
