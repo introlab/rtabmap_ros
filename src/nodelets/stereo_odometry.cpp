@@ -248,8 +248,8 @@ void StereoOdometry::onOdomInit()
 				approxSync&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
 				imageRectLeft_.getTopic().c_str(),
 				imageRectRight_.getTopic().c_str(),
-				cameraInfoLeft_.getTopic().c_str(),
-				cameraInfoRight_.getTopic().c_str());
+				cameraInfoLeft_.getSubscriber()->get_topic_name(),
+				cameraInfoRight_.getSubscriber()->get_topic_name());
 	}
 
 	this->startWarningThread(subscribedTopicsMsg, approxSync);
