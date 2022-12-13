@@ -262,7 +262,8 @@ bool convertScan3dMsg(
 		tf::TransformListener & listener,
 		double waitForTransform,
 		int maxPoints = 0,
-		float maxRange = 0.0f);
+		float maxRange = 0.0f,
+		bool is2D = false);
 
 bool deskew(
 		const sensor_msgs::PointCloud2 & input,

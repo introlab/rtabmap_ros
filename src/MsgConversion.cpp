@@ -43,6 +43,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <image_geometry/pinhole_camera_model.h>
 #include <image_geometry/stereo_camera_model.h>
 #include <sensor_msgs/image_encodings.h>
+#include <sensor_msgs/point_cloud2_iterator.h>
 #include <laser_geometry/laser_geometry.h>
 #include <rtabmap/core/util3d_surface.h>
 
@@ -2350,10 +2351,11 @@ bool convertScanMsg(
 		double waitForTransform,
 		bool outputInFrameId)
 {
-	// make sure the frame of the laser is updated too
+	// make sure the frame of the laser is updated during the whole scan time
 	rtabmap::Transform tmpT = getTransform(
-			odomFrameId.empty()?frameId:odomFrameId,
 			scan2dMsg.header.frame_id,
+			odomFrameId.empty()?frameId:odomFrameId,
+			scan2dMsg.header.stamp,
 			scan2dMsg.header.stamp + ros::Duration().fromSec(scan2dMsg.ranges.size()*scan2dMsg.time_increment),
 			listener,
 			waitForTransform);
@@ -2489,7 +2491,8 @@ bool convertScan3dMsg(
 		tf::TransformListener & listener,
 		double waitForTransform,
 		int maxPoints,
-		float maxRange)
+		float maxRange,
+		bool is2D)
 {
 	UASSERT_MSG(scan3dMsg.data.size() == scan3dMsg.row_step*scan3dMsg.height,
 			uFormat("data=%d row_step=%d height=%d", scan3dMsg.data.size(), scan3dMsg.row_step, scan3dMsg.height).c_str());
@@ -2521,7 +2524,7 @@ bool convertScan3dMsg(
 			scanLocalTransform = sensorT * scanLocalTransform;
 		}
 	}
-	scan = rtabmap::util3d::laserScanFromPointCloud(scan3dMsg);
+	scan = rtabmap::util3d::laserScanFromPointCloud(scan3dMsg, true, is2D);
 	scan = rtabmap::LaserScan(scan, maxPoints, maxRange, scanLocalTransform);
 	return true;
 }

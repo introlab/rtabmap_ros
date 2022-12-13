@@ -61,6 +61,19 @@ private:
 
 	void callbackScan(const sensor_msgs::LaserScanConstPtr & msg)
 	{
+		// make sure the frame of the laser is updated during the whole scan time
+		rtabmap::Transform tmpT = getTransform(
+				msg->header.frame_id,
+				fixedFrameId_,
+				msg->header.stamp,
+				msg->header.stamp + ros::Duration().fromSec(msg->ranges.size()*msg->time_increment),
+				*tfListener_,
+				waitForTransformDuration_);
+		if(tmpT.isNull())
+		{
+			return;
+		}
+
 		sensor_msgs::PointCloud2 scanOut;
 		laser_geometry::LaserProjection projection;
 		projection.transformLaserScanToPointCloud(fixedFrameId_, *msg, scanOut, *tfListener_);

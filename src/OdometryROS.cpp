@@ -403,35 +403,6 @@ void OdometryROS::warningLoop(const std::string & subscribedTopicsMsg, bool appr
 	}
 }
 
-Transform OdometryROS::getTransform(const std::string & fromFrameId, const std::string & toFrameId, const ros::Time & stamp) const
-{
-	// TF ready?
-	Transform transform;
-	try
-	{
-		if(waitForTransform_ && !stamp.isZero() && waitForTransformDuration_ > 0.0)
-		{
-			//if(!tfBuffer_.canTransform(fromFrameId, toFrameId, stamp, ros::Duration(1)))
-			std::string errorMsg;
-			if(!tfListener_.waitForTransform(fromFrameId, toFrameId, stamp, ros::Duration(waitForTransformDuration_), ros::Duration(0.01), &errorMsg))
-			{
-				NODELET_WARN( "odometry: Could not get transform from %s to %s (stamp=%f) after %f seconds (\"wait_for_transform_duration\"=%f)! Error=\"%s\"",
-						fromFrameId.c_str(), toFrameId.c_str(), stamp.toSec(), waitForTransformDuration_, waitForTransformDuration_, errorMsg.c_str());
-				return transform;
-			}
-		}
-
-		tf::StampedTransform tmp;
-		tfListener_.lookupTransform(fromFrameId, toFrameId, stamp, tmp);
-		transform = rtabmap_ros::transformFromTF(tmp);
-	}
-	catch(tf::TransformException & ex)
-	{
-		NODELET_WARN( "%s",ex.what());
-	}
-	return transform;
-}
-
 rtabmap::Transform OdometryROS::velocityGuess() const
 {
 	if(odometry_)
@@ -449,7 +420,7 @@ void OdometryROS::callbackIMU(const sensor_msgs::ImuConstPtr& msg)
 		rtabmap::Transform localTransform = rtabmap::Transform::getIdentity();
 		if(this->frameId().compare(msg->header.frame_id) != 0)
 		{
-			localTransform = getTransform(this->frameId(), msg->header.frame_id, msg->header.stamp);
+			localTransform = getTransform(this->frameId(), msg->header.frame_id, msg->header.stamp, this->tfListener(), this->waitForTransformDuration());
 		}
 		if(localTransform.isNull())
 		{
@@ -552,7 +523,7 @@ void OdometryROS::processData(SensorData & data, const std_msgs::Header & header
 
 		if(!groundTruthFrameId_.empty())
 		{
-			groundTruth = getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, header.stamp);
+			groundTruth = getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, header.stamp, this->tfListener(), this->waitForTransformDuration());
 
 			if(!data.imageRaw().empty() || !data.laserScanRaw().isEmpty())
 			{
@@ -586,7 +557,7 @@ void OdometryROS::processData(SensorData & data, const std_msgs::Header & header
 	Transform guessCurrentPose;
 	if(!guessFrameId_.empty())
 	{
-		guessCurrentPose = this->getTransform(guessFrameId_, frameId_, header.stamp);
+		guessCurrentPose = getTransform(guessFrameId_, frameId_, header.stamp, this->tfListener(), this->waitForTransformDuration());
 
 		Transform previousPose = guessPreviousPose_;
 		if(guessPreviousPose_.isNull())
@@ -906,7 +877,7 @@ void OdometryROS::processData(SensorData & data, const std_msgs::Header & header
 			else
 			{
 				// Check TF to see if sensor fusion is used (e.g., the output of robot_localization)
-				Transform tfPose = this->getTransform(odomFrameId_, frameId_, header.stamp);
+				Transform tfPose = getTransform(odomFrameId_, frameId_, header.stamp, this->tfListener(), this->waitForTransformDuration());
 				if(tfPose.isNull())
 				{
 					NODELET_WARN( "Odometry automatically reset to latest computed pose!");

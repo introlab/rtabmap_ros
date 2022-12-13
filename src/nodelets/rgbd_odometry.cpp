@@ -450,7 +450,7 @@ private:
 				higherStamp = stamp;
 			}
 
-			Transform localTransform = getTransform(this->frameId(), rgbImages[i]->header.frame_id, stamp);
+			Transform localTransform = getTransform(this->frameId(), rgbImages[i]->header.frame_id, stamp, this->tfListener(), this->waitForTransformDuration());
 			if(localTransform.isNull())
 			{
 				return;

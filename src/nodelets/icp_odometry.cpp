@@ -62,6 +62,7 @@ public:
 	ICPOdometry() :
 		OdometryROS(false, false, true),
 		scanCloudMaxPoints_(0),
+		scanCloudIs2d_(false),
 		scanDownsamplingStep_(1),
 		scanRangeMin_(0),
 		scanRangeMax_(0),
@@ -92,6 +93,7 @@ private:
 		int queueSize = 1;
 		pnh.param("queue_size",  queueSize, queueSize);
 		pnh.param("scan_cloud_max_points",  scanCloudMaxPoints_, scanCloudMaxPoints_);
+		pnh.param("scan_cloud_is_2d",  scanCloudIs2d_, scanCloudIs2d_);
 		pnh.param("scan_downsampling_step", scanDownsamplingStep_, scanDownsamplingStep_);
 		pnh.param("scan_range_min",  scanRangeMin_, scanRangeMin_);
 		pnh.param("scan_range_max",  scanRangeMax_, scanRangeMax_);
@@ -140,6 +142,7 @@ private:
 
 		NODELET_INFO("IcpOdometry: queue_size             = %d", queueSize);
 		NODELET_INFO("IcpOdometry: scan_cloud_max_points  = %d", scanCloudMaxPoints_);
+		NODELET_INFO("IcpOdometry: scan_cloud_is_2d       = %s", scanCloudIs2d_?"true":"false");
 		NODELET_INFO("IcpOdometry: scan_downsampling_step = %d", scanDownsamplingStep_);
 		NODELET_INFO("IcpOdometry: scan_range_min         = %f m", scanRangeMin_);
 		NODELET_INFO("IcpOdometry: scan_range_max         = %f m", scanRangeMax_);
@@ -332,29 +335,61 @@ private:
 			return;
 		}
 
-		// make sure the frame of the laser is updated too
+		// make sure the frame of the laser is updated
 		Transform localScanTransform = getTransform(this->frameId(),
 				scanMsg->header.frame_id,
-				scanMsg->header.stamp);
+				scanMsg->header.stamp,
+				this->tfListener(),
+				this->waitForTransformDuration());
 		if(localScanTransform.isNull())
 		{
 			ROS_ERROR("TF of received laser scan topic at time %fs is not set, aborting odometry update.", scanMsg->header.stamp.toSec());
 			return;
 		}
 
-		//transform in frameId_ frame
+		//transform in scan frame
 		sensor_msgs::PointCloud2 scanOut;
 		laser_geometry::LaserProjection projection;
 
-		if(deskewing_ && !guessFrameId().empty())
+		if(deskewing_ && (!guessFrameId().empty() || (frameId().compare(scanMsg->header.frame_id) != 0)))
 		{
-			projection.transformLaserScanToPointCloud(deskewing_&&!guessFrameId().empty()?guessFrameId():scanMsg->header.frame_id, *scanMsg, scanOut, this->tfListener());
+			// make sure the frame of the laser is updated during the whole scan time
+			rtabmap::Transform tmpT = getTransform(
+					scanMsg->header.frame_id,
+					guessFrameId().empty()?frameId():guessFrameId(),
+					scanMsg->header.stamp,
+					scanMsg->header.stamp + ros::Duration().fromSec(scanMsg->ranges.size()*scanMsg->time_increment),
+					this->tfListener(),
+					this->waitForTransformDuration());
+			if(tmpT.isNull())
+			{
+				return;
+			}
+
+			projection.transformLaserScanToPointCloud(
+					guessFrameId().empty()?frameId():guessFrameId(),
+					*scanMsg, 
+					scanOut,
+					this->tfListener(),
+					laser_geometry::channel_option::Intensity | laser_geometry::channel_option::Timestamp);
+
+			if(guessFrameId().empty() && previousStamp() > 0 && !velocityGuess().isNull())
+			{
+				// deskew with constant velocity model (we are in frameId)
+				sensor_msgs::PointCloud2 scanOutDeskewed;
+				if(!deskew(scanOut, scanOutDeskewed, previousStamp(), velocityGuess()))
+				{
+					ROS_ERROR("Failed to deskew input cloud, aborting odometry update!");
+					return;
+				}
+				scanOut = scanOutDeskewed;
+			}
 
 			sensor_msgs::PointCloud2 scanOutDeskewed;
 			if(!pcl_ros::transformPointCloud(scanMsg->header.frame_id, scanOut, scanOutDeskewed, this->tfListener()))
 			{
 				ROS_ERROR("Cannot transform back projected scan from \"%s\" frame to \"%s\" frame at time %fs.",
-						guessFrameId().c_str(), scanMsg->header.frame_id.c_str(), scanMsg->header.stamp.toSec());
+						(guessFrameId().empty()?frameId():guessFrameId()).c_str(), scanMsg->header.frame_id.c_str(), scanMsg->header.stamp.toSec());
 				return;
 			}
 			scanOut = scanOutDeskewed;
@@ -363,7 +398,7 @@ private:
 		{
 			projection.projectLaser(*scanMsg, scanOut, -1.0, laser_geometry::channel_option::Intensity | laser_geometry::channel_option::Timestamp);
 
-			if(previousStamp() > 0 && !velocityGuess().isNull())
+			if(deskewing_ && previousStamp() > 0 && !velocityGuess().isNull())
 			{
 				// deskew with constant velocity model
 				sensor_msgs::PointCloud2 scanOutDeskewed;
@@ -372,6 +407,7 @@ private:
 					ROS_ERROR("Failed to deskew input cloud, aborting odometry update!");
 					return;
 				}
+				scanOut = scanOutDeskewed;
 			}
 		}
 
@@ -540,30 +576,37 @@ private:
 			return;
 		}
 
-		sensor_msgs::PointCloud2 cloudMsg;
+		sensor_msgs::PointCloud2::Ptr cloudMsg(new sensor_msgs::PointCloud2);
 		if (!plugins_.empty())
 		{
 			if (plugins_[0]->isEnabled())
 			{
-				cloudMsg = plugins_[0]->filterPointCloud(*pointCloudMsg);
+				*cloudMsg = plugins_[0]->filterPointCloud(*pointCloudMsg);
 			}
 			else
 			{
-				cloudMsg = *pointCloudMsg;
+				*cloudMsg = *pointCloudMsg;
 			}
 
 			if (plugins_.size() > 1)
 			{
 				for (int i = 1; i < plugins_.size(); i++) {
 					if (plugins_[i]->isEnabled()) {
-						cloudMsg = plugins_[i]->filterPointCloud(cloudMsg);
+						*cloudMsg = plugins_[i]->filterPointCloud(*cloudMsg);
 					}
 				}
 			}
 		}
 		else
 		{
-			cloudMsg = *pointCloudMsg;
+			*cloudMsg = *pointCloudMsg;
+		}
+
+		Transform localScanTransform = getTransform(this->frameId(), cloudMsg->header.frame_id, cloudMsg->header.stamp, this->tfListener(), this->waitForTransformDuration());
+		if(localScanTransform.isNull())
+		{
+			ROS_ERROR("TF of received scan cloud at time %fs is not set, aborting rtabmap update.", cloudMsg->header.stamp.toSec());
+			return;
 		}
 
 		if(deskewing_)
@@ -571,7 +614,7 @@ private:
 			if(!guessFrameId().empty())
 			{
 				// deskew with TF
-				if(!deskew(*pointCloudMsg, cloudMsg, guessFrameId(), tfListener(), waitForTransformDuration(), deskewingSlerp_))
+				if(!deskew(*pointCloudMsg, *cloudMsg, guessFrameId(), tfListener(), waitForTransformDuration(), deskewingSlerp_))
 				{
 					ROS_ERROR("Failed to deskew input cloud, aborting odometry update!");
 					return;
@@ -580,10 +623,42 @@ private:
 			else if(previousStamp() > 0 && !velocityGuess().isNull())
 			{
 				// deskew with constant velocity model
-				if(!deskew(*pointCloudMsg, cloudMsg, previousStamp(), velocityGuess()))
+				bool alreadyInBaseFrame = frameId().compare(pointCloudMsg->header.frame_id) == 0;
+				sensor_msgs::PointCloud2Ptr cloudInBaseFrame;
+				sensor_msgs::PointCloud2Ptr cloudPtr = cloudMsg;
+				if(!alreadyInBaseFrame)
+				{
+					// transform in base frame
+					cloudInBaseFrame.reset(new sensor_msgs::PointCloud2);
+					if(!pcl_ros::transformPointCloud(frameId(), *pointCloudMsg, *cloudInBaseFrame, this->tfListener()))
+					{
+						ROS_ERROR("Cannot transform back projected scan from \"%s\" frame to \"%s\" frame at time %fs.",
+								pointCloudMsg->header.frame_id.c_str(), frameId().c_str(), pointCloudMsg->header.stamp.toSec());
+						return;
+					}
+					cloudPtr = cloudInBaseFrame;
+				}
+
+				sensor_msgs::PointCloud2::Ptr cloudDeskewed(new sensor_msgs::PointCloud2);
+				if(!deskew(*cloudPtr, *cloudDeskewed, previousStamp(), velocityGuess()))
 				{
 					ROS_ERROR("Failed to deskew input cloud, aborting odometry update!");
 					return;
+				}
+
+				if(!alreadyInBaseFrame)
+				{
+					// put back in scan frame
+					if(!pcl_ros::transformPointCloud(pointCloudMsg->header.frame_id.c_str(), *cloudDeskewed, *cloudMsg, this->tfListener()))
+					{
+						ROS_ERROR("Cannot transform back projected scan from \"%s\" frame to \"%s\" frame at time %fs.",
+								frameId().c_str(), pointCloudMsg->header.frame_id.c_str(), pointCloudMsg->header.stamp.toSec());
+						return;
+					}
+				}
+				else
+				{
+					cloudMsg = cloudDeskewed;
 				}
 			}
 		}
@@ -591,15 +666,20 @@ private:
 		LaserScan scan;
 		bool hasNormals = false;
 		bool hasIntensity = false;
-		for(unsigned int i=0; i<cloudMsg.fields.size(); ++i)
+		bool is3D = false;
+		for(unsigned int i=0; i<cloudMsg->fields.size(); ++i)
 		{
-			if(scanVoxelSize_ == 0.0f && cloudMsg.fields[i].name.compare("normal_x") == 0)
+			if(scanVoxelSize_ == 0.0f && cloudMsg->fields[i].name.compare("normal_x") == 0)
 			{
 				hasNormals = true;
 			}
-			if(cloudMsg.fields[i].name.compare("intensity") == 0)
+			if(cloudMsg->fields[i].name.compare("z") == 0 && !scanCloudIs2d_)
 			{
-				if(cloudMsg.fields[i].datatype == sensor_msgs::PointField::FLOAT32)
+				is3D = true;
+			}
+			if(cloudMsg->fields[i].name.compare("intensity") == 0)
+			{
+				if(cloudMsg->fields[i].datatype == sensor_msgs::PointField::FLOAT32)
 				{
 					hasIntensity = true;
 				}
@@ -610,39 +690,33 @@ private:
 					{
 						ROS_WARN("The input scan cloud has an \"intensity\" field "
 								"but the datatype (%d) is not supported. Intensity will be ignored. "
-								"This message is only shown once.", cloudMsg.fields[i].datatype);
+								"This message is only shown once.", cloudMsg->fields[i].datatype);
 						warningShown = true;
 					}
 				}
 			}
 		}
 
-		Transform localScanTransform = getTransform(this->frameId(), cloudMsg.header.frame_id, cloudMsg.header.stamp);
-		if(localScanTransform.isNull())
+		if(scanCloudMaxPoints_ == 0 && cloudMsg->height > 1)
 		{
-			ROS_ERROR("TF of received scan cloud at time %fs is not set, aborting rtabmap update.", cloudMsg.header.stamp.toSec());
-			return;
-		}
-		if(scanCloudMaxPoints_ == 0 && cloudMsg.height > 1)
-		{
-			scanCloudMaxPoints_ = cloudMsg.height * cloudMsg.width;
+			scanCloudMaxPoints_ = cloudMsg->height * cloudMsg->width;
 			NODELET_WARN("IcpOdometry: \"scan_cloud_max_points\" is not set but input "
 					"cloud is not dense, for convenience it will be set to %d (%dx%d)",
-					scanCloudMaxPoints_, cloudMsg.width, cloudMsg.height);
+					scanCloudMaxPoints_, cloudMsg->width, cloudMsg->height);
 		}
-		else if(cloudMsg.height > 1 && scanCloudMaxPoints_ < cloudMsg.height * cloudMsg.width)
+		else if(cloudMsg->height > 1 && scanCloudMaxPoints_ < cloudMsg->height * cloudMsg->width)
 		{
 			NODELET_WARN("IcpOdometry: \"scan_cloud_max_points\" is set to %d but input "
 					"cloud is not dense and has a size of %d (%dx%d), setting to this later size.",
-					scanCloudMaxPoints_, cloudMsg.width *cloudMsg.height, cloudMsg.width, cloudMsg.height);
-			scanCloudMaxPoints_ = cloudMsg.width *cloudMsg.height;
+					scanCloudMaxPoints_, cloudMsg->width *cloudMsg->height, cloudMsg->width, cloudMsg->height);
+			scanCloudMaxPoints_ = cloudMsg->width *cloudMsg->height;
 		}
 		int maxLaserScans = scanCloudMaxPoints_;
 
 		if(hasNormals && hasIntensity)
 		{
 			pcl::PointCloud<pcl::PointXYZINormal>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZINormal>);
-			pcl::fromROSMsg(cloudMsg, *pclScan);
+			pcl::fromROSMsg(*cloudMsg, *pclScan);
 			if(pclScan->size() && scanDownsamplingStep_ > 1)
 			{
 				pclScan = util3d::downsample(pclScan, scanDownsamplingStep_);
@@ -655,12 +729,12 @@ private:
 					maxLaserScans /= scanDownsamplingStep_;
 				}
 			}
-			scan = util3d::laserScanFromPointCloud(*pclScan);
+			scan = is3D?util3d::laserScanFromPointCloud(*pclScan):util3d::laserScan2dFromPointCloud(*pclScan);
 		}
 		else if(hasNormals)
 		{
 			pcl::PointCloud<pcl::PointNormal>::Ptr pclScan(new pcl::PointCloud<pcl::PointNormal>);
-			pcl::fromROSMsg(cloudMsg, *pclScan);
+			pcl::fromROSMsg(*cloudMsg, *pclScan);
 			if(pclScan->size() && scanDownsamplingStep_ > 1)
 			{
 				pclScan = util3d::downsample(pclScan, scanDownsamplingStep_);
@@ -673,12 +747,12 @@ private:
 					maxLaserScans /= scanDownsamplingStep_;
 				}
 			}
-			scan = util3d::laserScanFromPointCloud(*pclScan);
+			scan = is3D?util3d::laserScanFromPointCloud(*pclScan):util3d::laserScan2dFromPointCloud(*pclScan);
 		}
 		else if(hasIntensity)
 		{
 			pcl::PointCloud<pcl::PointXYZI>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZI>);
-			pcl::fromROSMsg(cloudMsg, *pclScan);
+			pcl::fromROSMsg(*cloudMsg, *pclScan);
 			if(pclScan->size() && scanDownsamplingStep_ > 1)
 			{
 				pclScan = util3d::downsample(pclScan, scanDownsamplingStep_);
@@ -708,21 +782,23 @@ private:
 				if(scanNormalK_ > 0 || scanNormalRadius_>0.0f)
 				{
 					//compute normals
-					pcl::PointCloud<pcl::Normal>::Ptr normals = util3d::computeNormals(pclScan, scanNormalK_, scanNormalRadius_);
+					pcl::PointCloud<pcl::Normal>::Ptr normals = is3D?
+							util3d::computeNormals(pclScan, scanNormalK_, scanNormalRadius_):
+							util3d::computeNormals2D(pclScan, scanNormalK_, scanNormalRadius_);
 					pcl::PointCloud<pcl::PointXYZINormal>::Ptr pclScanNormal(new pcl::PointCloud<pcl::PointXYZINormal>);
 					pcl::concatenateFields(*pclScan, *normals, *pclScanNormal);
-					scan = util3d::laserScanFromPointCloud(*pclScanNormal);
+					scan = is3D?util3d::laserScanFromPointCloud(*pclScanNormal):util3d::laserScan2dFromPointCloud(*pclScanNormal);
 				}
 				else
 				{
-					scan = util3d::laserScanFromPointCloud(*pclScan);
+					scan = is3D?util3d::laserScanFromPointCloud(*pclScan):util3d::laserScan2dFromPointCloud(*pclScan);
 				}
 			}
 		}
 		else
 		{
 			pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
-			pcl::fromROSMsg(cloudMsg, *pclScan);
+			pcl::fromROSMsg(*cloudMsg, *pclScan);
 			if(pclScan->size() && scanDownsamplingStep_ > 1)
 			{
 				pclScan = util3d::downsample(pclScan, scanDownsamplingStep_);
@@ -752,14 +828,16 @@ private:
 				if(scanNormalK_ > 0 || scanNormalRadius_>0.0f)
 				{
 					//compute normals
-					pcl::PointCloud<pcl::Normal>::Ptr normals = util3d::computeNormals(pclScan, scanNormalK_, scanNormalRadius_);
+					pcl::PointCloud<pcl::Normal>::Ptr normals = is3D?
+							util3d::computeNormals(pclScan, scanNormalK_, scanNormalRadius_):
+							util3d::computeNormals2D(pclScan, scanNormalK_, scanNormalRadius_);
 					pcl::PointCloud<pcl::PointNormal>::Ptr pclScanNormal(new pcl::PointCloud<pcl::PointNormal>);
 					pcl::concatenateFields(*pclScan, *normals, *pclScanNormal);
-					scan = util3d::laserScanFromPointCloud(*pclScanNormal);
+					scan = is3D?util3d::laserScanFromPointCloud(*pclScanNormal):util3d::laserScan2dFromPointCloud(*pclScanNormal);
 				}
 				else
 				{
-					scan = util3d::laserScanFromPointCloud(*pclScan);
+					scan = is3D?util3d::laserScanFromPointCloud(*pclScan):util3d::laserScan2dFromPointCloud(*pclScan);
 				}
 			}
 		}
@@ -783,9 +861,9 @@ private:
 				cv::Mat(),
 				rtabmap::CameraModel(),
 				0,
-				rtabmap_ros::timestampFromROS(cloudMsg.header.stamp));
+				rtabmap_ros::timestampFromROS(cloudMsg->header.stamp));
 
-		this->processData(data, cloudMsg.header);
+		this->processData(data, cloudMsg->header);
 	}
 
 protected:
@@ -810,6 +888,7 @@ private:
 	ros::Subscriber cloud_sub_;
 	ros::Publisher filtered_scan_pub_;
 	int scanCloudMaxPoints_;
+	bool scanCloudIs2d_;
 	int scanDownsamplingStep_;
 	double scanRangeMin_;
 	double scanRangeMax_;

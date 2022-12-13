@@ -112,6 +112,7 @@ CoreWrapper::CoreWrapper() :
 		genDepthFillIterations_(1),
 		genDepthFillHolesError_(0.1),
 		scanCloudMaxPoints_(0),
+		scanCloudIs2d_(false),
 		mapToOdom_(rtabmap::Transform::getIdentity()),
 		transformThread_(0),
 		tfThreadRunning_(false),
@@ -204,6 +205,7 @@ void CoreWrapper::onInit()
 	pnh.param("gen_depth_fill_iterations",  genDepthFillIterations_, genDepthFillIterations_);
 	pnh.param("gen_depth_fill_holes_error", genDepthFillHolesError_, genDepthFillHolesError_);
 	pnh.param("scan_cloud_max_points",  scanCloudMaxPoints_, scanCloudMaxPoints_);
+	pnh.param("scan_cloud_is_2d",       scanCloudIs2d_, scanCloudIs2d_);
 	if(pnh.hasParam("scan_cloud_normal_k"))
 	{
 		ROS_WARN("rtabmap: Parameter \"scan_cloud_normal_k\" has been removed. RTAB-Map's parameter \"%s\" should be used instead. "
@@ -268,6 +270,7 @@ void CoreWrapper::onInit()
 	if(subscribeScanCloud)
 	{
 		NODELET_INFO("rtabmap: scan_cloud_max_points = %d", scanCloudMaxPoints_);
+		NODELET_INFO("rtabmap: scan_cloud_is_2d      = %s", scanCloudIs2d_?"true":"false");
 	}
 
 	infoPub_ = nh.advertise<rtabmap_ros::Info>("info", 1);
@@ -1412,7 +1415,9 @@ void CoreWrapper::commonMultiCameraCallbackImpl(
 				scan,
 				tfListener_,
 				waitForTransform_?waitForTransformDuration_:0,
-				scanCloudMaxPoints_))
+				scanCloudMaxPoints_,
+				0,
+				scanCloudIs2d_))
 		{
 			NODELET_ERROR("Could not convert 3d laser scan msg! Aborting rtabmap update...");
 			return;
@@ -1617,7 +1622,9 @@ void CoreWrapper::commonLaserScanCallback(
 				scan,
 				tfListener_,
 				waitForTransform_?waitForTransformDuration_:0,
-				scanCloudMaxPoints_))
+				scanCloudMaxPoints_,
+				0,
+				scanCloudIs2d_))
 		{
 			NODELET_ERROR("Could not convert 3d laser scan msg! Aborting rtabmap update...");
 			return;

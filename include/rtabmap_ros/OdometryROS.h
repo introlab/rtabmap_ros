@@ -75,7 +75,6 @@ public:
 	const std::string & guessFrameId() const {return guessFrameId_;}
 	const rtabmap::ParametersMap & parameters() const {return parameters_;}
 	bool isPaused() const {return paused_;}
-	rtabmap::Transform getTransform(const std::string & fromFrameId, const std::string & toFrameId, const ros::Time & stamp) const;
 
 protected:
 	void startWarningThread(const std::string & subscribedTopicsMsg, bool approxSync);
