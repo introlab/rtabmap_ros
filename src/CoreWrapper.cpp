@@ -488,7 +488,7 @@ void CoreWrapper::onInit()
 				Parameters::kGridSensor().c_str());
 		parameters_.insert(ParametersPair(Parameters::kGridRangeMax(), "0"));
 	}
-	if(subscribeScan3d && parameters_.find(Parameters::kIcpPointToPlaneRadius()) == parameters_.end())
+	if(subscribeScan3d && !scanCloudIs2d_ && parameters_.find(Parameters::kIcpPointToPlaneRadius()) == parameters_.end())
 	{
 		NODELET_INFO("Setting \"%s\" parameter to 0 (default %f) as \"subscribe_scan_cloud\" is true.",
 				Parameters::kIcpPointToPlaneRadius().c_str(),
@@ -500,13 +500,14 @@ void CoreWrapper::onInit()
 	if(parameters_.find(Parameters::kRGBDProximityPathMaxNeighbors()) == parameters_.end() &&
 		(regStrategy == Registration::kTypeIcp || regStrategy == Registration::kTypeVisIcp))
 	{
-		if(subscribeScan2d)
+		if(subscribeScan2d || (subscribeScan3d && scanCloudIs2d_))
 		{
-			NODELET_WARN("Setting \"%s\" parameter to 10 (default 0) as \"subscribe_scan\" is "
+			NODELET_WARN("Setting \"%s\" parameter to 10 (default 0) as \"%s\" is "
 					"true and \"%s\" uses ICP. Proximity detection by space will be also done by merging close "
 					"scans. To disable, set \"%s\" to 0. To suppress this warning, "
 					"add <param name=\"%s\" type=\"string\" value=\"10\"/>",
 					Parameters::kRGBDProximityPathMaxNeighbors().c_str(),
+					subscribeScan2d?"subscribe_scan":"scan_cloud_is_2d",
 					Parameters::kRegStrategy().c_str(),
 					Parameters::kRGBDProximityPathMaxNeighbors().c_str(),
 					Parameters::kRGBDProximityPathMaxNeighbors().c_str());
