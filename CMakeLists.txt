@@ -267,7 +267,7 @@ SET(rtabmap_plugins_lib_src
 )
 
 IF(${cv_bridge_VERSION_MAJOR} GREATER 1 OR ${cv_bridge_VERSION_MINOR} GREATER 10)
-   SET(rtabmap_plugins_lib_src ${rtabmap_plugins_lib_src} src/nodelets/rgbd_sync.cpp src/nodelets/stereo_sync.cpp src/nodelets/rgb_sync.cpp src/nodelets/rgbd_relay.cpp)
+   SET(rtabmap_plugins_lib_src ${rtabmap_plugins_lib_src} src/nodelets/rgbd_sync.cpp src/nodelets/stereo_sync.cpp src/nodelets/rgb_sync.cpp src/nodelets/rgbd_relay.cpp src/nodelets/rgbd_split.cpp)
 ELSE()
    ADD_DEFINITIONS("-DCV_BRIDGE_HYDRO")
 ENDIF()   
@@ -374,6 +374,10 @@ set_target_properties(rtabmap_rgb_sync PROPERTIES OUTPUT_NAME "rgb_sync")
 add_executable(rtabmap_rgbd_relay src/RGBDRelayNode.cpp)
 target_link_libraries(rtabmap_rgbd_relay ${Libraries})
 set_target_properties(rtabmap_rgbd_relay PROPERTIES OUTPUT_NAME "rgbd_relay")
+
+add_executable(rtabmap_rgbd_split src/RGBDSplitNode.cpp)
+target_link_libraries(rtabmap_rgbd_split ${Libraries})
+set_target_properties(rtabmap_rgbd_split PROPERTIES OUTPUT_NAME "rgbd_split")
 
 add_executable(rtabmap_map_optimizer src/MapOptimizerNode.cpp)
 target_link_libraries(rtabmap_map_optimizer rtabmap_ros)
