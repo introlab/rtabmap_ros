@@ -223,11 +223,11 @@ int main(int argc, char** argv)
 	}
 
 	UTimer timer;
-	rtabmap::CameraInfo cameraInfo;
-	rtabmap::SensorData data = reader.takeImage(&cameraInfo);
+	rtabmap::SensorCaptureInfo captureInfo;
+	rtabmap::SensorData data = reader.takeImage(&captureInfo);
 	rtabmap::OdometryInfo odomInfo;
-	odomInfo.reg.covariance = cameraInfo.odomCovariance;
-	rtabmap::OdometryEvent odom(data, cameraInfo.odomPose, odomInfo);
+	odomInfo.reg.covariance = captureInfo.odomCovariance;
+	rtabmap::OdometryEvent odom(data, captureInfo.odomPose, odomInfo);
 	double acquisitionTime = timer.ticks();
 	while(ros::ok() && odom.data().id())
 	{
@@ -670,10 +670,10 @@ int main(int argc, char** argv)
 		}
 
 		timer.restart();
-		cameraInfo = rtabmap::CameraInfo();
-		data = reader.takeImage(&cameraInfo);
-		odomInfo.reg.covariance = cameraInfo.odomCovariance;
-		odom = rtabmap::OdometryEvent(data, cameraInfo.odomPose, odomInfo);
+		captureInfo = rtabmap::SensorCaptureInfo();
+		data = reader.takeImage(&captureInfo);
+		odomInfo.reg.covariance = captureInfo.odomCovariance;
+		odom = rtabmap::OdometryEvent(data, captureInfo.odomPose, odomInfo);
 		acquisitionTime = timer.ticks();
 	}
 

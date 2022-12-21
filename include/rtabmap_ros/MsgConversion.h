@@ -276,7 +276,6 @@ bool deskew(
 bool deskew(
 		const sensor_msgs::PointCloud2 & input,
 		sensor_msgs::PointCloud2 & output,
-		double previousStamp,
 		const rtabmap::Transform & velocity);
 
 }

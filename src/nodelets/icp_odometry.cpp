@@ -377,7 +377,7 @@ private:
 			{
 				// deskew with constant velocity model (we are in frameId)
 				sensor_msgs::PointCloud2 scanOutDeskewed;
-				if(!deskew(scanOut, scanOutDeskewed, previousStamp(), velocityGuess()))
+				if(!deskew(scanOut, scanOutDeskewed, velocityGuess()))
 				{
 					ROS_ERROR("Failed to deskew input cloud, aborting odometry update!");
 					return;
@@ -402,7 +402,7 @@ private:
 			{
 				// deskew with constant velocity model
 				sensor_msgs::PointCloud2 scanOutDeskewed;
-				if(!deskew(scanOut, scanOutDeskewed, previousStamp(), velocityGuess()))
+				if(!deskew(scanOut, scanOutDeskewed, velocityGuess()))
 				{
 					ROS_ERROR("Failed to deskew input cloud, aborting odometry update!");
 					return;
@@ -640,7 +640,7 @@ private:
 				}
 
 				sensor_msgs::PointCloud2::Ptr cloudDeskewed(new sensor_msgs::PointCloud2);
-				if(!deskew(*cloudPtr, *cloudDeskewed, previousStamp(), velocityGuess()))
+				if(!deskew(*cloudPtr, *cloudDeskewed, velocityGuess()))
 				{
 					ROS_ERROR("Failed to deskew input cloud, aborting odometry update!");
 					return;

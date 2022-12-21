@@ -2536,8 +2536,7 @@ bool deskew_impl(
 		tf::TransformListener * listener,
 		double waitForTransform,
 		bool slerp,
-		const rtabmap::Transform & velocity,
-		double previousStamp)
+		const rtabmap::Transform & velocity)
 {
 	if(listener != 0)
 	{
@@ -2558,12 +2557,6 @@ bool deskew_impl(
 		if(!slerp)
 		{
 			ROS_ERROR("slerp should be true when constant velocity model is used!");
-			return false;
-		}
-
-		if(previousStamp <= 0.0)
-		{
-			ROS_ERROR("previousStamp should be >0 when constant velocity model is used!");
 			return false;
 		}
 
@@ -2711,7 +2704,7 @@ bool deskew_impl(
 
 	rtabmap::Transform firstPose;
 	rtabmap::Transform lastPose;
-	double scanTime = 0;
+	double scanTime = lastStamp.toSec() - firstStamp.toSec();
 	if(slerp)
 	{
 		if(listener != 0)
@@ -2736,23 +2729,13 @@ bool deskew_impl(
 			float vx,vy,vz, vroll,vpitch,vyaw;
 			velocity.getTranslationAndEulerAngles(vx,vy,vz, vroll,vpitch,vyaw);
 
-			// We need three poses:
 			//  1- The pose of base frame in odom frame at first stamp
-			//  2- The pose of base frame in odom frame at msg stamp
-			//  3- The pose of base frame in odom frame at last stamp
-			UASSERT(firstStamp.toSec() >= previousStamp);
-			UASSERT(lastStamp.toSec() > previousStamp);
-			double dt1 = firstStamp.toSec() - previousStamp;
-			double dt2 = input.header.stamp.toSec() - previousStamp;
-			double dt3 = lastStamp.toSec() - previousStamp;
+			//  2- The pose of base frame in odom frame at last stamp
+			double dt1 = firstStamp.toSec() - input.header.stamp.toSec();
+			double dt2 = lastStamp.toSec() - input.header.stamp.toSec();
 
-			rtabmap::Transform p1(vx*dt1, vy*dt1, vz*dt1, vroll*dt1, vpitch*dt1, vyaw*dt1);
-			rtabmap::Transform p2(vx*dt2, vy*dt2, vz*dt2, vroll*dt2, vpitch*dt2, vyaw*dt2);
-			rtabmap::Transform p3(vx*dt3, vy*dt3, vz*dt3, vroll*dt3, vpitch*dt3, vyaw*dt3);
-
-			// First and last poses are relative to stamp of the msg
-			firstPose = p2.inverse() * p1;
-			lastPose = p2.inverse() * p3;
+			firstPose = rtabmap::Transform(vx*dt1, vy*dt1, vz*dt1, vroll*dt1, vpitch*dt1, vyaw*dt1);
+			lastPose = rtabmap::Transform(vx*dt2, vy*dt2, vz*dt2, vroll*dt2, vpitch*dt2, vyaw*dt2);
 		}
 
 		if(firstPose.isNull())
@@ -2773,7 +2756,6 @@ bool deskew_impl(
 					input.header.stamp.toSec());
 			return false;
 		}
-		scanTime = lastStamp.toSec() - firstStamp.toSec();
 	}
 	//else tf will be used to get more accurate transforms
 
@@ -2920,7 +2902,7 @@ bool deskew_impl(
 			}
 		}
 	}
-	ROS_DEBUG("Lidar deskewing time=%fs", processingTime.elapsed());
+	ROS_WARN("Lidar deskewing time=%fs", processingTime.elapsed());
 	return true;
 }
 
@@ -2932,16 +2914,15 @@ bool deskew(
 		double waitForTransform,
 		bool slerp)
 {
-	return deskew_impl(input, output, fixedFrameId, &listener, waitForTransform, slerp, rtabmap::Transform(), 0);
+	return deskew_impl(input, output, fixedFrameId, &listener, waitForTransform, slerp, rtabmap::Transform());
 }
 
 bool deskew(
 		const sensor_msgs::PointCloud2 & input,
 		sensor_msgs::PointCloud2 & output,
-		double previousStamp,
 		const rtabmap::Transform & velocity)
 {
-	return deskew_impl(input, output, "", 0, 0, true, velocity, previousStamp);
+	return deskew_impl(input, output, "", 0, 0, true, velocity);
 }
 
 }
