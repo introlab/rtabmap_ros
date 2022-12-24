@@ -182,5 +182,5 @@ void MapGraphDisplay::processMessage( const rtabmap_ros::MapGraph::ConstPtr& msg
 
 } // namespace rtabmap_ros
 
-#include <pluginlib/class_list_macros.h>
+#include <pluginlib/class_list_macros.hpp>
 PLUGINLIB_EXPORT_CLASS( rtabmap_ros::MapGraphDisplay, rviz::Display )

@@ -27,8 +27,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <rtabmap_ros/OdometryROS.h>
 
-#include <pluginlib/class_list_macros.h>
-#include <pluginlib/class_loader.h>
+#include <pluginlib/class_list_macros.hpp>
+#include <pluginlib/class_loader.hpp>
 
 #include <nodelet/nodelet.h>
 
