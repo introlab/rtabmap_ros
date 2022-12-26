@@ -1,6 +1,6 @@
 
 #include <ros/ros.h>
-#include <pluginlib/class_list_macros.h>
+#include <pluginlib/class_list_macros.hpp>
 #include <nodelet/nodelet.h>
 
 #include <tf/transform_listener.h>
