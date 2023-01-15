@@ -1,3 +1,4 @@
+<?xml version="1.0"?>
 <!-- -->
 <launch>
   <!-- Convenience launch file to launch odometry, rtabmap and rtabmapviz nodes at once -->

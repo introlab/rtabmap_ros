@@ -1,3 +1,4 @@
+<?xml version="1.0"?>
 
 <launch>
   <!-- rosbag record camera/data_throttled_image/compressed camera/data_throttled_image_depth/compressedDepth camera/data_throttled_camera_info tf base_scan /base_controller/odom -->

@@ -1,3 +1,4 @@
+<?xml version="1.0"?>
 <launch>
   <!-- Print on the file tag_bundle1.png (with GIMP: set size in Image Settings to 160x240mm) -->
   <!-- Definition of the tag bundle is tags.yaml, make sure the camera is calibrated or adjust the size of the tag if needed -->

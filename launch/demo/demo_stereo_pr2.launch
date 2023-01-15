@@ -1,3 +1,4 @@
+<?xml version="1.0"?>
 <launch>
     <!-- 6DOF stereo demo: download a bag example from http://projects.csail.mit.edu/stata/downloads.php.
     You will need to remove the transform /combined_odometry from the /tf messages:

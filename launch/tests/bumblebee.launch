@@ -1,3 +1,4 @@
+<?xml version="1.0"?>
 <launch>
     
     <node pkg="camera1394stereo" type="camera1394stereo_node" name="camera1394stereo_node" output="screen" >

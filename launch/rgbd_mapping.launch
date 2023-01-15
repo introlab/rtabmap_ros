@@ -1,3 +1,4 @@
+<?xml version="1.0"?>
 
 <launch>
   <!-- Backward compatibility launch file, use rtabmap.launch instead -->

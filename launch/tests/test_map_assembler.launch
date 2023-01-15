@@ -1,3 +1,4 @@
+<?xml version="1.0"?>
 <launch>
   <!-- Example to assemble 3D point clouds from depth when rtabmap is using scan for 2d occupancy grid :
         $ roslaunch rtabmap_ros demo_robot_mapping.launch rviz:=true rtabmapviz:=false

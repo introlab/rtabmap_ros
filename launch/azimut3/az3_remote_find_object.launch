@@ -1,3 +1,4 @@
+<?xml version="1.0"?>
 <launch>
   <node name="find_object_3d" pkg="find_object_2d" type="find_object_2d" output="screen">
     <param name="gui" value="true" type="bool"/>

@@ -1,4 +1,5 @@
 <?xml version="1.0"?>
+<?xml version="1.0"?>
 <launch>
     <!-- 1) Make sure rtabmap is built with libpointmatcher for lidar:=true option (lidar SLAM)
 
