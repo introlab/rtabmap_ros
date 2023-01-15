@@ -40,7 +40,7 @@
     <arg name="rgb_topic"               value="$(arg rgb_topic)" />
     <arg name="depth_topic"             value="$(arg depth_topic)" />
     <arg name="camera_info_topic"       value="$(arg camera_info_topic)" />
-                                                                                
+
     <arg name="subscribe_scan_cloud"    value="true"/>
     <arg name="scan_cloud_topic"        value="/assembled_cloud2"/>
 

@@ -5,7 +5,7 @@ TrajectoryPlannerROS:
   acc_lim_y:  0.75
   acc_lim_theta: 4
   # min_vel_x and max_rotational_vel were set to keep the ICR at
-  # minimal distance of 0.48 m. 
+  # minimal distance of 0.48 m.
   # Basically, max_rotational_vel * rho_min <= min_vel_x
   max_vel_x:  0.5
   min_vel_x:  0.24
@@ -17,7 +17,7 @@ TrajectoryPlannerROS:
   xy_goal_tolerance:  0.25
   yaw_goal_tolerance: 0.25
   latch_xy_goal_tolerance: true
-  
+
   # make sure that the minimum velocity multiplied by the sim_period is less than twice the tolerance on a goal. Otherwise, the robot will prefer to rotate in place just outside of range of its target position rather than moving towards the goal.
   sim_time: 1.5 # set between 1 and 2. The higher he value, the smoother the path (though more samples would be required).
   sim_granularity: 0.025
@@ -35,7 +35,7 @@ TrajectoryPlannerROS:
 #move_base
 controller_frequency: 10.0 #The robot can move faster when higher.
 
-#global planner 
+#global planner
 NavfnROS:
     allow_unknown: true
     visualize_potential: false

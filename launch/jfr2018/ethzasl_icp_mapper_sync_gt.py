@@ -1,4 +1,4 @@
-#!/usr/bin/env python  
+#!/usr/bin/env python
 import roslib
 import rospy
 import os
@@ -15,7 +15,7 @@ def callback(data):
     global listener
     global rmse
     global lastTime
-  
+
     if rospy.get_time() - lastTime < 1:
         return
     lastTime = rospy.get_time()

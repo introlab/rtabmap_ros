@@ -1,4 +1,4 @@
-#!/usr/bin/env python 
+#!/usr/bin/env python
 import rosbag
 from tf.msg import tfMessage
 with rosbag.Bag('rgbd_dataset_freiburg3_long_office_household_tf_renamed.bag', 'w') as outbag:

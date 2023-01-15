@@ -4,12 +4,12 @@
         $ roslaunch rtabmap_ros demo_robot_mapping.launch rviz:=true rtabmapviz:=false
         $ roslaunch rtabmap_ros test_map_assembler.launch
         $ rosbag play -clock demo_mapping.bag
-  -->        
- 
+  -->
+
   <group ns="rtabmap">
      <node pkg="rtabmap_ros" type="map_assembler" name="map_assembler">
         <remap from="mapData" to="mapData"/>
         <param name="regenerate_local_grids" value="true"/>
      </node>
-  </group>  
+  </group>
 </launch>

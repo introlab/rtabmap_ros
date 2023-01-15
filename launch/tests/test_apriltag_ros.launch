@@ -16,7 +16,7 @@
   <!-- Set parameters -->
   <rosparam command="load" file="$(find rtabmap_ros)/launch/tests/tag_settings.yaml" ns="apriltag_ros_continuous_node" />
   <rosparam command="load" file="$(find rtabmap_ros)/launch/tests/tags.yaml" ns="apriltag_ros_continuous_node" />
-  
+
   <node pkg="apriltag_ros" type="apriltag_ros_continuous_node" name="apriltag_ros_continuous_node" clear_params="true" output="screen">
     <remap from="image_rect" to="$(arg rgb_topic)" />
     <remap from="camera_info" to="$(arg camera_info_topic)" />
