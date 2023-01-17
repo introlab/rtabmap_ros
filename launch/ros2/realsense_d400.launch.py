@@ -17,6 +17,7 @@ def generate_launch_description():
     parameters=[{
           'frame_id':'camera_link',
           'subscribe_depth':True,
+          'subscribe_odom_info':True,
           'approx_sync':False}]
 
     remappings=[

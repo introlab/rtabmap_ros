@@ -114,6 +114,7 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 		genDepthFillIterations_(1),
 		genDepthFillHolesError_(0.1),
 		scanCloudMaxPoints_(0),
+		scanCloudIs2d_(false),
 		mapToOdom_(rtabmap::Transform::getIdentity()),
 		transformThread_(0),
 		tfThreadRunning_(false),
@@ -201,6 +202,7 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 	genDepthFillIterations_ = this->declare_parameter("gen_depth_fill_iterations", genDepthFillIterations_);
 	genDepthFillHolesError_ = this->declare_parameter("gen_depth_fill_holes_error", genDepthFillHolesError_);
 	scanCloudMaxPoints_ = this->declare_parameter("scan_cloud_max_points", scanCloudMaxPoints_);
+	scanCloudIs2d_ = this->declare_parameter("scan_cloud_is_2d", scanCloudIs2d_);
 
 	stereoToDepth_ = this->declare_parameter("stereo_to_depth", stereoToDepth_);
 	odomSensorSync_ = this->declare_parameter("odom_sensor_sync", odomSensorSync_);
@@ -246,6 +248,7 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 	if(this->isSubscribedToScan3d())
 	{
 		RCLCPP_INFO(get_logger(), "rtabmap: scan_cloud_max_points = %d", scanCloudMaxPoints_);
+		RCLCPP_INFO(get_logger(), "rtabmap: scan_cloud_is_2d = %s", scanCloudIs2d_?"true":"false");
 	}
 
 	infoPub_ = this->create_publisher<rtabmap_ros::msg::Info>("info", 1);
@@ -437,7 +440,7 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 				Parameters::kGridSensor().c_str());
 		parameters_.insert(ParametersPair(Parameters::kGridRangeMax(), "0"));
 	}
-	if(this->isSubscribedToScan3d() && parameters_.find(Parameters::kIcpPointToPlaneRadius()) == parameters_.end())
+	if(this->isSubscribedToScan3d() && !scanCloudIs2d_ && parameters_.find(Parameters::kIcpPointToPlaneRadius()) == parameters_.end())
 	{
 		RCLCPP_INFO(this->get_logger(), "Setting \"%s\" parameter to 0 (default %f) as \"subscribe_scan_cloud\" is true.",
 				Parameters::kIcpPointToPlaneRadius().c_str(),
@@ -449,13 +452,14 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 	if(parameters_.find(Parameters::kRGBDProximityPathMaxNeighbors()) == parameters_.end() &&
 		(regStrategy == Registration::kTypeIcp || regStrategy == Registration::kTypeVisIcp))
 	{
-		if(this->isSubscribedToScan2d())
+		if(this->isSubscribedToScan2d() || (this->isSubscribedToScan3d() && scanCloudIs2d_))
 		{
-			RCLCPP_WARN(this->get_logger(), "Setting \"%s\" parameter to 10 (default 0) as \"subscribe_scan\" is "
+			RCLCPP_WARN(this->get_logger(), "Setting \"%s\" parameter to 10 (default 0) as \"%s\" is "
 					"true and \"%s\" uses ICP. Proximity detection by space will be also done by merging close "
 					"scans. To disable, set \"%s\" to 0. To suppress this warning, "
 					"add <param name=\"%s\" type=\"string\" value=\"10\"/>",
 					Parameters::kRGBDProximityPathMaxNeighbors().c_str(),
+					this->isSubscribedToScan2d()?"subscribe_scan":"scan_cloud_is_2d",
 					Parameters::kRegStrategy().c_str(),
 					Parameters::kRGBDProximityPathMaxNeighbors().c_str(),
 					Parameters::kRGBDProximityPathMaxNeighbors().c_str());
@@ -1385,7 +1389,9 @@ void CoreWrapper::commonMultiCameraCallbackImpl(
 				scan,
 				*tfBuffer_,
 				waitForTransform_,
-				scanCloudMaxPoints_))
+				scanCloudMaxPoints_,
+				0,
+				scanCloudIs2d_))
 		{
 			RCLCPP_ERROR(this->get_logger(), "Could not convert 3d laser scan msg! Aborting rtabmap update...");
 			return;
@@ -1590,7 +1596,9 @@ void CoreWrapper::commonLaserScanCallback(
 				scan,
 				*tfBuffer_,
 				waitForTransform_,
-				scanCloudMaxPoints_))
+				scanCloudMaxPoints_,
+				0,
+				scanCloudIs2d_))
 		{
 			RCLCPP_ERROR(this->get_logger(), "Could not convert 3d laser scan msg! Aborting rtabmap update...");
 			return;

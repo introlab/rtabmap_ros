@@ -50,6 +50,19 @@ LidarDeskewing::~LidarDeskewing()
 
 void LidarDeskewing::callbackScan(const sensor_msgs::msg::LaserScan::ConstSharedPtr msg)
 {
+	// make sure the frame of the laser is updated during the whole scan time
+	rtabmap::Transform tmpT = rtabmap_ros::getTransform(
+			msg->header.frame_id,
+			fixedFrameId_,
+			msg->header.stamp,
+			rclcpp::Time(msg->header.stamp.sec, msg->header.stamp.nanosec) + rclcpp::Duration::from_seconds(msg->ranges.size()*msg->time_increment),
+			*tfBuffer_,
+			waitForTransformDuration_);
+	if(tmpT.isNull())
+	{
+		return;
+	}
+
 	sensor_msgs::msg::PointCloud2 scanOut;
 	laser_geometry::LaserProjection projection;
 	projection.transformLaserScanToPointCloud(fixedFrameId_, *msg, scanOut, *tfBuffer_);
@@ -61,6 +74,7 @@ void LidarDeskewing::callbackScan(const sensor_msgs::msg::LaserScan::ConstShared
 				scanOut.header.frame_id.c_str(), msg->header.frame_id.c_str(), rtabmap_ros::timestampFromROS(msg->header.stamp));
 		return;
 	}
+
 	sensor_msgs::msg::PointCloud2 scanOutDeskewed;
 	rtabmap_ros::transformPointCloud(t.toEigen4f(), scanOut, scanOutDeskewed);
 	pubScan_->publish(scanOutDeskewed);

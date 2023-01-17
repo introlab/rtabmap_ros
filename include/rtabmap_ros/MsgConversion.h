@@ -263,7 +263,8 @@ bool convertScan3dMsg(
 		tf2_ros::Buffer & tfBuffer,
 		double waitForTransform,
 		int maxPoints = 0,
-		float maxRange = 0.0f);
+		float maxRange = 0.0f,
+		bool is2D = false);
 
 // Missing function in ros2 (from old pcl_ros)
 void transformPointCloud (

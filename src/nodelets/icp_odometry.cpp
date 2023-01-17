@@ -50,6 +50,7 @@ namespace rtabmap_ros
 ICPOdometry::ICPOdometry(const rclcpp::NodeOptions & options) :
 	OdometryROS("icp_odometry", options),
 	scanCloudMaxPoints_(0),
+	scanCloudIs2d_(false),
 	scanDownsamplingStep_(1),
 	scanRangeMin_(0),
 	scanRangeMax_(0),
@@ -74,6 +75,7 @@ ICPOdometry::~ICPOdometry()
 void ICPOdometry::onOdomInit()
 {
 	scanCloudMaxPoints_ = this->declare_parameter("scan_cloud_max_points", scanCloudMaxPoints_);
+	scanCloudIs2d_ = this->declare_parameter("scan_cloud_is_2d", scanCloudIs2d_);
 	scanDownsamplingStep_ = this->declare_parameter("scan_downsampling_step", scanDownsamplingStep_);
 	scanRangeMin_ = this->declare_parameter("scan_range_min", scanRangeMin_);
 	scanRangeMax_ = this->declare_parameter("scan_range_max", scanRangeMax_);
@@ -81,6 +83,8 @@ void ICPOdometry::onOdomInit()
 	scanNormalK_ = this->declare_parameter("scan_normal_k", scanNormalK_);
 	scanNormalRadius_ = this->declare_parameter("scan_normal_radius", scanNormalRadius_);
 	scanNormalGroundUp_ = this->declare_parameter("scan_normal_ground_up", scanNormalGroundUp_);
+	deskewing_ = this->declare_parameter("deskewing", deskewing_);
+	deskewingSlerp_ = this->declare_parameter("deskewing_slerp", deskewingSlerp_);
 
 	/*if (pnh.hasParam("plugins"))
 	{
@@ -113,6 +117,7 @@ void ICPOdometry::onOdomInit()
 
 	RCLCPP_INFO(this->get_logger(), "IcpOdometry: qos                    = %d", (int)qos());
 	RCLCPP_INFO(this->get_logger(), "IcpOdometry: scan_cloud_max_points  = %d", scanCloudMaxPoints_);
+	RCLCPP_INFO(this->get_logger(), "IcpOdometry: scan_cloud_is_2d       = %s", scanCloudIs2d_?"true":"false");
 	RCLCPP_INFO(this->get_logger(), "IcpOdometry: scan_downsampling_step = %d", scanDownsamplingStep_);
 	RCLCPP_INFO(this->get_logger(), "IcpOdometry: scan_range_min         = %f m", scanRangeMin_);
 	RCLCPP_INFO(this->get_logger(), "IcpOdometry: scan_range_max         = %f m", scanRangeMax_);
@@ -318,11 +323,41 @@ void ICPOdometry::callbackScan(const sensor_msgs::msg::LaserScan::SharedPtr scan
 	//transform in frameId_ frame
 	sensor_msgs::msg::PointCloud2 scanOut;
 	laser_geometry::LaserProjection projection;
-	if(deskewing_ && !guessFrameId().empty())
+	if(deskewing_ && (!guessFrameId().empty() || (frameId().compare(scanMsg->header.frame_id) != 0)))
 	{
-		projection.transformLaserScanToPointCloud(deskewing_&&!guessFrameId().empty()?guessFrameId():scanMsg->header.frame_id, *scanMsg, scanOut, this->tfBuffer());
+		// make sure the frame of the laser is updated during the whole scan time
+		rtabmap::Transform tmpT = getTransform(
+				scanMsg->header.frame_id,
+				guessFrameId().empty()?frameId():guessFrameId(),
+				scanMsg->header.stamp,
+				rclcpp::Time(scanMsg->header.stamp.sec, scanMsg->header.stamp.nanosec) + rclcpp::Duration::from_seconds(scanMsg->ranges.size()*scanMsg->time_increment),
+				this->tfBuffer(),
+				this->waitForTransform());
+		if(tmpT.isNull())
+		{
+			return;
+		}
 
-		rtabmap::Transform t = rtabmap_ros::getTransform(scanOut.header.frame_id, scanMsg->header.frame_id, scanMsg->header.stamp, tfBuffer(), waitForTransform());
+		projection.transformLaserScanToPointCloud(
+			guessFrameId().empty()?frameId():guessFrameId(),
+			*scanMsg,
+			scanOut,
+			this->tfBuffer(),
+			laser_geometry::channel_option::Intensity | laser_geometry::channel_option::Timestamp);
+
+		if(guessFrameId().empty() && previousStamp() > 0 && !velocityGuess().isNull())
+		{
+			// deskew with constant velocity model (we are in frameId)
+			sensor_msgs::msg::PointCloud2 scanOutDeskewed;
+			if(!deskew(scanOut, scanOutDeskewed, previousStamp(), velocityGuess()))
+			{
+				RCLCPP_ERROR(this->get_logger(), "Failed to deskew input cloud, aborting odometry update!");
+				return;
+			}
+			scanOut = scanOutDeskewed;
+		}
+
+		rtabmap::Transform t = rtabmap_ros::getTransform(scanMsg->header.frame_id, scanOut.header.frame_id, scanMsg->header.stamp, tfBuffer(), waitForTransform());
 		if(t.isNull())
 		{
 			RCLCPP_ERROR(this->get_logger(), "Cannot transform back projected scan from \"%s\" frame to \"%s\" frame at time %fs.",
@@ -338,7 +373,7 @@ void ICPOdometry::callbackScan(const sensor_msgs::msg::LaserScan::SharedPtr scan
 	{
 		projection.projectLaser(*scanMsg, scanOut, -1.0, laser_geometry::channel_option::Intensity | laser_geometry::channel_option::Timestamp);
 
-		if(previousStamp() > 0 && !velocityGuess().isNull())
+		if(deskewing_ && previousStamp() > 0 && !velocityGuess().isNull())
 		{
 			// deskew with constant velocity model
 			sensor_msgs::msg::PointCloud2 scanOutDeskewed;
@@ -347,6 +382,7 @@ void ICPOdometry::callbackScan(const sensor_msgs::msg::LaserScan::SharedPtr scan
 				RCLCPP_ERROR(this->get_logger(), "Failed to deskew input cloud, aborting odometry update!");
 				return;
 			}
+			scanOut = scanOutDeskewed;
 		}
 	}
 
@@ -515,7 +551,7 @@ void ICPOdometry::callbackCloud(const sensor_msgs::msg::PointCloud2::SharedPtr p
 		return;
 	}
 
-	sensor_msgs::msg::PointCloud2 cloudMsg;
+	std::shared_ptr<sensor_msgs::msg::PointCloud2> cloudMsg(new sensor_msgs::msg::PointCloud2);
 	/*if (!plugins_.empty())
 	{
 		if (plugins_[0]->isEnabled())
@@ -538,7 +574,14 @@ void ICPOdometry::callbackCloud(const sensor_msgs::msg::PointCloud2::SharedPtr p
 	}
 	else */
 	{
-		cloudMsg = *pointCloudMsg;
+		*cloudMsg = *pointCloudMsg;
+	}
+
+	rtabmap::Transform localScanTransform = getTransform(this->frameId(), cloudMsg->header.frame_id, cloudMsg->header.stamp, this->tfBuffer(), this->waitForTransform());
+	if(localScanTransform.isNull())
+	{
+		RCLCPP_ERROR(this->get_logger(), "TF of received scan cloud at time %fs is not set, aborting rtabmap update.", timestampFromROS(cloudMsg->header.stamp));
+		return;
 	}
 
 	if(deskewing_)
@@ -546,7 +589,7 @@ void ICPOdometry::callbackCloud(const sensor_msgs::msg::PointCloud2::SharedPtr p
 		if(!guessFrameId().empty())
 		{
 			// deskew with TF
-			if(!deskew(*pointCloudMsg, cloudMsg, guessFrameId(), tfBuffer(), waitForTransform(), deskewingSlerp_))
+			if(!deskew(*pointCloudMsg, *cloudMsg, guessFrameId(), tfBuffer(), waitForTransform(), deskewingSlerp_))
 			{
 				RCLCPP_ERROR(this->get_logger(), "Failed to deskew input cloud, aborting odometry update!");
 				return;
@@ -555,10 +598,47 @@ void ICPOdometry::callbackCloud(const sensor_msgs::msg::PointCloud2::SharedPtr p
 		else if(previousStamp() > 0 && !velocityGuess().isNull())
 		{
 			// deskew with constant velocity model
-			if(!deskew(*pointCloudMsg, cloudMsg, previousStamp(), velocityGuess()))
+			bool alreadyInBaseFrame = frameId().compare(pointCloudMsg->header.frame_id) == 0;
+			std::shared_ptr<sensor_msgs::msg::PointCloud2> cloudInBaseFrame;
+			std::shared_ptr<sensor_msgs::msg::PointCloud2> cloudPtr = cloudMsg;
+			if(!alreadyInBaseFrame)
+			{
+				// transform in base frame
+				rtabmap::Transform t = rtabmap_ros::getTransform(frameId(), pointCloudMsg->header.frame_id, pointCloudMsg->header.stamp, tfBuffer(), waitForTransform());
+				if(t.isNull())
+				{
+					RCLCPP_ERROR(this->get_logger(), "Cannot transform cloud from \"%s\" frame to \"%s\" frame at time %fs.",
+							pointCloudMsg->header.frame_id.c_str(), frameId().c_str(), timestampFromROS(pointCloudMsg->header.stamp));
+					return;
+				}
+
+				cloudInBaseFrame.reset(new sensor_msgs::msg::PointCloud2);
+				rtabmap_ros::transformPointCloud(t.toEigen4f(), *pointCloudMsg, *cloudInBaseFrame);
+				cloudPtr = cloudInBaseFrame;
+			}
+
+			std::shared_ptr<sensor_msgs::msg::PointCloud2> cloudDeskewed(new sensor_msgs::msg::PointCloud2);
+			if(!deskew(*cloudPtr, *cloudDeskewed, previousStamp(), velocityGuess()))
 			{
 				RCLCPP_ERROR(this->get_logger(), "Failed to deskew input cloud, aborting odometry update!");
 				return;
+			}
+
+			if(!alreadyInBaseFrame)
+			{
+				// put back in scan frame
+				rtabmap::Transform t = rtabmap_ros::getTransform(pointCloudMsg->header.frame_id, frameId(), pointCloudMsg->header.stamp, tfBuffer(), waitForTransform());
+				if(t.isNull())
+				{
+					RCLCPP_ERROR(this->get_logger(), "Cannot transform cloud from \"%s\" frame to \"%s\" frame at time %fs.",
+							frameId().c_str(), pointCloudMsg->header.frame_id.c_str(), timestampFromROS(pointCloudMsg->header.stamp));
+					return;
+				}
+				rtabmap_ros::transformPointCloud(t.toEigen4f(), *cloudDeskewed, *cloudMsg);
+			}
+			else
+			{
+				cloudMsg = cloudDeskewed;
 			}
 		}
 	}
@@ -566,15 +646,20 @@ void ICPOdometry::callbackCloud(const sensor_msgs::msg::PointCloud2::SharedPtr p
 	LaserScan scan;
 	bool hasNormals = false;
 	bool hasIntensity = false;
-	for(unsigned int i=0; i<cloudMsg.fields.size(); ++i)
+	bool is3D = false;
+	for(unsigned int i=0; i<cloudMsg->fields.size(); ++i)
 	{
-		if(scanVoxelSize_ == 0.0f && cloudMsg.fields[i].name.compare("normal_x") == 0)
+		if(scanVoxelSize_ == 0.0f && cloudMsg->fields[i].name.compare("normal_x") == 0)
 		{
 			hasNormals = true;
 		}
-		if(cloudMsg.fields[i].name.compare("intensity") == 0)
+		if(cloudMsg->fields[i].name.compare("z") == 0 && !scanCloudIs2d_)
 		{
-			if(cloudMsg.fields[i].datatype == sensor_msgs::msg::PointField::FLOAT32)
+			is3D = true;
+		}
+		if(cloudMsg->fields[i].name.compare("intensity") == 0)
+		{
+			if(cloudMsg->fields[i].datatype == sensor_msgs::msg::PointField::FLOAT32)
 			{
 				hasIntensity = true;
 			}
@@ -585,39 +670,33 @@ void ICPOdometry::callbackCloud(const sensor_msgs::msg::PointCloud2::SharedPtr p
 				{
 					RCLCPP_WARN(this->get_logger(), "The input scan cloud has an \"intensity\" field "
 							"but the datatype (%d) is not supported. Intensity will be ignored. "
-							"This message is only shown once.", cloudMsg.fields[i].datatype);
+							"This message is only shown once.", cloudMsg->fields[i].datatype);
 					warningShown = true;
 				}
 			}
 		}
 	}
 
-	Transform localScanTransform = getTransform(this->frameId(), cloudMsg.header.frame_id, cloudMsg.header.stamp, tfBuffer(), waitForTransform());
-	if(localScanTransform.isNull())
+	if(scanCloudMaxPoints_ == 0 && cloudMsg->height > 1)
 	{
-		RCLCPP_ERROR(this->get_logger(), "TF of received scan cloud at time %fs is not set, aborting rtabmap update.", timestampFromROS(cloudMsg.header.stamp));
-		return;
-	}
-	if(scanCloudMaxPoints_ == 0 && cloudMsg.height > 1)
-	{
-		scanCloudMaxPoints_ = cloudMsg.height * cloudMsg.width;
+		scanCloudMaxPoints_ = cloudMsg->height * cloudMsg->width;
 		RCLCPP_WARN(this->get_logger(), "IcpOdometry: \"scan_cloud_max_points\" is not set but input "
 				"cloud is not dense, for convenience it will be set to %d (%dx%d)",
-				scanCloudMaxPoints_, cloudMsg.width, cloudMsg.height);
+				scanCloudMaxPoints_, cloudMsg->width, cloudMsg->height);
 	}
-	else if(cloudMsg.height > 1 && scanCloudMaxPoints_ < int(cloudMsg.height * cloudMsg.width))
+	else if(cloudMsg->height > 1 && scanCloudMaxPoints_ < int(cloudMsg->height * cloudMsg->width))
 	{
 		RCLCPP_WARN(this->get_logger(), "IcpOdometry: \"scan_cloud_max_points\" is set to %d but input "
 				"cloud is not dense and has a size of %d (%dx%d), setting to this later size.",
-				scanCloudMaxPoints_, cloudMsg.width *cloudMsg.height, cloudMsg.width, cloudMsg.height);
-		scanCloudMaxPoints_ = cloudMsg.width *cloudMsg.height;
+				scanCloudMaxPoints_, cloudMsg->width *cloudMsg->height, cloudMsg->width, cloudMsg->height);
+		scanCloudMaxPoints_ = cloudMsg->width *cloudMsg->height;
 	}
 	int maxLaserScans = scanCloudMaxPoints_;
 
 	if(hasNormals && hasIntensity)
 	{
 		pcl::PointCloud<pcl::PointXYZINormal>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZINormal>);
-		pcl::fromROSMsg(cloudMsg, *pclScan);
+		pcl::fromROSMsg(*cloudMsg, *pclScan);
 		if(pclScan->size() && scanDownsamplingStep_ > 1)
 		{
 			pclScan = util3d::downsample(pclScan, scanDownsamplingStep_);
@@ -630,12 +709,12 @@ void ICPOdometry::callbackCloud(const sensor_msgs::msg::PointCloud2::SharedPtr p
 				maxLaserScans /= scanDownsamplingStep_;
 			}
 		}
-		scan = util3d::laserScanFromPointCloud(*pclScan);
+		scan = is3D?util3d::laserScanFromPointCloud(*pclScan):util3d::laserScan2dFromPointCloud(*pclScan);
 	}
 	else if(hasNormals)
 	{
 		pcl::PointCloud<pcl::PointNormal>::Ptr pclScan(new pcl::PointCloud<pcl::PointNormal>);
-		pcl::fromROSMsg(cloudMsg, *pclScan);
+		pcl::fromROSMsg(*cloudMsg, *pclScan);
 		if(pclScan->size() && scanDownsamplingStep_ > 1)
 		{
 			pclScan = util3d::downsample(pclScan, scanDownsamplingStep_);
@@ -648,12 +727,12 @@ void ICPOdometry::callbackCloud(const sensor_msgs::msg::PointCloud2::SharedPtr p
 				maxLaserScans /= scanDownsamplingStep_;
 			}
 		}
-		scan = util3d::laserScanFromPointCloud(*pclScan);
+		scan = is3D?util3d::laserScanFromPointCloud(*pclScan):util3d::laserScan2dFromPointCloud(*pclScan);
 	}
 	else if(hasIntensity)
 	{
 		pcl::PointCloud<pcl::PointXYZI>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZI>);
-		pcl::fromROSMsg(cloudMsg, *pclScan);
+		pcl::fromROSMsg(*cloudMsg, *pclScan);
 		if(pclScan->size() && scanDownsamplingStep_ > 1)
 		{
 			pclScan = util3d::downsample(pclScan, scanDownsamplingStep_);
@@ -683,21 +762,23 @@ void ICPOdometry::callbackCloud(const sensor_msgs::msg::PointCloud2::SharedPtr p
 			if(scanNormalK_ > 0 || scanNormalRadius_>0.0f)
 			{
 				//compute normals
-				pcl::PointCloud<pcl::Normal>::Ptr normals = util3d::computeNormals(pclScan, scanNormalK_, scanNormalRadius_);
+				pcl::PointCloud<pcl::Normal>::Ptr normals = is3D?
+						util3d::computeNormals(pclScan, scanNormalK_, scanNormalRadius_):
+						util3d::computeNormals2D(pclScan, scanNormalK_, scanNormalRadius_);
 				pcl::PointCloud<pcl::PointXYZINormal>::Ptr pclScanNormal(new pcl::PointCloud<pcl::PointXYZINormal>);
 				pcl::concatenateFields(*pclScan, *normals, *pclScanNormal);
-				scan = util3d::laserScanFromPointCloud(*pclScanNormal);
+				scan = is3D?util3d::laserScanFromPointCloud(*pclScanNormal):util3d::laserScan2dFromPointCloud(*pclScanNormal);
 			}
 			else
 			{
-				scan = util3d::laserScanFromPointCloud(*pclScan);
+				scan = is3D?util3d::laserScanFromPointCloud(*pclScan):util3d::laserScan2dFromPointCloud(*pclScan);
 			}
 		}
 	}
 	else
 	{
 		pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
-		pcl::fromROSMsg(cloudMsg, *pclScan);
+		pcl::fromROSMsg(*cloudMsg, *pclScan);
 		if(pclScan->size() && scanDownsamplingStep_ > 1)
 		{
 			pclScan = util3d::downsample(pclScan, scanDownsamplingStep_);
@@ -728,14 +809,16 @@ void ICPOdometry::callbackCloud(const sensor_msgs::msg::PointCloud2::SharedPtr p
 			if(scanNormalK_ > 0 || scanNormalRadius_>0.0f)
 			{
 				//compute normals
-				pcl::PointCloud<pcl::Normal>::Ptr normals = util3d::computeNormals(pclScan, scanNormalK_, scanNormalRadius_);
+				pcl::PointCloud<pcl::Normal>::Ptr normals = is3D?
+						util3d::computeNormals(pclScan, scanNormalK_, scanNormalRadius_):
+						util3d::computeNormals2D(pclScan, scanNormalK_, scanNormalRadius_);
 				pcl::PointCloud<pcl::PointNormal>::Ptr pclScanNormal(new pcl::PointCloud<pcl::PointNormal>);
 				pcl::concatenateFields(*pclScan, *normals, *pclScanNormal);
-				scan = util3d::laserScanFromPointCloud(*pclScanNormal);
+				scan = is3D?util3d::laserScanFromPointCloud(*pclScanNormal):util3d::laserScan2dFromPointCloud(*pclScanNormal);
 			}
 			else
 			{
-				scan = util3d::laserScanFromPointCloud(*pclScan);
+				scan = is3D?util3d::laserScanFromPointCloud(*pclScan):util3d::laserScan2dFromPointCloud(*pclScan);
 			}
 		}
 	}
@@ -759,9 +842,9 @@ void ICPOdometry::callbackCloud(const sensor_msgs::msg::PointCloud2::SharedPtr p
 			cv::Mat(),
 			CameraModel(),
 			0,
-			rtabmap_ros::timestampFromROS(cloudMsg.header.stamp));
+			rtabmap_ros::timestampFromROS(cloudMsg->header.stamp));
 
-	this->processData(data, cloudMsg.header);
+	this->processData(data, cloudMsg->header);
 }
 
 void ICPOdometry::flushCallbacks()

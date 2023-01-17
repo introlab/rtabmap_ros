@@ -288,6 +288,7 @@ private:
 	int genDepthFillIterations_;
 	double genDepthFillHolesError_;
 	int scanCloudMaxPoints_;
+	bool scanCloudIs2d_;
 
 	rtabmap::Transform mapToOdom_;
 	std::mutex mapToOdomMutex_;

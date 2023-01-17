@@ -366,13 +366,13 @@ void RGBDOdometry::commonCallback(
 			!(depthImages[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1) == 0 ||
 			 depthImages[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1) == 0 ||
 			 depthImages[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0))
-			 {
-				RCLCPP_ERROR(this->get_logger(), "Input type must be image=mono8,mono16,rgb8,bgr8,bgra8,rgba8 and "
-				"image_depth=32FC1,16UC1,mono16. Current rgb=%s and depth=%s",
-					rgbImages[i]->encoding.c_str(),
-					depthImages[i]->encoding.c_str());
-				return;
-			}
+		{
+			RCLCPP_ERROR(this->get_logger(), "Input type must be image=mono8,mono16,rgb8,bgr8,bgra8,rgba8 and "
+			"image_depth=32FC1,16UC1,mono16. Current rgb=%s and depth=%s",
+				rgbImages[i]->encoding.c_str(),
+				depthImages[i]->encoding.c_str());
+			return;
+		}
 		UASSERT_MSG(rgbImages[i]->image.cols == imageWidth && rgbImages[i]->image.rows == imageHeight,
 				uFormat("imageWidth=%d vs %d imageHeight=%d vs %d",
 						imageWidth,

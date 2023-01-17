@@ -24,7 +24,7 @@
 #   SLAM:
 #   $ ros2 launch rtabmap_ros turtlebot3_rgbd_sync.launch.py
 #   OR
-#   $ ros2 launch rtabmap_ros rtabmap.launch.py visual_odometry:=false frame_id:=base_footprint subscribe_scan:=true  approx_sync:=true approx_rgbd_sync:=false odom_topic:=/odom args:="-d --RGBD/NeighborLinkRefining true --Reg/Strategy 1 --Reg/Force3DoF true --Grid/RangeMin 0.2" use_sim_time:=true rgbd_sync:=true rgb_topic:=/camera/image_raw depth_topic:=/camera/depth/image_raw camera_info_topic:=/camera/camera_info
+#   $ ros2 launch rtabmap_ros rtabmap.launch.py visual_odometry:=false frame_id:=base_footprint subscribe_scan:=true  approx_sync:=true approx_rgbd_sync:=false odom_topic:=/odom args:="-d --RGBD/NeighborLinkRefining true --Reg/Strategy 1 --Reg/Force3DoF true --Grid/RangeMin 0.2" use_sim_time:=true rgbd_sync:=true rgb_topic:=/camera/image_raw depth_topic:=/camera/depth/image_raw camera_info_topic:=/camera/camera_info qos:=2
 #
 #   Navigation (install nav2_bringup package):
 #     $ ros2 launch nav2_bringup navigation_launch.py use_sim_time:=True

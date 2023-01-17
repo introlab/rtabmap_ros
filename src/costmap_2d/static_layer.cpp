@@ -42,7 +42,7 @@
 
 #include "static_layer.h"
 #include <costmap_2d/costmap_math.h>
-#include <pluginlib/class_list_macros.h>
+#include <pluginlib/class_list_macros.hpp>
 
 PLUGINLIB_EXPORT_CLASS(rtabmap_ros::StaticLayer, costmap_2d::Layer)
 

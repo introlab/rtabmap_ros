@@ -25,52 +25,34 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "OrbitOrientedViewController.h"
+#include <rtabmap_ros/visibility.h>
+#include "rclcpp/rclcpp.hpp"
 
-#include <OgreCamera.h>
-#include <OgreQuaternion.h>
-#include <OgreSceneManager.h>
-#include <OgreSceneNode.h>
-#include <OgreVector3.h>
-#include <OgreViewport.h>
+#include <sensor_msgs/image_encodings.hpp>
 
-#include "rviz/properties/float_property.h"
-#include "rviz/properties/vector_property.h"
-#include "rviz/ogre_helpers/shape.h"
+#include <image_transport/image_transport.hpp>
+
+#include "rtabmap_ros/msg/rgbd_image.hpp"
 
 namespace rtabmap_ros
 {
 
-void OrbitOrientedViewController::updateCamera()
+class RGBDSplit : public rclcpp::Node
 {
-	float distance = distance_property_->getFloat();
-	float yaw = yaw_property_->getFloat();
-	float pitch = pitch_property_->getFloat();
+public:
+	RTABMAP_ROS_PUBLIC
+	explicit RGBDSplit(const rclcpp::NodeOptions & options);
 
-	Ogre::Matrix3 rot;
-	reference_orientation_.ToRotationMatrix(rot);
-	Ogre::Radian rollTarget, pitchTarget, yawTarget;
-	rot.ToEulerAnglesXYZ(yawTarget, pitchTarget, rollTarget);
+	virtual ~RGBDSplit() {}
 
-	yaw += rollTarget.valueRadians();
-	pitch += pitchTarget.valueRadians();
+	void callback(const rtabmap_ros::msg::RGBDImage::SharedPtr input) const;
 
-	Ogre::Vector3 focal_point = focal_point_property_->getVector();
+private:
+	rclcpp::Subscription<rtabmap_ros::msg::RGBDImage>::SharedPtr rgbdImageSub_;
 
-	float x = distance * cos( yaw ) * cos( pitch ) + focal_point.x;
-	float y = distance * sin( yaw ) * cos( pitch ) + focal_point.y;
-	float z = distance *              sin( pitch ) + focal_point.z;
-
-	Ogre::Vector3 pos( x, y, z );
-
-	camera_->setPosition(pos);
-	camera_->setFixedYawAxis(true, target_scene_node_->getOrientation() * Ogre::Vector3::UNIT_Z);
-	camera_->setDirection(target_scene_node_->getOrientation() * (focal_point - pos));
-
-	focal_shape_->setPosition( focal_point );
-}
+	image_transport::CameraPublisher rgbPub_;
+	image_transport::CameraPublisher depthPub_;
+};
 
 }
 
-#include <pluginlib/class_list_macros.hpp>
-PLUGINLIB_EXPORT_CLASS( rtabmap_ros::OrbitOrientedViewController, rviz::ViewController )

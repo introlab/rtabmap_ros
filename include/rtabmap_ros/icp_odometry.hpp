@@ -68,6 +68,7 @@ private:
 	rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr cloud_sub_;
 	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr filtered_scan_pub_;
 	int scanCloudMaxPoints_;
+	bool scanCloudIs2d_;
 	int scanDownsamplingStep_;
 	double scanRangeMin_;
 	double scanRangeMax_;

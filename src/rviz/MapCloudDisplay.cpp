@@ -970,5 +970,5 @@ bool MapCloudDisplay::transformCloud(const CloudInfoPtr& cloud_info, bool update
 
 } // namespace rtabmap
 
-#include <pluginlib/class_list_macros.hpp>  // NOLINT
+#include <pluginlib/class_list_macros.hpp>
 PLUGINLIB_EXPORT_CLASS(rtabmap_ros::MapCloudDisplay, rviz_common::Display)

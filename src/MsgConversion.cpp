@@ -2347,10 +2347,11 @@ bool convertScanMsg(
 		double waitForTransform,
 		bool outputInFrameId)
 {
-	// make sure the frame of the laser is updated too
+	// make sure the frame of the laser is updated during the whole scan time
 	rtabmap::Transform tmpT = getTransform(
-			odomFrameId.empty()?frameId:odomFrameId,
 			scan2dMsg.header.frame_id,
+			odomFrameId.empty()?frameId:odomFrameId,
+			rclcpp::Time(scan2dMsg.header.stamp.sec, scan2dMsg.header.stamp.nanosec),
 			rclcpp::Time(scan2dMsg.header.stamp.sec, scan2dMsg.header.stamp.nanosec) + rclcpp::Duration::from_seconds(scan2dMsg.ranges.size()*scan2dMsg.time_increment),
 			tfBuffer,
 			waitForTransform);
@@ -2486,7 +2487,8 @@ bool convertScan3dMsg(
 		tf2_ros::Buffer & listener,
 		double waitForTransform,
 		int maxPoints,
-		float maxRange)
+		float maxRange,
+		bool is2D)
 {
 	UASSERT_MSG(scan3dMsg.data.size() == scan3dMsg.row_step*scan3dMsg.height,
 			uFormat("data=%d row_step=%d height=%d", scan3dMsg.data.size(), scan3dMsg.row_step, scan3dMsg.height).c_str());
@@ -2518,8 +2520,7 @@ bool convertScan3dMsg(
 			scanLocalTransform = sensorT * scanLocalTransform;
 		}
 	}
-
-	scan = rtabmap::util3d::laserScanFromPointCloud(scan3dMsg);
+	scan = rtabmap::util3d::laserScanFromPointCloud(scan3dMsg, true, is2D);
 	scan = rtabmap::LaserScan(scan, maxPoints, maxRange, scanLocalTransform);
 	return true;
 }

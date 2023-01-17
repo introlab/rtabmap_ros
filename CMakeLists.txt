@@ -296,6 +296,7 @@ SET(rtabmap_plugins_lib_src
     src/nodelets/stereo_sync.cpp 
     src/nodelets/rgb_sync.cpp 
     src/nodelets/rgbd_relay.cpp
+    src/nodelets/rgbd_split.cpp
     src/nodelets/lidar_deskewing.cpp
 )
 
@@ -434,6 +435,11 @@ ament_target_dependencies(rtabmap_rgbd_relay ${Libraries})
 target_link_libraries(rtabmap_rgbd_relay rtabmap_plugins ${RTABMap_LIBRARIES})
 set_target_properties(rtabmap_rgbd_relay PROPERTIES OUTPUT_NAME "rgbd_relay")
 
+add_executable(rtabmap_rgbd_split src/RGBDSplitNode.cpp)
+ament_target_dependencies(rtabmap_rgbd_split ${Libraries})
+target_link_libraries(rtabmap_rgbd_split rtabmap_plugins ${RTABMap_LIBRARIES})
+set_target_properties(rtabmap_rgbd_split PROPERTIES OUTPUT_NAME "rgbd_split")
+
 add_executable(rtabmap_point_cloud_xyz src/PointCloudXYZNode.cpp)
 ament_target_dependencies(rtabmap_point_cloud_xyz ${Libraries})
 target_link_libraries(rtabmap_point_cloud_xyz rtabmap_plugins ${RTABMap_LIBRARIES})
@@ -549,6 +555,9 @@ foreach(typesupport_impl ${typesupport_impls})
     ${PROJECT_NAME} ${typesupport_impl}
   )
   rosidl_get_typesupport_target(rtabmap_rgbd_relay
+    ${PROJECT_NAME} ${typesupport_impl}
+  )
+  rosidl_get_typesupport_target(rtabmap_rgbd_split
     ${PROJECT_NAME} ${typesupport_impl}
   )
   rosidl_get_typesupport_target(rtabmap_rgbd_sync
@@ -732,6 +741,7 @@ install(TARGETS
    rtabmap_stereo_sync
    rtabmap_rgb_sync
    rtabmap_rgbd_relay
+   rtabmap_rgbd_split
 #   rtabmap_wifi_signal_sub
    DESTINATION lib/${PROJECT_NAME}
 )
