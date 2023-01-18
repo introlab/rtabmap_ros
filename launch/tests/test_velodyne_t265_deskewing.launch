@@ -1,7 +1,8 @@
+<?xml version="1.0"?>
 <!-- -->
 <launch>
-  
-    <!-- 
+
+    <!--
     Hand-held 3D lidar mapping example using only a Velodyne PUCK and external odometry (using t265 as example).
     Prerequisities: rtabmap should be built with libpointmatcher
     We use T265 only for lidar deskewing and icp_odometry guess in this example.
@@ -27,30 +28,30 @@
 
     <arg name="resolution"         default="0.05"/> <!-- set 0.05-0.3 for indoor, set 0.3-0.5 for outdoor -->
     <arg name="iterations"         default="10"/>
-    
+
     <!-- Grid parameters -->
     <arg name="ground_is_obstacle" default="true"/>
     <arg name="grid_max_range"     default="20"/>
-    
+
     <!-- For F2M Odometry -->
     <arg name="ground_normals_up" default="false"/> <!-- set to true when velodyne is always horizontal to ground (ground robot, car) -->
     <arg name="local_map_size"    default="15000"/>
     <arg name="key_frame_thr"     default="0.6"/>
-    
+
     <!-- For FLOAM Odometry -->
     <arg name="floam"    default="false"/> <!-- RTAB-Map should be built with FLOAM http://official-rtab-map-forum.206.s1.nabble.com/icp-odometry-with-LOAM-crash-tp8261p8563.html -->
     <arg name="floam_sensor" default="0"/> <!-- 0=16 rings (VLP16), 1=32 rings, 2=64 rings -->
-    
+
     <!-- Static transform between velodyne and T265: TODO: Adjust with real position/orientation!!! -->
     <node unless="$(arg use_sim_time)" pkg="tf" type="static_transform_publisher" name="T265_to_velodyne_tf" args="-0.01 0 0.055 0 0 0 t265_link velodyne 100"/>
-    
+
     <!-- Velodyne sensor VLP16 -->
     <include unless="$(arg use_sim_time)" file="$(find velodyne_pointcloud)/launch/VLP16_points.launch">
        <arg     if="$(arg scan_20_hz)" name="rpm" value="1200"/>
        <arg unless="$(arg scan_20_hz)" name="rpm" value="600"/>
        <arg name="organize_cloud" value="true"/> <!-- should be organized for deskewing -->
     </include>
-    
+
     <!-- T265 -->
     <group unless="$(arg use_sim_time)" ns="t265">
       <include file="$(find realsense2_camera)/launch/includes/nodelet.launch.xml">
@@ -65,7 +66,7 @@
         <arg name="enable_pose"           value="true"/>
       </include>
     </group>
-    
+
     <!-- Lidar Deskewing -->
     <node if="$(arg deskewing)" pkg="nodelet" type="nodelet" name="lidar_deskewing" args="standalone rtabmap_ros/lidar_deskewing" output="screen">
       <param name="wait_for_transform" value="0.01"/>
@@ -87,7 +88,7 @@
         <param name="wait_for_transform_duration" type="double" value="0.2"/>
         <param     if="$(arg scan_20_hz)" name="expected_update_rate" type="double" value="25"/>
         <param unless="$(arg scan_20_hz)" name="expected_update_rate" type="double" value="15"/>
-     
+
         <!-- ICP parameters -->
         <param name="Icp/PointToPlane"        type="string" value="true"/>
         <param name="Icp/Iterations"          type="string" value="$(arg iterations)"/>
@@ -100,36 +101,36 @@
         <param name="Icp/PointToPlaneRadius"  type="string" value="0"/>
         <param name="Icp/MaxTranslation"      type="string" value="2"/>
         <param name="Icp/MaxCorrespondenceDistance" type="string" value="$(eval resolution*10)"/>
-        <param name="Icp/PM"                  type="string" value="true"/> 
+        <param name="Icp/PM"                  type="string" value="true"/>
         <param name="Icp/PMOutlierRatio"      type="string" value="0.7"/>
-        <param name="Icp/CorrespondenceRatio" type="string" value="0.01"/>  
+        <param name="Icp/CorrespondenceRatio" type="string" value="0.01"/>
         <param if="$(arg ground_normals_up)" name="Icp/PointToPlaneGroundNormalsUp"  type="string" value="0.8"/>
 
-        <!-- Odom parameters -->       
+        <!-- Odom parameters -->
         <param name="Odom/ScanKeyFrameThr"       type="string" value="$(arg key_frame_thr)"/>
         <param     if="$(arg floam)" name="Odom/Strategy" type="string" value="11"/>
         <param unless="$(arg floam)" name="Odom/Strategy" type="string" value="0"/>
         <param name="OdomF2M/ScanSubtractRadius" type="string" value="$(arg resolution)"/>
         <param name="OdomF2M/ScanMaxSize"        type="string" value="$(arg local_map_size)"/>
-        <param name="OdomLOAM/Sensor"            type="string" value="$(arg floam_sensor)"/> 
+        <param name="OdomLOAM/Sensor"            type="string" value="$(arg floam_sensor)"/>
         <param name="OdomLOAM/Resolution"        type="string" value="$(arg resolution)"/>
         <param if="$(eval not deskewing and scan_20_hz)" name="OdomLOAM/ScanPeriod" type="string" value="0.05"/>
         <param if="$(eval not deskewing and not scan_20_hz)" name="OdomLOAM/ScanPeriod" type="string" value="0.1"/>
         <param if="$(arg deskewing)" name="OdomLOAM/ScanPeriod" type="string" value="0"/>
       </node>
 
-      <node pkg="rtabmap_ros" type="rtabmap" name="rtabmap" output="screen" args="-d">	  
-        <param name="frame_id"             type="string" value="$(arg frame_id)"/>  
+      <node pkg="rtabmap_ros" type="rtabmap" name="rtabmap" output="screen" args="-d">
+        <param name="frame_id"             type="string" value="$(arg frame_id)"/>
         <param name="subscribe_depth"      type="bool" value="false"/>
         <param name="subscribe_rgb"        type="bool" value="false"/>
         <param name="subscribe_scan_cloud" type="bool" value="true"/>
         <param name="approx_sync"          type="bool" value="false"/>
         <param name="wait_for_transform_duration" type="double" value="0.2"/>
-        
+
         <remap from="scan_cloud" to="assembled_cloud"/>
-     
+
         <!-- RTAB-Map's parameters -->
-        <param name="Rtabmap/DetectionRate"          type="string" value="1"/>  
+        <param name="Rtabmap/DetectionRate"          type="string" value="1"/>
         <param name="RGBD/NeighborLinkRefining"      type="string" value="false"/>
         <param name="RGBD/ProximityBySpace"          type="string" value="true"/>
         <param name="RGBD/ProximityMaxGraphDepth"    type="string" value="0"/>
@@ -139,8 +140,8 @@
         <param name="Mem/NotLinkedNodesKept"         type="string" value="false"/>
         <param name="Mem/STMSize"                    type="string" value="30"/>
         <param name="Mem/LaserScanNormalK"           type="string" value="20"/>
-        
-        <param name="Reg/Strategy"                   type="string" value="1"/> 
+
+        <param name="Reg/Strategy"                   type="string" value="1"/>
         <param name="Grid/CellSize"                  type="string" value="$(arg resolution)"/>
         <param name="Grid/RangeMax"                  type="string" value="$(arg grid_max_range)"/>
         <param name="Grid/ClusterRadius"             type="string" value="1"/>
@@ -156,7 +157,7 @@
         <param name="Icp/Epsilon"                    type="string" value="0.001"/>
         <param name="Icp/MaxTranslation"             type="string" value="3"/>
         <param name="Icp/MaxCorrespondenceDistance"  type="string" value="$(eval resolution*10)"/>
-        <param name="Icp/PM"                         type="string" value="true"/> 
+        <param name="Icp/PM"                         type="string" value="true"/>
         <param name="Icp/PMOutlierRatio"             type="string" value="0.7"/>
         <param name="Icp/CorrespondenceRatio"        type="string" value="$(arg loop_ratio)"/>
       </node>

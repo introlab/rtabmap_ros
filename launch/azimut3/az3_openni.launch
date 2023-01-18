@@ -1,3 +1,4 @@
+<?xml version="1.0"?>
 
 <launch>
 
@@ -14,5 +15,5 @@
   <!-- Xtion frame -->
   <node pkg="tf" type="static_transform_publisher" name="base_to_camera_tf"
       args="0.057 0.087 0.185 0.0 0.0 0.0 /base_link /camera_link 100" />
-      
+
 </launch>

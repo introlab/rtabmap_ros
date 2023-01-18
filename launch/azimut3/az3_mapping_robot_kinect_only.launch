@@ -1,3 +1,4 @@
+<?xml version="1.0"?>
 
 <launch>
 
@@ -19,7 +20,7 @@
     <remap from="odom" to="/base_controller/odom"/>
 
     <param name="Odom/MinInliers" type="string" value="10"/>
-    <param name="Odom/InlierDistance" type="string" value="0.01"/>    
+    <param name="Odom/InlierDistance" type="string" value="0.01"/>
 
     <param name="frame_id" type="string" value="base_footprint"/>
   </node>

@@ -1,3 +1,4 @@
+<?xml version="1.0"?>
 <!-- -->
 <launch>
 
@@ -6,11 +7,11 @@
   <!-- rosbag filter demo_mapping.bag demo_mapping_no_odom.bag 'topic != "/tf" or topic == "/tf" and m.transforms[0].header.frame_id != "/odom"' -->
   <!-- WARNING : Database is automatically deleted on each startup                       -->
   <!--           See "delete_db_on_start" option below...                                -->
-  
+
   <!-- Choose visualization -->
   <arg name="rviz" default="true" />
   <arg name="rtabmapviz" default="false" />
-  
+
   <!-- Choose hector_slam or icp_odometry for odometry -->
   <arg name="hector" default="true" />
 
@@ -21,19 +22,19 @@
 
   <!-- Example with camera or not -->
   <arg name="camera" default="true" />
-  
+
   <!-- Limit lidar range if > 0 (has effect only when hector:=false) -->
   <arg name="max_range" default="0" />
-  
+
   <!-- Point to Plane ICP? (has effect only when hector:=false) -->
   <arg name="p2n" default="true" />
-  
+
   <!-- Use libpointmatcher for ICP? (has effect only when hector:=false) -->
   <arg name="pm" default="true" />
 
   <param name="use_sim_time" type="bool" value="True"/>
-  
-  <node if="$(arg hector)" pkg="tf" type="static_transform_publisher" name="scanmatcher_to_base_footprint" 
+
+  <node if="$(arg hector)" pkg="tf" type="static_transform_publisher" name="scanmatcher_to_base_footprint"
     args="0.0 0.0 0.0 0.0 0.0 0.0 /scanmatcher_frame /base_footprint 100" />
 
   <!-- Odometry from laser scans -->
@@ -44,36 +45,36 @@
     <param name="map_frame" value="hector_map" />
     <param name="base_frame" value="base_footprint" />
     <param name="odom_frame" value="odom" />
-    
+
     <!-- Tf use -->
     <param name="pub_map_odom_transform" value="false"/>
     <param name="pub_map_scanmatch_transform" value="true"/>
     <param name="pub_odometry" value="true"/>
-    
+
     <!-- Map size / start point -->
     <param name="map_resolution" value="0.050"/>
     <param name="map_size" value="2048"/>
     <param name="map_multi_res_levels" value="2" />
-    
+
     <!-- Map update parameters -->
     <param name="map_update_angle_thresh" value="0.06" />
-    
-    <!-- Advertising config --> 
+
+    <!-- Advertising config -->
     <param name="scan_topic" value="/jn0/base_scan"/>
   </node>
-  
+
   <!-- If argument "hector" is false, we use rtabmap's icp odometry to generate odometry for us -->
   <node unless="$(arg hector)" pkg="rtabmap_ros" type="icp_odometry" name="icp_odometry" output="screen" >
      <remap from="scan"      to="/jn0/base_scan"/>
      <remap from="odom"      to="/scanmatch_odom"/>
      <remap from="odom_info"      to="/rtabmap/odom_info"/>
-	  
+
      <param name="frame_id"        type="string" value="base_footprint"/>
      <param name="deskewing"       type="string" value="true"/>
 
      <param if="$(arg odom_guess)" name="odom_frame_id"   type="string" value="icp_odom"/>
      <param if="$(arg odom_guess)" name="guess_frame_id"  type="string" value="odom"/>
-     
+
      <param name="Icp/VoxelSize"     type="string" value="0.05"/>
      <param name="Icp/RangeMax"      type="string" value="$(arg max_range)"/>
      <param name="Icp/Epsilon"       type="string" value="0.001"/>
@@ -106,12 +107,12 @@
     <!-- args: "delete_db_on_start" and "udebug" -->
     <node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="screen" args="--delete_db_on_start">
       <param name="frame_id" type="string" value="base_footprint"/>
-	
+
       <param name="subscribe_rgb"   type="bool" value="false"/>
       <param name="subscribe_depth" type="bool" value="false"/>
       <param name="subscribe_rgbd"  type="bool" value="$(arg camera)"/>
       <param name="subscribe_scan"  type="bool" value="true"/>
-	
+
       <remap from="scan" to="/jn0/base_scan"/>
 
       <!-- As hector doesn't provide compatible covariance in the odometry topic, don't use the topic and fix the covariance -->
@@ -121,7 +122,7 @@
 
       <remap unless="$(arg hector)" from="odom" to="/scanmatch_odom"/>
       <param unless="$(arg hector)" name="subscribe_odom_info" type="bool" value="true"/>
-	
+
       <!-- RTAB-Map's parameters -->
       <param name="Reg/Strategy"       type="string" value="1"/>    <!-- 0=Visual, 1=ICP, 2=Visual+ICP -->
       <param name="Reg/Force3DoF"      type="string" value="true"/>
@@ -131,13 +132,13 @@
       <param name="Icp/RangeMax"             type="string" value="$(arg max_range)"/>
       <param name="Grid/RangeMax"            type="string" value="$(arg max_range)"/>
     </node>
-    
+
     <!-- Visualisation RTAB-Map -->
     <node if="$(arg rtabmapviz)" pkg="rtabmap_ros" type="rtabmapviz" name="rtabmapviz" args="-d $(find rtabmap_ros)/launch/config/rgbd_gui.ini" output="screen">
       <param name="subscribe_rgbd"      type="bool" value="$(arg camera)"/>
       <param name="subscribe_laserScan" type="bool" value="true"/>
       <param name="frame_id"            type="string" value="base_footprint"/>
-    
+
       <remap from="scan"            to="/jn0/base_scan"/>
 
       <!-- As hector doesn't provide compatible covariance in the odometry topic -->
@@ -146,9 +147,9 @@
       <remap unless="$(arg hector)" from="odom" to="/scanmatch_odom"/>
       <param unless="$(arg hector)" name="subscribe_odom_info" type="bool" value="true"/>
     </node>
-  
+
   </group>
-  
+
   <!-- Visualisation RVIZ -->
   <node if="$(arg rviz)" pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap_ros)/launch/config/demo_robot_mapping.rviz" output="screen"/>
    <node if="$(arg camera)" pkg="nodelet" type="nodelet" name="points_xyzrgb" args="standalone rtabmap_ros/point_cloud_xyzrgb">

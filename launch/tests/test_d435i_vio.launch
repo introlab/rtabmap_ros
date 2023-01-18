@@ -1,7 +1,8 @@
+<?xml version="1.0"?>
 <launch>
 
 <!-- Example usage of RTAB-Map with VINS-Fusion support for realsense D435i.
-     Make sure to disable the IR emitter or put a tape on the IR emitter to 
+     Make sure to disable the IR emitter or put a tape on the IR emitter to
      avoid VINS tracking the fixed IR points (that would cause large drifts) -->
 
 <arg name="rtabmapviz" default="true"/>
@@ -12,7 +13,7 @@
 
 <include file="$(find realsense2_camera)/launch/rs_camera.launch">
    <arg name="align_depth"   value="$(arg depth_mode)"/>
-   <arg name="unite_imu_method" value="$(arg unite_imu_method)"/> 
+   <arg name="unite_imu_method" value="$(arg unite_imu_method)"/>
    <arg name="enable_gyro"   value="true"/>
    <arg name="enable_accel"  value="true"/>
    <arg name="enable_infra1" value="true"/>

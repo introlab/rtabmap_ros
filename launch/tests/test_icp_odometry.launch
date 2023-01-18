@@ -1,18 +1,19 @@
+<?xml version="1.0"?>
 
 <launch>
 
   <!-- We test here ICP odometry using a guess from visual odometry -->
-  
+
   <arg name="rgbd"    default="false"/>
   <arg name="pm"      default="false"/>
   <arg name="nodelet" default="false"/>
-   
+
   <include file="$(find freenect_launch)/launch/freenect.launch" >
     <arg name="depth_registration" value="true"/>
     <arg name="data_skip" value="3"/>
   </include>
-  
-  <group ns="camera"> 
+
+  <group ns="camera">
     <node pkg="nodelet" type="nodelet" name="points_xyz" args="load rtabmap_ros/point_cloud_xyz camera_nodelet_manager">
       <remap from="depth/image"       to="depth_registered/image_raw"/>
       <remap from="depth/camera_info" to="depth_registered/camera_info"/>
@@ -20,7 +21,7 @@
 
       <param name="voxel_size" type="double" value="0.05"/>
       <param name="decimation" type="int" value="8"/>
-      
+
       <param name="Odom/AlignWithGround"  type="string" value="true"/>
     </node>
 
@@ -30,11 +31,11 @@
         <remap from="depth/image"       to="depth_registered/image_raw"/>
         <remap from="rgb/camera_info"   to="rgb/camera_info"/>
         <remap from="rgb/image"         to="rgb/image_rect_mono"/>
-	  
-        <param name="frame_id"        type="string" value="camera_link"/>   
+
+        <param name="frame_id"        type="string" value="camera_link"/>
         <param name="scan_normal_k"   type="int" value="10"/>
-        <param name="subscribe_scan_cloud" type="bool" value="true"/>   
-     
+        <param name="subscribe_scan_cloud" type="bool" value="true"/>
+
         <param name="Icp/PointToPlane"  type="string" value="true"/>
         <param name="Icp/VoxelSize"     type="string" value="0"/>
         <param name="Icp/PM"            type="string" value="$(arg pm)"/>
@@ -42,10 +43,10 @@
       </node>
       <node unless="$(arg rgbd)" pkg="nodelet" type="nodelet" name="icp_odometry" args="load rtabmap_ros/icp_odometry camera_nodelet_manager" output="screen">
         <remap from="scan_cloud"      to="/voxel_cloud"/>
-	  
-        <param name="frame_id"        type="string" value="camera_link"/>   
-        <param name="scan_normal_k"   type="int" value="10"/>   
-       
+
+        <param name="frame_id"        type="string" value="camera_link"/>
+        <param name="scan_normal_k"   type="int" value="10"/>
+
         <param name="Icp/PointToPlane"  type="string" value="true"/>
         <param name="Icp/VoxelSize"     type="string" value="0"/>
         <param name="Icp/PM"            type="string" value="$(arg pm)"/>
@@ -54,18 +55,18 @@
         <param name="Odom/ResetCountdown"  type="string" value="1"/>
       </node>
     </group>
-    
+
     <group unless="$(arg nodelet)">
       <node if="$(arg rgbd)" pkg="rtabmap_ros" type="rgbdicp_odometry" name="rgbdicp_odometry" output="screen">
         <remap from="scan_cloud"        to="/voxel_cloud"/>
         <remap from="depth/image"       to="depth_registered/image_raw"/>
         <remap from="rgb/camera_info"   to="rgb/camera_info"/>
         <remap from="rgb/image"         to="rgb/image_rect_mono"/>
-	  
-        <param name="frame_id"        type="string" value="camera_link"/>   
+
+        <param name="frame_id"        type="string" value="camera_link"/>
         <param name="scan_normal_k"   type="int" value="10"/>
-        <param name="subscribe_scan_cloud" type="bool" value="true"/>   
-     
+        <param name="subscribe_scan_cloud" type="bool" value="true"/>
+
         <param name="Icp/PointToPlane"  type="string" value="true"/>
         <param name="Icp/VoxelSize"     type="string" value="0"/>
         <param name="Icp/PM"            type="string" value="$(arg pm)"/>
@@ -73,10 +74,10 @@
       </node>
       <node unless="$(arg rgbd)" pkg="rtabmap_ros" type="icp_odometry" name="icp_odometry" output="screen">
         <remap from="scan_cloud"      to="/voxel_cloud"/>
-	  
-        <param name="frame_id"        type="string" value="camera_link"/>   
-        <param name="scan_normal_k"   type="int" value="10"/>   
-     
+
+        <param name="frame_id"        type="string" value="camera_link"/>
+        <param name="scan_normal_k"   type="int" value="10"/>
+
         <param name="Icp/PointToPlane"  type="string" value="true"/>
         <param name="Icp/VoxelSize"     type="string" value="0"/>
         <param name="Icp/PM"            type="string" value="$(arg pm)"/>
@@ -87,12 +88,12 @@
     </group>
 
   </group>
-  
-  <!-- We just use odometry without rtabmap node, so set a static /map->/odom 
+
+  <!-- We just use odometry without rtabmap node, so set a static /map->/odom
        transform so that rviz config below works out-of-the-box -->
   <node pkg="tf" type="static_transform_publisher" name="map_odom"
-        args="0 0 0 0 0 0 map odom 100" />  
-  
+        args="0 0 0 0 0 0 map odom 100" />
+
   <!-- Visualization RVIZ -->
   <node pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap_ros)/launch/config/rgbd.rviz"/>
 </launch>
