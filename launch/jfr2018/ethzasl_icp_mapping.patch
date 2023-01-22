@@ -9,17 +9,17 @@ index 67820e7..aec1839 100644
 +    maxDist: 1
      knn: 5
      epsilon: 3.16
- 
+
  outlierFilters:
    - TrimmedDistOutlierFilter:
 -     ratio: 0.85
 +     ratio: 0.95
    - SurfaceNormalOutlierFilter:
       maxAngle: 0.42
- 
+
 @@ -25,7 +25,11 @@ transformationCheckers:
        maxTranslationNorm: 5.00
- 
+
  inspector:
 -# VTKFileInspector
 +# VTKFileInspector:
@@ -28,7 +28,7 @@ index 67820e7..aec1839 100644
 +#   dumpReading : 1
 +#   dumpReference : 1
   NullInspector
- 
+
  logger:
 diff --git a/libpointmatcher_ros/src/point_cloud.cpp b/libpointmatcher_ros/src/point_cloud.cpp
 index b77651d..8eb1f6c 100644

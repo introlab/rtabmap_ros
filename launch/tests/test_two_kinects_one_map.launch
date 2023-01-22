@@ -1,15 +1,16 @@
+<?xml version="1.0"?>
 
 <launch>
-   
+
   <!-- Testing 2 Kinects localizing in the same map at the same time -->
-  <!-- Prerequisities: the default ~/.ros/rtabmap.db should be 
+  <!-- Prerequisities: the default ~/.ros/rtabmap.db should be
                        already created with one of the Kinect using mapping tutorial:
-                       http://wiki.ros.org/rtabmap_ros/Tutorials/HandHeldMapping 
+                       http://wiki.ros.org/rtabmap_ros/Tutorials/HandHeldMapping
               $ roslaunch freenect_launch freenect.launch depth_registration:=true
               $ roslaunch rtabmap_ros rtabmap.launch args:="-d"
   -->
-  
-   
+
+
   <!-- Cameras -->
   <include file="$(find freenect_launch)/launch/freenect.launch">
     <arg name="depth_registration" value="True" />

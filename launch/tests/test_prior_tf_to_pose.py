@@ -1,4 +1,4 @@
-#!/usr/bin/env python  
+#!/usr/bin/env python
 import rospy
 import tf
 import numpy
@@ -14,9 +14,9 @@ if __name__ == '__main__':
     cov = rospy.get_param('~cov', 1)
     rateParam = rospy.get_param('~rate', 30) # 10hz
     pub = rospy.Publisher('global_pose', PoseWithCovarianceStamped, queue_size=1)
-   
+
     print 'start loop!'
-    rate = rospy.Rate(rateParam) 
+    rate = rospy.Rate(rateParam)
     while not rospy.is_shutdown():
         poseOut = PoseWithCovarianceStamped()
         try:
@@ -27,7 +27,7 @@ if __name__ == '__main__':
             print str(e)
             rate.sleep()
             continue
-        
+
         poseOut.header.stamp.nsecs = now.nsecs
         poseOut.header.stamp.secs = now.secs
         poseOut.header.frame_id = outputFrame

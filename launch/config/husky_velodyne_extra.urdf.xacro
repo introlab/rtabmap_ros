@@ -5,5 +5,5 @@
   <xacro:VLP-16 parent="base_laser_mount" name="velodyne" topic="velodyne_points" gpu="true" organize_cloud="true">
     <origin xyz="0.025 0 0.175" rpy="0 0 0" />
   </xacro:VLP-16>
-  
+
 </robot>

@@ -15,7 +15,7 @@ odom_frame_id:="odom_combined" odom_tf_angular_variance:=0.0001 odom_tf_linear_v
 //neighbor link refine
 --RGBD/NeighborLinkRefining true --RGBD/OptimizeMaxError 1.5
 // odom frame to frame
---Odom/Strategy 1 
+--Odom/Strategy 1
 
 $ rosparam load scan_filter.yaml scan_to_scan_filter_chain
 $ rosrun laser_filters scan_to_scan_filter_chain scan:=/base_scan_t scan_filtered:=/base_scan_t_filtered
@@ -23,7 +23,7 @@ $ rosrun laser_filters scan_to_scan_filter_chain scan:=/base_scan_t scan_filtere
 $ ./republish_scan.py _offset:=82.2
 
 //stereo
-$ ./republish_camera_info.py camera_info_in:=/wide_stereo/right/camera_info camera_info_out:=/wide_stereo/right/camera_info_scaled 
+$ ./republish_camera_info.py camera_info_in:=/wide_stereo/right/camera_info camera_info_out:=/wide_stereo/right/camera_info_scaled
 $ export ROS_NAMESPACE=wide_stereo
 $ rosrun stereo_image_proc stereo_image_proc left/image_raw:=left/image_raw right/image_raw:=right/image_raw left/camera_info:=left/camera_info right/camera_info:=right/camera_info_scaled
 
@@ -66,7 +66,7 @@ $ rosbag play --clock --pause ./stata-mit/2012-01-25-12-14-25.bag
 //2012-01-25-12-33-29
 $ rosbag play --clock --pause ./stata-mit/2012-01-25-12-33-29.bag
 $ ./gt_tf_broadcaster.py _file:=./stata-mit/2012-01-25-12-33-29_part1_floor2.gt.laser.poses _frame_id:=scan_gt _fixed_frame_id:=world _offset_time:=82.2 _offset_x:=-0.275
-// for short-lidar 
+// for short-lidar
 $ rosparam load scan_filter.yaml scan_to_scan_filter_chain
 $ rosrun laser_filters scan_to_scan_filter_chain scan:=/base_scan_t scan_filtered:=/base_scan_t_filtered
 // for fake lidar kinect

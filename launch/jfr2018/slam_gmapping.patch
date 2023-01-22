@@ -7,7 +7,7 @@ index bd9977c..b4f9382 100644
  #include "ros/console.h"
  #include "nav_msgs/MapMetaData.h"
 +#include <nav_msgs/Path.h>
- 
+
  #include "gmapping/sensor/sensor_range/rangesensor.h"
  #include "gmapping/sensor/sensor_odometry/odometrysensor.h"
 @@ -258,6 +259,7 @@ void SlamGMapping::startLiveSlam()
@@ -24,12 +24,12 @@ index bd9977c..b4f9382 100644
    sstm_ = node_.advertise<nav_msgs::MapMetaData>("map_metadata", 1, true);
 +  pathPub_ = node_.advertise<nav_msgs::Path>("map_path", 1, true);
    ss_ = node_.advertiseService("dynamic_map", &SlamGMapping::mapCallback, this);
-   
+
    rosbag::Bag bag;
 @@ -410,6 +413,18 @@ SlamGMapping::initMapper(const sensor_msgs::LaserScan& scan)
      return false;
    }
- 
+
 +  try
 +    {
 +	  	tf_.lookupTransform(laser_frame_, base_frame_, scan.header.stamp, scan_to_base_);
@@ -47,7 +47,7 @@ index bd9977c..b4f9382 100644
    v.setValue(0, 0, 1 + laser_pose.getOrigin().z());
 @@ -617,6 +632,8 @@ SlamGMapping::laserCallback(const sensor_msgs::LaserScan::ConstPtr& scan)
      ROS_DEBUG("scan processed");
- 
+
      GMapping::OrientedPoint mpose = gsp_->getParticles()[gsp_->getBestParticleIndex()].pose;
 +    GMapping::GridSlamProcessor::TNode * node = gsp_->getParticles()[gsp_->getBestParticleIndex()].node;
 +
@@ -56,7 +56,7 @@ index bd9977c..b4f9382 100644
      ROS_DEBUG("correction: %.3f %.3f %.3f", mpose.x - odom_pose.x, mpose.y - odom_pose.y, mpose.theta - odom_pose.theta);
 @@ -699,6 +716,23 @@ SlamGMapping::updateMap(const sensor_msgs::LaserScan& scan)
                                  delta_);
- 
+
    ROS_DEBUG("Trajectory tree:");
 +  nav_msgs::Path path;
 +  int count = 0;
@@ -95,15 +95,15 @@ index bd9977c..b4f9382 100644
 @@ -764,8 +805,11 @@ SlamGMapping::updateMap(const sensor_msgs::LaserScan& scan)
    map_.map.header.stamp = ros::Time::now();
    map_.map.header.frame_id = tf_.resolve( map_frame_ );
- 
+
 +  path.header = map_.map.header;
 +
    sst_.publish(map_.map);
    sstm_.publish(map_.map.info);
 +  pathPub_.publish(path);
  }
- 
- bool 
+
+ bool
 diff --git a/gmapping/src/slam_gmapping.h b/gmapping/src/slam_gmapping.h
 index ae622b9..8d84645 100644
 --- a/gmapping/src/slam_gmapping.h
@@ -119,7 +119,7 @@ index ae622b9..8d84645 100644
 @@ -92,6 +93,8 @@ class SlamGMapping
      std::string map_frame_;
      std::string odom_frame_;
- 
+
 +    tf::StampedTransform scan_to_base_;
 +
      void updateMap(const sensor_msgs::LaserScan& scan);

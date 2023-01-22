@@ -1,12 +1,13 @@
 <?xml version="1.0"?>
+<?xml version="1.0"?>
 <launch>
     <!-- 1) Make sure rtabmap is built with libpointmatcher for lidar:=true option (lidar SLAM)
 
          2) Install https://github.com/jmscslgroup/catvehicle
-            We need a stereo camera and velodyne point cloud looking like the real 
-            sensor (ring-like pattern), so we have to modifiy the default catvehicle 
-            urdf. First we have to install velodyne_simulator package to have the 
-            right gazebo plugin and copy this modified velodyne config: 
+            We need a stereo camera and velodyne point cloud looking like the real
+            sensor (ring-like pattern), so we have to modifiy the default catvehicle
+            urdf. First we have to install velodyne_simulator package to have the
+            right gazebo plugin and copy this modified velodyne config:
                * sudo apt install ros-$ROS_DISTRO-velodyne-simulator
                * cp ~/catkin_ws/src/rtabmap_ros/launch/config/catvehicle_velodyne_points.gazebo ~/catkin_ws/src/catvehicle/urdf/.
             Secondly, we have to modify the triclops config to make it stereo:
@@ -18,14 +19,14 @@
          4) roslaunch catvehicle catvehicle_spawn.launch velodyne_points:=true triclops:=true Z:=5
          5) roslaunch catvehicle joystick.launch
          6) SLAM, 3 choices:
-            A) LiDAR-SLAM + Visual loop closure detection: 
+            A) LiDAR-SLAM + Visual loop closure detection:
               roslaunch rtabmap_ros demo_catvehicle_mapping.launch
-            B) LiDAR-SLAM without camera: 
+            B) LiDAR-SLAM without camera:
               roslaunch rtabmap_ros demo_catvehicle_mapping.launch camera:=false
-            C) Visual-SLAM without lidar: 
+            C) Visual-SLAM without lidar:
               roslaunch rtabmap_ros demo_catvehicle_mapping.launch lidar:=false
 
-         Note: Gazebo real-time factor should be equal or below 1. If it is over 1, 
+         Note: Gazebo real-time factor should be equal or below 1. If it is over 1,
                in gazebo client, select Physics, then change real time update rate to 500.
     -->
     <arg name="camera"     default="true" />
@@ -34,7 +35,7 @@
     <arg name="rtabmapviz" default="true" />
     <arg name="rviz"       default="true" />
     <arg name="light"      default="false" /> <!-- Don't record all scans if false -->
-    <arg name="altitude"   default="0" /> <!-- assemble occupancy grids by altitude (radius in meters, 0=disabled) --> 
+    <arg name="altitude"   default="0" /> <!-- assemble occupancy grids by altitude (radius in meters, 0=disabled) -->
     <arg name="localization"   default="false" />
 
     <!-- Common parameters -->
@@ -77,7 +78,7 @@
         <!-- LiDAR SLAM parameters -->
         <arg     if="$(arg lidar)" name="args" value="$(arg clear_db) $(arg common_args)
                 --Reg/Strategy 1"/>
-        
+
         <!-- Visual SLAM parameters -->
         <arg unless="$(arg lidar)" name="args" value="$(arg clear_db) $(arg common_args)
                 --Reg/Strategy 0
@@ -85,7 +86,7 @@
                 --Grid/MaxGroundHeight 0.7
                 --Grid/NoiseFilteringRadius 0.5"/>
 
-        <arg name="localization" value="$(arg localization)"/>        
+        <arg name="localization" value="$(arg localization)"/>
         <arg name="subscribe_scan_cloud" value="$(arg lidar)"/>
         <arg name="stereo"            value="$(arg camera)"/>
         <arg unless="$(arg camera)" name="depth"          value="false"/>
@@ -95,13 +96,13 @@
 
         <arg     if="$(arg lidar)" name="odom_topic" value="lidar_odom"/>
         <arg unless="$(arg lidar)" name="odom_topic" value="visual_odom"/>
-        
+
         <arg name="odom_guess_frame_id" value="catvehicle/odom"/>
         <arg name="frame_id"            value="catvehicle/base_link"/>
         <arg name="map_frame_id"        value="catvehicle/map"/>
         <arg     if="$(arg lidar)" name="vo_frame_id" value="catvehicle/lidar_odom"/>
         <arg unless="$(arg lidar)" name="vo_frame_id" value="catvehicle/visual_odom"/>
-        
+
         <arg name="stereo_namespace"  value="/catvehicle/triclops"/>
         <arg name="right_image_topic" value="/catvehicle/triclops/right/image_rect_color"/>
         <arg name="scan_cloud_topic"  value="/catvehicle/velodyne_points"/>
@@ -121,4 +122,4 @@
     </include>
 
     <node if="$(arg rviz)" pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap_ros)/launch/config/catvehicle.rviz"/>
-</launch> 
+</launch>

@@ -1,6 +1,7 @@
+<?xml version="1.0"?>
 <launch>
 
-<!-- 
+<!--
 Examples:
    F2M (default VO):
       $ roslaunch rtabmap_ros euroc_datasets.launch
@@ -72,10 +73,10 @@ Examples:
 <!-- TF frames -->
 <node pkg="tf" type="static_transform_publisher" name="imu_base_link" args="0 0 0 3.1415926 -1.570796 0 base_link imu4 5"/>
 <node pkg="tf" type="static_transform_publisher" name="cam0_imu_link" args="-0.021640 -0.064677 0.009811 1.555925 0.025777 0.003757 imu4 cam0 50"/>
-<node pkg="tf" type="static_transform_publisher" name="cam1_imu_link" args="-0.019844 0.045369 0.007862 1.558237 0.025393 0.017907 imu4 cam1 50"/> 
+<node pkg="tf" type="static_transform_publisher" name="cam1_imu_link" args="-0.019844 0.045369 0.007862 1.558237 0.025393 0.017907 imu4 cam1 50"/>
 
 <!-- For MH sequences, /leica/position doesn't give the orientation, so minimal ground truth error could be as high as 12 cm -->
-<node     if="$(arg MH_seq)" pkg="tf" type="static_transform_publisher" name="leica_base_link" args="0.120209 -0.0184772 -0.0748903 0 0 0 leica base_link_gt 100"/> 
+<node     if="$(arg MH_seq)" pkg="tf" type="static_transform_publisher" name="leica_base_link" args="0.120209 -0.0184772 -0.0748903 0 0 0 leica base_link_gt 100"/>
 <node unless="$(arg MH_seq)" pkg="tf" type="static_transform_publisher" name="vicon_base_link" args="0.12395 -0.02781 -0.06901 0 0 0 vicon/firefly_sbx/firefly_sbx base_link_gt 100"/>
 
 <node     if="$(arg MH_seq)" pkg="rtabmap_ros" type="point_to_tf.py" name="point_to_tf">
@@ -95,7 +96,7 @@ Examples:
    <param name="use_mag" value="false"/>
    <param name="world_frame" value="enu"/>
    <param name="publish_tf" value="false"/>
-</node> 
+</node>
 
 <!-- RTAB-Map -->
 <include file="$(find rtabmap_ros)/launch/rtabmap.launch">

@@ -1,3 +1,4 @@
+<?xml version="1.0"?>
 <!--
   Copyright 2016 The Cartographer Authors
 
@@ -22,7 +23,7 @@
       type="cartographer_node" args="
           -configuration_directory
               $(find cartographer_ros)/configuration_files
-          -configuration_basename pr2.lua" 
+          -configuration_basename pr2.lua"
       output="screen">
     <remap from="scan" to="/base_scan_t_filtered" /> <!-- /base_scan_t /base_scan_t_filtered /camera_scan -->
     <remap from="odom" to="/odom_combined" />

@@ -1,11 +1,12 @@
+<?xml version="1.0"?>
 
 <launch>
 
   <!-- Localization-only mode -->
   <arg name="localization"      default="false"/>
   <arg     if="$(arg localization)" name="rtabmap_args"  default=""/>
-  <arg unless="$(arg localization)" name="rtabmap_args"  default="--delete_db_on_start"/>  
-  
+  <arg unless="$(arg localization)" name="rtabmap_args"  default="--delete_db_on_start"/>
+
   <!-- "Disable" odometry from azimut3 -->
   <group ns="base_controller">
       <param name="odom_frame_id" type="string" value="az3_odom"/>
@@ -29,8 +30,8 @@
 
       <param name="Vis/MinInliers" type="string" value="10"/>
       <param name="Vis/InlierDistance" type="string" value="0.1"/>
-      <param name="Vis/MaxDepth" type="string" value="4"/>    
-      <param name="Reg/Force3DoF" type="string" value="true"/>     
+      <param name="Vis/MaxDepth" type="string" value="4"/>
+      <param name="Reg/Force3DoF" type="string" value="true"/>
 
       <param name="frame_id" type="string" value="base_footprint"/>
     </node>

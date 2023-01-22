@@ -1,3 +1,4 @@
+<?xml version="1.0"?>
 
 <launch>
 
@@ -6,7 +7,7 @@
 
   <!-- AZIMUT 3 bringup: launch motors/odometry -->
   <include file="$(find az3_bringup)/az3_standalone.launch"/>
-  
+
   <!-- OpenNI -->
   <include file="$(find rtabmap_ros)/launch/azimut3/az3_openni.launch"/>
 
@@ -23,7 +24,7 @@
       <remap from="depth/image"     to="/camera/depth_registered/image_raw"/>
       <remap from="rgb/camera_info" to="/camera/depth_registered/camera_info"/>
 
-      <remap from="goal_out"        to="current_goal"/>	
+      <remap from="goal_out"        to="current_goal"/>
       <remap from="move_base"       to="/planner/move_base"/>
       <remap from="grid_map"        to="/map"/>
 
@@ -31,8 +32,8 @@
       <param unless="$(arg localization)" name="Rtabmap/TimeThr"        type="string" value="500"/>
       <param if="$(arg localization)"     name="Mem/IncrementalMemory"  type="string" value="false"/>
       <param if="$(arg localization)"     name="Mem/InitWMWithAllNodes" type="string" value="true"/>
-      <param name="RGBD/PoseScanMatching"        type="string" value="true"/>           
-      <param name="RGBD/LocalRadius"             type="string" value="4"/>  
+      <param name="RGBD/PoseScanMatching"        type="string" value="true"/>
+      <param name="RGBD/LocalRadius"             type="string" value="4"/>
       <param name="Mem/RehearsalSimilarity"      type="string" value="0.30"/>
       <param name="Rtabmap/DetectionRate"        type="string" value="1"/>
       <param name="RGBD/OptimizeSlam2d"          type="string" value="true"/>
@@ -44,7 +45,7 @@
       <param name="LccIcp2/CorrespondenceRatio"  type="string" value="0.2"/>
     </node>
   </group>
-  
+
   <!-- teleop -->
   <node name="joy" pkg="joy" type="joy_node"/>
   <group ns="teleop">
@@ -59,7 +60,7 @@
      <remap from="obstacles_cloud"       to="/obstacles_cloud"/>
      <remap from="ground_cloud"          to="/ground_cloud"/>
      <remap from="map"                   to="/map"/>
-        
+
      <node pkg="move_base" type="move_base" respawn="true" name="move_base" output="screen">
         <param name="base_global_planner" value="navfn/NavfnROS"/>
     	<rosparam file="$(find rtabmap_ros)/launch/azimut3/config/costmap_common_params_2d.yaml"  command="load" ns="global_costmap" />
@@ -68,7 +69,7 @@
     	<rosparam file="$(find rtabmap_ros)/launch/azimut3/config/global_costmap_params.yaml"     command="load" ns="global_costmap"/>
     	<rosparam file="$(find rtabmap_ros)/launch/azimut3/config/base_local_planner_params.yaml" command="load" />
      </node>
-   		
+
      <param name="cmd_vel/abtr_priority" value="10"/>
   </group>
 
@@ -81,7 +82,7 @@
         args="/cmd_eta /teleop/cmd_eta"/>
   <node name="register_cmd_vel" pkg="abtr_priority" type="register"
         args="/cmd_vel /planner/cmd_vel"/>
-  
+
   <!-- Throttling messages -->
   <group ns="camera">
     <node pkg="nodelet" type="nodelet" name="data_throttle" args="load rtabmap_ros/data_throttle camera_nodelet_manager">
@@ -90,7 +91,7 @@
       <remap from="rgb/image_in"        to="rgb/image_rect_color"/>
       <remap from="depth/image_in"      to="depth_registered/image_raw"/>
       <remap from="rgb/camera_info_in"  to="depth_registered/camera_info"/>
-    
+
       <remap from="rgb/image_out"       to="throttled_image"/>
       <remap from="depth/image_out"     to="throttled_image_depth"/>
       <remap from="rgb/camera_info_out" to="throttled_camera_info"/>
@@ -106,26 +107,26 @@
       <param name="max_depth"   type="double" value="4.0"/>
       <param name="voxel_size"  type="double" value="0.02"/>
     </node>
-  
+
     <node pkg="nodelet" type="nodelet" name="obstacles_detection" args="load rtabmap_ros/obstacles_detection obstacle_nodelet_manager">
       <remap from="cloud"     to="cloudXYZ"/>
       <remap from="obstacles" to="/obstacles_cloud"/>
       <remap from="ground"    to="/ground_cloud"/>
 
-      <param name="frame_id"             type="string" value="base_footprint"/>		
+      <param name="frame_id"             type="string" value="base_footprint"/>
       <param name="map_frame_id"         type="string" value="map"/>
       <param name="wait_for_transform"   type="bool" value="true"/>
       <param name="min_cluster_size"     type="int" value="20"/>
       <param name="max_obstacles_height" type="double" value="0.4"/>
       <param name="ground_normal_angle"  type="double" value="0.1"/>
     </node>
-    
+
     <!-- scan from the camera -->
     <node pkg="nodelet" type="nodelet" name="depthimage_to_laserscan" args="load depthimage_to_laserscan/DepthImageToLaserScanNodelet camera_nodelet_manager">
       <remap from="image"       to="depth_registered/image_raw"/>
       <remap from="camera_info" to="depth_registered/camera_info"/>
       <remap from="scan"        to="/kinect_scan"/>
       <param name="range_max" type="double" value="4"/>
-    </node>   
+    </node>
   </group>
 </launch>
