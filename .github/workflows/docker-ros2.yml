@@ -17,14 +17,17 @@ jobs:
           docker_path: 'foxy'
           docker_platforms: |
             linux/amd64
+            linux/arm64
         - docker_tag: humble
           docker_path: 'humble'
           docker_platforms: |
             linux/amd64
+            linux/arm64
         - docker_tag: humble-latest
           docker_path: 'humble/latest'
           docker_platforms: |
             linux/amd64
+            linux/arm64
     
     steps:
       -
