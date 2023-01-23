@@ -29,9 +29,9 @@
    
  * Launch `rtabmap` from inside the container (**with gui**, if you have a nvidia GPU, follow those [instructions](http://wiki.ros.org/docker/Tutorials/Hardware%20Acceleration#nvidia-docker2) with nvidia-docker2 using one of the images above instead of the ros image example, or for other GPUs try the intel/AMD [instructions](http://wiki.ros.org/action/fullsearch/docker/Tutorials/Hardware%20Acceleration) to build a `rtabmap_ros3d` image with your GPU driver), saving the database on host `~/.ros/rtabmap.db`:
 
-   * With [nvidia-docker2 approach](http://wiki.ros.org/docker/Tutorials/Hardware%20Acceleration#nvidia-docker2), we would have this Dockerfile:
+   * With [nvidia-docker2 approach](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html), we would have this Dockerfile:
        ```docker
-       FROM introlab3it/rtabmap_ros:noetic
+       FROM introlab3it/rtabmap_ros:humble
 
        # nvidia-container-runtime
        ENV NVIDIA_VISIBLE_DEVICES \
@@ -56,8 +56,7 @@
          --env="XAUTHORITY=$XAUTH" \
          --volume="$XAUTH:$XAUTH" \
          --runtime=nvidia \
-         --env ROS_MASTER_URI=http://172.17.0.1:11311 --env ROS_IP=172.17.0.2 \
          -v ~/.ros:/root  \
          rtabmap_ros3d \
-         roslaunch rtabmap_ros rtabmap.launch database_path:=/root/rtabmap.db rtabmap_args:="--delete_db_on_start"
+         ros2 launch rtabmap_ros rtabmap.launch.py database_path:=/root/rtabmap.db rtabmap_args:="--delete_db_on_start"
        ```
