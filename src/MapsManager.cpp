@@ -53,6 +53,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace rtabmap;
 
+namespace rtabmap_ros {
+
 MapsManager::MapsManager() :
 		cloudOutputVoxelized_(true),
 		cloudSubtractFiltering_(false),
@@ -1410,3 +1412,4 @@ cv::Mat MapsManager::getGridProbMap(
 	return occupancyGrid_->getProbMap(xMin, yMin);
 }
 
+} // namespace rtabmap_ros
