@@ -342,7 +342,7 @@ public:
 #endif
 
 private:
-	MapsManager mapsManager_;
+	rtabmap_ros::MapsManager mapsManager_;
 	std::map<int, Signature> nodes_;
 	std::map<int, Transform> optimizedPoses_;
 	std::string mapFrameId_;
