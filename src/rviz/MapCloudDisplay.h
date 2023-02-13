@@ -37,7 +37,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap_ros/MapData.h>
 #include <rtabmap/core/Transform.h>
 
-#include <pluginlib/class_loader.h>
+#include <pluginlib/class_loader.hpp>
 #include <sensor_msgs/PointCloud2.h>
 
 #include <ros/callback_queue.h>

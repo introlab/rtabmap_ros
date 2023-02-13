@@ -1,3 +1,4 @@
+<?xml version="1.0"?>
 <!-- -->
 <launch>
     <!-- For ref: https://docs.omniverse.nvidia.com/app_isaacsim/app_isaacsim/tutorial_ros_navigation.html#isaac-sim-app-tutorial-ros-navigation
@@ -12,11 +13,18 @@
          Note: carter_2dnav package can be copied to your catkin_ws from:
             $ cp -r ~/.local/share/ov/pkg/isaac_sim-2021.2.0/ros_workspace/src/* ~/catkin_ws/src/.
 
+       Isaac Sim 2021:
          For Lidar 3D Mode (lidar3d:=true), make sure in isaac sim that Carter robot is set with VLP16-like parameters (16 rings):
             Under World -> Carter_ROS -> chassis_link -> carter_lidar -> highLod = True
                                                                       -> verticalFov = 32
                                                                       -> verticalResolution = 2
                                                       -> ROS_lidar    -> pointCloudEnabled = True
+
+       Isaac Sim 2022 (Action Graph):
+         To enable all camera streams (right, depth left and depth right):
+           1. Stage view -> World-> Carter_ROS, right-click on ROS_Cameras -> Open graph
+           2. For all Branch nodes (green/red icon), select them, then check Compute Node -> Inputs -> Condition checkbox.
+         3D LIDAR: TODO: didn't find how to enable/publish it.
     -->
 
     <param name="use_sim_time" value="true" />
@@ -27,6 +35,7 @@
     <arg name="lidar3d_grid3d"      default="true" />
 
     <arg name="camera"              default="true" />
+    <arg name="stereo"              default="false" /> <!-- RGB-D mode by default -->
 
     <!-- Load Robot Description -->
     <arg name="model" default="$(find carter_description)/urdf/carter.urdf"/>
@@ -46,7 +55,8 @@
         <arg name="localization"      value="$(arg localization)"/>
         <arg     if="$(arg lidar3d)" name="subscribe_scan_cloud" value="true"/>
         <arg unless="$(arg lidar3d)" name="subscribe_scan" value="true"/>
-        <arg name="depth"             value="$(arg camera)"/>
+        <arg name="stereo"            value="$(eval camera and stereo)"/>
+        <arg name="depth"             value="$(eval camera and not stereo)"/>
         <arg name="subscribe_rgb"     value="$(arg camera)"/>
         <arg name="visual_odometry"   value="false"/>
         <arg name="odom_topic"        value="/odom"/>
@@ -54,6 +64,10 @@
         <arg name="depth_topic"       value="/depth_left"/>
         <arg name="rgb_topic"         value="/rgb_left"/>
         <arg name="camera_info_topic" value="/camera_info_left"/>
+        <arg name="left_image_topic"        value="/rgb_left"/>
+        <arg name="left_camera_info_topic"  value="/camera_info_left"/>
+        <arg name="right_image_topic"       value="/rgb_right"/>
+        <arg name="right_camera_info_topic" value="/camera_info_right"/>
         <arg name="scan_topic"        value="/scan"/>
         <arg name="scan_cloud_topic"  value="/point_cloud"/>
         <arg name="rgbd_sync"         value="true"/>
@@ -61,23 +75,23 @@
         <arg name="use_sim_time"      value="true"/>
         <arg name="tag_linear_variance" value="0.1"/>
         <arg name="tag_angular_variance" value="0.2"/>
-        
+
 
         <arg name="scan_cloud_assembling"             value="$(arg lidar3d)"/>
         <arg name="scan_cloud_assembling_fixed_frame" value="odom"/>
         <arg name="scan_cloud_assembling_range_max"   value="60"/>
         <arg name="scan_cloud_assembling_voxel_size"  value="$(arg cell_size)"/>
     </include>
-    
+
     <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen">
         <param name="TrajectoryPlannerROS/max_vel_theta" value="0.3"/>
         <param name="TrajectoryPlannerROS/min_vel_theta" value="-0.3"/>
-        <rosparam file="$(find carter_2dnav)/params/costmap_common_params.yaml" command="load" ns="global_costmap" /> 
+        <rosparam file="$(find carter_2dnav)/params/costmap_common_params.yaml" command="load" ns="global_costmap" />
         <rosparam file="$(find carter_2dnav)/params/costmap_common_params.yaml" command="load" ns="local_costmap" />
         <rosparam file="$(find carter_2dnav)/params/local_costmap_params.yaml" command="load" />
-        <rosparam file="$(find carter_2dnav)/params/global_costmap_params.yaml" command="load" /> 
+        <rosparam file="$(find carter_2dnav)/params/global_costmap_params.yaml" command="load" />
         <rosparam file="$(find carter_2dnav)/params/base_local_planner_params.yaml" command="load" />
     </node>
 
     <node type="rviz" name="rviz" pkg="rviz" args="-d $(find carter_2dnav)/rviz/carter_2dnav.rviz" />
-</launch> 
+</launch>

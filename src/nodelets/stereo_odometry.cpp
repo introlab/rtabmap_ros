@@ -26,7 +26,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #include "rtabmap_ros/OdometryROS.h"
-#include "pluginlib/class_list_macros.h"
+#include "pluginlib/class_list_macros.hpp"
 #include "nodelet/nodelet.h"
 
 #include <message_filters/subscriber.h>
@@ -353,7 +353,7 @@ private:
 				higherStamp = stamp;
 			}
 
-			Transform localTransform = getTransform(this->frameId(), leftImages[i]->header.frame_id, stamp);
+			Transform localTransform = getTransform(this->frameId(), leftImages[i]->header.frame_id, stamp, this->tfListener(), this->waitForTransformDuration());
 			if(localTransform.isNull())
 			{
 				return;
@@ -389,38 +389,71 @@ private:
 				rtabmap::Transform stereoTransform;
 				if(!alreadyRectified)
 				{
-					stereoTransform = getTransform(
-							rightCameraInfos[i].header.frame_id,
-							leftCameraInfos[i].header.frame_id,
-							leftCameraInfos[i].header.stamp);
-					if(stereoTransform.isNull())
+					if(rightCameraInfos[i].header.frame_id.empty() || leftCameraInfos[i].header.frame_id.empty())
 					{
-						NODELET_ERROR("Parameter %s is false but we cannot get TF between the two cameras! (between frames %s and %s)",
-								Parameters::kRtabmapImagesAlreadyRectified().c_str(),
-								rightCameraInfos[i].header.frame_id.c_str(),
-								leftCameraInfos[i].header.frame_id.c_str());
-						return;
+						if(rightCameraInfos[i].P[3] == 0.0 && leftCameraInfos[i].P[3] == 0)
+						{
+							NODELET_ERROR("Parameter %s is false but the frame_id in one of the camera_info "
+									"topic is empty, so TF between the cameras cannot be computed!",
+									Parameters::kRtabmapImagesAlreadyRectified().c_str());
+							return;
+						}
+						else
+						{
+							static bool warned = false;
+							if(!warned)
+							{
+								NODELET_WARN("Parameter %s is false but the frame_id in one of the "
+										"camera_info topic is empty, so TF between the cameras cannot be "
+										"computed! However, the baseline can be computed from the calibration, "
+										"we will use this one instead of TF. This message is only printed once...",
+										Parameters::kRtabmapImagesAlreadyRectified().c_str());
+								warned = true;
+							}
+						}
 					}
-					else if(stereoTransform.isIdentity())
+					else
 					{
-						NODELET_ERROR("Parameter %s is false but we cannot get a valid TF between the two cameras! "
-								"Identity transform returned between left and right cameras. Verify that if TF between "
-								"the cameras is valid: \"rosrun tf tf_echo %s %s\".",
-								Parameters::kRtabmapImagesAlreadyRectified().c_str(),
-								rightCameraInfos[i].header.frame_id.c_str(),
-								leftCameraInfos[i].header.frame_id.c_str());
-						return;
+						stereoTransform = getTransform(
+								rightCameraInfos[i].header.frame_id,
+								leftCameraInfos[i].header.frame_id,
+								leftCameraInfos[i].header.stamp,
+								this->tfListener(),
+								this->waitForTransformDuration());
+						if(stereoTransform.isNull())
+						{
+							NODELET_ERROR("Parameter %s is false but we cannot get TF between the two cameras! (between frames %s and %s)",
+									Parameters::kRtabmapImagesAlreadyRectified().c_str(),
+									rightCameraInfos[i].header.frame_id.c_str(),
+									leftCameraInfos[i].header.frame_id.c_str());
+							return;
+						}
+						else if(stereoTransform.isIdentity())
+						{
+							NODELET_ERROR("Parameter %s is false but we cannot get a valid TF between the two cameras! "
+									"Identity transform returned between left and right cameras. Verify that if TF between "
+									"the cameras is valid: \"rosrun tf tf_echo %s %s\".",
+									Parameters::kRtabmapImagesAlreadyRectified().c_str(),
+									rightCameraInfos[i].header.frame_id.c_str(),
+									leftCameraInfos[i].header.frame_id.c_str());
+							return;
+						}
 					}
 				}
 
 				rtabmap::StereoCameraModel stereoModel = rtabmap_ros::stereoCameraModelFromROS(leftCameraInfos[i], rightCameraInfos[i], localTransform, stereoTransform);
 
-				if(stereoModel.baseline() == 0 && alreadyRectified)
+				if( stereoModel.baseline() == 0 &&
+					alreadyRectified &&
+					!rightCameraInfos[i].header.frame_id.empty() &&
+					!leftCameraInfos[i].header.frame_id.empty())
 				{
 					stereoTransform = getTransform(
 							leftCameraInfos[i].header.frame_id,
 							rightCameraInfos[i].header.frame_id,
-							leftCameraInfos[i].header.stamp);
+							leftCameraInfos[i].header.stamp,
+							this->tfListener(),
+							this->waitForTransformDuration());
 
 					if(!stereoTransform.isNull() && stereoTransform.x()>0)
 					{

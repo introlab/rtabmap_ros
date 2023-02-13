@@ -1,3 +1,4 @@
+<?xml version="1.0"?>
 <launch>
   <!--
     $ sudo apt install ros-melodic-turtlebot3* ros-melodic-dwa-local-planner
@@ -36,7 +37,7 @@
       <remap from="depth/image"       to="/camera/depth/image_raw"/>
       <remap from="rgb/camera_info"   to="/camera/rgb/camera_info"/>
     </node>
-  
+
     <node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="screen" args="$(arg rtabmap_args)">
       <param name="database_path"       type="string" value="$(arg database_path)"/>
       <param name="frame_id"            type="string" value="base_footprint"/>
@@ -47,10 +48,10 @@
       <param name="subscribe_scan"      type="bool"   value="true"/>
       <param name="approx_sync"         type="bool"   value="true"/>
 
-      <!-- use actionlib to send goals to move_base --> 
+      <!-- use actionlib to send goals to move_base -->
       <param name="use_action_for_goal" type="bool" value="true"/>
       <remap from="move_base"            to="/move_base"/>
-	
+
       <!-- inputs -->
       <remap from="scan"            to="/scan"/>
       <remap from="odom"            to="/odom"/>
@@ -58,7 +59,7 @@
 
       <!-- output -->
       <remap from="grid_map" to="/map"/>
-	
+
       <!-- RTAB-Map's parameters -->
       <param name="Reg/Strategy"                 type="string" value="1"/>
       <param name="Reg/Force3DoF"                type="string" value="true"/>
@@ -88,7 +89,7 @@
   </include>
 
   <!-- rviz -->
-  <group if="$(arg open_rviz)"> 
+  <group if="$(arg open_rviz)">
     <node pkg="rviz" type="rviz" name="rviz" required="true"
           args="-d $(find turtlebot3_navigation)/rviz/turtlebot3_navigation.rviz"/>
   </group>

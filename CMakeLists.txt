@@ -230,10 +230,11 @@ SET(rtabmap_plugins_lib_src
    src/nodelets/undistort_depth.cpp
    src/nodelets/imu_to_tf.cpp
    src/nodelets/rgbdx_sync.cpp
+   src/nodelets/lidar_deskewing.cpp
 )
 
 IF(${cv_bridge_VERSION_MAJOR} GREATER 1 OR ${cv_bridge_VERSION_MINOR} GREATER 10)
-   SET(rtabmap_plugins_lib_src ${rtabmap_plugins_lib_src} src/nodelets/rgbd_sync.cpp src/nodelets/stereo_sync.cpp src/nodelets/rgb_sync.cpp src/nodelets/rgbd_relay.cpp)
+   SET(rtabmap_plugins_lib_src ${rtabmap_plugins_lib_src} src/nodelets/rgbd_sync.cpp src/nodelets/stereo_sync.cpp src/nodelets/rgb_sync.cpp src/nodelets/rgbd_relay.cpp src/nodelets/rgbd_split.cpp)
 ELSE()
    ADD_DEFINITIONS("-DCV_BRIDGE_HYDRO")
 ENDIF()   
@@ -342,6 +343,10 @@ add_executable(rtabmap_rgbd_relay src/RGBDRelayNode.cpp)
 target_link_libraries(rtabmap_rgbd_relay ${Libraries})
 set_target_properties(rtabmap_rgbd_relay PROPERTIES OUTPUT_NAME "rgbd_relay")
 
+add_executable(rtabmap_rgbd_split src/RGBDSplitNode.cpp)
+target_link_libraries(rtabmap_rgbd_split ${Libraries})
+set_target_properties(rtabmap_rgbd_split PROPERTIES OUTPUT_NAME "rgbd_split")
+
 add_executable(rtabmap_map_optimizer src/MapOptimizerNode.cpp)
 target_link_libraries(rtabmap_map_optimizer rtabmap_ros)
 set_target_properties(rtabmap_map_optimizer PROPERTIES OUTPUT_NAME "map_optimizer")
@@ -353,6 +358,10 @@ set_target_properties(rtabmap_map_assembler PROPERTIES OUTPUT_NAME "map_assemble
 add_executable(rtabmap_imu_to_tf src/ImuToTFNode.cpp)
 target_link_libraries(rtabmap_imu_to_tf ${Libraries})
 set_target_properties(rtabmap_imu_to_tf PROPERTIES OUTPUT_NAME "imu_to_tf")
+
+add_executable(rtabmap_lidar_deskewing src/LidarDeskewingNode.cpp)
+target_link_libraries(rtabmap_lidar_deskewing ${Libraries})
+set_target_properties(rtabmap_lidar_deskewing PROPERTIES OUTPUT_NAME "lidar_deskewing")
 
 IF(NOT WIN32)
 add_executable(rtabmap_wifi_signal_pub src/WifiSignalPubNode.cpp)

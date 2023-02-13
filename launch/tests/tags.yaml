@@ -47,7 +47,7 @@ tag_bundles:
        name: 'tag_bundle1',
        layout:
          [
-           # for a pixel = ~8mm 
+           # for a pixel = ~8mm
            {id: 1,   size: 0.0620, x: 0.0000, y:  0.0000, z: 0, qw: 1, qx: 0, qy: 0, qz: 0},
            {id: 2,   size: 0.0620, x: 0.0770, y:  0.0000, z: 0, qw: 1, qx: 0, qy: 0, qz: 0},
            {id: 25,  size: 0.0620, x: 0.0000, y: -0.0770, z: 0, qw: 1, qx: 0, qy: 0, qz: 0},

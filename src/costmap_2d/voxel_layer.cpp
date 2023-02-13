@@ -36,7 +36,7 @@
  *         David V. Lu!!
  *********************************************************************/
 #include "voxel_layer.h"
-#include <pluginlib/class_list_macros.h>
+#include <pluginlib/class_list_macros.hpp>
 #include <sensor_msgs/point_cloud2_iterator.h>
 #include <boost/thread.hpp>
 #include <pcl_conversions/pcl_conversions.h>

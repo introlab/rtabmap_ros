@@ -27,7 +27,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <rtabmap_ros/OdometryROS.h>
 
-#include <pluginlib/class_list_macros.h>
+#include <pluginlib/class_list_macros.hpp>
 #include <nodelet/nodelet.h>
 
 #include <message_filters/subscriber.h>
@@ -281,7 +281,7 @@ private:
 				}
 			}
 
-			Transform localTransform = getTransform(this->frameId(), image->header.frame_id, stamp);
+			Transform localTransform = getTransform(this->frameId(), image->header.frame_id, stamp, this->tfListener(), this->waitForTransformDuration());
 			if(localTransform.isNull())
 			{
 				return;
@@ -316,7 +316,9 @@ private:
 					// make sure the frame of the laser is updated too
 					localScanTransform = getTransform(this->frameId(),
 							scanMsg->header.frame_id,
-							scanMsg->header.stamp + ros::Duration().fromSec(scanMsg->ranges.size()*scanMsg->time_increment));
+							scanMsg->header.stamp + ros::Duration().fromSec(scanMsg->ranges.size()*scanMsg->time_increment),
+							this->tfListener(),
+							this->waitForTransformDuration());
 					if(localScanTransform.isNull())
 					{
 						ROS_ERROR("TF of received laser scan topic at time %fs is not set, aborting odometry update.", scanMsg->header.stamp.toSec());
@@ -381,7 +383,7 @@ private:
 							}
 						}
 					}
-					localScanTransform = getTransform(this->frameId(), cloudMsg->header.frame_id, cloudMsg->header.stamp);
+					localScanTransform = getTransform(this->frameId(), cloudMsg->header.frame_id, cloudMsg->header.stamp, this->tfListener(), this->waitForTransformDuration());
 					if(localScanTransform.isNull())
 					{
 						ROS_ERROR("TF of received scan cloud at time %fs is not set, aborting rtabmap update.", cloudMsg->header.stamp.toSec());

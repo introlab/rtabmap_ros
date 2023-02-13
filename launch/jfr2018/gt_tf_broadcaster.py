@@ -1,4 +1,4 @@
-#!/usr/bin/env python  
+#!/usr/bin/env python
 import roslib
 import rospy
 import os
@@ -14,7 +14,7 @@ if __name__ == '__main__':
     offset_y = rospy.get_param('~offset_y', 0.0)
     offset_theta = rospy.get_param('~offset_theta', 0.0)
     gtFile = rospy.get_param('~file', 'groundtruth.txt')
-    gtFile = os.path.expanduser(gtFile) 
+    gtFile = os.path.expanduser(gtFile)
     br = tf.TransformBroadcaster()
 
     init_x = 0
@@ -34,7 +34,7 @@ if __name__ == '__main__':
                 init_x = x
                 init_y = y
                 init = True
-            
+
             x -= init_x
             y -= init_y
 

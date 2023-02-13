@@ -1,4 +1,4 @@
-#!/usr/bin/env python  
+#!/usr/bin/env python
 import roslib
 import rospy
 import os
@@ -16,11 +16,11 @@ def callback(data):
     global lastSize
     global slamPosesInd
     global rmse
-  
+
     point_markers = []
     for m in data.markers:
         if m.type==2:
-            point_markers.append(m) 
+            point_markers.append(m)
 
     if len(point_markers) > 0 and lastSize != len(point_markers):
         t = rospy.Time(point_markers[0].header.stamp.secs, point_markers[0].header.stamp.nsecs)

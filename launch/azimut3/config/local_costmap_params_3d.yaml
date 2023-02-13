@@ -15,19 +15,19 @@ local_costmap:
   observation_sources: point_cloud_sensor
 
   laser_scan_sensor: {
-    data_type: LaserScan, 
-    topic: base_scan, 
-    expected_update_rate: 0.2, 
-    marking: true, 
+    data_type: LaserScan,
+    topic: base_scan,
+    expected_update_rate: 0.2,
+    marking: true,
     clearing: true}
 
   # assuming receiving a cloud from rtabmap/obstacles_detection node
   point_cloud_sensor: {
     sensor_frame: base_footprint,
-    data_type: PointCloud2, 
-    topic: openni_points, 
-    expected_update_rate: 0.5, 
-    marking: true, 
+    data_type: PointCloud2,
+    topic: openni_points,
+    expected_update_rate: 0.5,
+    marking: true,
     clearing: true,
     min_obstacle_height: -99999.0,
     max_obstacle_height: 0.5}

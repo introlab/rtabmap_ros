@@ -71,6 +71,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "MapsManager.h"
 
+#include "rtabmap_ros/ULogToRosout.h"
+
 #ifdef WITH_OCTOMAP_MSGS
 #include <octomap_msgs/GetOctomap.h>
 #endif
@@ -282,6 +284,7 @@ private:
 	int genDepthFillIterations_;
 	double genDepthFillHolesError_;
 	int scanCloudMaxPoints_;
+	bool scanCloudIs2d_;
 
 	rtabmap::Transform mapToOdom_;
 	boost::mutex mapToOdomMutex_;
@@ -393,8 +396,8 @@ private:
 	bool alreadyRectifiedImages_;
 	bool twoDMapping_;
 	ros::Time previousStamp_;
-	std::set<int> nodesToRepublish_;
-	int maxNodesRepublished_;
+
+	ULogToRosout ulogToRosout_;
 };
 
 }

@@ -81,6 +81,7 @@ OdometryROS::OdometryROS(bool stereoParams, bool visParams, bool icpParams) :
 	previousStamp_(0.0),
 	expectedUpdateRate_(0.0),
 	maxUpdateRate_(0.0),
+	minUpdateRate_(0.0),
 	odomStrategy_(Parameters::defaultOdomStrategy()),
 	waitIMUToinit_(false),
 	imuProcessed_(false)
@@ -148,8 +149,14 @@ void OdometryROS::onInit()
 
 	pnh.param("expected_update_rate", expectedUpdateRate_, expectedUpdateRate_); // expected sensor rate
 	pnh.param("max_update_rate", maxUpdateRate_, maxUpdateRate_);
+	pnh.param("min_update_rate", minUpdateRate_, minUpdateRate_);
 
 	pnh.param("wait_imu_to_init", waitIMUToinit_, waitIMUToinit_);
+
+	int eventLevel = ULogger::kFatal;
+	pnh.param("log_to_rosout_level", eventLevel, eventLevel);
+	UASSERT(eventLevel >= ULogger::kDebug && eventLevel <= ULogger::kFatal);
+	ULogger::setEventLevel((ULogger::Level)eventLevel);
 
 	if(publishTf_ && !guessFrameId_.empty() && guessFrameId_.compare(odomFrameId_) == 0)
 	{
@@ -163,6 +170,7 @@ void OdometryROS::onInit()
 	NODELET_INFO("Odometry: publish_tf             = %s", publishTf_?"true":"false");
 	NODELET_INFO("Odometry: wait_for_transform     = %s", waitForTransform_?"true":"false");
 	NODELET_INFO("Odometry: wait_for_transform_duration  = %f", waitForTransformDuration_);
+	NODELET_INFO("Odometry: log_to_rosout_level    = %d", eventLevel);
 	NODELET_INFO("Odometry: initial_pose           = %s", initialPose.prettyPrint().c_str());
 	NODELET_INFO("Odometry: ground_truth_frame_id  = %s", groundTruthFrameId_.c_str());
 	NODELET_INFO("Odometry: ground_truth_base_frame_id = %s", groundTruthBaseFrameId_.c_str());
@@ -174,6 +182,7 @@ void OdometryROS::onInit()
 	NODELET_INFO("Odometry: guess_min_time         = %f", guessMinTime_);
 	NODELET_INFO("Odometry: expected_update_rate   = %f Hz", expectedUpdateRate_);
 	NODELET_INFO("Odometry: max_update_rate        = %f Hz", maxUpdateRate_);
+	NODELET_INFO("Odometry: min_update_rate        = %f Hz", minUpdateRate_);
 	NODELET_INFO("Odometry: wait_imu_to_init       = %s", waitIMUToinit_?"true":"false");
 
 	configPath = uReplaceChar(configPath, '~', UDirectory::homeDir());
@@ -254,8 +263,8 @@ void OdometryROS::onInit()
 		}
 		else if(pnh.getParam(iter->first, vDouble))
 		{
-			NODELET_INFO( "Setting odometry parameter \"%s\"=\"%s\"", iter->first.c_str(), uNumber2Str(vDouble).c_str());
-			iter->second = uNumber2Str(vDouble);
+			NODELET_INFO( "Setting odometry parameter \"%s\"=\"%s\"", iter->first.c_str(), uNumber2Str(vDouble, 6).c_str());
+			iter->second = uNumber2Str(vDouble, 6);
 		}
 		else if(pnh.getParam(iter->first, vInt))
 		{
@@ -394,33 +403,13 @@ void OdometryROS::warningLoop(const std::string & subscribedTopicsMsg, bool appr
 	}
 }
 
-Transform OdometryROS::getTransform(const std::string & fromFrameId, const std::string & toFrameId, const ros::Time & stamp) const
+rtabmap::Transform OdometryROS::velocityGuess() const
 {
-	// TF ready?
-	Transform transform;
-	try
+	if(odometry_)
 	{
-		if(waitForTransform_ && !stamp.isZero() && waitForTransformDuration_ > 0.0)
-		{
-			//if(!tfBuffer_.canTransform(fromFrameId, toFrameId, stamp, ros::Duration(1)))
-			std::string errorMsg;
-			if(!tfListener_.waitForTransform(fromFrameId, toFrameId, stamp, ros::Duration(waitForTransformDuration_), ros::Duration(0.01), &errorMsg))
-			{
-				NODELET_WARN( "odometry: Could not get transform from %s to %s (stamp=%f) after %f seconds (\"wait_for_transform_duration\"=%f)! Error=\"%s\"",
-						fromFrameId.c_str(), toFrameId.c_str(), stamp.toSec(), waitForTransformDuration_, waitForTransformDuration_, errorMsg.c_str());
-				return transform;
-			}
-		}
-
-		tf::StampedTransform tmp;
-		tfListener_.lookupTransform(fromFrameId, toFrameId, stamp, tmp);
-		transform = rtabmap_ros::transformFromTF(tmp);
+		return odometry_->getVelocityGuess();
 	}
-	catch(tf::TransformException & ex)
-	{
-		NODELET_WARN( "%s",ex.what());
-	}
-	return transform;
+	return rtabmap::Transform();
 }
 
 void OdometryROS::callbackIMU(const sensor_msgs::ImuConstPtr& msg)
@@ -431,7 +420,7 @@ void OdometryROS::callbackIMU(const sensor_msgs::ImuConstPtr& msg)
 		rtabmap::Transform localTransform = rtabmap::Transform::getIdentity();
 		if(this->frameId().compare(msg->header.frame_id) != 0)
 		{
-			localTransform = getTransform(this->frameId(), msg->header.frame_id, msg->header.stamp);
+			localTransform = getTransform(this->frameId(), msg->header.frame_id, msg->header.stamp, this->tfListener(), this->waitForTransformDuration());
 		}
 		if(localTransform.isNull())
 		{
@@ -534,7 +523,7 @@ void OdometryROS::processData(SensorData & data, const std_msgs::Header & header
 
 		if(!groundTruthFrameId_.empty())
 		{
-			groundTruth = getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, header.stamp);
+			groundTruth = getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, header.stamp, this->tfListener(), this->waitForTransformDuration());
 
 			if(!data.imageRaw().empty() || !data.laserScanRaw().isEmpty())
 			{
@@ -568,7 +557,7 @@ void OdometryROS::processData(SensorData & data, const std_msgs::Header & header
 	Transform guessCurrentPose;
 	if(!guessFrameId_.empty())
 	{
-		guessCurrentPose = this->getTransform(guessFrameId_, frameId_, header.stamp);
+		guessCurrentPose = getTransform(guessFrameId_, frameId_, header.stamp, this->tfListener(), this->waitForTransformDuration());
 
 		Transform previousPose = guessPreviousPose_;
 		if(guessPreviousPose_.isNull())
@@ -623,6 +612,8 @@ void OdometryROS::processData(SensorData & data, const std_msgs::Header & header
 		}
 	}
 
+	bool tooOldPreviousData = minUpdateRate_ > 0 && previousStamp_ > 0 && (header.stamp.toSec()-previousStamp_) > 1.0/minUpdateRate_;
+
 	// process data
 	ros::WallTime time = ros::WallTime::now();
 	rtabmap::OdometryInfo info;
@@ -630,7 +621,11 @@ void OdometryROS::processData(SensorData & data, const std_msgs::Header & header
 	{
 		data.setGroundTruth(groundTruth);
 	}
-	rtabmap::Transform pose = odometry_->process(data, guess_, &info);
+	rtabmap::Transform pose;
+	if(!tooOldPreviousData)
+	{
+		pose = odometry_->process(data, guess_, &info);
+	}
 	if(!pose.isNull())
 	{
 		guess_.setNull();
@@ -856,12 +851,21 @@ void OdometryROS::processData(SensorData & data, const std_msgs::Header & header
 		}
 	}
 
-	if(pose.isNull() && resetCurrentCount_ > 0)
+	if(pose.isNull() && (resetCurrentCount_ > 0 || tooOldPreviousData))
 	{
-		NODELET_WARN( "Odometry lost! Odometry will be reset after next %d consecutive unsuccessful odometry updates...", resetCurrentCount_);
+		if(tooOldPreviousData)
+		{
+			NODELET_WARN( "Odometry lost! Odometry will be reset because last update "
+					"is %fs too old (>%fs, min_update_rate = %f Hz). Previous data stamp is %f while new data stamp is %f.",
+					header.stamp.toSec() - previousStamp_, 1.0/minUpdateRate_, minUpdateRate_, previousStamp_, header.stamp.toSec());
+		}
+		else
+		{
+			NODELET_WARN( "Odometry lost! Odometry will be reset after next %d consecutive unsuccessful odometry updates...", resetCurrentCount_);
+			--resetCurrentCount_;
+		}
 
-		--resetCurrentCount_;
-		if(resetCurrentCount_ == 0)
+		if(resetCurrentCount_ == 0 || tooOldPreviousData)
 		{
 			if(!guess_.isNull())
 			{
@@ -873,7 +877,7 @@ void OdometryROS::processData(SensorData & data, const std_msgs::Header & header
 			else
 			{
 				// Check TF to see if sensor fusion is used (e.g., the output of robot_localization)
-				Transform tfPose = this->getTransform(odomFrameId_, frameId_, header.stamp);
+				Transform tfPose = getTransform(odomFrameId_, frameId_, header.stamp, this->tfListener(), this->waitForTransformDuration());
 				if(tfPose.isNull())
 				{
 					NODELET_WARN( "Odometry automatically reset to latest computed pose!");
@@ -883,7 +887,7 @@ void OdometryROS::processData(SensorData & data, const std_msgs::Header & header
 				{
 					NODELET_WARN( "Odometry automatically reset to latest odometry pose available from TF (%s->%s)!",
 							odomFrameId_.c_str(), frameId_.c_str());
-					odometry_->reset(odometry_->getPose());
+					odometry_->reset(tfPose);
 				}
 			}
 		}

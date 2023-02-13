@@ -29,7 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <stdio.h>
 #include <ros/ros.h>
-#include "pluginlib/class_list_macros.h"
+#include "pluginlib/class_list_macros.hpp"
 
 #include <nav_msgs/Path.h>
 #include <std_msgs/Int32MultiArray.h>
@@ -112,6 +112,7 @@ CoreWrapper::CoreWrapper() :
 		genDepthFillIterations_(1),
 		genDepthFillHolesError_(0.1),
 		scanCloudMaxPoints_(0),
+		scanCloudIs2d_(false),
 		mapToOdom_(rtabmap::Transform::getIdentity()),
 		transformThread_(0),
 		tfThreadRunning_(false),
@@ -125,8 +126,7 @@ CoreWrapper::CoreWrapper() :
 		alreadyRectifiedImages_(Parameters::defaultRtabmapImagesAlreadyRectified()),
 		twoDMapping_(Parameters::defaultRegForce3DoF()),
 		previousStamp_(0),
-		mbClient_(0),
-		maxNodesRepublished_(2)
+		mbClient_(0)
 {
 	char * rosHomePath = getenv("ROS_HOME");
 	std::string workingDir = rosHomePath?rosHomePath:UDirectory::homeDir()+"/.ros";
@@ -142,6 +142,7 @@ void CoreWrapper::onInit()
 	mapsManager_.init(nh, pnh, getName(), true);
 
 	bool publishTf = true;
+	std::string initialPoseStr;
 	double tfDelay = 0.05; // 20 Hz
 	double tfTolerance = 0.1; // 100 ms
 	std::string odomFrameIdInit;
@@ -174,6 +175,11 @@ void CoreWrapper::onInit()
 		}
 	}
 
+	int eventLevel = ULogger::kFatal;
+	pnh.param("log_to_rosout_level", eventLevel, eventLevel);
+	UASSERT(eventLevel >= ULogger::kDebug && eventLevel <= ULogger::kFatal);
+	ULogger::setEventLevel((ULogger::Level)eventLevel);
+
 	pnh.param("publish_tf",          publishTf, publishTf);
 	pnh.param("tf_delay",            tfDelay, tfDelay);
 	if(pnh.hasParam("tf_prefix"))
@@ -187,9 +193,9 @@ void CoreWrapper::onInit()
 	pnh.param("landmark_linear_variance", landmarkDefaultLinVariance_, landmarkDefaultLinVariance_);
 	pnh.param("wait_for_transform",  waitForTransform_, waitForTransform_);
 	pnh.param("wait_for_transform_duration",  waitForTransformDuration_, waitForTransformDuration_);
+	pnh.param("initial_pose",          initialPoseStr, initialPoseStr);
 	pnh.param("use_action_for_goal", useActionForGoal_, useActionForGoal_);
 	pnh.param("use_saved_map", useSavedMap_, useSavedMap_);
-	pnh.param("max_nodes_republished", maxNodesRepublished_, maxNodesRepublished_);
 	pnh.param("gen_scan",            genScan_, genScan_);
 	pnh.param("gen_scan_max_depth",  genScanMaxDepth_, genScanMaxDepth_);
 	pnh.param("gen_scan_min_depth",  genScanMinDepth_, genScanMinDepth_);
@@ -199,6 +205,7 @@ void CoreWrapper::onInit()
 	pnh.param("gen_depth_fill_iterations",  genDepthFillIterations_, genDepthFillIterations_);
 	pnh.param("gen_depth_fill_holes_error", genDepthFillHolesError_, genDepthFillHolesError_);
 	pnh.param("scan_cloud_max_points",  scanCloudMaxPoints_, scanCloudMaxPoints_);
+	pnh.param("scan_cloud_is_2d",       scanCloudIs2d_, scanCloudIs2d_);
 	if(pnh.hasParam("scan_cloud_normal_k"))
 	{
 		ROS_WARN("rtabmap: Parameter \"scan_cloud_normal_k\" has been removed. RTAB-Map's parameter \"%s\" should be used instead. "
@@ -230,6 +237,8 @@ void CoreWrapper::onInit()
 				groundTruthBaseFrameId_.c_str());
 	}
 	NODELET_INFO("rtabmap: map_frame_id  = %s", mapFrameId_.c_str());
+	NODELET_INFO("rtabmap: log_to_rosout_level = %d", eventLevel);
+	NODELET_INFO("rtabmap: initial_pose  = %s", initialPoseStr.c_str());
 	NODELET_INFO("rtabmap: use_action_for_goal  = %s", useActionForGoal_?"true":"false");
 	NODELET_INFO("rtabmap: tf_delay      = %f", tfDelay);
 	NODELET_INFO("rtabmap: tf_tolerance  = %f", tfTolerance);
@@ -261,6 +270,7 @@ void CoreWrapper::onInit()
 	if(subscribeScanCloud)
 	{
 		NODELET_INFO("rtabmap: scan_cloud_max_points = %d", scanCloudMaxPoints_);
+		NODELET_INFO("rtabmap: scan_cloud_is_2d      = %s", scanCloudIs2d_?"true":"false");
 	}
 
 	infoPub_ = nh.advertise<rtabmap_ros::Info>("info", 1);
@@ -478,7 +488,7 @@ void CoreWrapper::onInit()
 				Parameters::kGridSensor().c_str());
 		parameters_.insert(ParametersPair(Parameters::kGridRangeMax(), "0"));
 	}
-	if(subscribeScan3d && parameters_.find(Parameters::kIcpPointToPlaneRadius()) == parameters_.end())
+	if(subscribeScan3d && !scanCloudIs2d_ && parameters_.find(Parameters::kIcpPointToPlaneRadius()) == parameters_.end())
 	{
 		NODELET_INFO("Setting \"%s\" parameter to 0 (default %f) as \"subscribe_scan_cloud\" is true.",
 				Parameters::kIcpPointToPlaneRadius().c_str(),
@@ -490,13 +500,14 @@ void CoreWrapper::onInit()
 	if(parameters_.find(Parameters::kRGBDProximityPathMaxNeighbors()) == parameters_.end() &&
 		(regStrategy == Registration::kTypeIcp || regStrategy == Registration::kTypeVisIcp))
 	{
-		if(subscribeScan2d)
+		if(subscribeScan2d || (subscribeScan3d && scanCloudIs2d_))
 		{
-			NODELET_WARN("Setting \"%s\" parameter to 10 (default 0) as \"subscribe_scan\" is "
+			NODELET_WARN("Setting \"%s\" parameter to 10 (default 0) as \"%s\" is "
 					"true and \"%s\" uses ICP. Proximity detection by space will be also done by merging close "
 					"scans. To disable, set \"%s\" to 0. To suppress this warning, "
 					"add <param name=\"%s\" type=\"string\" value=\"10\"/>",
 					Parameters::kRGBDProximityPathMaxNeighbors().c_str(),
+					subscribeScan2d?"subscribe_scan":"scan_cloud_is_2d",
 					Parameters::kRegStrategy().c_str(),
 					Parameters::kRGBDProximityPathMaxNeighbors().c_str(),
 					Parameters::kRGBDProximityPathMaxNeighbors().c_str());
@@ -802,6 +813,21 @@ void CoreWrapper::onInit()
 		if(updateParams)
 		{
 			rtabmap_.parseParameters(parameters_);
+		}
+	}
+
+	// Set initial pose if set
+	if(!initialPoseStr.empty())
+	{
+		Transform intialPose = Transform::fromString(initialPoseStr);
+		if(!intialPose.isNull())
+		{
+			NODELET_INFO("Setting initial pose: \"%s\"", intialPose.prettyPrint().c_str());
+			rtabmap_.setInitialPose(intialPose);
+		}
+		else
+		{
+			NODELET_ERROR("Invalid initial_pose: \"%s\"", initialPoseStr.c_str());
 		}
 	}
 
@@ -1390,7 +1416,9 @@ void CoreWrapper::commonMultiCameraCallbackImpl(
 				scan,
 				tfListener_,
 				waitForTransform_?waitForTransformDuration_:0,
-				scanCloudMaxPoints_))
+				scanCloudMaxPoints_,
+				0,
+				scanCloudIs2d_))
 		{
 			NODELET_ERROR("Could not convert 3d laser scan msg! Aborting rtabmap update...");
 			return;
@@ -1595,7 +1623,9 @@ void CoreWrapper::commonLaserScanCallback(
 				scan,
 				tfListener_,
 				waitForTransform_?waitForTransformDuration_:0,
-				scanCloudMaxPoints_))
+				scanCloudMaxPoints_,
+				0,
+				scanCloudIs2d_))
 		{
 			NODELET_ERROR("Could not convert 3d laser scan msg! Aborting rtabmap update...");
 			return;
@@ -2391,22 +2421,7 @@ void CoreWrapper::imuAsyncCallback(const sensor_msgs::ImuConstPtr & msg)
 
 void CoreWrapper::republishNodeDataCallback(const std_msgs::Int32MultiArray::ConstPtr& msg)
 {
-	if(maxNodesRepublished_>0)
-	{
-		nodesToRepublish_.insert(msg->data.begin(), msg->data.end());
-	}
-	else
-	{
-		static bool warned = false;
-		if(!warned)
-		{
-			NODELET_WARN("A node is requesting some node data "
-					"to be republished after the next update, "
-					"but parameter \"max_nodes_republished\" is not over 0, "
-					"ignoring the call. This warning is only printed once.");
-			warned = true;
-		}
-	}
+	rtabmap_.addNodesToRepublish(msg->data);
 }
 
 void CoreWrapper::interOdomCallback(const nav_msgs::OdometryConstPtr & msg)
@@ -2720,7 +2735,6 @@ bool CoreWrapper::resetRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empt
 	mapToOdomMutex_.lock();
 	mapToOdom_.setIdentity();
 	mapToOdomMutex_.unlock();
-	nodesToRepublish_.clear();
 
 	return true;
 }
@@ -2811,7 +2825,6 @@ bool CoreWrapper::loadDatabaseCallback(rtabmap_ros::LoadDatabase::Request& req, 
 	mapToOdomMutex_.lock();
 	mapToOdom_.setIdentity();
 	mapToOdomMutex_.unlock();
-	nodesToRepublish_.clear();
 
 	// Open new database
 	databasePath_ = newDatabasePath;
@@ -2928,7 +2941,6 @@ bool CoreWrapper::backupDatabaseCallback(std_srvs::Empty::Request&, std_srvs::Em
 	globalPose_.header.stamp = ros::Time(0);
 	gps_ = rtabmap::GPS();
 	tags_.clear();
-	nodesToRepublish_.clear();
 
 	NODELET_INFO("Backup: Saving \"%s\" to \"%s\"...", databasePath_.c_str(), (databasePath_+".back").c_str());
 	UFile::copy(databasePath_, databasePath_+".back");
@@ -3976,67 +3988,10 @@ void CoreWrapper::publishStats(const ros::Time & stamp)
 		msg->header.stamp = stamp;
 		msg->header.frame_id = mapFrameId_;
 
-		std::map<int, Signature> signatures;
-		if(stats.getLastSignatureData().id() > 0)
-		{
-			signatures.insert(std::make_pair(stats.getLastSignatureData().id(), stats.getLastSignatureData()));
-		}
-
-		if(nodesToRepublish_.size() && !rtabmap_.getLastLocalizationPose().isNull())
-		{
-			// Republish data from closest nodes of the current localization
-			std::map<int, Transform> nodesOnly(rtabmap_.getLocalOptimizedPoses().lower_bound(1), rtabmap_.getLocalOptimizedPoses().end());
-			int id = rtabmap::graph::findNearestNode(nodesOnly, rtabmap_.getLastLocalizationPose());
-			if(id>0)
-			{
-				std::map<int, int> ids = rtabmap_.getMemory()->getNeighborsId(id, 0, 0, true, false, true);
-				std::multimap<int, int> missingIds;
-				for(std::map<int, int>::iterator iter=ids.begin(); iter!=ids.end(); ++iter)
-				{
-					if(nodesToRepublish_.find(iter->first) != nodesToRepublish_.end())
-					{
-						missingIds.insert(std::make_pair(iter->second, iter->first));
-					}
-				}
-
-				if(nodesToRepublish_.size() != missingIds.size())
-				{
-					// remove requested nodes not anymore in the graph
-					for(std::set<int>::iterator iter=nodesToRepublish_.begin(); iter!=nodesToRepublish_.end();)
-					{
-						if(ids.find(*iter) == ids.end())
-						{
-							iter = nodesToRepublish_.erase(iter);
-						}
-						else
-						{
-							++iter;
-						}
-					}
-				}
-
-				int loaded = 0;
-				std::stringstream stream;
-				for(std::multimap<int, int>::iterator iter=missingIds.begin(); iter!=missingIds.end() && loaded<maxNodesRepublished_; ++iter)
-				{
-					signatures.insert(std::make_pair(iter->second, rtabmap_.getMemory()->getNodeData(iter->second, true, true, true, true)));
-					nodesToRepublish_.erase(iter->second);
-					++loaded;
-					stream << iter->second << " ";
-				}
-				if(loaded)
-				{
-					NODELET_WARN("Republishing data of requested node(s) %sfrom \"%s\" input topic (max_nodes_republished=%d)",
-							stream.str().c_str(),
-							republishNodeDataSub_.getTopic().c_str(),
-							maxNodesRepublished_);
-				}
-			}
-		}
 		rtabmap_ros::mapDataToROS(
 			stats.poses(),
 			stats.constraints(),
-			signatures,
+			stats.getSignaturesData(),
 			stats.mapCorrection(),
 			*msg);
 
@@ -4176,7 +4131,8 @@ void CoreWrapper::publishStats(const ros::Time & stamp)
 			nav_msgs::Path path;
 			if(pubPath)
 			{
-				path.poses.resize(stats.poses().size());
+				// Ignore pose of current location in Localization mode
+				path.poses.resize(stats.poses().size()-(rtabmap_.getMemory()->isIncremental()?0:1));
 			}
 			int oi = 0;
 			for(std::map<int, Transform>::const_iterator poseIter=stats.poses().begin();
@@ -4244,7 +4200,7 @@ void CoreWrapper::publishStats(const ros::Time & stamp)
 
 					markers.markers.push_back(marker);
 				}
-				if(pubPath)
+				if(pubPath && (rtabmap_.getMemory()->isIncremental() || poseIter->first != stats.poses().rbegin()->first))
 				{
 					rtabmap_ros::transformToPoseMsg(poseIter->second, path.poses.at(oi).pose);
 					path.poses.at(oi).header.frame_id = mapFrameId_;

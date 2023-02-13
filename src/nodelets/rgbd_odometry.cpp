@@ -27,7 +27,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <rtabmap_ros/OdometryROS.h>
 
-#include <pluginlib/class_list_macros.h>
+#include <pluginlib/class_list_macros.hpp>
 #include <nodelet/nodelet.h>
 
 #include <message_filters/subscriber.h>
@@ -450,7 +450,7 @@ private:
 				higherStamp = stamp;
 			}
 
-			Transform localTransform = getTransform(this->frameId(), rgbImages[i]->header.frame_id, stamp);
+			Transform localTransform = getTransform(this->frameId(), rgbImages[i]->header.frame_id, stamp, this->tfListener(), this->waitForTransformDuration());
 			if(localTransform.isNull())
 			{
 				return;
@@ -557,11 +557,11 @@ private:
 			infoMsgs.push_back(*cameraInfo);
 
 			double stampDiff = fabs(image->header.stamp.toSec() - depth->header.stamp.toSec());
-			if(stampDiff > 0.010)
+			if(stampDiff > 0.020)
 			{
 				NODELET_WARN("The time difference between rgb and depth frames is "
 						"high (diff=%fs, rgb=%fs, depth=%fs). You may want "
-						"to set approx_sync_max_interval lower than 0.01s to reject spurious bad synchronizations or use "
+						"to set approx_sync_max_interval lower than 0.02s to reject spurious bad synchronizations or use "
 						"approx_sync=false if streams have all the exact same timestamp.",
 						stampDiff,
 						image->header.stamp.toSec(),
