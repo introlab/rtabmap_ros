@@ -32,16 +32,9 @@ find_package(fiducial_msgs)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
-find_package(RTABMap 0.20.23 REQUIRED)
+find_package(RTABMap 0.21.0 REQUIRED)
 
-find_package(OpenCV REQUIRED QUIET COMPONENTS core calib3d imgproc highgui stitching photo video OPTIONAL_COMPONENTS aruco xfeatures2d nonfree gpu cudafeatures2d)
-
-IF(RTABMAP_GUI)
-FIND_PACKAGE(PCL 1.7 REQUIRED QUIET COMPONENTS common io kdtree search surface filters registration sample_consensus segmentation visualization)
-ELSE()
-FIND_PACKAGE(PCL 1.7 REQUIRED QUIET COMPONENTS common io kdtree search surface filters registration sample_consensus segmentation )
-ENDIF()
-add_definitions(${PCL_DEFINITIONS}) # To include -march=native if set
+add_definitions(${RTABMap_DEFINITIONS}) # To include -march=native if set
 
 IF(WIN32)
 add_compile_options(-bigobj)
@@ -70,27 +63,6 @@ ENDIF(RTABMAP_SYNC_MULTI_RGBD)
 IF(RTABMAP_SYNC_USER_DATA)
 add_definitions("-DRTABMAP_SYNC_USER_DATA")
 ENDIF(RTABMAP_SYNC_USER_DATA)
-
-#Qt stuff
-# If librtabmap_gui.so is found, rtabmapviz will be built
-# If rviz is found, plugins will be built
-IF(RTABMAP_GUI OR rviz_FOUND)
-   IF(RTABMAP_QT_VERSION EQUAL 4)
-      FIND_PACKAGE(Qt4 COMPONENTS QtCore QtGui REQUIRED)
-      INCLUDE(${QT_USE_FILE})
-   ELSE()
-      IF(RTABMAP_GUI)
-         FIND_PACKAGE(Qt5 COMPONENTS Widgets Core Gui REQUIRED)
-      ELSE()
-         # For rviz plugins, look for Qt5 before Qt4
-         FIND_PACKAGE(Qt5 COMPONENTS Widgets Core Gui QUIET)
-         IF(NOT Qt5_FOUND)
-            FIND_PACKAGE(Qt4 COMPONENTS QtCore QtGui REQUIRED)
-            INCLUDE(${QT_USE_FILE})
-         ENDIF(NOT Qt5_FOUND)
-      ENDIF()
-   ENDIF()   
-ENDIF(RTABMAP_GUI OR rviz_FOUND)
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
@@ -184,12 +156,12 @@ ENDIF(find_object_2d_FOUND)
 
 catkin_package(
   INCLUDE_DIRS include
-  LIBRARIES rtabmap_ros
+  LIBRARIES rtabmap_ros rtabmap_sync
   CATKIN_DEPENDS cv_bridge roscpp rospy sensor_msgs std_msgs std_srvs nav_msgs geometry_msgs visualization_msgs
                  image_transport tf tf_conversions tf2_ros eigen_conversions laser_geometry pcl_conversions 
                  pcl_ros nodelet dynamic_reconfigure message_filters class_loader rosgraph_msgs
                  stereo_msgs move_base_msgs image_geometry ${optional_dependencies}
-  DEPENDS RTABMap OpenCV
+  DEPENDS RTABMap
 )
 
 ###########
@@ -201,18 +173,13 @@ catkin_package(
 # include_directories(include)
 include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/include
-  ${RTABMap_INCLUDE_DIRS}
-  ${OpenCV_INCLUDE_DIRS}
-  ${PCL_INCLUDE_DIRS}
   ${catkin_INCLUDE_DIRS}
 )
 
 # libraries
 SET(Libraries
-   ${OpenCV_LIBRARIES}
-   ${PCL_LIBRARIES}
+   rtabmap
    ${catkin_LIBRARIES}
-   ${RTABMap_LIBRARIES}
 )
  
 SET(rtabmap_sync_lib_src
@@ -336,8 +303,9 @@ target_link_libraries(rtabmap_plugins
 add_dependencies(rtabmap_ros ${${PROJECT_NAME}_EXPORTED_TARGETS})
 add_dependencies(rtabmap_plugins ${${PROJECT_NAME}_EXPORTED_TARGETS})
 
-add_executable(rtabmap src/CoreNode.cpp)
-target_link_libraries(rtabmap ${Libraries})
+add_executable(rtabmap_node src/CoreNode.cpp)
+target_link_libraries(rtabmap_node ${Libraries})
+set_target_properties(rtabmap_node PROPERTIES OUTPUT_NAME "rtabmap")
 
 add_executable(rtabmap_rgbd_odometry src/RGBDOdometryNode.cpp)
 target_link_libraries(rtabmap_rgbd_odometry ${Libraries})
@@ -426,12 +394,9 @@ add_executable(rtabmap_stereo_camera src/StereoCameraNode.cpp)
 target_link_libraries(rtabmap_stereo_camera rtabmap_ros)
 set_target_properties(rtabmap_stereo_camera PROPERTIES OUTPUT_NAME "stereo_camera")
 
-IF(RTABMAP_GUI)
+IF(RTABMap_gui_FOUND)
     add_executable(rtabmapviz src/GuiNode.cpp src/GuiWrapper.cpp src/PreferencesDialogROS.cpp)
-    target_link_libraries(rtabmapviz rtabmap_sync ${QT_LIBRARIES})
-    IF(Qt5_FOUND)
-        QT5_USE_MODULES(rtabmapviz Widgets Core Gui)
-    ENDIF()
+    target_link_libraries(rtabmapviz rtabmap_sync rtabmap_gui)
 ELSE()
     MESSAGE(WARNING "Found RTAB-Map built without its GUI library. Node rtabmapviz will not be built!")
 ENDIF()
@@ -599,7 +564,7 @@ install(TARGETS
    rtabmap_sync
    rtabmap_ros
    rtabmap_plugins 
-   rtabmap 
+   rtabmap_node 
    rtabmap_rgbd_odometry 
    rtabmap_icp_odometry
    rtabmap_rgbdicp_odometry 
@@ -620,14 +585,14 @@ install(TARGETS
    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
-IF(RTABMAP_GUI)
+IF(RTABMap_gui_FOUND)
     install(TARGETS 
        rtabmapviz
        ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
        LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
        RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
      )
-ENDIF(RTABMAP_GUI)
+ENDIF(RTABMap_gui_FOUND)
 
 ## Mark cpp header files for installation
 install(DIRECTORY include/${PROJECT_NAME}/

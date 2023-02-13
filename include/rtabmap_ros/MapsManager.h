@@ -43,6 +43,8 @@ class OccupancyGrid;
 
 }  // namespace rtabmap
 
+namespace rtabmap_ros {
+
 class MapsManager {
 public:
 	MapsManager();
@@ -135,5 +137,7 @@ private:
 	bool latching_;
 	std::map<void*, bool> latched_;
 };
+
+}  // namespace rtabmap_ros
 
 #endif /* MAPSMANAGER_H_ */
