@@ -149,7 +149,6 @@ void RGBDSync::callback(
 	{
 		double rgbStamp = timestampFromROS(image->header.stamp);
 		double depthStamp = timestampFromROS(depth->header.stamp);
-		double infoStamp = timestampFromROS(cameraInfo->header.stamp);
 
 		double stampDiff = fabs(rgbStamp - depthStamp);
 		if(stampDiff > 0.010)
