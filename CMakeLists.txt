@@ -149,7 +149,7 @@ ENDIF(RTABMAP_SYNC_USER_DATA)
  )
 
 ## Generate messages and services
- rosidl_generate_interfaces(rtabmap_msgs
+ rosidl_generate_interfaces(${PROJECT_NAME}
    ${msg_files}
    ${srv_files}
    DEPENDENCIES geometry_msgs std_msgs sensor_msgs std_srvs visualization_msgs image_geometry
@@ -325,7 +325,7 @@ ament_target_dependencies(rtabmap_sync ${Libraries})
 ament_target_dependencies(rtabmap_plugins ${Libraries})
 
 if("$ENV{ROS_DISTRO}" STRGREATER_EQUAL "humble")
-  rosidl_get_typesupport_target(cpp_typesupport_target rtabmap_msgs "rosidl_typesupport_cpp")
+  rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
   target_link_libraries(rtabmap_common ${cpp_typesupport_target})
   target_link_libraries(rtabmap_sync rtabmap_common ${cpp_typesupport_target})
@@ -336,9 +336,9 @@ else()
   target_link_libraries(rtabmap_sync rtabmap_common)
   target_link_libraries(rtabmap_plugins rtabmap_common)
 
-  rosidl_target_interfaces(rtabmap_common rtabmap_msgs "rosidl_typesupport_cpp")
-  rosidl_target_interfaces(rtabmap_sync rtabmap_msgs "rosidl_typesupport_cpp")
-  rosidl_target_interfaces(rtabmap_plugins rtabmap_msgs "rosidl_typesupport_cpp")
+  rosidl_target_interfaces(rtabmap_common ${PROJECT_NAME} "rosidl_typesupport_cpp")
+  rosidl_target_interfaces(rtabmap_sync ${PROJECT_NAME} "rosidl_typesupport_cpp")
+  rosidl_target_interfaces(rtabmap_plugins ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
   function(rosidl_get_typesupport_target var generate_interfaces_target typesupport_name)
     rosidl_target_interfaces(${var} ${generate_interfaces_target} ${typesupport_name})
@@ -476,12 +476,12 @@ set_target_properties(rtabmap_lidar_deskewing PROPERTIES OUTPUT_NAME "lidar_desk
 #ENDIF(find_object_2d_FOUND)
 
 #add_executable(rtabmap_external_loop_detectionexample src/ExternalLoopDetectionExample.cpp)
-#add_dependencies(rtabmap_external_loop_detectionexample ${rtabmap_msgs_EXPORTED_TARGETS})
+#add_dependencies(rtabmap_external_loop_detectionexample ${${PROJECT_NAME}_EXPORTED_TARGETS})
 #ament_target_dependencies(rtabmap_external_loop_detectionexample ${Libraries} rtabmap_common)
 #set_target_properties(rtabmap_external_loop_detectionexample PROPERTIES OUTPUT_NAME "external_loop_detection_example")
 
 #add_executable(rtabmap_camera src/CameraNode.cpp)
-#add_dependencies(rtabmap_camera ${rtabmap_msgs_EXPORTED_TARGETS})
+#add_dependencies(rtabmap_camera ${${PROJECT_NAME}_EXPORTED_TARGETS})
 #ament_target_dependencies(rtabmap_camera ${Libraries})
 #set_target_properties(rtabmap_camera PROPERTIES OUTPUT_NAME "camera")
 
@@ -518,44 +518,44 @@ get_rmw_typesupport(typesupport_impls "${rmw_implementation}" LANGUAGE "cpp")
 
 foreach(typesupport_impl ${typesupport_impls})
   rosidl_get_typesupport_target(rtabmap_rgbd_odometry
-    rtabmap_msgs ${typesupport_impl}
+    ${PROJECT_NAME} ${typesupport_impl}
   )
   rosidl_get_typesupport_target(rtabmap_stereo_odometry
-    rtabmap_msgs ${typesupport_impl}
+    ${PROJECT_NAME} ${typesupport_impl}
   )
   rosidl_get_typesupport_target(rtabmap_icp_odometry
-    rtabmap_msgs ${typesupport_impl}
+    ${PROJECT_NAME} ${typesupport_impl}
   )
   rosidl_get_typesupport_target(rtabmap_rgbd_relay
-    rtabmap_msgs ${typesupport_impl}
+    ${PROJECT_NAME} ${typesupport_impl}
   )
   rosidl_get_typesupport_target(rtabmap_rgbd_split
-    rtabmap_msgs ${typesupport_impl}
+    ${PROJECT_NAME} ${typesupport_impl}
   )
   rosidl_get_typesupport_target(rtabmap_rgbd_sync
-    rtabmap_msgs ${typesupport_impl}
+    ${PROJECT_NAME} ${typesupport_impl}
   )
   rosidl_get_typesupport_target(rtabmap_rgbdx_sync
-    rtabmap_msgs ${typesupport_impl}
+    ${PROJECT_NAME} ${typesupport_impl}
   )
   rosidl_get_typesupport_target(rtabmap_rgb_sync
-    rtabmap_msgs ${typesupport_impl}
+    ${PROJECT_NAME} ${typesupport_impl}
   )
   rosidl_get_typesupport_target(rtabmap_stereo_sync
-    rtabmap_msgs ${typesupport_impl}
+    ${PROJECT_NAME} ${typesupport_impl}
   )
   rosidl_get_typesupport_target(rtabmap_pointcloud_to_depthimage
-    rtabmap_msgs ${typesupport_impl}
+    ${PROJECT_NAME} ${typesupport_impl}
   )
   rosidl_get_typesupport_target(rtabmap_point_cloud_xyzrgb
-    rtabmap_msgs ${typesupport_impl}
+    ${PROJECT_NAME} ${typesupport_impl}
   )
   rosidl_get_typesupport_target(rtabmap_node
-    rtabmap_msgs ${typesupport_impl}
+    ${PROJECT_NAME} ${typesupport_impl}
   )
   IF(RTABMAP_GUI)
     rosidl_get_typesupport_target(rtabmapviz
-      rtabmap_msgs ${typesupport_impl}
+      ${PROJECT_NAME} ${typesupport_impl}
     )
   ENDIF()
 endforeach()
@@ -615,7 +615,7 @@ IF(rviz_default_plugins_FOUND)
 
     foreach(typesupport_impl ${typesupport_impls})
 	  rosidl_get_typesupport_target(rtabmap_rviz_plugins
-	    rtabmap_msgs ${typesupport_impl}
+	    ${PROJECT_NAME} ${typesupport_impl}
 	  )
     endforeach()
     
