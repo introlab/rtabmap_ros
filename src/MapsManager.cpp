@@ -342,6 +342,17 @@ bool MapsManager::hasSubscribers() const
 			;
 }
 
+bool MapsManager::isMapUpdated() const
+{
+	// We are currently using the check made in OccupancyGrid::update()
+	// to know if the map/graph changed. If there are no subscribers to
+	// any grid topics, we won't know it, so we will assume the graph
+	// changed.
+	return gridUpdated_ ||
+			(gridMapPub_->get_subscription_count() == 0 &&
+			 gridProbMapPub_->get_subscription_count() == 0);
+}
+
 std::map<int, Transform> MapsManager::getFilteredPoses(const std::map<int, Transform> & poses)
 {
 	if(mapFilterRadius_ > 0.0)

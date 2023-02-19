@@ -92,6 +92,7 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 		lastPose_(Transform::getIdentity()),
 		lastPoseIntermediate_(false),
 		latestNodeWasReached_(false),
+		graphLatched_(false),
 		frameId_("base_link"),
 		odomFrameId_(""),
 		mapFrameId_("map"),
@@ -253,7 +254,7 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 
 	infoPub_ = this->create_publisher<rtabmap_ros::msg::Info>("info", 1);
 	mapDataPub_ = this->create_publisher<rtabmap_ros::msg::MapData>("mapData", 1);
-	mapGraphPub_ = this->create_publisher<rtabmap_ros::msg::MapGraph>("mapGraph", 1);
+	mapGraphPub_ = this->create_publisher<rtabmap_ros::msg::MapGraph>("mapGraph", rclcpp::QoS(1).reliable().durability(mapsManager_.isLatching()?RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL:RMW_QOS_POLICY_DURABILITY_VOLATILE));
 	odomCachePub_ = this->create_publisher<rtabmap_ros::msg::MapGraph>("mapOdomCache", 1);
 	landmarksPub_ = this->create_publisher<geometry_msgs::msg::PoseArray>("landmarks", 1);
 	labelsPub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>("labels", 1);
@@ -2015,8 +2016,6 @@ void CoreWrapper::process(
 			}
 			else
 			{
-				// Publish local graph, info
-				this->publishStats(stamp);
 				if(localizationPosePub_->get_subscription_count() &&
 					!rtabmap_.getStatistics().localizationCovariance().empty())
 				{
@@ -2081,6 +2080,9 @@ void CoreWrapper::process(
 				timeUpdateMaps = timer.ticks();
 
 				mapsManager_.publishMaps(filteredPoses, stamp, mapFrameId_);
+
+				// Publish local graph, info
+				this->publishStats(stamp);
 
 				// update goal if planning is enabled
 				if(!currentMetricGoal_.isNull())
@@ -2683,6 +2685,7 @@ void CoreWrapper::resetRtabmapCallback(
 	lastPublishedMetricGoal_.setNull();
 	goalFrameId_.clear();
 	latestNodeWasReached_ = false;
+	graphLatched_ = false;
 	mapsManager_.clear();
 	previousStamp_ = rclcpp::Time(0);
 	globalPose_.header.stamp = rclcpp::Time(0);
@@ -2776,6 +2779,7 @@ void CoreWrapper::loadDatabaseCallback(
 	lastPublishedMetricGoal_.setNull();
 	goalFrameId_.clear();
 	latestNodeWasReached_ = false;
+	graphLatched_ = false;
 	mapsManager_.clear();
 	previousStamp_ = rclcpp::Time(0);
 	globalPose_.header.stamp = rclcpp::Time(0);
@@ -2901,6 +2905,7 @@ void CoreWrapper::backupDatabaseCallback(
 	lastPublishedMetricGoal_.setNull();
 	goalFrameId_.clear();
 	latestNodeWasReached_ = false;
+	graphLatched_ = false;
 	userDataMutex_.lock();
 	userData_ = cv::Mat();
 	userDataMutex_.unlock();
@@ -3982,17 +3987,30 @@ void CoreWrapper::publishStats(const rclcpp::Time & stamp)
 
 	if(mapGraphPub_->get_subscription_count())
 	{
-		rtabmap_ros::msg::MapGraph::UniquePtr msg(new rtabmap_ros::msg::MapGraph);
-		msg->header.stamp = stamp;
-		msg->header.frame_id = mapFrameId_;
+		if(mapsManager_.isMapUpdated())
+		{
+			graphLatched_ = false;
+		}
+		if(!(mapsManager_.isLatching() && graphLatched_))
+		{
+			rtabmap_ros::msg::MapGraph::UniquePtr msg(new rtabmap_ros::msg::MapGraph);
+			msg->header.stamp = stamp;
+			msg->header.frame_id = mapFrameId_;
 
-		rtabmap_ros::mapGraphToROS(
-			stats.poses(),
-			stats.constraints(),
-			stats.mapCorrection(),
-			*msg);
+			rtabmap_ros::mapGraphToROS(
+				stats.poses(),
+				stats.constraints(),
+				stats.mapCorrection(),
+				*msg);
 
-		mapGraphPub_->publish(std::move(msg));
+			mapGraphPub_->publish(std::move(msg));
+			graphLatched_ = mapsManager_.isLatching();
+		}
+		// else we already published the latched graph
+	}
+	else
+	{
+		graphLatched_ = false;
 	}
 
 	if(odomCachePub_->get_subscription_count())

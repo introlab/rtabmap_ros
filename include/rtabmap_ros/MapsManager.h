@@ -59,6 +59,8 @@ public:
 	void init(rclcpp::Node & node, const std::string & name, bool usePublicNamespace);
 	void clear();
 	bool hasSubscribers() const;
+	bool isLatching() const {return latching_;}
+	bool isMapUpdated() const;
 	void backwardCompatibilityParameters(rclcpp::Node & node, rtabmap::ParametersMap & parameters) const;
 	void setParameters(const rtabmap::ParametersMap & parameters);
 	void set2DMap(const cv::Mat & map, float xMin, float yMin, float cellSize, const std::map<int, rtabmap::Transform> & poses, const rtabmap::Memory * memory = 0);

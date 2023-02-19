@@ -375,11 +375,12 @@ CommonDataSubscriber::CommonDataSubscriber(rclcpp::Node & node, bool gui) :
 	rgbdCameras_ = node.declare_parameter("rgbd_cameras", rgbdCameras_);
 	queueSize_ = node.declare_parameter("queue_size", queueSize_);
 
-	int qosOdom = node.declare_parameter("qos_odom", 0);
-	int qosImage = node.declare_parameter("qos_image", 0);
+	int qos = node.declare_parameter("qos", 0);
+	int qosOdom = node.declare_parameter("qos_odom", qos);
+	int qosImage = node.declare_parameter("qos_image", qos);
 	int qosCameraInfo = node.declare_parameter("qos_camera_info", qosImage);
-	int qosScan = node.declare_parameter("qos_scan", 0);
-	int qosUserData = node.declare_parameter("qos_user_data", 0);
+	int qosScan = node.declare_parameter("qos_scan", qos);
+	int qosUserData = node.declare_parameter("qos_user_data", qos);
 	qosOdom_ = (rmw_qos_reliability_policy_t)qosOdom;
 	qosImage_ = (rmw_qos_reliability_policy_t)qosImage;
 	qosCameraInfo_ = (rmw_qos_reliability_policy_t)qosCameraInfo;
