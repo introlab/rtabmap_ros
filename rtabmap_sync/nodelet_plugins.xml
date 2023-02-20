@@ -1,0 +1,47 @@
+<library path="lib/librtabmap_sync_plugins"> 
+
+  <class name="rtabmap_sync/rgbd_sync" 
+         type="rtabmap_sync::RGBDSync" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
+  
+  <class name="rtabmap_sync/rgbdx_sync" 
+         type="rtabmap_sync::RGBDXSync" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
+
+  <class name="rtabmap_sync/stereo_sync" 
+         type="rtabmap_sync::StereoSync" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
+  
+  <class name="rtabmap_sync/rgb_sync" 
+         type="rtabmap_sync::RgbSync" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
+
+</library>
+
+<library path="lib/librtabmap_sync"> 
+
+  <class name="rtabmap_sync/rtabmap" 
+         type="rtabmap_sync::CoreWrapper" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
+</library>
+

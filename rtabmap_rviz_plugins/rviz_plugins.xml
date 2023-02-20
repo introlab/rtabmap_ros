@@ -1,0 +1,33 @@
+<library path="lib/librtabmap_rviz_plugins">
+  <class name="rtabmap_rviz_plugins/MapCloud"
+         type="rtabmap_rviz_plugins::MapCloudDisplay"
+         base_class_type="rviz::Display">
+    <description>
+      Displays graph point clouds from rtabmap_msgs/MapData messages.
+    </description>
+    <message_type>rtabmap_msgs/MapData</message_type>
+  </class>
+  <class name="rtabmap_rviz_plugins/MapGraph"
+         type="rtabmap_rviz_plugins::MapGraphDisplay"
+         base_class_type="rviz::Display">
+    <description>
+      Displays graphs from rtabmap_msgs/MapGraph messages.
+    </description>
+    <message_type>rtabmap_msgs/MapGraph</message_type>
+  </class>
+  <class name="rtabmap_rviz_plugins/Info"
+         type="rtabmap_rviz_plugins::InfoDisplay"
+         base_class_type="rviz::Display">
+    <description>
+      Displays information from rtabmap_msgs/Info messages.
+    </description>
+    <message_type>rtabmap_msgs/Info</message_type>
+  </class>
+  <class name="rtabmap_rviz_plugins/OrbitOriented"
+         type="rtabmap_rviz_plugins::OrbitOrientedViewController"
+         base_class_type="rviz::ViewController">
+    <description>
+      Camera orbit with orientation.
+    </description>
+  </class>
+</library>

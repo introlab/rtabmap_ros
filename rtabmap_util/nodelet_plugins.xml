@@ -1,0 +1,107 @@
+<library path="lib/librtabmap_util_plugins"> 
+      
+  <class name="rtabmap_util/point_cloud_xyzrgb" 
+         type="rtabmap_util::PointCloudXYZRGB" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
+  
+  <class name="rtabmap_util/point_cloud_xyz" 
+         type="rtabmap_util::PointCloudXYZ" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
+  
+  <class name="rtabmap_util/disparity_to_depth" 
+         type="rtabmap_util::DisparityToDepth" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
+  
+  <class name="rtabmap_util/pointcloud_to_depthimage" 
+         type="rtabmap_util::PointCloudToDepthImage" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
+  
+  <class name="rtabmap_util/obstacles_detection" 
+         type="rtabmap_util::ObstaclesDetection" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
+  
+  <class name="rtabmap_util/point_cloud_aggregator" 
+         type="rtabmap_util::PointCloudAggregator" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
+  
+  <class name="rtabmap_util/point_cloud_assembler" 
+         type="rtabmap_util::PointCloudAssembler" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
+  
+  <class name="rtabmap_util/rgbd_relay" 
+         type="rtabmap_util::RGBDRelay" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
+  
+  <class name="rtabmap_util/stereo_sync" 
+         type="rtabmap_util::StereoSync" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
+  
+  <class name="rtabmap_util/rgb_sync" 
+         type="rtabmap_util::RgbSync" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
+  
+  <class name="rtabmap_util/rgbd_split" 
+         type="rtabmap_util::RGBDSplit" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
+
+  <class name="rtabmap_util/imu_to_tf" 
+         type="rtabmap_util::ImuToTF" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
+  
+  <class name="rtabmap_util/lidar_deskewing" 
+         type="rtabmap_util::LidarDeskewing" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
+
+</library>

@@ -1,0 +1,11 @@
+<library path="lib/librtabmap_slam_plugins"> 
+
+  <class name="rtabmap_slam/rtabmap" 
+         type="rtabmap_slam::CoreWrapper" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
+</library>
+
