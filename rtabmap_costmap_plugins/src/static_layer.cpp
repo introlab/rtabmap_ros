@@ -263,4 +263,4 @@ void StaticLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min_i, int
     updateWithMax(master_grid, min_i, min_j, max_i, max_j);
 }
 
-}  // namespace rtabmap_ros
+}  // namespace rtabmap_costmap_plugins

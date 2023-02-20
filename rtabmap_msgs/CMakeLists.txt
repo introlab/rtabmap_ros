@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.5)
 project(rtabmap_msgs)
 
 ##################
@@ -71,7 +71,7 @@ generate_messages(
 ## catkin specific configuration ##
 ###################################
 catkin_package(
-  CATKIN_DEPENDS std_msgs std_srvs geometry_msgs sensor_msgs
+  CATKIN_DEPENDS message_runtime std_msgs std_srvs geometry_msgs sensor_msgs
 )
 
 ###########

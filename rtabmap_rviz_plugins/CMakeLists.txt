@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.5)
 project(rtabmap_rviz_plugins)
 
 # For rviz plugins, look for Qt5 before Qt4

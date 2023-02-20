@@ -485,4 +485,4 @@ void VoxelLayer::updateOrigin(double new_origin_x, double new_origin_y)
   delete[] local_voxel_map;
 }
 
-}  // namespace rtabmap_ros
+}  // namespace rtabmap_costmap_plugins

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.5)
 project(rtabmap_conversions)
 
 find_package(catkin REQUIRED COMPONENTS
@@ -49,6 +49,10 @@ add_library(rtabmap_conversions
 
 target_link_libraries(rtabmap_conversions
   ${Libraries}
+)
+
+add_dependencies(rtabmap_conversions 
+    rtabmap_msgs_generate_messages_cpp
 )
 
 #############
