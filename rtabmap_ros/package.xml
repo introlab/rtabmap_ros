@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>rtabmap_ros</name>
+  <version>0.1.0</version>
+  <description>
+    RTAB-Map Stack
+  </description>
+  <maintainer email="matlabbe@gmail.com">Mathieu Labbe</maintainer>
+  <author>Mathieu Labbe</author>
+  <license>BSD</license>
+  <url type="bugtracker">https://github.com/introlab/rtabmap_ros/issues</url>
+  <url type="repository">https://github.com/introlab/rtabmap_ros</url>
+  
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <exec_depend>rtabmap_conversions</exec_depend>
+  <exec_depend>rtabmap_costmap_plugins</exec_depend>
+  <exec_depend>rtabmap_demos</exec_depend>
+  <exec_depend>rtabmap_examples</exec_depend>
+  <exec_depend>rtabmap_launch</exec_depend>
+  <exec_depend>rtabmap_legacy</exec_depend>
+  <exec_depend>rtabmap_msgs</exec_depend>
+  <exec_depend>rtabmap_odometry</exec_depend>
+  <exec_depend>rtabmap_legacy</exec_depend>
+  <exec_depend>rtabmap_python</exec_depend>
+  <exec_depend>rtabmap_rviz_plugins</exec_depend>
+  <exec_depend>rtabmap_slam</exec_depend>
+  <exec_depend>rtabmap_sync</exec_depend>
+  <exec_depend>rtabmap_util</exec_depend>
+  <exec_depend>rtabmap_viz</exec_depend>
+  
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+
+</package>
