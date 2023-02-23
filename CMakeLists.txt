@@ -396,7 +396,7 @@ set_target_properties(rtabmap_stereo_camera PROPERTIES OUTPUT_NAME "stereo_camer
 
 IF(RTABMap_gui_FOUND)
     add_executable(rtabmapviz src/GuiNode.cpp src/GuiWrapper.cpp src/PreferencesDialogROS.cpp)
-    target_link_libraries(rtabmapviz rtabmap_sync rtabmap_gui)
+    target_link_libraries(rtabmapviz rtabmap_sync rtabmap::gui)
 ELSE()
     MESSAGE(WARNING "Found RTAB-Map built without its GUI library. Node rtabmapviz will not be built!")
 ENDIF()
