@@ -2099,6 +2099,16 @@ bool convertRGBDMsgs(
 						ROS_ERROR("Parameter %s is false but we cannot get TF between the two cameras!", rtabmap::Parameters::kRtabmapImagesAlreadyRectified().c_str());
 						return false;
 					}
+					else if(stereoTransform.isIdentity())
+					{
+						ROS_ERROR("Parameter %s is false but we cannot get a valid TF between the two cameras! "
+								"Identity transform returned between left and right cameras. Verify that if TF between "
+								"the cameras is valid: \"rosrun tf tf_echo %s %s\".",
+								rtabmap::Parameters::kRtabmapImagesAlreadyRectified().c_str(),
+								depthCameraInfoMsgs[i].header.frame_id.c_str(),
+								cameraInfoMsgs[i].header.frame_id.c_str());
+						return false;
+					}
 				}
 			}
 

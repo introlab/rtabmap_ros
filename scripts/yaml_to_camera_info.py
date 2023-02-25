@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import rospy
 import yaml
+import sys
 from sensor_msgs.msg import CameraInfo
 from sensor_msgs.msg import Image
 
