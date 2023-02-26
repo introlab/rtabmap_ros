@@ -75,7 +75,7 @@
         <param name="Icp/CorrespondenceRatio" type="string" value="0.01"/>
 
         <!-- Odom parameters -->
-        <param name="Odom/ScanKeyFrameThr"       type="string" value="0.95"/>
+        <param name="Odom/ScanKeyFrameThr"       type="string" value="0.8"/>
         <param name="Odom/Strategy"              type="string" value="0"/>
         <param name="OdomF2M/ScanSubtractRadius" type="string" value="0.2"/>
         <param name="OdomF2M/ScanMaxSize"        type="string" value="15000"/>

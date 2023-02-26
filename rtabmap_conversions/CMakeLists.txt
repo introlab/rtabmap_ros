@@ -32,7 +32,7 @@ include_directories(
 
 # libraries
 SET(Libraries
-   rtabmap
+   rtabmap::rtabmap
    ${catkin_LIBRARIES}
 )
 
