@@ -2097,7 +2097,7 @@ bool convertRGBDMsgs(
 					}
 					else if(stereoTransform.isIdentity())
 					{
-						ROS_ERROR("Parameter %s is false but we cannot get a valid TF between the two cameras! "
+						UERROR("Parameter %s is false but we cannot get a valid TF between the two cameras! "
 								"Identity transform returned between left and right cameras. Verify that if TF between "
 								"the cameras is valid: \"rosrun tf tf_echo %s %s\".",
 								rtabmap::Parameters::kRtabmapImagesAlreadyRectified().c_str(),
