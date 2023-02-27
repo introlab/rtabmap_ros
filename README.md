@@ -77,7 +77,7 @@ The ROS2 equivalent is (with those [lines](https://github.com/stereolabs/zed-ros
 ```bash
 ros2 launch zed_wrapper zed.launch.py
 
-ros2 launch rtabmap_ros rtabmap.launch.py \
+ros2 launch rtabmap_launch rtabmap.launch.py \
     rtabmap_args:="--delete_db_on_start" \
     rgb_topic:=/zed/zed_node/rgb/image_rect_color \
     depth_topic:=/zed/zed_node/depth/depth_registered \
@@ -121,10 +121,10 @@ ros2 launch rtabmap_ros rtabmap.launch.py \
 
 2. Launch RTAB-Map:
     ```
-    ros2 launch rtabmap_ros turtlebot3_scan.launch.py
+    ros2 launch rtabmap_demos turtlebot3_scan.launch.py
     
     # OR with rtabmap.launch.py
-    ros2 launch rtabmap_ros rtabmap.launch.py \
+    ros2 launch rtabmap_launch rtabmap.launch.py \
        visual_odometry:=false \
        frame_id:=base_footprint \
        subscribe_scan:=true depth:=false \
@@ -143,4 +143,4 @@ ros2 launch rtabmap_ros rtabmap.launch.py \
     ros2 launch nav2_bringup rviz_launch.py
     ```
     
-See [launch/ros2](https://github.com/introlab/rtabmap_ros/tree/ros2/launch/ros2) subfolder for some other ROS2 examples with turtlebot3 in simulation and a RGB-D camera.
+See [rtabmap_demos/launch](https://github.com/introlab/rtabmap_ros/tree/ros2/rtabmap_demos/launch) and [rtabmap_examples/launch](https://github.com/introlab/rtabmap_ros/tree/ros2/rtabmap_demos/launch) subfolders for some other ROS2 examples with turtlebot3 in simulation and a RGB-D camera.
