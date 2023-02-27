@@ -17,6 +17,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_eigen REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
 
 find_package(RTABMap 0.21.0 REQUIRED)
 
@@ -37,6 +38,7 @@ SET(Libraries
    std_msgs
    tf2
    tf2_eigen
+   tf2_geometry_msgs
    RTABMap
 )
 

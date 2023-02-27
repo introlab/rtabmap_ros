@@ -15,14 +15,11 @@
   <buildtool_depend>ament_cmake</buildtool_depend>
 
   <exec_depend>rtabmap_conversions</exec_depend>
-  <exec_depend>rtabmap_costmap_plugins</exec_depend>
   <exec_depend>rtabmap_demos</exec_depend>
   <exec_depend>rtabmap_examples</exec_depend>
   <exec_depend>rtabmap_launch</exec_depend>
-  <exec_depend>rtabmap_legacy</exec_depend>
   <exec_depend>rtabmap_msgs</exec_depend>
-  <exec_depend>rtabmap_odometry</exec_depend>
-  <exec_depend>rtabmap_legacy</exec_depend>
+  <exec_depend>rtabmap_odom</exec_depend>
   <exec_depend>rtabmap_python</exec_depend>
   <exec_depend>rtabmap_rviz_plugins</exec_depend>
   <exec_depend>rtabmap_slam</exec_depend>
