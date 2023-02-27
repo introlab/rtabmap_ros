@@ -1,7 +1,7 @@
 # Requirements:
 #   Install Turtlebot3 packages
 #   Modify turtlebot3_waffle SDF:
-#     1) Edit turtlebot3_gazebo/models/turtlebot3_waffle/model.sdf
+#     1) Edit /opt/ros/$ROS_DISTRO/share/turtlebot3_gazebo/models/turtlebot3_waffle/model.sdf
 #     2) Add
 #          <joint name="camera_rgb_optical_joint" type="fixed">
 #            <parent>camera_rgb_frame</parent>
@@ -22,9 +22,10 @@
 #   $ ros2 launch turtlebot3_gazebo turtlebot3_world.launch.py
 #
 #   SLAM:
-#   $ ros2 launch rtabmap_ros turtlebot3_rgbd.launch.py
+#   $ ros2 launch rtabmap_demos turtlebot3_rgbd.launch.py
 #   OR
-#   $ ros2 launch rtabmap_ros rtabmap.launch.py visual_odometry:=false frame_id:=base_footprint odom_topic:=/odom args:="-d" use_sim_time:=true rgb_topic:=/camera/image_raw depth_topic:=/camera/depth/image_raw camera_info_topic:=/camera/camera_info approx_sync:=true qos:=2
+#   $ ros2 launch rtabmap_launch rtabmap.launch.py visual_odometry:=false frame_id:=base_footprint odom_topic:=/odom args:="-d" use_sim_time:=true rgb_topic:=/camera/image_raw depth_topic:=/camera/depth/image_raw camera_info_topic:=/camera/camera_info approx_sync:=true qos:=2
+#   $ ros2 run topic_tools relay /rtabmap/map /map
 #
 #   Navigation (install nav2_bringup package):
 #     $ ros2 launch nav2_bringup navigation_launch.py use_sim_time:=True
@@ -81,7 +82,7 @@ def generate_launch_description():
         # SLAM mode:
         Node(
             condition=UnlessCondition(localization),
-            package='rtabmap_ros', executable='rtabmap', output='screen',
+            package='rtabmap_slam', executable='rtabmap', output='screen',
             parameters=[parameters],
             remappings=remappings,
             arguments=['-d']), # This will delete the previous database (~/.ros/rtabmap.db)
@@ -89,14 +90,14 @@ def generate_launch_description():
         # Localization mode:
         Node(
             condition=IfCondition(localization),
-            package='rtabmap_ros', executable='rtabmap', output='screen',
+            package='rtabmap_slam', executable='rtabmap', output='screen',
             parameters=[parameters,
               {'Mem/IncrementalMemory':'False',
                'Mem/InitWMWithAllNodes':'True'}],
             remappings=remappings),
 
         Node(
-            package='rtabmap_ros', executable='rtabmapviz', output='screen',
+            package='rtabmap_viz', executable='rtabmap_viz', output='screen',
             parameters=[parameters],
             remappings=remappings),
     ])

@@ -144,6 +144,16 @@ ament_target_dependencies(rtabmap_lidar_deskewing ${Libraries})
 target_link_libraries(rtabmap_lidar_deskewing rtabmap_util_plugins)
 set_target_properties(rtabmap_lidar_deskewing PROPERTIES OUTPUT_NAME "lidar_deskewing")
 
+add_executable(rtabmap_point_cloud_xyz src/PointCloudXYZNode.cpp)
+ament_target_dependencies(rtabmap_point_cloud_xyz ${Libraries})
+target_link_libraries(rtabmap_point_cloud_xyz rtabmap_util_plugins)
+set_target_properties(rtabmap_point_cloud_xyz PROPERTIES OUTPUT_NAME "point_cloud_xyz")
+
+add_executable(rtabmap_point_cloud_xyzrgb src/PointCloudXYZRGBNode.cpp)
+ament_target_dependencies(rtabmap_point_cloud_xyzrgb ${Libraries})
+target_link_libraries(rtabmap_point_cloud_xyzrgb rtabmap_util_plugins)
+set_target_properties(rtabmap_point_cloud_xyzrgb PROPERTIES OUTPUT_NAME "point_cloud_xyzrgb")
+
 #add_executable(rtabmap_data_player src/DbPlayerNode.cpp)
 #ament_target_dependencies(rtabmap_data_player ${Libraries})
 #target_link_libraries(rtabmap_data_player rtabmap_util_plugins)
@@ -159,10 +169,15 @@ ament_target_dependencies(rtabmap_pointcloud_to_depthimage ${Libraries})
 target_link_libraries(rtabmap_pointcloud_to_depthimage rtabmap_util_plugins)
 set_target_properties(rtabmap_pointcloud_to_depthimage PROPERTIES OUTPUT_NAME "pointcloud_to_depthimage")
 
+add_executable(rtabmap_obstacles_detection src/ObstaclesDetectionNode.cpp)
+ament_target_dependencies(rtabmap_obstacles_detection ${Libraries})
+target_link_libraries(rtabmap_obstacles_detection rtabmap_util_plugins)
+set_target_properties(rtabmap_obstacles_detection PROPERTIES OUTPUT_NAME "obstacles_detection")
+
 add_executable(rtabmap_point_cloud_aggregator src/PointCloudAggregatorNode.cpp)
 ament_target_dependencies(rtabmap_point_cloud_aggregator ${Libraries})
 target_link_libraries(rtabmap_point_cloud_aggregator rtabmap_util_plugins)
-set_target_properties(rtabmap_point_cloud_aggregator PROPERTIES OUTPUT_NAME "rtabmap_point_cloud_aggregator")
+set_target_properties(rtabmap_point_cloud_aggregator PROPERTIES OUTPUT_NAME "point_cloud_aggregator")
 
 add_executable(rtabmap_point_cloud_assembler src/PointCloudAssemblerNode.cpp)
 ament_target_dependencies(rtabmap_point_cloud_assembler ${Libraries})
@@ -203,10 +218,15 @@ install(TARGETS
 #   rtabmap_map_optimizer
 #   rtabmap_data_player
 #   rtabmap_odom_msg_to_tf
-   rtabmap_pointcloud_to_depthimage
-   rtabmap_point_cloud_assembler
    rtabmap_rgbd_relay
    rtabmap_rgbd_split
+   rtabmap_lidar_deskewing
+   rtabmap_point_cloud_xyz
+   rtabmap_point_cloud_xyzrgb
+   rtabmap_pointcloud_to_depthimage
+   rtabmap_obstacles_detection
+   rtabmap_point_cloud_aggregator
+   rtabmap_point_cloud_assembler
    DESTINATION lib/${PROJECT_NAME}
 )
 

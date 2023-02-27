@@ -4,11 +4,11 @@
 #   $ rosbags-convert V1_01_easy.bag
 #   $ rosbags-convert MH_01_easy.bag
 #
-#   $ ros2 launch rtabmap_ros euroc_datasets.launch.py gt:=true
+#   $ ros2 launch rtabmap_examples euroc_datasets.launch.py gt:=true
 #   $ cd V1_01_easy
 #   $ ros2 bag play V1_01_easy.db3 --clock
 #
-#   $ ros2 launch rtabmap_ros euroc_datasets.launch.py gt:=false
+#   $ ros2 launch rtabmap_examples euroc_datasets.launch.py gt:=false
 #   $ cd MH_01_easy
 #   $ ros2 bag play MH_01_easy.db3 --clock
 
@@ -61,13 +61,13 @@ def generate_launch_description():
 
         # Nodes to launch
         Node(
-            package='rtabmap_ros', executable='stereo_odometry', output='screen',
+            package='rtabmap_odom', executable='stereo_odometry', output='screen',
             parameters=[parameters],
             remappings=remappings),
 
         Node(
             condition=IfCondition(ground_truth),
-            package='rtabmap_ros', executable='rtabmap', output='screen',
+            package='rtabmap_slam', executable='rtabmap', output='screen',
             parameters=[parameters,
                 { 'ground_truth_frame_id':'world',
                   'ground_truth_base_frame_id':'base_link_gt'}],
@@ -75,28 +75,28 @@ def generate_launch_description():
             arguments=['-d']),
         Node(
             condition=UnlessCondition(ground_truth),
-            package='rtabmap_ros', executable='rtabmap', output='screen',
+            package='rtabmap_slam', executable='rtabmap', output='screen',
             parameters=[parameters],
             remappings=remappings,
             arguments=['-d']),
 
         Node(
-            package='rtabmap_ros', executable='rtabmapviz', output='screen',
+            package='rtabmap_viz', executable='rtabmap_viz', output='screen',
             parameters=[parameters],
             remappings=remappings),
         
         # Image rectification and publishing synchronized camera_info
         Node(
-            package='rtabmap_ros', executable='yaml_to_camera_info.py', output='screen',
-            parameters=[{'yaml_path': [FindPackageShare('rtabmap_ros'), '/launch/calibration/euroc_left.yaml']}],
+            package='rtabmap_util', executable='yaml_to_camera_info.py', output='screen',
+            parameters=[{'yaml_path': [FindPackageShare('rtabmap_examples'), '/launch/calibration/euroc_left.yaml']}],
             remappings=[
               ('image', '/cam0/image_raw'),
               ('camera_info', 'left/camera_info')],
             namespace='stereo_camera'),
               
         Node(
-            package='rtabmap_ros', executable='yaml_to_camera_info.py', output='screen',
-            parameters=[{'yaml_path': [FindPackageShare('rtabmap_ros'), '/launch/calibration/euroc_right.yaml']}],
+            package='rtabmap_util', executable='yaml_to_camera_info.py', output='screen',
+            parameters=[{'yaml_path': [FindPackageShare('rtabmap_examples'), '/launch/calibration/euroc_right.yaml']}],
             remappings=[
               ('image', '/cam1/image_raw'),
               ('camera_info', 'right/camera_info')],
@@ -138,7 +138,7 @@ def generate_launch_description():
             arguments=['0', '0', '0', '0', '0', '0', 'world', 'map']),
         
         Node(
-            package='rtabmap_ros', executable='transform_to_tf.py', output='screen',
+            package='rtabmap_util', executable='transform_to_tf.py', output='screen',
             parameters=[{'frame_id': 'world', 'child_frame_id': 'vicon/firefly_sbx/firefly_sbx'}],
             remappings=[('transform', '/vicon/firefly_sbx/firefly_sbx')]),    
     ])

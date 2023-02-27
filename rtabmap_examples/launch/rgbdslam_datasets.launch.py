@@ -11,7 +11,7 @@
 #   $ sudo pip install rosbags     # See https://docs.openvins.com/dev-ros1-to-ros2.html
 #   $ rosbags-convert rgbd_dataset_freiburg3_long_office_household_frameid_fixed.bag
 
-#   $ ros2 launch rtabmap_ros rgbdslam_datasets.launch.py
+#   $ ros2 launch rtabmap_examples rgbdslam_datasets.launch.py
 #   $ cd rgbd_dataset_freiburg3_long_office_household_frameid_fixed
 #   $ ros2 bag play rgbd_dataset_freiburg3_long_office_household_frameid_fixed.db3 --clock
 
@@ -51,18 +51,18 @@ def generate_launch_description():
 
         # Nodes to launch
         Node(
-            package='rtabmap_ros', executable='rgbd_odometry', output='screen',
+            package='rtabmap_odom', executable='rgbd_odometry', output='screen',
             parameters=parameters,
             remappings=remappings),
 
         Node(
-            package='rtabmap_ros', executable='rtabmap', output='screen',
+            package='rtabmap_slam', executable='rtabmap', output='screen',
             parameters=parameters,
             remappings=remappings,
             arguments=['-d']),
 
         Node(
-            package='rtabmap_ros', executable='rtabmapviz', output='screen',
+            package='rtabmap_viz', executable='rtabmap_viz', output='screen',
             parameters=parameters,
             remappings=remappings),
        

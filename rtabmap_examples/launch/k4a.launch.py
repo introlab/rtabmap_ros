@@ -3,7 +3,7 @@
 #   Install Azure_Kinect_ROS_Driver ros2 package (https://github.com/microsoft/Azure_Kinect_ROS_Driver/tree/humble)
 #   Install imu_filter_madgwick ros2 package
 # Example:
-#   $ ros2 launch rtabmap_ros k4a.launch.py
+#   $ ros2 launch rtabmap_examples k4a.launch.py
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable
@@ -30,7 +30,7 @@ def generate_launch_description():
         
         # Visual odometry node      
         Node(
-            package='rtabmap_ros', executable='rgbd_odometry', output='screen',
+            package='rtabmap_odom', executable='rgbd_odometry', output='screen',
             parameters=[{ 'frame_id':'camera_base',
                           'subscribe_odom_info':True,
                           'approx_sync':True,
@@ -46,14 +46,14 @@ def generate_launch_description():
 
         # SLAM node
         Node(
-            package='rtabmap_ros', executable='rtabmap', output='screen',
+            package='rtabmap_slam', executable='rtabmap', output='screen',
             parameters=parameters,
             remappings=remappings,
             arguments=['-d']),
 
         # Visualization node
         Node(
-            package='rtabmap_ros', executable='rtabmapviz', output='screen',
+            package='rtabmap_viz', executable='rtabmap_viz', output='screen',
             parameters=parameters,
             remappings=remappings),
             

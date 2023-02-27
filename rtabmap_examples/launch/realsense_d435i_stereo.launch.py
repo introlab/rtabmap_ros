@@ -5,7 +5,7 @@
 #   $ ros2 launch realsense2_camera rs_launch.py enable_gyro:=true enable_accel:=true unite_imu_method:=1 enable_infra1:=true enable_infra2:=true enable_sync:=true
 #   $ ros2 param set /camera/camera depth_module.emitter_enabled 0
 #
-#   $ ros2 launch rtabmap_ros realsense_d435i_stereo.launch.py
+#   $ ros2 launch rtabmap_examples realsense_d435i_stereo.launch.py
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable
@@ -30,18 +30,18 @@ def generate_launch_description():
 
         # Nodes to launch       
         Node(
-            package='rtabmap_ros', executable='stereo_odometry', output='screen',
+            package='rtabmap_odom', executable='stereo_odometry', output='screen',
             parameters=parameters,
             remappings=remappings),
 
         Node(
-            package='rtabmap_ros', executable='rtabmap', output='screen',
+            package='rtabmap_slam', executable='rtabmap', output='screen',
             parameters=parameters,
             remappings=remappings,
             arguments=['-d']),
 
         Node(
-            package='rtabmap_ros', executable='rtabmapviz', output='screen',
+            package='rtabmap_viz', executable='rtabmap_viz', output='screen',
             parameters=parameters,
             remappings=remappings),
                 

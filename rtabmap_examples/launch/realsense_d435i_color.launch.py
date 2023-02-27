@@ -4,7 +4,7 @@
 # Example:
 #   $ ros2 launch realsense2_camera rs_launch.py enable_gyro:=true enable_accel:=true unite_imu_method:=1 enable_sync:=true
 #
-#   $ ros2 launch rtabmap_ros realsense_d435i_color.launch.py
+#   $ ros2 launch rtabmap_examples realsense_d435i_color.launch.py
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable
@@ -29,25 +29,25 @@ def generate_launch_description():
 
         # Nodes to launch       
         Node(
-            package='rtabmap_ros', executable='rgbd_odometry', output='screen',
+            package='rtabmap_odom', executable='rgbd_odometry', output='screen',
             parameters=parameters,
             remappings=remappings),
 
         Node(
-            package='rtabmap_ros', executable='rtabmap', output='screen',
+            package='rtabmap_slam', executable='rtabmap', output='screen',
             parameters=parameters,
             remappings=remappings,
             arguments=['-d']),
 
         Node(
-            package='rtabmap_ros', executable='rtabmapviz', output='screen',
+            package='rtabmap_viz', executable='rtabmap_viz', output='screen',
             parameters=parameters,
             remappings=remappings),
         
         # Because of this issue: https://github.com/IntelRealSense/realsense-ros/issues/2564
         # Generate point cloud from not aligned depth
         Node(
-            package='rtabmap_ros', executable='point_cloud_xyz', output='screen',
+            package='rtabmap_util', executable='point_cloud_xyz', output='screen',
             parameters=[{'approx_sync':False}],
             remappings=[('depth/image',       '/camera/depth/image_rect_raw'),
                         ('depth/camera_info', '/camera/depth/camera_info'),
@@ -55,7 +55,7 @@ def generate_launch_description():
         
         # Generate aligned depth to color camera from the point cloud above       
         Node(
-            package='rtabmap_ros', executable='pointcloud_to_depthimage', output='screen',
+            package='rtabmap_util', executable='pointcloud_to_depthimage', output='screen',
             parameters=[{ 'decimation':2,
                           'fixed_frame_id':'camera_link',
                           'fill_holes_size':1}],
