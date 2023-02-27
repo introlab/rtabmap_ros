@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import rclpy
 import yaml
+import sys
 from rclpy.node import Node
 from sensor_msgs.msg import CameraInfo
 from sensor_msgs.msg import Image
