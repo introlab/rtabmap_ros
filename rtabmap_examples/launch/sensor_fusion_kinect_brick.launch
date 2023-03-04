@@ -30,7 +30,7 @@
   <node pkg="tf" type="static_transform_publisher" name="optical_rotation"
         args="$(arg optical_rotate) /camera_rgb_frame /camera_rgb_optical_frame 100" />
 
-  <include file="$(find rtabmap_ros)/launch/tests/sensor_fusion.launch">
+  <include file="$(find rtabmap_examples)/launch/sensor_fusion.launch">
       <arg name="frame_id" value="camera_rgb_frame"/>
       <arg name="localization" value="$(arg localization)"/>
       <arg name="imu_remove_gravitational_acceleration" value="false"/>

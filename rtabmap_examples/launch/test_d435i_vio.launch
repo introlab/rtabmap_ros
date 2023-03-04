@@ -5,7 +5,7 @@
      Make sure to disable the IR emitter or put a tape on the IR emitter to
      avoid VINS tracking the fixed IR points (that would cause large drifts) -->
 
-<arg name="rtabmapviz" default="true"/>
+<arg name="rtabmap_viz" default="true"/>
 <arg name="rviz"       default="false"/>
 <arg name="depth_mode" default="true"/>
 <arg name="odom_strategy" default="9"/> <!-- default VINS -->
@@ -34,7 +34,7 @@
 <!-- RTAB-Map: depth mode -->
 <!-- We have to launch stereo_odometry externally from rtabmap.launch so that rtabmap can use RGB-D input -->
 <group ns="rtabmap">
-<node if="$(arg depth_mode)" pkg="rtabmap_ros" type="stereo_odometry" name="stereo_odometry" args="--Optimizer/GravitySigma 0.3 --Odom/Strategy $(arg odom_strategy) --OdomVINS/ConfigPath $(find vins)/../config/realsense_d435i/realsense_stereo_imu_config.yaml" output="screen">
+<node if="$(arg depth_mode)" pkg="rtabmap_odom" type="stereo_odometry" name="stereo_odometry" args="--Optimizer/GravitySigma 0.3 --Odom/Strategy $(arg odom_strategy) --OdomVINS/ConfigPath $(find vins)/../config/realsense_d435i/realsense_stereo_imu_config.yaml" output="screen">
    <remap from="left/image_rect"   to="/camera/infra1/image_rect_raw"/>
    <remap from="right/image_rect"  to="/camera/infra2/image_rect_raw"/>
    <remap from="left/camera_info"  to="/camera/infra1/camera_info"/>
@@ -44,7 +44,7 @@
    <param name="wait_imu_to_init"  value="true"/>
 </node>
 </group>
-<include if="$(arg depth_mode)" file="$(find rtabmap_ros)/launch/rtabmap.launch">
+<include if="$(arg depth_mode)" file="$(find rtabmap_launch)/launch/rtabmap.launch">
    <arg name="rtabmap_args"      value="--delete_db_on_start --Optimizer/GravitySigma 0.3"/>
    <arg name="rgb_topic"         value="/camera/color/image_raw"/>
    <arg name="depth_topic"       value="/camera/aligned_depth_to_color/image_raw"/>
@@ -53,12 +53,12 @@
    <arg name="approx_sync"       value="false"/>
    <arg name="frame_id"          value="camera_link"/>
    <arg name="imu_topic"         value="/rtabmap/imu"/>
-   <arg name="rtabmapviz"        value="$(arg rtabmapviz)"/>
+   <arg name="rtabmap_viz"        value="$(arg rtabmap_viz)"/>
    <arg name="rviz"              value="$(arg rviz)"/>
 </include>
 
 <!-- RTAB-Map: Stereo mode -->
-<include unless="$(arg depth_mode)" file="$(find rtabmap_ros)/launch/rtabmap.launch">
+<include unless="$(arg depth_mode)" file="$(find rtabmap_launch)/launch/rtabmap.launch">
    <arg name="rtabmap_args"            value="--delete_db_on_start --Optimizer/GravitySigma 0.3 --Odom/Strategy $(arg odom_strategy) --OdomVINS/ConfigPath $(find vins)/../config/realsense_d435i/realsense_stereo_imu_config.yaml"/>
    <arg name="left_image_topic"        value="/camera/infra1/image_rect_raw"/>
    <arg name="right_image_topic"       value="/camera/infra2/image_rect_raw"/>
@@ -68,7 +68,7 @@
    <arg name="frame_id"                value="camera_link"/>
    <arg name="imu_topic"               value="/rtabmap/imu"/>
    <arg name="wait_imu_to_init"        value="true"/>
-   <arg name="rtabmapviz"              value="$(arg rtabmapviz)"/>
+   <arg name="rtabmap_viz"              value="$(arg rtabmap_viz)"/>
    <arg name="rviz"                    value="$(arg rviz)"/>
 </include>
 

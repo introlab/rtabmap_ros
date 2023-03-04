@@ -14,7 +14,7 @@
   </include>
 
   <group ns="camera">
-    <node pkg="nodelet" type="nodelet" name="points_xyz" args="load rtabmap_ros/point_cloud_xyz camera_nodelet_manager">
+    <node pkg="nodelet" type="nodelet" name="points_xyz" args="load rtabmap_util/point_cloud_xyz camera_nodelet_manager">
       <remap from="depth/image"       to="depth_registered/image_raw"/>
       <remap from="depth/camera_info" to="depth_registered/camera_info"/>
       <remap from="cloud"             to="/voxel_cloud" />
@@ -26,7 +26,7 @@
     </node>
 
     <group if="$(arg nodelet)">
-      <node if="$(arg rgbd)" pkg="nodelet" type="nodelet" name="rgbdicp_odometry" args="load rtabmap_ros/rgbdicp_odometry camera_nodelet_manager">
+      <node if="$(arg rgbd)" pkg="nodelet" type="nodelet" name="rgbdicp_odometry" args="load rtabmap_odom/rgbdicp_odometry camera_nodelet_manager">
         <remap from="scan_cloud"        to="/voxel_cloud"/>
         <remap from="depth/image"       to="depth_registered/image_raw"/>
         <remap from="rgb/camera_info"   to="rgb/camera_info"/>
@@ -41,7 +41,7 @@
         <param name="Icp/PM"            type="string" value="$(arg pm)"/>
         <param name="Icp/PMOutlierRatio" type="string" value="0.65"/>
       </node>
-      <node unless="$(arg rgbd)" pkg="nodelet" type="nodelet" name="icp_odometry" args="load rtabmap_ros/icp_odometry camera_nodelet_manager" output="screen">
+      <node unless="$(arg rgbd)" pkg="nodelet" type="nodelet" name="icp_odometry" args="load rtabmap_odom/icp_odometry camera_nodelet_manager" output="screen">
         <remap from="scan_cloud"      to="/voxel_cloud"/>
 
         <param name="frame_id"        type="string" value="camera_link"/>
@@ -57,7 +57,7 @@
     </group>
 
     <group unless="$(arg nodelet)">
-      <node if="$(arg rgbd)" pkg="rtabmap_ros" type="rgbdicp_odometry" name="rgbdicp_odometry" output="screen">
+      <node if="$(arg rgbd)" pkg="rtabmap_odom" type="rgbdicp_odometry" name="rgbdicp_odometry" output="screen">
         <remap from="scan_cloud"        to="/voxel_cloud"/>
         <remap from="depth/image"       to="depth_registered/image_raw"/>
         <remap from="rgb/camera_info"   to="rgb/camera_info"/>
@@ -72,7 +72,7 @@
         <param name="Icp/PM"            type="string" value="$(arg pm)"/>
         <param name="Icp/PMOutlierRatio" type="string" value="0.65"/>
       </node>
-      <node unless="$(arg rgbd)" pkg="rtabmap_ros" type="icp_odometry" name="icp_odometry" output="screen">
+      <node unless="$(arg rgbd)" pkg="rtabmap_odom" type="icp_odometry" name="icp_odometry" output="screen">
         <remap from="scan_cloud"      to="/voxel_cloud"/>
 
         <param name="frame_id"        type="string" value="camera_link"/>
@@ -95,5 +95,5 @@
         args="0 0 0 0 0 0 map odom 100" />
 
   <!-- Visualization RVIZ -->
-  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap_ros)/launch/config/rgbd.rviz"/>
+  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap_launch)/launch/config/rgbd.rviz"/>
 </launch>

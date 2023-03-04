@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <launch>
 
-    <arg name="rtabmapviz"    default="true"/>
+    <arg name="rtabmap_viz"    default="true"/>
 
     <include file="$(find azure_kinect_ros_driver)/launch/driver.launch">
        <arg name="point_cloud" value="false"/>
@@ -11,7 +11,7 @@
 
     <group ns="rtabmap">
 
-      <node pkg="nodelet" type="nodelet" name="points_xyz" args="standalone rtabmap_ros/point_cloud_xyz" output="screen">
+      <node pkg="nodelet" type="nodelet" name="points_xyz" args="standalone rtabmap_util/point_cloud_xyz" output="screen">
         <remap from="depth/image"       to="/depth_to_rgb/image_raw"/>
         <remap from="depth/camera_info" to="/depth_to_rgb/camera_info"/>
         <remap from="cloud"             to="voxel_cloud" />
@@ -23,7 +23,7 @@
         <param name="approx_sync" type="bool"   value="false"/>
       </node>
 
-      <node pkg="rtabmap_ros" type="icp_odometry" name="icp_odometry" output="screen">
+      <node pkg="rtabmap_odom" type="icp_odometry" name="icp_odometry" output="screen">
         <remap from="scan_cloud" to="voxel_cloud"/>
         <param name="frame_id" type="string" value="camera_base"/>
 
@@ -37,7 +37,7 @@
         <param name="OdomF2M/ScanMaxSize"        type="string" value="5000"/>
       </node>
 
-      <node pkg="rtabmap_ros" type="rtabmap" name="rtabmap" output="screen" args="-d">
+      <node pkg="rtabmap_slam" type="rtabmap" name="rtabmap" output="screen" args="-d">
         <param name="frame_id"             type="string" value="camera_base"/>
         <param name="subscribe_depth"      type="bool" value="false"/>
         <param name="subscribe_rgb"        type="bool" value="false"/>
@@ -56,7 +56,7 @@
         <param name="Icp/MaxTranslation"      type="string" value="0.5"/>
       </node>
 
-      <node if="$(arg rtabmapviz)" name="rtabmapviz" pkg="rtabmap_ros" type="rtabmapviz" output="screen">
+      <node if="$(arg rtabmap_viz)" name="rtabmap_viz" pkg="rtabmap_viz" type="rtabmap_viz" output="screen">
         <param name="frame_id" type="string" value="camera_base"/>
         <param name="subscribe_rgb" type="bool" value="false"/>
         <param name="subscribe_depth" type="bool" value="false"/>

@@ -13,7 +13,12 @@
 
   <depend>dynamic_reconfigure</depend>
   <depend>image_transport</depend>
+  <depend>nodelet</depend>
   <depend>rtabmap_conversions</depend>
   <depend>rtabmap_msgs</depend>
+  
+  <export>
+    <nodelet plugin="${prefix}/nodelet_plugins.xml" />
+  </export>
 
 </package>

@@ -20,7 +20,7 @@
 
   <group ns="rtabmap">
     <!-- Visual Odometry -->
-    <node pkg="rtabmap_ros" type="rgbd_odometry" name="visual_odometry" output="screen" args="$(arg rtabmap_args)">
+    <node pkg="rtabmap_odom" type="rgbd_odometry" name="visual_odometry" output="screen" args="$(arg rtabmap_args)">
       <remap from="rgb/image"       to="$(arg rgb_topic)"/>
       <remap from="depth/image"     to="$(arg depth_topic)"/>
       <remap from="rgb/camera_info" to="$(arg camera_info_topic)"/>
@@ -38,7 +38,7 @@
     </node>
 
     <!-- SLAM -->
-    <node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="screen" args="$(arg rtabmap_args)">
+    <node name="rtabmap" pkg="rtabmap_slam" type="rtabmap" output="screen" args="$(arg rtabmap_args)">
       <param name="frame_id"        type="string" value="$(arg frame_id)"/>
 
       <remap from="rgb/image"       to="$(arg rgb_topic)"/>

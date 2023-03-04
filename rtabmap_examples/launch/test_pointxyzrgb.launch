@@ -8,7 +8,7 @@
   </include>
 
   <group ns="camera">
-  <node pkg="nodelet" type="nodelet" name="data_throttle" args="load rtabmap_ros/data_throttle camera_nodelet_manager">
+  <node pkg="nodelet" type="nodelet" name="data_throttle" args="load rtabmap_legacy/data_throttle camera_nodelet_manager">
     <remap from="rgb/image_in"       to="rgb/image_rect_color"/>
     <remap from="depth/image_in"     to="depth_registered/image_raw"/>
     <remap from="rgb/camera_info_in" to="depth_registered/camera_info"/>
@@ -16,7 +16,7 @@
     <param name="decimation" type="int" value="2"/>
   </node>
 
-  <node pkg="nodelet" type="nodelet" name="points_xyzrgb" args="load rtabmap_ros/point_cloud_xyzrgb camera_nodelet_manager">
+  <node pkg="nodelet" type="nodelet" name="points_xyzrgb" args="load rtabmap_util/point_cloud_xyzrgb camera_nodelet_manager">
     <remap from="rgb/image"       to="rgb/image_out"/>
     <remap from="depth/image"     to="depth/image_out"/>
     <remap from="rgb/camera_info" to="rgb/camera_info_out"/>
@@ -28,7 +28,7 @@
     <param name="normal_k" type="int" value="6"/>
   </node>
 
-  <node pkg="nodelet" type="nodelet" name="points_xyz" args="load rtabmap_ros/point_cloud_xyz camera_nodelet_manager">
+  <node pkg="nodelet" type="nodelet" name="points_xyz" args="load rtabmap_util/point_cloud_xyz camera_nodelet_manager">
     <remap from="depth/image"     to="depth/image_out"/>
     <remap from="depth/camera_info" to="rgb/camera_info_out"/>
     <remap from="cloud"           to="/voxel_cloud_xyz" />
@@ -58,7 +58,7 @@
    </group>
 
   <node pkg="nodelet" type="nodelet" name="standalone_nodelet"  args="manager" output="screen"/>
-  <node pkg="nodelet" type="nodelet" name="stereo_throttle" args="load rtabmap_ros/stereo_throttle standalone_nodelet">
+  <node pkg="nodelet" type="nodelet" name="stereo_throttle" args="load rtabmap_legacy/stereo_throttle standalone_nodelet">
     <remap from="left/image"         to="/stereo_camera/left/image_rect_color"/>
     <remap from="right/image"        to="/stereo_camera/right/image_rect"/>
     <remap from="left/camera_info"   to="/stereo_camera/left/camera_info_throttle"/>
@@ -68,7 +68,7 @@
     <param name="approx_sync" type="bool" value="false"/>
   </node>
 
-  <node pkg="nodelet" type="nodelet" name="points_xyzrgb" args="load rtabmap_ros/point_cloud_xyzrgb standalone_nodelet">
+  <node pkg="nodelet" type="nodelet" name="points_xyzrgb" args="load rtabmap_util/point_cloud_xyzrgb standalone_nodelet">
     <remap from="left/image"         to="/stereo_camera/left/image_rect_color_throttle"/>
     <remap from="right/image"        to="/stereo_camera/right/image_rect_throttle"/>
     <remap from="left/camera_info"   to="/stereo_camera/left/camera_info_throttle_throttle"/>

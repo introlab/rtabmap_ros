@@ -9,7 +9,7 @@
   <arg name="rgb_topic"               default="/camera/rgb/image_rect_color" />
   <arg name="depth_topic"             default="/camera/depth_registered/image_raw" />
   <arg name="camera_info_topic"       default="/camera/rgb/camera_info" />
-  <arg name="rtabmapviz"              default="true" />
+  <arg name="rtabmap_viz"              default="true" />
   <arg name="rviz"                    default="false" />
 
   <!-- Kinect -->
@@ -33,7 +33,7 @@
   <node type="periodic_snapshotter" pkg="laser_assembler" name="periodic_snapshotter"/>
 
   <!-- RTAB-Map -->
-  <include file="$(find rtabmap_ros)/launch/rtabmap.launch">
+  <include file="$(find rtabmap_launch)/launch/rtabmap.launch">
     <arg name="rtabmap_args"            value="$(arg rtabmap_args)"/>
 
     <arg name="queue_size"              value="30" />
@@ -44,7 +44,7 @@
     <arg name="subscribe_scan_cloud"    value="true"/>
     <arg name="scan_cloud_topic"        value="/assembled_cloud2"/>
 
-    <arg name="rtabmapviz"              value="$(arg rtabmapviz)"/>
+    <arg name="rtabmap_viz"             value="$(arg rtabmap_viz)"/>
     <arg name="rviz"                    value="$(arg rviz)"/>
   </include>
 

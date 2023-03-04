@@ -19,7 +19,7 @@
 
   	<!-- Run the ROS package stereo_image_proc (throttle to 10 Hz to avoid rectifying all images) -->
 	<group ns="/stereo_camera" >
-	    	<node pkg="nodelet" type="nodelet" name="stereo_throttle" args="standalone rtabmap_ros/stereo_throttle">
+	    	<node pkg="nodelet" type="nodelet" name="stereo_throttle" args="standalone rtabmap_legacy/stereo_throttle">
 		    <remap from="left/image"        to="left/image_raw"/>
 		    <remap from="right/image"       to="right/image_raw"/>
 		    <remap from="left/camera_info"  to="left/camera_info"/>
@@ -36,6 +36,6 @@
 			<remap from="right/camera_info" to="right/camera_info_throttle"/>
 		</node>
 
-  		<node if="$(arg gen_depth)" pkg="nodelet" type="nodelet" name="disparity2depth" args="standalone rtabmap_ros/disparity_to_depth"/>
+  		<node if="$(arg gen_depth)" pkg="nodelet" type="nodelet" name="disparity2depth" args="standalone rtabmap_util/disparity_to_depth"/>
 	</group>
 </launch>

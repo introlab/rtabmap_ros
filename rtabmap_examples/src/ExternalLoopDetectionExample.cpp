@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <rtabmap_msgs/MapData.h>
 #include <rtabmap_msgs/Info.h>
-#include <rtabmap_ros/MsgConversion.h>
+#include <rtabmap_conversions/MsgConversion.h>
 #include <rtabmap_msgs/AddLink.h>
 #include <rtabmap_msgs/GetMap.h>
 
@@ -48,11 +48,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 /*
  * Test:
- * $ roslaunch rtabmap_ros demo_robot_mapping.launch
+ * $ roslaunch rtabmap_demos demo_robot_mapping.launch
  * Disable internal loop closure detection, in rtabmapviz->Preferences:
  *    ->Vocabulary, set Max words to -1 (loop closure detection disabled)
  *    ->Proximity Detection, uncheck proximity detection by space
- * $ rosrun rtabmap_ros external_loop_detection_example
+ * $ rosrun rtabmap_examples external_loop_detection_example
  * $ rosbag play --clock demo_mapping.bag
  */
 
@@ -76,7 +76,7 @@ void mapDataCallback(const rtabmap_msgs::MapDataConstPtr & mapDataMsg, const rta
 	ROS_INFO("Received map data!");
 
 	rtabmap::Statistics stats;
-	rtabmap_ros::infoFromROS(*infoMsg, stats);
+	rtabmap_conversions::infoFromROS(*infoMsg, stats);
 
 	bool smallMovement = (bool)uValue(stats.data(), rtabmap::Statistics::kMemorySmall_movement(), 0.0f);
 	bool fastMovement = (bool)uValue(stats.data(), rtabmap::Statistics::kMemoryFast_movement(), 0.0f);
@@ -91,7 +91,7 @@ void mapDataCallback(const rtabmap_msgs::MapDataConstPtr & mapDataMsg, const rta
 	std::map<int, rtabmap::Transform> poses;
 	std::multimap<int, rtabmap::Link> links;
 	std::map<int, rtabmap::Signature> signatures;
-	rtabmap_ros::mapDataFromROS(*mapDataMsg, poses, links, signatures, mapToOdom);
+	rtabmap_conversions::mapDataFromROS(*mapDataMsg, poses, links, signatures, mapToOdom);
 
 	if(!signatures.empty() &&
 		signatures.rbegin()->second.sensorData().isValid() &&
@@ -125,7 +125,7 @@ void mapDataCallback(const rtabmap_msgs::MapDataConstPtr & mapDataMsg, const rta
 					{
 						rtabmap::Link link(fromId, toId, rtabmap::Link::kUserClosure, t, regInfo.covariance.inv());
 						rtabmap_msgs::AddLinkRequest req;
-						rtabmap_ros::linkToROS(link, req.link);
+						rtabmap_conversions::linkToROS(link, req.link);
 						rtabmap_msgs::AddLinkResponse res;
 						if(!addLinkSrv.call(req, res))
 						{
@@ -197,11 +197,11 @@ int main(int argc, char** argv)
 		std::map<int, rtabmap::Transform> poses;
 		std::multimap<int, rtabmap::Link> links;
 		rtabmap::Transform mapToOdom;
-		rtabmap_ros::mapGraphFromROS(mapRes.data.graph, poses, links, mapToOdom);
+		rtabmap_conversions::mapGraphFromROS(mapRes.data.graph, poses, links, mapToOdom);
 		int addedNodes = 0;
 		for(size_t i=0; i<mapRes.data.nodes.size(); ++i)
 		{
-			rtabmap::Signature s = rtabmap_ros::nodeDataFromROS(mapRes.data.nodes.at(i));
+			rtabmap::Signature s = rtabmap_conversions::nodeDataFromROS(mapRes.data.nodes.at(i));
 			rtabmap::SensorData compressedData = s.sensorData();
 			s.sensorData().uncompressData();
 			if(loopClosureDetector.process(s.sensorData(), rtabmap::Transform()))
