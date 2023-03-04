@@ -249,7 +249,7 @@ Visualization Manager:
         Value: true
       Axis: Z
       Channel Name: intensity
-      Class: rtabmap_ros/MapCloud
+      Class: rtabmap_rviz_plugins/MapCloud
       Cloud decimation: 4
       Cloud from scan: false
       Cloud max depth (m): 3
@@ -279,7 +279,7 @@ Visualization Manager:
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
-    - Class: rtabmap_ros/Info
+    - Class: rtabmap_rviz_plugins/Info
       Enabled: true
       Name: Info
       Topic: /rtabmap/info
@@ -339,7 +339,7 @@ Visualization Manager:
   Value: true
   Views:
     Current:
-      Class: rtabmap_ros/OrbitOriented
+      Class: rtabmap_rviz_plugins/OrbitOriented
       Distance: 7.50918865
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.0599999987

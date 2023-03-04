@@ -6,8 +6,8 @@
          1) In Isaac sim, click on menu Isaac Examples - ROS - Navigation
          2) Terminal:  $ roscore
          3) To teleop: $ rosrun teleop_twist_keyboard teleop_twist_keyboard.py _speed:=0.15 _turn:=0.20
-         4) Navigation: roslaunch rtabmap_ros demo_isaac_carter_navigation.launch
-         5) Set max depth range to 10m in rtabmapviz for correct visualization (Preferences->3D Rendering under map and odom columns)
+         4) Navigation: roslaunch rtabmap_demos demo_isaac_carter_navigation.launch
+         5) Set max depth range to 10m in rtabmap_viz for correct visualization (Preferences->3D Rendering under map and odom columns)
          6) Press Play in Isaac sim
 
          Note: carter_2dnav package can be copied to your catkin_ws from:
@@ -49,7 +49,7 @@
 
     <!-- RTAB-Map -->
     <remap from="/rtabmap/grid_map" to="/map"/>
-    <include file="$(find rtabmap_ros)/launch/rtabmap.launch">
+    <include file="$(find rtabmap_launch)/launch/rtabmap.launch">
         <arg     if="$(arg localization)" name="args" value="--Reg/Strategy 1 --Reg/Force3DoF true --RGBD/NeighborLinkRefining true --Icp/MaxTranslation 0.5 $(arg args3d)"/>
         <arg unless="$(arg localization)" name="args" value="-d --Reg/Strategy 1 --Reg/Force3DoF true --RGBD/NeighborLinkRefining true --Icp/MaxTranslation 0.5 $(arg args3d)"/>
         <arg name="localization"      value="$(arg localization)"/>

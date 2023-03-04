@@ -6,10 +6,10 @@
        $ roslaunch turtlebot_bringup minimal.launch
 
        Mapping:
-       $ roslaunch rtabmap_ros demo_turtlebot_mapping.launch
+       $ roslaunch rtabmap_demos demo_turtlebot_mapping.launch
 
        Visualization:
-       $ roslaunch rtabmap_ros demo_turtlebot_rviz.launch
+       $ roslaunch rtabmap_demos demo_turtlebot_rviz.launch
 
        This launch file is a one to one replacement of the gmapping_demo.launch in the
        "SLAM Map Building with TurtleBot" tutorial:
@@ -23,13 +23,13 @@
 
        For turtlebot in simulation (Gazebo):
          $ roslaunch turtlebot_gazebo turtlebot_world.launch
-         $ roslaunch rtabmap_ros demo_turtlebot_mapping.launch simulation:=true
-         $ roslaunch rtabmap_ros demo_turtlebot_rviz.launch
+         $ roslaunch rtabmap_demos demo_turtlebot_mapping.launch simulation:=true
+         $ roslaunch rtabmap_demos demo_turtlebot_rviz.launch
   -->
 
   <arg name="database_path"     default="rtabmap.db"/>
   <arg name="rgbd_odometry"     default="false"/>
-  <arg name="rtabmapviz"        default="false"/>
+  <arg name="rtabmap_viz"        default="false"/>
   <arg name="localization"      default="false"/>
   <arg name="simulation"        default="false"/>
   <arg name="sw_registered"     default="false"/>
@@ -58,7 +58,7 @@
   <!-- Mapping -->
   <group ns="rtabmap">
 
-    <node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="screen" args="$(arg args)">
+    <node name="rtabmap" pkg="rtabmap_slam" type="rtabmap" output="screen" args="$(arg args)">
 	  <param name="database_path"       type="string" value="$(arg database_path)"/>
 	  <param name="frame_id"            type="string" value="base_footprint"/>
 	  <param name="wait_for_transform_duration"  type="double"   value="$(arg wait_for_transform)"/>
@@ -108,7 +108,7 @@
     </node>
 
     <!-- Odometry : ONLY for testing without the actual robot! /odom TF should not be already published. -->
-    <node if="$(arg rgbd_odometry)" pkg="rtabmap_ros" type="rgbd_odometry" name="rgbd_odometry" output="screen">
+    <node if="$(arg rgbd_odometry)" pkg="rtabmap_odom" type="rgbd_odometry" name="rgbd_odometry" output="screen">
       <param name="frame_id"                    type="string" value="base_footprint"/>
       <param name="wait_for_transform_duration" type="double" value="$(arg wait_for_transform)"/>
       <param name="Reg/Force3DoF"               type="string" value="true"/>
@@ -119,8 +119,8 @@
       <remap from="rgb/camera_info" to="$(arg camera_info_topic)"/>
     </node>
 
-    <!-- visualization with rtabmapviz -->
-    <node if="$(arg rtabmapviz)" pkg="rtabmap_ros" type="rtabmapviz" name="rtabmapviz" args="-d $(find rtabmap_ros)/launch/config/rgbd_gui.ini" output="screen">
+    <!-- visualization with rtabmap_viz -->
+    <node if="$(arg rtabmap_viz)" pkg="rtabmap_viz" type="rtabmap_viz" name="rtabmap_viz" args="-d $(find rtabmap_demos)/launch/config/rgbd_gui.ini" output="screen">
   	  <param name="subscribe_depth"             type="bool" value="true"/>
       <param name="subscribe_scan"              type="bool" value="true"/>
       <param name="frame_id"                    type="string" value="base_footprint"/>

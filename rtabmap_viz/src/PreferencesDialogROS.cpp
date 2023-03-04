@@ -118,7 +118,7 @@ bool PreferencesDialogROS::readCoreSettings(const QString & filePath)
 	}
 
 	ros::NodeHandle rnh(rtabmapNodeName_);
-	ROS_INFO("rtabmapviz: %s", this->getParamMessage().toStdString().c_str());
+	ROS_INFO("rtabmap_viz: %s", this->getParamMessage().toStdString().c_str());
 	bool validParameters = true;
 	int readCount = 0;
 	rtabmap::ParametersMap parameters = rtabmap::Parameters::getDefaultParameters();
@@ -145,7 +145,7 @@ bool PreferencesDialogROS::readCoreSettings(const QString & filePath)
 		{
 			if(!warned)
 			{
-				ROS_INFO("rtabmapviz: Cannot get rtabmap's parameters, waiting max 5 seconds in case the node has just been launched.");
+				ROS_INFO("rtabmap_viz: Cannot get rtabmap's parameters, waiting max 5 seconds in case the node has just been launched.");
 				warned = true;
 			}
 			uSleep(100);
@@ -154,11 +154,11 @@ bool PreferencesDialogROS::readCoreSettings(const QString & filePath)
 		{
 			if(UTimer::now()-stamp < 5.0)
 			{
-				ROS_INFO("rtabmapviz: rtabmap's parameters seem now there! continuing...");
+				ROS_INFO("rtabmap_viz: rtabmap's parameters seem now there! continuing...");
 			}
 			else
 			{
-				ROS_WARN("rtabmapviz: rtabmap's parameters seem not all there yet! continuing with those there if some...");
+				ROS_WARN("rtabmap_viz: rtabmap's parameters seem not all there yet! continuing with those there if some...");
 			}
 		}
 	}
@@ -207,17 +207,17 @@ bool PreferencesDialogROS::readCoreSettings(const QString & filePath)
 			}
 			else
 			{
-				ROS_WARN("rtabmapviz: Parameter %s not found", i->first.c_str());
+				ROS_WARN("rtabmap_viz: Parameter %s not found", i->first.c_str());
 				validParameters = false;
 			}
 		}
 	}
 
-	ROS_INFO("rtabmapviz: Parameters read = %d", readCount);
+	ROS_INFO("rtabmap_viz: Parameters read = %d", readCount);
 
 	if(validParameters)
 	{
-		ROS_INFO("rtabmapviz: Parameters successfully read.");
+		ROS_INFO("rtabmap_viz: Parameters successfully read.");
 	}
 	else
 	{

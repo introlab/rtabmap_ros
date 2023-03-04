@@ -11,13 +11,13 @@
             /stereo_camera/right/camera_info_throttle
             /tf
 
-      $ roslaunch rtabmap demo_stereo_outdoor.launch
+      $ roslaunch rtabmap_demos demo_stereo_outdoor.launch
       $ rosbag play -.-clock stereo_oudoorA.bag
    -->
 
    <!-- Choose visualization -->
    <arg name="rviz" default="true" />
-   <arg name="rtabmapviz" default="false" />
+   <arg name="rtabmap_viz" default="false" />
    <arg name="local_bundle" default="true" />
    <arg name="stereo_sync" default="false" />
 
@@ -37,7 +37,7 @@
          <param name="disparity_range" value="128"/>
       </node>
 
-      <node if="$(arg stereo_sync)" pkg="nodelet" type="nodelet" name="stereo_sync" args="standalone rtabmap_ros/stereo_sync">
+      <node if="$(arg stereo_sync)" pkg="nodelet" type="nodelet" name="stereo_sync" args="standalone rtabmap_sync/stereo_sync">
       <remap from="left/image_rect"   to="left/image_rect_color"/>
       <remap from="right/image_rect"   to="right/image_rect"/>
       <remap from="left/camera_info"   to="left/camera_info_throttle"/>
@@ -48,7 +48,7 @@
    <group ns="rtabmap">
 
       <!-- Stereo Odometry -->
-      <node pkg="rtabmap_ros" type="stereo_odometry" name="stereo_odometry" output="screen">
+      <node pkg="rtabmap_odom" type="stereo_odometry" name="stereo_odometry" output="screen">
          <remap from="left/image_rect"       to="/stereo_camera/left/image_rect"/>
          <remap from="right/image_rect"      to="/stereo_camera/right/image_rect"/>
          <remap from="left/camera_info"      to="/stereo_camera/left/camera_info_throttle"/>
@@ -73,7 +73,7 @@
       </node>
 
       <!-- Visual SLAM: args: "delete_db_on_start" and "udebug" -->
-      <node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="screen" args="--delete_db_on_start">
+      <node name="rtabmap" pkg="rtabmap_slam" type="rtabmap" output="screen" args="--delete_db_on_start">
          <param name="frame_id"         type="string" value="base_footprint"/>
          <param unless="$(arg stereo_sync)" name="subscribe_stereo" type="bool" value="true"/>
          <param name="subscribe_depth"  type="bool" value="false"/>
@@ -102,7 +102,7 @@
       </node>
 
       <!-- Visualisation RTAB-Map -->
-      <node if="$(arg rtabmapviz)" pkg="rtabmap_ros" type="rtabmapviz" name="rtabmapviz" args="-d $(find rtabmap_ros)/launch/config/rgbd_gui.ini" output="screen">
+      <node if="$(arg rtabmap_viz)" pkg="rtabmap_viz" type="rtabmap_viz" name="rtabmap_viz" args="-d $(find rtabmap_demos)/launch/config/rgbd_gui.ini" output="screen">
          <param unless="$(arg stereo_sync)" name="subscribe_stereo"    type="bool" value="true"/>
          <param name="subscribe_odom_info" type="bool" value="true"/>
          <param name="subscribe_rgbd"      type="bool" value="$(arg stereo_sync)"/>
@@ -122,6 +122,6 @@
    </group>
 
    <!-- Visualisation RVIZ -->
-   <node if="$(arg rviz)" pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap_ros)/launch/config/demo_stereo_outdoor.rviz"/>
+   <node if="$(arg rviz)" pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap_demos)/launch/config/demo_stereo_outdoor.rviz"/>
 
 </launch>

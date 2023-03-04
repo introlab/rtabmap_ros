@@ -7,7 +7,7 @@
 
   <param name="use_sim_time" type="bool" value="True"/>
 
-  <include file="$(find rtabmap_ros)/launch/data_recorder.launch">
+  <include file="$(find rtabmap_launch)/launch/data_recorder.launch">
     <arg name="subscribe_odometry"   value="true"/>
     <arg name="subscribe_depth"      value="true"/>
     <arg name="subscribe_stereo"     value="false"/>

@@ -98,7 +98,7 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 
 	pnh.param("rtabmap", rtabmapNodeName_, rtabmapNodeName_);
 
-	ROS_INFO("rtabmapviz: Using configuration from \"%s\"", configFile.toStdString().c_str());
+	ROS_INFO("rtabmap_viz: Using configuration from \"%s\"", configFile.toStdString().c_str());
 	uSleep(500);
 	prefDialog_ = new PreferencesDialogROS(configFile, rtabmapNodeName_);
 	mainWindow_ = new MainWindow(prefDialog_);
@@ -127,7 +127,7 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 		{
 			initCachePath = UDirectory::currentDir(true) + initCachePath;
 		}
-		ROS_INFO("rtabmapviz: Initializing cache with local database \"%s\"", initCachePath.c_str());
+		ROS_INFO("rtabmap_viz: Initializing cache with local database \"%s\"", initCachePath.c_str());
 		uSleep(2000); // make sure rtabmap node is created if launched at the same time
 		rtabmap_msgs::GetMap getMapSrv;
 		getMapSrv.request.global = false;
@@ -136,7 +136,7 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 		if(!ros::service::call("get_map", getMapSrv))
 		{
 			ROS_WARN("Can't call \"get_map\" service. The cache will still be loaded "
-					"but the clouds won't be created until next time rtabmapviz "
+					"but the clouds won't be created until next time rtabmap_viz "
 					"receives the optimized graph.");
 		}
 		else
@@ -189,7 +189,7 @@ void GuiWrapper::infoMapCallback(
 		const rtabmap_msgs::InfoConstPtr & infoMsg,
 		const rtabmap_msgs::MapDataConstPtr & mapMsg)
 {
-	//ROS_INFO("rtabmapviz: RTAB-Map info ex received!");
+	//ROS_INFO("rtabmap_viz: RTAB-Map info ex received!");
 
 	// Map from ROS struct to rtabmap struct
 	rtabmap::Statistics stat;
@@ -567,7 +567,7 @@ void GuiWrapper::commonMultiCameraCallback(
 					waitForTransform_?waitForTransformDuration_:0.0,
 					imagesAlreadyRectified))
 			{
-				ROS_ERROR("Could not convert rgb/depth msgs! Aborting rtabmapviz update...");
+				ROS_ERROR("Could not convert rgb/depth msgs! Aborting rtabmap_viz update...");
 				return;
 			}
 		}
@@ -583,7 +583,7 @@ void GuiWrapper::commonMultiCameraCallback(
 					tfListener_,
 					waitForTransform_?waitForTransformDuration_:0))
 			{
-				ROS_ERROR("Could not convert laser scan msg! Aborting rtabmapviz update...");
+				ROS_ERROR("Could not convert laser scan msg! Aborting rtabmap_viz update...");
 				return;
 			}
 		}
@@ -598,7 +598,7 @@ void GuiWrapper::commonMultiCameraCallback(
 					tfListener_,
 					waitForTransform_?waitForTransformDuration_:0))
 			{
-				ROS_ERROR("Could not convert 3d laser scan msg! Aborting rtabmapviz update...");
+				ROS_ERROR("Could not convert 3d laser scan msg! Aborting rtabmap_viz update...");
 				return;
 			}
 		}
@@ -756,7 +756,7 @@ void GuiWrapper::commonStereoCallback(
 				waitForTransform_?waitForTransformDuration_:0.0,
 				imagesAlreadyRectified))
 		{
-			ROS_ERROR("Could not convert stereo msgs! Aborting rtabmapviz update...");
+			ROS_ERROR("Could not convert stereo msgs! Aborting rtabmap_viz update...");
 			return;
 		}
 
@@ -771,7 +771,7 @@ void GuiWrapper::commonStereoCallback(
 					tfListener_,
 					waitForTransform_?waitForTransformDuration_:0))
 			{
-				ROS_ERROR("Could not convert laser scan msg! Aborting rtabmapviz update...");
+				ROS_ERROR("Could not convert laser scan msg! Aborting rtabmap_viz update...");
 				return;
 			}
 		}
@@ -786,7 +786,7 @@ void GuiWrapper::commonStereoCallback(
 					tfListener_,
 					waitForTransform_?waitForTransformDuration_:0))
 			{
-				ROS_ERROR("Could not convert 3d laser scan msg! Aborting rtabmapviz update...");
+				ROS_ERROR("Could not convert 3d laser scan msg! Aborting rtabmap_viz update...");
 				return;
 			}
 		}
@@ -918,7 +918,7 @@ void GuiWrapper::commonLaserScanCallback(
 					tfListener_,
 					waitForTransform_?waitForTransformDuration_:0))
 			{
-				ROS_ERROR("Could not convert laser scan msg! Aborting rtabmapviz update...");
+				ROS_ERROR("Could not convert laser scan msg! Aborting rtabmap_viz update...");
 				return;
 			}
 		}
@@ -933,7 +933,7 @@ void GuiWrapper::commonLaserScanCallback(
 					tfListener_,
 					waitForTransform_?waitForTransformDuration_:0))
 			{
-				ROS_ERROR("Could not convert 3d laser scan msg! Aborting rtabmapviz update...");
+				ROS_ERROR("Could not convert 3d laser scan msg! Aborting rtabmap_viz update...");
 				return;
 			}
 		}

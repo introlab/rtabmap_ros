@@ -363,7 +363,7 @@ Visualization Manager:
         Value: true
       Axis: Z
       Channel Name: intensity
-      Class: rtabmap_ros/MapCloud
+      Class: rtabmap_rviz_plugins/MapCloud
       Cloud decimation: 4
       Cloud max depth (m): 4
       Cloud voxel size (m): 0.05

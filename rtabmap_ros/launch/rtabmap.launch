@@ -10,7 +10,8 @@
   <arg name="subscribe_rgb"  default="$(arg depth)"/>
 
   <!-- Choose visualization -->
-  <arg name="rtabmapviz"              default="true" />
+  <arg name="rtabmap_viz"             default="true" />
+  <arg name="rtabmapviz"              default="$(arg rtabmap_viz)" /> <!-- deprecated, use rtabmap_viz -->
   <arg name="rviz"                    default="false" />
 
   <!-- Localization-only mode -->
@@ -154,7 +155,7 @@
     <arg name="depth"          value="$(arg depth)"/>
     <arg name="subscribe_rgb"  value="$(arg subscribe_rgb)"/>
 
-    <arg name="rtabmapviz"     value="$(arg rtabmapviz)" />
+    <arg name="rtabmap_viz"    value="$(arg rtabmapviz)" />
     <arg name="rviz"           value="$(arg rviz)" />
 
     <arg name="localization"            value="$(arg localization)"/>

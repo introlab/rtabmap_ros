@@ -20,5 +20,12 @@
   <exec_depend>rtabmap_ros</exec_depend>
   <exec_depend>rtabmap_rviz_plugins</exec_depend>
   <exec_depend>rtabmap_viz</exec_depend>
+  <exec_depend>rtabmap_util</exec_depend>
+  
+  <exec_depend>hector_mapping</exec_depend>
+  <exec_depend>husky_navigation</exec_depend>
+  <exec_depend>turtlebot3_gazebo</exec_depend>
+  <exec_depend>turtlebot3_bringup</exec_depend>
+  <exec_depend>turtlebot3_navigation</exec_depend>
 
 </package>

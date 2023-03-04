@@ -12,7 +12,7 @@
 
   <group ns="rtabmap">
 	<!-- args: "delete_db_on_start" and "udebug" -->
-	<node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="screen" args="$(arg rtabmap_args)">
+	<node name="rtabmap" pkg="rtabmap_slam" type="rtabmap" output="screen" args="$(arg rtabmap_args)">
 
 	    <param name="subscribe_rgb"       type="bool" value="false"/>    <!-- must be false for appearance-based mode -->
 	    <param name="subscribe_depth"     type="bool" value="false"/>    <!-- must be false for appearance-based mode -->
@@ -40,11 +40,11 @@
 	</node>
 
 	<!-- visualization of the "infoEx" topic sent by rtabmap node -->
-	<node name="rtabmapviz" pkg="rtabmap_ros" type="rtabmapviz" output="screen" args="-d $(find rtabmap_ros)/launch/config/appearance_gui.ini">
+	<node name="rtabmap_viz" pkg="rtabmap_viz" type="rtabmap_viz" output="screen" args="-d $(find rtabmap_demos)/launch/config/appearance_gui.ini">
 	    <param name="subscribe_odom"      type="bool" value="false"/>    <!-- must be false for appearance-based mode -->
 
-	    <!-- This enables the GUI to pause a rtabmap_ros/camera when action "pause" is checked. -->
-	    <!-- NOTE: It is specific to rtabmap_ros/camera. Action "pause" in the GUI will still pause the rtabmap node. -->
+	    <!-- This enables the GUI to pause a rtabmap_legacy/camera when action "pause" is checked. -->
+	    <!-- NOTE: It is specific to rtabmap_legacy/camera. Action "pause" in the GUI will still pause the rtabmap node. -->
 		<param name="camera_node_name" type="string" value="/camera"/>
 
 	</node>
@@ -55,7 +55,7 @@
 		<remap from="image" to="image"/>
 
 		<param name="device_id"            value="0" type="int"/>
-		<param name="video_or_images_path" value="$(find rtabmap_ros)/launch/data/demo_appearance" type="string"/>
+		<param name="video_or_images_path" value="$(find rtabmap_demos)/launch/data/demo_appearance" type="string"/>
 		<param name="frame_rate"           value="2.0" type="double"/>
 		<param name="width"                value="0" type="int"/>
 		<param name="height"               value="0" type="int"/>

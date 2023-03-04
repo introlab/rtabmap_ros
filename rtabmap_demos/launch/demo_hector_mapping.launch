@@ -10,7 +10,7 @@
 
   <!-- Choose visualization -->
   <arg name="rviz" default="true" />
-  <arg name="rtabmapviz" default="false" />
+  <arg name="rtabmap_viz" default="false" />
 
   <!-- Choose hector_slam or icp_odometry for odometry -->
   <arg name="hector" default="true" />
@@ -64,7 +64,7 @@
   </node>
 
   <!-- If argument "hector" is false, we use rtabmap's icp odometry to generate odometry for us -->
-  <node unless="$(arg hector)" pkg="rtabmap_ros" type="icp_odometry" name="icp_odometry" output="screen" >
+  <node unless="$(arg hector)" pkg="rtabmap_odom" type="icp_odometry" name="icp_odometry" output="screen" >
      <remap from="scan"      to="/jn0/base_scan"/>
      <remap from="odom"      to="/scanmatch_odom"/>
      <remap from="odom_info"      to="/rtabmap/odom_info"/>
@@ -95,7 +95,7 @@
   </node>
 
   <group ns="rtabmap">
-    <node if="$(arg camera)" pkg="nodelet" type="nodelet" name="rgbd_sync" args="standalone rtabmap_ros/rgbd_sync" output="screen">
+    <node if="$(arg camera)" pkg="nodelet" type="nodelet" name="rgbd_sync" args="standalone rtabmap_sync/rgbd_sync" output="screen">
       <remap from="rgb/image"       to="/data_throttled_image"/>
       <remap from="depth/image"     to="/data_throttled_image_depth"/>
       <remap from="rgb/camera_info" to="/data_throttled_camera_info"/>
@@ -105,7 +105,7 @@
 
     <!-- SLAM -->
     <!-- args: "delete_db_on_start" and "udebug" -->
-    <node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="screen" args="--delete_db_on_start">
+    <node name="rtabmap" pkg="rtabmap_slam" type="rtabmap" output="screen" args="--delete_db_on_start">
       <param name="frame_id" type="string" value="base_footprint"/>
 
       <param name="subscribe_rgb"   type="bool" value="false"/>
@@ -134,7 +134,7 @@
     </node>
 
     <!-- Visualisation RTAB-Map -->
-    <node if="$(arg rtabmapviz)" pkg="rtabmap_ros" type="rtabmapviz" name="rtabmapviz" args="-d $(find rtabmap_ros)/launch/config/rgbd_gui.ini" output="screen">
+    <node if="$(arg rtabmap_viz)" pkg="rtabmap_viz" type="rtabmap_viz" name="rtabmap_viz" args="-d $(find rtabmap_demos)/launch/config/rgbd_gui.ini" output="screen">
       <param name="subscribe_rgbd"      type="bool" value="$(arg camera)"/>
       <param name="subscribe_laserScan" type="bool" value="true"/>
       <param name="frame_id"            type="string" value="base_footprint"/>
@@ -151,8 +151,8 @@
   </group>
 
   <!-- Visualisation RVIZ -->
-  <node if="$(arg rviz)" pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap_ros)/launch/config/demo_robot_mapping.rviz" output="screen"/>
-   <node if="$(arg camera)" pkg="nodelet" type="nodelet" name="points_xyzrgb" args="standalone rtabmap_ros/point_cloud_xyzrgb">
+  <node if="$(arg rviz)" pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap_demos)/launch/config/demo_robot_mapping.rviz" output="screen"/>
+   <node if="$(arg camera)" pkg="nodelet" type="nodelet" name="points_xyzrgb" args="standalone rtabmap_util/point_cloud_xyzrgb">
     <remap from="rgbd_image"      to="/rtabmap/rgbd_image"/>
     <remap from="cloud"           to="voxel_cloud" />
 

@@ -49,7 +49,7 @@ int main(int argc, char** argv)
 	ULogger::setType(ULogger::kTypeConsole);
 	ULogger::setLevel(ULogger::kWarning);
 
-	ros::init(argc, argv, "rtabmapviz");
+	ros::init(argc, argv, "rtabmap_viz");
 
 	app = new QApplication(argc, argv);
 	app->connect( app, SIGNAL( lastWindowClosed() ), app, SLOT( quit() ) );
@@ -68,16 +68,16 @@ int main(int argc, char** argv)
 	spinner = new ros::AsyncSpinner(1); // Use 1 thread
 	spinner->start();
 
-	ROS_INFO("rtabmapviz started.");
+	ROS_INFO("rtabmap_viz started.");
 	// Now wait for application to finish
 	int r = app->exec();// MUST be called by the Main Thread
 
-	ROS_INFO("rtabmapviz stopping spinner...");
+	ROS_INFO("rtabmap_viz stopping spinner...");
 	delete spinner;
 
-	ROS_INFO("rtabmapviz deleting qt stuff...");
+	ROS_INFO("rtabmap_viz deleting qt stuff...");
 	delete gui;
 	delete app;
-	ROS_INFO("rtabmapviz: All done! Closing...");
+	ROS_INFO("rtabmap_viz: All done! Closing...");
 	return r;
 }
