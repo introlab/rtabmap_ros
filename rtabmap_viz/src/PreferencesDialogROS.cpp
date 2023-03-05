@@ -85,7 +85,7 @@ QString PreferencesDialogROS::getParamMessage()
 
 bool PreferencesDialogROS::hasAllParameters()
 {
-	auto node = std::make_shared<rclcpp::Node>("rtabmapviz");
+	auto node = std::make_shared<rclcpp::Node>("rtabmap_viz");
 	auto client = std::make_shared<rclcpp::AsyncParametersClient>(node, rtabmapNodeName_);
 	return client->service_is_ready();
 }
@@ -98,7 +98,7 @@ bool PreferencesDialogROS::readCoreSettings(const QString & filePath)
 		path = filePath;
 	}
 
-	auto node = std::make_shared<rclcpp::Node>("rtabmapviz");
+	auto node = std::make_shared<rclcpp::Node>("rtabmap_viz");
 	RCLCPP_INFO(node->get_logger(), "%s", this->getParamMessage().toStdString().c_str());
 	rtabmap::ParametersMap parameters = rtabmap::Parameters::getDefaultParameters();
 	// remove Odom parameters

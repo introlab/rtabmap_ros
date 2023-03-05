@@ -99,7 +99,7 @@ GuiWrapper::GuiWrapper(const rclcpp::NodeOptions & options) :
 
 	rtabmapNodeName_ = this->declare_parameter("rtabmap", rtabmapNodeName_);
 
-	RCLCPP_INFO(this->get_logger(), "rtabmapviz: Using configuration from \"%s\"", configFile.toStdString().c_str());
+	RCLCPP_INFO(this->get_logger(), "rtabmap_viz: Using configuration from \"%s\"", configFile.toStdString().c_str());
 	uSleep(500);
 	prefDialog_ = new PreferencesDialogROS(this, configFile, rtabmapNodeName_);
 	mainWindow_ = new MainWindow(prefDialog_);
@@ -126,12 +126,12 @@ GuiWrapper::GuiWrapper(const rclcpp::NodeOptions & options) :
 		{
 			initCachePath = UDirectory::currentDir(true) + initCachePath;
 		}
-		RCLCPP_INFO(this->get_logger(), "rtabmapviz: Initializing cache with local database \"%s\"", initCachePath.c_str());
+		RCLCPP_INFO(this->get_logger(), "rtabmap_viz: Initializing cache with local database \"%s\"", initCachePath.c_str());
 		if(!callMapDataService("get_map_data", false, true, true))
 		{
 			RCLCPP_ERROR(this->get_logger(),
 					"The cache will still be loaded "
-					"but the clouds won't be created until next time rtabmapviz "
+					"but the clouds won't be created until next time rtabmap_viz "
 					"receives the optimized graph.");
 		}
 		QMetaObject::invokeMethod(mainWindow_, "updateCacheFromDatabase", Q_ARG(QString, QString(initCachePath.c_str())));
@@ -174,7 +174,7 @@ void GuiWrapper::infoMapCallback(
 		const rtabmap_msgs::msg::Info::ConstSharedPtr infoMsg,
 		const rtabmap_msgs::msg::MapData::ConstSharedPtr mapMsg)
 {
-	//RCLCPP_INFO(this->get_logger(), "rtabmapviz: RTAB-Map info ex received!");
+	//RCLCPP_INFO(this->get_logger(), "rtabmap_viz: RTAB-Map info ex received!");
 
 	// Map from ROS struct to rtabmap struct
 	rtabmap::Statistics stat;
@@ -290,7 +290,7 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 		const rtabmap::ParametersMap & defaultParameters = rtabmap::Parameters::getDefaultParameters();
 		rtabmap::ParametersMap parameters = ((rtabmap::ParamEvent *)anEvent)->getParameters();
 		std::vector<rclcpp::Parameter> rosParameters;
-		auto node = rclcpp::Node::make_shared("rtabmapviz");
+		auto node = rclcpp::Node::make_shared("rtabmap_viz");
 		for(rtabmap::ParametersMap::iterator i=parameters.begin(); i!=parameters.end(); ++i)
 		{
 			//save only parameters with valid names
@@ -612,7 +612,7 @@ void GuiWrapper::commonMultiCameraCallback(
 					waitForTransform_,
 					imagesAlreadyRectified))
 			{
-				RCLCPP_ERROR(this->get_logger(), "Could not convert rgb/depth msgs! Aborting rtabmapviz update...");
+				RCLCPP_ERROR(this->get_logger(), "Could not convert rgb/depth msgs! Aborting rtabmap_viz update...");
 				return;
 			}
 		}
@@ -628,7 +628,7 @@ void GuiWrapper::commonMultiCameraCallback(
 					*tfBuffer_,
 					waitForTransform_))
 			{
-				RCLCPP_ERROR(this->get_logger(), "Could not convert laser scan msg! Aborting rtabmapviz update...");
+				RCLCPP_ERROR(this->get_logger(), "Could not convert laser scan msg! Aborting rtabmap_viz update...");
 				return;
 			}
 		}
@@ -643,7 +643,7 @@ void GuiWrapper::commonMultiCameraCallback(
 					*tfBuffer_,
 					waitForTransform_))
 			{
-				RCLCPP_ERROR(this->get_logger(), "Could not convert 3d laser scan msg! Aborting rtabmapviz update...");
+				RCLCPP_ERROR(this->get_logger(), "Could not convert 3d laser scan msg! Aborting rtabmap_viz update...");
 				return;
 			}
 		}
@@ -801,7 +801,7 @@ void GuiWrapper::commonStereoCallback(
 				waitForTransform_,
 				imagesAlreadyRectified))
 		{
-			RCLCPP_ERROR(this->get_logger(), "Could not convert stereo msgs! Aborting rtabmapviz update...");
+			RCLCPP_ERROR(this->get_logger(), "Could not convert stereo msgs! Aborting rtabmap_viz update...");
 			return;
 		}
 
@@ -816,7 +816,7 @@ void GuiWrapper::commonStereoCallback(
 					*tfBuffer_,
 					waitForTransform_))
 			{
-				RCLCPP_ERROR(this->get_logger(), "Could not convert laser scan msg! Aborting rtabmapviz update...");
+				RCLCPP_ERROR(this->get_logger(), "Could not convert laser scan msg! Aborting rtabmap_viz update...");
 				return;
 			}
 		}
@@ -831,7 +831,7 @@ void GuiWrapper::commonStereoCallback(
 					*tfBuffer_,
 					waitForTransform_))
 			{
-				RCLCPP_ERROR(this->get_logger(), "Could not convert 3d laser scan msg! Aborting rtabmapviz update...");
+				RCLCPP_ERROR(this->get_logger(), "Could not convert 3d laser scan msg! Aborting rtabmap_viz update...");
 				return;
 			}
 		}
@@ -963,7 +963,7 @@ void GuiWrapper::commonLaserScanCallback(
 					*tfBuffer_,
 					waitForTransform_))
 			{
-				RCLCPP_ERROR(this->get_logger(), "Could not convert laser scan msg! Aborting rtabmapviz update...");
+				RCLCPP_ERROR(this->get_logger(), "Could not convert laser scan msg! Aborting rtabmap_viz update...");
 				return;
 			}
 		}
@@ -978,7 +978,7 @@ void GuiWrapper::commonLaserScanCallback(
 					*tfBuffer_,
 					waitForTransform_))
 			{
-				RCLCPP_ERROR(this->get_logger(), "Could not convert 3d laser scan msg! Aborting rtabmapviz update...");
+				RCLCPP_ERROR(this->get_logger(), "Could not convert 3d laser scan msg! Aborting rtabmap_viz update...");
 				return;
 			}
 		}

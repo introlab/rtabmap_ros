@@ -23,13 +23,4 @@
     </description>
     <message_type>rtabmap_rviz_plugins/msg/Info</message_type>
   </class>
-  <!--
-  <class name="rtabmap_rviz_plugins/OrbitOriented"
-         type="rtabmap_rviz_plugins::OrbitOrientedViewController"
-         base_class_type="rviz::ViewController">
-    <description>
-      Camera orbit with orientation.
-    </description>
-  </class>
-  -->
 </library>

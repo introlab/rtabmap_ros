@@ -103,7 +103,7 @@ public:
 			ROS_INFO("map_optimizer: map_frame_id = %s", mapFrameId_.c_str());
 			ROS_INFO("map_optimizer: odom_frame_id = %s", odomFrameId_.c_str());
 			ROS_INFO("map_optimizer: tf_delay = %f", tfDelay);
-			transformThread_ = new boost::thread(std::bind(&MapOptimizer::publishLoop, this, tfDelay));
+			transformThread_ = new boost::thread(boost::bind(&MapOptimizer::publishLoop, this, tfDelay));
 		}
 	}
 

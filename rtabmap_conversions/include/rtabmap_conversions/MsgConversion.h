@@ -266,6 +266,20 @@ bool convertScan3dMsg(
 		float maxRange = 0.0f,
 		bool is2D = false);
 
+bool deskew(
+		const sensor_msgs::msg::PointCloud2 & input,
+		sensor_msgs::msg::PointCloud2 & output,
+		const std::string & fixedFrameId,
+		tf2_ros::Buffer & tfBuffer,
+		double waitForTransform,
+		bool slerp = false);
+
+bool deskew(
+		const sensor_msgs::msg::PointCloud2 & input,
+		sensor_msgs::msg::PointCloud2 & output,
+		double previousStamp,
+		const rtabmap::Transform & velocity);
+
 // Missing function in ros2 (from old pcl_ros)
 void transformPointCloud (
 		const Eigen::Matrix4f &transform,
@@ -295,20 +309,6 @@ inline int sizeOfPointField(int datatype)
   }
   return -1;
 }
-
-bool deskew(
-		const sensor_msgs::msg::PointCloud2 & input,
-		sensor_msgs::msg::PointCloud2 & output,
-		const std::string & fixedFrameId,
-		tf2_ros::Buffer & tfBuffer,
-		double waitForTransform,
-		bool slerp = false);
-
-bool deskew(
-		const sensor_msgs::msg::PointCloud2 & input,
-		sensor_msgs::msg::PointCloud2 & output,
-		double previousStamp,
-		const rtabmap::Transform & velocity);
 }
 
 #endif /* MSGCONVERSION_H_ */

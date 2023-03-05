@@ -36,7 +36,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 QApplication * app = 0;
 
 void my_handler(int){
-	UINFO("rtabmapviz: ctrl-c catched! Exiting Qt app...");
+	UINFO("rtabmap_viz: ctrl-c catched! Exiting Qt app...");
 	app->exit(-1);
 }
 
@@ -82,15 +82,15 @@ int main(int argc, char** argv)
 		// Launch executer
 		std::thread execution_thread(spin_executor);
 
-		RCLCPP_INFO(node->get_logger(), "rtabmapviz started.");
+		RCLCPP_INFO(node->get_logger(), "rtabmap_viz started.");
 		// Now wait for application to finish
 		r = app->exec();// MUST be called by the Main Thread
 
-		RCLCPP_INFO(node->get_logger(), "rtabmapviz stopping spinner...");
+		RCLCPP_INFO(node->get_logger(), "rtabmap_viz stopping spinner...");
 		rclcpp::shutdown();
 		execution_thread.join();
 
-		RCLCPP_INFO(node->get_logger(), "rtabmapviz: All done! Closing...");
+		RCLCPP_INFO(node->get_logger(), "rtabmap_viz: All done! Closing...");
 	}
 	delete app;
 
