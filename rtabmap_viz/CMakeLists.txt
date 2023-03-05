@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.5)
 project(rtabmap_viz)
 
-
+find_package(Qt5 COMPONENTS Widgets REQUIRED)
 
 find_package(catkin REQUIRED COMPONENTS
              cv_bridge geometry_msgs std_msgs std_srvs nav_msgs rtabmap_msgs rtabmap_sync tf
@@ -20,6 +20,8 @@ catkin_package(
 ## Build ##
 ###########
 
+include_directories(${Qt5Widgets_INCLUDE_DIRS})
+
 # include_directories(include)
 include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -27,6 +29,7 @@ include_directories(
 )
 
 add_executable(rtabmap_viz src/GuiNode.cpp src/GuiWrapper.cpp src/PreferencesDialogROS.cpp)
+target_compile_options(rtabmap_viz PRIVATE -fPIC)
 target_link_libraries(rtabmap_viz ${catkin_LIBRARIES})
 
 
