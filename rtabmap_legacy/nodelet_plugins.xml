@@ -1,0 +1,42 @@
+<library path="lib/librtabmap_legacy_plugins"> 
+  <class name="rtabmap_legacy/data_throttle" 
+         type="rtabmap_legacy::DataThrottleNodelet" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
+  
+  <class name="rtabmap_legacy/stereo_throttle" 
+         type="rtabmap_legacy::StereoThrottleNodelet" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
+  
+  <class name="rtabmap_legacy/data_odom_sync" 
+         type="rtabmap_legacy::DataOdomSyncNodelet" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
+
+  <class name="rtabmap_legacy/obstacles_detection_old" 
+         type="rtabmap_legacy::ObstaclesDetectionOld" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
+
+  <class name="rtabmap_legacy/undistort_depth" 
+         type="rtabmap_legacy::UndistortDepth" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
+
+</library>

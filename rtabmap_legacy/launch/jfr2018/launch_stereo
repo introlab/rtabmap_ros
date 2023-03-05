@@ -1,0 +1,34 @@
+// stereo_odometry
+$ roslaunch rtabmap_launch rtabmap.launch args:="-d --Rtabmap/PublishRAMUsage true --Rtabmap/StartNewMapOnLoopClosure true --Reg/Force3DoF false --RGBD/ProximityPathMaxNeighbors 0 --Mem/STMSize 15 --Mem/BinDataKept false --Kp/FlannRebalancingFactor 1.0 --RGBD/LinearUpdate 0 --RGBD/ProximityBySpace true --Odom/KeyFrameThr 0.3 --Odom/Strategy 0 --OdomF2M/MaxSize 2000 --RGBD/OptimizeMaxError 0.5 --OdomORBSLAM2/VocPath /home/mathieu/workspace/ORB_SLAM2/Vocabulary/ORBvoc.txt --OdomORBSLAM2/Fps 15 --FAST/Threshold 7" odom_args:="--Vis/CorType 0" frame_id:=base_footprint ground_truth_frame_id:=world ground_truth_base_frame_id:=scan_gt use_sim_time:=true stereo:=true stereo_namespace:=/wide_stereo left_camera_info_topic:=/wide_stereo/left/camera_info_throttle right_camera_info_topic:=/wide_stereo/right/camera_info_scaled odom_topic:=odom  approx_sync:=false database_path:=/media/mathieu/5B60E7B25BDFCB79/bags/rtabmap.db odom_guess_frame_id:=odom_combined
+// with wheel odom
+odom_frame_id:=odom_combined odom_tf_angular_variance:=0.0001 odom_tf_linear_variance:=0.0001 visual_odometry:=false
+// flow
+--Vis/CorType 1 --Odom/KeyFrameThr 0.6
+
+$ ./republish_camera_info.py camera_info_in:=/wide_stereo/right/camera_info_throttle camera_info_out:=/wide_stereo/right/camera_info_scaled
+
+$ export ROS_NAMESPACE=wide_stereo
+$ rosrun stereo_image_proc stereo_image_proc left/image_raw:=left/image_raw_throttle right/image_raw:=right/image_raw_throttle left/camera_info:=left/camera_info_throttle right/camera_info:=right/camera_info_scaled
+<node if="$(arg gen_depth)" pkg="nodelet" type="nodelet" name="disparity2depth" args="standalone rtabmap_ros/disparity_to_depth"/>
+
+$ ./gt_tf_broadcaster.py _file:=./stata-mit/2012-01-25-12-14-25_part1_floor2.gt.laser.poses _frame_id:=scan_gt _fixed_frame_id:=world _offset_time:=82.2 _offset_x:=-0.275
+// or
+// To make ground truth matching dataset 2012-01-25-12-14-25.bag (offset found with pcl_icp2d between end of first bag and begin of second bag)
+$ rosrun tf static_transform_publisher -0.00273873 -0.38818 0 0 0 0 world world_offset 100
+$ ./gt_tf_broadcaster.py _file:=./stata-mit/2012-01-25-12-33-29_part1_floor2.gt.laser.poses _frame_id:=scan_gt _fixed_frame_id:=world_offset _offset_time:=82.2 _offset_x:=-0.275
+// otherwise
+$ ./gt_tf_broadcaster.py _file:=./stata-mit/2012-01-25-12-33-29_part1_floor2.gt.laser.poses _frame_id:=scan_gt _fixed_frame_id:=world _offset_time:=82.2 _offset_x:=-0.275
+
+$ ./sync_path_gt.py _frame_id:=scan_gt mapPath:=/rtabmap/mapPath
+
+$ rostopic hz /rtabmap/grid_map
+
+$ rosbag play --clock --pause ./stata-mit/2012-01-25-12-14-25_stereo.bag
+// or
+$ rosbag play --clock --pause ./stata-mit/2012-01-25-12-33-29_stereo.bag
+
+//copy results (assuming we are in bags directory)
+$ cp rtabmap.db gt_poses.txt rmse.txt slam_poses.txt ../results/stata_mit/2012-01-25-12-14-25/rtabmap/stereo
+//or
+$ cp rtabmap.db gt_poses.txt rmse.txt slam_poses.txt ../results/stata_mit/2012-01-25-12-33-29/rtabmap/stereo
+

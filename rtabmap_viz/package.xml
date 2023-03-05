@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>rtabmap_viz</name>
+  <version>0.1.0</version>
+  <description>RTAB-Map's visualization package.</description>
+  <maintainer email="matlabbe@gmail.com">Mathieu Labbe</maintainer>
+  <author>Mathieu Labbe</author>
+  <license>BSD</license>
+  <url type="bugtracker">https://github.com/introlab/rtabmap_ros/issues</url>
+  <url type="repository">https://github.com/introlab/rtabmap_ros</url>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <depend>cv_bridge</depend>
+  <depend>geometry_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>std_srvs</depend>
+  <depend>nav_msgs</depend>
+  <depend>rtabmap_msgs</depend>
+  <depend>rtabmap_sync</depend>
+  <depend>tf</depend>
+
+</package>

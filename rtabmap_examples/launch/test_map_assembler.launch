@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- Example to assemble 3D point clouds from depth when rtabmap is using scan for 2d occupancy grid :
+        $ roslaunch rtabmap_ros demo_robot_mapping.launch rviz:=true rtabmapviz:=false
+        $ roslaunch rtabmap_ros test_map_assembler.launch
+        $ rosbag play -clock demo_mapping.bag
+  -->
+
+  <group ns="rtabmap">
+     <node pkg="rtabmap_util" type="map_assembler" name="map_assembler">
+        <remap from="mapData" to="mapData"/>
+        <param name="regenerate_local_grids" value="true"/>
+     </node>
+  </group>
+</launch>

@@ -1,0 +1,109 @@
+<?xml version="1.0"?>
+
+<launch>
+
+   <!-- Kinect 2
+        Install Kinect2 : Follow ALL directives at https://github.com/code-iai/iai_kinect2
+                          Make sure it is calibrated!
+        Run:
+           $ roslaunch kinect2_bridge kinect2_bridge.launch publish_tf:=true
+           $ roslaunch rtabmap_legacy rgbd_mapping_kinect2.launch
+   -->
+
+   <!-- Which image resolution to process in rtabmap: sd, qhd, hd -->
+   <arg name="resolution" default="qhd" />
+
+   <!-- Fixed frame id, you may set "base_link" or "base_footprint" if they are published -->
+   <arg name="frame_id" default="kinect2_base_link"/>
+
+   <!-- Rotate the camera -->
+   <arg name="pi/2" value="1.5707963267948966"/>
+   <arg name="optical_rotate" value="0 0 0 -$(arg pi/2) 0 -$(arg pi/2)" />
+   <node pkg="tf" type="static_transform_publisher" name="kinect2_base_link"
+        args="$(arg optical_rotate) kinect2_base_link kinect2_link 100" />
+
+   <!-- Choose visualization -->
+   <arg name="rviz" default="false" />
+   <arg name="rtabmapviz" default="true" />
+
+   <!-- Corresponding config files -->
+   <arg name="rtabmapviz_cfg"          default="~/.ros/rtabmap_gui.ini" />
+   <arg name="rviz_cfg"                default="-d $(find rtabmap_launch)/launch/config/rgbd.rviz" />
+
+   <!-- slightly increase default parameters for larger images (qhd=720p) -->
+   <arg name="gftt_block_size" default="5" />
+   <arg name="gftt_min_distance" default="5" />
+
+  <group ns="rtabmap">
+
+    <!-- Odometry -->
+    <node pkg="rtabmap_odom" type="rgbd_odometry" name="visual_odometry" output="screen">
+      <remap from="rgb/image" to="/kinect2/$(arg resolution)/image_color_rect"/>
+      <remap from="depth/image" to="/kinect2/$(arg resolution)/image_depth_rect"/>
+      <remap from="rgb/camera_info" to="/kinect2/$(arg resolution)/camera_info"/>
+
+      <param name="frame_id" type="string" value="$(arg frame_id)"/>
+      <param name="approx_sync" type="bool" value="false"/>
+
+	  <param name="GFTT/BlockSize" type="string" value="$(arg gftt_block_size)"/>
+      <param name="GFTT/MinDistance" type="string" value="$(arg gftt_min_distance)"/>
+    </node>
+
+    <!-- Visual SLAM (robot side) -->
+    <!-- args: "delete_db_on_start" and "udebug" -->
+    <node name="rtabmap" pkg="rtabmap_slam" type="rtabmap" output="screen" args="--delete_db_on_start">
+      <param name="subscribe_depth" type="bool" value="true"/>
+	  <param name="frame_id" type="string" value="$(arg frame_id)"/>
+
+      <remap from="rgb/image" to="/kinect2/$(arg resolution)/image_color_rect"/>
+      <remap from="depth/image" to="/kinect2/$(arg resolution)/image_depth_rect"/>
+      <remap from="rgb/camera_info" to="/kinect2/$(arg resolution)/camera_info"/>
+
+      <param name="approx_sync" type="bool" value="false"/>
+
+      <param name="GFTT/BlockSize" type="string" value="$(arg gftt_block_size)"/>
+      <param name="GFTT/MinDistance" type="string" value="$(arg gftt_min_distance)"/>
+    </node>
+
+    <!-- Visualisation RTAB-Map -->
+    <node if="$(arg rtabmapviz)" pkg="rtabmap_viz" type="rtabmap_viz" name="rtabmap_viz" args="$(arg rtabmapviz_cfg)" output="screen">
+      <param name="subscribe_depth" type="bool" value="true"/>
+      <param name="subscribe_odom_info" type="bool" value="true"/>
+      <param name="approx_sync" type="bool" value="false"/>
+      <param name="frame_id" type="string" value="$(arg frame_id)"/>
+
+      <remap from="rgb/image" to="/kinect2/$(arg resolution)/image_color_rect"/>
+      <remap from="depth/image" to="/kinect2/$(arg resolution)/image_depth_rect"/>
+      <remap from="rgb/camera_info" to="/kinect2/$(arg resolution)/camera_info"/>
+    </node>
+
+  </group>
+
+  <!-- Visualization RVIZ -->
+  <node if="$(arg rviz)" pkg="rviz" type="rviz" name="rviz" args="$(arg rviz_cfg)"/>
+  <!-- sync cloud with odometry and voxelize the point cloud (for fast visualization in rviz) -->
+  <node if="$(arg rviz)" pkg="nodelet" type="nodelet" name="standalone_nodelet"  args="manager" output="screen"/>
+  <node if="$(arg rviz)" pkg="nodelet" type="nodelet" name="data_odom_sync" args="load rtabmap_ros/data_odom_sync standalone_nodelet">
+    <remap from="rgb/image_in"       to="/kinect2/$(arg resolution)/image_color_rect"/>
+    <remap from="depth/image_in"     to="/kinect2/$(arg resolution)/image_depth_rect"/>
+    <remap from="rgb/camera_info_in" to="/kinect2/$(arg resolution)/camera_info"/>
+
+    <remap from="odom_in"             to="rtabmap/odom"/>
+
+    <param name="approx_sync" type="bool" value="false"/>
+
+    <remap from="rgb/image_out"       to="data_odom_sync/image"/>
+    <remap from="depth/image_out"     to="data_odom_sync/depth"/>
+    <remap from="rgb/camera_info_out" to="data_odom_sync/camera_info"/>
+    <remap from="odom_out"            to="odom_sync"/>
+  </node>
+  <node if="$(arg rviz)" pkg="nodelet" type="nodelet" name="points_xyzrgb" args="load rtabmap_ros/point_cloud_xyzrgb standalone_nodelet">
+    <remap from="rgb/image"       to="data_odom_sync/image"/>
+    <remap from="depth/image"     to="data_odom_sync/depth"/>
+    <remap from="rgb/camera_info" to="data_odom_sync/camera_info"/>
+    <remap from="cloud"           to="voxel_cloud" />
+
+    <param name="voxel_size" type="double" value="0.01"/>
+  </node>
+
+</launch>

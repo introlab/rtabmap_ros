@@ -1,0 +1,75 @@
+<?xml version="1.0"?>
+<launch>
+
+<!-- Example usage of RTAB-Map with VINS-Fusion support for realsense D435i.
+     Make sure to disable the IR emitter or put a tape on the IR emitter to
+     avoid VINS tracking the fixed IR points (that would cause large drifts) -->
+
+<arg name="rtabmap_viz" default="true"/>
+<arg name="rviz"       default="false"/>
+<arg name="depth_mode" default="true"/>
+<arg name="odom_strategy" default="9"/> <!-- default VINS -->
+<arg name="unite_imu_method" default="copy"/> <!-- "copy" or "linear_interpolation" -->
+
+<include file="$(find realsense2_camera)/launch/rs_camera.launch">
+   <arg name="align_depth"   value="$(arg depth_mode)"/>
+   <arg name="unite_imu_method" value="$(arg unite_imu_method)"/>
+   <arg name="enable_gyro"   value="true"/>
+   <arg name="enable_accel"  value="true"/>
+   <arg name="enable_infra1" value="true"/>
+   <arg name="enable_infra2" value="true"/>
+   <arg name="gyro_fps"      value="200"/>
+   <arg name="accel_fps"     value="250"/>
+   <arg name="enable_sync"   value="true"/>
+</include>
+
+<node pkg="imu_filter_madgwick" type="imu_filter_node" name="imu_filter_node">
+   <param name="use_mag"       value="false"/>
+   <param name="publish_tf"    value="false"/>
+   <param name="world_frame"   value="enu"/>
+   <remap from="/imu/data_raw" to="/camera/imu"/>
+   <remap from="/imu/data"     to="/rtabmap/imu"/>
+</node>
+
+<!-- RTAB-Map: depth mode -->
+<!-- We have to launch stereo_odometry externally from rtabmap.launch so that rtabmap can use RGB-D input -->
+<group ns="rtabmap">
+<node if="$(arg depth_mode)" pkg="rtabmap_odom" type="stereo_odometry" name="stereo_odometry" args="--Optimizer/GravitySigma 0.3 --Odom/Strategy $(arg odom_strategy) --OdomVINS/ConfigPath $(find vins)/../config/realsense_d435i/realsense_stereo_imu_config.yaml" output="screen">
+   <remap from="left/image_rect"   to="/camera/infra1/image_rect_raw"/>
+   <remap from="right/image_rect"  to="/camera/infra2/image_rect_raw"/>
+   <remap from="left/camera_info"  to="/camera/infra1/camera_info"/>
+   <remap from="right/camera_info" to="/camera/infra2/camera_info"/>
+   <remap from="imu"               to="/rtabmap/imu"/>
+   <param name="frame_id"          value="camera_link"/>
+   <param name="wait_imu_to_init"  value="true"/>
+</node>
+</group>
+<include if="$(arg depth_mode)" file="$(find rtabmap_launch)/launch/rtabmap.launch">
+   <arg name="rtabmap_args"      value="--delete_db_on_start --Optimizer/GravitySigma 0.3"/>
+   <arg name="rgb_topic"         value="/camera/color/image_raw"/>
+   <arg name="depth_topic"       value="/camera/aligned_depth_to_color/image_raw"/>
+   <arg name="camera_info_topic" value="/camera/color/camera_info"/>
+   <arg name="visual_odometry"   value="false"/>
+   <arg name="approx_sync"       value="false"/>
+   <arg name="frame_id"          value="camera_link"/>
+   <arg name="imu_topic"         value="/rtabmap/imu"/>
+   <arg name="rtabmap_viz"        value="$(arg rtabmap_viz)"/>
+   <arg name="rviz"              value="$(arg rviz)"/>
+</include>
+
+<!-- RTAB-Map: Stereo mode -->
+<include unless="$(arg depth_mode)" file="$(find rtabmap_launch)/launch/rtabmap.launch">
+   <arg name="rtabmap_args"            value="--delete_db_on_start --Optimizer/GravitySigma 0.3 --Odom/Strategy $(arg odom_strategy) --OdomVINS/ConfigPath $(find vins)/../config/realsense_d435i/realsense_stereo_imu_config.yaml"/>
+   <arg name="left_image_topic"        value="/camera/infra1/image_rect_raw"/>
+   <arg name="right_image_topic"       value="/camera/infra2/image_rect_raw"/>
+   <arg name="left_camera_info_topic"  value="/camera/infra1/camera_info"/>
+   <arg name="right_camera_info_topic" value="/camera/infra2/camera_info"/>
+   <arg name="stereo"                  value="true"/>
+   <arg name="frame_id"                value="camera_link"/>
+   <arg name="imu_topic"               value="/rtabmap/imu"/>
+   <arg name="wait_imu_to_init"        value="true"/>
+   <arg name="rtabmap_viz"              value="$(arg rtabmap_viz)"/>
+   <arg name="rviz"                    value="$(arg rviz)"/>
+</include>
+
+</launch>

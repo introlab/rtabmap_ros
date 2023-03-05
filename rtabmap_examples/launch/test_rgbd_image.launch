@@ -1,0 +1,56 @@
+<?xml version="1.0"?>
+
+<launch>
+
+  <!-- Kinect: -->
+  <include file="$(find freenect_launch)/launch/freenect.launch">
+    <arg name="depth_registration" value="true" />
+  </include>
+
+  <arg name="compressed" default="false"/>
+  <arg name="compressed_rate" default="0"/>
+
+  <group ns="camera">
+    <node pkg="nodelet" type="nodelet" name="rgbd_sync" args="load rtabmap_sync/rgbd_sync camera_nodelet_manager" output="screen">
+      <remap from="rgb/image"         to="rgb/image_rect_color"/>
+      <remap from="depth/image"       to="depth_registered/image_raw"/>
+      <remap from="rgb/camera_info"   to="rgb/camera_info"/>
+      <param name="compressed_rate" value="$(arg compressed_rate)"/>
+    </node>
+  </group>
+
+   <!-- Nodes -->
+  <group ns="rtabmap">
+
+    <!-- RGB-D Odometry -->
+    <node pkg="rtabmap_odom" type="rgbd_odometry" name="rgbd_odometry" output="screen">
+      <param name="subscribe_rgbd"       type="bool"   value="true"/>
+      <remap     if="$(arg compressed)"    from="rgbd_image"   to="/camera/rgbd_image/compressed"/>
+      <remap unless="$(arg compressed)"    from="rgbd_image"   to="/camera/rgbd_image"/>
+
+	  <param name="Odom/AlignWithGround"  type="string" value="true"/>
+      <param name="frame_id"         type="string" value="camera_link"/>
+    </node>
+
+    <node name="rtabmap" pkg="rtabmap_slam" type="rtabmap" output="screen" args="--delete_db_on_start">
+      <param name="subscribe_depth"       type="bool"   value="false"/>
+      <param name="subscribe_rgbd"       type="bool"   value="true"/>
+      <param name="frame_id"             type="string" value="camera_link"/>
+      <param name="approx_sync"          type="string" value="false"/>
+      <remap     if="$(arg compressed)"    from="rgbd_image"   to="/camera/rgbd_image/compressed"/>
+      <remap unless="$(arg compressed)"    from="rgbd_image"   to="/camera/rgbd_image"/>
+    </node>
+
+    <node pkg="rtabmap_viz" type="rtabmap_viz" name="rtabmap_viz" output="screen">
+      <param name="subscribe_depth"      type="bool"   value="false"/>
+      <param name="subscribe_rgbd"       type="bool"   value="true"/>
+      <param name="frame_id"             type="string" value="camera_link"/>
+      <param name="approx_sync"          type="string" value="false"/>
+      <remap     if="$(arg compressed)"    from="rgbd_image"   to="/camera/rgbd_image/compressed"/>
+      <remap unless="$(arg compressed)"    from="rgbd_image"   to="/camera/rgbd_image"/>
+      <param name="subscribe_odom_info"  type="bool"   value="true"/>
+    </node>
+
+  </group>
+
+</launch>

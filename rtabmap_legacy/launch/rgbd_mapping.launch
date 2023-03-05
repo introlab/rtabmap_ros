@@ -1,0 +1,78 @@
+<?xml version="1.0"?>
+
+<launch>
+  <!-- Backward compatibility launch file, use rtabmap.launch instead -->
+
+  <!-- Your RGB-D sensor should be already started with "depth_registration:=true".
+        Examples:
+           $ roslaunch freenect_launch freenect.launch depth_registration:=true
+           $ roslaunch openni2_launch openni2.launch depth_registration:=true -->
+
+  <!-- Choose visualization -->
+  <arg name="rviz"                    default="false" />
+  <arg name="rtabmapviz"              default="true" />
+
+  <!-- Localization-only mode -->
+  <arg name="localization"            default="false"/>
+
+  <!-- Corresponding config files -->
+  <arg name="rtabmapviz_cfg"          default="~/.ros/rtabmap_gui.ini" />
+  <arg name="rviz_cfg"                default="$(find rtabmap_launch)/launch/config/rgbd.rviz" />
+
+  <arg name="frame_id"                default="camera_link"/>   <!-- Fixed frame id, you may set "base_link" or "base_footprint" if they are published -->
+  <arg name="database_path"           default="~/.ros/rtabmap.db"/>
+  <arg name="rtabmap_args"            default=""/>              <!-- delete_db_on_start, udebug -->
+  <arg name="launch_prefix"           default=""/>              <!-- for debugging purpose, it fills launch-prefix tag of the nodes -->
+  <arg name="approx_sync"             default="true"/>         <!-- if timestamps of the input topics are not synchronized -->
+
+  <arg name="rgb_topic"               default="/camera/rgb/image_rect_color" />
+  <arg name="depth_registered_topic"  default="/camera/depth_registered/image_raw" />
+  <arg name="camera_info_topic"       default="/camera/rgb/camera_info" />
+  <arg name="compressed"              default="false"/>
+
+  <arg name="subscribe_scan"          default="false"/>         <!-- Assuming 2D scan if set, rtabmap will do 3DoF mapping instead of 6DoF -->
+  <arg name="scan_topic"              default="/scan"/>
+
+  <arg name="subscribe_scan_cloud"    default="false"/>         <!-- Assuming 3D scan if set -->
+  <arg name="scan_cloud_topic"        default="/scan_cloud"/>
+
+  <arg name="visual_odometry"         default="true"/>          <!-- Generate visual odometry -->
+  <arg name="odom_topic"              default="/odom"/>         <!-- Odometry topic used if visual_odometry is false -->
+  <arg name="odom_frame_id"           default=""/>              <!-- If set, TF is used to get odometry instead of the topic -->
+
+  <arg name="namespace"               default="rtabmap"/>
+  <arg name="wait_for_transform"      default="0.2"/>
+
+  <include file="$(find rtabmap_launch)/launch/rtabmap.launch">
+    <arg name="rtabmap_viz"              value="$(arg rtabmapviz)" />
+    <arg name="rviz"                    value="$(arg rviz)" />
+    <arg name="localization"            value="$(arg localization)"/>
+    <arg name="gui_cfg"                 value="$(arg rtabmapviz_cfg)" />
+    <arg name="rviz_cfg"                value="$(arg rviz_cfg)" />
+
+    <arg name="frame_id"                value="$(arg frame_id)"/>
+    <arg name="namespace"               value="$(arg namespace)"/>
+    <arg name="database_path"           value="$(arg database_path)"/>
+    <arg name="wait_for_transform"      value="$(arg wait_for_transform)"/>
+    <arg name="rtabmap_args"            value="$(arg rtabmap_args)"/>
+    <arg name="launch_prefix"           value="$(arg launch_prefix)"/>
+    <arg name="approx_sync"             value="$(arg approx_sync)"/>
+
+    <arg name="rgb_topic"               value="$(arg rgb_topic)" />
+    <arg name="depth_topic"             value="$(arg depth_registered_topic)" />
+    <arg name="camera_info_topic"       value="$(arg camera_info_topic)" />
+    <arg name="compressed"              value="$(arg compressed)"/>
+
+    <arg name="subscribe_scan"          value="$(arg subscribe_scan)"/>
+    <arg name="scan_topic"              value="$(arg scan_topic)"/>
+
+    <arg name="subscribe_scan_cloud"    value="$(arg subscribe_scan_cloud)"/>
+    <arg name="scan_cloud_topic"        value="$(arg scan_cloud_topic)"/>
+
+    <arg name="visual_odometry"         value="$(arg visual_odometry)"/>
+    <arg name="odom_topic"              value="$(arg odom_topic)"/>
+    <arg name="odom_frame_id"           value="$(arg odom_frame_id)"/>
+    <arg name="odom_args"               value="$(arg rtabmap_args)"/>
+  </include>
+
+</launch>

@@ -1,0 +1,84 @@
+<?xml version="1.0"?>
+
+<launch>
+
+   <!-- Example with rgbd datasets:
+   $ wget http://vision.in.tum.de/rgbd/dataset/freiburg3/rgbd_dataset_freiburg3_long_office_household.bag
+   $ rosbag decompress rgbd_dataset_freiburg3_long_office_household.bag
+   $ chmod +x test_prior_rename_kinect_bag_tf.py
+   $ ./test_prior_rename_kinect_bag_tf.py
+
+   We simulate an external "global_pose" by republishing ground truth TF (VICON) with some
+   covariance, normally you should not have to use test_prior_tf_to_pose.py as the node
+   publishing the global pose would give it directly as a pose with correct covariance.
+
+   Rename all child_frame_id "/kinect" to "/kinect_gt" Tf in the bag
+   using test_prior_rename_kinect_bag_tf.py in this directory!
+
+   $ roslaunch rtabmap_examples test_prior.launch
+   $ chmod +x test_prior_tf_to_pose.py
+   $ ./test_prior_tf_to_pose.py
+   $ rosbag play -.-clock rgbd_dataset_freiburg3_long_office_household_tf_renamed.bag
+   -->
+
+   <param name="use_sim_time" type="bool" value="True"/>
+
+   <!-- Choose visualization -->
+   <arg name="rviz" default="true" />
+   <arg name="rtabmap_viz" default="false" />
+
+   <!-- TF FRAMES -->
+  <node pkg="tf" type="static_transform_publisher" name="world_to_map"
+    args="0.0 0.0 0.0 0.0 0.0 0.0 /world /map 100" />
+
+  <group ns="rtabmap">
+
+    <!-- Odometry -->
+    <node pkg="rtabmap_odom" type="rgbd_odometry" name="rgbd_odometry" output="screen">
+      <remap from="rgb/image"       to="/camera/rgb/image_color"/>
+      <remap from="depth/image"     to="/camera/depth/image"/>
+      <remap from="rgb/camera_info" to="/camera/rgb/camera_info"/>
+      <remap from="odom" to="vis_odom"/>
+
+      <param name="odom_frame_id" type="string" value="vis_odom"/>
+      <param name="frame_id" type="string" value="kinect"/>
+    </node>
+
+    <!-- Visual SLAM -->
+    <node name="rtabmap" pkg="rtabmap_slam" type="rtabmap" output="screen" args="--delete_db_on_start">
+      <param name="subscribe_depth" type="bool" value="true"/>
+      <param name="frame_id" type="string" value="kinect"/>
+
+      <param name="RGBD/CreateOccupancyGrid" type="string" value="false"/>
+      <param name="Optimizer/PriorsIgnored" type="string" value="false"/>
+      <param name="Optimizer/Strategy" type="string" value="1"/>
+
+      <remap from="rgb/image" to="/camera/rgb/image_color"/>
+      <remap from="depth/image" to="/camera/depth/image"/>
+      <remap from="rgb/camera_info" to="/camera/rgb/camera_info"/>
+      <remap from="odom" to="vis_odom"/>
+      <remap from="global_pose" to="/global_pose"/>
+      <param name="ground_truth_frame_id" type="string" value="world"/>
+      <param name="ground_truth_base_frame_id" type="string" value="kinect_gt"/>
+    </node>
+
+    <!-- Visualisation  -->
+    <node if="$(arg rtabmap_viz)" pkg="rtabmap_viz" type="rtabmap_viz" name="rtabmap_viz" args="-d $(find rtabmap_examples)/launch/config/rgbd_gui.ini" output="screen">
+      <param name="subscribe_depth" type="bool" value="true"/>
+      <param name="subscribe_laserScan" type="bool" value="false"/>
+      <param name="subscribe_odom_info" type="bool" value="true"/>
+      <param name="queue_size" type="int" value="30"/>
+
+      <param name="frame_id" type="string" value="kinect"/>
+
+      <remap from="rgb/image" to="/camera/rgb/image_color"/>
+      <remap from="depth/image" to="/camera/depth/image"/>
+      <remap from="rgb/camera_info" to="/camera/rgb/camera_info"/>
+      <remap from="odom" to="vis_odom"/>
+    </node>
+
+  </group>
+
+  <node if="$(arg rviz)" pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap_examples)/launch/config/rgbdslam_datasets.rviz"/>
+
+</launch>

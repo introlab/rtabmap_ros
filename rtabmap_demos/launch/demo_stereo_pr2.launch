@@ -1,0 +1,85 @@
+<?xml version="1.0"?>
+<launch>
+    <!-- 6DOF stereo demo: download a bag example from http://projects.csail.mit.edu/stata/downloads.php.
+    You will need to remove the transform /combined_odometry from the /tf messages:
+    $ rosbag filter 2011-01-20-07-18-45.bag out.bag 'topic != "/tf" or topic == "/tf" and m.transforms[0].header.frame_id != "/odom_combined"'
+    Run the example:
+    $ roslaunch rtabmap_demos demo_stereo.launch
+    $ rosbag play -.-clock out.bag        (replace -.- by double-dashes)
+    -->
+
+	<param name="use_sim_time" type="bool" value="True"/>
+
+	<!-- Run the ROS package stereo_image_proc for image rectification and disparity computation -->
+	<group ns="/wide_stereo">
+	   <node pkg="nodelet" type="nodelet" name="standalone_nodelet"  args="manager" output="screen"/>
+       <node pkg="nodelet" type="nodelet" name="disparity" args="load stereo_image_proc/disparity standalone_nodelet"/>
+	   <node pkg="nodelet" type="nodelet" name="disparity2depth" args="load rtabmap_util/disparity_to_depth standalone_nodelet"/>
+	</group>
+
+	<!-- Odometry: Run the viso2_ros package -->
+	<node pkg="viso2_ros" type="stereo_odometer" name="stereo_odometer" output="screen">
+		<remap from="stereo" to="/wide_stereo"/>
+		<remap from="image" to="image_rect"/>
+		<param name="base_link_frame_id" value="/base_footprint"/>
+		<param name="odom_frame_id" value="/odom"/>
+		<param name="ref_frame_change_method" value="1"/>
+	</node>
+
+  <group ns="rtabmap">
+
+    <!-- Visual SLAM (robot side) -->
+    <!-- args: "delete_db_on_start" and "udebug" -->
+    <node name="rtabmap" pkg="rtabmap_slam" type="rtabmap" output="screen" args="--delete_db_on_start">
+      <param name="subscribe_depth" type="bool" value="true"/>
+      <param name="subscribe_laserScan" type="bool" value="true"/>
+
+      <remap from="rgb/image" to="/wide_stereo/left/image_rect"/>
+      <remap from="rgb/camera_info" to="/wide_stereo/left/camera_info"/>
+
+      <remap from="depth/image" to="/wide_stereo/depth"/>
+
+      <remap from="odom" to="/stereo_odometer/odometry"/>
+      <remap from="scan" to="/base_scan"/>
+
+      <param name="frame_id" type="string" value="/base_footprint"/>
+      <param name="queue_size" type="int" value="30"/>
+
+      <param name="Rtabmap/TimeThr" type="string" value="700"/>
+      <param name="Rtabmap/DetectionRate" type="string" value="1"/>
+      <param name="SURF/HessianThreshold" type="string" value="600"/>
+      <param name="LccBow/MaxDepth" type="string" value="0"/>
+      <param name="RGBD/LocalLoopDetectionSpace" type="string" value="false"/>
+	  <param name="RGBD/LocalLoopDetectionTime" type="string" value="false"/>
+      <param name="LccBow/MinInliers" type="string" value="10"/>
+      <param name="LccBow/InlierDistance" type="string" value="0.05"/>
+      <param name="Kp/DetectorStrategy" type="string" value="0"/>   <!-- use SURF -->
+	  <param name="Kp/NNStrategy" type="string" value="1"/>         <!-- kdTree -->
+
+      <!-- Uncomment to force 3dof loop closure constraint using                   -->
+      <!-- the 2d scans (set ScanMatchingSize=1 to correct odometry with laser)    -->
+      <!--
+	  <param name="LccIcp/Type" type="string" value="2"/>
+	  <param name="LccIcp2/CorrespondenceRatio" type="string" value="0.3"/>
+	  <param name="LccIcp2/MaxFitness" type="string" value="5"/>
+	  <param name="RGBD/ScanMatchingSize" type="string" value="0"/>
+	  -->
+
+    </node>
+
+    <!-- Visualisation (client side) -->
+    <node pkg="rtabmap_viz" type="rtabmap_viz" name="rtabmap_viz" args="-d $(find rtabmap_demos)/launch/config/rgbd_gui.ini" output="screen">
+      <param name="subscribe_depth" type="bool" value="true"/>
+      <param name="subscribe_laserScan" type="bool" value="true"/>
+      <param name="queue_size" type="int" value="30"/>
+
+      <remap from="rgb/image" to="/wide_stereo/left/image_rect"/>
+      <remap from="rgb/camera_info" to="/wide_stereo/left/camera_info"/>
+      <remap from="depth/image" to="/wide_stereo/depth"/>
+
+      <remap from="scan" to="/base_scan"/>
+      <remap from="odom" to="/stereo_odometer/odometry"/>
+    </node>
+  </group>
+
+</launch>

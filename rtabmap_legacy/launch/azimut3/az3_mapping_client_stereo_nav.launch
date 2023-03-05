@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+
+<launch>
+
+  <!-- relays -->
+  <node name="mapData_relay" type="relay" pkg="topic_tools" args="/rtabmap/mapData_optimized /rtabmap/mapData_relay"/>
+  <node name="republish_rgb" type="republish" pkg="image_transport" args="theora in:=/stereo_camera/left/image_rect_color raw out:=/stereo_camera/left/image_rect_color_relay" />
+
+  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap_legacy)/launch/azimut3/config/azimut3_stereo_nav.rviz"/>
+</launch>

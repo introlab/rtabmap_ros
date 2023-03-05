@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<launch>
+
+  <arg name="localization"      default="false"/>
+  <arg name="uid"/>
+
+  <!-- Kinect: -->
+  <include file="$(find freenect_launch)/launch/freenect.launch">
+    <arg name="depth_registration" value="true" />
+    <arg name="publish_tf" value="false" />
+  </include>
+
+  <!-- IMU Sensor: -->
+  <node pkg="imu_brick" type="imu_brick_node" name="imu_brick">
+      <param name="frame_id"                       value="imu_link"/>
+      <param name="period_ms"                      value="10"/>
+      <param name="uid"              type="string" value="$(arg uid)"/>
+      <param name="cov_orientation"  type="double" value="0.0005"/>
+      <param name="cov_velocity"     type="double" value="0.00025"/>
+      <param name="cov_acceleration" type="double" value="0.1"/>
+      <param name="remove_gravitational_acceleration" type="bool" value="true"/>
+   </node>
+
+  <!-- IMU frame: just over the RGB camera -->
+  <node pkg="tf" type="static_transform_publisher" name="rgb_to_imu_tf"
+      args="-0.032 0.0 0.032 0.0 0.0 0.0 /camera_rgb_frame /imu_link 100" />
+
+  <arg name="pi/2" value="1.5707963267948966" />
+   	<arg name="optical_rotate" value="0 0 0 -$(arg pi/2) 0 -$(arg pi/2)" />
+  <node pkg="tf" type="static_transform_publisher" name="optical_rotation"
+        args="$(arg optical_rotate) /camera_rgb_frame /camera_rgb_optical_frame 100" />
+
+  <include file="$(find rtabmap_examples)/launch/sensor_fusion.launch">
+      <arg name="frame_id" value="camera_rgb_frame"/>
+      <arg name="localization" value="$(arg localization)"/>
+      <arg name="imu_remove_gravitational_acceleration" value="false"/>
+  </include>
+
+</launch>

@@ -1,0 +1,83 @@
+<?xml version="1.0"?>
+
+<launch>
+
+  <include file="$(find freenect_launch)/launch/freenect.launch" >
+    <arg name="depth_registration" value="true"/>
+    <arg name="data_skip" value="3"/>
+  </include>
+
+  <group ns="camera">
+  <node pkg="nodelet" type="nodelet" name="data_throttle" args="load rtabmap_legacy/data_throttle camera_nodelet_manager">
+    <remap from="rgb/image_in"       to="rgb/image_rect_color"/>
+    <remap from="depth/image_in"     to="depth_registered/image_raw"/>
+    <remap from="rgb/camera_info_in" to="depth_registered/camera_info"/>
+
+    <param name="decimation" type="int" value="2"/>
+  </node>
+
+  <node pkg="nodelet" type="nodelet" name="points_xyzrgb" args="load rtabmap_util/point_cloud_xyzrgb camera_nodelet_manager">
+    <remap from="rgb/image"       to="rgb/image_out"/>
+    <remap from="depth/image"     to="depth/image_out"/>
+    <remap from="rgb/camera_info" to="rgb/camera_info_out"/>
+    <remap from="cloud"           to="/voxel_cloud_xyzrgb" />
+
+    <param name="voxel_size" type="double" value="0.02"/>
+    <param name="decimation" type="int" value="2"/>
+    <param name="noise_filter_radius" type="double" value="0.05"/>
+    <param name="normal_k" type="int" value="6"/>
+  </node>
+
+  <node pkg="nodelet" type="nodelet" name="points_xyz" args="load rtabmap_util/point_cloud_xyz camera_nodelet_manager">
+    <remap from="depth/image"     to="depth/image_out"/>
+    <remap from="depth/camera_info" to="rgb/camera_info_out"/>
+    <remap from="cloud"           to="/voxel_cloud_xyz" />
+
+    <param name="voxel_size" type="double" value="0.02"/>
+    <param name="decimation" type="int" value="2"/>
+    <param name="noise_filter_radius" type="double" value="0.05"/>
+    <param name="normal_k" type="int" value="6"/>
+  </node>
+  </group>
+
+  <!-- stereo test with stereo_outdoorA.bag -->
+<!--
+   <param name="use_sim_time" value="true"/>
+
+   <node name="republish_left" type="republish" pkg="image_transport" args="compressed in:=/stereo_camera/left/image_raw_throttle raw out:=/stereo_camera/left/image_raw_throttle_relay" />
+   <node name="republish_right" type="republish" pkg="image_transport" args="compressed in:=/stereo_camera/right/image_raw_throttle raw out:=/stereo_camera/right/image_raw_throttle_relay" />
+
+   <group ns="/stereo_camera" >
+      <node pkg="stereo_image_proc" type="stereo_image_proc" name="stereo_image_proc">
+         <remap from="left/image_raw"    to="left/image_raw_throttle_relay"/>
+         <remap from="left/camera_info"  to="left/camera_info_throttle"/>
+         <remap from="right/image_raw"   to="right/image_raw_throttle_relay"/>
+         <remap from="right/camera_info" to="right/camera_info_throttle"/>
+         <param name="disparity_range" value="128"/>
+      </node>
+   </group>
+
+  <node pkg="nodelet" type="nodelet" name="standalone_nodelet"  args="manager" output="screen"/>
+  <node pkg="nodelet" type="nodelet" name="stereo_throttle" args="load rtabmap_legacy/stereo_throttle standalone_nodelet">
+    <remap from="left/image"         to="/stereo_camera/left/image_rect_color"/>
+    <remap from="right/image"        to="/stereo_camera/right/image_rect"/>
+    <remap from="left/camera_info"   to="/stereo_camera/left/camera_info_throttle"/>
+    <remap from="right/camera_info"  to="/stereo_camera/right/camera_info_throttle"/>
+
+    <param name="decimation" type="int" value="2"/>
+    <param name="approx_sync" type="bool" value="false"/>
+  </node>
+
+  <node pkg="nodelet" type="nodelet" name="points_xyzrgb" args="load rtabmap_util/point_cloud_xyzrgb standalone_nodelet">
+    <remap from="left/image"         to="/stereo_camera/left/image_rect_color_throttle"/>
+    <remap from="right/image"        to="/stereo_camera/right/image_rect_throttle"/>
+    <remap from="left/camera_info"   to="/stereo_camera/left/camera_info_throttle_throttle"/>
+    <remap from="right/camera_info"  to="/stereo_camera/right/camera_info_throttle_throttle"/>
+    <remap from="cloud"              to="/voxel_cloud" />
+
+    <param name="decimation" type="int" value="2"/>
+    <param name="approx_sync" type="bool" value="false"/>
+  </node>
+-->
+
+</launch>

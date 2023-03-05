@@ -1,0 +1,13 @@
+<class_libraries>
+  <library path="lib/librtabmap_costmap_plugins">
+    <class type="rtabmap_costmap_plugins::StaticLayer"     base_class_type="costmap_2d::Layer">
+      <description>Listens to OccupancyGrid messages and copies them in, like from map_server.</description>
+    </class>
+  </library>
+  <library path="lib/librtabmap_costmap_plugins2">
+    <class type="rtabmap_costmap_plugins::VoxelLayer"     base_class_type="costmap_2d::Layer">
+      <description>Similar to obstacle costmap, but uses 3D voxel grid to store data.</description>
+    </class>
+  </library>
+</class_libraries>
+

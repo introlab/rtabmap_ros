@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>rtabmap_demos</name>
+  <version>0.1.0</version>
+  <description>RTAB-Map's demo launch files.</description>
+  <maintainer email="matlabbe@gmail.com">Mathieu Labbe</maintainer>
+  <author>Mathieu Labbe</author>
+  <license>BSD</license>
+  <url type="bugtracker">https://github.com/introlab/rtabmap_ros/issues</url>
+  <url type="repository">https://github.com/introlab/rtabmap_ros</url>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <depend>find_object_2d</depend>
+  <depend>rtabmap_conversions</depend>
+  <depend>rtabmap_msgs</depend>
+
+  <exec_depend>rtabmap_costmap_plugins</exec_depend>
+  <exec_depend>rtabmap_legacy</exec_depend>
+  <exec_depend>rtabmap_ros</exec_depend>
+  <exec_depend>rtabmap_rviz_plugins</exec_depend>
+  <exec_depend>rtabmap_viz</exec_depend>
+  <exec_depend>rtabmap_util</exec_depend>
+  
+  <exec_depend>hector_mapping</exec_depend>
+  <exec_depend>husky_navigation</exec_depend>
+  <exec_depend>turtlebot3_gazebo</exec_depend>
+  <exec_depend>turtlebot3_bringup</exec_depend>
+  <exec_depend>turtlebot3_navigation</exec_depend>
+
+</package>

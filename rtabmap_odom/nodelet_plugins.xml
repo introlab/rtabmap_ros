@@ -1,0 +1,35 @@
+<library path="lib/librtabmap_odom_plugins"> 
+
+  <class name="rtabmap_odom/rgbd_odometry" 
+         type="rtabmap_odom::RGBDOdometry" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
+  
+  <class name="rtabmap_odom/stereo_odometry" 
+         type="rtabmap_odom::StereoOdometry" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
+  
+  <class name="rtabmap_odom/rgbdicp_odometry" 
+         type="rtabmap_odom::RGBDICPOdometry" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
+  
+  <class name="rtabmap_odom/icp_odometry" 
+         type="rtabmap_odom::ICPOdometry" 
+         base_class_type="nodelet::Nodelet">
+    <description>
+      This is my nodelet.
+    </description>
+  </class>
+
+</library>

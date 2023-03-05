@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>rtabmap_util</name>
+  <version>0.1.0</version>
+  <description>RTAB-Map's various useful nodes and nodelets.</description>
+  <maintainer email="matlabbe@gmail.com">Mathieu Labbe</maintainer>
+  <author>Mathieu Labbe</author>
+  <license>BSD</license>
+  <url type="bugtracker">https://github.com/introlab/rtabmap_ros/issues</url>
+  <url type="repository">https://github.com/introlab/rtabmap_ros</url>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <depend>cv_bridge</depend>
+  <depend>image_transport</depend>
+  <depend>roscpp</depend>
+  <depend>octomap_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>tf</depend>
+  <depend>laser_geometry</depend>
+  <depend>pcl_conversions</depend>
+  <depend>pcl_ros</depend>
+  <depend>nodelet</depend>
+  <depend>message_filters</depend>
+  <depend>pluginlib</depend>
+  <depend>rtabmap_msgs</depend>
+  <depend>rtabmap_conversions</depend>
+
+  <export>
+    <nodelet plugin="${prefix}/nodelet_plugins.xml" />
+  </export>
+</package>

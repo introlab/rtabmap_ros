@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<!--
+  Used for visualising the turtlebot while building a map or navigating with the ros navistack.
+ -->
+<launch>
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find rtabmap_demos)/launch/config/turtlebot_navigation.rviz"/>
+</launch>

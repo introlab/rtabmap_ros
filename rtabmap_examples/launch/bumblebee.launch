@@ -1,0 +1,41 @@
+<?xml version="1.0"?>
+<launch>
+
+    <node pkg="camera1394stereo" type="camera1394stereo_node" name="camera1394stereo_node" output="screen" >
+	    <param name="video_mode" value="format7_mode3" />
+	    <param name="format7_color_coding" value="raw16" />
+	    <param name="bayer_pattern" value="bggr" />
+	    <param name="bayer_method" value="" />
+	    <param name="stereo_method" value="Interlaced" />
+	    <param name="camera_info_url_left" value="" />
+	    <param name="camera_info_url_right" value="" />
+  	</node>
+
+	<arg name="gen_depth" default="false"/>
+  	<arg name="pi/2" value="1.5707963267948966" />
+    	<arg name="optical_rotate" value="0 0 0 -$(arg pi/2) 0 -$(arg pi/2)" />
+  	<node pkg="tf" type="static_transform_publisher" name="camera_base_link"
+        args="$(arg optical_rotate) base_link stereo_camera 100" />
+
+  	<!-- Run the ROS package stereo_image_proc (throttle to 10 Hz to avoid rectifying all images) -->
+	<group ns="/stereo_camera" >
+	    	<node pkg="nodelet" type="nodelet" name="stereo_throttle" args="standalone rtabmap_legacy/stereo_throttle">
+		    <remap from="left/image"        to="left/image_raw"/>
+		    <remap from="right/image"       to="right/image_raw"/>
+		    <remap from="left/camera_info"  to="left/camera_info"/>
+		    <remap from="right/camera_info" to="right/camera_info"/>
+
+		    <param name="queue_size" type="int" value="10"/>
+		    <param name="rate" type="double" value="10"/>
+		</node>
+
+		<node pkg="stereo_image_proc" type="stereo_image_proc" name="stereo_image_proc">
+			<remap from="left/image_raw"    to="left/image_raw_throttle"/>
+			<remap from="left/camera_info"  to="left/camera_info_throttle"/>
+			<remap from="right/image_raw"   to="right/image_raw_throttle"/>
+			<remap from="right/camera_info" to="right/camera_info_throttle"/>
+		</node>
+
+  		<node if="$(arg gen_depth)" pkg="nodelet" type="nodelet" name="disparity2depth" args="standalone rtabmap_util/disparity_to_depth"/>
+	</group>
+</launch>

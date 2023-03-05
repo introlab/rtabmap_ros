@@ -1,0 +1,11 @@
+#global_costmap
+global_frame: map
+robot_base_frame: base_footprint
+update_frequency: 1
+publish_frequency: 1
+always_send_full_costmap: false
+plugins:
+   - {name: static_layer, type: "rtabmap_costmap_plugins::StaticLayer"}
+   - {name: obstacle_layer, type: "costmap_2d::ObstacleLayer"}
+   - {name: inflation_layer, type: "costmap_2d::InflationLayer"}
+

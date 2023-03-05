@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<launch>
+  <node name="find_object_3d" pkg="find_object_2d" type="find_object_2d" output="screen">
+    <param name="gui" value="true" type="bool"/>
+    <param name="settings_path" value="$(find rtabmap_legacy)/launch/azimut3/config/azimut3_find_object.ini" type="str"/>
+    <param name="subscribe_depth" value="true" type="bool"/>
+    <param name="objects_path" value="$(find rtabmap_demos)/launch/data/books" type="str"/>
+
+    <remap from="rgb/image_rect_color" to="camera/data_throttled_image_relay"/>
+    <remap from="depth_registered/image_raw" to="camera/data_throttled_image_depth_relay"/>
+    <remap from="depth_registered/camera_info" to="camera/data_throttled_camera_info_relay"/>
+  </node>
+</launch>

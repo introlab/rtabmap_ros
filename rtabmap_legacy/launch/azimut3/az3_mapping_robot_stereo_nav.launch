@@ -1,0 +1,167 @@
+<?xml version="1.0"?>
+
+<launch>
+    <!-- "Disable" wheel odometry from azimut3 -->
+    <group ns="base_controller">
+      <param name="odom_frame_id" type="string" value="az3_odom"/>
+      <param name="base_frame_id" type="string" value="az3_base_link"/>
+    </group>
+    <remap from="/base_controller/odom" to="/base_controller/az3_odom"/>
+
+	<!-- AZIMUT 3 bringup: launch motors and TF -->
+	<include file="$(find az3_bringup)/az3_standalone.launch"/>
+
+	<node name="joy" pkg="joy" type="joy_node"/>
+    <group ns="teleop">
+        <remap from="joy" to="/joy"/>
+        <node name="teleop" pkg="nodelet" type="nodelet" args="standalone azimut_tools/Teleop"/>
+        <param name="cmd_eta/abtr_priority" value="50"/>
+    </group>
+
+	<!-- ROS navigation stack move_base -->
+    <group ns="planner">
+        <remap from="openni_points" to="/planner_cloud"/>
+        <remap from="base_scan" to="/base_scan"/>
+        <remap from="map" to="/rtabmap/proj_map"/>
+        <remap from="move_base_simple/goal" to="/planner_goal"/>
+
+        <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen">
+    	  <rosparam file="$(find rtabmap_legacy)/launch/azimut3/config/costmap_common_params.yaml" command="load" ns="global_costmap" />
+     	  <rosparam file="$(find rtabmap_legacy)/launch/azimut3/config/costmap_common_params.yaml" command="load" ns="local_costmap" />
+    	  <rosparam file="$(find rtabmap_legacy)/launch/azimut3/config/local_costmap_params_3d.yaml" command="load" />
+    	  <rosparam file="$(find rtabmap_legacy)/launch/azimut3/config/global_costmap_params.yaml" command="load" ns="global_costmap"/>
+    	  <rosparam file="$(find rtabmap_legacy)/launch/azimut3/config/base_local_planner_params.yaml" command="load" />
+   		</node>
+
+        <param name="cmd_vel/abtr_priority" value="10"/>
+    </group>
+
+    <node name="az3_abtr" pkg="azimut_tools" type="azimut_abtr_priority_node">
+        <remap from="abtr_cmd_eta" to="/base_controller/cmd_eta"/>
+    </node>
+
+	<!-- Arbitration between teleop and planner -->
+    <node name="register_cmd_eta" pkg="abtr_priority" type="register"
+        args="/cmd_eta /teleop/cmd_eta"/>
+    <node name="register_cmd_vel" pkg="abtr_priority" type="register"
+        args="/cmd_vel /planner/cmd_vel"/>
+
+	<!-- Stereo camera -->
+	<node pkg="camera1394stereo" type="camera1394stereo_node" name="camera1394stereo_node" output="screen" >
+	    <param name="video_mode" value="format7_mode3" />
+	    <param name="format7_color_coding" value="raw16" />
+	    <param name="bayer_pattern" value="bggr" />
+	    <param name="bayer_method" value="" />
+	    <param name="stereo_method" value="Interlaced" />
+	    <param name="camera_info_url_left" value="" />
+	    <param name="camera_info_url_right" value="" />
+	</node>
+
+  	<!-- TF transforms for the stereo camera -->
+  	<arg name="pi/2" value="1.5707963267948966" />
+	<arg name="optical_rotate" value="0 0 0 -$(arg pi/2) 0 -$(arg pi/2)" />
+	<node pkg="tf" type="static_transform_publisher" name="stereo_camera_base_link"
+	    args="$(arg optical_rotate) stereo_camera_base stereo_camera 100" />
+	<node pkg="tf" type="static_transform_publisher" name="base_to_stereo_camera_base_link"
+	    args="0.01 0.06 0.90 0 0.37 0 base_link stereo_camera_base 100" />
+
+	<!-- Run the ROS package stereo_image_proc for image rectification-->
+	<group ns="/stereo_camera" >
+	    <node pkg="nodelet" type="nodelet" name="stereo_nodelet"  args="manager"/>
+		<!-- HACK: the fps parameter on camera1394stereo_node doesn't work for my camera!?!?
+			 Throttle camera images -->
+		<node pkg="nodelet" type="nodelet" name="stereo_throttle" args="load rtabmap_legacy/stereo_throttle stereo_nodelet">
+			<remap from="left/image"       to="left/image_raw"/>
+		    <remap from="right/image"      to="right/image_raw"/>
+		    <remap from="left/camera_info" to="left/camera_info"/>
+		    <remap from="right/camera_info" to="right/camera_info"/>
+
+		    <param name="queue_size" type="int" value="10"/>
+		    <param name="rate" type="double" value="20"/>
+		</node>
+
+		<node pkg="stereo_image_proc" type="stereo_image_proc" name="stereo_image_proc">
+			<remap from="left/image_raw"    to="left/image_raw_throttle"/>
+			<remap from="left/camera_info"  to="left/camera_info_throttle"/>
+			<remap from="right/image_raw"   to="right/image_raw_throttle"/>
+			<remap from="right/camera_info" to="right/camera_info_throttle"/>
+			<param name="disparity_range" value="128"/>
+		</node>
+
+		<!-- Create point cloud for the planner -->
+		<node pkg="nodelet" type="nodelet" name="disparity2cloud" args="load rtabmap_util/point_cloud_xyz stereo_nodelet">
+			<remap from="disparity/image"       to="disparity"/>
+			<remap from="disparity/camera_info" to="right/camera_info_throttle"/>
+			<remap from="cloud"                 to="cloudXYZ"/>
+
+			<param name="voxel_size" type="double" value="0.05"/>
+			<param name="decimation" type="int" value="4"/>
+			<param name="max_depth" type="double" value="4"/>
+		</node>
+		<node pkg="nodelet" type="nodelet" name="obstacles_detection" args="load rtabmap_util/obstacles_detection stereo_nodelet">
+    			<remap from="cloud" to="cloudXYZ"/>
+			<remap from="obstacles" to="/planner_cloud"/>
+
+			<param name="frame_id" type="string" value="base_footprint"/>
+			<param name="map_frame_id" type="string" value="map"/>
+			<param name="wait_for_transform" type="bool" value="true"/>
+			<param name="min_cluster_size" type="int" value="20"/>
+			<param name="max_obstacles_height" type="double" value="0.0"/>
+  		</node>
+	</group>
+
+	<!-- Visual Odometry -->
+	<node pkg="rtabmap_odom" type="stereo_odometry" name="stereo_odometry" output="screen">
+      <remap from="left/image_rect"       to="/stereo_camera/left/image_rect"/>
+      <remap from="right/image_rect"      to="/stereo_camera/right/image_rect"/>
+      <remap from="left/camera_info"      to="/stereo_camera/left/camera_info_throttle"/>
+      <remap from="right/camera_info"     to="/stereo_camera/right/camera_info_throttle"/>
+      <remap from="odom"                  to="/odometry"/>
+
+      <param name="frame_id" type="string" value="base_footprint"/>
+      <param name="odom_frame_id" type="string" value="odom"/>
+
+      <param name="Odom/InlierDistance" type="string" value="0.1"/>
+      <param name="Odom/MinInliers" type="string" value="10"/>
+      <param name="Odom/RoiRatios" type="string" value="0.03 0.03 0.04 0.04"/>
+      <param name="Odom/MaxDepth" type="string" value="10"/>
+
+      <param name="GFTT/MaxCorners" type="string" value="500"/>
+      <param name="GFTT/MinDistance" type="string" value="5"/>
+	</node>
+
+  <group ns="rtabmap">
+      <!-- Visual SLAM: args: "delete_db_on_start" and "udebug" -->
+      <node name="rtabmap" pkg="rtabmap_slam" type="rtabmap" output="screen" args="--delete_db_on_start">
+         <param name="frame_id" type="string" value="base_footprint"/>
+         <param name="subscribe_stereo" type="bool" value="true"/>
+         <param name="subscribe_depth" type="bool" value="false"/>
+
+         <remap from="left/image_rect" to="/stereo_camera/left/image_rect_color"/>
+         <remap from="right/image_rect" to="/stereo_camera/right/image_rect"/>
+         <remap from="left/camera_info" to="/stereo_camera/left/camera_info_throttle"/>
+         <remap from="right/camera_info" to="/stereo_camera/right/camera_info_throttle"/>
+
+         <remap from="odom" to="/odometry"/>
+
+         <param name="queue_size" type="int" value="30"/>
+
+         <!-- RTAB-Map's parameters -->
+         <param name="Rtabmap/TimeThr" type="string" value="700"/>
+         <param name="Rtabmap/DetectionRate" type="string" value="1"/>
+
+         <param name="Kp/WordsPerImage" type="string" value="200"/>
+         <param name="Kp/RoiRatios" type="string" value="0.03 0.03 0.04 0.04"/>
+
+         <param name="SURF/HessianThreshold" type="string" value="1000"/>
+
+         <param name="LccBow/MaxDepth" type="string" value="5"/>
+         <param name="LccBow/MinInliers" type="string" value="10"/>
+         <param name="LccBow/InlierDistance" type="string" value="0.05"/>
+
+         <param name="LccReextract/Activated" type="string" value="true"/>
+         <param name="LccReextract/MaxWords" type="string" value="500"/>
+      </node>
+   </group>
+
+</launch>

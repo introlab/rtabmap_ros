@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<launch>
+
+<!-- Use stereo_outdoorA.bag for testing -->
+<include file="$(find rtabmap_demos)/launch/demo_stereo_outdoor.launch"/>
+
+<group ns="/stereo_camera" >
+    <node pkg="nodelet" type="nodelet" name="obstacles_manager" args="manager"/>
+    <node pkg="nodelet" type="nodelet" name="disparity2cloud" args="load rtabmap_util/point_cloud_xyz obstacles_manager">
+		<remap from="disparity/image"       to="disparity"/>
+		<remap from="disparity/camera_info" to="right/camera_info_throttle"/>
+		<remap from="cloud"                 to="cloudXYZ"/>
+
+		<param name="voxel_size" type="double" value="0.05"/>
+		<param name="decimation" type="int" value="4"/>
+		<param name="max_depth" type="double" value="4"/>
+	</node>
+
+	<node pkg="nodelet" type="nodelet" name="obstacles_detection" args="load rtabmap_util/obstacles_detection obstacles_manager">
+	    <remap from="cloud" to="cloudXYZ"/>
+
+		<param name="frame_id" type="string" value="base_footprint"/>
+		<param name="wait_for_transform" type="bool" value="true"/>
+		<param name="min_cluster_size" type="int" value="20"/>
+		<param name="max_obstacles_height" type="double" value="0.0"/>
+    </node>
+</group>
+
+</launch>

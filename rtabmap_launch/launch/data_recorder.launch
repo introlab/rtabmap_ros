@@ -1,0 +1,90 @@
+<?xml version="1.0"?>
+<launch>
+
+  <!-- arguments -->
+  <arg name="subscribe_odometry"   default="false"/>
+  <arg name="subscribe_depth"      default="true"/>
+  <arg name="subscribe_stereo"     default="false"/>
+  <arg name="subscribe_rgbd"       default="false"/>
+  <arg name="subscribe_scan"       default="false"/>
+  <arg name="subscribe_scan_cloud" default="false"/>
+  <arg     if="$(arg subscribe_stereo)" name="approx_sync"  default="false"/>
+  <arg unless="$(arg subscribe_stereo)" name="approx_sync"  default="true"/>
+
+  <arg name="frame_id"      default="camera_link"/>
+  <arg name="odom_frame_id" default=""/>        <!-- use topic when not set, otherwise use TF if set -->
+  <arg name="ground_truth_frame_id"   default=""/>     <!-- e.g., "world" -->
+  <arg name="ground_truth_base_frame_id" default=""/>  <!-- e.g., "tracker", a fake frame matching the frame "frame_id" (but on different TF tree) -->
+
+  <arg name="output_path"   default="output.db"/>
+  <arg name="record_in_RAM" default="false"/>
+  <arg name="queue_size"    default="10"/>
+  <arg name="max_rate"      default="0"/>       <!-- Record as fast as possible -->
+
+  <arg name="rgb_topic"        default="camera/rgb/image_rect_color"/>
+  <arg name="rgb_info_topic"   default="camera/rgb/camera_info"/>
+  <arg name="depth_topic"      default="camera/depth_registered/image_raw"/>
+  <arg name="left_topic"       default="camera/left/image_rect_color"/>
+  <arg name="left_info_topic"  default="camera/left/camera_info"/>
+  <arg name="right_topic"      default="camera/right/image_rect"/>
+  <arg name="right_info_topic" default="camera/right/camera_info"/>
+  <arg name="rgbd_topic"       default="camera/rgbd_image" />
+  <arg name="odom_topic"       default="odom"/>
+  <arg name="scan_topic"       default="scan"/>
+  <arg name="scan_cloud_topic" default="scan_cloud"/>
+
+  <arg name="rgb_image_transport"  default="raw"/>
+  <arg name="depth_image_transport"  default="raw"/>
+
+  <node name="data_recorder" pkg="rtabmap_slam" type="rtabmap" output="screen" args="--delete_db_on_start">
+
+    <!-- Disable any processing -->
+	<param name="Mem/RehearsalSimilarity" type="string" value="1.0"/>    <!-- deactivate rehearsal -->
+	<param name="Kp/MaxFeatures"          type="string" value="-1"/>     <!-- deactivate keypoints extraction -->
+	<param name="Rtabmap/MaxRetrieved"    type="string" value="0"/>      <!-- deactivate global retrieval -->
+	<param name="RGBD/MaxLocalRetrieved"  type="string" value="0"/>      <!-- deactivate local retrieval -->
+	<param name="Mem/MapLabelsAdded"      type="string" value="false"/>  <!-- don't create map labels -->
+	<param name="Rtabmap/MemoryThr"       type="string" value="2"/>      <!-- keep the WM empty -->
+	<param name="Mem/STMSize"             type="string" value="1"/>      <!-- STM=1 -->
+	<param name="publish_tf"              type="bool"   value="false"/>  <!-- don't publish TF -->
+	<param name="RGBD/ProximityBySpace"   type="string" value="false"/>
+	<param name="RGBD/LinearUpdate"       type="string" value="0"/>
+	<param name="RGBD/AngularUpdate"      type="string" value="0"/>
+	<param name="RGBD/CreateOccupancyGrid" type="string" value="false"/>
+	<param unless="$(arg subscribe_odometry)" name="RGBD/Enabled" type="string" value="false"/>
+
+	<param name="Rtabmap/DetectionRate"   type="string" value="$(arg max_rate)"/>
+	<param name="DbSqlite3/InMemory"  type="string" value="$(arg record_in_RAM)"/>
+	<param name="database_path"       type="string" value="$(arg output_path)"/>
+	<param name="frame_id"            type="string" value="$(arg frame_id)"/>
+	<param name="ground_truth_frame_id"       type="string" value="$(arg ground_truth_frame_id)"/>
+    <param name="ground_truth_base_frame_id"  type="string" value="$(arg ground_truth_base_frame_id)"/>
+	<param name="subscribe_scan"      type="bool"   value="$(arg subscribe_scan)"/>
+	<param name="subscribe_scan_cloud" type="bool"   value="$(arg subscribe_scan_cloud)"/>
+	<param name="subscribe_stereo"    type="bool"   value="$(arg subscribe_stereo)"/>
+	<param name="subscribe_rgbd"      type="bool"   value="$(arg subscribe_rgbd)"/>
+	<param name="queue_size"          type="int"    value="$(arg queue_size)"/>
+	<param name="approx_sync"         type="bool"   value="$(arg approx_sync)"/>
+
+	<!-- Hack to use a fake odom_frame_id=frame_id if subscribe_odometry = false -->
+	<param if="$(arg subscribe_odometry)" name="odom_frame_id" type="string" value="$(arg odom_frame_id)"/>
+	<param unless="$(arg subscribe_odometry)" name="odom_frame_id" type="string" value="$(arg frame_id)"/>
+
+	<param name="rgb/image_transport" type="string" value="$(arg rgb_image_transport)"/>
+    <param name="depth/image_transport" type="string" value="$(arg depth_image_transport)"/>
+    <param name="left/image_transport" type="string" value="$(arg rgb_image_transport)"/>
+    <param name="right/image_transport" type="string" value="$(arg rgb_image_transport)"/>
+
+	<remap from="rgb/image"         to="$(arg rgb_topic)"/>
+	<remap from="rgb/camera_info"   to="$(arg rgb_info_topic)"/>
+  	<remap from="depth/image"       to="$(arg depth_topic)"/>
+  	<remap from="left/image_rect"   to="$(arg left_topic)"/>
+  	<remap from="left/camera_info"  to="$(arg left_info_topic)"/>
+  	<remap from="right/image_rect"  to="$(arg right_topic)"/>
+  	<remap from="right/camera_info" to="$(arg right_info_topic)"/>
+  	<remap from="rgbd_image"        to="$(arg rgbd_topic)"/>
+  	<remap from="scan"              to="$(arg scan_topic)"/>
+  	<remap from="scan_cloud"        to="$(arg scan_cloud_topic)"/>
+  	<remap from="odom"              to="$(arg odom_topic)"/>
+  </node>
+</launch>

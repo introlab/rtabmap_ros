@@ -1,0 +1,121 @@
+<?xml version="1.0"?>
+
+<launch>
+  <!--
+       Bringup Turtlebot:
+       $ roslaunch turtlebot_bringup minimal.launch
+
+       Mapping:
+       $ roslaunch rtabmap_demos demo_turtlebot_tango.launch
+
+       Visualization:
+       $ roslaunch rtabmap_demos demo_turtlebot_rviz.launch
+
+       This launch file is a one to one replacement of the gmapping_demo.launch in the
+       "SLAM Map Building with TurtleBot" tutorial:
+       http://wiki.ros.org/turtlebot_navigation/Tutorials/indigo/Build%20a%20map%20with%20SLAM
+
+       For localization-only after a mapping session, add argument "localization:=true" to
+       demo_turtlebot_mapping.launch line above. Move the robot around until it can relocalize in
+       the previous map, then the 2D map should re-appear again. You can then follow the same steps
+       from 3.3.2 of the "Autonomous Navigation of a Known Map with TurtleBot" tutorial:
+       http://wiki.ros.org/turtlebot_navigation/Tutorials/Autonomously%20navigate%20in%20a%20known%20map
+  -->
+
+  <arg name="database_path"     default="rtabmap.db"/>
+  <arg name="tango_odometry"    default="true"/>
+  <arg name="localization"      default="false"/>
+  <arg name="rtabmap_viz"        default="false"/>
+  <arg     if="$(arg localization)" name="args"  default=""/>
+  <arg unless="$(arg localization)" name="args"  default="--delete_db_on_start"/>
+
+  <arg name="wait_for_transform"  default="0.2"/>
+  <!--
+      robot_state_publisher's publishing frequency in "turtlebot_bringup/launch/includes/robot.launch.xml"
+      can be increase from 5 to 10 Hz to avoid some TF warnings.
+  -->
+
+  <!-- Adjust these transforms on where Tango is fixed on the robot (should be landscape to get laser scans right). When Tango odometry is used, we need to offset /start_of_service to actual camera pose, then set /base_footprint relative to /device  1.5707963267948966 -->
+  <node if="$(arg tango_odometry)" pkg="tf" type="static_transform_publisher" name="device_base_link" args="-0.3 0 0 0 1.5707963267948966 0 device base_footprint 100" />
+  <node if="$(arg tango_odometry)" pkg="tf" type="static_transform_publisher" name="odom_start_of_service_link" args="0 0 0.3 0 0 0 odom start_of_service 100" />
+  <node unless="$(arg tango_odometry)" pkg="tf" type="static_transform_publisher" name="base_device_link" args="0 0 0.3 0 0 0 device base_link 100" />
+
+  <!-- Generate registered depth image -->
+  <node name="pointcloud_to_depthimage" pkg="rtabmap_util" type="pointcloud_to_depthimage">
+    <remap from="cloud"            to="/tango/point_cloud"/>
+    <remap from="image"            to="/tango/registered_depth"/>
+    <remap from="camera_info"      to="/tango/camera/color_1/camera_info"/>
+
+    <param name="fixed_frame_id"   type="string"   value="odom"/>
+    <param name="decimation"       type="int"      value="8"/>
+    <param name="fill_holes_size"  type="int"      value="5"/>
+  </node>
+
+  <!-- Navigation stuff (move_base) -->
+  <node name="scan_relay" type="relay" pkg="topic_tools" args="/tango/laser_scan /scan"/>
+  <include file="$(find turtlebot_navigation)/launch/includes/move_base.launch.xml"/>
+
+  <!-- relay to avoid subscribing multiple times to rgb image -->
+  <node name="republish_rgb" type="republish" pkg="image_transport" args="compressed in:=/tango/camera/color_1/image_raw raw out:=/tango/camera/color_1/image_raw/relay" />
+
+  <!-- Mapping -->
+  <group ns="rtabmap">
+
+    <node name="rtabmap" pkg="rtabmap_slam" type="rtabmap" output="screen" args="$(arg args)">
+	  <param name="database_path"       type="string" value="$(arg database_path)"/>
+	  <param name="frame_id"            type="string" value="base_footprint"/>
+	  <param name="odom_frame_id"       type="string" value="odom"/>
+	  <param name="wait_for_transform_duration"  type="double"   value="$(arg wait_for_transform)"/>
+	  <param name="subscribe_depth"     type="bool"   value="true"/>
+	  <param name="subscribe_scan"      type="bool"   value="true"/>
+	  <param name="approx_sync"         type="bool"   value="true"/>
+
+	  <!-- inputs -->
+	  <remap from="scan"            to="/scan"/>
+	  <remap from="rgb/image"       to="/tango/camera/color_1/image_raw/relay"/>
+  	  <remap from="depth/image"     to="/tango/registered_depth"/>
+  	  <remap from="rgb/camera_info" to="/tango/camera/color_1/camera_info"/>
+
+  	  <!-- output -->
+  	  <remap from="grid_map" to="/map"/>
+
+	  <!-- RTAB-Map's parameters: do "rosrun rtabmap rtabmap (double-dash)params" to see the list of available parameters. -->
+	  <param name="RGBD/ProximityBySpace"        type="string" value="true"/>   <!-- Local loop closure detection (using estimated position) with locations in WM -->
+	  <param name="RGBD/OptimizeFromGraphEnd"    type="string" value="false"/>  <!-- Set to false to generate map correction between /map and /odom -->
+	  <param name="Kp/MaxDepth"                  type="string" value="4.0"/>
+	  <param name="Reg/Strategy"                 type="string" value="0"/>      <!-- Loop closure transformation: 0=Visual, 1=ICP, 2=Visual+ICP -->
+	  <param name="Icp/CorrespondenceRatio"      type="string" value="0.3"/>
+	  <param name="Vis/MinInliers"               type="string" value="15"/>      <!-- 3D visual words minimum inliers to accept loop closure -->
+	  <param name="Vis/InlierDistance"           type="string" value="0.1"/>    <!-- 3D visual words correspondence distance -->
+	  <param name="RGBD/AngularUpdate"           type="string" value="0.1"/>    <!-- Update map only if the robot is moving -->
+	  <param name="RGBD/LinearUpdate"            type="string" value="0.1"/>    <!-- Update map only if the robot is moving -->
+	  <param name="RGBD/ProximityPathMaxNeighbors" type="string" value="0"/>
+	  <param name="Rtabmap/TimeThr"              type="string" value="700"/>
+	  <param name="Mem/RehearsalSimilarity"      type="string" value="0.30"/>
+	  <param name="Optimizer/Slam2D"             type="string" value="false"/> <!-- cannot do 2D slam as Tango is 6DoF -->
+	  <param name="Reg/Force3DoF"                type="string" value="false"/> <!-- cannot do 2D slam as Tango is 6DoF -->
+	  <param name="Mem/ImagePreDecimation"       type="string" value="2"/>
+	  <param name="Mem/ImagePostDecimation"      type="string" value="2"/>
+
+
+	  <!-- localization mode -->
+	  <param     if="$(arg localization)" name="Mem/IncrementalMemory" type="string" value="false"/>
+	  <param unless="$(arg localization)" name="Mem/IncrementalMemory" type="string" value="true"/>
+	  <param name="Mem/InitWMWithAllNodes" type="string" value="$(arg localization)"/>
+    </node>
+
+    <!-- visualization with rtabmap_viz -->
+    <node if="$(arg rtabmap_viz)" pkg="rtabmap_viz" type="rtabmap_viz" name="rtabmap_viz" args="-d $(find rtabmap_demos)/launch/config/rgbd_gui.ini" output="screen">
+      <param name="subscribe_depth"             type="bool" value="true"/>
+      <param name="subscribe_scan"              type="bool" value="true"/>
+      <param name="frame_id"                    type="string" value="base_footprint"/>
+      <param name="wait_for_transform_duration" type="double" value="$(arg wait_for_transform)"/>
+
+      <remap from="rgb/image"       to="/tango/camera/color_1/image_raw/relay"/>
+      <remap from="depth/image"     to="/tango/registered_depth"/>
+      <remap from="rgb/camera_info" to="/tango/camera/color_1/camera_info"/>
+      <remap from="scan"            to="/scan"/>
+    </node>
+
+  </group>
+</launch>

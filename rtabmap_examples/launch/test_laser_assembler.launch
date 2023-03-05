@@ -1,0 +1,51 @@
+<?xml version="1.0"?>
+<launch>
+
+  <!-- Build laser_assembler package from source to have periodic_snapshotter node -->
+  <!-- Also use assemble_scans2 service in periodic_snapshotter, publish PointCloud2 and set duration to 1 second -->
+
+  <!-- Arguments -->
+  <arg name="rtabmap_args"            default="--delete_db_on_start --Rtabmap/DetectionRate 0 --RGBD/ProximityBySpace false --RGBD/LinearUpdate 0 --RGBD/AngularUpdate 0 --RGBD/ProximityPathMaxNeighbors 0"/>
+  <arg name="rgb_topic"               default="/camera/rgb/image_rect_color" />
+  <arg name="depth_topic"             default="/camera/depth_registered/image_raw" />
+  <arg name="camera_info_topic"       default="/camera/rgb/camera_info" />
+  <arg name="rtabmap_viz"              default="true" />
+  <arg name="rviz"                    default="false" />
+
+  <!-- Kinect -->
+  <include file="$(find freenect_launch)/launch/freenect.launch" >
+    <arg name="depth_registration" value="true"/>
+    <arg name="data_skip"          value="3"/>
+  </include>
+
+  <!-- Laser scan from Depth image -->
+  <node type="depthimage_to_laserscan" pkg="depthimage_to_laserscan" name="depthimage_to_laserscan">
+    <remap from="image"       to="$(arg depth_topic)"/>
+    <remap from="camera_info" to="$(arg camera_info_topic)"/>
+  </node>
+
+  <!-- Laser assembler (convert to PointCloud2) -->
+  <node type="laser_scan_assembler" pkg="laser_assembler" name="laser_assembler">
+    <remap from="scan"        to="scan"/>
+    <param name="max_scans"   type="int"    value="400" />
+    <param name="fixed_frame" type="string" value="odom" />
+  </node>
+  <node type="periodic_snapshotter" pkg="laser_assembler" name="periodic_snapshotter"/>
+
+  <!-- RTAB-Map -->
+  <include file="$(find rtabmap_launch)/launch/rtabmap.launch">
+    <arg name="rtabmap_args"            value="$(arg rtabmap_args)"/>
+
+    <arg name="queue_size"              value="30" />
+    <arg name="rgb_topic"               value="$(arg rgb_topic)" />
+    <arg name="depth_topic"             value="$(arg depth_topic)" />
+    <arg name="camera_info_topic"       value="$(arg camera_info_topic)" />
+
+    <arg name="subscribe_scan_cloud"    value="true"/>
+    <arg name="scan_cloud_topic"        value="/assembled_cloud2"/>
+
+    <arg name="rtabmap_viz"             value="$(arg rtabmap_viz)"/>
+    <arg name="rviz"                    value="$(arg rviz)"/>
+  </include>
+
+</launch>

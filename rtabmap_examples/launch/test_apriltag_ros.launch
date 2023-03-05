@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- Print on the file tag_bundle1.png (with GIMP: set size in Image Settings to 160x240mm) -->
+  <!-- Definition of the tag bundle is tags.yaml, make sure the camera is calibrated or adjust the size of the tag if needed -->
+  <!-- The TF published by apriltag_ros should match the point cloud created by the camera -->
+  <!-- Change Optimizer/Strategy below between 1 (g2o) and 2 (GTSAM), and landmark_angular_variance between 0.005 (optimize rotation) and 9999 (optimize only tag's XYZ) -->
+
+  <!-- $ roslaunch realsense2_camera rs_camera.launch align_depth:=true -->
+  <!-- $ roslaunch rtabmap_examples test_apriltag_ros.launch rgb_topic:=/camera/color/image_raw camera_info_topic:=/camera/color/camera_info -->
+  <!-- $ roslaunch rtabmap_launch rtabmap.launch depth_topic:=/camera/aligned_depth_to_color/image_raw rgb_topic:=/camera/color/image_raw camera_info_topic:=/camera/color/camera_info rviz:=true rtabmap_viz:=false args:="-d -Optimizer/Strategy 1" landmark_angular_variance:=9999 -->
+
+  <arg name="camera_frame_id"         default="camera_color_optical_frame"/>
+  <arg name="rgb_topic"               default="/camera/rgb/image_rect_color" />
+  <arg name="camera_info_topic"       default="/camera/rgb/camera_info" />
+
+  <!-- Set parameters -->
+  <rosparam command="load" file="$(find rtabmap_examples)/launch/config/tag_settings.yaml" ns="apriltag_ros_continuous_node" />
+  <rosparam command="load" file="$(find rtabmap_examples)/launch/config/tags.yaml" ns="apriltag_ros_continuous_node" />
+
+  <node pkg="apriltag_ros" type="apriltag_ros_continuous_node" name="apriltag_ros_continuous_node" clear_params="true" output="screen">
+    <remap from="image_rect" to="$(arg rgb_topic)" />
+    <remap from="camera_info" to="$(arg camera_info_topic)" />
+
+    <param name="camera_frame" type="str" value="$(arg camera_frame_id)" />
+    <param name="publish_tag_detections_image" type="bool" value="true" />      <!-- default: false -->
+  </node>
+</launch>

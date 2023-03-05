@@ -1,0 +1,56 @@
+<?xml version="1.0"?>
+
+<launch>
+
+  <!-- Testing 2 Kinects localizing in the same map at the same time -->
+  <!-- Prerequisities: the default ~/.ros/rtabmap.db should be
+                       already created with one of the Kinect using mapping tutorial:
+                       http://wiki.ros.org/rtabmap_ros/Tutorials/HandHeldMapping
+              $ roslaunch freenect_launch freenect.launch depth_registration:=true
+              $ roslaunch rtabmap_launch rtabmap.launch args:="-d"
+  -->
+
+
+  <!-- Cameras -->
+  <include file="$(find freenect_launch)/launch/freenect.launch">
+    <arg name="depth_registration" value="True" />
+    <arg name="camera" value="camera1" />
+    <arg name="device_id" value="#1" />
+  </include>
+
+  <include file="$(find freenect_launch)/launch/freenect.launch">
+    <arg name="depth_registration" value="True" />
+    <arg name="camera" value="camera2" />
+    <arg name="device_id" value="#2" />
+  </include>
+
+  <include file="$(find rtabmap_launch)/launch/rtabmap.launch">
+     <arg name="namespace"         value="rtabmap1"/>
+     <arg name="localization"      value="true" />
+     <arg name="frame_id"          value="camera1_link" />
+     <arg name="vo_frame_id"       value="odom1" />
+
+     <arg name="rgb_topic"         value="/camera1/rgb/image_rect_color" />
+     <arg name="depth_topic"       value="/camera1/depth_registered/image_raw" />
+     <arg name="camera_info_topic" value="/camera1/rgb/camera_info" />
+
+     <arg name="rtabmap_viz" value="false"/>
+  </include>
+
+  <include file="$(find rtabmap_launch)/launch/rtabmap.launch">
+     <arg name="namespace"         value="rtabmap2"/>
+     <arg name="localization"      value="true" />
+     <arg name="frame_id"          value="camera2_link" />
+     <arg name="vo_frame_id"       value="odom2" />
+
+     <arg name="rgb_topic"         value="/camera2/rgb/image_rect_color" />
+     <arg name="depth_topic"       value="/camera2/depth_registered/image_raw" />
+     <arg name="camera_info_topic" value="/camera2/rgb/camera_info" />
+
+     <arg name="rtabmap_viz" value="false"/>
+  </include>
+
+  <!-- Visualization RVIZ -->
+  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap_launch)/launch/config/rgbd.rviz"/>
+
+</launch>

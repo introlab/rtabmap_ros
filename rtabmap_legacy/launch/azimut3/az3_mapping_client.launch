@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+
+<launch>
+
+  <!-- Remote teleop -->
+  <!-- <include file="$(find az3_bringup)/joystick.launch"/> -->
+
+  <!-- We have two nodes (grid_map_assembler and rviz) subscribing to /rtabmap/mapData, so use -->
+  <!-- a relay on this machine, same for images -->
+  <node name="mapData_relay" type="relay" pkg="topic_tools" args="/rtabmap/mapData /rtabmap/mapData_relay"/>
+  <node name="camera_info_relay" type="relay" pkg="topic_tools" args="/camera/data_throttled_camera_info /camera/data_throttled_camera_info_relay"/>
+  <node name="republish_rgb" type="republish" pkg="image_transport" args="theora in:=/camera/data_throttled_image raw out:=/camera/data_throttled_image_relay" />
+  <node name="republish_depth" type="republish" pkg="image_transport" args="compressedDepth in:=/camera/data_throttled_image_depth raw out:=/camera/data_throttled_image_depth_relay" />
+
+  <!-- Grid map assembler for rviz -->
+  <node pkg="rtabmap_legacy" type="grid_map_assembler" name="grid_map_assembler" output="screen">
+    <remap from="mapData" to="rtabmap/mapData_relay"/>
+    <remap from="grid_map" to="rtabmap/grid_map"/>
+  </node>
+
+  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap_legacy)/launch/azimut3/config/azimut3.rviz"/>
+
+  <!-- Below, construct point cloud of the latest throttled data, disabled for bandwidth efficiency -->
+  <node pkg="nodelet" type="nodelet" name="standalone_nodelet"  args="manager" output="screen"/>
+  <node pkg="nodelet" type="nodelet" name="points_xyzrgb" args="load rtabmap_util/point_cloud_xyzrgb standalone_nodelet">
+    <remap from="rgb/image"       to="/camera/data_throttled_image_relay"/>
+    <remap from="depth/image"     to="/camera/data_throttled_image_depth_relay"/>
+    <remap from="rgb/camera_info" to="/camera/data_throttled_camera_info_relay"/>
+    <remap from="cloud"           to="voxel_cloud" />
+
+    <param name="queue_size" type="int" value="10"/>
+    <param name="voxel_size" type="double" value="0.01"/>
+  </node>
+</launch>

@@ -1,0 +1,120 @@
+<?xml version="1.0"?>
+<launch>
+
+<!--
+Examples:
+   F2M (default VO):
+      $ roslaunch rtabmap_examples euroc_datasets.launch
+      $ rosbag play -.-clock V1_01_easy.bag
+
+      For MH sequences, we should set MH_seq to true because the ground truth source is different.
+      $ roslaunch rtabmap_examples euroc_datasets.launch MH_seq:=true
+      $ rosbag play -.-clock MH_01_easy.bag
+
+   MSCKF (VIO):
+      $ roslaunch rtabmap_examples euroc_datasets.launch args:="Odom/Strategy 8"
+      $ rosbag play -.-clock V1_01_easy.bag
+
+      We need to ignore the first 24 seconds for correct VIO initialization (drone should not move).
+      $ roslaunch rtabmap_examples euroc_datasets.launch args:="Odom/Strategy 8" MH_seq:=true
+      $ rosbag play -.-clock -s 24 MH_01_easy.bag
+
+   OKVIS (VIO):
+      $ roslaunch rtabmap_examples euroc_datasets.launch args:="Odom/Strategy 6 OdomOKVIS/ConfigPath ~/okvis/config/config_fpga_p2_euroc.yaml" MH_seq:=true raw_images_for_odom:=true
+      $ rosbag play -.-clock MH_01_easy.bag
+
+   VINS (VIO):
+      $ roslaunch rtabmap_examples euroc_datasets.launch args:="Odom/Strategy 9 OdomVINS/ConfigPath ~/catkin_ws/src/VINS-Fusion/config/euroc/euroc_stereo_imu_config.yaml" MH_seq:=true raw_images_for_odom:=true
+      $ rosbag play -.-clock MH_01_easy.bag
+
+   VINS (VO):
+      $ roslaunch rtabmap_examples euroc_datasets.launch args:="Odom/Strategy 9 OdomVINS/ConfigPath ~/catkin_ws/src/VINS-Fusion/config/euroc/euroc_stereo_config.yaml" MH_seq:=true raw_images_for_odom:=true
+      $ rosbag play -.-clock MH_01_easy.bag
+-->
+
+<param name="use_sim_time" value="true"/>
+
+<arg name="feature_type" default="6"/>
+<arg name="gravity_opt" default="false"/> <!-- Rtabmap will use IMU data to add gravity constraints to graph -->
+
+<arg name="args" default=""/>
+<arg     if="$(arg gravity_opt)" name="common_args" default="-d --RGBD/CreateOccupancyGrid false --Odom/FeatureType $(arg feature_type) --Kp/DetectorStrategy $(arg feature_type) --Optimizer/GravitySigma 0.3 $(arg args)"/>
+<arg unless="$(arg gravity_opt)" name="common_args" default="-d --RGBD/CreateOccupancyGrid false --Odom/FeatureType $(arg feature_type) --Kp/DetectorStrategy $(arg feature_type) $(arg args) "/>
+
+<arg name="cfg" default=""/>
+<arg name="MH_seq" default="false"/> <!-- For MH sequences, the ground truth is coming from a different topic -->
+<arg name="raw_images_for_odom" default="false"/>
+<arg name="record_ground_truth" default="false"/>
+<arg name="rtabmap_viz" default="true"/>
+<arg name="rviz" default="false"/>
+
+<!-- Image rectification and publishing synchronized camera_info-->
+<group ns="stereo_camera">
+
+  <node pkg="rtabmap_util" type="yaml_to_camera_info.py" name="yaml_to_camera_info_left">
+    <param name="yaml_path" value="$(find rtabmap_examples)/launch/config/euroc_left.yaml"/>
+    <remap from="image" to="/cam0/image_raw"/>
+    <remap from="camera_info" to="left/camera_info"/>
+  </node>
+  <node pkg="rtabmap_util" type="yaml_to_camera_info.py" name="yaml_to_camera_info_right">
+    <param name="yaml_path" value="$(find rtabmap_examples)/launch/config/euroc_right.yaml"/>
+    <param name="frame_id" value="cam1"/>
+    <remap from="image" to="/cam1/image_raw"/>
+    <remap from="camera_info" to="right/camera_info"/>
+  </node>
+
+  <node unless="$(arg raw_images_for_odom)" pkg="stereo_image_proc" type="stereo_image_proc" name="stereo_image_proc">
+    <remap from="left/image_raw"    to="/cam0/image_raw"/>
+    <remap from="right/image_raw"   to="/cam1/image_raw"/>
+  </node>
+
+</group>
+
+<!-- TF frames -->
+<node pkg="tf" type="static_transform_publisher" name="imu_base_link" args="0 0 0 3.1415926 -1.570796 0 base_link imu4 5"/>
+<node pkg="tf" type="static_transform_publisher" name="cam0_imu_link" args="-0.021640 -0.064677 0.009811 1.555925 0.025777 0.003757 imu4 cam0 50"/>
+<node pkg="tf" type="static_transform_publisher" name="cam1_imu_link" args="-0.019844 0.045369 0.007862 1.558237 0.025393 0.017907 imu4 cam1 50"/>
+
+<!-- For MH sequences, /leica/position doesn't give the orientation, so minimal ground truth error could be as high as 12 cm -->
+<node     if="$(arg MH_seq)" pkg="tf" type="static_transform_publisher" name="leica_base_link" args="0.120209 -0.0184772 -0.0748903 0 0 0 leica base_link_gt 100"/>
+<node unless="$(arg MH_seq)" pkg="tf" type="static_transform_publisher" name="vicon_base_link" args="0.12395 -0.02781 -0.06901 0 0 0 vicon/firefly_sbx/firefly_sbx base_link_gt 100"/>
+
+<node     if="$(arg MH_seq)" pkg="rtabmap_util" type="point_to_tf.py" name="point_to_tf">
+  <remap from="point" to="/leica/position"/>
+  <param name="frame_id" value="leica"/>
+  <param name="fixed_frame_id" value="world"/>
+</node>
+<node unless="$(arg MH_seq)" pkg="rtabmap_util" type="transform_to_tf.py" name="transform_to_tf">
+  <remap from="transform" to="/vicon/firefly_sbx/firefly_sbx"/>
+  <param name="frame_id" value="world"/>
+  <param name="child_frame_id" value="vicon/firefly_sbx/firefly_sbx"/>
+</node>
+<node pkg="tf" type="static_transform_publisher" name="world_to_map" args="0.0 0.0 0.0 0.0 0.0 0.0 /world /map 100" />
+
+<node pkg="imu_complementary_filter" type="complementary_filter_node" name="imu_filter" output="screen">
+   <remap from="imu/data_raw" to="/imu0"/>
+   <param name="use_mag" value="false"/>
+   <param name="world_frame" value="enu"/>
+   <param name="publish_tf" value="false"/>
+</node>
+
+<!-- RTAB-Map -->
+<include file="$(find rtabmap_launch)/launch/rtabmap.launch">
+   <arg     if="$(arg raw_images_for_odom)" name="rtabmap_args" value="$(arg common_args) --Rtabmap/ImagesAlreadyRectified false"/>
+   <arg unless="$(arg raw_images_for_odom)" name="rtabmap_args" value="$(arg common_args)"/>
+   <arg     if="$(arg raw_images_for_odom)" name="odom_args" value="--Rtabmap/ImagesAlreadyRectified false"/>
+   <arg     if="$(arg raw_images_for_odom)" name="left_image_topic" value="/cam0/image_raw"/>
+   <arg     if="$(arg raw_images_for_odom)" name="right_image_topic" value="/cam1/image_raw"/>
+   <arg name="stereo" value="true"/>
+   <arg name="frame_id" value="base_link"/>
+   <arg name="wait_for_transform" value="0.1"/>
+   <arg if="$(arg record_ground_truth)" name="ground_truth_frame_id" value="world"/>
+   <arg if="$(arg record_ground_truth)" name="ground_truth_base_frame_id" value="base_link_gt"/>
+   <arg name="cfg" value="$(arg cfg)"/>
+   <arg name="imu_topic" value="/imu/data"/>
+   <arg name="rtabmap_viz" value="$(arg rtabmap_viz)"/>
+   <arg name="rviz" value="$(arg rviz)"/>
+   <arg name="wait_imu_to_init" value="true"/>
+</include>
+
+</launch>

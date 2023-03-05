@@ -1,0 +1,70 @@
+<?xml version="1.0"?>
+
+<launch>
+
+  <!-- Remote teleop -->
+  <include file="$(find az3_bringup)/joystick.launch"/>
+
+  <!-- Visualization and SLAM nodes use same data, so just subscribe once and relay messages -->
+  <node name="mapData_relay" type="relay" pkg="topic_tools" args="/rtabmap/mapData /rtabmap/mapData_relay"/>
+  <node name="odom_relay" type="relay" pkg="topic_tools" args="/base_controller/odom /base_controller/odom_relay"/>
+  <node name="scan_relay" type="relay" pkg="topic_tools" args="/base_scan /base_scan_relay"/>
+  <node name="camera_info_relay" type="relay" pkg="topic_tools" args="/camera/data_throttled_camera_info /camera/data_throttled_camera_info_relay"/>
+  <node name="republish_rgb" type="republish" pkg="image_transport" args="theora in:=/camera/data_throttled_image raw out:=/camera/data_throttled_image_relay" />
+  <node name="republish_depth" type="republish" pkg="image_transport" args="compressedDepth in:=/camera/data_throttled_image_depth raw out:=/camera/data_throttled_image_depth_relay" />
+
+  <!-- SLAM client side -->
+  <!-- args: "delete_db_on_start" and "udebug" -->
+  <group ns="rtabmap">
+    <node name="rtabmap" pkg="rtabmap_slam" type="rtabmap" output="screen" args="--delete_db_on_start">
+	  <param name="frame_id" type="string" value="base_footprint"/>
+
+	  <param name="subscribe_depth" type="bool" value="true"/>
+	  <param name="subscribe_laserScan" type="bool" value="true"/>
+
+	  <remap from="odom" to="/base_controller/odom_relay"/>
+	  <remap from="scan" to="/base_scan_relay"/>
+
+	  <remap from="rgb/image" to="/camera/data_throttled_image_relay"/>
+  	  <remap from="depth/image" to="/camera/data_throttled_image_depth_relay"/>
+  	  <remap from="rgb/camera_info" to="/camera/data_throttled_camera_info_relay"/>
+
+	  <param name="queue_size" type="int" value="10"/>
+
+	  <!-- RTAB-Map's parameters: do "rosrun rtabmap rtabmap (double-dash)params" to see the list of available parameters. -->
+	  <param name="RGBD/ScanMatchingSize" type="string" value="1"/>             <!-- Do odometry correction with consecutive laser scans -->
+	  <param name="RGBD/LocalLoopDetectionSpace" type="string" value="true"/>   <!-- Local loop closure detection (using estimated position) with locations in WM -->
+	  <param name="RGBD/LocalLoopDetectionTime" type="string" value="false"/>    <!-- Local loop closure detection with locations in STM -->
+	  <param name="Mem/BadSignaturesIgnored" type="string" value="false"/>      <!-- Don't ignore bad images for 3D node creation (e.g. white walls) -->
+	  <param name="LccIcp/Type" type="string" value="2"/>                       <!-- Loop closure transformation refining with ICP: 0=No ICP, 1=ICP 3D, 2=ICP 2D -->
+	  <param name="LccIcp2/Iterations" type="string" value="100"/>
+	  <param name="LccIcp2/VoxelSize" type="string" value="0"/>
+	  <param name="LccBow/MinInliers" type="string" value="5"/>                 <!-- 3D visual words minimum inliers to accept loop closure -->
+	  <param name="LccBow/MaxDepth" type="string" value="4.0"/>                 <!-- 3D visual words maximum depth 0=infinity -->
+	  <param name="LccBow/InlierDistance" type="string" value="0.1"/>           <!-- 3D visual words correspondence distance -->
+	  <param name="RGBD/AngularUpdate" type="string" value="0.01"/>             <!-- Update map only if the robot is moving -->
+	  <param name="RGBD/LinearUpdate" type="string" value="0.01"/>              <!-- Update map only if the robot is moving -->
+	  <param name="Rtabmap/TimeThr" type="string" value="700"/>
+	  <param name="Mem/RehearsalSimilarity" type="string" value="0.45"/>
+	  <param name="Mem/RehearsedNodesKept" type="string" value="false"/>
+    </node>
+
+    <!-- Grid map assembler for rviz -->
+    <node pkg="rtabmap_legacy" type="grid_map_assembler" name="grid_map_assembler" output="screen"/>
+  </group>
+
+  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap_legacy)/launch/azimut3/config/azimut3.rviz"/>
+
+  <!-- Below, construct point cloud of the latest throttled data -->
+  <node pkg="nodelet" type="nodelet" name="standalone_nodelet"  args="manager" output="screen"/>
+  <node pkg="nodelet" type="nodelet" name="points_xyzrgb" args="load rtabmap_util/point_cloud_xyzrgb standalone_nodelet">
+    <remap from="rgb/image"       to="/camera/data_throttled_image_relay"/>
+    <remap from="depth/image"     to="/camera/data_throttled_image_depth_relay"/>
+    <remap from="rgb/camera_info" to="/camera/data_throttled_camera_info_relay"/>
+    <remap from="cloud"           to="voxel_cloud" />
+
+    <param name="queue_size" type="int" value="10"/>
+    <param name="voxel_size" type="double" value="0.01"/>
+  </node>
+
+</launch>

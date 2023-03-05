@@ -1,0 +1,130 @@
+<?xml version="1.0"?>
+
+<launch>
+
+  <!-- Multi-cameras demo with 2 Kinects -->
+
+  <!-- Cameras -->
+  <include file="$(find freenect_launch)/launch/freenect.launch">
+    <arg name="depth_registration" value="True" />
+    <arg name="camera" value="camera1" />
+    <arg name="device_id" value="#1" />
+  </include>
+  <include file="$(find freenect_launch)/launch/freenect.launch">
+    <arg name="depth_registration" value="True" />
+    <arg name="camera" value="camera2" />
+    <arg name="device_id" value="#2" />
+  </include>
+
+  <!-- Frames: Kinects are placed at 90 degrees, clockwise -->
+  <node pkg="tf" type="static_transform_publisher" name="base_to_camera1_tf"
+      args="0.0 0.0 0.0 0.0 0.0 0.0 /base_link /camera1_link 100" />
+  <node pkg="tf" type="static_transform_publisher" name="base_to_camera2_tf"
+      args="-0.1325 -0.1975 0.0 -1.570796327 0.0 0.0 /base_link /camera2_link 100" />
+
+   <!-- Choose visualization -->
+   <arg name="rviz"       default="false" />
+   <arg name="rtabmap_viz" default="true" />
+
+   <!-- ODOMETRY MAIN ARGUMENTS:
+        -"strategy"        : Strategy: 0=Frame-to-Map 1=Frame-to-Frame
+        -"feature"         : Feature type: 0=SURF 1=SIFT 2=ORB 3=FAST/FREAK 4=FAST/BRIEF 5=GFTT/FREAK 6=GFTT/BRIEF 7=BRISK
+        -"nn"              : Nearest neighbor strategy : 0=Linear, 1=FLANN_KDTREE, 2=FLANN_LSH, 3=BRUTEFORCE
+                             Set to 1 for float descriptor like SIFT/SURF
+                             Set to 3 for binary descriptor like ORB/FREAK/BRIEF/BRISK
+        -"max_depth"       : Maximum features depth (m)
+        -"min_inliers"     : Minimum visual correspondences to accept a transformation (m)
+        -"inlier_distance" : RANSAC maximum inliers distance (m)
+        -"local_map"       : Local map size: number of unique features to keep track
+        -"odom_info_data"  : Fill odometry info messages with inliers/outliers data.
+    -->
+   <arg name="strategy"        default="0" />
+   <arg name="feature"         default="6" />
+   <arg name="nn"              default="3" />
+   <arg name="max_depth"       default="4.0" />
+   <arg name="min_inliers"     default="20" />
+   <arg name="inlier_distance" default="0.02" />
+   <arg name="local_map"       default="1000" />
+   <arg name="odom_info_data"  default="true" />
+   <arg name="wait_for_transform"  default="true" />
+
+   <!-- sync rgb/depth images per camera -->
+   <group ns="camera1">
+    <node pkg="nodelet" type="nodelet" name="rgbd_sync" args="load rtabmap_sync/rgbd_sync camera1_nodelet_manager">
+      <remap from="rgb/image"         to="rgb/image_rect_color"/>
+      <remap from="depth/image"       to="depth_registered/image_raw"/>
+      <remap from="rgb/camera_info"   to="rgb/camera_info"/>
+    </node>
+   </group>
+   <group ns="camera2">
+    <node pkg="nodelet" type="nodelet" name="rgbd_sync" args="load rtabmap_sync/rgbd_sync camera2_nodelet_manager">
+      <remap from="rgb/image"         to="rgb/image_rect_color"/>
+      <remap from="depth/image"       to="depth_registered/image_raw"/>
+      <remap from="rgb/camera_info"   to="rgb/camera_info"/>
+    </node>
+   </group>
+
+  <group ns="rtabmap">
+
+    <!-- Odometry -->
+    <node pkg="rtabmap_odom" type="rgbd_odometry" name="rgbd_odometry" output="screen">
+      <remap from="rgbd_image0"       to="/camera1/rgbd_image"/>
+      <remap from="rgbd_image1"       to="/camera2/rgbd_image"/>
+
+	  <param name="subscribe_rgbd"           type="bool"   value="true"/>
+	  <param name="frame_id"                 type="string" value="base_link"/>
+	  <param name="rgbd_cameras"             type="int"    value="2"/>
+	  <param name="wait_for_transform"       type="bool"   value="$(arg wait_for_transform)"/>
+	  <param name="Odom/Strategy"            type="string" value="$(arg strategy)"/>
+	  <param name="OdomF2M/BundleAdjustment" type="string" value="0"/> <!-- should be 0 for multi-cameras -->
+	  <param name="Vis/EstimationType"      type="string" value="0"/> <!-- should be 0 for multi-cameras -->
+	  <param name="Vis/FeatureType"         type="string" value="$(arg feature)"/>
+	  <param name="Vis/CorGuessWinSize"     type="string" value="0"/>
+	  <param name="Vis/CorNNType"           type="string" value="$(arg nn)"/>
+	  <param name="Vis/MaxDepth"            type="string" value="$(arg max_depth)"/>
+	  <param name="Vis/MinInliers"          type="string" value="$(arg min_inliers)"/>
+	  <param name="Vis/InlierDistance"      type="string" value="$(arg inlier_distance)"/>
+      <param name="OdomF2M/MaxSize" type="string" value="$(arg local_map)"/>
+      <param name="Odom/FillInfoData"        type="string" value="$(arg odom_info_data)"/>
+    </node>
+
+    <!-- Visual SLAM (robot side) -->
+    <!-- args: "delete_db_on_start" and "udebug" -->
+    <node name="rtabmap" pkg="rtabmap_slam" type="rtabmap" output="screen" args="--delete_db_on_start">
+      <param name="subscribe_depth"  type="bool"   value="false"/>
+      <param name="subscribe_rgbd"   type="bool"   value="true"/>
+      <param name="rgbd_cameras"    type="int"    value="2"/>
+	  <param name="frame_id"         type="string" value="base_link"/>
+	  <param name="gen_scan"         type="bool"   value="true"/>
+	  <param name="wait_for_transform" type="bool"   value="$(arg wait_for_transform)"/>
+	  <param name="map_negative_poses_ignored" type="bool"   value="false"/>        <!-- refresh grid map even if we are not moving-->
+	  <param name="map_negative_scan_empty_ray_tracing" type="bool" value="false"/> <!-- don't fill empty space between the generated scans-->
+
+      <remap from="rgbd_image0"       to="/camera1/rgbd_image"/>
+      <remap from="rgbd_image1"       to="/camera2/rgbd_image"/>
+
+      <param name="Grid/FromDepth"     type="string" value="false"/>
+      <param name="Vis/EstimationType" type="string" value="0"/> <!-- should be 0 for multi-cameras -->
+      <param name="Vis/MinInliers"     type="string" value="10"/>
+      <param name="Vis/InlierDistance" type="string" value="$(arg inlier_distance)"/>
+    </node>
+
+    <!-- Visualisation RTAB-Map -->
+    <node if="$(arg rtabmap_viz)" pkg="rtabmap_viz" type="rtabmap_viz" name="rtabmap_viz" args="-d $(find rtabmap_demos)/launch/config/rgbd_gui.ini" output="screen">
+      <param name="subscribe_depth"  type="bool"   value="false"/>
+      <param name="subscribe_rgbd"   type="bool"   value="true"/>
+      <param name="subscribe_odom_info" type="bool"   value="$(arg odom_info_data)"/>
+      <param name="frame_id"            type="string" value="base_link"/>
+      <param name="rgbd_cameras"       type="int"    value="2"/>
+      <param name="wait_for_transform"  type="bool"   value="$(arg wait_for_transform)"/>
+
+      <remap from="rgbd_image0"       to="/camera1/rgbd_image"/>
+      <remap from="rgbd_image1"       to="/camera2/rgbd_image"/>
+    </node>
+
+  </group>
+
+  <!-- Visualization RVIZ -->
+  <node if="$(arg rviz)" pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap_demos)/launch/config/rgbd.rviz"/>
+
+</launch>

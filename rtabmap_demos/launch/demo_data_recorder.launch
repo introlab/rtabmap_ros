@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+
+<launch>
+
+  <!-- record data to RTAB-Map database format (like a ROS bag, but usable in RTAB-Map for Windows/Mac OS X) -->
+  <!-- This demo works with demo_mapping.bag -->
+
+  <param name="use_sim_time" type="bool" value="True"/>
+
+  <include file="$(find rtabmap_launch)/launch/data_recorder.launch">
+    <arg name="subscribe_odometry"   value="true"/>
+    <arg name="subscribe_depth"      value="true"/>
+    <arg name="subscribe_stereo"     value="false"/>
+    <arg name="subscribe_scan"       value="true"/>
+
+    <arg name="frame_id"      value="base_footprint"/>
+    <arg name="odom_frame_id" value=""/>        <!-- use topic when not set, otherwise use TF if set -->
+
+    <arg name="output_path"   value="output.db"/>
+    <arg name="record_in_RAM" value="false"/>
+    <arg name="queue_size"    value="10"/>
+    <arg name="max_rate"      value="0"/>
+
+    <arg name="odom_topic"    value="/az3/base_controller/odom"/>
+    <arg name="scan_topic"    value="/jn0/base_scan"/>
+  </include>
+
+  <!-- uncompress image data -->
+  <node name="cameraInfo_relay"  type="relay"     pkg="topic_tools"     args="/data_throttled_camera_info /camera/rgb/camera_info"/>
+  <node name="republish_rgb"     type="republish" pkg="image_transport" args="compressed      in:=/data_throttled_image       raw out:=/camera/rgb/image_rect_color" />
+  <node name="republish_depth"   type="republish" pkg="image_transport" args="compressedDepth in:=/data_throttled_image_depth raw out:=/camera/depth_registered/image_raw" />
+
+</launch>

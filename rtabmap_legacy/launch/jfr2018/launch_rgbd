@@ -1,0 +1,31 @@
+// rgbd_odometry
+$ roslaunch rtabmap_launch rtabmap.launch args:="-d --Rtabmap/PublishRAMUsage true --Rtabmap/StartNewMapOnLoopClosure true --Reg/Force3DoF false --RGBD/ProximityPathMaxNeighbors 0 --Mem/STMSize 15 --Mem/BinDataKept false --Kp/FlannRebalancingFactor 1.0 --RGBD/LinearUpdate 0 --RGBD/ProximityBySpace true --RGBD/OptimizeMaxError 0.5 --FAST/Threshold 7" odom_args:="--Odom/Strategy 0 --Vis/CorType 0 --Odom/KeyFrameThr 0.3 --OdomF2M/MaxSize 2000 --OdomORBSLAM2/VocPath /home/mathieu/workspace/ORB_SLAM2/Vocabulary/ORBvoc.txt --OdomORBSLAM2/Fps 15" rgbd_sync:=true depth_scale:=1.043 frame_id:=base_footprint ground_truth_frame_id:=world ground_truth_base_frame_id:=scan_gt use_sim_time:=true  odom_topic:=odom rgb_topic:=/camera/rgb/image_raw_throttle depth_topic:=/camera/depth/image_raw_throttle camera_info_topic:=/camera/rgb/camera_info_throttle approx_sync:=false database_path:=/media/mathieu/5B60E7B25BDFCB79/bags/rtabmap.db odom_guess_frame_id:=odom_combined
+// use wheel odom
+odom_frame_id:=odom_combined odom_tf_angular_variance:=0.0001 odom_tf_linear_variance:=0.0001 visual_odometry:=false
+// flow
+--Vis/CorType 1 --Odom/KeyFrameThr 0.6 --Vis/BundleAdjustment 0
+// robot_localization
+odom_topic:=/odometry/filtered visual_odometry:=false approx_sync:=true
+$ roslaunch sensor_fusion.launch odom_args:="--Odom/Strategy 0 --Vis/CorType 0 --Odom/KeyFrameThr 0.3 --OdomF2M/MaxSize 2000 --OdomORBSLAM2/VocPath /home/mathieu/workspace/ORB_SLAM2/Vocabulary/ORBvoc.txt --OdomORBSLAM2/Fps 15 --FAST/Threshold 7" rgbd_image_topic:=/rtabmap/rgbd_image frame_id:=base_footprint imu_topic:=/torso_lift_imu/data wheelodom_topic:=/base_odometry/odom
+
+$ ./gt_tf_broadcaster.py _file:=./stata-mit/2012-01-25-12-14-25_part1_floor2.gt.laser.poses _frame_id:=scan_gt _fixed_frame_id:=world _offset_time:=82.2 _offset_x:=-0.275
+// or
+// To make ground truth matching dataset 2012-01-25-12-14-25.bag (offset found with pcl_icp2d between end of first bag and begin of second bag)
+$ rosrun tf static_transform_publisher -0.00273873 -0.38818 0 0 0 0 world world_offset 100
+$ ./gt_tf_broadcaster.py _file:=./stata-mit/2012-01-25-12-33-29_part1_floor2.gt.laser.poses _frame_id:=scan_gt _fixed_frame_id:=world_offset _offset_time:=82.2 _offset_x:=-0.275
+// otherwise
+$ ./gt_tf_broadcaster.py _file:=./stata-mit/2012-01-25-12-33-29_part1_floor2.gt.laser.poses _frame_id:=scan_gt _fixed_frame_id:=world _offset_time:=82.2 _offset_x:=-0.275
+
+$ ./sync_path_gt.py _frame_id:=scan_gt mapPath:=/rtabmap/mapPath
+
+$ rostopic hz /rtabmap/grid_map
+
+$ rosbag play --clock --pause ./stata-mit/2012-01-25-12-14-25_rgbd.bag
+// or
+$ rosbag play --clock --pause ./stata-mit/2012-01-25-12-33-29_rgbd.bag
+
+//copy results (assuming we are in bags directory)
+$ cp rtabmap.db gt_poses.txt rmse.txt slam_poses.txt ../results/stata_mit/2012-01-25-12-14-25/rtabmap/rgbd
+//or
+$ cp rtabmap.db gt_poses.txt rmse.txt slam_poses.txt ../results/stata_mit/2012-01-25-12-33-29/rtabmap/rgbd
+

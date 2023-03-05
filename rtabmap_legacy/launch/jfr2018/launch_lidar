@@ -1,0 +1,103 @@
+// icp_odometry with guess from odom_combined frame
+$ roslaunch rtabmap_launch rtabmap.launch args:="-d --Rtabmap/PublishRAMUsage true --Reg/Force3DoF true --Reg/Strategy 1 --RGBD/ProximityPathMaxNeighbors 10 --RGBD/ProximityPathFilteringRadius 1 --RGBD/ProximityByTime false --Mem/STMSize 30 --Mem/LaserScanVoxelSize 0.05 --Icp/VoxelSize 0.0 --Mem/LaserScanNormalK 5 --Mem/LaserScanNormalRadius 1 --Icp/Epsilon 0.001 --Icp/MaxTranslation 0.5 --RGBD/OptimizeMaxError 1 --Icp/PointToPlane true --Icp/CorrespondenceRatio 0.10 --Icp/PMOutlierRatio 0.95 --Mem/BinDataKept true --Grid/RangeMax 0 --Kp/DetectorStrategy 0 --Kp/MaxFeatures 200 --SURF/HessianThreshold 100 --Vis/MaxFeatures 500 --Mem/UseOdomFeatures false" odom_args:="--Icp/VoxelSize 0.05 --Icp/PointToPlaneRadius 1 --Odom/GuessMotion true --Odom/Strategy 0"  rgbd_sync:=true subscribe_scan:=true frame_id:=base_footprint ground_truth_frame_id:=world ground_truth_base_frame_id:=scan_gt use_sim_time:=true visual_odometry:=false odom_guess_frame_id:=odom_combined odom_guess_min_translation:=0.1 odom_guess_min_rotation:=0.1 odom_topic:=odom icp_odometry:=true database_path:=/media/mathieu/5B60E7B25BDFCB79/bags/rtabmap.db
+// proximity space short range
+scan_topic:=/base_scan_t_filtered
+// proximity space longer range
+scan_topic:=/base_scan_t
+// RGB-D back-end
+rgb_topic:=/camera/rgb/image_raw depth_topic:=/camera/depth/image_raw camera_info_topic:=/camera/rgb/camera_info
+// Stereo back-end
+stereo:=true stereo_namespace:=/wide_stereo left_camera_info_topic:=/wide_stereo/left/camera_info right_camera_info_topic:=/wide_stereo/right/camera_info_scaled approx_rgbd_sync:=false approx_sync:=true
+// odometry
+odom_frame_id:="odom_combined" odom_tf_angular_variance:=0.0001 odom_tf_linear_variance:=0.0001 icp_odometry:=false
+// disable loop closure detection
+--Kp/MaxFeatures -1
+//neighbor link refine
+--RGBD/NeighborLinkRefining true --RGBD/OptimizeMaxError 1.5
+// odom frame to frame
+--Odom/Strategy 1
+
+$ rosparam load scan_filter.yaml scan_to_scan_filter_chain
+$ rosrun laser_filters scan_to_scan_filter_chain scan:=/base_scan_t scan_filtered:=/base_scan_t_filtered
+
+$ ./republish_scan.py _offset:=82.2
+
+//stereo
+$ ./republish_camera_info.py camera_info_in:=/wide_stereo/right/camera_info camera_info_out:=/wide_stereo/right/camera_info_scaled
+$ export ROS_NAMESPACE=wide_stereo
+$ rosrun stereo_image_proc stereo_image_proc left/image_raw:=left/image_raw right/image_raw:=right/image_raw left/camera_info:=left/camera_info right/camera_info:=right/camera_info_scaled
+
+$ ./gt_tf_broadcaster.py _file:=./stata-mit/2012-01-25-12-14-25_part1_floor2.gt.laser.poses _frame_id:=scan_gt _fixed_frame_id:=world _offset_time:=82.2 _offset_x:=-0.275
+// or
+// To make ground truth matching dataset 2012-01-25-12-14-25.bag (transform is found by exporting scans according to ground truth for each sequence, then use pcl_icp)
+// xyz=0.006236,-0.351500,0.000000 rpy=0.000000,0.000000,-0.017832
+// old -0.00273873 -0.38818 0 0 0 0
+$ rosrun tf static_transform_publisher 0.006236 -0.351500 0 -0.017832 0 0 world world_offset 100
+$ ./gt_tf_broadcaster.py _file:=./stata-mit/2012-01-25-12-33-29_part1_floor2.gt.laser.poses _frame_id:=scan_gt _fixed_frame_id:=world_offset _offset_time:=82.2 _offset_x:=-0.275
+// otherwise
+$ ./gt_tf_broadcaster.py _file:=./stata-mit/2012-01-25-12-33-29_part1_floor2.gt.laser.poses _frame_id:=scan_gt _fixed_frame_id:=world _offset_time:=82.2 _offset_x:=-0.275
+
+// rtabmap
+$ ./sync_path_gt.py _frame_id:=scan_gt mapPath:=/rtabmap/mapPath
+
+$ rostopic hz /rtabmap/grid_map
+
+
+$ rosbag play --clock --pause ./stata-mit/2012-01-25-12-14-25.bag
+// or
+$ rosbag play --clock --pause ./stata-mit/2012-01-25-12-33-29.bag
+
+//copy results (assuming we are in bags directory)
+$ cp rtabmap.db gt_poses.txt rmse.txt slam_poses.txt ../results/stata_mit/2012-01-25-12-14-25/rtabmap
+//or
+$ cp rtabmap.db gt_poses.txt rmse.txt slam_poses.txt ../results/stata_mit/2012-01-25-12-33-29/rtabmap
+
+
+
+
+
+/// OTHER SCAN LIDAR SLAM
+$ roscore
+$ rosparam set use_sim_time true
+$ ./republish_scan.py _offset:=82.2
+//2012-01-25-12-14-25
+$ rosbag play --clock --pause ./stata-mit/2012-01-25-12-14-25.bag
+./gt_tf_broadcaster.py _file:=./stata-mit/2012-01-25-12-14-25_part1_floor2.gt.laser.poses _frame_id:=scan_gt _fixed_frame_id:=world _offset_time:=82.2 _offset_x:=-0.275
+//2012-01-25-12-33-29
+$ rosbag play --clock --pause ./stata-mit/2012-01-25-12-33-29.bag
+$ ./gt_tf_broadcaster.py _file:=./stata-mit/2012-01-25-12-33-29_part1_floor2.gt.laser.poses _frame_id:=scan_gt _fixed_frame_id:=world _offset_time:=82.2 _offset_x:=-0.275
+// for short-lidar
+$ rosparam load scan_filter.yaml scan_to_scan_filter_chain
+$ rosrun laser_filters scan_to_scan_filter_chain scan:=/base_scan_t scan_filtered:=/base_scan_t_filtered
+// for fake lidar kinect
+$ rosrun depthimage_to_laserscan depthimage_to_laserscan  image:=/camera/depth/image_raw camera_info:=/camera/rgb/camera_info scan:=/camera_scan _output_frame_id:=openni_rgb_frame _range_max:=6
+
+// gmapping
+$ rosrun gmapping slam_gmapping scan:=base_scan_t _odom_frame:=odom_combined _particles:=100 _base_frame:=base_footprint
+$ ./sync_path_gt.py _frame_id:=scan_gt
+
+// hector_slam
+$ rosrun hector_mapping hector_mapping _pub_map_odom_transform:=true _map_frame:=map _base_frame:=base_footprint _odom_frame:=odom_combined scan:=/base_scan_t _map_size:=4096
+$ ./sync_path_gt.py _frame_id:=scan_gt mapPath:=trajectory
+$ roslaunch hector_geotiff geotiff_mapper.launch trajectory_source_frame_name:=base_footprint
+
+// etchzasl_icp_mapper (in Mapper::gotScan(), change odomFrame to scanMsgIn.header.frame_id... OR in libpointmatcher_ros/pointcloud.cpp, change in rosMsgToPointMatcherCloud() the target_frame of transformPoint() to point's frame_id)
+// Remove _offset_x:=-0.275 from gt_tf_broadcaster.py above
+$ rosrun ethzasl_icp_mapper mapper scan:=/base_scan_t _odom_frame:=/odom_combined _map_frame:=map _subscribe_scan:=true _subscribe_cloud:=false _minMapPointCount:=1000 _minReadingPointCount:=150 _icpConfig:="/home/mathieu/catkin_ws/src/ethzasl_icp_mapping/ethzasl_icp_mapper/launch/2D_scans/icp.yaml" _inputFiltersConfig:="/home/mathieu/catkin_ws/src/ethzasl_icp_mapping/ethzasl_icp_mapper/launch/2D_scans/input_filters.yaml" _mapPostFiltersConfig:="/home/mathieu/catkin_ws/src/ethzasl_icp_mapping/ethzasl_icp_mapper/launch/2D_scans/map_post_filters.yaml" _minOverlap:=0.5
+$ rosrun ethzasl_icp_mapper occupancy_grid_builder scan:=/base_scan_t
+$ ./ethzasl_icp_mapper_sync_gt.py _frame_id:=scan_gt
+
+// cartographer (markers time may be slightly off as they are not updated at the sime time than scan)
+$ ./pose_to_odom.py
+$ roslaunch cartographer.launch bag_filename:=/home/mathieu/bags/2012-01-25-12-33-29.bag
+$ ./cartographer_sync_markers_gt.py _frame_id:=scan_gt
+
+// karto (don't use graph as markers, but GetAllProcessedScans with GetCorrectedPose for each scan pose, then set time of marker to last scan)
+$ rosrun slam_karto slam_karto _base_frame:=base_footprint _odom_frame:=odom_combined scan:=/base_scan_t _map_update_interval:=1
+$ ./slam_karto_sync_markers_gt.py _frame_id:=scan_gt mapPath:=/rtabmap/mapPath
+
+// mrpt_graphslam_2d (add scan_topic and odom_topic arguments to launch, don't play with odom_ombined tf)
+$ roslaunch mrpt_graphslam_2d graphslam.launch scan_topic:=base_scan_t odom_topic:=odom_combined base_link_frame_ID:=base_footprint odometry_frame_ID:=/odom_combined start_rviz:=true
+$ ./pose_to_odom.py
+$ ./sync_path_gt.py _frame_id:=scan_gt mapPath:=/feedback/robot_trajectory
+

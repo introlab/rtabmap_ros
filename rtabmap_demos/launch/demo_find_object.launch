@@ -1,0 +1,127 @@
+<?xml version="1.0"?>
+
+<launch>
+
+  <!-- Choose visualization -->
+  <arg name="rviz" default="true" />
+  <arg name="rtabmap_viz" default="false" />
+  <arg name="save_objects" default="false"/>
+  <arg name="localization" default="false"/>
+  <arg name="save_objects_as_landmarks" default="false"/> <!-- apriltag_ros package should be installed and rtabmap_slam built with it -->
+  <arg     if="$(arg localization)" name="rtabmap_args" default=""/>
+  <arg unless="$(arg localization)" name="rtabmap_args" default="--delete_db_on_start"/>
+
+  <param name="use_sim_time" type="bool" value="True"/>
+
+  <!-- SLAM (robot side) -->
+  <!-- args: "delete_db_on_start" and "udebug" -->
+  <group ns="rtabmap">
+    <node name="rtabmap" pkg="rtabmap_slam" type="rtabmap" output="screen" args="$(arg rtabmap_args)">
+	  <param name="frame_id" type="string" value="base_footprint"/>
+
+	  <param name="subscribe_depth" type="bool" value="true"/>
+	  <param name="subscribe_scan" type="bool" value="true"/>
+
+	  <remap from="odom" to="/base_controller/odom"/>
+	  <remap from="scan" to="/base_scan"/>
+	  <remap if="$(arg save_objects)" from="user_data_async" to="/objectsData"/>
+
+	  <remap from="rgb/image"       to="/camera/data_throttled_image"/>
+  	  <remap from="depth/image"     to="/camera/data_throttled_image_depth"/>
+  	  <remap from="rgb/camera_info" to="/camera/data_throttled_camera_info"/>
+
+  	  <param name="rgb/image_transport"   type="string" value="compressed"/>
+      <param name="depth/image_transport" type="string" value="compressedDepth"/>
+
+	  <param name="queue_size" type="int" value="10"/>
+	  <param name="landmark_linear_variance" type="double" value="0.1"/>
+	  <param name="landmark_angular_variance" type="double" value="0.5"/>
+
+	  <!-- RTAB-Map's parameters: do "rosrun rtabmap rtabmap (double-dash)params" to see the list of available parameters. -->
+	  <param name="RGBD/NeighborLinkRefining" type="string" value="true"/>  <!-- Do odometry correction with consecutive laser scans -->
+	  <param name="RGBD/ProximityBySpace"     type="string" value="true"/>  <!-- Proximity detection (using estimated position) with locations in WM -->
+	  <param name="Mem/BadSignaturesIgnored"  type="string" value="false"/> <!-- Don't ignore bad images for 3D node creation (e.g. white walls) -->
+	  <param name="Reg/Strategy"              type="string" value="1"/>     <!-- Registration strategy: 0=visual, 1=ICP, 2=visual+ICP -->
+	  <param name="Icp/CorrespondenceRatio"   type="string" value="0.2"/>
+	  <param name="Icp/Iterations"            type="string" value="30"/>
+	  <param name="Icp/VoxelSize"             type="string" value="0.025"/>
+	  <param name="Vis/MinInliers"            type="string" value="10"/>    <!-- 3D visual words minimum inliers to accept loop closure -->
+	  <param name="Vis/MaxDepth"              type="string" value="4.0"/>   <!-- 3D visual words maximum depth 0=infinity -->
+	  <param name="Vis/InlierDistance"        type="string" value="0.1"/>   <!-- 3D visual words correspondence distance -->
+	  <param name="RGBD/AngularUpdate"        type="string" value="0.01"/>  <!-- Update map only if the robot is moving -->
+	  <param name="RGBD/LinearUpdate"         type="string" value="0.01"/>  <!-- Update map only if the robot is moving -->
+	  <param name="Rtabmap/TimeThr"           type="string" value="700"/>
+	  <param name="Mem/RehearsalSimilarity"   type="string" value="0.45"/>
+	  <param name="Mem/NotLinkedNodesKept"    type="string" value="false"/>
+	  <param name="Optimizer/Slam2D"          type="string" value="true"/>
+	  <param name="Reg/Force3DoF"             type="string" value="true"/>
+	  <param if="$(arg localization)" name="Mem/IncrementalMemory" type="string" value="false"/>
+    </node>
+
+    <!-- Visualisation RTAB-Map -->
+    <node if="$(arg rtabmap_viz)" pkg="rtabmap_viz" type="rtabmap_viz" name="rtabmap_viz" args="-d $(find rtabmap_demos)/launch/config/rgbd_gui.ini" output="screen">
+  	  <param name="subscribe_depth" type="bool" value="true"/>
+      <param name="subscribe_scan"  type="bool" value="true"/>
+      <param name="frame_id"        type="string" value="base_footprint"/>
+
+      <remap from="rgb/image"       to="/camera/data_throttled_image"/>
+      <remap from="depth/image"     to="/camera/data_throttled_image_depth"/>
+      <remap from="rgb/camera_info" to="/camera/data_throttled_camera_info"/>
+      <remap from="scan"            to="/base_scan"/>
+      <remap from="odom"            to="/base_controller/odom"/>
+
+      <param name="rgb/image_transport"   type="string" value="compressed"/>
+      <param name="depth/image_transport" type="string" value="compressedDepth"/>
+    </node>
+
+  </group>
+
+  <!-- send AZIMUT 3 urdf to param server -->
+  <!--
+  <param name="robot_description" command="$(find xacro)/xacro.py '$(find az3_description)/robots/azimut_3_laser.urdf.xacro'" />
+  -->
+
+  <!-- Visualisation -->
+  <node if="$(arg rviz)" pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap_demos)/launch/config/demo_find_object.rviz" output="screen"/>
+
+  <node pkg="nodelet" type="nodelet" name="points_xyzrgb" args="standalone rtabmap_util/point_cloud_xyzrgb">
+    <remap from="rgb/image"       to="/camera/data_throttled_image"/>
+    <remap from="depth/image"     to="/camera/data_throttled_image_depth"/>
+    <remap from="rgb/camera_info" to="/camera/data_throttled_camera_info"/>
+    <remap from="cloud"           to="voxel_cloud" />
+
+    <param name="rgb/image_transport"   type="string" value="compressed"/>
+    <param name="depth/image_transport" type="string" value="compressedDepth"/>
+
+    <param name="queue_size" type="int" value="10"/>
+    <param name="voxel_size" type="double" value="0.01"/>
+  </node>
+
+  <!-- Find-Object -->
+  <node name="find_object_3d" pkg="find_object_2d" type="find_object_2d" output="screen">
+    <param name="gui"             value="true" type="bool"/>
+    <param name="settings_path"   value="$(find rtabmap_demos)/launch/config/find_object.ini" type="str"/>
+    <param name="subscribe_depth" value="true" type="bool"/>
+    <param name="objects_path"    value="$(find rtabmap_demos)/launch/data/books" type="str"/>
+
+    <remap from="rgb/image_rect_color"         to="/camera/data_throttled_image"/>
+    <remap from="depth_registered/image_raw"   to="/camera/data_throttled_image_depth"/>
+    <remap from="depth_registered/camera_info" to="/camera/data_throttled_camera_info"/>
+
+    <param name="rgb/image_transport"              type="string" value="compressed"/>
+    <param name="depth_registered/image_transport" type="string" value="compressedDepth"/>
+  </node>
+
+  <!-- Save objects to database example -->
+  <node if="$(arg save_objects)" name="save_objects_example" pkg="rtabmap_demos" type="save_objects_example" output="screen">
+    <remap from="mapData" to="/rtabmap/mapData"/>
+    <param name="frame_id" value="base_footprint"/>
+  </node>
+
+  <!-- Convert objects to tags -->
+  <node if="$(arg save_objects_as_landmarks)" name="objects_to_tags" pkg="rtabmap_util" type="objects_to_tags.py" output="screen">
+    <remap from="tag_detections" to="/rtabmap/tag_detections"/>
+    <param name="distance_max" value="2.0"/>
+  </node>
+
+</launch>

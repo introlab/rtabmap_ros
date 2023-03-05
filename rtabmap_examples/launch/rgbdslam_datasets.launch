@@ -1,0 +1,93 @@
+<?xml version="1.0"?>
+
+<launch>
+
+   <!-- Example to run rgbd datasets:
+   $ wget http://vision.in.tum.de/rgbd/dataset/freiburg3/rgbd_dataset_freiburg3_long_office_household.bag
+   $ rosbag decompress rgbd_dataset_freiburg3_long_office_household.bag
+   $ wget https://gist.githubusercontent.com/matlabbe/897b775c38836ed8069a1397485ab024/raw/6287ce3def8231945326efead0c8a7730bf6a3d5/tum_rename_world_kinect_frame.py
+   $ python tum_rename_world_kinect_frame.py rgbd_dataset_freiburg3_long_office_household.bag
+
+   $ roslaunch rtabmap_examples rgbdslam_datasets.launch
+   $ rosbag play -.-clock rgbd_dataset_freiburg3_long_office_household.bag
+   -->
+
+   <param name="use_sim_time" type="bool" value="True"/>
+
+   <!-- Choose visualization -->
+   <arg name="rviz" default="true" />
+   <arg name="rtabmap_viz" default="false" />
+
+  <!-- TF FRAMES -->
+  <node pkg="tf" type="static_transform_publisher" name="world_to_map"
+    args="0.0 0.0 0.0 0.0 0.0 0.0 /world /map 100" />
+
+
+  <group ns="rtabmap">
+
+    <!-- Odometry -->
+    <node pkg="rtabmap_odom" type="rgbd_odometry" name="rgbd_odometry" output="screen">
+      <remap from="rgb/image"       to="/camera/rgb/image_color"/>
+      <remap from="depth/image"     to="/camera/depth/image"/>
+      <remap from="rgb/camera_info" to="/camera/rgb/camera_info"/>
+
+      <param name="Odom/Strategy" type="string" value="0"/>      <!-- 0=Frame-to-Map, 1=Frame-to-KeyFrame -->
+      <param name="Odom/ResetCountdown" type="string" value="15"/>
+      <param name="Odom/GuessSmoothingDelay" type="string" value="0"/>
+
+      <param name="frame_id" type="string" value="kinect"/>
+      <param name="queue_size" type="int" value="10"/>
+      <param name="wait_for_transform" type="bool" value="true"/>
+      <param name="ground_truth_frame_id" type="string" value="world"/>
+      <param name="ground_truth_base_frame_id" type="string" value="kinect_gt"/>
+    </node>
+
+    <!-- Visual SLAM -->
+    <!-- args: "delete_db_on_start" and "udebug" -->
+    <node name="rtabmap" pkg="rtabmap_slam" type="rtabmap" output="screen" args="--delete_db_on_start">
+      <param name="subscribe_depth" type="bool" value="true"/>
+
+      <param name="Rtabmap/StartNewMapOnLoopClosure" type="string" value="true"/>
+      <param name="RGBD/CreateOccupancyGrid" type="string" value="false"/>
+      <param name="Rtabmap/CreateIntermediateNodes" type="string" value="true"/>
+      <param name="RGBD/LinearUpdate" type="string" value="0"/>
+      <param name="RGBD/AngularUpdate" type="string" value="0"/>
+
+      <param name="frame_id" type="string" value="kinect"/>
+      <param name="ground_truth_frame_id" type="string" value="world"/>
+      <param name="ground_truth_base_frame_id" type="string" value="kinect_gt"/>
+
+      <remap from="rgb/image" to="/camera/rgb/image_color"/>
+      <remap from="depth/image" to="/camera/depth/image"/>
+      <remap from="rgb/camera_info" to="/camera/rgb/camera_info"/>
+
+      <param name="queue_size" type="int" value="10"/>
+    </node>
+
+    <!-- Visualisation  -->
+    <node if="$(arg rtabmap_viz)" pkg="rtabmap_viz" type="rtabmap_viz" name="rtabmap_viz" args="-d $(find rtabmap_examples)/launch/config/rgbd_gui.ini" output="screen">
+      <param name="subscribe_depth" type="bool" value="true"/>
+      <param name="subscribe_odom_info" type="bool" value="true"/>
+      <param name="queue_size" type="int" value="30"/>
+
+      <param name="frame_id" type="string" value="kinect"/>
+
+      <remap from="rgb/image" to="/camera/rgb/image_color"/>
+      <remap from="depth/image" to="/camera/depth/image"/>
+      <remap from="rgb/camera_info" to="/camera/rgb/camera_info"/>
+    </node>
+
+  </group>
+
+  <node if="$(arg rviz)" pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap_examples)/launch/config/rgbdslam_datasets.rviz"/>
+  <node if="$(arg rviz)" pkg="nodelet" type="nodelet" name="points_xyzrgb" args="standalone rtabmap_util/point_cloud_xyzrgb">
+    <remap from="rgb/image"       to="/camera/rgb/image_color"/>
+    <remap from="depth/image"     to="/camera/depth/image"/>
+    <remap from="rgb/camera_info" to="/camera/rgb/camera_info"/>
+    <remap from="cloud"           to="voxel_cloud" />
+
+    <param name="queue_size" type="int" value="10"/>
+    <param name="decimation" type="double" value="4"/>
+  </node>
+
+</launch>
