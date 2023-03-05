@@ -11,11 +11,11 @@
   <include file="$(find az3_bringup)/az3_standalone.launch"/>
 
   <!-- OpenNI -->
-  <include file="$(find rtabmap_ros)/launch/azimut3/az3_openni.launch"/>
+  <include file="$(find rtabmap_legacy)/launch/azimut3/az3_openni.launch"/>
 
   <!-- SLAM (robot side) -->
   <group ns="rtabmap">
-    <node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="screen" args="$(arg rtabmap_args)">
+    <node name="rtabmap" pkg="rtabmap_slam" type="rtabmap" output="screen" args="$(arg rtabmap_args)">
       <param name="frame_id"            type="string" value="base_footprint"/>
       <param name="subscribe_scan"      type="bool" value="true"/>
       <param name="use_action_for_goal" type="bool" value="true"/>
@@ -92,11 +92,11 @@
      <remap from="move_base_simple/goal" to="/planner_goal"/>
      <node pkg="move_base" type="move_base" respawn="true" name="move_base" output="screen">
         <param name="base_global_planner" value="navfn/NavfnROS"/>
-    	<rosparam file="$(find rtabmap_ros)/launch/azimut3/config/costmap_common_params_2d.yaml" command="load" ns="global_costmap"/>
-     	<rosparam file="$(find rtabmap_ros)/launch/azimut3/config/costmap_common_params_2d.yaml" command="load" ns="local_costmap" />
-    	<rosparam file="$(find rtabmap_ros)/launch/azimut3/config/local_costmap_params.yaml" command="load" ns="local_costmap" />
-    	<rosparam file="$(find rtabmap_ros)/launch/azimut3/config/global_costmap_params.yaml" command="load" ns="global_costmap"/>
-    	<rosparam file="$(find rtabmap_ros)/launch/azimut3/config/base_local_planner_params.yaml" command="load" />
+    	<rosparam file="$(find rtabmap_legacy)/launch/azimut3/config/costmap_common_params_2d.yaml" command="load" ns="global_costmap"/>
+     	<rosparam file="$(find rtabmap_legacy)/launch/azimut3/config/costmap_common_params_2d.yaml" command="load" ns="local_costmap" />
+    	<rosparam file="$(find rtabmap_legacy)/launch/azimut3/config/local_costmap_params.yaml" command="load" ns="local_costmap" />
+    	<rosparam file="$(find rtabmap_legacy)/launch/azimut3/config/global_costmap_params.yaml" command="load" ns="global_costmap"/>
+    	<rosparam file="$(find rtabmap_legacy)/launch/azimut3/config/base_local_planner_params.yaml" command="load" />
      </node>
 
      <param name="cmd_vel/abtr_priority" value="10"/>
@@ -114,7 +114,7 @@
 
   <!-- Throttling messages -->
   <group ns="camera">
-    <node pkg="nodelet" type="nodelet" name="data_throttle" args="load rtabmap_ros/data_throttle camera_nodelet_manager">
+    <node pkg="nodelet" type="nodelet" name="data_throttle" args="load rtabmap_legacy/data_throttle camera_nodelet_manager">
       <param name="rate" type="double" value="5"/>
       <param name="decimation" type="int" value="2"/>
 
@@ -128,7 +128,7 @@
     </node>
 
     <!-- for the planner -->
-    <node pkg="nodelet" type="nodelet" name="points_xyz_planner" args="load rtabmap_ros/point_cloud_xyz camera_nodelet_manager">
+    <node pkg="nodelet" type="nodelet" name="points_xyz_planner" args="load rtabmap_util/point_cloud_xyz camera_nodelet_manager">
       <remap from="depth/image"            to="data_resized_image_depth"/>
       <remap from="depth/camera_info"      to="data_resized_camera_info"/>
       <remap from="cloud"                  to="cloudXYZ" />
@@ -137,7 +137,7 @@
       <param name="voxel_size" type="double" value="0.02"/>
     </node>
 
-    <node pkg="nodelet" type="nodelet" name="obstacles_detection" args="load rtabmap_ros/obstacles_detection camera_nodelet_manager">
+    <node pkg="nodelet" type="nodelet" name="obstacles_detection" args="load rtabmap_util/obstacles_detection camera_nodelet_manager">
       <remap from="cloud" to="cloudXYZ"/>
       <remap from="obstacles" to="/obstacles_cloud"/>
       <remap from="ground"    to="/ground_cloud"/>

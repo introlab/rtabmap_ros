@@ -16,8 +16,8 @@
   <arg name="localization"            default="false"/>
 
   <!-- Corresponding config files -->
-  <arg name="rtabmapviz_cfg"          default="$(find rtabmap_ros)/launch/config/rgbd_gui.ini" />
-  <arg name="rviz_cfg"                default="$(find rtabmap_ros)/launch/config/rgbd.rviz" />
+  <arg name="rtabmapviz_cfg"          default="~/.ros/rtabmap_gui.ini" />
+  <arg name="rviz_cfg"                default="$(find rtabmap_launch)/launch/config/rgbd.rviz" />
 
   <arg name="frame_id"                default="base_link"/>     <!-- Fixed frame id, you may set "base_link" or "base_footprint" if they are published -->
   <arg name="database_path"           default="~/.ros/rtabmap.db"/>
@@ -45,9 +45,9 @@
   <arg name="namespace"               default="rtabmap"/>
   <arg name="wait_for_transform"      default="0.2"/>
 
-  <include file="$(find rtabmap_ros)/launch/rtabmap.launch">
+  <include file="$(find rtabmap_launch)/launch/rtabmap.launch">
     <arg name="stereo"                  value="true"/>
-    <arg name="rtabmapviz"              value="$(arg rtabmapviz)" />
+    <arg name="rtabmap_viz"             value="$(arg rtabmapviz)" />
     <arg name="rviz"                    value="$(arg rviz)" />
     <arg name="localization"            value="$(arg localization)"/>
     <arg name="gui_cfg"                 value="$(arg rtabmapviz_cfg)" />

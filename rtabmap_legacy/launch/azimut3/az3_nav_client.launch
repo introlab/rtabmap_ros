@@ -18,7 +18,7 @@
   <node if="$(arg sub_data)" name="republish_rgb" type="republish" pkg="image_transport" args="theora in:=/camera/data_resized_image raw out:=/camera/data_resized_image_relay" />
   <node if="$(arg sub_data)" name="republish_depth" type="republish" pkg="image_transport" args="compressedDepth in:=/camera/data_resized_image_depth raw out:=/camera/data_resized_image_depth_relay" />
 
-  <node if="$(arg sub_data)" pkg="nodelet" type="nodelet" name="points_xyzrgb" args="standalone rtabmap_ros/point_cloud_xyzrgb">
+  <node if="$(arg sub_data)" pkg="nodelet" type="nodelet" name="points_xyzrgb" args="standalone rtabmap_util/point_cloud_xyzrgb">
     <remap from="rgb/image"       to="/camera/data_resized_image_relay"/>
     <remap from="depth/image"     to="/camera/data_resized_image_depth_relay"/>
     <remap from="rgb/camera_info" to="/camera/data_resized_camera_info"/>
@@ -27,7 +27,7 @@
 
   <group ns="rtabmap">
   <!-- Visualisation RTAB-Map -->
-  <node if="$(arg rtabmapviz)" pkg="rtabmap_ros" type="rtabmapviz" name="rtabmapviz" args="-d $(find rtabmap_ros)/launch/config/rgbd_gui.ini" output="screen">
+  <node if="$(arg rtabmapviz)" pkg="rtabmap_viz" type="rtabmap_viz" name="rtabmap_viz" args="~/.ros/rtabmap_gui.ini" output="screen">
       <param name="queue_size" type="int" value="10"/>
       <param name="frame_id" type="string" value="base_footprint"/>
       <remap from="odom" to="/base_controller/odom"/>
@@ -44,5 +44,5 @@
   </group>
 
   <!-- Visualisation RVIZ -->
-  <node if="$(arg rviz)" pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap_ros)/launch/azimut3/config/azimut3_nav.rviz"/>
+  <node if="$(arg rviz)" pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap_legacy)/launch/azimut3/config/azimut3_nav.rviz"/>
 </launch>

@@ -16,7 +16,7 @@
   <!-- SLAM client side -->
   <!-- args: "delete_db_on_start" and "udebug" -->
   <group ns="rtabmap">
-    <node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="screen" args="--delete_db_on_start">
+    <node name="rtabmap" pkg="rtabmap_slam" type="rtabmap" output="screen" args="--delete_db_on_start">
 	  <param name="frame_id" type="string" value="base_footprint"/>
 
 	  <param name="subscribe_depth" type="bool" value="true"/>
@@ -50,14 +50,14 @@
     </node>
 
     <!-- Grid map assembler for rviz -->
-    <node pkg="rtabmap_ros" type="grid_map_assembler" name="grid_map_assembler" output="screen"/>
+    <node pkg="rtabmap_legacy" type="grid_map_assembler" name="grid_map_assembler" output="screen"/>
   </group>
 
-  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap_ros)/launch/azimut3/config/azimut3.rviz"/>
+  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find rtabmap_legacy)/launch/azimut3/config/azimut3.rviz"/>
 
   <!-- Below, construct point cloud of the latest throttled data -->
   <node pkg="nodelet" type="nodelet" name="standalone_nodelet"  args="manager" output="screen"/>
-  <node pkg="nodelet" type="nodelet" name="points_xyzrgb" args="load rtabmap_ros/point_cloud_xyzrgb standalone_nodelet">
+  <node pkg="nodelet" type="nodelet" name="points_xyzrgb" args="load rtabmap_util/point_cloud_xyzrgb standalone_nodelet">
     <remap from="rgb/image"       to="/camera/data_throttled_image_relay"/>
     <remap from="depth/image"     to="/camera/data_throttled_image_depth_relay"/>
     <remap from="rgb/camera_info" to="/camera/data_throttled_camera_info_relay"/>
