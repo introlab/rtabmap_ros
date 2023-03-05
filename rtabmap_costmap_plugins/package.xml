@@ -12,6 +12,7 @@
   <buildtool_depend>catkin</buildtool_depend>
   <buildtool_depend>genmsg</buildtool_depend>
 
+  <build_depend>dynamic_reconfigure</build_depend>
   <build_depend>libpcl-all-dev</build_depend>
   <build_depend>message_generation</build_depend>
   <depend>costmap_2d</depend>

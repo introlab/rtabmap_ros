@@ -11,11 +11,24 @@
 
   <buildtool_depend>catkin</buildtool_depend>
 
-  <depend>dynamic_reconfigure</depend>
-  <depend>image_transport</depend>
-  <depend>nodelet</depend>
-  <depend>rtabmap_conversions</depend>
-  <depend>rtabmap_msgs</depend>
+  <build_export_depend>rtabmap_conversions</build_export_depend>
+  <build_export_depend>rtabmap_msgs</build_export_depend>
+
+  <build_depend>dynamic_reconfigure</build_depend>
+  <build_depend>image_transport</build_depend>
+  <build_depend>rtabmap_conversions</build_depend>
+  <build_depend>rtabmap_msgs</build_depend>
+
+  <exec_depend>dynamic_reconfigure</exec_depend>
+  <exec_depend>image_transport</exec_depend>
+  <exec_depend>nodelet</exec_depend>
+  <exec_depend>rtabmap_conversions</exec_depend>
+  <exec_depend>rtabmap_demos</exec_depend>
+  <exec_depend>rtabmap_launch</exec_depend>
+  <exec_depend>rtabmap_msgs</exec_depend>
+  <exec_depend>rtabmap_odom</exec_depend>
+  <exec_depend>rtabmap_slam</exec_depend>
+  <exec_depend>rtabmap_viz</exec_depend>
   
   <export>
     <nodelet plugin="${prefix}/nodelet_plugins.xml" />

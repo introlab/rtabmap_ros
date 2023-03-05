@@ -13,7 +13,10 @@
 
   <exec_depend>rtabmap_costmap_plugins</exec_depend>
   <exec_depend>rtabmap_msgs</exec_depend>
+  <exec_depend>rtabmap_odom</exec_depend>
   <exec_depend>rtabmap_rviz_plugins</exec_depend>
+  <exec_depend>rtabmap_slam</exec_depend>
+  <exec_depend>rtabmap_util</exec_depend>
   <exec_depend>rtabmap_viz</exec_depend>
 
 </package>

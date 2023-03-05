@@ -5,7 +5,7 @@ project(rtabmap_costmap_plugins)
 ## Dependencies ##
 ##################
 
-find_package(catkin REQUIRED COMPONENTS roscpp pcl_conversions costmap_2d)
+find_package(catkin REQUIRED COMPONENTS dynamic_reconfigure roscpp pcl_conversions costmap_2d)
 
 catkin_package(
   INCLUDE_DIRS include
