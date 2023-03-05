@@ -16,7 +16,6 @@
 
   <exec_depend>rtabmap_costmap_plugins</exec_depend>
   <exec_depend>rtabmap_msgs</exec_depend>
-  <exec_depend>rtabmap_ros</exec_depend>
   <exec_depend>rtabmap_rviz_plugins</exec_depend>
   <exec_depend>rtabmap_viz</exec_depend>
   <exec_depend>rtabmap_demos</exec_depend>

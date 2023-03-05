@@ -20,7 +20,6 @@
   <exec_depend>rtabmap_launch</exec_depend>
   <exec_depend>rtabmap_legacy</exec_depend>
   <exec_depend>rtabmap_msgs</exec_depend>
-  <exec_depend>rtabmap_odometry</exec_depend>
   <exec_depend>rtabmap_legacy</exec_depend>
   <exec_depend>rtabmap_python</exec_depend>
   <exec_depend>rtabmap_rviz_plugins</exec_depend>
