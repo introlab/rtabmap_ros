@@ -9,6 +9,7 @@ COPY . ros2_ws/src/rtabmap_ros
 RUN source /ros_entrypoint.sh && \
     cd ros2_ws && \
     export MAKEFLAGS="-j1" && \
+    apt update && apt install -y ros-humble-pcl-ros && \
     colcon build --event-handlers console_direct+ --install-base /opt/ros/humble --merge-install --cmake-args -DRTABMAP_SYNC_MULTI_RGBD=ON -DCMAKE_BUILD_TYPE=Release && \
     cd && \
     rm -rf ros2_ws

@@ -1,0 +1,8 @@
+
+if(@RTABMAP_SYNC_MULTI_RGBD_CONF@)
+  add_definitions("-DRTABMAP_SYNC_MULTI_RGBD")
+endif()
+
+if(@RTABMAP_SYNC_USER_DATA_CONF@)
+  add_definitions("-DRTABMAP_SYNC_USER_DATA")
+endif()
