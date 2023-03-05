@@ -1,5 +1,9 @@
 FROM introlab3it/rtabmap:focal-foxy
 
+RUN apt-get update && apt-get install -y \
+    ros-foxy-pcl-ros \
+    && rm -rf /var/lib/apt/lists/
+
 RUN source /ros_entrypoint.sh && \
     mkdir -p ros2_ws/src && \
     cd ros2_ws/src
