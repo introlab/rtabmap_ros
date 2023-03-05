@@ -1,7 +1,7 @@
 FROM introlab3it/rtabmap:22.04
 
 RUN apt-get update && apt-get install -y \
-    ros-foxy-pcl-ros \
+    ros-humble-pcl-ros \
     && rm -rf /var/lib/apt/lists/
 
 RUN source /ros_entrypoint.sh && \
