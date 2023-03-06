@@ -29,9 +29,7 @@ include_directories(
 
 ## We also use Ogre for rviz plugins
 # this file doesn't exist post-noetic, but pkg_check_modules still works
-IF(EXISTS $ENV{ROS_ROOT}/core/rosbuild/FindPkgConfig.cmake)
-  include($ENV{ROS_ROOT}/core/rosbuild/FindPkgConfig.cmake)
-ENDIF()
+find_package(PkgConfig REQUIRED)
 pkg_check_modules(OGRE OGRE)
 include_directories( ${OGRE_INCLUDE_DIRS} )
 link_directories( ${OGRE_LIBRARY_DIRS} )
