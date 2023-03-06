@@ -1,8 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 project(rtabmap_viz)
 
-find_package(Qt5 COMPONENTS Widgets REQUIRED)
-
 find_package(catkin REQUIRED COMPONENTS
              cv_bridge geometry_msgs std_msgs std_srvs nav_msgs rtabmap_msgs rtabmap_sync tf
 )
@@ -28,8 +26,6 @@ ENDIF(NOT Qt5_FOUND)
 ###########
 ## Build ##
 ###########
-
-include_directories(${Qt5Widgets_INCLUDE_DIRS})
 
 # include_directories(include)
 include_directories(
