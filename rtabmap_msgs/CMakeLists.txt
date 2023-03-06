@@ -6,7 +6,7 @@ project(rtabmap_msgs)
 ##################
 
 find_package(catkin REQUIRED COMPONENTS
-             std_msgs std_srvs geometry_msgs sensor_msgs genmsg
+             message_generation std_msgs std_srvs geometry_msgs sensor_msgs genmsg
 )
 
 #######################################
