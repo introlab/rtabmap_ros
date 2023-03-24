@@ -209,7 +209,7 @@ private:
 	{
 		//make sure we are using Reg/Strategy=0
 		ParametersMap::iterator iter = parameters.find(Parameters::kRegStrategy());
-		if(iter != parameters.end() && iter->second.compare("0") != 0)
+		if(iter != parameters.end() && iter->second.compare("2") != 0)
 		{
 			ROS_WARN("RGBDICP odometry works only with \"Reg/Strategy\"=2. Ignoring value %s.", iter->second.c_str());
 		}
