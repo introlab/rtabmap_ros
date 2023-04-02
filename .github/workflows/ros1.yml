@@ -31,18 +31,13 @@ jobs:
     - uses: ros-tooling/setup-ros@v0.2
       with:
         required-ros-distributions: ${{ matrix.ros_distro }}
-    
+
     - name: Install dependencies
       run: |
         sudo apt-get update
         sudo apt-get -y install ros-${{ matrix.ros_distro }}-rtabmap-ros
         sudo apt-get -y remove ros-${{ matrix.ros_distro }}-rtabmap
-        
-    - uses: actions/checkout@v2
-      with:
-        repository: 'introlab/rtabmap'
-        path: 'rtabmap'
-        
+
     - name: Setup catkin workspace
       run: | 
         source /opt/ros/${{ matrix.ros_distro }}/setup.bash
@@ -50,23 +45,20 @@ jobs:
         cd ${{github.workspace}}/catkin_ws/src
         catkin_init_workspace
         cd ..
-        catkin_make
-        
+        catkin build
+
+    - uses: actions/checkout@v2
+      with:
+        repository: 'introlab/rtabmap'
+        path: 'catkin_ws/src/rtabmap'
+
     - uses: actions/checkout@v2
       with:
         path: 'catkin_ws/src/rtabmap_ros'
-        
-    - name: Build latest rtabmap library
-      run: |
-        source /opt/ros/${{ matrix.ros_distro }}/setup.bash
-        cd ${{github.workspace}}/rtabmap
-        cmake -B build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_INSTALL_PREFIX=${{github.workspace}}/catkin_ws/devel
-        cmake --build build --config ${{env.BUILD_TYPE}} --target install
 
-    - name: caktkin_make
+    - name: caktkin build
       run: |
         source /opt/ros/${{ matrix.ros_distro }}/setup.bash
-        source ${{github.workspace}}/catkin_ws/devel/setup.bash
         cd ${{github.workspace}}/catkin_ws
-        catkin_make -DSETUPTOOLS_DEB_LAYOUT=OFF
-        catkin_make install     
+        catkin build -DSETUPTOOLS_DEB_LAYOUT=OFF
+        catkin build install     
