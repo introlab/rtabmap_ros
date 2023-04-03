@@ -62,5 +62,5 @@ jobs:
       run: |
         source /opt/ros/${{ matrix.ros_distro }}/setup.bash
         cd ${{github.workspace}}/catkin_ws
-        catkin build -DSETUPTOOLS_DEB_LAYOUT=OFF
+        catkin build --verbose --cmake-args -DSETUPTOOLS_DEB_LAYOUT=OFF
         catkin build install     
