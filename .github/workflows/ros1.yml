@@ -46,7 +46,7 @@ jobs:
         mkdir -p ${{github.workspace}}/catkin_ws/src
         cd ${{github.workspace}}/catkin_ws/src
         cd ..
-        catkin init
+        catkin config --init --install --extend /opt/ros/${{ matrix.ros_distro }} --cmake-args -DSETUPTOOLS_DEB_LAYOUT=OFF 
 
     - uses: actions/checkout@v2
       with:
@@ -61,5 +61,4 @@ jobs:
       run: |
         source /opt/ros/${{ matrix.ros_distro }}/setup.bash
         cd ${{github.workspace}}/catkin_ws
-        catkin config --install --install-space /opt/ros/${{ matrix.ros_distro }}
-        catkin build --verbose --cmake-args -DSETUPTOOLS_DEB_LAYOUT=OFF     
+        catkin build -p 1 -i
