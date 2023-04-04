@@ -45,6 +45,7 @@ jobs:
         source /opt/ros/${{ matrix.ros_distro }}/setup.bash
         mkdir -p ${{github.workspace}}/catkin_ws/src
         cd ${{github.workspace}}/catkin_ws/src
+        cd ..
         catkin init
 
     - uses: actions/checkout@v2
