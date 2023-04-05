@@ -20,14 +20,11 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-20.04, ubuntu-18.04]
+        os: [ubuntu-20.04]
         include:
         - os: ubuntu-20.04
           ros_distro: 'noetic'
-          python: 'python3'
-        - os: ubuntu-18.04
-          ros_distro: 'melodic'
-          python: 'python'
+
 
     steps:   
     - uses: ros-tooling/setup-ros@v0.2
@@ -37,7 +34,7 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get -y install ros-${{ matrix.ros_distro }}-rtabmap-ros ${{ matrix.python }}-catkin-tools
+        sudo apt-get -y install ros-${{ matrix.ros_distro }}-rtabmap-ros python3-catkin-tools
         sudo apt-get -y remove ros-${{ matrix.ros_distro }}-rtabmap
 
     - name: Setup catkin workspace
