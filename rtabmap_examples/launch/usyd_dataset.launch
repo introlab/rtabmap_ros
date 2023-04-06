@@ -1,0 +1,171 @@
+<?xml version="1.0"?>
+<launch>
+
+    <!--
+    Dataset: https://its.acfr.usyd.edu.au/datasets-2/usyd-campus-dataset/
+    Tools to play dataset's rosbags: https://gitlab.acfr.usyd.edu.au/its/dataset_metapackage
+    
+    roslaunch dataset_playback run.launch
+    roslaunch rtabmap_examples usyd_dataset.launch cameras:=true
+    -->
+
+    <arg name="rtabmap_viz"   default="true"/>
+    <arg name="deskewing"     default="true"/>
+    
+    <arg name="cameras"         default="false"/>
+
+    <arg name="resolution"        default="0.5"/>
+    <arg name="local_map_size"    default="10000"/>
+    <arg name="key_frame_thr"     default="0.8"/>
+    
+    <!-- Regenerate lidar point clouds with timestamps -->
+    <node pkg="nodelet" type="nodelet" name="velodyne_transform" args="standalone velodyne_pointcloud/TransformNodelet" ns="velodyne/front">
+      <param name="model" value="VLP16"/>
+      <param name="calibration" value="$(find velodyne_pointcloud)/params/VLP16db.yaml"/>
+      <param name="fixed_frame" value=""/>
+      <param name="target_frame" value=""/>
+      <param name="max_range" value="130.0"/>
+      <param name="min_range" value="0.4"/>
+      <param name="organize_cloud" value="true"/>
+    </node>
+    <arg name="scan_topic" value="/velodyne/front/velodyne_points"/>
+    
+    <!-- Publish vn100 odom as Tf to record it in the database as "ground truth" for comparison -->
+    <node pkg="rtabmap_util" type="odom_msg_to_tf" name="odom_msg_to_tf" output="screen">
+      <remap from="odom" to="/vn100/odometry"/>
+      <param name="frame_id" value="vn100_imu_link"/>
+      <param name="odom_frame_id" value="vn100_odom"/>
+    </node>
+
+    <!-- Lidar Deskewing -->
+    <node if="$(arg deskewing)" pkg="nodelet" type="nodelet" name="lidar_deskewing" args="standalone rtabmap_util/lidar_deskewing" output="screen">
+      <param name="wait_for_transform" value="0.1"/>
+      <param name="fixed_frame_id" value="odom"/>
+      <remap from="input_cloud" to="$(arg scan_topic)"/>
+    </node>
+
+    <arg     if="$(arg deskewing)" name="scan_topic_deskewed" default="$(arg scan_topic)/deskewed"/>
+    <arg unless="$(arg deskewing)" name="scan_topic_deskewed" default="$(arg scan_topic)"/>
+    
+    <group ns="rtabmap">
+    
+      <!-- Cameras sync -->
+      <node if="$(arg cameras)" pkg="rtabmap_sync" type="rgb_sync" name="rgb_sync_0" output="screen" ns="/gmsl/A1">
+        <param name="approx_sync" value="true"/>
+        <remap from="rgb/image_rect" to="image_rect_color"/>
+        <remap from="rgb/camera_info" to="camera_info"/>
+      </node>
+      <node if="$(arg cameras)" pkg="rtabmap_sync" type="rgb_sync" name="rgb_sync_1" output="screen" ns="/gmsl/A2">
+        <param name="approx_sync" value="true"/>
+        <remap from="rgb/image_rect" to="image_rect_color"/>
+        <remap from="rgb/camera_info" to="camera_info"/>
+      </node>
+      <node if="$(arg cameras)" pkg="rtabmap_sync" type="rgbdx_sync" name="rgbdx_sync" output="screen">
+        <param name="rgbd_cameras" value="2"/>
+        <remap from="rgbd_image0" to="/gmsl/A1/rgbd_image"/>
+        <remap from="rgbd_image1" to="/gmsl/A2/rgbd_image"/>
+      </node>
+
+      <!-- Lidar Odometry -->
+      <node pkg="rtabmap_odom" type="icp_odometry" name="icp_odometry" output="screen">
+        <remap from="scan_cloud" to="$(arg scan_topic_deskewed)"/>
+        <remap from="imu"        to="/vn100/imu"/>
+        <param name="guess_frame_id"  type="string" value="odom"/>
+        <param name="frame_id"        type="string" value="base_footprint"/>
+        <param name="odom_frame_id"   type="string" value="lidar_odom"/>
+        <param name="wait_for_transform_duration" type="double" value="0.2"/>
+        <param name="expected_update_rate" type="double" value="15"/>
+        <param name="scan_cloud_max_points" type="int" value="0"/>
+        <param name="wait_imu_to_init" type="bool" value="true"/>
+
+        <!-- ICP parameters -->
+        <param name="Icp/PointToPlane"        type="string" value="false"/>
+        <param name="Icp/Iterations"          type="string" value="10"/>
+        <param name="Icp/Epsilon"             type="string" value="0.001"/>
+        <param name="Icp/VoxelSize"           type="string" value="$(arg resolution)"/>
+        <param name="Icp/MaxTranslation"      type="string" value="2"/>
+        <param name="Icp/OutlierRatio"        type="string" value="0.7"/>
+        <param name="Icp/PMMatcherKnn"        type="string" value="3"/>
+        <param name="Icp/PMMatcherEpsilon"    type="string" value="0.001"/>
+        <param name="Icp/MaxCorrespondenceDistance" type="string" value="$(eval resolution*3)"/>
+        <param name="Icp/PointToPlaneGroundNormalsUp"  type="string" value="0.9"/>
+
+        <!-- Odom parameters -->
+        <param name="Odom/ScanKeyFrameThr"       type="string" value="$(arg key_frame_thr)"/>
+        <param name="OdomF2M/ScanSubtractRadius" type="string" value="$(arg resolution)"/>
+        <param name="OdomF2M/ScanMaxSize"        type="string" value="$(arg local_map_size)"/>
+      </node>
+
+      <!-- SLAM -->
+      <node pkg="rtabmap_slam" type="rtabmap" name="rtabmap" output="screen" args="-d">
+        <param name="frame_id"             type="string" value="base_footprint"/>
+        <param name="odom_frame_id" type="string" value=""/>
+        <param name="odom_sensor_sync"     type="bool" value="true"/>
+        <param name="subscribe_depth"      type="bool" value="false"/>
+        <param name="subscribe_rgb"        type="bool" value="false"/>
+        <param name="subscribe_scan_cloud" type="bool" value="true"/>
+        <param     if="$(arg cameras)" name="approx_sync" type="bool" value="true"/>
+        <param unless="$(arg cameras)" name="approx_sync" type="bool" value="false"/>
+        <param name="wait_for_transform_duration" type="double" value="0.2"/>
+        <param name="ground_truth_frame_id" type="string" value="vn100_odom"/>
+        <param name="ground_truth_base_frame_id" type="string" value="vn100_imu_link"/>
+        
+        <param if="$(arg cameras)" name="subscribe_rgbd" type="bool" value="true"/>
+        <param if="$(arg cameras)" name="rgbd_cameras" type="int" value="0"/>
+        <param if="$(arg cameras)" name="gen_depth" type="bool" value="true"/>
+        <param if="$(arg cameras)" name="gen_depth_decimation" type="int" value="8"/>
+        <param if="$(arg cameras)" name="gen_depth_fill_holes_size" type="int" value="10"/>
+        <param if="$(arg cameras)" name="gen_depth_fill_holes_error" type="double" value="100"/>
+        <param if="$(arg cameras)" name="gen_depth_fill_iterations" type="int" value="2"/>
+
+        <remap from="scan_cloud" to="$(arg scan_topic_deskewed)"/>
+        <remap from="gps/fix" to="/ublox_gps/fix"/>
+        <remap from="imu" to="/vn100/imu"/>
+
+        <!-- RTAB-Map's parameters -->
+        <param name="Rtabmap/DetectionRate"          type="string" value="1"/>
+        <param name="RGBD/NeighborLinkRefining"      type="string" value="false"/>
+        <param name="RGBD/ProximityBySpace"          type="string" value="true"/>
+        <param name="RGBD/ProximityMaxGraphDepth"    type="string" value="0"/>
+        <param name="RGBD/ProximityPathMaxNeighbors" type="string" value="1"/>
+        <param name="RGBD/ProximityMergedScanCovFactor" type="string" value="10"/>
+        <param name="RGBD/LinearUpdate"              type="string" value="0.2"/>
+        <param name="RGBD/LocalRadius"               type="string" value="30"/>
+        <param name="Mem/NotLinkedNodesKept"         type="string" value="false"/>
+        <param name="Mem/STMSize"                    type="string" value="30"/>
+        <param name="Reg/Strategy"                   type="string" value="1"/>
+        <param name="Optimizer/GravitySigma"         type="string" value="3"/>
+
+        <param name="RGBD/CreateOccupancyGrid"       type="string" value="false"/>
+        <param name="Grid/CellSize"                  type="string" value="$(arg resolution)"/>
+        <param name="Grid/RangeMax"                  type="string" value="20"/>
+        <param name="Grid/RangeMin"                  type="string" value="2"/>
+        <param name="Grid/RayTracing"                type="string" value="true"/>
+        <param name="Grid/ClusterRadius"             type="string" value="1"/>
+        <param name="Grid/ClusterRadius"             type="string" value="1"/>
+        <param name="Grid/GroundIsObstacle"          type="string" value="false"/>
+
+        <!-- ICP parameters -->
+        <param name="Icp/VoxelSize"                  type="string" value="$(arg resolution)"/>
+        <param name="Icp/PointToPlane"               type="string" value="false"/>
+        <param name="Icp/Iterations"                 type="string" value="15"/>
+        <param name="Icp/Epsilon"                    type="string" value="0.001"/>
+        <param name="Icp/PMMatcherEpsilon"           type="string" value="0.001"/>
+        <param name="Icp/MaxTranslation"             type="string" value="5"/>
+        <param name="Icp/MaxCorrespondenceDistance"  type="string" value="3"/>
+        <param name="Icp/OutlierRatio"               type="string" value="0.7"/>
+        <param name="Icp/PointToPlaneGroundNormalsUp"  type="string" value="0.9"/>
+      </node>
+
+      <node if="$(arg rtabmap_viz)" name="rtabmap_viz" pkg="rtabmap_viz" type="rtabmap_viz">
+        <param name="frame_id"             type="string" value="base_footprint"/>
+        <param name="odom_frame_id" type="string" value="lidar_odom"/>
+        <param name="subscribe_odom_info"  type="bool" value="true"/>
+        <param name="subscribe_scan_cloud" type="bool" value="true"/>
+        <param name="approx_sync"          type="bool" value="false"/>
+        <remap from="scan_cloud" to="odom_filtered_input_scan"/>
+        <remap from="odom_info"  to="odom_info"/>
+      </node>
+  </group>
+
+</launch>

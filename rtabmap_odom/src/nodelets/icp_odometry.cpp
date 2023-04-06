@@ -61,7 +61,7 @@ class ICPOdometry : public OdometryROS
 public:
 	ICPOdometry() :
 		OdometryROS(false, false, true),
-		scanCloudMaxPoints_(0),
+		scanCloudMaxPoints_(-1),
 		scanCloudIs2d_(false),
 		scanDownsamplingStep_(1),
 		scanRangeMin_(0),
@@ -697,19 +697,26 @@ private:
 			}
 		}
 
-		if(scanCloudMaxPoints_ == 0 && cloudMsg->height > 1)
-		{
-			scanCloudMaxPoints_ = cloudMsg->height * cloudMsg->width;
-			NODELET_WARN("IcpOdometry: \"scan_cloud_max_points\" is not set but input "
-					"cloud is not dense, for convenience it will be set to %d (%dx%d)",
-					scanCloudMaxPoints_, cloudMsg->width, cloudMsg->height);
+        if(cloudMsg->height > 1) // organized cloud
+        {
+		    if(scanCloudMaxPoints_ == -1)
+		    {
+			    scanCloudMaxPoints_ = cloudMsg->height * cloudMsg->width;
+			    NODELET_WARN("IcpOdometry: \"scan_cloud_max_points\" is not set but input "
+					    "cloud is not dense, for convenience it will be set to %d (%dx%d)",
+					    scanCloudMaxPoints_, cloudMsg->width, cloudMsg->height);
+		    }
+		    else if(scanCloudMaxPoints_ > 0 && scanCloudMaxPoints_ < cloudMsg->height * cloudMsg->width)
+		    {
+			    NODELET_WARN("IcpOdometry: \"scan_cloud_max_points\" is set to %d but input "
+					    "cloud is not dense and has a size of %d (%dx%d), setting to this later size.",
+					    scanCloudMaxPoints_, cloudMsg->width *cloudMsg->height, cloudMsg->width, cloudMsg->height);
+			    scanCloudMaxPoints_ = cloudMsg->width *cloudMsg->height;
+		    }
 		}
-		else if(cloudMsg->height > 1 && scanCloudMaxPoints_ < cloudMsg->height * cloudMsg->width)
+		if(scanCloudMaxPoints_ == -1)
 		{
-			NODELET_WARN("IcpOdometry: \"scan_cloud_max_points\" is set to %d but input "
-					"cloud is not dense and has a size of %d (%dx%d), setting to this later size.",
-					scanCloudMaxPoints_, cloudMsg->width *cloudMsg->height, cloudMsg->width, cloudMsg->height);
-			scanCloudMaxPoints_ = cloudMsg->width *cloudMsg->height;
+		    scanCloudMaxPoints_ = 0;
 		}
 		int maxLaserScans = scanCloudMaxPoints_;
 
