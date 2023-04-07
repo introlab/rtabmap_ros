@@ -16,7 +16,7 @@
 
     <arg name="resolution"        default="0.5"/>
     <arg name="local_map_size"    default="10000"/>
-    <arg name="key_frame_thr"     default="0.8"/>
+    <arg name="key_frame_thr"     default="0.5"/>
     
     <!-- Regenerate lidar point clouds with timestamps -->
     <node pkg="nodelet" type="nodelet" name="velodyne_transform" args="standalone velodyne_pointcloud/TransformNodelet" ns="velodyne/front">
@@ -35,6 +35,15 @@
       <remap from="odom" to="/vn100/odometry"/>
       <param name="frame_id" value="vn100_imu_link"/>
       <param name="odom_frame_id" value="vn100_odom"/>
+    </node>
+    
+    <!-- Recompute IMU quaternion -->
+    <node pkg="nodelet" type="nodelet" name="imu_filter" args="standalone imu_filter_madgwick/ImuFilterNodelet">
+      <remap from="imu/data_raw" to="/vn100/imu"/>
+      <remap from="imu/data"     to="/vn100/imu/filtered"/>
+      <param name="use_mag" value="false"/>
+      <param name="world_frame" value="enu"/>
+      <param name="publish_tf" value="false"/>
     </node>
 
     <!-- Lidar Deskewing -->
@@ -69,7 +78,7 @@
       <!-- Lidar Odometry -->
       <node pkg="rtabmap_odom" type="icp_odometry" name="icp_odometry" output="screen">
         <remap from="scan_cloud" to="$(arg scan_topic_deskewed)"/>
-        <remap from="imu"        to="/vn100/imu"/>
+        <remap from="imu"        to="/vn100/imu/filtered"/>
         <param name="guess_frame_id"  type="string" value="odom"/>
         <param name="frame_id"        type="string" value="base_footprint"/>
         <param name="odom_frame_id"   type="string" value="lidar_odom"/>
@@ -81,7 +90,6 @@
         <!-- ICP parameters -->
         <param name="Icp/PointToPlane"        type="string" value="false"/>
         <param name="Icp/Iterations"          type="string" value="10"/>
-        <param name="Icp/Epsilon"             type="string" value="0.001"/>
         <param name="Icp/VoxelSize"           type="string" value="$(arg resolution)"/>
         <param name="Icp/MaxTranslation"      type="string" value="2"/>
         <param name="Icp/OutlierRatio"        type="string" value="0.7"/>
@@ -120,7 +128,7 @@
 
         <remap from="scan_cloud" to="$(arg scan_topic_deskewed)"/>
         <remap from="gps/fix" to="/ublox_gps/fix"/>
-        <remap from="imu" to="/vn100/imu"/>
+        <remap from="imu" to="/vn100/imu/filtered"/>
 
         <!-- RTAB-Map's parameters -->
         <param name="Rtabmap/DetectionRate"          type="string" value="1"/>
@@ -148,9 +156,7 @@
         <!-- ICP parameters -->
         <param name="Icp/VoxelSize"                  type="string" value="$(arg resolution)"/>
         <param name="Icp/PointToPlane"               type="string" value="false"/>
-        <param name="Icp/Iterations"                 type="string" value="15"/>
-        <param name="Icp/Epsilon"                    type="string" value="0.001"/>
-        <param name="Icp/PMMatcherEpsilon"           type="string" value="0.001"/>
+        <param name="Icp/Iterations"                 type="string" value="30"/>
         <param name="Icp/MaxTranslation"             type="string" value="5"/>
         <param name="Icp/MaxCorrespondenceDistance"  type="string" value="3"/>
         <param name="Icp/OutlierRatio"               type="string" value="0.7"/>
