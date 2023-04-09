@@ -53,7 +53,7 @@ def generate_launch_description():
               'Icp/Strategy', '1',
               'Icp/OutlierRatio', '0.7',
               'Icp/CorrespondenceRatio', '0.01',
-              'Odom/ScanKeyFrameThr', '0.6',
+              'Odom/ScanKeyFrameThr', '0.4',
               'OdomF2M/ScanSubtractRadius', '0.1',
               'OdomF2M/ScanMaxSize', '15000',
               'OdomF2M/BundleAdjustment', 'false',
