@@ -36,7 +36,7 @@
     <!-- For F2M Odometry -->
     <arg name="ground_normals_up" default="false"/> <!-- set to true when velodyne is always horizontal to ground (ground robot, car) -->
     <arg name="local_map_size"    default="15000"/>
-    <arg name="key_frame_thr"     default="0.6"/>
+    <arg name="key_frame_thr"     default="0.4"/>
 
     <!-- For FLOAM Odometry -->
     <arg name="floam"    default="false"/> <!-- RTAB-Map should be built with FLOAM http://official-rtab-map-forum.206.s1.nabble.com/icp-odometry-with-LOAM-crash-tp8261p8563.html -->

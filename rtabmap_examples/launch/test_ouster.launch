@@ -73,6 +73,7 @@
         <param name="Icp/PM"                  type="string" value="true"/>
         <param name="Icp/PMOutlierRatio"      type="string" value="0.1"/>
         <param name="Icp/CorrespondenceRatio" type="string" value="0.01"/>
+        <param name="Icp/ReciprocalCorrespondences" type="string" value="false"/>
 
         <!-- Odom parameters -->
         <param name="Odom/ScanKeyFrameThr"       type="string" value="0.8"/>

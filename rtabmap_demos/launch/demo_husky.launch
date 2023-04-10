@@ -3,8 +3,11 @@
 <launch>
 
   <!-- Bringup the Husky with SICK (2D LiDAR), realsense camera (RGB-D camera) and velodyne (3D LiDAR):
-       $ export HUSKY_URDF_EXTRAS=$(rospack find rtabmap_demos)/launch/config/husky_velodyne_extra.urdf.xacro
-       $ roslaunch husky_gazebo husky_playpen.launch realsense_enabled:=true
+       $ export HUSKY_URDF_EXTRAS=$(rospack find rtabmap_demos)/launch/config/husky_velodyne_gpu_extra.urdf.xacro
+       $ export HUSKY_UST10_ENABLED=1
+       $ export HUSKY_REALSENSE_ENABLED=1
+       $ export HUSKY_REALSENSE_XYZ="0.2206 0 0.1"
+       $ roslaunch husky_gazebo husky_playpen.launch
        $ roslaunch husky_viz view_robot.launch
 
        For ICP odometry examples, rtabmap should be built with libpointmatcher.
@@ -73,6 +76,7 @@
       --RGBD/NeighborLinkRefining true
       --Grid/CellSize $(arg cell_size)
       --Icp/PointToPlaneRadius 0
+      --Odom/ScanKeyFrameThr 0.5
       --Icp/MaxTranslation 1"/>
 
   <arg if="$(arg lidar3d)" name="lidar_args" default="
@@ -87,6 +91,7 @@
       --Icp/Epsilon 0.001
       --OdomF2M/ScanSubtractRadius $(arg cell_size)
       --OdomF2M/ScanMaxSize 15000
+      --Odom/ScanKeyFrameThr 0.5
       --Grid/ClusterRadius 1
       --Grid/RangeMax 20
       --Grid/RayTracing $(arg lidar3d_ray_tracing)
@@ -111,7 +116,7 @@
 
     <!-- 2D LiDAR -->
     <arg name="subscribe_scan"  value="$(arg lidar2d)" />
-    <arg     if="$(arg lidar2d)" name="scan_topic"  value="/scan" />
+    <arg     if="$(arg lidar2d)" name="scan_topic"  value="/front/scan" />
     <arg unless="$(arg lidar2d)" name="scan_topic"  value="/scan_not_used" />
 
     <!-- 3D LiDAR -->

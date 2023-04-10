@@ -23,7 +23,7 @@
   <!-- Example with camera or not -->
   <arg name="camera" default="true" />
 
-  <!-- Limit lidar range if > 0 (has effect only when hector:=false) -->
+  <!-- Limit lidar range if > 0 (has effect only when hector:=false, better with odom_guess:=true) -->
   <arg name="max_range" default="0" />
 
   <!-- Point to Plane ICP? (has effect only when hector:=false) -->
@@ -91,7 +91,7 @@
      <param name="Odom/Strategy"        type="string" value="0"/>
      <param name="Odom/GuessMotion"     type="string" value="true"/>
      <param name="Odom/ResetCountdown"  type="string" value="0"/>
-     <param name="Odom/ScanKeyFrameThr"  type="string" value="0.9"/>
+     <param name="Odom/ScanKeyFrameThr"  type="string" value="0.75"/>
   </node>
 
   <group ns="rtabmap">

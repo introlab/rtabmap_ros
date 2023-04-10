@@ -35,6 +35,7 @@
         <!-- Odom parameters -->
         <param name="OdomF2M/ScanSubtractRadius" type="string" value="0.05"/>
         <param name="OdomF2M/ScanMaxSize"        type="string" value="5000"/>
+        <param name="Odom/ScanKeyFrameThr"       type="string" value="0.5"/>
       </node>
 
       <node pkg="rtabmap_slam" type="rtabmap" name="rtabmap" output="screen" args="-d">
