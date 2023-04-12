@@ -14,6 +14,7 @@
   <depend>cv_bridge</depend>
   <depend>image_transport</depend>
   <depend>roscpp</depend>
+  <depend>nav_msgs</depend>
   <depend>octomap_msgs</depend>
   <depend>sensor_msgs</depend>
   <depend>std_msgs</depend>
