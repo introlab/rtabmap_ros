@@ -17,6 +17,7 @@
   <depend>nav_msgs</depend>
   <depend>octomap_msgs</depend>
   <depend>sensor_msgs</depend>
+  <depend>stereo_msgs</depend>
   <depend>std_msgs</depend>
   <depend>tf</depend>
   <depend>laser_geometry</depend>
