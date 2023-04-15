@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.5)
 project(rtabmap_demos)
 
 find_package(catkin REQUIRED COMPONENTS
-              rtabmap_conversions rtabmap_msgs
+              rtabmap_conversions rtabmap_msgs visualization_msgs
 )
 
 # Optional components
@@ -14,7 +14,7 @@ IF(find_object_2d_FOUND)
 ENDIF(find_object_2d_FOUND)
 
 catkin_package(
-  CATKIN_DEPENDS rtabmap_conversions rtabmap_msgs ${optional_dependencies}
+  CATKIN_DEPENDS rtabmap_conversions rtabmap_msgs visualization_msgs ${optional_dependencies}
 )
 
 include_directories(${catkin_INCLUDE_DIRS})

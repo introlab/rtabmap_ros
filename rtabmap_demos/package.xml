@@ -14,6 +14,7 @@
   <depend>find_object_2d</depend>
   <depend>rtabmap_conversions</depend>
   <depend>rtabmap_msgs</depend>
+  <depend>visualization_msgs</depend>
 
   <exec_depend>rtabmap_costmap_plugins</exec_depend>
   <exec_depend>rtabmap_launch</exec_depend>
