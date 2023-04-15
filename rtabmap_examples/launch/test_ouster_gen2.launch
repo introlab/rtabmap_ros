@@ -59,7 +59,8 @@
       <arg name="image" value="true"/>
       <arg     if="$(arg scan_20_hz)" name="lidar_mode" value="1024x20"/>
       <arg unless="$(arg scan_20_hz)" name="lidar_mode" value="1024x10"/>
-      <arg if="$(arg ptp)" name="timestamp_mode" value="TIME_FROM_PTP_1588"/>
+      <arg     if="$(arg ptp)" name="timestamp_mode" value="TIME_FROM_PTP_1588"/>
+      <arg unless="$(arg ptp)" name="timestamp_mode" value="TIME_FROM_ROS_TIME"/>
     </include>
 
     <!-- IMU orientation estimation and publish tf accordingly to os_sensor frame -->
