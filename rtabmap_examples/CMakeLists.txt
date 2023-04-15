@@ -2,11 +2,11 @@ cmake_minimum_required(VERSION 3.5)
 project(rtabmap_examples)
 
 find_package(catkin REQUIRED COMPONENTS
-             roscpp rtabmap_conversions
+             roscpp rtabmap_conversions message_filters
 )
 
 catkin_package(
-  CATKIN_DEPENDS roscpp rtabmap_conversions
+  CATKIN_DEPENDS roscpp rtabmap_conversions message_filters
 )
 
 ###########

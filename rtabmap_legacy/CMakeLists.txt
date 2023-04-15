@@ -1,14 +1,14 @@
 cmake_minimum_required(VERSION 3.5)
 project(rtabmap_legacy)
 
-find_package(catkin REQUIRED COMPONENTS dynamic_reconfigure image_transport rtabmap_conversions rtabmap_msgs
+find_package(catkin REQUIRED COMPONENTS dynamic_reconfigure image_transport rtabmap_conversions rtabmap_util nodelet
 )
 
 generate_dynamic_reconfigure_options(cfg/Camera.cfg)
 
 catkin_package(
   LIBRARIES rtabmap_legacy_plugins
-  CATKIN_DEPENDS dynamic_reconfigure image_transport rtabmap_conversions rtabmap_msgs
+  CATKIN_DEPENDS dynamic_reconfigure image_transport rtabmap_conversions rtabmap_msgs rtabmap_util
 )
 
 ###########

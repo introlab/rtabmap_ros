@@ -13,6 +13,7 @@
 
   <depend>roscpp</depend>
   <depend>rtabmap_conversions</depend>
+  <depend>message_filters</depend>
 
   <exec_depend>rtabmap_costmap_plugins</exec_depend>
   <exec_depend>rtabmap_launch</exec_depend>
