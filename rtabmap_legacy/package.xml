@@ -30,6 +30,7 @@
   <exec_depend>rtabmap_odom</exec_depend>
   <exec_depend>rtabmap_slam</exec_depend>
   <exec_depend>rtabmap_viz</exec_depend>
+  <exec_depend>rtabmap_util</exec_depend>
   
   <export>
     <nodelet plugin="${prefix}/nodelet_plugins.xml" />
