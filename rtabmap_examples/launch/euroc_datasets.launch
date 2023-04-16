@@ -71,13 +71,23 @@ Examples:
 </group>
 
 <!-- TF frames -->
-<node pkg="tf" type="static_transform_publisher" name="imu_base_link" args="0 0 0 3.1415926 -1.570796 0 base_link imu4 5"/>
-<node pkg="tf" type="static_transform_publisher" name="cam0_imu_link" args="-0.021640 -0.064677 0.009811 1.555925 0.025777 0.003757 imu4 cam0 50"/>
-<node pkg="tf" type="static_transform_publisher" name="cam1_imu_link" args="-0.019844 0.045369 0.007862 1.558237 0.025393 0.017907 imu4 cam1 50"/>
+<node pkg="tf" type="static_transform_publisher" name="imu_base_link" args="0 0 0 3.1415926 -1.570796 0 base_link imu4 100">
+  <remap from="tf" to="tf_static"/>
+</node>
+<node pkg="tf" type="static_transform_publisher" name="cam0_imu_link" args="-0.021640 -0.064677 0.009811 1.555925 0.025777 0.003757 imu4 cam0 100">
+  <remap from="tf" to="tf_static"/>
+</node>
+<node pkg="tf" type="static_transform_publisher" name="cam1_imu_link" args="-0.019844 0.045369 0.007862 1.558237 0.025393 0.017907 imu4 cam1 100">
+  <remap from="tf" to="tf_static"/>
+</node>
 
 <!-- For MH sequences, /leica/position doesn't give the orientation, so minimal ground truth error could be as high as 12 cm -->
-<node     if="$(arg MH_seq)" pkg="tf" type="static_transform_publisher" name="leica_base_link" args="0.120209 -0.0184772 -0.0748903 0 0 0 leica base_link_gt 100"/>
-<node unless="$(arg MH_seq)" pkg="tf" type="static_transform_publisher" name="vicon_base_link" args="0.12395 -0.02781 -0.06901 0 0 0 vicon/firefly_sbx/firefly_sbx base_link_gt 100"/>
+<node     if="$(arg MH_seq)" pkg="tf" type="static_transform_publisher" name="leica_base_link" args="0.120209 -0.0184772 -0.0748903 0 0 0 leica base_link_gt 100">
+  <remap from="tf" to="tf_static"/>
+</node>
+<node unless="$(arg MH_seq)" pkg="tf" type="static_transform_publisher" name="vicon_base_link" args="0.12395 -0.02781 -0.06901 0 0 0 vicon/firefly_sbx/firefly_sbx base_link_gt 100">
+  <remap from="tf" to="tf_static"/>
+</node>
 
 <node     if="$(arg MH_seq)" pkg="rtabmap_util" type="point_to_tf.py" name="point_to_tf">
   <remap from="point" to="/leica/position"/>
@@ -89,7 +99,9 @@ Examples:
   <param name="frame_id" value="world"/>
   <param name="child_frame_id" value="vicon/firefly_sbx/firefly_sbx"/>
 </node>
-<node pkg="tf" type="static_transform_publisher" name="world_to_map" args="0.0 0.0 0.0 0.0 0.0 0.0 /world /map 100" />
+<node pkg="tf" type="static_transform_publisher" name="world_to_map" args="0.0 0.0 0.0 0.0 0.0 0.0 /world /map 100">
+  <remap from="tf" to="tf_static"/>
+</node>
 
 <node pkg="imu_complementary_filter" type="complementary_filter_node" name="imu_filter" output="screen">
    <remap from="imu/data_raw" to="/imu0"/>
@@ -104,6 +116,7 @@ Examples:
    <arg unless="$(arg raw_images_for_odom)" name="rtabmap_args" value="$(arg common_args)"/>
    <arg     if="$(arg raw_images_for_odom)" name="odom_args" value="--Rtabmap/ImagesAlreadyRectified false"/>
    <arg     if="$(arg raw_images_for_odom)" name="left_image_topic" value="/cam0/image_raw"/>
+   <arg unless="$(arg raw_images_for_odom)" name="left_image_topic" value="/stereo_camera/left/image_rect"/>
    <arg     if="$(arg raw_images_for_odom)" name="right_image_topic" value="/cam1/image_raw"/>
    <arg name="stereo" value="true"/>
    <arg name="frame_id" value="base_link"/>
