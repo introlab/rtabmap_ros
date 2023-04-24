@@ -9,15 +9,20 @@
     roslaunch rtabmap_examples usyd_dataset.launch cameras:=true
     -->
 
-    <arg name="rtabmap_viz"   default="true"/>
-    <arg name="deskewing"     default="true"/>
+    <arg name="rtabmap_viz"    default="true"/>
+    <arg name="deskewing"      default="true"/>
     
-    <arg name="cameras"         default="false"/>
+    <arg name="cameras"        default="false"/>
 
-    <arg name="resolution"        default="0.5"/>
-    <arg name="local_map_size"    default="10000"/>
-    <arg name="key_frame_thr"     default="0.5"/>
+    <arg name="resolution"     default="0.5"/>
+    <arg name="local_map_size" default="10000"/>
+    <arg name="key_frame_thr"  default="0.5"/>
     
+    <arg name="append"         default="false"/> <!-- true: don't delete previous db, create new session -->
+
+    <arg     if="$(arg append)" name="rtabmap_args" value=""/>
+    <arg unless="$(arg append)" name="rtabmap_args" value="-d"/> <!-- delete previous db -->
+
     <!-- Regenerate lidar point clouds with timestamps -->
     <node pkg="nodelet" type="nodelet" name="velodyne_transform" args="standalone velodyne_pointcloud/TransformNodelet" ns="velodyne/front">
       <param name="model" value="VLP16"/>
@@ -91,12 +96,12 @@
         <param name="Icp/PointToPlane"        type="string" value="false"/>
         <param name="Icp/Iterations"          type="string" value="10"/>
         <param name="Icp/VoxelSize"           type="string" value="$(arg resolution)"/>
+        <param name="Icp/PointToPlaneK"       type="string" value="0"/>
         <param name="Icp/MaxTranslation"      type="string" value="2"/>
         <param name="Icp/OutlierRatio"        type="string" value="0.7"/>
         <param name="Icp/PMMatcherKnn"        type="string" value="3"/>
         <param name="Icp/PMMatcherEpsilon"    type="string" value="0.001"/>
         <param name="Icp/MaxCorrespondenceDistance" type="string" value="$(eval resolution*3)"/>
-        <param name="Icp/PointToPlaneGroundNormalsUp"  type="string" value="0.9"/>
 
         <!-- Odom parameters -->
         <param name="Odom/ScanKeyFrameThr"       type="string" value="$(arg key_frame_thr)"/>
@@ -105,7 +110,7 @@
       </node>
 
       <!-- SLAM -->
-      <node pkg="rtabmap_slam" type="rtabmap" name="rtabmap" output="screen" args="-d">
+      <node pkg="rtabmap_slam" type="rtabmap" name="rtabmap" output="screen" args="$(arg rtabmap_args)">
         <param name="frame_id"             type="string" value="base_footprint"/>
         <param name="odom_frame_id" type="string" value=""/>
         <param name="odom_sensor_sync"     type="bool" value="true"/>
@@ -132,6 +137,7 @@
 
         <!-- RTAB-Map's parameters -->
         <param name="Rtabmap/DetectionRate"          type="string" value="1"/>
+        <param name="Rtabmap/LoopGPS"                type="string" value="false"/> <!-- GPS can be quite wrong in that dataset-->
         <param name="RGBD/NeighborLinkRefining"      type="string" value="false"/>
         <param name="RGBD/ProximityBySpace"          type="string" value="true"/>
         <param name="RGBD/ProximityMaxGraphDepth"    type="string" value="0"/>
@@ -157,10 +163,9 @@
         <param name="Icp/VoxelSize"                  type="string" value="$(arg resolution)"/>
         <param name="Icp/PointToPlane"               type="string" value="false"/>
         <param name="Icp/Iterations"                 type="string" value="30"/>
-        <param name="Icp/MaxTranslation"             type="string" value="5"/>
+        <param name="Icp/MaxTranslation"             type="string" value="10"/>
         <param name="Icp/MaxCorrespondenceDistance"  type="string" value="3"/>
         <param name="Icp/OutlierRatio"               type="string" value="0.7"/>
-        <param name="Icp/PointToPlaneGroundNormalsUp"  type="string" value="0.9"/>
       </node>
 
       <node if="$(arg rtabmap_viz)" name="rtabmap_viz" pkg="rtabmap_viz" type="rtabmap_viz">
