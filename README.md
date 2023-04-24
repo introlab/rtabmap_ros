@@ -93,6 +93,12 @@ ros2 launch rtabmap_launch rtabmap.launch.py \
 
 # Installation 
 
+### Binaries
+```bash
+sudo apt install ros-$ROS_DISTRO-rtabmap-ros
+```
+
+### From Source
 * RTAB-Map ROS2 package:
     ```bash
     cd ~/ros2_ws
