@@ -2,6 +2,10 @@
 <launch>
 
     <!--
+    Requires RTAB-Map with OpenCV's xfeatures2d and nonfree modules.
+    See docker usage if you want RTAB-Map already built with them:
+    https://github.com/introlab/rtabmap_ros/tree/master/docker
+
     Dataset: https://its.acfr.usyd.edu.au/datasets-2/usyd-campus-dataset/
     Tools to play dataset's rosbags: https://gitlab.acfr.usyd.edu.au/its/dataset_metapackage
     
@@ -18,10 +22,12 @@
     <arg name="local_map_size" default="10000"/>
     <arg name="key_frame_thr"  default="0.5"/>
     
+    <arg name="database_path"  default="~/.ros/rtabmap.db"/>
+
     <arg name="append"         default="false"/> <!-- true: don't delete previous db, create new session -->
 
-    <arg     if="$(arg append)" name="rtabmap_args" value=""/>
-    <arg unless="$(arg append)" name="rtabmap_args" value="-d"/> <!-- delete previous db -->
+    <arg     if="$(arg append)" name="rtabmap_args" default=""/>
+    <arg unless="$(arg append)" name="rtabmap_args" default="-d"/> <!-- delete previous db -->
 
     <!-- Regenerate lidar point clouds with timestamps -->
     <node pkg="nodelet" type="nodelet" name="velodyne_transform" args="standalone velodyne_pointcloud/TransformNodelet" ns="velodyne/front">
@@ -111,6 +117,7 @@
 
       <!-- SLAM -->
       <node pkg="rtabmap_slam" type="rtabmap" name="rtabmap" output="screen" args="$(arg rtabmap_args)">
+        <param name="database_path"        type="string" value="$(arg database_path)"/>
         <param name="frame_id"             type="string" value="base_footprint"/>
         <param name="odom_frame_id" type="string" value=""/>
         <param name="odom_sensor_sync"     type="bool" value="true"/>
@@ -147,6 +154,8 @@
         <param name="RGBD/LocalRadius"               type="string" value="30"/>
         <param name="Mem/NotLinkedNodesKept"         type="string" value="false"/>
         <param name="Mem/STMSize"                    type="string" value="30"/>
+        <param name="Mem/ImagePreDecimation"         type="string" value="2"/> <!-- Scale down image 2x -->
+        <param name="Mem/ImagePostDecimtation"       type="string" value="2"/>
         <param name="Reg/Strategy"                   type="string" value="1"/>
         <param name="Optimizer/GravitySigma"         type="string" value="3"/>
 
@@ -158,6 +167,13 @@
         <param name="Grid/ClusterRadius"             type="string" value="1"/>
         <param name="Grid/ClusterRadius"             type="string" value="1"/>
         <param name="Grid/GroundIsObstacle"          type="string" value="false"/>
+
+        <!-- Use SURF features to make it easier to find loop closures between datasets -->
+        <param name="Kp/DetectorStrategy"            type="string" value="0"/>
+        <param name="Kp/MaxFeatures"                 type="string" value="400"/> <!-- For bag-of-words -->
+        <param name="Vis/MaxFeatures"                type="string" value="600"/> <!-- For visual transform estimation -->
+        <param name="Mem/DepthAsMask"                type="string" value="false"/> <!-- use whole images for keypoints -->
+        <param name="Mem/StereoFromMotion"           type="string" value="true"/> <!-- will estimate 3D position of keypoints outside depth image based on odometry -->
 
         <!-- ICP parameters -->
         <param name="Icp/VoxelSize"                  type="string" value="$(arg resolution)"/>
