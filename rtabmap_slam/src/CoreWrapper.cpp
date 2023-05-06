@@ -809,7 +809,7 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 	globalPoseAsyncSub_ = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>("global_pose", 5, std::bind(&CoreWrapper::globalPoseAsyncCallback, this, std::placeholders::_1));
 	gpsFixAsyncSub_ = this->create_subscription<sensor_msgs::msg::NavSatFix>("gps/fix", rclcpp::QoS(5).reliability((rmw_qos_reliability_policy_t)qosGPS), std::bind(&CoreWrapper::gpsFixAsyncCallback, this, std::placeholders::_1));
 #ifdef WITH_APRILTAG_MSGS
-	tagDetectionsSub_ = this->create_subscription<apriltag_ros::msg::AprilTagDetectionArray>("tag_detections", 5, std::bind(&CoreWrapper::tagDetectionsAsyncCallback, this, std::placeholders::_1));
+	tagDetectionsSub_ = this->create_subscription<apriltag_msgs::msg::AprilTagDetectionArray>("tag_detections", 5, std::bind(&CoreWrapper::tagDetectionsAsyncCallback, this, std::placeholders::_1));
 #endif
 #ifdef WITH_FIDUCIAL_MSGS
 	fiducialTransfromsSub_ = this->create_subscription<fiducial_msgs::msg::FiducialTransformArray>("fiducial_transforms", 5, std::bind(&CoreWrapper::fiducialDetectionsAsyncCallback, this, std::placeholders::_1));
@@ -2293,44 +2293,29 @@ void CoreWrapper::tagDetectionsAsyncCallback(const apriltag_msgs::msg::AprilTagD
 	{
 		for(unsigned int i=0; i<tagDetections->detections.size(); ++i)
 		{
-			if(tagDetections->detections[i].id.size() >= 1)
+			std::string tagFrameId = tagDetections->detections[i].family+":"+uNumber2Str(tagDetections->detections[i].id);
+			Transform camToTag = rtabmap_conversions::getTransform(
+				tagDetections->header.frame_id, // e.g., camera_optical_frame
+				tagFrameId,                     // e.g., tag36h11:42
+				tagDetections->header.stamp,
+				*tfBuffer_,
+				waitForTransform_);
+			if(camToTag.isNull())
 			{
-				geometry_msgs::msg::PoseWithCovarianceStamped p = tagDetections->detections[i].pose;
-				p.header = tagDetections->header;
-				if(!tagDetections->detections[i].pose.header.frame_id.empty())
-				{
-					p.header.frame_id = tagDetections->detections[i].pose.header.frame_id;
-
-					static bool warned = false;
-					if(!warned &&
-						!tagDetections->header.frame_id.empty() &&
-						tagDetections->detections[i].pose.header.frame_id.compare(tagDetections->header.frame_id)!=0)
-					{
-						RCLCPP_WARN(get_logger(), "frame_id set for individual tag detections (%s) doesn't match the frame_id of the message (%s), "
-								"the resulting pose of the tag may be wrong. This message is only printed once.",
-								tagDetections->detections[i].pose.header.frame_id.c_str(), tagDetections->header.frame_id.c_str());
-						warned = true;
-					}
-				}
-				if(!tagDetections->detections[i].pose.header.stamp.isZero())
-				{
-					p.header.stamp = tagDetections->detections[i].pose.header.stamp;
-
-					static bool warned = false;
-					if(!warned &&
-						!tagDetections->header.stamp.isZero() &&
-						tagDetections->detections[i].pose.header.stamp != tagDetections->header.stamp)
-					{
-						RCLCPP_WARN(get_logger(), "stamp set for individual tag detections (%f) doesn't match the stamp of the message (%f), "
-								"the resulting pose of the tag may be wrongly interpolated. This message is only printed once.",
-								tagDetections->detections[i].pose.header.stamp.toSec(), tagDetections->header.stamp.toSec());
-						warned = true;
-					}
-				}
-				uInsert(tags_,
-						std::make_pair(tagDetections->detections[i].id[0],
-								std::make_pair(p, tagDetections->detections[i].size.size()==1?(float)tagDetections->detections[i].size[0]:0.0f)));
+				RCLCPP_WARN(get_logger(), "Could not get TF between %s and %s frames for tag detection %d.",
+					frameId_.c_str(),
+					tagFrameId.c_str(),
+					tagDetections->detections[i].id);
+					continue;
 			}
+
+			geometry_msgs::msg::PoseWithCovarianceStamped p;
+			rtabmap_conversions::transformToPoseMsg(camToTag, p.pose.pose);
+			p.header = tagDetections->header;
+			
+			uInsert(tags_,
+					std::make_pair(tagDetections->detections[i].id,
+							std::make_pair(p, 0.0f)));
 		}
 	}
 }
