@@ -11,7 +11,7 @@ RUN source /ros_entrypoint.sh && \
     cd catkin_ws && \
     apt update && \
     rosdep install --from-paths src --ignore-src -y && \
-    rm -rf /var/lib/apt/lists/* && \
+    apt-get clean && rm -rf /var/lib/apt/lists/ && \
     catkin_make -j1 -DRTABMAP_SYNC_MULTI_RGBD=ON -DCMAKE_INSTALL_PREFIX=/opt/ros/noetic install && \
     cd && \
     rm -rf catkin_ws
