@@ -808,6 +808,8 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 	userDataAsyncSub_ = this->create_subscription<rtabmap_msgs::msg::UserData>("user_data_async", rclcpp::QoS(5).reliability((rmw_qos_reliability_policy_t)qosUserData_), std::bind(&CoreWrapper::userDataAsyncCallback, this, std::placeholders::_1));
 	globalPoseAsyncSub_ = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>("global_pose", 5, std::bind(&CoreWrapper::globalPoseAsyncCallback, this, std::placeholders::_1));
 	gpsFixAsyncSub_ = this->create_subscription<sensor_msgs::msg::NavSatFix>("gps/fix", rclcpp::QoS(5).reliability((rmw_qos_reliability_policy_t)qosGPS), std::bind(&CoreWrapper::gpsFixAsyncCallback, this, std::placeholders::_1));
+	landmarkDetectionSub_ = this->create_subscription<rtabmap_msgs::msg::LandmarkDetection>("landmark_detection", 5, std::bind(&CoreWrapper::landmarkDetectionAsyncCallback, this, std::placeholders::_1));
+	landmarkDetectionsSub_ = this->create_subscription<rtabmap_msgs::msg::LandmarkDetections>("landmark_detections", 5, std::bind(&CoreWrapper::landmarkDetectionsAsyncCallback, this, std::placeholders::_1));
 #ifdef WITH_APRILTAG_MSGS
 	tagDetectionsSub_ = this->create_subscription<apriltag_msgs::msg::AprilTagDetectionArray>("tag_detections", 5, std::bind(&CoreWrapper::tagDetectionsAsyncCallback, this, std::placeholders::_1));
 #endif
@@ -1886,7 +1888,7 @@ void CoreWrapper::process(
 
 		//tag detections
 		Landmarks landmarks = rtabmap_conversions::landmarksFromROS(
-				tags_,
+				landmarks_,
 				frameId_,
 				odomFrameId,
 				lastPoseStamp_,
@@ -1894,7 +1896,7 @@ void CoreWrapper::process(
 				waitForTransform_,
 				landmarkDefaultLinVariance_,
 				landmarkDefaultAngVariance_);
-		tags_.clear();
+		landmarks_.clear();
 		if(!landmarks.empty())
 		{
 			data.setLandmarks(landmarks);
@@ -2286,6 +2288,35 @@ void CoreWrapper::gpsFixAsyncCallback(const sensor_msgs::msg::NavSatFix::SharedP
 	}
 }
 
+void CoreWrapper::landmarkDetectionAsyncCallback(const rtabmap_msgs::msg::LandmarkDetection::SharedPtr landmarkDetection)
+{
+	if(!paused_)
+	{
+		geometry_msgs::msg::PoseWithCovarianceStamped p;
+		p.header = landmarkDetection->header;
+		p.pose = landmarkDetection->pose;
+		uInsert(landmarks_,
+			std::make_pair(landmarkDetection->id,
+				std::make_pair(p, landmarkDetection->size)));
+	}
+}
+
+void CoreWrapper::landmarkDetectionsAsyncCallback(const rtabmap_msgs::msg::LandmarkDetections::SharedPtr landmarkDetections)
+{
+	if(!paused_)
+	{
+		for(unsigned int i=0; i<landmarkDetections->landmarks.size(); ++i)
+		{
+			geometry_msgs::msg::PoseWithCovarianceStamped p;
+			p.header = landmarkDetections->landmarks[i].header;
+			p.pose = landmarkDetections->landmarks[i].pose;
+			uInsert(landmarks_,
+				std::make_pair(landmarkDetections->landmarks[i].id,
+					std::make_pair(p, landmarkDetections->landmarks[i].size)));
+		}
+	}
+}
+
 #ifdef WITH_APRILTAG_MSGS
 void CoreWrapper::tagDetectionsAsyncCallback(const apriltag_msgs::msg::AprilTagDetectionArray::SharedPtr tagDetections)
 {
@@ -2313,7 +2344,7 @@ void CoreWrapper::tagDetectionsAsyncCallback(const apriltag_msgs::msg::AprilTagD
 			rtabmap_conversions::transformToPoseMsg(camToTag, p.pose.pose);
 			p.header = tagDetections->header;
 			
-			uInsert(tags_,
+			uInsert(landmarks_,
 					std::make_pair(tagDetections->detections[i].id,
 							std::make_pair(p, 0.0f)));
 		}
@@ -2334,7 +2365,7 @@ void CoreWrapper::fiducialDetectionsAsyncCallback(const fiducial_msgs::msg::Fidu
 			p.pose.pose.position.y = fiducialDetections.transforms[i].transform.translation.y;
 			p.pose.pose.position.z = fiducialDetections.transforms[i].transform.translation.z;
 			p.header = fiducialDetections.header;
-			uInsert(tags_,
+			uInsert(landmarks_,
 					std::make_pair(fiducialDetections.transforms[i].fiducial_id,
 							std::make_pair(p, 0.0f)));
 		}
@@ -2675,7 +2706,7 @@ void CoreWrapper::resetRtabmapCallback(
 	previousStamp_ = rclcpp::Time(0);
 	globalPose_.header.stamp = rclcpp::Time(0);
 	gps_ = rtabmap::GPS();
-	tags_.clear();
+	landmarks_.clear();
 	userDataMutex_.lock();
 	userData_ = cv::Mat();
 	userDataMutex_.unlock();
@@ -2769,7 +2800,7 @@ void CoreWrapper::loadDatabaseCallback(
 	previousStamp_ = rclcpp::Time(0);
 	globalPose_.header.stamp = rclcpp::Time(0);
 	gps_ = rtabmap::GPS();
-	tags_.clear();
+	landmarks_.clear();
 	userDataMutex_.lock();
 	userData_ = cv::Mat();
 	userDataMutex_.unlock();
@@ -2896,7 +2927,7 @@ void CoreWrapper::backupDatabaseCallback(
 	userDataMutex_.unlock();
 	globalPose_.header.stamp = rclcpp::Time(0);
 	gps_ = rtabmap::GPS();
-	tags_.clear();
+	landmarks_.clear();
 
 	RCLCPP_INFO(this->get_logger(), "Backup: Saving \"%s\" to \"%s\"...", databasePath_.c_str(), (databasePath_+".back").c_str());
 	UFile::copy(databasePath_, databasePath_+".back");

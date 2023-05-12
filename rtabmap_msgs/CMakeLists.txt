@@ -25,6 +25,8 @@ set(msg_files
    "msg/MapGraph.msg"
    "msg/NodeData.msg"
    "msg/Link.msg"
+   "msg/LandmarkDetection.msg"
+   "msg/LandmarkDetections.msg"
    "msg/OdomInfo.msg"
    "msg/Point2f.msg"
    "msg/Point3f.msg"

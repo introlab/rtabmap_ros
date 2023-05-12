@@ -67,6 +67,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "rtabmap_msgs/msg/odom_info.hpp"
 #include "rtabmap_msgs/msg/info.hpp"
+#include "rtabmap_msgs/msg/landmark_detection.hpp"
+#include "rtabmap_msgs/msg/landmark_detections.hpp"
 #include "rtabmap_msgs/srv/get_nodes_in_radius.hpp"
 #include "rtabmap_msgs/srv/load_database.hpp"
 #include "rtabmap_msgs/srv/detect_more_loop_closures.hpp"
@@ -159,6 +161,8 @@ private:
 	void userDataAsyncCallback(const rtabmap_msgs::msg::UserData::SharedPtr dataMsg);
 	void globalPoseAsyncCallback(const geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr globalPoseMsg);
 	void gpsFixAsyncCallback(const sensor_msgs::msg::NavSatFix::SharedPtr gpsFixMsg);
+	void landmarkDetectionAsyncCallback(const rtabmap_msgs::msg::LandmarkDetection::SharedPtr landmarkDetection);
+	void landmarkDetectionsAsyncCallback(const rtabmap_msgs::msg::LandmarkDetections::SharedPtr landmarkDetections);
 #ifdef WITH_APRILTAG_MSGS
 	void tagDetectionsAsyncCallback(const apriltag_msgs::msg::AprilTagDetectionArray::SharedPtr tagDetections);
 #endif
@@ -379,13 +383,15 @@ private:
 	geometry_msgs::msg::PoseWithCovarianceStamped globalPose_;
 	rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr gpsFixAsyncSub_;
 	rtabmap::GPS gps_;
+	rclcpp::Subscription<rtabmap_msgs::msg::LandmarkDetection>::SharedPtr landmarkDetectionSub_;
+	rclcpp::Subscription<rtabmap_msgs::msg::LandmarkDetections>::SharedPtr landmarkDetectionsSub_;
 #ifdef WITH_APRILTAG_MSGS
 	rclcpp::Subscription<apriltag_msgs::msg::AprilTagDetectionArray>::SharedPtr tagDetectionsSub_;
 #endif
 #ifdef WITH_FIDUCIAL_MSGS
 	rclcpp::Subscription<fiducial_msgs::msg::FiducialTransformArray>::SharedPtr fiducialTransfromsSub_;
 #endif
-	std::map<int, std::pair<geometry_msgs::msg::PoseWithCovarianceStamped, float> > tags_; // id, <pose, size>
+	std::map<int, std::pair<geometry_msgs::msg::PoseWithCovarianceStamped, float> > landmarks_; // id, <pose, size>
 	rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imuSub_;
 
 	std::map<double, rtabmap::Transform> imus_;
