@@ -130,6 +130,7 @@ This section shows how to install RTAB-Map ros-pkg on **ROS Melodic/Noetic** (Ca
         * Add `-DRTABMAP_SYNC_USER_DATA=ON` to `catkin_make` if you plan to use user data synchronized topics.
 
 ## Build from source for Nvidia Jetson
+ * For latest jetpack, see this [post](https://github.com/introlab/rtabmap_ros/issues/943) to use docker (you will save a lot of time using the already built docker images).
  * For **Jetpack 4** (Ubuntu 18.04 with ROS Melodic), see this [post](https://github.com/introlab/rtabmap/issues/427#issuecomment-608052821).
  * For **Jetpack 3** (Ubuntu 16.04 with ROS Kinetic), see this [post](https://github.com/introlab/rtabmap_ros/issues/655).
 
