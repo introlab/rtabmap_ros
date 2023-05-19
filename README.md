@@ -149,4 +149,4 @@ sudo apt install ros-$ROS_DISTRO-rtabmap-ros
     ros2 launch nav2_bringup rviz_launch.py
     ```
     
-See [rtabmap_demos/launch](https://github.com/introlab/rtabmap_ros/tree/ros2/rtabmap_demos/launch) and [rtabmap_examples/launch](https://github.com/introlab/rtabmap_ros/tree/ros2/rtabmap_demos/launch) subfolders for some other ROS2 examples with turtlebot3 in simulation and a RGB-D camera.
+See [rtabmap_demos/launch](https://github.com/introlab/rtabmap_ros/tree/ros2/rtabmap_demos/launch) and [rtabmap_examples/launch](https://github.com/introlab/rtabmap_ros/tree/ros2/rtabmap_examples/launch) subfolders for some other ROS2 examples with turtlebot3 in simulation and a RGB-D camera.
