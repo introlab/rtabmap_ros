@@ -53,7 +53,7 @@ def generate_launch_description():
                          'publish_tf':False}],
             remappings=[('imu/data_raw', '/camera/imu')]),
         
-        # The IMU frame is mising in TF tree, add it:
+        # The IMU frame is missing in TF tree, add it:
         Node(
             package='tf2_ros', executable='static_transform_publisher', output='screen',
             arguments=['0', '0', '0', '0', '0', '0', 'camera_gyro_optical_frame', 'camera_imu_optical_frame']),
