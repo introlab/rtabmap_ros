@@ -89,6 +89,7 @@ CoreWrapper::CoreWrapper() :
 		lastPose_(Transform::getIdentity()),
 		lastPoseIntermediate_(false),
 		latestNodeWasReached_(false),
+		pubLocPoseOnlyWhenLocalizing_(false),
 		graphLatched_(false),
 		frameId_("base_link"),
 		odomFrameId_(""),
@@ -192,6 +193,7 @@ void CoreWrapper::onInit()
 	pnh.param("odom_tf_linear_variance", odomDefaultLinVariance_, odomDefaultLinVariance_);
 	pnh.param("landmark_angular_variance", landmarkDefaultAngVariance_, landmarkDefaultAngVariance_);
 	pnh.param("landmark_linear_variance", landmarkDefaultLinVariance_, landmarkDefaultLinVariance_);
+	pnh.param("pub_loc_pose_only_when_localizing", pubLocPoseOnlyWhenLocalizing_,pubLocPoseOnlyWhenLocalizing_);
 	pnh.param("wait_for_transform",  waitForTransform_, waitForTransform_);
 	pnh.param("wait_for_transform_duration",  waitForTransformDuration_, waitForTransformDuration_);
 	pnh.param("initial_pose",          initialPoseStr, initialPoseStr);
@@ -244,6 +246,7 @@ void CoreWrapper::onInit()
 	NODELET_INFO("rtabmap: tf_delay      = %f", tfDelay);
 	NODELET_INFO("rtabmap: tf_tolerance  = %f", tfTolerance);
 	NODELET_INFO("rtabmap: odom_sensor_sync   = %s", odomSensorSync_?"true":"false");
+	NODELET_INFO("rtabmap: pub_loc_pose_only_when_localizing = %s", pubLocPoseOnlyWhenLocalizing_?"true":"false");
 	bool subscribeStereo = false;
 	pnh.param("subscribe_stereo",      subscribeStereo, subscribeStereo);
 	if(subscribeStereo)
@@ -2043,17 +2046,36 @@ void CoreWrapper::process(
 			}
 			else
 			{
-				if(localizationPosePub_.getNumSubscribers() &&
-					!rtabmap_.getStatistics().localizationCovariance().empty())
+				if(localizationPosePub_.getNumSubscribers())
 				{
-					geometry_msgs::PoseWithCovarianceStamped poseMsg;
-					poseMsg.header.frame_id = mapFrameId_;
-					poseMsg.header.stamp = stamp;
-					rtabmap_conversions::transformToPoseMsg(mapToOdom_*odom, poseMsg.pose.pose);
-					poseMsg.pose.covariance;
-					const cv::Mat & cov = rtabmap_.getStatistics().localizationCovariance();
-					memcpy(poseMsg.pose.covariance.data(), cov.data, cov.total()*sizeof(double));
-					localizationPosePub_.publish(poseMsg);
+					bool localized = rtabmap_.getStatistics().loopClosureId()!=0 ||
+							rtabmap_.getStatistics().proximityDetectionId()!=0 ||
+							static_cast<int>(uValue(rtabmap_.getStatistics().data(), rtabmap::Statistics::kLoopLandmark_detected(), 0.0f))!=0;
+
+					if(localized || !pubLocPoseOnlyWhenLocalizing_)
+					{
+						geometry_msgs::PoseWithCovarianceStamped poseMsg;
+						poseMsg.header.frame_id = mapFrameId_;
+						poseMsg.header.stamp = stamp;
+						rtabmap_conversions::transformToPoseMsg(mapToOdom_*odom, poseMsg.pose.pose);
+						poseMsg.pose.covariance;
+						if(!rtabmap_.getStatistics().localizationCovariance().empty())
+						{
+							const cv::Mat & cov = rtabmap_.getStatistics().localizationCovariance();
+							memcpy(poseMsg.pose.covariance.data(), cov.data, cov.total()*sizeof(double));
+						}
+						else
+						{
+							// Not yet localized, publish large covariance
+							poseMsg.pose.covariance.data()[0] = 9999;
+							poseMsg.pose.covariance.data()[7] = 9999;
+							poseMsg.pose.covariance.data()[14] = twoDMapping_?rtabmap::Registration::COVARIANCE_LINEAR_EPSILON:9999;
+							poseMsg.pose.covariance.data()[21] = twoDMapping_?rtabmap::Registration::COVARIANCE_ANGULAR_EPSILON:9999;
+							poseMsg.pose.covariance.data()[28] = twoDMapping_?rtabmap::Registration::COVARIANCE_ANGULAR_EPSILON:9999;
+							poseMsg.pose.covariance.data()[35] = 9999;
+						}
+						localizationPosePub_.publish(poseMsg);
+					}
 				}
 				std::map<int, rtabmap::Transform> filteredPoses(rtabmap_.getLocalOptimizedPoses().lower_bound(1), rtabmap_.getLocalOptimizedPoses().end());
 
