@@ -54,7 +54,8 @@ public:
 		waitForTransform_(false),
 		mapFrameProjection_(rtabmap::Parameters::defaultGridMapFrameProjection()),
 		warned_(false)
-	{}
+	{
+	}
 
 	virtual ~ObstaclesDetection()
 	{}
@@ -235,31 +236,24 @@ private:
 		projObstaclesPub_ = nh.advertise<sensor_msgs::PointCloud2>("proj_obstacles", 1);
 	}
 
-
-
-	void callback(const sensor_msgs::PointCloud2ConstPtr & cloudMsg)
+	template<typename PointT>
+	void process(
+		typename pcl::PointCloud<PointT>::Ptr & inputCloud,
+		const std_msgs::Header & header)
 	{
-		ros::WallTime time = ros::WallTime::now();
-
-		if (groundPub_.getNumSubscribers() == 0 && obstaclesPub_.getNumSubscribers() == 0 && projObstaclesPub_.getNumSubscribers() == 0)
-		{
-			// no one wants the results
-			return;
-		}
-
 		rtabmap::Transform localTransform = rtabmap::Transform::getIdentity();
 		try
 		{
 			if(waitForTransform_)
 			{
-				if(!tfListener_.waitForTransform(frameId_, cloudMsg->header.frame_id, cloudMsg->header.stamp, ros::Duration(1)))
+				if(!tfListener_.waitForTransform(frameId_, header.frame_id, header.stamp, ros::Duration(1)))
 				{
-					NODELET_ERROR("Could not get transform from %s to %s after 1 second!", frameId_.c_str(), cloudMsg->header.frame_id.c_str());
+					NODELET_ERROR("Could not get transform from %s to %s after 1 second!", frameId_.c_str(), header.frame_id.c_str());
 					return;
 				}
 			}
 			tf::StampedTransform tmp;
-			tfListener_.lookupTransform(frameId_, cloudMsg->header.frame_id, cloudMsg->header.stamp, tmp);
+			tfListener_.lookupTransform(frameId_, header.frame_id, header.stamp, tmp);
 			localTransform = rtabmap_conversions::transformFromTF(tmp);
 		}
 		catch(tf::TransformException & ex)
@@ -275,14 +269,14 @@ private:
 			{
 				if(waitForTransform_)
 				{
-					if(!tfListener_.waitForTransform(mapFrameId_, frameId_, cloudMsg->header.stamp, ros::Duration(1)))
+					if(!tfListener_.waitForTransform(mapFrameId_, frameId_, header.stamp, ros::Duration(1)))
 					{
 						NODELET_ERROR("Could not get transform from %s to %s after 1 second!", mapFrameId_.c_str(), frameId_.c_str());
 						return;
 					}
 				}
 				tf::StampedTransform tmp;
-				tfListener_.lookupTransform(mapFrameId_, frameId_, cloudMsg->header.stamp, tmp);
+				tfListener_.lookupTransform(mapFrameId_, frameId_, header.stamp, tmp);
 				pose = rtabmap_conversions::transformFromTF(tmp);
 			}
 			catch(tf::TransformException & ex)
@@ -292,17 +286,7 @@ private:
 			}
 		}
 
-		UASSERT_MSG(cloudMsg->data.size() == cloudMsg->row_step*cloudMsg->height,
-				uFormat("data=%d row_step=%d height=%d", cloudMsg->data.size(), cloudMsg->row_step, cloudMsg->height).c_str());
-
-		pcl::PointCloud<pcl::PointXYZ>::Ptr inputCloud(new pcl::PointCloud<pcl::PointXYZ>);
-		pcl::fromROSMsg(*cloudMsg, *inputCloud);
-		if(inputCloud->isOrganized())
-		{
-			std::vector<int> indices;
-			pcl::removeNaNFromPointCloud(*inputCloud, *inputCloud, indices);
-		}
-		else if(!inputCloud->is_dense && inputCloud->height == 1)
+		if(!inputCloud->is_dense && inputCloud->height == 1)
 		{
 			if(!warned_)
 			{
@@ -316,18 +300,30 @@ private:
 
 		//Common variables for all strategies
 		pcl::IndicesPtr ground, obstacles;
-		pcl::PointCloud<pcl::PointXYZ>::Ptr obstaclesCloud(new pcl::PointCloud<pcl::PointXYZ>);
-		pcl::PointCloud<pcl::PointXYZ>::Ptr groundCloud(new pcl::PointCloud<pcl::PointXYZ>);
-		pcl::PointCloud<pcl::PointXYZ>::Ptr obstaclesCloudWithoutFlatSurfaces(new pcl::PointCloud<pcl::PointXYZ>);
+		typename pcl::PointCloud<PointT>::Ptr obstaclesCloud(new pcl::PointCloud<PointT>);
+		typename pcl::PointCloud<PointT>::Ptr groundCloud(new pcl::PointCloud<PointT>);
+		typename pcl::PointCloud<PointT>::Ptr obstaclesCloudWithoutFlatSurfaces(new pcl::PointCloud<PointT>);
 
 		if(inputCloud->size())
 		{
+			pcl::IndicesPtr indices(new std::vector<int>);
+			if(inputCloud->isOrganized())
+			{
+				for(size_t i = 0; i<inputCloud->size(); ++i)
+				{
+					if(pcl::isFinite(inputCloud->at(i)))
+					{
+						indices->push_back(i);
+					}
+				}
+			}
+
 			inputCloud = rtabmap::util3d::transformPointCloud(inputCloud, localTransform);
 
 			pcl::IndicesPtr flatObstacles(new std::vector<int>);
-			pcl::PointCloud<pcl::PointXYZ>::Ptr cloud = grid_.segmentCloud<pcl::PointXYZ>(
+			typename pcl::PointCloud<PointT>::Ptr cloud = grid_.segmentCloud<PointT>(
 					inputCloud,
-					pcl::IndicesPtr(new std::vector<int>),
+					indices,
 					pose,
 					cv::Point3f(localTransform.x(), localTransform.y(), localTransform.z()),
 					ground,
@@ -399,14 +395,14 @@ private:
 		}
 		else
 		{
-			ROS_WARN("obstacles_detection: Input cloud is empty! (%d x %d, is_dense=%d)", cloudMsg->width, cloudMsg->height, cloudMsg->is_dense?1:0);
+			ROS_WARN("obstacles_detection: Input cloud is empty!");
 		}
 
 		if(groundPub_.getNumSubscribers())
 		{
 			sensor_msgs::PointCloud2 rosCloud;
 			pcl::toROSMsg(*groundCloud, rosCloud);
-			rosCloud.header = cloudMsg->header;
+			rosCloud.header = header;
 
 			//publish the message
 			groundPub_.publish(rosCloud);
@@ -416,7 +412,7 @@ private:
 		{
 			sensor_msgs::PointCloud2 rosCloud;
 			pcl::toROSMsg(*obstaclesCloud, rosCloud);
-			rosCloud.header = cloudMsg->header;
+			rosCloud.header = header;
 
 			//publish the message
 			obstaclesPub_.publish(rosCloud);
@@ -426,11 +422,48 @@ private:
 		{
 			sensor_msgs::PointCloud2 rosCloud;
 			pcl::toROSMsg(*obstaclesCloudWithoutFlatSurfaces, rosCloud);
-			rosCloud.header.stamp = cloudMsg->header.stamp;
+			rosCloud.header.stamp = header.stamp;
 			rosCloud.header.frame_id = frameId_;
 
 			//publish the message
 			projObstaclesPub_.publish(rosCloud);
+		}
+	}
+
+	void callback(const sensor_msgs::PointCloud2ConstPtr & cloudMsg)
+	{
+		ros::WallTime time = ros::WallTime::now();
+
+		if (groundPub_.getNumSubscribers() == 0 && obstaclesPub_.getNumSubscribers() == 0 && projObstaclesPub_.getNumSubscribers() == 0)
+		{
+			// no one wants the results
+			return;
+		}
+
+		UASSERT_MSG(cloudMsg->data.size() == cloudMsg->row_step*cloudMsg->height,
+				uFormat("data=%d row_step=%d height=%d", cloudMsg->data.size(), cloudMsg->row_step, cloudMsg->height).c_str());
+
+		bool hasNormals = false;
+		for(unsigned int i=0; i<cloudMsg->fields.size(); ++i)
+		{
+			if(cloudMsg->fields[i].name.compare("normal_x") == 0)
+			{
+				hasNormals = true;
+				break;
+			}
+		}
+
+		pcl::PointCloud<pcl::PointXYZ>::Ptr inputCloud(new pcl::PointCloud<pcl::PointXYZ>);
+		pcl::PointCloud<pcl::PointNormal>::Ptr inputCloudNormal(new pcl::PointCloud<pcl::PointNormal>);
+		if(hasNormals)
+		{
+			pcl::fromROSMsg(*cloudMsg, *inputCloudNormal);
+			process<pcl::PointNormal>(inputCloudNormal, cloudMsg->header);
+		}
+		else
+		{
+			pcl::fromROSMsg(*cloudMsg, *inputCloud);
+			process<pcl::PointXYZ>(inputCloud, cloudMsg->header);
 		}
 
 		NODELET_DEBUG("Obstacles segmentation time = %f s", (ros::WallTime::now() - time).toSec());

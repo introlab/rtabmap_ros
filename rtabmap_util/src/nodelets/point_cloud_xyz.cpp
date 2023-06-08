@@ -100,6 +100,9 @@ private:
 		ros::NodeHandle & nh = getNodeHandle();
 		ros::NodeHandle & pnh = getPrivateNodeHandle();
 
+		ULogger::setType(ULogger::kTypeConsole);
+		ULogger::setLevel(ULogger::kWarning);
+
 		int queueSize = 10;
 		bool approxSync = true;
 		std::string roiStr;
@@ -116,7 +119,7 @@ private:
 		pnh.param("normal_k", normalK_, normalK_);
 		pnh.param("normal_radius", normalRadius_, normalRadius_);
 		pnh.param("filter_nans", filterNaNs_, filterNaNs_);
-		pnh.param("roi_ratios", roiStr, roiStr);
+		pnh.param("roi_ratios", roiStr, roiStr); // [left, right, top, bottom]
 
 		// Deprecated
 		if(pnh.hasParam("cut_left"))
@@ -282,7 +285,6 @@ private:
 					minDepth_,
 					indices.get());
 			processAndPublish(pclCloud, indices, depthMsg->header);
-
 			NODELET_DEBUG("point_cloud_xyz from depth time = %f s", (ros::WallTime::now() - time).toSec());
 		}
 	}
@@ -361,7 +363,15 @@ private:
 		if(!pclCloud->empty() && (pclCloud->is_dense || !indices->empty()) && (normalK_ > 0 || normalRadius_ > 0.0f))
 		{
 			//compute normals
-			pcl::PointCloud<pcl::Normal>::Ptr normals = rtabmap::util3d::computeNormals(pclCloud, normalK_, normalRadius_);
+			pcl::PointCloud<pcl::Normal>::Ptr normals;
+			if(pclCloud->isOrganized())
+			{
+				normals = rtabmap::util3d::computeFastOrganizedNormals(pclCloud, indices, normalRadius_, normalK_);
+			}
+			else
+			{
+				normals = rtabmap::util3d::computeNormals(pclCloud, normalK_, normalRadius_);
+			}
 			pcl::PointCloud<pcl::PointNormal>::Ptr pclCloudNormal(new pcl::PointCloud<pcl::PointNormal>);
 			pcl::concatenateFields(*pclCloud, *normals, *pclCloudNormal);
 			if(filterNaNs_)
