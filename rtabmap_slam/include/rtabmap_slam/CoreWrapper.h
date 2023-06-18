@@ -263,6 +263,7 @@ private:
 	rtabmap::Transform currentMetricGoal_;
 	rtabmap::Transform lastPublishedMetricGoal_;
 	bool latestNodeWasReached_;
+	bool pubLocPoseOnlyWhenLocalizing_;
 	bool graphLatched_;
 	rtabmap::ParametersMap parameters_;
 	std::map<std::string, float> rtabmapROSStats_;

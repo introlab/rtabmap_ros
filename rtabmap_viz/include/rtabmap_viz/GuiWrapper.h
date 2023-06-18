@@ -71,6 +71,7 @@ protected:
 
 private:
 	void infoMapCallback(const rtabmap_msgs::msg::Info::ConstSharedPtr infoMsg, const rtabmap_msgs::msg::MapData::ConstSharedPtr mapMsg);
+	void infoCallback(const rtabmap_msgs::msg::Info::ConstSharedPtr infoMsg);
 	void goalPathCallback(const rtabmap_msgs::msg::Goal::ConstSharedPtr goalMsg, const nav_msgs::msg::Path::ConstSharedPtr pathMsg);
 	void goalReachedCallback(const std_msgs::msg::Bool::ConstSharedPtr value);
 
@@ -141,6 +142,7 @@ private:
 
 	message_filters::Subscriber<rtabmap_msgs::msg::Info> infoTopic_;
 	message_filters::Subscriber<rtabmap_msgs::msg::MapData> mapDataTopic_;
+	rclcpp::Subscription<rtabmap_msgs::msg::Info>::SharedPtr infoOnlyTopic_;
 
 	message_filters::Subscriber<rtabmap_msgs::msg::Goal> goalTopic_;
 	message_filters::Subscriber<nav_msgs::msg::Path> pathTopic_;

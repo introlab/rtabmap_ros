@@ -92,6 +92,7 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 		lastPose_(Transform::getIdentity()),
 		lastPoseIntermediate_(false),
 		latestNodeWasReached_(false),
+		pubLocPoseOnlyWhenLocalizing_(false),
 		graphLatched_(false),
 		frameId_("base_link"),
 		odomFrameId_(""),
@@ -189,7 +190,8 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 
 	landmarkDefaultAngVariance_ = this->declare_parameter("landmark_angular_variance", landmarkDefaultAngVariance_);
 	landmarkDefaultLinVariance_ = this->declare_parameter("landmark_linear_variance", landmarkDefaultLinVariance_);
-
+	
+	pubLocPoseOnlyWhenLocalizing_ = this->declare_parameter("pub_loc_pose_only_when_localizing", pubLocPoseOnlyWhenLocalizing_);
 	waitForTransform_ = this->declare_parameter("wait_for_transform", waitForTransform_);
 	initialPoseStr = this->declare_parameter("initial_pose", initialPoseStr);
 	useActionForGoal_ = this->declare_parameter("use_action_for_goal", useActionForGoal_);
@@ -226,6 +228,7 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 	RCLCPP_INFO(this->get_logger(), "rtabmap: tf_delay      = %f", tfDelay);
 	RCLCPP_INFO(this->get_logger(), "rtabmap: tf_tolerance  = %f", tfTolerance);
 	RCLCPP_INFO(this->get_logger(), "rtabmap: odom_sensor_sync   = %s", odomSensorSync_?"true":"false");
+	RCLCPP_INFO(this->get_logger(), "rtabmap: pub_loc_pose_only_when_localizing = %s", pubLocPoseOnlyWhenLocalizing_?"true":"false");
 	if(this->isSubscribedToStereo())
 	{
 		RCLCPP_INFO(this->get_logger(), "rtabmap: stereo_to_depth = %s", stereoToDepth_?"true":"false");
@@ -2018,16 +2021,35 @@ void CoreWrapper::process(
 			}
 			else
 			{
-				if(localizationPosePub_->get_subscription_count() &&
-					!rtabmap_.getStatistics().localizationCovariance().empty())
+				if(localizationPosePub_->get_subscription_count())
 				{
-					geometry_msgs::msg::PoseWithCovarianceStamped poseMsg;
-					poseMsg.header.frame_id = mapFrameId_;
-					poseMsg.header.stamp = stamp;
-					rtabmap_conversions::transformToPoseMsg(mapToOdom_*odom, poseMsg.pose.pose);
-					const cv::Mat & cov = rtabmap_.getStatistics().localizationCovariance();
-					memcpy(poseMsg.pose.covariance.data(), cov.data, cov.total()*sizeof(double));
-					localizationPosePub_->publish(poseMsg);
+				    bool localized = rtabmap_.getStatistics().loopClosureId()!=0 ||
+							rtabmap_.getStatistics().proximityDetectionId()!=0 ||
+							static_cast<int>(uValue(rtabmap_.getStatistics().data(), rtabmap::Statistics::kLoopLandmark_detected(), 0.0f))!=0;
+
+                    if(localized || !pubLocPoseOnlyWhenLocalizing_)
+					{
+						geometry_msgs::msg::PoseWithCovarianceStamped poseMsg;
+					    poseMsg.header.frame_id = mapFrameId_;
+					    poseMsg.header.stamp = stamp;
+						rtabmap_conversions::transformToPoseMsg(mapToOdom_*odom, poseMsg.pose.pose);
+						if(!rtabmap_.getStatistics().localizationCovariance().empty())
+						{
+							const cv::Mat & cov = rtabmap_.getStatistics().localizationCovariance();
+							memcpy(poseMsg.pose.covariance.data(), cov.data, cov.total()*sizeof(double));
+						}
+						else
+						{
+							// Not yet localized, publish large covariance
+							poseMsg.pose.covariance.data()[0] = 9999;
+							poseMsg.pose.covariance.data()[7] = 9999;
+							poseMsg.pose.covariance.data()[14] = twoDMapping_?rtabmap::Registration::COVARIANCE_LINEAR_EPSILON:9999;
+							poseMsg.pose.covariance.data()[21] = twoDMapping_?rtabmap::Registration::COVARIANCE_ANGULAR_EPSILON:9999;
+							poseMsg.pose.covariance.data()[28] = twoDMapping_?rtabmap::Registration::COVARIANCE_ANGULAR_EPSILON:9999;
+							poseMsg.pose.covariance.data()[35] = 9999;
+						}
+						localizationPosePub_->publish(poseMsg);
+					}
 				}
 				std::map<int, rtabmap::Transform> filteredPoses(rtabmap_.getLocalOptimizedPoses().lower_bound(1), rtabmap_.getLocalOptimizedPoses().end());
 

@@ -50,6 +50,13 @@ RTAB-Map's ROS2 package (branch `ros2`). **ROS2 Foxy minimum required**: current
             <td>Rolling</td>
             <td><a href="http://build.ros2.org/job/Rbin_uJ64__rtabmap_ros__ubuntu_jammy_amd64__binary/"><img src="http://build.ros2.org/buildStatus/icon?job=Rbin_uJ64__rtabmap_ros__ubuntu_jammy_amd64__binary" alt="Build Status"/></td>
         </tr>
+        <tr>
+           <td>Docker</td>
+           <td>
+             <a href="https://hub.docker.com/r/introlab3it/rtabmap_ros">rtabmap_ros</a>
+           </td>
+           <td><img src="https://img.shields.io/docker/pulls/introlab3it/rtabmap_ros.svg?label=pulls" alt="Docker Pulls"/></td>
+        </tr>
     </tbody>
 </table>
 

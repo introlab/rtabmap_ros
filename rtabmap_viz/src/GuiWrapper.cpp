@@ -112,12 +112,14 @@ GuiWrapper::GuiWrapper(const rclcpp::NodeOptions & options) :
 
 	// To receive odometry events
 	std::string initCachePath;
+	bool subscribeInfoOnly = false;
 	frameId_ = this->declare_parameter("frame_id", frameId_);
 	this->get_parameter_or("odom_frame_id", odomFrameId_, odomFrameId_); // set to use odom from TF, ros2: already declared in CommonDataSubscriber
 	waitForTransform_ = this->declare_parameter("wait_for_transform", waitForTransform_);
 	odomSensorSync_ = this->declare_parameter("odom_sensor_sync", odomSensorSync_);
 	maxOdomUpdateRate_ = this->declare_parameter("max_odom_update_rate", maxOdomUpdateRate_);
 	cameraNodeName_ = this->declare_parameter("camera_node_name", cameraNodeName_); // used to pause the rtabmap_ros/camera when pausing the process
+	subscribeInfoOnly = this->declare_parameter("subscribe_info_only", subscribeInfoOnly);
 	initCachePath = this->declare_parameter("init_cache_path", initCachePath);
 	if(initCachePath.size())
 	{
@@ -142,13 +144,21 @@ GuiWrapper::GuiWrapper(const rclcpp::NodeOptions & options) :
 
 	republishNodeDataPub_ = this->create_publisher<std_msgs::msg::Int32MultiArray>("republish_node_data", 1);
 
-	infoTopic_.subscribe(this, "info");
-	mapDataTopic_.subscribe(this, "mapData");
-	infoMapSync_ = new message_filters::Synchronizer<MyInfoMapSyncPolicy>(
-			MyInfoMapSyncPolicy(this->getQueueSize()),
-			infoTopic_,
-			mapDataTopic_);
-	infoMapSync_->registerCallback(std::bind(&GuiWrapper::infoMapCallback, this, std::placeholders::_1, std::placeholders::_2));
+	if(subscribeInfoOnly)
+	{
+	    RCLCPP_INFO(this->get_logger(), "rtabmap_viz: subscribe_info_only=true");
+		infoOnlyTopic_ = this->create_subscription<rtabmap_msgs::msg::Info>("info", 1, std::bind(&GuiWrapper::infoCallback, this, std::placeholders::_1));
+	}
+	else
+	{
+		infoTopic_.subscribe(this, "info");
+	    mapDataTopic_.subscribe(this, "mapData");
+	    infoMapSync_ = new message_filters::Synchronizer<MyInfoMapSyncPolicy>(
+			    MyInfoMapSyncPolicy(this->getQueueSize()),
+			    infoTopic_,
+			    mapDataTopic_);
+	    infoMapSync_->registerCallback(std::bind(&GuiWrapper::infoMapCallback, this, std::placeholders::_1, std::placeholders::_2));
+	}
 
 	goalTopic_.subscribe(this, "goal_node");
 	pathTopic_.subscribe(this, "global_path");
@@ -194,6 +204,36 @@ void GuiWrapper::infoMapCallback(
 	stat.setPoses(poses);
 	stat.setSignaturesData(signatures);
 	stat.setConstraints(links);
+
+	this->post(new RtabmapEvent(stat));
+}
+
+void GuiWrapper::infoCallback(
+		const rtabmap_msgs::msg::Info::ConstSharedPtr infoMsg)
+{
+	rtabmap::Statistics stat;
+
+	// Info from ROS
+	rtabmap_conversions::infoFromROS(*infoMsg, stat);
+
+	// mapToOdom can be recovered from statistics
+	if(stat.data().find(Statistics::kLoopMapToOdom_x()) != stat.data().end() &&
+	   stat.data().find(Statistics::kLoopMapToOdom_y()) != stat.data().end() &&
+	   stat.data().find(Statistics::kLoopMapToOdom_z()) != stat.data().end() &&
+	   stat.data().find(Statistics::kLoopMapToOdom_roll()) != stat.data().end() &&
+	   stat.data().find(Statistics::kLoopMapToOdom_pitch()) != stat.data().end() &&
+	   stat.data().find(Statistics::kLoopMapToOdom_yaw()) != stat.data().end())
+	{
+		rtabmap::Transform mapToOdom;
+		mapToOdom = rtabmap::Transform(
+			stat.data().at(Statistics::kLoopMapToOdom_x()),
+			stat.data().at(Statistics::kLoopMapToOdom_y()),
+			stat.data().at(Statistics::kLoopMapToOdom_z()),
+			stat.data().at(Statistics::kLoopMapToOdom_roll())*M_PI/180.f,
+			stat.data().at(Statistics::kLoopMapToOdom_pitch())*M_PI/180.f,
+			stat.data().at(Statistics::kLoopMapToOdom_yaw())*M_PI/180.f);
+		stat.setMapCorrection(mapToOdom);
+	}
 
 	this->post(new RtabmapEvent(stat));
 }
