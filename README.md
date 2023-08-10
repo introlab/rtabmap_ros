@@ -106,6 +106,10 @@ sudo apt install ros-$ROS_DISTRO-rtabmap-ros
 ```
 
 ### From Source
+* Make sure to uninstall any rtabmap binaries:
+    ```
+    sudo apt remove ros-$ROS_DISTRO-rtabmap*
+    ```
 * RTAB-Map ROS2 package:
     ```bash
     cd ~/ros2_ws
