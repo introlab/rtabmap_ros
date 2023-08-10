@@ -100,8 +100,8 @@ This section shows how to install RTAB-Map ros-pkg on **ROS Melodic/Noetic** (Ca
  0. Required dependencies
      * The easiest way to get all them (Qt, PCL, VTK, OpenCV, ...) is to install/uninstall rtabmap binaries:
           ```bash
-          sudo apt install ros-$ROS_DISTRO-rtabmap ros-$ROS_DISTRO-rtabmap-ros
-          sudo apt remove ros-$ROS_DISTRO-rtabmap ros-$ROS_DISTRO-rtabmap-ros
+          sudo apt install ros-$ROS_DISTRO-rtabmap*
+          sudo apt remove ros-$ROS_DISTRO-rtabmap*
           ```
  
  1. Optional dependencies
