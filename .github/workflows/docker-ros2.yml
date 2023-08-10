@@ -11,18 +11,8 @@ jobs:
     
     strategy:
       matrix:
-        docker_tag: [foxy, foxy-latest, humble, humble-latest]
+        docker_tag: [humble, humble-latest]
         include:
-        - docker_tag: foxy
-          docker_path: 'foxy'
-          docker_platforms: |
-            linux/amd64
-            linux/arm64
-        - docker_tag: foxy-latest
-          docker_path: 'foxy/latest'
-          docker_platforms: |
-            linux/amd64
-            linux/arm64
         - docker_tag: humble
           docker_path: 'humble'
           docker_platforms: |
