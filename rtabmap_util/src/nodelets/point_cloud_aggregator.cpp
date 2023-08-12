@@ -159,7 +159,7 @@ PointCloudAggregator::PointCloudAggregator(const rclcpp::NodeOptions & options) 
 			if(!callbackCalled_)
 			{
 				RCLCPP_WARN(this->get_logger(), "%s: Did not receive data since 5 seconds! Make sure the input topics are "
-						"published (\"$ rostopic hz my_topic\") and the timestamps in their "
+						"published (\"$ ros2 topic hz my_topic\") and the timestamps in their "
 						"header are set. %s%s",
 						this->get_name(),
 						approx?"":"Parameter \"approx_sync\" is false, which means that input "
