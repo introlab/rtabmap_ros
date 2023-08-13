@@ -652,7 +652,7 @@ void CommonDataSubscriber::setupCallbacks(rclcpp::Node & node)
 				{
 					RCLCPP_WARN(node.get_logger(),
 							"%s: Did not receive data since 5 seconds! Make sure the input topics are "
-							"published (\"$ rostopic hz my_topic\") and the timestamps in their "
+							"published (\"$ ros2 topic hz my_topic\") and the timestamps in their "
 							"header are set. If topics are coming from different computers, make sure "
 							"the clocks of the computers are synchronized (\"ntpdate\"). If topics are "
 							"not published at the same rate, you could increase \"queue_size\" parameter "
