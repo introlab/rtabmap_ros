@@ -29,26 +29,18 @@ For the RTAB-Map libraries and standalone application, visit [RTAB-Map's home pa
  <table>
     <tbody>
         <tr>
-           <td rowspan="2">ROS 1</td>
-           <td>Melodic</td>
-            <td><a href="http://build.ros.org/job/Mbin_ubv8_uBv8__rtabmap_ros__ubuntu_bionic_arm64__binary/"><img src="http://build.ros.org/buildStatus/icon?job=Mbin_ubv8_uBv8__rtabmap_ros__ubuntu_bionic_arm64__binary" alt="Build Status"/></td>
-        </tr>
-        <tr>
+            <td rowspan="1">ROS 1</td>
             <td>Noetic</td>
             <td><a href="http://build.ros.org/job/Nbin_ufv8_uFv8__rtabmap_ros__ubuntu_focal_arm64__binary/"><img src="http://build.ros.org/buildStatus/icon?job=Nbin_ufv8_uFv8__rtabmap_ros__ubuntu_focal_arm64__binary" alt="Build Status"/></td>
         </tr>
         <tr>
-            <td rowspan="4">ROS 2</td>
-            <td>Foxy</td>
-            <td><a href="http://build.ros2.org/job/Fbin_uF64__rtabmap_ros__ubuntu_focal_amd64__binary/"><img src="http://build.ros2.org/buildStatus/icon?job=Fbin_uF64__rtabmap_ros__ubuntu_focal_amd64__binary" alt="Build Status"/></td>
-        </tr>
-        <tr>
-            <td>Galactic</td>
-            <td><a href="http://build.ros2.org/job/Gbin_uF64__rtabmap_ros__ubuntu_focal_amd64__binary/"><img src="http://build.ros2.org/buildStatus/icon?job=Gbin_uF64__rtabmap_ros__ubuntu_focal_amd64__binary" alt="Build Status"/></td>
-        </tr>
-        <tr>
+            <td rowspan="3">ROS 2</td>
             <td>Humble</td>
             <td><a href="http://build.ros2.org/job/Hbin_uJ64__rtabmap_ros__ubuntu_jammy_amd64__binary/"><img src="http://build.ros2.org/buildStatus/icon?job=Hbin_uJ64__rtabmap_ros__ubuntu_jammy_amd64__binary" alt="Build Status"/></td>
+        </tr>
+        <tr>
+            <td>Iron</td>
+            <td><a href="http://build.ros2.org/job/Ibin_uJ64__rtabmap_ros__ubuntu_jammy_amd64__binary/"><img src="http://build.ros2.org/buildStatus/icon?job=Ibin_uJ64__rtabmap_ros__ubuntu_jammy_amd64__binary" alt="Build Status"/></td>
         </tr>
         <tr>
             <td>Rolling</td>
@@ -88,7 +80,7 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/ros/noetic/lib/x86_64-linux-gnu
 
 
 ## Build from source
-This section shows how to install RTAB-Map ros-pkg on **ROS Melodic/Noetic** (Catkin build).
+This section shows how to install RTAB-Map ros-pkg on **ROS Noetic** (Catkin build).
 
 * The next instructions assume that you have set up your ROS workspace using this [tutorial](http://wiki.ros.org/catkin/Tutorials/create_a_workspace). The workspace path is `~/catkin_ws` and your `~/.bashrc` contains:
  
@@ -98,21 +90,21 @@ This section shows how to install RTAB-Map ros-pkg on **ROS Melodic/Noetic** (Ca
     ```
 
  0. Required dependencies
-     * The easiest way to get all them (Qt, PCL, VTK, OpenCV, ...) is to install/uninstall rtabmap binaries:
+     * The easiest way to get all them (Qt, PCL, VTK, OpenCV, g2o, gtsam ...) is to install/uninstall rtabmap binaries:
           ```bash
           sudo apt install ros-$ROS_DISTRO-rtabmap*
           sudo apt remove ros-$ROS_DISTRO-rtabmap*
           ```
  
  1. Optional dependencies
-     * If you want SURF/SIFT on Melodic/Noetic, you have to build [OpenCV]([OpenCV](http://opencv.org/)) from source to have access to *xfeatures2d* and *nonfree* modules (note that SIFT is not in *nonfree* anymore since OpenCV 4.4.0). Install it in `/usr/local` (default) and rtabmap library should link with it instead of the one installed in ROS. 
-         * On Melodic/Noetic, build from source with *xfeatures2d* module (and *nonfree* module if needed) the same OpenCV version already installed on the system. You will then avoid breaking `cv_bridge` with `rtabmap_ros`. If you want to install a more recent OpenCV version, I recommend to uninstall `libopencv*` libraries (with all ros packages depending on it) and rebuild all those ros packages in your catkin workspace (to make sure `cv_bridge` is linked on the OpenCV version you just compiled).
+     * If you want SURF/SIFT on Noetic, you have to build [OpenCV]([OpenCV](http://opencv.org/)) from source to have access to *xfeatures2d* and *nonfree* modules. Install it in `/usr/local` (default) and rtabmap library should link with it instead of the one installed in ROS. 
+         * On Noetic, build from source with *xfeatures2d* module (and *nonfree* module if needed) the same OpenCV version already installed on the system. You will then avoid breaking `cv_bridge` with `rtabmap_ros`. If you want to install a more recent OpenCV version, I recommend to uninstall `libopencv*` libraries (with all ros packages depending on it) and rebuild all those ros packages in your catkin workspace (to make sure `cv_bridge` is linked on the OpenCV version you just compiled).
   
     * [g2o](https://github.com/RainerKuemmerle/g2o): Should be already installed by `ros-$ROS_DISTRO-libg2o`.
 
-    * [GTSAM](https://gtsam.org/get_started/): Install via PPA to avoid building from source. If you install from source, make sure to build with `cmake  -DGTSAM_BUILD_WITH_MARCH_NATIVE=OFF -DGTSAM_USE_SYSTEM_EIGEN=ON`.
+    * [GTSAM](https://gtsam.org/get_started/): Should be already installed by `ros-$ROS_DISTRO-gtsam`.
     
-    * [libpointmatcher](https://github.com/ethz-asl/libpointmatcher): **Recommended** if you are going to use lidars. Follow their [instructions](https://github.com/ethz-asl/libpointmatcher#quick-start) to install. Should be alread installed by `ros-$ROS_DISTRO-libpointmatcher`.
+    * [libpointmatcher](https://github.com/ethz-asl/libpointmatcher): **Recommended** if you are going to use lidars. Should be alread installed by `ros-$ROS_DISTRO-libpointmatcher` (Official [install instructions](https://github.com/ethz-asl/libpointmatcher#quick-start)).
 
 2. Install RTAB-Map standalone libraries. **Do not clone in your Catkin workspace**.
     ```bash
