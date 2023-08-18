@@ -2058,7 +2058,6 @@ void CoreWrapper::process(
 						poseMsg.header.frame_id = mapFrameId_;
 						poseMsg.header.stamp = stamp;
 						rtabmap_conversions::transformToPoseMsg(mapToOdom_*odom, poseMsg.pose.pose);
-						poseMsg.pose.covariance;
 						if(!rtabmap_.getStatistics().localizationCovariance().empty())
 						{
 							const cv::Mat & cov = rtabmap_.getStatistics().localizationCovariance();
