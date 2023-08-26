@@ -221,6 +221,9 @@ void GuiWrapper::infoMapCallback(
 	stat.setConstraints(links);
 
 	this->post(new RtabmapEvent(stat));
+
+	tick(infoMsg->header.stamp);
+
 }
 
 void GuiWrapper::infoCallback(
@@ -251,6 +254,8 @@ void GuiWrapper::infoCallback(
 	}
 
 	this->post(new RtabmapEvent(stat));
+
+	tick(infoMsg->header.stamp);
 }
 
 void GuiWrapper::goalPathCallback(

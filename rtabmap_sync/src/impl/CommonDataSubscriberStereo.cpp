@@ -32,11 +32,10 @@ namespace rtabmap_sync {
 // Stereo
 void CommonDataSubscriber::stereoCallback(
 		const sensor_msgs::ImageConstPtr& leftImageMsg,
-	   const sensor_msgs::ImageConstPtr& rightImageMsg,
-	   const sensor_msgs::CameraInfoConstPtr& leftCamInfoMsg,
-	   const sensor_msgs::CameraInfoConstPtr& rightCamInfoMsg)
+		const sensor_msgs::ImageConstPtr& rightImageMsg,
+		const sensor_msgs::CameraInfoConstPtr& leftCamInfoMsg,
+		const sensor_msgs::CameraInfoConstPtr& rightCamInfoMsg)
 {
-	callbackCalled();
 	nav_msgs::OdometryConstPtr odomMsg; // Null
 	rtabmap_msgs::UserDataConstPtr userDataMsg; // Null
 	sensor_msgs::LaserScan scanMsg; // null
@@ -46,12 +45,11 @@ void CommonDataSubscriber::stereoCallback(
 }
 void CommonDataSubscriber::stereoInfoCallback(
 		const sensor_msgs::ImageConstPtr& leftImageMsg,
-	   const sensor_msgs::ImageConstPtr& rightImageMsg,
-	   const sensor_msgs::CameraInfoConstPtr& leftCamInfoMsg,
-	   const sensor_msgs::CameraInfoConstPtr& rightCamInfoMsg,
-	   const rtabmap_msgs::OdomInfoConstPtr& odomInfoMsg)
+		const sensor_msgs::ImageConstPtr& rightImageMsg,
+		const sensor_msgs::CameraInfoConstPtr& leftCamInfoMsg,
+		const sensor_msgs::CameraInfoConstPtr& rightCamInfoMsg,
+		const rtabmap_msgs::OdomInfoConstPtr& odomInfoMsg)
 {
-	callbackCalled();
 	nav_msgs::OdometryConstPtr odomMsg; // Null
 	rtabmap_msgs::UserDataConstPtr userDataMsg; // Null
 	sensor_msgs::LaserScan scan2dMsg; // null
@@ -67,7 +65,6 @@ void CommonDataSubscriber::stereoOdomCallback(
 		const sensor_msgs::CameraInfoConstPtr& leftCamInfoMsg,
 		const sensor_msgs::CameraInfoConstPtr& rightCamInfoMsg)
 {
-	callbackCalled();
 	rtabmap_msgs::UserDataConstPtr userDataMsg; // Null
 	sensor_msgs::LaserScan scanMsg; // Null
 	sensor_msgs::PointCloud2 scan3dMsg; // null
@@ -82,7 +79,6 @@ void CommonDataSubscriber::stereoOdomInfoCallback(
 		const sensor_msgs::CameraInfoConstPtr& rightCamInfoMsg,
 		const rtabmap_msgs::OdomInfoConstPtr & odomInfoMsg)
 {
-	callbackCalled();
 	rtabmap_msgs::UserDataConstPtr userDataMsg; // Null
 	sensor_msgs::LaserScan scan2dMsg; // Null
 	sensor_msgs::PointCloud2 scan3dMsg; // Null

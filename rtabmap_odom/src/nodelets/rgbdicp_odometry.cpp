@@ -202,7 +202,7 @@ private:
 					info_sub_.getTopic().c_str(),
 					scan_sub_.getTopic().c_str());
 		}
-		this->startWarningThread(subscribedTopicsMsg, approxSync);
+		initDiagnosticMsg(subscribedTopicsMsg, approxSync);
 	}
 
 	virtual void updateParameters(ParametersMap & parameters)
@@ -243,7 +243,6 @@ private:
 			const sensor_msgs::LaserScanConstPtr& scanMsg,
 			const sensor_msgs::PointCloud2ConstPtr& cloudMsg)
 	{
-		callbackCalled();
 		if(!this->isPaused())
 		{
 			if(!(image->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) ==0 ||

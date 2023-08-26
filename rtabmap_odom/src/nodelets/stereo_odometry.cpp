@@ -282,7 +282,7 @@ private:
 					cameraInfoRight_.getTopic().c_str());
 		}
 
-		this->startWarningThread(subscribedTopicsMsg, approxSync);
+		initDiagnosticMsg(subscribedTopicsMsg, approxSync);
 	}
 
 	virtual void updateParameters(ParametersMap & parameters)
@@ -578,7 +578,6 @@ private:
 				const sensor_msgs::CameraInfoConstPtr& cameraInfoLeft,
 				const sensor_msgs::CameraInfoConstPtr& cameraInfoRight)
 	{
-		callbackCalled();
 		if(!this->isPaused())
 		{
 			std::vector<cv_bridge::CvImageConstPtr> leftMsgs(1);
@@ -609,7 +608,6 @@ private:
 	void callbackRGBD(
 			const rtabmap_msgs::RGBDImageConstPtr& image)
 	{
-		callbackCalled();
 		if(!this->isPaused())
 		{
 			std::vector<cv_bridge::CvImageConstPtr> leftMsgs(1);
@@ -627,7 +625,6 @@ private:
 	void callbackRGBDX(
 			const rtabmap_msgs::RGBDImagesConstPtr& images)
 	{
-		callbackCalled();
 		if(!this->isPaused())
 		{
 			if(images->rgbd_images.empty())
@@ -654,7 +651,6 @@ private:
 			const rtabmap_msgs::RGBDImageConstPtr& image,
 			const rtabmap_msgs::RGBDImageConstPtr& image2)
 	{
-		callbackCalled();
 		if(!this->isPaused())
 		{
 			std::vector<cv_bridge::CvImageConstPtr> leftMsgs(2);
@@ -677,7 +673,6 @@ private:
 			const rtabmap_msgs::RGBDImageConstPtr& image2,
 			const rtabmap_msgs::RGBDImageConstPtr& image3)
 	{
-		callbackCalled();
 		if(!this->isPaused())
 		{
 			std::vector<cv_bridge::CvImageConstPtr> leftMsgs(3);
@@ -704,7 +699,6 @@ private:
 			const rtabmap_msgs::RGBDImageConstPtr& image3,
 			const rtabmap_msgs::RGBDImageConstPtr& image4)
 	{
-		callbackCalled();
 		if(!this->isPaused())
 		{
 			std::vector<cv_bridge::CvImageConstPtr> leftMsgs(4);

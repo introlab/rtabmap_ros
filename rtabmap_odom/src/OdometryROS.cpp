@@ -57,9 +57,8 @@ using namespace rtabmap;
 namespace rtabmap_odom {
 
 OdometryROS::OdometryROS(bool stereoParams, bool visParams, bool icpParams) :
+	rtabmap_sync::SyncDiagnostic(0.5),
 	odometry_(0),
-	warningThread_(0),
-	callbackCalled_(false),
 	frameId_("base_link"),
 	odomFrameId_("odom"),
 	groundTruthFrameId_(""),
@@ -91,13 +90,6 @@ OdometryROS::OdometryROS(bool stereoParams, bool visParams, bool icpParams) :
 
 OdometryROS::~OdometryROS()
 {
-	if(warningThread_)
-	{
-		callbackCalled();
-		warningThread_->join();
-		delete warningThread_;
-	}
-
 	delete odometry_;
 }
 
@@ -378,29 +370,17 @@ void OdometryROS::onInit()
 	onOdomInit();
 }
 
-void OdometryROS::startWarningThread(const std::string & subscribedTopicsMsg, bool approxSync)
+void OdometryROS::initDiagnosticMsg(const std::string & subscribedTopicsMsg, bool approxSync)
 {
-	warningThread_ = new boost::thread(boost::bind(&OdometryROS::warningLoop, this, subscribedTopicsMsg, approxSync));
 	NODELET_INFO("%s", subscribedTopicsMsg.c_str());
-}
-
-void OdometryROS::warningLoop(const std::string & subscribedTopicsMsg, bool approxSync)
-{
-	ros::Duration r(5.0);
-	while(!callbackCalled_)
-	{
-		r.sleep();
-		if(!callbackCalled_)
-		{
-			ROS_WARN("%s: Did not receive data since 5 seconds! Make sure the input topics are "
+	initDiagnostic("",
+		uFormat("%s: Did not receive data since 5 seconds! Make sure the input topics are "
 					"published (\"$ rostopic hz my_topic\") and the timestamps in their "
 					"header are set. %s%s",
 					getName().c_str(),
 					approxSync?"":"Parameter \"approx_sync\" is false, which means that input "
 						"topics should have all the exact timestamp for the callback to be called.",
-					subscribedTopicsMsg.c_str());
-		}
-	}
+					subscribedTopicsMsg.c_str()));
 }
 
 rtabmap::Transform OdometryROS::velocityGuess() const
@@ -953,6 +933,16 @@ void OdometryROS::processData(SensorData & data, const std_msgs::Header & header
 		{
 			NODELET_INFO( "Odom: ratio=%f, std dev=%fm|%frad, update time=%fs", info.reg.icpInliersRatio, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (ros::WallTime::now()-time).toSec());
 		}
+
+		if(!pose.isNull())
+		{
+			double curentRate = 1.0/(ros::WallTime::now()-time).toSec();
+			tick(header.stamp, 
+				maxUpdateRate_>0 && maxUpdateRate_ < curentRate ? maxUpdateRate_:
+				expectedUpdateRate_>0 && expectedUpdateRate_ < curentRate ? expectedUpdateRate_:
+				previousStamp_ == 0.0 || header.stamp.toSec() - previousStamp_ > 1.0/curentRate?0:curentRate);
+		}
+
 		previousStamp_ = header.stamp.toSec();
 	}
 }
