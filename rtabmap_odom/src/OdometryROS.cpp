@@ -370,17 +370,20 @@ void OdometryROS::onInit()
 	onOdomInit();
 }
 
-void OdometryROS::initDiagnosticMsg(const std::string & subscribedTopicsMsg, bool approxSync)
+void OdometryROS::initDiagnosticMsg(const std::string & subscribedTopicsMsg, bool approxSync, const std::string & subscribedTopic)
 {
 	NODELET_INFO("%s", subscribedTopicsMsg.c_str());
-	initDiagnostic("",
+	std::vector<diagnostic_updater::DiagnosticTask*> tasks;
+	tasks.push_back(&statusDiagnostic_);
+	initDiagnostic(subscribedTopic,
 		uFormat("%s: Did not receive data since 5 seconds! Make sure the input topics are "
 					"published (\"$ rostopic hz my_topic\") and the timestamps in their "
 					"header are set. %s%s",
 					getName().c_str(),
 					approxSync?"":"Parameter \"approx_sync\" is false, which means that input "
 						"topics should have all the exact timestamp for the callback to be called.",
-					subscribedTopicsMsg.c_str()));
+					subscribedTopicsMsg.c_str()),
+		tasks);
 }
 
 rtabmap::Transform OdometryROS::velocityGuess() const
@@ -934,10 +937,11 @@ void OdometryROS::processData(SensorData & data, const std_msgs::Header & header
 			NODELET_INFO( "Odom: ratio=%f, std dev=%fm|%frad, update time=%fs", info.reg.icpInliersRatio, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (ros::WallTime::now()-time).toSec());
 		}
 
+		statusDiagnostic_.setStatus(pose.isNull());
 		if(!pose.isNull())
 		{
 			double curentRate = 1.0/(ros::WallTime::now()-time).toSec();
-			tick(header.stamp, 
+			tick(header.stamp,
 				maxUpdateRate_>0 && maxUpdateRate_ < curentRate ? maxUpdateRate_:
 				expectedUpdateRate_>0 && expectedUpdateRate_ < curentRate ? expectedUpdateRate_:
 				previousStamp_ == 0.0 || header.stamp.toSec() - previousStamp_ > 1.0/curentRate?0:curentRate);
@@ -1028,5 +1032,26 @@ bool OdometryROS::setLogError(std_srvs::Empty::Request&, std_srvs::Empty::Respon
 	return true;
 }
 
+OdometryROS::OdomStatusTask::OdomStatusTask() :
+		diagnostic_updater::DiagnosticTask("Odom status"),
+		lost_(false)
+{}
+
+void OdometryROS::OdomStatusTask::setStatus(bool isLost)
+{
+	lost_ = isLost;
+}
+
+void OdometryROS::OdomStatusTask::run(diagnostic_updater::DiagnosticStatusWrapper &stat)
+{
+	if(lost_)
+	{
+		stat.summary(diagnostic_msgs::DiagnosticStatus::ERROR, "Lost!");
+	}
+	else
+	{
+		stat.summary(diagnostic_msgs::DiagnosticStatus::OK, "Tracking.");
+	}
+}
 
 }

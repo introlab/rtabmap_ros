@@ -161,6 +161,7 @@ private:
 		NODELET_INFO("RGBDOdometry: rgbd_cameras   = %d", rgbdCameras);
 		NODELET_INFO("RGBDOdometry: keep_color     = %s", keepColor_?"true":"false");
 
+		std::string subscribedTopic;
 		std::string subscribedTopicsMsg;
 		if(subscribeRGBD)
 		{
@@ -356,6 +357,7 @@ private:
 				exactSync_->registerCallback(boost::bind(&RGBDOdometry::callback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3));
 			}
 
+			subscribedTopic = rgb_nh.resolveName("image");
 			subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s \\\n   %s \\\n   %s",
 					getName().c_str(),
 					approxSync?"approx":"exact",
@@ -364,7 +366,7 @@ private:
 					image_depth_sub_.getTopic().c_str(),
 					info_sub_.getTopic().c_str());
 		}
-		initDiagnosticMsg(subscribedTopicsMsg, approxSync);
+		initDiagnosticMsg(subscribedTopicsMsg, approxSync, subscribedTopic);
 	}
 
 	virtual void updateParameters(ParametersMap & parameters)

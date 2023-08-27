@@ -111,6 +111,7 @@ private:
 		NODELET_INFO("StereoOdometry: subscribe_rgbd = %s", subscribeRGBD?"true":"false");
 		NODELET_INFO("StereoOdometry: keep_color = %s", keepColor_?"true":"false");
 
+		std::string subscribedTopic;
 		std::string subscribedTopicsMsg;
 		if(subscribeRGBD)
 		{
@@ -271,7 +272,7 @@ private:
 				exactSync_->registerCallback(boost::bind(&StereoOdometry::callback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 			}
 
-
+			subscribedTopic = left_nh.resolveName("image_rect");
 			subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s \\\n   %s \\\n   %s \\\n   %s",
 					getName().c_str(),
 					approxSync?"approx":"exact",
@@ -282,7 +283,7 @@ private:
 					cameraInfoRight_.getTopic().c_str());
 		}
 
-		initDiagnosticMsg(subscribedTopicsMsg, approxSync);
+		initDiagnosticMsg(subscribedTopicsMsg, approxSync, subscribedTopic);
 	}
 
 	virtual void updateParameters(ParametersMap & parameters)

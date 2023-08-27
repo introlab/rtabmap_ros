@@ -38,6 +38,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <std_msgs/Header.h>
 #include <sensor_msgs/Imu.h>
 
+#include <diagnostic_updater/diagnostic_updater.h>
+
 #include <rtabmap_msgs/ResetPose.h>
 #include <rtabmap/core/SensorData.h>
 #include <rtabmap/core/Parameters.h>
@@ -78,7 +80,7 @@ public:
 	bool isPaused() const {return paused_;}
 
 protected:
-	void initDiagnosticMsg(const std::string & subscribedTopicsMsg, bool approxSync);
+	void initDiagnosticMsg(const std::string & subscribedTopicsMsg, bool approxSync, const std::string & subscribedTopic = "");
 
 	virtual void flushCallbacks() = 0;
 	tf::TransformListener & tfListener() {return tfListener_;}
@@ -151,6 +153,17 @@ private:
 	std::pair<rtabmap::SensorData, std_msgs::Header > bufferedData_;
 
 	rtabmap_util::ULogToRosout ulogToRosout_;
+
+	class OdomStatusTask : public diagnostic_updater::DiagnosticTask
+	{
+	public:
+		OdomStatusTask();
+		void setStatus(bool isLost);
+		void run(diagnostic_updater::DiagnosticStatusWrapper &stat);
+	private:
+		bool lost_;
+	};
+	OdomStatusTask statusDiagnostic_;
 };
 
 }
