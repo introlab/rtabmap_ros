@@ -5,6 +5,7 @@ find_package(catkin REQUIRED COMPONENTS
              cv_bridge image_geometry laser_geometry message_filters 
              nav_msgs nodelet pcl_conversions pcl_ros pluginlib roscpp 
              sensor_msgs rtabmap_conversions rtabmap_msgs rtabmap_util
+             rtabmap_sync
 )
 
 catkin_package(
@@ -13,6 +14,7 @@ catkin_package(
   CATKIN_DEPENDS cv_bridge image_geometry laser_geometry message_filters 
              nav_msgs nodelet pcl_conversions pcl_ros pluginlib roscpp 
              sensor_msgs rtabmap_conversions rtabmap_msgs rtabmap_util
+             rtabmap_sync
 )
 
 ###########

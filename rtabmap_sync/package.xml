@@ -20,6 +20,7 @@
   <depend>rtabmap_conversions</depend>
   <depend>rtabmap_msgs</depend>
   <depend>sensor_msgs</depend>
+  <depend>diagnostic_updater</depend>
 
   <export>
     <nodelet plugin="${prefix}/nodelet_plugins.xml" />

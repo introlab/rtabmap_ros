@@ -51,12 +51,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap_msgs/OdomInfo.h>
 #include <rtabmap_msgs/ScanDescriptor.h>
 #include <rtabmap_sync/CommonDataSubscriberDefines.h>
+#include <rtabmap_sync/SyncDiagnostic.h>
 
 #include <boost/thread.hpp>
 
 namespace rtabmap_sync {
 
-class CommonDataSubscriber {
+class CommonDataSubscriber : public SyncDiagnostic {
 public:
 	CommonDataSubscriber(bool gui);
 	virtual ~CommonDataSubscriber();
@@ -122,8 +123,6 @@ protected:
 				const cv::Mat & localDescriptors = cv::Mat());
 
 private:
-	void warningLoop();
-	void callbackCalled() {callbackCalled_ = true;}
 	void setupDepthCallbacks(
 			ros::NodeHandle & nh,
 			ros::NodeHandle & pnh,
@@ -256,8 +255,6 @@ protected:
 
 private:
 	bool approxSync_;
-	boost::thread* warningThread_;
-	bool callbackCalled_;
 	bool subscribedToDepth_;
 	bool subscribedToStereo_;
 	bool subscribedToRGB_;

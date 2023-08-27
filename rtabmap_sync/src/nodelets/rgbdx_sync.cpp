@@ -41,12 +41,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace rtabmap_sync
 {
 
-class RGBDXSync : public nodelet::Nodelet
+class RGBDXSync : public nodelet::Nodelet, public SyncDiagnostic
 {
 public:
 	RGBDXSync() :
-		warningThread_(0),
-		callbackCalled_(false),
 		SYNC_INIT(rgbd2),
 		SYNC_INIT(rgbd3),
 		SYNC_INIT(rgbd4),
@@ -59,12 +57,16 @@ public:
 	virtual ~RGBDXSync()
 	{
 		SYNC_DEL(rgbd2);
+		SYNC_DEL(rgbd3);
+		SYNC_DEL(rgbd4);
+		SYNC_DEL(rgbd5);
+		SYNC_DEL(rgbd6);
+		SYNC_DEL(rgbd7);
+		SYNC_DEL(rgbd8);
 
-		if(warningThread_)
+		for(size_t i=0; i<rgbdSubs_.size(); ++i)
 		{
-			callbackCalled_=true;
-			warningThread_->join();
-			delete warningThread_;
+			delete rgbdSubs_[i];
 		}
 	}
 
@@ -160,28 +162,19 @@ private:
 			}
 		}
 
-		warningThread_ = new boost::thread(boost::bind(&RGBDXSync::warningLoop, this, subscribedTopicsMsg_, approxSync));
-		NODELET_INFO("%s%s", subscribedTopicsMsg_.c_str(),
+		std::string subscribedTopicsMsg = uFormat("%s%s", subscribedTopicsMsg_.c_str(),
 				approxSync&&approxSyncMaxInterval!=0.0?uFormat(" (approx sync max interval=%fs)", approxSyncMaxInterval).c_str():"");
-	}
+		NODELET_INFO(subscribedTopicsMsg.c_str());
 
-	void warningLoop(const std::string & subscribedTopicsMsg, bool approxSync)
-	{
-		ros::Duration r(5.0);
-		while(!callbackCalled_)
-		{
-			r.sleep();
-			if(!callbackCalled_)
-			{
-				ROS_WARN("%s: Did not receive data since 5 seconds! Make sure the input topics are "
-						"published (\"$ rostopic hz my_topic\") and the timestamps in their "
-						"header are set. %s%s",
-						getName().c_str(),
-						approxSync?"":"Parameter \"approx_sync\" is false, which means that input "
-							"topics should have all the exact timestamp for the callback to be called.",
-						subscribedTopicsMsg.c_str());
-			}
-		}
+		// Setup diagnostic
+		initDiagnostic("",
+			uFormat("%s: Did not receive data since 5 seconds! Make sure the input topics are "
+					"published (\"$ rostopic hz my_topic\") and the timestamps in their "
+					"header are set. %s%s",
+					getName().c_str(),
+					approxSync?"":"Parameter \"approx_sync\" is false, which means that input "
+						"topics should have all the exact timestamp for the callback to be called.",
+					subscribedTopicsMsg.c_str()));
 	}
 
 	DATA_SYNCS2(rgbd2, rtabmap_msgs::RGBDImage, rtabmap_msgs::RGBDImage);
@@ -193,20 +186,16 @@ private:
 	DATA_SYNCS8(rgbd8, rtabmap_msgs::RGBDImage, rtabmap_msgs::RGBDImage, rtabmap_msgs::RGBDImage, rtabmap_msgs::RGBDImage, rtabmap_msgs::RGBDImage, rtabmap_msgs::RGBDImage, rtabmap_msgs::RGBDImage, rtabmap_msgs::RGBDImage);
 
 private:
-	boost::thread * warningThread_;
-	bool callbackCalled_;
-
 	ros::Publisher rgbdImagesPub_;
 
 	std::vector<message_filters::Subscriber<rtabmap_msgs::RGBDImage>*> rgbdSubs_;
 };
 
-
 void RGBDXSync::rgbd2Callback(
 		  const rtabmap_msgs::RGBDImageConstPtr& image0,
 		  const rtabmap_msgs::RGBDImageConstPtr& image1)
 {
-	callbackCalled_ = true;
+	tick(image0->header.stamp);
 	rtabmap_msgs::RGBDImages output;
 	output.header = image0->header;
 	output.rgbd_images.resize(2);
@@ -220,7 +209,7 @@ void RGBDXSync::rgbd3Callback(
 		  const rtabmap_msgs::RGBDImageConstPtr& image1,
 		  const rtabmap_msgs::RGBDImageConstPtr& image2)
 {
-	callbackCalled_ = true;
+	tick(image0->header.stamp);
 	rtabmap_msgs::RGBDImages output;
 	output.header = image0->header;
 	output.rgbd_images.resize(3);
@@ -236,7 +225,7 @@ void RGBDXSync::rgbd4Callback(
 		  const rtabmap_msgs::RGBDImageConstPtr& image2,
 		  const rtabmap_msgs::RGBDImageConstPtr& image3)
 {
-	callbackCalled_ = true;
+	tick(image0->header.stamp);
 	rtabmap_msgs::RGBDImages output;
 	output.header = image0->header;
 	output.rgbd_images.resize(4);
@@ -254,7 +243,7 @@ void RGBDXSync::rgbd5Callback(
 		  const rtabmap_msgs::RGBDImageConstPtr& image3,
 		  const rtabmap_msgs::RGBDImageConstPtr& image4)
 {
-	callbackCalled_ = true;
+	tick(image0->header.stamp);
 	rtabmap_msgs::RGBDImages output;
 	output.header = image0->header;
 	output.rgbd_images.resize(5);
@@ -274,7 +263,7 @@ void RGBDXSync::rgbd6Callback(
 		  const rtabmap_msgs::RGBDImageConstPtr& image4,
 		  const rtabmap_msgs::RGBDImageConstPtr& image5)
 {
-	callbackCalled_ = true;
+	tick(image0->header.stamp);
 	rtabmap_msgs::RGBDImages output;
 	output.header = image0->header;
 	output.rgbd_images.resize(6);
@@ -296,7 +285,7 @@ void RGBDXSync::rgbd7Callback(
 		  const rtabmap_msgs::RGBDImageConstPtr& image5,
 		  const rtabmap_msgs::RGBDImageConstPtr& image6)
 {
-	callbackCalled_ = true;
+	tick(image0->header.stamp);
 	rtabmap_msgs::RGBDImages output;
 	output.header = image0->header;
 	output.rgbd_images.resize(7);
@@ -320,7 +309,7 @@ void RGBDXSync::rgbd8Callback(
 		  const rtabmap_msgs::RGBDImageConstPtr& image6,
 		  const rtabmap_msgs::RGBDImageConstPtr& image7)
 {
-	callbackCalled_ = true;
+	tick(image0->header.stamp);
 	rtabmap_msgs::RGBDImages output;
 	output.header = image0->header;
 	output.rgbd_images.resize(8);

@@ -51,33 +51,24 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtabmap/core/Compression.h"
 #include "rtabmap/utilite/UConversion.h"
 
+#include "rtabmap_sync/SyncDiagnostic.h"
+
 namespace rtabmap_sync
 {
 
-class StereoSync : public nodelet::Nodelet
+class StereoSync : public nodelet::Nodelet, public SyncDiagnostic
 {
 public:
 	StereoSync() :
 		compressedRate_(0),
-		warningThread_(0),
-		callbackCalled_(false),
 		approxSync_(0),
 		exactSync_(0)
 	{}
 
 	virtual ~StereoSync()
 	{
-		if(approxSync_)
-			delete approxSync_;
-		if(exactSync_)
-			delete exactSync_;
-
-		if(warningThread_)
-		{
-			callbackCalled_=true;
-			warningThread_->join();
-			delete warningThread_;
-		}
+		delete approxSync_;
+		delete exactSync_;
 	}
 
 private:
@@ -138,28 +129,17 @@ private:
 							imageRightSub_.getTopic().c_str(),
 							cameraInfoLeftSub_.getTopic().c_str(),
 							cameraInfoRightSub_.getTopic().c_str());
+		NODELET_INFO(subscribedTopicsMsg.c_str());
 
-		warningThread_ = new boost::thread(boost::bind(&StereoSync::warningLoop, this, subscribedTopicsMsg, approxSync));
-		NODELET_INFO("%s", subscribedTopicsMsg.c_str());
-	}
+		initDiagnostic(left_nh.resolveName("image_rect"),
+			uFormat("%s: Did not receive data since 5 seconds! Make sure the input topics are "
+					"published (\"$ rostopic hz my_topic\") and the timestamps in their "
+					"header are set. %s%s",
+					getName().c_str(),
+					approxSync?"":"Parameter \"approx_sync\" is false, which means that input "
+						"topics should have all the exact timestamp for the callback to be called.",
+					subscribedTopicsMsg.c_str()));
 
-	void warningLoop(const std::string & subscribedTopicsMsg, bool approxSync)
-	{
-		ros::Duration r(5.0);
-		while(!callbackCalled_)
-		{
-			r.sleep();
-			if(!callbackCalled_)
-			{
-				ROS_WARN("%s: Did not receive data since 5 seconds! Make sure the input topics are "
-						"published (\"$ rostopic hz my_topic\") and the timestamps in their "
-						"header are set. %s%s",
-						getName().c_str(),
-						approxSync?"":"Parameter \"approx_sync\" is false, which means that input "
-							"topics should have all the exact timestamp for the callback to be called.",
-						subscribedTopicsMsg.c_str());
-			}
-		}
 	}
 
 	void callback(
@@ -168,7 +148,8 @@ private:
 			  const sensor_msgs::CameraInfoConstPtr& cameraInfoLeft,
 			  const sensor_msgs::CameraInfoConstPtr& cameraInfoRight)
 	{
-		callbackCalled_ = true;
+		tick(imageLeft->header.stamp);
+
 		if(rgbdImagePub_.getNumSubscribers() || rgbdImageCompressedPub_.getNumSubscribers())
 		{
 			double leftStamp = imageLeft->header.stamp.toSec();
@@ -244,8 +225,6 @@ private:
 
 private:
 	double compressedRate_;
-	boost::thread * warningThread_;
-	bool callbackCalled_;
 	ros::Time lastCompressedPublished_;
 
 	ros::Publisher rgbdImagePub_;

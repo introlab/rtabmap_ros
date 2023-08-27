@@ -25,6 +25,7 @@
   <depend>rtabmap_conversions</depend>
   <depend>rtabmap_msgs</depend>
   <depend>rtabmap_util</depend>
+  <depend>rtabmap_sync</depend>
 
   <export>
     <nodelet plugin="${prefix}/nodelet_plugins.xml" />

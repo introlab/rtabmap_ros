@@ -161,6 +161,7 @@ private:
 		NODELET_INFO("RGBDOdometry: rgbd_cameras   = %d", rgbdCameras);
 		NODELET_INFO("RGBDOdometry: keep_color     = %s", keepColor_?"true":"false");
 
+		std::string subscribedTopic;
 		std::string subscribedTopicsMsg;
 		if(subscribeRGBD)
 		{
@@ -356,6 +357,7 @@ private:
 				exactSync_->registerCallback(boost::bind(&RGBDOdometry::callback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3));
 			}
 
+			subscribedTopic = rgb_nh.resolveName("image");
 			subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s \\\n   %s \\\n   %s",
 					getName().c_str(),
 					approxSync?"approx":"exact",
@@ -364,7 +366,7 @@ private:
 					image_depth_sub_.getTopic().c_str(),
 					info_sub_.getTopic().c_str());
 		}
-		this->startWarningThread(subscribedTopicsMsg, approxSync);
+		initDiagnosticMsg(subscribedTopicsMsg, approxSync, subscribedTopic);
 	}
 
 	virtual void updateParameters(ParametersMap & parameters)
@@ -546,7 +548,6 @@ private:
 			const sensor_msgs::ImageConstPtr& depth,
 			const sensor_msgs::CameraInfoConstPtr& cameraInfo)
 	{
-		callbackCalled();
 		if(!this->isPaused())
 		{
 			std::vector<cv_bridge::CvImageConstPtr> imageMsgs(1);
@@ -575,7 +576,6 @@ private:
 	void callbackRGBD(
 			const rtabmap_msgs::RGBDImageConstPtr& image)
 	{
-		callbackCalled();
 		if(!this->isPaused())
 		{
 			std::vector<cv_bridge::CvImageConstPtr> imageMsgs(1);
@@ -591,7 +591,6 @@ private:
 	void callbackRGBDX(
 			const rtabmap_msgs::RGBDImagesConstPtr& images)
 	{
-		callbackCalled();
 		if(!this->isPaused())
 		{
 			if(images->rgbd_images.empty())
@@ -616,7 +615,6 @@ private:
 			const rtabmap_msgs::RGBDImageConstPtr& image,
 			const rtabmap_msgs::RGBDImageConstPtr& image2)
 	{
-		callbackCalled();
 		if(!this->isPaused())
 		{
 			std::vector<cv_bridge::CvImageConstPtr> imageMsgs(2);
@@ -636,7 +634,6 @@ private:
 			const rtabmap_msgs::RGBDImageConstPtr& image2,
 			const rtabmap_msgs::RGBDImageConstPtr& image3)
 	{
-		callbackCalled();
 		if(!this->isPaused())
 		{
 			std::vector<cv_bridge::CvImageConstPtr> imageMsgs(3);
@@ -659,7 +656,6 @@ private:
 			const rtabmap_msgs::RGBDImageConstPtr& image3,
 			const rtabmap_msgs::RGBDImageConstPtr& image4)
 	{
-		callbackCalled();
 		if(!this->isPaused())
 		{
 			std::vector<cv_bridge::CvImageConstPtr> imageMsgs(4);
@@ -685,7 +681,6 @@ private:
 			const rtabmap_msgs::RGBDImageConstPtr& image4,
 			const rtabmap_msgs::RGBDImageConstPtr& image5)
 	{
-		callbackCalled();
 		if(!this->isPaused())
 		{
 			std::vector<cv_bridge::CvImageConstPtr> imageMsgs(5);

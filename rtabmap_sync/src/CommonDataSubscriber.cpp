@@ -30,10 +30,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace rtabmap_sync {
 
 CommonDataSubscriber::CommonDataSubscriber(bool gui) :
+		SyncDiagnostic(0.5),
 		queueSize_(10),
 		approxSync_(true),
-		warningThread_(0),
-		callbackCalled_(false),
 		subscribedToDepth_(!gui),
 		subscribedToStereo_(false),
 		subscribedToRGB_(!gui),
@@ -661,20 +660,23 @@ void CommonDataSubscriber::setupCallbacks(
 
 	if(subscribedToDepth_ || subscribedToStereo_ || subscribedToRGBD_ || subscribedToScan2d_ || subscribedToScan3d_ || subscribedToScanDescriptor_ || subscribedToRGB_ || subscribedToOdom_)
 	{
-		warningThread_ = new boost::thread(boost::bind(&CommonDataSubscriber::warningLoop, this));
 		ROS_INFO("%s", subscribedTopicsMsg_.c_str());
+		initDiagnostic("",
+			uFormat("%s: Did not receive data since 5 seconds! Make sure the input topics are "
+					"published (\"$ rostopic hz my_topic\") and the timestamps in their "
+					"header are set. If topics are coming from different computers, make sure "
+					"the clocks of the computers are synchronized (\"ntpdate\"). %s%s",
+					name_.c_str(),
+					approxSync_?
+							uFormat("If topics are not published at the same rate, you could increase \"queue_size\" parameter (current=%d).", queueSize_).c_str():
+							"Parameter \"approx_sync\" is false, which means that input topics should have all the exact timestamp for the callback to be called.",
+					subscribedTopicsMsg_.c_str()));
+		
 	}
 }
 
 CommonDataSubscriber::~CommonDataSubscriber()
 {
-	if(warningThread_)
-	{
-		callbackCalled();
-		warningThread_->join();
-		delete warningThread_;
-	}
-
 	// RGB + Depth
 	SYNC_DEL(depth);
 	SYNC_DEL(depthScan2d);
@@ -990,27 +992,6 @@ CommonDataSubscriber::~CommonDataSubscriber()
 	rgbdSubs_.clear();
 }
 
-void CommonDataSubscriber::warningLoop()
-{
-	ros::Duration r(5.0);
-	while(!callbackCalled_)
-	{
-		r.sleep();
-		if(!callbackCalled_)
-		{
-			ROS_WARN("%s: Did not receive data since 5 seconds! Make sure the input topics are "
-					"published (\"$ rostopic hz my_topic\") and the timestamps in their "
-					"header are set. If topics are coming from different computers, make sure "
-					"the clocks of the computers are synchronized (\"ntpdate\"). %s%s",
-					name_.c_str(),
-					approxSync_?
-							uFormat("If topics are not published at the same rate, you could increase \"queue_size\" parameter (current=%d).", queueSize_).c_str():
-							"Parameter \"approx_sync\" is false, which means that input topics should have all the exact timestamp for the callback to be called.",
-					subscribedTopicsMsg_.c_str());
-		}
-	}
-}
-
 void CommonDataSubscriber::commonSingleCameraCallback(
 		const nav_msgs::OdometryConstPtr & odomMsg,
 		const rtabmap_msgs::UserDataConstPtr & userDataMsg,
@@ -1026,8 +1007,6 @@ void CommonDataSubscriber::commonSingleCameraCallback(
 		const std::vector<rtabmap_msgs::Point3f> & localPoints3d,
 		const cv::Mat & localDescriptors)
 {
-	callbackCalled();
-
 	std::vector<std::vector<rtabmap_msgs::KeyPoint> > localKeyPointsMsgs;
 	localKeyPointsMsgs.push_back(localKeyPoints);
 	std::vector<std::vector<rtabmap_msgs::Point3f> > localPoints3dMsgs;
