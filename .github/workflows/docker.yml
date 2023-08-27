@@ -11,7 +11,7 @@ jobs:
     
     strategy:
       matrix:
-        docker_tag: [kinetic, melodic, melodic-latest, noetic, noetic-latest]
+        docker_tag: [kinetic, melodic, noetic, noetic-latest]
         include:
         - docker_tag: kinetic
           docker_path: 'kinetic'
@@ -23,11 +23,6 @@ jobs:
             linux/amd64
             linux/arm64
 #            linux/arm/v7
-        - docker_tag: melodic-latest
-          docker_path: 'melodic/latest'
-          docker_platforms: |
-            linux/amd64
-            linux/arm64
         - docker_tag: noetic
           docker_path: 'noetic'
           docker_platforms: |
