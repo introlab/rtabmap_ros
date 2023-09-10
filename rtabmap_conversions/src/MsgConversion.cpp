@@ -2673,17 +2673,103 @@ bool deskew_impl(
 	ros::Time lastStamp;
 	if(timeDatatype == 6) // UINT32
 	{
-		unsigned int nsec = *((const unsigned int*)(&input.data[0]+offsetTime));
-		firstStamp = input.header.stamp+ros::Duration(0, nsec);
-		nsec = *((const unsigned int*)(&input.data[timeOnColumns?(input.width-1)*input.point_step:(input.height-1)*input.row_step]+offsetTime));
-		lastStamp = input.header.stamp+ros::Duration(0, nsec);
+		unsigned int nsecFirst = *((const unsigned int*)(&input.data[0]+offsetTime));
+		unsigned int nsecLast = *((const unsigned int*)(&input.data[(input.width-1)*input.point_step + input.row_step*(input.height-1)]+offsetTime));
+
+		if(nsecFirst > nsecLast)
+		{
+			// scans are not ordered, we need to search min/max
+			static bool warned = false;
+			if(!warned) {
+				UWARN("Timestamp channel is not ordered, we will have to parse every scans to "
+					  "determinate first and last time offsets. This will add slightly computation "
+					  "time. This warning is only shown once.");
+				warned = true;
+			}
+			if(timeOnColumns)
+			{
+				for(size_t i=0; i<input.width; ++i)
+				{
+					unsigned int nsec = *((const unsigned int*)(&input.data[(i)*input.point_step]+offsetTime));
+					if(nsec < nsecFirst)
+					{
+						nsecFirst = nsec;
+					}
+					else if(nsec > nsecLast)
+					{
+						nsecLast = nsec;
+					}
+				}
+			}
+			else
+			{
+				for(size_t i=0; i<input.height; ++i)
+				{
+					unsigned int nsec = *((const unsigned int*)(&input.data[input.row_step*(i)]+offsetTime));
+					if(nsec < nsecFirst)
+					{
+						nsecFirst = nsec;
+					}
+					else if(nsec > nsecLast)
+					{
+						nsecLast = nsec;
+					}
+				}
+			}
+		}
+
+		firstStamp = input.header.stamp+ros::Duration(0, nsecFirst);
+		lastStamp = input.header.stamp+ros::Duration(0, nsecLast);
 	}
 	else if(timeDatatype == 7) // FLOAT32
 	{
-		float sec = *((const float*)(&input.data[0]+offsetTime));
-		firstStamp = input.header.stamp+ros::Duration().fromSec(sec);
-		sec = *((const float*)(&input.data[timeOnColumns?(input.width-1)*input.point_step:(input.height-1)*input.row_step]+offsetTime));
-		lastStamp = input.header.stamp+ros::Duration().fromSec(sec);
+		float secFirst = *((const float*)(&input.data[0]+offsetTime));
+		float secLast = *((const float*)(&input.data[(input.width-1)*input.point_step + input.row_step*(input.height-1)]+offsetTime));
+
+		if(secFirst > secLast)
+		{
+			// scans are not ordered, we need to search min/max
+			static bool warned = false;
+			if(!warned) {
+				UWARN("Timestamp channel is not ordered, we will have to parse every scans to "
+					  "determinate first and last time offsets. This will add slightly computation "
+					  "time. This warning is only shown once.");
+				warned = true;
+			}
+			if(timeOnColumns)
+			{
+				for(size_t i=0; i<input.width; ++i)
+				{
+					float sec = *((const float*)(&input.data[(i)*input.point_step]+offsetTime));
+					if(sec < secFirst)
+					{
+						secFirst = sec;
+					}
+					else if(sec > secLast)
+					{
+						secLast = sec;
+					}
+				}
+			}
+			else
+			{
+				for(size_t i=0; i<input.height; ++i)
+				{
+					float sec = *((const float*)(&input.data[input.row_step*(i)]+offsetTime));
+					if(sec < secFirst)
+					{
+						secFirst = sec;
+					}
+					else if(sec > secLast)
+					{
+						secLast = sec;
+					}
+				}
+			}
+		}
+
+		firstStamp = input.header.stamp+ros::Duration().fromSec(secFirst);
+		lastStamp = input.header.stamp+ros::Duration().fromSec(secLast);
 	}
 	else
 	{
@@ -2691,9 +2777,14 @@ bool deskew_impl(
 		return false;
 	}
 
-	if(lastStamp <= firstStamp)
+	if(lastStamp < firstStamp)
 	{
-		ROS_ERROR("First and last stamps in the scan are the same!");
+		ROS_ERROR("Last stamp (%f) is smaller than first stamp (%f) (header=%f)!", lastStamp.toSec(), firstStamp.toSec(), input.header.stamp.toSec());
+		return false;
+	}
+	else if(lastStamp == firstStamp)
+	{
+		ROS_ERROR("First and last stamps in the scan are the same (%f) (header=%f)!", lastStamp.toSec(), input.header.stamp.toSec());
 		return false;
 	}
 
