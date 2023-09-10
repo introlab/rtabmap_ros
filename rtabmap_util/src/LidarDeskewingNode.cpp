@@ -26,10 +26,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #include "rtabmap_util/lidar_deskewing.hpp"
+#include "rtabmap/utilite/ULogger.h"
 #include "rclcpp/rclcpp.hpp"
 
 int main(int argc, char **argv)
 {
+	ULogger::setType(ULogger::kTypeConsole);
 	rclcpp::init(argc, argv);
 	rclcpp::spin(std::make_shared<rtabmap_util::LidarDeskewing>(rclcpp::NodeOptions()));
 	rclcpp::shutdown();
