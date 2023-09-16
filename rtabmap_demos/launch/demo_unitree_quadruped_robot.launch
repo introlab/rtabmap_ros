@@ -1,0 +1,95 @@
+<?xml version="1.0"?>
+
+<launch>
+
+  <!-- See https://github.com/unitreerobotics/unitree_guide to bringup simulation.
+       Fix Cx/Cy of the cameras by setting them to 464 and 400 respectively in unitree_ros/robots/go1_description/xacro/depthCamera.xacro
+       Ideally, build rtabmap with OpenGV support. 
+       Would work better if simulated environment has a lot of visual texture, see https://github.com/introlab/rtabmap_ros/issues/1031#issuecomment-1722322305 
+       
+       Launch:
+        $ roslaunch unitree_guide gazeboSim.launch wname:=apt
+        $ roslaunch rtabmap_demos demo_unitree_quadruped_robot.launch
+        $ ~/catkin_ws/devel/lib/unitree_guide/junior_ctrl
+       Press 2 to get up, press 4 to move (w,a,s,d) and rotate (j,l)
+       -->
+
+   <arg name="localization" default="false"/>
+   <arg     if="$(arg localization)" name="rtabmap_args" default="--Mem/IncrementalMemory false"/>
+   <arg unless="$(arg localization)" name="rtabmap_args" default="--Mem/IncrementalMemory true --delete_db_on_start"/>
+
+   <!-- sync rgb/depth images and camera info per camera -->
+   <group ns="camera_face">
+    <node pkg="rtabmap_sync" type="rgbd_sync" name="rgbd_sync">
+      <remap from="rgb/image"         to="color/image_raw"/>
+      <remap from="depth/image"       to="depth/image_raw"/>
+      <remap from="rgb/camera_info"   to="color/camera_info"/>
+      <param name="approx_sync" value="false"/>
+    </node>
+   </group>
+   <group ns="camera_left">
+    <node pkg="rtabmap_sync" type="rgbd_sync" name="rgbd_sync">
+      <remap from="rgb/image"         to="color/image_raw"/>
+      <remap from="depth/image"       to="depth/image_raw"/>
+      <remap from="rgb/camera_info"   to="color/camera_info"/>
+      <param name="approx_sync" value="false"/>
+    </node>
+   </group>
+   <group ns="camera_right">
+    <node pkg="rtabmap_sync" type="rgbd_sync" name="rgbd_sync">
+      <remap from="rgb/image"         to="color/image_raw"/>
+      <remap from="depth/image"       to="depth/image_raw"/>
+      <remap from="rgb/camera_info"   to="color/camera_info"/>
+      <param name="approx_sync" value="false"/>
+    </node>
+   </group>
+
+  <group ns="rtabmap">
+
+    <!-- sync all cameras together -->
+    <node pkg="rtabmap_sync" type="rgbdx_sync" name="rgbdx_sync" output="screen">
+      <remap from="rgbd_image0" to="/camera_left/rgbd_image"/>
+      <remap from="rgbd_image1" to="/camera_face/rgbd_image"/>
+      <remap from="rgbd_image2" to="/camera_right/rgbd_image"/>
+      <param name="rgbd_cameras" type="int"   value="3"/>
+    </node>
+
+    <!-- Odometry -->
+    <node pkg="rtabmap_odom" type="rgbd_odometry" name="rgbd_odometry" output="screen">
+      <remap from="imu" to="/trunk_imu"/>
+
+	  <param name="subscribe_rgbd"           type="bool"   value="true"/>
+	  <param name="frame_id"                 type="string" value="base"/>
+	  <param name="rgbd_cameras"             type="int"    value="0"/>
+	  <param name="wait_for_imu_to_init"     type="bool"   value="true"/>
+	  
+	  <param name="Odom/ImageDecimation"     type="int"    value="2"/>
+    </node>
+
+    <!-- Visual SLAM -->
+    <node name="rtabmap" pkg="rtabmap_slam" type="rtabmap" output="screen" args="$(arg rtabmap_args)">
+      <remap from="imu" to="/trunk_imu"/>
+      <param name="subscribe_depth"  type="bool"   value="false"/>
+      <param name="subscribe_rgbd"   type="bool"   value="true"/>
+      <param name="rgbd_cameras"     type="int"    value="0"/>
+	  <param name="frame_id"         type="string" value="base"/>
+	  
+	  <param name="Grid/RangeMin"    type="string" value="0.1"/> <!-- to avoid adding legs as obstacle in occupancy grid map -->
+	  <param name="Grid/MaxObstacleHeight" type="string" value="1"/>
+	  <param name="Mem/ImagePreDecimation" type="string" value="2"/>
+	  <param name="Mem/ImagePostDecimation" type="string" value="2"/>
+    </node>
+
+    <!-- Visualisation RTAB-Map -->
+    <node pkg="rtabmap_viz" type="rtabmap_viz" name="rtabmap_viz" args="-d $(find rtabmap_demos)/launch/config/rgbd_gui.ini" output="screen">
+      <param name="subscribe_depth"  type="bool"   value="false"/>
+      <param name="subscribe_rgbd"   type="bool"   value="true"/>
+      <param name="subscribe_odom_info" type="bool"   value="true"/>
+      <param name="frame_id"            type="string" value="base"/>
+      <param name="rgbd_cameras"        type="int"    value="0"/>
+    </node>
+
+  </group>
+
+
+</launch>
