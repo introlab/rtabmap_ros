@@ -2591,29 +2591,14 @@ bool deskew_impl(
 	int timeDatatype = 6;
 	for(size_t i=0; i<input.fields.size(); ++i)
 	{
-		if(input.fields[i].name.compare("t") == 0)
+		if(input.fields[i].name.compare("t") == 0 ||
+		   input.fields[i].name.compare("time") == 0 ||
+		   input.fields[i].name.compare("stamps") == 0 ||
+		   input.fields[i].name.compare("timestamp") == 0)
 		{
 			if(offsetTime != -1)
 			{
-				ROS_WARN("The input cloud should have only one of these fields: t, time or stamps. Overriding with %s.", input.fields[i].name.c_str());
-			}
-			offsetTime = input.fields[i].offset;
-			timeDatatype = input.fields[i].datatype;
-		}
-		else if(input.fields[i].name.compare("time") == 0)
-		{
-			if(offsetTime != -1)
-			{
-				ROS_WARN("The input cloud should have only one of these fields: t, time or stamps. Overriding with %s.", input.fields[i].name.c_str());
-			}
-			offsetTime = input.fields[i].offset;
-			timeDatatype = input.fields[i].datatype;
-		}
-		else if(input.fields[i].name.compare("stamps") == 0)
-		{
-			if(offsetTime != -1)
-			{
-				ROS_WARN("The input cloud should have only one of these fields: t, time or stamps. Overriding with %s.", input.fields[i].name.c_str());
+				ROS_WARN("The input cloud should have only one of these fields: t, time, stamps or timestamp. Overriding with %s.", input.fields[i].name.c_str());
 			}
 			offsetTime = input.fields[i].offset;
 			timeDatatype = input.fields[i].datatype;
@@ -2637,7 +2622,7 @@ bool deskew_impl(
 
 	if(offsetTime < 0)
 	{
-		ROS_ERROR("Input cloud doesn't have \"t\" or \"time\" field!");
+		ROS_ERROR("Input cloud doesn't have \"t\", \"time\", \"stamps\" or \"timestamp\" field!");
 		return false;
 	}
 	if(offsetX < 0)
@@ -2681,7 +2666,7 @@ bool deskew_impl(
 			// scans are not ordered, we need to search min/max
 			static bool warned = false;
 			if(!warned) {
-				UWARN("Timestamp channel is not ordered, we will have to parse every scans to "
+				ROS_WARN("Timestamp channel is not ordered, we will have to parse every scans to "
 					  "determinate first and last time offsets. This will add slightly computation "
 					  "time. This warning is only shown once.");
 				warned = true;
@@ -2731,7 +2716,7 @@ bool deskew_impl(
 			// scans are not ordered, we need to search min/max
 			static bool warned = false;
 			if(!warned) {
-				UWARN("Timestamp channel is not ordered, we will have to parse every scans to "
+				ROS_WARN("Timestamp channel is not ordered, we will have to parse every scans to "
 					  "determinate first and last time offsets. This will add slightly computation "
 					  "time. This warning is only shown once.");
 				warned = true;
@@ -2771,12 +2756,65 @@ bool deskew_impl(
 		firstStamp = input.header.stamp+ros::Duration().fromSec(secFirst);
 		lastStamp = input.header.stamp+ros::Duration().fromSec(secLast);
 	}
+	else if(timeDatatype == 8) // FLOAT64
+	{
+		double secFirst = *((const double*)(&input.data[0]+offsetTime));
+		double secLast = *((const double*)(&input.data[(input.width-1)*input.point_step + input.row_step*(input.height-1)]+offsetTime));
+		if(secFirst > secLast)
+		{
+			// scans are not ordered, we need to search min/max
+			static bool warned = false;
+			if(!warned) {
+				ROS_WARN("Timestamp channel is not ordered, we will have to parse every scans to "
+					  "determinate first and last time offsets. This will add slightly computation "
+					  "time. This warning is only shown once.");
+				warned = true;
+			}
+			if(timeOnColumns)
+			{
+				for(size_t i=0; i<input.width; ++i)
+				{
+					double sec = *((const double*)(&input.data[(i)*input.point_step]+offsetTime));
+					if(sec < secFirst)
+					{
+						secFirst = sec;
+					}
+					else if(sec > secLast)
+					{
+						secLast = sec;
+					}
+				}
+			}
+			else
+			{
+				for(size_t i=0; i<input.height; ++i)
+				{
+					double sec = *((const double*)(&input.data[input.row_step*(i)]+offsetTime));
+					if(sec < secFirst)
+					{
+						secFirst = sec;
+					}
+					else if(sec > secLast)
+					{
+						secLast = sec;
+					}
+				}
+			}
+		}
+
+		firstStamp = ros::Time(secFirst);
+		lastStamp = ros::Time(secLast);
+	}
 	else
 	{
 		ROS_ERROR("Not supported time datatype %d!", timeDatatype);
 		return false;
 	}
-
+	if(!(timeDatatype >=6 && timeDatatype<=8))
+	{
+		ROS_ERROR("Only lidar timestamp channel data type 6, 7 or 8 is supported! (received %d)", timeDatatype);
+		return false;
+	}
 	if(lastStamp < firstStamp)
 	{
 		ROS_ERROR("Last stamp (%f) is smaller than first stamp (%f) (header=%f)!", lastStamp.toSec(), firstStamp.toSec(), input.header.stamp.toSec());
@@ -2896,10 +2934,15 @@ bool deskew_impl(
 				unsigned int nsec = *((const unsigned int*)(&output.data[u*output.point_step]+offsetTime));
 				stamp = input.header.stamp+ros::Duration(0, nsec);
 			}
-			else
+			else if(timeDatatype == 7) //float 32
 			{
 				float sec = *((const float*)(&output.data[u*output.point_step]+offsetTime));
 				stamp = input.header.stamp+ros::Duration().fromSec(sec);
+			}
+			else if(timeDatatype == 8) //float64
+			{
+				double sec = *((const double*)(&output.data[u*output.point_step]+offsetTime));
+				stamp = ros::Time(sec);
 			}
 
 			rtabmap::Transform transform;
@@ -2944,9 +2987,13 @@ bool deskew_impl(
 				{
 					*((unsigned int*)(dataPtr+offsetTime)) = 0;
 				}
-				else
+				else if(timeDatatype == 7)
 				{
 					*((float*)(dataPtr+offsetTime)) = 0;
+				}
+				else if(timeDatatype == 8)
+				{
+					*((double*)(dataPtr+offsetTime)) = 0;
 				}
 			}
 		}
@@ -2966,10 +3013,15 @@ bool deskew_impl(
 				unsigned int nsec = *((const unsigned int*)(&output.data[v*output.row_step]+offsetTime));
 				stamp = input.header.stamp+ros::Duration(0, nsec);
 			}
-			else
+			else if(timeDatatype == 7) //float 32
 			{
 				float sec = *((const float*)(&output.data[v*output.row_step]+offsetTime));
 				stamp = input.header.stamp+ros::Duration().fromSec(sec);
+			}
+			else if(timeDatatype == 8)
+			{
+				double sec = *((const double*)(&output.data[v*output.row_step]+offsetTime));
+				stamp = ros::Time(sec);
 			}
 
 			rtabmap::Transform transform;
@@ -3014,9 +3066,13 @@ bool deskew_impl(
 				{
 					*((unsigned int*)(dataPtr+offsetTime)) = 0;
 				}
-				else
+				else if(timeDatatype == 7)
 				{
 					*((float*)(dataPtr+offsetTime)) = 0;
+				}
+				else if(timeDatatype == 8)
+				{
+					*((double*)(dataPtr+offsetTime)) = 0;
 				}
 			}
 		}
