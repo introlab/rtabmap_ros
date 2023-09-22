@@ -2587,29 +2587,14 @@ bool deskew_impl(
 	int timeDatatype = 6;
 	for(size_t i=0; i<input.fields.size(); ++i)
 	{
-		if(input.fields[i].name.compare("t") == 0)
+		if(input.fields[i].name.compare("t") == 0 ||
+		   input.fields[i].name.compare("time") == 0 ||
+		   input.fields[i].name.compare("stamps") == 0 ||
+		   input.fields[i].name.compare("timestamp") == 0)
 		{
 			if(offsetTime != -1)
 			{
-				UWARN("The input cloud should have only one of these fields: t, time or stamps. Overriding with %s.", input.fields[i].name.c_str());
-			}
-			offsetTime = input.fields[i].offset;
-			timeDatatype = input.fields[i].datatype;
-		}
-		else if(input.fields[i].name.compare("time") == 0)
-		{
-			if(offsetTime != -1)
-			{
-				UWARN("The input cloud should have only one of these fields: t, time or stamps. Overriding with %s.", input.fields[i].name.c_str());
-			}
-			offsetTime = input.fields[i].offset;
-			timeDatatype = input.fields[i].datatype;
-		}
-		else if(input.fields[i].name.compare("stamps") == 0)
-		{
-			if(offsetTime != -1)
-			{
-				UWARN("The input cloud should have only one of these fields: t, time or stamps. Overriding with %s.", input.fields[i].name.c_str());
+				UWARN("The input cloud should have only one of these fields: t, time, stamps or timestamp. Overriding with %s.", input.fields[i].name.c_str());
 			}
 			offsetTime = input.fields[i].offset;
 			timeDatatype = input.fields[i].datatype;
@@ -2633,7 +2618,7 @@ bool deskew_impl(
 
 	if(offsetTime < 0)
 	{
-		UERROR("Input cloud doesn't have \"t\" or \"time\" field!");
+		UERROR("Input cloud doesn't have \"t\", \"time\", \"stamps\" or \"timestamp\" field!");
 		return false;
 	}
 	if(offsetX < 0)
@@ -2767,12 +2752,65 @@ bool deskew_impl(
 		firstStamp = rclcpp::Time(input.header.stamp)+rclcpp::Duration::from_seconds(secFirst);
 		lastStamp = rclcpp::Time(input.header.stamp)+rclcpp::Duration::from_seconds(secLast);
 	}
+	else if(timeDatatype == 8) // FLOAT64
+	{
+		double secFirst = *((const double*)(&input.data[0]+offsetTime));
+		double secLast = *((const double*)(&input.data[(input.width-1)*input.point_step + input.row_step*(input.height-1)]+offsetTime));
+		if(secFirst > secLast)
+		{
+			// scans are not ordered, we need to search min/max
+			static bool warned = false;
+			if(!warned) {
+				UWARN("Timestamp channel is not ordered, we will have to parse every scans to "
+					  "determinate first and last time offsets. This will add slightly computation "
+					  "time. This warning is only shown once.");
+				warned = true;
+			}
+			if(timeOnColumns)
+			{
+				for(size_t i=0; i<input.width; ++i)
+				{
+					double sec = *((const double*)(&input.data[(i)*input.point_step]+offsetTime));
+					if(sec < secFirst)
+					{
+						secFirst = sec;
+					}
+					else if(sec > secLast)
+					{
+						secLast = sec;
+					}
+				}
+			}
+			else
+			{
+				for(size_t i=0; i<input.height; ++i)
+				{
+					double sec = *((const double*)(&input.data[input.row_step*(i)]+offsetTime));
+					if(sec < secFirst)
+					{
+						secFirst = sec;
+					}
+					else if(sec > secLast)
+					{
+						secLast = sec;
+					}
+				}
+			}
+		}
+
+		firstStamp = timestampToROS(secFirst);
+		lastStamp = timestampToROS(secLast);
+	}
 	else
 	{
 		UERROR("Not supported time datatype %d!", timeDatatype);
 		return false;
 	}
-
+	if(!(timeDatatype >=6 && timeDatatype<=8))
+	{
+		UERROR("Only lidar timestamp channel data type 6, 7 or 8 is supported! (received %d)", timeDatatype);
+		return false;
+	}
 	if(lastStamp < firstStamp)
 	{
 		UERROR("Last stamp (%f) is smaller than first stamp (%f) (header=%f)!", timestampFromROS(lastStamp), timestampFromROS(firstStamp), timestampFromROS(input.header.stamp));
@@ -2890,10 +2928,15 @@ bool deskew_impl(
 				unsigned int nsec = *((const unsigned int*)(&output.data[u*output.point_step]+offsetTime));
 				stamp = rclcpp::Time(input.header.stamp)+rclcpp::Duration(0, nsec);
 			}
-			else
+			else if(timeDatatype == 7) //float 32
 			{
 				float sec = *((const float*)(&output.data[u*output.point_step]+offsetTime));
 				stamp = rclcpp::Time(input.header.stamp)+rclcpp::Duration::from_seconds(sec);
+			}
+			else if(timeDatatype == 8) //float64
+			{
+				double sec = *((const double*)(&output.data[u*output.point_step]+offsetTime));
+				stamp = timestampToROS(sec);
 			}
 
 			rtabmap::Transform transform;
@@ -2938,9 +2981,13 @@ bool deskew_impl(
 				{
 					*((unsigned int*)(dataPtr+offsetTime)) = 0;
 				}
-				else
+				else if(timeDatatype == 7)
 				{
 					*((float*)(dataPtr+offsetTime)) = 0;
+				}
+				else if(timeDatatype == 8)
+				{
+					*((double*)(dataPtr+offsetTime)) = 0;
 				}
 			}
 		}
@@ -2960,10 +3007,15 @@ bool deskew_impl(
 				unsigned int nsec = *((const unsigned int*)(&output.data[v*output.row_step]+offsetTime));
 				stamp = rclcpp::Time(input.header.stamp)+rclcpp::Duration(0, nsec);
 			}
-			else
+			else if(timeDatatype == 7) //float 32
 			{
 				float sec = *((const float*)(&output.data[v*output.row_step]+offsetTime));
 				stamp = rclcpp::Time(input.header.stamp)+rclcpp::Duration::from_seconds(sec);
+			}
+			else if(timeDatatype == 8)
+			{
+				double sec = *((const double*)(&output.data[v*output.row_step]+offsetTime));
+				stamp = timestampToROS(sec);
 			}
 
 			rtabmap::Transform transform;
@@ -3008,9 +3060,13 @@ bool deskew_impl(
 				{
 					*((unsigned int*)(dataPtr+offsetTime)) = 0;
 				}
-				else
+				else if(timeDatatype == 7)
 				{
 					*((float*)(dataPtr+offsetTime)) = 0;
+				}
+				else if(timeDatatype == 8)
+				{
+					*((double*)(dataPtr+offsetTime)) = 0;
 				}
 			}
 		}
