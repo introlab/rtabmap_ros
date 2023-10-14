@@ -21,10 +21,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        ros_distro: [foxy, humble, iron]
+        ros_distro: [humble, iron]
         include:
-        - ros_distro: 'foxy'
-          os: ubuntu-20.04
         - ros_distro: 'humble'
           os: ubuntu-22.04
         - ros_distro: 'iron'
@@ -38,7 +36,7 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get -y install ros-${{ matrix.ros_distro }}-rtabmap
+        sudo apt-get -y install ros-${{ matrix.ros_distro }}-rtabmap-ros
         sudo apt-get -y remove ros-${{ matrix.ros_distro }}-rtabmap*
                 
     - name: Setup ros2 workspace
