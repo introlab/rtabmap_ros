@@ -518,22 +518,8 @@ void CommonDataSubscriber::setupCallbacks(
 	}
 	else if(subscribedToRGBD_)
 	{
-		if(rgbdCameras == 0)
-		{
-			setupRGBDXCallbacks(
-					nh,
-					pnh,
-					subscribedToOdom_,
-					subscribeUserData,
-					subscribeScan2d,
-					subscribeScan3d,
-					subscribeScanDesc,
-					subscribeOdomInfo,
-					queueSize_,
-					approxSync_);
-		}
 #ifdef RTABMAP_SYNC_MULTI_RGBD
-		else if(rgbdCameras >= 6)
+		if(rgbdCameras >= 6)
 		{
 			if(rgbdCameras > 6)
 			{
@@ -619,6 +605,20 @@ void CommonDataSubscriber::setupCallbacks(
 					"but you will have to synchronize RGBDImage topics yourself.");
 		}
 #endif
+		else if(rgbdCameras == 0)
+		{
+			setupRGBDXCallbacks(
+					nh,
+					pnh,
+					subscribedToOdom_,
+					subscribeUserData,
+					subscribeScan2d,
+					subscribeScan3d,
+					subscribeScanDesc,
+					subscribeOdomInfo,
+					queueSize_,
+					approxSync_);
+		}
 		else
 		{
 			setupRGBDCallbacks(
