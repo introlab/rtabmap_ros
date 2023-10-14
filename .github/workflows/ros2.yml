@@ -59,4 +59,5 @@ jobs:
       run: |
         source /opt/ros/${{ matrix.ros_distro }}/setup.bash
         cd ${{github.workspace}}/ros2_ws
+        rosdep install --from-paths src --ignore-src -r -y
         colcon build --event-handlers console_direct+
