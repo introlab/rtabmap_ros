@@ -21,11 +21,13 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        ros_distro: [foxy, humble]
+        ros_distro: [foxy, humble, iron]
         include:
         - ros_distro: 'foxy'
           os: ubuntu-20.04
         - ros_distro: 'humble'
+          os: ubuntu-22.04
+        - ros_distro: 'iron'
           os: ubuntu-22.04
 
     steps:   
@@ -36,8 +38,8 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get -y install ros-${{ matrix.ros_distro }}-rtabmap ros-${{ matrix.ros_distro }}-nav2-msgs ros-${{ matrix.ros_distro }}-pcl-ros
-        sudo apt-get -y remove ros-${{ matrix.ros_distro }}-rtabmap
+        sudo apt-get -y install ros-${{ matrix.ros_distro }}-rtabmap
+        sudo apt-get -y remove ros-${{ matrix.ros_distro }}-rtabmap*
                 
     - name: Setup ros2 workspace
       run: | 
@@ -59,5 +61,6 @@ jobs:
       run: |
         source /opt/ros/${{ matrix.ros_distro }}/setup.bash
         cd ${{github.workspace}}/ros2_ws
+        rosdep update
         rosdep install --from-paths src --ignore-src -r -y
         colcon build --event-handlers console_direct+
