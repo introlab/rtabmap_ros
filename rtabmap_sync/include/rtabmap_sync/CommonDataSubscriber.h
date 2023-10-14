@@ -52,10 +52,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap_msgs/msg/odom_info.hpp>
 #include <rtabmap_msgs/msg/scan_descriptor.hpp>
 #include <rtabmap_sync/CommonDataSubscriberDefines.h>
+#include <rtabmap_sync/SyncDiagnostic.h>
 
 namespace rtabmap_sync {
 
-class CommonDataSubscriber {
+class CommonDataSubscriber : public SyncDiagnostic {
 public:
 	RTABMAP_SYNC_PUBLIC
 	CommonDataSubscriber(rclcpp::Node & node, bool gui);
@@ -119,7 +120,6 @@ protected:
 				const cv::Mat & localDescriptors = cv::Mat());
 
 private:
-	void callbackCalled() {callbackCalled_ = true;}
 	void setupDepthCallbacks(
 			rclcpp::Node & node,
 			bool subscribeOdom,
@@ -245,8 +245,6 @@ protected:
 
 private:
 	bool approxSync_;
-	std::thread* warningThread_;
-	bool callbackCalled_;
 	bool subscribedToDepth_;
 	bool subscribedToStereo_;
 	bool subscribedToRGB_;

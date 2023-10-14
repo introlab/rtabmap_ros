@@ -62,9 +62,8 @@ OdometryROS::OdometryROS(const rclcpp::NodeOptions & options) :
 
 OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & options) :
 	Node(name, options),
+	rtabmap_sync::SyncDiagnostic(this, 0.5),
 	odometry_(0),
-	warningThread_(0),
-	callbackCalled_(false),
 	frameId_("base_link"),
 	odomFrameId_("odom"),
 	groundTruthFrameId_(""),
@@ -190,13 +189,6 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 
 OdometryROS::~OdometryROS()
 {
-	if(warningThread_)
-	{
-		callbackCalled();
-		warningThread_->join();
-		delete warningThread_;
-	}
-
 	delete odometry_;
 }
 
@@ -369,28 +361,21 @@ void OdometryROS::init(bool stereoParams, bool visParams, bool icpParams)
 	onOdomInit();
 }
 
-void OdometryROS::startWarningThread(const std::string & subscribedTopicsMsg, bool approxSync)
+void OdometryROS::initDiagnosticMsg(const std::string & subscribedTopicsMsg, bool approxSync, const std::string & subscribedTopic)
 {
 	RCLCPP_INFO(this->get_logger(), "%s", subscribedTopicsMsg.c_str());
 
-	subscribedTopicsMsg_ = subscribedTopicsMsg;
-	warningThread_ = new std::thread([&](){
-		rclcpp::Rate r(1.0/5.0);
-		while(!callbackCalled_)
-		{
-			r.sleep();
-			if(!callbackCalled_)
-			{
-				RCLCPP_WARN(this->get_logger(), "%s: Did not receive data since 5 seconds! Make sure the input topics are "
-						"published (\"$ ros2 topic hz my_topic\") and the timestamps in their "
-						"header are set. %s%s",
-						this->get_name(),
-						approxSync?"":"Parameter \"approx_sync\" is false, which means that input "
-							"topics should have all the exact timestamp for the callback to be called.",
-							subscribedTopicsMsg_.c_str());
-			}
-		}
-	});
+	std::vector<diagnostic_updater::DiagnosticTask*> tasks;
+	tasks.push_back(&statusDiagnostic_);
+	initDiagnostic(subscribedTopic,
+		uFormat("%s: Did not receive data since 5 seconds! Make sure the input topics are "
+					"published (\"$ rostopic hz my_topic\") and the timestamps in their "
+					"header are set. %s%s",
+					this->get_name(),
+					approxSync?"":"Parameter \"approx_sync\" is false, which means that input "
+						"topics should have all the exact timestamp for the callback to be called.",
+					subscribedTopicsMsg.c_str()),
+		tasks);
 }
 
 rtabmap::Transform OdometryROS::velocityGuess() const
@@ -945,6 +930,17 @@ void OdometryROS::processData(SensorData & data, const std_msgs::msg::Header & h
 		{
 			RCLCPP_INFO(this->get_logger(), "Odom: ratio=%f, std dev=%fm|%frad, update time=%fs", info.reg.icpInliersRatio, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (now()-timeStart).seconds());
 		}
+
+		statusDiagnostic_.setStatus(pose.isNull());
+		if(!pose.isNull())
+		{
+			double curentRate = 1.0/(this->now()-timeStart).seconds();
+			tick(header.stamp,
+				maxUpdateRate_>0 && maxUpdateRate_ < curentRate ? maxUpdateRate_:
+				expectedUpdateRate_>0 && expectedUpdateRate_ < curentRate ? expectedUpdateRate_:
+				previousStamp_ == 0.0 || rtabmap_conversions::timestampFromROS(header.stamp) - previousStamp_ > 1.0/curentRate?0:curentRate);
+		}
+		
 		previousStamp_ = rtabmap_conversions::timestampFromROS(header.stamp);
 	}
 }
@@ -1046,6 +1042,27 @@ void OdometryROS::setLogError(
 	ULogger::setLevel(ULogger::kError);
 }
 
+OdometryROS::OdomStatusTask::OdomStatusTask() :
+		diagnostic_updater::DiagnosticTask("Odom status"),
+		lost_(false)
+{}
+
+void OdometryROS::OdomStatusTask::setStatus(bool isLost)
+{
+	lost_ = isLost;
+}
+
+void OdometryROS::OdomStatusTask::run(diagnostic_updater::DiagnosticStatusWrapper &stat)
+{
+	if(lost_)
+	{
+		stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "Lost!");
+	}
+	else
+	{
+		stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "Tracking.");
+	}
+}
 
 }
 

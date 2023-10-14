@@ -32,9 +32,9 @@ namespace rtabmap_sync {
 // Stereo
 void CommonDataSubscriber::stereoCallback(
 		const sensor_msgs::msg::Image::ConstSharedPtr leftImageMsg,
-	   const sensor_msgs::msg::Image::ConstSharedPtr rightImageMsg,
-	   const sensor_msgs::msg::CameraInfo::ConstSharedPtr leftCamInfoMsg,
-	   const sensor_msgs::msg::CameraInfo::ConstSharedPtr rightCamInfoMsg)
+		const sensor_msgs::msg::Image::ConstSharedPtr rightImageMsg,
+		const sensor_msgs::msg::CameraInfo::ConstSharedPtr leftCamInfoMsg,
+		const sensor_msgs::msg::CameraInfo::ConstSharedPtr rightCamInfoMsg)
 {
 	nav_msgs::msg::Odometry::SharedPtr odomMsg; // Null
 	rtabmap_msgs::msg::UserData::SharedPtr userDataMsg; // Null
@@ -45,12 +45,11 @@ void CommonDataSubscriber::stereoCallback(
 }
 void CommonDataSubscriber::stereoInfoCallback(
 		const sensor_msgs::msg::Image::ConstSharedPtr leftImageMsg,
-	   const sensor_msgs::msg::Image::ConstSharedPtr rightImageMsg,
-	   const sensor_msgs::msg::CameraInfo::ConstSharedPtr leftCamInfoMsg,
-	   const sensor_msgs::msg::CameraInfo::ConstSharedPtr rightCamInfoMsg,
-	   const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr odomInfoMsg)
+		const sensor_msgs::msg::Image::ConstSharedPtr rightImageMsg,
+		const sensor_msgs::msg::CameraInfo::ConstSharedPtr leftCamInfoMsg,
+		const sensor_msgs::msg::CameraInfo::ConstSharedPtr rightCamInfoMsg,
+		const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr odomInfoMsg)
 {
-	callbackCalled();
 	nav_msgs::msg::Odometry::SharedPtr odomMsg; // Null
 	rtabmap_msgs::msg::UserData::SharedPtr userDataMsg; // Null
 	sensor_msgs::msg::LaserScan scan2dMsg; // Null
@@ -66,7 +65,6 @@ void CommonDataSubscriber::stereoOdomCallback(
 		const sensor_msgs::msg::CameraInfo::ConstSharedPtr leftCamInfoMsg,
 		const sensor_msgs::msg::CameraInfo::ConstSharedPtr rightCamInfoMsg)
 {
-	callbackCalled();
 	rtabmap_msgs::msg::UserData::SharedPtr userDataMsg; // Null
 	sensor_msgs::msg::LaserScan scanMsg; // null
 	sensor_msgs::msg::PointCloud2 scan3dMsg; // Null
@@ -81,7 +79,6 @@ void CommonDataSubscriber::stereoOdomInfoCallback(
 		const sensor_msgs::msg::CameraInfo::ConstSharedPtr rightCamInfoMsg,
 		const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr odomInfoMsg)
 {
-	callbackCalled();
 	rtabmap_msgs::msg::UserData::SharedPtr userDataMsg; // Null
 	sensor_msgs::msg::LaserScan scan2dMsg; // Null
 	sensor_msgs::msg::PointCloud2 scan3dMsg; // Null

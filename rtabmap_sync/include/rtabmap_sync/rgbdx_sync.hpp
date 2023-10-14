@@ -41,11 +41,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtabmap_msgs/msg/rgbd_image.hpp"
 #include "rtabmap_msgs/msg/rgbd_images.hpp"
 #include "rtabmap_sync/CommonDataSubscriber.h"
+#include "rtabmap_sync/SyncDiagnostic.h"
 
 namespace rtabmap_sync
 {
 
-class RGBDXSync : public rclcpp::Node
+class RGBDXSync : public rclcpp::Node, public SyncDiagnostic
 {
 public:
 	RTABMAP_SYNC_PUBLIC
@@ -68,11 +69,6 @@ private:
 	DATA_SYNCS8(rgbd8, rtabmap_msgs::msg::RGBDImage, rtabmap_msgs::msg::RGBDImage, rtabmap_msgs::msg::RGBDImage, rtabmap_msgs::msg::RGBDImage, rtabmap_msgs::msg::RGBDImage, rtabmap_msgs::msg::RGBDImage, rtabmap_msgs::msg::RGBDImage, rtabmap_msgs::msg::RGBDImage)
 
 private:
-	std::thread * warningThread_;
-	bool callbackCalled_;
-
-	std::string subscribedTopicsMsg_;
-
 	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImages>::SharedPtr rgbdImagesPub_;
 
 	std::vector<message_filters::Subscriber<rtabmap_msgs::msg::RGBDImage>*> rgbdSubs_;

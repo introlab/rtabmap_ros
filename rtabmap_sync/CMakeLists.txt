@@ -10,6 +10,7 @@ find_package(rclcpp_components REQUIRED)
 find_package(rtabmap_conversions REQUIRED)
 find_package(rtabmap_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(diagnostic_updater REQUIRED)
 
 option(RTABMAP_SYNC_MULTI_RGBD "Build with multi RGBD camera synchronization support"  OFF)
 option(RTABMAP_SYNC_USER_DATA "Build with input user data support"  OFF)
@@ -49,6 +50,7 @@ SET(Libraries
    rtabmap_conversions
    rtabmap_msgs
    sensor_msgs
+   diagnostic_updater
 )
 
 ###########

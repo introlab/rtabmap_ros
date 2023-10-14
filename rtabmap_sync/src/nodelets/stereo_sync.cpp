@@ -42,9 +42,8 @@ namespace rtabmap_sync
 
 StereoSync::StereoSync(const rclcpp::NodeOptions & options) :
 		Node("stereo_sync", options),
+		SyncDiagnostic(this),
 		compressedRate_(0),
-		warningThread_(0),
-		callbackCalled_(false),
 		approxSync_(0),
 		exactSync_(0)
 {
@@ -88,7 +87,7 @@ StereoSync::StereoSync(const rclcpp::NodeOptions & options) :
 	cameraInfoLeftSub_.subscribe(this, "left/camera_info"), rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile();
 	cameraInfoRightSub_.subscribe(this, "right/camera_info", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile());
 
-	subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync%s):\n   %s,\n   %s,\n   %s,\n   %s",
+	std::string subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s,\n   %s,\n   %s,\n   %s",
 						get_name(),
 						approxSync?"approx":"exact",
 						approxSync&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
@@ -97,36 +96,22 @@ StereoSync::StereoSync(const rclcpp::NodeOptions & options) :
 						cameraInfoLeftSub_.getSubscriber()->get_topic_name(),
 						cameraInfoRightSub_.getSubscriber()->get_topic_name());
 
-	RCLCPP_INFO(this->get_logger(), "%s", subscribedTopicsMsg_.c_str());
+	RCLCPP_INFO(this->get_logger(), "%s", subscribedTopicsMsg.c_str());
 
-	warningThread_ = new std::thread([&](){
-		rclcpp::Rate r(1/5.0);
-		while(!callbackCalled_)
-		{
-			r.sleep();
-			if(!callbackCalled_)
-			{
-				RCLCPP_WARN(this->get_logger(),
-						"%s: Did not receive data since 5 seconds! Make sure the input topics are "
-						"published (\"$ ros2 topic hz my_topic\") and the timestamps in their "
-						"header are set. %s%s",
-						get_name(),
-						approxSync?"":"Parameter \"approx_sync\" is false, which means that input "
-							"topics should have all the exact timestamp for the callback to be called.",
-						subscribedTopicsMsg_.c_str());
-			}
-		}
-	});
+	initDiagnostic(imageLeftSub_.getSubscriber().getTopic(),
+		uFormat("%s: Did not receive data since 5 seconds! Make sure the input topics are "
+				"published (\"$ rostopic hz my_topic\") and the timestamps in their "
+				"header are set. %s%s",
+				get_name(),
+				approxSync?"":"Parameter \"approx_sync\" is false, which means that input "
+					"topics should have all the exact timestamp for the callback to be called.",
+				subscribedTopicsMsg.c_str()));
 }
 
 StereoSync::~StereoSync()
 {
 	delete approxSync_;
 	delete exactSync_;
-
-	callbackCalled_=true;
-	warningThread_->join();
-	delete warningThread_;
 }
 
 void StereoSync::callback(
@@ -135,7 +120,7 @@ void StereoSync::callback(
 		const sensor_msgs::msg::CameraInfo::ConstSharedPtr cameraInfoLeft,
 		const sensor_msgs::msg::CameraInfo::ConstSharedPtr cameraInfoRight)
 {
-	callbackCalled_ = true;
+	tick(imageLeft->header.stamp);
 	if(rgbdImagePub_->get_subscription_count() || rgbdImageCompressedPub_->get_subscription_count())
 	{
 		double leftStamp = rtabmap_conversions::timestampFromROS(imageLeft->header.stamp);

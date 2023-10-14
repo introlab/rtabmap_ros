@@ -101,6 +101,11 @@ void ICPOdometry::onOdomInit()
 	cloud_sub_ = create_subscription<sensor_msgs::msg::PointCloud2>("scan_cloud", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos()), std::bind(&ICPOdometry::callbackCloud, this, std::placeholders::_1));
 
 	filtered_scan_pub_ = create_publisher<sensor_msgs::msg::PointCloud2>("odom_filtered_input_scan", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos()));
+
+	initDiagnosticMsg(uFormat("\n%s subscribed to %s and %s (make sure only one of this topic is published, otherwise remap one to a dummy topic name).",
+			get_name(),
+			scan_sub_->get_topic_name(),
+			cloud_sub_->get_topic_name()), true);
 }
 
 void ICPOdometry::updateParameters(ParametersMap & parameters)

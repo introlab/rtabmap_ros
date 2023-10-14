@@ -43,11 +43,10 @@ namespace rtabmap_sync
 
 RGBDSync::RGBDSync(const rclcpp::NodeOptions & options) :
 	Node("rgbd_sync", options),
+	SyncDiagnostic(this),
 	depthScale_(1.0),
 	decimation_(1),
 	compressedRate_(0),
-	warningThread_(0),
-	callbackCalled_(false),
 	approxSyncDepth_(0),
 	exactSyncDepth_(0)
 {
@@ -100,7 +99,7 @@ RGBDSync::RGBDSync(const rclcpp::NodeOptions & options) :
 	imageDepthSub_.subscribe(this, "depth/image", hints.getTransport(), rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
 	cameraInfoSub_.subscribe(this, "rgb/camera_info", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile());
 
-	subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync%s):\n   %s,\n   %s,\n   %s",
+	std::string subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s,\n   %s,\n   %s",
 						get_name(),
 						approxSync?"approx":"exact",
 						approxSync&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
@@ -108,35 +107,22 @@ RGBDSync::RGBDSync(const rclcpp::NodeOptions & options) :
 						imageDepthSub_.getSubscriber().getTopic().c_str(),
 						cameraInfoSub_.getSubscriber()->get_topic_name());
 
-	RCLCPP_INFO(this->get_logger(), "%s", subscribedTopicsMsg_.c_str());
+	RCLCPP_INFO(this->get_logger(), "%s", subscribedTopicsMsg.c_str());
 
-	warningThread_ = new std::thread([&](){
-		rclcpp::Rate r(1/5.0);
-		while(!callbackCalled_)
-		{
-			r.sleep();
-			if(!callbackCalled_)
-			{
-				RCLCPP_WARN(this->get_logger(),
-						"%s: Did not receive data since 5 seconds! Make sure the input topics are "
-						"published (\"$ ros2 topic hz my_topic\") and the timestamps in their "
+	initDiagnostic(imageSub_.getSubscriber().getTopic(),
+				uFormat("%s: Did not receive data since 5 seconds! Make sure the input topics are "
+						"published (\"$ rostopic hz my_topic\") and the timestamps in their "
 						"header are set. %s%s",
-						this->get_name(),
+						get_name(),
 						approxSync?"":"Parameter \"approx_sync\" is false, which means that input "
 							"topics should have all the exact timestamp for the callback to be called.",
-						subscribedTopicsMsg_.c_str());
-			}
-		}
-	});
+						subscribedTopicsMsg.c_str()));
 }
 
 RGBDSync::~RGBDSync()
 {
 	delete approxSyncDepth_;
 	delete exactSyncDepth_;
-	callbackCalled_ = true;
-	warningThread_->join();
-	delete warningThread_;
 }
 
 void RGBDSync::callback(
@@ -144,7 +130,7 @@ void RGBDSync::callback(
 		  const sensor_msgs::msg::Image::ConstSharedPtr depth,
 		  const sensor_msgs::msg::CameraInfo::ConstSharedPtr cameraInfo)
 {
-	callbackCalled_ = true;
+	tick(image->header.stamp);
 	if(rgbdImagePub_->get_subscription_count() || rgbdImageCompressedPub_->get_subscription_count())
 	{
 		double rgbStamp = rtabmap_conversions::timestampFromROS(image->header.stamp);

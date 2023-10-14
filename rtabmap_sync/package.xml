@@ -21,7 +21,8 @@
   <depend>rtabmap_conversions</depend>
   <depend>rtabmap_msgs</depend>
   <depend>sensor_msgs</depend>
-  
+  <depend>diagnostic_updater</depend>
+
   <export>
 	<build_type>ament_cmake</build_type>
   </export>

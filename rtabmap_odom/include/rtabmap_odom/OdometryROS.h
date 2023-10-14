@@ -34,6 +34,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
 
+#include <diagnostic_updater/diagnostic_updater.hpp>
+
 #include <std_srvs/srv/empty.hpp>
 #include <std_msgs/msg/header.hpp>
 #include <nav_msgs/msg/odometry.hpp>
@@ -49,6 +51,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <boost/thread.hpp>
 
 #include "rtabmap_util/ULogToRosout.h"
+#include "rtabmap_sync/SyncDiagnostic.h"
 
 namespace rtabmap {
 class Odometry;
@@ -56,7 +59,7 @@ class Odometry;
 
 namespace rtabmap_odom {
 
-class OdometryROS : public rclcpp::Node
+class OdometryROS : public rclcpp::Node, public rtabmap_sync::SyncDiagnostic
 {
 
 public:
@@ -83,9 +86,8 @@ public:
 
 protected:
 	void init(bool stereoParams, bool visParams, bool icpParams);
-	void startWarningThread(const std::string & subscribedTopicsMsg, bool approxSync);
-	void callbackCalled() {callbackCalled_ = true;}
 	rmw_qos_reliability_policy_t qos() const {return qos_;}
+	void initDiagnosticMsg(const std::string & subscribedTopicsMsg, bool approxSync, const std::string & subscribedTopic = "");
 
 	virtual void flushCallbacks() {};
 	tf2_ros::Buffer & tfBuffer() {return *tfBuffer_;}
@@ -95,7 +97,6 @@ protected:
 	virtual void postProcessData(const rtabmap::SensorData & /*data*/, const std_msgs::msg::Header & /*header*/) const {}
 
 private:
-	void warningLoop(const std::string & subscribedTopicsMsg, bool approxSync);
 
 	virtual void updateParameters(rtabmap::ParametersMap &) {}
 	virtual void onOdomInit() {}
@@ -105,9 +106,6 @@ private:
 
 private:
 	rtabmap::Odometry * odometry_;
-	std::thread * warningThread_;
-	std::string subscribedTopicsMsg_;
-	bool callbackCalled_;
 
 	// parameters
 	std::string frameId_;
@@ -167,6 +165,17 @@ private:
 	rtabmap::Transform initialPose_;
 
 	rtabmap_util::ULogToRosout ulogToRosout_;
+
+	class OdomStatusTask : public diagnostic_updater::DiagnosticTask
+	{
+	public:
+		OdomStatusTask();
+		void setStatus(bool isLost);
+		void run(diagnostic_updater::DiagnosticStatusWrapper &stat);
+	private:
+		bool lost_;
+	};
+	OdomStatusTask statusDiagnostic_;
 };
 
 }

@@ -39,11 +39,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <message_filters/subscriber.h>
 
 #include "rtabmap_msgs/msg/rgbd_image.hpp"
+#include "rtabmap_sync/SyncDiagnostic.h"
 
 namespace rtabmap_sync
 {
 
-class RGBSync : public rclcpp::Node
+class RGBSync : public rclcpp::Node, public SyncDiagnostic
 {
 public:
 	RTABMAP_SYNC_PUBLIC
@@ -57,12 +58,8 @@ public:
 
 private:
 	double compressedRate_;
-	std::thread * warningThread_;
-	bool callbackCalled_;
 
 	rclcpp::Time lastCompressedPublished_;
-
-	std::string subscribedTopicsMsg_;
 
 	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr rgbdImagePub_;
 	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr rgbdImageCompressedPub_;

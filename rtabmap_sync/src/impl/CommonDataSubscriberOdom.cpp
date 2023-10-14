@@ -32,7 +32,6 @@ namespace rtabmap_sync {
 void CommonDataSubscriber::odomCallback(
 		const nav_msgs::msg::Odometry::ConstSharedPtr odomMsg)
 {
-	callbackCalled();
 	rtabmap_msgs::msg::UserData::SharedPtr userDataMsg; // Null
 	sensor_msgs::msg::PointCloud2::SharedPtr scan3dMsg; // Null
 	rtabmap_msgs::msg::OdomInfo::SharedPtr odomInfoMsg; // null
@@ -42,7 +41,6 @@ void CommonDataSubscriber::odomInfoCallback(
 		const nav_msgs::msg::Odometry::ConstSharedPtr odomMsg,
 		const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr odomInfoMsg)
 {
-	callbackCalled();
 	rtabmap_msgs::msg::UserData::SharedPtr userDataMsg; // Null
 	sensor_msgs::msg::LaserScan::SharedPtr scan2dMsg; // Null
 	commonOdomCallback(odomMsg, userDataMsg, odomInfoMsg);
@@ -52,7 +50,6 @@ void CommonDataSubscriber::odomDataCallback(
 		const nav_msgs::msg::Odometry::ConstSharedPtr odomMsg,
 		const rtabmap_msgs::msg::UserData::ConstSharedPtr userDataMsg)
 {
-	callbackCalled();
 	rtabmap_msgs::msg::OdomInfo::SharedPtr odomInfoMsg; // null
 	commonOdomCallback(odomMsg, userDataMsg, odomInfoMsg);
 }
@@ -61,7 +58,6 @@ void CommonDataSubscriber::odomDataInfoCallback(
 		const rtabmap_msgs::msg::UserData::ConstSharedPtr userDataMsg,
 		const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr odomInfoMsg)
 {
-	callbackCalled();
 	sensor_msgs::msg::PointCloud2::SharedPtr scan3dMsg; // Null
 	commonOdomCallback(odomMsg, userDataMsg, odomInfoMsg);
 }

@@ -90,6 +90,7 @@ void StereoOdometry::onOdomInit()
 	RCLCPP_INFO(this->get_logger(), "StereoOdometry: subscribe_rgbd = %s", subscribeRGBD?"true":"false");
 	RCLCPP_INFO(this->get_logger(), "StereoOdometry: keep_color     = %s", keepColor_?"true":"false");
 
+	std::string subscribedTopic;
 	std::string subscribedTopicsMsg;
 	if(subscribeRGBD)
 	{
@@ -206,6 +207,7 @@ void StereoOdometry::onOdomInit()
 		{
 			rgbdxSub_ = create_subscription<rtabmap_msgs::msg::RGBDImages>("rgbd_images", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos()), std::bind(&StereoOdometry::callbackRGBDX, this, std::placeholders::_1));
 
+			subscribedTopic = rgbdxSub_->get_topic_name();
 			subscribedTopicsMsg =
 					uFormat("\n%s subscribed to:\n   %s",
 					get_name(),
@@ -215,6 +217,7 @@ void StereoOdometry::onOdomInit()
 		{
 			rgbdSub_ = create_subscription<rtabmap_msgs::msg::RGBDImage>("rgbd_image", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos()), std::bind(&StereoOdometry::callbackRGBD, this, std::placeholders::_1));
 
+			subscribedTopic = rgbdSub_->get_topic_name();
 			subscribedTopicsMsg =
 					uFormat("\n%s subscribed to:\n   %s",
 					get_name(),
@@ -242,6 +245,7 @@ void StereoOdometry::onOdomInit()
 			exactSync_->registerCallback(std::bind(&StereoOdometry::callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 		}
 
+		subscribedTopic = imageRectLeft_.getTopic();
 		subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s \\\n   %s \\\n   %s \\\n   %s",
 				get_name(),
 				approxSync?"approx":"exact",
@@ -252,7 +256,7 @@ void StereoOdometry::onOdomInit()
 				cameraInfoRight_.getSubscriber()->get_topic_name());
 	}
 
-	this->startWarningThread(subscribedTopicsMsg, approxSync);
+	initDiagnosticMsg(subscribedTopicsMsg, approxSync, subscribedTopic);
 }
 
 void StereoOdometry::updateParameters(ParametersMap & parameters)
@@ -587,7 +591,6 @@ void StereoOdometry::callback(
 		const sensor_msgs::msg::CameraInfo::ConstSharedPtr cameraInfoLeft,
 		const sensor_msgs::msg::CameraInfo::ConstSharedPtr cameraInfoRight)
 {
-	callbackCalled();
 	if(!this->isPaused())
 	{
 		std::vector<cv_bridge::CvImageConstPtr> leftMsgs(1);
@@ -618,7 +621,6 @@ void StereoOdometry::callback(
 void StereoOdometry::callbackRGBD(
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image)
 {
-	callbackCalled();
 	if(!this->isPaused())
 	{
 		std::vector<cv_bridge::CvImageConstPtr> leftMsgs(1);
@@ -636,7 +638,6 @@ void StereoOdometry::callbackRGBD(
 void StereoOdometry::callbackRGBDX(
 		const rtabmap_msgs::msg::RGBDImages::ConstSharedPtr images)
 {
-	callbackCalled();
 	if(!this->isPaused())
 	{
 		if(images->rgbd_images.empty())
@@ -663,7 +664,6 @@ void StereoOdometry::callbackRGBD2(
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image,
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image2)
 {
-	callbackCalled();
 	if(!this->isPaused())
 	{
 		std::vector<cv_bridge::CvImageConstPtr> leftMsgs(2);
@@ -686,7 +686,6 @@ void StereoOdometry::callbackRGBD3(
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image2,
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image3)
 {
-	callbackCalled();
 	if(!this->isPaused())
 	{
 		std::vector<cv_bridge::CvImageConstPtr> leftMsgs(3);
@@ -713,7 +712,6 @@ void StereoOdometry::callbackRGBD4(
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image3,
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image4)
 {
-	callbackCalled();
 	if(!this->isPaused())
 	{
 		std::vector<cv_bridge::CvImageConstPtr> leftMsgs(4);

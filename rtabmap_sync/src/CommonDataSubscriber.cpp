@@ -31,10 +31,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace rtabmap_sync {
 
 CommonDataSubscriber::CommonDataSubscriber(rclcpp::Node & node, bool gui) :
+		SyncDiagnostic(&node, 0.5),
 		queueSize_(10),
 		approxSync_(true),
-		warningThread_(0),
-		callbackCalled_(false),
 		subscribedToDepth_(!gui),
 		subscribedToStereo_(false),
 		subscribedToRGB_(!gui),
@@ -510,21 +509,8 @@ void CommonDataSubscriber::setupCallbacks(rclcpp::Node & node)
 	}
 	else if(subscribedToRGBD_)
 	{
-		if(rgbdCameras_ == 0)
-		{
-			setupRGBDXCallbacks(
-					node,
-					subscribedToOdom_,
-					subscribedToUserData_,
-					subscribedToScan2d_,
-					subscribedToScan3d_,
-					subscribedToScanDescriptor_,
-					subscribedToOdomInfo_,
-					queueSize_,
-					approxSync_);
-		}
 #ifdef RTABMAP_SYNC_MULTI_RGBD
-		else if(rgbdCameras_ >= 6)
+		if(rgbdCameras_ >= 6)
 		{
 			if(rgbdCameras_ > 6)
 			{
@@ -605,6 +591,19 @@ void CommonDataSubscriber::setupCallbacks(rclcpp::Node & node)
 					"but you will have to synchronize RGBDImage topics yourself.");
 		}
 #endif
+		else if(rgbdCameras_ == 0)
+		{
+			setupRGBDXCallbacks(
+					node,
+					subscribedToOdom_,
+					subscribedToUserData_,
+					subscribedToScan2d_,
+					subscribedToScan3d_,
+					subscribedToScanDescriptor_,
+					subscribedToOdomInfo_,
+					queueSize_,
+					approxSync_);
+		}
 		else
 		{
 			setupRGBDCallbacks(
@@ -643,40 +642,22 @@ void CommonDataSubscriber::setupCallbacks(rclcpp::Node & node)
 
 	if(subscribedToDepth_ || subscribedToStereo_ || subscribedToRGBD_ || subscribedToScan2d_ || subscribedToScan3d_ || subscribedToScanDescriptor_ || subscribedToRGB_ || subscribedToOdom_)
 	{
-		warningThread_ = new std::thread([&](){
-			rclcpp::Rate r(1/5.0);
-			while(!callbackCalled_)
-			{
-				r.sleep();
-				if(!callbackCalled_)
-				{
-					RCLCPP_WARN(node.get_logger(),
-							"%s: Did not receive data since 5 seconds! Make sure the input topics are "
-							"published (\"$ ros2 topic hz my_topic\") and the timestamps in their "
-							"header are set. If topics are coming from different computers, make sure "
-							"the clocks of the computers are synchronized (\"ntpdate\"). If topics are "
-							"not published at the same rate, you could increase \"queue_size\" parameter "
-							"(current=%d). %s%s",
-							name_.c_str(),
-							queueSize_,
-							approxSync_?"":	"Parameter \"approx_sync\" is false, which means that input topics should have all the exact timestamp for the callback to be called.",
-							subscribedTopicsMsg_.c_str());
-				}
-			}
-		});
 		RCLCPP_INFO(node.get_logger(), "%s", subscribedTopicsMsg_.c_str());
+		initDiagnostic("",
+			uFormat("%s: Did not receive data since 5 seconds! Make sure the input topics are "
+					"published (\"$ ros2 topic hz my_topic\") and the timestamps in their "
+					"header are set. If topics are coming from different computers, make sure "
+					"the clocks of the computers are synchronized (\"ntpdate\"). %s%s",
+					name_.c_str(),
+					approxSync_?
+							uFormat("If topics are not published at the same rate, you could increase \"queue_size\" parameter (current=%d).", queueSize_).c_str():
+							"Parameter \"approx_sync\" is false, which means that input topics should have all the exact timestamp for the callback to be called.",
+					subscribedTopicsMsg_.c_str()));
 	}
 }
 
 CommonDataSubscriber::~CommonDataSubscriber()
 {
-	if(warningThread_)
-	{
-		callbackCalled();
-		warningThread_->join();
-		delete warningThread_;
-	}
-
 	// RGB + Depth
 	SYNC_DEL(depth);
 	SYNC_DEL(depthScan2d);
@@ -1007,8 +988,6 @@ void CommonDataSubscriber::commonSingleCameraCallback(
 		const std::vector<rtabmap_msgs::msg::Point3f> & localPoints3d,
 		const cv::Mat & localDescriptors)
 {
-	callbackCalled();
-
 	std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > localKeyPointsMsgs;
 	localKeyPointsMsgs.push_back(localKeyPoints);
 	std::vector<std::vector<rtabmap_msgs::msg::Point3f> > localPoints3dMsgs;

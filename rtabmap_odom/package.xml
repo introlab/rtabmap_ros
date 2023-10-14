@@ -26,7 +26,8 @@
   <depend>rtabmap_conversions</depend>
   <depend>rtabmap_msgs</depend>
   <depend>rtabmap_util</depend>
-  
+  <depend>rtabmap_sync</depend>
+
   <export>
 	<build_type>ament_cmake</build_type>
   </export>

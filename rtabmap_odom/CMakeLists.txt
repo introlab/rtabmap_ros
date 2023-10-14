@@ -25,6 +25,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(rtabmap_conversions REQUIRED)
 find_package(rtabmap_msgs REQUIRED)
 find_package(rtabmap_util REQUIRED)
+find_package(rtabmap_sync REQUIRED)
 
 include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -43,6 +44,7 @@ SET(Libraries
    rtabmap_conversions
    rtabmap_msgs
    rtabmap_util
+   rtabmap_sync
 )
 
 ###########
