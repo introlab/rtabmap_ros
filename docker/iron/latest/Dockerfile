@@ -11,7 +11,9 @@ RUN source /ros_entrypoint.sh && \
     export MAKEFLAGS="-j1" && \
     rosdep init && \
     rosdep update && \
+    apt-get update && \
     rosdep install --from-paths src --ignore-src -r -y && \
+    apt-get clean && rm -rf /var/lib/apt/lists/ && \
     colcon build --event-handlers console_direct+ --install-base /opt/ros/iron --merge-install --cmake-args -DRTABMAP_SYNC_MULTI_RGBD=ON -DCMAKE_BUILD_TYPE=Release && \
     cd && \
     rm -rf ros2_ws
