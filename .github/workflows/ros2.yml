@@ -32,14 +32,7 @@ jobs:
     - uses: ros-tooling/setup-ros@v0.6
       with:
         required-ros-distributions: ${{ matrix.ros_distro }}
-    
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get upgrade -y
-        sudo apt-get -y install ros-${{ matrix.ros_distro }}-rtabmap-ros
-        sudo apt-get -y remove ros-${{ matrix.ros_distro }}-rtabmap*
-                
+                   
     - name: Setup ros2 workspace
       run: | 
         source /opt/ros/${{ matrix.ros_distro }}/setup.bash
@@ -61,5 +54,5 @@ jobs:
         source /opt/ros/${{ matrix.ros_distro }}/setup.bash
         cd ${{github.workspace}}/ros2_ws
         rosdep update
-        rosdep install --from-paths src --ignore-src -r -y
+        rosdep install --from-paths src --ignore-src -r -y -t build_export -t test -t build -t buildtool_export -t buildtool
         colcon build --event-handlers console_direct+
