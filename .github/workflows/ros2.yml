@@ -36,6 +36,7 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
+        sudo apt-get upgrade -y
         sudo apt-get -y install ros-${{ matrix.ros_distro }}-rtabmap-ros
         sudo apt-get -y remove ros-${{ matrix.ros_distro }}-rtabmap*
                 

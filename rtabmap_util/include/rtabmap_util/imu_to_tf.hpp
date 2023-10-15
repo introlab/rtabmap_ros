@@ -28,38 +28,34 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap_util/visibility.h>
 #include "rclcpp/rclcpp.hpp"
 
+#include <sensor_msgs/msg/imu.hpp>
+
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
-
-#include <sensor_msgs/msg/point_cloud2.hpp>
-#include <sensor_msgs/msg/laser_scan.hpp>
+#include <tf2_ros/transform_broadcaster.h>
 
 namespace rtabmap_util
 {
 
-class LidarDeskewing : public rclcpp::Node
+class ImuToTF : public rclcpp::Node
 {
 public:
 	RTABMAP_UTIL_PUBLIC
-	explicit LidarDeskewing(const rclcpp::NodeOptions & options);
-	virtual ~LidarDeskewing();
+	explicit ImuToTF(const rclcpp::NodeOptions & options);
+	virtual ~ImuToTF();
 
 private:
-	void callbackScan(const sensor_msgs::msg::LaserScan::ConstSharedPtr msg);
-	void callbackCloud(const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg);
+	void imuCallback(const sensor_msgs::msg::Imu::ConstSharedPtr msg);
 
 private:
-	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubScan_;
-	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubCloud_;
-	rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr subScan_;
-	rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr subCloud_;
+	rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr sub_;
+	std::shared_ptr<tf2_ros::TransformBroadcaster> tfBroadcaster_;
 	std::string fixedFrameId_;
-	double waitForTransformDuration_;
-	bool slerp_;
+	std::string baseFrameId_;
 	std::shared_ptr<tf2_ros::Buffer> tfBuffer_;
 	std::shared_ptr<tf2_ros::TransformListener> tfListener_;
+	double waitForTransformDuration_;
 };
 
 }
-
 
