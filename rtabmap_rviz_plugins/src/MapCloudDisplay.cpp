@@ -289,7 +289,7 @@ void MapCloudDisplay::processMapData(const rtabmap_msgs::MapData& map)
 		int id = map.nodes[i].id;
 
 		// Always refresh the cloud if there are data
-		rtabmap::Signature s = rtabmap_conversions::nodeDataFromROS(map.nodes[i]);
+		rtabmap::Signature s = rtabmap_conversions::nodeFromROS(map.nodes[i]);
 		if((fromDepth &&
 			!s.sensorData().imageCompressed().empty() &&
 		    !s.sensorData().depthOrRightCompressed().empty() &&

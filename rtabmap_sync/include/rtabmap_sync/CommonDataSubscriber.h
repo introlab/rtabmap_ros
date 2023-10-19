@@ -50,6 +50,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap_msgs/UserData.h>
 #include <rtabmap_msgs/OdomInfo.h>
 #include <rtabmap_msgs/ScanDescriptor.h>
+#include <rtabmap_msgs/SensorData.h>
 #include <rtabmap_sync/CommonDataSubscriberDefines.h>
 #include <rtabmap_sync/SyncDiagnostic.h>
 
@@ -105,6 +106,10 @@ protected:
 	virtual void commonOdomCallback(
 				const nav_msgs::OdometryConstPtr & odomMsg,
 				const rtabmap_msgs::UserDataConstPtr & userDataMsg,
+				const rtabmap_msgs::OdomInfoConstPtr& odomInfoMsg) = 0;
+	virtual void commonSensorDataCallback(
+				const rtabmap_msgs::SensorDataConstPtr & sensorDataMsg,
+				const nav_msgs::OdometryConstPtr & odomMsg,
 				const rtabmap_msgs::OdomInfoConstPtr& odomInfoMsg) = 0;
 
 	void commonSingleCameraCallback(
@@ -231,6 +236,13 @@ private:
 			int queueSize,
 			bool approxSync);
 #endif
+    void setupSensorDataCallbacks(
+			ros::NodeHandle & nh,
+			ros::NodeHandle & pnh,
+			bool subscribeOdom,
+			bool subscribeOdomInfo,
+			int queueSize,
+			bool approxSync);
 	void setupScanCallbacks(
 			ros::NodeHandle & nh,
 			ros::NodeHandle & pnh,
@@ -260,6 +272,7 @@ private:
 	bool subscribedToRGB_;
 	bool subscribedToOdom_;
 	bool subscribedToRGBD_;
+	bool subscribedToSensorData_;
 	bool subscribedToScan2d_;
 	bool subscribedToScan3d_;
 	bool subscribedToScanDescriptor_;
@@ -276,6 +289,10 @@ private:
 	std::vector<message_filters::Subscriber<rtabmap_msgs::RGBDImage>*> rgbdSubs_;
 	ros::Subscriber rgbdXSubOnly_;
 	message_filters::Subscriber<rtabmap_msgs::RGBDImages> rgbdXSub_;
+
+	//for sensor data callback
+	ros::Subscriber sensorDataSubOnly_;
+	message_filters::Subscriber<rtabmap_msgs::SensorData> sensorDataSub_;
 
 	//stereo callback
 	image_transport::SubscriberFilter imageRectLeft_;
@@ -446,6 +463,14 @@ private:
 	DATA_SYNCS4(rgbdXOdomDataScanDesc, nav_msgs::Odometry, rtabmap_msgs::UserData, rtabmap_msgs::RGBDImages, rtabmap_msgs::ScanDescriptor);
 	DATA_SYNCS4(rgbdXOdomDataInfo, nav_msgs::Odometry, rtabmap_msgs::UserData, rtabmap_msgs::RGBDImages, rtabmap_msgs::OdomInfo);
 #endif
+
+    // SensorData
+	void sensorDataCallback(const rtabmap_msgs::SensorDataConstPtr&);
+	DATA_SYNCS2(sensorDataInfo, rtabmap_msgs::SensorData, rtabmap_msgs::OdomInfo);
+
+	// SensorData + Odom
+	DATA_SYNCS2(sensorDataOdom, nav_msgs::Odometry, rtabmap_msgs::SensorData);
+	DATA_SYNCS3(sensorDataOdomInfo, nav_msgs::Odometry, rtabmap_msgs::SensorData, rtabmap_msgs::OdomInfo);
 
 #ifdef RTABMAP_SYNC_MULTI_RGBD
 	// 2 RGBD

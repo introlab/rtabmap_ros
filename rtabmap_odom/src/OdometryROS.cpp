@@ -42,6 +42,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/util3d_transforms.h>
 #include <rtabmap/core/Memory.h>
 #include <rtabmap/core/Signature.h>
+#include <rtabmap/core/Compression.h>
 #include "rtabmap_conversions/MsgConversion.h"
 #include "rtabmap_msgs/OdomInfo.h"
 #include "rtabmap/utilite/UConversion.h"
@@ -71,6 +72,7 @@ OdometryROS::OdometryROS(bool stereoParams, bool visParams, bool icpParams) :
 	waitForTransform_(true),
 	waitForTransformDuration_(0.1), // 100 ms
 	publishNullWhenLost_(true),
+	publishCompressedSensorData_(false),
 	paused_(false),
 	resetCountdown_(0),
 	resetCurrentCount_(0),
@@ -81,6 +83,9 @@ OdometryROS::OdometryROS(bool stereoParams, bool visParams, bool icpParams) :
 	expectedUpdateRate_(0.0),
 	maxUpdateRate_(0.0),
 	minUpdateRate_(0.0),
+	pubSensorDataImage_(true),
+	compressionImgFormat_(".jpg"),
+	compressionParallelized_(true),
 	odomStrategy_(Parameters::defaultOdomStrategy()),
 	waitIMUToinit_(false),
 	imuProcessed_(false)
@@ -105,6 +110,8 @@ void OdometryROS::onInit()
 	odomLocalScanMap_ = nh.advertise<sensor_msgs::PointCloud2>("odom_local_scan_map", 1);
 	odomLastFrame_ = nh.advertise<sensor_msgs::PointCloud2>("odom_last_frame", 1);
 	odomRgbdImagePub_ = nh.advertise<rtabmap_msgs::RGBDImage>("odom_rgbd_image", 1);
+	odomSensorDataPub_ = nh.advertise<rtabmap_msgs::SensorData>("odom_sensor_data", 1);
+	odomSensorDataCompressedPub_ = nh.advertise<rtabmap_msgs::SensorData>("odom_sensor_data_compressed", 1);
 
 	Transform initialPose = Transform::getIdentity();
 	std::string initialPoseStr;
@@ -143,6 +150,10 @@ void OdometryROS::onInit()
 	pnh.param("max_update_rate", maxUpdateRate_, maxUpdateRate_);
 	pnh.param("min_update_rate", minUpdateRate_, minUpdateRate_);
 
+	pnh.param("pub_sensor_data_image", pubSensorDataImage_, pubSensorDataImage_);
+	pnh.param("pub_sensor_data_image_compression_format", compressionImgFormat_, compressionImgFormat_);
+	pnh.param("pub_sensor_data_parallel_compression", compressionParallelized_, compressionParallelized_);
+
 	pnh.param("wait_imu_to_init", waitIMUToinit_, waitIMUToinit_);
 
 	int eventLevel = ULogger::kFatal;
@@ -168,6 +179,7 @@ void OdometryROS::onInit()
 	NODELET_INFO("Odometry: ground_truth_base_frame_id = %s", groundTruthBaseFrameId_.c_str());
 	NODELET_INFO("Odometry: config_path            = %s", configPath.c_str());
 	NODELET_INFO("Odometry: publish_null_when_lost = %s", publishNullWhenLost_?"true":"false");
+	NODELET_INFO("Odometry: publish_compressed_sensor_data = %s", publishCompressedSensorData_?"true":"false");
 	NODELET_INFO("Odometry: guess_frame_id         = %s", guessFrameId_.c_str());
 	NODELET_INFO("Odometry: guess_min_translation  = %f", guessMinTranslation_);
 	NODELET_INFO("Odometry: guess_min_rotation     = %f", guessMinRotation_);
@@ -176,6 +188,9 @@ void OdometryROS::onInit()
 	NODELET_INFO("Odometry: max_update_rate        = %f Hz", maxUpdateRate_);
 	NODELET_INFO("Odometry: min_update_rate        = %f Hz", minUpdateRate_);
 	NODELET_INFO("Odometry: wait_imu_to_init       = %s", waitIMUToinit_?"true":"false");
+	NODELET_INFO("Odometry: pub_sensor_data_image  = %s", pubSensorDataImage_?"true":"false");
+	NODELET_INFO("Odometry: pub_sensor_data_image_compression_format = %s", compressionImgFormat_.c_str());
+	NODELET_INFO("Odometry: pub_sensor_data_parallel_compression     = %s", compressionParallelized_?"true":"false");
 
 	configPath = uReplaceChar(configPath, '~', UDirectory::homeDir());
 	if(configPath.size() && configPath.at(0) != '/')
@@ -902,6 +917,8 @@ void OdometryROS::processData(SensorData & data, const std_msgs::Header & header
 		}
 	}
 
+	postProcessData(data, header);
+
 	if(!data.imageRaw().empty() && odomRgbdImagePub_.getNumSubscribers())
 	{
 		if(!header.frame_id.empty())
@@ -917,10 +934,85 @@ void OdometryROS::processData(SensorData & data, const std_msgs::Header & header
 		}
 	}
 
-	postProcessData(data, header);
-
 	if(!data.imageRaw().empty() || !data.laserScanRaw().isEmpty())
 	{
+		if(odomSensorDataPub_.getNumSubscribers())
+		{
+			rtabmap_msgs::SensorData msg;
+			rtabmap_conversions::sensorDataToROS(data, msg, frameId_, pubSensorDataImage_);
+			msg.header.stamp = header.stamp; // use corresponding time stamp to image
+			odomSensorDataPub_.publish(msg);
+		}
+		if(odomSensorDataCompressedPub_.getNumSubscribers())
+		{
+			cv::Mat compressedImage;
+			cv::Mat compressedDepth;
+			cv::Mat compressedScan;
+			if(compressionParallelized_)
+			{
+				rtabmap::CompressionThread ctImage(data.imageRaw(), compressionImgFormat_);
+				rtabmap::CompressionThread ctDepth(data.depthOrRightRaw(), data.depthOrRightRaw().type() == CV_32FC1 || data.depthOrRightRaw().type() == CV_16UC1?std::string(".png"):compressionImgFormat_);
+				rtabmap::CompressionThread ctLaserScan(data.laserScanRaw().data());
+				if(pubSensorDataImage_ && !data.imageRaw().empty())
+				{
+					ctImage.start();
+				}
+				if(pubSensorDataImage_ && !data.depthOrRightRaw().empty())
+				{
+					ctDepth.start();
+				}
+				if(!data.laserScanRaw().isEmpty())
+				{
+					ctLaserScan.start();
+				}
+				ctImage.join();
+				ctDepth.join();
+				ctLaserScan.join();
+
+				compressedImage = ctImage.getCompressedData();
+				compressedDepth = ctDepth.getCompressedData();
+				compressedScan = ctLaserScan.getCompressedData();
+			}
+			else
+			{
+				if(pubSensorDataImage_)
+				{
+					compressedImage = compressImage2(data.imageRaw(), compressionImgFormat_);
+					compressedDepth = compressImage2(data.depthOrRightRaw(), data.depthOrRightRaw().type() == CV_32FC1 || data.depthOrRightRaw().type() == CV_16UC1?std::string(".png"):compressionImgFormat_);
+				}
+				compressedScan = compressData2(data.laserScanRaw().data());
+			}
+			if(!compressedImage.empty() && !data.stereoCameraModels().empty())
+			{
+				data.setStereoImage(compressedImage, compressedDepth, data.stereoCameraModels(), false);
+			}
+			else if(!compressedImage.empty() && !data.cameraModels().empty())
+			{
+				data.setRGBDImage(compressedImage, compressedDepth, data.cameraModels(), false);
+			}
+			if(!compressedScan.empty())
+			{
+				data.setLaserScan(data.laserScanRaw().angleIncrement() == 0.0f?
+							LaserScan(compressedScan,
+								data.laserScanRaw().maxPoints(),
+								data.laserScanRaw().rangeMax(),
+								data.laserScanRaw().format(),
+								data.laserScanRaw().localTransform()):
+							LaserScan(compressedScan,
+								data.laserScanRaw().format(),
+								data.laserScanRaw().rangeMin(),
+								data.laserScanRaw().rangeMax(),
+								data.laserScanRaw().angleMin(),
+								data.laserScanRaw().angleMax(),
+								data.laserScanRaw().angleIncrement(),
+								data.laserScanRaw().localTransform()), false);
+			}
+			rtabmap_msgs::SensorData msg;
+			rtabmap_conversions::sensorDataToROS(data, msg, frameId_, false);
+			msg.header.stamp = header.stamp; // use corresponding time stamp to image
+			odomSensorDataCompressedPub_.publish(msg);
+		}
+
 		if(visParams_)
 		{
 			if(icpParams_)

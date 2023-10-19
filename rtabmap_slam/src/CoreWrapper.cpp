@@ -1745,6 +1745,47 @@ void CoreWrapper::commonOdomCallback(
 	covariance_ = cv::Mat();
 }
 
+void CoreWrapper::commonSensorDataCallback(
+		const rtabmap_msgs::SensorDataConstPtr & sensorDataMsg,
+		const nav_msgs::OdometryConstPtr & odomMsg,
+		const rtabmap_msgs::OdomInfoConstPtr& odomInfoMsg)
+{
+	UTimer timerConversion;
+	UASSERT(sensorDataMsg.get());
+	std::string odomFrameId = odomFrameId_;
+	if(odomMsg.get())
+	{
+		odomFrameId = odomMsg->header.frame_id;
+		if(!odomUpdate(odomMsg, sensorDataMsg->header.stamp))
+		{
+			return;
+		}
+	}
+	else if(!odomTFUpdate(sensorDataMsg->header.stamp))
+	{
+		return;
+	}
+
+	SensorData data = rtabmap_conversions::sensorDataFromROS(*sensorDataMsg);
+
+	OdometryInfo odomInfo;
+	if(odomInfoMsg.get())
+	{
+		odomInfo = rtabmap_conversions::odomInfoFromROS(*odomInfoMsg);
+	}
+
+	process(lastPoseStamp_,
+			data,
+			lastPose_,
+			lastPoseVelocity_,
+			odomFrameId,
+			covariance_,
+			odomInfo,
+			timerConversion.ticks());
+
+	covariance_ = cv::Mat();
+}
+
 void CoreWrapper::process(
 		const ros::Time & stamp,
 		SensorData & data,
@@ -3255,8 +3296,8 @@ bool CoreWrapper::getNodeDataCallback(rtabmap_msgs::GetNodeData::Request& req, r
 
 		if(s.id()>0)
 		{
-			rtabmap_msgs::NodeData msg;
-			rtabmap_conversions::nodeDataToROS(s, msg);
+			rtabmap_msgs::Node msg;
+			rtabmap_conversions::nodeToROS(s, msg);
 			res.data.push_back(msg);
 		}
 	}

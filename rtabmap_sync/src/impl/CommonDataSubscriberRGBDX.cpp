@@ -523,6 +523,7 @@ void CommonDataSubscriber::setupRGBDXCallbacks(
 		}
 		else
 		{
+			rgbdXSub_.unsubscribe();
 			rgbdXSubOnly_ = nh.subscribe("rgbd_images", queueSize, &CommonDataSubscriber::rgbdXCallback, this);
 
 			subscribedTopicsMsg_ =
