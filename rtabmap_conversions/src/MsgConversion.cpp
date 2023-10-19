@@ -1198,12 +1198,15 @@ rtabmap::SensorData sensorDataFromROS(const rtabmap_msgs::SensorData & msg)
 	}
 
 	// Laser scan data
-	s.setLaserScan(rtabmap::LaserScan(
-		compressedMatFromBytes(msg.laser_scan_compressed),
-		msg.laser_scan_max_pts,
-		msg.laser_scan_max_range,
-		(rtabmap::LaserScan::Format)msg.laser_scan_format,
-		transformFromGeometryMsg(msg.laser_scan_local_transform)));
+	if(!msg.laser_scan_compressed.empty())
+	{
+		s.setLaserScan(rtabmap::LaserScan(
+			compressedMatFromBytes(msg.laser_scan_compressed),
+			msg.laser_scan_max_pts,
+			msg.laser_scan_max_range,
+			(rtabmap::LaserScan::Format)msg.laser_scan_format,
+			transformFromGeometryMsg(msg.laser_scan_local_transform)));
+	}
 	if(!msg.laser_scan.data.empty())
 	{
 		pcl::PCLPointCloud2 cloud;
@@ -1244,6 +1247,7 @@ rtabmap::SensorData sensorDataFromROS(const rtabmap_msgs::SensorData & msg)
 			msg.grid_cell_size,
 			point3fFromROS(msg.grid_view_point));
 	s.setGPS(rtabmap::GPS(msg.gps.stamp, msg.gps.longitude, msg.gps.latitude, msg.gps.altitude, msg.gps.error, msg.gps.bearing));
+	s.setIMU(rtabmap_conversions::imuFromROS(msg.imu, transformFromGeometryMsg(msg.imu_local_transform)));
 	return s;
 }
 void sensorDataToROS(const rtabmap::SensorData & data, rtabmap_msgs::SensorData & msg, const std::string & frameId, bool copyRawData)
@@ -1389,6 +1393,8 @@ void sensorDataToROS(const rtabmap::SensorData & data, rtabmap_msgs::SensorData 
 
 	rtabmap_conversions::globalDescriptorsToROS(data.globalDescriptors(), msg.global_descriptors);
 	rtabmap_conversions::envSensorsToROS(data.envSensors(), msg.env_sensors);
+	rtabmap_conversions::imuToROS(data.imu(), msg.imu);
+	transformToGeometryMsg(data.imu().localTransform(), msg.imu_local_transform);
 }
 
 rtabmap::Signature nodeFromROS(const rtabmap_msgs::Node & msg)
@@ -1847,6 +1853,43 @@ void userDataToROS(const cv::Mat & data, rtabmap_msgs::UserData & dataMsg, bool 
 			dataMsg.cols = data.cols;
 			dataMsg.type = data.type();
 		}
+	}
+}
+
+rtabmap::IMU imuFromROS(const sensor_msgs::Imu & msg, const rtabmap::Transform & localTransform)
+{
+	return rtabmap::IMU(
+		cv::Vec4d(msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w),
+		cv::Mat(3,3,CV_64FC1,(void*)msg.orientation_covariance.data()).clone(),
+		cv::Vec3d(msg.angular_velocity.x, msg.angular_velocity.y, msg.angular_velocity.z),
+		cv::Mat(3,3,CV_64FC1,(void*)msg.angular_velocity_covariance.data()).clone(),
+		cv::Vec3d(msg.linear_acceleration.x, msg.linear_acceleration.y, msg.linear_acceleration.z),
+		cv::Mat(3,3,CV_64FC1,(void*)msg.linear_acceleration_covariance.data()).clone(),
+		localTransform);
+}
+void imuToROS(const rtabmap::IMU & imu, sensor_msgs::Imu & msg)
+{
+	msg.orientation.x = imu.orientation()[0];
+	msg.orientation.y = imu.orientation()[1];
+	msg.orientation.z = imu.orientation()[2];
+	msg.orientation.w = imu.orientation()[3];
+	if(!imu.orientationCovariance().empty())
+	{
+		memcpy((void*)msg.orientation_covariance.data(), imu.orientationCovariance().data, 9*sizeof(double));
+	}
+	msg.angular_velocity.x = imu.angularVelocity()[0];
+	msg.angular_velocity.y = imu.angularVelocity()[1];
+	msg.angular_velocity.z = imu.angularVelocity()[2];
+	if(!imu.angularVelocityCovariance().empty())
+	{
+		memcpy((void*)msg.angular_velocity_covariance.data(), imu.angularVelocityCovariance().data, 9*sizeof(double));
+	}
+	msg.linear_acceleration.x = imu.linearAcceleration()[0];
+	msg.linear_acceleration.y = imu.linearAcceleration()[1];
+	msg.linear_acceleration.z = imu.linearAcceleration()[2];
+	if(!imu.linearAccelerationCovariance().empty())
+	{
+		memcpy((void*)msg.linear_acceleration_covariance.data(), imu.linearAccelerationCovariance().data, 9*sizeof(double));
 	}
 }
 

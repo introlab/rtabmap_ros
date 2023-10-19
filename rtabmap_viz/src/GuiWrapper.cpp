@@ -1159,6 +1159,7 @@ void GuiWrapper::commonSensorDataCallback(
 		lastOdomInfoUpdateTime_ = UTimer::now();
 
 		data = rtabmap_conversions::sensorDataFromROS(*sensorDataMsg);
+		data.uncompressData();
 
 		if(odomInfoMsg.get())
 		{

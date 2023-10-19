@@ -182,6 +182,9 @@ void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_msgs::OdomInfo & 
 cv::Mat userDataFromROS(const rtabmap_msgs::UserData & dataMsg);
 void userDataToROS(const cv::Mat & data, rtabmap_msgs::UserData & dataMsg, bool compress);
 
+rtabmap::IMU imuFromROS(const sensor_msgs::Imu & msg, const rtabmap::Transform & localTransform = rtabmap::Transform::getIdentity());
+void imuToROS(const rtabmap::IMU & imu, sensor_msgs::Imu & msg);
+
 rtabmap::Landmarks landmarksFromROS(
 		const std::map<int, std::pair<geometry_msgs::PoseWithCovarianceStamped, float> > & tags,
 		const std::string & frameId,

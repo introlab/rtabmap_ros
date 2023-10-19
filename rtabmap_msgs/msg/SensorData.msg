@@ -55,6 +55,7 @@ GlobalDescriptor[] global_descriptors
 EnvSensor[] env_sensors
 
 sensor_msgs/Imu imu
+geometry_msgs/Transform imu_local_transform
 
 Landmark[] landmarks
 
