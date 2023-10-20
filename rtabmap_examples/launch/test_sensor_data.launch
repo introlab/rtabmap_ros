@@ -46,7 +46,7 @@
   <arg name="stereo"                  default="false"/>
 
   <arg name="frame_id"                default="camera_link"/>
-  <arg name="rtabmap_args"            default="--delete_db_on_start"/>   <!-- delete_db_on_start -->
+  <arg name="rtabmap_args"            default="--delete_db_on_start --logconsole"/>   <!-- delete_db_on_start -->
   <arg name="odom_args"               default="$(arg rtabmap_args)"/>
 
   <!-- RGB-D related topics -->
