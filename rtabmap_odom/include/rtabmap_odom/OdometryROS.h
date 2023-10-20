@@ -124,6 +124,7 @@ private:
 	ros::Publisher odomLastFrame_;
 	ros::Publisher odomRgbdImagePub_;
 	ros::Publisher odomSensorDataPub_;
+	ros::Publisher odomSensorDataFeaturesPub_;
 	ros::Publisher odomSensorDataCompressedPub_;
 	ros::ServiceServer resetSrv_;
 	ros::ServiceServer resetToPoseSrv_;
@@ -149,7 +150,6 @@ private:
 	double expectedUpdateRate_;
 	double maxUpdateRate_;
 	double minUpdateRate_;
-	bool pubSensorDataImage_;
 	std::string compressionImgFormat_;
 	bool compressionParallelized_;
 	int odomStrategy_;
