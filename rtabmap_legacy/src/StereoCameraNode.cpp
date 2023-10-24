@@ -28,7 +28,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "ros/ros.h"
 #include <rtabmap/utilite/ULogger.h>
 #include <rtabmap/utilite/UDirectory.h>
-#include <rtabmap/core/CameraStereo.h>
+#include <rtabmap/core/camera/CameraStereoVideo.h>
 #include <rtabmap/core/util2d.h>
 #include <rtabmap_conversions/MsgConversion.h>
 #include <image_transport/image_transport.h>
