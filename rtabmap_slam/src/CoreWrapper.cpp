@@ -1768,6 +1768,10 @@ void CoreWrapper::commonSensorDataCallback(
 	}
 
 	SensorData data = rtabmap_conversions::sensorDataFromROS(*sensorDataMsg);
+	if(lastPoseIntermediate_)
+	{
+		data.setId(-1);
+	}
 
 	OdometryInfo odomInfo;
 	if(odomInfoMsg.get())
