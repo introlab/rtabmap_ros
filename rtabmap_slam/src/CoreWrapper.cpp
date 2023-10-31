@@ -742,7 +742,16 @@ void CoreWrapper::onInit()
 				Parameters::kOptimizerIterations().c_str(), mapFrameId_.c_str());
 	}
 
-	setupCallbacks(nh, pnh, getName()); // do it at the end
+	std::vector<diagnostic_updater::DiagnosticTask*> tasks;
+	double localizationThreshold = 0.0f;
+	pnh.param("loc_thr", localizationThreshold, localizationThreshold);
+	if(rtabmap_.getMemory() && !rtabmap_.getMemory()->isIncremental() && localizationThreshold > 0.0)
+	{
+		NODELET_INFO("rtabmap: loc_thr  = %f", localizationThreshold);
+		localizationDiagnostic_.setLocalizationThreshold(localizationThreshold);
+		tasks.push_back(&localizationDiagnostic_);
+	}
+	setupCallbacks(nh, pnh, getName(), tasks); // do it at the end
 	if(!this->isDataSubscribed())
 	{
 		bool isRGBD = uStr2Bool(parameters_.at(Parameters::kRGBDEnabled()).c_str());
@@ -2224,6 +2233,13 @@ void CoreWrapper::process(
 
 				timePublishMaps = timer.ticks();
 			}
+
+			// If not intermediate node
+			if(data.id() > 0)
+			{
+				localizationDiagnostic_.updateStatus(rtabmap_.getStatistics().localizationCovariance(), twoDMapping_);
+				tick(stamp, rate_>0?rate_:1000.0/(timeMsgConversion+timeRtabmap+timeUpdateMaps+timePublishMaps));
+			}
 		}
 		else
 		{
@@ -2245,12 +2261,6 @@ void CoreWrapper::process(
 		rtabmapROSStats_.insert(std::make_pair(std::string("RtabmapROS/TimeUpdatingMaps/ms"), timeUpdateMaps*1000.0f));
 		rtabmapROSStats_.insert(std::make_pair(std::string("RtabmapROS/TimePublishing/ms"), timePublishMaps*1000.0f));
 		rtabmapROSStats_.insert(std::make_pair(std::string("RtabmapROS/TimeTotal/ms"), (timeMsgConversion+timeRtabmap+timeUpdateMaps+timePublishMaps)*1000.0f));
-
-		// If not intermediate node
-		if(data.id() > 0)
-		{
-			tick(stamp, rate_>0?rate_:1000.0/(timeMsgConversion+timeRtabmap+timeUpdateMaps+timePublishMaps));
-		}
 	}
 	else if(!rtabmap_.isIDsGenerated())
 	{
@@ -4473,6 +4483,50 @@ void CoreWrapper::publishGlobalPath(const ros::Time & stamp)
 			}
 		}
 	}
+}
+
+CoreWrapper::LocalizationStatusTask::LocalizationStatusTask() :
+		diagnostic_updater::DiagnosticTask("Localization status"),
+		localizationThreshold_(0.0),
+		localizationError_(9999)
+{}
+
+void CoreWrapper::LocalizationStatusTask::setLocalizationThreshold(double value)
+{
+	localizationThreshold_ = value;
+}
+
+void CoreWrapper::LocalizationStatusTask::updateStatus(const cv::Mat & cov, bool twoDMapping)
+{
+	if(localizationThreshold_ > 0.0 && !cov.empty())
+	{
+		if(cov.at<double>(0,0) >= 9999.0)
+		{
+			localizationError_ = 9999.0;
+		}
+		else
+		{
+			localizationError_ = sqrt(uMax3(cov.at<double>(0,0), cov.at<double>(1,1), twoDMapping?0.0:cov.at<double>(2,2)));
+		}
+	}
+}
+
+void CoreWrapper::LocalizationStatusTask::run(diagnostic_updater::DiagnosticStatusWrapper &stat)
+{
+	if(localizationError_>=9999)
+	{
+		stat.summary(diagnostic_msgs::DiagnosticStatus::ERROR, "Not localized!");
+	}
+	else if(localizationError_ > localizationThreshold_)
+	{
+		stat.summary(diagnostic_msgs::DiagnosticStatus::ERROR, "Localization error is high!");
+	}
+	else
+	{
+		stat.summary(diagnostic_msgs::DiagnosticStatus::OK, "Localized.");
+	}
+	stat.add("Localization error (m)", localizationError_);
+	stat.add("loc_thr (m)", localizationThreshold_);
 }
 
 #ifdef WITH_OCTOMAP_MSGS

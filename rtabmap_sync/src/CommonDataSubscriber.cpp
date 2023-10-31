@@ -356,7 +356,8 @@ CommonDataSubscriber::CommonDataSubscriber(bool gui) :
 void CommonDataSubscriber::setupCallbacks(
 		ros::NodeHandle & nh,
 		ros::NodeHandle & pnh,
-		const std::string & name)
+		const std::string & name,
+		std::vector<diagnostic_updater::DiagnosticTask*> otherTasks)
 {
 	bool subscribeScan2d = false;
 	bool subscribeScan3d = false;
@@ -670,7 +671,8 @@ void CommonDataSubscriber::setupCallbacks(
 					approxSync_?
 							uFormat("If topics are not published at the same rate, you could increase \"queue_size\" parameter (current=%d).", queueSize_).c_str():
 							"Parameter \"approx_sync\" is false, which means that input topics should have all the exact timestamp for the callback to be called.",
-					subscribedTopicsMsg_.c_str()));
+					subscribedTopicsMsg_.c_str()),
+					otherTasks);
 		
 	}
 }

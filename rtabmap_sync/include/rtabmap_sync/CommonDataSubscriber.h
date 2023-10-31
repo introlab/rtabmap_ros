@@ -80,7 +80,8 @@ protected:
 	void setupCallbacks(
 			ros::NodeHandle & nh,
 			ros::NodeHandle & pnh,
-			const std::string & name);
+			const std::string & name,
+			std::vector<diagnostic_updater::DiagnosticTask*> otherTasks = std::vector<diagnostic_updater::DiagnosticTask*>());
 	virtual void commonMultiCameraCallback(
 				const nav_msgs::OdometryConstPtr & odomMsg,
 				const rtabmap_msgs::UserDataConstPtr & userDataMsg,
