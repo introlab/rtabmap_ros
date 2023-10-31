@@ -58,7 +58,6 @@ using namespace rtabmap;
 namespace rtabmap_odom {
 
 OdometryROS::OdometryROS(bool stereoParams, bool visParams, bool icpParams) :
-	rtabmap_sync::SyncDiagnostic(0.5),
 	odometry_(0),
 	frameId_("base_link"),
 	odomFrameId_("odom"),
@@ -386,9 +385,10 @@ void OdometryROS::onInit()
 void OdometryROS::initDiagnosticMsg(const std::string & subscribedTopicsMsg, bool approxSync, const std::string & subscribedTopic)
 {
 	NODELET_INFO("%s", subscribedTopicsMsg.c_str());
+	syncDiagnostic_.reset(new rtabmap_sync::SyncDiagnostic(getNodeHandle(), getPrivateNodeHandle(), getName(), 0.5));
 	std::vector<diagnostic_updater::DiagnosticTask*> tasks;
 	tasks.push_back(&statusDiagnostic_);
-	initDiagnostic(subscribedTopic,
+	syncDiagnostic_->init(subscribedTopic,
 		uFormat("%s: Did not receive data since 5 seconds! Make sure the input topics are "
 					"published (\"$ rostopic hz my_topic\") and the timestamps in their "
 					"header are set. %s%s",
@@ -1039,10 +1039,10 @@ void OdometryROS::processData(SensorData & data, const std_msgs::Header & header
 		}
 
 		statusDiagnostic_.setStatus(pose.isNull());
-		if(!pose.isNull())
+		if(syncDiagnostic_.get() && !pose.isNull())
 		{
 			double curentRate = 1.0/(ros::WallTime::now()-time).toSec();
-			tick(header.stamp,
+			syncDiagnostic_->tick(header.stamp,
 				maxUpdateRate_>0 && maxUpdateRate_ < curentRate ? maxUpdateRate_:
 				expectedUpdateRate_>0 && expectedUpdateRate_ < curentRate ? expectedUpdateRate_:
 				previousStamp_ == 0.0 || header.stamp.toSec() - previousStamp_ > 1.0/curentRate?0:curentRate);

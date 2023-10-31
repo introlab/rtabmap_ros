@@ -58,7 +58,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace rtabmap_sync {
 
-class CommonDataSubscriber : public SyncDiagnostic {
+class CommonDataSubscriber {
 public:
 	CommonDataSubscriber(bool gui);
 	virtual ~CommonDataSubscriber();
@@ -128,6 +128,8 @@ protected:
 				const std::vector<rtabmap_msgs::KeyPoint> & localKeyPoints = std::vector<rtabmap_msgs::KeyPoint>(),
 				const std::vector<rtabmap_msgs::Point3f> & localPoints3d = std::vector<rtabmap_msgs::Point3f>(),
 				const cv::Mat & localDescriptors = cv::Mat());
+
+	void tick(const ros::Time & stamp, double targetFrequency = 0);
 
 private:
 	void setupDepthCallbacks(
@@ -313,6 +315,8 @@ private:
 	ros::Subscriber scan3dSubOnly_;
 	ros::Subscriber scanDescSubOnly_;
 	ros::Subscriber odomSubOnly_;
+
+	std::unique_ptr<SyncDiagnostic> syncDiagnostic_;
 
 	// RGB + Depth
 	DATA_SYNCS3(depth, sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo);

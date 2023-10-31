@@ -55,7 +55,7 @@ class Odometry;
 
 namespace rtabmap_odom {
 
-class OdometryROS : public nodelet::Nodelet, public rtabmap_sync::SyncDiagnostic
+class OdometryROS : public nodelet::Nodelet
 {
 
 public:
@@ -170,6 +170,8 @@ private:
 		bool lost_;
 	};
 	OdomStatusTask statusDiagnostic_;
+
+	std::unique_ptr<rtabmap_sync::SyncDiagnostic> syncDiagnostic_;
 };
 
 }

@@ -30,7 +30,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace rtabmap_sync {
 
 CommonDataSubscriber::CommonDataSubscriber(bool gui) :
-		SyncDiagnostic(0.5),
 		queueSize_(10),
 		approxSync_(true),
 		subscribedToDepth_(!gui),
@@ -720,7 +719,8 @@ void CommonDataSubscriber::setupCallbacks(
 	if(subscribedToDepth_ || subscribedToStereo_ || subscribedToRGBD_ || subscribedToScan2d_ || subscribedToScan3d_ || subscribedToScanDescriptor_ || subscribedToRGB_ || subscribedToOdom_)
 	{
 		ROS_INFO("%s", subscribedTopicsMsg_.c_str());
-		initDiagnostic("",
+		syncDiagnostic_.reset(new SyncDiagnostic(nh, pnh, name, 0.5));
+		syncDiagnostic_->init("",
 			uFormat("%s: Did not receive data since 5 seconds! Make sure the input topics are "
 					"published (\"$ rostopic hz my_topic\") and the timestamps in their "
 					"header are set. If topics are coming from different computers, make sure "
@@ -1102,6 +1102,14 @@ void CommonDataSubscriber::commonSingleCameraCallback(
 			localKeyPointsMsgs,
 			localPoints3dMsgs,
 			localDescriptorsMsgs);
+}
+
+void CommonDataSubscriber::tick(const ros::Time & stamp, double targetFrequency)
+{
+	if(syncDiagnostic_.get())
+	{
+		syncDiagnostic_->tick(stamp, targetFrequency);
+	}
 }
 
 } /* namespace rtabmap_sync */

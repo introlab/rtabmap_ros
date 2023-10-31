@@ -12,7 +12,8 @@ namespace rtabmap_sync {
 
 class SyncDiagnostic {
     public:
-        SyncDiagnostic(double tolerance = 0.1, int windowSize = 5) :
+        SyncDiagnostic(ros::NodeHandle h = ros::NodeHandle(), ros::NodeHandle ph = ros::NodeHandle("~"), std::string nodeName = ros::this_node::getName(), double tolerance = 0.1, int windowSize = 5) :
+            diagnosticUpdater_(h, ph, nodeName),
             frequencyStatus_(diagnostic_updater::FrequencyStatusParam(&targetFrequency_, &targetFrequency_, tolerance)),
             lastCallbackCalledStamp_(ros::Time::now().toSec()-1),
             targetFrequency_(0.0),
@@ -21,8 +22,7 @@ class SyncDiagnostic {
         UASSERT(windowSize_ >= 1);
     }
 
-protected:
-    void initDiagnostic(
+    void init(
         const std::string & topic,
         const std::string & topicsNotReceivedWarningMsg,
         std::vector<diagnostic_updater::DiagnosticTask*> otherTasks = std::vector<diagnostic_updater::DiagnosticTask*>())
