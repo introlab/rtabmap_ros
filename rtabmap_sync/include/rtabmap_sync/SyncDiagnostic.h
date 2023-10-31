@@ -15,6 +15,8 @@ class SyncDiagnostic {
         SyncDiagnostic(ros::NodeHandle h = ros::NodeHandle(), ros::NodeHandle ph = ros::NodeHandle("~"), std::string nodeName = ros::this_node::getName(), double tolerance = 0.1, int windowSize = 5) :
             diagnosticUpdater_(h, ph, nodeName),
             frequencyStatus_(diagnostic_updater::FrequencyStatusParam(&targetFrequency_, &targetFrequency_, tolerance)),
+            timeStampStatus_(diagnostic_updater::TimeStampStatusParam()),
+            compositeTask_("Sync status"),
             lastCallbackCalledStamp_(ros::Time::now().toSec()-1),
             targetFrequency_(0.0),
             windowSize_(windowSize)
@@ -35,7 +37,9 @@ class SyncDiagnostic {
             // Assuming format is /back_camera/left/image, we want "back_camera"
             strList.pop_back();
         }
-        diagnosticUpdater_.add(frequencyStatus_);
+        compositeTask_.addTask(&frequencyStatus_);
+        compositeTask_.addTask(&timeStampStatus_);
+        diagnosticUpdater_.add(compositeTask_);
         for(size_t i=0; i<otherTasks.size(); ++i)
         {
             diagnosticUpdater_.add(*otherTasks[i]);
@@ -48,6 +52,7 @@ class SyncDiagnostic {
     void tick(const ros::Time & stamp, double targetFrequency = 0)
     {
         frequencyStatus_.tick();
+        timeStampStatus_.tick(stamp);
         double singlePeriod = stamp.toSec() - lastCallbackCalledStamp_;
 
         window_.push_back(singlePeriod);
@@ -91,6 +96,8 @@ private:
         std::string topicsNotReceivedWarningMsg_;
         diagnostic_updater::Updater diagnosticUpdater_;
         diagnostic_updater::FrequencyStatus frequencyStatus_;
+        diagnostic_updater::TimeStampStatus timeStampStatus_;
+        diagnostic_updater::CompositeDiagnosticTask compositeTask_;
         ros::Timer diagnosticTimer_;
         double lastCallbackCalledStamp_;
         double targetFrequency_;

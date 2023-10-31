@@ -168,9 +168,9 @@ private:
 		void run(diagnostic_updater::DiagnosticStatusWrapper &stat);
 	private:
 		bool lost_;
+		bool dataReceived_;
 	};
 	OdomStatusTask statusDiagnostic_;
-
 	std::unique_ptr<rtabmap_sync::SyncDiagnostic> syncDiagnostic_;
 };
 

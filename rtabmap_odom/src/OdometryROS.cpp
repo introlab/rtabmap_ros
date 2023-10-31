@@ -1135,17 +1135,23 @@ bool OdometryROS::setLogError(std_srvs::Empty::Request&, std_srvs::Empty::Respon
 
 OdometryROS::OdomStatusTask::OdomStatusTask() :
 		diagnostic_updater::DiagnosticTask("Odom status"),
-		lost_(false)
+		lost_(false),
+		dataReceived_(false)
 {}
 
 void OdometryROS::OdomStatusTask::setStatus(bool isLost)
 {
+	dataReceived_ = true;
 	lost_ = isLost;
 }
 
 void OdometryROS::OdomStatusTask::run(diagnostic_updater::DiagnosticStatusWrapper &stat)
 {
-	if(lost_)
+	if(!dataReceived_)
+	{
+		stat.summary(diagnostic_msgs::DiagnosticStatus::ERROR, "No data received!");
+	}
+	else if(lost_)
 	{
 		stat.summary(diagnostic_msgs::DiagnosticStatus::ERROR, "Lost!");
 	}
