@@ -2730,7 +2730,7 @@ void CoreWrapper::goalNodeCallback(const rtabmap_msgs::GoalConstPtr & msg)
 
 bool CoreWrapper::updateRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
-	ros::NodeHandle pnh("~");
+	ros::NodeHandle & pnh = getPrivateNodeHandle();
 	for(rtabmap::ParametersMap::iterator iter=parameters_.begin(); iter!=parameters_.end(); ++iter)
 	{
 		std::string vStr;
@@ -2835,8 +2835,7 @@ bool CoreWrapper::pauseRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empt
 	{
 		paused_ = true;
 		NODELET_INFO("rtabmap: paused!");
-		ros::NodeHandle pnh("~");
-		pnh.setParam("is_rtabmap_paused", true);
+		getPrivateNodeHandle().setParam("is_rtabmap_paused", true);
 	}
 	return true;
 }
@@ -2851,8 +2850,7 @@ bool CoreWrapper::resumeRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Emp
 	{
 		paused_ = false;
 		NODELET_INFO("rtabmap: resumed!");
-		ros::NodeHandle pnh("~");
-		pnh.setParam("is_rtabmap_paused", false);
+		getPrivateNodeHandle().setParam("is_rtabmap_paused", false);
 	}
 	return true;
 }
