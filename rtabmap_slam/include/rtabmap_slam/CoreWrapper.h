@@ -151,6 +151,10 @@ private:
 			const nav_msgs::OdometryConstPtr & odomMsg,
 			const rtabmap_msgs::UserDataConstPtr & userDataMsg,
 			const rtabmap_msgs::OdomInfoConstPtr& odomInfoMsg);
+	virtual void commonSensorDataCallback(
+			const rtabmap_msgs::SensorDataConstPtr & sensorDataMsg,
+			const nav_msgs::OdometryConstPtr & odomMsg,
+			const rtabmap_msgs::OdomInfoConstPtr& odomInfoMsg);
 
 	void defaultCallback(const sensor_msgs::ImageConstPtr & imageMsg); // no odom
 

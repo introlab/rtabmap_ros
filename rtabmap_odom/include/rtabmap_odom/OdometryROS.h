@@ -55,7 +55,7 @@ class Odometry;
 
 namespace rtabmap_odom {
 
-class OdometryROS : public nodelet::Nodelet, public rtabmap_sync::SyncDiagnostic
+class OdometryROS : public nodelet::Nodelet
 {
 
 public:
@@ -113,6 +113,7 @@ private:
 	bool waitForTransform_;
 	double waitForTransformDuration_;
 	bool publishNullWhenLost_;
+	bool publishCompressedSensorData_;
 	rtabmap::ParametersMap parameters_;
 
 	ros::Publisher odomPub_;
@@ -122,6 +123,9 @@ private:
 	ros::Publisher odomLocalScanMap_;
 	ros::Publisher odomLastFrame_;
 	ros::Publisher odomRgbdImagePub_;
+	ros::Publisher odomSensorDataPub_;
+	ros::Publisher odomSensorDataFeaturesPub_;
+	ros::Publisher odomSensorDataCompressedPub_;
 	ros::ServiceServer resetSrv_;
 	ros::ServiceServer resetToPoseSrv_;
 	ros::ServiceServer pauseSrv_;
@@ -146,6 +150,8 @@ private:
 	double expectedUpdateRate_;
 	double maxUpdateRate_;
 	double minUpdateRate_;
+	std::string compressionImgFormat_;
+	bool compressionParallelized_;
 	int odomStrategy_;
 	bool waitIMUToinit_;
 	bool imuProcessed_;
@@ -162,8 +168,10 @@ private:
 		void run(diagnostic_updater::DiagnosticStatusWrapper &stat);
 	private:
 		bool lost_;
+		bool dataReceived_;
 	};
 	OdomStatusTask statusDiagnostic_;
+	std::unique_ptr<rtabmap_sync::SyncDiagnostic> syncDiagnostic_;
 };
 
 }

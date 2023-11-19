@@ -776,7 +776,8 @@ void CoreWrapper::onInit()
 			!this->isSubscribedToStereo() &&
 			!this->isSubscribedToRGBD() &&
 			!this->isSubscribedToRGB() &&
-			(this->isSubscribedToScan2d() || this->isSubscribedToScan3d() || this->isSubscribedToOdom()))
+			(this->isSubscribedToScan2d() || this->isSubscribedToScan3d() || this->isSubscribedToOdom()) &&
+			!this->isSubscribedToSensorData())
 	{
 		NODELET_WARN("There is no image subscription, bag-of-words loop closure detection will be disabled...");
 		int kpMaxFeatures = Parameters::defaultKpMaxFeatures();
@@ -1754,6 +1755,51 @@ void CoreWrapper::commonOdomCallback(
 	covariance_ = cv::Mat();
 }
 
+void CoreWrapper::commonSensorDataCallback(
+		const rtabmap_msgs::SensorDataConstPtr & sensorDataMsg,
+		const nav_msgs::OdometryConstPtr & odomMsg,
+		const rtabmap_msgs::OdomInfoConstPtr& odomInfoMsg)
+{
+	UTimer timerConversion;
+	UASSERT(sensorDataMsg.get());
+	std::string odomFrameId = odomFrameId_;
+	if(odomMsg.get())
+	{
+		odomFrameId = odomMsg->header.frame_id;
+		if(!odomUpdate(odomMsg, sensorDataMsg->header.stamp))
+		{
+			return;
+		}
+	}
+	else if(!odomTFUpdate(sensorDataMsg->header.stamp))
+	{
+		return;
+	}
+
+	SensorData data = rtabmap_conversions::sensorDataFromROS(*sensorDataMsg);
+	if(lastPoseIntermediate_)
+	{
+		data.setId(-1);
+	}
+
+	OdometryInfo odomInfo;
+	if(odomInfoMsg.get())
+	{
+		odomInfo = rtabmap_conversions::odomInfoFromROS(*odomInfoMsg);
+	}
+
+	process(lastPoseStamp_,
+			data,
+			lastPose_,
+			lastPoseVelocity_,
+			odomFrameId,
+			covariance_,
+			odomInfo,
+			timerConversion.ticks());
+
+	covariance_ = cv::Mat();
+}
+
 void CoreWrapper::process(
 		const ros::Time & stamp,
 		SensorData & data,
@@ -2684,7 +2730,7 @@ void CoreWrapper::goalNodeCallback(const rtabmap_msgs::GoalConstPtr & msg)
 
 bool CoreWrapper::updateRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
-	ros::NodeHandle pnh("~");
+	ros::NodeHandle & pnh = getPrivateNodeHandle();
 	for(rtabmap::ParametersMap::iterator iter=parameters_.begin(); iter!=parameters_.end(); ++iter)
 	{
 		std::string vStr;
@@ -2789,8 +2835,7 @@ bool CoreWrapper::pauseRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empt
 	{
 		paused_ = true;
 		NODELET_INFO("rtabmap: paused!");
-		ros::NodeHandle pnh("~");
-		pnh.setParam("is_rtabmap_paused", true);
+		getPrivateNodeHandle().setParam("is_rtabmap_paused", true);
 	}
 	return true;
 }
@@ -2805,8 +2850,7 @@ bool CoreWrapper::resumeRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Emp
 	{
 		paused_ = false;
 		NODELET_INFO("rtabmap: resumed!");
-		ros::NodeHandle pnh("~");
-		pnh.setParam("is_rtabmap_paused", false);
+		getPrivateNodeHandle().setParam("is_rtabmap_paused", false);
 	}
 	return true;
 }
@@ -3265,8 +3309,8 @@ bool CoreWrapper::getNodeDataCallback(rtabmap_msgs::GetNodeData::Request& req, r
 
 		if(s.id()>0)
 		{
-			rtabmap_msgs::NodeData msg;
-			rtabmap_conversions::nodeDataToROS(s, msg);
+			rtabmap_msgs::Node msg;
+			rtabmap_conversions::nodeToROS(s, msg);
 			res.data.push_back(msg);
 		}
 	}

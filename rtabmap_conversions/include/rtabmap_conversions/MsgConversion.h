@@ -55,7 +55,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap_msgs/Point3f.h>
 #include <rtabmap_msgs/MapData.h>
 #include <rtabmap_msgs/MapGraph.h>
-#include <rtabmap_msgs/NodeData.h>
+#include <rtabmap_msgs/Node.h>
 #include <rtabmap_msgs/OdomInfo.h>
 #include <rtabmap_msgs/Info.h>
 #include <rtabmap_msgs/RGBDImage.h>
@@ -162,11 +162,18 @@ void mapGraphToROS(
 		const rtabmap::Transform & mapToOdom,
 		rtabmap_msgs::MapGraph & msg);
 
-rtabmap::Signature nodeDataFromROS(const rtabmap_msgs::NodeData & msg);
-void nodeDataToROS(const rtabmap::Signature & signature, rtabmap_msgs::NodeData & msg);
+rtabmap::SensorData sensorDataFromROS(const rtabmap_msgs::SensorData & msg);
+void sensorDataToROS(const rtabmap::SensorData & signature, rtabmap_msgs::SensorData & msg, const std::string & frameId = "base_link", bool copyRawData = false);
 
-rtabmap::Signature nodeInfoFromROS(const rtabmap_msgs::NodeData & msg);
-void nodeInfoToROS(const rtabmap::Signature & signature, rtabmap_msgs::NodeData & msg);
+rtabmap::Signature nodeFromROS(const rtabmap_msgs::Node & msg);
+void nodeToROS(const rtabmap::Signature & signature, rtabmap_msgs::Node & msg);
+
+// DEPRECATED
+rtabmap::Signature nodeDataFromROS(const rtabmap_msgs::Node & msg);
+void nodeDataToROS(const rtabmap::Signature & signature, rtabmap_msgs::Node & msg);
+
+rtabmap::Signature nodeInfoFromROS(const rtabmap_msgs::Node & msg);
+void nodeInfoToROS(const rtabmap::Signature & signature, rtabmap_msgs::Node & msg);
 
 std::map<std::string, float> odomInfoToStatistics(const rtabmap::OdometryInfo & info);
 rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_msgs::OdomInfo & msg, bool ignoreData = false);
@@ -174,6 +181,9 @@ void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_msgs::OdomInfo & 
 
 cv::Mat userDataFromROS(const rtabmap_msgs::UserData & dataMsg);
 void userDataToROS(const cv::Mat & data, rtabmap_msgs::UserData & dataMsg, bool compress);
+
+rtabmap::IMU imuFromROS(const sensor_msgs::Imu & msg, const rtabmap::Transform & localTransform = rtabmap::Transform::getIdentity());
+void imuToROS(const rtabmap::IMU & imu, sensor_msgs::Imu & msg);
 
 rtabmap::Landmarks landmarksFromROS(
 		const std::map<int, std::pair<geometry_msgs::PoseWithCovarianceStamped, float> > & tags,

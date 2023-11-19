@@ -257,11 +257,11 @@ public:
 		rtabmap_conversions::mapGraphFromROS(msg.graph, poses, constraints, mapOdom);
 		for(unsigned int i=0; i<msg.nodes.size(); ++i)
 		{
-			if(msg.nodes[i].image.size() ||
-			   msg.nodes[i].depth.size() ||
-			   msg.nodes[i].laserScan.size())
+			if(msg.nodes[i].data.left_compressed.size() ||
+			   msg.nodes[i].data.right_compressed.size() ||
+			   msg.nodes[i].data.laser_scan_compressed.size())
 			{
-				Signature data = rtabmap_conversions::nodeDataFromROS(msg.nodes[i]);
+				Signature data = rtabmap_conversions::nodeFromROS(msg.nodes[i]);
 				if(localGridsRegenerated_)
 				{
 					data.sensorData().setOccupancyGrid(cv::Mat(), cv::Mat(), cv::Mat(), 0, cv::Point3f());

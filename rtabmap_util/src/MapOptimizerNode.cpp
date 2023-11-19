@@ -301,7 +301,7 @@ public:
 						for(std::list<int>::iterator iter=toAdd.begin(); iter!=toAdd.end(); ++iter)
 						{
 							UASSERT(cachedNodeInfos_.find(*iter) != cachedNodeInfos_.end());
-							rtabmap_conversions::nodeDataToROS(cachedNodeInfos_.at(*iter), outputDataMsg.nodes[oi]);
+							rtabmap_conversions::nodeToROS(cachedNodeInfos_.at(*iter), outputDataMsg.nodes[oi]);
 							++oi;
 						}
 					}

@@ -56,7 +56,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace rtabmap_sync
 {
 
-class RgbSync : public nodelet::Nodelet, public SyncDiagnostic
+class RgbSync : public nodelet::Nodelet
 {
 public:
 	RgbSync() :
@@ -123,7 +123,8 @@ private:
 							cameraInfoSub_.getTopic().c_str());
 		NODELET_INFO(subscribedTopicsMsg.c_str());
 
-		initDiagnostic(rgb_nh.resolveName("image_rect"),
+		syncDiagnostic_.reset(new SyncDiagnostic(nh, pnh, getName()));
+		syncDiagnostic_->init(rgb_nh.resolveName("image_rect"),
 			uFormat("%s: Did not receive data since 5 seconds! Make sure the input topics are "
 					"published (\"$ rostopic hz my_topic\") and the timestamps in their "
 					"header are set. %s%s",
@@ -137,7 +138,7 @@ private:
 			  const sensor_msgs::ImageConstPtr& image,
 			  const sensor_msgs::CameraInfoConstPtr& cameraInfo)
 	{
-		tick(image->header.stamp);
+		syncDiagnostic_->tick(image->header.stamp);
 
 		if(rgbdImagePub_.getNumSubscribers() || rgbdImageCompressedPub_.getNumSubscribers())
 		{
@@ -205,6 +206,8 @@ private:
 
 	typedef message_filters::sync_policies::ExactTime<sensor_msgs::Image, sensor_msgs::CameraInfo> MyExactSyncPolicy;
 	message_filters::Synchronizer<MyExactSyncPolicy> * exactSync_;
+
+	std::unique_ptr<SyncDiagnostic> syncDiagnostic_;
 };
 
 PLUGINLIB_EXPORT_CLASS(rtabmap_sync::RgbSync, nodelet::Nodelet);

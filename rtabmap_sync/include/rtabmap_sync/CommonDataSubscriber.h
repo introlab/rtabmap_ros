@@ -50,6 +50,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap_msgs/UserData.h>
 #include <rtabmap_msgs/OdomInfo.h>
 #include <rtabmap_msgs/ScanDescriptor.h>
+#include <rtabmap_msgs/SensorData.h>
 #include <rtabmap_sync/CommonDataSubscriberDefines.h>
 #include <rtabmap_sync/SyncDiagnostic.h>
 
@@ -57,7 +58,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace rtabmap_sync {
 
-class CommonDataSubscriber : public SyncDiagnostic {
+class CommonDataSubscriber {
 public:
 	CommonDataSubscriber(bool gui);
 	virtual ~CommonDataSubscriber();
@@ -69,8 +70,9 @@ public:
 	bool isSubscribedToRGBD() const   {return subscribedToRGBD_;}
 	bool isSubscribedToScan2d() const {return subscribedToScan2d_;}
 	bool isSubscribedToScan3d() const {return subscribedToScan3d_;}
+	bool isSubscribedToSensorData() const {return subscribedToSensorData_;}
 	bool isSubscribedToOdomInfo() const {return subscribedToOdomInfo_;}
-	bool isDataSubscribed() const {return isSubscribedToDepth() || isSubscribedToStereo() || isSubscribedToRGBD() || isSubscribedToScan2d() || isSubscribedToScan3d() || isSubscribedToRGB() || isSubscribedToOdom();}
+	bool isDataSubscribed() const {return isSubscribedToDepth() || isSubscribedToStereo() || isSubscribedToRGBD() || isSubscribedToScan2d() || isSubscribedToScan3d() || isSubscribedToRGB() || isSubscribedToOdom() || isSubscribedToSensorData();}
 	int rgbdCameras() const {return isSubscribedToRGBD()?(int)rgbdSubs_.size():0;}
 	int getQueueSize() const {return queueSize_;}
 	bool isApproxSync() const {return approxSync_;}
@@ -107,6 +109,10 @@ protected:
 				const nav_msgs::OdometryConstPtr & odomMsg,
 				const rtabmap_msgs::UserDataConstPtr & userDataMsg,
 				const rtabmap_msgs::OdomInfoConstPtr& odomInfoMsg) = 0;
+	virtual void commonSensorDataCallback(
+				const rtabmap_msgs::SensorDataConstPtr & sensorDataMsg,
+				const nav_msgs::OdometryConstPtr & odomMsg,
+				const rtabmap_msgs::OdomInfoConstPtr& odomInfoMsg) = 0;
 
 	void commonSingleCameraCallback(
 				const nav_msgs::OdometryConstPtr & odomMsg,
@@ -122,6 +128,8 @@ protected:
 				const std::vector<rtabmap_msgs::KeyPoint> & localKeyPoints = std::vector<rtabmap_msgs::KeyPoint>(),
 				const std::vector<rtabmap_msgs::Point3f> & localPoints3d = std::vector<rtabmap_msgs::Point3f>(),
 				const cv::Mat & localDescriptors = cv::Mat());
+
+	void tick(const ros::Time & stamp, double targetFrequency = 0);
 
 private:
 	void setupDepthCallbacks(
@@ -232,6 +240,13 @@ private:
 			int queueSize,
 			bool approxSync);
 #endif
+    void setupSensorDataCallbacks(
+			ros::NodeHandle & nh,
+			ros::NodeHandle & pnh,
+			bool subscribeOdom,
+			bool subscribeOdomInfo,
+			int queueSize,
+			bool approxSync);
 	void setupScanCallbacks(
 			ros::NodeHandle & nh,
 			ros::NodeHandle & pnh,
@@ -261,6 +276,7 @@ private:
 	bool subscribedToRGB_;
 	bool subscribedToOdom_;
 	bool subscribedToRGBD_;
+	bool subscribedToSensorData_;
 	bool subscribedToScan2d_;
 	bool subscribedToScan3d_;
 	bool subscribedToScanDescriptor_;
@@ -277,6 +293,10 @@ private:
 	std::vector<message_filters::Subscriber<rtabmap_msgs::RGBDImage>*> rgbdSubs_;
 	ros::Subscriber rgbdXSubOnly_;
 	message_filters::Subscriber<rtabmap_msgs::RGBDImages> rgbdXSub_;
+
+	//for sensor data callback
+	ros::Subscriber sensorDataSubOnly_;
+	message_filters::Subscriber<rtabmap_msgs::SensorData> sensorDataSub_;
 
 	//stereo callback
 	image_transport::SubscriberFilter imageRectLeft_;
@@ -295,6 +315,8 @@ private:
 	ros::Subscriber scan3dSubOnly_;
 	ros::Subscriber scanDescSubOnly_;
 	ros::Subscriber odomSubOnly_;
+
+	std::unique_ptr<SyncDiagnostic> syncDiagnostic_;
 
 	// RGB + Depth
 	DATA_SYNCS3(depth, sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo);
@@ -447,6 +469,14 @@ private:
 	DATA_SYNCS4(rgbdXOdomDataScanDesc, nav_msgs::Odometry, rtabmap_msgs::UserData, rtabmap_msgs::RGBDImages, rtabmap_msgs::ScanDescriptor);
 	DATA_SYNCS4(rgbdXOdomDataInfo, nav_msgs::Odometry, rtabmap_msgs::UserData, rtabmap_msgs::RGBDImages, rtabmap_msgs::OdomInfo);
 #endif
+
+    // SensorData
+	void sensorDataCallback(const rtabmap_msgs::SensorDataConstPtr&);
+	DATA_SYNCS2(sensorDataInfo, rtabmap_msgs::SensorData, rtabmap_msgs::OdomInfo);
+
+	// SensorData + Odom
+	DATA_SYNCS2(sensorDataOdom, nav_msgs::Odometry, rtabmap_msgs::SensorData);
+	DATA_SYNCS3(sensorDataOdomInfo, nav_msgs::Odometry, rtabmap_msgs::SensorData, rtabmap_msgs::OdomInfo);
 
 #ifdef RTABMAP_SYNC_MULTI_RGBD
 	// 2 RGBD

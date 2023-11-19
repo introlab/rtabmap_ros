@@ -201,7 +201,7 @@ int main(int argc, char** argv)
 		int addedNodes = 0;
 		for(size_t i=0; i<mapRes.data.nodes.size(); ++i)
 		{
-			rtabmap::Signature s = rtabmap_conversions::nodeDataFromROS(mapRes.data.nodes.at(i));
+			rtabmap::Signature s = rtabmap_conversions::nodeFromROS(mapRes.data.nodes.at(i));
 			rtabmap::SensorData compressedData = s.sensorData();
 			s.sensorData().uncompressData();
 			if(loopClosureDetector.process(s.sensorData(), rtabmap::Transform()))
