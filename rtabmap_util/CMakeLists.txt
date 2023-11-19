@@ -113,7 +113,7 @@ set_target_properties(rtabmap_pointcloud_to_depthimage PROPERTIES OUTPUT_NAME "p
 
 add_executable(rtabmap_point_cloud_aggregator src/PointCloudAggregatorNode.cpp)
 target_link_libraries(rtabmap_point_cloud_aggregator ${catkin_LIBRARIES})
-set_target_properties(rtabmap_point_cloud_aggregator PROPERTIES OUTPUT_NAME "rtabmap_point_cloud_aggregator")
+set_target_properties(rtabmap_point_cloud_aggregator PROPERTIES OUTPUT_NAME "point_cloud_aggregator")
 
 add_executable(rtabmap_point_cloud_assembler src/PointCloudAssemblerNode.cpp)
 target_link_libraries(rtabmap_point_cloud_assembler ${catkin_LIBRARIES})
@@ -141,6 +141,7 @@ install(TARGETS
    rtabmap_data_player
    rtabmap_odom_msg_to_tf
    rtabmap_pointcloud_to_depthimage
+   rtabmap_point_cloud_aggregator
    rtabmap_point_cloud_assembler
    rtabmap_rgbd_relay
    rtabmap_rgbd_split
