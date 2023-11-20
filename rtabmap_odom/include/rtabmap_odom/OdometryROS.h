@@ -59,7 +59,7 @@ class Odometry;
 
 namespace rtabmap_odom {
 
-class OdometryROS : public rclcpp::Node, public rtabmap_sync::SyncDiagnostic
+class OdometryROS : public rclcpp::Node
 {
 
 public:
@@ -119,6 +119,7 @@ private:
 	bool publishTf_;
 	double waitForTransform_;
 	bool publishNullWhenLost_;
+	bool publishCompressedSensorData_;
 	rmw_qos_reliability_policy_t qos_;
 	rtabmap::ParametersMap parameters_;
 
@@ -129,6 +130,9 @@ private:
 	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr odomLocalScanMap_;
 	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr odomLastFrame_;
 	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr odomRgbdImagePub_;
+	rclcpp::Publisher<rtabmap_msgs::msg::SensorData>::SharedPtr odomSensorDataPub_;
+	rclcpp::Publisher<rtabmap_msgs::msg::SensorData>::SharedPtr odomSensorDataFeaturesPub_;
+	rclcpp::Publisher<rtabmap_msgs::msg::SensorData>::SharedPtr odomSensorDataCompressedPub_;
 
 	rclcpp::Service<std_srvs::srv::Empty>::SharedPtr resetSrv_;
 	rclcpp::Service<rtabmap_msgs::srv::ResetPose>::SharedPtr resetToPoseSrv_;
@@ -156,6 +160,8 @@ private:
 	double expectedUpdateRate_;
 	double maxUpdateRate_;
 	double minUpdateRate_;
+	std::string compressionImgFormat_;
+	bool compressionParallelized_;
 	int odomStrategy_;
 	bool waitIMUToinit_;
 	bool imuProcessed_;
@@ -174,8 +180,10 @@ private:
 		void run(diagnostic_updater::DiagnosticStatusWrapper &stat);
 	private:
 		bool lost_;
+		bool dataReceived_;
 	};
 	OdomStatusTask statusDiagnostic_;
+	std::unique_ptr<rtabmap_sync::SyncDiagnostic> syncDiagnostic_;
 };
 
 }

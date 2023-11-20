@@ -116,6 +116,11 @@ private:
 			const rtabmap_msgs::msg::UserData::ConstSharedPtr & userDataMsg,
 			const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr& odomInfoMsg);
 
+	virtual void commonSensorDataCallback(
+			const rtabmap_msgs::msg::SensorData::ConstSharedPtr & sensorDataMsg,
+			const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
+			const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr & odomInfoMsg);
+
 	void defaultCallback(const nav_msgs::msg::Odometry::SharedPtr & odomMsg);
 
 	void processRequestedMap(const rtabmap_msgs::msg::MapData & map);

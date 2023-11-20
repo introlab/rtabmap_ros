@@ -9,7 +9,7 @@ MapGraph graph
 ##################
 # Graph data
 ##################
-NodeData[] nodes
+Node[] nodes
 
 
 

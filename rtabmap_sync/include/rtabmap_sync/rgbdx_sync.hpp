@@ -46,7 +46,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace rtabmap_sync
 {
 
-class RGBDXSync : public rclcpp::Node, public SyncDiagnostic
+class RGBDXSync : public rclcpp::Node
 {
 public:
 	RTABMAP_SYNC_PUBLIC
@@ -72,6 +72,8 @@ private:
 	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImages>::SharedPtr rgbdImagesPub_;
 
 	std::vector<message_filters::Subscriber<rtabmap_msgs::msg::RGBDImage>*> rgbdSubs_;
+
+	std::unique_ptr<SyncDiagnostic> syncDiagnostic_;
 };
 
 }

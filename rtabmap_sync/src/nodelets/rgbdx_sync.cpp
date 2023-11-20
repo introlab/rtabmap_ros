@@ -34,7 +34,6 @@ namespace rtabmap_sync
 
 RGBDXSync::RGBDXSync(const rclcpp::NodeOptions & options) :
 	Node("rgbd_sync", options),
-	SyncDiagnostic(this),
 	SYNC_INIT(rgbd2),
 	SYNC_INIT(rgbd3),
 	SYNC_INIT(rgbd4),
@@ -131,18 +130,20 @@ RGBDXSync::RGBDXSync(const rclcpp::NodeOptions & options) :
 		}
 	}
 
-	RCLCPP_INFO(this->get_logger(), "%s%s", subscribedTopicsMsg_.c_str(),
-			approxSync&&approxSyncMaxInterval!=0.0?uFormat(" (approx sync max interval=%fs)", approxSyncMaxInterval).c_str():"");
+	std::string subscribedTopicsMsg = uFormat("%s%s", subscribedTopicsMsg_.c_str(),
+				approxSync&&approxSyncMaxInterval!=0.0?uFormat(" (approx sync max interval=%fs)", approxSyncMaxInterval).c_str():"");
+	RCLCPP_INFO(this->get_logger(), subscribedTopicsMsg.c_str());
 
 	// Setup diagnostic
-	initDiagnostic("",
+	syncDiagnostic_.reset(new SyncDiagnostic(this));
+	syncDiagnostic_->init("",
 		uFormat("%s: Did not receive data since 5 seconds! Make sure the input topics are "
 				"published (\"$ rostopic hz my_topic\") and the timestamps in their "
 				"header are set. %s%s",
 				get_name(),
 				approxSync?"":"Parameter \"approx_sync\" is false, which means that input "
 					"topics should have all the exact timestamp for the callback to be called.",
-					subscribedTopicsMsg_.c_str()));
+					subscribedTopicsMsg.c_str()));
 }
 
 RGBDXSync::~RGBDXSync()
@@ -160,7 +161,7 @@ void RGBDXSync::rgbd2Callback(
 		  const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image0,
 		  const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1)
 {
-	tick(image0->header.stamp);
+	syncDiagnostic_->tick(image0->header.stamp);
 	rtabmap_msgs::msg::RGBDImages output;
 	output.header = image0->header;
 	output.rgbd_images.resize(2);
@@ -174,7 +175,7 @@ void RGBDXSync::rgbd3Callback(
 		  const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1,
 		  const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image2)
 {
-	tick(image0->header.stamp);
+	syncDiagnostic_->tick(image0->header.stamp);
 	rtabmap_msgs::msg::RGBDImages output;
 	output.header = image0->header;
 	output.rgbd_images.resize(3);
@@ -190,7 +191,7 @@ void RGBDXSync::rgbd4Callback(
 		  const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image2,
 		  const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image3)
 {
-	tick(image0->header.stamp);
+	syncDiagnostic_->tick(image0->header.stamp);
 	rtabmap_msgs::msg::RGBDImages output;
 	output.header = image0->header;
 	output.rgbd_images.resize(4);
@@ -208,7 +209,7 @@ void RGBDXSync::rgbd5Callback(
 		  const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image3,
 		  const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image4)
 {
-	tick(image0->header.stamp);
+	syncDiagnostic_->tick(image0->header.stamp);
 	rtabmap_msgs::msg::RGBDImages output;
 	output.header = image0->header;
 	output.rgbd_images.resize(5);
@@ -228,7 +229,7 @@ void RGBDXSync::rgbd6Callback(
 		  const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image4,
 		  const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image5)
 {
-	tick(image0->header.stamp);
+	syncDiagnostic_->tick(image0->header.stamp);
 	rtabmap_msgs::msg::RGBDImages output;
 	output.header = image0->header;
 	output.rgbd_images.resize(6);
@@ -250,7 +251,7 @@ void RGBDXSync::rgbd7Callback(
 		  const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image5,
 		  const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image6)
 {
-	tick(image0->header.stamp);
+	syncDiagnostic_->tick(image0->header.stamp);
 	rtabmap_msgs::msg::RGBDImages output;
 	output.header = image0->header;
 	output.rgbd_images.resize(7);
@@ -274,7 +275,7 @@ void RGBDXSync::rgbd8Callback(
 		  const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image6,
 		  const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image7)
 {
-	tick(image0->header.stamp);
+	syncDiagnostic_->tick(image0->header.stamp);
 	rtabmap_msgs::msg::RGBDImages output;
 	output.header = image0->header;
 	output.rgbd_images.resize(8);

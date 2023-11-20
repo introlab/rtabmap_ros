@@ -42,6 +42,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/util3d_transforms.h>
 #include <rtabmap/core/Memory.h>
 #include <rtabmap/core/Signature.h>
+#include <rtabmap/core/Compression.h>
 #include "rtabmap_conversions/MsgConversion.h"
 #include "rtabmap_msgs/msg/odom_info.hpp"
 #include "rtabmap/utilite/UConversion.h"
@@ -62,7 +63,6 @@ OdometryROS::OdometryROS(const rclcpp::NodeOptions & options) :
 
 OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & options) :
 	Node(name, options),
-	rtabmap_sync::SyncDiagnostic(this, 0.5),
 	odometry_(0),
 	frameId_("base_link"),
 	odomFrameId_("odom"),
@@ -75,6 +75,7 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	publishTf_(true),
 	waitForTransform_(0.1), // 100 ms
 	publishNullWhenLost_(true),
+	publishCompressedSensorData_(false),
 	qos_(RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT),
 	paused_(false),
 	resetCountdown_(0),
@@ -83,6 +84,8 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	expectedUpdateRate_(0.0),
 	maxUpdateRate_(0.0),
 	minUpdateRate_(0.0),
+	compressionImgFormat_(".jpg"),
+	compressionParallelized_(true),
 	odomStrategy_(Parameters::defaultOdomStrategy()),
 	waitIMUToinit_(false),
 	imuProcessed_(false),
@@ -100,6 +103,9 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	odomLocalScanMap_ = create_publisher<sensor_msgs::msg::PointCloud2>("odom_local_scan_map", rclcpp::QoS(1).reliability(qos_));
 	odomLastFrame_ = create_publisher<sensor_msgs::msg::PointCloud2>("odom_last_frame", rclcpp::QoS(1).reliability(qos_));
 	odomRgbdImagePub_ = create_publisher<rtabmap_msgs::msg::RGBDImage>("odom_rgbd_image", rclcpp::QoS(1).reliability(qos_));
+	odomSensorDataPub_ = create_publisher<rtabmap_msgs::msg::SensorData>("odom_sensor_data/raw", rclcpp::QoS(1).reliability(qos_));
+	odomSensorDataFeaturesPub_ = create_publisher<rtabmap_msgs::msg::SensorData>("odom_sensor_data/features", rclcpp::QoS(1).reliability(qos_));
+	odomSensorDataCompressedPub_ = create_publisher<rtabmap_msgs::msg::SensorData>("odom_sensor_data/compressed", rclcpp::QoS(1).reliability(qos_));
 
 	tfBuffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
 	//auto timer_interface = std::make_shared<tf2_ros::CreateTimerROS>(
@@ -130,6 +136,9 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	maxUpdateRate_ = this->declare_parameter("max_update_rate", maxUpdateRate_);
 	minUpdateRate_ = this->declare_parameter("min_update_rate", minUpdateRate_);
 
+	compressionImgFormat_ = this->declare_parameter("sensor_data_compression_format", compressionImgFormat_);
+	compressionParallelized_ = this->declare_parameter("sensor_data_parallel_compression", compressionParallelized_);
+
 	waitIMUToinit_ = this->declare_parameter("wait_imu_to_init", waitIMUToinit_);
 
 
@@ -155,6 +164,7 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	RCLCPP_INFO(this->get_logger(), "Odometry: ground_truth_base_frame_id = %s", groundTruthBaseFrameId_.c_str());
 	RCLCPP_INFO(this->get_logger(), "Odometry: config_path            = %s", configPath_.c_str());
 	RCLCPP_INFO(this->get_logger(), "Odometry: publish_null_when_lost = %s", publishNullWhenLost_?"true":"false");
+	RCLCPP_INFO(this->get_logger(), "Odometry: publish_compressed_sensor_data = %s", publishCompressedSensorData_?"true":"false");
 	RCLCPP_INFO(this->get_logger(), "Odometry: guess_frame_id         = %s", guessFrameId_.c_str());
 	RCLCPP_INFO(this->get_logger(), "Odometry: guess_min_translation  = %f", guessMinTranslation_);
 	RCLCPP_INFO(this->get_logger(), "Odometry: guess_min_rotation     = %f", guessMinRotation_);
@@ -163,6 +173,8 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	RCLCPP_INFO(this->get_logger(), "Odometry: max_update_rate        = %f Hz", maxUpdateRate_);
 	RCLCPP_INFO(this->get_logger(), "Odometry: min_update_rate        = %f Hz", minUpdateRate_);
 	RCLCPP_INFO(this->get_logger(), "Odometry: wait_imu_to_init       = %s", waitIMUToinit_?"true":"false");
+	RCLCPP_INFO(this->get_logger(), "Odometry: sensor_data_compression_format = %s", compressionImgFormat_.c_str());
+	RCLCPP_INFO(this->get_logger(), "Odometry: sensor_data_parallel_compression = %s", compressionParallelized_?"true":"false");
 
 	configPath_ = uReplaceChar(configPath_, '~', UDirectory::homeDir());
 	if(configPath_.size() && configPath_.at(0) != '/')
@@ -364,10 +376,11 @@ void OdometryROS::init(bool stereoParams, bool visParams, bool icpParams)
 void OdometryROS::initDiagnosticMsg(const std::string & subscribedTopicsMsg, bool approxSync, const std::string & subscribedTopic)
 {
 	RCLCPP_INFO(this->get_logger(), "%s", subscribedTopicsMsg.c_str());
+	syncDiagnostic_.reset(new rtabmap_sync::SyncDiagnostic(this, 0.5));
 
 	std::vector<diagnostic_updater::DiagnosticTask*> tasks;
 	tasks.push_back(&statusDiagnostic_);
-	initDiagnostic(subscribedTopic,
+	syncDiagnostic_->init(subscribedTopic,
 		uFormat("%s: Did not receive data since 5 seconds! Make sure the input topics are "
 					"published (\"$ rostopic hz my_topic\") and the timestamps in their "
 					"header are set. %s%s",
@@ -895,6 +908,8 @@ void OdometryROS::processData(SensorData & data, const std_msgs::msg::Header & h
 			odomInfoLitePub_->publish(infoMsg);
 		}
 	}
+	
+	postProcessData(data, header);
 
 	if(!data.imageRaw().empty() && odomRgbdImagePub_->get_subscription_count()>0)
 	{
@@ -911,10 +926,96 @@ void OdometryROS::processData(SensorData & data, const std_msgs::msg::Header & h
 		}
 	}
 
-	postProcessData(data, header);
-
 	if(!data.imageRaw().empty() || !data.laserScanRaw().isEmpty())
 	{
+		if(odomSensorDataPub_->get_subscription_count()>0 || odomSensorDataFeaturesPub_->get_subscription_count()>0)
+		{
+			rtabmap_msgs::msg::SensorData msg;
+			rtabmap_conversions::sensorDataToROS(data, msg, frameId_, odomSensorDataPub_->get_subscription_count()>0);
+			msg.header.stamp = header.stamp; // use corresponding time stamp to image
+			if(odomSensorDataPub_->get_subscription_count()>0)
+			{
+				odomSensorDataPub_->publish(msg);
+			}
+			if(odomSensorDataFeaturesPub_->get_subscription_count()>0)
+			{
+				// remove data
+				msg.left = sensor_msgs::msg::Image();
+				msg.right = sensor_msgs::msg::Image();
+				msg.laser_scan = sensor_msgs::msg::PointCloud2();
+				msg.grid_ground.clear();
+				msg.grid_obstacles.clear();
+				msg.grid_empty_cells.clear();
+				odomSensorDataFeaturesPub_->publish(msg);
+			}
+		}
+		if(odomSensorDataCompressedPub_->get_subscription_count()>0)
+		{
+			cv::Mat compressedImage;
+			cv::Mat compressedDepth;
+			cv::Mat compressedScan;
+			if(compressionParallelized_)
+			{
+				rtabmap::CompressionThread ctImage(data.imageRaw(), compressionImgFormat_);
+				rtabmap::CompressionThread ctDepth(data.depthOrRightRaw(), data.depthOrRightRaw().type() == CV_32FC1 || data.depthOrRightRaw().type() == CV_16UC1?std::string(".png"):compressionImgFormat_);
+				rtabmap::CompressionThread ctLaserScan(data.laserScanRaw().data());
+				if(!data.imageRaw().empty())
+				{
+					ctImage.start();
+				}
+				if(!data.depthOrRightRaw().empty())
+				{
+					ctDepth.start();
+				}
+				if(!data.laserScanRaw().isEmpty())
+				{
+					ctLaserScan.start();
+				}
+				ctImage.join();
+				ctDepth.join();
+				ctLaserScan.join();
+
+				compressedImage = ctImage.getCompressedData();
+				compressedDepth = ctDepth.getCompressedData();
+				compressedScan = ctLaserScan.getCompressedData();
+			}
+			else
+			{
+				compressedImage = compressImage2(data.imageRaw(), compressionImgFormat_);
+				compressedDepth = compressImage2(data.depthOrRightRaw(), data.depthOrRightRaw().type() == CV_32FC1 || data.depthOrRightRaw().type() == CV_16UC1?std::string(".png"):compressionImgFormat_);
+				compressedScan = compressData2(data.laserScanRaw().data());
+			}
+			if(!compressedImage.empty() && !data.stereoCameraModels().empty())
+			{
+				data.setStereoImage(compressedImage, compressedDepth, data.stereoCameraModels(), false);
+			}
+			else if(!compressedImage.empty() && !data.cameraModels().empty())
+			{
+				data.setRGBDImage(compressedImage, compressedDepth, data.cameraModels(), false);
+			}
+			if(!compressedScan.empty())
+			{
+				data.setLaserScan(data.laserScanRaw().angleIncrement() == 0.0f?
+							LaserScan(compressedScan,
+								data.laserScanRaw().maxPoints(),
+								data.laserScanRaw().rangeMax(),
+								data.laserScanRaw().format(),
+								data.laserScanRaw().localTransform()):
+							LaserScan(compressedScan,
+								data.laserScanRaw().format(),
+								data.laserScanRaw().rangeMin(),
+								data.laserScanRaw().rangeMax(),
+								data.laserScanRaw().angleMin(),
+								data.laserScanRaw().angleMax(),
+								data.laserScanRaw().angleIncrement(),
+								data.laserScanRaw().localTransform()), false);
+			}
+			rtabmap_msgs::msg::SensorData msg;
+			rtabmap_conversions::sensorDataToROS(data, msg, frameId_, false);
+			msg.header.stamp = header.stamp; // use corresponding time stamp to image
+			odomSensorDataCompressedPub_->publish(msg);
+		}
+
 		if(visParams_)
 		{
 			if(icpParams_)
@@ -932,10 +1033,10 @@ void OdometryROS::processData(SensorData & data, const std_msgs::msg::Header & h
 		}
 
 		statusDiagnostic_.setStatus(pose.isNull());
-		if(!pose.isNull())
+		if(syncDiagnostic_.get() && !pose.isNull())
 		{
 			double curentRate = 1.0/(this->now()-timeStart).seconds();
-			tick(header.stamp,
+			syncDiagnostic_->tick(header.stamp,
 				maxUpdateRate_>0 && maxUpdateRate_ < curentRate ? maxUpdateRate_:
 				expectedUpdateRate_>0 && expectedUpdateRate_ < curentRate ? expectedUpdateRate_:
 				previousStamp_ == 0.0 || rtabmap_conversions::timestampFromROS(header.stamp) - previousStamp_ > 1.0/curentRate?0:curentRate);
@@ -1044,17 +1145,23 @@ void OdometryROS::setLogError(
 
 OdometryROS::OdomStatusTask::OdomStatusTask() :
 		diagnostic_updater::DiagnosticTask("Odom status"),
-		lost_(false)
+		lost_(false),
+		dataReceived_(false)
 {}
 
 void OdometryROS::OdomStatusTask::setStatus(bool isLost)
 {
+	dataReceived_ = true;
 	lost_ = isLost;
 }
 
 void OdometryROS::OdomStatusTask::run(diagnostic_updater::DiagnosticStatusWrapper &stat)
 {
-	if(lost_)
+	if(!dataReceived_)
+	{
+		stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "No data received!");
+	}
+	else if(lost_)
 	{
 		stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "Lost!");
 	}

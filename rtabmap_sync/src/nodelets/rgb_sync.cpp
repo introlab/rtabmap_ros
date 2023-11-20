@@ -43,7 +43,6 @@ namespace rtabmap_sync
 
 RGBSync::RGBSync(const rclcpp::NodeOptions & options) :
 	Node("rgbd_sync", options),
-	SyncDiagnostic(this),
 	compressedRate_(0),
 	approxSync_(0),
 	exactSync_(0)
@@ -96,7 +95,8 @@ RGBSync::RGBSync(const rclcpp::NodeOptions & options) :
 
 	RCLCPP_INFO(this->get_logger(), "%s", subscribedTopicsMsg.c_str());
 
-	initDiagnostic(imageSub_.getSubscriber().getTopic(),
+		syncDiagnostic_.reset(new SyncDiagnostic(this));
+		syncDiagnostic_->init(imageSub_.getSubscriber().getTopic(),
 			uFormat("%s: Did not receive data since 5 seconds! Make sure the input topics are "
 					"published (\"$ ros2 topic hz my_topic\") and the timestamps in their "
 					"header are set. %s%s",
@@ -119,7 +119,7 @@ void RGBSync::callback(
 		  const sensor_msgs::msg::Image::ConstSharedPtr image,
 		  const sensor_msgs::msg::CameraInfo::ConstSharedPtr cameraInfo)
 {
-	tick(image->header.stamp);
+	syncDiagnostic_->tick(image->header.stamp);
 	if(rgbdImagePub_->get_subscription_count() || rgbdImageCompressedPub_->get_subscription_count())
 	{
 		double stamp = rtabmap_conversions::timestampFromROS(image->header.stamp);

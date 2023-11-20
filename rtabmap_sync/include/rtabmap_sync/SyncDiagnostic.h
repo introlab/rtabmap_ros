@@ -19,6 +19,8 @@ class SyncDiagnostic {
         	node_(node),
 			diagnosticUpdater_(node),
             frequencyStatus_(diagnostic_updater::FrequencyStatusParam(&targetFrequency_, &targetFrequency_, tolerance)),
+			timeStampStatus_(diagnostic_updater::TimeStampStatusParam()),
+			compositeTask_("Sync status"),
             lastCallbackCalledStamp_(rtabmap_conversions::timestampFromROS(node_->now())-1),
             targetFrequency_(0.0),
             windowSize_(windowSize)
@@ -26,8 +28,7 @@ class SyncDiagnostic {
         UASSERT(windowSize_ >= 1);
     }
 
-protected:
-    void initDiagnostic(
+    void init(
         const std::string & topic,
         const std::string & topicsNotReceivedWarningMsg,
         std::vector<diagnostic_updater::DiagnosticTask*> otherTasks = std::vector<diagnostic_updater::DiagnosticTask*>())
@@ -40,7 +41,9 @@ protected:
             // Assuming format is /back_camera/left/image, we want "back_camera"
             strList.pop_back();
         }
-        diagnosticUpdater_.add(frequencyStatus_);
+        compositeTask_.addTask(&frequencyStatus_);
+        compositeTask_.addTask(&timeStampStatus_);
+        diagnosticUpdater_.add(compositeTask_);
         for(size_t i=0; i<otherTasks.size(); ++i)
         {
             diagnosticUpdater_.add(*otherTasks[i]);
@@ -53,6 +56,7 @@ protected:
     void tick(const rclcpp::Time & stamp, double targetFrequency = 0)
     {
         frequencyStatus_.tick();
+		timeStampStatus_.tick(stamp);
         double singlePeriod = rtabmap_conversions::timestampFromROS(stamp) - lastCallbackCalledStamp_;
 
         window_.push_back(singlePeriod);
@@ -95,6 +99,8 @@ private:
 	std::string topicsNotReceivedWarningMsg_;
 	diagnostic_updater::Updater diagnosticUpdater_;
 	diagnostic_updater::FrequencyStatus frequencyStatus_;
+	diagnostic_updater::TimeStampStatus timeStampStatus_;
+	diagnostic_updater::CompositeDiagnosticTask compositeTask_;
 	rclcpp::TimerBase::SharedPtr diagnosticTimer_;
 	double lastCallbackCalledStamp_;
 	double targetFrequency_;

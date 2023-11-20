@@ -44,7 +44,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace rtabmap_sync
 {
 
-class RGBSync : public rclcpp::Node, public SyncDiagnostic
+class RGBSync : public rclcpp::Node
 {
 public:
 	RTABMAP_SYNC_PUBLIC
@@ -72,6 +72,8 @@ private:
 
 	typedef message_filters::sync_policies::ExactTime<sensor_msgs::msg::Image, sensor_msgs::msg::CameraInfo> MyExactSyncPolicy;
 	message_filters::Synchronizer<MyExactSyncPolicy> * exactSync_;
+
+	std::unique_ptr<SyncDiagnostic> syncDiagnostic_;
 };
 
 }

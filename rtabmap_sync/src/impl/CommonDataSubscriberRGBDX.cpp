@@ -526,7 +526,8 @@ void CommonDataSubscriber::setupRGBDXCallbacks(
 		}
 		else
 		{
-			rgbdXSubOnly_ = node.create_subscription<rtabmap_msgs::msg::RGBDImages>("rgbd_images", rclcpp::QoS(1).reliability(qosOdom_), std::bind(&CommonDataSubscriber::rgbdXCallback, this, std::placeholders::_1));
+			rgbdXSub_.unsubscribe();
+			rgbdXSubOnly_ = node.create_subscription<rtabmap_msgs::msg::RGBDImages>("rgbd_images", rclcpp::QoS(1).reliability(qosImage_), std::bind(&CommonDataSubscriber::rgbdXCallback, this, std::placeholders::_1));
 
 			subscribedTopicsMsg_ =
 					uFormat("\n%s subscribed to:\n   %s",

@@ -42,7 +42,6 @@ namespace rtabmap_sync
 
 StereoSync::StereoSync(const rclcpp::NodeOptions & options) :
 		Node("stereo_sync", options),
-		SyncDiagnostic(this),
 		compressedRate_(0),
 		approxSync_(0),
 		exactSync_(0)
@@ -98,7 +97,8 @@ StereoSync::StereoSync(const rclcpp::NodeOptions & options) :
 
 	RCLCPP_INFO(this->get_logger(), "%s", subscribedTopicsMsg.c_str());
 
-	initDiagnostic(imageLeftSub_.getSubscriber().getTopic(),
+	syncDiagnostic_.reset(new SyncDiagnostic(this));
+	syncDiagnostic_->init(imageLeftSub_.getSubscriber().getTopic(),
 		uFormat("%s: Did not receive data since 5 seconds! Make sure the input topics are "
 				"published (\"$ rostopic hz my_topic\") and the timestamps in their "
 				"header are set. %s%s",
@@ -120,7 +120,7 @@ void StereoSync::callback(
 		const sensor_msgs::msg::CameraInfo::ConstSharedPtr cameraInfoLeft,
 		const sensor_msgs::msg::CameraInfo::ConstSharedPtr cameraInfoRight)
 {
-	tick(imageLeft->header.stamp);
+	syncDiagnostic_->tick(imageLeft->header.stamp);
 	if(rgbdImagePub_->get_subscription_count() || rgbdImageCompressedPub_->get_subscription_count())
 	{
 		double leftStamp = rtabmap_conversions::timestampFromROS(imageLeft->header.stamp);

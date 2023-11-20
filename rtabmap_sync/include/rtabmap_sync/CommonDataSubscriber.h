@@ -51,12 +51,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap_msgs/msg/user_data.hpp>
 #include <rtabmap_msgs/msg/odom_info.hpp>
 #include <rtabmap_msgs/msg/scan_descriptor.hpp>
+#include <rtabmap_msgs/msg/sensor_data.hpp>
 #include <rtabmap_sync/CommonDataSubscriberDefines.h>
 #include <rtabmap_sync/SyncDiagnostic.h>
 
 namespace rtabmap_sync {
 
-class CommonDataSubscriber : public SyncDiagnostic {
+class CommonDataSubscriber {
 public:
 	RTABMAP_SYNC_PUBLIC
 	CommonDataSubscriber(rclcpp::Node & node, bool gui);
@@ -69,15 +70,18 @@ public:
 	bool isSubscribedToRGBD() const   {return subscribedToRGBD_;}
 	bool isSubscribedToScan2d() const {return subscribedToScan2d_;}
 	bool isSubscribedToScan3d() const {return subscribedToScan3d_;}
+	bool isSubscribedToSensorData() const {return subscribedToSensorData_;}
 	bool isSubscribedToOdomInfo() const {return subscribedToOdomInfo_;}
-	bool isDataSubscribed() const {return isSubscribedToDepth() || isSubscribedToStereo() || isSubscribedToRGBD() || isSubscribedToScan2d() || isSubscribedToScan3d() || isSubscribedToRGB() || isSubscribedToOdom();}
+	bool isDataSubscribed() const {return isSubscribedToDepth() || isSubscribedToStereo() || isSubscribedToRGBD() || isSubscribedToScan2d() || isSubscribedToScan3d() || isSubscribedToRGB() || isSubscribedToOdom() || isSubscribedToSensorData();}
 	int rgbdCameras() const {return isSubscribedToRGBD()?(int)rgbdSubs_.size():0;}
 	int getQueueSize() const {return queueSize_;}
 	bool isApproxSync() const {return approxSync_;}
 	const std::string & name() const {return name_;}
 
 protected:
-	void setupCallbacks(rclcpp::Node & node);
+	void setupCallbacks(
+			rclcpp::Node & node,
+			std::vector<diagnostic_updater::DiagnosticTask*> otherTasks = std::vector<diagnostic_updater::DiagnosticTask*>());
 	virtual void commonMultiCameraCallback(
 				const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
 				const rtabmap_msgs::msg::UserData::ConstSharedPtr & userDataMsg,
@@ -103,6 +107,10 @@ protected:
 				const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
 				const rtabmap_msgs::msg::UserData::ConstSharedPtr & userDataMsg,
 				const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr& odomInfoMsg) = 0;
+	virtual void commonSensorDataCallback(
+				const rtabmap_msgs::msg::SensorData::ConstSharedPtr & sensorDataMsg,
+				const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
+				const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr& odomInfoMsg) = 0;
 
 	void commonSingleCameraCallback(
 				const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
@@ -118,6 +126,8 @@ protected:
 				const std::vector<rtabmap_msgs::msg::KeyPoint> & localKeyPoints = std::vector<rtabmap_msgs::msg::KeyPoint>(),
 				const std::vector<rtabmap_msgs::msg::Point3f> & localPoints3d = std::vector<rtabmap_msgs::msg::Point3f>(),
 				const cv::Mat & localDescriptors = cv::Mat());
+
+	void tick(const rclcpp::Time & stamp, double targetFrequency = 0);
 
 private:
 	void setupDepthCallbacks(
@@ -218,6 +228,12 @@ private:
 			int queueSize,
 			bool approxSync);
 #endif
+    void setupSensorDataCallbacks(
+			rclcpp::Node & node,
+			bool subscribeOdom,
+			bool subscribeOdomInfo,
+			int queueSize,
+			bool approxSync);
 	void setupScanCallbacks(
 			rclcpp::Node & node,
 			bool subscribeScan2d,
@@ -242,6 +258,7 @@ protected:
 	rmw_qos_reliability_policy_t qosCameraInfo_;
 	rmw_qos_reliability_policy_t qosScan_;
 	rmw_qos_reliability_policy_t qosUserData_;
+	rmw_qos_reliability_policy_t qosSensorData_;
 
 private:
 	bool approxSync_;
@@ -250,6 +267,7 @@ private:
 	bool subscribedToRGB_;
 	bool subscribedToOdom_;
 	bool subscribedToRGBD_;
+	bool subscribedToSensorData_;
 	bool subscribedToScan2d_;
 	bool subscribedToScan3d_;
 	bool subscribedToScanDescriptor_;
@@ -270,6 +288,10 @@ private:
 	rclcpp::Subscription<rtabmap_msgs::msg::RGBDImages>::ConstSharedPtr rgbdXSubOnly_;
 	message_filters::Subscriber<rtabmap_msgs::msg::RGBDImages> rgbdXSub_;
 
+	//for sensor data callback
+	rclcpp::Subscription<rtabmap_msgs::msg::SensorData>::ConstSharedPtr sensorDataSubOnly_;
+	message_filters::Subscriber<rtabmap_msgs::msg::SensorData> sensorDataSub_;
+	
 	//stereo callback
 	image_transport::SubscriberFilter imageRectLeft_;
 	image_transport::SubscriberFilter imageRectRight_;
@@ -287,6 +309,8 @@ private:
 	rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::ConstSharedPtr scan3dSubOnly_;
 	rclcpp::Subscription<rtabmap_msgs::msg::ScanDescriptor>::ConstSharedPtr scanDescSubOnly_;
 	rclcpp::Subscription<nav_msgs::msg::Odometry>::ConstSharedPtr odomSubOnly_;
+
+	std::unique_ptr<SyncDiagnostic> syncDiagnostic_;
 
 	// RGB + Depth
 	DATA_SYNCS3(depth, sensor_msgs::msg::Image, sensor_msgs::msg::Image, sensor_msgs::msg::CameraInfo)
@@ -439,6 +463,14 @@ private:
 	DATA_SYNCS4(rgbdXOdomDataScanDesc, nav_msgs::msg::Odometry, rtabmap_msgs::msg::UserData, rtabmap_msgs::msg::RGBDImages, rtabmap_msgs::msg::ScanDescriptor)
 	DATA_SYNCS4(rgbdXOdomDataInfo, nav_msgs::msg::Odometry, rtabmap_msgs::msg::UserData, rtabmap_msgs::msg::RGBDImages, rtabmap_msgs::msg::OdomInfo)
 #endif
+
+    // SensorData
+	void sensorDataCallback(const rtabmap_msgs::msg::SensorData::ConstSharedPtr);
+	DATA_SYNCS2(sensorDataInfo, rtabmap_msgs::msg::SensorData, rtabmap_msgs::msg::OdomInfo);
+
+	// SensorData + Odom
+	DATA_SYNCS2(sensorDataOdom, nav_msgs::msg::Odometry, rtabmap_msgs::msg::SensorData);
+	DATA_SYNCS3(sensorDataOdomInfo, nav_msgs::msg::Odometry, rtabmap_msgs::msg::SensorData, rtabmap_msgs::msg::OdomInfo);
 
 #ifdef RTABMAP_SYNC_MULTI_RGBD
 	// 2 RGBD

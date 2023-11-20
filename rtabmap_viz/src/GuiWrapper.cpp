@@ -1132,4 +1132,107 @@ void GuiWrapper::commonOdomCallback(
 	QMetaObject::invokeMethod(mainWindow_, "processOdometry", Q_ARG(rtabmap::OdometryEvent, odomEvent), Q_ARG(bool, ignoreData));
 }
 
+void GuiWrapper::commonSensorDataCallback(
+		const rtabmap_msgs::msg::SensorData::ConstSharedPtr & sensorDataMsg,
+		const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
+		const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr & odomInfoMsg)
+{
+	UASSERT(sensorDataMsg.get());
+	std_msgs::msg::Header odomHeader;
+	std::string frameId = frameId_;
+	if(odomMsg.get())
+	{
+		odomHeader = odomMsg->header;
+		if(!odomMsg->child_frame_id.empty())
+		{
+			frameId = odomMsg->child_frame_id;
+		}
+		else
+		{
+			RCLCPP_WARN(this->get_logger(), "Received odom topic with child_frame_id not set! Using \"%s\" as base frame.", frameId_.c_str());
+		}
+	}
+	else
+	{
+		odomHeader = sensorDataMsg->header;
+		odomHeader.frame_id = odomFrameId_;
+	}
+
+	Transform odomT = rtabmap_conversions::getTransform(odomHeader.frame_id, frameId, odomHeader.stamp, *tfBuffer_, waitForTransform_);
+	cv::Mat covariance = cv::Mat::eye(6,6,CV_64FC1);
+	if(odomMsg.get())
+	{
+		UASSERT(odomMsg->twist.covariance.size() == 36);
+		if(odomMsg->twist.covariance[0] != 0 &&
+			 odomMsg->twist.covariance[7] != 0 &&
+			 odomMsg->twist.covariance[14] != 0 &&
+			 odomMsg->twist.covariance[21] != 0 &&
+			 odomMsg->twist.covariance[28] != 0 &&
+			 odomMsg->twist.covariance[35] != 0)
+		{
+			covariance = cv::Mat(6,6,CV_64FC1,(void*)odomMsg->twist.covariance.data()).clone();
+		}
+	}
+	else if(odomInfoMsg.get() && odomInfoMsg->covariance.size() == 36)
+	{
+		if(odomInfoMsg->covariance[0] != 0 &&
+			 odomInfoMsg->covariance[7] != 0 &&
+			 odomInfoMsg->covariance[14] != 0 &&
+			 odomInfoMsg->covariance[21] != 0 &&
+			 odomInfoMsg->covariance[28] != 0 &&
+			 odomInfoMsg->covariance[35] != 0)
+		{
+			covariance = cv::Mat(6,6,CV_64FC1,(void*)odomInfoMsg->covariance.data()).clone();
+		}
+	}
+	if(odomHeader.frame_id.empty())
+	{
+		RCLCPP_ERROR(this->get_logger(), "Odometry frame not set!?");
+		return;
+	}
+
+	rtabmap::SensorData data;
+	rtabmap::OdometryInfo info;
+	bool ignoreData = false;
+
+	// limit update rate
+	if(maxOdomUpdateRate_<=0.0 ||
+	   (UTimer::now() - lastOdomInfoUpdateTime_ > 1.0/maxOdomUpdateRate_ &&
+	   !mainWindow_->isProcessingOdometry() &&
+	   !mainWindow_->isProcessingStatistics()))
+	{
+		lastOdomInfoUpdateTime_ = UTimer::now();
+
+		data = rtabmap_conversions::sensorDataFromROS(*sensorDataMsg);
+		data.uncompressData();
+
+		if(odomInfoMsg.get())
+		{
+			info = rtabmap_conversions::odomInfoFromROS(*odomInfoMsg);
+		}
+		ignoreData = false;
+	}
+	else if(odomInfoMsg.get())
+	{
+		data = rtabmap_conversions::sensorDataFromROS(*sensorDataMsg);
+		data.clearRawData();
+		data.clearCompressedData();
+		info = rtabmap_conversions::odomInfoFromROS(*odomInfoMsg).copyWithoutData();
+		ignoreData = true;
+	}
+	else
+	{
+		// don't update GUI odom stuff if we don't use visual odometry
+		return;
+	}
+
+	info.reg.covariance = covariance;
+	rtabmap::OdometryEvent odomEvent(
+		data,
+		odomMsg.get()?rtabmap_conversions::transformFromPoseMsg(odomMsg->pose.pose):odomT,
+		info);
+
+	QMetaObject::invokeMethod(mainWindow_, "processOdometry", Q_ARG(rtabmap::OdometryEvent, odomEvent), Q_ARG(bool, ignoreData));
+}
+
 }

@@ -66,6 +66,7 @@ SET(rtabmap_sync_lib_src
    src/impl/CommonDataSubscriberRGBDX.cpp
    src/impl/CommonDataSubscriberScan.cpp
    src/impl/CommonDataSubscriberOdom.cpp
+   src/impl/CommonDataSubscriberSensorData.cpp
 )
 IF(RTABMAP_SYNC_MULTI_RGBD)
   SET(rtabmap_sync_lib_src
