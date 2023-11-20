@@ -57,7 +57,7 @@ EnvSensor[] env_sensors
 sensor_msgs/Imu imu
 geometry_msgs/Transform imu_local_transform
 
-Landmark[] landmarks
+LandmarkDetection[] landmarks
 
 # Ground truth
 geometry_msgs/Pose ground_truth_pose

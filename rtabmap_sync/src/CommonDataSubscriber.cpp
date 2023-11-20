@@ -191,6 +191,11 @@ CommonDataSubscriber::CommonDataSubscriber(bool gui) :
 		SYNC_INIT(rgbdXOdomDataInfo),
 #endif
 
+        // SensorData
+        SYNC_INIT(sensorDataInfo),
+        SYNC_INIT(sensorDataOdom),
+        SYNC_INIT(sensorDataOdomInfo),
+
 #ifdef RTABMAP_SYNC_MULTI_RGBD
 		// 2 RGBD
 		SYNC_INIT(rgbd2),

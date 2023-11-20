@@ -26,7 +26,8 @@ add_message_files(
    SensorData.msg
    Link.msg
    OdomInfo.msg
-   Landmark.msg
+   LandmarkDetection.msg
+   LandmarkDetections.msg
    Point2f.msg
    Point3f.msg
    Goal.msg

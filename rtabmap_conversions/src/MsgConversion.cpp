@@ -1105,11 +1105,10 @@ rtabmap::SensorData sensorDataFromROS(const rtabmap_msgs::SensorData & msg)
 
 	// Image data
 	cv::Mat left, right;
-	cv_bridge::CvImageConstPtr leftRawPtr, rightRawPtr;
 	if(!msg.left.data.empty())
 	{
 		boost::shared_ptr<void const> trackedObject;
-		leftRawPtr = cv_bridge::toCvShare(msg.left, trackedObject);
+		cv_bridge::CvImageConstPtr leftRawPtr = cv_bridge::toCvShare(msg.left, trackedObject);
 
 		if(!(leftRawPtr->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) ==0 ||
 			 leftRawPtr->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
@@ -1143,7 +1142,7 @@ rtabmap::SensorData sensorDataFromROS(const rtabmap_msgs::SensorData & msg)
 	if(!msg.right.data.empty())
 	{
 		boost::shared_ptr<void const> trackedObject;
-		rightRawPtr = cv_bridge::toCvShare(msg.right, trackedObject);
+		cv_bridge::CvImageConstPtr rightRawPtr = cv_bridge::toCvShare(msg.right, trackedObject);
 
 		if(!(rightRawPtr->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) ==0 ||
 			 rightRawPtr->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
@@ -1169,7 +1168,7 @@ rtabmap::SensorData sensorDataFromROS(const rtabmap_msgs::SensorData & msg)
 			}
 			else
 			{
-				right = cv_bridge::cvtColor(leftRawPtr, "mono8")->image;
+				right = cv_bridge::cvtColor(rightRawPtr, "mono8")->image;
 			}
 		}
 	}
