@@ -1753,10 +1753,7 @@ void CoreWrapper::commonSensorDataCallback(
 	}
 
 	SensorData data = rtabmap_conversions::sensorDataFromROS(*sensorDataMsg);
-	if(lastPoseIntermediate_)
-	{
-		data.setId(-1);
-	}
+	data.setId(lastPoseIntermediate_?-1:0);
 
 	OdometryInfo odomInfo;
 	if(odomInfoMsg.get())
@@ -2256,7 +2253,7 @@ void CoreWrapper::process(
 			}
 
 			// If not intermediate node
-			if(data.id() > 0)
+			if(data.id() >= 0)
 			{
 				localizationDiagnostic_.updateStatus(rtabmap_.getStatistics().localizationCovariance(), twoDMapping_);
 				tick(stamp, rate_>0?rate_:1000.0/(timeMsgConversion+timeRtabmap+timeUpdateMaps+timePublishMaps));
