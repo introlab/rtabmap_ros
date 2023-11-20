@@ -29,7 +29,6 @@ set(msg_files
    "msg/LandmarkDetection.msg"
    "msg/LandmarkDetections.msg"
    "msg/OdomInfo.msg"
-   "msg/Landmark.msg"
    "msg/Point2f.msg"
    "msg/Point3f.msg"
    "msg/Goal.msg"
