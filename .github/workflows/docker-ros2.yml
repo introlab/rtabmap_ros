@@ -30,7 +30,6 @@ jobs:
           docker_path: 'iron/latest'
           docker_platforms: |
             linux/amd64
-            linux/arm64
     
     steps:
       -
