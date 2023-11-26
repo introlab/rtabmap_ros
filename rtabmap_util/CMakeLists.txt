@@ -131,6 +131,7 @@ catkin_install_python(PROGRAMS
   scripts/yaml_to_camera_info.py
   scripts/netvlad_tf_ros.py
   scripts/gazebo_ground_truth.py
+  scripts/republish_tf_static.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
