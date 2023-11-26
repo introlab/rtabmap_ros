@@ -837,6 +837,11 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 	auto on_parameter_event_callback =
 			[this](const rcl_interfaces::msg::ParameterEvent::SharedPtr event) -> void
 			{
+				if(event->node.compare(std::string(get_namespace())+"/"+get_name()) != 0)
+				{
+					return;
+				}
+				RCLCPP_INFO(this->get_logger(), "Parameters event received!");
 				if(event->changed_parameters.size())
 				{
 					for(size_t i=0; i<event->changed_parameters.size(); ++i)
