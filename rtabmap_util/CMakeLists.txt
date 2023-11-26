@@ -208,6 +208,7 @@ install(PROGRAMS
 #  scripts/gazebo_ground_truth.py
   scripts/transform_to_tf.py
   scripts/yaml_to_camera_info.py
+  scripts/republish_tf_static.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
