@@ -377,6 +377,7 @@ private:
 					*scanMsg, 
 					scanOut,
 					this->tfListener(),
+					-1.0,
 					laser_geometry::channel_option::Intensity | laser_geometry::channel_option::Timestamp);
 
 			if(guessFrameId().empty() && previousStamp() > 0 && !velocityGuess().isNull())
