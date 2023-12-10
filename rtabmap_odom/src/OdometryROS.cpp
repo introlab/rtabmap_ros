@@ -141,6 +141,27 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 
 	waitIMUToinit_ = this->declare_parameter("wait_imu_to_init", waitIMUToinit_);
 
+	configPath_ = uReplaceChar(configPath_, '~', UDirectory::homeDir());
+	if(configPath_.size() && configPath_.at(0) != '/')
+	{
+		configPath_ = UDirectory::currentDir(true) + configPath_;
+	}
+
+	if(initialPoseStr.size())
+	{
+		std::vector<std::string> values = uListToVector(uSplit(initialPoseStr, ' '));
+		if(values.size() == 6)
+		{
+			initialPose_ = Transform(
+					uStr2Float(values[0]), uStr2Float(values[1]), uStr2Float(values[2]),
+					uStr2Float(values[3]), uStr2Float(values[4]), uStr2Float(values[5]));
+		}
+		else
+		{
+			RCLCPP_ERROR(this->get_logger(), "Wrong initial_pose format: %s (should be \"x y z roll pitch yaw\" with angle in radians). "
+					  "Identity will be used...", initialPoseStr.c_str());
+		}
+	}
 
 	int eventLevel = ULogger::kFatal;
 	eventLevel = this->declare_parameter("log_to_rosout_level", eventLevel);
@@ -175,28 +196,6 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	RCLCPP_INFO(this->get_logger(), "Odometry: wait_imu_to_init       = %s", waitIMUToinit_?"true":"false");
 	RCLCPP_INFO(this->get_logger(), "Odometry: sensor_data_compression_format = %s", compressionImgFormat_.c_str());
 	RCLCPP_INFO(this->get_logger(), "Odometry: sensor_data_parallel_compression = %s", compressionParallelized_?"true":"false");
-
-	configPath_ = uReplaceChar(configPath_, '~', UDirectory::homeDir());
-	if(configPath_.size() && configPath_.at(0) != '/')
-	{
-		configPath_ = UDirectory::currentDir(true) + configPath_;
-	}
-
-	if(initialPoseStr.size())
-	{
-		std::vector<std::string> values = uListToVector(uSplit(initialPoseStr, ' '));
-		if(values.size() == 6)
-		{
-			initialPose_ = Transform(
-					uStr2Float(values[0]), uStr2Float(values[1]), uStr2Float(values[2]),
-					uStr2Float(values[3]), uStr2Float(values[4]), uStr2Float(values[5]));
-		}
-		else
-		{
-			RCLCPP_ERROR(this->get_logger(), "Wrong initial_pose format: %s (should be \"x y z roll pitch yaw\" with angle in radians). "
-					  "Identity will be used...", initialPoseStr.c_str());
-		}
-	}
 }
 
 OdometryROS::~OdometryROS()
