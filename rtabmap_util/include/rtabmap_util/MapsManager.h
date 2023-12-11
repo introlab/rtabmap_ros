@@ -40,6 +40,8 @@ namespace rtabmap {
 class OctoMap;
 class Memory;
 class OccupancyGrid;
+class LocalMapMaker;
+class GridMap;
 
 }  // namespace rtabmap
 
@@ -85,6 +87,7 @@ public:
 
 	const rtabmap::OctoMap * getOctomap() const {return octomap_;}
 	const rtabmap::OccupancyGrid * getOccupancyGrid() const {return occupancyGrid_;}
+	const rtabmap::LocalMapMaker * getLocalMapMaker() const {return localMapMaker_;}
 
 private:
 	// mapping stuff
@@ -112,6 +115,7 @@ private:
 	ros::Publisher octoMapObstacleCloud_;
 	ros::Publisher octoMapEmptySpace_;
 	ros::Publisher octoMapProj_;
+	ros::Publisher elevationMapPub_;
 
 	std::map<int, rtabmap::Transform> assembledGroundPoses_;
 	std::map<int, rtabmap::Transform> assembledObstaclePoses_;
@@ -122,17 +126,19 @@ private:
 	std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr > groundClouds_;
 	std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr > obstacleClouds_;
 
-	std::map<int, rtabmap::Transform> gridPoses_;
-	cv::Mat gridMap_;
-	std::map<int, std::pair< std::pair<cv::Mat, cv::Mat>, cv::Mat> > gridMaps_; // < <ground, obstacles>, empty cells >
-	std::map<int, cv::Point3f> gridMapsViewpoints_;
+	std::map<int, std::pair< std::pair<cv::Mat, cv::Mat>, cv::Mat> > localMaps_; // < <ground, obstacles>, empty cells >
+	std::map<int, cv::Point3f> localMapsViewpoints_;
 
 	rtabmap::OccupancyGrid * occupancyGrid_;
+	rtabmap::LocalMapMaker * localMapMaker_;
 	bool gridUpdated_;
 
 	rtabmap::OctoMap * octomap_;
 	int octomapTreeDepth_;
 	bool octomapUpdated_;
+
+	rtabmap::GridMap * elevationMap_;
+	bool elevationMapUpdated_;
 
 	rtabmap::ParametersMap parameters_;
 

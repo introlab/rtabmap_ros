@@ -28,6 +28,7 @@
   <depend>pluginlib</depend>
   <depend>rtabmap_msgs</depend>
   <depend>rtabmap_conversions</depend>
+  <depend>grid_map_ros</depend>
 
   <export>
     <nodelet plugin="${prefix}/nodelet_plugins.xml" />
