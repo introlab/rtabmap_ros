@@ -55,7 +55,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #if defined(WITH_GRID_MAP_ROS) and defined(RTABMAP_GRIDMAP)
 #include <grid_map_ros/GridMapRosConverter.hpp>
-#include <rtabmap/core/GridMap.h>
+#include <rtabmap/core/global_map/GridMap.h>
 #endif
 
 using namespace rtabmap;
@@ -317,7 +317,6 @@ void MapsManager::backwardCompatibilityParameters(ros::NodeHandle & pnh, Paramet
 	parameterMoved(pnh, "proj_map_frame", Parameters::kGridMapFrameProjection(), parameters);
 	parameterMoved(pnh, "grid_unknown_space_filled", Parameters::kGridScan2dUnknownSpaceFilled(), parameters);
 	parameterMoved(pnh, "grid_cell_size", Parameters::kGridCellSize(), parameters);
-	parameterMoved(pnh, "grid_incremental", Parameters::kGridGlobalFullUpdate(), parameters);
 	parameterMoved(pnh, "grid_size", Parameters::kGridGlobalMinSize(), parameters);
 	parameterMoved(pnh, "grid_eroded", Parameters::kGridGlobalEroded(), parameters);
 	parameterMoved(pnh, "grid_footprint_radius", Parameters::kGridGlobalFootprintRadius(), parameters);
