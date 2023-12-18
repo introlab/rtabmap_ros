@@ -57,10 +57,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/OdometryEvent.h>
 #include <rtabmap/core/Version.h>
 #include <rtabmap/core/OccupancyGrid.h>
-#include <rtabmap/core/LocalMapMaker.h>
 #include <rtabmap/core/DBDriver.h>
 #include <rtabmap/core/Registration.h>
 #include <rtabmap/core/Graph.h>
+#include <rtabmap/core/LocalGridMaker.h>
 #include <rtabmap/core/Optimizer.h>
 
 #ifdef WITH_OCTOMAP_MSGS

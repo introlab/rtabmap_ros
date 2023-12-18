@@ -33,6 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/filters/filter.h>
+#include <rtabmap/core/LocalGridMaker.h>
 
 #include <tf/transform_listener.h>
 
@@ -40,7 +41,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <rtabmap_conversions/MsgConversion.h>
 
-#include "rtabmap/core/LocalMapMaker.h"
 #include "rtabmap/utilite/UStl.h"
 
 namespace rtabmap_util
@@ -441,7 +441,7 @@ private:
 	std::string mapFrameId_;
 	bool waitForTransform_;
 
-	rtabmap::LocalMapMaker localMapMaker_;
+	rtabmap::LocalGridMaker localMapMaker_;
 	bool mapFrameProjection_;
 	bool warned_;
 
