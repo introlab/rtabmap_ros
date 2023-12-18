@@ -329,24 +329,18 @@ void MapsManager::backwardCompatibilityParameters(ros::NodeHandle & pnh, Paramet
 void MapsManager::setParameters(const rtabmap::ParametersMap & parameters)
 {
 	parameters_ = parameters;
+	delete occupancyGrid_;
 	occupancyGrid_ = new OccupancyGrid(&localMaps_, parameters_);
-	localMapMaker_ = new LocalGridMaker(parameters_);
+	
+	localMapMaker_->parseParameters(parameters_);
 
 #if defined(WITH_OCTOMAP_MSGS) and defined(RTABMAP_OCTOMAP)
-	if(octomap_)
-	{
-		delete octomap_;
-		octomap_ = 0;
-	}
+	delete octomap_;
 	octomap_ = new OctoMap(&localMaps_, parameters_);
 #endif
 
 #if defined(WITH_GRID_MAP_ROS) and defined(RTABMAP_GRIDMAP)
-	if(elevationMap_)
-	{
-		delete elevationMap_;
-		elevationMap_ = 0;
-	}
+	delete elevationMap_;
 	elevationMap_ = new GridMap(&localMaps_, parameters_);
 #endif
 }
