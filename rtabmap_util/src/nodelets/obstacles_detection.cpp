@@ -33,6 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/filters/filter.h>
+#include <rtabmap/core/LocalGridMaker.h>
 
 #include <tf/transform_listener.h>
 
@@ -40,7 +41,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <rtabmap_conversions/MsgConversion.h>
 
-#include "rtabmap/core/OccupancyGrid.h"
 #include "rtabmap/utilite/UStl.h"
 
 namespace rtabmap_util
@@ -226,7 +226,7 @@ private:
 			NODELET_ERROR("obstacles_detection: Parameter \"%s\" is true but map_frame_id is not set!", rtabmap::Parameters::kGridMapFrameProjection().c_str());
 		}
 
-		grid_.parseParameters(parameters);
+		localMapMaker_.parseParameters(parameters);
 
 		cloudSub_ = nh.subscribe("cloud", 1, &ObstaclesDetection::callback, this);
 
@@ -325,7 +325,7 @@ private:
 			inputCloud = rtabmap::util3d::transformPointCloud(inputCloud, localTransform);
 
 			pcl::IndicesPtr flatObstacles(new std::vector<int>);
-			pcl::PointCloud<pcl::PointXYZ>::Ptr cloud = grid_.segmentCloud<pcl::PointXYZ>(
+			pcl::PointCloud<pcl::PointXYZ>::Ptr cloud = localMapMaker_.segmentCloud<pcl::PointXYZ>(
 					inputCloud,
 					pcl::IndicesPtr(new std::vector<int>),
 					pose,
@@ -441,7 +441,7 @@ private:
 	std::string mapFrameId_;
 	bool waitForTransform_;
 
-	rtabmap::OccupancyGrid grid_;
+	rtabmap::LocalGridMaker localMapMaker_;
 	bool mapFrameProjection_;
 	bool warned_;
 
