@@ -33,7 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <sensor_msgs/msg/point_cloud2.hpp>
 
-#include <rtabmap/core/OccupancyGrid.h>
+#include <rtabmap/core/LocalGridMaker.h>
 
 namespace rtabmap_util
 {
@@ -53,7 +53,7 @@ private:
 	std::string mapFrameId_;
 	double waitForTransform_;
 
-	rtabmap::OccupancyGrid grid_;
+	rtabmap::LocalGridMaker localMapMaker_;
 	bool mapFrameProjection_;
 	bool warned_;
 

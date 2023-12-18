@@ -38,10 +38,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/Graph.h>
 #include <rtabmap/core/Version.h>
 #include <rtabmap/core/OccupancyGrid.h>
-
 #include <pcl/search/kdtree.h>
 
 #include <pcl_conversions/pcl_conversions.h>
+#include <rtabmap/core/LocalGridMaker.h>
 
 #ifdef RTABMAP_OCTOMAP
 #ifdef WITH_OCTOMAP_MSGS
@@ -66,10 +66,11 @@ MapsManager::MapsManager() :
 		scanEmptyRayTracing_(true),
 		assembledObstacles_(new pcl::PointCloud<pcl::PointXYZRGB>),
 		assembledGround_(new pcl::PointCloud<pcl::PointXYZRGB>),
-		occupancyGrid_(new OccupancyGrid),
+		occupancyGrid_(new OccupancyGrid(&localMaps_)),
+		localMapMaker_(new LocalGridMaker),
 		gridUpdated_(true),
 #ifdef RTABMAP_OCTOMAP
-		octomap_(new OctoMap),
+		octomap_(new OctoMap(&localMaps_)),
 #endif
 		octomapTreeDepth_(16),
 		octomapUpdated_(true),
@@ -162,13 +163,10 @@ MapsManager::~MapsManager() {
 	clear();
 
 	delete occupancyGrid_;
+	delete localMapMaker_;
 
 #ifdef RTABMAP_OCTOMAP
-	if(octomap_)
-	{
-		delete octomap_;
-		octomap_ = 0;
-	}
+	delete octomap_;
 #endif
 }
 
@@ -223,7 +221,6 @@ void MapsManager::backwardCompatibilityParameters(rclcpp::Node & node, Parameter
 	parameterMoved(node, "proj_map_frame", Parameters::kGridMapFrameProjection(), parameters);
 	parameterMoved(node, "grid_unknown_space_filled", Parameters::kGridScan2dUnknownSpaceFilled(), parameters);
 	parameterMoved(node, "grid_cell_size", Parameters::kGridCellSize(), parameters);
-	parameterMoved(node, "grid_incremental", Parameters::kGridGlobalFullUpdate(), parameters);
 	parameterMoved(node, "grid_size", Parameters::kGridGlobalMinSize(), parameters);
 	parameterMoved(node, "grid_eroded", Parameters::kGridGlobalEroded(), parameters);
 	parameterMoved(node, "grid_footprint_radius", Parameters::kGridGlobalFootprintRadius(), parameters);
@@ -237,15 +234,14 @@ void MapsManager::backwardCompatibilityParameters(rclcpp::Node & node, Parameter
 void MapsManager::setParameters(const rtabmap::ParametersMap & parameters)
 {
 	parameters_ = parameters;
-	occupancyGrid_->parseParameters(parameters_);
+	delete occupancyGrid_;
+	occupancyGrid_ = new OccupancyGrid(&localMaps_, parameters_);
+
+	localMapMaker_->parseParameters(parameters_);
 
 #ifdef RTABMAP_OCTOMAP
-	if(octomap_)
-	{
-		delete octomap_;
-		octomap_ = 0;
-	}
-	octomap_ = new OctoMap(parameters_);
+	delete octomap_;
+	octomap_ = new OctoMap(&localMaps_, parameters_);
 #endif
 }
 
@@ -263,8 +259,8 @@ void MapsManager::set2DMap(
 	{
 		for(std::map<int, rtabmap::Transform>::const_iterator iter=poses.lower_bound(1); iter!=poses.end(); ++iter)
 		{
-			std::map<int, std::pair< std::pair<cv::Mat, cv::Mat>, cv::Mat> >::iterator jter = gridMaps_.find(iter->first);
-			if(!uContains(gridMaps_, iter->first))
+			std::map<int, LocalGrid>::const_iterator jter = localMaps_.find(iter->first);
+			if(jter == localMaps_.end())
 			{
 				rtabmap::SensorData data;
 				data = memory->getNodeData(iter->first, false, false, false, true);
@@ -284,14 +280,8 @@ void MapsManager::set2DMap(
 							&obstacles,
 							&emptyCells);
 
-					uInsert(gridMaps_, std::make_pair(iter->first, std::make_pair(std::make_pair(ground, obstacles), emptyCells)));
-					uInsert(gridMapsViewpoints_, std::make_pair(iter->first, data.gridViewPoint()));
-					occupancyGrid_->addToCache(iter->first, ground, obstacles, emptyCells);
+					localMaps_.add(iter->first, ground, obstacles, emptyCells, data.gridCellSize(), data.gridViewPoint());
 				}
-			}
-			else
-			{
-				occupancyGrid_->addToCache(iter->first, jter->second.first.first, jter->second.first.second, jter->second.second);
 			}
 		}
 	}
@@ -299,8 +289,7 @@ void MapsManager::set2DMap(
 
 void MapsManager::clear()
 {
-	gridMaps_.clear();
-	gridMapsViewpoints_.clear();
+	localMaps_.clear();
 	assembledGround_->clear();
 	assembledObstacles_->clear();
 	assembledGroundPoses_.clear();
@@ -455,9 +444,9 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 		UTimer longUpdateTimer;
 		if(filteredPoses.size() > 20)
 		{
-			if(updateGridCache && gridMaps_.size() < 5)
+			if(updateGridCache && localMaps_.size() < 5)
 			{
-				UWARN("Many occupancy grids should be loaded (~%d), this may take a while to update the map(s)...", int(filteredPoses.size()-gridMaps_.size()));
+				UWARN("Many occupancy grids should be loaded (~%d), this may take a while to update the map(s)...", int(filteredPoses.size()-localMaps_.size()));
 				longUpdate = true;
 			}
 #ifdef RTABMAP_OCTOMAP
@@ -476,7 +465,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 			if(!iter->second.isNull())
 			{
 				rtabmap::SensorData data;
-				if(updateGridCache && (iter->first == 0 || !uContains(gridMaps_, iter->first)))
+				if(updateGridCache && (iter->first == 0 || !uContains(localMaps_.localGrids(), iter->first)))
 				{
 					UDEBUG("Data required for %d", iter->first);
 					std::map<int, rtabmap::Signature>::const_iterator findIter = signatures.find(iter->first);
@@ -486,7 +475,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 					}
 					else if(memory)
 					{
-						data = memory->getNodeData(iter->first, occupancyGrid_->isGridFromDepth() && !occupancySavedInDB, !occupancyGrid_->isGridFromDepth() && !occupancySavedInDB, false, true);
+						data = memory->getNodeData(iter->first, localMapMaker_->isGridFromDepth() && !occupancySavedInDB, !localMapMaker_->isGridFromDepth() && !occupancySavedInDB, false, true);
 					}
 
 					UDEBUG("Adding grid map %d to cache...", iter->first);
@@ -515,12 +504,12 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 						{
 							// if we are here, it is because we loaded a database with old nodes not having occupancy grid set
 							// try reload again
-							data = memory->getNodeData(iter->first, occupancyGrid_->isGridFromDepth(), !occupancyGrid_->isGridFromDepth(), false, false);
+							data = memory->getNodeData(iter->first, localMapMaker_->isGridFromDepth(), !localMapMaker_->isGridFromDepth(), false, false);
 						}
 						data.uncompressData(
-								occupancyGrid_->isGridFromDepth() && generateGrid?&rgb:0,
-								occupancyGrid_->isGridFromDepth() && generateGrid?&depth:0,
-								!occupancyGrid_->isGridFromDepth() && generateGrid?&scan:0,
+								localMapMaker_->isGridFromDepth() && generateGrid?&rgb:0,
+								localMapMaker_->isGridFromDepth() && generateGrid?&depth:0,
+								!localMapMaker_->isGridFromDepth() && generateGrid?&scan:0,
 								0,
 								generateGrid?0:&ground,
 								generateGrid?0:&obstacles,
@@ -530,15 +519,12 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 						{
 							Signature tmp(data);
 							tmp.setPose(iter->second);
-							occupancyGrid_->createLocalMap(tmp, ground, obstacles, emptyCells, viewPoint);
-							uInsert(gridMaps_, std::make_pair(iter->first, std::make_pair(std::make_pair(ground, obstacles), emptyCells)));
-							uInsert(gridMapsViewpoints_, std::make_pair(iter->first, viewPoint));
+							localMapMaker_->createLocalMap(tmp, ground, obstacles, emptyCells, viewPoint);
+							localMaps_.add(iter->first, ground, obstacles, emptyCells, localMapMaker_->getCellSize(), viewPoint);
 						}
 						else
 						{
-							viewPoint = data.gridViewPoint();
-							uInsert(gridMaps_, std::make_pair(iter->first, std::make_pair(std::make_pair(ground, obstacles), emptyCells)));
-							uInsert(gridMapsViewpoints_, std::make_pair(iter->first, viewPoint));
+							localMaps_.add(iter->first, ground, obstacles, emptyCells, data.gridCellSize(), data.gridViewPoint());
 						}
 					}
 					else
@@ -552,16 +538,16 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 						{
 							ParametersMap parameters;
 							parameters.insert(ParametersPair(Parameters::kGridScan2dUnknownSpaceFilled(), uBool2Str(scanEmptyRayTracing_)));
-							occupancyGrid_->parseParameters(parameters);
+							localMapMaker_->parseParameters(parameters);
 						}
 
 						cv::Mat rgb, depth;
 						LaserScan scan;
 						bool generateGrid = data.gridCellSize() == 0.0f || (unknownSpaceFilled != scanEmptyRayTracing_ && scanEmptyRayTracing_);
 						data.uncompressData(
-							occupancyGrid_->isGridFromDepth() && generateGrid?&rgb:0,
-							occupancyGrid_->isGridFromDepth() && generateGrid?&depth:0,
-							!occupancyGrid_->isGridFromDepth() && generateGrid?&scan:0,
+							localMapMaker_->isGridFromDepth() && generateGrid?&rgb:0,
+							localMapMaker_->isGridFromDepth() && generateGrid?&depth:0,
+							!localMapMaker_->isGridFromDepth() && generateGrid?&scan:0,
 							0,
 							generateGrid?0:&ground,
 							generateGrid?0:&obstacles,
@@ -571,15 +557,12 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 						{
 							Signature tmp(data);
 							tmp.setPose(iter->second);
-							occupancyGrid_->createLocalMap(tmp, ground, obstacles, emptyCells, viewPoint);
-							uInsert(gridMaps_,  std::make_pair(iter->first, std::make_pair(std::make_pair(ground, obstacles), emptyCells)));
-							uInsert(gridMapsViewpoints_, std::make_pair(iter->first, viewPoint));
+							localMapMaker_->createLocalMap(tmp, ground, obstacles, emptyCells, viewPoint);
+							localMaps_.add(iter->first, ground, obstacles, emptyCells, localMapMaker_->getCellSize(), viewPoint);
 						}
 						else
 						{
-							viewPoint = data.gridViewPoint();
-							uInsert(gridMaps_,  std::make_pair(iter->first, std::make_pair(std::make_pair(ground, obstacles), emptyCells)));
-							uInsert(gridMapsViewpoints_, std::make_pair(iter->first, viewPoint));
+							localMaps_.add(iter->first, ground, obstacles, emptyCells, data.gridCellSize(), data.gridViewPoint());
 						}
 
 						// put back
@@ -587,50 +570,10 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 						{
 							ParametersMap parameters;
 							parameters.insert(ParametersPair(Parameters::kGridScan2dUnknownSpaceFilled(), uBool2Str(unknownSpaceFilled)));
-							occupancyGrid_->parseParameters(parameters);
+							localMapMaker_->parseParameters(parameters);
 						}
 					}
 				}
-
-				if(updateGrid &&
-						(iter->first == 0 ||
-						  occupancyGrid_->addedNodes().find(iter->first) == occupancyGrid_->addedNodes().end()))
-				{
-					std::map<int, std::pair<std::pair<cv::Mat, cv::Mat>, cv::Mat> >::iterator mter = gridMaps_.find(iter->first);
-					if(mter != gridMaps_.end())
-					{
-						if(!mter->second.first.first.empty() || !mter->second.first.second.empty() || !mter->second.second.empty())
-						{
-							occupancyGrid_->addToCache(iter->first, mter->second.first.first, mter->second.first.second, mter->second.second);
-						}
-					}
-				}
-
-#ifdef RTABMAP_OCTOMAP
-				if(updateOctomap &&
-						(iter->first == 0 ||
-						  octomap_->addedNodes().find(iter->first) == octomap_->addedNodes().end()))
-				{
-					std::map<int, std::pair<std::pair<cv::Mat, cv::Mat>, cv::Mat> >::iterator mter = gridMaps_.find(iter->first);
-					std::map<int, cv::Point3f>::iterator pter = gridMapsViewpoints_.find(iter->first);
-					if(mter != gridMaps_.end() && pter!=gridMapsViewpoints_.end())
-					{
-						if((mter->second.first.first.empty() || mter->second.first.first.channels() > 2) &&
-						   (mter->second.first.second.empty() || mter->second.first.second.channels() > 2) &&
-						   (mter->second.second.empty() || mter->second.second.channels() > 2))
-						{
-							octomap_->addToCache(iter->first, mter->second.first.first, mter->second.first.second, mter->second.second, pter->second);
-						}
-						else if(!mter->second.first.first.empty() && !mter->second.first.second.empty() && !mter->second.second.empty())
-						{
-							UWARN("Node %d: Cannot update octomap with 2D occupancy grids. "
-									"Do \"$ rosrun rtabmap_ros rtabmap --params | grep Grid\" to see "
-									"all occupancy grid parameters.",
-									iter->first);
-						}
-					}
-				}
-#endif
 			}
 			else
 			{
@@ -651,19 +594,6 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 			UINFO("Octomap update time = %fs", time.ticks());
 		}
 #endif
-		for(std::map<int, std::pair<std::pair<cv::Mat, cv::Mat>, cv::Mat> >::iterator iter=gridMaps_.begin();
-			iter!=gridMaps_.end();)
-		{
-			if(!uContains(poses, iter->first))
-			{
-				UASSERT(gridMapsViewpoints_.erase(iter->first) != 0);
-				gridMaps_.erase(iter++);
-			}
-			else
-			{
-				++iter;
-			}
-		}
 
 		for(std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr >::iterator iter=groundClouds_.begin();
 			iter!=groundClouds_.end();)
@@ -892,16 +822,16 @@ void MapsManager::publishMaps(
 
 		for(std::map<int, Transform>::const_iterator iter = poses.begin(); iter!=poses.end(); ++iter)
 		{
-			std::map<int, std::pair<std::pair<cv::Mat, cv::Mat>, cv::Mat> >::iterator jter = gridMaps_.find(iter->first);
+			std::map<int, LocalGrid>::const_iterator jter = localMaps_.find(iter->first);
 			if(updateGround  && assembledGroundPoses_.find(iter->first) == assembledGroundPoses_.end())
 			{
 				if(iter->first > 0)
 				{
 					assembledGroundPoses_.insert(*iter);
 				}
-				if(jter!=gridMaps_.end() && jter->second.first.first.cols)
+				if(jter!=localMaps_.end() && jter->second.groundCells.cols)
 				{
-					pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::laserScanToPointCloudRGB(LaserScan::backwardCompatibility(jter->second.first.first), iter->second, 0, 255, 0);
+					pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::laserScanToPointCloudRGB(LaserScan::backwardCompatibility(jter->second.groundCells), iter->second, 0, 255, 0);
 					pcl::PointCloud<pcl::PointXYZRGB>::Ptr subtractedCloud = transformed;
 					if(cloudSubtractFiltering_)
 					{
@@ -946,9 +876,9 @@ void MapsManager::publishMaps(
 				{
 					assembledObstaclePoses_.insert(*iter);
 				}
-				if(jter!=gridMaps_.end() && jter->second.first.second.cols)
+				if(jter!=localMaps_.end() && jter->second.obstacleCells.cols)
 				{
-					pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::laserScanToPointCloudRGB(LaserScan::backwardCompatibility(jter->second.first.second), iter->second, 255, 0, 0);
+					pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed = util3d::laserScanToPointCloudRGB(LaserScan::backwardCompatibility(jter->second.obstacleCells), iter->second, 255, 0, 0);
 					pcl::PointCloud<pcl::PointXYZRGB>::Ptr subtractedCloud = transformed;
 					if(cloudSubtractFiltering_)
 					{
@@ -1333,7 +1263,7 @@ void MapsManager::publishMaps(
 			}
 			else if(poses.size())
 			{
-				UWARN("Grid map is empty! (local maps=%d)", (int)gridMaps_.size());
+				UWARN("Grid map is empty! (local maps=%ld)", localMaps_.size());
 			}
 		}
 		if(gridMapPub_->get_subscription_count())
@@ -1371,7 +1301,7 @@ void MapsManager::publishMaps(
 			}
 			else if(poses.size())
 			{
-				UWARN("Grid map is empty! (local maps=%d)", (int)gridMaps_.size());
+				UWARN("Grid map is empty! (local maps=%ld)", localMaps_.size());
 			}
 		}
 	}
@@ -1387,21 +1317,12 @@ void MapsManager::publishMaps(
 
 	if(!this->hasSubscribers() && mapCacheCleanup_)
 	{
-		if(!gridMaps_.empty())
+		if(!localMaps_.empty())
 		{
-			size_t totalBytes = 0;
-			for(std::map<int, std::pair< std::pair<cv::Mat, cv::Mat>, cv::Mat> >::iterator iter=gridMaps_.begin(); iter!=gridMaps_.end(); ++iter)
-			{
-				totalBytes+= sizeof(int)+
-						iter->second.first.first.total()*iter->second.first.first.elemSize() +
-						iter->second.first.second.total()*iter->second.first.second.elemSize() +
-						iter->second.second.total()*iter->second.second.elemSize();
-			}
-			totalBytes += gridMapsViewpoints_.size()*sizeof(int) + gridMapsViewpoints_.size() * sizeof(cv::Point3f);
-			UINFO("MapsManager: cleanup %ld grid maps (~%ld MB)...", gridMaps_.size(), totalBytes/1048576);
+			size_t totalBytes = localMaps_.getMemoryUsed();
+			UINFO("MapsManager: cleanup %ld grid maps (~%ld MB)...", localMaps_.size(), totalBytes/1048576);
 		}
-		gridMaps_.clear();
-		gridMapsViewpoints_.clear();
+		localMaps_.clear();
 	}
 }
 
