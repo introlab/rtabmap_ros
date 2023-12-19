@@ -1480,7 +1480,7 @@ void MapsManager::publishMaps(
 	{
 		latched_.at(&gridProbMapPub_) = false;
 	}
-
+#if defined(WITH_GRID_MAP_ROS) and defined(RTABMAP_GRIDMAP)
 	if( elevationMapUpdated_ ||
 		!latching_ ||
 		(elevationMapPub_.getNumSubscribers() && !latched_.at(&elevationMapPub_)))
@@ -1500,7 +1500,7 @@ void MapsManager::publishMaps(
 	{
 		elevationMap_->clear();
 	}
-
+#endif
 	if(!this->hasSubscribers() && mapCacheCleanup_)
 	{
 		if(!localMaps_.empty())
