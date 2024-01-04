@@ -427,7 +427,8 @@ bool MapsManager::hasSubscribers() const
 			octoMapObstacleCloud_.getNumSubscribers() != 0 ||
 			octoMapGroundCloud_.getNumSubscribers() != 0 ||
 			octoMapEmptySpace_.getNumSubscribers() != 0 ||
-			octoMapProj_.getNumSubscribers() != 0;
+			octoMapProj_.getNumSubscribers() != 0 ||
+			elevationMapPub_.getNumSubscribers() != 0;
 }
 
 bool MapsManager::isMapUpdated() const

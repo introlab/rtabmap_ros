@@ -60,6 +60,12 @@ MESSAGE(STATUS "WITH octomap_msgs")
 ADD_DEFINITIONS("-DWITH_OCTOMAP_MSGS")
 ENDIF(octomap_msgs_FOUND)
 
+# If grid_map_core is found, add definition
+IF(grid_map_core_FOUND)
+MESSAGE(STATUS "WITH grid_map_core")
+ADD_DEFINITIONS("-DWITH_GRID_MAP_CORE")
+ENDIF(grid_map_core_FOUND)
+
 # If apriltag_ros is found, add definition
 IF(apriltag_ros_FOUND)
 MESSAGE(STATUS "WITH apriltag_ros")
