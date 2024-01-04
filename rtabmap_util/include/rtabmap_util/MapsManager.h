@@ -132,6 +132,24 @@ private:
 #if defined(WITH_GRID_MAP_ROS) and defined(RTABMAP_GRIDMAP)
 	rclcpp::Publisher<grid_map_msgs::msg::GridMap>::SharedPtr elevationMapPub_;
 #endif
+=======
+	ros::Publisher cloudMapPub_;
+	ros::Publisher cloudGroundPub_;
+	ros::Publisher cloudObstaclesPub_;
+	ros::Publisher projMapPub_;
+	ros::Publisher gridMapPub_;
+	ros::Publisher gridProbMapPub_;
+	ros::Publisher scanMapPub_;
+	ros::Publisher octoMapPubBin_;
+	ros::Publisher octoMapPubFull_;
+	ros::Publisher octoMapCloud_;
+	ros::Publisher octoMapFrontierCloud_;
+	ros::Publisher octoMapGroundCloud_;
+	ros::Publisher octoMapObstacleCloud_;
+	ros::Publisher octoMapEmptySpace_;
+	ros::Publisher octoMapProj_;
+	ros::Publisher elevationMapPub_;
+>>>>>>> c70f9f1b14ead8f51ee724bd0b2c88ff091d74fa
 
 	std::map<int, rtabmap::Transform> assembledGroundPoses_;
 	std::map<int, rtabmap::Transform> assembledObstaclePoses_;
@@ -154,9 +172,13 @@ private:
 	int octomapTreeDepth_;
 	bool octomapUpdated_;
 
+<<<<<<< HEAD
 #ifdef RTABMAP_GRIDMAP
 	rtabmap::GridMap * elevationMap_;
 #endif
+=======
+	rtabmap::GridMap * elevationMap_;
+>>>>>>> c70f9f1b14ead8f51ee724bd0b2c88ff091d74fa
 	bool elevationMapUpdated_;
 
 	rtabmap::ParametersMap parameters_;
