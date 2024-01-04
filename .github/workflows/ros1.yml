@@ -36,6 +36,7 @@ jobs:
         sudo apt-get update
         sudo apt-get -y install ros-${{ matrix.ros_distro }}-rtabmap-ros python3-catkin-tools
         sudo apt-get -y remove ros-${{ matrix.ros_distro }}-rtabmap
+        sudo pip3 uninstall empy --yes
 
     - name: Setup catkin workspace
       run: | 

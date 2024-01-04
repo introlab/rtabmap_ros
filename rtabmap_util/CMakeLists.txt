@@ -29,6 +29,7 @@ find_package(rtabmap_conversions REQUIRED)
 
 # Optional components
 find_package(octomap_msgs)
+find_package(grid_map_ros)
 
 include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -75,7 +76,7 @@ SET(rtabmap_util_plugins_lib_src
 )
 
 
-# If octomap is found, add definition
+# If octomap is found, add dependency
 IF(octomap_msgs_FOUND)
 MESSAGE(STATUS "WITH octomap_msgs")
 include_directories(
@@ -88,6 +89,18 @@ SET(Libraries
 ADD_DEFINITIONS("-DWITH_OCTOMAP_MSGS")
 ENDIF(octomap_msgs_FOUND)
 
+# If grid_map is found, add dependency
+IF(grid_map_ros_FOUND)
+MESSAGE(STATUS "WITH grid_map_ros")
+include_directories(
+  ${grid_map_ros_INCLUDE_DIRS}
+)
+SET(Libraries
+  grid_map_ros
+  ${Libraries}
+)
+ENDIF(grid_map_ros_FOUND)
+
 ############################
 ## Declare a cpp library
 ############################
@@ -99,6 +112,14 @@ target_include_directories(rtabmap_util_plugins
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
+
+IF(octomap_msgs_FOUND)
+  target_compile_definitions(rtabmap_util_plugins PUBLIC -DWITH_OCTOMAP_MSGS)
+ENDIF(octomap_msgs_FOUND)
+
+IF(grid_map_ros_FOUND)
+  target_compile_definitions(rtabmap_util_plugins PUBLIC -DWITH_GRID_MAP_ROS)
+ENDIF(grid_map_ros_FOUND)
 
 ament_target_dependencies(rtabmap_util_plugins ${Libraries})
 

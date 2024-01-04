@@ -57,6 +57,8 @@ RGBDOdometry::RGBDOdometry(const rclcpp::NodeOptions & options) :
 		exactSync4_(0),
 		approxSync5_(0),
 		exactSync5_(0),
+		approxSync6_(0),
+		exactSync6_(0),
 		queueSize_(5),
 		keepColor_(false)
 {
@@ -75,6 +77,8 @@ RGBDOdometry::~RGBDOdometry()
 	delete exactSync4_;
 	delete approxSync5_;
 	delete exactSync5_;
+	delete approxSync6_;
+	delete exactSync6_;
 }
 
 void RGBDOdometry::onOdomInit()
@@ -92,10 +96,6 @@ void RGBDOdometry::onOdomInit()
 	if(rgbdCameras <= 0)
 	{
 		rgbdCameras = 1;
-	}
-	if(rgbdCameras > 5)
-	{
-		RCLCPP_FATAL(this->get_logger(), "Only 5 cameras maximum supported yet. Set 0 to use rgbd_images input (for which rgbdx_sync node can sync up to 8 cameras).");
 	}
 	keepColor_ = this->declare_parameter("keep_color", keepColor_);
 
@@ -128,6 +128,10 @@ void RGBDOdometry::onOdomInit()
 			if(rgbdCameras >= 5)
 			{
 				rgbd_image5_sub_.subscribe(this, "rgbd_image4", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile());
+			}
+			if(rgbdCameras >= 6)
+			{
+				rgbd_image6_sub_.subscribe(this, "rgbd_image5", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile());
 			}
 
 			if(rgbdCameras == 2)
@@ -255,6 +259,54 @@ void RGBDOdometry::onOdomInit()
 						rgbd_image3_sub_.getSubscriber()->get_topic_name(),
 						rgbd_image4_sub_.getSubscriber()->get_topic_name(),
 						rgbd_image5_sub_.getSubscriber()->get_topic_name());
+			}
+			else if(rgbdCameras == 6)
+			{
+				if(approxSync)
+				{
+					approxSync6_ = new message_filters::Synchronizer<MyApproxSync6Policy>(
+							MyApproxSync6Policy(queueSize_),
+							rgbd_image1_sub_,
+							rgbd_image2_sub_,
+							rgbd_image3_sub_,
+							rgbd_image4_sub_,
+							rgbd_image5_sub_,
+							rgbd_image6_sub_);
+					if(approxSyncMaxInterval > 0.0)
+						approxSync6_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval));
+					approxSync6_->registerCallback(std::bind(&RGBDOdometry::callbackRGBD6, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6));
+				}
+				else
+				{
+					exactSync6_ = new message_filters::Synchronizer<MyExactSync6Policy>(
+							MyExactSync6Policy(queueSize_),
+							rgbd_image1_sub_,
+							rgbd_image2_sub_,
+							rgbd_image3_sub_,
+							rgbd_image4_sub_,
+							rgbd_image5_sub_,
+							rgbd_image6_sub_);
+					exactSync6_->registerCallback(std::bind(&RGBDOdometry::callbackRGBD6, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6));
+				}
+				subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s \\\n  %s \\\n  %s \\\n   %s \\\n   %s \\\n   %s",
+						get_name(),
+						approxSync?"approx":"exact",
+						approxSync&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
+						rgbd_image1_sub_.getTopic().c_str(),
+						rgbd_image2_sub_.getTopic().c_str(),
+						rgbd_image3_sub_.getTopic().c_str(),
+						rgbd_image4_sub_.getTopic().c_str(),
+						rgbd_image5_sub_.getTopic().c_str(),
+						rgbd_image6_sub_.getTopic().c_str());
+			}
+			else
+			{
+				RCLCPP_FATAL(this->get_logger(),
+						  "%s doesn't support more than 6 cameras (rgbd_cameras=%d) with "
+						  "internal synchronization interface, set rgbd_cameras=0 and use "
+						  "rgbd_images input topic instead for more cameras (for which "
+						  "rgbdx_sync node can sync up to 8 cameras).",
+						  get_name(), rgbdCameras);
 			}
 		}
 		else if(rgbdCameras == 0)
@@ -649,6 +701,36 @@ void RGBDOdometry::callbackRGBD5(
 	}
 }
 
+void RGBDOdometry::callbackRGBD6(
+		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image,
+		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image2,
+		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image3,
+		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image4,
+		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image5,
+		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image6)
+{
+	if(!this->isPaused())
+	{
+		std::vector<cv_bridge::CvImageConstPtr> imageMsgs(6);
+		std::vector<cv_bridge::CvImageConstPtr> depthMsgs(6);
+		std::vector<sensor_msgs::msg::CameraInfo> infoMsgs;
+		rtabmap_conversions::toCvShare(image, imageMsgs[0], depthMsgs[0]);
+		rtabmap_conversions::toCvShare(image2, imageMsgs[1], depthMsgs[1]);
+		rtabmap_conversions::toCvShare(image3, imageMsgs[2], depthMsgs[2]);
+		rtabmap_conversions::toCvShare(image4, imageMsgs[3], depthMsgs[3]);
+		rtabmap_conversions::toCvShare(image5, imageMsgs[4], depthMsgs[4]);
+		rtabmap_conversions::toCvShare(image6, imageMsgs[5], depthMsgs[5]);
+		infoMsgs.push_back(image->rgb_camera_info);
+		infoMsgs.push_back(image2->rgb_camera_info);
+		infoMsgs.push_back(image3->rgb_camera_info);
+		infoMsgs.push_back(image4->rgb_camera_info);
+		infoMsgs.push_back(image5->rgb_camera_info);
+		infoMsgs.push_back(image6->rgb_camera_info);
+
+		this->commonCallback(imageMsgs, depthMsgs, infoMsgs);
+	}
+}
+
 void RGBDOdometry::flushCallbacks()
 {
 	// flush callbacks
@@ -747,6 +829,32 @@ void RGBDOdometry::flushCallbacks()
 				rgbd_image4_sub_,
 				rgbd_image5_sub_);
 		exactSync5_->registerCallback(std::bind(&RGBDOdometry::callbackRGBD5, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5));
+	}
+	if(approxSync6_)
+	{
+		delete approxSync6_;
+		approxSync6_ = new message_filters::Synchronizer<MyApproxSync6Policy>(
+				MyApproxSync6Policy(queueSize_),
+				rgbd_image1_sub_,
+				rgbd_image2_sub_,
+				rgbd_image3_sub_,
+				rgbd_image4_sub_,
+				rgbd_image5_sub_,
+				rgbd_image6_sub_);
+		approxSync6_->registerCallback(std::bind(&RGBDOdometry::callbackRGBD6, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6));
+	}
+	if(exactSync6_)
+	{
+		delete exactSync6_;
+		exactSync6_ = new message_filters::Synchronizer<MyExactSync6Policy>(
+				MyExactSync6Policy(queueSize_),
+				rgbd_image1_sub_,
+				rgbd_image2_sub_,
+				rgbd_image3_sub_,
+				rgbd_image4_sub_,
+				rgbd_image5_sub_,
+				rgbd_image6_sub_);
+		exactSync6_->registerCallback(std::bind(&RGBDOdometry::callbackRGBD6, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6));
 	}
 }
 

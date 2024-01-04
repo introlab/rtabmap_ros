@@ -51,6 +51,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/OctoMap.h>
 #endif
 
+#if defined(WITH_GRID_MAP_ROS) and defined(RTABMAP_GRIDMAP)
+#include <grid_map_ros/GridMapRosConverter.hpp>
+#include <rtabmap/core/global_map/GridMap.h>
+#endif
+
 using namespace rtabmap;
 
 namespace rtabmap_util {
@@ -74,6 +79,10 @@ MapsManager::MapsManager() :
 #endif
 		octomapTreeDepth_(16),
 		octomapUpdated_(true),
+#if defined(WITH_GRID_MAP_ROS) and defined(RTABMAP_GRIDMAP)
+		elevationMap_(new GridMap(&localMaps_)),
+#endif
+		elevationMapUpdated_(true),
 		latching_(true)
 {
 }
@@ -96,6 +105,7 @@ void MapsManager::init(rclcpp::Node & node, const std::string & name, bool)
 	// connect
 	latching_ = node.declare_parameter("latch", rclcpp::ParameterValue(latching_)).get<bool>();
 
+	RCLCPP_INFO(node.get_logger(), "%s(maps): latch                      = %s", name.c_str(), latching_?"true":"false");
 	RCLCPP_INFO(node.get_logger(), "%s(maps): map_filter_radius          = %f", name.c_str(), mapFilterRadius_);
 	RCLCPP_INFO(node.get_logger(), "%s(maps): map_filter_angle           = %f", name.c_str(), mapFilterAngle_);
 	RCLCPP_INFO(node.get_logger(), "%s(maps): map_cleanup                = %s", name.c_str(), mapCacheCleanup_?"true":"false");
@@ -105,7 +115,6 @@ void MapsManager::init(rclcpp::Node & node, const std::string & name, bool)
 	RCLCPP_INFO(node.get_logger(), "%s(maps): cloud_subtract_filtering   = %s", name.c_str(), cloudSubtractFiltering_?"true":"false");
 	RCLCPP_INFO(node.get_logger(), "%s(maps): cloud_subtract_filtering_min_neighbors = %d", name.c_str(), cloudSubtractFilteringMinNeighbors_);
 
-#ifdef WITH_OCTOMAP_MSGS
 #ifdef RTABMAP_OCTOMAP
 	octomapTreeDepth_ = node.declare_parameter("octomap_tree_depth", rclcpp::ParameterValue(octomapTreeDepth_)).get<int>();
 	if(octomapTreeDepth_ > 16)
@@ -120,9 +129,6 @@ void MapsManager::init(rclcpp::Node & node, const std::string & name, bool)
 	}
 	RCLCPP_INFO(node.get_logger(), "%s(maps): octomap_tree_depth         = %d", name.c_str(), octomapTreeDepth_);
 #endif
-#endif
-
-
 
 	// mapping topics
 	latched_.clear();
@@ -157,6 +163,11 @@ void MapsManager::init(rclcpp::Node & node, const std::string & name, bool)
 	octoMapProj_ = node.create_publisher<nav_msgs::msg::OccupancyGrid>("octomap_grid", rclcpp::QoS(1).reliable().durability(latching_?RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL:RMW_QOS_POLICY_DURABILITY_VOLATILE));
 	latched_.insert(std::make_pair((void*)&octoMapProj_, false));
 #endif
+
+#if defined(WITH_GRID_MAP_ROS) and defined(RTABMAP_GRIDMAP)
+	elevationMapPub_ = node.create_publisher<grid_map_msgs::msg::GridMap>("elevation_map", rclcpp::QoS(1).reliable().durability(latching_?RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL:RMW_QOS_POLICY_DURABILITY_VOLATILE));
+	latched_.insert(std::make_pair((void*)&elevationMapPub_, false));
+#endif
 }
 
 MapsManager::~MapsManager() {
@@ -167,6 +178,9 @@ MapsManager::~MapsManager() {
 
 #ifdef RTABMAP_OCTOMAP
 	delete octomap_;
+#endif
+#if defined(WITH_GRID_MAP_ROS) and defined(RTABMAP_GRIDMAP)
+	delete elevationMap_;
 #endif
 }
 
@@ -236,12 +250,15 @@ void MapsManager::setParameters(const rtabmap::ParametersMap & parameters)
 	parameters_ = parameters;
 	delete occupancyGrid_;
 	occupancyGrid_ = new OccupancyGrid(&localMaps_, parameters_);
-
 	localMapMaker_->parseParameters(parameters_);
 
 #ifdef RTABMAP_OCTOMAP
 	delete octomap_;
 	octomap_ = new OctoMap(&localMaps_, parameters_);
+#endif
+#if defined(WITH_GRID_MAP_ROS) and defined(RTABMAP_GRIDMAP)
+	delete elevationMap_;
+	elevationMap_ = new GridMap(&localMaps_, parameters_);
 #endif
 }
 
@@ -299,9 +316,15 @@ void MapsManager::clear()
 	groundClouds_.clear();
 	obstacleClouds_.clear();
 	occupancyGrid_->clear();
+
 #ifdef RTABMAP_OCTOMAP
 	octomap_->clear();
 #endif
+
+#if defined(WITH_GRID_MAP_ROS) and defined(RTABMAP_GRIDMAP)
+	elevationMap_->clear();
+#endif
+
 	for(std::map<void*, bool>::iterator iter=latched_.begin(); iter!=latched_.end(); ++iter)
 	{
 		iter->second = false;
@@ -327,6 +350,9 @@ bool MapsManager::hasSubscribers() const
 			octoMapGroundCloud_->get_subscription_count() != 0 ||
 			octoMapEmptySpace_->get_subscription_count() != 0 ||
 			octoMapProj_->get_subscription_count() != 0
+#endif
+#if defined(WITH_GRID_MAP_ROS) and defined(RTABMAP_GRIDMAP)
+			|| elevationMapPub_->get_subscription_count() != 0
 #endif
 			;
 }
@@ -361,7 +387,8 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 		const std::map<int, rtabmap::Signature> & signatures)
 {
 	bool updateGridCache = updateGrid || updateOctomap;
-	if(!updateGrid && !updateOctomap)
+	bool updateElevation = false;
+	if(!updateGrid && !updateOctomap && !updateOctomap)
 	{
 		//  all false, update only those where we have subscribers
 #ifdef RTABMAP_OCTOMAP
@@ -378,21 +405,29 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 				octoMapProj_->get_subscription_count() != 0;
 #endif
 
+#if defined(WITH_GRID_MAP_ROS) and defined(RTABMAP_GRIDMAP)
+		updateElevation = elevationMapPub_->get_subscription_count() != 0;
+#endif
+
 		updateGrid = gridMapPub_->get_subscription_count() != 0 ||
 				gridProbMapPub_->get_subscription_count() != 0;
 
-		updateGridCache = updateOctomap || updateGrid ||
+		updateGridCache = updateOctomap || updateGrid || updateElevation ||
 				cloudMapPub_->get_subscription_count() != 0 ||
 				cloudObstaclesPub_->get_subscription_count() != 0 ||
 				cloudGroundPub_->get_subscription_count() != 0;
 	}
 
-#if !defined(WITH_OCTOMAP_MSGS) and !defined(RTABMAP_OCTOMAP)
+#if not (defined(WITH_OCTOMAP_MSGS) and defined(RTABMAP_OCTOMAP))
 	updateOctomap = false;
+#endif
+#if not (defined(WITH_GRID_MAP_ROS) and defined(RTABMAP_GRIDMAP))
+	updateElevation = false;
 #endif
 
 	gridUpdated_ = updateGrid;
 	octomapUpdated_ = updateOctomap;
+	elevationMapUpdated_ = updateElevation;
 
 
 	UDEBUG("Updating map caches...");
@@ -595,6 +630,18 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 		}
 #endif
 
+#if defined(WITH_GRID_MAP_ROS) and defined(RTABMAP_GRIDMAP)
+		if(updateElevation)
+		{
+			UTimer time;
+			elevationMapUpdated_ = elevationMap_->update(filteredPoses);
+			UINFO("GridMap (elevation map) update time = %fs", time.ticks());
+		}
+#endif
+
+		localMaps_.clear(true);
+
+
 		for(std::map<int, pcl::PointCloud<pcl::PointXYZRGB>::Ptr >::iterator iter=groundClouds_.begin();
 			iter!=groundClouds_.end();)
 		{
@@ -795,10 +842,6 @@ void MapsManager::publishMaps(
 							}
 						}
 						++countObstacles;
-					}
-					else
-					{
-						//std::map<int, std::pair<std::pair<cv::Mat, cv::Mat>, cv::Mat> >::iterator jter = gridMaps_.find(iter->first);
 					}
 				}
 			}
@@ -1218,7 +1261,6 @@ void MapsManager::publishMaps(
 	{
 		latched_.at(&octoMapProj_) = false;
 	}
-
 #endif
 
 	if( gridUpdated_ ||
@@ -1314,7 +1356,27 @@ void MapsManager::publishMaps(
 	{
 		latched_.at(&gridProbMapPub_) = false;
 	}
-
+#if defined(WITH_GRID_MAP_ROS) and defined(RTABMAP_GRIDMAP)
+	if( elevationMapUpdated_ ||
+		!latching_ ||
+		(elevationMapPub_->get_subscription_count() && !latched_.at(&elevationMapPub_)))
+	{
+		grid_map_msgs::msg::GridMap::UniquePtr msg;
+		msg = grid_map::GridMapRosConverter::toMessage(elevationMap_->gridMap());
+		msg->header.frame_id = mapFrameId;
+		msg->header.stamp = stamp;
+		elevationMapPub_->publish(std::move(msg));
+	}
+	if(elevationMapPub_->get_subscription_count() == 0)
+	{
+		latched_.at(&elevationMapPub_) = false;
+	}
+	if( mapCacheCleanup_ &&
+		elevationMapPub_->get_subscription_count() == 0)
+	{
+		elevationMap_->clear();
+	}
+#endif
 	if(!this->hasSubscribers() && mapCacheCleanup_)
 	{
 		if(!localMaps_.empty())

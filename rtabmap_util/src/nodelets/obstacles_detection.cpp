@@ -31,6 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/filters/filter.h>
+#include <rtabmap/core/LocalGridMaker.h>
 
 #include <rtabmap_conversions/MsgConversion.h>
 
@@ -84,8 +85,6 @@ ObstaclesDetection::ObstaclesDetection(const rclcpp::NodeOptions & options) :
 
 	cloudSub_ = create_subscription<sensor_msgs::msg::PointCloud2>("cloud", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos), std::bind(&ObstaclesDetection::callback, this, std::placeholders::_1));
 }
-
-
 
 void ObstaclesDetection::callback(const sensor_msgs::msg::PointCloud2::ConstSharedPtr cloudMsg)
 {

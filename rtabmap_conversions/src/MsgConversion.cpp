@@ -2850,6 +2850,12 @@ bool deskew_impl(
 	if(offsetTime < 0)
 	{
 		UERROR("Input cloud doesn't have \"t\", \"time\", \"stamps\" or \"timestamp\" field!");
+		std::string fieldsReceived;
+		for(size_t i=0; i<input.fields.size(); ++i)
+		{
+			fieldsReceived += input.fields[i].name + " ";
+		}
+		UERROR("Input cloud has these fields: %s", fieldsReceived.c_str());
 		return false;
 	}
 	if(offsetX < 0)

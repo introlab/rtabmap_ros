@@ -95,6 +95,14 @@ private:
 			const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image4,
 			const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image5);
 
+	void callbackRGBD6(
+			const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image,
+			const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image2,
+			const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image3,
+			const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image4,
+			const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image5,
+			const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image6);
+
 protected:
 	virtual void flushCallbacks();
 
@@ -110,6 +118,7 @@ private:
 	message_filters::Subscriber<rtabmap_msgs::msg::RGBDImage> rgbd_image3_sub_;
 	message_filters::Subscriber<rtabmap_msgs::msg::RGBDImage> rgbd_image4_sub_;
 	message_filters::Subscriber<rtabmap_msgs::msg::RGBDImage> rgbd_image5_sub_;
+	message_filters::Subscriber<rtabmap_msgs::msg::RGBDImage> rgbd_image6_sub_;
 
 	typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::msg::Image, sensor_msgs::msg::Image, sensor_msgs::msg::CameraInfo> MyApproxSyncPolicy;
 	message_filters::Synchronizer<MyApproxSyncPolicy> * approxSync_;
@@ -131,6 +140,10 @@ private:
 	message_filters::Synchronizer<MyApproxSync5Policy> * approxSync5_;
 	typedef message_filters::sync_policies::ExactTime<rtabmap_msgs::msg::RGBDImage, rtabmap_msgs::msg::RGBDImage, rtabmap_msgs::msg::RGBDImage, rtabmap_msgs::msg::RGBDImage, rtabmap_msgs::msg::RGBDImage> MyExactSync5Policy;
 	message_filters::Synchronizer<MyExactSync5Policy> * exactSync5_;
+	typedef message_filters::sync_policies::ApproximateTime<rtabmap_msgs::msg::RGBDImage, rtabmap_msgs::msg::RGBDImage, rtabmap_msgs::msg::RGBDImage, rtabmap_msgs::msg::RGBDImage, rtabmap_msgs::msg::RGBDImage, rtabmap_msgs::msg::RGBDImage> MyApproxSync6Policy;
+	message_filters::Synchronizer<MyApproxSync6Policy> * approxSync6_;
+	typedef message_filters::sync_policies::ExactTime<rtabmap_msgs::msg::RGBDImage, rtabmap_msgs::msg::RGBDImage, rtabmap_msgs::msg::RGBDImage, rtabmap_msgs::msg::RGBDImage, rtabmap_msgs::msg::RGBDImage, rtabmap_msgs::msg::RGBDImage> MyExactSync6Policy;
+	message_filters::Synchronizer<MyExactSync6Policy> * exactSync6_;
 	int queueSize_;
 	bool keepColor_;
 };
