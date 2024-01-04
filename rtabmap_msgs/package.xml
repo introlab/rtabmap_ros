@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="2">
   <name>rtabmap_msgs</name>
-  <version>0.21.1</version>
+  <version>0.21.3</version>
   <description>RTAB-Map's msgs package.</description>
   <maintainer email="matlabbe@gmail.com">Mathieu Labbe</maintainer>
   <author>Mathieu Labbe</author>
