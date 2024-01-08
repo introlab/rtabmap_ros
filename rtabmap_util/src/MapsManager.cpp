@@ -630,8 +630,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 						}
 						else
 						{
-							viewPoint = data.gridViewPoint();
-							localMaps_.add(iter->first, ground, obstacles, emptyCells, localMapMaker_->getCellSize(), viewPoint);
+							localMaps_.add(iter->first, ground, obstacles, emptyCells, data.gridCellSize(), data.gridViewPoint());
 						}
 					}
 					else
@@ -669,8 +668,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 						}
 						else
 						{
-							viewPoint = data.gridViewPoint();
-							localMaps_.add(iter->first, ground, obstacles, emptyCells, localMapMaker_->getCellSize(), viewPoint);
+							localMaps_.add(iter->first, ground, obstacles, emptyCells, data.gridCellSize(), data.gridViewPoint());
 						}
 
 						// put back
