@@ -164,7 +164,7 @@ private:
 
 		std::string subscribedTopicsMsg = uFormat("%s%s", subscribedTopicsMsg_.c_str(),
 				approxSync&&approxSyncMaxInterval!=0.0?uFormat(" (approx sync max interval=%fs)", approxSyncMaxInterval).c_str():"");
-		NODELET_INFO(subscribedTopicsMsg.c_str());
+		NODELET_INFO("%s", subscribedTopicsMsg.c_str());
 
 		// Setup diagnostic
 		syncDiagnostic_.reset(new SyncDiagnostic(nh, pnh, getName()));
