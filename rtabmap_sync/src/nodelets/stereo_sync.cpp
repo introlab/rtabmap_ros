@@ -129,7 +129,7 @@ private:
 							imageRightSub_.getTopic().c_str(),
 							cameraInfoLeftSub_.getTopic().c_str(),
 							cameraInfoRightSub_.getTopic().c_str());
-		NODELET_INFO(subscribedTopicsMsg.c_str());
+		NODELET_INFO("%s", subscribedTopicsMsg.c_str());
 
 		syncDiagnostic_.reset(new SyncDiagnostic(nh, pnh, getName()));
 		syncDiagnostic_->init(left_nh.resolveName("image_rect"),

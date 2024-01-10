@@ -121,7 +121,7 @@ private:
 							approxSync&&approxSyncMaxInterval!=std::numeric_limits<double>::max()?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
 							imageSub_.getTopic().c_str(),
 							cameraInfoSub_.getTopic().c_str());
-		NODELET_INFO(subscribedTopicsMsg.c_str());
+		NODELET_INFO("%s", subscribedTopicsMsg.c_str());
 
 		syncDiagnostic_.reset(new SyncDiagnostic(nh, pnh, getName()));
 		syncDiagnostic_->init(rgb_nh.resolveName("image_rect"),

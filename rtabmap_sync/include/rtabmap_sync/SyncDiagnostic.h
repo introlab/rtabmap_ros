@@ -88,7 +88,7 @@ private:
 
         if(ros::Time::now().toSec()-lastCallbackCalledStamp_ >= 5 && !topicsNotReceivedWarningMsg_.empty())
         {
-            ROS_WARN_THROTTLE(5, topicsNotReceivedWarningMsg_.c_str());
+            ROS_WARN_THROTTLE(5, "%s", topicsNotReceivedWarningMsg_.c_str());
         }
     }
 
