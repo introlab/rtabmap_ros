@@ -59,4 +59,4 @@ jobs:
       run: |
         source /opt/ros/${{ matrix.ros_distro }}/setup.bash
         cd ${{github.workspace}}/catkin_ws
-        catkin build -p 1 -i
+        catkin build -p 1 -i --verbose
