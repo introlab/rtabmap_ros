@@ -838,7 +838,12 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 	auto on_parameter_event_callback =
 			[this](const rcl_interfaces::msg::ParameterEvent::SharedPtr event) -> void
 			{
-				if(event->node.compare(std::string(get_namespace())+"/"+get_name()) != 0)
+				std::string ns = get_namespace();
+				if(ns != "/")
+				{
+					ns += "/";
+				}
+				if(event->node.compare(ns+get_name()) != 0)
 				{
 					return;
 				}
@@ -850,7 +855,25 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 						std::string key = event->changed_parameters[i].name;
 						if(parameters_.find(key) != parameters_.end())
 						{
-							std::string vStr = event->changed_parameters[i].value.string_value;
+							std::string vStr;
+							switch(event->changed_parameters[i].value.type) {
+							    case 1:
+							        vStr = uBool2Str(event->changed_parameters[i].value.bool_value);
+							        break;
+							    case 2:
+							        vStr = uNumber2Str((int)event->changed_parameters[i].value.integer_value);
+							        break;
+							    case 3:
+							        vStr = uNumber2Str(event->changed_parameters[i].value.double_value);
+							        break;
+							    case 4:
+							        vStr = event->changed_parameters[i].value.string_value;
+							        break;
+							    default:
+							        RCLCPP_WARN(this->get_logger(), "Parameter type %d received for parameter %s is not supported, use string type.",
+							                (int)event->changed_parameters[i].value.type, key.c_str());
+							        continue;
+							}
 							RCLCPP_INFO(this->get_logger(), "Setting RTAB-Map parameter \"%s\"=\"%s\"", key.c_str(), vStr.c_str());
 							parameters_.at(key) = vStr;
 						}
