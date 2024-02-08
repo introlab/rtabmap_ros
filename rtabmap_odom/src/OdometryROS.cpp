@@ -1043,7 +1043,7 @@ void OdometryROS::processData(SensorData & data, const std_msgs::Header & header
 		{
 			double curentRate = 1.0/(ros::WallTime::now()-time).toSec();
 			syncDiagnostic_->tick(header.stamp,
-				maxUpdateRate_>0 && maxUpdateRate_ < curentRate ? maxUpdateRate_:
+				maxUpdateRate_>0 ? maxUpdateRate_:
 				expectedUpdateRate_>0 && expectedUpdateRate_ < curentRate ? expectedUpdateRate_:
 				previousStamp_ == 0.0 || header.stamp.toSec() - previousStamp_ > 1.0/curentRate?0:curentRate);
 		}
