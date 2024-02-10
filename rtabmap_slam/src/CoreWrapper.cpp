@@ -328,10 +328,12 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 	{
 		RCLCPP_WARN(get_logger(), "Node paused... don't forget to call service \"resume\" to start rtabmap.");
 	}
+
+	const std::map<std::string, rclcpp::ParameterValue> & overrides = this->get_node_parameters_interface()->get_parameter_overrides();
 	for(ParametersMap::iterator iter=allParameters.begin(); iter!=allParameters.end(); ++iter)
 	{
 		std::string vStr = this->declare_parameter(iter->first, iter->second);
-		if(vStr.compare(iter->second)!=0)
+		if(overrides.find(iter->first) != overrides.end())
 		{
 			RCLCPP_INFO(this->get_logger(), "Setting RTAB-Map parameter \"%s\"=\"%s\"", iter->first.c_str(), vStr.c_str());
 
