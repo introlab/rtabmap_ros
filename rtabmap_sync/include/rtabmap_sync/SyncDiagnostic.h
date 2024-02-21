@@ -90,7 +90,7 @@ private:
     {
         if(rtabmap_conversions::timestampFromROS(node_->now())-lastCallbackCalledStamp_ >= 5 && !topicsNotReceivedWarningMsg_.empty())
         {
-        	RCLCPP_WARN_THROTTLE(node_->get_logger(), *node_->get_clock(), 5000, topicsNotReceivedWarningMsg_.c_str());
+        	RCLCPP_WARN_THROTTLE(node_->get_logger(), *node_->get_clock(), 5000, "%s", topicsNotReceivedWarningMsg_.c_str());
         }
     }
 

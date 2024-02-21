@@ -1036,7 +1036,7 @@ void OdometryROS::processData(SensorData & data, const std_msgs::msg::Header & h
 		{
 			double curentRate = 1.0/(this->now()-timeStart).seconds();
 			syncDiagnostic_->tick(header.stamp,
-				maxUpdateRate_>0 && maxUpdateRate_ < curentRate ? maxUpdateRate_:
+				maxUpdateRate_>0 ? maxUpdateRate_:
 				expectedUpdateRate_>0 && expectedUpdateRate_ < curentRate ? expectedUpdateRate_:
 				previousStamp_ == 0.0 || rtabmap_conversions::timestampFromROS(header.stamp) - previousStamp_ > 1.0/curentRate?0:curentRate);
 		}
