@@ -97,7 +97,7 @@
       --Grid/RayTracing $(arg lidar3d_ray_tracing)
       --Grid/CellSize $(arg cell_size)
       --Icp/PointToPlaneRadius 0
-      --Icp/PointToPlaneNormalK 10
+      --Icp/PointToPlaneK 10
       --Icp/MaxTranslation 1"/>
 
   <!--- Run rtabmap -->
