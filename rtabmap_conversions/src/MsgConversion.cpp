@@ -2709,6 +2709,32 @@ bool convertScanMsg(
 		data = flipScan;
 	}
 
+	// scan message validation check
+	if(!data.empty() && data.rows != 1) {
+		ROS_ERROR("Invalid scan data format");
+		return false;
+	}
+	if(!data.empty() && !(data.type() == CV_8UC1 || data.type() == CV_32FC2 || data.type() == CV_32FC3 || data.type() == CV_32FC(4) || data.type() == CV_32FC(5) || data.type() == CV_32FC(6)  || data.type() == CV_32FC(7))) {
+		ROS_ERROR("Invalid scan data format");
+		return false;
+	}
+	if(!outputInFrameId && scanLocalTransform.isNull()) {
+		ROS_ERROR("Invalid scan data format");
+		return false;
+	}
+	if(angleIncrement == 0.0f) {
+		ROS_ERROR("Invalid scan data format");
+		return false;
+	}
+	if(scan2dMsg.range_min>scan2dMsg.range_max) {
+		ROS_ERROR("Invalid scan data format");
+		return false;
+	}
+	if((scan2dMsg.angleIncrement>0 && scan2dMsg.angleMax<scan2dMsg.angleMin) || (scan2dMsg.angleIncrement<0 && scan2dMsg.angleMax>scan2dMsg.angleMin)) {
+		ROS_ERROR("Invalid scan data format");
+		return false;
+	}
+	
 	scan = rtabmap::LaserScan(
 			data,
 			format,
