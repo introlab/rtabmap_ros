@@ -1930,11 +1930,11 @@ rtabmap::Landmarks landmarksFromROS(
 		if(!baseToTag.isNull())
 		{
 			// Correction of the global pose accounting the odometry movement since we received it
-			rtabmap::Transform correction = rtabmap_conversions::getTransform(
+			rtabmap::Transform correction = rtabmap_conversions::getMovingTransform(
 					frameId,
 					odomFrameId,
-					iter->second.first.header.stamp,
 					odomStamp,
+					iter->second.first.header.stamp,
 					listener,
 					waitForTransform);
 			if(!correction.isNull())
@@ -1996,11 +1996,11 @@ rtabmap::Transform getTransform(
 
 // get moving transform accordingly to a fixed frame. For example get
 // transform between moving /base_link between two stamps accordingly to /odom frame.
-rtabmap::Transform getTransform(
-		const std::string & sourceTargetFrame,
+rtabmap::Transform getMovingTransform(
+		const std::string & movingFrame,
 		const std::string & fixedFrame,
-		const ros::Time & stampSource,
-		const ros::Time & stampTarget,
+		const ros::Time & stampFrom,
+		const ros::Time & stampTo,
 		tf::TransformListener & listener,
 		double waitForTransform)
 {
@@ -2008,25 +2008,25 @@ rtabmap::Transform getTransform(
 	rtabmap::Transform transform;
 	try
 	{
-		ros::Time stamp = stampSource>stampTarget?stampSource:stampTarget;
+		ros::Time stamp = stampTo>stampFrom?stampTo:stampFrom;
 		if(waitForTransform > 0.0 && !stamp.isZero())
 		{
 			std::string errorMsg;
-			if(!listener.waitForTransform(sourceTargetFrame, fixedFrame, stamp, ros::Duration(waitForTransform), ros::Duration(0.01), &errorMsg))
+			if(!listener.waitForTransform(movingFrame, fixedFrame, stamp, ros::Duration(waitForTransform), ros::Duration(0.01), &errorMsg))
 			{
 				ROS_WARN("Could not get transform from %s to %s accordingly to %s after %f seconds (for stamps=%f -> %f)! Error=\"%s\".",
-						sourceTargetFrame.c_str(), sourceTargetFrame.c_str(), fixedFrame.c_str(), waitForTransform, stampSource.toSec(), stampTarget.toSec(), errorMsg.c_str());
+						movingFrame.c_str(), movingFrame.c_str(), fixedFrame.c_str(), waitForTransform, stampTo.toSec(), stampFrom.toSec(), errorMsg.c_str());
 				return transform;
 			}
 		}
 
 		tf::StampedTransform tmp;
-		listener.lookupTransform(sourceTargetFrame, stampTarget, sourceTargetFrame, stampSource, fixedFrame, tmp);
+		listener.lookupTransform(movingFrame, stampFrom, movingFrame, stampTo, fixedFrame, tmp);
 		transform = rtabmap_conversions::transformFromTF(tmp);
 	}
 	catch(tf::TransformException & ex)
 	{
-		ROS_WARN("(getting transform movement of %s according to fixed %s) %s", sourceTargetFrame.c_str(), fixedFrame.c_str(), ex.what());
+		ROS_WARN("(getting transform movement of %s according to fixed %s) %s", movingFrame.c_str(), fixedFrame.c_str(), ex.what());
 	}
 	return transform;
 }
@@ -2178,7 +2178,7 @@ bool convertRGBDMsgs(
 		// sync with odometry stamp
 		if(!odomFrameId.empty() && odomStamp != stamp)
 		{
-			rtabmap::Transform sensorT = getTransform(
+			rtabmap::Transform sensorT = getMovingTransform(
 					frameId,
 					odomFrameId,
 					odomStamp,
@@ -2494,7 +2494,7 @@ bool convertStereoMsg(
 	// sync with odometry stamp
 	if(!odomFrameId.empty() && odomStamp != leftImageMsg->header.stamp)
 	{
-		rtabmap::Transform sensorT = getTransform(
+		rtabmap::Transform sensorT = getMovingTransform(
 				frameId,
 				odomFrameId,
 				odomStamp,
@@ -2592,7 +2592,7 @@ bool convertScanMsg(
 		bool outputInFrameId)
 {
 	// make sure the frame of the laser is updated during the whole scan time
-	rtabmap::Transform tmpT = getTransform(
+	rtabmap::Transform tmpT = getMovingTransform(
 			scan2dMsg.header.frame_id,
 			odomFrameId.empty()?frameId:odomFrameId,
 			scan2dMsg.header.stamp,
@@ -2635,7 +2635,7 @@ bool convertScanMsg(
 	// sync with odometry stamp
 	if(!odomFrameId.empty() && odomStamp != scan2dMsg.header.stamp)
 	{
-		rtabmap::Transform sensorT = getTransform(
+		rtabmap::Transform sensorT = getMovingTransform(
 				frameId,
 				odomFrameId,
 				odomStamp,
@@ -2747,7 +2747,7 @@ bool convertScan3dMsg(
 	// sync with odometry stamp
 	if(!odomFrameId.empty() && odomStamp != scan3dMsg.header.stamp)
 	{
-		rtabmap::Transform sensorT = getTransform(
+		rtabmap::Transform sensorT = getMovingTransform(
 				frameId,
 				odomFrameId,
 				odomStamp,
@@ -3091,18 +3091,18 @@ bool deskew_impl(
 	{
 		if(listener != 0)
 		{
-			firstPose = rtabmap_conversions::getTransform(
+			firstPose = rtabmap_conversions::getMovingTransform(
 					input.header.frame_id,
 					fixedFrameId,
-					firstStamp,
 					input.header.stamp,
+					firstStamp,
 					*listener,
 					0);
-			lastPose = rtabmap_conversions::getTransform(
+			lastPose = rtabmap_conversions::getMovingTransform(
 					input.header.frame_id,
 					fixedFrameId,
-					lastStamp,
 					input.header.stamp,
+					lastStamp,
 					*listener,
 					0);
 		}
@@ -3188,11 +3188,11 @@ bool deskew_impl(
 			}
 			else
 			{
-				transform = rtabmap_conversions::getTransform(
+				transform = rtabmap_conversions::getMovingTransform(
 						output.header.frame_id,
 						fixedFrameId,
-						stamp,
 						output.header.stamp,
+						stamp,
 						*listener,
 						0);
 				if(transform.isNull())
@@ -3267,11 +3267,11 @@ bool deskew_impl(
 			}
 			else
 			{
-				transform = rtabmap_conversions::getTransform(
+				transform = rtabmap_conversions::getMovingTransform(
 						output.header.frame_id,
 						fixedFrameId,
-						stamp,
 						output.header.stamp,
+						stamp,
 						*listener,
 						0);
 				if(transform.isNull())

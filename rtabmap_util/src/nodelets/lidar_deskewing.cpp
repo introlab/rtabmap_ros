@@ -62,7 +62,7 @@ private:
 	void callbackScan(const sensor_msgs::LaserScanConstPtr & msg)
 	{
 		// make sure the frame of the laser is updated during the whole scan time
-		rtabmap::Transform tmpT = rtabmap_conversions::getTransform(
+		rtabmap::Transform tmpT = rtabmap_conversions::getMovingTransform(
 				msg->header.frame_id,
 				fixedFrameId_,
 				msg->header.stamp,

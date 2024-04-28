@@ -160,11 +160,11 @@ private:
 			if(!fixedFrameId_.empty())
 			{
 				// approx sync
-				cloudDisplacement = rtabmap_conversions::getTransform(
+				cloudDisplacement = rtabmap_conversions::getMovingTransform(
 						pointCloud2Msg->header.frame_id,
 						fixedFrameId_,
-						cameraInfoMsg->header.stamp,
 						pointCloud2Msg->header.stamp,
+						cameraInfoMsg->header.stamp,
 						*listener_,
 						waitForTransform_);
 			}

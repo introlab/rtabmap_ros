@@ -208,11 +208,11 @@ rtabmap::Transform getTransform(
 
 // get moving transform accordingly to a fixed frame. For example get
 // transform of /base_link between two stamps accordingly to /odom frame.
-rtabmap::Transform getTransform(
-		const std::string & sourceTargetFrame,
+rtabmap::Transform getMovingTransform(
+		const std::string & movingFrame,
 		const std::string & fixedFrame,
-		const ros::Time & stampSource,
-		const ros::Time & stampTarget,
+		const ros::Time & stampFrom,
+		const ros::Time & stampTo,
 		tf::TransformListener & listener,
 		double waitForTransform);
 

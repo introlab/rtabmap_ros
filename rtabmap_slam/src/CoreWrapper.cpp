@@ -1941,11 +1941,11 @@ void CoreWrapper::process(
 				globalPose *= sensorToBase; // transform global pose from sensor frame to robot base frame
 
 				// Correction of the global pose accounting the odometry movement since we received it
-				Transform correction = rtabmap_conversions::getTransform(
+				Transform correction = rtabmap_conversions::getMovingTransform(
 						frameId_,
 						odomFrameId,
-						globalPose_.header.stamp,
 						lastPoseStamp_,
+						globalPose_.header.stamp,
 						tfListener_,
 						waitForTransform_?waitForTransformDuration_:0.0);
 				if(!correction.isNull())
