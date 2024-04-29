@@ -1930,11 +1930,11 @@ rtabmap::Landmarks landmarksFromROS(
 		if(!baseToTag.isNull())
 		{
 			// Correction of the global pose accounting the odometry movement since we received it
-			rtabmap::Transform correction = rtabmap_conversions::getMovingTransform(
+			rtabmap::Transform correction = rtabmap_conversions::getTransform(
 					frameId,
 					odomFrameId,
-					odomStamp,
 					iter->second.first.header.stamp,
+					odomStamp,
 					listener,
 					waitForTransform);
 			if(!correction.isNull())
@@ -1996,11 +1996,11 @@ rtabmap::Transform getTransform(
 
 // get moving transform accordingly to a fixed frame. For example get
 // transform between moving /base_link between two stamps accordingly to /odom frame.
-rtabmap::Transform getMovingTransform(
-		const std::string & movingFrame,
+rtabmap::Transform getTransform(
+		const std::string & sourceTargetFrame,
 		const std::string & fixedFrame,
-		const ros::Time & stampFrom,
-		const ros::Time & stampTo,
+		const ros::Time & stampSource,
+		const ros::Time & stampTarget,
 		tf::TransformListener & listener,
 		double waitForTransform)
 {
@@ -2008,25 +2008,25 @@ rtabmap::Transform getMovingTransform(
 	rtabmap::Transform transform;
 	try
 	{
-		ros::Time stamp = stampTo>stampFrom?stampTo:stampFrom;
+		ros::Time stamp = stampSource>stampTarget?stampSource:stampTarget;
 		if(waitForTransform > 0.0 && !stamp.isZero())
 		{
 			std::string errorMsg;
-			if(!listener.waitForTransform(movingFrame, fixedFrame, stamp, ros::Duration(waitForTransform), ros::Duration(0.01), &errorMsg))
+			if(!listener.waitForTransform(sourceTargetFrame, fixedFrame, stamp, ros::Duration(waitForTransform), ros::Duration(0.01), &errorMsg))
 			{
 				ROS_WARN("Could not get transform from %s to %s accordingly to %s after %f seconds (for stamps=%f -> %f)! Error=\"%s\".",
-						movingFrame.c_str(), movingFrame.c_str(), fixedFrame.c_str(), waitForTransform, stampTo.toSec(), stampFrom.toSec(), errorMsg.c_str());
+						sourceTargetFrame.c_str(), sourceTargetFrame.c_str(), fixedFrame.c_str(), waitForTransform, stampSource.toSec(), stampTarget.toSec(), errorMsg.c_str());
 				return transform;
 			}
 		}
 
 		tf::StampedTransform tmp;
-		listener.lookupTransform(movingFrame, stampFrom, movingFrame, stampTo, fixedFrame, tmp);
+		listener.lookupTransform(sourceTargetFrame, stampTarget, sourceTargetFrame, stampSource, fixedFrame, tmp);
 		transform = rtabmap_conversions::transformFromTF(tmp);
 	}
 	catch(tf::TransformException & ex)
 	{
-		ROS_WARN("(getting transform movement of %s according to fixed %s) %s", movingFrame.c_str(), fixedFrame.c_str(), ex.what());
+		ROS_WARN("(getting transform movement of %s according to fixed %s) %s", sourceTargetFrame.c_str(), fixedFrame.c_str(), ex.what());
 	}
 	return transform;
 }
@@ -2178,7 +2178,7 @@ bool convertRGBDMsgs(
 		// sync with odometry stamp
 		if(!odomFrameId.empty() && odomStamp != stamp)
 		{
-			rtabmap::Transform sensorT = getMovingTransform(
+			rtabmap::Transform sensorT = getTransform(
 					frameId,
 					odomFrameId,
 					odomStamp,
@@ -2494,7 +2494,7 @@ bool convertStereoMsg(
 	// sync with odometry stamp
 	if(!odomFrameId.empty() && odomStamp != leftImageMsg->header.stamp)
 	{
-		rtabmap::Transform sensorT = getMovingTransform(
+		rtabmap::Transform sensorT = getTransform(
 				frameId,
 				odomFrameId,
 				odomStamp,
@@ -2592,7 +2592,7 @@ bool convertScanMsg(
 		bool outputInFrameId)
 {
 	// make sure the frame of the laser is updated during the whole scan time
-	rtabmap::Transform tmpT = getMovingTransform(
+	rtabmap::Transform tmpT = getTransform(
 			scan2dMsg.header.frame_id,
 			odomFrameId.empty()?frameId:odomFrameId,
 			scan2dMsg.header.stamp,
@@ -2635,7 +2635,7 @@ bool convertScanMsg(
 	// sync with odometry stamp
 	if(!odomFrameId.empty() && odomStamp != scan2dMsg.header.stamp)
 	{
-		rtabmap::Transform sensorT = getMovingTransform(
+		rtabmap::Transform sensorT = getTransform(
 				frameId,
 				odomFrameId,
 				odomStamp,
@@ -2711,27 +2711,21 @@ bool convertScanMsg(
 
 	// scan message validation check
 	if(!data.empty() && data.rows != 1) {
-		ROS_ERROR("Invalid scan data format");
 		return false;
 	}
 	if(!data.empty() && !(data.type() == CV_8UC1 || data.type() == CV_32FC2 || data.type() == CV_32FC3 || data.type() == CV_32FC(4) || data.type() == CV_32FC(5) || data.type() == CV_32FC(6)  || data.type() == CV_32FC(7))) {
-		ROS_ERROR("Invalid scan data format");
 		return false;
 	}
 	if(!outputInFrameId && scanLocalTransform.isNull()) {
-		ROS_ERROR("Invalid scan data format");
 		return false;
 	}
-	if(angleIncrement == 0.0f) {
-		ROS_ERROR("Invalid scan data format");
+	if(scan2dMsg.angle_increment == 0.0f) {
 		return false;
 	}
 	if(scan2dMsg.range_min>scan2dMsg.range_max) {
-		ROS_ERROR("Invalid scan data format");
 		return false;
 	}
-	if((scan2dMsg.angleIncrement>0 && scan2dMsg.angleMax<scan2dMsg.angleMin) || (scan2dMsg.angleIncrement<0 && scan2dMsg.angleMax>scan2dMsg.angleMin)) {
-		ROS_ERROR("Invalid scan data format");
+	if((scan2dMsg.angle_increment>0 && scan2dMsg.angle_max<scan2dMsg.angle_min) || (scan2dMsg.angle_increment<0 && scan2dMsg.angle_max>scan2dMsg.angle_min)) {
 		return false;
 	}
 	
@@ -2773,7 +2767,7 @@ bool convertScan3dMsg(
 	// sync with odometry stamp
 	if(!odomFrameId.empty() && odomStamp != scan3dMsg.header.stamp)
 	{
-		rtabmap::Transform sensorT = getMovingTransform(
+		rtabmap::Transform sensorT = getTransform(
 				frameId,
 				odomFrameId,
 				odomStamp,
@@ -3117,18 +3111,18 @@ bool deskew_impl(
 	{
 		if(listener != 0)
 		{
-			firstPose = rtabmap_conversions::getMovingTransform(
+			firstPose = rtabmap_conversions::getTransform(
 					input.header.frame_id,
 					fixedFrameId,
-					input.header.stamp,
 					firstStamp,
+					input.header.stamp,
 					*listener,
 					0);
-			lastPose = rtabmap_conversions::getMovingTransform(
+			lastPose = rtabmap_conversions::getTransform(
 					input.header.frame_id,
 					fixedFrameId,
-					input.header.stamp,
 					lastStamp,
+					input.header.stamp,
 					*listener,
 					0);
 		}
@@ -3214,11 +3208,11 @@ bool deskew_impl(
 			}
 			else
 			{
-				transform = rtabmap_conversions::getMovingTransform(
+				transform = rtabmap_conversions::getTransform(
 						output.header.frame_id,
 						fixedFrameId,
-						output.header.stamp,
 						stamp,
+						output.header.stamp,
 						*listener,
 						0);
 				if(transform.isNull())
@@ -3293,11 +3287,11 @@ bool deskew_impl(
 			}
 			else
 			{
-				transform = rtabmap_conversions::getMovingTransform(
+				transform = rtabmap_conversions::getTransform(
 						output.header.frame_id,
 						fixedFrameId,
-						output.header.stamp,
 						stamp,
+						output.header.stamp,
 						*listener,
 						0);
 				if(transform.isNull())
