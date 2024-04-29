@@ -360,7 +360,7 @@ private:
 		if(deskewing_ && (!guessFrameId().empty() || (frameId().compare(scanMsg->header.frame_id) != 0)))
 		{
 			// make sure the frame of the laser is updated during the whole scan time
-			rtabmap::Transform tmpT = rtabmap_conversions::getTransform(
+			rtabmap::Transform tmpT = rtabmap_conversions::getMovingTransform(
 					scanMsg->header.frame_id,
 					guessFrameId().empty()?frameId():guessFrameId(),
 					scanMsg->header.stamp,

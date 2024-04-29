@@ -29,6 +29,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "nodelet/loader.h"
 #include <rtabmap/utilite/ULogger.h>
 #include <rtabmap/core/Parameters.h>
+#ifdef RTABMAP_PYTHON
+#include <rtabmap/core/PythonInterface.h>
+#endif
 
 int main(int argc, char **argv)
 {
@@ -68,6 +71,10 @@ int main(int argc, char **argv)
 		}
 		nargv.push_back(argv[i]);
 	}
+
+#ifdef RTABMAP_PYTHON
+	rtabmap::PythonInterface pythonInterface;
+#endif
 
 	nodelet::Loader nodelet;
 	nodelet::M_string remap(ros::names::getRemappings());
