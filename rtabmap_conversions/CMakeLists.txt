@@ -7,7 +7,7 @@ find_package(catkin REQUIRED COMPONENTS
              image_geometry rtabmap_msgs
 )
 
-find_package(RTABMap 0.21.4 REQUIRED)
+find_package(RTABMap 0.21.5 REQUIRED)
 
 catkin_package(
   INCLUDE_DIRS include
