@@ -30,7 +30,7 @@
   <depend>message_filters</depend>
   <depend>rtabmap_msgs</depend>
   <depend>rtabmap_conversions</depend>
-  <depend>grid_map_ros</depend>
+<!--  <depend>grid_map_ros</depend> # Uncommment when available in jazzy -->
 
   <export>
 	<build_type>ament_cmake</build_type>

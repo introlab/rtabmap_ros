@@ -21,7 +21,7 @@
   <exec_depend>rtabmap_viz</exec_depend>
   <exec_depend>imu_filter_madgwick</exec_depend>
   <exec_depend>tf2_ros</exec_depend>
-  <exec_depend>realsense2_camera</exec_depend>
+<!--  <exec_depend>realsense2_camera</exec_depend> # Uncommment when available in jazzy -->
   <exec_depend>velodyne</exec_depend>
   
   <export>

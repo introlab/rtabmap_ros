@@ -15,7 +15,7 @@
   <depend>cv_bridge</depend>
   <depend>geometry_msgs</depend>
   <depend>nav_msgs</depend>
-  <depend>nav2_msgs</depend>
+<!--  <depend>nav2_msgs</depend> # Uncommment when available in jazzy -->
   <depend>rclcpp</depend>
   <depend>rclcpp_components</depend>
   <depend>sensor_msgs</depend>

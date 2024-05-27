@@ -17,7 +17,7 @@
   <exec_depend>rtabmap_util</exec_depend>
   <exec_depend>rtabmap_rviz_plugins</exec_depend>
   <exec_depend>rtabmap_viz</exec_depend>
-  <exec_depend>nav2_bringup</exec_depend>
+<!--  <exec_depend>nav2_bringup</exec_depend> # Uncommment when available in jazzy -->
   
   <export>
     <build_type>ament_cmake</build_type>
