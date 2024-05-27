@@ -2,7 +2,7 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>rtabmap_ros</name>
-  <version>0.21.4</version>
+  <version>0.21.5</version>
   <description>
     RTAB-Map Stack
   </description>
