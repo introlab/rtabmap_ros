@@ -289,11 +289,11 @@ void PointCloudAggregator::combineClouds(const std::vector<sensor_msgs::msg::Poi
 			   cloudMsgs[0]->header.stamp != cloudMsgs[i]->header.stamp)
 			{
 				// approx sync
-				cloudDisplacement = rtabmap_conversions::getTransform(
+				cloudDisplacement = rtabmap_conversions::getMovingTransform(
 						frameId, //sourceTargetFrame
 						fixedFrameId_, //fixedFrame
-						cloudMsgs[i]->header.stamp, //stampSource
 						cloudMsgs[0]->header.stamp, //stampTarget
+						cloudMsgs[i]->header.stamp, //stampSource
 						*tfBuffer_,
 						waitForTransform_);
 			}
