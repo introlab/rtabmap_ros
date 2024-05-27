@@ -212,8 +212,8 @@ rtabmap::Transform getTransform(
 rtabmap::Transform getMovingTransform(
 		const std::string & movingFrame,
 		const std::string & fixedFrame,
-		const ros::Time & stampFrom,
-		const ros::Time & stampTo,
+		const rclcpp::Time & stampFrom,
+		const rclcpp::Time & stampTo,
 		tf2_ros::Buffer & tfBuffer,
 		double waitForTransform);
 
