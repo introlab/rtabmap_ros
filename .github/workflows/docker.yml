@@ -22,18 +22,17 @@ jobs:
           docker_platforms: |
             linux/amd64
             linux/arm64
-#            linux/arm/v7
         - docker_tag: noetic
           docker_path: 'noetic'
           docker_platforms: |
             linux/amd64
             linux/arm64
-#            linux/arm/v7
         - docker_tag: noetic-latest
           docker_path: 'noetic/latest'
           docker_platforms: |
             linux/amd64
             linux/arm64
+            linux/arm/v7
     
     steps:
       -

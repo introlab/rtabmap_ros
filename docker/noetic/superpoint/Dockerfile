@@ -50,7 +50,7 @@ RUN apt update && \
 # Install ros dependencies
 RUN apt-get update && \
     apt upgrade -y && \
-    apt-get install -y git ros-noetic-ros-base python3-catkin-tools python3-rosdep build-essential ros-noetic-rtabmap-ros ros-noetic-pybind11-catkin && \
+    apt-get install -y git ros-noetic-ros-base python3-catkin-tools python3-rosdep build-essential ros-noetic-rtabmap-ros ros-noetic-pybind11-catkin ros-noetic-image-transport-plugins ros-noetic-stereo-image-proc && \
     apt-get remove -y ros-noetic-rtabmap && \
     rosdep init && \
     apt-get clean && rm -rf /var/lib/apt/lists/
