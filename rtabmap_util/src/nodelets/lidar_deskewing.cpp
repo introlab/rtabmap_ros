@@ -51,7 +51,7 @@ LidarDeskewing::~LidarDeskewing()
 void LidarDeskewing::callbackScan(const sensor_msgs::msg::LaserScan::ConstSharedPtr msg)
 {
 	// make sure the frame of the laser is updated during the whole scan time
-	rtabmap::Transform tmpT = rtabmap_conversions::getTransform(
+	rtabmap::Transform tmpT = rtabmap_conversions::getMovingTransform(
 			msg->header.frame_id,
 			fixedFrameId_,
 			msg->header.stamp,
