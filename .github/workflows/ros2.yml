@@ -17,19 +17,20 @@ jobs:
     # well on Windows or Mac.  You can convert this to a matrix build if you need
     # cross-platform coverage.
     # See: https://docs.github.com/en/free-pro-team@latest/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
-    name: Build on ros2 ${{ matrix.ros_distro }} and ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+    name: Build on ros2 ${{ matrix.ros_distro }} and ${{ matrix.docker_image }}
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         ros_distro: [humble, iron, jazzy]
         include:
         - ros_distro: 'humble'
-          os: ubuntu-22.04
+          docker_image: ubuntu:jammy
         - ros_distro: 'iron'
-          os: ubuntu-22.04
+          docker_image: ubuntu:jammy
         - ros_distro: 'jazzy'
-          os: ubuntu-24.04
-
+          docker_image: ubuntu:noble
+    container:
+      image: ${{ matrix.docker_image }}
     steps:   
     - uses: ros-tooling/setup-ros@v0.7
       with:
