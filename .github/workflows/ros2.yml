@@ -24,11 +24,11 @@ jobs:
         ros_distro: [humble, iron, jazzy]
         include:
         - ros_distro: 'humble'
-          docker_image: ubuntu:jammy
+          docker_image: rostooling/setup-ros-docker:ubuntu-jammy-ros-humble-desktop
         - ros_distro: 'iron'
-          docker_image: ubuntu:jammy
+          docker_image: rostooling/setup-ros-docker:ubuntu-jammy-ros-iron-desktop
         - ros_distro: 'jazzy'
-          docker_image: ubuntu:noble
+          docker_image: rostooling/setup-ros-docker:ubuntu-noble-ros-jazzy-desktop
       fail-fast: false
     container:
       image: ${{ matrix.docker_image }}
