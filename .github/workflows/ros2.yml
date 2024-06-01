@@ -38,7 +38,7 @@ jobs:
       with:
         required-ros-distributions: ${{ matrix.ros_distro }}
     - run: |
-        echo -e "repositories:\n  introlab/rtabmap:\n    type: git\n    url: https://github.com/introlab/rtabmap.git\n    version: master\n" > /tmp/deps.repos \
+        echo -e "repositories:\n  introlab/rtabmap:\n    type: git\n    url: https://github.com/introlab/rtabmap.git\n    version: master\n" > /tmp/deps.repos &&\
         cat /tmp/deps.repos
     - uses: ros-tooling/action-ros-ci@v0.3
       with:
