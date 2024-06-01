@@ -19,6 +19,7 @@ jobs:
     # See: https://docs.github.com/en/free-pro-team@latest/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
     name: Build on ros2 ${{ matrix.ros_distro }} and ${{ matrix.docker_image }}
     runs-on: ubuntu-latest
+    fail-fast: false
     strategy:
       matrix:
         ros_distro: [humble, iron, jazzy]
@@ -35,29 +36,8 @@ jobs:
     - uses: ros-tooling/setup-ros@v0.7
       with:
         required-ros-distributions: ${{ matrix.ros_distro }}
-                   
-    - name: Setup ros2 workspace
-      shell: /usr/bin/bash -e {0}
-      run: | 
-        source /opt/ros/${{ matrix.ros_distro }}/setup.bash
-        mkdir -p ${{github.workspace}}/ros2_ws/src
-        cd ${{github.workspace}}/ros2_ws
-        colcon build
-        
-    - uses: actions/checkout@v2
+
+    - uses: ros-tooling/action-ros-ci@v0.3
       with:
-        repository: 'introlab/rtabmap'
-        path: 'ros2_ws/src/rtabmap'
-        
-    - uses: actions/checkout@v2
-      with:
-        path: 'ros2_ws/src/rtabmap_ros'
-        
-    - name: colcon build
-      shell: /usr/bin/bash -e {0}
-      run: |
-        source /opt/ros/${{ matrix.ros_distro }}/setup.bash
-        cd ${{github.workspace}}/ros2_ws
-        rosdep update
-        rosdep install --from-paths src --ignore-src -r -y -t build_export -t test -t build -t buildtool_export -t buildtool
-        colcon build --event-handlers console_direct+
+        package-name: rtabmap_ros
+        target-ros2-distro: ${{ matrix.ros_distro }}
