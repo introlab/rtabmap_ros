@@ -36,7 +36,10 @@ jobs:
     - uses: ros-tooling/setup-ros@v0.7
       with:
         required-ros-distributions: ${{ matrix.ros_distro }}
+    - run: |
+        echo -e "- git:\n    local-name: rtabmap\n    uri: https://github.com/introlab/rtabmap.git\n    version: master" > /tmp/deps.repos
     - uses: ros-tooling/action-ros-ci@v0.3
       with:
         package-name: rtabmap_ros
         target-ros2-distro: ${{ matrix.ros_distro }}
+        vcs-repo-file-url: /tmp/deps.repos
