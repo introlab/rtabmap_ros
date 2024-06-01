@@ -19,7 +19,6 @@ jobs:
     # See: https://docs.github.com/en/free-pro-team@latest/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
     name: Build on ros2 ${{ matrix.ros_distro }} and ${{ matrix.docker_image }}
     runs-on: ubuntu-latest
-    fail-fast: false
     strategy:
       matrix:
         ros_distro: [humble, iron, jazzy]
@@ -30,13 +29,13 @@ jobs:
           docker_image: ubuntu:jammy
         - ros_distro: 'jazzy'
           docker_image: ubuntu:noble
+      fail-fast: false
     container:
       image: ${{ matrix.docker_image }}
     steps:   
     - uses: ros-tooling/setup-ros@v0.7
       with:
         required-ros-distributions: ${{ matrix.ros_distro }}
-
     - uses: ros-tooling/action-ros-ci@v0.3
       with:
         package-name: rtabmap_ros
