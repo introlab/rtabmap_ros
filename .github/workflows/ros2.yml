@@ -37,6 +37,7 @@ jobs:
         required-ros-distributions: ${{ matrix.ros_distro }}
                    
     - name: Setup ros2 workspace
+      shell: bash
       run: | 
         source /opt/ros/${{ matrix.ros_distro }}/setup.bash
         mkdir -p ${{github.workspace}}/ros2_ws/src
@@ -53,6 +54,7 @@ jobs:
         path: 'ros2_ws/src/rtabmap_ros'
         
     - name: colcon build
+      shell: bash
       run: |
         source /opt/ros/${{ matrix.ros_distro }}/setup.bash
         cd ${{github.workspace}}/ros2_ws
