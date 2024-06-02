@@ -13,6 +13,7 @@
     docker run -it --rm \
      --user $UID \
      -e ROS_HOME=/tmp/.ros \
+     -e OMP_WAIT_POLICY=passive \
      --network=host \
      --ipc=host \
      -v ~/.ros:/tmp/.ros \
@@ -35,6 +36,7 @@
       -e NVIDIA_VISIBLE_DEVICES=all \
       -e NVIDIA_DRIVER_CAPABILITIES=all \
       -e XAUTHORITY=$XAUTH \
+      -e OMP_WAIT_POLICY=passive \
       --user $UID \
       -e ROS_HOME=/tmp/.ros \
       -v ~/.ros:/tmp/.ros \

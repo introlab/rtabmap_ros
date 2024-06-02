@@ -16,14 +16,14 @@ namespace rtabmap_sync {
 class SyncDiagnostic {
     public:
         SyncDiagnostic(rclcpp::Node * node, double tolerance = 0.1, int windowSize = 5) :
-        	node_(node),
-			diagnosticUpdater_(node),
-            frequencyStatus_(diagnostic_updater::FrequencyStatusParam(&targetFrequency_, &targetFrequency_, tolerance)),
-			timeStampStatus_(diagnostic_updater::TimeStampStatusParam()),
-			compositeTask_("Sync status"),
-            lastCallbackCalledStamp_(rtabmap_conversions::timestampFromROS(node_->now())-1),
-            targetFrequency_(0.0),
-            windowSize_(windowSize)
+		node_(node),
+		diagnosticUpdater_(node),
+		frequencyStatus_(diagnostic_updater::FrequencyStatusParam(&targetFrequency_, &targetFrequency_, tolerance), node->get_clock()),
+		timeStampStatus_(diagnostic_updater::TimeStampStatusParam(), node->get_clock()),
+		compositeTask_("Sync status"),
+		lastCallbackCalledStamp_(rtabmap_conversions::timestampFromROS(node_->now())-1),
+		targetFrequency_(0.0),
+		windowSize_(windowSize)
     {
         UASSERT(windowSize_ >= 1);
     }
