@@ -161,6 +161,8 @@ private:
 
 		// StereoBM parameters
 		stereoBMParameters_ = rtabmap::Parameters::getDefaultParameters("StereoBM");
+		uInsert(stereoBMParameters_, rtabmap::Parameters::getDefaultParameters("StereoSGBM"));
+		stereoBMParameters_.insert(rtabmap::ParametersPair(rtabmap::Parameters::kStereoDenseStrategy(), uNumber2Str(rtabmap::Parameters::defaultStereoDenseStrategy())));
 		for(rtabmap::ParametersMap::iterator iter=stereoBMParameters_.begin(); iter!=stereoBMParameters_.end(); ++iter)
 		{
 			std::string vStr;
