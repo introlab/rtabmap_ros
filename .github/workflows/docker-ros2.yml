@@ -11,7 +11,7 @@ jobs:
     
     strategy:
       matrix:
-        docker_tag: [humble, humble-latest, iron, iron-latest]
+        docker_tag: [humble, humble-latest, iron, iron-latest, jazzy-latest]
         include:
         - docker_tag: humble
           docker_path: 'humble'
@@ -30,6 +30,16 @@ jobs:
           docker_path: 'iron/latest'
           docker_platforms: |
             linux/amd64
+# Re-add "jazzy" after binaries are released
+#        - docker_tag: jazzy
+#          docker_path: 'jazzy'
+#          docker_platforms: |
+#            linux/amd64
+        - docker_tag: jazzy-latest
+          docker_path: 'jazzy/latest'
+          docker_platforms: |
+            linux/amd64
+            linux/arm64
     
     steps:
       -
