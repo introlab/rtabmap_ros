@@ -37,7 +37,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <image_transport/image_transport.hpp>
 #include <image_transport/subscriber_filter.hpp>
 
+#ifdef PRE_ROS_IRON
 #include <cv_bridge/cv_bridge.h>
+#else
+#include <cv_bridge/cv_bridge.hpp>
+#endif
 #include <sensor_msgs/msg/image.hpp>
 #include <rtabmap_msgs/msg/rgbd_image.hpp>
 #include <rtabmap_msgs/msg/rgbd_images.hpp>

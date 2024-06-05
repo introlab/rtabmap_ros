@@ -29,7 +29,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <sensor_msgs/image_encodings.hpp>
 
+#ifdef PRE_ROS_IRON
 #include <image_geometry/stereo_camera_model.h>
+#else
+#include <image_geometry/stereo_camera_model.hpp>
+#endif
 
 #include "rtabmap_conversions/MsgConversion.h"
 #include <rtabmap_msgs/msg/rgbd_images.hpp>

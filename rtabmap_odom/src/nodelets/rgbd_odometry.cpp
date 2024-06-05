@@ -27,7 +27,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <rtabmap_odom/rgbd_odometry.hpp>
 
+#ifdef PRE_ROS_IRON
 #include <image_geometry/stereo_camera_model.h>
+#else
+#include <image_geometry/stereo_camera_model.hpp>
+#endif
 
 #include <sensor_msgs/image_encodings.hpp>
 

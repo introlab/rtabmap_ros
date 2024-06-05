@@ -14,7 +14,6 @@ find_package(ament_cmake REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
-find_package(nav2_msgs REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_components REQUIRED)
@@ -28,12 +27,9 @@ find_package(rtabmap_msgs REQUIRED)
 find_package(rtabmap_util REQUIRED)
 find_package(rtabmap_sync REQUIRED)
 
-IF(${nav2_msgs_VERSION_MAJOR} EQUAL 0)
-   ADD_DEFINITIONS("-DNAV_MSGS_FOXY")
-ENDIF()
-
 #optional
 find_package(apriltag_msgs)
+find_package(nav2_msgs)
 
 IF(WIN32)
 add_compile_options(-bigobj)
@@ -48,7 +44,6 @@ SET(Libraries
    cv_bridge
    geometry_msgs
    nav_msgs
-   nav2_msgs
    rclcpp
    rclcpp_components
    sensor_msgs
@@ -79,6 +74,19 @@ SET(Libraries
    apriltag_msgs
 )
 ENDIF(apriltag_msgs_FOUND)
+
+# If nav2_msgs is found, add definition
+IF(nav2_msgs_FOUND)
+MESSAGE(STATUS "WITH nav2_msgs")
+ADD_DEFINITIONS("-DWITH_NAV2_MSGS")
+SET(Libraries
+   ${Libraries}
+   nav2_msgs
+)
+IF(${nav2_msgs_VERSION_MAJOR} EQUAL 0)
+   ADD_DEFINITIONS("-DNAV_MSGS_FOXY")
+ENDIF()
+ENDIF(nav2_msgs_FOUND)
 
 ############################
 ## Declare a cpp library
