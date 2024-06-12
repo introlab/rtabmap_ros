@@ -162,27 +162,27 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 	if(subscribeInfoOnly)
 	{
 		ROS_INFO("subscribe_info_only=true");
-		infoOnlyTopic_ = nh.subscribe("info", 1, &GuiWrapper::infoCallback, this);
+		infoOnlyTopic_ = nh.subscribe("info", this->getTopicQueueSize(), &GuiWrapper::infoCallback, this);
 	}
 	else
 	{
-		infoTopic_.subscribe(nh, "info", 1);
-		mapDataTopic_.subscribe(nh, "mapData", 1);
+		infoTopic_.subscribe(nh, "info", this->getTopicQueueSize());
+		mapDataTopic_.subscribe(nh, "mapData", this->getTopicQueueSize());
 		infoMapSync_ = new message_filters::Synchronizer<MyInfoMapSyncPolicy>(
-				MyInfoMapSyncPolicy(this->getQueueSize()),
+				MyInfoMapSyncPolicy(this->getSyncQueueSize()),
 				infoTopic_,
 				mapDataTopic_);
 		infoMapSync_->registerCallback(boost::bind(&GuiWrapper::infoMapCallback, this, boost::placeholders::_1, boost::placeholders::_2));
 	}
 
-	goalTopic_.subscribe(nh, "goal_node", 1);
-	pathTopic_.subscribe(nh, "global_path", 1);
+	goalTopic_.subscribe(nh, "goal_node", this->getTopicQueueSize());
+	pathTopic_.subscribe(nh, "global_path", this->getTopicQueueSize());
 	goalPathSync_ = new message_filters::Synchronizer<MyGoalPathSyncPolicy>(
-			MyGoalPathSyncPolicy(this->getQueueSize()),
+			MyGoalPathSyncPolicy(this->getSyncQueueSize()),
 			goalTopic_,
 			pathTopic_);
 	goalPathSync_->registerCallback(boost::bind(&GuiWrapper::goalPathCallback, this, boost::placeholders::_1, boost::placeholders::_2));
-	goalReachedTopic_ = nh.subscribe("goal_reached", 1, &GuiWrapper::goalReachedCallback, this);
+	goalReachedTopic_ = nh.subscribe("goal_reached", this->getTopicQueueSize(), &GuiWrapper::goalReachedCallback, this);
 
 	setupCallbacks(nh, pnh, ros::this_node::getName()); // do it at the end
 }

@@ -72,7 +72,8 @@ public:
 		exactScanSync_(0),
 		approxCloudSync_(0),
 		exactCloudSync_(0),
-		queueSize_(5),
+		queueSize_(1),
+		syncQueueSize_(5),
 		keepColor_(false),
 		scanCloudMaxPoints_(0),
 		scanVoxelSize_(0.0),
@@ -113,7 +114,19 @@ private:
 		double approxSyncMaxInterval = 0.0;
 		pnh.param("approx_sync", approxSync, approxSync);
 		pnh.param("approx_sync_max_interval", approxSyncMaxInterval, approxSyncMaxInterval);
-		pnh.param("queue_size", queueSize_, queueSize_);
+		pnh.param("topic_queue_size", queueSize_, queueSize_);
+		if(pnh.hasParam("queue_size") && !pnh.hasParam("sync_queue_size"))
+		{
+			pnh.param("queue_size", syncQueueSize_, syncQueueSize_);
+			ROS_WARN("Parameter \"queue_size\" has been renamed "
+					"to \"sync_queue_size\" and will be removed "
+					"in future versions! The value (%d) is still copied to "
+					"\"sync_queue_size\".", syncQueueSize_);
+		}
+		else
+		{
+			pnh.param("sync_queue_size", syncQueueSize_, syncQueueSize_);
+		}
 		pnh.param("subscribe_scan_cloud", subscribeScanCloud, subscribeScanCloud);
 		pnh.param("scan_cloud_max_points",  scanCloudMaxPoints_, scanCloudMaxPoints_);
 		pnh.param("scan_voxel_size", scanVoxelSize_, scanVoxelSize_);
@@ -130,7 +143,8 @@ private:
 		NODELET_INFO("RGBDIcpOdometry: approx_sync           = %s", approxSync?"true":"false");
 		if(approxSync)
 			NODELET_INFO("RGBDIcpOdometry: approx_sync_max_interval = %f", approxSyncMaxInterval);
-		NODELET_INFO("RGBDIcpOdometry: queue_size            = %d", queueSize_);
+		NODELET_INFO("RGBDIcpOdometry: topic_queue_size      = %d", queueSize_);
+		NODELET_INFO("RGBDIcpOdometry: sync_queue_size       = %d", syncQueueSize_);
 		NODELET_INFO("RGBDIcpOdometry: subscribe_scan_cloud  = %s", subscribeScanCloud?"true":"false");
 		NODELET_INFO("RGBDIcpOdometry: scan_cloud_max_points = %d", scanCloudMaxPoints_);
 		NODELET_INFO("RGBDIcpOdometry: scan_voxel_size       = %f", scanVoxelSize_);
@@ -147,24 +161,24 @@ private:
 		image_transport::TransportHints hintsRgb("raw", ros::TransportHints(), rgb_pnh);
 		image_transport::TransportHints hintsDepth("raw", ros::TransportHints(), depth_pnh);
 
-		image_mono_sub_.subscribe(rgb_it, rgb_nh.resolveName("image"), 1, hintsRgb);
-		image_depth_sub_.subscribe(depth_it, depth_nh.resolveName("image"), 1, hintsDepth);
-		info_sub_.subscribe(rgb_nh, "camera_info", 1);
+		image_mono_sub_.subscribe(rgb_it, rgb_nh.resolveName("image"), queueSize_, hintsRgb);
+		image_depth_sub_.subscribe(depth_it, depth_nh.resolveName("image"), queueSize_, hintsDepth);
+		info_sub_.subscribe(rgb_nh, "camera_info", queueSize_);
 
 		std::string subscribedTopicsMsg;
 		if(subscribeScanCloud)
 		{
-			cloud_sub_.subscribe(nh, "scan_cloud", 1);
+			cloud_sub_.subscribe(nh, "scan_cloud", queueSize_);
 			if(approxSync)
 			{
-				approxCloudSync_ = new message_filters::Synchronizer<MyApproxCloudSyncPolicy>(MyApproxCloudSyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_, cloud_sub_);
+				approxCloudSync_ = new message_filters::Synchronizer<MyApproxCloudSyncPolicy>(MyApproxCloudSyncPolicy(syncQueueSize_), image_mono_sub_, image_depth_sub_, info_sub_, cloud_sub_);
 				if(approxSyncMaxInterval > 0.0)
 					approxCloudSync_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
 				approxCloudSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackCloud, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 			}
 			else
 			{
-				exactCloudSync_ = new message_filters::Synchronizer<MyExactCloudSyncPolicy>(MyExactCloudSyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_, cloud_sub_);
+				exactCloudSync_ = new message_filters::Synchronizer<MyExactCloudSyncPolicy>(MyExactCloudSyncPolicy(syncQueueSize_), image_mono_sub_, image_depth_sub_, info_sub_, cloud_sub_);
 				exactCloudSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackCloud, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 			}
 
@@ -179,17 +193,17 @@ private:
 		}
 		else
 		{
-			scan_sub_.subscribe(nh, "scan", 1);
+			scan_sub_.subscribe(nh, "scan", queueSize_);
 			if(approxSync)
 			{
-				approxScanSync_ = new message_filters::Synchronizer<MyApproxScanSyncPolicy>(MyApproxScanSyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_, scan_sub_);
+				approxScanSync_ = new message_filters::Synchronizer<MyApproxScanSyncPolicy>(MyApproxScanSyncPolicy(syncQueueSize_), image_mono_sub_, image_depth_sub_, info_sub_, scan_sub_);
 				if(approxSyncMaxInterval > 0.0)
 					approxScanSync_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
 				approxScanSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackScan, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 			}
 			else
 			{
-				exactScanSync_ = new message_filters::Synchronizer<MyExactScanSyncPolicy>(MyExactScanSyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_, scan_sub_);
+				exactScanSync_ = new message_filters::Synchronizer<MyExactScanSyncPolicy>(MyExactScanSyncPolicy(syncQueueSize_), image_mono_sub_, image_depth_sub_, info_sub_, scan_sub_);
 				exactScanSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackScan, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 			}
 
@@ -460,25 +474,25 @@ protected:
 		if(approxScanSync_)
 		{
 			delete approxScanSync_;
-			approxScanSync_ = new message_filters::Synchronizer<MyApproxScanSyncPolicy>(MyApproxScanSyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_, scan_sub_);
+			approxScanSync_ = new message_filters::Synchronizer<MyApproxScanSyncPolicy>(MyApproxScanSyncPolicy(syncQueueSize_), image_mono_sub_, image_depth_sub_, info_sub_, scan_sub_);
 			approxScanSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackScan, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 		}
 		if(exactScanSync_)
 		{
 			delete exactScanSync_;
-			exactScanSync_ = new message_filters::Synchronizer<MyExactScanSyncPolicy>(MyExactScanSyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_, scan_sub_);
+			exactScanSync_ = new message_filters::Synchronizer<MyExactScanSyncPolicy>(MyExactScanSyncPolicy(syncQueueSize_), image_mono_sub_, image_depth_sub_, info_sub_, scan_sub_);
 			exactScanSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackScan, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 		}
 		if(approxCloudSync_)
 		{
 			delete approxCloudSync_;
-			approxCloudSync_ = new message_filters::Synchronizer<MyApproxCloudSyncPolicy>(MyApproxCloudSyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_, cloud_sub_);
+			approxCloudSync_ = new message_filters::Synchronizer<MyApproxCloudSyncPolicy>(MyApproxCloudSyncPolicy(syncQueueSize_), image_mono_sub_, image_depth_sub_, info_sub_, cloud_sub_);
 			approxCloudSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackCloud, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 		}
 		if(exactCloudSync_)
 		{
 			delete exactCloudSync_;
-			exactCloudSync_ = new message_filters::Synchronizer<MyExactCloudSyncPolicy>(MyExactCloudSyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_, cloud_sub_);
+			exactCloudSync_ = new message_filters::Synchronizer<MyExactCloudSyncPolicy>(MyExactCloudSyncPolicy(syncQueueSize_), image_mono_sub_, image_depth_sub_, info_sub_, cloud_sub_);
 			exactCloudSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackCloud, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 		}
 	}
@@ -498,6 +512,7 @@ private:
 	typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo, sensor_msgs::PointCloud2> MyExactCloudSyncPolicy;
 	message_filters::Synchronizer<MyExactCloudSyncPolicy> * exactCloudSync_;
 	int queueSize_;
+	int syncQueueSize_;
 	bool keepColor_;
 	int scanCloudMaxPoints_;
 	double scanVoxelSize_;

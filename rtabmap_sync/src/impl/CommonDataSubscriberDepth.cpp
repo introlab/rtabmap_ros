@@ -463,9 +463,7 @@ void CommonDataSubscriber::setupDepthCallbacks(
 		bool subscribeScan2d,
 		bool subscribeScan3d,
 		bool subscribeScanDesc,
-		bool subscribeOdomInfo,
-		int queueSize,
-		bool approxSync)
+		bool subscribeOdomInfo)
 {
 	ROS_INFO("Setup depth callback");
 
@@ -480,195 +478,195 @@ void CommonDataSubscriber::setupDepthCallbacks(
 	image_transport::TransportHints hintsRgb("raw", ros::TransportHints(), rgb_pnh);
 	image_transport::TransportHints hintsDepth("raw", ros::TransportHints(), depth_pnh);
 
-	imageSub_.subscribe(rgb_it, rgb_nh.resolveName("image"), queueSize, hintsRgb);
-	imageDepthSub_.subscribe(depth_it, depth_nh.resolveName("image"), queueSize, hintsDepth);
-	cameraInfoSub_.subscribe(rgb_nh, "camera_info", queueSize);
+	imageSub_.subscribe(rgb_it, rgb_nh.resolveName("image"), topicQueueSize_, hintsRgb);
+	imageDepthSub_.subscribe(depth_it, depth_nh.resolveName("image"), topicQueueSize_, hintsDepth);
+	cameraInfoSub_.subscribe(rgb_nh, "camera_info", topicQueueSize_);
 
 #ifdef RTABMAP_SYNC_USER_DATA
 	if(subscribeOdom && subscribeUserData)
 	{
-		odomSub_.subscribe(nh, "odom", queueSize);
-		userDataSub_.subscribe(nh, "user_data", queueSize);
+		odomSub_.subscribe(nh, "odom", topicQueueSize_);
+		userDataSub_.subscribe(nh, "user_data", topicQueueSize_);
 
 		if(subscribeScanDesc)
 		{
 			subscribedToScanDescriptor_ = true;
-			scanDescSub_.subscribe(nh, "scan_descriptor", queueSize);
+			scanDescSub_.subscribe(nh, "scan_descriptor", topicQueueSize_);
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-				SYNC_DECL7(CommonDataSubscriber, depthOdomDataScanDescInfo, approxSync, queueSize, odomSub_, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scanDescSub_, odomInfoSub_);
+				odomInfoSub_.subscribe(nh, "odom_info", topicQueueSize_);
+				SYNC_DECL7(CommonDataSubscriber, depthOdomDataScanDescInfo, approxSync_, syncQueueSize_, odomSub_, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scanDescSub_, odomInfoSub_);
 			}
 			else
 			{
-				SYNC_DECL6(CommonDataSubscriber, depthOdomDataScanDesc, approxSync, queueSize, odomSub_, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scanDescSub_);
+				SYNC_DECL6(CommonDataSubscriber, depthOdomDataScanDesc, approxSync_, syncQueueSize_, odomSub_, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scanDescSub_);
 			}
 		}
 		else if(subscribeScan2d)
 		{
 			subscribedToScan2d_ = true;
-			scanSub_.subscribe(nh, "scan", queueSize);
+			scanSub_.subscribe(nh, "scan", topicQueueSize_);
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-				SYNC_DECL7(CommonDataSubscriber, depthOdomDataScan2dInfo, approxSync, queueSize, odomSub_, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scanSub_, odomInfoSub_);
+				odomInfoSub_.subscribe(nh, "odom_info", topicQueueSize_);
+				SYNC_DECL7(CommonDataSubscriber, depthOdomDataScan2dInfo, approxSync_, syncQueueSize_, odomSub_, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scanSub_, odomInfoSub_);
 			}
 			else
 			{
-				SYNC_DECL6(CommonDataSubscriber, depthOdomDataScan2d, approxSync, queueSize, odomSub_, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scanSub_);
+				SYNC_DECL6(CommonDataSubscriber, depthOdomDataScan2d, approxSync_, syncQueueSize_, odomSub_, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scanSub_);
 			}
 		}
 		else if(subscribeScan3d)
 		{
 			subscribedToScan3d_ = true;
-			scan3dSub_.subscribe(nh, "scan_cloud", queueSize);
+			scan3dSub_.subscribe(nh, "scan_cloud", topicQueueSize_);
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-				SYNC_DECL7(CommonDataSubscriber, depthOdomDataScan3dInfo, approxSync, queueSize, odomSub_, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scan3dSub_, odomInfoSub_);
+				odomInfoSub_.subscribe(nh, "odom_info", topicQueueSize_);
+				SYNC_DECL7(CommonDataSubscriber, depthOdomDataScan3dInfo, approxSync_, syncQueueSize_, odomSub_, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scan3dSub_, odomInfoSub_);
 			}
 			else
 			{
-				SYNC_DECL6(CommonDataSubscriber, depthOdomDataScan3d, approxSync, queueSize, odomSub_, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scan3dSub_);
+				SYNC_DECL6(CommonDataSubscriber, depthOdomDataScan3d, approxSync_, syncQueueSize_, odomSub_, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scan3dSub_);
 			}
 		}
 		else if(subscribeOdomInfo)
 		{
 			subscribedToOdomInfo_ = true;
-			odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-			SYNC_DECL6(CommonDataSubscriber, depthOdomDataInfo, approxSync, queueSize, odomSub_, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, odomInfoSub_);
+			odomInfoSub_.subscribe(nh, "odom_info", topicQueueSize_);
+			SYNC_DECL6(CommonDataSubscriber, depthOdomDataInfo, approxSync_, syncQueueSize_, odomSub_, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, odomInfoSub_);
 		}
 		else
 		{
-			SYNC_DECL5(CommonDataSubscriber, depthOdomData, approxSync, queueSize, odomSub_, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_);
+			SYNC_DECL5(CommonDataSubscriber, depthOdomData, approxSync_, syncQueueSize_, odomSub_, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_);
 		}
 	}
 	else 
 #endif
 	if(subscribeOdom)
 	{
-		odomSub_.subscribe(nh, "odom", queueSize);
+		odomSub_.subscribe(nh, "odom", topicQueueSize_);
 
 		if(subscribeScanDesc)
 		{
 			subscribedToScanDescriptor_ = true;
-			scanDescSub_.subscribe(nh, "scan_descriptor", queueSize);
+			scanDescSub_.subscribe(nh, "scan_descriptor", topicQueueSize_);
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-				SYNC_DECL6(CommonDataSubscriber, depthOdomScanDescInfo, approxSync, queueSize, odomSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scanDescSub_, odomInfoSub_);
+				odomInfoSub_.subscribe(nh, "odom_info", topicQueueSize_);
+				SYNC_DECL6(CommonDataSubscriber, depthOdomScanDescInfo, approxSync_, syncQueueSize_, odomSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scanDescSub_, odomInfoSub_);
 			}
 			else
 			{
-				SYNC_DECL5(CommonDataSubscriber, depthOdomScanDesc, approxSync, queueSize, odomSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scanDescSub_);
+				SYNC_DECL5(CommonDataSubscriber, depthOdomScanDesc, approxSync_, syncQueueSize_, odomSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scanDescSub_);
 			}
 		}
 		else if(subscribeScan2d)
 		{
 			subscribedToScan2d_ = true;
-			scanSub_.subscribe(nh, "scan", queueSize);
+			scanSub_.subscribe(nh, "scan", topicQueueSize_);
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-				SYNC_DECL6(CommonDataSubscriber, depthOdomScan2dInfo, approxSync, queueSize, odomSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scanSub_, odomInfoSub_);
+				odomInfoSub_.subscribe(nh, "odom_info", topicQueueSize_);
+				SYNC_DECL6(CommonDataSubscriber, depthOdomScan2dInfo, approxSync_, syncQueueSize_, odomSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scanSub_, odomInfoSub_);
 			}
 			else
 			{
-				SYNC_DECL5(CommonDataSubscriber, depthOdomScan2d, approxSync, queueSize, odomSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scanSub_);
+				SYNC_DECL5(CommonDataSubscriber, depthOdomScan2d, approxSync_, syncQueueSize_, odomSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scanSub_);
 			}
 		}
 		else if(subscribeScan3d)
 		{
 			subscribedToScan3d_ = true;
-			scan3dSub_.subscribe(nh, "scan_cloud", queueSize);
+			scan3dSub_.subscribe(nh, "scan_cloud", topicQueueSize_);
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-				SYNC_DECL6(CommonDataSubscriber, depthOdomScan3dInfo, approxSync, queueSize, odomSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scan3dSub_, odomInfoSub_);
+				odomInfoSub_.subscribe(nh, "odom_info", topicQueueSize_);
+				SYNC_DECL6(CommonDataSubscriber, depthOdomScan3dInfo, approxSync_, syncQueueSize_, odomSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scan3dSub_, odomInfoSub_);
 			}
 			else
 			{
-				SYNC_DECL5(CommonDataSubscriber, depthOdomScan3d, approxSync, queueSize, odomSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scan3dSub_);
+				SYNC_DECL5(CommonDataSubscriber, depthOdomScan3d, approxSync_, syncQueueSize_, odomSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scan3dSub_);
 			}
 		}
 		else if(subscribeOdomInfo)
 		{
 			subscribedToOdomInfo_ = true;
-			odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-			SYNC_DECL5(CommonDataSubscriber, depthOdomInfo, approxSync, queueSize, odomSub_, imageSub_, imageDepthSub_, cameraInfoSub_, odomInfoSub_);
+			odomInfoSub_.subscribe(nh, "odom_info", topicQueueSize_);
+			SYNC_DECL5(CommonDataSubscriber, depthOdomInfo, approxSync_, syncQueueSize_, odomSub_, imageSub_, imageDepthSub_, cameraInfoSub_, odomInfoSub_);
 		}
 		else
 		{
-			SYNC_DECL4(CommonDataSubscriber, depthOdom, approxSync, queueSize, odomSub_, imageSub_, imageDepthSub_, cameraInfoSub_);
+			SYNC_DECL4(CommonDataSubscriber, depthOdom, approxSync_, syncQueueSize_, odomSub_, imageSub_, imageDepthSub_, cameraInfoSub_);
 		}
 	}
 #ifdef RTABMAP_SYNC_USER_DATA
 	else if(subscribeUserData)
 	{
-		userDataSub_.subscribe(nh, "user_data", queueSize);
+		userDataSub_.subscribe(nh, "user_data", topicQueueSize_);
 
 		if(subscribeScanDesc)
 		{
 			subscribedToScanDescriptor_ = true;
-			scanDescSub_.subscribe(nh, "scan_descriptor", queueSize);
+			scanDescSub_.subscribe(nh, "scan_descriptor", topicQueueSize_);
 
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-				SYNC_DECL6(CommonDataSubscriber, depthDataScanDescInfo, approxSync, queueSize, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scanDescSub_, odomInfoSub_);
+				odomInfoSub_.subscribe(nh, "odom_info", topicQueueSize_);
+				SYNC_DECL6(CommonDataSubscriber, depthDataScanDescInfo, approxSync_, syncQueueSize_, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scanDescSub_, odomInfoSub_);
 			}
 			else
 			{
-				SYNC_DECL5(CommonDataSubscriber, depthDataScanDesc, approxSync, queueSize, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scanDescSub_);
+				SYNC_DECL5(CommonDataSubscriber, depthDataScanDesc, approxSync_, syncQueueSize_, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scanDescSub_);
 			}
 		}
 		else if(subscribeScan2d)
 		{
 			subscribedToScan2d_ = true;
-			scanSub_.subscribe(nh, "scan", queueSize);
+			scanSub_.subscribe(nh, "scan", topicQueueSize_);
 
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-				SYNC_DECL6(CommonDataSubscriber, depthDataScan2dInfo, approxSync, queueSize, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scanSub_, odomInfoSub_);
+				odomInfoSub_.subscribe(nh, "odom_info", topicQueueSize_);
+				SYNC_DECL6(CommonDataSubscriber, depthDataScan2dInfo, approxSync_, syncQueueSize_, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scanSub_, odomInfoSub_);
 			}
 			else
 			{
-				SYNC_DECL5(CommonDataSubscriber, depthDataScan2d, approxSync, queueSize, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scanSub_);
+				SYNC_DECL5(CommonDataSubscriber, depthDataScan2d, approxSync_, syncQueueSize_, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scanSub_);
 			}
 		}
 		else if(subscribeScan3d)
 		{
 			subscribedToScan3d_ = true;
-			scan3dSub_.subscribe(nh, "scan_cloud", queueSize);
+			scan3dSub_.subscribe(nh, "scan_cloud", topicQueueSize_);
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-				SYNC_DECL6(CommonDataSubscriber, depthDataScan3dInfo, approxSync, queueSize, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scan3dSub_, odomInfoSub_);
+				odomInfoSub_.subscribe(nh, "odom_info", topicQueueSize_);
+				SYNC_DECL6(CommonDataSubscriber, depthDataScan3dInfo, approxSync_, syncQueueSize_, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scan3dSub_, odomInfoSub_);
 			}
 			else
 			{
-				SYNC_DECL5(CommonDataSubscriber, depthDataScan3d, approxSync, queueSize, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scan3dSub_);
+				SYNC_DECL5(CommonDataSubscriber, depthDataScan3d, approxSync_, syncQueueSize_, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, scan3dSub_);
 			}
 		}
 		else if(subscribeOdomInfo)
 		{
 			subscribedToOdomInfo_ = true;
-			odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-			SYNC_DECL5(CommonDataSubscriber, depthDataInfo, approxSync, queueSize, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, odomInfoSub_);
+			odomInfoSub_.subscribe(nh, "odom_info", topicQueueSize_);
+			SYNC_DECL5(CommonDataSubscriber, depthDataInfo, approxSync_, syncQueueSize_, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_, odomInfoSub_);
 		}
 		else
 		{
-			SYNC_DECL4(CommonDataSubscriber, depthData, approxSync, queueSize, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_);
+			SYNC_DECL4(CommonDataSubscriber, depthData, approxSync_, syncQueueSize_, userDataSub_, imageSub_, imageDepthSub_, cameraInfoSub_);
 		}
 	}
 #endif
@@ -677,57 +675,57 @@ void CommonDataSubscriber::setupDepthCallbacks(
 		if(subscribeScanDesc)
 		{
 			subscribedToScanDescriptor_ = true;
-			scanDescSub_.subscribe(nh, "scan_descriptor", queueSize);
+			scanDescSub_.subscribe(nh, "scan_descriptor", topicQueueSize_);
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-				SYNC_DECL5(CommonDataSubscriber, depthScanDescInfo, approxSync, queueSize, imageSub_, imageDepthSub_, cameraInfoSub_, scanDescSub_, odomInfoSub_);
+				odomInfoSub_.subscribe(nh, "odom_info", topicQueueSize_);
+				SYNC_DECL5(CommonDataSubscriber, depthScanDescInfo, approxSync_, syncQueueSize_, imageSub_, imageDepthSub_, cameraInfoSub_, scanDescSub_, odomInfoSub_);
 			}
 			else
 			{
-				SYNC_DECL4(CommonDataSubscriber, depthScanDesc, approxSync, queueSize, imageSub_, imageDepthSub_, cameraInfoSub_, scanDescSub_);
+				SYNC_DECL4(CommonDataSubscriber, depthScanDesc, approxSync_, syncQueueSize_, imageSub_, imageDepthSub_, cameraInfoSub_, scanDescSub_);
 			}
 		}
 		else if(subscribeScan2d)
 		{
 			subscribedToScan2d_ = true;
-			scanSub_.subscribe(nh, "scan", queueSize);
+			scanSub_.subscribe(nh, "scan", topicQueueSize_);
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-				SYNC_DECL5(CommonDataSubscriber, depthScan2dInfo, approxSync, queueSize, imageSub_, imageDepthSub_, cameraInfoSub_, scanSub_, odomInfoSub_);
+				odomInfoSub_.subscribe(nh, "odom_info", topicQueueSize_);
+				SYNC_DECL5(CommonDataSubscriber, depthScan2dInfo, approxSync_, syncQueueSize_, imageSub_, imageDepthSub_, cameraInfoSub_, scanSub_, odomInfoSub_);
 			}
 			else
 			{
-				SYNC_DECL4(CommonDataSubscriber, depthScan2d, approxSync, queueSize, imageSub_, imageDepthSub_, cameraInfoSub_, scanSub_);
+				SYNC_DECL4(CommonDataSubscriber, depthScan2d, approxSync_, syncQueueSize_, imageSub_, imageDepthSub_, cameraInfoSub_, scanSub_);
 			}
 		}
 		else if(subscribeScan3d)
 		{
 			subscribedToScan3d_ = true;
-			scan3dSub_.subscribe(nh, "scan_cloud", queueSize);
+			scan3dSub_.subscribe(nh, "scan_cloud", topicQueueSize_);
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-				SYNC_DECL5(CommonDataSubscriber, depthScan3dInfo, approxSync, queueSize, imageSub_, imageDepthSub_, cameraInfoSub_, scan3dSub_, odomInfoSub_);
+				odomInfoSub_.subscribe(nh, "odom_info", topicQueueSize_);
+				SYNC_DECL5(CommonDataSubscriber, depthScan3dInfo, approxSync_, syncQueueSize_, imageSub_, imageDepthSub_, cameraInfoSub_, scan3dSub_, odomInfoSub_);
 			}
 			else
 			{
-				SYNC_DECL4(CommonDataSubscriber, depthScan3d, approxSync, queueSize, imageSub_, imageDepthSub_, cameraInfoSub_, scan3dSub_);
+				SYNC_DECL4(CommonDataSubscriber, depthScan3d, approxSync_, syncQueueSize_, imageSub_, imageDepthSub_, cameraInfoSub_, scan3dSub_);
 			}
 		}
 		else if(subscribeOdomInfo)
 		{
 			subscribedToOdomInfo_ = true;
-			odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-			SYNC_DECL4(CommonDataSubscriber, depthInfo, approxSync, queueSize, imageSub_, imageDepthSub_, cameraInfoSub_, odomInfoSub_);
+			odomInfoSub_.subscribe(nh, "odom_info", topicQueueSize_);
+			SYNC_DECL4(CommonDataSubscriber, depthInfo, approxSync_, syncQueueSize_, imageSub_, imageDepthSub_, cameraInfoSub_, odomInfoSub_);
 		}
 		else
 		{
-			SYNC_DECL3(CommonDataSubscriber, depth, approxSync, queueSize, imageSub_, imageDepthSub_, cameraInfoSub_);
+			SYNC_DECL3(CommonDataSubscriber, depth, approxSync_, syncQueueSize_, imageSub_, imageDepthSub_, cameraInfoSub_);
 		}
 	}
 }

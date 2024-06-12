@@ -81,12 +81,25 @@ private:
 		ros::NodeHandle & nh = getNodeHandle();
 		ros::NodeHandle & pnh = getPrivateNodeHandle();
 
-		int queueSize = 10;
+		int queueSize = 1;
+		int syncQueueSize = 10;
 		bool approxSync = true;
 		double approxSyncMaxInterval = 0.0;
 		pnh.param("approx_sync", approxSync, approxSync);
 		pnh.param("approx_sync_max_interval", approxSyncMaxInterval, approxSyncMaxInterval);
-		pnh.param("queue_size", queueSize, queueSize);
+		pnh.param("topic_queue_size", queueSize, queueSize);
+		if(pnh.hasParam("queue_size") && !pnh.hasParam("sync_queue_size"))
+		{
+			pnh.param("queue_size", syncQueueSize, syncQueueSize);
+			ROS_WARN("Parameter \"queue_size\" has been renamed "
+					"to \"sync_queue_size\" and will be removed "
+					"in future versions! The value (%d) is still copied to "
+					"\"sync_queue_size\".", syncQueueSize);
+		}
+		else
+		{
+			pnh.param("sync_queue_size", syncQueueSize, syncQueueSize);
+		}
 		pnh.param("depth_scale", depthScale_, depthScale_);
 		pnh.param("decimation", decimation_, decimation_);
 		pnh.param("compressed_rate", compressedRate_, compressedRate_);
@@ -99,7 +112,8 @@ private:
 		NODELET_INFO("%s: approx_sync = %s", getName().c_str(), approxSync?"true":"false");
 		if(approxSync)
 			NODELET_INFO("%s: approx_sync_max_interval = %f", getName().c_str(), approxSyncMaxInterval);
-		NODELET_INFO("%s: queue_size  = %d", getName().c_str(), queueSize);
+		NODELET_INFO("%s: topic_queue_size  = %d", getName().c_str(), queueSize);
+		NODELET_INFO("%s: sync_queue_size  = %d", getName().c_str(), syncQueueSize);
 		NODELET_INFO("%s: depth_scale = %f", getName().c_str(), depthScale_);
 		NODELET_INFO("%s: decimation = %d", getName().c_str(), decimation_);
 		NODELET_INFO("%s: compressed_rate = %f", getName().c_str(), compressedRate_);
@@ -109,14 +123,14 @@ private:
 
 		if(approxSync)
 		{
-			approxSyncDepth_ = new message_filters::Synchronizer<MyApproxSyncDepthPolicy>(MyApproxSyncDepthPolicy(queueSize), imageSub_, imageDepthSub_, cameraInfoSub_);
+			approxSyncDepth_ = new message_filters::Synchronizer<MyApproxSyncDepthPolicy>(MyApproxSyncDepthPolicy(syncQueueSize), imageSub_, imageDepthSub_, cameraInfoSub_);
 			if(approxSyncMaxInterval > 0.0)
 				approxSyncDepth_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
 			approxSyncDepth_->registerCallback(boost::bind(&RGBDSync::callback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3));
 		}
 		else
 		{
-			exactSyncDepth_ = new message_filters::Synchronizer<MyExactSyncDepthPolicy>(MyExactSyncDepthPolicy(queueSize), imageSub_, imageDepthSub_, cameraInfoSub_);
+			exactSyncDepth_ = new message_filters::Synchronizer<MyExactSyncDepthPolicy>(MyExactSyncDepthPolicy(syncQueueSize), imageSub_, imageDepthSub_, cameraInfoSub_);
 			exactSyncDepth_->registerCallback(boost::bind(&RGBDSync::callback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3));
 		}
 
@@ -129,9 +143,9 @@ private:
 		image_transport::TransportHints hintsRgb("raw", ros::TransportHints(), rgb_pnh);
 		image_transport::TransportHints hintsDepth("raw", ros::TransportHints(), depth_pnh);
 
-		imageSub_.subscribe(rgb_it, rgb_nh.resolveName("image"), 1, hintsRgb);
-		imageDepthSub_.subscribe(depth_it, depth_nh.resolveName("image"), 1, hintsDepth);
-		cameraInfoSub_.subscribe(rgb_nh, "camera_info", 1);
+		imageSub_.subscribe(rgb_it, rgb_nh.resolveName("image"), queueSize, hintsRgb);
+		imageDepthSub_.subscribe(depth_it, depth_nh.resolveName("image"), queueSize, hintsDepth);
+		cameraInfoSub_.subscribe(rgb_nh, "camera_info", queueSize);
 
 		std::string subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s \\\n   %s \\\n   %s",
 							getName().c_str(),

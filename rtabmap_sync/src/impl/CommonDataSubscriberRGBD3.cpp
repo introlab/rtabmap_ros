@@ -438,9 +438,7 @@ void CommonDataSubscriber::setupRGBD3Callbacks(
 		bool subscribeScan2d,
 		bool subscribeScan3d,
 		bool subscribeScanDescriptor,
-		bool subscribeOdomInfo,
-		int queueSize,
-		bool approxSync)
+		bool subscribeOdomInfo)
 {
 	ROS_INFO("Setup rgbd3 callback");
 
@@ -448,151 +446,151 @@ void CommonDataSubscriber::setupRGBD3Callbacks(
 	for(int i=0; i<3; ++i)
 	{
 		rgbdSubs_[i] = new message_filters::Subscriber<rtabmap_msgs::RGBDImage>;
-		rgbdSubs_[i]->subscribe(nh, uFormat("rgbd_image%d", i), queueSize);
+		rgbdSubs_[i]->subscribe(nh, uFormat("rgbd_image%d", i), topicQueueSize_);
 	}
 #ifdef RTABMAP_SYNC_USER_DATA
 	if(subscribeOdom && subscribeUserData)
 	{
-		odomSub_.subscribe(nh, "odom", queueSize);
-		userDataSub_.subscribe(nh, "user_data", queueSize);
+		odomSub_.subscribe(nh, "odom", topicQueueSize_);
+		userDataSub_.subscribe(nh, "user_data", topicQueueSize_);
 		if(subscribeScanDescriptor)
 		{
 			subscribedToScanDescriptor_ = true;
-			scanDescSub_.subscribe(nh, "scan_descriptor", queueSize);
+			scanDescSub_.subscribe(nh, "scan_descriptor", topicQueueSize_);
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = false;
 				ROS_WARN("subscribe_odom_info ignored...");
 			}
-			SYNC_DECL6(CommonDataSubscriber, rgbd3OdomDataScanDesc, approxSync, queueSize, odomSub_, userDataSub_, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), scanDescSub_);
+			SYNC_DECL6(CommonDataSubscriber, rgbd3OdomDataScanDesc, approxSync_, syncQueueSize_, odomSub_, userDataSub_, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), scanDescSub_);
 		}
 		else if(subscribeScan2d)
 		{
 			subscribedToScan2d_ = true;
-			scanSub_.subscribe(nh, "scan", queueSize);
+			scanSub_.subscribe(nh, "scan", topicQueueSize_);
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = false;
 				ROS_WARN("subscribe_odom_info ignored...");
 			}
-			SYNC_DECL6(CommonDataSubscriber, rgbd3OdomDataScan2d, approxSync, queueSize, odomSub_, userDataSub_, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), scanSub_);
+			SYNC_DECL6(CommonDataSubscriber, rgbd3OdomDataScan2d, approxSync_, syncQueueSize_, odomSub_, userDataSub_, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), scanSub_);
 		}
 		else if(subscribeScan3d)
 		{
 			subscribedToScan3d_ = true;
-			scan3dSub_.subscribe(nh, "scan_cloud", queueSize);
+			scan3dSub_.subscribe(nh, "scan_cloud", topicQueueSize_);
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = false;
 				ROS_WARN("subscribe_odom_info ignored...");
 			}
-			SYNC_DECL6(CommonDataSubscriber, rgbd3OdomDataScan3d, approxSync, queueSize, odomSub_, userDataSub_, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), scan3dSub_);
+			SYNC_DECL6(CommonDataSubscriber, rgbd3OdomDataScan3d, approxSync_, syncQueueSize_, odomSub_, userDataSub_, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), scan3dSub_);
 		}
 		else if(subscribeOdomInfo)
 		{
 			subscribedToOdomInfo_ = true;
-			odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-			SYNC_DECL6(CommonDataSubscriber, rgbd3OdomDataInfo, approxSync, queueSize, odomSub_, userDataSub_, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), odomInfoSub_);
+			odomInfoSub_.subscribe(nh, "odom_info", topicQueueSize_);
+			SYNC_DECL6(CommonDataSubscriber, rgbd3OdomDataInfo, approxSync_, syncQueueSize_, odomSub_, userDataSub_, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), odomInfoSub_);
 		}
 		else
 		{
-			SYNC_DECL5(CommonDataSubscriber, rgbd3OdomData, approxSync, queueSize, odomSub_, userDataSub_, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]));
+			SYNC_DECL5(CommonDataSubscriber, rgbd3OdomData, approxSync_, syncQueueSize_, odomSub_, userDataSub_, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]));
 		}
 	}
 	else
 #endif		
 	if(subscribeOdom)
 	{
-		odomSub_.subscribe(nh, "odom", queueSize);
+		odomSub_.subscribe(nh, "odom", topicQueueSize_);
 		if(subscribeScanDescriptor)
 		{
 			subscribedToScanDescriptor_ = true;
-			scanDescSub_.subscribe(nh, "scan_descriptor", queueSize);
+			scanDescSub_.subscribe(nh, "scan_descriptor", topicQueueSize_);
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = false;
 				ROS_WARN("subscribe_odom_info ignored...");
 			}
-			SYNC_DECL5(CommonDataSubscriber, rgbd3OdomScanDesc, approxSync, queueSize, odomSub_, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), scanDescSub_);
+			SYNC_DECL5(CommonDataSubscriber, rgbd3OdomScanDesc, approxSync_, syncQueueSize_, odomSub_, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), scanDescSub_);
 		}
 		else if(subscribeScan2d)
 		{
 			subscribedToScan2d_ = true;
-			scanSub_.subscribe(nh, "scan", queueSize);
+			scanSub_.subscribe(nh, "scan", topicQueueSize_);
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = false;
 				ROS_WARN("subscribe_odom_info ignored...");
 			}
-			SYNC_DECL5(CommonDataSubscriber, rgbd3OdomScan2d, approxSync, queueSize, odomSub_, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), scanSub_);
+			SYNC_DECL5(CommonDataSubscriber, rgbd3OdomScan2d, approxSync_, syncQueueSize_, odomSub_, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), scanSub_);
 		}
 		else if(subscribeScan3d)
 		{
 			subscribedToScan3d_ = true;
-			scan3dSub_.subscribe(nh, "scan_cloud", queueSize);
+			scan3dSub_.subscribe(nh, "scan_cloud", topicQueueSize_);
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = false;
 				ROS_WARN("subscribe_odom_info ignored...");
 			}
-			SYNC_DECL5(CommonDataSubscriber, rgbd3OdomScan3d, approxSync, queueSize, odomSub_, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), scan3dSub_);
+			SYNC_DECL5(CommonDataSubscriber, rgbd3OdomScan3d, approxSync_, syncQueueSize_, odomSub_, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), scan3dSub_);
 		}
 		else if(subscribeOdomInfo)
 		{
 			subscribedToOdomInfo_ = true;
-			odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-			SYNC_DECL5(CommonDataSubscriber, rgbd3OdomInfo, approxSync, queueSize, odomSub_, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), odomInfoSub_);
+			odomInfoSub_.subscribe(nh, "odom_info", topicQueueSize_);
+			SYNC_DECL5(CommonDataSubscriber, rgbd3OdomInfo, approxSync_, syncQueueSize_, odomSub_, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), odomInfoSub_);
 		}
 		else
 		{
-			SYNC_DECL4(CommonDataSubscriber, rgbd3Odom, approxSync, queueSize, odomSub_, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]));
+			SYNC_DECL4(CommonDataSubscriber, rgbd3Odom, approxSync_, syncQueueSize_, odomSub_, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]));
 		}
 	}
 #ifdef RTABMAP_SYNC_USER_DATA
 	else if(subscribeUserData)
 	{
-		userDataSub_.subscribe(nh, "user_data", queueSize);
+		userDataSub_.subscribe(nh, "user_data", topicQueueSize_);
 		if(subscribeScanDescriptor)
 		{
 			subscribedToScanDescriptor_ = true;
-			scanDescSub_.subscribe(nh, "scan_descriptor", queueSize);
+			scanDescSub_.subscribe(nh, "scan_descriptor", topicQueueSize_);
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = false;
 				ROS_WARN("subscribe_odom_info ignored...");
 			}
-			SYNC_DECL5(CommonDataSubscriber, rgbd3DataScanDesc, approxSync, queueSize, userDataSub_, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), scanDescSub_);		}
+			SYNC_DECL5(CommonDataSubscriber, rgbd3DataScanDesc, approxSync_, syncQueueSize_, userDataSub_, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), scanDescSub_);		}
 		else if(subscribeScan2d)
 		{
 			subscribedToScan2d_ = true;
-			scanSub_.subscribe(nh, "scan", queueSize);
+			scanSub_.subscribe(nh, "scan", topicQueueSize_);
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = false;
 				ROS_WARN("subscribe_odom_info ignored...");
 			}
-			SYNC_DECL5(CommonDataSubscriber, rgbd3DataScan2d, approxSync, queueSize, userDataSub_, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), scanSub_);
+			SYNC_DECL5(CommonDataSubscriber, rgbd3DataScan2d, approxSync_, syncQueueSize_, userDataSub_, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), scanSub_);
 		}
 		else if(subscribeScan3d)
 		{
 			subscribedToScan3d_ = true;
-			scan3dSub_.subscribe(nh, "scan_cloud", queueSize);
+			scan3dSub_.subscribe(nh, "scan_cloud", topicQueueSize_);
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = false;
 				ROS_WARN("subscribe_odom_info ignored...");
 			}
-			SYNC_DECL5(CommonDataSubscriber, rgbd3DataScan3d, approxSync, queueSize, userDataSub_, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), scan3dSub_);
+			SYNC_DECL5(CommonDataSubscriber, rgbd3DataScan3d, approxSync_, syncQueueSize_, userDataSub_, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), scan3dSub_);
 		}
 		else if(subscribeOdomInfo)
 		{
 			subscribedToOdomInfo_ = true;
-			odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-			SYNC_DECL5(CommonDataSubscriber, rgbd3DataInfo, approxSync, queueSize, userDataSub_, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), odomInfoSub_);
+			odomInfoSub_.subscribe(nh, "odom_info", topicQueueSize_);
+			SYNC_DECL5(CommonDataSubscriber, rgbd3DataInfo, approxSync_, syncQueueSize_, userDataSub_, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), odomInfoSub_);
 		}
 		else
 		{
-			SYNC_DECL4(CommonDataSubscriber, rgbd3Data, approxSync, queueSize, userDataSub_, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]));
+			SYNC_DECL4(CommonDataSubscriber, rgbd3Data, approxSync_, syncQueueSize_, userDataSub_, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]));
 		}
 	}
 #endif
@@ -601,45 +599,45 @@ void CommonDataSubscriber::setupRGBD3Callbacks(
 		if(subscribeScanDescriptor)
 		{
 			subscribedToScanDescriptor_ = true;
-			scanDescSub_.subscribe(nh, "scan_descriptor", queueSize);
+			scanDescSub_.subscribe(nh, "scan_descriptor", topicQueueSize_);
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = false;
 				ROS_WARN("subscribe_odom_info ignored...");
 			}
-			SYNC_DECL4(CommonDataSubscriber, rgbd3ScanDesc, approxSync, queueSize, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), scanDescSub_);
+			SYNC_DECL4(CommonDataSubscriber, rgbd3ScanDesc, approxSync_, syncQueueSize_, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), scanDescSub_);
 		}
 		else if(subscribeScan2d)
 		{
 			subscribedToScan2d_ = true;
-			scanSub_.subscribe(nh, "scan", queueSize);
+			scanSub_.subscribe(nh, "scan", topicQueueSize_);
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = false;
 				ROS_WARN("subscribe_odom_info ignored...");
 			}
-			SYNC_DECL4(CommonDataSubscriber, rgbd3Scan2d, approxSync, queueSize, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), scanSub_);
+			SYNC_DECL4(CommonDataSubscriber, rgbd3Scan2d, approxSync_, syncQueueSize_, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), scanSub_);
 		}
 		else if(subscribeScan3d)
 		{
 			subscribedToScan3d_ = true;
-			scan3dSub_.subscribe(nh, "scan_cloud", queueSize);
+			scan3dSub_.subscribe(nh, "scan_cloud", topicQueueSize_);
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = false;
 				ROS_WARN("subscribe_odom_info ignored...");
 			}
-			SYNC_DECL4(CommonDataSubscriber, rgbd3Scan3d, approxSync, queueSize, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), scan3dSub_);
+			SYNC_DECL4(CommonDataSubscriber, rgbd3Scan3d, approxSync_, syncQueueSize_, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), scan3dSub_);
 		}
 		else if(subscribeOdomInfo)
 		{
 			subscribedToOdomInfo_ = true;
-			odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-			SYNC_DECL4(CommonDataSubscriber, rgbd3Info, approxSync, queueSize, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), odomInfoSub_);
+			odomInfoSub_.subscribe(nh, "odom_info", topicQueueSize_);
+			SYNC_DECL4(CommonDataSubscriber, rgbd3Info, approxSync_, syncQueueSize_, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), odomInfoSub_);
 		}
 		else
 		{
-			SYNC_DECL3(CommonDataSubscriber, rgbd3, approxSync, queueSize, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]));
+			SYNC_DECL3(CommonDataSubscriber, rgbd3, approxSync_, syncQueueSize_, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]));
 		}
 	}
 }

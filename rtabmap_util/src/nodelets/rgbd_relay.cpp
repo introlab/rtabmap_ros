@@ -73,13 +73,8 @@ private:
 		ros::NodeHandle & nh = getNodeHandle();
 		ros::NodeHandle & pnh = getPrivateNodeHandle();
 
-		int queueSize = 10;
-		bool approxSync = true;
-		pnh.param("queue_size", queueSize, queueSize);
 		pnh.param("compress", compress_, compress_);
 		pnh.param("uncompress", uncompress_, uncompress_);
-
-		NODELET_INFO("%s: queue_size  = %d", getName().c_str(), queueSize);
 
 		rgbdImageSub_ = nh.subscribe("rgbd_image", 1, &RGBDRelay::callback, this);
 		rgbdImagePub_ = nh.advertise<rtabmap_msgs::RGBDImage>(nh.resolveName("rgbd_image") + "_relay", 1);

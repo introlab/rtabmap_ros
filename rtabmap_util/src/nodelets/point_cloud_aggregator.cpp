@@ -99,11 +99,24 @@ private:
 		ros::NodeHandle & nh = getNodeHandle();
 		ros::NodeHandle & pnh = getPrivateNodeHandle();
 
-		int queueSize = 5;
+		int queueSize = 1;
+		int syncQueueSize = 5;
 		int count = 2;
 		bool approx=true;
 		double approxSyncMaxInterval = 0.0;
-		pnh.param("queue_size", queueSize, queueSize);
+		pnh.param("topic_queue_size", queueSize, queueSize);
+		if(pnh.hasParam("queue_size") && !pnh.hasParam("sync_queue_size"))
+		{
+			pnh.param("queue_size", syncQueueSize, syncQueueSize);
+			ROS_WARN("Parameter \"queue_size\" has been renamed "
+					"to \"sync_queue_size\" and will be removed "
+					"in future versions! The value (%d) is copied to "
+					"\"sync_queue_size\".", syncQueueSize);
+		}
+		else
+		{
+			pnh.param("sync_queue_size", syncQueueSize, syncQueueSize);
+		}
 		pnh.param("frame_id", frameId_, frameId_);
 		pnh.param("fixed_frame_id", fixedFrameId_, fixedFrameId_);
 		pnh.param("approx_sync", approx, approx);
@@ -112,14 +125,14 @@ private:
 		pnh.param("wait_for_transform_duration", waitForTransformDuration_, waitForTransformDuration_);
 		pnh.param("xyz_output", xyzOutput_, xyzOutput_);
 
-		cloudSub_1_.subscribe(nh, "cloud1", 1);
-		cloudSub_2_.subscribe(nh, "cloud2", 1);
+		cloudSub_1_.subscribe(nh, "cloud1", queueSize);
+		cloudSub_2_.subscribe(nh, "cloud2", queueSize);
 
 		std::string subscribedTopicsMsg;
 		if(count == 4)
 		{
-			cloudSub_3_.subscribe(nh, "cloud3", 1);
-			cloudSub_4_.subscribe(nh, "cloud4", 1);
+			cloudSub_3_.subscribe(nh, "cloud3", queueSize);
+			cloudSub_4_.subscribe(nh, "cloud4", queueSize);
 			if(approx)
 			{
 				approxSync4_ = new message_filters::Synchronizer<ApproxSync4Policy>(ApproxSync4Policy(queueSize), cloudSub_1_, cloudSub_2_, cloudSub_3_, cloudSub_4_);
@@ -143,7 +156,7 @@ private:
 		}
 		else if(count == 3)
 		{
-			cloudSub_3_.subscribe(nh, "cloud3", 1);
+			cloudSub_3_.subscribe(nh, "cloud3", queueSize);
 			if(approx)
 			{
 				approxSync3_ = new message_filters::Synchronizer<ApproxSync3Policy>(ApproxSync3Policy(queueSize), cloudSub_1_, cloudSub_2_, cloudSub_3_);

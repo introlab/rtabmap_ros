@@ -71,11 +71,6 @@ private:
 		ros::NodeHandle & nh = getNodeHandle();
 		ros::NodeHandle & pnh = getPrivateNodeHandle();
 
-		int queueSize = 10;
-		pnh.param("queue_size", queueSize, queueSize);
-
-		NODELET_INFO("%s: queue_size  = %d", getName().c_str(), queueSize);
-
 		ros::NodeHandle rgb_nh(nh, nh.resolveName("rgbd_image") + "/rgb");
 		ros::NodeHandle depth_nh(nh, nh.resolveName("rgbd_image") + "/depth");
 		image_transport::ImageTransport rgb_it(rgb_nh);

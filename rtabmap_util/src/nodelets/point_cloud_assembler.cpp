@@ -109,10 +109,23 @@ private:
 		ros::NodeHandle & nh = getNodeHandle();
 		ros::NodeHandle & pnh = getPrivateNodeHandle();
 
-		int queueSize = 5;
+		int queueSize = 1;
+		int syncQueueSize = 5;
 		bool subscribeOdomInfo = false;
 
-		pnh.param("queue_size", queueSize, queueSize);
+		pnh.param("topic_queue_size", queueSize, queueSize);
+		if(pnh.hasParam("queue_size") && !pnh.hasParam("sync_queue_size"))
+		{
+			pnh.param("queue_size", syncQueueSize, syncQueueSize);
+			ROS_WARN("Parameter \"queue_size\" has been renamed "
+						"to \"sync_queue_size\" and will be removed "
+						"in future versions! The value (%d) is copied to "
+						"\"sync_queue_size\".", syncQueueSize);
+		}
+		else
+		{
+			pnh.param("sync_queue_size", syncQueueSize, syncQueueSize);
+		}
 		pnh.param("fixed_frame_id", fixedFrameId_, fixedFrameId_);
 		pnh.param("frame_id", frameId_, frameId_);
 		pnh.param("max_clouds", maxClouds_, maxClouds_);
@@ -131,7 +144,8 @@ private:
 		pnh.param("subscribe_odom_info", subscribeOdomInfo, subscribeOdomInfo);
 		ROS_ASSERT(maxClouds_>0 || assemblingTime_ >0.0);
 
-		ROS_INFO("%s: queue_size=%d", getName().c_str(), queueSize);
+		ROS_INFO("%s: topic_queue_size=%d", getName().c_str(), queueSize);
+		ROS_INFO("%s: sync_queue_size=%d", getName().c_str(), syncQueueSize);
 		ROS_INFO("%s: fixed_frame_id=%s", getName().c_str(), fixedFrameId_.c_str());
 		ROS_INFO("%s: frame_id=%s", getName().c_str(), frameId_.c_str());
 		ROS_INFO("%s: max_clouds=%d", getName().c_str(), maxClouds_);
@@ -166,10 +180,10 @@ private:
 		}
 		else if(subscribeOdomInfo)
 		{
-			syncCloudSub_.subscribe(nh, "cloud", 1);
-			syncOdomSub_.subscribe(nh, "odom", 1);
-			syncOdomInfoSub_.subscribe(nh, "odom_info", 1);
-			exactInfoSync_ = new message_filters::Synchronizer<syncInfoPolicy>(syncInfoPolicy(queueSize), syncCloudSub_, syncOdomSub_, syncOdomInfoSub_);
+			syncCloudSub_.subscribe(nh, "cloud", queueSize);
+			syncOdomSub_.subscribe(nh, "odom", queueSize);
+			syncOdomInfoSub_.subscribe(nh, "odom_info", queueSize);
+			exactInfoSync_ = new message_filters::Synchronizer<syncInfoPolicy>(syncInfoPolicy(syncQueueSize), syncCloudSub_, syncOdomSub_, syncOdomInfoSub_);
 			exactInfoSync_->registerCallback(boost::bind(&rtabmap_util::PointCloudAssembler::callbackCloudOdomInfo, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3));
 			subscribedTopicsMsg = uFormat("\n%s subscribed to (exact sync):\n   %s,\n   %s",
 								getName().c_str(),
@@ -181,9 +195,9 @@ private:
 		}
 		else
 		{
-			syncCloudSub_.subscribe(nh, "cloud", 1);
-			syncOdomSub_.subscribe(nh, "odom", 1);
-			exactSync_ = new message_filters::Synchronizer<syncPolicy>(syncPolicy(queueSize), syncCloudSub_, syncOdomSub_);
+			syncCloudSub_.subscribe(nh, "cloud", queueSize);
+			syncOdomSub_.subscribe(nh, "odom", queueSize);
+			exactSync_ = new message_filters::Synchronizer<syncPolicy>(syncPolicy(syncQueueSize), syncCloudSub_, syncOdomSub_);
 			exactSync_->registerCallback(boost::bind(&rtabmap_util::PointCloudAssembler::callbackCloudOdom, this, boost::placeholders::_1, boost::placeholders::_2));
 			subscribedTopicsMsg = uFormat("\n%s subscribed to (exact sync):\n   %s,\n   %s",
 								getName().c_str(),

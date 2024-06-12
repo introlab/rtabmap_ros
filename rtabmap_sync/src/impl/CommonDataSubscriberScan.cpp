@@ -250,9 +250,7 @@ void CommonDataSubscriber::setupScanCallbacks(
 		bool scanDescTopic,
 		bool subscribeOdom,
 		bool subscribeUserData,
-		bool subscribeOdomInfo,
-		int queueSize,
-		bool approxSync)
+		bool subscribeOdomInfo)
 {
 	ROS_INFO("Setup scan callback");
 
@@ -261,36 +259,36 @@ void CommonDataSubscriber::setupScanCallbacks(
 		if(scanDescTopic)
 		{
 			subscribedToScanDescriptor_ = true;
-			scanDescSub_.subscribe(nh, "scan_descriptor", queueSize);
+			scanDescSub_.subscribe(nh, "scan_descriptor", topicQueueSize_);
 		}
 		else if(scan2dTopic)
 		{
 			subscribedToScan2d_ = true;
-			scanSub_.subscribe(nh, "scan", queueSize);
+			scanSub_.subscribe(nh, "scan", topicQueueSize_);
 		}
 		else
 		{
 			subscribedToScan3d_ = true;
-			scan3dSub_.subscribe(nh, "scan_cloud", queueSize);
+			scan3dSub_.subscribe(nh, "scan_cloud", topicQueueSize_);
 		}
 
 #ifdef RTABMAP_SYNC_USER_DATA
 		if(subscribeOdom && subscribeUserData)
 		{
-			odomSub_.subscribe(nh, "odom", queueSize);
-			userDataSub_.subscribe(nh, "user_data", queueSize);
+			odomSub_.subscribe(nh, "odom", topicQueueSize_);
+			userDataSub_.subscribe(nh, "user_data", topicQueueSize_);
 
 			if(scanDescTopic)
 			{
 				if(subscribeOdomInfo)
 				{
 					subscribedToOdomInfo_ = true;
-					odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-					SYNC_DECL4(CommonDataSubscriber, odomDataScanDescInfo, approxSync, queueSize, odomSub_, userDataSub_, scanDescSub_, odomInfoSub_);
+					odomInfoSub_.subscribe(nh, "odom_info", topicQueueSize_);
+					SYNC_DECL4(CommonDataSubscriber, odomDataScanDescInfo, approxSync_, syncQueueSize_, odomSub_, userDataSub_, scanDescSub_, odomInfoSub_);
 				}
 				else
 				{
-					SYNC_DECL3(CommonDataSubscriber, odomDataScanDesc, approxSync, queueSize, odomSub_, userDataSub_, scanDescSub_);
+					SYNC_DECL3(CommonDataSubscriber, odomDataScanDesc, approxSync_, syncQueueSize_, odomSub_, userDataSub_, scanDescSub_);
 				}
 			}
 			else if(scan2dTopic)
@@ -298,12 +296,12 @@ void CommonDataSubscriber::setupScanCallbacks(
 				if(subscribeOdomInfo)
 				{
 					subscribedToOdomInfo_ = true;
-					odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-					SYNC_DECL4(CommonDataSubscriber, odomDataScan2dInfo, approxSync, queueSize, odomSub_, userDataSub_, scanSub_, odomInfoSub_);
+					odomInfoSub_.subscribe(nh, "odom_info", topicQueueSize_);
+					SYNC_DECL4(CommonDataSubscriber, odomDataScan2dInfo, approxSync_, syncQueueSize_, odomSub_, userDataSub_, scanSub_, odomInfoSub_);
 				}
 				else
 				{
-					SYNC_DECL3(CommonDataSubscriber, odomDataScan2d, approxSync, queueSize, odomSub_, userDataSub_, scanSub_);
+					SYNC_DECL3(CommonDataSubscriber, odomDataScan2d, approxSync_, syncQueueSize_, odomSub_, userDataSub_, scanSub_);
 				}
 			}
 			else
@@ -311,12 +309,12 @@ void CommonDataSubscriber::setupScanCallbacks(
 				if(subscribeOdomInfo)
 				{
 					subscribedToOdomInfo_ = true;
-					odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-					SYNC_DECL4(CommonDataSubscriber, odomDataScan3dInfo, approxSync, queueSize, odomSub_, userDataSub_, scan3dSub_, odomInfoSub_);
+					odomInfoSub_.subscribe(nh, "odom_info", topicQueueSize_);
+					SYNC_DECL4(CommonDataSubscriber, odomDataScan3dInfo, approxSync_, syncQueueSize_, odomSub_, userDataSub_, scan3dSub_, odomInfoSub_);
 				}
 				else
 				{
-					SYNC_DECL3(CommonDataSubscriber, odomDataScan3d, approxSync, queueSize, odomSub_, userDataSub_, scan3dSub_);
+					SYNC_DECL3(CommonDataSubscriber, odomDataScan3d, approxSync_, syncQueueSize_, odomSub_, userDataSub_, scan3dSub_);
 				}
 			}
 		}
@@ -324,19 +322,19 @@ void CommonDataSubscriber::setupScanCallbacks(
 #endif			
 		if(subscribeOdom)
 		{
-			odomSub_.subscribe(nh, "odom", queueSize);
+			odomSub_.subscribe(nh, "odom", topicQueueSize_);
 
 			if(scanDescTopic)
 			{
 				if(subscribeOdomInfo)
 				{
 					subscribedToOdomInfo_ = true;
-					odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-					SYNC_DECL3(CommonDataSubscriber, odomScanDescInfo, approxSync, queueSize, odomSub_, scanDescSub_, odomInfoSub_);
+					odomInfoSub_.subscribe(nh, "odom_info", topicQueueSize_);
+					SYNC_DECL3(CommonDataSubscriber, odomScanDescInfo, approxSync_, syncQueueSize_, odomSub_, scanDescSub_, odomInfoSub_);
 				}
 				else
 				{
-					SYNC_DECL2(CommonDataSubscriber, odomScanDesc, approxSync, queueSize, odomSub_, scanDescSub_);
+					SYNC_DECL2(CommonDataSubscriber, odomScanDesc, approxSync_, syncQueueSize_, odomSub_, scanDescSub_);
 				}
 			}
 			else if(scan2dTopic)
@@ -344,12 +342,12 @@ void CommonDataSubscriber::setupScanCallbacks(
 				if(subscribeOdomInfo)
 				{
 					subscribedToOdomInfo_ = true;
-					odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-					SYNC_DECL3(CommonDataSubscriber, odomScan2dInfo, approxSync, queueSize, odomSub_, scanSub_, odomInfoSub_);
+					odomInfoSub_.subscribe(nh, "odom_info", topicQueueSize_);
+					SYNC_DECL3(CommonDataSubscriber, odomScan2dInfo, approxSync_, syncQueueSize_, odomSub_, scanSub_, odomInfoSub_);
 				}
 				else
 				{
-					SYNC_DECL2(CommonDataSubscriber, odomScan2d, approxSync, queueSize, odomSub_, scanSub_);
+					SYNC_DECL2(CommonDataSubscriber, odomScan2d, approxSync_, syncQueueSize_, odomSub_, scanSub_);
 				}
 			}
 			else
@@ -357,31 +355,31 @@ void CommonDataSubscriber::setupScanCallbacks(
 				if(subscribeOdomInfo)
 				{
 					subscribedToOdomInfo_ = true;
-					odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-					SYNC_DECL3(CommonDataSubscriber, odomScan3dInfo, approxSync, queueSize, odomSub_, scan3dSub_, odomInfoSub_);
+					odomInfoSub_.subscribe(nh, "odom_info", topicQueueSize_);
+					SYNC_DECL3(CommonDataSubscriber, odomScan3dInfo, approxSync_, syncQueueSize_, odomSub_, scan3dSub_, odomInfoSub_);
 				}
 				else
 				{
-					SYNC_DECL2(CommonDataSubscriber, odomScan3d, approxSync, queueSize, odomSub_, scan3dSub_);
+					SYNC_DECL2(CommonDataSubscriber, odomScan3d, approxSync_, syncQueueSize_, odomSub_, scan3dSub_);
 				}
 			}
 		}
 #ifdef RTABMAP_SYNC_USER_DATA
 		else if(subscribeUserData)
 		{
-			userDataSub_.subscribe(nh, "user_data", queueSize);
+			userDataSub_.subscribe(nh, "user_data", topicQueueSize_);
 
 			if(scanDescTopic)
 			{
 				if(subscribeOdomInfo)
 				{
 					subscribedToOdomInfo_ = true;
-					odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-					SYNC_DECL3(CommonDataSubscriber, dataScanDescInfo, approxSync, queueSize, userDataSub_, scanDescSub_, odomInfoSub_);
+					odomInfoSub_.subscribe(nh, "odom_info", topicQueueSize_);
+					SYNC_DECL3(CommonDataSubscriber, dataScanDescInfo, approxSync_, syncQueueSize_, userDataSub_, scanDescSub_, odomInfoSub_);
 				}
 				else
 				{
-					SYNC_DECL2(CommonDataSubscriber, dataScanDesc, approxSync, queueSize, userDataSub_, scanDescSub_);
+					SYNC_DECL2(CommonDataSubscriber, dataScanDesc, approxSync_, syncQueueSize_, userDataSub_, scanDescSub_);
 				}
 			}
 			else if(scan2dTopic)
@@ -389,12 +387,12 @@ void CommonDataSubscriber::setupScanCallbacks(
 				if(subscribeOdomInfo)
 				{
 					subscribedToOdomInfo_ = true;
-					odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-					SYNC_DECL3(CommonDataSubscriber, dataScan2dInfo, approxSync, queueSize, userDataSub_, scanSub_, odomInfoSub_);
+					odomInfoSub_.subscribe(nh, "odom_info", topicQueueSize_);
+					SYNC_DECL3(CommonDataSubscriber, dataScan2dInfo, approxSync_, syncQueueSize_, userDataSub_, scanSub_, odomInfoSub_);
 				}
 				else
 				{
-					SYNC_DECL2(CommonDataSubscriber, dataScan2d, approxSync, queueSize, userDataSub_, scanSub_);
+					SYNC_DECL2(CommonDataSubscriber, dataScan2d, approxSync_, syncQueueSize_, userDataSub_, scanSub_);
 				}
 			}
 			else
@@ -402,12 +400,12 @@ void CommonDataSubscriber::setupScanCallbacks(
 				if(subscribeOdomInfo)
 				{
 					subscribedToOdomInfo_ = true;
-					odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-					SYNC_DECL3(CommonDataSubscriber, dataScan3dInfo, approxSync, queueSize, userDataSub_, scan3dSub_, odomInfoSub_);
+					odomInfoSub_.subscribe(nh, "odom_info", topicQueueSize_);
+					SYNC_DECL3(CommonDataSubscriber, dataScan3dInfo, approxSync_, syncQueueSize_, userDataSub_, scan3dSub_, odomInfoSub_);
 				}
 				else
 				{
-					SYNC_DECL2(CommonDataSubscriber, dataScan3d, approxSync, queueSize, userDataSub_, scan3dSub_);
+					SYNC_DECL2(CommonDataSubscriber, dataScan3d, approxSync_, syncQueueSize_, userDataSub_, scan3dSub_);
 				}
 			}
 		}
@@ -415,18 +413,18 @@ void CommonDataSubscriber::setupScanCallbacks(
 		else if(subscribeOdomInfo)
 		{
 			subscribedToOdomInfo_ = true;
-			odomInfoSub_.subscribe(nh, "odom_info", queueSize);
+			odomInfoSub_.subscribe(nh, "odom_info", topicQueueSize_);
 			if(scanDescTopic)
 			{
-				SYNC_DECL2(CommonDataSubscriber, scanDescInfo, approxSync, queueSize, scanDescSub_, odomInfoSub_);
+				SYNC_DECL2(CommonDataSubscriber, scanDescInfo, approxSync_, syncQueueSize_, scanDescSub_, odomInfoSub_);
 			}
 			else if(scan2dTopic)
 			{
-				SYNC_DECL2(CommonDataSubscriber, scan2dInfo, approxSync, queueSize, scanSub_, odomInfoSub_);
+				SYNC_DECL2(CommonDataSubscriber, scan2dInfo, approxSync_, syncQueueSize_, scanSub_, odomInfoSub_);
 			}
 			else
 			{
-				SYNC_DECL2(CommonDataSubscriber, scan3dInfo, approxSync, queueSize, scan3dSub_, odomInfoSub_);
+				SYNC_DECL2(CommonDataSubscriber, scan3dInfo, approxSync_, syncQueueSize_, scan3dSub_, odomInfoSub_);
 			}
 		}
 	}
@@ -435,7 +433,7 @@ void CommonDataSubscriber::setupScanCallbacks(
 		if(scanDescTopic)
 		{
 			subscribedToScanDescriptor_ = true;
-			scanDescSubOnly_ = nh.subscribe("scan_descriptor", queueSize, &CommonDataSubscriber::scanDescCallback, this);
+			scanDescSubOnly_ = nh.subscribe("scan_descriptor", syncQueueSize_, &CommonDataSubscriber::scanDescCallback, this);
 			subscribedTopicsMsg_ =
 					uFormat("\n%s subscribed to:\n   %s",
 					ros::this_node::getName().c_str(),
@@ -444,7 +442,7 @@ void CommonDataSubscriber::setupScanCallbacks(
 		else if(scan2dTopic)
 		{
 			subscribedToScan2d_ = true;
-			scan2dSubOnly_ = nh.subscribe("scan", queueSize, &CommonDataSubscriber::scan2dCallback, this);
+			scan2dSubOnly_ = nh.subscribe("scan", syncQueueSize_, &CommonDataSubscriber::scan2dCallback, this);
 			subscribedTopicsMsg_ =
 					uFormat("\n%s subscribed to:\n   %s",
 					ros::this_node::getName().c_str(),
@@ -453,7 +451,7 @@ void CommonDataSubscriber::setupScanCallbacks(
 		else
 		{
 			subscribedToScan3d_ = true;
-			scan3dSubOnly_ = nh.subscribe("scan_cloud", queueSize, &CommonDataSubscriber::scan3dCallback, this);
+			scan3dSubOnly_ = nh.subscribe("scan_cloud", syncQueueSize_, &CommonDataSubscriber::scan3dCallback, this);
 			subscribedTopicsMsg_ =
 					uFormat("\n%s subscribed to:\n   %s",
 					ros::this_node::getName().c_str(),

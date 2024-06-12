@@ -89,9 +89,7 @@ void CommonDataSubscriber::setupStereoCallbacks(
 		ros::NodeHandle & nh,
 		ros::NodeHandle & pnh,
 		bool subscribeOdom,
-		bool subscribeOdomInfo,
-		int queueSize,
-		bool approxSync)
+		bool subscribeOdomInfo)
 {
 	ROS_INFO("Setup stereo callback");
 
@@ -104,24 +102,24 @@ void CommonDataSubscriber::setupStereoCallbacks(
 	image_transport::TransportHints hintsLeft("raw", ros::TransportHints(), left_pnh);
 	image_transport::TransportHints hintsRight("raw", ros::TransportHints(), right_pnh);
 
-	imageRectLeft_.subscribe(left_it, left_nh.resolveName("image_rect"), queueSize, hintsLeft);
-	imageRectRight_.subscribe(right_it, right_nh.resolveName("image_rect"), queueSize, hintsRight);
-	cameraInfoLeft_.subscribe(left_nh, "camera_info", queueSize);
-	cameraInfoRight_.subscribe(right_nh, "camera_info", queueSize);
+	imageRectLeft_.subscribe(left_it, left_nh.resolveName("image_rect"), syncQueueSize_, hintsLeft);
+	imageRectRight_.subscribe(right_it, right_nh.resolveName("image_rect"), syncQueueSize_, hintsRight);
+	cameraInfoLeft_.subscribe(left_nh, "camera_info", topicQueueSize_);
+	cameraInfoRight_.subscribe(right_nh, "camera_info", topicQueueSize_);
 
 	if(subscribeOdom)
 	{
-		odomSub_.subscribe(nh, "odom", queueSize);
+		odomSub_.subscribe(nh, "odom", topicQueueSize_);
 
 		if(subscribeOdomInfo)
 		{
 			subscribedToOdomInfo_ = true;
-			odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-			SYNC_DECL6(CommonDataSubscriber, stereoOdomInfo, approxSync, queueSize, odomSub_, imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_, odomInfoSub_);
+			odomInfoSub_.subscribe(nh, "odom_info", topicQueueSize_);
+			SYNC_DECL6(CommonDataSubscriber, stereoOdomInfo, approxSync_, syncQueueSize_, odomSub_, imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_, odomInfoSub_);
 		}
 		else
 		{
-			SYNC_DECL5(CommonDataSubscriber, stereoOdom, approxSync, queueSize, odomSub_, imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_);
+			SYNC_DECL5(CommonDataSubscriber, stereoOdom, approxSync_, syncQueueSize_, odomSub_, imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_);
 		}
 	}
 	else
@@ -129,12 +127,12 @@ void CommonDataSubscriber::setupStereoCallbacks(
 		if(subscribeOdomInfo)
 		{
 			subscribedToOdomInfo_ = true;
-			odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-			SYNC_DECL5(CommonDataSubscriber, stereoInfo, approxSync, queueSize, imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_, odomInfoSub_);
+			odomInfoSub_.subscribe(nh, "odom_info", topicQueueSize_);
+			SYNC_DECL5(CommonDataSubscriber, stereoInfo, approxSync_, syncQueueSize_, imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_, odomInfoSub_);
 		}
 		else
 		{
-			SYNC_DECL4(CommonDataSubscriber, stereo, approxSync, queueSize, imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_);
+			SYNC_DECL4(CommonDataSubscriber, stereo, approxSync_, syncQueueSize_, imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_);
 		}
 	}
 }

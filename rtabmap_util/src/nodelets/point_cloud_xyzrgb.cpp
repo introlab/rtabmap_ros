@@ -108,13 +108,26 @@ private:
 		ros::NodeHandle & nh = getNodeHandle();
 		ros::NodeHandle & pnh = getPrivateNodeHandle();
 
-		int queueSize = 10;
+		int queueSize = 1;
+		int syncQueueSize = 10;
 		bool approxSync = true;
 		std::string roiStr;
 		double approxSyncMaxInterval = 0.0;
 		pnh.param("approx_sync", approxSync, approxSync);
 		pnh.param("approx_sync_max_interval", approxSyncMaxInterval, approxSyncMaxInterval);
-		pnh.param("queue_size", queueSize, queueSize);
+		pnh.param("topic_queue_size", queueSize, queueSize);
+		if(pnh.hasParam("queue_size") && !pnh.hasParam("sync_queue_size"))
+		{
+			pnh.param("queue_size", syncQueueSize, syncQueueSize);
+			ROS_WARN("Parameter \"queue_size\" has been renamed "
+					"to \"sync_queue_size\" and will be removed "
+					"in future versions! The value (%d) is copied to "
+					"\"sync_queue_size\".", syncQueueSize);
+		}
+		else
+		{
+			pnh.param("sync_queue_size", syncQueueSize, syncQueueSize);
+		}
 		pnh.param("max_depth", maxDepth_, maxDepth_);
 		pnh.param("min_depth", minDepth_, minDepth_);
 		pnh.param("voxel_size", voxelSize_, voxelSize_);
@@ -199,30 +212,30 @@ private:
 
 		if(approxSync)
 		{
-			approxSyncDepth_ = new message_filters::Synchronizer<MyApproxSyncDepthPolicy>(MyApproxSyncDepthPolicy(queueSize), imageSub_, imageDepthSub_, cameraInfoSub_);
+			approxSyncDepth_ = new message_filters::Synchronizer<MyApproxSyncDepthPolicy>(MyApproxSyncDepthPolicy(syncQueueSize), imageSub_, imageDepthSub_, cameraInfoSub_);
 			if(approxSyncMaxInterval > 0.0)
 				approxSyncDepth_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
 			approxSyncDepth_->registerCallback(boost::bind(&PointCloudXYZRGB::depthCallback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3));
 
-			approxSyncDisparity_ = new message_filters::Synchronizer<MyApproxSyncDisparityPolicy>(MyApproxSyncDisparityPolicy(queueSize), imageLeft_, imageDisparitySub_, cameraInfoLeft_);
+			approxSyncDisparity_ = new message_filters::Synchronizer<MyApproxSyncDisparityPolicy>(MyApproxSyncDisparityPolicy(syncQueueSize), imageLeft_, imageDisparitySub_, cameraInfoLeft_);
 			if(approxSyncMaxInterval > 0.0)
 				approxSyncDisparity_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
 			approxSyncDisparity_->registerCallback(boost::bind(&PointCloudXYZRGB::disparityCallback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3));
 
-			approxSyncStereo_ = new message_filters::Synchronizer<MyApproxSyncStereoPolicy>(MyApproxSyncStereoPolicy(queueSize), imageLeft_, imageRight_, cameraInfoLeft_, cameraInfoRight_);
+			approxSyncStereo_ = new message_filters::Synchronizer<MyApproxSyncStereoPolicy>(MyApproxSyncStereoPolicy(syncQueueSize), imageLeft_, imageRight_, cameraInfoLeft_, cameraInfoRight_);
 			if(approxSyncMaxInterval > 0.0)
 				approxSyncStereo_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
 			approxSyncStereo_->registerCallback(boost::bind(&PointCloudXYZRGB::stereoCallback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 		}
 		else
 		{
-			exactSyncDepth_ = new message_filters::Synchronizer<MyExactSyncDepthPolicy>(MyExactSyncDepthPolicy(queueSize), imageSub_, imageDepthSub_, cameraInfoSub_);
+			exactSyncDepth_ = new message_filters::Synchronizer<MyExactSyncDepthPolicy>(MyExactSyncDepthPolicy(syncQueueSize), imageSub_, imageDepthSub_, cameraInfoSub_);
 			exactSyncDepth_->registerCallback(boost::bind(&PointCloudXYZRGB::depthCallback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3));
 
-			exactSyncDisparity_ = new message_filters::Synchronizer<MyExactSyncDisparityPolicy>(MyExactSyncDisparityPolicy(queueSize), imageLeft_, imageDisparitySub_, cameraInfoLeft_);
+			exactSyncDisparity_ = new message_filters::Synchronizer<MyExactSyncDisparityPolicy>(MyExactSyncDisparityPolicy(syncQueueSize), imageLeft_, imageDisparitySub_, cameraInfoLeft_);
 			exactSyncDisparity_->registerCallback(boost::bind(&PointCloudXYZRGB::disparityCallback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3));
 
-			exactSyncStereo_ = new message_filters::Synchronizer<MyExactSyncStereoPolicy>(MyExactSyncStereoPolicy(queueSize), imageLeft_, imageRight_, cameraInfoLeft_, cameraInfoRight_);
+			exactSyncStereo_ = new message_filters::Synchronizer<MyExactSyncStereoPolicy>(MyExactSyncStereoPolicy(syncQueueSize), imageLeft_, imageRight_, cameraInfoLeft_, cameraInfoRight_);
 			exactSyncStereo_->registerCallback(boost::bind(&PointCloudXYZRGB::stereoCallback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 		}
 
@@ -235,9 +248,9 @@ private:
 		image_transport::TransportHints hintsRgb("raw", ros::TransportHints(), rgb_pnh);
 		image_transport::TransportHints hintsDepth("raw", ros::TransportHints(), depth_pnh);
 
-		imageSub_.subscribe(rgb_it, rgb_nh.resolveName("image"), 1, hintsRgb);
-		imageDepthSub_.subscribe(depth_it, depth_nh.resolveName("image"), 1, hintsDepth);
-		cameraInfoSub_.subscribe(rgb_nh, "camera_info", 1);
+		imageSub_.subscribe(rgb_it, rgb_nh.resolveName("image"), queueSize, hintsRgb);
+		imageDepthSub_.subscribe(depth_it, depth_nh.resolveName("image"), queueSize, hintsDepth);
+		cameraInfoSub_.subscribe(rgb_nh, "camera_info", queueSize);
 
 		ros::NodeHandle left_nh(nh, "left");
 		ros::NodeHandle right_nh(nh, "right");
@@ -248,12 +261,12 @@ private:
 		image_transport::TransportHints hintsLeft("raw", ros::TransportHints(), left_pnh);
 		image_transport::TransportHints hintsRight("raw", ros::TransportHints(), right_pnh);
 
-		imageDisparitySub_.subscribe(nh, "disparity", 1);
+		imageDisparitySub_.subscribe(nh, "disparity", queueSize);
 
-		imageLeft_.subscribe(left_it, left_nh.resolveName("image"), 1, hintsLeft);
-		imageRight_.subscribe(right_it, right_nh.resolveName("image"), 1, hintsRight);
-		cameraInfoLeft_.subscribe(left_nh, "camera_info", 1);
-		cameraInfoRight_.subscribe(right_nh, "camera_info", 1);
+		imageLeft_.subscribe(left_it, left_nh.resolveName("image"), queueSize, hintsLeft);
+		imageRight_.subscribe(right_it, right_nh.resolveName("image"), queueSize, hintsRight);
+		cameraInfoLeft_.subscribe(left_nh, "camera_info", queueSize);
+		cameraInfoRight_.subscribe(right_nh, "camera_info", queueSize);
 	}
 
 	void depthCallback(

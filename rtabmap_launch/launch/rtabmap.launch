@@ -47,7 +47,9 @@
   <arg name="ground_truth_base_frame_id" default=""/>  <!-- e.g., "tracker", a fake frame matching the frame "frame_id" (but on different TF tree) -->
   <arg name="namespace"               default="rtabmap"/>
   <arg name="database_path"           default="~/.ros/rtabmap.db"/>
-  <arg name="queue_size"              default="10"/>
+  <arg name="topic_queue_size"        default="1"/>
+  <arg name="queue_size"              default="10"/> <!-- for backward compatibility, use sync_queue_size directly-->
+  <arg name="sync_queue_size"         default="$(arg queue_size)"/>
   <arg name="wait_for_transform"      default="0.2"/>
   <arg name="args"                    default=""/>              <!-- delete_db_on_start, udebug -->
   <arg name="rtabmap_args"            default="$(arg args)"/>   <!-- deprecated, use "args" argument -->
@@ -181,7 +183,8 @@
           <remap from="rgbd_image"      to="$(arg rgbd_topic_relay)"/>
           <param name="approx_sync"     type="bool"   value="$(arg approx_rgbd_sync)"/>
           <param name="approx_sync_max_interval" type="double" value="$(arg approx_sync_max_interval)"/>
-          <param name="queue_size"      type="int"    value="$(arg queue_size)"/>
+          <param name="topic_queue_size" type="int"  value="$(arg topic_queue_size)"/>
+          <param name="sync_queue_size"  type="int"  value="$(arg sync_queue_size)"/>
           <param name="depth_scale"     type="double" value="$(arg rgbd_depth_scale)"/>
           <param name="decimation"     type="double" value="$(arg rgbd_decimation)"/>
         </node>
@@ -203,7 +206,8 @@
           <remap from="rgbd_image"      to="$(arg rgbd_topic_relay)"/>
           <param name="approx_sync"     type="bool"   value="$(arg approx_rgbd_sync)"/>
           <param name="approx_sync_max_interval" type="double" value="$(arg approx_sync_max_interval)"/>
-          <param name="queue_size"      type="int"    value="$(arg queue_size)"/>
+          <param name="topic_queue_size" type="int"  value="$(arg topic_queue_size)"/>
+          <param name="sync_queue_size"  type="int"  value="$(arg sync_queue_size)"/>
         </node>
       </group>
     </group>
@@ -253,7 +257,8 @@
           <param name="approx_sync"                 type="bool"   value="$(arg approx_sync)"/>
           <param name="approx_sync_max_interval"    type="double" value="$(arg approx_sync_max_interval)"/>
           <param name="config_path"                 type="string" value="$(arg cfg)"/>
-          <param name="queue_size"                  type="int"    value="$(arg queue_size)"/>
+          <param name="topic_queue_size"            type="int"    value="$(arg topic_queue_size)"/>
+          <param name="sync_queue_size"             type="int"    value="$(arg sync_queue_size)"/>
           <param name="subscribe_rgbd"              type="bool"   value="$(arg subscribe_rgbd)"/>
           <param name="guess_frame_id"              type="string" value="$(arg odom_guess_frame_id)"/>
           <param name="guess_min_translation"       type="double" value="$(arg odom_guess_min_translation)"/>
@@ -283,7 +288,8 @@
           <param name="approx_sync"                 type="bool"   value="$(arg approx_sync)"/>
           <param name="approx_sync_max_interval"    type="double" value="$(arg approx_sync_max_interval)"/>
           <param name="config_path"                 type="string" value="$(arg cfg)"/>
-          <param name="queue_size"                  type="int"    value="$(arg queue_size)"/>
+          <param name="topic_queue_size"            type="int"    value="$(arg topic_queue_size)"/>
+          <param name="sync_queue_size"             type="int"    value="$(arg sync_queue_size)"/>
           <param name="subscribe_rgbd"              type="bool"   value="$(arg subscribe_rgbd)"/>
           <param name="guess_frame_id"              type="string" value="$(arg odom_guess_frame_id)"/>
           <param name="guess_min_translation"       type="double" value="$(arg odom_guess_min_translation)"/>
@@ -310,7 +316,8 @@
       <param name="wait_for_transform_duration" type="double" value="$(arg wait_for_transform)"/>
       <param name="wait_imu_to_init"            type="bool"   value="$(arg wait_imu_to_init)"/>
       <param name="config_path"                 type="string" value="$(arg cfg)"/>
-      <param name="queue_size"                  type="int"    value="$(arg queue_size)"/>
+      <param name="topic_queue_size"            type="int"    value="$(arg topic_queue_size)"/>
+      <param name="sync_queue_size"             type="int"    value="$(arg sync_queue_size)"/>
       <param name="guess_frame_id"              type="string" value="$(arg odom_guess_frame_id)"/>
       <param name="guess_min_translation"       type="double" value="$(arg odom_guess_min_translation)"/>
       <param name="guess_min_rotation"          type="double" value="$(arg odom_guess_min_rotation)"/>
@@ -377,7 +384,8 @@
       <param name="database_path"        type="string" value="$(arg database_path)"/>
       <param name="approx_sync"          type="bool"   value="$(eval approx_sync and not use_odom_features)"/>
       <param name="config_path"          type="string" value="$(arg cfg)"/>
-      <param name="queue_size"           type="int" value="$(arg queue_size)"/>
+      <param name="topic_queue_size"            type="int"    value="$(arg topic_queue_size)"/>
+      <param name="sync_queue_size"             type="int"    value="$(arg sync_queue_size)"/>
       <param if="$(eval not scan_cloud_filtered and not scan_cloud_assembling)" name="scan_cloud_max_points" type="int" value="$(arg scan_cloud_max_points)"/>
       <param name="landmark_linear_variance"   type="double" value="$(arg tag_linear_variance)"/>
       <param name="landmark_angular_variance"  type="double" value="$(arg tag_angular_variance)"/>
@@ -434,7 +442,8 @@
       <param name="frame_id"             type="string" value="$(arg frame_id)"/>
       <param name="odom_frame_id"        type="string" value="$(arg odom_frame_id)"/>
       <param name="wait_for_transform_duration" type="double"   value="$(arg wait_for_transform)"/>
-      <param name="queue_size"           type="int"    value="$(arg queue_size)"/>
+      <param name="topic_queue_size"            type="int"    value="$(arg topic_queue_size)"/>
+      <param name="sync_queue_size"             type="int"    value="$(arg sync_queue_size)"/>
       <param name="approx_sync"          type="bool"   value="$(eval approx_sync and not use_odom_features)"/>
 
       <remap from="rgb/image"       to="$(arg rgb_topic_relay)"/>

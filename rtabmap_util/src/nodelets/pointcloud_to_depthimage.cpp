@@ -92,9 +92,22 @@ private:
 		ros::NodeHandle & nh = getNodeHandle();
 		ros::NodeHandle & pnh = getPrivateNodeHandle();
 
-		int queueSize = 10;
+		int queueSize = 1;
+		int syncQueueSize = 10;
 		bool approx = true;
-		pnh.param("queue_size", queueSize, queueSize);
+		pnh.param("topic_queue_size", queueSize, queueSize);
+		if(pnh.hasParam("queue_size") && !pnh.hasParam("sync_queue_size"))
+		{
+			pnh.param("queue_size", syncQueueSize, syncQueueSize);
+			ROS_WARN("Parameter \"queue_size\" has been renamed "
+					"to \"sync_queue_size\" and will be removed "
+					"in future versions! The value (%d) is copied to "
+					"\"sync_queue_size\".", syncQueueSize);
+		}
+		else
+		{
+			pnh.param("sync_queue_size", syncQueueSize, syncQueueSize);
+		}
 		pnh.param("fixed_frame_id", fixedFrameId_, fixedFrameId_);
 		pnh.param("wait_for_transform", waitForTransform_, waitForTransform_);
 		pnh.param("fill_holes_size", fillHolesSize_, fillHolesSize_);
@@ -115,7 +128,8 @@ private:
 
 		ROS_INFO("Params:");
 		ROS_INFO("  approx=%s", approx?"true":"false");
-		ROS_INFO("  queue_size=%d", queueSize);
+		ROS_INFO("  topic_queue_size=%d", queueSize);
+		ROS_INFO("  sync_queue_size=%d", syncQueueSize);
 		ROS_INFO("  fixed_frame_id=%s", fixedFrameId_.c_str());
 		ROS_INFO("  wait_for_transform=%fs", waitForTransform_);
 		ROS_INFO("  fill_holes_size=%d pixels (0=disabled)", fillHolesSize_);
@@ -133,18 +147,18 @@ private:
 
 		if(approx)
 		{
-			approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize), pointCloudSub_, cameraInfoSub_);
+			approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(syncQueueSize), pointCloudSub_, cameraInfoSub_);
 			approxSync_->registerCallback(boost::bind(&PointCloudToDepthImage::callback, this, boost::placeholders::_1, boost::placeholders::_2));
 		}
 		else
 		{
 			fixedFrameId_.clear();
-			exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize), pointCloudSub_, cameraInfoSub_);
+			exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(syncQueueSize), pointCloudSub_, cameraInfoSub_);
 			exactSync_->registerCallback(boost::bind(&PointCloudToDepthImage::callback, this, boost::placeholders::_1, boost::placeholders::_2));
 		}
 
-		pointCloudSub_.subscribe(nh, "cloud", 1);
-		cameraInfoSub_.subscribe(nh, "camera_info", 1);
+		pointCloudSub_.subscribe(nh, "cloud", queueSize);
+		cameraInfoSub_.subscribe(nh, "camera_info", queueSize);
 	}
 
 	void callback(

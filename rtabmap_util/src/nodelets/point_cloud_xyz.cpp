@@ -100,13 +100,26 @@ private:
 		ros::NodeHandle & nh = getNodeHandle();
 		ros::NodeHandle & pnh = getPrivateNodeHandle();
 
-		int queueSize = 10;
+		int queueSize = 1;
+		int syncQueueSize = 10;
 		bool approxSync = true;
 		std::string roiStr;
 		double approxSyncMaxInterval = 0.0;
 		pnh.param("approx_sync", approxSync, approxSync);
 		pnh.param("approx_sync_max_interval", approxSyncMaxInterval, approxSyncMaxInterval);
-		pnh.param("queue_size", queueSize, queueSize);
+		pnh.param("topic_queue_size", queueSize, queueSize);
+		if(pnh.hasParam("queue_size") && !pnh.hasParam("sync_queue_size"))
+		{
+			pnh.param("queue_size", syncQueueSize, syncQueueSize);
+			ROS_WARN("Parameter \"queue_size\" has been renamed "
+					"to \"sync_queue_size\" and will be removed "
+					"in future versions! The value (%d) is copied to "
+					"\"sync_queue_size\".", syncQueueSize);
+		}
+		else
+		{
+			pnh.param("sync_queue_size", syncQueueSize, syncQueueSize);
+		}
 		pnh.param("max_depth", maxDepth_, maxDepth_);
 		pnh.param("min_depth", minDepth_, minDepth_);
 		pnh.param("voxel_size", voxelSize_, voxelSize_);
@@ -171,22 +184,22 @@ private:
 
 		if(approxSync)
 		{
-			approxSyncDepth_ = new message_filters::Synchronizer<MyApproxSyncDepthPolicy>(MyApproxSyncDepthPolicy(queueSize), imageDepthSub_, cameraInfoSub_);
+			approxSyncDepth_ = new message_filters::Synchronizer<MyApproxSyncDepthPolicy>(MyApproxSyncDepthPolicy(syncQueueSize), imageDepthSub_, cameraInfoSub_);
 			if(approxSyncMaxInterval > 0.0)
 				approxSyncDepth_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
 			approxSyncDepth_->registerCallback(boost::bind(&PointCloudXYZ::callback, this, boost::placeholders::_1, boost::placeholders::_2));
 
-			approxSyncDisparity_ = new message_filters::Synchronizer<MyApproxSyncDisparityPolicy>(MyApproxSyncDisparityPolicy(queueSize), disparitySub_, disparityCameraInfoSub_);
+			approxSyncDisparity_ = new message_filters::Synchronizer<MyApproxSyncDisparityPolicy>(MyApproxSyncDisparityPolicy(syncQueueSize), disparitySub_, disparityCameraInfoSub_);
 			if(approxSyncMaxInterval > 0.0)
 				approxSyncDisparity_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
 			approxSyncDisparity_->registerCallback(boost::bind(&PointCloudXYZ::callbackDisparity, this, boost::placeholders::_1, boost::placeholders::_2));
 		}
 		else
 		{
-			exactSyncDepth_ = new message_filters::Synchronizer<MyExactSyncDepthPolicy>(MyExactSyncDepthPolicy(queueSize), imageDepthSub_, cameraInfoSub_);
+			exactSyncDepth_ = new message_filters::Synchronizer<MyExactSyncDepthPolicy>(MyExactSyncDepthPolicy(syncQueueSize), imageDepthSub_, cameraInfoSub_);
 			exactSyncDepth_->registerCallback(boost::bind(&PointCloudXYZ::callback, this, boost::placeholders::_1, boost::placeholders::_2));
 
-			exactSyncDisparity_ = new message_filters::Synchronizer<MyExactSyncDisparityPolicy>(MyExactSyncDisparityPolicy(queueSize), disparitySub_, disparityCameraInfoSub_);
+			exactSyncDisparity_ = new message_filters::Synchronizer<MyExactSyncDisparityPolicy>(MyExactSyncDisparityPolicy(syncQueueSize), disparitySub_, disparityCameraInfoSub_);
 			exactSyncDisparity_->registerCallback(boost::bind(&PointCloudXYZ::callbackDisparity, this, boost::placeholders::_1, boost::placeholders::_2));
 		}
 
@@ -195,11 +208,11 @@ private:
 		image_transport::ImageTransport depth_it(depth_nh);
 		image_transport::TransportHints hintsDepth("raw", ros::TransportHints(), depth_pnh);
 
-		imageDepthSub_.subscribe(depth_it, depth_nh.resolveName("image"), 1, hintsDepth);
-		cameraInfoSub_.subscribe(depth_nh, "camera_info", 1);
+		imageDepthSub_.subscribe(depth_it, depth_nh.resolveName("image"), queueSize, hintsDepth);
+		cameraInfoSub_.subscribe(depth_nh, "camera_info", queueSize);
 
-		disparitySub_.subscribe(nh, "disparity/image", 1);
-		disparityCameraInfoSub_.subscribe(nh, "disparity/camera_info", 1);
+		disparitySub_.subscribe(nh, "disparity/image", queueSize);
+		disparityCameraInfoSub_.subscribe(nh, "disparity/camera_info", queueSize);
 
 		cloudPub_ = nh.advertise<sensor_msgs::PointCloud2>("cloud", 1);
 	}

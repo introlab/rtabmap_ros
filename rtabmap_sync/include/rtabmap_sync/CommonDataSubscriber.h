@@ -74,7 +74,8 @@ public:
 	bool isSubscribedToOdomInfo() const {return subscribedToOdomInfo_;}
 	bool isDataSubscribed() const {return isSubscribedToDepth() || isSubscribedToStereo() || isSubscribedToRGBD() || isSubscribedToScan2d() || isSubscribedToScan3d() || isSubscribedToRGB() || isSubscribedToOdom() || isSubscribedToSensorData();}
 	int rgbdCameras() const {return isSubscribedToRGBD()?(int)rgbdSubs_.size():0;}
-	int getQueueSize() const {return queueSize_;}
+	int getTopicQueueSize() const {return topicQueueSize_;}
+	int getSyncQueueSize() const {return syncQueueSize_;}
 	bool isApproxSync() const {return approxSync_;}
 	const std::string & name() const {return name_;}
 
@@ -140,16 +141,12 @@ private:
 			bool subscribeScan2d,
 			bool subscribeScan3d,
 			bool subscribeScanDesc,
-			bool subscribeOdomInfo,
-			int queueSize,
-			bool approxSync);
+			bool subscribeOdomInfo);
 	void setupStereoCallbacks(
 			ros::NodeHandle & nh,
 			ros::NodeHandle & pnh,
 			bool subscribeOdom,
-			bool subscribeOdomInfo,
-			int queueSize,
-			bool approxSync);
+			bool subscribeOdomInfo);
 	void setupRGBCallbacks(
 			ros::NodeHandle & nh,
 			ros::NodeHandle & pnh,
@@ -158,9 +155,7 @@ private:
 			bool subscribeScan2d,
 			bool subscribeScan3d,
 			bool subscribeScanDesc,
-			bool subscribeOdomInfo,
-			int queueSize,
-			bool approxSync);
+			bool subscribeOdomInfo);
 	void setupRGBDCallbacks(
 			ros::NodeHandle & nh,
 			ros::NodeHandle & pnh,
@@ -169,9 +164,7 @@ private:
 			bool subscribeScan2d,
 			bool subscribeScan3d,
 			bool subscribeScanDesc,
-			bool subscribeOdomInfo,
-			int queueSize,
-			bool approxSync);
+			bool subscribeOdomInfo);
 	void setupRGBDXCallbacks(
 			ros::NodeHandle & nh,
 			ros::NodeHandle & pnh,
@@ -180,9 +173,7 @@ private:
 			bool subscribeScan2d,
 			bool subscribeScan3d,
 			bool subscribeScanDesc,
-			bool subscribeOdomInfo,
-			int queueSize,
-			bool approxSync);
+			bool subscribeOdomInfo);
 #ifdef RTABMAP_SYNC_MULTI_RGBD
 	void setupRGBD2Callbacks(
 			ros::NodeHandle & nh,
@@ -192,9 +183,7 @@ private:
 			bool subscribeScan2d,
 			bool subscribeScan3d,
 			bool subscribeScanDesc,
-			bool subscribeOdomInfo,
-			int queueSize,
-			bool approxSync);
+			bool subscribeOdomInfo);
 	void setupRGBD3Callbacks(
 			ros::NodeHandle & nh,
 			ros::NodeHandle & pnh,
@@ -203,9 +192,7 @@ private:
 			bool subscribeScan2d,
 			bool subscribeScan3d,
 			bool subscribeScanDesc,
-			bool subscribeOdomInfo,
-			int queueSize,
-			bool approxSync);
+			bool subscribeOdomInfo);
 	void setupRGBD4Callbacks(
 			ros::NodeHandle & nh,
 			ros::NodeHandle & pnh,
@@ -214,9 +201,7 @@ private:
 			bool subscribeScan2d,
 			bool subscribeScan3d,
 			bool subscribeScanDesc,
-			bool subscribeOdomInfo,
-			int queueSize,
-			bool approxSync); 
+			bool subscribeOdomInfo); 
 	void setupRGBD5Callbacks(
 			ros::NodeHandle & nh,
 			ros::NodeHandle & pnh,
@@ -225,9 +210,7 @@ private:
 			bool subscribeScan2d,
 			bool subscribeScan3d,
 			bool subscribeScanDesc,
-			bool subscribeOdomInfo,
-			int queueSize,
-			bool approxSync);
+			bool subscribeOdomInfo);
 	void setupRGBD6Callbacks(
 			ros::NodeHandle & nh,
 			ros::NodeHandle & pnh,
@@ -236,17 +219,13 @@ private:
 			bool subscribeScan2d,
 			bool subscribeScan3d,
 			bool subscribeScanDesc,
-			bool subscribeOdomInfo,
-			int queueSize,
-			bool approxSync);
+			bool subscribeOdomInfo);
 #endif
     void setupSensorDataCallbacks(
 			ros::NodeHandle & nh,
 			ros::NodeHandle & pnh,
 			bool subscribeOdom,
-			bool subscribeOdomInfo,
-			int queueSize,
-			bool approxSync);
+			bool subscribeOdomInfo);
 	void setupScanCallbacks(
 			ros::NodeHandle & nh,
 			ros::NodeHandle & pnh,
@@ -254,20 +233,17 @@ private:
 			bool subscribeScanDesc,
 			bool subscribeOdom,
 			bool subscribeUserData,
-			bool subscribeOdomInfo,
-			int queueSize,
-			bool approxSync);
+			bool subscribeOdomInfo);
 	void setupOdomCallbacks(
 			ros::NodeHandle & nh,
 			ros::NodeHandle & pnh,
 			bool subscribeUserData,
-			bool subscribeOdomInfo,
-			int queueSize,
-			bool approxSync);
+			bool subscribeOdomInfo);
 
 protected:
 	std::string subscribedTopicsMsg_;
-	int queueSize_;
+	int topicQueueSize_;
+	int syncQueueSize_;
 
 private:
 	bool approxSync_;

@@ -30,7 +30,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace rtabmap_sync {
 
 CommonDataSubscriber::CommonDataSubscriber(bool gui) :
-		queueSize_(10),
+		topicQueueSize_(10),
+		syncQueueSize_(10),
 		approxSync_(true),
 		subscribedToDepth_(!gui),
 		subscribedToStereo_(false),
@@ -504,11 +505,23 @@ void CommonDataSubscriber::setupCallbacks(
 	{
 		ROS_ERROR("\"depth_cameras\" parameter doesn't exist anymore. It is replaced by \"rgbd_cameras\" used when \"subscribe_rgbd\" is true.");
 	}
-	pnh.param("queue_size",          queueSize_, queueSize_);
+	pnh.param("topic_queue_size", topicQueueSize_, topicQueueSize_);
+	if(pnh.hasParam("queue_size") && !pnh.hasParam("sync_queue_size"))
+	{
+		pnh.param("queue_size", syncQueueSize_, syncQueueSize_);
+		ROS_WARN("Parameter \"queue_size\" has been renamed "
+				 "to \"sync_queue_size\" and will be removed "
+				 "in future versions! The value (%d) is copied to "
+				 "\"sync_queue_size\".", syncQueueSize_);
+	}
+	else
+	{
+		pnh.param("sync_queue_size", syncQueueSize_, syncQueueSize_);
+	}
 	if(pnh.hasParam("stereo_approx_sync") && !pnh.hasParam("approx_sync"))
 	{
 		ROS_WARN("Parameter \"stereo_approx_sync\" has been renamed "
-				 "to \"approx_sync\"! Your value is still copied to "
+				 "to \"approx_sync\"! Your value is copied to "
 				 "corresponding parameter.");
 		pnh.param("stereo_approx_sync", approxSync_, approxSync_);
 	}
@@ -527,8 +540,9 @@ void CommonDataSubscriber::setupCallbacks(
 	ROS_INFO("%s: subscribe_scan = %s", name.c_str(), subscribeScan2d?"true":"false");
 	ROS_INFO("%s: subscribe_scan_cloud = %s", name.c_str(), subscribeScan3d?"true":"false");
 	ROS_INFO("%s: subscribe_scan_descriptor = %s", name.c_str(), subscribeScanDesc?"true":"false");
-	ROS_INFO("%s: queue_size    = %d", name.c_str(), queueSize_);
-	ROS_INFO("%s: approx_sync   = %s", name.c_str(), approxSync_?"true":"false");
+	ROS_INFO("%s: topic_queue_size = %d", name.c_str(), topicQueueSize_);
+	ROS_INFO("%s: sync_queue_size = %d", name.c_str(), syncQueueSize_);
+	ROS_INFO("%s: approx_sync = %s", name.c_str(), approxSync_?"true":"false");
 
 	subscribedToOdom_ = odomFrameId.empty() && subscribeOdom;
 	if(subscribedToDepth_)
@@ -541,9 +555,7 @@ void CommonDataSubscriber::setupCallbacks(
 				subscribeScan2d,
 				subscribeScan3d,
 				subscribeScanDesc,
-				subscribeOdomInfo,
-				queueSize_,
-				approxSync_);
+				subscribeOdomInfo);
 	}
 	else if(subscribedToStereo_)
 	{
@@ -551,9 +563,7 @@ void CommonDataSubscriber::setupCallbacks(
 				nh,
 				pnh,
 				subscribedToOdom_,
-				subscribeOdomInfo,
-				queueSize_,
-				approxSync_);
+				subscribeOdomInfo);
 	}
 	else if(subscribedToRGB_)
 	{
@@ -565,9 +575,7 @@ void CommonDataSubscriber::setupCallbacks(
 				subscribeScan2d,
 				subscribeScan3d,
 				subscribeScanDesc,
-				subscribeOdomInfo,
-				queueSize_,
-				approxSync_);
+				subscribeOdomInfo);
 	}
 	else if(subscribedToRGBD_)
 	{
@@ -589,9 +597,7 @@ void CommonDataSubscriber::setupCallbacks(
 					subscribeScan2d,
 					subscribeScan3d,
 					subscribeScanDesc,
-					subscribeOdomInfo,
-					queueSize_,
-					approxSync_);
+					subscribeOdomInfo);
 		}
 		else if(rgbdCameras == 5)
 		{
@@ -603,9 +609,7 @@ void CommonDataSubscriber::setupCallbacks(
 					subscribeScan2d,
 					subscribeScan3d,
 					subscribeScanDesc,
-					subscribeOdomInfo,
-					queueSize_,
-					approxSync_);
+					subscribeOdomInfo);
 		}
 		else if(rgbdCameras == 4)
 		{
@@ -617,9 +621,7 @@ void CommonDataSubscriber::setupCallbacks(
 					subscribeScan2d,
 					subscribeScan3d,
 					subscribeScanDesc,
-					subscribeOdomInfo,
-					queueSize_,
-					approxSync_);
+					subscribeOdomInfo);
 		}
 		else if(rgbdCameras == 3)
 		{
@@ -631,9 +633,7 @@ void CommonDataSubscriber::setupCallbacks(
 					subscribeScan2d,
 					subscribeScan3d,
 					subscribeScanDesc,
-					subscribeOdomInfo,
-					queueSize_,
-					approxSync_);
+					subscribeOdomInfo);
 		}
 		else if(rgbdCameras == 2)
 		{
@@ -645,9 +645,7 @@ void CommonDataSubscriber::setupCallbacks(
 					subscribeScan2d,
 					subscribeScan3d,
 					subscribeScanDesc,
-					subscribeOdomInfo,
-					queueSize_,
-					approxSync_);
+					subscribeOdomInfo);
 		}
 #else
 		if(rgbdCameras>1)
@@ -668,9 +666,7 @@ void CommonDataSubscriber::setupCallbacks(
 					subscribeScan2d,
 					subscribeScan3d,
 					subscribeScanDesc,
-					subscribeOdomInfo,
-					queueSize_,
-					approxSync_);
+					subscribeOdomInfo);
 		}
 		else
 		{
@@ -682,9 +678,7 @@ void CommonDataSubscriber::setupCallbacks(
 					subscribeScan2d,
 					subscribeScan3d,
 					subscribeScanDesc,
-					subscribeOdomInfo,
-					queueSize_,
-					approxSync_);
+					subscribeOdomInfo);
 		}
 	}
 	else if(subscribeScan2d || subscribeScan3d || subscribeScanDesc)
@@ -696,9 +690,7 @@ void CommonDataSubscriber::setupCallbacks(
 					subscribeScanDesc,
 					subscribedToOdom_,
 					subscribeUserData,
-					subscribeOdomInfo,
-					queueSize_,
-					approxSync_);
+					subscribeOdomInfo);
 	}
 	else if(subscribedToSensorData_)
 	{
@@ -706,9 +698,7 @@ void CommonDataSubscriber::setupCallbacks(
 					nh,
 					pnh,
 					subscribedToOdom_,
-					subscribeOdomInfo,
-					queueSize_,
-					approxSync_);
+					subscribeOdomInfo);
 	}
 	else if(subscribedToOdom_)
 	{
@@ -716,9 +706,7 @@ void CommonDataSubscriber::setupCallbacks(
 					nh,
 					pnh,
 					subscribeUserData,
-					subscribeOdomInfo,
-					queueSize_,
-					approxSync_);
+					subscribeOdomInfo);
 	}
 
 	if(subscribedToDepth_ || subscribedToStereo_ || subscribedToRGBD_ || subscribedToScan2d_ || subscribedToScan3d_ || subscribedToScanDescriptor_ || subscribedToRGB_ || subscribedToOdom_)
@@ -732,7 +720,7 @@ void CommonDataSubscriber::setupCallbacks(
 					"the clocks of the computers are synchronized (\"ntpdate\"). %s%s",
 					name_.c_str(),
 					approxSync_?
-							uFormat("If topics are not published at the same rate, you could increase \"queue_size\" parameter (current=%d).", queueSize_).c_str():
+							uFormat("If topics are not published at the same rate, you could increase \"sync_queue_size\" and/or \"topic_queue_size\" parameters (current=%d and %d respectively).", syncQueueSize_, topicQueueSize_).c_str():
 							"Parameter \"approx_sync\" is false, which means that input topics should have all the exact timestamp for the callback to be called.",
 					subscribedTopicsMsg_.c_str()),
 					otherTasks);

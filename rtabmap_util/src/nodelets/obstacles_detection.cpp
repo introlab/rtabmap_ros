@@ -113,8 +113,6 @@ private:
 		ULogger::setType(ULogger::kTypeConsole);
 		ULogger::setLevel(ULogger::kWarning);
 
-		int queueSize = 10;
-		pnh.param("queue_size", queueSize, queueSize);
 		pnh.param("frame_id", frameId_, frameId_);
 		pnh.param("map_frame_id", mapFrameId_, mapFrameId_);
 		pnh.param("wait_for_transform", waitForTransform_, waitForTransform_);

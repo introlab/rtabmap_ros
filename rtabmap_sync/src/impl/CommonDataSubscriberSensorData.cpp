@@ -68,25 +68,23 @@ void CommonDataSubscriber::setupSensorDataCallbacks(
 		ros::NodeHandle & nh,
 		ros::NodeHandle & pnh,
 		bool subscribeOdom,
-		bool subscribeOdomInfo,
-		int queueSize,
-		bool approxSync)
+		bool subscribeOdomInfo)
 {
 	ROS_INFO("Setup SensorData callback");
 
-	sensorDataSub_.subscribe(nh, "sensor_data", queueSize);
+	sensorDataSub_.subscribe(nh, "sensor_data", topicQueueSize_);
 	if(subscribeOdom)
 	{
-		odomSub_.subscribe(nh, "odom", queueSize);
+		odomSub_.subscribe(nh, "odom", topicQueueSize_);
 		if(subscribeOdomInfo)
 		{
 			subscribedToOdomInfo_ = true;
-			odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-			SYNC_DECL3(CommonDataSubscriber, sensorDataOdomInfo, approxSync, queueSize, odomSub_, sensorDataSub_, odomInfoSub_);
+			odomInfoSub_.subscribe(nh, "odom_info", topicQueueSize_);
+			SYNC_DECL3(CommonDataSubscriber, sensorDataOdomInfo, approxSync_, syncQueueSize_, odomSub_, sensorDataSub_, odomInfoSub_);
 		}
 		else
 		{
-			SYNC_DECL2(CommonDataSubscriber, sensorDataOdom, approxSync, queueSize, odomSub_, sensorDataSub_);
+			SYNC_DECL2(CommonDataSubscriber, sensorDataOdom, approxSync_, syncQueueSize_, odomSub_, sensorDataSub_);
 		}
 	}
 	else
@@ -94,13 +92,13 @@ void CommonDataSubscriber::setupSensorDataCallbacks(
 		if(subscribeOdomInfo)
 		{
 			subscribedToOdomInfo_ = true;
-			odomInfoSub_.subscribe(nh, "odom_info", queueSize);
-			SYNC_DECL2(CommonDataSubscriber, sensorDataInfo, approxSync, queueSize, sensorDataSub_, odomInfoSub_);
+			odomInfoSub_.subscribe(nh, "odom_info", topicQueueSize_);
+			SYNC_DECL2(CommonDataSubscriber, sensorDataInfo, approxSync_, syncQueueSize_, sensorDataSub_, odomInfoSub_);
 		}
 		else
 		{
 			sensorDataSub_.unsubscribe();
-			sensorDataSubOnly_ = nh.subscribe("sensor_data", queueSize, &CommonDataSubscriber::sensorDataCallback, this);
+			sensorDataSubOnly_ = nh.subscribe("sensor_data", syncQueueSize_, &CommonDataSubscriber::sensorDataCallback, this);
 
 			subscribedTopicsMsg_ =
 					uFormat("\n%s subscribed to:\n   %s",
