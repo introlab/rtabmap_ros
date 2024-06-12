@@ -1,0 +1,11 @@
+{
+    "image": "introlab3it/rtabmap_ros:noetic-latest",
+    "customizations": {
+        "vscode": {
+          "extensions": ["ms-vscode.cpptools-themes", "ms-vscode.cmake-tools", "vscjava.vscode-java-pack"]
+        }
+    },
+    "workspaceMount": "source=${localWorkspaceFolder},target=/catkin_ws/src/rtabmap_ros,type=bind",
+    "workspaceFolder": "/catkin_ws",
+    "postAttachCommand": "apt remove -y ros-noetic-rtabmap-* && echo 'Initialize catkin: source /opt/ros/noetic/setup.bash && cd /catkin_ws/src && catkin_init_workspace && cd /catkin_ws && catkin_make'"
+}
