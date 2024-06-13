@@ -66,29 +66,27 @@ void CommonDataSubscriber::odomDataInfoCallback(
 void CommonDataSubscriber::setupOdomCallbacks(
 		rclcpp::Node& node,
 		bool subscribeUserData,
-		bool subscribeOdomInfo,
-		int queueSize,
-		bool approxSync)
+		bool subscribeOdomInfo)
 {
 	RCLCPP_INFO(node.get_logger(), "Setup scan callback");
 
 	if(subscribeUserData || subscribeOdomInfo)
 	{
-		odomSub_.subscribe(&node, "odom", rclcpp::QoS(1).reliability(qosOdom_).get_rmw_qos_profile());
+		odomSub_.subscribe(&node, "odom", rclcpp::QoS(topicQueueSize_).reliability(qosOdom_).get_rmw_qos_profile());
 
 #ifdef RTABMAP_SYNC_USER_DATA
 		if(subscribeUserData)
 		{
-			userDataSub_.subscribe(&node, "user_data", rclcpp::QoS(1).reliability(qosUserData_).get_rmw_qos_profile());
+			userDataSub_.subscribe(&node, "user_data", rclcpp::QoS(topicQueueSize_).reliability(qosUserData_).get_rmw_qos_profile());
 			if(subscribeOdomInfo)
 			{
 				subscribedToOdomInfo_ = true;
-				odomInfoSub_.subscribe(&node, "odom_info", rclcpp::QoS(1).reliability(qosOdom_).get_rmw_qos_profile());
-				SYNC_DECL3(CommonDataSubscriber, odomDataInfo, approxSync, queueSize, odomSub_, userDataSub_, odomInfoSub_);
+				odomInfoSub_.subscribe(&node, "odom_info", rclcpp::QoS(topicQueueSize_).reliability(qosOdom_).get_rmw_qos_profile());
+				SYNC_DECL3(CommonDataSubscriber, odomDataInfo, approxSync_, syncQueueSize_, odomSub_, userDataSub_, odomInfoSub_);
 			}
 			else
 			{
-				SYNC_DECL2(CommonDataSubscriber, odomData, approxSync, queueSize, odomSub_, userDataSub_);
+				SYNC_DECL2(CommonDataSubscriber, odomData, approxSync_, syncQueueSize_, odomSub_, userDataSub_);
 			}
 		}
 		else 
@@ -96,13 +94,13 @@ void CommonDataSubscriber::setupOdomCallbacks(
 		if(subscribeOdomInfo)
 		{
 			subscribedToOdomInfo_ = true;
-			odomInfoSub_.subscribe(&node, "odom_info", rclcpp::QoS(1).reliability(qosOdom_).get_rmw_qos_profile());
-			SYNC_DECL2(CommonDataSubscriber, odomInfo, approxSync, queueSize, odomSub_, odomInfoSub_);
+			odomInfoSub_.subscribe(&node, "odom_info", rclcpp::QoS(topicQueueSize_).reliability(qosOdom_).get_rmw_qos_profile());
+			SYNC_DECL2(CommonDataSubscriber, odomInfo, approxSync_, syncQueueSize_, odomSub_, odomInfoSub_);
 		}
 	}
 	else
 	{
-		odomSubOnly_ = node.create_subscription<nav_msgs::msg::Odometry>("odom", rclcpp::QoS(1).reliability(qosOdom_), std::bind(&CommonDataSubscriber::odomCallback, this, std::placeholders::_1));
+		odomSubOnly_ = node.create_subscription<nav_msgs::msg::Odometry>("odom", rclcpp::QoS(topicQueueSize_).reliability(qosOdom_), std::bind(&CommonDataSubscriber::odomCallback, this, std::placeholders::_1));
 		subscribedTopicsMsg_ =
 				uFormat("\n%s subscribed to:\n   %s",
 				node.get_name(),

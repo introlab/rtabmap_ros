@@ -148,7 +148,8 @@ private:
 	message_filters::Synchronizer<MyApproxSync6Policy> * approxSync6_;
 	typedef message_filters::sync_policies::ExactTime<rtabmap_msgs::msg::RGBDImage, rtabmap_msgs::msg::RGBDImage, rtabmap_msgs::msg::RGBDImage, rtabmap_msgs::msg::RGBDImage, rtabmap_msgs::msg::RGBDImage, rtabmap_msgs::msg::RGBDImage> MyExactSync6Policy;
 	message_filters::Synchronizer<MyExactSync6Policy> * exactSync6_;
-	int queueSize_;
+	int topicQueueSize_;
+	int syncQueueSize_;
 	bool keepColor_;
 };
 

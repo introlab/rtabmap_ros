@@ -8,6 +8,9 @@ from sensor_msgs.msg import Image
 
 def yaml_to_CameraInfo(yaml_fname):
     with open(yaml_fname, "r") as file_handle:
+        first_line = file_handle.readline()
+        if "%YAML:" not in first_line:
+            file_handle.seek(0)
         calib_data = yaml.load(file_handle, Loader=yaml.FullLoader)
  
     msg = CameraInfo()

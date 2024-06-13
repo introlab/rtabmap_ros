@@ -746,7 +746,7 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 		}
 		auto node = rclcpp::Node::make_shared("rtabmap");
 		image_transport::TransportHints hints(this);
-		defaultSub_ = image_transport::create_subscription(node.get(), "image", std::bind(&CoreWrapper::defaultCallback, this, std::placeholders::_1), hints.getTransport(), rclcpp::QoS(queueSize_).reliability((rmw_qos_reliability_policy_t)qosImage_).get_rmw_qos_profile());
+		defaultSub_ = image_transport::create_subscription(node.get(), "image", std::bind(&CoreWrapper::defaultCallback, this, std::placeholders::_1), hints.getTransport(), rclcpp::QoS(this->getTopicQueueSize()).reliability((rmw_qos_reliability_policy_t)qosImage_).get_rmw_qos_profile());
 
 
 		RCLCPP_INFO(this->get_logger(), "\n%s subscribed to:\n   %s", get_name(), defaultSub_.getTopic().c_str());

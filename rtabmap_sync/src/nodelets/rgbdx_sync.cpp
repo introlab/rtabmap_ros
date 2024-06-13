@@ -42,21 +42,33 @@ RGBDXSync::RGBDXSync(const rclcpp::NodeOptions & options) :
 	SYNC_INIT(rgbd7),
 	SYNC_INIT(rgbd8)
 {
-	int queueSize = 10;
+	int topicQueueSize = 1;
+	int syncQueueSize = 10;
 	bool approxSync = true;
 	int rgbdCameras = 2;
 	double approxSyncMaxInterval = 0.0;
 	int qos = 0;
 	approxSync = this->declare_parameter("approx_sync", approxSync);
 	approxSyncMaxInterval = this->declare_parameter("approx_sync_max_interval", approxSyncMaxInterval);
-	queueSize = this->declare_parameter("queue_size", queueSize);
+	topicQueueSize = this->declare_parameter("topic_queue_size", topicQueueSize);
+	int queueSize = this->declare_parameter("queue_size", -1);
+	if(queueSize != -1)
+	{
+		syncQueueSize = queueSize;
+		RCLCPP_WARN(this->get_logger(), "Parameter \"queue_size\" has been renamed "
+				 "to \"sync_queue_size\" and will be removed "
+				 "in future versions! The value (%d) is copied to "
+				 "\"sync_queue_size\".", syncQueueSize);
+	}
+	syncQueueSize = this->declare_parameter("sync_queue_size", syncQueueSize);
 	qos = this->declare_parameter("qos", qos);
 	rgbdCameras = this->declare_parameter("rgbd_cameras", rgbdCameras);
 
 	RCLCPP_INFO(this->get_logger(), "%s: approx_sync  = %s", get_name(), approxSync?"true":"false");
 	if(approxSync)
 		RCLCPP_INFO(this->get_logger(), "%s: approx_sync_max_interval = %f", get_name(), approxSyncMaxInterval);
-	RCLCPP_INFO(this->get_logger(), "%s: queue_size   = %d", get_name(), queueSize);
+	RCLCPP_INFO(this->get_logger(), "%s: topic_queue_size   = %d", get_name(), topicQueueSize);
+	RCLCPP_INFO(this->get_logger(), "%s: sync_queue_size    = %d", get_name(), syncQueueSize);
 	RCLCPP_INFO(this->get_logger(), "%s: qos          = %d", get_name(), qos);
 	RCLCPP_INFO(this->get_logger(), "%s: rgbd_cameras = %d", get_name(), rgbdCameras);
 
@@ -68,14 +80,14 @@ RGBDXSync::RGBDXSync(const rclcpp::NodeOptions & options) :
 	for(int i=0; i<rgbdCameras; ++i)
 	{
 		rgbdSubs_[i] = new message_filters::Subscriber<rtabmap_msgs::msg::RGBDImage>;
-		rgbdSubs_[i]->subscribe(this, uFormat("rgbd_image%d", i), rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+		rgbdSubs_[i]->subscribe(this, uFormat("rgbd_image%d", i), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
 	}
 
 	std::string name_ = get_name();
 	std::string subscribedTopicsMsg_;
 	if(rgbdCameras==2)
 	{
-		SYNC_DECL2(RGBDXSync, rgbd2, approxSync, queueSize, (*rgbdSubs_[0]), (*rgbdSubs_[1]));
+		SYNC_DECL2(RGBDXSync, rgbd2, approxSync, syncQueueSize, (*rgbdSubs_[0]), (*rgbdSubs_[1]));
 		if(approxSync && approxSyncMaxInterval>0.0)
 		{
 			rgbd2ApproximateSync_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval));
@@ -83,7 +95,7 @@ RGBDXSync::RGBDXSync(const rclcpp::NodeOptions & options) :
 	}
 	else if(rgbdCameras==3)
 	{
-		SYNC_DECL3(RGBDXSync, rgbd3, approxSync, queueSize, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]));
+		SYNC_DECL3(RGBDXSync, rgbd3, approxSync, syncQueueSize, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]));
 		if(approxSync && approxSyncMaxInterval>0.0)
 		{
 			rgbd3ApproximateSync_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval));
@@ -91,7 +103,7 @@ RGBDXSync::RGBDXSync(const rclcpp::NodeOptions & options) :
 	}
 	else if(rgbdCameras==4)
 	{
-		SYNC_DECL4(RGBDXSync, rgbd4, approxSync, queueSize, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), (*rgbdSubs_[3]));
+		SYNC_DECL4(RGBDXSync, rgbd4, approxSync, syncQueueSize, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), (*rgbdSubs_[3]));
 		if(approxSync && approxSyncMaxInterval>0.0)
 		{
 			rgbd4ApproximateSync_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval));
@@ -99,7 +111,7 @@ RGBDXSync::RGBDXSync(const rclcpp::NodeOptions & options) :
 	}
 	else if(rgbdCameras==5)
 	{
-		SYNC_DECL5(RGBDXSync, rgbd5, approxSync, queueSize, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), (*rgbdSubs_[3]), (*rgbdSubs_[4]));
+		SYNC_DECL5(RGBDXSync, rgbd5, approxSync, syncQueueSize, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), (*rgbdSubs_[3]), (*rgbdSubs_[4]));
 		if(approxSync && approxSyncMaxInterval>0.0)
 		{
 			rgbd5ApproximateSync_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval));
@@ -107,7 +119,7 @@ RGBDXSync::RGBDXSync(const rclcpp::NodeOptions & options) :
 	}
 	else if(rgbdCameras==6)
 	{
-		SYNC_DECL6(RGBDXSync, rgbd6, approxSync, queueSize, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), (*rgbdSubs_[3]), (*rgbdSubs_[4]), (*rgbdSubs_[5]));
+		SYNC_DECL6(RGBDXSync, rgbd6, approxSync, syncQueueSize, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), (*rgbdSubs_[3]), (*rgbdSubs_[4]), (*rgbdSubs_[5]));
 		if(approxSync && approxSyncMaxInterval>0.0)
 		{
 			rgbd6ApproximateSync_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval));
@@ -115,7 +127,7 @@ RGBDXSync::RGBDXSync(const rclcpp::NodeOptions & options) :
 	}
 	else if(rgbdCameras==7)
 	{
-		SYNC_DECL7(RGBDXSync, rgbd7, approxSync, queueSize, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), (*rgbdSubs_[3]), (*rgbdSubs_[4]), (*rgbdSubs_[5]), (*rgbdSubs_[6]));
+		SYNC_DECL7(RGBDXSync, rgbd7, approxSync, syncQueueSize, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), (*rgbdSubs_[3]), (*rgbdSubs_[4]), (*rgbdSubs_[5]), (*rgbdSubs_[6]));
 		if(approxSync && approxSyncMaxInterval>0.0)
 		{
 			rgbd7ApproximateSync_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval));
@@ -123,7 +135,7 @@ RGBDXSync::RGBDXSync(const rclcpp::NodeOptions & options) :
 	}
 	else if(rgbdCameras==8)
 	{
-		SYNC_DECL8(RGBDXSync, rgbd8, approxSync, queueSize, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), (*rgbdSubs_[3]), (*rgbdSubs_[4]), (*rgbdSubs_[5]), (*rgbdSubs_[6]), (*rgbdSubs_[7]));
+		SYNC_DECL8(RGBDXSync, rgbd8, approxSync, syncQueueSize, (*rgbdSubs_[0]), (*rgbdSubs_[1]), (*rgbdSubs_[2]), (*rgbdSubs_[3]), (*rgbdSubs_[4]), (*rgbdSubs_[5]), (*rgbdSubs_[6]), (*rgbdSubs_[7]));
 		if(approxSync && approxSyncMaxInterval>0.0)
 		{
 			rgbd8ApproximateSync_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval));

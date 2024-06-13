@@ -181,7 +181,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 		} \
 		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (%s sync):\n   %s \\\n   %s \\\n   %s \\\n   %s \\\n   %s", \
 				name_.c_str(), \
-				approxSync?"approx":"exact", \
+				APPROX?"approx":"exact", \
 				getTopicName(SUB0.getSubscriber()).c_str(), \
 				getTopicName(SUB1.getSubscriber()).c_str(), \
 				getTopicName(SUB2.getSubscriber()).c_str(), \

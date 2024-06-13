@@ -78,7 +78,8 @@ public:
 	bool isSubscribedToOdomInfo() const {return subscribedToOdomInfo_;}
 	bool isDataSubscribed() const {return isSubscribedToDepth() || isSubscribedToStereo() || isSubscribedToRGBD() || isSubscribedToScan2d() || isSubscribedToScan3d() || isSubscribedToRGB() || isSubscribedToOdom() || isSubscribedToSensorData();}
 	int rgbdCameras() const {return isSubscribedToRGBD()?(int)rgbdSubs_.size():0;}
-	int getQueueSize() const {return queueSize_;}
+	int getTopicQueueSize() const {return topicQueueSize_;}
+	int getSyncQueueSize() const {return syncQueueSize_;}
 	bool isApproxSync() const {return approxSync_;}
 	const std::string & name() const {return name_;}
 
@@ -141,15 +142,11 @@ private:
 			bool subscribeScan2d,
 			bool subscribeScan3d,
 			bool subscribeScanDesc,
-			bool subscribeOdomInfo,
-			int queueSize,
-			bool approxSync);
+			bool subscribeOdomInfo);
 	void setupStereoCallbacks(
 			rclcpp::Node & node,
 			bool subscribeOdom,
-			bool subscribeOdomInfo,
-			int queueSize,
-			bool approxSync);
+			bool subscribeOdomInfo);
 	void setupRGBCallbacks(
 			rclcpp::Node & node,
 			bool subscribeOdom,
@@ -157,9 +154,7 @@ private:
 			bool subscribeScan2d,
 			bool subscribeScan3d,
 			bool subscribeScanDesc,
-			bool subscribeOdomInfo,
-			int queueSize,
-			bool approxSync);
+			bool subscribeOdomInfo);
 	void setupRGBDCallbacks(
 			rclcpp::Node & node,
 			bool subscribeOdom,
@@ -167,9 +162,7 @@ private:
 			bool subscribeScan2d,
 			bool subscribeScan3d,
 			bool subscribeScanDesc,
-			bool subscribeOdomInfo,
-			int queueSize,
-			bool approxSync);
+			bool subscribeOdomInfo);
 	void setupRGBDXCallbacks(
 			rclcpp::Node & node,
 			bool subscribeOdom,
@@ -177,9 +170,7 @@ private:
 			bool subscribeScan2d,
 			bool subscribeScan3d,
 			bool subscribeScanDesc,
-			bool subscribeOdomInfo,
-			int queueSize,
-			bool approxSync);
+			bool subscribeOdomInfo);
 #ifdef RTABMAP_SYNC_MULTI_RGBD
 	void setupRGBD2Callbacks(
 			rclcpp::Node & node,
@@ -188,9 +179,7 @@ private:
 			bool subscribeScan2d,
 			bool subscribeScan3d,
 			bool subscribeScanDesc,
-			bool subscribeOdomInfo,
-			int queueSize,
-			bool approxSync);
+			bool subscribeOdomInfo);
 	void setupRGBD3Callbacks(
 			rclcpp::Node & node,
 			bool subscribeOdom,
@@ -198,9 +187,7 @@ private:
 			bool subscribeScan2d,
 			bool subscribeScan3d,
 			bool subscribeScanDesc,
-			bool subscribeOdomInfo,
-			int queueSize,
-			bool approxSync);
+			bool subscribeOdomInfo);
 	void setupRGBD4Callbacks(
 			rclcpp::Node & node,
 			bool subscribeOdom,
@@ -208,9 +195,7 @@ private:
 			bool subscribeScan2d,
 			bool subscribeScan3d,
 			bool subscribeScanDesc,
-			bool subscribeOdomInfo,
-			int queueSize,
-			bool approxSync); 
+			bool subscribeOdomInfo); 
 	void setupRGBD5Callbacks(
 			rclcpp::Node & node,
 			bool subscribeOdom,
@@ -218,9 +203,7 @@ private:
 			bool subscribeScan2d,
 			bool subscribeScan3d,
 			bool subscribeScanDesc,
-			bool subscribeOdomInfo,
-			int queueSize,
-			bool approxSync);
+			bool subscribeOdomInfo);
 	void setupRGBD6Callbacks(
 			rclcpp::Node & node,
 			bool subscribeOdom,
@@ -228,35 +211,28 @@ private:
 			bool subscribeScan2d,
 			bool subscribeScan3d,
 			bool subscribeScanDesc,
-			bool subscribeOdomInfo,
-			int queueSize,
-			bool approxSync);
+			bool subscribeOdomInfo);
 #endif
     void setupSensorDataCallbacks(
 			rclcpp::Node & node,
 			bool subscribeOdom,
-			bool subscribeOdomInfo,
-			int queueSize,
-			bool approxSync);
+			bool subscribeOdomInfo);
 	void setupScanCallbacks(
 			rclcpp::Node & node,
 			bool subscribeScan2d,
 			bool subscribeScanDesc,
 			bool subscribeOdom,
 			bool subscribeUserData,
-			bool subscribeOdomInfo,
-			int queueSize,
-			bool approxSync);
+			bool subscribeOdomInfo);
 	void setupOdomCallbacks(
 			rclcpp::Node & node,
 			bool subscribeUserData,
-			bool subscribeOdomInfo,
-			int queueSize,
-			bool approxSync);
+			bool subscribeOdomInfo);
 
 protected:
 	std::string subscribedTopicsMsg_;
-	int queueSize_;
+	int topicQueueSize_;
+	int syncQueueSize_;
 	rmw_qos_reliability_policy_t qosOdom_;
 	rmw_qos_reliability_policy_t qosImage_;
 	rmw_qos_reliability_policy_t qosCameraInfo_;

@@ -60,10 +60,21 @@ PointCloudToDepthImage::PointCloudToDepthImage(const rclcpp::NodeOptions & optio
 	//tfBuffer_->setCreateTimerInterface(timer_interface);
 	tfListener_ = std::make_shared<tf2_ros::TransformListener>(*tfBuffer_);
 
-	int queueSize = 10;
+	int topicQueueSize = 1;
+	int syncQueueSize = 10;
 	int qos = 0;
 	bool approx = true;
-	queueSize = this->declare_parameter("queue_size", queueSize);
+	topicQueueSize = this->declare_parameter("topic_queue_size", topicQueueSize);
+	int queueSize = this->declare_parameter("queue_size", -1);
+	if(queueSize != -1)
+	{
+		syncQueueSize = queueSize;
+		RCLCPP_WARN(this->get_logger(), "Parameter \"queue_size\" has been renamed "
+				 "to \"sync_queue_size\" and will be removed "
+				 "in future versions! The value (%d) is copied to "
+				 "\"sync_queue_size\".", syncQueueSize);
+	}
+	syncQueueSize = this->declare_parameter("sync_queue_size", syncQueueSize);
 	qos = this->declare_parameter("qos", qos);
 	int qosCamInfo = this->declare_parameter("qos_camera_info", qos);
 	fixedFrameId_ = this->declare_parameter("fixed_frame_id", fixedFrameId_);
@@ -86,7 +97,8 @@ PointCloudToDepthImage::PointCloudToDepthImage(const rclcpp::NodeOptions & optio
 
 	RCLCPP_INFO(this->get_logger(), "Params:");
 	RCLCPP_INFO(this->get_logger(), "  approx=%s", approx?"true":"false");
-	RCLCPP_INFO(this->get_logger(), "  queue_size=%d", queueSize);
+	RCLCPP_INFO(this->get_logger(), "  topic_queue_size=%d", topicQueueSize);
+	RCLCPP_INFO(this->get_logger(), "  sync_queue_size=%d", syncQueueSize);
 	RCLCPP_INFO(this->get_logger(), "  fixed_frame_id=%s", fixedFrameId_.c_str());
 	RCLCPP_INFO(this->get_logger(), "  wait_for_transform=%fs", waitForTransform_);
 	RCLCPP_INFO(this->get_logger(), "  fill_holes_size=%d pixels (0=disabled)", fillHolesSize_);
@@ -105,18 +117,18 @@ PointCloudToDepthImage::PointCloudToDepthImage(const rclcpp::NodeOptions & optio
 
 	if(approx)
 	{
-		approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize), pointCloudSub_, cameraInfoSub_);
+		approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(syncQueueSize), pointCloudSub_, cameraInfoSub_);
 		approxSync_->registerCallback(std::bind(&PointCloudToDepthImage::callback, this, std::placeholders::_1, std::placeholders::_2));
 	}
 	else
 	{
 		fixedFrameId_.clear();
-		exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize), pointCloudSub_, cameraInfoSub_);
+		exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(syncQueueSize), pointCloudSub_, cameraInfoSub_);
 		exactSync_->registerCallback(std::bind(&PointCloudToDepthImage::callback, this, std::placeholders::_1, std::placeholders::_2));
 	}
 
-	pointCloudSub_.subscribe(this, "cloud", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
-	cameraInfoSub_.subscribe(this, "camera_info", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile());
+	pointCloudSub_.subscribe(this, "cloud", rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	cameraInfoSub_.subscribe(this, "camera_info", rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile());
 }
 
 PointCloudToDepthImage::~PointCloudToDepthImage()

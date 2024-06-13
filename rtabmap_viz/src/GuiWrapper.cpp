@@ -147,27 +147,27 @@ GuiWrapper::GuiWrapper(const rclcpp::NodeOptions & options) :
 	if(subscribeInfoOnly)
 	{
 	    RCLCPP_INFO(this->get_logger(), "rtabmap_viz: subscribe_info_only=true");
-		infoOnlyTopic_ = this->create_subscription<rtabmap_msgs::msg::Info>("info", 1, std::bind(&GuiWrapper::infoCallback, this, std::placeholders::_1));
+		infoOnlyTopic_ = this->create_subscription<rtabmap_msgs::msg::Info>("info", rclcpp::QoS(this->getTopicQueueSize()), std::bind(&GuiWrapper::infoCallback, this, std::placeholders::_1));
 	}
 	else
 	{
-		infoTopic_.subscribe(this, "info");
-	    mapDataTopic_.subscribe(this, "mapData");
+	    infoTopic_.subscribe(this, "info", rclcpp::QoS(this->getTopicQueueSize()).get_rmw_qos_profile());
+	    mapDataTopic_.subscribe(this, "mapData", rclcpp::QoS(this->getTopicQueueSize()).get_rmw_qos_profile());
 	    infoMapSync_ = new message_filters::Synchronizer<MyInfoMapSyncPolicy>(
-			    MyInfoMapSyncPolicy(this->getQueueSize()),
+			    MyInfoMapSyncPolicy(this->getSyncQueueSize()),
 			    infoTopic_,
 			    mapDataTopic_);
 	    infoMapSync_->registerCallback(std::bind(&GuiWrapper::infoMapCallback, this, std::placeholders::_1, std::placeholders::_2));
 	}
 
-	goalTopic_.subscribe(this, "goal_node");
-	pathTopic_.subscribe(this, "global_path");
+	goalTopic_.subscribe(this, "goal_node", rclcpp::QoS(this->getTopicQueueSize()).get_rmw_qos_profile());
+	pathTopic_.subscribe(this, "global_path", rclcpp::QoS(this->getTopicQueueSize()).get_rmw_qos_profile());
 	goalPathSync_ = new message_filters::Synchronizer<MyGoalPathSyncPolicy>(
-			MyGoalPathSyncPolicy(this->getQueueSize()),
+			MyGoalPathSyncPolicy(this->getSyncQueueSize()),
 			goalTopic_,
 			pathTopic_);
 	goalPathSync_->registerCallback(std::bind(&GuiWrapper::goalPathCallback, this, std::placeholders::_1, std::placeholders::_2));
-	goalReachedTopic_ = this->create_subscription<std_msgs::msg::Bool>("goal_reached", 5, std::bind(&GuiWrapper::goalReachedCallback, this, std::placeholders::_1));
+	goalReachedTopic_ = this->create_subscription<std_msgs::msg::Bool>("goal_reached", rclcpp::QoS(topicQueueSize_), std::bind(&GuiWrapper::goalReachedCallback, this, std::placeholders::_1));
 
 	setupCallbacks(*this); // do it at the end
 }
