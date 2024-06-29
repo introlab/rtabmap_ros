@@ -142,7 +142,7 @@ GuiWrapper::GuiWrapper(const rclcpp::NodeOptions & options) :
 	UEventsManager::addHandler(this);
 	UEventsManager::addHandler(mainWindow_);
 
-	republishNodeDataPub_ = this->create_publisher<std_msgs::msg::Int32MultiArray>("republish_node_data", 1);
+	republishNodeDataPub_ = this->create_publisher<std_msgs::msg::Int32MultiArray>(rtabmapNodeName_+"/republish_node_data", 1);
 
 	if(subscribeInfoOnly)
 	{
@@ -369,7 +369,7 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 		rtabmap::RtabmapEventCmd::Cmd cmd = cmdEvent->getCmd();
 		if(cmd == rtabmap::RtabmapEventCmd::kCmdResetMemory)
 		{
-			if(!callEmptyService("reset"))
+			if(!callEmptyService(rtabmapNodeName_+"/reset"))
 			{
 				RCLCPP_ERROR(this->get_logger(), "Can't call \"reset\" service");
 			}
@@ -390,7 +390,7 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 			callEmptyService("pause_odom");
 
 			// Pause rtabmap
-			if(!callEmptyService("pause"))
+			if(!callEmptyService(rtabmapNodeName_+"/pause"))
 			{
 				RCLCPP_ERROR(this->get_logger(), "Can't call \"pause\" service");
 			}
@@ -398,7 +398,7 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 		else if(cmd == rtabmap::RtabmapEventCmd::kCmdResume)
 		{
 			// Resume rtabmap
-			if(!callEmptyService("resume"))
+			if(!callEmptyService(rtabmapNodeName_+"/resume"))
 			{
 				RCLCPP_ERROR(this->get_logger(), "Can't call \"resume\" service");
 			}
@@ -418,7 +418,7 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 		}
 		else if(cmd == rtabmap::RtabmapEventCmd::kCmdTriggerNewMap)
 		{
-			if(!callEmptyService("trigger_new_map"))
+			if(!callEmptyService(rtabmapNodeName_+"/trigger_new_map"))
 			{
 				RCLCPP_ERROR(this->get_logger(), "Can't call \"trigger_new_map\" service");
 			}
@@ -429,7 +429,7 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 			UASSERT(cmdEvent->value2().isBool());
 			UASSERT(cmdEvent->value3().isBool());
 
-			if(!callMapDataService("get_map_data", cmdEvent->value1().toBool(), cmdEvent->value2().toBool(), cmdEvent->value3().toBool()))
+			if(!callMapDataService(rtabmapNodeName_+"/get_map_data", cmdEvent->value1().toBool(), cmdEvent->value2().toBool(), cmdEvent->value3().toBool()))
 			{
 				this->post(new RtabmapEvent3DMap(1)); // service error
 			}
@@ -438,7 +438,7 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 		{
 			UASSERT(cmdEvent->value1().isStr() || cmdEvent->value1().isInt() || cmdEvent->value1().isUInt());
 
-			auto client = this->create_client<rtabmap_msgs::srv::SetGoal>("set_goal");
+			auto client = this->create_client<rtabmap_msgs::srv::SetGoal>(rtabmapNodeName_+"/set_goal");
 			if(client->wait_for_service(std::chrono::seconds(1)))
 			{
 				auto request = std::make_shared<rtabmap_msgs::srv::SetGoal::Request>();
@@ -468,7 +468,7 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 		}
 		else if(cmd == rtabmap::RtabmapEventCmd::kCmdCancelGoal)
 		{
-			if(!callEmptyService("cancel_goal"))
+			if(!callEmptyService(rtabmapNodeName_+"/cancel_goal"))
 			{
 				RCLCPP_ERROR(this->get_logger(), "Can't call \"cancel_goal\" service");
 			}
@@ -478,7 +478,7 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 			UASSERT(cmdEvent->value1().isStr());
 			UASSERT(cmdEvent->value2().isUndef() || cmdEvent->value2().isInt() || cmdEvent->value2().isUInt());
 
-			auto client = this->create_client<rtabmap_msgs::srv::SetLabel>("set_label");
+			auto client = this->create_client<rtabmap_msgs::srv::SetLabel>(rtabmapNodeName_+"/set_label");
 			if(client->wait_for_service(std::chrono::seconds(1)))
 			{
 				auto request = std::make_shared<rtabmap_msgs::srv::SetLabel::Request>();
@@ -495,7 +495,7 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 		else if(cmd == rtabmap::RtabmapEventCmd::kCmdRemoveLabel)
 		{
 			UASSERT(cmdEvent->value1().isStr());
-			auto client = this->create_client<rtabmap_msgs::srv::RemoveLabel>("remove_label");
+			auto client = this->create_client<rtabmap_msgs::srv::RemoveLabel>(rtabmapNodeName_+"/remove_label");
 			if(client->wait_for_service(std::chrono::seconds(1)))
 			{
 				auto request = std::make_shared<rtabmap_msgs::srv::RemoveLabel::Request>();

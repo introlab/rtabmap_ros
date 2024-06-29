@@ -274,6 +274,7 @@ def launch_setup(context, *args, **kwargs):
                 "odom_frame_id": LaunchConfiguration('odom_frame_id').perform(context),
                 "publish_tf": LaunchConfiguration('publish_tf_map'),
                 "initial_pose": LaunchConfiguration('initial_pose'),
+                "use_action_for_goal": LaunchConfiguration('use_action_for_goal'),
                 "ground_truth_frame_id": LaunchConfiguration('ground_truth_frame_id').perform(context),
                 "ground_truth_base_frame_id": LaunchConfiguration('ground_truth_base_frame_id').perform(context),
                 "odom_tf_angular_variance": LaunchConfiguration('odom_tf_angular_variance'),
@@ -316,7 +317,8 @@ def launch_setup(context, *args, **kwargs):
                 ("tag_detections", LaunchConfiguration('tag_topic')),
                 ("fiducial_transforms", LaunchConfiguration('fiducial_topic')),
                 ("odom", LaunchConfiguration('odom_topic')),
-                ("imu", LaunchConfiguration('imu_topic'))],
+                ("imu", LaunchConfiguration('imu_topic')),
+                ("goal_out", LaunchConfiguration('output_goal_topic'))],
             arguments=[LaunchConfiguration("args"), "--ros-args", "--log-level", [LaunchConfiguration('namespace'), '.rtabmap:=', LaunchConfiguration('log_level')], "--log-level", ['rtabmap:=', LaunchConfiguration('log_level')]],
             prefix=LaunchConfiguration('launch_prefix'),
             namespace=LaunchConfiguration('namespace')),
@@ -425,6 +427,9 @@ def generate_launch_description():
         DeclareLaunchArgument('output',         default_value='screen',             description='Control node output (screen or log).'),
         DeclareLaunchArgument('initial_pose',   default_value='',                   description='Set an initial pose (only in localization mode). Format: "x y z roll pitch yaw" or "x y z qx qy qz qw". Default: see "RGBD/StartAtOrigin" doc'),
         
+        DeclareLaunchArgument('output_goal_topic', default_value='/goal_pose',      description='Output goal topic (can be connected to nav2).'),
+        DeclareLaunchArgument('use_action_for_goal', default_value='false',         description='Connect to nav2\'s navigate_to_pose action server instead of publishing the output goal topic.'),
+
         DeclareLaunchArgument('ground_truth_frame_id',      default_value='', description='e.g., "world"'),
         DeclareLaunchArgument('ground_truth_base_frame_id', default_value='', description='e.g., "tracker", a fake frame matching the frame "frame_id" (but on different TF tree)'),
         
