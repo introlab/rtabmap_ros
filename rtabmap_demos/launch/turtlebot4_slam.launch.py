@@ -15,10 +15,13 @@
 #
 #   4) Click on double points ".." button on top-right next to power button to undock.
 #
-#   5) Teleop the robot:
-#     $ ros2 run teleop_twist_keyboard teleop_twist_keyboard
+#   5) Move the robot:
+#     b) By sending goals with RVIZ's "Nav2 Goal" button in action bar.
+#     a) By teleoperating:
+#        $ ros2 run teleop_twist_keyboard teleop_twist_keyboard
+#     c) By using autonomous exploration node (tested with https://github.com/robo-friends/m-explore-ros2):
+#        $ ros2 launch explore_lite explore.launch.py
 #
-#   6) Send goals with RVIZ's "Nav2 Goal" button in action bar:
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable
@@ -58,7 +61,8 @@ def generate_launch_description():
           # RTAB-Map's parameters should be strings:
           'Reg/Strategy':'1',
           'Reg/Force3DoF':'true',
-          'Mem/NotLinkedNodesKept':'false'
+          'Mem/NotLinkedNodesKept':'false',
+          'Icp/PointToPlaneMinComplexity':'0.04' # to be more robust to long corridors with low geometry
     }
 
     remappings=[

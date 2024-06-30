@@ -10,10 +10,13 @@
 #
 #   3) Click on double points ".." button on top-right next to power button to undock.
 #
-#   4) Teleop the robot:
-#     $ ros2 run teleop_twist_keyboard teleop_twist_keyboard
+#   4) Move the robot:
+#     b) By sending goals with RVIZ's "Nav2 Goal" button in action bar.
+#     a) By teleoperating:
+#        $ ros2 run teleop_twist_keyboard teleop_twist_keyboard
+#     c) By using autonomous exploration node (tested with https://github.com/robo-friends/m-explore-ros2):
+#        $ ros2 launch explore_lite explore.launch.py
 #
-#   5) Send goals with RVIZ's "Nav2 Goal" button in action bar.
 
 from ament_index_python.packages import get_package_share_directory
 
