@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        ros_distro: [humble, iron, jazzy]
+        ros_distro: [humble, iron]
         include:
         - ros_distro: 'humble'
           ubuntu_distro: 'jammy'
