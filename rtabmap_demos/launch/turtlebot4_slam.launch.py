@@ -1,3 +1,7 @@
+#
+# Note: Make sure you have this fix for turtlebot4_description https://github.com/turtlebot/turtlebot4/pull/434,
+#       otherwise, the lidar and camera point cloud won't be aligned correctly.
+#
 # Example with gazebo:
 #   1) Launch simulator (turtlebot4 and nav2):
 #     $ ros2 launch turtlebot4_ignition_bringup turtlebot4_ignition.launch.py slam:=false nav2:=true rviz:=true
@@ -39,6 +43,7 @@ def generate_launch_description():
           'subscribe_rgbd':True,
           'subscribe_scan':True,
           'use_action_for_goal':True,
+          'odom_sensor_sync': True,
           'qos_scan':qos,
           'qos_image':qos,
           'qos_imu':qos,

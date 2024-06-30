@@ -1,3 +1,7 @@
+#
+# Note: Make sure you have this fix for turtlebot4_description https://github.com/turtlebot/turtlebot4/pull/434,
+#       otherwise, the lidar and camera point cloud won't be aligned correctly.
+#
 # Example:
 #   1) Launch simulator (turtlebot4, nav2 and rtabmap):
 #     $ ros2 launch rtabmap_demos turtlebot4_ignition.launch.py
