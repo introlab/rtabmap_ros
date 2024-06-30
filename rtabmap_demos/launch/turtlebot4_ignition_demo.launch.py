@@ -2,9 +2,9 @@
 #   1) Launch simulator (turtlebot4, nav2 and rtabmap):
 #     $ ros2 launch rtabmap_demos turtlebot4_ignition.launch.py
 #
-#   2) Click on "Play" button on bottom-right of gazebo.
+#   2) Click on "Play" button on bottom-left of gazebo.
 #
-#   3) Click on double points ".." button on top right next to power button to undock.
+#   3) Click on double points ".." button on top-right next to power button to undock.
 #
 #   4) Teleop the robot:
 #     $ ros2 run teleop_twist_keyboard teleop_twist_keyboard

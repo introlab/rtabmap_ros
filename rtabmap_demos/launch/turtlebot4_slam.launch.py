@@ -7,9 +7,9 @@
 #     OR
 #     $ ros2 launch rtabmap_launch rtabmap.launch.py rtabmap_viz:=true subscribe_scan:=true rgbd_sync:=true depth_topic:=/oakd/rgb/preview/depth odom_sensor_sync:=true camera_info_topic:=/oakd/rgb/preview/camera_info rgb_topic:=/oakd/rgb/preview/image_raw visual_odometry:=false approx_sync:=true approx_rgbd_sync:=false odom_guess_frame_id:=odom icp_odometry:=true odom_topic:="icp_odom" map_topic:="/map" qos:=2 use_sim_time:=true odom_log_level:=warn rtabmap_args:="--delete_db_on_start --Reg/Strategy 1 --Reg/Force3DoF true --Mem/NotLinkedNodesKept false" use_action_for_goal:=true
 #
-#   3) Click on "Play" button on bottom-right of gazebo.
+#   3) Click on "Play" button on bottom-left of gazebo.
 #
-#   4) Click on double points ".." button on top right next to power button to undock.
+#   4) Click on double points ".." button on top-right next to power button to undock.
 #
 #   5) Teleop the robot:
 #     $ ros2 run teleop_twist_keyboard teleop_twist_keyboard
