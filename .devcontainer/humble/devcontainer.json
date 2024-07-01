@@ -1,0 +1,11 @@
+{
+    "image": "introlab3it/rtabmap_ros:humble-latest",
+    "customizations": {
+        "vscode": {
+          "extensions": ["ms-vscode.cpptools-themes", "ms-vscode.cmake-tools", "vscjava.vscode-java-pack"]
+        }
+    },
+    "workspaceMount": "source=${localWorkspaceFolder},target=/ros2_ws/src/rtabmap_ros,type=bind",
+    "workspaceFolder": "/ros2_ws",
+    "postAttachCommand": "echo 'Initialize colcon: source /opt/ros/humble/setup.bash && cd /ros2_ws && colcon build --cmake-args -DRTABMAP_SYNC_MULTI_RGBD=ON -DCMAKE_BUILD_TYPE=Release'"
+}

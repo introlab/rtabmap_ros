@@ -17,42 +17,32 @@ jobs:
     # well on Windows or Mac.  You can convert this to a matrix build if you need
     # cross-platform coverage.
     # See: https://docs.github.com/en/free-pro-team@latest/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
-    name: Build on ros2 ${{ matrix.ros_distro }} and ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+    name: Build ros2 ${{ matrix.ros_distro }} on ubuntu ${{ matrix.ubuntu_distro }}
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         ros_distro: [humble, iron]
         include:
         - ros_distro: 'humble'
-          os: ubuntu-22.04
+          ubuntu_distro: 'jammy'
         - ros_distro: 'iron'
-          os: ubuntu-22.04
-
+          ubuntu_distro: 'jammy'
+# Disabled as there still missing dependencies on jazzy:
+#        - ros_distro: 'jazzy'
+#          ubuntu_distro: 'noble'
+      fail-fast: false
+    container:
+      image: rostooling/setup-ros-docker:ubuntu-${{ matrix.ubuntu_distro }}-ros-${{ matrix.ros_distro }}-desktop-latest
     steps:   
-    - uses: ros-tooling/setup-ros@v0.6
+    - uses: actions/checkout@v4
+    - uses: ros-tooling/setup-ros@v0.7
       with:
         required-ros-distributions: ${{ matrix.ros_distro }}
-                   
-    - name: Setup ros2 workspace
-      run: | 
-        source /opt/ros/${{ matrix.ros_distro }}/setup.bash
-        mkdir -p ${{github.workspace}}/ros2_ws/src
-        cd ${{github.workspace}}/ros2_ws
-        colcon build
-        
-    - uses: actions/checkout@v2
+    - run: |
+        echo "repositories:\n  introlab/rtabmap:\n    type: git\n    url: https://github.com/introlab/rtabmap.git\n    version: master\n" > /tmp/deps.repos &&\
+        cat /tmp/deps.repos
+    - uses: ros-tooling/action-ros-ci@v0.3
       with:
-        repository: 'introlab/rtabmap'
-        path: 'ros2_ws/src/rtabmap'
-        
-    - uses: actions/checkout@v2
-      with:
-        path: 'ros2_ws/src/rtabmap_ros'
-        
-    - name: colcon build
-      run: |
-        source /opt/ros/${{ matrix.ros_distro }}/setup.bash
-        cd ${{github.workspace}}/ros2_ws
-        rosdep update
-        rosdep install --from-paths src --ignore-src -r -y -t build_export -t test -t build -t buildtool_export -t buildtool
-        colcon build --event-handlers console_direct+
+        package-name: rtabmap_ros
+        target-ros2-distro: ${{ matrix.ros_distro }}
+        vcs-repo-file-url: /tmp/deps.repos

@@ -57,7 +57,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap_conversions/MsgConversion.h>
 #include <rtabmap_msgs/srv/get_map.hpp>
 
-
 namespace rtabmap_rviz_plugins
 {
 
@@ -96,6 +95,10 @@ MapCloudDisplay::MapCloudDisplay()
 {
 	//QIcon icon;
 	//this->setIcon(icon);
+
+	auto options = rclcpp::NodeOptions().arguments(
+		{"--ros-args", "--remap", "__node:=rviz_map_cloud_action_client", "--"});
+	clientNode_ = std::make_shared<rclcpp::Node>("_", options);
 
 	style_property_ = new rviz_common::properties::EnumProperty( "Style", "Flat Squares",
 										"Rendering mode to use, in order of computational complexity.",
@@ -500,64 +503,64 @@ void MapCloudDisplay::updateCloudParameters()
 	fromScan_ = cloud_from_scan_->getBool();
 }
 
-void MapCloudDisplay::downloadMap(bool /*graphOnly*/)
+void MapCloudDisplay::downloadMap(bool graphOnly)
 {
-	RCLCPP_ERROR(rviz_ros_node_.lock()->get_raw_node()->get_logger(), "MapCloud plugin: DownloadMap still not working on ros2");
-	return;
-	// FIXME: ros2: can connect to client, rtabmap returns data but the callback here is never called?!
-	/*
 	auto request = std::make_shared<rtabmap_msgs::srv::GetMap::Request>();
 	request->global_map = false;
 	request->optimized = true;
 	request->graph_only = graphOnly;
 	std::string rtabmapNs = download_namespace->getStdString();
-	std::string srvName = uFormat("%s/get_map_data", rtabmapNs.c_str());
-//	QMessageBox * messageBox = new QMessageBox(
-//			QMessageBox::NoIcon,
-//			tr("Calling \"%1\" service...").arg(srvName.c_str()),
-//			tr("Downloading the map... please wait (rviz could become gray!)"),
-//			QMessageBox::NoButton);
-//	messageBox->setAttribute(Qt::WA_DeleteOnClose, true);
-//	messageBox->show();
-//	QApplication::processEvents();
-//	uSleep(100); // hack make sure the text in the QMessageBox is shown...
-//	QApplication::processEvents();
+	std::string srvName = rtabmapNs+"/get_map_data";
+	QMessageBox * messageBox = new QMessageBox(
+			QMessageBox::NoIcon,
+			tr("Calling \"%1\" service...").arg(srvName.c_str()),
+			tr("Downloading the map... please wait (rviz could become gray!)"),
+			QMessageBox::NoButton,
+			getAssociatedWidget());
+	messageBox->setAttribute(Qt::WA_DeleteOnClose, true);
+	messageBox->show();
+	QApplication::processEvents();
+	uSleep(100); // hack make sure the text in the QMessageBox is shown...
+	QApplication::processEvents();
 	
-	RVIZ_COMMON_LOG_WARNING(uFormat("Wait for service %s", srvName.c_str()));
-	auto client = rviz_ros_node_.lock()->get_raw_node()->create_client<rtabmap_ros::srv::GetMap>(srvName);
+	RVIZ_COMMON_LOG_INFO(uFormat("Wait for service %s", srvName.c_str()));
+	
+	auto client = clientNode_->create_client<rtabmap_msgs::srv::GetMap>(srvName);
 	if(client->wait_for_service(std::chrono::seconds(1)))
 	{
-		using ServiceResponseFuture = rclcpp::Client<rtabmap_ros::srv::GetMap>::SharedFuture;
-		auto response_received_callback = [this, &graphOnly](ServiceResponseFuture future) {
-			auto result = future.get();
-			RVIZ_COMMON_LOG_WARNING(uFormat("Process data"));
+		RVIZ_COMMON_LOG_INFO(uFormat("Calling service %s", srvName.c_str()));
+		auto result = client->async_send_request(request);
+		if (rclcpp::spin_until_future_complete(clientNode_, result) ==
+    		rclcpp::FutureReturnCode::SUCCESS)
+		{
+			RVIZ_COMMON_LOG_INFO(uFormat("Process data"));
+			auto future = result.get();
 			if(graphOnly)
 			{
-				//messageBox->setText(tr("Updating the map (%1 nodes downloaded)...").arg(result->data.graph.poses.size()));
-				//QApplication::processEvents();
-				processMapData(result->data);
-				//messageBox->setText(tr("Updating the map (%1 nodes downloaded)... done!").arg(result->data.graph.poses.size()));
-
-			//	QTimer::singleShot(1000, messageBox, SLOT(close()));
+				messageBox->setText(tr("Updating the map (%1 nodes downloaded)...").arg(future->data.graph.poses.size()));
+				QApplication::processEvents();
+				processMapData(future->data);
+				messageBox->setText(tr("Updating the map (%1 nodes downloaded)... done!").arg(future->data.graph.poses.size()));
+				QApplication::processEvents();
+				QTimer::singleShot(1000, messageBox, SLOT(close()));
 			}
 			else
 			{
-				//messageBox->setText(tr("Creating all clouds (%1 poses and %2 clouds downloaded)...")
-				//		.arg(result->data.graph.poses.size()).arg(result->data.nodes.size()));
-				//QApplication::processEvents();
+				messageBox->setText(tr("Creating all clouds (%1 poses and %2 clouds downloaded)...")
+						.arg(future->data.graph.poses.size()).arg(future->data.nodes.size()));
+				QApplication::processEvents();
 				this->reset();
-				processMapData(result->data);
-				//messageBox->setText(tr("Creating all clouds (%1 poses and %2 clouds downloaded)... done!")
-				//		.arg(result->data.graph.poses.size()).arg(result->data.nodes.size()));
+				processMapData(future->data);
+				messageBox->setText(tr("Creating all clouds (%1 poses and %2 clouds downloaded)... done!")
+						.arg(future->data.graph.poses.size()).arg(future->data.nodes.size()));
 
-			//	QTimer::singleShot(1000, messageBox, SLOT(close()));
+				QTimer::singleShot(1000, messageBox, SLOT(close()));
 			}
-		};
-		RVIZ_COMMON_LOG_WARNING(uFormat("Calling service %s", srvName.c_str()));
-		auto result_future = client->async_send_request(request, response_received_callback);
-		RVIZ_COMMON_LOG_WARNING(uFormat("Wait"));
-		result_future.wait();
-		RVIZ_COMMON_LOG_WARNING(uFormat("Wait end"));
+		} else {
+			std::string msg = uFormat("Failed to call service %s", srvName.c_str());
+			RVIZ_COMMON_LOG_ERROR(msg);
+			messageBox->setText(msg.c_str());
+		}
 	}
 	else
 	{
@@ -567,8 +570,8 @@ void MapCloudDisplay::downloadMap(bool /*graphOnly*/)
 				  srvName.c_str(),
 				  rtabmapNs.c_str());
 		RVIZ_COMMON_LOG_ERROR(msg);
-		//messageBox->setText(msg.c_str());
-	}*/
+		messageBox->setText(msg.c_str());
+	}
 }
 
 void MapCloudDisplay::downloadNamespaceChanged()

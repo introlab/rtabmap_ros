@@ -27,7 +27,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <rtabmap_util/rgbd_split.hpp>
 
+#ifdef PRE_ROS_IRON
 #include <cv_bridge/cv_bridge.h>
+#else
+#include <cv_bridge/cv_bridge.hpp>
+#endif
 
 namespace rtabmap_util
 {
@@ -35,12 +39,9 @@ namespace rtabmap_util
 RGBDSplit::RGBDSplit(const rclcpp::NodeOptions & options) :
 	Node("rgbd_split", options)
 {
-	int queueSize = 10;
 	int qos = 0;
-	queueSize = this->declare_parameter("queue_size", queueSize);
 	qos = this->declare_parameter("qos", qos);
 
-	RCLCPP_INFO(this->get_logger(), "%s: queue_size  = %d", get_name(), queueSize);
 	RCLCPP_INFO(this->get_logger(), "%s: qos         = %d", get_name(), qos);
 
 	rgbdImageSub_ = create_subscription<rtabmap_msgs::msg::RGBDImage>("rgbd_image", rclcpp::QoS(5).reliability((rmw_qos_reliability_policy_t)qos), std::bind(&RGBDSplit::callback, this, std::placeholders::_1));

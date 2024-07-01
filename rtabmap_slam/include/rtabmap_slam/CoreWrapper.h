@@ -88,8 +88,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <apriltag_msgs/msg/april_tag_detection_array.hpp>
 #endif
 
+#ifdef WITH_NAV2_MSGS
 #include <nav2_msgs/action/navigate_to_pose.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
+#endif
 
 //#define WITH_FIDUCIAL_MSGS
 #ifdef WITH_FIDUCIAL_MSGS
@@ -109,8 +111,10 @@ public:
 	explicit CoreWrapper(const rclcpp::NodeOptions & options);
 	virtual ~CoreWrapper();
 
+#ifdef WITH_NAV2_MSGS
 	using NavigateToPose = nav2_msgs::action::NavigateToPose;
 	using GoalHandleNav2 = rclcpp_action::ClientGoalHandle<NavigateToPose>;
+#endif
 
 private:
 	bool odomUpdate(const nav_msgs::msg::Odometry & odomMsg, rclcpp::Time stamp);
@@ -246,12 +250,14 @@ private:
 
 	void publishStats(const rclcpp::Time & stamp);
 	void publishCurrentGoal(const rclcpp::Time & stamp);
+#ifdef WITH_NAV2_MSGS
 #ifdef NAV_MSGS_FOXY
 	void goalResponseCallback(std::shared_future<GoalHandleNav2::SharedPtr> future);
 #else
         void goalResponseCallback(const GoalHandleNav2::SharedPtr & goal_handle);
 #endif
 	void resultCallback(const GoalHandleNav2::WrappedResult & result);
+#endif
 
 	void publishLocalPath(const rclcpp::Time & stamp);
 	void publishGlobalPath(const rclcpp::Time & stamp);
@@ -373,7 +379,9 @@ private:
 	rclcpp::Service<octomap_msgs::srv::GetOctomap>::SharedPtr octomapBinarySrv_;
 	rclcpp::Service<octomap_msgs::srv::GetOctomap>::SharedPtr octomapFullSrv_;
 #endif
+#ifdef WITH_NAV2_MSGS
 	rclcpp_action::Client<NavigateToPose>::SharedPtr nav2Client_;
+#endif
 
 	std::thread* transformThread_;
 	bool tfThreadRunning_;

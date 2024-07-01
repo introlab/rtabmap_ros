@@ -30,7 +30,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sensor_msgs/msg/compressed_image.hpp>
 #include <sensor_msgs/image_encodings.hpp>
 
+#ifdef PRE_ROS_IRON
 #include <cv_bridge/cv_bridge.h>
+#else
+#include <cv_bridge/cv_bridge.hpp>
+#endif
 #include <opencv2/highgui/highgui.hpp>
 
 #include "rtabmap/core/Compression.h"
@@ -49,13 +53,24 @@ RGBDSync::RGBDSync(const rclcpp::NodeOptions & options) :
 	approxSyncDepth_(0),
 	exactSyncDepth_(0)
 {
-	int queueSize = 10;
+	int topicQueueSize = 1;
+	int syncQueueSize = 10;
 	bool approxSync = true;
 	double approxSyncMaxInterval = 0.0;
 	int qos = 0;
 	approxSync = this->declare_parameter("approx_sync", approxSync);
 	approxSyncMaxInterval = this->declare_parameter("approx_sync_max_interval", approxSyncMaxInterval);
-	queueSize = this->declare_parameter("queue_size", queueSize);
+	topicQueueSize = this->declare_parameter("topic_queue_size", topicQueueSize);
+	int queueSize = this->declare_parameter("queue_size", -1);
+	if(queueSize != -1)
+	{
+		syncQueueSize = queueSize;
+		RCLCPP_WARN(this->get_logger(), "Parameter \"queue_size\" has been renamed "
+				 "to \"sync_queue_size\" and will be removed "
+				 "in future versions! The value (%d) is copied to "
+				 "\"sync_queue_size\".", syncQueueSize);
+	}
+	syncQueueSize = this->declare_parameter("sync_queue_size", syncQueueSize);
 	qos = this->declare_parameter("qos", qos);
 	int qosCamInfo = this->declare_parameter("qos_camera_info", qos);
 	depthScale_ = this->declare_parameter("depth_scale", depthScale_);
@@ -70,8 +85,9 @@ RGBDSync::RGBDSync(const rclcpp::NodeOptions & options) :
 	RCLCPP_INFO(this->get_logger(), "%s: approx_sync = %s", get_name(), approxSync?"true":"false");
 	if(approxSync)
 		RCLCPP_INFO(this->get_logger(), "%s: approx_sync_max_interval = %f", get_name(), approxSyncMaxInterval);
-	RCLCPP_INFO(this->get_logger(), "%s: queue_size  = %d", get_name(), queueSize);
-	RCLCPP_INFO(this->get_logger(), "%s: qos         = %d", get_name(), qos);
+	RCLCPP_INFO(this->get_logger(), "%s: topic_queue_size  = %d", get_name(), topicQueueSize);
+	RCLCPP_INFO(this->get_logger(), "%s: sync_queue_size  = %d", get_name(), syncQueueSize);
+	RCLCPP_INFO(this->get_logger(), "%s: qos             = %d", get_name(), qos);
 	RCLCPP_INFO(this->get_logger(), "%s: qos_camera_info = %d", get_name(), qosCamInfo);
 	RCLCPP_INFO(this->get_logger(), "%s: depth_scale = %f", get_name(), depthScale_);
 	RCLCPP_INFO(this->get_logger(), "%s: decimation = %d", get_name(), decimation_);
@@ -82,21 +98,21 @@ RGBDSync::RGBDSync(const rclcpp::NodeOptions & options) :
 
 	if(approxSync)
 	{
-		approxSyncDepth_ = new message_filters::Synchronizer<MyApproxSyncDepthPolicy>(MyApproxSyncDepthPolicy(queueSize), imageSub_, imageDepthSub_, cameraInfoSub_);
+		approxSyncDepth_ = new message_filters::Synchronizer<MyApproxSyncDepthPolicy>(MyApproxSyncDepthPolicy(syncQueueSize), imageSub_, imageDepthSub_, cameraInfoSub_);
 		if(approxSyncMaxInterval > 0.0)
 			approxSyncDepth_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval));
 		approxSyncDepth_->registerCallback(std::bind(&RGBDSync::callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 	}
 	else
 	{
-		exactSyncDepth_ = new message_filters::Synchronizer<MyExactSyncDepthPolicy>(MyExactSyncDepthPolicy(queueSize), imageSub_, imageDepthSub_, cameraInfoSub_);
+		exactSyncDepth_ = new message_filters::Synchronizer<MyExactSyncDepthPolicy>(MyExactSyncDepthPolicy(syncQueueSize), imageSub_, imageDepthSub_, cameraInfoSub_);
 		exactSyncDepth_->registerCallback(std::bind(&RGBDSync::callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 	}
 
 	image_transport::TransportHints hints(this);
-	imageSub_.subscribe(this, "rgb/image", hints.getTransport(), rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
-	imageDepthSub_.subscribe(this, "depth/image", hints.getTransport(), rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
-	cameraInfoSub_.subscribe(this, "rgb/camera_info", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile());
+	imageSub_.subscribe(this, "rgb/image", hints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	imageDepthSub_.subscribe(this, "depth/image", hints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	cameraInfoSub_.subscribe(this, "rgb/camera_info", rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile());
 
 	std::string subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s,\n   %s,\n   %s",
 						get_name(),

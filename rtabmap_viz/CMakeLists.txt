@@ -16,6 +16,8 @@ find_package(rtabmap_msgs REQUIRED)
 find_package(rtabmap_sync REQUIRED)
 find_package(tf2 REQUIRED)
 
+find_package(RTABMap COMPONENTS gui REQUIRED)
+
 include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )

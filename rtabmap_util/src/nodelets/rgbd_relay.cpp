@@ -32,7 +32,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sensor_msgs/msg/camera_info.hpp>
 #include <sensor_msgs/image_encodings.hpp>
 
+#ifdef PRE_ROS_IRON
 #include <cv_bridge/cv_bridge.h>
+#else
+#include <cv_bridge/cv_bridge.hpp>
+#endif
 #include <opencv2/highgui/highgui.hpp>
 
 #include "rtabmap_conversions/MsgConversion.h"

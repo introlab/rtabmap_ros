@@ -46,6 +46,10 @@ if("$ENV{ROS_DISTRO}" STRLESS "humble")
   add_definitions(-DPRE_ROS_HUMBLE)
 endif()
 
+IF("$ENV{ROS_DISTRO}" STRLESS "iron")
+  add_definitions(-DPRE_ROS_IRON)
+ENDIF()
+
 ###########
 ## Build ##
 ###########
@@ -57,6 +61,10 @@ target_include_directories(rtabmap_conversions
     $<INSTALL_INTERFACE:include>
 )
 ament_target_dependencies(rtabmap_conversions ${Libraries})
+
+IF("$ENV{ROS_DISTRO}" STRLESS "iron")
+  target_compile_definitions(rtabmap_conversions PUBLIC -DPRE_ROS_IRON)
+ENDIF()
 
 #############
 ## Install ##

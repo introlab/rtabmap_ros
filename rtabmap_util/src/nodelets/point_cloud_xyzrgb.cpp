@@ -31,10 +31,16 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <rtabmap_conversions/MsgConversion.h>
 
+#ifdef PRE_ROS_IRON
+#include <cv_bridge/cv_bridge.h>
 #include <image_geometry/pinhole_camera_model.h>
 #include <image_geometry/stereo_camera_model.h>
+#else
+#include <cv_bridge/cv_bridge.hpp>
+#include <image_geometry/pinhole_camera_model.hpp>
+#include <image_geometry/stereo_camera_model.hpp>
+#endif
 
-#include <cv_bridge/cv_bridge.h>
 #include <opencv2/highgui/highgui.hpp>
 
 #include "rtabmap/core/util2d.h"
@@ -67,12 +73,23 @@ PointCloudXYZRGB::PointCloudXYZRGB(const rclcpp::NodeOptions & options) :
 {
 	bool approxSync = true;
 	std::string roiStr;
-	int queueSize = 10;
+	int topicQueueSize = 1;
+	int syncQueueSize = 10;
 	int qos = 0;
 	double approxSyncMaxInterval = 0.0;
 	approxSync = this->declare_parameter("approx_sync", approxSync);
 	approxSyncMaxInterval = this->declare_parameter("approx_sync_max_interval", approxSyncMaxInterval);
-	queueSize = this->declare_parameter("queue_size", queueSize);
+	topicQueueSize = this->declare_parameter("topic_queue_size", topicQueueSize);
+	int queueSize = this->declare_parameter("queue_size", -1);
+	if(queueSize != -1)
+	{
+		syncQueueSize = queueSize;
+		RCLCPP_WARN(this->get_logger(), "Parameter \"queue_size\" has been renamed "
+				 "to \"sync_queue_size\" and will be removed "
+				 "in future versions! The value (%d) is copied to "
+				 "\"sync_queue_size\".", syncQueueSize);
+	}
+	syncQueueSize = this->declare_parameter("sync_queue_size", syncQueueSize);
 	qos = this->declare_parameter("qos", qos);
 	int qosCamInfo = this->declare_parameter("qos_camera_info", qos);
 	maxDepth_ = this->declare_parameter("max_depth", maxDepth_);
@@ -135,49 +152,49 @@ PointCloudXYZRGB::PointCloudXYZRGB(const rclcpp::NodeOptions & options) :
 
 	cloudPub_ = create_publisher<sensor_msgs::msg::PointCloud2>("cloud", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos));
 
-	rgbdImageSub_ = create_subscription<rtabmap_msgs::msg::RGBDImage>("rgbd_image", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos), std::bind(&PointCloudXYZRGB::rgbdImageCallback, this, std::placeholders::_1));
+	rgbdImageSub_ = create_subscription<rtabmap_msgs::msg::RGBDImage>("rgbd_image", rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos), std::bind(&PointCloudXYZRGB::rgbdImageCallback, this, std::placeholders::_1));
 
 	if(approxSync)
 	{
 
-		approxSyncDepth_ = new message_filters::Synchronizer<MyApproxSyncDepthPolicy>(MyApproxSyncDepthPolicy(queueSize), imageSub_, imageDepthSub_, cameraInfoSub_);
+		approxSyncDepth_ = new message_filters::Synchronizer<MyApproxSyncDepthPolicy>(MyApproxSyncDepthPolicy(syncQueueSize), imageSub_, imageDepthSub_, cameraInfoSub_);
 		if(approxSyncMaxInterval > 0.0)
 			approxSyncDepth_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval));
 		approxSyncDepth_->registerCallback(std::bind(&PointCloudXYZRGB::depthCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
-		approxSyncDisparity_ = new message_filters::Synchronizer<MyApproxSyncDisparityPolicy>(MyApproxSyncDisparityPolicy(queueSize), imageLeft_, imageDisparitySub_, cameraInfoLeft_);
+		approxSyncDisparity_ = new message_filters::Synchronizer<MyApproxSyncDisparityPolicy>(MyApproxSyncDisparityPolicy(syncQueueSize), imageLeft_, imageDisparitySub_, cameraInfoLeft_);
 		if(approxSyncMaxInterval > 0.0)
 			approxSyncDisparity_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval));
 		approxSyncDisparity_->registerCallback(std::bind(&PointCloudXYZRGB::disparityCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
-		approxSyncStereo_ = new message_filters::Synchronizer<MyApproxSyncStereoPolicy>(MyApproxSyncStereoPolicy(queueSize), imageLeft_, imageRight_, cameraInfoLeft_, cameraInfoRight_);
+		approxSyncStereo_ = new message_filters::Synchronizer<MyApproxSyncStereoPolicy>(MyApproxSyncStereoPolicy(syncQueueSize), imageLeft_, imageRight_, cameraInfoLeft_, cameraInfoRight_);
 		if(approxSyncMaxInterval > 0.0)
 			approxSyncStereo_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval));
 		approxSyncStereo_->registerCallback(std::bind(&PointCloudXYZRGB::stereoCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 	}
 	else
 	{
-		exactSyncDepth_ = new message_filters::Synchronizer<MyExactSyncDepthPolicy>(MyExactSyncDepthPolicy(queueSize), imageSub_, imageDepthSub_, cameraInfoSub_);
+		exactSyncDepth_ = new message_filters::Synchronizer<MyExactSyncDepthPolicy>(MyExactSyncDepthPolicy(syncQueueSize), imageSub_, imageDepthSub_, cameraInfoSub_);
 		exactSyncDepth_->registerCallback(std::bind(&PointCloudXYZRGB::depthCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
-		exactSyncDisparity_ = new message_filters::Synchronizer<MyExactSyncDisparityPolicy>(MyExactSyncDisparityPolicy(queueSize), imageLeft_, imageDisparitySub_, cameraInfoLeft_);
+		exactSyncDisparity_ = new message_filters::Synchronizer<MyExactSyncDisparityPolicy>(MyExactSyncDisparityPolicy(syncQueueSize), imageLeft_, imageDisparitySub_, cameraInfoLeft_);
 		exactSyncDisparity_->registerCallback(std::bind(&PointCloudXYZRGB::disparityCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
-		exactSyncStereo_ = new message_filters::Synchronizer<MyExactSyncStereoPolicy>(MyExactSyncStereoPolicy(queueSize), imageLeft_, imageRight_, cameraInfoLeft_, cameraInfoRight_);
+		exactSyncStereo_ = new message_filters::Synchronizer<MyExactSyncStereoPolicy>(MyExactSyncStereoPolicy(syncQueueSize), imageLeft_, imageRight_, cameraInfoLeft_, cameraInfoRight_);
 		exactSyncStereo_->registerCallback(std::bind(&PointCloudXYZRGB::stereoCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 	}
 
 	image_transport::TransportHints hints(this);
-	imageSub_.subscribe(this, "rgb/image", hints.getTransport(), rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
-	imageDepthSub_.subscribe(this, "depth/image", hints.getTransport(), rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
-	cameraInfoSub_.subscribe(this, "rgb/camera_info", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile());
+	imageSub_.subscribe(this, "rgb/image", hints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	imageDepthSub_.subscribe(this, "depth/image", hints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	cameraInfoSub_.subscribe(this, "rgb/camera_info", rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile());
 
-	imageDisparitySub_.subscribe(this, "disparity", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	imageDisparitySub_.subscribe(this, "disparity", rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
 
-	imageLeft_.subscribe(this, "left/image", hints.getTransport(), rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
-	imageRight_.subscribe(this, "right/image", hints.getTransport(), rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
-	cameraInfoLeft_.subscribe(this, "left/camera_info", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile());
-	cameraInfoRight_.subscribe(this, "right/camera_info", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile());
+	imageLeft_.subscribe(this, "left/image", hints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	imageRight_.subscribe(this, "right/image", hints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	cameraInfoLeft_.subscribe(this, "left/camera_info", rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile());
+	cameraInfoRight_.subscribe(this, "right/camera_info", rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile());
 }
 
 PointCloudXYZRGB::~PointCloudXYZRGB()
