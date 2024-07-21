@@ -7,5 +7,6 @@
     },
     "workspaceMount": "source=${localWorkspaceFolder},target=/catkin_ws/src/rtabmap_ros,type=bind",
     "workspaceFolder": "/catkin_ws",
-    "postAttachCommand": "echo 'Initialize catkin: source /opt/ros/noetic/setup.bash && cd /catkin_ws/src && catkin_init_workspace && cd /catkin_ws && catkin_make'"
+    "postAttachCommand": "echo 'Initialize catkin: source /opt/ros/noetic/setup.bash && cd /catkin_ws/src && catkin_init_workspace && cd /catkin_ws && catkin_make'",
+    "runArgs": ["--privileged"]
 }
