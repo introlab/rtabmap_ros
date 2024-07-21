@@ -2593,6 +2593,24 @@ bool convertScanMsg(
 		double waitForTransform,
 		bool outputInFrameId)
 {
+	// scan message validation check
+	if(scan2dMsg.angle_increment == 0.0f) {
+		UERROR("convertScanMsg: angle_increment should not be 0!");
+		return false;
+	}
+	if(scan2dMsg.range_min > scan2dMsg.range_max) {
+		UERROR("convertScanMsg: range_min (%f) should be smaller than range_max (%f)!", scan2dMsg.range_min, scan2dMsg.range_max);
+		return false;
+	}
+	if(scan2dMsg.angle_increment > 0 && scan2dMsg.angle_max < scan2dMsg.angle_min) {
+		UERROR("convertScanMsg: Angle increment (%f) should be negative if angle_min(%f) > angle_max(%f)!", scan2dMsg.angle_increment, scan2dMsg.angle_min, scan2dMsg.angle_max);
+		return false;
+	}
+	else if (scan2dMsg.angle_increment < 0 && scan2dMsg.angle_max > scan2dMsg.angle_min) {
+		UERROR("convertScanMsg: Angle increment (%f) should positive if angle_min(%f) < angle_max(%f)!", scan2dMsg.angle_increment, scan2dMsg.angle_min, scan2dMsg.angle_max);
+		return false;
+	}
+
 	// make sure the frame of the laser is updated during the whole scan time
 	rtabmap::Transform tmpT = getMovingTransform(
 			scan2dMsg.header.frame_id,
