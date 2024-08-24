@@ -46,7 +46,7 @@ RGBDSplit::RGBDSplit(const rclcpp::NodeOptions & options) :
 
 	rgbdImageSub_ = create_subscription<rtabmap_msgs::msg::RGBDImage>("rgbd_image", rclcpp::QoS(5).reliability((rmw_qos_reliability_policy_t)qos), std::bind(&RGBDSplit::callback, this, std::placeholders::_1));
 
-	auto node = rclcpp::Node::make_shared(this->get_name());
+	auto node = std::shared_ptr<RGBDSplit>(this, [](auto *) {});
 	image_transport::ImageTransport it(node);
 	rgbPub_ = image_transport::create_camera_publisher(node.get(), std::string(rgbdImageSub_->get_topic_name()) + "/rgb", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
 	depthPub_ = image_transport::create_camera_publisher(node.get(), std::string(rgbdImageSub_->get_topic_name()) + "/depth", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
