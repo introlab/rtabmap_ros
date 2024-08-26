@@ -1402,6 +1402,7 @@ rtabmap::Signature nodeFromROS(const rtabmap_msgs::Node & msg)
 	std::multimap<int, int> words;
 	std::vector<cv::KeyPoint> wordsKpts;
 	std::vector<cv::Point3f> words3D;
+
 	cv::Mat wordsDescriptors = rtabmap::uncompressData(msg.word_descriptors);
 
 	if(msg.word_id_keys.size() != msg.word_id_values.size())
@@ -1456,6 +1457,7 @@ rtabmap::Signature nodeFromROS(const rtabmap_msgs::Node & msg)
 	}
 	s.setWords(words, wordsKpts, words3D, wordsDescriptors);
 	s.sensorData() = sensorDataFromROS(msg.data);
+	s.sensorData().setId(msg.id);
 	return s;
 }
 void nodeToROS(const rtabmap::Signature & signature, rtabmap_msgs::Node & msg)
