@@ -30,7 +30,7 @@ RTAB-Map's ROS2 package (branch `ros2`). **ROS2 Foxy minimum required**: current
             <td><a href="http://build.ros.org/job/Nbin_ufv8_uFv8__rtabmap_ros__ubuntu_focal_arm64__binary/"><img src="http://build.ros.org/buildStatus/icon?job=Nbin_ufv8_uFv8__rtabmap_ros__ubuntu_focal_arm64__binary" alt="Build Status"/></td>
         </tr>
         <tr>
-            <td rowspan="3">ROS 2</td>
+            <td rowspan="4">ROS 2</td>
             <td>Humble</td>
             <td><a href="http://build.ros2.org/job/Hbin_uJ64__rtabmap_ros__ubuntu_jammy_amd64__binary/"><img src="http://build.ros2.org/buildStatus/icon?job=Hbin_uJ64__rtabmap_ros__ubuntu_jammy_amd64__binary" alt="Build Status"/></td>
         </tr>
@@ -39,8 +39,12 @@ RTAB-Map's ROS2 package (branch `ros2`). **ROS2 Foxy minimum required**: current
             <td><a href="http://build.ros2.org/job/Ibin_uJ64__rtabmap_ros__ubuntu_jammy_amd64__binary/"><img src="http://build.ros2.org/buildStatus/icon?job=Ibin_uJ64__rtabmap_ros__ubuntu_jammy_amd64__binary" alt="Build Status"/></td>
         </tr>
         <tr>
+            <td>Jazzy</td>
+            <td><a href="http://build.ros2.org/job/Jbin_uN64__rtabmap_ros__ubuntu_noble_amd64__binary/"><img src="http://build.ros2.org/buildStatus/icon?job=Jbin_uN64__rtabmap_ros__ubuntu_noble_amd64__binary" alt="Build Status"/></td>
+        </tr>
+        <tr>
             <td>Rolling</td>
-            <td><a href="http://build.ros2.org/job/Rbin_uJ64__rtabmap_ros__ubuntu_jammy_amd64__binary/"><img src="http://build.ros2.org/buildStatus/icon?job=Rbin_uJ64__rtabmap_ros__ubuntu_jammy_amd64__binary" alt="Build Status"/></td>
+            <td><a href="http://build.ros2.org/job/Rbin_uN64__rtabmap_ros__ubuntu_noble_amd64__binary/"><img src="http://build.ros2.org/buildStatus/icon?job=Rbin_uN64__rtabmap_ros__ubuntu_noble_amd64__binary" alt="Build Status"/></td>
         </tr>
         <tr>
            <td>Docker</td>
