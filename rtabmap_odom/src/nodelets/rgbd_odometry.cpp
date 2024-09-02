@@ -125,29 +125,32 @@ void RGBDOdometry::onOdomInit()
 	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: rgbd_cameras   = %d", rgbdCameras);
 	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: keep_color     = %s", keepColor_?"true":"false");
 
+	rclcpp::SubscriptionOptions options;
+	options.callback_group = dataCallbackGroup_;
+
 	std::string subscribedTopic;
 	std::string subscribedTopicsMsg;
 	if(subscribeRGBD)
 	{
 		if(rgbdCameras >= 2)
 		{
-			rgbd_image1_sub_.subscribe(this, "rgbd_image0", rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile());
-			rgbd_image2_sub_.subscribe(this, "rgbd_image1", rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile());
+			rgbd_image1_sub_.subscribe(this, "rgbd_image0", rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
+			rgbd_image2_sub_.subscribe(this, "rgbd_image1", rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
 			if(rgbdCameras >= 3)
 			{
-				rgbd_image3_sub_.subscribe(this, "rgbd_image2", rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile());
+				rgbd_image3_sub_.subscribe(this, "rgbd_image2", rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
 			}
 			if(rgbdCameras >= 4)
 			{
-				rgbd_image4_sub_.subscribe(this, "rgbd_image3", rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile());
+				rgbd_image4_sub_.subscribe(this, "rgbd_image3", rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
 			}
 			if(rgbdCameras >= 5)
 			{
-				rgbd_image5_sub_.subscribe(this, "rgbd_image4", rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile());
+				rgbd_image5_sub_.subscribe(this, "rgbd_image4", rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
 			}
 			if(rgbdCameras >= 6)
 			{
-				rgbd_image6_sub_.subscribe(this, "rgbd_image5", rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile());
+				rgbd_image6_sub_.subscribe(this, "rgbd_image5", rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
 			}
 
 			if(rgbdCameras == 2)
@@ -327,7 +330,7 @@ void RGBDOdometry::onOdomInit()
 		}
 		else if(rgbdCameras == 0)
 		{
-			rgbdxSub_ = create_subscription<rtabmap_msgs::msg::RGBDImages>("rgbd_images", rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()), std::bind(&RGBDOdometry::callbackRGBDX, this, std::placeholders::_1));
+			rgbdxSub_ = create_subscription<rtabmap_msgs::msg::RGBDImages>("rgbd_images", rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()), std::bind(&RGBDOdometry::callbackRGBDX, this, std::placeholders::_1), options);
 
 			subscribedTopic = rgbdxSub_->get_topic_name();
 			subscribedTopicsMsg = uFormat("\n%s subscribed to:\n   %s",
@@ -336,7 +339,7 @@ void RGBDOdometry::onOdomInit()
 		}
 		else
 		{
-			rgbdSub_ = create_subscription<rtabmap_msgs::msg::RGBDImage>("rgbd_image", rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()), std::bind(&RGBDOdometry::callbackRGBD, this, std::placeholders::_1));
+			rgbdSub_ = create_subscription<rtabmap_msgs::msg::RGBDImage>("rgbd_image", rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()), std::bind(&RGBDOdometry::callbackRGBD, this, std::placeholders::_1), options);
 
 			subscribedTopic = rgbdSub_->get_topic_name();
 			subscribedTopicsMsg =
@@ -348,9 +351,9 @@ void RGBDOdometry::onOdomInit()
 	else
 	{
 		image_transport::TransportHints hints(this);
-		image_mono_sub_.subscribe(this, "rgb/image", hints.getTransport(), rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile());
-		image_depth_sub_.subscribe(this, "depth/image", hints.getTransport(), rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile());
-		info_sub_.subscribe(this, "rgb/camera_info", rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile());
+		image_mono_sub_.subscribe(this, "rgb/image", hints.getTransport(), rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
+		image_depth_sub_.subscribe(this, "depth/image", hints.getTransport(), rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
+		info_sub_.subscribe(this, "rgb/camera_info", rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile(), options);
 
 		if(approxSync)
 		{

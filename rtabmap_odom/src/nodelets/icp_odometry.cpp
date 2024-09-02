@@ -97,8 +97,11 @@ void ICPOdometry::onOdomInit()
 	RCLCPP_INFO(this->get_logger(), "IcpOdometry: deskewing              = %s", deskewing_?"true":"false");
 	RCLCPP_INFO(this->get_logger(), "IcpOdometry: deskewing_slerp        = %s", deskewingSlerp_?"true":"false");
 
-	scan_sub_ = create_subscription<sensor_msgs::msg::LaserScan>("scan", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos()), std::bind(&ICPOdometry::callbackScan, this, std::placeholders::_1));
-	cloud_sub_ = create_subscription<sensor_msgs::msg::PointCloud2>("scan_cloud", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos()), std::bind(&ICPOdometry::callbackCloud, this, std::placeholders::_1));
+	rclcpp::SubscriptionOptions options;
+	options.callback_group = dataCallbackGroup_;
+
+	scan_sub_ = create_subscription<sensor_msgs::msg::LaserScan>("scan", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos()), std::bind(&ICPOdometry::callbackScan, this, std::placeholders::_1), options);
+	cloud_sub_ = create_subscription<sensor_msgs::msg::PointCloud2>("scan_cloud", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos()), std::bind(&ICPOdometry::callbackCloud, this, std::placeholders::_1), options);
 
 	filtered_scan_pub_ = create_publisher<sensor_msgs::msg::PointCloud2>("odom_filtered_input_scan", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos()));
 

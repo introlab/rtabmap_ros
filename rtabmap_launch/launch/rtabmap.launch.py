@@ -373,7 +373,9 @@ def launch_setup(context, *args, **kwargs):
                 "decimation": 4,
                 "voxel_size": 0.0,
                 "approx_sync": LaunchConfiguration('approx_sync'),
-                "approx_sync_max_interval": LaunchConfiguration('approx_sync_max_interval')
+                "approx_sync_max_interval": LaunchConfiguration('approx_sync_max_interval'),
+                "qos": LaunchConfiguration('qos_image'),
+                "qos_camera_info": LaunchConfiguration('qos_camera_info')
             }],
             remappings=[
                 ('left/image', LaunchConfiguration('left_image_topic_relay')),
@@ -418,8 +420,8 @@ def generate_launch_description():
         DeclareLaunchArgument('publish_tf_map', default_value='true',               description='Publish TF between map and odomerty.'),
         DeclareLaunchArgument('namespace',      default_value='rtabmap',            description=''),
         DeclareLaunchArgument('database_path',  default_value='~/.ros/rtabmap.db',  description='Where is the map saved/loaded.'),
-        DeclareLaunchArgument('topic_queue_size', default_value='1',                description='Queue size of individual topic subscribers.'),
-        DeclareLaunchArgument('queue_size',     default_value='10',                 description='Backward compatibility, use "sync_queue_size" instead.'),
+        DeclareLaunchArgument('topic_queue_size', default_value='10',               description='Queue size of individual topic subscribers.'),
+        DeclareLaunchArgument('queue_size',     default_value='2',                  description='Backward compatibility, use "sync_queue_size" instead.'),
         DeclareLaunchArgument('qos',            default_value='1',                  description='General QoS used for sensor input data: 0=system default, 1=Reliable, 2=Best Effort.'),
         DeclareLaunchArgument('wait_for_transform', default_value='0.2',            description=''),
         DeclareLaunchArgument('rtabmap_args',   default_value='',                   description='Backward compatibility, use "args" instead.'),
