@@ -25,7 +25,7 @@ def generate_launch_description():
 
     return LaunchDescription([
 
-        # Launch depthai camera driver
+        # Launch camera driver
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource([os.path.join(
                 get_package_share_directory('depthai_examples'), 'launch'),

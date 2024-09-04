@@ -569,7 +569,6 @@ void RGBDOdometry::callback(
 		const sensor_msgs::msg::Image::ConstSharedPtr depth,
 		const sensor_msgs::msg::CameraInfo::ConstSharedPtr cameraInfo)
 {
-	RCLCPP_WARN(get_logger(), "Received image callback: %f delay=%f", rtabmap_conversions::timestampFromROS(image->header.stamp), (now() - image->header.stamp).seconds());
 	if(!this->isPaused())
 	{
 		std::vector<cv_bridge::CvImageConstPtr> imageMsgs(1);

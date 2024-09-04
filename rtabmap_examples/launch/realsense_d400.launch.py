@@ -2,16 +2,16 @@
 #   A realsense D400 series
 #   Install realsense2 ros2 package (make sure you have this patch: https://github.com/IntelRealSense/realsense-ros/issues/2564#issuecomment-1336288238)
 # Example:
-#   $ ros2 launch realsense2_camera rs_launch.py align_depth.enable:=true
-#
 #   $ ros2 launch rtabmap_examples realsense_d400.launch.py
-#   OR
-#   $ ros2 launch rtabmap_launch rtabmap.launch.py frame_id:=camera_link args:="-d" rgb_topic:=/camera/color/image_raw depth_topic:=/camera/aligned_depth_to_color/image_raw camera_info_topic:=/camera/color/camera_info approx_sync:=false
+
+import os
+
+from ament_index_python.packages import get_package_share_directory
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable
-from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import Node
+from launch_ros.actions import Node, SetParameter
+from launch.actions import IncludeLaunchDescription
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 def generate_launch_description():
     parameters=[{
@@ -27,7 +27,18 @@ def generate_launch_description():
 
     return LaunchDescription([
 
-        # Nodes to launch
+        # Make sure IR emitter is enabled
+        SetParameter(name='depth_module.emitter_enabled', value=1),
+
+        # Launch camera driver
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([os.path.join(
+                get_package_share_directory('realsense2_camera'), 'launch'),
+                '/rs_launch.py']),
+                launch_arguments={'align_depth.enable': 'true',
+                                  'rgb_camera.profile': '640x360x30'}.items(),
+        ),
+
         Node(
             package='rtabmap_odom', executable='rgbd_odometry', output='screen',
             parameters=parameters,

@@ -335,7 +335,6 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 		const rtabmap::ParametersMap & defaultParameters = rtabmap::Parameters::getDefaultParameters();
 		rtabmap::ParametersMap parameters = ((rtabmap::ParamEvent *)anEvent)->getParameters();
 		std::vector<rclcpp::Parameter> rosParameters;
-		auto node = rclcpp::Node::make_shared("rtabmap_viz");
 		for(rtabmap::ParametersMap::iterator i=parameters.begin(); i!=parameters.end(); ++i)
 		{
 			//save only parameters with valid names

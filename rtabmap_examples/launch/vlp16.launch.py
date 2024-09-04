@@ -1,15 +1,16 @@
 # Example:
-#   $ ros2 launch velodyne_driver velodyne_driver_node-VLP16-launch.py
-#   $ ros2 launch velodyne_pointcloud velodyne_transform_node-VLP16-launch.py
-#
-#   SLAM:
 #   $ ros2 launch rtabmap_examples vlp16.launch.py
 
+import os
+
+from ament_index_python.packages import get_package_share_directory
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch.actions import IncludeLaunchDescription
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 def generate_launch_description():
 
@@ -28,6 +29,17 @@ def generate_launch_description():
             description='Enable lidar deskewing'),
           
         # Nodes to launch
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([os.path.join(
+                get_package_share_directory('velodyne_driver'), 'launch'),
+                '/velodyne_driver_node-VLP16-launch.py']),
+        ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([os.path.join(
+                get_package_share_directory('velodyne_pointcloud'), 'launch'),
+                '/velodyne_transform_node-VLP16-launch.py']),
+        ),
+
         Node(
             package='rtabmap_odom', executable='icp_odometry', output='screen',
             parameters=[{
@@ -57,18 +69,7 @@ def generate_launch_description():
             remappings=[
               ('scan_cloud', '/velodyne_points')
             ]),
-            
-        Node(
-            package='rtabmap_util', executable='point_cloud_assembler', output='screen',
-            parameters=[{
-              'max_clouds':10,
-              'fixed_frame_id':'',
-              'use_sim_time':use_sim_time,
-            }],
-            remappings=[
-              ('cloud', 'odom_filtered_input_scan')
-            ]),
-            
+       
         Node(
             package='rtabmap_slam', executable='rtabmap', output='screen',
             parameters=[{
@@ -102,7 +103,7 @@ def generate_launch_description():
               'Icp/CorrespondenceRatio': '0.2'
             }],
             remappings=[
-              ('scan_cloud', 'assembled_cloud')
+              ('scan_cloud', 'odom_filtered_input_scan')
             ],
             arguments=[
               '-d' # This will delete the previous database (~/.ros/rtabmap.db)
