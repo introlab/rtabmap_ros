@@ -457,10 +457,10 @@ void OdometryROS::processData(SensorData & data, const std_msgs::Header & header
 		dataReady_.release();
 		dataMutex_.unlock();
 	}
-	else
-	{
-		NODELET_INFO("Dropping image/scan data");
-	}
+	//else
+	//{
+	//	NODELET_INFO("Dropping image/scan data");
+	//}
 }
 
 void OdometryROS::mainLoopKill()
