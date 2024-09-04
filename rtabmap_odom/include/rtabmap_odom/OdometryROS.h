@@ -43,6 +43,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap_msgs/ResetPose.h>
 #include <rtabmap/core/SensorData.h>
 #include <rtabmap/core/Parameters.h>
+#include <rtabmap/utilite/UThread.h>
 
 #include <boost/thread.hpp>
 
@@ -55,7 +56,7 @@ class Odometry;
 
 namespace rtabmap_odom {
 
-class OdometryROS : public nodelet::Nodelet
+class OdometryROS : public nodelet::Nodelet, public UThread
 {
 
 public:
@@ -93,6 +94,9 @@ private:
 	virtual void onInit();
 	virtual void onOdomInit() = 0;
 	virtual void updateParameters(rtabmap::ParametersMap & parameters) {}
+
+	virtual void mainLoop();
+	virtual void mainLoopKill();
 
 	void callbackIMU(const sensor_msgs::ImuConstPtr& msg);
 	void reset(const rtabmap::Transform & pose = rtabmap::Transform::getIdentity());
@@ -138,6 +142,13 @@ private:
 	tf::TransformListener tfListener_;
 	ros::Subscriber imuSub_;
 
+	// Safe-threading
+	UMutex imuMutex_;
+	UMutex dataMutex_;	
+	USemaphore dataReady_;
+	rtabmap::SensorData dataToProcess_;
+	std_msgs::Header dataHeaderToProcess_;
+
 	bool paused_;
 	int resetCountdown_;
 	int resetCurrentCount_;
@@ -156,7 +167,6 @@ private:
 	bool waitIMUToinit_;
 	bool imuProcessed_;
 	std::map<double, rtabmap::IMU> imus_;
-	std::pair<rtabmap::SensorData, std_msgs::Header > bufferedData_;
 
 	rtabmap_util::ULogToRosout ulogToRosout_;
 
