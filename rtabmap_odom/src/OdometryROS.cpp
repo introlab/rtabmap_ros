@@ -461,13 +461,12 @@ void OdometryROS::processData(SensorData & data, const std_msgs::msg::Header & h
 	}
 	else
 	{
-		RCLCPP_DEBUG(get_logger(), "Dropping image");
+		RCLCPP_DEBUG(get_logger(), "Dropping image/scan data");
 	}
 }
 
 void OdometryROS::mainLoopKill()
 {
-	RCLCPP_WARN(this->get_logger(), "OdometryROS::mainLoopKill()");
 	// in case we were waiting, unblock thread
 	dataReady_.release();
 }
@@ -1055,20 +1054,21 @@ void OdometryROS::mainLoop()
 		odomSensorDataCompressedPub_->publish(msg);
 	}
 
+	double delay =  (now()-header.stamp).seconds(); 
 	if(visParams_)
 	{
 		if(icpParams_)
 		{
-			RCLCPP_INFO(this->get_logger(), "Odom: quality=%d, ratio=%f, std dev=%fm|%frad, update time=%fs delay=%fs", info.reg.inliers, info.reg.icpInliersRatio, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (now()-timeStart).seconds(), (now()-header.stamp).seconds());
+			RCLCPP_INFO(this->get_logger(), "Odom: quality=%d, ratio=%f, std dev=%fm|%frad, update time=%fs delay=%fs", info.reg.inliers, info.reg.icpInliersRatio, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (now()-timeStart).seconds(), delay);
 		}
 		else
 		{
-			RCLCPP_INFO(this->get_logger(), "Odom: quality=%d, std dev=%fm|%frad, update time=%fs delay=%fs", info.reg.inliers, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (now()-timeStart).seconds(), (now()-header.stamp).seconds());
+			RCLCPP_INFO(this->get_logger(), "Odom: quality=%d, std dev=%fm|%frad, update time=%fs delay=%fs", info.reg.inliers, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (now()-timeStart).seconds(), delay);
 		}
 	}
 	else // if(icpParams_)
 	{
-		RCLCPP_INFO(this->get_logger(), "Odom: ratio=%f, std dev=%fm|%frad, update time=%fs delay=%fs", info.reg.icpInliersRatio, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (now()-timeStart).seconds(), (now()-header.stamp).seconds());
+		RCLCPP_INFO(this->get_logger(), "Odom: ratio=%f, std dev=%fm|%frad, update time=%fs delay=%fs", info.reg.icpInliersRatio, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (now()-timeStart).seconds(), delay);
 	}
 
 	statusDiagnostic_.setStatus(pose.isNull());
@@ -1112,6 +1112,8 @@ void OdometryROS::reset(const Transform & pose)
 	previousStamp_ = 0.0;
 	resetCurrentCount_ = resetCountdown_;
 	imuProcessed_ = false;
+	dataToProcess_ = SensorData();
+	dataHeaderToProcess_ = std_msgs::Header();
 	imuMutex_.lock();
 	imus_.clear();
 	imuMutex_.unlock();

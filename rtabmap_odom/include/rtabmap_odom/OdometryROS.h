@@ -162,6 +162,13 @@ private:
 	rtabmap::SensorData dataToProcess_;
 	std_msgs::msg::Header dataHeaderToProcess_;
 
+	// Safe-threading
+	UMutex imuMutex_;
+	UMutex dataMutex_;	
+	USemaphore dataReady_;
+	rtabmap::SensorData dataToProcess_;
+	std_msgs::Header dataHeaderToProcess_;
+
 	bool paused_;
 	int resetCountdown_;
 	int resetCurrentCount_;
