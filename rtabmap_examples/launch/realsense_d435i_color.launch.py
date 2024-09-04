@@ -6,10 +6,14 @@
 #
 #   $ ros2 launch rtabmap_examples realsense_d435i_color.launch.py
 
+import os
+
+from ament_index_python.packages import get_package_share_directory
+
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable
-from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import Node
+from launch_ros.actions import Node, SetParameter
+from launch.actions import IncludeLaunchDescription
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 def generate_launch_description():
     parameters=[{
@@ -23,11 +27,26 @@ def generate_launch_description():
           ('imu', '/imu/data'),
           ('rgb/image', '/camera/color/image_raw'),
           ('rgb/camera_info', '/camera/color/camera_info'),
-          ('depth/image', '/camera/realigned_depth_to_color/image_raw')]
+          ('depth/image', '/camera/aligned_depth_to_color/image_raw')]
 
     return LaunchDescription([
 
-        # Nodes to launch       
+        # Make sure IR emitter is enabled
+        SetParameter(name='depth_module.emitter_enabled', value=1),
+
+        # Launch camera driver
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([os.path.join(
+                get_package_share_directory('realsense2_camera'), 'launch'),
+                '/rs_launch.py']),
+                launch_arguments={'enable_gyro': 'true',
+                                  'enable_accel': 'true',
+                                  'unite_imu_method': '1',
+                                  'align_depth.enable': 'true',
+                                  'enable_sync': 'true',
+                                  'rgb_camera.profile': '640x360x30'}.items(),
+        ),
+
         Node(
             package='rtabmap_odom', executable='rgbd_odometry', output='screen',
             parameters=parameters,
@@ -43,26 +62,7 @@ def generate_launch_description():
             package='rtabmap_viz', executable='rtabmap_viz', output='screen',
             parameters=parameters,
             remappings=remappings),
-        
-        # Because of this issue: https://github.com/IntelRealSense/realsense-ros/issues/2564
-        # Generate point cloud from not aligned depth
-        Node(
-            package='rtabmap_util', executable='point_cloud_xyz', output='screen',
-            parameters=[{'approx_sync':False}],
-            remappings=[('depth/image',       '/camera/depth/image_rect_raw'),
-                        ('depth/camera_info', '/camera/depth/camera_info'),
-                        ('cloud',             '/camera/cloud_from_depth')]),
-        
-        # Generate aligned depth to color camera from the point cloud above       
-        Node(
-            package='rtabmap_util', executable='pointcloud_to_depthimage', output='screen',
-            parameters=[{ 'decimation':2,
-                          'fixed_frame_id':'camera_link',
-                          'fill_holes_size':1}],
-            remappings=[('camera_info', '/camera/color/camera_info'),
-                        ('cloud',       '/camera/cloud_from_depth'),
-                        ('image_raw',   '/camera/realigned_depth_to_color/image_raw')]),
-        
+
         # Compute quaternion of the IMU
         Node(
             package='imu_filter_madgwick', executable='imu_filter_madgwick_node', output='screen',

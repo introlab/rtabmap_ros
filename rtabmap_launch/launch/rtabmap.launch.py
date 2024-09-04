@@ -85,6 +85,7 @@ def launch_setup(context, *args, **kwargs):
             namespace=LaunchConfiguration('namespace')),
         Node(
             package='rtabmap_sync', executable='rgbd_sync', name="rgbd_sync", output="screen",
+            emulate_tty=True,
             condition=IfCondition(PythonExpression(["'", LaunchConfiguration('stereo'), "' != 'true' and '", LaunchConfiguration('rgbd_sync'), "' == 'true'"])),
             parameters=[{
                 "approx_sync": LaunchConfiguration('approx_rgbd_sync'),
@@ -120,6 +121,7 @@ def launch_setup(context, *args, **kwargs):
             namespace=LaunchConfiguration('namespace')),
         Node(
             package='rtabmap_sync', executable='stereo_sync', name="stereo_sync", output="screen",
+            emulate_tty=True,
             condition=IfCondition(PythonExpression(["'", LaunchConfiguration('stereo'), "' == 'true' and '", LaunchConfiguration('rgbd_sync'), "' == 'true'"])),
             parameters=[{
                 "approx_sync": LaunchConfiguration('approx_rgbd_sync'),
@@ -139,6 +141,7 @@ def launch_setup(context, *args, **kwargs):
         # Relay rgbd_image
         Node(
             package='rtabmap_util', executable='rgbd_relay', name="rgbd_relay", output="screen",
+            emulate_tty=True,
             condition=IfCondition(PythonExpression(["'", LaunchConfiguration('rgbd_sync'), "' != 'true' and '", LaunchConfiguration('subscribe_rgbd'), "' == 'true' and '", LaunchConfiguration('compressed'), "' != 'true'"])),
             parameters=[{
                 "qos": LaunchConfiguration('qos_image')}],
@@ -148,6 +151,7 @@ def launch_setup(context, *args, **kwargs):
             namespace=LaunchConfiguration('namespace')),
         Node(
             package='rtabmap_util', executable='rgbd_relay', name="rgbd_relay_uncompress", output="screen",
+            emulate_tty=True,
             condition=IfCondition(PythonExpression(["'", LaunchConfiguration('rgbd_sync'), "' != 'true' and '", LaunchConfiguration('subscribe_rgbd'), "' == 'true' and '", LaunchConfiguration('compressed'), "' == 'true'"])),
             parameters=[{
                 "uncompress": True,
@@ -160,6 +164,7 @@ def launch_setup(context, *args, **kwargs):
         # RGB-D odometry
         Node(
             package='rtabmap_odom', executable='rgbd_odometry', name="rgbd_odometry", output="screen",
+            emulate_tty=True,
             condition=IfCondition(PythonExpression(["'", LaunchConfiguration('icp_odometry'), "' != 'true' and '", LaunchConfiguration('visual_odometry'), "' == 'true' and '", LaunchConfiguration('stereo'), "' != 'true'"])),
             parameters=[{
                 "frame_id": LaunchConfiguration('frame_id'),
@@ -195,6 +200,7 @@ def launch_setup(context, *args, **kwargs):
         # Stereo odometry
         Node(
             package='rtabmap_odom', executable='stereo_odometry', name="stereo_odometry", output="screen",
+            emulate_tty=True,
             condition=IfCondition(PythonExpression(["'", LaunchConfiguration('icp_odometry'), "' != 'true' and '", LaunchConfiguration('visual_odometry'), "' == 'true' and '", LaunchConfiguration('stereo'), "' == 'true'"])),
             parameters=[{
                 "frame_id": LaunchConfiguration('frame_id'),
@@ -231,6 +237,7 @@ def launch_setup(context, *args, **kwargs):
         # ICP odometry
         Node(
             package='rtabmap_odom', executable='icp_odometry', name="icp_odometry", output="screen",
+            emulate_tty=True,
             condition=IfCondition(LaunchConfiguration('icp_odometry')),
             parameters=[{
                 "frame_id": LaunchConfiguration('frame_id'),
@@ -260,6 +267,7 @@ def launch_setup(context, *args, **kwargs):
 
         Node(
             package='rtabmap_slam', executable='rtabmap', name="rtabmap", output="screen",
+            emulate_tty=True,
             parameters=[{
                 "subscribe_depth": LaunchConfiguration('depth'),
                 "subscribe_rgbd": LaunchConfiguration('subscribe_rgbd'),
@@ -325,6 +333,7 @@ def launch_setup(context, *args, **kwargs):
 
         Node(
             package='rtabmap_viz', executable='rtabmap_viz', name="rtabmap_viz", output='screen',
+            emulate_tty=True,
             parameters=[{
                 "subscribe_depth": LaunchConfiguration('depth'),
                 "subscribe_rgbd": LaunchConfiguration('subscribe_rgbd'),
@@ -368,12 +377,15 @@ def launch_setup(context, *args, **kwargs):
             arguments=[["-d"], [LaunchConfiguration("rviz_cfg")]]),
         Node(
             package='rtabmap_util', executable='point_cloud_xyzrgb', name="point_cloud_xyzrgb", output='screen',
+            emulate_tty=True,
             condition=IfCondition(LaunchConfiguration("rviz")),
             parameters=[{
                 "decimation": 4,
                 "voxel_size": 0.0,
                 "approx_sync": LaunchConfiguration('approx_sync'),
-                "approx_sync_max_interval": LaunchConfiguration('approx_sync_max_interval')
+                "approx_sync_max_interval": LaunchConfiguration('approx_sync_max_interval'),
+                "qos": LaunchConfiguration('qos_image'),
+                "qos_camera_info": LaunchConfiguration('qos_camera_info')
             }],
             remappings=[
                 ('left/image', LaunchConfiguration('left_image_topic_relay')),
@@ -418,8 +430,8 @@ def generate_launch_description():
         DeclareLaunchArgument('publish_tf_map', default_value='true',               description='Publish TF between map and odomerty.'),
         DeclareLaunchArgument('namespace',      default_value='rtabmap',            description=''),
         DeclareLaunchArgument('database_path',  default_value='~/.ros/rtabmap.db',  description='Where is the map saved/loaded.'),
-        DeclareLaunchArgument('topic_queue_size', default_value='1',                description='Queue size of individual topic subscribers.'),
-        DeclareLaunchArgument('queue_size',     default_value='10',                 description='Backward compatibility, use "sync_queue_size" instead.'),
+        DeclareLaunchArgument('topic_queue_size', default_value='10',               description='Queue size of individual topic subscribers.'),
+        DeclareLaunchArgument('queue_size',     default_value='2',                  description='Backward compatibility, use "sync_queue_size" instead.'),
         DeclareLaunchArgument('qos',            default_value='1',                  description='General QoS used for sensor input data: 0=system default, 1=Reliable, 2=Best Effort.'),
         DeclareLaunchArgument('wait_for_transform', default_value='0.2',            description=''),
         DeclareLaunchArgument('rtabmap_args',   default_value='',                   description='Backward compatibility, use "args" instead.'),

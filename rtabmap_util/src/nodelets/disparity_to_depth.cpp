@@ -45,10 +45,8 @@ DisparityToDepth::DisparityToDepth(const rclcpp::NodeOptions & options) :
 	int qos = 0;
 	qos = this->declare_parameter("qos", qos);
 
-	auto node = std::shared_ptr<DisparityToDepth>(this, [](auto *) {});
-	image_transport::ImageTransport it(node);
-	pub32f_ = image_transport::create_publisher(node.get(), "depth", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
-	pub16u_ = image_transport::create_publisher(node.get(), "depth_raw", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	pub32f_ = image_transport::create_publisher(this, "depth", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	pub16u_ = image_transport::create_publisher(this, "depth_raw", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
 
 	sub_ = create_subscription<stereo_msgs::msg::DisparityImage>("disparity", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos), std::bind(&DisparityToDepth::callback, this, std::placeholders::_1));
 }

@@ -42,8 +42,8 @@ RGBDXSync::RGBDXSync(const rclcpp::NodeOptions & options) :
 	SYNC_INIT(rgbd7),
 	SYNC_INIT(rgbd8)
 {
-	int topicQueueSize = 1;
-	int syncQueueSize = 10;
+	int topicQueueSize = 10;
+	int syncQueueSize = 2;
 	bool approxSync = true;
 	int rgbdCameras = 2;
 	double approxSyncMaxInterval = 0.0;
@@ -151,8 +151,11 @@ RGBDXSync::RGBDXSync(const rclcpp::NodeOptions & options) :
 	syncDiagnostic_->init("",
 		uFormat("%s: Did not receive data since 5 seconds! Make sure the input topics are "
 				"published (\"$ rostopic hz my_topic\") and the timestamps in their "
-				"header are set. %s%s",
+				"header are set. Ajusting topic_queue_size (%d) and sync_queue_size (%d) "
+				"can also help for better synchronization if framerates and/or delays are different.%s%s",
 				get_name(),
+				topicQueueSize,
+				syncQueueSize,
 				approxSync?"":"Parameter \"approx_sync\" is false, which means that input "
 					"topics should have all the exact timestamp for the callback to be called.",
 					subscribedTopicsMsg.c_str()));

@@ -31,8 +31,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace rtabmap_sync {
 
 CommonDataSubscriber::CommonDataSubscriber(rclcpp::Node & node, bool gui) :
-		topicQueueSize_(1),
-		syncQueueSize_(10),
+		topicQueueSize_(10),
+		syncQueueSize_(2),
 		approxSync_(true),
 		subscribedToDepth_(!gui),
 		subscribedToStereo_(false),
@@ -699,8 +699,12 @@ void CommonDataSubscriber::setupCallbacks(
 			uFormat("%s: Did not receive data since 5 seconds! Make sure the input topics are "
 					"published (\"$ ros2 topic hz my_topic\") and the timestamps in their "
 					"header are set. If topics are coming from different computers, make sure "
-					"the clocks of the computers are synchronized (\"ntpdate\"). %s%s",
+					"the clocks of the computers are synchronized (\"ntpdate\"). Ajusting "
+					"topic_queue_size (%d) and sync_queue_size (%d) can also help for better "
+					"synchronization if framerates and/or delays are different. %s%s",
 					name_.c_str(),
+					topicQueueSize_,
+					syncQueueSize_,
 					approxSync_?
 							uFormat("If topics are not published at the same rate, you could increase \"sync_queue_size\" and/or \"topic_queue_size\" parameters (current=%d and %d respectively).", syncQueueSize_, topicQueueSize_).c_str():
 							"Parameter \"approx_sync\" is false, which means that input topics should have all the exact timestamp for the callback to be called.",

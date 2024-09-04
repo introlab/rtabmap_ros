@@ -97,6 +97,8 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	initialPose_(Transform::getIdentity()),
 	ulogToRosout_(this)
 {
+	dataCallbackGroup_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+
 	int qos = this->declare_parameter("qos", (int)qos_);
 	qos_ = (rmw_qos_reliability_policy_t)qos;
 
@@ -204,6 +206,7 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 
 OdometryROS::~OdometryROS()
 {
+	this->join(true);
 	delete odometry_;
 }
 
@@ -365,13 +368,18 @@ void OdometryROS::init(bool stereoParams, bool visParams, bool icpParams)
 	Parameters::parse(this->parameters(), Parameters::kOdomStrategy(), odomStrategy_);
 	if(waitIMUToinit_)
 	{
-		int queueSize = 10;
-		this->get_parameter_or("queue_size", queueSize, queueSize);
+		imuCallbackGroup_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+		rclcpp::SubscriptionOptions options;
+		options.callback_group = imuCallbackGroup_;
+		int queueSize = this->declare_parameter("imu_queue_size", 200);
 		int qosImu = this->declare_parameter("qos_imu", (int)qos_);
-		imuSub_ = create_subscription<sensor_msgs::msg::Imu>("imu", rclcpp::QoS(queueSize*5).reliability((rmw_qos_reliability_policy_t)qosImu), std::bind(&OdometryROS::callbackIMU, this, std::placeholders::_1));
+		imuSub_ = create_subscription<sensor_msgs::msg::Imu>("imu", rclcpp::QoS(queueSize).reliability((rmw_qos_reliability_policy_t)qosImu), std::bind(&OdometryROS::callbackIMU, this, std::placeholders::_1), options);
 		RCLCPP_INFO(this->get_logger(), "odometry: Subscribing to IMU topic %s", imuSub_->get_topic_name());
 		RCLCPP_INFO(this->get_logger(), "odometry: qos_imu = %d", qosImu);
+		RCLCPP_INFO(this->get_logger(), "odometry: imu_queue_size = %d", queueSize);
 	}
+
+	this->start();
 
 	onOdomInit();
 }
@@ -408,6 +416,8 @@ void OdometryROS::callbackIMU(const sensor_msgs::msg::Imu::SharedPtr msg)
 	if(!this->isPaused())
 	{
 		double stamp = rtabmap_conversions::timestampFromROS(msg->header.stamp);
+		//RCLCPP_WARN(get_logger(), "Received imu: %f delay=%f", stamp, (now() - msg->header.stamp).seconds());
+
 		rtabmap::Transform localTransform = rtabmap::Transform::getIdentity();
 		if(this->frameId().compare(msg->header.frame_id) != 0)
 		{
@@ -428,18 +438,12 @@ void OdometryROS::callbackIMU(const sensor_msgs::msg::Imu::SharedPtr msg)
 				cv::Mat(3,3,CV_64FC1,(void*)msg->linear_acceleration_covariance.data()).clone(),
 				localTransform);
 
+		UScopeMutex m(imuMutex_);
 		imus_.insert(std::make_pair(stamp, imu));
-		//RCLCPP_WARN(get_logger(), "Received imu: %f", stamp);
-
-		if(bufferedData_.first.isValid() && stamp > bufferedData_.first.stamp())
-		{
-			SensorData data = bufferedData_.first;
-			bufferedData_.first = SensorData();
-			processData(data, bufferedData_.second);
-		}
 
 		if(imus_.size() > 1000)
 		{
+			RCLCPP_WARN(this->get_logger(), "Dropping imu data!");
 			imus_.erase(imus_.begin());
 		}
 	}
@@ -447,44 +451,77 @@ void OdometryROS::callbackIMU(const sensor_msgs::msg::Imu::SharedPtr msg)
 
 void OdometryROS::processData(SensorData & data, const std_msgs::msg::Header & header)
 {
-	if((waitIMUToinit_ && !imuProcessed_) && odometry_->framesProcessed() == 0 && odometry_->getPose().isIdentity() && imus_.empty())
+	//RCLCPP_WARN(get_logger(), "Received image: %f delay=%f", data.stamp(), (now() - header.stamp).seconds());
+	if(dataMutex_.lockTry() == 0)
 	{
-		RCLCPP_WARN(this->get_logger(), "odometry: waiting imu (%s) to initialize orientation (wait_imu_to_init=true)", imuSub_->get_topic_name());
+		dataToProcess_ = data;
+		dataHeaderToProcess_ = header;
+		dataReady_.release();
+		dataMutex_.unlock();
+	}
+	else
+	{
+		RCLCPP_DEBUG(get_logger(), "Dropping image/scan data");
+	}
+}
+
+void OdometryROS::mainLoopKill()
+{
+	// in case we were waiting, unblock thread
+	dataReady_.release();
+}
+
+void OdometryROS::mainLoop()
+{
+	dataReady_.acquire();
+
+	if(!this->isRunning())
+	{
+		// thread killed
 		return;
 	}
 
-	if(waitIMUToinit_ && (imus_.empty() || imus_.rbegin()->first < rtabmap_conversions::timestampFromROS(header.stamp)))
-	{
-		//RCLCPP_WARN(get_logger(), "No imu received with higher stamp than last image (%f)! Buffering this image until we get more imu msgs...", timestampFromROS(header.stamp));
+	UScopeMutex lock(dataMutex_);
 
-		// keep in cache to process later when we will receive imu msgs
-		if(bufferedData_.first.isValid())
+	// aliases
+	SensorData & data = dataToProcess_;
+	std_msgs::msg::Header & header = dataHeaderToProcess_;
+
+	std::vector<std::pair<double, rtabmap::IMU> > imus;
+	{
+		UScopeMutex m(imuMutex_);
+	
+		if((waitIMUToinit_ && !imuProcessed_) && odometry_->framesProcessed() == 0 && odometry_->getPose().isIdentity() && imus_.empty())
 		{
-			RCLCPP_ERROR(this->get_logger(), "Overwriting previous data! Make sure IMU is "
-					"published faster than data rate. (last image stamp "
-					"buffered=%f and new one is %f, last imu stamp received=%f)",
-					bufferedData_.first.stamp(), data.stamp(), imus_.empty()?0:imus_.rbegin()->first);
+			RCLCPP_WARN(this->get_logger(), "odometry: waiting imu (%s) to initialize orientation (wait_imu_to_init=true)", imuSub_->get_topic_name());
+			return;
 		}
-		bufferedData_.first = data;
-		bufferedData_.second = header;
-		return;
-	}
-	// process all imu data up to current image stamp (or just after so that underlying odom approach can do interpolation of imu at image stamp)
-	std::map<double, rtabmap::IMU>::iterator iterEnd = imus_.lower_bound(rtabmap_conversions::timestampFromROS(header.stamp));
-	if(iterEnd!= imus_.end())
+
+		if(waitIMUToinit_ && (imus_.empty() || imus_.rbegin()->first < rtabmap_conversions::timestampFromROS(header.stamp)))
+		{
+			RCLCPP_ERROR(this->get_logger(), "Make sure IMU is published faster than data rate! (last image stamp=%f and last imu stamp received=%f)",
+					data.stamp(), imus_.empty()?0:imus_.rbegin()->first);
+			return;
+		}
+		// process all imu data up to current image stamp (or just after so that underlying odom approach can do interpolation of imu at image stamp)
+		std::map<double, rtabmap::IMU>::iterator iterEnd = imus_.lower_bound(rtabmap_conversions::timestampFromROS(header.stamp));
+		if(iterEnd!= imus_.end())
+		{
+			++iterEnd;
+		}
+		for(std::map<double, rtabmap::IMU>::iterator iter=imus_.begin(); iter!=iterEnd;)
+		{
+			imus.push_back(*iter);
+			imus_.erase(iter++);
+		}
+	} // end imu lock
+
+	for(size_t i=0; i<imus.size(); ++i)
 	{
-		++iterEnd;
-	}
-	for(std::map<double, rtabmap::IMU>::iterator iter=imus_.begin(); iter!=iterEnd;)
-	{
-		//NODELET_WARN("img callback: process imu   %f", iter->first);
-		SensorData dataIMU(iter->second, 0, iter->first);
+		SensorData dataIMU(imus[i].second, 0, imus[i].first);
 		odometry_->process(dataIMU);
-		imus_.erase(iter++);
 		imuProcessed_ = true;
 	}
-
-	//RCLCPP_WARN(get_logger(), "img callback: process image %f", timestampFromROS(header.stamp));
 
 	Transform groundTruth;
 	if(!data.imageRaw().empty() || !data.laserScanRaw().isEmpty())
@@ -1017,20 +1054,21 @@ void OdometryROS::processData(SensorData & data, const std_msgs::msg::Header & h
 		odomSensorDataCompressedPub_->publish(msg);
 	}
 
+	double delay =  (now()-header.stamp).seconds(); 
 	if(visParams_)
 	{
 		if(icpParams_)
 		{
-			RCLCPP_INFO(this->get_logger(), "Odom: quality=%d, ratio=%f, std dev=%fm|%frad, update time=%fs", info.reg.inliers, info.reg.icpInliersRatio, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (now()-timeStart).seconds());
+			RCLCPP_INFO(this->get_logger(), "Odom: quality=%d, ratio=%f, std dev=%fm|%frad, update time=%fs delay=%fs", info.reg.inliers, info.reg.icpInliersRatio, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (now()-timeStart).seconds(), delay);
 		}
 		else
 		{
-			RCLCPP_INFO(this->get_logger(), "Odom: quality=%d, std dev=%fm|%frad, update time=%fs", info.reg.inliers, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (now()-timeStart).seconds());
+			RCLCPP_INFO(this->get_logger(), "Odom: quality=%d, std dev=%fm|%frad, update time=%fs delay=%fs", info.reg.inliers, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (now()-timeStart).seconds(), delay);
 		}
 	}
 	else // if(icpParams_)
 	{
-		RCLCPP_INFO(this->get_logger(), "Odom: ratio=%f, std dev=%fm|%frad, update time=%fs", info.reg.icpInliersRatio, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (now()-timeStart).seconds());
+		RCLCPP_INFO(this->get_logger(), "Odom: ratio=%f, std dev=%fm|%frad, update time=%fs delay=%fs", info.reg.icpInliersRatio, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (now()-timeStart).seconds(), delay);
 	}
 
 	statusDiagnostic_.setStatus(pose.isNull());
@@ -1067,14 +1105,18 @@ void OdometryROS::resetToPose(
 
 void OdometryROS::reset(const Transform & pose)
 {
+	UScopeMutex lock(dataMutex_);
 	odometry_->reset(pose);
 	guess_.setNull();
 	guessPreviousPose_.setNull();
 	previousStamp_ = 0.0;
 	resetCurrentCount_ = resetCountdown_;
 	imuProcessed_ = false;
-	bufferedData_.first= SensorData();
+	dataToProcess_ = SensorData();
+	dataHeaderToProcess_ = std_msgs::msg::Header();
+	imuMutex_.lock();
 	imus_.clear();
+	imuMutex_.unlock();
 	this->flushCallbacks();
 }
 

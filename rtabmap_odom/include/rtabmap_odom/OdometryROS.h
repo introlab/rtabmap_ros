@@ -47,6 +47,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap_msgs/srv/reset_pose.hpp>
 #include <rtabmap/core/SensorData.h>
 #include <rtabmap/core/Parameters.h>
+#include <rtabmap/utilite/UThread.h>
 
 #include <boost/thread.hpp>
 
@@ -59,7 +60,7 @@ class Odometry;
 
 namespace rtabmap_odom {
 
-class OdometryROS : public rclcpp::Node
+class OdometryROS : public rclcpp::Node, public UThread
 {
 
 public:
@@ -98,11 +99,16 @@ protected:
 
 private:
 
+	virtual void mainLoop();
+	virtual void mainLoopKill();
 	virtual void updateParameters(rtabmap::ParametersMap &) {}
 	virtual void onOdomInit() {}
 
 	void callbackIMU(const sensor_msgs::msg::Imu::SharedPtr msg);
 	void reset(const rtabmap::Transform & pose = rtabmap::Transform::getIdentity());
+
+protected:
+	rclcpp::CallbackGroup::SharedPtr dataCallbackGroup_;
 
 private:
 	rtabmap::Odometry * odometry_;
@@ -147,6 +153,14 @@ private:
 	std::shared_ptr<tf2_ros::Buffer> tfBuffer_;
 	std::shared_ptr<tf2_ros::TransformListener> tfListener_;
 	rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imuSub_;
+	rclcpp::CallbackGroup::SharedPtr imuCallbackGroup_;
+
+	// Safe-threading
+	UMutex imuMutex_;
+	UMutex dataMutex_;	
+	USemaphore dataReady_;
+	rtabmap::SensorData dataToProcess_;
+	std_msgs::msg::Header dataHeaderToProcess_;
 
 	bool paused_;
 	int resetCountdown_;
@@ -166,7 +180,6 @@ private:
 	bool waitIMUToinit_;
 	bool imuProcessed_;
 	std::map<double, rtabmap::IMU> imus_;
-	std::pair<rtabmap::SensorData, std_msgs::msg::Header > bufferedData_;
 	std::string configPath_;
 	rtabmap::Transform initialPose_;
 
