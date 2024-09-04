@@ -63,8 +63,8 @@ StereoOdometry::StereoOdometry(const rclcpp::NodeOptions & options) :
 		exactSync5_(0),
 		approxSync6_(0),
 		exactSync6_(0),
-		topicQueueSize_(1),
-		syncQueueSize_(5),
+		topicQueueSize_(10),
+		syncQueueSize_(2),
 		keepColor_(false)
 {
 	OdometryROS::init(true, true, false);
@@ -367,10 +367,12 @@ void StereoOdometry::onOdomInit()
 		}
 
 		subscribedTopic = imageRectLeft_.getTopic();
-		subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s \\\n   %s \\\n   %s \\\n   %s",
+		subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s, topic_queue_size=%d, sync_queue_size=%d):\n   %s \\\n   %s \\\n   %s \\\n   %s",
 				get_name(),
 				approxSync?"approx":"exact",
 				approxSync&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
+				topicQueueSize_,
+				syncQueueSize_,
 				imageRectLeft_.getTopic().c_str(),
 				imageRectRight_.getTopic().c_str(),
 				cameraInfoLeft_.getSubscriber()->get_topic_name(),

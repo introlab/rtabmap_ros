@@ -1988,12 +1988,6 @@ rtabmap::Transform getTransform(
 {
 	// TF ready?
 	rtabmap::Transform transform;
-	std::string errString;
-	if(!tfBuffer.canTransform(fromFrameId, toFrameId,  tf2_ros::fromMsg(stamp), tf2::durationFromSec(waitForTransform), &errString))
-	{
-		UWARN("(can transform %s -> %s?) %s (wait_for_transform=%f)", fromFrameId.c_str(), toFrameId.c_str(), errString.c_str(), waitForTransform);
-		return rtabmap::Transform();
-	}
 	try
 	{
 		geometry_msgs::msg::TransformStamped tmp;

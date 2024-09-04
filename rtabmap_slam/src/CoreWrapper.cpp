@@ -2316,7 +2316,7 @@ void CoreWrapper::process(
 		{
 			timeRtabmap = timer.ticks();
 		}
-		RCLCPP_INFO(this->get_logger(), "rtabmap (%d): Rate=%.2fs, Limit=%.3fs, Conversion=%.4fs, RTAB-Map=%.4fs, Maps update=%.4fs pub=%.4fs (local map=%d, WM=%d)",
+		RCLCPP_INFO(this->get_logger(), "rtabmap (%d): Rate=%.2fs, Limit=%.3fs, Conversion=%.4fs, RTAB-Map=%.4fs, Maps update=%.4fs pub=%.4fs delay=%.4fs (local map=%d, WM=%d)",
 				rtabmap_.getLastLocationId(),
 				rate_>0?1.0f/rate_:0,
 				rtabmap_.getTimeThreshold()/1000.0f,
@@ -2324,6 +2324,7 @@ void CoreWrapper::process(
 				timeRtabmap,
 				timeUpdateMaps,
 				timePublishMaps,
+				(now() - lastPoseStamp_).seconds(),
 				(int)rtabmap_.getLocalOptimizedPoses().size(),
 				rtabmap_.getWMSize()+rtabmap_.getSTMSize());
 		rtabmapROSStats_.insert(std::make_pair(std::string("RtabmapROS/HasSubscribers/"), mapsManager_.hasSubscribers()?1:0));

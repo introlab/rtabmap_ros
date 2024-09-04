@@ -63,8 +63,8 @@ RGBDOdometry::RGBDOdometry(const rclcpp::NodeOptions & options) :
 		exactSync5_(0),
 		approxSync6_(0),
 		exactSync6_(0),
-		topicQueueSize_(1),
-		syncQueueSize_(5),
+		topicQueueSize_(10),
+		syncQueueSize_(2),
 		keepColor_(false)
 {
 	OdometryROS::init(false, true, false);
@@ -369,10 +369,12 @@ void RGBDOdometry::onOdomInit()
 		}
 
 		subscribedTopic = image_mono_sub_.getSubscriber().getTopic();
-		subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s,\n   %s,\n   %s",
+		subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s, topic_queue_size=%d, sync_queue_size=%d):\n   %s,\n   %s,\n   %s",
 				get_name(),
 				approxSync?"approx":"exact",
 				approxSync&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
+				topicQueueSize_,
+				syncQueueSize_,
 				image_mono_sub_.getSubscriber().getTopic().c_str(),
 				image_depth_sub_.getSubscriber().getTopic().c_str(),
 				info_sub_.getSubscriber()->get_topic_name());
@@ -567,6 +569,7 @@ void RGBDOdometry::callback(
 		const sensor_msgs::msg::Image::ConstSharedPtr depth,
 		const sensor_msgs::msg::CameraInfo::ConstSharedPtr cameraInfo)
 {
+	RCLCPP_WARN(get_logger(), "Received image callback: %f delay=%f", rtabmap_conversions::timestampFromROS(image->header.stamp), (now() - image->header.stamp).seconds());
 	if(!this->isPaused())
 	{
 		std::vector<cv_bridge::CvImageConstPtr> imageMsgs(1);

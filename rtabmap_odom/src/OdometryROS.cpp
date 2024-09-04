@@ -373,7 +373,7 @@ void OdometryROS::init(bool stereoParams, bool visParams, bool icpParams)
 		options.callback_group = imuCallbackGroup_;
 		int queueSize = this->declare_parameter("imu_queue_size", 200);
 		int qosImu = this->declare_parameter("qos_imu", (int)qos_);
-		imuSub_ = create_subscription<sensor_msgs::msg::Imu>("imu", rclcpp::QoS(queueSize).reliability((rmw_qos_reliability_policy_t)qosImu), std::bind(&OdometryROS::callbackIMU, this, std::placeholders::_1));
+		imuSub_ = create_subscription<sensor_msgs::msg::Imu>("imu", rclcpp::QoS(queueSize).reliability((rmw_qos_reliability_policy_t)qosImu), std::bind(&OdometryROS::callbackIMU, this, std::placeholders::_1), options);
 		RCLCPP_INFO(this->get_logger(), "odometry: Subscribing to IMU topic %s", imuSub_->get_topic_name());
 		RCLCPP_INFO(this->get_logger(), "odometry: qos_imu = %d", qosImu);
 		RCLCPP_INFO(this->get_logger(), "odometry: imu_queue_size = %d", queueSize);
@@ -459,6 +459,10 @@ void OdometryROS::processData(SensorData & data, const std_msgs::msg::Header & h
 		dataReady_.release();
 		dataMutex_.unlock();
 	}
+	else
+	{
+		RCLCPP_DEBUG(get_logger(), "Dropping image");
+	}
 }
 
 void OdometryROS::mainLoopKill()
@@ -484,6 +488,7 @@ void OdometryROS::mainLoop()
 	SensorData & data = dataToProcess_;
 	std_msgs::msg::Header & header = dataHeaderToProcess_;
 
+	std::vector<std::pair<double, rtabmap::IMU> > imus;
 	{
 		UScopeMutex m(imuMutex_);
 	
@@ -507,12 +512,17 @@ void OdometryROS::mainLoop()
 		}
 		for(std::map<double, rtabmap::IMU>::iterator iter=imus_.begin(); iter!=iterEnd;)
 		{
-			SensorData dataIMU(iter->second, 0, iter->first);
-			odometry_->process(dataIMU);
+			imus.push_back(*iter);
 			imus_.erase(iter++);
-			imuProcessed_ = true;
 		}
 	} // end imu lock
+
+	for(size_t i=0; i<imus.size(); ++i)
+	{
+		SensorData dataIMU(imus[i].second, 0, imus[i].first);
+		odometry_->process(dataIMU);
+		imuProcessed_ = true;
+	}
 
 	Transform groundTruth;
 	if(!data.imageRaw().empty() || !data.laserScanRaw().isEmpty())
