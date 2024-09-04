@@ -1113,7 +1113,7 @@ void OdometryROS::reset(const Transform & pose)
 	resetCurrentCount_ = resetCountdown_;
 	imuProcessed_ = false;
 	dataToProcess_ = SensorData();
-	dataHeaderToProcess_ = std_msgs::Header();
+	dataHeaderToProcess_ = std_msgs::msg::Header();
 	imuMutex_.lock();
 	imus_.clear();
 	imuMutex_.unlock();

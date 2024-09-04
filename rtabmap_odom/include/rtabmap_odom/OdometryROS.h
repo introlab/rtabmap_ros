@@ -155,19 +155,12 @@ private:
 	rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imuSub_;
 	rclcpp::CallbackGroup::SharedPtr imuCallbackGroup_;
 
-	UMutex dataMutex_;	
-	UMutex imuMutex_;
-	USemaphore dataReady_;
-
-	rtabmap::SensorData dataToProcess_;
-	std_msgs::msg::Header dataHeaderToProcess_;
-
 	// Safe-threading
 	UMutex imuMutex_;
 	UMutex dataMutex_;	
 	USemaphore dataReady_;
 	rtabmap::SensorData dataToProcess_;
-	std_msgs::Header dataHeaderToProcess_;
+	std_msgs::msg::Header dataHeaderToProcess_;
 
 	bool paused_;
 	int resetCountdown_;
