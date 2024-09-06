@@ -56,6 +56,8 @@ private:
 	rtabmap::LocalGridMaker localMapMaker_;
 	bool mapFrameProjection_;
 	bool warned_;
+	float rangeMin_;
+	float rangeMax_;
 
 	std::shared_ptr<tf2_ros::Buffer> tfBuffer_;
 	std::shared_ptr<tf2_ros::TransformListener> tfListener_;

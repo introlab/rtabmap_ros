@@ -45,7 +45,9 @@ ObstaclesDetection::ObstaclesDetection(const rclcpp::NodeOptions & options) :
 	frameId_("base_link"),
 	waitForTransform_(0.2),
 	mapFrameProjection_(rtabmap::Parameters::defaultGridMapFrameProjection()),
-	warned_(false)
+	warned_(false),
+	rangeMin_(0),
+	rangeMax_(0)
 {
 	ULogger::setType(ULogger::kTypeConsole);
 	ULogger::setLevel(ULogger::kWarning);
@@ -75,6 +77,8 @@ ObstaclesDetection::ObstaclesDetection(const rclcpp::NodeOptions & options) :
 	}
 
 	localMapMaker_.parseParameters(gridParameters);
+	rtabmap::Parameters::parse(gridParameters, rtabmap::Parameters::kGridRangeMin(), rangeMin_);
+	rtabmap::Parameters::parse(gridParameters, rtabmap::Parameters::kGridRangeMax(), rangeMax_);
 
 	tfBuffer_ = std::make_shared< tf2_ros::Buffer >(this->get_clock());
 	tfListener_ = std::make_shared< tf2_ros::TransformListener >(*tfBuffer_);
@@ -84,6 +88,42 @@ ObstaclesDetection::ObstaclesDetection(const rclcpp::NodeOptions & options) :
 	projObstaclesPub_ = create_publisher<sensor_msgs::msg::PointCloud2>("proj_obstacles", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos));
 
 	cloudSub_ = create_subscription<sensor_msgs::msg::PointCloud2>("cloud", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos), std::bind(&ObstaclesDetection::callback, this, std::placeholders::_1));
+}
+
+pcl::PointCloud<pcl::PointXYZ> rangeFiltering(
+		const pcl::PointCloud<pcl::PointXYZ> & cloud,
+		float rangeMin,
+		float rangeMax)
+{
+	if(!cloud.empty() && (rangeMin > 0.0f || rangeMax > 0.0f))
+	{
+		pcl::PointCloud<pcl::PointXYZ> output;
+		output.reserve(cloud.size());
+		int oi = 0;
+		float rangeMinSqrd = rangeMin * rangeMin;
+		float rangeMaxSqrd = rangeMax * rangeMax;
+		for(size_t i=0; i<cloud.size(); ++i)
+		{
+			const pcl::PointXYZ & pt = cloud.at(i);
+			float r = pt.x*pt.x + pt.y*pt.y + pt.z*pt.z;
+
+			if(rangeMin > 0.0f && r < rangeMinSqrd)
+			{
+				continue;
+			}
+			if(rangeMax > 0.0f && r > rangeMaxSqrd)
+			{
+				continue;
+			}
+			
+			output.push_back(pt);
+			++oi;
+		}
+		output.resize(oi);
+		return output;
+	}
+
+	return cloud;
 }
 
 void ObstaclesDetection::callback(const sensor_msgs::msg::PointCloud2::ConstSharedPtr cloudMsg)
@@ -137,6 +177,11 @@ void ObstaclesDetection::callback(const sensor_msgs::msg::PointCloud2::ConstShar
 		inputCloud->is_dense = true;
 	}
 
+	if(rangeMin_ > 0.0f || rangeMax_ > 0.0f)
+	{
+		*inputCloud = rangeFiltering(*inputCloud, rangeMin_, rangeMax_);
+	}
+	
 	//Common variables for all strategies
 	pcl::IndicesPtr ground, obstacles;
 	pcl::PointCloud<pcl::PointXYZ>::Ptr obstaclesCloud(new pcl::PointCloud<pcl::PointXYZ>);
