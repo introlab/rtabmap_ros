@@ -254,7 +254,7 @@ private:
 #ifdef NAV_MSGS_FOXY
 	void goalResponseCallback(std::shared_future<GoalHandleNav2::SharedPtr> future);
 #else
-        void goalResponseCallback(const GoalHandleNav2::SharedPtr & goal_handle);
+    void goalResponseCallback(const GoalHandleNav2::SharedPtr & goal_handle);
 #endif
 	void resultCallback(const GoalHandleNav2::WrappedResult & result);
 #endif
@@ -381,6 +381,7 @@ private:
 #endif
 #ifdef WITH_NAV2_MSGS
 	rclcpp_action::Client<NavigateToPose>::SharedPtr nav2Client_;
+	rclcpp_action::GoalUUID lastGoalSent_;
 #endif
 
 	std::thread* transformThread_;
