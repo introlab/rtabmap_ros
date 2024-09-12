@@ -129,7 +129,7 @@ GuiWrapper::GuiWrapper(const rclcpp::NodeOptions & options) :
 			initCachePath = UDirectory::currentDir(true) + initCachePath;
 		}
 		RCLCPP_INFO(this->get_logger(), "rtabmap_viz: Initializing cache with local database \"%s\"", initCachePath.c_str());
-		if(!callMapDataService("get_map_data", false, true, true))
+		if(!callMapDataService(rtabmapNodeName_+"/get_map_data", false, true, true))
 		{
 			RCLCPP_ERROR(this->get_logger(),
 					"The cache will still be loaded "
