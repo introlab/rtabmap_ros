@@ -120,6 +120,7 @@ private:
 	bool odomUpdate(const nav_msgs::msg::Odometry & odomMsg, rclcpp::Time stamp);
 	bool odomTFUpdate(const rclcpp::Time & stamp); // TF odom
 
+	// Callback called from sync thread
 	virtual void commonMultiCameraCallback(
 				const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
 				const rtabmap_msgs::msg::UserData::ConstSharedPtr & userDataMsg,
@@ -134,6 +135,7 @@ private:
 				const std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > & localKeyPoints = std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> >(),
 				const std::vector<std::vector<rtabmap_msgs::msg::Point3f> > & localPoints3d = std::vector<std::vector<rtabmap_msgs::msg::Point3f> >(),
 				const std::vector<cv::Mat> & localDescriptors = std::vector<cv::Mat>());
+	// Callback called in from thread
 	void commonMultiCameraCallbackImpl(
 				const std::string & odomFrameId,
 				const rtabmap_msgs::msg::UserData::ConstSharedPtr & userDataMsg,
@@ -148,6 +150,7 @@ private:
 				const std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > & localKeyPoints,
 				const std::vector<std::vector<rtabmap_msgs::msg::Point3f> > & localPoints3d,
 				const std::vector<cv::Mat> & localDescriptors);
+	// Callback called in from thread
 	virtual void commonLaserScanCallback(
 				const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
 				const rtabmap_msgs::msg::UserData::ConstSharedPtr & userDataMsg,
@@ -155,11 +158,13 @@ private:
 				const sensor_msgs::msg::PointCloud2 & scan3dMsg,
 				const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr& odomInfoMsg,
 				const rtabmap_msgs::msg::GlobalDescriptor & globalDescriptor = rtabmap_msgs::msg::GlobalDescriptor());
+	// Callback called in from thread
 	virtual void commonOdomCallback(
 			const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
 			const rtabmap_msgs::msg::UserData::ConstSharedPtr & userDataMsg,
 			const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr& odomInfoMsg);
 
+	// Callback called in from thread
 	virtual void commonSensorDataCallback(
 			const rtabmap_msgs::msg::SensorData::ConstSharedPtr & sensorDataMsg,
 			const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
@@ -194,6 +199,8 @@ private:
 	void goalCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg);
 	void goalNodeCallback(const rtabmap_msgs::msg::Goal::SharedPtr msg);
 	void updateGoal(const rclcpp::Time & stamp);
+
+	void processAsync();
 
 	void process(
 			const rclcpp::Time & stamp,
@@ -444,6 +451,23 @@ private:
 		double localizationError_;
 	};
 	LocalizationStatusTask localizationDiagnostic_;
+
+	rclcpp::CallbackGroup::SharedPtr processingCallbackGroup_;
+	struct SyncData {
+		bool valid;
+		rclcpp::Time stamp;
+		rtabmap::SensorData data;
+		rtabmap::Transform odom;
+		std::vector<float> odomVelocity;
+		std::string odomFrameId;
+		cv::Mat odomCovariance;
+		rtabmap::OdometryInfo odomInfo;
+		double timeMsgConversion;
+	};
+	rclcpp::TimerBase::SharedPtr syncTimer_;
+	SyncData syncData_;
+	UMutex syncDataMutex_;
+	bool triggerNewMapBeforeNextUpdate_;
 };
 
 }

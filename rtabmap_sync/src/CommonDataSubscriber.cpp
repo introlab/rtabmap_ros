@@ -364,7 +364,6 @@ CommonDataSubscriber::CommonDataSubscriber(rclcpp::Node & node, bool gui) :
 	name_ = node.get_name();
 
 	syncCallbackGroup_ = node.create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-	syncData_.valid = false;
 
 	// ROS related parameters (private)
 	// ros2: should be declared in the constructor to be used by inherited classes in their constructor
@@ -729,11 +728,6 @@ void CommonDataSubscriber::setupCallbacks(
 							"Parameter \"approx_sync\" is false, which means that input topics should have all the exact timestamp for the callback to be called.",
 					subscribedTopicsMsg_.c_str()),
 					otherTasks);
-		
-		// Create the processing timer  
-		processingCallbackGroup_ = node.create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-		syncTimer_ = node.create_wall_timer(0s, std::bind(&CommonDataSubscriber::processSyncData, this), processingCallbackGroup_);  
-		syncTimer_->cancel();
 	}
 }
 
@@ -1054,31 +1048,6 @@ CommonDataSubscriber::~CommonDataSubscriber()
 	rgbdSubs_.clear();
 }
 
-void CommonDataSubscriber::processSyncData()
-{
-	UScopeMutex lock(syncDataMutex_);
-	if(syncData_.valid)
-	{
-		commonMultiCameraCallback(
-			syncData_.odomMsg,
-			syncData_.userDataMsg,
-			syncData_.imageMsgs,
-			syncData_.depthMsgs,
-			syncData_.cameraInfoMsgs,
-			syncData_.depthCameraInfoMsgs,
-			syncData_.scanMsg,
-			syncData_.scan3dMsg,
-			syncData_.odomInfoMsg,
-			syncData_.globalDescriptorMsgs,
-			syncData_.localKeyPoints,
-			syncData_.localPoints3d,
-			syncData_.localDescriptors);
-		
-		syncData_.valid = false;
-	}
-	syncTimer_->cancel();
-}
-
 void CommonDataSubscriber::commonSingleCameraCallback(
 		const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
 		const rtabmap_msgs::msg::UserData::ConstSharedPtr & userDataMsg,
@@ -1115,7 +1084,7 @@ void CommonDataSubscriber::commonSingleCameraCallback(
 	}
 	cameraInfoMsgs.push_back(rgbCameraInfoMsg);
 	depthCameraInfoMsgs.push_back(depthCameraInfoMsg);
-	addSyncData(
+	commonMultiCameraCallback(
 			odomMsg,
 			userDataMsg,
 			imageMsgs,
@@ -1129,42 +1098,6 @@ void CommonDataSubscriber::commonSingleCameraCallback(
 			localKeyPointsMsgs,
 			localPoints3dMsgs,
 			localDescriptorsMsgs);
-}
-
-void CommonDataSubscriber::addSyncData(
-		const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
-		const rtabmap_msgs::msg::UserData::ConstSharedPtr & userDataMsg,
-		const std::vector<cv_bridge::CvImageConstPtr> & imageMsgs,
-		const std::vector<cv_bridge::CvImageConstPtr> & depthMsgs,
-		const std::vector<sensor_msgs::msg::CameraInfo> & cameraInfoMsgs,
-		const std::vector<sensor_msgs::msg::CameraInfo> & depthCameraInfoMsgs,
-		const sensor_msgs::msg::LaserScan& scanMsg,
-		const sensor_msgs::msg::PointCloud2& scan3dMsg,
-		const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr& odomInfoMsg,
-		const std::vector<rtabmap_msgs::msg::GlobalDescriptor> & globalDescriptorMsgs,
-		const std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > & localKeyPoints,
-		const std::vector<std::vector<rtabmap_msgs::msg::Point3f> > & localPoints3d,
-		const std::vector<cv::Mat> & localDescriptors)
-{
-	if(syncTimer_->is_canceled() && syncDataMutex_.lockTry() == 0)
-	{
-		syncData_.valid=true;
-		syncData_.odomMsg = odomMsg;
-		syncData_.userDataMsg = userDataMsg;
-		syncData_.imageMsgs = imageMsgs;
-		syncData_.depthMsgs = depthMsgs;
-		syncData_.cameraInfoMsgs = cameraInfoMsgs;
-		syncData_.depthCameraInfoMsgs = depthCameraInfoMsgs;
-		syncData_.scanMsg = scanMsg;
-		syncData_.scan3dMsg = scan3dMsg;
-		syncData_.odomInfoMsg = odomInfoMsg;
-		syncData_.globalDescriptorMsgs = globalDescriptorMsgs;
-		syncData_.localKeyPoints = localKeyPoints;
-		syncData_.localPoints3d = localPoints3d;
-		syncData_.localDescriptors = localDescriptors;
-		syncTimer_->reset();
-		syncDataMutex_.unlock();
-	}
 }
 
 void CommonDataSubscriber::tick(const rclcpp::Time & stamp, double targetFrequency)
