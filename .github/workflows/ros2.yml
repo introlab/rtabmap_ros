@@ -21,15 +21,14 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        ros_distro: [humble, iron]
+        ros_distro: [humble, iron, jazzy]
         include:
         - ros_distro: 'humble'
           ubuntu_distro: 'jammy'
         - ros_distro: 'iron'
           ubuntu_distro: 'jammy'
-# Disabled as there still missing dependencies on jazzy:
-#        - ros_distro: 'jazzy'
-#          ubuntu_distro: 'noble'
+        - ros_distro: 'jazzy'
+          ubuntu_distro: 'noble'
       fail-fast: false
     container:
       image: rostooling/setup-ros-docker:ubuntu-${{ matrix.ubuntu_distro }}-ros-${{ matrix.ros_distro }}-desktop-latest
