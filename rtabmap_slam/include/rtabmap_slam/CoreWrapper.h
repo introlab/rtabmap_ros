@@ -341,7 +341,7 @@ private:
 	std::shared_ptr<tf2_ros::Buffer> tfBuffer_;
 	std::shared_ptr<tf2_ros::TransformListener> tfListener_;
 
-	rclcpp::SyncParametersClient::SharedPtr parametersClient_;
+	rclcpp::AsyncParametersClient::SharedPtr parametersClient_;
 	rclcpp::Subscription<rcl_interfaces::msg::ParameterEvent>::SharedPtr parameterEventSub_;
 
 	rclcpp::Service<std_srvs::srv::Empty>::SharedPtr updateSrv_;

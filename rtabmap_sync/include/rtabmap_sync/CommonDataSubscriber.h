@@ -117,26 +117,43 @@ protected:
 				const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
 				const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr& odomInfoMsg) = 0;
 
-	void commonSingleCameraCallback(
-				const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
-				const rtabmap_msgs::msg::UserData::ConstSharedPtr & userDataMsg,
-				const cv_bridge::CvImageConstPtr & imageMsg,
-				const cv_bridge::CvImageConstPtr & depthMsg,
-				const sensor_msgs::msg::CameraInfo & rgbCameraInfoMsg,
-				const sensor_msgs::msg::CameraInfo & depthCameraInfoMsg,
-				const sensor_msgs::msg::LaserScan & scanMsg,
-				const sensor_msgs::msg::PointCloud2 & scan3dMsg,
-				const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr& odomInfoMsg,
-				const std::vector<rtabmap_msgs::msg::GlobalDescriptor> & globalDescriptorMsgs = std::vector<rtabmap_msgs::msg::GlobalDescriptor>(),
-				const std::vector<rtabmap_msgs::msg::KeyPoint> & localKeyPoints = std::vector<rtabmap_msgs::msg::KeyPoint>(),
-				const std::vector<rtabmap_msgs::msg::Point3f> & localPoints3d = std::vector<rtabmap_msgs::msg::Point3f>(),
-				const cv::Mat & localDescriptors = cv::Mat());
-
 	void tick(const rclcpp::Time & stamp, double targetFrequency = 0);
 
+	rclcpp::CallbackGroup::SharedPtr & processingCallbackGroup(){return processingCallbackGroup_;}
+
 private:
+	void addSyncData(
+			const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
+			const rtabmap_msgs::msg::UserData::ConstSharedPtr & userDataMsg,
+			const std::vector<cv_bridge::CvImageConstPtr> & imageMsgs,
+			const std::vector<cv_bridge::CvImageConstPtr> & depthMsgs,
+			const std::vector<sensor_msgs::msg::CameraInfo> & cameraInfoMsgs,
+			const std::vector<sensor_msgs::msg::CameraInfo> & depthCameraInfoMsgs,
+			const sensor_msgs::msg::LaserScan& scanMsg,
+			const sensor_msgs::msg::PointCloud2& scan3dMsg,
+			const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr& odomInfoMsg,
+			const std::vector<rtabmap_msgs::msg::GlobalDescriptor> & globalDescriptorMsgs = std::vector<rtabmap_msgs::msg::GlobalDescriptor>(),
+			const std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > & localKeyPoints = std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> >(),
+			const std::vector<std::vector<rtabmap_msgs::msg::Point3f> > & localPoints3d = std::vector<std::vector<rtabmap_msgs::msg::Point3f> >(),
+			const std::vector<cv::Mat> & localDescriptors = std::vector<cv::Mat>());
+	void commonSingleCameraCallback(
+			const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
+			const rtabmap_msgs::msg::UserData::ConstSharedPtr & userDataMsg,
+			const cv_bridge::CvImageConstPtr & imageMsg,
+			const cv_bridge::CvImageConstPtr & depthMsg,
+			const sensor_msgs::msg::CameraInfo & rgbCameraInfoMsg,
+			const sensor_msgs::msg::CameraInfo & depthCameraInfoMsg,
+			const sensor_msgs::msg::LaserScan & scanMsg,
+			const sensor_msgs::msg::PointCloud2 & scan3dMsg,
+			const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr& odomInfoMsg,
+			const std::vector<rtabmap_msgs::msg::GlobalDescriptor> & globalDescriptorMsgs = std::vector<rtabmap_msgs::msg::GlobalDescriptor>(),
+			const std::vector<rtabmap_msgs::msg::KeyPoint> & localKeyPoints = std::vector<rtabmap_msgs::msg::KeyPoint>(),
+			const std::vector<rtabmap_msgs::msg::Point3f> & localPoints3d = std::vector<rtabmap_msgs::msg::Point3f>(),
+			const cv::Mat & localDescriptors = cv::Mat());
+	void processSyncData();
 	void setupDepthCallbacks(
 			rclcpp::Node & node,
+			const rclcpp::SubscriptionOptions & options,
 			bool subscribeOdom,
 			bool subscribeUserData,
 			bool subscribeScan2d,
@@ -145,10 +162,12 @@ private:
 			bool subscribeOdomInfo);
 	void setupStereoCallbacks(
 			rclcpp::Node & node,
+			const rclcpp::SubscriptionOptions & options,
 			bool subscribeOdom,
 			bool subscribeOdomInfo);
 	void setupRGBCallbacks(
 			rclcpp::Node & node,
+			const rclcpp::SubscriptionOptions & options,
 			bool subscribeOdom,
 			bool subscribeUserData,
 			bool subscribeScan2d,
@@ -157,6 +176,7 @@ private:
 			bool subscribeOdomInfo);
 	void setupRGBDCallbacks(
 			rclcpp::Node & node,
+			const rclcpp::SubscriptionOptions & options,
 			bool subscribeOdom,
 			bool subscribeUserData,
 			bool subscribeScan2d,
@@ -165,6 +185,7 @@ private:
 			bool subscribeOdomInfo);
 	void setupRGBDXCallbacks(
 			rclcpp::Node & node,
+			const rclcpp::SubscriptionOptions & options,
 			bool subscribeOdom,
 			bool subscribeUserData,
 			bool subscribeScan2d,
@@ -174,6 +195,7 @@ private:
 #ifdef RTABMAP_SYNC_MULTI_RGBD
 	void setupRGBD2Callbacks(
 			rclcpp::Node & node,
+			const rclcpp::SubscriptionOptions & options,
 			bool subscribeOdom,
 			bool subscribeUserData,
 			bool subscribeScan2d,
@@ -182,6 +204,7 @@ private:
 			bool subscribeOdomInfo);
 	void setupRGBD3Callbacks(
 			rclcpp::Node & node,
+			const rclcpp::SubscriptionOptions & options,
 			bool subscribeOdom,
 			bool subscribeUserData,
 			bool subscribeScan2d,
@@ -190,6 +213,7 @@ private:
 			bool subscribeOdomInfo);
 	void setupRGBD4Callbacks(
 			rclcpp::Node & node,
+			const rclcpp::SubscriptionOptions & options,
 			bool subscribeOdom,
 			bool subscribeUserData,
 			bool subscribeScan2d,
@@ -198,6 +222,7 @@ private:
 			bool subscribeOdomInfo); 
 	void setupRGBD5Callbacks(
 			rclcpp::Node & node,
+			const rclcpp::SubscriptionOptions & options,
 			bool subscribeOdom,
 			bool subscribeUserData,
 			bool subscribeScan2d,
@@ -206,6 +231,7 @@ private:
 			bool subscribeOdomInfo);
 	void setupRGBD6Callbacks(
 			rclcpp::Node & node,
+			const rclcpp::SubscriptionOptions & options,
 			bool subscribeOdom,
 			bool subscribeUserData,
 			bool subscribeScan2d,
@@ -215,10 +241,12 @@ private:
 #endif
     void setupSensorDataCallbacks(
 			rclcpp::Node & node,
+			const rclcpp::SubscriptionOptions & options,
 			bool subscribeOdom,
 			bool subscribeOdomInfo);
 	void setupScanCallbacks(
 			rclcpp::Node & node,
+			const rclcpp::SubscriptionOptions & options,
 			bool subscribeScan2d,
 			bool subscribeScanDesc,
 			bool subscribeOdom,
@@ -226,6 +254,7 @@ private:
 			bool subscribeOdomInfo);
 	void setupOdomCallbacks(
 			rclcpp::Node & node,
+			const rclcpp::SubscriptionOptions & options,
 			bool subscribeUserData,
 			bool subscribeOdomInfo);
 
@@ -256,6 +285,10 @@ private:
 	std::string odomFrameId_;
 	int rgbdCameras_;
 	std::string name_;
+
+	rclcpp::TimerBase::SharedPtr syncTimer_;
+	rclcpp::CallbackGroup::SharedPtr syncCallbackGroup_;
+	rclcpp::CallbackGroup::SharedPtr processingCallbackGroup_;
 
 	//for depth and rgb-only callbacks
 	image_transport::SubscriberFilter imageSub_;
@@ -614,6 +647,25 @@ private:
 	DATA_SYNCS2(odomData, nav_msgs::msg::Odometry, rtabmap_msgs::msg::UserData)
 	DATA_SYNCS3(odomDataInfo, nav_msgs::msg::Odometry, rtabmap_msgs::msg::UserData, rtabmap_msgs::msg::OdomInfo)
 #endif
+
+	struct SyncData {
+		bool valid;
+		nav_msgs::msg::Odometry::ConstSharedPtr odomMsg;
+		rtabmap_msgs::msg::UserData::ConstSharedPtr userDataMsg;
+		std::vector<cv_bridge::CvImageConstPtr> imageMsgs;
+		std::vector<cv_bridge::CvImageConstPtr> depthMsgs;
+		std::vector<sensor_msgs::msg::CameraInfo> cameraInfoMsgs;
+		std::vector<sensor_msgs::msg::CameraInfo> depthCameraInfoMsgs;
+		sensor_msgs::msg::LaserScan scanMsg;
+		sensor_msgs::msg::PointCloud2 scan3dMsg;
+		rtabmap_msgs::msg::OdomInfo::ConstSharedPtr odomInfoMsg;
+		std::vector<rtabmap_msgs::msg::GlobalDescriptor> globalDescriptorMsgs;
+		std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > localKeyPoints;
+		std::vector<std::vector<rtabmap_msgs::msg::Point3f> > localPoints3d;
+		std::vector<cv::Mat> localDescriptors;
+	};
+	SyncData syncData_;
+	UMutex syncDataMutex_;
 };
 
 } /* namespace rtabmap_ros */

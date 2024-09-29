@@ -84,8 +84,11 @@ int main(int argc, char** argv)
 	rclcpp::init(argc, argv);
 	rclcpp::NodeOptions options;
 	options.arguments(arguments);
+	auto node = std::make_shared<rtabmap_slam::CoreWrapper>(options);
+	rclcpp::executors::MultiThreadedExecutor executor;
+	executor.add_node(node);
 	UINFO("rtabmap %s started...", RTABMAP_VERSION);
-	rclcpp::spin(std::make_shared<rtabmap_slam::CoreWrapper>(options));
+	executor.spin();
 	rclcpp::shutdown();
 	return 0;
 }
