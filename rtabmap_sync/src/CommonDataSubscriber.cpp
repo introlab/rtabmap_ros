@@ -363,6 +363,8 @@ CommonDataSubscriber::CommonDataSubscriber(rclcpp::Node & node, bool gui) :
 {
 	name_ = node.get_name();
 
+	syncCallbackGroup_ = node.create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+
 	// ROS related parameters (private)
 	// ros2: should be declared in the constructor to be used by inherited classes in their constructor
 	subscribedToDepth_ = node.declare_parameter("subscribe_depth", subscribedToDepth_);
@@ -539,11 +541,15 @@ void CommonDataSubscriber::setupCallbacks(
 	RCLCPP_INFO(node.get_logger(), "%s: qos_user_data   = %d", name_.c_str(), qosUserData_);
 	RCLCPP_INFO(node.get_logger(), "%s: approx_sync     = %s", name_.c_str(), approxSync_?"true":"false");
 
+	rclcpp::SubscriptionOptions callbackOptions;
+	callbackOptions.callback_group = syncCallbackGroup_;
+
 	subscribedToOdom_ = odomFrameId_.empty() && subscribedToOdom_;
 	if(subscribedToDepth_)
 	{
 		setupDepthCallbacks(
 				node,
+				callbackOptions,
 				subscribedToOdom_,
 				subscribedToUserData_,
 				subscribedToScan2d_,
@@ -555,6 +561,7 @@ void CommonDataSubscriber::setupCallbacks(
 	{
 		setupStereoCallbacks(
 				node,
+				callbackOptions,
 				subscribedToOdom_,
 				subscribedToOdomInfo_);
 	}
@@ -562,6 +569,7 @@ void CommonDataSubscriber::setupCallbacks(
 	{
 		setupRGBCallbacks(
 				node,
+				callbackOptions,
 				subscribedToOdom_,
 				subscribedToUserData_,
 				subscribedToScan2d_,
@@ -583,6 +591,7 @@ void CommonDataSubscriber::setupCallbacks(
 
 			setupRGBD6Callbacks(
 					node,
+					callbackOptions,
 					subscribedToOdom_,
 					subscribedToUserData_,
 					subscribedToScan2d_,
@@ -594,6 +603,7 @@ void CommonDataSubscriber::setupCallbacks(
 		{
 			setupRGBD5Callbacks(
 					node,
+					callbackOptions,
 					subscribedToOdom_,
 					subscribedToUserData_,
 					subscribedToScan2d_,
@@ -605,6 +615,7 @@ void CommonDataSubscriber::setupCallbacks(
 		{
 			setupRGBD4Callbacks(
 					node,
+					callbackOptions,
 					subscribedToOdom_,
 					subscribedToUserData_,
 					subscribedToScan2d_,
@@ -616,6 +627,7 @@ void CommonDataSubscriber::setupCallbacks(
 		{
 			setupRGBD3Callbacks(
 					node,
+					callbackOptions,
 					subscribedToOdom_,
 					subscribedToUserData_,
 					subscribedToScan2d_,
@@ -627,6 +639,7 @@ void CommonDataSubscriber::setupCallbacks(
 		{
 			setupRGBD2Callbacks(
 					node,
+					callbackOptions,
 					subscribedToOdom_,
 					subscribedToUserData_,
 					subscribedToScan2d_,
@@ -647,6 +660,7 @@ void CommonDataSubscriber::setupCallbacks(
 		{
 			setupRGBDXCallbacks(
 					node,
+					callbackOptions,
 					subscribedToOdom_,
 					subscribedToUserData_,
 					subscribedToScan2d_,
@@ -658,6 +672,7 @@ void CommonDataSubscriber::setupCallbacks(
 		{
 			setupRGBDCallbacks(
 					node,
+					callbackOptions,
 					subscribedToOdom_,
 					subscribedToUserData_,
 					subscribedToScan2d_,
@@ -670,6 +685,7 @@ void CommonDataSubscriber::setupCallbacks(
 	{
 		setupScanCallbacks(
 					node,
+					callbackOptions,
 					subscribedToScan2d_,
 					subscribedToScanDescriptor_,
 					subscribedToOdom_,
@@ -680,6 +696,7 @@ void CommonDataSubscriber::setupCallbacks(
 	{
 		setupSensorDataCallbacks(
 					node,
+					callbackOptions,
 					subscribedToOdom_,
 					subscribedToOdomInfo_);
 	}
@@ -687,6 +704,7 @@ void CommonDataSubscriber::setupCallbacks(
 	{
 		setupOdomCallbacks(
 					node,
+					callbackOptions,
 					subscribedToUserData_,
 					subscribedToOdomInfo_);
 	}
