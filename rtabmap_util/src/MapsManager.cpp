@@ -1485,7 +1485,11 @@ void MapsManager::publishMaps(
 		(elevationMapPub_.getNumSubscribers() && !latched_.at(&elevationMapPub_)))
 	{
 		grid_map_msgs::GridMap msg;
+#if RTABMAP_VERSION_MAJOR>0 || (RTABMAP_VERSION_MAJOR==0 && RTABMAP_VERSION_MINOR>21) || (RTABMAP_VERSION_MAJOR==0 && RTABMAP_VERSION_MINOR==21 && RTABMAP_VERSION_PATCH>=8)
+		grid_map::GridMapRosConverter::toMessage(*elevationMap_->gridMap(), msg);
+#else
 		grid_map::GridMapRosConverter::toMessage(elevationMap_->gridMap(), msg);
+#endif
 		msg.info.header.frame_id = mapFrameId;
 		msg.info.header.stamp = stamp;
 		elevationMapPub_.publish(msg);
