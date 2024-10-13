@@ -397,6 +397,7 @@ private:
 	// for loop closure detection only
 	image_transport::Subscriber defaultSub_;
 
+	rclcpp::CallbackGroup::SharedPtr userDataAsyncCallbackGroup_;
 	rclcpp::Subscription<rtabmap_msgs::msg::UserData>::SharedPtr userDataAsyncSub_;
 	cv::Mat userData_;
 	UMutex userDataMutex_;
@@ -405,6 +406,8 @@ private:
 	geometry_msgs::msg::PoseWithCovarianceStamped globalPose_;
 	rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr gpsFixAsyncSub_;
 	rtabmap::GPS gps_;
+
+	rclcpp::CallbackGroup::SharedPtr landmarkCallbackGroup_;
 	rclcpp::Subscription<rtabmap_msgs::msg::LandmarkDetection>::SharedPtr landmarkDetectionSub_;
 	rclcpp::Subscription<rtabmap_msgs::msg::LandmarkDetections>::SharedPtr landmarkDetectionsSub_;
 #ifdef WITH_APRILTAG_MSGS
@@ -414,10 +417,14 @@ private:
 	rclcpp::Subscription<fiducial_msgs::msg::FiducialTransformArray>::SharedPtr fiducialTransfromsSub_;
 #endif
 	std::map<int, std::pair<geometry_msgs::msg::PoseWithCovarianceStamped, float> > landmarks_; // id, <pose, size>
-	rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imuSub_;
+	UMutex landmarksMutex_;
 
+	rclcpp::CallbackGroup::SharedPtr imuCallbackGroup_;
+	rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imuSub_;
 	std::map<double, rtabmap::Transform> imus_;
 	std::string imuFrameId_;
+	UMutex imuMutex_;
+
 	rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr republishNodeDataSub_;
 
 	rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr interOdomSub_;

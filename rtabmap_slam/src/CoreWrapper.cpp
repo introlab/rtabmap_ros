@@ -845,23 +845,34 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 	}
 	this->set_parameters(rosParameters);
 
+	// Setup callback groups for any subscriptions that should not be affected by main processing thread.
+	userDataAsyncCallbackGroup_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+	landmarkCallbackGroup_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+	imuCallbackGroup_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+	rclcpp::SubscriptionOptions userDataAsyncSubOptions;
+	rclcpp::SubscriptionOptions landmarkSubOptions;
+	rclcpp::SubscriptionOptions imuSubOptions;
+	userDataAsyncSubOptions.callback_group = userDataAsyncCallbackGroup_;
+	landmarkSubOptions.callback_group = imuCallbackGroup_;
+	imuSubOptions.callback_group = imuCallbackGroup_;
+
 	int qosGPS = 0;
 	int qosIMU = 0;
 	qosGPS = this->declare_parameter("qos_gps", qosGPS);
 	qosIMU = this->declare_parameter("qos_imu", qosIMU);
-	userDataAsyncSub_ = this->create_subscription<rtabmap_msgs::msg::UserData>("user_data_async", rclcpp::QoS(5).reliability((rmw_qos_reliability_policy_t)qosUserData_), std::bind(&CoreWrapper::userDataAsyncCallback, this, std::placeholders::_1), subOptions);
-	globalPoseAsyncSub_ = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>("global_pose", 5, std::bind(&CoreWrapper::globalPoseAsyncCallback, this, std::placeholders::_1), subOptions);
-	gpsFixAsyncSub_ = this->create_subscription<sensor_msgs::msg::NavSatFix>("gps/fix", rclcpp::QoS(5).reliability((rmw_qos_reliability_policy_t)qosGPS), std::bind(&CoreWrapper::gpsFixAsyncCallback, this, std::placeholders::_1), subOptions);
-	landmarkDetectionSub_ = this->create_subscription<rtabmap_msgs::msg::LandmarkDetection>("landmark_detection", 5, std::bind(&CoreWrapper::landmarkDetectionAsyncCallback, this, std::placeholders::_1), subOptions);
-	landmarkDetectionsSub_ = this->create_subscription<rtabmap_msgs::msg::LandmarkDetections>("landmark_detections", 5, std::bind(&CoreWrapper::landmarkDetectionsAsyncCallback, this, std::placeholders::_1), subOptions);
+	userDataAsyncSub_ = this->create_subscription<rtabmap_msgs::msg::UserData>("user_data_async", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qosUserData_), std::bind(&CoreWrapper::userDataAsyncCallback, this, std::placeholders::_1), userDataAsyncSubOptions);
+	globalPoseAsyncSub_ = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>("global_pose", 1, std::bind(&CoreWrapper::globalPoseAsyncCallback, this, std::placeholders::_1), subOptions);
+	gpsFixAsyncSub_ = this->create_subscription<sensor_msgs::msg::NavSatFix>("gps/fix", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qosGPS), std::bind(&CoreWrapper::gpsFixAsyncCallback, this, std::placeholders::_1), subOptions);
+	landmarkDetectionSub_ = this->create_subscription<rtabmap_msgs::msg::LandmarkDetection>("landmark_detection", 1, std::bind(&CoreWrapper::landmarkDetectionAsyncCallback, this, std::placeholders::_1), landmarkSubOptions);
+	landmarkDetectionsSub_ = this->create_subscription<rtabmap_msgs::msg::LandmarkDetections>("landmark_detections", 1, std::bind(&CoreWrapper::landmarkDetectionsAsyncCallback, this, std::placeholders::_1), landmarkSubOptions);
 #ifdef WITH_APRILTAG_MSGS
-	tagDetectionsSub_ = this->create_subscription<apriltag_msgs::msg::AprilTagDetectionArray>("tag_detections", 5, std::bind(&CoreWrapper::tagDetectionsAsyncCallback, this, std::placeholders::_1), subOptions);
+	tagDetectionsSub_ = this->create_subscription<apriltag_msgs::msg::AprilTagDetectionArray>("tag_detections", 5, std::bind(&CoreWrapper::tagDetectionsAsyncCallback, this, std::placeholders::_1), landmarkSubOptions);
 #endif
 #ifdef WITH_FIDUCIAL_MSGS
-	fiducialTransfromsSub_ = this->create_subscription<fiducial_msgs::msg::FiducialTransformArray>("fiducial_transforms", 5, std::bind(&CoreWrapper::fiducialDetectionsAsyncCallback, this, std::placeholders::_1), subOptions);
+	fiducialTransfromsSub_ = this->create_subscription<fiducial_msgs::msg::FiducialTransformArray>("fiducial_transforms", 5, std::bind(&CoreWrapper::fiducialDetectionsAsyncCallback, this, std::placeholders::_1), landmarkSubOptions);
 #endif
-	imuSub_ = this->create_subscription<sensor_msgs::msg::Imu>("imu", rclcpp::QoS(100).reliability((rmw_qos_reliability_policy_t)qosIMU), std::bind(&CoreWrapper::imuAsyncCallback, this, std::placeholders::_1), subOptions);
-	republishNodeDataSub_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(servicePrefix+"republish_node_data", 5, std::bind(&CoreWrapper::republishNodeDataCallback, this, std::placeholders::_1), subOptions);
+	imuSub_ = this->create_subscription<sensor_msgs::msg::Imu>("imu", rclcpp::QoS(100).reliability((rmw_qos_reliability_policy_t)qosIMU), std::bind(&CoreWrapper::imuAsyncCallback, this, std::placeholders::_1), imuSubOptions);
+	republishNodeDataSub_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(servicePrefix+"republish_node_data", 1, std::bind(&CoreWrapper::republishNodeDataCallback, this, std::placeholders::_1), subOptions);
 
 	parametersClient_ = std::make_shared<rclcpp::AsyncParametersClient>(this, std::string(), rmw_qos_profile_parameters, processingCallbackGroup_);
 	auto on_parameter_event_callback =
@@ -2071,6 +2082,7 @@ void CoreWrapper::process(
 		gps_ = rtabmap::GPS();
 
 		//tag detections
+		landmarksMutex_.lock();
 		Landmarks landmarks = rtabmap_conversions::landmarksFromROS(
 				landmarks_,
 				frameId_,
@@ -2081,17 +2093,20 @@ void CoreWrapper::process(
 				landmarkDefaultLinVariance_,
 				landmarkDefaultAngVariance_);
 		landmarks_.clear();
+		landmarksMutex_.unlock();
 		if(!landmarks.empty())
 		{
 			data.setLandmarks(landmarks);
 		}
 
 		// IMU
+		imuMutex_.lock();
 		if(!imus_.empty())
 		{
 			Transform t = Transform::getTransform(imus_, data.stamp());
 			if(!t.isNull())
 			{
+				imuMutex_.unlock();
 				// get local transform
 				rtabmap::Transform localTransform;
 				if(frameId_.compare(imuFrameId_) != 0)
@@ -2115,9 +2130,14 @@ void CoreWrapper::process(
 			else
 			{
 				RCLCPP_WARN(this->get_logger(), "We are receiving imu data (buffer=%d), but cannot interpolate "
-						"imu transform at time %f. IMU won't be added to graph.",
-						(int)imus_.size(), data.stamp());
+						"imu transform at time %f (latest imu received with stamp %f). IMU won't be added to graph.",
+						(int)imus_.size(), data.stamp(), imus_.rbegin()->first);
+						imuMutex_.unlock();
 			}
+		}
+		else
+		{
+			imuMutex_.unlock();
 		}
 
 		double timeRtabmap = 0.0;
@@ -2512,6 +2532,7 @@ void CoreWrapper::landmarkDetectionAsyncCallback(const rtabmap_msgs::msg::Landma
 		geometry_msgs::msg::PoseWithCovarianceStamped p;
 		p.header = landmarkDetection->header;
 		p.pose = landmarkDetection->pose;
+		UScopeMutex lock(landmarksMutex_);
 		uInsert(landmarks_,
 			std::make_pair(landmarkDetection->id,
 				std::make_pair(p, landmarkDetection->size)));
@@ -2522,6 +2543,7 @@ void CoreWrapper::landmarkDetectionsAsyncCallback(const rtabmap_msgs::msg::Landm
 {
 	if(!paused_)
 	{
+		UScopeMutex lock(landmarksMutex_);
 		for(unsigned int i=0; i<landmarkDetections->landmarks.size(); ++i)
 		{
 			geometry_msgs::msg::PoseWithCovarianceStamped p;
@@ -2539,6 +2561,7 @@ void CoreWrapper::tagDetectionsAsyncCallback(const apriltag_msgs::msg::AprilTagD
 {
 	if(!paused_)
 	{
+		UScopeMutex lock(landmarksMutex_);
 		for(unsigned int i=0; i<tagDetections->detections.size(); ++i)
 		{
 			std::string tagFrameId = tagDetections->detections[i].family+":"+uNumber2Str(tagDetections->detections[i].id);
@@ -2574,6 +2597,7 @@ void CoreWrapper::fiducialDetectionsAsyncCallback(const fiducial_msgs::msg::Fidu
 {
 	if(!paused_)
 	{
+		UScopeMutex lock(landmarksMutex_);
 		for(unsigned int i=0; i<fiducialDetections.transforms.size(); ++i)
 		{
 			geometry_msgs::PoseWithCovarianceStamped p;
@@ -2600,6 +2624,7 @@ void CoreWrapper::imuAsyncCallback(const sensor_msgs::msg::Imu::SharedPtr msg)
 		}
 		else
 		{
+			UScopeMutex lock(imuMutex_);
 			Transform orientation(0,0,0, msg->orientation.x, msg->orientation.y, msg->orientation.z, msg->orientation.w);
 			imus_.insert(std::make_pair(rtabmap_conversions::timestampFromROS(msg->header.stamp), orientation));
 			if(imus_.size() > 1000)
@@ -2923,12 +2948,16 @@ void CoreWrapper::resetRtabmapCallback(
 	previousStamp_ = rclcpp::Time(0);
 	globalPose_.header.stamp = rclcpp::Time(0);
 	gps_ = rtabmap::GPS();
+	landmarksMutex_.lock();
 	landmarks_.clear();
+	landmarksMutex_.unlock();
 	userDataMutex_.lock();
 	userData_ = cv::Mat();
 	userDataMutex_.unlock();
+	imuMutex_.lock();
 	imus_.clear();
 	imuFrameId_.clear();
+	imuMutex_.unlock();
 	interOdoms_.clear();
 	mapToOdomMutex_.lock();
 	mapToOdom_.setIdentity();
@@ -3017,12 +3046,16 @@ void CoreWrapper::loadDatabaseCallback(
 	previousStamp_ = rclcpp::Time(0);
 	globalPose_.header.stamp = rclcpp::Time(0);
 	gps_ = rtabmap::GPS();
+	landmarksMutex_.lock();
 	landmarks_.clear();
+	landmarksMutex_.unlock();
 	userDataMutex_.lock();
 	userData_ = cv::Mat();
 	userDataMutex_.unlock();
+	imuMutex_.lock();
 	imus_.clear();
 	imuFrameId_.clear();
+	imuMutex_.unlock();
 	interOdoms_.clear();
 	mapToOdomMutex_.lock();
 	mapToOdom_.setIdentity();
@@ -3144,7 +3177,9 @@ void CoreWrapper::backupDatabaseCallback(
 	userDataMutex_.unlock();
 	globalPose_.header.stamp = rclcpp::Time(0);
 	gps_ = rtabmap::GPS();
+	landmarksMutex_.lock();
 	landmarks_.clear();
+	landmarksMutex_.unlock();
 
 	RCLCPP_INFO(this->get_logger(), "Backup: Saving \"%s\" to \"%s\"...", databasePath_.c_str(), (databasePath_+".back").c_str());
 	UFile::copy(databasePath_, databasePath_+".back");
