@@ -108,9 +108,9 @@ void RGBDOdometry::onOdomInit()
 	int qosCamInfo = this->declare_parameter("qos_camera_info", (int)qos());
 	subscribeRGBD = this->declare_parameter("subscribe_rgbd", subscribeRGBD);
 	rgbdCameras = this->declare_parameter("rgbd_cameras", rgbdCameras);
-	if(rgbdCameras <= 0)
+	if(rgbdCameras < 0)
 	{
-		rgbdCameras = 1;
+		rgbdCameras = 0;
 	}
 	keepColor_ = this->declare_parameter("keep_color", keepColor_);
 
