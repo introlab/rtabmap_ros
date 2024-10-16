@@ -1691,18 +1691,6 @@ rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_msgs::msg::OdomInfo & msg, b
 	info.localBundleOutliers = msg.local_bundle_outliers;
 	info.localBundleConstraints = msg.local_bundle_constraints;
 	info.localBundleTime = msg.local_bundle_time;
-	UASSERT(msg.local_bundle_models.size() == msg.local_bundle_ids.size());
-	UASSERT(msg.local_bundle_models.size() == msg.local_bundle_poses.size());
-	for(size_t i=0; i<msg.local_bundle_ids.size(); ++i)
-	{
-		std::vector<rtabmap::CameraModel> models;
-		for(size_t j=0; j<msg.local_bundle_models[i].models.size(); ++j)
-		{
-			models.push_back(cameraModelFromROS(msg.local_bundle_models[i].models[j].camera_info, transformFromGeometryMsg(msg.local_bundle_models[i].models[j].local_transform)));
-		}
-		info.localBundleModels.insert(std::make_pair(msg.local_bundle_ids[i], models));
-		info.localBundlePoses.insert(std::make_pair(msg.local_bundle_ids[i], transformFromPoseMsg(msg.local_bundle_poses[i])));
-	}
 	info.keyFrameAdded = msg.key_frame_added;
 	info.timeEstimation = msg.time_estimation;
 	info.timeParticleFiltering =  msg.time_particle_filtering;
@@ -1720,6 +1708,19 @@ rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_msgs::msg::OdomInfo & msg, b
 
 	if(!ignoreData)
 	{
+		UASSERT(msg.local_bundle_models.size() == msg.local_bundle_ids.size());
+		UASSERT(msg.local_bundle_models.size() == msg.local_bundle_poses.size());
+		for(size_t i=0; i<msg.local_bundle_ids.size(); ++i)
+		{
+			std::vector<rtabmap::CameraModel> models;
+			for(size_t j=0; j<msg.local_bundle_models[i].models.size(); ++j)
+			{
+				models.push_back(cameraModelFromROS(msg.local_bundle_models[i].models[j].camera_info, transformFromGeometryMsg(msg.local_bundle_models[i].models[j].local_transform)));
+			}
+			info.localBundleModels.insert(std::make_pair(msg.local_bundle_ids[i], models));
+			info.localBundlePoses.insert(std::make_pair(msg.local_bundle_ids[i], transformFromPoseMsg(msg.local_bundle_poses[i])));
+		}
+		
 		UASSERT(msg.words_keys.size() == msg.words_values.size());
 		for(unsigned int i=0; i<msg.words_keys.size(); ++i)
 		{
