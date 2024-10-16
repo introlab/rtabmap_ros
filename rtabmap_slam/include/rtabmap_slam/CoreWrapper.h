@@ -118,7 +118,7 @@ public:
 
 private:
 	bool odomUpdate(const nav_msgs::msg::Odometry & odomMsg, rclcpp::Time stamp);
-	bool odomTFUpdate(const rclcpp::Time & stamp); // TF odom
+	bool odomTFUpdate(const std::string & odomFrameId, const rclcpp::Time & stamp); // TF odom
 
 	// Callback called from sync thread
 	virtual void commonMultiCameraCallback(
@@ -273,11 +273,14 @@ private:
 private:
 	rtabmap::Rtabmap rtabmap_;
 	bool paused_;
+
+	UMutex lastPoseMutex_;
 	rtabmap::Transform lastPose_;
 	rclcpp::Time lastPoseStamp_;
 	std::vector<float> lastPoseVelocity_;
+	cv::Mat lastPoseCovariance_;
 	bool lastPoseIntermediate_;
-	cv::Mat covariance_;
+
 	rtabmap::Transform currentMetricGoal_;
 	rtabmap::Transform lastPublishedMetricGoal_;
 	bool latestNodeWasReached_;

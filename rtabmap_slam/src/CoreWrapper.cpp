@@ -711,9 +711,9 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 			rclcpp::Rate r(1.0 / tfDelay);
 			while(tfThreadRunning_)
 			{
+				mapToOdomMutex_.lock();
 				if(!odomFrameId_.empty())
 				{
-					mapToOdomMutex_.lock();
 					rclcpp::Time tfExpiration = now() + rclcpp::Duration::from_seconds(tfTolerance);
 					geometry_msgs::msg::TransformStamped msg;
 					msg.child_frame_id = odomFrameId_;
@@ -721,8 +721,8 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 					msg.header.stamp = tfExpiration;
 					rtabmap_conversions::transformToGeometryMsg(mapToOdom_, msg.transform);
 					tfBroadcaster_->sendTransform(msg);
-					mapToOdomMutex_.unlock();
 				}
+				mapToOdomMutex_.unlock();
 				r.sleep();
 			}
 		});
@@ -1098,11 +1098,13 @@ bool CoreWrapper::odomUpdate(const nav_msgs::msg::Odometry & odomMsg, rclcpp::Ti
 			}
 		}
 
+		UScopeMutex lock(lastPoseMutex_);
+
 		if(!lastPose_.isIdentity() && !odom.isNull() && (odom.isIdentity() || (odomMsg.pose.covariance[0] >= BAD_COVARIANCE && odomMsg.twist.covariance[0] >= BAD_COVARIANCE)))
 		{
 			UWARN("Odometry is reset (identity pose or high variance (%f) detected). Increment map id!", MAX(odomMsg.pose.covariance[0], odomMsg.twist.covariance[0]));
 			triggerNewMapBeforeNextUpdate_ = true;
-			covariance_ = cv::Mat();
+			lastPoseCovariance_ = cv::Mat();
 		}
 
 		lastPoseIntermediate_ = false;
@@ -1137,9 +1139,9 @@ bool CoreWrapper::odomUpdate(const nav_msgs::msg::Odometry & odomMsg, rclcpp::Ti
 				covariance.at<double>(0,0)>0.0)
 			{
 				// Use largest covariance error (to be independent of the odometry frame rate)
-				if(covariance_.empty() || covariance.at<double>(0,0) > covariance_.at<double>(0,0))
+				if(lastPoseCovariance_.empty() || covariance.at<double>(0,0) > lastPoseCovariance_.at<double>(0,0))
 				{
-					covariance_ = covariance;
+					lastPoseCovariance_ = covariance;
 				}
 			}
 		}
@@ -1175,22 +1177,24 @@ bool CoreWrapper::odomUpdate(const nav_msgs::msg::Odometry & odomMsg, rclcpp::Ti
 	return false;
 }
 
-bool CoreWrapper::odomTFUpdate(const rclcpp::Time & stamp)
+bool CoreWrapper::odomTFUpdate(const std::string & odomFrameId, const rclcpp::Time & stamp)
 {
 	if(!paused_)
 	{
 		// Odom TF ready?
-		Transform odom = rtabmap_conversions::getTransform(odomFrameId_, frameId_, stamp, *tfBuffer_, waitForTransform_);
+		Transform odom = rtabmap_conversions::getTransform(odomFrameId, frameId_, stamp, *tfBuffer_, waitForTransform_);
 		if(odom.isNull())
 		{
 			return false;
 		}
 
+		UScopeMutex lock(lastPoseMutex_);
+
 		if(!lastPose_.isIdentity() && odom.isIdentity())
 		{
 			UWARN("Odometry is reset (identity pose detected). Increment map id!");
 			triggerNewMapBeforeNextUpdate_ = true;
-			covariance_ = cv::Mat();
+			lastPoseCovariance_ = cv::Mat();
 		}
 
 		lastPoseIntermediate_ = false;
@@ -1243,7 +1247,7 @@ void CoreWrapper::commonMultiCameraCallback(
 		const std::vector<std::vector<rtabmap_msgs::msg::Point3f> > & localPoints3d,
 		const std::vector<cv::Mat> & localDescriptors)
 {
-	std::string odomFrameId = odomFrameId_;
+	std::string odomFrameId;
 	if(odomMsg.get())
 	{
 		odomFrameId = odomMsg->header.frame_id;
@@ -1266,27 +1270,34 @@ void CoreWrapper::commonMultiCameraCallback(
 			return;
 		}
 	}
-	else if(!scan2dMsg.ranges.empty())
+	else
 	{
-		if(!odomTFUpdate(scan2dMsg.header.stamp))
+		mapToOdomMutex_.lock();
+		odomFrameId = odomFrameId_;
+		mapToOdomMutex_.unlock();
+		if(!scan2dMsg.ranges.empty())
+		{
+			if(!odomTFUpdate(odomFrameId, scan2dMsg.header.stamp))
+			{
+				return;
+			}
+		}
+		else if(!scan3dMsg.data.empty())
+		{
+			if(!odomTFUpdate(odomFrameId, scan3dMsg.header.stamp))
+			{
+				return;
+			}
+		}
+		else if(cameraInfoMsgs.size() == 0 || !odomTFUpdate(odomFrameId, cameraInfoMsgs[0].header.stamp))
 		{
 			return;
 		}
-	}
-	else if(!scan3dMsg.data.empty())
-	{
-		if(!odomTFUpdate(scan3dMsg.header.stamp))
-		{
-			return;
-		}
-	}
-	else if(cameraInfoMsgs.size() == 0 || !odomTFUpdate(cameraInfoMsgs[0].header.stamp))
-	{
-		return;
 	}
 
 	if(syncTimer_->is_canceled() && syncDataMutex_.lockTry() == 0)
 	{
+		UScopeMutex lock(lastPoseMutex_);
 		commonMultiCameraCallbackImpl(odomFrameId,
 				userDataMsg,
 				imageMsgs,
@@ -1601,7 +1612,7 @@ void CoreWrapper::commonMultiCameraCallbackImpl(
 	syncData_.odom = lastPose_;
 	syncData_.odomVelocity = lastPoseVelocity_;
 	syncData_.odomFrameId = odomFrameId;
-	syncData_.odomCovariance = covariance_;
+	syncData_.odomCovariance = lastPoseCovariance_;
 	syncData_.odomInfo = odomInfo;
 	syncData_.timeMsgConversion = timerConversion.ticks();
 
@@ -1610,7 +1621,7 @@ void CoreWrapper::commonMultiCameraCallbackImpl(
 		previousStamp_ = lastPoseStamp_;
 	}
 
-	covariance_ = cv::Mat();
+	lastPoseCovariance_ = cv::Mat();
 }
 
 void CoreWrapper::commonLaserScanCallback(
@@ -1622,7 +1633,7 @@ void CoreWrapper::commonLaserScanCallback(
 		const rtabmap_msgs::msg::GlobalDescriptor & globalDescriptor)
 {
 	UTimer timerConversion;
-	std::string odomFrameId = odomFrameId_;
+	std::string odomFrameId;
 	if(odomMsg.get())
 	{
 		odomFrameId = odomMsg->header.frame_id;
@@ -1645,28 +1656,34 @@ void CoreWrapper::commonLaserScanCallback(
 			return;
 		}
 	}
-	else if(!scan2dMsg.ranges.empty())
-	{
-		if(!odomTFUpdate(scan2dMsg.header.stamp))
-		{
-			return;
-		}
-	}
-	else if(!scan3dMsg.data.empty())
-	{
-		if(!odomTFUpdate(scan3dMsg.header.stamp))
-		{
-			return;
-		}
-	}
 	else
 	{
-		return;
+		mapToOdomMutex_.lock();
+		odomFrameId = odomFrameId_;
+		mapToOdomMutex_.unlock();
+		if(!scan2dMsg.ranges.empty())
+		{
+			if(!odomTFUpdate(odomFrameId, scan2dMsg.header.stamp))
+			{
+				return;
+			}
+		}
+		else if(!scan3dMsg.data.empty())
+		{
+			if(!odomTFUpdate(odomFrameId, scan3dMsg.header.stamp))
+			{
+				return;
+			}
+		}
+		else
+		{
+			return;
+		}
 	}
 
 	if(syncTimer_->is_canceled() && syncDataMutex_.lockTry() == 0)
 	{
-
+		UScopeMutex lock(lastPoseMutex_);
 		LaserScan scan;
 		if(!scan2dMsg.ranges.empty())
 		{
@@ -1734,7 +1751,7 @@ void CoreWrapper::commonLaserScanCallback(
 		OdometryInfo odomInfo;
 		if(odomInfoMsg.get())
 		{
-			odomInfo = rtabmap_conversions::odomInfoFromROS(*odomInfoMsg);
+			odomInfo = rtabmap_conversions::odomInfoFromROS(*odomInfoMsg, true);
 		}
 
 		if(!globalDescriptor.data.empty())
@@ -1747,7 +1764,7 @@ void CoreWrapper::commonLaserScanCallback(
 		syncData_.odom = lastPose_;
 		syncData_.odomVelocity = lastPoseVelocity_;
 		syncData_.odomFrameId = odomFrameId;
-		syncData_.odomCovariance = covariance_;
+		syncData_.odomCovariance = lastPoseCovariance_;
 		syncData_.odomInfo = odomInfo;
 		syncData_.timeMsgConversion = timerConversion.ticks();
 
@@ -1756,7 +1773,7 @@ void CoreWrapper::commonLaserScanCallback(
 			previousStamp_ = lastPoseStamp_;
 		}
 
-		covariance_ = cv::Mat();
+		lastPoseCovariance_ = cv::Mat();
 
 		syncTimer_->reset();
 		syncDataMutex_.unlock();
@@ -1770,9 +1787,7 @@ void CoreWrapper::commonOdomCallback(
 {
 	UTimer timerConversion;
 	UASSERT(odomMsg.get());
-	std::string odomFrameId = odomFrameId_;
-
-	odomFrameId = odomMsg->header.frame_id;
+	std::string odomFrameId = odomMsg->header.frame_id;
 	if(!odomUpdate(*odomMsg, odomMsg->header.stamp))
 	{
 		return;
@@ -1780,6 +1795,7 @@ void CoreWrapper::commonOdomCallback(
 
 	if(syncTimer_->is_canceled() && syncDataMutex_.lockTry() == 0)
 	{
+		UScopeMutex lock(lastPoseMutex_);
 		cv::Mat userData;
 		if(userDataMsg.get())
 		{
@@ -1809,7 +1825,7 @@ void CoreWrapper::commonOdomCallback(
 		OdometryInfo odomInfo;
 		if(odomInfoMsg.get())
 		{
-			odomInfo = rtabmap_conversions::odomInfoFromROS(*odomInfoMsg);
+			odomInfo = rtabmap_conversions::odomInfoFromROS(*odomInfoMsg, true);
 		}
 
 		syncData_.valid = true;
@@ -1817,7 +1833,7 @@ void CoreWrapper::commonOdomCallback(
 		syncData_.odom = lastPose_;
 		syncData_.odomVelocity = lastPoseVelocity_;
 		syncData_.odomFrameId = odomFrameId;
-		syncData_.odomCovariance = covariance_;
+		syncData_.odomCovariance = lastPoseCovariance_;
 		syncData_.odomInfo = odomInfo;
 		syncData_.timeMsgConversion = timerConversion.ticks();
 
@@ -1826,7 +1842,7 @@ void CoreWrapper::commonOdomCallback(
 			previousStamp_ = lastPoseStamp_;
 		}
 
-		covariance_ = cv::Mat();
+		lastPoseCovariance_ = cv::Mat();
 
 		syncTimer_->reset();
 		syncDataMutex_.unlock();
@@ -1840,7 +1856,7 @@ void CoreWrapper::commonSensorDataCallback(
 {
 	UTimer timerConversion;
 	UASSERT(sensorDataMsg.get());
-	std::string odomFrameId = odomFrameId_;
+	std::string odomFrameId;
 	if(odomMsg.get())
 	{
 		odomFrameId = odomMsg->header.frame_id;
@@ -1849,21 +1865,27 @@ void CoreWrapper::commonSensorDataCallback(
 			return;
 		}
 	}
-	else if(!odomTFUpdate(sensorDataMsg->header.stamp))
+	else
 	{
-		return;
+		mapToOdomMutex_.lock();
+		odomFrameId = odomFrameId_;
+		mapToOdomMutex_.unlock();
+		if(!odomTFUpdate(odomFrameId, sensorDataMsg->header.stamp))
+		{
+			return;
+		}
 	}
 
 	if(syncTimer_->is_canceled() && syncDataMutex_.lockTry() == 0)
 	{
-
+		UScopeMutex lock(lastPoseMutex_);
 		syncData_.data = rtabmap_conversions::sensorDataFromROS(*sensorDataMsg);
 		syncData_.data.setId(lastPoseIntermediate_?-1:0);
 
 		OdometryInfo odomInfo;
 		if(odomInfoMsg.get())
 		{
-			odomInfo = rtabmap_conversions::odomInfoFromROS(*odomInfoMsg);
+			odomInfo = rtabmap_conversions::odomInfoFromROS(*odomInfoMsg, true);
 		}
 
 		syncData_.valid = true;
@@ -1871,7 +1893,7 @@ void CoreWrapper::commonSensorDataCallback(
 		syncData_.odom = lastPose_;
 		syncData_.odomVelocity = lastPoseVelocity_;
 		syncData_.odomFrameId = odomFrameId;
-		syncData_.odomCovariance = covariance_;
+		syncData_.odomCovariance = lastPoseCovariance_;
 		syncData_.odomInfo = odomInfo;
 		syncData_.timeMsgConversion = timerConversion.ticks();
 
@@ -1880,7 +1902,7 @@ void CoreWrapper::commonSensorDataCallback(
 			previousStamp_ = lastPoseStamp_;
 		}
 
-		covariance_ = cv::Mat();
+		lastPoseCovariance_ = cv::Mat();
 
 		syncTimer_->reset();
 		syncDataMutex_.unlock();
@@ -1928,7 +1950,7 @@ void CoreWrapper::process(
 		// Add intermediate nodes?
 		for(std::list<std::pair<nav_msgs::msg::Odometry, rtabmap_msgs::msg::OdomInfo> >::iterator iter=interOdoms_.begin(); iter!=interOdoms_.end();)
 		{
-			if(rclcpp::Time(iter->first.header.stamp.sec, iter->first.header.stamp.nanosec) < lastPoseStamp_)
+			if(rclcpp::Time(iter->first.header.stamp.sec, iter->first.header.stamp.nanosec) < stamp)
 			{
 				Transform interOdom;
 				if(!rtabmap_.getLocalOptimizedPoses().empty())
@@ -2017,7 +2039,7 @@ void CoreWrapper::process(
 				}
 				interOdoms_.erase(iter++);
 			}
-			else if(iter->first.header.stamp == lastPoseStamp_)
+			else if(iter->first.header.stamp == stamp)
 			{
 				interOdoms_.erase(iter++);
 				break;
@@ -2032,7 +2054,7 @@ void CoreWrapper::process(
 		Transform groundTruthPose;
 		if(!groundTruthFrameId_.empty())
 		{
-			groundTruthPose = rtabmap_conversions::getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, lastPoseStamp_, *tfBuffer_, waitForTransform_);
+			groundTruthPose = rtabmap_conversions::getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, stamp, *tfBuffer_, waitForTransform_);
 		}
 		data.setGroundTruth(groundTruthPose);
 
@@ -2043,7 +2065,7 @@ void CoreWrapper::process(
 			Transform sensorToBase = rtabmap_conversions::getTransform(
 					globalPose_.header.frame_id,
 					frameId_,
-					lastPoseStamp_,
+					stamp,
 					*tfBuffer_,
 					waitForTransform_);
 			if(!sensorToBase.isNull())
@@ -2055,7 +2077,7 @@ void CoreWrapper::process(
 				Transform correction = rtabmap_conversions::getMovingTransform(
 						frameId_,
 						odomFrameId,
-						lastPoseStamp_,
+						stamp,
 						rclcpp::Time(globalPose_.header.stamp.sec, globalPose_.header.stamp.nanosec),
 						*tfBuffer_,
 						waitForTransform_);
@@ -2087,7 +2109,7 @@ void CoreWrapper::process(
 				landmarks_,
 				frameId_,
 				odomFrameId,
-				lastPoseStamp_,
+				stamp,
 				*tfBuffer_,
 				waitForTransform_,
 				landmarkDefaultLinVariance_,
@@ -2204,7 +2226,7 @@ void CoreWrapper::process(
 			timeRtabmap = timer.ticks();
 			mapToOdomMutex_.lock();
 			mapToOdom_ = rtabmap_.getMapCorrection();
-
+			Transform mapToOdomSafe = mapToOdom_.clone();
 			if(!odomFrameId.empty() && !odomFrameId_.empty() && odomFrameId_.compare(odomFrameId)!=0)
 			{
 				RCLCPP_ERROR(get_logger(), "Odometry received doesn't have same frame_id "
@@ -2233,7 +2255,7 @@ void CoreWrapper::process(
 						geometry_msgs::msg::PoseWithCovarianceStamped poseMsg;
 					    poseMsg.header.frame_id = mapFrameId_;
 					    poseMsg.header.stamp = stamp;
-						rtabmap_conversions::transformToPoseMsg(mapToOdom_*odom, poseMsg.pose.pose);
+						rtabmap_conversions::transformToPoseMsg(mapToOdomSafe*odom, poseMsg.pose.pose);
 						if(!rtabmap_.getStatistics().localizationCovariance().empty())
 						{
 							const cv::Mat & cov = rtabmap_.getStatistics().localizationCovariance();
@@ -2266,12 +2288,12 @@ void CoreWrapper::process(
 					SensorData tmpData = data;
 					tmpData.setId(0);
 					tmpSignature.insert(std::make_pair(0, Signature(0, -1, 0, data.stamp(), "", odom, Transform(), tmpData)));
-					filteredPoses.insert(std::make_pair(0, mapToOdom_*odom));
+					filteredPoses.insert(std::make_pair(0, mapToOdomSafe*odom));
 				}
 
 				if((mappingMaxNodes_ > 0 || mappingAltitudeDelta_>0.0) && filteredPoses.size()>1)
 				{
-					std::map<int, Transform> nearestPoses = filterNodesToAssemble(filteredPoses, mapToOdom_*odom);
+					std::map<int, Transform> nearestPoses = filterNodesToAssemble(filteredPoses, mapToOdomSafe*odom);
 					//add latest/zero and make sure those on a planned path are not filtered
 					std::set<int> onPath;
 					if(rtabmap_.getPath().size())
@@ -2425,7 +2447,7 @@ void CoreWrapper::process(
 				timeRtabmap,
 				timeUpdateMaps,
 				timePublishMaps,
-				(now() - lastPoseStamp_).seconds(),
+				(now() - stamp).seconds(),
 				(int)rtabmap_.getLocalOptimizedPoses().size(),
 				rtabmap_.getWMSize()+rtabmap_.getSTMSize());
 		rtabmapROSStats_.insert(std::make_pair(std::string("RtabmapROS/HasSubscribers/"), mapsManager_.hasSubscribers()?1:0));
@@ -2935,10 +2957,15 @@ void CoreWrapper::resetRtabmapCallback(
 {
 	RCLCPP_INFO(this->get_logger(), "rtabmap: Reset");
 	rtabmap_.resetMemory();
-	covariance_ = cv::Mat();
+
+	lastPoseMutex_.lock();
+	lastPoseCovariance_ = cv::Mat();
 	lastPose_.setIdentity();
+	lastPoseStamp_ = rclcpp::Time();
 	lastPoseVelocity_.clear();
 	lastPoseIntermediate_ = false;
+	lastPoseMutex_.unlock();
+
 	currentMetricGoal_.setNull();
 	lastPublishedMetricGoal_.setNull();
 	goalFrameId_.clear();
@@ -3033,10 +3060,14 @@ void CoreWrapper::loadDatabaseCallback(
 	rtabmap_.close();
 	RCLCPP_INFO(get_logger(), "LoadDatabase: Saving current map (%s, %ld MB)... done!", databasePath_.c_str(), UFile::length(databasePath_)/(1024*1024));
 
-	covariance_ = cv::Mat();
+	lastPoseMutex_.lock();
+	lastPoseCovariance_ = cv::Mat();
 	lastPose_.setIdentity();
+	lastPoseStamp_ = rclcpp::Time();
 	lastPoseVelocity_.clear();
 	lastPoseIntermediate_ = false;
+	lastPoseMutex_.unlock();
+	
 	currentMetricGoal_.setNull();
 	lastPublishedMetricGoal_.setNull();
 	goalFrameId_.clear();
@@ -3164,9 +3195,14 @@ void CoreWrapper::backupDatabaseCallback(
 	rtabmap_.close();
 	RCLCPP_INFO(this->get_logger(), "Backup: Saving memory... done!");
 
-	covariance_ = cv::Mat();
+	lastPoseMutex_.lock();
+	lastPoseCovariance_ = cv::Mat();
 	lastPose_.setIdentity();
+	lastPoseStamp_ = rclcpp::Time();
 	lastPoseVelocity_.clear();
+	lastPoseIntermediate_ = false;
+	lastPoseMutex_.unlock();
+
 	currentMetricGoal_.setNull();
 	lastPublishedMetricGoal_.setNull();
 	goalFrameId_.clear();
@@ -3504,11 +3540,15 @@ void CoreWrapper::getMapDataCallback(
 			!req->graph_only,
 			!req->graph_only);
 
+	mapToOdomMutex_.lock();
+	Transform mapToOdomSafe = mapToOdom_.clone();
+	mapToOdomMutex_.unlock();
+
 	//RGB-D SLAM data
 	rtabmap_conversions::mapDataToROS(poses,
 		constraints,
 		signatures,
-		mapToOdom_,
+		mapToOdomSafe,
 		res->data);
 
 	res->data.header.stamp = now();
@@ -3548,11 +3588,15 @@ void CoreWrapper::getMapData2Callback(
 			req->with_words,
 			req->with_global_descriptors);
 
+	mapToOdomMutex_.lock();
+	Transform mapToOdomSafe = mapToOdom_.clone();
+	mapToOdomMutex_.unlock();
+
 	//RGB-D SLAM data
 	rtabmap_conversions::mapDataToROS(poses,
 		constraints,
 		signatures,
-		mapToOdom_,
+		mapToOdomSafe,
 		res->data);
 
 	res->data.header.stamp = now();
@@ -3671,6 +3715,10 @@ void CoreWrapper::publishMapCallback(
 				!req->graph_only,
 				!req->graph_only);
 
+		mapToOdomMutex_.lock();
+		Transform mapToOdomSafe = mapToOdom_.clone();
+		mapToOdomMutex_.unlock();
+
 		if(mapDataPub_->get_subscription_count())
 		{
 			rtabmap_msgs::msg::MapData::UniquePtr msg(new rtabmap_msgs::msg::MapData);
@@ -3680,7 +3728,7 @@ void CoreWrapper::publishMapCallback(
 			rtabmap_conversions::mapDataToROS(poses,
 				constraints,
 				signatures,
-				mapToOdom_,
+				mapToOdomSafe,
 				*msg);
 
 			mapDataPub_->publish(std::move(msg));
@@ -3694,7 +3742,7 @@ void CoreWrapper::publishMapCallback(
 
 			rtabmap_conversions::mapGraphToROS(poses,
 				constraints,
-				mapToOdom_,
+				mapToOdomSafe,
 				*msg);
 
 			mapGraphPub_->publish(std::move(msg));
