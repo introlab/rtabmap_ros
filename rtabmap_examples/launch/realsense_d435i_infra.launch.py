@@ -23,9 +23,9 @@ def generate_launch_description():
 
     remappings=[
           ('imu', '/imu/data'),
-          ('rgb/image', '/camera/infra1/image_rect_raw'),
-          ('rgb/camera_info', '/camera/infra1/camera_info'),
-          ('depth/image', '/camera/depth/image_rect_raw')]
+          ('rgb/image', '/camera/camera/infra1/image_rect_raw'),
+          ('rgb/camera_info', '/camera/camera/infra1/camera_info'),
+          ('depth/image', '/camera/camera/depth/image_rect_raw')]
 
     return LaunchDescription([
 
@@ -39,7 +39,7 @@ def generate_launch_description():
                 '/rs_launch.py']),
                 launch_arguments={'enable_gyro': 'true',
                                   'enable_accel': 'true',
-                                  'unite_imu_method': '1',
+                                  'unite_imu_method': '2',
                                   'enable_infra1': 'true',
                                   'enable_infra2': 'true',
                                   'enable_sync': 'true'}.items(),
@@ -67,7 +67,7 @@ def generate_launch_description():
             parameters=[{'use_mag': False, 
                          'world_frame':'enu', 
                          'publish_tf':False}],
-            remappings=[('imu/data_raw', '/camera/imu')]),
+            remappings=[('imu/data_raw', '/camera/camera/imu')]),
         
         # The IMU frame is missing in TF tree, add it:
         Node(
