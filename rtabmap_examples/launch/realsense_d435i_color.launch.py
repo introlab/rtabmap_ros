@@ -2,8 +2,6 @@
 #   A realsense D435i
 #   Install realsense2 ros2 package (ros-$ROS_DISTRO-realsense2-camera)
 # Example:
-#   $ ros2 launch realsense2_camera rs_launch.py enable_gyro:=true enable_accel:=true unite_imu_method:=1 enable_sync:=true
-#
 #   $ ros2 launch rtabmap_examples realsense_d435i_color.launch.py
 
 import os
@@ -39,9 +37,10 @@ def generate_launch_description():
             PythonLaunchDescriptionSource([os.path.join(
                 get_package_share_directory('realsense2_camera'), 'launch'),
                 '/rs_launch.py']),
-                launch_arguments={'enable_gyro': 'true',
+                launch_arguments={'camera_namespace': '',
+                                  'enable_gyro': 'true',
                                   'enable_accel': 'true',
-                                  'unite_imu_method': '1',
+                                  'unite_imu_method': '2',
                                   'align_depth.enable': 'true',
                                   'enable_sync': 'true',
                                   'rgb_camera.profile': '640x360x30'}.items(),
