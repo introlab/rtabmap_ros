@@ -22,10 +22,10 @@ def generate_launch_description():
 
     remappings=[
           ('imu', '/imu/data'),
-          ('left/image_rect', '/camera/camera/infra1/image_rect_raw'),
-          ('left/camera_info', '/camera/camera/infra1/camera_info'),
-          ('right/image_rect', '/camera/camera/infra2/image_rect_raw'),
-          ('right/camera_info', '/camera/camera/infra2/camera_info')]
+          ('left/image_rect', '/camera/infra1/image_rect_raw'),
+          ('left/camera_info', '/camera/infra1/camera_info'),
+          ('right/image_rect', '/camera/infra2/image_rect_raw'),
+          ('right/camera_info', '/camera/infra2/camera_info')]
 
     return LaunchDescription([
 
@@ -37,7 +37,8 @@ def generate_launch_description():
             PythonLaunchDescriptionSource([os.path.join(
                 get_package_share_directory('realsense2_camera'), 'launch'),
                 '/rs_launch.py']),
-                launch_arguments={'enable_gyro': 'true',
+                launch_arguments={'camera_namespace': "",
+                                  'enable_gyro': 'true',
                                   'enable_accel': 'true',
                                   'unite_imu_method': '2',
                                   'enable_infra1': 'true',
@@ -67,7 +68,7 @@ def generate_launch_description():
             parameters=[{'use_mag': False, 
                          'world_frame':'enu', 
                          'publish_tf':False}],
-            remappings=[('imu/data_raw', '/camera/camera/imu')]),
+            remappings=[('imu/data_raw', '/camera/imu')]),
         
         # The IMU frame is missing in TF tree, add it:
         Node(
