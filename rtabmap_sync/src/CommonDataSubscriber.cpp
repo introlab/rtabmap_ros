@@ -32,7 +32,7 @@ namespace rtabmap_sync {
 
 CommonDataSubscriber::CommonDataSubscriber(rclcpp::Node & node, bool gui) :
 		topicQueueSize_(10),
-		syncQueueSize_(2),
+		syncQueueSize_(5),
 		approxSync_(true),
 		subscribedToDepth_(!gui),
 		subscribedToStereo_(false),
@@ -1104,7 +1104,7 @@ void CommonDataSubscriber::tick(const rclcpp::Time & stamp, double targetFrequen
 {
 	if(syncDiagnostic_.get())
 	{
-		syncDiagnostic_->tick(stamp, targetFrequency);
+		syncDiagnostic_->tickOutput(stamp, targetFrequency);
 	}
 }
 

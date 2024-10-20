@@ -54,7 +54,7 @@ RGBDSync::RGBDSync(const rclcpp::NodeOptions & options) :
 	exactSyncDepth_(0)
 {
 	int topicQueueSize = 10;
-	int syncQueueSize = 2;
+	int syncQueueSize = 5;
 	bool approxSync = true;
 	double approxSyncMaxInterval = 0.0;
 	int qos = 0;
@@ -149,7 +149,7 @@ void RGBDSync::callback(
 		  const sensor_msgs::msg::Image::ConstSharedPtr depth,
 		  const sensor_msgs::msg::CameraInfo::ConstSharedPtr cameraInfo)
 {
-	syncDiagnostic_->tick(image->header.stamp);
+	syncDiagnostic_->tickInput(image->header.stamp);
 	if(rgbdImagePub_->get_subscription_count() || rgbdImageCompressedPub_->get_subscription_count())
 	{
 		double rgbStamp = rtabmap_conversions::timestampFromROS(image->header.stamp);
@@ -273,6 +273,7 @@ void RGBDSync::callback(
 					depthStamp, rtabmap_conversions::timestampFromROS(depth->header.stamp));
 		}
 	}
+	syncDiagnostic_->tickOutput(image->header.stamp);
 }
 
 }

@@ -33,6 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace rtabmap_sync {
 
 #define IMAGE_CONVERSION() \
+		if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(image1Msg->header.stamp);} \
 		std::vector<cv_bridge::CvImageConstPtr> imageMsgs(5); \
 		std::vector<cv_bridge::CvImageConstPtr> depthMsgs(5); \
 		rtabmap_conversions::toCvShare(image1Msg, imageMsgs[0], depthMsgs[0]); \

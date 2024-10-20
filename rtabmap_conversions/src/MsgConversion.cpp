@@ -2169,7 +2169,7 @@ bool convertRGBDMsgs(
 		rtabmap::Transform localTransform = rtabmap_conversions::getTransform(frameId, !imageMsgs.empty()?imageMsgs[i]->header.frame_id:cameraInfoMsgs[i].header.frame_id, stamp, listener, waitForTransform);
 		if(localTransform.isNull())
 		{
-			UERROR("TF of received image %d at time %fs is not set!", i, stamp.seconds());
+			UERROR("TF of received image for camera %d at time %fs is not set!", i, stamp.seconds());
 			return false;
 		}
 		// sync with odometry stamp

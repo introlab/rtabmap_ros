@@ -280,6 +280,9 @@ void ICPOdometry::callbackScan(const sensor_msgs::msg::LaserScan::SharedPtr scan
 		scan_sub_.reset();
 		return;
 	}
+
+	tick(scanMsg->header.stamp);
+
 	scanReceived_ = true;
 	if(this->isPaused())
 	{
@@ -523,6 +526,9 @@ void ICPOdometry::callbackCloud(const sensor_msgs::msg::PointCloud2::SharedPtr p
 		cloud_sub_.reset();
 		return;
 	}
+
+	tick(pointCloudMsg->header.stamp);
+
 	cloudReceived_ = true;
 	if(this->isPaused())
 	{

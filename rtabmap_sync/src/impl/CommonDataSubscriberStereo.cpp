@@ -36,6 +36,7 @@ void CommonDataSubscriber::stereoCallback(
 		const sensor_msgs::msg::CameraInfo::ConstSharedPtr leftCamInfoMsg,
 		const sensor_msgs::msg::CameraInfo::ConstSharedPtr rightCamInfoMsg)
 {
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(leftImageMsg->header.stamp);}
 	nav_msgs::msg::Odometry::SharedPtr odomMsg; // Null
 	rtabmap_msgs::msg::UserData::SharedPtr userDataMsg; // Null
 	sensor_msgs::msg::LaserScan scanMsg; // null
@@ -50,6 +51,7 @@ void CommonDataSubscriber::stereoInfoCallback(
 		const sensor_msgs::msg::CameraInfo::ConstSharedPtr rightCamInfoMsg,
 		const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr odomInfoMsg)
 {
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(leftImageMsg->header.stamp);}
 	nav_msgs::msg::Odometry::SharedPtr odomMsg; // Null
 	rtabmap_msgs::msg::UserData::SharedPtr userDataMsg; // Null
 	sensor_msgs::msg::LaserScan scan2dMsg; // Null
@@ -65,6 +67,7 @@ void CommonDataSubscriber::stereoOdomCallback(
 		const sensor_msgs::msg::CameraInfo::ConstSharedPtr leftCamInfoMsg,
 		const sensor_msgs::msg::CameraInfo::ConstSharedPtr rightCamInfoMsg)
 {
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(leftImageMsg->header.stamp);}
 	rtabmap_msgs::msg::UserData::SharedPtr userDataMsg; // Null
 	sensor_msgs::msg::LaserScan scanMsg; // null
 	sensor_msgs::msg::PointCloud2 scan3dMsg; // Null
@@ -79,6 +82,7 @@ void CommonDataSubscriber::stereoOdomInfoCallback(
 		const sensor_msgs::msg::CameraInfo::ConstSharedPtr rightCamInfoMsg,
 		const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr odomInfoMsg)
 {
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(leftImageMsg->header.stamp);}
 	rtabmap_msgs::msg::UserData::SharedPtr userDataMsg; // Null
 	sensor_msgs::msg::LaserScan scan2dMsg; // Null
 	sensor_msgs::msg::PointCloud2 scan3dMsg; // Null

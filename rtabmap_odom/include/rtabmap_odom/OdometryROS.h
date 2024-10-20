@@ -109,6 +109,7 @@ private:
 
 protected:
 	rclcpp::CallbackGroup::SharedPtr dataCallbackGroup_;
+	void tick(const rclcpp::Time & stamp);
 
 private:
 	rtabmap::Odometry * odometry_;
@@ -178,10 +179,12 @@ private:
 	bool compressionParallelized_;
 	int odomStrategy_;
 	bool waitIMUToinit_;
+	bool alwaysCheckImuTf_;
 	bool imuProcessed_;
-	std::map<double, rtabmap::IMU> imus_;
+	std::map<double, sensor_msgs::msg::Imu::ConstSharedPtr> imus_;
 	std::string configPath_;
 	rtabmap::Transform initialPose_;
+	rtabmap::Transform imuLocalTransform_;
 
 	rtabmap_util::ULogToRosout ulogToRosout_;
 

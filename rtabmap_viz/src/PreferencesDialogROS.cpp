@@ -85,8 +85,7 @@ QString PreferencesDialogROS::getParamMessage()
 
 bool PreferencesDialogROS::hasAllParameters()
 {
-	auto node = std::make_shared<rclcpp::Node>("rtabmap_viz");
-	auto client = std::make_shared<rclcpp::AsyncParametersClient>(node, rtabmapNodeName_);
+	auto client = std::make_shared<rclcpp::AsyncParametersClient>(node_, rtabmapNodeName_);
 	return client->service_is_ready();
 }
 
@@ -98,8 +97,13 @@ bool PreferencesDialogROS::readCoreSettings(const QString & filePath)
 		path = filePath;
 	}
 
-	auto node = std::make_shared<rclcpp::Node>("rtabmap_viz");
-	RCLCPP_INFO(node->get_logger(), "%s", this->getParamMessage().toStdString().c_str());
+	char nodeName[42];
+	snprintf(
+		nodeName, sizeof(nodeName), "rtabmap_viz_param_client_%zx",
+		reinterpret_cast<size_t>(this)
+	);
+	auto node = std::make_shared<rclcpp::Node>(nodeName);
+	RCLCPP_INFO(node_->get_logger(), "%s", this->getParamMessage().toStdString().c_str());
 	rtabmap::ParametersMap parameters = rtabmap::Parameters::getDefaultParameters();
 	// remove Odom parameters
 	for(ParametersMap::iterator iter=parameters.begin(); iter!=parameters.end();)
@@ -145,7 +149,7 @@ bool PreferencesDialogROS::readCoreSettings(const QString & filePath)
 
 	auto client = std::make_shared<rclcpp::AsyncParametersClient>(node, rtabmapNodeName_);
 	if (!client->wait_for_service(std::chrono::seconds(5))) {
-		RCLCPP_ERROR(node->get_logger(), "Can't call rtabmap parameters service, is the node running?");
+		RCLCPP_ERROR(node_->get_logger(), "Can't call rtabmap parameters service, is the node running?");
 	}
 	int readCount = 0;
 	if(client->service_is_ready())
@@ -163,18 +167,18 @@ bool PreferencesDialogROS::readCoreSettings(const QString & filePath)
 		}
 	}
 
-	RCLCPP_INFO(node->get_logger(), "Parameters read = %d", readCount);
+	RCLCPP_INFO(node_->get_logger(), "Parameters read = %d", readCount);
 
 	if(readCount>0)
 	{
-		RCLCPP_INFO(node->get_logger(), "Parameters successfully read.");
+		RCLCPP_INFO(node_->get_logger(), "Parameters successfully read.");
 	}
 	else
 	{
 		if(this->isVisible())
 		{
 			QString warning = tr("Failed to get RTAB-Map parameters from ROS server, the rtabmap node may be not started or some parameters won't work...");
-			RCLCPP_WARN(node->get_logger(), "%s", warning.toStdString().c_str());
+			RCLCPP_WARN(node_->get_logger(), "%s", warning.toStdString().c_str());
 			QMessageBox::warning(this, tr("Can't read parameters from ROS server."), warning);
 		}
 		return false;
