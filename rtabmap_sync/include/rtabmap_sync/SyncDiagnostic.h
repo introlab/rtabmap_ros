@@ -8,6 +8,7 @@
 
 #include "rtabmap_conversions/MsgConversion.h"
 #include "rtabmap/utilite/ULogger.h"
+#include "rtabmap/utilite/UMutex.h"
 
 using namespace std::chrono_literals;
 
@@ -15,14 +16,19 @@ namespace rtabmap_sync {
 
 class SyncDiagnostic {
     public:
-        SyncDiagnostic(rclcpp::Node * node, double tolerance = 0.1, int windowSize = 5) :
+        SyncDiagnostic(rclcpp::Node * node, double tolerance = 0.2, int windowSize = 5) :
 		node_(node),
-		diagnosticUpdater_(node),
-		frequencyStatus_(diagnostic_updater::FrequencyStatusParam(&targetFrequency_, &targetFrequency_, tolerance), node->get_clock()),
-		timeStampStatus_(diagnostic_updater::TimeStampStatusParam(), node->get_clock()),
-		compositeTask_("Sync status"),
-		lastCallbackCalledStamp_(rtabmap_conversions::timestampFromROS(node_->now())-1),
-		targetFrequency_(0.0),
+		diagnosticUpdater_(node, 2.0),
+		inFrequencyStatus_(diagnostic_updater::FrequencyStatusParam(&inTargetFrequency_, &inTargetFrequency_, tolerance), node->get_clock()),
+		inTimeStampStatus_(diagnostic_updater::TimeStampStatusParam(), node->get_clock()),
+        outFrequencyStatus_(diagnostic_updater::FrequencyStatusParam(&outTargetFrequency_, &outTargetFrequency_, tolerance), node->get_clock()),
+		outTimeStampStatus_(diagnostic_updater::TimeStampStatusParam(), node->get_clock()),
+		inCompositeTask_("Input Status"),
+        outCompositeTask_("Output Status"),
+        lastTickInputStamp_(rtabmap_conversions::timestampFromROS(node_->now())-1),
+		lastTickOutputStamp_(rtabmap_conversions::timestampFromROS(node_->now())-1),
+        inTargetFrequency_(0.0),
+		outTargetFrequency_(0.0),
 		windowSize_(windowSize)
     {
         UASSERT(windowSize_ >= 1);
@@ -41,71 +47,120 @@ class SyncDiagnostic {
             // Assuming format is /back_camera/left/image, we want "back_camera"
             strList.pop_back();
         }
-        compositeTask_.addTask(&frequencyStatus_);
-        compositeTask_.addTask(&timeStampStatus_);
-        diagnosticUpdater_.add(compositeTask_);
+        inCompositeTask_.addTask(&inFrequencyStatus_);
+        inCompositeTask_.addTask(&inTimeStampStatus_);
+        diagnosticUpdater_.add(inCompositeTask_);
+        outCompositeTask_.addTask(&outFrequencyStatus_);
+        outCompositeTask_.addTask(&outTimeStampStatus_);
+        diagnosticUpdater_.add(outCompositeTask_);
         for(size_t i=0; i<otherTasks.size(); ++i)
         {
             diagnosticUpdater_.add(*otherTasks[i]);
         }
         diagnosticUpdater_.setHardwareID(strList.empty()?"none":uJoin(strList, "/"));
         diagnosticUpdater_.force_update();
-        diagnosticTimer_ = node_->create_wall_timer(1s, std::bind(&SyncDiagnostic::diagnosticTimerCallback, this), nullptr);
+        diagnosticTimer_ = node_->create_wall_timer(5s, std::bind(&SyncDiagnostic::diagnosticTimerCallback, this), nullptr);
     }
 
-    void tick(const rclcpp::Time & stamp, double targetFrequency = 0)
+    void tickInput(const rclcpp::Time & stamp, double expectedFrequency = 0)
     {
-        frequencyStatus_.tick();
-		timeStampStatus_.tick(stamp);
-        double singlePeriod = rtabmap_conversions::timestampFromROS(stamp) - lastCallbackCalledStamp_;
+        updateFrequency(
+            stamp,
+            expectedFrequency,
+            inFrequencyStatus_,
+            inTimeStampStatus_,
+            inWindow_,
+            inTargetFrequency_,
+            lastTickInputStamp_);
+    }
 
-        window_.push_back(singlePeriod);
-        if(window_.size() > windowSize_)
-        {
-            window_.pop_front();
-        }
-        double period = 0.0;
-        if(window_.size() == windowSize_)
-        {
-            for(size_t i=0; i<window_.size(); ++i)
-            {
-                period += window_[i];
-            }
-            period /= windowSize_;
-        }
-
-        if(period>0.0 && targetFrequency == 0 && (targetFrequency_ == 0.0 || period < 1.0/targetFrequency_))
-        {
-            targetFrequency_ = 1.0/period;
-        }
-        else if(targetFrequency>0)
-        {
-            targetFrequency_ = targetFrequency;
-        }
-        lastCallbackCalledStamp_ = rtabmap_conversions::timestampFromROS(stamp);
+    void tickOutput(const rclcpp::Time & stamp, double expectedFrequency = 0)
+    {
+        updateFrequency(
+            stamp,
+            expectedFrequency,
+            outFrequencyStatus_,
+            outTimeStampStatus_,
+            outWindow_,
+            outTargetFrequency_,
+            lastTickOutputStamp_);
     }
 
 private:
     void diagnosticTimerCallback()
     {
-        if(rtabmap_conversions::timestampFromROS(node_->now())-lastCallbackCalledStamp_ >= 5 && !topicsNotReceivedWarningMsg_.empty())
+        UScopeMutex lock(tickMutex_);
+        if(rtabmap_conversions::timestampFromROS(node_->now())-lastTickInputStamp_ >= 5 && !topicsNotReceivedWarningMsg_.empty())
         {
-        	RCLCPP_WARN_THROTTLE(node_->get_logger(), *node_->get_clock(), 5000, "%s", topicsNotReceivedWarningMsg_.c_str());
+        	RCLCPP_WARN(node_->get_logger(), "%s", topicsNotReceivedWarningMsg_.c_str());
         }
+    }
+
+    void updateFrequency(
+        const rclcpp::Time & stamp,
+        const double & expectedFrequency,
+        diagnostic_updater::FrequencyStatus & freqStatus,
+        diagnostic_updater::TimeStampStatus & timeStatus,
+        std::deque<double> & window,
+        double & targetFrequency,
+        double & lastTickStamp)
+    {
+        UScopeMutex lock(tickMutex_);
+
+        freqStatus.tick();
+		timeStatus.tick(stamp);
+
+        double stampSec = rtabmap_conversions::timestampFromROS(stamp);
+        double singlePeriod = stampSec - lastTickStamp;
+
+        window.push_back(singlePeriod);
+        if(window.size() > windowSize_)
+        {
+            window.pop_front();
+
+             double period = 0.0;
+            if(window.size() == windowSize_)
+            {
+                for(size_t i=0; i<window.size(); ++i)
+                {
+                    period += window[i];
+                }
+                period /= windowSize_;
+            }
+
+            if(period>0.0 && expectedFrequency == 0 && (targetFrequency == 0.0 || period < 1.0/targetFrequency))
+            {
+                targetFrequency = 1.0/period;
+            }
+            else if(expectedFrequency>0)
+            {
+                targetFrequency = expectedFrequency;
+            
+            }
+        }
+
+        lastTickStamp = stampSec;
     }
 
 private:
     rclcpp::Node * node_;
 	std::string topicsNotReceivedWarningMsg_;
 	diagnostic_updater::Updater diagnosticUpdater_;
-	diagnostic_updater::FrequencyStatus frequencyStatus_;
-	diagnostic_updater::TimeStampStatus timeStampStatus_;
-	diagnostic_updater::CompositeDiagnosticTask compositeTask_;
+    diagnostic_updater::FrequencyStatus inFrequencyStatus_;
+	diagnostic_updater::TimeStampStatus inTimeStampStatus_;
+	diagnostic_updater::FrequencyStatus outFrequencyStatus_;
+	diagnostic_updater::TimeStampStatus outTimeStampStatus_;
+	diagnostic_updater::CompositeDiagnosticTask inCompositeTask_;
+    diagnostic_updater::CompositeDiagnosticTask outCompositeTask_;
 	rclcpp::TimerBase::SharedPtr diagnosticTimer_;
-	double lastCallbackCalledStamp_;
-	double targetFrequency_;
+	double lastTickInputStamp_;
+    double lastTickOutputStamp_;
+	double inTargetFrequency_;
+    double outTargetFrequency_;
 	int windowSize_;
-	std::deque<double> window_;
+	std::deque<double> inWindow_;
+    std::deque<double> outWindow_;
+    UMutex tickMutex_;
 
 };
 

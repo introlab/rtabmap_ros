@@ -43,7 +43,7 @@ RGBDXSync::RGBDXSync(const rclcpp::NodeOptions & options) :
 	SYNC_INIT(rgbd8)
 {
 	int topicQueueSize = 10;
-	int syncQueueSize = 2;
+	int syncQueueSize = 5;
 	bool approxSync = true;
 	int rgbdCameras = 2;
 	double approxSyncMaxInterval = 0.0;
@@ -176,13 +176,14 @@ void RGBDXSync::rgbd2Callback(
 		  const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image0,
 		  const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1)
 {
-	syncDiagnostic_->tick(image0->header.stamp);
+	syncDiagnostic_->tickInput(image0->header.stamp);
 	rtabmap_msgs::msg::RGBDImages output;
 	output.header = image0->header;
 	output.rgbd_images.resize(2);
 	output.rgbd_images[0]=(*image0);
 	output.rgbd_images[1]=(*image1);
 	rgbdImagesPub_->publish(output);
+	syncDiagnostic_->tickOutput(image0->header.stamp);
 }
 
 void RGBDXSync::rgbd3Callback(
@@ -190,7 +191,7 @@ void RGBDXSync::rgbd3Callback(
 		  const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1,
 		  const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image2)
 {
-	syncDiagnostic_->tick(image0->header.stamp);
+	syncDiagnostic_->tickInput(image0->header.stamp);
 	rtabmap_msgs::msg::RGBDImages output;
 	output.header = image0->header;
 	output.rgbd_images.resize(3);
@@ -198,6 +199,7 @@ void RGBDXSync::rgbd3Callback(
 	output.rgbd_images[1]=(*image1);
 	output.rgbd_images[2]=(*image2);
 	rgbdImagesPub_->publish(output);
+	syncDiagnostic_->tickOutput(image0->header.stamp);
 }
 
 void RGBDXSync::rgbd4Callback(
@@ -206,7 +208,7 @@ void RGBDXSync::rgbd4Callback(
 		  const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image2,
 		  const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image3)
 {
-	syncDiagnostic_->tick(image0->header.stamp);
+	syncDiagnostic_->tickInput(image0->header.stamp);
 	rtabmap_msgs::msg::RGBDImages output;
 	output.header = image0->header;
 	output.rgbd_images.resize(4);
@@ -215,6 +217,7 @@ void RGBDXSync::rgbd4Callback(
 	output.rgbd_images[2]=(*image2);
 	output.rgbd_images[3]=(*image3);
 	rgbdImagesPub_->publish(output);
+	syncDiagnostic_->tickOutput(image0->header.stamp);
 }
 
 void RGBDXSync::rgbd5Callback(
@@ -224,7 +227,7 @@ void RGBDXSync::rgbd5Callback(
 		  const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image3,
 		  const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image4)
 {
-	syncDiagnostic_->tick(image0->header.stamp);
+	syncDiagnostic_->tickInput(image0->header.stamp);
 	rtabmap_msgs::msg::RGBDImages output;
 	output.header = image0->header;
 	output.rgbd_images.resize(5);
@@ -234,6 +237,7 @@ void RGBDXSync::rgbd5Callback(
 	output.rgbd_images[3]=(*image3);
 	output.rgbd_images[4]=(*image4);
 	rgbdImagesPub_->publish(output);
+	syncDiagnostic_->tickOutput(image0->header.stamp);
 }
 
 void RGBDXSync::rgbd6Callback(
@@ -244,7 +248,7 @@ void RGBDXSync::rgbd6Callback(
 		  const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image4,
 		  const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image5)
 {
-	syncDiagnostic_->tick(image0->header.stamp);
+	syncDiagnostic_->tickInput(image0->header.stamp);
 	rtabmap_msgs::msg::RGBDImages output;
 	output.header = image0->header;
 	output.rgbd_images.resize(6);
@@ -255,6 +259,7 @@ void RGBDXSync::rgbd6Callback(
 	output.rgbd_images[4]=(*image4);
 	output.rgbd_images[5]=(*image5);
 	rgbdImagesPub_->publish(output);
+	syncDiagnostic_->tickOutput(image0->header.stamp);
 }
 
 void RGBDXSync::rgbd7Callback(
@@ -266,7 +271,7 @@ void RGBDXSync::rgbd7Callback(
 		  const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image5,
 		  const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image6)
 {
-	syncDiagnostic_->tick(image0->header.stamp);
+	syncDiagnostic_->tickInput(image0->header.stamp);
 	rtabmap_msgs::msg::RGBDImages output;
 	output.header = image0->header;
 	output.rgbd_images.resize(7);
@@ -278,6 +283,7 @@ void RGBDXSync::rgbd7Callback(
 	output.rgbd_images[5]=(*image5);
 	output.rgbd_images[6]=(*image6);
 	rgbdImagesPub_->publish(output);
+	syncDiagnostic_->tickOutput(image0->header.stamp);
 }
 
 void RGBDXSync::rgbd8Callback(
@@ -290,7 +296,7 @@ void RGBDXSync::rgbd8Callback(
 		  const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image6,
 		  const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image7)
 {
-	syncDiagnostic_->tick(image0->header.stamp);
+	syncDiagnostic_->tickInput(image0->header.stamp);
 	rtabmap_msgs::msg::RGBDImages output;
 	output.header = image0->header;
 	output.rgbd_images.resize(8);
@@ -303,6 +309,7 @@ void RGBDXSync::rgbd8Callback(
 	output.rgbd_images[6]=(*image6);
 	output.rgbd_images[7]=(*image7);
 	rgbdImagesPub_->publish(output);
+	syncDiagnostic_->tickOutput(image0->header.stamp);
 }
 
 }

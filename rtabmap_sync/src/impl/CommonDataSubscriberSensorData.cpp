@@ -34,33 +34,37 @@ namespace rtabmap_sync {
 
 // SensorData
 void CommonDataSubscriber::sensorDataCallback(
-		const rtabmap_msgs::msg::SensorData::ConstSharedPtr imagesMsg)
+		const rtabmap_msgs::msg::SensorData::ConstSharedPtr sensorDataMsg)
 {
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(sensorDataMsg->header.stamp);}
 	nav_msgs::msg::Odometry::ConstSharedPtr odomMsg; // Null
 	rtabmap_msgs::msg::OdomInfo::ConstSharedPtr odomInfoMsg; // null
-	commonSensorDataCallback(imagesMsg, odomMsg, odomInfoMsg);
+	commonSensorDataCallback(sensorDataMsg, odomMsg, odomInfoMsg);
 }
 void CommonDataSubscriber::sensorDataInfoCallback(
-		const rtabmap_msgs::msg::SensorData::ConstSharedPtr imagesMsg,
+		const rtabmap_msgs::msg::SensorData::ConstSharedPtr sensorDataMsg,
 		const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr odomInfoMsg)
 {
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(sensorDataMsg->header.stamp);}
 	nav_msgs::msg::Odometry::ConstSharedPtr odomMsg; // Null
-	commonSensorDataCallback(imagesMsg, odomMsg, odomInfoMsg);
+	commonSensorDataCallback(sensorDataMsg, odomMsg, odomInfoMsg);
 }
 // SensorData + Odom
 void CommonDataSubscriber::sensorDataOdomCallback(
 		const nav_msgs::msg::Odometry::ConstSharedPtr odomMsg,
-		const rtabmap_msgs::msg::SensorData::ConstSharedPtr imagesMsg)
+		const rtabmap_msgs::msg::SensorData::ConstSharedPtr sensorDataMsg)
 {
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(sensorDataMsg->header.stamp);}
 	rtabmap_msgs::msg::OdomInfo::ConstSharedPtr odomInfoMsg; // null
-	commonSensorDataCallback(imagesMsg, odomMsg, odomInfoMsg);
+	commonSensorDataCallback(sensorDataMsg, odomMsg, odomInfoMsg);
 }
 void CommonDataSubscriber::sensorDataOdomInfoCallback(
 		const nav_msgs::msg::Odometry::ConstSharedPtr odomMsg,
-		const rtabmap_msgs::msg::SensorData::ConstSharedPtr imagesMsg,
+		const rtabmap_msgs::msg::SensorData::ConstSharedPtr sensorDataMsg,
 		const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr odomInfoMsg)
 {
-	commonSensorDataCallback(imagesMsg, odomMsg, odomInfoMsg);
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(sensorDataMsg->header.stamp);}
+	commonSensorDataCallback(sensorDataMsg, odomMsg, odomInfoMsg);
 }
 
 void CommonDataSubscriber::setupSensorDataCallbacks(
