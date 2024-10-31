@@ -174,16 +174,13 @@ PointCloudAssembler::PointCloudAssembler(const rclcpp::NodeOptions & options) :
 		rclcpp::Rate r(1.0/5.0);
 		while(!callbackCalled_)
 		{
+			RCLCPP_WARN(this->get_logger(),
+					"%s: Did not receive data since 5 seconds! Make sure the input topics are "
+					"published (\"$ ros2 topic hz my_topic\") and the timestamps in their "
+					"header are set. %s",
+					get_name(),
+					subscribedTopicsMsg_.c_str());
 			r.sleep();
-			if(!callbackCalled_)
-			{
-				RCLCPP_WARN(this->get_logger(),
-						"%s: Did not receive data since 5 seconds! Make sure the input topics are "
-						"published (\"$ ros2 topic hz my_topic\") and the timestamps in their "
-						"header are set. %s",
-						get_name(),
-						subscribedTopicsMsg_.c_str());
-			}
 		}
 	});
 
@@ -286,13 +283,14 @@ void PointCloudAssembler::callbackCloudOdomInfo(
 	}
 	else
 	{
-		RCLCPP_WARN(this->get_logger(), "Reseting point cloud assembler as null odometry has been received.");
+		RCLCPP_WARN(this->get_logger(), "Resetting point cloud assembler as null odometry has been received.");
 		clouds_.clear();
 	}
 }
 
 void PointCloudAssembler::callbackCloud(const sensor_msgs::msg::PointCloud2::ConstSharedPtr cloudMsg)
 {
+	callbackCalled_ = true;
 	if(cloudPub_->get_subscription_count())
 	{
 		UASSERT_MSG(cloudMsg->data.size() == cloudMsg->row_step*cloudMsg->height,
