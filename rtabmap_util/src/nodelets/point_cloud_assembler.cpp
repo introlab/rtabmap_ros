@@ -302,6 +302,7 @@ private:
 
 	void callbackCloud(const sensor_msgs::PointCloud2ConstPtr & cloudMsg)
 	{
+		callbackCalled_ = true;
 		if(cloudPub_.getNumSubscribers())
 		{
 			UASSERT_MSG(cloudMsg->data.size() == cloudMsg->row_step*cloudMsg->height,
