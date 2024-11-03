@@ -61,6 +61,7 @@ private:
 	double depthScale_;
 	int decimation_;
 	double compressedRate_;
+	double approxSyncMaxInterval_;
 
 	rclcpp::Time lastCompressedPublished_;
 
