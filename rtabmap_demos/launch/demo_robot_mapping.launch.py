@@ -1,5 +1,5 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable
+from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 from launch.conditions import IfCondition, UnlessCondition
 from launch_ros.actions import Node
@@ -9,8 +9,6 @@ from ament_index_python.packages import get_package_share_directory
 
 def generate_launch_description():
 
-    use_sim_time = LaunchConfiguration('use_sim_time')
-    qos = LaunchConfiguration('qos')
     localization = LaunchConfiguration('localization')
 
     parameters={
@@ -60,7 +58,7 @@ def generate_launch_description():
         DeclareLaunchArgument('localization', default_value='false', description='Launch in localization mode.'),
         DeclareLaunchArgument('rviz_cfg', default_value=config_rviz,  description='Configuration path of rviz2.'),
 
-        SetParameter(name='use_sim_time', value='true'),
+        SetParameter(name='use_sim_time', value=True),
 
         # Nodes to launch
         Node(
