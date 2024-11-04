@@ -39,10 +39,11 @@ def generate_launch_description():
           'Kp/MaxFeatures':            '400',
           'Reg/Force3DoF':             'true',
           'RGBD/OptimizeMaxError':     '10',
-          'Optimizer/Strategy':        '0',       # Referred paper used TORO
+          'Optimizer/Strategy':        '2',       # Referred paper used TORO (0), latest version recommends GTSAM (2)
           'Optimizer/Iterations':      '100',
           'Kp/IncrementalFlann':       'false',   # Referred paper didn't use incremental FLANN
           'Grid/Sensor':               '1',
+          'Icp/MaxTranslation':        '0.5',
     }
     
     remappings=[
