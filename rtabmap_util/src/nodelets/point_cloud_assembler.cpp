@@ -73,8 +73,8 @@ PointCloudAssembler::PointCloudAssembler(const rclcpp::NodeOptions & options) :
 	//tfBuffer_->setCreateTimerInterface(timer_interface);
 	tfListener_ = std::make_shared<tf2_ros::TransformListener>(*tfBuffer_);
 
-	int topicQueueSize = 1;
-	int syncQueueSize = 5;
+	int topicQueueSize = 10;
+	int syncQueueSize = 10;
 	int qos = RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT;
 	bool subscribeOdomInfo = false;
 

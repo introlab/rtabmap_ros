@@ -9,7 +9,7 @@
 #     $ ros2 launch clearpath_viz view_navigation.launch.py namespace:=a200_0000
 #
 #   3) Launch SLAM:
-#     $ ros2 launch rtabmap_demos husky_slam.launch.py use_sim_time:=true
+#     $ ros2 launch rtabmap_demos husky_slam2d.launch.py use_sim_time:=true
 #
 #   4) Launch nav2"
 #     $ ros2 launch clearpath_nav2_demos nav2.launch.py setup_path:=$HOME/clearpath/ use_sim_time:=true
@@ -35,7 +35,7 @@ def generate_launch_description():
     localization = LaunchConfiguration('localization')
     robot_ns = LaunchConfiguration('robot_ns')
 
-    icp_parameters={
+    icp_odom_parameters={
           'odom_frame_id':'icp_odom',
           'guess_frame_id':'odom'
     }
@@ -48,6 +48,7 @@ def generate_launch_description():
           # RTAB-Map's parameters should be strings:
           'Mem/NotLinkedNodesKept':'false',
           'Grid/RangeMin':'0.7', # ignore laser scan points on the robot itself
+          'RGBD/OptimizeMaxError':'2',
     }
 
     # Shared parameters between different nodes
@@ -56,9 +57,10 @@ def generate_launch_description():
           'use_sim_time':use_sim_time,
           # RTAB-Map's parameters should be strings:
           'Reg/Strategy':'1',
-          'Reg/Force3DoF':'true',
+          'Reg/Force3DoF':'true', # we are moving on a 2D flat floor
           'Mem/NotLinkedNodesKept':'false',
-          'Icp/PointToPlaneMinComplexity':'0.04' # to be more robust to long corridors with low geometry
+          'Icp/PointToPlaneMinComplexity':'0.04', # to be more robust to long corridors with low geometry
+          'Icp/MaxTranslation': '1'
     }
 
     remappings=[
@@ -95,7 +97,7 @@ def generate_launch_description():
         Node(
             package='rtabmap_odom', executable='icp_odometry', output='screen',
             namespace=robot_ns,
-            parameters=[icp_parameters, shared_parameters],
+            parameters=[icp_odom_parameters, shared_parameters],
             remappings=remappings,
             arguments=["--ros-args", "--log-level", 'warn']),
 

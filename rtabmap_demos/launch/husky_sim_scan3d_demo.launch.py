@@ -11,7 +11,7 @@
 #
 # Example with gazebo:
 #   1) Launch simulator (husky, nav2 and rtabmap):
-#     $ ros2 launch rtabmap_demos husky_sim_demo.launch.py robot_ns:=a200_0000
+#     $ ros2 launch rtabmap_demos husky_sim_scan3d_demo.launch.py robot_ns:=a200_0000
 #
 #   2) Click on "Play" button on bottom-left of gazebo as soon as you can see it to avoid controllers crashing after 5 sec.
 #
@@ -59,7 +59,7 @@ def generate_launch_description():
     viz_launch = PathJoinSubstitution(
         [pkg_clearpath_viz, 'launch', 'view_navigation.launch.py'])
     rtabmap_launch = PathJoinSubstitution(
-        [pkg_rtabmap_demos, 'launch', 'husky_slam.launch.py'])
+        [pkg_rtabmap_demos, 'launch', 'husky_slam3d.launch.py'])
     nav2_launch = PathJoinSubstitution(
         [pkg_clearpath_nav2_demos, 'launch', 'nav2.launch.py'])
 
