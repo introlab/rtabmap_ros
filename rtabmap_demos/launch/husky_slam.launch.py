@@ -32,14 +32,12 @@ from launch_ros.actions import Node
 def generate_launch_description():
 
     use_sim_time = LaunchConfiguration('use_sim_time')
-    qos = LaunchConfiguration('qos')
     localization = LaunchConfiguration('localization')
     robot_ns = LaunchConfiguration('robot_ns')
 
     icp_parameters={
           'odom_frame_id':'icp_odom',
-          'guess_frame_id':'odom',
-          'qos':qos
+          'guess_frame_id':'odom'
     }
 
     rtabmap_parameters={
@@ -47,18 +45,15 @@ def generate_launch_description():
           'subscribe_scan':True,
           'use_action_for_goal':True,
           'odom_sensor_sync': True,
-          'qos_scan':qos,
-          'qos_image':qos,
-          'qos_imu':qos,
           # RTAB-Map's parameters should be strings:
-          'Mem/NotLinkedNodesKept':'false'
+          'Mem/NotLinkedNodesKept':'false',
+          'Grid/RangeMin':'0.7', # ignore laser scan points on the robot itself
     }
 
     # Shared parameters between different nodes
     shared_parameters={
           'frame_id':'base_link',
           'use_sim_time':use_sim_time,
-          'sync_queue_size': 10,
           # RTAB-Map's parameters should be strings:
           'Reg/Strategy':'1',
           'Reg/Force3DoF':'true',
@@ -83,10 +78,6 @@ def generate_launch_description():
             description='Use simulation (Gazebo) clock if true'),
         
         DeclareLaunchArgument(
-            'qos', default_value='0',
-            description='QoS used for input sensor topics'),
-            
-        DeclareLaunchArgument(
             'localization', default_value='false', choices=['true', 'false'],
             description='Launch rtabmap in localization mode (a map should have been already created).'),
 
@@ -98,7 +89,7 @@ def generate_launch_description():
         Node(
             package='rtabmap_sync', executable='rgbd_sync', output='screen',
             namespace=robot_ns,
-            parameters=[{'approx_sync':False, 'use_sim_time':use_sim_time, 'qos':qos}],
+            parameters=[{'approx_sync':False, 'use_sim_time':use_sim_time}],
             remappings=remappings),
 
         Node(

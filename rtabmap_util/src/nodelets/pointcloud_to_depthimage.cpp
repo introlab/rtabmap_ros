@@ -62,7 +62,7 @@ PointCloudToDepthImage::PointCloudToDepthImage(const rclcpp::NodeOptions & optio
 
 	int topicQueueSize = 1;
 	int syncQueueSize = 10;
-	int qos = 0;
+	int qos = RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT;
 	bool approx = true;
 	topicQueueSize = this->declare_parameter("topic_queue_size", topicQueueSize);
 	int queueSize = this->declare_parameter("queue_size", -1);

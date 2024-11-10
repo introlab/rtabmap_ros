@@ -64,7 +64,7 @@ PointCloudAggregator::PointCloudAggregator(const rclcpp::NodeOptions & options) 
 	int count = 2;
 	bool approx=true;
 	double approxSyncMaxInterval = 0.0;
-	int qos=0;
+	int qos=RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT;
 	topicQueueSize = this->declare_parameter("topic_queue_size", topicQueueSize);
 	int queueSize = this->declare_parameter("queue_size", -1);
 	if(queueSize != -1)

@@ -42,7 +42,7 @@ namespace rtabmap_util
 DisparityToDepth::DisparityToDepth(const rclcpp::NodeOptions & options) :
 	rclcpp::Node("disparity_to_depth", options)
 {
-	int qos = 0;
+	int qos = RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT;
 	qos = this->declare_parameter("qos", qos);
 
 	pub32f_ = image_transport::create_publisher(this, "depth", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());

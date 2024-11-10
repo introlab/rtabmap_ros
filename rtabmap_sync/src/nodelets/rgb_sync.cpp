@@ -52,9 +52,9 @@ RGBSync::RGBSync(const rclcpp::NodeOptions & options) :
 	exactSync_(0)
 {
 	int topicQueueSize = 10;
-	int syncQueueSize = 5;
+	int syncQueueSize = 10;
 	bool approxSync = true;
-	int qos = 0;
+	int qos = RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT;
 	double approxSyncMaxInterval = 0.0;
 	approxSync = this->declare_parameter("approx_sync", approxSync);
 	approxSyncMaxInterval = this->declare_parameter("approx_sync_max_interval", approxSyncMaxInterval);

@@ -55,7 +55,7 @@ ObstaclesDetection::ObstaclesDetection(const rclcpp::NodeOptions & options) :
 	frameId_ = this->declare_parameter("frame_id", frameId_);
 	mapFrameId_ = this->declare_parameter("map_frame_id", mapFrameId_);
 	waitForTransform_ = this->declare_parameter("wait_for_transform", waitForTransform_);
-	int qos = 0;
+	int qos = RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT;
 	qos = this->declare_parameter("qos", qos);
 
 	rtabmap::ParametersMap gridParameters = rtabmap::Parameters::getDefaultParameters("Grid");

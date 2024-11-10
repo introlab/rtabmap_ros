@@ -1,3 +1,19 @@
+# Requirements:
+#   Download one or both rosbags:
+#    * stereo_outdoorA.db3: https://drive.google.com/file/d/1O7mCXg_sw4tZY1S88a-n96O6OulmqvqI/view?usp=drive_link
+#    * stereo_outdoorB.db3: https://drive.google.com/file/d/1mSu7418Fkbe-hIz2-3Mi936PrWuD2un_/view?usp=drive_link
+#
+# Example:
+#
+#   SLAM:
+#     $ ros2 launch rtabmap_demos stereo_outdoor_demo.launch.py  rviz:=true rtabmap_viz:=true
+#
+#   Rosbag:
+#     $ ros2 bag play stereo_outdoorA.db3 --clock
+#     when done, you can play the secon bag:
+#     $ ros2 bag play stereo_outdoorB.db3 --clock
+#
+
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, GroupAction
 from launch.launch_description_sources import PythonLaunchDescriptionSource

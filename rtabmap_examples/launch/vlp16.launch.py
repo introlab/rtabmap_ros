@@ -16,6 +16,7 @@ def generate_launch_description():
 
     use_sim_time = LaunchConfiguration('use_sim_time')
     deskewing = LaunchConfiguration('deskewing')
+    qos = LaunchConfiguration('qos')
     
     return LaunchDescription([
 
@@ -27,6 +28,10 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'deskewing', default_value='true',
             description='Enable lidar deskewing'),
+        
+        DeclareLaunchArgument(
+            'qos', default_value='1',
+            description='Quality of Service: 0=system default, 1=reliable, 2=best effort'),
           
         # Nodes to launch
         IncludeLaunchDescription(
@@ -49,6 +54,7 @@ def generate_launch_description():
               'expected_update_rate':15.0,
               'deskewing':deskewing,
               'use_sim_time':use_sim_time,
+              'qos':qos,
               # RTAB-Map's internal parameters are strings:
               'Icp/PointToPlane': 'true',
               'Icp/Iterations': '10',
@@ -80,6 +86,7 @@ def generate_launch_description():
               'approx_sync':False,
               'wait_for_transform':0.2,
               'use_sim_time':use_sim_time,
+              'qos':qos,
               # RTAB-Map's internal parameters are strings:
               'RGBD/ProximityMaxGraphDepth': '0',
               'RGBD/ProximityPathMaxNeighbors': '1',
@@ -118,6 +125,7 @@ def generate_launch_description():
               'subscribe_scan_cloud':True,
               'approx_sync':False,
               'use_sim_time':use_sim_time,
+              'qos':qos,
             }],
             remappings=[
                ('scan_cloud', 'odom_filtered_input_scan')

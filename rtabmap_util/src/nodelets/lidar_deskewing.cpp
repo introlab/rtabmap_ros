@@ -21,7 +21,7 @@ LidarDeskewing::LidarDeskewing(const rclcpp::NodeOptions & options) :
 	tfListener_ = std::make_shared<tf2_ros::TransformListener>(*tfBuffer_);
 
 	int queueSize = 5;
-	int qos = 0;
+	int qos = RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT;
 	queueSize = this->declare_parameter("queue_size", queueSize);
 	qos = this->declare_parameter("qos", qos);
 	fixedFrameId_ = this->declare_parameter("fixed_frame_id", fixedFrameId_);

@@ -855,8 +855,8 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 	landmarkSubOptions.callback_group = imuCallbackGroup_;
 	imuSubOptions.callback_group = imuCallbackGroup_;
 
-	int qosGPS = 0;
-	int qosIMU = 0;
+	int qosGPS = RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT;
+	int qosIMU = RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT;
 	qosGPS = this->declare_parameter("qos_gps", qosGPS);
 	qosIMU = this->declare_parameter("qos_imu", qosIMU);
 	userDataAsyncSub_ = this->create_subscription<rtabmap_msgs::msg::UserData>("user_data_async", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qosUserData_), std::bind(&CoreWrapper::userDataAsyncCallback, this, std::placeholders::_1), userDataAsyncSubOptions);

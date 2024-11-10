@@ -1,3 +1,16 @@
+# Requirements:
+#   Download rosbag:
+#    * demo_mapping.db3: https://drive.google.com/file/d/1v9qJ2U7GlYhqBJr7OQHWbDSCfgiVaLWb/view?usp=drive_link
+#
+# Example:
+#
+#   SLAM:
+#     $ ros2 launch rtabmap_demos robot_mapping_demo.launch.py rviz:=true rtabmap_viz:=true
+#
+#   Rosbag:
+#     $ ros2 bag play demo_mapping.db3 --clock
+#
+
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration

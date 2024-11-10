@@ -1,3 +1,17 @@
+# Requirements:
+#   find_object_2d package installed
+#   Download rosbag:
+#    * demo_find_object.db3: https://drive.google.com/file/d/1web54yQkxeGFr2UwOjKeoajGGDm0fZXT/view?usp=drive_link
+#
+# Example:
+#
+#   SLAM:
+#     $ ros2 launch rtabmap_demos find_object_demo.launch.py rviz:=true rtabmap_viz:=true
+#
+#   Rosbag:
+#     $ ros2 bag play demo_find_object.db3 --clock
+#
+
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration

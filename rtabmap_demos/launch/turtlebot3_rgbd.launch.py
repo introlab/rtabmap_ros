@@ -1,34 +1,15 @@
-# Requirements:
-#   Install Turtlebot3 packages
-#   Modify turtlebot3_waffle SDF:
-#     1) Edit /opt/ros/$ROS_DISTRO/share/turtlebot3_gazebo/models/turtlebot3_waffle/model.sdf
-#     2) Add
-#          <joint name="camera_rgb_optical_joint" type="fixed">
-#            <parent>camera_rgb_frame</parent>
-#            <child>camera_rgb_optical_frame</child>
-#            <pose>0 0 0 -1.57079632679 0 -1.57079632679</pose>
-#            <axis>
-#              <xyz>0 0 1</xyz>
-#            </axis>
-#          </joint> 
-#     3) Rename <link name="camera_rgb_frame"> to <link name="camera_rgb_optical_frame">
-#     4) Add <link name="camera_rgb_frame"/>
-#     5) Change <sensor name="camera" type="camera"> to <sensor name="camera" type="depth">
-#     6) Change image width/height from 1920x1080 to 640x480
-#     7) Note that we can increase min scan range from 0.12 to 0.2 to avoid having scans 
-#        hitting the robot itself
 # Example:
-#   $ export TURTLEBOT3_MODEL=waffle
-#   $ ros2 launch turtlebot3_gazebo turtlebot3_world.launch.py
+#
+#   Bringup turtlebot3:
+#     $ export TURTLEBOT3_MODEL=waffle
+#     $ export LDS_MODEL=LDS-01
+#     $ ros2 launch turtlebot3_bringup robot.launch.py
 #
 #   SLAM:
-#   $ ros2 launch rtabmap_demos turtlebot3_rgbd.launch.py
-#   OR
-#   $ ros2 launch rtabmap_launch rtabmap.launch.py visual_odometry:=false frame_id:=base_footprint odom_topic:=/odom args:="-d" use_sim_time:=true rgb_topic:=/camera/image_raw depth_topic:=/camera/depth/image_raw camera_info_topic:=/camera/camera_info approx_sync:=true qos:=2
-#   $ ros2 run topic_tools relay /rtabmap/map /map
+#     $ ros2 launch rtabmap_demos turtlebot3_rgbd.launch.py
 #
 #   Navigation (install nav2_bringup package):
-#     $ ros2 launch nav2_bringup navigation_launch.py use_sim_time:=True
+#     $ ros2 launch nav2_bringup navigation_launch.py
 #     $ ros2 launch nav2_bringup rviz_launch.py
 #
 #   Teleop:
@@ -43,7 +24,6 @@ from launch_ros.actions import Node
 def generate_launch_description():
 
     use_sim_time = LaunchConfiguration('use_sim_time')
-    qos = LaunchConfiguration('qos')
     localization = LaunchConfiguration('localization')
 
     parameters={
@@ -51,9 +31,12 @@ def generate_launch_description():
           'use_sim_time':use_sim_time,
           'subscribe_depth':True,
           'use_action_for_goal':True,
-          'qos_image':qos,
-          'qos_imu':qos,
           'Reg/Force3DoF':'true',
+          'Grid/RayTracing':'true', # Fill empty space
+          'Grid/3D':'false', # Use 2D occupancy
+          'Grid/NormalsSegmentation':'false', # Use passthrough filter to detect obstacles
+          'Grid/MaxGroundHeight':'0.05', # All points above 5 cm are obstacles
+          'Grid/MaxObstacleHeight':'1',  # All points over 1 meter are ignored
           'Optimizer/GravitySigma':'0' # Disable imu constraints (we are already in 2D)
     }
 
@@ -69,10 +52,6 @@ def generate_launch_description():
             'use_sim_time', default_value='true',
             description='Use simulation (Gazebo) clock if true'),
         
-        DeclareLaunchArgument(
-            'qos', default_value='2',
-            description='QoS used for input sensor topics'),
-            
         DeclareLaunchArgument(
             'localization', default_value='false',
             description='Launch in localization mode.'),

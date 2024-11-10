@@ -68,7 +68,6 @@ def generate_launch_description():
         launch_arguments=[
             ('rtabmap_viz', LaunchConfiguration('rtabmap_viz')),
             ('localization', LaunchConfiguration('localization')),
-            ('qos', '2'),
             ('use_sim_time', 'true')
         ]
     )

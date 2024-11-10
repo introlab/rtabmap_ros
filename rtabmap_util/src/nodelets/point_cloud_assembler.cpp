@@ -75,7 +75,7 @@ PointCloudAssembler::PointCloudAssembler(const rclcpp::NodeOptions & options) :
 
 	int topicQueueSize = 1;
 	int syncQueueSize = 5;
-	int qos = 0;
+	int qos = RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT;
 	bool subscribeOdomInfo = false;
 
 	topicQueueSize = this->declare_parameter("topic_queue_size", topicQueueSize);

@@ -7,9 +7,9 @@
 #     $ ros2 launch turtlebot4_ignition_bringup turtlebot4_ignition.launch.py slam:=false nav2:=true rviz:=true
 #
 #   2) Launch SLAM:
-#     $ ros2 launch rtabmap_demos turtlebot4_slam.launch.py use_sim_time:=true qos:=2
+#     $ ros2 launch rtabmap_demos turtlebot4_slam.launch.py use_sim_time:=true
 #     OR
-#     $ ros2 launch rtabmap_launch rtabmap.launch.py rtabmap_viz:=true subscribe_scan:=true rgbd_sync:=true depth_topic:=/oakd/rgb/preview/depth odom_sensor_sync:=true camera_info_topic:=/oakd/rgb/preview/camera_info rgb_topic:=/oakd/rgb/preview/image_raw visual_odometry:=false approx_sync:=true approx_rgbd_sync:=false odom_guess_frame_id:=odom icp_odometry:=true odom_topic:="icp_odom" map_topic:="/map" qos:=2 use_sim_time:=true odom_log_level:=warn rtabmap_args:="--delete_db_on_start --Reg/Strategy 1 --Reg/Force3DoF true --Mem/NotLinkedNodesKept false" use_action_for_goal:=true
+#     $ ros2 launch rtabmap_launch rtabmap.launch.py rtabmap_viz:=true subscribe_scan:=true rgbd_sync:=true depth_topic:=/oakd/rgb/preview/depth odom_sensor_sync:=true camera_info_topic:=/oakd/rgb/preview/camera_info rgb_topic:=/oakd/rgb/preview/image_raw visual_odometry:=false approx_sync:=true approx_rgbd_sync:=false odom_guess_frame_id:=odom icp_odometry:=true odom_topic:="icp_odom" map_topic:="/map" use_sim_time:=true odom_log_level:=warn rtabmap_args:="--delete_db_on_start --Reg/Strategy 1 --Reg/Force3DoF true --Mem/NotLinkedNodesKept false" use_action_for_goal:=true
 #
 #   3) Click on "Play" button on bottom-left of gazebo.
 #
@@ -38,8 +38,7 @@ def generate_launch_description():
 
     icp_parameters={
           'odom_frame_id':'icp_odom',
-          'guess_frame_id':'odom',
-          'qos':qos
+          'guess_frame_id':'odom'
     }
 
     rtabmap_parameters={
@@ -47,9 +46,6 @@ def generate_launch_description():
           'subscribe_scan':True,
           'use_action_for_goal':True,
           'odom_sensor_sync': True,
-          'qos_scan':qos,
-          'qos_image':qos,
-          'qos_imu':qos,
           # RTAB-Map's parameters should be strings:
           'Mem/NotLinkedNodesKept':'false'
     }
@@ -79,7 +75,7 @@ def generate_launch_description():
             description='Use simulation (Gazebo) clock if true'),
         
         DeclareLaunchArgument(
-            'qos', default_value='0',
+            'qos', default_value='1',
             description='QoS used for input sensor topics'),
             
         DeclareLaunchArgument(

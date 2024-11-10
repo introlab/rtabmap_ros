@@ -39,7 +39,7 @@ namespace rtabmap_util
 RGBDSplit::RGBDSplit(const rclcpp::NodeOptions & options) :
 	Node("rgbd_split", options)
 {
-	int qos = 0;
+	int qos = RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT;
 	qos = this->declare_parameter("qos", qos);
 
 	RCLCPP_INFO(this->get_logger(), "%s: qos         = %d", get_name(), qos);

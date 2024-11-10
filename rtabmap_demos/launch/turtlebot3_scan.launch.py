@@ -1,20 +1,15 @@
-# Requirements:
-#   Install Turtlebot3 packages
-#   Note that we can edit /opt/ros/$ROS_DISTRO/share/turtlebot3_gazebo/models/turtlebot_waffle/model.sdf 
-#     to increase min scan range from 0.12 to 0.2 to avoid having scans 
-#     hitting the robot itself
 # Example:
-#   $ export TURTLEBOT3_MODEL=waffle
-#   $ ros2 launch turtlebot3_gazebo turtlebot3_world.launch.py
+#
+#   Bringup turtlebot3:
+#     $ export TURTLEBOT3_MODEL=waffle
+#     $ export LDS_MODEL=LDS-01
+#     $ ros2 launch turtlebot3_bringup robot.launch.py
 #
 #   SLAM:
-#   $ ros2 launch rtabmap_demos turtlebot3_scan.launch.py
-#   OR
-#   $ ros2 launch rtabmap_launch rtabmap.launch.py visual_odometry:=false frame_id:=base_footprint subscribe_scan:=true depth:=false approx_sync:=true odom_topic:=/odom args:="-d --RGBD/NeighborLinkRefining true --Reg/Strategy 1 --Reg/Force3DoF true --Grid/RangeMin 0.2" use_sim_time:=true qos:=2
-#   $ ros2 run topic_tools relay /rtabmap/map /map
+#     $ ros2 launch rtabmap_demos turtlebot3_scan.launch.py
 #
 #   Navigation (install nav2_bringup package):
-#     $ ros2 launch nav2_bringup navigation_launch.py use_sim_time:=True
+#     $ ros2 launch nav2_bringup navigation_launch.py
 #     $ ros2 launch nav2_bringup rviz_launch.py
 #
 #   Teleop:
@@ -29,7 +24,6 @@ from launch_ros.actions import Node
 def generate_launch_description():
 
     use_sim_time = LaunchConfiguration('use_sim_time')
-    qos = LaunchConfiguration('qos')
     localization = LaunchConfiguration('localization')
     
     parameters={
@@ -40,8 +34,6 @@ def generate_launch_description():
           'subscribe_scan':True,
           'approx_sync':True,
           'use_action_for_goal':True,
-          'qos_scan':qos,
-          'qos_imu':qos,
           'Reg/Strategy':'1',
           'Reg/Force3DoF':'true',
           'RGBD/NeighborLinkRefining':'True',
@@ -59,10 +51,6 @@ def generate_launch_description():
             'use_sim_time', default_value='true',
             description='Use simulation (Gazebo) clock if true'),
         
-        DeclareLaunchArgument(
-            'qos', default_value='2',
-            description='QoS used for input sensor topics'),
-            
         DeclareLaunchArgument(
             'localization', default_value='false',
             description='Launch in localization mode.'),

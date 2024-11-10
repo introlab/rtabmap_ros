@@ -32,7 +32,7 @@ namespace rtabmap_sync {
 
 CommonDataSubscriber::CommonDataSubscriber(rclcpp::Node & node, bool gui) :
 		topicQueueSize_(10),
-		syncQueueSize_(5),
+		syncQueueSize_(10),
 		approxSync_(true),
 		subscribedToDepth_(!gui),
 		subscribedToStereo_(false),
@@ -393,7 +393,7 @@ CommonDataSubscriber::CommonDataSubscriber(rclcpp::Node & node, bool gui) :
 	}
 	syncQueueSize_ = node.declare_parameter("sync_queue_size", syncQueueSize_);
 
-	int qos = node.declare_parameter("qos", 0);
+	int qos = node.declare_parameter("qos", (int)RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT);
 	int qosOdom = node.declare_parameter("qos_odom", qos);
 	int qosImage = node.declare_parameter("qos_image", qos);
 	int qosCameraInfo = node.declare_parameter("qos_camera_info", qosImage);

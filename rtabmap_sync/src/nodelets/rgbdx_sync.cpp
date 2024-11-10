@@ -43,11 +43,11 @@ RGBDXSync::RGBDXSync(const rclcpp::NodeOptions & options) :
 	SYNC_INIT(rgbd8)
 {
 	int topicQueueSize = 10;
-	int syncQueueSize = 5;
+	int syncQueueSize = 10;
 	bool approxSync = true;
 	int rgbdCameras = 2;
 	double approxSyncMaxInterval = 0.0;
-	int qos = 0;
+	int qos = RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT;
 	approxSync = this->declare_parameter("approx_sync", approxSync);
 	approxSyncMaxInterval = this->declare_parameter("approx_sync_max_interval", approxSyncMaxInterval);
 	topicQueueSize = this->declare_parameter("topic_queue_size", topicQueueSize);

@@ -68,7 +68,7 @@ PointCloudXYZ::PointCloudXYZ(const rclcpp::NodeOptions & options) :
 {
 	int topicQueueSize = 1;
 	int syncQueueSize = 10;
-	int qos = 0;
+	int qos = RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT;
 	bool approxSync = true;
 	std::string roiStr;
 	double approxSyncMaxInterval = 0.0;
