@@ -59,7 +59,7 @@ def generate_launch_description():
     viz_launch = PathJoinSubstitution(
         [pkg_clearpath_viz, 'launch', 'view_navigation.launch.py'])
     rtabmap_launch = PathJoinSubstitution(
-        [pkg_rtabmap_demos, 'launch', 'husky_slam3d.launch.py'])
+        [pkg_rtabmap_demos, 'launch', 'husky', 'husky_slam3d.launch.py'])
     nav2_launch = PathJoinSubstitution(
         [pkg_clearpath_nav2_demos, 'launch', 'nav2.launch.py'])
 

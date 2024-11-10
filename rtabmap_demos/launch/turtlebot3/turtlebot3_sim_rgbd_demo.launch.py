@@ -52,7 +52,7 @@ def generate_launch_description():
     rviz_launch = PathJoinSubstitution(
         [pkg_nav2_bringup, 'launch', 'rviz_launch.py'])
     rtabmap_launch = PathJoinSubstitution(
-        [pkg_rtabmap_demos, 'launch', 'turtlebot3_rgbd.launch.py'])
+        [pkg_rtabmap_demos, 'launch', 'turtlebot3', 'turtlebot3_rgbd.launch.py'])
 
     # Includes
     gazebo = IncludeLaunchDescription(

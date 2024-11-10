@@ -2,10 +2,23 @@
 #   Install Turtlebot3 packages
 #   Modify turtlebot3_waffle SDF:
 #     1) Edit /opt/ros/$ROS_DISTRO/share/turtlebot3_gazebo/models/turtlebot3_waffle/model.sdf
-#     2) We can increase min scan range from 0.12 to 0.2 to avoid having scans 
+#     2) Add
+#          <joint name="camera_rgb_optical_joint" type="fixed">
+#            <parent>camera_rgb_frame</parent>
+#            <child>camera_rgb_optical_frame</child>
+#            <pose>0 0 0 -1.57079632679 0 -1.57079632679</pose>
+#            <axis>
+#              <xyz>0 0 1</xyz>
+#            </axis>
+#          </joint> 
+#     3) Rename <link name="camera_rgb_frame"> to <link name="camera_rgb_optical_frame">
+#     4) Add <link name="camera_rgb_frame"/>
+#     5) Change <sensor name="camera" type="camera"> to <sensor name="camera" type="depth">
+#     6) Change image width/height from 1920x1080 to 640x480
+#     7) Note that we can increase min scan range from 0.12 to 0.2 to avoid having scans 
 #        hitting the robot itself
 # Example:
-#   $ ros2 launch rtabmap_demos turtlebot3_sim_scan_demo.launch.py
+#   $ ros2 launch rtabmap_demos turtlebot3_sim_rgbd_scan_demo.launch.py
 #
 #   Teleop:
 #     $ ros2 run turtlebot3_teleop teleop_keyboard
@@ -41,7 +54,7 @@ def generate_launch_description():
     rviz_launch = PathJoinSubstitution(
         [pkg_nav2_bringup, 'launch', 'rviz_launch.py'])
     rtabmap_launch = PathJoinSubstitution(
-        [pkg_rtabmap_demos, 'launch', 'turtlebot3_scan.launch.py'])
+        [pkg_rtabmap_demos, 'launch', 'turtlebot3', 'turtlebot3_rgbd_scan.launch.py'])
 
     # Includes
     gazebo = IncludeLaunchDescription(

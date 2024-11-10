@@ -11,7 +11,7 @@
 #
 # Example with gazebo:
 #   1) Launch simulator (husky, nav2 and rtabmap):
-#     $ ros2 launch rtabmap_demos husky_sim_scan2d_demo.launch.py robot_ns:=a200_0000
+#     $ ros2 launch rtabmap_demos husky_sim_scan3d_assemble_demo.launch.py robot_ns:=a200_0000
 #
 #   2) Click on "Play" button on bottom-left of gazebo as soon as you can see it to avoid controllers crashing after 5 sec.
 #
@@ -34,8 +34,6 @@ import os
 ARGUMENTS = [
     DeclareLaunchArgument('rtabmap_viz', default_value='true',
                           choices=['true', 'false'], description='Start rtabmap_viz.'),
-    DeclareLaunchArgument('localization', default_value='false',
-                          choices=['true', 'false'], description='Start rtabmap in localization mode (a map should have been already created).'),
     DeclareLaunchArgument('world', default_value='warehouse',
                           description='Ignition World'),
     DeclareLaunchArgument('robot_ns', default_value='a200_0000',
@@ -59,7 +57,7 @@ def generate_launch_description():
     viz_launch = PathJoinSubstitution(
         [pkg_clearpath_viz, 'launch', 'view_navigation.launch.py'])
     rtabmap_launch = PathJoinSubstitution(
-        [pkg_rtabmap_demos, 'launch', 'husky_slam2d.launch.py'])
+        [pkg_rtabmap_demos, 'launch', 'husky', 'husky_slam3d_assemble.launch.py'])
     nav2_launch = PathJoinSubstitution(
         [pkg_clearpath_nav2_demos, 'launch', 'nav2.launch.py'])
 
@@ -81,7 +79,6 @@ def generate_launch_description():
         PythonLaunchDescriptionSource([rtabmap_launch]),
         launch_arguments=[
             ('rtabmap_viz', LaunchConfiguration('rtabmap_viz')),
-            ('localization', LaunchConfiguration('localization')),
             ('use_sim_time', 'true'),
             ('robot_ns', LaunchConfiguration('robot_ns'))
         ]
