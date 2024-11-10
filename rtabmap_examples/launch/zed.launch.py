@@ -55,7 +55,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
                                     'publish_map_tf': 'false'}.items(),
         ),
 
-        # Sync right/depth/camera_info together
+        # Sync rgb/depth/camera_info together
         Node(   
             package='rtabmap_sync', executable='rgbd_sync', output='screen',
             parameters=parameters,

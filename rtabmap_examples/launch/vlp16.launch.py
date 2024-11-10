@@ -14,17 +14,12 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 def generate_launch_description():
 
-    use_sim_time = LaunchConfiguration('use_sim_time')
     deskewing = LaunchConfiguration('deskewing')
     qos = LaunchConfiguration('qos')
     
     return LaunchDescription([
 
-        # Launch arguments
-        DeclareLaunchArgument(
-            'use_sim_time', default_value='false',
-            description='Use simulation (Gazebo) clock if true'),
-        
+        # Launch arguments       
         DeclareLaunchArgument(
             'deskewing', default_value='true',
             description='Enable lidar deskewing'),
@@ -53,7 +48,6 @@ def generate_launch_description():
               'wait_for_transform':0.2,
               'expected_update_rate':15.0,
               'deskewing':deskewing,
-              'use_sim_time':use_sim_time,
               'qos':qos,
               # RTAB-Map's internal parameters are strings:
               'Icp/PointToPlane': 'true',
@@ -85,7 +79,6 @@ def generate_launch_description():
               'subscribe_scan_cloud':True,
               'approx_sync':False,
               'wait_for_transform':0.2,
-              'use_sim_time':use_sim_time,
               'qos':qos,
               # RTAB-Map's internal parameters are strings:
               'RGBD/ProximityMaxGraphDepth': '0',
@@ -124,7 +117,6 @@ def generate_launch_description():
               'subscribe_odom_info':True,
               'subscribe_scan_cloud':True,
               'approx_sync':False,
-              'use_sim_time':use_sim_time,
               'qos':qos,
             }],
             remappings=[

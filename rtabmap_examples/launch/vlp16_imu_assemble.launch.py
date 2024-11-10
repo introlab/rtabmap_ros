@@ -1,5 +1,5 @@
 # Example:
-#   $ ros2 launch rtabmap_examples vlp16_imu.launch.py
+#   $ ros2 launch rtabmap_examples vlp16_imu_assemble.launch.py
 
 import os
 
@@ -13,8 +13,10 @@ from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 def launch_setup(context, *args, **kwargs):      
+    
     qos = LaunchConfiguration('qos')
     scan_topic = LaunchConfiguration('scan_topic')
+    deskewed_scan_topic = ''.join([scan_topic.perform(context), "/deskewed"])
     imu_topic = LaunchConfiguration('imu_topic')
     imu_filtered_topic = ''.join([imu_topic.perform(context), "/filtered"])
     frame_id = LaunchConfiguration('frame_id')
@@ -36,7 +38,7 @@ def launch_setup(context, *args, **kwargs):
         ),
         
         # The IMU driver publishing /imu/data (adjust imu_topic argument if your imu publishes another topic name)
-        Node(package='imu_brick', executable='imu_brick_node'), # publishing /imu/data
+        Node(package='imu_brick', executable='imu_brick_node'),
         
         # Static transform between velodyne and imu frame
         Node(package='tf2_ros', executable='static_transform_publisher', arguments=["0", "0", "0.05", "-1.57", "0", "0", "velodyne", "imu_link"]),
@@ -67,6 +69,15 @@ def launch_setup(context, *args, **kwargs):
             remappings=[
                 ('imu/data', imu_filtered_topic)
             ]),
+        
+        # External Deskewing
+        Node(
+            package='rtabmap_util', executable='lidar_deskewing', output='screen',
+            parameters=[{
+              'fixed_frame_id':frame_id_stabilized}],
+            remappings=[
+                ('input_cloud', scan_topic)
+            ]),
 
         Node(
             package='rtabmap_odom', executable='icp_odometry', output='screen',
@@ -76,7 +87,6 @@ def launch_setup(context, *args, **kwargs):
               'guess_frame_id':frame_id_stabilized,
               'wait_for_transform':0.2,
               'expected_update_rate':15.0,
-              'deskewing':True, # Scans will be deskewed internally based on guess_frame_id (i.e., our stabilized imu frame) 
               'wait_imu_to_init': True,
               'qos':qos,
               # RTAB-Map's internal parameters are strings:
@@ -97,9 +107,16 @@ def launch_setup(context, *args, **kwargs):
               'OdomF2M/BundleAdjustment': 'false'
             }],
             remappings=[
-              ('scan_cloud', scan_topic),
+              ('scan_cloud', deskewed_scan_topic), # Subscribing to deskewed scan topic
               ('imu', imu_filtered_topic)
             ]),
+        
+        #Assemble deskewed scans based on icp odometry
+        Node(
+            package='rtabmap_util', executable='point_cloud_assembler', output='screen',
+            parameters=[{'assembling_time': 1.0, 
+                         'fixed_frame_id': ""}],
+            remappings=[('cloud', deskewed_scan_topic)]),
         
         Node(
             package='rtabmap_slam', executable='rtabmap', output='screen',
@@ -112,6 +129,7 @@ def launch_setup(context, *args, **kwargs):
               'wait_for_transform':0.2,
               'qos':qos,
               # RTAB-Map's internal parameters are strings:
+              'Rtabmap/DetectionRate': '0', # Rate fixed by assembling time above (1 Hz)
               'RGBD/ProximityMaxGraphDepth': '0',
               'RGBD/ProximityPathMaxNeighbors': '1',
               'RGBD/AngularUpdate': '0.05',
@@ -134,7 +152,7 @@ def launch_setup(context, *args, **kwargs):
               'Icp/CorrespondenceRatio': '0.2'
             }],
             remappings=[
-              ('scan_cloud', 'odom_filtered_input_scan'), # Subscribe to deskewed scans from icp_odometry
+              ('scan_cloud', 'assembled_cloud'), # We subscribe to assembled scans
               ('imu', imu_filtered_topic)
             ],
             arguments=[
@@ -152,7 +170,7 @@ def launch_setup(context, *args, **kwargs):
               'qos':qos,
             }],
             remappings=[
-                ('scan_cloud', 'odom_filtered_input_scan')
+                ('scan_cloud', deskewed_scan_topic)
             ]),
       ]
 
@@ -160,7 +178,7 @@ def generate_launch_description():
     
     return LaunchDescription([
 
-        # Launch arguments              
+        # Launch arguments       
         DeclareLaunchArgument(
             'qos', default_value='1',
             description='Quality of Service: 0=system default, 1=reliable, 2=best effort'),
