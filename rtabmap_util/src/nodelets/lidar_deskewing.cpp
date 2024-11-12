@@ -14,10 +14,6 @@ LidarDeskewing::LidarDeskewing(const rclcpp::NodeOptions & options) :
 	slerp_(false)
 {
 	tfBuffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
-	//auto timer_interface = std::make_shared<tf2_ros::CreateTimerROS>(
-	//	this->get_node_base_interface(),
-	//	this->get_node_timers_interface());
-	//tfBuffer_->setCreateTimerInterface(timer_interface);
 	tfListener_ = std::make_shared<tf2_ros::TransformListener>(*tfBuffer_);
 
 	int queueSize = 5;

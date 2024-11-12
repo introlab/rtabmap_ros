@@ -114,11 +114,7 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	odomSensorDataFeaturesPub_ = create_publisher<rtabmap_msgs::msg::SensorData>("odom_sensor_data/features", rclcpp::QoS(1).reliability(qos_));
 	odomSensorDataCompressedPub_ = create_publisher<rtabmap_msgs::msg::SensorData>("odom_sensor_data/compressed", rclcpp::QoS(1).reliability(qos_));
 
-	tfBuffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
-	//auto timer_interface = std::make_shared<tf2_ros::CreateTimerROS>(
-	//	this->get_node_base_interface(),
-	//	this->get_node_timers_interface());
-	//tfBuffer_->setCreateTimerInterface(timer_interface);
+	tfBuffer_ = std::make_shared<tf2_ros::Buffer>(get_clock());
 	tfListener_ = std::make_shared<tf2_ros::TransformListener>(*tfBuffer_);
 	tfBroadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
 
