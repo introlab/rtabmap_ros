@@ -46,6 +46,10 @@ def generate_launch_description():
             'qos', default_value='1',
             description='Quality of Service: 0=system default, 1=reliable, 2=best effort'),
         
+        DeclareLaunchArgument(
+            'camera_model', default_value='',
+            description="[REQUIRED] The model of the camera. Using a wrong camera model can disable camera features. Valid choices are: ['zed', 'zedm', 'zed2', 'zed2i', 'zedx', 'zedxm', 'virtual']"),
+        
         #################################
         # Hardware specific nodes - BEGIN
         #################################
