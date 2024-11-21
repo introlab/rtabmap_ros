@@ -30,6 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 int main(int argc, char **argv)
 {
   ULogger::setType(ULogger::kTypeConsole);
+  ULogger::setLevel(ULogger::kWarning);
 	rclcpp::init(argc, argv);
 	rclcpp::spin(std::make_shared<rtabmap_util::PointCloudAssembler>(rclcpp::NodeOptions()));
 	rclcpp::shutdown();
