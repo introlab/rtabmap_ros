@@ -31,7 +31,6 @@ def generate_launch_description():
         Node(
             package='rtabmap_odom', executable='rgbd_odometry', output='screen',
             parameters=[{ 'frame_id':'camera_base',
-                          'subscribe_odom_info':True,
                           'approx_sync':True,
                           'approx_sync_max_interval':0.01,
                           'wait_imu_to_init':True,
