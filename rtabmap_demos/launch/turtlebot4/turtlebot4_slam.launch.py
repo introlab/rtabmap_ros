@@ -34,6 +34,7 @@ def generate_launch_description():
 
     use_sim_time = LaunchConfiguration('use_sim_time')
     localization = LaunchConfiguration('localization')
+    rtabmap_viz = LaunchConfiguration('rtabmap_viz')
 
     icp_parameters={
           'odom_frame_id':'icp_odom',
@@ -76,6 +77,10 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'localization', default_value='false', choices=['true', 'false'],
             description='Launch rtabmap in localization mode (a map should have been already created).'),
+        
+        DeclareLaunchArgument(
+            'rtabmap_viz', default_value='true', choices=['true', 'false'],
+            description='Launch rtabmap_viz for visualization.'),
 
         # Nodes to launch
         Node(
@@ -107,6 +112,7 @@ def generate_launch_description():
             remappings=remappings),
 
         Node(
+            condition=IfCondition(rtabmap_viz),
             package='rtabmap_viz', executable='rtabmap_viz', output='screen',
             parameters=[rtabmap_parameters, shared_parameters],
             remappings=remappings),
