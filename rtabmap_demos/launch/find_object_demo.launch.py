@@ -47,15 +47,15 @@ def generate_launch_description():
          ('scan',            '/base_scan')]
     
     config_rviz = os.path.join(
-        get_package_share_directory('rtabmap_demos'), 'launch', 'config', 'demo_robot_mapping.rviz'
+        get_package_share_directory('rtabmap_demos'), 'config', 'demo_robot_mapping.rviz'
     )
     
     config_find_object = os.path.join(
-        get_package_share_directory('rtabmap_demos'), 'launch', 'config', 'find_object.ini'
+        get_package_share_directory('rtabmap_demos'), 'config', 'find_object.ini'
     )
     
     data_find_object = os.path.join(
-        get_package_share_directory('rtabmap_demos'), 'launch', 'data', 'books'
+        get_package_share_directory('rtabmap_demos'), 'data', 'books'
     )
 
     return LaunchDescription([

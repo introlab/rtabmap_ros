@@ -348,6 +348,7 @@ void ICPOdometry::callbackScan(const sensor_msgs::msg::LaserScan::SharedPtr scan
 
 		sensor_msgs::msg::PointCloud2 scanOutDeskewed;
 		rtabmap_conversions::transformPointCloud(t.toEigen4f(), scanOut, scanOutDeskewed);
+		scanOutDeskewed.header.frame_id = scanMsg->header.frame_id;
 		scanOut = scanOutDeskewed;
 	}
 	else

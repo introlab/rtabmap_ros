@@ -46,7 +46,7 @@ def launch_setup(context, *args, **kwargs):
     world = LaunchConfiguration('world').perform(context)
     
     nav2_params_file = PathJoinSubstitution(
-        [FindPackageShare('rtabmap_demos'), 'launch', 'config', 'turtlebot3_rgbd_nav2_params.yaml']
+        [FindPackageShare('rtabmap_demos'), 'params', 'turtlebot3_rgbd_nav2_params.yaml']
     )
 
     # Paths
@@ -61,7 +61,11 @@ def launch_setup(context, *args, **kwargs):
 
     # Includes
     gazebo = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([gazebo_launch])
+        PythonLaunchDescriptionSource([gazebo_launch]),
+        launch_arguments=[
+            ('x_pose', LaunchConfiguration('x_pose')),
+            ('y_pose', LaunchConfiguration('y_pose'))
+        ]
     )
     nav2 = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([nav2_launch]),
@@ -100,6 +104,14 @@ def generate_launch_description():
             'world', default_value='house',
             choices=['world', 'house', 'dqn_stage1', 'dqn_stage2', 'dqn_stage3', 'dqn_stage4'],
             description='Turtlebot3 gazebo world.'),
+        
+        DeclareLaunchArgument(
+            'x_pose', default_value='-2.0',
+            description='Initial position of the robot in the simulator.'),
+        
+        DeclareLaunchArgument(
+            'y_pose', default_value='0.5',
+            description='Initial position of the robot in the simulator.'),
 
         OpaqueFunction(function=launch_setup)
     ])

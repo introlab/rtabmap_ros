@@ -923,7 +923,8 @@ void cameraModelToROS(
 	UASSERT(model.R().empty() || model.R().total() == 9);
 	if(model.R().empty())
 	{
-		memset(camInfo.r.data(), 0.0, 9*sizeof(double));
+		cv::Mat eye = cv::Mat::eye(3,3,CV_64FC1);
+		memcpy(camInfo.r.data(), eye.data, 9*sizeof(double));
 	}
 	else
 	{
@@ -934,6 +935,10 @@ void cameraModelToROS(
 	if(model.P().empty())
 	{
 		memset(camInfo.p.data(), 0.0, 12*sizeof(double));
+		if(!model.K_raw().empty()) {
+			model.K_raw().copyTo(cv::Mat(3,4,CV_64FC1, camInfo.p.data()).colRange(0,3));
+			camInfo.p.back() = 1.0;
+		}
 	}
 	else
 	{

@@ -53,7 +53,7 @@ def generate_launch_description():
          ('odom',       '/vo')]
     
     config_rviz = os.path.join(
-        get_package_share_directory('rtabmap_demos'), 'launch', 'config', 'demo_robot_mapping.rviz'
+        get_package_share_directory('rtabmap_demos'), 'config', 'demo_robot_mapping.rviz'
     )
 
     return LaunchDescription([

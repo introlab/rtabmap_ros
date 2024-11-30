@@ -244,6 +244,7 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 	RCLCPP_INFO(this->get_logger(), "rtabmap: tf_tolerance  = %f", tfTolerance);
 	RCLCPP_INFO(this->get_logger(), "rtabmap: odom_sensor_sync   = %s", odomSensorSync_?"true":"false");
 	RCLCPP_INFO(this->get_logger(), "rtabmap: pub_loc_pose_only_when_localizing = %s", pubLocPoseOnlyWhenLocalizing_?"true":"false");
+	RCLCPP_INFO(this->get_logger(), "rtabmap: wait_for_transform = %f", waitForTransform_);
 	if(this->isSubscribedToStereo())
 	{
 		RCLCPP_INFO(this->get_logger(), "rtabmap: stereo_to_depth = %s", stereoToDepth_?"true":"false");

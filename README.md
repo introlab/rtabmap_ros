@@ -62,6 +62,21 @@ RTAB-Map's ROS2 package (branch `ros2`). **ROS2 Foxy minimum required**: current
 
 * For robot integration examples (turtlebot3 and turtlebot4, nav2 integration), see [rtabmap_demos](https://github.com/introlab/rtabmap_ros/tree/ros2/rtabmap_demos) sub-folder.
 
+## Logging
+To make RTAB-Map's logs appear ordered with RCLCPP's logs, set the following environment variables in your `.bashrc` (see official "[About Logging](https://docs.ros.org/en/humble/Concepts/Intermediate/About-Logging.html)" documentation for more info):
+```bash
+export RCUTILS_LOGGING_USE_STDOUT=1
+export RCUTILS_LOGGING_BUFFERED_STREAM=1
+# Optional, but if you like colored logs:
+export RCUTILS_COLORIZED_OUTPUT=1
+```
+
+## Recommended DDS
+If RTAB-Map's GUI or topic frequency feel laggy (even if processing time looks fast enough), it may be caused by the DDS. I recommend to use [Cyclone DDS](https://docs.ros.org/en/foxy/Installation/DDS-Implementations/Working-with-Eclipse-CycloneDDS.html), you can try it by adding this before launching any nodes/launch files:
+```bash
+export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+```
+
 # Installation 
 
 ### Binaries

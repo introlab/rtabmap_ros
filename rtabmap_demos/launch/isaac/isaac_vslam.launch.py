@@ -43,7 +43,6 @@ def launch_setup(context, *args, **kwargs):
           'Optimizer/GravitySigma':'0' # Disable imu constraints (we are already in 2D)
     }
     if enable_vo_value:
-        parameters['odom_frame_id'] = 'vo'
         parameters['guess_frame_id'] = 'odom'
     else:
         parameters['odom_frame_id'] = 'odom'
@@ -88,12 +87,11 @@ def launch_setup(context, *args, **kwargs):
             condition=IfCondition(enable_vo),
             package='rtabmap_odom', executable=vo_node_prefix+'_odometry', output='screen',
             namespace='rtabmap',
-            parameters=[parameters],
+            parameters=[parameters, {'odom_frame_id': 'vo'}],
             remappings=remappings),
         
         # VSLAM:
         Node(
-            condition=UnlessCondition(localization),
             package='rtabmap_slam', executable='rtabmap', output='screen',
             namespace='rtabmap',
             parameters=[parameters],

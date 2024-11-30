@@ -181,6 +181,8 @@ private:
 	bool waitIMUToinit_;
 	bool alwaysCheckImuTf_;
 	bool imuProcessed_;
+	int processedMsgs_;
+	int droppedMsgs_;
 	std::map<double, sensor_msgs::msg::Imu::ConstSharedPtr> imus_;
 	std::string configPath_;
 	rtabmap::Transform initialPose_;
@@ -192,11 +194,13 @@ private:
 	{
 	public:
 		OdomStatusTask();
-		void setStatus(bool isLost);
+		void setStatus(bool isLost, int processedMsgs, int droppedMsgs);
 		void run(diagnostic_updater::DiagnosticStatusWrapper &stat);
 	private:
 		bool lost_;
 		bool dataReceived_;
+		int processedMsgs_;
+		int droppedMsgs_;
 	};
 	OdomStatusTask statusDiagnostic_;
 	std::unique_ptr<rtabmap_sync::SyncDiagnostic> syncDiagnostic_;

@@ -28,7 +28,7 @@ def launch_setup(context, *args, **kwargs):
     )
     
     nav2_params_file = PathJoinSubstitution(
-        [FindPackageShare('rtabmap_demos'), 'launch', 'config', 'champ_nav2_params.yaml']
+        [FindPackageShare('rtabmap_demos'), 'params', 'champ_nav2_params.yaml']
     )
 
     rviz_config_path = PathJoinSubstitution(

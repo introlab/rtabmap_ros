@@ -67,7 +67,9 @@ def launch_setup(context, *args, **kwargs):
     nav2_launch = PathJoinSubstitution(
         [pkg_nav2_bringup, 'launch', 'navigation_launch.py'])
     nav2_vo_params = PathJoinSubstitution(
-        [pkg_rtabmap_demos, 'launch', 'config', 'isaac_vslam_nav2_params.yaml'])
+        [pkg_rtabmap_demos, 'params', 'isaac_vslam_nav2_params.yaml'])
+    nav2_params = PathJoinSubstitution(
+        [pkg_rtabmap_demos, 'params', 'isaac_nav2_params.yaml'])
     rviz_launch = PathJoinSubstitution(
         [pkg_nav2_bringup, 'launch', 'rviz_launch.py'])
     rtabmap_launch = PathJoinSubstitution(
@@ -82,6 +84,7 @@ def launch_setup(context, *args, **kwargs):
         package='isaac_ros_image_proc',
         plugin='nvidia::isaac_ros::image_proc::ResizeNode',
         parameters=[{
+            'use_sim_time': True,
             'output_width': image_width,
             'output_height': image_height,
         }],
@@ -99,6 +102,7 @@ def launch_setup(context, *args, **kwargs):
         package='isaac_ros_image_proc',
         plugin='nvidia::isaac_ros::image_proc::ResizeNode',
         parameters=[{
+            'use_sim_time': True,
             'output_width': image_width,
             'output_height': image_height,
         }],
@@ -116,6 +120,7 @@ def launch_setup(context, *args, **kwargs):
         package='isaac_ros_image_proc',
         plugin='nvidia::isaac_ros::image_proc::RectifyNode',
         parameters=[{
+            'use_sim_time': True,
             'output_width': image_width,
             'output_height': image_height,
         }],
@@ -133,6 +138,7 @@ def launch_setup(context, *args, **kwargs):
         package='isaac_ros_image_proc',
         plugin='nvidia::isaac_ros::image_proc::RectifyNode',
         parameters=[{
+            'use_sim_time': True,
             'output_width': image_width,
             'output_height': image_height,
         }],
@@ -150,8 +156,9 @@ def launch_setup(context, *args, **kwargs):
         package='isaac_ros_stereo_image_proc',
         plugin='nvidia::isaac_ros::stereo_image_proc::DisparityNode',
         parameters=[{
+                'use_sim_time': True,
                 'backends': 'CUDA',
-                'max_disparity': 64.0,
+                'max_disparity': 64.0
         }],
         namespace="front_stereo_camera",
         remappings=[
@@ -164,6 +171,9 @@ def launch_setup(context, *args, **kwargs):
         name='disparity_to_depth_node',
         package='isaac_ros_stereo_image_proc',
         plugin='nvidia::isaac_ros::stereo_image_proc::DisparityToDepthNode',
+        parameters=[{
+                'use_sim_time': True,
+        }],
         namespace="front_stereo_camera"
     )
     
@@ -192,6 +202,9 @@ def launch_setup(context, *args, **kwargs):
     if vo == 'rtabmap':
         # We need to change the base odom frame to vo
         nav2_args.append(('params_file', nav2_vo_params))
+    else:
+        # Use custom version with higher velocities
+        nav2_args.append(('params_file', nav2_params))
     nav2 = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([nav2_launch]),
         launch_arguments=nav2_args

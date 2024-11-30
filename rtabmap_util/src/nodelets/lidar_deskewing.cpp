@@ -73,6 +73,7 @@ void LidarDeskewing::callbackScan(const sensor_msgs::msg::LaserScan::ConstShared
 
 	sensor_msgs::msg::PointCloud2 scanOutDeskewed;
 	rtabmap_conversions::transformPointCloud(t.toEigen4f(), scanOut, scanOutDeskewed);
+	scanOutDeskewed.header.frame_id = msg->header.frame_id;
 	pubScan_->publish(scanOutDeskewed);
 }
 

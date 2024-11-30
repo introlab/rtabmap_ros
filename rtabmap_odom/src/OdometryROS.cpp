@@ -94,6 +94,8 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	waitIMUToinit_(false),
 	alwaysCheckImuTf_(true),
 	imuProcessed_(false),
+	processedMsgs_(0),
+	droppedMsgs_(0),
 	configPath_(),
 	initialPose_(Transform::getIdentity()),
 	ulogToRosout_(this)
@@ -450,10 +452,12 @@ void OdometryROS::processData(SensorData & data, const std_msgs::msg::Header & h
 		dataHeaderToProcess_ = header;
 		dataReady_.release();
 		dataMutex_.unlock();
+		++processedMsgs_;
 	}
 	else
 	{
-		RCLCPP_DEBUG(get_logger(), "Dropping image/scan data");
+		//RCLCPP_WARN(get_logger(), "Dropping image/scan data");
+		++droppedMsgs_;
 	}
 }
 
@@ -673,7 +677,7 @@ void OdometryROS::mainLoop()
 	bool tooOldPreviousData = minUpdateRate_ > 0 && previousStamp_ > 0 && (rtabmap_conversions::timestampFromROS(header.stamp)-previousStamp_) > 1.0/minUpdateRate_;
 
 	// process data
-	rclcpp::Time timeStart = now();
+	rclcpp::Time timeStart = rclcpp::Clock().now();
 	rtabmap::OdometryInfo info;
 	if(!groundTruth.isNull())
 	{
@@ -1088,22 +1092,24 @@ void OdometryROS::mainLoop()
 	{
 		if(icpParams_)
 		{
-			RCLCPP_INFO(this->get_logger(), "Odom: quality=%d, ratio=%f, std dev=%fm|%frad, update time=%fs delay=%fs", info.reg.inliers, info.reg.icpInliersRatio, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (now()-timeStart).seconds(), delay);
+			RCLCPP_INFO(this->get_logger(), "Odom: quality=%d, ratio=%f, std dev=%fm|%frad, update time=%fs delay=%fs", info.reg.inliers, info.reg.icpInliersRatio, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (rclcpp::Clock().now()-timeStart).seconds(), delay);
 		}
 		else
 		{
-			RCLCPP_INFO(this->get_logger(), "Odom: quality=%d, std dev=%fm|%frad, update time=%fs delay=%fs", info.reg.inliers, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (now()-timeStart).seconds(), delay);
+			RCLCPP_INFO(this->get_logger(), "Odom: quality=%d, std dev=%fm|%frad, update time=%fs delay=%fs", info.reg.inliers, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (rclcpp::Clock().now()-timeStart).seconds(), delay);
 		}
 	}
 	else // if(icpParams_)
 	{
-		RCLCPP_INFO(this->get_logger(), "Odom: ratio=%f, std dev=%fm|%frad, update time=%fs delay=%fs", info.reg.icpInliersRatio, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (now()-timeStart).seconds(), delay);
+		RCLCPP_INFO(this->get_logger(), "Odom: ratio=%f, std dev=%fm|%frad, update time=%fs delay=%fs", info.reg.icpInliersRatio, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (rclcpp::Clock().now()-timeStart).seconds(), delay);
 	}
 
-	statusDiagnostic_.setStatus(pose.isNull());
+	statusDiagnostic_.setStatus(pose.isNull(), processedMsgs_, droppedMsgs_);
+	processedMsgs_ = 0;
+	droppedMsgs_ = 0;
 	if(syncDiagnostic_.get())
 	{
-		double curentRate = 1.0/(this->now()-timeStart).seconds();
+		double curentRate = 1.0/(rclcpp::Clock().now()-timeStart).seconds();
 		syncDiagnostic_->tickOutput(header.stamp,
 			maxUpdateRate_>0 ? maxUpdateRate_:
 			expectedUpdateRate_>0 && expectedUpdateRate_ < curentRate ? expectedUpdateRate_:
@@ -1218,13 +1224,17 @@ void OdometryROS::setLogError(
 OdometryROS::OdomStatusTask::OdomStatusTask() :
 		diagnostic_updater::DiagnosticTask("Odom status"),
 		lost_(false),
-		dataReceived_(false)
+		dataReceived_(false),
+		processedMsgs_(0),
+		droppedMsgs_(0)
 {}
 
-void OdometryROS::OdomStatusTask::setStatus(bool isLost)
+void OdometryROS::OdomStatusTask::setStatus(bool isLost, int processedMsgs, int droppedMsgs)
 {
 	dataReceived_ = true;
 	lost_ = isLost;
+	processedMsgs_ += processedMsgs;
+	droppedMsgs_ += droppedMsgs;
 }
 
 void OdometryROS::OdomStatusTask::run(diagnostic_updater::DiagnosticStatusWrapper &stat)
@@ -1241,6 +1251,10 @@ void OdometryROS::OdomStatusTask::run(diagnostic_updater::DiagnosticStatusWrappe
 	{
 		stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "Tracking.");
 	}
+	stat.add("Topics Processed", processedMsgs_);
+	stat.add("Topics Dropped", droppedMsgs_);
+	processedMsgs_ = 0;
+	droppedMsgs_ = 0;
 }
 
 void OdometryROS::tick(const rclcpp::Time & stamp)

@@ -16,15 +16,17 @@
 #     $ ros2 run turtlebot3_teleop teleop_keyboard
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable
+from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
 from launch.conditions import IfCondition, UnlessCondition
 from launch_ros.actions import Node
 
-def generate_launch_description():
-
+def launch_setup(context, *args, **kwargs):
     use_sim_time = LaunchConfiguration('use_sim_time')
-    localization = LaunchConfiguration('localization')
+    localization = LaunchConfiguration('localization').perform(context)
+    localization = localization == 'True' or localization == 'true'
+    icp_odometry = LaunchConfiguration('icp_odometry').perform(context)
+    icp_odometry = icp_odometry == 'True' or icp_odometry == 'true'
     
     parameters={
           'frame_id':'base_footprint',
@@ -40,10 +42,45 @@ def generate_launch_description():
           'Grid/RangeMin':'0.2', # ignore laser scan points on the robot itself
           'Optimizer/GravitySigma':'0' # Disable imu constraints (we are already in 2D)
     }
-    
+    arguments = []
+    if localization:
+        parameters['Mem/IncrementalMemory'] = 'False'
+        parameters['Mem/InitWMWithAllNodes'] = 'True'
+    else:
+        arguments.append('-d') # This will delete the previous database (~/.ros/rtabmap.db)
+               
     remappings=[
           ('scan', '/scan')]
+    if icp_odometry:
+        remappings.append(('odom', 'icp_odom'))
+    
+    return [
+        # Nodes to launch
+        
+        # ICP odometry (optional)
+        Node(
+            condition=IfCondition(LaunchConfiguration('icp_odometry')),
+            package='rtabmap_odom', executable='icp_odometry', output='screen',
+            parameters=[parameters, 
+                        {'odom_frame_id':'icp_odom',
+                         'guess_frame_id':'odom'}],
+            remappings=remappings),
+        
+        # SLAM:
+        Node(
+            package='rtabmap_slam', executable='rtabmap', output='screen',
+            parameters=[parameters],
+            remappings=remappings,
+            arguments=arguments),
 
+        # Visualization
+        Node(
+            package='rtabmap_viz', executable='rtabmap_viz', output='screen',
+            parameters=[parameters],
+            remappings=remappings),
+    ]
+
+def generate_launch_description():
     return LaunchDescription([
 
         # Launch arguments
@@ -54,28 +91,10 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'localization', default_value='false',
             description='Launch in localization mode.'),
-
-        # Nodes to launch
         
-        # SLAM mode:
-        Node(
-            condition=UnlessCondition(localization),
-            package='rtabmap_slam', executable='rtabmap', output='screen',
-            parameters=[parameters],
-            remappings=remappings,
-            arguments=['-d']), # This will delete the previous database (~/.ros/rtabmap.db)
-            
-        # Localization mode:
-        Node(
-            condition=IfCondition(localization),
-            package='rtabmap_slam', executable='rtabmap', output='screen',
-            parameters=[parameters,
-              {'Mem/IncrementalMemory':'False',
-               'Mem/InitWMWithAllNodes':'True'}],
-            remappings=remappings),
+        DeclareLaunchArgument(
+            'icp_odometry', default_value='false',
+            description='Launch ICP odometry on top of wheel odometry.'),
 
-        Node(
-            package='rtabmap_viz', executable='rtabmap_viz', output='screen',
-            parameters=[parameters],
-            remappings=remappings),
+        OpaqueFunction(function=launch_setup)
     ])
