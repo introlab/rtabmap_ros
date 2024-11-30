@@ -9,6 +9,7 @@
 # Example:
 #
 #   SLAM:
+#     $ rm ~/.ros/rtabmap.db
 #     $ ros2 launch rtabmap_demos multisession_mapping_demo.launch.py
 #
 #   Rosbag:
@@ -64,7 +65,6 @@ def generate_launch_description():
           'Optimizer/Strategy':        '2',       # Referred paper used TORO (0), latest version recommends GTSAM (2)
           'Optimizer/Iterations':      '100',
           'Kp/IncrementalFlann':       'false',   # Referred paper didn't use incremental FLANN
-          'Grid/Sensor':               '1',
           'Icp/MaxTranslation':        '0.5',
     }
     

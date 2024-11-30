@@ -4,6 +4,7 @@
 #     1) Edit /opt/ros/$ROS_DISTRO/share/turtlebot3_gazebo/models/turtlebot3_waffle/model.sdf
 #     2) We can increase min scan range from 0.12 to 0.2 to avoid having scans 
 #        hitting the robot itself
+#
 # Example:
 #   $ ros2 launch rtabmap_demos turtlebot3_sim_scan_demo.launch.py
 #
@@ -13,15 +14,13 @@
 from ament_index_python.packages import get_package_share_directory
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
-from launch.actions import IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 import os
 
-def generate_launch_description():
-
+def launch_setup(context, *args, **kwargs):
     if not 'TURTLEBOT3_MODEL' in os.environ:
         os.environ['TURTLEBOT3_MODEL'] = 'waffle'
 
@@ -32,10 +31,12 @@ def generate_launch_description():
         'nav2_bringup')
     pkg_rtabmap_demos = get_package_share_directory(
         'rtabmap_demos')
+    
+    world = LaunchConfiguration('world').perform(context)
 
     # Paths
     gazebo_launch = PathJoinSubstitution(
-        [pkg_turtlebot3_gazebo, 'launch', 'turtlebot3_world.launch.py'])
+        [pkg_turtlebot3_gazebo, 'launch', f'turtlebot3_{world}.launch.py'])
     nav2_launch = PathJoinSubstitution(
         [pkg_nav2_bringup, 'launch', 'navigation_launch.py'])
     rviz_launch = PathJoinSubstitution(
@@ -63,17 +64,26 @@ def generate_launch_description():
             ('use_sim_time', 'true')
         ]
     )
-    
+    return [
+        # Nodes to launch
+        nav2,
+        rviz,
+        rtabmap,
+        gazebo,
+    ]
+
+def generate_launch_description():
     return LaunchDescription([
         
         # Launch arguments
         DeclareLaunchArgument(
             'localization', default_value='false',
             description='Launch in localization mode.'),
+        
+        DeclareLaunchArgument(
+            'world', default_value='world',
+            choices=['world', 'house', 'dqn_stage1', 'dqn_stage2', 'dqn_stage3', 'dqn_stage4'],
+            description='Turtlebot3 gazebo world.'),
 
-        # Nodes to launch
-        nav2,
-        rviz,
-        rtabmap,
-        gazebo
+        OpaqueFunction(function=launch_setup)
     ])

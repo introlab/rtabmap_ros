@@ -36,7 +36,8 @@ def launch_setup(context, *args, **kwargs):
     )
     
     rviz = LaunchConfiguration('rviz').perform(context)
-    
+    world = LaunchConfiguration('world').perform(context)
+
     return [
         TimerAction(
             actions = [
@@ -53,7 +54,7 @@ def launch_setup(context, *args, **kwargs):
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(sim_launch_path),
             launch_arguments={'rviz': 'false',
-                              'world': os.path.join(gz_pkg_share, "worlds/playground.world")}.items()
+                              'world': os.path.join(gz_pkg_share, f"worlds/{world}.world")}.items()
         ),
     ]
 
@@ -76,6 +77,11 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'localization', default_value='false', choices=['true', 'false'],
             description='Launch rtabmap in localization mode (a map should have been already created).'),
+        
+        DeclareLaunchArgument(
+            'world', default_value='playground',
+            choices=['outdoor', 'playground'],
+            description='Champ gazebo world.'),
         
         OpaqueFunction(function=launch_setup)
     ])

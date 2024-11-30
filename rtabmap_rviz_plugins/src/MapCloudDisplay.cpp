@@ -319,7 +319,8 @@ void MapCloudDisplay::processMapData(const rtabmap_msgs::msg::MapData& map)
 								cloud_filter_floor_height_->getFloat()!=0.0f?cloud_filter_floor_height_->getFloat():-999.0f,
 								cloud_filter_ceiling_height_->getFloat()!=0.0f && (cloud_filter_floor_height_->getFloat()==0.0f || cloud_filter_ceiling_height_->getFloat()>cloud_filter_floor_height_->getFloat())?cloud_filter_ceiling_height_->getFloat():999.0f);
 						// convert back in /base_link frame
-						cloud = rtabmap::util3d::transformPointCloud(cloud, s.getPose().inverse());
+						if(!cloud->empty())
+							cloud = rtabmap::util3d::transformPointCloud(cloud, s.getPose().inverse());
 					}
 
 					if(!cloud->empty())

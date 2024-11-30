@@ -6,7 +6,7 @@
 # Example:
 #
 #   SLAM:
-#     $ ros2 launch rtabmap_demos find_object_demo.launch.py rviz:=true rtabmap_viz:=true
+#     $ ros2 launch rtabmap_demos find_object_demo.launch.py
 #
 #   Rosbag:
 #     $ ros2 bag play demo_find_object.db3 --clock

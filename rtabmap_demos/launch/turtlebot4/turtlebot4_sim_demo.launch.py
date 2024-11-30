@@ -4,7 +4,7 @@
 #
 # Example:
 #   1) Launch simulator (turtlebot4, nav2 and rtabmap):
-#     $ ros2 launch rtabmap_demos turtlebot4_ignition_demo.launch.py
+#     $ ros2 launch rtabmap_demos turtlebot4_sim_demo.launch.py
 #
 #   2) Click on "Play" button on bottom-left of gazebo.
 #

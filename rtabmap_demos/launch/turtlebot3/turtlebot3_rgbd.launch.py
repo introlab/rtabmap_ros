@@ -34,9 +34,10 @@ def generate_launch_description():
           'Reg/Force3DoF':'true',
           'Grid/RayTracing':'true', # Fill empty space
           'Grid/3D':'false', # Use 2D occupancy
+          'Grid/RangeMax':'3',
           'Grid/NormalsSegmentation':'false', # Use passthrough filter to detect obstacles
           'Grid/MaxGroundHeight':'0.05', # All points above 5 cm are obstacles
-          'Grid/MaxObstacleHeight':'1',  # All points over 1 meter are ignored
+          'Grid/MaxObstacleHeight':'0.4',  # All points over 1 meter are ignored
           'Optimizer/GravitySigma':'0' # Disable imu constraints (we are already in 2D)
     }
 
@@ -79,4 +80,22 @@ def generate_launch_description():
             package='rtabmap_viz', executable='rtabmap_viz', output='screen',
             parameters=[parameters],
             remappings=remappings),
+        
+        # Obstacle detection with the camera for nav2 local costmap.
+        # First, we need to convert depth image to a point cloud.
+        # Second, we segment the floor from the obstacles.
+        Node(
+            package='rtabmap_util', executable='point_cloud_xyz', output='screen',
+            parameters=[{'decimation': 2,
+                         'max_depth': 3.0,
+                         'voxel_size': 0.02}],
+            remappings=[('depth/image', '/camera/depth/image_raw'),
+                        ('depth/camera_info', '/camera/camera_info'),
+                        ('cloud', '/camera/cloud')]),
+        Node(
+            package='rtabmap_util', executable='obstacles_detection', output='screen',
+            parameters=[parameters],
+            remappings=[('cloud', '/camera/cloud'),
+                        ('obstacles', '/camera/obstacles'),
+                        ('ground', '/camera/ground')]),
     ])

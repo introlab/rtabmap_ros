@@ -55,7 +55,7 @@ def generate_launch_description():
           'Grid/MaxObstacleHeight':'1',  # All points over 1 meter are ignored
           'Grid/RayTracing':'true', # Fill empty space
           'Grid/3D':'false', # Use 2D occupancy
-          'RGBD/OptimizeMaxError':'2',
+          'RGBD/OptimizeMaxError':'0.3', # There are a lot of repetitive patterns, be more strict in accepting loop closures
     }
 
     # Shared parameters between different nodes
