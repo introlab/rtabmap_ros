@@ -3058,6 +3058,25 @@ bool deskew_impl(
 			}
 		}
 
+		if(secFirst > 1.e18)
+		{
+			// convert nanoseconds to seconds
+			secFirst /= 1.e9;
+			secLast /= 1.e9;
+		}
+		else if(secFirst > 1.e15)
+		{
+			// convert microseconds to seconds
+			secFirst /= 1.e6;
+			secLast /= 1.e6;
+		}
+		else if(secFirst > 1.e12)
+		{
+			// convert milliseconds to seconds
+			secFirst /= 1.e3;
+			secLast /= 1.e3;
+		}
+
 		firstStamp = timestampToROS(secFirst);
 		lastStamp = timestampToROS(secLast);
 	}
