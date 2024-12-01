@@ -3,7 +3,7 @@ name: ros2
 
 on:
   push:
-    branches: [ ros2, humble-devel, jazzy-devel]
+    branches: [ ros2 ]
   pull_request:
     branches: [ ros2 ]
 
@@ -21,12 +21,10 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        ros_distro: [humble, jazzy]
+        ros_distro: [humble]
         include:
         - ros_distro: 'humble'
           ubuntu_distro: 'jammy'
-        - ros_distro: 'jazzy'
-          ubuntu_distro: 'noble'
       fail-fast: false
     container:
       image: rostooling/setup-ros-docker:ubuntu-${{ matrix.ubuntu_distro }}-ros-${{ matrix.ros_distro }}-desktop-latest
