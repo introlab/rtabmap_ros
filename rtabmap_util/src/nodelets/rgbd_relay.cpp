@@ -52,7 +52,7 @@ RGBDRelay::RGBDRelay(const rclcpp::NodeOptions & options) :
 	compress_(false),
 	uncompress_(false)
 {
-	int qos = 0;
+	int qos = RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT;
 	qos = this->declare_parameter("qos", qos);
 	compress_ = this->declare_parameter("compress", compress_);
 	uncompress_ = this->declare_parameter("uncompress", uncompress_);

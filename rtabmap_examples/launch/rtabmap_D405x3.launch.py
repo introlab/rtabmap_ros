@@ -31,7 +31,7 @@ from ament_index_python.packages import get_package_share_directory
 def generate_launch_description():     
 
     config_rviz = os.path.join(
-            get_package_share_directory('rtabmap_examples'), 'launch', 'config', 'slam_D405x3_config.rviz')         
+            get_package_share_directory('rtabmap_examples'), 'config', 'slam_D405x3_config.rviz')         
 
     rviz_node = launch_ros.actions.Node(
         package='rviz2', executable='rviz2', output='screen',

@@ -64,7 +64,7 @@ RGBDOdometry::RGBDOdometry(const rclcpp::NodeOptions & options) :
 		approxSync6_(0),
 		exactSync6_(0),
 		topicQueueSize_(10),
-		syncQueueSize_(2),
+		syncQueueSize_(5),
 		keepColor_(false)
 {
 	OdometryROS::init(false, true, false);
@@ -569,6 +569,8 @@ void RGBDOdometry::callback(
 		const sensor_msgs::msg::Image::ConstSharedPtr depth,
 		const sensor_msgs::msg::CameraInfo::ConstSharedPtr cameraInfo)
 {
+	tick(image->header.stamp);
+
 	if(!this->isPaused())
 	{
 		std::vector<cv_bridge::CvImageConstPtr> imageMsgs(1);
@@ -597,6 +599,8 @@ void RGBDOdometry::callback(
 void RGBDOdometry::callbackRGBDX(
 		const rtabmap_msgs::msg::RGBDImages::ConstSharedPtr images)
 {
+	tick(images->header.stamp);
+
 	if(!this->isPaused())
 	{
 		if(images->rgbd_images.empty())
@@ -620,6 +624,8 @@ void RGBDOdometry::callbackRGBDX(
 void RGBDOdometry::callbackRGBD(
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image)
 {
+	tick(image->header.stamp);
+
 	if(!this->isPaused())
 	{
 		std::vector<cv_bridge::CvImageConstPtr> imageMsgs(1);
@@ -636,6 +642,8 @@ void RGBDOdometry::callbackRGBD2(
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image,
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image2)
 {
+	tick(image->header.stamp);
+
 	if(!this->isPaused())
 	{
 		std::vector<cv_bridge::CvImageConstPtr> imageMsgs(2);
@@ -655,6 +663,8 @@ void RGBDOdometry::callbackRGBD3(
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image2,
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image3)
 {
+	tick(image->header.stamp);
+
 	if(!this->isPaused())
 	{
 		std::vector<cv_bridge::CvImageConstPtr> imageMsgs(3);
@@ -677,6 +687,8 @@ void RGBDOdometry::callbackRGBD4(
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image3,
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image4)
 {
+	tick(image->header.stamp);
+
 	if(!this->isPaused())
 	{
 		std::vector<cv_bridge::CvImageConstPtr> imageMsgs(4);
@@ -702,6 +714,8 @@ void RGBDOdometry::callbackRGBD5(
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image4,
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image5)
 {
+	tick(image->header.stamp);
+
 	if(!this->isPaused())
 	{
 		std::vector<cv_bridge::CvImageConstPtr> imageMsgs(5);
@@ -730,6 +744,8 @@ void RGBDOdometry::callbackRGBD6(
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image5,
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image6)
 {
+	tick(image->header.stamp);
+
 	if(!this->isPaused())
 	{
 		std::vector<cv_bridge::CvImageConstPtr> imageMsgs(6);

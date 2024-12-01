@@ -10,8 +10,9 @@ from ament_index_python.packages import get_package_share_directory
 
 from launch import LaunchDescription
 from launch_ros.actions import Node, SetParameter
-from launch.actions import IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import LaunchConfiguration
 
 def generate_launch_description():
     parameters=[{
@@ -29,6 +30,11 @@ def generate_launch_description():
 
     return LaunchDescription([
 
+        # Launch arguments
+        DeclareLaunchArgument(
+            'unite_imu_method', default_value='2',
+            description='0-None, 1-copy, 2-linear_interpolation. Use unite_imu_method:="1" if imu topics stop being published.'),
+
         # Make sure IR emitter is enabled
         SetParameter(name='depth_module.emitter_enabled', value=1),
 
@@ -40,7 +46,7 @@ def generate_launch_description():
                 launch_arguments={'camera_namespace': '',
                                   'enable_gyro': 'true',
                                   'enable_accel': 'true',
-                                  'unite_imu_method': '2',
+                                  'unite_imu_method': LaunchConfiguration('unite_imu_method'),
                                   'align_depth.enable': 'true',
                                   'enable_sync': 'true',
                                   'rgb_camera.profile': '640x360x30'}.items(),
@@ -69,9 +75,4 @@ def generate_launch_description():
                          'world_frame':'enu', 
                          'publish_tf':False}],
             remappings=[('imu/data_raw', '/camera/imu')]),
-        
-        # The IMU frame is missing in TF tree, add it:
-        Node(
-            package='tf2_ros', executable='static_transform_publisher', output='screen',
-            arguments=['0', '0', '0', '0', '0', '0', 'camera_gyro_optical_frame', 'camera_imu_optical_frame']),
     ])

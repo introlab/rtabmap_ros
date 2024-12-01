@@ -174,6 +174,7 @@ def launch_setup(context, *args, **kwargs):
                 "ground_truth_base_frame_id": LaunchConfiguration('ground_truth_base_frame_id').perform(context),
                 "wait_for_transform": LaunchConfiguration('wait_for_transform'),
                 "wait_imu_to_init": LaunchConfiguration('wait_imu_to_init'),
+                "always_check_imu_tf": LaunchConfiguration('always_check_imu_tf'),
                 "approx_sync": LaunchConfiguration('approx_sync'),
                 "approx_sync_max_interval": LaunchConfiguration('approx_sync_max_interval'),
                 "config_path": LaunchConfiguration('cfg').perform(context),
@@ -210,6 +211,7 @@ def launch_setup(context, *args, **kwargs):
                 "ground_truth_base_frame_id": LaunchConfiguration('ground_truth_base_frame_id').perform(context),
                 "wait_for_transform": LaunchConfiguration('wait_for_transform'),
                 "wait_imu_to_init": LaunchConfiguration('wait_imu_to_init'),
+                "always_check_imu_tf": LaunchConfiguration('always_check_imu_tf'),
                 "approx_sync": LaunchConfiguration('approx_sync'),
                 "approx_sync_max_interval": LaunchConfiguration('approx_sync_max_interval'),
                 "config_path": LaunchConfiguration('cfg').perform(context),
@@ -247,6 +249,7 @@ def launch_setup(context, *args, **kwargs):
                 "ground_truth_base_frame_id": LaunchConfiguration('ground_truth_base_frame_id').perform(context),
                 "wait_for_transform": LaunchConfiguration('wait_for_transform'),
                 "wait_imu_to_init": LaunchConfiguration('wait_imu_to_init'),
+                "always_check_imu_tf": LaunchConfiguration('always_check_imu_tf'),
                 "approx_sync": LaunchConfiguration('approx_sync'),
                 "config_path": LaunchConfiguration('cfg').perform(context),
                 "topic_queue_size": LaunchConfiguration('topic_queue_size'),
@@ -431,8 +434,8 @@ def generate_launch_description():
         DeclareLaunchArgument('namespace',      default_value='rtabmap',            description=''),
         DeclareLaunchArgument('database_path',  default_value='~/.ros/rtabmap.db',  description='Where is the map saved/loaded.'),
         DeclareLaunchArgument('topic_queue_size', default_value='10',               description='Queue size of individual topic subscribers.'),
-        DeclareLaunchArgument('queue_size',     default_value='2',                  description='Backward compatibility, use "sync_queue_size" instead.'),
-        DeclareLaunchArgument('qos',            default_value='1',                  description='General QoS used for sensor input data: 0=system default, 1=Reliable, 2=Best Effort.'),
+        DeclareLaunchArgument('queue_size',     default_value='10',                 description='Backward compatibility, use "sync_queue_size" instead.'),
+        DeclareLaunchArgument('qos',            default_value='0',                  description='General QoS used for sensor input data: 0=system default, 1=Reliable, 2=Best Effort.'),
         DeclareLaunchArgument('wait_for_transform', default_value='0.2',            description=''),
         DeclareLaunchArgument('rtabmap_args',   default_value='',                   description='Backward compatibility, use "args" instead.'),
         DeclareLaunchArgument('launch_prefix',  default_value='',                   description='For debugging purpose, it fills prefix tag of the nodes, e.g., "xterm -e gdb -ex run --args"'),
@@ -492,11 +495,12 @@ def generate_launch_description():
         DeclareLaunchArgument('odom_guess_frame_id',        default_value='',      description=''),
         DeclareLaunchArgument('odom_guess_min_translation', default_value='0.0',   description=''),
         DeclareLaunchArgument('odom_guess_min_rotation',    default_value='0.0',   description=''),
-        
+
         # imu
         DeclareLaunchArgument('imu_topic',        default_value='/imu/data', description='Used with VIO approaches and for SLAM graph optimization (gravity constraints).'),
         DeclareLaunchArgument('wait_imu_to_init', default_value='false',     description=''),
-        
+        DeclareLaunchArgument('always_check_imu_tf', default_value='true',     description='The odometry node will always check if TF between IMU frame and base frame has changed. If false, it is checked till a valid transform is initialized.'),
+
         # User Data
         DeclareLaunchArgument('subscribe_user_data',   default_value='false',            description='User data synchronized subscription.'),
         DeclareLaunchArgument('user_data_topic',       default_value='/user_data',       description=''),

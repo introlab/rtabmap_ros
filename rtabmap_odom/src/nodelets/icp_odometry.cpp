@@ -280,6 +280,9 @@ void ICPOdometry::callbackScan(const sensor_msgs::msg::LaserScan::SharedPtr scan
 		scan_sub_.reset();
 		return;
 	}
+
+	tick(scanMsg->header.stamp);
+
 	scanReceived_ = true;
 	if(this->isPaused())
 	{
@@ -345,6 +348,7 @@ void ICPOdometry::callbackScan(const sensor_msgs::msg::LaserScan::SharedPtr scan
 
 		sensor_msgs::msg::PointCloud2 scanOutDeskewed;
 		rtabmap_conversions::transformPointCloud(t.toEigen4f(), scanOut, scanOutDeskewed);
+		scanOutDeskewed.header.frame_id = scanMsg->header.frame_id;
 		scanOut = scanOutDeskewed;
 	}
 	else
@@ -523,6 +527,9 @@ void ICPOdometry::callbackCloud(const sensor_msgs::msg::PointCloud2::SharedPtr p
 		cloud_sub_.reset();
 		return;
 	}
+
+	tick(pointCloudMsg->header.stamp);
+
 	cloudReceived_ = true;
 	if(this->isPaused())
 	{

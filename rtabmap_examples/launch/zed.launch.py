@@ -55,7 +55,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
                                     'publish_map_tf': 'false'}.items(),
         ),
 
-        # Sync right/depth/camera_info together
+        # Sync rgb/depth/camera_info together
         Node(   
             package='rtabmap_sync', executable='rgbd_sync', output='screen',
             parameters=parameters,
@@ -92,6 +92,10 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'use_zed_odometry', default_value='false',
             description='Use zed\'s computed odometry instead of using rtabmap\'s odometry.'),
+        
+        DeclareLaunchArgument(
+            'camera_model', default_value='',
+            description="[REQUIRED] The model of the camera. Using a wrong camera model can disable camera features. Valid choices are: ['zed', 'zedm', 'zed2', 'zed2i', 'zedx', 'zedxm', 'virtual']"),
         
         OpaqueFunction(function=launch_setup)
     ])

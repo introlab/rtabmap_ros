@@ -1,26 +1,25 @@
 #
-# Note: Make sure you have this fix for turtlebot4_description https://github.com/turtlebot/turtlebot4/pull/434,
-#       otherwise, the lidar and camera point cloud won't be aligned correctly.
 #
 # Example with gazebo:
-#   1) Launch simulator (turtlebot4 and nav2):
-#     $ ros2 launch turtlebot4_ignition_bringup turtlebot4_ignition.launch.py slam:=false nav2:=true rviz:=true
+#   1) Launch simulator (husky):
+#     $ ros2 launch clearpath_gz simulation.launch.py
+#     Click on "Play" button on bottom-left of gazebo as soon as you can see it to avoid controllers crashing after 5 sec.
 #
-#   2) Launch SLAM:
-#     $ ros2 launch rtabmap_demos turtlebot4_slam.launch.py use_sim_time:=true qos:=2
-#     OR
-#     $ ros2 launch rtabmap_launch rtabmap.launch.py rtabmap_viz:=true subscribe_scan:=true rgbd_sync:=true depth_topic:=/oakd/rgb/preview/depth odom_sensor_sync:=true camera_info_topic:=/oakd/rgb/preview/camera_info rgb_topic:=/oakd/rgb/preview/image_raw visual_odometry:=false approx_sync:=true approx_rgbd_sync:=false odom_guess_frame_id:=odom icp_odometry:=true odom_topic:="icp_odom" map_topic:="/map" qos:=2 use_sim_time:=true odom_log_level:=warn rtabmap_args:="--delete_db_on_start --Reg/Strategy 1 --Reg/Force3DoF true --Mem/NotLinkedNodesKept false" use_action_for_goal:=true
+#   2) Launch rviz:
+#     $ ros2 launch clearpath_viz view_navigation.launch.py namespace:=a200_0000
 #
-#   3) Click on "Play" button on bottom-left of gazebo.
+#   3) Launch SLAM:
+#     $ ros2 launch rtabmap_demos husky_slam3d.launch.py use_sim_time:=true
 #
-#   4) Click on double points ".." button on top-right next to power button to undock.
+#   4) Launch nav2"
+#     $ ros2 launch clearpath_nav2_demos nav2.launch.py setup_path:=$HOME/clearpath/ use_sim_time:=true
+#
+#   4) Click on "Play" button on bottom-left of gazebo.
 #
 #   5) Move the robot:
 #     b) By sending goals with RVIZ's "Nav2 Goal" button in action bar.
 #     a) By teleoperating:
-#        $ ros2 run teleop_twist_keyboard teleop_twist_keyboard
-#     c) By using autonomous exploration node (tested with https://github.com/robo-friends/m-explore-ros2):
-#        $ ros2 launch explore_lite explore.launch.py
+#        $ ros2 run teleop_twist_keyboard teleop_twist_keyboard --ros-args -r cmd_vel:=/a200_0000/cmd_vel
 #
 
 from launch import LaunchDescription
@@ -33,25 +32,30 @@ from launch_ros.actions import Node
 def generate_launch_description():
 
     use_sim_time = LaunchConfiguration('use_sim_time')
-    qos = LaunchConfiguration('qos')
     localization = LaunchConfiguration('localization')
+    robot_ns = LaunchConfiguration('robot_ns')
 
-    icp_parameters={
+    icp_odom_parameters={
           'odom_frame_id':'icp_odom',
           'guess_frame_id':'odom',
-          'qos':qos
+          'OdomF2M/ScanSubtractRadius': '0.3', # match voxel size
+          'OdomF2M/ScanMaxSize': '10000'
     }
 
     rtabmap_parameters={
           'subscribe_rgbd':True,
-          'subscribe_scan':True,
+          'subscribe_scan_cloud':True,
           'use_action_for_goal':True,
           'odom_sensor_sync': True,
-          'qos_scan':qos,
-          'qos_image':qos,
-          'qos_imu':qos,
           # RTAB-Map's parameters should be strings:
-          'Mem/NotLinkedNodesKept':'false'
+          'Mem/NotLinkedNodesKept':'false',
+          'Grid/RangeMin':'0.5', # ignore laser scan points on the robot itself
+          'Grid/NormalsSegmentation':'false', # Use passthrough filter to detect obstacles
+          'Grid/MaxGroundHeight':'0.05', # All points above 5 cm are obstacles
+          'Grid/MaxObstacleHeight':'1',  # All points over 1 meter are ignored
+          'Grid/RayTracing':'true', # Fill empty space
+          'Grid/3D':'false', # Use 2D occupancy
+          'RGBD/OptimizeMaxError':'0.3', # There are a lot of repetitive patterns, be more strict in accepting loop closures
     }
 
     # Shared parameters between different nodes
@@ -60,16 +64,23 @@ def generate_launch_description():
           'use_sim_time':use_sim_time,
           # RTAB-Map's parameters should be strings:
           'Reg/Strategy':'1',
-          'Reg/Force3DoF':'true',
+          'Reg/Force3DoF':'true', # we are moving on a 2D flat floor
           'Mem/NotLinkedNodesKept':'false',
-          'Icp/PointToPlaneMinComplexity':'0.04' # to be more robust to long corridors with low geometry
+          'Icp/VoxelSize': '0.3',
+          'Icp/MaxCorrespondenceDistance': '3', # roughly 10x voxel size
+          'Icp/PointToPlaneGroundNormalsUp': '0.9',
+          'Icp/RangeMin': '0.5',
+          'Icp/MaxTranslation': '1'
     }
 
     remappings=[
+          ('/tf', 'tf'),
+          ('/tf_static', 'tf_static'),
           ('odom', 'icp_odom'),
-          ('rgb/image', '/oakd/rgb/preview/image_raw'),
-          ('rgb/camera_info', '/oakd/rgb/preview/camera_info'),
-          ('depth/image', '/oakd/rgb/preview/depth')]
+          ('scan_cloud', 'sensors/lidar3d_0/points'),
+          ('rgb/image', 'sensors/camera_0/color/image'),
+          ('rgb/camera_info', 'sensors/camera_0/color/camera_info'),
+          ('depth/image', 'sensors/camera_0/depth/image')]
 
     return LaunchDescription([
 
@@ -79,29 +90,32 @@ def generate_launch_description():
             description='Use simulation (Gazebo) clock if true'),
         
         DeclareLaunchArgument(
-            'qos', default_value='0',
-            description='QoS used for input sensor topics'),
-            
-        DeclareLaunchArgument(
             'localization', default_value='false', choices=['true', 'false'],
             description='Launch rtabmap in localization mode (a map should have been already created).'),
+
+        DeclareLaunchArgument(
+            'robot_ns', default_value='a200_0000',
+            description='Robot namespace.'),
 
         # Nodes to launch
         Node(
             package='rtabmap_sync', executable='rgbd_sync', output='screen',
-            parameters=[{'approx_sync':False, 'use_sim_time':use_sim_time, 'qos':qos}],
+            namespace=robot_ns,
+            parameters=[{'approx_sync':False, 'use_sim_time':use_sim_time}],
             remappings=remappings),
 
         Node(
             package='rtabmap_odom', executable='icp_odometry', output='screen',
-            parameters=[icp_parameters, shared_parameters],
+            namespace=robot_ns,
+            parameters=[icp_odom_parameters, shared_parameters],
             remappings=remappings,
-            arguments=["--ros-args", "--log-level", 'icp_odometry:=warn']),
+            arguments=["--ros-args", "--log-level", 'warn']),
 
         # SLAM Mode:
         Node(
             condition=UnlessCondition(localization),
             package='rtabmap_slam', executable='rtabmap', output='screen',
+            namespace=robot_ns,
             parameters=[rtabmap_parameters, shared_parameters],
             remappings=remappings,
             arguments=['-d']),
@@ -110,6 +124,7 @@ def generate_launch_description():
         Node(
             condition=IfCondition(localization),
             package='rtabmap_slam', executable='rtabmap', output='screen',
+            namespace=robot_ns,
             parameters=[rtabmap_parameters, shared_parameters,
               {'Mem/IncrementalMemory':'False',
                'Mem/InitWMWithAllNodes':'True'}],
@@ -117,6 +132,7 @@ def generate_launch_description():
 
         Node(
             package='rtabmap_viz', executable='rtabmap_viz', output='screen',
+            namespace=robot_ns,
             parameters=[rtabmap_parameters, shared_parameters],
             remappings=remappings),
     ])

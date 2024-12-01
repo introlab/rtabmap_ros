@@ -51,10 +51,10 @@ StereoSync::StereoSync(const rclcpp::NodeOptions & options) :
 		exactSync_(0)
 {
 	int topicQueueSize = 10;
-	int syncQueueSize = 2;
+	int syncQueueSize = 10;
 	bool approxSync = false;
 	double approxSyncMaxInterval = 0.0;
-	int qos = 0;
+	int qos = RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT;
 	approxSync = this->declare_parameter("approx_sync", approxSync);
 	approxSyncMaxInterval = this->declare_parameter("approx_sync_max_interval", approxSyncMaxInterval);
 	topicQueueSize = this->declare_parameter("topic_queue_size", topicQueueSize);
@@ -139,7 +139,7 @@ void StereoSync::callback(
 		const sensor_msgs::msg::CameraInfo::ConstSharedPtr cameraInfoLeft,
 		const sensor_msgs::msg::CameraInfo::ConstSharedPtr cameraInfoRight)
 {
-	syncDiagnostic_->tick(imageLeft->header.stamp);
+	syncDiagnostic_->tickInput(imageLeft->header.stamp);
 	if(rgbdImagePub_->get_subscription_count() || rgbdImageCompressedPub_->get_subscription_count())
 	{
 		double leftStamp = rtabmap_conversions::timestampFromROS(imageLeft->header.stamp);
@@ -209,6 +209,7 @@ void StereoSync::callback(
 					rightStamp, rtabmap_conversions::timestampFromROS(imageRight->header.stamp));
 		}
 	}
+	syncDiagnostic_->tickOutput(imageLeft->header.stamp);
 }
 
 }

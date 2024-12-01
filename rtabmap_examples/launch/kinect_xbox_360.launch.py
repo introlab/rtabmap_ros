@@ -12,8 +12,7 @@ def generate_launch_description():
           'frame_id':'camera_link',
           'subscribe_depth':True,
           'subscribe_odom_info':True,
-          'approx_sync':True,
-          'qos':1}]
+          'approx_sync':True}]
 
     remappings=[
           ('rgb/image', '/kinect/rgb/image_raw'),

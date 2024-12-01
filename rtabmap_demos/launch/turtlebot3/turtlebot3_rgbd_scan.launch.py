@@ -1,34 +1,15 @@
-# Requirements:
-#   Install Turtlebot3 packages
-#   Modify turtlebot3_waffle SDF:
-#     1) Edit /opt/ros/$ROS_DISTRO/share/turtlebot3_gazebo/models/turtlebot3_waffle/model.sdf
-#     2) Add
-#          <joint name="camera_rgb_optical_joint" type="fixed">
-#            <parent>camera_rgb_frame</parent>
-#            <child>camera_rgb_optical_frame</child>
-#            <pose>0 0 0 -1.57079632679 0 -1.57079632679</pose>
-#            <axis>
-#              <xyz>0 0 1</xyz>
-#            </axis>
-#          </joint> 
-#     3) Rename <link name="camera_rgb_frame"> to <link name="camera_rgb_optical_frame">
-#     4) Add <link name="camera_rgb_frame"/>
-#     5) Change <sensor name="camera" type="camera"> to <sensor name="camera" type="depth">
-#     6) Change image width/height from 1920x1080 to 640x480
-#     7) Note that we can increase min scan range from 0.12 to 0.2 to avoid having scans 
-#        hitting the robot itself
 # Example:
-#   $ export TURTLEBOT3_MODEL=waffle
-#   $ ros2 launch turtlebot3_gazebo turtlebot3_world.launch.py
+#
+#   Bringup turtlebot3:
+#     $ export TURTLEBOT3_MODEL=waffle
+#     $ export LDS_MODEL=LDS-01
+#     $ ros2 launch turtlebot3_bringup robot.launch.py
 #
 #   SLAM:
-#   $ ros2 launch rtabmap_demos turtlebot3_rgbd_sync.launch.py
-#   OR
-#   $ ros2 launch rtabmap_launch rtabmap.launch.py visual_odometry:=false frame_id:=base_footprint subscribe_scan:=true  approx_sync:=true approx_rgbd_sync:=false odom_topic:=/odom args:="-d --RGBD/NeighborLinkRefining true --Reg/Strategy 1 --Reg/Force3DoF true --Grid/RangeMin 0.2" use_sim_time:=true rgbd_sync:=true rgb_topic:=/camera/image_raw depth_topic:=/camera/depth/image_raw camera_info_topic:=/camera/camera_info qos:=2
-#   $ ros2 run topic_tools relay /rtabmap/map /map
+#     $ ros2 launch rtabmap_demos turtlebot3_rgbd_scan.launch.py
 #
 #   Navigation (install nav2_bringup package):
-#     $ ros2 launch nav2_bringup navigation_launch.py use_sim_time:=True
+#     $ ros2 launch nav2_bringup navigation_launch.py
 #     $ ros2 launch nav2_bringup rviz_launch.py
 #
 #   Teleop:
@@ -44,7 +25,6 @@ from launch_ros.actions import Node
 def generate_launch_description():
 
     use_sim_time = LaunchConfiguration('use_sim_time')
-    qos = LaunchConfiguration('qos')
     localization = LaunchConfiguration('localization')
 
     parameters={
@@ -53,13 +33,17 @@ def generate_launch_description():
           'subscribe_rgbd':True,
           'subscribe_scan':True,
           'use_action_for_goal':True,
-          'qos_scan':qos,
-          'qos_image':qos,
-          'qos_imu':qos,
           # RTAB-Map's parameters should be strings:
           'Reg/Strategy':'1',
           'Reg/Force3DoF':'true',
           'RGBD/NeighborLinkRefining':'True',
+          'Grid/RayTracing':'true', # Fill empty space
+          'Grid/3D':'false', # Use 2D occupancy
+          'Grid/RangeMax':'3',
+          'Grid/NormalsSegmentation':'false', # Use passthrough filter to detect obstacles
+          'Grid/Sensor':'2', # Use both laser scan and camera for obstacle detection in global map
+          'Grid/MaxGroundHeight':'0.05', # All points above 5 cm are obstacles
+          'Grid/MaxObstacleHeight':'0.4',  # All points over 1 meter are ignored
           'Grid/RangeMin':'0.2', # ignore laser scan points on the robot itself
           'Optimizer/GravitySigma':'0' # Disable imu constraints (we are already in 2D)
     }
@@ -73,13 +57,9 @@ def generate_launch_description():
 
         # Launch arguments
         DeclareLaunchArgument(
-            'use_sim_time', default_value='true',
+            'use_sim_time', default_value='false',
             description='Use simulation (Gazebo) clock if true'),
-        
-        DeclareLaunchArgument(
-            'qos', default_value='2',
-            description='QoS used for input sensor topics'),
-            
+
         DeclareLaunchArgument(
             'localization', default_value='false',
             description='Launch in localization mode.'),
@@ -87,7 +67,7 @@ def generate_launch_description():
         # Nodes to launch
         Node(
             package='rtabmap_sync', executable='rgbd_sync', output='screen',
-            parameters=[{'approx_sync':False, 'use_sim_time':use_sim_time, 'qos':qos}],
+            parameters=[{'approx_sync':False, 'use_sim_time':use_sim_time}],
             remappings=remappings),
 
         # SLAM Mode:
@@ -111,4 +91,22 @@ def generate_launch_description():
             package='rtabmap_viz', executable='rtabmap_viz', output='screen',
             parameters=[parameters],
             remappings=remappings),
+        
+        # Obstacle detection with the camera for nav2 local costmap.
+        # First, we need to convert depth image to a point cloud.
+        # Second, we segment the floor from the obstacles.
+        Node(
+            package='rtabmap_util', executable='point_cloud_xyz', output='screen',
+            parameters=[{'decimation': 2,
+                         'max_depth': 3.0,
+                         'voxel_size': 0.02}],
+            remappings=[('depth/image', '/camera/depth/image_raw'),
+                        ('depth/camera_info', '/camera/camera_info'),
+                        ('cloud', '/camera/cloud')]),
+        Node(
+            package='rtabmap_util', executable='obstacles_detection', output='screen',
+            parameters=[parameters],
+            remappings=[('cloud', '/camera/cloud'),
+                        ('obstacles', '/camera/obstacles'),
+                        ('ground', '/camera/ground')]),
     ])

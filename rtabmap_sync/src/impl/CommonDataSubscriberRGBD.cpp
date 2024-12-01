@@ -36,6 +36,7 @@ namespace rtabmap_sync {
 void CommonDataSubscriber::rgbdCallback(
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1Msg)
 {
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(image1Msg->header.stamp);}
 	cv_bridge::CvImageConstPtr rgb, depth;
 	rtabmap_conversions::toCvShare(image1Msg, rgb, depth);
 
@@ -61,6 +62,7 @@ void CommonDataSubscriber::rgbdScan2dCallback(
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1Msg,
 		const sensor_msgs::msg::LaserScan::ConstSharedPtr scanMsg)
 {
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(image1Msg->header.stamp);}
 	cv_bridge::CvImageConstPtr rgb, depth;
 	rtabmap_conversions::toCvShare(image1Msg, rgb, depth);
 
@@ -85,6 +87,7 @@ void CommonDataSubscriber::rgbdScan3dCallback(
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1Msg,
 		const sensor_msgs::msg::PointCloud2::ConstSharedPtr scan3dMsg)
 {
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(image1Msg->header.stamp);}
 	cv_bridge::CvImageConstPtr rgb, depth;
 	rtabmap_conversions::toCvShare(image1Msg, rgb, depth);
 
@@ -109,6 +112,7 @@ void CommonDataSubscriber::rgbdScanDescCallback(
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1Msg,
 		const rtabmap_msgs::msg::ScanDescriptor::ConstSharedPtr scanDescMsg)
 {
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(image1Msg->header.stamp);}
 	cv_bridge::CvImageConstPtr rgb, depth;
 	rtabmap_conversions::toCvShare(image1Msg, rgb, depth);
 
@@ -132,6 +136,7 @@ void CommonDataSubscriber::rgbdInfoCallback(
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1Msg,
 		const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr odomInfoMsg)
 {
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(image1Msg->header.stamp);}
 	cv_bridge::CvImageConstPtr rgb, depth;
 	rtabmap_conversions::toCvShare(image1Msg, rgb, depth);
 
@@ -158,6 +163,7 @@ void CommonDataSubscriber::rgbdOdomCallback(
 		const nav_msgs::msg::Odometry::ConstSharedPtr odomMsg,
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1Msg)
 {
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(image1Msg->header.stamp);}
 	cv_bridge::CvImageConstPtr rgb, depth;
 	rtabmap_conversions::toCvShare(image1Msg, rgb, depth);
 
@@ -183,6 +189,7 @@ void CommonDataSubscriber::rgbdOdomScan2dCallback(
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1Msg,
 		const sensor_msgs::msg::LaserScan::ConstSharedPtr scanMsg)
 {
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(image1Msg->header.stamp);}
 	cv_bridge::CvImageConstPtr rgb, depth;
 	rtabmap_conversions::toCvShare(image1Msg, rgb, depth);
 
@@ -207,6 +214,7 @@ void CommonDataSubscriber::rgbdOdomScan3dCallback(
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1Msg,
 		const sensor_msgs::msg::PointCloud2::ConstSharedPtr scan3dMsg)
 {
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(image1Msg->header.stamp);}
 	cv_bridge::CvImageConstPtr rgb, depth;
 	rtabmap_conversions::toCvShare(image1Msg, rgb, depth);
 
@@ -231,6 +239,7 @@ void CommonDataSubscriber::rgbdOdomScanDescCallback(
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1Msg,
 		const rtabmap_msgs::msg::ScanDescriptor::ConstSharedPtr scanDescMsg)
 {
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(image1Msg->header.stamp);}
 	cv_bridge::CvImageConstPtr rgb, depth;
 	rtabmap_conversions::toCvShare(image1Msg, rgb, depth);
 
@@ -258,6 +267,7 @@ void CommonDataSubscriber::rgbdOdomInfoCallback(
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1Msg,
 		const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr odomInfoMsg)
 {
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(image1Msg->header.stamp);}
 	cv_bridge::CvImageConstPtr rgb, depth;
 	rtabmap_conversions::toCvShare(image1Msg, rgb, depth);
 
@@ -284,6 +294,7 @@ void CommonDataSubscriber::rgbdDataCallback(
 		const rtabmap_msgs::msg::UserData::ConstSharedPtr userDataMsg,
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1Msg)
 {
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(image1Msg->header.stamp);}
 	cv_bridge::CvImageConstPtr rgb, depth;
 	rtabmap_conversions::toCvShare(image1Msg, rgb, depth);
 
@@ -309,6 +320,7 @@ void CommonDataSubscriber::rgbdDataScan2dCallback(
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1Msg,
 		const sensor_msgs::msg::LaserScan::ConstSharedPtr scanMsg)
 {
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(image1Msg->header.stamp);}
 	cv_bridge::CvImageConstPtr rgb, depth;
 	rtabmap_conversions::toCvShare(image1Msg, rgb, depth);
 
@@ -333,6 +345,7 @@ void CommonDataSubscriber::rgbdDataScan3dCallback(
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1Msg,
 		const sensor_msgs::msg::PointCloud2::ConstSharedPtr scan3dMsg)
 {
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(image1Msg->header.stamp);}
 	cv_bridge::CvImageConstPtr rgb, depth;
 	rtabmap_conversions::toCvShare(image1Msg, rgb, depth);
 
@@ -357,6 +370,7 @@ void CommonDataSubscriber::rgbdDataScanDescCallback(
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1Msg,
 		const rtabmap_msgs::msg::ScanDescriptor::ConstSharedPtr scanDescMsg)
 {
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(image1Msg->header.stamp);}
 	cv_bridge::CvImageConstPtr rgb, depth;
 	rtabmap_conversions::toCvShare(image1Msg, rgb, depth);
 
@@ -384,6 +398,7 @@ void CommonDataSubscriber::rgbdDataInfoCallback(
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1Msg,
 		const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr odomInfoMsg)
 {
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(image1Msg->header.stamp);}
 	cv_bridge::CvImageConstPtr rgb, depth;
 	rtabmap_conversions::toCvShare(image1Msg, rgb, depth);
 
@@ -410,6 +425,7 @@ void CommonDataSubscriber::rgbdOdomDataCallback(
 		const rtabmap_msgs::msg::UserData::ConstSharedPtr userDataMsg,
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1Msg)
 {
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(image1Msg->header.stamp);}
 	cv_bridge::CvImageConstPtr rgb, depth;
 	rtabmap_conversions::toCvShare(image1Msg, rgb, depth);
 
@@ -435,6 +451,7 @@ void CommonDataSubscriber::rgbdOdomDataScan2dCallback(
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1Msg,
 		const sensor_msgs::msg::LaserScan::ConstSharedPtr scanMsg)
 {
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(image1Msg->header.stamp);}
 	cv_bridge::CvImageConstPtr rgb, depth;
 	rtabmap_conversions::toCvShare(image1Msg, rgb, depth);
 
@@ -459,6 +476,7 @@ void CommonDataSubscriber::rgbdOdomDataScan3dCallback(
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1Msg,
 		const sensor_msgs::msg::PointCloud2::ConstSharedPtr scan3dMsg)
 {
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(image1Msg->header.stamp);}
 	cv_bridge::CvImageConstPtr rgb, depth;
 	rtabmap_conversions::toCvShare(image1Msg, rgb, depth);
 
@@ -483,6 +501,7 @@ void CommonDataSubscriber::rgbdOdomDataScanDescCallback(
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1Msg,
 		const rtabmap_msgs::msg::ScanDescriptor::ConstSharedPtr scanDescMsg)
 {
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(image1Msg->header.stamp);}
 	cv_bridge::CvImageConstPtr rgb, depth;
 	rtabmap_conversions::toCvShare(image1Msg, rgb, depth);
 
@@ -510,6 +529,7 @@ void CommonDataSubscriber::rgbdOdomDataInfoCallback(
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1Msg,
 		const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr odomInfoMsg)
 {
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(image1Msg->header.stamp);}
 	cv_bridge::CvImageConstPtr rgb, depth;
 	rtabmap_conversions::toCvShare(image1Msg, rgb, depth);
 
