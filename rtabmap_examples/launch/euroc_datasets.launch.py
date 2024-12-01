@@ -88,7 +88,7 @@ def generate_launch_description():
         # Image rectification and publishing synchronized camera_info
         Node(
             package='rtabmap_util', executable='yaml_to_camera_info.py', output='screen',
-            parameters=[{'yaml_path': [FindPackageShare('rtabmap_examples'), '/launch/config/euroc_left.yaml']}],
+            parameters=[{'yaml_path': [FindPackageShare('rtabmap_examples'), '/config/euroc_left.yaml']}],
             remappings=[
               ('image', '/cam0/image_raw'),
               ('camera_info', 'left/camera_info')],
@@ -96,7 +96,7 @@ def generate_launch_description():
               
         Node(
             package='rtabmap_util', executable='yaml_to_camera_info.py', output='screen',
-            parameters=[{'yaml_path': [FindPackageShare('rtabmap_examples'), '/launch/config/euroc_right.yaml']}],
+            parameters=[{'yaml_path': [FindPackageShare('rtabmap_examples'), '/config/euroc_right.yaml']}],
             remappings=[
               ('image', '/cam1/image_raw'),
               ('camera_info', 'right/camera_info')],

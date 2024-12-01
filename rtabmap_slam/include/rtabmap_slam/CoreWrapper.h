@@ -118,8 +118,9 @@ public:
 
 private:
 	bool odomUpdate(const nav_msgs::msg::Odometry & odomMsg, rclcpp::Time stamp);
-	bool odomTFUpdate(const rclcpp::Time & stamp); // TF odom
+	bool odomTFUpdate(const std::string & odomFrameId, const rclcpp::Time & stamp); // TF odom
 
+	// Callback called from sync thread
 	virtual void commonMultiCameraCallback(
 				const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
 				const rtabmap_msgs::msg::UserData::ConstSharedPtr & userDataMsg,
@@ -134,6 +135,7 @@ private:
 				const std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > & localKeyPoints = std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> >(),
 				const std::vector<std::vector<rtabmap_msgs::msg::Point3f> > & localPoints3d = std::vector<std::vector<rtabmap_msgs::msg::Point3f> >(),
 				const std::vector<cv::Mat> & localDescriptors = std::vector<cv::Mat>());
+	// Callback called from sync thread
 	void commonMultiCameraCallbackImpl(
 				const std::string & odomFrameId,
 				const rtabmap_msgs::msg::UserData::ConstSharedPtr & userDataMsg,
@@ -148,6 +150,7 @@ private:
 				const std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > & localKeyPoints,
 				const std::vector<std::vector<rtabmap_msgs::msg::Point3f> > & localPoints3d,
 				const std::vector<cv::Mat> & localDescriptors);
+	// Callback called from sync thread
 	virtual void commonLaserScanCallback(
 				const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
 				const rtabmap_msgs::msg::UserData::ConstSharedPtr & userDataMsg,
@@ -155,11 +158,13 @@ private:
 				const sensor_msgs::msg::PointCloud2 & scan3dMsg,
 				const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr& odomInfoMsg,
 				const rtabmap_msgs::msg::GlobalDescriptor & globalDescriptor = rtabmap_msgs::msg::GlobalDescriptor());
+	// Callback called from sync thread
 	virtual void commonOdomCallback(
 			const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
 			const rtabmap_msgs::msg::UserData::ConstSharedPtr & userDataMsg,
 			const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr& odomInfoMsg);
 
+	// Callback called from sync thread
 	virtual void commonSensorDataCallback(
 			const rtabmap_msgs::msg::SensorData::ConstSharedPtr & sensorDataMsg,
 			const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
@@ -194,6 +199,8 @@ private:
 	void goalCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg);
 	void goalNodeCallback(const rtabmap_msgs::msg::Goal::SharedPtr msg);
 	void updateGoal(const rclcpp::Time & stamp);
+
+	void processAsync();
 
 	void process(
 			const rclcpp::Time & stamp,
@@ -254,7 +261,7 @@ private:
 #ifdef NAV_MSGS_FOXY
 	void goalResponseCallback(std::shared_future<GoalHandleNav2::SharedPtr> future);
 #else
-        void goalResponseCallback(const GoalHandleNav2::SharedPtr & goal_handle);
+    void goalResponseCallback(const GoalHandleNav2::SharedPtr & goal_handle);
 #endif
 	void resultCallback(const GoalHandleNav2::WrappedResult & result);
 #endif
@@ -266,11 +273,14 @@ private:
 private:
 	rtabmap::Rtabmap rtabmap_;
 	bool paused_;
+
+	UMutex lastPoseMutex_;
 	rtabmap::Transform lastPose_;
 	rclcpp::Time lastPoseStamp_;
 	std::vector<float> lastPoseVelocity_;
+	cv::Mat lastPoseCovariance_;
 	bool lastPoseIntermediate_;
-	cv::Mat covariance_;
+
 	rtabmap::Transform currentMetricGoal_;
 	rtabmap::Transform lastPublishedMetricGoal_;
 	bool latestNodeWasReached_;
@@ -341,7 +351,7 @@ private:
 	std::shared_ptr<tf2_ros::Buffer> tfBuffer_;
 	std::shared_ptr<tf2_ros::TransformListener> tfListener_;
 
-	rclcpp::SyncParametersClient::SharedPtr parametersClient_;
+	rclcpp::AsyncParametersClient::SharedPtr parametersClient_;
 	rclcpp::Subscription<rcl_interfaces::msg::ParameterEvent>::SharedPtr parameterEventSub_;
 
 	rclcpp::Service<std_srvs::srv::Empty>::SharedPtr updateSrv_;
@@ -381,6 +391,7 @@ private:
 #endif
 #ifdef WITH_NAV2_MSGS
 	rclcpp_action::Client<NavigateToPose>::SharedPtr nav2Client_;
+	rclcpp_action::GoalUUID lastGoalSent_;
 #endif
 
 	std::thread* transformThread_;
@@ -389,6 +400,7 @@ private:
 	// for loop closure detection only
 	image_transport::Subscriber defaultSub_;
 
+	rclcpp::CallbackGroup::SharedPtr userDataAsyncCallbackGroup_;
 	rclcpp::Subscription<rtabmap_msgs::msg::UserData>::SharedPtr userDataAsyncSub_;
 	cv::Mat userData_;
 	UMutex userDataMutex_;
@@ -397,6 +409,8 @@ private:
 	geometry_msgs::msg::PoseWithCovarianceStamped globalPose_;
 	rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr gpsFixAsyncSub_;
 	rtabmap::GPS gps_;
+
+	rclcpp::CallbackGroup::SharedPtr landmarkCallbackGroup_;
 	rclcpp::Subscription<rtabmap_msgs::msg::LandmarkDetection>::SharedPtr landmarkDetectionSub_;
 	rclcpp::Subscription<rtabmap_msgs::msg::LandmarkDetections>::SharedPtr landmarkDetectionsSub_;
 #ifdef WITH_APRILTAG_MSGS
@@ -406,10 +420,14 @@ private:
 	rclcpp::Subscription<fiducial_msgs::msg::FiducialTransformArray>::SharedPtr fiducialTransfromsSub_;
 #endif
 	std::map<int, std::pair<geometry_msgs::msg::PoseWithCovarianceStamped, float> > landmarks_; // id, <pose, size>
-	rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imuSub_;
+	UMutex landmarksMutex_;
 
+	rclcpp::CallbackGroup::SharedPtr imuCallbackGroup_;
+	rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imuSub_;
 	std::map<double, rtabmap::Transform> imus_;
 	std::string imuFrameId_;
+	UMutex imuMutex_;
+
 	rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr republishNodeDataSub_;
 
 	rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr interOdomSub_;
@@ -443,6 +461,23 @@ private:
 		double localizationError_;
 	};
 	LocalizationStatusTask localizationDiagnostic_;
+
+	rclcpp::CallbackGroup::SharedPtr processingCallbackGroup_;
+	struct SyncData {
+		bool valid;
+		rclcpp::Time stamp;
+		rtabmap::SensorData data;
+		rtabmap::Transform odom;
+		std::vector<float> odomVelocity;
+		std::string odomFrameId;
+		cv::Mat odomCovariance;
+		rtabmap::OdometryInfo odomInfo;
+		double timeMsgConversion;
+	};
+	rclcpp::TimerBase::SharedPtr syncTimer_;
+	SyncData syncData_;
+	UMutex syncDataMutex_;
+	bool triggerNewMapBeforeNextUpdate_;
 };
 
 }

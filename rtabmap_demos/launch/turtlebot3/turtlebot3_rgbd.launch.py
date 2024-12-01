@@ -1,20 +1,15 @@
-# Requirements:
-#   Install Turtlebot3 packages
-#   Note that we can edit /opt/ros/$ROS_DISTRO/share/turtlebot3_gazebo/models/turtlebot_waffle/model.sdf 
-#     to increase min scan range from 0.12 to 0.2 to avoid having scans 
-#     hitting the robot itself
 # Example:
-#   $ export TURTLEBOT3_MODEL=waffle
-#   $ ros2 launch turtlebot3_gazebo turtlebot3_world.launch.py
+#
+#   Bringup turtlebot3:
+#     $ export TURTLEBOT3_MODEL=waffle
+#     $ export LDS_MODEL=LDS-01
+#     $ ros2 launch turtlebot3_bringup robot.launch.py
 #
 #   SLAM:
-#   $ ros2 launch rtabmap_demos turtlebot3_scan.launch.py
-#   OR
-#   $ ros2 launch rtabmap_launch rtabmap.launch.py visual_odometry:=false frame_id:=base_footprint subscribe_scan:=true depth:=false approx_sync:=true odom_topic:=/odom args:="-d --RGBD/NeighborLinkRefining true --Reg/Strategy 1 --Reg/Force3DoF true --Grid/RangeMin 0.2" use_sim_time:=true qos:=2
-#   $ ros2 run topic_tools relay /rtabmap/map /map
+#     $ ros2 launch rtabmap_demos turtlebot3_rgbd.launch.py
 #
 #   Navigation (install nav2_bringup package):
-#     $ ros2 launch nav2_bringup navigation_launch.py use_sim_time:=True
+#     $ ros2 launch nav2_bringup navigation_launch.py
 #     $ ros2 launch nav2_bringup rviz_launch.py
 #
 #   Teleop:
@@ -29,28 +24,27 @@ from launch_ros.actions import Node
 def generate_launch_description():
 
     use_sim_time = LaunchConfiguration('use_sim_time')
-    qos = LaunchConfiguration('qos')
     localization = LaunchConfiguration('localization')
-    
+
     parameters={
           'frame_id':'base_footprint',
           'use_sim_time':use_sim_time,
-          'subscribe_depth':False,
-          'subscribe_rgb':False,
-          'subscribe_scan':True,
-          'approx_sync':True,
+          'subscribe_depth':True,
           'use_action_for_goal':True,
-          'qos_scan':qos,
-          'qos_imu':qos,
-          'Reg/Strategy':'1',
           'Reg/Force3DoF':'true',
-          'RGBD/NeighborLinkRefining':'True',
-          'Grid/RangeMin':'0.2', # ignore laser scan points on the robot itself
+          'Grid/RayTracing':'true', # Fill empty space
+          'Grid/3D':'false', # Use 2D occupancy
+          'Grid/RangeMax':'3',
+          'Grid/NormalsSegmentation':'false', # Use passthrough filter to detect obstacles
+          'Grid/MaxGroundHeight':'0.05', # All points above 5 cm are obstacles
+          'Grid/MaxObstacleHeight':'0.4',  # All points over 1 meter are ignored
           'Optimizer/GravitySigma':'0' # Disable imu constraints (we are already in 2D)
     }
-    
+
     remappings=[
-          ('scan', '/scan')]
+          ('rgb/image', '/camera/image_raw'),
+          ('rgb/camera_info', '/camera/camera_info'),
+          ('depth/image', '/camera/depth/image_raw')]
 
     return LaunchDescription([
 
@@ -59,10 +53,6 @@ def generate_launch_description():
             'use_sim_time', default_value='true',
             description='Use simulation (Gazebo) clock if true'),
         
-        DeclareLaunchArgument(
-            'qos', default_value='2',
-            description='QoS used for input sensor topics'),
-            
         DeclareLaunchArgument(
             'localization', default_value='false',
             description='Launch in localization mode.'),
@@ -90,4 +80,22 @@ def generate_launch_description():
             package='rtabmap_viz', executable='rtabmap_viz', output='screen',
             parameters=[parameters],
             remappings=remappings),
+        
+        # Obstacle detection with the camera for nav2 local costmap.
+        # First, we need to convert depth image to a point cloud.
+        # Second, we segment the floor from the obstacles.
+        Node(
+            package='rtabmap_util', executable='point_cloud_xyz', output='screen',
+            parameters=[{'decimation': 2,
+                         'max_depth': 3.0,
+                         'voxel_size': 0.02}],
+            remappings=[('depth/image', '/camera/depth/image_raw'),
+                        ('depth/camera_info', '/camera/camera_info'),
+                        ('cloud', '/camera/cloud')]),
+        Node(
+            package='rtabmap_util', executable='obstacles_detection', output='screen',
+            parameters=[parameters],
+            remappings=[('cloud', '/camera/cloud'),
+                        ('obstacles', '/camera/obstacles'),
+                        ('ground', '/camera/ground')]),
     ])

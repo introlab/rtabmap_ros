@@ -51,10 +51,10 @@ RGBSync::RGBSync(const rclcpp::NodeOptions & options) :
 	approxSync_(0),
 	exactSync_(0)
 {
-	int topicQueueSize = 1;
+	int topicQueueSize = 10;
 	int syncQueueSize = 10;
 	bool approxSync = true;
-	int qos = 0;
+	int qos = RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT;
 	double approxSyncMaxInterval = 0.0;
 	approxSync = this->declare_parameter("approx_sync", approxSync);
 	approxSyncMaxInterval = this->declare_parameter("approx_sync_max_interval", approxSyncMaxInterval);
@@ -115,8 +115,11 @@ RGBSync::RGBSync(const rclcpp::NodeOptions & options) :
 		syncDiagnostic_->init(imageSub_.getSubscriber().getTopic(),
 			uFormat("%s: Did not receive data since 5 seconds! Make sure the input topics are "
 					"published (\"$ ros2 topic hz my_topic\") and the timestamps in their "
-					"header are set. %s%s",
+					"header are set. Ajusting topic_queue_size (%d) and sync_queue_size (%d) "
+					"can also help for better synchronization if framerates and/or delays are different. %s%s",
 					this->get_name(),
+					topicQueueSize,
+					syncQueueSize,
 					approxSync?"":"Parameter \"approx_sync\" is false, which means that input "
 						"topics should have all the exact timestamp for the callback to be called.",
 					subscribedTopicsMsg.c_str()));
@@ -135,7 +138,7 @@ void RGBSync::callback(
 		  const sensor_msgs::msg::Image::ConstSharedPtr image,
 		  const sensor_msgs::msg::CameraInfo::ConstSharedPtr cameraInfo)
 {
-	syncDiagnostic_->tick(image->header.stamp);
+	syncDiagnostic_->tickInput(image->header.stamp);
 	if(rgbdImagePub_->get_subscription_count() || rgbdImageCompressedPub_->get_subscription_count())
 	{
 		double stamp = rtabmap_conversions::timestampFromROS(image->header.stamp);
@@ -185,6 +188,7 @@ void RGBSync::callback(
 					stamp, rtabmap_conversions::timestampFromROS(image->header.stamp));
 		}
 	}
+	syncDiagnostic_->tickOutput(image->header.stamp);
 }
 
 }

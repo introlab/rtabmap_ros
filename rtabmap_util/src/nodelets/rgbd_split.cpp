@@ -39,17 +39,15 @@ namespace rtabmap_util
 RGBDSplit::RGBDSplit(const rclcpp::NodeOptions & options) :
 	Node("rgbd_split", options)
 {
-	int qos = 0;
+	int qos = RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT;
 	qos = this->declare_parameter("qos", qos);
 
 	RCLCPP_INFO(this->get_logger(), "%s: qos         = %d", get_name(), qos);
 
 	rgbdImageSub_ = create_subscription<rtabmap_msgs::msg::RGBDImage>("rgbd_image", rclcpp::QoS(5).reliability((rmw_qos_reliability_policy_t)qos), std::bind(&RGBDSplit::callback, this, std::placeholders::_1));
 
-	auto node = rclcpp::Node::make_shared(this->get_name());
-	image_transport::ImageTransport it(node);
-	rgbPub_ = image_transport::create_camera_publisher(node.get(), std::string(rgbdImageSub_->get_topic_name()) + "/rgb", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
-	depthPub_ = image_transport::create_camera_publisher(node.get(), std::string(rgbdImageSub_->get_topic_name()) + "/depth", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	rgbPub_ = image_transport::create_camera_publisher(this, std::string(rgbdImageSub_->get_topic_name()) + "/rgb", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	depthPub_ = image_transport::create_camera_publisher(this, std::string(rgbdImageSub_->get_topic_name()) + "/depth", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
 }
 
 

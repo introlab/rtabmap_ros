@@ -42,7 +42,7 @@ ImuToTF::ImuToTF(const rclcpp::NodeOptions & options) :
 	tfListener_ = std::make_shared<tf2_ros::TransformListener>(*tfBuffer_);
 	tfBroadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
 
-	int qos = 0;
+	int qos = RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT;
 	fixedFrameId_ = this->declare_parameter("fixed_frame_id", fixedFrameId_);
 	baseFrameId_ = this->declare_parameter("base_frame_id", baseFrameId_);
 	qos = this->declare_parameter("qos", qos);

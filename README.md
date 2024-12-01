@@ -1,7 +1,7 @@
 rtabmap_ros
 ===========
 
-RTAB-Map's ROS2 package (branch `ros2`). **ROS2 Foxy minimum required**: currently most nodes are ported to ROS2, however they are not all tested yet. The interface is the same than on ROS1 (parameters and topic names should still match ROS1 documentation on [rtabmap_ros](http://wiki.ros.org/rtabmap_ros)). 
+RTAB-Map's ROS2 package (branch `ros2`). **ROS2 Foxy minimum required**: currently most nodes are ported to ROS2. The interface is the same than on ROS1 (parameters and topic names should still match ROS1 documentation on [rtabmap_ros](http://wiki.ros.org/rtabmap_ros)). 
 
 #### CI Latest
 
@@ -30,7 +30,7 @@ RTAB-Map's ROS2 package (branch `ros2`). **ROS2 Foxy minimum required**: current
             <td><a href="http://build.ros.org/job/Nbin_ufv8_uFv8__rtabmap_ros__ubuntu_focal_arm64__binary/"><img src="http://build.ros.org/buildStatus/icon?job=Nbin_ufv8_uFv8__rtabmap_ros__ubuntu_focal_arm64__binary" alt="Build Status"/></td>
         </tr>
         <tr>
-            <td rowspan="3">ROS 2</td>
+            <td rowspan="4">ROS 2</td>
             <td>Humble</td>
             <td><a href="http://build.ros2.org/job/Hbin_uJ64__rtabmap_ros__ubuntu_jammy_amd64__binary/"><img src="http://build.ros2.org/buildStatus/icon?job=Hbin_uJ64__rtabmap_ros__ubuntu_jammy_amd64__binary" alt="Build Status"/></td>
         </tr>
@@ -39,8 +39,12 @@ RTAB-Map's ROS2 package (branch `ros2`). **ROS2 Foxy minimum required**: current
             <td><a href="http://build.ros2.org/job/Ibin_uJ64__rtabmap_ros__ubuntu_jammy_amd64__binary/"><img src="http://build.ros2.org/buildStatus/icon?job=Ibin_uJ64__rtabmap_ros__ubuntu_jammy_amd64__binary" alt="Build Status"/></td>
         </tr>
         <tr>
+            <td>Jazzy</td>
+            <td><a href="http://build.ros2.org/job/Jbin_uN64__rtabmap_ros__ubuntu_noble_amd64__binary/"><img src="http://build.ros2.org/buildStatus/icon?job=Jbin_uN64__rtabmap_ros__ubuntu_noble_amd64__binary" alt="Build Status"/></td>
+        </tr>
+        <tr>
             <td>Rolling</td>
-            <td><a href="http://build.ros2.org/job/Rbin_uJ64__rtabmap_ros__ubuntu_jammy_amd64__binary/"><img src="http://build.ros2.org/buildStatus/icon?job=Rbin_uJ64__rtabmap_ros__ubuntu_jammy_amd64__binary" alt="Build Status"/></td>
+            <td><a href="http://build.ros2.org/job/Rbin_uN64__rtabmap_ros__ubuntu_noble_amd64__binary/"><img src="http://build.ros2.org/buildStatus/icon?job=Rbin_uN64__rtabmap_ros__ubuntu_noble_amd64__binary" alt="Build Status"/></td>
         </tr>
         <tr>
            <td>Docker</td>
@@ -54,41 +58,24 @@ RTAB-Map's ROS2 package (branch `ros2`). **ROS2 Foxy minimum required**: current
 
 # Usage
 
-`rtabmap.launch` is also ported to ROS2 with same arguments. If you see [ROS1 examples](http://wiki.ros.org/rtabmap_ros/Tutorials/HandHeldMapping) like this:
+* For sensor integration examples (stereo and RGB-D cameras, 3D LiDAR), see [rtabmap_examples](https://github.com/introlab/rtabmap_ros/tree/ros2/rtabmap_examples/launch) sub-folder.
 
+* For robot integration examples (turtlebot3 and turtlebot4, nav2 integration), see [rtabmap_demos](https://github.com/introlab/rtabmap_ros/tree/ros2/rtabmap_demos) sub-folder.
+
+## Logging
+To make RTAB-Map's logs appear ordered with RCLCPP's logs, set the following environment variables in your `.bashrc` (see official "[About Logging](https://docs.ros.org/en/humble/Concepts/Intermediate/About-Logging.html)" documentation for more info):
 ```bash
-roslaunch zed_wrapper zed_no_tf.launch
-
-roslaunch rtabmap_ros rtabmap.launch \
-    rtabmap_args:="--delete_db_on_start" \
-    rgb_topic:=/zed/zed_node/rgb/image_rect_color \
-    depth_topic:=/zed/zed_node/depth/depth_registered \
-    camera_info_topic:=/zed/zed_node/rgb/camera_info \
-    frame_id:=base_link \
-    approx_sync:=false \
-    wait_imu_to_init:=true \
-    imu_topic:=/zed_node/imu/data
-
+export RCUTILS_LOGGING_USE_STDOUT=1
+export RCUTILS_LOGGING_BUFFERED_STREAM=1
+# Optional, but if you like colored logs:
+export RCUTILS_COLORIZED_OUTPUT=1
 ```
 
-The ROS2 equivalent is (with those [lines](https://github.com/stereolabs/zed-ros2-wrapper/blob/b512dce6ad4565f4770273995b147122e735ca0f/zed_wrapper/config/common.yaml#L58-L60) set to false to avoid TF conflicts):
-
+## Recommended DDS
+If RTAB-Map's GUI or topic frequency feel laggy (even if processing time looks fast enough), it may be caused by the DDS. I recommend to use [Cyclone DDS](https://docs.ros.org/en/foxy/Installation/DDS-Implementations/Working-with-Eclipse-CycloneDDS.html), you can try it by adding this before launching any nodes/launch files:
 ```bash
-ros2 launch zed_wrapper zed.launch.py
-
-ros2 launch rtabmap_launch rtabmap.launch.py \
-    rtabmap_args:="--delete_db_on_start" \
-    rgb_topic:=/zed/zed_node/rgb/image_rect_color \
-    depth_topic:=/zed/zed_node/depth/depth_registered \
-    camera_info_topic:=/zed/zed_node/rgb/camera_info \
-    frame_id:=base_link \
-    approx_sync:=false \
-    wait_imu_to_init:=true \
-    imu_topic:=/zed/zed_node/imu/data \
-    qos:=1 \
-    rviz:=true
+export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 ```
-`qos` (Quality of Service) argument should match the published topics QoS (1=RELIABLE, 2=BEST EFFORT). ROS1 was always RELIABLE.
 
 # Installation 
 
@@ -117,39 +104,3 @@ sudo apt install ros-$ROS_DISTRO-rtabmap-ros
     colcon build --symlink-install --cmake-args -DRTABMAP_SYNC_MULTI_RGBD=ON -DRTABMAP_SYNC_USER_DATA=ON -DCMAKE_BUILD_TYPE=Release
     ```
 
-# Example with Turtlebot3
-
-1. Launch Turtlebot3 simulator:
-    ```bash
-    export TURTLEBOT3_MODEL=waffle
-    ros2 launch turtlebot3_gazebo turtlebot3_world.launch.py
-    
-    export TURTLEBOT3_MODEL=waffle
-    ros2 run turtlebot3_teleop teleop_keyboard
-    ```
-
-2. Launch RTAB-Map:
-    ```
-    ros2 launch rtabmap_demos turtlebot3_scan.launch.py
-    
-    # OR with rtabmap.launch.py
-    ros2 launch rtabmap_launch rtabmap.launch.py \
-       visual_odometry:=false \
-       frame_id:=base_footprint \
-       subscribe_scan:=true depth:=false \
-       approx_sync:=true \
-       odom_topic:=/odom \
-       scan_topic:=/scan \
-       qos:=2 \
-       args:="-d --RGBD/NeighborLinkRefining true --Reg/Strategy 1" \
-       use_sim_time:=true \
-       rviz:=true
-    ```
-
-3. Launch navigation (`nav2_bringup` package should be installed):
-    ```
-    ros2 launch nav2_bringup navigation_launch.py use_sim_time:=True
-    ros2 launch nav2_bringup rviz_launch.py
-    ```
-    
-See [rtabmap_demos/launch](https://github.com/introlab/rtabmap_ros/tree/ros2/rtabmap_demos/launch) and [rtabmap_examples/launch](https://github.com/introlab/rtabmap_ros/tree/ros2/rtabmap_examples/launch) subfolders for some other ROS2 examples with turtlebot3 in simulation and a RGB-D camera.

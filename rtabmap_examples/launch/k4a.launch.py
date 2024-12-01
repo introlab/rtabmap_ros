@@ -1,21 +1,20 @@
 # Requirements:
 #   A Kinect for Azure
 #   Install Azure_Kinect_ROS_Driver ros2 package (https://github.com/microsoft/Azure_Kinect_ROS_Driver/tree/humble)
+#   To install Kinect SDK on Ubuntu 22.04, see https://github.com/microsoft/Azure-Kinect-Sensor-SDK/issues/1790#issuecomment-1531626651
+#   udev rules: https://github.com/microsoft/Azure-Kinect-Sensor-SDK/blob/5f79890933e1c81e325633152b2f2799df825b8b/docs/usage.md#linux-device-setup
 #   Install imu_filter_madgwick ros2 package
 # Example:
 #   $ ros2 launch rtabmap_examples k4a.launch.py
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable
-from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 def generate_launch_description():
     parameters=[{
           'frame_id':'camera_base',
           'subscribe_rgbd':True,
-          'subscribe_odom_info':True,
-          'qos':1}]
+          'subscribe_odom_info':True}]
 
     remappings=[
           ('imu', '/imu/data'),
@@ -32,11 +31,9 @@ def generate_launch_description():
         Node(
             package='rtabmap_odom', executable='rgbd_odometry', output='screen',
             parameters=[{ 'frame_id':'camera_base',
-                          'subscribe_odom_info':True,
                           'approx_sync':True,
                           'approx_sync_max_interval':0.01,
                           'wait_imu_to_init':True,
-                          'qos':1,
                           'queue_size':30,
                           'keep_color':True,
                           # Color image needs to be rectified, 

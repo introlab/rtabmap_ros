@@ -47,6 +47,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap_msgs/srv/reset_pose.hpp>
 #include <rtabmap/core/SensorData.h>
 #include <rtabmap/core/Parameters.h>
+#include <rtabmap/utilite/UThread.h>
 
 #include <boost/thread.hpp>
 
@@ -59,7 +60,7 @@ class Odometry;
 
 namespace rtabmap_odom {
 
-class OdometryROS : public rclcpp::Node
+class OdometryROS : public rclcpp::Node, public UThread
 {
 
 public:
@@ -98,11 +99,17 @@ protected:
 
 private:
 
+	virtual void mainLoop();
+	virtual void mainLoopKill();
 	virtual void updateParameters(rtabmap::ParametersMap &) {}
 	virtual void onOdomInit() {}
 
 	void callbackIMU(const sensor_msgs::msg::Imu::SharedPtr msg);
 	void reset(const rtabmap::Transform & pose = rtabmap::Transform::getIdentity());
+
+protected:
+	rclcpp::CallbackGroup::SharedPtr dataCallbackGroup_;
+	void tick(const rclcpp::Time & stamp);
 
 private:
 	rtabmap::Odometry * odometry_;
@@ -147,6 +154,14 @@ private:
 	std::shared_ptr<tf2_ros::Buffer> tfBuffer_;
 	std::shared_ptr<tf2_ros::TransformListener> tfListener_;
 	rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imuSub_;
+	rclcpp::CallbackGroup::SharedPtr imuCallbackGroup_;
+
+	// Safe-threading
+	UMutex imuMutex_;
+	UMutex dataMutex_;	
+	USemaphore dataReady_;
+	rtabmap::SensorData dataToProcess_;
+	std_msgs::msg::Header dataHeaderToProcess_;
 
 	bool paused_;
 	int resetCountdown_;
@@ -164,11 +179,14 @@ private:
 	bool compressionParallelized_;
 	int odomStrategy_;
 	bool waitIMUToinit_;
+	bool alwaysCheckImuTf_;
 	bool imuProcessed_;
-	std::map<double, rtabmap::IMU> imus_;
-	std::pair<rtabmap::SensorData, std_msgs::msg::Header > bufferedData_;
+	int processedMsgs_;
+	int droppedMsgs_;
+	std::map<double, sensor_msgs::msg::Imu::ConstSharedPtr> imus_;
 	std::string configPath_;
 	rtabmap::Transform initialPose_;
+	rtabmap::Transform imuLocalTransform_;
 
 	rtabmap_util::ULogToRosout ulogToRosout_;
 
@@ -176,11 +194,13 @@ private:
 	{
 	public:
 		OdomStatusTask();
-		void setStatus(bool isLost);
+		void setStatus(bool isLost, int processedMsgs, int droppedMsgs);
 		void run(diagnostic_updater::DiagnosticStatusWrapper &stat);
 	private:
 		bool lost_;
 		bool dataReceived_;
+		int processedMsgs_;
+		int droppedMsgs_;
 	};
 	OdomStatusTask statusDiagnostic_;
 	std::unique_ptr<rtabmap_sync::SyncDiagnostic> syncDiagnostic_;

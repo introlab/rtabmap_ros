@@ -73,9 +73,9 @@ PointCloudAssembler::PointCloudAssembler(const rclcpp::NodeOptions & options) :
 	//tfBuffer_->setCreateTimerInterface(timer_interface);
 	tfListener_ = std::make_shared<tf2_ros::TransformListener>(*tfBuffer_);
 
-	int topicQueueSize = 1;
-	int syncQueueSize = 5;
-	int qos = 0;
+	int topicQueueSize = 10;
+	int syncQueueSize = 10;
+	int qos = RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT;
 	bool subscribeOdomInfo = false;
 
 	topicQueueSize = this->declare_parameter("topic_queue_size", topicQueueSize);
@@ -286,13 +286,14 @@ void PointCloudAssembler::callbackCloudOdomInfo(
 	}
 	else
 	{
-		RCLCPP_WARN(this->get_logger(), "Reseting point cloud assembler as null odometry has been received.");
+		RCLCPP_WARN(this->get_logger(), "Resetting point cloud assembler as null odometry has been received.");
 		clouds_.clear();
 	}
 }
 
 void PointCloudAssembler::callbackCloud(const sensor_msgs::msg::PointCloud2::ConstSharedPtr cloudMsg)
 {
+	callbackCalled_ = true;
 	if(cloudPub_->get_subscription_count())
 	{
 		UASSERT_MSG(cloudMsg->data.size() == cloudMsg->row_step*cloudMsg->height,

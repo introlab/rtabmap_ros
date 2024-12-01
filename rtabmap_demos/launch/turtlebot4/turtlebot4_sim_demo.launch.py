@@ -4,7 +4,7 @@
 #
 # Example:
 #   1) Launch simulator (turtlebot4, nav2 and rtabmap):
-#     $ ros2 launch rtabmap_demos turtlebot4_ignition.launch.py
+#     $ ros2 launch rtabmap_demos turtlebot4_sim_demo.launch.py
 #
 #   2) Click on "Play" button on bottom-left of gazebo.
 #
@@ -50,7 +50,7 @@ def generate_launch_description():
     ignition_launch = PathJoinSubstitution(
         [pkg_turtlebot4_ignition_bringup, 'launch', 'turtlebot4_ignition.launch.py'])
     rtabmap_launch = PathJoinSubstitution(
-        [pkg_rtabmap_demos, 'launch', 'turtlebot4_slam.launch.py'])
+        [pkg_rtabmap_demos, 'launch', 'turtlebot4', 'turtlebot4_slam.launch.py'])
 
     ignition = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([ignition_launch]),
@@ -68,7 +68,6 @@ def generate_launch_description():
         launch_arguments=[
             ('rtabmap_viz', LaunchConfiguration('rtabmap_viz')),
             ('localization', LaunchConfiguration('localization')),
-            ('qos', '2'),
             ('use_sim_time', 'true')
         ]
     )

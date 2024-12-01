@@ -73,6 +73,7 @@ SET(rtabmap_util_plugins_lib_src
    src/nodelets/lidar_deskewing.cpp
    src/nodelets/rgbd_relay.cpp
    src/nodelets/rgbd_split.cpp
+   src/nodelets/map_assembler.cpp
 )
 
 
@@ -134,6 +135,7 @@ rclcpp_components_register_nodes(rtabmap_util_plugins "rtabmap_util::PointCloudT
 rclcpp_components_register_nodes(rtabmap_util_plugins "rtabmap_util::ObstaclesDetection")
 rclcpp_components_register_nodes(rtabmap_util_plugins "rtabmap_util::PointCloudAggregator")
 rclcpp_components_register_nodes(rtabmap_util_plugins "rtabmap_util::PointCloudAssembler")
+rclcpp_components_register_nodes(rtabmap_util_plugins "rtabmap_util::MapAssembler")
 
 add_executable(rtabmap_rgbd_relay src/RGBDRelayNode.cpp)
 ament_target_dependencies(rtabmap_rgbd_relay ${Libraries})
@@ -150,10 +152,10 @@ set_target_properties(rtabmap_rgbd_split PROPERTIES OUTPUT_NAME "rgbd_split")
 #target_link_libraries(rtabmap_map_optimizer rtabmap_util_plugins)
 #set_target_properties(rtabmap_map_optimizer PROPERTIES OUTPUT_NAME "map_optimizer")
 
-#add_executable(rtabmap_map_assembler src/MapAssemblerNode.cpp)
-#ament_target_dependencies(rtabmap_map_assembler ${Libraries})
-#target_link_libraries(rtabmap_map_assembler rtabmap_util_plugins rtabmap_util_plugins)
-#set_target_properties(rtabmap_map_assembler PROPERTIES OUTPUT_NAME "map_assembler")
+add_executable(rtabmap_map_assembler src/MapAssemblerNode.cpp)
+ament_target_dependencies(rtabmap_map_assembler ${Libraries})
+target_link_libraries(rtabmap_map_assembler rtabmap_util_plugins)
+set_target_properties(rtabmap_map_assembler PROPERTIES OUTPUT_NAME "map_assembler")
 
 add_executable(rtabmap_imu_to_tf src/ImuToTFNode.cpp)
 ament_target_dependencies(rtabmap_imu_to_tf ${Libraries})
@@ -241,7 +243,6 @@ install(TARGETS
    RUNTIME DESTINATION bin
 )
 install(TARGETS
-#   rtabmap_map_assembler
 #   rtabmap_map_optimizer
 #   rtabmap_data_player
 #   rtabmap_odom_msg_to_tf
@@ -256,6 +257,7 @@ install(TARGETS
    rtabmap_obstacles_detection
    rtabmap_point_cloud_aggregator
    rtabmap_point_cloud_assembler
+   rtabmap_map_assembler
    DESTINATION lib/${PROJECT_NAME}
 )
 
