@@ -2,9 +2,9 @@ name: ros1
 
 on:
   push:
-    branches: [ master ]
+    branches: [ noetic-devel ]
   pull_request:
-    branches: [ master ]
+    branches: [ noetic-devel ]
 
 env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
@@ -50,6 +50,7 @@ jobs:
       with:
         repository: 'introlab/rtabmap'
         path: 'catkin_ws/src/rtabmap'
+        ref: 'noetic-devel'
 
     - uses: actions/checkout@v2
       with:
