@@ -3,9 +3,9 @@ name: ros2
 
 on:
   push:
-    branches: [ ros2 ]
+    branches: [ jazzy-devel ]
   pull_request:
-    branches: [ ros2 ]
+    branches: [ jazzy-devel ]
 
 env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
@@ -21,10 +21,10 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        ros_distro: [humble]
+        ros_distro: [jazzy]
         include:
-        - ros_distro: 'humble'
-          ubuntu_distro: 'jammy'
+        - ros_distro: 'jazzy'
+          ubuntu_distro: 'noble'
       fail-fast: false
     container:
       image: rostooling/setup-ros-docker:ubuntu-${{ matrix.ubuntu_distro }}-ros-${{ matrix.ros_distro }}-desktop-latest
@@ -34,7 +34,7 @@ jobs:
       with:
         required-ros-distributions: ${{ matrix.ros_distro }}
     - run: |
-        echo "repositories:\n  introlab/rtabmap:\n    type: git\n    url: https://github.com/introlab/rtabmap.git\n    version: master\n" > /tmp/deps.repos &&\
+        echo "repositories:\n  introlab/rtabmap:\n    type: git\n    url: https://github.com/introlab/rtabmap.git\n    version: jazzy-devel\n" > /tmp/deps.repos &&\
         cat /tmp/deps.repos
     - uses: ros-tooling/action-ros-ci@v0.3
       with:
