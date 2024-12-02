@@ -3215,6 +3215,21 @@ bool deskew_impl(
 			else if(timeDatatype == 8) //float64
 			{
 				double sec = *((const double*)(&output.data[u*output.point_step]+offsetTime));
+				if(sec > 1.e18)
+				{
+					// convert nanoseconds to seconds
+					sec /= 1.e9;
+				}
+				else if(sec > 1.e15)
+				{
+					// convert microseconds to seconds
+					sec /= 1.e6;
+				}
+				else if(sec > 1.e12)
+				{
+					// sec milliseconds to seconds
+					sec /= 1.e3;
+				}
 				stamp = timestampToROS(sec);
 			}
 
@@ -3294,6 +3309,21 @@ bool deskew_impl(
 			else if(timeDatatype == 8)
 			{
 				double sec = *((const double*)(&output.data[v*output.row_step]+offsetTime));
+				if(sec > 1.e18)
+				{
+					// convert nanoseconds to seconds
+					sec /= 1.e9;
+				}
+				else if(sec > 1.e15)
+				{
+					// convert microseconds to seconds
+					sec /= 1.e6;
+				}
+				else if(sec > 1.e12)
+				{
+					// sec milliseconds to seconds
+					sec /= 1.e3;
+				}
 				stamp = timestampToROS(sec);
 			}
 
