@@ -463,6 +463,10 @@ void OdometryROS::processData(SensorData & data, const std_msgs::Header & header
 	//NODELET_WARN("Received image: %f delay=%f", data.stamp(), (ros::Time::now() - header.stamp).toSec());
 	if(dataMutex_.lockTry() == 0)
 	{
+		if(bufferedDataToProcess_) {
+			NODELET_ERROR("We didn't receive IMU newer than previous image (%f) and we just received a new image (%f). The previous image is dropped!",
+						dataHeaderToProcess_.stamp.toSec(), header.stamp.toSec());
+		}
 		dataToProcess_ = data;
 		dataHeaderToProcess_ = header;
 		bufferedDataToProcess_ = false;
@@ -509,15 +513,9 @@ void OdometryROS::mainLoop()
 
 		if(waitIMUToinit_ && (imus_.empty() || imus_.rbegin()->first < header.stamp.toSec()))
 		{
-			if(bufferedDataToProcess_) {
-				NODELET_ERROR("Make sure IMU is published faster than data rate! (last image stamp=%f and last imu stamp received=%f). Previous image is dropped, buffering the new image until an imu with same or greater stamp is received.",
-						data.stamp(), imus_.empty()?0:imus_.rbegin()->first);
-			}
-			else {
-				NODELET_WARN("Make sure IMU is published faster than data rate! (last image stamp=%f and last imu stamp received=%f). Buffering the image until an imu with same or greater stamp is received.",
-						data.stamp(), imus_.empty()?0:imus_.rbegin()->first);
-				bufferedDataToProcess_ = true;
-			}
+			NODELET_WARN("Make sure IMU is published faster than data rate! (last image stamp=%f and last imu stamp received=%f). Buffering the image until an imu with same or greater stamp is received.",
+					data.stamp(), imus_.empty()?0:imus_.rbegin()->first);
+			bufferedDataToProcess_ = true;
 			return;
 		}
 		// process all imu data up to current image stamp (or just after so that underlying odom approach can do interpolation of imu at image stamp)
@@ -1128,6 +1126,7 @@ void OdometryROS::reset(const Transform & pose)
 	imuProcessed_ = false;
 	dataToProcess_ = SensorData();
 	dataHeaderToProcess_ = std_msgs::Header();
+	bufferedDataToProcess_ = false;
 	imuMutex_.lock();
 	imus_.clear();
 	imuMutex_.unlock();
