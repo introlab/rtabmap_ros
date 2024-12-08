@@ -436,13 +436,24 @@ void OdometryROS::callbackIMU(const sensor_msgs::ImuConstPtr& msg)
 				cv::Mat(3,3,CV_64FC1,(void*)msg->linear_acceleration_covariance.data()).clone(),
 				localTransform);
 
-		UScopeMutex m(imuMutex_);
-
-		imus_.insert(std::make_pair(stamp, imu));
-		if(imus_.size() > 1000)
 		{
-			NODELET_WARN("Dropping imu data!");
-			imus_.erase(imus_.begin());
+			UScopeMutex m(imuMutex_);
+
+			imus_.insert(std::make_pair(stamp, imu));
+			if(imus_.size() > 1000)
+			{
+				NODELET_WARN("Dropping imu data!");
+				imus_.erase(imus_.begin());
+			}
+		}
+		if(dataMutex_.lockTry() == 0)
+		{
+			if(bufferedDataToProcess_ && dataHeaderToProcess_.stamp.toSec() <= stamp)
+			{
+				bufferedDataToProcess_ = false;
+				dataReady_.release();
+			}
+			dataMutex_.unlock();
 		}
 	}
 }
@@ -454,6 +465,7 @@ void OdometryROS::processData(SensorData & data, const std_msgs::Header & header
 	{
 		dataToProcess_ = data;
 		dataHeaderToProcess_ = header;
+		bufferedDataToProcess_ = false;
 		dataReady_.release();
 		dataMutex_.unlock();
 	}
@@ -497,8 +509,15 @@ void OdometryROS::mainLoop()
 
 		if(waitIMUToinit_ && (imus_.empty() || imus_.rbegin()->first < header.stamp.toSec()))
 		{
-			NODELET_ERROR("Make sure IMU is published faster than data rate! (last image stamp=%f and last imu stamp received=%f)",
-					data.stamp(), imus_.empty()?0:imus_.rbegin()->first);
+			if(bufferedDataToProcess_) {
+				NODELET_ERROR("Make sure IMU is published faster than data rate! (last image stamp=%f and last imu stamp received=%f). Previous image is dropped, buffering the new image until an imu with same or greater stamp is received.",
+						data.stamp(), imus_.empty()?0:imus_.rbegin()->first);
+			}
+			else {
+				NODELET_WARN("Make sure IMU is published faster than data rate! (last image stamp=%f and last imu stamp received=%f). Buffering the image until an imu with same or greater stamp is received.",
+						data.stamp(), imus_.empty()?0:imus_.rbegin()->first);
+				bufferedDataToProcess_ = true;
+			}
 			return;
 		}
 		// process all imu data up to current image stamp (or just after so that underlying odom approach can do interpolation of imu at image stamp)
