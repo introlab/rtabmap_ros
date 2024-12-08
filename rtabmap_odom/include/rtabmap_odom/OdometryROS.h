@@ -162,6 +162,7 @@ private:
 	USemaphore dataReady_;
 	rtabmap::SensorData dataToProcess_;
 	std_msgs::msg::Header dataHeaderToProcess_;
+	bool bufferedDataToProcess_;
 
 	bool paused_;
 	int resetCountdown_;
