@@ -940,10 +940,9 @@ void OdometryROS::mainLoop()
 					"is %fs too old (>%fs, min_update_rate = %f Hz). Previous data stamp is %f while new data stamp is %f.",
 					rtabmap_conversions::timestampFromROS(header.stamp) - previousStamp_, 1.0/minUpdateRate_, minUpdateRate_, previousStamp_, rtabmap_conversions::timestampFromROS(header.stamp));
 		}
-		else
+		else if(--resetCurrentCount_>0)
 		{
 			RCLCPP_WARN(this->get_logger(), "Odometry lost! Odometry will be reset after next %d consecutive unsuccessful odometry updates...", resetCurrentCount_);
-			--resetCurrentCount_;
 		}
 
 		if(resetCurrentCount_ == 0 || tooOldPreviousData)
@@ -970,6 +969,11 @@ void OdometryROS::mainLoop()
 							odomFrameId_.c_str(), frameId_.c_str());
 					odometry_->reset(tfPose);
 				}
+			}
+			// Keep resetting if the odometry cannot initialize in next updates (e.g., lack of features).
+			// This will make sure we keep updating to latest guess pose.
+			if(resetCurrentCount_ == 0) {
+				++resetCurrentCount_;
 			}
 		}
 	}
