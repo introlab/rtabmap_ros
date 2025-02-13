@@ -346,7 +346,7 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 	}
 
 	// declare parameters
-	this->declare_parameter("is_rtabmap_paused", paused_);
+	paused_ = this->declare_parameter("is_rtabmap_paused", paused_);
 	if(paused_)
 	{
 		RCLCPP_WARN(get_logger(), "Node paused... don't forget to call service \"resume\" to start rtabmap.");
@@ -388,6 +388,7 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 	
 	char ** argv = new char*[argList.size()];
 	bool deleteDbOnStart = false;
+	deleteDbOnStart = this->declare_parameter("delete_db_on_start", deleteDbOnStart);
 	for(unsigned int i=0; i<argList.size(); ++i)
 	{
 		argv[i] = &argList[i].at(0);
