@@ -436,13 +436,24 @@ void OdometryROS::callbackIMU(const sensor_msgs::ImuConstPtr& msg)
 				cv::Mat(3,3,CV_64FC1,(void*)msg->linear_acceleration_covariance.data()).clone(),
 				localTransform);
 
-		UScopeMutex m(imuMutex_);
-
-		imus_.insert(std::make_pair(stamp, imu));
-		if(imus_.size() > 1000)
 		{
-			NODELET_WARN("Dropping imu data!");
-			imus_.erase(imus_.begin());
+			UScopeMutex m(imuMutex_);
+
+			imus_.insert(std::make_pair(stamp, imu));
+			if(imus_.size() > 1000)
+			{
+				NODELET_WARN("Dropping imu data!");
+				imus_.erase(imus_.begin());
+			}
+		}
+		if(dataMutex_.lockTry() == 0)
+		{
+			if(bufferedDataToProcess_ && dataHeaderToProcess_.stamp.toSec() <= stamp)
+			{
+				bufferedDataToProcess_ = false;
+				dataReady_.release();
+			}
+			dataMutex_.unlock();
 		}
 	}
 }
@@ -452,8 +463,13 @@ void OdometryROS::processData(SensorData & data, const std_msgs::Header & header
 	//NODELET_WARN("Received image: %f delay=%f", data.stamp(), (ros::Time::now() - header.stamp).toSec());
 	if(dataMutex_.lockTry() == 0)
 	{
+		if(bufferedDataToProcess_) {
+			NODELET_ERROR("We didn't receive IMU newer than previous image (%f) and we just received a new image (%f). The previous image is dropped!",
+						dataHeaderToProcess_.stamp.toSec(), header.stamp.toSec());
+		}
 		dataToProcess_ = data;
 		dataHeaderToProcess_ = header;
+		bufferedDataToProcess_ = false;
 		dataReady_.release();
 		dataMutex_.unlock();
 	}
@@ -497,8 +513,9 @@ void OdometryROS::mainLoop()
 
 		if(waitIMUToinit_ && (imus_.empty() || imus_.rbegin()->first < header.stamp.toSec()))
 		{
-			NODELET_ERROR("Make sure IMU is published faster than data rate! (last image stamp=%f and last imu stamp received=%f)",
+			NODELET_WARN("Make sure IMU is published faster than data rate! (last image stamp=%f and last imu stamp received=%f). Buffering the image until an imu with same or greater stamp is received.",
 					data.stamp(), imus_.empty()?0:imus_.rbegin()->first);
+			bufferedDataToProcess_ = true;
 			return;
 		}
 		// process all imu data up to current image stamp (or just after so that underlying odom approach can do interpolation of imu at image stamp)
@@ -888,10 +905,9 @@ void OdometryROS::mainLoop()
 					"is %fs too old (>%fs, min_update_rate = %f Hz). Previous data stamp is %f while new data stamp is %f.",
 					header.stamp.toSec() - previousStamp_, 1.0/minUpdateRate_, minUpdateRate_, previousStamp_, header.stamp.toSec());
 		}
-		else
+		else if(--resetCurrentCount_>0)
 		{
 			NODELET_WARN( "Odometry lost! Odometry will be reset after next %d consecutive unsuccessful odometry updates...", resetCurrentCount_);
-			--resetCurrentCount_;
 		}
 
 		if(resetCurrentCount_ == 0 || tooOldPreviousData)
@@ -918,6 +934,11 @@ void OdometryROS::mainLoop()
 							odomFrameId_.c_str(), frameId_.c_str());
 					odometry_->reset(tfPose);
 				}
+			}
+			// Keep resetting if the odometry cannot initialize in next updates (e.g., lack of features).
+			// This will make sure we keep updating to latest guess pose.
+			if(resetCurrentCount_ == 0) {
+				++resetCurrentCount_;
 			}
 		}
 	}
@@ -1109,6 +1130,7 @@ void OdometryROS::reset(const Transform & pose)
 	imuProcessed_ = false;
 	dataToProcess_ = SensorData();
 	dataHeaderToProcess_ = std_msgs::Header();
+	bufferedDataToProcess_ = false;
 	imuMutex_.lock();
 	imus_.clear();
 	imuMutex_.unlock();
