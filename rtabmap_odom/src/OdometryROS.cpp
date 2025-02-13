@@ -420,25 +420,36 @@ void OdometryROS::callbackIMU(const sensor_msgs::msg::Imu::SharedPtr msg)
 		double stamp = rtabmap_conversions::timestampFromROS(msg->header.stamp);
 		//RCLCPP_WARN(get_logger(), "Received imu: %f delay=%f", stamp, (now() - msg->header.stamp).seconds());
 
-		UScopeMutex m(imuMutex_);
-
-		if(!imuProcessed_ && imus_.empty())
 		{
-			rtabmap::Transform localTransform = rtabmap_conversions::getTransform(this->frameId(), msg->header.frame_id, msg->header.stamp, *tfBuffer_, waitForTransform_);
-			if(localTransform.isNull())
+			UScopeMutex m(imuMutex_);
+
+			if(!imuProcessed_ && imus_.empty())
 			{
-				RCLCPP_WARN(this->get_logger(), "Dropping imu data! A valid TF between %s and %s is required to initialize IMU.",
-					this->frameId().c_str(), msg->header.frame_id.c_str());
-				return;
+				rtabmap::Transform localTransform = rtabmap_conversions::getTransform(this->frameId(), msg->header.frame_id, msg->header.stamp, *tfBuffer_, waitForTransform_);
+				if(localTransform.isNull())
+				{
+					RCLCPP_WARN(this->get_logger(), "Dropping imu data! A valid TF between %s and %s is required to initialize IMU.",
+						this->frameId().c_str(), msg->header.frame_id.c_str());
+					return;
+				}
+			}
+
+			imus_.insert(std::make_pair(stamp, msg));
+
+			if(imus_.size() > 1000)
+			{
+				RCLCPP_WARN(this->get_logger(), "Dropping imu data!");
+				imus_.erase(imus_.begin());
 			}
 		}
-
-		imus_.insert(std::make_pair(stamp, msg));
-
-		if(imus_.size() > 1000)
+		if(dataMutex_.lockTry() == 0)
 		{
-			RCLCPP_WARN(this->get_logger(), "Dropping imu data!");
-			imus_.erase(imus_.begin());
+			if(bufferedDataToProcess_ && rtabmap_conversions::timestampFromROS(dataHeaderToProcess_.stamp) <= stamp)
+			{
+				bufferedDataToProcess_ = false;
+				dataReady_.release();
+			}
+			dataMutex_.unlock();
 		}
 	}
 }
@@ -448,8 +459,14 @@ void OdometryROS::processData(SensorData & data, const std_msgs::msg::Header & h
 	//RCLCPP_WARN(get_logger(), "Received image: %f delay=%f", data.stamp(), (now() - header.stamp).seconds());
 	if(dataMutex_.lockTry() == 0)
 	{
+		if(bufferedDataToProcess_) {
+			RCLCPP_ERROR(this->get_logger(), "We didn't receive IMU newer than previous image (%f) and we just received a new image (%f). The previous image is dropped!",
+						rtabmap_conversions::timestampFromROS(dataHeaderToProcess_.stamp), rtabmap_conversions::timestampFromROS(header.stamp));
+			++droppedMsgs_;
+		}
 		dataToProcess_ = data;
 		dataHeaderToProcess_ = header;
+		bufferedDataToProcess_ = false;
 		dataReady_.release();
 		dataMutex_.unlock();
 		++processedMsgs_;
@@ -495,8 +512,9 @@ void OdometryROS::mainLoop()
 
 		if(waitIMUToinit_ && (imus_.empty() || imus_.rbegin()->first < rtabmap_conversions::timestampFromROS(header.stamp)))
 		{
-			RCLCPP_ERROR(this->get_logger(), "Make sure IMU is published faster than data rate! (last image stamp=%f and last imu stamp received=%f)",
+			RCLCPP_WARN(this->get_logger(), "Make sure IMU is published faster than data rate! (last image stamp=%f and last imu stamp received=%f). Buffering the image until an imu with same or greater stamp is received.",
 					data.stamp(), imus_.empty()?0:imus_.rbegin()->first);
+			bufferedDataToProcess_ = true;
 			return;
 		}
 		// process all imu data up to current image stamp (or just after so that underlying odom approach can do interpolation of imu at image stamp)
@@ -922,10 +940,9 @@ void OdometryROS::mainLoop()
 					"is %fs too old (>%fs, min_update_rate = %f Hz). Previous data stamp is %f while new data stamp is %f.",
 					rtabmap_conversions::timestampFromROS(header.stamp) - previousStamp_, 1.0/minUpdateRate_, minUpdateRate_, previousStamp_, rtabmap_conversions::timestampFromROS(header.stamp));
 		}
-		else
+		else if(--resetCurrentCount_>0)
 		{
 			RCLCPP_WARN(this->get_logger(), "Odometry lost! Odometry will be reset after next %d consecutive unsuccessful odometry updates...", resetCurrentCount_);
-			--resetCurrentCount_;
 		}
 
 		if(resetCurrentCount_ == 0 || tooOldPreviousData)
@@ -952,6 +969,11 @@ void OdometryROS::mainLoop()
 							odomFrameId_.c_str(), frameId_.c_str());
 					odometry_->reset(tfPose);
 				}
+			}
+			// Keep resetting if the odometry cannot initialize in next updates (e.g., lack of features).
+			// This will make sure we keep updating to latest guess pose.
+			if(resetCurrentCount_ == 0) {
+				++resetCurrentCount_;
 			}
 		}
 	}
@@ -1149,6 +1171,7 @@ void OdometryROS::reset(const Transform & pose)
 	imuProcessed_ = false;
 	dataToProcess_ = SensorData();
 	dataHeaderToProcess_ = std_msgs::msg::Header();
+	bufferedDataToProcess_ = false;
 	imuMutex_.lock();
 	imus_.clear();
 	imuMutex_.unlock();
