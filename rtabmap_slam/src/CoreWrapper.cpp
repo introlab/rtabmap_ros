@@ -2693,14 +2693,41 @@ void CoreWrapper::interOdomInfoCallback(const nav_msgs::msg::Odometry::ConstShar
 
 void CoreWrapper::initialPoseCallback(const geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr msg)
 {
-	Transform intialPose = rtabmap_conversions::transformFromPoseMsg(msg->pose.pose);
-	if(intialPose.isNull())
+	Transform mapToPose = Transform::getIdentity();
+	if(msg->header.frame_id.empty())
 	{
-		RCLCPP_ERROR(this->get_logger(), "Pose received is null!");
-		return;
+		RCLCPP_WARN(this->get_logger(), "Received initialpose doesn't have frame_id set, assuming it is in %s frame.", mapFrameId_.c_str());
+	}
+	else if(msg->header.frame_id != mapFrameId_)
+	{
+		mapToPose = rtabmap_conversions::getTransform(mapFrameId_, msg->header.frame_id, msg->header.stamp, *tfBuffer_, waitForTransform_);
+		if(mapToPose.isNull())
+		{
+			RCLCPP_ERROR(this->get_logger(), "Failed to transform initialpose from frame %s to map frame %s", msg->header.frame_id.c_str(), mapFrameId_.c_str());
+			return;
+		}
 	}
 
-	rtabmap_.setInitialPose(intialPose);
+	Transform initialPose = rtabmap_conversions::transformFromPoseMsg(msg->pose.pose);
+	if(initialPose.isNull())
+	{
+		RCLCPP_ERROR(this->get_logger(), "initialpose received is null!");
+		return;
+	}
+	if(mapToPose.isIdentity())
+	{
+		RCLCPP_INFO(this->get_logger(), "initialpose received: %s", initialPose.prettyPrint().c_str());
+		rtabmap_.setInitialPose(initialPose);
+	}
+	else
+	{
+		RCLCPP_INFO(this->get_logger(), "initialpose received: %s in %s frame, transformed to %s in %s frame.",
+			initialPose.prettyPrint().c_str(),
+			msg->header.frame_id.c_str(),
+			(mapToPose * initialPose).prettyPrint().c_str(),
+			mapFrameId_.c_str());
+		rtabmap_.setInitialPose(mapToPose*initialPose);
+	}
 }
 
 void CoreWrapper::goalCommonCallback(
