@@ -1,7 +1,7 @@
 rtabmap_ros
 ===========
 
-RTAB-Map's ROS2 package (branch `ros2`). **ROS2 Foxy minimum required**: currently most nodes are ported to ROS2. The interface is the same than on ROS1 (parameters and topic names should still match ROS1 documentation on [rtabmap_ros](http://wiki.ros.org/rtabmap_ros)). 
+RTAB-Map's ROS2 package (branch `ros2`). **ROS2 Humble minimum required**: currently most nodes are ported to ROS2. The interface is the same than on ROS1 (parameters and topic names should still match ROS1 documentation on [rtabmap_ros](http://wiki.ros.org/rtabmap_ros)). 
 
 #### CI Latest
 
@@ -33,10 +33,6 @@ RTAB-Map's ROS2 package (branch `ros2`). **ROS2 Foxy minimum required**: current
             <td rowspan="4">ROS 2</td>
             <td>Humble</td>
             <td><a href="http://build.ros2.org/job/Hbin_uJ64__rtabmap_ros__ubuntu_jammy_amd64__binary/"><img src="http://build.ros2.org/buildStatus/icon?job=Hbin_uJ64__rtabmap_ros__ubuntu_jammy_amd64__binary" alt="Build Status"/></td>
-        </tr>
-        <tr>
-            <td>Iron</td>
-            <td><a href="http://build.ros2.org/job/Ibin_uJ64__rtabmap_ros__ubuntu_jammy_amd64__binary/"><img src="http://build.ros2.org/buildStatus/icon?job=Ibin_uJ64__rtabmap_ros__ubuntu_jammy_amd64__binary" alt="Build Status"/></td>
         </tr>
         <tr>
             <td>Jazzy</td>
