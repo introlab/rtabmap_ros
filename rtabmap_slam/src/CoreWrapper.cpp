@@ -922,7 +922,10 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 						RCLCPP_INFO(this->get_logger(), "RTAB-Map rate detection = %f Hz", rate_);
 					}
 					rtabmap_.parseParameters(parameters_);
-					mapsManager_.setParameters(parameters_);
+					// Don't reset map in localization mode
+					if(rtabmap_.getMemory()->isIncremental()) {
+						mapsManager_.setParameters(parameters_);
+					}
 				}
 			};
 
@@ -2971,7 +2974,10 @@ void CoreWrapper::updateRtabmapCallback(
 		RCLCPP_INFO(get_logger(), "2D mapping = %s", twoDMapping_?"true":"false");
 	}
 	rtabmap_.parseParameters(parameters_);
-	mapsManager_.setParameters(parameters_);
+	// Don't reset map in localization mode
+	if(rtabmap_.getMemory()->isIncremental()) {
+		mapsManager_.setParameters(parameters_);
+	}
 }
 
 void CoreWrapper::resetRtabmapCallback(
