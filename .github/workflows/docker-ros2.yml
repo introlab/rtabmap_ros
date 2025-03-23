@@ -61,6 +61,6 @@ jobs:
           platforms: ${{ matrix.docker_platforms }}
           file: ./docker/${{ matrix.docker_path }}/Dockerfile
           tags: introlab3it/rtabmap_ros:${{ matrix.docker_tag }}
-          cache-from: type=registry,ref=introlab3it/rtabmap_ros:${{ matrix.docker_tag }}
+          no-cache: true
           cache-to: type=inline
 
