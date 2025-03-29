@@ -89,7 +89,9 @@ bool PreferencesDialogROS::hasAllParameters()
 	rtabmap::ParametersMap parameters = rtabmap::Parameters::getDefaultParameters();
 	for(rtabmap::ParametersMap::const_iterator i=parameters.begin(); i!=parameters.end(); ++i)
 	{
-		if(i->first.compare(rtabmap::Parameters::kRtabmapWorkingDirectory()) != 0 && !nh.hasParam(i->first))
+		if(i->first.compare(rtabmap::Parameters::kRtabmapWorkingDirectory()) != 0 &&
+		   !nh.hasParam(i->first) &&
+		   i->first.find("Odom") != 0)
 		{
 			return false;
 		}
@@ -101,7 +103,9 @@ bool PreferencesDialogROS::hasAllParameters(const ros::NodeHandle & nh, const rt
 {
 	for(rtabmap::ParametersMap::const_iterator i=parameters.begin(); i!=parameters.end(); ++i)
 	{
-		if(i->first.compare(rtabmap::Parameters::kRtabmapWorkingDirectory()) != 0 && !nh.hasParam(i->first))
+		if(i->first.compare(rtabmap::Parameters::kRtabmapWorkingDirectory()) != 0 &&
+		   !nh.hasParam(i->first) &&
+		   i->first.find("Odom") != 0)
 		{
 			return false;
 		}
