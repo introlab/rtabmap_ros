@@ -39,8 +39,15 @@ SET(Libraries
 ## Build ##
 ###########
 
-add_executable(rtabmap_viz src/GuiNode.cpp src/GuiWrapper.cpp src/PreferencesDialogROS.cpp)
+add_executable(rtabmap_viz src/GuiNode.cpp src/GuiWrapper.cpp src/PreferencesDialogROS.cpp include/${PROJECT_NAME}/PreferencesDialogROS.h)
 ament_target_dependencies(rtabmap_viz ${Libraries})
+SET_TARGET_PROPERTIES(
+  rtabmap_viz
+   PROPERTIES
+	   AUTOUIC ON
+     AUTOMOC ON
+     AUTORCC ON
+)
 
 #############
 ## Install ##
