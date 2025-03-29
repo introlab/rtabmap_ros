@@ -87,8 +87,10 @@ private:
 				}
 
 				tf::StampedTransform tmp;
-				tfListener_.lookupTransform(msg->header.frame_id, baseFrameId_, msg->header.stamp, tmp);
-				tf::Transform t = tmp.inverse()*st*tmp;
+				tfListener_.lookupTransform(baseFrameId_, msg->header.frame_id, msg->header.stamp, tmp);
+				tf::Quaternion q;
+				q.setRPY(0.0,0.0,tf::getYaw(tmp.getRotation()));
+				tf::Transform t = tf::Transform(q)*st*tmp.inverse(); // base_frame orientation
 				st.setRotation(t.getRotation());
 				st.child_frame_id_ = baseFrameId_;
 			}
