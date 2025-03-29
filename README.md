@@ -125,7 +125,7 @@ This section shows how to install RTAB-Map ros-pkg on **ROS Noetic** (Catkin bui
     ```bash
     cd ~/catkin_ws
     git clone https://github.com/introlab/rtabmap_ros.git src/rtabmap_ros
-    catkin_make -j4
+    catkin_make -DCMAKE_BUILD_TYPE=Release -j4
     ```
     * Use `catkin_make -j1` if compilation requires more RAM than you have (e.g., some files require up to ~2 GB to build depending on gcc version).
     * Options:
@@ -158,7 +158,7 @@ roscd rtabmap_ros
 git pull origin master
 roscd
 cd ..
-catkin_make -j1 --pkg rtabmap_ros
+catkin_make -j1 -DCMAKE_BUILD_TYPE=Release --pkg rtabmap_ros
 ```
 
 
