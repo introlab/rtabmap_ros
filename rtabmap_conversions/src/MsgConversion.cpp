@@ -3386,7 +3386,7 @@ bool deskew_impl(
 			}
 		}
 	}
-	UDEBUG("Lidar deskewing time=%fs", processingTime.elapsed());
+	UDEBUG("Lidar deskewing time=%fs (slerp=%s waitForTransform=%f)", processingTime.elapsed(), slerp?"true":"false", waitForTransform);
 	return true;
 }
 
