@@ -161,7 +161,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
                   {'subscribe_rgbd': rgbd_image_used,
                    'topic_queue_size': 40,
                    'sync_queue_size': 40,}],
-      remappings=remappings + [('scan_cloud', 'assembled_cloud')],
+      remappings=remappings + [('scan_cloud', 'assembled_cloud'), ('gps/fix', LaunchConfiguration('gps_topic'))],
       arguments=arguments), 
 
     # Just for visualization
@@ -224,6 +224,10 @@ def generate_launch_description():
     DeclareLaunchArgument(
       'imu_topic', default_value='/imu/data',
       description='Name of an IMU topic.'),
+    
+    DeclareLaunchArgument(
+      'gps_topic', default_value='/gps/fix',
+      description='Name of a GPS topic.'),
     
     DeclareLaunchArgument(
       'rgbd_image_topic', default_value='',
