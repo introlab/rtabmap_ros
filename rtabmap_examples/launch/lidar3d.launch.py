@@ -8,7 +8,7 @@
 #
 #   If an IMU is used, make sure TF between lidar/base frame and imu is
 #     already calibrated. In this example, we assume the imu topic has 
-#     already the orientation estimated, it not, you can use 
+#     already the orientation estimated, if not, you can use 
 #     imu_filter_madgwick_node (with use_mag:=false publish_tf:=false)
 #     and set imu_topic to output topic of the filter.
 #
@@ -46,6 +46,9 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
   localization = LaunchConfiguration('localization').perform(context)
   localization = localization == 'true' or localization == 'True'
   
+  deskewing_slerp = LaunchConfiguration('deskewing_slerp').perform(context)
+  deskewing_slerp = deskewing_slerp == 'true' or deskewing_slerp == 'True'
+  
   fixed_frame_from_imu = False
   fixed_frame_id =  LaunchConfiguration('fixed_frame_id').perform(context)
   if not fixed_frame_id and imu_used:
@@ -78,10 +81,11 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
   }
   
   icp_odometry_parameters = {
-    'expected_update_rate': 15.0,
+    'expected_update_rate': LaunchConfiguration('expected_update_rate'),
     'deskewing': not fixed_frame_id, # If fixed_frame_id is set, we do deskewing externally below
     'odom_frame_id': 'icp_odom',
     'guess_frame_id': fixed_frame_id,
+    'deskewing_slerp': deskewing_slerp,
     # RTAB-Map's internal parameters are strings:
     'Odom/ScanKeyFrameThr': '0.4',
     'OdomF2M/ScanSubtractRadius': str(voxel_size_value),
@@ -106,7 +110,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
     'Mem/NotLinkedNodesKept': 'false',
     'Mem/STMSize': '30',
     'Reg/Strategy': '1',
-    'Icp/CorrespondenceRatio': '0.2'
+    'Icp/CorrespondenceRatio': LaunchConfiguration('min_loop_closure_overlap')
   }
   
   arguments = []
@@ -162,7 +166,8 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
         parameters=[{
           'use_sim_time': use_sim_time,
           'fixed_frame_id': fixed_frame_id,
-          'wait_for_transform': 0.2}],
+          'wait_for_transform': 0.2,
+          'slerp': deskewing_slerp}],
         remappings=[
             ('input_cloud', lidar_topic)
         ])
@@ -207,8 +212,20 @@ def generate_launch_description():
       description='RGBD image topic (ignored if empty). Would be the output of a rtabmap_sync\'s rgbd_sync, stereo_sync or rgb_sync node.'),
     
     DeclareLaunchArgument(
+      'expected_update_rate', default_value='15.0',
+      description='Expected lidar frame rate. Ideally, set it slightly higher than actual frame rate, like 15 Hz for 10 Hz lidar scans.'),
+    
+    DeclareLaunchArgument(
       'voxel_size', default_value='0.1',
       description='Voxel size (m) of the downsampled lidar point cloud. For indoor, set it between 0.1 and 0.3. For outdoor, set it to 0.5 or over.'),
+    
+    DeclareLaunchArgument(
+      'min_loop_closure_overlap', default_value='0.2',
+      description='Minimum scan overlap pourcentage to accept a loop closure.'),
+    
+    DeclareLaunchArgument(
+      'deskewing_slerp', default_value='true',
+      description='Use fast slerp interpolation between first and last stamps of the scan for deskewing. It would less accruate than requesting TF for every points, but a lot faster. Enable this if the delay of the deskewed scan is significant larger than the original scan.'),
 
     DeclareLaunchArgument(
       'qos', default_value='1',

@@ -111,10 +111,10 @@ PointCloudAggregator::PointCloudAggregator(const rclcpp::NodeOptions & options) 
 				get_name(),
 				approx?"approx":"exact",
 				approx&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
-				cloudSub_1_.getTopic().c_str(),
-				cloudSub_2_.getTopic().c_str(),
-				cloudSub_3_.getTopic().c_str(),
-				cloudSub_4_.getTopic().c_str());
+				cloudSub_1_.getSubscriber()->get_topic_name(),
+				cloudSub_2_.getSubscriber()->get_topic_name(),
+				cloudSub_3_.getSubscriber()->get_topic_name(),
+				cloudSub_4_.getSubscriber()->get_topic_name());
 	}
 	else if(count == 3)
 	{
@@ -135,9 +135,9 @@ PointCloudAggregator::PointCloudAggregator(const rclcpp::NodeOptions & options) 
 				this->get_name(),
 				approx?"approx":"exact",
 				approx&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
-				cloudSub_1_.getTopic().c_str(),
-				cloudSub_2_.getTopic().c_str(),
-				cloudSub_3_.getTopic().c_str());
+				cloudSub_1_.getSubscriber()->get_topic_name(),
+				cloudSub_2_.getSubscriber()->get_topic_name(),
+				cloudSub_3_.getSubscriber()->get_topic_name());
 	}
 	else
 	{
@@ -157,8 +157,8 @@ PointCloudAggregator::PointCloudAggregator(const rclcpp::NodeOptions & options) 
 				this->get_name(),
 				approx?"approx":"exact",
 				approx&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
-				cloudSub_1_.getTopic().c_str(),
-				cloudSub_2_.getTopic().c_str());
+				cloudSub_1_.getSubscriber()->get_topic_name(),
+				cloudSub_2_.getSubscriber()->get_topic_name());
 	}
 
 
@@ -175,10 +175,11 @@ PointCloudAggregator::PointCloudAggregator(const rclcpp::NodeOptions & options) 
 						this->get_name(),
 						approx?"":"Parameter \"approx_sync\" is false, which means that input "
 							"topics should have all the exact timestamp for the callback to be called.",
-							subscribedTopicsMsg.c_str());
+						subscribedTopicsMsg.c_str());
 			}
 		}
 	});
+	RCLCPP_INFO(this->get_logger(), "%s", subscribedTopicsMsg.c_str());
 }
 
 PointCloudAggregator::~PointCloudAggregator()

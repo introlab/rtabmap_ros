@@ -1,10 +1,10 @@
 # Description:
-#   In this example, we will record ALL lidar scans. An IMU or low latency odometry is required for this example.
+#   In this example, we will record ALL lidar scans from 2 lidars. An IMU or low latency odometry is required for this example.
 # 
 # Example:
-#   Launch your lidar sensor:
-#   $ ros2 launch velodyne_driver velodyne_driver_node-VLP16-launch.py
-#   $ ros2 launch velodyne_pointcloud velodyne_transform_node-VLP16-launch.py
+#   Launch your lidar sensors
+#     In this example, we assume the lidar topics have a frame_id linked to same parent (e.g., base_link) and
+#     the extrinsics are known (URDF) and/or already calibrated.
 #   
 #   Launch your IMU sensor, make sure TF between lidar/base frame and imu is already calibrated.
 #     In this example, we assume the imu topic has 
@@ -16,8 +16,8 @@
 #     already calibrated. To provide image data to this example, you should use
 #     rtabmap_sync's rgbd_sync or stereo_sync node.
 #
-#   Launch the example by adjusting the lidar topic, imu topic and base frame:
-#   $ ros2 launch rtabmap_examples lidar3d.launch.py lidar_topic:=/velodyne_points imu_topic:=/imu/data frame_id:=velodyne
+#   Launch the example by adjusting the lidar topics, imu topic and base frame:
+#   $ ros2 launch rtabmap_examples lidar3d.launch.py lidar1_topic:=/lidar1/velodyne_points lidar2_topic:=/lidar1/velodyne_points imu_topic:=/imu/data frame_id:=base_link
 
 from launch import LaunchDescription, LaunchContext
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
@@ -27,7 +27,7 @@ from launch_ros.actions import Node
 def launch_setup(context: LaunchContext, *args, **kwargs):
   
   frame_id = LaunchConfiguration('frame_id')
-
+  
   external_odom_frame_id =  LaunchConfiguration('external_odom_frame_id').perform(context)
 
   fixed_frame_from_imu = False
@@ -44,9 +44,13 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
   rgbd_image_topic = LaunchConfiguration('rgbd_image_topic')
   rgbd_image_used =  rgbd_image_topic.perform(context) != ''
   
-  lidar_topic = LaunchConfiguration('lidar_topic')
-  lidar_topic_value = lidar_topic.perform(context)
-  lidar_topic_deskewed = lidar_topic_value + "/deskewed"
+  lidar1_topic = LaunchConfiguration('lidar1_topic')
+  lidar1_topic_value = lidar1_topic.perform(context)
+  lidar1_topic_deskewed = lidar1_topic_value + "/deskewed"
+  
+  lidar2_topic = LaunchConfiguration('lidar2_topic')
+  lidar2_topic_value = lidar2_topic.perform(context)
+  lidar2_topic_deskewed = lidar2_topic_value + "/deskewed"
   
   voxel_size = LaunchConfiguration('voxel_size')
   voxel_size_value = float(voxel_size.perform(context))
@@ -125,33 +129,57 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
     rtabmap_parameters['Mem/InitWMWithAllNodes'] = 'True'
   else:
     arguments.append('-d') # This will delete the previous database (~/.ros/rtabmap.db)
-    
+  
   if external_odom_frame_id:
-    viz_topic = lidar_topic_deskewed
+    viz_topic = "combined_cloud"
   else:
     viz_topic = 'odom_filtered_input_scan'
   
   nodes = [
-    # Lidar deskewing
+    # Lidar1 deskewing
     Node(
-      package='rtabmap_util', executable='lidar_deskewing', output='screen',
+      package='rtabmap_util', executable='lidar_deskewing', name="lidar1_deskewing", output='screen',
       parameters=[{
         'use_sim_time': use_sim_time,
         'fixed_frame_id': fixed_frame_id,
         'wait_for_transform': 0.2,
         'slerp': deskewing_slerp}],
       remappings=[
-          ('input_cloud', lidar_topic)
+          ('input_cloud', lidar1_topic)
       ]),
+
+    # Lidar2 deskewing
+    Node(
+      package='rtabmap_util', executable='lidar_deskewing', name="lidar2_deskewing", output='screen',
+      parameters=[{
+        'use_sim_time': use_sim_time,
+        'fixed_frame_id': fixed_frame_id,
+        'wait_for_transform': 0.2,
+        'slerp': deskewing_slerp}],
+      remappings=[
+          ('input_cloud', lidar2_topic)
+      ]),
+
+    # Combine the two lidars in single point cloud
+    Node(
+      package='rtabmap_util', executable='point_cloud_aggregator', output='screen',
+      parameters=[{
+        'use_sim_time': use_sim_time,
+        'approx_sync': True,
+        'fixed_frame_id': fixed_frame_id,
+        'count': 2}],
+      remappings=[
+        ('cloud1', lidar1_topic_deskewed),
+        ('cloud2', lidar2_topic_deskewed)]),
     
-    # Assemble deskewed scans based on icp odometry
+    # Assemble combined deskewed scans based on icp odometry
     Node(
       package='rtabmap_util', executable='point_cloud_assembler', output='screen',
       parameters=[{
         'use_sim_time': use_sim_time,
         'assembling_time': LaunchConfiguration('assembling_time'), 
         'fixed_frame_id': (external_odom_frame_id if external_odom_frame_id else "")}], # This will make the node subscribing to icp odometry topic "icp_odom"
-      remappings=[('cloud', lidar_topic_deskewed),
+      remappings=[('cloud', "combined_cloud"),
                   ('odom', 'icp_odom')]),
     
     # Update the map
@@ -177,7 +205,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
       Node(
         package='rtabmap_odom', executable='icp_odometry', output='screen',
         parameters=[shared_parameters, icp_odometry_parameters],
-        remappings=remappings + [('scan_cloud', lidar_topic_deskewed)]))
+        remappings=remappings + [('scan_cloud', "combined_cloud")]))
   
   if fixed_frame_from_imu:
     # Create a stabilized base frame based on imu for lidar deskewing
@@ -218,8 +246,12 @@ def generate_launch_description():
       description='Localization mode.'),
 
     DeclareLaunchArgument(
-      'lidar_topic', default_value='/velodyne_points',
-      description='Name of the lidar PointCloud2 topic.'),
+      'lidar1_topic', default_value='/lidar1/velodyne_points',
+      description='Name of the lidar1\'s PointCloud2 topic.'),
+    
+    DeclareLaunchArgument(
+      'lidar2_topic', default_value='/lidar2/velodyne_points',
+      description='Name of the lidar2\'s PointCloud2 topic.'),
 
     DeclareLaunchArgument(
       'imu_topic', default_value='/imu/data',
