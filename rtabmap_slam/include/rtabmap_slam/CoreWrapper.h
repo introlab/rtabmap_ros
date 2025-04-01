@@ -136,7 +136,7 @@ private:
 				const std::vector<std::vector<rtabmap_msgs::msg::Point3f> > & localPoints3d = std::vector<std::vector<rtabmap_msgs::msg::Point3f> >(),
 				const std::vector<cv::Mat> & localDescriptors = std::vector<cv::Mat>());
 	// Callback called from sync thread
-	void commonMultiCameraCallbackImpl(
+	rtabmap::SensorData commonMultiCameraCallbackImpl(
 				const std::string & odomFrameId,
 				const rtabmap_msgs::msg::UserData::ConstSharedPtr & userDataMsg,
 				const std::vector<cv_bridge::CvImageConstPtr> & imageMsgs,
@@ -306,6 +306,7 @@ private:
 	double landmarkDefaultLinVariance_;
 	double waitForTransform_;
 	bool useActionForGoal_;
+	bool doubleBuffer_;
 	bool useSavedMap_;
 	bool genScan_;
 	double genScanMaxDepth_;
@@ -481,7 +482,9 @@ private:
 	};
 	rclcpp::TimerBase::SharedPtr syncTimer_;
 	SyncData syncData_;
+	SyncData bufferedSyncData_;
 	UMutex syncDataMutex_;
+	UMutex bufferedSyncDataMutex_;
 	bool triggerNewMapBeforeNextUpdate_;
 };
 
