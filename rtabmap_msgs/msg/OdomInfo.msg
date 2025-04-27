@@ -18,6 +18,8 @@ int32 localKeyFrames
 int32 localBundleOutliers
 int32 localBundleConstraints
 float32 localBundleTime
+float32 localBundleAvgInlierDistance
+int32 localBundleMaxKeyFramesForInlier
 bool keyFrameAdded
 float32 timeEstimation
 float32 timeParticleFiltering

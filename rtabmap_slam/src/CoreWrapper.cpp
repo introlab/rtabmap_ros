@@ -2526,14 +2526,41 @@ void CoreWrapper::interOdomInfoCallback(const nav_msgs::OdometryConstPtr & msg1,
 
 void CoreWrapper::initialPoseCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr & msg)
 {
-	Transform intialPose = rtabmap_conversions::transformFromPoseMsg(msg->pose.pose);
-	if(intialPose.isNull())
+	Transform mapToPose = Transform::getIdentity();
+	if(msg->header.frame_id.empty())
 	{
-		NODELET_ERROR("Pose received is null!");
-		return;
+		NODELET_WARN("Received initialpose doesn't have frame_id set, assuming it is in %s frame.", mapFrameId_.c_str());
+	}
+	else if(msg->header.frame_id != mapFrameId_)
+	{
+		mapToPose = rtabmap_conversions::getTransform(mapFrameId_, msg->header.frame_id, msg->header.stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+		if(mapToPose.isNull())
+		{
+			NODELET_ERROR("Failed to transform initialpose from frame %s to map frame %s", msg->header.frame_id.c_str(), mapFrameId_.c_str());
+			return;
+		}
 	}
 
-	rtabmap_.setInitialPose(intialPose);
+	Transform initialPose = rtabmap_conversions::transformFromPoseMsg(msg->pose.pose);
+	if(initialPose.isNull())
+	{
+		NODELET_ERROR("initialpose received is null!");
+		return;
+	}
+	if(mapToPose.isIdentity())
+	{
+		NODELET_INFO("initialpose received: %s", initialPose.prettyPrint().c_str());
+		rtabmap_.setInitialPose(initialPose);
+	}
+	else
+	{
+		NODELET_INFO("initialpose received: %s in %s frame, transformed to %s in %s frame.",
+			initialPose.prettyPrint().c_str(),
+			msg->header.frame_id.c_str(),
+			(mapToPose * initialPose).prettyPrint().c_str(),
+			mapFrameId_.c_str());
+		rtabmap_.setInitialPose(mapToPose*initialPose);
+	}
 }
 
 void CoreWrapper::goalCommonCallback(
@@ -2788,7 +2815,10 @@ bool CoreWrapper::updateRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Emp
 		NODELET_INFO("2D mapping = %s", twoDMapping_?"true":"false");
 	}
 	rtabmap_.parseParameters(parameters_);
-	mapsManager_.setParameters(parameters_);
+	// Don't reset map in localization mode
+	if(rtabmap_.getMemory()->isIncremental()) {
+		mapsManager_.setParameters(parameters_);
+	}
 	return true;
 }
 

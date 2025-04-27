@@ -1598,6 +1598,8 @@ std::map<std::string, float> odomInfoToStatistics(const rtabmap::OdometryInfo & 
 	stats.insert(std::make_pair("Odometry/LocalBundleOutliers/", info.localBundleOutliers));
 	stats.insert(std::make_pair("Odometry/LocalBundleConstraints/", info.localBundleConstraints));
 	stats.insert(std::make_pair("Odometry/LocalBundleTime/ms", info.localBundleTime*1000.0f));
+	stats.insert(std::make_pair("Odometry/localBundleAvgInlierDistance/pix", info.localBundleAvgInlierDistance));
+	stats.insert(std::make_pair("Odometry/localBundleMaxKeyFramesForInlier/", info.localBundleMaxKeyFramesForInlier));
 	stats.insert(std::make_pair("Odometry/KeyFrameAdded/", info.keyFrameAdded?1.0f:0.0f));
 	stats.insert(std::make_pair("Odometry/Interval/ms", (float)info.interval));
 	stats.insert(std::make_pair("Odometry/Distance/m", info.distanceTravelled));
@@ -1674,6 +1676,8 @@ rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_msgs::OdomInfo & msg, bool i
 	info.localBundleOutliers = msg.localBundleOutliers;
 	info.localBundleConstraints = msg.localBundleConstraints;
 	info.localBundleTime = msg.localBundleTime;
+	info.localBundleAvgInlierDistance = msg.localBundleAvgInlierDistance;
+	info.localBundleMaxKeyFramesForInlier = msg.localBundleMaxKeyFramesForInlier;
 	UASSERT(msg.localBundleModels.size() == msg.localBundleIds.size());
 	UASSERT(msg.localBundleModels.size() == msg.localBundlePoses.size());
 	for(size_t i=0; i<msg.localBundleIds.size(); ++i)
@@ -1753,6 +1757,8 @@ void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_msgs::OdomInfo & 
 	msg.localBundleOutliers = info.localBundleOutliers;
 	msg.localBundleConstraints = info.localBundleConstraints;
 	msg.localBundleTime = info.localBundleTime;
+	msg.localBundleAvgInlierDistance = info.localBundleAvgInlierDistance;
+	msg.localBundleMaxKeyFramesForInlier = info.localBundleMaxKeyFramesForInlier;
 	UASSERT(info.localBundleModels.size() == info.localBundlePoses.size());
 	for(std::map<int, std::vector<rtabmap::CameraModel> >::const_iterator iter=info.localBundleModels.begin();
 		iter!=info.localBundleModels.end();

@@ -33,11 +33,18 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 
-add_executable(rtabmap_viz src/GuiNode.cpp src/GuiWrapper.cpp src/PreferencesDialogROS.cpp)
+add_executable(rtabmap_viz src/GuiNode.cpp src/GuiWrapper.cpp src/PreferencesDialogROS.cpp include/${PROJECT_NAME}/PreferencesDialogROS.h)
 IF(Qt5_FOUND)
     QT5_USE_MODULES(rtabmap_viz Widgets Core Gui)
 ENDIF(Qt5_FOUND)
 target_link_libraries(rtabmap_viz ${catkin_LIBRARIES})
+SET_TARGET_PROPERTIES(
+  rtabmap_viz
+   PROPERTIES
+	   AUTOUIC ON
+     AUTOMOC ON
+     AUTORCC ON
+)
 
 
 #############

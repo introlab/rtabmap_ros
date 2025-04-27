@@ -35,6 +35,7 @@ using namespace rtabmap;
 
 class PreferencesDialogROS : public PreferencesDialog
 {
+	Q_OBJECT
 public:
 	PreferencesDialogROS(const QString & configFile, const std::string & rtabmapNodeName);
 	virtual ~PreferencesDialogROS();
@@ -43,7 +44,7 @@ public:
 	virtual QString getTmpIniFilePath() const;
 	bool hasAllParameters();
 
-public slots:
+public Q_SLOTS:
 	void readRtabmapNodeParameters();
 
 protected:
