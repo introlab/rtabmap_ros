@@ -117,8 +117,22 @@ public:
 #endif
 
 private:
-	bool odomUpdate(const nav_msgs::msg::Odometry & odomMsg, rclcpp::Time stamp);
+	struct SyncData {
+		bool valid;
+		rclcpp::Time stamp;
+		rtabmap::SensorData data;
+		rtabmap::Transform odom;
+		std::vector<float> odomVelocity;
+		std::string odomFrameId;
+		cv::Mat odomCovariance;
+		rtabmap::OdometryInfo odomInfo;
+		double timeMsgConversion;
+	};
+
+	bool odomUpdate(const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg, const rclcpp::Time & stamp, std::string & odomFrameId);
+	bool odomMsgUpdate(const nav_msgs::msg::Odometry & odomMsg, rclcpp::Time stamp);
 	bool odomTFUpdate(const std::string & odomFrameId, const rclcpp::Time & stamp); // TF odom
+	void fillUpLastPoseData(SyncData & data, const std::string & odomFrameId, const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr& odomInfoMsg, double msgConversionTime);
 
 	// Callback called from sync thread
 	virtual void commonMultiCameraCallback(
@@ -145,7 +159,6 @@ private:
 				const std::vector<sensor_msgs::msg::CameraInfo> & depthCameraInfoMsgs,
 				const sensor_msgs::msg::LaserScan & scan2dMsg,
 				const sensor_msgs::msg::PointCloud2 & scan3dMsg,
-				const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr& odomInfoMsg,
 				const std::vector<rtabmap_msgs::msg::GlobalDescriptor> & globalDescriptorMsgs,
 				const std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > & localKeyPoints,
 				const std::vector<std::vector<rtabmap_msgs::msg::Point3f> > & localPoints3d,
@@ -274,7 +287,8 @@ private:
 	rtabmap::Rtabmap rtabmap_;
 	bool paused_;
 
-	UMutex lastPoseMutex_;
+	// Variables used in callbacks from sync callback group
+	UMutex syncCallbackGroupMutex_;
 	rtabmap::Transform lastPose_;
 	rclcpp::Time lastPoseStamp_;
 	std::vector<float> lastPoseVelocity_;
@@ -451,6 +465,8 @@ private:
 	double mappingAltitudeDelta_;
 	bool alreadyRectifiedImages_;
 	bool twoDMapping_;
+
+	UMutex previousStampMutex_;
 	rclcpp::Time previousStamp_;
 
 	rtabmap_util::ULogToRosout ulogToRosout_;
@@ -469,22 +485,11 @@ private:
 	LocalizationStatusTask localizationDiagnostic_;
 
 	rclcpp::CallbackGroup::SharedPtr processingCallbackGroup_;
-	struct SyncData {
-		bool valid;
-		rclcpp::Time stamp;
-		rtabmap::SensorData data;
-		rtabmap::Transform odom;
-		std::vector<float> odomVelocity;
-		std::string odomFrameId;
-		cv::Mat odomCovariance;
-		rtabmap::OdometryInfo odomInfo;
-		double timeMsgConversion;
-	};
+
 	rclcpp::TimerBase::SharedPtr syncTimer_;
+	UMutex syncDataMutex_;
 	SyncData syncData_;
 	SyncData bufferedSyncData_;
-	UMutex syncDataMutex_;
-	UMutex bufferedSyncDataMutex_;
 	bool triggerNewMapBeforeNextUpdate_;
 };
 
