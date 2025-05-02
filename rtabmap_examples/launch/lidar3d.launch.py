@@ -46,6 +46,9 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
   localization = LaunchConfiguration('localization').perform(context)
   localization = localization == 'true' or localization == 'True'
   
+  deskewing = LaunchConfiguration('deskewing').perform(context)
+  deskewing = deskewing == 'true' or deskewing == 'True'
+  
   deskewing_slerp = LaunchConfiguration('deskewing_slerp').perform(context)
   deskewing_slerp = deskewing_slerp == 'true' or deskewing_slerp == 'True'
   
@@ -55,7 +58,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
     fixed_frame_from_imu = True
     fixed_frame_id = frame_id.perform(context) + "_stabilized"
   
-  if not fixed_frame_id:
+  if not fixed_frame_id or not deskewing:
     lidar_topic_deskewed = lidar_topic
   
   # Rule of thumb:
@@ -82,7 +85,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
   
   icp_odometry_parameters = {
     'expected_update_rate': LaunchConfiguration('expected_update_rate'),
-    'deskewing': not fixed_frame_id, # If fixed_frame_id is set, we do deskewing externally below
+    'deskewing': not fixed_frame_id and deskewing, # If fixed_frame_id is set, we do deskewing externally below
     'odom_frame_id': 'icp_odom',
     'guess_frame_id': fixed_frame_id,
     'deskewing_slerp': deskewing_slerp,
@@ -101,6 +104,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
     'subscribe_rgb': False,
     'subscribe_odom_info': True,
     'subscribe_scan_cloud': True,
+    'map_frame_id': 'new_map',
     # RTAB-Map's internal parameters are strings:
     'RGBD/ProximityMaxGraphDepth': '0',
     'RGBD/ProximityPathMaxNeighbors': '1',
@@ -110,7 +114,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
     'Mem/NotLinkedNodesKept': 'false',
     'Mem/STMSize': '30',
     'Reg/Strategy': '1',
-    'Icp/CorrespondenceRatio': LaunchConfiguration('min_loop_closure_overlap')
+    'Icp/CorrespondenceRatio': str(LaunchConfiguration('min_loop_closure_overlap').perform(context))
   }
   
   arguments = []
@@ -158,7 +162,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
           'wait_for_transform_duration': 0.001}],
         remappings=[('imu/data', imu_topic)]))
 
-  if fixed_frame_id:
+  if fixed_frame_id and deskewing:
     # Lidar deskewing
     nodes.append(
       Node(

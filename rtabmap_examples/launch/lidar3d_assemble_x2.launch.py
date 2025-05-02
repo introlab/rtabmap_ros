@@ -115,7 +115,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
     'Mem/NotLinkedNodesKept': 'false',
     'Mem/STMSize': '30',
     'Reg/Strategy': '1',
-    'Icp/CorrespondenceRatio': LaunchConfiguration('min_loop_closure_overlap')
+    'Icp/CorrespondenceRatio': str(LaunchConfiguration('min_loop_closure_overlap').perform(context))
   }
   
   remappings = [('imu', imu_topic),
