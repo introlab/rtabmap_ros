@@ -68,9 +68,12 @@ export RCUTILS_COLORIZED_OUTPUT=1
 ```
 
 ## Recommended DDS
-If RTAB-Map's GUI or topic frequency feel laggy (even if processing time looks fast enough), it may be caused by the DDS. I recommend to use [Cyclone DDS](https://docs.ros.org/en/foxy/Installation/DDS-Implementations/Working-with-Eclipse-CycloneDDS.html), you can try it by adding this before launching any nodes/launch files:
+If RTAB-Map's GUI or topic frequency feel laggy (even if processing time looks fast enough), it may be caused by the DDS. I recommend to use [Cyclone DDS](https://docs.ros.org/en/foxy/Installation/DDS-Implementations/Working-with-Eclipse-CycloneDDS.html), you can try it by adding this before launching any nodes/launch files (or add to your `.bashrc`):
 ```bash
 export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+# Cyclone prefers multicast by default, if your router got too much spammed, 
+# disable multicast with (https://github.com/ros2/rmw_cyclonedds/issues/489):
+export CYCLONEDDS_URI="<Disc><DefaultMulticastAddress>0.0.0.0</></>"
 ```
 
 # Installation 
