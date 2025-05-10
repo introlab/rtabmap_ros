@@ -15,21 +15,25 @@
 + [Isaac Sim Nav2 and RGB-D VSLAM](#isaac-sim-nav2-and-rgb-d-vslam)
 
 ### Outdoor Stereo VSLAM
-[stereo_outdoor_demo.launch.py](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_demos/launch/stereo_outdoor_demo.launch.py)
+[stereo_outdoor_demo.launch.py](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_demos/launch/stereo_outdoor_demo.launch.py) ([Video](https://youtu.be/qpTS7kg9J3A))
 
 ![Peek 2024-11-29 10-52](https://github.com/user-attachments/assets/b6dd4a1c-5bd5-4cfa-936d-e8e707bbcb23)
+
 ### Indoor 2D LiDAR and RGB-D SLAM
-[robot_mapping_demo.launch.py](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_demos/launch/robot_mapping_demo.launch.py)
+[robot_mapping_demo.launch.py](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_demos/launch/robot_mapping_demo.launch.py) (Videos: [rtabmap_viz](https://youtu.be/c0qrEd5rR7M), [rviz](https://youtu.be/MQoSDpAsqps))
 
 ![Peek 2024-11-29 11-07](https://github.com/user-attachments/assets/b02beeea-28ed-4fde-932d-c89bef1a046d)
+
 ### Multi-Session Indoor 2D LiDAR and RGB-D SLAM
-[multisession_mapping_demo.launch.py](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_demos/launch/multisession_mapping_demo.launch.py)
+[multisession_mapping_demo.launch.py](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_demos/launch/multisession_mapping_demo.launch.py) ([Video](https://youtu.be/XrnyhaxPCro))
 
 ![Peek 2024-11-29 11-48](https://github.com/user-attachments/assets/b130e5ab-618f-4c8b-840f-f926b65ab53b)
+
 ### Find-Object with SLAM
-[find_object_demo.launch.py](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_demos/launch/find_object_demo.launch.py)
+[find_object_demo.launch.py](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_demos/launch/find_object_demo.launch.py) ([Video](https://youtu.be/o1GSQanY-Do))
 
 ![Peek 2024-11-29 12-01](https://github.com/user-attachments/assets/b3cc0c67-517a-4f69-b4cc-35d288e96165)
+
 ### Turtlebot4 Nav2, 2D LiDAR and RGB-D SLAM
 [turtlebot4_sim_demo.launch.py](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_demos/launch/turtlebot4/turtlebot4_sim_demo.launch.py)
 
