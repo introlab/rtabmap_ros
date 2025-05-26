@@ -1652,9 +1652,8 @@ std::map<std::string, float> odomInfoToStatistics(const rtabmap::OdometryInfo & 
 	{
 		if(!info.transform.isNull())
 		{
-			rtabmap::Transform diff = info.transformGroundTruth.inverse()*info.transform;
-			stats.insert(std::make_pair("Odometry/TG_error_lin/m", diff.getNorm()));
-			stats.insert(std::make_pair("Odometry/TG_error_ang/deg", diff.getAngle()*180.0/CV_PI));
+			stats.insert(std::make_pair("Odometry/TG_error_lin/m", info.transformGroundTruth.getDistance(info.transform)));
+			stats.insert(std::make_pair("Odometry/TG_error_ang/deg", info.transformGroundTruth.getAngle(info.transform)*180.0/CV_PI));
 		}
 
 		info.transformGroundTruth.getTranslationAndEulerAngles(x,y,z,roll,pitch,yaw);
