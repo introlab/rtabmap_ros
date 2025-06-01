@@ -720,7 +720,17 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 					tfBroadcaster_->sendTransform(msg);
 				}
 				mapToOdomMutex_.unlock();
-				r.sleep();
+				try {
+					r.sleep();
+				}
+				catch(std::exception & e) {
+					if(rclcpp::ok()) {
+						RCLCPP_ERROR(this->get_logger(),
+							"Could not sleep: \"%s\", TF \"%s\"->\"%s\" won't be published anymore!",
+							e.what(), mapFrameId_.c_str(), odomFrameId_.c_str());
+					} // else: the node may have been shutdown
+					break;
+				}
 			}
 		});
 	}
