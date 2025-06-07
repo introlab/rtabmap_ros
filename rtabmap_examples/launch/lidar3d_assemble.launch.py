@@ -42,7 +42,9 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
   imu_topic = LaunchConfiguration('imu_topic')
   
   rgbd_image_topic = LaunchConfiguration('rgbd_image_topic')
-  rgbd_image_used =  rgbd_image_topic.perform(context) != ''
+  rgbd_images_topic = LaunchConfiguration('rgbd_images_topic')
+  rgbd_image_used =  rgbd_image_topic.perform(context) != '' or rgbd_images_topic.perform(context) != ''
+  rgbd_cameras = 0 if rgbd_images_topic.perform(context) != '' else 1
   
   lidar_topic = LaunchConfiguration('lidar_topic')
   lidar_topic_value = lidar_topic.perform(context)
@@ -117,7 +119,10 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
   remappings = [('imu', imu_topic),
                 ('odom', 'icp_odom')]
   if rgbd_image_used:
-    remappings.append(('rgbd_image', LaunchConfiguration('rgbd_image_topic')))
+    if rgbd_cameras == 1:
+      remappings.append(('rgbd_image', LaunchConfiguration('rgbd_image_topic')))
+    else:
+      remappings.append(('rgbd_images', LaunchConfiguration('rgbd_images_topic')))
     
   arguments = []
   if localization:
@@ -159,6 +164,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
       package='rtabmap_slam', executable='rtabmap', output='screen',
       parameters=[shared_parameters, rtabmap_parameters,
                   {'subscribe_rgbd': rgbd_image_used,
+                   'rgbd_cameras': rgbd_cameras,
                    'topic_queue_size': 40,
                    'sync_queue_size': 40,}],
       remappings=remappings + [('scan_cloud', 'assembled_cloud'), ('gps/fix', LaunchConfiguration('gps_topic'))],
@@ -232,6 +238,10 @@ def generate_launch_description():
     DeclareLaunchArgument(
       'rgbd_image_topic', default_value='',
       description='RGBD image topic (ignored if empty). Would be the output of a rtabmap_sync\'s rgbd_sync, stereo_sync or rgb_sync node.'),
+    
+    DeclareLaunchArgument(
+      'rgbd_images_topic', default_value='',
+      description='RGBD images topic (ignored if empty, override "rgbd_image_topic" if set). Would be the output of a rtabmap_sync\'s rgbdx_sync node.'),
     
     DeclareLaunchArgument(
       'voxel_size', default_value='0.1',

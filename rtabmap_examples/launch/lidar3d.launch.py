@@ -32,7 +32,9 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
   imu_used =  imu_topic.perform(context) != ''
   
   rgbd_image_topic = LaunchConfiguration('rgbd_image_topic')
-  rgbd_image_used =  rgbd_image_topic.perform(context) != ''
+  rgbd_images_topic = LaunchConfiguration('rgbd_images_topic')
+  rgbd_image_used =  rgbd_image_topic.perform(context) != '' or rgbd_images_topic.perform(context) != ''
+  rgbd_cameras = 0 if rgbd_images_topic.perform(context) != '' else 1
   
   voxel_size = LaunchConfiguration('voxel_size')
   voxel_size_value = float(voxel_size.perform(context))
@@ -105,6 +107,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
     'subscribe_odom_info': True,
     'subscribe_scan_cloud': True,
     'map_frame_id': 'new_map',
+    'odom_sensor_sync': True, # This will adjust camera position based on difference between lidar and camera stamps.
     # RTAB-Map's internal parameters are strings:
     'RGBD/ProximityMaxGraphDepth': '0',
     'RGBD/ProximityPathMaxNeighbors': '1',
@@ -130,7 +133,10 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
   else:
     remappings.append(('imu', 'imu_not_used'))
   if rgbd_image_used:
-    remappings.append(('rgbd_image', LaunchConfiguration('rgbd_image_topic')))
+    if rgbd_cameras == 1:
+      remappings.append(('rgbd_image', LaunchConfiguration('rgbd_image_topic')))
+    else:
+      remappings.append(('rgbd_images', LaunchConfiguration('rgbd_images_topic')))
   
   nodes = [
     Node(
@@ -140,7 +146,9 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
     
     Node(
       package='rtabmap_slam', executable='rtabmap', output='screen',
-      parameters=[shared_parameters, rtabmap_parameters, {'subscribe_rgbd': rgbd_image_used}],
+      parameters=[shared_parameters, rtabmap_parameters, 
+                  {'subscribe_rgbd': rgbd_image_used, 
+                   'rgbd_cameras': rgbd_cameras}],
       remappings=remappings + [('scan_cloud', lidar_topic_deskewed)],
       arguments=arguments), 
   
@@ -214,6 +222,10 @@ def generate_launch_description():
     DeclareLaunchArgument(
       'rgbd_image_topic', default_value='',
       description='RGBD image topic (ignored if empty). Would be the output of a rtabmap_sync\'s rgbd_sync, stereo_sync or rgb_sync node.'),
+    
+    DeclareLaunchArgument(
+      'rgbd_images_topic', default_value='',
+      description='RGBD images topic (ignored if empty, override "rgbd_image_topic" if set). Would be the output of a rtabmap_sync\'s rgbdx_sync node.'),
     
     DeclareLaunchArgument(
       'expected_update_rate', default_value='15.0',
