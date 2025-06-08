@@ -10,8 +10,13 @@ env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
   BUILD_TYPE: Release
 
-jobs:
+jobs: 
   build:
+    # Disabling because Ubuntu 20.04 doesn't exist anymore on CI:
+    #   This is a scheduled Ubuntu 20.04 retirement. Ubuntu 20.04 LTS 
+    #   runner will be removed on 2025-04-15. For more details, see https://github.com/actions/runner-images/issues/11101
+    if: false
+
     # The CMake configure and build commands are platform agnostic and should work equally
     # well on Windows or Mac.  You can convert this to a matrix build if you need
     # cross-platform coverage.

@@ -364,7 +364,7 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 		std::string vStr = this->declare_parameter(iter->first, iter->second);
 		if(overrides.find(iter->first) != overrides.end())
 		{
-			RCLCPP_INFO(this->get_logger(), "Setting RTAB-Map parameter \"%s\"=\"%s\"", iter->first.c_str(), vStr.c_str());
+			RCLCPP_INFO(this->get_logger(), "Setting RTAB-Map parameter \"%s\"=\"%s\" (rosparam)", iter->first.c_str(), vStr.c_str());
 
 			if(iter->first.compare(Parameters::kRtabmapWorkingDirectory()) == 0)
 			{
@@ -3197,14 +3197,16 @@ void CoreWrapper::loadDatabaseCallback(
 	// Open new database
 	databasePath_ = newDatabasePath;
 
-	// modify default parameters with those in the database
+	//Warn if database's parameters are different than the current ones we are using
 	if(!req->clear && UFile::exists(databasePath_))
 	{
 		ParametersMap dbParameters;
 		rtabmap::DBDriver * driver = rtabmap::DBDriver::create();
+		std::string databaseVersion = "0.0.0";
 		if(driver->openConnection(databasePath_))
 		{
 			dbParameters = driver->getLastParameters(); // parameter migration is already done
+			databaseVersion = driver->getDatabaseVersion();
 		}
 		delete driver;
 		for(ParametersMap::iterator iter=dbParameters.begin(); iter!=dbParameters.end(); ++iter)
@@ -3214,15 +3216,31 @@ void CoreWrapper::loadDatabaseCallback(
 				// ignore working directory
 				continue;
 			}
-			if(parameters_.find(iter->first) == parameters_.end() &&
-				parameters_.find(iter->first)->second.compare(iter->second) !=0)
+			if(iter->first.find("Odom") == 0)
 			{
-				RCLCPP_WARN(get_logger(), "RTAB-Map parameter \"%s\" from database (%s) is different "
-						"from the current used one (%s). We still keep the "
+				// ignore odometry params
+				continue;
+			}
+			if(parameters_.find(iter->first) == parameters_.end())
+			{
+				RCLCPP_WARN(get_logger(), "RTAB-Map parameter \"%s\" from database (%s, version \"%s\") doesn't exist "
+						"in current rtabmap version (\"%s\"). The parameter is ignored.",
+						iter->first.c_str(),
+						iter->second.c_str(),
+						databaseVersion.c_str(),
+						RTABMAP_VERSION);
+			}
+			else if(parameters_.find(iter->first)->second.compare(iter->second) !=0)
+			{
+				RCLCPP_WARN(get_logger(), "RTAB-Map parameter \"%s\" from database (%s, version=\"%s\") is different "
+						"from the current used one (%s, version=\"%s\"). We still keep the "
 						"current parameter value (%s). If you want to switch between databases "
 						"with different configurations, restart rtabmap node instead of using this service.",
-						iter->first.c_str(), iter->second.c_str(),
+						iter->first.c_str(),
+						iter->second.c_str(),
+						databaseVersion.c_str(),
 						parameters_.find(iter->first)->second.c_str(),
+						RTABMAP_VERSION,
 						parameters_.find(iter->first)->second.c_str());
 			}
 		}
