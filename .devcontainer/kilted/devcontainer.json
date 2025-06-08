@@ -16,7 +16,7 @@
       },
     "settings": {
       "python.autoComplete.extraPaths": [
-        "/opt/ros/jazzy/lib/python3/dist-packages"
+        "/opt/ros/kilted/lib/python3/dist-packages"
       ],
       "terminal.integrated.defaultProfile.linux": "bash"
     },

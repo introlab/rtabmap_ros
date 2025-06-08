@@ -57,6 +57,10 @@ SET(Libraries
    rtabmap_sync
 )
 
+if("$ENV{ROS_DISTRO}" STRLESS "jazzy")
+  add_definitions(-DPRE_ROS_JAZZY)
+endif()
+
 ###########
 ## Build ##
 ###########

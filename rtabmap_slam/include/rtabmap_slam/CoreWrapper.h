@@ -405,10 +405,15 @@ private:
 	cv::Mat userData_;
 	UMutex userDataMutex_;
 
+	rclcpp::CallbackGroup::SharedPtr globalPoseAsyncCallbackGroup_;
 	rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr globalPoseAsyncSub_;
-	geometry_msgs::msg::PoseWithCovarianceStamped globalPose_;
+	std::map<double, geometry_msgs::msg::PoseWithCovarianceStamped> globalPoses_;
+	UMutex globalPoseMutex_;
+
+	rclcpp::CallbackGroup::SharedPtr gpsAsyncCallbackGroup_;
 	rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr gpsFixAsyncSub_;
-	rtabmap::GPS gps_;
+	std::map<double, rtabmap::GPS> gps_;
+	UMutex gpsMutex_;
 
 	rclcpp::CallbackGroup::SharedPtr landmarkCallbackGroup_;
 	rclcpp::Subscription<rtabmap_msgs::msg::LandmarkDetection>::SharedPtr landmarkDetectionSub_;

@@ -2,8 +2,8 @@
 
 * Available images on [introlab3it/rtabmap_ros](https://hub.docker.com/r/introlab3it/rtabmap_ros/):
     ```
-    foxy, foxy-latest
     humble, humble-latest
+    jazzy, jazzy-latest
     ```
     * The `-latest` images are automatically built from latest version of `rtabmap` and `rtabmap_ros` from source (including dependencies that are not available with ROS binaries). The other images have the same version than the binaries released on ROS. 
 

@@ -8,6 +8,9 @@
 #           <width>320</width>
 #           <height>240</height>
 #        </image>
+#   - Fix lidar sim distortions by editing /opt/ros/humble/share/clearpath_gz/worlds/warehouse.sdf (https://github.com/gazebosim/gz-sim/issues/2743):
+#        - <render_engine>ogre2</render_engine>
+#        + <render_engine>ogre</render_engine>
 #
 # Example with gazebo:
 #   1) Launch simulator (husky, nav2 and rtabmap):
