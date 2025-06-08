@@ -64,8 +64,7 @@ void ImuToTF::imuCallback(const sensor_msgs::msg::Imu::ConstSharedPtr msg)
 {
 	tf2::Quaternion q;
 	tf2::fromMsg(msg->orientation, q);
-	tf2::Transform st;
-	st.setRotation(q);
+	tf2::Transform st(q);
 
 	std::string childFrameId = msg->header.frame_id;
 
@@ -97,7 +96,6 @@ void ImuToTF::imuCallback(const sensor_msgs::msg::Imu::ConstSharedPtr msg)
 			return;
 		}
 	}
-	st.setOrigin(tf2::Vector3(0,0,0));
 
 	geometry_msgs::msg::TransformStamped output;
 	output.header.frame_id = fixedFrameId_;
