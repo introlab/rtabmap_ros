@@ -34,6 +34,7 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration('use_sim_time')
     localization = LaunchConfiguration('localization')
     robot_ns = LaunchConfiguration('robot_ns')
+    use_camera = LaunchConfiguration('use_camera')
 
     icp_odom_parameters={
           'odom_frame_id':'icp_odom',
@@ -43,7 +44,9 @@ def generate_launch_description():
     }
 
     rtabmap_parameters={
-          'subscribe_rgbd':True,
+          'subscribe_rgb':False,
+          'subscribe_depth':False,
+          'subscribe_rgbd': use_camera,
           'subscribe_scan_cloud':True,
           'use_action_for_goal':True,
           'odom_sensor_sync': True,
@@ -88,7 +91,7 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'use_sim_time', default_value='false', choices=['true', 'false'],
             description='Use simulation (Gazebo) clock if true'),
-        
+
         DeclareLaunchArgument(
             'localization', default_value='false', choices=['true', 'false'],
             description='Launch rtabmap in localization mode (a map should have been already created).'),
@@ -97,8 +100,13 @@ def generate_launch_description():
             'robot_ns', default_value='a200_0000',
             description='Robot namespace.'),
 
+        DeclareLaunchArgument(
+            'use_camera', default_value='true',
+            description='Use camera for global loop closure / re-localization.'),
+
         # Nodes to launch
         Node(
+            condition=IfCondition(use_camera),
             package='rtabmap_sync', executable='rgbd_sync', output='screen',
             namespace=robot_ns,
             parameters=[{'approx_sync':False, 'use_sim_time':use_sim_time}],

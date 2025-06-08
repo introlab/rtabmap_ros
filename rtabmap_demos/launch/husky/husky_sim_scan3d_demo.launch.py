@@ -43,6 +43,8 @@ ARGUMENTS = [
                           description='Ignition World'),
     DeclareLaunchArgument('robot_ns', default_value='a200_0000',
                           description='Robot namespace'),
+    DeclareLaunchArgument('use_camera', default_value='true',
+                          description='Use camera for global loop closure / re-localization.'),
 ]
 
 def generate_launch_description():
@@ -86,6 +88,7 @@ def generate_launch_description():
             ('rtabmap_viz', LaunchConfiguration('rtabmap_viz')),
             ('localization', LaunchConfiguration('localization')),
             ('use_sim_time', 'true'),
+            ('use_camera', LaunchConfiguration('use_camera')),
             ('robot_ns', LaunchConfiguration('robot_ns'))
         ]
     )
