@@ -33,3 +33,4 @@ jobs:
         package-name: rtabmap_ros
         target-ros2-distro: ${{ matrix.ros_distro }}
         vcs-repo-file-url: /tmp/deps.repos
+        rosdep-check: true
