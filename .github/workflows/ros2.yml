@@ -3,9 +3,9 @@ name: ros2
 
 on:
   push:
-    branches: [ ros2 ]
+    branches: [ kilted-devel ]
   pull_request:
-    branches: [ ros2 ]
+    branches: [ kilted-devel ]
 
 env:
   BUILD_TYPE: Release
@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        ros_distro: [humble, jazzy, kilted]
+        ros_distro: [kilted]
       fail-fast: false
     container:
       image: osrf/ros:${{ matrix.ros_distro }}-desktop-full
@@ -26,7 +26,7 @@ jobs:
       with:
         required-ros-distributions: ${{ matrix.ros_distro }}
     - run: |
-        echo "repositories:\n  introlab/rtabmap:\n    type: git\n    url: https://github.com/introlab/rtabmap.git\n    version: master\n" > /tmp/deps.repos &&\
+        echo "repositories:\n  introlab/rtabmap:\n    type: git\n    url: https://github.com/introlab/rtabmap.git\n    version: kilted-devel\n" > /tmp/deps.repos &&\
         cat /tmp/deps.repos
     - uses: ros-tooling/action-ros-ci@v0.4
       with:
