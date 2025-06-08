@@ -154,9 +154,9 @@ PointCloudAssembler::PointCloudAssembler(const rclcpp::NodeOptions & options) :
 		exactInfoSync_->registerCallback(std::bind(&rtabmap_util::PointCloudAssembler::callbackCloudOdomInfo, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (exact sync):\n   %s,\n   %s",
 							get_name(),
-							syncCloudSub_.getTopic().c_str(),
-							syncOdomSub_.getTopic().c_str(),
-							syncOdomInfoSub_.getTopic().c_str());
+							syncCloudSub_.getSubscriber()->get_topic_name(),
+							syncOdomSub_.getSubscriber()->get_topic_name(),
+							syncOdomInfoSub_.getSubscriber()->get_topic_name());
 	}
 	else
 	{
@@ -166,8 +166,8 @@ PointCloudAssembler::PointCloudAssembler(const rclcpp::NodeOptions & options) :
 		exactSync_->registerCallback(std::bind(&rtabmap_util::PointCloudAssembler::callbackCloudOdom, this, std::placeholders::_1, std::placeholders::_2));
 		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (exact sync):\n   %s,\n   %s",
 							get_name(),
-							syncCloudSub_.getTopic().c_str(),
-							syncOdomSub_.getTopic().c_str());
+							syncCloudSub_.getSubscriber()->get_topic_name(),
+							syncOdomSub_.getSubscriber()->get_topic_name());
 	}
 
 	warningThread_ = new std::thread([&](){

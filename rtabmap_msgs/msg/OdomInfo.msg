@@ -18,6 +18,8 @@ int32 local_key_frames
 int32 local_bundle_outliers
 int32 local_bundle_constraints
 float32 local_bundle_time
+float32 local_bundle_avg_inlier_distance
+int32 local_bundle_max_key_frames_for_inlier
 bool key_frame_added
 float32 time_estimation
 float32 time_particle_filtering

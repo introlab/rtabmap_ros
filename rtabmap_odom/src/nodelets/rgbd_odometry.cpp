@@ -113,6 +113,8 @@ void RGBDOdometry::onOdomInit()
 		rgbdCameras = 0;
 	}
 	keepColor_ = this->declare_parameter("keep_color", keepColor_);
+	std::string rgbdTransport = this->declare_parameter("rgb_transport", std::string("raw"));
+	std::string depthTransport = this->declare_parameter("depth_transport", std::string("raw"));
 
 	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: approx_sync    = %s", approxSync?"true":"false");
 	if(approxSync)
@@ -124,6 +126,8 @@ void RGBDOdometry::onOdomInit()
 	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: subscribe_rgbd = %s", subscribeRGBD?"true":"false");
 	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: rgbd_cameras   = %d", rgbdCameras);
 	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: keep_color     = %s", keepColor_?"true":"false");
+	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: rgb_transport   = %s", rgbdTransport.c_str());
+	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: depth_transport = %s", depthTransport.c_str());
 
 	rclcpp::SubscriptionOptions options;
 	options.callback_group = dataCallbackGroup_;
@@ -350,10 +354,19 @@ void RGBDOdometry::onOdomInit()
 	}
 	else
 	{
-		image_transport::TransportHints hints(this);
-		image_mono_sub_.subscribe(this, "rgb/image", hints.getTransport(), rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
-		image_depth_sub_.subscribe(this, "depth/image", hints.getTransport(), rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
-		info_sub_.subscribe(this, "rgb/camera_info", rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile(), options);
+		image_transport::TransportHints rgb_hints(this, "raw", "rgb_transport");
+		image_transport::TransportHints depth_hints(this, "raw", "depth_transport");
+
+		std::string rgb_topic = get_node_base_interface()->resolve_topic_or_service_name(
+      		"rgb/image", false, false
+		);
+		std::string depth_topic = get_node_base_interface()->resolve_topic_or_service_name(
+      		"depth/image", false, false
+		);
+
+		image_mono_sub_.subscribe(this, rgb_topic, rgb_hints.getTransport(), rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
+		image_depth_sub_.subscribe(this, depth_topic, depth_hints.getTransport(), rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
+		info_sub_.subscribe(this, "rgb/camera_info", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile());
 
 		if(approxSync)
 		{

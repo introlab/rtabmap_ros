@@ -323,6 +323,42 @@ inline int sizeOfPointField(int datatype)
   }
   return -1;
 }
+
+template <typename K, typename V>
+typename std::map<K, V>::const_iterator getClosestIterator(
+	const std::map<K, V> & buffer,
+	const K & key)
+{
+	UASSERT(!buffer.empty());
+	typename std::map<K, V>::const_iterator iterB = buffer.lower_bound(key);
+	typename std::map<K, V>::const_iterator iterA = iterB;
+	if(iterA != buffer.begin())
+	{
+		iterA = --iterA;
+	}
+	if(iterB == buffer.end())
+	{
+		iterB = --iterB;
+	}
+	if(iterA == iterB)
+	{
+		return iterA;
+	}
+	if(iterA->first > key)
+	{
+		return iterA;
+	}
+	else if(iterB->first < key)
+	{
+		return iterB;
+	}
+	else if(key - iterA->first < iterB->first - key)
+	{
+		return iterA;
+	}
+	return iterB;
+}
+
 }
 
 #endif /* MSGCONVERSION_H_ */

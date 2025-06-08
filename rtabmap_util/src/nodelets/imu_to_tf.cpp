@@ -29,6 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap_conversions/MsgConversion.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <tf2/LinearMath/Transform.h>
+#include <tf2/utils.hpp>
 
 namespace rtabmap_util
 {
@@ -63,8 +64,7 @@ void ImuToTF::imuCallback(const sensor_msgs::msg::Imu::ConstSharedPtr msg)
 {
 	tf2::Quaternion q;
 	tf2::fromMsg(msg->orientation, q);
-	tf2::Transform st;
-	st.setRotation(q);
+	tf2::Transform st(q);
 
 	std::string childFrameId = msg->header.frame_id;
 
@@ -81,10 +81,12 @@ void ImuToTF::imuCallback(const sensor_msgs::msg::Imu::ConstSharedPtr msg)
 				return;
 			}
 
-			geometry_msgs::msg::TransformStamped tmp = tfBuffer_->lookupTransform(msg->header.frame_id, baseFrameId_, msg->header.stamp);
+			geometry_msgs::msg::TransformStamped tmp = tfBuffer_->lookupTransform(baseFrameId_, msg->header.frame_id, msg->header.stamp);
 			tf2::Transform tmp_t;
 			tf2::fromMsg(tmp.transform, tmp_t);
-			tf2::Transform t = tmp_t.inverse()*st*tmp_t;
+			tf2::Quaternion q;
+			q.setRPY(0.0,0.0,tf2::getYaw(tmp_t.getRotation()));
+			tf2::Transform t = tf2::Transform(q)*st*tmp_t.inverse(); // base_frame orientation
 			st.setRotation(t.getRotation());
 			childFrameId = baseFrameId_;
 		}
@@ -94,7 +96,6 @@ void ImuToTF::imuCallback(const sensor_msgs::msg::Imu::ConstSharedPtr msg)
 			return;
 		}
 	}
-	st.setOrigin(tf2::Vector3(0,0,0));
 
 	geometry_msgs::msg::TransformStamped output;
 	output.header.frame_id = fixedFrameId_;

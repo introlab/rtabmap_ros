@@ -8,6 +8,9 @@
 #           <width>320</width>
 #           <height>240</height>
 #        </image>
+#   - Fix lidar sim distortions by editing /opt/ros/humble/share/clearpath_gz/worlds/warehouse.sdf (https://github.com/gazebosim/gz-sim/issues/2743):
+#        - <render_engine>ogre2</render_engine>
+#        + <render_engine>ogre</render_engine>
 #
 # Example with gazebo:
 #   1) Launch simulator (husky, nav2 and rtabmap):
@@ -40,6 +43,8 @@ ARGUMENTS = [
                           description='Ignition World'),
     DeclareLaunchArgument('robot_ns', default_value='a200_0000',
                           description='Robot namespace'),
+    DeclareLaunchArgument('use_camera', default_value='true',
+                          description='Use camera for global loop closure / re-localization.'),
 ]
 
 def generate_launch_description():
@@ -83,6 +88,7 @@ def generate_launch_description():
             ('rtabmap_viz', LaunchConfiguration('rtabmap_viz')),
             ('localization', LaunchConfiguration('localization')),
             ('use_sim_time', 'true'),
+            ('use_camera', LaunchConfiguration('use_camera')),
             ('robot_ns', LaunchConfiguration('robot_ns'))
         ]
     )
