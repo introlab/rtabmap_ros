@@ -17,5 +17,4 @@ RUN mkdir -p /home/${USERNAME}/ros2_ws/src && \
     chown -R ${USERNAME}:${USERNAME} /home/${USERNAME}/ros2_ws
 
 RUN echo "source /opt/ros/kilted/setup.bash" >> /home/${USERNAME}/.bashrc
-
-
+RUN echo "source /usr/share/bash-completion/completions/git" >> /home/${USERNAME}/.bashrc
