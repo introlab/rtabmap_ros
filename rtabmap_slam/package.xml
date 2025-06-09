@@ -24,6 +24,7 @@
   <depend>tf2</depend>
   <depend>tf2_ros</depend>
   <depend>visualization_msgs</depend>
+  <depend>apriltag_msgs</depend>
   
   <depend>rtabmap_msgs</depend>
   <depend>rtabmap_util</depend>
