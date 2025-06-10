@@ -17,6 +17,9 @@ jobs:
     strategy:
       matrix:
         ros_distro: [kilted]
+        include:
+        - ros_distro: kilted
+          skip_keys: ''
       fail-fast: false
     container:
       image: osrf/ros:${{ matrix.ros_distro }}-desktop-full
@@ -34,3 +37,4 @@ jobs:
         target-ros2-distro: ${{ matrix.ros_distro }}
         vcs-repo-file-url: /tmp/deps.repos
         rosdep-check: true
+        rosdep-skip-keys: "${{ matrix.skip_keys }}"

@@ -1,4 +1,4 @@
-FROM introlab3it/rtabmap:24.04
+FROM introlab3it/rtabmap:noble
 
 RUN source /ros_entrypoint.sh && \
     mkdir -p ros2_ws/src && \

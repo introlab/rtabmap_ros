@@ -12,6 +12,8 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
+  <build_depend>ros_environment</build_depend>
+
   <depend>cv_bridge</depend>
   <depend>image_transport</depend>
   <depend>rclcpp</depend>
