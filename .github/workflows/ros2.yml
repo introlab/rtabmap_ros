@@ -17,6 +17,13 @@ jobs:
     strategy:
       matrix:
         ros_distro: [humble, jazzy, kilted]
+        include:
+        - ros_distro: humble
+          skip_keys: ''
+        - ros_distro: jazzy
+          skip_keys: ''
+        - ros_distro: kilted
+          skip_keys: 'nav2_bringup nav2_msgs'
       fail-fast: false
     container:
       image: osrf/ros:${{ matrix.ros_distro }}-desktop-full
@@ -33,3 +40,4 @@ jobs:
         package-name: rtabmap_ros
         target-ros2-distro: ${{ matrix.ros_distro }}
         vcs-repo-file-url: /tmp/deps.repos
+        rosdep-skip-keys: "${{ matrix.skip_keys }}"
