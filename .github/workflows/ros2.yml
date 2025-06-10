@@ -28,7 +28,7 @@ jobs:
     - run: |
         echo "repositories:\n  introlab/rtabmap:\n    type: git\n    url: https://github.com/introlab/rtabmap.git\n    version: humble-devel\n" > /tmp/deps.repos &&\
         cat /tmp/deps.repos
-    - uses: ros-tooling/action-ros-ci@0.4
+    - uses: ros-tooling/action-ros-ci@v0.4
       with:
         package-name: rtabmap_ros
         target-ros2-distro: ${{ matrix.ros_distro }}
