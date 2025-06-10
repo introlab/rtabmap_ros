@@ -28,7 +28,7 @@ jobs:
     - run: |
         echo "repositories:\n  introlab/rtabmap:\n    type: git\n    url: https://github.com/introlab/rtabmap.git\n    version: jazzy-devel\n" > /tmp/deps.repos &&\
         cat /tmp/deps.repos
-    - uses: matlabbe/action-ros-ci@support_rosdep_check_without_skipping
+    - uses: ros-tooling/action-ros-ci@0.4
       with:
         package-name: rtabmap_ros
         target-ros2-distro: ${{ matrix.ros_distro }}
