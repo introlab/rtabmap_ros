@@ -12,7 +12,7 @@ RUN source /ros_entrypoint.sh && \
     rosdep init && \
     rosdep update && \
     apt-get update && \
-    apt-get upgrade && \
+    apt-get upgrade -y && \
     rosdep install --from-paths src --ignore-src -r -y -t build_export -t test -t build -t buildtool_export -t buildtool && \
     apt remove ros-$ROS_DISTRO-rtabmap -y && \
     apt-get clean && rm -rf /var/lib/apt/lists/ && \
