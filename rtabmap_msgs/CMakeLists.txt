@@ -10,6 +10,12 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+find_library(
+        rcutils_LIB NAMES rcutils
+        PATHS "/opt/ros/humble/lib"
+        NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH REQUIRED
+      )
+
 ##################
 ## Dependencies ##
 ##################
