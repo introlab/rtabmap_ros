@@ -10,6 +10,8 @@ RUN source /ros_entrypoint.sh && \
     env && \
     ls -l /opt/ros/humble/lib && \
     ls -l /opt/ros/humble/lib/aarch64-linux-gnu && \
+    file /opt/ros/humble/lib/librcutils.so && \
+    file /opt/ros/humble/lib/libbuiltin_interfaces__rosidl_generator_c.so && \
     cd ros2_ws && \
     export MAKEFLAGS="-j1" && \
     rosdep init && \
