@@ -6,6 +6,8 @@ RUN source /ros_entrypoint.sh && \
 
 COPY . ros2_ws/src/rtabmap_ros
 
+RUN ls -l /opt/ros/humble/lib
+
 RUN source /ros_entrypoint.sh && \
     cd ros2_ws && \
     export MAKEFLAGS="-j1" && \
