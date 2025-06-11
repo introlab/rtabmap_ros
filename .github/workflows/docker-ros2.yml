@@ -3,7 +3,7 @@ name: docker
 on:
   push:
     branches:
-      - 'ros2'
+      - 'debug_builtin_interfaces_issue'
 
 jobs:
   docker:
@@ -12,31 +12,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        docker_tag: [humble, humble-latest, jazzy, jazzy-latest, kilted-latest]
+        docker_tag: [humble-latest-test]
         include:
-        - docker_tag: humble
-          docker_path: 'humble'
-          docker_platforms: |
-            linux/amd64
-        - docker_tag: humble-latest
+        - docker_tag: humble-latest-test
           docker_path: 'humble/latest'
           docker_platforms: |
-            linux/amd64
-            linux/arm64
-        - docker_tag: jazzy
-          docker_path: 'jazzy'
-          docker_platforms: |
-            linux/amd64
-            linux/arm64
-        - docker_tag: jazzy-latest
-          docker_path: 'jazzy/latest'
-          docker_platforms: |
-            linux/amd64
-            linux/arm64
-        - docker_tag: kilted-latest
-          docker_path: 'kilted/latest'
-          docker_platforms: |
-            linux/amd64
             linux/arm64
     
     steps:
@@ -62,7 +42,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          push: true
+          push: false
           platforms: ${{ matrix.docker_platforms }}
           file: ./docker/${{ matrix.docker_path }}/Dockerfile
           tags: introlab3it/rtabmap_ros:${{ matrix.docker_tag }}
