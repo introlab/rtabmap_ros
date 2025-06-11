@@ -6,9 +6,10 @@ RUN source /ros_entrypoint.sh && \
 
 COPY . ros2_ws/src/rtabmap_ros
 
-RUN ls -l /opt/ros/humble/lib
-
 RUN source /ros_entrypoint.sh && \
+    env && \
+    ls -l /opt/ros/humble/lib && \
+    ls -l /opt/ros/humble/lib/aarch64-linux-gnu && \
     cd ros2_ws && \
     export MAKEFLAGS="-j1" && \
     rosdep init && \
@@ -16,6 +17,6 @@ RUN source /ros_entrypoint.sh && \
     apt-get update && \
     rosdep install --from-paths src --ignore-src -r -y -t build_export -t test -t build -t buildtool_export -t buildtool --skip-keys="rtabmap" && \
     apt-get clean && rm -rf /var/lib/apt/lists/ && \
-    colcon build --event-handlers console_direct+ --install-base /opt/ros/humble --merge-install --cmake-args -DRTABMAP_SYNC_MULTI_RGBD=ON -DCMAKE_BUILD_TYPE=Release && \
+    colcon build --event-handlers console_direct+ --install-base /opt/ros/humble --merge-install --cmake-args --debug-find -DRTABMAP_SYNC_MULTI_RGBD=ON -DCMAKE_BUILD_TYPE=Release && \
     cd && \
     rm -rf ros2_ws
