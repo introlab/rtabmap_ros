@@ -7,6 +7,13 @@ find_library(
         NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH REQUIRED
       )
 
+      find_library(
+        crypto_LIB NAMES crypto
+        PATHS "/usr/lib/aarch64-linux-gnu"
+        NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH REQUIRED
+      )
+
+
 find_package(cv_bridge REQUIRED)
 find_package(image_transport REQUIRED)
 find_package(message_filters REQUIRED)
