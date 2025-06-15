@@ -1,18 +1,18 @@
 cmake_minimum_required(VERSION 3.5)
 project(rtabmap_sync)
 
-if("$ENV{ROS_DISTRO}" STRLESS "jazzy")
+if("$ENV{ROS_DISTRO}" STRLESS "jazzy" AND CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
   # issues #1285 #1288
   find_library(
     builtin_interfaces__rosidl_generator_c_LIB NAMES builtin_interfaces__rosidl_generator_c
     PATHS "/opt/ros/$ENV{ROS_DISTRO}/lib"
     NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH REQUIRED
   )
- # find_library(
- #       crypto_LIB NAMES crypto
- #       PATHS "/usr/lib/aarch64-linux-gnu"
- #       NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH REQUIRED
- #     )
+  find_library(
+        crypto_LIB NAMES crypto
+        PATHS "/usr/lib/${CMAKE_SYSTEM_PROCESSOR}-linux-gnu"
+        NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH REQUIRED
+      )
 endif()
 
 find_package(cv_bridge REQUIRED)

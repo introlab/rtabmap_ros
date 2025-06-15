@@ -10,9 +10,7 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-MESSAGE(STATUS "Bulding for CMAKE_SYSTEM_PROCESSOR=${CMAKE_SYSTEM_PROCESSOR}")
-
-if("$ENV{ROS_DISTRO}" STRLESS "jazzy")
+if("$ENV{ROS_DISTRO}" STRLESS "jazzy" AND CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
   # issues #1285 #1288
   find_library(
     rcutils_LIB NAMES rcutils

@@ -12,11 +12,22 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        docker_tag: [humble-latest-test]
+        docker_tag: [humble-latest-test, jazzy-latest-test, kilted-latest-test]
         include:
         - docker_tag: humble-latest-test
           docker_path: 'humble/latest'
           docker_platforms: |
+            linux/amd64
+            linux/arm64
+        - docker_tag: jazzy-latest-test
+          docker_path: 'jazzy/latest'
+          docker_platforms: |
+            linux/amd64
+            linux/arm64
+        - docker_tag: kilted-latest-test
+          docker_path: 'kilted/latest'
+          docker_platforms: |
+            linux/amd64
             linux/arm64
     
     steps:

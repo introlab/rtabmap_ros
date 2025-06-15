@@ -5,7 +5,7 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-if("$ENV{ROS_DISTRO}" STRLESS "jazzy")
+if("$ENV{ROS_DISTRO}" STRLESS "jazzy" AND CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
   # issues #1285 #1288
   find_library(
     builtin_interfaces__rosidl_generator_c_LIB NAMES builtin_interfaces__rosidl_generator_c
