@@ -12,7 +12,6 @@
 
   <buildtool_depend>ament_cmake_ros</buildtool_depend>
 
-  <depend>builtin_interfaces</depend>
   <depend>cv_bridge</depend>
   <depend>image_geometry</depend>
   <depend>laser_geometry</depend>
