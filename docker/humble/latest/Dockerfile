@@ -13,10 +13,6 @@ RUN source /ros_entrypoint.sh && \
     rosdep install --from-paths src --ignore-src -r -y -t build_export -t test -t build -t buildtool_export -t buildtool --skip-keys="rtabmap" && \
     apt-get clean && rm -rf /var/lib/apt/lists/ && \
     env && \
-    ls -l /opt/ros/humble/lib && \
-    ls -l /opt/ros/humble/lib/aarch64-linux-gnu && \
-    file /opt/ros/humble/lib/librcutils.so && \
-    file /opt/ros/humble/lib/libbuiltin_interfaces__rosidl_generator_c.so && \
-    colcon build --executor sequential --event-handlers console_direct+ --install-base /opt/ros/humble --merge-install --cmake-args --debug-find -DRTABMAP_SYNC_MULTI_RGBD=ON -DCMAKE_BUILD_TYPE=Release && \
+    colcon build --executor sequential --event-handlers console_direct+ --install-base /opt/ros/humble --merge-install --cmake-args -DRTABMAP_SYNC_MULTI_RGBD=ON -DCMAKE_BUILD_TYPE=Release && \
     cd && \
     rm -rf ros2_ws
