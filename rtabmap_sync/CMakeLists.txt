@@ -1,19 +1,21 @@
 cmake_minimum_required(VERSION 3.5)
 project(rtabmap_sync)
 
-find_library(
-        builtin_interfaces__rosidl_generator_c_LIB NAMES builtin_interfaces__rosidl_generator_c
-        PATHS "/opt/ros/humble/lib"
-        NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH REQUIRED
-      )
+#find_library(
+#        builtin_interfaces__rosidl_generator_c_LIB NAMES builtin_interfaces__rosidl_generator_c
+#        PATHS "/opt/ros/humble/lib"
+#        NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH REQUIRED
+#      )
 
-      find_library(
-        crypto_LIB NAMES crypto
-        PATHS "/usr/lib/aarch64-linux-gnu"
-        NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH REQUIRED
-      )
+ #     find_library(
+ #       crypto_LIB NAMES crypto
+ #       PATHS "/usr/lib/aarch64-linux-gnu"
+ #       NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH REQUIRED
+ #     )
 
 
+find_package(builtin_interfaces REQUIRED)
+find_package(OpenSSL REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(image_transport REQUIRED)
 find_package(message_filters REQUIRED)

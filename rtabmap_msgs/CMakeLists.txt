@@ -10,17 +10,18 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-find_library(
-        rcutils_LIB NAMES rcutils
-        PATHS "/opt/ros/humble/lib"
-        NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH REQUIRED
-      )
+#find_library(
+#        rcutils_LIB NAMES rcutils
+#        PATHS "/opt/ros/humble/lib"
+#        NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH REQUIRED
+#      )
 
 ##################
 ## Dependencies ##
 ##################
 find_package(rosidl_default_generators REQUIRED)
 
+find_package(rcutils REQUIRED)
 find_package(builtin_interfaces REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)

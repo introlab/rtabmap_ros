@@ -14,6 +14,7 @@
 
   <build_depend>ros_environment</build_depend>
 
+  <depend>builtin_interfaces</depend>
   <depend>cv_bridge</depend>
   <depend>geometry_msgs</depend>
   <depend>nav_msgs</depend>

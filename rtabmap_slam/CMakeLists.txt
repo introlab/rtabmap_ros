@@ -10,12 +10,13 @@ if(POLICY CMP0074)
     cmake_policy(SET CMP0074 NEW)
 endif()
 
-find_library(
-        builtin_interfaces__rosidl_generator_c_LIB NAMES builtin_interfaces__rosidl_generator_c
-        PATHS "/opt/ros/humble/lib"
-        NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH REQUIRED
-      )
+#find_library(
+#        builtin_interfaces__rosidl_generator_c_LIB NAMES builtin_interfaces__rosidl_generator_c
+#        PATHS "/opt/ros/humble/lib"
+#        NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH REQUIRED
+#      )
 
+find_package(builtin_interfaces REQUIRED)
 find_package(ament_cmake REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(geometry_msgs REQUIRED)
