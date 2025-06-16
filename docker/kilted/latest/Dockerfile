@@ -8,7 +8,7 @@ COPY . ros2_ws/src/rtabmap_ros
 
 RUN source /ros_entrypoint.sh && \
     cd ros2_ws && \
-    export MAKEFLAGS="-j1" && \
+    export MAKEFLAGS="-j2" && \
     rosdep init && \
     rosdep update && \
     apt-get update && \
