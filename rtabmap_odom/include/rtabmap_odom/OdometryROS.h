@@ -159,6 +159,7 @@ private:
 	rtabmap::Transform guess_;
 	rtabmap::Transform guessPreviousPose_;
 	double previousStamp_;
+	double previousClockTime_;
 	double expectedUpdateRate_;
 	double maxUpdateRate_;
 	double minUpdateRate_;
