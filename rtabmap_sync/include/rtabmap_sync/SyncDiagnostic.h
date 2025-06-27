@@ -19,7 +19,9 @@ class SyncDiagnostic {
             compositeTask_("Sync status"),
             lastCallbackCalledStamp_(ros::Time::now().toSec()-1),
             targetFrequency_(0.0),
-            windowSize_(windowSize)
+            windowSize_(windowSize),
+            lastTickTime_(0.0),
+            nodeName_(nodeName)
     {
         UASSERT(windowSize_ >= 1);
     }
@@ -83,7 +85,8 @@ class SyncDiagnostic {
         double clockNow = ros::Time::now().toSec();
         if(lastTickTime_ > clockNow)
         {
-            ROS_WARN("Detected time jump in the past of %f sec, forcing diagnostic update.", clockNow - lastTickTime_);
+            ROS_WARN("%s: Detected time jump in the past of %f sec, forcing diagnostic update.", 
+                nodeName_.c_str(), clockNow - lastTickTime_);
             diagnosticUpdater_.force_update();
             diagnosticTimer_.stop();
             diagnosticTimer_.start();
@@ -116,6 +119,7 @@ private:
         int windowSize_;
         std::deque<double> window_;
         double lastTickTime_;
+        std::string nodeName_;
 
 };
 
