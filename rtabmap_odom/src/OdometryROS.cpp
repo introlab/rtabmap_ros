@@ -553,19 +553,20 @@ void OdometryROS::mainLoop()
 				previousClockTime_ - clockNow);
 			SensorData dataCpy = dataToProcess_;
 			std_msgs::Header headerCpy = dataHeaderToProcess_;
+			double previousCpy = previousClockTime_;
 			this->reset(odometry_->getPose());
-			if(previousClockTime_ < headerCpy.stamp.toSec()) {
+			if(previousCpy < headerCpy.stamp.toSec()) {
 				// new frame is using new clock, process it now
 				dataToProcess_ = dataCpy;
 				dataHeaderToProcess_ = headerCpy;
 				dataReady_.release();
 				NODELET_WARN("Odometry: Restarting with frame: %f (clock previous=%f, new=%f)",
-					headerCpy.stamp.toSec(), previousClockTime_, clockNow);
+					headerCpy.stamp.toSec(), previousCpy, clockNow);
 			}
 			else {
 				// skip that old frame
 				NODELET_WARN("Odometry: skipping frame: %f (clock previous=%f, new=%f)",
-					headerCpy.stamp.toSec(), previousClockTime_, clockNow);
+					headerCpy.stamp.toSec(), previousCpy, clockNow);
 			}
 			previousClockTime_ = clockNow;
 			return;
