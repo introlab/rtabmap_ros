@@ -544,40 +544,46 @@ void OdometryROS::mainLoop()
 	Transform groundTruth;
 	if(!data.imageRaw().empty() || !data.laserScanRaw().isEmpty())
 	{
+		// Detect time jump in the past
 		double clockNow = ros::Time::now().toSec();
-		if(previousStamp_>0.0 && previousStamp_ >= header.stamp.toSec())
+		if(previousClockTime_>0.0 && previousClockTime_ > clockNow)
 		{
-			// Detect time jump in the past
-			if(previousClockTime_>0.0 && previousClockTime_ > clockNow)
-			{
-				NODELET_WARN("Odometry: Detected jump back in time of %f sec. Odometry is "
-					"automatically reset to latest computed pose! Restarting with initial frame (stamp=%f).",
-					previousClockTime_ - clockNow, header.stamp.toSec());
-				SensorData dataCpy = dataToProcess_;
-				std_msgs::Header headerCpy = dataHeaderToProcess_;
-				this->reset(odometry_->getPose());
+			NODELET_WARN("Odometry: Detected jump back in time of %f sec. Odometry is "
+				"automatically reset to latest computed pose!",
+				previousClockTime_ - clockNow);
+			SensorData dataCpy = dataToProcess_;
+			std_msgs::Header headerCpy = dataHeaderToProcess_;
+			this->reset(odometry_->getPose());
+			if(previousClockTime_ < headerCpy.stamp.toSec()) {
+				// new frame is using new clock, process it now
 				dataToProcess_ = dataCpy;
 				dataHeaderToProcess_ = headerCpy;
-				previousClockTime_ = clockNow;
-				dataReady_.release(); // force reprocessing now
-				return;
+				dataReady_.release();
+				NODELET_WARN("Odometry: Restarting with frame: %f (clock previous=%f, new=%f)",
+					headerCpy.stamp.toSec(), previousClockTime_, clockNow);
 			}
-			else // topics received not in order?!
-			{
-				NODELET_WARN("Odometry: Detected not valid consecutive stamps (previous=%fs new=%fs). "
-						"New stamp should be always greater than previous stamp. Clock: previous=%f new=%f. This new data is ignored. ",
-						previousStamp_, header.stamp.toSec(),
-						previousClockTime_, clockNow);
-				previousClockTime_ = clockNow;
-				return;
+			else {
+				// skip that old frame
+				NODELET_WARN("Odometry: skipping frame: %f (clock previous=%f, new=%f)",
+					headerCpy.stamp.toSec(), previousClockTime_, clockNow);
 			}
+			previousClockTime_ = clockNow;
+			return;
+		}
+		previousClockTime_ = clockNow;
+
+		if(previousStamp_>0.0 && previousStamp_ >= header.stamp.toSec())
+		{
+			NODELET_WARN("Odometry: Detected not valid consecutive stamps (previous=%fs new=%fs). "
+					"New stamp should be always greater than previous stamp. This new data is ignored. ",
+					previousStamp_, header.stamp.toSec());
+			return;
 		}
 		else if(maxUpdateRate_ > 0 &&
 				previousStamp_ > 0 &&
 				(header.stamp.toSec()-previousStamp_+(expectedUpdateRate_ > 0?1.0/expectedUpdateRate_:0)) < 1.0/maxUpdateRate_)
 		{
 			// throttling
-			previousClockTime_ = clockNow;
 			return;
 		}
 		else if(maxUpdateRate_ == 0 &&
@@ -587,10 +593,8 @@ void OdometryROS::mainLoop()
 		{
 			NODELET_WARN("Odometry: Aborting odometry update, higher frame rate detected (%f Hz) than the expected one (%f Hz). (stamps: previous=%fs new=%fs)",
 					1.0/(header.stamp.toSec()-previousStamp_), expectedUpdateRate_, previousStamp_, header.stamp.toSec());
-			previousClockTime_ = clockNow;
 			return;
 		}
-		previousClockTime_ = clockNow;
 
 		if(!groundTruthFrameId_.empty())
 		{
