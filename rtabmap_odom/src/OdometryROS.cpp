@@ -551,10 +551,15 @@ void OdometryROS::mainLoop()
 			if(previousClockTime_>0.0 && previousClockTime_ > clockNow)
 			{
 				NODELET_WARN("Odometry: Detected jump back in time of %f sec. Odometry is "
-					"automatically reset to latest computed pose! Skipping this frame (stamp=%f).",
+					"automatically reset to latest computed pose! Restarting with initial frame (stamp=%f).",
 					previousClockTime_ - clockNow, header.stamp.toSec());
+				SensorData dataCpy = dataToProcess_;
+				std_msgs::Header headerCpy = dataHeaderToProcess_;
 				this->reset(odometry_->getPose());
+				dataToProcess_ = dataCpy;
+				dataHeaderToProcess_ = headerCpy;
 				previousClockTime_ = clockNow;
+				dataReady_.release(); // force reprocessing now
 				return;
 			}
 			else // topics received not in order?!
