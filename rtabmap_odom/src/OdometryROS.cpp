@@ -544,16 +544,17 @@ void OdometryROS::mainLoop()
 	Transform groundTruth;
 	if(!data.imageRaw().empty() || !data.laserScanRaw().isEmpty())
 	{
+		double clockNow = ros::Time::now().toSec();
 		if(previousStamp_>0.0 && previousStamp_ >= header.stamp.toSec())
 		{
 			// Detect time jump in the past
-			double now = ros::Time::now().toSec();
-			if(previousClockTime_>0.0 && previousClockTime_ > now)
+			if(previousClockTime_>0.0 && previousClockTime_ > clockNow)
 			{
 				NODELET_WARN("Odometry: Detected jump back in time of %f sec. Odometry is "
 					"automatically reset to latest computed pose! Skipping this frame (stamp=%f).",
-					previousClockTime_ - now, header.stamp.toSec());
+					previousClockTime_ - clockNow, header.stamp.toSec());
 				this->reset(odometry_->getPose());
+				previousClockTime_ = clockNow;
 				return;
 			}
 			else // topics received not in order?!
@@ -561,7 +562,8 @@ void OdometryROS::mainLoop()
 				NODELET_WARN("Odometry: Detected not valid consecutive stamps (previous=%fs new=%fs). "
 						"New stamp should be always greater than previous stamp. Clock: previous=%f new=%f. This new data is ignored. ",
 						previousStamp_, header.stamp.toSec(),
-						previousClockTime_, now);
+						previousClockTime_, clockNow);
+				previousClockTime_ = clockNow;
 				return;
 			}
 		}
@@ -570,6 +572,7 @@ void OdometryROS::mainLoop()
 				(header.stamp.toSec()-previousStamp_+(expectedUpdateRate_ > 0?1.0/expectedUpdateRate_:0)) < 1.0/maxUpdateRate_)
 		{
 			// throttling
+			previousClockTime_ = clockNow;
 			return;
 		}
 		else if(maxUpdateRate_ == 0 &&
@@ -579,8 +582,10 @@ void OdometryROS::mainLoop()
 		{
 			NODELET_WARN("Odometry: Aborting odometry update, higher frame rate detected (%f Hz) than the expected one (%f Hz). (stamps: previous=%fs new=%fs)",
 					1.0/(header.stamp.toSec()-previousStamp_), expectedUpdateRate_, previousStamp_, header.stamp.toSec());
+			previousClockTime_ = clockNow;
 			return;
 		}
+		previousClockTime_ = clockNow;
 
 		if(!groundTruthFrameId_.empty())
 		{
@@ -1117,7 +1122,6 @@ void OdometryROS::mainLoop()
 	}
 
 	previousStamp_ = header.stamp.toSec();
-	previousClockTime_ = ros::Time::now().toSec();
 }
 
 bool OdometryROS::reset(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
