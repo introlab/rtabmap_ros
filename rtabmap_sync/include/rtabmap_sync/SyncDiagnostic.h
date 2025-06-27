@@ -79,13 +79,25 @@ class SyncDiagnostic {
             targetFrequency_ = targetFrequency;
         }
         lastCallbackCalledStamp_ = stamp.toSec();
+
+        double clockNow = ros::Time::now().toSec();
+        if(lastTickTime_ > clockNow)
+        {
+            ROS_WARN("Detected time jump in the past of %f sec, forcing diagnostic update.", clockNow - lastTickTime_);
+            diagnosticUpdater_.force_update();
+            diagnosticTimer_.stop();
+            diagnosticTimer_.start();
+        }
+        else
+        {
+            diagnosticUpdater_.update();
+        }
+        lastTickTime_ = clockNow;
     }
 
 private:
     void diagnosticTimerCallback(const ros::TimerEvent& event)
     {
-        diagnosticUpdater_.update();
-
         if(ros::Time::now().toSec()-lastCallbackCalledStamp_ >= 5 && !topicsNotReceivedWarningMsg_.empty())
         {
             ROS_WARN_THROTTLE(5, "%s", topicsNotReceivedWarningMsg_.c_str());
@@ -103,6 +115,7 @@ private:
         double targetFrequency_;
         int windowSize_;
         std::deque<double> window_;
+        double lastTickTime_;
 
 };
 
