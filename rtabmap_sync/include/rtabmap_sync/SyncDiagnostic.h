@@ -86,10 +86,10 @@ class SyncDiagnostic {
         if(lastTickTime_ > clockNow)
         {
             ROS_WARN("%s: Detected time jump in the past of %f sec, forcing diagnostic update.", 
-                nodeName_.c_str(), clockNow - lastTickTime_);
+                nodeName_.c_str(), lastTickTime_ - clockNow);
             diagnosticUpdater_.force_update();
-            diagnosticTimer_.stop();
-            diagnosticTimer_.start();
+            diagnosticTimer_.setPeriod(ros::Duration(1));
+            lastCallbackCalledStamp_ = clockNow;
         }
         else
         {
