@@ -551,16 +551,17 @@ void OdometryROS::mainLoop()
 			if(previousClockTime_>0.0 && previousClockTime_ > now)
 			{
 				NODELET_WARN("Odometry: Detected jump back in time of %f sec. Odometry is "
-					"automatically reset to latest computed pose! Skipping this frame.",
-					previousClockTime_ - now);
+					"automatically reset to latest computed pose! Skipping this frame (stamp=%f).",
+					previousClockTime_ - now, header.stamp.toSec());
 				this->reset(odometry_->getPose());
 				return;
 			}
 			else // topics received not in order?!
 			{
 				NODELET_WARN("Odometry: Detected not valid consecutive stamps (previous=%fs new=%fs). "
-						"New stamp should be always greater than previous stamp. This new data is ignored. ",
-						previousStamp_, header.stamp.toSec());
+						"New stamp should be always greater than previous stamp. Clock: previous=%f new=%f. This new data is ignored. ",
+						previousStamp_, header.stamp.toSec(),
+						previousClockTime_, now);
 				return;
 			}
 		}
