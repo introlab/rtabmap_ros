@@ -887,6 +887,15 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 #ifdef WITH_APRILTAG_MSGS
 	tagDetectionsSub_ = this->create_subscription<apriltag_msgs::msg::AprilTagDetectionArray>("tag_detections", 5, std::bind(&CoreWrapper::tagDetectionsAsyncCallback, this, std::placeholders::_1), landmarkSubOptions);
 #endif
+#ifdef WITH_ARUCO_MSGS
+	arucoDetectionsSub_ = this->create_subscription<aruco_msgs::msg::MarkerArray>("marker_publisher/markers", 5, std::bind(&CoreWrapper::arucoAsyncCallback, this, std::placeholders::_1), landmarkSubOptions);
+#endif
+#ifdef WITH_ARUCO_OPENCV_MSGS
+	arucoCvDetectionsSub_ = this->create_subscription<aruco_opencv_msgs::msg::ArucoDetection>("aruco_detections", 5, std::bind(&CoreWrapper::arucoCvAsyncCallback, this, std::placeholders::_1), landmarkSubOptions);
+#endif
+#ifdef WITH_ARUCO_MARKERS_MSGS
+	arucoMarkersSub_ = this->create_subscription<aruco_markers_msgs::msg::MarkerArray>("aruco/markers", 5, std::bind(&CoreWrapper::arucoMarkersAsyncCallback, this, std::placeholders::_1), landmarkSubOptions);
+#endif
 #ifdef WITH_FIDUCIAL_MSGS
 	fiducialTransfromsSub_ = this->create_subscription<fiducial_msgs::msg::FiducialTransformArray>("fiducial_transforms", 5, std::bind(&CoreWrapper::fiducialDetectionsAsyncCallback, this, std::placeholders::_1), landmarkSubOptions);
 #endif
@@ -2680,6 +2689,66 @@ void CoreWrapper::tagDetectionsAsyncCallback(const apriltag_msgs::msg::AprilTagD
 			
 			uInsert(landmarks_,
 					std::make_pair(tagDetections->detections[i].id,
+							std::make_pair(p, 0.0f)));
+		}
+	}
+}
+#endif
+
+#ifdef WITH_ARUCO_MSGS
+void CoreWrapper::arucoAsyncCallback(const aruco_msgs::msg::MarkerArray::SharedPtr tagDetections)
+{
+	if(!paused_)
+	{
+		UScopeMutex lock(landmarksMutex_);
+		for(unsigned int i=0; i<tagDetections->markers.size(); ++i)
+		{
+			geometry_msgs::msg::PoseWithCovarianceStamped p;
+			p.pose = tagDetections->markers[i].pose;
+			p.header = tagDetections->markers[i].header;
+
+			uInsert(landmarks_,
+					std::make_pair((int)tagDetections->markers[i].id,
+							std::make_pair(p, 0.0f)));
+		}
+	}
+}
+#endif
+
+#ifdef WITH_ARUCO_OPENCV_MSGS
+void CoreWrapper::arucoCvAsyncCallback(const aruco_opencv_msgs::msg::ArucoDetection::SharedPtr tagDetections)
+{
+	if(!paused_)
+	{
+		UScopeMutex lock(landmarksMutex_);
+		for(unsigned int i=0; i<tagDetections->markers.size(); ++i)
+		{
+			geometry_msgs::msg::PoseWithCovarianceStamped p;
+			p.pose.pose = tagDetections->markers[i].pose;
+			p.header = tagDetections->header;
+			
+			uInsert(landmarks_,
+					std::make_pair((int)tagDetections->markers[i].marker_id,
+							std::make_pair(p, 0.0f)));
+		}
+	}
+}
+#endif
+
+#ifdef WITH_ARUCO_MARKERS_MSGS
+void CoreWrapper::arucoMarkersAsyncCallback(const aruco_markers_msgs::msg::MarkerArray::SharedPtr tagDetections)
+{
+	if(!paused_)
+	{
+		UScopeMutex lock(landmarksMutex_);
+		for(unsigned int i=0; i<tagDetections->markers.size(); ++i)
+		{
+			geometry_msgs::msg::PoseWithCovarianceStamped p;
+			p.pose.pose = tagDetections->markers[i].pose.pose;
+			p.header = tagDetections->markers[i].pose.header;
+			
+			uInsert(landmarks_,
+					std::make_pair((int)tagDetections->markers[i].id,
 							std::make_pair(p, 0.0f)));
 		}
 	}

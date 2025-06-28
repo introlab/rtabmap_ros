@@ -38,6 +38,9 @@ find_package(rtabmap_sync REQUIRED)
 
 #optional
 find_package(apriltag_msgs)
+find_package(aruco_msgs)
+find_package(aruco_markers_msgs)
+find_package(aruco_opencv_msgs)
 find_package(nav2_msgs)
 
 IF(WIN32)
@@ -87,6 +90,36 @@ SET(Libraries
    apriltag_msgs
 )
 ENDIF(apriltag_msgs_FOUND)
+
+# If aruco_msgs is found, add definition
+IF(aruco_msgs_FOUND)
+MESSAGE(STATUS "WITH aruco_msgs")
+ADD_DEFINITIONS("-DWITH_ARUCO_MSGS")
+SET(Libraries
+   ${Libraries}
+   aruco_msgs
+)
+ENDIF(aruco_msgs_FOUND)
+
+# If aruco_opencv_msgs is found, add definition
+IF(aruco_opencv_msgs_FOUND)
+MESSAGE(STATUS "WITH aruco_opencv_msgs")
+ADD_DEFINITIONS("-DWITH_ARUCO_OPENCV_MSGS")
+SET(Libraries
+   ${Libraries}
+   aruco_opencv_msgs
+)
+ENDIF(aruco_opencv_msgs_FOUND)
+
+# If aruco_markers_msgs is found, add definition
+IF(aruco_markers_msgs_FOUND)
+MESSAGE(STATUS "WITH aruco_markers_msgs")
+ADD_DEFINITIONS("-DWITH_ARUCO_MARKERS_MSGS")
+SET(Libraries
+   ${Libraries}
+   aruco_markers_msgs
+)
+ENDIF(aruco_markers_msgs_FOUND)
 
 # If nav2_msgs is found, add definition
 IF(nav2_msgs_FOUND)

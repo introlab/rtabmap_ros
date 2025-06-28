@@ -88,6 +88,18 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <apriltag_msgs/msg/april_tag_detection_array.hpp>
 #endif
 
+#ifdef WITH_ARUCO_MSGS
+#include <aruco_msgs/msg/marker_array.hpp>
+#endif
+
+#ifdef WITH_ARUCO_OPENCV_MSGS
+#include <aruco_opencv_msgs/msg/aruco_detection.hpp>
+#endif
+
+#ifdef WITH_ARUCO_MARKERS_MSGS
+#include <aruco_markers_msgs/msg/marker_array.hpp>
+#endif
+
 #ifdef WITH_NAV2_MSGS
 #include <nav2_msgs/action/navigate_to_pose.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
@@ -179,6 +191,15 @@ private:
 	void landmarkDetectionsAsyncCallback(const rtabmap_msgs::msg::LandmarkDetections::SharedPtr landmarkDetections);
 #ifdef WITH_APRILTAG_MSGS
 	void tagDetectionsAsyncCallback(const apriltag_msgs::msg::AprilTagDetectionArray::SharedPtr tagDetections);
+#endif
+#ifdef WITH_ARUCO_MSGS
+	void arucoAsyncCallback(const aruco_msgs::msg::MarkerArray::SharedPtr tagDetections);
+#endif
+#ifdef WITH_ARUCO_OPENCV_MSGS
+	void arucoCvAsyncCallback(const aruco_opencv_msgs::msg::ArucoDetection::SharedPtr tagDetections);
+#endif
+#ifdef WITH_ARUCO_MARKERS_MSGS
+	void arucoMarkersAsyncCallback(const aruco_markers_msgs::msg::MarkerArray::SharedPtr tagDetections);
 #endif
 #ifdef WITH_FIDUCIAL_MSGS
 	void fiducialDetectionsAsyncCallback(const fiducial_msgs::msgs::FiducialTransformArray::SharedPtr fiducialDetections);
@@ -420,6 +441,15 @@ private:
 	rclcpp::Subscription<rtabmap_msgs::msg::LandmarkDetections>::SharedPtr landmarkDetectionsSub_;
 #ifdef WITH_APRILTAG_MSGS
 	rclcpp::Subscription<apriltag_msgs::msg::AprilTagDetectionArray>::SharedPtr tagDetectionsSub_;
+#endif
+#ifdef WITH_ARUCO_MSGS
+	rclcpp::Subscription<aruco_msgs::msg::MarkerArray>::SharedPtr arucoDetectionsSub_;
+#endif
+#ifdef WITH_ARUCO_OPENCV_MSGS
+	rclcpp::Subscription<aruco_opencv_msgs::msg::ArucoDetection>::SharedPtr arucoCvDetectionsSub_;
+#endif
+#ifdef WITH_ARUCO_MARKERS_MSGS
+	rclcpp::Subscription<aruco_markers_msgs::msg::MarkerArray>::SharedPtr arucoMarkersSub_;
 #endif
 #ifdef WITH_FIDUCIAL_MSGS
 	rclcpp::Subscription<fiducial_msgs::msg::FiducialTransformArray>::SharedPtr fiducialTransfromsSub_;
