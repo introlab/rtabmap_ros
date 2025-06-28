@@ -41,6 +41,7 @@ find_package(apriltag_msgs)
 find_package(aruco_msgs)
 find_package(aruco_markers_msgs)
 find_package(aruco_opencv_msgs)
+find_package(ros2_aruco_interfaces)
 find_package(nav2_msgs)
 
 IF(WIN32)
@@ -120,6 +121,16 @@ SET(Libraries
    aruco_markers_msgs
 )
 ENDIF(aruco_markers_msgs_FOUND)
+
+# If ros2_aruco_interfaces is found, add definition
+IF(ros2_aruco_interfaces_FOUND)
+MESSAGE(STATUS "WITH ros2_aruco_interfaces")
+ADD_DEFINITIONS("-DWITH_ROS2_ARUCO_INTERFACES")
+SET(Libraries
+   ${Libraries}
+   ros2_aruco_interfaces
+)
+ENDIF(ros2_aruco_interfaces_FOUND)
 
 # If nav2_msgs is found, add definition
 IF(nav2_msgs_FOUND)
