@@ -48,7 +48,7 @@ class SyncDiagnostic {
         }
         diagnosticUpdater_.setHardwareID(strList.empty()?"none":uJoin(strList, "/"));
         diagnosticUpdater_.force_update();
-        diagnosticTimer_ = ros::NodeHandle().createTimer(ros::Duration(1), &SyncDiagnostic::diagnosticTimerCallback, this);
+        diagnosticTimer_ = ros::NodeHandle().createTimer(ros::Duration(5), &SyncDiagnostic::diagnosticTimerCallback, this);
     }
 
     void tick(const ros::Time & stamp, double targetFrequency = 0)
@@ -87,8 +87,10 @@ class SyncDiagnostic {
         {
             ROS_WARN("%s: Detected time jump in the past of %f sec, forcing diagnostic update.", 
                 nodeName_.c_str(), lastTickTime_ - clockNow);
+            frequencyStatus_.clear();
             diagnosticUpdater_.force_update();
             lastCallbackCalledStamp_ = clockNow;
+            diagnosticTimer_.setPeriod(ros::Duration(5));
         }
         else
         {
@@ -102,7 +104,7 @@ private:
     {
         if(ros::Time::now().toSec()-lastCallbackCalledStamp_ >= 5 && !topicsNotReceivedWarningMsg_.empty())
         {
-            ROS_WARN_THROTTLE(5, "%s", topicsNotReceivedWarningMsg_.c_str());
+            ROS_WARN("%s", topicsNotReceivedWarningMsg_.c_str());
         }
     }
 
