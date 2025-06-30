@@ -90,7 +90,6 @@ class SyncDiagnostic {
             frequencyStatus_.clear();
             diagnosticUpdater_.force_update();
             lastCallbackCalledStamp_ = clockNow;
-            diagnosticTimer_.setPeriod(ros::Duration(5));
         }
         else
         {
