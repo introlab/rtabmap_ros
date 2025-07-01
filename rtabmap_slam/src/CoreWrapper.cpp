@@ -1024,7 +1024,7 @@ bool CoreWrapper::odomUpdate(const nav_msgs::OdometryConstPtr & odomMsg, ros::Ti
 	if(!paused_)
 	{
 		// Check time jump in the past
-		if(previousStamp_.toSec()>0.0 && stamp.toSec() < previousStamp_) {
+		if(previousStamp_.toSec()>0.0 && stamp < previousStamp_) {
 			ROS_WARN("Detected time jump in the past of %f sec (previous stamp=%f, current stamp=%f). Resetting internal stamps and abort!",
 				previousStamp_.toSec() - stamp.toSec(), previousStamp_.toSec(), stamp.toSec());
 			previousStamp_ = ros::Time();
@@ -1143,7 +1143,7 @@ bool CoreWrapper::odomTFUpdate(const ros::Time & stamp)
 	if(!paused_)
 	{
 		// Check time jump in the past
-		if(previousStamp_.toSec()>0.0 && stamp.toSec() < previousStamp_) {
+		if(previousStamp_.toSec()>0.0 && stamp < previousStamp_) {
 			ROS_WARN("Detected time jump in the past of %f sec (previous stamp=%f, current stamp=%f). Resetting internal stamps and abort!",
 				previousStamp_.toSec() - stamp.toSec(), previousStamp_.toSec(), stamp.toSec());
 			previousStamp_ = ros::Time();
