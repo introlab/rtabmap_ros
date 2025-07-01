@@ -679,7 +679,18 @@ void OdometryROS::mainLoop()
 						correctionMsg.header.stamp = header.stamp;
 						Transform correction = odometry_->getPose() * guess_ * guessCurrentPose.inverse();
 						rtabmap_conversions::transformToGeometryMsg(correction, correctionMsg.transform);
-						tfBroadcaster_.sendTransform(correctionMsg);
+						ros::Time time_now = ros::Time::now();
+						if(time_now > correctionMsg.header.stamp) {
+							tfBroadcaster_.sendTransform(correctionMsg);
+						}
+						else {
+							ROS_WARN("TF %s->%s is not published because its stamp (%f) is greater "
+								"than current time (%f), possible time jump happened!",
+								correctionMsg.header.frame_id.c_str(),
+								correctionMsg.child_frame_id.c_str(),
+								correctionMsg.header.stamp.toSec(),
+								time_now.toSec());
+						}
 					}
 					guessPreviousPose_ = guessCurrentPose;
 					return;
@@ -733,11 +744,33 @@ void OdometryROS::mainLoop()
 				correctionMsg.header.stamp = header.stamp;
 				Transform correction = pose * guessCurrentPose.inverse();
 				rtabmap_conversions::transformToGeometryMsg(correction, correctionMsg.transform);
-				tfBroadcaster_.sendTransform(correctionMsg);
+				ros::Time time_now = ros::Time::now();
+				if(time_now > correctionMsg.header.stamp) {
+					tfBroadcaster_.sendTransform(correctionMsg);
+				}
+				else {
+					ROS_WARN("TF %s->%s is not published because its stamp (%f) is greater "
+						"than current time (%f), possible time jump happened!",
+						correctionMsg.header.frame_id.c_str(),
+						correctionMsg.child_frame_id.c_str(),
+						correctionMsg.header.stamp.toSec(),
+						time_now.toSec());
+				}
 			}
 			else
 			{
-				tfBroadcaster_.sendTransform(poseMsg);
+				ros::Time time_now = ros::Time::now();
+				if(time_now > poseMsg.header.stamp) {
+					tfBroadcaster_.sendTransform(poseMsg);
+				}
+				else {
+					ROS_WARN("TF %s->%s is not published because its stamp (%f) is greater "
+						"than current time (%f), possible time jump happened!",
+						poseMsg.header.frame_id.c_str(),
+						poseMsg.child_frame_id.c_str(),
+						poseMsg.header.stamp.toSec(),
+						time_now.toSec());
+				}
 			}
 		}
 
@@ -929,7 +962,18 @@ void OdometryROS::mainLoop()
 			correctionMsg.header.stamp = header.stamp;
 			Transform correction = odometry_->getPose() * guess_ * guessCurrentPose.inverse();
 			rtabmap_conversions::transformToGeometryMsg(correction, correctionMsg.transform);
-			tfBroadcaster_.sendTransform(correctionMsg);
+			ros::Time time_now = ros::Time::now();
+			if(time_now > correctionMsg.header.stamp) {
+				tfBroadcaster_.sendTransform(correctionMsg);
+			}
+			else {
+				ROS_WARN("TF %s->%s is not published because its stamp (%f) is greater "
+					"than current time (%f), possible time jump happened!",
+					correctionMsg.header.frame_id.c_str(),
+					correctionMsg.child_frame_id.c_str(),
+					correctionMsg.header.stamp.toSec(),
+					time_now.toSec());
+			}
 		}
 	}
 
