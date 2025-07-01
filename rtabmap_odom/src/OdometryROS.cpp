@@ -555,7 +555,7 @@ void OdometryROS::mainLoop()
 			std_msgs::Header headerCpy = dataHeaderToProcess_;
 			double previousCpy = previousClockTime_;
 			this->reset(odometry_->getPose());
-			if(previousCpy < headerCpy.stamp.toSec()) {
+			if(previousCpy > headerCpy.stamp.toSec()) {
 				// new frame is using new clock, process it now
 				dataToProcess_ = dataCpy;
 				dataHeaderToProcess_ = headerCpy;
