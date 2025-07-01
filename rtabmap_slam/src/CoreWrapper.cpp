@@ -1023,6 +1023,14 @@ bool CoreWrapper::odomUpdate(const nav_msgs::OdometryConstPtr & odomMsg, ros::Ti
 {
 	if(!paused_)
 	{
+		// Check time jump in the past
+		if(previousStamp_.toSec()>0.0 && stamp.toSec() < previousStamp_) {
+			ROS_WARN("Detected time jump in the past of %f sec (previous stamp=%f, current stamp=%f). Resetting internal stamps and abort!",
+				previousStamp_.toSec() - stamp.toSec(), previousStamp_.toSec(), stamp.toSec());
+			previousStamp_ = ros::Time();
+			return false;
+		}
+
 		Transform odom = rtabmap_conversions::transformFromPoseMsg(odomMsg->pose.pose);
 		if(!odom.isNull())
 		{
@@ -1134,6 +1142,14 @@ bool CoreWrapper::odomTFUpdate(const ros::Time & stamp)
 {
 	if(!paused_)
 	{
+		// Check time jump in the past
+		if(previousStamp_.toSec()>0.0 && stamp.toSec() < previousStamp_) {
+			ROS_WARN("Detected time jump in the past of %f sec (previous stamp=%f, current stamp=%f). Resetting internal stamps and abort!",
+				previousStamp_.toSec() - stamp.toSec(), previousStamp_.toSec(), stamp.toSec());
+			previousStamp_ = ros::Time();
+			return false;
+		}
+
 		// Odom TF ready?
 		Transform odom = rtabmap_conversions::getTransform(odomFrameId_, frameId_, stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
 		if(odom.isNull())

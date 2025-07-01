@@ -573,7 +573,13 @@ void OdometryROS::mainLoop()
 		}
 		previousClockTime_ = clockNow;
 
-		if(previousStamp_>0.0 && previousStamp_ >= header.stamp.toSec())
+		if(header.stamp.toSec() > clockNow) {
+			NODELET_WARN("Odometry: Detected topic's stamp in the future (topic=%fs now=%fs). "
+					"Aborting update!",
+					header.stamp.toSec(), clockNow);
+			return;
+		}
+		else if(previousStamp_>0.0 && previousStamp_ >= header.stamp.toSec())
 		{
 			NODELET_WARN("Odometry: Detected not valid consecutive stamps (previous=%fs new=%fs). "
 					"New stamp should be always greater than previous stamp. This new data is ignored. ",
