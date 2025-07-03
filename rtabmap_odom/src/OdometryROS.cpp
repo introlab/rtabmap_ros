@@ -949,7 +949,7 @@ void OdometryROS::mainLoop()
 			Transform correction = odometry_->getPose() * guess_ * guessCurrentPose.inverse();
 			rtabmap_conversions::transformToGeometryMsg(correction, correctionMsg.transform);
 			ros::Time time_now = ros::Time::now();
-			if(time_now > correctionMsg.header.stamp) {
+			if(time_now >= previousClockTime_) {
 				tfBroadcaster_.sendTransform(correctionMsg);
 			}
 			else {
