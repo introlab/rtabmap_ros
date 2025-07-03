@@ -380,11 +380,11 @@ private:
 					-1.0,
 					laser_geometry::channel_option::Intensity | laser_geometry::channel_option::Timestamp);
 
-			if(guessFrameId().empty() && previousStamp() > 0 && !velocityGuess().isNull())
+			if(guessFrameId().empty() && previousStamp().toSec() > 0.0 && !velocityGuess().isNull())
 			{
 				// deskew with constant velocity model (we are in frameId)
 				sensor_msgs::PointCloud2 scanOutDeskewed;
-				if(!rtabmap_conversions::deskew(scanOut, scanOutDeskewed, previousStamp(), velocityGuess()))
+				if(!rtabmap_conversions::deskew(scanOut, scanOutDeskewed, previousStamp().toSec(), velocityGuess()))
 				{
 					ROS_ERROR("Failed to deskew input cloud, aborting odometry update!");
 					return;
@@ -405,11 +405,11 @@ private:
 		{
 			projection.projectLaser(*scanMsg, scanOut, -1.0, laser_geometry::channel_option::Intensity | laser_geometry::channel_option::Timestamp);
 
-			if(deskewing_ && previousStamp() > 0 && !velocityGuess().isNull())
+			if(deskewing_ && previousStamp().toSec() > 0.0 && !velocityGuess().isNull())
 			{
 				// deskew with constant velocity model
 				sensor_msgs::PointCloud2 scanOutDeskewed;
-				if(!rtabmap_conversions::deskew(scanOut, scanOutDeskewed, previousStamp(), velocityGuess()))
+				if(!rtabmap_conversions::deskew(scanOut, scanOutDeskewed, previousStamp().toSec(), velocityGuess()))
 				{
 					ROS_ERROR("Failed to deskew input cloud, aborting odometry update!");
 					return;
@@ -628,7 +628,7 @@ private:
 					return;
 				}
 			}
-			else if(previousStamp() > 0 && !velocityGuess().isNull())
+			else if(previousStamp().toSec() > 0.0 && !velocityGuess().isNull())
 			{
 				// deskew with constant velocity model
 				bool alreadyInBaseFrame = frameId().compare(pointCloudMsg->header.frame_id) == 0;
@@ -648,7 +648,7 @@ private:
 				}
 
 				sensor_msgs::PointCloud2::Ptr cloudDeskewed(new sensor_msgs::PointCloud2);
-				if(!rtabmap_conversions::deskew(*cloudPtr, *cloudDeskewed, previousStamp(), velocityGuess()))
+				if(!rtabmap_conversions::deskew(*cloudPtr, *cloudDeskewed, previousStamp().toSec(), velocityGuess()))
 				{
 					ROS_ERROR("Failed to deskew input cloud, aborting odometry update!");
 					return;

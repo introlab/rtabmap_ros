@@ -78,8 +78,6 @@ OdometryROS::OdometryROS(bool stereoParams, bool visParams, bool icpParams) :
 	stereoParams_(stereoParams),
 	visParams_(visParams),
 	icpParams_(icpParams),
-	previousStamp_(0.0),
-	previousClockTime_(0.0),
 	expectedUpdateRate_(0.0),
 	maxUpdateRate_(0.0),
 	minUpdateRate_(0.0),
@@ -545,61 +543,55 @@ void OdometryROS::mainLoop()
 	if(!data.imageRaw().empty() || !data.laserScanRaw().isEmpty())
 	{
 		// Detect time jump in the past
-		double clockNow = ros::Time::now().toSec();
-		if(previousClockTime_>0.0 && previousClockTime_ > clockNow)
+		ros::Time clockNow = ros::Time::now();
+		if(previousClockTime_ > clockNow)
 		{
 			NODELET_WARN("Odometry: Detected jump back in time of %f sec. Odometry is "
 				"automatically reset to latest computed pose!",
-				previousClockTime_ - clockNow);
+				(previousClockTime_ - clockNow).toSec());
 			SensorData dataCpy = dataToProcess_;
 			std_msgs::Header headerCpy = dataHeaderToProcess_;
-			double previousCpy = previousClockTime_;
+			ros::Time previousCpy = previousClockTime_;
 			this->reset(odometry_->getPose());
-			if(previousCpy > headerCpy.stamp.toSec()) {
+			if(previousCpy > headerCpy.stamp) {
 				// new frame is using new clock, process it now
 				dataToProcess_ = dataCpy;
 				dataHeaderToProcess_ = headerCpy;
 				dataReady_.release();
 				NODELET_WARN("Odometry: Restarting with frame: %f (clock previous=%f, new=%f)",
-					headerCpy.stamp.toSec(), previousCpy, clockNow);
+					headerCpy.stamp.toSec(), previousCpy.toSec(), clockNow.toSec());
 			}
 			else {
 				// skip that old frame
 				NODELET_WARN("Odometry: skipping frame: %f (clock previous=%f, new=%f)",
-					headerCpy.stamp.toSec(), previousCpy, clockNow);
+					headerCpy.stamp.toSec(), previousCpy.toSec(), clockNow.toSec());
 			}
 			previousClockTime_ = clockNow;
 			return;
 		}
 		previousClockTime_ = clockNow;
 
-		if(header.stamp.toSec() > clockNow) {
-			NODELET_WARN("Odometry: Detected topic's stamp in the future (topic=%fs now=%fs). "
-					"Aborting update!",
-					header.stamp.toSec(), clockNow);
-			return;
-		}
-		else if(previousStamp_>0.0 && previousStamp_ >= header.stamp.toSec())
+		if(previousStamp_ >= header.stamp)
 		{
 			NODELET_WARN("Odometry: Detected not valid consecutive stamps (previous=%fs new=%fs). "
 					"New stamp should be always greater than previous stamp. This new data is ignored. ",
-					previousStamp_, header.stamp.toSec());
+					previousStamp_.toSec(), header.stamp.toSec());
 			return;
 		}
 		else if(maxUpdateRate_ > 0 &&
-				previousStamp_ > 0 &&
-				(header.stamp.toSec()-previousStamp_+(expectedUpdateRate_ > 0?1.0/expectedUpdateRate_:0)) < 1.0/maxUpdateRate_)
+				previousStamp_.toSec() > 0 &&
+				((header.stamp-previousStamp_).toSec()+(expectedUpdateRate_ > 0?1.0/expectedUpdateRate_:0)) < 1.0/maxUpdateRate_)
 		{
 			// throttling
 			return;
 		}
 		else if(maxUpdateRate_ == 0 &&
 				expectedUpdateRate_ > 0 &&
-			    previousStamp_ > 0 &&
-			    (header.stamp.toSec()-previousStamp_) < 1.0/expectedUpdateRate_)
+			    previousStamp_.toSec() > 0 &&
+			    (header.stamp-previousStamp_).toSec() < 1.0/expectedUpdateRate_)
 		{
 			NODELET_WARN("Odometry: Aborting odometry update, higher frame rate detected (%f Hz) than the expected one (%f Hz). (stamps: previous=%fs new=%fs)",
-					1.0/(header.stamp.toSec()-previousStamp_), expectedUpdateRate_, previousStamp_, header.stamp.toSec());
+					1.0/(header.stamp-previousStamp_).toSec(), expectedUpdateRate_, previousStamp_.toSec(), header.stamp.toSec());
 			return;
 		}
 
@@ -668,7 +660,7 @@ void OdometryROS::mainLoop()
 				guess_.getTranslationAndEulerAngles(x,y,z,roll,pitch,yaw);
 				if((guessMinTranslation_ <= 0.0 || uMax3(fabs(x), fabs(y), fabs(z)) < guessMinTranslation_) &&
 				   (guessMinRotation_ <= 0.0 || uMax3(fabs(roll), fabs(pitch), fabs(yaw)) < guessMinRotation_) &&
-				   (guessMinTime_ <= 0.0 || (previousStamp_>0.0 && header.stamp.toSec()-previousStamp_ < guessMinTime_)))
+				   (guessMinTime_ <= 0.0 || (previousStamp_.toSec()>0.0 && (header.stamp-previousStamp_).toSec() < guessMinTime_)))
 				{
 					// Ignore odometry update, we didn't move enough
 					if(publishTf_)
@@ -680,16 +672,14 @@ void OdometryROS::mainLoop()
 						Transform correction = odometry_->getPose() * guess_ * guessCurrentPose.inverse();
 						rtabmap_conversions::transformToGeometryMsg(correction, correctionMsg.transform);
 						ros::Time time_now = ros::Time::now();
-						if(time_now > correctionMsg.header.stamp) {
+						if(time_now >= previousClockTime_) {
 							tfBroadcaster_.sendTransform(correctionMsg);
 						}
 						else {
-							ROS_WARN("TF %s->%s is not published because its stamp (%f) is greater "
-								"than current time (%f), possible time jump happened!",
+							ROS_WARN("TF %s->%s is not published because we detected a time jump in the past of %f sec.",
 								correctionMsg.header.frame_id.c_str(),
 								correctionMsg.child_frame_id.c_str(),
-								correctionMsg.header.stamp.toSec(),
-								time_now.toSec());
+								(previousClockTime_ - time_now).toSec());
 						}
 					}
 					guessPreviousPose_ = guessCurrentPose;
@@ -705,7 +695,7 @@ void OdometryROS::mainLoop()
 		}
 	}
 
-	bool tooOldPreviousData = minUpdateRate_ > 0 && previousStamp_ > 0 && (header.stamp.toSec()-previousStamp_) > 1.0/minUpdateRate_;
+	bool tooOldPreviousData = minUpdateRate_ > 0 && previousStamp_.toSec() > 0 && (header.stamp-previousStamp_).toSec() > 1.0/minUpdateRate_;
 
 	// process data
 	ros::WallTime time = ros::WallTime::now();
@@ -745,31 +735,27 @@ void OdometryROS::mainLoop()
 				Transform correction = pose * guessCurrentPose.inverse();
 				rtabmap_conversions::transformToGeometryMsg(correction, correctionMsg.transform);
 				ros::Time time_now = ros::Time::now();
-				if(time_now > correctionMsg.header.stamp) {
+				if(time_now >= previousClockTime_) {
 					tfBroadcaster_.sendTransform(correctionMsg);
 				}
 				else {
-					ROS_WARN("TF %s->%s is not published because its stamp (%f) is greater "
-						"than current time (%f), possible time jump happened!",
+					ROS_WARN("TF %s->%s is not published because we detected a time jump in the past of %f sec.",
 						correctionMsg.header.frame_id.c_str(),
 						correctionMsg.child_frame_id.c_str(),
-						correctionMsg.header.stamp.toSec(),
-						time_now.toSec());
+						(previousClockTime_ - time_now).toSec());
 				}
 			}
 			else
 			{
 				ros::Time time_now = ros::Time::now();
-				if(time_now > poseMsg.header.stamp) {
+				if(time_now >= previousClockTime_) {
 					tfBroadcaster_.sendTransform(poseMsg);
 				}
 				else {
-					ROS_WARN("TF %s->%s is not published because its stamp (%f) is greater "
-						"than current time (%f), possible time jump happened!",
+					ROS_WARN("TF %s->%s is not published because we detected a time jump in the past of %f sec.",
 						poseMsg.header.frame_id.c_str(),
 						poseMsg.child_frame_id.c_str(),
-						poseMsg.header.stamp.toSec(),
-						time_now.toSec());
+						(previousClockTime_ - time_now).toSec());
 				}
 			}
 		}
@@ -983,7 +969,7 @@ void OdometryROS::mainLoop()
 		{
 			NODELET_WARN( "Odometry lost! Odometry will be reset because last update "
 					"is %fs too old (>%fs, min_update_rate = %f Hz). Previous data stamp is %f while new data stamp is %f.",
-					header.stamp.toSec() - previousStamp_, 1.0/minUpdateRate_, minUpdateRate_, previousStamp_, header.stamp.toSec());
+					(header.stamp - previousStamp_).toSec(), 1.0/minUpdateRate_, minUpdateRate_, previousStamp_.toSec(), header.stamp.toSec());
 		}
 		else if(--resetCurrentCount_>0)
 		{
@@ -1178,10 +1164,10 @@ void OdometryROS::mainLoop()
 		syncDiagnostic_->tick(header.stamp,
 			maxUpdateRate_>0 ? maxUpdateRate_:
 			expectedUpdateRate_>0 && expectedUpdateRate_ < curentRate ? expectedUpdateRate_:
-			previousStamp_ == 0.0 || header.stamp.toSec() - previousStamp_ > 1.0/curentRate?0:curentRate);
+			previousStamp_.toSec() == 0.0 || (header.stamp - previousStamp_).toSec() > 1.0/curentRate?0:curentRate);
 	}
 
-	previousStamp_ = header.stamp.toSec();
+	previousStamp_ = header.stamp;
 }
 
 bool OdometryROS::reset(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
@@ -1205,8 +1191,8 @@ void OdometryROS::reset(const Transform & pose)
 	odometry_->reset(pose);
 	guess_.setNull();
 	guessPreviousPose_.setNull();
-	previousStamp_ = 0.0;
-	previousClockTime_ = 0.0;
+	previousStamp_ = ros::Time();
+	previousClockTime_ = ros::Time();
 	resetCurrentCount_ = resetCountdown_;
 	imuProcessed_ = false;
 	dataToProcess_ = SensorData();
@@ -1216,6 +1202,7 @@ void OdometryROS::reset(const Transform & pose)
 	imus_.clear();
 	imuMutex_.unlock();
 	this->flushCallbacks();
+	this->tfListener().clear();
 }
 
 bool OdometryROS::pause(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
