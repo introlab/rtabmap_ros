@@ -718,12 +718,11 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 				mapToOdomMutex_.lock();
 				if(!odomFrameId_.empty())
 				{
-					rclcpp::Time tfExpiration = now() + rclcpp::Duration::from_seconds(tfTolerance);
 					geometry_msgs::msg::TransformStamped msg;
+					rtabmap_conversions::transformToGeometryMsg(mapToOdom_, msg.transform);
 					msg.child_frame_id = odomFrameId_;
 					msg.header.frame_id = mapFrameId_;
-					msg.header.stamp = tfExpiration;
-					rtabmap_conversions::transformToGeometryMsg(mapToOdom_, msg.transform);
+					msg.header.stamp = now() + rclcpp::Duration::from_seconds(tfTolerance);
 					tfBroadcaster_->sendTransform(msg);
 				}
 				mapToOdomMutex_.unlock();
