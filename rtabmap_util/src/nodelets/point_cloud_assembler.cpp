@@ -130,7 +130,7 @@ PointCloudAssembler::PointCloudAssembler(const rclcpp::NodeOptions & options) :
 
 	if(maxClouds_==0 && assemblingTime_ ==0.0)
 	{
-		RCLCPP_ERROR(get_logger(), "point_cloud_assembler: max_cloud or assembling_time parameters should be set!");
+		RCLCPP_ERROR(get_logger(), "point_cloud_assembler: max_clouds or assembling_time parameters should be set!");
 		exit(-1);
 	}
 
