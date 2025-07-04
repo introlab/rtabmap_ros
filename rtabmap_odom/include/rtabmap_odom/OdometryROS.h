@@ -87,7 +87,7 @@ protected:
 	tf::TransformListener & tfListener() {return tfListener_;}
 	double waitForTransformDuration() const {return waitForTransform_?waitForTransformDuration_:0.0;}
 	rtabmap::Transform velocityGuess() const;
-	double previousStamp() const {return previousStamp_;}
+	ros::Time previousStamp() const {return previousStamp_;}
 	virtual void postProcessData(const rtabmap::SensorData & data, const std_msgs::Header & header) const {}
 
 private:
@@ -158,7 +158,8 @@ private:
 	bool icpParams_;
 	rtabmap::Transform guess_;
 	rtabmap::Transform guessPreviousPose_;
-	double previousStamp_;
+	ros::Time previousStamp_;
+	ros::Time previousClockTime_;
 	double expectedUpdateRate_;
 	double maxUpdateRate_;
 	double minUpdateRate_;
