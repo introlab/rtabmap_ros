@@ -1202,7 +1202,6 @@ void OdometryROS::reset(const Transform & pose)
 	imus_.clear();
 	imuMutex_.unlock();
 	this->flushCallbacks();
-	this->tfListener().clear();
 }
 
 bool OdometryROS::pause(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
