@@ -88,6 +88,22 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <apriltag_msgs/msg/april_tag_detection_array.hpp>
 #endif
 
+#ifdef WITH_ARUCO_MSGS
+#include <aruco_msgs/msg/marker_array.hpp>
+#endif
+
+#ifdef WITH_ARUCO_OPENCV_MSGS
+#include <aruco_opencv_msgs/msg/aruco_detection.hpp>
+#endif
+
+#ifdef WITH_ARUCO_MARKERS_MSGS
+#include <aruco_markers_msgs/msg/marker_array.hpp>
+#endif
+
+#ifdef WITH_ROS2_ARUCO_INTERFACES
+#include <ros2_aruco_interfaces/msg/aruco_markers.hpp>
+#endif
+
 #ifdef WITH_NAV2_MSGS
 #include <nav2_msgs/action/navigate_to_pose.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
@@ -178,7 +194,20 @@ private:
 	void landmarkDetectionAsyncCallback(const rtabmap_msgs::msg::LandmarkDetection::SharedPtr landmarkDetection);
 	void landmarkDetectionsAsyncCallback(const rtabmap_msgs::msg::LandmarkDetections::SharedPtr landmarkDetections);
 #ifdef WITH_APRILTAG_MSGS
-	void tagDetectionsAsyncCallback(const apriltag_msgs::msg::AprilTagDetectionArray::SharedPtr tagDetections);
+	void tagDetectionsAsyncCallback(const apriltag_msgs::msg::AprilTagDetectionArray::SharedPtr msg);
+	void apriltagAsyncCallback(const apriltag_msgs::msg::AprilTagDetectionArray::SharedPtr msg);
+#endif
+#ifdef WITH_ARUCO_MSGS
+	void arucoAsyncCallback(const aruco_msgs::msg::MarkerArray::SharedPtr msg);
+#endif
+#ifdef WITH_ARUCO_OPENCV_MSGS
+	void arucoOpencvAsyncCallback(const aruco_opencv_msgs::msg::ArucoDetection::SharedPtr msg);
+#endif
+#ifdef WITH_ARUCO_MARKERS_MSGS
+	void arucoMarkersAsyncCallback(const aruco_markers_msgs::msg::MarkerArray::SharedPtr msg);
+#endif
+#ifdef WITH_ROS2_ARUCO_INTERFACES
+	void arucoInterfacesAsyncCallback(const ros2_aruco_interfaces::msg::ArucoMarkers::SharedPtr msg);
 #endif
 #ifdef WITH_FIDUCIAL_MSGS
 	void fiducialDetectionsAsyncCallback(const fiducial_msgs::msgs::FiducialTransformArray::SharedPtr fiducialDetections);
@@ -420,6 +449,19 @@ private:
 	rclcpp::Subscription<rtabmap_msgs::msg::LandmarkDetections>::SharedPtr landmarkDetectionsSub_;
 #ifdef WITH_APRILTAG_MSGS
 	rclcpp::Subscription<apriltag_msgs::msg::AprilTagDetectionArray>::SharedPtr tagDetectionsSub_;
+	rclcpp::Subscription<apriltag_msgs::msg::AprilTagDetectionArray>::SharedPtr apriltagSub_;
+#endif
+#ifdef WITH_ARUCO_MSGS
+	rclcpp::Subscription<aruco_msgs::msg::MarkerArray>::SharedPtr arucoSub_;
+#endif
+#ifdef WITH_ARUCO_OPENCV_MSGS
+	rclcpp::Subscription<aruco_opencv_msgs::msg::ArucoDetection>::SharedPtr arucoOpencvSub_;
+#endif
+#ifdef WITH_ARUCO_MARKERS_MSGS
+	rclcpp::Subscription<aruco_markers_msgs::msg::MarkerArray>::SharedPtr arucoMarkersSub_;
+#endif
+#ifdef WITH_ROS2_ARUCO_INTERFACES
+	rclcpp::Subscription<ros2_aruco_interfaces::msg::ArucoMarkers>::SharedPtr arucoInterfacesSub_;
 #endif
 #ifdef WITH_FIDUCIAL_MSGS
 	rclcpp::Subscription<fiducial_msgs::msg::FiducialTransformArray>::SharedPtr fiducialTransfromsSub_;

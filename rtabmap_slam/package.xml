@@ -12,6 +12,8 @@
 
   <buildtool_depend>ament_cmake_ros</buildtool_depend>
 
+  <build_depend>ros_environment</build_depend>
+
   <depend>cv_bridge</depend>
   <depend>geometry_msgs</depend>
   <depend>nav_msgs</depend>
@@ -25,6 +27,9 @@
   <depend>tf2_ros</depend>
   <depend>visualization_msgs</depend>
   <depend>apriltag_msgs</depend>
+  <depend>aruco_msgs</depend>
+  <depend>aruco_opencv_msgs</depend>
+  <!-- depend>aruco_markers_msgs</depend --> <!-- binaries only available on humble -->
   
   <depend>rtabmap_msgs</depend>
   <depend>rtabmap_util</depend>

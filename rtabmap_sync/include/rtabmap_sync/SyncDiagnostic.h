@@ -26,10 +26,10 @@ class SyncDiagnostic {
 		inCompositeTask_("Input Status"),
         outCompositeTask_("Output Status"),
         lastTickInputStamp_(rtabmap_conversions::timestampFromROS(node_->now())-1),
-		lastTickOutputStamp_(rtabmap_conversions::timestampFromROS(node_->now())-1),
         inTargetFrequency_(0.0),
 		outTargetFrequency_(0.0),
-		windowSize_(windowSize)
+		windowSize_(windowSize),
+        lastTickTime_(0.0)
     {
         UASSERT(windowSize_ >= 1);
     }
@@ -76,6 +76,7 @@ class SyncDiagnostic {
 
     void tickOutput(const rclcpp::Time & stamp, double expectedFrequency = 0)
     {
+        double lastTickOutputStamp;
         updateFrequency(
             stamp,
             expectedFrequency,
@@ -83,7 +84,7 @@ class SyncDiagnostic {
             outTimeStampStatus_,
             outWindow_,
             outTargetFrequency_,
-            lastTickOutputStamp_);
+            lastTickOutputStamp);
     }
 
 private:
@@ -140,6 +141,18 @@ private:
         }
 
         lastTickStamp = stampSec;
+
+        double clockNow = rtabmap_conversions::timestampFromROS(node_->now());
+        if(lastTickTime_ > clockNow)
+        {
+            RCLCPP_WARN(node_->get_logger(), "%s: Detected time jump in the past of %f sec, forcing diagnostic update.", 
+                node_->get_name(), lastTickTime_ - clockNow);
+            inFrequencyStatus_.clear();
+            outFrequencyStatus_.clear();
+            diagnosticUpdater_.force_update();
+            lastTickInputStamp_ = clockNow;
+        }
+        lastTickTime_ = clockNow;
     }
 
 private:
@@ -154,13 +167,13 @@ private:
     diagnostic_updater::CompositeDiagnosticTask outCompositeTask_;
 	rclcpp::TimerBase::SharedPtr diagnosticTimer_;
 	double lastTickInputStamp_;
-    double lastTickOutputStamp_;
 	double inTargetFrequency_;
     double outTargetFrequency_;
 	int windowSize_;
 	std::deque<double> inWindow_;
     std::deque<double> outWindow_;
     UMutex tickMutex_;
+    double lastTickTime_;
 
 };
 
