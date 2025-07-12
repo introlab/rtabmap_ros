@@ -567,10 +567,8 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 					RCLCPP_INFO(this->get_logger(), "Subscribe to inter odom + info messages");
 					interOdomSync_ = new message_filters::Synchronizer<MyExactInterOdomSyncPolicy>(MyExactInterOdomSyncPolicy(100), interOdomSyncSub_, interOdomInfoSyncSub_);
 					interOdomSync_->registerCallback(std::bind(&CoreWrapper::interOdomInfoCallback, this, std::placeholders::_1, std::placeholders::_2));
-					rmw_qos_profile_t qos = rmw_qos_profile_default;
-					qos.depth = 100;
-					interOdomSyncSub_.subscribe(this, "inter_odom", qos);
-					interOdomInfoSyncSub_.subscribe(this, "inter_odom_info", qos);
+					interOdomSyncSub_.subscribe(this, "inter_odom", RCLCPP_QOS(100, rclcpp::ReliabilityPolicy::SystemDefault));
+					interOdomInfoSyncSub_.subscribe(this, "inter_odom_info", RCLCPP_QOS(100, rclcpp::ReliabilityPolicy::SystemDefault));
 				}
 				else
 				{

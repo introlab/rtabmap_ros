@@ -100,17 +100,17 @@ void CommonDataSubscriber::setupStereoCallbacks(
 	image_transport::TransportHints hints(&node);
 	imageRectLeft_.subscribe(&node, "left/image_rect", hints.getTransport(), rclcpp::QoS(topicQueueSize_).reliability(qosImage_).get_rmw_qos_profile(), options);
 	imageRectRight_.subscribe(&node, "right/image_rect", hints.getTransport(), rclcpp::QoS(topicQueueSize_).reliability(qosImage_).get_rmw_qos_profile(), options);
-	cameraInfoLeft_.subscribe(&node, "left/camera_info", rclcpp::QoS(topicQueueSize_).reliability(qosCameraInfo_).get_rmw_qos_profile(), options);
-	cameraInfoRight_.subscribe(&node, "right/camera_info", rclcpp::QoS(topicQueueSize_).reliability(qosCameraInfo_).get_rmw_qos_profile(), options);
+	cameraInfoLeft_.subscribe(&node, "left/camera_info", RCLCPP_QOS(topicQueueSize_, qosCameraInfo_), options);
+	cameraInfoRight_.subscribe(&node, "right/camera_info", RCLCPP_QOS(topicQueueSize_, qosCameraInfo_), options);
 
 	if(subscribeOdom)
 	{
-		odomSub_.subscribe(&node, "odom", rclcpp::QoS(topicQueueSize_).reliability(qosOdom_).get_rmw_qos_profile(), options);
+		odomSub_.subscribe(&node, "odom", RCLCPP_QOS(topicQueueSize_, qosOdom_), options);
 
 		if(subscribeOdomInfo)
 		{
 			subscribedToOdomInfo_ = true;
-			odomInfoSub_.subscribe(&node, "odom_info", rclcpp::QoS(topicQueueSize_).reliability(qosOdom_).get_rmw_qos_profile(), options);
+			odomInfoSub_.subscribe(&node, "odom_info", RCLCPP_QOS(topicQueueSize_, qosOdom_), options);
 			SYNC_DECL6(CommonDataSubscriber, stereoOdomInfo, approxSync_, syncQueueSize_, odomSub_, imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_, odomInfoSub_);
 		}
 		else
@@ -123,7 +123,7 @@ void CommonDataSubscriber::setupStereoCallbacks(
 		if(subscribeOdomInfo)
 		{
 			subscribedToOdomInfo_ = true;
-			odomInfoSub_.subscribe(&node, "odom_info", rclcpp::QoS(topicQueueSize_).reliability(qosOdom_).get_rmw_qos_profile(), options);
+			odomInfoSub_.subscribe(&node, "odom_info", RCLCPP_QOS(topicQueueSize_, qosOdom_), options);
 			SYNC_DECL5(CommonDataSubscriber, stereoInfo, approxSync_, syncQueueSize_, imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_, odomInfoSub_);
 		}
 		else

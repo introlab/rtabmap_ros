@@ -80,7 +80,7 @@ RGBDXSync::RGBDXSync(const rclcpp::NodeOptions & options) :
 	for(int i=0; i<rgbdCameras; ++i)
 	{
 		rgbdSubs_[i] = new message_filters::Subscriber<rtabmap_msgs::msg::RGBDImage>;
-		rgbdSubs_[i]->subscribe(this, uFormat("rgbd_image%d", i), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+		rgbdSubs_[i]->subscribe(this, uFormat("rgbd_image%d", i), RCLCPP_QOS(topicQueueSize, qos));
 	}
 
 	std::string name_ = get_name();
