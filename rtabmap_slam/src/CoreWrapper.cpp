@@ -718,12 +718,11 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 				mapToOdomMutex_.lock();
 				if(!odomFrameId_.empty())
 				{
-					rclcpp::Time tfExpiration = now() + rclcpp::Duration::from_seconds(tfTolerance);
 					geometry_msgs::msg::TransformStamped msg;
+					rtabmap_conversions::transformToGeometryMsg(mapToOdom_, msg.transform);
 					msg.child_frame_id = odomFrameId_;
 					msg.header.frame_id = mapFrameId_;
-					msg.header.stamp = tfExpiration;
-					rtabmap_conversions::transformToGeometryMsg(mapToOdom_, msg.transform);
+					msg.header.stamp = now() + rclcpp::Duration::from_seconds(tfTolerance);
 					tfBroadcaster_->sendTransform(msg);
 				}
 				mapToOdomMutex_.unlock();
@@ -886,6 +885,19 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 	landmarkDetectionsSub_ = this->create_subscription<rtabmap_msgs::msg::LandmarkDetections>("landmark_detections", 1, std::bind(&CoreWrapper::landmarkDetectionsAsyncCallback, this, std::placeholders::_1), landmarkSubOptions);
 #ifdef WITH_APRILTAG_MSGS
 	tagDetectionsSub_ = this->create_subscription<apriltag_msgs::msg::AprilTagDetectionArray>("tag_detections", 5, std::bind(&CoreWrapper::tagDetectionsAsyncCallback, this, std::placeholders::_1), landmarkSubOptions);
+	apriltagSub_ = this->create_subscription<apriltag_msgs::msg::AprilTagDetectionArray>("apriltag/detections", 5, std::bind(&CoreWrapper::apriltagAsyncCallback, this, std::placeholders::_1), landmarkSubOptions);
+#endif
+#ifdef WITH_ARUCO_MSGS
+	arucoSub_ = this->create_subscription<aruco_msgs::msg::MarkerArray>("aruco/detections", 5, std::bind(&CoreWrapper::arucoAsyncCallback, this, std::placeholders::_1), landmarkSubOptions);
+#endif
+#ifdef WITH_ARUCO_OPENCV_MSGS
+	arucoOpencvSub_ = this->create_subscription<aruco_opencv_msgs::msg::ArucoDetection>("aruco_opencv/detections", 5, std::bind(&CoreWrapper::arucoOpencvAsyncCallback, this, std::placeholders::_1), landmarkSubOptions);
+#endif
+#ifdef WITH_ARUCO_MARKERS_MSGS
+	arucoMarkersSub_ = this->create_subscription<aruco_markers_msgs::msg::MarkerArray>("aruco_markers/detections", 5, std::bind(&CoreWrapper::arucoMarkersAsyncCallback, this, std::placeholders::_1), landmarkSubOptions);
+#endif
+#ifdef WITH_ROS2_ARUCO_INTERFACES
+	arucoInterfacesSub_ = this->create_subscription<ros2_aruco_interfaces::msg::ArucoMarkers>("aruco_interfaces/detections", 5, std::bind(&CoreWrapper::arucoInterfacesAsyncCallback, this, std::placeholders::_1), landmarkSubOptions);
 #endif
 #ifdef WITH_FIDUCIAL_MSGS
 	fiducialTransfromsSub_ = this->create_subscription<fiducial_msgs::msg::FiducialTransformArray>("fiducial_transforms", 5, std::bind(&CoreWrapper::fiducialDetectionsAsyncCallback, this, std::placeholders::_1), landmarkSubOptions);
@@ -2651,18 +2663,30 @@ void CoreWrapper::landmarkDetectionsAsyncCallback(const rtabmap_msgs::msg::Landm
 }
 
 #ifdef WITH_APRILTAG_MSGS
-void CoreWrapper::tagDetectionsAsyncCallback(const apriltag_msgs::msg::AprilTagDetectionArray::SharedPtr tagDetections)
+void CoreWrapper::tagDetectionsAsyncCallback(const apriltag_msgs::msg::AprilTagDetectionArray::SharedPtr msg)
+{
+	if(!paused_)
+	{
+		static bool warningShow = false;
+		if(!warningShow) {
+			RCLCPP_WARN(this->get_logger(), "\"tag_detections\" input topic name for apriltag_msgs is deprecated, remap \"apriltag\" input topic name instead. This message is only printed once.");
+			warningShow = true;
+		}
+		apriltagAsyncCallback(msg);
+	}
+}
+void CoreWrapper::apriltagAsyncCallback(const apriltag_msgs::msg::AprilTagDetectionArray::SharedPtr msg)
 {
 	if(!paused_)
 	{
 		UScopeMutex lock(landmarksMutex_);
-		for(unsigned int i=0; i<tagDetections->detections.size(); ++i)
+		for(unsigned int i=0; i<msg->detections.size(); ++i)
 		{
-			std::string tagFrameId = tagDetections->detections[i].family+":"+uNumber2Str(tagDetections->detections[i].id);
+			std::string tagFrameId = msg->detections[i].family+":"+uNumber2Str(msg->detections[i].id);
 			Transform camToTag = rtabmap_conversions::getTransform(
-				tagDetections->header.frame_id, // e.g., camera_optical_frame
+				msg->header.frame_id, // e.g., camera_optical_frame
 				tagFrameId,                     // e.g., tag36h11:42
-				tagDetections->header.stamp,
+				msg->header.stamp,
 				*tfBuffer_,
 				waitForTransform_);
 			if(camToTag.isNull())
@@ -2670,16 +2694,97 @@ void CoreWrapper::tagDetectionsAsyncCallback(const apriltag_msgs::msg::AprilTagD
 				RCLCPP_WARN(get_logger(), "Could not get TF between %s and %s frames for tag detection %d.",
 					frameId_.c_str(),
 					tagFrameId.c_str(),
-					tagDetections->detections[i].id);
+					msg->detections[i].id);
 					continue;
 			}
 
 			geometry_msgs::msg::PoseWithCovarianceStamped p;
 			rtabmap_conversions::transformToPoseMsg(camToTag, p.pose.pose);
-			p.header = tagDetections->header;
+			p.header = msg->header;
 			
 			uInsert(landmarks_,
-					std::make_pair(tagDetections->detections[i].id,
+					std::make_pair(msg->detections[i].id,
+							std::make_pair(p, 0.0f)));
+		}
+	}
+}
+#endif
+
+#ifdef WITH_ARUCO_MSGS
+void CoreWrapper::arucoAsyncCallback(const aruco_msgs::msg::MarkerArray::SharedPtr msg)
+{
+	if(!paused_)
+	{
+		UScopeMutex lock(landmarksMutex_);
+		for(unsigned int i=0; i<msg->markers.size(); ++i)
+		{
+			geometry_msgs::msg::PoseWithCovarianceStamped p;
+			p.pose = msg->markers[i].pose;
+			p.header = msg->markers[i].header;
+
+			uInsert(landmarks_,
+					std::make_pair((int)msg->markers[i].id,
+							std::make_pair(p, 0.0f)));
+		}
+	}
+}
+#endif
+
+#ifdef WITH_ARUCO_OPENCV_MSGS
+void CoreWrapper::arucoOpencvAsyncCallback(const aruco_opencv_msgs::msg::ArucoDetection::SharedPtr msg)
+{
+	if(!paused_)
+	{
+		UScopeMutex lock(landmarksMutex_);
+		for(unsigned int i=0; i<msg->markers.size(); ++i)
+		{
+			geometry_msgs::msg::PoseWithCovarianceStamped p;
+			p.pose.pose = msg->markers[i].pose;
+			p.header = msg->header;
+			
+			uInsert(landmarks_,
+					std::make_pair((int)msg->markers[i].marker_id,
+							std::make_pair(p, 0.0f)));
+		}
+	}
+}
+#endif
+
+#ifdef WITH_ARUCO_MARKERS_MSGS
+void CoreWrapper::arucoMarkersAsyncCallback(const aruco_markers_msgs::msg::MarkerArray::SharedPtr msg)
+{
+	if(!paused_)
+	{
+		UScopeMutex lock(landmarksMutex_);
+		for(unsigned int i=0; i<msg->markers.size(); ++i)
+		{
+			geometry_msgs::msg::PoseWithCovarianceStamped p;
+			p.pose.pose = msg->markers[i].pose.pose;
+			p.header = msg->markers[i].pose.header;
+			
+			uInsert(landmarks_,
+					std::make_pair((int)msg->markers[i].id,
+							std::make_pair(p, 0.0f)));
+		}
+	}
+}
+#endif
+
+#ifdef WITH_ROS2_ARUCO_INTERFACES
+void CoreWrapper::arucoInterfacesAsyncCallback(const ros2_aruco_interfaces::msg::ArucoMarkers::SharedPtr msg)
+{
+	if(!paused_)
+	{
+		UScopeMutex lock(landmarksMutex_);
+		UASSERT(msg->marker_ids.size() == msg->poses.size());
+		for(unsigned int i=0; i<msg->marker_ids.size(); ++i)
+		{
+			geometry_msgs::msg::PoseWithCovarianceStamped p;
+			p.pose.pose = msg->poses[i];
+			p.header = msg->header;
+			
+			uInsert(landmarks_,
+					std::make_pair((int)msg->marker_ids[i],
 							std::make_pair(p, 0.0f)));
 		}
 	}

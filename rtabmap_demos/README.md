@@ -7,6 +7,7 @@
 + [Turtlebot3 Nav2 and 2D LiDAR SLAM](#turtlebot3-nav2-and-2d-lidar-slam)
 + [Turtlebot3 Nav2 and RGB-D SLAM](#turtlebot3-nav2-and-rgb-d-slam)
 + [Turtlebot3 Nav2, 2D LiDAR and RGB-D SLAM](#turtlebot3-nav2-2d-lidar-and-rgb-d-slam)
++ [Turtlebot3 Nav2, Fake 2D LiDAR and RGB-D SLAM](#turtlebot3-nav2-fake-2d-lidar-and-rgb-d-slam)
 + [Champ Quadruped Nav2, Elevation Map and VSLAM](#champ-quadruped-nav2-elevation-map-and-vslam)
 + [Clearpath Husky Nav2, 2D LiDAR and RGB-D SLAM](#clearpath-husky-nav2-2d-lidar-and-rgb-d-slam)
 + [Clearpath Husky Nav2, 3D LiDAR and RGB-D SLAM](#clearpath-husky-nav2-3d-lidar-and-rgb-d-slam)
@@ -50,6 +51,14 @@
 [turtlebot3_sim_rgbd_scan_demo.launch.py](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_demos/launch/turtlebot3/turtlebot3_sim_rgbd_scan_demo.launch.py)
 
 ![Peek 2024-11-29 13-41](https://github.com/user-attachments/assets/2e878158-b1b6-48a4-801c-72cdb41b4783)
+### Turtlebot3 Nav2, Fake 2D LiDAR and RGB-D SLAM
+[turtlebot3_sim_rgbd_fake_scan_demo.launch.py](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_demos/launch/turtlebot3/turtlebot3_sim_rgbd_fake_scan_demo.launch.py)
+
+ * Red: Scan generated from camera's depth.
+ * Orange: Locally assembled scans used for proximity detection.
+ * Yellow: The map.
+
+![Peek 2025-07-04 16-57](https://github.com/user-attachments/assets/8869cf57-35a1-4236-bdab-151b88ae2ea1)
 ### Champ Quadruped Nav2, Elevation Map and VSLAM
 [champ_sim_vslam.launch.py](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_demos/launch/champ/champ_sim_vslam.launch.py)
 
