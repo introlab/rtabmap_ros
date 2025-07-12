@@ -175,6 +175,7 @@ private:
 	void fillTransformerOptions( rviz_common::properties::EnumProperty* prop, uint32_t mask );
 
 private:
+	std::shared_ptr<rclcpp::Node> clientNode_;
 	rclcpp::Publisher<std_msgs::msg::Int32MultiArray>::SharedPtr republishNodeDataPub_;
 	
 	std::map<int, CloudInfoPtr> cloud_infos_;

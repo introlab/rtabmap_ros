@@ -60,10 +60,21 @@ PointCloudToDepthImage::PointCloudToDepthImage(const rclcpp::NodeOptions & optio
 	//tfBuffer_->setCreateTimerInterface(timer_interface);
 	tfListener_ = std::make_shared<tf2_ros::TransformListener>(*tfBuffer_);
 
-	int queueSize = 10;
-	int qos = 0;
+	int topicQueueSize = 10;
+	int syncQueueSize = 10;
+	int qos = RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT;
 	bool approx = true;
-	queueSize = this->declare_parameter("queue_size", queueSize);
+	topicQueueSize = this->declare_parameter("topic_queue_size", topicQueueSize);
+	int queueSize = this->declare_parameter("queue_size", -1);
+	if(queueSize != -1)
+	{
+		syncQueueSize = queueSize;
+		RCLCPP_WARN(this->get_logger(), "Parameter \"queue_size\" has been renamed "
+				 "to \"sync_queue_size\" and will be removed "
+				 "in future versions! The value (%d) is copied to "
+				 "\"sync_queue_size\".", syncQueueSize);
+	}
+	syncQueueSize = this->declare_parameter("sync_queue_size", syncQueueSize);
 	qos = this->declare_parameter("qos", qos);
 	int qosCamInfo = this->declare_parameter("qos_camera_info", qos);
 	fixedFrameId_ = this->declare_parameter("fixed_frame_id", fixedFrameId_);
@@ -86,7 +97,8 @@ PointCloudToDepthImage::PointCloudToDepthImage(const rclcpp::NodeOptions & optio
 
 	RCLCPP_INFO(this->get_logger(), "Params:");
 	RCLCPP_INFO(this->get_logger(), "  approx=%s", approx?"true":"false");
-	RCLCPP_INFO(this->get_logger(), "  queue_size=%d", queueSize);
+	RCLCPP_INFO(this->get_logger(), "  topic_queue_size=%d", topicQueueSize);
+	RCLCPP_INFO(this->get_logger(), "  sync_queue_size=%d", syncQueueSize);
 	RCLCPP_INFO(this->get_logger(), "  fixed_frame_id=%s", fixedFrameId_.c_str());
 	RCLCPP_INFO(this->get_logger(), "  wait_for_transform=%fs", waitForTransform_);
 	RCLCPP_INFO(this->get_logger(), "  fill_holes_size=%d pixels (0=disabled)", fillHolesSize_);
@@ -95,28 +107,26 @@ PointCloudToDepthImage::PointCloudToDepthImage(const rclcpp::NodeOptions & optio
 	RCLCPP_INFO(this->get_logger(), "  decimation=%d", decimation_);
 	RCLCPP_INFO(this->get_logger(), "  upscale=%s (upscale_depth_error_ratio=%f)", upscale_?"true":"false", upscaleDepthErrorRatio_);
 
-	auto node = rclcpp::Node::make_shared(this->get_name());
-	image_transport::ImageTransport it(node);
-	depthImage16Pub_ = image_transport::create_camera_publisher(node.get(), "image_raw", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile()); // 16 bits unsigned in mm
-	depthImage32Pub_ = image_transport::create_camera_publisher(node.get(), "image", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());// 32 bits float in meters
+	depthImage16Pub_ = image_transport::create_publisher(this, "image_raw", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile()); // 16 bits unsigned in mm
+	depthImage32Pub_ = image_transport::create_publisher(this, "image", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());// 32 bits float in meters
 	pointCloudTransformedPub_ = create_publisher<sensor_msgs::msg::PointCloud2>("cloud_transformed", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos));
 	cameraInfo16Pub_ = create_publisher<sensor_msgs::msg::CameraInfo>(depthImage16Pub_.getTopic()+"/camera_info", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qosCamInfo));
 	cameraInfo32Pub_ = create_publisher<sensor_msgs::msg::CameraInfo>(depthImage32Pub_.getTopic()+"/camera_info", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qosCamInfo));
 
 	if(approx)
 	{
-		approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize), pointCloudSub_, cameraInfoSub_);
+		approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(syncQueueSize), pointCloudSub_, cameraInfoSub_);
 		approxSync_->registerCallback(std::bind(&PointCloudToDepthImage::callback, this, std::placeholders::_1, std::placeholders::_2));
 	}
 	else
 	{
 		fixedFrameId_.clear();
-		exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize), pointCloudSub_, cameraInfoSub_);
+		exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(syncQueueSize), pointCloudSub_, cameraInfoSub_);
 		exactSync_->registerCallback(std::bind(&PointCloudToDepthImage::callback, this, std::placeholders::_1, std::placeholders::_2));
 	}
 
-	pointCloudSub_.subscribe(this, "cloud", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
-	cameraInfoSub_.subscribe(this, "camera_info", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile());
+	pointCloudSub_.subscribe(this, "cloud", rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	cameraInfoSub_.subscribe(this, "camera_info", rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile());
 }
 
 PointCloudToDepthImage::~PointCloudToDepthImage()
@@ -149,6 +159,10 @@ void PointCloudToDepthImage::callback(
 
 		if(cloudDisplacement.isNull())
 		{
+			RCLCPP_ERROR(this->get_logger(), "Could not find transform between %s and %s, accordingly to %s, aborting!",
+				pointCloud2Msg->header.frame_id.c_str(), 
+				cameraInfoMsg->header.frame_id.c_str(),
+				fixedFrameId_.c_str());
 			return;
 		}
 
@@ -161,6 +175,9 @@ void PointCloudToDepthImage::callback(
 
 		if(cloudToCamera.isNull())
 		{
+			RCLCPP_ERROR(this->get_logger(), "Could not find transform between %s and %s, aborting!",
+				pointCloud2Msg->header.frame_id.c_str(), 
+				cameraInfoMsg->header.frame_id.c_str());
 			return;
 		}
 		rtabmap::Transform localTransform = cloudDisplacement*cloudToCamera;
@@ -229,7 +246,7 @@ void PointCloudToDepthImage::callback(
 		if(depthImage32Pub_.getNumSubscribers())
 		{
 			depthImage.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
-			depthImage32Pub_.publish(depthImage.toImageMsg(), cameraInfoMsg);
+			depthImage32Pub_.publish(depthImage.toImageMsg());
 			if(cameraInfo32Pub_->get_subscription_count())
 			{
 				cameraInfo32Pub_->publish(cameraInfoMsgOut);
@@ -240,7 +257,7 @@ void PointCloudToDepthImage::callback(
 		{
 			depthImage.encoding = sensor_msgs::image_encodings::TYPE_16UC1;
 			depthImage.image = rtabmap::util2d::cvtDepthFromFloat(depthImage.image);
-			depthImage16Pub_.publish(depthImage.toImageMsg(), cameraInfoMsg);
+			depthImage16Pub_.publish(depthImage.toImageMsg());
 			if(cameraInfo16Pub_->get_subscription_count())
 			{
 				cameraInfo16Pub_->publish(cameraInfoMsgOut);

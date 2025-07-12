@@ -38,8 +38,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/utilite/ULogger.h>
 #include <rtabmap/utilite/UTimer.h>
 #include <pcl_conversions/pcl_conversions.h>
+#ifdef PRE_ROS_IRON
 #include <image_geometry/pinhole_camera_model.h>
 #include <image_geometry/stereo_camera_model.h>
+#else
+#include <image_geometry/pinhole_camera_model.hpp>
+#include <image_geometry/stereo_camera_model.hpp>
+#endif
 #include <sensor_msgs/image_encodings.hpp>
 #include <sensor_msgs/msg/point_field.hpp>
 #include <geometry_msgs/msg/transform.hpp>
@@ -47,7 +52,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/util3d_surface.h>
 #ifdef PRE_ROS_HUMBLE
 #include <tf2_eigen/tf2_eigen.h>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #else
 #include <tf2_eigen/tf2_eigen.hpp>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
@@ -918,7 +923,8 @@ void cameraModelToROS(
 	UASSERT(model.R().empty() || model.R().total() == 9);
 	if(model.R().empty())
 	{
-		memset(camInfo.r.data(), 0.0, 9*sizeof(double));
+		cv::Mat eye = cv::Mat::eye(3,3,CV_64FC1);
+		memcpy(camInfo.r.data(), eye.data, 9*sizeof(double));
 	}
 	else
 	{
@@ -929,6 +935,10 @@ void cameraModelToROS(
 	if(model.P().empty())
 	{
 		memset(camInfo.p.data(), 0.0, 12*sizeof(double));
+		if(!model.K_raw().empty()) {
+			model.K_raw().copyTo(cv::Mat(3,4,CV_64FC1, camInfo.p.data()).colRange(0,3));
+			camInfo.p.back() = 1.0;
+		}
 	}
 	else
 	{
@@ -1610,6 +1620,8 @@ std::map<std::string, float> odomInfoToStatistics(const rtabmap::OdometryInfo & 
 	stats.insert(std::make_pair("Odometry/LocalBundleOutliers/", info.localBundleOutliers));
 	stats.insert(std::make_pair("Odometry/LocalBundleConstraints/", info.localBundleConstraints));
 	stats.insert(std::make_pair("Odometry/LocalBundleTime/ms", info.localBundleTime*1000.0f));
+	stats.insert(std::make_pair("Odometry/localBundleAvgInlierDistance/pix", info.localBundleAvgInlierDistance));
+	stats.insert(std::make_pair("Odometry/localBundleMaxKeyFramesForInlier/", info.localBundleMaxKeyFramesForInlier));
 	stats.insert(std::make_pair("Odometry/KeyFrameAdded/", info.keyFrameAdded?1.0f:0.0f));
 	stats.insert(std::make_pair("Odometry/Interval/ms", (float)info.interval));
 	stats.insert(std::make_pair("Odometry/Distance/m", info.distanceTravelled));
@@ -1640,9 +1652,8 @@ std::map<std::string, float> odomInfoToStatistics(const rtabmap::OdometryInfo & 
 	{
 		if(!info.transform.isNull())
 		{
-			rtabmap::Transform diff = info.transformGroundTruth.inverse()*info.transform;
-			stats.insert(std::make_pair("Odometry/TG_error_lin/m", diff.getNorm()));
-			stats.insert(std::make_pair("Odometry/TG_error_ang/deg", diff.getAngle()*180.0/CV_PI));
+			stats.insert(std::make_pair("Odometry/TG_error_lin/m", info.transformGroundTruth.getDistance(info.transform)));
+			stats.insert(std::make_pair("Odometry/TG_error_ang/deg", info.transformGroundTruth.getAngle(info.transform)*180.0/CV_PI));
 		}
 
 		info.transformGroundTruth.getTranslationAndEulerAngles(x,y,z,roll,pitch,yaw);
@@ -1686,18 +1697,8 @@ rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_msgs::msg::OdomInfo & msg, b
 	info.localBundleOutliers = msg.local_bundle_outliers;
 	info.localBundleConstraints = msg.local_bundle_constraints;
 	info.localBundleTime = msg.local_bundle_time;
-	UASSERT(msg.local_bundle_models.size() == msg.local_bundle_ids.size());
-	UASSERT(msg.local_bundle_models.size() == msg.local_bundle_poses.size());
-	for(size_t i=0; i<msg.local_bundle_ids.size(); ++i)
-	{
-		std::vector<rtabmap::CameraModel> models;
-		for(size_t j=0; j<msg.local_bundle_models[i].models.size(); ++j)
-		{
-			models.push_back(cameraModelFromROS(msg.local_bundle_models[i].models[j].camera_info, transformFromGeometryMsg(msg.local_bundle_models[i].models[j].local_transform)));
-		}
-		info.localBundleModels.insert(std::make_pair(msg.local_bundle_ids[i], models));
-		info.localBundlePoses.insert(std::make_pair(msg.local_bundle_ids[i], transformFromPoseMsg(msg.local_bundle_poses[i])));
-	}
+	info.localBundleAvgInlierDistance = msg.local_bundle_avg_inlier_distance;
+	info.localBundleMaxKeyFramesForInlier = msg.local_bundle_max_key_frames_for_inlier;
 	info.keyFrameAdded = msg.key_frame_added;
 	info.timeEstimation = msg.time_estimation;
 	info.timeParticleFiltering =  msg.time_particle_filtering;
@@ -1715,6 +1716,19 @@ rtabmap::OdometryInfo odomInfoFromROS(const rtabmap_msgs::msg::OdomInfo & msg, b
 
 	if(!ignoreData)
 	{
+		UASSERT(msg.local_bundle_models.size() == msg.local_bundle_ids.size());
+		UASSERT(msg.local_bundle_models.size() == msg.local_bundle_poses.size());
+		for(size_t i=0; i<msg.local_bundle_ids.size(); ++i)
+		{
+			std::vector<rtabmap::CameraModel> models;
+			for(size_t j=0; j<msg.local_bundle_models[i].models.size(); ++j)
+			{
+				models.push_back(cameraModelFromROS(msg.local_bundle_models[i].models[j].camera_info, transformFromGeometryMsg(msg.local_bundle_models[i].models[j].local_transform)));
+			}
+			info.localBundleModels.insert(std::make_pair(msg.local_bundle_ids[i], models));
+			info.localBundlePoses.insert(std::make_pair(msg.local_bundle_ids[i], transformFromPoseMsg(msg.local_bundle_poses[i])));
+		}
+		
 		UASSERT(msg.words_keys.size() == msg.words_values.size());
 		for(unsigned int i=0; i<msg.words_keys.size(); ++i)
 		{
@@ -1765,6 +1779,8 @@ void odomInfoToROS(const rtabmap::OdometryInfo & info, rtabmap_msgs::msg::OdomIn
 	msg.local_bundle_outliers = info.localBundleOutliers;
 	msg.local_bundle_constraints = info.localBundleConstraints;
 	msg.local_bundle_time = info.localBundleTime;
+	msg.local_bundle_avg_inlier_distance = info.localBundleAvgInlierDistance;
+	msg.local_bundle_max_key_frames_for_inlier = info.localBundleMaxKeyFramesForInlier;
 	UASSERT(info.localBundleModels.size() == info.localBundlePoses.size());
 	for(std::map<int, std::vector<rtabmap::CameraModel> >::const_iterator iter=info.localBundleModels.begin();
 		iter!=info.localBundleModels.end();
@@ -1983,12 +1999,6 @@ rtabmap::Transform getTransform(
 {
 	// TF ready?
 	rtabmap::Transform transform;
-	std::string errString;
-	if(!tfBuffer.canTransform(fromFrameId, toFrameId,  tf2_ros::fromMsg(stamp), tf2::durationFromSec(waitForTransform), &errString))
-	{
-		UWARN("(can transform %s -> %s?) %s (wait_for_transform=%f)", fromFrameId.c_str(), toFrameId.c_str(), errString.c_str(), waitForTransform);
-		return rtabmap::Transform();
-	}
 	try
 	{
 		geometry_msgs::msg::TransformStamped tmp;
@@ -2169,7 +2179,7 @@ bool convertRGBDMsgs(
 		rtabmap::Transform localTransform = rtabmap_conversions::getTransform(frameId, !imageMsgs.empty()?imageMsgs[i]->header.frame_id:cameraInfoMsgs[i].header.frame_id, stamp, listener, waitForTransform);
 		if(localTransform.isNull())
 		{
-			UERROR("TF of received image %d at time %fs is not set!", i, stamp.seconds());
+			UERROR("TF of received image for camera %d at time %fs is not set!", i, stamp.seconds());
 			return false;
 		}
 		// sync with odometry stamp
@@ -2588,6 +2598,24 @@ bool convertScanMsg(
 		double waitForTransform,
 		bool outputInFrameId)
 {
+	// scan message validation check
+	if(scan2dMsg.angle_increment == 0.0f) {
+		UERROR("convertScanMsg: angle_increment should not be 0!");
+		return false;
+	}
+	if(scan2dMsg.range_min > scan2dMsg.range_max) {
+		UERROR("convertScanMsg: range_min (%f) should be smaller than range_max (%f)!", scan2dMsg.range_min, scan2dMsg.range_max);
+		return false;
+	}
+	if(scan2dMsg.angle_increment > 0 && scan2dMsg.angle_max < scan2dMsg.angle_min) {
+		UERROR("convertScanMsg: Angle increment (%f) should be negative if angle_min(%f) > angle_max(%f)!", scan2dMsg.angle_increment, scan2dMsg.angle_min, scan2dMsg.angle_max);
+		return false;
+	}
+	else if (scan2dMsg.angle_increment < 0 && scan2dMsg.angle_max > scan2dMsg.angle_min) {
+		UERROR("convertScanMsg: Angle increment (%f) should positive if angle_min(%f) < angle_max(%f)!", scan2dMsg.angle_increment, scan2dMsg.angle_min, scan2dMsg.angle_max);
+		return false;
+	}
+
 	// make sure the frame of the laser is updated during the whole scan time
 	rtabmap::Transform tmpT = getMovingTransform(
 			scan2dMsg.header.frame_id,
@@ -3035,6 +3063,25 @@ bool deskew_impl(
 			}
 		}
 
+		if(secFirst > 1.e18)
+		{
+			// convert nanoseconds to seconds
+			secFirst /= 1.e9;
+			secLast /= 1.e9;
+		}
+		else if(secFirst > 1.e15)
+		{
+			// convert microseconds to seconds
+			secFirst /= 1.e6;
+			secLast /= 1.e6;
+		}
+		else if(secFirst > 1.e12)
+		{
+			// convert milliseconds to seconds
+			secFirst /= 1.e3;
+			secLast /= 1.e3;
+		}
+
 		firstStamp = timestampToROS(secFirst);
 		lastStamp = timestampToROS(secLast);
 	}
@@ -3173,6 +3220,21 @@ bool deskew_impl(
 			else if(timeDatatype == 8) //float64
 			{
 				double sec = *((const double*)(&output.data[u*output.point_step]+offsetTime));
+				if(sec > 1.e18)
+				{
+					// convert nanoseconds to seconds
+					sec /= 1.e9;
+				}
+				else if(sec > 1.e15)
+				{
+					// convert microseconds to seconds
+					sec /= 1.e6;
+				}
+				else if(sec > 1.e12)
+				{
+					// sec milliseconds to seconds
+					sec /= 1.e3;
+				}
 				stamp = timestampToROS(sec);
 			}
 
@@ -3252,6 +3314,21 @@ bool deskew_impl(
 			else if(timeDatatype == 8)
 			{
 				double sec = *((const double*)(&output.data[v*output.row_step]+offsetTime));
+				if(sec > 1.e18)
+				{
+					// convert nanoseconds to seconds
+					sec /= 1.e9;
+				}
+				else if(sec > 1.e15)
+				{
+					// convert microseconds to seconds
+					sec /= 1.e6;
+				}
+				else if(sec > 1.e12)
+				{
+					// sec milliseconds to seconds
+					sec /= 1.e3;
+				}
 				stamp = timestampToROS(sec);
 			}
 
@@ -3308,7 +3385,7 @@ bool deskew_impl(
 			}
 		}
 	}
-	UDEBUG("Lidar deskewing time=%fs", processingTime.elapsed());
+	UDEBUG("Lidar deskewing time=%fs (slerp=%s waitForTransform=%f)", processingTime.elapsed(), slerp?"true":"false", waitForTransform);
 	return true;
 }
 

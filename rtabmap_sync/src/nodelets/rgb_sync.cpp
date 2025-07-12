@@ -30,7 +30,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sensor_msgs/msg/compressed_image.hpp>
 #include <sensor_msgs/image_encodings.hpp>
 
+#ifdef PRE_ROS_IRON
 #include <cv_bridge/cv_bridge.h>
+#else
+#include <cv_bridge/cv_bridge.hpp>
+#endif
 #include <opencv2/highgui/highgui.hpp>
 
 #include "rtabmap/core/Compression.h"
@@ -47,13 +51,24 @@ RGBSync::RGBSync(const rclcpp::NodeOptions & options) :
 	approxSync_(0),
 	exactSync_(0)
 {
-	int queueSize = 10;
+	int topicQueueSize = 10;
+	int syncQueueSize = 10;
 	bool approxSync = true;
-	int qos = 0;
+	int qos = RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT;
 	double approxSyncMaxInterval = 0.0;
 	approxSync = this->declare_parameter("approx_sync", approxSync);
 	approxSyncMaxInterval = this->declare_parameter("approx_sync_max_interval", approxSyncMaxInterval);
-	queueSize = this->declare_parameter("queue_size", queueSize);
+	topicQueueSize = this->declare_parameter("topic_queue_size", topicQueueSize);
+	int queueSize = this->declare_parameter("queue_size", -1);
+	if(queueSize != -1)
+	{
+		syncQueueSize = queueSize;
+		RCLCPP_WARN(this->get_logger(), "Parameter \"queue_size\" has been renamed "
+				 "to \"sync_queue_size\" and will be removed "
+				 "in future versions! The value (%d) is copied to "
+				 "\"sync_queue_size\".", syncQueueSize);
+	}
+	syncQueueSize = this->declare_parameter("sync_queue_size", syncQueueSize);
 	qos = this->declare_parameter("qos", qos);
 	int qosCaminfo = this->declare_parameter("qos_camera_info", qos);
 	compressedRate_ = this->declare_parameter("compressed_rate", compressedRate_);
@@ -61,8 +76,9 @@ RGBSync::RGBSync(const rclcpp::NodeOptions & options) :
 	RCLCPP_INFO(this->get_logger(), "%s: approx_sync = %s", get_name(), approxSync?"true":"false");
 	if(approxSync)
 		RCLCPP_INFO(this->get_logger(), "%s: approx_sync_max_interval = %f", get_name(), approxSyncMaxInterval);
-	RCLCPP_INFO(this->get_logger(), "%s: queue_size  = %d", get_name(), queueSize);
-	RCLCPP_INFO(this->get_logger(), "%s: qos         = %d", get_name(), qos);
+	RCLCPP_INFO(this->get_logger(), "%s: topic_queue_size  = %d", get_name(), topicQueueSize);
+	RCLCPP_INFO(this->get_logger(), "%s: sync_queue_size   = %d", get_name(), syncQueueSize);
+	RCLCPP_INFO(this->get_logger(), "%s: qos             = %d", get_name(), qos);
 	RCLCPP_INFO(this->get_logger(), "%s: qos_camera_info = %d", get_name(), qosCaminfo);
 	RCLCPP_INFO(this->get_logger(), "%s: compressed_rate = %f", get_name(), compressedRate_);
 
@@ -71,20 +87,20 @@ RGBSync::RGBSync(const rclcpp::NodeOptions & options) :
 
 	if(approxSync)
 	{
-		approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize), imageSub_, cameraInfoSub_);
+		approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(syncQueueSize), imageSub_, cameraInfoSub_);
 		if(approxSyncMaxInterval > 0.0)
 			approxSync_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval));
 		approxSync_->registerCallback(std::bind(&RGBSync::callback, this, std::placeholders::_1, std::placeholders::_2));
 	}
 	else
 	{
-		exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize), imageSub_, cameraInfoSub_);
+		exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(syncQueueSize), imageSub_, cameraInfoSub_);
 		exactSync_->registerCallback(std::bind(&RGBSync::callback, this, std::placeholders::_1, std::placeholders::_2));
 	}
 
 	image_transport::TransportHints hints(this);
-	imageSub_.subscribe(this, "rgb/image", hints.getTransport(), rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
-	cameraInfoSub_.subscribe(this, "rgb/camera_info", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qosCaminfo).get_rmw_qos_profile());
+	imageSub_.subscribe(this, "rgb/image", hints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	cameraInfoSub_.subscribe(this, "rgb/camera_info", rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qosCaminfo).get_rmw_qos_profile());
 
 	std::string subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s,\n   %s",
 						get_name(),
@@ -99,8 +115,11 @@ RGBSync::RGBSync(const rclcpp::NodeOptions & options) :
 		syncDiagnostic_->init(imageSub_.getSubscriber().getTopic(),
 			uFormat("%s: Did not receive data since 5 seconds! Make sure the input topics are "
 					"published (\"$ ros2 topic hz my_topic\") and the timestamps in their "
-					"header are set. %s%s",
+					"header are set. Ajusting topic_queue_size (%d) and sync_queue_size (%d) "
+					"can also help for better synchronization if framerates and/or delays are different. %s%s",
 					this->get_name(),
+					topicQueueSize,
+					syncQueueSize,
 					approxSync?"":"Parameter \"approx_sync\" is false, which means that input "
 						"topics should have all the exact timestamp for the callback to be called.",
 					subscribedTopicsMsg.c_str()));
@@ -119,7 +138,7 @@ void RGBSync::callback(
 		  const sensor_msgs::msg::Image::ConstSharedPtr image,
 		  const sensor_msgs::msg::CameraInfo::ConstSharedPtr cameraInfo)
 {
-	syncDiagnostic_->tick(image->header.stamp);
+	syncDiagnostic_->tickInput(image->header.stamp);
 	if(rgbdImagePub_->get_subscription_count() || rgbdImageCompressedPub_->get_subscription_count())
 	{
 		double stamp = rtabmap_conversions::timestampFromROS(image->header.stamp);
@@ -169,6 +188,7 @@ void RGBSync::callback(
 					stamp, rtabmap_conversions::timestampFromROS(image->header.stamp));
 		}
 	}
+	syncDiagnostic_->tickOutput(image->header.stamp);
 }
 
 }

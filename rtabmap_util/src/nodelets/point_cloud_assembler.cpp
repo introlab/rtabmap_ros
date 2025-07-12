@@ -73,11 +73,22 @@ PointCloudAssembler::PointCloudAssembler(const rclcpp::NodeOptions & options) :
 	//tfBuffer_->setCreateTimerInterface(timer_interface);
 	tfListener_ = std::make_shared<tf2_ros::TransformListener>(*tfBuffer_);
 
-	int queueSize = 5;
-	int qos = 0;
+	int topicQueueSize = 10;
+	int syncQueueSize = 10;
+	int qos = RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT;
 	bool subscribeOdomInfo = false;
 
-	queueSize = this->declare_parameter("queue_size", queueSize);
+	topicQueueSize = this->declare_parameter("topic_queue_size", topicQueueSize);
+	int queueSize = this->declare_parameter("queue_size", -1);
+	if(queueSize != -1)
+	{
+		syncQueueSize = queueSize;
+		RCLCPP_WARN(this->get_logger(), "Parameter \"queue_size\" has been renamed "
+				 "to \"sync_queue_size\" and will be removed "
+				 "in future versions! The value (%d) is copied to "
+				 "\"sync_queue_size\".", syncQueueSize);
+	}
+	syncQueueSize = this->declare_parameter("sync_queue_size", syncQueueSize);
 	qos = this->declare_parameter("qos", qos);
 	int qosOdom = this->declare_parameter("qos_odom", qos);
 	fixedFrameId_ = this->declare_parameter("fixed_frame_id", fixedFrameId_);
@@ -97,7 +108,8 @@ PointCloudAssembler::PointCloudAssembler(const rclcpp::NodeOptions & options) :
 	removeZ_ = this->declare_parameter("remove_z", removeZ_);
 	subscribeOdomInfo = this->declare_parameter("subscribe_odom_info", subscribeOdomInfo);
 
-	RCLCPP_INFO(this->get_logger(), "%s: queue_size=%d", get_name(), queueSize);
+	RCLCPP_INFO(this->get_logger(), "%s: topic_queue_size=%d", get_name(), topicQueueSize);
+	RCLCPP_INFO(this->get_logger(), "%s: sync_queue_size=%d", get_name(), syncQueueSize);
 	RCLCPP_INFO(this->get_logger(), "%s: qos=%d", get_name(), qos);
 	RCLCPP_INFO(this->get_logger(), "%s: qos_odom=%d", get_name(), qosOdom);
 	RCLCPP_INFO(this->get_logger(), "%s: fixed_frame_id=%s", get_name(), fixedFrameId_.c_str());
@@ -118,7 +130,7 @@ PointCloudAssembler::PointCloudAssembler(const rclcpp::NodeOptions & options) :
 
 	if(maxClouds_==0 && assemblingTime_ ==0.0)
 	{
-		RCLCPP_ERROR(get_logger(), "point_cloud_assembler: max_cloud or assembling_time parameters should be set!");
+		RCLCPP_ERROR(get_logger(), "point_cloud_assembler: max_clouds or assembling_time parameters should be set!");
 		exit(-1);
 	}
 
@@ -128,34 +140,34 @@ PointCloudAssembler::PointCloudAssembler(const rclcpp::NodeOptions & options) :
 
 	if(!fixedFrameId_.empty())
 	{
-		cloudSub_ = create_subscription<sensor_msgs::msg::PointCloud2>("cloud", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos), std::bind(&PointCloudAssembler::callbackCloud, this, std::placeholders::_1));
+		cloudSub_ = create_subscription<sensor_msgs::msg::PointCloud2>("cloud", rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos), std::bind(&PointCloudAssembler::callbackCloud, this, std::placeholders::_1));
 		subscribedTopicsMsg_ = uFormat("\n%s subscribed to %s",
 							get_name(),
 							cloudSub_->get_topic_name());
 	}
 	else if(subscribeOdomInfo)
 	{
-		syncCloudSub_.subscribe(this, "cloud", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
-		syncOdomSub_.subscribe(this, "odom", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qosOdom).get_rmw_qos_profile());
-		syncOdomInfoSub_.subscribe(this, "odom_info", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qosOdom).get_rmw_qos_profile());
-		exactInfoSync_ = new message_filters::Synchronizer<syncInfoPolicy>(syncInfoPolicy(queueSize), syncCloudSub_, syncOdomSub_, syncOdomInfoSub_);
+		syncCloudSub_.subscribe(this, "cloud", rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+		syncOdomSub_.subscribe(this, "odom", rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qosOdom).get_rmw_qos_profile());
+		syncOdomInfoSub_.subscribe(this, "odom_info", rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qosOdom).get_rmw_qos_profile());
+		exactInfoSync_ = new message_filters::Synchronizer<syncInfoPolicy>(syncInfoPolicy(syncQueueSize), syncCloudSub_, syncOdomSub_, syncOdomInfoSub_);
 		exactInfoSync_->registerCallback(std::bind(&rtabmap_util::PointCloudAssembler::callbackCloudOdomInfo, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (exact sync):\n   %s,\n   %s",
 							get_name(),
-							syncCloudSub_.getTopic().c_str(),
-							syncOdomSub_.getTopic().c_str(),
-							syncOdomInfoSub_.getTopic().c_str());
+							syncCloudSub_.getSubscriber()->get_topic_name(),
+							syncOdomSub_.getSubscriber()->get_topic_name(),
+							syncOdomInfoSub_.getSubscriber()->get_topic_name());
 	}
 	else
 	{
-		syncCloudSub_.subscribe(this, "cloud", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
-		syncOdomSub_.subscribe(this, "odom", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qosOdom).get_rmw_qos_profile());
-		exactSync_ = new message_filters::Synchronizer<syncPolicy>(syncPolicy(queueSize), syncCloudSub_, syncOdomSub_);
+		syncCloudSub_.subscribe(this, "cloud", rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+		syncOdomSub_.subscribe(this, "odom", rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qosOdom).get_rmw_qos_profile());
+		exactSync_ = new message_filters::Synchronizer<syncPolicy>(syncPolicy(syncQueueSize), syncCloudSub_, syncOdomSub_);
 		exactSync_->registerCallback(std::bind(&rtabmap_util::PointCloudAssembler::callbackCloudOdom, this, std::placeholders::_1, std::placeholders::_2));
 		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (exact sync):\n   %s,\n   %s",
 							get_name(),
-							syncCloudSub_.getTopic().c_str(),
-							syncOdomSub_.getTopic().c_str());
+							syncCloudSub_.getSubscriber()->get_topic_name(),
+							syncOdomSub_.getSubscriber()->get_topic_name());
 	}
 
 	warningThread_ = new std::thread([&](){
@@ -274,13 +286,14 @@ void PointCloudAssembler::callbackCloudOdomInfo(
 	}
 	else
 	{
-		RCLCPP_WARN(this->get_logger(), "Reseting point cloud assembler as null odometry has been received.");
+		RCLCPP_WARN(this->get_logger(), "Resetting point cloud assembler as null odometry has been received.");
 		clouds_.clear();
 	}
 }
 
 void PointCloudAssembler::callbackCloud(const sensor_msgs::msg::PointCloud2::ConstSharedPtr cloudMsg)
 {
+	callbackCalled_ = true;
 	if(cloudPub_->get_subscription_count())
 	{
 		UASSERT_MSG(cloudMsg->data.size() == cloudMsg->row_step*cloudMsg->height,

@@ -1362,7 +1362,11 @@ void MapsManager::publishMaps(
 		(elevationMapPub_->get_subscription_count() && !latched_.at(&elevationMapPub_)))
 	{
 		grid_map_msgs::msg::GridMap::UniquePtr msg;
+#if RTABMAP_VERSION_MAJOR>0 || (RTABMAP_VERSION_MAJOR==0 && RTABMAP_VERSION_MINOR>21) || (RTABMAP_VERSION_MAJOR==0 && RTABMAP_VERSION_MINOR==21 && RTABMAP_VERSION_PATCH>=8)
+		msg = grid_map::GridMapRosConverter::toMessage(*elevationMap_->gridMap());
+#else
 		msg = grid_map::GridMapRosConverter::toMessage(elevationMap_->gridMap());
+#endif
 		msg->header.frame_id = mapFrameId;
 		msg->header.stamp = stamp;
 		elevationMapPub_->publish(std::move(msg));

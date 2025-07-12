@@ -75,10 +75,6 @@ GuiWrapper::GuiWrapper(const rclcpp::NodeOptions & options) :
 		maxOdomUpdateRate_(10)
 {
 	tfBuffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
-	//auto timer_interface = std::make_shared<tf2_ros::CreateTimerROS>(
-	//	this->get_node_base_interface(),
-	//	this->get_node_timers_interface());
-	//tfBuffer_->setCreateTimerInterface(timer_interface);
 	tfListener_ = std::make_shared<tf2_ros::TransformListener>(*tfBuffer_);
 
 	QString configFile = QDir::homePath()+"/.ros/rtabmapGUI.ini";
@@ -129,7 +125,7 @@ GuiWrapper::GuiWrapper(const rclcpp::NodeOptions & options) :
 			initCachePath = UDirectory::currentDir(true) + initCachePath;
 		}
 		RCLCPP_INFO(this->get_logger(), "rtabmap_viz: Initializing cache with local database \"%s\"", initCachePath.c_str());
-		if(!callMapDataService("get_map_data", false, true, true))
+		if(!callMapDataService(rtabmapNodeName_+"/get_map_data", false, true, true))
 		{
 			RCLCPP_ERROR(this->get_logger(),
 					"The cache will still be loaded "
@@ -142,32 +138,32 @@ GuiWrapper::GuiWrapper(const rclcpp::NodeOptions & options) :
 	UEventsManager::addHandler(this);
 	UEventsManager::addHandler(mainWindow_);
 
-	republishNodeDataPub_ = this->create_publisher<std_msgs::msg::Int32MultiArray>("republish_node_data", 1);
+	republishNodeDataPub_ = this->create_publisher<std_msgs::msg::Int32MultiArray>(rtabmapNodeName_+"/republish_node_data", 1);
 
 	if(subscribeInfoOnly)
 	{
 	    RCLCPP_INFO(this->get_logger(), "rtabmap_viz: subscribe_info_only=true");
-		infoOnlyTopic_ = this->create_subscription<rtabmap_msgs::msg::Info>("info", 1, std::bind(&GuiWrapper::infoCallback, this, std::placeholders::_1));
+		infoOnlyTopic_ = this->create_subscription<rtabmap_msgs::msg::Info>("info", rclcpp::QoS(this->getTopicQueueSize()), std::bind(&GuiWrapper::infoCallback, this, std::placeholders::_1));
 	}
 	else
 	{
-		infoTopic_.subscribe(this, "info");
-	    mapDataTopic_.subscribe(this, "mapData");
+	    infoTopic_.subscribe(this, "info", rclcpp::QoS(this->getTopicQueueSize()).get_rmw_qos_profile());
+	    mapDataTopic_.subscribe(this, "mapData", rclcpp::QoS(this->getTopicQueueSize()).get_rmw_qos_profile());
 	    infoMapSync_ = new message_filters::Synchronizer<MyInfoMapSyncPolicy>(
-			    MyInfoMapSyncPolicy(this->getQueueSize()),
+			    MyInfoMapSyncPolicy(this->getSyncQueueSize()),
 			    infoTopic_,
 			    mapDataTopic_);
 	    infoMapSync_->registerCallback(std::bind(&GuiWrapper::infoMapCallback, this, std::placeholders::_1, std::placeholders::_2));
 	}
 
-	goalTopic_.subscribe(this, "goal_node");
-	pathTopic_.subscribe(this, "global_path");
+	goalTopic_.subscribe(this, "goal_node", rclcpp::QoS(this->getTopicQueueSize()).get_rmw_qos_profile());
+	pathTopic_.subscribe(this, "global_path", rclcpp::QoS(this->getTopicQueueSize()).get_rmw_qos_profile());
 	goalPathSync_ = new message_filters::Synchronizer<MyGoalPathSyncPolicy>(
-			MyGoalPathSyncPolicy(this->getQueueSize()),
+			MyGoalPathSyncPolicy(this->getSyncQueueSize()),
 			goalTopic_,
 			pathTopic_);
 	goalPathSync_->registerCallback(std::bind(&GuiWrapper::goalPathCallback, this, std::placeholders::_1, std::placeholders::_2));
-	goalReachedTopic_ = this->create_subscription<std_msgs::msg::Bool>("goal_reached", 5, std::bind(&GuiWrapper::goalReachedCallback, this, std::placeholders::_1));
+	goalReachedTopic_ = this->create_subscription<std_msgs::msg::Bool>("goal_reached", rclcpp::QoS(topicQueueSize_), std::bind(&GuiWrapper::goalReachedCallback, this, std::placeholders::_1));
 
 	setupCallbacks(*this); // do it at the end
 }
@@ -335,7 +331,6 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 		const rtabmap::ParametersMap & defaultParameters = rtabmap::Parameters::getDefaultParameters();
 		rtabmap::ParametersMap parameters = ((rtabmap::ParamEvent *)anEvent)->getParameters();
 		std::vector<rclcpp::Parameter> rosParameters;
-		auto node = rclcpp::Node::make_shared("rtabmap_viz");
 		for(rtabmap::ParametersMap::iterator i=parameters.begin(); i!=parameters.end(); ++i)
 		{
 			//save only parameters with valid names
@@ -369,7 +364,7 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 		rtabmap::RtabmapEventCmd::Cmd cmd = cmdEvent->getCmd();
 		if(cmd == rtabmap::RtabmapEventCmd::kCmdResetMemory)
 		{
-			if(!callEmptyService("reset"))
+			if(!callEmptyService(rtabmapNodeName_+"/reset"))
 			{
 				RCLCPP_ERROR(this->get_logger(), "Can't call \"reset\" service");
 			}
@@ -390,7 +385,7 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 			callEmptyService("pause_odom");
 
 			// Pause rtabmap
-			if(!callEmptyService("pause"))
+			if(!callEmptyService(rtabmapNodeName_+"/pause"))
 			{
 				RCLCPP_ERROR(this->get_logger(), "Can't call \"pause\" service");
 			}
@@ -398,7 +393,7 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 		else if(cmd == rtabmap::RtabmapEventCmd::kCmdResume)
 		{
 			// Resume rtabmap
-			if(!callEmptyService("resume"))
+			if(!callEmptyService(rtabmapNodeName_+"/resume"))
 			{
 				RCLCPP_ERROR(this->get_logger(), "Can't call \"resume\" service");
 			}
@@ -418,7 +413,7 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 		}
 		else if(cmd == rtabmap::RtabmapEventCmd::kCmdTriggerNewMap)
 		{
-			if(!callEmptyService("trigger_new_map"))
+			if(!callEmptyService(rtabmapNodeName_+"/trigger_new_map"))
 			{
 				RCLCPP_ERROR(this->get_logger(), "Can't call \"trigger_new_map\" service");
 			}
@@ -429,7 +424,7 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 			UASSERT(cmdEvent->value2().isBool());
 			UASSERT(cmdEvent->value3().isBool());
 
-			if(!callMapDataService("get_map_data", cmdEvent->value1().toBool(), cmdEvent->value2().toBool(), cmdEvent->value3().toBool()))
+			if(!callMapDataService(rtabmapNodeName_+"/get_map_data", cmdEvent->value1().toBool(), cmdEvent->value2().toBool(), cmdEvent->value3().toBool()))
 			{
 				this->post(new RtabmapEvent3DMap(1)); // service error
 			}
@@ -438,7 +433,7 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 		{
 			UASSERT(cmdEvent->value1().isStr() || cmdEvent->value1().isInt() || cmdEvent->value1().isUInt());
 
-			auto client = this->create_client<rtabmap_msgs::srv::SetGoal>("set_goal");
+			auto client = this->create_client<rtabmap_msgs::srv::SetGoal>(rtabmapNodeName_+"/set_goal");
 			if(client->wait_for_service(std::chrono::seconds(1)))
 			{
 				auto request = std::make_shared<rtabmap_msgs::srv::SetGoal::Request>();
@@ -468,7 +463,7 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 		}
 		else if(cmd == rtabmap::RtabmapEventCmd::kCmdCancelGoal)
 		{
-			if(!callEmptyService("cancel_goal"))
+			if(!callEmptyService(rtabmapNodeName_+"/cancel_goal"))
 			{
 				RCLCPP_ERROR(this->get_logger(), "Can't call \"cancel_goal\" service");
 			}
@@ -478,7 +473,7 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 			UASSERT(cmdEvent->value1().isStr());
 			UASSERT(cmdEvent->value2().isUndef() || cmdEvent->value2().isInt() || cmdEvent->value2().isUInt());
 
-			auto client = this->create_client<rtabmap_msgs::srv::SetLabel>("set_label");
+			auto client = this->create_client<rtabmap_msgs::srv::SetLabel>(rtabmapNodeName_+"/set_label");
 			if(client->wait_for_service(std::chrono::seconds(1)))
 			{
 				auto request = std::make_shared<rtabmap_msgs::srv::SetLabel::Request>();
@@ -495,7 +490,7 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 		else if(cmd == rtabmap::RtabmapEventCmd::kCmdRemoveLabel)
 		{
 			UASSERT(cmdEvent->value1().isStr());
-			auto client = this->create_client<rtabmap_msgs::srv::RemoveLabel>("remove_label");
+			auto client = this->create_client<rtabmap_msgs::srv::RemoveLabel>(rtabmapNodeName_+"/remove_label");
 			if(client->wait_for_service(std::chrono::seconds(1)))
 			{
 				auto request = std::make_shared<rtabmap_msgs::srv::RemoveLabel::Request>();
@@ -549,8 +544,10 @@ void GuiWrapper::commonMultiCameraCallback(
 
 	std_msgs::msg::Header odomHeader;
 	std::string frameId = frameId_;
+	Transform odomT;
 	if(odomMsg.get())
 	{
+		odomT = rtabmap_conversions::transformFromPoseMsg(odomMsg->pose.pose);
 		odomHeader = odomMsg->header;
 		if(!odomMsg->child_frame_id.empty())
 		{
@@ -584,9 +581,18 @@ void GuiWrapper::commonMultiCameraCallback(
 			odomHeader = imageMsgs[0]->header;
 		}
 		odomHeader.frame_id = odomFrameId_;
+
+		odomT = rtabmap_conversions::getTransform(odomHeader.frame_id, frameId_, odomHeader.stamp, *tfBuffer_, waitForTransform_);
+		if(odomT.isNull())
+		{
+			RCLCPP_WARN(this->get_logger(), "Could not get odometry pose from "
+				"TF for stamp %f, aborting! To show red screen in rtabmap_viz "
+				"when this happens (indicating potentially lost), set subscribe_odom "
+				"to true.", rclcpp::Time(odomHeader.stamp).seconds());
+			return;
+		}
 	}
 
-	Transform odomT = rtabmap_conversions::getTransform(odomHeader.frame_id, frameId_, odomHeader.stamp, *tfBuffer_, waitForTransform_);
 	cv::Mat covariance = cv::Mat::eye(6,6,CV_64FC1);
 	if(odomMsg.get())
 	{
@@ -727,7 +733,7 @@ void GuiWrapper::commonMultiCameraCallback(
 						cameraModels,
 						0,
 						rtabmap_conversions::timestampFromROS(odomHeader.stamp)),
-		odomMsg.get()?rtabmap_conversions::transformFromPoseMsg(odomMsg->pose.pose):odomT,
+		odomT,
 		info);
 
 	QMetaObject::invokeMethod(mainWindow_, "processOdometry", Q_ARG(rtabmap::OdometryEvent, odomEvent), Q_ARG(bool, ignoreData));
@@ -750,8 +756,10 @@ void GuiWrapper::commonStereoCallback(
 {
 	std_msgs::msg::Header odomHeader;
 	std::string frameId = frameId_;
+	Transform odomT;
 	if(odomMsg.get())
 	{
+		odomT = rtabmap_conversions::transformFromPoseMsg(odomMsg->pose.pose);
 		odomHeader = odomMsg->header;
 		if(!odomMsg->child_frame_id.empty())
 		{
@@ -777,9 +785,18 @@ void GuiWrapper::commonStereoCallback(
 			odomHeader = leftCamInfoMsg.header;
 		}
 		odomHeader.frame_id = odomFrameId_;
+
+		odomT = rtabmap_conversions::getTransform(odomHeader.frame_id, frameId_, odomHeader.stamp, *tfBuffer_, waitForTransform_);
+		if(odomT.isNull())
+		{
+			RCLCPP_WARN(this->get_logger(), "Could not get odometry pose from "
+				"TF for stamp %f, aborting! To show red screen in rtabmap_viz "
+				"when this happens (indicating potentially lost), set subscribe_odom "
+				"to true.", rclcpp::Time(odomHeader.stamp).seconds());
+			return;
+		}
 	}
 
-	Transform odomT = rtabmap_conversions::getTransform(odomHeader.frame_id, frameId_, odomHeader.stamp, *tfBuffer_, waitForTransform_);
 	cv::Mat covariance = cv::Mat::eye(6,6,CV_64FC1);
 	if(odomMsg.get())
 	{
@@ -907,7 +924,7 @@ void GuiWrapper::commonStereoCallback(
 				stereoModel,
 				0,
 				rtabmap_conversions::timestampFromROS(odomHeader.stamp)),
-		odomMsg.get()?rtabmap_conversions::transformFromPoseMsg(odomMsg->pose.pose):odomT,
+		odomT,
 		info);
 
 	QMetaObject::invokeMethod(mainWindow_, "processOdometry", Q_ARG(rtabmap::OdometryEvent, odomEvent), Q_ARG(bool, ignoreData));
@@ -923,8 +940,10 @@ void GuiWrapper::commonLaserScanCallback(
 {
 	std_msgs::msg::Header odomHeader;
 	std::string frameId = frameId_;
+	Transform odomT;
 	if(odomMsg.get())
 	{
+		odomT = rtabmap_conversions::transformFromPoseMsg(odomMsg->pose.pose);
 		odomHeader = odomMsg->header;
 		if(!odomMsg->child_frame_id.empty())
 		{
@@ -950,9 +969,18 @@ void GuiWrapper::commonLaserScanCallback(
 			return;
 		}
 		odomHeader.frame_id = odomFrameId_;
+
+		odomT = rtabmap_conversions::getTransform(odomHeader.frame_id, frameId_, odomHeader.stamp, *tfBuffer_, waitForTransform_);
+		if(odomT.isNull())
+		{
+			RCLCPP_WARN(this->get_logger(), "Could not get odometry pose from "
+				"TF for stamp %f, aborting! To show red screen in rtabmap_viz "
+				"when this happens (indicating potentially lost), set subscribe_odom "
+				"to true.", rclcpp::Time(odomHeader.stamp).seconds());
+			return;
+		}
 	}
 
-	Transform odomT = rtabmap_conversions::getTransform(odomHeader.frame_id, frameId_, odomHeader.stamp, *tfBuffer_, waitForTransform_);
 	cv::Mat covariance = cv::Mat::eye(6,6,CV_64FC1);
 	if(odomMsg.get())
 	{
@@ -1054,7 +1082,7 @@ void GuiWrapper::commonLaserScanCallback(
 				rtabmap::CameraModel(),
 				0,
 				rtabmap_conversions::timestampFromROS(odomHeader.stamp)),
-		odomMsg.get()?rtabmap_conversions::transformFromPoseMsg(odomMsg->pose.pose):odomT,
+		odomT,
 		info);
 
 	QMetaObject::invokeMethod(mainWindow_, "processOdometry", Q_ARG(rtabmap::OdometryEvent, odomEvent), Q_ARG(bool, ignoreData));
@@ -1069,21 +1097,20 @@ void GuiWrapper::commonOdomCallback(
 
 	std_msgs::msg::Header odomHeader = odomMsg->header;
 
-	Transform odomT = rtabmap_conversions::getTransform(odomHeader.frame_id, odomMsg->child_frame_id, odomHeader.stamp, *tfBuffer_, waitForTransform_);
+	Transform odomT = rtabmap_conversions::transformFromPoseMsg(odomMsg->pose.pose);
 	cv::Mat covariance = cv::Mat::eye(6,6,CV_64FC1);
-	if(odomMsg.get())
+
+	UASSERT(odomMsg->twist.covariance.size() == 36);
+	if(odomMsg->twist.covariance[0] != 0 &&
+			odomMsg->twist.covariance[7] != 0 &&
+			odomMsg->twist.covariance[14] != 0 &&
+			odomMsg->twist.covariance[21] != 0 &&
+			odomMsg->twist.covariance[28] != 0 &&
+			odomMsg->twist.covariance[35] != 0)
 	{
-		UASSERT(odomMsg->twist.covariance.size() == 36);
-		if(odomMsg->twist.covariance[0] != 0 &&
-			 odomMsg->twist.covariance[7] != 0 &&
-			 odomMsg->twist.covariance[14] != 0 &&
-			 odomMsg->twist.covariance[21] != 0 &&
-			 odomMsg->twist.covariance[28] != 0 &&
-			 odomMsg->twist.covariance[35] != 0)
-		{
-			covariance = cv::Mat(6,6,CV_64FC1,(void*)odomMsg->twist.covariance.data()).clone();
-		}
+		covariance = cv::Mat(6,6,CV_64FC1,(void*)odomMsg->twist.covariance.data()).clone();
 	}
+
 	if(odomHeader.frame_id.empty())
 	{
 		RCLCPP_ERROR(this->get_logger(), "Odometry frame not set!?");
@@ -1126,7 +1153,7 @@ void GuiWrapper::commonOdomCallback(
 				rtabmap::CameraModel(),
 				0,
 				rtabmap_conversions::timestampFromROS(odomHeader.stamp)),
-		odomMsg.get()?rtabmap_conversions::transformFromPoseMsg(odomMsg->pose.pose):odomT,
+		odomT,
 		info);
 
 	QMetaObject::invokeMethod(mainWindow_, "processOdometry", Q_ARG(rtabmap::OdometryEvent, odomEvent), Q_ARG(bool, ignoreData));
@@ -1140,8 +1167,10 @@ void GuiWrapper::commonSensorDataCallback(
 	UASSERT(sensorDataMsg.get());
 	std_msgs::msg::Header odomHeader;
 	std::string frameId = frameId_;
+	Transform odomT;
 	if(odomMsg.get())
 	{
+		odomT = rtabmap_conversions::transformFromPoseMsg(odomMsg->pose.pose);
 		odomHeader = odomMsg->header;
 		if(!odomMsg->child_frame_id.empty())
 		{
@@ -1156,9 +1185,18 @@ void GuiWrapper::commonSensorDataCallback(
 	{
 		odomHeader = sensorDataMsg->header;
 		odomHeader.frame_id = odomFrameId_;
+
+		odomT = rtabmap_conversions::getTransform(odomHeader.frame_id, frameId_, odomHeader.stamp, *tfBuffer_, waitForTransform_);
+		if(odomT.isNull())
+		{
+			RCLCPP_WARN(this->get_logger(), "Could not get odometry pose from "
+				"TF for stamp %f, aborting! To show red screen in rtabmap_viz "
+				"when this happens (indicating potentially lost), set subscribe_odom "
+				"to true.", rclcpp::Time(odomHeader.stamp).seconds());
+			return;
+		}
 	}
 
-	Transform odomT = rtabmap_conversions::getTransform(odomHeader.frame_id, frameId, odomHeader.stamp, *tfBuffer_, waitForTransform_);
 	cv::Mat covariance = cv::Mat::eye(6,6,CV_64FC1);
 	if(odomMsg.get())
 	{
@@ -1229,7 +1267,7 @@ void GuiWrapper::commonSensorDataCallback(
 	info.reg.covariance = covariance;
 	rtabmap::OdometryEvent odomEvent(
 		data,
-		odomMsg.get()?rtabmap_conversions::transformFromPoseMsg(odomMsg->pose.pose):odomT,
+		odomT,
 		info);
 
 	QMetaObject::invokeMethod(mainWindow_, "processOdometry", Q_ARG(rtabmap::OdometryEvent, odomEvent), Q_ARG(bool, ignoreData));

@@ -1,0 +1,27 @@
+{
+    "build": {
+      "dockerfile": "Dockerfile",
+      "pull": true
+    },
+    "remoteUser": "vscode",
+    "customizations": {
+        "vscode": {
+          "extensions": [
+            "ms-vscode.cpptools-themes",
+            "ms-vscode.cmake-tools", 
+            "ms-vscode.cpptools-extension-pack",
+            "ms-azuretools.vscode-docker",
+            "ms-python.python"]
+        }
+      },
+    "settings": {
+      "python.autoComplete.extraPaths": [
+        "/opt/ros/noetic/lib/python3/dist-packages"
+      ],
+      "terminal.integrated.defaultProfile.linux": "bash"
+    },
+    "workspaceMount": "source=${localWorkspaceFolder},target=/home/vscode/catkin_ws/src/rtabmap_ros,type=bind",
+    "workspaceFolder": "/home/vscode/catkin_ws",
+    "postCreateCommand": "cd /home/vscode/catkin_ws/src && catkin_init_workspace"
+    //"runArgs": ["--privileged", "--runtime=nvidia", "--network=host"]
+}

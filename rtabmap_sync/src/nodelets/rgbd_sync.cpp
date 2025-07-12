@@ -30,7 +30,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sensor_msgs/msg/compressed_image.hpp>
 #include <sensor_msgs/image_encodings.hpp>
 
+#ifdef PRE_ROS_IRON
 #include <cv_bridge/cv_bridge.h>
+#else
+#include <cv_bridge/cv_bridge.hpp>
+#endif
 #include <opencv2/highgui/highgui.hpp>
 
 #include "rtabmap/core/Compression.h"
@@ -46,16 +50,27 @@ RGBDSync::RGBDSync(const rclcpp::NodeOptions & options) :
 	depthScale_(1.0),
 	decimation_(1),
 	compressedRate_(0),
+	approxSyncMaxInterval_(0.0),
 	approxSyncDepth_(0),
 	exactSyncDepth_(0)
 {
-	int queueSize = 10;
+	int topicQueueSize = 10;
+	int syncQueueSize = 10;
 	bool approxSync = true;
-	double approxSyncMaxInterval = 0.0;
-	int qos = 0;
+	int qos = RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT;
 	approxSync = this->declare_parameter("approx_sync", approxSync);
-	approxSyncMaxInterval = this->declare_parameter("approx_sync_max_interval", approxSyncMaxInterval);
-	queueSize = this->declare_parameter("queue_size", queueSize);
+	approxSyncMaxInterval_ = this->declare_parameter("approx_sync_max_interval", approxSyncMaxInterval_);
+	topicQueueSize = this->declare_parameter("topic_queue_size", topicQueueSize);
+	int queueSize = this->declare_parameter("queue_size", -1);
+	if(queueSize != -1)
+	{
+		syncQueueSize = queueSize;
+		RCLCPP_WARN(this->get_logger(), "Parameter \"queue_size\" has been renamed "
+				 "to \"sync_queue_size\" and will be removed "
+				 "in future versions! The value (%d) is copied to "
+				 "\"sync_queue_size\".", syncQueueSize);
+	}
+	syncQueueSize = this->declare_parameter("sync_queue_size", syncQueueSize);
 	qos = this->declare_parameter("qos", qos);
 	int qosCamInfo = this->declare_parameter("qos_camera_info", qos);
 	depthScale_ = this->declare_parameter("depth_scale", depthScale_);
@@ -69,9 +84,10 @@ RGBDSync::RGBDSync(const rclcpp::NodeOptions & options) :
 
 	RCLCPP_INFO(this->get_logger(), "%s: approx_sync = %s", get_name(), approxSync?"true":"false");
 	if(approxSync)
-		RCLCPP_INFO(this->get_logger(), "%s: approx_sync_max_interval = %f", get_name(), approxSyncMaxInterval);
-	RCLCPP_INFO(this->get_logger(), "%s: queue_size  = %d", get_name(), queueSize);
-	RCLCPP_INFO(this->get_logger(), "%s: qos         = %d", get_name(), qos);
+		RCLCPP_INFO(this->get_logger(), "%s: approx_sync_max_interval = %f", get_name(), approxSyncMaxInterval_);
+	RCLCPP_INFO(this->get_logger(), "%s: topic_queue_size  = %d", get_name(), topicQueueSize);
+	RCLCPP_INFO(this->get_logger(), "%s: sync_queue_size  = %d", get_name(), syncQueueSize);
+	RCLCPP_INFO(this->get_logger(), "%s: qos             = %d", get_name(), qos);
 	RCLCPP_INFO(this->get_logger(), "%s: qos_camera_info = %d", get_name(), qosCamInfo);
 	RCLCPP_INFO(this->get_logger(), "%s: depth_scale = %f", get_name(), depthScale_);
 	RCLCPP_INFO(this->get_logger(), "%s: decimation = %d", get_name(), decimation_);
@@ -82,26 +98,29 @@ RGBDSync::RGBDSync(const rclcpp::NodeOptions & options) :
 
 	if(approxSync)
 	{
-		approxSyncDepth_ = new message_filters::Synchronizer<MyApproxSyncDepthPolicy>(MyApproxSyncDepthPolicy(queueSize), imageSub_, imageDepthSub_, cameraInfoSub_);
-		if(approxSyncMaxInterval > 0.0)
-			approxSyncDepth_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval));
+		approxSyncDepth_ = new message_filters::Synchronizer<MyApproxSyncDepthPolicy>(MyApproxSyncDepthPolicy(syncQueueSize), imageSub_, imageDepthSub_, cameraInfoSub_);
+		if(approxSyncMaxInterval_ > 0.0)
+			approxSyncDepth_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval_));
 		approxSyncDepth_->registerCallback(std::bind(&RGBDSync::callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 	}
 	else
 	{
-		exactSyncDepth_ = new message_filters::Synchronizer<MyExactSyncDepthPolicy>(MyExactSyncDepthPolicy(queueSize), imageSub_, imageDepthSub_, cameraInfoSub_);
+		exactSyncDepth_ = new message_filters::Synchronizer<MyExactSyncDepthPolicy>(MyExactSyncDepthPolicy(syncQueueSize), imageSub_, imageDepthSub_, cameraInfoSub_);
 		exactSyncDepth_->registerCallback(std::bind(&RGBDSync::callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 	}
 
-	image_transport::TransportHints hints(this);
-	imageSub_.subscribe(this, "rgb/image", hints.getTransport(), rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
-	imageDepthSub_.subscribe(this, "depth/image", hints.getTransport(), rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
-	cameraInfoSub_.subscribe(this, "rgb/camera_info", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile());
+  	std::string rgbImageTransport = this->declare_parameter<std::string>("rgb_image_transport", "raw");
+	std::string depthImageTransport = this->declare_parameter<std::string>("depth_image_transport", "raw");
+	std::string rgbTopic = this->get_node_topics_interface()->resolve_topic_name("rgb/image"); // Humble doesn't resolve base topic, fixed by https://github.com/ros-perception/image_common/commit/ea7589ae8c1f7ecb83d6aab7b4c890c2d630d27a
+	std::string depthTopic = this->get_node_topics_interface()->resolve_topic_name("depth/image"); // Humble doesn't resolve base topic, fixed by https://github.com/ros-perception/image_common/commit/ea7589ae8c1f7ecb83d6aab7b4c890c2d630d27a
+	imageSub_.subscribe(this, rgbTopic, rgbImageTransport, rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	imageDepthSub_.subscribe(this, depthTopic, depthImageTransport, rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	cameraInfoSub_.subscribe(this, "rgb/camera_info", rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile());
 
 	std::string subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s,\n   %s,\n   %s",
 						get_name(),
 						approxSync?"approx":"exact",
-						approxSync&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
+						approxSync&&approxSyncMaxInterval_!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval_).c_str():"",
 						imageSub_.getSubscriber().getTopic().c_str(),
 						imageDepthSub_.getSubscriber().getTopic().c_str(),
 						cameraInfoSub_.getSubscriber()->get_topic_name());
@@ -112,8 +131,11 @@ RGBDSync::RGBDSync(const rclcpp::NodeOptions & options) :
 	syncDiagnostic_->init(imageSub_.getSubscriber().getTopic(),
 			uFormat("%s: Did not receive data since 5 seconds! Make sure the input topics are "
 					"published (\"$ rostopic hz my_topic\") and the timestamps in their "
-					"header are set. %s%s",
+					"header are set. Ajusting topic_queue_size (%d) and sync_queue_size (%d) "
+					"can also help for better synchronization if framerates and/or delays are different. %s%s",
 					get_name(),
+					topicQueueSize,
+					syncQueueSize,
 					approxSync?"":"Parameter \"approx_sync\" is false, which means that input "
 						"topics should have all the exact timestamp for the callback to be called.",
 					subscribedTopicsMsg.c_str()));
@@ -130,19 +152,20 @@ void RGBDSync::callback(
 		  const sensor_msgs::msg::Image::ConstSharedPtr depth,
 		  const sensor_msgs::msg::CameraInfo::ConstSharedPtr cameraInfo)
 {
-	syncDiagnostic_->tick(image->header.stamp);
+	syncDiagnostic_->tickInput(image->header.stamp);
 	if(rgbdImagePub_->get_subscription_count() || rgbdImageCompressedPub_->get_subscription_count())
 	{
 		double rgbStamp = rtabmap_conversions::timestampFromROS(image->header.stamp);
 		double depthStamp = rtabmap_conversions::timestampFromROS(depth->header.stamp);
 
 		double stampDiff = fabs(rgbStamp - depthStamp);
-		if(stampDiff > 0.010)
+		if(stampDiff > 0.010 && approxSyncMaxInterval_ == 0.0)
 		{
 			RCLCPP_WARN(this->get_logger(), "The time difference between rgb and depth frames is "
 					"high (diff=%fs, rgb=%fs, depth=%fs). You may want "
 					"to set approx_sync_max_interval lower than 0.01s to reject spurious bad synchronizations or use "
-					"approx_sync=false if streams have all the exact same timestamp.",
+					"approx_sync=false if streams have all the exact same timestamp. Setting approx_sync_max_interval "
+					"will suppress this warning.",
 					stampDiff,
 					rgbStamp,
 					depthStamp);
@@ -254,6 +277,7 @@ void RGBDSync::callback(
 					depthStamp, rtabmap_conversions::timestampFromROS(depth->header.stamp));
 		}
 	}
+	syncDiagnostic_->tickOutput(image->header.stamp);
 }
 
 }

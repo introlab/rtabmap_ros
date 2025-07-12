@@ -25,10 +25,13 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include <rtabmap/utilite/ULogger.h>
 #include "rtabmap_util/pointcloud_to_depthimage.hpp"
 
 int main(int argc, char **argv)
 {
+  ULogger::setType(ULogger::kTypeConsole);
+  ULogger::setLevel(ULogger::kWarning);
 	rclcpp::init(argc, argv);
 	rclcpp::spin(std::make_shared<rtabmap_util::PointCloudToDepthImage>(rclcpp::NodeOptions()));
 	rclcpp::shutdown();

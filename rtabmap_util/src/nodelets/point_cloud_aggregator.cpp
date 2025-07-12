@@ -59,12 +59,23 @@ PointCloudAggregator::PointCloudAggregator(const rclcpp::NodeOptions & options) 
 	//tfBuffer_->setCreateTimerInterface(timer_interface);
 	tfListener_ = std::make_shared<tf2_ros::TransformListener>(*tfBuffer_);
 
-	int queueSize = 5;
+	int topicQueueSize = 1;
+	int syncQueueSize = 5;
 	int count = 2;
 	bool approx=true;
 	double approxSyncMaxInterval = 0.0;
-	int qos=0;
-	queueSize = this->declare_parameter("queue_size", queueSize);
+	int qos=RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT;
+	topicQueueSize = this->declare_parameter("topic_queue_size", topicQueueSize);
+	int queueSize = this->declare_parameter("queue_size", -1);
+	if(queueSize != -1)
+	{
+		syncQueueSize = queueSize;
+		RCLCPP_WARN(this->get_logger(), "Parameter \"queue_size\" has been renamed "
+				 "to \"sync_queue_size\" and will be removed "
+				 "in future versions! The value (%d) is copied to "
+				 "\"sync_queue_size\".", syncQueueSize);
+	}
+	syncQueueSize = this->declare_parameter("sync_queue_size", syncQueueSize);
 	qos = this->declare_parameter("qos", qos);
 	frameId_ = this->declare_parameter("frame_id", frameId_);
 	fixedFrameId_ = this->declare_parameter("fixed_frame_id", fixedFrameId_);
@@ -76,78 +87,78 @@ PointCloudAggregator::PointCloudAggregator(const rclcpp::NodeOptions & options) 
 
 	cloudPub_ = create_publisher<sensor_msgs::msg::PointCloud2>("combined_cloud", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos));
 
-	cloudSub_1_.subscribe(this, "cloud1", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
-	cloudSub_2_.subscribe(this, "cloud2", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	cloudSub_1_.subscribe(this, "cloud1", rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	cloudSub_2_.subscribe(this, "cloud2", rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
 
 	std::string subscribedTopicsMsg;
 	if(count == 4)
 	{
-		cloudSub_3_.subscribe(this, "cloud3", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
-		cloudSub_4_.subscribe(this, "cloud4", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+		cloudSub_3_.subscribe(this, "cloud3", rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+		cloudSub_4_.subscribe(this, "cloud4", rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
 		if(approx)
 		{
-			approxSync4_ = new message_filters::Synchronizer<ApproxSync4Policy>(ApproxSync4Policy(queueSize), cloudSub_1_, cloudSub_2_, cloudSub_3_, cloudSub_4_);
+			approxSync4_ = new message_filters::Synchronizer<ApproxSync4Policy>(ApproxSync4Policy(syncQueueSize), cloudSub_1_, cloudSub_2_, cloudSub_3_, cloudSub_4_);
 			if(approxSyncMaxInterval > 0.0)
 				approxSync4_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval));
 			approxSync4_->registerCallback(std::bind(&rtabmap_util::PointCloudAggregator::clouds4_callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 		}
 		else
 		{
-			exactSync4_ = new message_filters::Synchronizer<ExactSync4Policy>(ExactSync4Policy(queueSize), cloudSub_1_, cloudSub_2_, cloudSub_3_, cloudSub_4_);
+			exactSync4_ = new message_filters::Synchronizer<ExactSync4Policy>(ExactSync4Policy(syncQueueSize), cloudSub_1_, cloudSub_2_, cloudSub_3_, cloudSub_4_);
 			exactSync4_->registerCallback(std::bind(&rtabmap_util::PointCloudAggregator::clouds4_callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 		}
 		subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s,\n   %s,\n   %s,\n   %s",
 				get_name(),
 				approx?"approx":"exact",
 				approx&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
-				cloudSub_1_.getTopic().c_str(),
-				cloudSub_2_.getTopic().c_str(),
-				cloudSub_3_.getTopic().c_str(),
-				cloudSub_4_.getTopic().c_str());
+				cloudSub_1_.getSubscriber()->get_topic_name(),
+				cloudSub_2_.getSubscriber()->get_topic_name(),
+				cloudSub_3_.getSubscriber()->get_topic_name(),
+				cloudSub_4_.getSubscriber()->get_topic_name());
 	}
 	else if(count == 3)
 	{
-		cloudSub_3_.subscribe(this, "cloud3", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+		cloudSub_3_.subscribe(this, "cloud3", rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
 		if(approx)
 		{
-			approxSync3_ = new message_filters::Synchronizer<ApproxSync3Policy>(ApproxSync3Policy(queueSize), cloudSub_1_, cloudSub_2_, cloudSub_3_);
+			approxSync3_ = new message_filters::Synchronizer<ApproxSync3Policy>(ApproxSync3Policy(syncQueueSize), cloudSub_1_, cloudSub_2_, cloudSub_3_);
 			if(approxSyncMaxInterval > 0.0)
 				approxSync3_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval));
 			approxSync3_->registerCallback(std::bind(&rtabmap_util::PointCloudAggregator::clouds3_callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 		}
 		else
 		{
-			exactSync3_ = new message_filters::Synchronizer<ExactSync3Policy>(ExactSync3Policy(queueSize), cloudSub_1_, cloudSub_2_, cloudSub_3_);
+			exactSync3_ = new message_filters::Synchronizer<ExactSync3Policy>(ExactSync3Policy(syncQueueSize), cloudSub_1_, cloudSub_2_, cloudSub_3_);
 			exactSync3_->registerCallback(std::bind(&rtabmap_util::PointCloudAggregator::clouds3_callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 		}
 		subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s,\n   %s,\n   %s",
 				this->get_name(),
 				approx?"approx":"exact",
 				approx&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
-				cloudSub_1_.getTopic().c_str(),
-				cloudSub_2_.getTopic().c_str(),
-				cloudSub_3_.getTopic().c_str());
+				cloudSub_1_.getSubscriber()->get_topic_name(),
+				cloudSub_2_.getSubscriber()->get_topic_name(),
+				cloudSub_3_.getSubscriber()->get_topic_name());
 	}
 	else
 	{
 		if(approx)
 		{
-			approxSync2_ = new message_filters::Synchronizer<ApproxSync2Policy>(ApproxSync2Policy(queueSize), cloudSub_1_, cloudSub_2_);
+			approxSync2_ = new message_filters::Synchronizer<ApproxSync2Policy>(ApproxSync2Policy(syncQueueSize), cloudSub_1_, cloudSub_2_);
 			if(approxSyncMaxInterval > 0.0)
 				approxSync2_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval));
 			approxSync2_->registerCallback(std::bind(&rtabmap_util::PointCloudAggregator::clouds2_callback, this, std::placeholders::_1, std::placeholders::_2));
 		}
 		else
 		{
-			exactSync2_ = new message_filters::Synchronizer<ExactSync2Policy>(ExactSync2Policy(queueSize), cloudSub_1_, cloudSub_2_);
+			exactSync2_ = new message_filters::Synchronizer<ExactSync2Policy>(ExactSync2Policy(syncQueueSize), cloudSub_1_, cloudSub_2_);
 			exactSync2_->registerCallback(std::bind(&rtabmap_util::PointCloudAggregator::clouds2_callback, this, std::placeholders::_1, std::placeholders::_2));
 		}
 		subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s,\n   %s",
 				this->get_name(),
 				approx?"approx":"exact",
 				approx&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
-				cloudSub_1_.getTopic().c_str(),
-				cloudSub_2_.getTopic().c_str());
+				cloudSub_1_.getSubscriber()->get_topic_name(),
+				cloudSub_2_.getSubscriber()->get_topic_name());
 	}
 
 
@@ -164,10 +175,11 @@ PointCloudAggregator::PointCloudAggregator(const rclcpp::NodeOptions & options) 
 						this->get_name(),
 						approx?"":"Parameter \"approx_sync\" is false, which means that input "
 							"topics should have all the exact timestamp for the callback to be called.",
-							subscribedTopicsMsg.c_str());
+						subscribedTopicsMsg.c_str());
 			}
 		}
 	});
+	RCLCPP_INFO(this->get_logger(), "%s", subscribedTopicsMsg.c_str());
 }
 
 PointCloudAggregator::~PointCloudAggregator()

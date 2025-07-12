@@ -31,7 +31,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace rtabmap_sync {
 
 CommonDataSubscriber::CommonDataSubscriber(rclcpp::Node & node, bool gui) :
-		queueSize_(10),
+		topicQueueSize_(10),
+		syncQueueSize_(10),
 		approxSync_(true),
 		subscribedToDepth_(!gui),
 		subscribedToStereo_(false),
@@ -362,6 +363,8 @@ CommonDataSubscriber::CommonDataSubscriber(rclcpp::Node & node, bool gui) :
 {
 	name_ = node.get_name();
 
+	syncCallbackGroup_ = node.create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+
 	// ROS related parameters (private)
 	// ros2: should be declared in the constructor to be used by inherited classes in their constructor
 	subscribedToDepth_ = node.declare_parameter("subscribe_depth", subscribedToDepth_);
@@ -378,9 +381,19 @@ CommonDataSubscriber::CommonDataSubscriber(rclcpp::Node & node, bool gui) :
 
 	odomFrameId_ = node.declare_parameter("odom_frame_id", odomFrameId_);
 	rgbdCameras_ = node.declare_parameter("rgbd_cameras", rgbdCameras_);
-	queueSize_ = node.declare_parameter("queue_size", queueSize_);
+	topicQueueSize_ = node.declare_parameter("topic_queue_size", topicQueueSize_);
+	int queueSize = node.declare_parameter("queue_size", -1);
+	if(queueSize != -1)
+	{
+		syncQueueSize_ = queueSize;
+		RCLCPP_WARN(node.get_logger(), "Parameter \"queue_size\" has been renamed "
+				 "to \"sync_queue_size\" and will be removed "
+				 "in future versions! The value (%d) is copied to "
+				 "\"sync_queue_size\".", syncQueueSize_);
+	}
+	syncQueueSize_ = node.declare_parameter("sync_queue_size", syncQueueSize_);
 
-	int qos = node.declare_parameter("qos", 0);
+	int qos = node.declare_parameter("qos", (int)RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT);
 	int qosOdom = node.declare_parameter("qos_odom", qos);
 	int qosImage = node.declare_parameter("qos_image", qos);
 	int qosCameraInfo = node.declare_parameter("qos_camera_info", qosImage);
@@ -519,7 +532,8 @@ void CommonDataSubscriber::setupCallbacks(
 	RCLCPP_INFO(node.get_logger(), "%s: subscribe_scan = %s", name_.c_str(), subscribedToScan2d_?"true":"false");
 	RCLCPP_INFO(node.get_logger(), "%s: subscribe_scan_cloud = %s", name_.c_str(), subscribedToScan3d_?"true":"false");
 	RCLCPP_INFO(node.get_logger(), "%s: subscribe_scan_descriptor = %s", name_.c_str(), subscribedToScanDescriptor_?"true":"false");
-	RCLCPP_INFO(node.get_logger(), "%s: queue_size      = %d", name_.c_str(), queueSize_);
+	RCLCPP_INFO(node.get_logger(), "%s: topic_queue_size = %d", name_.c_str(), topicQueueSize_);
+	RCLCPP_INFO(node.get_logger(), "%s: sync_queue_size  = %d", name_.c_str(), syncQueueSize_);
 	RCLCPP_INFO(node.get_logger(), "%s: qos_image       = %d", name_.c_str(), qosImage_);
 	RCLCPP_INFO(node.get_logger(), "%s: qos_camera_info = %d", name_.c_str(), qosCameraInfo_);
 	RCLCPP_INFO(node.get_logger(), "%s: qos_scan        = %d", name_.c_str(), qosScan_);
@@ -527,41 +541,41 @@ void CommonDataSubscriber::setupCallbacks(
 	RCLCPP_INFO(node.get_logger(), "%s: qos_user_data   = %d", name_.c_str(), qosUserData_);
 	RCLCPP_INFO(node.get_logger(), "%s: approx_sync     = %s", name_.c_str(), approxSync_?"true":"false");
 
+	rclcpp::SubscriptionOptions callbackOptions;
+	callbackOptions.callback_group = syncCallbackGroup_;
+
 	subscribedToOdom_ = odomFrameId_.empty() && subscribedToOdom_;
 	if(subscribedToDepth_)
 	{
 		setupDepthCallbacks(
 				node,
+				callbackOptions,
 				subscribedToOdom_,
 				subscribedToUserData_,
 				subscribedToScan2d_,
 				subscribedToScan3d_,
 				subscribedToScanDescriptor_,
-				subscribedToOdomInfo_,
-				queueSize_,
-				approxSync_);
+				subscribedToOdomInfo_);
 	}
 	else if(subscribedToStereo_)
 	{
 		setupStereoCallbacks(
 				node,
+				callbackOptions,
 				subscribedToOdom_,
-				subscribedToOdomInfo_,
-				queueSize_,
-				approxSync_);
+				subscribedToOdomInfo_);
 	}
 	else if(subscribedToRGB_)
 	{
 		setupRGBCallbacks(
 				node,
+				callbackOptions,
 				subscribedToOdom_,
 				subscribedToUserData_,
 				subscribedToScan2d_,
 				subscribedToScan3d_,
 				subscribedToScanDescriptor_,
-				subscribedToOdomInfo_,
-				queueSize_,
-				approxSync_);
+				subscribedToOdomInfo_);
 	}
 	else if(subscribedToRGBD_)
 	{
@@ -577,66 +591,61 @@ void CommonDataSubscriber::setupCallbacks(
 
 			setupRGBD6Callbacks(
 					node,
+					callbackOptions,
 					subscribedToOdom_,
 					subscribedToUserData_,
 					subscribedToScan2d_,
 					subscribedToScan3d_,
 					subscribedToScanDescriptor_,
-					subscribedToOdomInfo_,
-					queueSize_,
-					approxSync_);
+					subscribedToOdomInfo_);
 		}
 		else if(rgbdCameras_ == 5)
 		{
 			setupRGBD5Callbacks(
 					node,
+					callbackOptions,
 					subscribedToOdom_,
 					subscribedToUserData_,
 					subscribedToScan2d_,
 					subscribedToScan3d_,
 					subscribedToScanDescriptor_,
-					subscribedToOdomInfo_,
-					queueSize_,
-					approxSync_);
+					subscribedToOdomInfo_);
 		}
 		else if(rgbdCameras_ == 4)
 		{
 			setupRGBD4Callbacks(
 					node,
+					callbackOptions,
 					subscribedToOdom_,
 					subscribedToUserData_,
 					subscribedToScan2d_,
 					subscribedToScan3d_,
 					subscribedToScanDescriptor_,
-					subscribedToOdomInfo_,
-					queueSize_,
-					approxSync_);
+					subscribedToOdomInfo_);
 		}
 		else if(rgbdCameras_ == 3)
 		{
 			setupRGBD3Callbacks(
 					node,
+					callbackOptions,
 					subscribedToOdom_,
 					subscribedToUserData_,
 					subscribedToScan2d_,
 					subscribedToScan3d_,
 					subscribedToScanDescriptor_,
-					subscribedToOdomInfo_,
-					queueSize_,
-					approxSync_);
+					subscribedToOdomInfo_);
 		}
 		else if(rgbdCameras_ == 2)
 		{
 			setupRGBD2Callbacks(
 					node,
+					callbackOptions,
 					subscribedToOdom_,
 					subscribedToUserData_,
 					subscribedToScan2d_,
 					subscribedToScan3d_,
 					subscribedToScanDescriptor_,
-					subscribedToOdomInfo_,
-					queueSize_,
-					approxSync_);
+					subscribedToOdomInfo_);
 		}
 #else
 		if(rgbdCameras_>1)
@@ -651,58 +660,53 @@ void CommonDataSubscriber::setupCallbacks(
 		{
 			setupRGBDXCallbacks(
 					node,
+					callbackOptions,
 					subscribedToOdom_,
 					subscribedToUserData_,
 					subscribedToScan2d_,
 					subscribedToScan3d_,
 					subscribedToScanDescriptor_,
-					subscribedToOdomInfo_,
-					queueSize_,
-					approxSync_);
+					subscribedToOdomInfo_);
 		}
 		else
 		{
 			setupRGBDCallbacks(
 					node,
+					callbackOptions,
 					subscribedToOdom_,
 					subscribedToUserData_,
 					subscribedToScan2d_,
 					subscribedToScan3d_,
 					subscribedToScanDescriptor_,
-					subscribedToOdomInfo_,
-					queueSize_,
-					approxSync_);
+					subscribedToOdomInfo_);
 		}
 	}
 	else if(subscribedToScan2d_ || subscribedToScan3d_ || subscribedToScanDescriptor_)
 	{
 		setupScanCallbacks(
 					node,
+					callbackOptions,
 					subscribedToScan2d_,
 					subscribedToScanDescriptor_,
 					subscribedToOdom_,
 					subscribedToUserData_,
-					subscribedToOdomInfo_,
-					queueSize_,
-					approxSync_);
+					subscribedToOdomInfo_);
 	}
 	else if(subscribedToSensorData_)
 	{
 		setupSensorDataCallbacks(
 					node,
+					callbackOptions,
 					subscribedToOdom_,
-					subscribedToOdomInfo_,
-					queueSize_,
-					approxSync_);
+					subscribedToOdomInfo_);
 	}
 	else if(subscribedToOdom_)
 	{
 		setupOdomCallbacks(
 					node,
+					callbackOptions,
 					subscribedToUserData_,
-					subscribedToOdomInfo_,
-					queueSize_,
-					approxSync_);
+					subscribedToOdomInfo_);
 	}
 
 	if(subscribedToDepth_ || subscribedToStereo_ || subscribedToRGBD_ || subscribedToScan2d_ || subscribedToScan3d_ || subscribedToScanDescriptor_ || subscribedToRGB_ || subscribedToOdom_)
@@ -713,10 +717,14 @@ void CommonDataSubscriber::setupCallbacks(
 			uFormat("%s: Did not receive data since 5 seconds! Make sure the input topics are "
 					"published (\"$ ros2 topic hz my_topic\") and the timestamps in their "
 					"header are set. If topics are coming from different computers, make sure "
-					"the clocks of the computers are synchronized (\"ntpdate\"). %s%s",
+					"the clocks of the computers are synchronized (\"ntpdate\"). Ajusting "
+					"topic_queue_size (%d) and sync_queue_size (%d) can also help for better "
+					"synchronization if framerates and/or delays are different. %s%s",
 					name_.c_str(),
+					topicQueueSize_,
+					syncQueueSize_,
 					approxSync_?
-							uFormat("If topics are not published at the same rate, you could increase \"queue_size\" parameter (current=%d).", queueSize_).c_str():
+							uFormat("If topics are not published at the same rate, you could increase \"sync_queue_size\" and/or \"topic_queue_size\" parameters (current=%d and %d respectively).", syncQueueSize_, topicQueueSize_).c_str():
 							"Parameter \"approx_sync\" is false, which means that input topics should have all the exact timestamp for the callback to be called.",
 					subscribedTopicsMsg_.c_str()),
 					otherTasks);
@@ -1096,7 +1104,7 @@ void CommonDataSubscriber::tick(const rclcpp::Time & stamp, double targetFrequen
 {
 	if(syncDiagnostic_.get())
 	{
-		syncDiagnostic_->tick(stamp, targetFrequency);
+		syncDiagnostic_->tickOutput(stamp, targetFrequency);
 	}
 }
 

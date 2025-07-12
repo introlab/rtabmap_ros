@@ -27,7 +27,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <rtabmap_odom/rgbd_odometry.hpp>
 
+#ifdef PRE_ROS_IRON
 #include <image_geometry/stereo_camera_model.h>
+#else
+#include <image_geometry/stereo_camera_model.hpp>
+#endif
 
 #include <sensor_msgs/image_encodings.hpp>
 
@@ -59,7 +63,8 @@ RGBDOdometry::RGBDOdometry(const rclcpp::NodeOptions & options) :
 		exactSync5_(0),
 		approxSync6_(0),
 		exactSync6_(0),
-		queueSize_(5),
+		topicQueueSize_(10),
+		syncQueueSize_(5),
 		keepColor_(false)
 {
 	OdometryROS::init(false, true, false);
@@ -89,25 +94,43 @@ void RGBDOdometry::onOdomInit()
 	double approxSyncMaxInterval = 0.0;
 	approxSync = this->declare_parameter("approx_sync", approxSync);
 	approxSyncMaxInterval = this->declare_parameter("approx_sync_max_interval", approxSyncMaxInterval);
-	queueSize_ = this->declare_parameter("queue_size", queueSize_);
+	topicQueueSize_ = this->declare_parameter("topic_queue_size", topicQueueSize_);
+	int queueSize = this->declare_parameter("queue_size", -1);
+	if(queueSize != -1)
+	{
+		syncQueueSize_ = queueSize;
+		RCLCPP_WARN(this->get_logger(), "Parameter \"queue_size\" has been renamed "
+				 "to \"sync_queue_size\" and will be removed "
+				 "in future versions! The value (%d) is copied to "
+				 "\"sync_queue_size\".", syncQueueSize_);
+	}
+	syncQueueSize_ = this->declare_parameter("sync_queue_size", syncQueueSize_);
 	int qosCamInfo = this->declare_parameter("qos_camera_info", (int)qos());
 	subscribeRGBD = this->declare_parameter("subscribe_rgbd", subscribeRGBD);
 	rgbdCameras = this->declare_parameter("rgbd_cameras", rgbdCameras);
-	if(rgbdCameras <= 0)
+	if(rgbdCameras < 0)
 	{
-		rgbdCameras = 1;
+		rgbdCameras = 0;
 	}
 	keepColor_ = this->declare_parameter("keep_color", keepColor_);
+	std::string rgbdTransport = this->declare_parameter("rgb_transport", std::string("raw"));
+	std::string depthTransport = this->declare_parameter("depth_transport", std::string("raw"));
 
 	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: approx_sync    = %s", approxSync?"true":"false");
 	if(approxSync)
 		RCLCPP_INFO(this->get_logger(), "RGBDOdometry: approx_sync_max_interval = %f", approxSyncMaxInterval);
-	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: queue_size     = %d", queueSize_);
-	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: qos            = %d", (int)qos());
+	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: topic_queue_size = %d", topicQueueSize_);
+	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: sync_queue_size  = %d", syncQueueSize_);
+	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: qos             = %d", (int)qos());
 	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: qos_camera_info = %d", qosCamInfo);
 	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: subscribe_rgbd = %s", subscribeRGBD?"true":"false");
 	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: rgbd_cameras   = %d", rgbdCameras);
 	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: keep_color     = %s", keepColor_?"true":"false");
+	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: rgb_transport   = %s", rgbdTransport.c_str());
+	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: depth_transport = %s", depthTransport.c_str());
+
+	rclcpp::SubscriptionOptions options;
+	options.callback_group = dataCallbackGroup_;
 
 	std::string subscribedTopic;
 	std::string subscribedTopicsMsg;
@@ -115,23 +138,23 @@ void RGBDOdometry::onOdomInit()
 	{
 		if(rgbdCameras >= 2)
 		{
-			rgbd_image1_sub_.subscribe(this, "rgbd_image0", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile());
-			rgbd_image2_sub_.subscribe(this, "rgbd_image1", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile());
+			rgbd_image1_sub_.subscribe(this, "rgbd_image0", rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
+			rgbd_image2_sub_.subscribe(this, "rgbd_image1", rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
 			if(rgbdCameras >= 3)
 			{
-				rgbd_image3_sub_.subscribe(this, "rgbd_image2", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile());
+				rgbd_image3_sub_.subscribe(this, "rgbd_image2", rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
 			}
 			if(rgbdCameras >= 4)
 			{
-				rgbd_image4_sub_.subscribe(this, "rgbd_image3", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile());
+				rgbd_image4_sub_.subscribe(this, "rgbd_image3", rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
 			}
 			if(rgbdCameras >= 5)
 			{
-				rgbd_image5_sub_.subscribe(this, "rgbd_image4", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile());
+				rgbd_image5_sub_.subscribe(this, "rgbd_image4", rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
 			}
 			if(rgbdCameras >= 6)
 			{
-				rgbd_image6_sub_.subscribe(this, "rgbd_image5", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile());
+				rgbd_image6_sub_.subscribe(this, "rgbd_image5", rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
 			}
 
 			if(rgbdCameras == 2)
@@ -139,7 +162,7 @@ void RGBDOdometry::onOdomInit()
 				if(approxSync)
 				{
 					approxSync2_ = new message_filters::Synchronizer<MyApproxSync2Policy>(
-							MyApproxSync2Policy(queueSize_),
+							MyApproxSync2Policy(syncQueueSize_),
 							rgbd_image1_sub_,
 							rgbd_image2_sub_);
 					if(approxSyncMaxInterval > 0.0)
@@ -149,7 +172,7 @@ void RGBDOdometry::onOdomInit()
 				else
 				{
 					exactSync2_ = new message_filters::Synchronizer<MyExactSync2Policy>(
-							MyExactSync2Policy(queueSize_),
+							MyExactSync2Policy(syncQueueSize_),
 							rgbd_image1_sub_,
 							rgbd_image2_sub_);
 					exactSync2_->registerCallback(std::bind(&RGBDOdometry::callbackRGBD2, this, std::placeholders::_1, std::placeholders::_2));
@@ -166,7 +189,7 @@ void RGBDOdometry::onOdomInit()
 				if(approxSync)
 				{
 					approxSync3_ = new message_filters::Synchronizer<MyApproxSync3Policy>(
-							MyApproxSync3Policy(queueSize_),
+							MyApproxSync3Policy(syncQueueSize_),
 							rgbd_image1_sub_,
 							rgbd_image2_sub_,
 							rgbd_image3_sub_);
@@ -177,7 +200,7 @@ void RGBDOdometry::onOdomInit()
 				else
 				{
 					exactSync3_ = new message_filters::Synchronizer<MyExactSync3Policy>(
-							MyExactSync3Policy(queueSize_),
+							MyExactSync3Policy(syncQueueSize_),
 							rgbd_image1_sub_,
 							rgbd_image2_sub_,
 							rgbd_image3_sub_);
@@ -196,7 +219,7 @@ void RGBDOdometry::onOdomInit()
 				if(approxSync)
 				{
 					approxSync4_ = new message_filters::Synchronizer<MyApproxSync4Policy>(
-							MyApproxSync4Policy(queueSize_),
+							MyApproxSync4Policy(syncQueueSize_),
 							rgbd_image1_sub_,
 							rgbd_image2_sub_,
 							rgbd_image3_sub_,
@@ -208,7 +231,7 @@ void RGBDOdometry::onOdomInit()
 				else
 				{
 					exactSync4_ = new message_filters::Synchronizer<MyExactSync4Policy>(
-							MyExactSync4Policy(queueSize_),
+							MyExactSync4Policy(syncQueueSize_),
 							rgbd_image1_sub_,
 							rgbd_image2_sub_,
 							rgbd_image3_sub_,
@@ -229,7 +252,7 @@ void RGBDOdometry::onOdomInit()
 				if(approxSync)
 				{
 					approxSync5_ = new message_filters::Synchronizer<MyApproxSync5Policy>(
-							MyApproxSync5Policy(queueSize_),
+							MyApproxSync5Policy(syncQueueSize_),
 							rgbd_image1_sub_,
 							rgbd_image2_sub_,
 							rgbd_image3_sub_,
@@ -242,7 +265,7 @@ void RGBDOdometry::onOdomInit()
 				else
 				{
 					exactSync5_ = new message_filters::Synchronizer<MyExactSync5Policy>(
-							MyExactSync5Policy(queueSize_),
+							MyExactSync5Policy(syncQueueSize_),
 							rgbd_image1_sub_,
 							rgbd_image2_sub_,
 							rgbd_image3_sub_,
@@ -265,7 +288,7 @@ void RGBDOdometry::onOdomInit()
 				if(approxSync)
 				{
 					approxSync6_ = new message_filters::Synchronizer<MyApproxSync6Policy>(
-							MyApproxSync6Policy(queueSize_),
+							MyApproxSync6Policy(syncQueueSize_),
 							rgbd_image1_sub_,
 							rgbd_image2_sub_,
 							rgbd_image3_sub_,
@@ -279,7 +302,7 @@ void RGBDOdometry::onOdomInit()
 				else
 				{
 					exactSync6_ = new message_filters::Synchronizer<MyExactSync6Policy>(
-							MyExactSync6Policy(queueSize_),
+							MyExactSync6Policy(syncQueueSize_),
 							rgbd_image1_sub_,
 							rgbd_image2_sub_,
 							rgbd_image3_sub_,
@@ -311,7 +334,7 @@ void RGBDOdometry::onOdomInit()
 		}
 		else if(rgbdCameras == 0)
 		{
-			rgbdxSub_ = create_subscription<rtabmap_msgs::msg::RGBDImages>("rgbd_images", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos()), std::bind(&RGBDOdometry::callbackRGBDX, this, std::placeholders::_1));
+			rgbdxSub_ = create_subscription<rtabmap_msgs::msg::RGBDImages>("rgbd_images", rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()), std::bind(&RGBDOdometry::callbackRGBDX, this, std::placeholders::_1), options);
 
 			subscribedTopic = rgbdxSub_->get_topic_name();
 			subscribedTopicsMsg = uFormat("\n%s subscribed to:\n   %s",
@@ -320,7 +343,7 @@ void RGBDOdometry::onOdomInit()
 		}
 		else
 		{
-			rgbdSub_ = create_subscription<rtabmap_msgs::msg::RGBDImage>("rgbd_image", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos()), std::bind(&RGBDOdometry::callbackRGBD, this, std::placeholders::_1));
+			rgbdSub_ = create_subscription<rtabmap_msgs::msg::RGBDImage>("rgbd_image", rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()), std::bind(&RGBDOdometry::callbackRGBD, this, std::placeholders::_1), options);
 
 			subscribedTopic = rgbdSub_->get_topic_name();
 			subscribedTopicsMsg =
@@ -331,29 +354,40 @@ void RGBDOdometry::onOdomInit()
 	}
 	else
 	{
-		image_transport::TransportHints hints(this);
-		image_mono_sub_.subscribe(this, "rgb/image", hints.getTransport(), rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile());
-		image_depth_sub_.subscribe(this, "depth/image", hints.getTransport(), rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile());
+		image_transport::TransportHints rgb_hints(this, "raw", "rgb_transport");
+		image_transport::TransportHints depth_hints(this, "raw", "depth_transport");
+
+		std::string rgb_topic = get_node_base_interface()->resolve_topic_or_service_name(
+      		"rgb/image", false, false
+		);
+		std::string depth_topic = get_node_base_interface()->resolve_topic_or_service_name(
+      		"depth/image", false, false
+		);
+
+		image_mono_sub_.subscribe(this, rgb_topic, rgb_hints.getTransport(), rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
+		image_depth_sub_.subscribe(this, depth_topic, depth_hints.getTransport(), rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
 		info_sub_.subscribe(this, "rgb/camera_info", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile());
 
 		if(approxSync)
 		{
-			approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_);
+			approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(syncQueueSize_), image_mono_sub_, image_depth_sub_, info_sub_);
 			if(approxSyncMaxInterval > 0.0)
 				approxSync_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval));
 			approxSync_->registerCallback(std::bind(&RGBDOdometry::callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 		}
 		else
 		{
-			exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_);
+			exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(syncQueueSize_), image_mono_sub_, image_depth_sub_, info_sub_);
 			exactSync_->registerCallback(std::bind(&RGBDOdometry::callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 		}
 
 		subscribedTopic = image_mono_sub_.getSubscriber().getTopic();
-		subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s,\n   %s,\n   %s",
+		subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s, topic_queue_size=%d, sync_queue_size=%d):\n   %s,\n   %s,\n   %s",
 				get_name(),
 				approxSync?"approx":"exact",
 				approxSync&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
+				topicQueueSize_,
+				syncQueueSize_,
 				image_mono_sub_.getSubscriber().getTopic().c_str(),
 				image_depth_sub_.getSubscriber().getTopic().c_str(),
 				info_sub_.getSubscriber()->get_topic_name());
@@ -548,6 +582,8 @@ void RGBDOdometry::callback(
 		const sensor_msgs::msg::Image::ConstSharedPtr depth,
 		const sensor_msgs::msg::CameraInfo::ConstSharedPtr cameraInfo)
 {
+	tick(image->header.stamp);
+
 	if(!this->isPaused())
 	{
 		std::vector<cv_bridge::CvImageConstPtr> imageMsgs(1);
@@ -576,6 +612,8 @@ void RGBDOdometry::callback(
 void RGBDOdometry::callbackRGBDX(
 		const rtabmap_msgs::msg::RGBDImages::ConstSharedPtr images)
 {
+	tick(images->header.stamp);
+
 	if(!this->isPaused())
 	{
 		if(images->rgbd_images.empty())
@@ -599,6 +637,8 @@ void RGBDOdometry::callbackRGBDX(
 void RGBDOdometry::callbackRGBD(
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image)
 {
+	tick(image->header.stamp);
+
 	if(!this->isPaused())
 	{
 		std::vector<cv_bridge::CvImageConstPtr> imageMsgs(1);
@@ -615,6 +655,8 @@ void RGBDOdometry::callbackRGBD2(
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image,
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image2)
 {
+	tick(image->header.stamp);
+
 	if(!this->isPaused())
 	{
 		std::vector<cv_bridge::CvImageConstPtr> imageMsgs(2);
@@ -634,6 +676,8 @@ void RGBDOdometry::callbackRGBD3(
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image2,
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image3)
 {
+	tick(image->header.stamp);
+
 	if(!this->isPaused())
 	{
 		std::vector<cv_bridge::CvImageConstPtr> imageMsgs(3);
@@ -656,6 +700,8 @@ void RGBDOdometry::callbackRGBD4(
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image3,
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image4)
 {
+	tick(image->header.stamp);
+
 	if(!this->isPaused())
 	{
 		std::vector<cv_bridge::CvImageConstPtr> imageMsgs(4);
@@ -681,6 +727,8 @@ void RGBDOdometry::callbackRGBD5(
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image4,
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image5)
 {
+	tick(image->header.stamp);
+
 	if(!this->isPaused())
 	{
 		std::vector<cv_bridge::CvImageConstPtr> imageMsgs(5);
@@ -709,6 +757,8 @@ void RGBDOdometry::callbackRGBD6(
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image5,
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image6)
 {
+	tick(image->header.stamp);
+
 	if(!this->isPaused())
 	{
 		std::vector<cv_bridge::CvImageConstPtr> imageMsgs(6);
@@ -737,20 +787,20 @@ void RGBDOdometry::flushCallbacks()
 	if(approxSync_)
 	{
 		delete approxSync_;
-		approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_);
+		approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(syncQueueSize_), image_mono_sub_, image_depth_sub_, info_sub_);
 		approxSync_->registerCallback(std::bind(&RGBDOdometry::callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 	}
 	if(exactSync_)
 	{
 		delete exactSync_;
-		exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(queueSize_), image_mono_sub_, image_depth_sub_, info_sub_);
+		exactSync_ = new message_filters::Synchronizer<MyExactSyncPolicy>(MyExactSyncPolicy(syncQueueSize_), image_mono_sub_, image_depth_sub_, info_sub_);
 		exactSync_->registerCallback(std::bind(&RGBDOdometry::callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 	}
 	if(approxSync2_)
 	{
 		delete approxSync2_;
 		approxSync2_ = new message_filters::Synchronizer<MyApproxSync2Policy>(
-				MyApproxSync2Policy(queueSize_),
+				MyApproxSync2Policy(syncQueueSize_),
 				rgbd_image1_sub_,
 				rgbd_image2_sub_);
 		approxSync2_->registerCallback(std::bind(&RGBDOdometry::callbackRGBD2, this, std::placeholders::_1, std::placeholders::_2));
@@ -759,7 +809,7 @@ void RGBDOdometry::flushCallbacks()
 	{
 		delete exactSync2_;
 		exactSync2_ = new message_filters::Synchronizer<MyExactSync2Policy>(
-				MyExactSync2Policy(queueSize_),
+				MyExactSync2Policy(syncQueueSize_),
 				rgbd_image1_sub_,
 				rgbd_image2_sub_);
 		exactSync2_->registerCallback(std::bind(&RGBDOdometry::callbackRGBD2, this, std::placeholders::_1, std::placeholders::_2));
@@ -768,7 +818,7 @@ void RGBDOdometry::flushCallbacks()
 	{
 		delete approxSync3_;
 		approxSync3_ = new message_filters::Synchronizer<MyApproxSync3Policy>(
-				MyApproxSync3Policy(queueSize_),
+				MyApproxSync3Policy(syncQueueSize_),
 				rgbd_image1_sub_,
 				rgbd_image2_sub_,
 				rgbd_image3_sub_);
@@ -778,7 +828,7 @@ void RGBDOdometry::flushCallbacks()
 	{
 		delete exactSync3_;
 		exactSync3_ = new message_filters::Synchronizer<MyExactSync3Policy>(
-				MyExactSync3Policy(queueSize_),
+				MyExactSync3Policy(syncQueueSize_),
 				rgbd_image1_sub_,
 				rgbd_image2_sub_,
 				rgbd_image3_sub_);
@@ -788,7 +838,7 @@ void RGBDOdometry::flushCallbacks()
 	{
 		delete approxSync4_;
 		approxSync4_ = new message_filters::Synchronizer<MyApproxSync4Policy>(
-				MyApproxSync4Policy(queueSize_),
+				MyApproxSync4Policy(syncQueueSize_),
 				rgbd_image1_sub_,
 				rgbd_image2_sub_,
 				rgbd_image3_sub_,
@@ -799,7 +849,7 @@ void RGBDOdometry::flushCallbacks()
 	{
 		delete exactSync4_;
 		exactSync4_ = new message_filters::Synchronizer<MyExactSync4Policy>(
-				MyExactSync4Policy(queueSize_),
+				MyExactSync4Policy(syncQueueSize_),
 				rgbd_image1_sub_,
 				rgbd_image2_sub_,
 				rgbd_image3_sub_,
@@ -810,7 +860,7 @@ void RGBDOdometry::flushCallbacks()
 	{
 		delete approxSync5_;
 		approxSync5_ = new message_filters::Synchronizer<MyApproxSync5Policy>(
-				MyApproxSync5Policy(queueSize_),
+				MyApproxSync5Policy(syncQueueSize_),
 				rgbd_image1_sub_,
 				rgbd_image2_sub_,
 				rgbd_image3_sub_,
@@ -822,7 +872,7 @@ void RGBDOdometry::flushCallbacks()
 	{
 		delete exactSync5_;
 		exactSync5_ = new message_filters::Synchronizer<MyExactSync5Policy>(
-				MyExactSync5Policy(queueSize_),
+				MyExactSync5Policy(syncQueueSize_),
 				rgbd_image1_sub_,
 				rgbd_image2_sub_,
 				rgbd_image3_sub_,
@@ -834,7 +884,7 @@ void RGBDOdometry::flushCallbacks()
 	{
 		delete approxSync6_;
 		approxSync6_ = new message_filters::Synchronizer<MyApproxSync6Policy>(
-				MyApproxSync6Policy(queueSize_),
+				MyApproxSync6Policy(syncQueueSize_),
 				rgbd_image1_sub_,
 				rgbd_image2_sub_,
 				rgbd_image3_sub_,
@@ -847,7 +897,7 @@ void RGBDOdometry::flushCallbacks()
 	{
 		delete exactSync6_;
 		exactSync6_ = new message_filters::Synchronizer<MyExactSync6Policy>(
-				MyExactSync6Policy(queueSize_),
+				MyExactSync6Policy(syncQueueSize_),
 				rgbd_image1_sub_,
 				rgbd_image2_sub_,
 				rgbd_image3_sub_,
