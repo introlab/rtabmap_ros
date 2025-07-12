@@ -5,6 +5,15 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+if(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
+  # issues #1285 #1288
+  find_library(
+    message_filters_LIB NAMES message_filters
+    PATHS "/opt/ros/$ENV{ROS_DISTRO}/lib"
+    NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH REQUIRED
+  )
+endif()
+
 find_package(ament_cmake_ros REQUIRED)
 find_package(pcl_conversions REQUIRED)
 find_package(pluginlib REQUIRED)

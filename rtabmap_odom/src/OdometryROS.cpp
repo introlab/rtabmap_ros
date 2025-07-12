@@ -84,7 +84,11 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	paused_(false),
 	resetCountdown_(0),
 	resetCurrentCount_(0),
+	stereoParams_(false),
+	visParams_(false),
+	icpParams_(false),
 	previousStamp_(0.0),
+	previousClockTime_(0.0),
 	expectedUpdateRate_(0.0),
 	maxUpdateRate_(0.0),
 	minUpdateRate_(0.0),
@@ -577,7 +581,36 @@ void OdometryROS::mainLoop()
 	Transform groundTruth;
 	if(!data.imageRaw().empty() || !data.laserScanRaw().isEmpty())
 	{
-		if(previousStamp_>0.0 && previousStamp_ >= rtabmap_conversions::timestampFromROS(header.stamp))
+		// Detect time jump in the past
+		double clockNow = now().seconds();
+		if(previousClockTime_ > clockNow)
+		{
+			RCLCPP_WARN(this->get_logger(), "Odometry: Detected jump back in time of %f sec. Odometry is "
+				"automatically reset to latest computed pose!",
+				previousClockTime_ - clockNow);
+			SensorData dataCpy = dataToProcess_;
+			std_msgs::msg::Header headerCpy = dataHeaderToProcess_;
+			double previousCpy = previousClockTime_;
+			this->reset(odometry_->getPose());
+			if(clockNow > rtabmap_conversions::timestampFromROS(headerCpy.stamp)) {
+				// new frame is using new clock, process it now
+				dataToProcess_ = dataCpy;
+				dataHeaderToProcess_ = headerCpy;
+				dataReady_.release();
+				RCLCPP_WARN(this->get_logger(), "Odometry: Restarting with frame: %f (clock previous=%f, new=%f)",
+					rtabmap_conversions::timestampFromROS(headerCpy.stamp), previousCpy, clockNow);
+			}
+			else {
+				// skip that old frame
+				RCLCPP_WARN(this->get_logger(), "Odometry: skipping frame: %f (clock previous=%f, new=%f)",
+					rtabmap_conversions::timestampFromROS(headerCpy.stamp), previousCpy, clockNow);
+			}
+			previousClockTime_ = clockNow;
+			return;
+		}
+		previousClockTime_ = clockNow;
+
+		if(previousStamp_ >= rtabmap_conversions::timestampFromROS(header.stamp))
 		{
 			RCLCPP_WARN(this->get_logger(), "Odometry: Detected not valid consecutive stamps (previous=%fs new=%fs). "
 					"New stamp should be always greater than previous stamp. This new data is ignored.",
@@ -677,7 +710,17 @@ void OdometryROS::mainLoop()
 						correctionMsg.header.stamp = header.stamp;
 						Transform correction = odometry_->getPose() * guess_ * guessCurrentPose.inverse();
 						rtabmap_conversions::transformToGeometryMsg(correction, correctionMsg.transform);
-						tfBroadcaster_->sendTransform(correctionMsg);
+
+						double time_now = now().seconds();
+						if(time_now >= previousClockTime_) {
+							tfBroadcaster_->sendTransform(correctionMsg);
+						}
+						else {
+							RCLCPP_WARN(this->get_logger(), "TF %s->%s is not published because we detected a time jump in the past of %f sec.",
+								correctionMsg.header.frame_id.c_str(),
+								correctionMsg.child_frame_id.c_str(),
+								previousClockTime_ - time_now);
+						}
 					}
 					guessPreviousPose_ = guessCurrentPose;
 					return;
@@ -731,11 +774,30 @@ void OdometryROS::mainLoop()
 				correctionMsg.header.stamp = header.stamp;
 				Transform correction = pose * guessCurrentPose.inverse();
 				rtabmap_conversions::transformToGeometryMsg(correction, correctionMsg.transform);
-				tfBroadcaster_->sendTransform(correctionMsg);
+
+				double time_now = now().seconds();
+				if(time_now >= previousClockTime_) {
+					tfBroadcaster_->sendTransform(correctionMsg);
+				}
+				else {
+					RCLCPP_WARN(this->get_logger(), "TF %s->%s is not published because we detected a time jump in the past of %f sec.",
+						correctionMsg.header.frame_id.c_str(),
+						correctionMsg.child_frame_id.c_str(),
+						previousClockTime_ - time_now);
+				}
 			}
 			else
 			{
-				tfBroadcaster_->sendTransform(poseMsg);
+				double time_now = now().seconds();
+				if(time_now >= previousClockTime_) {
+					tfBroadcaster_->sendTransform(poseMsg);
+				}
+				else {
+					RCLCPP_WARN(this->get_logger(), "TF %s->%s is not published because we detected a time jump in the past of %f sec.",
+						poseMsg.header.frame_id.c_str(),
+						poseMsg.child_frame_id.c_str(),
+						previousClockTime_ - time_now);
+				}
 			}
 		}
 
@@ -927,7 +989,18 @@ void OdometryROS::mainLoop()
 			correctionMsg.header.stamp = header.stamp;
 			Transform correction = odometry_->getPose() * guess_ * guessCurrentPose.inverse();
 			rtabmap_conversions::transformToGeometryMsg(correction, correctionMsg.transform);
-			tfBroadcaster_->sendTransform(correctionMsg);
+			double time_now = now().seconds();
+			if(time_now >= previousClockTime_) {
+				tfBroadcaster_->sendTransform(correctionMsg);
+			}
+			else {
+				RCLCPP_WARN(this->get_logger(), "TF %s->%s is not published because its stamp (%f) is greater "
+					"than current time (%f), possible time jump happened!",
+					correctionMsg.header.frame_id.c_str(),
+					correctionMsg.child_frame_id.c_str(),
+					rtabmap_conversions::timestampFromROS(correctionMsg.header.stamp),
+					time_now);
+			}
 		}
 
 	}
@@ -1167,6 +1240,7 @@ void OdometryROS::reset(const Transform & pose)
 	guess_.setNull();
 	guessPreviousPose_.setNull();
 	previousStamp_ = 0.0;
+	previousClockTime_ = 0.0;
 	resetCurrentCount_ = resetCountdown_;
 	imuProcessed_ = false;
 	dataToProcess_ = SensorData();
