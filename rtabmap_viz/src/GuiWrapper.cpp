@@ -147,8 +147,8 @@ GuiWrapper::GuiWrapper(const rclcpp::NodeOptions & options) :
 	}
 	else
 	{
-	    infoTopic_.subscribe(this, "info", rclcpp::QoS(this->getTopicQueueSize()).get_rmw_qos_profile());
-	    mapDataTopic_.subscribe(this, "mapData", rclcpp::QoS(this->getTopicQueueSize()).get_rmw_qos_profile());
+	    infoTopic_.subscribe(this, "info", RCLCPP_QOS(this->getTopicQueueSize(), rclcpp::ReliabilityPolicy::SystemDefault));
+	    mapDataTopic_.subscribe(this, "mapData", RCLCPP_QOS(this->getTopicQueueSize(), rclcpp::ReliabilityPolicy::SystemDefault));
 	    infoMapSync_ = new message_filters::Synchronizer<MyInfoMapSyncPolicy>(
 			    MyInfoMapSyncPolicy(this->getSyncQueueSize()),
 			    infoTopic_,
@@ -156,8 +156,8 @@ GuiWrapper::GuiWrapper(const rclcpp::NodeOptions & options) :
 	    infoMapSync_->registerCallback(std::bind(&GuiWrapper::infoMapCallback, this, std::placeholders::_1, std::placeholders::_2));
 	}
 
-	goalTopic_.subscribe(this, "goal_node", rclcpp::QoS(this->getTopicQueueSize()).get_rmw_qos_profile());
-	pathTopic_.subscribe(this, "global_path", rclcpp::QoS(this->getTopicQueueSize()).get_rmw_qos_profile());
+	goalTopic_.subscribe(this, "goal_node", RCLCPP_QOS(this->getTopicQueueSize(), rclcpp::ReliabilityPolicy::SystemDefault));
+	pathTopic_.subscribe(this, "global_path", RCLCPP_QOS(this->getTopicQueueSize(), rclcpp::ReliabilityPolicy::SystemDefault));
 	goalPathSync_ = new message_filters::Synchronizer<MyGoalPathSyncPolicy>(
 			MyGoalPathSyncPolicy(this->getSyncQueueSize()),
 			goalTopic_,

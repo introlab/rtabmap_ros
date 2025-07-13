@@ -158,10 +158,10 @@ PointCloudXYZ::PointCloudXYZ(const rclcpp::NodeOptions & options) :
 
 	image_transport::TransportHints hints(this);
 	imageDepthSub_.subscribe(this, "depth/image", hints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
-	cameraInfoSub_.subscribe(this, "depth/camera_info", rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile());
+	cameraInfoSub_.subscribe(this, "depth/camera_info", RCLCPP_QOS(topicQueueSize, qosCamInfo));
 
-	disparitySub_.subscribe(this, "disparity/image", rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
-	disparityCameraInfoSub_.subscribe(this, "disparity/camera_info", rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile());
+	disparitySub_.subscribe(this, "disparity/image", RCLCPP_QOS(topicQueueSize, qos));
+	disparityCameraInfoSub_.subscribe(this, "disparity/camera_info", RCLCPP_QOS(topicQueueSize, qosCamInfo));
 }
 
 PointCloudXYZ::~PointCloudXYZ()
