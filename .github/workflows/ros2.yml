@@ -25,7 +25,7 @@ jobs:
         - ros_distro: kilted
           skip_keys: ''
         - ros_distro: rolling
-          skip_keys: 'nav2_bringup nav2_msgs'
+          skip_keys: 'nav2_bringup nav2_msgs velodyne'
       fail-fast: false
     container:
       image: osrf/ros:${{ matrix.ros_distro }}-desktop-full
