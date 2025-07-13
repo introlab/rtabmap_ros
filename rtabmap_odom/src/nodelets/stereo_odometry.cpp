@@ -129,23 +129,23 @@ void StereoOdometry::onOdomInit()
 	{
 		if(rgbdCameras >= 2)
 		{
-			rgbd_image1_sub_.subscribe(this, "rgbd_image0", rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
-			rgbd_image2_sub_.subscribe(this, "rgbd_image1", rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
+			rgbd_image1_sub_.subscribe(this, "rgbd_image0", RCLCPP_QOS(topicQueueSize_, qos()), options);
+			rgbd_image2_sub_.subscribe(this, "rgbd_image1", RCLCPP_QOS(topicQueueSize_, qos()), options);
 			if(rgbdCameras >= 3)
 			{
-				rgbd_image3_sub_.subscribe(this, "rgbd_image2", rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
+				rgbd_image3_sub_.subscribe(this, "rgbd_image2", RCLCPP_QOS(topicQueueSize_, qos()), options);
 			}
 			if(rgbdCameras >= 4)
 			{
-				rgbd_image4_sub_.subscribe(this, "rgbd_image3", rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
+				rgbd_image4_sub_.subscribe(this, "rgbd_image3", RCLCPP_QOS(topicQueueSize_, qos()), options);
 			}
 			if(rgbdCameras >= 5)
 			{
-				rgbd_image5_sub_.subscribe(this, "rgbd_image4", rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
+				rgbd_image5_sub_.subscribe(this, "rgbd_image4", RCLCPP_QOS(topicQueueSize_, qos()), options);
 			}
 			if(rgbdCameras >= 6)
 			{
-				rgbd_image6_sub_.subscribe(this, "rgbd_image5", rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
+				rgbd_image6_sub_.subscribe(this, "rgbd_image5", RCLCPP_QOS(topicQueueSize_, qos()), options);
 			}
 
 			if(rgbdCameras == 2)
@@ -350,8 +350,8 @@ void StereoOdometry::onOdomInit()
 		image_transport::TransportHints hints(this);
 		imageRectLeft_.subscribe(this, "left/image_rect", hints.getTransport(), rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
 		imageRectRight_.subscribe(this, "right/image_rect", hints.getTransport(), rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
-		cameraInfoLeft_.subscribe(this, "left/camera_info", rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile(), options);
-		cameraInfoRight_.subscribe(this, "right/camera_info", rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile(), options);
+		cameraInfoLeft_.subscribe(this, "left/camera_info", RCLCPP_QOS(topicQueueSize_, qosCamInfo), options);
+		cameraInfoRight_.subscribe(this, "right/camera_info", RCLCPP_QOS(topicQueueSize_, qosCamInfo), options);
 
 		if(approxSync)
 		{

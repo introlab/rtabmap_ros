@@ -28,7 +28,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap_util/imu_to_tf.hpp>
 #include <rtabmap_conversions/MsgConversion.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
-#include <tf2/LinearMath/Transform.h>
+#include <tf2/LinearMath/Transform.hpp>
 #include <tf2/utils.hpp>
 
 namespace rtabmap_util
