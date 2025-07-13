@@ -147,9 +147,9 @@ PointCloudAssembler::PointCloudAssembler(const rclcpp::NodeOptions & options) :
 	}
 	else if(subscribeOdomInfo)
 	{
-		syncCloudSub_.subscribe(this, "cloud", rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
-		syncOdomSub_.subscribe(this, "odom", rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qosOdom).get_rmw_qos_profile());
-		syncOdomInfoSub_.subscribe(this, "odom_info", rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qosOdom).get_rmw_qos_profile());
+		syncCloudSub_.subscribe(this, "cloud", RCLCPP_QOS(topicQueueSize, qos));
+		syncOdomSub_.subscribe(this, "odom", RCLCPP_QOS(topicQueueSize, qosOdom));
+		syncOdomInfoSub_.subscribe(this, "odom_info", RCLCPP_QOS(topicQueueSize, qosOdom));
 		exactInfoSync_ = new message_filters::Synchronizer<syncInfoPolicy>(syncInfoPolicy(syncQueueSize), syncCloudSub_, syncOdomSub_, syncOdomInfoSub_);
 		exactInfoSync_->registerCallback(std::bind(&rtabmap_util::PointCloudAssembler::callbackCloudOdomInfo, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (exact sync):\n   %s,\n   %s",
@@ -160,8 +160,8 @@ PointCloudAssembler::PointCloudAssembler(const rclcpp::NodeOptions & options) :
 	}
 	else
 	{
-		syncCloudSub_.subscribe(this, "cloud", rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
-		syncOdomSub_.subscribe(this, "odom", rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qosOdom).get_rmw_qos_profile());
+		syncCloudSub_.subscribe(this, "cloud", RCLCPP_QOS(topicQueueSize, qos));
+		syncOdomSub_.subscribe(this, "odom", RCLCPP_QOS(topicQueueSize, qosOdom));
 		exactSync_ = new message_filters::Synchronizer<syncPolicy>(syncPolicy(syncQueueSize), syncCloudSub_, syncOdomSub_);
 		exactSync_->registerCallback(std::bind(&rtabmap_util::PointCloudAssembler::callbackCloudOdom, this, std::placeholders::_1, std::placeholders::_2));
 		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (exact sync):\n   %s,\n   %s",

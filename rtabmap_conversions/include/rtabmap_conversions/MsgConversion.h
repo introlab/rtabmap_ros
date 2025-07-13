@@ -65,6 +65,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap_msgs/msg/rgbd_image.hpp>
 #include <rtabmap_msgs/msg/user_data.hpp>
 
+#ifdef PRE_ROS_KILTED
+#define RCLCPP_QOS(queueSize, qos) rclcpp::QoS(queueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile()
+#else
+#define RCLCPP_QOS(queueSize, qos) rclcpp::QoS(queueSize).reliability((rmw_qos_reliability_policy_t)qos)
+#endif
+
 namespace rtabmap_conversions {
 
 void transformToTF(const rtabmap::Transform & transform, tf2::Transform & tfTransform);

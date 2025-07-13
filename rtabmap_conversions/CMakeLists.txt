@@ -60,6 +60,10 @@ IF("$ENV{ROS_DISTRO}" STRLESS "iron")
   add_definitions(-DPRE_ROS_IRON)
 ENDIF()
 
+IF("$ENV{ROS_DISTRO}" STRLESS "kilted")
+  add_definitions(-DPRE_ROS_KILTED)
+ENDIF()
+
 ###########
 ## Build ##
 ###########
@@ -73,7 +77,9 @@ target_include_directories(rtabmap_conversions
 ament_target_dependencies(rtabmap_conversions ${Libraries})
 
 IF("$ENV{ROS_DISTRO}" STRLESS "iron")
-  target_compile_definitions(rtabmap_conversions PUBLIC -DPRE_ROS_IRON)
+  target_compile_definitions(rtabmap_conversions PUBLIC -DPRE_ROS_IRON -DPRE_ROS_KILTED)
+ELSEIF("$ENV{ROS_DISTRO}" STRLESS "kilted")
+  target_compile_definitions(rtabmap_conversions PUBLIC -DPRE_ROS_KILTED)
 ENDIF()
 
 #############
