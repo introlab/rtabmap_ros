@@ -17,7 +17,7 @@
   <depend>cv_bridge</depend>
   <depend>geometry_msgs</depend>
   <depend>nav_msgs</depend>
-  <!-- depend>nav2_msgs</depend> Not available on kilted -->
+  <depend>nav2_msgs</depend>
   <depend>rclcpp</depend>
   <depend>rclcpp_components</depend>
   <depend>sensor_msgs</depend>
