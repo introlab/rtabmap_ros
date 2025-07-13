@@ -16,13 +16,15 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        ros_distro: [humble, jazzy, kilted]
+        ros_distro: [humble, jazzy, kilted, rolling]
         include:
         - ros_distro: humble
           skip_keys: ''
         - ros_distro: jazzy
           skip_keys: ''
         - ros_distro: kilted
+          skip_keys: ''
+        - ros_distro: rolling
           skip_keys: 'nav2_bringup nav2_msgs'
       fail-fast: false
     container:
