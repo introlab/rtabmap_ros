@@ -87,14 +87,14 @@ PointCloudAggregator::PointCloudAggregator(const rclcpp::NodeOptions & options) 
 
 	cloudPub_ = create_publisher<sensor_msgs::msg::PointCloud2>("combined_cloud", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos));
 
-	cloudSub_1_.subscribe(this, "cloud1", rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
-	cloudSub_2_.subscribe(this, "cloud2", rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	cloudSub_1_.subscribe(this, "cloud1", RCLCPP_QOS(topicQueueSize, qos));
+	cloudSub_2_.subscribe(this, "cloud2", RCLCPP_QOS(topicQueueSize, qos));
 
 	std::string subscribedTopicsMsg;
 	if(count == 4)
 	{
-		cloudSub_3_.subscribe(this, "cloud3", rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
-		cloudSub_4_.subscribe(this, "cloud4", rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+		cloudSub_3_.subscribe(this, "cloud3", RCLCPP_QOS(topicQueueSize, qos));
+		cloudSub_4_.subscribe(this, "cloud4", RCLCPP_QOS(topicQueueSize, qos));
 		if(approx)
 		{
 			approxSync4_ = new message_filters::Synchronizer<ApproxSync4Policy>(ApproxSync4Policy(syncQueueSize), cloudSub_1_, cloudSub_2_, cloudSub_3_, cloudSub_4_);
@@ -118,7 +118,7 @@ PointCloudAggregator::PointCloudAggregator(const rclcpp::NodeOptions & options) 
 	}
 	else if(count == 3)
 	{
-		cloudSub_3_.subscribe(this, "cloud3", rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+		cloudSub_3_.subscribe(this, "cloud3", RCLCPP_QOS(topicQueueSize, qos));
 		if(approx)
 		{
 			approxSync3_ = new message_filters::Synchronizer<ApproxSync3Policy>(ApproxSync3Policy(syncQueueSize), cloudSub_1_, cloudSub_2_, cloudSub_3_);

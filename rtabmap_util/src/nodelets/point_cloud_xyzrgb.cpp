@@ -187,14 +187,14 @@ PointCloudXYZRGB::PointCloudXYZRGB(const rclcpp::NodeOptions & options) :
 	image_transport::TransportHints hints(this);
 	imageSub_.subscribe(this, "rgb/image", hints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
 	imageDepthSub_.subscribe(this, "depth/image", hints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
-	cameraInfoSub_.subscribe(this, "rgb/camera_info", rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile());
+	cameraInfoSub_.subscribe(this, "rgb/camera_info", RCLCPP_QOS(topicQueueSize, qosCamInfo));
 
-	imageDisparitySub_.subscribe(this, "disparity", rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	imageDisparitySub_.subscribe(this, "disparity", RCLCPP_QOS(topicQueueSize, qos));
 
 	imageLeft_.subscribe(this, "left/image", hints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
 	imageRight_.subscribe(this, "right/image", hints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
-	cameraInfoLeft_.subscribe(this, "left/camera_info", rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile());
-	cameraInfoRight_.subscribe(this, "right/camera_info", rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qosCamInfo).get_rmw_qos_profile());
+	cameraInfoLeft_.subscribe(this, "left/camera_info", RCLCPP_QOS(topicQueueSize, qosCamInfo));
+	cameraInfoRight_.subscribe(this, "right/camera_info", RCLCPP_QOS(topicQueueSize, qosCamInfo));
 }
 
 PointCloudXYZRGB::~PointCloudXYZRGB()
