@@ -835,25 +835,6 @@ rtabmap::CameraModel cameraModelFromROS(
 			D.at<double>(0,4) = camInfo.d[2];
 			D.at<double>(0,5) = camInfo.d[3];
 		}
-		else if(camInfo.d.size()>8)
-		{
-			bool zerosAfter8 = true;
-			for(size_t i=8; i<camInfo.d.size() && zerosAfter8; ++i)
-			{
-				if(camInfo.d[i] != 0.0)
-				{
-					zerosAfter8 = false;
-				}
-			}
-			static bool warned = false;
-			if(!zerosAfter8 && !warned)
-			{
-				UWARN("Camera info conversion: Distortion model is larger than 8, coefficients after 8 are ignored. This message is only shown once.");
-				warned = true;
-			}
-			D = cv::Mat(1, 8, CV_64FC1);
-			memcpy(D.data, camInfo.d.data(), D.cols*sizeof(double));
-		}
 		else
 		{
 			D = cv::Mat(1, camInfo.d.size(), CV_64FC1);
