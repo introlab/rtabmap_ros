@@ -47,6 +47,8 @@ CommonDataSubscriber::CommonDataSubscriber(rclcpp::Node & node, bool gui) :
 		subscribedToUserData_(false),
 		odomFrameId_(""),
 		rgbdCameras_(1),
+		imageTransport_("raw"),
+		depthTransport_("raw"),
 
 		// RGB + Depth
 		SYNC_INIT(depth),
@@ -392,6 +394,8 @@ CommonDataSubscriber::CommonDataSubscriber(rclcpp::Node & node, bool gui) :
 				 "\"sync_queue_size\".", syncQueueSize_);
 	}
 	syncQueueSize_ = node.declare_parameter("sync_queue_size", syncQueueSize_);
+	imageTransport_ = node.declare_parameter("image_transport", imageTransport_);
+	depthTransport_ = node.declare_parameter("depth_transport", depthTransport_);
 
 	int qos = node.declare_parameter("qos", (int)RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT);
 	int qosOdom = node.declare_parameter("qos_odom", qos);
@@ -540,6 +544,8 @@ void CommonDataSubscriber::setupCallbacks(
 	RCLCPP_INFO(node.get_logger(), "%s: qos_odom        = %d", name_.c_str(), qosOdom_);
 	RCLCPP_INFO(node.get_logger(), "%s: qos_user_data   = %d", name_.c_str(), qosUserData_);
 	RCLCPP_INFO(node.get_logger(), "%s: approx_sync     = %s", name_.c_str(), approxSync_?"true":"false");
+	RCLCPP_INFO(node.get_logger(), "%s: image_transport = %s", name_.c_str(), imageTransport_.c_str());
+	RCLCPP_INFO(node.get_logger(), "%s: depth_transport = %s", name_.c_str(), depthTransport_.c_str());
 
 	rclcpp::SubscriptionOptions callbackOptions;
 	callbackOptions.callback_group = syncCallbackGroup_;

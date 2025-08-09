@@ -102,6 +102,8 @@ PointCloudXYZRGB::PointCloudXYZRGB(const rclcpp::NodeOptions & options) :
 	normalRadius_ = this->declare_parameter("normal_radius", normalRadius_);
 	filterNaNs_ = this->declare_parameter("filter_nans", filterNaNs_);
 	roiStr = this->declare_parameter("roi_ratios", roiStr);
+	this->declare_parameter("image_transport", std::string("raw"));
+	this->declare_parameter("depth_transport", std::string("raw"));
 
 	//parse roi (region of interest)
 	roiRatios_.resize(4, 0);
@@ -184,15 +186,20 @@ PointCloudXYZRGB::PointCloudXYZRGB(const rclcpp::NodeOptions & options) :
 		exactSyncStereo_->registerCallback(std::bind(&PointCloudXYZRGB::stereoCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 	}
 
-	image_transport::TransportHints hints(this);
-	imageSub_.subscribe(this, "rgb/image", hints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
-	imageDepthSub_.subscribe(this, "depth/image", hints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	image_transport::TransportHints rgbHints(this); // using "image_transport" parameter
+	image_transport::TransportHints depthHints(this, "raw", "depth_transport");
+	std::string rgbTopic = this->get_node_topics_interface()->resolve_topic_name("rgb/image"); // Humble doesn't resolve base topic, fixed by https://github.com/ros-perception/image_common/commit/ea7589ae8c1f7ecb83d6aab7b4c890c2d630d27a
+	std::string depthTopic = this->get_node_topics_interface()->resolve_topic_name("depth/image"); // Humble doesn't resolve base topic, fixed by https://github.com/ros-perception/image_common/commit/ea7589ae8c1f7ecb83d6aab7b4c890c2d630d27a
+	imageSub_.subscribe(this, rgbTopic, rgbHints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	imageDepthSub_.subscribe(this, depthTopic, depthHints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
 	cameraInfoSub_.subscribe(this, "rgb/camera_info", RCLCPP_QOS(topicQueueSize, qosCamInfo));
 
 	imageDisparitySub_.subscribe(this, "disparity", RCLCPP_QOS(topicQueueSize, qos));
 
-	imageLeft_.subscribe(this, "left/image", hints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
-	imageRight_.subscribe(this, "right/image", hints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	std::string leftTopic = this->get_node_topics_interface()->resolve_topic_name("left/image"); // Humble doesn't resolve base topic, fixed by https://github.com/ros-perception/image_common/commit/ea7589ae8c1f7ecb83d6aab7b4c890c2d630d27a
+	std::string rightTopic = this->get_node_topics_interface()->resolve_topic_name("right/image"); // Humble doesn't resolve base topic, fixed by https://github.com/ros-perception/image_common/commit/ea7589ae8c1f7ecb83d6aab7b4c890c2d630d27a
+	imageLeft_.subscribe(this, leftTopic, rgbHints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	imageRight_.subscribe(this, rightTopic, rgbHints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
 	cameraInfoLeft_.subscribe(this, "left/camera_info", RCLCPP_QOS(topicQueueSize, qosCamInfo));
 	cameraInfoRight_.subscribe(this, "right/camera_info", RCLCPP_QOS(topicQueueSize, qosCamInfo));
 }

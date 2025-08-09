@@ -72,6 +72,7 @@ RGBSync::RGBSync(const rclcpp::NodeOptions & options) :
 	qos = this->declare_parameter("qos", qos);
 	int qosCaminfo = this->declare_parameter("qos_camera_info", qos);
 	compressedRate_ = this->declare_parameter("compressed_rate", compressedRate_);
+	std::string imageTransport = this->declare_parameter("image_transport", std::string("raw"));
 
 	RCLCPP_INFO(this->get_logger(), "%s: approx_sync = %s", get_name(), approxSync?"true":"false");
 	if(approxSync)
@@ -81,6 +82,7 @@ RGBSync::RGBSync(const rclcpp::NodeOptions & options) :
 	RCLCPP_INFO(this->get_logger(), "%s: qos             = %d", get_name(), qos);
 	RCLCPP_INFO(this->get_logger(), "%s: qos_camera_info = %d", get_name(), qosCaminfo);
 	RCLCPP_INFO(this->get_logger(), "%s: compressed_rate = %f", get_name(), compressedRate_);
+	RCLCPP_INFO(this->get_logger(), "%s: image_transport = %s", get_name(), imageTransport.c_str());
 
 	rgbdImagePub_ = this->create_publisher<rtabmap_msgs::msg::RGBDImage>("rgbd_image", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos));
 	rgbdImageCompressedPub_ = this->create_publisher<rtabmap_msgs::msg::RGBDImage>("rgbd_image/compressed", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos));
@@ -98,8 +100,9 @@ RGBSync::RGBSync(const rclcpp::NodeOptions & options) :
 		exactSync_->registerCallback(std::bind(&RGBSync::callback, this, std::placeholders::_1, std::placeholders::_2));
 	}
 
-	image_transport::TransportHints hints(this);
-	imageSub_.subscribe(this, "rgb/image", hints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	image_transport::TransportHints hints(this); // using "image_transport" parameter
+	std::string rgbTopic = this->get_node_topics_interface()->resolve_topic_name("rgb/image"); // Humble doesn't resolve base topic, fixed by https://github.com/ros-perception/image_common/commit/ea7589ae8c1f7ecb83d6aab7b4c890c2d630d27a
+	imageSub_.subscribe(this, rgbTopic, hints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
 	cameraInfoSub_.subscribe(this, "rgb/camera_info", RCLCPP_QOS(topicQueueSize, qosCaminfo));
 
 	std::string subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s,\n   %s",
