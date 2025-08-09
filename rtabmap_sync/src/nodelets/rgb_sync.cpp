@@ -101,7 +101,7 @@ RGBSync::RGBSync(const rclcpp::NodeOptions & options) :
 	}
 
 	image_transport::TransportHints hints(this); // using "image_transport" parameter
-	std::string rgbTopic = this->get_node_topics_interface()->resolve_topic_name("rgb/image"); // Humble doesn't resolve base topic, fixed by https://github.com/ros-perception/image_common/commit/ea7589ae8c1f7ecb83d6aab7b4c890c2d630d27a
+	std::string rgbTopic = this->get_node_topics_interface()->resolve_topic_name("rgb/image"); // Humble/Jazzy don't resolve base topic, fixed by https://github.com/ros-perception/image_common/commit/ea7589ae8c1f7ecb83d6aab7b4c890c2d630d27a
 	imageSub_.subscribe(this, rgbTopic, hints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
 	cameraInfoSub_.subscribe(this, "rgb/camera_info", RCLCPP_QOS(topicQueueSize, qosCaminfo));
 

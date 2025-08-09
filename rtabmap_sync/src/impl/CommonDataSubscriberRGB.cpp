@@ -504,7 +504,7 @@ void CommonDataSubscriber::setupRGBCallbacks(
 	RCLCPP_INFO(node.get_logger(), "Setup rgb-only callback");
 
 	image_transport::TransportHints hints(&node); // using "image_transport" parameter
-	std::string rgbTopic = node.get_node_topics_interface()->resolve_topic_name("rgb/image"); // Humble doesn't resolve base topic, fixed by https://github.com/ros-perception/image_common/commit/ea7589ae8c1f7ecb83d6aab7b4c890c2d630d27a
+	std::string rgbTopic = node.get_node_topics_interface()->resolve_topic_name("rgb/image"); // Humble/Jazzy don't resolve base topic, fixed by https://github.com/ros-perception/image_common/commit/ea7589ae8c1f7ecb83d6aab7b4c890c2d630d27a
 	imageSub_.subscribe(&node, rgbTopic, hints.getTransport(), rclcpp::QoS(topicQueueSize_).reliability(qosImage_).get_rmw_qos_profile(), options);
 	cameraInfoSub_.subscribe(&node, "rgb/camera_info", RCLCPP_QOS(topicQueueSize_, qosCameraInfo_), options);
 

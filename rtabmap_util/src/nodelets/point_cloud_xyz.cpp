@@ -158,7 +158,7 @@ PointCloudXYZ::PointCloudXYZ(const rclcpp::NodeOptions & options) :
 	cloudPub_ = create_publisher<sensor_msgs::msg::PointCloud2>("cloud", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos));
 
 	image_transport::TransportHints hints(this, "raw", "depth_transport");
-	std::string depthTopic = this->get_node_topics_interface()->resolve_topic_name("depth/image"); // Humble doesn't resolve base topic, fixed by https://github.com/ros-perception/image_common/commit/ea7589ae8c1f7ecb83d6aab7b4c890c2d630d27a
+	std::string depthTopic = this->get_node_topics_interface()->resolve_topic_name("depth/image"); // Humble/Jazzy don't resolve base topic, fixed by https://github.com/ros-perception/image_common/commit/ea7589ae8c1f7ecb83d6aab7b4c890c2d630d27a
 	imageDepthSub_.subscribe(this, depthTopic, hints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
 	cameraInfoSub_.subscribe(this, "depth/camera_info", RCLCPP_QOS(topicQueueSize, qosCamInfo));
 
