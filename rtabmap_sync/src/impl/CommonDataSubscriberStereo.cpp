@@ -97,9 +97,11 @@ void CommonDataSubscriber::setupStereoCallbacks(
 {
 	RCLCPP_INFO(node.get_logger(), "Setup stereo callback");
 
-	image_transport::TransportHints hints(&node);
-	imageRectLeft_.subscribe(&node, "left/image_rect", hints.getTransport(), rclcpp::QoS(topicQueueSize_).reliability(qosImage_).get_rmw_qos_profile(), options);
-	imageRectRight_.subscribe(&node, "right/image_rect", hints.getTransport(), rclcpp::QoS(topicQueueSize_).reliability(qosImage_).get_rmw_qos_profile(), options);
+	image_transport::TransportHints hints(&node); // using "image_transport" parameter
+	std::string leftTopic = node.get_node_topics_interface()->resolve_topic_name("left/image_rect"); // Humble/Jazzy don't resolve base topic, fixed by https://github.com/ros-perception/image_common/commit/ea7589ae8c1f7ecb83d6aab7b4c890c2d630d27a
+	std::string rightTopic = node.get_node_topics_interface()->resolve_topic_name("right/image_rect"); // Humble/Jazzy don't resolve base topic, fixed by https://github.com/ros-perception/image_common/commit/ea7589ae8c1f7ecb83d6aab7b4c890c2d630d27a
+	imageRectLeft_.subscribe(&node, leftTopic, hints.getTransport(), rclcpp::QoS(topicQueueSize_).reliability(qosImage_).get_rmw_qos_profile(), options);
+	imageRectRight_.subscribe(&node, rightTopic, hints.getTransport(), rclcpp::QoS(topicQueueSize_).reliability(qosImage_).get_rmw_qos_profile(), options);
 	cameraInfoLeft_.subscribe(&node, "left/camera_info", RCLCPP_QOS(topicQueueSize_, qosCameraInfo_), options);
 	cameraInfoRight_.subscribe(&node, "right/camera_info", RCLCPP_QOS(topicQueueSize_, qosCameraInfo_), options);
 

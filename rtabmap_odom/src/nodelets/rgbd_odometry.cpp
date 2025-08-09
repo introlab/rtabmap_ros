@@ -113,8 +113,16 @@ void RGBDOdometry::onOdomInit()
 		rgbdCameras = 0;
 	}
 	keepColor_ = this->declare_parameter("keep_color", keepColor_);
-	std::string rgbdTransport = this->declare_parameter("rgb_transport", std::string("raw"));
+	std::string rgbTransport = this->declare_parameter("rgb_transport", std::string("raw"));
+	if(rgbTransport != "raw") {
+		RCLCPP_WARN(this->get_logger(), "Parameter \"rgb_transport\" has been renamed "
+				"to \"image_transport\" and will be removed "
+				"in future versions! The value (%s) is copied to "
+				"\"image_transport\".", rgbTransport.c_str());
+	}
+	std::string imageTransport = this->declare_parameter("image_transport", rgbTransport);
 	std::string depthTransport = this->declare_parameter("depth_transport", std::string("raw"));
+	
 
 	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: approx_sync    = %s", approxSync?"true":"false");
 	if(approxSync)
@@ -126,7 +134,7 @@ void RGBDOdometry::onOdomInit()
 	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: subscribe_rgbd = %s", subscribeRGBD?"true":"false");
 	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: rgbd_cameras   = %d", rgbdCameras);
 	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: keep_color     = %s", keepColor_?"true":"false");
-	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: rgb_transport   = %s", rgbdTransport.c_str());
+	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: image_transport = %s", imageTransport.c_str());
 	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: depth_transport = %s", depthTransport.c_str());
 
 	rclcpp::SubscriptionOptions options;
@@ -354,18 +362,12 @@ void RGBDOdometry::onOdomInit()
 	}
 	else
 	{
-		image_transport::TransportHints rgb_hints(this, "raw", "rgb_transport");
+		image_transport::TransportHints rgb_hints(this); // using "image_transport" parameter
 		image_transport::TransportHints depth_hints(this, "raw", "depth_transport");
-
-		std::string rgb_topic = get_node_base_interface()->resolve_topic_or_service_name(
-      		"rgb/image", false, false
-		);
-		std::string depth_topic = get_node_base_interface()->resolve_topic_or_service_name(
-      		"depth/image", false, false
-		);
-
-		image_mono_sub_.subscribe(this, rgb_topic, rgb_hints.getTransport(), rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
-		image_depth_sub_.subscribe(this, depth_topic, depth_hints.getTransport(), rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
+		std::string rgbTopic = this->get_node_topics_interface()->resolve_topic_name("rgb/image"); // Humble/Jazzy don't resolve base topic, fixed by https://github.com/ros-perception/image_common/commit/ea7589ae8c1f7ecb83d6aab7b4c890c2d630d27a
+		std::string depthTopic = this->get_node_topics_interface()->resolve_topic_name("depth/image"); // Humble/Jazzy don't resolve base topic, fixed by https://github.com/ros-perception/image_common/commit/ea7589ae8c1f7ecb83d6aab7b4c890c2d630d27a
+		image_mono_sub_.subscribe(this, rgbTopic, rgb_hints.getTransport(), rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
+		image_depth_sub_.subscribe(this, depthTopic, depth_hints.getTransport(), rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
 		info_sub_.subscribe(this, "rgb/camera_info", RCLCPP_QOS(topicQueueSize_, qosCamInfo), options);
 
 		if(approxSync)

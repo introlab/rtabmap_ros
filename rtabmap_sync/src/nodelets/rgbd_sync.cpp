@@ -76,6 +76,22 @@ RGBDSync::RGBDSync(const rclcpp::NodeOptions & options) :
 	depthScale_ = this->declare_parameter("depth_scale", depthScale_);
 	decimation_ = this->declare_parameter("decimation", decimation_);
 	compressedRate_ = this->declare_parameter("compressed_rate", compressedRate_);
+	std::string rgbImageTransport = this->declare_parameter<std::string>("rgb_image_transport", std::string("raw"));
+	std::string depthImageTransport = this->declare_parameter<std::string>("depth_image_transport", std::string("raw"));
+	if(rgbImageTransport != "raw") {
+		RCLCPP_WARN(this->get_logger(), "Parameter \"rgb_image_transport\" has been renamed "
+				"to \"image_transport\" and will be removed "
+				"in future versions! The value (%s) is copied to "
+				"\"image_transport\".", rgbImageTransport.c_str());
+	}
+	if(depthImageTransport != "raw") {
+		RCLCPP_WARN(this->get_logger(), "Parameter \"depth_image_transport\" has been renamed "
+				"to \"depth_transport\" and will be removed "
+				"in future versions! The value (%s) is copied to "
+				"\"depth_transport\".", depthImageTransport.c_str());
+	}
+	std::string imageTransport = this->declare_parameter("image_transport", rgbImageTransport);
+	std::string depthTransport = this->declare_parameter("depth_transport", depthImageTransport);
 
 	if(decimation_<1)
 	{
@@ -92,6 +108,8 @@ RGBDSync::RGBDSync(const rclcpp::NodeOptions & options) :
 	RCLCPP_INFO(this->get_logger(), "%s: depth_scale = %f", get_name(), depthScale_);
 	RCLCPP_INFO(this->get_logger(), "%s: decimation = %d", get_name(), decimation_);
 	RCLCPP_INFO(this->get_logger(), "%s: compressed_rate = %f", get_name(), compressedRate_);
+	RCLCPP_INFO(this->get_logger(), "%s: image_transport = %s", get_name(), imageTransport.c_str());
+	RCLCPP_INFO(this->get_logger(), "%s: depth_transport = %s", get_name(), depthTransport.c_str());
 
 	rgbdImagePub_ = this->create_publisher<rtabmap_msgs::msg::RGBDImage>("rgbd_image", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos));
 	rgbdImageCompressedPub_ = this->create_publisher<rtabmap_msgs::msg::RGBDImage>("rgbd_image/compressed", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos));
@@ -109,12 +127,12 @@ RGBDSync::RGBDSync(const rclcpp::NodeOptions & options) :
 		exactSyncDepth_->registerCallback(std::bind(&RGBDSync::callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 	}
 
-  	std::string rgbImageTransport = this->declare_parameter<std::string>("rgb_image_transport", "raw");
-	std::string depthImageTransport = this->declare_parameter<std::string>("depth_image_transport", "raw");
-	std::string rgbTopic = this->get_node_topics_interface()->resolve_topic_name("rgb/image"); // Humble doesn't resolve base topic, fixed by https://github.com/ros-perception/image_common/commit/ea7589ae8c1f7ecb83d6aab7b4c890c2d630d27a
-	std::string depthTopic = this->get_node_topics_interface()->resolve_topic_name("depth/image"); // Humble doesn't resolve base topic, fixed by https://github.com/ros-perception/image_common/commit/ea7589ae8c1f7ecb83d6aab7b4c890c2d630d27a
-	imageSub_.subscribe(this, rgbTopic, rgbImageTransport, rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
-	imageDepthSub_.subscribe(this, depthTopic, depthImageTransport, rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	image_transport::TransportHints rgbHints(this); // using "image_transport" parameter
+	image_transport::TransportHints depthHints(this, "raw", "depth_transport");
+	std::string rgbTopic = this->get_node_topics_interface()->resolve_topic_name("rgb/image"); // Humble/Jazzy don't resolve base topic, fixed by https://github.com/ros-perception/image_common/commit/ea7589ae8c1f7ecb83d6aab7b4c890c2d630d27a
+	std::string depthTopic = this->get_node_topics_interface()->resolve_topic_name("depth/image"); // Humble/Jazzy doesn't resolve base topic, fixed by https://github.com/ros-perception/image_common/commit/ea7589ae8c1f7ecb83d6aab7b4c890c2d630d27a
+	imageSub_.subscribe(this, rgbTopic, rgbHints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	imageDepthSub_.subscribe(this, depthTopic, depthHints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
 	cameraInfoSub_.subscribe(this, "rgb/camera_info", RCLCPP_QOS(topicQueueSize, qosCamInfo));
 
 	std::string subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s,\n   %s,\n   %s",

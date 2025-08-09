@@ -109,6 +109,7 @@ void StereoOdometry::onOdomInit()
 	subscribeRGBD = this->declare_parameter("subscribe_rgbd", subscribeRGBD);
 	rgbdCameras = this->declare_parameter("rgbd_cameras", rgbdCameras);
 	keepColor_ = this->declare_parameter("keep_color", keepColor_);
+	std::string imageTransport = this->declare_parameter("image_transport", std::string("raw"));
 
 	RCLCPP_INFO(this->get_logger(), "StereoOdometry: approx_sync = %s", approxSync?"true":"false");
 	if(approxSync)
@@ -119,6 +120,7 @@ void StereoOdometry::onOdomInit()
 	RCLCPP_INFO(this->get_logger(), "StereoOdometry: qos_camera_info = %d", qosCamInfo);
 	RCLCPP_INFO(this->get_logger(), "StereoOdometry: subscribe_rgbd = %s", subscribeRGBD?"true":"false");
 	RCLCPP_INFO(this->get_logger(), "StereoOdometry: keep_color     = %s", keepColor_?"true":"false");
+	RCLCPP_INFO(this->get_logger(), "StereoOdometry: image_transport = %s", imageTransport.c_str());
 
 	rclcpp::SubscriptionOptions options;
 	options.callback_group = dataCallbackGroup_;
@@ -347,9 +349,12 @@ void StereoOdometry::onOdomInit()
 	}
 	else
 	{
-		image_transport::TransportHints hints(this);
-		imageRectLeft_.subscribe(this, "left/image_rect", hints.getTransport(), rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
-		imageRectRight_.subscribe(this, "right/image_rect", hints.getTransport(), rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
+		image_transport::TransportHints hints(this); // using "image_transport" parameter
+		
+		std::string leftTopic = this->get_node_topics_interface()->resolve_topic_name("left/image_rect"); // Humble/Jazzy don't resolve base topic, fixed by https://github.com/ros-perception/image_common/commit/ea7589ae8c1f7ecb83d6aab7b4c890c2d630d27a
+		std::string rightTopic = this->get_node_topics_interface()->resolve_topic_name("right/image_rect"); // Humble/Jazzy don't resolve base topic, fixed by https://github.com/ros-perception/image_common/commit/ea7589ae8c1f7ecb83d6aab7b4c890c2d630d27a
+		imageRectLeft_.subscribe(this, leftTopic, hints.getTransport(), rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
+		imageRectRight_.subscribe(this, rightTopic, hints.getTransport(), rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
 		cameraInfoLeft_.subscribe(this, "left/camera_info", RCLCPP_QOS(topicQueueSize_, qosCamInfo), options);
 		cameraInfoRight_.subscribe(this, "right/camera_info", RCLCPP_QOS(topicQueueSize_, qosCamInfo), options);
 
@@ -373,8 +378,8 @@ void StereoOdometry::onOdomInit()
 				approxSync&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
 				topicQueueSize_,
 				syncQueueSize_,
-				imageRectLeft_.getTopic().c_str(),
-				imageRectRight_.getTopic().c_str(),
+				imageRectLeft_.getSubscriber().getTopic().c_str(),
+				imageRectRight_.getSubscriber().getTopic().c_str(),
 				cameraInfoLeft_.getSubscriber()->get_topic_name(),
 				cameraInfoRight_.getSubscriber()->get_topic_name());
 	}

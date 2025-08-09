@@ -269,6 +269,8 @@ private:
 	std::string odomFrameId_;
 	int rgbdCameras_;
 	std::string name_;
+	std::string imageTransport_;
+	std::string depthTransport_;
 
 	rclcpp::CallbackGroup::SharedPtr syncCallbackGroup_;
 

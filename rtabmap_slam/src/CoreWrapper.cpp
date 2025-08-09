@@ -768,8 +768,9 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 					  Parameters::kRGBDEnabled().c_str(),
 					  Parameters::kRGBDEnabled().c_str());
 		}
-		image_transport::TransportHints hints(this);
-		defaultSub_ = image_transport::create_subscription(this, "image", std::bind(&CoreWrapper::defaultCallback, this, std::placeholders::_1), hints.getTransport(), rclcpp::QoS(this->getTopicQueueSize()).reliability((rmw_qos_reliability_policy_t)qosImage_).get_rmw_qos_profile(), subOptions);
+		image_transport::TransportHints hints(this); // using "image_transport" parameter
+		std::string imageTopic = this->get_node_topics_interface()->resolve_topic_name("image"); // Humble/Jazzy don't resolve base topic, fixed by https://github.com/ros-perception/image_common/commit/ea7589ae8c1f7ecb83d6aab7b4c890c2d630d27a
+		defaultSub_ = image_transport::create_subscription(this, imageTopic, std::bind(&CoreWrapper::defaultCallback, this, std::placeholders::_1), hints.getTransport(), rclcpp::QoS(this->getTopicQueueSize()).reliability((rmw_qos_reliability_policy_t)qosImage_).get_rmw_qos_profile(), subOptions);
 
 
 		RCLCPP_INFO(this->get_logger(), "\n%s subscribed to:\n   %s", get_name(), defaultSub_.getTopic().c_str());
