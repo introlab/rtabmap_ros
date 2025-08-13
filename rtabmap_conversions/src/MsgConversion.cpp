@@ -505,6 +505,7 @@ void rgbdImagesToROS(const rtabmap::SensorData & data,
 		int subImageWidth = data.imageRaw().cols / data.cameraModels().size();
 		int subDepthWidth = data.depthOrRightRaw().cols / data.cameraModels().size();
 		for(size_t i=0; i<data.cameraModels().size(); ++i) {
+			msg.rgbd_images[i].header = headers[i];
 			rtabmap_conversions::cameraModelToROS(data.cameraModels()[i], msg.rgbd_images[i].rgb_camera_info);
 			msg.rgbd_images[i].rgb_camera_info.header = headers[i];
 
