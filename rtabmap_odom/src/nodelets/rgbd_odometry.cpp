@@ -555,8 +555,7 @@ private:
 
 			if(ptrDepth->image.type() == depth.type())
 			{
-				//if(i < 4)
-					ptrDepth->image.copyTo(cv::Mat(depth, cv::Rect(i*depthWidth, 0, depthWidth, depthHeight)));
+				ptrDepth->image.copyTo(cv::Mat(depth, cv::Rect(i*depthWidth, 0, depthWidth, depthHeight)));
 			}
 			else
 			{

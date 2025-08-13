@@ -556,8 +556,6 @@ private:
 
 				rtabmap::StereoCameraModel stereoModel = rtabmap_conversions::stereoCameraModelFromROS(leftCameraInfos[i], rightCameraInfos[i], localTransform, stereoTransform);
 
-					std::cout << i << " " << stereoModel << std::endl;
-
 				if( stereoModel.baseline() == 0 &&
 					alreadyRectified &&
 					!rightCameraInfos[i].header.frame_id.empty() &&
@@ -590,8 +588,6 @@ private:
 								stereoTransform.x(),
 								stereoModel.localTransform(),
 								stereoModel.left().imageSize());
-
-								std::cout << i << " B " << stereoModel << std::endl;
 					}
 				}
 
