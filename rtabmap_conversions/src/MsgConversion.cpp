@@ -274,11 +274,17 @@ void rgbdImageToROS(const rtabmap::SensorData & data,
 						   data.depthOrRightRaw().type()==CV_8UC3?sensor_msgs::image_encodings::BGR8:
 						   data.depthOrRightRaw().type()==CV_16UC1?sensor_msgs::image_encodings::TYPE_16UC1:
 						   sensor_msgs::image_encodings::TYPE_32FC1;
-		if(compressImages) {
-			cvDepth.toCompressedImageMsg(msg.depth_compressed,
-				data.depthOrRightRaw().type()!=CV_16UC1 && 
-				data.depthOrRightRaw().type()!=CV_32FC1 && 
-				compressionFormat == ".jpg"?cv_bridge::JPG:cv_bridge::PNG);
+		if(compressImages){
+			if(cvDepth.encoding == sensor_msgs::image_encodings::TYPE_16UC1 ||
+			   cvDepth.encoding == sensor_msgs::image_encodings::TYPE_32FC1)
+			{
+				msg.depth_compressed.data = rtabmap::compressImage(cvDepth.image, ".png");
+				msg.depth_compressed.format = "png";
+			}
+			else
+			{
+				cvDepth.toCompressedImageMsg(msg.depth_compressed, compressionFormat == ".jpg"?cv_bridge::JPG:cv_bridge::PNG);
+			}
 		}
 		else {
 			cvDepth.toImageMsg(msg.depth);
@@ -519,14 +525,23 @@ void rgbdImagesToROS(const rtabmap::SensorData & data,
 			{
 				cvDepthORRight.image = cv::Mat(data.depthOrRightRaw(), cv::Range::all(), cv::Range(0,subDepthWidth));
 				cvDepthORRight.header = headers[i];
-				
-				if(compressImages) {
-					cvDepthORRight.toCompressedImageMsg(msg.rgbd_images[i].depth_compressed,
-						data.depthOrRightRaw().type()!=CV_16UC1 && 
-						data.depthOrRightRaw().type()!=CV_32FC1 && 
-						compressionFormat == ".jpg"?cv_bridge::JPG:cv_bridge::PNG);
+
+				if (compressImages)
+				{
+					if (cvDepthORRight.encoding == sensor_msgs::image_encodings::TYPE_16UC1 ||
+						cvDepthORRight.encoding == sensor_msgs::image_encodings::TYPE_32FC1)
+					{
+
+						msg.rgbd_images[i].depth_compressed.data = rtabmap::compressImage(cvDepthORRight.image, ".png");
+						msg.rgbd_images[i].depth_compressed.format = "png";
+					}
+					else
+					{
+						cvDepthORRight.toCompressedImageMsg(msg.rgbd_images[i].depth_compressed, compressionFormat == ".jpg" ? cv_bridge::JPG : cv_bridge::PNG);
+					}
 				}
-				else {
+				else
+				{
 					cvDepthORRight.toImageMsg(msg.rgbd_images[i].depth);
 				}
 			}
