@@ -443,6 +443,7 @@ private:
 		cv::Mat rgb;
 		cv::Mat depth;
 		std::vector<rtabmap::CameraModel> cameraModels;
+		std::vector<std_msgs::Header> mutiCamHeaders;
 		for(unsigned int i=0; i<rgbImages.size(); ++i)
 		{
 			if(!(rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) ==0 ||
@@ -539,7 +540,7 @@ private:
 			}
 			if(depth.empty())
 			{
-				depth = cv::Mat(depthHeight, depthWidth*cameraCount, ptrDepth->image.type());
+				depth = cv::Mat::zeros(depthHeight, depthWidth*cameraCount, ptrDepth->image.type());
 			}
 
 			if(ptrImage->image.type() == rgb.type())
@@ -554,7 +555,8 @@ private:
 
 			if(ptrDepth->image.type() == depth.type())
 			{
-				ptrDepth->image.copyTo(cv::Mat(depth, cv::Rect(i*depthWidth, 0, depthWidth, depthHeight)));
+				//if(i < 4)
+					ptrDepth->image.copyTo(cv::Mat(depth, cv::Rect(i*depthWidth, 0, depthWidth, depthHeight)));
 			}
 			else
 			{
@@ -563,6 +565,7 @@ private:
 			}
 
 			cameraModels.push_back(rtabmap_conversions::cameraModelFromROS(cameraInfos[i], localTransform));
+			mutiCamHeaders.push_back(rgbImages[i]->header);
 		}
 
 		rtabmap::SensorData data(
@@ -575,7 +578,7 @@ private:
 		std_msgs::Header header;
 		header.stamp = higherStamp;
 		header.frame_id = rgbImages.size()==1?rgbImages[0]->header.frame_id:"";
-		this->processData(data, header);
+		this->processData(data, header, mutiCamHeaders);
 	}
 
 	void callback(

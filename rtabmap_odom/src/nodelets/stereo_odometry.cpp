@@ -432,6 +432,7 @@ private:
 		cv::Mat left;
 		cv::Mat right;
 		std::vector<rtabmap::StereoCameraModel> cameraModels;
+		std::vector<std_msgs::Header> mutiCamHeaders;
 		for(unsigned int i=0; i<leftImages.size(); ++i)
 		{
 			if(!(leftImages[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) ==0 ||
@@ -555,6 +556,8 @@ private:
 
 				rtabmap::StereoCameraModel stereoModel = rtabmap_conversions::stereoCameraModelFromROS(leftCameraInfos[i], rightCameraInfos[i], localTransform, stereoTransform);
 
+					std::cout << i << " " << stereoModel << std::endl;
+
 				if( stereoModel.baseline() == 0 &&
 					alreadyRectified &&
 					!rightCameraInfos[i].header.frame_id.empty() &&
@@ -587,6 +590,8 @@ private:
 								stereoTransform.x(),
 								stereoModel.localTransform(),
 								stereoModel.left().imageSize());
+
+								std::cout << i << " B " << stereoModel << std::endl;
 					}
 				}
 
@@ -662,6 +667,7 @@ private:
 				}
 
 				cameraModels.push_back(stereoModel);
+				mutiCamHeaders.push_back(leftImages[i]->header);
 			}
 			else
 			{
@@ -681,7 +687,7 @@ private:
 		std_msgs::Header header;
 		header.stamp = higherStamp;
 		header.frame_id = leftImages.size()==1?leftImages[0]->header.frame_id:"";
-		this->processData(data, header);
+		this->processData(data, header, mutiCamHeaders);
 	}
 
 	void callback(

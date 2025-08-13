@@ -59,6 +59,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap_msgs/OdomInfo.h>
 #include <rtabmap_msgs/Info.h>
 #include <rtabmap_msgs/RGBDImage.h>
+#include <rtabmap_msgs/RGBDImages.h>
 #include <rtabmap_msgs/UserData.h>
 
 namespace rtabmap_conversions {
@@ -75,8 +76,17 @@ rtabmap::Transform transformFromPoseMsg(const geometry_msgs::Pose & msg, bool ig
 void toCvCopy(const rtabmap_msgs::RGBDImage & image, cv_bridge::CvImagePtr & rgb, cv_bridge::CvImagePtr & depth);
 void toCvShare(const rtabmap_msgs::RGBDImageConstPtr & image, cv_bridge::CvImageConstPtr & rgb, cv_bridge::CvImageConstPtr & depth);
 void toCvShare(const rtabmap_msgs::RGBDImage & image, const boost::shared_ptr<void const>& trackedObject, cv_bridge::CvImageConstPtr & rgb, cv_bridge::CvImageConstPtr & depth);
-void rgbdImageToROS(const rtabmap::SensorData & data, rtabmap_msgs::RGBDImage & msg, const std::string & sensorFrameId);
+void rgbdImageToROS(const rtabmap::SensorData & data,
+	rtabmap_msgs::RGBDImage & msg,
+	const std_msgs::Header & header,
+	bool compressImages,
+	const std::string & compressionFormat = "*.png");
 rtabmap::SensorData rgbdImageFromROS(const rtabmap_msgs::RGBDImageConstPtr & image);
+void rgbdImagesToROS(const rtabmap::SensorData & data, 
+	rtabmap_msgs::RGBDImages & msg,
+	const std::vector<std_msgs::Header> & headers,
+	bool compressImages,
+	const std::string & compressionFormat = "*.png");
 
 // copy data
 void compressedMatToBytes(const cv::Mat & compressed, std::vector<unsigned char> & bytes);

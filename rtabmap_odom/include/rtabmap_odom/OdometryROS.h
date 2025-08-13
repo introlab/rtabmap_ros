@@ -63,7 +63,7 @@ public:
 	OdometryROS(bool stereoParams, bool visParams, bool icpParams);
 	virtual ~OdometryROS();
 
-	void processData(rtabmap::SensorData & data, const std_msgs::Header & header);
+	void processData(rtabmap::SensorData & data, const std_msgs::Header & header, const std::vector<std_msgs::Header> & multiCamHeaders = std::vector<std_msgs::Header>());
 
 	bool reset(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 	bool resetToPose(rtabmap_msgs::ResetPose::Request&, rtabmap_msgs::ResetPose::Response&);
@@ -127,6 +127,9 @@ private:
 	ros::Publisher odomLocalScanMap_;
 	ros::Publisher odomLastFrame_;
 	ros::Publisher odomRgbdImagePub_;
+	ros::Publisher odomRgbdImageCompressedPub_;
+	ros::Publisher odomRgbdImagesPub_;
+	ros::Publisher odomRgbdImagesCompressedPub_;
 	ros::Publisher odomSensorDataPub_;
 	ros::Publisher odomSensorDataFeaturesPub_;
 	ros::Publisher odomSensorDataCompressedPub_;
@@ -148,6 +151,7 @@ private:
 	USemaphore dataReady_;
 	rtabmap::SensorData dataToProcess_;
 	std_msgs::Header dataHeaderToProcess_;
+	std::vector<std_msgs::Header> dataMultiCamHeadersToProcess_;
 	bool bufferedDataToProcess_;
 
 	bool paused_;

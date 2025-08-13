@@ -209,11 +209,13 @@ void toCvShare(const rtabmap_msgs::RGBDImage & image, const boost::shared_ptr<vo
 	}
 }
 
-void rgbdImageToROS(const rtabmap::SensorData & data, rtabmap_msgs::RGBDImage & msg, const std::string & sensorFrameId)
+void rgbdImageToROS(const rtabmap::SensorData & data,
+	rtabmap_msgs::RGBDImage & msg,
+	const std_msgs::Header & header,
+	bool compressImages,
+	const std::string & compressionFormat)
 {
-	std_msgs::Header header;
-	header.frame_id = sensorFrameId;
-	header.stamp = ros::Time(data.stamp());
+	msg.header = header;
 	rtabmap::Transform localTransform;
 	if(data.cameraModels().size()>1)
 	{
@@ -237,18 +239,26 @@ void rgbdImageToROS(const rtabmap::SensorData & data, rtabmap_msgs::RGBDImage & 
 		localTransform = data.stereoCameraModels()[0].localTransform();
 	}
 
+	if(compressImages && (!data.imageCompressed().empty() || !data.depthOrRightRaw().empty()))
+	{
+		ROS_ERROR("Conversion of compressed SensorData to RGBDImage is not implemented...");
+	}
+
 	if(!data.imageRaw().empty())
 	{
 		cv_bridge::CvImage cvImg;
 		cvImg.header = header;
 		cvImg.image = data.imageRaw();
-		UASSERT(data.imageRaw().type()==CV_8UC1 || data.imageRaw().type()==CV_8UC3);
-		cvImg.encoding = data.imageRaw().type()==CV_8UC1?sensor_msgs::image_encodings::MONO8:sensor_msgs::image_encodings::BGR8;
-		cvImg.toImageMsg(msg.rgb);
-	}
-	else if(!data.imageCompressed().empty())
-	{
-		ROS_ERROR("Conversion of compressed SensorData to RGBDImage is not implemented...");
+		UASSERT(data.imageRaw().type()==CV_8UC1 ||
+		        data.imageRaw().type()==CV_8UC3);
+		cvImg.encoding = data.imageRaw().type()==CV_8UC1?sensor_msgs::image_encodings::MONO8:
+						 sensor_msgs::image_encodings::BGR8;
+		if(compressImages) {
+			cvImg.toCompressedImageMsg(msg.rgb_compressed, compressionFormat == ".jpg"?cv_bridge::JPG:cv_bridge::PNG);
+		}
+		else {
+			cvImg.toImageMsg(msg.rgb);
+		}
 	}
 
 	if(!data.depthOrRightRaw().empty())
@@ -256,13 +266,23 @@ void rgbdImageToROS(const rtabmap::SensorData & data, rtabmap_msgs::RGBDImage & 
 		cv_bridge::CvImage cvDepth;
 		cvDepth.header = header;
 		cvDepth.image = data.depthOrRightRaw();
-		UASSERT(data.depthOrRightRaw().type()==CV_8UC1 || data.depthOrRightRaw().type()==CV_16UC1 || data.depthOrRightRaw().type()==CV_32FC1);
-		cvDepth.encoding = data.depthOrRightRaw().type()==CV_8UC1?sensor_msgs::image_encodings::MONO8:data.depthOrRightRaw().type()==CV_16UC1?sensor_msgs::image_encodings::TYPE_16UC1:sensor_msgs::image_encodings::TYPE_32FC1;
-		cvDepth.toImageMsg(msg.depth);
-	}
-	else if(!data.depthOrRightCompressed().empty())
-	{
-		ROS_ERROR("Conversion of compressed SensorData to RGBDImage is not implemented...");
+		UASSERT(data.depthOrRightRaw().type()==CV_8UC1 ||
+			    data.depthOrRightRaw().type()==CV_8UC3 ||
+				data.depthOrRightRaw().type()==CV_16UC1 ||
+				data.depthOrRightRaw().type()==CV_32FC1);
+		cvDepth.encoding = data.depthOrRightRaw().type()==CV_8UC1?sensor_msgs::image_encodings::MONO8:
+						   data.depthOrRightRaw().type()==CV_8UC3?sensor_msgs::image_encodings::BGR8:
+						   data.depthOrRightRaw().type()==CV_16UC1?sensor_msgs::image_encodings::TYPE_16UC1:
+						   sensor_msgs::image_encodings::TYPE_32FC1;
+		if(compressImages) {
+			cvDepth.toCompressedImageMsg(msg.depth_compressed,
+				data.depthOrRightRaw().type()!=CV_16UC1 && 
+				data.depthOrRightRaw().type()!=CV_32FC1 && 
+				compressionFormat == ".jpg"?cv_bridge::JPG:cv_bridge::PNG);
+		}
+		else {
+			cvDepth.toImageMsg(msg.depth);
+		}
 	}
 
 	//convert features
@@ -428,6 +448,136 @@ rtabmap::SensorData rgbdImageFromROS(const rtabmap_msgs::RGBDImageConstPtr & ima
 	}
 
 	return data;
+}
+
+void rgbdImagesToROS(const rtabmap::SensorData & data, 
+	rtabmap_msgs::RGBDImages & msg,
+	const std::vector<std_msgs::Header> & headers,
+	bool compressImages,
+	const std::string & compressionFormat)
+{
+	UASSERT(!headers.empty());
+	msg.header = headers[0];
+
+	if(compressImages && 
+	   ((data.imageRaw().empty() && !data.imageCompressed().empty()) ||
+	    (data.depthOrRightRaw().empty() && !data.depthOrRightCompressed().empty())))
+	{
+		ROS_ERROR("Conversion of compressed SensorData to RGBDImage is not implemented...");
+	}
+
+	cv_bridge::CvImage cvImg;
+	if(!data.imageRaw().empty())
+	{
+		UASSERT(data.imageRaw().type()==CV_8UC1 || 
+				data.imageRaw().type()==CV_8UC3);
+		cvImg.encoding = data.imageRaw().type()==CV_8UC1?sensor_msgs::image_encodings::MONO8:
+						 sensor_msgs::image_encodings::BGR8;
+	}
+	cv_bridge::CvImage cvDepthORRight;
+	if(!data.depthOrRightRaw().empty())
+	{
+		UASSERT(data.depthOrRightRaw().type()==CV_8UC1 ||
+				data.depthOrRightRaw().type()==CV_8UC3 ||
+				data.depthOrRightRaw().type()==CV_16UC1 || 
+				data.depthOrRightRaw().type()==CV_32FC1);
+		cvDepthORRight.encoding = data.depthOrRightRaw().type()==CV_8UC1?sensor_msgs::image_encodings::MONO8:
+						          data.depthOrRightRaw().type()==CV_8UC3?sensor_msgs::image_encodings::BGR8:
+						          data.depthOrRightRaw().type()==CV_16UC1?sensor_msgs::image_encodings::TYPE_16UC1:
+						          sensor_msgs::image_encodings::TYPE_32FC1;
+	}
+
+	if(!data.cameraModels().empty())
+	{
+		//rgb+depth
+		if(data.cameraModels().size() != headers.size())
+		{
+			UERROR("Cannot convert multi-camera data to rgbd images if number of sensor frames are not equal to number of cameras.");
+			return;
+		}
+		msg.rgbd_images.resize(data.cameraModels().size());
+		int subImageWidth = data.imageRaw().cols / data.cameraModels().size();
+		int subDepthWidth = data.depthOrRightRaw().cols / data.cameraModels().size();
+		for(size_t i=0; i<data.cameraModels().size(); ++i) {
+			rtabmap_conversions::cameraModelToROS(data.cameraModels()[i], msg.rgbd_images[i].rgb_camera_info);
+			msg.rgbd_images[i].rgb_camera_info.header = headers[i];
+
+			if(!data.imageRaw().empty())
+			{
+				cvImg.image = cv::Mat(data.imageRaw(), cv::Range::all(), cv::Range(0,subImageWidth));
+				cvImg.header = headers[i];
+				
+				if(compressImages) {
+					cvImg.toCompressedImageMsg(msg.rgbd_images[i].rgb_compressed, compressionFormat == ".jpg"?cv_bridge::JPG:cv_bridge::PNG);
+				}
+				else {
+					cvImg.toImageMsg(msg.rgbd_images[i].rgb);
+				}
+			}
+
+			if(!data.depthOrRightRaw().empty())
+			{
+				cvDepthORRight.image = cv::Mat(data.depthOrRightRaw(), cv::Range::all(), cv::Range(0,subDepthWidth));
+				cvDepthORRight.header = headers[i];
+				
+				if(compressImages) {
+					cvDepthORRight.toCompressedImageMsg(msg.rgbd_images[i].depth_compressed,
+						data.depthOrRightRaw().type()!=CV_16UC1 && 
+						data.depthOrRightRaw().type()!=CV_32FC1 && 
+						compressionFormat == ".jpg"?cv_bridge::JPG:cv_bridge::PNG);
+				}
+				else {
+					cvDepthORRight.toImageMsg(msg.rgbd_images[i].depth);
+				}
+			}
+		}
+		
+	}
+	else if(!data.stereoCameraModels().empty())
+	{
+		//stereo
+		if(data.stereoCameraModels().size() != headers.size())
+		{
+			UERROR("Cannot convert multi-camera data to rgbd images if number of sensor frames are not equal to number of cameras.");
+			return;
+		}
+		msg.rgbd_images.resize(data.stereoCameraModels().size());
+		int subImageWidth = data.imageRaw().cols / data.cameraModels().size();
+		int subRightWidth = data.depthOrRightRaw().cols / data.cameraModels().size();
+		for(size_t i=0; i<data.stereoCameraModels().size(); ++i) {
+			rtabmap_conversions::cameraModelToROS(data.stereoCameraModels()[i].left(), msg.rgbd_images[i].rgb_camera_info);
+			rtabmap_conversions::cameraModelToROS(data.stereoCameraModels()[i].right(), msg.rgbd_images[i].depth_camera_info);
+			msg.rgbd_images[i].rgb_camera_info.header = headers[i];
+			msg.rgbd_images[i].depth_camera_info.header = headers[i];
+
+			if(!data.imageRaw().empty())
+			{
+				cvImg.image = cv::Mat(data.imageRaw(), cv::Range::all(), cv::Range(0,subImageWidth));
+				cvImg.header = headers[i];
+				if(compressImages) {
+					cvImg.toCompressedImageMsg(msg.rgbd_images[i].rgb_compressed, compressionFormat == ".jpg"?cv_bridge::JPG:cv_bridge::PNG);
+				}
+				else {
+					cvImg.toImageMsg(msg.rgbd_images[i].rgb);
+				}
+			}
+
+			if(!data.depthOrRightRaw().empty())
+			{
+				cvDepthORRight.image = cv::Mat(data.depthOrRightRaw(), cv::Range::all(), cv::Range(0,subRightWidth));
+				cvDepthORRight.header = headers[i];
+				
+				if(compressImages) {
+					cvDepthORRight.toCompressedImageMsg(msg.rgbd_images[i].depth_compressed, compressionFormat == ".jpg"?cv_bridge::JPG:cv_bridge::PNG);
+				}
+				else {
+					cvDepthORRight.toImageMsg(msg.rgbd_images[i].depth);
+				}
+			}
+		}
+	}
+
+	// TODO: Could be possible to forward keypoints/descriptors/3d points by splitting them against each RGBDImage msg.
 }
 
 void compressedMatToBytes(const cv::Mat & compressed, std::vector<unsigned char> & bytes)

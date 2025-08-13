@@ -108,6 +108,9 @@ void OdometryROS::onInit()
 	odomLocalScanMap_ = nh.advertise<sensor_msgs::PointCloud2>("odom_local_scan_map", 1);
 	odomLastFrame_ = nh.advertise<sensor_msgs::PointCloud2>("odom_last_frame", 1);
 	odomRgbdImagePub_ = nh.advertise<rtabmap_msgs::RGBDImage>("odom_rgbd_image", 1);
+	odomRgbdImageCompressedPub_ = nh.advertise<rtabmap_msgs::RGBDImage>("odom_rgbd_image/compressed", 1);
+	odomRgbdImagesPub_ = nh.advertise<rtabmap_msgs::RGBDImages>("odom_rgbd_images", 1);
+	odomRgbdImagesCompressedPub_ = nh.advertise<rtabmap_msgs::RGBDImages>("odom_rgbd_images/compressed", 1);
 	odomSensorDataPub_ = nh.advertise<rtabmap_msgs::SensorData>("odom_sensor_data/raw", 1);
 	odomSensorDataFeaturesPub_ = nh.advertise<rtabmap_msgs::SensorData>("odom_sensor_data/features", 1);
 	odomSensorDataCompressedPub_ = nh.advertise<rtabmap_msgs::SensorData>("odom_sensor_data/compressed", 1);
@@ -457,7 +460,7 @@ void OdometryROS::callbackIMU(const sensor_msgs::ImuConstPtr& msg)
 	}
 }
 
-void OdometryROS::processData(SensorData & data, const std_msgs::Header & header)
+void OdometryROS::processData(SensorData & data, const std_msgs::Header & header, const std::vector<std_msgs::Header> & multiCamHeaders)
 {
 	//NODELET_WARN("Received image: %f delay=%f", data.stamp(), (ros::Time::now() - header.stamp).toSec());
 	if(dataMutex_.lockTry() == 0)
@@ -468,6 +471,7 @@ void OdometryROS::processData(SensorData & data, const std_msgs::Header & header
 		}
 		dataToProcess_ = data;
 		dataHeaderToProcess_ = header;
+		dataMultiCamHeadersToProcess_ = multiCamHeaders;
 		bufferedDataToProcess_ = false;
 		dataReady_.release();
 		dataMutex_.unlock();
@@ -551,12 +555,14 @@ void OdometryROS::mainLoop()
 				(previousClockTime_ - clockNow).toSec());
 			SensorData dataCpy = dataToProcess_;
 			std_msgs::Header headerCpy = dataHeaderToProcess_;
+			std::vector<std_msgs::Header> multiCamHeadersCpy = dataMultiCamHeadersToProcess_;
 			ros::Time previousCpy = previousClockTime_;
 			this->reset(odometry_->getPose());
 			if(previousCpy > headerCpy.stamp) {
 				// new frame is using new clock, process it now
 				dataToProcess_ = dataCpy;
 				dataHeaderToProcess_ = headerCpy;
+				dataMultiCamHeadersToProcess_ = multiCamHeadersCpy;
 				dataReady_.release();
 				NODELET_WARN("Odometry: Restarting with frame: %f (clock previous=%f, new=%f)",
 					headerCpy.stamp.toSec(), previousCpy.toSec(), clockNow.toSec());
@@ -1037,18 +1043,50 @@ void OdometryROS::mainLoop()
 
 	postProcessData(data, header);
 
-	if(!data.imageRaw().empty() && odomRgbdImagePub_.getNumSubscribers())
-	{
-		if(!header.frame_id.empty())
+	if(!data.imageRaw().empty()) {
+		if(odomRgbdImagePub_.getNumSubscribers() || odomRgbdImageCompressedPub_.getNumSubscribers())
 		{
-			rtabmap_msgs::RGBDImage msg;
-			rtabmap_conversions::rgbdImageToROS(data, msg, header.frame_id);
-			msg.header = header; // use corresponding time stamp to image
-			odomRgbdImagePub_.publish(msg);
+			if(data.cameraModels().size()<=1 && data.stereoCameraModels().size()<=1)
+			{
+				if(odomRgbdImagePub_.getNumSubscribers()) {
+					rtabmap_msgs::RGBDImage msg;
+					rtabmap_conversions::rgbdImageToROS(data, msg, header, false);
+					odomRgbdImagePub_.publish(msg);
+				}
+				
+				if(odomRgbdImageCompressedPub_.getNumSubscribers())
+				{
+					rtabmap_msgs::RGBDImage msg;
+					rtabmap_conversions::rgbdImageToROS(data, msg, header, true, compressionImgFormat_);
+					odomRgbdImageCompressedPub_.publish(msg);
+				}
+
+			}
+			else
+			{
+				ROS_WARN("Cannot convert SensorData for %s topic because it has more than one camera (%ld). "
+					"Subscribe to %s topic instead to get all cameras.",
+					odomRgbdImagePub_.getTopic().c_str(),
+					std::max(data.cameraModels().size(), data.stereoCameraModels().size()), 
+					odomRgbdImagesPub_.getTopic().c_str());
+			}
 		}
-		else
+
+		if(!dataMultiCamHeadersToProcess_.empty())
 		{
-			ROS_WARN("Sensor frame not set, cannot convert SensorData to RGBDImage");
+			if(odomRgbdImagesPub_.getNumSubscribers()) {
+				rtabmap_msgs::RGBDImages msg;
+				rtabmap_conversions::rgbdImagesToROS(data, msg, dataMultiCamHeadersToProcess_, false);
+				msg.header = header;
+				odomRgbdImagesPub_.publish(msg);
+			}
+			if(odomRgbdImagesCompressedPub_.getNumSubscribers())
+			{
+				rtabmap_msgs::RGBDImages msg;
+				rtabmap_conversions::rgbdImagesToROS(data, msg, dataMultiCamHeadersToProcess_, true, compressionImgFormat_);
+				msg.header = header;
+				odomRgbdImagesCompressedPub_.publish(msg);
+			}
 		}
 	}
 
@@ -1197,6 +1235,7 @@ void OdometryROS::reset(const Transform & pose)
 	imuProcessed_ = false;
 	dataToProcess_ = SensorData();
 	dataHeaderToProcess_ = std_msgs::Header();
+	dataMultiCamHeadersToProcess_.clear();
 	bufferedDataToProcess_ = false;
 	imuMutex_.lock();
 	imus_.clear();
