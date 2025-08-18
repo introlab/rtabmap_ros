@@ -100,6 +100,7 @@ private:
 	bool mapCacheCleanup_;
 	bool alwaysUpdateMap_;
 	bool scanEmptyRayTracing_;
+	bool localMapsCacheLoadedOnInit_;
 
 	ros::Publisher cloudMapPub_;
 	ros::Publisher cloudGroundPub_;

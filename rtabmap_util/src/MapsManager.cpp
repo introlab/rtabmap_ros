@@ -70,6 +70,7 @@ MapsManager::MapsManager() :
 		mapCacheCleanup_(true),
 		alwaysUpdateMap_(false),
 		scanEmptyRayTracing_(true),
+		localMapsCacheLoadedOnInit_(true),
 		assembledObstacles_(new pcl::PointCloud<pcl::PointXYZRGB>),
 		assembledGround_(new pcl::PointCloud<pcl::PointXYZRGB>),
 		occupancyGrid_(new OccupancyGrid(&localMaps_)),
@@ -122,6 +123,7 @@ void MapsManager::init(ros::NodeHandle & nh, ros::NodeHandle & pnh, const std::s
 		}
 	}
 	pnh.param("map_empty_ray_tracing", scanEmptyRayTracing_, scanEmptyRayTracing_);
+	pnh.param("map_cache_loaded_on_init", localMapsCacheLoadedOnInit_, localMapsCacheLoadedOnInit_);
 
 	if(pnh.hasParam("scan_output_voxelized"))
 	{
@@ -141,6 +143,7 @@ void MapsManager::init(ros::NodeHandle & nh, ros::NodeHandle & pnh, const std::s
 	ROS_INFO("%s(maps): map_cleanup                = %s", name.c_str(), mapCacheCleanup_?"true":"false");
 	ROS_INFO("%s(maps): map_always_update          = %s", name.c_str(), alwaysUpdateMap_?"true":"false");
 	ROS_INFO("%s(maps): map_empty_ray_tracing      = %s", name.c_str(), scanEmptyRayTracing_?"true":"false");
+	ROS_INFO("%s(maps): map_cache_loaded_on_init   = %s", name.c_str(), localMapsCacheLoadedOnInit_?"true":"false");
 	ROS_INFO("%s(maps): cloud_output_voxelized     = %s", name.c_str(), cloudOutputVoxelized_?"true":"false");
 	ROS_INFO("%s(maps): cloud_subtract_filtering   = %s", name.c_str(), cloudSubtractFiltering_?"true":"false");
 	ROS_INFO("%s(maps): cloud_subtract_filtering_min_neighbors = %d", name.c_str(), cloudSubtractFilteringMinNeighbors_);
@@ -355,7 +358,9 @@ void MapsManager::set2DMap(
 {
 	occupancyGrid_->setMap(map, xMin, yMin, cellSize, poses);
 	//update cache in case the map should be updated
-	if(memory)
+	if(memory && 
+		uStrNumCmp(memory->getDatabaseVersion(), "0.11.10")>=0 && // versions 0.11.10+ have local grids saved in db
+		localMapsCacheLoadedOnInit_)
 	{
 		for(std::map<int, rtabmap::Transform>::const_iterator iter=poses.lower_bound(1); iter!=poses.end(); ++iter)
 		{
