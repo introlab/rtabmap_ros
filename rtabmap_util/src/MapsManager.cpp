@@ -944,11 +944,19 @@ void MapsManager::publishMaps(
 
 			if(graphGroundOptimized && !tmpGroundPts.empty())
 			{
+#if RTABMAP_VERSION_MAJOR>0 || (RTABMAP_VERSION_MAJOR==0 && RTABMAP_VERSION_MINOR>=23)
+				assembledGroundIndex_.buildIndex(FlannIndex::FLANN_INDEX_KDTREE_SINGLE, tmpGroundPts);
+#else
 				assembledGroundIndex_.buildKDTreeSingleIndex(tmpGroundPts, 15);
+#endif
 			}
 			if(graphObstacleOptimized && !tmpObstaclePts.empty())
 			{
+#if RTABMAP_VERSION_MAJOR>0 || (RTABMAP_VERSION_MAJOR==0 && RTABMAP_VERSION_MINOR>=23)
+				assembledObstacleIndex_.buildIndex(FlannIndex::FLANN_INDEX_KDTREE_SINGLE, tmpObstaclePts);
+#else
 				assembledObstacleIndex_.buildKDTreeSingleIndex(tmpObstaclePts, 15);
+#endif
 			}
 			double indexingTime = t.ticks();
 			ROS_INFO("Graph optimized! Time recreating clouds (%d ground, %d obstacles) = %f s (indexing %fs)", countGrounds, countObstacles, addingPointsTime+indexingTime, indexingTime);
@@ -989,7 +997,11 @@ void MapsManager::publishMaps(
 							}
 							if(!assembledGroundIndex_.isBuilt())
 							{
+#if RTABMAP_VERSION_MAJOR>0 || (RTABMAP_VERSION_MAJOR==0 && RTABMAP_VERSION_MINOR>=23)
+								assembledGroundIndex_.buildIndex(FlannIndex::FLANN_INDEX_KDTREE_SINGLE, pts);
+#else
 								assembledGroundIndex_.buildKDTreeSingleIndex(pts, 15);
+#endif
 							}
 							else
 							{
@@ -1036,7 +1048,11 @@ void MapsManager::publishMaps(
 							}
 							if(!assembledObstacleIndex_.isBuilt())
 							{
+#if RTABMAP_VERSION_MAJOR>0 || (RTABMAP_VERSION_MAJOR==0 && RTABMAP_VERSION_MINOR>=23)
+								assembledObstacleIndex_.buildIndex(FlannIndex::FLANN_INDEX_KDTREE_SINGLE, pts);
+#else
 								assembledObstacleIndex_.buildKDTreeSingleIndex(pts, 15);
+#endif
 							}
 							else
 							{
