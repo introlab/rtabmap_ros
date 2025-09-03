@@ -551,32 +551,39 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 			filteredPoses.erase(0);
 		}
 
+		bool fullUpdateNeeded = true;
+#if RTABMAP_VERSION_MAJOR>0 || (RTABMAP_VERSION_MAJOR==0 && RTABMAP_VERSION_MINOR>=23)
+		fullUpdateNeeded = (updateGrid && occupancyGrid_->fullUpdateNeeded(filteredPoses))
+#if defined(WITH_OCTOMAP_MSGS) and defined(RTABMAP_OCTOMAP)
+		|| (updateOctomap && octomap_->fullUpdateNeeded(filteredPoses))
+#endif
+#if defined(WITH_GRID_MAP_ROS) and defined(RTABMAP_GRIDMAP)
+		|| (updateElevation && elevationMap_->fullUpdateNeeded(filteredPoses))
+#endif
+		;
+		if(fullUpdateNeeded) {
+			ROS_INFO("Full occupancy grid map update needed");
+		}
+		else {
+			ROS_DEBUG("Full occupancy grid map update not needed");
+		}
+#endif
+
 		bool longUpdate = false;
 		UTimer longUpdateTimer;
-		if(filteredPoses.size() > 20)
+		if(fullUpdateNeeded && filteredPoses.size() > 20 & localMaps_.size() < 5)
 		{
-			if(updateGridCache && localMaps_.size() < 5)
-			{
-				ROS_WARN("Many occupancy grids should be loaded (~%d), this may take a while to update the map(s)...", int(filteredPoses.size()-localMaps_.size()));
-				longUpdate = true;
-			}
-#if defined(WITH_OCTOMAP_MSGS) and defined(RTABMAP_OCTOMAP)
-			if(updateOctomap && octomap_->addedNodes().size() < 5)
-			{
-				ROS_WARN("Many clouds should be added to octomap (~%d), this may take a while to update the map(s)...", int(filteredPoses.size()-octomap_->addedNodes().size()));
-				longUpdate = true;
-			}
-#endif
+			ROS_WARN("Many occupancy grids should be loaded (~%d), this may take a while to update the map(s)...", int(filteredPoses.size()-localMaps_.size()));
+			longUpdate = true;
 		}
 
 		bool occupancySavedInDB = memory && uStrNumCmp(memory->getDatabaseVersion(), "0.11.10")>=0?true:false;
-
 		for(std::map<int, rtabmap::Transform>::iterator iter=filteredPoses.begin(); iter!=filteredPoses.end(); ++iter)
 		{
 			if(!iter->second.isNull())
 			{
 				rtabmap::SensorData data;
-				if(updateGridCache && (iter->first == 0 || !uContains(localMaps_.localGrids(), iter->first)))
+				if(iter->first == 0 || (fullUpdateNeeded && !uContains(localMaps_.localGrids(), iter->first)))
 				{
 					ROS_DEBUG("Data required for %d", iter->first);
 					std::map<int, rtabmap::Signature>::const_iterator findIter = signatures.find(iter->first);
