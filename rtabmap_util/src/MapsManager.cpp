@@ -69,6 +69,7 @@ MapsManager::MapsManager() :
 		mapCacheCleanup_(true),
 		alwaysUpdateMap_(false),
 		scanEmptyRayTracing_(true),
+		localMapsCacheLoadedOnInit_(true),
 		assembledObstacles_(new pcl::PointCloud<pcl::PointXYZRGB>),
 		assembledGround_(new pcl::PointCloud<pcl::PointXYZRGB>),
 		occupancyGrid_(new OccupancyGrid(&localMaps_)),
@@ -96,6 +97,7 @@ void MapsManager::init(rclcpp::Node & node, const std::string & name, bool)
 	alwaysUpdateMap_ = node.declare_parameter("map_always_update", rclcpp::ParameterValue(alwaysUpdateMap_)).get<bool>();
 
 	scanEmptyRayTracing_ = node.declare_parameter("map_empty_ray_tracing", rclcpp::ParameterValue(scanEmptyRayTracing_)).get<bool>();
+	localMapsCacheLoadedOnInit_ = node.declare_parameter("map_cache_loaded_on_init", rclcpp::ParameterValue(localMapsCacheLoadedOnInit_)).get<bool>();
 	cloudOutputVoxelized_ = node.declare_parameter("cloud_output_voxelized", rclcpp::ParameterValue(cloudOutputVoxelized_)).get<bool>();
 	cloudSubtractFiltering_ = node.declare_parameter("cloud_subtract_filtering", rclcpp::ParameterValue(cloudSubtractFiltering_)).get<bool>();
 	cloudSubtractFilteringMinNeighbors_ = node.declare_parameter("cloud_subtract_filtering_min_neighbors", rclcpp::ParameterValue(cloudSubtractFilteringMinNeighbors_)).get<int>();
@@ -111,6 +113,7 @@ void MapsManager::init(rclcpp::Node & node, const std::string & name, bool)
 	RCLCPP_INFO(node.get_logger(), "%s(maps): map_cleanup                = %s", name.c_str(), mapCacheCleanup_?"true":"false");
 	RCLCPP_INFO(node.get_logger(), "%s(maps): map_always_update          = %s", name.c_str(), alwaysUpdateMap_?"true":"false");
 	RCLCPP_INFO(node.get_logger(), "%s(maps): map_empty_ray_tracing      = %s", name.c_str(), scanEmptyRayTracing_?"true":"false");
+	RCLCPP_INFO(node.get_logger(), "%s(maps): map_cache_loaded_on_init   = %s", name.c_str(), localMapsCacheLoadedOnInit_?"true":"false");
 	RCLCPP_INFO(node.get_logger(), "%s(maps): cloud_output_voxelized     = %s", name.c_str(), cloudOutputVoxelized_?"true":"false");
 	RCLCPP_INFO(node.get_logger(), "%s(maps): cloud_subtract_filtering   = %s", name.c_str(), cloudSubtractFiltering_?"true":"false");
 	RCLCPP_INFO(node.get_logger(), "%s(maps): cloud_subtract_filtering_min_neighbors = %d", name.c_str(), cloudSubtractFilteringMinNeighbors_);
@@ -272,7 +275,9 @@ void MapsManager::set2DMap(
 {
 	occupancyGrid_->setMap(map, xMin, yMin, cellSize, poses);
 	//update cache in case the map should be updated
-	if(memory)
+	if(memory && 
+		uStrNumCmp(memory->getDatabaseVersion(), "0.11.10")>=0 && // versions 0.11.10+ have local grids saved in db
+		localMapsCacheLoadedOnInit_)
 	{
 		for(std::map<int, rtabmap::Transform>::const_iterator iter=poses.lower_bound(1); iter!=poses.end(); ++iter)
 		{
@@ -475,32 +480,39 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 			filteredPoses.erase(0);
 		}
 
+		bool fullUpdateNeeded = true;
+#if RTABMAP_VERSION_MAJOR>0 || (RTABMAP_VERSION_MAJOR==0 && RTABMAP_VERSION_MINOR>=23)
+		fullUpdateNeeded = (updateGrid && occupancyGrid_->fullUpdateNeeded(filteredPoses))
+#if defined(WITH_OCTOMAP_MSGS) and defined(RTABMAP_OCTOMAP)
+		|| (updateOctomap && octomap_->fullUpdateNeeded(filteredPoses))
+#endif
+#if defined(WITH_GRID_MAP_ROS) and defined(RTABMAP_GRIDMAP)
+		|| (updateElevation && elevationMap_->fullUpdateNeeded(filteredPoses))
+#endif
+		;
+		if(fullUpdateNeeded) {
+			UINFO("Full occupancy grid map update needed");
+		}
+		else {
+			UDEBUG("Full occupancy grid map update not needed");
+		}
+#endif
+
 		bool longUpdate = false;
 		UTimer longUpdateTimer;
-		if(filteredPoses.size() > 20)
+		if(fullUpdateNeeded && filteredPoses.size() > 20 && localMaps_.size() < 5)
 		{
-			if(updateGridCache && localMaps_.size() < 5)
-			{
-				UWARN("Many occupancy grids should be loaded (~%d), this may take a while to update the map(s)...", int(filteredPoses.size()-localMaps_.size()));
-				longUpdate = true;
-			}
-#ifdef RTABMAP_OCTOMAP
-			if(updateOctomap && octomap_->addedNodes().size() < 5)
-			{
-				UWARN("Many clouds should be added to octomap (~%d), this may take a while to update the map(s)...", int(filteredPoses.size()-octomap_->addedNodes().size()));
-				longUpdate = true;
-			}
-#endif
+			UWARN("Many occupancy grids should be loaded (~%d), this may take a while to update the map(s)...", int(filteredPoses.size()-localMaps_.size()));
+			longUpdate = true;
 		}
 
 		bool occupancySavedInDB = memory && uStrNumCmp(memory->getDatabaseVersion(), "0.11.10")>=0?true:false;
-
 		for(std::map<int, rtabmap::Transform>::iterator iter=filteredPoses.begin(); iter!=filteredPoses.end(); ++iter)
 		{
 			if(!iter->second.isNull())
 			{
 				rtabmap::SensorData data;
-				if(updateGridCache && (iter->first == 0 || !uContains(localMaps_.localGrids(), iter->first)))
+				if(iter->first == 0 || (fullUpdateNeeded && !uContains(localMaps_.localGrids(), iter->first)))
 				{
 					UDEBUG("Data required for %d", iter->first);
 					std::map<int, rtabmap::Signature>::const_iterator findIter = signatures.find(iter->first);
@@ -849,11 +861,19 @@ void MapsManager::publishMaps(
 
 			if(graphGroundOptimized && !tmpGroundPts.empty())
 			{
+#if RTABMAP_VERSION_MAJOR>0 || (RTABMAP_VERSION_MAJOR==0 && RTABMAP_VERSION_MINOR>=23)
+				assembledGroundIndex_.buildIndex(FlannIndex::FLANN_INDEX_KDTREE_SINGLE, tmpGroundPts);
+#else
 				assembledGroundIndex_.buildKDTreeSingleIndex(tmpGroundPts, 15);
+#endif
 			}
 			if(graphObstacleOptimized && !tmpObstaclePts.empty())
 			{
+#if RTABMAP_VERSION_MAJOR>0 || (RTABMAP_VERSION_MAJOR==0 && RTABMAP_VERSION_MINOR>=23)
+				assembledObstacleIndex_.buildIndex(FlannIndex::FLANN_INDEX_KDTREE_SINGLE, tmpObstaclePts);
+#else
 				assembledObstacleIndex_.buildKDTreeSingleIndex(tmpObstaclePts, 15);
+#endif
 			}
 			double indexingTime = t.ticks();
 			UINFO("Graph optimized! Time recreating clouds (%d ground, %d obstacles) = %f s (indexing %fs)", countGrounds, countObstacles, addingPointsTime+indexingTime, indexingTime);
@@ -894,7 +914,11 @@ void MapsManager::publishMaps(
 							}
 							if(!assembledGroundIndex_.isBuilt())
 							{
+#if RTABMAP_VERSION_MAJOR>0 || (RTABMAP_VERSION_MAJOR==0 && RTABMAP_VERSION_MINOR>=23)
+								assembledGroundIndex_.buildIndex(FlannIndex::FLANN_INDEX_KDTREE_SINGLE, pts);
+#else
 								assembledGroundIndex_.buildKDTreeSingleIndex(pts, 15);
+#endif
 							}
 							else
 							{
@@ -941,7 +965,11 @@ void MapsManager::publishMaps(
 							}
 							if(!assembledObstacleIndex_.isBuilt())
 							{
+#if RTABMAP_VERSION_MAJOR>0 || (RTABMAP_VERSION_MAJOR==0 && RTABMAP_VERSION_MINOR>=23)
+								assembledObstacleIndex_.buildIndex(FlannIndex::FLANN_INDEX_KDTREE_SINGLE, pts);
+#else
 								assembledObstacleIndex_.buildKDTreeSingleIndex(pts, 15);
+#endif
 							}
 							else
 							{

@@ -111,6 +111,7 @@ private:
 	bool mapCacheCleanup_;
 	bool alwaysUpdateMap_;
 	bool scanEmptyRayTracing_;
+	bool localMapsCacheLoadedOnInit_;
 
 	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr cloudMapPub_;
 	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr cloudGroundPub_;
