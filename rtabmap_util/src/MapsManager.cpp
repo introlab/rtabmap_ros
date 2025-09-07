@@ -571,7 +571,7 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 
 		bool longUpdate = false;
 		UTimer longUpdateTimer;
-		if(fullUpdateNeeded && filteredPoses.size() > 20 & localMaps_.size() < 5)
+		if(fullUpdateNeeded && filteredPoses.size() > 20 && localMaps_.size() < 5)
 		{
 			ROS_WARN("Many occupancy grids should be loaded (~%d), this may take a while to update the map(s)...", int(filteredPoses.size()-localMaps_.size()));
 			longUpdate = true;
