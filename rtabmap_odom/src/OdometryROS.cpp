@@ -564,10 +564,11 @@ void OdometryROS::processData()
 		{
 			++iterEnd;
 		}
-		for(std::map<double, sensor_msgs::msg::Imu::ConstSharedPtr>::iterator iter=imus_.begin(); iter!=iterEnd;)
+		std::map<double, sensor_msgs::msg::Imu::ConstSharedPtr>::iterator iterFirst = imus_.begin();
+		for(std::map<double, sensor_msgs::msg::Imu::ConstSharedPtr>::iterator iter=iterFirst; iter!=iterEnd;)
 		{
 			// Because we always keep the last processed imu in the buffer, skip the first one when processing again the buffer.
-			if(iter!=imus_.begin()) {
+			if(iter!=iterFirst) {
 				imus.push_back(*iter);
 			}
 			if(iter!=iterLast) {
