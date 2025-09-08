@@ -26,6 +26,7 @@ find_package(pcl_ros REQUIRED)
 find_package(message_filters REQUIRED)
 find_package(rtabmap_msgs REQUIRED)
 find_package(rtabmap_conversions REQUIRED)
+find_package(rtabmap_sync REQUIRED)
 
 # Optional components
 find_package(octomap_msgs)
@@ -54,6 +55,7 @@ SET(Libraries
    message_filters
    rtabmap_msgs
    rtabmap_conversions
+   rtabmap_sync
 )
 
 if("$ENV{ROS_DISTRO}" STRLESS "jazzy")

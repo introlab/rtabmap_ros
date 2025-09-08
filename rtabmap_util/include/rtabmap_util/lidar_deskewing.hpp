@@ -28,6 +28,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap_util/visibility.h>
 #include "rclcpp/rclcpp.hpp"
 
+#include <rtabmap_sync/SyncDiagnostic.h>
+
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
 
@@ -58,6 +60,8 @@ private:
 	bool slerp_;
 	std::shared_ptr<tf2_ros::Buffer> tfBuffer_;
 	std::shared_ptr<tf2_ros::TransformListener> tfListener_;
+	std::unique_ptr<rtabmap_sync::SyncDiagnostic> scanSyncDiagnostic_;
+	std::unique_ptr<rtabmap_sync::SyncDiagnostic> cloudSyncDiagnostic_;
 };
 
 }

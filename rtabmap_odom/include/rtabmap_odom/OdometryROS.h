@@ -98,7 +98,7 @@ protected:
 	virtual void postProcessData(const rtabmap::SensorData & /*data*/, const std_msgs::msg::Header & /*header*/) const {}
 
 private:
-
+	void processData();
 	virtual void mainLoop();
 	virtual void mainLoopKill();
 	virtual void updateParameters(rtabmap::ParametersMap &) {}
@@ -174,9 +174,12 @@ private:
 	rtabmap::Transform guessPreviousPose_;
 	double previousStamp_;
 	double previousClockTime_;
+	double lastReceivedTopicClock_;
+	double lastReceivedTopicStamp_;
 	double expectedUpdateRate_;
 	double maxUpdateRate_;
 	double minUpdateRate_;
+	bool alwaysProcessMostRecentFrame_;
 	std::string compressionImgFormat_;
 	bool compressionParallelized_;
 	int odomStrategy_;

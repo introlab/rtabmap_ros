@@ -203,7 +203,11 @@ void GuiWrapper::infoMapCallback(
 
 	this->post(new RtabmapEvent(stat));
 
-	tick(infoMsg->header.stamp);
+	ParametersMap allParameters = prefDialog_->getAllParameters();
+	float detectionRate = Parameters::defaultRtabmapDetectionRate();
+	Parameters::parse(allParameters, Parameters::kRtabmapDetectionRate(), detectionRate);
+
+	tick(infoMsg->header.stamp, detectionRate);
 
 }
 
@@ -236,7 +240,11 @@ void GuiWrapper::infoCallback(
 
 	this->post(new RtabmapEvent(stat));
 
-	tick(infoMsg->header.stamp);
+	ParametersMap allParameters = prefDialog_->getAllParameters();
+	float detectionRate = Parameters::defaultRtabmapDetectionRate();
+	Parameters::parse(allParameters, Parameters::kRtabmapDetectionRate(), detectionRate);
+
+	tick(infoMsg->header.stamp, detectionRate);
 }
 
 void GuiWrapper::goalPathCallback(

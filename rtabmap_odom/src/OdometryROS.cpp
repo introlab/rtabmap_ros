@@ -89,9 +89,12 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	icpParams_(false),
 	previousStamp_(0.0),
 	previousClockTime_(0.0),
+	lastReceivedTopicClock_(0.0),
+	lastReceivedTopicStamp_(0.0),
 	expectedUpdateRate_(0.0),
 	maxUpdateRate_(0.0),
 	minUpdateRate_(0.0),
+	alwaysProcessMostRecentFrame_(true),
 	compressionImgFormat_(".jpg"),
 	compressionParallelized_(true),
 	odomStrategy_(Parameters::defaultOdomStrategy()),
@@ -144,6 +147,7 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	expectedUpdateRate_ = this->declare_parameter("expected_update_rate", expectedUpdateRate_);
 	maxUpdateRate_ = this->declare_parameter("max_update_rate", maxUpdateRate_);
 	minUpdateRate_ = this->declare_parameter("min_update_rate", minUpdateRate_);
+	alwaysProcessMostRecentFrame_ = this->declare_parameter("always_process_most_recent_frame", alwaysProcessMostRecentFrame_);
 
 	compressionImgFormat_ = this->declare_parameter("sensor_data_compression_format", compressionImgFormat_);
 	compressionParallelized_ = this->declare_parameter("sensor_data_parallel_compression", compressionParallelized_);
@@ -461,25 +465,47 @@ void OdometryROS::callbackIMU(const sensor_msgs::msg::Imu::SharedPtr msg)
 void OdometryROS::processData(SensorData & data, const std_msgs::msg::Header & header)
 {
 	//RCLCPP_WARN(get_logger(), "Received image: %f delay=%f", data.stamp(), (now() - header.stamp).seconds());
+	double clockNow = rtabmap_conversions::timestampFromROS(now());
 	if(dataMutex_.lockTry() == 0)
 	{
 		if(bufferedDataToProcess_) {
-			RCLCPP_ERROR(this->get_logger(), "We didn't receive IMU newer than previous image (%f) and we just received a new image (%f). The previous image is dropped!",
+			RCLCPP_ERROR(this->get_logger(), "We didn't receive IMU newer than previous image/scan (%f) and we just received a new image/scan (%f). The previous image/scan is dropped!",
 						rtabmap_conversions::timestampFromROS(dataHeaderToProcess_.stamp), rtabmap_conversions::timestampFromROS(header.stamp));
 			++droppedMsgs_;
 		}
 		dataToProcess_ = data;
 		dataHeaderToProcess_ = header;
 		bufferedDataToProcess_ = false;
-		dataReady_.release();
+		if(alwaysProcessMostRecentFrame_) {
+			dataReady_.release();
+		}
 		dataMutex_.unlock();
 		++processedMsgs_;
+		if(!alwaysProcessMostRecentFrame_) {
+			processData();
+		}
 	}
 	else
 	{
-		//RCLCPP_WARN(get_logger(), "Dropping image/scan data");
+		double estimatedPeriod = clockNow - lastReceivedTopicClock_;
+		double topicPeriod = rtabmap_conversions::timestampFromROS(header.stamp) - lastReceivedTopicStamp_;
+		if(estimatedPeriod>0.0 && topicPeriod>0.0 && estimatedPeriod < topicPeriod*0.9) {
+			RCLCPP_WARN(get_logger(), 
+			"Dropping image/scan data with stamp %f (delay=%f). Something is wrong "
+			"because the clock difference with the previous topic received (%fs) is much lower than the "
+			"expected one (%fs) estimated from the topic stamps (previous stamp=%f). If you are processing "
+			"a large bag with flaky replaying delay, consider setting parameter \"always_process_most_recent_frame:=false\" "
+			"to avoid aggressively dropping data.",
+			rtabmap_conversions::timestampFromROS(header.stamp),
+			clockNow - rtabmap_conversions::timestampFromROS(header.stamp),
+			estimatedPeriod,
+			topicPeriod,
+			lastReceivedTopicStamp_);
+		}
 		++droppedMsgs_;
 	}
+	lastReceivedTopicStamp_ = rtabmap_conversions::timestampFromROS(header.stamp);
+	lastReceivedTopicClock_ = clockNow;
 }
 
 void OdometryROS::mainLoopKill()
@@ -497,7 +523,10 @@ void OdometryROS::mainLoop()
 		// thread killed
 		return;
 	}
-
+	processData();
+}
+void OdometryROS::processData()
+{
 	UScopeMutex lock(dataMutex_);
 
 	// aliases
@@ -516,21 +545,37 @@ void OdometryROS::mainLoop()
 
 		if(waitIMUToinit_ && (imus_.empty() || imus_.rbegin()->first < rtabmap_conversions::timestampFromROS(header.stamp)))
 		{
-			RCLCPP_WARN(this->get_logger(), "Make sure IMU is published faster than data rate! (last image stamp=%f and last imu stamp received=%f). Buffering the image until an imu with same or greater stamp is received.",
-					data.stamp(), imus_.empty()?0:imus_.rbegin()->first);
+			if(!imus_.empty()) {
+				RCLCPP_WARN(this->get_logger(), "Make sure IMU is published faster than data rate! (last image/scan stamp=%f and last imu stamp received=%f). Buffering the image/scan until an imu with same or greater stamp is received.",
+						data.stamp(), imus_.rbegin()->first);
+			}
+			else {
+				// If empty, it is an error!
+				RCLCPP_ERROR(this->get_logger(), "Make sure IMU is published faster than data rate! (last image/scan stamp=%f and imu buffer is empty). Buffering the image/scan until an imu with same or greater stamp is received.",
+						data.stamp());
+			}
 			bufferedDataToProcess_ = true;
 			return;
 		}
 		// process all imu data up to current image stamp (or just after so that underlying odom approach can do interpolation of imu at image stamp)
 		std::map<double, sensor_msgs::msg::Imu::ConstSharedPtr>::iterator iterEnd = imus_.lower_bound(rtabmap_conversions::timestampFromROS(header.stamp));
+		std::map<double, sensor_msgs::msg::Imu::ConstSharedPtr>::iterator iterLast = iterEnd;
 		if(iterEnd!= imus_.end())
 		{
 			++iterEnd;
 		}
 		for(std::map<double, sensor_msgs::msg::Imu::ConstSharedPtr>::iterator iter=imus_.begin(); iter!=iterEnd;)
 		{
-			imus.push_back(*iter);
-			imus_.erase(iter++);
+			// Because we always keep the last processed imu in the buffer, skip the first one when processing again the buffer.
+			if(iter!=imus_.begin()) {
+				imus.push_back(*iter);
+			}
+			if(iter!=iterLast) {
+				imus_.erase(iter++);
+			}
+			else {
+				++iter;
+			}
 		}
 	} // end imu lock
 
@@ -1241,6 +1286,8 @@ void OdometryROS::reset(const Transform & pose)
 	guessPreviousPose_.setNull();
 	previousStamp_ = 0.0;
 	previousClockTime_ = 0.0;
+	lastReceivedTopicClock_ = 0.0;
+	lastReceivedTopicStamp_ = 0.0;
 	resetCurrentCount_ = resetCountdown_;
 	imuProcessed_ = false;
 	dataToProcess_ = SensorData();

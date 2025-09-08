@@ -62,7 +62,7 @@ class SyncDiagnostic {
         diagnosticTimer_ = node_->create_wall_timer(5s, std::bind(&SyncDiagnostic::diagnosticTimerCallback, this), nullptr);
     }
 
-    void tickInput(const rclcpp::Time & stamp, double expectedFrequency = 0)
+    void tickInput(const rclcpp::Time & stamp, double expectedFrequency = 0.0)
     {
         updateFrequency(
             stamp,
@@ -74,9 +74,12 @@ class SyncDiagnostic {
             lastTickInputStamp_);
     }
 
-    void tickOutput(const rclcpp::Time & stamp, double expectedFrequency = 0)
+    void tickOutput(const rclcpp::Time & stamp, double expectedFrequency = 0.0)
     {
-        double lastTickOutputStamp;
+        if(expectedFrequency == 0.0) {
+            outTargetFrequency_ = inTargetFrequency_;
+        }
+        double lastTickOutputStamp = 0.0;
         updateFrequency(
             stamp,
             expectedFrequency,
@@ -112,31 +115,33 @@ private:
 		timeStatus.tick(stamp);
 
         double stampSec = rtabmap_conversions::timestampFromROS(stamp);
-        double singlePeriod = stampSec - lastTickStamp;
 
-        window.push_back(singlePeriod);
-        if(window.size() > windowSize_)
+        if(expectedFrequency>0)
         {
-            window.pop_front();
+            targetFrequency = expectedFrequency;
+        }
+        else if(lastTickStamp > 0.0) {
+            double singlePeriod = stampSec - lastTickStamp;
 
-             double period = 0.0;
-            if(window.size() == windowSize_)
+            window.push_back(singlePeriod);
+            if(window.size() > windowSize_)
             {
-                for(size_t i=0; i<window.size(); ++i)
+                window.pop_front();
+
+                double period = 0.0;
+                if(window.size() == windowSize_)
                 {
-                    period += window[i];
+                    for(size_t i=0; i<window.size(); ++i)
+                    {
+                        period += window[i];
+                    }
+                    period /= windowSize_;
                 }
-                period /= windowSize_;
-            }
 
-            if(period>0.0 && expectedFrequency == 0 && (targetFrequency == 0.0 || period < 1.0/targetFrequency))
-            {
-                targetFrequency = 1.0/period;
-            }
-            else if(expectedFrequency>0)
-            {
-                targetFrequency = expectedFrequency;
-            
+                if(period>0.0 && (targetFrequency == 0.0 || period < 1.0/targetFrequency))
+                {
+                    targetFrequency = 1.0/period;
+                }
             }
         }
 

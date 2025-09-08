@@ -32,6 +32,7 @@
   <depend>message_filters</depend>
   <depend>rtabmap_msgs</depend>
   <depend>rtabmap_conversions</depend>
+  <depend>rtabmap_sync</depend>
   <depend>grid_map_ros</depend>
 
   <export>
