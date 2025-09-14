@@ -78,9 +78,12 @@ OdometryROS::OdometryROS(bool stereoParams, bool visParams, bool icpParams) :
 	stereoParams_(stereoParams),
 	visParams_(visParams),
 	icpParams_(icpParams),
+	lastReceivedTopicClock_(0.0),
+	lastReceivedTopicStamp_(0.0),
 	expectedUpdateRate_(0.0),
 	maxUpdateRate_(0.0),
 	minUpdateRate_(0.0),
+	alwaysProcessMostRecentFrame_(true),
 	compressionImgFormat_(".jpg"),
 	compressionParallelized_(true),
 	odomStrategy_(Parameters::defaultOdomStrategy()),
@@ -148,6 +151,7 @@ void OdometryROS::onInit()
 	pnh.param("expected_update_rate", expectedUpdateRate_, expectedUpdateRate_); // expected sensor rate
 	pnh.param("max_update_rate", maxUpdateRate_, maxUpdateRate_);
 	pnh.param("min_update_rate", minUpdateRate_, minUpdateRate_);
+	pnh.param("always_process_most_recent_frame", alwaysProcessMostRecentFrame_, alwaysProcessMostRecentFrame_);
 
 	pnh.param("sensor_data_compression_format", compressionImgFormat_, compressionImgFormat_);
 	pnh.param("sensor_data_parallel_compression", compressionParallelized_, compressionParallelized_);
@@ -373,10 +377,11 @@ void OdometryROS::onInit()
 	Parameters::parse(this->parameters(), Parameters::kOdomStrategy(), odomStrategy_);
 	if(waitIMUToinit_)
 	{
-		int queueSize = 10;
-		pnh.param("queue_size", queueSize, queueSize);
-		imuSub_ = nh.subscribe("imu", queueSize*5, &OdometryROS::callbackIMU, this);
-		NODELET_INFO("odometry: Subscribing to IMU topic %s", imuSub_.getTopic().c_str());
+		int queueSize = 50;
+		pnh.param("imu_queue_size", queueSize, queueSize);
+		imuSub_ = nh.subscribe("imu", queueSize, &OdometryROS::callbackIMU, this);
+		NODELET_INFO("odometry: Subscribing to IMU topic %s (imu_queue_size=%d)",
+			imuSub_.getTopic().c_str(), queueSize);
 	}
 
 	this->start();
@@ -460,22 +465,43 @@ void OdometryROS::callbackIMU(const sensor_msgs::ImuConstPtr& msg)
 void OdometryROS::processData(SensorData & data, const std_msgs::Header & header)
 {
 	//NODELET_WARN("Received image: %f delay=%f", data.stamp(), (ros::Time::now() - header.stamp).toSec());
+	double clockNow = ros::Time::now().toSec();
 	if(dataMutex_.lockTry() == 0)
 	{
 		if(bufferedDataToProcess_) {
-			NODELET_ERROR("We didn't receive IMU newer than previous image (%f) and we just received a new image (%f). The previous image is dropped!",
+			NODELET_ERROR("We didn't receive IMU newer than previous image/scan (%f) and we just received a new image/scan (%f). The previous image/scan is dropped! Make sure IMU is published faster and with less delay than the image/scan.",
 						dataHeaderToProcess_.stamp.toSec(), header.stamp.toSec());
 		}
 		dataToProcess_ = data;
 		dataHeaderToProcess_ = header;
 		bufferedDataToProcess_ = false;
-		dataReady_.release();
+		if(alwaysProcessMostRecentFrame_) {
+			dataReady_.release();
+		}
 		dataMutex_.unlock();
+		if(!alwaysProcessMostRecentFrame_) {
+			processData();
+		}
 	}
 	else
 	{
-		NODELET_DEBUG("Dropping image/scan data");
+		double estimatedPeriod = clockNow - lastReceivedTopicClock_;
+		double topicPeriod = header.stamp.toSec() - lastReceivedTopicStamp_;
+		if(estimatedPeriod>0.0 && topicPeriod>0.0 && estimatedPeriod < topicPeriod*0.9) {
+			NODELET_WARN("Dropping image/scan data with stamp %f (delay=%f). Something is wrong "
+				"because the clock difference with the previous topic received (%fs) is much lower than the "
+				"expected one (%fs) estimated from the topic stamps (previous stamp=%f). If you are processing "
+				"a large bag with flaky replaying delay, consider setting parameter \"always_process_most_recent_frame:=false\" "
+				"to avoid aggressively dropping data.",
+				header.stamp.toSec(),
+				clockNow - header.stamp.toSec(),
+				estimatedPeriod,
+				topicPeriod,
+				lastReceivedTopicStamp_);
+		}
 	}
+	lastReceivedTopicStamp_ = header.stamp.toSec();
+	lastReceivedTopicClock_ = clockNow;
 }
 
 void OdometryROS::mainLoopKill()
@@ -493,7 +519,11 @@ void OdometryROS::mainLoop()
 		// thread killed
 		return;
 	}
+	processData();
+}
 
+void OdometryROS::processData()
+{
 	UScopeMutex lock(dataMutex_);
 
 	// aliases
@@ -512,21 +542,36 @@ void OdometryROS::mainLoop()
 
 		if(waitIMUToinit_ && (imus_.empty() || imus_.rbegin()->first < header.stamp.toSec()))
 		{
-			NODELET_WARN("Make sure IMU is published faster than data rate! (last image stamp=%f and last imu stamp received=%f). Buffering the image until an imu with same or greater stamp is received.",
-					data.stamp(), imus_.empty()?0:imus_.rbegin()->first);
+			if(imus_.empty()) {
+				// If empty, it is an error!
+				NODELET_ERROR("Make sure IMU is published faster than data rate! (last image/scan stamp=%f and imu buffer is empty). Buffering the image/scan until an imu with same or greater stamp is received.",
+						data.stamp());
+			}
 			bufferedDataToProcess_ = true;
 			return;
 		}
 		// process all imu data up to current image stamp (or just after so that underlying odom approach can do interpolation of imu at image stamp)
 		std::map<double, rtabmap::IMU>::iterator iterEnd = imus_.lower_bound(header.stamp.toSec());
+		std::map<double, rtabmap::IMU>::iterator iterLast = iterEnd;
 		if(iterEnd!= imus_.end())
 		{
 			++iterEnd;
 		}
-		for(std::map<double, rtabmap::IMU>::iterator iter=imus_.begin(); iter!=iterEnd;)
+		std::map<double, rtabmap::IMU>::iterator iterFirst = imus_.begin();
+		for(std::map<double, rtabmap::IMU>::iterator iter=iterFirst; iter!=iterEnd;)
 		{
-			imus.push_back(*iter);
-			imus_.erase(iter++);
+			// Because we always keep the last processed imu in the buffer, skip the first 
+			// one when processing again the buffer unless its time is lower/equal to image 
+			// current stamp (could happen on initialization).
+			if(iter!=iterFirst || iter->first <= header.stamp.toSec()) {
+				imus.push_back(*iter);
+			}
+			if(iter!=iterLast) {
+				imus_.erase(iter++);
+			}
+			else {
+				++iter;
+			}
 		}
 	}
 
@@ -1193,6 +1238,8 @@ void OdometryROS::reset(const Transform & pose)
 	guessPreviousPose_.setNull();
 	previousStamp_ = ros::Time();
 	previousClockTime_ = ros::Time();
+	lastReceivedTopicClock_ = 0.0;
+	lastReceivedTopicStamp_ = 0.0;
 	resetCurrentCount_ = resetCountdown_;
 	imuProcessed_ = false;
 	dataToProcess_ = SensorData();

@@ -127,6 +127,7 @@
   <arg name="odom_guess_min_rotation"    default="0"/>
   <arg name="odom_max_rate"            default="0"/>
   <arg name="odom_expected_rate"       default="0"/>
+  <arg name="odom_always_process_most_recent_frame" default="true"/>
   <arg name="imu_topic"                default="/imu/data"/>          <!-- only used with VIO approaches -->
   <arg name="wait_imu_to_init"         default="false"/>
   <arg name="use_odom_features"        default="false"/>
@@ -264,6 +265,7 @@
           <param name="guess_min_translation"       type="double" value="$(arg odom_guess_min_translation)"/>
           <param name="guess_min_rotation"          type="double" value="$(arg odom_guess_min_rotation)"/>
           <param name="expected_update_rate"        type="double" value="$(arg odom_expected_rate)"/>
+          <param name="always_process_most_recent_frame" type="bool" value="$(arg odom_always_process_most_recent_frame)"/>
           <param name="max_update_rate"             type="double" value="$(arg odom_max_rate)"/>
           <param name="keep_color"                  type="bool"   value="$(arg use_odom_features)"/>
         </node>
@@ -295,6 +297,7 @@
           <param name="guess_min_translation"       type="double" value="$(arg odom_guess_min_translation)"/>
           <param name="guess_min_rotation"          type="double" value="$(arg odom_guess_min_rotation)"/>
           <param name="expected_update_rate"        type="double" value="$(arg odom_expected_rate)"/>
+          <param name="always_process_most_recent_frame" type="bool" value="$(arg odom_always_process_most_recent_frame)"/>
           <param name="max_update_rate"             type="double" value="$(arg odom_max_rate)"/>
           <param name="keep_color"                  type="bool"   value="$(arg use_odom_features)"/>
         </node>
@@ -323,6 +326,7 @@
       <param name="guess_min_rotation"          type="double" value="$(arg odom_guess_min_rotation)"/>
       <param name="scan_cloud_max_points"       type="int"    value="$(arg scan_cloud_max_points)"/>
       <param name="expected_update_rate"        type="double" value="$(arg odom_expected_rate)"/>
+      <param name="always_process_most_recent_frame" type="bool" value="$(arg odom_always_process_most_recent_frame)"/>
       <param name="max_update_rate"             type="double" value="$(arg odom_max_rate)"/>
       <param name="deskewing"                   type="bool"   value="$(arg scan_deskewing)"/>
       <param name="deskewing_slerp"             type="bool"   value="$(arg scan_deskewing_slerp)"/>

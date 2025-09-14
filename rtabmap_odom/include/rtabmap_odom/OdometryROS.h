@@ -95,6 +95,7 @@ private:
 	virtual void onOdomInit() = 0;
 	virtual void updateParameters(rtabmap::ParametersMap & parameters) {}
 
+	void processData();
 	virtual void mainLoop();
 	virtual void mainLoopKill();
 
@@ -160,9 +161,12 @@ private:
 	rtabmap::Transform guessPreviousPose_;
 	ros::Time previousStamp_;
 	ros::Time previousClockTime_;
+	double lastReceivedTopicClock_;
+	double lastReceivedTopicStamp_;
 	double expectedUpdateRate_;
 	double maxUpdateRate_;
 	double minUpdateRate_;
+	bool alwaysProcessMostRecentFrame_;
 	std::string compressionImgFormat_;
 	bool compressionParallelized_;
 	int odomStrategy_;

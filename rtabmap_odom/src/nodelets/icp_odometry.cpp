@@ -91,7 +91,19 @@ private:
 		ros::NodeHandle & pnh = getPrivateNodeHandle();
 
 		int queueSize = 1;
-		pnh.param("queue_size",  queueSize, queueSize);
+		pnh.param("topic_queue_size", queueSize, queueSize);
+		if(pnh.hasParam("queue_size") && !pnh.hasParam("topic_queue_size"))
+		{
+			pnh.param("queue_size", queueSize, queueSize);
+			ROS_WARN("Parameter \"queue_size\" has been renamed "
+					"to \"topic_queue_size\" and will be removed "
+					"in future versions! The value (%d) is still copied to "
+					"\"topic_queue_size\".", queueSize);
+		}
+		else
+		{
+			pnh.param("topic_queue_size", queueSize, queueSize);
+		}
 		pnh.param("scan_cloud_max_points",  scanCloudMaxPoints_, scanCloudMaxPoints_);
 		pnh.param("scan_cloud_is_2d",  scanCloudIs2d_, scanCloudIs2d_);
 		pnh.param("scan_downsampling_step", scanDownsamplingStep_, scanDownsamplingStep_);
