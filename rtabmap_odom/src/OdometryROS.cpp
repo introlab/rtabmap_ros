@@ -469,7 +469,7 @@ void OdometryROS::processData(SensorData & data, const std_msgs::msg::Header & h
 	if(dataMutex_.lockTry() == 0)
 	{
 		if(bufferedDataToProcess_) {
-			RCLCPP_ERROR(this->get_logger(), "We didn't receive IMU newer than previous image/scan (%f) and we just received a new image/scan (%f). The previous image/scan is dropped!",
+			RCLCPP_ERROR(this->get_logger(), "We didn't receive IMU newer than previous image/scan (%f) and we just received a new image/scan (%f). The previous image/scan is dropped! Make sure IMU is published faster and with less delay than the image/scan.",
 						rtabmap_conversions::timestampFromROS(dataHeaderToProcess_.stamp), rtabmap_conversions::timestampFromROS(header.stamp));
 			++droppedMsgs_;
 		}
@@ -545,11 +545,7 @@ void OdometryROS::processData()
 
 		if(waitIMUToinit_ && (imus_.empty() || imus_.rbegin()->first < rtabmap_conversions::timestampFromROS(header.stamp)))
 		{
-			if(!imus_.empty()) {
-				RCLCPP_WARN(this->get_logger(), "Make sure IMU is published faster than data rate! (last image/scan stamp=%f and last imu stamp received=%f). Buffering the image/scan until an imu with same or greater stamp is received.",
-						data.stamp(), imus_.rbegin()->first);
-			}
-			else {
+			if(imus_.empty()) {
 				// If empty, it is an error!
 				RCLCPP_ERROR(this->get_logger(), "Make sure IMU is published faster than data rate! (last image/scan stamp=%f and imu buffer is empty). Buffering the image/scan until an imu with same or greater stamp is received.",
 						data.stamp());
@@ -567,8 +563,10 @@ void OdometryROS::processData()
 		std::map<double, sensor_msgs::msg::Imu::ConstSharedPtr>::iterator iterFirst = imus_.begin();
 		for(std::map<double, sensor_msgs::msg::Imu::ConstSharedPtr>::iterator iter=iterFirst; iter!=iterEnd;)
 		{
-			// Because we always keep the last processed imu in the buffer, skip the first one when processing again the buffer.
-			if(iter!=iterFirst) {
+			// Because we always keep the last processed imu in the buffer, skip the first 
+			// one when processing again the buffer unless its time is lower/equal to image 
+			// current stamp (could happen on initialization).
+			if(iter!=iterFirst || iter->first <= rtabmap_conversions::timestampFromROS(header.stamp)) {
 				imus.push_back(*iter);
 			}
 			if(iter!=iterLast) {

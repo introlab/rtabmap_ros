@@ -227,7 +227,7 @@ int main(int argc, char** argv)
 	}
 
 	UTimer timer;
-	rtabmap::CameraInfo cameraInfo;
+	rtabmap::SensorCaptureInfo cameraInfo;
 	rtabmap::SensorData data = reader.takeImage(&cameraInfo);
 	rtabmap::OdometryInfo odomInfo;
 	odomInfo.reg.covariance = cameraInfo.odomCovariance;

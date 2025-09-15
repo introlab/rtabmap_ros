@@ -62,7 +62,8 @@ def generate_launch_description():
         # Nodes to launch
         Node(
             package='rtabmap_odom', executable='stereo_odometry', output='screen',
-            parameters=[parameters],
+            parameters=[parameters,
+                { 'always_process_most_recent_frame':True}],
             remappings=remappings),
 
         Node(

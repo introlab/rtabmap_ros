@@ -186,7 +186,8 @@ def launch_setup(context, *args, **kwargs):
                 "subscribe_rgbd": LaunchConfiguration('subscribe_rgbd'),
                 "guess_frame_id": LaunchConfiguration('odom_guess_frame_id').perform(context),
                 "guess_min_translation": LaunchConfiguration('odom_guess_min_translation'),
-                "guess_min_rotation": LaunchConfiguration('odom_guess_min_rotation')}],
+                "guess_min_rotation": LaunchConfiguration('odom_guess_min_rotation'),
+                "always_process_most_recent_frame": LaunchConfiguration('odom_always_process_most_recent_frame')}],
             remappings=[
                 ("rgb/image", LaunchConfiguration('rgb_topic_relay')),
                 ("depth/image", LaunchConfiguration('depth_topic_relay')),
@@ -223,7 +224,8 @@ def launch_setup(context, *args, **kwargs):
                 "subscribe_rgbd": LaunchConfiguration('subscribe_rgbd'),
                 "guess_frame_id": LaunchConfiguration('odom_guess_frame_id').perform(context),
                 "guess_min_translation": LaunchConfiguration('odom_guess_min_translation'),
-                "guess_min_rotation": LaunchConfiguration('odom_guess_min_rotation')}],
+                "guess_min_rotation": LaunchConfiguration('odom_guess_min_rotation'),
+                "always_process_most_recent_frame": LaunchConfiguration('odom_always_process_most_recent_frame')}],
             remappings=[
                 ("left/image_rect", LaunchConfiguration('left_image_topic_relay')),
                 ("right/image_rect", LaunchConfiguration('right_image_topic_relay')),
@@ -258,7 +260,8 @@ def launch_setup(context, *args, **kwargs):
                 "qos_imu": LaunchConfiguration('qos_imu'),
                 "guess_frame_id": LaunchConfiguration('odom_guess_frame_id').perform(context),
                 "guess_min_translation": LaunchConfiguration('odom_guess_min_translation'),
-                "guess_min_rotation": LaunchConfiguration('odom_guess_min_rotation')}],
+                "guess_min_rotation": LaunchConfiguration('odom_guess_min_rotation'),
+                "always_process_most_recent_frame": LaunchConfiguration('odom_always_process_most_recent_frame')}],
             remappings=[
                 ("scan", LaunchConfiguration('scan_topic')),
                 ("scan_cloud", LaunchConfiguration('scan_cloud_topic')),
@@ -495,6 +498,7 @@ def generate_launch_description():
         DeclareLaunchArgument('odom_guess_frame_id',        default_value='',      description=''),
         DeclareLaunchArgument('odom_guess_min_translation', default_value='0.0',   description=''),
         DeclareLaunchArgument('odom_guess_min_rotation',    default_value='0.0',   description=''),
+        DeclareLaunchArgument('odom_always_process_most_recent_frame', default_value='true', description='Odometry: always process latest frame to reduce delay, skipping frames in case odometry is slower than camera frame rate. In case you want to make sure to process all frames (e.g., from a rosbag/dataset) and you don\'t care about delay, set this to false.'),
 
         # imu
         DeclareLaunchArgument('imu_topic',        default_value='/imu/data', description='Used with VIO approaches and for SLAM graph optimization (gravity constraints).'),
