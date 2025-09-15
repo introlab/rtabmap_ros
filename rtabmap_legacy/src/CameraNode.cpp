@@ -209,7 +209,7 @@ public:
 				//usb device
 				camera_ = new rtabmap::CameraVideo(deviceId, false, frameRate);
 			}
-			cameraThread_ = new rtabmap::CameraThread(camera_);
+			cameraThread_ = new rtabmap::SensorCaptureThread(camera_);
 			init();
 			if(!pause)
 			{
@@ -221,9 +221,9 @@ public:
 protected:
 	virtual bool handleEvent(UEvent * event)
 	{
-		if(event->getClassName().compare("CameraEvent") == 0)
+		if(event->getClassName().compare("SensorEvent") == 0)
 		{
-			rtabmap::CameraEvent * e = (rtabmap::CameraEvent*)event;
+			rtabmap::SensorEvent * e = (rtabmap::SensorEvent*)event;
 			const cv::Mat & image = e->data().imageRaw();
 			if(!image.empty() && image.depth() == CV_8U)
 			{
@@ -248,7 +248,7 @@ protected:
 
 private:
 	image_transport::Publisher rosPublisher_;
-	rtabmap::CameraThread * cameraThread_;
+	rtabmap::SensorCaptureThread * cameraThread_;
 	rtabmap::Camera * camera_;
 	ros::ServiceServer startSrv_;
 	ros::ServiceServer stopSrv_;
