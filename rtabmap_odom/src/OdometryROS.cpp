@@ -708,13 +708,14 @@ void OdometryROS::processData()
 				   (guessMinTime_ <= 0.0 || (previousStamp_.toSec()>0.0 && (header.stamp-previousStamp_).toSec() < guessMinTime_)))
 				{
 					// Ignore odometry update, we didn't move enough
+					Transform newPose = odometry_->getPose() * guess_;
 					if(publishTf_)
 					{
 						geometry_msgs::TransformStamped correctionMsg;
 						correctionMsg.child_frame_id = guessFrameId_;
 						correctionMsg.header.frame_id = odomFrameId_;
 						correctionMsg.header.stamp = header.stamp;
-						Transform correction = odometry_->getPose() * guess_ * guessCurrentPose.inverse();
+						Transform correction = newPose * guessCurrentPose.inverse();
 						rtabmap_conversions::transformToGeometryMsg(correction, correctionMsg.transform);
 						ros::Time time_now = ros::Time::now();
 						if(time_now >= previousClockTime_) {
@@ -727,6 +728,46 @@ void OdometryROS::processData()
 								(previousClockTime_ - time_now).toSec());
 						}
 					}
+					if(odomPub_.getNumSubscribers() && previousStamp_.toSec()>0)
+					{
+						nav_msgs::Odometry odom;
+						odom.header.stamp = header.stamp;
+						odom.header.frame_id = odomFrameId_;
+						odom.child_frame_id = frameId_;
+
+						//set the position
+						odom.pose.pose.position.x = newPose.x();
+						odom.pose.pose.position.y = newPose.y();
+						odom.pose.pose.position.z = newPose.z();
+						Eigen::Quaternionf q = newPose.getQuaternionf();
+						odom.pose.pose.orientation.x = q.x();
+						odom.pose.pose.orientation.y = q.y();
+						odom.pose.pose.orientation.z = q.z();
+						odom.pose.pose.orientation.w = q.w();
+
+						//set covariance
+						odom.pose.covariance.at(0) = 0.000001;  // xx
+						odom.pose.covariance.at(7) = 0.000001;  // yy
+						odom.pose.covariance.at(14) = 0.000001; // zz
+						odom.pose.covariance.at(21) = 0.000001; // rr
+						odom.pose.covariance.at(28) = 0.000001; // pp
+						odom.pose.covariance.at(35) = 0.000001; // yawyaw
+
+						//set velocity
+						double dt = (header.stamp-previousStamp_).toSec();
+						odom.twist.twist.linear.x = x/dt;
+						odom.twist.twist.linear.y = y/dt;
+						odom.twist.twist.linear.z = z/dt;
+						odom.twist.twist.angular.x = roll/dt;
+						odom.twist.twist.angular.y = pitch/dt;
+						odom.twist.twist.angular.z = yaw/dt;
+
+						odom.twist.covariance = odom.pose.covariance;
+
+						//publish the message
+						odomPub_.publish(odom);
+					}
+
 					guessPreviousPose_ = guessCurrentPose;
 					return;
 				}
