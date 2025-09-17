@@ -104,6 +104,7 @@ CoreWrapper::CoreWrapper() :
 		landmarkDefaultLinVariance_(0.001),
 		waitForTransform_(true),
 		waitForTransformDuration_(0.2), // 200 ms
+		staleUpdateDetection_(0.0),
 		useActionForGoal_(false),
 		useSavedMap_(true),
 		genScan_(false),
@@ -197,6 +198,7 @@ void CoreWrapper::onInit()
 	pnh.param("pub_loc_pose_only_when_localizing", pubLocPoseOnlyWhenLocalizing_,pubLocPoseOnlyWhenLocalizing_);
 	pnh.param("wait_for_transform",  waitForTransform_, waitForTransform_);
 	pnh.param("wait_for_transform_duration",  waitForTransformDuration_, waitForTransformDuration_);
+	pnh.param("stale_update_detection", staleUpdateDetection_, staleUpdateDetection_);
 	pnh.param("initial_pose",          initialPoseStr, initialPoseStr);
 	pnh.param("use_action_for_goal", useActionForGoal_, useActionForGoal_);
 	pnh.param("use_saved_map", useSavedMap_, useSavedMap_);
@@ -248,6 +250,14 @@ void CoreWrapper::onInit()
 	NODELET_INFO("rtabmap: tf_tolerance  = %f", tfTolerance);
 	NODELET_INFO("rtabmap: odom_sensor_sync   = %s", odomSensorSync_?"true":"false");
 	NODELET_INFO("rtabmap: pub_loc_pose_only_when_localizing = %s", pubLocPoseOnlyWhenLocalizing_?"true":"false");
+	NODELET_INFO("rtabmap: wait_for_transform = %s", waitForTransform_?"true":"false");
+	NODELET_INFO("rtabmap: wait_for_transform_duration = %f", waitForTransformDuration_);
+	if(staleUpdateDetection_!=0.0f && staleUpdateDetection_ < 1.0f) {
+		NODELET_ERROR("rtabmap: stale_update_detection should be 0 (disabled) or >= 1 (value that multiplies the detection update period). Current value is %f, setting it to 0...",
+			staleUpdateDetection_);
+		staleUpdateDetection_ = 0.0f;
+	}
+	NODELET_INFO("rtabmap: stale_update_detection = %f", staleUpdateDetection_);
 	bool subscribeStereo = false;
 	pnh.param("subscribe_stereo",      subscribeStereo, subscribeStereo);
 	if(subscribeStereo)
@@ -1054,6 +1064,23 @@ bool CoreWrapper::odomUpdate(const nav_msgs::OdometryConstPtr & odomMsg, ros::Ti
 			UWARN("Odometry is reset (identity pose or high variance (%f) detected). Increment map id!", MAX(odomMsg->pose.covariance[0], odomMsg->twist.covariance[0]));
 			rtabmap_.triggerNewMap();
 			covariance_ = cv::Mat();
+		} 
+		else if(previousStamp_.toSec() > 0.0 && rate_>0.0f && stamp.toSec() - previousStamp_.toSec() > staleUpdateDetection_/rate_)
+		{
+			UWARN("The time difference (%f s) between the new timestamp received (%f) and "
+				"the previous one (%f) is way over than the expected update period (%s=%f Hz) "
+				"%f x stale_update_detection (%f) = %f s. Triggering a new map! Set stale_update_detection to 0 "
+				"to avoid triggering a new map when this happens.",
+				stamp.toSec() - previousStamp_.toSec(),
+				stamp.toSec(),
+				previousStamp_.toSec(),
+				Parameters::kRtabmapDetectionRate().c_str(),
+				rate_,
+				1.0f/rate_,
+				staleUpdateDetection_,
+				staleUpdateDetection_/rate_);
+			rtabmap_.triggerNewMap();
+			covariance_ = cv::Mat();
 		}
 
 		lastPoseIntermediate_ = false;
@@ -1144,6 +1171,23 @@ bool CoreWrapper::odomTFUpdate(const ros::Time & stamp)
 		if(!lastPose_.isIdentity() && odom.isIdentity())
 		{
 			UWARN("Odometry is reset (identity pose detected). Increment map id!");
+			rtabmap_.triggerNewMap();
+			covariance_ = cv::Mat();
+		}
+		else if(previousStamp_.toSec() > 0.0 && rate_>0.0f && stamp.toSec() - previousStamp_.toSec() > staleUpdateDetection_/rate_)
+		{
+			UWARN("The time difference (%f s) between the new timestamp received (%f) and "
+				"the previous one (%f) is way over than the expected update period (%s=%f Hz) "
+				"%f x stale_update_detection (%f) = %f s. Triggering a new map! Set stale_update_detection to 0 "
+				"to avoid triggering a new map when this happens.",
+				stamp.toSec() - previousStamp_.toSec(),
+				stamp.toSec(),
+				previousStamp_.toSec(),
+				Parameters::kRtabmapDetectionRate().c_str(),
+				rate_,
+				1.0f/rate_,
+				staleUpdateDetection_,
+				staleUpdateDetection_/rate_);
 			rtabmap_.triggerNewMap();
 			covariance_ = cv::Mat();
 		}
