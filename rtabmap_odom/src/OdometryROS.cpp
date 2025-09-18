@@ -67,6 +67,8 @@ OdometryROS::OdometryROS(bool stereoParams, bool visParams, bool icpParams) :
 	guessMinTranslation_(0.0),
 	guessMinRotation_(0.0),
 	guessMinTime_(0.0),
+	guessLinearVariance_(0.001),
+	guessAngularVariance_(0.001),
 	publishTf_(true),
 	waitForTransform_(true),
 	waitForTransformDuration_(0.1), // 100 ms
@@ -147,6 +149,8 @@ void OdometryROS::onInit()
 	pnh.param("guess_min_translation", guessMinTranslation_, guessMinTranslation_);
 	pnh.param("guess_min_rotation", guessMinRotation_, guessMinRotation_);
 	pnh.param("guess_min_time", guessMinTime_, guessMinTime_);
+	pnh.param("guess_linear_variance", guessLinearVariance_, guessLinearVariance_);
+	pnh.param("guess_angular_variance", guessAngularVariance_, guessAngularVariance_);
 
 	pnh.param("expected_update_rate", expectedUpdateRate_, expectedUpdateRate_); // expected sensor rate
 	pnh.param("max_update_rate", maxUpdateRate_, maxUpdateRate_);
@@ -186,6 +190,8 @@ void OdometryROS::onInit()
 	NODELET_INFO("Odometry: guess_min_translation  = %f", guessMinTranslation_);
 	NODELET_INFO("Odometry: guess_min_rotation     = %f", guessMinRotation_);
 	NODELET_INFO("Odometry: guess_min_time         = %f", guessMinTime_);
+	NODELET_INFO("Odometry: guess_linear_variance  = %f", guessLinearVariance_);
+	NODELET_INFO("Odometry: guess_angular_variance  = %f", guessAngularVariance_);
 	NODELET_INFO("Odometry: expected_update_rate   = %f Hz", expectedUpdateRate_);
 	NODELET_INFO("Odometry: max_update_rate        = %f Hz", maxUpdateRate_);
 	NODELET_INFO("Odometry: min_update_rate        = %f Hz", minUpdateRate_);
@@ -746,12 +752,13 @@ void OdometryROS::processData()
 						odom.pose.pose.orientation.w = q.w();
 
 						//set covariance
-						odom.pose.covariance.at(0) = 0.000001;  // xx
-						odom.pose.covariance.at(7) = 0.000001;  // yy
-						odom.pose.covariance.at(14) = 0.000001; // zz
-						odom.pose.covariance.at(21) = 0.000001; // rr
-						odom.pose.covariance.at(28) = 0.000001; // pp
-						odom.pose.covariance.at(35) = 0.000001; // yawyaw
+						// libviso2 uses approximately vel variance * 2
+						odom.pose.covariance.at(0) = guessLinearVariance_*2;  // xx
+						odom.pose.covariance.at(7) = guessLinearVariance_*2;  // yy
+						odom.pose.covariance.at(14) = guessLinearVariance_*2; // zz
+						odom.pose.covariance.at(21) = guessAngularVariance_*2; // rr
+						odom.pose.covariance.at(28) = guessAngularVariance_*2; // pp
+						odom.pose.covariance.at(35) = guessAngularVariance_*2; // yawyaw
 
 						//set velocity
 						double dt = (header.stamp-previousStamp_).toSec();
@@ -763,6 +770,12 @@ void OdometryROS::processData()
 						odom.twist.twist.angular.z = yaw/dt;
 
 						odom.twist.covariance = odom.pose.covariance;
+						odom.twist.covariance.at(0) = guessLinearVariance_;  // xx
+						odom.twist.covariance.at(7) = guessLinearVariance_;  // yy
+						odom.twist.covariance.at(14) = guessLinearVariance_; // zz
+						odom.twist.covariance.at(21) = guessAngularVariance_; // rr
+						odom.twist.covariance.at(28) = guessAngularVariance_; // pp
+						odom.twist.covariance.at(35) = guessAngularVariance_; // yawyaw
 
 						//publish the message
 						odomPub_.publish(odom);
