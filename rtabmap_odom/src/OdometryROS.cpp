@@ -714,6 +714,15 @@ void OdometryROS::processData()
 				   (guessMinTime_ <= 0.0 || (previousStamp_.toSec()>0.0 && (header.stamp-previousStamp_).toSec() < guessMinTime_)))
 				{
 					// Ignore odometry update, we didn't move enough
+					NODELET_INFO("Skipping odometry update because there guess frame didn't move enough or "
+						"there is not enough time passed since last update."
+						"(translation: %f, guess_min_translation=%f) "
+						"(rotation: %f, guess_min_rotation=%f) "
+						"(period: %f, guess_min_time=%f). Republishing directly input guess %s->%s.",
+						uMax3(fabs(x), fabs(y), fabs(z)), guessMinTranslation_,
+						uMax3(fabs(roll), fabs(pitch), fabs(yaw)), guessMinRotation_,
+						previousStamp_.toSec()>0.0?(header.stamp-previousStamp_).toSec():0.0f, guessMinTime_,
+						guessFrameId_.c_str(), frameId_.c_str());
 					Transform newPose = odometry_->getPose() * guess_;
 					if(publishTf_)
 					{
