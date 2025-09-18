@@ -1065,7 +1065,10 @@ bool CoreWrapper::odomUpdate(const nav_msgs::OdometryConstPtr & odomMsg, ros::Ti
 			rtabmap_.triggerNewMap();
 			covariance_ = cv::Mat();
 		} 
-		else if(previousStamp_.toSec() > 0.0 && rate_>0.0f && stamp.toSec() - previousStamp_.toSec() > staleUpdateDetection_/rate_)
+		else if(staleUpdateDetection_>0.0 && 
+			    previousStamp_.toSec() > 0.0 && 
+				rate_>0.0f && 
+				stamp.toSec() - previousStamp_.toSec() > staleUpdateDetection_/rate_)
 		{
 			UWARN("The time difference (%f s) between the new timestamp received (%f) and "
 				"the previous one (%f) is way over than the expected update period (%s=%f Hz) "
@@ -1174,7 +1177,10 @@ bool CoreWrapper::odomTFUpdate(const ros::Time & stamp)
 			rtabmap_.triggerNewMap();
 			covariance_ = cv::Mat();
 		}
-		else if(previousStamp_.toSec() > 0.0 && rate_>0.0f && stamp.toSec() - previousStamp_.toSec() > staleUpdateDetection_/rate_)
+		else if(staleUpdateDetection_>0.0f && 
+			    previousStamp_.toSec() > 0.0 && 
+				rate_>0.0f && 
+				stamp.toSec() - previousStamp_.toSec() > staleUpdateDetection_/rate_)
 		{
 			UWARN("The time difference (%f s) between the new timestamp received (%f) and "
 				"the previous one (%f) is way over than the expected update period (%s=%f Hz) "
