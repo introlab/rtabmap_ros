@@ -51,7 +51,7 @@ class DataThrottleNodelet : public nodelet::Nodelet
 public:
 	//Constructor
 	DataThrottleNodelet():
-		rate_(0),
+		period_(0),
 		approxSync_(0),
 		exactSync_(0),
 		decimation_(1)
@@ -72,7 +72,7 @@ public:
 
 private:
 	ros::Time last_update_;
-	double rate_;
+	double period_;
 	virtual void onInit()
 	{
 		ros::NodeHandle& nh = getNodeHandle();
@@ -90,21 +90,32 @@ private:
 		int queueSize = 10;
 		bool approxSync = true;
 		double approxSyncMaxInterval = 0.0;
-		if(private_nh.getParam("max_rate", rate_))
+		double rate = 0.0;
+		double expectedInputRate = 0.0;
+		if(private_nh.getParam("max_rate", rate))
 		{
 			NODELET_WARN("\"max_rate\" is now known as \"rate\".");
 		}
-		private_nh.param("rate", rate_, rate_);
+		private_nh.param("rate", rate, rate);
+		private_nh.param("expected_input_rate", expectedInputRate, expectedInputRate);
 		private_nh.param("queue_size", queueSize, queueSize);
 		private_nh.param("approx_sync", approxSync, approxSync);
 		private_nh.param("approx_sync_max_interval", approxSyncMaxInterval, approxSyncMaxInterval);
 		private_nh.param("decimation", decimation_, decimation_);
 		ROS_ASSERT(decimation_ >= 1);
-		NODELET_INFO("rate=%f Hz", rate_);
+		NODELET_INFO("rate=%f Hz", rate);
+		NODELET_INFO("expected_input_rate=%f Hz", expectedInputRate);
 		NODELET_INFO("decimation=%d", decimation_);
 		NODELET_INFO("approx_sync = %s", approxSync?"true":"false");
 		if(approxSync)
 			NODELET_INFO("approx_sync_max_interval = %f", approxSyncMaxInterval);
+
+		if(rate>0){
+			period_ = 1.0/rate;
+		}
+		if(expectedInputRate > 0 && expectedInputRate >= rate) {
+			period_ -= (1.0/expectedInputRate)/2.0;
+		}
 
 		if(approxSync)
 		{
@@ -132,19 +143,19 @@ private:
 			const sensor_msgs::ImageConstPtr& imageDepth,
 			const sensor_msgs::CameraInfoConstPtr& camInfo)
 	{
-		if (rate_ > 0.0)
+		if (period_ > 0.0)
 		{
-			NODELET_DEBUG("update set to %f", rate_);
-			if ( last_update_ + ros::Duration(1.0/rate_) > ros::Time::now())
+			if (last_update_ != ros::Time() && (image->header.stamp - last_update_).toSec() < period_)
 			{
-				NODELET_DEBUG("throttle last update at %f skipping", last_update_.toSec());
+				NODELET_DEBUG("throttle last update at %f skipping (ref=%f)", image->header.stamp.toSec(), last_update_.toSec());
 				return;
 			}
 		}
-		else
+		else {
 			NODELET_DEBUG("rate unset continuing");
+		}
 
-		last_update_ = ros::Time::now();
+		last_update_ = image->header.stamp;
 
 		double rgbStamp = image->header.stamp.toSec();
 		double depthStamp = imageDepth->header.stamp.toSec();

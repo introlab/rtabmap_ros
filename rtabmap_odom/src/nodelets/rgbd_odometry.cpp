@@ -76,7 +76,8 @@ public:
 		exactSync6_(0),
 		topicQueueSize_(1),
 		syncQueueSize_(5),
-		keepColor_(false)
+		keepColor_(false),
+		approxSyncMaxInterval_(0.0)
 	{
 	}
 
@@ -108,9 +109,8 @@ private:
 		int rgbdCameras = 1;
 		bool approxSync = true;
 		bool subscribeRGBD = false;
-		double approxSyncMaxInterval = 0.0;
 		pnh.param("approx_sync", approxSync, approxSync);
-		pnh.param("approx_sync_max_interval", approxSyncMaxInterval, approxSyncMaxInterval);
+		pnh.param("approx_sync_max_interval", approxSyncMaxInterval_, approxSyncMaxInterval_);
 		pnh.param("topic_queue_size", topicQueueSize_, topicQueueSize_);
 		if(pnh.hasParam("queue_size") && !pnh.hasParam("sync_queue_size"))
 		{
@@ -138,7 +138,7 @@ private:
 
 		NODELET_INFO("RGBDOdometry: approx_sync    = %s", approxSync?"true":"false");
 		if(approxSync)
-			NODELET_INFO("RGBDOdometry: approx_sync_max_interval = %f", approxSyncMaxInterval);
+			NODELET_INFO("RGBDOdometry: approx_sync_max_interval = %f", approxSyncMaxInterval_);
 		NODELET_INFO("RGBDOdometry: topic_queue_size = %d", topicQueueSize_);
 		NODELET_INFO("RGBDOdometry: sync_queue_size  = %d", syncQueueSize_);
 		NODELET_INFO("RGBDOdometry: subscribe_rgbd = %s", subscribeRGBD?"true":"false");
@@ -178,8 +178,8 @@ private:
 								MyApproxSync2Policy(syncQueueSize_),
 								rgbd_image1_sub_,
 								rgbd_image2_sub_);
-						if(approxSyncMaxInterval > 0.0)
-							approxSync2_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
+						if(approxSyncMaxInterval_ > 0.0)
+							approxSync2_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval_));
 						approxSync2_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD2, this, boost::placeholders::_1, boost::placeholders::_2));
 					}
 					else
@@ -193,7 +193,7 @@ private:
 					subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s \\\n   %s",
 							getName().c_str(),
 							approxSync?"approx":"exact",
-							approxSync&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
+							approxSync&&approxSyncMaxInterval_!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval_).c_str():"",
 							rgbd_image1_sub_.getTopic().c_str(),
 							rgbd_image2_sub_.getTopic().c_str());
 				}
@@ -206,8 +206,8 @@ private:
 								rgbd_image1_sub_,
 								rgbd_image2_sub_,
 								rgbd_image3_sub_);
-						if(approxSyncMaxInterval > 0.0)
-							approxSync3_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
+						if(approxSyncMaxInterval_ > 0.0)
+							approxSync3_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval_));
 						approxSync3_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD3, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3));
 					}
 					else
@@ -222,7 +222,7 @@ private:
 					subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s \\\n   %s \\\n   %s",
 							getName().c_str(),
 							approxSync?"approx":"exact",
-							approxSync&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
+							approxSync&&approxSyncMaxInterval_!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval_).c_str():"",
 							rgbd_image1_sub_.getTopic().c_str(),
 							rgbd_image2_sub_.getTopic().c_str(),
 							rgbd_image3_sub_.getTopic().c_str());
@@ -237,8 +237,8 @@ private:
 								rgbd_image2_sub_,
 								rgbd_image3_sub_,
 								rgbd_image4_sub_);
-						if(approxSyncMaxInterval > 0.0)
-							approxSync4_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
+						if(approxSyncMaxInterval_ > 0.0)
+							approxSync4_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval_));
 						approxSync4_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD4, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 					}
 					else
@@ -254,7 +254,7 @@ private:
 					subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s \\\n   %s \\\n   %s \\\n   %s",
 							getName().c_str(),
 							approxSync?"approx":"exact",
-							approxSync&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
+							approxSync&&approxSyncMaxInterval_!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval_).c_str():"",
 							rgbd_image1_sub_.getTopic().c_str(),
 							rgbd_image2_sub_.getTopic().c_str(),
 							rgbd_image3_sub_.getTopic().c_str(),
@@ -271,8 +271,8 @@ private:
 								rgbd_image3_sub_,
 								rgbd_image4_sub_,
                                 rgbd_image5_sub_);
-						if(approxSyncMaxInterval > 0.0)
-							approxSync5_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
+						if(approxSyncMaxInterval_ > 0.0)
+							approxSync5_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval_));
 						approxSync5_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD5, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4, boost::placeholders::_5));
 					}
 					else
@@ -289,7 +289,7 @@ private:
 					subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s \\\n  %s \\\n  %s \\\n   %s \\\n   %s",
 							getName().c_str(),
 							approxSync?"approx":"exact",
-							approxSync&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
+							approxSync&&approxSyncMaxInterval_!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval_).c_str():"",
 							rgbd_image1_sub_.getTopic().c_str(),
 							rgbd_image2_sub_.getTopic().c_str(),
 							rgbd_image3_sub_.getTopic().c_str(),
@@ -308,8 +308,8 @@ private:
 								rgbd_image4_sub_,
 								rgbd_image5_sub_,
 								rgbd_image6_sub_);
-						if(approxSyncMaxInterval > 0.0)
-							approxSync6_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
+						if(approxSyncMaxInterval_ > 0.0)
+							approxSync6_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval_));
 						approxSync6_->registerCallback(boost::bind(&RGBDOdometry::callbackRGBD6, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4, boost::placeholders::_5, boost::placeholders::_6));
 					}
 					else
@@ -327,7 +327,7 @@ private:
 					subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s \\\n  %s \\\n  %s \\\n   %s \\\n   %s \\\n   %s",
 							getName().c_str(),
 							approxSync?"approx":"exact",
-							approxSync&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
+							approxSync&&approxSyncMaxInterval_!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval_).c_str():"",
 							rgbd_image1_sub_.getTopic().c_str(),
 							rgbd_image2_sub_.getTopic().c_str(),
 							rgbd_image3_sub_.getTopic().c_str(),
@@ -382,8 +382,8 @@ private:
 			if(approxSync)
 			{
 				approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(syncQueueSize_), image_mono_sub_, image_depth_sub_, info_sub_);
-				if(approxSyncMaxInterval > 0.0)
-					approxSync_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
+				if(approxSyncMaxInterval_ > 0.0)
+					approxSync_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval_));
 				approxSync_->registerCallback(boost::bind(&RGBDOdometry::callback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3));
 			}
 			else
@@ -396,7 +396,7 @@ private:
 			subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s \\\n   %s \\\n   %s",
 					getName().c_str(),
 					approxSync?"approx":"exact",
-					approxSync&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
+					approxSync&&approxSyncMaxInterval_!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval_).c_str():"",
 					image_mono_sub_.getTopic().c_str(),
 					image_depth_sub_.getTopic().c_str(),
 					info_sub_.getTopic().c_str());
@@ -593,7 +593,7 @@ private:
 			infoMsgs.push_back(*cameraInfo);
 
 			double stampDiff = fabs(image->header.stamp.toSec() - depth->header.stamp.toSec());
-			if(stampDiff > 0.020)
+			if(approxSyncMaxInterval_==0.0 && stampDiff > 0.020)
 			{
 				NODELET_WARN("The time difference between rgb and depth frames is "
 						"high (diff=%fs, rgb=%fs, depth=%fs). You may want "
@@ -934,6 +934,7 @@ private:
 	int topicQueueSize_;
 	int syncQueueSize_;
 	bool keepColor_;
+	double approxSyncMaxInterval_;
 };
 
 PLUGINLIB_EXPORT_CLASS(rtabmap_odom::RGBDOdometry, nodelet::Nodelet);

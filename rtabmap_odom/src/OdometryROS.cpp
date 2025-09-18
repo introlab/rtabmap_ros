@@ -487,7 +487,7 @@ void OdometryROS::processData(SensorData & data, const std_msgs::Header & header
 	{
 		double estimatedPeriod = clockNow - lastReceivedTopicClock_;
 		double topicPeriod = header.stamp.toSec() - lastReceivedTopicStamp_;
-		if(estimatedPeriod>0.0 && topicPeriod>0.0 && estimatedPeriod < topicPeriod*0.9) {
+		if(estimatedPeriod>0.0 && topicPeriod>0.0 && estimatedPeriod < topicPeriod*0.5) {
 			NODELET_WARN("Dropping image/scan data with stamp %f (delay=%f). Something is wrong "
 				"because the clock difference with the previous topic received (%fs) is much lower than the "
 				"expected one (%fs) estimated from the topic stamps (previous stamp=%f). If you are processing "

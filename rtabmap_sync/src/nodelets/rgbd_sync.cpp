@@ -65,6 +65,7 @@ public:
 		depthScale_(1.0),
 		decimation_(1),
 		compressedRate_(0),
+		approxSyncMaxInterval_(0.0),
 		approxSyncDepth_(0),
 		exactSyncDepth_(0)
 	{}
@@ -84,9 +85,8 @@ private:
 		int queueSize = 1;
 		int syncQueueSize = 10;
 		bool approxSync = true;
-		double approxSyncMaxInterval = 0.0;
 		pnh.param("approx_sync", approxSync, approxSync);
-		pnh.param("approx_sync_max_interval", approxSyncMaxInterval, approxSyncMaxInterval);
+		pnh.param("approx_sync_max_interval", approxSyncMaxInterval_, approxSyncMaxInterval_);
 		pnh.param("topic_queue_size", queueSize, queueSize);
 		if(pnh.hasParam("queue_size") && !pnh.hasParam("sync_queue_size"))
 		{
@@ -111,7 +111,7 @@ private:
 
 		NODELET_INFO("%s: approx_sync = %s", getName().c_str(), approxSync?"true":"false");
 		if(approxSync)
-			NODELET_INFO("%s: approx_sync_max_interval = %f", getName().c_str(), approxSyncMaxInterval);
+			NODELET_INFO("%s: approx_sync_max_interval = %f", getName().c_str(), approxSyncMaxInterval_);
 		NODELET_INFO("%s: topic_queue_size  = %d", getName().c_str(), queueSize);
 		NODELET_INFO("%s: sync_queue_size  = %d", getName().c_str(), syncQueueSize);
 		NODELET_INFO("%s: depth_scale = %f", getName().c_str(), depthScale_);
@@ -124,8 +124,8 @@ private:
 		if(approxSync)
 		{
 			approxSyncDepth_ = new message_filters::Synchronizer<MyApproxSyncDepthPolicy>(MyApproxSyncDepthPolicy(syncQueueSize), imageSub_, imageDepthSub_, cameraInfoSub_);
-			if(approxSyncMaxInterval > 0.0)
-				approxSyncDepth_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
+			if(approxSyncMaxInterval_ > 0.0)
+				approxSyncDepth_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval_));
 			approxSyncDepth_->registerCallback(boost::bind(&RGBDSync::callback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3));
 		}
 		else
@@ -150,7 +150,7 @@ private:
 		std::string subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s \\\n   %s \\\n   %s",
 							getName().c_str(),
 							approxSync?"approx":"exact",
-							approxSync&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
+							approxSync&&approxSyncMaxInterval_!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval_).c_str():"",
 							imageSub_.getTopic().c_str(),
 							imageDepthSub_.getTopic().c_str(),
 							cameraInfoSub_.getTopic().c_str());
@@ -181,7 +181,7 @@ private:
 			double infoStamp = cameraInfo->header.stamp.toSec();
 
 			double stampDiff = fabs(rgbStamp - depthStamp);
-			if(stampDiff > 0.010)
+			if(approxSyncMaxInterval_==0.0 && stampDiff > 0.010)
 			{
 				NODELET_WARN("The time difference between rgb and depth frames is "
 						"high (diff=%fs, rgb=%fs, depth=%fs). You may want "
@@ -304,6 +304,7 @@ private:
 	double depthScale_;
 	int decimation_;
 	double compressedRate_;
+	double approxSyncMaxInterval_;
 
 	ros::Time lastCompressedPublished_;
 
