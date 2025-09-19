@@ -61,6 +61,7 @@ class StereoSync : public nodelet::Nodelet
 public:
 	StereoSync() :
 		compressedRate_(0),
+		approxSyncMaxInterval_(0.0),
 		approxSync_(0),
 		exactSync_(0)
 	{}
@@ -80,10 +81,9 @@ private:
 		int queueSize = 1;
 		int syncQueueSize = 10;
 		bool approxSync = false;
-		double approxSyncMaxInterval = 0.0;
 		pnh.param("approx_sync", approxSync, approxSync);
 		if(approxSync)
-			pnh.param("approx_sync_max_interval", approxSyncMaxInterval, approxSyncMaxInterval);
+			pnh.param("approx_sync_max_interval", approxSyncMaxInterval_, approxSyncMaxInterval_);
 		pnh.param("topic_queue_size", queueSize, queueSize);
 		if(pnh.hasParam("queue_size") && !pnh.hasParam("sync_queue_size"))
 		{
@@ -100,7 +100,7 @@ private:
 		pnh.param("compressed_rate", compressedRate_, compressedRate_);
 
 		NODELET_INFO("%s: approx_sync = %s", getName().c_str(), approxSync?"true":"false");
-		NODELET_INFO("%s: approx_sync_max_interval = %f", getName().c_str(), approxSyncMaxInterval);
+		NODELET_INFO("%s: approx_sync_max_interval = %f", getName().c_str(), approxSyncMaxInterval_);
 		NODELET_INFO("%s: topic_queue_size  = %d", getName().c_str(), queueSize);
 		NODELET_INFO("%s: sync_queue_size  = %d", getName().c_str(), syncQueueSize);
 		NODELET_INFO("%s: compressed_rate = %f", getName().c_str(), compressedRate_);
@@ -111,8 +111,8 @@ private:
 		if(approxSync)
 		{
 			approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(syncQueueSize), imageLeftSub_, imageRightSub_, cameraInfoLeftSub_, cameraInfoRightSub_);
-			if(approxSyncMaxInterval>0.0)
-				approxSync_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
+			if(approxSyncMaxInterval_>0.0)
+				approxSync_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval_));
 			approxSync_->registerCallback(boost::bind(&StereoSync::callback, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 		}
 		else
@@ -138,7 +138,7 @@ private:
 		std::string subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s \\\n   %s \\\n   %s \\\n   %s",
 							getName().c_str(),
 							approxSync?"approx":"exact",
-							approxSync&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
+							approxSync&&approxSyncMaxInterval_!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval_).c_str():"",
 							imageLeftSub_.getTopic().c_str(),
 							imageRightSub_.getTopic().c_str(),
 							cameraInfoLeftSub_.getTopic().c_str(),
@@ -173,7 +173,7 @@ private:
 			double rightInfoStamp = cameraInfoRight->header.stamp.toSec();
 
 			double stampDiff = fabs(leftStamp - rightStamp);
-			if(stampDiff > 0.010)
+			if(approxSyncMaxInterval_==0.0 && stampDiff > 0.010)
 			{
 				NODELET_WARN("The time difference between left and right frames is "
 						"high (diff=%fs, left=%fs, right=%fs). If your left and right cameras are hardware "
@@ -240,6 +240,7 @@ private:
 
 private:
 	double compressedRate_;
+	double approxSyncMaxInterval_;
 	ros::Time lastCompressedPublished_;
 
 	ros::Publisher rgbdImagePub_;

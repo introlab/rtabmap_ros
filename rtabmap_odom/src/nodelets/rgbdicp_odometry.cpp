@@ -75,6 +75,7 @@ public:
 		queueSize_(1),
 		syncQueueSize_(5),
 		keepColor_(false),
+		approxSyncMaxInterval_(0.0),
 		scanCloudMaxPoints_(0),
 		scanVoxelSize_(0.0),
 		scanNormalK_(0),
@@ -111,9 +112,8 @@ private:
 
 		bool approxSync = true;
 		bool subscribeScanCloud = false;
-		double approxSyncMaxInterval = 0.0;
 		pnh.param("approx_sync", approxSync, approxSync);
-		pnh.param("approx_sync_max_interval", approxSyncMaxInterval, approxSyncMaxInterval);
+		pnh.param("approx_sync_max_interval", approxSyncMaxInterval_, approxSyncMaxInterval_);
 		pnh.param("topic_queue_size", queueSize_, queueSize_);
 		if(pnh.hasParam("queue_size") && !pnh.hasParam("sync_queue_size"))
 		{
@@ -142,7 +142,7 @@ private:
 
 		NODELET_INFO("RGBDIcpOdometry: approx_sync           = %s", approxSync?"true":"false");
 		if(approxSync)
-			NODELET_INFO("RGBDIcpOdometry: approx_sync_max_interval = %f", approxSyncMaxInterval);
+			NODELET_INFO("RGBDIcpOdometry: approx_sync_max_interval = %f", approxSyncMaxInterval_);
 		NODELET_INFO("RGBDIcpOdometry: topic_queue_size      = %d", queueSize_);
 		NODELET_INFO("RGBDIcpOdometry: sync_queue_size       = %d", syncQueueSize_);
 		NODELET_INFO("RGBDIcpOdometry: subscribe_scan_cloud  = %s", subscribeScanCloud?"true":"false");
@@ -172,8 +172,8 @@ private:
 			if(approxSync)
 			{
 				approxCloudSync_ = new message_filters::Synchronizer<MyApproxCloudSyncPolicy>(MyApproxCloudSyncPolicy(syncQueueSize_), image_mono_sub_, image_depth_sub_, info_sub_, cloud_sub_);
-				if(approxSyncMaxInterval > 0.0)
-					approxCloudSync_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
+				if(approxSyncMaxInterval_ > 0.0)
+					approxCloudSync_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval_));
 				approxCloudSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackCloud, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 			}
 			else
@@ -185,7 +185,7 @@ private:
 			subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s,\n   %s,\n   %s, \n   %s",
 					getName().c_str(),
 					approxSync?"approx":"exact",
-					approxSync&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
+					approxSync&&approxSyncMaxInterval_!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval_).c_str():"",
 					image_mono_sub_.getTopic().c_str(),
 					image_depth_sub_.getTopic().c_str(),
 					info_sub_.getTopic().c_str(),
@@ -197,8 +197,8 @@ private:
 			if(approxSync)
 			{
 				approxScanSync_ = new message_filters::Synchronizer<MyApproxScanSyncPolicy>(MyApproxScanSyncPolicy(syncQueueSize_), image_mono_sub_, image_depth_sub_, info_sub_, scan_sub_);
-				if(approxSyncMaxInterval > 0.0)
-					approxScanSync_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval));
+				if(approxSyncMaxInterval_ > 0.0)
+					approxScanSync_->setMaxIntervalDuration(ros::Duration(approxSyncMaxInterval_));
 				approxScanSync_->registerCallback(boost::bind(&RGBDICPOdometry::callbackScan, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4));
 			}
 			else
@@ -210,7 +210,7 @@ private:
 			subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s \\\n   %s \\\n   %s \\\n   %s",
 					getName().c_str(),
 					approxSync?"approx":"exact",
-					approxSync&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
+					approxSync&&approxSyncMaxInterval_!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval_).c_str():"",
 					image_mono_sub_.getTopic().c_str(),
 					image_depth_sub_.getTopic().c_str(),
 					info_sub_.getTopic().c_str(),
@@ -301,7 +301,7 @@ private:
 			}
 
 			double stampDiff = fabs(image->header.stamp.toSec() - depth->header.stamp.toSec());
-			if(stampDiff > 0.010)
+			if(approxSyncMaxInterval_==0.0 && stampDiff > 0.010)
 			{
 				NODELET_WARN("The time difference between rgb and depth frames is "
 						"high (diff=%fs, rgb=%fs, depth=%fs). You may want "
@@ -518,6 +518,7 @@ private:
 	double scanVoxelSize_;
 	int scanNormalK_;
 	double scanNormalRadius_;
+	double approxSyncMaxInterval_;
 };
 
 PLUGINLIB_EXPORT_CLASS(rtabmap_odom::RGBDICPOdometry, nodelet::Nodelet);
