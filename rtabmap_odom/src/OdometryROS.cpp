@@ -493,7 +493,7 @@ void OdometryROS::processData(SensorData & data, const std_msgs::Header & header
 	{
 		double estimatedPeriod = clockNow - lastReceivedTopicClock_;
 		double topicPeriod = header.stamp.toSec() - lastReceivedTopicStamp_;
-		if(estimatedPeriod>0.0 && topicPeriod>0.0 && estimatedPeriod < topicPeriod*0.9) {
+		if(estimatedPeriod>0.0 && topicPeriod>0.0 && estimatedPeriod < topicPeriod*0.5) {
 			NODELET_WARN("Dropping image/scan data with stamp %f (delay=%f). Something is wrong "
 				"because the clock difference with the previous topic received (%fs) is much lower than the "
 				"expected one (%fs) estimated from the topic stamps (previous stamp=%f). If you are processing "
@@ -678,9 +678,15 @@ void OdometryROS::processData()
 		}
 	}
 
+	bool tooOldPreviousData = minUpdateRate_ > 0 && previousStamp_.toSec() > 0 && (header.stamp-previousStamp_).toSec() > 1.0/minUpdateRate_;
+	bool skipOdometryUpdate = false;
+
+	rtabmap::Transform pose;
+	rtabmap::OdometryInfo info;
+	rtabmap::Transform guessVelocity;
 
 	Transform guessCurrentPose;
-	if(!guessFrameId_.empty())
+	if(!tooOldPreviousData && !guessFrameId_.empty())
 	{
 		guessCurrentPose = rtabmap_conversions::getTransform(guessFrameId_, frameId_, header.stamp, this->tfListener(), this->waitForTransformDuration());
 
@@ -714,84 +720,23 @@ void OdometryROS::processData()
 				   (guessMinTime_ <= 0.0 || (previousStamp_.toSec()>0.0 && (header.stamp-previousStamp_).toSec() < guessMinTime_)))
 				{
 					// Ignore odometry update, we didn't move enough
-					NODELET_INFO("Skipping odometry update because there guess frame didn't move enough or "
-						"there is not enough time passed since last update."
-						"(translation: %f, guess_min_translation=%f) "
-						"(rotation: %f, guess_min_rotation=%f) "
-						"(period: %f, guess_min_time=%f). Republishing directly input guess %s->%s.",
-						uMax3(fabs(x), fabs(y), fabs(z)), guessMinTranslation_,
-						uMax3(fabs(roll), fabs(pitch), fabs(yaw)), guessMinRotation_,
-						previousStamp_.toSec()>0.0?(header.stamp-previousStamp_).toSec():0.0f, guessMinTime_,
-						guessFrameId_.c_str(), frameId_.c_str());
-					Transform newPose = odometry_->getPose() * guess_;
-					if(publishTf_)
-					{
-						geometry_msgs::TransformStamped correctionMsg;
-						correctionMsg.child_frame_id = guessFrameId_;
-						correctionMsg.header.frame_id = odomFrameId_;
-						correctionMsg.header.stamp = header.stamp;
-						Transform correction = newPose * guessCurrentPose.inverse();
-						rtabmap_conversions::transformToGeometryMsg(correction, correctionMsg.transform);
-						ros::Time time_now = ros::Time::now();
-						if(time_now >= previousClockTime_) {
-							tfBroadcaster_.sendTransform(correctionMsg);
-						}
-						else {
-							ROS_WARN("TF %s->%s is not published because we detected a time jump in the past of %f sec.",
-								correctionMsg.header.frame_id.c_str(),
-								correctionMsg.child_frame_id.c_str(),
-								(previousClockTime_ - time_now).toSec());
-						}
-					}
-					if(odomPub_.getNumSubscribers() && previousStamp_.toSec()>0)
-					{
-						nav_msgs::Odometry odom;
-						odom.header.stamp = header.stamp;
-						odom.header.frame_id = odomFrameId_;
-						odom.child_frame_id = frameId_;
+					pose = odometry_->getPose() * guess_;
+					info.reg.covariance = cv::Mat::zeros(6,6,CV_64FC1);
+					info.reg.covariance.at<double>(0,0) = guessLinearVariance_;  // xx
+					info.reg.covariance.at<double>(1,1) = guessLinearVariance_;  // yy
+					info.reg.covariance.at<double>(2,2) = guessLinearVariance_; // zz
+					info.reg.covariance.at<double>(3,3) = guessAngularVariance_; // rr
+					info.reg.covariance.at<double>(4,4) = guessAngularVariance_; // pp
+					info.reg.covariance.at<double>(5,5) = guessAngularVariance_; // yawyaw
 
-						//set the position
-						odom.pose.pose.position.x = newPose.x();
-						odom.pose.pose.position.y = newPose.y();
-						odom.pose.pose.position.z = newPose.z();
-						Eigen::Quaternionf q = newPose.getQuaternionf();
-						odom.pose.pose.orientation.x = q.x();
-						odom.pose.pose.orientation.y = q.y();
-						odom.pose.pose.orientation.z = q.z();
-						odom.pose.pose.orientation.w = q.w();
-
-						//set covariance
-						// libviso2 uses approximately vel variance * 2
-						odom.pose.covariance.at(0) = guessLinearVariance_*2;  // xx
-						odom.pose.covariance.at(7) = guessLinearVariance_*2;  // yy
-						odom.pose.covariance.at(14) = guessLinearVariance_*2; // zz
-						odom.pose.covariance.at(21) = guessAngularVariance_*2; // rr
-						odom.pose.covariance.at(28) = guessAngularVariance_*2; // pp
-						odom.pose.covariance.at(35) = guessAngularVariance_*2; // yawyaw
-
-						//set velocity
-						double dt = (header.stamp-previousStamp_).toSec();
-						odom.twist.twist.linear.x = x/dt;
-						odom.twist.twist.linear.y = y/dt;
-						odom.twist.twist.linear.z = z/dt;
-						odom.twist.twist.angular.x = roll/dt;
-						odom.twist.twist.angular.y = pitch/dt;
-						odom.twist.twist.angular.z = yaw/dt;
-
-						odom.twist.covariance = odom.pose.covariance;
-						odom.twist.covariance.at(0) = guessLinearVariance_;  // xx
-						odom.twist.covariance.at(7) = guessLinearVariance_;  // yy
-						odom.twist.covariance.at(14) = guessLinearVariance_; // zz
-						odom.twist.covariance.at(21) = guessAngularVariance_; // rr
-						odom.twist.covariance.at(28) = guessAngularVariance_; // pp
-						odom.twist.covariance.at(35) = guessAngularVariance_; // yawyaw
-
-						//publish the message
-						odomPub_.publish(odom);
-					}
-
-					guessPreviousPose_ = guessCurrentPose;
-					return;
+					//set velocity
+					double dt = (header.stamp-previousStamp_).toSec();
+					UASSERT(dt>0.0);
+					// use part of guess matching dt
+					(previousPose.inverse() * guessCurrentPose).getTranslationAndEulerAngles(x,y,z,roll,pitch,yaw);
+					guessVelocity = rtabmap::Transform(x/dt, y/dt, z/dt, roll/dt, pitch/dt, yaw/dt);
+					
+					skipOdometryUpdate = true;
 				}
 			}
 			guessPreviousPose_ = guessCurrentPose;
@@ -803,23 +748,21 @@ void OdometryROS::processData()
 		}
 	}
 
-	bool tooOldPreviousData = minUpdateRate_ > 0 && previousStamp_.toSec() > 0 && (header.stamp-previousStamp_).toSec() > 1.0/minUpdateRate_;
-
 	// process data
 	ros::WallTime time = ros::WallTime::now();
-	rtabmap::OdometryInfo info;
 	if(!groundTruth.isNull())
 	{
 		data.setGroundTruth(groundTruth);
 	}
-	rtabmap::Transform pose;
-	if(!tooOldPreviousData)
+	if(!tooOldPreviousData || skipOdometryUpdate)
 	{
 		pose = odometry_->process(data, guess_, &info);
 	}
 	if(!pose.isNull())
 	{
-		guess_.setNull();
+		if(!skipOdometryUpdate) {
+			guess_.setNull();
+		}
 		resetCurrentCount_ = resetCountdown_;
 
 		//*********************
@@ -892,11 +835,16 @@ void OdometryROS::processData()
 			odom.pose.covariance.at(35) = info.reg.covariance.at<double>(5,5)*2; // yawyaw
 
 			//set velocity
-			bool setTwist = !odometry_->getVelocityGuess().isNull();
+			bool setTwist = !guessVelocity.isNull() || !odometry_->getVelocityGuess().isNull();
 			if(setTwist)
 			{
 				float x,y,z,roll,pitch,yaw;
-				odometry_->getVelocityGuess().getTranslationAndEulerAngles(x,y,z,roll,pitch,yaw);
+				if(skipOdometryUpdate) {
+					UASSERT(!guessVelocity.isNull());
+					guessVelocity.getTranslationAndEulerAngles(x,y,z,roll,pitch,yaw);
+				} else {
+					odometry_->getVelocityGuess().getTranslationAndEulerAngles(x,y,z,roll,pitch,yaw);
+				}
 				odom.twist.twist.linear.x = x;
 				odom.twist.twist.linear.y = y;
 				odom.twist.twist.linear.z = z;
@@ -941,7 +889,7 @@ void OdometryROS::processData()
 			odomLocalMap_.publish(cloudMsg);
 		}
 
-		if(odomLastFrame_.getNumSubscribers())
+		if(!skipOdometryUpdate && odomLastFrame_.getNumSubscribers())
 		{
 			// check which type of Odometry is using
 			if(odometry_->getType() == Odometry::kTypeF2M) // If it's Frame to Map Odometry
@@ -1249,7 +1197,10 @@ void OdometryROS::processData()
 	}
 
 	double delay = (ros::Time::now() - header.stamp).toSec(); 
-	if(visParams_)
+	if(skipOdometryUpdate) {
+		NODELET_INFO( "Odom: <skipped: guess not moving enough>, std dev=%fm|%frad, update time=%fs, delay=%fs", pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (ros::WallTime::now()-time).toSec(), delay);
+	}
+	else if(visParams_)
 	{
 		if(icpParams_)
 		{
