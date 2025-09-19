@@ -754,7 +754,7 @@ void OdometryROS::processData()
 	{
 		data.setGroundTruth(groundTruth);
 	}
-	if(!tooOldPreviousData || skipOdometryUpdate)
+	if(!tooOldPreviousData && !skipOdometryUpdate)
 	{
 		pose = odometry_->process(data, guess_, &info);
 	}
