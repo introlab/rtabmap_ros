@@ -104,7 +104,7 @@ CoreWrapper::CoreWrapper() :
 		landmarkDefaultLinVariance_(0.001),
 		waitForTransform_(true),
 		waitForTransformDuration_(0.2), // 200 ms
-		staleUpdateDetection_(0.0),
+		stalenessFactor_(0.0),
 		useActionForGoal_(false),
 		useSavedMap_(true),
 		genScan_(false),
@@ -198,7 +198,7 @@ void CoreWrapper::onInit()
 	pnh.param("pub_loc_pose_only_when_localizing", pubLocPoseOnlyWhenLocalizing_,pubLocPoseOnlyWhenLocalizing_);
 	pnh.param("wait_for_transform",  waitForTransform_, waitForTransform_);
 	pnh.param("wait_for_transform_duration",  waitForTransformDuration_, waitForTransformDuration_);
-	pnh.param("stale_update_detection", staleUpdateDetection_, staleUpdateDetection_);
+	pnh.param("staleness_factor", stalenessFactor_, stalenessFactor_);
 	pnh.param("initial_pose",          initialPoseStr, initialPoseStr);
 	pnh.param("use_action_for_goal", useActionForGoal_, useActionForGoal_);
 	pnh.param("use_saved_map", useSavedMap_, useSavedMap_);
@@ -252,12 +252,12 @@ void CoreWrapper::onInit()
 	NODELET_INFO("rtabmap: pub_loc_pose_only_when_localizing = %s", pubLocPoseOnlyWhenLocalizing_?"true":"false");
 	NODELET_INFO("rtabmap: wait_for_transform = %s", waitForTransform_?"true":"false");
 	NODELET_INFO("rtabmap: wait_for_transform_duration = %f", waitForTransformDuration_);
-	if(staleUpdateDetection_!=0.0f && staleUpdateDetection_ < 1.0f) {
-		NODELET_ERROR("rtabmap: stale_update_detection should be 0 (disabled) or >= 1 (value that multiplies the detection update period). Current value is %f, setting it to 0...",
-			staleUpdateDetection_);
-		staleUpdateDetection_ = 0.0f;
+	if(stalenessFactor_!=0.0 && stalenessFactor_ < 1.0) {
+		NODELET_ERROR("rtabmap: staleness_factor should be 0 (disabled) or >= 1 (value that multiplies the detection update period). Current value is %f, setting it to 0...",
+			stalenessFactor_);
+		stalenessFactor_ = 0.0;
 	}
-	NODELET_INFO("rtabmap: stale_update_detection = %f", staleUpdateDetection_);
+	NODELET_INFO("rtabmap: staleness_factor = %f", stalenessFactor_);
 	bool subscribeStereo = false;
 	pnh.param("subscribe_stereo",      subscribeStereo, subscribeStereo);
 	if(subscribeStereo)
@@ -1065,14 +1065,14 @@ bool CoreWrapper::odomUpdate(const nav_msgs::OdometryConstPtr & odomMsg, ros::Ti
 			rtabmap_.triggerNewMap();
 			covariance_ = cv::Mat();
 		} 
-		else if(staleUpdateDetection_>0.0 && 
+		else if(stalenessFactor_>0.0 && 
 			    previousStamp_.toSec() > 0.0 && 
 				rate_>0.0f && 
-				stamp.toSec() - previousStamp_.toSec() > staleUpdateDetection_/rate_)
+				stamp.toSec() - previousStamp_.toSec() > stalenessFactor_/rate_)
 		{
 			UWARN("The time difference (%f s) between the new timestamp received (%f) and "
 				"the previous one (%f) is way over than the expected update period (%s=%f Hz) "
-				"%f x stale_update_detection (%f) = %f s. Triggering a new map! Set stale_update_detection to 0 "
+				"%f x staleness_factor (%f) = %f s. Triggering a new map! Set staleness_factor to 0 "
 				"to avoid triggering a new map when this happens.",
 				stamp.toSec() - previousStamp_.toSec(),
 				stamp.toSec(),
@@ -1080,8 +1080,8 @@ bool CoreWrapper::odomUpdate(const nav_msgs::OdometryConstPtr & odomMsg, ros::Ti
 				Parameters::kRtabmapDetectionRate().c_str(),
 				rate_,
 				1.0f/rate_,
-				staleUpdateDetection_,
-				staleUpdateDetection_/rate_);
+				stalenessFactor_,
+				stalenessFactor_/rate_);
 			rtabmap_.triggerNewMap();
 			covariance_ = cv::Mat();
 		}
@@ -1177,14 +1177,14 @@ bool CoreWrapper::odomTFUpdate(const ros::Time & stamp)
 			rtabmap_.triggerNewMap();
 			covariance_ = cv::Mat();
 		}
-		else if(staleUpdateDetection_>0.0f && 
+		else if(stalenessFactor_>0.0 && 
 			    previousStamp_.toSec() > 0.0 && 
 				rate_>0.0f && 
-				stamp.toSec() - previousStamp_.toSec() > staleUpdateDetection_/rate_)
+				stamp.toSec() - previousStamp_.toSec() > stalenessFactor_/rate_)
 		{
 			UWARN("The time difference (%f s) between the new timestamp received (%f) and "
 				"the previous one (%f) is way over than the expected update period (%s=%f Hz) "
-				"%f x stale_update_detection (%f) = %f s. Triggering a new map! Set stale_update_detection to 0 "
+				"%f x staleness_factor (%f) = %f s. Triggering a new map! Set staleness_factor to 0 "
 				"to avoid triggering a new map when this happens.",
 				stamp.toSec() - previousStamp_.toSec(),
 				stamp.toSec(),
@@ -1192,8 +1192,8 @@ bool CoreWrapper::odomTFUpdate(const ros::Time & stamp)
 				Parameters::kRtabmapDetectionRate().c_str(),
 				rate_,
 				1.0f/rate_,
-				staleUpdateDetection_,
-				staleUpdateDetection_/rate_);
+				stalenessFactor_,
+				stalenessFactor_/rate_);
 			rtabmap_.triggerNewMap();
 			covariance_ = cv::Mat();
 		}
