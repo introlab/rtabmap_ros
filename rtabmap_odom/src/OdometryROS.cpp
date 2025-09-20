@@ -679,6 +679,38 @@ void OdometryROS::processData()
 	}
 
 	bool tooOldPreviousData = minUpdateRate_ > 0 && previousStamp_.toSec() > 0 && (header.stamp-previousStamp_).toSec() > 1.0/minUpdateRate_;
+	if(tooOldPreviousData)
+	{
+		NODELET_WARN( "Odometry lost! Odometry will be reset because last update "
+				"is %fs too old (>%fs, min_update_rate = %f Hz). Previous data stamp is %f while new data stamp is %f.",
+				(header.stamp - previousStamp_).toSec(), 1.0/minUpdateRate_, minUpdateRate_, previousStamp_.toSec(), header.stamp.toSec());
+
+		if(!guess_.isNull())
+		{
+			NODELET_WARN( "Odometry automatically reset based on latest guess available from TF (%s->%s, moved %s since got lost)!",
+					guessFrameId_.c_str(), frameId_.c_str(), guess_.prettyPrint().c_str());
+			odometry_->reset(odometry_->getPose() * guess_);
+			guess_.setNull();
+			guessPreviousPose_.setNull();
+		}
+		else
+		{
+			// Check TF to see if sensor fusion is used (e.g., the output of robot_localization)
+			Transform tfPose = rtabmap_conversions::getTransform(odomFrameId_, frameId_, header.stamp, this->tfListener(), this->waitForTransformDuration());
+			if(tfPose.isNull())
+			{
+				NODELET_WARN( "Odometry automatically reset to latest computed pose!");
+				odometry_->reset(odometry_->getPose());
+			}
+			else
+			{
+				NODELET_WARN( "Odometry automatically reset to latest odometry pose available from TF (%s->%s)!",
+						odomFrameId_.c_str(), frameId_.c_str());
+				odometry_->reset(tfPose);
+			}
+		}
+	}
+	
 	bool skipOdometryUpdate = false;
 
 	rtabmap::Transform pose;
@@ -686,7 +718,7 @@ void OdometryROS::processData()
 	rtabmap::Transform guessVelocity;
 
 	Transform guessCurrentPose;
-	if(!tooOldPreviousData && !guessFrameId_.empty())
+	if(!guessFrameId_.empty())
 	{
 		guessCurrentPose = rtabmap_conversions::getTransform(guessFrameId_, frameId_, header.stamp, this->tfListener(), this->waitForTransformDuration());
 
@@ -735,7 +767,6 @@ void OdometryROS::processData()
 					// use part of guess matching dt
 					(previousPose.inverse() * guessCurrentPose).getTranslationAndEulerAngles(x,y,z,roll,pitch,yaw);
 					guessVelocity = rtabmap::Transform(x/dt, y/dt, z/dt, roll/dt, pitch/dt, yaw/dt);
-					
 					skipOdometryUpdate = true;
 				}
 			}
@@ -754,7 +785,7 @@ void OdometryROS::processData()
 	{
 		data.setGroundTruth(groundTruth);
 	}
-	if(!tooOldPreviousData && !skipOdometryUpdate)
+	if(!skipOdometryUpdate)
 	{
 		pose = odometry_->process(data, guess_, &info);
 	}
@@ -1019,20 +1050,14 @@ void OdometryROS::processData()
 		}
 	}
 
-	if(pose.isNull() && (resetCurrentCount_ > 0 || tooOldPreviousData))
+	if(pose.isNull() && (resetCurrentCount_ > 0))
 	{
-		if(tooOldPreviousData)
-		{
-			NODELET_WARN( "Odometry lost! Odometry will be reset because last update "
-					"is %fs too old (>%fs, min_update_rate = %f Hz). Previous data stamp is %f while new data stamp is %f.",
-					(header.stamp - previousStamp_).toSec(), 1.0/minUpdateRate_, minUpdateRate_, previousStamp_.toSec(), header.stamp.toSec());
-		}
-		else if(--resetCurrentCount_>0)
+		if(--resetCurrentCount_>0)
 		{
 			NODELET_WARN( "Odometry lost! Odometry will be reset after next %d consecutive unsuccessful odometry updates...", resetCurrentCount_);
 		}
 
-		if(resetCurrentCount_ == 0 || tooOldPreviousData)
+		if(resetCurrentCount_ == 0)
 		{
 			if(!guess_.isNull())
 			{
@@ -1040,6 +1065,7 @@ void OdometryROS::processData()
 						guessFrameId_.c_str(), frameId_.c_str(), guess_.prettyPrint().c_str());
 				odometry_->reset(odometry_->getPose() * guess_);
 				guess_.setNull();
+				guessPreviousPose_.setNull();
 			}
 			else
 			{
@@ -1195,7 +1221,6 @@ void OdometryROS::processData()
 		msg.header.stamp = header.stamp; // use corresponding time stamp to image
 		odomSensorDataCompressedPub_.publish(msg);
 	}
-
 	double delay = (ros::Time::now() - header.stamp).toSec(); 
 	if(skipOdometryUpdate) {
 		NODELET_INFO( "Odom: <skipped: guess not moving enough>, std dev=%fm|%frad, update time=%fs, delay=%fs", pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (ros::WallTime::now()-time).toSec(), delay);
