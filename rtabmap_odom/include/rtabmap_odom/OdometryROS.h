@@ -114,6 +114,8 @@ private:
 	double guessMinTranslation_;
 	double guessMinRotation_;
 	double guessMinTime_;
+	double guessLinearVariance_;
+	double guessAngularVariance_;
 	bool publishTf_;
 	bool waitForTransform_;
 	double waitForTransformDuration_;

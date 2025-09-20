@@ -278,6 +278,7 @@ private:
 	double landmarkDefaultLinVariance_;
 	bool waitForTransform_;
 	double waitForTransformDuration_;
+	double staleUpdateDetection_;
 	bool useActionForGoal_;
 	bool useSavedMap_;
 	bool genScan_;
