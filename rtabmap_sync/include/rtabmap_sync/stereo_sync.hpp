@@ -59,6 +59,7 @@ public:
 			  const sensor_msgs::msg::CameraInfo::ConstSharedPtr cameraInfoRight);
 private:
 	double compressedRate_;
+	double approxSyncMaxInterval_;
 	rclcpp::Time lastCompressedPublished_;
 
 	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr rgbdImagePub_;

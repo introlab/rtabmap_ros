@@ -47,16 +47,16 @@ namespace rtabmap_sync
 StereoSync::StereoSync(const rclcpp::NodeOptions & options) :
 		Node("stereo_sync", options),
 		compressedRate_(0),
+		approxSyncMaxInterval_(0.0),
 		approxSync_(0),
 		exactSync_(0)
 {
 	int topicQueueSize = 10;
 	int syncQueueSize = 10;
 	bool approxSync = false;
-	double approxSyncMaxInterval = 0.0;
 	int qos = RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT;
 	approxSync = this->declare_parameter("approx_sync", approxSync);
-	approxSyncMaxInterval = this->declare_parameter("approx_sync_max_interval", approxSyncMaxInterval);
+	approxSyncMaxInterval_ = this->declare_parameter("approx_sync_max_interval", approxSyncMaxInterval_);
 	topicQueueSize = this->declare_parameter("topic_queue_size", topicQueueSize);
 	int queueSize = this->declare_parameter("queue_size", -1);
 	if(queueSize != -1)
@@ -74,7 +74,7 @@ StereoSync::StereoSync(const rclcpp::NodeOptions & options) :
 	std::string imageTransport = this->declare_parameter("image_transport", std::string("raw"));
 
 	RCLCPP_INFO(this->get_logger(), "%s: approx_sync = %s", get_name(), approxSync?"true":"false");
-	RCLCPP_INFO(this->get_logger(), "%s: approx_sync_max_interval = %f", get_name(), approxSyncMaxInterval);
+	RCLCPP_INFO(this->get_logger(), "%s: approx_sync_max_interval = %f", get_name(), approxSyncMaxInterval_);
 	RCLCPP_INFO(this->get_logger(), "%s: topic_queue_size  = %d", get_name(), topicQueueSize);
 	RCLCPP_INFO(this->get_logger(), "%s: sync_queue_size   = %d", get_name(), syncQueueSize);
 	RCLCPP_INFO(this->get_logger(), "%s: qos             = %d", get_name(), qos);
@@ -88,8 +88,8 @@ StereoSync::StereoSync(const rclcpp::NodeOptions & options) :
 	if(approxSync)
 	{
 		approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(syncQueueSize), imageLeftSub_, imageRightSub_, cameraInfoLeftSub_, cameraInfoRightSub_);
-		if(approxSyncMaxInterval>0.0)
-			approxSync_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval));
+		if(approxSyncMaxInterval_>0.0)
+			approxSync_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval_));
 		approxSync_->registerCallback(std::bind(&StereoSync::callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 	}
 	else
@@ -109,7 +109,7 @@ StereoSync::StereoSync(const rclcpp::NodeOptions & options) :
 	std::string subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s,\n   %s,\n   %s,\n   %s",
 						get_name(),
 						approxSync?"approx":"exact",
-						approxSync&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
+						approxSync&&approxSyncMaxInterval_!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval_).c_str():"",
 						imageLeftSub_.getSubscriber().getTopic().c_str(),
 						imageRightSub_.getSubscriber().getTopic().c_str(),
 						cameraInfoLeftSub_.getSubscriber()->get_topic_name(),

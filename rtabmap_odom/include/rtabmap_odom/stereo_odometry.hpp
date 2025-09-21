@@ -149,6 +149,7 @@ private:
 	int topicQueueSize_;
 	int syncQueueSize_;
 	bool keepColor_;
+	double approxSyncMaxInterval_;
 };
 
 }
