@@ -126,7 +126,7 @@ void RGBDOdometry::onOdomInit()
 
 	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: approx_sync    = %s", approxSync?"true":"false");
 	if(approxSync)
-		RCLCPP_INFO(this->get_logger(), "RGBDOdometry: approx_sync_max_interval = %f", approxSyncMaxInterval);
+		RCLCPP_INFO(this->get_logger(), "RGBDOdometry: approx_sync_max_interval = %f", approxSyncMaxInterval_);
 	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: topic_queue_size = %d", topicQueueSize_);
 	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: sync_queue_size  = %d", syncQueueSize_);
 	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: qos             = %d", (int)qos());
