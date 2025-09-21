@@ -145,6 +145,8 @@ int main(int argc, char** argv)
 	std::string odomFrameId = "odom";
 	std::string cameraFrameId = "camera_optical_link";
 	std::string scanFrameId = "base_laser_link";
+	std::string gtFrameId = "world";
+	std::string gtBaseFrameId = "base_link_gt";
 	double rate = 1.0f;
 	std::string databasePath = "";
 	bool publishTf = true;
@@ -155,6 +157,8 @@ int main(int argc, char** argv)
 	pnh.param("odom_frame_id", odomFrameId, odomFrameId);
 	pnh.param("camera_frame_id", cameraFrameId, cameraFrameId);
 	pnh.param("scan_frame_id", scanFrameId, scanFrameId);
+	pnh.param("ground_truth_frame_id", gtFrameId, gtFrameId);
+	pnh.param("ground_truth_base_frame_id", gtBaseFrameId, gtBaseFrameId);
 	pnh.param("rate", rate, rate); // Ratio of the database stamps
 	pnh.param("database", databasePath, databasePath);
 	pnh.param("publish_tf", publishTf, publishTf);
@@ -172,7 +176,8 @@ int main(int argc, char** argv)
 	ROS_INFO("odom_frame_id = %s", odomFrameId.c_str());
 	ROS_INFO("camera_frame_id = %s", cameraFrameId.c_str());
 	ROS_INFO("scan_frame_id = %s", scanFrameId.c_str());
-	ROS_INFO("rate = %f", rate);
+	ROS_INFO("ground_truth_frame_id = %s", gtFrameId.c_str());
+	ROS_INFO("rate (factor) = %f", rate);
 	ROS_INFO("publish_tf = %s", publishTf?"true":"false");
 	ROS_INFO("start_id = %d", startId);
 	ROS_INFO("Publish clock (--clock): %s", publishClock?"true":"false");
@@ -394,6 +399,7 @@ int main(int argc, char** argv)
 			{
 				localTransform = odom.data().stereoCameraModels()[0].left().localTransform();
 			}
+			std::vector<geometry_msgs::TransformStamped> transforms;
 			if(!localTransform.isNull())
 			{
 				geometry_msgs::TransformStamped baseToCamera;
@@ -401,7 +407,7 @@ int main(int argc, char** argv)
 				baseToCamera.header.frame_id = frameId;
 				baseToCamera.header.stamp = time;
 				rtabmap_conversions::transformToGeometryMsg(localTransform, baseToCamera.transform);
-				tfBroadcaster.sendTransform(baseToCamera);
+				transforms.push_back(baseToCamera);
 			}
 
 			if(!odom.pose().isNull())
@@ -411,7 +417,7 @@ int main(int argc, char** argv)
 				odomToBase.header.frame_id = odomFrameId;
 				odomToBase.header.stamp = time;
 				rtabmap_conversions::transformToGeometryMsg(odom.pose(), odomToBase.transform);
-				tfBroadcaster.sendTransform(odomToBase);
+				transforms.push_back(odomToBase);
 			}
 
 			if(!scanPub.getTopic().empty() || !scanCloudPub.getTopic().empty())
@@ -421,8 +427,18 @@ int main(int argc, char** argv)
 				baseToLaserScan.header.frame_id = frameId;
 				baseToLaserScan.header.stamp = time;
 				rtabmap_conversions::transformToGeometryMsg(odom.data().laserScanCompressed().localTransform(), baseToLaserScan.transform);
-				tfBroadcaster.sendTransform(baseToLaserScan);
+				transforms.push_back(baseToLaserScan);
 			}
+
+			if(!odom.data().groundTruth().isNull()) {
+				geometry_msgs::TransformStamped worldToBase;
+				worldToBase.child_frame_id = gtBaseFrameId;
+				worldToBase.header.frame_id = gtFrameId;
+				worldToBase.header.stamp = time;
+				rtabmap_conversions::transformToGeometryMsg(odom.data().groundTruth(), worldToBase.transform);
+				transforms.push_back(worldToBase);
+			}
+			tfBroadcaster.sendTransform(transforms);
 		}
 		if(!odom.pose().isNull())
 		{
@@ -517,7 +533,6 @@ int main(int argc, char** argv)
 			if(leftPub.getNumSubscribers() && type == 1)
 			{
 				leftPub.publish(imageRosMsg);
-				leftCamInfoPub.publish(camInfoA);
 			}
 		}
 
@@ -538,7 +553,6 @@ int main(int argc, char** argv)
 			imageRosMsg->header.stamp = time;
 
 			depthPub.publish(imageRosMsg);
-			depthCamInfoPub.publish(camInfoB);
 		}
 
 		if(rightPub.getNumSubscribers() && !odom.data().rightRaw().empty() && type==1)
@@ -551,7 +565,6 @@ int main(int argc, char** argv)
 			imageRosMsg->header.stamp = time;
 
 			rightPub.publish(imageRosMsg);
-			rightCamInfoPub.publish(camInfoB);
 		}
 
 		if(!odom.data().laserScanRaw().isEmpty())
