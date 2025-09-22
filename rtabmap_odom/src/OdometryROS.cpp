@@ -1050,7 +1050,7 @@ void OdometryROS::processData()
 		}
 	}
 
-	if(pose.isNull() && (resetCurrentCount_ > 0))
+	if(pose.isNull() && resetCurrentCount_ > 0)
 	{
 		if(--resetCurrentCount_>0)
 		{
