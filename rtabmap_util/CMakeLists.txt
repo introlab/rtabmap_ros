@@ -76,6 +76,7 @@ SET(rtabmap_util_plugins_lib_src
    src/nodelets/point_cloud_aggregator.cpp
    src/nodelets/point_cloud_assembler.cpp
    src/nodelets/imu_to_tf.cpp
+   src/nodelets/db_player.cpp
    src/nodelets/lidar_deskewing.cpp
    src/nodelets/rgbd_relay.cpp
    src/nodelets/rgbd_split.cpp
@@ -134,6 +135,7 @@ rclcpp_components_register_nodes(rtabmap_util_plugins "rtabmap_util::RGBDRelay")
 rclcpp_components_register_nodes(rtabmap_util_plugins "rtabmap_util::RGBDSplit")
 rclcpp_components_register_nodes(rtabmap_util_plugins "rtabmap_util::DisparityToDepth")
 rclcpp_components_register_nodes(rtabmap_util_plugins "rtabmap_util::ImuToTF")
+rclcpp_components_register_nodes(rtabmap_util_plugins "rtabmap_util::DbPlayer")
 rclcpp_components_register_nodes(rtabmap_util_plugins "rtabmap_util::LidarDeskewing")
 rclcpp_components_register_nodes(rtabmap_util_plugins "rtabmap_util::PointCloudXYZ")
 rclcpp_components_register_nodes(rtabmap_util_plugins "rtabmap_util::PointCloudXYZRGB")
@@ -188,10 +190,10 @@ ament_target_dependencies(rtabmap_point_cloud_xyzrgb ${Libraries})
 target_link_libraries(rtabmap_point_cloud_xyzrgb rtabmap_util_plugins)
 set_target_properties(rtabmap_point_cloud_xyzrgb PROPERTIES OUTPUT_NAME "point_cloud_xyzrgb")
 
-#add_executable(rtabmap_data_player src/DbPlayerNode.cpp)
-#ament_target_dependencies(rtabmap_data_player ${Libraries})
-#target_link_libraries(rtabmap_data_player rtabmap_util_plugins)
-#set_target_properties(rtabmap_data_player PROPERTIES OUTPUT_NAME "data_player")
+add_executable(rtabmap_data_player src/DbPlayerNode.cpp)
+ament_target_dependencies(rtabmap_data_player ${Libraries})
+target_link_libraries(rtabmap_data_player rtabmap_util_plugins)
+set_target_properties(rtabmap_data_player PROPERTIES OUTPUT_NAME "data_player")
 
 #add_executable(rtabmap_odom_msg_to_tf src/OdomMsgToTFNode.cpp)
 #ament_target_dependencies(rtabmap_odom_msg_to_tf ${Libraries})
@@ -250,7 +252,7 @@ install(TARGETS
 )
 install(TARGETS
 #   rtabmap_map_optimizer
-#   rtabmap_data_player
+   rtabmap_data_player
 #   rtabmap_odom_msg_to_tf
    rtabmap_imu_to_tf
    rtabmap_disparity_to_depth

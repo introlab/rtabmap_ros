@@ -50,8 +50,10 @@ public:
 private:
 	rclcpp::Subscription<rtabmap_msgs::msg::RGBDImage>::SharedPtr rgbdImageSub_;
 
-	image_transport::CameraPublisher rgbPub_;
-	image_transport::CameraPublisher depthPub_;
+	image_transport::Publisher rgbPub_;
+	image_transport::Publisher depthPub_;
+  rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr rgbInfoPub_;
+  rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr depthInfoPub_;
 };
 
 }

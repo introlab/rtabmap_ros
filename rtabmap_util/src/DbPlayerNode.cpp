@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2010-2016, Mathieu Labbe - IntRoLab - Universite de Sherbrooke
+Copyright (c) 2010-2019, Mathieu Labbe - IntRoLab - Universite de Sherbrooke
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -25,36 +25,9 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include <ros/ros.h>
-#include <sensor_msgs/Image.h>
-#include <sensor_msgs/image_encodings.h>
-#include <sensor_msgs/PointCloud2.h>
-#include <sensor_msgs/LaserScan.h>
-#include <sensor_msgs/CameraInfo.h>
-#include <sensor_msgs/NavSatFix.h>
-#include <geometry_msgs/PoseWithCovarianceStamped.h>
-#include <rosgraph_msgs/Clock.h>
-#include <pcl_conversions/pcl_conversions.h>
-#include <nav_msgs/Odometry.h>
-#ifdef PRE_ROS_IRON
-#include <cv_bridge/cv_bridge.h>
-#else
-#include <cv_bridge/cv_bridge.hpp>
-#endif
-#include <image_transport/image_transport.h>
-#include <tf2_ros/transform_broadcaster.h>
-#include <std_srvs/Empty.h>
-#include <rtabmap_conversions/MsgConversion.h>
-#include <rtabmap_msgs/SetGoal.h>
-#include <rtabmap/utilite/ULogger.h>
-#include <rtabmap/utilite/UStl.h>
-#include <rtabmap/utilite/UThread.h>
-#include <rtabmap/utilite/UDirectory.h>
-#include <rtabmap/utilite/UConversion.h>
-#include <rtabmap/core/util3d.h>
-#include <rtabmap/core/DBReader.h>
-#include <rtabmap/core/OdometryEvent.h>
-#include <cmath>
+#include "rtabmap_util/db_player.hpp"
+#include "rtabmap/utilite/ULogger.h"
+#include "rclcpp/rclcpp.hpp"
 
 #ifndef _WIN32
 #include <sys/ioctl.h>
@@ -96,604 +69,58 @@ bool spacehit()
 }
 #endif
 
-bool paused = false;
-bool pauseCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+int main(int argc, char **argv)
 {
-	if(paused)
-	{
-		ROS_WARN("Already paused!");
-	}
-	else
-	{
-		paused = true;
-		ROS_INFO("paused!");
-	}
-	return true;
-}
+	ULogger::setType(ULogger::kTypeConsole);
 
-bool resumeCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
-{
-	if(!paused)
-	{
-		ROS_WARN("Already running!");
-	}
-	else
-	{
-		paused = false;
-		ROS_INFO("resumed!");
-	}
-	return true;
-}
-
-int main(int argc, char** argv)
-{
-	ros::init(argc, argv, "data_player");
-
-	//ULogger::setType(ULogger::kTypeConsole);
-	//ULogger::setLevel(ULogger::kDebug);
-	//ULogger::setEventLevel(ULogger::kWarning);
-
-	bool publishClock = false;
+	std::vector<std::string> arguments;
 	for(int i=1;i<argc;++i)
 	{
-		if(strcmp(argv[i], "--clock") == 0)
-		{
-			publishClock = true;
-		}
+		arguments.push_back(argv[i]);
 	}
 
-	ros::NodeHandle nh;
-	ros::NodeHandle pnh("~");
+	rclcpp::init(argc, argv);
+	rclcpp::NodeOptions options;
+	options.arguments(arguments);
 
-	std::string frameId = "base_link";
-	std::string odomFrameId = "odom";
-	std::string cameraFrameId = "camera_optical_link";
-	std::string scanFrameId = "base_laser_link";
-	std::string gtFrameId = "world";
-	std::string gtBaseFrameId = "base_link_gt";
-	double rate = 1.0f;
-	std::string databasePath = "";
-	bool publishTf = true;
-	int startId = 0;
-	bool useDbStamps = true;
+	auto node = std::make_shared<rtabmap_util::DbPlayer>(options);
 
-	pnh.param("frame_id", frameId, frameId);
-	pnh.param("odom_frame_id", odomFrameId, odomFrameId);
-	pnh.param("camera_frame_id", cameraFrameId, cameraFrameId);
-	pnh.param("scan_frame_id", scanFrameId, scanFrameId);
-	pnh.param("ground_truth_frame_id", gtFrameId, gtFrameId);
-	pnh.param("ground_truth_base_frame_id", gtBaseFrameId, gtBaseFrameId);
-	pnh.param("rate", rate, rate); // Ratio of the database stamps
-	pnh.param("database", databasePath, databasePath);
-	pnh.param("publish_tf", publishTf, publishTf);
-	pnh.param("start_id", startId, startId);
+	rclcpp::Rate pauseRate(10);
 
-	// A general 360 lidar with 0.5 deg increment
-	double scanAngleMin, scanAngleMax, scanAngleIncrement, scanRangeMin, scanRangeMax;
-	pnh.param<double>("scan_angle_min", scanAngleMin, -M_PI);
-	pnh.param<double>("scan_angle_max", scanAngleMax, M_PI);
-	pnh.param<double>("scan_angle_increment", scanAngleIncrement, M_PI / 720.0);
-	pnh.param<double>("scan_range_min", scanRangeMin, 0.0);
-	pnh.param<double>("scan_range_max", scanRangeMax, 60);
-
-	ROS_INFO("frame_id = %s", frameId.c_str());
-	ROS_INFO("odom_frame_id = %s", odomFrameId.c_str());
-	ROS_INFO("camera_frame_id = %s", cameraFrameId.c_str());
-	ROS_INFO("scan_frame_id = %s", scanFrameId.c_str());
-	ROS_INFO("ground_truth_frame_id = %s", gtFrameId.c_str());
-	ROS_INFO("rate (factor) = %f", rate);
-	ROS_INFO("publish_tf = %s", publishTf?"true":"false");
-	ROS_INFO("start_id = %d", startId);
-	ROS_INFO("Publish clock (--clock): %s", publishClock?"true":"false");
-
-	if(databasePath.empty())
+	while(rclcpp::ok())
 	{
-		ROS_ERROR("Parameter \"database\" must be set (path to a RTAB-Map database).");
-		return -1;
-	}
-	databasePath = uReplaceChar(databasePath, '~', UDirectory::homeDir());
-	if(databasePath.size() && databasePath.at(0) != '/')
-	{
-		databasePath = UDirectory::currentDir(true) + databasePath;
-	}
-	ROS_INFO("database = %s", databasePath.c_str());
-
-	rtabmap::DBReader reader(databasePath, -rate, false, false, false, startId);
-	if(!reader.init())
-	{
-		ROS_ERROR("Cannot open database \"%s\".", databasePath.c_str());
-		return -1;
-	}
-
-	ros::ServiceServer pauseSrv = pnh.advertiseService("pause", pauseCallback);
-	ros::ServiceServer resumeSrv = pnh.advertiseService("resume", resumeCallback);
-
-	image_transport::ImageTransport it(nh);
-	image_transport::Publisher imagePub;
-	image_transport::Publisher rgbPub;
-	image_transport::Publisher depthPub;
-	image_transport::Publisher leftPub;
-	image_transport::Publisher rightPub;
-	ros::Publisher rgbCamInfoPub;
-	ros::Publisher depthCamInfoPub;
-	ros::Publisher leftCamInfoPub;
-	ros::Publisher rightCamInfoPub;
-	ros::Publisher odometryPub;
-	ros::Publisher scanPub;
-	ros::Publisher scanCloudPub;
-	ros::Publisher globalPosePub;
-	ros::Publisher gpsFixPub;
-	ros::Publisher clockPub;
-	tf2_ros::TransformBroadcaster tfBroadcaster;
-
-	if(publishClock)
-	{
-		clockPub = nh.advertise<rosgraph_msgs::Clock>("/clock", 1);
-	}
-
-	UTimer timer;
-	rtabmap::SensorCaptureInfo cameraInfo;
-	rtabmap::SensorData data = reader.takeImage(&cameraInfo);
-	rtabmap::OdometryInfo odomInfo;
-	odomInfo.reg.covariance = cameraInfo.odomCovariance;
-	rtabmap::OdometryEvent odom(data, cameraInfo.odomPose, odomInfo);
-	double acquisitionTime = timer.ticks();
-	while(ros::ok() && odom.data().id())
-	{
-		ROS_INFO("Reading sensor data %d...", odom.data().id());
-
-		ros::Time time(odom.data().stamp());
-
-		if(publishClock)
-		{
-			rosgraph_msgs::Clock msg;
-			msg.clock = time;
-			clockPub.publish(msg);
+		if(!node->publishNextFrame()) {
+			// end of file, exit
+			RCLCPP_INFO(node->get_logger(), "Last frame published, exiting!");
+			break;
 		}
 
-		sensor_msgs::CameraInfo camInfoA; //rgb or left
-		sensor_msgs::CameraInfo camInfoB; //depth or right
-
-		camInfoA.K.assign(0);
-		camInfoA.K[0] = camInfoA.K[4] = camInfoA.K[8] = 1;
-		camInfoA.R.assign(0);
-		camInfoA.R[0] = camInfoA.R[4] = camInfoA.R[8] = 1;
-		camInfoA.P.assign(0);
-		camInfoA.P[10] = 1;
-
-		camInfoA.header.frame_id = cameraFrameId;
-		camInfoA.header.stamp = time;
-
-		camInfoB = camInfoA;
-
-		int type = -1;
-		if(!odom.data().depthRaw().empty() && (odom.data().depthRaw().type() == CV_32FC1 || odom.data().depthRaw().type() == CV_16UC1))
-		{
-			if(odom.data().cameraModels().size() > 1)
-			{
-				ROS_WARN("Multi-cameras detected in database but this node cannot send multi-images yet...");
-			}
-			else
-			{
-				//depth
-				if(odom.data().cameraModels().size())
-				{
-					camInfoA.D.resize(5,0);
-
-					camInfoA.P[0] = odom.data().cameraModels()[0].fx();
-					camInfoA.K[0] = odom.data().cameraModels()[0].fx();
-					camInfoA.P[5] = odom.data().cameraModels()[0].fy();
-					camInfoA.K[4] = odom.data().cameraModels()[0].fy();
-					camInfoA.P[2] = odom.data().cameraModels()[0].cx();
-					camInfoA.K[2] = odom.data().cameraModels()[0].cx();
-					camInfoA.P[6] = odom.data().cameraModels()[0].cy();
-					camInfoA.K[5] = odom.data().cameraModels()[0].cy();
-
-					camInfoB = camInfoA;
-				}
-
-				type=0;
-
-				if(rgbPub.getTopic().empty()) rgbPub = it.advertise("rgb/image", 1);
-				if(depthPub.getTopic().empty()) depthPub = it.advertise("depth_registered/image", 1);
-				if(rgbCamInfoPub.getTopic().empty()) rgbCamInfoPub = nh.advertise<sensor_msgs::CameraInfo>("rgb/camera_info", 1);
-				if(depthCamInfoPub.getTopic().empty()) depthCamInfoPub = nh.advertise<sensor_msgs::CameraInfo>("depth_registered/camera_info", 1);
-			}
-		}
-		else if(!odom.data().rightRaw().empty() && odom.data().rightRaw().type() == CV_8U)
-		{
-			if(odom.data().stereoCameraModels().size() > 1)
-			{
-				ROS_WARN("Multi-cameras detected in database but this node cannot send multi-images yet...");
-			}
-			else
-			{
-				//stereo
-				if(odom.data().stereoCameraModels()[0].isValidForProjection())
-				{
-					camInfoA.D.resize(8,0);
-
-					camInfoA.P[0] = odom.data().stereoCameraModels()[0].left().fx();
-					camInfoA.K[0] = odom.data().stereoCameraModels()[0].left().fx();
-					camInfoA.P[5] = odom.data().stereoCameraModels()[0].left().fy();
-					camInfoA.K[4] = odom.data().stereoCameraModels()[0].left().fy();
-					camInfoA.P[2] = odom.data().stereoCameraModels()[0].left().cx();
-					camInfoA.K[2] = odom.data().stereoCameraModels()[0].left().cx();
-					camInfoA.P[6] = odom.data().stereoCameraModels()[0].left().cy();
-					camInfoA.K[5] = odom.data().stereoCameraModels()[0].left().cy();
-
-					camInfoB = camInfoA;
-					camInfoB.P[3] = odom.data().stereoCameraModels()[0].right().Tx(); // Right_Tx = -baseline*fx
-				}
-
-				type=1;
-
-				if(leftPub.getTopic().empty()) leftPub = it.advertise("left/image", 1);
-				if(rightPub.getTopic().empty()) rightPub = it.advertise("right/image", 1);
-				if(leftCamInfoPub.getTopic().empty()) leftCamInfoPub = nh.advertise<sensor_msgs::CameraInfo>("left/camera_info", 1);
-				if(rightCamInfoPub.getTopic().empty()) rightCamInfoPub = nh.advertise<sensor_msgs::CameraInfo>("right/camera_info", 1);
-			}
-
-		}
-		else
-		{
-			if(imagePub.getTopic().empty()) imagePub = it.advertise("image", 1);
-		}
-
-		camInfoA.height = odom.data().imageRaw().rows;
-		camInfoA.width = odom.data().imageRaw().cols;
-		camInfoB.height = odom.data().depthOrRightRaw().rows;
-		camInfoB.width = odom.data().depthOrRightRaw().cols;
-
-		if(!odom.data().laserScanRaw().isEmpty())
-		{
-			if(scanPub.getTopic().empty() && odom.data().laserScanRaw().is2d())
-			{
-				scanPub = nh.advertise<sensor_msgs::LaserScan>("scan", 1);
-				if(odom.data().laserScanRaw().angleIncrement() > 0.0f)
-				{
-					ROS_INFO("Scan will be published.");
-				}
-				else
-				{
-					ROS_INFO("Scan will be published with those parameters:");
-					ROS_INFO("  scan_angle_min=%f", scanAngleMin);
-					ROS_INFO("  scan_angle_max=%f", scanAngleMax);
-					ROS_INFO("  scan_angle_increment=%f", scanAngleIncrement);
-					ROS_INFO("  scan_range_min=%f", scanRangeMin);
-					ROS_INFO("  scan_range_max=%f", scanRangeMax);
-				}
-			}
-			else if(scanCloudPub.getTopic().empty())
-			{
-				scanCloudPub = nh.advertise<sensor_msgs::PointCloud2>("scan_cloud", 1);
-				ROS_INFO("Scan cloud will be published.");
-			}
-		}
-
-		if(!odom.data().globalPose().isNull() &&
-			odom.data().globalPoseCovariance().cols==6 &&
-			odom.data().globalPoseCovariance().rows==6)
-		{
-			if(globalPosePub.getTopic().empty())
-			{
-				globalPosePub = nh.advertise<geometry_msgs::PoseWithCovarianceStamped>("global_pose", 1);
-				ROS_INFO("Global pose will be published.");
-			}
-		}
-
-		if(odom.data().gps().stamp() > 0.0)
-		{
-			if(gpsFixPub.getTopic().empty())
-			{
-				gpsFixPub = nh.advertise<sensor_msgs::NavSatFix>("gps/fix", 1);
-				ROS_INFO("GPS will be published.");
-			}
-		}
-
-		// publish transforms first
-		if(publishTf)
-		{
-			rtabmap::Transform localTransform;
-			if(odom.data().cameraModels().size() == 1)
-			{
-				localTransform = odom.data().cameraModels()[0].localTransform();
-			}
-			else if(odom.data().stereoCameraModels().size() == 1)
-			{
-				localTransform = odom.data().stereoCameraModels()[0].left().localTransform();
-			}
-			std::vector<geometry_msgs::TransformStamped> transforms;
-			if(!localTransform.isNull())
-			{
-				geometry_msgs::TransformStamped baseToCamera;
-				baseToCamera.child_frame_id = cameraFrameId;
-				baseToCamera.header.frame_id = frameId;
-				baseToCamera.header.stamp = time;
-				rtabmap_conversions::transformToGeometryMsg(localTransform, baseToCamera.transform);
-				transforms.push_back(baseToCamera);
-			}
-
-			if(!odom.pose().isNull())
-			{
-				geometry_msgs::TransformStamped odomToBase;
-				odomToBase.child_frame_id = frameId;
-				odomToBase.header.frame_id = odomFrameId;
-				odomToBase.header.stamp = time;
-				rtabmap_conversions::transformToGeometryMsg(odom.pose(), odomToBase.transform);
-				transforms.push_back(odomToBase);
-			}
-
-			if(!scanPub.getTopic().empty() || !scanCloudPub.getTopic().empty())
-			{
-				geometry_msgs::TransformStamped baseToLaserScan;
-				baseToLaserScan.child_frame_id = scanFrameId;
-				baseToLaserScan.header.frame_id = frameId;
-				baseToLaserScan.header.stamp = time;
-				rtabmap_conversions::transformToGeometryMsg(odom.data().laserScanCompressed().localTransform(), baseToLaserScan.transform);
-				transforms.push_back(baseToLaserScan);
-			}
-
-			if(!odom.data().groundTruth().isNull()) {
-				geometry_msgs::TransformStamped worldToBase;
-				worldToBase.child_frame_id = gtBaseFrameId;
-				worldToBase.header.frame_id = gtFrameId;
-				worldToBase.header.stamp = time;
-				rtabmap_conversions::transformToGeometryMsg(odom.data().groundTruth(), worldToBase.transform);
-				transforms.push_back(worldToBase);
-			}
-			tfBroadcaster.sendTransform(transforms);
-		}
-		if(!odom.pose().isNull())
-		{
-			if(odometryPub.getTopic().empty()) odometryPub = nh.advertise<nav_msgs::Odometry>("odom", 1);
-
-			if(odometryPub.getNumSubscribers())
-			{
-				nav_msgs::Odometry odomMsg;
-				odomMsg.child_frame_id = frameId;
-				odomMsg.header.frame_id = odomFrameId;
-				odomMsg.header.stamp = time;
-				rtabmap_conversions::transformToPoseMsg(odom.pose(), odomMsg.pose.pose);
-				UASSERT(odomMsg.pose.covariance.size() == 36 &&
-						odom.covariance().total() == 36 &&
-						odom.covariance().type() == CV_64FC1);
-				memcpy(odomMsg.pose.covariance.begin(), odom.covariance().data, 36*sizeof(double));
-				odometryPub.publish(odomMsg);
-			}
-		}
-
-		// Publish async topics first (so that they can catched by rtabmap before the image topics)
-		if(globalPosePub.getNumSubscribers() > 0 &&
-			!odom.data().globalPose().isNull() &&
-			odom.data().globalPoseCovariance().cols==6 &&
-			odom.data().globalPoseCovariance().rows==6)
-		{
-			geometry_msgs::PoseWithCovarianceStamped msg;
-			rtabmap_conversions::transformToPoseMsg(odom.data().globalPose(), msg.pose.pose);
-			memcpy(msg.pose.covariance.data(), odom.data().globalPoseCovariance().data, 36*sizeof(double));
-			msg.header.frame_id = frameId;
-			msg.header.stamp = time;
-			globalPosePub.publish(msg);
-		}
-
-		if(odom.data().gps().stamp() > 0.0)
-		{
-			sensor_msgs::NavSatFix msg;
-			msg.longitude = odom.data().gps().longitude();
-			msg.latitude = odom.data().gps().latitude();
-			msg.altitude = odom.data().gps().altitude();
-			msg.position_covariance_type = sensor_msgs::NavSatFix::COVARIANCE_TYPE_DIAGONAL_KNOWN;
-			msg.position_covariance.at(0) = msg.position_covariance.at(4) = msg.position_covariance.at(8)= odom.data().gps().error()* odom.data().gps().error();
-			msg.header.frame_id = frameId;
-			msg.header.stamp.fromSec(odom.data().gps().stamp());
-			gpsFixPub.publish(msg);
-		}
-
-		if(type >= 0)
-		{
-			if(rgbCamInfoPub.getNumSubscribers() && type == 0)
-			{
-				rgbCamInfoPub.publish(camInfoA);
-			}
-			if(leftCamInfoPub.getNumSubscribers() && type == 1)
-			{
-				leftCamInfoPub.publish(camInfoA);
-			}
-			if(depthCamInfoPub.getNumSubscribers() && type == 0)
-			{
-				depthCamInfoPub.publish(camInfoB);
-			}
-			if(rightCamInfoPub.getNumSubscribers() && type == 1)
-			{
-				rightCamInfoPub.publish(camInfoB);
-			}
-		}
-
-		if(imagePub.getNumSubscribers() || rgbPub.getNumSubscribers() || leftPub.getNumSubscribers())
-		{
-			cv_bridge::CvImage img;
-			if(odom.data().imageRaw().channels() == 1)
-			{
-				img.encoding = sensor_msgs::image_encodings::MONO8;
-			}
-			else
-			{
-				img.encoding = sensor_msgs::image_encodings::BGR8;
-			}
-			img.image = odom.data().imageRaw();
-			sensor_msgs::ImagePtr imageRosMsg = img.toImageMsg();
-			imageRosMsg->header.frame_id = cameraFrameId;
-			imageRosMsg->header.stamp = time;
-
-			if(imagePub.getNumSubscribers())
-			{
-				imagePub.publish(imageRosMsg);
-			}
-			if(rgbPub.getNumSubscribers() && type == 0)
-			{
-				rgbPub.publish(imageRosMsg);
-			}
-			if(leftPub.getNumSubscribers() && type == 1)
-			{
-				leftPub.publish(imageRosMsg);
-			}
-		}
-
-		if(depthPub.getNumSubscribers() && !odom.data().depthRaw().empty() && type==0)
-		{
-			cv_bridge::CvImage img;
-			if(odom.data().depthRaw().type() == CV_32FC1)
-			{
-				img.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
-			}
-			else
-			{
-				img.encoding = sensor_msgs::image_encodings::TYPE_16UC1;
-			}
-			img.image = odom.data().depthRaw();
-			sensor_msgs::ImagePtr imageRosMsg = img.toImageMsg();
-			imageRosMsg->header.frame_id = cameraFrameId;
-			imageRosMsg->header.stamp = time;
-
-			depthPub.publish(imageRosMsg);
-		}
-
-		if(rightPub.getNumSubscribers() && !odom.data().rightRaw().empty() && type==1)
-		{
-			cv_bridge::CvImage img;
-			img.encoding = sensor_msgs::image_encodings::MONO8;
-			img.image = odom.data().rightRaw();
-			sensor_msgs::ImagePtr imageRosMsg = img.toImageMsg();
-			imageRosMsg->header.frame_id = cameraFrameId;
-			imageRosMsg->header.stamp = time;
-
-			rightPub.publish(imageRosMsg);
-		}
-
-		if(!odom.data().laserScanRaw().isEmpty())
-		{
-			if(scanPub.getNumSubscribers() && odom.data().laserScanRaw().is2d())
-			{
-				//inspired from pointcloud_to_laserscan package
-				sensor_msgs::LaserScan msg;
-				msg.header.frame_id = scanFrameId;
-				msg.header.stamp = time;
-
-				msg.angle_min = scanAngleMin;
-				msg.angle_max = scanAngleMax;
-				msg.angle_increment = scanAngleIncrement;
-				msg.time_increment = 0.0;
-				msg.scan_time = 0;
-				msg.range_min = scanRangeMin;
-				msg.range_max = scanRangeMax;
-				if(odom.data().laserScanRaw().angleIncrement() > 0.0f)
-				{
-					msg.angle_min = odom.data().laserScanRaw().angleMin();
-					msg.angle_max = odom.data().laserScanRaw().angleMax();
-					msg.angle_increment = odom.data().laserScanRaw().angleIncrement();
-					msg.range_min = odom.data().laserScanRaw().rangeMin();
-					msg.range_max = odom.data().laserScanRaw().rangeMax();
-				}
-
-				uint32_t rangesSize = std::ceil((msg.angle_max - msg.angle_min) / msg.angle_increment);
-				msg.ranges.assign(rangesSize, 0.0);
-
-				const cv::Mat & scan = odom.data().laserScanRaw().data();
-				for (int i=0; i<scan.cols; ++i)
-				{
-					const float * ptr = scan.ptr<float>(0,i);
-					double range = hypot(ptr[0], ptr[1]);
-					if (range >= msg.range_min && range <=msg.range_max)
-					{
-						double angle = atan2(ptr[1], ptr[0]);
-						if (angle >= msg.angle_min && angle <= msg.angle_max)
-						{
-							int index = (angle - msg.angle_min) / msg.angle_increment;
-							if (index>=0 && index<rangesSize && (range < msg.ranges[index] || msg.ranges[index]==0))
-							{
-								msg.ranges[index] = range;
-							}
-						}
-					}
-				}
-
-				scanPub.publish(msg);
-			}
-			else if(scanCloudPub.getNumSubscribers())
-			{
-				sensor_msgs::PointCloud2 msg;
-				pcl_conversions::moveFromPCL(*rtabmap::util3d::laserScanToPointCloud2(odom.data().laserScanRaw()), msg);
-				msg.header.frame_id = scanFrameId;
-				msg.header.stamp = time;
-				scanCloudPub.publish(msg);
-			}
-		}
-
-		if(odom.data().userDataRaw().type() == CV_8SC1 &&
-		   odom.data().userDataRaw().cols >= 7 && // including null str ending
-		   odom.data().userDataRaw().rows == 1 &&
-		   memcmp(odom.data().userDataRaw().data, "GOAL:", 5) == 0)
-		{
-			//GOAL format detected, remove it from the user data and send it as goal event
-			std::string goalStr = (const char *)odom.data().userDataRaw().data;
-			if(!goalStr.empty())
-			{
-				std::list<std::string> strs = uSplit(goalStr, ':');
-				if(strs.size() == 2)
-				{
-					int goalId = atoi(strs.rbegin()->c_str());
-
-					if(goalId > 0)
-					{
-						ROS_WARN("Goal %d detected, calling rtabmap's set_goal service!", goalId);
-						rtabmap_msgs::SetGoal setGoalSrv;
-						setGoalSrv.request.node_id = goalId;
-						setGoalSrv.request.node_label = "";
-						if(!ros::service::call("set_goal", setGoalSrv))
-						{
-							ROS_ERROR("Can't call \"set_goal\" service");
-						}
-					}
-				}
-			}
-		}
-
-		ros::spinOnce();
-
-		while(ros::ok())
+		while(rclcpp::ok())
 		{
 #ifndef _WIN32
 			if (spacehit()) {
-				paused = !paused;
-				if(paused)
+				node->setPaused(!node->isPaused());
+				if(node->isPaused())
 				{
-					ROS_INFO("paused!");
+					RCLCPP_INFO(node->get_logger(), "paused!");
 				}
 				else
 				{
-					ROS_INFO("resumed!");
+					RCLCPP_INFO(node->get_logger(), "resumed!");
 				}
 			}
 #endif
 
-			if(!paused)
+			if(!node->isPaused())
 			{
 				break;
 			}
 
-			uSleep(100);
-			ros::spinOnce();
+			pauseRate.sleep();
+			rclcpp::spin_some(node);
 		}
-
-		timer.restart();
-		cameraInfo = rtabmap::CameraInfo();
-		data = reader.takeImage(&cameraInfo);
-		odomInfo.reg.covariance = cameraInfo.odomCovariance;
-		odom = rtabmap::OdometryEvent(data, cameraInfo.odomPose, odomInfo);
-		acquisitionTime = timer.ticks();
 	}
 
-
+	rclcpp::shutdown();
 	return 0;
 }

@@ -46,8 +46,10 @@ RGBDSplit::RGBDSplit(const rclcpp::NodeOptions & options) :
 
 	rgbdImageSub_ = create_subscription<rtabmap_msgs::msg::RGBDImage>("rgbd_image", rclcpp::QoS(5).reliability((rmw_qos_reliability_policy_t)qos), std::bind(&RGBDSplit::callback, this, std::placeholders::_1));
 
-	rgbPub_ = image_transport::create_camera_publisher(this, std::string(rgbdImageSub_->get_topic_name()) + "/rgb", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
-	depthPub_ = image_transport::create_camera_publisher(this, std::string(rgbdImageSub_->get_topic_name()) + "/depth", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	rgbPub_ = image_transport::create_publisher(this, std::string(rgbdImageSub_->get_topic_name()) + "/rgb/image", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	depthPub_ = image_transport::create_publisher(this, std::string(rgbdImageSub_->get_topic_name()) + "/depth/image", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	rgbInfoPub_ = this->create_publisher<sensor_msgs::msg::CameraInfo>(std::string(rgbdImageSub_->get_topic_name()) + "/rgb/camera_info", 1);
+	depthInfoPub_ = this->create_publisher<sensor_msgs::msg::CameraInfo>(std::string(rgbdImageSub_->get_topic_name()) + "/depth/camera_info", 1);
 }
 
 
@@ -73,7 +75,8 @@ void RGBDSplit::callback(const rtabmap_msgs::msg::RGBDImage::SharedPtr input) co
 			cv_bridge::toCvCopy(input->rgb_compressed)->toImageMsg(outputImage);
 #endif
 		}
-		rgbPub_.publish(outputImage, outputCameraInfo);
+		rgbPub_.publish(outputImage);
+		rgbInfoPub_->publish(outputCameraInfo);
 	}
 
 	if(depthPub_.getNumSubscribers())
@@ -96,7 +99,8 @@ void RGBDSplit::callback(const rtabmap_msgs::msg::RGBDImage::SharedPtr input) co
 #endif
 		}
 		outputImage.header = outputCameraInfo.header = input->header;
-		depthPub_.publish(outputImage, outputCameraInfo);
+		depthPub_.publish(outputImage);
+		depthInfoPub_->publish(outputCameraInfo);
 	}
 }
 
