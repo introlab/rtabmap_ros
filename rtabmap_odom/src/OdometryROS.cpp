@@ -1065,7 +1065,6 @@ void OdometryROS::processData()
 						guessFrameId_.c_str(), frameId_.c_str(), guess_.prettyPrint().c_str());
 				odometry_->reset(odometry_->getPose() * guess_);
 				guess_.setNull();
-				guessPreviousPose_.setNull();
 			}
 			else
 			{
