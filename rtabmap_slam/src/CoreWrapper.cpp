@@ -121,6 +121,7 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 		landmarkDefaultAngVariance_(0.001),
 		landmarkDefaultLinVariance_(0.001),
 		waitForTransform_(0.2),// 200 ms
+		stalenessFactor_(0.0),
 		useActionForGoal_(false),
 		useSavedMap_(true),
 		genScan_(false),
@@ -207,6 +208,7 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 	
 	pubLocPoseOnlyWhenLocalizing_ = this->declare_parameter("pub_loc_pose_only_when_localizing", pubLocPoseOnlyWhenLocalizing_);
 	waitForTransform_ = this->declare_parameter("wait_for_transform", waitForTransform_);
+	stalenessFactor_ = this->declare_parameter("staleness_factor", stalenessFactor_);
 	initialPoseStr = this->declare_parameter("initial_pose", initialPoseStr);
 	useActionForGoal_ = this->declare_parameter("use_action_for_goal", useActionForGoal_);
 #ifndef WITH_NAV2_MSGS
@@ -251,6 +253,12 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 	RCLCPP_INFO(this->get_logger(), "rtabmap: odom_sensor_sync   = %s", odomSensorSync_?"true":"false");
 	RCLCPP_INFO(this->get_logger(), "rtabmap: pub_loc_pose_only_when_localizing = %s", pubLocPoseOnlyWhenLocalizing_?"true":"false");
 	RCLCPP_INFO(this->get_logger(), "rtabmap: wait_for_transform = %f", waitForTransform_);
+	if(stalenessFactor_!=0.0 && stalenessFactor_ < 1.0) {
+		RCLCPP_ERROR(this->get_logger(), "rtabmap: staleness_factor should be 0 (disabled) or >= 1 (value that multiplies the detection update period). Current value is %f, setting it to 0...",
+			stalenessFactor_);
+		stalenessFactor_ = 0.0;
+	}
+	RCLCPP_INFO(this->get_logger(), "rtabmap: staleness_factor = %f", stalenessFactor_);
 	if(this->isSubscribedToStereo())
 	{
 		RCLCPP_INFO(this->get_logger(), "rtabmap: stereo_to_depth = %s", stereoToDepth_?"true":"false");
@@ -1138,6 +1146,26 @@ bool CoreWrapper::odomUpdate(const nav_msgs::msg::Odometry & odomMsg, rclcpp::Ti
 			UWARN("Odometry is reset (identity pose or high variance (%f) detected). Increment map id!", MAX(odomMsg.pose.covariance[0], odomMsg.twist.covariance[0]));
 			triggerNewMapBeforeNextUpdate_ = true;
 			lastPoseCovariance_ = cv::Mat();
+		} 
+		else if(stalenessFactor_>0.0 && 
+			    previousStamp_.seconds() > 0.0 && 
+				rate_>0.0f && 
+				(stamp - previousStamp_).seconds() > stalenessFactor_/rate_)
+		{
+			UWARN("The time difference (%f s) between the new timestamp received (%f) and "
+				"the previous one (%f) is way over than the expected update period (%s=%f Hz) "
+				"%f x staleness_factor (%f) = %f s. Triggering a new map! Set staleness_factor to 0 "
+				"to avoid triggering a new map when this happens.",
+				(stamp - previousStamp_).seconds(),
+				stamp.seconds(),
+				previousStamp_.seconds(),
+				Parameters::kRtabmapDetectionRate().c_str(),
+				rate_,
+				1.0f/rate_,
+				stalenessFactor_,
+				stalenessFactor_/rate_);
+			triggerNewMapBeforeNextUpdate_ = true;
+			lastPoseCovariance_ = cv::Mat();
 		}
 
 		lastPoseIntermediate_ = false;
@@ -1226,6 +1254,26 @@ bool CoreWrapper::odomTFUpdate(const std::string & odomFrameId, const rclcpp::Ti
 		if(!lastPose_.isIdentity() && odom.isIdentity())
 		{
 			UWARN("Odometry is reset (identity pose detected). Increment map id!");
+			triggerNewMapBeforeNextUpdate_ = true;
+			lastPoseCovariance_ = cv::Mat();
+		}
+		else if(stalenessFactor_>0.0 && 
+			    previousStamp_.seconds() > 0.0 && 
+				rate_>0.0f && 
+				(stamp - previousStamp_).seconds() > stalenessFactor_/rate_)
+		{
+			UWARN("The time difference (%f s) between the new timestamp received (%f) and "
+				"the previous one (%f) is way over than the expected update period (%s=%f Hz) "
+				"%f x staleness_factor (%f) = %f s. Triggering a new map! Set staleness_factor to 0 "
+				"to avoid triggering a new map when this happens.",
+				(stamp - previousStamp_).seconds(),
+				stamp.seconds(),
+				previousStamp_.seconds(),
+				Parameters::kRtabmapDetectionRate().c_str(),
+				rate_,
+				1.0f/rate_,
+				stalenessFactor_,
+				stalenessFactor_/rate_);
 			triggerNewMapBeforeNextUpdate_ = true;
 			lastPoseCovariance_ = cv::Mat();
 		}

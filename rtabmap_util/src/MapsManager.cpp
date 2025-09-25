@@ -526,7 +526,9 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 			if(!iter->second.isNull())
 			{
 				rtabmap::SensorData data;
-				if(iter->first == 0 || (addedNodes->find(iter->first) == addedNodes->end() && !uContains(localMaps_.localGrids(), iter->first)))
+				if(iter->first == 0 || (
+					(fullUpdateNeeded || addedNodes->find(iter->first) == addedNodes->end()) && 
+						!uContains(localMaps_.localGrids(), iter->first)))
 				{
 					UDEBUG("Data required for %d", iter->first);
 					std::map<int, rtabmap::Signature>::const_iterator findIter = signatures.find(iter->first);
