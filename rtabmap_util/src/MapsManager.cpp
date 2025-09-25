@@ -551,14 +551,30 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 			filteredPoses.erase(0);
 		}
 
+
+		const std::map<int, rtabmap::Transform> emptyNodes;
+		const std::map<int, rtabmap::Transform> * addedNodes = &emptyNodes;
 		bool fullUpdateNeeded = true;
 #if RTABMAP_VERSION_MAJOR>0 || (RTABMAP_VERSION_MAJOR==0 && RTABMAP_VERSION_MINOR>=23)
-		fullUpdateNeeded = (updateGrid && occupancyGrid_->fullUpdateNeeded(filteredPoses))
+		if(updateGrid) {
+			fullUpdateNeeded = occupancyGrid_->fullUpdateNeeded(filteredPoses);
+			addedNodes = &occupancyGrid_->addedNodes();
+		}
 #if defined(WITH_OCTOMAP_MSGS) and defined(RTABMAP_OCTOMAP)
-		|| (updateOctomap && octomap_->fullUpdateNeeded(filteredPoses))
+		if(updateOctomap) {
+			fullUpdateNeeded = fullUpdateNeeded || octomap_->fullUpdateNeeded(filteredPoses);
+			if(octomap_->addedNodes().size() < addedNodes->size()) {
+				addedNodes = &octomap_->addedNodes();
+			}
+		}
 #endif
 #if defined(WITH_GRID_MAP_ROS) and defined(RTABMAP_GRIDMAP)
-		|| (updateElevation && elevationMap_->fullUpdateNeeded(filteredPoses))
+		if(updateElevation) {
+			fullUpdateNeeded = fullUpdateNeeded || elevationMap_->fullUpdateNeeded(filteredPoses);
+			if(elevationMap_->addedNodes().size() < addedNodes->size()) {
+				addedNodes = &elevationMap_->addedNodes();
+			}
+		}
 #endif
 		;
 		if(fullUpdateNeeded) {
@@ -583,7 +599,9 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 			if(!iter->second.isNull())
 			{
 				rtabmap::SensorData data;
-				if(iter->first == 0 || (fullUpdateNeeded && !uContains(localMaps_.localGrids(), iter->first)))
+				if(iter->first == 0 || (
+					(fullUpdateNeeded || addedNodes->find(iter->first) == addedNodes->end()) && 
+						!uContains(localMaps_.localGrids(), iter->first)))
 				{
 					ROS_DEBUG("Data required for %d", iter->first);
 					std::map<int, rtabmap::Signature>::const_iterator findIter = signatures.find(iter->first);
