@@ -23,7 +23,7 @@ jobs:
         - ros_distro: jazzy
           skip_keys: ''
         - ros_distro: kilted
-          skip_keys: ''
+          skip_keys: 'grid_map_ros'
         - ros_distro: rolling
           skip_keys: 'nav2_bringup nav2_msgs velodyne'
       fail-fast: false
