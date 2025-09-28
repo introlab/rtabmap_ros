@@ -29,6 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <rtabmap_conversions/MsgConversion.h>
 #include <rtabmap/gui/CameraViewer.h>
+#include <rtabmap/core/SensorEvent.h>
 #include <QComboBox>
 #include <QHBoxLayout>
 #include <QVBoxLayout>
@@ -58,6 +59,7 @@ RGBDImageViewer::RGBDImageViewer(std::shared_ptr<rclcpp::Node> & node, const rta
     warningLabel_ = new QLabel(this);
     warningLabel_->setStyleSheet("QLabel { color : red; }"); 
 	cameraView_ = new rtabmap::CameraViewer(this, parameters);
+    cameraView_->registerToEventsManager();
     QPushButton * refreshButton = new QPushButton(this);
     refreshButton->setIcon(style()->standardIcon(QStyle::SP_BrowserReload));
     refreshButton->setToolTip("Refresh topics and frames");
@@ -162,7 +164,8 @@ void RGBDImageViewer::callback(
         warningLabel_->setToolTip("");
         QMetaObject::invokeMethod(warningLabel_, "clear");
     }
-	QMetaObject::invokeMethod(cameraView_, "showImage", Q_ARG(rtabmap::SensorData, data));
+
+    this->post(new rtabmap::SensorEvent(data));
 }
 
 }

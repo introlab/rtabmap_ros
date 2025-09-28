@@ -35,6 +35,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
 #include <rtabmap/core/Parameters.h>
+#include <rtabmap/utilite/UEventsSender.h>
 
 namespace rtabmap
 {
@@ -47,7 +48,7 @@ class QLabel;
 
 namespace rtabmap_viz {
 
-class RGBDImageViewer : public QMainWindow
+class RGBDImageViewer : public QMainWindow, public UEventsSender
 {
     Q_OBJECT
 
