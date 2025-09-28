@@ -30,6 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <sensor_msgs/msg/image.hpp>
 #include <sensor_msgs/msg/camera_info.hpp>
+#include <sensor_msgs/msg/imu.hpp>
 #include <sensor_msgs/msg/laser_scan.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <sensor_msgs/msg/nav_sat_fix.hpp>
@@ -46,7 +47,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_broadcaster.h>
 
+#include <rtabmap_msgs/msg/rgbd_image.hpp>
 #include <rtabmap/core/DBReader.h>
+#include <rtabmap/core/OdometryEvent.h>
 
 namespace rtabmap_util
 {
@@ -57,13 +60,15 @@ public:
 	RTABMAP_UTIL_PUBLIC
 	explicit DbPlayer(const rclcpp::NodeOptions & options);
 	virtual ~DbPlayer();
-    bool publishNextFrame();
-    bool isPaused() const {return paused_;}
-    void setPaused(bool enabled) {paused_ = enabled;}
+  bool publishNextFrame();
+  bool isPaused() const {return paused_;}
+  void setPaused(bool enabled) {paused_ = enabled;}
 
 private:
-    void pauseCallback(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<std_srvs::srv::Empty::Request>, std::shared_ptr<std_srvs::srv::Empty::Response>);
+  void pauseCallback(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<std_srvs::srv::Empty::Request>, std::shared_ptr<std_srvs::srv::Empty::Response>);
 	void resumeCallback(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<std_srvs::srv::Empty::Request>, std::shared_ptr<std_srvs::srv::Empty::Response>);
+  void initializePublishers(const rtabmap::OdometryEvent & odom);
+  bool cvImageToROS(const cv::Mat & image, sensor_msgs::msg::Image & rosImage);
 
 private:
     bool paused_;
@@ -74,7 +79,15 @@ private:
     std::string scanFrameId_;
     std::string gtFrameId_;
     std::string gtBaseFrameId_;
+    std::string imuFrameId_;
     int qos_;
+    int qosCameraInfo_;
+    int qosOdom_;
+    int qosScan_;
+    int qosScanCloud_; 
+    int qosGlobalPose_;
+    int qosGps_;
+    int qosImu_;
     double scanAngleMin_;
     double scanAngleMax_;
     double scanAngleIncrement_;
@@ -89,15 +102,17 @@ private:
 	image_transport::Publisher depthPub_;
 	image_transport::Publisher leftPub_;
 	image_transport::Publisher rightPub_;
-    rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr rgbInfoPub_;
-    rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr depthInfoPub_;
-    rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr leftInfoPub_;
-    rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr rightInfoPub_;
+  rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr rgbInfoPub_;
+  rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr depthInfoPub_;
+  rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr leftInfoPub_;
+  rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr rightInfoPub_;
+  std::vector<rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr> rgbdImagePubs_;
 	rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odometryPub_;
 	rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr scanPub_;
 	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr scanCloudPub_;
 	rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr globalPosePub_;
 	rclcpp::Publisher<sensor_msgs::msg::NavSatFix>::SharedPtr gpsFixPub_;
+  rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imuPub_;
 	rclcpp::Publisher<rosgraph_msgs::msg::Clock>::SharedPtr clockPub_;
 	std::shared_ptr<tf2_ros::TransformBroadcaster> tfBroadcaster_;
 };

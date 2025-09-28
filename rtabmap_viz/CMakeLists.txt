@@ -68,12 +68,23 @@ SET_TARGET_PROPERTIES(
      AUTORCC ON
 )
 
+add_executable(rgbd_image_viewer src/RGBDImageViewerNode.cpp src/rgbd_image_viewer.cpp include/${PROJECT_NAME}/rgbd_image_viewer.hpp)
+ament_target_dependencies(rgbd_image_viewer ${Libraries})
+SET_TARGET_PROPERTIES(
+  rgbd_image_viewer
+   PROPERTIES
+	   AUTOUIC ON
+     AUTOMOC ON
+     AUTORCC ON
+)
+
 #############
 ## Install ##
 #############
 
 install(TARGETS 
    rtabmap_viz
+   rgbd_image_viewer
    DESTINATION lib/${PROJECT_NAME}
 )
 
