@@ -869,7 +869,12 @@ void cameraModelToROS(
 		sensor_msgs::msg::CameraInfo & camInfo)
 {
 	UASSERT(model.K_raw().empty() || model.K_raw().total() == 9);
-	if(model.K_raw().empty())
+	UASSERT(model.P().empty() || model.P().total() == 12);
+	if(!model.P().empty())
+	{
+		model.P().colRange(0,3).copyTo(cv::Mat(3,3,CV_64FC1, camInfo.k.data()));
+	}
+	else if(model.K_raw().empty())
 	{
 		memset(camInfo.k.data(), 0.0, 9*sizeof(double));
 	}
@@ -878,7 +883,12 @@ void cameraModelToROS(
 		memcpy(camInfo.k.data(), model.K_raw().data, 9*sizeof(double));
 	}
 
-	if(model.D_raw().total() == 6)
+	if(!model.P().empty()) {
+		camInfo.d = std::vector<double>(model.D().cols);
+		memcpy(camInfo.d.data(), model.D().data, model.D().cols*sizeof(double));
+		camInfo.distortion_model = "plumb_bob";
+	}
+	else if(model.D_raw().total() == 6)
 	{
 		camInfo.d = std::vector<double>(4);
 		camInfo.d[0] = model.D_raw().at<double>(0,0);
@@ -902,7 +912,7 @@ void cameraModelToROS(
 	}
 
 	UASSERT(model.R().empty() || model.R().total() == 9);
-	if(model.R().empty())
+	if(model.R().empty() || countNonZero(model.R()) == 0)
 	{
 		cv::Mat eye = cv::Mat::eye(3,3,CV_64FC1);
 		memcpy(camInfo.r.data(), eye.data, 9*sizeof(double));
@@ -912,7 +922,6 @@ void cameraModelToROS(
 		memcpy(camInfo.r.data(), model.R().data, 9*sizeof(double));
 	}
 
-	UASSERT(model.P().empty() || model.P().total() == 12);
 	if(model.P().empty())
 	{
 		memset(camInfo.p.data(), 0.0, 12*sizeof(double));

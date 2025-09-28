@@ -98,7 +98,22 @@ void RGBDSplit::callback(const rtabmap_msgs::msg::RGBDImage::SharedPtr input) co
 			cv_bridge::toCvCopy(input->depth_compressed)->toImageMsg(outputImage);
 #endif
 		}
-		outputImage.header = outputCameraInfo.header = input->header;
+		if(outputCameraInfo.header.frame_id.empty()) {
+			if(outputImage.header.frame_id.empty()) {
+				outputCameraInfo.header = input->header;
+			}
+			else {
+				outputCameraInfo.header = outputImage.header;
+			}
+		}
+		if(outputImage.header.frame_id.empty()) {
+			if(outputCameraInfo.header.frame_id.empty()) {
+				outputImage.header = input->header;
+			}
+			else {
+				outputImage.header = outputCameraInfo.header;
+			}
+		}
 		depthPub_.publish(outputImage);
 		depthInfoPub_->publish(outputCameraInfo);
 	}
