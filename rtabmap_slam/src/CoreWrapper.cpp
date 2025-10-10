@@ -123,6 +123,7 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 		waitForTransform_(0.2),// 200 ms
 		stalenessFactor_(0.0),
 		useActionForGoal_(false),
+		doubleBuffer_(false),
 		useSavedMap_(true),
 		genScan_(false),
 		genScanMaxDepth_(4.0),
@@ -210,6 +211,8 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 	waitForTransform_ = this->declare_parameter("wait_for_transform", waitForTransform_);
 	stalenessFactor_ = this->declare_parameter("staleness_factor", stalenessFactor_);
 	initialPoseStr = this->declare_parameter("initial_pose", initialPoseStr);
+	doubleBuffer_ = this->declare_parameter("double_buffer", doubleBuffer_);
+	
 	useActionForGoal_ = this->declare_parameter("use_action_for_goal", useActionForGoal_);
 #ifndef WITH_NAV2_MSGS
 	if(useActionForGoal_)
@@ -247,6 +250,7 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 	RCLCPP_INFO(this->get_logger(), "rtabmap: map_frame_id  = %s", mapFrameId_.c_str());
 	RCLCPP_INFO(this->get_logger(), "rtabmap: log_to_rosout_level  = %d", eventLevel);
 	RCLCPP_INFO(this->get_logger(), "rtabmap: initial_pose  = %s", initialPoseStr.c_str());
+	RCLCPP_INFO(this->get_logger(), "rtabmap: double_buffer = %s", doubleBuffer_?"true":"false");
 	RCLCPP_INFO(this->get_logger(), "rtabmap: use_action_for_goal  = %s", useActionForGoal_?"true":"false");
 	RCLCPP_INFO(this->get_logger(), "rtabmap: tf_delay      = %f", tfDelay);
 	RCLCPP_INFO(this->get_logger(), "rtabmap: tf_tolerance  = %f", tfTolerance);
@@ -1109,7 +1113,24 @@ void CoreWrapper::defaultCallback(const sensor_msgs::msg::Image::ConstSharedPtr 
 	}
 }
 
-bool CoreWrapper::odomUpdate(const nav_msgs::msg::Odometry & odomMsg, rclcpp::Time stamp)
+bool CoreWrapper::odomUpdate(const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg, const rclcpp::Time & stamp, std::string & odomFrameId)
+{
+	if(odomMsg.get())
+	{
+		odomFrameId = odomMsg->header.frame_id;
+		return odomMsgUpdate(*odomMsg, stamp);
+	}
+	else
+	{
+		mapToOdomMutex_.lock();
+		odomFrameId = odomFrameId_;
+		mapToOdomMutex_.unlock();
+		return odomTFUpdate(odomFrameId, stamp);
+	}
+	return true;
+}
+
+bool CoreWrapper::odomMsgUpdate(const nav_msgs::msg::Odometry & odomMsg, rclcpp::Time stamp)
 {
 	if(!paused_)
 	{
@@ -1138,8 +1159,6 @@ bool CoreWrapper::odomUpdate(const nav_msgs::msg::Odometry & odomMsg, rclcpp::Ti
 				odom = odomTF;
 			}
 		}
-
-		UScopeMutex lock(lastPoseMutex_);
 
 		if(!lastPose_.isIdentity() && !odom.isNull() && (odom.isIdentity() || (odomMsg.pose.covariance[0] >= BAD_COVARIANCE && odomMsg.twist.covariance[0] >= BAD_COVARIANCE)))
 		{
@@ -1216,6 +1235,7 @@ bool CoreWrapper::odomUpdate(const nav_msgs::msg::Odometry & odomMsg, rclcpp::Ti
 		}
 		if(rate_>0.0f)
 		{
+			UScopeMutex lock(previousStampMutex_);
 			if(previousStamp_.seconds() > 0.0 && stamp.seconds() > previousStamp_.seconds() && stamp.seconds() - previousStamp_.seconds() < 1.0f/rate_)
 			{
 				ignoreFrame = true;
@@ -1248,8 +1268,6 @@ bool CoreWrapper::odomTFUpdate(const std::string & odomFrameId, const rclcpp::Ti
 		{
 			return false;
 		}
-
-		UScopeMutex lock(lastPoseMutex_);
 
 		if(!lastPose_.isIdentity() && odom.isIdentity())
 		{
@@ -1291,6 +1309,7 @@ bool CoreWrapper::odomTFUpdate(const std::string & odomFrameId, const rclcpp::Ti
 		}
 		if(rate_>0.0f)
 		{
+			UScopeMutex lock(previousStampMutex_);
 			if(previousStamp_.seconds() > 0.0 && stamp.seconds() > previousStamp_.seconds() && stamp.seconds() - previousStamp_.seconds() < 1.0f/rate_)
 			{
 				ignoreFrame = true;
@@ -1313,6 +1332,30 @@ bool CoreWrapper::odomTFUpdate(const std::string & odomFrameId, const rclcpp::Ti
 	return false;
 }
 
+void CoreWrapper::fillUpLastPoseData(
+	SyncData & data,
+	const std::string & odomFrameId,
+	const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr& odomInfoMsg,
+	double msgConversionTime)
+{
+	if(odomInfoMsg.get())
+	{
+		data.odomInfo = rtabmap_conversions::odomInfoFromROS(*odomInfoMsg);
+	}
+	
+	data.valid = true;
+	data.data.setId(lastPoseIntermediate_?-1:0);
+	data.stamp = lastPoseStamp_;
+	data.odom = lastPose_;
+	data.odomVelocity = lastPoseVelocity_;
+	data.odomFrameId = odomFrameId;
+	data.odomCovariance = lastPoseCovariance_;
+	data.timeMsgConversion = msgConversionTime;
+
+	// reset covariance
+	lastPoseCovariance_ = cv::Mat();
+}
+
 void CoreWrapper::commonMultiCameraCallback(
 		const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
 		const rtabmap_msgs::msg::UserData::ConstSharedPtr & userDataMsg,
@@ -1328,58 +1371,33 @@ void CoreWrapper::commonMultiCameraCallback(
 		const std::vector<std::vector<rtabmap_msgs::msg::Point3f> > & localPoints3d,
 		const std::vector<cv::Mat> & localDescriptors)
 {
+	UScopeMutex syncCallbackGroupLock(syncCallbackGroupMutex_);
+	
 	std::string odomFrameId;
-	if(odomMsg.get())
+	if(!scan2dMsg.ranges.empty())
 	{
-		odomFrameId = odomMsg->header.frame_id;
-		if(!scan2dMsg.ranges.empty())
-		{
-			if(!odomUpdate(*odomMsg, scan2dMsg.header.stamp))
-			{
-				return;
-			}
-		}
-		else if(!scan3dMsg.data.empty())
-		{
-			if(!odomUpdate(*odomMsg, scan3dMsg.header.stamp))
-			{
-				return;
-			}
-		}
-		else if(cameraInfoMsgs.size() == 0 || !odomUpdate(*odomMsg, cameraInfoMsgs[0].header.stamp))
+		if(!odomUpdate(odomMsg, scan2dMsg.header.stamp, odomFrameId))
 		{
 			return;
 		}
 	}
-	else
+	else if(!scan3dMsg.data.empty())
 	{
-		mapToOdomMutex_.lock();
-		odomFrameId = odomFrameId_;
-		mapToOdomMutex_.unlock();
-		if(!scan2dMsg.ranges.empty())
-		{
-			if(!odomTFUpdate(odomFrameId, scan2dMsg.header.stamp))
-			{
-				return;
-			}
-		}
-		else if(!scan3dMsg.data.empty())
-		{
-			if(!odomTFUpdate(odomFrameId, scan3dMsg.header.stamp))
-			{
-				return;
-			}
-		}
-		else if(cameraInfoMsgs.size() == 0 || !odomTFUpdate(odomFrameId, cameraInfoMsgs[0].header.stamp))
+		if(!odomUpdate(odomMsg, scan3dMsg.header.stamp, odomFrameId))
 		{
 			return;
 		}
+	}
+	else if(cameraInfoMsgs.size() == 0 || !odomUpdate(odomMsg, cameraInfoMsgs[0].header.stamp, odomFrameId))
+	{
+		return;
 	}
 
+	UTimer timerConversion;
 	if(syncTimer_->is_canceled() && syncDataMutex_.lockTry() == 0)
 	{
-		UScopeMutex lock(lastPoseMutex_);
-		commonMultiCameraCallbackImpl(odomFrameId,
+		syncData_.data = commonMultiCameraCallbackImpl(
+				odomFrameId,
 				userDataMsg,
 				imageMsgs,
 				depthMsgs,
@@ -1387,20 +1405,56 @@ void CoreWrapper::commonMultiCameraCallback(
 				depthCameraInfoMsgs,
 				scan2dMsg,
 				scan3dMsg,
-				odomInfoMsg,
 				globalDescriptorMsgs,
 				localKeyPoints,
 				localPoints3d,
 				localDescriptors);
 		
-		if(syncData_.valid) {
+		if(syncData_.data.stamp() != 0.0)
+		{
+			fillUpLastPoseData(syncData_, odomFrameId, odomInfoMsg, timerConversion.ticks());
+			RCLCPP_WARN(this->get_logger(), "Trigger %f", rtabmap_conversions::timestampFromROS(syncData_.stamp));
 			syncTimer_->reset();
+		}
+		else
+		{
+			RCLCPP_WARN(this->get_logger(), "Received invalid data.");
 		}
 		syncDataMutex_.unlock();
 	}
+	else if(doubleBuffer_)
+	{
+		bufferedSyncData_.data = commonMultiCameraCallbackImpl(
+				odomFrameId,
+				userDataMsg,
+				imageMsgs,
+				depthMsgs,
+				cameraInfoMsgs,
+				depthCameraInfoMsgs,
+				scan2dMsg,
+				scan3dMsg,
+				globalDescriptorMsgs,
+				localKeyPoints,
+				localPoints3d,
+				localDescriptors);
+
+		if(bufferedSyncData_.data.stamp() != 0.0)
+		{
+			if(bufferedSyncData_.valid)
+			{
+				RCLCPP_WARN(this->get_logger(), "Skipping %f", rtabmap_conversions::timestampFromROS(bufferedSyncData_.stamp));
+			}
+			fillUpLastPoseData(bufferedSyncData_, odomFrameId, odomInfoMsg, timerConversion.ticks());
+			RCLCPP_WARN(this->get_logger(), "Buffer %f", rtabmap_conversions::timestampFromROS(bufferedSyncData_.stamp));
+		}
+	}
+	else
+	{
+		RCLCPP_WARN(this->get_logger(), "Skipping %f", rtabmap_conversions::timestampFromROS(lastPoseStamp_));
+	}
 }
 
-void CoreWrapper::commonMultiCameraCallbackImpl(
+rtabmap::SensorData CoreWrapper::commonMultiCameraCallbackImpl(
 		const std::string & odomFrameId,
 		const rtabmap_msgs::msg::UserData::ConstSharedPtr & userDataMsg,
 		const std::vector<cv_bridge::CvImageConstPtr> & imageMsgs,
@@ -1409,12 +1463,12 @@ void CoreWrapper::commonMultiCameraCallbackImpl(
 		const std::vector<sensor_msgs::msg::CameraInfo> & depthCameraInfoMsgs,
 		const sensor_msgs::msg::LaserScan & scan2dMsg,
 		const sensor_msgs::msg::PointCloud2 & scan3dMsg,
-		const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr& odomInfoMsg,
 		const std::vector<rtabmap_msgs::msg::GlobalDescriptor> & globalDescriptorMsgs,
 		const std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > & localKeyPointsMsgs,
 		const std::vector<std::vector<rtabmap_msgs::msg::Point3f> > & localPoints3dMsgs,
 		const std::vector<cv::Mat> & localDescriptorsMsgs)
 {
+	rtabmap::SensorData data;
 	UTimer timerConversion;
 	cv::Mat rgb;
 	cv::Mat depth;
@@ -1447,7 +1501,7 @@ void CoreWrapper::commonMultiCameraCallbackImpl(
 			&descriptors))
 	{
 		RCLCPP_ERROR(this->get_logger(), "Could not convert rgb/depth msgs! Aborting rtabmap update...");
-		return;
+		return data;
 	}
 	UDEBUG("cameraModels=%ld stereoCameraModels=%ld", cameraModels.size(), stereoCameraModels.size());
 	UDEBUG("rgb=%dx%d(type=%d), depth/right=%dx%d(type=%d)", rgb.rows, rgb.cols, rgb.type(), depth.rows, depth.cols, depth.type());
@@ -1483,7 +1537,7 @@ void CoreWrapper::commonMultiCameraCallbackImpl(
 			if(disparity.empty())
 			{
 				RCLCPP_ERROR(this->get_logger(), "Could not compute disparity image (\"stereo_to_depth\" is true)!");
-				return;
+				return data;
 			}
 			cv::Mat subDepth = rtabmap::util2d::depthFromDisparity(
 							disparity,
@@ -1493,7 +1547,7 @@ void CoreWrapper::commonMultiCameraCallbackImpl(
 			if(subDepth.empty())
 			{
 				RCLCPP_ERROR(this->get_logger(), "Could not compute depth image (\"stereo_to_depth\" is true)!");
-				return;
+				return data;
 			}
 			UASSERT(subDepth.type() == CV_16UC1 || subDepth.type() == CV_32FC1);
 
@@ -1509,7 +1563,7 @@ void CoreWrapper::commonMultiCameraCallbackImpl(
 			else
 			{
 				RCLCPP_ERROR(this->get_logger(), "Some Depth images are not the same type!");
-				return;
+				return data;
 			}
 
 			cameraModels.push_back(stereoCameraModels[i].left());
@@ -1559,7 +1613,7 @@ void CoreWrapper::commonMultiCameraCallbackImpl(
 				rtabmap_.getMemory() && uStrNumCmp(rtabmap_.getMemory()->getDatabaseVersion(), "0.11.10") < 0))
 		{
 			RCLCPP_ERROR(this->get_logger(), "Could not convert laser scan msg! Aborting rtabmap update...");
-			return;
+			return data;
 		}
 	}
 	else if(!scan3dMsg.data.empty())
@@ -1577,7 +1631,7 @@ void CoreWrapper::commonMultiCameraCallbackImpl(
 				scanCloudIs2d_))
 		{
 			RCLCPP_ERROR(this->get_logger(), "Could not convert 3d laser scan msg! Aborting rtabmap update...");
-			return;
+			return data;
 		}
 
 		RCLCPP_DEBUG(get_logger(), "%d %d %d %d", rgb.empty()?1:0, depth.empty()?1:0, scan.isEmpty()?1:0, genDepth_?1:0);
@@ -1649,7 +1703,7 @@ void CoreWrapper::commonMultiCameraCallbackImpl(
 
 	if(!stereoCameraModels.empty())
 	{
-		syncData_.data = SensorData(
+		data = SensorData(
 				scan,
 				rgb,
 				depth,
@@ -1660,7 +1714,7 @@ void CoreWrapper::commonMultiCameraCallbackImpl(
 	}
 	else
 	{
-		syncData_.data = SensorData(
+		data = SensorData(
 				scan,
 				rgb,
 				depth,
@@ -1670,39 +1724,19 @@ void CoreWrapper::commonMultiCameraCallbackImpl(
 				userData);
 	}
 
-	OdometryInfo odomInfo;
-	if(odomInfoMsg.get())
-	{
-		odomInfo = rtabmap_conversions::odomInfoFromROS(*odomInfoMsg);
-	}
-
 	if(!globalDescriptorMsgs.empty())
 	{
-		syncData_.data.setGlobalDescriptors(rtabmap_conversions::globalDescriptorsFromROS(globalDescriptorMsgs));
+		data.setGlobalDescriptors(rtabmap_conversions::globalDescriptorsFromROS(globalDescriptorMsgs));
 	}
 
 	if(!keypoints.empty())
 	{
 		UASSERT(points.empty() || points.size() == keypoints.size());
 		UASSERT(descriptors.empty() || descriptors.rows == (int)keypoints.size());
-		syncData_.data.setFeatures(keypoints, points, descriptors);
+		data.setFeatures(keypoints, points, descriptors);
 	}
 
-	syncData_.valid = true;
-	syncData_.stamp = lastPoseStamp_;
-	syncData_.odom = lastPose_;
-	syncData_.odomVelocity = lastPoseVelocity_;
-	syncData_.odomFrameId = odomFrameId;
-	syncData_.odomCovariance = lastPoseCovariance_;
-	syncData_.odomInfo = odomInfo;
-	syncData_.timeMsgConversion = timerConversion.ticks();
-
-	if(!lastPoseIntermediate_)
-	{
-		previousStamp_ = lastPoseStamp_;
-	}
-
-	lastPoseCovariance_ = cv::Mat();
+	return data;
 }
 
 void CoreWrapper::commonLaserScanCallback(
@@ -1713,151 +1747,121 @@ void CoreWrapper::commonLaserScanCallback(
 		const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr& odomInfoMsg,
 		const rtabmap_msgs::msg::GlobalDescriptor & globalDescriptor)
 {
-	UTimer timerConversion;
+	UScopeMutex syncCallbackGroupLock(syncCallbackGroupMutex_);
+
 	std::string odomFrameId;
-	if(odomMsg.get())
+	if(!scan2dMsg.ranges.empty())
 	{
-		odomFrameId = odomMsg->header.frame_id;
-		if(!scan2dMsg.ranges.empty())
+		if(!odomUpdate(odomMsg, scan2dMsg.header.stamp, odomFrameId))
 		{
-			if(!odomUpdate(*odomMsg, scan2dMsg.header.stamp))
-			{
-				return;
-			}
+			return;
 		}
-		else if(!scan3dMsg.data.empty())
-		{
-			if(!odomUpdate(*odomMsg, scan3dMsg.header.stamp))
-			{
-				return;
-			}
-		}
-		else
+	}
+	else if(!scan3dMsg.data.empty())
+	{
+		if(!odomUpdate(odomMsg, scan3dMsg.header.stamp, odomFrameId))
 		{
 			return;
 		}
 	}
 	else
 	{
-		mapToOdomMutex_.lock();
-		odomFrameId = odomFrameId_;
-		mapToOdomMutex_.unlock();
-		if(!scan2dMsg.ranges.empty())
+		return;
+	}
+
+	UTimer timerConversion;
+	LaserScan scan;
+	if(!scan2dMsg.ranges.empty())
+	{
+		if(!rtabmap_conversions::convertScanMsg(
+				scan2dMsg,
+				frameId_,
+				odomSensorSync_?odomFrameId:"",
+				lastPoseStamp_,
+				scan,
+				*tfBuffer_,
+				waitForTransform_,
+				// backward compatibility, project 2D scan in /base_link frame
+				rtabmap_.getMemory() && uStrNumCmp(rtabmap_.getMemory()->getDatabaseVersion(), "0.11.10") < 0))
 		{
-			if(!odomTFUpdate(odomFrameId, scan2dMsg.header.stamp))
-			{
-				return;
-			}
+			RCLCPP_ERROR(this->get_logger(), "Could not convert laser scan msg! Aborting rtabmap update...");
+			return;
 		}
-		else if(!scan3dMsg.data.empty())
+	}
+	else if(!scan3dMsg.data.empty())
+	{
+		if(!rtabmap_conversions::convertScan3dMsg(
+				scan3dMsg,
+				frameId_,
+				odomSensorSync_?odomFrameId:"",
+				lastPoseStamp_,
+				scan,
+				*tfBuffer_,
+				waitForTransform_,
+				scanCloudMaxPoints_,
+				0,
+				scanCloudIs2d_))
 		{
-			if(!odomTFUpdate(odomFrameId, scan3dMsg.header.stamp))
-			{
-				return;
-			}
-		}
-		else
-		{
+			RCLCPP_ERROR(this->get_logger(), "Could not convert 3d laser scan msg! Aborting rtabmap update...");
 			return;
 		}
 	}
 
-	if(syncTimer_->is_canceled() && syncDataMutex_.lockTry() == 0)
+	cv::Mat userData;
+	if(userDataMsg.get())
 	{
-		UScopeMutex lock(lastPoseMutex_);
-		LaserScan scan;
-		if(!scan2dMsg.ranges.empty())
+		userData = rtabmap_conversions::userDataFromROS(*userDataMsg);
+		UScopeMutex lock(userDataMutex_);
+		if(!userData_.empty())
 		{
-			if(!rtabmap_conversions::convertScanMsg(
-					scan2dMsg,
-					frameId_,
-					odomSensorSync_?odomFrameId:"",
-					lastPoseStamp_,
-					scan,
-					*tfBuffer_,
-					waitForTransform_,
-					// backward compatibility, project 2D scan in /base_link frame
-					rtabmap_.getMemory() && uStrNumCmp(rtabmap_.getMemory()->getDatabaseVersion(), "0.11.10") < 0))
-			{
-				RCLCPP_ERROR(this->get_logger(), "Could not convert laser scan msg! Aborting rtabmap update...");
-				return;
-			}
-		}
-		else if(!scan3dMsg.data.empty())
-		{
-			if(!rtabmap_conversions::convertScan3dMsg(
-					scan3dMsg,
-					frameId_,
-					odomSensorSync_?odomFrameId:"",
-					lastPoseStamp_,
-					scan,
-					*tfBuffer_,
-					waitForTransform_,
-					scanCloudMaxPoints_,
-					0,
-					scanCloudIs2d_))
-			{
-				RCLCPP_ERROR(this->get_logger(), "Could not convert 3d laser scan msg! Aborting rtabmap update...");
-				return;
-			}
-		}
-
-		cv::Mat userData;
-		if(userDataMsg.get())
-		{
-			userData = rtabmap_conversions::userDataFromROS(*userDataMsg);
-			UScopeMutex lock(userDataMutex_);
-			if(!userData_.empty())
-			{
-				RCLCPP_WARN(this->get_logger(), "Synchronized and asynchronized user data topics cannot be used at the same time. Async user data dropped!");
-				userData_ = cv::Mat();
-			}
-		}
-		else
-		{
-			UScopeMutex lock(userDataMutex_);
-			userData = userData_;
+			RCLCPP_WARN(this->get_logger(), "Synchronized and asynchronized user data topics cannot be used at the same time. Async user data dropped!");
 			userData_ = cv::Mat();
 		}
+	}
+	else
+	{
+		UScopeMutex lock(userDataMutex_);
+		userData = userData_;
+		userData_ = cv::Mat();
+	}
 
+	if(syncTimer_->is_canceled() && syncDataMutex_.lockTry() == 0)
+	{
 		syncData_.data = SensorData(
-				scan,
-				cv::Mat(),
-				cv::Mat(),
-				rtabmap::CameraModel(),
-				lastPoseIntermediate_?-1:0,
-				rtabmap_conversions::timestampFromROS(lastPoseStamp_),
-				userData);
-
-		OdometryInfo odomInfo;
-		if(odomInfoMsg.get())
-		{
-			odomInfo = rtabmap_conversions::odomInfoFromROS(*odomInfoMsg, true);
-		}
-
+			scan,
+			cv::Mat(),
+			cv::Mat(),
+			rtabmap::CameraModel(),
+			lastPoseIntermediate_?-1:0,
+			rtabmap_conversions::timestampFromROS(lastPoseStamp_),
+			userData);
+	
 		if(!globalDescriptor.data.empty())
 		{
 			syncData_.data.addGlobalDescriptor(rtabmap_conversions::globalDescriptorFromROS(globalDescriptor));
 		}
-
-		syncData_.valid = true;
-		syncData_.stamp = lastPoseStamp_;
-		syncData_.odom = lastPose_;
-		syncData_.odomVelocity = lastPoseVelocity_;
-		syncData_.odomFrameId = odomFrameId;
-		syncData_.odomCovariance = lastPoseCovariance_;
-		syncData_.odomInfo = odomInfo;
-		syncData_.timeMsgConversion = timerConversion.ticks();
-
-		if(!lastPoseIntermediate_)
-		{
-			previousStamp_ = lastPoseStamp_;
-		}
-
-		lastPoseCovariance_ = cv::Mat();
-
+		
+		fillUpLastPoseData(syncData_, odomFrameId, odomInfoMsg, timerConversion.ticks());
 		syncTimer_->reset();
 		syncDataMutex_.unlock();
+	}
+	else if(doubleBuffer_)
+	{
+		bufferedSyncData_.data = SensorData(
+			scan,
+			cv::Mat(),
+			cv::Mat(),
+			rtabmap::CameraModel(),
+			lastPoseIntermediate_?-1:0,
+			rtabmap_conversions::timestampFromROS(lastPoseStamp_),
+			userData);
+	
+		if(!globalDescriptor.data.empty())
+		{
+			bufferedSyncData_.data.addGlobalDescriptor(rtabmap_conversions::globalDescriptorFromROS(globalDescriptor));
+		}
+
+		fillUpLastPoseData(bufferedSyncData_, odomFrameId, odomInfoMsg, timerConversion.ticks());
 	}
 }
 
@@ -1866,67 +1870,59 @@ void CoreWrapper::commonOdomCallback(
 		const rtabmap_msgs::msg::UserData::ConstSharedPtr & userDataMsg,
 		const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr& odomInfoMsg)
 {
+	UScopeMutex syncCallbackGroupLock(syncCallbackGroupMutex_);
+
 	UTimer timerConversion;
 	UASSERT(odomMsg.get());
 	std::string odomFrameId = odomMsg->header.frame_id;
-	if(!odomUpdate(*odomMsg, odomMsg->header.stamp))
+	if(!odomMsgUpdate(*odomMsg, odomMsg->header.stamp))
 	{
 		return;
 	}
 
-	if(syncTimer_->is_canceled() && syncDataMutex_.lockTry() == 0)
+	UTimer timeConversion;
+	cv::Mat userData;
+	if(userDataMsg.get())
 	{
-		UScopeMutex lock(lastPoseMutex_);
-		cv::Mat userData;
-		if(userDataMsg.get())
+		userData = rtabmap_conversions::userDataFromROS(*userDataMsg);
+		UScopeMutex lock(userDataMutex_);
+		if(!userData_.empty())
 		{
-			userData = rtabmap_conversions::userDataFromROS(*userDataMsg);
-			UScopeMutex lock(userDataMutex_);
-			if(!userData_.empty())
-			{
-				RCLCPP_WARN(this->get_logger(), "Synchronized and asynchronized user data topics cannot be used at the same time. Async user data dropped!");
-				userData_ = cv::Mat();
-			}
-		}
-		else
-		{
-			UScopeMutex lock(userDataMutex_);
-			userData = userData_;
+			RCLCPP_WARN(this->get_logger(), "Synchronized and asynchronized user data topics cannot be used at the same time. Async user data dropped!");
 			userData_ = cv::Mat();
 		}
+	}
+	else
+	{
+		UScopeMutex lock(userDataMutex_);
+		userData = userData_;
+		userData_ = cv::Mat();
+	}
 
+	if(syncTimer_->is_canceled() && syncDataMutex_.lockTry() == 0)
+	{
 		syncData_.data = SensorData(
-				cv::Mat(),
-				cv::Mat(),
-				rtabmap::CameraModel(),
-				lastPoseIntermediate_?-1:0,
-				rtabmap_conversions::timestampFromROS(lastPoseStamp_),
-				userData);
+			cv::Mat(),
+			cv::Mat(),
+			rtabmap::CameraModel(),
+			lastPoseIntermediate_?-1:0,
+			rtabmap_conversions::timestampFromROS(lastPoseStamp_),
+			userData);
 
-		OdometryInfo odomInfo;
-		if(odomInfoMsg.get())
-		{
-			odomInfo = rtabmap_conversions::odomInfoFromROS(*odomInfoMsg, true);
-		}
-
-		syncData_.valid = true;
-		syncData_.stamp = lastPoseStamp_;
-		syncData_.odom = lastPose_;
-		syncData_.odomVelocity = lastPoseVelocity_;
-		syncData_.odomFrameId = odomFrameId;
-		syncData_.odomCovariance = lastPoseCovariance_;
-		syncData_.odomInfo = odomInfo;
-		syncData_.timeMsgConversion = timerConversion.ticks();
-
-		if(!lastPoseIntermediate_)
-		{
-			previousStamp_ = lastPoseStamp_;
-		}
-
-		lastPoseCovariance_ = cv::Mat();
-
+		fillUpLastPoseData(syncData_, odomFrameId, odomInfoMsg, timerConversion.ticks());
 		syncTimer_->reset();
 		syncDataMutex_.unlock();
+	}
+	else if(doubleBuffer_)
+	{
+		bufferedSyncData_.data = SensorData(
+			cv::Mat(),
+			cv::Mat(),
+			rtabmap::CameraModel(),
+			lastPoseIntermediate_?-1:0,
+			rtabmap_conversions::timestampFromROS(lastPoseStamp_),
+			userData);
+		fillUpLastPoseData(bufferedSyncData_, odomFrameId, odomInfoMsg, timerConversion.ticks());
 	}
 }
 
@@ -1935,58 +1931,36 @@ void CoreWrapper::commonSensorDataCallback(
 		const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
 		const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr& odomInfoMsg)
 {
+	UScopeMutex syncCallbackGroupLock(syncCallbackGroupMutex_);
+
 	UTimer timerConversion;
 	UASSERT(sensorDataMsg.get());
 	std::string odomFrameId;
-	if(odomMsg.get())
+	if(!odomUpdate(odomMsg, sensorDataMsg->header.stamp, odomFrameId))
 	{
-		odomFrameId = odomMsg->header.frame_id;
-		if(!odomUpdate(*odomMsg, sensorDataMsg->header.stamp))
-		{
-			return;
-		}
-	}
-	else
-	{
-		mapToOdomMutex_.lock();
-		odomFrameId = odomFrameId_;
-		mapToOdomMutex_.unlock();
-		if(!odomTFUpdate(odomFrameId, sensorDataMsg->header.stamp))
-		{
-			return;
-		}
+		return;
 	}
 
 	if(syncTimer_->is_canceled() && syncDataMutex_.lockTry() == 0)
 	{
-		UScopeMutex lock(lastPoseMutex_);
 		syncData_.data = rtabmap_conversions::sensorDataFromROS(*sensorDataMsg);
-		syncData_.data.setId(lastPoseIntermediate_?-1:0);
 
-		OdometryInfo odomInfo;
-		if(odomInfoMsg.get())
+		if(syncData_.data.stamp() != 0)
 		{
-			odomInfo = rtabmap_conversions::odomInfoFromROS(*odomInfoMsg, true);
+			fillUpLastPoseData(syncData_, odomFrameId, odomInfoMsg, timerConversion.ticks());
+			RCLCPP_WARN(this->get_logger(), "Trigger %f", rtabmap_conversions::timestampFromROS(syncData_.stamp));
+			syncTimer_->reset();
 		}
-
-		syncData_.valid = true;
-		syncData_.stamp = lastPoseStamp_;
-		syncData_.odom = lastPose_;
-		syncData_.odomVelocity = lastPoseVelocity_;
-		syncData_.odomFrameId = odomFrameId;
-		syncData_.odomCovariance = lastPoseCovariance_;
-		syncData_.odomInfo = odomInfo;
-		syncData_.timeMsgConversion = timerConversion.ticks();
-
-		if(!lastPoseIntermediate_)
-		{
-			previousStamp_ = lastPoseStamp_;
-		}
-
-		lastPoseCovariance_ = cv::Mat();
-
-		syncTimer_->reset();
 		syncDataMutex_.unlock();
+	}
+	else if(doubleBuffer_)
+	{
+		bufferedSyncData_.data = rtabmap_conversions::sensorDataFromROS(*sensorDataMsg);
+		if(bufferedSyncData_.data.stamp() != 0)
+		{
+			fillUpLastPoseData(bufferedSyncData_, odomFrameId, odomInfoMsg, timerConversion.ticks());
+			RCLCPP_WARN(this->get_logger(), "buffer %f", rtabmap_conversions::timestampFromROS(bufferedSyncData_.stamp));
+		}
 	}
 }
 
@@ -2002,6 +1976,13 @@ void CoreWrapper::processAsync()
 
 	if(syncData_.valid)
 	{
+		if(syncData_.data.id() >= 0) // not intermediate
+		{
+			UScopeMutex lock(previousStampMutex_);
+			previousStamp_ = syncData_.stamp;
+		}
+		
+		RCLCPP_WARN(this->get_logger(), "Process %f begin", rtabmap_conversions::timestampFromROS(syncData_.stamp));
 		process(syncData_.stamp,
 				syncData_.data,
 				syncData_.odom,
@@ -2010,7 +1991,20 @@ void CoreWrapper::processAsync()
 				syncData_.odomCovariance,
 				syncData_.odomInfo,
 				syncData_.timeMsgConversion);
+		RCLCPP_WARN(this->get_logger(), "Process %f end", rtabmap_conversions::timestampFromROS(syncData_.stamp));
 		syncData_.valid=false;
+	}
+	if(doubleBuffer_)
+	{
+		UScopeMutex syncCallbackGroupLock(syncCallbackGroupMutex_);
+		if(bufferedSyncData_.valid)
+		{
+			RCLCPP_WARN(this->get_logger(), "swap %f - > %f", rtabmap_conversions::timestampFromROS(syncData_.stamp), rtabmap_conversions::timestampFromROS(bufferedSyncData_.stamp));
+			syncData_ = bufferedSyncData_;
+			bufferedSyncData_.valid = false;
+			
+			return; // processAsync() will be called again now
+		}
 	}
 	syncTimer_->cancel();
 }
@@ -2339,6 +2333,7 @@ void CoreWrapper::process(
 		}
 
 		timeMsgConversion += timer.ticks();
+		//uSleep(500);
 		if(rtabmap_.process(data, odom, covariance, odomVelocity, externalStats))
 		{
 			timeRtabmap = timer.ticks();
@@ -3212,13 +3207,13 @@ void CoreWrapper::resetRtabmapCallback(
 	RCLCPP_INFO(this->get_logger(), "rtabmap: Reset");
 	rtabmap_.resetMemory();
 
-	lastPoseMutex_.lock();
+	syncCallbackGroupMutex_.lock();
 	lastPoseCovariance_ = cv::Mat();
 	lastPose_.setIdentity();
 	lastPoseStamp_ = rclcpp::Time();
 	lastPoseVelocity_.clear();
 	lastPoseIntermediate_ = false;
-	lastPoseMutex_.unlock();
+	syncCallbackGroupMutex_.unlock();
 
 	currentMetricGoal_.setNull();
 	lastPublishedMetricGoal_.setNull();
@@ -3226,20 +3221,34 @@ void CoreWrapper::resetRtabmapCallback(
 	latestNodeWasReached_ = false;
 	graphLatched_ = false;
 	mapsManager_.clear();
+
+	previousStampMutex_.lock();
 	previousStamp_ = rclcpp::Time(0);
+	previousStampMutex_.unlock();
+
+	globalPoseMutex_.lock();
 	globalPoses_.clear();
+	globalPoseMutex_.unlock();
+
+	gpsMutex_.lock();
 	gps_.clear();
+	gpsMutex_.unlock();
+
 	landmarksMutex_.lock();
 	landmarks_.clear();
 	landmarksMutex_.unlock();
+
 	userDataMutex_.lock();
 	userData_ = cv::Mat();
 	userDataMutex_.unlock();
+
 	imuMutex_.lock();
 	imus_.clear();
 	imuFrameId_.clear();
 	imuMutex_.unlock();
+
 	interOdoms_.clear();
+
 	mapToOdomMutex_.lock();
 	mapToOdom_.setIdentity();
 	mapToOdomMutex_.unlock();
@@ -3314,13 +3323,13 @@ void CoreWrapper::loadDatabaseCallback(
 	rtabmap_.close();
 	RCLCPP_INFO(get_logger(), "LoadDatabase: Saving current map (%s, %ld MB)... done!", databasePath_.c_str(), UFile::length(databasePath_)/(1024*1024));
 
-	lastPoseMutex_.lock();
+	syncCallbackGroupMutex_.lock();
 	lastPoseCovariance_ = cv::Mat();
 	lastPose_.setIdentity();
 	lastPoseStamp_ = rclcpp::Time();
 	lastPoseVelocity_.clear();
 	lastPoseIntermediate_ = false;
-	lastPoseMutex_.unlock();
+	syncCallbackGroupMutex_.unlock();
 	
 	currentMetricGoal_.setNull();
 	lastPublishedMetricGoal_.setNull();
@@ -3328,20 +3337,34 @@ void CoreWrapper::loadDatabaseCallback(
 	latestNodeWasReached_ = false;
 	graphLatched_ = false;
 	mapsManager_.clear();
+
+	previousStampMutex_.lock();
 	previousStamp_ = rclcpp::Time(0);
+	previousStampMutex_.unlock();
+
+	globalPoseMutex_.lock();
 	globalPoses_.clear();
+	globalPoseMutex_.unlock();
+
+	gpsMutex_.lock();
 	gps_.clear();
+	gpsMutex_.unlock();
+
 	landmarksMutex_.lock();
 	landmarks_.clear();
 	landmarksMutex_.unlock();
+
 	userDataMutex_.lock();
 	userData_ = cv::Mat();
 	userDataMutex_.unlock();
+
 	imuMutex_.lock();
 	imus_.clear();
 	imuFrameId_.clear();
 	imuMutex_.unlock();
+
 	interOdoms_.clear();
+
 	mapToOdomMutex_.lock();
 	mapToOdom_.setIdentity();
 	mapToOdomMutex_.unlock();
@@ -3467,13 +3490,13 @@ void CoreWrapper::backupDatabaseCallback(
 	rtabmap_.close();
 	RCLCPP_INFO(this->get_logger(), "Backup: Saving memory... done!");
 
-	lastPoseMutex_.lock();
+	syncCallbackGroupMutex_.lock();
 	lastPoseCovariance_ = cv::Mat();
 	lastPose_.setIdentity();
 	lastPoseStamp_ = rclcpp::Time();
 	lastPoseVelocity_.clear();
 	lastPoseIntermediate_ = false;
-	lastPoseMutex_.unlock();
+	syncCallbackGroupMutex_.unlock();
 
 	currentMetricGoal_.setNull();
 	lastPublishedMetricGoal_.setNull();
