@@ -590,6 +590,11 @@ void GuiWrapper::commonMultiCameraCallback(
 		}
 		odomHeader.frame_id = odomFrameId_;
 
+		if(odomHeader.frame_id.empty())
+		{
+			RCLCPP_ERROR(this->get_logger(), "This callback cannot be used without \"subscribe_odom\" or \"odom_frame_id\" set.");
+			return;
+		}
 		odomT = rtabmap_conversions::getTransform(odomHeader.frame_id, frameId_, odomHeader.stamp, *tfBuffer_, waitForTransform_);
 		if(odomT.isNull())
 		{
@@ -747,197 +752,6 @@ void GuiWrapper::commonMultiCameraCallback(
 	QMetaObject::invokeMethod(mainWindow_, "processOdometry", Q_ARG(rtabmap::OdometryEvent, odomEvent), Q_ARG(bool, ignoreData));
 }
 
-void GuiWrapper::commonStereoCallback(
-		const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
-		const rtabmap_msgs::msg::UserData::ConstSharedPtr &,
-		const cv_bridge::CvImageConstPtr& leftImageMsg,
-		const cv_bridge::CvImageConstPtr& rightImageMsg,
-		const sensor_msgs::msg::CameraInfo& leftCamInfoMsg,
-		const sensor_msgs::msg::CameraInfo& rightCamInfoMsg,
-		const sensor_msgs::msg::LaserScan & scan2dMsg,
-		const sensor_msgs::msg::PointCloud2 & scan3dMsg,
-		const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr& odomInfoMsg,
-		const std::vector<rtabmap_msgs::msg::GlobalDescriptor> &,
-		const std::vector<rtabmap_msgs::msg::KeyPoint> &,
-		const std::vector<rtabmap_msgs::msg::Point3f> &,
-		const cv::Mat &)
-{
-	std_msgs::msg::Header odomHeader;
-	std::string frameId = frameId_;
-	Transform odomT;
-	if(odomMsg.get())
-	{
-		odomT = rtabmap_conversions::transformFromPoseMsg(odomMsg->pose.pose);
-		odomHeader = odomMsg->header;
-		if(!odomMsg->child_frame_id.empty())
-		{
-			frameId = odomMsg->child_frame_id;
-		}
-		else
-		{
-			RCLCPP_WARN(get_logger(), "Received odom topic with child_frame_id not set! Using \"%s\" as base frame.", frameId_.c_str());
-		}
-	}
-	else
-	{
-		if(!scan2dMsg.ranges.empty())
-		{
-			odomHeader = scan2dMsg.header;
-		}
-		else if(!scan3dMsg.data.empty())
-		{
-			odomHeader = scan3dMsg.header;
-		}
-		else
-		{
-			odomHeader = leftCamInfoMsg.header;
-		}
-		odomHeader.frame_id = odomFrameId_;
-
-		odomT = rtabmap_conversions::getTransform(odomHeader.frame_id, frameId_, odomHeader.stamp, *tfBuffer_, waitForTransform_);
-		if(odomT.isNull())
-		{
-			RCLCPP_WARN(this->get_logger(), "Could not get odometry pose from "
-				"TF for stamp %f, aborting! To show red screen in rtabmap_viz "
-				"when this happens (indicating potentially lost), set subscribe_odom "
-				"to true.", rclcpp::Time(odomHeader.stamp).seconds());
-			return;
-		}
-	}
-
-	cv::Mat covariance = cv::Mat::eye(6,6,CV_64FC1);
-	if(odomMsg.get())
-	{
-		UASSERT(odomMsg->twist.covariance.size() == 36);
-		if(odomMsg->twist.covariance[0] != 0 &&
-			 odomMsg->twist.covariance[7] != 0 &&
-			 odomMsg->twist.covariance[14] != 0 &&
-			 odomMsg->twist.covariance[21] != 0 &&
-			 odomMsg->twist.covariance[28] != 0 &&
-			 odomMsg->twist.covariance[35] != 0)
-		{
-			covariance = cv::Mat(6,6,CV_64FC1,(void*)odomMsg->twist.covariance.data()).clone();
-		}
-	}
-	else if(odomInfoMsg.get() && odomInfoMsg->covariance.size() == 36)
-	{
-		if(odomInfoMsg->covariance[0] != 0 &&
-			 odomInfoMsg->covariance[7] != 0 &&
-			 odomInfoMsg->covariance[14] != 0 &&
-			 odomInfoMsg->covariance[21] != 0 &&
-			 odomInfoMsg->covariance[28] != 0 &&
-			 odomInfoMsg->covariance[35] != 0)
-		{
-			covariance = cv::Mat(6,6,CV_64FC1,(void*)odomInfoMsg->covariance.data()).clone();
-		}
-	}
-	if(odomHeader.frame_id.empty())
-	{
-		RCLCPP_ERROR(this->get_logger(), "Odometry frame not set!?");
-		return;
-	}
-
-	cv::Mat left;
-	cv::Mat right;
-	LaserScan scan;
-	rtabmap::StereoCameraModel stereoModel;
-	rtabmap::OdometryInfo info;
-	bool ignoreData = false;
-
-	// limit update rate
-	if(maxOdomUpdateRate_<=0.0 ||
-	   (UTimer::now() - lastOdomInfoUpdateTime_ > 1.0/maxOdomUpdateRate_ &&
-	   !mainWindow_->isProcessingOdometry() &&
-	   !mainWindow_->isProcessingStatistics()))
-	{
-		lastOdomInfoUpdateTime_ = UTimer::now();
-
-		ParametersMap allParameters = prefDialog_->getAllParameters();
-		bool imagesAlreadyRectified = Parameters::defaultRtabmapImagesAlreadyRectified();
-		Parameters::parse(allParameters, Parameters::kRtabmapImagesAlreadyRectified(), imagesAlreadyRectified);
-
-		if(!rtabmap_conversions::convertStereoMsg(
-				leftImageMsg,
-				rightImageMsg,
-				leftCamInfoMsg,
-				rightCamInfoMsg,
-				frameId,
-				odomSensorSync_?odomHeader.frame_id:"",
-				odomHeader.stamp,
-				left,
-				right,
-				stereoModel,
-				*tfBuffer_,
-				waitForTransform_,
-				imagesAlreadyRectified))
-		{
-			RCLCPP_ERROR(this->get_logger(), "Could not convert stereo msgs! Aborting rtabmap_viz update...");
-			return;
-		}
-
-		if(!scan2dMsg.ranges.empty())
-		{
-			if(!rtabmap_conversions::convertScanMsg(
-					scan2dMsg,
-					frameId,
-					odomSensorSync_?odomHeader.frame_id:"",
-					odomHeader.stamp,
-					scan,
-					*tfBuffer_,
-					waitForTransform_))
-			{
-				RCLCPP_ERROR(this->get_logger(), "Could not convert laser scan msg! Aborting rtabmap_viz update...");
-				return;
-			}
-		}
-		else if(!scan3dMsg.data.empty())
-		{
-			if(!rtabmap_conversions::convertScan3dMsg(
-					scan3dMsg,
-					frameId,
-					odomSensorSync_?odomHeader.frame_id:"",
-					odomHeader.stamp,
-					scan,
-					*tfBuffer_,
-					waitForTransform_))
-			{
-				RCLCPP_ERROR(this->get_logger(), "Could not convert 3d laser scan msg! Aborting rtabmap_viz update...");
-				return;
-			}
-		}
-
-		if(odomInfoMsg.get())
-		{
-			info = rtabmap_conversions::odomInfoFromROS(*odomInfoMsg);
-		}
-		ignoreData = false;
-	}
-	else if(odomInfoMsg.get())
-	{
-		info = rtabmap_conversions::odomInfoFromROS(*odomInfoMsg).copyWithoutData();
-		ignoreData = true;
-	}
-	else
-	{
-		// don't update GUI odom stuff if we don't use visual odometry
-		return;
-	}
-
-	info.reg.covariance = covariance;
-	rtabmap::OdometryEvent odomEvent(
-		rtabmap::SensorData(
-				scan,
-				left,
-				right,
-				stereoModel,
-				0,
-				rtabmap_conversions::timestampFromROS(odomHeader.stamp)),
-		odomT,
-		info);
-
-	QMetaObject::invokeMethod(mainWindow_, "processOdometry", Q_ARG(rtabmap::OdometryEvent, odomEvent), Q_ARG(bool, ignoreData));
-}
-
 void GuiWrapper::commonLaserScanCallback(
 		const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
 		const rtabmap_msgs::msg::UserData::ConstSharedPtr &,
@@ -977,6 +791,12 @@ void GuiWrapper::commonLaserScanCallback(
 			return;
 		}
 		odomHeader.frame_id = odomFrameId_;
+
+		if(odomHeader.frame_id.empty())
+		{
+			RCLCPP_ERROR(this->get_logger(), "This callback cannot be used without \"subscribe_odom\" or \"odom_frame_id\" set.");
+			return;
+		}
 
 		odomT = rtabmap_conversions::getTransform(odomHeader.frame_id, frameId_, odomHeader.stamp, *tfBuffer_, waitForTransform_);
 		if(odomT.isNull())
@@ -1193,6 +1013,12 @@ void GuiWrapper::commonSensorDataCallback(
 	{
 		odomHeader = sensorDataMsg->header;
 		odomHeader.frame_id = odomFrameId_;
+
+		if(odomHeader.frame_id.empty())
+		{
+			RCLCPP_ERROR(this->get_logger(), "This callback cannot be used without \"subscribe_odom\" or \"odom_frame_id\" set.");
+			return;
+		}
 
 		odomT = rtabmap_conversions::getTransform(odomHeader.frame_id, frameId_, odomHeader.stamp, *tfBuffer_, waitForTransform_);
 		if(odomT.isNull())

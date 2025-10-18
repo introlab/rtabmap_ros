@@ -531,6 +531,13 @@ void CommonDataSubscriber::setupCallbacks(
 	RCLCPP_INFO(node.get_logger(), "%s: subscribe_stereo = %s", name_.c_str(), subscribedToStereo_?"true":"false");
 	RCLCPP_INFO(node.get_logger(), "%s: subscribe_rgbd = %s (rgbd_cameras=%d)", name_.c_str(), subscribedToRGBD_?"true":"false", rgbdCameras_);
 	RCLCPP_INFO(node.get_logger(), "%s: subscribe_sensor_data = %s", name_.c_str(), subscribedToSensorData_?"true":"false");
+	if(subscribedToOdom_ && !odomFrameId_.empty()) {
+		RCLCPP_INFO(node.get_logger(), "%s: subscribe_odom = false (\"odom_frame_id\" is set)", name_.c_str());
+		subscribedToOdom_ = false;
+	}
+	else {
+		RCLCPP_INFO(node.get_logger(), "%s: subscribe_odom = %s", name_.c_str(), subscribedToOdom_?"true":"false");
+	}
 	RCLCPP_INFO(node.get_logger(), "%s: subscribe_odom_info = %s", name_.c_str(), subscribedToOdomInfo_?"true":"false");
 	RCLCPP_INFO(node.get_logger(), "%s: subscribe_user_data = %s", name_.c_str(), subscribedToUserData_?"true":"false");
 	RCLCPP_INFO(node.get_logger(), "%s: subscribe_scan = %s", name_.c_str(), subscribedToScan2d_?"true":"false");
@@ -550,7 +557,6 @@ void CommonDataSubscriber::setupCallbacks(
 	rclcpp::SubscriptionOptions callbackOptions;
 	callbackOptions.callback_group = syncCallbackGroup_;
 
-	subscribedToOdom_ = odomFrameId_.empty() && subscribedToOdom_;
 	if(subscribedToDepth_)
 	{
 		setupDepthCallbacks(

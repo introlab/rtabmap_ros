@@ -58,6 +58,7 @@ public:
 
 private:
 	double compressedRate_;
+	bool fillEmptyDepth_;
 
 	rclcpp::Time lastCompressedPublished_;
 

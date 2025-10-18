@@ -432,8 +432,10 @@ void RGBDOdometry::commonCallback(
 {
 	UASSERT(rgbImages.size() > 0 && rgbImages.size() == depthImages.size() && rgbImages.size() == cameraInfos.size());
 	rclcpp::Time higherStamp;
+	UASSERT_MSG(rgbImages[0], "RGB image is null!");
 	int imageWidth = rgbImages[0]->image.cols;
 	int imageHeight = rgbImages[0]->image.rows;
+	UASSERT_MSG(depthImages[0], "Depth image is null!");
 	int depthWidth = depthImages[0]->image.cols;
 	int depthHeight = depthImages[0]->image.rows;
 
@@ -447,6 +449,8 @@ void RGBDOdometry::commonCallback(
 	std::vector<rtabmap::CameraModel> cameraModels;
 	for(unsigned int i=0; i<rgbImages.size(); ++i)
 	{
+		UASSERT_MSG(rgbImages[i], uFormat("RGB image is null for camera %d", i).c_str());
+		UASSERT_MSG(depthImages[i], uFormat("Depth image is null for camera %d", i).c_str());
 		if(!(rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) ==0 ||
 			 rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
 			 rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||

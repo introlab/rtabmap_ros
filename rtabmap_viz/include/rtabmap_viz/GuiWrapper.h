@@ -89,20 +89,6 @@ private:
 			const std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > & localKeyPoints = std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> >(),
 			const std::vector<std::vector<rtabmap_msgs::msg::Point3f> > & localPoints3d = std::vector<std::vector<rtabmap_msgs::msg::Point3f> >(),
 			const std::vector<cv::Mat> & localDescriptors = std::vector<cv::Mat>());
-	virtual void commonStereoCallback(
-			const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
-			const rtabmap_msgs::msg::UserData::ConstSharedPtr & userDataMsg,
-			const cv_bridge::CvImageConstPtr& leftImageMsg,
-			const cv_bridge::CvImageConstPtr& rightImageMsg,
-			const sensor_msgs::msg::CameraInfo& leftCamInfoMsg,
-			const sensor_msgs::msg::CameraInfo& rightCamInfoMsg,
-			const sensor_msgs::msg::LaserScan & scan2dMsg,
-			const sensor_msgs::msg::PointCloud2 & scan3dMsg,
-			const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr& odomInfoMsg,
-			const std::vector<rtabmap_msgs::msg::GlobalDescriptor> & globalDescriptorMsgs = std::vector<rtabmap_msgs::msg::GlobalDescriptor>(),
-			const std::vector<rtabmap_msgs::msg::KeyPoint> & localKeyPoints = std::vector<rtabmap_msgs::msg::KeyPoint>(),
-			const std::vector<rtabmap_msgs::msg::Point3f> & localPoints3d = std::vector<rtabmap_msgs::msg::Point3f>(),
-			const cv::Mat & localDescriptors = cv::Mat());
 	virtual void commonLaserScanCallback(
 			const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
 			const rtabmap_msgs::msg::UserData::ConstSharedPtr & userDataMsg,

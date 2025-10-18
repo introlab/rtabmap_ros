@@ -1997,7 +1997,7 @@ rtabmap::Transform getTransform(
 	}
 	catch(tf2::TransformException & ex)
 	{
-		UWARN("(getting transform %s -> %s) %s (wait_for_transform=%f)", fromFrameId.c_str(), toFrameId.c_str(), ex.what(), waitForTransform);
+		UWARN("(getting transform \"%s\" -> \"%s\") %s (wait_for_transform=%f)", fromFrameId.c_str(), toFrameId.c_str(), ex.what(), waitForTransform);
 	}
 
 	return transform;
