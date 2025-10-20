@@ -65,9 +65,9 @@ GuiWrapper::GuiWrapper(const rclcpp::NodeOptions & options) :
 		Node("rtabmap_viz", options),
 		rtabmap_sync::CommonDataSubscriber(*this, true),
 		mainWindow_(0),
-		cameraNodeName_(""),
 		lastOdomInfoUpdateTime_(0),
 		rtabmapNodeName_("rtabmap"),
+		odometryNodeName_("rgbd_odometry"),
 		frameId_("base_link"),
 		odomFrameId_(""),
 		waitForTransform_(0.2), // 200 ms
@@ -93,7 +93,10 @@ GuiWrapper::GuiWrapper(const rclcpp::NodeOptions & options) :
 
 	configFile.replace('~', QDir::homePath());
 
-	rtabmapNodeName_ = this->declare_parameter("rtabmap", rtabmapNodeName_);
+	rtabmapNodeName_ = this->declare_parameter("rtabmap_node_name", rtabmapNodeName_);
+	odometryNodeName_ = this->declare_parameter("odometry_node_name", odometryNodeName_);
+	RCLCPP_INFO(get_logger(), "%s: rtabmap_node_name   = %s", get_name(), rtabmapNodeName_.c_str());
+	RCLCPP_INFO(get_logger(), "%s: odometry_node_name  = %s", get_name(), odometryNodeName_.c_str());
 
 	RCLCPP_INFO(this->get_logger(), "rtabmap_viz: Using configuration from \"%s\"", configFile.toStdString().c_str());
 	uSleep(500);
@@ -114,9 +117,17 @@ GuiWrapper::GuiWrapper(const rclcpp::NodeOptions & options) :
 	waitForTransform_ = this->declare_parameter("wait_for_transform", waitForTransform_);
 	odomSensorSync_ = this->declare_parameter("odom_sensor_sync", odomSensorSync_);
 	maxOdomUpdateRate_ = this->declare_parameter("max_odom_update_rate", maxOdomUpdateRate_);
-	cameraNodeName_ = this->declare_parameter("camera_node_name", cameraNodeName_); // used to pause the rtabmap_ros/camera when pausing the process
 	subscribeInfoOnly = this->declare_parameter("subscribe_info_only", subscribeInfoOnly);
 	initCachePath = this->declare_parameter("init_cache_path", initCachePath);
+
+	RCLCPP_INFO(get_logger(), "%s: frame_id             = \"%s\"", get_name(), frameId_.c_str());
+	RCLCPP_INFO(get_logger(), "%s: odom_frame_id        = \"%s\"", get_name(), odomFrameId_.c_str());
+	RCLCPP_INFO(get_logger(), "%s: wait_for_transform   = %f", get_name(), waitForTransform_);
+	RCLCPP_INFO(get_logger(), "%s: odom_sensor_sync     = %s", get_name(), odomSensorSync_?"true":"false");
+	RCLCPP_INFO(get_logger(), "%s: max_odom_update_rate = %f", get_name(), maxOdomUpdateRate_);
+	RCLCPP_INFO(get_logger(), "%s: subscribe_info_only  = %s", get_name(), subscribeInfoOnly?"true":"false");
+	RCLCPP_INFO(get_logger(), "%s: init_cache_path      = \"%s\"", get_name(), initCachePath.c_str());
+
 	if(initCachePath.size())
 	{
 		initCachePath = uReplaceChar(initCachePath, '~', UDirectory::homeDir());
@@ -327,7 +338,7 @@ bool GuiWrapper::callMapDataService(const std::string & name, bool global, bool 
 	}
 	else
 	{
-		RCLCPP_WARN(this->get_logger(), "Service \"%s\" not available.", name.c_str());
+		RCLCPP_WARN(this->get_logger(), "Service \"%s\" not available. If necessary, you can remap expected rtabmap node with \"rtabmap_node_name\" parameter.", name.c_str());
 	}
 	return false;
 }
@@ -356,7 +367,7 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 			RCLCPP_INFO(this->get_logger(), "Parameters updated");
 			auto client = std::make_shared<rclcpp::AsyncParametersClient>(this, rtabmapNodeName_);
 			if (!client->wait_for_service(std::chrono::seconds(5))) {
-				RCLCPP_ERROR(this->get_logger(), "Can't call rtabmap parameters service, is the node running?");
+				RCLCPP_ERROR(this->get_logger(), "Can't call \"%s\" parameters service, is the node running? If necessary, you can remap expected rtabmap node with \"rtabmap_node_name\" parameter.", rtabmapNodeName_.c_str());
 			}
 			else
 			{
@@ -374,28 +385,18 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 		{
 			if(!callEmptyService(rtabmapNodeName_+"/reset"))
 			{
-				RCLCPP_ERROR(this->get_logger(), "Can't call \"reset\" service");
+				RCLCPP_ERROR(this->get_logger(), "Can't call \"%s/reset\" service. If necessary, you can remap expected rtabmap node with \"rtabmap_node_name\" parameter.", rtabmapNodeName_.c_str());
 			}
 		}
 		else if(cmd == rtabmap::RtabmapEventCmd::kCmdPause)
 		{
-			// Pause the camera if the rtabmap/camera node is used
-			if(!cameraNodeName_.empty())
-			{
-				std::string str = uFormat("rosrun dynamic_reconfigure dynparam set %s pause true", cameraNodeName_.c_str());
-				if(system(str.c_str()) !=0)
-				{
-					RCLCPP_ERROR(this->get_logger(), "Command \"%s\" returned non zero value.", str.c_str());
-				}
-			}
-
-			// Pause visual_odometry
-			callEmptyService("pause_odom");
+			// Pause visual_odometry (can fail silently)
+			callEmptyService(odometryNodeName_ + "/pause_odom");
 
 			// Pause rtabmap
 			if(!callEmptyService(rtabmapNodeName_+"/pause"))
 			{
-				RCLCPP_ERROR(this->get_logger(), "Can't call \"pause\" service");
+				RCLCPP_ERROR(this->get_logger(), "Can't call \"%s/pause\" service. If necessary, you can remap expected rtabmap node with \"rtabmap_node_name\" parameter.", rtabmapNodeName_.c_str());
 			}
 		}
 		else if(cmd == rtabmap::RtabmapEventCmd::kCmdResume)
@@ -403,27 +404,17 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 			// Resume rtabmap
 			if(!callEmptyService(rtabmapNodeName_+"/resume"))
 			{
-				RCLCPP_ERROR(this->get_logger(), "Can't call \"resume\" service");
+				RCLCPP_ERROR(this->get_logger(), "Can't call \"%s/resume\" service. If necessary, you can remap expected rtabmap node with \"rtabmap_node_name\" parameter.", rtabmapNodeName_.c_str());
 			}
 
-			// Pause visual_odometry
-			callEmptyService("resume_odom");
-
-			// Resume the camera if the rtabmap/camera node is used
-			if(!cameraNodeName_.empty())
-			{
-				std::string str = uFormat("rosrun dynamic_reconfigure dynparam set %s pause false", cameraNodeName_.c_str());
-				if(system(str.c_str()) !=0)
-				{
-					RCLCPP_ERROR(this->get_logger(), "Command \"%s\" returned non zero value.", str.c_str());
-				}
-			}
+			// Pause visual_odometry (can fail silently)
+			callEmptyService(odometryNodeName_ + "/resume_odom");
 		}
 		else if(cmd == rtabmap::RtabmapEventCmd::kCmdTriggerNewMap)
 		{
 			if(!callEmptyService(rtabmapNodeName_+"/trigger_new_map"))
 			{
-				RCLCPP_ERROR(this->get_logger(), "Can't call \"trigger_new_map\" service");
+				RCLCPP_ERROR(this->get_logger(), "Can't call \"%s/trigger_new_map\" service. If necessary, you can remap expected rtabmap node with \"rtabmap_node_name\" parameter.", rtabmapNodeName_.c_str());
 			}
 		}
 		else if(cmd == rtabmap::RtabmapEventCmd::kCmdPublish3DMap)
@@ -466,14 +457,14 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 			}
 			else
 			{
-				RCLCPP_WARN(this->get_logger(), "Service \"set_goal\" not available.");
+				RCLCPP_WARN(this->get_logger(), "Service \"%s/set_goal\" not available. If necessary, you can remap expected rtabmap node with \"rtabmap_node_name\" parameter.", rtabmapNodeName_.c_str());
 			}
 		}
 		else if(cmd == rtabmap::RtabmapEventCmd::kCmdCancelGoal)
 		{
 			if(!callEmptyService(rtabmapNodeName_+"/cancel_goal"))
 			{
-				RCLCPP_ERROR(this->get_logger(), "Can't call \"cancel_goal\" service");
+				RCLCPP_ERROR(this->get_logger(), "Can't call \"%s/cancel_goal\" service. If necessary, you can remap expected rtabmap node with \"rtabmap_node_name\" parameter.", rtabmapNodeName_.c_str());
 			}
 		}
 		else if(cmd == rtabmap::RtabmapEventCmd::kCmdLabel)
@@ -492,7 +483,7 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 			}
 			else
 			{
-				RCLCPP_WARN(this->get_logger(), "Service \"set_label\" not available.");
+				RCLCPP_WARN(this->get_logger(), "Service \"%s/set_label\" not available. If necessary, you can remap expected rtabmap node with \"rtabmap_node_name\" parameter.", rtabmapNodeName_.c_str());
 			}
 		}
 		else if(cmd == rtabmap::RtabmapEventCmd::kCmdRemoveLabel)
@@ -508,7 +499,7 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 			}
 			else
 			{
-				RCLCPP_WARN(this->get_logger(), "Service \"remove_label\" not available.");
+				RCLCPP_WARN(this->get_logger(), "Service \"%s/remove_label\" not available. If necessary, you can remap expected rtabmap node with \"rtabmap_node_name\" parameter.", rtabmapNodeName_.c_str());
 			}
 		}
 		else if(cmd == rtabmap::RtabmapEventCmd::kCmdRepublishData)
@@ -525,9 +516,9 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 	}
 	else if(anEvent->getClassName().compare("OdometryResetEvent") == 0)
 	{
-		if(!callEmptyService("reset_odom"))
+		if(!callEmptyService(odometryNodeName_ + "/reset_odom"))
 		{
-			RCLCPP_ERROR(this->get_logger(), "Can't call \"reset_odom\" service, (will only work with rtabmap/visual_odometry node.)");
+			RCLCPP_ERROR(this->get_logger(), "Can't call \"%s/reset_odom\" service (will only work with rtabmap's odometry nodes, you can remap the node name with \"odometry_node_name\" parameter)", odometryNodeName_.c_str());
 		}
 	}
 	return false;

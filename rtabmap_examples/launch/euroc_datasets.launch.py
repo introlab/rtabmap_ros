@@ -83,7 +83,8 @@ def generate_launch_description():
 
         Node(
             package='rtabmap_viz', executable='rtabmap_viz', output='screen',
-            parameters=[parameters],
+            parameters=[parameters,
+                        {'odometry_node_name': "stereo_odometry"}],
             remappings=remappings),
         
         # Image rectification and publishing synchronized camera_info

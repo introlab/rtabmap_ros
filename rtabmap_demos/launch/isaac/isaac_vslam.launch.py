@@ -103,7 +103,8 @@ def launch_setup(context, *args, **kwargs):
             condition=IfCondition(rtabmap_viz),
             package='rtabmap_viz', executable='rtabmap_viz', output='screen',
             namespace='rtabmap',
-            parameters=[parameters],
+            parameters=[parameters,
+                        {"odometry_node_name": vo_node_prefix+'_odometry'}],
             remappings=remappings),
     ]
 

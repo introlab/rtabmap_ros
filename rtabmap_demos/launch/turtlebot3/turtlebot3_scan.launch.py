@@ -76,7 +76,8 @@ def launch_setup(context, *args, **kwargs):
         # Visualization
         Node(
             package='rtabmap_viz', executable='rtabmap_viz', output='screen',
-            parameters=[parameters],
+            parameters=[parameters,
+                        {"odometry_node_name": 'icp_odometry'}],
             remappings=remappings),
     ]
 

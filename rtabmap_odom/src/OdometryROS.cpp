@@ -370,15 +370,16 @@ void OdometryROS::init(bool stereoParams, bool visParams, bool icpParams)
 		odometry_->reset(initialPose_);
 	}
 
-	resetSrv_ = this->create_service<std_srvs::srv::Empty>("reset_odom", std::bind(&OdometryROS::resetOdom, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
-	resetToPoseSrv_ = this->create_service<rtabmap_msgs::srv::ResetPose>("reset_odom_to_pose", std::bind(&OdometryROS::resetToPose, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
-	pauseSrv_ = this->create_service<std_srvs::srv::Empty>("pause_odom", std::bind(&OdometryROS::pause, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
-	resumeSrv_ = this->create_service<std_srvs::srv::Empty>("resume_odom", std::bind(&OdometryROS::resume, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	const std::string servicePrefix = get_name() + std::string("/");
+	resetSrv_ = this->create_service<std_srvs::srv::Empty>(servicePrefix + "reset_odom", std::bind(&OdometryROS::resetOdom, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	resetToPoseSrv_ = this->create_service<rtabmap_msgs::srv::ResetPose>(servicePrefix + "reset_odom_to_pose", std::bind(&OdometryROS::resetToPose, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	pauseSrv_ = this->create_service<std_srvs::srv::Empty>(servicePrefix + "pause_odom", std::bind(&OdometryROS::pause, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	resumeSrv_ = this->create_service<std_srvs::srv::Empty>(servicePrefix + "resume_odom", std::bind(&OdometryROS::resume, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
-	setLogDebugSrv_ = this->create_service<std_srvs::srv::Empty>("log_debug", std::bind(&OdometryROS::setLogDebug, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
-	setLogInfoSrv_ = this->create_service<std_srvs::srv::Empty>("log_info", std::bind(&OdometryROS::setLogInfo, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
-	setLogWarnSrv_ = this->create_service<std_srvs::srv::Empty>("log_warning", std::bind(&OdometryROS::setLogWarn, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
-	setLogErrorSrv_ = this->create_service<std_srvs::srv::Empty>("log_error", std::bind(&OdometryROS::setLogError, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	setLogDebugSrv_ = this->create_service<std_srvs::srv::Empty>(servicePrefix + "log_debug", std::bind(&OdometryROS::setLogDebug, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	setLogInfoSrv_ = this->create_service<std_srvs::srv::Empty>(servicePrefix + "log_info", std::bind(&OdometryROS::setLogInfo, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	setLogWarnSrv_ = this->create_service<std_srvs::srv::Empty>(servicePrefix + "log_warning", std::bind(&OdometryROS::setLogWarn, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	setLogErrorSrv_ = this->create_service<std_srvs::srv::Empty>(servicePrefix + "log_error", std::bind(&OdometryROS::setLogError, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
 	odomStrategy_ = 0;
 	Parameters::parse(this->parameters(), Parameters::kOdomStrategy(), odomStrategy_);

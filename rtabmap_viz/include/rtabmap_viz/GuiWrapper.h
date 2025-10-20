@@ -116,9 +116,9 @@ private:
 private:
 	rtabmap::PreferencesDialog * prefDialog_;
 	rtabmap::MainWindow * mainWindow_;
-	std::string cameraNodeName_;
 	double lastOdomInfoUpdateTime_;
 	std::string rtabmapNodeName_;
+	std::string odometryNodeName_;
 
 	// odometry subscription stuffs
 	std::string frameId_;

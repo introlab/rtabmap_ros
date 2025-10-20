@@ -40,7 +40,17 @@ class ConditionalBool(Substitution):
             return self.text_else
             
 def launch_setup(context, *args, **kwargs):      
-               
+
+    rtabmap_viz_odometry_node_name = "rgbd_odometry"
+    use_icp_odometry = LaunchConfiguration('icp_odometry').perform(context)
+    use_icp_odometry = use_icp_odometry == 'true' or use_icp_odometry == 'True'
+    use_stereo_odometry = LaunchConfiguration('stereo').perform(context)
+    use_stereo_odometry = use_stereo_odometry == 'true' or use_stereo_odometry == 'True'
+    if use_icp_odometry:
+        rtabmap_viz_odometry_node_name = "icp_odometry"
+    elif use_stereo_odometry:
+        rtabmap_viz_odometry_node_name = "stereo_odometry"
+
     return [
         DeclareLaunchArgument('depth', default_value=ConditionalText('false', 'true', IfCondition(PythonExpression(["'", LaunchConfiguration('stereo'), "' == 'true'"]))._predicate_func(context)), description=''),
         DeclareLaunchArgument('subscribe_rgb', default_value=LaunchConfiguration('depth'), description=''),
@@ -359,7 +369,8 @@ def launch_setup(context, *args, **kwargs):
                 "qos_scan": LaunchConfiguration('qos_scan'),
                 "qos_odom": LaunchConfiguration('qos_odom'),
                 "qos_camera_info": LaunchConfiguration('qos_camera_info'),
-                "qos_user_data": LaunchConfiguration('qos_user_data')
+                "qos_user_data": LaunchConfiguration('qos_user_data'),
+                "odometry_node_name": rtabmap_viz_odometry_node_name
             }],
             remappings=[
                 ("rgb/image", LaunchConfiguration('rgb_topic_relay')),

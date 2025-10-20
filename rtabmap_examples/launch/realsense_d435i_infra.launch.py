@@ -35,6 +35,14 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'unite_imu_method', default_value='2',
             description='0-None, 1-copy, 2-linear_interpolation. Use unite_imu_method:="1" if imu topics stop being published.'),
+        
+        DeclareLaunchArgument(
+            'args', default_value='',
+            description='Extra arguments set to rtabmap and odometry nodes.'),
+        
+        DeclareLaunchArgument(
+            'odom_args', default_value='',
+            description='Extra arguments just for odometry node. If the same argument is already set in \"args\", it will be overwritten by the one in \"odom_args\".'),
 
         #Hack to disable IR emitter
         SetParameter(name='depth_module.emitter_enabled', value=0),
@@ -56,13 +64,14 @@ def generate_launch_description():
         Node(
             package='rtabmap_odom', executable='rgbd_odometry', output='screen',
             parameters=parameters,
+            arguments=[LaunchConfiguration("args"), LaunchConfiguration("odom_args")],
             remappings=remappings),
 
         Node(
             package='rtabmap_slam', executable='rtabmap', output='screen',
             parameters=parameters,
             remappings=remappings,
-            arguments=['-d']),
+            arguments=['-d', LaunchConfiguration("args")]),
 
         Node(
             package='rtabmap_viz', executable='rtabmap_viz', output='screen',

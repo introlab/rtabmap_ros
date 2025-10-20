@@ -16,11 +16,11 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 
 def generate_launch_description():
-    parameters=[{
+    parameters={
           'frame_id':'camera_link',
           'subscribe_stereo':True,
           'subscribe_odom_info':True,
-          'wait_imu_to_init':True}]
+          'wait_imu_to_init':True}
 
     remappings=[
           ('imu', '/imu/data'),
@@ -38,6 +38,15 @@ def generate_launch_description():
 
         #Hack to disable IR emitter
         SetParameter(name='depth_module.emitter_enabled', value=0),
+        
+        DeclareLaunchArgument(
+            'args', default_value='',
+            description='Extra arguments set to rtabmap and odometry nodes.'),
+        
+        DeclareLaunchArgument(
+            'odom_args', default_value='',
+            description='Extra arguments just for odometry node. If the same argument is already set in \"args\", it will be overwritten by the one in \"odom_args\".'),
+
 
         # Launch camera driver
         IncludeLaunchDescription(
@@ -55,18 +64,20 @@ def generate_launch_description():
 
         Node(
             package='rtabmap_odom', executable='stereo_odometry', output='screen',
-            parameters=parameters,
+            parameters=[parameters],
+            arguments=[LaunchConfiguration("args"), LaunchConfiguration("odom_args")],
             remappings=remappings),
 
         Node(
             package='rtabmap_slam', executable='rtabmap', output='screen',
-            parameters=parameters,
+            parameters=[parameters],
             remappings=remappings,
-            arguments=['-d']),
+            arguments=['-d', LaunchConfiguration("args")]),
 
         Node(
             package='rtabmap_viz', executable='rtabmap_viz', output='screen',
-            parameters=parameters,
+            parameters=[parameters,
+                        {'odometry_node_name': "stereo_odometry"}],
             remappings=remappings),
                 
         # Compute quaternion of the IMU

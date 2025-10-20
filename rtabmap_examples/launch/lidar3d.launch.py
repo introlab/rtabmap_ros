@@ -154,7 +154,8 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
   
     Node(
       package='rtabmap_viz', executable='rtabmap_viz', output='screen',
-      parameters=[shared_parameters, rtabmap_parameters],
+      parameters=[shared_parameters, rtabmap_parameters,
+                  {'odometry_node_name': "icp_odometry"}],
       remappings=remappings + [('scan_cloud', 'odom_filtered_input_scan')])
   ]
   
