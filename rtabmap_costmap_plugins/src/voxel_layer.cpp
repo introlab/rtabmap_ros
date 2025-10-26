@@ -228,11 +228,7 @@ void VoxelLayer::updateBounds(
 
       // now we need to compute the map coordinates for the observation
       unsigned int mx, my, mz;
-      if (*iter_z < origin_z_) {
-        if (!worldToMap3D(*iter_x, *iter_y, origin_z_, mx, my, mz)) {
-          continue;
-        }
-      } else if (!worldToMap3D(*iter_x, *iter_y, *iter_z, mx, my, mz)) {
+      if (!worldToMap3D(*iter_x, *iter_y, *iter_z, mx, my, mz)) {
         continue;
       }
 
