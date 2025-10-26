@@ -9,6 +9,7 @@ find_package(ament_cmake_ros REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(nav2_costmap_2d REQUIRED)
+find_package(visualization_msgs REQUIRED)
 
 include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -18,6 +19,7 @@ SET(Libraries
   pluginlib
   rclcpp
   nav2_costmap_2d
+  visualization_msgs
 )
 
 ###########
@@ -48,21 +50,36 @@ target_compile_definitions(rtabmap_costmap_plugins PUBLIC "PLUGINLIB__DISABLE_BO
 
 pluginlib_export_plugin_description_file(nav2_costmap_2d costmap_plugins.xml)
 
+add_executable(rtabmap_costmap_voxel_marker src/voxel_marker.cpp)
+ament_target_dependencies(rtabmap_costmap_voxel_marker ${Libraries})
+set_target_properties(rtabmap_costmap_voxel_marker PROPERTIES OUTPUT_NAME "voxel_marker")
+
 #############
 ## Install ##
 #############
 
-install(DIRECTORY include/
-   DESTINATION include
-   FILES_MATCHING PATTERN "*.h"
-)
+ament_export_dependencies(${Libraries})
+ament_export_include_directories(include)
+ament_export_targets(${PROJECT_NAME})           # To include downstream with targets
+ament_export_libraries(rtabmap_costmap_plugins) # To include downstream without targets
 
 install(TARGETS 
    rtabmap_costmap_plugins
+   EXPORT ${PROJECT_NAME}
    ARCHIVE DESTINATION lib
    LIBRARY DESTINATION lib
    RUNTIME DESTINATION bin
    INCLUDES DESTINATION include
+)
+
+install(TARGETS 
+   rtabmap_costmap_voxel_marker 
+   DESTINATION lib/${PROJECT_NAME}
+)
+
+install(DIRECTORY include/
+   DESTINATION include
+   FILES_MATCHING PATTERN "*.h"
 )
 
 ament_package()

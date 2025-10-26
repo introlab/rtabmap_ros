@@ -40,6 +40,7 @@
 
 #include <vector>
 
+#include <rtabmap_costmap_plugins/visibility.h>
 #include <rclcpp/rclcpp.hpp>
 #include <nav2_costmap_2d/layer.hpp>
 #include <nav2_costmap_2d/layered_costmap.hpp>
@@ -63,9 +64,7 @@ namespace rtabmap_costmap_plugins
 class VoxelLayer : public nav2_costmap_2d::ObstacleLayer
 {
 public:
-  /**
-   * @brief Voxel Layer constructor
-   */
+  RTABMAP_COSTMAP_PLUGINS_PUBLIC
   VoxelLayer()
   : voxel_grid_(0, 0, 0)
   {
