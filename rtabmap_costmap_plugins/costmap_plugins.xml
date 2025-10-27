@@ -1,0 +1,5 @@
+<library path="rtabmap_costmap_plugins">
+  <class type="rtabmap_costmap_plugins::VoxelLayer" base_class_type="nav2_costmap_2d::Layer">
+    <description>Similar to nav2_costmap_2d::VoxelLayer, but can also move along z-axis.</description>
+  </class>
+</library>

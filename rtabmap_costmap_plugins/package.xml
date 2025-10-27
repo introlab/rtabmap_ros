@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>rtabmap_costmap_plugins</name>
+  <version>0.22.1</version>
+  <description>RTAB-Map's costmap plugins.</description>
+  <maintainer email="matlabbe@gmail.com">Mathieu Labbe</maintainer>
+  <author>Mathieu Labbe</author>
+  <license>BSD</license>
+  <url type="bugtracker">https://github.com/introlab/rtabmap_ros/issues</url>
+  <url type="repository">https://github.com/introlab/rtabmap_ros</url>
+
+  <buildtool_depend>ament_cmake_ros</buildtool_depend>
+
+  <build_depend>ros_environment</build_depend>
+
+  <depend>pluginlib</depend>
+  <depend>rclcpp</depend>
+  <depend>nav2_costmap_2d</depend>
+  <depend>visualization_msgs</depend>
+  
+  <export>
+	<build_type>ament_cmake</build_type>
+  </export>
+
+</package>

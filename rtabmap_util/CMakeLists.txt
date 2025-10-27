@@ -232,7 +232,7 @@ ament_export_libraries(rtabmap_util_plugins) # To include downstream without tar
 
 # Install Python executables
 install(PROGRAMS
-#  scripts/patrol.py
+  scripts/patrol.py
 #  scripts/objects_to_tags.py
 #  scripts/point_to_tf.py
 #  scripts/netvlad_tf_ros.py
