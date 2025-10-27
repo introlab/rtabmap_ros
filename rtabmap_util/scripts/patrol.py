@@ -1,87 +1,104 @@
-#!/usr/bin/env python
-import rospy
+#!/usr/bin/env python3
 import sys
+import time
+import rclpy
+from rclpy.node import Node
 from std_msgs.msg import Bool
-from rtabmap_ros.msg import Goal
+from rtabmap_msgs.msg import Goal
 
-pub = rospy.Publisher('rtabmap/goal_node', Goal, queue_size=1)
-waypoints = []
-currentIndex = 0
-waitingTime = 1.0
-frameId = ""
 
-def callback(data):
-    global currentIndex
-    global waitingTime
-    global frameId
-    if data.data:
-        rospy.loginfo(rospy.get_caller_id() + ": Goal '%s' reached! Publishing next goal in %.1f sec...", waypoints[currentIndex], waitingTime)
-    else:
-        rospy.loginfo(rospy.get_caller_id() + ": Goal '%s' failed! Publishing next goal in %.1f sec...", waypoints[currentIndex], waitingTime)
+class PatrolNode(Node):
+    def __init__(self, waypoints):
+        super().__init__('patrol')
 
-    currentIndex = (currentIndex+1) % len(waypoints)
+        # --- Parameters ---
+        self.declare_parameter('time', 1.0)
+        self.declare_parameter('frame_id', '')
+        self.waiting_time = self.get_parameter('time').value
+        self.frame_id = self.get_parameter('frame_id').value
 
-    # Waiting time before sending next goal
-    rospy.sleep(waitingTime)
+        # --- Variables ---
+        self.waypoints = waypoints
+        self.current_index = 0
 
-    msg = Goal()
-    msg.frame_id = frameId
+        # --- Publisher & Subscriber ---
+        self.pub = self.create_publisher(Goal, 'rtabmap/goal_node', 10)
+        self.sub = self.create_subscription(Bool, 'rtabmap/goal_reached', self.callback, 10)
+
+        self.get_logger().info(f"Waypoints: {self.waypoints}")
+        self.get_logger().info(f"Waiting time: {self.waiting_time:.1f} sec")
+        self.get_logger().info(f"Publishing goals on: {self.pub.topic_name}")
+        self.get_logger().info(f"Receiving goal status on: {self.sub.topic_name}")
+
+        # Delay before sending first goal (ensure discovery)
+        time.sleep(1.0)
+
+        # Send first goal
+        self.send_goal()
+
+    def callback(self, msg: Bool):
+        """Called when goal_reached is received."""
+        if msg.data:
+            self.get_logger().info(
+                f"Goal '{self.waypoints[self.current_index]}' reached! "
+                f"Publishing next goal in {self.waiting_time:.1f} sec..."
+            )
+        else:
+            self.get_logger().info(
+                f"Goal '{self.waypoints[self.current_index]}' failed! "
+                f"Publishing next goal in {self.waiting_time:.1f} sec..."
+            )
+
+        # Move to next waypoint
+        self.current_index = (self.current_index + 1) % len(self.waypoints)
+
+        # Wait before sending next goal
+        time.sleep(self.waiting_time)
+        self.send_goal()
+
+    def send_goal(self):
+        """Send current goal to RTAB-Map."""
+        waypoint = self.waypoints[self.current_index]
+        msg = Goal()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.frame_id = self.frame_id
+
+        # Check if waypoint is a node id (int) or a label (string)
+        try:
+            msg.node_id = int(waypoint)
+            msg.node_label = ""
+        except ValueError:
+            msg.node_id = 0
+            msg.node_label = waypoint
+
+        self.get_logger().info(
+            f"Publishing goal '{waypoint}' ({self.current_index + 1}/{len(self.waypoints)})"
+        )
+        self.pub.publish(msg)
+
+
+def main(args=None):
+    rclpy.init(args=args)
+
+    # Extract waypoints from command-line args
+    if len(sys.argv) < 3:
+        print(
+            "Usage: patrol.py waypointA waypointB waypointC ... "
+            "[--ros-args -p time:=1.0 -p frame_id:=base_footprint]"
+        )
+        return
+
+    waypoints = [x for x in sys.argv[1:] if not x.startswith('--') and not x.startswith('_')]
+    node = PatrolNode(waypoints)
+
     try:
-        int(waypoints[currentIndex])
-        is_dig = True
-    except ValueError:
-        is_dig = False
-    if is_dig:
-        msg.node_id = int(waypoints[currentIndex])
-        msg.node_label = ""
-    else:
-        msg.node_id = 0
-        msg.node_label = waypoints[currentIndex]
-    
-    rospy.loginfo(rospy.get_caller_id() + ": Publishing goal '%s'! (%d/%d)", waypoints[currentIndex], currentIndex+1, len(waypoints))
-    msg.header.stamp = rospy.get_rostime()
-    pub.publish(msg)
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
 
-def main():
-    rospy.init_node('patrol', anonymous=False)
-    sub = rospy.Subscriber("rtabmap/goal_reached", Bool, callback)
-    global waitingTime
-    global frameId
-    waitingTime = rospy.get_param('~time', waitingTime)
-    frameId = rospy.get_param('~frame_id', frameId)
-    rospy.sleep(1.) # make sure that subscribers have seen this node before sending a goal
-
-    rospy.loginfo(rospy.get_caller_id() + ": Waypoints: [%s]", str(waypoints).strip('[]'))
-    rospy.loginfo(rospy.get_caller_id() + ": time: %f", waitingTime)
-    rospy.loginfo(rospy.get_caller_id() + ": publish goal on %s", pub.resolved_name)
-    rospy.loginfo(rospy.get_caller_id() + ": receive goal status on %s", sub.resolved_name)
-
-    # send the first goal
-    msg = Goal()
-    msg.frame_id = frameId
-    try:
-        int(waypoints[currentIndex])
-        is_dig = True
-    except ValueError:
-        is_dig = False
-    if is_dig:
-        msg.node_id = int(waypoints[currentIndex])
-        msg.node_label = ""
-    else:
-        msg.node_id = 0
-        msg.node_label = waypoints[currentIndex]
-    while rospy.Time.now().secs == 0:
-         rospy.loginfo(rospy.get_caller_id() + ": Waiting clock...")
-         rospy.sleep(.1)
-    msg.header.stamp = rospy.Time.now()
-    rospy.loginfo(rospy.get_caller_id() + ": Publishing goal '%s'! (%d/%d)", waypoints[currentIndex], currentIndex+1, len(waypoints))
-    pub.publish(msg)
-    rospy.spin()    
 
 if __name__ == '__main__':
-    if len(sys.argv) < 3:
-        print("usage: patrol.py waypointA waypointB waypointC ... [_time:=1 frame_id:=base_footprint] [topic remaps] (at least 2 waypoints, can be node id, landmark or label)")
-    else:
-        waypoints = sys.argv[1:] 
-        waypoints = [x for x in waypoints if not x.startswith('/') and not x.startswith('_')]
-        main()
+    main()
