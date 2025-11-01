@@ -3,7 +3,21 @@
 #   Install realsense2 ros2 package (ros-$ROS_DISTRO-realsense2-camera)
 # Example:
 #   $ ros2 launch rtabmap_examples realsense_d435i_stereo.launch.py
-
+#
+#
+#
+#
+# VINS-Fusion example:
+#   Add to your ros2 workspace the package https://github.com/zinuok/VINS-Fusion-ROS2
+#   Apply this patch https://gist.github.com/matlabbe/ebbb343cd744da9d6d6d6ded2e1557fd
+#      -> Revert "#define USE_GPU" change if you want to build VINS-Fusion with GPU support.
+#   That may be counterintuitive, but we need to build VINS-Fusion first, then rebuild rtabmap with VINS-Fusion support.
+#      -> in your ros2 workspace, do "colcon build --packages-select vins"
+#      -> go back under rtabmap library repo, then rebuild/install with "cmake -DWITH_VINS_FUSION=ON ..."
+#      -> do "colcon build" in your ros2 workspace again to rebuild rtabmap_ros
+#   $ ros2 launch rtabmap_examples realsense_d435i_stereo.launch.py odom_args:="--Odom/Strategy 9 OdomVINSFusion/ConfigPath ~/ros2_ws/src/VINS-Fusion-ROS2/config/realsense_d435i/realsense_stereo_imu_config.yaml"
+#      -> set "imu: 1" in realsense_stereo_imu_config.yaml to do stereo inertial odometry, otherwise only stereo odometry is done.
+#
 import os
 
 from ament_index_python.packages import get_package_share_directory
