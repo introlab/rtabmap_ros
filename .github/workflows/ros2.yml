@@ -44,7 +44,7 @@ jobs:
         cat /tmp/deps.repos
     - uses: ros-tooling/action-ros-ci@v0.4
       with:
-        package-name: ${{ packages }}
+        package-name: ${{ matrix.packages }}
         target-ros2-distro: ${{ matrix.ros_distro }}
         vcs-repo-file-url: /tmp/deps.repos
         rosdep-skip-keys: "${{ matrix.skip_keys }}"
