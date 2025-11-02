@@ -20,12 +20,17 @@ jobs:
         include:
         - ros_distro: humble
           skip_keys: ''
+          packages: 'rtabmap_ros'
         - ros_distro: jazzy
           skip_keys: ''
+          packages: 'rtabmap_ros'
         - ros_distro: kilted
           skip_keys: 'grid_map_ros'
+          packages: 'rtabmap_ros'
         - ros_distro: rolling
           skip_keys: 'nav2_bringup nav2_msgs velodyne'
+          # rtabmap_costmap_plugins cannot be built, missing nav2 on rolling, build other packages:
+          packages: 'rtabmap_launch rtabmap_demos rtabmap_python rtabmap_examples rtabmap_rviz_plugins'
       fail-fast: false
     container:
       image: osrf/ros:${{ matrix.ros_distro }}-desktop-full
@@ -39,7 +44,7 @@ jobs:
         cat /tmp/deps.repos
     - uses: ros-tooling/action-ros-ci@v0.4
       with:
-        package-name: rtabmap_ros
+        package-name: ${{ packages }}
         target-ros2-distro: ${{ matrix.ros_distro }}
         vcs-repo-file-url: /tmp/deps.repos
         rosdep-skip-keys: "${{ matrix.skip_keys }}"

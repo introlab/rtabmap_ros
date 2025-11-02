@@ -45,9 +45,6 @@ SET(Libraries
   rtabmap_msgs
 )
 
-MESSAGE(STATUS "rtabmap_conversions=${rtabmap_conversions_LIBRARIES}")
-
-
 ###########
 ## Build ##
 ###########
