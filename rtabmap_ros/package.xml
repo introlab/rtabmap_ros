@@ -26,6 +26,7 @@
   <exec_depend>rtabmap_sync</exec_depend>
   <exec_depend>rtabmap_util</exec_depend>
   <exec_depend>rtabmap_viz</exec_depend>
+  <exec_depend>rtabmap_costmap_plugins</exec_depend>
   
   <export>
     <build_type>ament_cmake</build_type>
