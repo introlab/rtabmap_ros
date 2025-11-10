@@ -571,9 +571,8 @@ void OdometryROS::processData()
 		for(std::map<double, sensor_msgs::msg::Imu::ConstSharedPtr>::iterator iter=iterFirst; iter!=iterEnd;)
 		{
 			// Because we always keep the last processed imu in the buffer, skip the first 
-			// one when processing again the buffer unless its time is lower/equal to image 
-			// current stamp (could happen on initialization).
-			if(iter!=iterFirst || iter->first <= rtabmap_conversions::timestampFromROS(header.stamp)) {
+			// one when processing again the buffer
+			if(iter!=iterFirst) {
 				imus.push_back(*iter);
 			}
 			if(iter!=iterLast) {
