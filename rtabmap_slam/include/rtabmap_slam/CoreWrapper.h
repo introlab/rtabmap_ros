@@ -68,6 +68,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtabmap_msgs/DetectMoreLoopClosures.h"
 #include "rtabmap_msgs/GlobalBundleAdjustment.h"
 #include "rtabmap_msgs/CleanupLocalGrids.h"
+#include "rtabmap_msgs/EnvSensor.h"
 
 #include "rtabmap_util/MapsManager.h"
 #include "rtabmap_util/ULogToRosout.h"
@@ -161,6 +162,7 @@ private:
 	void userDataAsyncCallback(const rtabmap_msgs::UserDataConstPtr & dataMsg);
 	void globalPoseAsyncCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr & globalPoseMsg);
 	void gpsFixAsyncCallback(const sensor_msgs::NavSatFixConstPtr & gpsFixMsg);
+	void envSensorCallback(const rtabmap_msgs::EnvSensorConstPtr & envSensorMsg);
 #ifdef WITH_APRILTAG_ROS
 	void tagDetectionsAsyncCallback(const apriltag_ros::AprilTagDetectionArray & tagDetections);
 #endif
@@ -372,12 +374,13 @@ private:
 
 	ros::Subscriber userDataAsyncSub_;
 	cv::Mat userData_;
-	UMutex userDataMutex_;
 
 	ros::Subscriber globalPoseAsyncSub_;
 	geometry_msgs::PoseWithCovarianceStamped globalPose_;
 	ros::Subscriber gpsFixAsyncSub_;
 	rtabmap::GPS gps_;
+	ros::Subscriber envSensorSub_;
+	rtabmap::EnvSensors envSensors_;
 	ros::Subscriber tagDetectionsSub_;
 	ros::Subscriber fiducialTransfromsSub_;
 	std::map<int, std::pair<geometry_msgs::PoseWithCovarianceStamped, float> > tags_; // id, <pose, size>

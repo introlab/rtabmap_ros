@@ -219,6 +219,7 @@ int main(int argc, char** argv)
 	ros::Publisher scanCloudPub;
 	ros::Publisher globalPosePub;
 	ros::Publisher gpsFixPub;
+	ros::Publisher envSensorPub;
 	ros::Publisher clockPub;
 	tf2_ros::TransformBroadcaster tfBroadcaster;
 
@@ -387,6 +388,15 @@ int main(int argc, char** argv)
 			}
 		}
 
+		if(!odom.data().envSensors().empty())
+		{
+			if(envSensorPub.getTopic().empty())
+			{
+				envSensorPub = nh.advertise<rtabmap_msgs::EnvSensor>("env_sensor", 1);
+				ROS_INFO("EnvSensor will be published.");
+			}
+		}
+
 		// publish transforms first
 		if(publishTf)
 		{
@@ -484,6 +494,20 @@ int main(int argc, char** argv)
 			msg.header.frame_id = frameId;
 			msg.header.stamp.fromSec(odom.data().gps().stamp());
 			gpsFixPub.publish(msg);
+		}
+
+		if(!odom.data().envSensors().empty())
+		{
+			for(rtabmap::EnvSensors::const_iterator iter=odom.data().envSensors().begin(); iter!=odom.data().envSensors().end(); ++iter)
+			{
+				rtabmap_msgs::EnvSensor msg;
+				rtabmap_conversions::envSensorToROS(iter->second, msg);
+				msg.header.frame_id = frameId;
+				if(iter->second.stamp() == 0.0) {
+					msg.header.stamp = ros::Time(data.stamp());
+				}
+				envSensorPub.publish(msg);
+			}
 		}
 
 		if(type >= 0)

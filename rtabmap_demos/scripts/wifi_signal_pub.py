@@ -2,11 +2,13 @@
 import rospy
 import struct
 import os
-from rtabmap_ros.msg import UserData
+from rtabmap_msgs.msg import UserData, EnvSensor
 
 def loop():
     rospy.init_node('wifi_signal_pub', anonymous=True)
     pub = rospy.Publisher('wifi_signal', UserData, queue_size=10)
+    envPub = rospy.Publisher('wifi_signal/env_sensor', EnvSensor, queue_size=10)
+    frameId = rospy.get_param('frame_id', 'base_link')
     rate = rospy.Rate(0.5) # 0.5hz
     while not rospy.is_shutdown():
     
@@ -34,7 +36,16 @@ def loop():
             # to get precise position in the graph afterward.
             msg.data = struct.pack(b'dd', dBm, rospy.get_time())
 
+            msg.header.frame_id = frameId
+            msg.header.stamp = rospy.Time.now()
             pub.publish(msg)
+            
+            # Example using env sensor:
+            envMsg = EnvSensor()
+            envMsg.type = 1
+            envMsg.value = dBm
+            envMsg = msg.header
+            envPub.publish(envMsg)
         else:
             rospy.logerr("Cannot get info from wireless!")
         rate.sleep()

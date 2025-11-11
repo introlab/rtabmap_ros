@@ -34,13 +34,19 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <rtabmap_conversions/MsgConversion.h>
 #include <rtabmap_msgs/UserData.h>
+#include <rtabmap_msgs/EnvSensor.h>
 
-// Demo:
+// Demo 1 (User Data):
 // $ roslaunch freenect_launch freenect.launch depth_registration:=true
-// $ roslaunch rtabmap_launch rtabmap.launch rtabmap_args:="--delete_db_on_start" user_data_async_topic:=/wifi_signal rtabmapviz:=false rviz:=true
+// $ roslaunch rtabmap_launch rtabmap.launch rtabmap_args:="--delete_db_on_start" user_data_async_topic:=/wifi_signal rtabmap_viz:=false rviz:=true
 // $ rosrun rtabmap_demos wifi_signal_pub interface:="wlan0"
 // $ rosrun rtabmap_demos wifi_signal_sub
 // In RVIZ add PointCloud2 "wifi_signals"
+
+// Demo 2 (Env Sensor):
+// $ roslaunch freenect_launch freenect.launch depth_registration:=true
+// $ roslaunch rtabmap_launch rtabmap.launch rtabmap_args:="--delete_db_on_start" env_sensor_topic:=/wifi_signal/env_sensor rtabmap_viz:=false rviz:=true
+// $ rosrun rtabmap_demos wifi_signal_pub interface:="wlan0"
 
 // A percentage value that represents the signal quality
 // of the network. WLAN_SIGNAL_QUALITY is of type ULONG.
@@ -78,6 +84,7 @@ int main(int argc, char** argv)
 	ros::Rate rate(rateHz);
 
 	ros::Publisher wifiPub = nh.advertise<rtabmap_msgs::UserData>("wifi_signal", 1);
+	ros::Publisher envSensorPub = nh.advertise<rtabmap_msgs::EnvSensor>("wifi_signal/env_sensor", 1);
 
 	while(ros::ok())
 	{
@@ -140,6 +147,13 @@ int main(int argc, char** argv)
 			dataMsg.header.stamp = stamp;
 			rtabmap_conversions::userDataToROS(data, dataMsg, false);
 			wifiPub.publish<rtabmap_msgs::UserData>(dataMsg);
+
+			// Example with env sensor
+			rtabmap_msgs::EnvSensor envMsg;
+			envMsg.header = dataMsg.header;
+			envMsg.type = rtabmap_msgs::EnvSensor::TYPE_WIFI_SIGNAL_STRENGTH;
+			envMsg.value = double(dBm);
+			envSensorPub.publish<rtabmap_msgs::EnvSensor>(envMsg);
 		}
 		ros::spinOnce();
 		rate.sleep();

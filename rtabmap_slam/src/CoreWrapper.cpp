@@ -865,6 +865,7 @@ void CoreWrapper::onInit()
 	userDataAsyncSub_ = nh.subscribe("user_data_async", 1, &CoreWrapper::userDataAsyncCallback, this);
 	globalPoseAsyncSub_ = nh.subscribe("global_pose", 1, &CoreWrapper::globalPoseAsyncCallback, this);
 	gpsFixAsyncSub_ = nh.subscribe("gps/fix", 1, &CoreWrapper::gpsFixAsyncCallback, this);
+	envSensorSub_ = nh.subscribe("env_sensor", 1, &CoreWrapper::envSensorCallback, this);
 #ifdef WITH_APRILTAG_ROS
 	tagDetectionsSub_ = nh.subscribe("tag_detections", 1, &CoreWrapper::tagDetectionsAsyncCallback, this);
 #endif
@@ -1542,7 +1543,6 @@ void CoreWrapper::commonMultiCameraCallbackImpl(
 	if(userDataMsg.get())
 	{
 		userData = rtabmap_conversions::userDataFromROS(*userDataMsg);
-		UScopeMutex lock(userDataMutex_);
 		if(!userData_.empty())
 		{
 			NODELET_WARN("Synchronized and asynchronized user data topics cannot be used at the same time. Async user data dropped!");
@@ -1551,7 +1551,6 @@ void CoreWrapper::commonMultiCameraCallbackImpl(
 	}
 	else
 	{
-		UScopeMutex lock(userDataMutex_);
 		userData = userData_;
 		userData_ = cv::Mat();
 	}
@@ -1701,7 +1700,6 @@ void CoreWrapper::commonLaserScanCallback(
 	if(userDataMsg.get())
 	{
 		userData = rtabmap_conversions::userDataFromROS(*userDataMsg);
-		UScopeMutex lock(userDataMutex_);
 		if(!userData_.empty())
 		{
 			NODELET_WARN("Synchronized and asynchronized user data topics cannot be used at the same time. Async user data dropped!");
@@ -1710,7 +1708,6 @@ void CoreWrapper::commonLaserScanCallback(
 	}
 	else
 	{
-		UScopeMutex lock(userDataMutex_);
 		userData = userData_;
 		userData_ = cv::Mat();
 	}
@@ -1766,7 +1763,6 @@ void CoreWrapper::commonOdomCallback(
 	if(userDataMsg.get())
 	{
 		userData = rtabmap_conversions::userDataFromROS(*userDataMsg);
-		UScopeMutex lock(userDataMutex_);
 		if(!userData_.empty())
 		{
 			NODELET_WARN("Synchronized and asynchronized user data topics cannot be used at the same time. Async user data dropped!");
@@ -1775,7 +1771,6 @@ void CoreWrapper::commonOdomCallback(
 	}
 	else
 	{
-		UScopeMutex lock(userDataMutex_);
 		userData = userData_;
 		userData_ = cv::Mat();
 	}
@@ -2031,6 +2026,13 @@ void CoreWrapper::process(
 		if(!landmarks.empty())
 		{
 			data.setLandmarks(landmarks);
+		}
+
+		// Env sensors
+		if(!envSensors_.empty())
+		{
+			data.setEnvSensors(envSensors_);
+			envSensors_.clear();
 		}
 
 		// IMU
@@ -2400,7 +2402,6 @@ void CoreWrapper::userDataAsyncCallback(const rtabmap_msgs::UserDataConstPtr & d
 {
 	if(!paused_)
 	{
-		UScopeMutex lock(userDataMutex_);
 		static bool warningShow = false;
 		if(!userData_.empty() && !warningShow)
 		{
@@ -2443,6 +2444,16 @@ void CoreWrapper::gpsFixAsyncCallback(const sensor_msgs::NavSatFixConstPtr & gps
 				gpsFixMsg->altitude,
 				error,
 				0);
+	}
+}
+
+void CoreWrapper::envSensorCallback(const rtabmap_msgs::EnvSensorConstPtr & envSensorMsg)
+{
+	if(!paused_)
+	{
+		// Can only insert one value for each type per node, keep the most recent
+		EnvSensor value = rtabmap_conversions::envSensorFromROS(*envSensorMsg);
+		uInsert(envSensors_, std::make_pair(value.type(), value));
 	}
 }
 
@@ -2889,10 +2900,9 @@ bool CoreWrapper::resetRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empt
 	previousStamp_ = ros::Time(0);
 	globalPose_.header.stamp = ros::Time(0);
 	gps_ = rtabmap::GPS();
+	envSensors_.clear();
 	tags_.clear();
-	userDataMutex_.lock();
 	userData_ = cv::Mat();
-	userDataMutex_.unlock();
 	imus_.clear();
 	imuFrameId_.clear();
 	interOdoms_.clear();
@@ -2978,10 +2988,9 @@ bool CoreWrapper::loadDatabaseCallback(rtabmap_msgs::LoadDatabase::Request& req,
 	previousStamp_ = ros::Time(0);
 	globalPose_.header.stamp = ros::Time(0);
 	gps_ = rtabmap::GPS();
+	envSensors_.clear();
 	tags_.clear();
-	userDataMutex_.lock();
 	userData_ = cv::Mat();
-	userDataMutex_.unlock();
 	imus_.clear();
 	imuFrameId_.clear();
 	interOdoms_.clear();
@@ -3117,11 +3126,10 @@ bool CoreWrapper::backupDatabaseCallback(std_srvs::Empty::Request&, std_srvs::Em
 	goalFrameId_.clear();
 	latestNodeWasReached_ = false;
 	graphLatched_ = false;
-	userDataMutex_.lock();
 	userData_ = cv::Mat();
-	userDataMutex_.unlock();
 	globalPose_.header.stamp = ros::Time(0);
 	gps_ = rtabmap::GPS();
+	envSensors_.clear();
 	tags_.clear();
 
 	NODELET_INFO("Backup: Saving \"%s\" to \"%s\"...", databasePath_.c_str(), (databasePath_+".back").c_str());

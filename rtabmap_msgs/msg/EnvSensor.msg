@@ -1,6 +1,27 @@
 
 Header header
 
-# EnvSensor
+# Environmental sensor
+
+# built-in types
+int32 TYPE_UNDEFINED=0
+int32 TYPE_WIFI_SIGNAL_STRENGTH=1      # dBm
+int32 TYPE_AMBIENT_TEMPERATURE=2       # Celcius
+int32 TYPE_AMBIENT_AIR_PRESSURE=3      # hPa
+int32 TYPE_AMBIENT_LIGHT=4             # lx
+int32 TYPE_AMBIENT_RELATIVE_HUMIDITY=5 # %
+
+# user types
+int32 TYPE_CUSTOM1=100
+int32 TYPE_CUSTOM2=101
+int32 TYPE_CUSTOM3=102
+int32 TYPE_CUSTOM4=103
+int32 TYPE_CUSTOM5=104
+int32 TYPE_CUSTOM6=105
+int32 TYPE_CUSTOM7=106
+int32 TYPE_CUSTOM8=107
+int32 TYPE_CUSTOM9=108
+
 int32 type
+
 float64 value
