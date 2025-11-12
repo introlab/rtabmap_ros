@@ -48,6 +48,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <tf2_ros/transform_broadcaster.h>
 
 #include <rtabmap_msgs/msg/rgbd_image.hpp>
+#include <rtabmap_msgs/msg/env_sensor.hpp>
 #include <rtabmap/core/DBReader.h>
 #include <rtabmap/core/OdometryEvent.h>
 
@@ -88,6 +89,7 @@ private:
     int qosGlobalPose_;
     int qosGps_;
     int qosImu_;
+    int qosEnvSensor_;
     double scanAngleMin_;
     double scanAngleMax_;
     double scanAngleIncrement_;
@@ -112,6 +114,7 @@ private:
 	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr scanCloudPub_;
 	rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr globalPosePub_;
 	rclcpp::Publisher<sensor_msgs::msg::NavSatFix>::SharedPtr gpsFixPub_;
+  rclcpp::Publisher<rtabmap_msgs::msg::EnvSensor>::SharedPtr envSensorPub_;
   rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imuPub_;
 	rclcpp::Publisher<rosgraph_msgs::msg::Clock>::SharedPtr clockPub_;
 	std::shared_ptr<tf2_ros::TransformBroadcaster> tfBroadcaster_;

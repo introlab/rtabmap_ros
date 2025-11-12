@@ -132,6 +132,7 @@ DbPlayer::DbPlayer(const rclcpp::NodeOptions & options) :
     RCLCPP_INFO(get_logger(), "  qos_global_pose = %d", qosGlobalPose_);
     RCLCPP_INFO(get_logger(), "  qos_gps = %d", qosGps_);
     RCLCPP_INFO(get_logger(), "  qos_imu = %d", qosImu_);
+    RCLCPP_INFO(get_logger(), "  qos_env_sensor = %d", qosEnvSensor_);
 
     if(databasePath.empty())
     {
@@ -318,6 +319,12 @@ void DbPlayer::initializePublishers(const rtabmap::OdometryEvent & odom)
     {
         gpsFixPub_ = this->create_publisher<sensor_msgs::msg::NavSatFix>("gps/fix", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qosGps_));
                 RCLCPP_INFO(get_logger(), "GPS                  \"%s\" will be published.", gpsFixPub_->get_topic_name());
+    }
+
+    if(!envSensorPub_.get() && !odom.data().envSensors().empty())
+    {
+        envSensorPub_ = this->create_publisher<rtabmap_msgs::msg::EnvSensor>("env_sensor", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qosEnvSensor_));
+                RCLCPP_INFO(get_logger(), "Env sensor           \"%s\" will be published.", envSensorPub_->get_topic_name());
     }
 
     if(!odometryPub_.get() && !odom.pose().isNull())
@@ -510,6 +517,23 @@ bool DbPlayer::publishNextFrame()
         msg.header.frame_id = frameId_;
         msg.header.stamp = rtabmap_conversions::timestampToROS(odom.data().gps().stamp());
         gpsFixPub_->publish(msg);
+    }
+
+    if( envSensorPub_.get() &&
+        envSensorPub_->get_subscription_count() > 0 &&
+        !odom.data().envSensors().empty())
+    {
+        rtabmap_msgs::msg::EnvSensor msg;
+        for(rtabmap::EnvSensors::const_iterator iter=odom.data().envSensors().begin(); iter!=odom.data().envSensors().end(); ++iter)
+        {
+            rtabmap_msgs::msg::EnvSensor msg;
+            rtabmap_conversions::envSensorToROS(iter->second, msg);
+            msg.header.frame_id = frameId_;
+            if(iter->second.stamp() == 0.0) {
+                msg.header.stamp = rtabmap_conversions::timestampToROS(data.stamp());
+            }
+            envSensorPub_->publish(msg);
+        }
     }
 
     if( imuPub_.get() &&

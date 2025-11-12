@@ -69,6 +69,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtabmap_msgs/msg/info.hpp"
 #include "rtabmap_msgs/msg/landmark_detection.hpp"
 #include "rtabmap_msgs/msg/landmark_detections.hpp"
+#include "rtabmap_msgs/msg/env_sensor.h"
 #include "rtabmap_msgs/srv/get_nodes_in_radius.hpp"
 #include "rtabmap_msgs/srv/load_database.hpp"
 #include "rtabmap_msgs/srv/detect_more_loop_closures.hpp"
@@ -191,6 +192,7 @@ private:
 	void userDataAsyncCallback(const rtabmap_msgs::msg::UserData::SharedPtr dataMsg);
 	void globalPoseAsyncCallback(const geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr globalPoseMsg);
 	void gpsFixAsyncCallback(const sensor_msgs::msg::NavSatFix::SharedPtr gpsFixMsg);
+	void envSensorAsyncCallback(const rtabmap_msgs::msg::EnvSensor::SharedPtr envSensorMsg);
 	void landmarkDetectionAsyncCallback(const rtabmap_msgs::msg::LandmarkDetection::SharedPtr landmarkDetection);
 	void landmarkDetectionsAsyncCallback(const rtabmap_msgs::msg::LandmarkDetections::SharedPtr landmarkDetections);
 #ifdef WITH_APRILTAG_MSGS
@@ -444,6 +446,11 @@ private:
 	rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr gpsFixAsyncSub_;
 	std::map<double, rtabmap::GPS> gps_;
 	UMutex gpsMutex_;
+
+	rclcpp::CallbackGroup::SharedPtr envSensorAsyncCallbackGroup_;
+	rclcpp::Subscription<rtabmap_msgs::msg::EnvSensor>::SharedPtr envSensorAsyncSub_;
+	rtabmap::EnvSensors envSensors_;
+	UMutex envSensorMutex_;
 
 	rclcpp::CallbackGroup::SharedPtr landmarkCallbackGroup_;
 	rclcpp::Subscription<rtabmap_msgs::msg::LandmarkDetection>::SharedPtr landmarkDetectionSub_;

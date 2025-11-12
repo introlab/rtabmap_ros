@@ -63,6 +63,7 @@ def launch_setup(context, *args, **kwargs):
         DeclareLaunchArgument('qos_user_data',   default_value=LaunchConfiguration('qos'), description='Specific QoS used for user input data: 0=system default, 1=Reliable, 2=Best Effort.'),
         DeclareLaunchArgument('qos_imu',         default_value=LaunchConfiguration('qos'), description='Specific QoS used for imu input data: 0=system default, 1=Reliable, 2=Best Effort.'),
         DeclareLaunchArgument('qos_gps',         default_value=LaunchConfiguration('qos'), description='Specific QoS used for gps input data: 0=system default, 1=Reliable, 2=Best Effort.'),
+        DeclareLaunchArgument('qos_env_sensor',         default_value=LaunchConfiguration('qos'), description='Specific QoS used for env sensor input data: 0=system default, 1=Reliable, 2=Best Effort.'),
         
         DeclareLaunchArgument('odom_log_level',  default_value=LaunchConfiguration('log_level'), description='Specific ROS logger level for odometry node.'),
         
@@ -316,6 +317,7 @@ def launch_setup(context, *args, **kwargs):
                 "qos_camera_info": LaunchConfiguration('qos_camera_info'),
                 "qos_imu": LaunchConfiguration('qos_imu'),
                 "qos_gps": LaunchConfiguration('qos_gps'),
+                "qos_env_sensor": LaunchConfiguration('qos_env_sensor'),
                 "qos_user_data": LaunchConfiguration('qos_user_data'),
                 "scan_normal_k": LaunchConfiguration('scan_normal_k'),
                 "landmark_linear_variance": LaunchConfiguration('tag_linear_variance'),
@@ -340,6 +342,7 @@ def launch_setup(context, *args, **kwargs):
                 ("gps/fix", LaunchConfiguration('gps_topic')),
                 ("tag_detections", LaunchConfiguration('tag_topic')),
                 ("fiducial_transforms", LaunchConfiguration('fiducial_topic')),
+                ("env_sensor", LaunchConfiguration('env_sensor_topic')),
                 ("odom", LaunchConfiguration('odom_topic')),
                 ("imu", LaunchConfiguration('imu_topic')),
                 ("goal_out", LaunchConfiguration('output_goal_topic'))],
@@ -529,6 +532,8 @@ def generate_launch_description():
         DeclareLaunchArgument('tag_linear_variance',  default_value='0.0001',          description=''),
         DeclareLaunchArgument('tag_angular_variance', default_value='9999.0',            description='>=9999 means rotation is ignored in optimization, when rotation estimation of the tag is not reliable or not computed.'),
         DeclareLaunchArgument('fiducial_topic',       default_value='/fiducial_transforms', description='aruco_detect async subscription, use tag_linear_variance and tag_angular_variance to set covariance.'),
+        
+        DeclareLaunchArgument('env_sensor_topic',     default_value='/env_sensor', description='A rtabmap_msgs/EnvSensor topic.'),
         OpaqueFunction(function=launch_setup)
     ])
 

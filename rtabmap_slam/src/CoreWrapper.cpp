@@ -872,24 +872,30 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 	gpsAsyncCallbackGroup_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 	landmarkCallbackGroup_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 	imuCallbackGroup_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+	envSensorAsyncCallbackGroup_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 	rclcpp::SubscriptionOptions userDataAsyncSubOptions;
 	rclcpp::SubscriptionOptions globalPoseAsyncSubOptions;
 	rclcpp::SubscriptionOptions gpsAsyncSubOptions;
 	rclcpp::SubscriptionOptions landmarkSubOptions;
 	rclcpp::SubscriptionOptions imuSubOptions;
+	rclcpp::SubscriptionOptions envSensorAsyncSubOptions;
 	userDataAsyncSubOptions.callback_group = userDataAsyncCallbackGroup_;
 	globalPoseAsyncSubOptions.callback_group = globalPoseAsyncCallbackGroup_;
 	gpsAsyncSubOptions.callback_group = gpsAsyncCallbackGroup_;
 	landmarkSubOptions.callback_group = imuCallbackGroup_;
 	imuSubOptions.callback_group = imuCallbackGroup_;
+	envSensorAsyncSubOptions.callback_group = envSensorAsyncCallbackGroup_;
 
 	int qosGPS = RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT;
 	int qosIMU = RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT;
+	int qosEnvSensor = RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT;
 	qosGPS = this->declare_parameter("qos_gps", qosGPS);
 	qosIMU = this->declare_parameter("qos_imu", qosIMU);
+	qosEnvSensor = this->declare_parameter("qos_env_sensor", qosEnvSensor);
 	userDataAsyncSub_ = this->create_subscription<rtabmap_msgs::msg::UserData>("user_data_async", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qosUserData_), std::bind(&CoreWrapper::userDataAsyncCallback, this, std::placeholders::_1), userDataAsyncSubOptions);
 	globalPoseAsyncSub_ = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>("global_pose", 1, std::bind(&CoreWrapper::globalPoseAsyncCallback, this, std::placeholders::_1), globalPoseAsyncSubOptions);
 	gpsFixAsyncSub_ = this->create_subscription<sensor_msgs::msg::NavSatFix>("gps/fix", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qosGPS), std::bind(&CoreWrapper::gpsFixAsyncCallback, this, std::placeholders::_1), gpsAsyncSubOptions);
+	envSensorAsyncSub_ = this->create_subscription<rtabmap_msgs::msg::EnvSensor>("env_sensor", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qosEnvSensor), std::bind(&CoreWrapper::envSensorAsyncCallback, this, std::placeholders::_1), envSensorAsyncSubOptions);
 	landmarkDetectionSub_ = this->create_subscription<rtabmap_msgs::msg::LandmarkDetection>("landmark_detection", 1, std::bind(&CoreWrapper::landmarkDetectionAsyncCallback, this, std::placeholders::_1), landmarkSubOptions);
 	landmarkDetectionsSub_ = this->create_subscription<rtabmap_msgs::msg::LandmarkDetections>("landmark_detections", 1, std::bind(&CoreWrapper::landmarkDetectionsAsyncCallback, this, std::placeholders::_1), landmarkSubOptions);
 #ifdef WITH_APRILTAG_MSGS
@@ -2256,6 +2262,16 @@ void CoreWrapper::process(
 			data.setLandmarks(landmarks);
 		}
 
+		// Env sensors
+		{
+			UScopeMutex lock(envSensorMutex_);
+			if(!envSensors_.empty())
+			{
+				data.setEnvSensors(envSensors_);
+				envSensors_.clear();
+			}
+		}
+
 		// IMU
 		imuMutex_.lock();
 		if(!imus_.empty())
@@ -2692,6 +2708,17 @@ void CoreWrapper::gpsFixAsyncCallback(const sensor_msgs::msg::NavSatFix::SharedP
 		{
 			gps_.erase(gps_.begin());
 		}
+	}
+}
+
+void CoreWrapper::envSensorAsyncCallback(const rtabmap_msgs::msg::EnvSensor::SharedPtr envSensorMsg)
+{
+	if(!paused_)
+	{
+		// Can only insert one value for each type per node, keep the most recent
+		EnvSensor value = rtabmap_conversions::envSensorFromROS(*envSensorMsg);
+		UScopeMutex lock(envSensorMutex_);
+		uInsert(envSensors_, std::make_pair(value.type(), value));
 	}
 }
 
@@ -3252,6 +3279,9 @@ void CoreWrapper::resetRtabmapCallback(
 	userDataMutex_.lock();
 	userData_ = cv::Mat();
 	userDataMutex_.unlock();
+	envSensorMutex_.lock();
+	envSensors_.clear();
+	envSensorMutex_.unlock();
 	imuMutex_.lock();
 	imus_.clear();
 	imuFrameId_.clear();
@@ -3354,6 +3384,9 @@ void CoreWrapper::loadDatabaseCallback(
 	userDataMutex_.lock();
 	userData_ = cv::Mat();
 	userDataMutex_.unlock();
+	envSensorMutex_.lock();
+	envSensors_.clear();
+	envSensorMutex_.unlock();
 	imuMutex_.lock();
 	imus_.clear();
 	imuFrameId_.clear();
@@ -3502,6 +3535,9 @@ void CoreWrapper::backupDatabaseCallback(
 	userDataMutex_.unlock();
 	globalPoses_.clear();
 	gps_.clear();
+	envSensorMutex_.lock();
+	envSensors_.clear();
+	envSensorMutex_.unlock();
 	landmarksMutex_.lock();
 	landmarks_.clear();
 	landmarksMutex_.unlock();
