@@ -417,11 +417,12 @@ bool DbPlayer::publishNextFrame()
             stereo = true;
         }
         int index = 0;
+        static bool firstTimeCamMsg = true;
         for(const auto & cam: *models) {
             rtabmap::Transform localTransform = cam.localTransform();
             if(!localTransform.isNull()) {
                 geometry_msgs::msg::TransformStamped baseToCamera;
-                baseToCamera.child_frame_id = (stereo?index%2==0?"left_":"right_":"") + cameraFrameId_ + (models->size()>1?uNumber2Str(index/(stereo?2:1)):"");
+                baseToCamera.child_frame_id = (stereo?index%2==0?"left_":"right_":"") + cameraFrameId_ + (((stereo && models->size()>2) || (!stereo && models->size()>1))?uNumber2Str(index/(stereo?2:1)):"");
                 baseToCamera.header.frame_id = frameId_;
                 baseToCamera.header.stamp = time;
                 if(cam.Tx() != 0) {
@@ -429,9 +430,13 @@ bool DbPlayer::publishNextFrame()
                 }
                 rtabmap_conversions::transformToGeometryMsg(localTransform, baseToCamera.transform);
                 transforms.push_back(baseToCamera);
+                if(firstTimeCamMsg) {
+                    RCLCPP_INFO(get_logger(), "Will publish tf %s -> %s", baseToCamera.header.frame_id.c_str(), baseToCamera.child_frame_id.c_str());
+                }
             }
             ++index;
         }
+        firstTimeCamMsg = firstTimeCamMsg && models->empty()?true:false;
 
         if(!odom.pose().isNull())
         {
@@ -441,6 +446,12 @@ bool DbPlayer::publishNextFrame()
             odomToBase.header.stamp = time;
             rtabmap_conversions::transformToGeometryMsg(odom.pose(), odomToBase.transform);
             transforms.push_back(odomToBase);
+            static bool firstTimeMsg = true;
+            if(firstTimeMsg) {
+                RCLCPP_INFO(get_logger(), "Will publish tf %s -> %s", odomToBase.header.frame_id.c_str(), odomToBase.child_frame_id.c_str());
+            }
+            firstTimeMsg = false;
+            
         }
 
         if(scanPub_.get() || scanCloudPub_.get())
@@ -451,6 +462,11 @@ bool DbPlayer::publishNextFrame()
             baseToLaserScan.header.stamp = time;
             rtabmap_conversions::transformToGeometryMsg(odom.data().laserScanCompressed().localTransform(), baseToLaserScan.transform);
             transforms.push_back(baseToLaserScan);
+            static bool firstTimeMsg = true;
+            if(firstTimeMsg) {
+                RCLCPP_INFO(get_logger(), "Will publish tf %s -> %s", baseToLaserScan.header.frame_id.c_str(), baseToLaserScan.child_frame_id.c_str());
+            }
+            firstTimeMsg = false;
         }
 
         if(!odom.data().groundTruth().isNull()) {
@@ -460,6 +476,11 @@ bool DbPlayer::publishNextFrame()
             worldToBase.header.stamp = time;
             rtabmap_conversions::transformToGeometryMsg(odom.data().groundTruth(), worldToBase.transform);
             transforms.push_back(worldToBase);
+            static bool firstTimeMsg = true;
+            if(firstTimeMsg) {
+                RCLCPP_INFO(get_logger(), "Will publish tf %s -> %s", worldToBase.header.frame_id.c_str(), worldToBase.child_frame_id.c_str());
+            }
+            firstTimeMsg = false;
         }
 
         if(!odom.data().imu().empty()) {
@@ -469,6 +490,11 @@ bool DbPlayer::publishNextFrame()
             baseToImu.header.stamp = time;
             rtabmap_conversions::transformToGeometryMsg(odom.data().imu().localTransform(), baseToImu.transform);
             transforms.push_back(baseToImu);
+            static bool firstTimeMsg = true;
+            if(firstTimeMsg) {
+                RCLCPP_INFO(get_logger(), "Will publish tf %s -> %s", baseToImu.header.frame_id.c_str(), baseToImu.child_frame_id.c_str());
+            }
+            firstTimeMsg = false;
         }
         tfBroadcaster_->sendTransform(transforms);
     }
