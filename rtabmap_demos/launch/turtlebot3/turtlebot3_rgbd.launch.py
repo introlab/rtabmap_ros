@@ -65,7 +65,7 @@ def generate_launch_description():
             package='rtabmap_slam', executable='rtabmap', output='screen',
             parameters=[parameters],
             remappings=remappings,
-            arguments=['-d', '--udebug']), # This will delete the previous database (~/.ros/rtabmap.db)
+            arguments=['-d']), # This will delete the previous database (~/.ros/rtabmap.db)
             
         # Localization mode:
         Node(
