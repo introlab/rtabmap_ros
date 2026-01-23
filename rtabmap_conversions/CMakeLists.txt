@@ -29,7 +29,7 @@ find_package(tf2 REQUIRED)
 find_package(tf2_eigen REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 
-find_package(RTABMap 0.22.0 REQUIRED)
+find_package(RTABMap 0.23.4 REQUIRED)
 
 include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/include

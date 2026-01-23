@@ -999,19 +999,28 @@ CoreWrapper::~CoreWrapper()
 	this->saveParameters(configPath_);
 
 	printf("rtabmap: Saving database/long-term memory... (located at %s)\n", databasePath_.c_str());
+	bool saveDatabase = true;
 	if(rtabmap_.getMemory())
 	{
-		// save the grid map
-		float xMin=0.0f, yMin=0.0f, gridCellSize = 0.05f;
-		cv::Mat pixels = mapsManager_.getGridMap(xMin, yMin, gridCellSize);
-		if(!pixels.empty())
+		if(!rtabmap_.getMemory()->isReadOnly())
 		{
-			printf("rtabmap: 2D occupancy grid map saved.\n");
-			rtabmap_.getMemory()->save2DMap(pixels, xMin, yMin, gridCellSize);
+			// save the grid map
+			float xMin=0.0f, yMin=0.0f, gridCellSize = 0.05f;
+			cv::Mat pixels = mapsManager_.getGridMap(xMin, yMin, gridCellSize);
+			if(!pixels.empty())
+			{
+				printf("rtabmap: 2D occupancy grid map saved.\n");
+				rtabmap_.getMemory()->save2DMap(pixels, xMin, yMin, gridCellSize);
+			}
+		}
+		else
+		{
+			printf("rtabmap: Database is read-only, the current state of the memory is not saved.\n");
+			saveDatabase = false;
 		}
 	}
 
-	rtabmap_.close();
+	rtabmap_.close(saveDatabase);
 	printf("rtabmap: Saving database/long-term memory...done! (located at %s, %ld MB)\n", databasePath_.c_str(), UFile::length(databasePath_)/(1024*1024));
 
 	delete interOdomSync_;
