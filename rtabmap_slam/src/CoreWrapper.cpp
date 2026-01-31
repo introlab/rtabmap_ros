@@ -3356,18 +3356,27 @@ void CoreWrapper::loadDatabaseCallback(
 
 	// Close old database
 	RCLCPP_INFO(get_logger(), "LoadDatabase: Saving current map (%s)...", databasePath_.c_str());
+	bool saveDatabase = true;
 	if(rtabmap_.getMemory())
 	{
-		// save the grid map
-		float xMin=0.0f, yMin=0.0f, gridCellSize = 0.05f;
-		cv::Mat pixels = mapsManager_.getGridMap(xMin, yMin, gridCellSize);
-		if(!pixels.empty())
+		if(!rtabmap_.getMemory()->isReadOnly())
 		{
-			printf("rtabmap: 2D occupancy grid map saved.\n");
-			rtabmap_.getMemory()->save2DMap(pixels, xMin, yMin, gridCellSize);
+			// save the grid map
+			float xMin=0.0f, yMin=0.0f, gridCellSize = 0.05f;
+			cv::Mat pixels = mapsManager_.getGridMap(xMin, yMin, gridCellSize);
+			if(!pixels.empty())
+			{
+				printf("rtabmap: 2D occupancy grid map saved.\n");
+				rtabmap_.getMemory()->save2DMap(pixels, xMin, yMin, gridCellSize);
+			}
+		}
+		else
+		{
+			printf("rtabmap: Database is read-only, the current state of the memory is not saved.\n");
+			saveDatabase = false;
 		}
 	}
-	rtabmap_.close();
+	rtabmap_.close(saveDatabase);
 	RCLCPP_INFO(get_logger(), "LoadDatabase: Saving current map (%s, %ld MB)... done!", databasePath_.c_str(), UFile::length(databasePath_)/(1024*1024));
 
 	lastPoseMutex_.lock();
@@ -3512,18 +3521,27 @@ void CoreWrapper::backupDatabaseCallback(
 		std::shared_ptr<std_srvs::srv::Empty::Response>)
 {
 	RCLCPP_INFO(this->get_logger(), "Backup: Saving memory...");
+	bool saveDatabase = true;
 	if(rtabmap_.getMemory())
 	{
-		// save the grid map
-		float xMin=0.0f, yMin=0.0f, gridCellSize = 0.05f;
-		cv::Mat pixels = mapsManager_.getGridMap(xMin, yMin, gridCellSize);
-		if(!pixels.empty())
+		if(!rtabmap_.getMemory()->isReadOnly())
 		{
-			printf("rtabmap: 2D occupancy grid map saved.\n");
-			rtabmap_.getMemory()->save2DMap(pixels, xMin, yMin, gridCellSize);
+			// save the grid map
+			float xMin=0.0f, yMin=0.0f, gridCellSize = 0.05f;
+			cv::Mat pixels = mapsManager_.getGridMap(xMin, yMin, gridCellSize);
+			if(!pixels.empty())
+			{
+				printf("rtabmap: 2D occupancy grid map saved.\n");
+				rtabmap_.getMemory()->save2DMap(pixels, xMin, yMin, gridCellSize);
+			}
+		}
+		else
+		{
+			printf("rtabmap: Database is read-only, the current state of the memory is not saved.\n");
+			saveDatabase = false;
 		}
 	}
-	rtabmap_.close();
+	rtabmap_.close(saveDatabase);
 	RCLCPP_INFO(this->get_logger(), "Backup: Saving memory... done!");
 
 	lastPoseMutex_.lock();
