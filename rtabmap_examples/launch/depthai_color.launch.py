@@ -2,9 +2,9 @@
 #   A OAK-D camera
 #   Install depthai-ros package (https://github.com/luxonis/depthai-ros). Tested on Humble branch!
 # Example:
-#   $ ros2 launch rtabmap_examples depthai.launch.py camera_model:=OAK-D
+#   $ ros2 launch rtabmap_examples depthai_color.launch.py camera_model:=OAK-D
 #
-# Description: In this example, we feed IR-D images to rtabmap
+# Description: In this example, we feed RGB-D images to rtabmap
 #
 # Note: The first frames may be too bright or too dark till camera exposure adjusts 
 #       to an appriopriate level. Do "Detection->Reset odometry", then 
@@ -24,9 +24,11 @@ def generate_launch_description():
     parameters=[{'frame_id':'oak-d-base-frame',
                  'subscribe_rgbd':True,
                  'subscribe_odom_info':True,
-                 'approx_sync':False,
-                 'wait_imu_to_init':True}]
-
+                 'approx_sync':False}]
+    
+    sync_parameters=[{'approx_sync':True,
+                      'approx_sync_max_interval':0.005}]
+    
     remappings=[('imu', '/imu/data')]
 
     return LaunchDescription([
@@ -36,17 +38,18 @@ def generate_launch_description():
             PythonLaunchDescriptionSource([os.path.join(
                 get_package_share_directory('depthai_examples'), 'launch'),
                 '/stereo_inertial_node.launch.py']),
-                launch_arguments={'depth_aligned': 'false',
-                                  'enableRviz': 'false',
-                                  'monoResolution': '400p'}.items(),
+                launch_arguments={'enableRviz': 'false',
+                                  'rgbResolution': '1080p',
+                                  'rgbScaleNumerator': '2', # Convert to 720p (same size than depth)
+                                  'rgbScaleDinominator': '3'}.items(),
         ),
 
         # Sync right/depth/camera_info together
         Node(   
             package='rtabmap_sync', executable='rgbd_sync', output='screen',
-            parameters=parameters,
-            remappings=[('rgb/image', '/right/image_rect'),
-                        ('rgb/camera_info', '/right/camera_info'),
+            parameters=sync_parameters,
+            remappings=[('rgb/image', '/color/image'),
+                        ('rgb/camera_info', '/color/camera_info'),
                         ('depth/image', '/stereo/depth')]),
 
         # Compute quaternion of the IMU
