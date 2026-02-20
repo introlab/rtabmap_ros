@@ -1,0 +1,27 @@
+#%YAML:1.0
+---
+camera_name: MULTI_RGBD_INERTIAL_DATASET_RIGHT
+image_width: 640
+image_height: 360
+camera_matrix:
+   rows: 3
+   cols: 3
+   data: [ 320.7208, 0., 325.4179, 0.,
+       320.7359, 184.8089, 0., 0., 1. ]
+distortion_coefficients:
+   rows: 1
+   cols: 4
+   data: [ -0.0531, 0.0549, -0.0166, 0.0 ]
+distortion_model: plumb_bob
+rectification_matrix:
+   rows: 3
+   cols: 3
+   data: [ 1, 0, 0, 
+       0, 1, 0,
+       0, 0, 1 ]
+projection_matrix:
+   rows: 3
+   cols: 4
+   data: [ 320.7208, 0., 325.4179, 0., 0.,
+       320.7359, 184.8089, 0., 0., 0., 1.,
+       0. ]
