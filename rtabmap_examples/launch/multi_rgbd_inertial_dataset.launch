@@ -114,6 +114,7 @@
       <param name="Grid/RayTracing"          type="string" value="true"/>
       <param name="Grid/NormalsSegmentation" type="string" value="false"/>
       <param name="Grid/MaxGroundHeight"     type="string" value="0.05"/>
+      <param name="Rtabmap/CreateIntermediateNodes" type="string" value="true"/> <!-- Only to record all odometry poses for trajectory evaluation purpose -->
       <remap from="sensor_data" to="odom_sensor_data/raw"/>
       <remap if="$(arg use_imu)" from="imu" to="/imu"/>
     </node>
