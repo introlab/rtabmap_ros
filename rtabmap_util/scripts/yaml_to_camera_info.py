@@ -73,9 +73,14 @@ class YamlToCameraInfo(Node):
 def main(args=None):
     rclpy.init(args=args)
     yaml_to_camera_info = YamlToCameraInfo()
-    rclpy.spin(yaml_to_camera_info)
-    yaml_to_camera_info.destroy_node()
-    rclpy.shutdown()
+    try:
+        rclpy.spin(yaml_to_camera_info)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        yaml_to_camera_info.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 if __name__ == "__main__":
     main()

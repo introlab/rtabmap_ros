@@ -22,6 +22,10 @@
     },
     "workspaceMount": "source=${localWorkspaceFolder},target=/home/vscode/catkin_ws/src/rtabmap_ros,type=bind",
     "workspaceFolder": "/home/vscode/catkin_ws",
-    "postCreateCommand": "cd /home/vscode/catkin_ws/src && catkin_init_workspace"
-    //"runArgs": ["--privileged", "--runtime=nvidia", "--network=host"]
+    "postCreateCommand": "cd /home/vscode/catkin_ws/src && catkin_init_workspace",
+    "runArgs": ["--privileged",
+                "--runtime=nvidia",
+                "--env=DISPLAY",
+                "--env=QT_X11_NO_MITSHM=1",
+                "--volume=/tmp/.X11-unix:/tmp/.X11-unix"]
 }

@@ -33,7 +33,7 @@ namespace rtabmap_sync
 {
 
 RGBDXSync::RGBDXSync(const rclcpp::NodeOptions & options) :
-	Node("rgbd_sync", options),
+	Node("rgbdx_sync", options),
 	SYNC_INIT(rgbd2),
 	SYNC_INIT(rgbd3),
 	SYNC_INIT(rgbd4),
