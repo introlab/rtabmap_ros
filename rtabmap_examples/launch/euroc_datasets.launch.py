@@ -105,15 +105,13 @@ def generate_launch_description():
             namespace='stereo_camera'),
             
         Node(
-            package='image_proc', executable='image_proc', output='screen',
+            package='image_proc', executable='rectify_node', output='screen',
             remappings=[
-              ('image_raw', '/cam0/image_raw'),
               ('image', '/cam0/image_raw')],
             namespace='stereo_camera/left'),
         Node(
-            package='image_proc', executable='image_proc', output='screen',
+            package='image_proc', executable='rectify_node', output='screen',
             remappings=[
-              ('image_raw', '/cam1/image_raw'),
               ('image', '/cam1/image_raw')],
             namespace='stereo_camera/right'),
 
