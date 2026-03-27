@@ -21,9 +21,9 @@ def generate_launch_description():
           'approx_sync':False}]
 
     remappings=[
-          ('rgb/image', '/camera/color/image_raw'),
-          ('rgb/camera_info', '/camera/color/camera_info'),
-          ('depth/image', '/camera/aligned_depth_to_color/image_raw')]
+          ('rgb/image', '/camera/camera/color/image_raw'),
+          ('rgb/camera_info', '/camera/camera/color/camera_info'),
+          ('depth/image', '/camera/camera/aligned_depth_to_color/image_raw')]
 
     return LaunchDescription([
 
