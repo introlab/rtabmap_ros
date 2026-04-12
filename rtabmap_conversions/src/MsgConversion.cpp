@@ -2740,8 +2740,9 @@ bool convertScan3dMsg(
 		float maxRange,
 		bool is2D)
 {
-	UASSERT_MSG(scan3dMsg.data.size() == scan3dMsg.row_step*scan3dMsg.height,
-			uFormat("data=%d row_step=%d height=%d", scan3dMsg.data.size(), scan3dMsg.row_step, scan3dMsg.height).c_str());
+	UASSERT_MSG(scan3dMsg.data.size() == scan3dMsg.row_step*scan3dMsg.height ||
+				scan3dMsg.data.size() == scan3dMsg.point_step*scan3dMsg.width*scan3dMsg.height,
+			uFormat("data=%d row_step=%d point_step=%d width=%d height=%d", scan3dMsg.data.size(), scan3dMsg.row_step,  scan3dMsg.point_step,  scan3dMsg.width, scan3dMsg.height).c_str());
 
 	rtabmap::Transform scanLocalTransform = getTransform(frameId, scan3dMsg.header.frame_id, scan3dMsg.header.stamp, listener, waitForTransform);
 	if(scanLocalTransform.isNull())
