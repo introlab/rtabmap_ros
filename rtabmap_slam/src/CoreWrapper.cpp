@@ -964,17 +964,7 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 							parameters_.at(key) = vStr;
 						}
 					}
-					RCLCPP_INFO(this->get_logger(), "rtabmap: Updating parameters");
-					if(parameters_.find(Parameters::kRtabmapDetectionRate()) != parameters_.end())
-					{
-						rate_ = uStr2Float(parameters_.at(Parameters::kRtabmapDetectionRate()));
-						RCLCPP_INFO(this->get_logger(), "RTAB-Map rate detection = %f Hz", rate_);
-					}
-					rtabmap_.parseParameters(parameters_);
-					// Don't reset map in localization mode
-					if(rtabmap_.getMemory()->isIncremental()) {
-						mapsManager_.setParameters(parameters_);
-					}
+					applyParameters();
 				}
 			};
 
@@ -3219,6 +3209,11 @@ void CoreWrapper::updateRtabmapCallback(
 			}
 		}
 	}
+	applyParameters();
+}
+
+void CoreWrapper::applyParameters()
+{
 	RCLCPP_INFO(get_logger(), "rtabmap: Updating parameters");
 	if(parameters_.find(Parameters::kRtabmapDetectionRate()) != parameters_.end())
 	{

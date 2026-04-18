@@ -245,6 +245,8 @@ private:
 	std::map<int, rtabmap::Transform> filterNodesToAssemble(
 			const std::map<int, rtabmap::Transform> & nodes,
 			const rtabmap::Transform & currentPose);
+	
+	void applyParameters();
 
 	void updateRtabmapCallback(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<std_srvs::srv::Empty::Request>, std::shared_ptr<std_srvs::srv::Empty::Response>);
 	void resetRtabmapCallback(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<std_srvs::srv::Empty::Request>, std::shared_ptr<std_srvs::srv::Empty::Response>);
