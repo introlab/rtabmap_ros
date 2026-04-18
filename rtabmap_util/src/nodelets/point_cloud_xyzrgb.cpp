@@ -240,21 +240,32 @@ void PointCloudXYZRGB::depthCallback(
 		rclcpp::Time time = now();
 
 		cv_bridge::CvImageConstPtr imagePtr;
-		if(image->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0)
-		{
-			imagePtr = cv_bridge::toCvShare(image);
+		try {
+			if(image->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0)
+			{
+				imagePtr = cv_bridge::toCvShare(image);
+			}
+			else if(image->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
+					image->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
+			{
+				imagePtr = cv_bridge::toCvShare(image, "mono8");
+			}
+			else
+			{
+				imagePtr = cv_bridge::toCvShare(image, "bgr8");
+			}
 		}
-		else if(image->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
-				image->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
-		{
-			imagePtr = cv_bridge::toCvShare(image, "mono8");
-		}
-		else
-		{
-			imagePtr = cv_bridge::toCvShare(image, "bgr8");
+		catch(cv::Exception& e) {
+			UFATAL("Fatal error while converting RGB image (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
 		}
 
-		cv_bridge::CvImageConstPtr imageDepthPtr = cv_bridge::toCvShare(imageDepth);
+		cv_bridge::CvImageConstPtr imageDepthPtr;
+		try {
+			imageDepthPtr = cv_bridge::toCvShare(imageDepth);
+		}
+		catch(cv::Exception& e) {
+			UFATAL("Fatal error while converting Depth image (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
+		}
 
 		rtabmap::CameraModel model = rtabmap_conversions::cameraModelFromROS(*cameraInfo);
 
@@ -318,18 +329,24 @@ void PointCloudXYZRGB::disparityCallback(
 		const sensor_msgs::msg::CameraInfo::ConstSharedPtr cameraInfo)
 {
 	cv_bridge::CvImageConstPtr imagePtr;
-	if(image->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0)
-	{
-		imagePtr = cv_bridge::toCvShare(image);
+	try {
+		if(image->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0)
+		{
+			imagePtr = cv_bridge::toCvShare(image);
+		}
+		else if(image->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
+				image->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
+		{
+			imagePtr = cv_bridge::toCvShare(image, "mono8");
+		}
+		else
+		{
+			imagePtr = cv_bridge::toCvShare(image, "bgr8");
+		}
 	}
-	else if(image->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
-			image->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
-	{
-		imagePtr = cv_bridge::toCvShare(image, "mono8");
-	}
-	else
-	{
-		imagePtr = cv_bridge::toCvShare(image, "bgr8");
+	catch(cv::Exception& e) {
+		UFATAL("Fatal error while converting RGB image (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
+		return;
 	}
 
 	if(imageDisparity->image.encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1) !=0 &&
@@ -404,16 +421,21 @@ void PointCloudXYZRGB::stereoCallback(
 		rclcpp::Time time = now();
 
 		cv_bridge::CvImageConstPtr ptrLeftImage, ptrRightImage;
-		if(imageLeft->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
-			imageLeft->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
-		{
-			ptrLeftImage = cv_bridge::toCvShare(imageLeft, "mono8");
+		try {
+			if(imageLeft->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
+				imageLeft->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
+			{
+				ptrLeftImage = cv_bridge::toCvShare(imageLeft, "mono8");
+			}
+			else
+			{
+				ptrLeftImage = cv_bridge::toCvShare(imageLeft, "bgr8");
+			}
+			ptrRightImage = cv_bridge::toCvShare(imageRight, "mono8");
 		}
-		else
-		{
-			ptrLeftImage = cv_bridge::toCvShare(imageLeft, "bgr8");
+		catch(cv::Exception& e) {
+			UFATAL("Fatal error converting images (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
 		}
-		ptrRightImage = cv_bridge::toCvShare(imageRight, "mono8");
 
 		if(roiRatios_[0]!=0.0f || roiRatios_[1]!=0.0f || roiRatios_[2]!=0.0f || roiRatios_[3]!=0.0f)
 		{

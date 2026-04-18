@@ -595,8 +595,13 @@ void RGBDOdometry::callback(
 		std::vector<cv_bridge::CvImageConstPtr> imageMsgs(1);
 		std::vector<cv_bridge::CvImageConstPtr> depthMsgs(1);
 		std::vector<sensor_msgs::msg::CameraInfo> infoMsgs;
-		imageMsgs[0] = cv_bridge::toCvShare(image);
-		depthMsgs[0] = cv_bridge::toCvShare(depth);
+		try{
+			imageMsgs[0] = cv_bridge::toCvShare(image);
+			depthMsgs[0] = cv_bridge::toCvShare(depth);
+		}
+		catch(cv::Exception& e) {
+			UFATAL("Fatal error while converting images (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
+		}
 		infoMsgs.push_back(*cameraInfo);
 
 		double stampDiff = fabs(rtabmap_conversions::timestampFromROS(image->header.stamp) - rtabmap_conversions::timestampFromROS(depth->header.stamp));

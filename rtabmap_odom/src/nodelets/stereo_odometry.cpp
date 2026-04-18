@@ -684,8 +684,13 @@ void StereoOdometry::callback(
 		std::vector<cv_bridge::CvImageConstPtr> rightMsgs(1);
 		std::vector<sensor_msgs::msg::CameraInfo> leftInfoMsgs;
 		std::vector<sensor_msgs::msg::CameraInfo> rightInfoMsgs;
-		leftMsgs[0] = cv_bridge::toCvShare(imageRectLeft);
-		rightMsgs[0] = cv_bridge::toCvShare(imageRectRight);
+		try{
+			leftMsgs[0] = cv_bridge::toCvShare(imageRectLeft);
+			rightMsgs[0] = cv_bridge::toCvShare(imageRectRight);
+		}
+		catch(cv::Exception& e) {
+			UFATAL("Fatal error while converting images (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
+		}
 		leftInfoMsgs.push_back(*cameraInfoLeft);
 		rightInfoMsgs.push_back(*cameraInfoRight);
 

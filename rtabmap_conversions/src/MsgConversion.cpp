@@ -191,39 +191,45 @@ void toCvShare(const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr & image, cv_br
 
 void toCvShare(const rtabmap_msgs::msg::RGBDImage & image, const std::shared_ptr<void const>& trackedObject, cv_bridge::CvImageConstPtr & rgb, cv_bridge::CvImageConstPtr & depth)
 {
-	if(!image.rgb.data.empty())
+	try
 	{
-		rgb = cv_bridge::toCvShare(image.rgb, trackedObject);
-	}
-	else if(!image.rgb_compressed.data.empty())
-	{
-		rgb = cv_bridge::toCvCopy(image.rgb_compressed);
-	}
-	else
-	{
-		// empty
-		rgb = std::make_shared<cv_bridge::CvImage>();
-	}
-
-	if(!image.depth.data.empty())
-	{
-		depth = cv_bridge::toCvShare(image.depth, trackedObject);
-	}
-	else if(!image.depth_compressed.data.empty())
-	{
-		if(image.depth_compressed.format.compare("jpg")==0)
+		if(!image.rgb.data.empty())
 		{
-			depth = cv_bridge::toCvCopy(image.depth_compressed);
+			rgb = cv_bridge::toCvShare(image.rgb, trackedObject);
+		}
+		else if(!image.rgb_compressed.data.empty())
+		{
+			rgb = cv_bridge::toCvCopy(image.rgb_compressed);
 		}
 		else
 		{
-			cv_bridge::CvImagePtr ptr = std::make_shared<cv_bridge::CvImage>();
-			ptr->header = image.depth_compressed.header;
-			ptr->image = rtabmap::uncompressImage(image.depth_compressed.data);
-			UASSERT(ptr->image.empty() || ptr->image.type() == CV_32FC1 || ptr->image.type() == CV_16UC1);
-			ptr->encoding = ptr->image.empty()?"":ptr->image.type() == CV_32FC1?sensor_msgs::image_encodings::TYPE_32FC1:sensor_msgs::image_encodings::TYPE_16UC1;
-			depth = ptr;
+			// empty
+			rgb = std::make_shared<cv_bridge::CvImage>();
 		}
+
+		if(!image.depth.data.empty())
+		{
+			depth = cv_bridge::toCvShare(image.depth, trackedObject);
+		}
+		else if(!image.depth_compressed.data.empty())
+		{
+			if(image.depth_compressed.format.compare("jpg")==0)
+			{
+				depth = cv_bridge::toCvCopy(image.depth_compressed);
+			}
+			else
+			{
+				cv_bridge::CvImagePtr ptr = std::make_shared<cv_bridge::CvImage>();
+				ptr->header = image.depth_compressed.header;
+				ptr->image = rtabmap::uncompressImage(image.depth_compressed.data);
+				UASSERT(ptr->image.empty() || ptr->image.type() == CV_32FC1 || ptr->image.type() == CV_16UC1);
+				ptr->encoding = ptr->image.empty()?"":ptr->image.type() == CV_32FC1?sensor_msgs::image_encodings::TYPE_32FC1:sensor_msgs::image_encodings::TYPE_16UC1;
+				depth = ptr;
+			}
+		}
+	}
+	catch(cv::Exception& e) {
+		UFATAL("Fatal error while converting rgbd image (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
 	}
 }
 
@@ -348,27 +354,32 @@ rtabmap::SensorData rgbdImageFromROS(const rtabmap_msgs::msg::RGBDImage::ConstSh
 			}
 
 			cv::Mat left, right;
-			if(imageRectLeft->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) == 0 ||
-			   imageRectLeft->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0)
-			{
-				left = imageRectLeft->image;
+			try {
+				if( imageRectLeft->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) == 0 ||
+					imageRectLeft->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0)
+				{
+					left = imageRectLeft->image;
+				}
+				else if(imageRectLeft->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
+				{
+					left = cv_bridge::cvtColor(imageRectLeft, "mono8")->image;
+				}
+				else
+				{
+					left = cv_bridge::cvtColor(imageRectLeft, "bgr8")->image;
+				}
+				if( imageRectRight->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) == 0 ||
+					imageRectRight->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0)
+				{
+					right = imageRectRight->image;
+				}
+				else
+				{
+					right = cv_bridge::cvtColor(imageRectRight, "mono8")->image;
+				}
 			}
-			else if(imageRectLeft->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
-			{
-				left = cv_bridge::cvtColor(imageRectLeft, "mono8")->image;
-			}
-			else
-			{
-				left = cv_bridge::cvtColor(imageRectLeft, "bgr8")->image;
-			}
-			if(imageRectRight->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) == 0 ||
-			   imageRectRight->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0)
-			{
-				right = imageRectRight->image;
-			}
-			else
-			{
-				right = cv_bridge::cvtColor(imageRectRight, "mono8")->image;
+			catch(cv::Exception& e) {
+				UFATAL("Fatal error while converting images (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
 			}
 
 			//
@@ -420,19 +431,24 @@ rtabmap::SensorData rgbdImageFromROS(const rtabmap_msgs::msg::RGBDImage::ConstSh
 		}
 
 		cv_bridge::CvImageConstPtr ptrImage = imageMsg;
-		if(imageMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0 ||
-			imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
-			imageMsg->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0)
-		{
-			// do nothing
+		try {
+			if(imageMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0 ||
+				imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
+				imageMsg->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0)
+			{
+				// do nothing
+			}
+			else if(imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
+			{
+				ptrImage = cv_bridge::cvtColor(imageMsg, "mono8");
+			}
+			else
+			{
+				ptrImage = cv_bridge::cvtColor(imageMsg, "bgr8");
+			}
 		}
-		else if(imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
-		{
-			ptrImage = cv_bridge::cvtColor(imageMsg, "mono8");
-		}
-		else
-		{
-			ptrImage = cv_bridge::cvtColor(imageMsg, "bgr8");
+		catch(cv::Exception& e) {
+			UFATAL("Fatal error while converting image (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
 		}
 
 		cv_bridge::CvImageConstPtr ptrDepth = depthMsg;
@@ -1136,18 +1152,23 @@ rtabmap::SensorData sensorDataFromROS(const rtabmap_msgs::msg::SensorData & msg)
 		}
 		else
 		{
-			if(leftRawPtr->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) == 0 ||
-				leftRawPtr->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0)
-			{
-				left = leftRawPtr->image.clone();
+			try {
+				if( leftRawPtr->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) == 0 ||
+					leftRawPtr->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0)
+				{
+					left = leftRawPtr->image.clone();
+				}
+				else if(leftRawPtr->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
+				{
+					left = cv_bridge::cvtColor(leftRawPtr, "mono8")->image;
+				}
+				else
+				{
+					left = cv_bridge::cvtColor(leftRawPtr, "bgr8")->image;
+				}
 			}
-			else if(leftRawPtr->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
-			{
-				left = cv_bridge::cvtColor(leftRawPtr, "mono8")->image;
-			}
-			else
-			{
-				left = cv_bridge::cvtColor(leftRawPtr, "bgr8")->image;
+			catch(cv::Exception& e) {
+				UFATAL("Fatal error while converting left image (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
 			}
 		}
 	}
@@ -1169,18 +1190,23 @@ rtabmap::SensorData sensorDataFromROS(const rtabmap_msgs::msg::SensorData & msg)
 		}
 		else
 		{
-			if(rightRawPtr->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) == 0 ||
-				rightRawPtr->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
-				(!isStereo && 
-				   (rightRawPtr->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0||
-					rightRawPtr->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1) == 0 ||
-					rightRawPtr->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1) == 0)))
-			{
-				right = rightRawPtr->image.clone();
+			try{
+				if( rightRawPtr->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) == 0 ||
+					rightRawPtr->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
+					(!isStereo && 
+					(rightRawPtr->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0||
+						rightRawPtr->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1) == 0 ||
+						rightRawPtr->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1) == 0)))
+				{
+					right = rightRawPtr->image.clone();
+				}
+				else
+				{
+					right = cv_bridge::cvtColor(rightRawPtr, "mono8")->image;
+				}
 			}
-			else
-			{
-				right = cv_bridge::cvtColor(rightRawPtr, "mono8")->image;
+			catch(cv::Exception& e) {
+				UFATAL("Fatal error while converting right image (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
 			}
 		}
 	}
@@ -2197,19 +2223,24 @@ bool convertRGBDMsgs(
 		if(!imageMsgs.empty())
 		{
 			cv_bridge::CvImageConstPtr ptrImage = imageMsgs[i];
-			if(imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0 ||
-			   imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
-			   imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0)
-			{
-				// do nothing
+			try {
+				if(imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0 ||
+				imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
+				imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0)
+				{
+					// do nothing
+				}
+				else if(imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
+				{
+					ptrImage = cv_bridge::cvtColor(imageMsgs[i], "mono8");
+				}
+				else
+				{
+					ptrImage = cv_bridge::cvtColor(imageMsgs[i], "bgr8");
+				}
 			}
-			else if(imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
-			{
-				ptrImage = cv_bridge::cvtColor(imageMsgs[i], "mono8");
-			}
-			else
-			{
-				ptrImage = cv_bridge::cvtColor(imageMsgs[i], "bgr8");
+			catch(cv::Exception& e) {
+				UFATAL("Fatal error while converting image (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
 			}
 
 			// initialize
@@ -2260,7 +2291,12 @@ bool convertRGBDMsgs(
 				}
 				else
 				{
-					ptrImage = cv_bridge::cvtColor(depthMsgs[i], "mono8");
+					try{
+						ptrImage = cv_bridge::cvtColor(depthMsgs[i], "mono8");
+					}
+					catch(cv::Exception& e) {
+						UFATAL("Fatal error while converting image (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
+					}
 				}
 
 				// initialize
@@ -2460,27 +2496,32 @@ bool convertStereoMsg(
 		return false;
 	}
 
-	if(leftImageMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) == 0 ||
-	   leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0)
-	{
-		left = leftImageMsg->image.clone();
+	try{
+		if( leftImageMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) == 0 ||
+			leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0)
+		{
+			left = leftImageMsg->image.clone();
+		}
+		else if(leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
+		{
+			left = cv_bridge::cvtColor(leftImageMsg, "mono8")->image;
+		}
+		else
+		{
+			left = cv_bridge::cvtColor(leftImageMsg, "bgr8")->image;
+		}
+		if( rightImageMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) == 0 ||
+			rightImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0)
+		{
+			right = rightImageMsg->image.clone();
+		}
+		else
+		{
+			right = cv_bridge::cvtColor(rightImageMsg, "mono8")->image;
+		}
 	}
-	else if(leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
-	{
-		left = cv_bridge::cvtColor(leftImageMsg, "mono8")->image;
-	}
-	else
-	{
-		left = cv_bridge::cvtColor(leftImageMsg, "bgr8")->image;
-	}
-	if(rightImageMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) == 0 ||
-	   rightImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0)
-	{
-		right = rightImageMsg->image.clone();
-	}
-	else
-	{
-		right = cv_bridge::cvtColor(rightImageMsg, "mono8")->image;
+	catch(cv::Exception& e) {
+		UFATAL("Fatal error while converting images (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
 	}
 
 	rtabmap::Transform localTransform = getTransform(frameId, leftImageMsg->header.frame_id, leftImageMsg->header.stamp, listener, waitForTransform);

@@ -215,8 +215,14 @@ void RGBDSync::callback(
 
 		cv::Mat rgbMat;
 		cv::Mat depthMat;
-		cv_bridge::CvImageConstPtr imagePtr = cv_bridge::toCvShare(image);
-		cv_bridge::CvImageConstPtr imageDepthPtr = cv_bridge::toCvShare(depth);
+		cv_bridge::CvImageConstPtr imagePtr, imageDepthPtr;
+		try {
+			imagePtr = cv_bridge::toCvShare(image);
+			imageDepthPtr = cv_bridge::toCvShare(depth);
+		}
+		catch(cv::Exception& e) {
+			UFATAL("Fatal error while converting images (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
+		}
 		rgbMat = imagePtr->image;
 		depthMat = imageDepthPtr->image;
 

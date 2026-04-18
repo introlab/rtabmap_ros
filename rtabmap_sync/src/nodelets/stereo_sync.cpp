@@ -185,10 +185,22 @@ void StereoSync::callback(
 				rtabmap_msgs::msg::RGBDImage::UniquePtr msgCompressed(new rtabmap_msgs::msg::RGBDImage);
 				*msgCompressed = *msg;
 
-				cv_bridge::CvImageConstPtr imagePtr = cv_bridge::toCvShare(imageLeft);
+				cv_bridge::CvImageConstPtr imagePtr;
+				try {
+					imagePtr = cv_bridge::toCvShare(imageLeft);
+				}
+				catch(cv::Exception& e) {
+					UFATAL("Fatal error while converting left image (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
+				}
 				imagePtr->toCompressedImageMsg(msgCompressed->rgb_compressed, cv_bridge::JPG);
 
-				cv_bridge::CvImageConstPtr imageDepthPtr = cv_bridge::toCvShare(imageRight);
+				cv_bridge::CvImageConstPtr imageDepthPtr;
+				try {
+					imageDepthPtr = cv_bridge::toCvShare(imageRight);
+				}
+				catch(cv::Exception& e) {
+					UFATAL("Fatal error while converting right image (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
+				}
 				imageDepthPtr->toCompressedImageMsg(msgCompressed->depth_compressed, cv_bridge::JPG);
 
 				rgbdImageCompressedPub_->publish(std::move(msgCompressed));

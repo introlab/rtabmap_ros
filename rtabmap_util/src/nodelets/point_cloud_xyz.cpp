@@ -189,7 +189,13 @@ void PointCloudXYZ::callback(
 	{
 		rclcpp::Time time = now();
 
-		cv_bridge::CvImageConstPtr imageDepthPtr = cv_bridge::toCvShare(depthMsg);
+		cv_bridge::CvImageConstPtr imageDepthPtr;
+		try{
+			imageDepthPtr = cv_bridge::toCvShare(depthMsg);
+		}
+		catch(cv::Exception& e) {
+			UFATAL("Fatal error while converting depth image (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
+		}
 
 		rtabmap::CameraModel model = rtabmap_conversions::cameraModelFromROS(*cameraInfo);
 
