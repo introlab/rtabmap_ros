@@ -2431,8 +2431,8 @@ void CoreWrapper::process(
 				if(rtabmap_.getMemory() == 0 ||
 					filteredPoses.size() == 0 ||
 					rtabmap_.getMemory()->getLastSignatureId() != filteredPoses.rbegin()->first ||
-					rtabmap_.getMemory()->getLastWorkingSignature(true) == 0 ||
-					rtabmap_.getMemory()->getLastWorkingSignature(true)->sensorData().gridCellSize() == 0 ||
+					rtabmap_.getMemory()->getLastWorkingSignature(false) == 0 ||
+					rtabmap_.getMemory()->getLastWorkingSignature(false)->sensorData().gridCellSize() == 0 ||
 					(!mapsManager_.getLocalMapMaker()->isGridFromDepth() && data.laserScanRaw().is2d())) // 2d laser scan would fill empty space for latest data
 				{
 					SensorData tmpData = data;
