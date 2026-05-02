@@ -18,6 +18,10 @@ fusioncore:
     publish_rate: 100.0
     publish.force_2d: true
 
+    # Gazebo Harmonic prefixes sensor frames with the model name (waffle/imu_link/tb3_imu).
+    # Override to the TF frame that robot_state_publisher actually publishes.
+    imu.frame_id: "imu_link"
+
     # MPU9250: magnetometer disabled (unreliable in sim / near motors)
     imu.has_magnetometer: false
     imu.gyro_noise: 0.005             # rad/s
