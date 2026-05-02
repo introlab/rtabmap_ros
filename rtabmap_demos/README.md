@@ -65,6 +65,7 @@
 
 FusionCore (wheel + IMU UKF) and `icp_odometry` run in a feedback loop: FusionCore's stable `odom` frame seeds scan matching via `guess_frame_id`, and the ICP result feeds back into FusionCore as a second velocity source. See [README](launch/turtlebot3/fusioncore/README.md) for architecture details.
 
+![FusionCore icp_odometry demo](https://github.com/user-attachments/assets/e1e07cfb-74e0-48b9-9bfd-32b68ee5a6ef)
 ### Champ Quadruped Nav2, Elevation Map and VSLAM
 [champ_sim_vslam.launch.py](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_demos/launch/champ/champ_sim_vslam.launch.py)
 
