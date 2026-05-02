@@ -1,7 +1,7 @@
-# FusionCore config for TurtleBot3 Waffle (Gazebo-classic)
+# FusionCore config for TurtleBot3 Waffle (Gazebo Harmonic)
 #
 # Platform:  TurtleBot3 Waffle (simulated)
-# IMU:       InvenSense MPU9250 (9-axis, magnetometer unreliable in sim)
+# IMU:       MPU9250 (9-axis, magnetometer unreliable in sim)
 # GPS:       None (indoor / simulation)
 # LiDAR:     HLS-LFCD2 via /scan (used by icp_odometry, not fused here directly)
 # encoder2:  rtabmap icp_odometry output on /rtabmap/icp_odometry
@@ -29,28 +29,14 @@ fusioncore:
     encoder.yaw_noise: 0.02           # rad/s
 
     # ICP odometry as second velocity source
-    # icp_odometry output feeds back here once scan matching stabilizes
     encoder2.topic: "/rtabmap/icp_odometry"
 
-    # No GPS: indoor/simulation only
-    gnss.base_noise_xy: 2.5
-    gnss.base_noise_z: 5.0
-    gnss.max_hdop: 4.0
-    gnss.min_satellites: 4
-    gnss.min_fix_type: 1
-    gnss.fix2_topic: ""
-    gnss.heading_topic: ""
-    gnss.azimuth_topic: ""
-
     outlier_rejection: true
-    outlier_threshold_gnss: 16.27
     outlier_threshold_imu: 15.09
     outlier_threshold_enc: 11.34
-    outlier_threshold_hdg: 10.83
 
     adaptive.imu: true
     adaptive.encoder: true
-    adaptive.gnss: false
     adaptive.window: 50
     adaptive.alpha: 0.01
 
@@ -66,11 +52,3 @@ fusioncore:
     ukf.q_acceleration: 1.0
     ukf.q_gyro_bias: 1.0e-5
     ukf.q_accel_bias: 1.0e-5
-
-    input.gnss_crs: "EPSG:4326"
-    output.crs: "EPSG:4978"
-    output.convert_to_enu_at_reference: true
-    reference.use_first_fix: false
-    reference.x: 0.0
-    reference.y: 0.0
-    reference.z: 0.0

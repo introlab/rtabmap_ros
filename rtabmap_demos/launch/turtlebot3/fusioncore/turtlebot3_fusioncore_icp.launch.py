@@ -117,7 +117,6 @@ def launch_setup(context, *args, **kwargs):
         'RGBD/NeighborLinkRefining': 'True',
         'Grid/RangeMin':         '0.2',
         'Optimizer/GravitySigma': '0',
-        'Odom/ResetCountdown':   '1',
     }
 
     if localization:
