@@ -8,6 +8,7 @@
 + [Turtlebot3 Nav2 and RGB-D SLAM](#turtlebot3-nav2-and-rgb-d-slam)
 + [Turtlebot3 Nav2, 2D LiDAR and RGB-D SLAM](#turtlebot3-nav2-2d-lidar-and-rgb-d-slam)
 + [Turtlebot3 Nav2, Fake 2D LiDAR and RGB-D SLAM](#turtlebot3-nav2-fake-2d-lidar-and-rgb-d-slam)
++ [Turtlebot3 Nav2, 2D LiDAR SLAM with FusionCore (IMU + wheel UKF)](#turtlebot3-nav2-2d-lidar-slam-with-fusioncore-imu--wheel-ukf)
 + [Champ Quadruped Nav2, Elevation Map and VSLAM](#champ-quadruped-nav2-elevation-map-and-vslam)
 + [Clearpath Husky Nav2, 2D LiDAR and RGB-D SLAM](#clearpath-husky-nav2-2d-lidar-and-rgb-d-slam)
 + [Clearpath Husky Nav2, 3D LiDAR and RGB-D SLAM](#clearpath-husky-nav2-3d-lidar-and-rgb-d-slam)
@@ -59,6 +60,11 @@
  * Yellow: The map.
 
 ![Peek 2025-07-04 16-57](https://github.com/user-attachments/assets/8869cf57-35a1-4236-bdab-151b88ae2ea1)
+### Turtlebot3 Nav2, 2D LiDAR SLAM with FusionCore (IMU + wheel UKF)
+[turtlebot3_sim_fusioncore_icp_demo.launch.py](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_demos/launch/turtlebot3/fusioncore/turtlebot3_sim_fusioncore_icp_demo.launch.py) (Jazzy + Gazebo Harmonic)
+
+FusionCore (wheel + IMU UKF) and `icp_odometry` run in a feedback loop: FusionCore's stable `odom` frame seeds scan matching via `guess_frame_id`, and the ICP result feeds back into FusionCore as a second velocity source. See [README](launch/turtlebot3/fusioncore/README.md) for architecture details.
+
 ### Champ Quadruped Nav2, Elevation Map and VSLAM
 [champ_sim_vslam.launch.py](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_demos/launch/champ/champ_sim_vslam.launch.py)
 
