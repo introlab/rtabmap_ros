@@ -14,12 +14,14 @@
 from ament_index_python.packages import get_package_share_directory
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
+from launch.actions import AppendEnvironmentVariable, DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.substitutions import FindPackageShare
 
 import os
+
+ROS_DISTRO = os.environ.get('ROS_DISTRO')
 
 def launch_setup(context, *args, **kwargs):
     if not 'TURTLEBOT3_MODEL' in os.environ:
@@ -30,6 +32,8 @@ def launch_setup(context, *args, **kwargs):
         'nav2_bringup')
     pkg_rtabmap_demos = get_package_share_directory(
         'rtabmap_demos')
+    pkg_turtlebot3_gazebo = get_package_share_directory(
+        'turtlebot3_gazebo')
     
     world_name = LaunchConfiguration('world').perform(context)
     
@@ -37,14 +41,26 @@ def launch_setup(context, *args, **kwargs):
     icp_odometry = icp_odometry == 'True' or icp_odometry == 'true'
     if icp_odometry:
         # modified nav2 params to use icp_odom instead odom frame
-        nav2_params_file = PathJoinSubstitution(
-            [FindPackageShare('rtabmap_demos'), 'params', 'turtlebot3_scan_nav2_params.yaml']
-        )
+        if ROS_DISTRO == 'jazzy':
+            nav2_params_file = PathJoinSubstitution(
+                [FindPackageShare('rtabmap_demos'), 'params', 'turtlebot3_scan_nav2_params_jazzy.yaml']
+            )
+        else:
+            nav2_params_file = PathJoinSubstitution(
+                [FindPackageShare('rtabmap_demos'), 'params', 'turtlebot3_scan_nav2_params.yaml']
+            )
     else:
-        # original nav2 params
-        nav2_params_file = PathJoinSubstitution(
-            [FindPackageShare('nav2_bringup'), 'params', 'nav2_params.yaml']
-        )
+        if ROS_DISTRO == 'jazzy':
+            # original nav2 params but with "enable_stamped_cmd_vel: True"
+            nav2_params_file = PathJoinSubstitution(
+                [FindPackageShare('rtabmap_demos'), 'params', 'turtlebot3_nav2_params_jazzy.yaml']
+            )
+        else:
+            # original nav2 params
+            nav2_params_file = PathJoinSubstitution(
+                [FindPackageShare('nav2_bringup'), 'params', 'nav2_params.yaml']
+            )
+            
 
     # Paths
     nav2_launch = PathJoinSubstitution(
@@ -53,47 +69,64 @@ def launch_setup(context, *args, **kwargs):
         [pkg_nav2_bringup, 'launch', 'rviz_launch.py'])
     rtabmap_launch = PathJoinSubstitution(
         [pkg_rtabmap_demos, 'launch', 'turtlebot3', 'turtlebot3_scan.launch.py'])
-
-    # To use ICP odometry, we should increase clock rate of gazebo, we copied content of
-    # turtlebot3_gazebo/launch/turtlebot3_world.launch here
-    launch_file_dir = os.path.join(get_package_share_directory('turtlebot3_gazebo'), 'launch')
-    pkg_gazebo_ros = get_package_share_directory('gazebo_ros')
-
+    
     world = os.path.join(
-        get_package_share_directory('turtlebot3_gazebo'),
-        'worlds',
-        f'turtlebot3_{world_name}.world'
-    )
-
-    import tempfile
-    with tempfile.NamedTemporaryFile(mode='w+t', delete=False) as clock_override_file:
-        clock_override_file.write("---\n"+
-                  "gazebo:\n"+
-                  "    ros__parameters:\n"+
-                  "        publish_rate: 100.0")
-
-    gzserver_cmd = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(pkg_gazebo_ros, 'launch', 'gzserver.launch.py')
-        ),
-        launch_arguments={
-            'world': world,
-            'params_file': clock_override_file.name}.items()
-    )
-
-    gzclient_cmd = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(pkg_gazebo_ros, 'launch', 'gzclient.launch.py')
+            get_package_share_directory('turtlebot3_gazebo'),
+            'worlds',
+            f'turtlebot3_{world_name}.world'
         )
-    )
+    
+    # To use ICP odometry, we should increase clock rate of gazebo (humble), we copied content of
+    # turtlebot3_gazebo/launch/turtlebot3_world.launch here.
+    #### BEGIN turtlebot3_gazebo/launch/turtlebot3_world.launch
+    if ROS_DISTRO == 'humble':
+        pkg_gazebo_ros = get_package_share_directory('gazebo_ros')
 
+        import tempfile
+        with tempfile.NamedTemporaryFile(mode='w+t', delete=False) as clock_override_file:
+            clock_override_file.write("---\n"+
+                    "gazebo:\n"+
+                    "    ros__parameters:\n"+
+                    "        publish_rate: 100.0")
+
+        gzserver_cmd = IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(pkg_gazebo_ros, 'launch', 'gzserver.launch.py')
+            ),
+            launch_arguments={
+                'world': world,
+                'params_file': clock_override_file.name}.items()
+        )
+
+        gzclient_cmd = IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(pkg_gazebo_ros, 'launch', 'gzclient.launch.py')
+            )
+        )
+    else:
+        ros_gz_sim = get_package_share_directory('ros_gz_sim')
+
+        gzserver_cmd = IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(ros_gz_sim, 'launch', 'gz_sim.launch.py')
+            ),
+            launch_arguments={'gz_args': ['-r -s -v2 ', world], 'on_exit_shutdown': 'true'}.items()
+        )
+
+        gzclient_cmd = IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(ros_gz_sim, 'launch', 'gz_sim.launch.py')
+            ),
+            launch_arguments={'gz_args': '-g -v2 ', 'on_exit_shutdown': 'true'}.items()
+        )
+
+    launch_file_dir = os.path.join(get_package_share_directory('turtlebot3_gazebo'), 'launch')
     robot_state_publisher_cmd = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(launch_file_dir, 'robot_state_publisher.launch.py')
         ),
         launch_arguments={'use_sim_time': 'true'}.items()
     )
-
     spawn_turtlebot_cmd = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(launch_file_dir, 'spawn_turtlebot3.launch.py')
@@ -104,6 +137,13 @@ def launch_setup(context, *args, **kwargs):
         }.items()
     )
     
+    set_env_vars_resources = AppendEnvironmentVariable(
+            'GZ_SIM_RESOURCE_PATH',
+            os.path.join(
+                get_package_share_directory('turtlebot3_gazebo'),
+                'models'))
+    #### END turtlebot3_gazebo/launch/turtlebot3_world.launch
+
     nav2 = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([nav2_launch]),
         launch_arguments=[
@@ -129,7 +169,8 @@ def launch_setup(context, *args, **kwargs):
         gzserver_cmd,
         gzclient_cmd,
         robot_state_publisher_cmd,
-        spawn_turtlebot_cmd
+        spawn_turtlebot_cmd,
+        set_env_vars_resources
     ]
 
 def generate_launch_description():

@@ -22,6 +22,18 @@
     },
     "workspaceMount": "source=${localWorkspaceFolder},target=/home/vscode/ros2_ws/src/rtabmap_ros,type=bind",
     "workspaceFolder": "/home/vscode/ros2_ws",
-    "postCreateCommand": "echo 'Initialize: export MAKEFLAGS=\"-j6\" && colcon build --cmake-args -DRTABMAP_SYNC_MULTI_RGBD=ON -DCMAKE_BUILD_TYPE=Release --parallel-workers 2'"
-    //"runArgs": ["--privileged", "--runtime=nvidia", "--network=host"]
+    "postCreateCommand": "echo 'Initialize: export MAKEFLAGS=\"-j6\" && colcon build --cmake-args -DRTABMAP_SYNC_MULTI_RGBD=ON -DCMAKE_BUILD_TYPE=Release --parallel-workers 2'",
+    "hostRequirements": {
+        "gpu": "optional"
+    },
+    "runArgs": ["--privileged",
+                "--network=host",
+                "--gpus=all",
+                //"--runtime=nvidia", // uncommment this if rtabmap doesn't show up in nvidia-smi on the host computer
+                "--env=DISPLAY",
+                "--env=QT_X11_NO_MITSHM=1",
+                "--volume=/tmp/.X11-unix:/tmp/.X11-unix"],
+    "containerEnv": {
+        "NVIDIA_VISIBLE_DEVICES": "all"
+    }
 }
