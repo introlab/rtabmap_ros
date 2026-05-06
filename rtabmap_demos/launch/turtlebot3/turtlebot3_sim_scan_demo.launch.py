@@ -87,13 +87,7 @@ def launch_setup(context, *args, **kwargs):
             ('use_sim_time', 'true')
         ]
     )
-    
-    world = os.path.join(
-            pkg_turtlebot3_gazebo,
-            'worlds',
-            f'turtlebot3_{world_name}.world'
-    )
-    
+        
     # To use ICP odometry, we should increase clock rate of gazebo (humble), we copied content of
     # turtlebot3_gazebo/launch/turtlebot3_world.launch here.
     turtlebot3_nodes = []
@@ -106,6 +100,12 @@ def launch_setup(context, *args, **kwargs):
                     "gazebo:\n"+
                     "    ros__parameters:\n"+
                     "        publish_rate: 100.0")
+
+        world = os.path.join(
+                pkg_turtlebot3_gazebo,
+                'worlds',
+                f'turtlebot3_{world_name}.world'
+        )
 
         gzserver_cmd = IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
@@ -149,7 +149,7 @@ def launch_setup(context, *args, **kwargs):
             set_env_vars_resources
         ]
     else:
-        gazebo_launch = PathJoinSubstitution([pkg_turtlebot3_gazebo, 'launch', f'turtlebot3_{world}.launch.py'])
+        gazebo_launch = PathJoinSubstitution([pkg_turtlebot3_gazebo, 'launch', f'turtlebot3_{world_name}.launch.py'])
         gazebo = IncludeLaunchDescription(
             PythonLaunchDescriptionSource([gazebo_launch]),
             launch_arguments=[
