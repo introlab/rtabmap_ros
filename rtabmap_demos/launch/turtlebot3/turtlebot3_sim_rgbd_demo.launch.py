@@ -31,6 +31,8 @@ from launch_ros.substitutions import FindPackageShare
 
 import os
 
+ROS_DISTRO = os.environ.get('ROS_DISTRO')
+
 def launch_setup(context, *args, **kwargs):
     if not 'TURTLEBOT3_MODEL' in os.environ:
         os.environ['TURTLEBOT3_MODEL'] = 'waffle'
@@ -45,9 +47,14 @@ def launch_setup(context, *args, **kwargs):
 
     world = LaunchConfiguration('world').perform(context)
     
-    nav2_params_file = PathJoinSubstitution(
-        [FindPackageShare('rtabmap_demos'), 'params', 'turtlebot3_rgbd_nav2_params.yaml']
-    )
+    if ROS_DISTRO == 'humble':
+        nav2_params_file = PathJoinSubstitution(
+            [FindPackageShare('rtabmap_demos'), 'params', 'humble', 'turtlebot3_rgbd_nav2_params.yaml']
+        )
+    else:
+        nav2_params_file = PathJoinSubstitution(
+            [FindPackageShare('rtabmap_demos'), 'params', 'turtlebot3_rgbd_nav2_params.yaml']
+        )
 
     # Paths
     gazebo_launch = PathJoinSubstitution(
