@@ -33,17 +33,17 @@ include_directories(
 )
 
 SET(Libraries
-  pcl_conversions
-  pluginlib
-  rclcpp
-  rviz_common
-  rviz_rendering
-  rviz_default_plugins
-  sensor_msgs
-  std_msgs
-  tf2
-  rtabmap_conversions
-  rtabmap_msgs
+  pcl_conversions::pcl_conversions
+  pluginlib::pluginlib
+  rclcpp::rclcpp
+  rviz_common::rviz_common
+  rviz_rendering::rviz_rendering
+  rviz_default_plugins::rviz_default_plugins
+  sensor_msgs::sensor_msgs
+  std_msgs::std_msgs
+  tf2::tf2
+  rtabmap_conversions::rtabmap_conversions
+  rtabmap_msgs::rtabmap_msgs
 )
 
 ###########
@@ -74,7 +74,7 @@ target_include_directories(rtabmap_rviz_plugins
     $<INSTALL_INTERFACE:include>
 )
 
-ament_target_dependencies(rtabmap_rviz_plugins ${Libraries})
+target_link_libraries(rtabmap_rviz_plugins PRIVATE ${Libraries})
 
 # Causes the visibility macros to use dllexport rather than dllimport,
 # which is appropriate when building the dll but not consuming it.

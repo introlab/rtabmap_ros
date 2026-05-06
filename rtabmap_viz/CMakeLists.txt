@@ -43,15 +43,16 @@ include_directories(
 
 # libraries
 SET(Libraries
-   cv_bridge
-   geometry_msgs
-   rclcpp
-   std_msgs
-   std_srvs
-   nav_msgs
-   rtabmap_msgs
-   rtabmap_sync
-   tf2
+   cv_bridge::cv_bridge
+   geometry_msgs::geometry_msgs
+   rclcpp::rclcpp
+   std_msgs::std_msgs
+   std_srvs::std_srvs
+   nav_msgs::nav_msgs
+   rtabmap_msgs::rtabmap_msgs
+   rtabmap_sync::rtabmap_sync
+   tf2::tf2
+   rtabmap::gui
 )
 
 ###########
@@ -59,7 +60,7 @@ SET(Libraries
 ###########
 
 add_executable(rtabmap_viz src/GuiNode.cpp src/GuiWrapper.cpp src/PreferencesDialogROS.cpp include/${PROJECT_NAME}/PreferencesDialogROS.h)
-ament_target_dependencies(rtabmap_viz ${Libraries})
+target_link_libraries(rtabmap_viz PRIVATE ${Libraries})
 SET_TARGET_PROPERTIES(
   rtabmap_viz
    PROPERTIES
@@ -69,7 +70,7 @@ SET_TARGET_PROPERTIES(
 )
 
 add_executable(rgbd_image_viewer src/RGBDImageViewerNode.cpp src/rgbd_image_viewer.cpp include/${PROJECT_NAME}/rgbd_image_viewer.hpp)
-ament_target_dependencies(rgbd_image_viewer ${Libraries})
+target_link_libraries(rgbd_image_viewer PRIVATE ${Libraries})
 SET_TARGET_PROPERTIES(
   rgbd_image_viewer
    PROPERTIES
