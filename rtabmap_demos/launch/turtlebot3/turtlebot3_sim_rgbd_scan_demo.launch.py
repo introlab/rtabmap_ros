@@ -13,8 +13,30 @@
 #          </joint> 
 #     3) Rename <link name="camera_rgb_frame"> to <link name="camera_rgb_optical_frame">
 #     4) Add <link name="camera_rgb_frame"/>
-#     5) Change <sensor name="camera" type="camera"> to <sensor name="camera" type="depth">
-#     6) Change image width/height from 1920x1080 to 640x480
+#     5) Change image width/height from 1920x1080 to 640x480
+#     6) [ROS2 HUMBLE] Change <sensor name="camera" type="camera"> to <sensor name="camera" type="depth">
+#     6) [ROS2 JAZZY] Change <gz_frame_id>camera_rgb_frame</gz_frame_id> to <gz_frame_id>camera_rgb_optical_frame</gz_frame_id>
+#     7) [ROS2 JAZZY] Add the following just after <sensor name="camera" ...> section (under same link)
+#        <sensor name="depth" type="depth">
+#            <always_on>true</always_on>
+#            <visualize>true</visualize>
+#            <update_rate>30</update_rate>
+#            <topic>camera/depth/image_raw</topic>
+#            <gz_frame_id>camera_rgb_optical_frame</gz_frame_id>
+#            <camera name="intel_realsense_r200_depth">
+#            <camera_info_topic>camera/depth/camera_info</camera_info_topic>
+#            <horizontal_fov>1.02974</horizontal_fov>
+#            <image>
+#                <width>640</width>
+#                <height>480</height>
+#                <format>R8G8B8</format>
+#            </image>
+#            <clip>
+#                <near>0.02</near>
+#                <far>300</far>
+#            </clip>
+#            </camera>
+#        </sensor>
 #     7) Note that we can increase min scan range from 0.12 to 0.2 to avoid having scans 
 #        hitting the robot itself
 # Example:
@@ -30,6 +52,7 @@ from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, Opaq
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.substitutions import FindPackageShare
+from launch_ros.actions import Node
 
 import os
 
@@ -69,13 +92,22 @@ def launch_setup(context, *args, **kwargs):
         [pkg_rtabmap_demos, 'launch', 'turtlebot3', 'turtlebot3_rgbd_scan.launch.py'])
 
     # Includes
-    gazebo = IncludeLaunchDescription(
+    gazebo = [IncludeLaunchDescription(
         PythonLaunchDescriptionSource([gazebo_launch]),
         launch_arguments=[
             ('x_pose', LaunchConfiguration('x_pose')),
             ('y_pose', LaunchConfiguration('y_pose'))
         ]
-    )
+    )]
+    if ROS_DISTRO != 'humble':
+        start_gazebo_ros_depth_image_bridge_cmd = Node(
+            package='ros_gz_image',
+            executable='image_bridge',
+            arguments=['/camera/depth/image_raw'],
+            output='screen',
+        )
+        gazebo.append(start_gazebo_ros_depth_image_bridge_cmd)
+
     nav2 = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([nav2_launch]),
         launch_arguments=[
@@ -86,20 +118,25 @@ def launch_setup(context, *args, **kwargs):
     rviz = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([rviz_launch])
     )
+    
+    max_ground_height = '0.05'
+    if ROS_DISTRO == 'jazzy':
+        max_ground_height = '0.02' # for the demo, on new gazebo the depth is more accurate
+    
     rtabmap = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([rtabmap_launch]),
         launch_arguments=[
             ('localization', LaunchConfiguration('localization')),
-            ('use_sim_time', 'true')
+            ('use_sim_time', 'true'),
+            ('max_ground_height', max_ground_height)
         ]
     )
     return [
         # Nodes to launch
         nav2,
         rviz,
-        rtabmap,
-        gazebo
-    ]
+        rtabmap
+    ] + gazebo
 
 def generate_launch_description():
     return LaunchDescription([
