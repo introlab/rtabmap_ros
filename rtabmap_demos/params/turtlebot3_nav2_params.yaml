@@ -1,4 +1,3 @@
-# Using icp_odom TF instead of odom
 bt_navigator:
   ros__parameters:
     global_frame: map
@@ -152,7 +151,7 @@ local_costmap:
     ros__parameters:
       update_frequency: 5.0
       publish_frequency: 2.0
-      global_frame: icp_odom
+      global_frame: odom
       robot_base_frame: base_link
       rolling_window: true
       width: 3
@@ -262,7 +261,7 @@ behavior_server:
       plugin: "nav2_behaviors::Wait"
     assisted_teleop:
       plugin: "nav2_behaviors::AssistedTeleop"
-    local_frame: icp_odom
+    local_frame: odom
     global_frame: map
     robot_base_frame: base_link
     transform_tolerance: 0.1
@@ -325,7 +324,7 @@ collision_monitor:
   ros__parameters:
     enable_stamped_cmd_vel: True
     base_frame_id: "base_footprint"
-    odom_frame_id: "icp_odom"
+    odom_frame_id: "odom"
     cmd_vel_in_topic: "cmd_vel_smoothed"
     cmd_vel_out_topic: "cmd_vel"
     state_topic: "collision_monitor_state"
@@ -364,7 +363,7 @@ docking_server:
     undock_angular_tolerance: 0.1
     max_retries: 3
     base_frame: "base_link"
-    fixed_frame: "icp_odom"
+    fixed_frame: "odom"
     dock_backwards: false
     dock_prestaging_tolerance: 0.5
 
@@ -410,7 +409,7 @@ docking_server:
 loopback_simulator:
   ros__parameters:
     base_frame_id: "base_footprint"
-    odom_frame_id: "icp_odom"
+    odom_frame_id: "odom"
     map_frame_id: "map"
     scan_frame_id: "base_scan"  # tb4_loopback_simulator.launch.py remaps to 'rplidar_link'
     update_duration: 0.02
