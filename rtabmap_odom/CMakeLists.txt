@@ -42,6 +42,7 @@ include_directories(
 
 SET(Libraries
    cv_bridge::cv_bridge
+   rclcpp_components::component
    image_geometry::image_geometry
    laser_geometry::laser_geometry
    message_filters::message_filters
@@ -58,6 +59,7 @@ SET(PublicLibraries
 )
 SET(AmentLibraries
    cv_bridge
+   rclcpp_components
    image_geometry
    laser_geometry
    message_filters
