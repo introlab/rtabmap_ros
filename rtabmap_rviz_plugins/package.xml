@@ -13,6 +13,7 @@
   <buildtool_depend>ament_cmake_ros</buildtool_depend>
 
   <build_depend>ros_environment</build_depend>
+  <build_depend>qtbase5-private-dev</build_depend> <!-- Required on Rolling -->
 
   <depend>pcl_conversions</depend>
   <depend>pluginlib</depend>

@@ -18,7 +18,7 @@ include_directories(
 SET(Libraries
   pluginlib::pluginlib
   rclcpp::rclcpp
-  nav2_costmap_2d::nav2_costmap_2d
+  nav2_costmap_2d::layers
   visualization_msgs::visualization_msgs
 )
 
