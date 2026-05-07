@@ -39,7 +39,7 @@ IF("$ENV{ROS_DISTRO}" STRLESS "jazzy")
   target_compile_definitions(rtabmap_costmap_plugins PRIVATE -DPRE_ROS_JAZZY)
 ENDIF()
 
-target_link_libraries(rtabmap_costmap_plugins PUBLIC ${Libraries})
+target_link_libraries(rtabmap_costmap_plugins PRIVATE ${Libraries})
 
 # Causes the visibility macros to use dllexport rather than dllimport,
 # which is appropriate when building the dll but not consuming it.
@@ -51,7 +51,7 @@ target_compile_definitions(rtabmap_costmap_plugins PUBLIC "PLUGINLIB__DISABLE_BO
 pluginlib_export_plugin_description_file(nav2_costmap_2d costmap_plugins.xml)
 
 add_executable(rtabmap_costmap_voxel_marker src/voxel_marker.cpp)
-ament_target_dependencies(rtabmap_costmap_voxel_marker ${Libraries})
+target_link_libraries(rtabmap_costmap_voxel_marker PRIVATE ${Libraries})
 set_target_properties(rtabmap_costmap_voxel_marker PROPERTIES OUTPUT_NAME "voxel_marker")
 
 #############
