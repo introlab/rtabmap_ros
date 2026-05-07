@@ -47,6 +47,19 @@ SET(Libraries
   rtabmap_conversions::rtabmap_conversions
   rtabmap_msgs::rtabmap_msgs
 )
+SET(AmentLibraries
+  pcl_conversions
+  pluginlib
+  rclcpp
+  rviz_common
+  rviz_rendering
+  rviz_default_plugins
+  sensor_msgs
+  std_msgs
+  tf2
+  rtabmap_conversions
+  rtabmap_msgs
+)
 
 ###########
 ## Build ##
@@ -75,8 +88,11 @@ target_include_directories(rtabmap_rviz_plugins
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
-
-target_link_libraries(rtabmap_rviz_plugins PRIVATE ${Libraries})
+if("$ENV{ROS_DISTRO}" STRLESS "jazzy")
+  ament_target_dependencies(rtabmap_rviz_plugins ${AmentLibraries})
+ELSE()
+  target_link_libraries(rtabmap_rviz_plugins PRIVATE ${Libraries})
+ENDIF()
 
 # Causes the visibility macros to use dllexport rather than dllimport,
 # which is appropriate when building the dll but not consuming it.

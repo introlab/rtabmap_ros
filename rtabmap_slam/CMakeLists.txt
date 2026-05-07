@@ -66,10 +66,10 @@ SET(Libraries
    tf2_ros::tf2_ros
    visualization_msgs::visualization_msgs
    rtabmap_msgs::rtabmap_msgs
-   rtabmap_util::rtabmap_util_plugins
+   rtabmap_util::rtabmap_util
    rtabmap_sync::rtabmap_sync
 )
-SET(Depends
+SET(AmentLibraries
    cv_bridge
    geometry_msgs
    nav_msgs
@@ -106,8 +106,8 @@ SET(Libraries
    ${Libraries}
    apriltag_msgs::apriltag_msgs
 )
-SET(Depends
-   ${Depends}
+SET(AmentLibraries
+   ${AmentLibraries}
    apriltag_msgs
 )
 ENDIF(apriltag_msgs_FOUND)
@@ -120,8 +120,8 @@ SET(Libraries
    ${Libraries}
    aruco_msgs::aruco_msgs
 )
-SET(Depends
-   ${Depends}
+SET(AmentLibraries
+   ${AmentLibraries}
    aruco_msgs
 )
 ENDIF(aruco_msgs_FOUND)
@@ -134,8 +134,8 @@ SET(Libraries
    ${Libraries}
    aruco_opencv_msgs::aruco_opencv_msgs
 )
-SET(Depends
-   ${Depends}
+SET(AmentLibraries
+   ${AmentLibraries}
    aruco_opencv_msgs
 )
 ENDIF(aruco_opencv_msgs_FOUND)
@@ -148,8 +148,8 @@ SET(Libraries
    ${Libraries}
    aruco_markers_msgs::aruco_markers_msgs
 )
-SET(Depends
-   ${Depends}
+SET(AmentLibraries
+   ${AmentLibraries}
    aruco_markers_msgs
 )
 ENDIF(aruco_markers_msgs_FOUND)
@@ -162,8 +162,8 @@ SET(Libraries
    ${Libraries}
    ros2_aruco_interfaces::ros2_aruco_interfaces
 )
-SET(Depends
-   ${Depends}
+SET(AmentLibraries
+   ${AmentLibraries}
    ros2_aruco_interfaces
 )
 ENDIF(ros2_aruco_interfaces_FOUND)
@@ -176,8 +176,8 @@ SET(Libraries
    ${Libraries}
    nav2_msgs::nav2_msgs
 )
-SET(Depends
-   ${Depends}
+SET(AmentLibraries
+   ${AmentLibraries}
    nav2_msgs
 )
 IF(${nav2_msgs_VERSION_MAJOR} EQUAL 0)
@@ -197,19 +197,23 @@ target_include_directories(rtabmap_slam_plugins
     $<INSTALL_INTERFACE:include>
 )
 
-target_link_libraries(rtabmap_slam_plugins PUBLIC ${Libraries})
+if("$ENV{ROS_DISTRO}" STRLESS "jazzy")
+   ament_target_dependencies(rtabmap_slam_plugins ${AmentLibraries})
+else()
+   target_link_libraries(rtabmap_slam_plugins PUBLIC ${Libraries})
+endif()
 
 rclcpp_components_register_nodes(rtabmap_slam_plugins "rtabmap_slam::CoreWrapper")
 
 add_executable(rtabmap_node src/CoreNode.cpp)
-target_link_libraries(rtabmap_node PRIVATE ${Libraries} rtabmap_slam_plugins)
+target_link_libraries(rtabmap_node PRIVATE rtabmap_slam_plugins)
 set_target_properties(rtabmap_node PROPERTIES OUTPUT_NAME "rtabmap")
 
 #############
 ## Install ##
 #############
 
-ament_export_dependencies(${Depends})
+ament_export_dependencies(${AmentLibraries})
 ament_export_include_directories(include)
 ament_export_targets(${PROJECT_NAME})          # To include downstream with targets
 ament_export_libraries(rtabmap_slam_plugins) # To include downstream without targets

@@ -55,18 +55,31 @@ include_directories(
 
 # libraries
 SET(Libraries
-   cv_bridge::cv_bridge
-   message_filters::message_filters
-   nav_msgs::nav_msgs
    rclcpp_components::component
-   sensor_msgs::sensor_msgs
 )
 SET(PublicLibraries
+    cv_bridge::cv_bridge
     rclcpp::rclcpp
+    message_filters::message_filters
     image_transport::image_transport
+    sensor_msgs::sensor_msgs
+    nav_msgs::nav_msgs
     rtabmap_msgs::rtabmap_msgs
     rtabmap_conversions::rtabmap_conversions
     diagnostic_updater::diagnostic_updater
+)
+
+SET(AmentLibraries
+   cv_bridge
+   image_transport
+   message_filters
+   nav_msgs
+   rclcpp
+   rclcpp_components
+   rtabmap_conversions
+   rtabmap_msgs
+   sensor_msgs
+   diagnostic_updater
 )
 
 ###########
@@ -119,8 +132,13 @@ target_include_directories(rtabmap_sync
     $<INSTALL_INTERFACE:include>
 )
 
-target_link_libraries(rtabmap_sync PRIVATE ${Libraries} PUBLIC ${PublicLibraries})
-target_link_libraries(rtabmap_sync_plugins PUBLIC ${Libraries} ${PublicLibraries})
+
+if("$ENV{ROS_DISTRO}" STRLESS "jazzy")
+  ament_target_dependencies(rtabmap_sync ${AmentLibraries})
+ELSE()
+  target_link_libraries(rtabmap_sync PRIVATE ${Libraries} PUBLIC ${PublicLibraries})
+ENDIF()
+target_link_libraries(rtabmap_sync_plugins PUBLIC rtabmap_sync)
 
 rclcpp_components_register_nodes(rtabmap_sync_plugins "rtabmap_sync::RGBDSync")
 rclcpp_components_register_nodes(rtabmap_sync_plugins "rtabmap_sync::StereoSync")
@@ -146,20 +164,7 @@ set_target_properties(rtabmap_rgb_sync PROPERTIES OUTPUT_NAME "rgb_sync")
 #############
 ## Install ##
 #############
-
-SET(Depends
-   cv_bridge
-   image_transport
-   message_filters
-   nav_msgs
-   rclcpp
-   rclcpp_components
-   rtabmap_conversions
-   rtabmap_msgs
-   sensor_msgs
-   diagnostic_updater
-)
-ament_export_dependencies(${Depends})
+ament_export_dependencies(${AmentLibraries})
 ament_export_include_directories(include)
 ament_export_targets(${PROJECT_NAME})          # To include downstream with targets
 ament_export_libraries(rtabmap_sync rtabmap_sync_plugins) # To include downstream without targets
