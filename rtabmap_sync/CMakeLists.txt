@@ -137,6 +137,7 @@ if("$ENV{ROS_DISTRO}" STRLESS "lyrical")
   ament_target_dependencies(rtabmap_sync ${AmentLibraries})
 ELSE()
   target_link_libraries(rtabmap_sync PRIVATE ${Libraries} PUBLIC ${PublicLibraries})
+  target_link_libraries(rtabmap_sync_plugins PUBLIC ${Libraries})
 ENDIF()
 target_link_libraries(rtabmap_sync_plugins PUBLIC rtabmap_sync)
 
