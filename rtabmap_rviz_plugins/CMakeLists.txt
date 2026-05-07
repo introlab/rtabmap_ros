@@ -88,7 +88,7 @@ target_include_directories(rtabmap_rviz_plugins
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
-if("$ENV{ROS_DISTRO}" STRLESS "jazzy")
+if("$ENV{ROS_DISTRO}" STRLESS "lyrical")
   ament_target_dependencies(rtabmap_rviz_plugins ${AmentLibraries})
 ELSE()
   target_link_libraries(rtabmap_rviz_plugins PRIVATE ${Libraries})

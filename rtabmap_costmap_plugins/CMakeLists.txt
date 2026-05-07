@@ -41,11 +41,13 @@ target_include_directories(rtabmap_costmap_plugins
     $<INSTALL_INTERFACE:include>
 )
 
-IF("$ENV{ROS_DISTRO}" STRLESS "jazzy")
-  target_compile_definitions(rtabmap_costmap_plugins PRIVATE -DPRE_ROS_JAZZY)
+IF("$ENV{ROS_DISTRO}" STRLESS "lyrical")
+  IF("$ENV{ROS_DISTRO}" STRLESS "jazzy")
+    target_compile_definitions(rtabmap_costmap_plugins PRIVATE -DPRE_ROS_JAZZY)
+  ENDIF()
   ament_target_dependencies(rtabmap_costmap_plugins ${AmentLibraries})
 ELSE()
-  arget_link_libraries(rtabmap_costmap_plugins PRIVATE ${Libraries})
+  target_link_libraries(rtabmap_costmap_plugins PRIVATE ${Libraries})
 ENDIF()
 
 
@@ -60,7 +62,7 @@ target_compile_definitions(rtabmap_costmap_plugins PUBLIC "PLUGINLIB__DISABLE_BO
 pluginlib_export_plugin_description_file(nav2_costmap_2d costmap_plugins.xml)
 
 add_executable(rtabmap_costmap_voxel_marker src/voxel_marker.cpp)
-IF("$ENV{ROS_DISTRO}" STRLESS "jazzy")
+IF("$ENV{ROS_DISTRO}" STRLESS "lyrical")
   ament_target_dependencies(rtabmap_costmap_voxel_marker ${AmentLibraries})
 ELSE()
   target_link_libraries(rtabmap_costmap_voxel_marker PRIVATE ${Libraries})

@@ -97,7 +97,7 @@ target_include_directories(rtabmap_odom
 )
 add_library(rtabmap_odom_plugins SHARED ${rtabmap_odom_plugins_lib_src})
 
-if("$ENV{ROS_DISTRO}" STRLESS "jazzy")
+if("$ENV{ROS_DISTRO}" STRLESS "lyrical")
    ament_target_dependencies(rtabmap_odom ${AmentLibraries})
 else()
    target_link_libraries(rtabmap_odom PRIVATE ${Libraries} PUBLIC ${PublicLibraries})

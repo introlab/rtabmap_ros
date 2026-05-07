@@ -133,7 +133,7 @@ target_include_directories(rtabmap_sync
 )
 
 
-if("$ENV{ROS_DISTRO}" STRLESS "jazzy")
+if("$ENV{ROS_DISTRO}" STRLESS "lyrical")
   ament_target_dependencies(rtabmap_sync ${AmentLibraries})
 ELSE()
   target_link_libraries(rtabmap_sync PRIVATE ${Libraries} PUBLIC ${PublicLibraries})

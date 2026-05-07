@@ -22,7 +22,7 @@
     },
     "workspaceMount": "source=${localWorkspaceFolder},target=/home/vscode/ros2_ws/src/rtabmap_ros,type=bind",
     "workspaceFolder": "/home/vscode/ros2_ws",
-    "postCreateCommand": "echo 'Initialize: export MAKEFLAGS=\"-j6\" && colcon build --cmake-args -DRTABMAP_SYNC_MULTI_RGBD=ON -DCMAKE_BUILD_TYPE=Release --parallel-workers 2'",
+    "postCreateCommand": "sudo rosdep init && rosdep update && sudo apt update && rosdep install --from-paths ~/ros2_ws/src/rtabmap_ros -i --skip-keys=rtabmap -y && echo 'Initialize: export MAKEFLAGS=\"-j6\" && colcon build --cmake-args -DRTABMAP_SYNC_MULTI_RGBD=ON -DCMAKE_BUILD_TYPE=Release --parallel-workers 2'",
     "hostRequirements": {
         "gpu": "optional"
     },

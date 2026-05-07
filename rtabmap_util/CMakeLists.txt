@@ -159,7 +159,7 @@ IF(grid_map_ros_FOUND)
   target_compile_definitions(rtabmap_util PUBLIC -DWITH_GRID_MAP_ROS)
 ENDIF(grid_map_ros_FOUND)
 
-if("$ENV{ROS_DISTRO}" STRLESS "jazzy")
+if("$ENV{ROS_DISTRO}" STRLESS "lyrical")
   ament_target_dependencies(rtabmap_util ${AmentLibraries})
 ELSE()
   target_link_libraries(rtabmap_util PRIVATE ${Libraries} PUBLIC ${PublicLibraries})

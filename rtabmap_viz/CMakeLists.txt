@@ -72,7 +72,7 @@ SET(AmentLibraries
 ###########
 
 add_executable(rtabmap_viz src/GuiNode.cpp src/GuiWrapper.cpp src/PreferencesDialogROS.cpp include/${PROJECT_NAME}/PreferencesDialogROS.h)
-if("$ENV{ROS_DISTRO}" STRLESS "jazzy")
+if("$ENV{ROS_DISTRO}" STRLESS "lyrical")
   ament_target_dependencies(rtabmap_viz ${AmentLibraries})
 else()
   target_link_libraries(rtabmap_viz PRIVATE ${Libraries})
@@ -86,7 +86,7 @@ SET_TARGET_PROPERTIES(
 )
 
 add_executable(rgbd_image_viewer src/RGBDImageViewerNode.cpp src/rgbd_image_viewer.cpp include/${PROJECT_NAME}/rgbd_image_viewer.hpp)
-if("$ENV{ROS_DISTRO}" STRLESS "jazzy")
+if("$ENV{ROS_DISTRO}" STRLESS "lyrical")
   ament_target_dependencies(rgbd_image_viewer ${AmentLibraries})
 else()
   target_link_libraries(rgbd_image_viewer PRIVATE ${Libraries})

@@ -89,7 +89,7 @@ target_include_directories(rtabmap_conversions
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
-if("$ENV{ROS_DISTRO}" STRLESS "jazzy")
+if("$ENV{ROS_DISTRO}" STRLESS "lyrical")
   ament_target_dependencies(rtabmap_conversions ${AmentLibraries})
 ELSE()
   target_link_libraries(rtabmap_conversions PRIVATE ${Libraries} PUBLIC ${PublicLibraries})

@@ -197,7 +197,7 @@ target_include_directories(rtabmap_slam_plugins
     $<INSTALL_INTERFACE:include>
 )
 
-if("$ENV{ROS_DISTRO}" STRLESS "jazzy")
+if("$ENV{ROS_DISTRO}" STRLESS "lyrical")
    ament_target_dependencies(rtabmap_slam_plugins ${AmentLibraries})
 else()
    target_link_libraries(rtabmap_slam_plugins PUBLIC ${Libraries})
