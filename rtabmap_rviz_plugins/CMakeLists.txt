@@ -15,7 +15,7 @@ if(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
 endif()
 
 # Make sure it is first to prevent Qt6 from claiming the generic versionless targets first
-find_package(QT NAMES Qt5 QUIET COMPONENTS Widgets)
+find_package(Qt5 QUIET COMPONENTS Widgets)
 
 find_package(ament_cmake_ros REQUIRED)
 find_package(pcl_conversions REQUIRED)
