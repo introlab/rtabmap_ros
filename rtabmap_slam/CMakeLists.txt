@@ -54,6 +54,22 @@ include_directories(
 
 # libraries
 SET(Libraries
+   cv_bridge::cv_bridge
+   geometry_msgs::geometry_msgs
+   nav_msgs::nav_msgs
+   rclcpp::rclcpp
+   rclcpp_components::component
+   sensor_msgs::sensor_msgs
+   std_msgs::std_msgs
+   std_srvs::std_srvs
+   tf2::tf2
+   tf2_ros::tf2_ros
+   visualization_msgs::visualization_msgs
+   rtabmap_msgs::rtabmap_msgs
+   rtabmap_util::rtabmap_util
+   rtabmap_sync::rtabmap_sync
+)
+SET(AmentLibraries
    cv_bridge
    geometry_msgs
    nav_msgs
@@ -88,6 +104,10 @@ MESSAGE(STATUS "WITH apriltag_msgs")
 ADD_DEFINITIONS("-DWITH_APRILTAG_MSGS")
 SET(Libraries
    ${Libraries}
+   apriltag_msgs::apriltag_msgs
+)
+SET(AmentLibraries
+   ${AmentLibraries}
    apriltag_msgs
 )
 ENDIF(apriltag_msgs_FOUND)
@@ -98,6 +118,10 @@ MESSAGE(STATUS "WITH aruco_msgs")
 ADD_DEFINITIONS("-DWITH_ARUCO_MSGS")
 SET(Libraries
    ${Libraries}
+   aruco_msgs::aruco_msgs
+)
+SET(AmentLibraries
+   ${AmentLibraries}
    aruco_msgs
 )
 ENDIF(aruco_msgs_FOUND)
@@ -108,6 +132,10 @@ MESSAGE(STATUS "WITH aruco_opencv_msgs")
 ADD_DEFINITIONS("-DWITH_ARUCO_OPENCV_MSGS")
 SET(Libraries
    ${Libraries}
+   aruco_opencv_msgs::aruco_opencv_msgs
+)
+SET(AmentLibraries
+   ${AmentLibraries}
    aruco_opencv_msgs
 )
 ENDIF(aruco_opencv_msgs_FOUND)
@@ -118,6 +146,10 @@ MESSAGE(STATUS "WITH aruco_markers_msgs")
 ADD_DEFINITIONS("-DWITH_ARUCO_MARKERS_MSGS")
 SET(Libraries
    ${Libraries}
+   aruco_markers_msgs::aruco_markers_msgs
+)
+SET(AmentLibraries
+   ${AmentLibraries}
    aruco_markers_msgs
 )
 ENDIF(aruco_markers_msgs_FOUND)
@@ -128,6 +160,10 @@ MESSAGE(STATUS "WITH ros2_aruco_interfaces")
 ADD_DEFINITIONS("-DWITH_ROS2_ARUCO_INTERFACES")
 SET(Libraries
    ${Libraries}
+   ros2_aruco_interfaces::ros2_aruco_interfaces
+)
+SET(AmentLibraries
+   ${AmentLibraries}
    ros2_aruco_interfaces
 )
 ENDIF(ros2_aruco_interfaces_FOUND)
@@ -138,6 +174,10 @@ MESSAGE(STATUS "WITH nav2_msgs")
 ADD_DEFINITIONS("-DWITH_NAV2_MSGS")
 SET(Libraries
    ${Libraries}
+   nav2_msgs::nav2_msgs
+)
+SET(AmentLibraries
+   ${AmentLibraries}
    nav2_msgs
 )
 IF(${nav2_msgs_VERSION_MAJOR} EQUAL 0)
@@ -157,20 +197,23 @@ target_include_directories(rtabmap_slam_plugins
     $<INSTALL_INTERFACE:include>
 )
 
-ament_target_dependencies(rtabmap_slam_plugins ${Libraries})
+if("$ENV{ROS_DISTRO}" STRLESS "lyrical")
+   ament_target_dependencies(rtabmap_slam_plugins ${AmentLibraries})
+else()
+   target_link_libraries(rtabmap_slam_plugins PUBLIC ${Libraries})
+endif()
 
 rclcpp_components_register_nodes(rtabmap_slam_plugins "rtabmap_slam::CoreWrapper")
 
 add_executable(rtabmap_node src/CoreNode.cpp)
-ament_target_dependencies(rtabmap_node ${Libraries})
-target_link_libraries(rtabmap_node rtabmap_slam_plugins)
+target_link_libraries(rtabmap_node PRIVATE rtabmap_slam_plugins)
 set_target_properties(rtabmap_node PROPERTIES OUTPUT_NAME "rtabmap")
 
 #############
 ## Install ##
 #############
 
-ament_export_dependencies(${Libraries})
+ament_export_dependencies(${AmentLibraries})
 ament_export_include_directories(include)
 ament_export_targets(${PROJECT_NAME})          # To include downstream with targets
 ament_export_libraries(rtabmap_slam_plugins) # To include downstream without targets

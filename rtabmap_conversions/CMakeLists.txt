@@ -28,15 +28,30 @@ find_package(std_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_eigen REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
+find_package(tf2_ros REQUIRED)
 
 find_package(RTABMap 0.23.5 REQUIRED)
 
-include_directories(
-  ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
-
 # libraries
 SET(Libraries
+   image_geometry::image_geometry
+   laser_geometry::laser_geometry
+   pcl_conversions::pcl_conversions
+   std_msgs::std_msgs
+   tf2::tf2
+   tf2_eigen::tf2_eigen
+   tf2_geometry_msgs::tf2_geometry_msgs
+)
+SET(PublicLibraries
+    sensor_msgs::sensor_msgs
+    geometry_msgs::geometry_msgs
+    rtabmap_msgs::rtabmap_msgs
+    rclcpp::rclcpp
+    rtabmap::core
+    cv_bridge::cv_bridge
+    tf2_ros::tf2_ros
+)
+SET(AmentLibraries
    cv_bridge
    geometry_msgs
    image_geometry
@@ -74,7 +89,11 @@ target_include_directories(rtabmap_conversions
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
-ament_target_dependencies(rtabmap_conversions ${Libraries})
+if("$ENV{ROS_DISTRO}" STRLESS "lyrical")
+  ament_target_dependencies(rtabmap_conversions ${AmentLibraries})
+ELSE()
+  target_link_libraries(rtabmap_conversions PRIVATE ${Libraries} PUBLIC ${PublicLibraries})
+ENDIF()
 
 IF("$ENV{ROS_DISTRO}" STRLESS "iron")
   target_compile_definitions(rtabmap_conversions PUBLIC -DPRE_ROS_IRON -DPRE_ROS_KILTED)
@@ -85,8 +104,7 @@ ENDIF()
 #############
 ## Install ##
 #############
-
-ament_export_dependencies(${Libraries})
+ament_export_dependencies(${AmentLibraries})
 ament_export_include_directories(include)
 ament_export_targets(${PROJECT_NAME})          # To include downstream with targets
 ament_export_libraries(rtabmap_conversions)    # To include downstream without targets

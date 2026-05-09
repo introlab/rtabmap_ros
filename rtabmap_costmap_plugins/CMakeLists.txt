@@ -16,6 +16,12 @@ include_directories(
 )
 
 SET(Libraries
+  pluginlib::pluginlib
+  rclcpp::rclcpp
+  nav2_costmap_2d::layers
+  visualization_msgs::visualization_msgs
+)
+SET(AmentLibraries
   pluginlib
   rclcpp
   nav2_costmap_2d
@@ -35,11 +41,16 @@ target_include_directories(rtabmap_costmap_plugins
     $<INSTALL_INTERFACE:include>
 )
 
-IF("$ENV{ROS_DISTRO}" STRLESS "jazzy")
-  target_compile_definitions(rtabmap_costmap_plugins PRIVATE -DPRE_ROS_JAZZY)
+IF("$ENV{ROS_DISTRO}" STRLESS "lyrical")
+  IF("$ENV{ROS_DISTRO}" STRLESS "jazzy")
+    target_compile_definitions(rtabmap_costmap_plugins PRIVATE -DPRE_ROS_JAZZY)
+  ENDIF()
+  ament_target_dependencies(rtabmap_costmap_plugins ${AmentLibraries})
+ELSE()
+  target_link_libraries(rtabmap_costmap_plugins PRIVATE ${Libraries})
 ENDIF()
 
-ament_target_dependencies(rtabmap_costmap_plugins ${Libraries})
+
 
 # Causes the visibility macros to use dllexport rather than dllimport,
 # which is appropriate when building the dll but not consuming it.
@@ -51,14 +62,17 @@ target_compile_definitions(rtabmap_costmap_plugins PUBLIC "PLUGINLIB__DISABLE_BO
 pluginlib_export_plugin_description_file(nav2_costmap_2d costmap_plugins.xml)
 
 add_executable(rtabmap_costmap_voxel_marker src/voxel_marker.cpp)
-ament_target_dependencies(rtabmap_costmap_voxel_marker ${Libraries})
+IF("$ENV{ROS_DISTRO}" STRLESS "lyrical")
+  ament_target_dependencies(rtabmap_costmap_voxel_marker ${AmentLibraries})
+ELSE()
+  target_link_libraries(rtabmap_costmap_voxel_marker PRIVATE ${Libraries})
+ENDIF()
 set_target_properties(rtabmap_costmap_voxel_marker PROPERTIES OUTPUT_NAME "voxel_marker")
 
 #############
 ## Install ##
 #############
-
-ament_export_dependencies(${Libraries})
+ament_export_dependencies(${AmentLibraries})
 ament_export_include_directories(include)
 ament_export_targets(${PROJECT_NAME})           # To include downstream with targets
 ament_export_libraries(rtabmap_costmap_plugins) # To include downstream without targets

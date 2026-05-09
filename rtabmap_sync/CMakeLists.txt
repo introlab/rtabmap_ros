@@ -55,6 +55,21 @@ include_directories(
 
 # libraries
 SET(Libraries
+   rclcpp_components::component
+)
+SET(PublicLibraries
+    cv_bridge::cv_bridge
+    rclcpp::rclcpp
+    message_filters::message_filters
+    image_transport::image_transport
+    sensor_msgs::sensor_msgs
+    nav_msgs::nav_msgs
+    rtabmap_msgs::rtabmap_msgs
+    rtabmap_conversions::rtabmap_conversions
+    diagnostic_updater::diagnostic_updater
+)
+
+SET(AmentLibraries
    cv_bridge
    image_transport
    message_filters
@@ -117,8 +132,14 @@ target_include_directories(rtabmap_sync
     $<INSTALL_INTERFACE:include>
 )
 
-ament_target_dependencies(rtabmap_sync ${Libraries})
-ament_target_dependencies(rtabmap_sync_plugins ${Libraries})
+
+if("$ENV{ROS_DISTRO}" STRLESS "lyrical")
+  ament_target_dependencies(rtabmap_sync ${AmentLibraries})
+ELSE()
+  target_link_libraries(rtabmap_sync PRIVATE ${Libraries} PUBLIC ${PublicLibraries})
+  target_link_libraries(rtabmap_sync_plugins PUBLIC ${Libraries})
+ENDIF()
+target_link_libraries(rtabmap_sync_plugins PUBLIC rtabmap_sync)
 
 rclcpp_components_register_nodes(rtabmap_sync_plugins "rtabmap_sync::RGBDSync")
 rclcpp_components_register_nodes(rtabmap_sync_plugins "rtabmap_sync::StereoSync")
@@ -126,30 +147,25 @@ rclcpp_components_register_nodes(rtabmap_sync_plugins "rtabmap_sync::RGBSync")
 rclcpp_components_register_nodes(rtabmap_sync_plugins "rtabmap_sync::RGBDXSync")
 
 add_executable(rtabmap_rgbd_sync src/RGBDSyncNode.cpp)
-ament_target_dependencies(rtabmap_rgbd_sync ${Libraries})
-target_link_libraries(rtabmap_rgbd_sync rtabmap_sync_plugins)
+target_link_libraries(rtabmap_rgbd_sync PRIVATE rtabmap_sync_plugins)
 set_target_properties(rtabmap_rgbd_sync PROPERTIES OUTPUT_NAME "rgbd_sync")
 
 add_executable(rtabmap_rgbdx_sync src/RGBDXSyncNode.cpp)
-ament_target_dependencies(rtabmap_rgbdx_sync ${Libraries})
-target_link_libraries(rtabmap_rgbdx_sync rtabmap_sync_plugins)
+target_link_libraries(rtabmap_rgbdx_sync PRIVATE rtabmap_sync_plugins)
 set_target_properties(rtabmap_rgbdx_sync PROPERTIES OUTPUT_NAME "rgbdx_sync")
 
 add_executable(rtabmap_stereo_sync src/StereoSyncNode.cpp)
-ament_target_dependencies(rtabmap_stereo_sync ${Libraries})
-target_link_libraries(rtabmap_stereo_sync rtabmap_sync_plugins)
+target_link_libraries(rtabmap_stereo_sync PRIVATE rtabmap_sync_plugins)
 set_target_properties(rtabmap_stereo_sync PROPERTIES OUTPUT_NAME "stereo_sync")
 
 add_executable(rtabmap_rgb_sync src/RGBSyncNode.cpp)
-ament_target_dependencies(rtabmap_rgb_sync ${Libraries})
-target_link_libraries(rtabmap_rgb_sync rtabmap_sync_plugins)
+target_link_libraries(rtabmap_rgb_sync PRIVATE rtabmap_sync_plugins)
 set_target_properties(rtabmap_rgb_sync PROPERTIES OUTPUT_NAME "rgb_sync")
 
 #############
 ## Install ##
 #############
-
-ament_export_dependencies(${Libraries})
+ament_export_dependencies(${AmentLibraries})
 ament_export_include_directories(include)
 ament_export_targets(${PROJECT_NAME})          # To include downstream with targets
 ament_export_libraries(rtabmap_sync rtabmap_sync_plugins) # To include downstream without targets

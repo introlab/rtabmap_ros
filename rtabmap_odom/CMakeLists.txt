@@ -41,7 +41,25 @@ include_directories(
 )
 
 SET(Libraries
+   cv_bridge::cv_bridge
+   rclcpp_components::component
+   image_geometry::image_geometry
+   laser_geometry::laser_geometry
+   message_filters::message_filters
+   pcl_conversions::pcl_conversions
+)
+SET(PublicLibraries
+   rclcpp::rclcpp
+   sensor_msgs::sensor_msgs
+   nav_msgs::nav_msgs
+   rtabmap_conversions::rtabmap_conversions
+   rtabmap_msgs::rtabmap_msgs
+   rtabmap_util::rtabmap_util
+   rtabmap_sync::rtabmap_sync
+)
+SET(AmentLibraries
    cv_bridge
+   rclcpp_components
    image_geometry
    laser_geometry
    message_filters
@@ -81,10 +99,13 @@ target_include_directories(rtabmap_odom
 )
 add_library(rtabmap_odom_plugins SHARED ${rtabmap_odom_plugins_lib_src})
 
-ament_target_dependencies(rtabmap_odom ${Libraries})
-ament_target_dependencies(rtabmap_odom_plugins ${Libraries})
-
-target_link_libraries(rtabmap_odom_plugins rtabmap_odom)
+if("$ENV{ROS_DISTRO}" STRLESS "lyrical")
+   ament_target_dependencies(rtabmap_odom ${AmentLibraries})
+else()
+   target_link_libraries(rtabmap_odom PRIVATE ${Libraries} PUBLIC ${PublicLibraries})
+   target_link_libraries(rtabmap_odom_plugins PUBLIC ${Libraries})
+endif()
+target_link_libraries(rtabmap_odom_plugins PUBLIC rtabmap_odom)
 
 rclcpp_components_register_nodes(rtabmap_odom_plugins "rtabmap_odom::RGBDOdometry")
 rclcpp_components_register_nodes(rtabmap_odom_plugins "rtabmap_odom::StereoOdometry")
@@ -92,25 +113,21 @@ rclcpp_components_register_nodes(rtabmap_odom_plugins "rtabmap_odom::ICPOdometry
 
 
 add_executable(rtabmap_rgbd_odometry src/RGBDOdometryNode.cpp)
-ament_target_dependencies(rtabmap_rgbd_odometry ${Libraries})
-target_link_libraries(rtabmap_rgbd_odometry rtabmap_odom_plugins)
+target_link_libraries(rtabmap_rgbd_odometry PRIVATE rtabmap_odom_plugins)
 set_target_properties(rtabmap_rgbd_odometry PROPERTIES OUTPUT_NAME "rgbd_odometry")
 
 add_executable(rtabmap_stereo_odometry src/StereoOdometryNode.cpp)
-ament_target_dependencies(rtabmap_stereo_odometry ${Libraries})
-target_link_libraries(rtabmap_stereo_odometry rtabmap_odom_plugins)
+target_link_libraries(rtabmap_stereo_odometry PRIVATE rtabmap_odom_plugins)
 set_target_properties(rtabmap_stereo_odometry PROPERTIES OUTPUT_NAME "stereo_odometry")
 
 add_executable(rtabmap_icp_odometry src/ICPOdometryNode.cpp)
-ament_target_dependencies(rtabmap_icp_odometry ${Libraries})
-target_link_libraries(rtabmap_icp_odometry rtabmap_odom_plugins)
+target_link_libraries(rtabmap_icp_odometry PRIVATE rtabmap_odom_plugins)
 set_target_properties(rtabmap_icp_odometry PROPERTIES OUTPUT_NAME "icp_odometry")
 
 #############
 ## Install ##
 #############
-
-ament_export_dependencies(${Libraries})
+ament_export_dependencies(${AmentLibraries})
 ament_export_include_directories(include)
 ament_export_targets(${PROJECT_NAME})          # To include downstream with targets
 ament_export_libraries(rtabmap_odom rtabmap_odom_plugins) # To include downstream without targets
