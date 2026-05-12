@@ -24,8 +24,13 @@ fusioncore:
 
     # MPU9250: magnetometer disabled (unreliable in sim / near motors)
     imu.has_magnetometer: false
-    imu.gyro_noise: 0.005             # rad/s
-    imu.accel_noise: 0.1              # m/s²
+    # Simulation-tuned noise values for Gazebo Harmonic MPU9250 plugin.
+    # Real MPU9250 hardware: gyro ~0.005 rad/s, accel ~0.1 m/s2.
+    # Gazebo injects lower noise than the real sensor, so tighter values
+    # reduce unnecessary filter uncertainty in sim without affecting real-hardware users
+    # (who should revert to the hardware spec values above).
+    imu.gyro_noise: 0.002             # rad/s  (Gazebo sim-tuned; real MPU9250: 0.005)
+    imu.accel_noise: 0.02             # m/s2   (Gazebo sim-tuned; real MPU9250: 0.1)
     imu.remove_gravitational_acceleration: false
 
     # Wheel odometry noise (TB3 differential drive, simulated)
