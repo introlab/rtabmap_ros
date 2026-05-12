@@ -32,6 +32,18 @@ The ICP result feeds back into FusionCore as a second velocity source (`encoder2
 tightening the state estimate further. `Odom/ResetCountdown: 1` lets the system
 auto-recover if ICP loses tracking.
 
+## Simulation vs real hardware
+
+In Gazebo, the DiffDrive plugin produces near-perfect wheel velocities with no slip or
+encoder noise, while the simulated MPU9250 injects Gaussian noise. FusionCore fusing
+both means the noisy IMU slightly degrades what is already a perfect odometry source,
+so the `map → odom` correction on each scan update will be slightly larger than in the
+standard wheel-odometry-only demo. On real hardware this completely inverts: wheel
+encoders accumulate slip, terrain variation, and mechanical error that dwarfs IMU noise,
+and fusion pays off measurably. The sim-tuned IMU noise values in `fusioncore_tb3.yaml`
+(`gyro_noise: 0.002`, `accel_noise: 0.02`) reduce unnecessary filter uncertainty in
+simulation; real MPU9250 users should use the hardware spec values noted in that file.
+
 ## Quick start
 
 ```bash
@@ -53,8 +65,7 @@ ros2 launch rtabmap_demos turtlebot3_sim_fusioncore_icp_demo.launch.py world:=ho
 ## Prerequisites
 
 ```bash
-sudo apt install ros-jazzy-fusioncore-ros ros-jazzy-turtlebot3-gazebo \
-                 ros-jazzy-rtabmap-ros ros-jazzy-nav2-bringup
+sudo apt install ros-jazzy-fusioncore-ros ros-jazzy-turtlebot3-gazebo                  ros-jazzy-rtabmap-ros ros-jazzy-nav2-bringup
 export TURTLEBOT3_MODEL=waffle
 ```
 
