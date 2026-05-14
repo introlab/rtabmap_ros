@@ -496,6 +496,7 @@ void RGBDOdometry::commonCallback(
 		Transform localTransform = rtabmap_conversions::getTransform(this->frameId(), rgbImages[i]->header.frame_id, stamp, tfBuffer(), waitForTransform());
 		if(localTransform.isNull())
 		{
+			RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000, "TF from %s to %s not found!", this->frameId().c_str(), rgbImages[i]->header.frame_id.c_str());
 			return;
 		}
 
