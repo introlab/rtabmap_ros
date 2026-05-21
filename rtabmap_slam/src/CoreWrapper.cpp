@@ -86,6 +86,7 @@ namespace rtabmap_slam {
 
 CoreWrapper::CoreWrapper() :
 		CommonDataSubscriber(false),
+		tfListener_(tfBuffer_),
 		paused_(false),
 		lastPose_(Transform::getIdentity()),
 		lastPoseIntermediate_(false),
@@ -1047,7 +1048,7 @@ bool CoreWrapper::odomUpdate(const nav_msgs::OdometryConstPtr & odomMsg, ros::Ti
 		{
 			Transform odomTF;
 			if(!stamp.isZero()) {
-				odomTF = rtabmap_conversions::getTransform(odomMsg->header.frame_id, frameId_, stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+				odomTF = rtabmap_conversions::getTransform(odomMsg->header.frame_id, frameId_, stamp, tfBuffer_, waitForTransform_?waitForTransformDuration_:0.0);
 			}
 			if(odomTF.isNull())
 			{
@@ -1174,7 +1175,7 @@ bool CoreWrapper::odomTFUpdate(const ros::Time & stamp)
 	if(!paused_)
 	{
 		// Odom TF ready?
-		Transform odom = rtabmap_conversions::getTransform(odomFrameId_, frameId_, stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+		Transform odom = rtabmap_conversions::getTransform(odomFrameId_, frameId_, stamp, tfBuffer_, waitForTransform_?waitForTransformDuration_:0.0);
 		if(odom.isNull())
 		{
 			return false;
@@ -1354,7 +1355,7 @@ void CoreWrapper::commonMultiCameraCallbackImpl(
 			depth,
 			cameraModels,
 			stereoCameraModels,
-			tfListener_,
+			tfBuffer_,
 			waitForTransform_?waitForTransformDuration_:0.0,
 			alreadyRectifiedImages_,
 			localKeyPointsMsgs,
@@ -1471,7 +1472,7 @@ void CoreWrapper::commonMultiCameraCallbackImpl(
 				odomSensorSync_?odomFrameId:"",
 				lastPoseStamp_,
 				scan,
-				tfListener_,
+				tfBuffer_,
 				waitForTransform_?waitForTransformDuration_:0,
 				// backward compatibility, project 2D scan in /base_link frame
 				rtabmap_.getMemory() && uStrNumCmp(rtabmap_.getMemory()->getDatabaseVersion(), "0.11.10") < 0))
@@ -1488,7 +1489,7 @@ void CoreWrapper::commonMultiCameraCallbackImpl(
 				odomSensorSync_?odomFrameId:"",
 				lastPoseStamp_,
 				scan,
-				tfListener_,
+				tfBuffer_,
 				waitForTransform_?waitForTransformDuration_:0,
 				scanCloudMaxPoints_,
 				0,
@@ -1676,7 +1677,7 @@ void CoreWrapper::commonLaserScanCallback(
 				odomSensorSync_?odomFrameId:"",
 				lastPoseStamp_,
 				scan,
-				tfListener_,
+				tfBuffer_,
 				waitForTransform_?waitForTransformDuration_:0,
 				// backward compatibility, project 2D scan in /base_link frame
 				rtabmap_.getMemory() && uStrNumCmp(rtabmap_.getMemory()->getDatabaseVersion(), "0.11.10") < 0))
@@ -1693,7 +1694,7 @@ void CoreWrapper::commonLaserScanCallback(
 				odomSensorSync_?odomFrameId:"",
 				lastPoseStamp_,
 				scan,
-				tfListener_,
+				tfBuffer_,
 				waitForTransform_?waitForTransformDuration_:0,
 				scanCloudMaxPoints_,
 				0,
@@ -1917,7 +1918,7 @@ void CoreWrapper::process(
 					Transform gt;
 					if(!groundTruthFrameId_.empty())
 					{
-						gt = rtabmap_conversions::getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, iter->first.header.stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+						gt = rtabmap_conversions::getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, iter->first.header.stamp, tfBuffer_, waitForTransform_?waitForTransformDuration_:0.0);
 					}
 					interData.setGroundTruth(gt);
 
@@ -1971,7 +1972,7 @@ void CoreWrapper::process(
 		Transform groundTruthPose;
 		if(!groundTruthFrameId_.empty())
 		{
-			groundTruthPose = rtabmap_conversions::getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, lastPoseStamp_, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+			groundTruthPose = rtabmap_conversions::getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, lastPoseStamp_, tfBuffer_, waitForTransform_?waitForTransformDuration_:0.0);
 		}
 		data.setGroundTruth(groundTruthPose);
 
@@ -1983,7 +1984,7 @@ void CoreWrapper::process(
 					globalPose_.header.frame_id,
 					frameId_,
 					lastPoseStamp_,
-					tfListener_,
+					tfBuffer_,
 					waitForTransform_?waitForTransformDuration_:0.0);
 			if(!sensorToBase.isNull())
 			{
@@ -1996,7 +1997,7 @@ void CoreWrapper::process(
 						odomFrameId,
 						lastPoseStamp_,
 						globalPose_.header.stamp,
-						tfListener_,
+						tfBuffer_,
 						waitForTransform_?waitForTransformDuration_:0.0);
 				if(!correction.isNull())
 				{
@@ -2026,7 +2027,7 @@ void CoreWrapper::process(
 				frameId_,
 				odomFrameId,
 				lastPoseStamp_,
-				tfListener_,
+				tfBuffer_,
 				waitForTransform_?waitForTransformDuration_:0,
 				landmarkDefaultLinVariance_,
 				landmarkDefaultAngVariance_);
@@ -2053,7 +2054,7 @@ void CoreWrapper::process(
 				rtabmap::Transform localTransform;
 				if(frameId_.compare(imuFrameId_) != 0)
 				{
-					localTransform = rtabmap_conversions::getTransform(frameId_, imuFrameId_, ros::Time(data.stamp()), tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+					localTransform = rtabmap_conversions::getTransform(frameId_, imuFrameId_, ros::Time(data.stamp()), tfBuffer_, waitForTransform_?waitForTransformDuration_:0.0);
 				}
 				else
 				{
@@ -2297,7 +2298,7 @@ void CoreWrapper::process(
 									Transform goalLocalTransform = Transform::getIdentity();
 									if(!goalFrameId_.empty() && goalFrameId_.compare(frameId_) != 0)
 									{
-										Transform localT = rtabmap_conversions::getTransform(frameId_, goalFrameId_, ros::Time::now(), tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+										Transform localT = rtabmap_conversions::getTransform(frameId_, goalFrameId_, ros::Time::now(), tfBuffer_, waitForTransform_?waitForTransformDuration_:0.0);
 										if(!localT.isNull())
 										{
 											goalLocalTransform = localT.inverse().to3DoF();
@@ -2602,7 +2603,7 @@ void CoreWrapper::initialPoseCallback(const geometry_msgs::PoseWithCovarianceSta
 	}
 	else if(msg->header.frame_id != mapFrameId_)
 	{
-		mapToPose = rtabmap_conversions::getTransform(mapFrameId_, msg->header.frame_id, msg->header.stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+		mapToPose = rtabmap_conversions::getTransform(mapFrameId_, msg->header.frame_id, msg->header.stamp, tfBuffer_, waitForTransform_?waitForTransformDuration_:0.0);
 		if(mapToPose.isNull())
 		{
 			NODELET_ERROR("Failed to transform initialpose from frame %s to map frame %s", msg->header.frame_id.c_str(), mapFrameId_.c_str());
@@ -2710,7 +2711,7 @@ void CoreWrapper::goalCommonCallback(
 						Transform goalLocalTransform = Transform::getIdentity();
 						if(!goalFrameId_.empty() && goalFrameId_.compare(frameId_) != 0)
 						{
-							Transform localT = rtabmap_conversions::getTransform(frameId_, goalFrameId_, stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+							Transform localT = rtabmap_conversions::getTransform(frameId_, goalFrameId_, stamp, tfBuffer_, waitForTransform_?waitForTransformDuration_:0.0);
 							if(!localT.isNull())
 							{
 								goalLocalTransform = localT.inverse().to3DoF();
@@ -2786,7 +2787,7 @@ void CoreWrapper::goalCallback(const geometry_msgs::PoseStampedConstPtr & msg)
 	// transform goal in /map frame
 	if(!msg->header.frame_id.empty() && mapFrameId_.compare(msg->header.frame_id) != 0)
 	{
-		Transform t = rtabmap_conversions::getTransform(mapFrameId_, msg->header.frame_id, msg->header.stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+		Transform t = rtabmap_conversions::getTransform(mapFrameId_, msg->header.frame_id, msg->header.stamp, tfBuffer_, waitForTransform_?waitForTransformDuration_:0.0);
 		if(t.isNull())
 		{
 			NODELET_ERROR("Cannot transform goal pose from \"%s\" frame to \"%s\" frame!",
@@ -3888,7 +3889,7 @@ bool CoreWrapper::getPlanCallback(nav_msgs::GetPlan::Request &req, nav_msgs::Get
 		Transform coordinateTransform = Transform::getIdentity();
 		if(!req.goal.header.frame_id.empty() && mapFrameId_.compare(req.goal.header.frame_id) != 0)
 		{
-			coordinateTransform = rtabmap_conversions::getTransform(mapFrameId_, req.goal.header.frame_id, req.goal.header.stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+			coordinateTransform = rtabmap_conversions::getTransform(mapFrameId_, req.goal.header.frame_id, req.goal.header.stamp, tfBuffer_, waitForTransform_?waitForTransformDuration_:0.0);
 			if(coordinateTransform.isNull())
 			{
 				NODELET_ERROR("Cannot transform goal pose from \"%s\" frame to \"%s\" frame!",
@@ -3966,7 +3967,7 @@ bool CoreWrapper::getPlanNodesCallback(rtabmap_msgs::GetPlan::Request &req, rtab
 		// transform goal in /map frame
 		if(!pose.isNull() && !req.goal.header.frame_id.empty() && mapFrameId_.compare(req.goal.header.frame_id) != 0)
 		{
-			coordinateTransform = rtabmap_conversions::getTransform(mapFrameId_, req.goal.header.frame_id, req.goal.header.stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+			coordinateTransform = rtabmap_conversions::getTransform(mapFrameId_, req.goal.header.frame_id, req.goal.header.stamp, tfBuffer_, waitForTransform_?waitForTransformDuration_:0.0);
 			if(coordinateTransform.isNull())
 			{
 				NODELET_ERROR("Cannot transform goal pose from \"%s\" frame to \"%s\" frame!",
@@ -4633,7 +4634,7 @@ void CoreWrapper::publishGlobalPath(const ros::Time & stamp)
 			Transform goalLocalTransform = Transform::getIdentity();
 			if(!goalFrameId_.empty() && goalFrameId_.compare(frameId_) != 0)
 			{
-				Transform localT = rtabmap_conversions::getTransform(frameId_, goalFrameId_, stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0.0);
+				Transform localT = rtabmap_conversions::getTransform(frameId_, goalFrameId_, stamp, tfBuffer_, waitForTransform_?waitForTransformDuration_:0.0);
 				if(!localT.isNull())
 				{
 					goalLocalTransform = localT.inverse().to3DoF();

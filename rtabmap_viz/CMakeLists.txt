@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.5)
 project(rtabmap_viz)
 
 find_package(catkin REQUIRED COMPONENTS
-             cv_bridge geometry_msgs std_msgs std_srvs nav_msgs rtabmap_msgs rtabmap_sync tf
+             cv_bridge geometry_msgs std_msgs std_srvs nav_msgs rtabmap_msgs rtabmap_sync tf tf2_ros
 )
 
 ###################################
@@ -11,7 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
 
 catkin_package(
   INCLUDE_DIRS include
-  CATKIN_DEPENDS cv_bridge geometry_msgs std_msgs std_srvs nav_msgs rtabmap_msgs rtabmap_sync tf
+  CATKIN_DEPENDS cv_bridge geometry_msgs std_msgs std_srvs nav_msgs rtabmap_msgs rtabmap_sync tf tf2_ros
 )
 
 # catkin is not using cmake targets for dependencies,

@@ -74,6 +74,7 @@ OdometryROS::OdometryROS(bool stereoParams, bool visParams, bool icpParams) :
 	waitForTransformDuration_(0.1), // 100 ms
 	publishNullWhenLost_(true),
 	publishCompressedSensorData_(false),
+	tfListener_(tfBuffer_),
 	paused_(false),
 	resetCountdown_(0),
 	resetCurrentCount_(0),
@@ -429,7 +430,7 @@ void OdometryROS::callbackIMU(const sensor_msgs::ImuConstPtr& msg)
 		rtabmap::Transform localTransform = rtabmap::Transform::getIdentity();
 		if(this->frameId().compare(msg->header.frame_id) != 0)
 		{
-			localTransform = rtabmap_conversions::getTransform(this->frameId(), msg->header.frame_id, msg->header.stamp, this->tfListener(), this->waitForTransformDuration());
+			localTransform = rtabmap_conversions::getTransform(this->frameId(), msg->header.frame_id, msg->header.stamp, this->tfBuffer(), this->waitForTransformDuration());
 		}
 		if(localTransform.isNull())
 		{
@@ -647,7 +648,7 @@ void OdometryROS::processData()
 
 		if(!groundTruthFrameId_.empty())
 		{
-			groundTruth = rtabmap_conversions::getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, header.stamp, this->tfListener(), this->waitForTransformDuration());
+			groundTruth = rtabmap_conversions::getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, header.stamp, this->tfBuffer(), this->waitForTransformDuration());
 
 			if(!data.imageRaw().empty() || !data.laserScanRaw().isEmpty())
 			{
@@ -695,7 +696,7 @@ void OdometryROS::processData()
 		else
 		{
 			// Check TF to see if sensor fusion is used (e.g., the output of robot_localization)
-			Transform tfPose = rtabmap_conversions::getTransform(odomFrameId_, frameId_, header.stamp, this->tfListener(), this->waitForTransformDuration());
+			Transform tfPose = rtabmap_conversions::getTransform(odomFrameId_, frameId_, header.stamp, this->tfBuffer(), this->waitForTransformDuration());
 			if(tfPose.isNull())
 			{
 				NODELET_WARN( "Odometry automatically reset to latest computed pose!");
@@ -719,7 +720,7 @@ void OdometryROS::processData()
 	Transform guessCurrentPose;
 	if(!guessFrameId_.empty())
 	{
-		guessCurrentPose = rtabmap_conversions::getTransform(guessFrameId_, frameId_, header.stamp, this->tfListener(), this->waitForTransformDuration());
+		guessCurrentPose = rtabmap_conversions::getTransform(guessFrameId_, frameId_, header.stamp, this->tfBuffer(), this->waitForTransformDuration());
 
 		Transform previousPose = guessPreviousPose_;
 		if(guessPreviousPose_.isNull())
@@ -1068,7 +1069,7 @@ void OdometryROS::processData()
 			else
 			{
 				// Check TF to see if sensor fusion is used (e.g., the output of robot_localization)
-				Transform tfPose = rtabmap_conversions::getTransform(odomFrameId_, frameId_, header.stamp, this->tfListener(), this->waitForTransformDuration());
+				Transform tfPose = rtabmap_conversions::getTransform(odomFrameId_, frameId_, header.stamp, this->tfBuffer(), this->waitForTransformDuration());
 				if(tfPose.isNull())
 				{
 					NODELET_WARN( "Odometry automatically reset to latest computed pose!");

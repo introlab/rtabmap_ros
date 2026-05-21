@@ -31,8 +31,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <ros/ros.h>
 #include <nodelet/nodelet.h>
 
+#include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_broadcaster.h>
-#include <tf/transform_listener.h>
+#include <tf2_ros/transform_listener.h>
 
 #include <std_srvs/Empty.h>
 #include <std_msgs/Header.h>
@@ -84,7 +85,7 @@ protected:
 	void initDiagnosticMsg(const std::string & subscribedTopicsMsg, bool approxSync, const std::string & subscribedTopic = "");
 
 	virtual void flushCallbacks() = 0;
-	tf::TransformListener & tfListener() {return tfListener_;}
+	tf2_ros::Buffer & tfBuffer() {return tfBuffer_;}
 	double waitForTransformDuration() const {return waitForTransform_?waitForTransformDuration_:0.0;}
 	rtabmap::Transform velocityGuess() const;
 	ros::Time previousStamp() const {return previousStamp_;}
@@ -142,7 +143,8 @@ private:
 	ros::ServiceServer setLogWarnSrv_;
 	ros::ServiceServer setLogErrorSrv_;
 	tf2_ros::TransformBroadcaster tfBroadcaster_;
-	tf::TransformListener tfListener_;
+	tf2_ros::Buffer tfBuffer_;
+	tf2_ros::TransformListener tfListener_;
 	ros::Subscriber imuSub_;
 
 	// Safe-threading

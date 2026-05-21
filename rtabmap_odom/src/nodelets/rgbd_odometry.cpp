@@ -487,7 +487,7 @@ private:
 				higherStamp = stamp;
 			}
 
-			Transform localTransform = rtabmap_conversions::getTransform(this->frameId(), rgbImages[i]->header.frame_id, stamp, this->tfListener(), this->waitForTransformDuration());
+			Transform localTransform = rtabmap_conversions::getTransform(this->frameId(), rgbImages[i]->header.frame_id, stamp, this->tfBuffer(), this->waitForTransformDuration());
 			if(localTransform.isNull())
 			{
 				return;

@@ -19,5 +19,6 @@
   <depend>rtabmap_msgs</depend>
   <depend>rtabmap_sync</depend>
   <depend>tf</depend>
+  <depend>tf2_ros</depend>
 
 </package>

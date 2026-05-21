@@ -52,6 +52,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <message_filters/sync_policies/exact_time.h>
 #include <message_filters/subscriber.h>
 
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
+
 namespace rtabmap_util
 {
 
@@ -87,7 +90,7 @@ public:
 private:
 	virtual void onInit()
 	{
-		listener_ = new tf::TransformListener();
+		listener_ = new tf2_ros::TransformListener(tfBuffer_);
 
 		ros::NodeHandle & nh = getNodeHandle();
 		ros::NodeHandle & pnh = getPrivateNodeHandle();
@@ -179,7 +182,7 @@ private:
 						fixedFrameId_,
 						pointCloud2Msg->header.stamp,
 						cameraInfoMsg->header.stamp,
-						*listener_,
+						tfBuffer_,
 						waitForTransform_);
 			}
 
@@ -192,7 +195,7 @@ private:
 					pointCloud2Msg->header.frame_id,
 					cameraInfoMsg->header.frame_id,
 					cameraInfoMsg->header.stamp,
-					*listener_,
+					tfBuffer_,
 					waitForTransform_);
 
 			if(cloudToCamera.isNull())
@@ -306,7 +309,8 @@ private:
 	message_filters::Subscriber<sensor_msgs::PointCloud2> pointCloudSub_;
 	message_filters::Subscriber<sensor_msgs::CameraInfo> cameraInfoSub_;
 	std::string fixedFrameId_;
-	tf::TransformListener * listener_;
+	tf2_ros::Buffer tfBuffer_;
+	tf2_ros::TransformListener * listener_;
 	double waitForTransform_;
 	int fillHolesSize_;
 	double fillHolesError_;

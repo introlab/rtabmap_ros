@@ -29,7 +29,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define MSGCONVERSION_H_
 
 #include <tf/tf.h>
-#include <tf/transform_listener.h>
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
 #include <geometry_msgs/Transform.h>
 #include <geometry_msgs/Pose.h>
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
@@ -135,7 +136,7 @@ rtabmap::StereoCameraModel stereoCameraModelFromROS(
 		const sensor_msgs::CameraInfo & leftCamInfo,
 		const sensor_msgs::CameraInfo & rightCamInfo,
 		const std::string & frameId,
-		tf::TransformListener & listener,
+		tf2_ros::Buffer & tfBuffer,
 		double waitForTransform);
 
 void mapDataFromROS(
@@ -190,7 +191,7 @@ rtabmap::Landmarks landmarksFromROS(
 		const std::string & frameId,
 		const std::string & odomFrameId,
 		const ros::Time & odomStamp,
-		tf::TransformListener & listener,
+		tf2_ros::Buffer & tfBuffer,
 		double waitForTransform,
 		double defaultLinVariance,
 		double defaultAngVariance);
@@ -202,7 +203,7 @@ rtabmap::Transform getTransform(
 		const std::string & fromFrameId,
 		const std::string & toFrameId,
 		const ros::Time & stamp,
-		tf::TransformListener & listener,
+		tf2_ros::Buffer & tfBuffer,
 		double waitForTransform);
 
 
@@ -213,7 +214,7 @@ rtabmap::Transform getMovingTransform(
 		const std::string & fixedFrame,
 		const ros::Time & stampFrom,
 		const ros::Time & stampTo,
-		tf::TransformListener & listener,
+		tf2_ros::Buffer & tfBuffer,
 		double waitForTransform);
 
 bool convertRGBDMsgs(
@@ -228,7 +229,7 @@ bool convertRGBDMsgs(
 		cv::Mat & depth,
 		std::vector<rtabmap::CameraModel> & cameraModels,
 		std::vector<rtabmap::StereoCameraModel> & stereoCameraModels,
-		tf::TransformListener & listener,
+		tf2_ros::Buffer & tfBuffer,
 		double waitForTransform,
 		bool alreadRectifiedImages,
 		const std::vector<std::vector<rtabmap_msgs::KeyPoint> > & localKeyPointsMsgs = std::vector<std::vector<rtabmap_msgs::KeyPoint> >(),
@@ -249,7 +250,7 @@ bool convertStereoMsg(
 		cv::Mat & left,
 		cv::Mat & right,
 		rtabmap::StereoCameraModel & stereoModel,
-		tf::TransformListener & listener,
+		tf2_ros::Buffer & tfBuffer,
 		double waitForTransform,
 		bool alreadyRectified);
 
@@ -259,7 +260,7 @@ bool convertScanMsg(
 		const std::string & odomFrameId,
 		const ros::Time & odomStamp,
 		rtabmap::LaserScan & scan,
-		tf::TransformListener & listener,
+		tf2_ros::Buffer & tfBuffer,
 		double waitForTransform,
 		bool outputInFrameId = false);
 
@@ -269,7 +270,7 @@ bool convertScan3dMsg(
 		const std::string & odomFrameId,
 		const ros::Time & odomStamp,
 		rtabmap::LaserScan & scan,
-		tf::TransformListener & listener,
+		tf2_ros::Buffer & tfBuffer,
 		double waitForTransform,
 		int maxPoints = 0,
 		float maxRange = 0.0f,
@@ -279,7 +280,7 @@ bool deskew(
 		const sensor_msgs::PointCloud2 & input,
 		sensor_msgs::PointCloud2 & output,
 		const std::string & fixedFrameId,
-		tf::TransformListener & listener,
+		tf2_ros::Buffer & tfBuffer,
 		double waitForTransform,
 		bool slerp = false);
 

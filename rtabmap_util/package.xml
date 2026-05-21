@@ -20,6 +20,7 @@
   <depend>stereo_msgs</depend>
   <depend>std_msgs</depend>
   <depend>tf</depend>
+  <depend>tf2_ros</depend>
   <depend>laser_geometry</depend>
   <depend>pcl_conversions</depend>
   <depend>pcl_ros</depend>

@@ -73,6 +73,7 @@ GuiWrapper::GuiWrapper(int & argc, char** argv) :
 		waitForTransformDuration_(0.2), // 200 ms
 		odomSensorSync_(false),
 		maxOdomUpdateRate_(10),
+		tfListener_(tfBuffer_),
 		cameraNodeName_(""),
 		lastOdomInfoUpdateTime_(0),
 		rtabmapNodeName_("rtabmap")
@@ -541,7 +542,7 @@ void GuiWrapper::commonMultiCameraCallback(
 		odomHeader.frame_id = odomFrameId_;
 	}
 
-	Transform odomT = rtabmap_conversions::getTransform(odomHeader.frame_id, frameId, odomHeader.stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0);
+	Transform odomT = rtabmap_conversions::getTransform(odomHeader.frame_id, frameId, odomHeader.stamp, tfBuffer_, waitForTransform_?waitForTransformDuration_:0);
 	cv::Mat covariance = cv::Mat::eye(6,6,CV_64FC1);
 	if(odomMsg.get())
 	{
@@ -608,7 +609,7 @@ void GuiWrapper::commonMultiCameraCallback(
 					depth,
 					cameraModels,
 					stereoCameraModels,
-					tfListener_,
+					tfBuffer_,
 					waitForTransform_?waitForTransformDuration_:0.0,
 					imagesAlreadyRectified))
 			{
@@ -625,7 +626,7 @@ void GuiWrapper::commonMultiCameraCallback(
 					odomSensorSync_?odomHeader.frame_id:"",
 					odomHeader.stamp,
 					scan,
-					tfListener_,
+					tfBuffer_,
 					waitForTransform_?waitForTransformDuration_:0))
 			{
 				ROS_ERROR("Could not convert laser scan msg! Aborting rtabmap_viz update...");
@@ -640,7 +641,7 @@ void GuiWrapper::commonMultiCameraCallback(
 					odomSensorSync_?odomHeader.frame_id:"",
 					odomHeader.stamp,
 					scan,
-					tfListener_,
+					tfBuffer_,
 					waitForTransform_?waitForTransformDuration_:0))
 			{
 				ROS_ERROR("Could not convert 3d laser scan msg! Aborting rtabmap_viz update...");
@@ -734,7 +735,7 @@ void GuiWrapper::commonStereoCallback(
 		odomHeader.frame_id = odomFrameId_;
 	}
 
-	Transform odomT = rtabmap_conversions::getTransform(odomHeader.frame_id, frameId, odomHeader.stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0);
+	Transform odomT = rtabmap_conversions::getTransform(odomHeader.frame_id, frameId, odomHeader.stamp, tfBuffer_, waitForTransform_?waitForTransformDuration_:0);
 	cv::Mat covariance = cv::Mat::eye(6,6,CV_64FC1);
 	if(odomMsg.get())
 	{
@@ -797,7 +798,7 @@ void GuiWrapper::commonStereoCallback(
 				left,
 				right,
 				stereoModel,
-				tfListener_,
+				tfBuffer_,
 				waitForTransform_?waitForTransformDuration_:0.0,
 				imagesAlreadyRectified))
 		{
@@ -813,7 +814,7 @@ void GuiWrapper::commonStereoCallback(
 					odomSensorSync_?odomHeader.frame_id:"",
 					odomHeader.stamp,
 					scan,
-					tfListener_,
+					tfBuffer_,
 					waitForTransform_?waitForTransformDuration_:0))
 			{
 				ROS_ERROR("Could not convert laser scan msg! Aborting rtabmap_viz update...");
@@ -828,7 +829,7 @@ void GuiWrapper::commonStereoCallback(
 					odomSensorSync_?odomHeader.frame_id:"",
 					odomHeader.stamp,
 					scan,
-					tfListener_,
+					tfBuffer_,
 					waitForTransform_?waitForTransformDuration_:0))
 			{
 				ROS_ERROR("Could not convert 3d laser scan msg! Aborting rtabmap_viz update...");
@@ -907,7 +908,7 @@ void GuiWrapper::commonLaserScanCallback(
 		odomHeader.frame_id = odomFrameId_;
 	}
 
-	Transform odomT = rtabmap_conversions::getTransform(odomHeader.frame_id, frameId, odomHeader.stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0);
+	Transform odomT = rtabmap_conversions::getTransform(odomHeader.frame_id, frameId, odomHeader.stamp, tfBuffer_, waitForTransform_?waitForTransformDuration_:0);
 	cv::Mat covariance = cv::Mat::eye(6,6,CV_64FC1);
 	if(odomMsg.get())
 	{
@@ -960,7 +961,7 @@ void GuiWrapper::commonLaserScanCallback(
 					odomSensorSync_?odomHeader.frame_id:"",
 					odomHeader.stamp,
 					scan,
-					tfListener_,
+					tfBuffer_,
 					waitForTransform_?waitForTransformDuration_:0))
 			{
 				ROS_ERROR("Could not convert laser scan msg! Aborting rtabmap_viz update...");
@@ -975,7 +976,7 @@ void GuiWrapper::commonLaserScanCallback(
 					odomSensorSync_?odomHeader.frame_id:"",
 					odomHeader.stamp,
 					scan,
-					tfListener_,
+					tfBuffer_,
 					waitForTransform_?waitForTransformDuration_:0))
 			{
 				ROS_ERROR("Could not convert 3d laser scan msg! Aborting rtabmap_viz update...");
@@ -1024,7 +1025,7 @@ void GuiWrapper::commonOdomCallback(
 
 	std_msgs::Header odomHeader = odomMsg->header;
 
-	Transform odomT = rtabmap_conversions::getTransform(odomHeader.frame_id, odomMsg->child_frame_id, odomHeader.stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0);
+	Transform odomT = rtabmap_conversions::getTransform(odomHeader.frame_id, odomMsg->child_frame_id, odomHeader.stamp, tfBuffer_, waitForTransform_?waitForTransformDuration_:0);
 	cv::Mat covariance = cv::Mat::eye(6,6,CV_64FC1);
 	if(odomMsg.get())
 	{
@@ -1113,7 +1114,7 @@ void GuiWrapper::commonSensorDataCallback(
 		odomHeader.frame_id = odomFrameId_;
 	}
 
-	Transform odomT = rtabmap_conversions::getTransform(odomHeader.frame_id, frameId, odomHeader.stamp, tfListener_, waitForTransform_?waitForTransformDuration_:0);
+	Transform odomT = rtabmap_conversions::getTransform(odomHeader.frame_id, frameId, odomHeader.stamp, tfBuffer_, waitForTransform_?waitForTransformDuration_:0);
 	cv::Mat covariance = cv::Mat::eye(6,6,CV_64FC1);
 	if(odomMsg.get())
 	{

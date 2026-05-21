@@ -36,7 +36,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtabmap/utilite/UEventsHandler.h"
 #include "rtabmap/core/Transform.h"
 
-#include <tf/transform_listener.h>
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
 
 #include <geometry_msgs/TwistStamped.h>
 #include <nav_msgs/Path.h>
@@ -133,7 +134,8 @@ private:
 	double waitForTransformDuration_;
 	bool odomSensorSync_;
 	double maxOdomUpdateRate_;
-	tf::TransformListener tfListener_;
+	tf2_ros::Buffer tfBuffer_;
+	tf2_ros::TransformListener tfListener_;
 
 	ros::Publisher republishNodeDataPub_;
 

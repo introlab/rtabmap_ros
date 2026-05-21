@@ -3,7 +3,8 @@
 #include <pluginlib/class_list_macros.hpp>
 #include <nodelet/nodelet.h>
 
-#include <tf/transform_listener.h>
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
 
 #include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/LaserScan.h>
@@ -31,12 +32,13 @@ public:
 
 	virtual ~LidarDeskewing()
 	{
+		delete tfListener_;
 	}
 
 private:
 	virtual void onInit()
 	{
-		tfListener_ = new tf::TransformListener();
+		tfListener_ = new tf2_ros::TransformListener(tfBuffer_);
 		ros::NodeHandle & nh = getNodeHandle();
 		ros::NodeHandle & pnh = getPrivateNodeHandle();
 
@@ -67,7 +69,7 @@ private:
 				fixedFrameId_,
 				msg->header.stamp,
 				msg->header.stamp + ros::Duration().fromSec(msg->ranges.size()*msg->time_increment),
-				*tfListener_,
+				tfBuffer_,
 				waitForTransformDuration_);
 		if(tmpT.isNull())
 		{
@@ -76,10 +78,10 @@ private:
 
 		sensor_msgs::PointCloud2 scanOut;
 		laser_geometry::LaserProjection projection;
-		projection.transformLaserScanToPointCloud(fixedFrameId_, *msg, scanOut, *tfListener_);
+		projection.transformLaserScanToPointCloud(fixedFrameId_, *msg, scanOut, tfBuffer_);
 
 		sensor_msgs::PointCloud2 scanOutDeskewed;
-		if(!pcl_ros::transformPointCloud(msg->header.frame_id, scanOut, scanOutDeskewed, *tfListener_))
+		if(!pcl_ros::transformPointCloud(msg->header.frame_id, scanOut, scanOutDeskewed, tfBuffer_))
 		{
 			ROS_ERROR("Cannot transform back projected scan from \"%s\" frame to \"%s\" frame at time %fs.",
 					fixedFrameId_.c_str(), msg->header.frame_id.c_str(), msg->header.stamp.toSec());
@@ -91,7 +93,7 @@ private:
 	void callbackCloud(const sensor_msgs::PointCloud2ConstPtr & msg)
 	{
 		sensor_msgs::PointCloud2 msgDeskewed;
-		if(rtabmap_conversions::deskew(*msg, msgDeskewed, fixedFrameId_, *tfListener_, waitForTransformDuration_, slerp_))
+		if(rtabmap_conversions::deskew(*msg, msgDeskewed, fixedFrameId_, tfBuffer_, waitForTransformDuration_, slerp_))
 		{
 			pubCloud_.publish(msgDeskewed);
 		}
@@ -112,7 +114,8 @@ private:
 	std::string fixedFrameId_;
 	double waitForTransformDuration_;
 	bool slerp_;
-	tf::TransformListener * tfListener_;
+	tf2_ros::Buffer tfBuffer_;
+	tf2_ros::TransformListener * tfListener_;
 };
 
 PLUGINLIB_EXPORT_CLASS(rtabmap_util::LidarDeskewing, nodelet::Nodelet);

@@ -357,7 +357,7 @@ private:
 		Transform localScanTransform = rtabmap_conversions::getTransform(this->frameId(),
 				scanMsg->header.frame_id,
 				scanMsg->header.stamp,
-				this->tfListener(),
+				this->tfBuffer(),
 				this->waitForTransformDuration());
 		if(localScanTransform.isNull())
 		{
@@ -377,7 +377,7 @@ private:
 					guessFrameId().empty()?frameId():guessFrameId(),
 					scanMsg->header.stamp,
 					scanMsg->header.stamp + ros::Duration().fromSec(scanMsg->ranges.size()*scanMsg->time_increment),
-					this->tfListener(),
+					this->tfBuffer(),
 					this->waitForTransformDuration());
 			if(tmpT.isNull())
 			{
@@ -388,7 +388,7 @@ private:
 					guessFrameId().empty()?frameId():guessFrameId(),
 					*scanMsg, 
 					scanOut,
-					this->tfListener(),
+					this->tfBuffer(),
 					-1.0,
 					laser_geometry::channel_option::Intensity | laser_geometry::channel_option::Timestamp);
 
@@ -405,7 +405,7 @@ private:
 			}
 
 			sensor_msgs::PointCloud2 scanOutDeskewed;
-			if(!pcl_ros::transformPointCloud(scanMsg->header.frame_id, scanOut, scanOutDeskewed, this->tfListener()))
+			if(!pcl_ros::transformPointCloud(scanMsg->header.frame_id, scanOut, scanOutDeskewed, this->tfBuffer()))
 			{
 				ROS_ERROR("Cannot transform back projected scan from \"%s\" frame to \"%s\" frame at time %fs.",
 						(guessFrameId().empty()?frameId():guessFrameId()).c_str(), scanMsg->header.frame_id.c_str(), scanMsg->header.stamp.toSec());
@@ -622,7 +622,7 @@ private:
 			*cloudMsg = *pointCloudMsg;
 		}
 
-		Transform localScanTransform = rtabmap_conversions::getTransform(this->frameId(), cloudMsg->header.frame_id, cloudMsg->header.stamp, this->tfListener(), this->waitForTransformDuration());
+		Transform localScanTransform = rtabmap_conversions::getTransform(this->frameId(), cloudMsg->header.frame_id, cloudMsg->header.stamp, this->tfBuffer(), this->waitForTransformDuration());
 		if(localScanTransform.isNull())
 		{
 			ROS_ERROR("TF of received scan cloud at time %fs is not set, aborting rtabmap update.", cloudMsg->header.stamp.toSec());
@@ -634,7 +634,7 @@ private:
 			if(!guessFrameId().empty())
 			{
 				// deskew with TF
-				if(!rtabmap_conversions::deskew(*pointCloudMsg, *cloudMsg, guessFrameId(), tfListener(), waitForTransformDuration(), deskewingSlerp_))
+				if(!rtabmap_conversions::deskew(*pointCloudMsg, *cloudMsg, guessFrameId(), tfBuffer(), waitForTransformDuration(), deskewingSlerp_))
 				{
 					ROS_ERROR("Failed to deskew input cloud, aborting odometry update!");
 					return;
@@ -650,7 +650,7 @@ private:
 				{
 					// transform in base frame
 					cloudInBaseFrame.reset(new sensor_msgs::PointCloud2);
-					if(!pcl_ros::transformPointCloud(frameId(), *pointCloudMsg, *cloudInBaseFrame, this->tfListener()))
+					if(!pcl_ros::transformPointCloud(frameId(), *pointCloudMsg, *cloudInBaseFrame, this->tfBuffer()))
 					{
 						ROS_ERROR("Cannot transform back projected scan from \"%s\" frame to \"%s\" frame at time %fs.",
 								pointCloudMsg->header.frame_id.c_str(), frameId().c_str(), pointCloudMsg->header.stamp.toSec());
@@ -669,7 +669,7 @@ private:
 				if(!alreadyInBaseFrame)
 				{
 					// put back in scan frame
-					if(!pcl_ros::transformPointCloud(pointCloudMsg->header.frame_id.c_str(), *cloudDeskewed, *cloudMsg, this->tfListener()))
+					if(!pcl_ros::transformPointCloud(pointCloudMsg->header.frame_id.c_str(), *cloudDeskewed, *cloudMsg, this->tfBuffer()))
 					{
 						ROS_ERROR("Cannot transform back projected scan from \"%s\" frame to \"%s\" frame at time %fs.",
 								frameId().c_str(), pointCloudMsg->header.frame_id.c_str(), pointCloudMsg->header.stamp.toSec());

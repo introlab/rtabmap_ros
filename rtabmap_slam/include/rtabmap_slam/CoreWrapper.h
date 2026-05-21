@@ -34,7 +34,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <std_srvs/Empty.h>
 
-#include <tf/transform_listener.h>
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
 #include <tf2_ros/transform_broadcaster.h>
 
 #include <std_msgs/Empty.h>
@@ -324,7 +325,8 @@ private:
 	std::string goalFrameId_;
 
 	tf2_ros::TransformBroadcaster tfBroadcaster_;
-	tf::TransformListener tfListener_;
+	tf2_ros::Buffer tfBuffer_;
+	tf2_ros::TransformListener tfListener_;
 
 	ros::ServiceServer updateSrv_;
 	ros::ServiceServer resetSrv_;

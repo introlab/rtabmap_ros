@@ -928,14 +928,14 @@ rtabmap::StereoCameraModel stereoCameraModelFromROS(
 		const sensor_msgs::CameraInfo & leftCamInfo,
 		const sensor_msgs::CameraInfo & rightCamInfo,
 		const std::string & frameId,
-		tf::TransformListener & listener,
+		tf2_ros::Buffer & tfBuffer,
 		double waitForTransform)
 {
 	rtabmap::Transform localTransform = getTransform(
 			frameId,
 			leftCamInfo.header.frame_id,
 			leftCamInfo.header.stamp,
-			listener,
+			tfBuffer,
 			waitForTransform);
 	if(localTransform.isNull())
 	{
@@ -946,7 +946,7 @@ rtabmap::StereoCameraModel stereoCameraModelFromROS(
 			leftCamInfo.header.frame_id,
 			rightCamInfo.header.frame_id,
 			leftCamInfo.header.stamp,
-			listener,
+			tfBuffer,
 			waitForTransform);
 	if(stereoTransform.isNull())
 	{
@@ -1885,7 +1885,7 @@ rtabmap::Landmarks landmarksFromROS(
 		const std::string & frameId,
 		const std::string & odomFrameId,
 		const ros::Time & odomStamp,
-		tf::TransformListener & listener,
+		tf2_ros::Buffer & tfBuffer,
 		double waitForTransform,
 		double defaultLinVariance,
 		double defaultAngVariance)
@@ -1903,7 +1903,7 @@ rtabmap::Landmarks landmarksFromROS(
 				frameId,
 				iter->second.first.header.frame_id,
 				iter->second.first.header.stamp,
-				listener,
+				tfBuffer,
 				waitForTransform);
 
 		if(baseToCamera.isNull())
@@ -1923,7 +1923,7 @@ rtabmap::Landmarks landmarksFromROS(
 					odomFrameId,
 					odomStamp,
 					iter->second.first.header.stamp,
-					listener,
+					tfBuffer,
 					waitForTransform);
 			if(!correction.isNull())
 			{
@@ -1952,32 +1952,20 @@ rtabmap::Transform getTransform(
 		const std::string & fromFrameId,
 		const std::string & toFrameId,
 		const ros::Time & stamp,
-		tf::TransformListener & listener,
+		tf2_ros::Buffer & tfBuffer,
 		double waitForTransform)
 {
 	// TF ready?
 	rtabmap::Transform transform;
 	try
 	{
-		if(waitForTransform > 0.0 && !stamp.isZero())
-		{
-			//if(!tfBuffer_.canTransform(fromFrameId, toFrameId, stamp, ros::Duration(1)))
-			std::string errorMsg;
-			if(!listener.waitForTransform(fromFrameId, toFrameId, stamp, ros::Duration(waitForTransform), ros::Duration(0.01), &errorMsg))
-			{
-				ROS_WARN("Could not get transform from %s to %s after %f seconds (for stamp=%f)! Error=\"%s\".",
-						fromFrameId.c_str(), toFrameId.c_str(), waitForTransform, stamp.toSec(), errorMsg.c_str());
-				return transform;
-			}
-		}
-
-		tf::StampedTransform tmp;
-		listener.lookupTransform(fromFrameId, toFrameId, stamp, tmp);
-		transform = rtabmap_conversions::transformFromTF(tmp);
+		geometry_msgs::TransformStamped tmp;
+		tmp = tfBuffer.lookupTransform(fromFrameId, toFrameId, stamp, ros::Duration(waitForTransform));
+		transform = rtabmap_conversions::transformFromGeometryMsg(tmp.transform);
 	}
-	catch(tf::TransformException & ex)
+	catch(tf2::TransformException & ex)
 	{
-		ROS_WARN("(getting transform %s -> %s) %s", fromFrameId.c_str(), toFrameId.c_str(), ex.what());
+		ROS_WARN("(getting transform %s -> %s) %s (wait_for_transform=%f)", fromFrameId.c_str(), toFrameId.c_str(), ex.what(), waitForTransform);
 	}
 	return transform;
 }
@@ -1989,30 +1977,18 @@ rtabmap::Transform getMovingTransform(
 		const std::string & fixedFrame,
 		const ros::Time & stampFrom,
 		const ros::Time & stampTo,
-		tf::TransformListener & listener,
+		tf2_ros::Buffer & tfBuffer,
 		double waitForTransform)
 {
 	// TF ready?
 	rtabmap::Transform transform;
 	try
 	{
-		ros::Time stamp = stampTo>stampFrom?stampTo:stampFrom;
-		if(waitForTransform > 0.0 && !stamp.isZero())
-		{
-			std::string errorMsg;
-			if(!listener.waitForTransform(movingFrame, fixedFrame, stamp, ros::Duration(waitForTransform), ros::Duration(0.01), &errorMsg))
-			{
-				ROS_WARN("Could not get transform from %s to %s accordingly to %s after %f seconds (for stamps=%f -> %f)! Error=\"%s\".",
-						movingFrame.c_str(), movingFrame.c_str(), fixedFrame.c_str(), waitForTransform, stampTo.toSec(), stampFrom.toSec(), errorMsg.c_str());
-				return transform;
-			}
-		}
-
-		tf::StampedTransform tmp;
-		listener.lookupTransform(movingFrame, stampFrom, movingFrame, stampTo, fixedFrame, tmp);
-		transform = rtabmap_conversions::transformFromTF(tmp);
+		geometry_msgs::TransformStamped tmp;
+		tmp = tfBuffer.lookupTransform(movingFrame, stampFrom, movingFrame, stampTo, fixedFrame, ros::Duration(waitForTransform));
+		transform = rtabmap_conversions::transformFromGeometryMsg(tmp.transform);
 	}
-	catch(tf::TransformException & ex)
+	catch(tf2::TransformException & ex)
 	{
 		ROS_WARN("(getting transform movement of %s according to fixed %s) %s", movingFrame.c_str(), fixedFrame.c_str(), ex.what());
 	}
@@ -2031,7 +2007,7 @@ bool convertRGBDMsgs(
 		cv::Mat & depth,
 		std::vector<rtabmap::CameraModel> & cameraModels,
 		std::vector<rtabmap::StereoCameraModel> & stereoCameraModels,
-		tf::TransformListener & listener,
+		tf2_ros::Buffer & tfBuffer,
 		double waitForTransform,
 		bool alreadRectifiedImages,
 		const std::vector<std::vector<rtabmap_msgs::KeyPoint> > & localKeyPointsMsgs,
@@ -2157,7 +2133,7 @@ bool convertRGBDMsgs(
 		}
 
 		// use depth's stamp so that geometry is sync to odom, use rgb frame as we assume depth is registered (normally depth msg should have same frame than rgb)
-		rtabmap::Transform localTransform = rtabmap_conversions::getTransform(frameId, !imageMsgs.empty()?imageMsgs[i]->header.frame_id:cameraInfoMsgs[i].header.frame_id, stamp, listener, waitForTransform);
+		rtabmap::Transform localTransform = rtabmap_conversions::getTransform(frameId, !imageMsgs.empty()?imageMsgs[i]->header.frame_id:cameraInfoMsgs[i].header.frame_id, stamp, tfBuffer, waitForTransform);
 		if(localTransform.isNull())
 		{
 			ROS_ERROR("TF of received image %d at time %fs is not set!", i, stamp.toSec());
@@ -2171,7 +2147,7 @@ bool convertRGBDMsgs(
 					odomFrameId,
 					odomStamp,
 					stamp,
-					listener,
+					tfBuffer,
 					waitForTransform);
 			if(sensorT.isNull())
 			{
@@ -2310,7 +2286,7 @@ bool convertRGBDMsgs(
 							depthCameraInfoMsgs[i].header.frame_id,
 							cameraInfoMsgs[i].header.frame_id,
 							cameraInfoMsgs[i].header.stamp,
-							listener,
+							tfBuffer,
 							waitForTransform);
 					if(stereoTransform.isNull())
 					{
@@ -2355,7 +2331,7 @@ bool convertRGBDMsgs(
 						cameraInfoMsgs[i].header.frame_id,
 						depthCameraInfoMsgs[i].header.frame_id,
 						cameraInfoMsgs[i].header.stamp,
-						listener,
+						tfBuffer,
 						waitForTransform);
 				}
 				if(stereoTransform.isNull() || stereoTransform.x()<=0)
@@ -2423,7 +2399,7 @@ bool convertStereoMsg(
 		cv::Mat & left,
 		cv::Mat & right,
 		rtabmap::StereoCameraModel & stereoModel,
-		tf::TransformListener & listener,
+		tf2_ros::Buffer & tfBuffer,
 		double waitForTransform,
 		bool alreadyRectified)
 {
@@ -2474,7 +2450,7 @@ bool convertStereoMsg(
 		right = cv_bridge::cvtColor(rightImageMsg, "mono8")->image;
 	}
 
-	rtabmap::Transform localTransform = getTransform(frameId, leftImageMsg->header.frame_id, leftImageMsg->header.stamp, listener, waitForTransform);
+	rtabmap::Transform localTransform = getTransform(frameId, leftImageMsg->header.frame_id, leftImageMsg->header.stamp, tfBuffer, waitForTransform);
 	if(localTransform.isNull())
 	{
 		return false;
@@ -2487,7 +2463,7 @@ bool convertStereoMsg(
 				odomFrameId,
 				odomStamp,
 				leftImageMsg->header.stamp,
-				listener,
+				tfBuffer,
 				waitForTransform);
 		if(sensorT.isNull())
 		{
@@ -2507,7 +2483,7 @@ bool convertStereoMsg(
 				rightCamInfoMsg.header.frame_id,
 				leftCamInfoMsg.header.frame_id,
 				leftCamInfoMsg.header.stamp,
-				listener,
+				tfBuffer,
 				waitForTransform);
 		if(stereoTransform.isNull())
 		{
@@ -2537,7 +2513,7 @@ bool convertStereoMsg(
 				leftCamInfoMsg.header.frame_id,
 				rightCamInfoMsg.header.frame_id,
 				leftCamInfoMsg.header.stamp,
-				listener,
+				tfBuffer,
 				waitForTransform);
 		if(stereoTransform.isNull() || stereoTransform.x()<=0)
 		{
@@ -2575,7 +2551,7 @@ bool convertScanMsg(
 		const std::string & odomFrameId,
 		const ros::Time & odomStamp,
 		rtabmap::LaserScan & scan,
-		tf::TransformListener & listener,
+		tf2_ros::Buffer & tfBuffer,
 		double waitForTransform,
 		bool outputInFrameId)
 {
@@ -2603,7 +2579,7 @@ bool convertScanMsg(
 			odomFrameId.empty()?frameId:odomFrameId,
 			scan2dMsg.header.stamp,
 			scan2dMsg.header.stamp + ros::Duration().fromSec(scan2dMsg.ranges.size()*scan2dMsg.time_increment),
-			listener,
+			tfBuffer,
 			waitForTransform);
 	if(tmpT.isNull())
 	{
@@ -2614,7 +2590,7 @@ bool convertScanMsg(
 			frameId,
 			scan2dMsg.header.frame_id,
 			scan2dMsg.header.stamp,
-			listener,
+			tfBuffer,
 			waitForTransform);
 	if(scanLocalTransform.isNull())
 	{
@@ -2624,14 +2600,14 @@ bool convertScanMsg(
 	//transform in frameId_ frame
 	sensor_msgs::PointCloud2 scanOut;
 	laser_geometry::LaserProjection projection;
-	projection.transformLaserScanToPointCloud(odomFrameId.empty()?frameId:odomFrameId, scan2dMsg, scanOut, listener);
+	projection.transformLaserScanToPointCloud(odomFrameId.empty()?frameId:odomFrameId, scan2dMsg, scanOut, tfBuffer);
 
 	//transform back in laser frame
 	rtabmap::Transform laserToOdom = getTransform(
 			scan2dMsg.header.frame_id,
 			odomFrameId.empty()?frameId:odomFrameId,
 			scan2dMsg.header.stamp,
-			listener,
+			tfBuffer,
 			waitForTransform);
 	if(laserToOdom.isNull())
 	{
@@ -2646,7 +2622,7 @@ bool convertScanMsg(
 				odomFrameId,
 				odomStamp,
 				scan2dMsg.header.stamp,
-				listener,
+				tfBuffer,
 				waitForTransform);
 		if(sensorT.isNull())
 		{
@@ -2734,7 +2710,7 @@ bool convertScan3dMsg(
 		const std::string & odomFrameId,
 		const ros::Time & odomStamp,
 		rtabmap::LaserScan & scan,
-		tf::TransformListener & listener,
+		tf2_ros::Buffer & tfBuffer,
 		double waitForTransform,
 		int maxPoints,
 		float maxRange,
@@ -2743,7 +2719,7 @@ bool convertScan3dMsg(
 	UASSERT_MSG(scan3dMsg.data.size() == scan3dMsg.row_step*scan3dMsg.height,
 			uFormat("data=%d row_step=%d height=%d", scan3dMsg.data.size(), scan3dMsg.row_step, scan3dMsg.height).c_str());
 
-	rtabmap::Transform scanLocalTransform = getTransform(frameId, scan3dMsg.header.frame_id, scan3dMsg.header.stamp, listener, waitForTransform);
+	rtabmap::Transform scanLocalTransform = getTransform(frameId, scan3dMsg.header.frame_id, scan3dMsg.header.stamp, tfBuffer, waitForTransform);
 	if(scanLocalTransform.isNull())
 	{
 		ROS_ERROR("TF of received scan cloud at time %fs is not set, aborting rtabmap update.", scan3dMsg.header.stamp.toSec());
@@ -2758,7 +2734,7 @@ bool convertScan3dMsg(
 				odomFrameId,
 				odomStamp,
 				scan3dMsg.header.stamp,
-				listener,
+				tfBuffer,
 				waitForTransform);
 		if(sensorT.isNull())
 		{
@@ -2779,13 +2755,13 @@ bool deskew_impl(
 		const sensor_msgs::PointCloud2 & input,
 		sensor_msgs::PointCloud2 & output,
 		const std::string & fixedFrameId,
-		tf::TransformListener * listener,
+		tf2_ros::Buffer * tfBuffer,
 		double waitForTransform,
 		bool slerp,
 		const rtabmap::Transform & velocity,
 		double previousStamp)
 {
-	if(listener != 0)
+	if(tfBuffer != 0)
 	{
 		if(input.header.frame_id.empty())
 		{
@@ -3088,16 +3064,15 @@ bool deskew_impl(
 	}
 
 	std::string errorMsg;
-	if(listener != 0 &&
+	if(tfBuffer != 0 &&
 	   waitForTransform>0.0 &&
-	   !listener->waitForTransform(
+	   !tfBuffer->canTransform(
 			input.header.frame_id,
 			firstStamp,
 			input.header.frame_id,
 			lastStamp,
 			fixedFrameId,
 			ros::Duration(waitForTransform),
-			ros::Duration(0.01),
 			&errorMsg))
 	{
 		ROS_ERROR("Could not estimate motion of %s accordingly to fixed frame %s between stamps %f and %f! (%s)",
@@ -3114,21 +3089,21 @@ bool deskew_impl(
 	double scanTime = 0;
 	if(slerp)
 	{
-		if(listener != 0)
+		if(tfBuffer != 0)
 		{
 			firstPose = rtabmap_conversions::getMovingTransform(
 					input.header.frame_id,
 					fixedFrameId,
 					input.header.stamp,
 					firstStamp,
-					*listener,
+					*tfBuffer,
 					0);
 			lastPose = rtabmap_conversions::getMovingTransform(
 					input.header.frame_id,
 					fixedFrameId,
 					input.header.stamp,
 					lastStamp,
-					*listener,
+					*tfBuffer,
 					0);
 		}
 		else
@@ -3233,7 +3208,7 @@ bool deskew_impl(
 						fixedFrameId,
 						output.header.stamp,
 						stamp,
-						*listener,
+						*tfBuffer,
 						0);
 				if(transform.isNull())
 				{
@@ -3327,7 +3302,7 @@ bool deskew_impl(
 						fixedFrameId,
 						output.header.stamp,
 						stamp,
-						*listener,
+						*tfBuffer,
 						0);
 				if(transform.isNull())
 				{
@@ -3376,11 +3351,11 @@ bool deskew(
 		const sensor_msgs::PointCloud2 & input,
 		sensor_msgs::PointCloud2 & output,
 		const std::string & fixedFrameId,
-		tf::TransformListener & listener,
+		tf2_ros::Buffer & tfBuffer,
 		double waitForTransform,
 		bool slerp)
 {
-	return deskew_impl(input, output, fixedFrameId, &listener, waitForTransform, slerp, rtabmap::Transform(), 0);
+	return deskew_impl(input, output, fixedFrameId, &tfBuffer, waitForTransform, slerp, rtabmap::Transform(), 0);
 }
 
 bool deskew(
