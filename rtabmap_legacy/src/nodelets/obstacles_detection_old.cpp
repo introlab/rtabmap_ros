@@ -123,7 +123,11 @@ private:
 		try
 		{
 			geometry_msgs::TransformStamped tmp;
-			tmp = tfBuffer_.lookupTransform(frameId_, cloudMsg->header.frame_id, cloudMsg->header.stamp, ros::Duration(waitForTransform_?1.0:0.0));
+			tmp = tfBuffer_.lookupTransform(
+					!frameId_.empty()&&frameId_.at(0)=='/'?frameId_.substr(1):frameId_,
+					!cloudMsg->header.frame_id.empty()&&cloudMsg->header.frame_id.at(0)=='/'?cloudMsg->header.frame_id.substr(1):cloudMsg->header.frame_id,
+					cloudMsg->header.stamp,
+					ros::Duration(waitForTransform_?1.0:0.0));
 			localTransform = rtabmap_conversions::transformFromGeometryMsg(tmp.transform);
 		}
 		catch(tf2::TransformException & ex)

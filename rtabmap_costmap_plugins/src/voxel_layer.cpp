@@ -406,7 +406,10 @@ void VoxelLayer::updateOrigin(double new_origin_x, double new_origin_y)
   {
       geometry_msgs::TransformStamped transformStamped;
 #ifdef COSTMAP_2D_POINTCLOUD2
-      transformStamped = tf_->lookupTransform(global_frame_, robot_base_frame_, ros::Time(0));
+      transformStamped = tf_->lookupTransform(
+          !global_frame_.empty()&&global_frame_.at(0)=='/'?global_frame_.substr(1):global_frame_,
+          !robot_base_frame_.empty()&&robot_base_frame_.at(0)=='/'?robot_base_frame_.substr(1):robot_base_frame_,
+          ros::Time(0));
 #else
       tf::StampedTransform stampedTransform;
       tf_->lookupTransform(global_frame_, robot_base_frame_, ros::Time(0), stampedTransform);

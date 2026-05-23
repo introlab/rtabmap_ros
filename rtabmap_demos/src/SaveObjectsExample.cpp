@@ -71,7 +71,10 @@ public:
                 geometry_msgs::TransformStamped pose;
                 try
                 {
-                    pose = tfBuffer_.lookupTransform(frameId_, objectFrameId, msg->header.stamp);
+                    pose = tfBuffer_.lookupTransform(
+                            !frameId_.empty()&&frameId_.at(0)=='/'?frameId_.substr(1):frameId_,
+                            !objectFrameId.empty()&&objectFrameId.at(0)=='/'?objectFrameId.substr(1):objectFrameId,
+                            msg->header.stamp);
                 }
                 catch(tf2::TransformException & ex)
                 {

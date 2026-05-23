@@ -82,7 +82,11 @@ private:
 			try
 			{
 				geometry_msgs::TransformStamped tmpMsg;
-				tmpMsg = tfBuffer_.lookupTransform(baseFrameId_, msg->header.frame_id, msg->header.stamp, ros::Duration(waitForTransformDuration_));
+				tmpMsg = tfBuffer_.lookupTransform(
+						!baseFrameId_.empty()&&baseFrameId_.at(0)=='/'?baseFrameId_.substr(1):baseFrameId_,
+						!msg->header.frame_id.empty()&&msg->header.frame_id.at(0)=='/'?msg->header.frame_id.substr(1):msg->header.frame_id,
+						msg->header.stamp,
+						ros::Duration(waitForTransformDuration_));
 				tf::Transform tmp;
 				tf::transformMsgToTF(tmpMsg.transform, tmp);
 				tf::Quaternion q;
