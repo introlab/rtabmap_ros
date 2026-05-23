@@ -465,7 +465,7 @@ private:
 				higherStamp = stamp;
 			}
 
-			Transform localTransform = rtabmap_conversions::getTransform(this->frameId(), leftImages[i]->header.frame_id, stamp, this->tfListener(), this->waitForTransformDuration());
+			Transform localTransform = rtabmap_conversions::getTransform(this->frameId(), leftImages[i]->header.frame_id, stamp, this->tfBuffer(), this->waitForTransformDuration());
 			if(localTransform.isNull())
 			{
 				return;
@@ -530,7 +530,7 @@ private:
 								rightCameraInfos[i].header.frame_id,
 								leftCameraInfos[i].header.frame_id,
 								leftCameraInfos[i].header.stamp,
-								this->tfListener(),
+								this->tfBuffer(),
 								this->waitForTransformDuration());
 						if(stereoTransform.isNull())
 						{
@@ -564,7 +564,7 @@ private:
 							leftCameraInfos[i].header.frame_id,
 							rightCameraInfos[i].header.frame_id,
 							leftCameraInfos[i].header.stamp,
-							this->tfListener(),
+							this->tfBuffer(),
 							this->waitForTransformDuration());
 
 					if(!stereoTransform.isNull() && stereoTransform.x()>0)

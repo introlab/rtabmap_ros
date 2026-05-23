@@ -1,10 +1,10 @@
 <?xml version="1.0"?>
 <launch>
   <!--
-    $ sudo apt install ros-melodic-turtlebot3* ros-melodic-dwa-local-planner
+    $ sudo apt install ros-$ROS_DISTRO-turtlebot3* ros-$ROS_DISTRO-dwa-local-planner
     To avoid TF warning about leading '/' in frame name, remove it in:
-       - "/opt/ros/melodic/share/turtlebot3_navigation/param/global_costmap_params.yaml"
-       - "/opt/ros/melodic/share/turtlebot3_navigation/param/local_costmap_params.yaml"
+       - "/opt/ros/$ROS_DISTRO/share/turtlebot3_navigation/param/global_costmap_params.yaml"
+       - "/opt/ros/$ROS_DISTRO/share/turtlebot3_navigation/param/local_costmap_params.yaml"
 
     Example Gazebo:
     $ export TURTLEBOT3_MODEL=waffle

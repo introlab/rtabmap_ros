@@ -33,7 +33,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
 
-#include <tf/transform_listener.h>
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
 
 #include <sensor_msgs/PointCloud2.h>
 
@@ -61,7 +62,8 @@ public:
 		segmentFlatObstacles_(false),
 		waitForTransform_(false),
 		optimizeForCloseObjects_(false),
-		projVoxelSize_(0.01)
+		projVoxelSize_(0.01),
+		tfListener_(tfBuffer_)
 	{}
 
 	virtual ~ObstaclesDetectionOld()
@@ -120,19 +122,15 @@ private:
 		rtabmap::Transform localTransform;
 		try
 		{
-			if(waitForTransform_)
-			{
-				if(!tfListener_.waitForTransform(frameId_, cloudMsg->header.frame_id, cloudMsg->header.stamp, ros::Duration(1)))
-				{
-					NODELET_ERROR("Could not get transform from %s to %s after 1 second!", frameId_.c_str(), cloudMsg->header.frame_id.c_str());
-					return;
-				}
-			}
-			tf::StampedTransform tmp;
-			tfListener_.lookupTransform(frameId_, cloudMsg->header.frame_id, cloudMsg->header.stamp, tmp);
-			localTransform = rtabmap_conversions::transformFromTF(tmp);
+			geometry_msgs::TransformStamped tmp;
+			tmp = tfBuffer_.lookupTransform(
+					!frameId_.empty()&&frameId_.at(0)=='/'?frameId_.substr(1):frameId_,
+					!cloudMsg->header.frame_id.empty()&&cloudMsg->header.frame_id.at(0)=='/'?cloudMsg->header.frame_id.substr(1):cloudMsg->header.frame_id,
+					cloudMsg->header.stamp,
+					ros::Duration(waitForTransform_?1.0:0.0));
+			localTransform = rtabmap_conversions::transformFromGeometryMsg(tmp.transform);
 		}
-		catch(tf::TransformException & ex)
+		catch(tf2::TransformException & ex)
 		{
 			NODELET_ERROR("%s",ex.what());
 			return;
@@ -342,7 +340,8 @@ private:
 	bool optimizeForCloseObjects_;
 	double projVoxelSize_;
 
-	tf::TransformListener tfListener_;
+	tf2_ros::Buffer tfBuffer_;
+	tf2_ros::TransformListener tfListener_;
 
 	ros::Publisher groundPub_;
 	ros::Publisher obstaclesPub_;

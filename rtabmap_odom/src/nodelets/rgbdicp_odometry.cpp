@@ -294,7 +294,7 @@ private:
 				}
 			}
 
-			Transform localTransform = rtabmap_conversions::getTransform(this->frameId(), image->header.frame_id, stamp, this->tfListener(), this->waitForTransformDuration());
+			Transform localTransform = rtabmap_conversions::getTransform(this->frameId(), image->header.frame_id, stamp, this->tfBuffer(), this->waitForTransformDuration());
 			if(localTransform.isNull())
 			{
 				return;
@@ -330,7 +330,7 @@ private:
 					localScanTransform = rtabmap_conversions::getTransform(this->frameId(),
 							scanMsg->header.frame_id,
 							scanMsg->header.stamp + ros::Duration().fromSec(scanMsg->ranges.size()*scanMsg->time_increment),
-							this->tfListener(),
+							this->tfBuffer(),
 							this->waitForTransformDuration());
 					if(localScanTransform.isNull())
 					{
@@ -341,7 +341,7 @@ private:
 					//transform in frameId_ frame
 					sensor_msgs::PointCloud2 scanOut;
 					laser_geometry::LaserProjection projection;
-					projection.transformLaserScanToPointCloud(scanMsg->header.frame_id, *scanMsg, scanOut, this->tfListener());
+					projection.transformLaserScanToPointCloud(scanMsg->header.frame_id, *scanMsg, scanOut, this->tfBuffer());
 					pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
 					pcl::fromROSMsg(scanOut, *pclScan);
 					pclScan->is_dense = true;
@@ -396,7 +396,7 @@ private:
 							}
 						}
 					}
-					localScanTransform = rtabmap_conversions::getTransform(this->frameId(), cloudMsg->header.frame_id, cloudMsg->header.stamp, this->tfListener(), this->waitForTransformDuration());
+					localScanTransform = rtabmap_conversions::getTransform(this->frameId(), cloudMsg->header.frame_id, cloudMsg->header.stamp, this->tfBuffer(), this->waitForTransformDuration());
 					if(localScanTransform.isNull())
 					{
 						ROS_ERROR("TF of received scan cloud at time %fs is not set, aborting rtabmap update.", cloudMsg->header.stamp.toSec());

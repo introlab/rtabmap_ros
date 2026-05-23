@@ -36,7 +36,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <pcl_ros/transforms.h>
 
-#include <tf/transform_listener.h>
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
 
 #include <sensor_msgs/PointCloud2.h>
 
@@ -73,7 +74,8 @@ public:
 		exactSync2_(0),
 		approxSync2_(0),
 		waitForTransformDuration_(0.1),
-		xyzOutput_(false)
+		xyzOutput_(false),
+		tfListener_(tfBuffer_)
 	{}
 
 	virtual ~PointCloudAggregator()
@@ -250,7 +252,7 @@ private:
 			if(!frameId.empty() && frameId.compare(cloudMsgs[0]->header.frame_id) != 0)
 			{
 				sensor_msgs::PointCloud2 tmp;
-				pcl_ros::transformPointCloud(frameId, *cloudMsgs[0], tmp, tfListener_);
+				pcl_ros::transformPointCloud(frameId, *cloudMsgs[0], tmp, tfBuffer_);
 				pcl_conversions::toPCL(tmp, *output);
 			}
 			else
@@ -307,7 +309,7 @@ private:
 							fixedFrameId_, //fixedFrame
 							cloudMsgs[0]->header.stamp, //stampTarget
 							cloudMsgs[i]->header.stamp, //stampSource
-							tfListener_,
+							tfBuffer_,
 							waitForTransformDuration_);
 				}
 
@@ -315,7 +317,7 @@ private:
 				if(frameId.compare(cloudMsgs[i]->header.frame_id) != 0)
 				{
 					sensor_msgs::PointCloud2 tmp;
-					pcl_ros::transformPointCloud(frameId, *cloudMsgs[i], tmp, tfListener_);
+					pcl_ros::transformPointCloud(frameId, *cloudMsgs[i], tmp, tfBuffer_);
 					if(!cloudDisplacement.isNull())
 					{
 						sensor_msgs::PointCloud2 tmp2;
@@ -468,7 +470,8 @@ private:
 	std::string fixedFrameId_;
 	double waitForTransformDuration_;
 	bool xyzOutput_;
-	tf::TransformListener tfListener_;
+	tf2_ros::Buffer tfBuffer_;
+	tf2_ros::TransformListener tfListener_;
 };
 
 PLUGINLIB_EXPORT_CLASS(rtabmap_util::PointCloudAggregator, nodelet::Nodelet);

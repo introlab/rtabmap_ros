@@ -38,7 +38,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <pcl_ros/transforms.h>
 
-#include <tf/transform_listener.h>
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
 
 #include <nav_msgs/Odometry.h>
 #include <sensor_msgs/PointCloud2.h>
@@ -87,7 +88,8 @@ public:
 		noiseMinNeighbors_(5),
 		removeZ_(false),
 		fixedFrameId_("odom"),
-		frameId_("")
+		frameId_(""),
+		tfListener_(tfBuffer_)
 	{}
 
 	virtual ~PointCloudAssembler()
@@ -316,7 +318,7 @@ private:
 						fixedFrameId_, //fromFrame
 						cloudMsg->header.frame_id, //toFrame
 						cloudMsg->header.stamp,
-						tfListener_,
+						tfBuffer_,
 						waitForTransformDuration_);
 
 				if(pose.isNull())
@@ -475,7 +477,7 @@ private:
 								fixedFrameId_, //fromFrame
 								frameId_, //toFrame
 								cloudMsg->header.stamp,
-								tfListener_,
+								tfBuffer_,
 								waitForTransformDuration_);
 						if(t.isNull())
 						{
@@ -582,7 +584,8 @@ private:
 	bool removeZ_;
 	std::string fixedFrameId_;
 	std::string frameId_;
-	tf::TransformListener tfListener_;
+	tf2_ros::Buffer tfBuffer_;
+	tf2_ros::TransformListener tfListener_;
 	rtabmap::Transform previousPose_;
 
 	std::list<pcl::PCLPointCloud2::Ptr> clouds_;

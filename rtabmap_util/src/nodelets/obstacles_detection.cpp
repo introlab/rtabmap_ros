@@ -35,7 +35,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <pcl/filters/filter.h>
 #include <rtabmap/core/LocalGridMaker.h>
 
-#include <tf/transform_listener.h>
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
 
 #include <sensor_msgs/PointCloud2.h>
 
@@ -53,7 +54,8 @@ public:
 		frameId_("base_link"),
 		waitForTransform_(false),
 		mapFrameProjection_(rtabmap::Parameters::defaultGridMapFrameProjection()),
-		warned_(false)
+		warned_(false),
+		tfListener_(tfBuffer_)
 	{}
 
 	virtual ~ObstaclesDetection()
@@ -248,19 +250,15 @@ private:
 		rtabmap::Transform localTransform = rtabmap::Transform::getIdentity();
 		try
 		{
-			if(waitForTransform_)
-			{
-				if(!tfListener_.waitForTransform(frameId_, cloudMsg->header.frame_id, cloudMsg->header.stamp, ros::Duration(1)))
-				{
-					NODELET_ERROR("Could not get transform from %s to %s after 1 second!", frameId_.c_str(), cloudMsg->header.frame_id.c_str());
-					return;
-				}
-			}
-			tf::StampedTransform tmp;
-			tfListener_.lookupTransform(frameId_, cloudMsg->header.frame_id, cloudMsg->header.stamp, tmp);
-			localTransform = rtabmap_conversions::transformFromTF(tmp);
+			geometry_msgs::TransformStamped tmp;
+			tmp = tfBuffer_.lookupTransform(
+					!frameId_.empty()&&frameId_.at(0)=='/'?frameId_.substr(1):frameId_,
+					!cloudMsg->header.frame_id.empty()&&cloudMsg->header.frame_id.at(0)=='/'?cloudMsg->header.frame_id.substr(1):cloudMsg->header.frame_id,
+					cloudMsg->header.stamp,
+					ros::Duration(waitForTransform_?1.0:0.0));
+			localTransform = rtabmap_conversions::transformFromGeometryMsg(tmp.transform);
 		}
-		catch(tf::TransformException & ex)
+		catch(tf2::TransformException & ex)
 		{
 			NODELET_ERROR("%s",ex.what());
 			return;
@@ -271,19 +269,15 @@ private:
 		{
 			try
 			{
-				if(waitForTransform_)
-				{
-					if(!tfListener_.waitForTransform(mapFrameId_, frameId_, cloudMsg->header.stamp, ros::Duration(1)))
-					{
-						NODELET_ERROR("Could not get transform from %s to %s after 1 second!", mapFrameId_.c_str(), frameId_.c_str());
-						return;
-					}
-				}
-				tf::StampedTransform tmp;
-				tfListener_.lookupTransform(mapFrameId_, frameId_, cloudMsg->header.stamp, tmp);
-				pose = rtabmap_conversions::transformFromTF(tmp);
+				geometry_msgs::TransformStamped tmp;
+				tmp = tfBuffer_.lookupTransform(
+						!mapFrameId_.empty()&&mapFrameId_.at(0)=='/'?mapFrameId_.substr(1):mapFrameId_,
+						!frameId_.empty()&&frameId_.at(0)=='/'?frameId_.substr(1):frameId_,
+						cloudMsg->header.stamp,
+						ros::Duration(waitForTransform_?1.0:0.0));
+				pose = rtabmap_conversions::transformFromGeometryMsg(tmp.transform);
 			}
-			catch(tf::TransformException & ex)
+			catch(tf2::TransformException & ex)
 			{
 				NODELET_ERROR("%s",ex.what());
 				return;
@@ -443,7 +437,8 @@ private:
 	bool mapFrameProjection_;
 	bool warned_;
 
-	tf::TransformListener tfListener_;
+	tf2_ros::Buffer tfBuffer_;
+	tf2_ros::TransformListener tfListener_;
 
 	ros::Publisher groundPub_;
 	ros::Publisher obstaclesPub_;

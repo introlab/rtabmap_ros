@@ -3,7 +3,7 @@ project(rtabmap_conversions)
 
 find_package(catkin REQUIRED COMPONENTS
              cv_bridge roscpp sensor_msgs std_msgs geometry_msgs
-             tf tf_conversions eigen_conversions laser_geometry pcl_conversions 
+             tf tf2_ros tf_conversions eigen_conversions laser_geometry pcl_conversions
              image_geometry rtabmap_msgs
 )
 
@@ -13,7 +13,7 @@ catkin_package(
   INCLUDE_DIRS include
   LIBRARIES rtabmap_conversions
   CATKIN_DEPENDS cv_bridge roscpp sensor_msgs std_msgs geometry_msgs
-             tf tf_conversions eigen_conversions laser_geometry pcl_conversions 
+             tf tf2_ros tf_conversions eigen_conversions laser_geometry pcl_conversions
              image_geometry rtabmap_msgs
   DEPENDS RTABMap
 )

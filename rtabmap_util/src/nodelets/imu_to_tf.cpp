@@ -30,8 +30,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <nodelet/nodelet.h>
 #include <sensor_msgs/Imu.h>
 #include <tf/transform_broadcaster.h>
+#include <tf/transform_datatypes.h>
 #include <tf/LinearMath/Matrix3x3.h>
-#include <tf/transform_listener.h>
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
 
 namespace rtabmap_util
 {
@@ -41,6 +43,7 @@ class ImuToTF : public nodelet::Nodelet
 public:
 	ImuToTF() :
 		fixedFrameId_("odom"),
+		tfListener_(tfBuffer_),
 		waitForTransformDuration_(0.1)
 	{}
 
@@ -78,23 +81,21 @@ private:
 		{
 			try
 			{
-				std::string errorMsg;
-				if(!tfListener_.waitForTransform(baseFrameId_, msg->header.frame_id, msg->header.stamp, ros::Duration(waitForTransformDuration_), ros::Duration(0.01), &errorMsg))
-				{
-					NODELET_ERROR("Could not get transform from %s to %s after %f seconds (for stamp=%f)! Error=\"%s\".",
-							baseFrameId_.c_str(), msg->header.frame_id.c_str(), 0.1, msg->header.stamp.toSec(), errorMsg.c_str());
-					return;
-				}
-
-				tf::StampedTransform tmp;
-				tfListener_.lookupTransform(baseFrameId_, msg->header.frame_id, msg->header.stamp, tmp);
+				geometry_msgs::TransformStamped tmpMsg;
+				tmpMsg = tfBuffer_.lookupTransform(
+						!baseFrameId_.empty()&&baseFrameId_.at(0)=='/'?baseFrameId_.substr(1):baseFrameId_,
+						!msg->header.frame_id.empty()&&msg->header.frame_id.at(0)=='/'?msg->header.frame_id.substr(1):msg->header.frame_id,
+						msg->header.stamp,
+						ros::Duration(waitForTransformDuration_));
+				tf::Transform tmp;
+				tf::transformMsgToTF(tmpMsg.transform, tmp);
 				tf::Quaternion q;
 				q.setRPY(0.0,0.0,tf::getYaw(tmp.getRotation()));
 				tf::Transform t = tf::Transform(q)*st*tmp.inverse(); // base_frame orientation
 				st.setRotation(t.getRotation());
 				st.child_frame_id_ = baseFrameId_;
 			}
-			catch(tf::TransformException & ex)
+			catch(tf2::TransformException & ex)
 			{
 				NODELET_ERROR("(getting transform %s -> %s) %s", baseFrameId_.c_str(), msg->header.frame_id.c_str(), ex.what());
 				return;
@@ -114,7 +115,8 @@ private:
 	tf::TransformBroadcaster pub_;
 	std::string fixedFrameId_;
 	std::string baseFrameId_;
-	tf::TransformListener tfListener_;
+	tf2_ros::Buffer tfBuffer_;
+	tf2_ros::TransformListener tfListener_;
 	double waitForTransformDuration_;
 };
 

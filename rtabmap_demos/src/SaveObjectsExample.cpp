@@ -26,7 +26,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #include <ros/ros.h>
-#include <tf/transform_listener.h>
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
 #include <find_object_2d/ObjectsStamped.h>
 #include <rtabmap/utilite/UConversion.h>
 #include <opencv2/core/core.hpp>
@@ -40,6 +41,7 @@ class SaveObjectsExample
 public:
 	SaveObjectsExample() :
         objFramePrefix_("object"),
+        tfListener_(tfBuffer_),
         frameId_("base_link")
     {
         ros::NodeHandle pnh("~");
@@ -66,12 +68,15 @@ public:
                 std::string objectFrameId = uFormat("%s_%d", objFramePrefix_.c_str(),id); // "object_1", "object_2"
 
                 // get pose of the object in base frame
-                tf::StampedTransform pose;
+                geometry_msgs::TransformStamped pose;
                 try
                 {
-                    tfListener_.lookupTransform(frameId_, objectFrameId, msg->header.stamp, pose);
+                    pose = tfBuffer_.lookupTransform(
+                            !frameId_.empty()&&frameId_.at(0)=='/'?frameId_.substr(1):frameId_,
+                            !objectFrameId.empty()&&objectFrameId.at(0)=='/'?objectFrameId.substr(1):objectFrameId,
+                            msg->header.stamp);
                 }
-                catch(tf::TransformException & ex)
+                catch(tf2::TransformException & ex)
                 {
                     ROS_WARN("%s",ex.what());
                     return;
@@ -79,13 +84,13 @@ public:
 
                 data.at<double>(i, 0) = double(id);
                 data.at<double>(i, 1) = ros::Time(msg->header.stamp).toSec();
-                data.at<double>(i, 2) = pose.getOrigin().x();
-                data.at<double>(i, 3) = pose.getOrigin().y();
-                data.at<double>(i, 4) = pose.getOrigin().z();
-                data.at<double>(i, 5) = pose.getRotation().x();
-                data.at<double>(i, 6) = pose.getRotation().y();
-                data.at<double>(i, 7) = pose.getRotation().z();
-                data.at<double>(i, 8) = pose.getRotation().w();
+                data.at<double>(i, 2) = pose.transform.translation.x;
+                data.at<double>(i, 3) = pose.transform.translation.y;
+                data.at<double>(i, 4) = pose.transform.translation.z;
+                data.at<double>(i, 5) = pose.transform.rotation.x;
+                data.at<double>(i, 6) = pose.transform.rotation.y;
+                data.at<double>(i, 7) = pose.transform.rotation.z;
+                data.at<double>(i, 8) = pose.transform.rotation.w;
             }
 
             rtabmap_msgs::UserData dataMsg;
@@ -254,7 +259,8 @@ private:
     std::string objFramePrefix_;
     ros::Subscriber subObjects_;
     ros::Subscriber subsMapData_;
-    tf::TransformListener tfListener_;
+    tf2_ros::Buffer tfBuffer_;
+    tf2_ros::TransformListener tfListener_;
     ros::Publisher pub_;
     ros::Publisher pubMarkers_;
     std::map<int, cv::Mat> nodeToObjects_;

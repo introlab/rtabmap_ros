@@ -1,0 +1,41 @@
+name: noetic-pr
+
+on:
+  pull_request:
+    branches:
+      - 'master'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        docker_tag: [rtabmap_ros_noetic_pr]
+        include:
+        - docker_tag: rtabmap_ros_noetic_pr
+          docker_path: 'noetic/latest'
+          docker_platforms: |
+            linux/amd64
+    
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v2
+      -
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      -
+        name: Build and push
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: false
+          platforms: ${{ matrix.docker_platforms }}
+          file: ./docker/${{ matrix.docker_path }}/Dockerfile
+          tags: ${{ matrix.docker_tag }}
+
