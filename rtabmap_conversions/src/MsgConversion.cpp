@@ -1960,7 +1960,11 @@ rtabmap::Transform getTransform(
 	try
 	{
 		geometry_msgs::TransformStamped tmp;
-		tmp = tfBuffer.lookupTransform(fromFrameId, toFrameId, stamp, ros::Duration(waitForTransform));
+		tmp = tfBuffer.lookupTransform(
+			!fromFrameId.empty()&&fromFrameId.at(0)=='/'?fromFrameId.substr(1):fromFrameId,
+			!toFrameId.empty()&&toFrameId.at(0)=='/'?toFrameId.substr(1):toFrameId,
+			stamp,
+			ros::Duration(waitForTransform));
 		transform = rtabmap_conversions::transformFromGeometryMsg(tmp.transform);
 	}
 	catch(tf2::TransformException & ex)
@@ -1985,7 +1989,13 @@ rtabmap::Transform getMovingTransform(
 	try
 	{
 		geometry_msgs::TransformStamped tmp;
-		tmp = tfBuffer.lookupTransform(movingFrame, stampFrom, movingFrame, stampTo, fixedFrame, ros::Duration(waitForTransform));
+		tmp = tfBuffer.lookupTransform(
+			!movingFrame.empty()&&movingFrame.at(0)=='/'?movingFrame.substr(1):movingFrame,
+			stampFrom,
+			!movingFrame.empty()&&movingFrame.at(0)=='/'?movingFrame.substr(1):movingFrame,
+			stampTo,
+			!fixedFrame.empty()&&fixedFrame.at(0)=='/'?fixedFrame.substr(1):fixedFrame,
+			ros::Duration(waitForTransform));
 		transform = rtabmap_conversions::transformFromGeometryMsg(tmp.transform);
 	}
 	catch(tf2::TransformException & ex)
@@ -3067,11 +3077,11 @@ bool deskew_impl(
 	if(tfBuffer != 0 &&
 	   waitForTransform>0.0 &&
 	   !tfBuffer->canTransform(
-			input.header.frame_id,
+			!input.header.frame_id.empty()&&input.header.frame_id.at(0)=='/'?input.header.frame_id.substr(1):input.header.frame_id,
 			firstStamp,
-			input.header.frame_id,
+			!input.header.frame_id.empty()&&input.header.frame_id.at(0)=='/'?input.header.frame_id.substr(1):input.header.frame_id,
 			lastStamp,
-			fixedFrameId,
+			!fixedFrameId.empty()&&fixedFrameId.at(0)=='/'?fixedFrameId.substr(1):fixedFrameId,
 			ros::Duration(waitForTransform),
 			&errorMsg))
 	{
