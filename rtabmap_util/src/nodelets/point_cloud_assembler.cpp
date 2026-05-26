@@ -401,8 +401,8 @@ private:
 #else
 							pcl::concatenatePointCloud(*assembled, *(*iter), *assembledTmp);
 #endif
-							//Make sure row_step is the sum of both
-							assembledTmp->row_step = assembled->row_step + (*iter)->row_step;
+							// Make sure row_step is updated
+							assembledTmp->row_step = assembledTmp->point_step * assembledTmp->width;
 							assembled = assembledTmp;
 						}
 					}
