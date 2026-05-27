@@ -307,8 +307,9 @@ private:
 		callbackCalled_ = true;
 		if(cloudPub_.getNumSubscribers())
 		{
-			UASSERT_MSG(cloudMsg->data.size() == cloudMsg->row_step*cloudMsg->height,
-					uFormat("data=%d row_step=%d height=%d", cloudMsg->data.size(), cloudMsg->row_step, cloudMsg->height).c_str());
+			UASSERT_MSG(cloudMsg->data.size() == cloudMsg->row_step*cloudMsg->height ||
+						cloudMsg->data.size() == cloudMsg->point_step*cloudMsg->width*cloudMsg->height,
+					uFormat("data=%d row_step=%d point_step=%d width=%d height=%d", cloudMsg->data.size(), cloudMsg->row_step, cloudMsg->point_step, cloudMsg->width, cloudMsg->height).c_str());
 
 			if(skipClouds_<=0 || cloudsSkipped_ >= skipClouds_)
 			{
