@@ -975,14 +975,14 @@ rtabmap::StereoCameraModel stereoCameraModelFromROS(
 		const sensor_msgs::msg::CameraInfo & leftCamInfo,
 		const sensor_msgs::msg::CameraInfo & rightCamInfo,
 		const std::string & frameId,
-		tf2_ros::Buffer & listener,
+		tf2_ros::Buffer & tfBuffer,
 		double waitForTransform)
 {
 	rtabmap::Transform localTransform = getTransform(
 			frameId,
 			leftCamInfo.header.frame_id,
 			leftCamInfo.header.stamp,
-			listener,
+			tfBuffer,
 			waitForTransform);
 	if(localTransform.isNull())
 	{
@@ -993,7 +993,7 @@ rtabmap::StereoCameraModel stereoCameraModelFromROS(
 			leftCamInfo.header.frame_id,
 			rightCamInfo.header.frame_id,
 			leftCamInfo.header.stamp,
-			listener,
+			tfBuffer,
 			waitForTransform);
 	if(stereoTransform.isNull())
 	{
@@ -1943,7 +1943,7 @@ rtabmap::Landmarks landmarksFromROS(
 		const std::string & frameId,
 		const std::string & odomFrameId,
 		const rclcpp::Time & odomStamp,
-		tf2_ros::Buffer & listener,
+		tf2_ros::Buffer & tfBuffer,
 		double waitForTransform,
 		double defaultLinVariance,
 		double defaultAngVariance)
@@ -1961,7 +1961,7 @@ rtabmap::Landmarks landmarksFromROS(
 				frameId,
 				iter->second.first.header.frame_id,
 				iter->second.first.header.stamp,
-				listener,
+				tfBuffer,
 				waitForTransform);
 
 		if(baseToCamera.isNull())
@@ -1981,7 +1981,7 @@ rtabmap::Landmarks landmarksFromROS(
 					odomFrameId,
 					odomStamp,
 					iter->second.first.header.stamp,
-					listener,
+					tfBuffer,
 					waitForTransform);
 			if(!correction.isNull())
 			{
@@ -2010,7 +2010,7 @@ rtabmap::Transform getTransform(
 		const std::string & fromFrameId,
 		const std::string & toFrameId,
 		const rclcpp::Time & stamp,
-		tf2_ros::Buffer &tfBuffer,
+		tf2_ros::Buffer & tfBuffer,
 		double waitForTransform)
 {
 	// TF ready?
@@ -2066,7 +2066,7 @@ bool convertRGBDMsgs(
 		cv::Mat & depth,
 		std::vector<rtabmap::CameraModel> & cameraModels,
 		std::vector<rtabmap::StereoCameraModel> & stereoCameraModels,
-		tf2_ros::Buffer & listener,
+		tf2_ros::Buffer & tfBuffer,
 		double waitForTransform,
 		bool alreadRectifiedImages,
 		const std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > & localKeyPointsMsgs,
@@ -2192,7 +2192,7 @@ bool convertRGBDMsgs(
 		}
 
 		// use depth's stamp so that geometry is sync to odom, use rgb frame as we assume depth is registered (normally depth msg should have same frame than rgb)
-		rtabmap::Transform localTransform = rtabmap_conversions::getTransform(frameId, !imageMsgs.empty()?imageMsgs[i]->header.frame_id:cameraInfoMsgs[i].header.frame_id, stamp, listener, waitForTransform);
+		rtabmap::Transform localTransform = rtabmap_conversions::getTransform(frameId, !imageMsgs.empty()?imageMsgs[i]->header.frame_id:cameraInfoMsgs[i].header.frame_id, stamp, tfBuffer, waitForTransform);
 		if(localTransform.isNull())
 		{
 			UERROR("TF of received image for camera %d at time %fs is not set!", i, stamp.seconds());
@@ -2206,7 +2206,7 @@ bool convertRGBDMsgs(
 					odomFrameId,
 					odomStamp,
 					stamp,
-					listener,
+					tfBuffer,
 					waitForTransform);
 			if(sensorT.isNull())
 			{
@@ -2355,7 +2355,7 @@ bool convertRGBDMsgs(
 							depthCameraInfoMsgs[i].header.frame_id,
 							cameraInfoMsgs[i].header.frame_id,
 							cameraInfoMsgs[i].header.stamp,
-							listener,
+							tfBuffer,
 							waitForTransform);
 					if(stereoTransform.isNull())
 					{
@@ -2400,7 +2400,7 @@ bool convertRGBDMsgs(
 						cameraInfoMsgs[i].header.frame_id,
 						depthCameraInfoMsgs[i].header.frame_id,
 						cameraInfoMsgs[i].header.stamp,
-						listener,
+						tfBuffer,
 						waitForTransform);
 				}
 				if(stereoTransform.isNull() || stereoTransform.x()<=0)
@@ -2468,7 +2468,7 @@ bool convertStereoMsg(
 		cv::Mat & left,
 		cv::Mat & right,
 		rtabmap::StereoCameraModel & stereoModel,
-		tf2_ros::Buffer & listener,
+		tf2_ros::Buffer & tfBuffer,
 		double waitForTransform,
 		bool alreadyRectified)
 {
@@ -2524,7 +2524,7 @@ bool convertStereoMsg(
 		UFATAL("Fatal error while converting images (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
 	}
 
-	rtabmap::Transform localTransform = getTransform(frameId, leftImageMsg->header.frame_id, leftImageMsg->header.stamp, listener, waitForTransform);
+	rtabmap::Transform localTransform = getTransform(frameId, leftImageMsg->header.frame_id, leftImageMsg->header.stamp, tfBuffer, waitForTransform);
 	if(localTransform.isNull())
 	{
 		return false;
@@ -2537,7 +2537,7 @@ bool convertStereoMsg(
 				odomFrameId,
 				odomStamp,
 				leftImageMsg->header.stamp,
-				listener,
+				tfBuffer,
 				waitForTransform);
 		if(sensorT.isNull())
 		{
@@ -2557,7 +2557,7 @@ bool convertStereoMsg(
 				rightCamInfoMsg.header.frame_id,
 				leftCamInfoMsg.header.frame_id,
 				leftCamInfoMsg.header.stamp,
-				listener,
+				tfBuffer,
 				waitForTransform);
 		if(stereoTransform.isNull())
 		{
@@ -2587,7 +2587,7 @@ bool convertStereoMsg(
 				leftCamInfoMsg.header.frame_id,
 				rightCamInfoMsg.header.frame_id,
 				leftCamInfoMsg.header.stamp,
-				listener,
+				tfBuffer,
 				waitForTransform);
 		if(stereoTransform.isNull() || stereoTransform.x()<=0)
 		{
@@ -2784,7 +2784,7 @@ bool convertScan3dMsg(
 		const std::string & odomFrameId,
 		const rclcpp::Time & odomStamp,
 		rtabmap::LaserScan & scan,
-		tf2_ros::Buffer & listener,
+		tf2_ros::Buffer & tfBuffer,
 		double waitForTransform,
 		int maxPoints,
 		float maxRange,
@@ -2793,7 +2793,7 @@ bool convertScan3dMsg(
 	UASSERT_MSG(scan3dMsg.data.size() == scan3dMsg.row_step*scan3dMsg.height,
 			uFormat("data=%d row_step=%d height=%d", scan3dMsg.data.size(), scan3dMsg.row_step, scan3dMsg.height).c_str());
 
-	rtabmap::Transform scanLocalTransform = getTransform(frameId, scan3dMsg.header.frame_id, scan3dMsg.header.stamp, listener, waitForTransform);
+	rtabmap::Transform scanLocalTransform = getTransform(frameId, scan3dMsg.header.frame_id, scan3dMsg.header.stamp, tfBuffer, waitForTransform);
 	if(scanLocalTransform.isNull())
 	{
 		UERROR("TF of received scan cloud at time %fs is not set, aborting rtabmap update.", timestampFromROS(scan3dMsg.header.stamp));
@@ -2808,7 +2808,7 @@ bool convertScan3dMsg(
 				odomFrameId,
 				odomStamp,
 				scan3dMsg.header.stamp,
-				listener,
+				tfBuffer,
 				waitForTransform);
 		if(sensorT.isNull())
 		{
