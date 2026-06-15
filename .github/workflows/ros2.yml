@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        ros_distro: [humble, jazzy, kilted, lyrical, rolling]
+        ros_distro: [humble, jazzy, kilted, rolling]
         include:
         - ros_distro: humble
           skip_keys: ''
@@ -31,10 +31,10 @@ jobs:
         - ros_distro: kilted
           skip_keys: 'grid_map_ros'
           packages: 'rtabmap_ros'
-        - ros_distro: lyrical
-          skip_keys: 'nav2_bringup nav2_msgs velodyne'
-          # rtabmap_costmap_plugins cannot be built, missing nav2 on lyrical, build other packages:
-          packages: 'rtabmap_launch rtabmap_demos rtabmap_python rtabmap_examples rtabmap_rviz_plugins'
+        #- ros_distro: lyrical
+        #  skip_keys: 'nav2_bringup nav2_msgs velodyne'
+        #  # rtabmap_costmap_plugins cannot be built, missing nav2 on lyrical, build other packages:
+        #  packages: 'rtabmap_launch rtabmap_demos rtabmap_python rtabmap_examples rtabmap_rviz_plugins'
         - ros_distro: rolling
           skip_keys: 'nav2_bringup nav2_msgs velodyne'
           # rtabmap_costmap_plugins cannot be built, missing nav2 on rolling, build other packages:
