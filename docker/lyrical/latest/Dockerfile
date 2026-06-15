@@ -1,4 +1,4 @@
-FROM introlab3it/rtabmap:lyrical
+FROM introlab3it/rtabmap:resolute
 
 RUN source /ros_entrypoint.sh && \
     mkdir -p ros2_ws/src && \
