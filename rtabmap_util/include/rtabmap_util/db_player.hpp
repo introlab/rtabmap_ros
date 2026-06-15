@@ -44,8 +44,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <std_srvs/srv/empty.hpp>
 
-#include <tf2_ros/buffer.h>
-#include <tf2_ros/transform_broadcaster.h>
+#include <tf2_ros/buffer.hpp>
+#include <tf2_ros/transform_broadcaster.hpp>
 
 #include <rtabmap_msgs/msg/rgbd_image.hpp>
 #include <rtabmap_msgs/msg/env_sensor.hpp>

@@ -87,6 +87,9 @@ int main(int argc, char **argv)
 
 	rclcpp::Rate pauseRate(10);
 
+	rclcpp::executors::SingleThreadedExecutor executor;
+	executor.add_node(node);
+
 	while(rclcpp::ok())
 	{
 		if(!node->publishNextFrame()) {
@@ -117,7 +120,7 @@ int main(int argc, char **argv)
 			}
 
 			pauseRate.sleep();
-			rclcpp::spin_some(node);
+			executor.spin_some();
 		}
 	}
 

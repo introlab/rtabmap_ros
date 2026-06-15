@@ -220,7 +220,7 @@ void DbPlayer::initializePublishers(const rtabmap::OdometryEvent & odom)
         else
         {
             if(rgbPub_.getTopic().empty()) {
-                rgbPub_ = image_transport::create_publisher(this, "rgb/image", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos_).get_rmw_qos_profile());
+                rgbPub_ = image_transport::create_publisher(*this, "rgb/image", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos_));
                 RCLCPP_INFO(get_logger(), "Gray/RGB image       \"%s\" will be published.", rgbPub_.getTopic().c_str());
             }
             if(!rgbInfoPub_.get()) {
@@ -228,7 +228,7 @@ void DbPlayer::initializePublishers(const rtabmap::OdometryEvent & odom)
                 RCLCPP_INFO(get_logger(), "Gray/RGB calibration \"%s\" will be published.", rgbInfoPub_->get_topic_name());
             }
             if(depthPub_.getTopic().empty()) {
-                depthPub_ = image_transport::create_publisher(this, "depth/image", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos_).get_rmw_qos_profile());
+                depthPub_ = image_transport::create_publisher(*this, "depth/image", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos_));
                 RCLCPP_INFO(get_logger(), "Depth image          \"%s\" will be published.", depthPub_.getTopic().c_str());
             }
             if(!depthInfoPub_.get()) {
@@ -254,7 +254,7 @@ void DbPlayer::initializePublishers(const rtabmap::OdometryEvent & odom)
         else
         {
             if(leftPub_.getTopic().empty()) {
-                leftPub_ = image_transport::create_publisher(this, "left/image", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos_).get_rmw_qos_profile());
+                leftPub_ = image_transport::create_publisher(*this, "left/image", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos_));
                 RCLCPP_INFO(get_logger(), "Left image           \"%s\" will be published.", leftPub_.getTopic().c_str());
             }
             if(!leftInfoPub_.get()) {
@@ -262,7 +262,7 @@ void DbPlayer::initializePublishers(const rtabmap::OdometryEvent & odom)
                 RCLCPP_INFO(get_logger(), "Left calibration     \"%s\" will be published.", leftInfoPub_->get_topic_name());
             }
             if(rightPub_.getTopic().empty()) {
-                rightPub_ = image_transport::create_publisher(this, "right/image", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos_).get_rmw_qos_profile());
+                rightPub_ = image_transport::create_publisher(*this, "right/image", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos_));
                 RCLCPP_INFO(get_logger(), "Right image          \"%s\" will be published.", rightPub_.getTopic().c_str());
             }
             if(!rightInfoPub_.get()) {
@@ -274,7 +274,7 @@ void DbPlayer::initializePublishers(const rtabmap::OdometryEvent & odom)
     }
     else if(imagePub_.getTopic().empty())
     {
-        imagePub_ = image_transport::create_publisher(this, "image", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos_).get_rmw_qos_profile());
+        imagePub_ = image_transport::create_publisher(*this, "image", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos_));
                 RCLCPP_INFO(get_logger(), "Image                \"%s\" without calibration will be published.", imagePub_.getTopic().c_str());
     }
 
