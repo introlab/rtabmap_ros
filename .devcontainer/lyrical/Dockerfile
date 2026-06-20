@@ -1,5 +1,5 @@
 
-FROM introlab3it/rtabmap:lyrical
+FROM introlab3it/rtabmap:resolute
 
 # remove ubuntu user
 RUN touch /var/mail/ubuntu && chown ubuntu /var/mail/ubuntu && userdel -r ubuntu
@@ -18,5 +18,5 @@ RUN set -ex && \
 RUN mkdir -p /home/${USERNAME}/ros2_ws/src && \
     chown -R ${USERNAME}:${USERNAME} /home/${USERNAME}/ros2_ws
 
-RUN echo "source /opt/ros/kilted/setup.bash" >> /home/${USERNAME}/.bashrc
+RUN echo "source /opt/ros/lyrical/setup.bash" >> /home/${USERNAME}/.bashrc
 RUN echo "source /usr/share/bash-completion/completions/git" >> /home/${USERNAME}/.bashrc

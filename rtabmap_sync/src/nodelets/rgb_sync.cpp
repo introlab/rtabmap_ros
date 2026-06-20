@@ -103,9 +103,14 @@ RGBSync::RGBSync(const rclcpp::NodeOptions & options) :
 		exactSync_->registerCallback(std::bind(&RGBSync::callback, this, std::placeholders::_1, std::placeholders::_2));
 	}
 
-	image_transport::TransportHints hints(*this); // using "image_transport" parameter
 	std::string rgbTopic = this->get_node_topics_interface()->resolve_topic_name("rgb/image"); // Humble/Jazzy don't resolve base topic, fixed by https://github.com/ros-perception/image_common/commit/ea7589ae8c1f7ecb83d6aab7b4c890c2d630d27a
+#ifdef PRE_ROS_LYRICAL
+	image_transport::TransportHints hints(this); // using "image_transport" parameter
+	imageSub_.subscribe(this, rgbTopic, hints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+#else
+	image_transport::TransportHints hints(*this); // using "image_transport" parameter
 	imageSub_.subscribe(*this, rgbTopic, hints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos));
+#endif
 	cameraInfoSub_.subscribe(this, "rgb/camera_info", RCLCPP_QOS(topicQueueSize, qosCaminfo));
 
 	std::string subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s,\n   %s",

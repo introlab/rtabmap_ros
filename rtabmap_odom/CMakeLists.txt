@@ -74,6 +74,10 @@ SET(AmentLibraries
    rtabmap_sync
 )
 
+IF("$ENV{ROS_DISTRO}" STRLESS "lyrical")
+  add_definitions(-DPRE_ROS_LYRICAL)
+ENDIF()
+
 ###########
 ## Build ##
 ###########

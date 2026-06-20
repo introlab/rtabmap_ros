@@ -82,6 +82,10 @@ SET(AmentLibraries
    diagnostic_updater
 )
 
+IF("$ENV{ROS_DISTRO}" STRLESS "lyrical")
+  add_definitions(-DPRE_ROS_LYRICAL)
+ENDIF()
+
 ###########
 ## Build ##
 ###########
