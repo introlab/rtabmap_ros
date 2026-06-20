@@ -17,7 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        docker_tag: [humble, humble-latest, jazzy, jazzy-latest, kilted, kilted-latest, lyrical, lyrical-latest]
+        docker_tag: [humble, humble-latest, jazzy, jazzy-latest, kilted, kilted-latest, lyrical-latest]
         include:
         - docker_tag: humble
           docker_path: 'humble'
@@ -47,11 +47,12 @@ jobs:
           docker_path: 'kilted/latest'
           docker_platforms: |
             linux/amd64
-        - docker_tag: lyrical
-          docker_path: 'lyrical'
-          docker_platforms: |
-            linux/amd64
-            linux/arm64
+        #Disabled till rtabmap_ros is released on lyrical
+        #- docker_tag: lyrical
+        #  docker_path: 'lyrical'
+        #  docker_platforms: |
+        #    linux/amd64
+        #    linux/arm64
         - docker_tag: lyrical-latest
           docker_path: 'lyrical/latest'
           docker_platforms: |
