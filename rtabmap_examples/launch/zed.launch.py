@@ -23,13 +23,26 @@ remappings = []
 
 def launch_setup(context: LaunchContext, *args, **kwargs):
 
-    # Hack to override grab_resolution parameter without changing any files
+    use_zed_odometry = LaunchConfiguration('use_zed_odometry').perform(context) in ["True", "true"]
+
+    # Override some ZED parameters without changing any files:
+    #  * grab_resolution: VGA
+    #  * pos_tracking_enabled: disabled when rtabmap computes the odometry, so
+    #    the ZED node does not publish the odom->camera_link TF (which would
+    #    conflict with rtabmap's odometry). We still set publish_tf:=true below
+    #    so the ZED node keeps broadcasting the IMU TF, which rtabmap needs
+    #    (wait_imu_to_init). sensors.publish_imu_tf is ignored when publish_tf
+    #    is false, and the IMU frame is not in the ZED URDF, so this is the only
+    #    way to get the IMU TF while rtabmap owns the odometry.
+    pos_tracking_enabled = 'true' if use_zed_odometry else 'false'
     with tempfile.NamedTemporaryFile(mode='w+t', delete=False) as zed_override_file:
         zed_override_file.write("---\n"+
                   "/**:\n"+
                   "    ros__parameters:\n"+
                   "        general:\n"+
-                  "            grab_resolution: 'VGA'")
+                  "            grab_resolution: 'VGA'\n"+
+                  "        pos_tracking:\n"+
+                  "            pos_tracking_enabled: "+pos_tracking_enabled)
 
     parameters=[{'frame_id':'zed_camera_link',
                  'subscribe_rgbd':True,
@@ -38,7 +51,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
 
     remappings=[('imu', '/zed/zed_node/imu/data')]
 
-    if LaunchConfiguration('use_zed_odometry').perform(context) in ["True", "true"]:
+    if use_zed_odometry:
         remappings.append(('odom', '/zed/zed_node/odom'))
     else:
         parameters.append({'subscribe_odom_info': True})
@@ -51,7 +64,8 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
                 '/zed_camera.launch.py']),
                 launch_arguments={'camera_model': LaunchConfiguration('camera_model'),
                                     'ros_params_override_path': zed_override_file.name,
-                                    'publish_tf': LaunchConfiguration('use_zed_odometry'),
+                                    'publish_tf': 'true',
+                                    'publish_imu_tf': 'true',
                                     'publish_map_tf': 'false'}.items(),
         ),
 
@@ -59,8 +73,8 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
         Node(   
             package='rtabmap_sync', executable='rgbd_sync', output='screen',
             parameters=parameters,
-            remappings=[('rgb/image', '/zed/zed_node/rgb/image_rect_color'),
-                        ('rgb/camera_info', '/zed/zed_node/rgb/camera_info'),
+            remappings=[('rgb/image', '/zed/zed_node/rgb/color/rect/image'),
+                        ('rgb/camera_info', '/zed/zed_node/rgb/color/rect/camera_info'),
                         ('depth/image', '/zed/zed_node/depth/depth_registered')]),
 
         # Visual odometry

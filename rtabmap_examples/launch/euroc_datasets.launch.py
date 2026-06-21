@@ -62,7 +62,8 @@ def generate_launch_description():
         # Nodes to launch
         Node(
             package='rtabmap_odom', executable='stereo_odometry', output='screen',
-            parameters=[parameters],
+            parameters=[parameters,
+                { 'always_process_most_recent_frame':True}],
             remappings=remappings),
 
         Node(
@@ -82,7 +83,8 @@ def generate_launch_description():
 
         Node(
             package='rtabmap_viz', executable='rtabmap_viz', output='screen',
-            parameters=[parameters],
+            parameters=[parameters,
+                        {'odometry_node_name': "stereo_odometry"}],
             remappings=remappings),
         
         # Image rectification and publishing synchronized camera_info
@@ -103,15 +105,13 @@ def generate_launch_description():
             namespace='stereo_camera'),
             
         Node(
-            package='image_proc', executable='image_proc', output='screen',
+            package='image_proc', executable='rectify_node', output='screen',
             remappings=[
-              ('image_raw', '/cam0/image_raw'),
               ('image', '/cam0/image_raw')],
             namespace='stereo_camera/left'),
         Node(
-            package='image_proc', executable='image_proc', output='screen',
+            package='image_proc', executable='rectify_node', output='screen',
             remappings=[
-              ('image_raw', '/cam1/image_raw'),
               ('image', '/cam1/image_raw')],
             namespace='stereo_camera/right'),
 

@@ -102,6 +102,8 @@ PointCloudXYZRGB::PointCloudXYZRGB(const rclcpp::NodeOptions & options) :
 	normalRadius_ = this->declare_parameter("normal_radius", normalRadius_);
 	filterNaNs_ = this->declare_parameter("filter_nans", filterNaNs_);
 	roiStr = this->declare_parameter("roi_ratios", roiStr);
+	this->declare_parameter("image_transport", std::string("raw"));
+	this->declare_parameter("depth_transport", std::string("raw"));
 
 	//parse roi (region of interest)
 	roiRatios_.resize(4, 0);
@@ -184,15 +186,32 @@ PointCloudXYZRGB::PointCloudXYZRGB(const rclcpp::NodeOptions & options) :
 		exactSyncStereo_->registerCallback(std::bind(&PointCloudXYZRGB::stereoCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 	}
 
-	image_transport::TransportHints hints(this);
-	imageSub_.subscribe(this, "rgb/image", hints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
-	imageDepthSub_.subscribe(this, "depth/image", hints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	std::string rgbTopic = this->get_node_topics_interface()->resolve_topic_name("rgb/image"); // Humble/Jazzy don't resolve base topic, fixed by https://github.com/ros-perception/image_common/commit/ea7589ae8c1f7ecb83d6aab7b4c890c2d630d27a
+	std::string depthTopic = this->get_node_topics_interface()->resolve_topic_name("depth/image"); // Humble/Jazzy don't resolve base topic, fixed by https://github.com/ros-perception/image_common/commit/ea7589ae8c1f7ecb83d6aab7b4c890c2d630d27a
+#ifdef PRE_ROS_LYRICAL
+	image_transport::TransportHints rgbHints(this); // using "image_transport" parameter
+	image_transport::TransportHints depthHints(this, "raw", "depth_transport");
+	imageSub_.subscribe(this, rgbTopic, rgbHints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	imageDepthSub_.subscribe(this, depthTopic, depthHints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+#else
+	image_transport::TransportHints rgbHints(*this); // using "image_transport" parameter
+	image_transport::TransportHints depthHints(*this, "raw", "depth_transport");
+	imageSub_.subscribe(*this, rgbTopic, rgbHints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos));
+	imageDepthSub_.subscribe(*this, depthTopic, depthHints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos));
+#endif
 	cameraInfoSub_.subscribe(this, "rgb/camera_info", RCLCPP_QOS(topicQueueSize, qosCamInfo));
 
 	imageDisparitySub_.subscribe(this, "disparity", RCLCPP_QOS(topicQueueSize, qos));
 
-	imageLeft_.subscribe(this, "left/image", hints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
-	imageRight_.subscribe(this, "right/image", hints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	std::string leftTopic = this->get_node_topics_interface()->resolve_topic_name("left/image"); // Humble/Jazzy don't resolve base topic, fixed by https://github.com/ros-perception/image_common/commit/ea7589ae8c1f7ecb83d6aab7b4c890c2d630d27a
+	std::string rightTopic = this->get_node_topics_interface()->resolve_topic_name("right/image"); // Humble/Jazzy don't resolve base topic, fixed by https://github.com/ros-perception/image_common/commit/ea7589ae8c1f7ecb83d6aab7b4c890c2d630d27a
+#ifdef PRE_ROS_LYRICAL
+	imageLeft_.subscribe(this, leftTopic, rgbHints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	imageRight_.subscribe(this, rightTopic, rgbHints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+#else
+	imageLeft_.subscribe(*this, leftTopic, rgbHints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos));
+	imageRight_.subscribe(*this, rightTopic, rgbHints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos));
+#endif
 	cameraInfoLeft_.subscribe(this, "left/camera_info", RCLCPP_QOS(topicQueueSize, qosCamInfo));
 	cameraInfoRight_.subscribe(this, "right/camera_info", RCLCPP_QOS(topicQueueSize, qosCamInfo));
 }
@@ -233,21 +252,32 @@ void PointCloudXYZRGB::depthCallback(
 		rclcpp::Time time = now();
 
 		cv_bridge::CvImageConstPtr imagePtr;
-		if(image->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0)
-		{
-			imagePtr = cv_bridge::toCvShare(image);
+		try {
+			if(image->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0)
+			{
+				imagePtr = cv_bridge::toCvShare(image);
+			}
+			else if(image->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
+					image->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
+			{
+				imagePtr = cv_bridge::toCvShare(image, "mono8");
+			}
+			else
+			{
+				imagePtr = cv_bridge::toCvShare(image, "bgr8");
+			}
 		}
-		else if(image->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
-				image->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
-		{
-			imagePtr = cv_bridge::toCvShare(image, "mono8");
-		}
-		else
-		{
-			imagePtr = cv_bridge::toCvShare(image, "bgr8");
+		catch(cv::Exception& e) {
+			UFATAL("Fatal error while converting RGB image (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
 		}
 
-		cv_bridge::CvImageConstPtr imageDepthPtr = cv_bridge::toCvShare(imageDepth);
+		cv_bridge::CvImageConstPtr imageDepthPtr;
+		try {
+			imageDepthPtr = cv_bridge::toCvShare(imageDepth);
+		}
+		catch(cv::Exception& e) {
+			UFATAL("Fatal error while converting Depth image (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
+		}
 
 		rtabmap::CameraModel model = rtabmap_conversions::cameraModelFromROS(*cameraInfo);
 
@@ -311,18 +341,24 @@ void PointCloudXYZRGB::disparityCallback(
 		const sensor_msgs::msg::CameraInfo::ConstSharedPtr cameraInfo)
 {
 	cv_bridge::CvImageConstPtr imagePtr;
-	if(image->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0)
-	{
-		imagePtr = cv_bridge::toCvShare(image);
+	try {
+		if(image->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0)
+		{
+			imagePtr = cv_bridge::toCvShare(image);
+		}
+		else if(image->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
+				image->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
+		{
+			imagePtr = cv_bridge::toCvShare(image, "mono8");
+		}
+		else
+		{
+			imagePtr = cv_bridge::toCvShare(image, "bgr8");
+		}
 	}
-	else if(image->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
-			image->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
-	{
-		imagePtr = cv_bridge::toCvShare(image, "mono8");
-	}
-	else
-	{
-		imagePtr = cv_bridge::toCvShare(image, "bgr8");
+	catch(cv::Exception& e) {
+		UFATAL("Fatal error while converting RGB image (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
+		return;
 	}
 
 	if(imageDisparity->image.encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1) !=0 &&
@@ -397,16 +433,21 @@ void PointCloudXYZRGB::stereoCallback(
 		rclcpp::Time time = now();
 
 		cv_bridge::CvImageConstPtr ptrLeftImage, ptrRightImage;
-		if(imageLeft->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
-			imageLeft->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
-		{
-			ptrLeftImage = cv_bridge::toCvShare(imageLeft, "mono8");
+		try {
+			if(imageLeft->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
+				imageLeft->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
+			{
+				ptrLeftImage = cv_bridge::toCvShare(imageLeft, "mono8");
+			}
+			else
+			{
+				ptrLeftImage = cv_bridge::toCvShare(imageLeft, "bgr8");
+			}
+			ptrRightImage = cv_bridge::toCvShare(imageRight, "mono8");
 		}
-		else
-		{
-			ptrLeftImage = cv_bridge::toCvShare(imageLeft, "bgr8");
+		catch(cv::Exception& e) {
+			UFATAL("Fatal error converting images (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
 		}
-		ptrRightImage = cv_bridge::toCvShare(imageRight, "mono8");
 
 		if(roiRatios_[0]!=0.0f || roiRatios_[1]!=0.0f || roiRatios_[2]!=0.0f || roiRatios_[3]!=0.0f)
 		{

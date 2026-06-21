@@ -48,6 +48,7 @@ namespace rtabmap_sync
 RGBSync::RGBSync(const rclcpp::NodeOptions & options) :
 	Node("rgbd_sync", options),
 	compressedRate_(0),
+	fillEmptyDepth_(false),
 	approxSync_(0),
 	exactSync_(0)
 {
@@ -72,6 +73,8 @@ RGBSync::RGBSync(const rclcpp::NodeOptions & options) :
 	qos = this->declare_parameter("qos", qos);
 	int qosCaminfo = this->declare_parameter("qos_camera_info", qos);
 	compressedRate_ = this->declare_parameter("compressed_rate", compressedRate_);
+	std::string imageTransport = this->declare_parameter("image_transport", std::string("raw"));
+	fillEmptyDepth_ = this->declare_parameter("fill_empty_depth", fillEmptyDepth_);
 
 	RCLCPP_INFO(this->get_logger(), "%s: approx_sync = %s", get_name(), approxSync?"true":"false");
 	if(approxSync)
@@ -81,6 +84,8 @@ RGBSync::RGBSync(const rclcpp::NodeOptions & options) :
 	RCLCPP_INFO(this->get_logger(), "%s: qos             = %d", get_name(), qos);
 	RCLCPP_INFO(this->get_logger(), "%s: qos_camera_info = %d", get_name(), qosCaminfo);
 	RCLCPP_INFO(this->get_logger(), "%s: compressed_rate = %f", get_name(), compressedRate_);
+	RCLCPP_INFO(this->get_logger(), "%s: image_transport = %s", get_name(), imageTransport.c_str());
+	RCLCPP_INFO(this->get_logger(), "%s: fill_empty_depth = %s", get_name(), fillEmptyDepth_?"true":"false");
 
 	rgbdImagePub_ = this->create_publisher<rtabmap_msgs::msg::RGBDImage>("rgbd_image", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos));
 	rgbdImageCompressedPub_ = this->create_publisher<rtabmap_msgs::msg::RGBDImage>("rgbd_image/compressed", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos));
@@ -98,8 +103,14 @@ RGBSync::RGBSync(const rclcpp::NodeOptions & options) :
 		exactSync_->registerCallback(std::bind(&RGBSync::callback, this, std::placeholders::_1, std::placeholders::_2));
 	}
 
-	image_transport::TransportHints hints(this);
-	imageSub_.subscribe(this, "rgb/image", hints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	std::string rgbTopic = this->get_node_topics_interface()->resolve_topic_name("rgb/image"); // Humble/Jazzy don't resolve base topic, fixed by https://github.com/ros-perception/image_common/commit/ea7589ae8c1f7ecb83d6aab7b4c890c2d630d27a
+#ifdef PRE_ROS_LYRICAL
+	image_transport::TransportHints hints(this); // using "image_transport" parameter
+	imageSub_.subscribe(this, rgbTopic, hints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+#else
+	image_transport::TransportHints hints(*this); // using "image_transport" parameter
+	imageSub_.subscribe(*this, rgbTopic, hints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos));
+#endif
 	cameraInfoSub_.subscribe(this, "rgb/camera_info", RCLCPP_QOS(topicQueueSize, qosCaminfo));
 
 	std::string subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s,\n   %s",
@@ -147,6 +158,14 @@ void RGBSync::callback(
 		msg.header.frame_id = cameraInfo->header.frame_id;
 		msg.header.stamp = image->header.stamp;
 		msg.rgb_camera_info = *cameraInfo;
+		cv_bridge::CvImage fakeDepthImage;
+		if(fillEmptyDepth_)
+		{
+			msg.depth_camera_info = *cameraInfo;
+			fakeDepthImage.header = image->header;
+			fakeDepthImage.image = cv::Mat::zeros(image->height, image->width, CV_16UC1);
+			fakeDepthImage.encoding = sensor_msgs::image_encodings::TYPE_16UC1;
+		}
 
 		if(rgbdImageCompressedPub_->get_subscription_count())
 		{
@@ -169,6 +188,13 @@ void RGBSync::callback(
 				cv_bridge::CvImageConstPtr imagePtr = cv_bridge::toCvShare(image);
 				imagePtr->toCompressedImageMsg(msgCompressed.rgb_compressed, cv_bridge::JPG);
 
+				if(fillEmptyDepth_)
+				{
+					msgCompressed.depth_compressed.header = image->header;
+					msgCompressed.depth_compressed.data = rtabmap::compressImage(fakeDepthImage.image, ".png");
+					msgCompressed.depth_compressed.format = "png";
+				}
+
 				rgbdImageCompressedPub_->publish(msgCompressed);
 			}
 		}
@@ -176,6 +202,10 @@ void RGBSync::callback(
 		if(rgbdImagePub_->get_subscription_count())
 		{
 			msg.rgb = *image;
+			if(fillEmptyDepth_)
+			{
+				fakeDepthImage.toImageMsg(msg.depth);
+			}
 			rgbdImagePub_->publish(msg);
 		}
 

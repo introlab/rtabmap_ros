@@ -10,6 +10,10 @@ on:
 env:
   BUILD_TYPE: Release
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build:
     name: Build ros2 ${{ matrix.ros_distro }}
@@ -20,6 +24,7 @@ jobs:
         include:
         - ros_distro: jazzy
           skip_keys: ''
+          packages: 'rtabmap_ros'
       fail-fast: false
     container:
       image: osrf/ros:${{ matrix.ros_distro }}-desktop-full
@@ -29,11 +34,15 @@ jobs:
       with:
         required-ros-distributions: ${{ matrix.ros_distro }}
     - run: |
+        DEBIAN_FRONTEND=noninteractive
+        sudo apt update
+        sudo apt upgrade -y
+    - run: |
         echo "repositories:\n  introlab/rtabmap:\n    type: git\n    url: https://github.com/introlab/rtabmap.git\n    version: jazzy-devel\n" > /tmp/deps.repos &&\
         cat /tmp/deps.repos
     - uses: ros-tooling/action-ros-ci@v0.4
       with:
-        package-name: rtabmap_ros
+        package-name: ${{ matrix.packages }}
         target-ros2-distro: ${{ matrix.ros_distro }}
         vcs-repo-file-url: /tmp/deps.repos
         rosdep-check: true

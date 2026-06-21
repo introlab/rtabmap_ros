@@ -78,6 +78,7 @@ private:
 	double scanNormalGroundUp_;
 	bool deskewing_;
 	bool deskewingSlerp_;
+	int topicQueueSize_;
 	//std::vector<std::shared_ptr<rtabmap_ros::PluginInterface> > plugins_;
 	//pluginlib::ClassLoader<rtabmap_ros::PluginInterface> plugin_loader_;
 	bool scanReceived_ = false;

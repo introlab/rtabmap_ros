@@ -76,6 +76,8 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	guessMinTranslation_(0.0),
 	guessMinRotation_(0.0),
 	guessMinTime_(0.0),
+	guessLinearVariance_(0.001),
+	guessAngularVariance_(0.001),
 	publishTf_(true),
 	waitForTransform_(0.1), // 100 ms
 	publishNullWhenLost_(true),
@@ -89,9 +91,12 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	icpParams_(false),
 	previousStamp_(0.0),
 	previousClockTime_(0.0),
+	lastReceivedTopicClock_(0.0),
+	lastReceivedTopicStamp_(0.0),
 	expectedUpdateRate_(0.0),
 	maxUpdateRate_(0.0),
 	minUpdateRate_(0.0),
+	alwaysProcessMostRecentFrame_(true),
 	compressionImgFormat_(".jpg"),
 	compressionParallelized_(true),
 	odomStrategy_(Parameters::defaultOdomStrategy()),
@@ -140,10 +145,13 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	guessMinTranslation_ = this->declare_parameter("guess_min_translation", guessMinTranslation_);
 	guessMinRotation_ = this->declare_parameter("guess_min_rotation", guessMinRotation_);
 	guessMinTime_ = this->declare_parameter("guess_min_time", guessMinTime_);
+	guessLinearVariance_ = this->declare_parameter("guess_linear_variance", guessLinearVariance_);
+	guessAngularVariance_ = this->declare_parameter("guess_angular_variance", guessAngularVariance_);
 
 	expectedUpdateRate_ = this->declare_parameter("expected_update_rate", expectedUpdateRate_);
 	maxUpdateRate_ = this->declare_parameter("max_update_rate", maxUpdateRate_);
 	minUpdateRate_ = this->declare_parameter("min_update_rate", minUpdateRate_);
+	alwaysProcessMostRecentFrame_ = this->declare_parameter("always_process_most_recent_frame", alwaysProcessMostRecentFrame_);
 
 	compressionImgFormat_ = this->declare_parameter("sensor_data_compression_format", compressionImgFormat_);
 	compressionParallelized_ = this->declare_parameter("sensor_data_parallel_compression", compressionParallelized_);
@@ -201,6 +209,8 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	RCLCPP_INFO(this->get_logger(), "Odometry: guess_min_translation  = %f", guessMinTranslation_);
 	RCLCPP_INFO(this->get_logger(), "Odometry: guess_min_rotation     = %f", guessMinRotation_);
 	RCLCPP_INFO(this->get_logger(), "Odometry: guess_min_time         = %f", guessMinTime_);
+	RCLCPP_INFO(this->get_logger(), "Odometry: guess_linear_variance  = %f", guessLinearVariance_);
+	RCLCPP_INFO(this->get_logger(), "Odometry: guess_angular_variance = %f", guessAngularVariance_);
 	RCLCPP_INFO(this->get_logger(), "Odometry: expected_update_rate   = %f Hz", expectedUpdateRate_);
 	RCLCPP_INFO(this->get_logger(), "Odometry: max_update_rate        = %f Hz", maxUpdateRate_);
 	RCLCPP_INFO(this->get_logger(), "Odometry: min_update_rate        = %f Hz", minUpdateRate_);
@@ -360,15 +370,16 @@ void OdometryROS::init(bool stereoParams, bool visParams, bool icpParams)
 		odometry_->reset(initialPose_);
 	}
 
-	resetSrv_ = this->create_service<std_srvs::srv::Empty>("reset_odom", std::bind(&OdometryROS::resetOdom, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
-	resetToPoseSrv_ = this->create_service<rtabmap_msgs::srv::ResetPose>("reset_odom_to_pose", std::bind(&OdometryROS::resetToPose, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
-	pauseSrv_ = this->create_service<std_srvs::srv::Empty>("pause_odom", std::bind(&OdometryROS::pause, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
-	resumeSrv_ = this->create_service<std_srvs::srv::Empty>("resume_odom", std::bind(&OdometryROS::resume, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	const std::string servicePrefix = get_name() + std::string("/");
+	resetSrv_ = this->create_service<std_srvs::srv::Empty>(servicePrefix + "reset_odom", std::bind(&OdometryROS::resetOdom, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	resetToPoseSrv_ = this->create_service<rtabmap_msgs::srv::ResetPose>(servicePrefix + "reset_odom_to_pose", std::bind(&OdometryROS::resetToPose, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	pauseSrv_ = this->create_service<std_srvs::srv::Empty>(servicePrefix + "pause_odom", std::bind(&OdometryROS::pause, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	resumeSrv_ = this->create_service<std_srvs::srv::Empty>(servicePrefix + "resume_odom", std::bind(&OdometryROS::resume, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
-	setLogDebugSrv_ = this->create_service<std_srvs::srv::Empty>("log_debug", std::bind(&OdometryROS::setLogDebug, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
-	setLogInfoSrv_ = this->create_service<std_srvs::srv::Empty>("log_info", std::bind(&OdometryROS::setLogInfo, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
-	setLogWarnSrv_ = this->create_service<std_srvs::srv::Empty>("log_warning", std::bind(&OdometryROS::setLogWarn, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
-	setLogErrorSrv_ = this->create_service<std_srvs::srv::Empty>("log_error", std::bind(&OdometryROS::setLogError, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	setLogDebugSrv_ = this->create_service<std_srvs::srv::Empty>(servicePrefix + "log_debug", std::bind(&OdometryROS::setLogDebug, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	setLogInfoSrv_ = this->create_service<std_srvs::srv::Empty>(servicePrefix + "log_info", std::bind(&OdometryROS::setLogInfo, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	setLogWarnSrv_ = this->create_service<std_srvs::srv::Empty>(servicePrefix + "log_warning", std::bind(&OdometryROS::setLogWarn, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+	setLogErrorSrv_ = this->create_service<std_srvs::srv::Empty>(servicePrefix + "log_error", std::bind(&OdometryROS::setLogError, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
 	odomStrategy_ = 0;
 	Parameters::parse(this->parameters(), Parameters::kOdomStrategy(), odomStrategy_);
@@ -461,25 +472,47 @@ void OdometryROS::callbackIMU(const sensor_msgs::msg::Imu::SharedPtr msg)
 void OdometryROS::processData(SensorData & data, const std_msgs::msg::Header & header)
 {
 	//RCLCPP_WARN(get_logger(), "Received image: %f delay=%f", data.stamp(), (now() - header.stamp).seconds());
+	double clockNow = rtabmap_conversions::timestampFromROS(now());
 	if(dataMutex_.lockTry() == 0)
 	{
 		if(bufferedDataToProcess_) {
-			RCLCPP_ERROR(this->get_logger(), "We didn't receive IMU newer than previous image (%f) and we just received a new image (%f). The previous image is dropped!",
+			RCLCPP_ERROR(this->get_logger(), "We didn't receive IMU newer than previous image/scan (%f) and we just received a new image/scan (%f). The previous image/scan is dropped! Make sure IMU is published faster and with less delay than the image/scan.",
 						rtabmap_conversions::timestampFromROS(dataHeaderToProcess_.stamp), rtabmap_conversions::timestampFromROS(header.stamp));
 			++droppedMsgs_;
 		}
 		dataToProcess_ = data;
 		dataHeaderToProcess_ = header;
 		bufferedDataToProcess_ = false;
-		dataReady_.release();
+		if(alwaysProcessMostRecentFrame_) {
+			dataReady_.release();
+		}
 		dataMutex_.unlock();
 		++processedMsgs_;
+		if(!alwaysProcessMostRecentFrame_) {
+			processData();
+		}
 	}
 	else
 	{
-		//RCLCPP_WARN(get_logger(), "Dropping image/scan data");
+		double estimatedPeriod = clockNow - lastReceivedTopicClock_;
+		double topicPeriod = rtabmap_conversions::timestampFromROS(header.stamp) - lastReceivedTopicStamp_;
+		if(estimatedPeriod>0.0 && topicPeriod>0.0 && estimatedPeriod < topicPeriod*0.5) {
+			RCLCPP_WARN(get_logger(), 
+			"Dropping image/scan data with stamp %f (delay=%f). Something is wrong "
+			"because the clock difference with the previous topic received (%fs) is much lower than the "
+			"expected one (%fs) estimated from the topic stamps (previous stamp=%f). If you are processing "
+			"a large bag with flaky replaying delay, consider setting parameter \"always_process_most_recent_frame:=false\" "
+			"to avoid aggressively dropping data.",
+			rtabmap_conversions::timestampFromROS(header.stamp),
+			clockNow - rtabmap_conversions::timestampFromROS(header.stamp),
+			estimatedPeriod,
+			topicPeriod,
+			lastReceivedTopicStamp_);
+		}
 		++droppedMsgs_;
 	}
+	lastReceivedTopicStamp_ = rtabmap_conversions::timestampFromROS(header.stamp);
+	lastReceivedTopicClock_ = clockNow;
 }
 
 void OdometryROS::mainLoopKill()
@@ -497,7 +530,10 @@ void OdometryROS::mainLoop()
 		// thread killed
 		return;
 	}
-
+	processData();
+}
+void OdometryROS::processData()
+{
 	UScopeMutex lock(dataMutex_);
 
 	// aliases
@@ -516,21 +552,35 @@ void OdometryROS::mainLoop()
 
 		if(waitIMUToinit_ && (imus_.empty() || imus_.rbegin()->first < rtabmap_conversions::timestampFromROS(header.stamp)))
 		{
-			RCLCPP_WARN(this->get_logger(), "Make sure IMU is published faster than data rate! (last image stamp=%f and last imu stamp received=%f). Buffering the image until an imu with same or greater stamp is received.",
-					data.stamp(), imus_.empty()?0:imus_.rbegin()->first);
+			if(imus_.empty()) {
+				// If empty, it is an error!
+				RCLCPP_ERROR(this->get_logger(), "Make sure IMU is published faster than data rate! (last image/scan stamp=%f and imu buffer is empty). Buffering the image/scan until an imu with same or greater stamp is received.",
+						data.stamp());
+			}
 			bufferedDataToProcess_ = true;
 			return;
 		}
 		// process all imu data up to current image stamp (or just after so that underlying odom approach can do interpolation of imu at image stamp)
 		std::map<double, sensor_msgs::msg::Imu::ConstSharedPtr>::iterator iterEnd = imus_.lower_bound(rtabmap_conversions::timestampFromROS(header.stamp));
+		std::map<double, sensor_msgs::msg::Imu::ConstSharedPtr>::iterator iterLast = iterEnd;
 		if(iterEnd!= imus_.end())
 		{
 			++iterEnd;
 		}
-		for(std::map<double, sensor_msgs::msg::Imu::ConstSharedPtr>::iterator iter=imus_.begin(); iter!=iterEnd;)
+		std::map<double, sensor_msgs::msg::Imu::ConstSharedPtr>::iterator iterFirst = imus_.begin();
+		for(std::map<double, sensor_msgs::msg::Imu::ConstSharedPtr>::iterator iter=iterFirst; iter!=iterEnd;)
 		{
-			imus.push_back(*iter);
-			imus_.erase(iter++);
+			// Because we always keep the last processed imu in the buffer, skip the first 
+			// one when processing again the buffer
+			if(iter!=iterFirst) {
+				imus.push_back(*iter);
+			}
+			if(iter!=iterLast) {
+				imus_.erase(iter++);
+			}
+			else {
+				++iter;
+			}
 		}
 	} // end imu lock
 
@@ -666,6 +716,44 @@ void OdometryROS::mainLoop()
 		}
 	}
 
+	bool tooOldPreviousData = minUpdateRate_ > 0 && previousStamp_ > 0 && rtabmap_conversions::timestampFromROS(header.stamp)-previousStamp_ > 1.0/minUpdateRate_;
+	if(tooOldPreviousData)
+	{
+		RCLCPP_WARN(this->get_logger(), "Odometry lost! Odometry will be reset because last update "
+				"is %fs too old (>%fs, min_update_rate = %f Hz). Previous data stamp is %f while new data stamp is %f.",
+				rtabmap_conversions::timestampFromROS(header.stamp) - previousStamp_, 1.0/minUpdateRate_, minUpdateRate_, previousStamp_, rtabmap_conversions::timestampFromROS(header.stamp));
+
+		if(!guess_.isNull())
+		{
+			RCLCPP_WARN(this->get_logger(), "Odometry automatically reset based on latest guess available from TF (%s->%s, moved %s since got lost)!",
+					guessFrameId_.c_str(), frameId_.c_str(), guess_.prettyPrint().c_str());
+			odometry_->reset(odometry_->getPose() * guess_);
+			guess_.setNull();
+			guessPreviousPose_.setNull();
+		}
+		else
+		{
+			// Check TF to see if sensor fusion is used (e.g., the output of robot_localization)
+			Transform tfPose = rtabmap_conversions::getTransform(odomFrameId_, frameId_, header.stamp, *tfBuffer_, waitForTransform_);
+			if(tfPose.isNull())
+			{
+				RCLCPP_WARN(this->get_logger(), "Odometry automatically reset to latest computed pose!");
+				odometry_->reset(odometry_->getPose());
+			}
+			else
+			{
+				RCLCPP_WARN(this->get_logger(), "Odometry automatically reset to latest odometry pose available from TF (%s->%s)!",
+						odomFrameId_.c_str(), frameId_.c_str());
+				odometry_->reset(tfPose);
+			}
+		}
+	}
+	
+	bool skipOdometryUpdate = false;
+
+	rtabmap::Transform pose;
+	rtabmap::OdometryInfo info;
+	rtabmap::Transform guessVelocity;
 
 	Transform guessCurrentPose;
 	if(!guessFrameId_.empty())
@@ -702,28 +790,22 @@ void OdometryROS::mainLoop()
 				   (guessMinTime_ <= 0.0 || (previousStamp_>0.0 && rtabmap_conversions::timestampFromROS(header.stamp)-previousStamp_ < guessMinTime_)))
 				{
 					// Ignore odometry update, we didn't move enough
-					if(publishTf_)
-					{
-						geometry_msgs::msg::TransformStamped correctionMsg;
-						correctionMsg.child_frame_id = guessFrameId_;
-						correctionMsg.header.frame_id = odomFrameId_;
-						correctionMsg.header.stamp = header.stamp;
-						Transform correction = odometry_->getPose() * guess_ * guessCurrentPose.inverse();
-						rtabmap_conversions::transformToGeometryMsg(correction, correctionMsg.transform);
+					pose = odometry_->getPose() * guess_;
+					info.reg.covariance = cv::Mat::zeros(6,6,CV_64FC1);
+					info.reg.covariance.at<double>(0,0) = guessLinearVariance_;  // xx
+					info.reg.covariance.at<double>(1,1) = guessLinearVariance_;  // yy
+					info.reg.covariance.at<double>(2,2) = guessLinearVariance_; // zz
+					info.reg.covariance.at<double>(3,3) = guessAngularVariance_; // rr
+					info.reg.covariance.at<double>(4,4) = guessAngularVariance_; // pp
+					info.reg.covariance.at<double>(5,5) = guessAngularVariance_; // yawyaw
 
-						double time_now = now().seconds();
-						if(time_now >= previousClockTime_) {
-							tfBroadcaster_->sendTransform(correctionMsg);
-						}
-						else {
-							RCLCPP_WARN(this->get_logger(), "TF %s->%s is not published because we detected a time jump in the past of %f sec.",
-								correctionMsg.header.frame_id.c_str(),
-								correctionMsg.child_frame_id.c_str(),
-								previousClockTime_ - time_now);
-						}
-					}
-					guessPreviousPose_ = guessCurrentPose;
-					return;
+					//set velocity
+					double dt = rtabmap_conversions::timestampFromROS(header.stamp)-previousStamp_;
+					UASSERT(dt>0.0);
+					// use part of guess matching dt
+					(previousPose.inverse() * guessCurrentPose).getTranslationAndEulerAngles(x,y,z,roll,pitch,yaw);
+					guessVelocity = rtabmap::Transform(x/dt, y/dt, z/dt, roll/dt, pitch/dt, yaw/dt);
+					skipOdometryUpdate = true;
 				}
 			}
 			guessPreviousPose_ = guessCurrentPose;
@@ -735,23 +817,21 @@ void OdometryROS::mainLoop()
 		}
 	}
 
-	bool tooOldPreviousData = minUpdateRate_ > 0 && previousStamp_ > 0 && (rtabmap_conversions::timestampFromROS(header.stamp)-previousStamp_) > 1.0/minUpdateRate_;
-
 	// process data
 	rclcpp::Time timeStart = rclcpp::Clock().now();
-	rtabmap::OdometryInfo info;
 	if(!groundTruth.isNull())
 	{
 		data.setGroundTruth(groundTruth);
 	}
-	rtabmap::Transform pose;
-	if(!tooOldPreviousData)
+	if(!skipOdometryUpdate)
 	{
 		pose = odometry_->process(data, guess_, &info);
 	}
 	if(!pose.isNull())
 	{
-		guess_.setNull();
+		if(!skipOdometryUpdate) {
+			guess_.setNull();
+		}
 		resetCurrentCount_ = resetCountdown_;
 
 		//*********************
@@ -825,11 +905,16 @@ void OdometryROS::mainLoop()
 			odom.pose.covariance.at(35) = info.reg.covariance.at<double>(5,5)*2; // yawyaw
 
 			//set velocity
-			bool setTwist = !odometry_->getVelocityGuess().isNull();
+			bool setTwist = !guessVelocity.isNull() || !odometry_->getVelocityGuess().isNull();
 			if(setTwist)
 			{
 				float x,y,z,roll,pitch,yaw;
-				odometry_->getVelocityGuess().getTranslationAndEulerAngles(x,y,z,roll,pitch,yaw);
+				if(skipOdometryUpdate) {
+					UASSERT(!guessVelocity.isNull());
+					guessVelocity.getTranslationAndEulerAngles(x,y,z,roll,pitch,yaw);
+				} else {
+					odometry_->getVelocityGuess().getTranslationAndEulerAngles(x,y,z,roll,pitch,yaw);
+				}
 				odom.twist.twist.linear.x = x;
 				odom.twist.twist.linear.y = y;
 				odom.twist.twist.linear.z = z;
@@ -874,7 +959,7 @@ void OdometryROS::mainLoop()
 			odomLocalMap_->publish(cloudMsg);
 		}
 
-		if(odomLastFrame_->get_subscription_count())
+		if(!skipOdometryUpdate && odomLastFrame_->get_subscription_count())
 		{
 			// check which type of Odometry is using
 			if(odometry_->getType() == Odometry::kTypeF2M) // If it's Frame to Map Odometry
@@ -1005,20 +1090,14 @@ void OdometryROS::mainLoop()
 
 	}
 
-	if(pose.isNull() && (resetCurrentCount_ > 0 || tooOldPreviousData))
+	if(pose.isNull() && resetCurrentCount_ > 0)
 	{
-		if(tooOldPreviousData)
-		{
-			RCLCPP_WARN(this->get_logger(), "Odometry lost! Odometry will be reset because last update "
-					"is %fs too old (>%fs, min_update_rate = %f Hz). Previous data stamp is %f while new data stamp is %f.",
-					rtabmap_conversions::timestampFromROS(header.stamp) - previousStamp_, 1.0/minUpdateRate_, minUpdateRate_, previousStamp_, rtabmap_conversions::timestampFromROS(header.stamp));
-		}
-		else if(--resetCurrentCount_>0)
+		if(--resetCurrentCount_>0)
 		{
 			RCLCPP_WARN(this->get_logger(), "Odometry lost! Odometry will be reset after next %d consecutive unsuccessful odometry updates...", resetCurrentCount_);
 		}
 
-		if(resetCurrentCount_ == 0 || tooOldPreviousData)
+		if(resetCurrentCount_ == 0)
 		{
 			if(!guess_.isNull())
 			{
@@ -1181,9 +1260,11 @@ void OdometryROS::mainLoop()
 		msg.header.stamp = header.stamp; // use corresponding time stamp to image
 		odomSensorDataCompressedPub_->publish(msg);
 	}
-
 	double delay =  (now()-header.stamp).seconds(); 
-	if(visParams_)
+	if(skipOdometryUpdate) {
+		RCLCPP_INFO(this->get_logger(), "Odom: <skipped: guess not moving enough>, std dev=%fm|%frad, update time=%fs, delay=%fs", pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (rclcpp::Clock().now()-timeStart).seconds(), delay);
+	}
+	else if(visParams_)
 	{
 		if(icpParams_)
 		{
@@ -1241,6 +1322,8 @@ void OdometryROS::reset(const Transform & pose)
 	guessPreviousPose_.setNull();
 	previousStamp_ = 0.0;
 	previousClockTime_ = 0.0;
+	lastReceivedTopicClock_ = 0.0;
+	lastReceivedTopicStamp_ = 0.0;
 	resetCurrentCount_ = resetCountdown_;
 	imuProcessed_ = false;
 	dataToProcess_ = SensorData();
