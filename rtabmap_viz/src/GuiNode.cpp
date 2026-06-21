@@ -37,7 +37,7 @@ QApplication * app = 0;
 
 void my_handler(int){
 	UINFO("rtabmap_viz: ctrl-c catched! Exiting Qt app...");
-	app->exit(-1);
+	app->exit(0);
 }
 
 int main(int argc, char** argv)
@@ -87,8 +87,12 @@ int main(int argc, char** argv)
 		r = app->exec();// MUST be called by the Main Thread
 
 		RCLCPP_INFO(node->get_logger(), "rtabmap_viz stopping spinner...");
-		rclcpp::shutdown();
-		execution_thread.join();
+		if (rclcpp::ok()) {
+			rclcpp::shutdown();
+		}
+		if (execution_thread.joinable()) {
+			execution_thread.join();
+		}
 
 		RCLCPP_INFO(node->get_logger(), "rtabmap_viz: All done! Closing...");
 	}

@@ -149,7 +149,7 @@ bool PreferencesDialogROS::readCoreSettings(const QString & filePath)
 
 	auto client = std::make_shared<rclcpp::AsyncParametersClient>(node, rtabmapNodeName_);
 	if (!client->wait_for_service(std::chrono::seconds(5))) {
-		RCLCPP_ERROR(node_->get_logger(), "Can't call rtabmap parameters service, is the node running?");
+		RCLCPP_ERROR(node_->get_logger(), "Can't call \"%s\" parameters service, is the node running? If necessary, you can remap the expected rtabmap node name with \"rtabmap_node_name\" parameter.", rtabmapNodeName_.c_str());
 	}
 	int readCount = 0;
 	if(client->service_is_ready())

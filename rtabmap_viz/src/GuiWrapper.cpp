@@ -65,9 +65,9 @@ GuiWrapper::GuiWrapper(const rclcpp::NodeOptions & options) :
 		Node("rtabmap_viz", options),
 		rtabmap_sync::CommonDataSubscriber(*this, true),
 		mainWindow_(0),
-		cameraNodeName_(""),
 		lastOdomInfoUpdateTime_(0),
 		rtabmapNodeName_("rtabmap"),
+		odometryNodeName_("rgbd_odometry"),
 		frameId_("base_link"),
 		odomFrameId_(""),
 		waitForTransform_(0.2), // 200 ms
@@ -93,7 +93,10 @@ GuiWrapper::GuiWrapper(const rclcpp::NodeOptions & options) :
 
 	configFile.replace('~', QDir::homePath());
 
-	rtabmapNodeName_ = this->declare_parameter("rtabmap", rtabmapNodeName_);
+	rtabmapNodeName_ = this->declare_parameter("rtabmap_node_name", rtabmapNodeName_);
+	odometryNodeName_ = this->declare_parameter("odometry_node_name", odometryNodeName_);
+	RCLCPP_INFO(get_logger(), "%s: rtabmap_node_name   = %s", get_name(), rtabmapNodeName_.c_str());
+	RCLCPP_INFO(get_logger(), "%s: odometry_node_name  = %s", get_name(), odometryNodeName_.c_str());
 
 	RCLCPP_INFO(this->get_logger(), "rtabmap_viz: Using configuration from \"%s\"", configFile.toStdString().c_str());
 	uSleep(500);
@@ -114,9 +117,17 @@ GuiWrapper::GuiWrapper(const rclcpp::NodeOptions & options) :
 	waitForTransform_ = this->declare_parameter("wait_for_transform", waitForTransform_);
 	odomSensorSync_ = this->declare_parameter("odom_sensor_sync", odomSensorSync_);
 	maxOdomUpdateRate_ = this->declare_parameter("max_odom_update_rate", maxOdomUpdateRate_);
-	cameraNodeName_ = this->declare_parameter("camera_node_name", cameraNodeName_); // used to pause the rtabmap_ros/camera when pausing the process
 	subscribeInfoOnly = this->declare_parameter("subscribe_info_only", subscribeInfoOnly);
 	initCachePath = this->declare_parameter("init_cache_path", initCachePath);
+
+	RCLCPP_INFO(get_logger(), "%s: frame_id             = \"%s\"", get_name(), frameId_.c_str());
+	RCLCPP_INFO(get_logger(), "%s: odom_frame_id        = \"%s\"", get_name(), odomFrameId_.c_str());
+	RCLCPP_INFO(get_logger(), "%s: wait_for_transform   = %f", get_name(), waitForTransform_);
+	RCLCPP_INFO(get_logger(), "%s: odom_sensor_sync     = %s", get_name(), odomSensorSync_?"true":"false");
+	RCLCPP_INFO(get_logger(), "%s: max_odom_update_rate = %f", get_name(), maxOdomUpdateRate_);
+	RCLCPP_INFO(get_logger(), "%s: subscribe_info_only  = %s", get_name(), subscribeInfoOnly?"true":"false");
+	RCLCPP_INFO(get_logger(), "%s: init_cache_path      = \"%s\"", get_name(), initCachePath.c_str());
+
 	if(initCachePath.size())
 	{
 		initCachePath = uReplaceChar(initCachePath, '~', UDirectory::homeDir());
@@ -203,7 +214,11 @@ void GuiWrapper::infoMapCallback(
 
 	this->post(new RtabmapEvent(stat));
 
-	tick(infoMsg->header.stamp);
+	ParametersMap allParameters = prefDialog_->getAllParameters();
+	float detectionRate = Parameters::defaultRtabmapDetectionRate();
+	Parameters::parse(allParameters, Parameters::kRtabmapDetectionRate(), detectionRate);
+
+	tick(infoMsg->header.stamp, detectionRate);
 
 }
 
@@ -236,7 +251,11 @@ void GuiWrapper::infoCallback(
 
 	this->post(new RtabmapEvent(stat));
 
-	tick(infoMsg->header.stamp);
+	ParametersMap allParameters = prefDialog_->getAllParameters();
+	float detectionRate = Parameters::defaultRtabmapDetectionRate();
+	Parameters::parse(allParameters, Parameters::kRtabmapDetectionRate(), detectionRate);
+
+	tick(infoMsg->header.stamp, detectionRate);
 }
 
 void GuiWrapper::goalPathCallback(
@@ -319,7 +338,7 @@ bool GuiWrapper::callMapDataService(const std::string & name, bool global, bool 
 	}
 	else
 	{
-		RCLCPP_WARN(this->get_logger(), "Service \"%s\" not available.", name.c_str());
+		RCLCPP_WARN(this->get_logger(), "Service \"%s\" not available. If necessary, you can remap expected rtabmap node with \"rtabmap_node_name\" parameter.", name.c_str());
 	}
 	return false;
 }
@@ -348,7 +367,7 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 			RCLCPP_INFO(this->get_logger(), "Parameters updated");
 			auto client = std::make_shared<rclcpp::AsyncParametersClient>(this, rtabmapNodeName_);
 			if (!client->wait_for_service(std::chrono::seconds(5))) {
-				RCLCPP_ERROR(this->get_logger(), "Can't call rtabmap parameters service, is the node running?");
+				RCLCPP_ERROR(this->get_logger(), "Can't call \"%s\" parameters service, is the node running? If necessary, you can remap expected rtabmap node with \"rtabmap_node_name\" parameter.", rtabmapNodeName_.c_str());
 			}
 			else
 			{
@@ -366,28 +385,18 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 		{
 			if(!callEmptyService(rtabmapNodeName_+"/reset"))
 			{
-				RCLCPP_ERROR(this->get_logger(), "Can't call \"reset\" service");
+				RCLCPP_ERROR(this->get_logger(), "Can't call \"%s/reset\" service. If necessary, you can remap expected rtabmap node with \"rtabmap_node_name\" parameter.", rtabmapNodeName_.c_str());
 			}
 		}
 		else if(cmd == rtabmap::RtabmapEventCmd::kCmdPause)
 		{
-			// Pause the camera if the rtabmap/camera node is used
-			if(!cameraNodeName_.empty())
-			{
-				std::string str = uFormat("rosrun dynamic_reconfigure dynparam set %s pause true", cameraNodeName_.c_str());
-				if(system(str.c_str()) !=0)
-				{
-					RCLCPP_ERROR(this->get_logger(), "Command \"%s\" returned non zero value.", str.c_str());
-				}
-			}
-
-			// Pause visual_odometry
-			callEmptyService("pause_odom");
+			// Pause visual_odometry (can fail silently)
+			callEmptyService(odometryNodeName_ + "/pause_odom");
 
 			// Pause rtabmap
 			if(!callEmptyService(rtabmapNodeName_+"/pause"))
 			{
-				RCLCPP_ERROR(this->get_logger(), "Can't call \"pause\" service");
+				RCLCPP_ERROR(this->get_logger(), "Can't call \"%s/pause\" service. If necessary, you can remap expected rtabmap node with \"rtabmap_node_name\" parameter.", rtabmapNodeName_.c_str());
 			}
 		}
 		else if(cmd == rtabmap::RtabmapEventCmd::kCmdResume)
@@ -395,27 +404,17 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 			// Resume rtabmap
 			if(!callEmptyService(rtabmapNodeName_+"/resume"))
 			{
-				RCLCPP_ERROR(this->get_logger(), "Can't call \"resume\" service");
+				RCLCPP_ERROR(this->get_logger(), "Can't call \"%s/resume\" service. If necessary, you can remap expected rtabmap node with \"rtabmap_node_name\" parameter.", rtabmapNodeName_.c_str());
 			}
 
-			// Pause visual_odometry
-			callEmptyService("resume_odom");
-
-			// Resume the camera if the rtabmap/camera node is used
-			if(!cameraNodeName_.empty())
-			{
-				std::string str = uFormat("rosrun dynamic_reconfigure dynparam set %s pause false", cameraNodeName_.c_str());
-				if(system(str.c_str()) !=0)
-				{
-					RCLCPP_ERROR(this->get_logger(), "Command \"%s\" returned non zero value.", str.c_str());
-				}
-			}
+			// Pause visual_odometry (can fail silently)
+			callEmptyService(odometryNodeName_ + "/resume_odom");
 		}
 		else if(cmd == rtabmap::RtabmapEventCmd::kCmdTriggerNewMap)
 		{
 			if(!callEmptyService(rtabmapNodeName_+"/trigger_new_map"))
 			{
-				RCLCPP_ERROR(this->get_logger(), "Can't call \"trigger_new_map\" service");
+				RCLCPP_ERROR(this->get_logger(), "Can't call \"%s/trigger_new_map\" service. If necessary, you can remap expected rtabmap node with \"rtabmap_node_name\" parameter.", rtabmapNodeName_.c_str());
 			}
 		}
 		else if(cmd == rtabmap::RtabmapEventCmd::kCmdPublish3DMap)
@@ -458,14 +457,14 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 			}
 			else
 			{
-				RCLCPP_WARN(this->get_logger(), "Service \"set_goal\" not available.");
+				RCLCPP_WARN(this->get_logger(), "Service \"%s/set_goal\" not available. If necessary, you can remap expected rtabmap node with \"rtabmap_node_name\" parameter.", rtabmapNodeName_.c_str());
 			}
 		}
 		else if(cmd == rtabmap::RtabmapEventCmd::kCmdCancelGoal)
 		{
 			if(!callEmptyService(rtabmapNodeName_+"/cancel_goal"))
 			{
-				RCLCPP_ERROR(this->get_logger(), "Can't call \"cancel_goal\" service");
+				RCLCPP_ERROR(this->get_logger(), "Can't call \"%s/cancel_goal\" service. If necessary, you can remap expected rtabmap node with \"rtabmap_node_name\" parameter.", rtabmapNodeName_.c_str());
 			}
 		}
 		else if(cmd == rtabmap::RtabmapEventCmd::kCmdLabel)
@@ -484,7 +483,7 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 			}
 			else
 			{
-				RCLCPP_WARN(this->get_logger(), "Service \"set_label\" not available.");
+				RCLCPP_WARN(this->get_logger(), "Service \"%s/set_label\" not available. If necessary, you can remap expected rtabmap node with \"rtabmap_node_name\" parameter.", rtabmapNodeName_.c_str());
 			}
 		}
 		else if(cmd == rtabmap::RtabmapEventCmd::kCmdRemoveLabel)
@@ -500,7 +499,7 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 			}
 			else
 			{
-				RCLCPP_WARN(this->get_logger(), "Service \"remove_label\" not available.");
+				RCLCPP_WARN(this->get_logger(), "Service \"%s/remove_label\" not available. If necessary, you can remap expected rtabmap node with \"rtabmap_node_name\" parameter.", rtabmapNodeName_.c_str());
 			}
 		}
 		else if(cmd == rtabmap::RtabmapEventCmd::kCmdRepublishData)
@@ -517,9 +516,9 @@ bool GuiWrapper::handleEvent(UEvent * anEvent)
 	}
 	else if(anEvent->getClassName().compare("OdometryResetEvent") == 0)
 	{
-		if(!callEmptyService("reset_odom"))
+		if(!callEmptyService(odometryNodeName_ + "/reset_odom"))
 		{
-			RCLCPP_ERROR(this->get_logger(), "Can't call \"reset_odom\" service, (will only work with rtabmap/visual_odometry node.)");
+			RCLCPP_ERROR(this->get_logger(), "Can't call \"%s/reset_odom\" service (will only work with rtabmap's odometry nodes, you can remap the node name with \"odometry_node_name\" parameter)", odometryNodeName_.c_str());
 		}
 	}
 	return false;
@@ -582,6 +581,11 @@ void GuiWrapper::commonMultiCameraCallback(
 		}
 		odomHeader.frame_id = odomFrameId_;
 
+		if(odomHeader.frame_id.empty())
+		{
+			RCLCPP_ERROR(this->get_logger(), "This callback cannot be used without \"subscribe_odom\" or \"odom_frame_id\" set.");
+			return;
+		}
 		odomT = rtabmap_conversions::getTransform(odomHeader.frame_id, frameId_, odomHeader.stamp, *tfBuffer_, waitForTransform_);
 		if(odomT.isNull())
 		{
@@ -739,197 +743,6 @@ void GuiWrapper::commonMultiCameraCallback(
 	QMetaObject::invokeMethod(mainWindow_, "processOdometry", Q_ARG(rtabmap::OdometryEvent, odomEvent), Q_ARG(bool, ignoreData));
 }
 
-void GuiWrapper::commonStereoCallback(
-		const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
-		const rtabmap_msgs::msg::UserData::ConstSharedPtr &,
-		const cv_bridge::CvImageConstPtr& leftImageMsg,
-		const cv_bridge::CvImageConstPtr& rightImageMsg,
-		const sensor_msgs::msg::CameraInfo& leftCamInfoMsg,
-		const sensor_msgs::msg::CameraInfo& rightCamInfoMsg,
-		const sensor_msgs::msg::LaserScan & scan2dMsg,
-		const sensor_msgs::msg::PointCloud2 & scan3dMsg,
-		const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr& odomInfoMsg,
-		const std::vector<rtabmap_msgs::msg::GlobalDescriptor> &,
-		const std::vector<rtabmap_msgs::msg::KeyPoint> &,
-		const std::vector<rtabmap_msgs::msg::Point3f> &,
-		const cv::Mat &)
-{
-	std_msgs::msg::Header odomHeader;
-	std::string frameId = frameId_;
-	Transform odomT;
-	if(odomMsg.get())
-	{
-		odomT = rtabmap_conversions::transformFromPoseMsg(odomMsg->pose.pose);
-		odomHeader = odomMsg->header;
-		if(!odomMsg->child_frame_id.empty())
-		{
-			frameId = odomMsg->child_frame_id;
-		}
-		else
-		{
-			RCLCPP_WARN(get_logger(), "Received odom topic with child_frame_id not set! Using \"%s\" as base frame.", frameId_.c_str());
-		}
-	}
-	else
-	{
-		if(!scan2dMsg.ranges.empty())
-		{
-			odomHeader = scan2dMsg.header;
-		}
-		else if(!scan3dMsg.data.empty())
-		{
-			odomHeader = scan3dMsg.header;
-		}
-		else
-		{
-			odomHeader = leftCamInfoMsg.header;
-		}
-		odomHeader.frame_id = odomFrameId_;
-
-		odomT = rtabmap_conversions::getTransform(odomHeader.frame_id, frameId_, odomHeader.stamp, *tfBuffer_, waitForTransform_);
-		if(odomT.isNull())
-		{
-			RCLCPP_WARN(this->get_logger(), "Could not get odometry pose from "
-				"TF for stamp %f, aborting! To show red screen in rtabmap_viz "
-				"when this happens (indicating potentially lost), set subscribe_odom "
-				"to true.", rclcpp::Time(odomHeader.stamp).seconds());
-			return;
-		}
-	}
-
-	cv::Mat covariance = cv::Mat::eye(6,6,CV_64FC1);
-	if(odomMsg.get())
-	{
-		UASSERT(odomMsg->twist.covariance.size() == 36);
-		if(odomMsg->twist.covariance[0] != 0 &&
-			 odomMsg->twist.covariance[7] != 0 &&
-			 odomMsg->twist.covariance[14] != 0 &&
-			 odomMsg->twist.covariance[21] != 0 &&
-			 odomMsg->twist.covariance[28] != 0 &&
-			 odomMsg->twist.covariance[35] != 0)
-		{
-			covariance = cv::Mat(6,6,CV_64FC1,(void*)odomMsg->twist.covariance.data()).clone();
-		}
-	}
-	else if(odomInfoMsg.get() && odomInfoMsg->covariance.size() == 36)
-	{
-		if(odomInfoMsg->covariance[0] != 0 &&
-			 odomInfoMsg->covariance[7] != 0 &&
-			 odomInfoMsg->covariance[14] != 0 &&
-			 odomInfoMsg->covariance[21] != 0 &&
-			 odomInfoMsg->covariance[28] != 0 &&
-			 odomInfoMsg->covariance[35] != 0)
-		{
-			covariance = cv::Mat(6,6,CV_64FC1,(void*)odomInfoMsg->covariance.data()).clone();
-		}
-	}
-	if(odomHeader.frame_id.empty())
-	{
-		RCLCPP_ERROR(this->get_logger(), "Odometry frame not set!?");
-		return;
-	}
-
-	cv::Mat left;
-	cv::Mat right;
-	LaserScan scan;
-	rtabmap::StereoCameraModel stereoModel;
-	rtabmap::OdometryInfo info;
-	bool ignoreData = false;
-
-	// limit update rate
-	if(maxOdomUpdateRate_<=0.0 ||
-	   (UTimer::now() - lastOdomInfoUpdateTime_ > 1.0/maxOdomUpdateRate_ &&
-	   !mainWindow_->isProcessingOdometry() &&
-	   !mainWindow_->isProcessingStatistics()))
-	{
-		lastOdomInfoUpdateTime_ = UTimer::now();
-
-		ParametersMap allParameters = prefDialog_->getAllParameters();
-		bool imagesAlreadyRectified = Parameters::defaultRtabmapImagesAlreadyRectified();
-		Parameters::parse(allParameters, Parameters::kRtabmapImagesAlreadyRectified(), imagesAlreadyRectified);
-
-		if(!rtabmap_conversions::convertStereoMsg(
-				leftImageMsg,
-				rightImageMsg,
-				leftCamInfoMsg,
-				rightCamInfoMsg,
-				frameId,
-				odomSensorSync_?odomHeader.frame_id:"",
-				odomHeader.stamp,
-				left,
-				right,
-				stereoModel,
-				*tfBuffer_,
-				waitForTransform_,
-				imagesAlreadyRectified))
-		{
-			RCLCPP_ERROR(this->get_logger(), "Could not convert stereo msgs! Aborting rtabmap_viz update...");
-			return;
-		}
-
-		if(!scan2dMsg.ranges.empty())
-		{
-			if(!rtabmap_conversions::convertScanMsg(
-					scan2dMsg,
-					frameId,
-					odomSensorSync_?odomHeader.frame_id:"",
-					odomHeader.stamp,
-					scan,
-					*tfBuffer_,
-					waitForTransform_))
-			{
-				RCLCPP_ERROR(this->get_logger(), "Could not convert laser scan msg! Aborting rtabmap_viz update...");
-				return;
-			}
-		}
-		else if(!scan3dMsg.data.empty())
-		{
-			if(!rtabmap_conversions::convertScan3dMsg(
-					scan3dMsg,
-					frameId,
-					odomSensorSync_?odomHeader.frame_id:"",
-					odomHeader.stamp,
-					scan,
-					*tfBuffer_,
-					waitForTransform_))
-			{
-				RCLCPP_ERROR(this->get_logger(), "Could not convert 3d laser scan msg! Aborting rtabmap_viz update...");
-				return;
-			}
-		}
-
-		if(odomInfoMsg.get())
-		{
-			info = rtabmap_conversions::odomInfoFromROS(*odomInfoMsg);
-		}
-		ignoreData = false;
-	}
-	else if(odomInfoMsg.get())
-	{
-		info = rtabmap_conversions::odomInfoFromROS(*odomInfoMsg).copyWithoutData();
-		ignoreData = true;
-	}
-	else
-	{
-		// don't update GUI odom stuff if we don't use visual odometry
-		return;
-	}
-
-	info.reg.covariance = covariance;
-	rtabmap::OdometryEvent odomEvent(
-		rtabmap::SensorData(
-				scan,
-				left,
-				right,
-				stereoModel,
-				0,
-				rtabmap_conversions::timestampFromROS(odomHeader.stamp)),
-		odomT,
-		info);
-
-	QMetaObject::invokeMethod(mainWindow_, "processOdometry", Q_ARG(rtabmap::OdometryEvent, odomEvent), Q_ARG(bool, ignoreData));
-}
-
 void GuiWrapper::commonLaserScanCallback(
 		const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
 		const rtabmap_msgs::msg::UserData::ConstSharedPtr &,
@@ -969,6 +782,12 @@ void GuiWrapper::commonLaserScanCallback(
 			return;
 		}
 		odomHeader.frame_id = odomFrameId_;
+
+		if(odomHeader.frame_id.empty())
+		{
+			RCLCPP_ERROR(this->get_logger(), "This callback cannot be used without \"subscribe_odom\" or \"odom_frame_id\" set.");
+			return;
+		}
 
 		odomT = rtabmap_conversions::getTransform(odomHeader.frame_id, frameId_, odomHeader.stamp, *tfBuffer_, waitForTransform_);
 		if(odomT.isNull())
@@ -1185,6 +1004,12 @@ void GuiWrapper::commonSensorDataCallback(
 	{
 		odomHeader = sensorDataMsg->header;
 		odomHeader.frame_id = odomFrameId_;
+
+		if(odomHeader.frame_id.empty())
+		{
+			RCLCPP_ERROR(this->get_logger(), "This callback cannot be used without \"subscribe_odom\" or \"odom_frame_id\" set.");
+			return;
+		}
 
 		odomT = rtabmap_conversions::getTransform(odomHeader.frame_id, frameId_, odomHeader.stamp, *tfBuffer_, waitForTransform_);
 		if(odomT.isNull())

@@ -141,7 +141,8 @@ def generate_launch_description():
         Node(
             package='rtabmap_viz', executable='rtabmap_viz', output='screen',
             condition=IfCondition(LaunchConfiguration("rtabmap_viz")),
-            parameters=[parameters],
+            parameters=[parameters,
+                        {"odometry_node_name": 'stereo_odometry'}],
             remappings=remappings),
         Node(
             package='rviz2', executable='rviz2', name="rviz2", output='screen',

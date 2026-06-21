@@ -20,11 +20,13 @@ from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable
 from launch.substitutions import LaunchConfiguration
 from launch.conditions import IfCondition, UnlessCondition
 from launch_ros.actions import Node
+from launch.actions import OpaqueFunction
 
-def generate_launch_description():
+def launch_setup(context, *args, **kwargs):
 
     use_sim_time = LaunchConfiguration('use_sim_time')
     localization = LaunchConfiguration('localization')
+    max_ground_height = LaunchConfiguration('max_ground_height').perform(context)
 
     parameters={
           'frame_id':'base_footprint',
@@ -36,7 +38,7 @@ def generate_launch_description():
           'Grid/3D':'false', # Use 2D occupancy
           'Grid/RangeMax':'3',
           'Grid/NormalsSegmentation':'false', # Use passthrough filter to detect obstacles
-          'Grid/MaxGroundHeight':'0.05', # All points above 5 cm are obstacles
+          'Grid/MaxGroundHeight': str(max_ground_height), # All points above 5 cm are obstacles
           'Grid/MaxObstacleHeight':'0.4',  # All points over 1 meter are ignored
           'Optimizer/GravitySigma':'0' # Disable imu constraints (we are already in 2D)
     }
@@ -46,17 +48,7 @@ def generate_launch_description():
           ('rgb/camera_info', '/camera/camera_info'),
           ('depth/image', '/camera/depth/image_raw')]
 
-    return LaunchDescription([
-
-        # Launch arguments
-        DeclareLaunchArgument(
-            'use_sim_time', default_value='true',
-            description='Use simulation (Gazebo) clock if true'),
-        
-        DeclareLaunchArgument(
-            'localization', default_value='false',
-            description='Launch in localization mode.'),
-
+    return [
         # Nodes to launch
         
         # SLAM mode:
@@ -98,4 +90,23 @@ def generate_launch_description():
             remappings=[('cloud', '/camera/cloud'),
                         ('obstacles', '/camera/obstacles'),
                         ('ground', '/camera/ground')]),
+    ]
+
+def generate_launch_description():
+    return LaunchDescription([
+
+        # Launch arguments
+        DeclareLaunchArgument(
+            'use_sim_time', default_value='true',
+            description='Use simulation (Gazebo) clock if true'),
+        
+        DeclareLaunchArgument(
+            'localization', default_value='false',
+            description='Launch in localization mode.'),
+        
+        DeclareLaunchArgument(
+            'max_ground_height', default_value='0.05',
+            description='Maximum ground height, everything above is obstacle'),
+
+        OpaqueFunction(function=launch_setup)
     ])
