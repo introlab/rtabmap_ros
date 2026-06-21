@@ -23,9 +23,10 @@ jobs:
         ros_distro: [lyrical]
         include:
         - ros_distro: lyrical
-          skip_keys: 'nav2_bringup nav2_msgs velodyne grid_map_ros realsense2_camera libpointmatcher'
-          # rtabmap_costmap_plugins cannot be built, missing nav2 on lyrical, build other packages:
-          packages: 'rtabmap_launch rtabmap_demos rtabmap_python rtabmap_examples rtabmap_rviz_plugins'
+          skip_keys: '' # skip keys shoudl be empty when release on ROSDISTRO_devel branch, comment these keys in the appriopriate package.
+          # rtabmap_costmap_plugins cannot be built, missing nav2 on lyrical, commented from rtabmap_ros package. 
+          # Make sure rosdistro doesn't declare rtabmap_costmap_plugins.
+          packages: 'rtabmap_ros'
       fail-fast: false
     container:
       image: osrf/ros:${{ matrix.ros_distro }}-desktop-full
@@ -46,4 +47,5 @@ jobs:
         package-name: ${{ matrix.packages }}
         target-ros2-distro: ${{ matrix.ros_distro }}
         vcs-repo-file-url: /tmp/deps.repos
+        rosdep-check: true
         rosdep-skip-keys: "${{ matrix.skip_keys }}"

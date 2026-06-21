@@ -21,8 +21,8 @@
   <exec_depend>rtabmap_viz</exec_depend>
   <exec_depend>imu_filter_madgwick</exec_depend>
   <exec_depend>tf2_ros</exec_depend>
-  <exec_depend>realsense2_camera</exec_depend>
-  <exec_depend>velodyne</exec_depend>
+  <!-- <exec_depend>realsense2_camera</exec_depend> Not available on Lyrical -->
+  <!-- <exec_depend>velodyne</exec_depend> Not available on Lyrical -->
   
   <export>
     <build_type>ament_cmake</build_type>
