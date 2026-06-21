@@ -24,7 +24,7 @@ import netvlad_tf.nets as nets
 from std_msgs.msg import String
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
-from rtabmap_python import compression as cp
+from rtabmap_python import cv_compression as cp
 from rtabmap_msgs.msg import GlobalDescriptor
 
 class netvlad_ros:

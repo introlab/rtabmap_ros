@@ -32,8 +32,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rclcpp/rclcpp.hpp>
 #include <QMainWindow>
 #include "rtabmap_msgs/msg/rgbd_image.hpp"
-#include <tf2_ros/buffer.h>
-#include <tf2_ros/transform_listener.h>
+#include <tf2_ros/buffer.hpp>
+#include <tf2_ros/transform_listener.hpp>
 #include <rtabmap/core/Parameters.h>
 #include <rtabmap/utilite/UEventsSender.h>
 

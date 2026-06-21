@@ -46,8 +46,13 @@ RGBDSplit::RGBDSplit(const rclcpp::NodeOptions & options) :
 
 	rgbdImageSub_ = create_subscription<rtabmap_msgs::msg::RGBDImage>("rgbd_image", rclcpp::QoS(5).reliability((rmw_qos_reliability_policy_t)qos), std::bind(&RGBDSplit::callback, this, std::placeholders::_1));
 
+#ifdef PRE_ROS_LYRICAL
 	rgbPub_ = image_transport::create_publisher(this, std::string(rgbdImageSub_->get_topic_name()) + "/rgb/image", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
-	depthPub_ = image_transport::create_publisher(this, std::string(rgbdImageSub_->get_topic_name()) + "/depth/image", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	depthPub_ = image_transport::create_publisher(this, std::string(rgbdImageSub_->get_topic_name()) + "/depth/image", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());	
+#else
+	rgbPub_ = image_transport::create_publisher(*this, std::string(rgbdImageSub_->get_topic_name()) + "/rgb/image", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos));
+	depthPub_ = image_transport::create_publisher(*this, std::string(rgbdImageSub_->get_topic_name()) + "/depth/image", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos));
+#endif
 	rgbInfoPub_ = this->create_publisher<sensor_msgs::msg::CameraInfo>(std::string(rgbdImageSub_->get_topic_name()) + "/rgb/camera_info", 1);
 	depthInfoPub_ = this->create_publisher<sensor_msgs::msg::CameraInfo>(std::string(rgbdImageSub_->get_topic_name()) + "/depth/camera_info", 1);
 }

@@ -87,6 +87,10 @@ if("$ENV{ROS_DISTRO}" STRLESS "jazzy")
   add_definitions(-DPRE_ROS_JAZZY)
 endif()
 
+IF("$ENV{ROS_DISTRO}" STRLESS "lyrical")
+  add_definitions(-DPRE_ROS_LYRICAL)
+ENDIF()
+
 ###########
 ## Build ##
 ###########

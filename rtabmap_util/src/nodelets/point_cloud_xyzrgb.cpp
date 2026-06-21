@@ -186,20 +186,32 @@ PointCloudXYZRGB::PointCloudXYZRGB(const rclcpp::NodeOptions & options) :
 		exactSyncStereo_->registerCallback(std::bind(&PointCloudXYZRGB::stereoCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 	}
 
-	image_transport::TransportHints rgbHints(this); // using "image_transport" parameter
-	image_transport::TransportHints depthHints(this, "raw", "depth_transport");
 	std::string rgbTopic = this->get_node_topics_interface()->resolve_topic_name("rgb/image"); // Humble/Jazzy don't resolve base topic, fixed by https://github.com/ros-perception/image_common/commit/ea7589ae8c1f7ecb83d6aab7b4c890c2d630d27a
 	std::string depthTopic = this->get_node_topics_interface()->resolve_topic_name("depth/image"); // Humble/Jazzy don't resolve base topic, fixed by https://github.com/ros-perception/image_common/commit/ea7589ae8c1f7ecb83d6aab7b4c890c2d630d27a
+#ifdef PRE_ROS_LYRICAL
+	image_transport::TransportHints rgbHints(this); // using "image_transport" parameter
+	image_transport::TransportHints depthHints(this, "raw", "depth_transport");
 	imageSub_.subscribe(this, rgbTopic, rgbHints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
 	imageDepthSub_.subscribe(this, depthTopic, depthHints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+#else
+	image_transport::TransportHints rgbHints(*this); // using "image_transport" parameter
+	image_transport::TransportHints depthHints(*this, "raw", "depth_transport");
+	imageSub_.subscribe(*this, rgbTopic, rgbHints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos));
+	imageDepthSub_.subscribe(*this, depthTopic, depthHints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos));
+#endif
 	cameraInfoSub_.subscribe(this, "rgb/camera_info", RCLCPP_QOS(topicQueueSize, qosCamInfo));
 
 	imageDisparitySub_.subscribe(this, "disparity", RCLCPP_QOS(topicQueueSize, qos));
 
 	std::string leftTopic = this->get_node_topics_interface()->resolve_topic_name("left/image"); // Humble/Jazzy don't resolve base topic, fixed by https://github.com/ros-perception/image_common/commit/ea7589ae8c1f7ecb83d6aab7b4c890c2d630d27a
 	std::string rightTopic = this->get_node_topics_interface()->resolve_topic_name("right/image"); // Humble/Jazzy don't resolve base topic, fixed by https://github.com/ros-perception/image_common/commit/ea7589ae8c1f7ecb83d6aab7b4c890c2d630d27a
+#ifdef PRE_ROS_LYRICAL
 	imageLeft_.subscribe(this, leftTopic, rgbHints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
 	imageRight_.subscribe(this, rightTopic, rgbHints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+#else
+	imageLeft_.subscribe(*this, leftTopic, rgbHints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos));
+	imageRight_.subscribe(*this, rightTopic, rgbHints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos));
+#endif
 	cameraInfoLeft_.subscribe(this, "left/camera_info", RCLCPP_QOS(topicQueueSize, qosCamInfo));
 	cameraInfoRight_.subscribe(this, "right/camera_info", RCLCPP_QOS(topicQueueSize, qosCamInfo));
 }

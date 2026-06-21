@@ -17,7 +17,9 @@ setup(
     maintainer_email='matlabbe@gmail.com',
     description="RTAB-Map's python package.",
     license='BSD',
-    tests_require=['pytest'],
+    extras_require={
+        'test': ['pytest'],
+    },
     entry_points={
         'console_scripts': [
         ],
