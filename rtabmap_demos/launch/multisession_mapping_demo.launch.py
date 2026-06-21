@@ -60,6 +60,7 @@ def generate_launch_description():
           'Kp/DetectorStrategy':       '1',       # Referred paper used SURF (0), here use SIFT as it is available with opencv binaries
           'Vis/FeatureType':           '1',       # Referred paper used SURF (0), here use SIFT as it is available with opencv binaries
           'Kp/MaxFeatures':            '400',
+          'Kp/BadSignRatio':           '0.25',    # Kp/BadSignRatio behaves differently than before if Kp/MaxFeatures is not 0, that is now a ratio of Kp/MaxFeatures directly.
           'Reg/Force3DoF':             'true',
           'RGBD/OptimizeMaxError':     '10',
           'Optimizer/Strategy':        '2',       # Referred paper used TORO (0), latest version recommends GTSAM (2)

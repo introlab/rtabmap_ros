@@ -191,39 +191,45 @@ void toCvShare(const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr & image, cv_br
 
 void toCvShare(const rtabmap_msgs::msg::RGBDImage & image, const std::shared_ptr<void const>& trackedObject, cv_bridge::CvImageConstPtr & rgb, cv_bridge::CvImageConstPtr & depth)
 {
-	if(!image.rgb.data.empty())
+	try
 	{
-		rgb = cv_bridge::toCvShare(image.rgb, trackedObject);
-	}
-	else if(!image.rgb_compressed.data.empty())
-	{
-		rgb = cv_bridge::toCvCopy(image.rgb_compressed);
-	}
-	else
-	{
-		// empty
-		rgb = std::make_shared<cv_bridge::CvImage>();
-	}
-
-	if(!image.depth.data.empty())
-	{
-		depth = cv_bridge::toCvShare(image.depth, trackedObject);
-	}
-	else if(!image.depth_compressed.data.empty())
-	{
-		if(image.depth_compressed.format.compare("jpg")==0)
+		if(!image.rgb.data.empty())
 		{
-			depth = cv_bridge::toCvCopy(image.depth_compressed);
+			rgb = cv_bridge::toCvShare(image.rgb, trackedObject);
+		}
+		else if(!image.rgb_compressed.data.empty())
+		{
+			rgb = cv_bridge::toCvCopy(image.rgb_compressed);
 		}
 		else
 		{
-			cv_bridge::CvImagePtr ptr = std::make_shared<cv_bridge::CvImage>();
-			ptr->header = image.depth_compressed.header;
-			ptr->image = rtabmap::uncompressImage(image.depth_compressed.data);
-			UASSERT(ptr->image.empty() || ptr->image.type() == CV_32FC1 || ptr->image.type() == CV_16UC1);
-			ptr->encoding = ptr->image.empty()?"":ptr->image.type() == CV_32FC1?sensor_msgs::image_encodings::TYPE_32FC1:sensor_msgs::image_encodings::TYPE_16UC1;
-			depth = ptr;
+			// empty
+			rgb = std::make_shared<cv_bridge::CvImage>();
 		}
+
+		if(!image.depth.data.empty())
+		{
+			depth = cv_bridge::toCvShare(image.depth, trackedObject);
+		}
+		else if(!image.depth_compressed.data.empty())
+		{
+			if(image.depth_compressed.format.compare("jpg")==0)
+			{
+				depth = cv_bridge::toCvCopy(image.depth_compressed);
+			}
+			else
+			{
+				cv_bridge::CvImagePtr ptr = std::make_shared<cv_bridge::CvImage>();
+				ptr->header = image.depth_compressed.header;
+				ptr->image = rtabmap::uncompressImage(image.depth_compressed.data);
+				UASSERT(ptr->image.empty() || ptr->image.type() == CV_32FC1 || ptr->image.type() == CV_16UC1);
+				ptr->encoding = ptr->image.empty()?"":ptr->image.type() == CV_32FC1?sensor_msgs::image_encodings::TYPE_32FC1:sensor_msgs::image_encodings::TYPE_16UC1;
+				depth = ptr;
+			}
+		}
+	}
+	catch(cv::Exception& e) {
+		UFATAL("Fatal error while converting rgbd image (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
 	}
 }
 
@@ -348,27 +354,32 @@ rtabmap::SensorData rgbdImageFromROS(const rtabmap_msgs::msg::RGBDImage::ConstSh
 			}
 
 			cv::Mat left, right;
-			if(imageRectLeft->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) == 0 ||
-			   imageRectLeft->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0)
-			{
-				left = imageRectLeft->image;
+			try {
+				if( imageRectLeft->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) == 0 ||
+					imageRectLeft->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0)
+				{
+					left = imageRectLeft->image;
+				}
+				else if(imageRectLeft->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
+				{
+					left = cv_bridge::cvtColor(imageRectLeft, "mono8")->image;
+				}
+				else
+				{
+					left = cv_bridge::cvtColor(imageRectLeft, "bgr8")->image;
+				}
+				if( imageRectRight->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) == 0 ||
+					imageRectRight->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0)
+				{
+					right = imageRectRight->image;
+				}
+				else
+				{
+					right = cv_bridge::cvtColor(imageRectRight, "mono8")->image;
+				}
 			}
-			else if(imageRectLeft->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
-			{
-				left = cv_bridge::cvtColor(imageRectLeft, "mono8")->image;
-			}
-			else
-			{
-				left = cv_bridge::cvtColor(imageRectLeft, "bgr8")->image;
-			}
-			if(imageRectRight->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) == 0 ||
-			   imageRectRight->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0)
-			{
-				right = imageRectRight->image;
-			}
-			else
-			{
-				right = cv_bridge::cvtColor(imageRectRight, "mono8")->image;
+			catch(cv::Exception& e) {
+				UFATAL("Fatal error while converting images (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
 			}
 
 			//
@@ -420,19 +431,24 @@ rtabmap::SensorData rgbdImageFromROS(const rtabmap_msgs::msg::RGBDImage::ConstSh
 		}
 
 		cv_bridge::CvImageConstPtr ptrImage = imageMsg;
-		if(imageMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0 ||
-			imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
-			imageMsg->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0)
-		{
-			// do nothing
+		try {
+			if(imageMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0 ||
+				imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
+				imageMsg->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0)
+			{
+				// do nothing
+			}
+			else if(imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
+			{
+				ptrImage = cv_bridge::cvtColor(imageMsg, "mono8");
+			}
+			else
+			{
+				ptrImage = cv_bridge::cvtColor(imageMsg, "bgr8");
+			}
 		}
-		else if(imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
-		{
-			ptrImage = cv_bridge::cvtColor(imageMsg, "mono8");
-		}
-		else
-		{
-			ptrImage = cv_bridge::cvtColor(imageMsg, "bgr8");
+		catch(cv::Exception& e) {
+			UFATAL("Fatal error while converting image (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
 		}
 
 		cv_bridge::CvImageConstPtr ptrDepth = depthMsg;
@@ -835,25 +851,6 @@ rtabmap::CameraModel cameraModelFromROS(
 			D.at<double>(0,4) = camInfo.d[2];
 			D.at<double>(0,5) = camInfo.d[3];
 		}
-		else if(camInfo.d.size()>8)
-		{
-			bool zerosAfter8 = true;
-			for(size_t i=8; i<camInfo.d.size() && zerosAfter8; ++i)
-			{
-				if(camInfo.d[i] != 0.0)
-				{
-					zerosAfter8 = false;
-				}
-			}
-			static bool warned = false;
-			if(!zerosAfter8 && !warned)
-			{
-				UWARN("Camera info conversion: Distortion model is larger than 8, coefficients after 8 are ignored. This message is only shown once.");
-				warned = true;
-			}
-			D = cv::Mat(1, 8, CV_64FC1);
-			memcpy(D.data, camInfo.d.data(), D.cols*sizeof(double));
-		}
 		else
 		{
 			D = cv::Mat(1, camInfo.d.size(), CV_64FC1);
@@ -888,7 +885,12 @@ void cameraModelToROS(
 		sensor_msgs::msg::CameraInfo & camInfo)
 {
 	UASSERT(model.K_raw().empty() || model.K_raw().total() == 9);
-	if(model.K_raw().empty())
+	UASSERT(model.P().empty() || model.P().total() == 12);
+	if(!model.P().empty())
+	{
+		model.P().colRange(0,3).copyTo(cv::Mat(3,3,CV_64FC1, camInfo.k.data()));
+	}
+	else if(model.K_raw().empty())
 	{
 		memset(camInfo.k.data(), 0.0, 9*sizeof(double));
 	}
@@ -897,7 +899,12 @@ void cameraModelToROS(
 		memcpy(camInfo.k.data(), model.K_raw().data, 9*sizeof(double));
 	}
 
-	if(model.D_raw().total() == 6)
+	if(!model.P().empty()) {
+		camInfo.d = std::vector<double>(model.D().cols);
+		memcpy(camInfo.d.data(), model.D().data, model.D().cols*sizeof(double));
+		camInfo.distortion_model = "plumb_bob";
+	}
+	else if(model.D_raw().total() == 6)
 	{
 		camInfo.d = std::vector<double>(4);
 		camInfo.d[0] = model.D_raw().at<double>(0,0);
@@ -921,7 +928,7 @@ void cameraModelToROS(
 	}
 
 	UASSERT(model.R().empty() || model.R().total() == 9);
-	if(model.R().empty())
+	if(model.R().empty() || countNonZero(model.R()) == 0)
 	{
 		cv::Mat eye = cv::Mat::eye(3,3,CV_64FC1);
 		memcpy(camInfo.r.data(), eye.data, 9*sizeof(double));
@@ -931,7 +938,6 @@ void cameraModelToROS(
 		memcpy(camInfo.r.data(), model.R().data, 9*sizeof(double));
 	}
 
-	UASSERT(model.P().empty() || model.P().total() == 12);
 	if(model.P().empty())
 	{
 		memset(camInfo.p.data(), 0.0, 12*sizeof(double));
@@ -969,14 +975,14 @@ rtabmap::StereoCameraModel stereoCameraModelFromROS(
 		const sensor_msgs::msg::CameraInfo & leftCamInfo,
 		const sensor_msgs::msg::CameraInfo & rightCamInfo,
 		const std::string & frameId,
-		tf2_ros::Buffer & listener,
+		tf2_ros::Buffer & tfBuffer,
 		double waitForTransform)
 {
 	rtabmap::Transform localTransform = getTransform(
 			frameId,
 			leftCamInfo.header.frame_id,
 			leftCamInfo.header.stamp,
-			listener,
+			tfBuffer,
 			waitForTransform);
 	if(localTransform.isNull())
 	{
@@ -987,7 +993,7 @@ rtabmap::StereoCameraModel stereoCameraModelFromROS(
 			leftCamInfo.header.frame_id,
 			rightCamInfo.header.frame_id,
 			leftCamInfo.header.stamp,
-			listener,
+			tfBuffer,
 			waitForTransform);
 	if(stereoTransform.isNull())
 	{
@@ -1146,18 +1152,23 @@ rtabmap::SensorData sensorDataFromROS(const rtabmap_msgs::msg::SensorData & msg)
 		}
 		else
 		{
-			if(leftRawPtr->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) == 0 ||
-				leftRawPtr->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0)
-			{
-				left = leftRawPtr->image.clone();
+			try {
+				if( leftRawPtr->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) == 0 ||
+					leftRawPtr->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0)
+				{
+					left = leftRawPtr->image.clone();
+				}
+				else if(leftRawPtr->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
+				{
+					left = cv_bridge::cvtColor(leftRawPtr, "mono8")->image;
+				}
+				else
+				{
+					left = cv_bridge::cvtColor(leftRawPtr, "bgr8")->image;
+				}
 			}
-			else if(leftRawPtr->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
-			{
-				left = cv_bridge::cvtColor(leftRawPtr, "mono8")->image;
-			}
-			else
-			{
-				left = cv_bridge::cvtColor(leftRawPtr, "bgr8")->image;
+			catch(cv::Exception& e) {
+				UFATAL("Fatal error while converting left image (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
 			}
 		}
 	}
@@ -1179,18 +1190,23 @@ rtabmap::SensorData sensorDataFromROS(const rtabmap_msgs::msg::SensorData & msg)
 		}
 		else
 		{
-			if(rightRawPtr->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) == 0 ||
-				rightRawPtr->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
-				(!isStereo && 
-				   (rightRawPtr->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0||
-					rightRawPtr->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1) == 0 ||
-					rightRawPtr->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1) == 0)))
-			{
-				right = rightRawPtr->image.clone();
+			try{
+				if( rightRawPtr->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) == 0 ||
+					rightRawPtr->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
+					(!isStereo && 
+					(rightRawPtr->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0||
+						rightRawPtr->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1) == 0 ||
+						rightRawPtr->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1) == 0)))
+				{
+					right = rightRawPtr->image.clone();
+				}
+				else
+				{
+					right = cv_bridge::cvtColor(rightRawPtr, "mono8")->image;
+				}
 			}
-			else
-			{
-				right = cv_bridge::cvtColor(rightRawPtr, "mono8")->image;
+			catch(cv::Exception& e) {
+				UFATAL("Fatal error while converting right image (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
 			}
 		}
 	}
@@ -1927,7 +1943,7 @@ rtabmap::Landmarks landmarksFromROS(
 		const std::string & frameId,
 		const std::string & odomFrameId,
 		const rclcpp::Time & odomStamp,
-		tf2_ros::Buffer & listener,
+		tf2_ros::Buffer & tfBuffer,
 		double waitForTransform,
 		double defaultLinVariance,
 		double defaultAngVariance)
@@ -1945,7 +1961,7 @@ rtabmap::Landmarks landmarksFromROS(
 				frameId,
 				iter->second.first.header.frame_id,
 				iter->second.first.header.stamp,
-				listener,
+				tfBuffer,
 				waitForTransform);
 
 		if(baseToCamera.isNull())
@@ -1965,7 +1981,7 @@ rtabmap::Landmarks landmarksFromROS(
 					odomFrameId,
 					odomStamp,
 					iter->second.first.header.stamp,
-					listener,
+					tfBuffer,
 					waitForTransform);
 			if(!correction.isNull())
 			{
@@ -1994,7 +2010,7 @@ rtabmap::Transform getTransform(
 		const std::string & fromFrameId,
 		const std::string & toFrameId,
 		const rclcpp::Time & stamp,
-		tf2_ros::Buffer &tfBuffer,
+		tf2_ros::Buffer & tfBuffer,
 		double waitForTransform)
 {
 	// TF ready?
@@ -2007,7 +2023,7 @@ rtabmap::Transform getTransform(
 	}
 	catch(tf2::TransformException & ex)
 	{
-		UWARN("(getting transform %s -> %s) %s (wait_for_transform=%f)", fromFrameId.c_str(), toFrameId.c_str(), ex.what(), waitForTransform);
+		UWARN("(getting transform \"%s\" -> \"%s\") %s (wait_for_transform=%f)", fromFrameId.c_str(), toFrameId.c_str(), ex.what(), waitForTransform);
 	}
 
 	return transform;
@@ -2050,7 +2066,7 @@ bool convertRGBDMsgs(
 		cv::Mat & depth,
 		std::vector<rtabmap::CameraModel> & cameraModels,
 		std::vector<rtabmap::StereoCameraModel> & stereoCameraModels,
-		tf2_ros::Buffer & listener,
+		tf2_ros::Buffer & tfBuffer,
 		double waitForTransform,
 		bool alreadRectifiedImages,
 		const std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > & localKeyPointsMsgs,
@@ -2176,7 +2192,7 @@ bool convertRGBDMsgs(
 		}
 
 		// use depth's stamp so that geometry is sync to odom, use rgb frame as we assume depth is registered (normally depth msg should have same frame than rgb)
-		rtabmap::Transform localTransform = rtabmap_conversions::getTransform(frameId, !imageMsgs.empty()?imageMsgs[i]->header.frame_id:cameraInfoMsgs[i].header.frame_id, stamp, listener, waitForTransform);
+		rtabmap::Transform localTransform = rtabmap_conversions::getTransform(frameId, !imageMsgs.empty()?imageMsgs[i]->header.frame_id:cameraInfoMsgs[i].header.frame_id, stamp, tfBuffer, waitForTransform);
 		if(localTransform.isNull())
 		{
 			UERROR("TF of received image for camera %d at time %fs is not set!", i, stamp.seconds());
@@ -2190,7 +2206,7 @@ bool convertRGBDMsgs(
 					odomFrameId,
 					odomStamp,
 					stamp,
-					listener,
+					tfBuffer,
 					waitForTransform);
 			if(sensorT.isNull())
 			{
@@ -2207,19 +2223,24 @@ bool convertRGBDMsgs(
 		if(!imageMsgs.empty())
 		{
 			cv_bridge::CvImageConstPtr ptrImage = imageMsgs[i];
-			if(imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0 ||
-			   imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
-			   imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0)
-			{
-				// do nothing
+			try {
+				if(imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0 ||
+				imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
+				imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0)
+				{
+					// do nothing
+				}
+				else if(imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
+				{
+					ptrImage = cv_bridge::cvtColor(imageMsgs[i], "mono8");
+				}
+				else
+				{
+					ptrImage = cv_bridge::cvtColor(imageMsgs[i], "bgr8");
+				}
 			}
-			else if(imageMsgs[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
-			{
-				ptrImage = cv_bridge::cvtColor(imageMsgs[i], "mono8");
-			}
-			else
-			{
-				ptrImage = cv_bridge::cvtColor(imageMsgs[i], "bgr8");
+			catch(cv::Exception& e) {
+				UFATAL("Fatal error while converting image (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
 			}
 
 			// initialize
@@ -2270,7 +2291,12 @@ bool convertRGBDMsgs(
 				}
 				else
 				{
-					ptrImage = cv_bridge::cvtColor(depthMsgs[i], "mono8");
+					try{
+						ptrImage = cv_bridge::cvtColor(depthMsgs[i], "mono8");
+					}
+					catch(cv::Exception& e) {
+						UFATAL("Fatal error while converting image (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
+					}
 				}
 
 				// initialize
@@ -2329,7 +2355,7 @@ bool convertRGBDMsgs(
 							depthCameraInfoMsgs[i].header.frame_id,
 							cameraInfoMsgs[i].header.frame_id,
 							cameraInfoMsgs[i].header.stamp,
-							listener,
+							tfBuffer,
 							waitForTransform);
 					if(stereoTransform.isNull())
 					{
@@ -2374,7 +2400,7 @@ bool convertRGBDMsgs(
 						cameraInfoMsgs[i].header.frame_id,
 						depthCameraInfoMsgs[i].header.frame_id,
 						cameraInfoMsgs[i].header.stamp,
-						listener,
+						tfBuffer,
 						waitForTransform);
 				}
 				if(stereoTransform.isNull() || stereoTransform.x()<=0)
@@ -2442,7 +2468,7 @@ bool convertStereoMsg(
 		cv::Mat & left,
 		cv::Mat & right,
 		rtabmap::StereoCameraModel & stereoModel,
-		tf2_ros::Buffer & listener,
+		tf2_ros::Buffer & tfBuffer,
 		double waitForTransform,
 		bool alreadyRectified)
 {
@@ -2470,30 +2496,35 @@ bool convertStereoMsg(
 		return false;
 	}
 
-	if(leftImageMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) == 0 ||
-	   leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0)
-	{
-		left = leftImageMsg->image.clone();
+	try{
+		if( leftImageMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) == 0 ||
+			leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0)
+		{
+			left = leftImageMsg->image.clone();
+		}
+		else if(leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
+		{
+			left = cv_bridge::cvtColor(leftImageMsg, "mono8")->image;
+		}
+		else
+		{
+			left = cv_bridge::cvtColor(leftImageMsg, "bgr8")->image;
+		}
+		if( rightImageMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) == 0 ||
+			rightImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0)
+		{
+			right = rightImageMsg->image.clone();
+		}
+		else
+		{
+			right = cv_bridge::cvtColor(rightImageMsg, "mono8")->image;
+		}
 	}
-	else if(leftImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
-	{
-		left = cv_bridge::cvtColor(leftImageMsg, "mono8")->image;
-	}
-	else
-	{
-		left = cv_bridge::cvtColor(leftImageMsg, "bgr8")->image;
-	}
-	if(rightImageMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) == 0 ||
-	   rightImageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0)
-	{
-		right = rightImageMsg->image.clone();
-	}
-	else
-	{
-		right = cv_bridge::cvtColor(rightImageMsg, "mono8")->image;
+	catch(cv::Exception& e) {
+		UFATAL("Fatal error while converting images (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
 	}
 
-	rtabmap::Transform localTransform = getTransform(frameId, leftImageMsg->header.frame_id, leftImageMsg->header.stamp, listener, waitForTransform);
+	rtabmap::Transform localTransform = getTransform(frameId, leftImageMsg->header.frame_id, leftImageMsg->header.stamp, tfBuffer, waitForTransform);
 	if(localTransform.isNull())
 	{
 		return false;
@@ -2506,7 +2537,7 @@ bool convertStereoMsg(
 				odomFrameId,
 				odomStamp,
 				leftImageMsg->header.stamp,
-				listener,
+				tfBuffer,
 				waitForTransform);
 		if(sensorT.isNull())
 		{
@@ -2526,7 +2557,7 @@ bool convertStereoMsg(
 				rightCamInfoMsg.header.frame_id,
 				leftCamInfoMsg.header.frame_id,
 				leftCamInfoMsg.header.stamp,
-				listener,
+				tfBuffer,
 				waitForTransform);
 		if(stereoTransform.isNull())
 		{
@@ -2556,7 +2587,7 @@ bool convertStereoMsg(
 				leftCamInfoMsg.header.frame_id,
 				rightCamInfoMsg.header.frame_id,
 				leftCamInfoMsg.header.stamp,
-				listener,
+				tfBuffer,
 				waitForTransform);
 		if(stereoTransform.isNull() || stereoTransform.x()<=0)
 		{
@@ -2753,7 +2784,7 @@ bool convertScan3dMsg(
 		const std::string & odomFrameId,
 		const rclcpp::Time & odomStamp,
 		rtabmap::LaserScan & scan,
-		tf2_ros::Buffer & listener,
+		tf2_ros::Buffer & tfBuffer,
 		double waitForTransform,
 		int maxPoints,
 		float maxRange,
@@ -2762,7 +2793,7 @@ bool convertScan3dMsg(
 	UASSERT_MSG(scan3dMsg.data.size() == scan3dMsg.row_step*scan3dMsg.height,
 			uFormat("data=%d row_step=%d height=%d", scan3dMsg.data.size(), scan3dMsg.row_step, scan3dMsg.height).c_str());
 
-	rtabmap::Transform scanLocalTransform = getTransform(frameId, scan3dMsg.header.frame_id, scan3dMsg.header.stamp, listener, waitForTransform);
+	rtabmap::Transform scanLocalTransform = getTransform(frameId, scan3dMsg.header.frame_id, scan3dMsg.header.stamp, tfBuffer, waitForTransform);
 	if(scanLocalTransform.isNull())
 	{
 		UERROR("TF of received scan cloud at time %fs is not set, aborting rtabmap update.", timestampFromROS(scan3dMsg.header.stamp));
@@ -2777,7 +2808,7 @@ bool convertScan3dMsg(
 				odomFrameId,
 				odomStamp,
 				scan3dMsg.header.stamp,
-				listener,
+				tfBuffer,
 				waitForTransform);
 		if(sensorT.isNull())
 		{

@@ -65,7 +65,8 @@ StereoOdometry::StereoOdometry(const rclcpp::NodeOptions & options) :
 		exactSync6_(0),
 		topicQueueSize_(10),
 		syncQueueSize_(5),
-		keepColor_(false)
+		keepColor_(false),
+		approxSyncMaxInterval_(0.0)
 {
 	OdometryROS::init(true, true, false);
 }
@@ -90,10 +91,9 @@ void StereoOdometry::onOdomInit()
 {
 	bool approxSync = false;
 	bool subscribeRGBD = false;
-	double approxSyncMaxInterval = 0.0;
 	int rgbdCameras = 1;
 	approxSync = this->declare_parameter("approx_sync", approxSync);
-	approxSyncMaxInterval = this->declare_parameter("approx_sync_max_interval", approxSyncMaxInterval);
+	approxSyncMaxInterval_ = this->declare_parameter("approx_sync_max_interval", approxSyncMaxInterval_);
 	topicQueueSize_ = this->declare_parameter("topic_queue_size", topicQueueSize_);
 	int queueSize = this->declare_parameter("queue_size", -1);
 	if(queueSize != -1)
@@ -109,16 +109,18 @@ void StereoOdometry::onOdomInit()
 	subscribeRGBD = this->declare_parameter("subscribe_rgbd", subscribeRGBD);
 	rgbdCameras = this->declare_parameter("rgbd_cameras", rgbdCameras);
 	keepColor_ = this->declare_parameter("keep_color", keepColor_);
+	std::string imageTransport = this->declare_parameter("image_transport", std::string("raw"));
 
 	RCLCPP_INFO(this->get_logger(), "StereoOdometry: approx_sync = %s", approxSync?"true":"false");
 	if(approxSync)
-		RCLCPP_INFO(this->get_logger(), "StereoOdometry: approx_sync_max_interval = %f", approxSyncMaxInterval);
+		RCLCPP_INFO(this->get_logger(), "StereoOdometry: approx_sync_max_interval = %f", approxSyncMaxInterval_);
 	RCLCPP_INFO(this->get_logger(), "StereoOdometry: topic_queue_size  = %d", topicQueueSize_);
 	RCLCPP_INFO(this->get_logger(), "StereoOdometry: sync_queue_size   = %d", syncQueueSize_);
 	RCLCPP_INFO(this->get_logger(), "StereoOdometry: qos             = %d", (int)qos());
 	RCLCPP_INFO(this->get_logger(), "StereoOdometry: qos_camera_info = %d", qosCamInfo);
 	RCLCPP_INFO(this->get_logger(), "StereoOdometry: subscribe_rgbd = %s", subscribeRGBD?"true":"false");
 	RCLCPP_INFO(this->get_logger(), "StereoOdometry: keep_color     = %s", keepColor_?"true":"false");
+	RCLCPP_INFO(this->get_logger(), "StereoOdometry: image_transport = %s", imageTransport.c_str());
 
 	rclcpp::SubscriptionOptions options;
 	options.callback_group = dataCallbackGroup_;
@@ -156,8 +158,8 @@ void StereoOdometry::onOdomInit()
 							MyApproxSync2Policy(syncQueueSize_),
 							rgbd_image1_sub_,
 							rgbd_image2_sub_);
-					if(approxSyncMaxInterval > 0.0)
-						approxSync2_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval));
+					if(approxSyncMaxInterval_ > 0.0)
+						approxSync2_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval_));
 					approxSync2_->registerCallback(std::bind(&StereoOdometry::callbackRGBD2, this, std::placeholders::_1, std::placeholders::_2));
 				}
 				else
@@ -171,7 +173,7 @@ void StereoOdometry::onOdomInit()
 				subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s \\\n   %s",
 						get_name(),
 						approxSync?"approx":"exact",
-						approxSync&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
+						approxSync&&approxSyncMaxInterval_!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval_).c_str():"",
 						rgbd_image1_sub_.getTopic().c_str(),
 						rgbd_image2_sub_.getTopic().c_str());
 			}
@@ -184,8 +186,8 @@ void StereoOdometry::onOdomInit()
 							rgbd_image1_sub_,
 							rgbd_image2_sub_,
 							rgbd_image3_sub_);
-					if(approxSyncMaxInterval > 0.0)
-						approxSync3_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval));
+					if(approxSyncMaxInterval_ > 0.0)
+						approxSync3_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval_));
 					approxSync3_->registerCallback(std::bind(&StereoOdometry::callbackRGBD3, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 				}
 				else
@@ -200,7 +202,7 @@ void StereoOdometry::onOdomInit()
 				subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s \\\n   %s \\\n   %s",
 						get_name(),
 						approxSync?"approx":"exact",
-						approxSync&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
+						approxSync&&approxSyncMaxInterval_!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval_).c_str():"",
 						rgbd_image1_sub_.getTopic().c_str(),
 						rgbd_image2_sub_.getTopic().c_str(),
 						rgbd_image3_sub_.getTopic().c_str());
@@ -215,8 +217,8 @@ void StereoOdometry::onOdomInit()
 							rgbd_image2_sub_,
 							rgbd_image3_sub_,
 							rgbd_image4_sub_);
-					if(approxSyncMaxInterval > 0.0)
-						approxSync4_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval));
+					if(approxSyncMaxInterval_ > 0.0)
+						approxSync4_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval_));
 					approxSync4_->registerCallback(std::bind(&StereoOdometry::callbackRGBD4, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 				}
 				else
@@ -232,7 +234,7 @@ void StereoOdometry::onOdomInit()
 				subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s \\\n   %s \\\n   %s \\\n   %s",
 						get_name(),
 						approxSync?"approx":"exact",
-						approxSync&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
+						approxSync&&approxSyncMaxInterval_!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval_).c_str():"",
 						rgbd_image1_sub_.getTopic().c_str(),
 						rgbd_image2_sub_.getTopic().c_str(),
 						rgbd_image3_sub_.getTopic().c_str(),
@@ -249,8 +251,8 @@ void StereoOdometry::onOdomInit()
 							rgbd_image3_sub_,
 							rgbd_image4_sub_,
 							rgbd_image5_sub_);
-					if(approxSyncMaxInterval > 0.0)
-						approxSync5_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval));
+					if(approxSyncMaxInterval_ > 0.0)
+						approxSync5_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval_));
 					approxSync5_->registerCallback(std::bind(&StereoOdometry::callbackRGBD5, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5));
 				}
 				else
@@ -267,7 +269,7 @@ void StereoOdometry::onOdomInit()
 				subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s \\\n   %s \\\n   %s \\\n   %s \\\n   %s",
 						get_name(),
 						approxSync?"approx":"exact",
-						approxSync&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
+						approxSync&&approxSyncMaxInterval_!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval_).c_str():"",
 						rgbd_image1_sub_.getTopic().c_str(),
 						rgbd_image2_sub_.getTopic().c_str(),
 						rgbd_image3_sub_.getTopic().c_str(),
@@ -286,8 +288,8 @@ void StereoOdometry::onOdomInit()
 							rgbd_image4_sub_,
 							rgbd_image5_sub_,
 							rgbd_image6_sub_);
-					if(approxSyncMaxInterval > 0.0)
-						approxSync6_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval));
+					if(approxSyncMaxInterval_ > 0.0)
+						approxSync6_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval_));
 					approxSync6_->registerCallback(std::bind(&StereoOdometry::callbackRGBD6, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6));
 				}
 				else
@@ -305,7 +307,7 @@ void StereoOdometry::onOdomInit()
 				subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s \\\n   %s \\\n   %s \\\n   %s \\\n   %s \\\n   %s",
 						get_name(),
 						approxSync?"approx":"exact",
-						approxSync&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
+						approxSync&&approxSyncMaxInterval_!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval_).c_str():"",
 						rgbd_image1_sub_.getTopic().c_str(),
 						rgbd_image2_sub_.getTopic().c_str(),
 						rgbd_image3_sub_.getTopic().c_str(),
@@ -347,17 +349,25 @@ void StereoOdometry::onOdomInit()
 	}
 	else
 	{
-		image_transport::TransportHints hints(this);
-		imageRectLeft_.subscribe(this, "left/image_rect", hints.getTransport(), rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
-		imageRectRight_.subscribe(this, "right/image_rect", hints.getTransport(), rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
+		std::string leftTopic = this->get_node_topics_interface()->resolve_topic_name("left/image_rect"); // Humble/Jazzy don't resolve base topic, fixed by https://github.com/ros-perception/image_common/commit/ea7589ae8c1f7ecb83d6aab7b4c890c2d630d27a
+		std::string rightTopic = this->get_node_topics_interface()->resolve_topic_name("right/image_rect"); // Humble/Jazzy don't resolve base topic, fixed by https://github.com/ros-perception/image_common/commit/ea7589ae8c1f7ecb83d6aab7b4c890c2d630d27a
+#ifdef PRE_ROS_LYRICAL
+		image_transport::TransportHints hints(this); // using "image_transport" parameter
+		imageRectLeft_.subscribe(this, leftTopic, hints.getTransport(), rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
+		imageRectRight_.subscribe(this, rightTopic, hints.getTransport(), rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
+#else
+		image_transport::TransportHints hints(*this); // using "image_transport" parameter
+		imageRectLeft_.subscribe(*this, leftTopic, hints.getTransport(), rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()), options);
+		imageRectRight_.subscribe(*this, rightTopic, hints.getTransport(), rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()), options);
+#endif
 		cameraInfoLeft_.subscribe(this, "left/camera_info", RCLCPP_QOS(topicQueueSize_, qosCamInfo), options);
 		cameraInfoRight_.subscribe(this, "right/camera_info", RCLCPP_QOS(topicQueueSize_, qosCamInfo), options);
 
 		if(approxSync)
 		{
 			approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(syncQueueSize_), imageRectLeft_, imageRectRight_, cameraInfoLeft_, cameraInfoRight_);
-			if(approxSyncMaxInterval>0.0)
-				approxSync_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval));
+			if(approxSyncMaxInterval_>0.0)
+				approxSync_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval_));
 			approxSync_->registerCallback(std::bind(&StereoOdometry::callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 		}
 		else
@@ -370,11 +380,11 @@ void StereoOdometry::onOdomInit()
 		subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s, topic_queue_size=%d, sync_queue_size=%d):\n   %s \\\n   %s \\\n   %s \\\n   %s",
 				get_name(),
 				approxSync?"approx":"exact",
-				approxSync&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
+				approxSync&&approxSyncMaxInterval_!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval_).c_str():"",
 				topicQueueSize_,
 				syncQueueSize_,
-				imageRectLeft_.getTopic().c_str(),
-				imageRectRight_.getTopic().c_str(),
+				imageRectLeft_.getSubscriber().getTopic().c_str(),
+				imageRectRight_.getSubscriber().getTopic().c_str(),
 				cameraInfoLeft_.getSubscriber()->get_topic_name(),
 				cameraInfoRight_.getSubscriber()->get_topic_name());
 	}
@@ -496,49 +506,6 @@ void StereoOdometry::commonCallback(
 					}
 					else
 					{
-						stereoTransform = rtabmap_conversions::getTransform(
-								rightCameraInfos[i].header.frame_id,
-								leftCameraInfos[i].header.frame_id,
-								leftCameraInfos[i].header.stamp,
-								tfBuffer(),
-								waitForTransform());
-						if(stereoTransform.isNull())
-						{
-							RCLCPP_ERROR(this->get_logger(), "Parameter %s is false but we cannot get TF between the two cameras! (between frames %s and %s)",
-									Parameters::kRtabmapImagesAlreadyRectified().c_str(),
-									rightCameraInfos[i].header.frame_id.c_str(),
-									leftCameraInfos[i].header.frame_id.c_str());
-							return;
-						}
-						else if(stereoTransform.isIdentity())
-						{
-							RCLCPP_ERROR(this->get_logger(), "Parameter %s is false but we cannot get a valid TF between the two cameras! "
-									"Identity transform returned between left and right cameras. Verify that if TF between "
-									"the cameras is valid: \"rosrun tf tf_echo %s %s\".",
-									Parameters::kRtabmapImagesAlreadyRectified().c_str(),
-									rightCameraInfos[i].header.frame_id.c_str(),
-									leftCameraInfos[i].header.frame_id.c_str());
-							return;
-						}
-					}
-				}
-
-				rtabmap::StereoCameraModel stereoModel = rtabmap_conversions::stereoCameraModelFromROS(leftCameraInfos[i], rightCameraInfos[i], localTransform, stereoTransform);
-
-				if( stereoModel.baseline() == 0 &&
-					alreadyRectified &&
-					!rightCameraInfos[i].header.frame_id.empty() &&
-					!leftCameraInfos[i].header.frame_id.empty())
-				{
-					stereoTransform = rtabmap_conversions::getTransform(
-							leftCameraInfos[i].header.frame_id,
-							rightCameraInfos[i].header.frame_id,
-							leftCameraInfos[i].header.stamp,
-							tfBuffer(),
-							waitForTransform());
-
-					if(!stereoTransform.isNull() && stereoTransform.x()>0)
-					{
 						static bool warned = false;
 						if(!warned)
 						{
@@ -571,7 +538,7 @@ void StereoOdometry::commonCallback(
 					{
 						RCLCPP_ERROR(this->get_logger(), "Parameter %s is false but we cannot get a valid TF between the two cameras! "
 								"Identity transform returned between left and right cameras. Verify that if TF between "
-								"the cameras is valid: \"rosrun tf tf_echo %s %s\".",
+								"the cameras is valid: \"ros2 run tf2_ros tf_echo %s %s\".",
 								Parameters::kRtabmapImagesAlreadyRectified().c_str(),
 								rightCameraInfos[i].header.frame_id.c_str(),
 								leftCameraInfos[i].header.frame_id.c_str());
@@ -722,13 +689,18 @@ void StereoOdometry::callback(
 		std::vector<cv_bridge::CvImageConstPtr> rightMsgs(1);
 		std::vector<sensor_msgs::msg::CameraInfo> leftInfoMsgs;
 		std::vector<sensor_msgs::msg::CameraInfo> rightInfoMsgs;
-		leftMsgs[0] = cv_bridge::toCvShare(imageRectLeft);
-		rightMsgs[0] = cv_bridge::toCvShare(imageRectRight);
+		try{
+			leftMsgs[0] = cv_bridge::toCvShare(imageRectLeft);
+			rightMsgs[0] = cv_bridge::toCvShare(imageRectRight);
+		}
+		catch(cv::Exception& e) {
+			UFATAL("Fatal error while converting images (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
+		}
 		leftInfoMsgs.push_back(*cameraInfoLeft);
 		rightInfoMsgs.push_back(*cameraInfoRight);
 
 		double stampDiff = fabs(rtabmap_conversions::timestampFromROS(imageRectLeft->header.stamp) - rtabmap_conversions::timestampFromROS(imageRectRight->header.stamp));
-		if(stampDiff > 0.010)
+		if(approxSyncMaxInterval_==0.0 && stampDiff > 0.010)
 		{
 			RCLCPP_WARN(this->get_logger(), "The time difference between left and right frames is "
 					"high (diff=%fs, left=%fs, right=%fs). If your left and right cameras are hardware "

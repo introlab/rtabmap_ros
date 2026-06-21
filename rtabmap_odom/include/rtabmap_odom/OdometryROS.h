@@ -30,9 +30,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "rclcpp/rclcpp.hpp"
 
-#include <tf2_ros/transform_broadcaster.h>
-#include <tf2_ros/buffer.h>
-#include <tf2_ros/transform_listener.h>
+#include <tf2_ros/transform_broadcaster.hpp>
+#include <tf2_ros/buffer.hpp>
+#include <tf2_ros/transform_listener.hpp>
 
 #include <diagnostic_updater/diagnostic_updater.hpp>
 
@@ -98,7 +98,7 @@ protected:
 	virtual void postProcessData(const rtabmap::SensorData & /*data*/, const std_msgs::msg::Header & /*header*/) const {}
 
 private:
-
+	void processData();
 	virtual void mainLoop();
 	virtual void mainLoopKill();
 	virtual void updateParameters(rtabmap::ParametersMap &) {}
@@ -123,6 +123,8 @@ private:
 	double guessMinTranslation_;
 	double guessMinRotation_;
 	double guessMinTime_;
+	double guessLinearVariance_;
+	double guessAngularVariance_;
 	bool publishTf_;
 	double waitForTransform_;
 	bool publishNullWhenLost_;
@@ -174,9 +176,12 @@ private:
 	rtabmap::Transform guessPreviousPose_;
 	double previousStamp_;
 	double previousClockTime_;
+	double lastReceivedTopicClock_;
+	double lastReceivedTopicStamp_;
 	double expectedUpdateRate_;
 	double maxUpdateRate_;
 	double minUpdateRate_;
+	bool alwaysProcessMostRecentFrame_;
 	std::string compressionImgFormat_;
 	bool compressionParallelized_;
 	int odomStrategy_;

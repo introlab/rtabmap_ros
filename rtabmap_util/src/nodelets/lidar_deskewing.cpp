@@ -46,6 +46,16 @@ LidarDeskewing::~LidarDeskewing()
 
 void LidarDeskewing::callbackScan(const sensor_msgs::msg::LaserScan::ConstSharedPtr msg)
 {
+	if(scanSyncDiagnostic_.get() == 0) {
+		scanSyncDiagnostic_.reset(new rtabmap_sync::SyncDiagnostic(this, 0.5));
+		scanSyncDiagnostic_->init(subScan_->get_topic_name(),
+			uFormat("%s: Did not receive data since 5 seconds! Make sure the input topic \"%s\" is "
+						"published (\"$ rostopic hz my_topic\") and the timestamps in their "
+						"header are set.",
+						this->get_name(),
+						subScan_->get_topic_name()));
+	}
+	scanSyncDiagnostic_->tickInput(msg->header.stamp);
 	// make sure the frame of the laser is updated during the whole scan time
 	rtabmap::Transform tmpT = rtabmap_conversions::getMovingTransform(
 			msg->header.frame_id,
@@ -75,10 +85,23 @@ void LidarDeskewing::callbackScan(const sensor_msgs::msg::LaserScan::ConstShared
 	rtabmap_conversions::transformPointCloud(t.toEigen4f(), scanOut, scanOutDeskewed);
 	scanOutDeskewed.header.frame_id = msg->header.frame_id;
 	pubScan_->publish(scanOutDeskewed);
+
+	scanSyncDiagnostic_->tickOutput(msg->header.stamp);
 }
 
 void LidarDeskewing::callbackCloud(const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg)
 {
+	if(cloudSyncDiagnostic_.get() == 0) {
+		cloudSyncDiagnostic_.reset(new rtabmap_sync::SyncDiagnostic(this, 0.5));
+		cloudSyncDiagnostic_->init(subCloud_->get_topic_name(),
+			uFormat("%s: Did not receive data since 5 seconds! Make sure the input topic \"%s\" is "
+						"published (\"$ rostopic hz my_topic\") and the timestamps in their "
+						"header are set.",
+						this->get_name(),
+						subCloud_->get_topic_name()));
+	}
+	cloudSyncDiagnostic_->tickInput(msg->header.stamp);
+
 	sensor_msgs::msg::PointCloud2 msgDeskewed;
 	if(rtabmap_conversions::deskew(*msg, msgDeskewed, fixedFrameId_, *tfBuffer_, waitForTransformDuration_, slerp_))
 	{
@@ -91,6 +114,7 @@ void LidarDeskewing::callbackCloud(const sensor_msgs::msg::PointCloud2::ConstSha
 		RCLCPP_WARN(this->get_logger(), "deskewing failed! returning possible skewed cloud!");
 		pubCloud_->publish(*msg);
 	}
+	cloudSyncDiagnostic_->tickOutput(msg->header.stamp);
 }
 
 }

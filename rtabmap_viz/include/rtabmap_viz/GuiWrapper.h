@@ -38,8 +38,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtabmap/utilite/UEventsHandler.h"
 #include "rtabmap/core/Transform.h"
 
-#include <tf2_ros/buffer.h>
-#include <tf2_ros/transform_listener.h>
+#include <tf2_ros/buffer.hpp>
+#include <tf2_ros/transform_listener.hpp>
 
 #include <geometry_msgs/msg/twist_stamped.hpp>
 #include <nav_msgs/msg/path.hpp>
@@ -89,20 +89,6 @@ private:
 			const std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > & localKeyPoints = std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> >(),
 			const std::vector<std::vector<rtabmap_msgs::msg::Point3f> > & localPoints3d = std::vector<std::vector<rtabmap_msgs::msg::Point3f> >(),
 			const std::vector<cv::Mat> & localDescriptors = std::vector<cv::Mat>());
-	virtual void commonStereoCallback(
-			const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
-			const rtabmap_msgs::msg::UserData::ConstSharedPtr & userDataMsg,
-			const cv_bridge::CvImageConstPtr& leftImageMsg,
-			const cv_bridge::CvImageConstPtr& rightImageMsg,
-			const sensor_msgs::msg::CameraInfo& leftCamInfoMsg,
-			const sensor_msgs::msg::CameraInfo& rightCamInfoMsg,
-			const sensor_msgs::msg::LaserScan & scan2dMsg,
-			const sensor_msgs::msg::PointCloud2 & scan3dMsg,
-			const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr& odomInfoMsg,
-			const std::vector<rtabmap_msgs::msg::GlobalDescriptor> & globalDescriptorMsgs = std::vector<rtabmap_msgs::msg::GlobalDescriptor>(),
-			const std::vector<rtabmap_msgs::msg::KeyPoint> & localKeyPoints = std::vector<rtabmap_msgs::msg::KeyPoint>(),
-			const std::vector<rtabmap_msgs::msg::Point3f> & localPoints3d = std::vector<rtabmap_msgs::msg::Point3f>(),
-			const cv::Mat & localDescriptors = cv::Mat());
 	virtual void commonLaserScanCallback(
 			const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
 			const rtabmap_msgs::msg::UserData::ConstSharedPtr & userDataMsg,
@@ -130,9 +116,9 @@ private:
 private:
 	rtabmap::PreferencesDialog * prefDialog_;
 	rtabmap::MainWindow * mainWindow_;
-	std::string cameraNodeName_;
 	double lastOdomInfoUpdateTime_;
 	std::string rtabmapNodeName_;
+	std::string odometryNodeName_;
 
 	// odometry subscription stuffs
 	std::string frameId_;
