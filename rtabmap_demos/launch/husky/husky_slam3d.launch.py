@@ -141,6 +141,7 @@ def generate_launch_description():
         Node(
             package='rtabmap_viz', executable='rtabmap_viz', output='screen',
             namespace=robot_ns,
-            parameters=[rtabmap_parameters, shared_parameters],
+            parameters=[rtabmap_parameters, shared_parameters,
+                        {"odometry_node_name": "icp_odometry"}],
             remappings=remappings),
     ])

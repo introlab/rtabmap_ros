@@ -88,7 +88,6 @@ def generate_launch_description():
         remappings=[
             ("rgbd_image", '/realsense_camera1/rgbd_image'),
             ("odom", 'odom')],
-        arguments=["--delete_db_on_start", ''],
         prefix='',
         namespace='rtabmap'
     )

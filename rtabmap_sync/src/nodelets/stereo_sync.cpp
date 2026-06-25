@@ -47,16 +47,16 @@ namespace rtabmap_sync
 StereoSync::StereoSync(const rclcpp::NodeOptions & options) :
 		Node("stereo_sync", options),
 		compressedRate_(0),
+		approxSyncMaxInterval_(0.0),
 		approxSync_(0),
 		exactSync_(0)
 {
 	int topicQueueSize = 10;
 	int syncQueueSize = 10;
 	bool approxSync = false;
-	double approxSyncMaxInterval = 0.0;
 	int qos = RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT;
 	approxSync = this->declare_parameter("approx_sync", approxSync);
-	approxSyncMaxInterval = this->declare_parameter("approx_sync_max_interval", approxSyncMaxInterval);
+	approxSyncMaxInterval_ = this->declare_parameter("approx_sync_max_interval", approxSyncMaxInterval_);
 	topicQueueSize = this->declare_parameter("topic_queue_size", topicQueueSize);
 	int queueSize = this->declare_parameter("queue_size", -1);
 	if(queueSize != -1)
@@ -71,14 +71,16 @@ StereoSync::StereoSync(const rclcpp::NodeOptions & options) :
 	qos = this->declare_parameter("qos", qos);
 	int qosCamInfo = this->declare_parameter("qos_camera_info", qos);
 	compressedRate_ = this->declare_parameter("compressed_rate", compressedRate_);
+	std::string imageTransport = this->declare_parameter("image_transport", std::string("raw"));
 
 	RCLCPP_INFO(this->get_logger(), "%s: approx_sync = %s", get_name(), approxSync?"true":"false");
-	RCLCPP_INFO(this->get_logger(), "%s: approx_sync_max_interval = %f", get_name(), approxSyncMaxInterval);
+	RCLCPP_INFO(this->get_logger(), "%s: approx_sync_max_interval = %f", get_name(), approxSyncMaxInterval_);
 	RCLCPP_INFO(this->get_logger(), "%s: topic_queue_size  = %d", get_name(), topicQueueSize);
 	RCLCPP_INFO(this->get_logger(), "%s: sync_queue_size   = %d", get_name(), syncQueueSize);
 	RCLCPP_INFO(this->get_logger(), "%s: qos             = %d", get_name(), qos);
 	RCLCPP_INFO(this->get_logger(), "%s: qos_camera_info = %d", get_name(), qosCamInfo);
 	RCLCPP_INFO(this->get_logger(), "%s: compressed_rate = %f", get_name(), compressedRate_);
+	RCLCPP_INFO(this->get_logger(), "%s: image_transport = %s", get_name(), imageTransport.c_str());
 
 	rgbdImagePub_ = create_publisher<rtabmap_msgs::msg::RGBDImage>("rgbd_image", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos));
 	rgbdImageCompressedPub_ = create_publisher<rtabmap_msgs::msg::RGBDImage>("rgbd_image/compressed", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos));
@@ -86,8 +88,8 @@ StereoSync::StereoSync(const rclcpp::NodeOptions & options) :
 	if(approxSync)
 	{
 		approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(syncQueueSize), imageLeftSub_, imageRightSub_, cameraInfoLeftSub_, cameraInfoRightSub_);
-		if(approxSyncMaxInterval>0.0)
-			approxSync_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval));
+		if(approxSyncMaxInterval_>0.0)
+			approxSync_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval_));
 		approxSync_->registerCallback(std::bind(&StereoSync::callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 	}
 	else
@@ -96,16 +98,24 @@ StereoSync::StereoSync(const rclcpp::NodeOptions & options) :
 		exactSync_->registerCallback(std::bind(&StereoSync::callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 	}
 
-	image_transport::TransportHints hints(this);
-	imageLeftSub_.subscribe(this, "left/image_rect", hints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
-	imageRightSub_.subscribe(this, "right/image_rect", hints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	std::string leftTopic = this->get_node_topics_interface()->resolve_topic_name("left/image_rect"); // Humble/Jazzy don't resolve base topic, fixed by https://github.com/ros-perception/image_common/commit/ea7589ae8c1f7ecb83d6aab7b4c890c2d630d27a
+	std::string rightTopic = this->get_node_topics_interface()->resolve_topic_name("right/image_rect"); // Humble/Jazzy don't resolve base topic, fixed by https://github.com/ros-perception/image_common/commit/ea7589ae8c1f7ecb83d6aab7b4c890c2d630d27a
+#ifdef PRE_ROS_LYRICAL
+	image_transport::TransportHints hints(this); // using "image_transport" parameter
+	imageLeftSub_.subscribe(this, leftTopic, hints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+	imageRightSub_.subscribe(this, rightTopic, hints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
+#else
+	image_transport::TransportHints hints(*this); // using "image_transport" parameter
+	imageLeftSub_.subscribe(*this, leftTopic, hints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos));
+	imageRightSub_.subscribe(*this, rightTopic, hints.getTransport(), rclcpp::QoS(topicQueueSize).reliability((rmw_qos_reliability_policy_t)qos));
+#endif
 	cameraInfoLeftSub_.subscribe(this, "left/camera_info", RCLCPP_QOS(topicQueueSize, qosCamInfo));
 	cameraInfoRightSub_.subscribe(this, "right/camera_info", RCLCPP_QOS(topicQueueSize, qosCamInfo));
 
 	std::string subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s,\n   %s,\n   %s,\n   %s",
 						get_name(),
 						approxSync?"approx":"exact",
-						approxSync&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
+						approxSync&&approxSyncMaxInterval_!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval_).c_str():"",
 						imageLeftSub_.getSubscriber().getTopic().c_str(),
 						imageRightSub_.getSubscriber().getTopic().c_str(),
 						cameraInfoLeftSub_.getSubscriber()->get_topic_name(),
@@ -181,10 +191,22 @@ void StereoSync::callback(
 				rtabmap_msgs::msg::RGBDImage::UniquePtr msgCompressed(new rtabmap_msgs::msg::RGBDImage);
 				*msgCompressed = *msg;
 
-				cv_bridge::CvImageConstPtr imagePtr = cv_bridge::toCvShare(imageLeft);
+				cv_bridge::CvImageConstPtr imagePtr;
+				try {
+					imagePtr = cv_bridge::toCvShare(imageLeft);
+				}
+				catch(cv::Exception& e) {
+					UFATAL("Fatal error while converting left image (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
+				}
 				imagePtr->toCompressedImageMsg(msgCompressed->rgb_compressed, cv_bridge::JPG);
 
-				cv_bridge::CvImageConstPtr imageDepthPtr = cv_bridge::toCvShare(imageRight);
+				cv_bridge::CvImageConstPtr imageDepthPtr;
+				try {
+					imageDepthPtr = cv_bridge::toCvShare(imageRight);
+				}
+				catch(cv::Exception& e) {
+					UFATAL("Fatal error while converting right image (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
+				}
 				imageDepthPtr->toCompressedImageMsg(msgCompressed->depth_compressed, cv_bridge::JPG);
 
 				rgbdImageCompressedPub_->publish(std::move(msgCompressed));

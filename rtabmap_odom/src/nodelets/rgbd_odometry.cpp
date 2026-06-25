@@ -65,7 +65,8 @@ RGBDOdometry::RGBDOdometry(const rclcpp::NodeOptions & options) :
 		exactSync6_(0),
 		topicQueueSize_(10),
 		syncQueueSize_(5),
-		keepColor_(false)
+		keepColor_(false),
+		approxSyncMaxInterval_(0.0)
 {
 	OdometryROS::init(false, true, false);
 }
@@ -91,9 +92,8 @@ void RGBDOdometry::onOdomInit()
 	int rgbdCameras = 1;
 	bool approxSync = true;
 	bool subscribeRGBD = false;
-	double approxSyncMaxInterval = 0.0;
 	approxSync = this->declare_parameter("approx_sync", approxSync);
-	approxSyncMaxInterval = this->declare_parameter("approx_sync_max_interval", approxSyncMaxInterval);
+	approxSyncMaxInterval_ = this->declare_parameter("approx_sync_max_interval", approxSyncMaxInterval_);
 	topicQueueSize_ = this->declare_parameter("topic_queue_size", topicQueueSize_);
 	int queueSize = this->declare_parameter("queue_size", -1);
 	if(queueSize != -1)
@@ -113,12 +113,20 @@ void RGBDOdometry::onOdomInit()
 		rgbdCameras = 0;
 	}
 	keepColor_ = this->declare_parameter("keep_color", keepColor_);
-	std::string rgbdTransport = this->declare_parameter("rgb_transport", std::string("raw"));
+	std::string rgbTransport = this->declare_parameter("rgb_transport", std::string("raw"));
+	if(rgbTransport != "raw") {
+		RCLCPP_WARN(this->get_logger(), "Parameter \"rgb_transport\" has been renamed "
+				"to \"image_transport\" and will be removed "
+				"in future versions! The value (%s) is copied to "
+				"\"image_transport\".", rgbTransport.c_str());
+	}
+	std::string imageTransport = this->declare_parameter("image_transport", rgbTransport);
 	std::string depthTransport = this->declare_parameter("depth_transport", std::string("raw"));
+	
 
 	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: approx_sync    = %s", approxSync?"true":"false");
 	if(approxSync)
-		RCLCPP_INFO(this->get_logger(), "RGBDOdometry: approx_sync_max_interval = %f", approxSyncMaxInterval);
+		RCLCPP_INFO(this->get_logger(), "RGBDOdometry: approx_sync_max_interval = %f", approxSyncMaxInterval_);
 	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: topic_queue_size = %d", topicQueueSize_);
 	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: sync_queue_size  = %d", syncQueueSize_);
 	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: qos             = %d", (int)qos());
@@ -126,7 +134,7 @@ void RGBDOdometry::onOdomInit()
 	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: subscribe_rgbd = %s", subscribeRGBD?"true":"false");
 	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: rgbd_cameras   = %d", rgbdCameras);
 	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: keep_color     = %s", keepColor_?"true":"false");
-	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: rgb_transport   = %s", rgbdTransport.c_str());
+	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: image_transport = %s", imageTransport.c_str());
 	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: depth_transport = %s", depthTransport.c_str());
 
 	rclcpp::SubscriptionOptions options;
@@ -165,8 +173,8 @@ void RGBDOdometry::onOdomInit()
 							MyApproxSync2Policy(syncQueueSize_),
 							rgbd_image1_sub_,
 							rgbd_image2_sub_);
-					if(approxSyncMaxInterval > 0.0)
-						approxSync2_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval));
+					if(approxSyncMaxInterval_ > 0.0)
+						approxSync2_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval_));
 					approxSync2_->registerCallback(std::bind(&RGBDOdometry::callbackRGBD2, this, std::placeholders::_1, std::placeholders::_2));
 				}
 				else
@@ -180,7 +188,7 @@ void RGBDOdometry::onOdomInit()
 				subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s,\n   %s",
 						get_name(),
 						approxSync?"approx":"exact",
-						approxSync&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
+						approxSync&&approxSyncMaxInterval_!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval_).c_str():"",
 						rgbd_image1_sub_.getSubscriber()->get_topic_name(),
 						rgbd_image2_sub_.getSubscriber()->get_topic_name());
 			}
@@ -193,8 +201,8 @@ void RGBDOdometry::onOdomInit()
 							rgbd_image1_sub_,
 							rgbd_image2_sub_,
 							rgbd_image3_sub_);
-					if(approxSyncMaxInterval > 0.0)
-							approxSync3_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval));
+					if(approxSyncMaxInterval_ > 0.0)
+							approxSync3_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval_));
 					approxSync3_->registerCallback(std::bind(&RGBDOdometry::callbackRGBD3, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 				}
 				else
@@ -209,7 +217,7 @@ void RGBDOdometry::onOdomInit()
 				subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s,\n   %s,\n   %s",
 						get_name(),
 						approxSync?"approx":"exact",
-						approxSync&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
+						approxSync&&approxSyncMaxInterval_!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval_).c_str():"",
 						rgbd_image1_sub_.getSubscriber()->get_topic_name(),
 						rgbd_image2_sub_.getSubscriber()->get_topic_name(),
 						rgbd_image3_sub_.getSubscriber()->get_topic_name());
@@ -224,8 +232,8 @@ void RGBDOdometry::onOdomInit()
 							rgbd_image2_sub_,
 							rgbd_image3_sub_,
 							rgbd_image4_sub_);
-					if(approxSyncMaxInterval > 0.0)
-						approxSync4_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval));
+					if(approxSyncMaxInterval_ > 0.0)
+						approxSync4_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval_));
 					approxSync4_->registerCallback(std::bind(&RGBDOdometry::callbackRGBD4, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 				}
 				else
@@ -241,7 +249,7 @@ void RGBDOdometry::onOdomInit()
 				subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s,\n   %s,\n   %s,\n   %s",
 						get_name(),
 						approxSync?"approx":"exact",
-						approxSync&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
+						approxSync&&approxSyncMaxInterval_!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval_).c_str():"",
 						rgbd_image1_sub_.getSubscriber()->get_topic_name(),
 						rgbd_image2_sub_.getSubscriber()->get_topic_name(),
 						rgbd_image3_sub_.getSubscriber()->get_topic_name(),
@@ -258,8 +266,8 @@ void RGBDOdometry::onOdomInit()
 							rgbd_image3_sub_,
 							rgbd_image4_sub_,
 							rgbd_image5_sub_);
-					if(approxSyncMaxInterval > 0.0)
-						approxSync5_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval));
+					if(approxSyncMaxInterval_ > 0.0)
+						approxSync5_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval_));
 					approxSync5_->registerCallback(std::bind(&RGBDOdometry::callbackRGBD5, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5));
 				}
 				else
@@ -276,7 +284,7 @@ void RGBDOdometry::onOdomInit()
 				subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s \\\n  %s \\\n  %s \\\n   %s \\\n   %s",
 						get_name(),
 						approxSync?"approx":"exact",
-						approxSync&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
+						approxSync&&approxSyncMaxInterval_!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval_).c_str():"",
 						rgbd_image1_sub_.getSubscriber()->get_topic_name(),
 						rgbd_image2_sub_.getSubscriber()->get_topic_name(),
 						rgbd_image3_sub_.getSubscriber()->get_topic_name(),
@@ -295,8 +303,8 @@ void RGBDOdometry::onOdomInit()
 							rgbd_image4_sub_,
 							rgbd_image5_sub_,
 							rgbd_image6_sub_);
-					if(approxSyncMaxInterval > 0.0)
-						approxSync6_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval));
+					if(approxSyncMaxInterval_ > 0.0)
+						approxSync6_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval_));
 					approxSync6_->registerCallback(std::bind(&RGBDOdometry::callbackRGBD6, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6));
 				}
 				else
@@ -314,7 +322,7 @@ void RGBDOdometry::onOdomInit()
 				subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s):\n   %s \\\n  %s \\\n  %s \\\n   %s \\\n   %s \\\n   %s",
 						get_name(),
 						approxSync?"approx":"exact",
-						approxSync&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
+						approxSync&&approxSyncMaxInterval_!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval_).c_str():"",
 						rgbd_image1_sub_.getTopic().c_str(),
 						rgbd_image2_sub_.getTopic().c_str(),
 						rgbd_image3_sub_.getTopic().c_str(),
@@ -354,25 +362,26 @@ void RGBDOdometry::onOdomInit()
 	}
 	else
 	{
-		image_transport::TransportHints rgb_hints(this, "raw", "rgb_transport");
+		std::string rgbTopic = this->get_node_topics_interface()->resolve_topic_name("rgb/image"); // Humble/Jazzy don't resolve base topic, fixed by https://github.com/ros-perception/image_common/commit/ea7589ae8c1f7ecb83d6aab7b4c890c2d630d27a
+		std::string depthTopic = this->get_node_topics_interface()->resolve_topic_name("depth/image"); // Humble/Jazzy don't resolve base topic, fixed by https://github.com/ros-perception/image_common/commit/ea7589ae8c1f7ecb83d6aab7b4c890c2d630d27a
+#ifdef PRE_ROS_LYRICAL
+		image_transport::TransportHints rgb_hints(this); // using "image_transport" parameter
 		image_transport::TransportHints depth_hints(this, "raw", "depth_transport");
-
-		std::string rgb_topic = get_node_base_interface()->resolve_topic_or_service_name(
-      		"rgb/image", false, false
-		);
-		std::string depth_topic = get_node_base_interface()->resolve_topic_or_service_name(
-      		"depth/image", false, false
-		);
-
-		image_mono_sub_.subscribe(this, rgb_topic, rgb_hints.getTransport(), rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
-		image_depth_sub_.subscribe(this, depth_topic, depth_hints.getTransport(), rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
+		image_mono_sub_.subscribe(this, rgbTopic, rgb_hints.getTransport(), rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
+		image_depth_sub_.subscribe(this, depthTopic, depth_hints.getTransport(), rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()).get_rmw_qos_profile(), options);
+#else
+		image_transport::TransportHints rgb_hints(*this); // using "image_transport" parameter
+		image_transport::TransportHints depth_hints(*this, "raw", "depth_transport");
+		image_mono_sub_.subscribe(*this, rgbTopic, rgb_hints.getTransport(), rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()), options);
+		image_depth_sub_.subscribe(*this, depthTopic, depth_hints.getTransport(), rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()), options);
+#endif
 		info_sub_.subscribe(this, "rgb/camera_info", RCLCPP_QOS(topicQueueSize_, qosCamInfo), options);
 
 		if(approxSync)
 		{
 			approxSync_ = new message_filters::Synchronizer<MyApproxSyncPolicy>(MyApproxSyncPolicy(syncQueueSize_), image_mono_sub_, image_depth_sub_, info_sub_);
-			if(approxSyncMaxInterval > 0.0)
-				approxSync_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval));
+			if(approxSyncMaxInterval_ > 0.0)
+				approxSync_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(approxSyncMaxInterval_));
 			approxSync_->registerCallback(std::bind(&RGBDOdometry::callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 		}
 		else
@@ -385,7 +394,7 @@ void RGBDOdometry::onOdomInit()
 		subscribedTopicsMsg = uFormat("\n%s subscribed to (%s sync%s, topic_queue_size=%d, sync_queue_size=%d):\n   %s,\n   %s,\n   %s",
 				get_name(),
 				approxSync?"approx":"exact",
-				approxSync&&approxSyncMaxInterval!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval).c_str():"",
+				approxSync&&approxSyncMaxInterval_!=0.0?uFormat(", max interval=%fs", approxSyncMaxInterval_).c_str():"",
 				topicQueueSize_,
 				syncQueueSize_,
 				image_mono_sub_.getSubscriber().getTopic().c_str(),
@@ -430,8 +439,10 @@ void RGBDOdometry::commonCallback(
 {
 	UASSERT(rgbImages.size() > 0 && rgbImages.size() == depthImages.size() && rgbImages.size() == cameraInfos.size());
 	rclcpp::Time higherStamp;
+	UASSERT_MSG(rgbImages[0], "RGB image is null!");
 	int imageWidth = rgbImages[0]->image.cols;
 	int imageHeight = rgbImages[0]->image.rows;
+	UASSERT_MSG(depthImages[0], "Depth image is null!");
 	int depthWidth = depthImages[0]->image.cols;
 	int depthHeight = depthImages[0]->image.rows;
 
@@ -445,6 +456,8 @@ void RGBDOdometry::commonCallback(
 	std::vector<rtabmap::CameraModel> cameraModels;
 	for(unsigned int i=0; i<rgbImages.size(); ++i)
 	{
+		UASSERT_MSG(rgbImages[i], uFormat("RGB image is null for camera %d", i).c_str());
+		UASSERT_MSG(depthImages[i], uFormat("Depth image is null for camera %d", i).c_str());
 		if(!(rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) ==0 ||
 			 rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
 			 rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||
@@ -589,12 +602,17 @@ void RGBDOdometry::callback(
 		std::vector<cv_bridge::CvImageConstPtr> imageMsgs(1);
 		std::vector<cv_bridge::CvImageConstPtr> depthMsgs(1);
 		std::vector<sensor_msgs::msg::CameraInfo> infoMsgs;
-		imageMsgs[0] = cv_bridge::toCvShare(image);
-		depthMsgs[0] = cv_bridge::toCvShare(depth);
+		try{
+			imageMsgs[0] = cv_bridge::toCvShare(image);
+			depthMsgs[0] = cv_bridge::toCvShare(depth);
+		}
+		catch(cv::Exception& e) {
+			UFATAL("Fatal error while converting images (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
+		}
 		infoMsgs.push_back(*cameraInfo);
 
 		double stampDiff = fabs(rtabmap_conversions::timestampFromROS(image->header.stamp) - rtabmap_conversions::timestampFromROS(depth->header.stamp));
-		if(stampDiff > 0.020)
+		if(approxSyncMaxInterval_==0.0 && stampDiff > 0.020)
 		{
 			RCLCPP_WARN(this->get_logger(), "The time difference between rgb and depth frames is "
 					"high (diff=%fs, rgb=%fs, depth=%fs). You may want "

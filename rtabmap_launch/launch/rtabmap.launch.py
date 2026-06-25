@@ -40,7 +40,17 @@ class ConditionalBool(Substitution):
             return self.text_else
             
 def launch_setup(context, *args, **kwargs):      
-               
+
+    rtabmap_viz_odometry_node_name = "rgbd_odometry"
+    use_icp_odometry = LaunchConfiguration('icp_odometry').perform(context)
+    use_icp_odometry = use_icp_odometry == 'true' or use_icp_odometry == 'True'
+    use_stereo_odometry = LaunchConfiguration('stereo').perform(context)
+    use_stereo_odometry = use_stereo_odometry == 'true' or use_stereo_odometry == 'True'
+    if use_icp_odometry:
+        rtabmap_viz_odometry_node_name = "icp_odometry"
+    elif use_stereo_odometry:
+        rtabmap_viz_odometry_node_name = "stereo_odometry"
+
     return [
         DeclareLaunchArgument('depth', default_value=ConditionalText('false', 'true', IfCondition(PythonExpression(["'", LaunchConfiguration('stereo'), "' == 'true'"]))._predicate_func(context)), description=''),
         DeclareLaunchArgument('subscribe_rgb', default_value=LaunchConfiguration('depth'), description=''),
@@ -53,6 +63,7 @@ def launch_setup(context, *args, **kwargs):
         DeclareLaunchArgument('qos_user_data',   default_value=LaunchConfiguration('qos'), description='Specific QoS used for user input data: 0=system default, 1=Reliable, 2=Best Effort.'),
         DeclareLaunchArgument('qos_imu',         default_value=LaunchConfiguration('qos'), description='Specific QoS used for imu input data: 0=system default, 1=Reliable, 2=Best Effort.'),
         DeclareLaunchArgument('qos_gps',         default_value=LaunchConfiguration('qos'), description='Specific QoS used for gps input data: 0=system default, 1=Reliable, 2=Best Effort.'),
+        DeclareLaunchArgument('qos_env_sensor',         default_value=LaunchConfiguration('qos'), description='Specific QoS used for env sensor input data: 0=system default, 1=Reliable, 2=Best Effort.'),
         
         DeclareLaunchArgument('odom_log_level',  default_value=LaunchConfiguration('log_level'), description='Specific ROS logger level for odometry node.'),
         
@@ -186,7 +197,8 @@ def launch_setup(context, *args, **kwargs):
                 "subscribe_rgbd": LaunchConfiguration('subscribe_rgbd'),
                 "guess_frame_id": LaunchConfiguration('odom_guess_frame_id').perform(context),
                 "guess_min_translation": LaunchConfiguration('odom_guess_min_translation'),
-                "guess_min_rotation": LaunchConfiguration('odom_guess_min_rotation')}],
+                "guess_min_rotation": LaunchConfiguration('odom_guess_min_rotation'),
+                "always_process_most_recent_frame": LaunchConfiguration('odom_always_process_most_recent_frame')}],
             remappings=[
                 ("rgb/image", LaunchConfiguration('rgb_topic_relay')),
                 ("depth/image", LaunchConfiguration('depth_topic_relay')),
@@ -223,7 +235,8 @@ def launch_setup(context, *args, **kwargs):
                 "subscribe_rgbd": LaunchConfiguration('subscribe_rgbd'),
                 "guess_frame_id": LaunchConfiguration('odom_guess_frame_id').perform(context),
                 "guess_min_translation": LaunchConfiguration('odom_guess_min_translation'),
-                "guess_min_rotation": LaunchConfiguration('odom_guess_min_rotation')}],
+                "guess_min_rotation": LaunchConfiguration('odom_guess_min_rotation'),
+                "always_process_most_recent_frame": LaunchConfiguration('odom_always_process_most_recent_frame')}],
             remappings=[
                 ("left/image_rect", LaunchConfiguration('left_image_topic_relay')),
                 ("right/image_rect", LaunchConfiguration('right_image_topic_relay')),
@@ -258,7 +271,8 @@ def launch_setup(context, *args, **kwargs):
                 "qos_imu": LaunchConfiguration('qos_imu'),
                 "guess_frame_id": LaunchConfiguration('odom_guess_frame_id').perform(context),
                 "guess_min_translation": LaunchConfiguration('odom_guess_min_translation'),
-                "guess_min_rotation": LaunchConfiguration('odom_guess_min_rotation')}],
+                "guess_min_rotation": LaunchConfiguration('odom_guess_min_rotation'),
+                "always_process_most_recent_frame": LaunchConfiguration('odom_always_process_most_recent_frame')}],
             remappings=[
                 ("scan", LaunchConfiguration('scan_topic')),
                 ("scan_cloud", LaunchConfiguration('scan_cloud_topic')),
@@ -303,6 +317,7 @@ def launch_setup(context, *args, **kwargs):
                 "qos_camera_info": LaunchConfiguration('qos_camera_info'),
                 "qos_imu": LaunchConfiguration('qos_imu'),
                 "qos_gps": LaunchConfiguration('qos_gps'),
+                "qos_env_sensor": LaunchConfiguration('qos_env_sensor'),
                 "qos_user_data": LaunchConfiguration('qos_user_data'),
                 "scan_normal_k": LaunchConfiguration('scan_normal_k'),
                 "landmark_linear_variance": LaunchConfiguration('tag_linear_variance'),
@@ -327,6 +342,7 @@ def launch_setup(context, *args, **kwargs):
                 ("gps/fix", LaunchConfiguration('gps_topic')),
                 ("tag_detections", LaunchConfiguration('tag_topic')),
                 ("fiducial_transforms", LaunchConfiguration('fiducial_topic')),
+                ("env_sensor", LaunchConfiguration('env_sensor_topic')),
                 ("odom", LaunchConfiguration('odom_topic')),
                 ("imu", LaunchConfiguration('imu_topic')),
                 ("goal_out", LaunchConfiguration('output_goal_topic'))],
@@ -356,7 +372,8 @@ def launch_setup(context, *args, **kwargs):
                 "qos_scan": LaunchConfiguration('qos_scan'),
                 "qos_odom": LaunchConfiguration('qos_odom'),
                 "qos_camera_info": LaunchConfiguration('qos_camera_info'),
-                "qos_user_data": LaunchConfiguration('qos_user_data')
+                "qos_user_data": LaunchConfiguration('qos_user_data'),
+                "odometry_node_name": rtabmap_viz_odometry_node_name
             }],
             remappings=[
                 ("rgb/image", LaunchConfiguration('rgb_topic_relay')),
@@ -495,6 +512,7 @@ def generate_launch_description():
         DeclareLaunchArgument('odom_guess_frame_id',        default_value='',      description=''),
         DeclareLaunchArgument('odom_guess_min_translation', default_value='0.0',   description=''),
         DeclareLaunchArgument('odom_guess_min_rotation',    default_value='0.0',   description=''),
+        DeclareLaunchArgument('odom_always_process_most_recent_frame', default_value='true', description='Odometry: always process latest frame to reduce delay, skipping frames in case odometry is slower than camera frame rate. In case you want to make sure to process all frames (e.g., from a rosbag/dataset) and you don\'t care about delay, set this to false.'),
 
         # imu
         DeclareLaunchArgument('imu_topic',        default_value='/imu/data', description='Used with VIO approaches and for SLAM graph optimization (gravity constraints).'),
@@ -514,6 +532,8 @@ def generate_launch_description():
         DeclareLaunchArgument('tag_linear_variance',  default_value='0.0001',          description=''),
         DeclareLaunchArgument('tag_angular_variance', default_value='9999.0',            description='>=9999 means rotation is ignored in optimization, when rotation estimation of the tag is not reliable or not computed.'),
         DeclareLaunchArgument('fiducial_topic',       default_value='/fiducial_transforms', description='aruco_detect async subscription, use tag_linear_variance and tag_angular_variance to set covariance.'),
+        
+        DeclareLaunchArgument('env_sensor_topic',     default_value='/env_sensor', description='A rtabmap_msgs/EnvSensor topic.'),
         OpaqueFunction(function=launch_setup)
     ])
 

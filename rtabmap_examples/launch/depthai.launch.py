@@ -1,8 +1,14 @@
 # Requirements:
 #   A OAK-D camera
-#   Install depthai-ros package (https://github.com/luxonis/depthai-ros)
+#   Install depthai-ros package (https://github.com/luxonis/depthai-ros). Tested on Humble branch!
 # Example:
 #   $ ros2 launch rtabmap_examples depthai.launch.py camera_model:=OAK-D
+#
+# Description: In this example, we feed IR-D images to rtabmap
+#
+# Note: The first frames may be too bright or too dark till camera exposure adjusts 
+#       to an appriopriate level. Do "Detection->Reset odometry", then 
+#       "Edit->Delete memory" if tracking is lost on start.
 
 import os
 

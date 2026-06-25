@@ -15,9 +15,11 @@ setup(
     zip_safe=True,
     maintainer='Mathieu Labbe',
     maintainer_email='matlabbe@gmail.com',
-    description='RTAB-Map\'s python package.',
+    description="RTAB-Map's python package.",
     license='BSD',
-    tests_require=['pytest'],
+    extras_require={
+        'test': ['pytest'],
+    },
     entry_points={
         'console_scripts': [
         ],
