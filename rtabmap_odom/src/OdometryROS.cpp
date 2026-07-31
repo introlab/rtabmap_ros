@@ -1272,7 +1272,16 @@ void OdometryROS::processData()
 		}
 		else
 		{
-			RCLCPP_INFO(this->get_logger(), "Odom: quality=%d, std dev=%fm|%frad, update time=%fs delay=%fs", info.reg.inliers, pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)), pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)), (rclcpp::Clock().now()-timeStart).seconds(), delay);
+			RCLCPP_INFO(
+					this->get_logger(),
+					"Odom: quality=%d, features=%d, local_map=%d, std dev=%fm|%frad, update time=%fs delay=%fs",
+					info.reg.inliers,
+					info.features,
+					info.localMapSize,
+					pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(0,0)),
+					pose.isNull()?0.0f:std::sqrt(info.reg.covariance.at<double>(5,5)),
+					(rclcpp::Clock().now()-timeStart).seconds(),
+					delay);
 		}
 	}
 	else // if(icpParams_)
