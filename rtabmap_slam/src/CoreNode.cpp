@@ -32,6 +32,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/utilite/UStl.h>
 #include <rtabmap/utilite/UFile.h>
 #include <rtabmap/core/Version.h>
+#ifdef RTABMAP_PYTHON
+#include <rtabmap/core/PythonInterface.h>
+#endif
 #include "nodelet/loader.h"
 
 int main(int argc, char** argv)
@@ -87,6 +90,12 @@ int main(int argc, char** argv)
 		}
 		nargv.push_back(argv[i]);
 	}
+
+#ifdef RTABMAP_PYTHON
+	// Initialize the embedded python interpreter on the main thread, as
+	// the nodelet below is loaded in a worker thread.
+	rtabmap::PythonInterface::instance("rtabmap");
+#endif
 
 	nodelet::Loader nodelet;
 	nodelet::M_string remap(ros::names::getRemappings());

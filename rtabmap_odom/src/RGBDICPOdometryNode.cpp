@@ -73,7 +73,9 @@ int main(int argc, char **argv)
 	}
 
 #ifdef RTABMAP_PYTHON
-	rtabmap::PythonInterface pythonInterface;
+	// Initialize the embedded python interpreter on the main thread, as
+	// the nodelet below is loaded in a worker thread.
+	rtabmap::PythonInterface::instance("rgbdicp_odometry");
 #endif
 
 	nodelet::Loader nodelet;
