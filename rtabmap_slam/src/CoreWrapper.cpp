@@ -3332,10 +3332,10 @@ bool CoreWrapper::globalBundleAdjustmentCallback(rtabmap_msgs::GlobalBundleAdjus
 	UTimer timer;
 	int optimizer = (int)Optimizer::kTypeG2O; // g2o
 	int iterations = Parameters::defaultOptimizerIterations();
-	float pixelVariance = Parameters::defaultg2oPixelVariance();
+	float pixelVariance = Parameters::defaultOptimizerPixelVariance();
 	bool rematchFeatures = true;
 	Parameters::parse(parameters_, Parameters::kOptimizerIterations(), iterations);
-	Parameters::parse(parameters_, Parameters::kg2oPixelVariance(), pixelVariance);
+	Parameters::parse(parameters_, Parameters::kOptimizerPixelVariance(), pixelVariance);
 	if(req.type == 1.0f)
 	{
 		optimizer = (int)Optimizer::kTypeCVSBA;
