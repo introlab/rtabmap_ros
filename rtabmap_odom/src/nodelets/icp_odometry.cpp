@@ -577,8 +577,10 @@ private:
 
 	void callbackCloud(const sensor_msgs::PointCloud2ConstPtr& pointCloudMsg)
 	{
-		UASSERT_MSG(pointCloudMsg->data.size() == pointCloudMsg->row_step*pointCloudMsg->height,
-				uFormat("data=%d row_step=%d height=%d", pointCloudMsg->data.size(), pointCloudMsg->row_step, pointCloudMsg->height).c_str());
+		UASSERT_MSG(pointCloudMsg->data.size() == pointCloudMsg->row_step*pointCloudMsg->height ||
+					(pointCloudMsg->data.size() == pointCloudMsg->point_step*pointCloudMsg->width*pointCloudMsg->height),
+				uFormat("data=%d row_step=%d point_step=%d width=%d height=%d",
+					pointCloudMsg->data.size(), pointCloudMsg->row_step, pointCloudMsg->point_step, pointCloudMsg->width, pointCloudMsg->height).c_str());
 		
 		if(scanReceived_)
 		{
@@ -686,6 +688,8 @@ private:
 		LaserScan scan;
 		bool hasNormals = false;
 		bool hasIntensity = false;
+		bool hasTime = false;
+		bool hasRing = false;
 		bool is3D = false;
 		for(unsigned int i=0; i<cloudMsg->fields.size(); ++i)
 		{
@@ -710,6 +714,42 @@ private:
 					{
 						ROS_WARN("The input scan cloud has an \"intensity\" field "
 								"but the datatype (%d) is not supported. Intensity will be ignored. "
+								"This message is only shown once.", cloudMsg->fields[i].datatype);
+						warningShown = true;
+					}
+				}
+			}
+			if(cloudMsg->fields[i].name.compare("time") == 0)
+			{
+				if(cloudMsg->fields[i].datatype == sensor_msgs::PointField::FLOAT32)
+				{
+					hasTime = true;
+				}
+				else
+				{
+					static bool warningShown = false;
+					if(!warningShown)
+					{
+						ROS_WARN("The input scan cloud has an \"time\" field "
+								"but the datatype (%d) is not supported. Time will be ignored. "
+								"This message is only shown once.", cloudMsg->fields[i].datatype);
+						warningShown = true;
+					}
+				}
+			}
+			if(cloudMsg->fields[i].name.compare("ring") == 0)
+			{
+				if(cloudMsg->fields[i].datatype == sensor_msgs::PointField::UINT16)
+				{
+					hasRing = true;
+				}
+				else
+				{
+					static bool warningShown = false;
+					if(!warningShown)
+					{
+						ROS_WARN("The input scan cloud has an \"ring\" field "
+								"but the datatype (%d) is not supported. Ring will be ignored. "
 								"This message is only shown once.", cloudMsg->fields[i].datatype);
 						warningShown = true;
 					}
@@ -778,47 +818,72 @@ private:
 		}
 		else if(hasIntensity)
 		{
-			pcl::PointCloud<pcl::PointXYZI>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZI>);
-			pcl::fromROSMsg(*cloudMsg, *pclScan);
-			if(pclScan->size() && scanDownsamplingStep_ > 1)
+			if(hasTime && scanVoxelSize_== 0.0f && scanNormalK_ == 0 && scanNormalRadius_ == 0.0f)
 			{
-				pclScan = util3d::downsample(pclScan, scanDownsamplingStep_);
-				if(pclScan->height>1)
-				{
-					maxLaserScans = pclScan->height * pclScan->width;
-				}
-				else
-				{
-					maxLaserScans /= scanDownsamplingStep_;
-				}
+				pcl::PCLPointCloud2 pclCloud;
+				pcl_conversions::moveToPCL(*cloudMsg, pclCloud);
+				scan = util3d::laserScanFromPointCloud(pclCloud, true, !is3D);
 			}
-			if(!pclScan->is_dense)
+			else
 			{
-				pclScan = util3d::removeNaNFromPointCloud(pclScan);
-			}
+				if(hasTime)
+				{
+					static bool warned = false;
+					if(!warned)
+					{
+						NODELET_WARN("Input cloud has \"time\" channel, but as scan_voxel_size (%s) "
+									 "and/or scan_normal_k (%s) and/or scan_normal_radius (%s) are set, "
+									 "time is dropped. To make sure to passthrough the time channel to "
+									 "underlaying odometry, set those parameters to 0.",
+									Parameters::kIcpVoxelSize().c_str(),
+									Parameters::kIcpPointToPlaneK().c_str(),
+									Parameters::kIcpPointToPlaneRadius().c_str());
+						warned=true;
+					}
+				}
 
-			if(pclScan->size())
-			{
-				if(scanVoxelSize_ > 0.0f)
+				pcl::PointCloud<pcl::PointXYZI>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZI>);
+				pcl::fromROSMsg(*cloudMsg, *pclScan);
+				if(pclScan->size() && scanDownsamplingStep_ > 1)
 				{
-					float pointsBeforeFiltering = (float)pclScan->size();
-					pclScan = util3d::voxelize(pclScan, scanVoxelSize_);
-					float ratio = float(pclScan->size()) / pointsBeforeFiltering;
-					maxLaserScans = int(float(maxLaserScans) * ratio);
+					pclScan = util3d::downsample(pclScan, scanDownsamplingStep_);
+					if(pclScan->height>1)
+					{
+						maxLaserScans = pclScan->height * pclScan->width;
+					}
+					else
+					{
+						maxLaserScans /= scanDownsamplingStep_;
+					}
 				}
-				if(scanNormalK_ > 0 || scanNormalRadius_>0.0f)
+				if(!pclScan->is_dense)
 				{
-					//compute normals
-					pcl::PointCloud<pcl::Normal>::Ptr normals = is3D?
-							util3d::computeNormals(pclScan, scanNormalK_, scanNormalRadius_):
-							util3d::computeNormals2D(pclScan, scanNormalK_, scanNormalRadius_);
-					pcl::PointCloud<pcl::PointXYZINormal>::Ptr pclScanNormal(new pcl::PointCloud<pcl::PointXYZINormal>);
-					pcl::concatenateFields(*pclScan, *normals, *pclScanNormal);
-					scan = is3D?util3d::laserScanFromPointCloud(*pclScanNormal):util3d::laserScan2dFromPointCloud(*pclScanNormal);
+					pclScan = util3d::removeNaNFromPointCloud(pclScan);
 				}
-				else
+
+				if(pclScan->size())
 				{
-					scan = is3D?util3d::laserScanFromPointCloud(*pclScan):util3d::laserScan2dFromPointCloud(*pclScan);
+					if(scanVoxelSize_ > 0.0f)
+					{
+						float pointsBeforeFiltering = (float)pclScan->size();
+						pclScan = util3d::voxelize(pclScan, scanVoxelSize_);
+						float ratio = float(pclScan->size()) / pointsBeforeFiltering;
+						maxLaserScans = int(float(maxLaserScans) * ratio);
+					}
+					if(scanNormalK_ > 0 || scanNormalRadius_>0.0f)
+					{
+						//compute normals
+						pcl::PointCloud<pcl::Normal>::Ptr normals = is3D?
+								util3d::computeNormals(pclScan, scanNormalK_, scanNormalRadius_):
+								util3d::computeNormals2D(pclScan, scanNormalK_, scanNormalRadius_);
+						pcl::PointCloud<pcl::PointXYZINormal>::Ptr pclScanNormal(new pcl::PointCloud<pcl::PointXYZINormal>);
+						pcl::concatenateFields(*pclScan, *normals, *pclScanNormal);
+						scan = is3D?util3d::laserScanFromPointCloud(*pclScanNormal):util3d::laserScan2dFromPointCloud(*pclScanNormal);
+					}
+					else
+					{
+						scan = is3D?util3d::laserScanFromPointCloud(*pclScan):util3d::laserScan2dFromPointCloud(*pclScan);
+					}
 				}
 			}
 		}
