@@ -29,6 +29,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rclcpp/rclcpp.hpp"
 #include <rtabmap/utilite/UStl.h>
 #include <rtabmap/utilite/UDirectory.h>
+#include <rtabmap/core/Version.h>
+#ifdef RTABMAP_PYTHON
+#include <rtabmap/core/PythonInterface.h>
+#endif
 
 int main(int argc, char** argv)
 {
@@ -80,6 +84,12 @@ int main(int argc, char** argv)
 		}
 		arguments.push_back(argv[i]);
 	}
+
+#ifdef RTABMAP_PYTHON
+	// Initialize the embedded python interpreter on the main thread, as
+	// the nodelet below is loaded in a worker thread.
+	rtabmap::PythonInterface::instance("rtabmap");
+#endif	
 
 	rclcpp::init(argc, argv);
 	rclcpp::NodeOptions options;
