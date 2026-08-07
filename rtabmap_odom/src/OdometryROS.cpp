@@ -127,7 +127,7 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 
 	tfBuffer_ = std::make_shared<tf2_ros::Buffer>(get_clock());
 	tfListener_ = std::make_shared<tf2_ros::TransformListener>(*tfBuffer_);
-	tfBroadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
+	tfBroadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(*this);
 
 	std::string initialPoseStr;
 	frameId_ = this->declare_parameter("frame_id", frameId_);

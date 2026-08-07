@@ -160,7 +160,7 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 
 	tfBuffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
 	tfListener_ = std::make_shared<tf2_ros::TransformListener>(*tfBuffer_);
-	tfBroadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
+	tfBroadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(*this);
 
 	bool publishTf = true;
 	std::string initialPoseStr;
