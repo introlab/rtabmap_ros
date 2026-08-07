@@ -1,4 +1,4 @@
-name: docker
+name: docker-ros2
 
 on:
   push:

@@ -38,6 +38,7 @@ jobs:
           packages: 'rtabmap_launch rtabmap_demos rtabmap_python rtabmap_examples rtabmap_rviz_plugins'
         - ros_distro: rolling
           skip_keys: 'nav2_bringup nav2_msgs velodyne'
+          use_ros2_testing: true # Rolling is using ros2-testing (nightly)
           # rtabmap_costmap_plugins cannot be built, missing nav2 on rolling, build other packages:
           packages: 'rtabmap_launch rtabmap_demos rtabmap_python rtabmap_examples rtabmap_rviz_plugins'
       fail-fast: false
@@ -48,6 +49,7 @@ jobs:
     - uses: ros-tooling/setup-ros@v0.7
       with:
         required-ros-distributions: ${{ matrix.ros_distro }}
+        use-ros2-testing: ${{ matrix.use_ros2_testing || false }}
     - run: |
         DEBIAN_FRONTEND=noninteractive
         sudo apt update
