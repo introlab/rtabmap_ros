@@ -159,7 +159,7 @@ DbPlayer::DbPlayer(const rclcpp::NodeOptions & options) :
     resumeSrv_ = this->create_service<std_srvs::srv::Empty>(servicePrefix + "resume", std::bind(&DbPlayer::resumeCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
     if(publishTf) {
-        tfBroadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
+        tfBroadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(*this);
     }
 
     if(publishClock)

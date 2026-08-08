@@ -30,7 +30,7 @@ find_package(tf2_eigen REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 
-find_package(RTABMap 0.23.5 REQUIRED)
+find_package(RTABMap 0.23.10 REQUIRED)
 
 # libraries
 SET(Libraries
