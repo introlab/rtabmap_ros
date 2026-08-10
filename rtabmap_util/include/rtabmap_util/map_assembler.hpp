@@ -79,6 +79,7 @@ private:
 private:
 	MapsManager mapsManager_;
 	std::map<int, rtabmap::Signature> nodes_;
+	int lastNodeAdded_;
 	std::map<int, rtabmap::Transform> optimizedPoses_;
 	std::string mapFrameId_;
 	std::string rtabmapNodeName_;

@@ -381,7 +381,7 @@ std::map<int, Transform> MapsManager::getFilteredPoses(const std::map<int, Trans
 		double angle = mapFilterAngle_ == 0.0?CV_PI+0.1:mapFilterAngle_*CV_PI/180.0;
 		return rtabmap::graph::radiusPosesFiltering(poses, mapFilterRadius_, angle);
 	}
-	return std::map<int, Transform>();
+	return poses;
 }
 
 std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
@@ -440,6 +440,12 @@ std::map<int, rtabmap::Transform> MapsManager::updateMapCaches(
 	if(!memory && signatures.size() == 0)
 	{
 		UERROR("Memory and signatures should not be both null!?");
+		return std::map<int, rtabmap::Transform>();
+	}
+
+	if(posesIn.empty())
+	{
+		UERROR("Poses are empty, cannot update map caches!");
 		return std::map<int, rtabmap::Transform>();
 	}
 

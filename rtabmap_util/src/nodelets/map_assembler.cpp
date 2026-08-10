@@ -52,6 +52,7 @@ namespace rtabmap_util
 {
 MapAssembler::MapAssembler(const rclcpp::NodeOptions & options) :
 		Node("map_assembler", options),
+		lastNodeAdded_(-1),
 		rtabmapNodeName_("rtabmap"),
 		localGridsRegenerated_(false)
 {
@@ -256,12 +257,28 @@ void MapAssembler::mapDataReceivedCallback(const rtabmap_msgs::msg::MapData::Con
 }
 void MapAssembler::processMapData(const rtabmap_msgs::msg::MapData & msg)
 {
+	if(msg.graph.poses.empty() && msg.nodes.empty())
+	{
+		// empty map, nothing to update
+		return;
+	}
+
 	UTimer timer;
 
 	std::map<int, rtabmap::Transform> poses;
 	std::multimap<int, rtabmap::Link> constraints;
 	rtabmap::Transform mapOdom;
 	rtabmap_conversions::mapGraphFromROS(msg.graph, poses, constraints, mapOdom);
+
+	// If the last node added to the cache is not in the graph anymore, it has been
+	// discarded by rtabmap (e.g., too small motion), so remove it from the cache.
+	if(lastNodeAdded_>0 && poses.find(lastNodeAdded_) == poses.end())
+	{
+		RCLCPP_DEBUG(get_logger(), "map_assembler: Removing node %d from cache (discarded by rtabmap)", lastNodeAdded_);
+		nodes_.erase(lastNodeAdded_);
+	}
+	lastNodeAdded_ = -1;
+
 	for(unsigned int i=0; i<msg.nodes.size(); ++i)
 	{
 		if(msg.nodes[i].data.left_compressed.size() ||
@@ -274,17 +291,11 @@ void MapAssembler::processMapData(const rtabmap_msgs::msg::MapData & msg)
 				data.sensorData().setOccupancyGrid(cv::Mat(), cv::Mat(), cv::Mat(), 0, cv::Point3f());
 			}
 			uInsert(nodes_, std::make_pair(msg.nodes[i].id, data));
+			if(msg.nodes[i].id > lastNodeAdded_)
+			{
+				lastNodeAdded_ = msg.nodes[i].id;
+			}
 		}
-	}
-
-	// create a tmp signature with latest sensory data
-	if(poses.size() && nodes_.find(poses.rbegin()->first) != nodes_.end())
-	{
-		rtabmap::Signature tmpS = nodes_.at(poses.rbegin()->first);
-		rtabmap::SensorData tmpData = tmpS.sensorData();
-		tmpData.setId(0);
-		uInsert(nodes_, std::make_pair(0, rtabmap::Signature(0, -1, 0, tmpS.getStamp(), "", tmpS.getPose(), rtabmap::Transform(), tmpData)));
-		poses.insert(std::make_pair(0, poses.rbegin()->second));
 	}
 
 	// Update maps
@@ -296,6 +307,12 @@ void MapAssembler::processMapData(const rtabmap_msgs::msg::MapData & msg)
 				false,
 				false,
 				nodes_);
+	}
+	else
+	{
+		// No data cached, republish the maps already assembled, applying
+		// the same pose filtering than updateMapCaches() would do.
+		poses = mapsManager_.getFilteredPoses(poses);
 	}
 	double updateTime = timer.ticks();
 
@@ -313,6 +330,9 @@ void MapAssembler::reset(const std::shared_ptr<rmw_request_id_t>,
 {
 	RCLCPP_INFO(this->get_logger(), "map_assembler: reset!");
 	mapsManager_.clear();
+	nodes_.clear();
+	lastNodeAdded_ = -1;
+	optimizedPoses_.clear();
 }
 
 #ifdef WITH_OCTOMAP_MSGS
@@ -326,7 +346,10 @@ void MapAssembler::octomapBinaryCallback(
 	res->map.header.frame_id = mapFrameId_;
 	res->map.header.stamp = now();
 
-	mapsManager_.updateMapCaches(optimizedPoses_, 0, false, true, nodes_);
+	if(!optimizedPoses_.empty() && !nodes_.empty())
+	{
+		mapsManager_.updateMapCaches(optimizedPoses_, 0, false, true, nodes_);
+	}
 
 	const rtabmap::OctoMap * octomap = mapsManager_.getOctomap();
 	if(octomap->octree()->size())
@@ -342,7 +365,10 @@ void MapAssembler::octomapFullCallback(
 	res->map.header.frame_id = mapFrameId_;
 	res->map.header.stamp = now();
 
-	mapsManager_.updateMapCaches(optimizedPoses_, 0, false, true, nodes_);
+	if(!optimizedPoses_.empty() && !nodes_.empty())
+	{
+		mapsManager_.updateMapCaches(optimizedPoses_, 0, false, true, nodes_);
+	}
 
 	const rtabmap::OctoMap * octomap = mapsManager_.getOctomap();
 	if(octomap->octree()->size())
