@@ -4,6 +4,8 @@
 #
 
 import os
+import pathlib
+import sys
 
 from launch import LaunchDescription, Substitution, LaunchContext
 from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable, LogInfo, OpaqueFunction
@@ -13,6 +15,12 @@ from launch_ros.actions import Node
 from launch_ros.actions import SetParameter
 from typing import Text
 from ament_index_python.packages import get_package_share_directory
+
+THIS_DIR = pathlib.Path(__file__).resolve().parent
+if str(THIS_DIR) not in sys.path:
+    sys.path.insert(0, str(THIS_DIR))
+
+from rtabmap_launch_args import filter_rtabmap_arguments
 
 #Based on https://answers.ros.org/question/363763/ros2-how-best-to-conditionally-include-a-prefix-in-a-launchpy-file/
 class ConditionalText(Substitution):
@@ -42,6 +50,9 @@ class ConditionalBool(Substitution):
 def launch_setup(context, *args, **kwargs):      
 
     rtabmap_viz_odometry_node_name = "rgbd_odometry"
+    filtered_rtabmap_args, removed_odom_args = filter_rtabmap_arguments(
+        LaunchConfiguration('rtabmap_args').perform(context)
+    )
     use_icp_odometry = LaunchConfiguration('icp_odometry').perform(context)
     use_icp_odometry = use_icp_odometry == 'true' or use_icp_odometry == 'True'
     use_stereo_odometry = LaunchConfiguration('stereo').perform(context)
@@ -51,10 +62,28 @@ def launch_setup(context, *args, **kwargs):
     elif use_stereo_odometry:
         rtabmap_viz_odometry_node_name = "stereo_odometry"
 
-    return [
+    rtabmap_node_arguments = list(filtered_rtabmap_args)
+    rtabmap_node_arguments.extend([
+        "--ros-args",
+        "--log-level",
+        [LaunchConfiguration('namespace'), '.rtabmap:=', LaunchConfiguration('log_level')],
+        "--log-level",
+        ['rtabmap:=', LaunchConfiguration('log_level')]
+    ])
+
+    launch_actions = []
+    if removed_odom_args:
+        launch_actions.append(
+            LogInfo(
+                msg='Ignoring odometry-only arguments for rtabmap node: ' +
+                ' '.join(removed_odom_args)
+            )
+        )
+
+    launch_actions.extend([
         DeclareLaunchArgument('depth', default_value=ConditionalText('false', 'true', IfCondition(PythonExpression(["'", LaunchConfiguration('stereo'), "' == 'true'"]))._predicate_func(context)), description=''),
         DeclareLaunchArgument('subscribe_rgb', default_value=LaunchConfiguration('depth'), description=''),
-        DeclareLaunchArgument('args',  default_value=LaunchConfiguration('rtabmap_args'), description='Can be used to pass RTAB-Map\'s parameters or other flags like --udebug and --delete_db_on_start/-d'),
+        DeclareLaunchArgument('args',  default_value=LaunchConfiguration('rtabmap_args'), description='Can be used to pass RTAB-Map\'s parameters or other flags like --udebug and --delete_db_on_start/-d. Odometry-only parameters (for example --Odom/ResetCountdown) are ignored by the rtabmap node and should be set in odom_args.'),
         DeclareLaunchArgument('sync_queue_size',  default_value=LaunchConfiguration('queue_size'), description='Queue size of topic synchronizers.'),
         DeclareLaunchArgument('qos_image',       default_value=LaunchConfiguration('qos'), description='Specific QoS used for image input data: 0=system default, 1=Reliable, 2=Best Effort.'),
         DeclareLaunchArgument('qos_camera_info', default_value=LaunchConfiguration('qos'), description='Specific QoS used for camera info input data: 0=system default, 1=Reliable, 2=Best Effort.'),
@@ -346,7 +375,7 @@ def launch_setup(context, *args, **kwargs):
                 ("odom", LaunchConfiguration('odom_topic')),
                 ("imu", LaunchConfiguration('imu_topic')),
                 ("goal_out", LaunchConfiguration('output_goal_topic'))],
-            arguments=[LaunchConfiguration("args"), "--ros-args", "--log-level", [LaunchConfiguration('namespace'), '.rtabmap:=', LaunchConfiguration('log_level')], "--log-level", ['rtabmap:=', LaunchConfiguration('log_level')]],
+            arguments=rtabmap_node_arguments,
             prefix=LaunchConfiguration('launch_prefix'),
             namespace=LaunchConfiguration('namespace')),
 
@@ -417,7 +446,8 @@ def launch_setup(context, *args, **kwargs):
                 ('rgb/camera_info', LaunchConfiguration('camera_info_topic')),
                 ('rgbd_image', LaunchConfiguration('rgbd_topic_relay')),
                 ('cloud', 'voxel_cloud')]),
-        ]
+        ])
+    return launch_actions
 
 def generate_launch_description():
     
