@@ -333,7 +333,7 @@ void ICPOdometry::callbackScan(const sensor_msgs::msg::LaserScan::SharedPtr scan
 		{
 			// deskew with constant velocity model (we are in frameId)
 			sensor_msgs::msg::PointCloud2 scanOutDeskewed;
-			if(!rtabmap_conversions::deskew(scanOut, scanOutDeskewed, previousStamp(), velocityGuess()))
+			if(!rtabmap_conversions::deskew(scanOut, scanOutDeskewed, velocityGuess()))
 			{
 				RCLCPP_ERROR(this->get_logger(), "Failed to deskew input cloud, aborting odometry update!");
 				return;
@@ -362,7 +362,7 @@ void ICPOdometry::callbackScan(const sensor_msgs::msg::LaserScan::SharedPtr scan
 		{
 			// deskew with constant velocity model
 			sensor_msgs::msg::PointCloud2 scanOutDeskewed;
-			if(!rtabmap_conversions::deskew(scanOut, scanOutDeskewed, previousStamp(), velocityGuess()))
+			if(!rtabmap_conversions::deskew(scanOut, scanOutDeskewed, velocityGuess()))
 			{
 				RCLCPP_ERROR(this->get_logger(), "Failed to deskew input cloud, aborting odometry update!");
 				return;
@@ -583,7 +583,7 @@ void ICPOdometry::callbackCloud(const sensor_msgs::msg::PointCloud2::SharedPtr p
 			}
 
 			std::shared_ptr<sensor_msgs::msg::PointCloud2> cloudDeskewed(new sensor_msgs::msg::PointCloud2);
-			if(!rtabmap_conversions::deskew(*cloudPtr, *cloudDeskewed, previousStamp(), velocityGuess()))
+			if(!rtabmap_conversions::deskew(*cloudPtr, *cloudDeskewed, velocityGuess()))
 			{
 				RCLCPP_ERROR(this->get_logger(), "Failed to deskew input cloud, aborting odometry update!");
 				return;

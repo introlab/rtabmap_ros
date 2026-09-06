@@ -1533,13 +1533,481 @@ TEST(MsgConversion, transformPointCloudIdentityPreservesMetadata)
 	EXPECT_NEAR(p.z, 3.0f, 1e-5);
 }
 
+namespace {
+
+// A robot driving straight at a wall while the lidar sweeps.
+// A 10 Hz lidar: 100 samples 1 ms apart, so the sweep spans 99 ms and scans repeat
+// every 100 ms. Scan N covers [1000.000, 1000.099], scan N+1 covers [1000.100, 1000.199].
+constexpr size_t kScanPoints = 100;      // samples per sweep
+constexpr double kScanStep = 0.001;      // s between consecutive samples
+constexpr double kScanSpan = kScanStep * (kScanPoints - 1);   // 0.099 s, first -> last
+constexpr float kWallDistance = 5.0f;    // m, distance to the wall at the first point
+constexpr float kSpeed = 1.0f;           // m/s forward (+x)
+
+/// How the per-point time channel is encoded. deskew() accepts three datatypes, and
+/// FLOAT64 differs from the other two: it carries ABSOLUTE stamps (with an automatic
+/// ms/us/ns unit guess), while UINT32 and FLOAT32 carry offsets from the header stamp.
+enum TimeEncoding
+{
+	kOffsetSecFloat32,   ///< FLOAT32 seconds, relative to header.stamp
+	kOffsetNsecUint32,   ///< UINT32 nanoseconds, relative to header.stamp
+	kAbsoluteSecFloat64, ///< FLOAT64 absolute seconds
+	kAbsoluteMsecFloat64 ///< FLOAT64 absolute milliseconds (auto-scaled by deskew)
+};
+
+/// Organized-cloud layout. deskew() picks its traversal from width>height, so the two
+/// orderings exercise different loops.
+enum ScanLayout
+{
+	kTimeOnColumns,  ///< Ouster style: width=time samples, height=rings
+	kTimeOnRows      ///< Velodyne style: height=time samples, width=rings
+};
+
+/**
+ * Builds the raw (skewed) scan of a flat wall captured while moving forward.
+ *
+ * Each time sample is taken 1 ms after the previous one, by which time the robot has
+ * closed in on the wall by kSpeed * elapsed. Expressed in the sensor frame at capture
+ * time, the wall therefore appears to slide towards the robot: a straight wall is
+ * recorded as a slanted line. Deskewing must undo exactly that.
+ *
+ * @param headerStamp       absolute stamp put in the message header
+ * @param firstPointOffset  time of the first sample relative to the header stamp
+ * @param encoding          how to write the time channel
+ * @param layout            whether time runs along columns or rows
+ * @param rings             number of rings (the non-time dimension)
+ * @param fieldName         name of the time channel
+ * @param descendingTime    emit the samples newest-first, which deskew has to detect
+ */
+sensor_msgs::msg::PointCloud2 makeSkewedWallScan(
+		double headerStamp,
+		double firstPointOffset,
+		TimeEncoding encoding = kOffsetSecFloat32,
+		ScanLayout layout = kTimeOnColumns,
+		size_t rings = 1,
+		const std::string & fieldName = "t",
+		bool descendingTime = false)
+{
+	const bool timeIs64Bit =
+			encoding == kAbsoluteSecFloat64 || encoding == kAbsoluteMsecFloat64;
+	// Keep the 8-byte time channel aligned: x,y,z then 4 bytes of padding.
+	const uint32_t timeOffset = timeIs64Bit ? 16 : 12;
+	const uint32_t pointStep = timeIs64Bit ? 24 : 16;
+
+	sensor_msgs::msg::PointCloud2 cloud;
+	cloud.header.stamp = timestampToROS(headerStamp);
+	cloud.header.frame_id = "base_link";
+	cloud.is_bigendian = false;
+	cloud.is_dense = true;
+	if(layout == kTimeOnColumns)
+	{
+		cloud.width = kScanPoints;
+		cloud.height = rings;
+	}
+	else
+	{
+		cloud.width = rings;
+		cloud.height = kScanPoints;
+	}
+
+	cloud.fields.resize(4);
+	const char * xyz[3] = {"x", "y", "z"};
+	for(int i=0; i<3; ++i)
+	{
+		cloud.fields[i].name = xyz[i];
+		cloud.fields[i].offset = 4 * i;
+		cloud.fields[i].datatype = sensor_msgs::msg::PointField::FLOAT32;
+		cloud.fields[i].count = 1;
+	}
+	cloud.fields[3].name = fieldName;
+	cloud.fields[3].offset = timeOffset;
+	cloud.fields[3].datatype =
+			encoding == kOffsetNsecUint32 ? sensor_msgs::msg::PointField::UINT32 :
+			timeIs64Bit                   ? sensor_msgs::msg::PointField::FLOAT64 :
+			                                sensor_msgs::msg::PointField::FLOAT32;
+	cloud.fields[3].count = 1;
+
+	cloud.point_step = pointStep;
+	cloud.row_step = cloud.point_step * cloud.width;
+	cloud.data.resize(cloud.row_step * cloud.height);
+
+	for(size_t i=0; i<kScanPoints; ++i)          // position in the message
+	{
+		// When descending, the point stored first is the one captured last.
+		const size_t sample = descendingTime ? (kScanPoints - 1 - i) : i;
+		const double elapsed = double(sample) * kScanStep;    // since the first capture
+		const double offset = firstPointOffset + elapsed;     // relative to the header
+		const double absolute = headerStamp + offset;
+
+		for(size_t r=0; r<rings; ++r)
+		{
+			const size_t row = (layout == kTimeOnColumns) ? r : i;
+			const size_t col = (layout == kTimeOnColumns) ? i : r;
+			unsigned char * base = &cloud.data[row * cloud.row_step + col * cloud.point_step];
+
+			float * p = reinterpret_cast<float *>(base);
+			p[0] = kWallDistance - kSpeed * float(elapsed);   // the skew
+			p[1] = -1.0f + 2.0f * float(sample) / float(kScanPoints - 1);
+			p[2] = 0.1f * float(r);                            // one plane per ring
+
+			switch(encoding)
+			{
+				case kOffsetSecFloat32:
+					*reinterpret_cast<float *>(base + timeOffset) = float(offset);
+					break;
+				case kOffsetNsecUint32:
+					*reinterpret_cast<uint32_t *>(base + timeOffset) =
+							uint32_t(std::llround(offset * 1e9));
+					break;
+				case kAbsoluteSecFloat64:
+					*reinterpret_cast<double *>(base + timeOffset) = absolute;
+					break;
+				case kAbsoluteMsecFloat64:
+					*reinterpret_cast<double *>(base + timeOffset) = absolute * 1e3;
+					break;
+			}
+		}
+	}
+	return cloud;
+}
+
+/// Reads x of the point at (time sample, ring) for the given layout.
+float readWallX(const sensor_msgs::msg::PointCloud2 & cloud, size_t sample, size_t ring,
+		ScanLayout layout)
+{
+	const size_t row = (layout == kTimeOnColumns) ? ring : sample;
+	const size_t col = (layout == kTimeOnColumns) ? sample : ring;
+	return *reinterpret_cast<const float *>(
+			&cloud.data[row * cloud.row_step + col * cloud.point_step]);
+}
+
+float readField(const sensor_msgs::msg::PointCloud2 & cloud, size_t index, size_t field)
+{
+	return *reinterpret_cast<const float *>(
+			&cloud.data[index * cloud.point_step + cloud.fields[field].offset]);
+}
+
+}  // namespace
+
+TEST(MsgConversion, deskewConstantVelocityHeaderAtFirstPoint)
+{
+	const double firstPointStamp = 1000.0;
+
+	// Header stamped at the first point, so "t" runs 0 .. +0.100 s.
+	const sensor_msgs::msg::PointCloud2 in = makeSkewedWallScan(firstPointStamp, 0.0);
+	ASSERT_NEAR(readField(in, 0, 0), kWallDistance, 1e-4) << "first point is unskewed";
+	ASSERT_NEAR(readField(in, kScanPoints-1, 0), kWallDistance - float(kScanSpan), 1e-4)
+		<< "last point is skewed by v*0.099s = 9.9 cm";
+
+	sensor_msgs::msg::PointCloud2 out;
+	ASSERT_TRUE(deskew(in, out, rtabmap::Transform(kSpeed, 0, 0, 0, 0, 0)));
+
+	// Everything collapses back onto the wall at its original distance.
+	for(size_t i=0; i<kScanPoints; ++i)
+	{
+		EXPECT_NEAR(readField(out, i, 0), kWallDistance, 1e-4) << "x of point " << i;
+		EXPECT_NEAR(readField(out, i, 1), readField(in, i, 1), 1e-6) << "y of point " << i;
+		EXPECT_NEAR(readField(out, i, 2), 0.0f, 1e-6) << "z of point " << i;
+		EXPECT_FLOAT_EQ(readField(out, i, 3), 0.0f)
+			<< "t must be zeroed to mark the cloud as deskewed, point " << i;
+	}
+}
+
+TEST(MsgConversion, deskewConstantVelocityHeaderAtLastPoint)
+{
+	const double firstPointStamp = 1000.0;
+	const double lastPointStamp = firstPointStamp + kScanSpan;
+
+	// Same physical scan, but stamped at the last point: "t" runs -0.100 .. 0 s.
+	const sensor_msgs::msg::PointCloud2 in = makeSkewedWallScan(lastPointStamp, -kScanSpan);
+
+	sensor_msgs::msg::PointCloud2 out;
+	ASSERT_TRUE(deskew(in, out, rtabmap::Transform(kSpeed, 0, 0, 0, 0, 0)));
+
+	// Still a straight line, but now expressed in the frame at the END of the scan,
+	// by which point the robot has advanced kSpeed * kScanSpan = 9.9 cm.
+	const float expected = kWallDistance - kSpeed * float(kScanSpan);
+	for(size_t i=0; i<kScanPoints; ++i)
+	{
+		EXPECT_NEAR(readField(out, i, 0), expected, 1e-4) << "x of point " << i;
+	}
+
+	// The line is flat to well under a millimetre: that is the deskewing working,
+	// independently of which end of the scan the frame is anchored to.
+	float minX = readField(out, 0, 0);
+	float maxX = minX;
+	for(size_t i=1; i<kScanPoints; ++i)
+	{
+		minX = std::min(minX, readField(out, i, 0));
+		maxX = std::max(maxX, readField(out, i, 0));
+	}
+	EXPECT_LT(maxX - minX, 1e-3f) << "deskewed scan must be flat";
+}
+
+TEST(MsgConversion, deskewConstantVelocityStationaryRobotIsNoOp)
+{
+	// With no motion there is nothing to correct, so the skewed input must come back
+	// unchanged -- this pins that the correction is driven by the velocity and not by
+	// something incidental to the time field.
+	const double firstPointStamp = 1000.0;
+	const sensor_msgs::msg::PointCloud2 in = makeSkewedWallScan(firstPointStamp, 0.0);
+
+	sensor_msgs::msg::PointCloud2 out;
+	ASSERT_TRUE(deskew(in, out, rtabmap::Transform(0, 0, 0, 0, 0, 0)));
+
+	for(size_t i=0; i<kScanPoints; ++i)
+	{
+		EXPECT_NEAR(readField(out, i, 0), readField(in, i, 0), 1e-6) << "point " << i;
+	}
+}
+
+/// Deskews a wall scan built with the given encoding/layout and asserts it comes out
+/// flat at the expected distance.
+void expectDeskewRecoversWall(
+		TimeEncoding encoding,
+		ScanLayout layout,
+		size_t rings,
+		double headerStamp,
+		const std::string & fieldName = "t")
+{
+	SCOPED_TRACE("encoding=" + std::to_string(int(encoding)) +
+			" layout=" + std::to_string(int(layout)) +
+			" rings=" + std::to_string(rings) +
+			" field=" + fieldName);
+
+	const sensor_msgs::msg::PointCloud2 in =
+			makeSkewedWallScan(headerStamp, 0.0, encoding, layout, rings, fieldName);
+
+	sensor_msgs::msg::PointCloud2 out;
+	ASSERT_TRUE(deskew(in, out, rtabmap::Transform(kSpeed, 0, 0, 0, 0, 0)));
+
+	for(size_t i=0; i<kScanPoints; ++i)
+	{
+		for(size_t r=0; r<rings; ++r)
+		{
+			EXPECT_NEAR(readWallX(out, i, r, layout), kWallDistance, 1e-3)
+				<< "sample " << i << " ring " << r;
+		}
+	}
+}
+
+TEST(MsgConversion, deskewTimeAsFloat32SecondsOffset)
+{
+	expectDeskewRecoversWall(kOffsetSecFloat32, kTimeOnColumns, 1, 1000.0);
+}
+
+TEST(MsgConversion, deskewTimeAsUint32NanosecondsOffset)
+{
+	// UINT32 offsets are unsigned, so the header can only sit at or before the scan.
+	expectDeskewRecoversWall(kOffsetNsecUint32, kTimeOnColumns, 1, 1000.0);
+}
+
+TEST(MsgConversion, deskewTimeAsFloat64AbsoluteSeconds)
+{
+	// FLOAT64 carries absolute stamps rather than offsets.
+	expectDeskewRecoversWall(kAbsoluteSecFloat64, kTimeOnColumns, 1, 1000.0);
+}
+
+TEST(MsgConversion, deskewTimeAsFloat64AbsoluteMilliseconds)
+{
+	// Above 1e12 deskew treats FLOAT64 stamps as milliseconds and rescales them, so
+	// this needs a realistic epoch: 1.7e9 s is 1.7e12 ms.
+	expectDeskewRecoversWall(kAbsoluteMsecFloat64, kTimeOnColumns, 1, 1.7e9);
+}
+
+TEST(MsgConversion, deskewTimeOnColumnsWithMultipleRings)
+{
+	// Ouster layout: width=101 samples > height=4 rings.
+	expectDeskewRecoversWall(kOffsetSecFloat32, kTimeOnColumns, 4, 1000.0);
+}
+
+TEST(MsgConversion, deskewTimeOnRowsWithMultipleRings)
+{
+	// Velodyne layout: height=101 samples > width=4 rings, which takes the other loop.
+	expectDeskewRecoversWall(kOffsetSecFloat32, kTimeOnRows, 4, 1000.0);
+}
+
+TEST(MsgConversion, deskewLayoutsAgree)
+{
+	// The same scan expressed in either layout must deskew to the same geometry.
+	const double headerStamp = 1000.0;
+	const size_t rings = 4;
+
+	sensor_msgs::msg::PointCloud2 byColumns, byRows;
+	ASSERT_TRUE(deskew(makeSkewedWallScan(headerStamp, 0.0, kOffsetSecFloat32, kTimeOnColumns, rings),
+			byColumns, rtabmap::Transform(kSpeed, 0, 0, 0, 0, 0)));
+	ASSERT_TRUE(deskew(makeSkewedWallScan(headerStamp, 0.0, kOffsetSecFloat32, kTimeOnRows, rings),
+			byRows, rtabmap::Transform(kSpeed, 0, 0, 0, 0, 0)));
+
+	for(size_t i=0; i<kScanPoints; ++i)
+	{
+		for(size_t r=0; r<rings; ++r)
+		{
+			EXPECT_NEAR(readWallX(byColumns, i, r, kTimeOnColumns),
+					readWallX(byRows, i, r, kTimeOnRows), 1e-6)
+				<< "sample " << i << " ring " << r;
+		}
+	}
+}
+
+TEST(MsgConversion, deskewAcceptsEveryTimeFieldName)
+{
+	for(const std::string & name : {"t", "time", "stamps", "timestamp"})
+	{
+		expectDeskewRecoversWall(kOffsetSecFloat32, kTimeOnColumns, 1, 1000.0, name);
+	}
+}
+
+TEST(MsgConversion, deskewHandlesDescendingTimestamps)
+{
+	// Some drivers emit the sweep newest-first. deskew detects that the channel is not
+	// ascending and rescans it for the true min/max before interpolating.
+	const double headerStamp = 1000.0;
+	const sensor_msgs::msg::PointCloud2 in = makeSkewedWallScan(
+			headerStamp, 0.0, kOffsetSecFloat32, kTimeOnColumns, 1, "t",
+			/*descendingTime=*/true);
+
+	// Sanity: the stored order really is newest-first.
+	ASSERT_NEAR(readWallX(in, 0, 0, kTimeOnColumns), kWallDistance - float(kScanSpan), 1e-4);
+	ASSERT_NEAR(readWallX(in, kScanPoints-1, 0, kTimeOnColumns), kWallDistance, 1e-4);
+
+	sensor_msgs::msg::PointCloud2 out;
+	ASSERT_TRUE(deskew(in, out, rtabmap::Transform(kSpeed, 0, 0, 0, 0, 0)));
+
+	for(size_t i=0; i<kScanPoints; ++i)
+	{
+		EXPECT_NEAR(readWallX(out, i, 0, kTimeOnColumns), kWallDistance, 1e-3)
+			<< "sample " << i;
+	}
+}
+
+TEST(MsgConversion, deskewRejectsUnknownTimeFieldName)
+{
+	const sensor_msgs::msg::PointCloud2 in = makeSkewedWallScan(
+			1000.0, 0.0, kOffsetSecFloat32, kTimeOnColumns, 1, "elapsed");
+
+	sensor_msgs::msg::PointCloud2 out;
+	EXPECT_FALSE(deskew(in, out, rtabmap::Transform(kSpeed, 0, 0, 0, 0, 0)));
+}
+
+TEST(MsgConversion, deskewRejectsUnsupportedTimeDatatype)
+{
+	sensor_msgs::msg::PointCloud2 in = makeSkewedWallScan(1000.0, 0.0);
+	in.fields[3].datatype = sensor_msgs::msg::PointField::INT32;   // 4 bytes, but not 6/7/8
+
+	sensor_msgs::msg::PointCloud2 out;
+	EXPECT_FALSE(deskew(in, out, rtabmap::Transform(kSpeed, 0, 0, 0, 0, 0)));
+}
+
+TEST(MsgConversion, deskewWithRotationIsAnchoredAtTheHeaderStamp)
+{
+	// A pure yaw rate makes the correction a pure rotation about z, so it can be checked
+	// exactly: each sample must be rotated by yawRate * (its time - the header stamp),
+	// with its distance from the origin unchanged. This is what pins the correction to
+	// the header stamp -- there is no other reference time involved.
+	const double headerStamp = 1000.0;
+	const double yawRate = 0.5;   // rad/s
+	const sensor_msgs::msg::PointCloud2 in = makeSkewedWallScan(headerStamp, 0.0);
+
+	sensor_msgs::msg::PointCloud2 out;
+	ASSERT_TRUE(deskew(in, out, rtabmap::Transform(0, 0, 0, 0, 0, yawRate)));
+
+	auto xy = [](const sensor_msgs::msg::PointCloud2 & c, size_t i) {
+		const float * p = reinterpret_cast<const float *>(&c.data[i * c.point_step]);
+		return std::make_pair(p[0], p[1]);
+	};
+
+	for(size_t i=0; i<kScanPoints; ++i)
+	{
+		const std::pair<float, float> a = xy(in, i);
+		const std::pair<float, float> b = xy(out, i);
+		const double dt = double(i) * kScanStep;   // sample 0 sits at the header stamp
+
+		EXPECT_NEAR(std::hypot(b.first, b.second), std::hypot(a.first, a.second), 1e-4)
+			<< "a rotation must preserve the range of sample " << i;
+		EXPECT_NEAR(std::atan2(b.second, b.first) - std::atan2(a.second, a.first),
+				yawRate * dt, 1e-4)
+			<< "sample " << i << " must be rotated by yawRate*dt";
+	}
+
+	// Spelling out the i=0 case: dt is zero there, so that sample is untouched.
+	EXPECT_FLOAT_EQ(xy(out, 0).first, xy(in, 0).first);
+	EXPECT_FLOAT_EQ(xy(out, 0).second, xy(in, 0).second);
+}
+
+TEST(MsgConversion, deskewPassesThroughWhenThereIsNoTimeSpread)
+{
+	// A driver that leaves the time channel at zero gives a scan with no time spread.
+	// There is nothing to correct, so the cloud must come back unchanged rather than
+	// being reported as a failure -- callers abort the frame on false.
+	sensor_msgs::msg::PointCloud2 in = makeSkewedWallScan(1000.0, 0.0);
+	for(size_t i=0; i<kScanPoints; ++i)
+	{
+		*reinterpret_cast<float *>(&in.data[i * in.point_step + in.fields[3].offset]) = 0.0f;
+	}
+
+	sensor_msgs::msg::PointCloud2 out;
+	ASSERT_TRUE(deskew(in, out, rtabmap::Transform(kSpeed, 0, 0, 0, 0, 0)));
+	EXPECT_EQ(out.data, in.data) << "the cloud must be returned untouched";
+}
+
+TEST(MsgConversion, deskewIsIdempotent)
+{
+	// Deskewing zeroes the time channel to mark the cloud as done, so running deskew a
+	// second time (e.g. lidar_deskewing feeding icp_odometry) must be a silent no-op.
+	const sensor_msgs::msg::PointCloud2 in = makeSkewedWallScan(1000.0, 0.0);
+	const rtabmap::Transform velocity(kSpeed, 0, 0, 0, 0, 0);
+
+	sensor_msgs::msg::PointCloud2 once;
+	ASSERT_TRUE(deskew(in, once, velocity));
+	for(size_t i=0; i<kScanPoints; ++i)
+	{
+		ASSERT_FLOAT_EQ(*reinterpret_cast<const float *>(
+				&once.data[i * once.point_step + once.fields[3].offset]), 0.0f)
+			<< "deskewing must zero the time channel, sample " << i;
+	}
+
+	sensor_msgs::msg::PointCloud2 twice;
+	ASSERT_TRUE(deskew(once, twice, velocity)) << "a second pass must not fail";
+	EXPECT_EQ(twice.data, once.data) << "a second pass must change nothing";
+}
+
+TEST(MsgConversion, deskewClampsSamplesOutsideTheSweep)
+{
+	// The ordering check only inspects the first and last samples, so a corrupt stamp in
+	// the middle is not detected. It must be clamped to the end of the sweep rather than
+	// extrapolated, which would fling the point far past the wall.
+	const double headerStamp = 1000.0;
+	sensor_msgs::msg::PointCloud2 in = makeSkewedWallScan(headerStamp, 0.0);
+	const size_t corrupt = kScanPoints / 2;
+	*reinterpret_cast<float *>(
+			&in.data[corrupt * in.point_step + in.fields[3].offset]) = 0.5f;  // 5x the sweep
+
+	sensor_msgs::msg::PointCloud2 out;
+	ASSERT_TRUE(deskew(in, out, rtabmap::Transform(kSpeed, 0, 0, 0, 0, 0)));
+
+	// Clamped to the last sample's correction, so it lands within the sweep's own range
+	// rather than metres away. Every other sample is unaffected.
+	const float x = readWallX(out, corrupt, 0, kTimeOnColumns);
+	EXPECT_GE(x, kWallDistance - 1e-3f);
+	EXPECT_LE(x, kWallDistance + float(kSpeed * kScanSpan) + 1e-3f)
+		<< "an unclamped ratio of ~5 would put this point ~0.45 m past the wall";
+
+	for(size_t i=0; i<kScanPoints; ++i)
+	{
+		if(i == corrupt) continue;
+		EXPECT_NEAR(readWallX(out, i, 0, kTimeOnColumns), kWallDistance, 1e-3)
+			<< "uncorrupted sample " << i << " must be unaffected";
+	}
+}
+
 TEST(MsgConversion, deskewWithoutTimeFieldFails)
 {
 	// Deskewing needs a per-point time field; a plain XYZ cloud cannot be deskewed.
 	const sensor_msgs::msg::PointCloud2 in = makeXYZCloud({{1.0f, 0.0f, 0.0f}});
 
 	sensor_msgs::msg::PointCloud2 out;
-	EXPECT_FALSE(deskew(in, out, 0.0, rtabmap::Transform(1, 0, 0, 0, 0, 0)));
+	EXPECT_FALSE(deskew(in, out, rtabmap::Transform(1, 0, 0, 0, 0, 0)));
 }
 
 TEST(MsgConversion, deskewNullVelocityFails)
@@ -1547,7 +2015,7 @@ TEST(MsgConversion, deskewNullVelocityFails)
 	const sensor_msgs::msg::PointCloud2 in = makeXYZCloud({{1.0f, 0.0f, 0.0f}});
 
 	sensor_msgs::msg::PointCloud2 out;
-	EXPECT_FALSE(deskew(in, out, 0.0, rtabmap::Transform()))
+	EXPECT_FALSE(deskew(in, out, rtabmap::Transform()))
 		<< "a null velocity cannot deskew";
 }
 
