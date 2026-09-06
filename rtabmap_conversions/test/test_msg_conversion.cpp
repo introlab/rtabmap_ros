@@ -417,6 +417,8 @@ TEST(MsgConversion, keypointsFromROSAppendsAndAppliesXShift)
 
 TEST(MsgConversion, timestampRoundTrip)
 {
+	// Not exact on purpose: a double resolves to a few hundred nanoseconds at this
+	// magnitude, so the round trip is only good to about a microsecond.
 	const double in = 1234567890.123456;
 	EXPECT_NEAR(timestampFromROS(timestampToROS(in)), in, 1e-6);
 }
@@ -1411,11 +1413,10 @@ TEST(MsgConversion, infoRoundTrip)
 	rtabmap_msgs::msg::Info msg;
 	infoToROS(in, msg);
 
-	// infoToROS leaves the header to the caller (see CoreWrapper, which stamps the
-	// message before calling it), so infoFromROS can only recover the stamp if the
-	// header was filled in the same way.
-	EXPECT_EQ(msg.header.stamp.sec, 0) << "infoToROS must not touch the header";
-	msg.header.stamp = timestampToROS(in.stamp());
+	// An unstamped header is filled from the statistics, so infoFromROS recovers the
+	// stamp without the caller doing anything. Only to double precision, though.
+	EXPECT_NEAR(timestampFromROS(msg.header.stamp), in.stamp(), 1e-6);
+	EXPECT_TRUE(msg.header.frame_id.empty()) << "the frame id is always the caller's job";
 
 	rtabmap::Statistics out;
 	infoFromROS(msg, out);
@@ -2064,11 +2065,10 @@ TEST(MsgConversion, rgbdImageRoundTrip)
 	EXPECT_EQ(msg.rgb_camera_info.header.frame_id, "camera_link");
 	EXPECT_NEAR(timestampFromROS(msg.rgb_camera_info.header.stamp), 1234.5, 1e-6);
 
-	// rgbdImageToROS stamps only the sub-messages; the top-level header is the
-	// caller's job (see OdometryROS, which assigns msg.header right after the call),
-	// and rgbdImageFromROS reads the stamp from that top-level header.
-	EXPECT_EQ(msg.header.stamp.sec, 0) << "rgbdImageToROS must not touch the header";
-	msg.header = msg.rgb_camera_info.header;
+	// The top-level header is stamped too, so rgbdImageFromROS recovers the stamp
+	// without the caller having to fill it in.
+	EXPECT_EQ(msg.header.frame_id, "camera_link");
+	EXPECT_NEAR(timestampFromROS(msg.header.stamp), 1234.5, 1e-6);
 
 	// The returned SensorData shallow-references the message buffers, so the message
 	// must outlive it -- see rgbdImageFromROSAliasesTheMessage.
@@ -2354,6 +2354,24 @@ TEST(MsgConversion, nodeWithStereoModelRoundTrip)
 	EXPECT_EQ(out.id(), in.id());
 	ASSERT_EQ(out.sensorData().stereoCameraModels().size(), 1u);
 	EXPECT_NEAR(out.sensorData().stereoCameraModels()[0].baseline(), 0.12, 1e-6);
+}
+
+TEST(MsgConversion, infoToROSKeepsACallerSuppliedStamp)
+{
+	// CoreWrapper stamps the message before calling infoToROS, sometimes with a
+	// publication time unrelated to the data. That must not be overwritten.
+	rtabmap::Statistics in;
+	in.setExtended(true);
+	in.setStamp(1234.5);
+
+	rtabmap_msgs::msg::Info msg;
+	msg.header.stamp = timestampToROS(9999.0);
+	msg.header.frame_id = "map";
+	infoToROS(in, msg);
+
+	EXPECT_NEAR(timestampFromROS(msg.header.stamp), 9999.0, 1e-6)
+		<< "a caller-supplied stamp must win over the statistics stamp";
+	EXPECT_EQ(msg.header.frame_id, "map");
 }
 
 TEST(MsgConversion, infoOdomCacheRoundTrip)

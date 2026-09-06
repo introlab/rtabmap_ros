@@ -50,17 +50,9 @@ Full signatures and per-function notes are in the [API documentation](https://do
 
 ## Conventions worth knowing
 
-These are not obvious from the signatures and are the usual source of surprises.
+These cut across the whole API and are not obvious from the signatures. Per-function caveats — object lifetimes, which fields a given `ToROS()` fills — are documented on the functions themselves.
 
 **Null transforms.** RTAB-Map distinguishes a *null* transform (unknown) from identity. Over the wire this is encoded as an all-zero quaternion, so `transformFromGeometryMsg()` and `transformFromPoseMsg()` return a null `rtabmap::Transform` for one. Always check `isNull()` before using a result. `tf2::Transform` cannot represent this — it stores rotation as a basis matrix — so `transformToTF()` returns a `bool` instead.
-
-**Headers are the caller's job.** `infoToROS()` and `rgbdImageToROS()` deliberately do not set the top-level `header` of the message they fill; the caller stamps it. Their `FromROS()` counterparts read the stamp from that header, so forgetting it yields a silently zero timestamp.
-
-**`sensorDataToROS()` writes more than `sensorDataFromROS()` reads.** In particular `ground_truth_pose` is written but only read back by `nodeFromROS()`, which owns that field.
-
-**`rgbdImageFromROS()` does not copy the pixels.** The returned `SensorData` points into the message's own buffers, which is deliberate — copying every frame would be wasteful. The message must therefore outlive the `SensorData`, and you must deep-copy before letting it escape a subscription callback, since the queue recycles the message as soon as the callback returns.
-
-**Per-point time channels come in two flavours.** `deskew()` accepts a `t`, `time`, `stamps` or `timestamp` field. `UINT32` (nanoseconds) and `FLOAT32` (seconds) are *offsets from the message header stamp*; `FLOAT64` carries *absolute* stamps, with milliseconds/microseconds/nanoseconds detected automatically by magnitude. Deskewing zeroes the channel on output to mark the cloud as done, so running `deskew()` twice is a no-op rather than an error.
 
 **`CameraInfo` matrices are fixed-size arrays.** `k`, `r` and `p` are `std::array`, so they are never "empty" — an unset matrix is all zeros. `cameraModelFromROS()` treats a zero `k[0]`/`p[0]` (the focal length) as absent.
 
@@ -72,14 +64,18 @@ colcon test --packages-select rtabmap_conversions
 colcon test-result --verbose
 ```
 
-The unit tests in [`test/`](https://github.com/introlab/rtabmap_ros/tree/ros2/rtabmap_conversions/test) cover the whole public API. They need no running node: TF-dependent conversions are tested against a `tf2_ros::Buffer` populated directly with `setTransform()`.
-
 ## Documentation
 
 API documentation is generated with [rosdoc2](https://github.com/ros-infrastructure/rosdoc2) from the Doxygen comments in the public header, and published to [docs.ros.org](https://docs.ros.org/en/rolling/p/rtabmap_conversions/). To build it locally:
 
 ```bash
 rosdoc2 build --package-path rtabmap_conversions --output-directory doc_output
+```
+
+Besides `doc_output`, rosdoc2 writes `docs_build/` and `cross_reference/` scratch directories into the current directory. `docs_build/` contains a copy of the package manifest, so colcon then sees two packages of the same name and every later build fails with `Duplicate package names not supported`. Mark it once and the problem goes away for good — rosdoc2 leaves an existing marker in place on subsequent runs:
+
+```bash
+touch docs_build/COLCON_IGNORE
 ```
 
 ## License

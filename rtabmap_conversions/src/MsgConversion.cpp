@@ -272,6 +272,7 @@ void rgbdImageToROS(const rtabmap::SensorData & data, rtabmap_msgs::msg::RGBDIma
 		UERROR("Cannot convert multi-camera data to rgbd image");
 		return;
 	}
+	msg.header = header;
 	if(data.cameraModels().size() == 1)
 	{
 		//rgb+depth
@@ -586,6 +587,13 @@ void infoFromROS(const rtabmap_msgs::msg::Info & info, rtabmap::Statistics & sta
 
 void infoToROS(const rtabmap::Statistics & stats, rtabmap_msgs::msg::Info & info)
 {
+	// Fall back to the statistics' own stamp when the caller left the header unstamped.
+	// Callers that already stamped it keep their value, which may be a publication time
+	// unrelated to the data, or the exact input stamp rather than this double-derived one.
+	if(info.header.stamp.sec == 0 && info.header.stamp.nanosec == 0)
+	{
+		info.header.stamp = timestampToROS(stats.stamp());
+	}
 	info.ref_id = stats.refImageId();
 	info.loop_closure_id = stats.loopClosureId();
 	info.proximity_detection_id = stats.proximityDetectionId();

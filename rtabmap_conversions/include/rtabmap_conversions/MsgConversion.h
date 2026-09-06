@@ -200,11 +200,16 @@ void toCvShare(const rtabmap_msgs::msg::RGBDImage & image, const std::shared_ptr
  * represented by this message and is rejected with an error.
  *
  * @param[in]  data          the sensor data to convert
- * @param[out] msg           the converted message
- * @param[in]  sensorFrameId frame id stamped on the sub-messages
+ * @param[out] msg           the converted message, stamped with @p data's stamp
+ * @param[in]  sensorFrameId frame id stamped on the message and its sub-messages
  *
- * @warning Only the sub-message headers are stamped. The top-level `msg.header` is left
- *          for the caller to set, and rgbdImageFromROS() reads the stamp from there.
+ * @note rtabmap::SensorData holds its stamp as a double, so the stamp written here is
+ *       only accurate to a few hundred nanoseconds at current epoch times and will not
+ *       compare equal to the ROS stamp the data originally came from. Callers that need
+ *       the exact original stamp assign `msg.header` after this call.
+ * @note Unlike infoToROS(), an already-stamped `msg.header` is overwritten rather than
+ *       kept: the same header is applied to every sub-message here, so preserving only
+ *       the top-level one would leave the message internally inconsistent.
  */
 void rgbdImageToROS(const rtabmap::SensorData & data, rtabmap_msgs::msg::RGBDImage & msg, const std::string & sensorFrameId);
 
@@ -262,8 +267,15 @@ void infoFromROS(const rtabmap_msgs::msg::Info & info, rtabmap::Statistics & sta
  * @brief Fill an Info message from RTAB-Map statistics.
  * @param[in]  stats the statistics to convert
  * @param[out] info  the converted message
- * @warning The `header` is left for the caller to stamp; infoFromROS() reads the
- *          statistics stamp from it.
+ * @note If the caller left `info.header.stamp` unset it is filled from @p stats, so that
+ *       infoFromROS() recovers a stamp. An already-stamped header is never overwritten:
+ *       rtabmap::Statistics holds its stamp as a double, so the value derived from it is
+ *       only accurate to a few hundred nanoseconds at current epoch times and will not
+ *       compare equal to the ROS stamp the data came from. Callers wanting the exact
+ *       input stamp — or a publication time unrelated to the data — stamp the header
+ *       themselves before or after this call.
+ * @warning The frame id is never set: rtabmap::Statistics does not carry one, so the
+ *          caller must always fill `info.header.frame_id` itself.
  */
 void infoToROS(const rtabmap::Statistics & stats, rtabmap_msgs::msg::Info & info);
 
@@ -627,7 +639,14 @@ rtabmap::Landmarks landmarksFromROS(
 // Timestamps
 //============================================================================
 
-/** @brief Convert a ROS time into seconds. */
+/**
+ * @brief Convert a ROS time into seconds.
+ * @note A double holds about 15-16 significant digits, so at current epoch times
+ *       (~1.7e9 s) it resolves to roughly 400 ns. Converting back with timestampToROS()
+ *       therefore does not reproduce the original stamp exactly, and the rounding can
+ *       carry into the seconds field. Compare converted stamps with a tolerance, and
+ *       keep the original rclcpp::Time whenever exactness matters.
+ */
 inline double timestampFromROS(const rclcpp::Time & stamp) {return stamp.seconds();}
 /**
  * @brief Convert seconds into a ROS time.
