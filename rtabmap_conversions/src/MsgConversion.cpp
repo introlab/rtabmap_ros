@@ -1389,10 +1389,13 @@ void sensorDataToROS(const rtabmap::SensorData & data, rtabmap_msgs::msg::Sensor
 	{
 		pcl::PCLPointCloud2::Ptr cloud = rtabmap::util3d::laserScanToPointCloud2(data.laserScanRaw());
 		pcl_conversions::moveFromPCL(*cloud, msg.laser_scan);
-		msg.laser_scan_max_pts = data.laserScanCompressed().maxPoints();
-		msg.laser_scan_max_range = data.laserScanCompressed().rangeMax();
-		msg.laser_scan_format = data.laserScanCompressed().format();
-		transformToGeometryMsg(data.laserScanCompressed().localTransform(), msg.laser_scan_local_transform);
+		// Describe the scan we just serialized: reading these from laserScanCompressed()
+		// zeroes them whenever only the raw scan is set, and sensorDataFromROS() then
+		// fails its format assertion.
+		msg.laser_scan_max_pts = data.laserScanRaw().maxPoints();
+		msg.laser_scan_max_range = data.laserScanRaw().rangeMax();
+		msg.laser_scan_format = data.laserScanRaw().format();
+		transformToGeometryMsg(data.laserScanRaw().localTransform(), msg.laser_scan_local_transform);
 	}
 	if(!data.laserScanCompressed().empty())
 	{

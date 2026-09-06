@@ -28,6 +28,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <functional>
 #include <limits>
 
 #include <rtabmap_conversions/MsgConversion.h>
@@ -1578,6 +1579,8 @@ enum ScanLayout
  * @param rings             number of rings (the non-time dimension)
  * @param fieldName         name of the time channel
  * @param descendingTime    emit the samples newest-first, which deskew has to detect
+ * @param displacement      distance travelled as a function of time since the first
+ *                          sample; defaults to the constant-velocity kSpeed * elapsed
  */
 sensor_msgs::msg::PointCloud2 makeSkewedWallScan(
 		double headerStamp,
@@ -1586,7 +1589,8 @@ sensor_msgs::msg::PointCloud2 makeSkewedWallScan(
 		ScanLayout layout = kTimeOnColumns,
 		size_t rings = 1,
 		const std::string & fieldName = "t",
-		bool descendingTime = false)
+		bool descendingTime = false,
+		const std::function<double(double)> & displacement = nullptr)
 {
 	const bool timeIs64Bit =
 			encoding == kAbsoluteSecFloat64 || encoding == kAbsoluteMsecFloat64;
@@ -1646,7 +1650,9 @@ sensor_msgs::msg::PointCloud2 makeSkewedWallScan(
 			unsigned char * base = &cloud.data[row * cloud.row_step + col * cloud.point_step];
 
 			float * p = reinterpret_cast<float *>(base);
-			p[0] = kWallDistance - kSpeed * float(elapsed);   // the skew
+			// The robot has closed in on the wall by this much when the sample was taken.
+			const double travelled = displacement ? displacement(elapsed) : kSpeed * elapsed;
+			p[0] = kWallDistance - float(travelled);          // the skew
 			p[1] = -1.0f + 2.0f * float(sample) / float(kScanPoints - 1);
 			p[2] = 0.1f * float(r);                            // one plane per ring
 
@@ -2148,6 +2154,671 @@ TEST(MsgConversion, toCvShareAliasesRawImages)
 	ASSERT_FALSE(rgbPtr->image.empty());
 	EXPECT_EQ(cv::countNonZero(rgbPtr->image.reshape(1) != rgb.reshape(1)), 0);
 	EXPECT_EQ(cv::countNonZero(depthPtr->image != depth), 0);
+}
+
+/////////////////////////
+// Compressed images
+/////////////////////////
+
+namespace {
+
+/// Builds a depth image compressed the way rtabmap does it (not a jpg/png CompressedImage).
+sensor_msgs::msg::CompressedImage makeRtabmapCompressedDepth(const cv::Mat & depth)
+{
+	sensor_msgs::msg::CompressedImage msg;
+	msg.format = "";   // anything but "jpg" takes the rtabmap::uncompressImage path
+	msg.data = rtabmap::compressImage(depth, ".png");
+	return msg;
+}
+
+}  // namespace
+
+TEST(MsgConversion, toCvCopyReadsCompressedDepth)
+{
+	const cv::Mat depth(4, 4, CV_16UC1, cv::Scalar(1234));
+
+	rtabmap_msgs::msg::RGBDImage msg;
+	msg.depth_compressed = makeRtabmapCompressedDepth(depth);
+
+	cv_bridge::CvImagePtr rgbPtr, depthPtr;
+	toCvCopy(msg, rgbPtr, depthPtr);
+
+	ASSERT_TRUE(depthPtr);
+	ASSERT_FALSE(depthPtr->image.empty());
+	EXPECT_EQ(depthPtr->image.type(), CV_16UC1);
+	EXPECT_EQ(depthPtr->encoding, sensor_msgs::image_encodings::TYPE_16UC1);
+	EXPECT_EQ(cv::countNonZero(depthPtr->image != depth), 0);
+}
+
+TEST(MsgConversion, toCvShareReadsCompressedDepth)
+{
+	const cv::Mat depth(4, 4, CV_32FC1, cv::Scalar(1.5f));
+
+	rtabmap_msgs::msg::RGBDImage msg;
+	msg.depth_compressed = makeRtabmapCompressedDepth(depth);
+
+	cv_bridge::CvImageConstPtr rgbPtr, depthPtr;
+	toCvShare(msg, std::shared_ptr<void const>(), rgbPtr, depthPtr);
+
+	ASSERT_TRUE(depthPtr);
+	ASSERT_FALSE(depthPtr->image.empty());
+	EXPECT_EQ(depthPtr->image.type(), CV_32FC1);
+	EXPECT_EQ(depthPtr->encoding, sensor_msgs::image_encodings::TYPE_32FC1);
+	EXPECT_EQ(cv::countNonZero(depthPtr->image != depth), 0);
+}
+
+TEST(MsgConversion, toCvCopyReadsCompressedRgb)
+{
+	const cv::Mat rgb(8, 8, CV_8UC3, cv::Scalar(10, 20, 30));
+
+	rtabmap_msgs::msg::RGBDImage msg;
+	msg.rgb_compressed.format = "png";
+	msg.rgb_compressed.data = rtabmap::compressImage(rgb, ".png");
+
+	cv_bridge::CvImagePtr rgbPtr, depthPtr;
+	toCvCopy(msg, rgbPtr, depthPtr);
+
+	ASSERT_TRUE(rgbPtr);
+	ASSERT_FALSE(rgbPtr->image.empty());
+	EXPECT_EQ(rgbPtr->image.type(), CV_8UC3);
+	EXPECT_EQ(cv::countNonZero(rgbPtr->image.reshape(1) != rgb.reshape(1)), 0);
+}
+
+/////////////////////////
+// SensorData: raw copies, laser scans, stereo
+/////////////////////////
+
+TEST(MsgConversion, sensorDataToROSCopyRawDataCarriesImages)
+{
+	cv::Mat K = (cv::Mat_<double>(3, 3) <<
+			525.0, 0.0, 4.0, 0.0, 525.0, 4.0, 0.0, 0.0, 1.0);
+	const rtabmap::CameraModel model("cam", cv::Size(8, 8), K, cv::Mat(), cv::Mat(), cv::Mat());
+
+	const cv::Mat rgb(8, 8, CV_8UC3, cv::Scalar(10, 20, 30));
+	const cv::Mat depth(8, 8, CV_16UC1, cv::Scalar(2000));
+	rtabmap::SensorData in(rgb, depth, model, 1, 1000.0);
+
+	// Without copyRawData the raw images are not serialized...
+	rtabmap_msgs::msg::SensorData without;
+	sensorDataToROS(in, without, "base_link", /*copyRawData=*/false);
+	EXPECT_TRUE(without.left.data.empty());
+	EXPECT_TRUE(without.right.data.empty());
+
+	// ...with it, they are.
+	rtabmap_msgs::msg::SensorData with;
+	sensorDataToROS(in, with, "base_link", /*copyRawData=*/true);
+	ASSERT_FALSE(with.left.data.empty());
+	ASSERT_FALSE(with.right.data.empty());
+	EXPECT_EQ(with.left.encoding, sensor_msgs::image_encodings::BGR8);
+	EXPECT_EQ(with.right.encoding, sensor_msgs::image_encodings::TYPE_16UC1);
+
+	const rtabmap::SensorData out = sensorDataFromROS(with);
+	ASSERT_FALSE(out.imageRaw().empty());
+	EXPECT_EQ(cv::countNonZero(out.imageRaw().reshape(1) != rgb.reshape(1)), 0);
+	ASSERT_FALSE(out.depthRaw().empty());
+	EXPECT_EQ(cv::countNonZero(out.depthRaw() != depth), 0);
+}
+
+TEST(MsgConversion, sensorDataLaserScanRoundTrip)
+{
+	cv::Mat points(1, 3, CV_32FC3);
+	points.at<cv::Vec3f>(0, 0) = cv::Vec3f(1.0f, 0.0f, 0.0f);
+	points.at<cv::Vec3f>(0, 1) = cv::Vec3f(0.0f, 2.0f, 0.0f);
+	points.at<cv::Vec3f>(0, 2) = cv::Vec3f(0.0f, 0.0f, 3.0f);
+
+	const rtabmap::Transform localTransform(0.0f, 0.0f, 0.3f, 0.0f, 0.0f, 0.0f);
+	const rtabmap::LaserScan scan(points, /*maxPoints=*/100, /*maxRange=*/40.0f,
+			rtabmap::LaserScan::kXYZ, localTransform);
+
+	rtabmap::SensorData in;
+	in.setStamp(1000.0);
+	in.setLaserScan(scan);
+
+	rtabmap_msgs::msg::SensorData msg;
+	sensorDataToROS(in, msg, "base_link", /*copyRawData=*/true);
+
+	EXPECT_EQ(msg.laser_scan_max_pts, 100);
+	EXPECT_FLOAT_EQ(msg.laser_scan_max_range, 40.0f);
+	EXPECT_EQ(msg.laser_scan_format, (int)rtabmap::LaserScan::kXYZ);
+	expectTransformNear(transformFromGeometryMsg(msg.laser_scan_local_transform),
+			localTransform, 1e-4f);
+
+	const rtabmap::SensorData out = sensorDataFromROS(msg);
+	const rtabmap::LaserScan & outScan = out.laserScanRaw().empty()
+			? out.laserScanCompressed() : out.laserScanRaw();
+	EXPECT_EQ(outScan.size(), scan.size());
+	EXPECT_EQ(outScan.maxPoints(), scan.maxPoints());
+	EXPECT_FLOAT_EQ(outScan.rangeMax(), scan.rangeMax());
+	expectTransformNear(outScan.localTransform(), localTransform, 1e-4f);
+}
+
+TEST(MsgConversion, sensorDataStereoModelRoundTrip)
+{
+	const double fx = 525.0;
+	const double baseline = 0.12;
+	const rtabmap::Transform localTransform(0.0f, 0.0f, 0.1f, 0.0f, 0.0f, 0.0f);
+
+	const rtabmap::StereoCameraModel stereo(
+			fx, fx, 320.0, 240.0, baseline, localTransform, cv::Size(640, 480));
+	ASSERT_TRUE(stereo.isValidForProjection()) << "precondition";
+
+	rtabmap::SensorData in;
+	in.setStamp(1000.0);
+	in.setStereoImage(cv::Mat(), cv::Mat(), stereo);
+
+	rtabmap_msgs::msg::SensorData msg;
+	sensorDataToROS(in, msg, "base_link");
+
+	// The stereo branch fills BOTH camera infos, unlike the monocular one.
+	ASSERT_EQ(msg.left_camera_info.size(), 1u);
+	ASSERT_EQ(msg.right_camera_info.size(), 1u);
+
+	const rtabmap::SensorData out = sensorDataFromROS(msg);
+	ASSERT_EQ(out.stereoCameraModels().size(), 1u);
+	EXPECT_TRUE(out.cameraModels().empty()) << "must not be read back as monocular";
+	EXPECT_NEAR(out.stereoCameraModels()[0].left().fx(), fx, 1e-9);
+	EXPECT_NEAR(out.stereoCameraModels()[0].baseline(), baseline, 1e-6);
+	expectTransformNear(out.stereoCameraModels()[0].localTransform(), localTransform, 1e-4f);
+}
+
+TEST(MsgConversion, nodeWithStereoModelRoundTrip)
+{
+	const rtabmap::StereoCameraModel stereo(
+			525.0, 525.0, 320.0, 240.0, 0.12,
+			rtabmap::Transform::getIdentity(), cv::Size(640, 480));
+
+	rtabmap::Signature in(3, 0, 1, 1000.0, "stereo_node", sampleTransform());
+	in.sensorData().setStereoImage(cv::Mat(), cv::Mat(), stereo);
+
+	rtabmap_msgs::msg::Node msg;
+	nodeToROS(in, msg);
+	const rtabmap::Signature out = nodeFromROS(msg);
+
+	EXPECT_EQ(out.id(), in.id());
+	ASSERT_EQ(out.sensorData().stereoCameraModels().size(), 1u);
+	EXPECT_NEAR(out.sensorData().stereoCameraModels()[0].baseline(), 0.12, 1e-6);
+}
+
+TEST(MsgConversion, infoOdomCacheRoundTrip)
+{
+	// Statistics carries a whole MapGraph for the odometry cache in localization mode.
+	std::map<int, rtabmap::Transform> poses;
+	poses.insert(std::make_pair(1, sampleTransform()));
+	poses.insert(std::make_pair(2, rtabmap::Transform(1, 2, 3, 0, 0, 0)));
+
+	std::multimap<int, rtabmap::Link> links;
+	links.insert(std::make_pair(1, rtabmap::Link(
+			1, 2, rtabmap::Link::kNeighbor, sampleTransform())));
+
+	rtabmap::Statistics in;
+	in.setExtended(true);
+	in.setOdomCachePoses(poses);
+	in.setOdomCacheConstraints(links);
+
+	rtabmap_msgs::msg::Info msg;
+	infoToROS(in, msg);
+	ASSERT_EQ(msg.odom_cache.poses.size(), poses.size());
+	ASSERT_EQ(msg.odom_cache.links.size(), links.size());
+
+	rtabmap::Statistics out;
+	infoFromROS(msg, out);
+
+	ASSERT_EQ(out.odomCachePoses().size(), poses.size());
+	expectTransformNear(out.odomCachePoses().at(1), poses.at(1));
+	expectTransformNear(out.odomCachePoses().at(2), poses.at(2));
+	EXPECT_EQ(out.odomCacheConstraints().size(), links.size());
+}
+
+/////////////////////////
+// TF-based conversions
+/////////////////////////
+
+namespace {
+
+/// A tf2 buffer needs a clock, but neither a node nor a listener: transforms can be
+/// injected directly, which makes every TF-based conversion an ordinary unit test.
+std::shared_ptr<tf2_ros::Buffer> makeTfBuffer()
+{
+	std::shared_ptr<tf2_ros::Buffer> buffer =
+			std::make_shared<tf2_ros::Buffer>(std::make_shared<rclcpp::Clock>(RCL_ROS_TIME));
+	// Transforms are injected synchronously before the lookups, so tell tf2 not to warn
+	// about waiting for a listener thread that will never exist.
+	buffer->setUsingDedicatedThread(true);
+	return buffer;
+}
+
+void addTf(tf2_ros::Buffer & buffer,
+		const std::string & parent, const std::string & child,
+		const rtabmap::Transform & t, double stamp, bool isStatic = true)
+{
+	geometry_msgs::msg::TransformStamped msg;
+	msg.header.stamp = timestampToROS(stamp);
+	msg.header.frame_id = parent;
+	msg.child_frame_id = child;
+	transformToGeometryMsg(t, msg.transform);
+	ASSERT_TRUE(buffer.setTransform(msg, "unit_test", isStatic));
+}
+
+}  // namespace
+
+TEST(MsgConversion, getTransformReadsTheBuffer)
+{
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();
+	const rtabmap::Transform baseToCamera(0.1f, 0.0f, 0.2f, 0.0f, 0.0f, 0.0f);
+	addTf(*buffer, "base_link", "camera_link", baseToCamera, 1000.0);
+
+	const rtabmap::Transform out =
+			getTransform("base_link", "camera_link", timestampToROS(1000.0), *buffer, 0.0);
+
+	expectTransformNear(out, baseToCamera);
+}
+
+TEST(MsgConversion, getTransformReturnsNullWhenUnknown)
+{
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();
+	addTf(*buffer, "base_link", "camera_link", rtabmap::Transform::getIdentity(), 1000.0);
+
+	// An unrelated frame must not throw; it must come back as a null transform.
+	EXPECT_TRUE(getTransform("base_link", "lidar_link", timestampToROS(1000.0), *buffer, 0.0)
+			.isNull());
+}
+
+TEST(MsgConversion, getTransformIsInvertedByFrameOrder)
+{
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();
+	const rtabmap::Transform baseToCamera(0.1f, 0.2f, 0.3f, 0.0f, 0.0f, 0.5f);
+	addTf(*buffer, "base_link", "camera_link", baseToCamera, 1000.0);
+
+	const rtabmap::Transform forward =
+			getTransform("base_link", "camera_link", timestampToROS(1000.0), *buffer, 0.0);
+	const rtabmap::Transform backward =
+			getTransform("camera_link", "base_link", timestampToROS(1000.0), *buffer, 0.0);
+
+	expectTransformNear(backward, forward.inverse(), 1e-4f);
+}
+
+TEST(MsgConversion, getMovingTransformMeasuresMotionBetweenStamps)
+{
+	// base_link drives 1 m along x of odom between t=1000 and t=1001.
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();
+	addTf(*buffer, "odom", "base_link", rtabmap::Transform(0, 0, 0, 0, 0, 0), 1000.0, false);
+	addTf(*buffer, "odom", "base_link", rtabmap::Transform(1, 0, 0, 0, 0, 0), 1001.0, false);
+
+	// Motion of base_link from t=1000 to t=1001, seen in the fixed odom frame.
+	const rtabmap::Transform motion = getMovingTransform(
+			"base_link", "odom", timestampToROS(1000.0), timestampToROS(1001.0), *buffer, 0.0);
+
+	ASSERT_FALSE(motion.isNull());
+	EXPECT_NEAR(motion.x(), 1.0, 1e-4);
+	EXPECT_NEAR(motion.y(), 0.0, 1e-4);
+	EXPECT_NEAR(motion.z(), 0.0, 1e-4);
+}
+
+TEST(MsgConversion, getMovingTransformInterpolatesBetweenStamps)
+{
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();
+	addTf(*buffer, "odom", "base_link", rtabmap::Transform(0, 0, 0, 0, 0, 0), 1000.0, false);
+	addTf(*buffer, "odom", "base_link", rtabmap::Transform(1, 0, 0, 0, 0, 0), 1001.0, false);
+
+	// Halfway through, so half the motion.
+	const rtabmap::Transform half = getMovingTransform(
+			"base_link", "odom", timestampToROS(1000.0), timestampToROS(1000.5), *buffer, 0.0);
+
+	ASSERT_FALSE(half.isNull());
+	EXPECT_NEAR(half.x(), 0.5, 1e-4);
+}
+
+TEST(MsgConversion, getMovingTransformIsNullWithoutAFixedFrame)
+{
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();
+	addTf(*buffer, "odom", "base_link", rtabmap::Transform::getIdentity(), 1000.0, false);
+
+	EXPECT_TRUE(getMovingTransform("base_link", "map",
+			timestampToROS(1000.0), timestampToROS(1001.0), *buffer, 0.0).isNull());
+}
+
+TEST(MsgConversion, convertScanMsgProducesALaserScan)
+{
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();
+	const rtabmap::Transform baseToLaser(0.2f, 0.0f, 0.1f, 0.0f, 0.0f, 0.0f);
+	addTf(*buffer, "base_link", "laser", baseToLaser, 1000.0);
+
+	sensor_msgs::msg::LaserScan msg;
+	msg.header.stamp = timestampToROS(1000.0);
+	msg.header.frame_id = "laser";
+	msg.angle_min = -1.0f;
+	msg.angle_max = 1.0f;
+	msg.angle_increment = 0.1f;
+	msg.time_increment = 0.0f;
+	msg.range_min = 0.1f;
+	msg.range_max = 30.0f;
+	msg.ranges.assign(21, 5.0f);
+
+	rtabmap::LaserScan scan;
+	ASSERT_TRUE(convertScanMsg(msg, "base_link", "", timestampToROS(1000.0),
+			scan, *buffer, 0.0));
+
+	EXPECT_FALSE(scan.empty());
+	EXPECT_EQ(scan.size(), (int)msg.ranges.size());
+	expectTransformNear(scan.localTransform(), baseToLaser, 1e-4f);
+}
+
+TEST(MsgConversion, convertScanMsgRejectsMalformedScans)
+{
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();
+	addTf(*buffer, "base_link", "laser", rtabmap::Transform::getIdentity(), 1000.0);
+
+	sensor_msgs::msg::LaserScan base;
+	base.header.stamp = timestampToROS(1000.0);
+	base.header.frame_id = "laser";
+	base.angle_min = -1.0f;
+	base.angle_max = 1.0f;
+	base.angle_increment = 0.1f;
+	base.range_min = 0.1f;
+	base.range_max = 30.0f;
+	base.ranges.assign(21, 5.0f);
+
+	rtabmap::LaserScan scan;
+
+	sensor_msgs::msg::LaserScan zeroIncrement = base;
+	zeroIncrement.angle_increment = 0.0f;
+	EXPECT_FALSE(convertScanMsg(zeroIncrement, "base_link", "", timestampToROS(1000.0),
+			scan, *buffer, 0.0)) << "angle_increment of 0 would divide by zero";
+
+	sensor_msgs::msg::LaserScan invertedRange = base;
+	invertedRange.range_min = 40.0f;
+	EXPECT_FALSE(convertScanMsg(invertedRange, "base_link", "", timestampToROS(1000.0),
+			scan, *buffer, 0.0)) << "range_min > range_max";
+
+	sensor_msgs::msg::LaserScan invertedAngle = base;
+	invertedAngle.angle_min = 1.0f;
+	invertedAngle.angle_max = -1.0f;
+	EXPECT_FALSE(convertScanMsg(invertedAngle, "base_link", "", timestampToROS(1000.0),
+			scan, *buffer, 0.0)) << "positive increment with angle_max < angle_min";
+}
+
+TEST(MsgConversion, convertScanMsgFailsWithoutTf)
+{
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();   // empty
+
+	sensor_msgs::msg::LaserScan msg;
+	msg.header.stamp = timestampToROS(1000.0);
+	msg.header.frame_id = "laser";
+	msg.angle_min = -1.0f;
+	msg.angle_max = 1.0f;
+	msg.angle_increment = 0.1f;
+	msg.range_min = 0.1f;
+	msg.range_max = 30.0f;
+	msg.ranges.assign(21, 5.0f);
+
+	rtabmap::LaserScan scan;
+	EXPECT_FALSE(convertScanMsg(msg, "base_link", "", timestampToROS(1000.0),
+			scan, *buffer, 0.0));
+}
+
+TEST(MsgConversion, convertScan3dMsgKeepsLocalTransformAndLimits)
+{
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();
+	const rtabmap::Transform baseToLidar(0.0f, 0.0f, 0.5f, 0.0f, 0.0f, 0.0f);
+	addTf(*buffer, "base_link", "lidar", baseToLidar, 1000.0);
+
+	sensor_msgs::msg::PointCloud2 msg =
+			makeXYZCloud({{1.0f, 0.0f, 0.0f}, {2.0f, 0.0f, 0.0f}, {3.0f, 0.0f, 0.0f}});
+	msg.header.stamp = timestampToROS(1000.0);
+	msg.header.frame_id = "lidar";
+
+	rtabmap::LaserScan scan;
+	ASSERT_TRUE(convertScan3dMsg(msg, "base_link", "", timestampToROS(1000.0),
+			scan, *buffer, 0.0));
+
+	EXPECT_EQ(scan.size(), 3);
+	expectTransformNear(scan.localTransform(), baseToLidar, 1e-4f);
+	EXPECT_EQ(scan.rangeMax(), 0.0f) << "no max range requested";
+
+	rtabmap::LaserScan limited;
+	ASSERT_TRUE(convertScan3dMsg(msg, "base_link", "", timestampToROS(1000.0),
+			limited, *buffer, 0.0, /*maxPoints=*/10, /*maxRange=*/2.5f));
+	EXPECT_EQ(limited.maxPoints(), 10);
+	EXPECT_FLOAT_EQ(limited.rangeMax(), 2.5f);
+}
+
+TEST(MsgConversion, convertScan3dMsgFailsWithoutTf)
+{
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();   // empty
+
+	sensor_msgs::msg::PointCloud2 msg = makeXYZCloud({{1.0f, 0.0f, 0.0f}});
+	msg.header.stamp = timestampToROS(1000.0);
+	msg.header.frame_id = "lidar";
+
+	rtabmap::LaserScan scan;
+	EXPECT_FALSE(convertScan3dMsg(msg, "base_link", "", timestampToROS(1000.0),
+			scan, *buffer, 0.0));
+}
+
+TEST(MsgConversion, landmarksFromROSAppliesTfAndDefaultVariance)
+{
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();
+	const rtabmap::Transform baseToCamera(0.5f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+	addTf(*buffer, "base_link", "camera_link", baseToCamera, 1000.0);
+
+	geometry_msgs::msg::PoseWithCovarianceStamped tag;
+	tag.header.stamp = timestampToROS(1000.0);
+	tag.header.frame_id = "camera_link";
+	tag.pose.pose.position.x = 2.0;      // 2 m in front of the camera
+	tag.pose.pose.orientation.w = 1.0;
+	// covariance left at zero -> the defaults must be substituted
+
+	std::map<int, std::pair<geometry_msgs::msg::PoseWithCovarianceStamped, float> > tags;
+	tags.insert(std::make_pair(7, std::make_pair(tag, 0.15f)));
+
+	const rtabmap::Landmarks landmarks = landmarksFromROS(
+			tags, "base_link", "", timestampToROS(1000.0), *buffer, 0.0,
+			/*defaultLinVariance=*/0.01, /*defaultAngVariance=*/0.02);
+
+	ASSERT_EQ(landmarks.size(), 1u);
+	ASSERT_TRUE(landmarks.find(7) != landmarks.end());
+
+	// The tag pose must come back in base_link: 0.5 (base->camera) + 2.0 (camera->tag).
+	EXPECT_NEAR(landmarks.at(7).pose().x(), 2.5, 1e-4);
+
+	const cv::Mat cov = landmarks.at(7).covariance();
+	ASSERT_EQ(cov.rows, 6);
+	EXPECT_NEAR(cov.at<double>(0,0), 0.01, 1e-9) << "linear default";
+	EXPECT_NEAR(cov.at<double>(3,3), 0.02, 1e-9) << "angular default";
+}
+
+TEST(MsgConversion, landmarksFromROSCorrectsForOdometryMotion)
+{
+	// The tag is seen 1 s after the odometry stamp, during which the robot drives 1 m.
+	// landmarksFromROS must fold that motion in, otherwise the landmark is placed where
+	// the robot would have seen it had it not moved.
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();
+	const rtabmap::Transform baseToCamera(0.5f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+	addTf(*buffer, "base_link", "camera_link", baseToCamera, 1000.0);
+	addTf(*buffer, "odom", "base_link", rtabmap::Transform(0, 0, 0, 0, 0, 0), 1000.0, false);
+	addTf(*buffer, "odom", "base_link", rtabmap::Transform(1, 0, 0, 0, 0, 0), 1001.0, false);
+
+	geometry_msgs::msg::PoseWithCovarianceStamped tag;
+	tag.header.stamp = timestampToROS(1001.0);     // observed at t=1001
+	tag.header.frame_id = "camera_link";
+	tag.pose.pose.position.x = 2.0;
+	tag.pose.pose.orientation.w = 1.0;
+
+	std::map<int, std::pair<geometry_msgs::msg::PoseWithCovarianceStamped, float> > tags;
+	tags.insert(std::make_pair(7, std::make_pair(tag, 0.15f)));
+
+	// odomStamp is 1000, one second BEFORE the observation.
+	const rtabmap::Landmarks corrected = landmarksFromROS(
+			tags, "base_link", "odom", timestampToROS(1000.0), *buffer, 0.0, 0.01, 0.02);
+
+	ASSERT_EQ(corrected.size(), 1u);
+	// 0.5 (base->camera) + 2.0 (camera->tag) + 1.0 (odometry motion since odomStamp).
+	EXPECT_NEAR(corrected.at(7).pose().x(), 3.5, 1e-3);
+
+	// Without an odom frame the correction cannot be looked up, and the landmark stays
+	// in the frame at the observation stamp.
+	const rtabmap::Landmarks uncorrected = landmarksFromROS(
+			tags, "base_link", "", timestampToROS(1000.0), *buffer, 0.0, 0.01, 0.02);
+	ASSERT_EQ(uncorrected.size(), 1u);
+	EXPECT_NEAR(uncorrected.at(7).pose().x(), 2.5, 1e-3);
+}
+
+TEST(MsgConversion, landmarksFromROSKeepsProvidedCovariance)
+{
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();
+	addTf(*buffer, "base_link", "camera_link", rtabmap::Transform::getIdentity(), 1000.0);
+
+	geometry_msgs::msg::PoseWithCovarianceStamped tag;
+	tag.header.stamp = timestampToROS(1000.0);
+	tag.header.frame_id = "camera_link";
+	tag.pose.pose.position.x = 1.0;
+	tag.pose.pose.orientation.w = 1.0;
+	for(size_t i=0; i<6; ++i)
+	{
+		tag.pose.covariance[i*6 + i] = 0.5;   // a real, finite covariance
+	}
+
+	std::map<int, std::pair<geometry_msgs::msg::PoseWithCovarianceStamped, float> > tags;
+	tags.insert(std::make_pair(1, std::make_pair(tag, 0.1f)));
+
+	const rtabmap::Landmarks landmarks = landmarksFromROS(
+			tags, "base_link", "", timestampToROS(1000.0), *buffer, 0.0,
+			/*defaultLinVariance=*/0.01, /*defaultAngVariance=*/0.02);
+
+	ASSERT_EQ(landmarks.size(), 1u);
+	EXPECT_NEAR(landmarks.at(1).covariance().at<double>(0,0), 0.5, 1e-9)
+		<< "a provided covariance must not be replaced by the default";
+	EXPECT_NEAR(landmarks.at(1).covariance().at<double>(3,3), 0.5, 1e-9);
+}
+
+TEST(MsgConversion, landmarksFromROSRejectsNonPositiveIds)
+{
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();
+	addTf(*buffer, "base_link", "camera_link", rtabmap::Transform::getIdentity(), 1000.0);
+
+	geometry_msgs::msg::PoseWithCovarianceStamped tag;
+	tag.header.stamp = timestampToROS(1000.0);
+	tag.header.frame_id = "camera_link";
+	tag.pose.pose.orientation.w = 1.0;
+
+	std::map<int, std::pair<geometry_msgs::msg::PoseWithCovarianceStamped, float> > tags;
+	tags.insert(std::make_pair(0, std::make_pair(tag, 0.1f)));
+	tags.insert(std::make_pair(-3, std::make_pair(tag, 0.1f)));
+	tags.insert(std::make_pair(5, std::make_pair(tag, 0.1f)));
+
+	const rtabmap::Landmarks landmarks = landmarksFromROS(
+			tags, "base_link", "", timestampToROS(1000.0), *buffer, 0.0, 0.01, 0.02);
+
+	EXPECT_EQ(landmarks.size(), 1u) << "ids <= 0 must be dropped";
+	EXPECT_TRUE(landmarks.find(5) != landmarks.end());
+}
+
+void expectTfDeskewRecoversWall(bool slerp)
+{
+	SCOPED_TRACE(slerp ? "slerp=true" : "slerp=false");
+
+	// base_link advances 0.1 m along odom over the sweep -- the same motion the constant
+	// velocity tests apply at 1 m/s. With slerp the correction is interpolated between
+	// the two end poses; without it, every sample gets its own TF lookup.
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();
+	addTf(*buffer, "odom", "base_link", rtabmap::Transform(0, 0, 0, 0, 0, 0), 1000.0, false);
+	addTf(*buffer, "odom", "base_link",
+			rtabmap::Transform(float(kSpeed * kScanSpan), 0, 0, 0, 0, 0),
+			1000.0 + kScanSpan, false);
+
+	sensor_msgs::msg::PointCloud2 in = makeSkewedWallScan(1000.0, 0.0);
+	in.header.frame_id = "base_link";
+
+	sensor_msgs::msg::PointCloud2 out;
+	ASSERT_TRUE(deskew(in, out, "odom", *buffer, 0.0, slerp));
+
+	for(size_t i=0; i<kScanPoints; ++i)
+	{
+		EXPECT_NEAR(readWallX(out, i, 0, kTimeOnColumns), kWallDistance, 1e-3)
+			<< "sample " << i;
+	}
+}
+
+TEST(MsgConversion, deskewWithTfBufferSlerp)
+{
+	expectTfDeskewRecoversWall(/*slerp=*/true);
+}
+
+TEST(MsgConversion, deskewWithTfBufferPerPointLookup)
+{
+	// slerp=false takes a completely different path: a getMovingTransform() per sample
+	// instead of one interpolation between the sweep's end poses.
+	expectTfDeskewRecoversWall(/*slerp=*/false);
+}
+
+TEST(MsgConversion, deskewSlerpLinearizesNonLinearMotion)
+{
+	// A piecewise-linear trajectory: the robot covers most of the sweep's distance in the
+	// first half, then nearly stops. Both the TF buffer and the skew of the input cloud
+	// are generated from this same motion, so the true answer is unambiguous: a correct
+	// deskew must recover the flat wall.
+	const double kneeTime = kScanSpan / 2.0;
+	const double kneeX = 0.09;                        // vs 0.0495 if it were linear
+	const double endX = kSpeed * kScanSpan;           // 0.099
+	// Matches how tf2 interpolates between consecutive samples.
+	auto travelled = [&](double elapsed) {
+		return elapsed <= kneeTime
+				? kneeX * (elapsed / kneeTime)
+				: kneeX + (endX - kneeX) * ((elapsed - kneeTime) / (kScanSpan - kneeTime));
+	};
+
+	auto buildBuffer = [&]() {
+		std::shared_ptr<tf2_ros::Buffer> b = makeTfBuffer();
+		geometry_msgs::msg::TransformStamped m;
+		m.header.frame_id = "odom";
+		m.child_frame_id = "base_link";
+		m.transform.rotation.w = 1.0;
+		for(double elapsed : {0.0, kneeTime, kScanSpan})
+		{
+			m.header.stamp = timestampToROS(1000.0 + elapsed);
+			m.transform.translation.x = travelled(elapsed);
+			b->setTransform(m, "unit_test", false);
+		}
+		return b;
+	};
+
+	sensor_msgs::msg::PointCloud2 in = makeSkewedWallScan(
+			1000.0, 0.0, kOffsetSecFloat32, kTimeOnColumns, 1, "t", false, travelled);
+	in.header.frame_id = "base_link";
+
+	sensor_msgs::msg::PointCloud2 slerped, perPoint;
+	const std::shared_ptr<tf2_ros::Buffer> b1 = buildBuffer();
+	const std::shared_ptr<tf2_ros::Buffer> b2 = buildBuffer();
+	ASSERT_TRUE(deskew(in, slerped, "odom", *b1, 0.0, /*slerp=*/true));
+	ASSERT_TRUE(deskew(in, perPoint, "odom", *b2, 0.0, /*slerp=*/false));
+
+	// Per-point lookups follow the real motion, so they reconstruct the wall exactly.
+	for(size_t i=0; i<kScanPoints; ++i)
+	{
+		EXPECT_NEAR(readWallX(perPoint, i, 0, kTimeOnColumns), kWallDistance, 1e-3)
+			<< "slerp=false must be exact, sample " << i;
+	}
+
+	// slerp only reads the sweep's two end poses, so it straight-lines through the knee
+	// and leaves a visible residual in the middle of the scan.
+	double worst = 0.0;
+	for(size_t i=0; i<kScanPoints; ++i)
+	{
+		worst = std::max(worst,
+				std::abs(double(readWallX(slerped, i, 0, kTimeOnColumns)) - kWallDistance));
+	}
+	EXPECT_GT(worst, 1e-2) << "slerp must show the error of linearizing the motion";
+}
+
+TEST(MsgConversion, deskewWithTfBufferFailsWithoutTf)
+{
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();   // empty
+
+	sensor_msgs::msg::PointCloud2 in = makeSkewedWallScan(1000.0, 0.0);
+	in.header.frame_id = "base_link";
+
+	sensor_msgs::msg::PointCloud2 out;
+	EXPECT_FALSE(deskew(in, out, "odom", *buffer, 0.0, true));
 }
 
 /////////////////////////
