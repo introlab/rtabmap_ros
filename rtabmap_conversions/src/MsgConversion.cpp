@@ -3275,6 +3275,7 @@ bool deskew_impl(
 
 	output = input;
 	rclcpp::Time stamp;
+	bool clampWarned = false;   // reported once per cloud, see the clamp below
 	UTimer processingTime;
 	if(timeOnColumns)
 	{
@@ -3326,13 +3327,18 @@ bool deskew_impl(
 				double ratio = (stamp-firstStamp).seconds() / scanTime;
 				if(ratio < 0.0 || ratio > 1.0)
 				{
-					// Not rate-limited on purpose: this means the timestamp channel of the
-					// input cloud is corrupted, which is a serious upstream problem.
-					UWARN("A point has a stamp (%f) outside the first (%f) and last (%f) "
-						  "stamps of the scan, its correction is clamped to the closest end "
-						  "of the sweep. The timestamp channel of the input cloud is likely "
-						  "corrupted.",
-						  timestampFromROS(stamp), timestampFromROS(firstStamp), timestampFromROS(lastStamp));
+					// Warned once per cloud rather than once per process: the timestamp
+					// channel is corrupted, which is a serious upstream problem worth
+					// reporting on every affected scan, but not once per point.
+					if(!clampWarned)
+					{
+						UWARN("A point has a stamp (%f) outside the first (%f) and last (%f) "
+							  "stamps of the scan, its correction is clamped to the closest end "
+							  "of the sweep. The timestamp channel of the input cloud is likely "
+							  "corrupted. Only the first such point of this cloud is reported.",
+							  timestampFromROS(stamp), timestampFromROS(firstStamp), timestampFromROS(lastStamp));
+						clampWarned = true;
+					}
 					ratio = ratio<0.0?0.0:1.0;
 				}
 				transform = firstPose.interpolate(float(ratio), lastPose);
@@ -3435,13 +3441,18 @@ bool deskew_impl(
 				double ratio = (stamp-firstStamp).seconds() / scanTime;
 				if(ratio < 0.0 || ratio > 1.0)
 				{
-					// Not rate-limited on purpose: this means the timestamp channel of the
-					// input cloud is corrupted, which is a serious upstream problem.
-					UWARN("A point has a stamp (%f) outside the first (%f) and last (%f) "
-						  "stamps of the scan, its correction is clamped to the closest end "
-						  "of the sweep. The timestamp channel of the input cloud is likely "
-						  "corrupted.",
-						  timestampFromROS(stamp), timestampFromROS(firstStamp), timestampFromROS(lastStamp));
+					// Warned once per cloud rather than once per process: the timestamp
+					// channel is corrupted, which is a serious upstream problem worth
+					// reporting on every affected scan, but not once per point.
+					if(!clampWarned)
+					{
+						UWARN("A point has a stamp (%f) outside the first (%f) and last (%f) "
+							  "stamps of the scan, its correction is clamped to the closest end "
+							  "of the sweep. The timestamp channel of the input cloud is likely "
+							  "corrupted. Only the first such point of this cloud is reported.",
+							  timestampFromROS(stamp), timestampFromROS(firstStamp), timestampFromROS(lastStamp));
+						clampWarned = true;
+					}
 					ratio = ratio<0.0?0.0:1.0;
 				}
 				transform = firstPose.interpolate(float(ratio), lastPose);
