@@ -2822,6 +2822,287 @@ TEST(MsgConversion, deskewWithTfBufferFailsWithoutTf)
 }
 
 /////////////////////////
+// convertRGBDMsgs / convertStereoMsg
+/////////////////////////
+
+namespace {
+
+/// A rectified pinhole CameraInfo. tx is P(0,3): 0 for the left/depth camera, and
+/// -fx*baseline for the right camera of a stereo pair.
+sensor_msgs::msg::CameraInfo makeCameraInfo(
+		const std::string & frameId, double stamp, int width, int height,
+		double tx = 0.0, double fx = 100.0)
+{
+	sensor_msgs::msg::CameraInfo info;
+	info.header.stamp = timestampToROS(stamp);
+	info.header.frame_id = frameId;
+	info.width = width;
+	info.height = height;
+	info.distortion_model = "plumb_bob";
+	info.d = {0.0, 0.0, 0.0, 0.0, 0.0};
+	info.k = {fx, 0.0, width/2.0, 0.0, fx, height/2.0, 0.0, 0.0, 1.0};
+	info.r = {1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0};
+	info.p = {fx, 0.0, width/2.0, tx, 0.0, fx, height/2.0, 0.0, 0.0, 0.0, 1.0, 0.0};
+	return info;
+}
+
+cv_bridge::CvImageConstPtr makeImage(
+		const std::string & frameId, double stamp,
+		const cv::Mat & image, const std::string & encoding)
+{
+	std_msgs::msg::Header header;
+	header.stamp = timestampToROS(stamp);
+	header.frame_id = frameId;
+	return std::make_shared<cv_bridge::CvImage>(header, encoding, image);
+}
+
+}  // namespace
+
+TEST(MsgConversion, convertRGBDMsgsSingleCamera)
+{
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();
+	const rtabmap::Transform baseToCamera(0.1f, 0.0f, 0.2f, 0.0f, 0.0f, 0.0f);
+	addTf(*buffer, "base_link", "camera_link", baseToCamera, 1000.0);
+
+	const cv::Mat rgbImage(8, 8, CV_8UC3, cv::Scalar(10, 20, 30));
+	const cv::Mat depthImage(8, 8, CV_16UC1, cv::Scalar(1500));
+
+	const std::vector<cv_bridge::CvImageConstPtr> images =
+			{makeImage("camera_link", 1000.0, rgbImage, "bgr8")};
+	const std::vector<cv_bridge::CvImageConstPtr> depths =
+			{makeImage("camera_link", 1000.0, depthImage, "16UC1")};
+	const std::vector<sensor_msgs::msg::CameraInfo> infos =
+			{makeCameraInfo("camera_link", 1000.0, 8, 8)};
+
+	cv::Mat rgb, depth;
+	std::vector<rtabmap::CameraModel> models;
+	std::vector<rtabmap::StereoCameraModel> stereoModels;
+	ASSERT_TRUE(convertRGBDMsgs(images, depths, infos, {}, "base_link", "",
+			timestampToROS(1000.0), rgb, depth, models, stereoModels,
+			*buffer, 0.0, /*alreadyRectifiedImages=*/true));
+
+	EXPECT_TRUE(stereoModels.empty()) << "a depth image must not produce a stereo model";
+	ASSERT_EQ(models.size(), 1u);
+	EXPECT_NEAR(models[0].fx(), 100.0, 1e-9);
+	expectTransformNear(models[0].localTransform(), baseToCamera, 1e-4f);
+
+	ASSERT_EQ(rgb.cols, 8);
+	ASSERT_EQ(rgb.rows, 8);
+	EXPECT_EQ(depth.type(), CV_16UC1);
+	EXPECT_EQ(depth.at<unsigned short>(0, 0), 1500);
+}
+
+TEST(MsgConversion, convertRGBDMsgsMultiCameraSideBySide)
+{
+	// Two cameras are concatenated horizontally into one wide image, one model each.
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();
+	addTf(*buffer, "base_link", "cam0", rtabmap::Transform(0.1f, 0.1f, 0, 0, 0, 0), 1000.0);
+	addTf(*buffer, "base_link", "cam1", rtabmap::Transform(0.1f, -0.1f, 0, 0, 0, 0), 1000.0);
+
+	const cv::Mat rgb0(8, 8, CV_8UC3, cv::Scalar(10, 0, 0));
+	const cv::Mat rgb1(8, 8, CV_8UC3, cv::Scalar(0, 20, 0));
+	const cv::Mat depth0(8, 8, CV_16UC1, cv::Scalar(1000));
+	const cv::Mat depth1(8, 8, CV_16UC1, cv::Scalar(2000));
+
+	const std::vector<cv_bridge::CvImageConstPtr> images = {
+			makeImage("cam0", 1000.0, rgb0, "bgr8"),
+			makeImage("cam1", 1000.0, rgb1, "bgr8")};
+	const std::vector<cv_bridge::CvImageConstPtr> depths = {
+			makeImage("cam0", 1000.0, depth0, "16UC1"),
+			makeImage("cam1", 1000.0, depth1, "16UC1")};
+	const std::vector<sensor_msgs::msg::CameraInfo> infos = {
+			makeCameraInfo("cam0", 1000.0, 8, 8),
+			makeCameraInfo("cam1", 1000.0, 8, 8)};
+
+	cv::Mat rgb, depth;
+	std::vector<rtabmap::CameraModel> models;
+	std::vector<rtabmap::StereoCameraModel> stereoModels;
+	ASSERT_TRUE(convertRGBDMsgs(images, depths, infos, {}, "base_link", "",
+			timestampToROS(1000.0), rgb, depth, models, stereoModels,
+			*buffer, 0.0, true));
+
+	ASSERT_EQ(models.size(), 2u);
+	EXPECT_EQ(rgb.cols, 16) << "the two 8-wide images must be side by side";
+	EXPECT_EQ(rgb.rows, 8);
+	EXPECT_EQ(depth.cols, 16);
+
+	// Each half keeps its own camera's data.
+	EXPECT_EQ(depth.at<unsigned short>(0, 0), 1000);
+	EXPECT_EQ(depth.at<unsigned short>(0, 8), 2000);
+	EXPECT_NEAR(models[0].localTransform().y(), 0.1, 1e-4);
+	EXPECT_NEAR(models[1].localTransform().y(), -0.1, 1e-4);
+}
+
+TEST(MsgConversion, convertRGBDMsgsRejectsBadEncoding)
+{
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();
+	addTf(*buffer, "base_link", "camera_link", rtabmap::Transform::getIdentity(), 1000.0);
+
+	// 32FC1 is a valid depth encoding but not a valid rgb/left one.
+	const cv::Mat bad(8, 8, CV_32FC1, cv::Scalar(1.0f));
+	const std::vector<cv_bridge::CvImageConstPtr> images =
+			{makeImage("camera_link", 1000.0, bad, "32FC1")};
+	const std::vector<sensor_msgs::msg::CameraInfo> infos =
+			{makeCameraInfo("camera_link", 1000.0, 8, 8)};
+
+	cv::Mat rgb, depth;
+	std::vector<rtabmap::CameraModel> models;
+	std::vector<rtabmap::StereoCameraModel> stereoModels;
+	EXPECT_FALSE(convertRGBDMsgs(images, {}, infos, {}, "base_link", "",
+			timestampToROS(1000.0), rgb, depth, models, stereoModels,
+			*buffer, 0.0, true));
+}
+
+TEST(MsgConversion, convertRGBDMsgsFailsWithoutTf)
+{
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();   // empty
+
+	const cv::Mat rgbImage(8, 8, CV_8UC3, cv::Scalar(10, 20, 30));
+	const std::vector<cv_bridge::CvImageConstPtr> images =
+			{makeImage("camera_link", 1000.0, rgbImage, "bgr8")};
+	const std::vector<sensor_msgs::msg::CameraInfo> infos =
+			{makeCameraInfo("camera_link", 1000.0, 8, 8)};
+
+	cv::Mat rgb, depth;
+	std::vector<rtabmap::CameraModel> models;
+	std::vector<rtabmap::StereoCameraModel> stereoModels;
+	EXPECT_FALSE(convertRGBDMsgs(images, {}, infos, {}, "base_link", "",
+			timestampToROS(1000.0), rgb, depth, models, stereoModels,
+			*buffer, 0.0, true));
+}
+
+TEST(MsgConversion, convertRGBDMsgsCarriesLocalFeatures)
+{
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();
+	addTf(*buffer, "base_link", "camera_link", rtabmap::Transform::getIdentity(), 1000.0);
+
+	const cv::Mat rgbImage(8, 8, CV_8UC3, cv::Scalar(10, 20, 30));
+	const cv::Mat depthImage(8, 8, CV_16UC1, cv::Scalar(1500));
+	const std::vector<cv_bridge::CvImageConstPtr> images =
+			{makeImage("camera_link", 1000.0, rgbImage, "bgr8")};
+	const std::vector<cv_bridge::CvImageConstPtr> depths =
+			{makeImage("camera_link", 1000.0, depthImage, "16UC1")};
+	const std::vector<sensor_msgs::msg::CameraInfo> infos =
+			{makeCameraInfo("camera_link", 1000.0, 8, 8)};
+
+	std::vector<rtabmap_msgs::msg::KeyPoint> kptMsgs(2);
+	kptMsgs[0].pt.x = 1.0f; kptMsgs[0].pt.y = 2.0f; kptMsgs[0].size = 7.0f;
+	kptMsgs[1].pt.x = 3.0f; kptMsgs[1].pt.y = 4.0f; kptMsgs[1].size = 7.0f;
+	std::vector<rtabmap_msgs::msg::Point3f> ptMsgs(2);
+	ptMsgs[0].x = 1.0f; ptMsgs[1].x = 2.0f;
+	cv::Mat descriptors = cv::Mat::ones(2, 4, CV_32FC1);
+
+	std::vector<cv::KeyPoint> outKpts;
+	std::vector<cv::Point3f> outPts;
+	cv::Mat outDescriptors;
+
+	cv::Mat rgb, depth;
+	std::vector<rtabmap::CameraModel> models;
+	std::vector<rtabmap::StereoCameraModel> stereoModels;
+	ASSERT_TRUE(convertRGBDMsgs(images, depths, infos, {}, "base_link", "",
+			timestampToROS(1000.0), rgb, depth, models, stereoModels,
+			*buffer, 0.0, true,
+			{kptMsgs}, {ptMsgs}, {descriptors},
+			&outKpts, &outPts, &outDescriptors));
+
+	ASSERT_EQ(outKpts.size(), 2u);
+	EXPECT_FLOAT_EQ(outKpts[0].pt.x, 1.0f);
+	EXPECT_FLOAT_EQ(outKpts[1].pt.x, 3.0f);
+	ASSERT_EQ(outPts.size(), 2u);
+	EXPECT_FLOAT_EQ(outPts[1].x, 2.0f);
+	EXPECT_EQ(outDescriptors.rows, 2);
+}
+
+TEST(MsgConversion, convertStereoMsgProducesAStereoModel)
+{
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();
+	const rtabmap::Transform baseToLeft(0.1f, 0.0f, 0.2f, 0.0f, 0.0f, 0.0f);
+	addTf(*buffer, "base_link", "left_link", baseToLeft, 1000.0);
+
+	const double fx = 100.0;
+	const double baseline = 0.15;
+	const cv::Mat leftImage(8, 8, CV_8UC1, cv::Scalar(40));
+	const cv::Mat rightImage(8, 8, CV_8UC1, cv::Scalar(50));
+
+	cv::Mat left, right;
+	rtabmap::StereoCameraModel model;
+	ASSERT_TRUE(convertStereoMsg(
+			makeImage("left_link", 1000.0, leftImage, "mono8"),
+			makeImage("right_link", 1000.0, rightImage, "mono8"),
+			makeCameraInfo("left_link", 1000.0, 8, 8, /*tx=*/0.0, fx),
+			makeCameraInfo("right_link", 1000.0, 8, 8, /*tx=*/-fx*baseline, fx),
+			"base_link", "", timestampToROS(1000.0),
+			left, right, model, *buffer, 0.0, /*alreadyRectified=*/true));
+
+	EXPECT_NEAR(model.baseline(), baseline, 1e-6);
+	EXPECT_NEAR(model.left().fx(), fx, 1e-9);
+	expectTransformNear(model.localTransform(), baseToLeft, 1e-4f);
+
+	ASSERT_EQ(left.type(), CV_8UC1);
+	ASSERT_EQ(right.type(), CV_8UC1);
+	EXPECT_EQ(left.at<unsigned char>(0, 0), 40);
+	EXPECT_EQ(right.at<unsigned char>(0, 0), 50);
+}
+
+TEST(MsgConversion, convertStereoMsgConvertsColourToMono)
+{
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();
+	addTf(*buffer, "base_link", "left_link", rtabmap::Transform::getIdentity(), 1000.0);
+
+	const cv::Mat colour(8, 8, CV_8UC3, cv::Scalar(10, 20, 30));
+	const cv::Mat mono(8, 8, CV_8UC1, cv::Scalar(50));
+
+	cv::Mat left, right;
+	rtabmap::StereoCameraModel model;
+	ASSERT_TRUE(convertStereoMsg(
+			makeImage("left_link", 1000.0, colour, "bgr8"),
+			makeImage("right_link", 1000.0, mono, "mono8"),
+			makeCameraInfo("left_link", 1000.0, 8, 8, 0.0),
+			makeCameraInfo("right_link", 1000.0, 8, 8, -15.0),
+			"base_link", "", timestampToROS(1000.0),
+			left, right, model, *buffer, 0.0, true));
+
+	// The left image is kept in colour; the right is always reduced to mono.
+	EXPECT_EQ(left.type(), CV_8UC3);
+	EXPECT_EQ(right.type(), CV_8UC1);
+}
+
+TEST(MsgConversion, convertStereoMsgRejectsBadEncoding)
+{
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();
+	addTf(*buffer, "base_link", "left_link", rtabmap::Transform::getIdentity(), 1000.0);
+
+	const cv::Mat bad(8, 8, CV_32FC1, cv::Scalar(1.0f));
+	const cv::Mat mono(8, 8, CV_8UC1, cv::Scalar(50));
+
+	cv::Mat left, right;
+	rtabmap::StereoCameraModel model;
+	EXPECT_FALSE(convertStereoMsg(
+			makeImage("left_link", 1000.0, bad, "32FC1"),
+			makeImage("right_link", 1000.0, mono, "mono8"),
+			makeCameraInfo("left_link", 1000.0, 8, 8, 0.0),
+			makeCameraInfo("right_link", 1000.0, 8, 8, -15.0),
+			"base_link", "", timestampToROS(1000.0),
+			left, right, model, *buffer, 0.0, true));
+}
+
+TEST(MsgConversion, convertStereoMsgFailsWithoutTf)
+{
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();   // empty
+	const cv::Mat mono(8, 8, CV_8UC1, cv::Scalar(50));
+
+	cv::Mat left, right;
+	rtabmap::StereoCameraModel model;
+	EXPECT_FALSE(convertStereoMsg(
+			makeImage("left_link", 1000.0, mono, "mono8"),
+			makeImage("right_link", 1000.0, mono, "mono8"),
+			makeCameraInfo("left_link", 1000.0, 8, 8, 0.0),
+			makeCameraInfo("right_link", 1000.0, 8, 8, -15.0),
+			"base_link", "", timestampToROS(1000.0),
+			left, right, model, *buffer, 0.0, true));
+}
+
+/////////////////////////
 // IMU
 /////////////////////////
 
