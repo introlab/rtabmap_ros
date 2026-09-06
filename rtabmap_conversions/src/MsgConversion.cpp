@@ -796,9 +796,12 @@ rtabmap::CameraModel cameraModelFromROS(
 		const sensor_msgs::CameraInfo & camInfo,
 		const rtabmap::Transform & localTransform)
 {
+	// Note: K, R and P are fixed-size arrays in the ROS message (boost::array), so they
+	// are never empty and their size is always right. An unset matrix is signalled by
+	// all-zero content instead: K[0] and P[0] hold the focal length, which is always
+	// non-zero for a valid calibration, and an unset rectification matrix is all zeros.
 	cv:: Mat K;
-	UASSERT(camInfo.K.empty() || camInfo.K.size() == 9);
-	if(!camInfo.K.empty())
+	if(camInfo.K[0] != 0.0)
 	{
 		K = cv::Mat(3, 3, CV_64FC1);
 		memcpy(K.data, camInfo.K.elems, 9*sizeof(double));
@@ -825,17 +828,22 @@ rtabmap::CameraModel cameraModelFromROS(
 		}
 	}
 
+	// R is a rotation matrix, so any of its elements can legitimately be zero: only
+	// an entirely zero matrix means "not set".
 	cv:: Mat R;
-	UASSERT(camInfo.R.empty() || camInfo.R.size() == 9);
-	if(!camInfo.R.empty())
+	bool rIsSet = false;
+	for(size_t i=0; !rIsSet && i<camInfo.R.size(); ++i)
+	{
+		rIsSet = camInfo.R[i] != 0.0;
+	}
+	if(rIsSet)
 	{
 		R = cv::Mat(3, 3, CV_64FC1);
 		memcpy(R.data, camInfo.R.elems, 9*sizeof(double));
 	}
 
 	cv:: Mat P;
-	UASSERT(camInfo.P.empty() || camInfo.P.size() == 12);
-	if(!camInfo.P.empty())
+	if(camInfo.P[0] != 0.0)
 	{
 		P = cv::Mat(3, 4, CV_64FC1);
 		memcpy(P.data, camInfo.P.elems, 12*sizeof(double));
