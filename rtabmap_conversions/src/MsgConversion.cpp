@@ -3592,8 +3592,15 @@ transformPointCloud (
     Eigen::Vector4f pt_out;
 
     bool max_range_point = false;
-    int distance_ptr_offset = i*in.point_step + in.fields[dist_idx].offset;
-    float* distance_ptr = (dist_idx < 0 ? NULL : (float*)(&in.data[distance_ptr_offset]));
+    // Only touch in.fields[dist_idx] when the "distance" field actually exists:
+    // indexing with -1 is out of bounds and aborts on a hardened libstdc++.
+    int distance_ptr_offset = 0;
+    float* distance_ptr = NULL;
+    if (dist_idx >= 0)
+    {
+      distance_ptr_offset = i*in.point_step + in.fields[dist_idx].offset;
+      distance_ptr = (float*)(&in.data[distance_ptr_offset]);
+    }
     if (!std::isfinite (pt[0]) || !std::isfinite (pt[1]) || !std::isfinite (pt[2]))
     {
       if (distance_ptr==NULL || !std::isfinite(*distance_ptr))  // Invalid point
