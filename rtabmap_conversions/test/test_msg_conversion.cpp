@@ -421,6 +421,23 @@ TEST(MsgConversion, timestampRoundTrip)
 	EXPECT_NEAR(timestampFromROS(timestampToROS(in)), in, 1e-6);
 }
 
+TEST(MsgConversion, timestampToROSUsesRosClock)
+{
+	// Message header stamps convert to RCL_ROS_TIME, while rclcpp::Time(sec, nsec)
+	// defaults to RCL_SYSTEM_TIME. Comparing two different clock types throws, so a
+	// timestamp built here must be comparable with one taken from a message -- several
+	// conversions do exactly that when syncing to an odometry stamp.
+	const rclcpp::Time built = timestampToROS(1000.0);
+	EXPECT_EQ(built.get_clock_type(), RCL_ROS_TIME);
+
+	builtin_interfaces::msg::Time asMsg = timestampToROS(1000.5);
+	const rclcpp::Time fromMsg(asMsg);
+	EXPECT_EQ(fromMsg.get_clock_type(), RCL_ROS_TIME);
+
+	EXPECT_NO_THROW({ volatile bool differ = (built != fromMsg); (void)differ; })
+		<< "a built stamp must be comparable with a message-derived one";
+}
+
 TEST(MsgConversion, timestampZeroRoundTrip)
 {
 	EXPECT_EQ(timestampFromROS(timestampToROS(0.0)), 0.0);
@@ -2931,6 +2948,277 @@ TEST(MsgConversion, convertRGBDMsgsMultiCameraSideBySide)
 	EXPECT_EQ(depth.at<unsigned short>(0, 8), 2000);
 	EXPECT_NEAR(models[0].localTransform().y(), 0.1, 1e-4);
 	EXPECT_NEAR(models[1].localTransform().y(), -0.1, 1e-4);
+}
+
+namespace {
+
+/// base_link sits at odom origin at t=1000 and 1 m along x at t=1001.
+void addOdomMotion(tf2_ros::Buffer & buffer)
+{
+	geometry_msgs::msg::TransformStamped m;
+	m.header.frame_id = "odom";
+	m.child_frame_id = "base_link";
+	m.transform.rotation.w = 1.0;
+	m.header.stamp = timestampToROS(1000.0);
+	m.transform.translation.x = 0.0;
+	ASSERT_TRUE(buffer.setTransform(m, "unit_test", false));
+	m.header.stamp = timestampToROS(1001.0);
+	m.transform.translation.x = 1.0;
+	ASSERT_TRUE(buffer.setTransform(m, "unit_test", false));
+}
+
+}  // namespace
+
+TEST(MsgConversion, convertRGBDMsgsSyncsToOdomStamp)
+{
+	// The image is captured at t=1001 but must be expressed relative to the base frame
+	// at odomStamp=1000, one metre back.
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();
+	const rtabmap::Transform baseToCamera(0.1f, 0.0f, 0.2f, 0.0f, 0.0f, 0.0f);
+	addTf(*buffer, "base_link", "camera_link", baseToCamera, 1000.0);
+	addOdomMotion(*buffer);
+
+	const cv::Mat rgbImage(8, 8, CV_8UC3, cv::Scalar(10, 20, 30));
+	const cv::Mat depthImage(8, 8, CV_16UC1, cv::Scalar(1500));
+	const std::vector<cv_bridge::CvImageConstPtr> images =
+			{makeImage("camera_link", 1001.0, rgbImage, "bgr8")};
+	const std::vector<cv_bridge::CvImageConstPtr> depths =
+			{makeImage("camera_link", 1001.0, depthImage, "16UC1")};
+	const std::vector<sensor_msgs::msg::CameraInfo> infos =
+			{makeCameraInfo("camera_link", 1001.0, 8, 8)};
+
+	cv::Mat rgb, depth;
+	std::vector<rtabmap::CameraModel> corrected;
+	std::vector<rtabmap::StereoCameraModel> stereoModels;
+	ASSERT_TRUE(convertRGBDMsgs(images, depths, infos, {}, "base_link", "odom",
+			timestampToROS(1000.0), rgb, depth, corrected, stereoModels, *buffer, 0.0, true));
+	ASSERT_EQ(corrected.size(), 1u);
+	EXPECT_NEAR(corrected[0].localTransform().x(), 1.1, 1e-3)
+		<< "0.1 base->camera plus 1.0 of odometry motion";
+
+	// Without an odom frame the motion is not folded in.
+	std::vector<rtabmap::CameraModel> uncorrected;
+	std::vector<rtabmap::StereoCameraModel> stereoModels2;
+	ASSERT_TRUE(convertRGBDMsgs(images, depths, infos, {}, "base_link", "",
+			timestampToROS(1000.0), rgb, depth, uncorrected, stereoModels2, *buffer, 0.0, true));
+	ASSERT_EQ(uncorrected.size(), 1u);
+	EXPECT_NEAR(uncorrected[0].localTransform().x(), 0.1, 1e-3);
+}
+
+TEST(MsgConversion, convertRGBDMsgsSyncsEachCameraAtItsOwnStamp)
+{
+	// Two cameras captured 1 s apart, on a robot moving 1 m/s along x. Each must be
+	// corrected by its OWN elapsed motion, not by a single shared one.
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();
+	addTf(*buffer, "base_link", "cam0", rtabmap::Transform(0.1f, 0.1f, 0, 0, 0, 0), 1000.0);
+	addTf(*buffer, "base_link", "cam1", rtabmap::Transform(0.1f, -0.1f, 0, 0, 0, 0), 1000.0);
+	addOdomMotion(*buffer);                                        // x=0 @1000, x=1 @1001
+	geometry_msgs::msg::TransformStamped m;                        // extend to x=2 @1002
+	m.header.frame_id = "odom";
+	m.child_frame_id = "base_link";
+	m.transform.rotation.w = 1.0;
+	m.header.stamp = timestampToROS(1002.0);
+	m.transform.translation.x = 2.0;
+	ASSERT_TRUE(buffer->setTransform(m, "unit_test", false));
+
+	const cv::Mat rgb0(8, 8, CV_8UC3, cv::Scalar(10, 0, 0));
+	const cv::Mat rgb1(8, 8, CV_8UC3, cv::Scalar(0, 20, 0));
+	const cv::Mat depth0(8, 8, CV_16UC1, cv::Scalar(1000));
+	const cv::Mat depth1(8, 8, CV_16UC1, cv::Scalar(2000));
+
+	const std::vector<cv_bridge::CvImageConstPtr> images = {
+			makeImage("cam0", 1001.0, rgb0, "bgr8"),
+			makeImage("cam1", 1002.0, rgb1, "bgr8")};
+	const std::vector<cv_bridge::CvImageConstPtr> depths = {
+			makeImage("cam0", 1001.0, depth0, "16UC1"),
+			makeImage("cam1", 1002.0, depth1, "16UC1")};
+	const std::vector<sensor_msgs::msg::CameraInfo> infos = {
+			makeCameraInfo("cam0", 1001.0, 8, 8),
+			makeCameraInfo("cam1", 1002.0, 8, 8)};
+
+	cv::Mat rgb, depth;
+	std::vector<rtabmap::CameraModel> models;
+	std::vector<rtabmap::StereoCameraModel> stereoModels;
+	ASSERT_TRUE(convertRGBDMsgs(images, depths, infos, {}, "base_link", "odom",
+			timestampToROS(1000.0), rgb, depth, models, stereoModels, *buffer, 0.0, true));
+
+	ASSERT_EQ(models.size(), 2u);
+	// cam0 is 1 s after odomStamp, cam1 is 2 s after.
+	EXPECT_NEAR(models[0].localTransform().x(), 1.1, 1e-3) << "0.1 + 1.0 of motion";
+	EXPECT_NEAR(models[1].localTransform().x(), 2.1, 1e-3) << "0.1 + 2.0 of motion";
+	// The corrections must differ, which is the whole point of per-camera stamps.
+	EXPECT_GT(models[1].localTransform().x() - models[0].localTransform().x(), 0.5);
+	// The lateral offsets are untouched by a purely forward motion.
+	EXPECT_NEAR(models[0].localTransform().y(), 0.1, 1e-3);
+	EXPECT_NEAR(models[1].localTransform().y(), -0.1, 1e-3);
+}
+
+TEST(MsgConversion, convertRGBDMsgsPrefersTheDepthStampWhenTheyDiffer)
+{
+	// The RGB and depth stamps of a camera are assumed to be equal. This pins the
+	// tie-break for when they are not: the depth stamp prevails, since it is the one the
+	// geometry is synchronized to. Not a behaviour to rely on -- a camera whose two
+	// stamps disagree is already outside the contract.
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();
+	addTf(*buffer, "base_link", "camera_link", rtabmap::Transform(0.1f, 0, 0, 0, 0, 0), 1000.0);
+	addOdomMotion(*buffer);
+
+	const cv::Mat rgbImage(8, 8, CV_8UC3, cv::Scalar(10, 20, 30));
+	const cv::Mat depthImage(8, 8, CV_16UC1, cv::Scalar(1500));
+
+	// RGB stamped at odomStamp (no motion), depth stamped 1 s later (1 m of motion).
+	const std::vector<cv_bridge::CvImageConstPtr> images =
+			{makeImage("camera_link", 1000.0, rgbImage, "bgr8")};
+	const std::vector<cv_bridge::CvImageConstPtr> depths =
+			{makeImage("camera_link", 1001.0, depthImage, "16UC1")};
+	const std::vector<sensor_msgs::msg::CameraInfo> infos =
+			{makeCameraInfo("camera_link", 1000.0, 8, 8)};
+
+	cv::Mat rgb, depth;
+	std::vector<rtabmap::CameraModel> models;
+	std::vector<rtabmap::StereoCameraModel> stereoModels;
+	ASSERT_TRUE(convertRGBDMsgs(images, depths, infos, {}, "base_link", "odom",
+			timestampToROS(1000.0), rgb, depth, models, stereoModels, *buffer, 0.0, true));
+
+	ASSERT_EQ(models.size(), 1u);
+	EXPECT_NEAR(models[0].localTransform().x(), 1.1, 1e-3)
+		<< "the depth stamp (1001) prevails over the rgb stamp (1000)";
+}
+
+TEST(MsgConversion, convertRGBDMsgsMultiStereoBuildsOneModelPerPair)
+{
+	// mono8 "right" images make convertRGBDMsgs take the stereo branch and produce
+	// StereoCameraModels instead of CameraModels. The odometry sync is not re-tested
+	// here: it happens in the shared loop before the depth/stereo split, so
+	// convertRGBDMsgsSyncsEachCameraAtItsOwnStamp already covers it for both.
+	const double fx = 100.0;
+	const double baseline0 = 0.15;
+	const double baseline1 = 0.20;
+
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();
+	addTf(*buffer, "base_link", "left0", rtabmap::Transform(0.1f, 0.1f, 0, 0, 0, 0), 1000.0);
+	addTf(*buffer, "base_link", "left1", rtabmap::Transform(0.1f, -0.1f, 0, 0, 0, 0), 1000.0);
+
+	const cv::Mat left0(8, 8, CV_8UC1, cv::Scalar(40));
+	const cv::Mat left1(8, 8, CV_8UC1, cv::Scalar(60));
+	const cv::Mat right(8, 8, CV_8UC1, cv::Scalar(50));
+
+	const std::vector<cv_bridge::CvImageConstPtr> images = {
+			makeImage("left0", 1000.0, left0, "mono8"),
+			makeImage("left1", 1000.0, left1, "mono8")};
+	const std::vector<cv_bridge::CvImageConstPtr> rights = {
+			makeImage("right0", 1000.0, right, "mono8"),
+			makeImage("right1", 1000.0, right, "mono8")};
+	const std::vector<sensor_msgs::msg::CameraInfo> leftInfos = {
+			makeCameraInfo("left0", 1000.0, 8, 8, 0.0, fx),
+			makeCameraInfo("left1", 1000.0, 8, 8, 0.0, fx)};
+	const std::vector<sensor_msgs::msg::CameraInfo> rightInfos = {
+			makeCameraInfo("right0", 1000.0, 8, 8, -fx*baseline0, fx),
+			makeCameraInfo("right1", 1000.0, 8, 8, -fx*baseline1, fx)};
+
+	cv::Mat rgb, depth;
+	std::vector<rtabmap::CameraModel> models;
+	std::vector<rtabmap::StereoCameraModel> stereoModels;
+	ASSERT_TRUE(convertRGBDMsgs(images, rights, leftInfos, rightInfos, "base_link", "",
+			timestampToROS(1000.0), rgb, depth, models, stereoModels, *buffer, 0.0, true));
+
+	EXPECT_TRUE(models.empty()) << "mono8 right images must give stereo models";
+	ASSERT_EQ(stereoModels.size(), 2u);
+
+	// Each pair keeps its own baseline and its own local transform.
+	EXPECT_NEAR(stereoModels[0].baseline(), baseline0, 1e-6);
+	EXPECT_NEAR(stereoModels[1].baseline(), baseline1, 1e-6);
+	EXPECT_NEAR(stereoModels[0].localTransform().y(), 0.1, 1e-3);
+	EXPECT_NEAR(stereoModels[1].localTransform().y(), -0.1, 1e-3);
+
+	// The two left images are laid out side by side, as in the RGB-D case.
+	EXPECT_EQ(rgb.cols, 16);
+	EXPECT_EQ(depth.cols, 16);
+}
+
+TEST(MsgConversion, convertRGBDMsgsSurvivesAFailedOdomLookup)
+{
+	// A missing odom frame must only warn: the data is still converted, uncorrected.
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();
+	addTf(*buffer, "base_link", "camera_link", rtabmap::Transform(0.1f, 0, 0.2f, 0, 0, 0), 1001.0);
+
+	const cv::Mat rgbImage(8, 8, CV_8UC3, cv::Scalar(10, 20, 30));
+	const std::vector<cv_bridge::CvImageConstPtr> images =
+			{makeImage("camera_link", 1001.0, rgbImage, "bgr8")};
+	const std::vector<sensor_msgs::msg::CameraInfo> infos =
+			{makeCameraInfo("camera_link", 1001.0, 8, 8)};
+
+	cv::Mat rgb, depth;
+	std::vector<rtabmap::CameraModel> models;
+	std::vector<rtabmap::StereoCameraModel> stereoModels;
+	ASSERT_TRUE(convertRGBDMsgs(images, {}, infos, {}, "base_link", "odom",
+			timestampToROS(1000.0), rgb, depth, models, stereoModels, *buffer, 0.0, true))
+		<< "a failed odometry correction must not be fatal";
+	ASSERT_EQ(models.size(), 1u);
+	EXPECT_NEAR(models[0].localTransform().x(), 0.1, 1e-3) << "left uncorrected";
+}
+
+TEST(MsgConversion, convertStereoMsgSyncsToOdomStamp)
+{
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();
+	addTf(*buffer, "base_link", "left_link", rtabmap::Transform(0.1f, 0, 0.2f, 0, 0, 0), 1000.0);
+	addOdomMotion(*buffer);
+
+	const cv::Mat mono(8, 8, CV_8UC1, cv::Scalar(40));
+
+	cv::Mat left, right;
+	rtabmap::StereoCameraModel model;
+	ASSERT_TRUE(convertStereoMsg(
+			makeImage("left_link", 1001.0, mono, "mono8"),
+			makeImage("right_link", 1001.0, mono, "mono8"),
+			makeCameraInfo("left_link", 1001.0, 8, 8, 0.0),
+			makeCameraInfo("right_link", 1001.0, 8, 8, -15.0),
+			"base_link", "odom", timestampToROS(1000.0),
+			left, right, model, *buffer, 0.0, true));
+
+	EXPECT_NEAR(model.localTransform().x(), 1.1, 1e-3);
+}
+
+TEST(MsgConversion, convertScan3dMsgSyncsToOdomStamp)
+{
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();
+	addTf(*buffer, "base_link", "lidar", rtabmap::Transform(0.0f, 0, 0.5f, 0, 0, 0), 1000.0);
+	addOdomMotion(*buffer);
+
+	sensor_msgs::msg::PointCloud2 msg = makeXYZCloud({{1.0f, 0.0f, 0.0f}});
+	msg.header.stamp = timestampToROS(1001.0);
+	msg.header.frame_id = "lidar";
+
+	rtabmap::LaserScan scan;
+	ASSERT_TRUE(convertScan3dMsg(msg, "base_link", "odom", timestampToROS(1000.0),
+			scan, *buffer, 0.0));
+
+	EXPECT_NEAR(scan.localTransform().x(), 1.0, 1e-3) << "0.0 base->lidar plus 1.0 motion";
+	EXPECT_NEAR(scan.localTransform().z(), 0.5, 1e-3);
+}
+
+TEST(MsgConversion, convertScanMsgSyncsToOdomStamp)
+{
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();
+	addTf(*buffer, "base_link", "laser", rtabmap::Transform(0.2f, 0, 0.1f, 0, 0, 0), 1000.0);
+	addOdomMotion(*buffer);
+
+	sensor_msgs::msg::LaserScan msg;
+	msg.header.stamp = timestampToROS(1001.0);
+	msg.header.frame_id = "laser";
+	msg.angle_min = -1.0f;
+	msg.angle_max = 1.0f;
+	msg.angle_increment = 0.1f;
+	msg.time_increment = 0.0f;
+	msg.range_min = 0.1f;
+	msg.range_max = 30.0f;
+	msg.ranges.assign(21, 5.0f);
+
+	rtabmap::LaserScan scan;
+	ASSERT_TRUE(convertScanMsg(msg, "base_link", "odom", timestampToROS(1000.0),
+			scan, *buffer, 0.0));
+
+	EXPECT_NEAR(scan.localTransform().x(), 1.2, 1e-3) << "0.2 base->laser plus 1.0 motion";
 }
 
 TEST(MsgConversion, convertRGBDMsgsRejectsBadEncoding)
