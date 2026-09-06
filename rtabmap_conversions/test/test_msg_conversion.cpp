@@ -34,6 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <rtabmap/core/Transform.h>
 #include <rtabmap/core/util3d_transforms.h>
+#include <rtabmap/core/Compression.h>
 
 using namespace rtabmap_conversions;
 
@@ -808,6 +809,877 @@ TEST(MsgConversion, cameraModelToROSSynthesizesPFromK)
 	}
 	// P(2,3) is a translation term and must stay zero for a single camera.
 	EXPECT_DOUBLE_EQ(out.p[11], 0.0);
+}
+
+/////////////////////////
+// GlobalDescriptor
+/////////////////////////
+
+TEST(MsgConversion, globalDescriptorRoundTrip)
+{
+	cv::Mat data = (cv::Mat_<float>(1, 4) << 1.0f, 2.0f, 3.0f, 4.0f);
+	cv::Mat info = (cv::Mat_<float>(1, 2) << 9.0f, 8.0f);
+	const rtabmap::GlobalDescriptor in(7, data, info);
+
+	rtabmap_msgs::msg::GlobalDescriptor msg;
+	globalDescriptorToROS(in, msg);
+	const rtabmap::GlobalDescriptor out = globalDescriptorFromROS(msg);
+
+	EXPECT_EQ(out.type(), in.type());
+	ASSERT_EQ(out.data().total(), in.data().total());
+	for(size_t i=0; i<in.data().total(); ++i)
+	{
+		EXPECT_FLOAT_EQ(out.data().at<float>(0, i), in.data().at<float>(0, i)) << "data at " << i;
+	}
+	ASSERT_EQ(out.info().total(), in.info().total());
+	for(size_t i=0; i<in.info().total(); ++i)
+	{
+		EXPECT_FLOAT_EQ(out.info().at<float>(0, i), in.info().at<float>(0, i)) << "info at " << i;
+	}
+}
+
+TEST(MsgConversion, globalDescriptorsVectorRoundTrip)
+{
+	std::vector<rtabmap::GlobalDescriptor> in;
+	in.push_back(rtabmap::GlobalDescriptor(1, (cv::Mat_<float>(1, 2) << 1.0f, 2.0f)));
+	in.push_back(rtabmap::GlobalDescriptor(2, (cv::Mat_<float>(1, 2) << 3.0f, 4.0f)));
+
+	std::vector<rtabmap_msgs::msg::GlobalDescriptor> msg;
+	globalDescriptorsToROS(in, msg);
+	ASSERT_EQ(msg.size(), in.size());
+
+	const std::vector<rtabmap::GlobalDescriptor> out = globalDescriptorsFromROS(msg);
+	ASSERT_EQ(out.size(), in.size());
+	for(size_t i=0; i<in.size(); ++i)
+	{
+		EXPECT_EQ(out[i].type(), in[i].type()) << "at " << i;
+		EXPECT_FLOAT_EQ(out[i].data().at<float>(0, 0), in[i].data().at<float>(0, 0)) << "at " << i;
+	}
+}
+
+TEST(MsgConversion, globalDescriptorsEmptyRoundTrip)
+{
+	std::vector<rtabmap_msgs::msg::GlobalDescriptor> msg(3);
+	globalDescriptorsToROS(std::vector<rtabmap::GlobalDescriptor>(), msg);
+
+	EXPECT_TRUE(msg.empty()) << "output must be cleared";
+	EXPECT_TRUE(globalDescriptorsFromROS(msg).empty());
+}
+
+/////////////////////////
+// UserData
+/////////////////////////
+
+TEST(MsgConversion, userDataUncompressedRoundTrip)
+{
+	const cv::Mat in = (cv::Mat_<int>(2, 3) << 1, 2, 3, 4, 5, 6);
+
+	rtabmap_msgs::msg::UserData msg;
+	userDataToROS(in, msg, /*compress=*/false);
+
+	EXPECT_EQ(msg.rows, in.rows);
+	EXPECT_EQ(msg.cols, in.cols);
+	EXPECT_EQ(msg.type, in.type());
+
+	const cv::Mat out = userDataFromROS(msg);
+	ASSERT_EQ(out.rows, in.rows);
+	ASSERT_EQ(out.cols, in.cols);
+	ASSERT_EQ(out.type(), in.type());
+	EXPECT_EQ(cv::countNonZero(out != in), 0);
+}
+
+TEST(MsgConversion, userDataCompressedRoundTrip)
+{
+	const cv::Mat in = (cv::Mat_<int>(2, 3) << 1, 2, 3, 4, 5, 6);
+
+	rtabmap_msgs::msg::UserData msg;
+	userDataToROS(in, msg, /*compress=*/true);
+
+	// Compressed payloads travel as a 1xN byte blob.
+	EXPECT_EQ(msg.rows, 1);
+	EXPECT_EQ(msg.type, CV_8UC1);
+	EXPECT_EQ((size_t)msg.cols, msg.data.size());
+
+	// userDataFromROS hands back the still-compressed blob; the caller uncompresses.
+	const cv::Mat blob = userDataFromROS(msg);
+	ASSERT_FALSE(blob.empty());
+	const cv::Mat out = rtabmap::uncompressData(blob);
+
+	ASSERT_EQ(out.rows, in.rows);
+	ASSERT_EQ(out.cols, in.cols);
+	ASSERT_EQ(out.type(), in.type());
+	EXPECT_EQ(cv::countNonZero(out != in), 0);
+}
+
+TEST(MsgConversion, userDataEmpty)
+{
+	rtabmap_msgs::msg::UserData msg;
+	userDataToROS(cv::Mat(), msg, /*compress=*/false);
+	EXPECT_TRUE(msg.data.empty());
+	EXPECT_TRUE(userDataFromROS(msg).empty());
+}
+
+/////////////////////////
+// StereoCameraModel
+/////////////////////////
+
+TEST(MsgConversion, stereoCameraModelFromROS)
+{
+	const double fx = 525.0;
+	const double baseline = 0.12;
+
+	sensor_msgs::msg::CameraInfo left;
+	left.width = 640;
+	left.height = 480;
+	left.k = {fx, 0.0, 320.0, 0.0, fx, 240.0, 0.0, 0.0, 1.0};
+	left.r = {1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0};
+	left.p = {fx, 0.0, 320.0, 0.0, 0.0, fx, 240.0, 0.0, 0.0, 0.0, 1.0, 0.0};
+
+	// The right camera carries the baseline in P(0,3) = -fx * baseline.
+	sensor_msgs::msg::CameraInfo right = left;
+	right.p[3] = -fx * baseline;
+
+	const rtabmap::StereoCameraModel model = stereoCameraModelFromROS(
+			left, right, rtabmap::Transform::getIdentity());
+
+	EXPECT_NEAR(model.left().fx(), fx, 1e-9);
+	EXPECT_NEAR(model.right().fx(), fx, 1e-9);
+	EXPECT_NEAR(model.baseline(), baseline, 1e-9);
+	EXPECT_TRUE(model.isValidForProjection());
+}
+
+/////////////////////////
+// OdometryInfo
+/////////////////////////
+
+TEST(MsgConversion, odomInfoRoundTrip)
+{
+	rtabmap::OdometryInfo in;
+	in.lost = false;
+	in.features = 500;
+	in.localMapSize = 1000;
+	in.localScanMapSize = 2000;
+	in.localKeyFrames = 5;
+	in.keyFrameAdded = true;
+	in.timeEstimation = 0.02f;
+	in.interval = 0.033;
+	in.distanceTravelled = 12.5f;
+	in.reg.matches = 300;
+	in.reg.inliers = 250;
+	in.transform = sampleTransform();
+
+	rtabmap_msgs::msg::OdomInfo msg;
+	odomInfoToROS(in, msg);
+	const rtabmap::OdometryInfo out = odomInfoFromROS(msg);
+
+	EXPECT_EQ(out.lost, in.lost);
+	EXPECT_EQ(out.features, in.features);
+	EXPECT_EQ(out.localMapSize, in.localMapSize);
+	EXPECT_EQ(out.localScanMapSize, in.localScanMapSize);
+	EXPECT_EQ(out.localKeyFrames, in.localKeyFrames);
+	EXPECT_EQ(out.keyFrameAdded, in.keyFrameAdded);
+	EXPECT_FLOAT_EQ(out.timeEstimation, in.timeEstimation);
+	EXPECT_NEAR(out.interval, in.interval, 1e-6);
+	EXPECT_FLOAT_EQ(out.distanceTravelled, in.distanceTravelled);
+	EXPECT_EQ(out.reg.matches, in.reg.matches);
+	EXPECT_EQ(out.reg.inliers, in.reg.inliers);
+	expectTransformNear(out.transform, in.transform);
+}
+
+TEST(MsgConversion, odomInfoIgnoreDataDropsHeavyMembers)
+{
+	rtabmap::OdometryInfo in;
+	in.features = 500;
+	in.reg.inliers = 250;
+	in.words.insert(std::make_pair(1, cv::KeyPoint(cv::Point2f(1, 2), 3)));
+	in.localMap.insert(std::make_pair(1, cv::Point3f(1, 2, 3)));
+
+	rtabmap_msgs::msg::OdomInfo full;
+	odomInfoToROS(in, full, /*ignoreData=*/false);
+	EXPECT_FALSE(full.words_keys.empty());
+
+	rtabmap_msgs::msg::OdomInfo light;
+	odomInfoToROS(in, light, /*ignoreData=*/true);
+	EXPECT_TRUE(light.words_keys.empty()) << "heavy members must be dropped";
+
+	// The scalar statistics survive either way.
+	EXPECT_EQ(odomInfoFromROS(light).features, in.features);
+	EXPECT_EQ(odomInfoFromROS(light).reg.inliers, in.reg.inliers);
+}
+
+TEST(MsgConversion, odomInfoToStatistics)
+{
+	rtabmap::OdometryInfo info;
+	info.features = 400;
+	info.reg.inliers = 100;
+	info.reg.matches = 200;
+	info.localMapSize = 1234;
+
+	const std::map<std::string, float> stats = odomInfoToStatistics(info);
+
+	ASSERT_TRUE(stats.find("Odometry/Features/") != stats.end());
+	EXPECT_FLOAT_EQ(stats.at("Odometry/Features/"), 400.0f);
+	EXPECT_FLOAT_EQ(stats.at("Odometry/Matches/"), 200.0f);
+	EXPECT_FLOAT_EQ(stats.at("Odometry/Inliers/"), 100.0f);
+	EXPECT_FLOAT_EQ(stats.at("Odometry/LocalMapSize/"), 1234.0f);
+	// MatchesRatio is inliers/features, and must not divide by zero.
+	EXPECT_FLOAT_EQ(stats.at("Odometry/MatchesRatio/"), 100.0f/400.0f);
+}
+
+TEST(MsgConversion, odomInfoToStatisticsEmptyCovariance)
+{
+	// RegistrationInfo does not initialize covariance, so a plain OdometryInfo has
+	// an empty matrix. Reading it must not be attempted.
+	rtabmap::OdometryInfo info;
+	ASSERT_TRUE(info.reg.covariance.empty()) << "precondition";
+
+	const std::map<std::string, float> stats = odomInfoToStatistics(info);
+
+	EXPECT_TRUE(stats.find("Odometry/StdDevLin/") == stats.end())
+		<< "covariance-derived stats must be omitted, not read out of bounds";
+	EXPECT_TRUE(stats.find("Odometry/VarianceAng/") == stats.end());
+	// The rest of the statistics are still produced.
+	EXPECT_TRUE(stats.find("Odometry/Features/") != stats.end());
+}
+
+TEST(MsgConversion, odomInfoToStatisticsWithCovariance)
+{
+	rtabmap::OdometryInfo info;
+	info.reg.covariance = cv::Mat::eye(6, 6, CV_64FC1) * 4.0;
+
+	const std::map<std::string, float> stats = odomInfoToStatistics(info);
+
+	ASSERT_TRUE(stats.find("Odometry/VarianceLin/") != stats.end());
+	EXPECT_FLOAT_EQ(stats.at("Odometry/VarianceLin/"), 4.0f);
+	EXPECT_FLOAT_EQ(stats.at("Odometry/StdDevLin/"), 2.0f);
+	EXPECT_FLOAT_EQ(stats.at("Odometry/VarianceAng/"), 4.0f);
+	EXPECT_FLOAT_EQ(stats.at("Odometry/StdDevAng/"), 2.0f);
+}
+
+TEST(MsgConversion, odomInfoToStatisticsNoFeatures)
+{
+	rtabmap::OdometryInfo info;
+	info.features = 0;
+	info.reg.inliers = 10;
+
+	EXPECT_FLOAT_EQ(odomInfoToStatistics(info).at("Odometry/MatchesRatio/"), 0.0f)
+		<< "must not divide by zero";
+}
+
+/////////////////////////
+// MapGraph / MapData
+/////////////////////////
+
+TEST(MsgConversion, mapGraphRoundTrip)
+{
+	std::map<int, rtabmap::Transform> poses;
+	poses.insert(std::make_pair(1, rtabmap::Transform(1, 0, 0, 0, 0, 0)));
+	poses.insert(std::make_pair(2, sampleTransform()));
+
+	std::multimap<int, rtabmap::Link> links;
+	links.insert(std::make_pair(1, rtabmap::Link(
+			1, 2, rtabmap::Link::kNeighbor, sampleTransform(),
+			cv::Mat::eye(6, 6, CV_64FC1) * 2.0)));
+	links.insert(std::make_pair(2, rtabmap::Link(
+			2, 1, rtabmap::Link::kGlobalClosure, rtabmap::Transform::getIdentity(),
+			cv::Mat::eye(6, 6, CV_64FC1))));
+
+	const rtabmap::Transform mapToOdom(0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 0.1f);
+
+	rtabmap_msgs::msg::MapGraph msg;
+	mapGraphToROS(poses, links, mapToOdom, msg);
+	ASSERT_EQ(msg.poses.size(), poses.size());
+	ASSERT_EQ(msg.poses_id.size(), poses.size());
+	ASSERT_EQ(msg.links.size(), links.size());
+
+	std::map<int, rtabmap::Transform> outPoses;
+	std::multimap<int, rtabmap::Link> outLinks;
+	rtabmap::Transform outMapToOdom;
+	mapGraphFromROS(msg, outPoses, outLinks, outMapToOdom);
+
+	ASSERT_EQ(outPoses.size(), poses.size());
+	for(std::map<int, rtabmap::Transform>::const_iterator iter=poses.begin(); iter!=poses.end(); ++iter)
+	{
+		ASSERT_TRUE(outPoses.find(iter->first) != outPoses.end()) << "missing pose " << iter->first;
+		expectTransformNear(outPoses.at(iter->first), iter->second);
+	}
+
+	ASSERT_EQ(outLinks.size(), links.size());
+	for(std::multimap<int, rtabmap::Link>::const_iterator iter=links.begin(); iter!=links.end(); ++iter)
+	{
+		std::multimap<int, rtabmap::Link>::const_iterator found = outLinks.find(iter->first);
+		ASSERT_TRUE(found != outLinks.end()) << "missing link from " << iter->first;
+		EXPECT_EQ(found->second.from(), iter->second.from());
+		EXPECT_EQ(found->second.to(), iter->second.to());
+		EXPECT_EQ(found->second.type(), iter->second.type());
+	}
+
+	expectTransformNear(outMapToOdom, mapToOdom);
+}
+
+TEST(MsgConversion, mapGraphEmptyRoundTrip)
+{
+	rtabmap_msgs::msg::MapGraph msg;
+	mapGraphToROS(std::map<int, rtabmap::Transform>(), std::multimap<int, rtabmap::Link>(),
+			rtabmap::Transform(), msg);
+
+	EXPECT_TRUE(msg.poses.empty());
+	EXPECT_TRUE(msg.links.empty());
+
+	std::map<int, rtabmap::Transform> poses;
+	std::multimap<int, rtabmap::Link> links;
+	rtabmap::Transform mapToOdom;
+	mapGraphFromROS(msg, poses, links, mapToOdom);
+
+	EXPECT_TRUE(poses.empty());
+	EXPECT_TRUE(links.empty());
+	EXPECT_TRUE(mapToOdom.isNull()) << "a null map_to_odom must survive as null";
+}
+
+TEST(MsgConversion, mapDataRoundTrip)
+{
+	std::map<int, rtabmap::Transform> poses;
+	poses.insert(std::make_pair(1, sampleTransform()));
+
+	std::multimap<int, rtabmap::Link> links;
+	links.insert(std::make_pair(1, rtabmap::Link(
+			1, 2, rtabmap::Link::kNeighbor, sampleTransform())));
+
+	std::map<int, rtabmap::Signature> signatures;
+	rtabmap::Signature sig(1, 0, 3, 1234.5, "my_label", sampleTransform());
+	signatures.insert(std::make_pair(1, sig));
+
+	const rtabmap::Transform mapToOdom = rtabmap::Transform::getIdentity();
+
+	rtabmap_msgs::msg::MapData msg;
+	mapDataToROS(poses, links, signatures, mapToOdom, msg);
+	ASSERT_EQ(msg.nodes.size(), signatures.size());
+	ASSERT_EQ(msg.graph.poses.size(), poses.size());
+
+	std::map<int, rtabmap::Transform> outPoses;
+	std::multimap<int, rtabmap::Link> outLinks;
+	std::map<int, rtabmap::Signature> outSignatures;
+	rtabmap::Transform outMapToOdom;
+	mapDataFromROS(msg, outPoses, outLinks, outSignatures, outMapToOdom);
+
+	EXPECT_EQ(outPoses.size(), poses.size());
+	EXPECT_EQ(outLinks.size(), links.size());
+	ASSERT_EQ(outSignatures.size(), signatures.size());
+	ASSERT_TRUE(outSignatures.find(1) != outSignatures.end());
+	EXPECT_EQ(outSignatures.at(1).id(), sig.id());
+	EXPECT_EQ(outSignatures.at(1).getLabel(), sig.getLabel());
+	EXPECT_EQ(outSignatures.at(1).getWeight(), sig.getWeight());
+	EXPECT_NEAR(outSignatures.at(1).getStamp(), sig.getStamp(), 1e-6);
+}
+
+/////////////////////////
+// Node / Signature
+/////////////////////////
+
+namespace {
+
+rtabmap::Signature sampleSignature()
+{
+	rtabmap::Signature s(7, 2, 3, 1234.5, "node_label", sampleTransform());
+
+	std::multimap<int, int> words;
+	std::vector<cv::KeyPoint> kpts;
+	std::vector<cv::Point3f> pts3;
+	cv::Mat descriptors(2, 4, CV_32FC1);
+	for(int i=0; i<2; ++i)
+	{
+		words.insert(std::make_pair(100 + i, i));
+		kpts.push_back(cv::KeyPoint(cv::Point2f(10.0f * i, 20.0f * i), 7.0f));
+		pts3.push_back(cv::Point3f(1.0f * i, 2.0f * i, 3.0f * i));
+		for(int j=0; j<4; ++j)
+		{
+			descriptors.at<float>(i, j) = float(i * 4 + j);
+		}
+	}
+	s.setWords(words, kpts, pts3, descriptors);
+	return s;
+}
+
+}  // namespace
+
+TEST(MsgConversion, nodeRoundTrip)
+{
+	const rtabmap::Signature in = sampleSignature();
+
+	rtabmap_msgs::msg::Node msg;
+	nodeToROS(in, msg);
+	const rtabmap::Signature out = nodeFromROS(msg);
+
+	EXPECT_EQ(out.id(), in.id());
+	EXPECT_EQ(out.mapId(), in.mapId());
+	EXPECT_EQ(out.getWeight(), in.getWeight());
+	EXPECT_NEAR(out.getStamp(), in.getStamp(), 1e-6);
+	EXPECT_EQ(out.getLabel(), in.getLabel());
+	expectTransformNear(out.getPose(), in.getPose());
+
+	// Visual words: ids, keypoints, 3D points and descriptors.
+	ASSERT_EQ(out.getWords().size(), in.getWords().size());
+	EXPECT_TRUE(std::equal(out.getWords().begin(), out.getWords().end(), in.getWords().begin()));
+
+	ASSERT_EQ(out.getWordsKpts().size(), in.getWordsKpts().size());
+	for(size_t i=0; i<in.getWordsKpts().size(); ++i)
+	{
+		EXPECT_FLOAT_EQ(out.getWordsKpts()[i].pt.x, in.getWordsKpts()[i].pt.x) << "kpt " << i;
+		EXPECT_FLOAT_EQ(out.getWordsKpts()[i].pt.y, in.getWordsKpts()[i].pt.y) << "kpt " << i;
+	}
+
+	ASSERT_EQ(out.getWords3().size(), in.getWords3().size());
+	for(size_t i=0; i<in.getWords3().size(); ++i)
+	{
+		EXPECT_FLOAT_EQ(out.getWords3()[i].x, in.getWords3()[i].x) << "pt3 " << i;
+		EXPECT_FLOAT_EQ(out.getWords3()[i].z, in.getWords3()[i].z) << "pt3 " << i;
+	}
+
+	ASSERT_EQ(out.getWordsDescriptors().rows, in.getWordsDescriptors().rows);
+	ASSERT_EQ(out.getWordsDescriptors().cols, in.getWordsDescriptors().cols);
+	EXPECT_EQ(cv::countNonZero(out.getWordsDescriptors() != in.getWordsDescriptors()), 0);
+}
+
+TEST(MsgConversion, nodeGroundTruthRoundTrip)
+{
+	// The ground truth travels in the Node's SensorData sub-message but is written and
+	// read by the Node conversion itself.
+	rtabmap::Signature in(7, 2, 3, 1234.5, "node_label",
+			sampleTransform(), rtabmap::Transform(9.0f, 8.0f, 7.0f, 0.0f, 0.0f, 0.0f));
+
+	rtabmap_msgs::msg::Node msg;
+	nodeToROS(in, msg);
+	const rtabmap::Signature out = nodeFromROS(msg);
+
+	expectTransformNear(out.getGroundTruthPose(), in.getGroundTruthPose());
+}
+
+TEST(MsgConversion, nodeInfoRoundTripCarriesNoSensorData)
+{
+	const rtabmap::Signature in = sampleSignature();
+
+	rtabmap_msgs::msg::Node msg;
+	nodeInfoToROS(in, msg);
+	const rtabmap::Signature out = nodeInfoFromROS(msg);
+
+	EXPECT_EQ(out.id(), in.id());
+	EXPECT_EQ(out.mapId(), in.mapId());
+	EXPECT_EQ(out.getWeight(), in.getWeight());
+	EXPECT_EQ(out.getLabel(), in.getLabel());
+	expectTransformNear(out.getPose(), in.getPose());
+}
+
+TEST(MsgConversion, nodeDataRoundTripCarriesWords)
+{
+	const rtabmap::Signature in = sampleSignature();
+
+	rtabmap_msgs::msg::Node msg;
+	nodeDataToROS(in, msg);
+	const rtabmap::Signature out = nodeDataFromROS(msg);
+
+	EXPECT_EQ(out.getWords().size(), in.getWords().size());
+	EXPECT_EQ(out.getWordsKpts().size(), in.getWordsKpts().size());
+	EXPECT_EQ(out.getWords3().size(), in.getWords3().size());
+}
+
+TEST(MsgConversion, nodeEmptyRoundTrip)
+{
+	rtabmap::Signature in(1);
+
+	rtabmap_msgs::msg::Node msg;
+	nodeToROS(in, msg);
+	const rtabmap::Signature out = nodeFromROS(msg);
+
+	EXPECT_EQ(out.id(), 1);
+	EXPECT_TRUE(out.getWords().empty());
+	EXPECT_TRUE(out.getWordsKpts().empty());
+	EXPECT_TRUE(out.getWordsDescriptors().empty());
+}
+
+/////////////////////////
+// SensorData
+/////////////////////////
+
+TEST(MsgConversion, sensorDataRoundTrip)
+{
+	cv::Mat K = (cv::Mat_<double>(3, 3) <<
+			525.0, 0.0, 320.0, 0.0, 525.0, 240.0, 0.0, 0.0, 1.0);
+	const rtabmap::CameraModel model(
+			"cam", cv::Size(640, 480), K, cv::Mat(), cv::Mat(), cv::Mat(),
+			rtabmap::Transform(0.0f, 0.0f, 0.1f, 0.0f, 0.0f, 0.0f));
+
+	rtabmap::SensorData in(cv::Mat(), cv::Mat(), model, 42, 1234.5);
+	in.setGroundTruth(sampleTransform());
+	in.setGPS(rtabmap::GPS(1234.5, -71.9, 45.4, 100.0, 5.0, 90.0));
+
+	rtabmap_msgs::msg::SensorData msg;
+	sensorDataToROS(in, msg, "base_link");
+	EXPECT_EQ(msg.header.frame_id, "base_link");
+
+	const rtabmap::SensorData out = sensorDataFromROS(msg);
+
+	EXPECT_NEAR(out.stamp(), in.stamp(), 1e-6);
+
+	// sensorDataToROS writes ground_truth_pose into the message, but sensorDataFromROS
+	// deliberately does not read it back: the ground truth is owned by the enclosing
+	// Node conversion (nodeFromROS feeds it to the Signature constructor). See
+	// nodeGroundTruthRoundTrip for the round trip that does preserve it.
+	EXPECT_FALSE(transformFromPoseMsg(msg.ground_truth_pose).isNull())
+		<< "the message must still carry the ground truth for nodeFromROS";
+	EXPECT_TRUE(out.groundTruth().isNull())
+		<< "sensorDataFromROS does not restore the ground truth";
+
+	ASSERT_EQ(out.cameraModels().size(), 1u);
+	EXPECT_NEAR(out.cameraModels()[0].fx(), 525.0, 1e-9);
+	EXPECT_NEAR(out.cameraModels()[0].cx(), 320.0, 1e-9);
+	expectTransformNear(
+			out.cameraModels()[0].localTransform(), model.localTransform());
+
+	EXPECT_NEAR(out.gps().longitude(), in.gps().longitude(), 1e-9);
+	EXPECT_NEAR(out.gps().latitude(), in.gps().latitude(), 1e-9);
+	EXPECT_NEAR(out.gps().altitude(), in.gps().altitude(), 1e-9);
+	EXPECT_NEAR(out.gps().bearing(), in.gps().bearing(), 1e-9);
+}
+
+TEST(MsgConversion, sensorDataUserDataRoundTrip)
+{
+	rtabmap::SensorData in;
+	in.setStamp(10.0);
+	in.setUserData((cv::Mat_<int>(1, 3) << 7, 8, 9));
+
+	rtabmap_msgs::msg::SensorData msg;
+	sensorDataToROS(in, msg);
+	const rtabmap::SensorData out = sensorDataFromROS(msg);
+
+	const cv::Mat data = out.userDataRaw().empty()
+			? rtabmap::uncompressData(out.userDataCompressed())
+			: out.userDataRaw();
+	ASSERT_FALSE(data.empty());
+	ASSERT_EQ(data.cols, 3);
+	EXPECT_EQ(data.at<int>(0, 0), 7);
+	EXPECT_EQ(data.at<int>(0, 2), 9);
+}
+
+/////////////////////////
+// Statistics / Info
+/////////////////////////
+
+TEST(MsgConversion, infoRoundTrip)
+{
+	rtabmap::Statistics in;
+	in.setExtended(true);
+	in.setRefImageId(5);
+	in.setLoopClosureId(9);
+	in.setProximityDetectionId(11);
+	in.setStamp(1234.5);
+	in.setLoopClosureTransform(sampleTransform());
+	in.setWmState(std::vector<int>{1, 2, 3});
+
+	std::map<int, float> posterior;
+	posterior.insert(std::make_pair(1, 0.25f));
+	posterior.insert(std::make_pair(2, 0.75f));
+	in.setPosterior(posterior);
+
+	std::map<int, int> weights;
+	weights.insert(std::make_pair(1, 10));
+	in.setWeights(weights);
+
+	std::map<int, std::string> labels;
+	labels.insert(std::make_pair(1, "kitchen"));
+	in.setLabels(labels);
+
+	in.addStatistic("Some/Stat/", 3.5f);
+
+	rtabmap_msgs::msg::Info msg;
+	infoToROS(in, msg);
+
+	// infoToROS leaves the header to the caller (see CoreWrapper, which stamps the
+	// message before calling it), so infoFromROS can only recover the stamp if the
+	// header was filled in the same way.
+	EXPECT_EQ(msg.header.stamp.sec, 0) << "infoToROS must not touch the header";
+	msg.header.stamp = timestampToROS(in.stamp());
+
+	rtabmap::Statistics out;
+	infoFromROS(msg, out);
+
+	EXPECT_EQ(out.refImageId(), in.refImageId());
+	EXPECT_EQ(out.loopClosureId(), in.loopClosureId());
+	EXPECT_EQ(out.proximityDetectionId(), in.proximityDetectionId());
+	EXPECT_NEAR(out.stamp(), in.stamp(), 1e-6);
+	expectTransformNear(out.loopClosureTransform(), in.loopClosureTransform());
+	EXPECT_EQ(out.wmState(), in.wmState());
+
+	ASSERT_EQ(out.posterior().size(), in.posterior().size());
+	EXPECT_FLOAT_EQ(out.posterior().at(1), 0.25f);
+	EXPECT_FLOAT_EQ(out.posterior().at(2), 0.75f);
+
+	ASSERT_EQ(out.weights().size(), in.weights().size());
+	EXPECT_EQ(out.weights().at(1), 10);
+
+	ASSERT_EQ(out.labels().size(), in.labels().size());
+	EXPECT_EQ(out.labels().at(1), "kitchen");
+
+	ASSERT_TRUE(out.data().find("Some/Stat/") != out.data().end());
+	EXPECT_FLOAT_EQ(out.data().at("Some/Stat/"), 3.5f);
+}
+
+/////////////////////////
+// PointCloud2 helpers
+/////////////////////////
+
+namespace {
+
+/// Builds a dense, unorganized XYZ float cloud from the given points.
+sensor_msgs::msg::PointCloud2 makeXYZCloud(const std::vector<cv::Point3f> & points)
+{
+	sensor_msgs::msg::PointCloud2 cloud;
+	cloud.height = 1;
+	cloud.width = points.size();
+	cloud.is_bigendian = false;
+	cloud.is_dense = true;
+	cloud.fields.resize(3);
+	const char * names[3] = {"x", "y", "z"};
+	for(int i=0; i<3; ++i)
+	{
+		cloud.fields[i].name = names[i];
+		cloud.fields[i].offset = 4 * i;
+		cloud.fields[i].datatype = sensor_msgs::msg::PointField::FLOAT32;
+		cloud.fields[i].count = 1;
+	}
+	cloud.point_step = 12;
+	cloud.row_step = cloud.point_step * cloud.width;
+	cloud.data.resize(cloud.row_step * cloud.height);
+	for(size_t i=0; i<points.size(); ++i)
+	{
+		float * p = reinterpret_cast<float *>(&cloud.data[i * cloud.point_step]);
+		p[0] = points[i].x;
+		p[1] = points[i].y;
+		p[2] = points[i].z;
+	}
+	return cloud;
+}
+
+cv::Point3f readXYZ(const sensor_msgs::msg::PointCloud2 & cloud, size_t index)
+{
+	const float * p = reinterpret_cast<const float *>(&cloud.data[index * cloud.point_step]);
+	return cv::Point3f(p[0], p[1], p[2]);
+}
+
+}  // namespace
+
+TEST(MsgConversion, transformPointCloudTranslation)
+{
+	const std::vector<cv::Point3f> points = {{1.0f, 2.0f, 3.0f}, {-1.0f, 0.0f, 1.0f}};
+	const sensor_msgs::msg::PointCloud2 in = makeXYZCloud(points);
+
+	Eigen::Matrix4f t = Eigen::Matrix4f::Identity();
+	t(0, 3) = 10.0f;
+	t(1, 3) = 20.0f;
+	t(2, 3) = 30.0f;
+
+	sensor_msgs::msg::PointCloud2 out;
+	transformPointCloud(t, in, out);
+
+	ASSERT_EQ(out.width, in.width);
+	ASSERT_EQ(out.point_step, in.point_step);
+	for(size_t i=0; i<points.size(); ++i)
+	{
+		const cv::Point3f p = readXYZ(out, i);
+		EXPECT_NEAR(p.x, points[i].x + 10.0f, 1e-4) << "point " << i;
+		EXPECT_NEAR(p.y, points[i].y + 20.0f, 1e-4) << "point " << i;
+		EXPECT_NEAR(p.z, points[i].z + 30.0f, 1e-4) << "point " << i;
+	}
+}
+
+TEST(MsgConversion, transformPointCloudRotation)
+{
+	// 90 degrees about z maps (1,0,0) to (0,1,0).
+	const std::vector<cv::Point3f> points = {{1.0f, 0.0f, 0.0f}};
+	const sensor_msgs::msg::PointCloud2 in = makeXYZCloud(points);
+
+	const Eigen::Matrix4f t =
+			rtabmap::Transform(0, 0, 0, 0, 0, M_PI/2.0).toEigen4f();
+
+	sensor_msgs::msg::PointCloud2 out;
+	transformPointCloud(t, in, out);
+
+	const cv::Point3f p = readXYZ(out, 0);
+	EXPECT_NEAR(p.x, 0.0f, 1e-5);
+	EXPECT_NEAR(p.y, 1.0f, 1e-5);
+	EXPECT_NEAR(p.z, 0.0f, 1e-5);
+}
+
+TEST(MsgConversion, transformPointCloudIdentityPreservesMetadata)
+{
+	const sensor_msgs::msg::PointCloud2 in = makeXYZCloud({{1.0f, 2.0f, 3.0f}});
+
+	sensor_msgs::msg::PointCloud2 out;
+	transformPointCloud(Eigen::Matrix4f::Identity(), in, out);
+
+	EXPECT_EQ(out.height, in.height);
+	EXPECT_EQ(out.width, in.width);
+	EXPECT_EQ(out.point_step, in.point_step);
+	EXPECT_EQ(out.row_step, in.row_step);
+	EXPECT_EQ(out.is_dense, in.is_dense);
+	ASSERT_EQ(out.fields.size(), in.fields.size());
+	for(size_t i=0; i<in.fields.size(); ++i)
+	{
+		EXPECT_EQ(out.fields[i].name, in.fields[i].name) << "field " << i;
+	}
+
+	const cv::Point3f p = readXYZ(out, 0);
+	EXPECT_NEAR(p.x, 1.0f, 1e-5);
+	EXPECT_NEAR(p.y, 2.0f, 1e-5);
+	EXPECT_NEAR(p.z, 3.0f, 1e-5);
+}
+
+TEST(MsgConversion, deskewWithoutTimeFieldFails)
+{
+	// Deskewing needs a per-point time field; a plain XYZ cloud cannot be deskewed.
+	const sensor_msgs::msg::PointCloud2 in = makeXYZCloud({{1.0f, 0.0f, 0.0f}});
+
+	sensor_msgs::msg::PointCloud2 out;
+	EXPECT_FALSE(deskew(in, out, 0.0, rtabmap::Transform(1, 0, 0, 0, 0, 0)));
+}
+
+TEST(MsgConversion, deskewNullVelocityFails)
+{
+	const sensor_msgs::msg::PointCloud2 in = makeXYZCloud({{1.0f, 0.0f, 0.0f}});
+
+	sensor_msgs::msg::PointCloud2 out;
+	EXPECT_FALSE(deskew(in, out, 0.0, rtabmap::Transform()))
+		<< "a null velocity cannot deskew";
+}
+
+/////////////////////////
+// RGBDImage
+/////////////////////////
+
+TEST(MsgConversion, rgbdImageRoundTrip)
+{
+	cv::Mat K = (cv::Mat_<double>(3, 3) <<
+			525.0, 0.0, 320.0, 0.0, 525.0, 240.0, 0.0, 0.0, 1.0);
+	const rtabmap::CameraModel model(
+			"cam", cv::Size(4, 4), K, cv::Mat(), cv::Mat(), cv::Mat(),
+			rtabmap::Transform(0.0f, 0.0f, 0.1f, 0.0f, 0.0f, 0.0f));
+
+	cv::Mat rgb(4, 4, CV_8UC3, cv::Scalar(10, 20, 30));
+	cv::Mat depth(4, 4, CV_16UC1, cv::Scalar(1000));
+	rtabmap::SensorData in(rgb, depth, model, 1, 1234.5);
+
+	rtabmap_msgs::msg::RGBDImage msg;
+	rgbdImageToROS(in, msg, "camera_link");
+
+	EXPECT_EQ(msg.rgb_camera_info.header.frame_id, "camera_link");
+	EXPECT_NEAR(timestampFromROS(msg.rgb_camera_info.header.stamp), 1234.5, 1e-6);
+
+	// rgbdImageToROS stamps only the sub-messages; the top-level header is the
+	// caller's job (see OdometryROS, which assigns msg.header right after the call),
+	// and rgbdImageFromROS reads the stamp from that top-level header.
+	EXPECT_EQ(msg.header.stamp.sec, 0) << "rgbdImageToROS must not touch the header";
+	msg.header = msg.rgb_camera_info.header;
+
+	// The returned SensorData shallow-references the message buffers, so the message
+	// must outlive it -- see rgbdImageFromROSAliasesTheMessage.
+	const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr held =
+			std::make_shared<const rtabmap_msgs::msg::RGBDImage>(msg);
+	const rtabmap::SensorData out = rgbdImageFromROS(held);
+
+	EXPECT_NEAR(out.stamp(), in.stamp(), 1e-6);
+	ASSERT_EQ(out.cameraModels().size(), 1u);
+	EXPECT_NEAR(out.cameraModels()[0].fx(), 525.0, 1e-9);
+
+	// The local transform is not carried by the message (CameraInfo has no such
+	// field); callers resolve it from TF, so it comes back as the default identity.
+	EXPECT_TRUE(out.cameraModels()[0].localTransform().isIdentity())
+		<< out.cameraModels()[0].localTransform().prettyPrint();
+
+	ASSERT_FALSE(out.imageRaw().empty());
+	EXPECT_EQ(out.imageRaw().type(), CV_8UC3);
+	EXPECT_EQ(cv::countNonZero(out.imageRaw().reshape(1) != rgb.reshape(1)), 0);
+
+	ASSERT_FALSE(out.depthRaw().empty());
+	EXPECT_EQ(out.depthRaw().type(), CV_16UC1);
+	EXPECT_EQ(cv::countNonZero(out.depthRaw() != depth), 0);
+}
+
+TEST(MsgConversion, rgbdImageFromROSAliasesTheMessage)
+{
+	// rgbdImageFromROS deliberately avoids copying the pixels: the SensorData it returns
+	// points into the message's own buffers. Mutating the message is visible through the
+	// SensorData. Callers must therefore keep the message alive and unchanged for as long
+	// as they use the result -- and must deep-copy before letting the SensorData outlive
+	// the subscription callback, since the ROS queue recycles the message once it
+	// returns.
+	cv::Mat rgb(4, 4, CV_8UC3, cv::Scalar(10, 20, 30));
+	cv::Mat depth(4, 4, CV_16UC1, cv::Scalar(1000));
+
+	auto msg = std::make_shared<rtabmap_msgs::msg::RGBDImage>();
+	msg->rgb_camera_info.width = 4;
+	msg->rgb_camera_info.height = 4;
+	msg->rgb_camera_info.k = {525.0, 0.0, 2.0, 0.0, 525.0, 2.0, 0.0, 0.0, 1.0};
+	cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", rgb).toImageMsg(msg->rgb);
+	cv_bridge::CvImage(std_msgs::msg::Header(), "16UC1", depth).toImageMsg(msg->depth);
+
+	const rtabmap::SensorData data = rgbdImageFromROS(msg);
+	ASSERT_FALSE(data.imageRaw().empty());
+	ASSERT_EQ(data.imageRaw().at<cv::Vec3b>(0, 0), cv::Vec3b(10, 20, 30));
+
+	// Writing through the message is observable in the SensorData: no copy was made.
+	msg->rgb.data[0] = 99;
+	EXPECT_EQ(data.imageRaw().at<cv::Vec3b>(0, 0)[0], 99)
+		<< "SensorData is expected to alias the message buffer";
+}
+
+TEST(MsgConversion, toCvCopyReadsRawImages)
+{
+	cv::Mat rgb(4, 4, CV_8UC3, cv::Scalar(10, 20, 30));
+	cv::Mat depth(4, 4, CV_16UC1, cv::Scalar(1000));
+
+	rtabmap_msgs::msg::RGBDImage msg;
+	cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", rgb).toImageMsg(msg.rgb);
+	cv_bridge::CvImage(std_msgs::msg::Header(), "16UC1", depth).toImageMsg(msg.depth);
+
+	cv_bridge::CvImagePtr rgbPtr, depthPtr;
+	toCvCopy(msg, rgbPtr, depthPtr);
+
+	ASSERT_TRUE(rgbPtr && depthPtr);
+	EXPECT_EQ(cv::countNonZero(rgbPtr->image.reshape(1) != rgb.reshape(1)), 0);
+	EXPECT_EQ(cv::countNonZero(depthPtr->image != depth), 0);
+
+	// The copy must be independent of the message buffer.
+	rgbPtr->image.at<cv::Vec3b>(0, 0) = cv::Vec3b(0, 0, 0);
+	EXPECT_EQ(rgb.at<cv::Vec3b>(0, 0), cv::Vec3b(10, 20, 30));
+}
+
+TEST(MsgConversion, toCvCopyEmptyImageYieldsEmptyPtr)
+{
+	rtabmap_msgs::msg::RGBDImage msg;
+
+	cv_bridge::CvImagePtr rgbPtr, depthPtr;
+	toCvCopy(msg, rgbPtr, depthPtr);
+
+	ASSERT_TRUE(rgbPtr && depthPtr) << "pointers must be valid even with no image";
+	EXPECT_TRUE(rgbPtr->image.empty());
+	EXPECT_TRUE(depthPtr->image.empty());
+}
+
+TEST(MsgConversion, toCvShareAliasesRawImages)
+{
+	cv::Mat rgb(4, 4, CV_8UC3, cv::Scalar(10, 20, 30));
+	cv::Mat depth(4, 4, CV_16UC1, cv::Scalar(1000));
+
+	rtabmap_msgs::msg::RGBDImage msg;
+	cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", rgb).toImageMsg(msg.rgb);
+	cv_bridge::CvImage(std_msgs::msg::Header(), "16UC1", depth).toImageMsg(msg.depth);
+
+	cv_bridge::CvImageConstPtr rgbPtr, depthPtr;
+	toCvShare(msg, std::shared_ptr<void const>(), rgbPtr, depthPtr);
+
+	ASSERT_TRUE(rgbPtr && depthPtr);
+	ASSERT_FALSE(rgbPtr->image.empty());
+	EXPECT_EQ(cv::countNonZero(rgbPtr->image.reshape(1) != rgb.reshape(1)), 0);
+	EXPECT_EQ(cv::countNonZero(depthPtr->image != depth), 0);
 }
 
 /////////////////////////
