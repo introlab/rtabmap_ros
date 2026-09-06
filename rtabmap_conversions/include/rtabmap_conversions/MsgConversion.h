@@ -73,7 +73,21 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace rtabmap_conversions {
 
-void transformToTF(const rtabmap::Transform & transform, tf2::Transform & tfTransform);
+/** Convert a rtabmap::Transform into a tf2::Transform.
+ * @param transform the transform to convert
+ * @param tfTransform set to the converted transform, or filled with NaN if @p transform is null
+ * @return false if @p transform is null, true otherwise
+ * Note: tf2::Transform stores its rotation as a basis matrix and cannot represent a
+ *       null transform, hence the return value instead of an in-band sentinel. The
+ *       output is set to NaN in that case so that ignoring the return value fails
+ *       loudly rather than silently using an identity transform.
+ */
+bool transformToTF(const rtabmap::Transform & transform, tf2::Transform & tfTransform);
+/** Convert a tf2::Transform into a rtabmap::Transform.
+ * @param transform the transform to convert
+ * @return the converted transform, or a null transform if @p transform contains NaN
+ *         (which is how transformToTF() reports a null transform)
+ */
 rtabmap::Transform transformFromTF(const tf2::Transform & transform);
 
 void transformToGeometryMsg(const rtabmap::Transform & transform, geometry_msgs::msg::Transform & msg);

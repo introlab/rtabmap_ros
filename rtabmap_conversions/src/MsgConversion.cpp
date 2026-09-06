@@ -27,6 +27,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "rtabmap_conversions/MsgConversion.h"
 
+#include <cmath>
+#include <limits>
+
 #include <opencv2/highgui/highgui.hpp>
 #include <zlib.h>
 #include "rclcpp/rclcpp.hpp"
@@ -60,21 +63,46 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace rtabmap_conversions {
 
-void transformToTF(const rtabmap::Transform & transform, tf2::Transform & tfTransform)
+bool transformToTF(const rtabmap::Transform & transform, tf2::Transform & tfTransform)
 {
-	if(!transform.isNull())
+	if(transform.isNull())
 	{
-		geometry_msgs::msg::TransformStamped gm = tf2::eigenToTransform(transform.toEigen3d());
-		//tf2::fromMsg(gm, tfTransform);
+		// tf2::Transform cannot represent a null transform: it stores its rotation as a
+		// basis matrix, so there is no equivalent of the all-zero quaternion used by the
+		// geometry_msgs conversions. Fill it with NaN so that a caller ignoring the
+		// return value corrupts its results loudly instead of silently carrying on with
+		// an identity that looks legitimate.
+		const tf2Scalar nan = std::numeric_limits<tf2Scalar>::quiet_NaN();
+		tfTransform = tf2::Transform(
+				tf2::Matrix3x3(nan, nan, nan, nan, nan, nan, nan, nan, nan),
+				tf2::Vector3(nan, nan, nan));
+		return false;
 	}
-	else
-	{
-		tfTransform = tf2::Transform(tf2::Quaternion(0,0,0,0));
-	}
+
+	geometry_msgs::msg::Transform msg;
+	transformToGeometryMsg(transform, msg);
+	tf2::fromMsg(msg, tfTransform);
+	return true;
 }
 
 rtabmap::Transform transformFromTF(const tf2::Transform & transform)
 {
+	// transformToTF() poisons its output with NaN for a null transform, as tf2::Transform
+	// has no null representation of its own. Map that back to a null transform here so the
+	// two functions round-trip, and so a NaN coming from anywhere else does not silently
+	// propagate into the rest of the pipeline.
+	const tf2::Vector3 & origin = transform.getOrigin();
+	const tf2::Matrix3x3 & basis = transform.getBasis();
+	bool nan = std::isnan(origin.x()) || std::isnan(origin.y()) || std::isnan(origin.z());
+	for(int i=0; !nan && i<3; ++i)
+	{
+		nan = std::isnan(basis[i].x()) || std::isnan(basis[i].y()) || std::isnan(basis[i].z());
+	}
+	if(nan)
+	{
+		return rtabmap::Transform();
+	}
+
 	Eigen::Isometry3d eigenTf;
 	geometry_msgs::msg::Transform gm = tf2::toMsg(transform);
 	eigenTf = tf2::transformToEigen(gm);
@@ -829,9 +857,12 @@ rtabmap::CameraModel cameraModelFromROS(
 		const sensor_msgs::msg::CameraInfo & camInfo,
 		const rtabmap::Transform & localTransform)
 {
+	// Note: k, r and p are fixed-size arrays in the ROS message, so they are never
+	// empty and their size is always right. An unset matrix is signalled by all-zero
+	// content instead: k[0] and p[0] hold the focal length, which is always non-zero
+	// for a valid calibration, and an unset rectification matrix is all zeros.
 	cv:: Mat K;
-	UASSERT(camInfo.k.empty() || camInfo.k.size() == 9);
-	if(!camInfo.k.empty())
+	if(camInfo.k[0] != 0.0)
 	{
 		K = cv::Mat(3, 3, CV_64FC1);
 		memcpy(K.data, camInfo.k.data(), 9*sizeof(double));
@@ -858,17 +889,22 @@ rtabmap::CameraModel cameraModelFromROS(
 		}
 	}
 
+	// R is a rotation matrix, so any of its elements can legitimately be zero: only
+	// an entirely zero matrix means "not set".
 	cv:: Mat R;
-	UASSERT(camInfo.r.empty() || camInfo.r.size() == 9);
-	if(!camInfo.r.empty())
+	bool rIsSet = false;
+	for(size_t i=0; !rIsSet && i<camInfo.r.size(); ++i)
+	{
+		rIsSet = camInfo.r[i] != 0.0;
+	}
+	if(rIsSet)
 	{
 		R = cv::Mat(3, 3, CV_64FC1);
 		memcpy(R.data, camInfo.r.data(), 9*sizeof(double));
 	}
 
 	cv:: Mat P;
-	UASSERT(camInfo.p.empty() || camInfo.p.size() == 12);
-	if(!camInfo.p.empty())
+	if(camInfo.p[0] != 0.0)
 	{
 		P = cv::Mat(3, 4, CV_64FC1);
 		memcpy(P.data, camInfo.p.data(), 12*sizeof(double));
@@ -942,8 +978,9 @@ void cameraModelToROS(
 	{
 		memset(camInfo.p.data(), 0.0, 12*sizeof(double));
 		if(!model.K_raw().empty()) {
+			// P = [K | 0]: copying K already sets the homogeneous P(2,2)=1, and the
+			// fourth column (the Tx/Ty/Tz translation) stays zero for a single camera.
 			model.K_raw().copyTo(cv::Mat(3,4,CV_64FC1, camInfo.p.data()).colRange(0,3));
-			camInfo.p.back() = 1.0;
 		}
 	}
 	else
