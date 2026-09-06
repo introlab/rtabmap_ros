@@ -284,10 +284,15 @@ bool deskew(
 		double waitForTransform,
 		bool slerp = false);
 
+/** Deskew a point cloud using a constant velocity model.
+ * @param input    cloud with a per-point time channel ("t", "time", "stamps" or "timestamp")
+ * @param output   deskewed cloud, expressed in the frame at input's header stamp
+ * @param velocity twist of the sensor frame (m/s and rad/s)
+ * @return false if the cloud has no usable time channel or velocity is null
+ */
 bool deskew(
 		const sensor_msgs::PointCloud2 & input,
 		sensor_msgs::PointCloud2 & output,
-		double previousStamp,
 		const rtabmap::Transform & velocity);
 
 }
