@@ -273,6 +273,12 @@ void MapsManager::set2DMap(
 		const std::map<int, rtabmap::Transform> & poses,
 		const rtabmap::Memory * memory)
 {
+	if(!map.empty() && poses.empty())
+	{
+		UWARN("Ignoring the 2D map (%dx%d): no poses were given. Pass the poses of the "
+			  "nodes the map was assembled from.", map.cols, map.rows);
+		return;
+	}
 	occupancyGrid_->setMap(map, xMin, yMin, cellSize, poses);
 	//update cache in case the map should be updated
 	if(memory && 
@@ -1420,6 +1426,7 @@ void MapsManager::publishMaps(
 		msg->header.frame_id = mapFrameId;
 		msg->header.stamp = stamp;
 		elevationMapPub_->publish(std::move(msg));
+		latched_.at(&elevationMapPub_) = true;
 	}
 	if(elevationMapPub_->get_subscription_count() == 0)
 	{
