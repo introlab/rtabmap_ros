@@ -165,6 +165,21 @@ void RGBDImageViewer::callback(
         QMetaObject::invokeMethod(warningLabel_, "clear");
     }
 
+    // rgbdImageFromROS() does not copy the pixels: the SensorData points into the ROS
+    // message buffers, which the subscription queue recycles as soon as this callback
+    // returns. The event below is posted asynchronously and so outlives the callback,
+    // therefore the images must be deep-copied first.
+    if(!data.imageRaw().empty() || !data.depthOrRightRaw().empty()) {
+        cv::Mat image = data.imageRaw().clone();
+        cv::Mat depthOrRight = data.depthOrRightRaw().clone();
+        if(!data.stereoCameraModels().empty()) {
+            data.setStereoImage(image, depthOrRight, data.stereoCameraModels());
+        }
+        else {
+            data.setRGBDImage(image, depthOrRight, data.cameraModels());
+        }
+    }
+
     this->post(new rtabmap::SensorEvent(data));
 }
 

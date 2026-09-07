@@ -122,5 +122,22 @@ install(DIRECTORY include/
    FILES_MATCHING PATTERN "*.h"
 )
 
+#############
+## Testing ##
+#############
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+
+  ament_add_gtest(test_msg_conversion test/test_msg_conversion.cpp)
+  if(TARGET test_msg_conversion)
+    target_link_libraries(test_msg_conversion rtabmap_conversions)
+    if("$ENV{ROS_DISTRO}" STRLESS "lyrical")
+      ament_target_dependencies(test_msg_conversion ${AmentLibraries})
+    else()
+      target_link_libraries(test_msg_conversion ${Libraries} ${PublicLibraries})
+    endif()
+  endif()
+endif()
+
 ament_package()
 
