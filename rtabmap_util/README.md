@@ -8,44 +8,46 @@ Every node is a [composable node](https://docs.ros.org/en/jazzy/Tutorials/Interm
 
 ## Nodes
 
+One page per node.
+
 **Sensor conversion**
 
 | Node | Description |
 |---|---|
-| [disparity_to_depth](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_util/doc/disparity_to_depth.md) | Disparity image → depth image, in metres and in millimetres. |
-| [pointcloud_to_depthimage](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_util/doc/pointcloud_to_depthimage.md) | Point cloud → depth image, by projecting into a virtual camera. Lets a lidar feed an RGB-D pipeline. |
-| [point_cloud_xyz](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_util/doc/point_cloud_xyz.md) | Depth or disparity image → point cloud, with filtering. |
-| [point_cloud_xyzrgb](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_util/doc/point_cloud_xyzrgb.md) | RGB-D, stereo or disparity → coloured point cloud. |
-| [imu_to_tf](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_util/doc/imu_to_tf.md) | IMU orientation → TF. |
+| [disparity_to_depth](doc/disparity_to_depth.md) | Disparity image → depth image, in metres and in millimetres. |
+| [pointcloud_to_depthimage](doc/pointcloud_to_depthimage.md) | Point cloud → depth image, by projecting into a virtual camera. Lets a lidar feed an RGB-D pipeline. |
+| [point_cloud_xyz](doc/point_cloud_xyz.md) | Depth or disparity image → point cloud, with filtering. |
+| [point_cloud_xyzrgb](doc/point_cloud_xyzrgb.md) | RGB-D, stereo or disparity → coloured point cloud. |
+| [imu_to_tf](doc/imu_to_tf.md) | IMU orientation → TF. |
 
 **RGBDImage plumbing**
 
 | Node | Description |
 |---|---|
-| [rgbd_relay](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_util/doc/rgbd_relay.md) | Republishes an `RGBDImage`, compressing or decompressing on the way. |
-| [rgbd_split](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_util/doc/rgbd_split.md) | Splits an `RGBDImage` back into standard `Image` and `CameraInfo` topics. |
+| [rgbd_relay](doc/rgbd_relay.md) | Republishes an `RGBDImage`, compressing or decompressing on the way. |
+| [rgbd_split](doc/rgbd_split.md) | Splits an `RGBDImage` back into standard `Image` and `CameraInfo` topics. |
 
 **Point cloud processing**
 
 | Node | Description |
 |---|---|
-| [lidar_deskewing](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_util/doc/lidar_deskewing.md) | Removes motion distortion from a lidar sweep. |
-| [point_cloud_aggregator](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_util/doc/point_cloud_aggregator.md) | Merges several sensors captured at the same moment. |
-| [point_cloud_assembler](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_util/doc/point_cloud_assembler.md) | Accumulates one sensor over time into a denser cloud. |
-| [obstacles_detection](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_util/doc/obstacles_detection.md) | Segments a cloud into ground and obstacles. |
+| [lidar_deskewing](doc/lidar_deskewing.md) | Removes motion distortion from a lidar sweep. |
+| [point_cloud_aggregator](doc/point_cloud_aggregator.md) | Merges several sensors captured at the same moment. |
+| [point_cloud_assembler](doc/point_cloud_assembler.md) | Accumulates one sensor over time into a denser cloud. |
+| [obstacles_detection](doc/obstacles_detection.md) | Segments a cloud into ground and obstacles. |
 
 **Maps and replay**
 
 | Node | Description |
 |---|---|
-| [map_assembler](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_util/doc/map_assembler.md) | Rebuilds the global maps from RTAB-Map's graph, off the SLAM node's critical path. |
-| [db_player](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_util/doc/db_player.md) | Replays a recorded RTAB-Map database as live sensor topics. |
+| [map_assembler](doc/map_assembler.md) | Rebuilds the global maps from RTAB-Map's graph, off the SLAM node's critical path. |
+| [db_player](doc/db_player.md) | Replays a recorded RTAB-Map database as live sensor topics. |
 
 ## Library
 
-The package also installs a small C++ library, whose API is documented in the [C++ API reference](https://docs.ros.org/en/ros2_packages/rolling/api/rtabmap_util/generated/index.html) generated from the headers.
+The package also installs a small C++ library, whose API is documented in the [C++ API reference](https://docs.ros.org/en/jazzy/p/rtabmap_util/generated/index.html) generated from the headers.
 
-`MapsManager` is the piece worth knowing about: it turns a pose graph plus per-node occupancy grids into the assembled clouds, occupancy grid, octomap and elevation map, and publishes them. Both [map_assembler](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_util/doc/map_assembler.md) and `rtabmap_slam`'s `rtabmap` node use it, which is why their map outputs and `Grid/*` parameters behave identically.
+`MapsManager` is the piece worth knowing about: it turns a pose graph plus per-node occupancy grids into the assembled clouds, occupancy grid, octomap and elevation map, and publishes them. Both [map_assembler](doc/map_assembler.md) and `rtabmap_slam`'s `rtabmap` node use it, which is why their map outputs and `Grid/*` parameters behave identically.
 
 ## Conventions
 
