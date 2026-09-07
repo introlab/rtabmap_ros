@@ -313,7 +313,7 @@ void ICPOdometry::callbackScan(const sensor_msgs::msg::LaserScan::SharedPtr scan
 				scanMsg->header.frame_id,
 				guessFrameId().empty()?frameId():guessFrameId(),
 				scanMsg->header.stamp,
-				rclcpp::Time(scanMsg->header.stamp.sec, scanMsg->header.stamp.nanosec) + rclcpp::Duration::from_seconds(scanMsg->ranges.size()*scanMsg->time_increment),
+				rclcpp::Time(scanMsg->header.stamp.sec, scanMsg->header.stamp.nanosec) + rclcpp::Duration::from_seconds((scanMsg->ranges.empty()?0:scanMsg->ranges.size()-1)*scanMsg->time_increment),
 				this->tfBuffer(),
 				this->waitForTransform());
 		if(tmpT.isNull())

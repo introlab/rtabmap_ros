@@ -125,7 +125,7 @@ void RGBDRelay::callback(const rtabmap_msgs::msg::RGBDImage::SharedPtr input) co
 				// already raw, just copy pointer
 				output->rgb = input->rgb;
 			}
-			if(!input->rgb_compressed.data.empty())
+			else if(!input->rgb_compressed.data.empty())
 			{
 				cv_bridge::toCvCopy(input->rgb_compressed)->toImageMsg(output->rgb);
 			}
@@ -135,20 +135,37 @@ void RGBDRelay::callback(const rtabmap_msgs::msg::RGBDImage::SharedPtr input) co
 				// already raw, just copy pointer
 				output->depth = input->depth;
 			}
-			else if(input->depth_compressed.format.compare("jpg")==0)
+			else if(!input->depth_compressed.data.empty())
 			{
-				// right stereo image
-				cv_bridge::toCvCopy(input->depth_compressed)->toImageMsg(output->depth);
-			}
-			else
-			{
-				// dpeth image
+				// Decode first, then pick the encoding from what actually came out.
+				// Branching on the "jpg"/"png" format string instead would abort on a
+				// right image compressed as PNG, which nothing forbids.
 				auto cvImg = std::make_unique<cv_bridge::CvImage>();
 				cvImg->header = input->depth_compressed.header;
 				cvImg->image = rtabmap::uncompressImage(input->depth_compressed.data);
-				UASSERT(cvImg->image.empty() || cvImg->image.type() == CV_32FC1 || cvImg->image.type() == CV_16UC1);
-				cvImg->encoding = cvImg->image.empty()?"":cvImg->image.type() == CV_32FC1?sensor_msgs::image_encodings::TYPE_32FC1:sensor_msgs::image_encodings::TYPE_16UC1;
-				cvImg->toImageMsg(output->depth);
+				if(cvImg->image.empty())
+				{
+					RCLCPP_ERROR(this->get_logger(), "Could not decompress the depth/right image of \"%s\" (format=\"%s\").",
+							rgbdImageSub_->get_topic_name(), input->depth_compressed.format.c_str());
+				}
+				else
+				{
+					switch(cvImg->image.type())
+					{
+						case CV_32FC1: cvImg->encoding = sensor_msgs::image_encodings::TYPE_32FC1; break;
+						case CV_16UC1: cvImg->encoding = sensor_msgs::image_encodings::TYPE_16UC1; break;
+						case CV_8UC1:  cvImg->encoding = sensor_msgs::image_encodings::MONO8; break;
+						case CV_8UC3:  cvImg->encoding = sensor_msgs::image_encodings::BGR8; break;
+						default:
+							RCLCPP_ERROR(this->get_logger(), "Unsupported decompressed depth/right image type %d.", cvImg->image.type());
+							cvImg->image = cv::Mat();
+							break;
+					}
+					if(!cvImg->image.empty())
+					{
+						cvImg->toImageMsg(output->depth);
+					}
+				}
 			}
 		}
 

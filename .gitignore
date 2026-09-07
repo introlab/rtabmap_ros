@@ -4,3 +4,4 @@ __pycache__
 # rosdoc2 build artifacts
 docs_build
 cross_reference
+doc_output

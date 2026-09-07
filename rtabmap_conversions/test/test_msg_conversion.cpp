@@ -2224,6 +2224,57 @@ TEST(MsgConversion, toCvShareReadsCompressedDepth)
 	EXPECT_EQ(cv::countNonZero(depthPtr->image != depth), 0);
 }
 
+TEST(MsgConversion, toCvShareOnAnEmptyMessageGivesEmptyImages)
+{
+	// Both pointers must be valid even when the message carries nothing: callers such as
+	// rgbdImageFromROS() dereference them unconditionally.
+	const rtabmap_msgs::msg::RGBDImage msg;
+
+	cv_bridge::CvImageConstPtr rgbPtr, depthPtr;
+	toCvShare(msg, std::shared_ptr<void const>(), rgbPtr, depthPtr);
+
+	ASSERT_TRUE(rgbPtr);
+	ASSERT_TRUE(depthPtr);
+	EXPECT_TRUE(rgbPtr->image.empty());
+	EXPECT_TRUE(depthPtr->image.empty());
+}
+
+TEST(MsgConversion, rgbdImageFromROSOnAnEmptyMessageIsInvalid)
+{
+	rtabmap_msgs::msg::RGBDImage::SharedPtr msg =
+			std::make_shared<rtabmap_msgs::msg::RGBDImage>();
+	msg->header.frame_id = "camera_link";
+	msg->header.stamp = rclcpp::Time(1000, 0, RCL_ROS_TIME);
+
+	const rtabmap::SensorData data = rgbdImageFromROS(msg);
+
+	EXPECT_FALSE(data.isValid()) << "an empty message must give empty data, not a crash";
+}
+
+TEST(MsgConversion, rgbdImageFromROSWithoutDepthKeepsTheColourImage)
+{
+	// The depth image is optional: colour plus camera info is a valid message, and the
+	// resolution check must not divide by the zero depth width.
+	rtabmap_msgs::msg::RGBDImage::SharedPtr msg =
+			std::make_shared<rtabmap_msgs::msg::RGBDImage>();
+	msg->header.frame_id = "camera_link";
+	msg->header.stamp = rclcpp::Time(1000, 0, RCL_ROS_TIME);
+	cv::Mat rgb(8, 8, CV_8UC3, cv::Scalar(10, 20, 30));
+	cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", rgb).toImageMsg(msg->rgb);
+	msg->rgb_camera_info.width = 8;
+	msg->rgb_camera_info.height = 8;
+	msg->rgb_camera_info.k = {525.0, 0.0, 4.0, 0.0, 525.0, 4.0, 0.0, 0.0, 1.0};
+
+	const rtabmap::SensorData data = rgbdImageFromROS(msg);
+
+	EXPECT_TRUE(data.isValid());
+	ASSERT_FALSE(data.imageRaw().empty());
+	EXPECT_EQ(data.imageRaw().at<cv::Vec3b>(0, 0), cv::Vec3b(10, 20, 30));
+	EXPECT_TRUE(data.depthRaw().empty());
+	ASSERT_EQ(data.cameraModels().size(), 1u);
+	EXPECT_NEAR(data.cameraModels()[0].fx(), 525.0, 1e-9);
+}
+
 TEST(MsgConversion, toCvCopyReadsCompressedRgb)
 {
 	const cv::Mat rgb(8, 8, CV_8UC3, cv::Scalar(10, 20, 30));

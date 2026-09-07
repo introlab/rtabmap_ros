@@ -26,6 +26,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #include <rtabmap_util/rgbd_split.hpp>
+#include <rtabmap/core/Compression.h>
+#include <rtabmap/utilite/ULogger.h>
+#include <sensor_msgs/image_encodings.hpp>
 
 #ifdef PRE_ROS_IRON
 #include <cv_bridge/cv_bridge.h>
@@ -100,7 +103,36 @@ void RGBDSplit::callback(const rtabmap_msgs::msg::RGBDImage::SharedPtr input) co
 #ifdef CV_BRIDGE_HYDRO
 			ROS_ERROR("Unsupported compressed image copy, please upgrade at least to ROS Indigo to use this.");
 #else
-			cv_bridge::toCvCopy(input->depth_compressed)->toImageMsg(outputImage);
+			// Decode first, then pick the encoding from what actually came out. Going
+			// by the "jpg"/"png" format string instead would mislabel a depth PNG as
+			// mono8 (cv_bridge cannot infer 16-bit from it), and would abort outright on
+			// a right image compressed as PNG, which nothing forbids.
+			cv_bridge::CvImage cvImg;
+			cvImg.header = input->depth_compressed.header;
+			cvImg.image = rtabmap::uncompressImage(input->depth_compressed.data);
+			if(cvImg.image.empty())
+			{
+				RCLCPP_ERROR(this->get_logger(), "Could not decompress the depth/right image of \"%s\" (format=\"%s\").",
+						rgbdImageSub_->get_topic_name(), input->depth_compressed.format.c_str());
+			}
+			else
+			{
+				switch(cvImg.image.type())
+				{
+					case CV_32FC1: cvImg.encoding = sensor_msgs::image_encodings::TYPE_32FC1; break;
+					case CV_16UC1: cvImg.encoding = sensor_msgs::image_encodings::TYPE_16UC1; break;
+					case CV_8UC1:  cvImg.encoding = sensor_msgs::image_encodings::MONO8; break;
+					case CV_8UC3:  cvImg.encoding = sensor_msgs::image_encodings::BGR8; break;
+					default:
+						RCLCPP_ERROR(this->get_logger(), "Unsupported decompressed depth/right image type %d.", cvImg.image.type());
+						cvImg.image = cv::Mat();
+						break;
+				}
+			}
+			if(!cvImg.image.empty())
+			{
+				cvImg.toImageMsg(outputImage);
+			}
 #endif
 		}
 		if(outputCameraInfo.header.frame_id.empty()) {
