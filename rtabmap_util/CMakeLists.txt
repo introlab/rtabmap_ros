@@ -332,6 +332,7 @@ if(BUILD_TESTING)
   rtabmap_util_add_node_test(test_point_cloud_xyz)
   rtabmap_util_add_node_test(test_pointcloud_to_depthimage)
   rtabmap_util_add_node_test(test_point_cloud_xyzrgb)
+  rtabmap_util_add_node_test(test_db_player)
 endif()
 
 ament_package()
