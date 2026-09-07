@@ -1,5 +1,6 @@
 .pydevproject
 .settings
+.vscode
 __pycache__
 # rosdoc2 build artifacts
 docs_build
