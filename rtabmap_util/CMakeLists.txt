@@ -334,6 +334,7 @@ if(BUILD_TESTING)
   rtabmap_util_add_node_test(test_point_cloud_xyzrgb)
   rtabmap_util_add_node_test(test_db_player)
   rtabmap_util_add_node_test(test_maps_manager)
+  rtabmap_util_add_node_test(test_map_assembler)
 endif()
 
 ament_package()

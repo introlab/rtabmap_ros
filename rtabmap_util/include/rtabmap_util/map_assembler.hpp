@@ -62,6 +62,9 @@ private:
 
 	void timerCallback();
 
+	/// Subscribes to "mapData"; the node is live from here on.
+	void subscribeToMapData();
+
 #ifdef WITH_OCTOMAP_MSGS
 #ifdef RTABMAP_OCTOMAP
 	void octomapBinaryCallback(
@@ -100,6 +103,7 @@ private:
 #endif
 #endif
 	bool localGridsRegenerated_;
+	double initializeFromRtabmapTimeout_;
 };
 
 }

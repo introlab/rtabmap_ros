@@ -36,10 +36,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <tf2_msgs/msg/tf_message.hpp>
 
+#include <atomic>
 #include <chrono>
 #include <functional>
 #include <memory>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace rtabmap_util_test {
@@ -138,6 +140,55 @@ protected:
 			executor_->spin_once(std::chrono::milliseconds(10));
 		}
 		return done();
+	}
+
+	/**
+	 * @brief Runs every node of the fixture on a multi-threaded executor until @p done.
+	 *
+	 * A node whose callback waits on another of its own callbacks -- a service call made
+	 * from a timer, say -- makes no progress under spinUntil(), because the second
+	 * callback cannot run while the first is still on the stack. Such nodes put the two
+	 * callbacks in different callback groups precisely so a multi-threaded executor can
+	 * overlap them; this hands them the threads to do it, then puts the nodes back on the
+	 * usual single-threaded executor.
+	 *
+	 * @warning Callbacks run on executor threads for the duration, so do not have any
+	 *          Collector subscribed while this runs: the test thread would read its
+	 *          messages while another thread appends to them. Use it to get a node
+	 *          through its start-up handshake, before subscribing to anything.
+	 */
+	bool spinMultiThreadedUntil(
+			const std::function<bool()> & done,
+			std::chrono::milliseconds timeout = std::chrono::milliseconds(15000))
+	{
+		rclcpp::executors::MultiThreadedExecutor booting(rclcpp::ExecutorOptions(), 4);
+		for(const rclcpp::Node::SharedPtr & node : nodes_)
+		{
+			executor_->remove_node(node);
+			booting.add_node(node);
+		}
+		executor_->remove_node(helper_);
+		booting.add_node(helper_);
+
+		std::thread spinner([&booting]() { booting.spin(); });
+		const std::chrono::steady_clock::time_point deadline =
+				std::chrono::steady_clock::now() + timeout;
+		while(rclcpp::ok() && !done() && std::chrono::steady_clock::now() < deadline)
+		{
+			std::this_thread::sleep_for(std::chrono::milliseconds(5));
+		}
+		const bool result = done();
+		booting.cancel();
+		spinner.join();
+
+		booting.remove_node(helper_);
+		executor_->add_node(helper_);
+		for(const rclcpp::Node::SharedPtr & node : nodes_)
+		{
+			booting.remove_node(node);
+			executor_->add_node(node);
+		}
+		return result;
 	}
 
 	/// Spins for a fixed duration, for the "nothing should happen" assertions.
