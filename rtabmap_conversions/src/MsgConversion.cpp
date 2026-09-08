@@ -796,9 +796,12 @@ rtabmap::CameraModel cameraModelFromROS(
 		const sensor_msgs::CameraInfo & camInfo,
 		const rtabmap::Transform & localTransform)
 {
+	// Note: K, R and P are fixed-size arrays in the ROS message (boost::array), so they
+	// are never empty and their size is always right. An unset matrix is signalled by
+	// all-zero content instead: K[0] and P[0] hold the focal length, which is always
+	// non-zero for a valid calibration, and an unset rectification matrix is all zeros.
 	cv:: Mat K;
-	UASSERT(camInfo.K.empty() || camInfo.K.size() == 9);
-	if(!camInfo.K.empty())
+	if(camInfo.K[0] != 0.0)
 	{
 		K = cv::Mat(3, 3, CV_64FC1);
 		memcpy(K.data, camInfo.K.elems, 9*sizeof(double));
@@ -825,17 +828,22 @@ rtabmap::CameraModel cameraModelFromROS(
 		}
 	}
 
+	// R is a rotation matrix, so any of its elements can legitimately be zero: only
+	// an entirely zero matrix means "not set".
 	cv:: Mat R;
-	UASSERT(camInfo.R.empty() || camInfo.R.size() == 9);
-	if(!camInfo.R.empty())
+	bool rIsSet = false;
+	for(size_t i=0; !rIsSet && i<camInfo.R.size(); ++i)
+	{
+		rIsSet = camInfo.R[i] != 0.0;
+	}
+	if(rIsSet)
 	{
 		R = cv::Mat(3, 3, CV_64FC1);
 		memcpy(R.data, camInfo.R.elems, 9*sizeof(double));
 	}
 
 	cv:: Mat P;
-	UASSERT(camInfo.P.empty() || camInfo.P.size() == 12);
-	if(!camInfo.P.empty())
+	if(camInfo.P[0] != 0.0)
 	{
 		P = cv::Mat(3, 4, CV_64FC1);
 		memcpy(P.data, camInfo.P.elems, 12*sizeof(double));
@@ -2768,8 +2776,7 @@ bool deskew_impl(
 		tf2_ros::Buffer * tfBuffer,
 		double waitForTransform,
 		bool slerp,
-		const rtabmap::Transform & velocity,
-		double previousStamp)
+		const rtabmap::Transform & velocity)
 {
 	if(tfBuffer != 0)
 	{
@@ -2790,12 +2797,6 @@ bool deskew_impl(
 		if(!slerp)
 		{
 			ROS_ERROR("slerp should be true when constant velocity model is used!");
-			return false;
-		}
-
-		if(previousStamp <= 0.0)
-		{
-			ROS_ERROR("previousStamp should be >0 when constant velocity model is used!");
 			return false;
 		}
 
@@ -3069,8 +3070,23 @@ bool deskew_impl(
 	}
 	else if(lastStamp == firstStamp)
 	{
-		ROS_ERROR("First and last stamps in the scan are the same (%f) (header=%f)!", lastStamp.toSec(), input.header.stamp.toSec());
-		return false;
+		// There is no time spread across the scan, so there is nothing to correct. This
+		// happens when the driver doesn't fill the per-point time channel, and also when
+		// the cloud has already been deskewed: deskewing zeroes that channel to mark it.
+		// Pass the cloud through unchanged so that deskewing twice is a no-op rather than
+		// a failure that makes the caller drop the frame.
+		static bool warned = false;
+		if(!warned)
+		{
+			ROS_WARN("First and last stamps in the scan are the same (%f) (header=%f), the "
+					 "cloud is returned unchanged. Either the time channel is not filled by "
+					 "the driver, or the cloud has already been deskewed. This warning is "
+					 "only shown once.",
+					 lastStamp.toSec(), input.header.stamp.toSec());
+			warned = true;
+		}
+		output = input;
+		return true;
 	}
 
 	std::string errorMsg;
@@ -3121,23 +3137,19 @@ bool deskew_impl(
 			float vx,vy,vz, vroll,vpitch,vyaw;
 			velocity.getTranslationAndEulerAngles(vx,vy,vz, vroll,vpitch,vyaw);
 
-			// We need three poses:
-			//  1- The pose of base frame in odom frame at first stamp
-			//  2- The pose of base frame in odom frame at msg stamp
-			//  3- The pose of base frame in odom frame at last stamp
-			UASSERT(firstStamp.toSec() >= previousStamp);
-			UASSERT(lastStamp.toSec() > previousStamp);
-			double dt1 = firstStamp.toSec() - previousStamp;
-			double dt2 = input.header.stamp.toSec() - previousStamp;
-			double dt3 = lastStamp.toSec() - previousStamp;
-
-			rtabmap::Transform p1(vx*dt1, vy*dt1, vz*dt1, vroll*dt1, vpitch*dt1, vyaw*dt1);
-			rtabmap::Transform p2(vx*dt2, vy*dt2, vz*dt2, vroll*dt2, vpitch*dt2, vyaw*dt2);
-			rtabmap::Transform p3(vx*dt3, vy*dt3, vz*dt3, vroll*dt3, vpitch*dt3, vyaw*dt3);
+			// Integrate the velocity directly from the stamp of the msg, which is the
+			// frame the deskewed cloud is expressed in. Going through a third, earlier
+			// reference pose and composing it away would give the same answer for a pure
+			// translation, but not for a rotation: Transform() scales roll/pitch/yaw
+			// linearly instead of using the twist exponential, so the composition only
+			// cancels in the small-angle limit. Keeping dt bounded by the scan duration
+			// is where that approximation is at its best.
+			double dt1 = firstStamp.toSec() - input.header.stamp.toSec();
+			double dt3 = lastStamp.toSec() - input.header.stamp.toSec();
 
 			// First and last poses are relative to stamp of the msg
-			firstPose = p2.inverse() * p1;
-			lastPose = p2.inverse() * p3;
+			firstPose = rtabmap::Transform(vx*dt1, vy*dt1, vz*dt1, vroll*dt1, vpitch*dt1, vyaw*dt1);
+			lastPose = rtabmap::Transform(vx*dt3, vy*dt3, vz*dt3, vroll*dt3, vpitch*dt3, vyaw*dt3);
 		}
 
 		if(firstPose.isNull())
@@ -3164,6 +3176,7 @@ bool deskew_impl(
 
 	output = input;
 	ros::Time stamp;
+	bool clampWarned = false;   // reported once per cloud, see the clamp below
 	UTimer processingTime;
 	if(timeOnColumns)
 	{
@@ -3209,7 +3222,27 @@ bool deskew_impl(
 			rtabmap::Transform transform;
 			if(slerp)
 			{
-				transform = firstPose.interpolate((stamp-firstStamp).toSec() / scanTime, lastPose);
+				// The ordering check only compares the first and last samples, so a stamp
+				// outside [firstStamp, lastStamp] can slip through. Clamp it: extrapolating
+				// would throw the point far beyond the sweep.
+				double ratio = (stamp-firstStamp).toSec() / scanTime;
+				if(ratio < 0.0 || ratio > 1.0)
+				{
+					// Warned once per cloud rather than once per process: the timestamp
+					// channel is corrupted, which is a serious upstream problem worth
+					// reporting on every affected scan, but not once per point.
+					if(!clampWarned)
+					{
+						ROS_WARN("A point has a stamp (%f) outside the first (%f) and last (%f) "
+								 "stamps of the scan, its correction is clamped to the closest end "
+								 "of the sweep. The timestamp channel of the input cloud is likely "
+								 "corrupted. Only the first such point of this cloud is reported.",
+								 stamp.toSec(), firstStamp.toSec(), lastStamp.toSec());
+						clampWarned = true;
+					}
+					ratio = ratio<0.0?0.0:1.0;
+				}
+				transform = firstPose.interpolate(float(ratio), lastPose);
 			}
 			else
 			{
@@ -3303,7 +3336,27 @@ bool deskew_impl(
 			rtabmap::Transform transform;
 			if(slerp)
 			{
-				transform = firstPose.interpolate((stamp-firstStamp).toSec() / scanTime, lastPose);
+				// The ordering check only compares the first and last samples, so a stamp
+				// outside [firstStamp, lastStamp] can slip through. Clamp it: extrapolating
+				// would throw the point far beyond the sweep.
+				double ratio = (stamp-firstStamp).toSec() / scanTime;
+				if(ratio < 0.0 || ratio > 1.0)
+				{
+					// Warned once per cloud rather than once per process: the timestamp
+					// channel is corrupted, which is a serious upstream problem worth
+					// reporting on every affected scan, but not once per point.
+					if(!clampWarned)
+					{
+						ROS_WARN("A point has a stamp (%f) outside the first (%f) and last (%f) "
+								 "stamps of the scan, its correction is clamped to the closest end "
+								 "of the sweep. The timestamp channel of the input cloud is likely "
+								 "corrupted. Only the first such point of this cloud is reported.",
+								 stamp.toSec(), firstStamp.toSec(), lastStamp.toSec());
+						clampWarned = true;
+					}
+					ratio = ratio<0.0?0.0:1.0;
+				}
+				transform = firstPose.interpolate(float(ratio), lastPose);
 			}
 			else
 			{
@@ -3365,16 +3418,15 @@ bool deskew(
 		double waitForTransform,
 		bool slerp)
 {
-	return deskew_impl(input, output, fixedFrameId, &tfBuffer, waitForTransform, slerp, rtabmap::Transform(), 0);
+	return deskew_impl(input, output, fixedFrameId, &tfBuffer, waitForTransform, slerp, rtabmap::Transform());
 }
 
 bool deskew(
 		const sensor_msgs::PointCloud2 & input,
 		sensor_msgs::PointCloud2 & output,
-		double previousStamp,
 		const rtabmap::Transform & velocity)
 {
-	return deskew_impl(input, output, "", 0, 0, true, velocity, previousStamp);
+	return deskew_impl(input, output, "", 0, 0, true, velocity);
 }
 
 }
