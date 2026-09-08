@@ -1,0 +1,77 @@
+# Codecov configuration -- https://docs.codecov.com/docs/codecov-yaml
+#
+# Coverage data is produced by .github/workflows/coverage.yml (colcon's
+# coverage-gcc mixin over the packages that have tests, aggregated by
+# colcon-lcov-result) and uploaded by codecov/codecov-action; this file only
+# controls what Codecov reports back on a pull request. Nothing is posted
+# unless the Codecov GitHub App has access to the repository.
+
+# action-ros-ci checks the repository out into a colcon workspace, so every
+# path in the lcov report is prefixed. Strip it, otherwise Codecov cannot match
+# a file to the one in the diff and reports no coverage at all.
+fixes:
+  - "ros_ws/src/rtabmap_ros/::"
+
+# Mark uncovered added lines inline in the "Files changed" tab.
+github_checks:
+  annotations: true
+
+coverage:
+  precision: 2
+  round: down
+  range: "10...90" # red/green scale: 10% is fully red, 90% fully green
+
+  status:
+    # Catch a slow slide down without pinning an absolute number.
+    project:
+      default:
+        target: auto
+        threshold: 1%
+
+    # Coverage of the lines this pull request touches. Advisory: reported, but
+    # does not block the merge -- drop "informational" to make it gate.
+    patch:
+      default:
+        informational: true
+
+# Per-package breakdown, computed from the same single upload -- no extra job
+# and no separate flag upload per package. Each component gets its own line in
+# the pull request comment and its own status check.
+component_management:
+  default_rules:
+    statuses:
+      - type: project
+        target: auto
+        threshold: 1%
+  individual_components:
+    - component_id: rtabmap_conversions
+      name: rtabmap_conversions
+      paths:
+        - rtabmap_conversions/**
+    - component_id: rtabmap_util
+      name: rtabmap_util
+      paths:
+        - rtabmap_util/**
+
+comment:
+  layout: "condensed_header, diff, components, files"
+  behavior: default
+  require_changes: true # stay quiet when coverage doesn't move
+
+# Only rtabmap_conversions and rtabmap_util have tests today, so everything
+# else would report as 0% and drag the total down to a number that says
+# nothing. As a package gains tests, drop its line here and add it to
+# individual_components above.
+ignore:
+  - "rtabmap_costmap_plugins/**"
+  - "rtabmap_demos/**"
+  - "rtabmap_examples/**"
+  - "rtabmap_launch/**"
+  - "rtabmap_msgs/**"
+  - "rtabmap_odom/**"
+  - "rtabmap_python/**"
+  - "rtabmap_rviz_plugins/**"
+  - "rtabmap_slam/**"
+  - "rtabmap_sync/**"
+  - "rtabmap_viz/**"
+  - "**/test/**"

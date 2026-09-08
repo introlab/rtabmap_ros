@@ -1,0 +1,86 @@
+name: Coverage
+
+on:
+  push:
+    branches: [ ros2 ]
+  pull_request:
+    branches: [ ros2 ]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  coverage:
+    name: Coverage (humble)
+    runs-on: ubuntu-latest
+    container:
+      image: osrf/ros:humble-desktop-full
+    env:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - run: |
+          DEBIAN_FRONTEND=noninteractive
+          sudo apt-get update
+          # genhtml, for the browsable artifact below. colcon-lcov-result pulls
+          # in lcov itself, but only after the build has already run.
+          sudo apt-get install -y lcov
+
+      - run: |
+          echo "repositories:\n  introlab/rtabmap:\n    type: git\n    url: https://github.com/introlab/rtabmap.git\n    version: master\n" > /tmp/deps.repos &&\
+          cat /tmp/deps.repos
+
+      # Only the packages that have tests. Their dependencies, RTAB-Map itself
+      # included, are still built (--packages-up-to), they are just not measured.
+      - uses: ros-tooling/action-ros-ci@v0.4
+        with:
+          package-name: rtabmap_conversions rtabmap_util
+          target-ros2-distro: humble
+          vcs-repo-file-url: /tmp/deps.repos
+          # The test sources are the instrument, not the subject: a line in a
+          # test counts as uncovered only when the test skipped it, which says
+          # nothing about the code under test. They are also near-fully covered
+          # by construction, so leaving them in inflates the number.
+          coverage-ignore-pattern: "*/test/*"
+          colcon-defaults: |
+            {
+              "build": {
+                "mixin": ["coverage-gcc"]
+              }
+            }
+          # Pinned so a change in the mixin repository cannot break this job.
+          colcon-mixin-repository: https://raw.githubusercontent.com/colcon/colcon-mixin-repository/b8436aa16c0bdbc01081b12caa253cbf16e0fb82/index.yaml
+
+      - name: Coverage summary
+        run: lcov --summary ros_ws/lcov/total_coverage.info
+
+      - name: HTML coverage report
+        run: genhtml --ignore-errors source,mismatch ros_ws/lcov/total_coverage.info --output-directory coverage-html --legend --demangle-cpp
+
+      - name: Upload HTML coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html
+          path: coverage-html
+          retention-days: 14
+
+      - name: Upload to Codecov
+        if: ${{ env.CODECOV_TOKEN != '' }}
+        uses: codecov/codecov-action@v5
+        with:
+          files: ros_ws/lcov/total_coverage.info
+          # Upload ONLY the aggregated lcov file. By default the CLI also walks
+          # the tree and runs gcov over every .gcno it finds, which re-adds the
+          # test sources that coverage-ignore-pattern just dropped.
+          disable_search: true
+          plugins: noop
+          token: ${{ env.CODECOV_TOKEN }}
+          fail_ci_if_error: false
