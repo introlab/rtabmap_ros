@@ -80,8 +80,6 @@ namespace rtabmap_util {
  * updateMapCaches() and publishMaps() unconditionally on every graph update and pay
  * nothing while nobody is listening.
  *
- * @note An occupancy grid needs cells spread over two dimensions: a graph whose cells all
- *       lie along a single line produces the clouds but no grid at all.
  */
 class MapsManager {
 public:
