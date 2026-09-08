@@ -9,7 +9,7 @@ ROS 2 wrapper for [RTAB-Map](https://github.com/introlab/rtabmap), a graph-based
 
 | | Build | Docker |
 |---|---|---|
-| ROS 1 | [![ROS 1](https://github.com/introlab/rtabmap_ros/actions/workflows/noetic-pr.yml/badge.svg)](https://github.com/introlab/rtabmap_ros/actions/workflows/noetic-pr.yml) | [![Docker](https://github.com/introlab/rtabmap_ros/actions/workflows/docker.yml/badge.svg)](https://github.com/introlab/rtabmap_ros/actions/workflows/docker.yml) |
+| ROS 1 | [![ROS 1](https://github.com/introlab/rtabmap_ros/actions/workflows/ros1.yml/badge.svg)](https://github.com/introlab/rtabmap_ros/actions/workflows/ros1.yml) | [![Docker](https://github.com/introlab/rtabmap_ros/actions/workflows/docker.yml/badge.svg)](https://github.com/introlab/rtabmap_ros/actions/workflows/docker.yml) |
 | ROS 2 | [![ROS 2](https://github.com/introlab/rtabmap_ros/actions/workflows/ros2.yml/badge.svg)](https://github.com/introlab/rtabmap_ros/actions/workflows/ros2.yml) | [![Docker ROS 2](https://github.com/introlab/rtabmap_ros/actions/workflows/docker-ros2.yml/badge.svg)](https://github.com/introlab/rtabmap_ros/actions/workflows/docker-ros2.yml) |
 
 #### ROS Binaries

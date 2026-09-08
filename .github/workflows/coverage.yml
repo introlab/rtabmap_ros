@@ -71,19 +71,6 @@ jobs:
           # guaranteed to stay that way -- and at -O2 inlining and dead-code
           # elimination make gcov's line attribution unreliable.
           extra-cmake-args: -DCMAKE_BUILD_TYPE=Debug
-          # colcon lcov-result captures each selected package's whole build
-          # directory, so more than this repo's sources end up in it. Filtered:
-          #   */test/*      the test sources -- the instrument, not the subject.
-          #                 A line there is uncovered only when the test skipped
-          #                 it, which says nothing about the code under test, and
-          #                 they are near-fully covered by construction.
-          #   /usr/*, /opt/*  everything outside the workspace. RTAB-Map's own
-          #                 .cpp files are never captured -- the library is
-          #                 installed in the image, not built here -- but its
-          #                 inline and template code is emitted into the objects
-          #                 of the packages that include it, and so lands in this
-          #                 report, as do PCL, Eigen and the standard library.
-          coverage-ignore-pattern: "*/test/* /usr/* /opt/*"
           colcon-defaults: |
             {
               "build": {
@@ -92,18 +79,51 @@ jobs:
             }
           # Pinned so a change in the mixin repository cannot break this job.
           colcon-mixin-repository: https://raw.githubusercontent.com/colcon/colcon-mixin-repository/b8436aa16c0bdbc01081b12caa253cbf16e0fb82/index.yaml
+          # Run the coverage passes ourselves, in the step below. The action's
+          # own baseline pass is a bare `colcon lcov-result --initial` with no
+          # package selection, so it walks every package in the workspace --
+          # including the ones --packages-up-to never built -- and fails with
+          # "cannot read .../build/rtabmap_viz".
+          coverage-result: false
 
+      # Both passes restricted to the packages that were actually built.
+      #
+      # lcov captures each package's whole build directory, so more than this
+      # repo's sources land in it. Filtered:
+      #   */test/*  the test sources -- the instrument, not the subject. A line
+      #             there is uncovered only when the test skipped it, which says
+      #             nothing about the code under test, and they are near-fully
+      #             covered by construction.
+      #   /usr/*, /opt/*  everything outside the workspace. RTAB-Map's own .cpp
+      #             files are never captured (the library is installed in the
+      #             image, not built here), but its inline and template code is
+      #             emitted into the objects of the packages that include it,
+      #             as are PCL, Eigen and the standard library.
+      # Quoting them matters: action-ros-ci injects filters unquoted, so the
+      # shell can glob them away before colcon ever sees them.
+      - name: Coverage report
+        working-directory: ros_ws
+        run: |
+          source /opt/ros/humble/setup.sh
+          PKGS="rtabmap_conversions rtabmap_util"
+          # Baseline from the .gcno files. Without it a source file that no test
+          # ever loaded is missing from the report altogether rather than
+          # counted as 0%, which quietly inflates the result.
+          colcon lcov-result --initial --packages-select $PKGS
+          colcon lcov-result --packages-select $PKGS --verbose \
+            --filter '*/test/*' '/usr/*' '/opt/*'
+
+      # Fails the job if the step above produced nothing -- the failure mode
+      # this workflow has hit twice already is a green run that measured zero.
       - name: Coverage summary
         run: lcov --summary ros_ws/lcov/total_coverage.info
 
-      - name: HTML coverage report
-        run: genhtml --ignore-errors source,mismatch ros_ws/lcov/total_coverage.info --output-directory coverage-html --legend --demangle-cpp
-
+      # colcon lcov-result runs genhtml itself, into the same lcov/ directory.
       - name: Upload HTML coverage artifact
         uses: actions/upload-artifact@v4
         with:
           name: coverage-html
-          path: coverage-html
+          path: ros_ws/lcov
           retention-days: 14
 
       - name: Upload to Codecov
@@ -113,7 +133,7 @@ jobs:
           files: ros_ws/lcov/total_coverage.info
           # Upload ONLY the aggregated lcov file. By default the CLI also walks
           # the tree and runs gcov over every .gcno it finds, which re-adds the
-          # test sources that coverage-ignore-pattern just dropped.
+          # test sources the --filter above just dropped.
           disable_search: true
           plugins: noop
           token: ${{ env.CODECOV_TOKEN }}
