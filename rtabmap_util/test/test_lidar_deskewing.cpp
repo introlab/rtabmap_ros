@@ -24,7 +24,7 @@ class LidarDeskewingTest : public NodeTest
 protected:
 	static constexpr double kSweep = 0.099;    ///< first sample to last, seconds
 	static constexpr double kSpeed = 1.0;      ///< m/s, straight at the wall
-	static constexpr float kWall = 5.0f;       ///< distance to the wall, metres
+	static constexpr float kWall = 5.0f;       ///< distance to the wall, meters
 
 	/// Distance travelled since the first sample. Drives both the TF and the skew.
 	static double travelled(double elapsed) { return kSpeed * elapsed; }
@@ -100,7 +100,7 @@ TEST_F(LidarDeskewingTest, DeskewsACloudUsingTf)
 TEST_F(LidarDeskewingTest, DeskewsAScanUsingTf)
 {
 	// Same idea as the cloud case, for the 2D path. A ray at angle theta taken once the
-	// sensor has advanced d metres measures (wall - d)/cos(theta), so the raw scan bends.
+	// sensor has advanced d meters measures (wall - d)/cos(theta), so the raw scan bends.
 	// Deskewing must put every point back on the wall at x = kWall.
 	addNode(std::make_shared<rtabmap_util::LidarDeskewing>(rclcpp::NodeOptions()
 			.parameter_overrides({

@@ -62,15 +62,15 @@ inline sensor_msgs::msg::Image makeImage(
 	return msg;
 }
 
-/// An RGB-D message with raw bgr8 colour and 16UC1 depth.
+/// An RGB-D message with raw bgr8 color and 16UC1 depth.
 inline rtabmap_msgs::msg::RGBDImage makeRGBDImage(
 		const std::string & frameId, double stamp, int width = 8, int height = 8,
-		const cv::Scalar & rgbColour = cv::Scalar(10, 20, 30), uint16_t depthValue = 1500)
+		const cv::Scalar & rgbColor = cv::Scalar(10, 20, 30), uint16_t depthValue = 1500)
 {
 	rtabmap_msgs::msg::RGBDImage msg;
 	msg.header.frame_id = frameId;
 	msg.header.stamp = stampOf(stamp);
-	msg.rgb = makeImage(frameId, stamp, cv::Mat(height, width, CV_8UC3, rgbColour), "bgr8");
+	msg.rgb = makeImage(frameId, stamp, cv::Mat(height, width, CV_8UC3, rgbColor), "bgr8");
 	msg.depth = makeImage(frameId, stamp,
 			cv::Mat(height, width, CV_16UC1, cv::Scalar(depthValue)), "16UC1");
 	msg.rgb_camera_info = makeCameraInfo(frameId, stamp, width, height);
@@ -83,7 +83,7 @@ inline rtabmap_msgs::msg::RGBDImage makeRGBDImage(
  *
  * The "depth" slot holds the mono8 right image and the second camera info carries the
  * baseline in P(0,3), which is what makes consumers treat the pair as stereo rather
- * than as colour plus depth.
+ * than as color plus depth.
  */
 inline rtabmap_msgs::msg::RGBDImage makeStereoRGBDImage(
 		const std::string & frameId, double stamp, int width = 8, int height = 8,
@@ -167,7 +167,7 @@ inline sensor_msgs::msg::PointCloud2 makeXYZCloud(
  * @param stamp         stamp of the first sample, which is also the message stamp
  * @param sampleCount   number of samples along the wall
  * @param sweepDuration seconds from the first sample to the last
- * @param wallDistance  distance to the wall at the first sample, in metres
+ * @param wallDistance  distance to the wall at the first sample, in meters
  * @param displacement  distance travelled as a function of seconds since the first
  *                      sample; must match the motion published to TF
  */

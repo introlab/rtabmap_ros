@@ -57,7 +57,7 @@ protected:
 		infoPub_->publish(makeCameraInfo("camera_link", stamp, kWidth, kHeight, 0.0, kFx));
 	}
 
-	/// A block of points straight ahead of the optical axis at @p depth metres.
+	/// A block of points straight ahead of the optical axis at @p depth meters.
 	static std::vector<cv::Point3f> blockAt(float depth)
 	{
 		std::vector<cv::Point3f> points;
@@ -96,7 +96,7 @@ TEST_F(PointCloudToDepthImageTest, ProjectsACloudIntoADepthImage)
 	EXPECT_FLOAT_EQ(pixel32f(img, 0, 0), 0.0f);
 }
 
-TEST_F(PointCloudToDepthImageTest, PublishesMillimetresOnImageRaw)
+TEST_F(PointCloudToDepthImageTest, PublishesMillimetersOnImageRaw)
 {
 	start();
 	publishFrame(1000.0, blockAt(2.0f));
@@ -104,7 +104,7 @@ TEST_F(PointCloudToDepthImageTest, PublishesMillimetresOnImageRaw)
 
 	const sensor_msgs::msg::Image & img = image16_->back();
 	EXPECT_EQ(img.encoding, sensor_msgs::image_encodings::TYPE_16UC1);
-	EXPECT_EQ(pixel16u(img, kHeight/2, kWidth/2), 2000) << "2 m expressed in millimetres";
+	EXPECT_EQ(pixel16u(img, kHeight/2, kWidth/2), 2000) << "2 m expressed in millimeters";
 }
 
 TEST_F(PointCloudToDepthImageTest, EmptyCloudGivesAnAllZeroImage)
@@ -193,7 +193,7 @@ protected:
 	static constexpr double kSpeed = 1.0;        ///< m/s
 	static constexpr double kCloudStamp = 1000.0;
 	static constexpr double kInfoDelay = 0.04;   ///< the camera info lags the cloud by this
-	static constexpr float kRange = 2.0f;        ///< distance to the point, metres
+	static constexpr float kRange = 2.0f;        ///< distance to the point, meters
 	static constexpr int kFrames = 3;            ///< see publishFrames()
 	static constexpr double kPeriod = 0.2;       ///< seconds between frames
 

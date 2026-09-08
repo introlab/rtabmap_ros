@@ -12,7 +12,7 @@ The assembling itself is done by `MapsManager`, which is shared with `rtabmap_sl
 
 ```bash
 ros2 run rtabmap_util map_assembler --ros-args \
-  -p Grid/CellSize:=0.05 -p Grid/RangeMax:=8.0
+  -p Grid/CellSize:=0.05 -p Grid/RangeMax:=8.0 -p cloud_output_voxelized:=true
 ```
 
 ```python
@@ -20,14 +20,15 @@ ComposableNode(
     package='rtabmap_util',
     plugin='rtabmap_util::MapAssembler',
     name='map_assembler',
-    parameters=[{'Grid/CellSize': '0.05', 'cloud_output_voxelized': True}])
+    parameters=[{'Grid/CellSize': '0.05', 'Grid/RangeMax': '8.0',
+                 'cloud_output_voxelized': True}])
 ```
 
 ## Subscribed Topics
 
 | Topic | Type | Description |
 |---|---|---|
-| `mapData` | [`rtabmap_msgs/msg/MapData`](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_msgs/msg/MapData.msg) | The graph, plus the sensor data of any newly added node. Published by `rtabmap`. |
+| `mapData` | [`rtabmap_msgs/msg/MapData`](https://docs.ros.org/en/jazzy/p/rtabmap_msgs/msg/MapData.html) | The graph, plus the sensor data of any newly added node. Published by `rtabmap`. |
 
 ## Published Topics
 
@@ -36,13 +37,13 @@ Everything is published only when subscribed, and — by default — **latched**
 | Topic | Type | Description |
 |---|---|---|
 | `cloud_map` | [`PointCloud2`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/PointCloud2.html) | Ground and obstacles together. |
-| `cloud_ground` | `PointCloud2` | Ground only, coloured green. |
-| `cloud_obstacles` | `PointCloud2` | Obstacles only, coloured red. |
+| `cloud_ground` | `PointCloud2` | Ground only, colored green. |
+| `cloud_obstacles` | `PointCloud2` | Obstacles only, colored red. |
 | `map` | [`OccupancyGrid`](https://docs.ros.org/en/jazzy/p/nav_msgs/msg/OccupancyGrid.html) | The 2D occupancy grid, the one navigation wants. |
 | `grid_prob_map` | `OccupancyGrid` | The same grid as occupancy probabilities rather than free/occupied/unknown. |
 | `octomap_occupied_space`, `octomap_obstacles`, `octomap_ground`, `octomap_empty_space`, `octomap_global_frontier_space` | `PointCloud2` | Octomap contents, one cloud per category. Requires RTAB-Map built with OctoMap. |
 | `octomap_grid` | `OccupancyGrid` | The octomap projected to 2D. |
-| `octomap_binary`, `octomap_full` | [`Octomap`](https://docs.ros.org/en/jazzy/p/octomap_msgs/msg/Octomap.html) | The tree itself, for `octovis` or other octomap consumers. |
+| `octomap_binary`, `octomap_full` | [`Octomap`](https://docs.ros.org/en/jazzy/p/octomap_msgs/msg/Octomap.html) | The tree itself, for `octovis` or other octomap consumers. Serialized as a **`ColorOcTree`**, see [Octomap tree type](#octomap-tree-type). |
 | `elevation_map` | [`GridMap`](https://github.com/ANYbotics/grid_map/blob/master/grid_map_msgs/msg/GridMap.msg) | Elevation map. Requires RTAB-Map built with `grid_map`. |
 
 ## Services
@@ -67,25 +68,33 @@ Everything is published only when subscribed, and — by default — **latched**
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `latch` | `bool` | `true` | Publish with transient-local durability so late subscribers get the current map. |
-| `map_filter_radius` | `double` | `0.0` | Skip nodes closer together than this, in metres. A cheap way to thin a dense graph. `0` disables. |
+| `map_filter_radius` | `double` | `0.0` | Skip nodes closer together than this, in meters. A cheap way to thin a dense graph. `0` disables. |
 | `map_filter_angle` | `double` | `30.0` | With `map_filter_radius`, nodes are only merged if they also differ by less than this angle, in degrees. |
-| `map_always_update` | `bool` | `false` | Include the current, not-yet-committed node in the map. Gives a more responsive map at the cost of redoing work each cycle. |
-| `map_empty_ray_tracing` | `bool` | `true` | Fill unknown space between the sensor and its hits for 2D scans. |
+| `map_always_update` | `bool` | `false` | **No effect here**, see below. |
+| `map_empty_ray_tracing` | `bool` | `true` | **No effect here**, see below. |
 | `map_cleanup` | `bool` | `true` | Free the cached clouds when nobody is subscribed. |
 | `cloud_output_voxelized` | `bool` | `true` | Voxelize the assembled clouds at `Grid/CellSize`. |
 | `cloud_subtract_filtering` | `bool` | `false` | Drop points that duplicate ones already in the map. Slower, smaller output. |
-| `cloud_subtract_filtering_min_neighbors` | `int` | `2` | Neighbours needed for a point to count as a duplicate. |
+| `cloud_subtract_filtering_min_neighbors` | `int` | `2` | Neighbors needed for a point to count as a duplicate. |
 | `octomap_tree_depth` | `int` | `16` | Depth the octomap clouds are generated at. Lower means coarser and faster. Maximum 16. |
 
-Every RTAB-Map **`Grid/*`**, **`GridGlobal/*`**, **`StereoBM/*`** and **`StereoSGBM/*`** parameter is also exposed, and they control the segmentation and the global grid. See RTAB-Map's [parameter reference](https://github.com/introlab/rtabmap/blob/master/corelib/include/rtabmap/core/Parameters.h); the ones discussed in [obstacles_detection](obstacles_detection.md#parameters) apply here too, plus:
+`map_always_update` and `map_empty_ray_tracing` are declared because they come with `MapsManager`, but neither does anything in this node. Both only apply to the *current*, not-yet-committed node, which `MapsManager` identifies by the pose id `0`. That node is assembled inside `rtabmap_slam`'s `rtabmap` node from its live sensor data and is never published on `mapData`, so the graph reaching `map_assembler` only ever contains committed nodes. Set them on the `rtabmap` node instead, where they do apply.
 
-| Parameter | Default | Description |
-|---|---|---|
-| `GridGlobal/MinSize` | `0.0` | Minimum size of the global grid, in metres. |
-| `GridGlobal/Eroded` | `false` | Erode obstacle cells. |
-| `GridGlobal/OccupancyThr` | `0.5` | Probability above which a cell counts as occupied. |
-| `GridGlobal/UpdateError` | `0.01` | How far a node must move in an optimized graph before the map is rebuilt, in metres. |
-| `GridGlobal/FootprintRadius` | `0.0` | Clear obstacles within this radius of the robot's path, in metres. |
+Every RTAB-Map **`Grid/*`**, **`GridGlobal/*`**, **`StereoBM/*`** and **`StereoSGBM/*`** parameter is also exposed, all documented in RTAB-Map's [parameter reference](https://introlab.github.io/rtabmap/api/latest/parameters.html). The split between the first two is worth knowing: **`Grid/*`** decides how each node's local grid is built from its sensor data — the same segmentation [obstacles_detection](obstacles_detection.md#parameters) does, and the parameters listed there apply here too — while **`GridGlobal/*`** decides how those local grids are merged into the global map, so it covers the map's minimum size, its occupancy threshold, and how far the graph must move before the whole map is rebuilt.
+
+## Octomap tree type
+
+RTAB-Map keeps a color per voxel, so the tree it publishes on `octomap_binary` and `octomap_full` reports its `id` as **`ColorOcTree`**, not the plain `OcTree` many examples assume.
+
+That is deliberate and interoperable: `octomap_msgs::binaryMsgToMap()` and `fullMsgToMap()` branch on that `id` and hand you back an `octomap::ColorOcTree`, and `octovis` opens it without complaint. What does break is code that assumes the other branch:
+
+```cpp
+octomap::AbstractOcTree * tree = octomap_msgs::binaryMsgToMap(msg);
+octomap::OcTree * octree = dynamic_cast<octomap::OcTree *>(tree);   // null
+octomap::ColorOcTree * octree = dynamic_cast<octomap::ColorOcTree *>(tree);   // ok
+```
+
+`ColorOcTree` does not derive from `OcTree` — both derive from `OccupancyOcTreeBase` — so cast to `ColorOcTree`, or to `octomap::OccupancyOcTreeBase<...>` if you only need occupancy and want to accept either.
 
 ## Start-up
 
@@ -96,7 +105,5 @@ That call blocks the subscription to `mapData` until it returns or times out, wh
 If rtabmap is started later in localization mode, call its `publish_maps` service with `graph_only=false` so `map_assembler` receives the data it missed.
 
 ## Notes
-
-An occupancy grid needs cells spread over two dimensions. A graph whose nodes and cells all lie on a single line produces no grid at all — only the clouds — which is worth knowing when testing with synthetic data.
 
 `regenerate_local_grids` is the parameter to reach for when a recorded map's grids were built with settings you now want to change. Without it, `Grid/*` changes only affect nodes added from then on, because each node's grid is stored with it.

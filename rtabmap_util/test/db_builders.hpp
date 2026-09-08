@@ -46,7 +46,7 @@ namespace rtabmap_util_test {
 constexpr int kDbFrames = 3;              ///< nodes in each database
 constexpr double kFirstStamp = 1000.0;    ///< stamp of node 1, seconds
 constexpr double kStampStep = 0.05;       ///< seconds between consecutive nodes
-constexpr float kPoseStep = 0.5f;         ///< metres along x between odometry poses
+constexpr float kPoseStep = 0.5f;         ///< meters along x between odometry poses
 constexpr double kOdomVariance = 0.25;    ///< diagonal of the odometry covariance
 
 constexpr int kImageWidth = 80;
@@ -56,7 +56,7 @@ constexpr double kFy = 100.0;
 constexpr double kCx = 40.0;
 constexpr double kCy = 30.0;
 constexpr double kBaseline = 0.12;
-constexpr uint16_t kDepthMillimetres = 1500;
+constexpr uint16_t kDepthMillimeters = 1500;
 
 constexpr double kGpsLongitude = -71.9;
 constexpr double kGpsLatitude = 45.4;
@@ -143,7 +143,7 @@ typedef std::function<void(int id, rtabmap::Signature & signature)> NodeDecorato
  *
  * Nodes are numbered from 1, stamped kStampStep apart (db_player replays at the database
  * stamps, so a node without one aborts the read), posed kPoseStep apart along x, and
- * joined by the neighbour links that carry the odometry covariance.
+ * joined by the neighbor links that carry the odometry covariance.
  */
 inline void writeDatabase(
 		const std::string & path, int frames,
@@ -163,7 +163,7 @@ inline void writeDatabase(
 
 		if(id > 1)
 		{
-			// The backward neighbour link is where DBReader reads the odometry
+			// The backward neighbor link is where DBReader reads the odometry
 			// covariance from: it publishes the inverse of this information matrix.
 			const rtabmap::Transform motion(kPoseStep, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
 			s->addLink(rtabmap::Link(id, id-1, rtabmap::Link::kNeighbor, motion.inverse(),
@@ -182,7 +182,7 @@ inline void writeDatabase(
 	delete driver;
 }
 
-/// A colour image whose pixels identify the node, so a test can tell frames apart.
+/// A color image whose pixels identify the node, so a test can tell frames apart.
 inline cv::Mat makeRgb(int id)
 {
 	return cv::Mat(kImageHeight, kImageWidth, CV_8UC3, cv::Scalar(id, 2*id, 3*id));
@@ -190,7 +190,7 @@ inline cv::Mat makeRgb(int id)
 
 inline cv::Mat makeDepth()
 {
-	return cv::Mat(kImageHeight, kImageWidth, CV_16UC1, cv::Scalar(kDepthMillimetres));
+	return cv::Mat(kImageHeight, kImageWidth, CV_16UC1, cv::Scalar(kDepthMillimeters));
 }
 
 inline rtabmap::CameraModel rgbdCameraModel()
@@ -233,7 +233,7 @@ inline void writeStereoDatabase(const std::string & path, int frames = kDbFrames
 	});
 }
 
-/// A colour image with no calibration at all, which db_player replays on "image".
+/// A color image with no calibration at all, which db_player replays on "image".
 inline void writeImageOnlyDatabase(const std::string & path, int frames = kDbFrames)
 {
 	writeDatabase(path, frames, [](int id, double stamp) {
@@ -261,10 +261,10 @@ constexpr float kScanRangeMax = 10.0f;
 inline float scanRangeOf(int bin) { return 1.0f + 0.1f * float(bin); }
 
 /**
- * @brief A 2D scan with one point at the centre of every bin.
+ * @brief A 2D scan with one point at the center of every bin.
  *
  * db_player re-bins the cartesian points back into a LaserScan message, so putting each
- * point at a bin centre makes the expected index exact rather than a rounding coin flip.
+ * point at a bin center makes the expected index exact rather than a rounding coin flip.
  */
 inline rtabmap::LaserScan makeScan2d()
 {

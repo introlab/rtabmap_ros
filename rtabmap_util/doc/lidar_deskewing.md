@@ -59,11 +59,29 @@ Output names are derived from the **resolved** input names, so remapping the inp
 
 ## Requirements
 
-For `input_cloud`, the cloud **must have a per-point time field**. Without one the node cannot know when each point was taken and cannot deskew. Drivers name it `t`, `time`, `stamps`, `offset_time` or similar; RTAB-Map accepts the common variants. Most lidar drivers can be configured to include it — for Velodyne and Ouster it is on by default in recent versions.
+For `input_cloud`, the cloud **must have a per-point time field**. Without one the node cannot know when each point was taken and cannot deskew.
+
+The field has to be named `t`, `time`, `stamps` or `timestamp` — anything else is not recognized, whatever it contains. Its type decides how the value is read:
+
+| Type | Meaning |
+|---|---|
+| `uint32` | nanoseconds since the cloud's own stamp |
+| `float32` | seconds since the cloud's own stamp |
+| `float64` | an absolute timestamp; seconds, milliseconds, microseconds and nanoseconds are told apart by magnitude |
+
+Common drivers that satisfy this out of the box: **Ouster** (`t`), **Velodyne** (`time`), **RoboSense** (`timestamp`) and **Livox** (`timestamp`). Livox needs its PointCloud2 output rather than the default `CustomMsg` format, which this node cannot subscribe to at all.
+
+To check what your driver actually publishes:
+
+```bash
+ros2 topic echo /your/points --field fields --once
+```
+
+If none of the four names is in that list, look for a driver option to add per-point timestamps before anything else.
 
 The `fixed_frame_id` → sensor transform must cover the whole sweep, which means **odometry has to be at least as recent as the lidar**. If it lags, raise `wait_for_transform`.
 
-## Behaviour when TF is missing
+## Behavior when TF is missing
 
 The two inputs deliberately differ:
 
@@ -72,6 +90,6 @@ The two inputs deliberately differ:
 
 ## Notes
 
-Deskewing matters most when rotating: at 1 rad/s a 100 ms sweep spans nearly 6°, and the far end of the scan is badly misplaced. Pure translation at walking speed is a few centimetres, which matters at close range.
+Deskewing matters most when rotating: at 1 rad/s a 100 ms sweep spans nearly 6°, and the far end of the scan is badly misplaced. Pure translation at walking speed is a few centimeters, which matters at close range.
 
 Put this node before ICP odometry or [point_cloud_assembler](point_cloud_assembler.md), not after. Anything registering against a skewed cloud has already paid for the distortion.

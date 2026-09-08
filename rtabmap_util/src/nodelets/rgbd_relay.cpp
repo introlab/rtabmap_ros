@@ -43,6 +43,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "rtabmap/core/Compression.h"
 #include "rtabmap/utilite/UConversion.h"
+#include "rtabmap/utilite/ULogger.h"
 
 namespace rtabmap_util
 {
@@ -54,11 +55,20 @@ RGBDRelay::RGBDRelay(const rclcpp::NodeOptions & options) :
 {
 	int qos = RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT;
 	qos = this->declare_parameter("qos", qos);
+	// The two sides can be set independently so the relay can bridge a publisher
+	// and a subscriber that don't agree on reliability. Both default to qos.
+	int qosSub = this->declare_parameter("qos_sub", qos);
+	int qosPub = this->declare_parameter("qos_pub", qos);
+	int queueSub = this->declare_parameter("queue_sub", 5);
+	int queuePub = this->declare_parameter("queue_pub", 1);
 	compress_ = this->declare_parameter("compress", compress_);
 	uncompress_ = this->declare_parameter("uncompress", uncompress_);
 
-	rgbdImageSub_ = create_subscription<rtabmap_msgs::msg::RGBDImage>("rgbd_image", rclcpp::QoS(5).reliability((rmw_qos_reliability_policy_t)qos), std::bind(&RGBDRelay::callback, this, std::placeholders::_1));
-	rgbdImagePub_ = create_publisher<rtabmap_msgs::msg::RGBDImage>("rgbd_image_relay", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos));
+	UASSERT_MSG(queueSub >= 1 && queuePub >= 1,
+			uFormat("queue_sub (%d) and queue_pub (%d) must be at least 1", queueSub, queuePub).c_str());
+
+	rgbdImageSub_ = create_subscription<rtabmap_msgs::msg::RGBDImage>("rgbd_image", rclcpp::QoS(queueSub).reliability((rmw_qos_reliability_policy_t)qosSub), std::bind(&RGBDRelay::callback, this, std::placeholders::_1));
+	rgbdImagePub_ = create_publisher<rtabmap_msgs::msg::RGBDImage>("rgbd_image_relay", rclcpp::QoS(queuePub).reliability((rmw_qos_reliability_policy_t)qosPub));
 }
 
 void RGBDRelay::callback(const rtabmap_msgs::msg::RGBDImage::SharedPtr input) const

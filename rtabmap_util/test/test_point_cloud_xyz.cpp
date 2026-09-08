@@ -21,19 +21,19 @@ constexpr int kWidth = 16;
 constexpr int kHeight = 16;
 constexpr double kFx = 100.0;
 
-/// A depth image where every pixel is at @p metres.
+/// A depth image where every pixel is at @p meters.
 sensor_msgs::msg::Image makeDepth(
-		double stamp, float metres,
+		double stamp, float meters,
 		const std::string & encoding = sensor_msgs::image_encodings::TYPE_32FC1)
 {
 	cv::Mat image;
 	if(encoding == sensor_msgs::image_encodings::TYPE_32FC1)
 	{
-		image = cv::Mat(kHeight, kWidth, CV_32FC1, cv::Scalar(metres));
+		image = cv::Mat(kHeight, kWidth, CV_32FC1, cv::Scalar(meters));
 	}
 	else
 	{
-		image = cv::Mat(kHeight, kWidth, CV_16UC1, cv::Scalar(uint16_t(metres*1000.0f)));
+		image = cv::Mat(kHeight, kWidth, CV_16UC1, cv::Scalar(uint16_t(meters*1000.0f)));
 	}
 	return makeImage("camera_link", stamp, image, encoding);
 }
@@ -91,10 +91,10 @@ protected:
 	}
 
 	/// Publishes a synchronized depth + camera_info pair.
-	void publishFrame(double stamp, float metres,
+	void publishFrame(double stamp, float meters,
 			const std::string & encoding = sensor_msgs::image_encodings::TYPE_32FC1)
 	{
-		depthPub_->publish(makeDepth(stamp, metres, encoding));
+		depthPub_->publish(makeDepth(stamp, meters, encoding));
 		infoPub_->publish(makeCameraInfo("camera_link", stamp, kWidth, kHeight, 0.0, kFx));
 	}
 
@@ -116,19 +116,19 @@ TEST_F(PointCloudXYZTest, ProjectsDepthIntoACloud)
 		<< "the cloud takes the depth image's frame";
 
 	// The principal-point pixel projects straight ahead at the measured depth.
-	const size_t centre = size_t(kHeight/2) * kWidth + kWidth/2;
-	EXPECT_NEAR(readXYZ(cloud, centre).z, 2.0f, 1e-3);
+	const size_t center = size_t(kHeight/2) * kWidth + kWidth/2;
+	EXPECT_NEAR(readXYZ(cloud, center).z, 2.0f, 1e-3);
 }
 
-TEST_F(PointCloudXYZTest, Accepts16UC1Millimetres)
+TEST_F(PointCloudXYZTest, Accepts16UC1Millimeters)
 {
 	start();
 	publishFrame(1000.0, 2.0f, sensor_msgs::image_encodings::TYPE_16UC1);
 	ASSERT_TRUE(spinUntil([&]() { return !out_->empty(); }));
 
-	const size_t centre = size_t(kHeight/2) * kWidth + kWidth/2;
-	EXPECT_NEAR(readXYZ(out_->back(), centre).z, 2.0f, 1e-3)
-		<< "millimetre depth must be converted to metres";
+	const size_t center = size_t(kHeight/2) * kWidth + kWidth/2;
+	EXPECT_NEAR(readXYZ(out_->back(), center).z, 2.0f, 1e-3)
+		<< "millimeter depth must be converted to meters";
 }
 
 TEST_F(PointCloudXYZTest, RejectsUnsupportedEncoding)
@@ -173,9 +173,9 @@ TEST_F(PointCloudXYZTest, WithinMaxDepthPointsStayValid)
 	publishFrame(1000.0, 5.0f);          // inside the limit
 	ASSERT_TRUE(spinUntil([&]() { return !out_->empty(); }));
 
-	const size_t centre = size_t(kHeight/2) * kWidth + kWidth/2;
-	EXPECT_FALSE(std::isnan(readXYZ(out_->back(), centre).z));
-	EXPECT_NEAR(readXYZ(out_->back(), centre).z, 5.0f, 1e-3);
+	const size_t center = size_t(kHeight/2) * kWidth + kWidth/2;
+	EXPECT_FALSE(std::isnan(readXYZ(out_->back(), center).z));
+	EXPECT_NEAR(readXYZ(out_->back(), center).z, 5.0f, 1e-3);
 }
 
 TEST_F(PointCloudXYZTest, MinDepthMarksNearPointsInvalid)
@@ -284,8 +284,8 @@ TEST_F(PointCloudXYZDisparityTest, ProjectsDisparityIntoACloud)
 	EXPECT_EQ(cloud.header.frame_id, "camera_link")
 		<< "the cloud takes the disparity image's frame";
 
-	const size_t centre = size_t(kHeight/2) * kWidth + kWidth/2;
-	EXPECT_NEAR(readXYZ(cloud, centre).z, 2.0f, 1e-3);
+	const size_t center = size_t(kHeight/2) * kWidth + kWidth/2;
+	EXPECT_NEAR(readXYZ(cloud, center).z, 2.0f, 1e-3);
 }
 
 TEST_F(PointCloudXYZDisparityTest, Accepts16SC1FixedPointDisparity)
@@ -295,8 +295,8 @@ TEST_F(PointCloudXYZDisparityTest, Accepts16SC1FixedPointDisparity)
 	publishFrame(1000.0, makeDisparity16SC1(1000.0, 5.0f));
 	ASSERT_TRUE(spinUntil([&]() { return !out_->empty(); }));
 
-	const size_t centre = size_t(kHeight/2) * kWidth + kWidth/2;
-	EXPECT_NEAR(readXYZ(out_->back(), centre).z, 2.0f, 1e-3);
+	const size_t center = size_t(kHeight/2) * kWidth + kWidth/2;
+	EXPECT_NEAR(readXYZ(out_->back(), center).z, 2.0f, 1e-3);
 }
 
 TEST_F(PointCloudXYZDisparityTest, RejectsUnsupportedDisparityEncoding)

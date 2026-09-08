@@ -1,12 +1,12 @@
 # point_cloud_xyz
 
-Projects a depth or disparity image into an unorganized point cloud.
+Projects a depth or disparity image into a point cloud.
 
 The node takes a depth image and its calibration and produces a [`sensor_msgs/msg/PointCloud2`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/PointCloud2.html), with optional decimation, range limits, voxel and radius filtering, and normal estimation — the same preprocessing RTAB-Map would do internally, done once and shared.
 
-`depth_image_proc/point_cloud_xyz` does the bare projection; this node exists for the filtering, and for accepting disparity directly.
+[`depth_image_proc`](https://docs.ros.org/en/jazzy/p/depth_image_proc/)'s own `point_cloud_xyz` does the bare projection; this node exists for the filtering, and for accepting disparity directly.
 
-See [point_cloud_xyzrgb](point_cloud_xyzrgb.md) for the coloured equivalent.
+See [point_cloud_xyzrgb](point_cloud_xyzrgb.md) for the colored equivalent.
 
 ## Usage
 
@@ -14,7 +14,7 @@ See [point_cloud_xyzrgb](point_cloud_xyzrgb.md) for the coloured equivalent.
 ros2 run rtabmap_util point_cloud_xyz --ros-args \
   -r depth/image:=/camera/depth/image_raw \
   -r depth/camera_info:=/camera/depth/camera_info \
-  -p decimation:=4 -p max_depth:=5.0
+  -p decimation:=4 -p max_depth:=5.0 -p voxel_size:=0.05
 ```
 
 ```python
@@ -35,7 +35,7 @@ The node listens on two independent input sets and uses whichever one is being p
 
 | Topic | Type | Description |
 |---|---|---|
-| `depth/image` | [`sensor_msgs/msg/Image`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/Image.html) | `32FC1` (metres), `16UC1` (millimetres) or `mono16`. Goes through `image_transport`, see `depth_transport`. |
+| `depth/image` | [`sensor_msgs/msg/Image`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/Image.html) | `32FC1` (meters), `16UC1` (millimeters) or `mono16`. Goes through [`image_transport`](https://docs.ros.org/en/jazzy/p/image_transport/), see `depth_transport` parameter below. |
 | `depth/camera_info` | [`sensor_msgs/msg/CameraInfo`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/CameraInfo.html) | |
 
 **Disparity**
@@ -73,13 +73,13 @@ Nothing is computed unless `cloud` has a subscriber.
 |---|---|---|---|
 | `decimation` | `int` | `1` | Keep one pixel in `decimation`, in each direction. `2` gives a quarter of the points. The image dimensions must divide by it. |
 | `roi_ratios` | `string` | `""` | Crop before projecting, as four ratios `"left right top bottom"`, e.g. `"0.1 0.1 0 0.2"`. |
-| `min_depth` | `double` | `0.0` | Discard points nearer than this, in metres. `0` disables. |
-| `max_depth` | `double` | `0.0` | Discard points further than this, in metres. `0` disables. |
-| `voxel_size` | `double` | `0.0` | Downsample to one point per voxel of this size, in metres. `0` disables. |
-| `noise_filter_radius` | `double` | `0.0` | Radius outlier removal, in metres. `0` disables. |
-| `noise_filter_min_neighbors` | `int` | `5` | Neighbours a point needs within `noise_filter_radius` to survive. |
-| `normal_k` | `int` | `0` | Estimate normals from this many nearest neighbours. `0` disables. |
-| `normal_radius` | `double` | `0.0` | Estimate normals from all neighbours within this radius, in metres. `0` disables. |
+| `min_depth` | `double` | `0.0` | Discard points nearer than this, in meters. `0` disables. |
+| `max_depth` | `double` | `0.0` | Discard points further than this, in meters. `0` disables. |
+| `voxel_size` | `double` | `0.0` | Downsample to one point per voxel of this size, in meters. `0` disables. |
+| `noise_filter_radius` | `double` | `0.0` | Radius outlier removal, in meters. `0` disables. |
+| `noise_filter_min_neighbors` | `int` | `5` | Neighbors a point needs within `noise_filter_radius` to survive. |
+| `normal_k` | `int` | `0` | Estimate normals from this many nearest neighbors. `0` disables. |
+| `normal_radius` | `double` | `0.0` | Estimate normals from all neighbors within this radius, in meters. `0` disables. |
 | `filter_nans` | `bool` | `false` | See [Organized output](#organized-output). |
 
 ## Organized output
@@ -92,4 +92,4 @@ Voxel and radius filtering also produce unorganized clouds, since both remove po
 
 ## Notes
 
-`decimation` is by far the cheapest way to cut the cost of everything downstream, and on a depth image it loses very little: neighbouring pixels of a surface are nearly redundant. Reach for it before `voxel_size`.
+`decimation` is by far the cheapest way to cut the cost of everything downstream, and on a depth image it loses very little: neighboring pixels of a surface are nearly redundant. Reach for it before `voxel_size`.

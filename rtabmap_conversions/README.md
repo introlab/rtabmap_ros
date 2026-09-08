@@ -46,7 +46,7 @@ The naming is uniform: `xxxFromROS()` converts a message into an RTAB-Map type, 
 | Graph | `mapDataFromROS`, `mapGraphFromROS`, `nodeFromROS`, `linkFromROS`, `sensorDataFromROS` (+ `ToROS` variants) |
 | Misc | `infoFromROS`, `odomInfoFromROS`, `odomInfoToStatistics`, `imuFromROS`, `userDataFromROS`, `envSensorFromROS`, `landmarksFromROS`, `timestampFromROS`, `timestampToROS` |
 
-Full signatures and per-function notes are in the [API documentation](https://docs.ros.org/en/rolling/p/rtabmap_conversions/) and in [`MsgConversion.h`](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_conversions/include/rtabmap_conversions/MsgConversion.h).
+Full signatures and per-function notes are in the [API documentation](https://docs.ros.org/en/jazzy/p/rtabmap_conversions/) and in [`MsgConversion.h`](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_conversions/include/rtabmap_conversions/MsgConversion.h).
 
 ## Conventions worth knowing
 
@@ -66,7 +66,7 @@ colcon test-result --verbose
 
 ## Documentation
 
-API documentation is generated with [rosdoc2](https://github.com/ros-infrastructure/rosdoc2) from the Doxygen comments in the public header, and published to [docs.ros.org](https://docs.ros.org/en/rolling/p/rtabmap_conversions/). To build it locally:
+API documentation is generated with [rosdoc2](https://github.com/ros-infrastructure/rosdoc2) from the Doxygen comments in the public header, and published to [docs.ros.org](https://docs.ros.org/en/jazzy/p/rtabmap_conversions/). To build it locally:
 
 ```bash
 rosdoc2 build --package-path rtabmap_conversions --output-directory doc_output

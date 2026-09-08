@@ -1,8 +1,8 @@
 # point_cloud_xyzrgb
 
-Projects an RGB-D frame, a stereo pair or a disparity image into a coloured point cloud.
+Projects an RGB-D frame, a stereo pair or a disparity image into a colored point cloud.
 
-The coloured counterpart of [point_cloud_xyz](point_cloud_xyz.md): same filtering, same parameters, but every point carries the colour of the pixel it came from. It accepts four different input sets, so it can sit at the end of an RGB-D, stereo or disparity pipeline without anything in between.
+The colored counterpart of [point_cloud_xyz](point_cloud_xyz.md): same filtering, same parameters, but every point carries the color of the pixel it came from. It accepts four different input sets, so it can sit at the end of an RGB-D, stereo or disparity pipeline without anything in between.
 
 ## Usage
 
@@ -34,7 +34,7 @@ Four independent input sets; connect exactly one.
 | Topic | Type | Description |
 |---|---|---|
 | `rgb/image` | [`sensor_msgs/msg/Image`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/Image.html) | `mono8`, `mono16`, `bgr8`, `rgb8`, `bgra8`, `rgba8` or `bayer_grbg8`. |
-| `depth/image` | [`sensor_msgs/msg/Image`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/Image.html) | `32FC1`, `16UC1` or `mono16`, **registered to the colour camera**. |
+| `depth/image` | [`sensor_msgs/msg/Image`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/Image.html) | `32FC1`, `16UC1` or `mono16`, **registered to the color camera**. |
 | `rgb/camera_info` | [`sensor_msgs/msg/CameraInfo`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/CameraInfo.html) | |
 
 **Stereo**
@@ -52,7 +52,7 @@ Dense matching is done on the fly with OpenCV's block matcher; see [Stereo match
 
 | Topic | Type | Description |
 |---|---|---|
-| `left/image` | [`sensor_msgs/msg/Image`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/Image.html) | Supplies the colour. |
+| `left/image` | [`sensor_msgs/msg/Image`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/Image.html) | Supplies the color. |
 | `disparity` | [`stereo_msgs/msg/DisparityImage`](https://docs.ros.org/en/jazzy/p/stereo_msgs/msg/DisparityImage.html) | `32FC1` or `16SC1`. |
 | `left/camera_info` | [`sensor_msgs/msg/CameraInfo`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/CameraInfo.html) | |
 
@@ -60,7 +60,7 @@ Dense matching is done on the fly with OpenCV's block matcher; see [Stereo match
 
 | Topic | Type | Description |
 |---|---|---|
-| `rgbd_image` | [`rtabmap_msgs/msg/RGBDImage`](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_msgs/msg/RGBDImage.msg) | A whole frame in one message, RGB-D or stereo. No synchronization needed, so this is the most reliable input. |
+| `rgbd_image` | [`rtabmap_msgs/msg/RGBDImage`](https://docs.ros.org/en/jazzy/p/rtabmap_msgs/msg/RGBDImage.html) | A whole frame in one message, RGB-D or stereo. No synchronization needed, so this is the most reliable input. |
 
 ## Published Topics
 
@@ -72,7 +72,7 @@ Nothing is computed unless `cloud` has a subscriber.
 
 ## Parameters
 
-Identical to [point_cloud_xyz](point_cloud_xyz.md#parameters), with `image_transport` added and the `Stereo*` family below.
+Identical to [point_cloud_xyz](point_cloud_xyz.md#parameters), with [`image_transport`](https://docs.ros.org/en/jazzy/p/image_transport/) added and the `Stereo*` family below.
 
 **Synchronization**
 
@@ -84,7 +84,7 @@ Identical to [point_cloud_xyz](point_cloud_xyz.md#parameters), with `image_trans
 | `sync_queue_size` | `int` | `10` | Queue depth of the synchronizer. |
 | `qos` | `int` | `0` | Reliability of the image and disparity subscriptions. |
 | `qos_camera_info` | `int` | value of `qos` | Reliability of the camera info subscriptions. |
-| `image_transport` | `string` | `"raw"` | `image_transport` plugin for the colour, left and right images. |
+| `image_transport` | `string` | `"raw"` | `image_transport` plugin for the color, left and right images. |
 | `depth_transport` | `string` | `"raw"` | `image_transport` plugin for `depth/image`. |
 
 **Projection and filtering**, applied in this order
@@ -93,12 +93,12 @@ Identical to [point_cloud_xyz](point_cloud_xyz.md#parameters), with `image_trans
 |---|---|---|---|
 | `decimation` | `int` | `1` | Keep one pixel in `decimation`, in each direction. |
 | `roi_ratios` | `string` | `""` | Crop before projecting, `"left right top bottom"`. **Ignored for stereo input**, which warns if you set it. |
-| `min_depth` | `double` | `0.0` | Discard points nearer than this, in metres. `0` disables. |
-| `max_depth` | `double` | `0.0` | Discard points further than this, in metres. `0` disables. |
-| `voxel_size` | `double` | `0.0` | Downsample to one point per voxel, in metres. `0` disables. |
-| `noise_filter_radius` | `double` | `0.0` | Radius outlier removal, in metres. `0` disables. |
-| `noise_filter_min_neighbors` | `int` | `5` | Neighbours needed within `noise_filter_radius`. |
-| `normal_k` | `int` | `0` | Estimate normals from this many neighbours. `0` disables. |
+| `min_depth` | `double` | `0.0` | Discard points nearer than this, in meters. `0` disables. |
+| `max_depth` | `double` | `0.0` | Discard points further than this, in meters. `0` disables. |
+| `voxel_size` | `double` | `0.0` | Downsample to one point per voxel, in meters. `0` disables. |
+| `noise_filter_radius` | `double` | `0.0` | Radius outlier removal, in meters. `0` disables. |
+| `noise_filter_min_neighbors` | `int` | `5` | Neighbors needed within `noise_filter_radius`. |
+| `normal_k` | `int` | `0` | Estimate normals from this many neighbors. `0` disables. |
 | `normal_radius` | `double` | `0.0` | Estimate normals within this radius. `0` disables. |
 | `filter_nans` | `bool` | `false` | Drop invalid points instead of leaving them NaN, giving an unorganized cloud. See [point_cloud_xyz](point_cloud_xyz.md#organized-output). |
 
@@ -110,12 +110,12 @@ The stereo and `rgbd_image`-with-stereo inputs run OpenCV's block matcher, confi
 -p StereoBM/NumDisparities:=64 -p StereoBM/BlockSize:=15
 ```
 
-The full list is in RTAB-Map's [parameter reference](https://github.com/introlab/rtabmap/blob/master/corelib/include/rtabmap/core/Parameters.h). The two that matter most are `StereoBM/NumDisparities` (must exceed the largest disparity you expect, and must not exceed the image width) and `StereoBM/BlockSize`.
+The full list is in RTAB-Map's [parameter reference](https://introlab.github.io/rtabmap/api/latest/parameters.html). The two that matter most are `StereoBM/NumDisparities` (must exceed the largest disparity you expect, and must not exceed the image width) and `StereoBM/BlockSize`.
 
 If you already have a disparity image, feed the disparity input instead — it skips the matching entirely.
 
 ## Notes
 
-For RGB-D input the depth **must be registered to the colour camera**: the node pairs pixel `(u,v)` of the colour image with pixel `(u,v)` of the depth image and uses one calibration for both. Unregistered depth gives a cloud whose colours are offset from its geometry. Most drivers offer an aligned depth stream for this reason.
+For RGB-D input the depth **must be registered to the color camera**: the node pairs pixel `(u,v)` of the color image with pixel `(u,v)` of the depth image and uses one calibration for both. Unregistered depth gives a cloud whose colors are offset from its geometry. Most drivers offer an aligned depth stream for this reason.
 
-An `rgbd_image` carrying only colour and no depth is valid and yields an empty cloud rather than an error.
+An `rgbd_image` carrying only color and no depth is valid and yields an empty cloud rather than an error.

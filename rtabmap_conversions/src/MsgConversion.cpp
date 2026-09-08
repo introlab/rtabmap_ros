@@ -437,7 +437,7 @@ rtabmap::SensorData rgbdImageFromROS(const rtabmap_msgs::msg::RGBDImage::ConstSh
 		int depthWidth = depthMsg->image.cols;
 		int depthHeight = depthMsg->image.rows;
 
-		// The depth image is optional: a message can legitimately carry only the colour
+		// The depth image is optional: a message can legitimately carry only the color
 		// image and its camera info. Compare the resolutions only when there is a depth
 		// image, otherwise the ratios divide by zero.
 		UASSERT_MSG(

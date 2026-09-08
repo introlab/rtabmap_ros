@@ -19,7 +19,8 @@ ComposableNode(
     package='rtabmap_util',
     plugin='rtabmap_util::DisparityToDepth',
     name='disparity_to_depth',
-    remappings=[('disparity', '/stereo/disparity')])
+    remappings=[('disparity', '/stereo/disparity'),
+                ('depth', '/stereo/depth')])
 ```
 
 ## Subscribed Topics
@@ -32,8 +33,8 @@ ComposableNode(
 
 | Topic | Type | Description |
 |---|---|---|
-| `depth` | [`sensor_msgs/msg/Image`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/Image.html) (`32FC1`) | Depth in **metres**. |
-| `depth_raw` | [`sensor_msgs/msg/Image`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/Image.html) (`16UC1`) | The same depth in **millimetres**, the compact form most RGB-D drivers publish. |
+| `depth` | [`sensor_msgs/msg/Image`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/Image.html) (`32FC1`) | Depth in **meters**. |
+| `depth_raw` | [`sensor_msgs/msg/Image`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/Image.html) (`16UC1`) | The same depth in **millimeters**, the compact form most RGB-D drivers publish. |
 
 Both are computed only if something is subscribed to them, so leaving one unused costs nothing. Both keep the header of the input disparity image.
 
@@ -41,7 +42,11 @@ Both are computed only if something is subscribed to them, so leaving one unused
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `qos` | `int` | `0` | Reliability of the subscription and both publishers: `0` system default, `1` reliable, `2` best effort. |
+| `qos` | `int` | `0` | Reliability of both sides: `0` system default, `1` reliable, `2` best effort. |
+| `qos_sub` | `int` | value of `qos` | Reliability of the `disparity` subscription alone. |
+| `qos_pub` | `int` | value of `qos` | Reliability of the `depth` and `depth_raw` publishers alone. |
+| `queue_sub` | `int` | `1` | Queue depth of the `disparity` subscription. Must be at least 1. |
+| `queue_pub` | `int` | `1` | Queue depth of both publishers. Must be at least 1. |
 
 ## Notes
 

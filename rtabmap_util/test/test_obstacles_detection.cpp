@@ -278,7 +278,7 @@ TEST_F(ObstaclesDetectionTest, MapFrameIdRecoversTheGroundOnASlope)
 	ASSERT_TRUE(spinUntil([&]() { return !ground->empty() && !obstacles->empty(); }));
 
 	EXPECT_GT(ground->back().width, 0u)
-		<< "levelled by the map pitch, the slope is ground -- roll/pitch apply even "
+		<< "leveled by the map pitch, the slope is ground -- roll/pitch apply even "
 		   "though Grid/MapFrameProjection is false";
 }
 
@@ -380,7 +380,7 @@ TEST_F(ObstaclesDetectionRangeTest, GridRangeMinDropsNearbyPoints)
 	EXPECT_NEAR(extent.second, 3.1f, 1e-3);
 }
 
-TEST_F(ObstaclesDetectionRangeTest, DefaultRangeMaxIsFiveMetres)
+TEST_F(ObstaclesDetectionRangeTest, DefaultRangeMaxIsFiveMeters)
 {
 	// Grid/RangeMax defaults to 5.0, not infinity: a patch at 6 m is silently dropped
 	// even though no range parameter was set.

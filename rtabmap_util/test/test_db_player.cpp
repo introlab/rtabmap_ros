@@ -157,8 +157,8 @@ TEST_F(DbPlayerTest, ReplaysRgbAndDepthImages)
 
 	EXPECT_EQ(depth->back().encoding, sensor_msgs::image_encodings::TYPE_16UC1);
 	EXPECT_EQ(depth->back().header.frame_id, "camera_optical_link")
-		<< "depth is registered with the colour camera, so it shares its frame";
-	EXPECT_EQ(*reinterpret_cast<const uint16_t *>(depth->back().data.data()), kDepthMillimetres);
+		<< "depth is registered with the color camera, so it shares its frame";
+	EXPECT_EQ(*reinterpret_cast<const uint16_t *>(depth->back().data.data()), kDepthMillimeters);
 }
 
 TEST_F(DbPlayerTest, StampsImagesWithTheDatabaseStamps)
@@ -206,7 +206,7 @@ TEST_F(DbPlayerTest, ReplaysCameraCalibration)
 	EXPECT_EQ(rgbInfo->back().header.frame_id, "camera_optical_link");
 
 	EXPECT_NEAR(depthInfo->back().k[0], kFx, 1e-6)
-		<< "the depth camera info repeats the colour calibration";
+		<< "the depth camera info repeats the color calibration";
 }
 
 TEST_F(DbPlayerTest, ReplaysImageWithoutCalibrationOnImageTopic)
@@ -355,7 +355,7 @@ TEST_F(DbPlayerTest, UsesScanParametersWhenTheScanHasNoAngles)
 	const double angleMin = -0.5;
 	const double angleIncrement = 0.05;
 	const int targetBin = 10;
-	// The centre of the target bin: db_player truncates (angle-angle_min)/increment, so a
+	// The center of the target bin: db_player truncates (angle-angle_min)/increment, so a
 	// bearing on a bin boundary would land on either side depending on the rounding.
 	const float bearing = float(angleMin + (double(targetBin) + 0.5) * angleIncrement);
 	const float nearest = 1.0f;
@@ -452,7 +452,7 @@ TEST_F(DbPlayerTest, ReplaysOdometryWithItsCovariance)
 		<< "the pose must be the one recorded for node " << id;
 	EXPECT_NEAR(msg.pose.pose.position.y, 0.0, 1e-5);
 
-	// The covariance is the inverse of the neighbour link's information matrix.
+	// The covariance is the inverse of the neighbor link's information matrix.
 	EXPECT_NEAR(msg.pose.covariance[0], kOdomVariance, 1e-6);
 	EXPECT_NEAR(msg.pose.covariance[35], kOdomVariance, 1e-6);
 }

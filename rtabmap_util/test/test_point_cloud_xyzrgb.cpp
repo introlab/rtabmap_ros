@@ -20,10 +20,10 @@ namespace {
 constexpr int kWidth = 16;
 constexpr int kHeight = 16;
 constexpr double kFx = 100.0;
-constexpr int kCentre = (kHeight/2) * kWidth + kWidth/2;
+constexpr int kCenter = (kHeight/2) * kWidth + kWidth/2;
 
-/// The colour every synthetic RGB image is painted with, in OpenCV's BGR order.
-const cv::Scalar kColour(10, 20, 30);
+/// The color every synthetic RGB image is painted with, in OpenCV's BGR order.
+const cv::Scalar kColor(10, 20, 30);
 
 sensor_msgs::msg::Image makeRgb(double stamp, const std::string & encoding = "bgr8")
 {
@@ -33,15 +33,15 @@ sensor_msgs::msg::Image makeRgb(double stamp, const std::string & encoding = "bg
 				cv::Mat(kHeight, kWidth, CV_8UC1, cv::Scalar(128)), encoding);
 	}
 	return makeImage("camera_link", stamp,
-			cv::Mat(kHeight, kWidth, CV_8UC3, kColour), encoding);
+			cv::Mat(kHeight, kWidth, CV_8UC3, kColor), encoding);
 }
 
-sensor_msgs::msg::Image makeDepth(double stamp, float metres,
+sensor_msgs::msg::Image makeDepth(double stamp, float meters,
 		const std::string & encoding = sensor_msgs::image_encodings::TYPE_32FC1)
 {
 	cv::Mat image = encoding == sensor_msgs::image_encodings::TYPE_32FC1
-			? cv::Mat(kHeight, kWidth, CV_32FC1, cv::Scalar(metres))
-			: cv::Mat(kHeight, kWidth, CV_16UC1, cv::Scalar(uint16_t(metres*1000.0f)));
+			? cv::Mat(kHeight, kWidth, CV_32FC1, cv::Scalar(meters))
+			: cv::Mat(kHeight, kWidth, CV_16UC1, cv::Scalar(uint16_t(meters*1000.0f)));
 	return makeImage("camera_link", stamp, image, encoding);
 }
 
@@ -106,12 +106,12 @@ protected:
 	}
 
 	/// Publishes a synchronized rgb + depth + camera_info triple.
-	void publishFrame(double stamp, float metres,
+	void publishFrame(double stamp, float meters,
 			const std::string & depthEncoding = sensor_msgs::image_encodings::TYPE_32FC1,
 			const std::string & rgbEncoding = "bgr8")
 	{
 		rgbPub_->publish(makeRgb(stamp, rgbEncoding));
-		depthPub_->publish(makeDepth(stamp, metres, depthEncoding));
+		depthPub_->publish(makeDepth(stamp, meters, depthEncoding));
 		infoPub_->publish(makeCameraInfo("camera_link", stamp, kWidth, kHeight, 0.0, kFx));
 	}
 
@@ -125,7 +125,7 @@ protected:
 // rgb + depth + camera_info
 //============================================================================
 
-TEST_F(PointCloudXYZRGBTest, ProjectsRgbAndDepthIntoAColouredCloud)
+TEST_F(PointCloudXYZRGBTest, ProjectsRgbAndDepthIntoAColoredCloud)
 {
 	start();
 	publishFrame(1000.0, 2.0f);
@@ -137,33 +137,33 @@ TEST_F(PointCloudXYZRGBTest, ProjectsRgbAndDepthIntoAColouredCloud)
 	EXPECT_EQ(cloud.header.frame_id, "camera_link")
 		<< "the cloud takes the RGB image's frame";
 	EXPECT_TRUE(hasField(cloud, "rgb")) << "the whole point of this node";
-	EXPECT_NEAR(readXYZ(cloud, kCentre).z, 2.0f, 1e-3);
+	EXPECT_NEAR(readXYZ(cloud, kCenter).z, 2.0f, 1e-3);
 
-	// The RGB image is uniform, so every point carries the same colour. cv_bridge hands
+	// The RGB image is uniform, so every point carries the same color. cv_bridge hands
 	// the node a bgr8 image, which reaches the cloud as r=30, g=20, b=10.
-	const cv::Vec3b rgb = readRGB(cloud, kCentre);
+	const cv::Vec3b rgb = readRGB(cloud, kCenter);
 	EXPECT_EQ(int(rgb[0]), 30);
 	EXPECT_EQ(int(rgb[1]), 20);
 	EXPECT_EQ(int(rgb[2]), 10);
 }
 
-TEST_F(PointCloudXYZRGBTest, Accepts16UC1Millimetres)
+TEST_F(PointCloudXYZRGBTest, Accepts16UC1Millimeters)
 {
 	start();
 	publishFrame(1000.0, 2.0f, sensor_msgs::image_encodings::TYPE_16UC1);
 	ASSERT_TRUE(spinUntil([&]() { return !out_->empty(); }));
 
-	EXPECT_NEAR(readXYZ(out_->back(), kCentre).z, 2.0f, 1e-3)
-		<< "millimetre depth must be converted to metres";
+	EXPECT_NEAR(readXYZ(out_->back(), kCenter).z, 2.0f, 1e-3)
+		<< "millimeter depth must be converted to meters";
 }
 
-TEST_F(PointCloudXYZRGBTest, AcceptsMono8Colour)
+TEST_F(PointCloudXYZRGBTest, AcceptsMono8Color)
 {
 	start();
 	publishFrame(1000.0, 2.0f, sensor_msgs::image_encodings::TYPE_32FC1, "mono8");
 	ASSERT_TRUE(spinUntil([&]() { return !out_->empty(); }));
 
-	const cv::Vec3b rgb = readRGB(out_->back(), kCentre);
+	const cv::Vec3b rgb = readRGB(out_->back(), kCenter);
 	EXPECT_EQ(int(rgb[0]), 128) << "a grey image gives grey points";
 	EXPECT_EQ(int(rgb[1]), 128);
 	EXPECT_EQ(int(rgb[2]), 128);
@@ -174,7 +174,7 @@ TEST_F(PointCloudXYZRGBTest, RejectsUnsupportedDepthEncoding)
 	start();
 	rgbPub_->publish(makeRgb(1000.0));
 	depthPub_->publish(makeImage("camera_link", 1000.0,
-			cv::Mat(kHeight, kWidth, CV_8UC3, kColour), "bgr8"));
+			cv::Mat(kHeight, kWidth, CV_8UC3, kColor), "bgr8"));
 	infoPub_->publish(makeCameraInfo("camera_link", 1000.0, kWidth, kHeight, 0.0, kFx));
 	spinFor(std::chrono::milliseconds(400));
 
@@ -210,7 +210,7 @@ TEST_F(PointCloudXYZRGBTest, MaxDepthMarksFarPointsInvalid)
 	ASSERT_TRUE(spinUntil([&]() { return !out_->empty(); }));
 
 	EXPECT_EQ(out_->back().width * out_->back().height, uint32_t(kWidth*kHeight));
-	EXPECT_TRUE(std::isnan(readXYZ(out_->back(), kCentre).z));
+	EXPECT_TRUE(std::isnan(readXYZ(out_->back(), kCenter).z));
 }
 
 TEST_F(PointCloudXYZRGBTest, MinDepthMarksNearPointsInvalid)
@@ -219,7 +219,7 @@ TEST_F(PointCloudXYZRGBTest, MinDepthMarksNearPointsInvalid)
 	publishFrame(1000.0, 1.0f);
 	ASSERT_TRUE(spinUntil([&]() { return !out_->empty(); }));
 
-	EXPECT_TRUE(std::isnan(readXYZ(out_->back(), kCentre).z));
+	EXPECT_TRUE(std::isnan(readXYZ(out_->back(), kCenter).z));
 }
 
 TEST_F(PointCloudXYZRGBTest, FilterNaNsRemovesInvalidPoints)
@@ -241,7 +241,7 @@ TEST_F(PointCloudXYZRGBTest, NormalKAddsNormalFields)
 
 	EXPECT_TRUE(hasField(out_->back(), "normal_x"))
 		<< "asking for normals must change the point type";
-	EXPECT_TRUE(hasField(out_->back(), "rgb")) << "and must keep the colour";
+	EXPECT_TRUE(hasField(out_->back(), "rgb")) << "and must keep the color";
 }
 
 TEST_F(PointCloudXYZRGBTest, NoNormalFieldsByDefault)
@@ -321,7 +321,7 @@ TEST_F(PointCloudXYZRGBRgbdTest, ProjectsAnRgbdImage)
 	EXPECT_EQ(cloud.width * cloud.height, uint32_t(kWidth*kHeight));
 	EXPECT_EQ(cloud.header.frame_id, "camera_link");
 	EXPECT_TRUE(hasField(cloud, "rgb"));
-	EXPECT_NEAR(readXYZ(cloud, kCentre).z, 1.5f, 1e-3)
+	EXPECT_NEAR(readXYZ(cloud, kCenter).z, 1.5f, 1e-3)
 		<< "makeRGBDImage() fills the depth image with 1500 mm";
 }
 
@@ -338,9 +338,9 @@ TEST_F(PointCloudXYZRGBRgbdTest, IgnoresAnInvalidRgbdImage)
 	EXPECT_TRUE(out_->empty());
 }
 
-TEST_F(PointCloudXYZRGBRgbdTest, PublishesAnEmptyCloudForAColourOnlyRgbdImage)
+TEST_F(PointCloudXYZRGBRgbdTest, PublishesAnEmptyCloudForAColorOnlyRgbdImage)
 {
-	// Depth is optional in an RGBDImage, so colour alone must not be treated as a broken
+	// Depth is optional in an RGBDImage, so color alone must not be treated as a broken
 	// message: there is simply nothing to project.
 	start();
 	rtabmap_msgs::msg::RGBDImage msg = makeRGBDImage("camera_link", 1000.0, kWidth, kHeight);
@@ -396,7 +396,7 @@ protected:
 	rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr infoPub_;
 };
 
-TEST_F(PointCloudXYZRGBDisparityTest, ProjectsDisparityIntoAColouredCloud)
+TEST_F(PointCloudXYZRGBDisparityTest, ProjectsDisparityIntoAColoredCloud)
 {
 	start();
 	publishFrame(1000.0, 5.0f);   // depth = f*t/d = 100*0.1/5 = 2 m
@@ -407,9 +407,9 @@ TEST_F(PointCloudXYZRGBDisparityTest, ProjectsDisparityIntoAColouredCloud)
 	EXPECT_EQ(cloud.header.frame_id, "camera_link")
 		<< "the cloud takes the disparity image's frame";
 	EXPECT_TRUE(hasField(cloud, "rgb"));
-	EXPECT_NEAR(readXYZ(cloud, kCentre).z, 2.0f, 1e-3);
+	EXPECT_NEAR(readXYZ(cloud, kCenter).z, 2.0f, 1e-3);
 
-	const cv::Vec3b rgb = readRGB(cloud, kCentre);
+	const cv::Vec3b rgb = readRGB(cloud, kCenter);
 	EXPECT_EQ(int(rgb[0]), 30);
 	EXPECT_EQ(int(rgb[2]), 10);
 }
@@ -434,7 +434,7 @@ TEST_F(PointCloudXYZRGBDisparityTest, MaxDepthMarksFarPointsInvalid)
 	publishFrame(1000.0, 5.0f);   // 2 m, beyond the limit
 	ASSERT_TRUE(spinUntil([&]() { return !out_->empty(); }));
 
-	EXPECT_TRUE(std::isnan(readXYZ(out_->back(), kCentre).z));
+	EXPECT_TRUE(std::isnan(readXYZ(out_->back(), kCenter).z));
 }
 
 //============================================================================
@@ -495,7 +495,7 @@ protected:
 	rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr rightInfoPub_;
 };
 
-TEST_F(PointCloudXYZRGBStereoTest, MatchesAStereoPairIntoAColouredCloud)
+TEST_F(PointCloudXYZRGBStereoTest, MatchesAStereoPairIntoAColoredCloud)
 {
 	start({rclcpp::Parameter("StereoBM/NumDisparities", std::string("16")),
 		   rclcpp::Parameter("StereoBM/BlockSize", std::string("9"))});
@@ -510,8 +510,8 @@ TEST_F(PointCloudXYZRGBStereoTest, MatchesAStereoPairIntoAColouredCloud)
 	EXPECT_TRUE(hasField(cloud, "rgb"));
 
 	// The pair is a shifted copy of itself, so the whole matched area sits at one depth.
-	const size_t centre = size_t(kStereoHeight/2) * kStereoWidth + kStereoWidth/2;
-	EXPECT_NEAR(readXYZ(cloud, centre).z, 2.0f, 0.2f);
+	const size_t center = size_t(kStereoHeight/2) * kStereoWidth + kStereoWidth/2;
+	EXPECT_NEAR(readXYZ(cloud, center).z, 2.0f, 0.2f);
 }
 
 TEST_F(PointCloudXYZRGBStereoTest, RejectsUnsupportedStereoEncoding)

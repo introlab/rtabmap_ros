@@ -142,9 +142,9 @@ public:
 	 * @brief Installs an already assembled 2D map, e.g. one loaded from a database.
 	 *
 	 * @param map      the grid, `CV_8SC1` with -1 unknown, 0 free, 100 occupied
-	 * @param xMin     world x of the map's origin, in metres
-	 * @param yMin     world y of the map's origin, in metres
-	 * @param cellSize resolution, in metres
+	 * @param xMin     world x of the map's origin, in meters
+	 * @param yMin     world y of the map's origin, in meters
+	 * @param cellSize resolution, in meters
 	 * @param poses    poses of the nodes @p map was assembled from
 	 * @param memory   optional memory to load the missing local grids from, so the map can
 	 *                 keep growing from where it left off
@@ -205,9 +205,9 @@ public:
 
 	/**
 	 * @brief The 2D occupancy grid as a ternary map.
-	 * @param[out] xMin         world x of the map's origin, in metres
-	 * @param[out] yMin         world y of the map's origin, in metres
-	 * @param[out] gridCellSize resolution, in metres
+	 * @param[out] xMin         world x of the map's origin, in meters
+	 * @param[out] yMin         world y of the map's origin, in meters
+	 * @param[out] gridCellSize resolution, in meters
 	 * @return `CV_8SC1`, -1 unknown, 0 free, 100 occupied. Empty if nothing is assembled.
 	 */
 	cv::Mat getGridMap(
@@ -217,9 +217,9 @@ public:
 
 	/**
 	 * @brief The 2D occupancy grid as probabilities.
-	 * @param[out] xMin         world x of the map's origin, in metres
-	 * @param[out] yMin         world y of the map's origin, in metres
-	 * @param[out] gridCellSize resolution, in metres
+	 * @param[out] xMin         world x of the map's origin, in meters
+	 * @param[out] yMin         world y of the map's origin, in meters
+	 * @param[out] gridCellSize resolution, in meters
 	 * @return `CV_8SC1`, -1 unknown, otherwise 0-100. Empty if nothing is assembled.
 	 */
 	cv::Mat getGridProbMap(

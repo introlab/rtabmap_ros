@@ -22,7 +22,8 @@ ComposableNode(
     package='rtabmap_util',
     plugin='rtabmap_util::DbPlayer',
     name='db_player',
-    parameters=[{'database': '/path/to/rtabmap.db', 'rate': 1.0}])
+    parameters=[{'database': '/path/to/rtabmap.db', 'rate': 1.0,
+                 'frame_id': 'base_link'}])
 ```
 
 ## Published Topics
@@ -36,7 +37,7 @@ ComposableNode(
 | `left/image`, `left/camera_info` | `Image`, `CameraInfo` | Single stereo pair. |
 | `right/image`, `right/camera_info` | `Image`, `CameraInfo` | Single stereo pair. |
 | `image` | `Image` | Images with no calibration. |
-| `rgbd_image0`, `rgbd_image1`, … | [`RGBDImage`](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_msgs/msg/RGBDImage.msg) | Multiple RGB-D cameras, one topic each. |
+| `rgbd_image0`, `rgbd_image1`, … | [`RGBDImage`](https://docs.ros.org/en/jazzy/p/rtabmap_msgs/msg/RGBDImage.html) | Multiple RGB-D cameras, one topic each. |
 | `stereo_image0`, `stereo_image1`, … | `RGBDImage` | Multiple stereo pairs, one topic each. |
 | `scan` | [`LaserScan`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/LaserScan.html) | A 2D laser scan. |
 | `scan_cloud` | [`PointCloud2`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/PointCloud2.html) | A 3D laser scan. |
@@ -44,7 +45,7 @@ ComposableNode(
 | `imu` | [`Imu`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/Imu.html) | Gravity was recorded. Orientation only. |
 | `global_pose` | [`PoseWithCovarianceStamped`](https://docs.ros.org/en/jazzy/p/geometry_msgs/msg/PoseWithCovarianceStamped.html) | A prior pose was recorded. |
 | `gps/fix` | [`NavSatFix`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/NavSatFix.html) | GPS was recorded. |
-| `env_sensor` | [`EnvSensor`](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_msgs/msg/EnvSensor.msg) | Environmental sensors were recorded. |
+| `env_sensor` | [`EnvSensor`](https://docs.ros.org/en/jazzy/p/rtabmap_msgs/msg/EnvSensor.html) | Environmental sensors were recorded. |
 | `/clock` | [`Clock`](https://docs.ros.org/en/jazzy/p/rosgraph_msgs/msg/Clock.html) | `publish_clock` is set. See [Simulated time](#simulated-time). |
 
 Everything except `/tf` and `/clock` is published only when it has a subscriber.
@@ -102,7 +103,7 @@ When run as the standalone executable, the **space bar** toggles pause as well.
 
 ## Simulated time
 
-With `publish_clock` the node publishes `/clock` from the recorded stamps. Start every other node with `use_sim_time:=true` and the whole system runs on the database's timeline instead of the wall clock, so playback speed no longer affects behaviour — a good idea when replaying faster than real time, and essential for reproducible runs.
+With `publish_clock` the node publishes `/clock` from the recorded stamps. Start every other node with `use_sim_time:=true` and the whole system runs on the database's timeline instead of the wall clock, so playback speed no longer affects behavior — a good idea when replaying faster than real time, and essential for reproducible runs.
 
 ```bash
 ros2 run rtabmap_util data_player --ros-args -p database:=map.db -p publish_clock:=true

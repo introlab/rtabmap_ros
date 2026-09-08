@@ -118,7 +118,7 @@ cv::Point3f pointAt(const sensor_msgs::msg::PointCloud2 & cloud, size_t index)
 }
 
 /// Reads the packed rgb field of point @p index as (r,g,b).
-cv::Vec3b colourAt(const sensor_msgs::msg::PointCloud2 & cloud, size_t index)
+cv::Vec3b colorAt(const sensor_msgs::msg::PointCloud2 & cloud, size_t index)
 {
 	uint32_t offset = 16;
 	for(size_t i=0; i<cloud.fields.size(); ++i)
@@ -131,23 +131,23 @@ cv::Vec3b colourAt(const sensor_msgs::msg::PointCloud2 & cloud, size_t index)
 }
 
 /**
- * @brief The centre of octomap voxel (@p i, @p j, @p k) at kCellSize resolution.
+ * @brief The center of octomap voxel (@p i, @p j, @p k) at kCellSize resolution.
  *
- * Cells handed to the octomap have to sit on voxel centres when their neighbours matter:
+ * Cells handed to the octomap have to sit on voxel centers when their neighbors matter:
  * a coordinate on a voxel boundary (a multiple of the cell size) falls on either side
- * depending on rounding, so a cell meant to touch its neighbour may not.
+ * depending on rounding, so a cell meant to touch its neighbor may not.
  */
-cv::Point3f voxelCentre(int i, int j, int k)
+cv::Point3f voxelCenter(int i, int j, int k)
 {
 	return cv::Point3f((float(i)+0.5f)*kCellSize, (float(j)+0.5f)*kCellSize,
 			(float(k)+0.5f)*kCellSize);
 }
 
-/// Where OctoMap::createCloud() reports the voxel centred at @p centre: x and y at the
-/// cell corner, z at the centre.
-cv::Point3f asReported(const cv::Point3f & centre)
+/// Where OctoMap::createCloud() reports the voxel centerd at @p center: x and y at the
+/// cell corner, z at the center.
+cv::Point3f asReported(const cv::Point3f & center)
 {
-	return cv::Point3f(centre.x - 0.5f*kCellSize, centre.y - 0.5f*kCellSize, centre.z);
+	return cv::Point3f(center.x - 0.5f*kCellSize, center.y - 0.5f*kCellSize, center.z);
 }
 
 /// True if @p cloud holds a point within @p tolerance of @p expected.
@@ -375,7 +375,7 @@ TEST_F(MapsManagerTest, AssemblesGroundAndObstacleClouds)
 		<< "node 2 sits 2 m along x, so its obstacle lands at 3 m";
 }
 
-TEST_F(MapsManagerTest, ColoursGroundGreenAndObstaclesRed)
+TEST_F(MapsManagerTest, ColorsGroundGreenAndObstaclesRed)
 {
 	start();
 	std::shared_ptr<Collector<sensor_msgs::msg::PointCloud2>> ground =
@@ -387,8 +387,8 @@ TEST_F(MapsManagerTest, ColoursGroundGreenAndObstaclesRed)
 	ASSERT_FALSE(ground->empty());
 	ASSERT_FALSE(obstacles->empty());
 
-	EXPECT_EQ(colourAt(ground->back(), 0), cv::Vec3b(0, 255, 0));
-	EXPECT_EQ(colourAt(obstacles->back(), 0), cv::Vec3b(255, 0, 0));
+	EXPECT_EQ(colorAt(ground->back(), 0), cv::Vec3b(0, 255, 0));
+	EXPECT_EQ(colorAt(obstacles->back(), 0), cv::Vec3b(255, 0, 0));
 }
 
 TEST_F(MapsManagerTest, CloudMapCombinesGroundAndObstacles)
@@ -552,7 +552,7 @@ TEST_F(MapsManagerTest, FilterRadiusThinsNearbyPoses)
 	std::map<int, rtabmap::Transform> poses;
 	for(int id=1; id<=4; ++id)
 	{
-		// All within a metre of each other, and all facing the same way.
+		// All within a meter of each other, and all facing the same way.
 		poses.insert(std::make_pair(id, rtabmap::Transform(0.1f*float(id), 0, 0, 0, 0, 0)));
 	}
 	EXPECT_LT(maps_->getFilteredPoses(poses).size(), poses.size())
@@ -819,7 +819,7 @@ TEST_F(MapsManagerTest, PublishesTheBinaryOctomap)
 	EXPECT_EQ(binary->back().header.frame_id, "map");
 	EXPECT_TRUE(binary->back().binary);
 	EXPECT_EQ(binary->back().id, "ColorOcTree")
-		<< "rtabmap keeps a colour per voxel, so the tree type is not a plain OcTree";
+		<< "rtabmap keeps a color per voxel, so the tree type is not a plain OcTree";
 	EXPECT_NEAR(binary->back().resolution, kCellSize, 1e-6);
 	EXPECT_FALSE(binary->back().data.empty()) << "the serialized tree must not be empty";
 }
@@ -834,6 +834,8 @@ TEST_F(MapsManagerTest, PublishesTheFullOctomap)
 
 	ASSERT_FALSE(full->empty()) << "no full octomap published";
 	EXPECT_FALSE(full->back().binary) << "the full tree carries occupancy probabilities";
+	EXPECT_EQ(full->back().id, "ColorOcTree")
+		<< "consumers deserialize on this id, so both messages must report the same type";
 	EXPECT_NEAR(full->back().resolution, kCellSize, 1e-6);
 	EXPECT_FALSE(full->back().data.empty());
 }
@@ -862,7 +864,7 @@ TEST_F(MapsManagerTest, PublishesTheOctomapObstacles)
 
 	ASSERT_FALSE(obstacles->empty()) << "no octomap obstacles published";
 	EXPECT_EQ(obstacles->back().width * obstacles->back().height, 2u);
-	// Points come back at voxel centres, up to half a cell from where they went in.
+	// Points come back at voxel centers, up to half a cell from where they went in.
 	EXPECT_TRUE(containsPoint(obstacles->back(), cv::Point3f(1.0f, 0.0f, 0.0f), kCellSize));
 	EXPECT_TRUE(containsPoint(obstacles->back(),
 			cv::Point3f(3.0f, -0.1f, kObstacleHeight), kCellSize));
@@ -895,7 +897,7 @@ TEST_F(MapsManagerTest, PublishesTheOctomapEmptySpace)
 	EXPECT_EQ(empty->back().width * empty->back().height, 2u)
 		<< "node 1's two empty cells, and nothing else: ground cells are stored as "
 		   "occupied nodes flagged as ground, so they are not free space";
-	// createCloud() reports x and y at the cell corner but z at the cell centre.
+	// createCloud() reports x and y at the cell corner but z at the cell center.
 	EXPECT_TRUE(containsPoint(empty->back(),
 			cv::Point3f(0.2f, -0.1f, 0.5f*kCellSize), 1e-3f));
 	EXPECT_TRUE(containsPoint(empty->back(),
@@ -904,7 +906,7 @@ TEST_F(MapsManagerTest, PublishesTheOctomapEmptySpace)
 
 TEST_F(MapsManagerTest, PublishesTheOctomapFrontier)
 {
-	// A frontier cell is a free cell with at least one unknown face neighbour. Nothing
+	// A frontier cell is a free cell with at least one unknown face neighbor. Nothing
 	// encloses this scene, so the frontier is exactly the free space: node 1's two empty
 	// cells. The ground and obstacle cells are occupied nodes and never qualify.
 	start();
@@ -926,7 +928,7 @@ TEST_F(MapsManagerTest, AnEnclosedEmptyCellIsNotAFrontier)
 {
 	// The frontier rule in one scene: two identical empty cells, one walled in on all six
 	// faces by obstacles and one out in the open. Both are free space, but only the open
-	// one has an unknown neighbour, so only it is a frontier.
+	// one has an unknown neighbor, so only it is a frontier.
 	start();
 	std::shared_ptr<Collector<sensor_msgs::msg::PointCloud2>> frontier =
 			collectFromMaps<sensor_msgs::msg::PointCloud2>("octomap_global_frontier_space");
@@ -934,15 +936,15 @@ TEST_F(MapsManagerTest, AnEnclosedEmptyCellIsNotAFrontier)
 			collect<sensor_msgs::msg::PointCloud2>(topic("octomap_empty_space"));
 	ASSERT_TRUE(waitForPublisher(empty->subscription));
 
-	const cv::Point3f enclosed = voxelCentre(19, 0, 9);
-	const cv::Point3f open = voxelCentre(39, 0, 9);
+	const cv::Point3f enclosed = voxelCenter(19, 0, 9);
+	const cv::Point3f open = voxelCenter(39, 0, 9);
 
 	std::map<int, rtabmap::Signature> signatures;
 	signatures.insert(std::make_pair(1, makeGridSignature(1, rtabmap::Transform::getIdentity(),
 			/*ground=*/{},
-			/*obstacles=*/{voxelCentre(18, 0, 9), voxelCentre(20, 0, 9),    // -x, +x
-						   voxelCentre(19, -1, 9), voxelCentre(19, 1, 9),   // -y, +y
-						   voxelCentre(19, 0, 8), voxelCentre(19, 0, 10)},  // -z, +z
+			/*obstacles=*/{voxelCenter(18, 0, 9), voxelCenter(20, 0, 9),    // -x, +x
+						   voxelCenter(19, -1, 9), voxelCenter(19, 1, 9),   // -y, +y
+						   voxelCenter(19, 0, 8), voxelCenter(19, 0, 10)},  // -z, +z
 			/*empty=*/{enclosed, open})));
 	std::map<int, rtabmap::Transform> poses;
 	poses.insert(std::make_pair(1, rtabmap::Transform::getIdentity()));
@@ -965,7 +967,7 @@ TEST_F(MapsManagerTest, AnEnclosedEmptyCellIsNotAFrontier)
 	EXPECT_TRUE(containsPoint(frontier->back(), asReported(open), 1e-3f))
 		<< "the open cell borders unknown space";
 	EXPECT_FALSE(containsPoint(frontier->back(), asReported(enclosed), 1e-3f))
-		<< "all six face neighbours of the enclosed cell are known, so it is not a frontier";
+		<< "all six face neighbors of the enclosed cell are known, so it is not a frontier";
 }
 
 TEST_F(MapsManagerTest, PublishesTheOctomapGrid)

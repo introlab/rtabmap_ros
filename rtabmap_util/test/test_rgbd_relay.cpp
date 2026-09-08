@@ -9,6 +9,7 @@ All rights reserved. (BSD-3-Clause, see the repository root.)
 #include <rtabmap_util/rgbd_relay.hpp>
 
 #include <rtabmap/core/Compression.h>
+#include <rtabmap/utilite/UException.h>
 
 using namespace rtabmap_util_test;
 
@@ -64,7 +65,7 @@ TEST_F(RGBDRelayTest, CompressesRawImagesWhenAsked)
 	const rtabmap_msgs::msg::RGBDImage & got = out_->back();
 	EXPECT_FALSE(got.rgb_compressed.data.empty()) << "rgb must be compressed";
 	EXPECT_FALSE(got.depth_compressed.data.empty()) << "depth must be compressed";
-	// Depth is lossless png; colour is jpg.
+	// Depth is lossless png; color is jpg.
 	EXPECT_EQ(got.depth_compressed.format, "png");
 	EXPECT_TRUE(got.rgb.data.empty()) << "the raw image is not carried as well";
 }
@@ -89,7 +90,7 @@ TEST_F(RGBDRelayTest, CompressesAStereoPairAsJpeg)
 
 TEST_F(RGBDRelayTest, CompressesDepthAsLosslessPng)
 {
-	// The same call with no baseline is treated as colour + depth instead.
+	// The same call with no baseline is treated as color + depth instead.
 	start(/*compress=*/true, /*uncompress=*/false);
 
 	pub_->publish(makeRGBDImage("camera_link", 1000.0));
@@ -227,4 +228,123 @@ TEST_F(RGBDRelayRightImageTest, UncompressesAPngRightImage)
 	ASSERT_FALSE(got.depth.data.empty());
 	EXPECT_EQ(got.depth.encoding, sensor_msgs::image_encodings::MONO8);
 	EXPECT_EQ(got.depth.step, 8u);
+}
+
+/// QoS of the two sides, set independently through qos_sub and qos_pub.
+///
+/// A reliable subscription refuses to match a best-effort publisher, while a best-effort
+/// subscription matches either. Every assertion below rests on that asymmetry: whether a
+/// connection is established at all is what tells us which reliability the node picked.
+class RGBDRelayQosTest : public NodeTest
+{
+protected:
+	enum Reliability { kSystemDefault = 0, kReliable = 1, kBestEffort = 2 };
+
+	void startRelay(const std::vector<rclcpp::Parameter> & params)
+	{
+		addNode(std::make_shared<rtabmap_util::RGBDRelay>(
+				rclcpp::NodeOptions().parameter_overrides(params)));
+	}
+
+	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr input(Reliability reliability)
+	{
+		rclcpp::QoS qos(10);
+		reliability == kBestEffort ? qos.best_effort() : qos.reliable();
+		return helper()->create_publisher<rtabmap_msgs::msg::RGBDImage>("rgbd_image", qos);
+	}
+
+	std::shared_ptr<Collector<rtabmap_msgs::msg::RGBDImage>> output(Reliability reliability)
+	{
+		rclcpp::QoS qos(10);
+		reliability == kBestEffort ? qos.best_effort() : qos.reliable();
+		return collect<rtabmap_msgs::msg::RGBDImage>("rgbd_image_relay", qos);
+	}
+};
+
+TEST_F(RGBDRelayQosTest, BridgesABestEffortSourceToAReliableConsumer)
+{
+	// The point of splitting the parameter: a sensor publishing best effort feeding a
+	// consumer that only accepts reliable. Neither could talk to the other directly.
+	startRelay({rclcpp::Parameter("qos_sub", int(kBestEffort)),
+				rclcpp::Parameter("qos_pub", int(kReliable))});
+
+	std::shared_ptr<Collector<rtabmap_msgs::msg::RGBDImage>> out = output(kReliable);
+	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr pub = input(kBestEffort);
+	ASSERT_TRUE(waitForSubscriber(pub)) << "a best-effort source must reach the relay";
+	ASSERT_TRUE(waitForPublisher(out->subscription))
+		<< "a reliable consumer must be able to subscribe to the relayed topic";
+
+	pub->publish(makeRGBDImage("camera_link", 1000.0));
+	ASSERT_TRUE(spinUntil([&]() { return !out->empty(); }));
+	EXPECT_EQ(out->back().header.frame_id, "camera_link");
+}
+
+TEST_F(RGBDRelayQosTest, QosSubOverridesQosOnTheInputOnly)
+{
+	// qos says reliable, which a best-effort source could not match; qos_sub overrides it.
+	startRelay({rclcpp::Parameter("qos", int(kReliable)),
+				rclcpp::Parameter("qos_sub", int(kBestEffort))});
+
+	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr pub = input(kBestEffort);
+	EXPECT_TRUE(waitForSubscriber(pub)) << "qos_sub must win over qos on the subscription";
+
+	// The output side kept qos, so a reliable consumer still matches it.
+	std::shared_ptr<Collector<rtabmap_msgs::msg::RGBDImage>> out = output(kReliable);
+	EXPECT_TRUE(waitForPublisher(out->subscription))
+		<< "qos_sub must not affect the publisher";
+}
+
+TEST_F(RGBDRelayQosTest, QosPubOverridesQosOnTheOutputOnly)
+{
+	// qos says best effort, which no reliable consumer could match; qos_pub overrides it.
+	startRelay({rclcpp::Parameter("qos", int(kBestEffort)),
+				rclcpp::Parameter("qos_pub", int(kReliable))});
+
+	std::shared_ptr<Collector<rtabmap_msgs::msg::RGBDImage>> out = output(kReliable);
+	EXPECT_TRUE(waitForPublisher(out->subscription))
+		<< "qos_pub must win over qos on the publisher";
+
+	// The input side kept qos, so it is still best effort and accepts a best-effort source.
+	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr pub = input(kBestEffort);
+	EXPECT_TRUE(waitForSubscriber(pub)) << "qos_pub must not affect the subscription";
+}
+
+TEST_F(RGBDRelayQosTest, BothSidesFallBackToQos)
+{
+	// Only qos is given, so both sides must be best effort -- as before the split.
+	startRelay({rclcpp::Parameter("qos", int(kBestEffort))});
+
+	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr pub = input(kBestEffort);
+	EXPECT_TRUE(waitForSubscriber(pub)) << "the subscription must have followed qos";
+
+	std::shared_ptr<Collector<rtabmap_msgs::msg::RGBDImage>> out = output(kReliable);
+	spinFor(std::chrono::milliseconds(500));
+	EXPECT_EQ(out->subscription->get_publisher_count(), 0u)
+		<< "the publisher must have followed qos too: best effort, so a reliable "
+		   "consumer cannot match it";
+}
+
+TEST_F(RGBDRelayQosTest, HonorsTheConfiguredQueueDepths)
+{
+	// Queue depth is not directly observable from outside, so this only pins down that
+	// the parameters are accepted and the relay still works with them set.
+	startRelay({rclcpp::Parameter("queue_sub", 20), rclcpp::Parameter("queue_pub", 10)});
+
+	std::shared_ptr<Collector<rtabmap_msgs::msg::RGBDImage>> out = output(kReliable);
+	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr pub = input(kReliable);
+	ASSERT_TRUE(waitForSubscriber(pub));
+	ASSERT_TRUE(waitForPublisher(out->subscription));
+
+	pub->publish(makeRGBDImage("camera_link", 1000.0));
+	ASSERT_TRUE(spinUntil([&]() { return !out->empty(); }));
+	EXPECT_EQ(out->back().header.frame_id, "camera_link");
+}
+
+TEST_F(RGBDRelayQosTest, RejectsAZeroQueueDepth)
+{
+	// rclcpp::QoS(0) is not a meaningful depth, so say so at construction rather than
+	// leaving the relay silently misconfigured.
+	EXPECT_THROW(
+		startRelay({rclcpp::Parameter("queue_sub", 0)}),
+		UException);
 }
