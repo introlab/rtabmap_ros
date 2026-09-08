@@ -111,12 +111,8 @@ private:
 				}
 				else if(!input->rgb.data.empty())
 				{
-#ifdef CV_BRIDGE_HYDRO
-					ROS_ERROR("Unsupported compressed image copy, please upgrade at least to ROS Indigo to use this.");
-#else
-					cv_bridge::CvImageConstPtr rgb = cv_bridge::toCvShare(input->rgb, input);
-					rgb->toCompressedImageMsg(output.rgb_compressed, cv_bridge::JPG);
-#endif
+					cv_bridge::CvImageConstPtr imagePtr = cv_bridge::toCvShare(input->rgb, input);
+					imagePtr->toCompressedImageMsg(output.rgb_compressed, cv_bridge::JPG);
 				}
 
 				if(!input->depth_compressed.data.empty())
@@ -136,8 +132,7 @@ private:
 					{
 						// depth image
 						cv_bridge::CvImageConstPtr imageDepthPtr = cv_bridge::toCvShare(input->depth, input);
-						output.depth_compressed.data = rtabmap::compressImage(imageDepthPtr->image, ".png");
-						output.depth_compressed.format = "png";
+						rtabmap_conversions::toCompressedDepthImageMsg(*imageDepthPtr, output.depth_compressed, "rvl");
 					}
 				}
 			}
@@ -150,11 +145,7 @@ private:
 				}
 				if(!input->rgb_compressed.data.empty())
 				{
-#ifdef CV_BRIDGE_HYDRO
-					ROS_ERROR("Unsupported compressed image copy, please upgrade at least to ROS Indigo to use this.");
-#else
-					cv_bridge::toCvCopy(input->rgb_compressed)->toImageMsg(output.rgb);
-#endif
+					rtabmap_conversions::toCvCopy(input->rgb_compressed)->toImageMsg(output.rgb);
 				}
 
 				if(!input->depth.data.empty())
@@ -162,24 +153,11 @@ private:
 					// already raw, just copy pointer
 					output.depth = input->depth;
 				}
-				else if(input->depth_compressed.format.compare("jpg")==0)
+				else if(!input->depth_compressed.data.empty())
 				{
-					// right stereo image
-#ifdef CV_BRIDGE_HYDRO
-					ROS_ERROR("Unsupported compressed image copy, please upgrade at least to ROS Indigo to use this.");
-#else
-					cv_bridge::toCvCopy(input->depth_compressed)->toImageMsg(output.depth);
-#endif
-				}
-				else
-				{
-					// depth image
-					cv_bridge::CvImagePtr ptr = boost::make_shared<cv_bridge::CvImage>();
-					ptr->header = input->depth_compressed.header;
-					ptr->image = rtabmap::uncompressImage(input->depth_compressed.data);
-					ROS_ASSERT(ptr->image.empty() || ptr->image.type() == CV_32FC1 || ptr->image.type() == CV_16UC1);
-					ptr->encoding = ptr->image.empty()?"":ptr->image.type() == CV_32FC1?sensor_msgs::image_encodings::TYPE_32FC1:sensor_msgs::image_encodings::TYPE_16UC1;
-					ptr->toImageMsg(output.depth);
+					// right stereo image or depth image, toCvCopy handles both
+					// regular compressed images and transport compressedDepth formats
+					rtabmap_conversions::toCvCopy(input->depth_compressed)->toImageMsg(output.depth);
 				}
 			}
 

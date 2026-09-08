@@ -133,6 +133,145 @@ rtabmap::Transform transformFromPoseMsg(const geometry_msgs::Pose & msg, bool ig
 	return rtabmap::Transform::fromEigen3d(tfPose);
 }
 
+cv_bridge::CvImagePtr toCvCopy(const sensor_msgs::CompressedImage & source)
+{
+	if(source.format.find("compressedDepth") != std::string::npos)
+	{
+		std::string format;
+		if(source.format.find("compressedDepth png") != std::string::npos || source.format.find("compressedDepth ") == std::string::npos)
+		{
+			format = "png";
+		}
+		else if(source.format.find("compressedDepth rvl") != std::string::npos)
+		{
+			format = "rvl";
+		}
+		else
+		{
+			ROS_ERROR("Unsupported compressed depth format \"%s\".", source.format.c_str());
+			return cv_bridge::CvImagePtr();
+		}
+
+		cv_bridge::CvImagePtr cv_ptr(new cv_bridge::CvImage());
+		cv_ptr->header = source.header;
+		cv_ptr->encoding = source.format.substr(0, source.format.find(';'));
+
+		if (source.data.size() > 12)
+		{
+			if(format == "png")
+			{
+				std::vector<unsigned char> bytes(source.data.begin() + 12, source.data.end());
+				cv_ptr->image = rtabmap::uncompressImage(bytes);
+			}
+			else if(format == "rvl")
+			{
+				std::vector<unsigned char> bytes;
+				bytes.reserve(8 + (source.data.size() - 12));
+				bytes.insert(bytes.end(), "DEPTHRVL", "DEPTHRVL" + 8);
+				bytes.insert(bytes.end(), source.data.begin() + 12, source.data.end());
+				cv_ptr->image = rtabmap::uncompressImage(bytes);
+			}
+		}
+
+		if(cv_ptr->encoding == "32FC1" && (cv_ptr->image.rows > 0) && (cv_ptr->image.cols > 0))
+		{
+			float depthQuantA, depthQuantB;
+			memcpy(&depthQuantA, &source.data[4], sizeof(float));
+			memcpy(&depthQuantB, &source.data[8], sizeof(float));
+
+			cv::Mat depthImg(cv_ptr->image.size(), CV_32FC1);
+
+			cv::MatIterator_<float> itDepthImg = depthImg.begin<float>(), itDepthImg_end = depthImg.end<float>();
+			cv::MatConstIterator_<uint16_t> itInvDepthImg = cv_ptr->image.begin<uint16_t>(), itInvDepthImg_end = cv_ptr->image.end<uint16_t>();
+
+			for (; (itDepthImg != itDepthImg_end) && (itInvDepthImg != itInvDepthImg_end); ++itDepthImg, ++itInvDepthImg)
+			{
+				if (*itInvDepthImg) {
+					*itDepthImg = depthQuantA / static_cast<float>(*itInvDepthImg - depthQuantB);
+				} else {
+					*itDepthImg = std::numeric_limits<float>::quiet_NaN();
+				}
+			}
+
+			cv_ptr->image = depthImg;
+		}
+
+		return cv_ptr;
+	}
+	else
+	{
+#ifdef CV_BRIDGE_HYDRO
+		ROS_ERROR("Unsupported compressed image copy, please upgrade at least to ROS Indigo to use this.");
+		return cv_bridge::CvImagePtr();
+#else
+		return cv_bridge::toCvCopy(source);
+#endif
+	}
+}
+
+void toCompressedDepthImageMsg(const cv_bridge::CvImage & source, sensor_msgs::CompressedImage & ros_image, const std::string & format)
+{
+	if(source.encoding == "32FC1" || source.encoding == "16UC1")
+	{
+		ros_image.header = source.header;
+		ros_image.format = source.encoding + "; compressedDepth " + format;
+
+		float depthMax = 10.0;
+		float depthZ0 = 100.0;
+		float depthQuantA = depthZ0 * (depthZ0 + 1.0f);
+		float depthQuantB = 1.0f - depthQuantA / depthMax;
+
+		std::vector<unsigned char> bytes;
+
+		if(source.encoding == "32FC1" && source.image.rows > 0 && source.image.cols > 0)
+		{
+			cv::Mat invDepthImg(source.image.size(), CV_16UC1);
+
+			cv::MatConstIterator_<float> itDepthImg = source.image.begin<float>(), itDepthImg_end = source.image.end<float>();
+			cv::MatIterator_<uint16_t> itInvDepthImg = invDepthImg.begin<uint16_t>(), itInvDepthImg_end = invDepthImg.end<uint16_t>();
+
+			for(; (itDepthImg != itDepthImg_end) && (itInvDepthImg != itInvDepthImg_end); ++itDepthImg, ++itInvDepthImg)
+			{
+				if(*itDepthImg < depthMax)
+				{
+					*itInvDepthImg = depthQuantA / *itDepthImg + depthQuantB;
+				}
+				else
+				{
+					*itInvDepthImg = 0;
+				}
+			}
+
+			bytes = rtabmap::compressImage(invDepthImg, format == "rvl" ? ".rvl" : ".png");
+		}
+		else if(source.encoding == "16UC1" && source.image.rows > 0 && source.image.cols > 0)
+		{
+			bytes = rtabmap::compressImage(source.image, format == "rvl" ? ".rvl" : ".png");
+		}
+
+		if(format == "png" && !bytes.empty())
+		{
+			ros_image.data.resize(12 + bytes.size());
+			memset(&ros_image.data[0], 0, 4);
+			memcpy(&ros_image.data[4], &depthQuantA, sizeof(float));
+			memcpy(&ros_image.data[8], &depthQuantB, sizeof(float));
+			memcpy(&ros_image.data[12], bytes.data(), bytes.size());
+		}
+		else if(format == "rvl" && bytes.size() > 8)
+		{
+			ros_image.data.resize(12 + (bytes.size() - 8));
+			memset(&ros_image.data[0], 0, 4);
+			memcpy(&ros_image.data[4], &depthQuantA, sizeof(float));
+			memcpy(&ros_image.data[8], &depthQuantB, sizeof(float));
+			memcpy(&ros_image.data[12], &bytes[8], bytes.size() - 8);
+		}
+	}
+	else
+	{
+		ROS_ERROR("Compression requires single-channel 32bit-floating point or 16bit raw depth images (input format is: %s).", source.encoding.c_str());
+	}
+}
+
 void toCvCopy(const rtabmap_msgs::RGBDImage & image, cv_bridge::CvImagePtr & rgb, cv_bridge::CvImagePtr & depth)
 {
 	if(!image.rgb.data.empty())
@@ -141,11 +280,7 @@ void toCvCopy(const rtabmap_msgs::RGBDImage & image, cv_bridge::CvImagePtr & rgb
 	}
 	else if(!image.rgb_compressed.data.empty())
 	{
-#ifdef CV_BRIDGE_HYDRO
-		ROS_ERROR("Unsupported compressed image copy, please upgrade at least to ROS Indigo to use this.");
-#else
-		rgb = cv_bridge::toCvCopy(image.rgb_compressed);
-#endif
+		rgb = toCvCopy(image.rgb_compressed);
 	}
 
 	if(!image.depth.data.empty())
@@ -154,12 +289,7 @@ void toCvCopy(const rtabmap_msgs::RGBDImage & image, cv_bridge::CvImagePtr & rgb
 	}
 	else if(!image.depth_compressed.data.empty())
 	{
-		cv_bridge::CvImagePtr ptr = boost::make_shared<cv_bridge::CvImage>();
-		ptr->header = image.depth_compressed.header;
-		ptr->image = rtabmap::uncompressImage(image.depth_compressed.data);
-		ROS_ASSERT(ptr->image.empty() || ptr->image.type() == CV_32FC1 || ptr->image.type() == CV_16UC1);
-		ptr->encoding = ptr->image.empty()?"":ptr->image.type() == CV_32FC1?sensor_msgs::image_encodings::TYPE_32FC1:sensor_msgs::image_encodings::TYPE_16UC1;
-		depth = ptr;
+		depth = toCvCopy(image.depth_compressed);
 	}
 }
 
@@ -176,11 +306,7 @@ void toCvShare(const rtabmap_msgs::RGBDImage & image, const boost::shared_ptr<vo
 	}
 	else if(!image.rgb_compressed.data.empty())
 	{
-#ifdef CV_BRIDGE_HYDRO
-		ROS_ERROR("Unsupported compressed image copy, please upgrade at least to ROS Indigo to use this.");
-#else
-		rgb = cv_bridge::toCvCopy(image.rgb_compressed);
-#endif
+		rgb = toCvCopy(image.rgb_compressed);
 	}
 
 	if(!image.depth.data.empty())
@@ -189,23 +315,7 @@ void toCvShare(const rtabmap_msgs::RGBDImage & image, const boost::shared_ptr<vo
 	}
 	else if(!image.depth_compressed.data.empty())
 	{
-		if(image.depth_compressed.format.compare("jpg")==0)
-		{
-#ifdef CV_BRIDGE_HYDRO
-			ROS_ERROR("Unsupported compressed image copy, please upgrade at least to ROS Indigo to use this.");
-#else
-			depth = cv_bridge::toCvCopy(image.depth_compressed);
-#endif
-		}
-		else
-		{
-			cv_bridge::CvImagePtr ptr = boost::make_shared<cv_bridge::CvImage>();
-			ptr->header = image.depth_compressed.header;
-			ptr->image = rtabmap::uncompressImage(image.depth_compressed.data);
-			ROS_ASSERT(ptr->image.empty() || ptr->image.type() == CV_32FC1 || ptr->image.type() == CV_16UC1);
-			ptr->encoding = ptr->image.empty()?"":ptr->image.type() == CV_32FC1?sensor_msgs::image_encodings::TYPE_32FC1:sensor_msgs::image_encodings::TYPE_16UC1;
-			depth = ptr;
-		}
+		depth = toCvCopy(image.depth_compressed);
 	}
 }
 
@@ -1168,7 +1278,7 @@ rtabmap::SensorData sensorDataFromROS(const rtabmap_msgs::SensorData & msg)
 			compressedMatFromBytes(msg.left_compressed),
 			compressedMatFromBytes(msg.right_compressed),
 			stereoModels);
-		if(!left.empty() && !right.empty())
+		if(!left.empty() || !right.empty())
 		{
 			s.setStereoImage(left, right, stereoModels, false);
 		}
@@ -1179,7 +1289,7 @@ rtabmap::SensorData sensorDataFromROS(const rtabmap_msgs::SensorData & msg)
 			compressedMatFromBytes(msg.left_compressed),
 			compressedMatFromBytes(msg.right_compressed),
 			models);
-		if(!left.empty() && !right.empty())
+		if(!left.empty() || !right.empty())
 		{
 			s.setRGBDImage(left, right, models, false);
 		}
@@ -1238,6 +1348,7 @@ rtabmap::SensorData sensorDataFromROS(const rtabmap_msgs::SensorData & msg)
 	s.setIMU(rtabmap_conversions::imuFromROS(msg.imu, transformFromGeometryMsg(msg.imu_local_transform)));
 	return s;
 }
+
 void sensorDataToROS(const rtabmap::SensorData & data, rtabmap_msgs::SensorData & msg, const std::string & frameId, bool copyRawData)
 {
 	// add data

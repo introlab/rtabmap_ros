@@ -35,8 +35,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <geometry_msgs/Pose.h>
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <sensor_msgs/CameraInfo.h>
-#include <sensor_msgs/LaserScan.h>
+#include <sensor_msgs/CompressedImage.h>
 #include <sensor_msgs/Image.h>
+#include <sensor_msgs/LaserScan.h>
 #include <sensor_msgs/PointCloud2.h>
 
 #include <opencv2/opencv.hpp>
@@ -73,6 +74,8 @@ rtabmap::Transform transformFromGeometryMsg(const geometry_msgs::Transform & msg
 void transformToPoseMsg(const rtabmap::Transform & transform, geometry_msgs::Pose & msg);
 rtabmap::Transform transformFromPoseMsg(const geometry_msgs::Pose & msg, bool ignoreRotationIfNotSet = false);
 
+cv_bridge::CvImagePtr toCvCopy(const sensor_msgs::CompressedImage & source);
+void toCompressedDepthImageMsg(const cv_bridge::CvImage & source, sensor_msgs::CompressedImage & ros_image, const std::string & format = "rvl");
 void toCvCopy(const rtabmap_msgs::RGBDImage & image, cv_bridge::CvImagePtr & rgb, cv_bridge::CvImagePtr & depth);
 void toCvShare(const rtabmap_msgs::RGBDImageConstPtr & image, cv_bridge::CvImageConstPtr & rgb, cv_bridge::CvImageConstPtr & depth);
 void toCvShare(const rtabmap_msgs::RGBDImage & image, const boost::shared_ptr<void const>& trackedObject, cv_bridge::CvImageConstPtr & rgb, cv_bridge::CvImageConstPtr & depth);
