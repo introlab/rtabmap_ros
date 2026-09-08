@@ -14,15 +14,17 @@ ROS 2 wrapper for [RTAB-Map](https://github.com/introlab/rtabmap), a graph-based
 
 #### ROS Binaries
 
-| | Distro | Status |
-|---|---|---|
-| ROS 1 | Noetic (EOL) | [`0.21.13`](https://github.com/introlab/rtabmap_ros/tree/noetic-devel) |
-| ROS 2 | Humble | [![Humble](http://build.ros2.org/buildStatus/icon?job=Hbin_uJ64__rtabmap_ros__ubuntu_jammy_amd64__binary)](http://build.ros2.org/job/Hbin_uJ64__rtabmap_ros__ubuntu_jammy_amd64__binary/) |
-| ROS 2 | Jazzy | [![Jazzy](http://build.ros2.org/buildStatus/icon?job=Jbin_uN64__rtabmap_ros__ubuntu_noble_amd64__binary)](http://build.ros2.org/job/Jbin_uN64__rtabmap_ros__ubuntu_noble_amd64__binary/) |
-| ROS 2 | Kilted | [![Kilted](http://build.ros2.org/buildStatus/icon?job=Kbin_uN64__rtabmap_ros__ubuntu_noble_amd64__binary)](http://build.ros2.org/job/Kbin_uN64__rtabmap_ros__ubuntu_noble_amd64__binary/) |
-| ROS 2 | Lyrical | [![Lyrical](http://build.ros2.org/buildStatus/icon?job=Lbin_uR64__rtabmap_ros__ubuntu_resolute_amd64__binary)](http://build.ros2.org/job/Lbin_uR64__rtabmap_ros__ubuntu_resolute_amd64__binary/) |
-| ROS 2 | Rolling | [![Rolling](http://build.ros2.org/buildStatus/icon?job=Rbin_uN64__rtabmap_ros__ubuntu_noble_amd64__binary)](http://build.ros2.org/job/Rbin_uN64__rtabmap_ros__ubuntu_noble_amd64__binary/) |
-| Docker | [rtabmap_ros](https://hub.docker.com/r/introlab3it/rtabmap_ros) | ![Docker Pulls](https://img.shields.io/docker/pulls/introlab3it/rtabmap_ros.svg?label=pulls) |
+| | Distro | Released | In apt | Build |
+|---|---|---|---|---|
+| ROS 1 | Noetic (EOL) | [![released](https://img.shields.io/badge/dynamic/yaml?url=https%3A%2F%2Fraw.githubusercontent.com%2Fros%2Frosdistro%2Fmaster%2Fnoetic%2Fdistribution.yaml&query=%24.repositories.rtabmap_ros.release.version&label=%20)](https://github.com/ros/rosdistro/blob/master/noetic/distribution.yaml) | [![apt](https://img.shields.io/ros/v/noetic/rtabmap_ros?label=%20)](https://index.ros.org/p/rtabmap_ros/#noetic) | |
+| ROS 2 | Humble | [![released](https://img.shields.io/badge/dynamic/yaml?url=https%3A%2F%2Fraw.githubusercontent.com%2Fros%2Frosdistro%2Fmaster%2Fhumble%2Fdistribution.yaml&query=%24.repositories.rtabmap_ros.release.version&label=%20)](https://github.com/ros/rosdistro/blob/master/humble/distribution.yaml) | [![apt](https://img.shields.io/ros/v/humble/rtabmap_ros?label=%20)](https://index.ros.org/p/rtabmap_ros/#humble) | [![build](http://build.ros2.org/buildStatus/icon?job=Hbin_uJ64__rtabmap_ros__ubuntu_jammy_amd64__binary)](http://build.ros2.org/job/Hbin_uJ64__rtabmap_ros__ubuntu_jammy_amd64__binary/) |
+| ROS 2 | Jazzy | [![released](https://img.shields.io/badge/dynamic/yaml?url=https%3A%2F%2Fraw.githubusercontent.com%2Fros%2Frosdistro%2Fmaster%2Fjazzy%2Fdistribution.yaml&query=%24.repositories.rtabmap_ros.release.version&label=%20)](https://github.com/ros/rosdistro/blob/master/jazzy/distribution.yaml) | [![apt](https://img.shields.io/ros/v/jazzy/rtabmap_ros?label=%20)](https://index.ros.org/p/rtabmap_ros/#jazzy) | [![build](http://build.ros2.org/buildStatus/icon?job=Jbin_uN64__rtabmap_ros__ubuntu_noble_amd64__binary)](http://build.ros2.org/job/Jbin_uN64__rtabmap_ros__ubuntu_noble_amd64__binary/) |
+| ROS 2 | Kilted | [![released](https://img.shields.io/badge/dynamic/yaml?url=https%3A%2F%2Fraw.githubusercontent.com%2Fros%2Frosdistro%2Fmaster%2Fkilted%2Fdistribution.yaml&query=%24.repositories.rtabmap_ros.release.version&label=%20)](https://github.com/ros/rosdistro/blob/master/kilted/distribution.yaml) | [![apt](https://img.shields.io/ros/v/kilted/rtabmap_ros?label=%20)](https://index.ros.org/p/rtabmap_ros/#kilted) | [![build](http://build.ros2.org/buildStatus/icon?job=Kbin_uN64__rtabmap_ros__ubuntu_noble_amd64__binary)](http://build.ros2.org/job/Kbin_uN64__rtabmap_ros__ubuntu_noble_amd64__binary/) |
+| ROS 2 | Lyrical | [![released](https://img.shields.io/badge/dynamic/yaml?url=https%3A%2F%2Fraw.githubusercontent.com%2Fros%2Frosdistro%2Fmaster%2Flyrical%2Fdistribution.yaml&query=%24.repositories.rtabmap_ros.release.version&label=%20)](https://github.com/ros/rosdistro/blob/master/lyrical/distribution.yaml) | [![apt](https://img.shields.io/ros/v/lyrical/rtabmap_ros?label=%20)](https://index.ros.org/p/rtabmap_ros/#lyrical) | [![build](http://build.ros2.org/buildStatus/icon?job=Lbin_uR64__rtabmap_ros__ubuntu_resolute_amd64__binary)](http://build.ros2.org/job/Lbin_uR64__rtabmap_ros__ubuntu_resolute_amd64__binary/) |
+| ROS 2 | Rolling | [![released](https://img.shields.io/badge/dynamic/yaml?url=https%3A%2F%2Fraw.githubusercontent.com%2Fros%2Frosdistro%2Fmaster%2Frolling%2Fdistribution.yaml&query=%24.repositories.rtabmap_ros.release.version&label=%20)](https://github.com/ros/rosdistro/blob/master/rolling/distribution.yaml) | [![apt](https://img.shields.io/ros/v/rolling/rtabmap_ros?label=%20)](https://index.ros.org/p/rtabmap_ros/#rolling) | [![build](http://build.ros2.org/buildStatus/icon?job=Rbin_uN64__rtabmap_ros__ubuntu_noble_amd64__binary)](http://build.ros2.org/job/Rbin_uN64__rtabmap_ros__ubuntu_noble_amd64__binary/) |
+| Docker | [rtabmap_ros](https://hub.docker.com/r/introlab3it/rtabmap_ros) | | ![Docker Pulls](https://img.shields.io/docker/pulls/introlab3it/rtabmap_ros.svg?label=pulls) | |
+
+*Released* is the version bloomed into [rosdistro](https://github.com/ros/rosdistro); *In apt* is what `apt install` actually gives you today. They differ while a release is waiting on a buildfarm sync.
 
 # Packages
 
@@ -68,7 +70,7 @@ The stack is split into small packages so a pipeline only pulls in what it uses.
 
 # Installation
 
-These instructions are for ROS 2. On ROS 1, the last Noetic release was `0.21.13`; follow the [ROS 1 installation instructions](https://github.com/introlab/rtabmap_ros/tree/master#installation) on the [`master`](https://github.com/introlab/rtabmap_ros/tree/master) branch to build the latest version.
+These instructions are for ROS 2. For ROS 1, follow the [installation instructions](https://github.com/introlab/rtabmap_ros/tree/master#installation) on the [`master`](https://github.com/introlab/rtabmap_ros/tree/master) branch, which also carries the latest version for Noetic.
 
 ### Binaries
 
