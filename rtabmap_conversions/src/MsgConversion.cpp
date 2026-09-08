@@ -255,6 +255,11 @@ void toCvShare(const rtabmap_msgs::msg::RGBDImage & image, const std::shared_ptr
 				depth = ptr;
 			}
 		}
+		else
+		{
+			// empty
+			depth = std::make_shared<cv_bridge::CvImage>();
+		}
 	}
 	catch(cv::Exception& e) {
 		UFATAL("Fatal error while converting rgbd image (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
@@ -432,7 +437,11 @@ rtabmap::SensorData rgbdImageFromROS(const rtabmap_msgs::msg::RGBDImage::ConstSh
 		int depthWidth = depthMsg->image.cols;
 		int depthHeight = depthMsg->image.rows;
 
+		// The depth image is optional: a message can legitimately carry only the color
+		// image and its camera info. Compare the resolutions only when there is a depth
+		// image, otherwise the ratios divide by zero.
 		UASSERT_MSG(
+			depthMsg->image.empty() ||
 			imageWidth/depthWidth == imageHeight/depthHeight,
 			uFormat("rgb=%dx%d depth=%dx%d", imageWidth, imageHeight, depthWidth, depthHeight).c_str());
 
@@ -448,7 +457,8 @@ rtabmap::SensorData rgbdImageFromROS(const rtabmap_msgs::msg::RGBDImage::ConstSh
 			 imageMsg->encoding.compare(sensor_msgs::image_encodings::BGRA8) == 0 ||
 			 imageMsg->encoding.compare(sensor_msgs::image_encodings::RGBA8) == 0 ||
 			 imageMsg->encoding.compare(sensor_msgs::image_encodings::BAYER_GRBG8) == 0) ||
-			!(depthMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1) == 0 ||
+			!(depthMsg->image.empty() ||
+			 depthMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1) == 0 ||
 			 depthMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1) == 0 ||
 			 depthMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0))
 		{
@@ -2707,7 +2717,7 @@ bool convertScanMsg(
 			scan2dMsg.header.frame_id,
 			odomFrameId.empty()?frameId:odomFrameId,
 			rclcpp::Time(scan2dMsg.header.stamp.sec, scan2dMsg.header.stamp.nanosec),
-			rclcpp::Time(scan2dMsg.header.stamp.sec, scan2dMsg.header.stamp.nanosec) + rclcpp::Duration::from_seconds(scan2dMsg.ranges.size()*scan2dMsg.time_increment),
+			rclcpp::Time(scan2dMsg.header.stamp.sec, scan2dMsg.header.stamp.nanosec) + rclcpp::Duration::from_seconds((scan2dMsg.ranges.empty()?0:scan2dMsg.ranges.size()-1)*scan2dMsg.time_increment),
 			tfBuffer,
 			waitForTransform);
 	if(tmpT.isNull())

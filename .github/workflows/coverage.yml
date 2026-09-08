@@ -1,0 +1,156 @@
+name: Coverage
+
+on:
+  push:
+    branches: [ ros2 ]
+  pull_request:
+    branches: [ ros2 ]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  coverage:
+    name: Coverage (humble)
+    runs-on: ubuntu-latest
+    container:
+      # RTAB-Map master, already built and installed on top of ROS Humble
+      # (jammy = 22.04) -- the same base the repo's own docker/humble image
+      # uses. Saves building the library here, and pins the coverage run to
+      # RTAB-Map master rather than whatever the released binaries carry.
+      image: introlab3it/rtabmap:jammy
+    env:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # The container runs as root, so no sudo (it is not installed).
+      #
+      # colcon lcov-result is not a built-in verb -- it comes from the
+      # colcon-lcov-result package, which action-ros-ci calls but does not
+      # install. ros2.yml gets it for free because it runs ros-tooling/setup-ros
+      # first; this job calls action-ros-ci directly, so install it here.
+      # Without it action-ros-ci logs "invalid choice: 'lcov-result'", ignores
+      # the failure, and the job goes green having measured nothing.
+      # Versions pinned to the ones setup-ros uses.
+      - run: |
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          # lcov for genhtml (the browsable artifact below); colcon-lcov-result
+          # shells out to it too.
+          apt-get install -y lcov python3-pip
+          pip3 install -U \
+            colcon-lcov-result==0.5.0 \
+            colcon-coveragepy-result==0.0.8
+          colcon lcov-result --help > /dev/null
+          # The image ships rosdep but has never initialized it -- the repo's
+          # own docker/humble Dockerfile runs `rosdep init` for the same reason.
+          # action-ros-ci only runs `rosdep update`, which fails with "no
+          # sources directory exists" until this has happened once.
+          rosdep init || true
+
+      # Only the packages that have tests. The others are still built when a
+      # tested package depends on them (--packages-up-to), just not measured.
+      - uses: ros-tooling/action-ros-ci@v0.4
+        with:
+          package-name: rtabmap_conversions rtabmap_util
+          target-ros2-distro: humble
+          # RTAB-Map is installed in the image, not as an apt package, so rosdep
+          # cannot resolve the key and must not try.
+          rosdep-skip-keys: rtabmap
+          # The coverage-gcc mixin only adds --coverage; it sets no build type,
+          # and neither action-ros-ci nor this repo's CMakeLists do. Without
+          # this the build type is empty, which happens to mean -O0 but is not
+          # guaranteed to stay that way -- and at -O2 inlining and dead-code
+          # elimination make gcov's line attribution unreliable.
+          extra-cmake-args: -DCMAKE_BUILD_TYPE=Debug
+          colcon-defaults: |
+            {
+              "build": {
+                "mixin": ["coverage-gcc"]
+              }
+            }
+          # Pinned so a change in the mixin repository cannot break this job.
+          colcon-mixin-repository: https://raw.githubusercontent.com/colcon/colcon-mixin-repository/b8436aa16c0bdbc01081b12caa253cbf16e0fb82/index.yaml
+          # Run the coverage passes ourselves, in the step below. The action's
+          # own baseline pass is a bare `colcon lcov-result --initial` with no
+          # package selection, so it walks every package in the workspace --
+          # including the ones --packages-up-to never built -- and fails with
+          # "cannot read .../build/rtabmap_viz".
+          coverage-result: false
+
+      # Both passes restricted to the packages that were actually built.
+      #
+      # lcov captures each package's whole build directory, so more than this
+      # repo's sources land in it. Filtered:
+      #   */test/*  the test sources -- the instrument, not the subject. A line
+      #             there is uncovered only when the test skipped it, which says
+      #             nothing about the code under test, and they are near-fully
+      #             covered by construction.
+      #   /usr/*, /opt/*  everything outside the workspace. RTAB-Map's own .cpp
+      #             files are never captured (the library is installed in the
+      #             image, not built here), but its inline and template code is
+      #             emitted into the objects of the packages that include it,
+      #             as are PCL, Eigen and the standard library.
+      #   *CompilerId*, */CMakeFiles/*  CMake's compiler-probe translation
+      #             units. colcon-lcov-result tries to delete their .gcno files
+      #             but misses these, and they are recorded against a path that
+      #             does not exist -- which kills the genhtml pass colcon runs
+      #             at the end ("cannot read .../CMakeCCompilerId.c", exit 2).
+      #             Filters run before that pass, so dropping them here is
+      #             enough.
+      # Quoting them matters: action-ros-ci injects filters unquoted, so the
+      # shell can glob them away before colcon ever sees them.
+      - name: Coverage report
+        working-directory: ros_ws
+        run: |
+          # `.` not `source`: steps in this container run under sh (dash), where
+          # `source` does not exist. GitHub picks sh whenever it cannot find
+          # bash in the image's PATH, and says so in the log ("shell: sh -e").
+          . /opt/ros/humble/setup.sh
+          PKGS="rtabmap_conversions rtabmap_util"
+          # Baseline from the .gcno files. Without it a source file that no test
+          # ever loaded is missing from the report altogether rather than
+          # counted as 0%, which quietly inflates the result.
+          colcon lcov-result --initial --packages-select $PKGS
+          # The verb ends by running genhtml and returns *its* exit code, so a
+          # cosmetic HTML hiccup fails the whole job even though the report was
+          # written. The deliverable is total_coverage.info; the HTML is a
+          # convenience. Tolerate the former, then gate on the latter.
+          colcon lcov-result --packages-select $PKGS --verbose \
+            --filter '*/test/*' '/usr/*' '/opt/*' \
+              '*CompilerId*' '*/CMakeFiles/*' || true
+          test -s lcov/total_coverage.info
+
+      # Fails the job if the step above produced nothing -- the failure mode
+      # this workflow has hit twice already is a green run that measured zero.
+      - name: Coverage summary
+        run: lcov --summary ros_ws/lcov/total_coverage.info
+
+      # colcon lcov-result runs genhtml itself, into the same lcov/ directory.
+      - name: Upload HTML coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html
+          path: ros_ws/lcov
+          retention-days: 14
+
+      - name: Upload to Codecov
+        if: ${{ env.CODECOV_TOKEN != '' }}
+        uses: codecov/codecov-action@v5
+        with:
+          files: ros_ws/lcov/total_coverage.info
+          # Upload ONLY the aggregated lcov file. By default the CLI also walks
+          # the tree and runs gcov over every .gcno it finds, which re-adds the
+          # test sources the --filter above just dropped.
+          disable_search: true
+          plugins: noop
+          token: ${{ env.CODECOV_TOKEN }}
+          fail_ci_if_error: false

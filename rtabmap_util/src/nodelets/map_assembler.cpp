@@ -54,12 +54,18 @@ MapAssembler::MapAssembler(const rclcpp::NodeOptions & options) :
 		Node("map_assembler", options),
 		lastNodeAdded_(-1),
 		rtabmapNodeName_("rtabmap"),
-		localGridsRegenerated_(false)
+		localGridsRegenerated_(false),
+		initializeFromRtabmapTimeout_(5.0)
 {
 	std::string configPath;
 	configPath = this->declare_parameter("config_path", configPath);
 	localGridsRegenerated_ = this->declare_parameter("regenerate_local_grids", localGridsRegenerated_);
 	rtabmapNodeName_ = this->declare_parameter("rtabmap", rtabmapNodeName_);
+	// Seconds to wait for rtabmap's get_map_data service on start-up, which is how
+	// map_assembler catches up on a map that already exists. Set it to 0 to skip the call
+	// entirely: the subscription to "mapData" is then created right away instead of after
+	// the wait, which is what you want when map_assembler starts before rtabmap.
+	initializeFromRtabmapTimeout_ = this->declare_parameter("initialize_from_rtabmap_timeout", initializeFromRtabmapTimeout_);
 
 	//parameters
 	rtabmap::ParametersMap parameters;
@@ -175,6 +181,7 @@ MapAssembler::MapAssembler(const rclcpp::NodeOptions & options) :
 	}
 
 	RCLCPP_INFO(this->get_logger(), "%s: regenerate_local_grids          = %s", this->get_name(), localGridsRegenerated_?"true":"false");
+	RCLCPP_INFO(this->get_logger(), "%s: initialize_from_rtabmap_timeout = %fs (0=don't ask rtabmap for the map)", this->get_name(), initializeFromRtabmapTimeout_);
 	mapsManager_.init(*this, this->get_name(), true);
 	mapsManager_.backwardCompatibilityParameters(*this, parameters);
 	mapsManager_.setParameters(parameters);
@@ -189,13 +196,29 @@ MapAssembler::MapAssembler(const rclcpp::NodeOptions & options) :
 #endif
 #endif
 
-	std::string getMapSrv = rtabmapNodeName_+"/get_map_data";
+	if(initializeFromRtabmapTimeout_ > 0.0)
+	{
+		std::string getMapSrv = rtabmapNodeName_+"/get_map_data";
 
-	// We cannot call the service and wait in the constructor, lets call it later and subscribe afterwards
-	serviceCbGroup_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-	timerCbGroup_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-	client_ = this->create_client<rtabmap_msgs::srv::GetMap>(getMapSrv, rclcpp::ServicesQoS(), serviceCbGroup_); // Put it in a different group than the timer
-	timer_ = this->create_wall_timer(1s, std::bind(&MapAssembler::timerCallback, this), timerCbGroup_);
+		// We cannot call the service and wait in the constructor, lets call it later and subscribe afterwards
+		serviceCbGroup_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+		timerCbGroup_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+		client_ = this->create_client<rtabmap_msgs::srv::GetMap>(getMapSrv, rclcpp::ServicesQoS(), serviceCbGroup_); // Put it in a different group than the timer
+		timer_ = this->create_wall_timer(1s, std::bind(&MapAssembler::timerCallback, this), timerCbGroup_);
+	}
+	else
+	{
+		subscribeToMapData();
+	}
+}
+
+void MapAssembler::subscribeToMapData()
+{
+	rclcpp::SubscriptionOptions options;
+	// Null unless we came through the timer, in which case the node's default group is used.
+	options.callback_group = timerCbGroup_;
+	mapDataSub_ = create_subscription<rtabmap_msgs::msg::MapData>("mapData", rclcpp::QoS(1),
+		std::bind(&MapAssembler::mapDataReceivedCallback, this, std::placeholders::_1), options);
 }
 
 MapAssembler::~MapAssembler() {}
@@ -213,7 +236,8 @@ void MapAssembler::timerCallback()
 	std::string getMapSrv = rtabmapNodeName_+"/get_map_data";
 	RCLCPP_INFO(this->get_logger(), "Calling service \"%s\"...", getMapSrv.c_str());
 	
-	if(client_->wait_for_service(5s))
+	if(client_->wait_for_service(
+			std::chrono::duration<double>(initializeFromRtabmapTimeout_)))
 	{
 		auto request = std::make_shared<rtabmap_msgs::srv::GetMap::Request>();
 		request->global_map = false;
@@ -237,18 +261,16 @@ void MapAssembler::timerCallback()
 	}
 	else
 	{
-		RCLCPP_WARN(this->get_logger(), "Service \"%s\" not available after waiting for 5 seconds, "
+		RCLCPP_WARN(this->get_logger(), "Service \"%s\" not available after waiting for %f seconds, "
 				"may not be a problem if rtabmap is started afterwards. If rtabmap "
 				"is started after in localization mode, call %s/publish_maps "
 				"service with graph_only=false to make sure map_assembler has all the data.",
 					getMapSrv.c_str(),
+					initializeFromRtabmapTimeout_,
 					rtabmapNodeName_.c_str());
 	}
 
-	rclcpp::SubscriptionOptions options;
-	options.callback_group =  timerCbGroup_;
-	mapDataSub_ = create_subscription<rtabmap_msgs::msg::MapData>("mapData", rclcpp::QoS(1), 
-		std::bind(&MapAssembler::mapDataReceivedCallback, this, std::placeholders::_1), options);
+	subscribeToMapData();
 }
 
 void MapAssembler::mapDataReceivedCallback(const rtabmap_msgs::msg::MapData::ConstSharedPtr msg)

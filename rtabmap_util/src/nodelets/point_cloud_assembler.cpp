@@ -45,8 +45,6 @@ namespace rtabmap_util
 
 PointCloudAssembler::PointCloudAssembler(const rclcpp::NodeOptions & options) :
 	Node("point_cloud_assembler", options),
-	warningThread_(0),
-	callbackCalled_(false),
 	exactSync_(0),
 	exactInfoSync_(0),
 	maxClouds_(0),
@@ -170,22 +168,14 @@ PointCloudAssembler::PointCloudAssembler(const rclcpp::NodeOptions & options) :
 							syncOdomSub_.getSubscriber()->get_topic_name());
 	}
 
-	warningThread_ = new std::thread([&](){
-		rclcpp::Rate r(1.0/5.0);
-		while(!callbackCalled_)
-		{
-			r.sleep();
-			if(!callbackCalled_)
-			{
-				RCLCPP_WARN(this->get_logger(),
-						"%s: Did not receive data since 5 seconds! Make sure the input topics are "
-						"published (\"$ ros2 topic hz my_topic\") and the timestamps in their "
-						"header are set. %s",
-						get_name(),
-						subscribedTopicsMsg_.c_str());
-			}
-		}
-	});
+	syncDiagnostic_.reset(new rtabmap_sync::SyncDiagnostic(this, 0.5));
+	syncDiagnostic_->init(
+		cloudSub_?cloudSub_->get_topic_name():syncCloudSub_.getSubscriber()->get_topic_name(),
+		uFormat("%s: Did not receive data since 5 seconds! Make sure the input topics are "
+				"published (\"$ ros2 topic hz my_topic\") and the timestamps in their "
+				"header are set. %s",
+				get_name(),
+				subscribedTopicsMsg_.c_str()));
 
 	RCLCPP_INFO(this->get_logger(), "%s", subscribedTopicsMsg_.c_str());
 }
@@ -194,20 +184,12 @@ PointCloudAssembler::~PointCloudAssembler()
 {
 	delete exactSync_;
 	delete exactInfoSync_;
-
-	if(warningThread_)
-	{
-		callbackCalled_=true;
-		warningThread_->join();
-		delete warningThread_;
-	}
 }
 
 void PointCloudAssembler::callbackCloudOdom(
 		const sensor_msgs::msg::PointCloud2::ConstSharedPtr cloudMsg,
 		const nav_msgs::msg::Odometry::ConstSharedPtr odomMsg)
 {
-	callbackCalled_ = true;
 	rtabmap::Transform odom = rtabmap_conversions::transformFromPoseMsg(odomMsg->pose.pose);
 	if(!odom.isNull())
 	{
@@ -270,7 +252,6 @@ void PointCloudAssembler::callbackCloudOdomInfo(
 			const nav_msgs::msg::Odometry::ConstSharedPtr odomMsg,
 			const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr odomInfoMsg)
 {
-	callbackCalled_ = true;
 	rtabmap::Transform odom = rtabmap_conversions::transformFromPoseMsg(odomMsg->pose.pose);
 	if(!odom.isNull())
 	{
@@ -293,7 +274,7 @@ void PointCloudAssembler::callbackCloudOdomInfo(
 
 void PointCloudAssembler::callbackCloud(const sensor_msgs::msg::PointCloud2::ConstSharedPtr cloudMsg)
 {
-	callbackCalled_ = true;
+	syncDiagnostic_->tickInput(cloudMsg->header.stamp);
 	if(cloudPub_->get_subscription_count())
 	{
 		UASSERT_MSG(cloudMsg->data.size() == cloudMsg->row_step*cloudMsg->height,
@@ -487,6 +468,7 @@ void PointCloudAssembler::callbackCloud(const sensor_msgs::msg::PointCloud2::Con
 					rosCloud.header.frame_id = frameId_;
 				}
 				cloudPub_->publish(rosCloud);
+				syncDiagnostic_->tickOutput(cloudMsg->header.stamp);
 				if(circularBuffer_)
 				{
 					if(!isMoving)

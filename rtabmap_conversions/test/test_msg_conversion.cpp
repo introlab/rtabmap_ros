@@ -1756,7 +1756,7 @@ TEST(MsgConversion, deskewConstantVelocityHeaderAtLastPoint)
 		EXPECT_NEAR(readField(out, i, 0), expected, 1e-4) << "x of point " << i;
 	}
 
-	// The line is flat to well under a millimetre: that is the deskewing working,
+	// The line is flat to well under a millimeter: that is the deskewing working,
 	// independently of which end of the scan the frame is anchored to.
 	float minX = readField(out, 0, 0);
 	float maxX = minX;
@@ -2011,7 +2011,7 @@ TEST(MsgConversion, deskewClampsSamplesOutsideTheSweep)
 	ASSERT_TRUE(deskew(in, out, rtabmap::Transform(kSpeed, 0, 0, 0, 0, 0)));
 
 	// Clamped to the last sample's correction, so it lands within the sweep's own range
-	// rather than metres away. Every other sample is unaffected.
+	// rather than meters away. Every other sample is unaffected.
 	const float x = readWallX(out, corrupt, 0, kTimeOnColumns);
 	EXPECT_GE(x, kWallDistance - 1e-3f);
 	EXPECT_LE(x, kWallDistance + float(kSpeed * kScanSpan) + 1e-3f)
@@ -2222,6 +2222,57 @@ TEST(MsgConversion, toCvShareReadsCompressedDepth)
 	EXPECT_EQ(depthPtr->image.type(), CV_32FC1);
 	EXPECT_EQ(depthPtr->encoding, sensor_msgs::image_encodings::TYPE_32FC1);
 	EXPECT_EQ(cv::countNonZero(depthPtr->image != depth), 0);
+}
+
+TEST(MsgConversion, toCvShareOnAnEmptyMessageGivesEmptyImages)
+{
+	// Both pointers must be valid even when the message carries nothing: callers such as
+	// rgbdImageFromROS() dereference them unconditionally.
+	const rtabmap_msgs::msg::RGBDImage msg;
+
+	cv_bridge::CvImageConstPtr rgbPtr, depthPtr;
+	toCvShare(msg, std::shared_ptr<void const>(), rgbPtr, depthPtr);
+
+	ASSERT_TRUE(rgbPtr);
+	ASSERT_TRUE(depthPtr);
+	EXPECT_TRUE(rgbPtr->image.empty());
+	EXPECT_TRUE(depthPtr->image.empty());
+}
+
+TEST(MsgConversion, rgbdImageFromROSOnAnEmptyMessageIsInvalid)
+{
+	rtabmap_msgs::msg::RGBDImage::SharedPtr msg =
+			std::make_shared<rtabmap_msgs::msg::RGBDImage>();
+	msg->header.frame_id = "camera_link";
+	msg->header.stamp = rclcpp::Time(1000, 0, RCL_ROS_TIME);
+
+	const rtabmap::SensorData data = rgbdImageFromROS(msg);
+
+	EXPECT_FALSE(data.isValid()) << "an empty message must give empty data, not a crash";
+}
+
+TEST(MsgConversion, rgbdImageFromROSWithoutDepthKeepsTheColorImage)
+{
+	// The depth image is optional: color plus camera info is a valid message, and the
+	// resolution check must not divide by the zero depth width.
+	rtabmap_msgs::msg::RGBDImage::SharedPtr msg =
+			std::make_shared<rtabmap_msgs::msg::RGBDImage>();
+	msg->header.frame_id = "camera_link";
+	msg->header.stamp = rclcpp::Time(1000, 0, RCL_ROS_TIME);
+	cv::Mat rgb(8, 8, CV_8UC3, cv::Scalar(10, 20, 30));
+	cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", rgb).toImageMsg(msg->rgb);
+	msg->rgb_camera_info.width = 8;
+	msg->rgb_camera_info.height = 8;
+	msg->rgb_camera_info.k = {525.0, 0.0, 4.0, 0.0, 525.0, 4.0, 0.0, 0.0, 1.0};
+
+	const rtabmap::SensorData data = rgbdImageFromROS(msg);
+
+	EXPECT_TRUE(data.isValid());
+	ASSERT_FALSE(data.imageRaw().empty());
+	EXPECT_EQ(data.imageRaw().at<cv::Vec3b>(0, 0), cv::Vec3b(10, 20, 30));
+	EXPECT_TRUE(data.depthRaw().empty());
+	ASSERT_EQ(data.cameraModels().size(), 1u);
+	EXPECT_NEAR(data.cameraModels()[0].fx(), 525.0, 1e-9);
 }
 
 TEST(MsgConversion, toCvCopyReadsCompressedRgb)
@@ -2990,7 +3041,7 @@ void addOdomMotion(tf2_ros::Buffer & buffer)
 TEST(MsgConversion, convertRGBDMsgsSyncsToOdomStamp)
 {
 	// The image is captured at t=1001 but must be expressed relative to the base frame
-	// at odomStamp=1000, one metre back.
+	// at odomStamp=1000, one meter back.
 	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();
 	const rtabmap::Transform baseToCamera(0.1f, 0.0f, 0.2f, 0.0f, 0.0f, 0.0f);
 	addTf(*buffer, "base_link", "camera_link", baseToCamera, 1000.0);
@@ -3075,7 +3126,7 @@ TEST(MsgConversion, convertRGBDMsgsPrefersTheDepthStampWhenTheyDiffer)
 {
 	// The RGB and depth stamps of a camera are assumed to be equal. This pins the
 	// tie-break for when they are not: the depth stamp prevails, since it is the one the
-	// geometry is synchronized to. Not a behaviour to rely on -- a camera whose two
+	// geometry is synchronized to. Not a behavior to rely on -- a camera whose two
 	// stamps disagree is already outside the contract.
 	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();
 	addTf(*buffer, "base_link", "camera_link", rtabmap::Transform(0.1f, 0, 0, 0, 0, 0), 1000.0);
@@ -3350,25 +3401,25 @@ TEST(MsgConversion, convertStereoMsgProducesAStereoModel)
 	EXPECT_EQ(right.at<unsigned char>(0, 0), 50);
 }
 
-TEST(MsgConversion, convertStereoMsgConvertsColourToMono)
+TEST(MsgConversion, convertStereoMsgConvertsColorToMono)
 {
 	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();
 	addTf(*buffer, "base_link", "left_link", rtabmap::Transform::getIdentity(), 1000.0);
 
-	const cv::Mat colour(8, 8, CV_8UC3, cv::Scalar(10, 20, 30));
+	const cv::Mat color(8, 8, CV_8UC3, cv::Scalar(10, 20, 30));
 	const cv::Mat mono(8, 8, CV_8UC1, cv::Scalar(50));
 
 	cv::Mat left, right;
 	rtabmap::StereoCameraModel model;
 	ASSERT_TRUE(convertStereoMsg(
-			makeImage("left_link", 1000.0, colour, "bgr8"),
+			makeImage("left_link", 1000.0, color, "bgr8"),
 			makeImage("right_link", 1000.0, mono, "mono8"),
 			makeCameraInfo("left_link", 1000.0, 8, 8, 0.0),
 			makeCameraInfo("right_link", 1000.0, 8, 8, -15.0),
 			"base_link", "", timestampToROS(1000.0),
 			left, right, model, *buffer, 0.0, true));
 
-	// The left image is kept in colour; the right is always reduced to mono.
+	// The left image is kept in color; the right is always reduced to mono.
 	EXPECT_EQ(left.type(), CV_8UC3);
 	EXPECT_EQ(right.type(), CV_8UC1);
 }

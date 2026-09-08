@@ -176,7 +176,9 @@ void toCvCopy(const rtabmap_msgs::msg::RGBDImage & image, cv_bridge::CvImagePtr 
 /**
  * @brief Extract the RGB and depth images of an RGBDImage message without copying.
  *
- * The returned images alias the message's buffers, so @p image must outlive them.
+ * The returned images alias the message's buffers, so @p image must outlive them. Both
+ * output pointers are always valid; they hold an empty image when the corresponding
+ * field is not set.
  *
  * @param[in]  image the message to read; its shared pointer keeps the buffers alive
  * @param[out] rgb   the RGB image
@@ -186,6 +188,10 @@ void toCvShare(const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr & image, cv_br
 
 /**
  * @brief Extract the RGB and depth images of an RGBDImage message without copying.
+ *
+ * Both output pointers are always valid; they hold an empty image when the corresponding
+ * field is not set.
+ *
  * @param[in]  image         the message to read
  * @param[in]  trackedObject object whose lifetime keeps the message buffers alive
  * @param[out] rgb           the RGB image
@@ -219,8 +225,12 @@ void rgbdImageToROS(const rtabmap::SensorData & data, rtabmap_msgs::msg::RGBDIma
  * The stamp is taken from the top-level `image->header`, and the camera's local
  * transform is not carried by the message (callers resolve it from TF).
  *
+ * The depth image is optional: a message carrying only the color image and its camera
+ * info gives a SensorData with no depth, which is valid.
+ *
  * @param image the message to convert
- * @return the converted sensor data
+ * @return the converted sensor data, empty (SensorData::isValid() false) if the message
+ *         carries no color image or an unsupported encoding
  *
  * @warning The returned SensorData does **not** copy the pixels: it points into the
  *          message's own buffers. @p image must therefore outlive it and must not be
@@ -772,7 +782,7 @@ bool convertRGBDMsgs(
 /**
  * @brief Convert a stereo pair into RTAB-Map inputs.
  *
- * The left image keeps its colour; the right image is always reduced to mono.
+ * The left image keeps its color; the right image is always reduced to mono.
  *
  * @param leftImageMsg     left image
  * @param rightImageMsg    right image

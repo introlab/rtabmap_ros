@@ -300,4 +300,41 @@ install(DIRECTORY include/
    FILES_MATCHING PATTERN "*.h"
 )
 
+#############
+## Testing ##
+#############
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+
+  # Each node gets its own test binary: a crash or a stuck executor in one node cannot
+  # take the others down, and every binary starts with a clean DDS graph.
+  macro(rtabmap_util_add_node_test test_name)
+    ament_add_gtest(${test_name} test/${test_name}.cpp)
+    if(TARGET ${test_name})
+      target_include_directories(${test_name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/test)
+      target_link_libraries(${test_name} rtabmap_util_plugins rtabmap_util)
+      if("$ENV{ROS_DISTRO}" STRLESS "lyrical")
+        ament_target_dependencies(${test_name} ${AmentLibraries})
+      else()
+        target_link_libraries(${test_name} ${Libraries} ${PublicLibraries})
+      endif()
+    endif()
+  endmacro()
+
+  rtabmap_util_add_node_test(test_imu_to_tf)
+  rtabmap_util_add_node_test(test_disparity_to_depth)
+  rtabmap_util_add_node_test(test_rgbd_relay)
+  rtabmap_util_add_node_test(test_rgbd_split)
+  rtabmap_util_add_node_test(test_lidar_deskewing)
+  rtabmap_util_add_node_test(test_obstacles_detection)
+  rtabmap_util_add_node_test(test_point_cloud_aggregator)
+  rtabmap_util_add_node_test(test_point_cloud_assembler)
+  rtabmap_util_add_node_test(test_point_cloud_xyz)
+  rtabmap_util_add_node_test(test_pointcloud_to_depthimage)
+  rtabmap_util_add_node_test(test_point_cloud_xyzrgb)
+  rtabmap_util_add_node_test(test_db_player)
+  rtabmap_util_add_node_test(test_maps_manager)
+  rtabmap_util_add_node_test(test_map_assembler)
+endif()
+
 ament_package()

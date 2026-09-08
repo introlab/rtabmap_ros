@@ -29,6 +29,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtabmap/utilite/ULogger.h"
 #include "rclcpp/rclcpp.hpp"
 
+#include <stdexcept>
+
 #ifndef _WIN32
 #include <sys/ioctl.h>
 #include <termios.h>
@@ -83,7 +85,19 @@ int main(int argc, char **argv)
 	rclcpp::NodeOptions options;
 	options.arguments(arguments);
 
-	auto node = std::make_shared<rtabmap_util::DbPlayer>(options);
+	std::shared_ptr<rtabmap_util::DbPlayer> node;
+	try
+	{
+		node = std::make_shared<rtabmap_util::DbPlayer>(options);
+	}
+	catch(const std::exception & e)
+	{
+		// The node reports what went wrong before throwing; keep the process exit clean
+		// rather than letting an uncaught exception abort.
+		UERROR("%s", e.what());
+		rclcpp::shutdown();
+		return -1;
+	}
 
 	rclcpp::Rate pauseRate(10);
 

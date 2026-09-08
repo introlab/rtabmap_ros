@@ -164,9 +164,10 @@ void PointCloudToDepthImage::callback(
 
 		if(cloudDisplacement.isNull())
 		{
-			RCLCPP_ERROR(this->get_logger(), "Could not find transform between %s and %s, accordingly to %s, aborting!",
-				pointCloud2Msg->header.frame_id.c_str(), 
-				cameraInfoMsg->header.frame_id.c_str(),
+			RCLCPP_ERROR(this->get_logger(), "Could not find how %s moved between the cloud (%f) and the camera info (%f) stamps, accordingly to %s, aborting!",
+				pointCloud2Msg->header.frame_id.c_str(),
+				cloudStamp,
+				infoStamp,
 				fixedFrameId_.c_str());
 			return;
 		}

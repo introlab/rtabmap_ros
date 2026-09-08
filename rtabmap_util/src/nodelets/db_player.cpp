@@ -28,6 +28,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap_util/db_player.hpp>
 #include <sensor_msgs/image_encodings.hpp>
 
+#include <stdexcept>
+
 #include <image_transport/image_transport.hpp>
 
 #include <rtabmap_conversions/MsgConversion.h>
@@ -106,13 +108,14 @@ DbPlayer::DbPlayer(const rclcpp::NodeOptions & options) :
     qosGlobalPose_ =  this->declare_parameter("qos_global_pose", qos_);
     qosGps_ =         this->declare_parameter("qos_gps", qos_);
     qosImu_ =         this->declare_parameter("qos_imu", qos_);
+    qosEnvSensor_ =   this->declare_parameter("qos_env_sensor", qos_);
 
     // A general 360 lidar with 0.5 deg increment
     scanAngleMin_ =         this->declare_parameter("scan_angle_min", -M_PI);
     scanAngleMax_ =         this->declare_parameter("scan_angle_max", M_PI);
     scanAngleIncrement_ =   this->declare_parameter("scan_angle_increment", M_PI / 720.0);
     scanRangeMin_ =         this->declare_parameter("scan_range_min", 0.0);
-    scanRangeMax_ =         this->declare_parameter("scan_range_max", 60);
+    scanRangeMax_ =         this->declare_parameter("scan_range_max", 60.0);
 
     RCLCPP_INFO(get_logger(), "frame_id = %s", frameId_.c_str());
     RCLCPP_INFO(get_logger(), "odom_frame_id = %s", odomFrameId_.c_str());
@@ -136,8 +139,11 @@ DbPlayer::DbPlayer(const rclcpp::NodeOptions & options) :
 
     if(databasePath.empty())
     {
+        // Throwing rather than exiting: this node can be loaded in a component container
+        // next to others, and taking the whole process down with it would be rude.
         RCLCPP_ERROR(get_logger(), "Parameter \"database\" must be set (path to a RTAB-Map database).");
-        exit(-1);
+        throw std::invalid_argument(
+            "db_player: parameter \"database\" must be set (path to a RTAB-Map database).");
     }
 
     databasePath = uReplaceChar(databasePath, '~', UDirectory::homeDir());
@@ -151,7 +157,8 @@ DbPlayer::DbPlayer(const rclcpp::NodeOptions & options) :
     if(!reader_->init())
     {
         RCLCPP_ERROR(get_logger(), "Cannot open database \"%s\".", databasePath.c_str());
-        exit(-1);
+        throw std::runtime_error(
+            uFormat("db_player: cannot open database \"%s\".", databasePath.c_str()));
     }
 
     const std::string servicePrefix = get_name() + std::string("/");
@@ -300,8 +307,12 @@ void DbPlayer::initializePublishers(const rtabmap::OdometryEvent & odom)
 
     if(!odom.data().laserScanRaw().isEmpty())
     {
-        if(!scanPub_.get() && odom.data().laserScanRaw().is2d())
+        // The publisher has to match the scan being replayed, not just whichever one has
+        // not been created yet: a 2D database must never advertise "scan_cloud".
+        if(odom.data().laserScanRaw().is2d())
         {
+          if(!scanPub_.get())
+          {
             scanPub_ = this->create_publisher<sensor_msgs::msg::LaserScan>("scan", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qosScan_));
             if(odom.data().laserScanRaw().angleIncrement() > 0.0f)
             {
@@ -316,6 +327,7 @@ void DbPlayer::initializePublishers(const rtabmap::OdometryEvent & odom)
                 RCLCPP_INFO(get_logger(), "  scan_range_min=%f", scanRangeMin_);
                 RCLCPP_INFO(get_logger(), "  scan_range_max=%f", scanRangeMax_);
             }
+          }
         }
         else if(!scanCloudPub_.get())
         {
@@ -569,7 +581,6 @@ bool DbPlayer::publishNextFrame()
         envSensorPub_->get_subscription_count() > 0 &&
         !odom.data().envSensors().empty())
     {
-        rtabmap_msgs::msg::EnvSensor msg;
         for(rtabmap::EnvSensors::const_iterator iter=odom.data().envSensors().begin(); iter!=odom.data().envSensors().end(); ++iter)
         {
             rtabmap_msgs::msg::EnvSensor msg;
