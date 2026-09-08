@@ -20,36 +20,65 @@ jobs:
     name: Coverage (humble)
     runs-on: ubuntu-latest
     container:
-      image: osrf/ros:humble-desktop-full
+      # RTAB-Map master, already built and installed on top of ROS Humble
+      # (jammy = 22.04) -- the same base the repo's own docker/humble image
+      # uses. Saves building the library here, and pins the coverage run to
+      # RTAB-Map master rather than whatever the released binaries carry.
+      image: introlab3it/rtabmap:jammy
     env:
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
     steps:
       - uses: actions/checkout@v4
 
+      # The container runs as root, so no sudo (it is not installed).
+      #
+      # colcon lcov-result is not a built-in verb -- it comes from the
+      # colcon-lcov-result package, which action-ros-ci calls but does not
+      # install. ros2.yml gets it for free because it runs ros-tooling/setup-ros
+      # first; this job calls action-ros-ci directly, so install it here.
+      # Without it action-ros-ci logs "invalid choice: 'lcov-result'", ignores
+      # the failure, and the job goes green having measured nothing.
+      # Versions pinned to the ones setup-ros uses.
       - run: |
-          DEBIAN_FRONTEND=noninteractive
-          sudo apt-get update
-          # genhtml, for the browsable artifact below. colcon-lcov-result pulls
-          # in lcov itself, but only after the build has already run.
-          sudo apt-get install -y lcov
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          # lcov for genhtml (the browsable artifact below); colcon-lcov-result
+          # shells out to it too.
+          apt-get install -y lcov python3-pip
+          pip3 install -U \
+            colcon-lcov-result==0.5.0 \
+            colcon-coveragepy-result==0.0.8
+          colcon lcov-result --help > /dev/null
 
-      - run: |
-          echo "repositories:\n  introlab/rtabmap:\n    type: git\n    url: https://github.com/introlab/rtabmap.git\n    version: master\n" > /tmp/deps.repos &&\
-          cat /tmp/deps.repos
-
-      # Only the packages that have tests. Their dependencies, RTAB-Map itself
-      # included, are still built (--packages-up-to), they are just not measured.
+      # Only the packages that have tests. The others are still built when a
+      # tested package depends on them (--packages-up-to), just not measured.
       - uses: ros-tooling/action-ros-ci@v0.4
         with:
           package-name: rtabmap_conversions rtabmap_util
           target-ros2-distro: humble
-          vcs-repo-file-url: /tmp/deps.repos
-          # The test sources are the instrument, not the subject: a line in a
-          # test counts as uncovered only when the test skipped it, which says
-          # nothing about the code under test. They are also near-fully covered
-          # by construction, so leaving them in inflates the number.
-          coverage-ignore-pattern: "*/test/*"
+          # RTAB-Map is installed in the image, not as an apt package, so rosdep
+          # cannot resolve the key and must not try.
+          rosdep-skip-keys: rtabmap
+          # The coverage-gcc mixin only adds --coverage; it sets no build type,
+          # and neither action-ros-ci nor this repo's CMakeLists do. Without
+          # this the build type is empty, which happens to mean -O0 but is not
+          # guaranteed to stay that way -- and at -O2 inlining and dead-code
+          # elimination make gcov's line attribution unreliable.
+          extra-cmake-args: -DCMAKE_BUILD_TYPE=Debug
+          # colcon lcov-result captures each selected package's whole build
+          # directory, so more than this repo's sources end up in it. Filtered:
+          #   */test/*      the test sources -- the instrument, not the subject.
+          #                 A line there is uncovered only when the test skipped
+          #                 it, which says nothing about the code under test, and
+          #                 they are near-fully covered by construction.
+          #   /usr/*, /opt/*  everything outside the workspace. RTAB-Map's own
+          #                 .cpp files are never captured -- the library is
+          #                 installed in the image, not built here -- but its
+          #                 inline and template code is emitted into the objects
+          #                 of the packages that include it, and so lands in this
+          #                 report, as do PCL, Eigen and the standard library.
+          coverage-ignore-pattern: "*/test/* /usr/* /opt/*"
           colcon-defaults: |
             {
               "build": {
