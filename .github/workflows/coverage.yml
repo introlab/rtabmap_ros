@@ -99,6 +99,13 @@ jobs:
       #             image, not built here), but its inline and template code is
       #             emitted into the objects of the packages that include it,
       #             as are PCL, Eigen and the standard library.
+      #   *CompilerId*, */CMakeFiles/*  CMake's compiler-probe translation
+      #             units. colcon-lcov-result tries to delete their .gcno files
+      #             but misses these, and they are recorded against a path that
+      #             does not exist -- which kills the genhtml pass colcon runs
+      #             at the end ("cannot read .../CMakeCCompilerId.c", exit 2).
+      #             Filters run before that pass, so dropping them here is
+      #             enough.
       # Quoting them matters: action-ros-ci injects filters unquoted, so the
       # shell can glob them away before colcon ever sees them.
       - name: Coverage report
@@ -113,8 +120,14 @@ jobs:
           # ever loaded is missing from the report altogether rather than
           # counted as 0%, which quietly inflates the result.
           colcon lcov-result --initial --packages-select $PKGS
+          # The verb ends by running genhtml and returns *its* exit code, so a
+          # cosmetic HTML hiccup fails the whole job even though the report was
+          # written. The deliverable is total_coverage.info; the HTML is a
+          # convenience. Tolerate the former, then gate on the latter.
           colcon lcov-result --packages-select $PKGS --verbose \
-            --filter '*/test/*' '/usr/*' '/opt/*'
+            --filter '*/test/*' '/usr/*' '/opt/*' \
+              '*CompilerId*' '*/CMakeFiles/*' || true
+          test -s lcov/total_coverage.info
 
       # Fails the job if the step above produced nothing -- the failure mode
       # this workflow has hit twice already is a green run that measured zero.
