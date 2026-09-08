@@ -16,7 +16,7 @@ ROS 2 wrapper for [RTAB-Map](https://github.com/introlab/rtabmap), a graph-based
 
 | | Distro | Status |
 |---|---|---|
-| ROS 1 | Noetic (EOL) | Last release [`0.21.13`](https://github.com/introlab/rtabmap_ros/tree/noetic-devel). Build from [`master`](https://github.com/introlab/rtabmap_ros/tree/master) branch to run latest version on ROS 1. |
+| ROS 1 | Noetic (EOL) | [`0.21.13`](https://github.com/introlab/rtabmap_ros/tree/noetic-devel) |
 | ROS 2 | Humble | [![Humble](http://build.ros2.org/buildStatus/icon?job=Hbin_uJ64__rtabmap_ros__ubuntu_jammy_amd64__binary)](http://build.ros2.org/job/Hbin_uJ64__rtabmap_ros__ubuntu_jammy_amd64__binary/) |
 | ROS 2 | Jazzy | [![Jazzy](http://build.ros2.org/buildStatus/icon?job=Jbin_uN64__rtabmap_ros__ubuntu_noble_amd64__binary)](http://build.ros2.org/job/Jbin_uN64__rtabmap_ros__ubuntu_noble_amd64__binary/) |
 | ROS 2 | Kilted | [![Kilted](http://build.ros2.org/buildStatus/icon?job=Kbin_uN64__rtabmap_ros__ubuntu_noble_amd64__binary)](http://build.ros2.org/job/Kbin_uN64__rtabmap_ros__ubuntu_noble_amd64__binary/) |
@@ -67,6 +67,8 @@ The stack is split into small packages so a pipeline only pulls in what it uses.
 | [`rtabmap_demos`](rtabmap_demos/README.md) | Full robot demos: turtlebot3 and turtlebot4, nav2 integration, multi-session mapping. |
 
 # Installation
+
+These instructions are for ROS 2. On ROS 1, the last Noetic release was `0.21.13`; follow the [ROS 1 installation instructions](https://github.com/introlab/rtabmap_ros/tree/master#installation) on the [`master`](https://github.com/introlab/rtabmap_ros/tree/master) branch to build the latest version.
 
 ### Binaries
 
