@@ -50,6 +50,11 @@ jobs:
             colcon-lcov-result==0.5.0 \
             colcon-coveragepy-result==0.0.8
           colcon lcov-result --help > /dev/null
+          # The image ships rosdep but has never initialized it -- the repo's
+          # own docker/humble Dockerfile runs `rosdep init` for the same reason.
+          # action-ros-ci only runs `rosdep update`, which fails with "no
+          # sources directory exists" until this has happened once.
+          rosdep init || true
 
       # Only the packages that have tests. The others are still built when a
       # tested package depends on them (--packages-up-to), just not measured.
