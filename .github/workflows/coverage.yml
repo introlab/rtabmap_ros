@@ -104,7 +104,10 @@ jobs:
       - name: Coverage report
         working-directory: ros_ws
         run: |
-          source /opt/ros/humble/setup.sh
+          # `.` not `source`: steps in this container run under sh (dash), where
+          # `source` does not exist. GitHub picks sh whenever it cannot find
+          # bash in the image's PATH, and says so in the log ("shell: sh -e").
+          . /opt/ros/humble/setup.sh
           PKGS="rtabmap_conversions rtabmap_util"
           # Baseline from the .gcno files. Without it a source file that no test
           # ever loaded is missing from the report altogether rather than
