@@ -1,4 +1,4 @@
-name: noetic-pr
+name: ros1
 
 on:
   pull_request:
