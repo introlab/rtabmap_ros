@@ -1121,7 +1121,7 @@ void OdometryROS::processData()
 
 	postProcessData(data, header);
 
-	if(!data.imageRaw().empty() && odomRgbdImagePub_.getNumSubscribers())
+	if(odomRgbdImagePub_.getNumSubscribers())
 	{
 		if(!header.frame_id.empty())
 		{
