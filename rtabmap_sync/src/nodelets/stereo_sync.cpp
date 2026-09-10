@@ -208,11 +208,11 @@ private:
 
 					rtabmap_msgs::RGBDImage msgCompressed = msg;
 
-					cv_bridge::CvImageConstPtr imagePtr = cv_bridge::toCvShare(imageLeft);
-					imagePtr->toCompressedImageMsg(msgCompressed.rgb_compressed, cv_bridge::JPG);
+					cv_bridge::CvImageConstPtr imageLeftPtr = cv_bridge::toCvShare(imageLeft);
+					imageLeftPtr->toCompressedImageMsg(msgCompressed.rgb_compressed, cv_bridge::JPG);
 
-					cv_bridge::CvImageConstPtr imageDepthPtr = cv_bridge::toCvShare(imageRight);
-					imageDepthPtr->toCompressedImageMsg(msgCompressed.depth_compressed, cv_bridge::JPG);
+					cv_bridge::CvImageConstPtr imageRightPtr = cv_bridge::toCvShare(imageRight);
+					imageRightPtr->toCompressedImageMsg(msgCompressed.depth_compressed, cv_bridge::JPG);
 
 					rgbdImageCompressedPub_.publish(msgCompressed);
 				}
