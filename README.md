@@ -52,7 +52,7 @@ The stack is split into small packages so a pipeline only pulls in what it uses.
 |---|---|
 | `rtabmap_msgs` | Message, service and action definitions used across the stack. |
 | [`rtabmap_conversions`](rtabmap_conversions/README.md) | C++ library converting between RTAB-Map library types and ROS 2 messages. |
-| `rtabmap_python` | Python helpers, currently image compression matching RTAB-Map's own format. |
+| [`rtabmap_python`](rtabmap_python/README.md) | Python helpers for RTAB-Map's own binary formats, currently the compressed matrices carried in `rtabmap_msgs` fields and database blobs. |
 
 ### Visualization
 
