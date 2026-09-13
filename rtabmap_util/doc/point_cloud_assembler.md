@@ -44,23 +44,18 @@ Node(
                 ('odom', 'icp_odom')]),
 ```
 
-Dotted edges are TF, solid ones are topics. The external odometry supplies the frame the deskewing measures motion against, and the same frame is `icp_odometry`'s motion guess; the assembled cloud, not the raw sweep, is what `rtabmap` stores:
+The deskewing and `icp_odometry` both measure motion against the `odom` frame, while the assembler takes the pose from the `icp_odom` topic instead; the assembled cloud, not the raw sweep, is what `rtabmap` stores:
 
 ```mermaid
 flowchart LR
     LIDAR["lidar driver"]
-    VIO["VIO or wheel-IMU<br>odometry"]
-    DESKEW["lidar_deskewing"]
-    ICP["icp_odometry"]
+    DESKEW["lidar_deskewing<br>fixed_frame_id: odom"]
+    ICP["icp_odometry<br>guess_frame_id: odom"]
     ASM["point_cloud_assembler<br>fixed_frame_id: ''"]
     MAP["rtabmap"]
-    GUESS(["tf: odom"])
     DESKEWED(["deskewed cloud"])
     ICPODOM(["icp_odom"])
     LIDAR -->|points| DESKEW
-    VIO --> GUESS
-    GUESS -.-> DESKEW
-    GUESS -.-> ICP
     DESKEW --> DESKEWED
     DESKEWED -->|scan_cloud| ICP
     DESKEWED -->|cloud| ASM
@@ -87,20 +82,16 @@ Node(
     remappings=[('cloud', '/camera/scan/deskewed')]),
 ```
 
-Here the pose comes from the robot's wheel odometry through TF. Nothing is being deskewed — `lidar_deskewing` is in the chain purely because this node takes `PointCloud2` and `depthimage_to_laserscan` emits a `LaserScan`:
+Here the pose comes from the robot's wheel odometry, through the `odom` frame in TF. Nothing is being deskewed — `lidar_deskewing` is in the chain purely because this node takes `PointCloud2` and `depthimage_to_laserscan` emits a `LaserScan`:
 
 ```mermaid
 flowchart LR
     D2S["depthimage_to_laserscan"]
     CONV["lidar_deskewing<br>LaserScan → PointCloud2"]
-    WHEEL["wheel odometry"]
-    ASM["point_cloud_assembler<br>circular_buffer, max_clouds: 20"]
+    ASM["point_cloud_assembler<br>circular_buffer<br>max_clouds: 20<br>frame_id: base_link<br>fixed_frame_id: odom"]
     MAP["rtabmap"]
-    ODOMTF(["tf: odom"])
     D2S -->|input_scan| CONV
     CONV -->|cloud| ASM
-    WHEEL --> ODOMTF
-    ODOMTF -.-> ASM
     ASM -->|assembled_cloud| MAP
 ```
 

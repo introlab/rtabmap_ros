@@ -33,17 +33,17 @@ With 2D or 3D lidars, feed the aggregator **deskewed** clouds: run a [lidar_desk
 
 The two nodes correct different motions and you generally want both. Deskewing removes the distortion *within* each sweep, point by point, because a spinning lidar measures each point from a slightly different pose. `fixed_frame_id` here places whole clouds relative to each other, because the sensors did not fire at the same instant. Merging raw sweeps only merges their distortions.
 
-One deskewing node per sensor, then this node, and optionally back to a `LaserScan`:
+One deskewing node per sensor, then this node, and optionally back to a `LaserScan`. Every stage that compensates motion needs the same fixed frame:
 
 ```mermaid
 flowchart LR
     L0["lidar_front driver"]
     L1["lidar_left driver"]
     L2["lidar_right driver"]
-    D0["lidar_deskewing"]
-    D1["lidar_deskewing"]
-    D2["lidar_deskewing"]
-    AGG["point_cloud_aggregator<br>count: 3, frame_id: base_link"]
+    D0["lidar_deskewing<br>fixed_frame_id: odom"]
+    D1["lidar_deskewing<br>fixed_frame_id: odom"]
+    D2["lidar_deskewing<br>fixed_frame_id: odom"]
+    AGG["point_cloud_aggregator<br>count: 3<br>frame_id: base_link<br>fixed_frame_id: odom"]
     SCAN["pointcloud_to_laserscan<br>optional"]
     L0 -->|/lidar_front/points| D0
     L1 -->|/lidar_left/points| D1
