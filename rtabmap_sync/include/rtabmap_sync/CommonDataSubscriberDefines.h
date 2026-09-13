@@ -29,7 +29,40 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define INCLUDE_RTABMAP_ROS_COMMONDATASUBSCRIBERIMPL_H_
 
 #include <rtabmap/utilite/UConversion.h>
-#include <rtabmap_sync/GetTopicName.h>
+
+#include <string>
+
+/**
+ * @brief One name for the topic of a subscription, whichever kind it is.
+ *
+ * A `message_filters::Subscriber` exposes `get_topic_name()` through the subscription it
+ * holds, while an `image_transport::SubscriberFilter` exposes `getTopic()`. The SYNC_DECL
+ * macros below log what a node subscribed to and have to handle both, so this picks
+ * whichever the object actually has, resolved at compile time.
+ *
+ * @{
+ */
+template<class T>
+auto getTopicNameImpl(T const& obj, int)
+    -> decltype(obj->get_topic_name(), std::string())
+{
+   return obj->get_topic_name();
+}
+
+template<class T>
+auto getTopicNameImpl(T const& obj, long)
+    -> decltype(obj.getTopic(), std::string())
+{
+  return obj.getTopic();
+}
+
+template<class T>
+auto getTopicName(T const& obj)
+    -> decltype(getTopicNameImpl(obj, 0), std::string())
+{
+  return getTopicNameImpl(obj, 0);
+}
+/** @} */
 
 #define DATA_SYNC2(PREFIX, SYNC_NAME, MSG0, MSG1) \
 	typedef message_filters::sync_policies::SYNC_NAME##Time<MSG0, MSG1> PREFIX##SYNC_NAME##SyncPolicy; \

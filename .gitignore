@@ -2,7 +2,11 @@
 .settings
 .vscode
 __pycache__
-# rosdoc2 build artifacts
-docs_build
+# rosdoc2 build artifacts. docs_build/ holds a copy of each package manifest, so
+# colcon would otherwise see two packages of every name and fail with "Duplicate
+# package names not supported" -- hence the COLCON_IGNORE, which is committed so
+# nobody has to know that. rosdoc2 leaves an existing marker in place.
+docs_build/*
+!docs_build/COLCON_IGNORE
 cross_reference
 doc_output

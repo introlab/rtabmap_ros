@@ -89,6 +89,20 @@ The `marking`/`clearing` split is the whole point. Ground points only clear: the
 
 Feeding the raw cloud in as a single source cannot do this — every floor point would mark an obstacle and the robot would refuse to move. Working from [`turtlebot3_rgbd.launch.py`](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_demos/launch/turtlebot3/turtlebot3_rgbd.launch.py) and its [nav2 parameters](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_demos/params/turtlebot3_rgbd_nav2_params.yaml) will save some time.
 
+A depth camera turned into ground and obstacle clouds for a costmap:
+
+```mermaid
+flowchart LR
+    CAM["camera driver"]
+    XYZ["point_cloud_xyz"]
+    OBST["obstacles_detection<br>frame_id: base_link"]
+    NAV["nav2 costmap"]
+    CAM -->|"depth/image,<br>camera_info"| XYZ
+    XYZ -->|cloud| OBST
+    OBST -->|ground| NAV
+    OBST -->|obstacles| NAV
+```
+
 ## Subscribed Topics
 
 | Topic | Type | Description |

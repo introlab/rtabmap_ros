@@ -197,4 +197,35 @@ install(DIRECTORY include/
    FILES_MATCHING PATTERN "*.h"
 )
 
+#############
+## Testing ##
+#############
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+  find_package(RTABMap REQUIRED)
+
+  # Each node gets its own test binary: a crash or a stuck executor in one node cannot
+  # take the others down, and every binary starts with a clean DDS graph.
+  macro(rtabmap_sync_add_node_test test_name)
+    ament_add_gtest(${test_name} test/${test_name}.cpp)
+    if(TARGET ${test_name})
+      target_include_directories(${test_name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/test)
+      target_link_libraries(${test_name} rtabmap_sync_plugins rtabmap_sync)
+      if("$ENV{ROS_DISTRO}" STRLESS "lyrical")
+        ament_target_dependencies(${test_name} ${AmentLibraries})
+      else()
+        target_link_libraries(${test_name} ${Libraries} ${PublicLibraries})
+      endif()
+    endif()
+  endmacro()
+
+  rtabmap_sync_add_node_test(test_rgbd_sync)
+  rtabmap_sync_add_node_test(test_rgb_sync)
+  rtabmap_sync_add_node_test(test_stereo_sync)
+  rtabmap_sync_add_node_test(test_rgbdx_sync)
+  rtabmap_sync_add_node_test(test_common_data_subscriber)
+  rtabmap_sync_add_node_test(test_common_data_subscriber_sync)
+  rtabmap_sync_add_node_test(test_sync_diagnostic)
+endif()
+
 ament_package(CONFIG_EXTRAS ${CMAKE_CURRENT_BINARY_DIR}/cmake/extra_configs.cmake)

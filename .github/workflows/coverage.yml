@@ -60,7 +60,7 @@ jobs:
       # tested package depends on them (--packages-up-to), just not measured.
       - uses: ros-tooling/action-ros-ci@v0.4
         with:
-          package-name: rtabmap_conversions rtabmap_util
+          package-name: rtabmap_conversions rtabmap_util rtabmap_sync
           target-ros2-distro: humble
           # RTAB-Map is installed in the image, not as an apt package, so rosdep
           # cannot resolve the key and must not try.
@@ -115,7 +115,7 @@ jobs:
           # `source` does not exist. GitHub picks sh whenever it cannot find
           # bash in the image's PATH, and says so in the log ("shell: sh -e").
           . /opt/ros/humble/setup.sh
-          PKGS="rtabmap_conversions rtabmap_util"
+          PKGS="rtabmap_conversions rtabmap_util rtabmap_sync"
           # Baseline from the .gcno files. Without it a source file that no test
           # ever loaded is missing from the report altogether rather than
           # counted as 0%, which quietly inflates the result.

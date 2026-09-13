@@ -58,9 +58,3 @@ A few things recur across these nodes.
 **`fixed_frame_id`.** Where a node has to account for the robot moving between two stamps, it does so by asking TF how a frame moved relative to a fixed one — usually `odom`. Leaving it empty disables the compensation rather than erroring, so a moving robot then gets subtly misplaced data.
 
 **`Grid/*` parameters.** Nodes that segment or assemble maps use RTAB-Map's own [`LocalGridMaker`](https://introlab.github.io/rtabmap/api/latest/classrtabmap_1_1LocalGridMaker.html), and expose its parameters directly under their RTAB-Map names. Their meanings and defaults are in RTAB-Map's [parameter reference](https://introlab.github.io/rtabmap/api/latest/parameters.html), which is the source of truth for them. One to know about: `Grid/RangeMax` is not unlimited by default, so distant points are dropped before anything else happens.
-
-## Building the documentation
-
-```bash
-rosdoc2 build --package-path rtabmap_util --output-directory doc_output
-```

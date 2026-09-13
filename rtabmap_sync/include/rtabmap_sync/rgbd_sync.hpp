@@ -44,6 +44,18 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace rtabmap_sync
 {
 
+/**
+ * @brief Groups an RGB-D camera's color, depth and calibration topics into one
+ *        `RGBDImage`.
+ *
+ * Three topics that have to stay together are easier to keep together as one message:
+ * remapping is a single line, nothing downstream re-synchronizes them, and a recording
+ * cannot end up with a depth frame and no color. It can also decimate, rescale depth and
+ * publish a compressed copy for a slow link.
+ *
+ * See the [node documentation](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_sync/doc/rgbd_sync.md)
+ * for topics and parameters.
+ */
 class RGBDSync : public rclcpp::Node
 {
 public:
@@ -63,6 +75,9 @@ private:
 	double compressedRate_;
 	double approxSyncMaxInterval_;
 
+	/// Stamp of the last compressed message published, for compressed_rate throttling.
+	/// Explicitly on the ROS clock: the default is the system clock, and rclcpp refuses
+	/// to compare two times that do not come from the same source.
 	rclcpp::Time lastCompressedPublished_;
 
 	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr rgbdImagePub_;

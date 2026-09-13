@@ -64,20 +64,6 @@ colcon test --packages-select rtabmap_conversions
 colcon test-result --verbose
 ```
 
-## Documentation
-
-API documentation is generated with [rosdoc2](https://github.com/ros-infrastructure/rosdoc2) from the Doxygen comments in the public header, and published to [docs.ros.org](https://docs.ros.org/en/jazzy/p/rtabmap_conversions/). To build it locally:
-
-```bash
-rosdoc2 build --package-path rtabmap_conversions --output-directory doc_output
-```
-
-Besides `doc_output`, rosdoc2 writes `docs_build/` and `cross_reference/` scratch directories into the current directory. `docs_build/` contains a copy of the package manifest, so colcon then sees two packages of the same name and every later build fails with `Duplicate package names not supported`. Mark it once and the problem goes away for good — rosdoc2 leaves an existing marker in place on subsequent runs:
-
-```bash
-touch docs_build/COLCON_IGNORE
-```
-
 ## License
 
 BSD-3-Clause. See the [repository root](https://github.com/introlab/rtabmap_ros#license).
