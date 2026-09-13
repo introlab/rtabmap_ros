@@ -4,6 +4,59 @@ Groups an RGB-D camera's color image, depth image and calibration into a single 
 
 A camera driver publishes three topics that only mean anything together. Keeping them together as one message is worth doing for its own sake — one topic to remap, one topic to record, and no chance of a bag holding a depth frame whose color frame was dropped — but the reason this node exists is that the synchronization has to happen *somewhere*, and doing it once here is cheaper than doing it again in every consumer.
 
+Doing it once also keeps the consumers *consistent*. A pipeline usually runs [`rgbd_odometry`](https://github.com/introlab/rtabmap_ros/tree/ros2/rtabmap_odom) and `rtabmap` — often `rtabmap_viz` too — over the same camera. Given the three raw topics, each of those nodes synchronizes them independently, and with approximate matching they can settle on different pairings. `rtabmap` then maps a color/depth pair that odometry never saw, at a pose computed from a different one.
+
+**Without `rgbd_sync`** — each consumer matches the three topics for itself, with its own synchronizer:
+
+```mermaid
+flowchart LR
+    CAM["camera driver"]
+    ODOM["rgbd_odometry<br>sync A"]
+    MAP["rtabmap<br>sync B"]
+    CAM -->|rgb/image| ODOM & MAP
+    CAM -->|depth/image| ODOM & MAP
+    CAM -->|rgb/camera_info| ODOM & MAP
+    ODOM -->|odometry| MAP
+```
+
+**With `rgbd_sync`** — matched once, then fanned out:
+
+```mermaid
+flowchart LR
+    CAM["camera driver"]
+    SYNC["rgbd_sync"]
+    ODOM["rgbd_odometry"]
+    ODOMT(["odometry"])
+    MAP["rtabmap"]
+    VIZ["rtabmap_viz"]
+    CAM -->|rgb/image| SYNC
+    CAM -->|depth/image| SYNC
+    CAM -->|rgb/camera_info| SYNC
+    SYNC -->|rgbd_image| ODOM & MAP & VIZ
+    ODOM --> ODOMT
+    ODOMT --> MAP & VIZ
+```
+
+The same holds when the pose comes from elsewhere — a wheel encoder, a lidar, or an external VIO. The camera then feeds only the mapping side, but every node on it still sees the identical frame:
+
+```mermaid
+flowchart LR
+    CAM["camera driver"]
+    SYNC["rgbd_sync"]
+    ODOM["odometry source<br>wheel, lidar or external"]
+    ODOMT(["odometry"])
+    MAP["rtabmap"]
+    VIZ["rtabmap_viz"]
+    CAM -->|rgb/image| SYNC
+    CAM -->|depth/image| SYNC
+    CAM -->|rgb/camera_info| SYNC
+    SYNC -->|rgbd_image| MAP & VIZ
+    ODOM --> ODOMT
+    ODOMT --> MAP & VIZ
+```
+
+Subscribe them all to one `RGBDImage` and the question does not arise: every node processes the identical message.
+
 It also gives a pipeline one place to synchronize. A consumer that has to match a camera against something on a different rate — a lidar, an IMU, odometry — matches one `RGBDImage` against them rather than three topics plus the others all at once. Synchronizing a large set in one go is the harder problem: the policy has to find a window that satisfies every input, and the more inputs with different rates and delays, the more often it settles for a poor match or none at all. Resolving the camera first, where the three topics are tightly correlated, leaves the downstream synchronizer a much easier job.
 
 It can also decimate the images, rescale depth into the unit RTAB-Map expects, and publish a compressed copy for a slow link. See [Compressing for a slow link](#compressing-for-a-slow-link).

@@ -6,6 +6,20 @@ The monocular counterpart of [rgbd_sync](rgbd_sync.md). It exists for pipelines 
 
 Without depth, RTAB-Map cannot build a metric map from these frames alone. It can still detect that a place has been seen before, which is enough for relocalization in an existing map and for adding loop closure constraints to a graph whose geometry comes from odometry or a lidar.
 
+The camera cannot supply a pose here — visual odometry needs depth or a stereo baseline — so the pose has to come from somewhere else:
+
+```mermaid
+flowchart LR
+    CAM["camera driver"]
+    SYNC["rgb_sync"]
+    ODOM["odometry source<br>wheel, lidar or external"]
+    MAP["rtabmap"]
+    CAM -->|rgb/image| SYNC
+    CAM -->|rgb/camera_info| SYNC
+    SYNC -->|rgbd_image| MAP
+    ODOM -->|odometry| MAP
+```
+
 ## Usage
 
 ```bash

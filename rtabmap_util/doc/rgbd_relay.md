@@ -25,6 +25,32 @@ ComposableNode(
     remappings=[('rgbd_image', '/camera/rgbd_image')])
 ```
 
+
+A relay at each end of the link, so only the compressed form crosses it. Once it is raw again it feeds the SLAM node directly, and [rgbd_split](rgbd_split.md) unpacks it into the plain `Image` topics RViz can display:
+
+```mermaid
+flowchart LR
+    subgraph ROBOT["robot"]
+        CAM["camera driver"]
+        SYNC["rgbd_sync"]
+        RELAY1["rgbd_relay<br>compress: true"]
+    end
+    subgraph REMOTE["remote computer"]
+        RELAY2["rgbd_relay<br>uncompress: true"]
+        RAW(["rgbd_image_relay"])
+        MAP["rtabmap"]
+        SPLIT["rgbd_split"]
+        RVIZ["RViz"]
+    end
+    CAM -->|"rgb, depth,<br>camera_info"| SYNC
+    SYNC -->|rgbd_image| RELAY1
+    RELAY1 -->|compressed| RELAY2
+    RELAY2 --> RAW
+    RAW --> MAP
+    RAW --> SPLIT
+    SPLIT -->|rgb, depth| RVIZ
+```
+
 ## Subscribed Topics
 
 | Topic | Type | Description |
@@ -60,6 +86,17 @@ ros2 run rtabmap_util rgbd_relay --ros-args \
   -r rgbd_image:=/camera/rgbd_image \
   -p qos_sub:=2 \
   -p qos_pub:=1
+```
+
+```mermaid
+flowchart LR
+    CAM["camera driver<br>publishes best effort"]
+    SYNC["rgbd_sync"]
+    RELAY["rgbd_relay<br>qos_sub: 2, qos_pub: 1"]
+    MAP["rtabmap<br>needs reliable"]
+    CAM -->|"rgb, depth,<br>camera_info"| SYNC
+    SYNC -->|rgbd_image| RELAY
+    RELAY -->|rgbd_image_relay| MAP
 ```
 
 Both parameters default to `qos`, so setting `qos` alone configures both sides at once.

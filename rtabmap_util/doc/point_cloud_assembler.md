@@ -44,6 +44,31 @@ Node(
                 ('odom', 'icp_odom')]),
 ```
 
+Dotted edges are TF, solid ones are topics. The external odometry supplies the frame the deskewing measures motion against, and the same frame is `icp_odometry`'s motion guess; the assembled cloud, not the raw sweep, is what `rtabmap` stores:
+
+```mermaid
+flowchart LR
+    LIDAR["lidar driver"]
+    VIO["VIO or wheel-IMU<br>odometry"]
+    DESKEW["lidar_deskewing"]
+    ICP["icp_odometry"]
+    ASM["point_cloud_assembler<br>fixed_frame_id: ''"]
+    MAP["rtabmap"]
+    GUESS(["tf: odom"])
+    DESKEWED(["deskewed cloud"])
+    ICPODOM(["icp_odom"])
+    LIDAR -->|points| DESKEW
+    VIO --> GUESS
+    GUESS -.-> DESKEW
+    GUESS -.-> ICP
+    DESKEW --> DESKEWED
+    DESKEWED -->|scan_cloud| ICP
+    DESKEWED -->|cloud| ASM
+    ICP --> ICPODOM
+    ICPODOM -->|odom| ASM & MAP
+    ASM -->|assembled_cloud| MAP
+```
+
 Note `fixed_frame_id: ''`. Clearing it switches the node from TF to the `odom` topic, pairing each cloud with the exact odometry message that goes with it rather than an interpolated TF lookup — see [Where the poses come from](#where-the-poses-come-from). Feeding the result to `rtabmap` as `scan_cloud` means the assembled cloud, not the raw sweep, is what gets stored.
 
 ### Widening a narrow field of view
@@ -62,9 +87,27 @@ Node(
     remappings=[('cloud', '/camera/scan/deskewed')]),
 ```
 
+Here the pose comes from the robot's wheel odometry through TF. Nothing is being deskewed — `lidar_deskewing` is in the chain purely because this node takes `PointCloud2` and `depthimage_to_laserscan` emits a `LaserScan`:
+
+```mermaid
+flowchart LR
+    D2S["depthimage_to_laserscan"]
+    CONV["lidar_deskewing<br>LaserScan → PointCloud2"]
+    WHEEL["wheel odometry"]
+    ASM["point_cloud_assembler<br>circular_buffer, max_clouds: 20"]
+    MAP["rtabmap"]
+    ODOMTF(["tf: odom"])
+    D2S -->|input_scan| CONV
+    CONV -->|cloud| ASM
+    WHEEL --> ODOMTF
+    ODOMTF -.-> ASM
+    ASM -->|assembled_cloud| MAP
+```
+
 `circular_buffer` is what makes this work as a live input: the window rolls, so every incoming scan produces a full assembled cloud rather than one per twenty. `linear_update` and `angular_update` stop a stationary robot from filling the buffer with twenty copies of the same view, which would leave it with nothing but the current scan the moment it moved off again.
 
 The cloud goes to `rtabmap` as `scan_cloud`, with `scan_cloud_is_2d` set since the points all came from one row of pixels.
+
 
 ## Subscribed Topics
 

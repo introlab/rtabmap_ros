@@ -10,6 +10,50 @@ The reason it is a build option at all is that each supported camera count is a 
 
 This node only groups: it never touches the images, the calibrations or the individual stamps.
 
+Each camera is packed by its own [rgbd_sync](rgbd_sync.md) first, and this node groups those into the one message the consumers subscribe to:
+
+```mermaid
+flowchart LR
+    CAM0["camera 0 driver"]
+    CAM1["camera 1 driver"]
+    SYNC0["rgbd_sync"]
+    SYNC1["rgbd_sync"]
+    XSYNC["rgbdx_sync"]
+    ODOM["rgbd_odometry"]
+    ODOMT(["odometry"])
+    MAP["rtabmap"]
+    VIZ["rtabmap_viz"]
+    CAM0 -->|"rgb, depth,<br>camera_info"| SYNC0
+    CAM1 -->|"rgb, depth,<br>camera_info"| SYNC1
+    SYNC0 -->|rgbd_image0| XSYNC
+    SYNC1 -->|rgbd_image1| XSYNC
+    XSYNC -->|rgbd_images| ODOM & MAP & VIZ
+    ODOM --> ODOMT
+    ODOMT --> MAP & VIZ
+```
+
+**With odometry from elsewhere** — a wheel encoder, a lidar, or an external VIO — the cameras feed only the mapping side:
+
+```mermaid
+flowchart LR
+    CAM0["camera 0 driver"]
+    CAM1["camera 1 driver"]
+    SYNC0["rgbd_sync"]
+    SYNC1["rgbd_sync"]
+    XSYNC["rgbdx_sync"]
+    ODOM["odometry source<br>wheel, lidar or external"]
+    ODOMT(["odometry"])
+    MAP["rtabmap"]
+    VIZ["rtabmap_viz"]
+    CAM0 -->|"rgb, depth,<br>camera_info"| SYNC0
+    CAM1 -->|"rgb, depth,<br>camera_info"| SYNC1
+    SYNC0 -->|rgbd_image0| XSYNC
+    SYNC1 -->|rgbd_image1| XSYNC
+    XSYNC -->|rgbd_images| MAP & VIZ
+    ODOM --> ODOMT
+    ODOMT --> MAP & VIZ
+```
+
 ## Usage
 
 ```bash

@@ -6,6 +6,44 @@ The same idea as [rgbd_sync](rgbd_sync.md), for a stereo camera: four topics tha
 
 The default topic names say `image_rect` because rectified images are what a stereo pipeline normally carries, and what RTAB-Map assumes by default — but this node does not require it and does not rectify anything itself. Feeding it unrectified images is fine as long as you tell the consumer: set `Rtabmap/ImagesAlreadyRectified` to `false` on the `stereo_odometry` and `rtabmap` nodes, and they rectify from the calibration themselves. Otherwise run [`stereo_image_proc`](https://docs.ros.org/en/jazzy/p/stereo_image_proc/) upstream.
 
+In a pipeline, the one `RGBDImage` feeds everything downstream — odometry included, so every node works from the same pair:
+
+```mermaid
+flowchart LR
+    CAM["stereo driver"]
+    SYNC["stereo_sync"]
+    ODOM["stereo_odometry"]
+    ODOMT(["odometry"])
+    MAP["rtabmap"]
+    VIZ["rtabmap_viz"]
+    CAM -->|left/image_rect| SYNC
+    CAM -->|right/image_rect| SYNC
+    CAM -->|left/camera_info| SYNC
+    CAM -->|right/camera_info| SYNC
+    SYNC -->|rgbd_image| ODOM & MAP & VIZ
+    ODOM --> ODOMT
+    ODOMT --> MAP & VIZ
+```
+
+**With odometry from elsewhere** — a wheel encoder, a lidar, or an external VIO — the stereo pair feeds only the mapping side:
+
+```mermaid
+flowchart LR
+    CAM["stereo driver"]
+    SYNC["stereo_sync"]
+    ODOM["odometry source<br>wheel, lidar or external"]
+    ODOMT(["odometry"])
+    MAP["rtabmap"]
+    VIZ["rtabmap_viz"]
+    CAM -->|left/image_rect| SYNC
+    CAM -->|right/image_rect| SYNC
+    CAM -->|left/camera_info| SYNC
+    CAM -->|right/camera_info| SYNC
+    SYNC -->|rgbd_image| MAP & VIZ
+    ODOM --> ODOMT
+    ODOMT --> MAP & VIZ
+```
+
 ## Usage
 
 ```bash
