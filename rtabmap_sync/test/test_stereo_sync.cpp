@@ -226,7 +226,9 @@ TEST_F(StereoSyncTest, CompressesBothImagesAsJpeg)
 
 TEST_F(StereoSyncTest, CompressedRateThrottlesTheCompressedOutputOnly)
 {
-	start({rclcpp::Parameter("compressed_rate", 2.0)});
+	// A long window (0.2 Hz = five seconds); the throttle runs off the wall clock, so a
+	// slow machine must not spill the four frames into a second one.
+	start({rclcpp::Parameter("compressed_rate", 0.2)});
 	collectCompressed();
 
 	for(int i=0; i<4; ++i)

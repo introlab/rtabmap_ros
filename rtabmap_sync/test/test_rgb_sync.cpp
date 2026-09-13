@@ -193,7 +193,9 @@ TEST_F(RGBSyncTest, CompressesTheFakeDepthAsPng)
 
 TEST_F(RGBSyncTest, CompressedRateThrottlesTheCompressedOutputOnly)
 {
-	start({rclcpp::Parameter("compressed_rate", 2.0)});
+	// A long window (0.2 Hz = five seconds); the throttle runs off the wall clock, so a
+	// slow machine must not spill the four frames into a second one.
+	start({rclcpp::Parameter("compressed_rate", 0.2)});
 	collectCompressed();
 
 	for(int i=0; i<4; ++i)
@@ -205,7 +207,7 @@ TEST_F(RGBSyncTest, CompressedRateThrottlesTheCompressedOutputOnly)
 	spinFor(std::chrono::milliseconds(200));
 	EXPECT_EQ(out_->size(), 4u) << "the raw output is never throttled";
 	EXPECT_EQ(compressed_->size(), 1u)
-		<< "at 2 Hz only the first of four back-to-back frames may be compressed";
+		<< "only the first of four back-to-back frames may be compressed";
 }
 
 TEST_F(RGBSyncTest, StaysSilentWithoutASubscriber)

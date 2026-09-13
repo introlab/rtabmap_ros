@@ -317,10 +317,12 @@ TEST_F(RGBDSyncTest, CompressedRateThrottlesTheCompressedOutputOnly)
 {
 	// Compression is expensive and the compressed topic usually feeds a slow link, so
 	// it can be published at a lower rate than the raw one.
-	start({rclcpp::Parameter("compressed_rate", 2.0)});
+	// The throttle is measured against the wall clock, not the message stamps, so the
+	// window has to be long enough that a slow machine still gets all four frames
+	// inside it -- 0.2 Hz gives five seconds for what takes milliseconds when idle.
+	start({rclcpp::Parameter("compressed_rate", 0.2)});
 	collectCompressed();
 
-	// Four frames well inside one 500 ms window.
 	for(int i=0; i<4; ++i)
 	{
 		publish(1000.0 + 0.01*double(i));
@@ -330,7 +332,7 @@ TEST_F(RGBDSyncTest, CompressedRateThrottlesTheCompressedOutputOnly)
 	spinFor(std::chrono::milliseconds(200));
 	EXPECT_EQ(out_->size(), 4u) << "the raw output is never throttled";
 	EXPECT_EQ(compressed_->size(), 1u)
-		<< "at 2 Hz only the first of four back-to-back frames may be compressed";
+		<< "only the first of four back-to-back frames may be compressed";
 }
 
 TEST_F(RGBDSyncTest, PublishesEveryFrameCompressedWhenTheRateIsUnset)

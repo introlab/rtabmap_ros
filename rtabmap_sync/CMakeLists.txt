@@ -206,8 +206,17 @@ if(BUILD_TESTING)
 
   # Each node gets its own test binary: a crash or a stuck executor in one node cannot
   # take the others down, and every binary starts with a clean DDS graph.
+  #
+  # Each binary also gets its own DDS domain. colcon tests packages in parallel and ctest
+  # can run these binaries in parallel, while these suites share topic names -- rgb/image,
+  # rgbd_image, odom -- with rtabmap_util's. On a shared domain they discover each other's
+  # publishers, and assertions then see traffic the test never sent. rtabmap_util numbers
+  # its own from 30; keep the two ranges apart.
+  set(rtabmap_sync_test_domain_id 50)
   macro(rtabmap_sync_add_node_test test_name)
-    ament_add_gtest(${test_name} test/${test_name}.cpp)
+    ament_add_gtest(${test_name} test/${test_name}.cpp
+      ENV ROS_DOMAIN_ID=${rtabmap_sync_test_domain_id})
+    math(EXPR rtabmap_sync_test_domain_id "${rtabmap_sync_test_domain_id} + 1")
     if(TARGET ${test_name})
       target_include_directories(${test_name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/test)
       target_link_libraries(${test_name} rtabmap_sync_plugins rtabmap_sync)
