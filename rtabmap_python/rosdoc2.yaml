@@ -1,0 +1,29 @@
+## Configuration for rosdoc2, the documentation generator used by docs.ros.org.
+## Regenerate the annotated default with:
+##   rosdoc2 default_config --package-path rtabmap_python
+## Build the docs locally with:
+##   rosdoc2 build --package-path rtabmap_python --output-directory doc_output
+
+## This 'attic section' self-documents this file's type and version.
+type: 'rosdoc2 config'
+version: 1
+
+---
+
+settings:
+    ## Generate the standard index page from package.xml (description, maintainer,
+    ## license, links) and a table of contents for the builders below.
+    generate_package_index: true
+
+    ## This is an ament_python package: there are no C/C++ headers to parse, and the
+    ## API reference comes from the module docstrings via sphinx-apidoc.
+    always_run_doxygen: false
+    always_run_sphinx_apidoc: true
+
+builders:
+    ## Sphinx renders the landing page and the autodoc pages sphinx-apidoc produces
+    ## from rtabmap_python/.
+    - sphinx: {
+        name: 'rtabmap_python',
+        output_dir: ''
+    }
