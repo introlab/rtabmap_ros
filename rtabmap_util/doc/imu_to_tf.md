@@ -91,15 +91,45 @@ Node(
     remappings=[('scan_cloud', '/lidar/points/deskewed')])
 ```
 
-The three nodes chain into a single TF tree:
+The three nodes chain into a single TF tree. In terms of data, this node's job is to turn the IMU's orientation into a *frame* that `lidar_deskewing` and `icp_odometry` can look up — while the IMU topic itself still goes straight to the SLAM nodes, which use it for their own purposes:
 
-```text
-map                                rtabmap
-└── icp_odom                       icp_odometry
-    └── base_link_stabilized       imu_to_tf
-        └── base_link
-            ├── lidar_link         robot description (static)
-            └── imu_link
+```mermaid
+flowchart LR
+    IMU["IMU driver"]
+    IMUT(["imu/data"])
+    I2T["imu_to_tf"]
+    LIDAR["lidar driver"]
+    DESKEW["lidar_deskewing"]
+    ICP["icp_odometry"]
+    MAP["rtabmap"]
+    TF(["tf: base_link_stabilized"])
+    DESKEWED(["/lidar/points/deskewed"])
+    IMU --> IMUT
+    IMUT --> I2T & ICP & MAP
+    I2T --> TF
+    LIDAR -->|/lidar/points| DESKEW
+    DESKEW --> DESKEWED
+    DESKEWED -->|scan_cloud| ICP & MAP
+    ICP -->|odom| MAP
+    TF -.-> DESKEW
+    TF -.-> ICP
+```
+
+And the frames themselves:
+
+```mermaid
+flowchart TB
+    MAP("map")
+    ICPODOM("icp_odom")
+    STAB("base_link_stabilized")
+    BASE("base_link")
+    LIDAR("lidar_link")
+    IMULINK("imu_link")
+    MAP -->|rtabmap| ICPODOM
+    ICPODOM -->|icp_odometry| STAB
+    STAB -->|imu_to_tf| BASE
+    BASE -->|robot description| LIDAR
+    BASE -->|robot description| IMULINK
 ```
 
 | Edge | Published by |

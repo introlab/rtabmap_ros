@@ -46,15 +46,18 @@ namespace rtabmap_sync
 {
 
 RGBSync::RGBSync(const rclcpp::NodeOptions & options) :
-	Node("rgbd_sync", options),
+	Node("rgb_sync", options),
 	compressedRate_(0),
 	fillEmptyDepth_(false),
+	lastCompressedPublished_(0, 0, RCL_ROS_TIME),
 	approxSync_(0),
 	exactSync_(0)
 {
 	int topicQueueSize = 10;
 	int syncQueueSize = 10;
-	bool approxSync = true;
+	// A camera publisher sends the image and its camera_info together, with the same
+	// stamp, so the exact policy is both cheaper and impossible to mismatch.
+	bool approxSync = false;
 	int qos = RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT;
 	double approxSyncMaxInterval = 0.0;
 	approxSync = this->declare_parameter("approx_sync", approxSync);

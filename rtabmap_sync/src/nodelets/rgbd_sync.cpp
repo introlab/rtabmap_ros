@@ -51,6 +51,7 @@ RGBDSync::RGBDSync(const rclcpp::NodeOptions & options) :
 	decimation_(1),
 	compressedRate_(0),
 	approxSyncMaxInterval_(0.0),
+	lastCompressedPublished_(0, 0, RCL_ROS_TIME),
 	approxSyncDepth_(0),
 	exactSyncDepth_(0)
 {

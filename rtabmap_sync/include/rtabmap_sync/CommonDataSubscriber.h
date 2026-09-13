@@ -59,34 +59,177 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap_sync/CommonDataSubscriberDefines.h>
 #include <rtabmap_sync/SyncDiagnostic.h>
 
+/**
+ * @namespace rtabmap_sync
+ * @brief Synchronization of the sensor topics RTAB-Map consumes.
+ *
+ * Two things live here: the standalone nodes that group a camera's topics into a single
+ * [RGBDImage](https://docs.ros.org/en/jazzy/p/rtabmap_msgs/msg/RGBDImage.html)
+ * (`rgbd_sync`, `stereo_sync`, `rgb_sync`, `rgbdx_sync`), and CommonDataSubscriber, the
+ * base class through which the consuming nodes subscribe.
+ */
 namespace rtabmap_sync {
 
+/**
+ * @brief Subscribes to whichever set of sensor topics a node was configured for, and
+ *        hands them over synchronized.
+ *
+ * RTAB-Map can be fed in a dozen shapes -- RGB-D, stereo, RGB-only, a pre-packed
+ * `RGBDImage` or several of them, a 2D or 3D scan, a whole `SensorData` -- each
+ * optionally alongside odometry, an `OdomInfo` and user data. That is far too many
+ * combinations for a node to wire by hand, so this class owns all of them: it reads the
+ * `subscribe_*` parameters, builds the one `message_filters` synchronizer that matches,
+ * and calls back with a uniform set of arguments no matter which inputs were used.
+ *
+ * `rtabmap_slam`'s `rtabmap` node and `rtabmap_viz` both derive from it, which is why
+ * they take identical topics and parameters.
+ *
+ * @par Using it
+ * Derive from both rclcpp::Node and this class, and call setupCallbacks() once the
+ * subclass is ready to receive data:
+ * @code
+ * class MyNode : public rclcpp::Node, public rtabmap_sync::CommonDataSubscriber
+ * {
+ * public:
+ *   explicit MyNode(const rclcpp::NodeOptions & options) :
+ *     Node("my_node", options),
+ *     CommonDataSubscriber(*this, false)
+ *   {
+ *     setupCallbacks(*this);
+ *   }
+ * protected:
+ *   void commonMultiCameraCallback(...) override { ... }
+ *   // ... and the three other callbacks
+ * };
+ * @endcode
+ * The constructor declares the parameters, so they are readable from the subclass
+ * constructor before setupCallbacks() is called.
+ *
+ * @par Which callback fires
+ * Exactly one of the four, decided once at setup:
+ * - commonMultiCameraCallback() for anything with a camera in it,
+ * - commonLaserScanCallback() for a scan with no camera,
+ * - commonSensorDataCallback() for `subscribe_sensor_data`,
+ * - commonOdomCallback() when odometry is the only input.
+ *
+ * @par Conflicting parameters
+ * Several `subscribe_*` flags describe the same slot. Rather than refusing to start,
+ * setupCallbacks() drops one of the two and logs which: stereo beats depth and RGB,
+ * `subscribe_rgbd` beats all three, `subscribe_sensor_data` beats everything including
+ * `subscribe_rgbd`, `subscribe_scan` beats `subscribe_scan_cloud`, and
+ * `subscribe_scan_descriptor` beats both. Setting `odom_frame_id` turns off
+ * `subscribe_odom`, since the pose is then read from TF instead.
+ *
+ * @par Build options
+ * Synchronizing several `RGBDImage` topics (`rgbd_cameras` > 1) needs
+ * `RTABMAP_SYNC_MULTI_RGBD`, and `subscribe_user_data` needs `RTABMAP_SYNC_USER_DATA`.
+ * Both are off by default because each multiplies the number of synchronizer templates
+ * the package instantiates. Turning the first on is the better of the two ways to take
+ * several cameras: the node subscribes to them directly, with nothing in between.
+ * Without it, `rgbd_cameras=0` selects the `RGBDImages` interface -- what `rgbdx_sync`
+ * publishes -- which needs no rebuild and has no camera-count limit, at the cost of one
+ * extra node and one full-frame copy per camera.
+ */
 class CommonDataSubscriber {
 public:
+	/**
+	 * @brief Declares the `subscribe_*`, queue and QoS parameters on @p node.
+	 *
+	 * Subscribing itself happens in setupCallbacks(), so that a subclass can read the
+	 * parameters and finish constructing before any message can arrive.
+	 *
+	 * @param node the node the parameters are declared on and the topics subscribed to
+	 * @param gui  true for a visualization node: `subscribe_depth` and `subscribe_rgb`
+	 *             then default to false, leaving odometry as the only default input
+	 */
 	RTABMAP_SYNC_PUBLIC
 	CommonDataSubscriber(rclcpp::Node & node, bool gui);
 	virtual ~CommonDataSubscriber();
 
+	/// True if subscribed to separate color, depth and camera_info topics.
 	bool isSubscribedToDepth() const  {return subscribedToDepth_;}
+	/// True if subscribed to a left/right image pair with their two camera_info topics.
 	bool isSubscribedToStereo() const {return subscribedToStereo_;}
+	/// True if subscribed to color and camera_info with no depth.
 	bool isSubscribedToRGB() const  {return subscribedToRGB_;}
+	/// True if odometry comes from the `odom` topic; false when `odom_frame_id` is set.
 	bool isSubscribedToOdom() const  {return subscribedToOdom_;}
+	/// True if subscribed to `RGBDImage` topics, or to the `RGBDImages` container.
 	bool isSubscribedToRGBD() const   {return subscribedToRGBD_;}
+	/// True if subscribed to a `LaserScan`.
 	bool isSubscribedToScan2d() const {return subscribedToScan2d_;}
+	/// True if subscribed to a `PointCloud2` scan.
 	bool isSubscribedToScan3d() const {return subscribedToScan3d_;}
+	/// True if subscribed to a whole `SensorData`.
 	bool isSubscribedToSensorData() const {return subscribedToSensorData_;}
+	/// True if an `OdomInfo` is synchronized with the data.
 	bool isSubscribedToOdomInfo() const {return subscribedToOdomInfo_;}
+	/// True if any input at all is subscribed. False means no callback can ever fire.
 	bool isDataSubscribed() const {return isSubscribedToDepth() || isSubscribedToStereo() || isSubscribedToRGBD() || isSubscribedToScan2d() || isSubscribedToScan3d() || isSubscribedToRGB() || isSubscribedToOdom() || isSubscribedToSensorData();}
+	/**
+	 * @brief Number of `RGBDImage` topics subscribed.
+	 * @return 0 when not subscribed to RGBD at all, and also on the `RGBDImages`
+	 *         interface (`rgbd_cameras=0`), where the count varies per message.
+	 */
 	int rgbdCameras() const {return isSubscribedToRGBD()?(int)rgbdSubs_.size():0;}
+	/// Queue depth of each individual subscription (`topic_queue_size`).
 	int getTopicQueueSize() const {return topicQueueSize_;}
+	/// Queue depth of the synchronizer (`sync_queue_size`).
 	int getSyncQueueSize() const {return syncQueueSize_;}
+	/**
+	 * @brief True if inputs are matched by nearest stamp rather than exact equality.
+	 *
+	 * The default depends on the inputs: false for stereo and for a scan with no camera,
+	 * true otherwise. The `approx_sync` parameter overrides it either way.
+	 */
 	bool isApproxSync() const {return approxSync_;}
+	/// The node name, as captured at construction.
 	const std::string & name() const {return name_;}
 
 protected:
+	/**
+	 * @brief Resolves the parameters into one synchronizer and subscribes.
+	 *
+	 * Call once from the subclass constructor, after the subclass is able to handle a
+	 * callback. This is also where the conflicting-parameter rules are applied and where
+	 * the /diagnostics reporting is set up.
+	 *
+	 * @param node       the node to subscribe on; pass the same one given to the constructor
+	 * @param otherTasks extra diagnostic tasks to publish alongside the input and output
+	 *                   rate, so the node reports its own state in the same message
+	 */
 	void setupCallbacks(
 			rclcpp::Node & node,
 			std::vector<diagnostic_updater::DiagnosticTask*> otherTasks = std::vector<diagnostic_updater::DiagnosticTask*>());
+	/**
+	 * @brief Called with one synchronized frame from one or more cameras.
+	 *
+	 * Fires for every configuration that has a camera in it, whichever way the camera was
+	 * subscribed. The vectors hold one entry per camera and are parallel; unused inputs
+	 * arrive empty or null rather than being signalled separately.
+	 *
+	 * @param odomMsg              the pose, or null when odometry is not subscribed
+	 * @param userDataMsg          user data, or null
+	 * @param imageMsgs            one color image per camera
+	 * @param depthMsgs            one depth image per camera, or the right image in
+	 *                             stereo; empty when there is no depth (RGB-only)
+	 * @param cameraInfoMsgs       calibration of each color camera
+	 * @param depthCameraInfoMsgs  calibration of each depth camera, or of the right
+	 *                             camera in stereo, whose P(0,3) carries the baseline
+	 * @param scanMsg              a 2D scan, or a default-constructed one if none
+	 * @param scan3dMsg            a 3D scan, or a default-constructed one if none
+	 * @param odomInfoMsg          odometry details, or null
+	 * @param globalDescriptorMsgs global descriptors, empty when none were computed
+	 * @param localKeyPoints       per-camera keypoints, in image coordinates; only ever
+	 *                             set by the RGBD inputs, which can carry the features
+	 *                             the odometry already extracted
+	 * @param localPoints3d        per-camera 3D points matching @p localKeyPoints, each
+	 *                             expressed in **its own camera's optical frame** -- not
+	 *                             in the robot's base frame. rtabmap_conversions'
+	 *                             `convertRGBDMsgs()` is what moves them to the base
+	 *                             frame, applying each camera's local transform.
+	 * @param localDescriptors     per-camera feature descriptors, already uncompressed
+	 */
 	virtual void commonMultiCameraCallback(
 				const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
 				const rtabmap_msgs::msg::UserData::ConstSharedPtr & userDataMsg,
@@ -101,6 +244,17 @@ protected:
 				const std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > & localKeyPoints = std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> >(),
 				const std::vector<std::vector<rtabmap_msgs::msg::Point3f> > & localPoints3d = std::vector<std::vector<rtabmap_msgs::msg::Point3f> >(),
 				const std::vector<cv::Mat> & localDescriptors = std::vector<cv::Mat>()) = 0;
+	/**
+	 * @brief Called with one synchronized scan, when no camera is subscribed.
+	 *
+	 * @param odomMsg          the pose, or null when odometry is not subscribed
+	 * @param userDataMsg      user data, or null
+	 * @param scanMsg          the 2D scan, default-constructed if the scan is 3D
+	 * @param scan3dMsg        the 3D scan, default-constructed if the scan is 2D
+	 * @param odomInfoMsg      odometry details, or null
+	 * @param globalDescriptor the descriptor from a `ScanDescriptor` input; its `data`
+	 *                         is empty when none was computed
+	 */
 	virtual void commonLaserScanCallback(
 				const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
 				const rtabmap_msgs::msg::UserData::ConstSharedPtr & userDataMsg,
@@ -108,15 +262,42 @@ protected:
 				const sensor_msgs::msg::PointCloud2 & scan3dMsg,
 				const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr& odomInfoMsg,
 				const rtabmap_msgs::msg::GlobalDescriptor & globalDescriptor = rtabmap_msgs::msg::GlobalDescriptor()) = 0;
+	/**
+	 * @brief Called with odometry alone, when it is the only subscribed input.
+	 * @param odomMsg     the pose
+	 * @param userDataMsg user data, or null
+	 * @param odomInfoMsg odometry details, or null
+	 */
 	virtual void commonOdomCallback(
 				const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
 				const rtabmap_msgs::msg::UserData::ConstSharedPtr & userDataMsg,
 				const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr& odomInfoMsg) = 0;
+	/**
+	 * @brief Called with a whole `SensorData`, for `subscribe_sensor_data`.
+	 *
+	 * A `SensorData` already carries the images, the scan and the calibration of one
+	 * frame, so nothing is unpacked here: it is passed on as it arrived.
+	 *
+	 * @param sensorDataMsg the frame
+	 * @param odomMsg       the pose, or null when odometry is not subscribed
+	 * @param odomInfoMsg   odometry details, or null
+	 */
 	virtual void commonSensorDataCallback(
 				const rtabmap_msgs::msg::SensorData::ConstSharedPtr & sensorDataMsg,
 				const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
 				const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr& odomInfoMsg) = 0;
 
+	/**
+	 * @brief Reports that the subclass produced an output, for /diagnostics.
+	 *
+	 * The input side is ticked automatically as messages arrive; this is the other half,
+	 * and it is what lets "one camera went quiet" be told apart from "the node is
+	 * receiving everything and falling behind". Call it once per published result.
+	 *
+	 * @param stamp           stamp of what was produced
+	 * @param targetFrequency the rate to be judged against, or 0 to inherit the rate
+	 *                        measured on the input side
+	 */
 	void tick(const rclcpp::Time & stamp, double targetFrequency = 0);
 
 private:

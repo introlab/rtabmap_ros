@@ -28,6 +28,23 @@ ComposableNode(
                 ('camera_info', '/camera/color/camera_info')])
 ```
 
+The lidar supplies the geometry, the camera supplies the pose and the color, and the result joins an ordinary RGB-D pipeline:
+
+```mermaid
+flowchart LR
+    LIDAR["lidar driver"]
+    CAM["camera driver"]
+    P2D["pointcloud_to_depthimage<br>fixed_frame_id: odom"]
+    SYNC["rgbd_sync"]
+    MAP["rtabmap"]
+    LIDAR -->|cloud| P2D
+    CAM -->|camera_info| P2D
+    CAM -->|rgb/image| SYNC
+    CAM -->|rgb/camera_info| SYNC
+    P2D -->|image_raw as depth/image| SYNC
+    SYNC -->|rgbd_image| MAP
+```
+
 ## Subscribed Topics
 
 | Topic | Type | Description |

@@ -24,6 +24,23 @@ ComposableNode(
                  'cloud_output_voxelized': True}])
 ```
 
+The graph comes from the SLAM node; the maps are built here, off its critical path. Nothing forces the split across machines — a second process on the robot works too — but only `mapData` crosses the boundary, so putting the assembling on a workstation keeps the heavy topics off the link as well as off the robot's CPU:
+
+```mermaid
+flowchart LR
+    subgraph ROBOT["robot"]
+        SLAM["rtabmap"]
+    end
+    subgraph REMOTE["remote computer"]
+        ASM["map_assembler"]
+        RVIZ["RViz"]
+    end
+    SLAM -->|mapData| ASM
+    ASM -->|cloud_map| RVIZ
+    ASM -->|map| RVIZ
+    ASM -->|octomap_binary| RVIZ
+```
+
 ## Subscribed Topics
 
 | Topic | Type | Description |

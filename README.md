@@ -37,7 +37,7 @@ The stack is split into small packages so a pipeline only pulls in what it uses.
 |---|---|
 | `rtabmap_slam` | The `rtabmap` node itself: appearance-based loop closure detection, graph optimization, memory management and map assembly. |
 | `rtabmap_odom` | Odometry nodes — `rgbd_odometry`, `stereo_odometry` and `icp_odometry`. Any external odometry can be used instead. |
-| `rtabmap_sync` | Synchronizes camera and lidar topics into a single message so they reach the SLAM node together — `rgbd_sync`, `stereo_sync`, `rgbdx_sync`. |
+| [`rtabmap_sync`](rtabmap_sync/README.md) | Synchronizes camera and lidar topics into a single message so they reach the SLAM node together — `rgbd_sync`, `stereo_sync`, `rgbdx_sync`. |
 
 ### Sensor processing
 
@@ -132,6 +132,18 @@ export CYCLONEDDS_URI="<Disc><DefaultMulticastAddress>0.0.0.0</></>"
 * **Library API** — [RTAB-Map's own API documentation](https://introlab.github.io/rtabmap/api/latest/).
 * **Papers and videos** — [introlab.github.io/rtabmap](https://introlab.github.io/rtabmap/).
 * **Old tutorials** — the [ROS 1 wiki](http://wiki.ros.org/rtabmap_ros/Tutorials), for anything not covered above; parameters and topic names are unchanged.
+
+## Building the documentation
+
+Each package's API reference is generated with [rosdoc2](https://github.com/ros-infrastructure/rosdoc2) from the Doxygen comments in its public headers, and published to docs.ros.org. rosdoc2 documents one package per invocation, so building the whole stack is a loop over them — run it from the repository root:
+
+```bash
+for pkg in rtabmap_*/; do
+  rosdoc2 build --package-path "$pkg" --output-directory doc_output || break
+done
+```
+
+Each package lands in `doc_output/<package>/index.html`.
 
 # License
 

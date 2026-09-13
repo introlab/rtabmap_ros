@@ -20,6 +20,18 @@ ComposableNode(
     remappings=[('rgbd_image', '/camera/rgbd_image')])
 ```
 
+Unpacking a bundle for RViz:
+
+```mermaid
+flowchart LR
+    RGBD(["/camera/rgbd_image"])
+    SPLIT["rgbd_split"]
+    RVIZ["RViz"]
+    RGBD --> SPLIT
+    SPLIT -->|"rgb/image,<br>rgb/camera_info"| RVIZ
+    SPLIT -->|"depth/image,<br>depth/camera_info"| RVIZ
+```
+
 ## Subscribed Topics
 
 | Topic | Type | Description |
