@@ -52,15 +52,19 @@ component_management:
       name: rtabmap_util
       paths:
         - rtabmap_util/**
+    - component_id: rtabmap_sync
+      name: rtabmap_sync
+      paths:
+        - rtabmap_sync/**
 
 comment:
   layout: "condensed_header, diff, components, files"
   behavior: default
   require_changes: true # stay quiet when coverage doesn't move
 
-# Only rtabmap_conversions and rtabmap_util have tests today, so everything
-# else would report as 0% and drag the total down to a number that says
-# nothing. As a package gains tests, drop its line here and add it to
+# Only rtabmap_conversions, rtabmap_util and rtabmap_sync have tests today, so
+# everything else would report as 0% and drag the total down to a number that
+# says nothing. As a package gains tests, drop its line here and add it to
 # individual_components above.
 ignore:
   - "rtabmap_costmap_plugins/**"
@@ -72,6 +76,5 @@ ignore:
   - "rtabmap_python/**"
   - "rtabmap_rviz_plugins/**"
   - "rtabmap_slam/**"
-  - "rtabmap_sync/**"
   - "rtabmap_viz/**"
   - "**/test/**"

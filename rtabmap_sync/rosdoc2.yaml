@@ -1,0 +1,35 @@
+## Configuration for rosdoc2, the documentation generator used by docs.ros.org.
+## Regenerate the annotated default with:
+##   rosdoc2 default_config --package-path rtabmap_sync
+## Build the docs locally with:
+##   rosdoc2 build --package-path rtabmap_sync --output-directory doc_output
+
+## This 'attic section' self-documents this file's type and version.
+type: 'rosdoc2 config'
+version: 1
+
+---
+
+settings:
+    ## Generate the standard index page from package.xml (description, maintainer,
+    ## license, links) and a table of contents for the builders below.
+    generate_package_index: true
+
+    ## This is an ament_cmake package, so doxygen runs on the public headers by
+    ## default and there are no Python modules to document.
+    always_run_doxygen: false
+    always_run_sphinx_apidoc: false
+
+builders:
+    ## Doxygen parses the public C++ API out of include/.
+    - doxygen: {
+        name: 'rtabmap_sync Public C/C++ API',
+        output_dir: 'generated/doxygen'
+    }
+    ## Sphinx renders the landing page and pulls the Doxygen XML in through
+    ## breathe/exhale so the API is browsable alongside the narrative docs.
+    - sphinx: {
+        name: 'rtabmap_sync',
+        doxygen_xml_directory: 'generated/doxygen/xml',
+        output_dir: ''
+    }
