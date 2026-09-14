@@ -114,7 +114,7 @@ Common to all three nodes; see [the README](../README.md#published-topics).
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `subscribe_rgbd` | `bool` | `false` | Take a pre-synchronized `RGBDImage` from `stereo_sync` instead of four raw topics. |
-| `rgbd_cameras` | `int` | `1` | Number of `RGBDImage` topics. `0` means one `RGBDImages` topic. Only with `subscribe_rgbd:=true`. |
+| `rgbd_cameras` | `int` | `1` | Number of `RGBDImage` topics. `0` means one `RGBDImages` topic. Only with `subscribe_rgbd:=true`. More than one needs RTAB-Map built with OpenGV, and the cameras hardware-synchronized — see [Several cameras](rgbd_odometry.md#several-cameras). |
 | `approx_sync` | `bool` | `false` | Match the raw topics by nearest stamp. **Defaults to exact**, unlike `rgbd_odometry` — see [Synchronization](#synchronization). |
 | `approx_sync_max_interval` | `double` | `0.0` | Reject sets spanning more than this many seconds. `0` disables. Only used when `approx_sync` is on. |
 | `topic_queue_size` | `int` | `10` | Queue depth of each input subscription. |

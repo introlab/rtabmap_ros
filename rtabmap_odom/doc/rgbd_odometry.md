@@ -148,6 +148,15 @@ Two routes, both requiring the frames to be synchronized and each camera to be i
 - **`rgbd_cameras:=2..6`** subscribes to `rgbd_image0`…`rgbd_imageN` and synchronizes them here.
 - **`rgbd_cameras:=0`** takes one `rgbd_images` topic from `rgbdx_sync`, which has no upper limit and needs no rebuild.
 
+**RTAB-Map has to be built with OpenGV for this.** The default motion estimation is PnP (`Vis/EstimationType=1`, 3D→2D), and the multi-camera version of it lives in OpenGV. Without that dependency the registration refuses to run and says so:
+
+```
+Multi-camera 2D-3D PnP registration is only available if rtabmap is built with
+OpenGV dependency. Use 3D-3D registration approach instead for multi-camera.
+```
+
+Check with `rtabmap --version`, which prints a `With OpenGV:` line. If it says `false`, either rebuild RTAB-Map against OpenGV or switch to `Vis/EstimationType:='0'` (3D→3D), which needs no extra dependency but registers point cloud to point cloud rather than reprojecting, and is the weaker estimator when depth is noisy.
+
 **Hardware-synchronize the cameras if you can.** The node treats the set as one rigid observation at one timestamp: features from every camera are registered together, with the extrinsics from TF held fixed. There is no equivalent of lidar deskewing here — it cannot estimate the motion that happened *within* the rig between one camera's exposure and the next. If the cameras fire at different instants while the robot moves, that motion is absorbed as though the rig had flexed, and the registration is pulled off by however far the robot travelled in between.
 
 Synchronizing the topics is not the same thing: `approx_sync` only decides which frames are grouped, it cannot undo an exposure that happened 20 ms later than its neighbour's.
