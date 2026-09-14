@@ -6,6 +6,15 @@ Splits an [`rtabmap_msgs/msg/RGBDImage`](https://docs.ros.org/en/jazzy/p/rtabmap
 
 It is the inverse of [rtabmap_sync](https://docs.ros.org/en/jazzy/p/rtabmap_sync/)'s `rgbd_sync`, and of its `stereo_sync` when `stereo` is set — those two are what produce an `RGBDImage` in the first place.
 
+## Contents
+
+- [Usage](#usage)
+- [Subscribed Topics](#subscribed-topics)
+- [Published Topics](#published-topics)
+- [Parameters](#parameters)
+- [Stereo messages](#stereo-messages)
+- [Notes](#notes)
+
 ## Usage
 
 ```bash

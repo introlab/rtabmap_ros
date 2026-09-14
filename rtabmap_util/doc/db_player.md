@@ -8,6 +8,16 @@ That makes it the tool for offline work: re-run SLAM with different parameters o
 
 > **The executable is named `data_player`**, not `db_player`. The composable node is `rtabmap_util::DbPlayer`.
 
+## Contents
+
+- [Usage](#usage)
+- [Published Topics](#published-topics)
+- [Published Transforms](#published-transforms)
+- [Services](#services)
+- [Parameters](#parameters)
+- [Simulated time](#simulated-time)
+- [Notes](#notes)
+
 ## Usage
 
 ```bash
@@ -67,7 +77,7 @@ Broadcast on every frame unless `publish_tf` is false.
 | Service | Type | Description |
 |---|---|---|
 | `~/pause` | [`std_srvs/srv/Empty`](https://docs.ros.org/en/jazzy/p/std_srvs/srv/Empty.html) | Pause playback. |
-| `~/resume` | `std_srvs/srv/Empty` | Resume it. |
+| `~/resume` | [`std_srvs/srv/Empty`](https://docs.ros.org/en/jazzy/p/std_srvs/srv/Empty.html) | Resume it. |
 
 When run as the standalone executable, the **space bar** toggles pause as well.
 

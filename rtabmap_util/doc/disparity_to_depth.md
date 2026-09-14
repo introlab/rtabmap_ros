@@ -6,6 +6,14 @@ Most of ROS handles depth, while a stereo pipeline produces disparity. This node
 
 Pixels whose disparity falls outside the message's own `min_disparity`/`max_disparity` are written as zero, which is the ROS convention for "no reading".
 
+## Contents
+
+- [Usage](#usage)
+- [Subscribed Topics](#subscribed-topics)
+- [Published Topics](#published-topics)
+- [Parameters](#parameters)
+- [Notes](#notes)
+
 ## Usage
 
 ```bash
