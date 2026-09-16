@@ -1254,12 +1254,12 @@ void CoreWrapper::commonMultiCameraCallback(
 		const std::vector<cv_bridge::CvImageConstPtr> & depthMsgs,
 		const std::vector<sensor_msgs::CameraInfo> & cameraInfoMsgs,
 		const std::vector<sensor_msgs::CameraInfo> & depthCameraInfoMsgs,
-		const sensor_msgs::LaserScan& scan2dMsg,
-		const sensor_msgs::PointCloud2& scan3dMsg,
-		const rtabmap_msgs::OdomInfoConstPtr& odomInfoMsg,
+		const sensor_msgs::LaserScan & scan2dMsg,
+		const sensor_msgs::PointCloud2 & scan3dMsg,
+		const rtabmap_msgs::OdomInfoConstPtr & odomInfoMsg,
 		const std::vector<rtabmap_msgs::GlobalDescriptor> & globalDescriptorMsgs,
-		const std::vector<std::vector<rtabmap_msgs::KeyPoint> > & localKeyPoints,
-		const std::vector<std::vector<rtabmap_msgs::Point3f> > & localPoints3d,
+		const std::vector<std::vector<rtabmap_msgs::KeyPoint>> & localKeyPoints,
+		const std::vector<std::vector<rtabmap_msgs::Point3f>> & localPoints3d,
 		const std::vector<cv::Mat> & localDescriptors)
 {
 	std::string odomFrameId = odomFrameId_;
@@ -1326,12 +1326,12 @@ void CoreWrapper::commonMultiCameraCallbackImpl(
 		const std::vector<cv_bridge::CvImageConstPtr> & depthMsgs,
 		const std::vector<sensor_msgs::CameraInfo> & cameraInfoMsgs,
 		const std::vector<sensor_msgs::CameraInfo> & depthCameraInfoMsgs,
-		const sensor_msgs::LaserScan& scan2dMsg,
-		const sensor_msgs::PointCloud2& scan3dMsg,
-		const rtabmap_msgs::OdomInfoConstPtr& odomInfoMsg,
+		const sensor_msgs::LaserScan & scan2dMsg,
+		const sensor_msgs::PointCloud2 & scan3dMsg,
+		const rtabmap_msgs::OdomInfoConstPtr & odomInfoMsg,
 		const std::vector<rtabmap_msgs::GlobalDescriptor> & globalDescriptorMsgs,
-		const std::vector<std::vector<rtabmap_msgs::KeyPoint> > & localKeyPointsMsgs,
-		const std::vector<std::vector<rtabmap_msgs::Point3f> > & localPoints3dMsgs,
+		const std::vector<std::vector<rtabmap_msgs::KeyPoint>> & localKeyPointsMsgs,
+		const std::vector<std::vector<rtabmap_msgs::Point3f>> & localPoints3dMsgs,
 		const std::vector<cv::Mat> & localDescriptorsMsgs)
 {
 	UTimer timerConversion;
@@ -1620,9 +1620,9 @@ void CoreWrapper::commonMultiCameraCallbackImpl(
 void CoreWrapper::commonLaserScanCallback(
 		const nav_msgs::OdometryConstPtr & odomMsg,
 		const rtabmap_msgs::UserDataConstPtr & userDataMsg,
-		const sensor_msgs::LaserScan& scan2dMsg,
-		const sensor_msgs::PointCloud2& scan3dMsg,
-		const rtabmap_msgs::OdomInfoConstPtr& odomInfoMsg,
+		const sensor_msgs::LaserScan & scan2dMsg,
+		const sensor_msgs::PointCloud2 & scan3dMsg,
+		const rtabmap_msgs::OdomInfoConstPtr & odomInfoMsg,
 		const rtabmap_msgs::GlobalDescriptor & globalDescriptor)
 {
 	UTimer timerConversion;
@@ -1756,7 +1756,7 @@ void CoreWrapper::commonLaserScanCallback(
 void CoreWrapper::commonOdomCallback(
 		const nav_msgs::OdometryConstPtr & odomMsg,
 		const rtabmap_msgs::UserDataConstPtr & userDataMsg,
-		const rtabmap_msgs::OdomInfoConstPtr& odomInfoMsg)
+		const rtabmap_msgs::OdomInfoConstPtr & odomInfoMsg)
 {
 	UTimer timerConversion;
 	UASSERT(odomMsg.get());
@@ -1813,7 +1813,7 @@ void CoreWrapper::commonOdomCallback(
 void CoreWrapper::commonSensorDataCallback(
 		const rtabmap_msgs::SensorDataConstPtr & sensorDataMsg,
 		const nav_msgs::OdometryConstPtr & odomMsg,
-		const rtabmap_msgs::OdomInfoConstPtr& odomInfoMsg)
+		const rtabmap_msgs::OdomInfoConstPtr & odomInfoMsg)
 {
 	UTimer timerConversion;
 	UASSERT(sensorDataMsg.get());
@@ -1849,6 +1849,141 @@ void CoreWrapper::commonSensorDataCallback(
 			odomInfo,
 			timerConversion.ticks());
 
+	covariance_ = cv::Mat();
+}
+
+void CoreWrapper::commonRGBDImageCallback(
+		const rtabmap_msgs::RGBDImageConstPtr & rgbdMsg,
+		const nav_msgs::OdometryConstPtr & odomMsg,
+		const rtabmap_msgs::UserDataConstPtr & userDataMsg,
+		const sensor_msgs::LaserScan & scanMsg,
+		const sensor_msgs::PointCloud2 & scan3dMsg,
+		const rtabmap_msgs::OdomInfoConstPtr & odomInfoMsg,
+		const rtabmap_msgs::GlobalDescriptor & globalDescriptor)
+{
+	UTimer timerConversion;
+	UASSERT(rgbdMsg.get());
+	std::string odomFrameId = odomFrameId_;
+	if(odomMsg.get())
+	{
+		odomFrameId = odomMsg->header.frame_id;
+		if(!scanMsg.ranges.empty())
+		{
+			if(!odomUpdate(odomMsg, scanMsg.header.stamp))
+			{
+				return;
+			}
+		}
+		else if(!scan3dMsg.data.empty())
+		{
+			if(!odomUpdate(odomMsg, scan3dMsg.header.stamp))
+			{
+				return;
+			}
+		}
+		else if(!odomUpdate(odomMsg, rgbdMsg->header.stamp))
+		{
+			return;
+		}
+	}
+	else if(!scanMsg.ranges.empty())
+	{
+		if(!odomTFUpdate(scanMsg.header.stamp))
+		{
+			return;
+		}
+	}
+	else if(!scan3dMsg.data.empty())
+	{
+		if(!odomTFUpdate(scan3dMsg.header.stamp))
+		{
+			return;
+		}
+	}
+	else if(!odomTFUpdate(rgbdMsg->header.stamp))
+	{
+		return;
+	}
+
+	SensorData data = rtabmap_conversions::rgbdImageFromROS(rgbdMsg);
+	data.setId(lastPoseIntermediate_?-1:0);
+
+	LaserScan scan;
+	if(!scanMsg.ranges.empty())
+	{
+		if(!rtabmap_conversions::convertScanMsg(
+				scanMsg,
+				frameId_,
+				odomSensorSync_?odomFrameId:"",
+				lastPoseStamp_,
+				scan,
+				tfBuffer_,
+				waitForTransform_?waitForTransformDuration_:0,
+				rtabmap_.getMemory() && uStrNumCmp(rtabmap_.getMemory()->getDatabaseVersion(), "0.11.10") < 0))
+		{
+			NODELET_ERROR("Could not convert laser scan msg! Aborting rtabmap update...");
+			return;
+		}
+	}
+	else if(!scan3dMsg.data.empty())
+	{
+		if(!rtabmap_conversions::convertScan3dMsg(
+				scan3dMsg,
+				frameId_,
+				odomSensorSync_?odomFrameId:"",
+				lastPoseStamp_,
+				scan,
+				tfBuffer_,
+				waitForTransform_?waitForTransformDuration_:0,
+				scanCloudMaxPoints_,
+				0,
+				scanCloudIs2d_))
+		{
+			NODELET_ERROR("Could not convert 3d laser scan msg! Aborting rtabmap update...");
+			return;
+		}
+	}
+	if(!scan.isEmpty())
+	{
+		data.setLaserScan(scan);
+	}
+
+	cv::Mat userData;
+	if(userDataMsg.get())
+	{
+		userData = rtabmap_conversions::userDataFromROS(*userDataMsg);
+		if(!userData_.empty())
+		{
+			NODELET_WARN("Synchronized and asynchronized user data topics cannot be used at the same time. Async user data dropped!");
+			userData_ = cv::Mat();
+		}
+	}
+	else
+	{
+		userData = userData_;
+		userData_ = cv::Mat();
+	}
+
+	OdometryInfo odomInfo;
+	if(odomInfoMsg.get())
+	{
+		odomInfo = rtabmap_conversions::odomInfoFromROS(*odomInfoMsg);
+	}
+
+	if(!globalDescriptor.data.empty())
+	{
+		data.addGlobalDescriptor(rtabmap_conversions::globalDescriptorFromROS(globalDescriptor));
+	}
+
+	process(lastPoseStamp_,
+			data,
+			lastPose_,
+			lastPoseVelocity_,
+			odomFrameId,
+			covariance_,
+			odomInfo,
+			timerConversion.ticks());
+	
 	covariance_ = cv::Mat();
 }
 

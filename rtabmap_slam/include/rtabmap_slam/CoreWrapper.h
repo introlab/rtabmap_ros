@@ -121,13 +121,14 @@ private:
 				const std::vector<cv_bridge::CvImageConstPtr> & depthMsgs,
 				const std::vector<sensor_msgs::CameraInfo> & cameraInfoMsgs,
 				const std::vector<sensor_msgs::CameraInfo> & depthCameraInfoMsgs,
-				const sensor_msgs::LaserScan& scanMsg,
-				const sensor_msgs::PointCloud2& scan3dMsg,
-				const rtabmap_msgs::OdomInfoConstPtr& odomInfoMsg,
+				const sensor_msgs::LaserScan & scanMsg,
+				const sensor_msgs::PointCloud2 & scan3dMsg,
+				const rtabmap_msgs::OdomInfoConstPtr & odomInfoMsg,
 				const std::vector<rtabmap_msgs::GlobalDescriptor> & globalDescriptorMsgs = std::vector<rtabmap_msgs::GlobalDescriptor>(),
-				const std::vector<std::vector<rtabmap_msgs::KeyPoint> > & localKeyPoints = std::vector<std::vector<rtabmap_msgs::KeyPoint> >(),
-				const std::vector<std::vector<rtabmap_msgs::Point3f> > & localPoints3d = std::vector<std::vector<rtabmap_msgs::Point3f> >(),
+				const std::vector<std::vector<rtabmap_msgs::KeyPoint>> & localKeyPoints = std::vector<std::vector<rtabmap_msgs::KeyPoint>>(),
+				const std::vector<std::vector<rtabmap_msgs::Point3f>> & localPoints3d = std::vector<std::vector<rtabmap_msgs::Point3f>>(),
 				const std::vector<cv::Mat> & localDescriptors = std::vector<cv::Mat>());
+
 	void commonMultiCameraCallbackImpl(
 				const std::string & odomFrameId,
 				const rtabmap_msgs::UserDataConstPtr & userDataMsg,
@@ -135,28 +136,40 @@ private:
 				const std::vector<cv_bridge::CvImageConstPtr> & depthMsgs,
 				const std::vector<sensor_msgs::CameraInfo> & cameraInfoMsgs,
 				const std::vector<sensor_msgs::CameraInfo> & depthCameraInfoMsgs,
-				const sensor_msgs::LaserScan& scan2dMsg,
-				const sensor_msgs::PointCloud2& scan3dMsg,
-				const rtabmap_msgs::OdomInfoConstPtr& odomInfoMsg,
+				const sensor_msgs::LaserScan & scan2dMsg,
+				const sensor_msgs::PointCloud2 & scan3dMsg,
+				const rtabmap_msgs::OdomInfoConstPtr & odomInfoMsg,
 				const std::vector<rtabmap_msgs::GlobalDescriptor> & globalDescriptorMsgs,
-				const std::vector<std::vector<rtabmap_msgs::KeyPoint> > & localKeyPoints,
-				const std::vector<std::vector<rtabmap_msgs::Point3f> > & localPoints3d,
+				const std::vector<std::vector<rtabmap_msgs::KeyPoint>> & localKeyPoints,
+				const std::vector<std::vector<rtabmap_msgs::Point3f>> & localPoints3d,
 				const std::vector<cv::Mat> & localDescriptors);
+
 	virtual void commonLaserScanCallback(
 				const nav_msgs::OdometryConstPtr & odomMsg,
 				const rtabmap_msgs::UserDataConstPtr & userDataMsg,
-				const sensor_msgs::LaserScan& scanMsg,
-				const sensor_msgs::PointCloud2& scan3dMsg,
-				const rtabmap_msgs::OdomInfoConstPtr& odomInfoMsg,
+				const sensor_msgs::LaserScan & scanMsg,
+				const sensor_msgs::PointCloud2 & scan3dMsg,
+				const rtabmap_msgs::OdomInfoConstPtr & odomInfoMsg,
 				const rtabmap_msgs::GlobalDescriptor & globalDescriptor = rtabmap_msgs::GlobalDescriptor());
+
 	virtual void commonOdomCallback(
 			const nav_msgs::OdometryConstPtr & odomMsg,
 			const rtabmap_msgs::UserDataConstPtr & userDataMsg,
-			const rtabmap_msgs::OdomInfoConstPtr& odomInfoMsg);
+			const rtabmap_msgs::OdomInfoConstPtr & odomInfoMsg);
+
 	virtual void commonSensorDataCallback(
 			const rtabmap_msgs::SensorDataConstPtr & sensorDataMsg,
 			const nav_msgs::OdometryConstPtr & odomMsg,
-			const rtabmap_msgs::OdomInfoConstPtr& odomInfoMsg);
+			const rtabmap_msgs::OdomInfoConstPtr & odomInfoMsg);
+	
+	virtual void commonRGBDImageCallback(
+			const rtabmap_msgs::RGBDImageConstPtr & rgbdMsg,
+			const nav_msgs::OdometryConstPtr & odomMsg,
+			const rtabmap_msgs::UserDataConstPtr & userDataMsg,
+			const sensor_msgs::LaserScan & scanMsg,
+			const sensor_msgs::PointCloud2 & scan3dMsg,
+			const rtabmap_msgs::OdomInfoConstPtr & odomInfoMsg,
+			const rtabmap_msgs::GlobalDescriptor & globalDescriptor = rtabmap_msgs::GlobalDescriptor());
 
 	void defaultCallback(const sensor_msgs::ImageConstPtr & imageMsg); // no odom
 
@@ -170,7 +183,7 @@ private:
 #ifdef WITH_FIDUCIAL_MSGS
 	void fiducialDetectionsAsyncCallback(const fiducial_msgs::FiducialTransformArray & fiducialDetections);
 #endif
-	void imuAsyncCallback(const sensor_msgs::ImuConstPtr & tagDetections);
+	void imuAsyncCallback(const sensor_msgs::ImuConstPtr & msg);
 	void republishNodeDataCallback(const std_msgs::Int32MultiArray::ConstPtr& msg);
 	void interOdomCallback(const nav_msgs::OdometryConstPtr & msg);
 	void interOdomInfoCallback(const nav_msgs::OdometryConstPtr & msg1, const rtabmap_msgs::OdomInfoConstPtr & msg2);

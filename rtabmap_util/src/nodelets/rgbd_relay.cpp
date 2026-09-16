@@ -155,8 +155,6 @@ private:
 				}
 				else if(!input->depth_compressed.data.empty())
 				{
-					// right stereo image or depth image, toCvCopy handles both
-					// regular compressed images and transport compressedDepth formats
 					rtabmap_conversions::toCvCopy(input->depth_compressed)->toImageMsg(output.depth);
 				}
 			}

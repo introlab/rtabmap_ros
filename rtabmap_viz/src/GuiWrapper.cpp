@@ -40,6 +40,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <opencv2/highgui/highgui.hpp>
 
 #include <rtabmap/gui/MainWindow.h>
+#include <rtabmap/core/Compression.h>
 #include <rtabmap/core/RtabmapEvent.h>
 #include <rtabmap/core/Parameters.h>
 #include <rtabmap/core/ParamEvent.h>
@@ -493,12 +494,12 @@ void GuiWrapper::commonMultiCameraCallback(
 		const std::vector<cv_bridge::CvImageConstPtr> & depthMsgs,
 		const std::vector<sensor_msgs::CameraInfo> & cameraInfoMsgs,
 		const std::vector<sensor_msgs::CameraInfo> & depthCameraInfoMsgs,
-		const sensor_msgs::LaserScan& scan2dMsg,
-		const sensor_msgs::PointCloud2& scan3dMsg,
-		const rtabmap_msgs::OdomInfoConstPtr& odomInfoMsg,
+		const sensor_msgs::LaserScan & scan2dMsg,
+		const sensor_msgs::PointCloud2 & scan3dMsg,
+		const rtabmap_msgs::OdomInfoConstPtr & odomInfoMsg,
 		const std::vector<rtabmap_msgs::GlobalDescriptor> & globalDescriptorMsgs,
-		const std::vector<std::vector<rtabmap_msgs::KeyPoint> > & localKeyPoints,
-		const std::vector<std::vector<rtabmap_msgs::Point3f> > & localPoints3d,
+		const std::vector<std::vector<rtabmap_msgs::KeyPoint>> & localKeyPoints,
+		const std::vector<std::vector<rtabmap_msgs::Point3f>> & localPoints3d,
 		const std::vector<cv::Mat> & localDescriptors)
 {
 	UASSERT(imageMsgs.size() == 0 || (imageMsgs.size() == cameraInfoMsgs.size()));
@@ -692,13 +693,13 @@ void GuiWrapper::commonMultiCameraCallback(
 void GuiWrapper::commonStereoCallback(
 		const nav_msgs::OdometryConstPtr & odomMsg,
 		const rtabmap_msgs::UserDataConstPtr & userDataMsg,
-		const cv_bridge::CvImageConstPtr& leftImageMsg,
-		const cv_bridge::CvImageConstPtr& rightImageMsg,
-		const sensor_msgs::CameraInfo& leftCamInfoMsg,
-		const sensor_msgs::CameraInfo& rightCamInfoMsg,
-		const sensor_msgs::LaserScan& scan2dMsg,
-		const sensor_msgs::PointCloud2& scan3dMsg,
-		const rtabmap_msgs::OdomInfoConstPtr& odomInfoMsg,
+		const cv_bridge::CvImageConstPtr & leftImageMsg,
+		const cv_bridge::CvImageConstPtr & rightImageMsg,
+		const sensor_msgs::CameraInfo & leftCamInfoMsg,
+		const sensor_msgs::CameraInfo & rightCamInfoMsg,
+		const sensor_msgs::LaserScan & scan2dMsg,
+		const sensor_msgs::PointCloud2 & scan3dMsg,
+		const rtabmap_msgs::OdomInfoConstPtr & odomInfoMsg,
 		const std::vector<rtabmap_msgs::GlobalDescriptor> & globalDescriptorMsgs,
 		const std::vector<rtabmap_msgs::KeyPoint> & localKeyPoints,
 		const std::vector<rtabmap_msgs::Point3f> & localPoints3d,
@@ -872,9 +873,9 @@ void GuiWrapper::commonStereoCallback(
 void GuiWrapper::commonLaserScanCallback(
 		const nav_msgs::OdometryConstPtr & odomMsg,
 		const rtabmap_msgs::UserDataConstPtr & userDataMsg,
-		const sensor_msgs::LaserScan& scan2dMsg,
-		const sensor_msgs::PointCloud2& scan3dMsg,
-		const rtabmap_msgs::OdomInfoConstPtr& odomInfoMsg,
+		const sensor_msgs::LaserScan & scan2dMsg,
+		const sensor_msgs::PointCloud2 & scan3dMsg,
+		const rtabmap_msgs::OdomInfoConstPtr & odomInfoMsg,
 		const rtabmap_msgs::GlobalDescriptor & globalDescriptor)
 {
 	std_msgs::Header odomHeader;
@@ -1019,7 +1020,7 @@ void GuiWrapper::commonLaserScanCallback(
 void GuiWrapper::commonOdomCallback(
 		const nav_msgs::OdometryConstPtr & odomMsg,
 		const rtabmap_msgs::UserDataConstPtr & userDataMsg,
-		const rtabmap_msgs::OdomInfoConstPtr& odomInfoMsg)
+		const rtabmap_msgs::OdomInfoConstPtr & odomInfoMsg)
 {
 	UASSERT(odomMsg.get());
 
@@ -1091,7 +1092,7 @@ void GuiWrapper::commonOdomCallback(
 void GuiWrapper::commonSensorDataCallback(
 		const rtabmap_msgs::SensorDataConstPtr & sensorDataMsg,
 		const nav_msgs::OdometryConstPtr & odomMsg,
-		const rtabmap_msgs::OdomInfoConstPtr& odomInfoMsg)
+		const rtabmap_msgs::OdomInfoConstPtr & odomInfoMsg)
 {
 	UASSERT(sensorDataMsg.get());
 	std_msgs::Header odomHeader;
@@ -1189,6 +1190,35 @@ void GuiWrapper::commonSensorDataCallback(
 		info);
 
 	QMetaObject::invokeMethod(mainWindow_, "processOdometry", Q_ARG(rtabmap::OdometryEvent, odomEvent), Q_ARG(bool, ignoreData));
+}
+
+void GuiWrapper::commonRGBDImageCallback(
+		const rtabmap_msgs::RGBDImageConstPtr & rgbdMsg,
+		const nav_msgs::OdometryConstPtr & odomMsg,
+		const rtabmap_msgs::UserDataConstPtr & userDataMsg,
+		const sensor_msgs::LaserScan & scanMsg,
+		const sensor_msgs::PointCloud2 & scan3dMsg,
+		const rtabmap_msgs::OdomInfoConstPtr & odomInfoMsg,
+		const rtabmap_msgs::GlobalDescriptor & globalDescriptor)
+{
+	cv_bridge::CvImageConstPtr rgb, depth;
+	rtabmap_conversions::toCvShare(rgbdMsg, rgb, depth);
+
+	std::vector<rtabmap_msgs::GlobalDescriptor> globalDescriptorMsgs;
+	if(!rgbdMsg->global_descriptor.data.empty())
+	{
+		globalDescriptorMsgs.push_back(rgbdMsg->global_descriptor);
+	}
+	if(!globalDescriptor.data.empty())
+	{
+		globalDescriptorMsgs.push_back(globalDescriptor);
+	}
+
+	commonSingleCameraCallback(odomMsg, userDataMsg, rgb, depth,
+			rgbdMsg->rgb_camera_info, rgbdMsg->depth_camera_info,
+			scanMsg, scan3dMsg, odomInfoMsg, globalDescriptorMsgs,
+			rgbdMsg->key_points, rgbdMsg->points,
+			rtabmap::uncompressData(rgbdMsg->descriptors));
 }
 
 }
