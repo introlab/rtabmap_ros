@@ -13,6 +13,7 @@ repository.
 | `stereo/rect/stereo_{left,right}.yaml` | [RTAB-Map `data/stereo_rect`](https://github.com/introlab/rtabmap/tree/master/data/stereo_rect) | `test_stereo_odometry.cpp` |
 | `stereo/raw/{left,right}/{420,425}.jpg` | frames 420 and 425 (21.00 s and 21.25 s at 20 Hz) of the [stereo indoor tutorial](https://github.com/introlab/rtabmap/wiki/Stereo-mapping) test sequence | `test_stereo_odometry.cpp` |
 | `stereo/raw/stereo_{left,right}.yaml`, `stereo/raw/stereo_pose.yaml` | that rig's own calibration (`stereo_tutorial_*`) | `test_stereo_odometry.cpp` |
+| `lidar/ouster_half_turn/` | frames 1613418430.682 and 1613418435.082 of an Ouster recording on a rotating mast | `test_icp_odometry.cpp` |
 | `rgbd/rgb/{17,154}.jpg`, `rgbd/depth/{17,154}.png` | [RTAB-Map `data/rgbd`](https://github.com/introlab/rtabmap/tree/master/data/rgbd) | `test_rgbd_odometry.cpp` |
 | `rgbd/calib/{17,154}.yaml` | [RTAB-Map `data/rgbd`](https://github.com/introlab/rtabmap/tree/master/data/rgbd) | `test_rgbd_odometry.cpp` |
 
@@ -37,6 +38,20 @@ odometry at the origin, the second has to be registered against it.
   across runs. Wider gaps in the same window register too, but not reliably: 21.00 s to
   22.00 s is ~1.04 m at around 45 inliers and lost tracking outright in one run out of
   eight, where this pair holds 210 or more.
+- **`lidar/ouster_half_turn`** -- two Ouster sweeps 4.40 s apart, recorded as a ROS 2 mcap
+  bag (`/tf`, `/tf_static`, `/os_cloud_node/points`) rather than as loose files, because
+  what makes them worth keeping is the TF history around them.
+
+  The sensor sits on a mast turning at ~42 deg/s while the platform stays put, so it moves
+  through its own 0.1 s sweep and the cloud comes off the driver skewed. The two sweeps are
+  half a turn apart (184.5 deg), which puts the skew in opposite directions and makes a
+  missing correction obvious. And because the platform never moves -- `base_link` ->
+  `box_link` does not translate by a single millimetre over the whole recording -- the
+  answer is known: the transform between the two is the identity. That is what the test
+  measures against, rather than a value taken from a previous run.
+
+  TF runs from 0.1 s before each sweep to 0.1 s past its end, with nothing in between: the
+  gap holds transforms nobody looks up, and keeping them would have tripled the file.
 - **`rgbd`** -- `17` and `154`, two frames of a hand-held Kinect sequence, far enough apart
   that losing tracking between them is a legitimate outcome.
 

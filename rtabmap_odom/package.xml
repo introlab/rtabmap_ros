@@ -31,6 +31,9 @@
   <depend>rtabmap_sync</depend>
 
   <test_depend>ament_cmake_gtest</test_depend>
+  <!-- The odometry tests replay recorded sensor data from test/data/lidar. -->
+  <test_depend>rosbag2_cpp</test_depend>
+  <test_depend>rosbag2_storage_mcap</test_depend>
 
   <export>
 	<build_type>ament_cmake</build_type>

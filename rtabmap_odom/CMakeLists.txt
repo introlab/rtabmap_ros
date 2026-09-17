@@ -164,6 +164,8 @@ if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
   find_package(RTABMap REQUIRED)
   find_package(OpenCV REQUIRED)
+  # Recorded sensor input is replayed by the tests themselves, not by "ros2 bag play".
+  find_package(rosbag2_cpp REQUIRED)
 
   # Real frames the visual odometry tests register against, read from the source tree:
   # these binaries are never installed, and the fixtures are not either. See
@@ -188,7 +190,8 @@ if(BUILD_TESTING)
       target_include_directories(${test_name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/test)
       target_compile_definitions(${test_name} PRIVATE
         RTABMAP_ODOM_TEST_DATA_ROOT="${rtabmap_odom_test_data_root}")
-      target_link_libraries(${test_name} rtabmap_odom_plugins rtabmap_odom ${OpenCV_LIBS})
+      target_link_libraries(${test_name} rtabmap_odom_plugins rtabmap_odom ${OpenCV_LIBS}
+        rosbag2_cpp::rosbag2_cpp)
       if("$ENV{ROS_DISTRO}" STRLESS "lyrical")
         ament_target_dependencies(${test_name} ${AmentLibraries})
       else()

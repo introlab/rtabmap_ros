@@ -104,6 +104,70 @@ protected:
 	std::shared_ptr<tf2_ros::StaticTransformBroadcaster> guessTf_;
 };
 
+/**
+ * always_process_most_recent_frame is a "skip the backlog" policy, and it is on by
+ * default: a frame that arrives while the previous one is still being registered is
+ * dropped rather than queued, so the odometry stays on the newest data instead of falling
+ * further and further behind a sensor it cannot keep up with. Registration holds the data
+ * mutex for its whole duration, and a frame that cannot take that mutex is the one that
+ * gets dropped.
+ *
+ * Every other test in these suites turns the policy off, to be able to account for each
+ * frame; this pair is where the default itself is covered.
+ *
+ * topic_queue_size is raised because icp_odometry defaults to 1: with a queue that deep
+ * the middleware would drop the burst before the node ever saw it, and the test would
+ * pass without exercising anything.
+ */
+TEST_F(OdometryRosTest, drops_frames_that_arrive_while_the_previous_one_is_registering)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+			collect<nav_msgs::msg::Odometry>("odom");
+	makeNode({rclcpp::Parameter("always_process_most_recent_frame", true),
+	          rclcpp::Parameter("topic_queue_size", 20)});
+
+	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub = scanPublisher();
+	ASSERT_TRUE(waitForSubscriber(pub));
+
+	// A burst with no spin in between, so the executor hands the node its second frame
+	// while the worker thread is still inside the first registration.
+	const size_t burst = 10;
+	for(size_t i=0; i<burst; ++i)
+	{
+		pub->publish(makeXYZCloud("lidar", 1.0 + 0.1*i, corner3D(cv::Point3f(0.05f*i, 0, 0))));
+	}
+	spinFor(std::chrono::milliseconds(2000));
+
+	EXPECT_GE(odom->size(), 1u) << "the burst produced no odometry at all";
+	EXPECT_LT(odom->size(), burst)
+			<< "every frame of the burst came back out, so nothing was skipped";
+}
+
+/// With the policy off, the same burst is registered whole, one pose per frame.
+TEST_F(OdometryRosTest, processes_every_frame_of_a_burst_when_the_policy_is_off)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+			collect<nav_msgs::msg::Odometry>("odom");
+	// always_process_most_recent_frame:=false comes from the fixture.
+	makeNode({rclcpp::Parameter("topic_queue_size", 20)});
+
+	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub = scanPublisher();
+	ASSERT_TRUE(waitForSubscriber(pub));
+
+	const size_t burst = 10;
+	for(size_t i=0; i<burst; ++i)
+	{
+		pub->publish(makeXYZCloud("lidar", 1.0 + 0.1*i, corner3D(cv::Point3f(0.05f*i, 0, 0))));
+	}
+
+	ASSERT_TRUE(spinUntil([&]() { return odom->size() >= burst; }))
+			<< "only " << odom->size() << " of " << burst << " frames came back out";
+	spinFor(std::chrono::milliseconds(200));
+	EXPECT_EQ(burst, odom->size()) << "more poses than frames";
+}
+
 /// The frames the pose is published in are both configurable.
 TEST_F(OdometryRosTest, publishes_in_the_configured_frames)
 {
