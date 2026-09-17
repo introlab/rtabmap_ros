@@ -54,6 +54,17 @@ flowchart LR
     ODOMT --> MAP & VIZ
 ```
 
+## Contents
+
+- [Usage](#usage)
+- [Subscribed Topics](#subscribed-topics)
+- [Published Topics](#published-topics)
+- [Parameters](#parameters)
+- [Order matters](#order-matters)
+- [Synchronization](#synchronization)
+- [Feeding it to rtabmap](#feeding-it-to-rtabmap)
+- [Diagnostics](#diagnostics)
+
 ## Usage
 
 ```bash

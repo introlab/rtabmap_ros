@@ -6,6 +6,17 @@ The node takes a cloud, works out which points belong to the floor and which sti
 
 The segmentation is RTAB-Map's own [`LocalGridMaker`](https://introlab.github.io/rtabmap/api/latest/classrtabmap_1_1LocalGridMaker.html), so it is configured through the same `Grid/*` parameters as RTAB-Map itself and produces the same result the SLAM node would.
 
+## Contents
+
+- [Usage](#usage)
+  - [Feeding a nav2 costmap](#feeding-a-nav2-costmap)
+- [Subscribed Topics](#subscribed-topics)
+- [Published Topics](#published-topics)
+- [Required Transforms](#required-transforms)
+- [Parameters](#parameters)
+- [Levelling on a slope](#levelling-on-a-slope)
+- [Notes](#notes)
+
 ## Usage
 
 ```bash

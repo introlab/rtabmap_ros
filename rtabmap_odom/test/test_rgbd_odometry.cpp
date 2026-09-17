@@ -1,0 +1,419 @@
+/*
+Copyright (c) 2010-2026, Mathieu Labbe - IntRoLab - Universite de Sherbrooke
+All rights reserved. (BSD-3-Clause, see the repository root.)
+*/
+
+#include <gtest/gtest.h>
+
+#include <tf2_ros/static_transform_broadcaster.h>
+
+#include <rtabmap_msgs/msg/odom_info.hpp>
+#include <rtabmap_msgs/msg/rgbd_images.hpp>
+
+#include <rtabmap_odom/rgbd_odometry.hpp>
+
+#include <cmath>
+
+#include "msg_builders.hpp"
+#include "node_test_utils.hpp"
+#include "test_data.hpp"
+
+namespace rtabmap_odom_test {
+
+namespace {
+
+::testing::Environment * const kRclcppEnv = registerRclcppEnvironment();
+
+/**
+ * The frames that carry a scene come from test/data/rgbd -- the same two RGB-D frames
+ * RTAB-Map registers in corelib/test/test_odometry.cpp. These tests assert the ROS-level
+ * contract (which topics are subscribed, what is published, how the parameters wire up)
+ * on real input rather than the accuracy of the registration, which is that test's
+ * business.
+ */
+const char * const kFrame = "17";
+const char * const kLaterFrame = "154";   // much further along the sequence
+
+/// The blank scene the "lost tracking" tests need is synthetic: there is nothing to see in it.
+const int kBlankWidth = 160;
+const int kBlankHeight = 120;
+
+double translationNorm(const nav_msgs::msg::Odometry & odom)
+{
+	const geometry_msgs::msg::Point & p = odom.pose.pose.position;
+	return std::sqrt(p.x*p.x + p.y*p.y + p.z*p.z);
+}
+
+/// The angle of the pose's rotation, in radians.
+double rotationAngle(const nav_msgs::msg::Odometry & odom)
+{
+	const geometry_msgs::msg::Quaternion & q = odom.pose.pose.orientation;
+	return 2.0 * std::acos(std::min(1.0, std::fabs(q.w)));
+}
+
+/// rtabmap_odom marks a pose it does not trust with a 9999 covariance rather than staying silent.
+bool isLost(const nav_msgs::msg::Odometry & odom)
+{
+	return odom.pose.covariance[0] >= 9999.0;
+}
+
+class RgbdOdometryTest : public NodeTest
+{
+protected:
+	void publishSensorTf()
+	{
+		staticTf_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(helper());
+		geometry_msgs::msg::TransformStamped tf;
+		tf.header.stamp = helper()->now();
+		tf.header.frame_id = "base_link";
+		tf.child_frame_id = "camera";
+		tf.transform.rotation.w = 1.0;
+		staticTf_->sendTransform(tf);
+	}
+
+	/**
+	 * @brief Waits until the node under test has subscribed to /tf_static.
+	 *
+	 * The fixture sends the sensor transform before the node exists, so the node's TF
+	 * listener only sees it as the retained transient-local message it gets on discovery.
+	 * Publishing an image before that arrives makes the node drop the frame after its
+	 * 100 ms wait_for_transform, for no reason the test can see.
+	 */
+	bool waitForTfListener()
+	{
+		if(!staticTf_)
+		{
+			return true;
+		}
+		return spinUntil([&]() { return helper()->count_subscribers("/tf_static") >= 1; });
+	}
+
+	std::shared_ptr<rtabmap_odom::RGBDOdometry> makeNode(
+			std::vector<rclcpp::Parameter> params = {})
+	{
+		// Defaults first, so a test that passes the same parameter overrides them.
+		//
+		// always_process_most_recent_frame:=false is what the node itself recommends for
+		// data that arrives faster than its stamps: these tests publish a whole sequence
+		// back to back with stamps a tenth of a second apart, and when the executor is
+		// slow enough that two of them land in the same spin -- a loaded CI runner, a
+		// single core -- the node drops the second as a replay glitch and the test waits
+		// for a message that will never come. It also keeps processing on the calling
+		// thread instead of the node's worker, which is what makes these tests observable
+		// at all: the odometry is finished by the time the publish returns.
+		std::vector<rclcpp::Parameter> all = {
+			rclcpp::Parameter("frame_id", "base_link"),
+			rclcpp::Parameter("publish_tf", false),
+			rclcpp::Parameter("always_process_most_recent_frame", false),
+		};
+		all.insert(all.end(), params.begin(), params.end());
+		rclcpp::NodeOptions options;
+		options.parameter_overrides(all);
+		std::shared_ptr<rtabmap_odom::RGBDOdometry> node =
+				addNode(std::make_shared<rtabmap_odom::RGBDOdometry>(options));
+		waitForTfListener();
+		return node;
+	}
+
+	/// One frame from test/data/rgbd, as rgbd_sync would deliver it: bgr8 plus 16UC1 millimetres.
+	rtabmap_msgs::msg::RGBDImage makeFrame(const std::string & name, double stamp)
+	{
+		const cv::Mat rgb = rgbdColorImage(name);
+		const cv::Mat depth = rgbdDepthImage(name);
+		EXPECT_FALSE(rgb.empty()) << "test/data/rgbd/rgb/" << name << ".jpg missing";
+		EXPECT_FALSE(depth.empty()) << "test/data/rgbd/depth/" << name << ".png missing";
+
+		rtabmap_msgs::msg::RGBDImage msg;
+		msg.header.frame_id = "camera";
+		msg.header.stamp = stampOf(stamp);
+		msg.rgb = makeImage("camera", stamp, rgb, "bgr8");
+		msg.depth = makeImage("camera", stamp, depth, "16UC1");
+		msg.rgb_camera_info = rgbdInfo(name, "camera", stamp);
+		msg.depth_camera_info = msg.rgb_camera_info;
+		return msg;
+	}
+
+	/// A scene with nothing in it: no features to detect, no motion to recover.
+	rtabmap_msgs::msg::RGBDImage makeBlankFrame(double stamp)
+	{
+		rtabmap_msgs::msg::RGBDImage msg;
+		msg.header.frame_id = "camera";
+		msg.header.stamp = stampOf(stamp);
+		msg.rgb = makeImage("camera", stamp,
+				cv::Mat::zeros(kBlankHeight, kBlankWidth, CV_8UC1), "mono8");
+		msg.depth = makeImage("camera", stamp,
+				cv::Mat(kBlankHeight, kBlankWidth, CV_32FC1, cv::Scalar(2.0f)), "32FC1");
+		msg.rgb_camera_info = makeCameraInfo("camera", stamp, kBlankWidth, kBlankHeight);
+		msg.depth_camera_info = msg.rgb_camera_info;
+		return msg;
+	}
+
+	std::shared_ptr<tf2_ros::StaticTransformBroadcaster> staticTf_;
+};
+
+/// The vendored calibration has to survive the trip through CameraInfo, or nothing below means anything.
+TEST_F(RgbdOdometryTest, the_test_calibration_describes_the_camera)
+{
+	const sensor_msgs::msg::CameraInfo info = rgbdInfo(kFrame, "camera", 1.0);
+
+	ASSERT_EQ(640u, info.width);
+	ASSERT_EQ(480u, info.height);
+	EXPECT_DOUBLE_EQ(525.0, info.k[0]);
+	EXPECT_DOUBLE_EQ(525.0, info.k[4]);
+	// No projection_matrix in the file: P falls back to [K|0], an already-rectified camera.
+	EXPECT_DOUBLE_EQ(info.k[0], info.p[0]);
+	EXPECT_DOUBLE_EQ(0.0, info.p[3]);
+}
+
+/// By default the node takes the three raw camera topics.
+TEST_F(RgbdOdometryTest, subscribes_to_the_raw_camera_topics_by_default)
+{
+	publishSensorTf();
+	makeNode();
+
+	rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr rgb =
+			helper()->create_publisher<sensor_msgs::msg::Image>("rgb/image", 10);
+	rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr depth =
+			helper()->create_publisher<sensor_msgs::msg::Image>("depth/image", 10);
+	rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr info =
+			helper()->create_publisher<sensor_msgs::msg::CameraInfo>("rgb/camera_info", 10);
+
+	EXPECT_TRUE(waitForSubscriber(rgb));
+	EXPECT_TRUE(waitForSubscriber(depth));
+	EXPECT_TRUE(waitForSubscriber(info));
+}
+
+/// A synchronized set of the three raw topics produces one odometry message, at the origin.
+TEST_F(RgbdOdometryTest, publishes_odom_for_a_synchronized_raw_frame)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+			collect<nav_msgs::msg::Odometry>("odom");
+	makeNode();
+
+	rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr rgb =
+			helper()->create_publisher<sensor_msgs::msg::Image>("rgb/image", 10);
+	rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr depth =
+			helper()->create_publisher<sensor_msgs::msg::Image>("depth/image", 10);
+	rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr info =
+			helper()->create_publisher<sensor_msgs::msg::CameraInfo>("rgb/camera_info", 10);
+	ASSERT_TRUE(waitForSubscriber(rgb));
+	ASSERT_TRUE(waitForSubscriber(depth));
+	ASSERT_TRUE(waitForSubscriber(info));
+
+	// Identical stamps, so this works under either synchronization policy.
+	const rtabmap_msgs::msg::RGBDImage frame = makeFrame(kFrame, 1.0);
+	rgb->publish(frame.rgb);
+	depth->publish(frame.depth);
+	info->publish(frame.rgb_camera_info);
+
+	ASSERT_TRUE(spinUntil([&]() { return !odom->empty(); }));
+	EXPECT_EQ("odom", odom->back().header.frame_id);
+	EXPECT_EQ("base_link", odom->back().child_frame_id);
+	// The first frame has nothing to register against: it defines the origin.
+	EXPECT_NEAR(0.0, translationNorm(odom->back()), 1e-9);
+}
+
+/// subscribe_rgbd swaps the three topics for one pre-synchronized RGBDImage.
+TEST_F(RgbdOdometryTest, subscribe_rgbd_takes_a_single_rgbd_image_topic)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+			collect<nav_msgs::msg::Odometry>("odom");
+	makeNode({rclcpp::Parameter("subscribe_rgbd", true)});
+
+	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr pub =
+			helper()->create_publisher<rtabmap_msgs::msg::RGBDImage>("rgbd_image", 10);
+	ASSERT_TRUE(waitForSubscriber(pub));
+
+	pub->publish(makeFrame(kFrame, 1.0));
+	EXPECT_TRUE(spinUntil([&]() { return !odom->empty(); }));
+}
+
+/**
+ * The same frame twice: the registration runs on real features and depth, and the only
+ * answer consistent with the input is "I have not moved". A node that mangles the depth
+ * units or the calibration on the way into RTAB-Map fails here, where the textureless
+ * scenes below cannot tell the difference.
+ */
+TEST_F(RgbdOdometryTest, registers_a_repeated_frame_as_no_motion)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+			collect<nav_msgs::msg::Odometry>("odom");
+	std::shared_ptr<Collector<rtabmap_msgs::msg::OdomInfo>> info =
+			collect<rtabmap_msgs::msg::OdomInfo>("odom_info");
+	makeNode({rclcpp::Parameter("subscribe_rgbd", true)});
+
+	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr pub =
+			helper()->create_publisher<rtabmap_msgs::msg::RGBDImage>("rgbd_image", 10);
+	ASSERT_TRUE(waitForSubscriber(pub));
+	ASSERT_TRUE(waitForPublisher(info->subscription));
+
+	pub->publish(makeFrame(kFrame, 1.0));
+	ASSERT_TRUE(spinUntil([&]() { return !odom->empty(); }));
+	pub->publish(makeFrame(kFrame, 1.1));
+	// Both collectors: odom and odom_info are published separately, and the assertions
+	// below compare the second of each.
+	ASSERT_TRUE(spinUntil([&]() { return odom->size() >= 2 && info->size() >= 2; }));
+
+	const nav_msgs::msg::Odometry & second = odom->back();
+	ASSERT_FALSE(isLost(second)) << "lost tracking on a frame identical to the previous one";
+	EXPECT_GT(info->back().features, 20) << "no features found in a real scene";
+	EXPECT_GT(info->back().inliers, 20)
+			<< "too few inliers (matches=" << info->back().matches << ")";
+	// Exactly zero on this build, in both translation and rotation; a millimetre and a
+	// milliradian leave room for a backend that answers with rounding noise instead.
+	EXPECT_LT(translationNorm(second), 0.001) << "motion reported between identical frames";
+	EXPECT_LT(rotationAngle(second), 0.001) << "rotation reported between identical frames";
+}
+
+/**
+ * Frames 17 and 154 are far apart in the sequence, so losing tracking is a legitimate
+ * outcome; what must hold is that the node's answer agrees with itself -- either a pose
+ * it stands behind, of a plausible size, or one flagged as unusable.
+ */
+TEST_F(RgbdOdometryTest, stays_consistent_between_two_distant_frames)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+			collect<nav_msgs::msg::Odometry>("odom");
+	makeNode({rclcpp::Parameter("subscribe_rgbd", true)});
+
+	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr pub =
+			helper()->create_publisher<rtabmap_msgs::msg::RGBDImage>("rgbd_image", 10);
+	ASSERT_TRUE(waitForSubscriber(pub));
+
+	pub->publish(makeFrame(kFrame, 1.0));
+	ASSERT_TRUE(spinUntil([&]() { return !odom->empty(); }));
+	pub->publish(makeFrame(kLaterFrame, 1.1));
+	ASSERT_TRUE(spinUntil([&]() { return odom->size() >= 2; }));
+
+	const nav_msgs::msg::Odometry & second = odom->back();
+	if(!isLost(second))
+	{
+		// 0.41 to 0.46 m over ten runs here. The bound stays a plausibility check rather
+		// than a fit: how far apart these two frames land is the registration's business,
+		// and this test's claim is only that the answer is not nonsense.
+		EXPECT_LT(translationNorm(second), 2.0)
+				<< "implausible jump of " << translationNorm(second) << " m";
+	}
+}
+
+/**
+ * @brief Two to six cameras, each on its own numbered topic.
+ *
+ * Above six the node has no synchronizer for it and says to use rgbd_cameras:=0 with the
+ * rgbd_images topic instead, so six is where this stops. Only the subscriptions are
+ * checked: one numbered topic per camera, none left behind.
+ */
+class RgbdOdometryCamerasTest :
+		public RgbdOdometryTest,
+		public ::testing::WithParamInterface<int>
+{
+};
+
+TEST_P(RgbdOdometryCamerasTest, subscribes_to_one_numbered_topic_per_camera)
+{
+	const int cameras = GetParam();
+	publishSensorTf();
+	makeNode({rclcpp::Parameter("subscribe_rgbd", true),
+	          rclcpp::Parameter("rgbd_cameras", cameras)});
+
+	// All of them first, so they are discovered together rather than one wait after another.
+	std::vector<rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr> publishers;
+	for(int i=0; i<cameras; ++i)
+	{
+		publishers.push_back(helper()->create_publisher<rtabmap_msgs::msg::RGBDImage>(
+				"rgbd_image" + std::to_string(i), 10));
+	}
+
+	for(int i=0; i<cameras; ++i)
+	{
+		EXPECT_TRUE(waitForSubscriber(publishers[i]))
+				<< "rgbd_cameras:=" << cameras << " left rgbd_image" << i << " unsubscribed";
+	}
+}
+
+INSTANTIATE_TEST_SUITE_P(
+		RgbdCameras,
+		RgbdOdometryCamerasTest,
+		::testing::Range(2, 7),
+		[](const ::testing::TestParamInfo<int> & info) {
+			return std::to_string(info.param) + "_cameras";
+		});
+
+/// rgbd_cameras:=0 takes any number of cameras in one RGBDImages message.
+TEST_F(RgbdOdometryTest, rgbd_cameras_zero_takes_an_rgbd_images_topic)
+{
+	publishSensorTf();
+	makeNode({rclcpp::Parameter("subscribe_rgbd", true),
+	          rclcpp::Parameter("rgbd_cameras", 0)});
+
+	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImages>::SharedPtr pub =
+			helper()->create_publisher<rtabmap_msgs::msg::RGBDImages>("rgbd_images", 10);
+
+	EXPECT_TRUE(waitForSubscriber(pub));
+}
+
+/// This node matches by nearest stamp unless told otherwise; stereo_odometry does not.
+TEST_F(RgbdOdometryTest, approx_sync_is_on_by_default)
+{
+	publishSensorTf();
+	std::shared_ptr<rtabmap_odom::RGBDOdometry> node = makeNode();
+
+	EXPECT_TRUE(node->get_parameter("approx_sync").as_bool());
+}
+
+/**
+ * A textureless scene is the documented failure: there is nothing to match, so the frame
+ * is lost and the node says so with a null pose rather than publishing nothing.
+ * See "When it loses track" in doc/rgbd_odometry.md.
+ */
+TEST_F(RgbdOdometryTest, reports_lost_with_a_null_pose_on_a_textureless_scene)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+			collect<nav_msgs::msg::Odometry>("odom");
+	std::shared_ptr<Collector<rtabmap_msgs::msg::OdomInfo>> info =
+			collect<rtabmap_msgs::msg::OdomInfo>("odom_info");
+	makeNode({rclcpp::Parameter("subscribe_rgbd", true)});
+
+	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr pub =
+			helper()->create_publisher<rtabmap_msgs::msg::RGBDImage>("rgbd_image", 10);
+	ASSERT_TRUE(waitForSubscriber(pub));
+	ASSERT_TRUE(waitForPublisher(info->subscription));
+
+	pub->publish(makeBlankFrame(1.0));
+	ASSERT_TRUE(spinUntil([&]() { return !odom->empty(); }));
+	pub->publish(makeBlankFrame(1.1));
+	ASSERT_TRUE(spinUntil([&]() { return odom->size() >= 2 && info->size() >= 2; }));
+
+	// Nothing to register against: no features, and the pose carries the "do not use me"
+	// covariance rather than the node going silent.
+	EXPECT_EQ(0, info->back().features);
+	EXPECT_TRUE(isLost(odom->back()));
+}
+
+/// publish_null_when_lost:=false makes the node go silent instead.
+TEST_F(RgbdOdometryTest, publishes_nothing_when_lost_if_null_publishing_is_off)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+			collect<nav_msgs::msg::Odometry>("odom");
+	makeNode({rclcpp::Parameter("subscribe_rgbd", true),
+	          rclcpp::Parameter("publish_null_when_lost", false)});
+
+	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr pub =
+			helper()->create_publisher<rtabmap_msgs::msg::RGBDImage>("rgbd_image", 10);
+	ASSERT_TRUE(waitForSubscriber(pub));
+
+	pub->publish(makeBlankFrame(1.0));
+	pub->publish(makeBlankFrame(1.1));
+	spinFor(std::chrono::milliseconds(1500));
+
+	EXPECT_TRUE(odom->empty());
+}
+
+}  // namespace
+}  // namespace rtabmap_odom_test

@@ -6,6 +6,17 @@ A spinning lidar takes tens of milliseconds to complete a sweep, and on a moving
 
 This node uses TF to find where the sensor actually was when each point was taken, and moves every point into the pose at the start of the sweep. A straight wall comes back straight.
 
+## Contents
+
+- [Usage](#usage)
+- [Subscribed Topics](#subscribed-topics)
+- [Published Topics](#published-topics)
+- [Required Transforms](#required-transforms)
+- [Parameters](#parameters)
+- [Requirements](#requirements)
+- [Behavior when TF is missing](#behavior-when-tf-is-missing)
+- [Notes](#notes)
+
 ## Usage
 
 ```bash

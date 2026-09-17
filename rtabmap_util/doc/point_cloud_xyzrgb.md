@@ -4,6 +4,15 @@ Projects an RGB-D frame, a stereo pair or a disparity image into a colored point
 
 The colored counterpart of [point_cloud_xyz](point_cloud_xyz.md): same filtering, same parameters, but every point carries the color of the pixel it came from. It accepts four different input sets, so it can sit at the end of an RGB-D, stereo or disparity pipeline without anything in between.
 
+## Contents
+
+- [Usage](#usage)
+- [Subscribed Topics](#subscribed-topics)
+- [Published Topics](#published-topics)
+- [Parameters](#parameters)
+- [Stereo matching](#stereo-matching)
+- [Notes](#notes)
+
 ## Usage
 
 ```bash

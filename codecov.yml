@@ -56,6 +56,10 @@ component_management:
       name: rtabmap_sync
       paths:
         - rtabmap_sync/**
+    - component_id: rtabmap_odom
+      name: rtabmap_odom
+      paths:
+        - rtabmap_odom/**
     - component_id: rtabmap_python
       name: rtabmap_python
       paths:
@@ -66,8 +70,8 @@ comment:
   behavior: default
   require_changes: true # stay quiet when coverage doesn't move
 
-# Only rtabmap_conversions, rtabmap_util, rtabmap_sync and rtabmap_python have tests
-# today, so
+# Only rtabmap_conversions, rtabmap_util, rtabmap_sync, rtabmap_odom and rtabmap_python
+# have tests today, so
 # everything else would report as 0% and drag the total down to a number that
 # says nothing. As a package gains tests, drop its line here and add it to
 # individual_components above.
@@ -77,7 +81,6 @@ ignore:
   - "rtabmap_examples/**"
   - "rtabmap_launch/**"
   - "rtabmap_msgs/**"
-  - "rtabmap_odom/**"
   - "rtabmap_rviz_plugins/**"
   - "rtabmap_slam/**"
   - "rtabmap_viz/**"

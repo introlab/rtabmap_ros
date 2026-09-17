@@ -8,6 +8,17 @@ It also lets you produce maps RTAB-Map is not currently configured to publish, o
 
 The assembling itself is done by `MapsManager`, which is shared with `rtabmap_slam` — the outputs and every `Grid/*` parameter behave identically in both.
 
+## Contents
+
+- [Usage](#usage)
+- [Subscribed Topics](#subscribed-topics)
+- [Published Topics](#published-topics)
+- [Services](#services)
+- [Parameters](#parameters)
+- [Octomap tree type](#octomap-tree-type)
+- [Start-up](#start-up)
+- [Notes](#notes)
+
 ## Usage
 
 ```bash

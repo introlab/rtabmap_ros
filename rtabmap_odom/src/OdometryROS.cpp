@@ -83,6 +83,7 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	publishNullWhenLost_(true),
 	publishCompressedSensorData_(false),
 	qos_(RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT),
+	bufferedDataToProcess_(false),
 	paused_(false),
 	resetCountdown_(0),
 	resetCurrentCount_(0),

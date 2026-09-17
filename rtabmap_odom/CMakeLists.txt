@@ -157,4 +157,53 @@ install(DIRECTORY include/
    FILES_MATCHING PATTERN "*.h"
 )
 
+#############
+## Testing ##
+#############
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+  find_package(RTABMap REQUIRED)
+  find_package(OpenCV REQUIRED)
+  # Recorded sensor input is replayed by the tests themselves, not by "ros2 bag play".
+  find_package(rosbag2_cpp REQUIRED)
+
+  # Real frames the visual odometry tests register against, read from the source tree:
+  # these binaries are never installed, and the fixtures are not either. See
+  # test/data/README.md for where they come from.
+  set(rtabmap_odom_test_data_root "${CMAKE_CURRENT_SOURCE_DIR}/test/data")
+
+  # Each node gets its own test binary: a crash or a stuck executor in one node cannot
+  # take the others down, and every binary starts with a clean DDS graph.
+  #
+  # Each binary also gets its own DDS domain. colcon tests packages in parallel and ctest
+  # can run these binaries in parallel, while these suites share topic names -- odom,
+  # rgbd_image, scan_cloud -- with rtabmap_sync's and rtabmap_util's. On a shared domain
+  # they discover each other's publishers and assertions then see traffic the test never
+  # sent. rtabmap_util numbers from 30 and rtabmap_sync from 50; keep the ranges apart.
+  set(rtabmap_odom_test_domain_id 70)
+  macro(rtabmap_odom_add_node_test test_name)
+    ament_add_gtest(${test_name} test/${test_name}.cpp
+      ENV ROS_DOMAIN_ID=${rtabmap_odom_test_domain_id}
+      TIMEOUT 300)
+    math(EXPR rtabmap_odom_test_domain_id "${rtabmap_odom_test_domain_id} + 1")
+    if(TARGET ${test_name})
+      target_include_directories(${test_name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/test)
+      target_compile_definitions(${test_name} PRIVATE
+        RTABMAP_ODOM_TEST_DATA_ROOT="${rtabmap_odom_test_data_root}")
+      target_link_libraries(${test_name} rtabmap_odom_plugins rtabmap_odom ${OpenCV_LIBS}
+        rosbag2_cpp::rosbag2_cpp)
+      if("$ENV{ROS_DISTRO}" STRLESS "lyrical")
+        ament_target_dependencies(${test_name} ${AmentLibraries})
+      else()
+        target_link_libraries(${test_name} ${Libraries} ${PublicLibraries})
+      endif()
+    endif()
+  endmacro()
+
+  rtabmap_odom_add_node_test(test_odometry_ros)
+  rtabmap_odom_add_node_test(test_rgbd_odometry)
+  rtabmap_odom_add_node_test(test_stereo_odometry)
+  rtabmap_odom_add_node_test(test_icp_odometry)
+endif()
+
 ament_package()

@@ -1,0 +1,52 @@
+rosbag2_bagfile_information:
+  compression_format: ''
+  compression_mode: ''
+  custom_data: null
+  duration:
+    nanoseconds: 5066021600
+  files:
+  - duration:
+      nanoseconds: 5066021600
+    message_count: 120
+    path: ouster_half_turn.mcap
+    starting_time:
+      nanoseconds_since_epoch: 1613418430206475184
+  message_count: 120
+  relative_file_paths:
+  - ouster_half_turn.mcap
+  ros_distro: rosbags
+  starting_time:
+    nanoseconds_since_epoch: 1613418430206475184
+  storage_identifier: mcap
+  topics_with_message_count:
+  - message_count: 2
+    topic_metadata:
+      name: /tf_static
+      offered_qos_profiles: "- avoid_ros_namespace_conventions: false\n  deadline:
+        {nsec: 0, sec: 0}\n  depth: 10\n  durability: 1\n  history: 1\n  lifespan:
+        {nsec: 0, sec: 0}\n  liveliness: 1\n  liveliness_lease_duration: {nsec: 0,
+        sec: 0}\n  reliability: 1"
+      serialization_format: cdr
+      type: tf2_msgs/msg/TFMessage
+      type_description_hash: RIHS01_e369d0f05a23ae52508854b66f6aa0437f3449d652e8cbf22d5abe85d020f087
+  - message_count: 116
+    topic_metadata:
+      name: /tf
+      offered_qos_profiles: "- avoid_ros_namespace_conventions: false\n  deadline:
+        {nsec: 0, sec: 0}\n  depth: 10\n  durability: 2\n  history: 1\n  lifespan:
+        {nsec: 0, sec: 0}\n  liveliness: 1\n  liveliness_lease_duration: {nsec: 0,
+        sec: 0}\n  reliability: 1"
+      serialization_format: cdr
+      type: tf2_msgs/msg/TFMessage
+      type_description_hash: RIHS01_e369d0f05a23ae52508854b66f6aa0437f3449d652e8cbf22d5abe85d020f087
+  - message_count: 2
+    topic_metadata:
+      name: /os_cloud_node/points
+      offered_qos_profiles: "- avoid_ros_namespace_conventions: false\n  deadline:
+        {nsec: 0, sec: 0}\n  depth: 10\n  durability: 2\n  history: 1\n  lifespan:
+        {nsec: 0, sec: 0}\n  liveliness: 1\n  liveliness_lease_duration: {nsec: 0,
+        sec: 0}\n  reliability: 1"
+      serialization_format: cdr
+      type: sensor_msgs/msg/PointCloud2
+      type_description_hash: RIHS01_9198cabf7da3796ae6fe19c4cb3bdd3525492988c70522628af5daa124bae2b5
+  version: 8
