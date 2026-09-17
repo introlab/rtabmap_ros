@@ -163,6 +163,12 @@ install(DIRECTORY include/
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
   find_package(RTABMap REQUIRED)
+  find_package(OpenCV REQUIRED)
+
+  # Real frames the visual odometry tests register against, read from the source tree:
+  # these binaries are never installed, and the fixtures are not either. See
+  # test/data/README.md for where they come from.
+  set(rtabmap_odom_test_data_root "${CMAKE_CURRENT_SOURCE_DIR}/test/data")
 
   # Each node gets its own test binary: a crash or a stuck executor in one node cannot
   # take the others down, and every binary starts with a clean DDS graph.
@@ -180,7 +186,9 @@ if(BUILD_TESTING)
     math(EXPR rtabmap_odom_test_domain_id "${rtabmap_odom_test_domain_id} + 1")
     if(TARGET ${test_name})
       target_include_directories(${test_name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/test)
-      target_link_libraries(${test_name} rtabmap_odom_plugins rtabmap_odom)
+      target_compile_definitions(${test_name} PRIVATE
+        RTABMAP_ODOM_TEST_DATA_ROOT="${rtabmap_odom_test_data_root}")
+      target_link_libraries(${test_name} rtabmap_odom_plugins rtabmap_odom ${OpenCV_LIBS})
       if("$ENV{ROS_DISTRO}" STRLESS "lyrical")
         ament_target_dependencies(${test_name} ${AmentLibraries})
       else()

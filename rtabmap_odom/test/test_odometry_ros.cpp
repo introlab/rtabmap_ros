@@ -48,6 +48,10 @@ protected:
 	{
 		std::vector<rclcpp::Parameter> all = icpTestParameters();
 		all.push_back(rclcpp::Parameter("frame_id", "base_link"));
+		// See the note in test_icp_odometry.cpp: without this the node drops frames that
+		// arrive closer together than their stamps claim, which is what a loaded runner
+		// does to a sequence published back to back.
+		all.push_back(rclcpp::Parameter("always_process_most_recent_frame", false));
 		for(const rclcpp::Parameter & p : params)
 		{
 			all.push_back(p);

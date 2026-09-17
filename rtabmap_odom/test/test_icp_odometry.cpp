@@ -40,10 +40,24 @@ protected:
 	std::shared_ptr<rtabmap_odom::ICPOdometry> makeNode(
 			std::vector<rclcpp::Parameter> params = {})
 	{
-		params.push_back(rclcpp::Parameter("frame_id", "base_link"));
-		params.push_back(rclcpp::Parameter("publish_tf", false));
+		// Defaults first, so a test that passes the same parameter overrides them.
+		//
+		// always_process_most_recent_frame:=false is what the node itself recommends for
+		// data that arrives faster than its stamps: these tests publish a whole sequence
+		// back to back with stamps a tenth of a second apart, and when the executor is
+		// slow enough that two of them land in the same spin -- a loaded CI runner, a
+		// single core -- the node drops the second as a replay glitch and the test waits
+		// for a message that will never come. It also keeps processing on the calling
+		// thread instead of the node's worker, which is what makes these tests observable
+		// at all: the odometry is finished by the time the publish returns.
+		std::vector<rclcpp::Parameter> all = {
+			rclcpp::Parameter("frame_id", "base_link"),
+			rclcpp::Parameter("publish_tf", false),
+			rclcpp::Parameter("always_process_most_recent_frame", false),
+		};
+		all.insert(all.end(), params.begin(), params.end());
 		rclcpp::NodeOptions options;
-		options.parameter_overrides(params);
+		options.parameter_overrides(all);
 		return addNode(std::make_shared<rtabmap_odom::ICPOdometry>(options));
 	}
 
