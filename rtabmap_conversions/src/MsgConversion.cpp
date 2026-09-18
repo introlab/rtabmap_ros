@@ -133,6 +133,145 @@ rtabmap::Transform transformFromPoseMsg(const geometry_msgs::Pose & msg, bool ig
 	return rtabmap::Transform::fromEigen3d(tfPose);
 }
 
+cv_bridge::CvImagePtr toCvCopy(const sensor_msgs::CompressedImage & source)
+{
+	if(source.format.find("compressedDepth") != std::string::npos)
+	{
+		std::string format;
+		if(source.format.find("compressedDepth png") != std::string::npos || source.format.find("compressedDepth ") == std::string::npos)
+		{
+			format = "png";
+		}
+		else if(source.format.find("compressedDepth rvl") != std::string::npos)
+		{
+			format = "rvl";
+		}
+		else
+		{
+			ROS_ERROR("Unsupported compressed depth format \"%s\".", source.format.c_str());
+			return cv_bridge::CvImagePtr();
+		}
+
+		cv_bridge::CvImagePtr cv_ptr(new cv_bridge::CvImage());
+		cv_ptr->header = source.header;
+		cv_ptr->encoding = source.format.substr(0, source.format.find(';'));
+
+		if (source.data.size() > 12)
+		{
+			if(format == "png")
+			{
+				std::vector<unsigned char> bytes(source.data.begin() + 12, source.data.end());
+				cv_ptr->image = rtabmap::uncompressImage(bytes);
+			}
+			else if(format == "rvl")
+			{
+				std::vector<unsigned char> bytes;
+				bytes.reserve(8 + (source.data.size() - 12));
+				bytes.insert(bytes.end(), "DEPTHRVL", "DEPTHRVL" + 8);
+				bytes.insert(bytes.end(), source.data.begin() + 12, source.data.end());
+				cv_ptr->image = rtabmap::uncompressImage(bytes);
+			}
+		}
+
+		if(cv_ptr->encoding == "32FC1" && (cv_ptr->image.rows > 0) && (cv_ptr->image.cols > 0))
+		{
+			float depthQuantA, depthQuantB;
+			memcpy(&depthQuantA, &source.data[4], sizeof(float));
+			memcpy(&depthQuantB, &source.data[8], sizeof(float));
+
+			cv::Mat depthImg(cv_ptr->image.size(), CV_32FC1);
+
+			cv::MatIterator_<float> itDepthImg = depthImg.begin<float>(), itDepthImg_end = depthImg.end<float>();
+			cv::MatConstIterator_<uint16_t> itInvDepthImg = cv_ptr->image.begin<uint16_t>(), itInvDepthImg_end = cv_ptr->image.end<uint16_t>();
+
+			for (; (itDepthImg != itDepthImg_end) && (itInvDepthImg != itInvDepthImg_end); ++itDepthImg, ++itInvDepthImg)
+			{
+				if (*itInvDepthImg) {
+					*itDepthImg = depthQuantA / static_cast<float>(*itInvDepthImg - depthQuantB);
+				} else {
+					*itDepthImg = std::numeric_limits<float>::quiet_NaN();
+				}
+			}
+
+			cv_ptr->image = depthImg;
+		}
+
+		return cv_ptr;
+	}
+	else
+	{
+#ifdef CV_BRIDGE_HYDRO
+		ROS_ERROR("Unsupported compressed image copy, please upgrade at least to ROS Indigo to use this.");
+		return cv_bridge::CvImagePtr();
+#else
+		return cv_bridge::toCvCopy(source);
+#endif
+	}
+}
+
+void toCompressedDepthImageMsg(const cv_bridge::CvImage & source, sensor_msgs::CompressedImage & ros_image, const std::string & format)
+{
+	if(source.encoding == "32FC1" || source.encoding == "16UC1")
+	{
+		ros_image.header = source.header;
+		ros_image.format = source.encoding + "; compressedDepth " + format;
+
+		float depthMax = 10.0;
+		float depthZ0 = 100.0;
+		float depthQuantA = depthZ0 * (depthZ0 + 1.0f);
+		float depthQuantB = 1.0f - depthQuantA / depthMax;
+
+		std::vector<unsigned char> bytes;
+
+		if(source.encoding == "32FC1" && source.image.rows > 0 && source.image.cols > 0)
+		{
+			cv::Mat invDepthImg(source.image.size(), CV_16UC1);
+
+			cv::MatConstIterator_<float> itDepthImg = source.image.begin<float>(), itDepthImg_end = source.image.end<float>();
+			cv::MatIterator_<uint16_t> itInvDepthImg = invDepthImg.begin<uint16_t>(), itInvDepthImg_end = invDepthImg.end<uint16_t>();
+
+			for(; (itDepthImg != itDepthImg_end) && (itInvDepthImg != itInvDepthImg_end); ++itDepthImg, ++itInvDepthImg)
+			{
+				if(*itDepthImg < depthMax)
+				{
+					*itInvDepthImg = depthQuantA / *itDepthImg + depthQuantB;
+				}
+				else
+				{
+					*itInvDepthImg = 0;
+				}
+			}
+
+			bytes = rtabmap::compressImage(invDepthImg, format == "rvl" ? ".rvl" : ".png");
+		}
+		else if(source.encoding == "16UC1" && source.image.rows > 0 && source.image.cols > 0)
+		{
+			bytes = rtabmap::compressImage(source.image, format == "rvl" ? ".rvl" : ".png");
+		}
+
+		if(format == "png" && !bytes.empty())
+		{
+			ros_image.data.resize(12 + bytes.size());
+			memset(&ros_image.data[0], 0, 4);
+			memcpy(&ros_image.data[4], &depthQuantA, sizeof(float));
+			memcpy(&ros_image.data[8], &depthQuantB, sizeof(float));
+			memcpy(&ros_image.data[12], bytes.data(), bytes.size());
+		}
+		else if(format == "rvl" && bytes.size() > 8)
+		{
+			ros_image.data.resize(12 + (bytes.size() - 8));
+			memset(&ros_image.data[0], 0, 4);
+			memcpy(&ros_image.data[4], &depthQuantA, sizeof(float));
+			memcpy(&ros_image.data[8], &depthQuantB, sizeof(float));
+			memcpy(&ros_image.data[12], &bytes[8], bytes.size() - 8);
+		}
+	}
+	else
+	{
+		ROS_ERROR("Compression requires single-channel 32bit-floating point or 16bit raw depth images (input format is: %s).", source.encoding.c_str());
+	}
+}
+
 void toCvCopy(const rtabmap_msgs::RGBDImage & image, cv_bridge::CvImagePtr & rgb, cv_bridge::CvImagePtr & depth)
 {
 	if(!image.rgb.data.empty())
@@ -141,11 +280,7 @@ void toCvCopy(const rtabmap_msgs::RGBDImage & image, cv_bridge::CvImagePtr & rgb
 	}
 	else if(!image.rgb_compressed.data.empty())
 	{
-#ifdef CV_BRIDGE_HYDRO
-		ROS_ERROR("Unsupported compressed image copy, please upgrade at least to ROS Indigo to use this.");
-#else
-		rgb = cv_bridge::toCvCopy(image.rgb_compressed);
-#endif
+		rgb = toCvCopy(image.rgb_compressed);
 	}
 
 	if(!image.depth.data.empty())
@@ -154,12 +289,7 @@ void toCvCopy(const rtabmap_msgs::RGBDImage & image, cv_bridge::CvImagePtr & rgb
 	}
 	else if(!image.depth_compressed.data.empty())
 	{
-		cv_bridge::CvImagePtr ptr = boost::make_shared<cv_bridge::CvImage>();
-		ptr->header = image.depth_compressed.header;
-		ptr->image = rtabmap::uncompressImage(image.depth_compressed.data);
-		ROS_ASSERT(ptr->image.empty() || ptr->image.type() == CV_32FC1 || ptr->image.type() == CV_16UC1);
-		ptr->encoding = ptr->image.empty()?"":ptr->image.type() == CV_32FC1?sensor_msgs::image_encodings::TYPE_32FC1:sensor_msgs::image_encodings::TYPE_16UC1;
-		depth = ptr;
+		depth = toCvCopy(image.depth_compressed);
 	}
 }
 
@@ -176,11 +306,7 @@ void toCvShare(const rtabmap_msgs::RGBDImage & image, const boost::shared_ptr<vo
 	}
 	else if(!image.rgb_compressed.data.empty())
 	{
-#ifdef CV_BRIDGE_HYDRO
-		ROS_ERROR("Unsupported compressed image copy, please upgrade at least to ROS Indigo to use this.");
-#else
-		rgb = cv_bridge::toCvCopy(image.rgb_compressed);
-#endif
+		rgb = toCvCopy(image.rgb_compressed);
 	}
 
 	if(!image.depth.data.empty())
@@ -189,23 +315,7 @@ void toCvShare(const rtabmap_msgs::RGBDImage & image, const boost::shared_ptr<vo
 	}
 	else if(!image.depth_compressed.data.empty())
 	{
-		if(image.depth_compressed.format.compare("jpg")==0)
-		{
-#ifdef CV_BRIDGE_HYDRO
-			ROS_ERROR("Unsupported compressed image copy, please upgrade at least to ROS Indigo to use this.");
-#else
-			depth = cv_bridge::toCvCopy(image.depth_compressed);
-#endif
-		}
-		else
-		{
-			cv_bridge::CvImagePtr ptr = boost::make_shared<cv_bridge::CvImage>();
-			ptr->header = image.depth_compressed.header;
-			ptr->image = rtabmap::uncompressImage(image.depth_compressed.data);
-			ROS_ASSERT(ptr->image.empty() || ptr->image.type() == CV_32FC1 || ptr->image.type() == CV_16UC1);
-			ptr->encoding = ptr->image.empty()?"":ptr->image.type() == CV_32FC1?sensor_msgs::image_encodings::TYPE_32FC1:sensor_msgs::image_encodings::TYPE_16UC1;
-			depth = ptr;
-		}
+		depth = toCvCopy(image.depth_compressed);
 	}
 }
 
@@ -248,7 +358,11 @@ void rgbdImageToROS(const rtabmap::SensorData & data, rtabmap_msgs::RGBDImage & 
 	}
 	else if(!data.imageCompressed().empty())
 	{
-		ROS_ERROR("Conversion of compressed SensorData to RGBDImage is not implemented...");
+		std::vector<unsigned char> bytes;
+		compressedMatToBytes(data.imageCompressed(), bytes);
+		msg.rgb_compressed.header = header;
+		msg.rgb_compressed.data = bytes;
+		msg.rgb_compressed.format = (bytes[0] == 0xFF && bytes[1] == 0xD8) ? "jpeg" : "png";
 	}
 
 	if(!data.depthOrRightRaw().empty())
@@ -262,7 +376,33 @@ void rgbdImageToROS(const rtabmap::SensorData & data, rtabmap_msgs::RGBDImage & 
 	}
 	else if(!data.depthOrRightCompressed().empty())
 	{
-		ROS_ERROR("Conversion of compressed SensorData to RGBDImage is not implemented...");
+		std::vector<unsigned char> bytes;
+		compressedMatToBytes(data.depthOrRightCompressed(), bytes);
+		if(rtabmap::compressedDepthFormat(bytes) == ".rvl")
+		{
+			msg.depth_compressed.header = header;
+			msg.depth_compressed.data.resize(12 + (bytes.size() - 8), 0);
+			memcpy(msg.depth_compressed.data.data() + 12, bytes.data() + 8, bytes.size() - 8);
+			msg.depth_compressed.format = "16UC1; compressedDepth rvl";
+		}
+		else if(bytes[0] == 0xFF && bytes[1] == 0xD8)
+		{
+			msg.depth_compressed.header = header;
+			msg.depth_compressed.data = bytes;
+			msg.depth_compressed.format = "jpeg";
+		}
+		else
+		{
+			cv_bridge::CvImage cvDepth;
+			cvDepth.header = header;
+			cvDepth.image = rtabmap::uncompressImage(bytes);
+			cvDepth.encoding =
+				cvDepth.image.type() == CV_16UC1 ? sensor_msgs::image_encodings::TYPE_16UC1 :
+				cvDepth.image.type() == CV_32FC1 ? sensor_msgs::image_encodings::TYPE_32FC1 :
+				cvDepth.image.type() == CV_8UC3  ? sensor_msgs::image_encodings::BGR8 :
+				sensor_msgs::image_encodings::MONO8;
+			cvDepth.toImageMsg(msg.depth);
+		}
 	}
 
 	//convert features
@@ -288,143 +428,136 @@ void rgbdImageToROS(const rtabmap::SensorData & data, rtabmap_msgs::RGBDImage & 
 rtabmap::SensorData rgbdImageFromROS(const rtabmap_msgs::RGBDImageConstPtr & image)
 {
 	rtabmap::SensorData data;
-	cv_bridge::CvImageConstPtr imageMsg;
-	cv_bridge::CvImageConstPtr depthMsg;
-	toCvShare(image, imageMsg, depthMsg);
 
 	rtabmap::StereoCameraModel stereoModel = stereoCameraModelFromROS(image->rgb_camera_info, image->depth_camera_info, rtabmap::Transform::getIdentity());
 
-	if(stereoModel.isValidForProjection())
+	cv::Mat rgbOrLeft, depthOrRight;
+
+	if(!image->rgb.data.empty())
 	{
-		cv_bridge::CvImageConstPtr imageRectLeft = imageMsg;
-		cv_bridge::CvImageConstPtr imageRectRight = depthMsg;
-		if(!(imageRectLeft->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) ==0 ||
-			 imageRectLeft->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
-			 imageRectLeft->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||
-			 imageRectLeft->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
-			 imageRectLeft->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0) ||
-			!(imageRectRight->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) ==0 ||
-			  imageRectRight->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
-			  imageRectRight->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||
-			  imageRectRight->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
-			  imageRectRight->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0))
+		cv_bridge::CvImageConstPtr imagePtr = cv_bridge::toCvShare(image->rgb, image);
+		if(imagePtr->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) == 0 ||
+		   imagePtr->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
+		   imagePtr->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0)
 		{
-			ROS_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8 (mono8 recommended), received types are %s (left) and %s (right)",
-					imageRectLeft->encoding.c_str(), imageRectRight->encoding.c_str());
-			return data;
+			rgbOrLeft = imagePtr->image;
 		}
-
-		if(!imageRectLeft->image.empty() && !imageRectRight->image.empty())
+		else if(imagePtr->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
 		{
-			if(stereoModel.baseline() > 10.0)
-			{
-				static bool shown = false;
-				if(!shown)
-				{
-					ROS_WARN("Detected baseline (%f m) is quite large! Is your "
-							 "right camera_info P(0,3) correctly set? Note that "
-							 "baseline=-P(0,3)/P(0,0). This warning is printed only once.",
-							 stereoModel.baseline());
-					shown = true;
-				}
-			}
-
-			cv::Mat left, right;
-			if(imageRectLeft->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) == 0 ||
-			   imageRectLeft->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0)
-			{
-				left = imageRectLeft->image;
-			}
-			else if(imageRectLeft->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
-			{
-				left = cv_bridge::cvtColor(imageRectLeft, "mono8")->image;
-			}
-			else
-			{
-				left = cv_bridge::cvtColor(imageRectLeft, "bgr8")->image;
-			}
-			if(imageRectRight->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) == 0 ||
-			   imageRectRight->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0)
-			{
-				right = imageRectRight->image;
-			}
-			else
-			{
-				right = cv_bridge::cvtColor(imageRectRight, "mono8")->image;
-			}
-
-			//
-
-			data = rtabmap::SensorData(
-					left,
-					right,
-					stereoModel,
-					0,
-					rtabmap_conversions::timestampFromROS(image->header.stamp));
+			rgbOrLeft = cv_bridge::cvtColor(imagePtr, "mono8")->image;
 		}
 		else
 		{
-			ROS_WARN("Odom: input images empty?!?");
+			rgbOrLeft = cv_bridge::cvtColor(imagePtr, "bgr8")->image;
 		}
 	}
-	else //depth
+	else if(!image->rgb_compressed.data.empty())
 	{
-		ros::Time higherStamp;
-		int imageWidth = imageMsg->image.cols;
-		int imageHeight = imageMsg->image.rows;
-		int depthWidth = depthMsg->image.cols;
-		int depthHeight = depthMsg->image.rows;
+		rgbOrLeft = compressedMatFromBytes(image->rgb_compressed.data, true);
+	}
 
-		UASSERT_MSG(
-			imageWidth/depthWidth == imageHeight/depthHeight,
-			uFormat("rgb=%dx%d depth=%dx%d", imageWidth, imageHeight, depthWidth, depthHeight).c_str());
-
-		cv::Mat rgb;
-		cv::Mat depth;
-		rtabmap::CameraModel cameraModels;
-
-		if(!(imageMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) ==0 ||
-			 imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
-			 imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||
-			 imageMsg->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
-			 imageMsg->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0 ||
-			 imageMsg->encoding.compare(sensor_msgs::image_encodings::BGRA8) == 0 ||
-			 imageMsg->encoding.compare(sensor_msgs::image_encodings::RGBA8) == 0 ||
-			 imageMsg->encoding.compare(sensor_msgs::image_encodings::BAYER_GRBG8) == 0) ||
-			!(depthMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1) == 0 ||
-			 depthMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1) == 0 ||
-			 depthMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0))
+	if(!image->depth.data.empty())
+	{
+		cv_bridge::CvImageConstPtr depthPtr = cv_bridge::toCvShare(image->depth, image);
+		if(stereoModel.isValidForProjection())
 		{
-			ROS_ERROR("Input type must be image=mono8,mono16,rgb8,bgr8,bgra8,rgba8 and "
-			"image_depth=32FC1,16UC1,mono16. Current rgb=%s and depth=%s",
-				imageMsg->encoding.c_str(),
-				depthMsg->encoding.c_str());
-			return data;
-		}
-
-		cv_bridge::CvImageConstPtr ptrImage = imageMsg;
-		if(imageMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1)==0 ||
-			imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
-			imageMsg->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0)
-		{
-			// do nothing
-		}
-		else if(imageMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
-		{
-			ptrImage = cv_bridge::cvtColor(imageMsg, "mono8");
+			if(depthPtr->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) == 0 ||
+			   depthPtr->encoding.compare(sensor_msgs::image_encodings::MONO8) == 0 ||
+			   depthPtr->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0)
+			{
+				depthOrRight = depthPtr->image;
+			}
+			else if(depthPtr->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)
+			{
+				depthOrRight = cv_bridge::cvtColor(depthPtr, "mono8")->image;
+			}
+			else
+			{
+				depthOrRight = cv_bridge::cvtColor(depthPtr, "bgr8")->image;
+			}
 		}
 		else
 		{
-			ptrImage = cv_bridge::cvtColor(imageMsg, "bgr8");
+			depthOrRight = depthPtr->image;
 		}
+	}
+	else if(!image->depth_compressed.data.empty())
+	{
+		if(image->depth_compressed.format.find("compressedDepth") != std::string::npos)
+		{
+			const std::string & format = image->depth_compressed.format;
+			if(format.substr(0, format.find(';')) == sensor_msgs::image_encodings::TYPE_16UC1)
+			{
+				if(format.find("compressedDepth png") != std::string::npos || format.find("compressedDepth ") == std::string::npos)
+				{
+					std::vector<unsigned char> bytes(image->depth_compressed.data.begin() + 12, image->depth_compressed.data.end());
+					depthOrRight = compressedMatFromBytes(bytes, true);
+				}
+				else if(format.find("compressedDepth rvl") != std::string::npos)
+				{
+					std::vector<unsigned char> bytes;
+					bytes.reserve(8 + (image->depth_compressed.data.size() - 12));
+					bytes.insert(bytes.end(), "DEPTHRVL", "DEPTHRVL" + 8);
+					bytes.insert(bytes.end(), image->depth_compressed.data.begin() + 12, image->depth_compressed.data.end());
+					depthOrRight = compressedMatFromBytes(bytes, true);
+				}
+				else
+				{
+					ROS_ERROR("Unsupported compressed depth format \"%s\".", format.c_str());
+				}
+			}
+			else
+			{
+				depthOrRight = toCvCopy(image->depth_compressed)->image;
+			}
+		}
+		else
+		{
+			depthOrRight = compressedMatFromBytes(image->depth_compressed.data, true);
+		}
+	}
 
-		cv_bridge::CvImageConstPtr ptrDepth = depthMsg;
+	if(stereoModel.isValidForProjection())
+	{
 		data = rtabmap::SensorData(
-				ptrImage->image,
-				ptrDepth->image,
+				rgbOrLeft,
+				depthOrRight,
+				stereoModel,
+				0,
+				rtabmap_conversions::timestampFromROS(image->header.stamp));
+	}
+	else
+	{
+		data = rtabmap::SensorData(
+				rgbOrLeft,
+				depthOrRight,
 				rtabmap_conversions::cameraModelFromROS(image->rgb_camera_info),
 				0,
 				rtabmap_conversions::timestampFromROS(image->header.stamp));
+	}
+
+	if(!image->key_points.empty())
+	{
+		std::vector<cv::KeyPoint> keypoints = rtabmap_conversions::keypointsFromROS(image->key_points);
+
+		std::vector<cv::Point3f> keypoints3D;
+		if(!image->points.empty())
+		{
+			keypoints3D = rtabmap_conversions::points3fFromROS(image->points);
+		}
+
+		cv::Mat descriptors;
+		if(!image->descriptors.empty())
+		{
+			descriptors = rtabmap::uncompressData(image->descriptors);
+		}
+
+		data.setFeatures(keypoints, keypoints3D, descriptors);
+	}
+
+	if(!image->global_descriptor.data.empty())
+	{
+		data.addGlobalDescriptor(rtabmap_conversions::globalDescriptorFromROS(image->global_descriptor));
 	}
 
 	return data;
@@ -1168,7 +1301,7 @@ rtabmap::SensorData sensorDataFromROS(const rtabmap_msgs::SensorData & msg)
 			compressedMatFromBytes(msg.left_compressed),
 			compressedMatFromBytes(msg.right_compressed),
 			stereoModels);
-		if(!left.empty() && !right.empty())
+		if(!left.empty() || !right.empty())
 		{
 			s.setStereoImage(left, right, stereoModels, false);
 		}
@@ -1179,7 +1312,7 @@ rtabmap::SensorData sensorDataFromROS(const rtabmap_msgs::SensorData & msg)
 			compressedMatFromBytes(msg.left_compressed),
 			compressedMatFromBytes(msg.right_compressed),
 			models);
-		if(!left.empty() && !right.empty())
+		if(!left.empty() || !right.empty())
 		{
 			s.setRGBDImage(left, right, models, false);
 		}
@@ -1238,6 +1371,7 @@ rtabmap::SensorData sensorDataFromROS(const rtabmap_msgs::SensorData & msg)
 	s.setIMU(rtabmap_conversions::imuFromROS(msg.imu, transformFromGeometryMsg(msg.imu_local_transform)));
 	return s;
 }
+
 void sensorDataToROS(const rtabmap::SensorData & data, rtabmap_msgs::SensorData & msg, const std::string & frameId, bool copyRawData)
 {
 	// add data

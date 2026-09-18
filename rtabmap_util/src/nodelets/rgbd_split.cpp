@@ -98,11 +98,7 @@ private:
 			}
 			else if(!input->rgb_compressed.data.empty())
 			{
-#ifdef CV_BRIDGE_HYDRO
-				ROS_ERROR("Unsupported compressed image copy, please upgrade at least to ROS Indigo to use this.");
-#else
-				cv_bridge::toCvCopy(input->rgb_compressed)->toImageMsg(outputImage);
-#endif
+				rtabmap_conversions::toCvCopy(input->rgb_compressed)->toImageMsg(outputImage);
 			}
 			rgbPub_.publish(outputImage, outputCameraInfo);
 		}
@@ -120,11 +116,7 @@ private:
 			}
 			else if(!input->depth_compressed.data.empty())
 			{
-#ifdef CV_BRIDGE_HYDRO
-				ROS_ERROR("Unsupported compressed image copy, please upgrade at least to ROS Indigo to use this.");
-#else
-				cv_bridge::toCvCopy(input->depth_compressed)->toImageMsg(outputImage);
-#endif
+				rtabmap_conversions::toCvCopy(input->depth_compressed)->toImageMsg(outputImage);
 			}
 			outputImage.header = outputCameraInfo.header = input->header;
 			depthPub_.publish(outputImage, outputCameraInfo);

@@ -88,6 +88,7 @@ OdometryROS::OdometryROS(bool stereoParams, bool visParams, bool icpParams) :
 	minUpdateRate_(0.0),
 	alwaysProcessMostRecentFrame_(true),
 	compressionImgFormat_(".jpg"),
+	compressionDepthFormat_(".rvl"),
 	compressionParallelized_(true),
 	odomStrategy_(Parameters::defaultOdomStrategy()),
 	waitIMUToinit_(false),
@@ -159,6 +160,7 @@ void OdometryROS::onInit()
 	pnh.param("always_process_most_recent_frame", alwaysProcessMostRecentFrame_, alwaysProcessMostRecentFrame_);
 
 	pnh.param("sensor_data_compression_format", compressionImgFormat_, compressionImgFormat_);
+	pnh.param("sensor_data_depth_compression_format", compressionDepthFormat_, compressionDepthFormat_);
 	pnh.param("sensor_data_parallel_compression", compressionParallelized_, compressionParallelized_);
 
 	pnh.param("wait_imu_to_init", waitIMUToinit_, waitIMUToinit_);
@@ -198,6 +200,7 @@ void OdometryROS::onInit()
 	NODELET_INFO("Odometry: min_update_rate        = %f Hz", minUpdateRate_);
 	NODELET_INFO("Odometry: wait_imu_to_init       = %s", waitIMUToinit_?"true":"false");
 	NODELET_INFO("Odometry: sensor_data_compression_format   = %s", compressionImgFormat_.c_str());
+	NODELET_INFO("Odometry: sensor_data_depth_compression_format   = %s", compressionDepthFormat_.c_str());
 	NODELET_INFO("Odometry: sensor_data_parallel_compression = %s", compressionParallelized_?"true":"false");
 
 	configPath = uReplaceChar(configPath, '~', UDirectory::homeDir());
@@ -1118,7 +1121,7 @@ void OdometryROS::processData()
 
 	postProcessData(data, header);
 
-	if(!data.imageRaw().empty() && odomRgbdImagePub_.getNumSubscribers())
+	if(odomRgbdImagePub_.getNumSubscribers())
 	{
 		if(!header.frame_id.empty())
 		{
@@ -1162,7 +1165,7 @@ void OdometryROS::processData()
 		if(compressionParallelized_)
 		{
 			rtabmap::CompressionThread ctImage(data.imageRaw(), compressionImgFormat_);
-			rtabmap::CompressionThread ctDepth(data.depthOrRightRaw(), data.depthOrRightRaw().type() == CV_32FC1 || data.depthOrRightRaw().type() == CV_16UC1?std::string(".png"):compressionImgFormat_);
+			rtabmap::CompressionThread ctDepth(data.depthOrRightRaw(), data.depthOrRightRaw().type()==CV_32FC1?".png":data.depthOrRightRaw().type()==CV_16UC1?compressionDepthFormat_:compressionImgFormat_);
 			rtabmap::CompressionThread ctLaserScan(data.laserScanRaw().data());
 			if(!data.imageRaw().empty())
 			{
@@ -1187,7 +1190,7 @@ void OdometryROS::processData()
 		else
 		{
 			compressedImage = compressImage2(data.imageRaw(), compressionImgFormat_);
-			compressedDepth = compressImage2(data.depthOrRightRaw(), data.depthOrRightRaw().type() == CV_32FC1 || data.depthOrRightRaw().type() == CV_16UC1?std::string(".png"):compressionImgFormat_);
+			compressedDepth = compressImage2(data.depthOrRightRaw(), data.depthOrRightRaw().type()==CV_32FC1?".png":data.depthOrRightRaw().type()==CV_16UC1?compressionDepthFormat_:compressionImgFormat_);
 			compressedScan = compressData2(data.laserScanRaw().data());
 		}
 		if(!compressedImage.empty() && !data.stereoCameraModels().empty())

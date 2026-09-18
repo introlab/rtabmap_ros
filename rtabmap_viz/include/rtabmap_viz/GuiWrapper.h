@@ -77,44 +77,55 @@ private:
 			const std::vector<cv_bridge::CvImageConstPtr> & depthMsgs,
 			const std::vector<sensor_msgs::CameraInfo> & cameraInfoMsgs,
 			const std::vector<sensor_msgs::CameraInfo> & depthCameraInfoMsgs,
-			const sensor_msgs::LaserScan& scan2dMsg,
-			const sensor_msgs::PointCloud2& scan3dMsg,
-			const rtabmap_msgs::OdomInfoConstPtr& odomInfoMsg,
+			const sensor_msgs::LaserScan & scan2dMsg,
+			const sensor_msgs::PointCloud2 & scan3dMsg,
+			const rtabmap_msgs::OdomInfoConstPtr & odomInfoMsg,
 			const std::vector<rtabmap_msgs::GlobalDescriptor> & globalDescriptorMsgs = std::vector<rtabmap_msgs::GlobalDescriptor>(),
-			const std::vector<std::vector<rtabmap_msgs::KeyPoint> > & localKeyPoints = std::vector<std::vector<rtabmap_msgs::KeyPoint> >(),
-			const std::vector<std::vector<rtabmap_msgs::Point3f> > & localPoints3d = std::vector<std::vector<rtabmap_msgs::Point3f> >(),
+			const std::vector<std::vector<rtabmap_msgs::KeyPoint>> & localKeyPoints = std::vector<std::vector<rtabmap_msgs::KeyPoint>>(),
+			const std::vector<std::vector<rtabmap_msgs::Point3f>> & localPoints3d = std::vector<std::vector<rtabmap_msgs::Point3f>>(),
 			const std::vector<cv::Mat> & localDescriptors = std::vector<cv::Mat>());
+
 	virtual void commonStereoCallback(
 			const nav_msgs::OdometryConstPtr & odomMsg,
 			const rtabmap_msgs::UserDataConstPtr & userDataMsg,
-			const cv_bridge::CvImageConstPtr& leftImageMsg,
-			const cv_bridge::CvImageConstPtr& rightImageMsg,
-			const sensor_msgs::CameraInfo& leftCamInfoMsg,
-			const sensor_msgs::CameraInfo& rightCamInfoMsg,
-			const sensor_msgs::LaserScan& scan2dMsg,
-			const sensor_msgs::PointCloud2& scan3dMsg,
-			const rtabmap_msgs::OdomInfoConstPtr& odomInfoMsg,
+			const cv_bridge::CvImageConstPtr & leftImageMsg,
+			const cv_bridge::CvImageConstPtr & rightImageMsg,
+			const sensor_msgs::CameraInfo & leftCamInfoMsg,
+			const sensor_msgs::CameraInfo & rightCamInfoMsg,
+			const sensor_msgs::LaserScan & scan2dMsg,
+			const sensor_msgs::PointCloud2 & scan3dMsg,
+			const rtabmap_msgs::OdomInfoConstPtr & odomInfoMsg,
 			const std::vector<rtabmap_msgs::GlobalDescriptor> & globalDescriptorMsgs = std::vector<rtabmap_msgs::GlobalDescriptor>(),
 			const std::vector<rtabmap_msgs::KeyPoint> & localKeyPoints = std::vector<rtabmap_msgs::KeyPoint>(),
 			const std::vector<rtabmap_msgs::Point3f> & localPoints3d = std::vector<rtabmap_msgs::Point3f>(),
 			const cv::Mat & localDescriptors = cv::Mat());
+
 	virtual void commonLaserScanCallback(
 			const nav_msgs::OdometryConstPtr & odomMsg,
 			const rtabmap_msgs::UserDataConstPtr & userDataMsg,
-			const sensor_msgs::LaserScan& scan2dMsg,
-			const sensor_msgs::PointCloud2& scan3dMsg,
-			const rtabmap_msgs::OdomInfoConstPtr& odomInfoMsg,
+			const sensor_msgs::LaserScan & scan2dMsg,
+			const sensor_msgs::PointCloud2 & scan3dMsg,
+			const rtabmap_msgs::OdomInfoConstPtr & odomInfoMsg,
 			const rtabmap_msgs::GlobalDescriptor & globalDescriptor = rtabmap_msgs::GlobalDescriptor());
 
 	virtual void commonOdomCallback(
 			const nav_msgs::OdometryConstPtr & odomMsg,
 			const rtabmap_msgs::UserDataConstPtr & userDataMsg,
-			const rtabmap_msgs::OdomInfoConstPtr& odomInfoMsg);
+			const rtabmap_msgs::OdomInfoConstPtr & odomInfoMsg);
 
 	virtual void commonSensorDataCallback(
 			const rtabmap_msgs::SensorDataConstPtr & sensorDataMsg,
 			const nav_msgs::OdometryConstPtr & odomMsg,
-			const rtabmap_msgs::OdomInfoConstPtr& odomInfoMsg);
+			const rtabmap_msgs::OdomInfoConstPtr & odomInfoMsg);
+	
+	virtual void commonRGBDImageCallback(
+			const rtabmap_msgs::RGBDImageConstPtr & rgbdMsg,
+			const nav_msgs::OdometryConstPtr & odomMsg,
+			const rtabmap_msgs::UserDataConstPtr & userDataMsg,
+			const sensor_msgs::LaserScan & scanMsg,
+			const sensor_msgs::PointCloud2 & scan3dMsg,
+			const rtabmap_msgs::OdomInfoConstPtr & odomInfoMsg,
+			const rtabmap_msgs::GlobalDescriptor & globalDescriptor = rtabmap_msgs::GlobalDescriptor());
 
 	void defaultCallback(const nav_msgs::OdometryConstPtr & odomMsg);
 
