@@ -27,525 +27,288 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <rtabmap_sync/CommonDataSubscriber.h>
 #include <rtabmap/utilite/UConversion.h>
-#include <rtabmap/core/Compression.h>
-#include <rtabmap_conversions/MsgConversion.h>
 
 namespace rtabmap_sync {
 
 // 1 RGBD camera
 void CommonDataSubscriber::rgbdCallback(
-		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1Msg)
+		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr rgbdMsg)
 {
-	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(image1Msg->header.stamp);}
-	cv_bridge::CvImageConstPtr rgb, depth;
-	rtabmap_conversions::toCvShare(image1Msg, rgb, depth);
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(rgbdMsg->header.stamp);}
 
-	rtabmap_msgs::msg::UserData::SharedPtr userDataMsg; // Null
 	nav_msgs::msg::Odometry::SharedPtr odomMsg; // Null
+	rtabmap_msgs::msg::UserData::SharedPtr userDataMsg; // Null
 	sensor_msgs::msg::LaserScan scanMsg; // Null
 	sensor_msgs::msg::PointCloud2 scan3dMsg; // Null
 	rtabmap_msgs::msg::OdomInfo::SharedPtr odomInfoMsg; // null
 
-	std::vector<rtabmap_msgs::msg::GlobalDescriptor> globalDescriptorMsgs;
-	if(!image1Msg->global_descriptor.data.empty())
-	{
-		globalDescriptorMsgs.push_back(image1Msg->global_descriptor);
-	}
-
-	commonSingleCameraCallback(odomMsg, userDataMsg, rgb,
-			depth, image1Msg->rgb_camera_info, image1Msg->depth_camera_info,
-			scanMsg, scan3dMsg, odomInfoMsg,
-			globalDescriptorMsgs, image1Msg->key_points, image1Msg->points,
-			rtabmap::uncompressData(image1Msg->descriptors));
+	commonRGBDImageCallback(rgbdMsg, odomMsg, userDataMsg, scanMsg, scan3dMsg, odomInfoMsg);
 }
+
 void CommonDataSubscriber::rgbdScan2dCallback(
-		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1Msg,
+		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr rgbdMsg,
 		const sensor_msgs::msg::LaserScan::ConstSharedPtr scanMsg)
 {
-	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(image1Msg->header.stamp);}
-	cv_bridge::CvImageConstPtr rgb, depth;
-	rtabmap_conversions::toCvShare(image1Msg, rgb, depth);
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(rgbdMsg->header.stamp);}
 
-	rtabmap_msgs::msg::UserData::SharedPtr userDataMsg; // Null
 	nav_msgs::msg::Odometry::SharedPtr odomMsg; // Null
+	rtabmap_msgs::msg::UserData::SharedPtr userDataMsg; // Null
 	sensor_msgs::msg::PointCloud2 scan3dMsg; // Null
 	rtabmap_msgs::msg::OdomInfo::SharedPtr odomInfoMsg; // null
 
-	std::vector<rtabmap_msgs::msg::GlobalDescriptor> globalDescriptorMsgs;
-	if(!image1Msg->global_descriptor.data.empty())
-	{
-		globalDescriptorMsgs.push_back(image1Msg->global_descriptor);
-	}
-
-	commonSingleCameraCallback(odomMsg, userDataMsg, rgb,
-			depth, image1Msg->rgb_camera_info, image1Msg->depth_camera_info,
-			*scanMsg, scan3dMsg, odomInfoMsg,
-			globalDescriptorMsgs, image1Msg->key_points, image1Msg->points,
-			rtabmap::uncompressData(image1Msg->descriptors));
+	commonRGBDImageCallback(rgbdMsg, odomMsg, userDataMsg, *scanMsg, scan3dMsg, odomInfoMsg);
 }
+
 void CommonDataSubscriber::rgbdScan3dCallback(
-		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1Msg,
+		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr rgbdMsg,
 		const sensor_msgs::msg::PointCloud2::ConstSharedPtr scan3dMsg)
 {
-	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(image1Msg->header.stamp);}
-	cv_bridge::CvImageConstPtr rgb, depth;
-	rtabmap_conversions::toCvShare(image1Msg, rgb, depth);
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(rgbdMsg->header.stamp);}
 
-	rtabmap_msgs::msg::UserData::SharedPtr userDataMsg; // Null
 	nav_msgs::msg::Odometry::SharedPtr odomMsg; // Null
+	rtabmap_msgs::msg::UserData::SharedPtr userDataMsg; // Null
 	sensor_msgs::msg::LaserScan scanMsg; // Null
 	rtabmap_msgs::msg::OdomInfo::SharedPtr odomInfoMsg; // null
 
-	std::vector<rtabmap_msgs::msg::GlobalDescriptor> globalDescriptorMsgs;
-	if(!image1Msg->global_descriptor.data.empty())
-	{
-		globalDescriptorMsgs.push_back(image1Msg->global_descriptor);
-	}
-
-	commonSingleCameraCallback(odomMsg, userDataMsg, rgb,
-			depth, image1Msg->rgb_camera_info, image1Msg->depth_camera_info,
-			scanMsg, *scan3dMsg, odomInfoMsg,
-			globalDescriptorMsgs, image1Msg->key_points, image1Msg->points,
-			rtabmap::uncompressData(image1Msg->descriptors));
+	commonRGBDImageCallback(rgbdMsg, odomMsg, userDataMsg, scanMsg, *scan3dMsg, odomInfoMsg);
 }
+
 void CommonDataSubscriber::rgbdScanDescCallback(
-		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1Msg,
+		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr rgbdMsg,
 		const rtabmap_msgs::msg::ScanDescriptor::ConstSharedPtr scanDescMsg)
 {
-	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(image1Msg->header.stamp);}
-	cv_bridge::CvImageConstPtr rgb, depth;
-	rtabmap_conversions::toCvShare(image1Msg, rgb, depth);
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(rgbdMsg->header.stamp);}
 
-	rtabmap_msgs::msg::UserData::ConstSharedPtr userDataMsg; // Null
 	nav_msgs::msg::Odometry::ConstSharedPtr odomMsg; // Null
+	rtabmap_msgs::msg::UserData::ConstSharedPtr userDataMsg; // Null
 	rtabmap_msgs::msg::OdomInfo::ConstSharedPtr odomInfoMsg; // null
 
-	std::vector<rtabmap_msgs::msg::GlobalDescriptor> globalDescriptorMsgs;
-	if(!image1Msg->global_descriptor.data.empty())
-	{
-		globalDescriptorMsgs.push_back(image1Msg->global_descriptor);
-	}
-
-	commonSingleCameraCallback(odomMsg, userDataMsg, rgb,
-			depth, image1Msg->rgb_camera_info, image1Msg->depth_camera_info,
-			scanDescMsg->scan, scanDescMsg->scan_cloud, odomInfoMsg,
-			globalDescriptorMsgs, image1Msg->key_points, image1Msg->points,
-			rtabmap::uncompressData(image1Msg->descriptors));
+	commonRGBDImageCallback(rgbdMsg, odomMsg, userDataMsg, scanDescMsg->scan, scanDescMsg->scan_cloud, odomInfoMsg, scanDescMsg->global_descriptor);
 }
+
 void CommonDataSubscriber::rgbdInfoCallback(
-		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1Msg,
+		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr rgbdMsg,
 		const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr odomInfoMsg)
 {
-	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(image1Msg->header.stamp);}
-	cv_bridge::CvImageConstPtr rgb, depth;
-	rtabmap_conversions::toCvShare(image1Msg, rgb, depth);
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(rgbdMsg->header.stamp);}
 
-	rtabmap_msgs::msg::UserData::SharedPtr userDataMsg; // Null
 	nav_msgs::msg::Odometry::SharedPtr odomMsg; // Null
+	rtabmap_msgs::msg::UserData::SharedPtr userDataMsg; // Null
 	sensor_msgs::msg::LaserScan scanMsg; // Null
 	sensor_msgs::msg::PointCloud2 scan3dMsg; // Null
 
-	std::vector<rtabmap_msgs::msg::GlobalDescriptor> globalDescriptorMsgs;
-	if(!image1Msg->global_descriptor.data.empty())
-	{
-		globalDescriptorMsgs.push_back(image1Msg->global_descriptor);
-	}
-
-	commonSingleCameraCallback(odomMsg, userDataMsg, rgb,
-			depth, image1Msg->rgb_camera_info, image1Msg->depth_camera_info,
-			scanMsg, scan3dMsg, odomInfoMsg,
-			globalDescriptorMsgs, image1Msg->key_points, image1Msg->points,
-			rtabmap::uncompressData(image1Msg->descriptors));
+	commonRGBDImageCallback(rgbdMsg, odomMsg, userDataMsg, scanMsg, scan3dMsg, odomInfoMsg);
 }
 
 // 1 RGBD camera + Odom
 void CommonDataSubscriber::rgbdOdomCallback(
 		const nav_msgs::msg::Odometry::ConstSharedPtr odomMsg,
-		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1Msg)
+		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr rgbdMsg)
 {
-	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(image1Msg->header.stamp);}
-	cv_bridge::CvImageConstPtr rgb, depth;
-	rtabmap_conversions::toCvShare(image1Msg, rgb, depth);
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(rgbdMsg->header.stamp);}
 
 	rtabmap_msgs::msg::UserData::SharedPtr userDataMsg; // Null
 	sensor_msgs::msg::LaserScan scanMsg; // Null
 	sensor_msgs::msg::PointCloud2 scan3dMsg; // Null
 	rtabmap_msgs::msg::OdomInfo::SharedPtr odomInfoMsg; // null
 
-	std::vector<rtabmap_msgs::msg::GlobalDescriptor> globalDescriptorMsgs;
-	if(!image1Msg->global_descriptor.data.empty())
-	{
-		globalDescriptorMsgs.push_back(image1Msg->global_descriptor);
-	}
-
-	commonSingleCameraCallback(odomMsg, userDataMsg, rgb,
-			depth, image1Msg->rgb_camera_info, image1Msg->depth_camera_info,
-			scanMsg, scan3dMsg, odomInfoMsg,
-			globalDescriptorMsgs, image1Msg->key_points, image1Msg->points,
-			rtabmap::uncompressData(image1Msg->descriptors));
+	commonRGBDImageCallback(rgbdMsg, odomMsg, userDataMsg, scanMsg, scan3dMsg, odomInfoMsg);
 }
+
 void CommonDataSubscriber::rgbdOdomScan2dCallback(
 		const nav_msgs::msg::Odometry::ConstSharedPtr odomMsg,
-		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1Msg,
+		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr rgbdMsg,
 		const sensor_msgs::msg::LaserScan::ConstSharedPtr scanMsg)
 {
-	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(image1Msg->header.stamp);}
-	cv_bridge::CvImageConstPtr rgb, depth;
-	rtabmap_conversions::toCvShare(image1Msg, rgb, depth);
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(rgbdMsg->header.stamp);}
 
 	rtabmap_msgs::msg::UserData::SharedPtr userDataMsg; // Null
 	sensor_msgs::msg::PointCloud2 scan3dMsg; // Null
 	rtabmap_msgs::msg::OdomInfo::SharedPtr odomInfoMsg; // null
 
-	std::vector<rtabmap_msgs::msg::GlobalDescriptor> globalDescriptorMsgs;
-	if(!image1Msg->global_descriptor.data.empty())
-	{
-		globalDescriptorMsgs.push_back(image1Msg->global_descriptor);
-	}
-
-	commonSingleCameraCallback(odomMsg, userDataMsg, rgb,
-			depth, image1Msg->rgb_camera_info, image1Msg->depth_camera_info,
-			*scanMsg, scan3dMsg, odomInfoMsg,
-			globalDescriptorMsgs, image1Msg->key_points, image1Msg->points,
-			rtabmap::uncompressData(image1Msg->descriptors));
+	commonRGBDImageCallback(rgbdMsg, odomMsg, userDataMsg, *scanMsg, scan3dMsg, odomInfoMsg);
 }
+
 void CommonDataSubscriber::rgbdOdomScan3dCallback(
 		const nav_msgs::msg::Odometry::ConstSharedPtr odomMsg,
-		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1Msg,
+		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr rgbdMsg,
 		const sensor_msgs::msg::PointCloud2::ConstSharedPtr scan3dMsg)
 {
-	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(image1Msg->header.stamp);}
-	cv_bridge::CvImageConstPtr rgb, depth;
-	rtabmap_conversions::toCvShare(image1Msg, rgb, depth);
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(rgbdMsg->header.stamp);}
 
 	rtabmap_msgs::msg::UserData::SharedPtr userDataMsg; // Null
 	sensor_msgs::msg::LaserScan scanMsg; // Null
 	rtabmap_msgs::msg::OdomInfo::SharedPtr odomInfoMsg; // null
 
-	std::vector<rtabmap_msgs::msg::GlobalDescriptor> globalDescriptorMsgs;
-	if(!image1Msg->global_descriptor.data.empty())
-	{
-		globalDescriptorMsgs.push_back(image1Msg->global_descriptor);
-	}
-
-	commonSingleCameraCallback(odomMsg, userDataMsg, rgb,
-			depth, image1Msg->rgb_camera_info, image1Msg->depth_camera_info,
-			scanMsg, *scan3dMsg, odomInfoMsg,
-			globalDescriptorMsgs, image1Msg->key_points, image1Msg->points,
-			rtabmap::uncompressData(image1Msg->descriptors));
+	commonRGBDImageCallback(rgbdMsg, odomMsg, userDataMsg, scanMsg, *scan3dMsg, odomInfoMsg);
 }
+
 void CommonDataSubscriber::rgbdOdomScanDescCallback(
 		const nav_msgs::msg::Odometry::ConstSharedPtr odomMsg,
-		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1Msg,
+		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr rgbdMsg,
 		const rtabmap_msgs::msg::ScanDescriptor::ConstSharedPtr scanDescMsg)
 {
-	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(image1Msg->header.stamp);}
-	cv_bridge::CvImageConstPtr rgb, depth;
-	rtabmap_conversions::toCvShare(image1Msg, rgb, depth);
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(rgbdMsg->header.stamp);}
 
 	rtabmap_msgs::msg::UserData::ConstSharedPtr userDataMsg; // Null
 	rtabmap_msgs::msg::OdomInfo::ConstSharedPtr odomInfoMsg; // null
 
-	std::vector<rtabmap_msgs::msg::GlobalDescriptor> globalDescriptorMsgs;
-	if(!image1Msg->global_descriptor.data.empty())
-	{
-		globalDescriptorMsgs.push_back(image1Msg->global_descriptor);
-	}
-	if(!scanDescMsg->global_descriptor.data.empty())
-	{
-		globalDescriptorMsgs.push_back(scanDescMsg->global_descriptor);
-	}
-
-	commonSingleCameraCallback(odomMsg, userDataMsg, rgb,
-			depth, image1Msg->rgb_camera_info, image1Msg->depth_camera_info,
-			scanDescMsg->scan, scanDescMsg->scan_cloud, odomInfoMsg,
-			globalDescriptorMsgs, image1Msg->key_points, image1Msg->points,
-			rtabmap::uncompressData(image1Msg->descriptors));
+	commonRGBDImageCallback(rgbdMsg, odomMsg, userDataMsg, scanDescMsg->scan, scanDescMsg->scan_cloud, odomInfoMsg, scanDescMsg->global_descriptor);
 }
+
 void CommonDataSubscriber::rgbdOdomInfoCallback(
 		const nav_msgs::msg::Odometry::ConstSharedPtr odomMsg,
-		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1Msg,
+		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr rgbdMsg,
 		const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr odomInfoMsg)
 {
-	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(image1Msg->header.stamp);}
-	cv_bridge::CvImageConstPtr rgb, depth;
-	rtabmap_conversions::toCvShare(image1Msg, rgb, depth);
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(rgbdMsg->header.stamp);}
 
 	rtabmap_msgs::msg::UserData::SharedPtr userDataMsg; // Null
 	sensor_msgs::msg::LaserScan scanMsg; // Null
 	sensor_msgs::msg::PointCloud2 scan3dMsg; // Null
 
-	std::vector<rtabmap_msgs::msg::GlobalDescriptor> globalDescriptorMsgs;
-	if(!image1Msg->global_descriptor.data.empty())
-	{
-		globalDescriptorMsgs.push_back(image1Msg->global_descriptor);
-	}
-
-	commonSingleCameraCallback(odomMsg, userDataMsg, rgb,
-			depth, image1Msg->rgb_camera_info, image1Msg->depth_camera_info,
-			scanMsg, scan3dMsg, odomInfoMsg,
-			globalDescriptorMsgs, image1Msg->key_points, image1Msg->points,
-			rtabmap::uncompressData(image1Msg->descriptors));
+	commonRGBDImageCallback(rgbdMsg, odomMsg, userDataMsg, scanMsg, scan3dMsg, odomInfoMsg);
 }
 
 #ifdef RTABMAP_SYNC_USER_DATA
 // 1 RGBD camera + User Data
 void CommonDataSubscriber::rgbdDataCallback(
 		const rtabmap_msgs::msg::UserData::ConstSharedPtr userDataMsg,
-		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1Msg)
+		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr rgbdMsg)
 {
-	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(image1Msg->header.stamp);}
-	cv_bridge::CvImageConstPtr rgb, depth;
-	rtabmap_conversions::toCvShare(image1Msg, rgb, depth);
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(rgbdMsg->header.stamp);}
 
 	nav_msgs::msg::Odometry::SharedPtr odomMsg; // Null
 	sensor_msgs::msg::LaserScan scanMsg; // Null
 	sensor_msgs::msg::PointCloud2 scan3dMsg; // Null
 	rtabmap_msgs::msg::OdomInfo::SharedPtr odomInfoMsg; // null
 
-	std::vector<rtabmap_msgs::msg::GlobalDescriptor> globalDescriptorMsgs;
-	if(!image1Msg->global_descriptor.data.empty())
-	{
-		globalDescriptorMsgs.push_back(image1Msg->global_descriptor);
-	}
-
-	commonSingleCameraCallback(odomMsg, userDataMsg, rgb,
-			depth, image1Msg->rgb_camera_info, image1Msg->depth_camera_info,
-			scanMsg, scan3dMsg, odomInfoMsg,
-			globalDescriptorMsgs, image1Msg->key_points, image1Msg->points,
-			rtabmap::uncompressData(image1Msg->descriptors));
+	commonRGBDImageCallback(rgbdMsg, odomMsg, userDataMsg, scanMsg, scan3dMsg, odomInfoMsg);
 }
+
 void CommonDataSubscriber::rgbdDataScan2dCallback(
 		const rtabmap_msgs::msg::UserData::ConstSharedPtr userDataMsg,
-		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1Msg,
+		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr rgbdMsg,
 		const sensor_msgs::msg::LaserScan::ConstSharedPtr scanMsg)
 {
-	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(image1Msg->header.stamp);}
-	cv_bridge::CvImageConstPtr rgb, depth;
-	rtabmap_conversions::toCvShare(image1Msg, rgb, depth);
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(rgbdMsg->header.stamp);}
 
 	nav_msgs::msg::Odometry::SharedPtr odomMsg; // Null
 	sensor_msgs::msg::PointCloud2 scan3dMsg; // Null
 	rtabmap_msgs::msg::OdomInfo::SharedPtr odomInfoMsg; // null
 
-	std::vector<rtabmap_msgs::msg::GlobalDescriptor> globalDescriptorMsgs;
-	if(!image1Msg->global_descriptor.data.empty())
-	{
-		globalDescriptorMsgs.push_back(image1Msg->global_descriptor);
-	}
-
-	commonSingleCameraCallback(odomMsg, userDataMsg, rgb,
-			depth, image1Msg->rgb_camera_info, image1Msg->depth_camera_info,
-			*scanMsg, scan3dMsg, odomInfoMsg,
-			globalDescriptorMsgs, image1Msg->key_points, image1Msg->points,
-			rtabmap::uncompressData(image1Msg->descriptors));
+	commonRGBDImageCallback(rgbdMsg, odomMsg, userDataMsg, *scanMsg, scan3dMsg, odomInfoMsg);
 }
+
 void CommonDataSubscriber::rgbdDataScan3dCallback(
 		const rtabmap_msgs::msg::UserData::ConstSharedPtr userDataMsg,
-		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1Msg,
+		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr rgbdMsg,
 		const sensor_msgs::msg::PointCloud2::ConstSharedPtr scan3dMsg)
 {
-	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(image1Msg->header.stamp);}
-	cv_bridge::CvImageConstPtr rgb, depth;
-	rtabmap_conversions::toCvShare(image1Msg, rgb, depth);
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(rgbdMsg->header.stamp);}
 
 	nav_msgs::msg::Odometry::SharedPtr odomMsg; // Null
 	sensor_msgs::msg::LaserScan scanMsg; // Null
 	rtabmap_msgs::msg::OdomInfo::SharedPtr odomInfoMsg; // null
 
-	std::vector<rtabmap_msgs::msg::GlobalDescriptor> globalDescriptorMsgs;
-	if(!image1Msg->global_descriptor.data.empty())
-	{
-		globalDescriptorMsgs.push_back(image1Msg->global_descriptor);
-	}
-
-	commonSingleCameraCallback(odomMsg, userDataMsg, rgb,
-			depth, image1Msg->rgb_camera_info, image1Msg->depth_camera_info,
-			scanMsg, *scan3dMsg, odomInfoMsg,
-			globalDescriptorMsgs, image1Msg->key_points, image1Msg->points,
-			rtabmap::uncompressData(image1Msg->descriptors));
+	commonRGBDImageCallback(rgbdMsg, odomMsg, userDataMsg, scanMsg, *scan3dMsg, odomInfoMsg);
 }
+
 void CommonDataSubscriber::rgbdDataScanDescCallback(
 		const rtabmap_msgs::msg::UserData::ConstSharedPtr userDataMsg,
-		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1Msg,
+		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr rgbdMsg,
 		const rtabmap_msgs::msg::ScanDescriptor::ConstSharedPtr scanDescMsg)
 {
-	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(image1Msg->header.stamp);}
-	cv_bridge::CvImageConstPtr rgb, depth;
-	rtabmap_conversions::toCvShare(image1Msg, rgb, depth);
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(rgbdMsg->header.stamp);}
 
 	nav_msgs::msg::Odometry::ConstSharedPtr odomMsg; // Null
 	rtabmap_msgs::msg::OdomInfo::ConstSharedPtr odomInfoMsg; // null
 
-	std::vector<rtabmap_msgs::msg::GlobalDescriptor> globalDescriptorMsgs;
-	if(!image1Msg->global_descriptor.data.empty())
-	{
-		globalDescriptorMsgs.push_back(image1Msg->global_descriptor);
-	}
-	if(!scanDescMsg->global_descriptor.data.empty())
-	{
-		globalDescriptorMsgs.push_back(scanDescMsg->global_descriptor);
-	}
-
-	commonSingleCameraCallback(odomMsg, userDataMsg, rgb,
-			depth, image1Msg->rgb_camera_info, image1Msg->depth_camera_info,
-			scanDescMsg->scan, scanDescMsg->scan_cloud, odomInfoMsg,
-			globalDescriptorMsgs, image1Msg->key_points, image1Msg->points,
-			rtabmap::uncompressData(image1Msg->descriptors));
+	commonRGBDImageCallback(rgbdMsg, odomMsg, userDataMsg, scanDescMsg->scan, scanDescMsg->scan_cloud, odomInfoMsg, scanDescMsg->global_descriptor);
 }
+
 void CommonDataSubscriber::rgbdDataInfoCallback(
 		const rtabmap_msgs::msg::UserData::ConstSharedPtr userDataMsg,
-		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1Msg,
+		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr rgbdMsg,
 		const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr odomInfoMsg)
 {
-	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(image1Msg->header.stamp);}
-	cv_bridge::CvImageConstPtr rgb, depth;
-	rtabmap_conversions::toCvShare(image1Msg, rgb, depth);
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(rgbdMsg->header.stamp);}
 
 	nav_msgs::msg::Odometry::ConstSharedPtr odomMsg; // Null
 	sensor_msgs::msg::LaserScan scanMsg; // Null
 	sensor_msgs::msg::PointCloud2 scan3dMsg; // Null
 
-	std::vector<rtabmap_msgs::msg::GlobalDescriptor> globalDescriptorMsgs;
-	if(!image1Msg->global_descriptor.data.empty())
-	{
-		globalDescriptorMsgs.push_back(image1Msg->global_descriptor);
-	}
-
-	commonSingleCameraCallback(odomMsg, userDataMsg, rgb,
-			depth, image1Msg->rgb_camera_info, image1Msg->depth_camera_info,
-			scanMsg, scan3dMsg, odomInfoMsg,
-			globalDescriptorMsgs, image1Msg->key_points, image1Msg->points,
-			rtabmap::uncompressData(image1Msg->descriptors));
+	commonRGBDImageCallback(rgbdMsg, odomMsg, userDataMsg, scanMsg, scan3dMsg, odomInfoMsg);
 }
 
 // 1 RGBD camera + Odom + User Data
 void CommonDataSubscriber::rgbdOdomDataCallback(
 		const nav_msgs::msg::Odometry::ConstSharedPtr odomMsg,
 		const rtabmap_msgs::msg::UserData::ConstSharedPtr userDataMsg,
-		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1Msg)
+		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr rgbdMsg)
 {
-	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(image1Msg->header.stamp);}
-	cv_bridge::CvImageConstPtr rgb, depth;
-	rtabmap_conversions::toCvShare(image1Msg, rgb, depth);
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(rgbdMsg->header.stamp);}
 
 	sensor_msgs::msg::LaserScan scanMsg; // Null
 	sensor_msgs::msg::PointCloud2 scan3dMsg; // Null
 	rtabmap_msgs::msg::OdomInfo::SharedPtr odomInfoMsg; // null
 
-	std::vector<rtabmap_msgs::msg::GlobalDescriptor> globalDescriptorMsgs;
-	if(!image1Msg->global_descriptor.data.empty())
-	{
-		globalDescriptorMsgs.push_back(image1Msg->global_descriptor);
-	}
-
-	commonSingleCameraCallback(odomMsg, userDataMsg, rgb,
-			depth, image1Msg->rgb_camera_info, image1Msg->depth_camera_info,
-			scanMsg, scan3dMsg, odomInfoMsg,
-			globalDescriptorMsgs, image1Msg->key_points, image1Msg->points,
-			rtabmap::uncompressData(image1Msg->descriptors));
+	commonRGBDImageCallback(rgbdMsg, odomMsg, userDataMsg, scanMsg, scan3dMsg, odomInfoMsg);
 }
+
 void CommonDataSubscriber::rgbdOdomDataScan2dCallback(
 		const nav_msgs::msg::Odometry::ConstSharedPtr odomMsg,
 		const rtabmap_msgs::msg::UserData::ConstSharedPtr userDataMsg,
-		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1Msg,
+		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr rgbdMsg,
 		const sensor_msgs::msg::LaserScan::ConstSharedPtr scanMsg)
 {
-	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(image1Msg->header.stamp);}
-	cv_bridge::CvImageConstPtr rgb, depth;
-	rtabmap_conversions::toCvShare(image1Msg, rgb, depth);
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(rgbdMsg->header.stamp);}
 
 	sensor_msgs::msg::PointCloud2 scan3dMsg; // Null
 	rtabmap_msgs::msg::OdomInfo::SharedPtr odomInfoMsg; // null
 
-	std::vector<rtabmap_msgs::msg::GlobalDescriptor> globalDescriptorMsgs;
-	if(!image1Msg->global_descriptor.data.empty())
-	{
-		globalDescriptorMsgs.push_back(image1Msg->global_descriptor);
-	}
-
-	commonSingleCameraCallback(odomMsg, userDataMsg, rgb,
-			depth, image1Msg->rgb_camera_info, image1Msg->depth_camera_info,
-			*scanMsg, scan3dMsg, odomInfoMsg,
-			globalDescriptorMsgs, image1Msg->key_points, image1Msg->points,
-			rtabmap::uncompressData(image1Msg->descriptors));
+	commonRGBDImageCallback(rgbdMsg, odomMsg, userDataMsg, *scanMsg, scan3dMsg, odomInfoMsg);
 }
+
 void CommonDataSubscriber::rgbdOdomDataScan3dCallback(
 		const nav_msgs::msg::Odometry::ConstSharedPtr odomMsg,
 		const rtabmap_msgs::msg::UserData::ConstSharedPtr userDataMsg,
-		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1Msg,
+		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr rgbdMsg,
 		const sensor_msgs::msg::PointCloud2::ConstSharedPtr scan3dMsg)
 {
-	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(image1Msg->header.stamp);}
-	cv_bridge::CvImageConstPtr rgb, depth;
-	rtabmap_conversions::toCvShare(image1Msg, rgb, depth);
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(rgbdMsg->header.stamp);}
 
 	sensor_msgs::msg::LaserScan scanMsg; // Null
 	rtabmap_msgs::msg::OdomInfo::SharedPtr odomInfoMsg; // null
 
-	std::vector<rtabmap_msgs::msg::GlobalDescriptor> globalDescriptorMsgs;
-	if(!image1Msg->global_descriptor.data.empty())
-	{
-		globalDescriptorMsgs.push_back(image1Msg->global_descriptor);
-	}
-
-	commonSingleCameraCallback(odomMsg, userDataMsg ,rgb,
-			depth, image1Msg->rgb_camera_info, image1Msg->depth_camera_info,
-			scanMsg, *scan3dMsg, odomInfoMsg,
-			globalDescriptorMsgs, image1Msg->key_points, image1Msg->points,
-			rtabmap::uncompressData(image1Msg->descriptors));
+	commonRGBDImageCallback(rgbdMsg, odomMsg, userDataMsg, scanMsg, *scan3dMsg, odomInfoMsg);
 }
+
 void CommonDataSubscriber::rgbdOdomDataScanDescCallback(
 		const nav_msgs::msg::Odometry::ConstSharedPtr odomMsg,
 		const rtabmap_msgs::msg::UserData::ConstSharedPtr userDataMsg,
-		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1Msg,
+		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr rgbdMsg,
 		const rtabmap_msgs::msg::ScanDescriptor::ConstSharedPtr scanDescMsg)
 {
-	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(image1Msg->header.stamp);}
-	cv_bridge::CvImageConstPtr rgb, depth;
-	rtabmap_conversions::toCvShare(image1Msg, rgb, depth);
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(rgbdMsg->header.stamp);}
 
 	rtabmap_msgs::msg::OdomInfo::ConstSharedPtr odomInfoMsg; // null
 
-	std::vector<rtabmap_msgs::msg::GlobalDescriptor> globalDescriptorMsgs;
-	if(!image1Msg->global_descriptor.data.empty())
-	{
-		globalDescriptorMsgs.push_back(image1Msg->global_descriptor);
-	}
-	if(!scanDescMsg->global_descriptor.data.empty())
-	{
-		globalDescriptorMsgs.push_back(scanDescMsg->global_descriptor);
-	}
-
-	commonSingleCameraCallback(odomMsg, userDataMsg ,rgb,
-			depth, image1Msg->rgb_camera_info, image1Msg->depth_camera_info,
-			scanDescMsg->scan, scanDescMsg->scan_cloud, odomInfoMsg,
-			globalDescriptorMsgs, image1Msg->key_points, image1Msg->points,
-			rtabmap::uncompressData(image1Msg->descriptors));
+	commonRGBDImageCallback(rgbdMsg, odomMsg, userDataMsg, scanDescMsg->scan, scanDescMsg->scan_cloud, odomInfoMsg, scanDescMsg->global_descriptor);
 }
+
 void CommonDataSubscriber::rgbdOdomDataInfoCallback(
 		const nav_msgs::msg::Odometry::ConstSharedPtr odomMsg,
 		const rtabmap_msgs::msg::UserData::ConstSharedPtr userDataMsg,
-		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image1Msg,
+		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr rgbdMsg,
 		const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr odomInfoMsg)
 {
-	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(image1Msg->header.stamp);}
-	cv_bridge::CvImageConstPtr rgb, depth;
-	rtabmap_conversions::toCvShare(image1Msg, rgb, depth);
+	if(syncDiagnostic_.get()) {syncDiagnostic_->tickInput(rgbdMsg->header.stamp);}
 
 	sensor_msgs::msg::LaserScan scanMsg; // Null
 	sensor_msgs::msg::PointCloud2 scan3dMsg; // Null
-	std::vector<rtabmap_msgs::msg::GlobalDescriptor> globalDescriptorMsgs;
-	if(!image1Msg->global_descriptor.data.empty())
-	{
-		globalDescriptorMsgs.push_back(image1Msg->global_descriptor);
-	}
 
-	commonSingleCameraCallback(odomMsg, userDataMsg, rgb,
-			depth, image1Msg->rgb_camera_info, image1Msg->depth_camera_info,
-			scanMsg, scan3dMsg, odomInfoMsg,
-			globalDescriptorMsgs, image1Msg->key_points, image1Msg->points,
-			rtabmap::uncompressData(image1Msg->descriptors));
+	commonRGBDImageCallback(rgbdMsg, odomMsg, userDataMsg, scanMsg, scan3dMsg, odomInfoMsg);
 }
 #endif
 

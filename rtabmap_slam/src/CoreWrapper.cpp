@@ -2016,6 +2016,156 @@ void CoreWrapper::commonSensorDataCallback(
 	}
 }
 
+void CoreWrapper::commonRGBDImageCallback(
+		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr & rgbdMsg,
+		const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
+		const rtabmap_msgs::msg::UserData::ConstSharedPtr & userDataMsg,
+		const sensor_msgs::msg::LaserScan & scanMsg,
+		const sensor_msgs::msg::PointCloud2 & scan3dMsg,
+		const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr & odomInfoMsg,
+		const rtabmap_msgs::msg::GlobalDescriptor & globalDescriptor)
+{
+	UTimer timerConversion;
+	UASSERT(rgbdMsg.get());
+	std::string odomFrameId = odomFrameId_;
+	if(odomMsg.get())
+	{
+		odomFrameId = odomMsg->header.frame_id;
+		if(!scanMsg.ranges.empty())
+		{
+			if(!odomUpdate(*odomMsg, scanMsg.header.stamp))
+			{
+				return;
+			}
+		}
+		else if(!scan3dMsg.data.empty())
+		{
+			if(!odomUpdate(*odomMsg, scan3dMsg.header.stamp))
+			{
+				return;
+			}
+		}
+		else if(!odomUpdate(*odomMsg, rgbdMsg->header.stamp))
+		{
+			return;
+		}
+	}
+	else if(!scanMsg.ranges.empty())
+	{
+		if(!odomTFUpdate(odomFrameId, scanMsg.header.stamp))
+		{
+			return;
+		}
+	}
+	else if(!scan3dMsg.data.empty())
+	{
+		if(!odomTFUpdate(odomFrameId, scan3dMsg.header.stamp))
+		{
+			return;
+		}
+	}
+	else if(!odomTFUpdate(odomFrameId, rgbdMsg->header.stamp))
+	{
+		return;
+	}
+
+	if(syncTimer_->is_canceled() && syncDataMutex_.lockTry() == 0)
+	{
+		UScopeMutex lock(lastPoseMutex_);
+		syncData_.data = rtabmap_conversions::rgbdImageFromROS(rgbdMsg);
+		syncData_.data.setId(lastPoseIntermediate_?-1:0);
+
+		LaserScan scan;
+		if(!scanMsg.ranges.empty())
+		{
+			if(!rtabmap_conversions::convertScanMsg(
+					scanMsg,
+					frameId_,
+					odomSensorSync_?odomFrameId:"",
+					lastPoseStamp_,
+					scan,
+					*tfBuffer_,
+					waitForTransform_,
+					rtabmap_.getMemory() && uStrNumCmp(rtabmap_.getMemory()->getDatabaseVersion(), "0.11.10") < 0))
+			{
+				RCLCPP_ERROR(get_logger(), "Could not convert laser scan msg! Aborting rtabmap update...");
+				return;
+			}
+		}
+		else if(!scan3dMsg.data.empty())
+		{
+			if(!rtabmap_conversions::convertScan3dMsg(
+					scan3dMsg,
+					frameId_,
+					odomSensorSync_?odomFrameId:"",
+					lastPoseStamp_,
+					scan,
+					*tfBuffer_,
+					waitForTransform_,
+					scanCloudMaxPoints_,
+					0,
+					scanCloudIs2d_))
+			{
+				RCLCPP_ERROR(get_logger(), "Could not convert 3d laser scan msg! Aborting rtabmap update...");
+				return;
+			}
+		}
+		if(!scan.isEmpty())
+		{
+			syncData_.data.setLaserScan(scan);
+		}
+
+		cv::Mat userData;
+		if(userDataMsg.get())
+		{
+			userData = rtabmap_conversions::userDataFromROS(*userDataMsg);
+			UScopeMutex lock(userDataMutex_);
+			if(!userData_.empty())
+			{
+				RCLCPP_WARN(get_logger(), "Synchronized and asynchronized user data topics cannot be used at the same time. Async user data dropped!");
+				userData_ = cv::Mat();
+			}
+		}
+		else
+		{
+			UScopeMutex lock(userDataMutex_);
+			userData = userData_;
+			userData_ = cv::Mat();
+		}
+		syncData_.data.setUserData(userData);
+
+		OdometryInfo odomInfo;
+		if(odomInfoMsg.get())
+		{
+			odomInfo = rtabmap_conversions::odomInfoFromROS(*odomInfoMsg);
+		}
+
+		if(!globalDescriptor.data.empty())
+		{
+			syncData_.data.addGlobalDescriptor(rtabmap_conversions::globalDescriptorFromROS(globalDescriptor));
+		}
+
+		syncData_.valid = true;
+		syncData_.stamp = lastPoseStamp_;
+		syncData_.odom = lastPose_;
+		syncData_.odomVelocity = lastPoseVelocity_;
+		syncData_.odomFrameId = odomFrameId;
+		syncData_.odomCovariance = lastPoseCovariance_;
+		syncData_.odomInfo = odomInfo;
+		syncData_.timeMsgConversion = timerConversion.ticks();
+
+		if(!lastPoseIntermediate_)
+		{
+			previousStamp_ = lastPoseStamp_;
+		}
+
+		lastPoseCovariance_ = cv::Mat();
+
+		syncTimer_->reset();
+		syncDataMutex_.unlock();
+	}
+}
+
 void CoreWrapper::processAsync()
 {
 	UScopeMutex lock(syncDataMutex_);
