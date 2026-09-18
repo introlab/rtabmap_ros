@@ -163,6 +163,17 @@ protected:
 		add(record);
 	}
 
+	void commonRGBDImageCallback(
+			const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr & rgbdMsg,
+			const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
+			const rtabmap_msgs::msg::UserData::ConstSharedPtr & userDataMsg,
+			const sensor_msgs::msg::LaserScan & scanMsg,
+			const sensor_msgs::msg::PointCloud2 & scan3dMsg,
+			const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr & odomInfoMsg,
+			const rtabmap_msgs::msg::GlobalDescriptor & globalDescriptor) override
+    {
+    }
+
 private:
 	/// Also drives the output half of the diagnostics, as the real subclasses do.
 	void add(const Record & record)

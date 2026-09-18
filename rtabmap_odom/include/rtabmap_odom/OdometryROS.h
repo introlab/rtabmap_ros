@@ -183,6 +183,7 @@ private:
 	double minUpdateRate_;
 	bool alwaysProcessMostRecentFrame_;
 	std::string compressionImgFormat_;
+	std::string compressionDepthFormat_;
 	bool compressionParallelized_;
 	int odomStrategy_;
 	bool waitIMUToinit_;
