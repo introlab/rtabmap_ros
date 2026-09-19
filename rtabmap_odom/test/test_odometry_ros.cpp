@@ -8,7 +8,7 @@ All rights reserved. (BSD-3-Clause, see the repository root.)
 #include <cstdlib>
 
 #include <tf2_msgs/msg/tf_message.hpp>
-#include <tf2_ros/static_transform_broadcaster.h>
+#include <tf2_ros/static_transform_broadcaster.hpp>
 
 #include <std_srvs/srv/empty.hpp>
 

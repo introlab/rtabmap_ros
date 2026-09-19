@@ -5,7 +5,7 @@ All rights reserved. (BSD-3-Clause, see the repository root.)
 
 #include <gtest/gtest.h>
 
-#include <tf2_ros/static_transform_broadcaster.h>
+#include <tf2_ros/static_transform_broadcaster.hpp>
 
 
 #include <rtabmap_msgs/msg/odom_info.hpp>

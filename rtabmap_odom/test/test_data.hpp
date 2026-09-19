@@ -9,8 +9,8 @@ All rights reserved. (BSD-3-Clause, see the repository root.)
 #include <geometry_msgs/msg/transform.hpp>
 #include <sensor_msgs/msg/camera_info.hpp>
 
-#include <tf2/LinearMath/Matrix3x3.h>
-#include <tf2/LinearMath/Quaternion.h>
+#include <tf2/LinearMath/Matrix3x3.hpp>
+#include <tf2/LinearMath/Quaternion.hpp>
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgcodecs.hpp>

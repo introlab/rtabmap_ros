@@ -519,7 +519,7 @@ void ICPOdometry::callbackScan(const sensor_msgs::msg::LaserScan::SharedPtr scan
 void ICPOdometry::callbackCloud(const sensor_msgs::msg::PointCloud2::SharedPtr pointCloudMsg)
 {
 	UASSERT_MSG(pointCloudMsg->data.size() == pointCloudMsg->row_step*pointCloudMsg->height,
-			uFormat("data=%d row_step=%d height=%d", pointCloudMsg->data.size(), pointCloudMsg->row_step, pointCloudMsg->height).c_str());
+			uFormat("data=%d row_step=%d height=%d", (int)pointCloudMsg->data.size(), (int)pointCloudMsg->row_step, (int)pointCloudMsg->height).c_str());
 
 	if(scanReceived_)
 	{
