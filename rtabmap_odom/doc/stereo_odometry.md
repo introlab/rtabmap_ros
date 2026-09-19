@@ -17,6 +17,7 @@ The shared parameters — frames, TF, guesses, the IMU, RTAB-Map's own parameter
 - [Parameters](#parameters)
 - [Synchronization](#synchronization)
 - [Getting the scale right](#getting-the-scale-right)
+- [Features computed elsewhere](#features-computed-elsewhere)
 - [Repetitive patterns](#repetitive-patterns)
 - [When it loses track](#when-it-loses-track)
 
@@ -145,6 +146,24 @@ Everything about a stereo trajectory's scale comes from the **baseline**, which 
 - A calibration whose baseline is off by a few percent produces a trajectory off by the same few percent, consistently, with nothing else looking wrong.
 
 If the map comes out uniformly too large or too small, check the baseline before anything else.
+
+## Features computed elsewhere
+
+`RGBDImage` has fields for local features — `key_points`, `points` and `descriptors` — and when a frame arrives with them filled, this node hands them to the odometry as they are instead of detecting and describing anything. RTAB-Map extracts features only from a frame that brought none, so nothing is recomputed, and neither is the disparity search that would otherwise give each feature its depth.
+
+This is for a camera, or a driver, that already does the extraction: on a multi-camera rig it is most of the per-frame work, and it can be done once and shared with `rtabmap` rather than repeated in each node.
+
+What a publisher has to get right:
+
+- **One entry per camera**, in the same order as the images, for `rgbd_cameras:=0` as well as the numbered topics.
+- **Keypoints in their own camera's left image.** The node stitches the left images side by side and shifts each camera's keypoints by the images that precede it. A stereo pair's features belong to the left image; nothing is expected in the right one.
+- **3D points in that camera's left optical frame.** They are brought into `frame_id` with the camera's transform from TF, the same one used for the calibration.
+- **Descriptors compressed** with `rtabmap::compressData()`, one row per keypoint, the same type for every camera.
+- **Equal counts.** `points` and `descriptors` may be left empty, but if they are there, they must have as many entries as there are keypoints. A frame whose three disagree has its features dropped with an error rather than used out of step.
+
+Both images may be left out entirely — the left image's job was to have features found in it, the right one's to give them their disparity, and they arrive with their 3D positions already. A frame is then its two calibrations and its features, which is the whole point: the images are nearly all of the bandwidth. Both `camera_info` still have to be there, the left one saying how big the image would have been and where the camera is, the right one carrying the baseline in `P(0,3)` — without it there is no scale, features or not.
+
+What stops applying, since nothing is extracted: `Vis/MaxFeatures`, the detector chosen with `Kp/DetectorStrategy`, and the depth bounds `Vis/MinDepth` and `Vis/MaxDepth`. Whatever is published is what gets registered, so the publisher owns those decisions. `Vis/CorType` must stay at `0` (feature matching); optical flow (`1`) reads the images themselves and has nothing to work with here.
 
 ## Repetitive patterns
 

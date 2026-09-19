@@ -43,6 +43,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <cv_bridge/cv_bridge.hpp>
 #endif
 #include <sensor_msgs/msg/image.hpp>
+#include <rtabmap_msgs/msg/key_point.hpp>
+#include <rtabmap_msgs/msg/point3f.hpp>
 #include <rtabmap_msgs/msg/rgbd_image.hpp>
 #include <rtabmap_msgs/msg/rgbd_images.hpp>
 
@@ -60,11 +62,20 @@ private:
 	virtual void updateParameters(rtabmap::ParametersMap & parameters);
 	virtual void onOdomInit();
 
+	/**
+	 * Local features, when the input topic carries them, are indexed per camera like
+	 * the images are: one entry per camera, in the same order, and placed in that
+	 * camera's left image. They are optional, and a frame that comes without them is
+	 * processed exactly as before, the features being extracted downstream.
+	 */
 	void commonCallback(
 			const std::vector<cv_bridge::CvImageConstPtr> & leftImages,
 			const std::vector<cv_bridge::CvImageConstPtr> & rightImages,
 			const std::vector<sensor_msgs::msg::CameraInfo>& leftCameraInfos,
-			const std::vector<sensor_msgs::msg::CameraInfo>& rightCameraInfos);
+			const std::vector<sensor_msgs::msg::CameraInfo>& rightCameraInfos,
+			const std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > & localKeyPointsMsgs = {},
+			const std::vector<std::vector<rtabmap_msgs::msg::Point3f> > & localPoints3dMsgs = {},
+			const std::vector<cv::Mat> & localDescriptorsMsgs = {});
 
 	void callback(
 			const sensor_msgs::msg::Image::ConstSharedPtr imageRectLeft,

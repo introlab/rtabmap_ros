@@ -14,6 +14,9 @@ All rights reserved. (BSD-3-Clause, see the repository root.)
 
 #include <cmath>
 
+#include <rtabmap/core/Version.h>
+
+#include "camera_rig.hpp"
 #include "msg_builders.hpp"
 #include "node_test_utils.hpp"
 #include "test_data.hpp"
@@ -88,6 +91,13 @@ protected:
 			return true;
 		}
 		return spinUntil([&]() { return helper()->count_subscribers("/tf_static") >= 1; });
+	}
+
+	/// Where each camera of a rig is mounted, as its driver would publish it once.
+	void publishRigTf(const CameraRig & rig)
+	{
+		staticTf_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(helper());
+		staticTf_->sendTransform(cameraRigTransforms(rig, helper()->now()));
 	}
 
 	std::shared_ptr<rtabmap_odom::StereoOdometry> makeNode(
@@ -732,6 +742,126 @@ TEST_F(StereoOdometryTest, rgbd_cameras_zero_takes_an_rgbd_images_topic)
 			helper()->create_publisher<rtabmap_msgs::msg::RGBDImages>("rgbd_images", 10);
 
 	EXPECT_TRUE(waitForSubscriber(pub));
+}
+
+/**
+ * @brief Four stereo pairs on one rig, driven a metre through a world of points.
+ *
+ * The frames carry their features -- keypoints, 3D points, descriptors -- and no image at
+ * all, as a driver that does its own extraction publishes them. What differs from the
+ * RGB-D rig is the second calibration of each camera: the node has to read the pairs as
+ * stereo, and the features still belong to the left image of each one.
+ *
+ * Both estimation types the multi-camera case supports are run. Vis/EstimationType=0
+ * aligns the two sets of 3D points, which needs nothing extra; =1 solves a PnP across all
+ * four cameras at once, which RTAB-Map hands to OpenGV and cannot do without it.
+ */
+class StereoOdometryRigTest :
+		public StereoOdometryTest,
+		public ::testing::WithParamInterface<int>
+{
+};
+
+TEST_P(StereoOdometryRigTest, recovers_the_trajectory_of_a_rig_from_the_features_it_is_given)
+{
+	const int estimationType = GetParam();
+#ifndef RTABMAP_OPENGV
+	if(estimationType == 1)
+	{
+		GTEST_SKIP() << "a multi-camera PnP is solved by OpenGV, which RTAB-Map was built without";
+	}
+#endif
+
+	const CameraRig rig = makeCameraRig();
+	publishRigTf(rig);
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+			collect<nav_msgs::msg::Odometry>("odom");
+	std::shared_ptr<Collector<rtabmap_msgs::msg::OdomInfo>> info =
+			collect<rtabmap_msgs::msg::OdomInfo>("odom_info");
+	makeNode({rclcpp::Parameter("subscribe_rgbd", true),
+	          rclcpp::Parameter("rgbd_cameras", 0),
+	          rclcpp::Parameter("Vis/EstimationType", std::to_string(estimationType))});
+
+	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImages>::SharedPtr pub =
+			helper()->create_publisher<rtabmap_msgs::msg::RGBDImages>("rgbd_images", 10);
+	ASSERT_TRUE(waitForSubscriber(pub));
+	ASSERT_TRUE(waitForPublisher(info->subscription));
+
+	// A metre forward, ten centimetres at a time.
+	const int frames = 11;
+	rtabmap_msgs::msg::RGBDImages lastFrame;
+	for(int i=0; i<frames; ++i)
+	{
+		lastFrame = cameraRigStereoFrame(rig, rtabmap::Transform(0.1f*i, 0, 0, 0, 0, 0), 1.0 + 0.1*i);
+		ASSERT_EQ(rig.cameras(), lastFrame.rgbd_images.size());
+		pub->publish(lastFrame);
+		ASSERT_TRUE(spinUntil([&]() { return odom->size() >= size_t(i+1); }))
+				<< "nothing came back for frame " << i;
+	}
+
+	const nav_msgs::msg::Odometry & last = odom->back();
+	ASSERT_FALSE(isLost(last)) << "lost tracking on a rig that sees the whole scene";
+	EXPECT_NEAR(1.0, last.pose.pose.position.x, 0.05)
+			<< "the rig travelled a metre along x";
+	EXPECT_NEAR(0.0, last.pose.pose.position.y, 0.05);
+	EXPECT_NEAR(0.0, last.pose.pose.position.z, 0.05);
+	EXPECT_NEAR(0.0, rotationAngle(last), 0.05) << "the rig never turned";
+
+	// The frame's own features, reassembled from the four cameras and used as they are.
+	// A couple can go missing on the way: RTAB-Map drops a feature whose descriptor lands
+	// on the same visual word as another one of the same frame, both being ambiguous then.
+	const int sent = int(cameraRigFeatureCount(lastFrame));
+	EXPECT_LE(info->back().features, sent);
+	EXPECT_GT(info->back().features, sent - 10)
+			<< "the node did not use the features the frame came with";
+}
+
+INSTANTIATE_TEST_SUITE_P(
+		EstimationTypes,
+		StereoOdometryRigTest,
+		::testing::Values(0, 1),
+		[](const ::testing::TestParamInfo<int> & info) {
+			return info.param == 0 ? std::string("3d_to_3d") : std::string("pnp_across_cameras");
+		});
+
+/**
+ * The control for the test above: the same frames with the features stripped off. What is
+ * left is four calibrations and nothing to see, which the node is right to process -- an
+ * empty scene is still a frame -- and right to report lost.
+ */
+TEST_F(StereoOdometryRigTest, the_same_frames_without_their_features_have_nothing_to_track)
+{
+	const CameraRig rig = makeCameraRig();
+	publishRigTf(rig);
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+			collect<nav_msgs::msg::Odometry>("odom");
+	std::shared_ptr<Collector<rtabmap_msgs::msg::OdomInfo>> info =
+			collect<rtabmap_msgs::msg::OdomInfo>("odom_info");
+	makeNode({rclcpp::Parameter("subscribe_rgbd", true),
+	          rclcpp::Parameter("rgbd_cameras", 0)});
+
+	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImages>::SharedPtr pub =
+			helper()->create_publisher<rtabmap_msgs::msg::RGBDImages>("rgbd_images", 10);
+	ASSERT_TRUE(waitForSubscriber(pub));
+	ASSERT_TRUE(waitForPublisher(info->subscription));
+
+	for(int i=0; i<2; ++i)
+	{
+		rtabmap_msgs::msg::RGBDImages frame =
+				cameraRigStereoFrame(rig, rtabmap::Transform(0.1f*i, 0, 0, 0, 0, 0), 1.0 + 0.1*i);
+		for(size_t c=0; c<frame.rgbd_images.size(); ++c)
+		{
+			frame.rgbd_images[c].key_points.clear();
+			frame.rgbd_images[c].points.clear();
+			frame.rgbd_images[c].descriptors.clear();
+		}
+		pub->publish(frame);
+		ASSERT_TRUE(spinUntil([&]() { return odom->size() >= size_t(i+1); }));
+	}
+
+	ASSERT_TRUE(spinUntil([&]() { return info->size() >= 2; }));
+	EXPECT_EQ(0, info->back().features) << "features appeared from a frame that has none";
+	EXPECT_TRUE(isLost(odom->back()));
 }
 
 }  // namespace

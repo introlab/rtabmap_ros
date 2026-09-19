@@ -160,20 +160,23 @@ inline std::vector<geometry_msgs::msg::TransformStamped> cameraRigTransforms(
 	return transforms;
 }
 
+/// What one camera of the rig saw: its keypoints, their 3D points and their descriptors.
+struct RigObservations
+{
+	std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > keyPoints;
+	std::vector<std::vector<rtabmap_msgs::msg::Point3f> > points;
+	std::vector<cv::Mat> descriptors;
+};
+
 /**
- * @brief What the rig observes from @p pose, as one message per camera.
+ * @brief What the rig sees from @p pose, one entry per camera.
  *
  * Each point is given to the first camera that has it in view, so no point is reported
  * twice. The keypoints are in their own camera's image, the 3D points in their own
  * camera's optical frame, and the descriptors in the order of the keypoints -- which is
  * how a driver publishes them, and what the node has to reassemble.
- *
- * @p withImages attaches a blank image to each camera. There is nothing to find in it,
- * but the odometry only takes the paths that touch images when one is there.
  */
-inline rtabmap_msgs::msg::RGBDImages cameraRigFrame(
-		const CameraRig & rig, const rtabmap::Transform & pose, double stamp,
-		bool withImages = false)
+inline RigObservations observeCameraRig(const CameraRig & rig, const rtabmap::Transform & pose)
 {
 	const size_t cameras = rig.cameras();
 	std::vector<rtabmap::CameraModel> models;
@@ -184,9 +187,10 @@ inline rtabmap_msgs::msg::RGBDImages cameraRigFrame(
 		worldToCamera.push_back((pose * rig.localTransforms[i]).inverse());
 	}
 
-	std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > keyPoints(cameras);
-	std::vector<std::vector<rtabmap_msgs::msg::Point3f> > points(cameras);
-	std::vector<cv::Mat> descriptors(cameras);
+	RigObservations seen;
+	seen.keyPoints.resize(cameras);
+	seen.points.resize(cameras);
+	seen.descriptors.resize(cameras);
 
 	for(size_t p=0; p<rig.points.size(); ++p)
 	{
@@ -213,23 +217,37 @@ inline rtabmap_msgs::msg::RGBDImages cameraRigFrame(
 			keyPoint.pt.y = v;
 			keyPoint.size = 3;
 			keyPoint.response = 1.0f;
-			keyPoints[i].push_back(keyPoint);
+			seen.keyPoints[i].push_back(keyPoint);
 
 			rtabmap_msgs::msg::Point3f point;
 			point.x = inCamera.x;
 			point.y = inCamera.y;
 			point.z = inCamera.z;
-			points[i].push_back(point);
+			seen.points[i].push_back(point);
 
-			descriptors[i].push_back(rig.descriptors.row(int(p)));
+			seen.descriptors[i].push_back(rig.descriptors.row(int(p)));
 			break;
 		}
 	}
+	return seen;
+}
+
+/**
+ * @brief The rig's observations from @p pose as RGB-D frames, one per camera.
+ *
+ * @p withImages attaches a blank image to each camera. There is nothing to find in it,
+ * but the odometry only takes the paths that touch images when one is there.
+ */
+inline rtabmap_msgs::msg::RGBDImages cameraRigFrame(
+		const CameraRig & rig, const rtabmap::Transform & pose, double stamp,
+		bool withImages = false)
+{
+	const RigObservations seen = observeCameraRig(rig, pose);
 
 	rtabmap_msgs::msg::RGBDImages msg;
 	msg.header.stamp = stampOf(stamp);
 	msg.header.frame_id = rig.frameIds[0];
-	for(size_t i=0; i<cameras; ++i)
+	for(size_t i=0; i<rig.cameras(); ++i)
 	{
 		rtabmap_msgs::msg::RGBDImage image;
 		image.header.stamp = msg.header.stamp;
@@ -245,10 +263,37 @@ inline rtabmap_msgs::msg::RGBDImages cameraRigFrame(
 		image.rgb_camera_info = makeCameraInfo(
 				rig.frameIds[i], stamp, rig.width, rig.height, 0.0, rig.fx);
 		image.depth_camera_info = image.rgb_camera_info;
-		image.key_points = keyPoints[i];
-		image.points = points[i];
-		image.descriptors = rtabmap::compressData(descriptors[i]);
+		image.key_points = seen.keyPoints[i];
+		image.points = seen.points[i];
+		image.descriptors = rtabmap::compressData(seen.descriptors[i]);
 		msg.rgbd_images.push_back(image);
+	}
+	return msg;
+}
+
+/**
+ * @brief The same observations as stereo frames: left camera plus a right one @p baseline
+ * to its side.
+ *
+ * `RGBDImage` carries a stereo pair as its color and depth fields, so this differs from
+ * the RGB-D frames above only in the second calibration, whose `P(0,3)` is what tells the
+ * node how far apart the two cameras are. The features belong to the left image either
+ * way, which is where a stereo pipeline finds them.
+ */
+inline rtabmap_msgs::msg::RGBDImages cameraRigStereoFrame(
+		const CameraRig & rig, const rtabmap::Transform & pose, double stamp,
+		double baseline = 0.12, bool withImages = false)
+{
+	rtabmap_msgs::msg::RGBDImages msg = cameraRigFrame(rig, pose, stamp, withImages);
+	for(size_t i=0; i<msg.rgbd_images.size(); ++i)
+	{
+		msg.rgbd_images[i].depth_camera_info = makeCameraInfo(
+				rig.frameIds[i], stamp, rig.width, rig.height, -baseline*rig.fx, rig.fx);
+		if(withImages)
+		{
+			msg.rgbd_images[i].depth = makeImage(rig.frameIds[i], stamp,
+					cv::Mat::zeros(rig.height, rig.width, CV_8UC1), "mono8");
+		}
 	}
 	return msg;
 }
