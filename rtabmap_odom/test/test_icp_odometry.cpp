@@ -9,6 +9,7 @@ All rights reserved. (BSD-3-Clause, see the repository root.)
 
 
 #include <rtabmap_msgs/msg/odom_info.hpp>
+#include <rtabmap_msgs/msg/sensor_data.hpp>
 
 #include <rtabmap_odom/icp_odometry.hpp>
 
@@ -93,7 +94,8 @@ protected:
 			// topics apart, or they publish over each other.
 			options.arguments({"--ros-args", "-r", "__node:=" + name,
 			                   "-r", "odom:=odom_" + name,
-			                   "-r", "odom_info:=odom_info_" + name});
+			                   "-r", "odom_info:=odom_info_" + name,
+			                   "-r", "odom_sensor_data/raw:=odom_sensor_data_" + name + "/raw"});
 		}
 		return addNode(std::make_shared<rtabmap_odom::ICPOdometry>(options));
 	}
@@ -1089,6 +1091,129 @@ TEST_F(IcpOdometryTest, without_an_imu_the_guess_carries_no_rotation)
 				<< "ICP recovered the turn from an identity guess, which would make the "
 				   "prediction tested above unnecessary";
 	}
+}
+
+
+// ---------------------------------------------------------------------------
+// What the node hands downstream, and two parameters that change it.
+// ---------------------------------------------------------------------------
+
+/**
+ * The scan republished on odom_sensor_data is the one ICP registered -- after
+ * voxelization -- not the sweep the lidar published. See "Reusing the filtered scan
+ * downstream" in doc/icp_odometry.md.
+ */
+TEST_F(IcpOdometryTest, republishes_the_filtered_scan_rather_than_the_input)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+			collect<nav_msgs::msg::Odometry>("odom");
+	std::shared_ptr<Collector<rtabmap_msgs::msg::SensorData>> data =
+			collect<rtabmap_msgs::msg::SensorData>("odom_sensor_data/raw");
+	std::vector<rclcpp::Parameter> params = icpTestParameters();
+	params.push_back(rclcpp::Parameter("scan_voxel_size", 0.5));   // coarse, on a 4 m corner
+	makeNode(params);
+
+	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub =
+			helper()->create_publisher<sensor_msgs::msg::PointCloud2>("scan_cloud", 10);
+	ASSERT_TRUE(waitForSubscriber(pub));
+
+	const std::vector<cv::Point3f> points = corner3D();
+	pub->publish(makeXYZCloud("lidar", 1.0, points));
+	ASSERT_TRUE(spinUntil([&]() { return !odom->empty() && !data->empty(); }));
+
+	// 1200 points in, 243 out at a 0.5 m voxel on a 4 m corner.
+	EXPECT_GT(data->back().laser_scan.width, 0u) << "no scan was republished at all";
+	EXPECT_LT(data->back().laser_scan.width, points.size() / 2)
+			<< "the republished scan still has the input's density, so it is the input";
+}
+
+/**
+ * scan_cloud_is_2d says a cloud carrying a z field is a planar scan after all, so it is
+ * registered -- and republished -- as 2D. The scan format says which it was: 3
+ * (kXYNormal) against 8 (3D with normals) for the same cloud.
+ */
+TEST_F(IcpOdometryTest, scan_cloud_is_2d_registers_a_cloud_as_a_planar_scan)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<rtabmap_msgs::msg::SensorData>> planar =
+			collect<rtabmap_msgs::msg::SensorData>("odom_sensor_data_planar/raw");
+	std::shared_ptr<Collector<rtabmap_msgs::msg::SensorData>> volume =
+			collect<rtabmap_msgs::msg::SensorData>("odom_sensor_data_volume/raw");
+	std::vector<rclcpp::Parameter> flat = icpTestParameters();
+	std::vector<rclcpp::Parameter> spatial = icpTestParameters();
+	flat.push_back(rclcpp::Parameter("scan_cloud_is_2d", true));
+	spatial.push_back(rclcpp::Parameter("scan_cloud_is_2d", false));
+	makeNode(flat, "planar");
+	makeNode(spatial, "volume");
+
+	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub =
+			helper()->create_publisher<sensor_msgs::msg::PointCloud2>("scan_cloud", 10);
+	ASSERT_TRUE(waitForSubscriber(pub, 2));
+
+	// A flat corner: two walls, every point at z = 0, but the cloud still carries a z field.
+	std::vector<cv::Point3f> points;
+	for(int i=0; i<200; ++i)
+	{
+		points.push_back(cv::Point3f(-2.0f + 0.02f*i, -2.0f, 0.0f));
+		points.push_back(cv::Point3f(-2.0f, -2.0f + 0.02f*i, 0.0f));
+	}
+	pub->publish(makeXYZCloud("lidar", 1.0, points));
+	ASSERT_TRUE(spinUntil([&]() { return !planar->empty() && !volume->empty(); }));
+
+	// LaserScan::Format numbers the 2D layouts 1 to 4 and the 3D ones from 5 up.
+	EXPECT_LT(planar->back().laser_scan_format, 5)
+			<< "the cloud was registered as 3D despite scan_cloud_is_2d";
+	EXPECT_GE(volume->back().laser_scan_format, 5)
+			<< "the same cloud should be 3D without the parameter";
+}
+
+/**
+ * deskewing_slerp interpolates the correction between the ends of the sweep instead of
+ * looking TF up for every point -- cheaper, and per the documentation slightly less
+ * accurate. It has to land in the same place.
+ */
+TEST_F(IcpOdometryTest, deskewing_slerp_gives_the_same_answer_as_the_per_point_lookup)
+{
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> slerp =
+			collect<nav_msgs::msg::Odometry>("odom_slerp");
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> perPoint =
+			collect<nav_msgs::msg::Odometry>("odom_perpoint");
+	const Recording recording = readOusterRecording();
+	ASSERT_TRUE(recording.valid()) << "could not read " << ousterHalfTurnBag();
+
+	const std::vector<rclcpp::Parameter> common = {
+		rclcpp::Parameter("deskewing", true),
+		rclcpp::Parameter("guess_frame_id", "base_link"),
+		rclcpp::Parameter("scan_cloud_max_points", 65536),
+		rclcpp::Parameter("scan_voxel_size", 0.2),
+		rclcpp::Parameter("Icp/MaxCorrespondenceDistance", "2.0"),
+		rclcpp::Parameter("Icp/MaxTranslation", "0.5"),
+		rclcpp::Parameter("wait_for_transform", 2.0)};
+	std::vector<rclcpp::Parameter> a = common, b = common;
+	a.push_back(rclcpp::Parameter("deskewing_slerp", true));
+	b.push_back(rclcpp::Parameter("deskewing_slerp", false));
+	makeNode(a, "slerp");
+	makeNode(b, "perpoint");
+	ASSERT_TRUE(publishRecordedTf(recording));
+
+	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub =
+			helper()->create_publisher<sensor_msgs::msg::PointCloud2>("scan_cloud", 10);
+	ASSERT_TRUE(waitForSubscriber(pub, 2));
+
+	pub->publish(recording.clouds[0]);
+	ASSERT_TRUE(spinUntil([&]() { return !slerp->empty() && !perPoint->empty(); }));
+	pub->publish(recording.clouds[1]);
+	ASSERT_TRUE(spinUntil([&]() {
+		return slerp->size() >= 2 && perPoint->size() >= 2; }));
+
+	ASSERT_FALSE(isLost(slerp->back())) << "the interpolated deskew failed to register";
+	ASSERT_FALSE(isLost(perPoint->back()));
+	// 0.0117 m against 0.0131 m, and the rotations agree to four decimals: "slightly less
+	// accurate", as documented, and nowhere near a different answer.
+	EXPECT_NEAR(translationNorm(perPoint->back()), translationNorm(slerp->back()), 0.01)
+			<< "interpolating the correction moved the estimate";
+	EXPECT_NEAR(rotationAngle(perPoint->back()), rotationAngle(slerp->back()), 0.01);
 }
 
 }  // namespace

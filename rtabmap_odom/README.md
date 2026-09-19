@@ -227,7 +227,7 @@ Recovering from lost is what `Odom/ResetCountdown` is for, or the `reset_odom` s
 
 | Service | Type | Description |
 |---|---|---|
-| `reset_odom` | [`std_srvs/srv/Empty`](https://docs.ros.org/en/jazzy/p/std_srvs/srv/Empty.html) | Reset the pose to the identity and drop the internal local map. |
+| `reset_odom` | [`std_srvs/srv/Empty`](https://docs.ros.org/en/jazzy/p/std_srvs/srv/Empty.html) | Drop the internal local map and restart the pose — at the identity, or, with `guess_frame_id` configured, at whatever pose the guess frame currently holds, so that odometry restarts where the other source says the robot is. |
 | `reset_odom_to_pose` | [`rtabmap_msgs/srv/ResetPose`](https://docs.ros.org/en/jazzy/p/rtabmap_msgs/srv/ResetPose.html) | Reset to a given `x y z roll pitch yaw`. |
 | `pause_odom` | [`std_srvs/srv/Empty`](https://docs.ros.org/en/jazzy/p/std_srvs/srv/Empty.html) | Stop processing incoming frames. |
 | `resume_odom` | [`std_srvs/srv/Empty`](https://docs.ros.org/en/jazzy/p/std_srvs/srv/Empty.html) | Resume. |
@@ -242,9 +242,9 @@ Common to all three nodes. **Every one of them, `odom` included, is published on
 | `odom` | [`nav_msgs/msg/Odometry`](https://docs.ros.org/en/jazzy/p/nav_msgs/msg/Odometry.html) | The pose and velocity. Covariance is meaningful: it grows with registration uncertainty, and is `9999` on the diagonal when lost. |
 | `odom_info` | [`rtabmap_msgs/msg/OdomInfo`](https://docs.ros.org/en/jazzy/p/rtabmap_msgs/msg/OdomInfo.html) | Everything about how the frame was registered — inlier count, matches, features, timings. The first thing to look at when odometry misbehaves. |
 | `odom_info_lite` | [`rtabmap_msgs/msg/OdomInfo`](https://docs.ros.org/en/jazzy/p/rtabmap_msgs/msg/OdomInfo.html) | The same without the per-feature arrays, for logging or a slow link. |
-| `odom_local_map` | [`sensor_msgs/msg/PointCloud2`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/PointCloud2.html) | The feature map the current frame was registered against. |
-| `odom_local_scan_map` | [`sensor_msgs/msg/PointCloud2`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/PointCloud2.html) | The scan map, for the ICP path. |
-| `odom_last_frame` | [`sensor_msgs/msg/PointCloud2`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/PointCloud2.html) | The current frame's points. |
+| `odom_local_map` | [`sensor_msgs/msg/PointCloud2`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/PointCloud2.html) | The feature map the current frame was registered against. Visual paths only — built from the frame's visual words, so `icp_odometry` never fills it. |
+| `odom_local_scan_map` | [`sensor_msgs/msg/PointCloud2`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/PointCloud2.html) | The scan map, the ICP path's equivalent of `odom_local_map`. |
+| `odom_last_frame` | [`sensor_msgs/msg/PointCloud2`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/PointCloud2.html) | The current frame's **features**, in the odom frame — not its scan or its pixels. Visual paths only, for the same reason as `odom_local_map`; for the filtered scan see `odom_sensor_data/*`. |
 | `odom_rgbd_image` | [`rtabmap_msgs/msg/RGBDImage`](https://docs.ros.org/en/jazzy/p/rtabmap_msgs/msg/RGBDImage.html) | The frame **as odometry processed it**, not the input as it arrived. See [Outputting filtered scans and features](#outputting-filtered-scans-and-features). |
 | `odom_sensor_data/raw`, `/features`, `/compressed` | [`rtabmap_msgs/msg/SensorData`](https://docs.ros.org/en/jazzy/p/rtabmap_msgs/msg/SensorData.html) | The same frame as `SensorData`. `/features` strips the images and scan and keeps only the extracted features; `/compressed` carries JPEG/PNG images instead of raw. |
 

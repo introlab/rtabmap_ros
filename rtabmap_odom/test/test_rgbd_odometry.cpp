@@ -415,5 +415,87 @@ TEST_F(RgbdOdometryTest, publishes_nothing_when_lost_if_null_publishing_is_off)
 	EXPECT_TRUE(odom->empty());
 }
 
+
+/**
+ * keep_color decides what reaches RTAB-Map from a color image, and therefore what the
+ * node republishes: the matcher works in grayscale, so the color is dropped unless asked
+ * for. Same contract as stereo_odometry, checked here because the doc states it of this
+ * node too.
+ */
+TEST_F(RgbdOdometryTest, keeps_the_image_in_color_when_asked)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<rtabmap_msgs::msg::RGBDImage>> frames =
+			collect<rtabmap_msgs::msg::RGBDImage>("odom_rgbd_image");
+	makeNode({rclcpp::Parameter("subscribe_rgbd", true),
+	          rclcpp::Parameter("keep_color", true)});
+
+	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr pub =
+			helper()->create_publisher<rtabmap_msgs::msg::RGBDImage>("rgbd_image", 10);
+	ASSERT_TRUE(waitForSubscriber(pub));
+	ASSERT_TRUE(waitForPublisher(frames->subscription));
+
+	pub->publish(makeFrame(kFrame, 1.0));
+	ASSERT_TRUE(spinUntil([&]() { return !frames->empty(); }));
+	EXPECT_EQ("bgr8", frames->back().rgb.encoding);
+}
+
+/// Off by default: what reaches RTAB-Map, and comes back out, is grayscale.
+TEST_F(RgbdOdometryTest, converts_the_image_to_grayscale_by_default)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<rtabmap_msgs::msg::RGBDImage>> frames =
+			collect<rtabmap_msgs::msg::RGBDImage>("odom_rgbd_image");
+	std::shared_ptr<rtabmap_odom::RGBDOdometry> node =
+			makeNode({rclcpp::Parameter("subscribe_rgbd", true)});
+	EXPECT_FALSE(node->get_parameter("keep_color").as_bool());
+
+	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr pub =
+			helper()->create_publisher<rtabmap_msgs::msg::RGBDImage>("rgbd_image", 10);
+	ASSERT_TRUE(waitForSubscriber(pub));
+	ASSERT_TRUE(waitForPublisher(frames->subscription));
+
+	pub->publish(makeFrame(kFrame, 1.0));
+	ASSERT_TRUE(spinUntil([&]() { return !frames->empty(); }));
+	EXPECT_EQ("mono8", frames->back().rgb.encoding);
+}
+
+/**
+ * The two feature topics the lidar node cannot fill: both are built from the frame's
+ * visual words, so they carry content only on the visual paths. `odom_local_map` is the
+ * map the frame was registered against, `odom_last_frame` the frame's own features, both
+ * in the odom frame.
+ */
+TEST_F(RgbdOdometryTest, publishes_the_feature_map_and_the_frame_that_registered_against_it)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+			collect<nav_msgs::msg::Odometry>("odom");
+	std::shared_ptr<Collector<sensor_msgs::msg::PointCloud2>> localMap =
+			collect<sensor_msgs::msg::PointCloud2>("odom_local_map");
+	std::shared_ptr<Collector<sensor_msgs::msg::PointCloud2>> lastFrame =
+			collect<sensor_msgs::msg::PointCloud2>("odom_last_frame");
+	makeNode({rclcpp::Parameter("subscribe_rgbd", true)});
+
+	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr pub =
+			helper()->create_publisher<rtabmap_msgs::msg::RGBDImage>("rgbd_image", 10);
+	ASSERT_TRUE(waitForSubscriber(pub));
+	ASSERT_TRUE(waitForPublisher(localMap->subscription));
+	ASSERT_TRUE(waitForPublisher(lastFrame->subscription));
+
+	pub->publish(makeFrame(kFrame, 1.0));
+	ASSERT_TRUE(spinUntil([&]() { return !odom->empty(); }));
+	pub->publish(makeFrame(kFrame, 1.1));
+	ASSERT_TRUE(spinUntil([&]() { return odom->size() >= 2; }));
+
+	// 534 features on this frame, in both, expressed in the odometry frame.
+	ASSERT_FALSE(localMap->empty()) << "no feature map was published";
+	ASSERT_FALSE(lastFrame->empty()) << "no frame features were published";
+	EXPECT_GT(localMap->back().width, 0u);
+	EXPECT_GT(lastFrame->back().width, 0u);
+	EXPECT_EQ("odom", lastFrame->back().header.frame_id)
+			<< "these are published in the odometry frame, not the sensor's";
+}
+
 }  // namespace
 }  // namespace rtabmap_odom_test

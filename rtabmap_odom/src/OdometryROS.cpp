@@ -717,39 +717,6 @@ void OdometryROS::processData()
 		}
 	}
 
-	bool tooOldPreviousData = minUpdateRate_ > 0 && previousStamp_ > 0 && rtabmap_conversions::timestampFromROS(header.stamp)-previousStamp_ > 1.0/minUpdateRate_;
-	if(tooOldPreviousData)
-	{
-		RCLCPP_WARN(this->get_logger(), "Odometry lost! Odometry will be reset because last update "
-				"is %fs too old (>%fs, min_update_rate = %f Hz). Previous data stamp is %f while new data stamp is %f.",
-				rtabmap_conversions::timestampFromROS(header.stamp) - previousStamp_, 1.0/minUpdateRate_, minUpdateRate_, previousStamp_, rtabmap_conversions::timestampFromROS(header.stamp));
-
-		if(!guess_.isNull())
-		{
-			RCLCPP_WARN(this->get_logger(), "Odometry automatically reset based on latest guess available from TF (%s->%s, moved %s since got lost)!",
-					guessFrameId_.c_str(), frameId_.c_str(), guess_.prettyPrint().c_str());
-			odometry_->reset(odometry_->getPose() * guess_);
-			guess_.setNull();
-			guessPreviousPose_.setNull();
-		}
-		else
-		{
-			// Check TF to see if sensor fusion is used (e.g., the output of robot_localization)
-			Transform tfPose = rtabmap_conversions::getTransform(odomFrameId_, frameId_, header.stamp, *tfBuffer_, waitForTransform_);
-			if(tfPose.isNull())
-			{
-				RCLCPP_WARN(this->get_logger(), "Odometry automatically reset to latest computed pose!");
-				odometry_->reset(odometry_->getPose());
-			}
-			else
-			{
-				RCLCPP_WARN(this->get_logger(), "Odometry automatically reset to latest odometry pose available from TF (%s->%s)!",
-						odomFrameId_.c_str(), frameId_.c_str());
-				odometry_->reset(tfPose);
-			}
-		}
-	}
-	
 	bool skipOdometryUpdate = false;
 
 	rtabmap::Transform pose;
@@ -757,19 +724,20 @@ void OdometryROS::processData()
 	rtabmap::Transform guessVelocity;
 
 	Transform guessCurrentPose;
+	// Whether the guess has a previous pose to be relative to, which decides how the pose
+	// is seeded from it further down. It is cleared by reset(), so a reset asked for
+	// through a service restarts at the guess frame while an automatic one continues from
+	// the pose it has just carried forward.
+	bool guessIsTheFirstOne = false;
 	if(!guessFrameId_.empty())
 	{
 		guessCurrentPose = rtabmap_conversions::getTransform(guessFrameId_, frameId_, header.stamp, *tfBuffer_, waitForTransform_);
 
 		Transform previousPose = guessPreviousPose_;
-		if(guessPreviousPose_.isNull())
+		guessIsTheFirstOne = guessPreviousPose_.isNull();
+		if(guessIsTheFirstOne)
 		{
 			previousPose = guessCurrentPose;
-			if(!guessCurrentPose.isNull() && odometry_->getPose().isIdentity())
-			{
-				RCLCPP_INFO(get_logger(), "Odometry: init pose with guess %s", guessCurrentPose.prettyPrint().c_str());
-				odometry_->reset(guessCurrentPose);
-			}
 		}
 
 		if(!previousPose.isNull() && !guessCurrentPose.isNull())
@@ -818,14 +786,96 @@ void OdometryROS::processData()
 		}
 	}
 
+	// Handled here rather than before the guess is computed: guess_ only holds the motion
+	// since the previous frame once the block above has run, and resetting without it
+	// throws away everything the guess source measured across the gap -- which is exactly
+	// what this reset is supposed to carry over.
+	bool tooOldPreviousData = minUpdateRate_ > 0 && previousStamp_ > 0 && rtabmap_conversions::timestampFromROS(header.stamp)-previousStamp_ > 1.0/minUpdateRate_;
+	if(tooOldPreviousData)
+	{
+		RCLCPP_WARN(this->get_logger(), "Odometry lost! Odometry will be reset because last update "
+				"is %fs too old (>%fs, min_update_rate = %f Hz). Previous data stamp is %f while new data stamp is %f.",
+				rtabmap_conversions::timestampFromROS(header.stamp) - previousStamp_, 1.0/minUpdateRate_, minUpdateRate_, previousStamp_, rtabmap_conversions::timestampFromROS(header.stamp));
+
+		if(!guess_.isNull())
+		{
+			RCLCPP_WARN(this->get_logger(), "Odometry automatically reset based on latest guess available from TF (%s->%s, moved %s since got lost)!",
+					guessFrameId_.c_str(), frameId_.c_str(), guess_.prettyPrint().c_str());
+			odometry_->reset(odometry_->getPose() * guess_);
+			// Cleared because it has just been applied: the odometry now starts from a
+			// pose that already includes it, and leaving it would have the registration
+			// apply it a second time on the frame that initialises the new map.
+			// guessPreviousPose_ is kept, so the next frame measures its motion from this
+			// one rather than starting over and losing a frame of it.
+			guess_.setNull();
+		}
+		else
+		{
+			// Check TF to see if sensor fusion is used (e.g., the output of robot_localization)
+			Transform tfPose = rtabmap_conversions::getTransform(odomFrameId_, frameId_, header.stamp, *tfBuffer_, waitForTransform_);
+			if(tfPose.isNull())
+			{
+				RCLCPP_WARN(this->get_logger(), "Odometry automatically reset to latest computed pose!");
+				odometry_->reset(odometry_->getPose());
+			}
+			else
+			{
+				RCLCPP_WARN(this->get_logger(), "Odometry automatically reset to latest odometry pose available from TF (%s->%s)!",
+						odomFrameId_.c_str(), frameId_.c_str());
+				odometry_->reset(tfPose);
+			}
+		}
+	}
+
 	// process data
 	rclcpp::Time timeStart = rclcpp::Clock().now();
 	if(!groundTruth.isNull())
 	{
 		data.setGroundTruth(groundTruth);
 	}
+	// Set when the guess has already been folded into the pose below, so that a reset
+	// later in this frame does not go looking for a fallback that is no longer needed.
+	bool poseCarriedByGuess = false;
 	if(!skipOdometryUpdate)
 	{
+		// This frame will initialise the odometry's map whenever no frame has been
+		// registered since the last reset -- at startup, after a service reset, or on
+		// recovery from an automatic one. Registration then returns no motion, so the pose
+		// has to be put where the guess says the robot is *before* the frame is processed:
+		// afterwards the map is already anchored in the wrong place, and the next
+		// registration measures the difference against that anchor and takes the correction
+		// straight back out. Resetting here costs nothing, the map being empty either way.
+		//
+		// There are two ways to be right, depending on what the guess can say:
+		if(odometry_->framesProcessed() == 0 && !guessCurrentPose.isNull())
+		{
+			if(guessIsTheFirstOne)
+			{
+				// Nothing to be relative to. Adopt the guess source's own coordinates, so
+				// that odometry restarts where the guess says it is rather than at the
+				// origin. A pose asked for explicitly through reset_odom_to_pose is left
+				// alone: only an odometry still sitting at the identity is seeded this way.
+				if(odometry_->getPose().isIdentity())
+				{
+					RCLCPP_INFO(get_logger(), "Odometry: init pose with guess %s",
+							guessCurrentPose.prettyPrint().c_str());
+					odometry_->reset(guessCurrentPose);
+				}
+			}
+			else if(!guess_.isNull() && !guess_.isIdentity())
+			{
+				// There is a previous guess pose, so the guess describes real motion since
+				// the frame before this one -- which an automatic reset has just carried the
+				// pose through. Advance by it and the trajectory stays continuous; drop it
+				// and the new map is anchored a frame behind, once per reset, accumulating.
+				RCLCPP_DEBUG(this->get_logger(), "Odometry: advancing the pose by the guess "
+						"(%s) before the map is initialised, so the motion measured since the "
+						"previous frame is not lost.", guess_.prettyPrint().c_str());
+				odometry_->reset(odometry_->getPose() * guess_);
+				guess_.setNull();
+				poseCarriedByGuess = true;
+			}
+		}
 		pose = odometry_->process(data, guess_, &info);
 	}
 	if(!pose.isNull())
@@ -1107,6 +1157,17 @@ void OdometryROS::processData()
 				odometry_->reset(odometry_->getPose() * guess_);
 				guess_.setNull();
 			}
+			else if(poseCarriedByGuess)
+			{
+				// The guess was folded into the pose before this frame was processed, so the
+				// pose already covers the motion since the last one. Going to TF for a
+				// fallback here would block for wait_for_transform on every lost frame and
+				// answer a question that has already been answered.
+				RCLCPP_WARN(this->get_logger(), "Odometry automatically reset, carrying the "
+						"latest guess from TF (%s->%s) that was already applied to the pose!",
+						guessFrameId_.c_str(), frameId_.c_str());
+				odometry_->reset(odometry_->getPose());
+			}
 			else
 			{
 				// Check TF to see if sensor fusion is used (e.g., the output of robot_localization)
@@ -1320,6 +1381,11 @@ void OdometryROS::reset(const Transform & pose)
 	UScopeMutex lock(dataMutex_);
 	odometry_->reset(pose);
 	guess_.setNull();
+	// Clearing this is what tells the next frame to restart from the guess frame rather
+	// than continue from here: the seeding step below cannot tell a reset asked for
+	// through a service from one the node decided on its own, and reads this instead. The
+	// automatic resets deliberately leave it alone, so that they carry on from the pose
+	// they just moved.
 	guessPreviousPose_.setNull();
 	previousStamp_ = 0.0;
 	previousClockTime_ = 0.0;
