@@ -101,6 +101,110 @@ protected:
 	 * processed. The clouds keep their recorded stamps and frame -- os_sensor, which TF
 	 * ties back to base_link through the rig's rotating joint.
 	 */
+
+	// -----------------------------------------------------------------------
+	// A 2D lidar on a robot driving at a corner, for the LaserScan deskewing path.
+	// -----------------------------------------------------------------------
+
+	static constexpr double kScanSweep = 0.1;     ///< first ray to last, seconds
+	static constexpr double kFirstScan = 1.0;     ///< stamp of the first scan
+	static constexpr double kSecondScan = 1.5;    ///< stamp of the second
+
+	/**
+	 * @brief Where the robot is at time @p t, in odom.
+	 *
+	 * It drives at 1 m/s through the first sweep and the gap after it, then stops before
+	 * the second. That difference is the whole point: at a constant speed both sweeps bend
+	 * by the same amount and even an unskewed registration lands in the right place, so
+	 * the bug would hide. Braking makes the first scan bent and the second straight.
+	 */
+	static double robotX(double t)
+	{
+		const double cruise = kSecondScan - kScanSweep;   // stops one sweep early
+		return t <= kFirstScan ? 0.0
+				: (t < cruise ? (t - kFirstScan) : (cruise - kFirstScan));
+	}
+
+	/// What the odometry should report between the two scan stamps.
+	static double trueDisplacement()
+	{
+		return robotX(kSecondScan) - robotX(kFirstScan);
+	}
+
+	/**
+	 * @brief One scan of the corner, skewed by the robot's motion during the sweep.
+	 *
+	 * Each ray is cast from where the sensor actually was when that ray was taken, which
+	 * is what a real lidar does and what makes the wall come out bent.
+	 */
+	sensor_msgs::msg::LaserScan makeSkewedCornerScan(double stamp)
+	{
+		sensor_msgs::msg::LaserScan scan;
+		scan.header.frame_id = "lidar";
+		scan.header.stamp = stampOf(stamp);
+		scan.angle_min = -1.0f;
+		scan.angle_max = 1.0f;
+		scan.angle_increment = 0.01f;
+		scan.range_min = 0.1f;
+		scan.range_max = 30.0f;
+		const size_t rays = size_t((scan.angle_max - scan.angle_min) / scan.angle_increment) + 1;
+		scan.time_increment = float(kScanSweep / double(rays - 1));
+		scan.scan_time = float(kScanSweep);
+		scan.ranges.resize(rays);
+		for(size_t i=0; i<rays; ++i)
+		{
+			const double rayTime = stamp + double(i) * scan.time_increment;
+			const double angle = scan.angle_min + double(i) * scan.angle_increment;
+			scan.ranges[i] = corner2DRange(robotX(rayTime), 0.0, angle);
+		}
+		return scan;
+	}
+
+	/**
+	 * @brief Publishes odom -> base_link along that trajectory, plus base_link -> lidar.
+	 *
+	 * Sampled at 100 Hz across both sweeps: laser_geometry interpolates between whatever
+	 * TF holds, and the correction is only as good as the trajectory it can see.
+	 */
+	bool publishRobotTrajectory()
+	{
+		staticTf_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(helper());
+		geometry_msgs::msg::TransformStamped sensor;
+		sensor.header.stamp = helper()->now();
+		sensor.header.frame_id = "base_link";
+		sensor.child_frame_id = "lidar";
+		sensor.transform.rotation.w = 1.0;
+		staticTf_->sendTransform(sensor);
+
+		rclcpp::Publisher<tf2_msgs::msg::TFMessage>::SharedPtr tf =
+				helper()->create_publisher<tf2_msgs::msg::TFMessage>("/tf", rclcpp::QoS(200));
+		std::shared_ptr<Collector<tf2_msgs::msg::TFMessage>> echo =
+				collect<tf2_msgs::msg::TFMessage>("/tf", rclcpp::QoS(200));
+		if(!waitForSubscriber(tf, 2))
+		{
+			return false;
+		}
+		size_t published = 0;
+		for(double t = kFirstScan - 0.1; t <= kSecondScan + kScanSweep + 0.1; t += 0.01)
+		{
+			geometry_msgs::msg::TransformStamped pose;
+			pose.header.stamp = stampOf(t);
+			pose.header.frame_id = "odom";
+			pose.child_frame_id = "base_link";
+			pose.transform.translation.x = robotX(t);
+			pose.transform.rotation.w = 1.0;
+			tf2_msgs::msg::TFMessage message;
+			message.transforms.push_back(pose);
+			tf->publish(message);
+			if(++published % 10 == 0)
+			{
+				spinFor(std::chrono::milliseconds(5));
+			}
+		}
+		tfPublisher_ = tf;
+		return spinUntil([&]() { return echo->size() >= published; });
+	}
+
 	struct Recording
 	{
 		std::vector<tf2_msgs::msg::TFMessage> staticTransforms;
@@ -526,6 +630,110 @@ TEST_F(IcpOdometryTest, deskewing_is_what_lets_a_half_turn_pair_register)
 				<< rotationAngle(deskewed->back()) << " rad, as recorded="
 				<< rotationAngle(asRecorded->back()) << " rad)";
 	}
+}
+
+
+// ---------------------------------------------------------------------------
+// 2D scan deskewing: a lidar on a robot driving at a corner.
+// ---------------------------------------------------------------------------
+
+/**
+ * The LaserScan path through icp_odometry, with deskewing against a fixed frame.
+ *
+ * The robot drives at the corner at 1 m/s and stops just before the second scan, so the
+ * first sweep is bent and the second is straight. Deskewed, both describe the same corner
+ * and the registration returns the distance actually travelled between the two stamps.
+ */
+TEST_F(IcpOdometryTest, deskews_a_2d_scan_against_a_fixed_frame)
+{
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+			collect<nav_msgs::msg::Odometry>("odom_deskewed");
+	makeNode({rclcpp::Parameter("deskewing", true),
+	          rclcpp::Parameter("guess_frame_id", "odom"),
+	          rclcpp::Parameter("Icp/PointToPlane", "false"),
+	          rclcpp::Parameter("Icp/CorrespondenceRatio", "0.1"),
+	          rclcpp::Parameter("Icp/MaxTranslation", "0.0"),
+	          rclcpp::Parameter("Reg/Force3DoF", "true"),
+	          rclcpp::Parameter("scan_voxel_size", 0.0),
+	          rclcpp::Parameter("wait_for_transform", 2.0)},
+	         "deskewed");
+	ASSERT_TRUE(publishRobotTrajectory());
+
+	rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr pub =
+			helper()->create_publisher<sensor_msgs::msg::LaserScan>("scan", 10);
+	ASSERT_TRUE(waitForSubscriber(pub));
+
+	pub->publish(makeSkewedCornerScan(kFirstScan));
+	ASSERT_TRUE(spinUntil([&]() { return !odom->empty(); })) << "the first scan produced nothing";
+	pub->publish(makeSkewedCornerScan(kSecondScan));
+	ASSERT_TRUE(spinUntil([&]() { return odom->size() >= 2; })) << "the second scan produced nothing";
+
+	ASSERT_FALSE(isLost(odom->back())) << "the deskewed pair failed to register";
+	// 0.399909 m against a truth of 0.4, and 5e-5 m sideways, repeatable to the last
+	// digit. A centimetre of tolerance leaves room for a different ICP backend without
+	// leaving room for the 5 cm error an unskewed registration makes on this scene.
+	EXPECT_NEAR(trueDisplacement(), odom->back().pose.pose.position.x, 0.01)
+			<< "the robot drove " << trueDisplacement() << " m between the two scans";
+	EXPECT_NEAR(0.0, odom->back().pose.pose.position.y, 0.01)
+			<< "it drove straight at the corner, so there is no sideways motion to find";
+}
+
+
+/**
+ * The same two scans with deskewing off, side by side with a node that has it on.
+ *
+ * The first sweep is bent by the motion and the second is not, so an uncorrected
+ * registration is matching two different shapes and pays for it in the estimate.
+ */
+TEST_F(IcpOdometryTest, deskewing_a_2d_scan_changes_what_is_registered)
+{
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> deskewed =
+			collect<nav_msgs::msg::Odometry>("odom_deskewed");
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> asScanned =
+			collect<nav_msgs::msg::Odometry>("odom_as_scanned");
+	const std::vector<rclcpp::Parameter> icp = {
+		rclcpp::Parameter("guess_frame_id", "odom"),
+		rclcpp::Parameter("Icp/PointToPlane", "false"),
+		rclcpp::Parameter("Icp/CorrespondenceRatio", "0.1"),
+		rclcpp::Parameter("Icp/MaxTranslation", "0.0"),
+		rclcpp::Parameter("Reg/Force3DoF", "true"),
+		rclcpp::Parameter("scan_voxel_size", 0.0),
+		rclcpp::Parameter("wait_for_transform", 2.0)};
+	std::vector<rclcpp::Parameter> on = icp, off = icp;
+	on.push_back(rclcpp::Parameter("deskewing", true));
+	off.push_back(rclcpp::Parameter("deskewing", false));
+	makeNode(on, "deskewed");
+	makeNode(off, "as_scanned");
+	ASSERT_TRUE(publishRobotTrajectory());
+
+	rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr pub =
+			helper()->create_publisher<sensor_msgs::msg::LaserScan>("scan", 10);
+	ASSERT_TRUE(waitForSubscriber(pub, 2));
+
+	pub->publish(makeSkewedCornerScan(kFirstScan));
+	ASSERT_TRUE(spinUntil([&]() { return !deskewed->empty() && !asScanned->empty(); }));
+	pub->publish(makeSkewedCornerScan(kSecondScan));
+	ASSERT_TRUE(spinUntil([&]() {
+		return deskewed->size() >= 2 && asScanned->size() >= 2; }));
+
+	ASSERT_FALSE(isLost(deskewed->back()));
+	ASSERT_FALSE(isLost(asScanned->back()))
+			<< "the uncorrected pair was expected to register, just badly";
+
+	const double deskewedError =
+			std::fabs(deskewed->back().pose.pose.position.x - trueDisplacement());
+	const double skewedError =
+			std::fabs(asScanned->back().pose.pose.position.x - trueDisplacement());
+
+	// Measured: 0.0001 m corrected against 0.0499 m uncorrected. That 5 cm is half the
+	// 0.1 m the robot covered during the bent sweep, which is what it costs to match a
+	// bent corner against a straight one.
+	EXPECT_LT(deskewedError, 0.01) << "deskewed estimate is " << deskewed->back().pose.pose.position.x;
+	EXPECT_GT(skewedError, 0.02)
+			<< "the uncorrected registration was as good as the corrected one, so "
+			   "deskewing never reached the scan (deskewed error=" << deskewedError
+			<< " m, uncorrected error=" << skewedError << " m)";
+	EXPECT_GT(skewedError, deskewedError * 5.0) << "deskewing barely improved the estimate";
 }
 
 }  // namespace

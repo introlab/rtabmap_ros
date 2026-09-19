@@ -8,6 +8,8 @@ All rights reserved. (BSD-3-Clause, see the repository root.)
 
 #include <opencv2/core/core.hpp>
 
+#include <cmath>
+
 #include <rclcpp/rclcpp.hpp>
 
 #include <vector>
@@ -45,6 +47,34 @@ inline std::vector<cv::Point3f> corner3D(
 				-half + float(rng.gaussian(0.005)), rng.uniform(-half, half)) - offset);
 	}
 	return points;
+}
+
+/**
+ * @brief Range to a 2D corner from a sensor at (@p sensorX, @p sensorY) looking along +x.
+ *
+ * Two perpendicular walls, one ahead and one to the left. A single wall would leave the
+ * motion along it unobservable and ICP would settle wherever it started; the corner pins
+ * both axes and the heading.
+ *
+ * @return the nearer wall along the ray, or 0 if the ray reaches neither
+ */
+inline float corner2DRange(
+		double sensorX, double sensorY, double angle,
+		float frontWall = 5.0f, float leftWall = 3.0f)
+{
+	const double dx = std::cos(angle);
+	const double dy = std::sin(angle);
+	double best = 0.0;
+	if(dx > 1e-6)
+	{
+		best = (frontWall - sensorX) / dx;
+	}
+	if(dy > 1e-6)
+	{
+		const double toLeft = (leftWall - sensorY) / dy;
+		best = (best <= 0.0 || toLeft < best) ? toLeft : best;
+	}
+	return float(best);
 }
 
 /**
