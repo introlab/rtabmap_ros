@@ -392,12 +392,21 @@ TEST_F(OdometryRosTest, reset_odom_to_pose_sets_the_given_pose)
 }
 
 /**
- * The twist covariance is how a reset is announced to whatever consumes this topic:
- * BAD_COVARIANCE means "I have a pose but no velocity yet", which only happens on the
- * first frame after a reset. rtabmap_slam starts a new mapping session when it sees it,
- * because the new pose cannot be linked to the previous one.
+ * A reset is announced to whatever consumes this topic by publishing both covariances
+ * bad: there is a pose, but it is an initialisation rather than a registration and there
+ * is no velocity behind it yet. The same pair of values goes out on the very first frame
+ * of a session, which is the same situation.
+ *
+ * They are bad for different reasons, and do not carry the same number. The pose
+ * covariance is RTAB-Map's registration covariance doubled, and registration reports
+ * BAD_COVARIANCE for a frame it could not link, so the pose comes out at 19998. The twist
+ * covariance is set to BAD_COVARIANCE directly, 9999, whenever no velocity is available.
+ * Tracking normally, both drop to the real values -- around 1e-8 on this synthetic scene.
+ *
+ * rtabmap_slam starts a new mapping session when it sees this, because the new pose
+ * cannot be linked to the previous one.
  */
-TEST_F(OdometryRosTest, marks_the_twist_covariance_bad_on_the_frame_after_a_reset)
+TEST_F(OdometryRosTest, marks_both_covariances_bad_on_the_frame_after_a_reset)
 {
 	publishSensorTf();
 	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
@@ -429,7 +438,7 @@ TEST_F(OdometryRosTest, marks_the_twist_covariance_bad_on_the_frame_after_a_rese
  * pose, or both covariances bad, so a reset to an arbitrary pose is still recognized as
  * the discontinuity it is.
  */
-TEST_F(OdometryRosTest, marks_the_twist_covariance_bad_after_reset_to_pose)
+TEST_F(OdometryRosTest, marks_both_covariances_bad_after_reset_to_pose)
 {
 	publishSensorTf();
 	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
