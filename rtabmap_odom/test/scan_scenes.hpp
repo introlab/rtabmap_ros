@@ -50,6 +50,26 @@ inline std::vector<cv::Point3f> corner3D(
 }
 
 /**
+ * @brief The same corner seen after the sensor has turned @p yaw about z.
+ *
+ * The corner does not move; the sensor does, so in the sensor's own frame every point
+ * turns the other way. This is what a scan taken after a rotation looks like.
+ */
+inline std::vector<cv::Point3f> corner3DTurned(double yaw)
+{
+	const double c = std::cos(-yaw);
+	const double s = std::sin(-yaw);
+	std::vector<cv::Point3f> points = corner3D();
+	for(cv::Point3f & p : points)
+	{
+		const float x = p.x;
+		p.x = float(c * x - s * p.y);
+		p.y = float(s * x + c * p.y);
+	}
+	return points;
+}
+
+/**
  * @brief Range to a 2D corner from a sensor at (@p sensorX, @p sensorY) looking along +x.
  *
  * Two perpendicular walls, one ahead and one to the left. A single wall would leave the
