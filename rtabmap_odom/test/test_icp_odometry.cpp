@@ -234,6 +234,29 @@ protected:
 	/// Where the IMU's heading starts; see publishImuTurn() for why it is not zero.
 	static constexpr double kImuHeading = 0.2;
 
+	/// base_link -> imu_link, which the IMU callback requires before it accepts anything.
+	void publishImuTf()
+	{
+		imuTf_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(helper());
+		geometry_msgs::msg::TransformStamped sensor;
+		sensor.header.stamp = helper()->now();
+		sensor.header.frame_id = "base_link";
+		sensor.child_frame_id = "imu_link";
+		sensor.transform.rotation.w = 1.0;
+		imuTf_->sendTransform(sensor);
+	}
+
+	/// One IMU sample, heading @p yaw about z.
+	sensor_msgs::msg::Imu imuSample(double stamp, double yaw)
+	{
+		sensor_msgs::msg::Imu sample;
+		sample.header.frame_id = "imu_link";
+		sample.header.stamp = stampOf(stamp);
+		sample.orientation.z = std::sin(yaw / 2.0);
+		sample.orientation.w = std::cos(yaw / 2.0);
+		return sample;
+	}
+
 	/**
 	 * @brief Publishes an IMU turning by kPredictedTurn between @p stamp and @p stamp + 0.1.
 	 *
@@ -246,7 +269,7 @@ protected:
 	 * held back until an IMU sample at or after its stamp has arrived, and dropped when
 	 * the next frame arrives without one.
 	 */
-	bool publishImuTurn(double stamp)
+	bool publishImuTurn(double stamp, double keepTurningTo = 0.0)
 	{
 		imuTf_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(helper());
 		geometry_msgs::msg::TransformStamped sensor;
@@ -262,11 +285,19 @@ protected:
 		{
 			return false;
 		}
-		for(double t = stamp - 0.1; t <= stamp + 0.15; t += 0.01)
+		const double last = keepTurningTo > 0.0 ? stamp + 0.3 : stamp + 0.15;
+		for(double t = stamp - 0.1; t <= last; t += 0.01)
 		{
-			const double turned = kImuHeading +
-					(t <= stamp ? 0.0
-					            : (t >= stamp + 0.1 ? kPredictedTurn : kPredictedTurn * (t - stamp) / 0.1));
+			double turn = t <= stamp ? 0.0
+					: (t >= stamp + 0.1 ? kPredictedTurn : kPredictedTurn * (t - stamp) / 0.1);
+			if(keepTurningTo > 0.0 && t > stamp + 0.1)
+			{
+				// Carries on turning after the second frame's stamp, so that a guess built
+				// from the newest sample instead of the one at the stamp would show it.
+				const double past = std::min(1.0, (t - stamp - 0.1) / 0.2);
+				turn = kPredictedTurn + (keepTurningTo - kPredictedTurn) * past;
+			}
+			const double turned = kImuHeading + turn;
 			sensor_msgs::msg::Imu sample;
 			sample.header.frame_id = "imu_link";
 			sample.header.stamp = stampOf(t);
@@ -781,6 +812,82 @@ TEST_F(IcpOdometryTest, takes_the_rotation_of_its_guess_from_the_guess_frame)
 	// The pose is the turn itself, where the IMU version also carries kImuHeading: both
 	// seed the first pose from their prediction, and this one starts at the identity.
 	EXPECT_NEAR(kPredictedTurn, rotationAngle(odom->back()), 0.02);
+}
+
+
+/**
+ * A frame stamped ahead of every IMU sample in the buffer is held, not processed: the
+ * odometry would otherwise register it without the orientation that belongs to it. It
+ * comes out as soon as an IMU sample reaches its stamp.
+ */
+TEST_F(IcpOdometryTest, holds_a_frame_until_an_imu_covers_its_stamp)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+			collect<nav_msgs::msg::Odometry>("odom");
+	std::vector<rclcpp::Parameter> params = icpTestParameters();
+	params.push_back(rclcpp::Parameter("wait_imu_to_init", true));
+	makeNode(params);
+
+	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub =
+			helper()->create_publisher<sensor_msgs::msg::PointCloud2>("scan_cloud", 10);
+	rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu =
+			helper()->create_publisher<sensor_msgs::msg::Imu>("imu", rclcpp::QoS(200));
+	ASSERT_TRUE(waitForSubscriber(pub));
+	ASSERT_TRUE(waitForSubscriber(imu));
+	publishImuTf();
+
+	// IMU up to 1.0 only...
+	for(double t = 0.9; t <= 1.0; t += 0.01)
+	{
+		imu->publish(imuSample(t, kImuHeading));
+	}
+	spinFor(std::chrono::milliseconds(200));
+
+	// ...and a frame stamped after all of it.
+	pub->publish(makeXYZCloud("lidar", 1.05, corner3D()));
+	spinFor(std::chrono::milliseconds(500));
+	EXPECT_TRUE(odom->empty())
+			<< "the frame was registered before any IMU covered its stamp";
+
+	// One sample at or past the frame's stamp releases it.
+	imu->publish(imuSample(1.06, kImuHeading));
+	EXPECT_TRUE(spinUntil([&]() { return !odom->empty(); }))
+			<< "the held frame was never processed once the IMU caught up";
+}
+
+/**
+ * The orientation handed to the odometry is the one belonging to the frame's stamp, not
+ * whatever the IMU has reached by the time the frame is processed. Here the IMU keeps
+ * turning well past the second frame -- to 2.0 rad, twice the turn between the scans --
+ * and the guess still comes out at the turn the frame saw.
+ */
+TEST_F(IcpOdometryTest, uses_the_orientation_at_the_frame_stamp_not_the_newest_one)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<rtabmap_msgs::msg::OdomInfo>> info =
+			collect<rtabmap_msgs::msg::OdomInfo>("odom_info");
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+			collect<nav_msgs::msg::Odometry>("odom");
+	std::vector<rclcpp::Parameter> params = icpTestParameters();
+	params.push_back(rclcpp::Parameter("wait_imu_to_init", true));
+	makeNode(params);
+
+	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub =
+			helper()->create_publisher<sensor_msgs::msg::PointCloud2>("scan_cloud", 10);
+	ASSERT_TRUE(waitForSubscriber(pub));
+	ASSERT_TRUE(publishImuTurn(1.0, 2.0));
+
+	pub->publish(makeXYZCloud("lidar", 1.0, corner3D()));
+	ASSERT_TRUE(spinUntil([&]() { return !odom->empty(); }));
+	pub->publish(makeXYZCloud("lidar", 1.1, corner3DTurned(kPredictedTurn)));
+	ASSERT_TRUE(spinUntil([&]() { return odom->size() >= 2 && info->size() >= 2; }));
+
+	// 1.05, the turn between the two stamps -- not the 2.0 the IMU has reached by then.
+	EXPECT_NEAR(kPredictedTurn, rotationAngleOf(info->back().guess.rotation), 0.02)
+			<< "the guess did not correspond to the frame's own stamp";
+	ASSERT_FALSE(isLost(odom->back())) << "the registration did not converge";
+	EXPECT_NEAR(kImuHeading + kPredictedTurn, rotationAngle(odom->back()), 0.02);
 }
 
 // ---------------------------------------------------------------------------
