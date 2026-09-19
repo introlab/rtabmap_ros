@@ -629,8 +629,18 @@ void OdometryROS::processData()
 		imuProcessed_ = true;
 	}
 
+	// Whether this is a frame at all, as opposed to an IMU-only update. Neither the image
+	// nor the features answer that on their own: a frame that brings its own features has
+	// no image, and a frame of an empty scene has no feature. The calibration does, being
+	// there whenever a camera produced the data -- the same rule RTAB-Map's own
+	// Odometry::process() applies before registering anything.
+	const bool isFrame = !data.imageRaw().empty() ||
+			!data.cameraModels().empty() ||
+			!data.stereoCameraModels().empty() ||
+			!data.laserScanRaw().isEmpty();
+
 	Transform groundTruth;
-	if(!data.imageRaw().empty() || !data.laserScanRaw().isEmpty())
+	if(isFrame)
 	{
 		// Detect time jump in the past
 		double clockNow = now().seconds();
@@ -689,7 +699,7 @@ void OdometryROS::processData()
 		{
 			groundTruth = rtabmap_conversions::getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, header.stamp, *tfBuffer_, waitForTransform_);
 
-			if(!data.imageRaw().empty() || !data.laserScanRaw().isEmpty())
+			if(isFrame)
 			{
 				// Use only XYZ to handle the case odometry was previously initialized with IMU,
 				// we assume that the ground truth contains also a real initial orientation

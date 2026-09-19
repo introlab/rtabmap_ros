@@ -163,6 +163,24 @@ Synchronizing the topics is not the same thing: `approx_sync` only decides which
 
 Calibration matters more with several cameras than with one for the same reason: the extrinsics between them come from TF, and an error there shows up as a constant bias in the estimated motion rather than as an obvious failure.
 
+## Features computed elsewhere
+
+`RGBDImage` has fields for local features — `key_points`, `points` and `descriptors` — and when a frame arrives with them filled, this node hands them to the odometry as they are instead of detecting and describing anything. RTAB-Map extracts features only from a frame that brought none, so nothing is recomputed.
+
+This is for a camera, or a driver, that already does the extraction: on a multi-camera rig it is most of the per-frame work, and it can be done once and shared with `rtabmap` rather than repeated in each node.
+
+What a publisher has to get right:
+
+- **One entry per camera**, in the same order as the images, for `rgbd_cameras:=0` as well as the numbered topics.
+- **Keypoints in their own camera's image coordinates.** The node stitches the images side by side and shifts each camera's keypoints by the images that precede it.
+- **3D points in that camera's optical frame.** They are brought into `frame_id` with the camera's transform from TF, the same one used for the calibration.
+- **Descriptors compressed** with `rtabmap::compressData()`, one row per keypoint, the same type for every camera.
+- **Equal counts.** `points` and `descriptors` may be left empty, but if they are there, they must have as many entries as there are keypoints. A frame whose three disagree has its features dropped with an error rather than used out of step.
+
+Both images may be left out entirely: the depth image's job was to give the keypoints their depth and they arrive with it, and the color image's was to have features found in it. A frame is then its calibration and its features, which is the whole point — the images are nearly all of the bandwidth. The `camera_info` of each camera has to be there either way, as it is what says how big the image would have been and, through its `frame_id`, where the camera is.
+
+What stops applying, since nothing is extracted: `Vis/MaxFeatures`, `Vis/DepthAsMask`, the detector chosen with `Kp/DetectorStrategy`, and the depth bounds `Vis/MinDepth` and `Vis/MaxDepth`. Whatever is published is what gets registered, so the publisher owns those decisions. `Vis/CorType` must stay at `0` (feature matching); optical flow (`1`) reads the images themselves and has nothing to work with here.
+
 ## Repetitive patterns
 
 Not every failure announces itself. A scene full of identical detail — a tiled floor, rows of identical shelving, a patterned carpet, a brick wall — hands the matcher plenty of features and plenty of confident matches, just not always the *right* ones. One tile matched to its neighbour looks like a perfectly good inlier, and the pose comes out shifted by exactly one tile. Inlier counts stay healthy, nothing is reported lost, and the trajectory drifts in steps.
