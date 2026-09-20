@@ -26,6 +26,18 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #include "rtabmap_rviz_plugins/MapGraphDisplay.h"
+
+// rviz's headers forward declare these, so the ones actually used here are included
+// directly rather than counting on what rviz happens to pull in.
+#include <OgreColourValue.h>
+#include <OgreManualObject.h>
+#include <OgreMatrix4.h>
+#include <OgreQuaternion.h>
+#include <OgreRenderOperation.h>
+#include <OgreSceneManager.h>
+#include <OgreSceneNode.h>
+#include <OgreVector.h>
+
 #include <rviz_common/display_context.hpp>
 #include "rviz_common/properties/color_property.hpp"
 #include "rviz_common/properties/float_property.hpp"
