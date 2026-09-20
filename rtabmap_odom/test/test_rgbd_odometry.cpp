@@ -7,6 +7,8 @@ All rights reserved. (BSD-3-Clause, see the repository root.)
 
 #include <tf2_ros/static_transform_broadcaster.hpp>
 
+#include <std_srvs/srv/empty.hpp>
+
 #include <rtabmap_msgs/msg/odom_info.hpp>
 #include <rtabmap_msgs/msg/rgbd_images.hpp>
 
@@ -116,6 +118,22 @@ protected:
 				addNode(std::make_shared<rtabmap_odom::RGBDOdometry>(options));
 		waitForTfListener();
 		return node;
+	}
+
+	/// Calls one of the node's std_srvs/Empty services and waits for the answer.
+	bool callEmptyService(const std::string & name)
+	{
+		rclcpp::Client<std_srvs::srv::Empty>::SharedPtr client =
+				helper()->create_client<std_srvs::srv::Empty>("/rgbd_odometry/" + name);
+		if(!spinUntil([&]() { return client->service_is_ready(); }))
+		{
+			return false;
+		}
+		std::shared_future<std_srvs::srv::Empty::Response::SharedPtr> future =
+				client->async_send_request(
+						std::make_shared<std_srvs::srv::Empty::Request>()).future.share();
+		return spinUntil([&]() {
+			return future.wait_for(std::chrono::seconds(0)) == std::future_status::ready; });
 	}
 
 	/// Where each camera of a rig is mounted, as its driver would publish it once.
@@ -679,19 +697,21 @@ TEST_F(RgbdOdometryRigTest, decimation_brings_the_given_features_down_with_the_i
  */
 class RgbdOdometryRigCamerasTest :
 		public RgbdOdometryTest,
-		public ::testing::WithParamInterface<int>
+		public ::testing::WithParamInterface<std::tuple<int, bool>>
 {
 };
 
 TEST_P(RgbdOdometryRigCamerasTest, recovers_the_trajectory_from_the_numbered_topics)
 {
-	const int cameras = GetParam();
+	const int cameras = std::get<0>(GetParam());
+	const bool approxSync = std::get<1>(GetParam());
 	const CameraRig rig = makeCameraRig(cameras);
 	publishRigTf(rig);
 	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
 			collect<nav_msgs::msg::Odometry>("odom");
 	makeNode({rclcpp::Parameter("subscribe_rgbd", true),
-	          rclcpp::Parameter("rgbd_cameras", cameras)});
+	          rclcpp::Parameter("rgbd_cameras", cameras),
+	          rclcpp::Parameter("approx_sync", approxSync)});
 
 	// One camera listens on rgbd_image, more than one on rgbd_image0..N-1.
 	std::vector<rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr> publishers;
@@ -724,14 +744,30 @@ TEST_P(RgbdOdometryRigCamerasTest, recovers_the_trajectory_from_the_numbered_top
 	EXPECT_NEAR(1.0, last.pose.pose.position.x, 0.05) << "the rig travelled a metre along x";
 	EXPECT_NEAR(0.0, last.pose.pose.position.y, 0.05);
 	EXPECT_NEAR(0.0, last.pose.pose.position.z, 0.05);
+
+	// A reset tears the synchronizer down and builds it again -- one per camera count,
+	// and a different one for each of the two sync policies. Frames have to keep arriving
+	// through the new one.
+	ASSERT_TRUE(callEmptyService("reset_odom"));
+	const size_t beforeReset = odom->size();
+	const rtabmap_msgs::msg::RGBDImages frame =
+			cameraRigFrame(rig, rtabmap::Transform(1.1f, 0, 0, 0, 0, 0), 2.1);
+	for(int c=0; c<cameras; ++c)
+	{
+		publishers[c]->publish(frame.rgbd_images[c]);
+	}
+	EXPECT_TRUE(spinUntil([&]() { return odom->size() > beforeReset; }))
+			<< "nothing came back after the reset rebuilt the synchronizer";
 }
 
 INSTANTIATE_TEST_SUITE_P(
 		RgbdCameras,
 		RgbdOdometryRigCamerasTest,
-		::testing::Range(1, 7),
-		[](const ::testing::TestParamInfo<int> & info) {
-			return std::to_string(info.param) + (info.param == 1 ? "_camera" : "_cameras");
+		::testing::Combine(::testing::Range(1, 7), ::testing::Bool()),
+		[](const ::testing::TestParamInfo<std::tuple<int, bool>> & info) {
+			const int cameras = std::get<0>(info.param);
+			return std::to_string(cameras) + (cameras == 1 ? "_camera_" : "_cameras_") +
+					(std::get<1>(info.param) ? "approx_sync" : "exact_sync");
 		});
 
 }  // namespace
