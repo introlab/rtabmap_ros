@@ -52,6 +52,18 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace rtabmap_odom
 {
 
+/**
+ * @brief Odometry from an RGB-D camera, or from several on one rig.
+ *
+ * Takes either the three raw topics of a camera (`rgb/image`, `depth/image`,
+ * `rgb/camera_info`) or pre-synchronized rtabmap_msgs::msg::RGBDImage messages, one per
+ * camera, and registers each frame's visual features against a local feature map. A
+ * frame that arrives with its own keypoints, 3D points and descriptors is registered
+ * with those rather than having them extracted again.
+ *
+ * @see doc/rgbd_odometry.md for the topics, the parameters and what to do when it loses
+ *      tracking.
+ */
 class RGBDOdometry : public rtabmap_odom::OdometryROS
 {
 public:

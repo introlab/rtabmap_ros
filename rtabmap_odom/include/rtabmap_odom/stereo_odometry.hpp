@@ -51,6 +51,17 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace rtabmap_odom
 {
 
+/**
+ * @brief Odometry from a stereo pair, or from several on one rig.
+ *
+ * Takes either the four raw topics of a stereo camera (left and right image plus their
+ * calibrations) or pre-synchronized rtabmap_msgs::msg::RGBDImage messages carrying the
+ * pair, one per camera. The right camera's `P(0,3)` is what gives the trajectory its
+ * scale. A frame that arrives with its own keypoints, 3D points and descriptors is
+ * registered with those rather than having them extracted again.
+ *
+ * @see doc/stereo_odometry.md for the topics, the parameters and the scale it depends on.
+ */
 class StereoOdometry : public rtabmap_odom::OdometryROS
 {
 public:
