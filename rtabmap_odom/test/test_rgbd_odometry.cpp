@@ -659,6 +659,12 @@ TEST_F(RgbdOdometryRigTest, the_same_frames_without_their_features_have_nothing_
  */
 TEST_F(RgbdOdometryRigTest, decimation_brings_the_given_features_down_with_the_image)
 {
+#ifndef RTABMAP_OPENGV
+	// Only a PnP reads the keypoints this test is about; a 3D-to-3D registration would
+	// come out right even with every one of them misplaced.
+	GTEST_SKIP() << "a multi-camera PnP is solved by OpenGV, which RTAB-Map was built without";
+#endif
+
 	const CameraRig rig = makeCameraRig();
 	publishRigTf(rig);
 	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
@@ -694,10 +700,14 @@ TEST_F(RgbdOdometryRigTest, decimation_brings_the_given_features_down_with_the_i
  * own per N, six of them in all. The test above drives the `rgbd_cameras:=0` one; these
  * drive the rest, by publishing each camera of the rig on its own topic and asking for
  * the same metre back.
+ *
+ * Each of them runs both estimation types, except that a multi-camera PnP needs OpenGV
+ * and is skipped when RTAB-Map was built without it. A single camera does not, so that
+ * one is run either way.
  */
 class RgbdOdometryRigCamerasTest :
 		public RgbdOdometryTest,
-		public ::testing::WithParamInterface<std::tuple<int, bool>>
+		public ::testing::WithParamInterface<std::tuple<int, bool, int>>
 {
 };
 
@@ -705,13 +715,22 @@ TEST_P(RgbdOdometryRigCamerasTest, recovers_the_trajectory_from_the_numbered_top
 {
 	const int cameras = std::get<0>(GetParam());
 	const bool approxSync = std::get<1>(GetParam());
+	const int estimationType = std::get<2>(GetParam());
+#ifndef RTABMAP_OPENGV
+	if(estimationType == 1 && cameras > 1)
+	{
+		GTEST_SKIP() << "a multi-camera PnP is solved by OpenGV, which RTAB-Map was built without";
+	}
+#endif
+
 	const CameraRig rig = makeCameraRig(cameras);
 	publishRigTf(rig);
 	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
 			collect<nav_msgs::msg::Odometry>("odom");
 	makeNode({rclcpp::Parameter("subscribe_rgbd", true),
 	          rclcpp::Parameter("rgbd_cameras", cameras),
-	          rclcpp::Parameter("approx_sync", approxSync)});
+	          rclcpp::Parameter("approx_sync", approxSync),
+	          rclcpp::Parameter("Vis/EstimationType", std::to_string(estimationType))});
 
 	// One camera listens on rgbd_image, more than one on rgbd_image0..N-1.
 	std::vector<rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr> publishers;
@@ -763,11 +782,12 @@ TEST_P(RgbdOdometryRigCamerasTest, recovers_the_trajectory_from_the_numbered_top
 INSTANTIATE_TEST_SUITE_P(
 		RgbdCameras,
 		RgbdOdometryRigCamerasTest,
-		::testing::Combine(::testing::Range(1, 7), ::testing::Bool()),
-		[](const ::testing::TestParamInfo<std::tuple<int, bool>> & info) {
+		::testing::Combine(::testing::Range(1, 7), ::testing::Bool(), ::testing::Values(0, 1)),
+		[](const ::testing::TestParamInfo<std::tuple<int, bool, int>> & info) {
 			const int cameras = std::get<0>(info.param);
 			return std::to_string(cameras) + (cameras == 1 ? "_camera_" : "_cameras_") +
-					(std::get<1>(info.param) ? "approx_sync" : "exact_sync");
+					(std::get<1>(info.param) ? "approx_sync_" : "exact_sync_") +
+					(std::get<2>(info.param) == 0 ? "3d_to_3d" : "pnp");
 		});
 
 }  // namespace
