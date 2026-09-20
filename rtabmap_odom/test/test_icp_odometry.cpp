@@ -15,7 +15,14 @@ All rights reserved. (BSD-3-Clause, see the repository root.)
 
 #include <tf2_msgs/msg/tf_message.hpp>
 
+#include <std_srvs/srv/empty.hpp>
+
+#include <algorithm>
 #include <cmath>
+#include <cstring>
+#include <limits>
+#include <string>
+#include <vector>
 
 #include "bag_playback.hpp"
 #include "msg_builders.hpp"
@@ -52,6 +59,83 @@ double rotationAngle(const nav_msgs::msg::Odometry & odom)
 	return 2.0 * std::acos(std::min(1.0, std::fabs(q.w)));
 }
 
+/**
+ * @brief The 2D corner seen from (@p x, @p y), every ray taken at the same instant.
+ *
+ * The skewed scans further down bend the walls with the robot's motion; this one does
+ * not, so it is what a sweep taken from a standstill looks like. @p withIntensities adds
+ * the channel a real lidar reports alongside the range, which is what decides whether the
+ * node carries the scan as PointXYZI or as PointXYZ.
+ */
+sensor_msgs::msg::LaserScan cornerScan(
+		double stamp, double x = 0.0, double y = 0.0, bool withIntensities = false,
+		float sweep = 0.0f)
+{
+	sensor_msgs::msg::LaserScan scan;
+	scan.header.frame_id = "lidar";
+	scan.header.stamp = stampOf(stamp);
+	scan.angle_min = -1.0f;
+	scan.angle_max = 1.0f;
+	scan.angle_increment = 0.01f;
+	scan.scan_time = 0.1f;
+	scan.range_min = 0.1f;
+	scan.range_max = 30.0f;
+	const size_t rays = size_t((scan.angle_max - scan.angle_min) / scan.angle_increment) + 1;
+	// Zero unless the caller wants the per-ray stamps deskewing needs.
+	scan.time_increment = rays > 1 ? sweep / float(rays - 1) : 0.0f;
+	scan.ranges.resize(rays);
+	for(size_t i=0; i<rays; ++i)
+	{
+		scan.ranges[i] = corner2DRange(x, y, scan.angle_min + double(i)*scan.angle_increment);
+	}
+	if(withIntensities)
+	{
+		// Flat, but present: the node only looks at whether the channel is there.
+		scan.intensities.assign(rays, 100.0f);
+	}
+	return scan;
+}
+
+/// @p cloud rearranged into @p width columns, the shape a spinning lidar publishes: one
+/// row per ring, and the node reads a full sweep's size off those dimensions.
+sensor_msgs::msg::PointCloud2 organized(sensor_msgs::msg::PointCloud2 cloud, uint32_t width)
+{
+	const uint32_t points = cloud.width * cloud.height;
+	cloud.width = width;
+	cloud.height = points / width;
+	cloud.row_step = cloud.point_step * cloud.width;
+	cloud.data.resize(size_t(cloud.row_step) * cloud.height);
+	return cloud;
+}
+
+/// Every value @p cloud carries in @p field, in point order; empty if it has no such field.
+std::vector<float> fieldValues(
+		const sensor_msgs::msg::PointCloud2 & cloud, const std::string & field)
+{
+	std::vector<float> values;
+	for(const sensor_msgs::msg::PointField & f : cloud.fields)
+	{
+		if(f.name == field && f.datatype == sensor_msgs::msg::PointField::FLOAT32)
+		{
+			for(size_t i=0; i<size_t(cloud.width)*cloud.height; ++i)
+			{
+				float value = 0.0f;
+				memcpy(&value, &cloud.data[i*cloud.point_step + f.offset], sizeof(float));
+				values.push_back(value);
+			}
+			break;
+		}
+	}
+	return values;
+}
+
+/// How many of @p values are above zero.
+size_t countPositive(const std::vector<float> & values)
+{
+	return size_t(std::count_if(values.begin(), values.end(),
+			[](float value) { return value > 0.0f; }));
+}
+
 class IcpOdometryTest : public NodeTest
 {
 protected:
@@ -65,6 +149,22 @@ protected:
 		tf.child_frame_id = sensorFrame;
 		tf.transform.rotation.w = 1.0;
 		staticTf_->sendTransform(tf);
+	}
+
+	/// Calls an Empty service the node advertises under its own name.
+	bool callEmptyService(const std::string & name)
+	{
+		rclcpp::Client<std_srvs::srv::Empty>::SharedPtr client =
+				helper()->create_client<std_srvs::srv::Empty>("/icp_odometry/" + name);
+		if(!spinUntil([&]() { return client->service_is_ready(); }))
+		{
+			return false;
+		}
+		std::shared_future<std_srvs::srv::Empty::Response::SharedPtr> future =
+				client->async_send_request(
+						std::make_shared<std_srvs::srv::Empty::Request>()).future.share();
+		return spinUntil([&]() {
+			return future.wait_for(std::chrono::seconds(0)) == std::future_status::ready; });
 	}
 
 	std::shared_ptr<rtabmap_odom::ICPOdometry> makeNode(
@@ -95,7 +195,8 @@ protected:
 			options.arguments({"--ros-args", "-r", "__node:=" + name,
 			                   "-r", "odom:=odom_" + name,
 			                   "-r", "odom_info:=odom_info_" + name,
-			                   "-r", "odom_sensor_data/raw:=odom_sensor_data_" + name + "/raw"});
+			                   "-r", "odom_sensor_data/raw:=odom_sensor_data_" + name + "/raw",
+			                   "-r", "odom_filtered_input_scan:=odom_filtered_input_scan_" + name});
 		}
 		return addNode(std::make_shared<rtabmap_odom::ICPOdometry>(options));
 	}
@@ -525,7 +626,7 @@ TEST_F(IcpOdometryTest, integrates_successive_motions_into_a_pose)
 }
 
 /**
- * The scan filters default to RTAB-Map's Icp/* values rather than to the zeros the
+ * The scan filters default to RTAB-Map's own Icp parameter values rather than to the zeros the
  * source's member initializers suggest. See "Where these defaults come from" in the doc.
  */
 TEST_F(IcpOdometryTest, scan_filters_default_to_the_icp_parameter_values)
@@ -1214,6 +1315,738 @@ TEST_F(IcpOdometryTest, deskewing_slerp_gives_the_same_answer_as_the_per_point_l
 	EXPECT_NEAR(translationNorm(perPoint->back()), translationNorm(slerp->back()), 0.01)
 			<< "interpolating the correction moved the estimate";
 	EXPECT_NEAR(rotationAngle(perPoint->back()), rotationAngle(slerp->back()), 0.01);
+}
+
+
+// ---------------------------------------------------------------------------
+// The fields a driver puts in its cloud, and the filters the node runs on them.
+// ---------------------------------------------------------------------------
+
+/**
+ * @brief A cloud carrying intensity, normals, both, or neither.
+ *
+ * Each combination is a different PCL point type inside the node, so a driver that
+ * publishes everything its lidar measured is handled by different code from one that
+ * publishes bare XYZ. All four describe the same corner, so all four have to end at the
+ * same pose. scan_downsampling_step is on throughout: the step is applied in each of the
+ * four, and halving the cloud is visible in what comes back out.
+ */
+class IcpOdometryCloudFieldsTest :
+		public IcpOdometryTest,
+		public ::testing::WithParamInterface<std::tuple<bool, bool>>
+{
+};
+
+TEST_P(IcpOdometryCloudFieldsTest, recovers_the_motion_whatever_fields_the_cloud_carries)
+{
+	const bool intensity = std::get<0>(GetParam());
+	const bool normals = std::get<1>(GetParam());
+	publishSensorTf();
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+			collect<nav_msgs::msg::Odometry>("odom");
+	std::shared_ptr<Collector<rtabmap_msgs::msg::SensorData>> data =
+			collect<rtabmap_msgs::msg::SensorData>("odom_sensor_data/raw");
+	std::vector<rclcpp::Parameter> params = icpTestParameters();
+	params.push_back(rclcpp::Parameter("scan_downsampling_step", 2));
+	makeNode(params);
+
+	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub =
+			helper()->create_publisher<sensor_msgs::msg::PointCloud2>("scan_cloud", 10);
+	ASSERT_TRUE(waitForSubscriber(pub));
+
+	const std::vector<cv::Point3f> points = corner3D();
+	pub->publish(makeCloudWithFields("lidar", 1.0, points, intensity, normals));
+	ASSERT_TRUE(spinUntil([&]() { return odom->size() >= 1 && data->size() >= 1; }));
+
+	const cv::Point3f motion(0.10f, 0.06f, 0.04f);
+	pub->publish(makeCloudWithFields("lidar", 1.1, corner3D(motion), intensity, normals));
+	ASSERT_TRUE(spinUntil([&]() { return odom->size() >= 2; }));
+
+	const nav_msgs::msg::Odometry & msg = odom->back();
+	EXPECT_NEAR(motion.x, msg.pose.pose.position.x, 0.015);
+	EXPECT_NEAR(motion.y, msg.pose.pose.position.y, 0.015);
+	EXPECT_NEAR(motion.z, msg.pose.pose.position.z, 0.015);
+	EXPECT_EQ(points.size()/2, data->front().laser_scan.width)
+			<< "scan_downsampling_step:=2 should have kept every second point";
+}
+
+INSTANTIATE_TEST_SUITE_P(
+		OptionalFields,
+		IcpOdometryCloudFieldsTest,
+		::testing::Combine(::testing::Bool(), ::testing::Bool()),
+		[](const ::testing::TestParamInfo<std::tuple<bool, bool>> & info) {
+			return std::string(std::get<0>(info.param) ? "intensity" : "no_intensity") +
+					(std::get<1>(info.param) ? "_normals" : "_no_normals");
+		});
+
+/**
+ * @brief A cloud that says it is not dense, with and without intensity.
+ *
+ * is_dense:=false is a driver saying some of these points are NaN -- a ray that hit
+ * nothing. The node drops them rather than handing NaNs to ICP.
+ */
+class IcpOdometryDenseTest :
+		public IcpOdometryTest,
+		public ::testing::WithParamInterface<bool>
+{
+};
+
+TEST_P(IcpOdometryDenseTest, drops_the_invalid_points_of_a_cloud_that_is_not_dense)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<rtabmap_msgs::msg::SensorData>> data =
+			collect<rtabmap_msgs::msg::SensorData>("odom_sensor_data/raw");
+	makeNode(icpTestParameters());
+
+	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub =
+			helper()->create_publisher<sensor_msgs::msg::PointCloud2>("scan_cloud", 10);
+	ASSERT_TRUE(waitForSubscriber(pub));
+
+	std::vector<cv::Point3f> points = corner3D();
+	const size_t valid = points.size();
+	const float nan = std::numeric_limits<float>::quiet_NaN();
+	points.insert(points.end(), 100, cv::Point3f(nan, nan, nan));
+	sensor_msgs::msg::PointCloud2 cloud =
+			makeCloudWithFields("lidar", 1.0, points, GetParam(), false);
+	cloud.is_dense = false;
+	pub->publish(cloud);
+	ASSERT_TRUE(spinUntil([&]() { return !data->empty(); }));
+
+	EXPECT_EQ(valid, data->back().laser_scan.width)
+			<< "the 100 NaN points were registered along with the real ones";
+}
+
+INSTANTIATE_TEST_SUITE_P(
+		OptionalFields,
+		IcpOdometryDenseTest,
+		::testing::Bool(),
+		[](const ::testing::TestParamInfo<bool> & info) {
+			return info.param ? "intensity" : "no_intensity";
+		});
+
+/**
+ * An organized cloud -- one row per laser ring -- tells the node how many points a full
+ * sweep has, so scan_cloud_max_points does not have to be given at all.
+ */
+TEST_F(IcpOdometryTest, takes_scan_cloud_max_points_from_an_organized_cloud)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<rtabmap_msgs::msg::SensorData>> data =
+			collect<rtabmap_msgs::msg::SensorData>("odom_sensor_data/raw");
+	makeNode(icpTestParameters());
+
+	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub =
+			helper()->create_publisher<sensor_msgs::msg::PointCloud2>("scan_cloud", 10);
+	ASSERT_TRUE(waitForSubscriber(pub));
+
+	const std::vector<cv::Point3f> points = corner3D();
+	pub->publish(organized(makeXYZCloud("lidar", 1.0, points), 80));
+	ASSERT_TRUE(spinUntil([&]() { return !data->empty(); }));
+
+	EXPECT_EQ(int(points.size()), data->back().laser_scan_max_pts);
+}
+
+/// A value too small for the cloud that arrived is raised to it rather than believed.
+TEST_F(IcpOdometryTest, raises_scan_cloud_max_points_to_the_size_of_an_organized_cloud)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<rtabmap_msgs::msg::SensorData>> data =
+			collect<rtabmap_msgs::msg::SensorData>("odom_sensor_data/raw");
+	std::vector<rclcpp::Parameter> params = icpTestParameters();
+	params.push_back(rclcpp::Parameter("scan_cloud_max_points", 10));
+	makeNode(params);
+
+	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub =
+			helper()->create_publisher<sensor_msgs::msg::PointCloud2>("scan_cloud", 10);
+	ASSERT_TRUE(waitForSubscriber(pub));
+
+	const std::vector<cv::Point3f> points = corner3D();
+	pub->publish(organized(makeXYZCloud("lidar", 1.0, points), 80));
+	ASSERT_TRUE(spinUntil([&]() { return !data->empty(); }));
+
+	EXPECT_EQ(int(points.size()), data->back().laser_scan_max_pts);
+}
+
+/**
+ * scan_range_min and scan_range_max cut the cloud down to a shell around the sensor. The
+ * corner spans 2.0 m to 3.5 m from the origin, so a 2.6-3.0 m window keeps part of it.
+ */
+TEST_F(IcpOdometryTest, keeps_only_the_cloud_points_within_the_range_limits)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<rtabmap_msgs::msg::SensorData>> data =
+			collect<rtabmap_msgs::msg::SensorData>("odom_sensor_data/raw");
+	std::vector<rclcpp::Parameter> params = icpTestParameters();
+	params.push_back(rclcpp::Parameter("scan_range_min", 2.6));
+	params.push_back(rclcpp::Parameter("scan_range_max", 3.0));
+	makeNode(params);
+
+	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub =
+			helper()->create_publisher<sensor_msgs::msg::PointCloud2>("scan_cloud", 10);
+	ASSERT_TRUE(waitForSubscriber(pub));
+
+	const std::vector<cv::Point3f> points = corner3D();
+	pub->publish(makeXYZCloud("lidar", 1.0, points));
+	ASSERT_TRUE(spinUntil([&]() { return !data->empty(); }));
+
+	EXPECT_GT(data->back().laser_scan.width, 0u) << "the whole cloud was filtered away";
+	EXPECT_LT(data->back().laser_scan.width, points.size())
+			<< "nothing outside 2.6-3.0 m was dropped";
+}
+
+/**
+ * scan_normal_ground_up turns the normals a driver sent toward a viewpoint 10 m above the
+ * sensor, so the ground's point up the way ICP expects rather than into the road. Here
+ * every normal arrives pointing down, and the scan republished on
+ * odom_filtered_input_scan is the one the node registered -- normals included, so it says
+ * which way they ended up. The second node is the control: without the parameter the node
+ * does not touch them at all.
+ */
+TEST_F(IcpOdometryTest, turns_the_normals_of_a_cloud_toward_a_viewpoint_above)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<sensor_msgs::msg::PointCloud2>> aligned =
+			collect<sensor_msgs::msg::PointCloud2>("odom_filtered_input_scan_aligned");
+	std::shared_ptr<Collector<sensor_msgs::msg::PointCloud2>> asIs =
+			collect<sensor_msgs::msg::PointCloud2>("odom_filtered_input_scan_as_is");
+	std::vector<rclcpp::Parameter> up = icpTestParameters();
+	up.push_back(rclcpp::Parameter("scan_normal_ground_up", 0.8));
+	makeNode(up, "aligned");
+	makeNode(icpTestParameters(), "as_is");
+
+	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub =
+			helper()->create_publisher<sensor_msgs::msg::PointCloud2>("scan_cloud", 10);
+	ASSERT_TRUE(waitForSubscriber(pub, 2));
+	ASSERT_TRUE(waitForPublisher(aligned->subscription));
+	ASSERT_TRUE(waitForPublisher(asIs->subscription));
+
+	pub->publish(makeCloudWithFields("lidar", 1.0, corner3D(), false, true,
+			cv::Point3f(0, 0, -1)));
+	ASSERT_TRUE(spinUntil([&]() { return !aligned->empty() && !asIs->empty(); }));
+
+	const std::vector<float> turned = fieldValues(aligned->back(), "normal_z");
+	ASSERT_FALSE(turned.empty()) << "the republished scan carries no normals";
+	EXPECT_EQ(turned.size(), countPositive(turned)) << "some normals still point down";
+
+	const std::vector<float> untouched = fieldValues(asIs->back(), "normal_z");
+	ASSERT_EQ(turned.size(), untouched.size());
+	EXPECT_EQ(0u, countPositive(untouched))
+			<< "the normals were turned over without scan_normal_ground_up being set";
+}
+
+/// What goes out on odom_filtered_input_scan is the filtered scan, not the input.
+TEST_F(IcpOdometryTest, publishes_the_scan_it_registered_on_odom_filtered_input_scan)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<sensor_msgs::msg::PointCloud2>> filtered =
+			collect<sensor_msgs::msg::PointCloud2>("odom_filtered_input_scan");
+	std::vector<rclcpp::Parameter> params = icpTestParameters();
+	params.push_back(rclcpp::Parameter("scan_voxel_size", 0.5));   // coarse, on a 4 m corner
+	makeNode(params);
+
+	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub =
+			helper()->create_publisher<sensor_msgs::msg::PointCloud2>("scan_cloud", 10);
+	ASSERT_TRUE(waitForSubscriber(pub));
+	ASSERT_TRUE(waitForPublisher(filtered->subscription));
+
+	const std::vector<cv::Point3f> points = corner3D();
+	pub->publish(makeXYZCloud("lidar", 1.0, points));
+	ASSERT_TRUE(spinUntil([&]() { return !filtered->empty(); }));
+
+	EXPECT_EQ("lidar", filtered->back().header.frame_id);
+	EXPECT_GT(filtered->back().width, 0u) << "nothing was republished at all";
+	EXPECT_LT(filtered->back().width, points.size()/2)
+			<< "the republished scan still has the input's density, so it is the input";
+}
+
+/**
+ * @brief Deskewing without a guess frame, on a cloud already in frame_id and on one that
+ * is not.
+ *
+ * With no fixed frame to look the motion up in, the node deskews against its own constant
+ * velocity model, which lives in frame_id: a cloud published in the sensor's frame has to
+ * be carried into frame_id and back, and one already there is deskewed where it lies. The
+ * velocity only exists once two frames have registered, so the correction starts on the
+ * third.
+ */
+class IcpOdometryDeskewFrameTest :
+		public IcpOdometryTest,
+		public ::testing::WithParamInterface<std::string>
+{
+};
+
+TEST_P(IcpOdometryDeskewFrameTest, deskews_against_its_own_velocity)
+{
+	const std::string frame = GetParam();
+	publishSensorTf();
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+			collect<nav_msgs::msg::Odometry>("odom");
+	std::vector<rclcpp::Parameter> params = icpTestParameters();
+	params.push_back(rclcpp::Parameter("deskewing", true));
+	makeNode(params);
+
+	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub =
+			helper()->create_publisher<sensor_msgs::msg::PointCloud2>("scan_cloud", 10);
+	ASSERT_TRUE(waitForSubscriber(pub));
+
+	for(int i=0; i<4; ++i)
+	{
+		pub->publish(makeCloudWithFields(frame, 1.0 + 0.1*i,
+				corner3D(cv::Point3f(0.05f*i, 0, 0)), false, false,
+				cv::Point3f(0, 0, 1), true));
+		ASSERT_TRUE(spinUntil([&]() { return odom->size() >= size_t(i+1); }))
+				<< "no odometry for the cloud at " << (1.0 + 0.1*i) << "s";
+	}
+
+	// Four frames 0.05 m apart, and a sweep short enough that deskewing them barely moves
+	// anything: the point is that the correction ran, not that it changed the answer.
+	EXPECT_NEAR(0.15, odom->back().pose.pose.position.x, 0.02);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+		CloudFrame,
+		IcpOdometryDeskewFrameTest,
+		::testing::Values("base_link", "lidar"),
+		[](const ::testing::TestParamInfo<std::string> & info) {
+			return "in_" + info.param;
+		});
+
+// ---------------------------------------------------------------------------
+// The same filters, on the 2D scan topic.
+// ---------------------------------------------------------------------------
+
+/**
+ * @brief A LaserScan with and without the intensity channel.
+ *
+ * laser_geometry carries the channel into the projected cloud when the scan has one, and
+ * from there the node takes the PointXYZI path rather than the PointXYZ one -- separate
+ * code for every filter below.
+ */
+class IcpOdometryScanChannelTest :
+		public IcpOdometryTest,
+		public ::testing::WithParamInterface<bool>
+{
+};
+
+TEST_P(IcpOdometryScanChannelTest, recovers_the_motion_whatever_channels_the_scan_carries)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+			collect<nav_msgs::msg::Odometry>("odom");
+	makeNode(icpTestParameters());
+
+	rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr pub =
+			helper()->create_publisher<sensor_msgs::msg::LaserScan>("scan", 10);
+	ASSERT_TRUE(waitForSubscriber(pub));
+
+	pub->publish(cornerScan(1.0, 0.0, 0.0, GetParam()));
+	ASSERT_TRUE(spinUntil([&]() { return odom->size() >= 1; }));
+
+	pub->publish(cornerScan(1.1, 0.05, 0.0, GetParam()));
+	ASSERT_TRUE(spinUntil([&]() { return odom->size() >= 2; }));
+
+	EXPECT_NEAR(0.05, odom->back().pose.pose.position.x, 0.02);
+}
+
+/// scan_downsampling_step and scan_voxel_size thin the scan before ICP sees it.
+TEST_P(IcpOdometryScanChannelTest, downsamples_and_voxelizes_a_laser_scan)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<rtabmap_msgs::msg::SensorData>> data =
+			collect<rtabmap_msgs::msg::SensorData>("odom_sensor_data/raw");
+	std::vector<rclcpp::Parameter> params = icpTestParameters();
+	params.push_back(rclcpp::Parameter("scan_downsampling_step", 2));
+	params.push_back(rclcpp::Parameter("scan_voxel_size", 0.05));
+	makeNode(params);
+
+	rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr pub =
+			helper()->create_publisher<sensor_msgs::msg::LaserScan>("scan", 10);
+	ASSERT_TRUE(waitForSubscriber(pub));
+
+	const sensor_msgs::msg::LaserScan scan = cornerScan(1.0, 0.0, 0.0, GetParam());
+	pub->publish(scan);
+	ASSERT_TRUE(spinUntil([&]() { return !data->empty(); }));
+
+	EXPECT_GT(data->back().laser_scan.width, 0u) << "the whole scan was filtered away";
+	EXPECT_LE(data->back().laser_scan.width, scan.ranges.size()/2 + 1)
+			<< "scan_downsampling_step:=2 alone should have halved it";
+}
+
+/// With both scan_normal_k and scan_normal_radius off, the scan goes to ICP as bare points.
+TEST_P(IcpOdometryScanChannelTest, registers_a_laser_scan_without_computing_normals)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<rtabmap_msgs::msg::SensorData>> data =
+			collect<rtabmap_msgs::msg::SensorData>("odom_sensor_data/raw");
+	std::vector<rclcpp::Parameter> params = icpTestParameters();
+	params.push_back(rclcpp::Parameter("scan_normal_k", 0));
+	params.push_back(rclcpp::Parameter("scan_normal_radius", 0.0));
+	makeNode(params);
+
+	rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr pub =
+			helper()->create_publisher<sensor_msgs::msg::LaserScan>("scan", 10);
+	ASSERT_TRUE(waitForSubscriber(pub));
+
+	pub->publish(cornerScan(1.0, 0.0, 0.0, GetParam()));
+	ASSERT_TRUE(spinUntil([&]() { return !data->empty(); }));
+
+	// LaserScan::Format 1 is kXY and 2 is kXYI; the layouts with normals are 3 and 4.
+	EXPECT_LT(data->back().laser_scan_format, 3)
+			<< "normals were computed although both scan_normal_* are off";
+}
+
+/// The range limits apply to a 2D scan too: the corner is 3 m away at its nearest.
+TEST_P(IcpOdometryScanChannelTest, keeps_only_the_scan_points_within_the_range_limits)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<rtabmap_msgs::msg::SensorData>> data =
+			collect<rtabmap_msgs::msg::SensorData>("odom_sensor_data/raw");
+	std::vector<rclcpp::Parameter> params = icpTestParameters();
+	params.push_back(rclcpp::Parameter("scan_range_min", 3.5));
+	params.push_back(rclcpp::Parameter("scan_range_max", 6.0));
+	makeNode(params);
+
+	rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr pub =
+			helper()->create_publisher<sensor_msgs::msg::LaserScan>("scan", 10);
+	ASSERT_TRUE(waitForSubscriber(pub));
+
+	const sensor_msgs::msg::LaserScan scan = cornerScan(1.0, 0.0, 0.0, GetParam());
+	pub->publish(scan);
+	ASSERT_TRUE(spinUntil([&]() { return !data->empty(); }));
+
+	EXPECT_GT(data->back().laser_scan.width, 0u) << "the whole scan was filtered away";
+	EXPECT_LT(data->back().laser_scan.width, scan.ranges.size())
+			<< "nothing nearer than 3.5 m was dropped";
+	EXPECT_NEAR(6.0, data->back().laser_scan_max_range, 1e-3)
+			<< "scan_range_max should replace the scan's own 30 m range_max";
+}
+
+INSTANTIATE_TEST_SUITE_P(
+		Channels,
+		IcpOdometryScanChannelTest,
+		::testing::Bool(),
+		[](const ::testing::TestParamInfo<bool> & info) {
+			return info.param ? "with_intensities" : "without_intensities";
+		});
+
+// ---------------------------------------------------------------------------
+// One lidar at a time, and the parameters that come from RTAB-Map's own names.
+// ---------------------------------------------------------------------------
+
+/**
+ * The node subscribes to both `scan` and `scan_cloud`, but registering a 2D scan against
+ * a 3D cloud is meaningless, so whichever topic speaks second is dropped for good.
+ */
+TEST_F(IcpOdometryTest, stops_listening_for_scans_once_clouds_are_arriving)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+			collect<nav_msgs::msg::Odometry>("odom");
+	makeNode(icpTestParameters());
+
+	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr cloud =
+			helper()->create_publisher<sensor_msgs::msg::PointCloud2>("scan_cloud", 10);
+	rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr scan =
+			helper()->create_publisher<sensor_msgs::msg::LaserScan>("scan", 10);
+	ASSERT_TRUE(waitForSubscriber(cloud));
+	ASSERT_TRUE(waitForSubscriber(scan));
+
+	cloud->publish(makeXYZCloud("lidar", 1.0, corner3D()));
+	ASSERT_TRUE(spinUntil([&]() { return odom->size() >= 1; }));
+
+	scan->publish(cornerScan(1.1));
+	spinFor(std::chrono::milliseconds(300));
+	EXPECT_EQ(1u, odom->size()) << "the scan was registered against the cloud";
+	EXPECT_EQ(0u, scan->get_subscription_count()) << "the scan subscriber is still up";
+}
+
+/// And the other way round: a cloud arriving after scans is dropped instead.
+TEST_F(IcpOdometryTest, stops_listening_for_clouds_once_scans_are_arriving)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+			collect<nav_msgs::msg::Odometry>("odom");
+	makeNode(icpTestParameters());
+
+	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr cloud =
+			helper()->create_publisher<sensor_msgs::msg::PointCloud2>("scan_cloud", 10);
+	rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr scan =
+			helper()->create_publisher<sensor_msgs::msg::LaserScan>("scan", 10);
+	ASSERT_TRUE(waitForSubscriber(cloud));
+	ASSERT_TRUE(waitForSubscriber(scan));
+
+	scan->publish(cornerScan(1.0));
+	ASSERT_TRUE(spinUntil([&]() { return odom->size() >= 1; }));
+
+	cloud->publish(makeXYZCloud("lidar", 1.1, corner3D()));
+	spinFor(std::chrono::milliseconds(300));
+	EXPECT_EQ(1u, odom->size()) << "the cloud was registered against the scan";
+	EXPECT_EQ(0u, cloud->get_subscription_count()) << "the cloud subscriber is still up";
+}
+
+/**
+ * Several of the Icp parameters name a filter the node runs itself, before ICP ever sees the
+ * scan. Setting one of those is taken as asking for the node's filter, so the value moves
+ * to the matching ros parameter -- see "Where these defaults come from" in the doc.
+ */
+TEST_F(IcpOdometryTest, takes_the_icp_filter_values_as_its_own_scan_parameters)
+{
+	publishSensorTf();
+	std::shared_ptr<rtabmap_odom::ICPOdometry> node = makeNode({
+			rclcpp::Parameter("Icp/DownsamplingStep", "2"),
+			rclcpp::Parameter("Icp/RangeMin", "0.5"),
+			rclcpp::Parameter("Icp/RangeMax", "20.0"),
+			rclcpp::Parameter("Icp/PointToPlaneRadius", "0.3"),
+			rclcpp::Parameter("Icp/PointToPlaneGroundNormalsUp", "0.8")});
+
+	EXPECT_EQ(2, node->get_parameter("scan_downsampling_step").as_int());
+	EXPECT_NEAR(0.5, node->get_parameter("scan_range_min").as_double(), 1e-6);
+	EXPECT_NEAR(20.0, node->get_parameter("scan_range_max").as_double(), 1e-6);
+	EXPECT_NEAR(0.3, node->get_parameter("scan_normal_radius").as_double(), 1e-6);
+	EXPECT_NEAR(0.8, node->get_parameter("scan_normal_ground_up").as_double(), 1e-6);
+}
+
+/**
+ * Reg/Strategy picks between visual and ICP registration, and this node only has ICP. A
+ * value asking for anything else is overruled rather than obeyed.
+ */
+TEST_F(IcpOdometryTest, registers_with_icp_whatever_reg_strategy_asks_for)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+			collect<nav_msgs::msg::Odometry>("odom");
+	std::vector<rclcpp::Parameter> params = icpTestParameters();
+	params.push_back(rclcpp::Parameter("Reg/Strategy", "0"));   // visual only
+	makeNode(params);
+
+	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub =
+			helper()->create_publisher<sensor_msgs::msg::PointCloud2>("scan_cloud", 10);
+	ASSERT_TRUE(waitForSubscriber(pub));
+
+	pub->publish(makeXYZCloud("lidar", 1.0, corner3D()));
+	ASSERT_TRUE(spinUntil([&]() { return odom->size() >= 1; }));
+
+	const cv::Point3f motion(0.10f, 0.06f, 0.04f);
+	pub->publish(makeXYZCloud("lidar", 1.1, corner3D(motion)));
+	ASSERT_TRUE(spinUntil([&]() { return odom->size() >= 2; }));
+
+	// Nothing but ICP could have recovered this: there is no image to register.
+	EXPECT_NEAR(motion.x, odom->back().pose.pose.position.x, 0.01);
+}
+
+
+/**
+ * @brief The four field combinations again, organized and downsampled.
+ *
+ * An organized cloud keeps its rows through the step, so the node counts what a full
+ * sweep holds from the cloud's own dimensions instead of dividing by the step.
+ */
+class IcpOdometryOrganizedFieldsTest :
+		public IcpOdometryTest,
+		public ::testing::WithParamInterface<std::tuple<bool, bool>>
+{
+};
+
+TEST_P(IcpOdometryOrganizedFieldsTest, sizes_a_downsampled_organized_cloud_from_its_rows)
+{
+	const bool intensity = std::get<0>(GetParam());
+	const bool normals = std::get<1>(GetParam());
+	publishSensorTf();
+	std::shared_ptr<Collector<rtabmap_msgs::msg::SensorData>> data =
+			collect<rtabmap_msgs::msg::SensorData>("odom_sensor_data/raw");
+	std::vector<rclcpp::Parameter> params = icpTestParameters();
+	params.push_back(rclcpp::Parameter("scan_downsampling_step", 2));
+	makeNode(params);
+
+	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub =
+			helper()->create_publisher<sensor_msgs::msg::PointCloud2>("scan_cloud", 10);
+	ASSERT_TRUE(waitForSubscriber(pub));
+
+	const std::vector<cv::Point3f> points = corner3D();
+	pub->publish(organized(
+			makeCloudWithFields("lidar", 1.0, points, intensity, normals), 80));
+	ASSERT_TRUE(spinUntil([&]() { return !data->empty(); }));
+
+	// 1200 points as 15 rings of 80, every second point of each ring kept: 15 x 40.
+	EXPECT_EQ(int(points.size()/2), data->back().laser_scan_max_pts);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+		OptionalFields,
+		IcpOdometryOrganizedFieldsTest,
+		::testing::Combine(::testing::Bool(), ::testing::Bool()),
+		[](const ::testing::TestParamInfo<std::tuple<bool, bool>> & info) {
+			return std::string(std::get<0>(info.param) ? "intensity" : "no_intensity") +
+					(std::get<1>(info.param) ? "_normals" : "_no_normals");
+		});
+
+/// With both scan_normal_* off, a cloud reaches ICP as bare points, intensity or not.
+TEST_P(IcpOdometryDenseTest, registers_a_cloud_without_computing_normals)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<rtabmap_msgs::msg::SensorData>> data =
+			collect<rtabmap_msgs::msg::SensorData>("odom_sensor_data/raw");
+	std::vector<rclcpp::Parameter> params = icpTestParameters();
+	params.push_back(rclcpp::Parameter("scan_normal_k", 0));
+	params.push_back(rclcpp::Parameter("scan_normal_radius", 0.0));
+	makeNode(params);
+
+	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub =
+			helper()->create_publisher<sensor_msgs::msg::PointCloud2>("scan_cloud", 10);
+	ASSERT_TRUE(waitForSubscriber(pub));
+
+	pub->publish(makeCloudWithFields("lidar", 1.0, corner3D(), GetParam(), false));
+	ASSERT_TRUE(spinUntil([&]() { return !data->empty(); }));
+
+	// LaserScan::Format kXYZ and kXYZI; the layouts with normals are 8 and 9.
+	EXPECT_EQ(GetParam() ? 6 : 5, data->back().laser_scan_format)
+			<< "normals were computed although both scan_normal_* are off";
+}
+
+/**
+ * An intensity channel the node cannot read -- anything but float32 -- is dropped rather
+ * than misread, and the cloud is registered without it.
+ */
+TEST_F(IcpOdometryTest, ignores_an_intensity_field_it_cannot_read)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<rtabmap_msgs::msg::SensorData>> data =
+			collect<rtabmap_msgs::msg::SensorData>("odom_sensor_data/raw");
+	makeNode(icpTestParameters());
+
+	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub =
+			helper()->create_publisher<sensor_msgs::msg::PointCloud2>("scan_cloud", 10);
+	ASSERT_TRUE(waitForSubscriber(pub));
+
+	sensor_msgs::msg::PointCloud2 cloud =
+			makeCloudWithFields("lidar", 1.0, corner3D(), true, false);
+	for(sensor_msgs::msg::PointField & field : cloud.fields)
+	{
+		if(field.name == "intensity")
+		{
+			field.datatype = sensor_msgs::msg::PointField::UINT8;
+		}
+	}
+	pub->publish(cloud);
+	ASSERT_TRUE(spinUntil([&]() { return !data->empty(); }));
+
+	// kXYZNormal rather than kXYZINormal: the channel was left out.
+	EXPECT_EQ(8, data->back().laser_scan_format)
+			<< "an intensity channel that is not float32 was carried through anyway";
+}
+
+/// A frame TF knows nothing about is an error, not a pose: the frame is dropped.
+TEST_F(IcpOdometryTest, refuses_a_cloud_whose_frame_is_not_in_tf)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+			collect<nav_msgs::msg::Odometry>("odom");
+	makeNode(icpTestParameters());
+
+	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub =
+			helper()->create_publisher<sensor_msgs::msg::PointCloud2>("scan_cloud", 10);
+	ASSERT_TRUE(waitForSubscriber(pub));
+
+	pub->publish(makeXYZCloud("unmounted_lidar", 1.0, corner3D()));
+	spinFor(std::chrono::milliseconds(500));
+	EXPECT_TRUE(odom->empty()) << "a cloud from an unknown frame was registered anyway";
+}
+
+/// The same for a 2D scan.
+TEST_F(IcpOdometryTest, refuses_a_scan_whose_frame_is_not_in_tf)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+			collect<nav_msgs::msg::Odometry>("odom");
+	makeNode(icpTestParameters());
+
+	rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr pub =
+			helper()->create_publisher<sensor_msgs::msg::LaserScan>("scan", 10);
+	ASSERT_TRUE(waitForSubscriber(pub));
+
+	sensor_msgs::msg::LaserScan scan = cornerScan(1.0);
+	scan.header.frame_id = "unmounted_lidar";
+	pub->publish(scan);
+	spinFor(std::chrono::milliseconds(500));
+	EXPECT_TRUE(odom->empty()) << "a scan from an unknown frame was registered anyway";
+}
+
+/**
+ * @brief Deskewing a 2D scan without a guess frame, from the sensor's frame and from
+ * frame_id.
+ *
+ * The cloud version of this is IcpOdometryDeskewFrameTest above; a scan takes a different
+ * route to the same place, because laser_geometry projects it into frame_id first when
+ * the sensor is mounted somewhere else, and leaves it alone when it is not.
+ */
+class IcpOdometryScanDeskewFrameTest :
+		public IcpOdometryTest,
+		public ::testing::WithParamInterface<std::string>
+{
+};
+
+TEST_P(IcpOdometryScanDeskewFrameTest, deskews_a_scan_against_its_own_velocity)
+{
+	const std::string frame = GetParam();
+	publishSensorTf();
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+			collect<nav_msgs::msg::Odometry>("odom");
+	std::vector<rclcpp::Parameter> params = icpTestParameters();
+	params.push_back(rclcpp::Parameter("deskewing", true));
+	makeNode(params);
+
+	rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr pub =
+			helper()->create_publisher<sensor_msgs::msg::LaserScan>("scan", 10);
+	ASSERT_TRUE(waitForSubscriber(pub));
+
+	for(int i=0; i<4; ++i)
+	{
+		sensor_msgs::msg::LaserScan scan = cornerScan(1.0 + 0.1*i, 0.05*i, 0.0, false, 0.01f);
+		scan.header.frame_id = frame;
+		pub->publish(scan);
+		ASSERT_TRUE(spinUntil([&]() { return odom->size() >= size_t(i+1); }))
+				<< "no odometry for the scan at " << (1.0 + 0.1*i) << "s";
+	}
+
+	EXPECT_NEAR(0.15, odom->back().pose.pose.position.x, 0.02);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+		ScanFrame,
+		IcpOdometryScanDeskewFrameTest,
+		::testing::Values("base_link", "lidar"),
+		[](const ::testing::TestParamInfo<std::string> & info) {
+			return "in_" + info.param;
+		});
+
+
+/**
+ * pause_odom stops the scan topic as well as the cloud one -- the scans keep arriving,
+ * and none of them is registered until resume_odom.
+ */
+TEST_F(IcpOdometryTest, pause_and_resume_stop_and_restart_processing_scans)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+			collect<nav_msgs::msg::Odometry>("odom");
+	std::shared_ptr<rtabmap_odom::ICPOdometry> node = makeNode(icpTestParameters());
+
+	rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr pub =
+			helper()->create_publisher<sensor_msgs::msg::LaserScan>("scan", 10);
+	ASSERT_TRUE(waitForSubscriber(pub));
+
+	pub->publish(cornerScan(1.0));
+	ASSERT_TRUE(spinUntil([&]() { return !odom->empty(); }));
+
+	ASSERT_TRUE(callEmptyService("pause_odom"));
+	const size_t whilePaused = odom->size();
+	pub->publish(cornerScan(1.1, 0.05));
+	spinFor(std::chrono::milliseconds(500));
+	EXPECT_EQ(whilePaused, odom->size()) << "a scan was registered while paused";
+
+	ASSERT_TRUE(callEmptyService("resume_odom"));
+	pub->publish(cornerScan(1.2, 0.10));
+	EXPECT_TRUE(spinUntil([&]() { return odom->size() > whilePaused; }));
 }
 
 }  // namespace

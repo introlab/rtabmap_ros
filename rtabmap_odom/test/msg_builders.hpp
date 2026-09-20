@@ -163,6 +163,84 @@ inline sensor_msgs::msg::PointCloud2 makeXYZCloud(
 	return cloud;
 }
 
+/**
+ * @brief An XYZ cloud carrying the optional fields a 3D lidar may add.
+ *
+ * `intensity` and the `normal_*`/`curvature` group each change which PCL point type the
+ * odometry converts the cloud into, so a driver that sends them takes a different path
+ * through the node than one that sends plain XYZ. `t` is the per-point offset from the
+ * header stamp that deskewing needs, spread evenly over @p sweep seconds.
+ */
+inline sensor_msgs::msg::PointCloud2 makeCloudWithFields(
+		const std::string & frameId, double stamp,
+		const std::vector<cv::Point3f> & points,
+		bool withIntensity, bool withNormals,
+		const cv::Point3f & normal = cv::Point3f(0, 0, 1),
+		bool withTime = false, float sweep = 0.01f)
+{
+	sensor_msgs::msg::PointCloud2 cloud;
+	cloud.header.frame_id = frameId;
+	cloud.header.stamp = stampOf(stamp);
+	cloud.height = 1;
+	cloud.width = points.size();
+	cloud.is_bigendian = false;
+	cloud.is_dense = true;
+
+	std::vector<std::string> names = {"x", "y", "z"};
+	if(withIntensity)
+	{
+		names.push_back("intensity");
+	}
+	if(withNormals)
+	{
+		names.push_back("normal_x");
+		names.push_back("normal_y");
+		names.push_back("normal_z");
+		names.push_back("curvature");
+	}
+	if(withTime)
+	{
+		names.push_back("t");
+	}
+	cloud.fields.resize(names.size());
+	for(size_t i=0; i<names.size(); ++i)
+	{
+		cloud.fields[i].name = names[i];
+		cloud.fields[i].offset = uint32_t(4 * i);
+		cloud.fields[i].datatype = sensor_msgs::msg::PointField::FLOAT32;
+		cloud.fields[i].count = 1;
+	}
+	cloud.point_step = uint32_t(4 * names.size());
+	cloud.row_step = cloud.point_step * cloud.width;
+	cloud.data.resize(size_t(cloud.row_step) * cloud.height);
+
+	for(size_t i=0; i<points.size(); ++i)
+	{
+		float * p = reinterpret_cast<float *>(&cloud.data[i * cloud.point_step]);
+		size_t f = 0;
+		p[f++] = points[i].x;
+		p[f++] = points[i].y;
+		p[f++] = points[i].z;
+		if(withIntensity)
+		{
+			p[f++] = float(i % 256);
+		}
+		if(withNormals)
+		{
+			p[f++] = normal.x;
+			p[f++] = normal.y;
+			p[f++] = normal.z;
+			p[f++] = 0.0f;   // curvature
+		}
+		if(withTime)
+		{
+			p[f++] = points.size() > 1 ?
+					sweep * float(i) / float(points.size() - 1) : 0.0f;
+		}
+	}
+	return cloud;
+}
+
 /// A small cloud on a line, enough to tell one scan from another.
 inline sensor_msgs::msg::PointCloud2 makeScanCloud(
 		const std::string & frameId, double stamp, size_t count = 4)
