@@ -196,30 +196,38 @@ Setting `always_process_most_recent_frame:=false` is the opposite trade: every f
 
 ### Lost frames, resets and new maps
 
-A frame that cannot be registered is *lost*. By default the node publishes a null odometry message — an all-zero pose, with `9999` written down the diagonal of both covariance matrices to mean "do not use this" or, equivalently, "I am lost" — rather than nothing at all:
+A frame that cannot be registered is *lost*: the node publishes an all-zero pose with `9999` down the diagonal of both covariance matrices, which says there is no pose here to use.
+
+The first frame after a reset — from `reset_odom`, `reset_odom_to_pose` or `Odom/ResetCountdown` — carries the same `9999` for a different reason. It is an *initialization* rather than a registration: nothing to measure against, no velocity to carry over. Its pose is real and meant to be used; what the covariance says is that it does not continue the last valid one.
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `publish_null_when_lost` | `bool` | `true` | Publish a null pose, with `9999` on the covariance diagonals, when a frame cannot be registered. `false` publishes nothing. |
 
-**Leave it on, unless a filter is consuming this topic.** A consumer that sees the null message knows odometry is lost; one that sees nothing cannot tell that apart from a node that died or a topic that was never connected. `rtabmap` itself relies on this to know it should not map the frame.
+**Leave it on, unless a filter is consuming this topic.** A consumer that sees the null message knows odometry is lost; one that sees nothing cannot tell that apart from a node that died or a topic that was never connected. `rtabmap` relies on it to know the frame should not be mapped.
 
-**With `publish_null_when_lost` on, a reset always starts a new mapping session, and the covariances are how that is signalled.** The first frame after a reset is an *initialization*, not a registration: there is no previous frame to measure against and no velocity to carry over, so it publishes `9999` in the covariance.
-
-`rtabmap` watches for exactly that — an identity pose, or pose **and** twist covariances both `>=9999` — and starts a **new map** rather than linking the new trajectory to the old one:
+`rtabmap` reads an identity pose, or both covariances at `9999`, as a discontinuity, and starts a **new map** rather than deforming the graph across a jump the robot never made:
 
 ```
 Odometry is reset (identity pose or high variance detected). Increment map id!
 ```
 
-Every reset looks like this, whether it came from `reset_odom`, from `reset_odom_to_pose`, or automatically from `Odom/ResetCountdown`, and whether or not a guess was used to choose the new pose. That is the point: the pose after a reset cannot be linked to the one before it, so mapping continues in a fresh session instead of deforming the graph across a jump the robot never made.
+While it is lost, `publish_null_when_lost:=true` publishes a null pose and no velocity for every frame, both marked `9999`, and `:=false` publishes nothing. What differs between configurations is the first frame after the reset, and where it restarts from:
 
-Turning `publish_null_when_lost` off suppresses that frame as well, so no reset — not even a manual `reset_odom` — ever starts a new map.
+| | First frame after the reset | Second frame | TF while lost | `rtabmap` |
+|---|---|---|---|---|
+| `publish_null_when_lost:=true` (default), with or without a guess | recovered pose, `9999` on both pose and velocity | registered, from the recovered pose | unbroken with a guess, absent without one | new map |
+| `publish_null_when_lost:=false` with `guess_frame_id` | recovered pose and the guess's velocity, both with the guess's covariance | registered, from the recovered pose | unbroken | one session |
+| `publish_null_when_lost:=false`, `publish_tf:=false`, another node publishing `odom` → `base_link` | not published | registered, from the recovered pose | unbroken, published by the other node | one session |
+| `publish_null_when_lost:=false` with neither | not published | registered, from the pose held before the loss | absent until it recovers | one session, across the gap |
 
-For finer control over when a reset should start a new map, put an intermediate node between this one and `rtabmap` and have it set the covariances itself before forwarding the topic. That node then decides what counts as a discontinuity, instead of it being inferred from the reset alone. Two cases where that is worth doing:
+*Registered* is the ordinary case: a pose and a velocity measured against the previous valid frame, with the covariance the registration computed.
 
-- **Not starting a new map on a reset**, when the guess frame is trusted enough that the recovered pose is continuous with what came before. The node forwards the frame with ordinary covariances and mapping carries on in one session.
-- **Starting one on an external health check** — the guess frame has not been published for a while, say, so the newly computed pose may be wrong even though registration reported success. The node writes `9999` into both covariance diagonals and `rtabmap` begins a fresh session.
+The two middle rows are the ones to build on. Either an external source is named through `guess_frame_id`, and the restarting frame is published as a continuation of the trajectory — the poses *and* the covariances staying continuous for as long as that guess is published — or a filter such as `robot_localization` owns `odom` → `base_link`, and the reset adopts whatever pose it holds.
+
+**The last row is a trap.** With nothing to say where the robot went while the odometry was lost, the reset resumes at the pose from before it, that motion is dropped from the trajectory, and since no `9999` ever reaches `rtabmap` the map is deformed across the gap rather than split at it. The node reports that combination as an error at startup.
+
+For finer control, put an intermediate node between this one and `rtabmap` and let it set the covariances itself. It decides what counts as a discontinuity, instead of that being inferred from the reset alone — starting a new map when the guess frame has gone quiet, say, and the newly computed pose may be wrong even though registration reported success.
 
 Recovering from lost is what `Odom/ResetCountdown` is for, or the `reset_odom` service. Combined with `guess_frame_id` it also keeps the TF tree intact throughout — see [It also keeps TF alive through a failure](#it-also-keeps-tf-alive-through-a-failure).
 

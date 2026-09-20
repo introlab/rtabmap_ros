@@ -61,6 +61,44 @@ using namespace rtabmap;
 
 namespace rtabmap_odom {
 
+namespace {
+
+/**
+ * @brief The covariance of a pose that came from the guess frame instead of registration.
+ *
+ * Used wherever the guess is what the published pose rests on: a frame the odometry did
+ * not update because it had not moved enough, and the frame that restarts the map after
+ * a reset. Nothing was measured in either case, so the confidence is the one the guess
+ * was declared to have rather than anything the registration computed.
+ */
+cv::Mat guessCovariance(double linearVariance, double angularVariance)
+{
+	cv::Mat covariance = cv::Mat::zeros(6,6,CV_64FC1);
+	covariance.at<double>(0,0) = linearVariance;  // xx
+	covariance.at<double>(1,1) = linearVariance;  // yy
+	covariance.at<double>(2,2) = linearVariance;  // zz
+	covariance.at<double>(3,3) = angularVariance; // rr
+	covariance.at<double>(4,4) = angularVariance; // pp
+	covariance.at<double>(5,5) = angularVariance; // yawyaw
+	return covariance;
+}
+
+/**
+ * @brief The velocity a motion implies, for a frame with no registration to measure one.
+ *
+ * Named apart from the guess itself so that it can be called where a `guessVelocity`
+ * variable is in scope.
+ */
+rtabmap::Transform velocityFrom(const rtabmap::Transform & motion, double dt)
+{
+	UASSERT(dt > 0.0);
+	float x,y,z,roll,pitch,yaw;
+	motion.getTranslationAndEulerAngles(x,y,z,roll,pitch,yaw);
+	return rtabmap::Transform(x/dt, y/dt, z/dt, roll/dt, pitch/dt, yaw/dt);
+}
+
+}  // namespace
+
 OdometryROS::OdometryROS(const rclcpp::NodeOptions & options) :
 		OdometryROS("odometry", options)
 	{}
@@ -194,6 +232,17 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 				"at the same time if \"guess_frame_id\" and \"odom_frame_id\" "
 				"are the same frame (value=\"%s\"). \"guess_frame_id\" is disabled.", odomFrameId_.c_str());
 		guessFrameId_.clear();
+	}
+	if(!publishNullWhenLost_ && guessFrameId_.empty() && publishTf_)
+	{
+		RCLCPP_ERROR(this->get_logger(), "\"publish_null_when_lost\" is false, but nothing can "
+				"say where odometry restarts after being lost: \"guess_frame_id\" is not set and "
+				"\"publish_tf\" is true, so the %s->%s fallback returns this node's own pose. "
+				"Whatever the robot did while lost will be silently dropped from the trajectory "
+				"and mapped across. Set \"guess_frame_id\", or set \"publish_tf\" to false if "
+				"another node (e.g. robot_localization) publishes %s->%s, or leave "
+				"\"publish_null_when_lost\" true.",
+				odomFrameId_.c_str(), frameId_.c_str(), odomFrameId_.c_str(), frameId_.c_str());
 	}
 	RCLCPP_INFO(this->get_logger(), "Odometry: frame_id               = %s", frameId_.c_str());
 	RCLCPP_INFO(this->get_logger(), "Odometry: odom_frame_id          = %s", odomFrameId_.c_str());
@@ -752,6 +801,18 @@ void OdometryROS::processData()
 
 		if(!previousPose.isNull() && !guessCurrentPose.isNull())
 		{
+			// What the guess frame says the robot is doing. This is what gets published
+			// for a frame with no registration behind it -- one skipped for not having
+			// moved enough, or one starting a new map, whose twist would otherwise be
+			// unknown although its pose comes from the guess. It is dropped further down
+			// as soon as the registration has a velocity of its own to report.
+			if(previousStamp_ > 0.0 &&
+			   rtabmap_conversions::timestampFromROS(header.stamp) > previousStamp_)
+			{
+				guessVelocity = velocityFrom(previousPose.inverse() * guessCurrentPose,
+						rtabmap_conversions::timestampFromROS(header.stamp) - previousStamp_);
+			}
+
 			if(guess_.isNull())
 			{
 				guess_ = previousPose.inverse() * guessCurrentPose;
@@ -770,20 +831,7 @@ void OdometryROS::processData()
 				{
 					// Ignore odometry update, we didn't move enough
 					pose = odometry_->getPose() * guess_;
-					info.reg.covariance = cv::Mat::zeros(6,6,CV_64FC1);
-					info.reg.covariance.at<double>(0,0) = guessLinearVariance_;  // xx
-					info.reg.covariance.at<double>(1,1) = guessLinearVariance_;  // yy
-					info.reg.covariance.at<double>(2,2) = guessLinearVariance_; // zz
-					info.reg.covariance.at<double>(3,3) = guessAngularVariance_; // rr
-					info.reg.covariance.at<double>(4,4) = guessAngularVariance_; // pp
-					info.reg.covariance.at<double>(5,5) = guessAngularVariance_; // yawyaw
 
-					//set velocity
-					double dt = rtabmap_conversions::timestampFromROS(header.stamp)-previousStamp_;
-					UASSERT(dt>0.0);
-					// use part of guess matching dt
-					(previousPose.inverse() * guessCurrentPose).getTranslationAndEulerAngles(x,y,z,roll,pitch,yaw);
-					guessVelocity = rtabmap::Transform(x/dt, y/dt, z/dt, roll/dt, pitch/dt, yaw/dt);
 					skipOdometryUpdate = true;
 				}
 			}
@@ -846,6 +894,9 @@ void OdometryROS::processData()
 	// Set when the guess has already been folded into the pose below, so that a reset
 	// later in this frame does not go looking for a fallback that is no longer needed.
 	bool poseCarriedByGuess = false;
+	// Set when this frame starts a new map and the guess frame says where, which is what
+	// makes the trajectory it starts continuous with the one before it.
+	bool initialisedOnGuess = false;
 	if(!skipOdometryUpdate)
 	{
 		// This frame will initialise the odometry's map whenever no frame has been
@@ -857,7 +908,8 @@ void OdometryROS::processData()
 		// straight back out. Resetting here costs nothing, the map being empty either way.
 		//
 		// There are two ways to be right, depending on what the guess can say:
-		if(odometry_->framesProcessed() == 0 && !guessCurrentPose.isNull())
+		initialisedOnGuess = odometry_->framesProcessed() == 0 && !guessCurrentPose.isNull();
+		if(initialisedOnGuess)
 		{
 			if(guessIsTheFirstOne)
 			{
@@ -887,6 +939,21 @@ void OdometryROS::processData()
 			}
 		}
 		pose = odometry_->process(data, guess_, &info);
+	}
+
+	// 9999 on both covariances is how rtabmap is told a frame starts a new map. When the
+	// guess frame says where it starts, and publish_null_when_lost says this consumer
+	// wants poses rather than the news of a reset, it goes out as a continuation instead.
+	const bool publishAsContinuation = initialisedOnGuess && !publishNullWhenLost_ && !pose.isNull();
+	if(skipOdometryUpdate || publishAsContinuation)
+	{
+		// Both rest on the guess rather than on a registration: its confidence, its velocity.
+		info.reg.covariance = guessCovariance(guessLinearVariance_, guessAngularVariance_);
+	}
+	else
+	{
+		// The registration measured this one, so its velocity is the one to publish.
+		guessVelocity.setNull();
 	}
 	if(!pose.isNull())
 	{
@@ -970,11 +1037,12 @@ void OdometryROS::processData()
 			if(setTwist)
 			{
 				float x,y,z,roll,pitch,yaw;
-				if(skipOdometryUpdate) {
-					UASSERT(!guessVelocity.isNull());
-					guessVelocity.getTranslationAndEulerAngles(x,y,z,roll,pitch,yaw);
-				} else {
+				// Whatever is left of the two: the registration's own velocity, or the
+				// guess's where the frame had no registration to give one.
+				if(guessVelocity.isNull()) {
 					odometry_->getVelocityGuess().getTranslationAndEulerAngles(x,y,z,roll,pitch,yaw);
+				} else {
+					guessVelocity.getTranslationAndEulerAngles(x,y,z,roll,pitch,yaw);
 				}
 				odom.twist.twist.linear.x = x;
 				odom.twist.twist.linear.y = y;
@@ -992,7 +1060,7 @@ void OdometryROS::processData()
 			odom.twist.covariance.at(35) = setTwist?info.reg.covariance.at<double>(5,5):BAD_COVARIANCE; // yawyaw
 
 			//publish the message
-			if(setTwist || publishNullWhenLost_)
+			if(setTwist || publishNullWhenLost_ || publishAsContinuation)
 			{
 				odomPub_->publish(odom);
 			}

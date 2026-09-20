@@ -957,8 +957,10 @@ TEST_F(OdometryRosTest, recovers_on_the_guess_after_a_metre_of_being_lost)
 	}
 	const size_t whileLost = odom->size();
 
-	// The scene comes back, seen from where the wheels say the robot now is. Again the
-	// first frame after the reset carries no velocity and is suppressed, so it takes two.
+	// The scene comes back, seen from where the wheels say the robot now is. The frame
+	// that restarts the map is published as a continuation of the old one (see
+	// publishes_the_restarting_frame_as_a_continuation_of_the_guess below); a second
+	// frame follows so that what is asserted here is a real registration.
 	pub->publish(makeXYZCloud("lidar", 2.2, corner3D(cv::Point3f(float(1.2*speed), 0, 0))));
 	spinFor(std::chrono::milliseconds(200));
 	pub->publish(makeXYZCloud("lidar", 2.3, corner3D(cv::Point3f(float(1.3*speed), 0, 0))));
@@ -1162,6 +1164,100 @@ TEST_F(OdometryRosTest, min_update_rate_adopts_a_fused_pose_from_tf_when_there_i
 			<< "the reset did not adopt the fused pose published on odom -> base_link";
 }
 
+
+/**
+ * @brief With the guess frame vouching for it, a reset is published rather than swallowed.
+ *
+ * The frame that restarts the map has nothing to measure against, so it normally carries
+ * 9999 on both covariances -- rtabmap's signal to start a new map rather than link across
+ * a jump. With `publish_null_when_lost:=false` that frame was not published at all: the
+ * map stayed in one piece, but its consumer lost a pose. It now goes out carrying the
+ * guess frame's own confidence and velocity, which is what makes the poses *and* the
+ * covariances on this topic continuous for as long as the guess is there.
+ */
+TEST_F(OdometryRosTest, publishes_the_restarting_frame_as_a_continuation_of_the_guess)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+			collect<nav_msgs::msg::Odometry>("odom");
+	makeNode({rclcpp::Parameter("guess_frame_id", "wheel_odom"),
+	          rclcpp::Parameter("publish_null_when_lost", false),
+	          rclcpp::Parameter("Odom/ResetCountdown", "1"),
+	          rclcpp::Parameter("wait_for_transform", 2.0)});
+
+	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub = scanPublisher();
+	ASSERT_TRUE(waitForSubscriber(pub));
+	const double speed = 1.0;   // m/s, frames at 10 Hz: x(t) = t - 1.0
+	ASSERT_TRUE(publishGuessMotion(1.0, 2.0, speed));
+
+	// Tracking, then one frame with nothing in it, which the countdown turns into a reset.
+	pub->publish(makeXYZCloud("lidar", 1.0, corner3D()));
+	spinFor(std::chrono::milliseconds(200));
+	pub->publish(makeXYZCloud("lidar", 1.1, corner3D(cv::Point3f(0.1f, 0, 0))));
+	ASSERT_TRUE(spinUntil([&]() { return !odom->empty(); })) << "never started tracking";
+	pub->publish(degenerateCloud(1.2));
+	spinFor(std::chrono::milliseconds(200));
+	const size_t beforeRestart = odom->size();
+
+	// The scene comes back: this is the frame that restarts the map.
+	pub->publish(makeXYZCloud("lidar", 1.3, corner3D(cv::Point3f(0.3f, 0, 0))));
+	ASSERT_TRUE(spinUntil([&]() { return odom->size() > beforeRestart; }))
+			<< "the frame that restarts the map was not published";
+
+	const nav_msgs::msg::Odometry restart = odom->back();
+	EXPECT_LT(restart.pose.covariance[0], 9999.0)
+			<< "the restarting frame still says it cannot be linked to what came before";
+	EXPECT_LT(restart.twist.covariance[0], 9999.0)
+			<< "rtabmap starts a new map when both covariances say 9999";
+	// The guess's own confidence, doubled into the pose as everywhere else on this topic.
+	EXPECT_DOUBLE_EQ(0.002, restart.pose.covariance[0]);
+	EXPECT_DOUBLE_EQ(0.001, restart.twist.covariance[0]);
+	EXPECT_DOUBLE_EQ(0.001, restart.twist.covariance[21]);
+	// And the guess's own velocity, there being no registration to take one from.
+	EXPECT_NEAR(speed, restart.twist.twist.linear.x, 0.05)
+			<< "the twist of the restarting frame does not match the guess it came from";
+	EXPECT_NEAR(0.3*speed, restart.pose.pose.position.x, 0.02)
+			<< "the map restarted somewhere other than where the guess says the robot is";
+
+	// From the next frame on it is an ordinary registration again, with its own covariance.
+	pub->publish(makeXYZCloud("lidar", 1.4, corner3D(cv::Point3f(0.4f, 0, 0))));
+	ASSERT_TRUE(spinUntil([&]() { return odom->size() > beforeRestart + 1; }));
+	EXPECT_NE(0.002, odom->back().pose.covariance[0])
+			<< "still reporting the guess's confidence after the registration resumed";
+	EXPECT_LT(odom->back().pose.covariance[0], 9999.0);
+}
+
+/// Unchanged by default: the restart still announces itself, which is what starts a new map.
+TEST_F(OdometryRosTest, marks_the_restarting_frame_as_unlinked_when_null_publishing_is_on)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+			collect<nav_msgs::msg::Odometry>("odom");
+	makeNode({rclcpp::Parameter("guess_frame_id", "wheel_odom"),
+	          rclcpp::Parameter("Odom/ResetCountdown", "1"),
+	          rclcpp::Parameter("wait_for_transform", 2.0)});
+
+	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub = scanPublisher();
+	ASSERT_TRUE(waitForSubscriber(pub));
+	ASSERT_TRUE(publishGuessMotion(1.0, 2.0, 1.0));
+
+	pub->publish(makeXYZCloud("lidar", 1.0, corner3D()));
+	spinFor(std::chrono::milliseconds(200));
+	pub->publish(makeXYZCloud("lidar", 1.1, corner3D(cv::Point3f(0.1f, 0, 0))));
+	ASSERT_TRUE(spinUntil([&]() { return !odom->empty(); }));
+	pub->publish(degenerateCloud(1.2));
+	spinFor(std::chrono::milliseconds(200));
+	const size_t beforeRestart = odom->size();
+
+	pub->publish(makeXYZCloud("lidar", 1.3, corner3D(cv::Point3f(0.3f, 0, 0))));
+	ASSERT_TRUE(spinUntil([&]() { return odom->size() > beforeRestart; }));
+
+	// The pose is the recovered one, but both covariances say it is not linked to the
+	// trajectory before it, which is how rtabmap knows to start a new map.
+	EXPECT_NEAR(0.3, odom->back().pose.pose.position.x, 0.02);
+	EXPECT_GE(odom->back().pose.covariance[0], 9999.0);
+	EXPECT_GE(odom->back().twist.covariance[0], 9999.0);
+}
 
 }  // namespace
 }  // namespace rtabmap_odom_test
