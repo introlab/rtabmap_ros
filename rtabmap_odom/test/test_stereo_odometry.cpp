@@ -1031,5 +1031,225 @@ TEST_F(StereoOdometryTest, ignores_features_whose_counts_disagree)
 			<< "features that do not line up with each other were used anyway";
 }
 
+/**
+ * @brief The calibration paths around `Rtabmap/ImagesAlreadyRectified`, on synthetic pairs.
+ *
+ * A stereo pair is only usable if the node can work out how far apart the two cameras
+ * are. It has two ways -- `P(0,3)` in the right `camera_info`, or the transform between
+ * the two camera frames in TF -- and refuses the frame rather than guessing when neither
+ * answers. These drive each of those outcomes.
+ */
+class StereoOdometryCalibrationTest : public StereoOdometryTest
+{
+protected:
+	/// A one-camera rig and its publisher, with the node already listening.
+	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr start(
+			const CameraRig & rig, std::vector<rclcpp::Parameter> params = {})
+	{
+		publishRigTf(rig);
+		params.push_back(rclcpp::Parameter("subscribe_rgbd", true));
+		params.push_back(rclcpp::Parameter("rgbd_cameras", 1));
+		makeNode(params);
+		rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr pub =
+				helper()->create_publisher<rtabmap_msgs::msg::RGBDImage>("rgbd_image", 10);
+		EXPECT_TRUE(waitForSubscriber(pub));
+		return pub;
+	}
+};
+
+/// No `P(0,3)` and nothing in TF to make up for it: there is no scale, so no pose.
+TEST_F(StereoOdometryCalibrationTest, refuses_a_pair_whose_calibration_has_no_baseline)
+{
+	const CameraRig rig = makeCameraRig(1);
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+			collect<nav_msgs::msg::Odometry>("odom");
+	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr pub = start(rig);
+
+	// Both calibrations describe the same camera, so TF between them is the identity.
+	rtabmap_msgs::msg::RGBDImages frame = cameraRigStereoFrame(
+			rig, rtabmap::Transform(0, 0, 0, 0, 0, 0), 1.0, /*baseline=*/0.0, /*withImages=*/true);
+	pub->publish(frame.rgbd_images[0]);
+	spinFor(std::chrono::milliseconds(500));
+
+	EXPECT_TRUE(odom->empty()) << "a pair with no baseline was registered anyway";
+}
+
+/// The D400 case the node warns about: no `P(0,3)`, but the two frames are in TF.
+TEST_F(StereoOdometryCalibrationTest, takes_the_baseline_from_tf_when_the_calibration_has_none)
+{
+	const CameraRig rig = makeCameraRig(1);
+	const double baseline = 0.12;
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+			collect<nav_msgs::msg::Odometry>("odom");
+
+	// The rig's TF, plus the right camera beside the left one.
+	staticTf_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(*helper());
+	std::vector<geometry_msgs::msg::TransformStamped> transforms =
+			cameraRigTransforms(rig, helper()->now());
+	geometry_msgs::msg::TransformStamped right;
+	right.header.stamp = helper()->now();
+	right.header.frame_id = rig.frameIds[0];
+	right.child_frame_id = rig.frameIds[0] + "_right";
+	right.transform.translation.x = baseline;
+	right.transform.rotation.w = 1.0;
+	transforms.push_back(right);
+	staticTf_->sendTransform(transforms);
+
+	// makeNode() waits for the node's TF listener to pick the static transforms up.
+	makeNode({rclcpp::Parameter("subscribe_rgbd", true), rclcpp::Parameter("rgbd_cameras", 1)});
+	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr pub =
+			helper()->create_publisher<rtabmap_msgs::msg::RGBDImage>("rgbd_image", 10);
+	ASSERT_TRUE(waitForSubscriber(pub));
+
+	// A metre forward, with the baseline reachable only through TF.
+	for(int i=0; i<11; ++i)
+	{
+		rtabmap_msgs::msg::RGBDImages frame = cameraRigStereoFrame(
+				rig, rtabmap::Transform(0.1f*i, 0, 0, 0, 0, 0), 1.0 + 0.1*i,
+				/*baseline=*/0.0, /*withImages=*/true);
+		frame.rgbd_images[0].depth_camera_info.header.frame_id = rig.frameIds[0] + "_right";
+		pub->publish(frame.rgbd_images[0]);
+		ASSERT_TRUE(spinUntil([&]() { return odom->size() >= size_t(i+1); }))
+				<< "nothing came back for frame " << i;
+	}
+
+	EXPECT_FALSE(isLost(odom->back())) << "the baseline from TF did not make the pair usable";
+	EXPECT_NEAR(1.0, odom->back().pose.pose.position.x, 0.05)
+			<< "the rig travelled a metre along x";
+}
+
+/// Unrectified images the node is asked to rectify, with no transform between the cameras.
+TEST_F(StereoOdometryCalibrationTest, refuses_unrectified_images_when_the_cameras_are_not_in_tf)
+{
+	const CameraRig rig = makeCameraRig(1);
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+			collect<nav_msgs::msg::Odometry>("odom");
+	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr pub =
+			start(rig, {rclcpp::Parameter("Rtabmap/ImagesAlreadyRectified", "false")});
+
+	rtabmap_msgs::msg::RGBDImages frame = cameraRigStereoFrame(
+			rig, rtabmap::Transform(0, 0, 0, 0, 0, 0), 1.0, 0.12, /*withImages=*/true);
+	// A right camera whose frame nothing in TF knows about.
+	frame.rgbd_images[0].depth_camera_info.header.frame_id = "right_camera_nobody_publishes";
+	pub->publish(frame.rgbd_images[0]);
+	spinFor(std::chrono::milliseconds(500));
+
+	EXPECT_TRUE(odom->empty())
+			<< "rectification was attempted without knowing where the two cameras are";
+}
+
+/// An encoding the node cannot read is refused rather than reinterpreted.
+TEST_F(StereoOdometryCalibrationTest, refuses_an_image_encoding_it_cannot_use)
+{
+	const CameraRig rig = makeCameraRig(1);
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+			collect<nav_msgs::msg::Odometry>("odom");
+	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr pub = start(rig);
+
+	rtabmap_msgs::msg::RGBDImages frame = cameraRigStereoFrame(
+			rig, rtabmap::Transform(0, 0, 0, 0, 0, 0), 1.0, 0.12, /*withImages=*/true);
+	frame.rgbd_images[0].rgb = makeImage(rig.frameIds[0], 1.0,
+			cv::Mat::zeros(rig.height, rig.width, CV_32FC1), "32FC1");
+	pub->publish(frame.rgbd_images[0]);
+	spinFor(std::chrono::milliseconds(500));
+
+	EXPECT_TRUE(odom->empty()) << "a 32FC1 left image was taken as a stereo frame";
+}
+
+/// The images of every camera are stitched into one strip, so they have to share a type.
+TEST_F(StereoOdometryTest, refuses_cameras_whose_images_are_of_different_types)
+{
+	const CameraRig rig = makeCameraRig(2);
+	publishRigTf(rig);
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+			collect<nav_msgs::msg::Odometry>("odom");
+	// keep_color leaves a color image in color, so the two cameras below stay different;
+	// converted to grayscale they would both end up 8UC1 and agree.
+	makeNode({rclcpp::Parameter("subscribe_rgbd", true),
+	          rclcpp::Parameter("rgbd_cameras", 2),
+	          rclcpp::Parameter("keep_color", true)});
+
+	std::vector<rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr> publishers;
+	for(int i=0; i<2; ++i)
+	{
+		publishers.push_back(helper()->create_publisher<rtabmap_msgs::msg::RGBDImage>(
+				"rgbd_image" + std::to_string(i), 10));
+	}
+	ASSERT_TRUE(waitForSubscriber(publishers[0]));
+	ASSERT_TRUE(waitForSubscriber(publishers[1]));
+
+	rtabmap_msgs::msg::RGBDImages frame = cameraRigStereoFrame(
+			rig, rtabmap::Transform(0, 0, 0, 0, 0, 0), 1.0, 0.12, /*withImages=*/true);
+	// The rig sends mono8; this camera sends color.
+	frame.rgbd_images[1].rgb = makeImage(rig.frameIds[1], 1.0,
+			cv::Mat::zeros(rig.height, rig.width, CV_8UC3), "bgr8");
+	publishers[0]->publish(frame.rgbd_images[0]);
+	publishers[1]->publish(frame.rgbd_images[1]);
+	spinFor(std::chrono::milliseconds(500));
+
+	EXPECT_TRUE(odom->empty()) << "images of two different types were stitched together";
+}
+
+/**
+ * Cameras of one rig are meant to fire together. When their stamps are far apart the node
+ * says so once and carries on -- the frame is still registered, since refusing it would
+ * be worse than registering a slightly stale one.
+ */
+TEST_F(StereoOdometryTest, warns_but_carries_on_when_the_cameras_are_far_apart_in_time)
+{
+	const CameraRig rig = makeCameraRig(2);
+	publishRigTf(rig);
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+			collect<nav_msgs::msg::Odometry>("odom");
+	// Exact matching would never pair frames this far apart, so there would be nothing
+	// to warn about.
+	makeNode({rclcpp::Parameter("subscribe_rgbd", true),
+	          rclcpp::Parameter("rgbd_cameras", 2),
+	          rclcpp::Parameter("approx_sync", true)});
+
+	std::vector<rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr> publishers;
+	for(int i=0; i<2; ++i)
+	{
+		publishers.push_back(helper()->create_publisher<rtabmap_msgs::msg::RGBDImage>(
+				"rgbd_image" + std::to_string(i), 10));
+	}
+	ASSERT_TRUE(waitForSubscriber(publishers[0]));
+	ASSERT_TRUE(waitForSubscriber(publishers[1]));
+
+	// Each camera 60 ms behind the other, against the 1/60 s the node considers high.
+	// Several pairs: the approximate policy needs more than one message per topic before
+	// it commits to a pairing.
+	for(int i=0; i<4; ++i)
+	{
+		const double stamp = 1.0 + 0.1*i;
+		const rtabmap::Transform pose(0.1f*i, 0, 0, 0, 0, 0);
+		publishers[0]->publish(
+				cameraRigStereoFrame(rig, pose, stamp, 0.12, true).rgbd_images[0]);
+		publishers[1]->publish(
+				cameraRigStereoFrame(rig, pose, stamp + 0.06, 0.12, true).rgbd_images[1]);
+		spinFor(std::chrono::milliseconds(100));
+	}
+
+	EXPECT_TRUE(spinUntil([&]() { return !odom->empty(); }))
+			<< "a pair whose cameras disagree about the time was dropped, not warned about";
+}
+
+/// A baseline that cannot be real is called out, and the frame is registered regardless.
+TEST_F(StereoOdometryCalibrationTest, warns_about_an_implausible_baseline)
+{
+	const CameraRig rig = makeCameraRig(1);
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+			collect<nav_msgs::msg::Odometry>("odom");
+	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr pub = start(rig);
+
+	// 20 m between the two cameras of one rig: possible to write down, not to build.
+	const rtabmap_msgs::msg::RGBDImages frame = cameraRigStereoFrame(
+			rig, rtabmap::Transform(0, 0, 0, 0, 0, 0), 1.0, /*baseline=*/20.0, /*withImages=*/true);
+	pub->publish(frame.rgbd_images[0]);
+
+	EXPECT_TRUE(spinUntil([&]() { return !odom->empty(); }))
+			<< "the frame was dropped rather than registered with a warning";
+}
+
 }  // namespace
 }  // namespace rtabmap_odom_test
