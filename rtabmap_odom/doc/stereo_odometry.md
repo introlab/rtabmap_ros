@@ -23,7 +23,7 @@ The shared parameters — frames, TF, guesses, the IMU, RTAB-Map's own parameter
 
 ## Pipeline arrangements
 
-A stereo pipeline, including the rectification step this node does **not** do for you:
+A typical stereo pipeline, rectification included:
 
 ```mermaid
 flowchart LR
@@ -38,23 +38,61 @@ flowchart LR
     ODOM -->|odom + TF| MAP
 ```
 
-`stereo_image_proc` is skipped when the driver already publishes rectified images, and [`stereo_sync`](https://github.com/introlab/rtabmap_ros/tree/ros2/rtabmap_sync) is skipped when nothing but odometry consumes the camera -- the node then takes the four rectified topics directly.
+`stereo_image_proc` can be dropped when the driver already publishes rectified images:
+
+```mermaid
+flowchart LR
+    CAM["stereo driver<br>publishing rectified images"]
+    SYNC["stereo_sync"]
+    ODOM["stereo_odometry"]
+    MAP["rtabmap"]
+    CAM -->|left/image_rect<br>right/image_rect<br>camera_info x2| SYNC
+    SYNC -->|rgbd_image| ODOM & MAP
+    ODOM -->|odom + TF| MAP
+```
 
 The same shortcut as on the RGB-D side is available here: drop `stereo_sync` and feed `rtabmap` from **this node's own output**.
 
 ```mermaid
 flowchart LR
-    CAM["stereo driver"]
-    PROC["stereo_image_proc"]
+    CAM["stereo driver<br>publishing rectified images"]
     ODOM["stereo_odometry"]
     MAP["rtabmap<br>subscribe_rgbd or subscribe_sensor_data"]
-    CAM -->|left/image_raw<br>right/image_raw<br>camera_info x2| PROC
-    PROC -->|left/image_rect<br>right/image_rect<br>camera_info x2| ODOM
+    CAM -->|left/image_rect<br>right/image_rect<br>camera_info x2| ODOM
     ODOM -->|odom_rgbd_image<br>or odom_sensor_data| MAP
     ODOM -->|odom + TF| MAP
 ```
 
 Remap `rtabmap`'s `rgbd_image` to `odom_rgbd_image`, or set `subscribe_sensor_data` and remap to `odom_sensor_data/raw`. The stereo pair survives the trip intact -- the left image, the right image and both calibrations travel in the one message, exactly as `stereo_sync` would have packed them -- and the features this node extracted come with it, so `rtabmap` does not redo feature detection and descriptor extraction.
+
+Everything above hands the node rectified images. It can also take the raw pair, straight from the driver:
+
+```mermaid
+flowchart LR
+    CAM["stereo driver"]
+    ODOM["stereo_odometry<br>Rtabmap/ImagesAlreadyRectified:=false"]
+    MAP["rtabmap<br>subscribe_rgbd or subscribe_sensor_data"]
+    CAM -->|left/image_raw<br>right/image_raw<br>camera_info x2| ODOM
+    ODOM -->|odom_rgbd_image<br>or odom_sensor_data| MAP
+    ODOM -->|odom + TF| MAP
+```
+
+Two different things can make that work:
+
+- **The odometry rectifies the pair itself.** With `Rtabmap/ImagesAlreadyRectified:=false` it builds a rectification map from the calibration and applies it to every frame, saying so once:
+
+  ```
+  Rtabmap/ImagesAlreadyRectified parameter is set to false but the selected odometry
+  approach cannot process raw stereo images. We will rectify them for convenience.
+  ```
+
+  It needs the geometry between the two cameras to do that — the right `camera_info` carrying `P(0,3)`, or TF between the two camera frames. If a rectification map cannot be built from what the calibration says, the frame is refused rather than registered wrong.
+
+- **The odometry takes them raw.** A few approaches do their own undistortion and want the unrectified images: `Odom/Strategy` `6` (OKVIS), `8` (MSCKF), `9` (VINS-Fusion) and `10` (OpenVINS), each available only if RTAB-Map was built against that library. Nothing rectifies anything then, and `Rtabmap/ImagesAlreadyRectified:=false` simply tells the pipeline to leave the images alone.
+
+Which of the two applies decides what `rtabmap` needs when it is fed from this node's output. If the odometry rectified the pair, the rectified images are what travels on -- they replace the raw ones in the frame -- and `rtabmap` keeps `Rtabmap/ImagesAlreadyRectified` at its default `true`. If the odometry took them raw, they arrive raw, and `rtabmap` needs `Rtabmap/ImagesAlreadyRectified:=false` of its own to rectify them again on its side. Set `Mem/UseOdomFeatures:=false` along with it, since it defaults to `true`: `rtabmap` rectifies a stereo pair but does not currently map features that travelled with the frame into the rectified image, so any it reused would be read against the wrong one.
+
+Rectifying here costs what `stereo_image_proc` would have cost, but only on the frames the odometry actually registers. When it runs slower than the camera — throttled by `max_update_rate`, or dropping frames that arrive while a registration is still running — the rectification happens at the odometry's rate instead of the camera's, and every frame `stereo_image_proc` would have rectified for nothing is saved. Where something else needs the whole stream rectified, the first arrangement is still the one to use.
 
 ## Usage
 
