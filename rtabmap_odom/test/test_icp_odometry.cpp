@@ -58,7 +58,7 @@ protected:
 	/// The sensor has to be connected to frame_id in TF before the first frame arrives.
 	void publishSensorTf(const std::string & sensorFrame = "lidar")
 	{
-		staticTf_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(helper());
+		staticTf_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(*helper());
 		geometry_msgs::msg::TransformStamped tf;
 		tf.header.stamp = helper()->now();
 		tf.header.frame_id = "base_link";
@@ -176,7 +176,7 @@ protected:
 	 */
 	bool publishRobotTrajectory()
 	{
-		staticTf_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(helper());
+		staticTf_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(*helper());
 		geometry_msgs::msg::TransformStamped sensor;
 		sensor.header.stamp = helper()->now();
 		sensor.header.frame_id = "base_link";
@@ -239,7 +239,7 @@ protected:
 	/// base_link -> imu_link, which the IMU callback requires before it accepts anything.
 	void publishImuTf()
 	{
-		imuTf_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(helper());
+		imuTf_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(*helper());
 		geometry_msgs::msg::TransformStamped sensor;
 		sensor.header.stamp = helper()->now();
 		sensor.header.frame_id = "base_link";
@@ -273,7 +273,7 @@ protected:
 	 */
 	bool publishImuTurn(double stamp, double keepTurningTo = 0.0)
 	{
-		imuTf_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(helper());
+		imuTf_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(*helper());
 		geometry_msgs::msg::TransformStamped sensor;
 		sensor.header.stamp = helper()->now();
 		sensor.header.frame_id = "base_link";
@@ -377,7 +377,7 @@ protected:
 	 */
 	bool publishRecordedTf(const Recording & recording)
 	{
-		staticBroadcaster_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(helper());
+		staticBroadcaster_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(*helper());
 		for(const tf2_msgs::msg::TFMessage & message : recording.staticTransforms)
 		{
 			staticBroadcaster_->sendTransform(message.transforms);

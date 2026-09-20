@@ -67,7 +67,7 @@ class StereoOdometryTest : public NodeTest
 protected:
 	void publishSensorTf()
 	{
-		staticTf_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(helper());
+		staticTf_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(*helper());
 		geometry_msgs::msg::TransformStamped tf;
 		tf.header.stamp = helper()->now();
 		tf.header.frame_id = "base_link";
@@ -96,7 +96,7 @@ protected:
 	/// Where each camera of a rig is mounted, as its driver would publish it once.
 	void publishRigTf(const CameraRig & rig)
 	{
-		staticTf_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(helper());
+		staticTf_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(*helper());
 		staticTf_->sendTransform(cameraRigTransforms(rig, helper()->now()));
 	}
 
@@ -259,7 +259,7 @@ protected:
 	 */
 	void publishSplitSensorTf()
 	{
-		staticTf_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(helper());
+		staticTf_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(*helper());
 		std::vector<geometry_msgs::msg::TransformStamped> transforms(2);
 		transforms[0].header.stamp = helper()->now();
 		transforms[0].header.frame_id = "base_link";

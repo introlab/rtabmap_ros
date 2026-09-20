@@ -36,7 +36,7 @@ class OdometryRosTest : public NodeTest
 protected:
 	void publishSensorTf()
 	{
-		staticTf_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(helper());
+		staticTf_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(*helper());
 		geometry_msgs::msg::TransformStamped tf;
 		tf.header.stamp = helper()->now();
 		tf.header.frame_id = "base_link";
@@ -166,7 +166,7 @@ protected:
 	 */
 	void publishFusedPose(double x)
 	{
-		fusedTf_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(helper());
+		fusedTf_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(*helper());
 		geometry_msgs::msg::TransformStamped fused;
 		fused.header.stamp = helper()->now();
 		fused.header.frame_id = "odom";
@@ -353,7 +353,7 @@ TEST_F(OdometryRosTest, broadcasts_a_correction_to_the_guess_frame_when_one_is_c
 	guess.header.frame_id = "odom";
 	guess.child_frame_id = "base_link";
 	guess.transform.rotation.w = 1.0;
-	guessTf_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(helper());
+	guessTf_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(*helper());
 	guessTf_->sendTransform(guess);
 
 	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
@@ -672,7 +672,7 @@ TEST_F(OdometryRosTest, keeps_broadcasting_the_correction_while_registration_is_
 	guess.header.frame_id = "odom";
 	guess.child_frame_id = "base_link";
 	guess.transform.rotation.w = 1.0;
-	guessTf_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(helper());
+	guessTf_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(*helper());
 	guessTf_->sendTransform(guess);
 
 	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
@@ -796,7 +796,7 @@ TEST_F(OdometryRosTest, skips_registration_when_the_guess_says_it_barely_moved)
 	guess.header.frame_id = "wheel_odom";
 	guess.child_frame_id = "base_link";
 	guess.transform.rotation.w = 1.0;
-	guessTf_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(helper());
+	guessTf_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(*helper());
 	guessTf_->sendTransform(guess);
 
 	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
