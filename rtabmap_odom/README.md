@@ -212,7 +212,7 @@ The first frame after a reset — from `reset_odom`, `reset_odom_to_pose` or `Od
 Odometry is reset (identity pose or high variance detected). Increment map id!
 ```
 
-While it is lost, `publish_null_when_lost:=true` publishes a null pose and no velocity for every frame, both marked `9999`, and `:=false` publishes nothing. What differs between configurations is the first frame after the reset, and where it restarts from:
+While it is lost, `publish_null_when_lost:=true` publishes a null pose and no velocity for every frame, both marked `9999`. With `:=false` it publishes nothing — except that a guess frame keeps it going: every frame that re-initialises the map, which `Odom/ResetCountdown` makes frequent, is published with the guess's pose and confidence, so the topic has no gap for as long as the guess is there. What differs between configurations is the first frame after the reset, and where it restarts from:
 
 | | First frame after the reset | Second frame | TF while lost | `rtabmap` |
 |---|---|---|---|---|

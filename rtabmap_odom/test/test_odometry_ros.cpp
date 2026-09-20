@@ -968,8 +968,17 @@ TEST_F(OdometryRosTest, recovers_on_the_guess_after_a_metre_of_being_lost)
 			<< "never recovered once there was something to register again";
 	spinFor(std::chrono::milliseconds(500));   // give any second message time to arrive
 
-	EXPECT_EQ(whileTracking, whileLost)
-			<< "something was published while lost, with publish_null_when_lost off";
+	// Nothing goes missing while lost either. With a guess to fall back on, a frame that
+	// re-initialises the map is published rather than dropped, carrying the guess's pose
+	// and its confidence. Whether any of the degenerate frames manages to initialise a map
+	// at all differs between builds, so what is checked is what such a frame carries
+	// rather than how many of them there are.
+	for(size_t i=whileTracking; i<whileLost; ++i)
+	{
+		EXPECT_DOUBLE_EQ(0.002, odom->messages[i]->pose.covariance[0])
+				<< "a pose published while lost should carry the guess's confidence, "
+				<< "message " << i << " of " << whileLost;
+	}
 
 	// Tracking again, on a real registration rather than the guess.
 	EXPECT_LT(odom->back().pose.covariance[0], 9999.0) << "still lost after recovering";
@@ -995,12 +1004,11 @@ TEST_F(OdometryRosTest, recovers_on_the_guess_after_a_metre_of_being_lost)
  * limit -- so the odometry is reset. A guess frame is available throughout, and the pose
  * after the gap should be where the wheels say the robot is.
  *
- * KNOWN BUG -- this currently reports 0.2 m against a true 1.2, losing the whole gap
- * rather than one frame of it. tooOldPreviousData is handled before the guess for the
- * frame is computed, so guess_ is still null from the last successful frame and the
- * "reset based on latest guess available from TF" branch never runs; the node logs
- * "Odometry automatically reset to latest computed pose!" and carries on from where it
- * was when it went quiet.
+ * This used to report 0.2 m against a true 1.2, losing the whole gap rather than one
+ * frame of it: tooOldPreviousData was handled before the guess for the frame was worked
+ * out, so guess_ was still null from the last successful frame, the "reset based on
+ * latest guess available from TF" branch never ran, and the node carried on from where
+ * it was when it went quiet. The reset now happens after the guess is computed.
  */
 TEST_F(OdometryRosTest, recovers_on_the_guess_after_min_update_rate_resets_it)
 {
@@ -1031,6 +1039,60 @@ TEST_F(OdometryRosTest, recovers_on_the_guess_after_min_update_rate_resets_it)
 	EXPECT_LT(odom->back().pose.covariance[0], 9999.0) << "still lost after the gap";
 	EXPECT_NEAR(1.2, odom->back().pose.pose.position.x, 0.02)
 			<< "the pose after the gap does not match the guess";
+}
+
+/**
+ * @brief The same metre of being lost, in the default configuration.
+ *
+ * `publish_null_when_lost` on is what most robots run: every lost frame is announced with
+ * a null pose, and the frame that restarts the map says it cannot be linked to what came
+ * before. What must not differ is *where* the odometry restarts -- the guess is folded
+ * into the pose either way, so the trajectory has to come back where the wheels say it is.
+ */
+TEST_F(OdometryRosTest, recovers_on_the_guess_after_a_metre_of_being_lost_announcing_each_loss)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+			collect<nav_msgs::msg::Odometry>("odom");
+	makeNode({rclcpp::Parameter("guess_frame_id", "wheel_odom"),
+	          rclcpp::Parameter("Odom/ResetCountdown", "1"),
+	          rclcpp::Parameter("wait_for_transform", 2.0)});
+
+	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub = scanPublisher();
+	ASSERT_TRUE(waitForSubscriber(pub));
+	// 1 m/s from t=1.0 to t=2.5, which covers every frame below: x(t) = t - 1.0.
+	const double speed = 1.0;
+	ASSERT_TRUE(publishGuessMotion(1.0, 2.5, speed));
+
+	pub->publish(makeXYZCloud("lidar", 1.0, corner3D()));
+	ASSERT_TRUE(spinUntil([&]() { return !odom->empty(); })) << "never started tracking";
+	pub->publish(makeXYZCloud("lidar", 1.1, corner3D(cv::Point3f(float(0.1*speed), 0, 0))));
+	ASSERT_TRUE(spinUntil([&]() { return odom->size() >= 2; }));
+	const size_t whileTracking = odom->size();
+
+	// A second of nothing to register against, at 10 Hz, while the wheels carry on.
+	for(int i=2; i<=11; ++i)
+	{
+		pub->publish(degenerateCloud(1.0 + 0.1*i));
+		spinFor(std::chrono::milliseconds(60));
+	}
+
+	// Every one of them is announced, which is the whole point of the default.
+	ASSERT_GT(odom->size(), whileTracking) << "being lost was never announced";
+	EXPECT_GE(odom->back().pose.covariance[0], 9999.0)
+			<< "a usable pose while there was nothing to register";
+
+	// The scene comes back, seen from where the wheels say the robot now is.
+	pub->publish(makeXYZCloud("lidar", 2.2, corner3D(cv::Point3f(float(1.2*speed), 0, 0))));
+	spinFor(std::chrono::milliseconds(200));
+	pub->publish(makeXYZCloud("lidar", 2.3, corner3D(cv::Point3f(float(1.3*speed), 0, 0))));
+	ASSERT_TRUE(spinUntil([&]() { return odom->back().pose.covariance[0] < 9999.0; }))
+			<< "never recovered once there was something to register again";
+
+	// And the trajectory resumes where the wheels say, exactly as with null publishing off.
+	EXPECT_NEAR(1.3*speed, odom->back().pose.pose.position.x, 0.02)
+			<< "the recovered pose does not match where the guess says the robot is";
+	EXPECT_NEAR(0.0, odom->back().pose.pose.position.y, 0.02) << "the robot drove straight";
 }
 
 

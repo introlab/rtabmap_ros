@@ -18,7 +18,9 @@ RUN source /ros_entrypoint.sh && \
     apt-get clean && rm -rf /var/lib/apt/lists/
 
 # Tests run in the build layer, before the workspace is deleted, so none of them reach
-# the image. CI asks for them; an emulated target (arm64) skips them anyway.
+# the image. CI asks for them; a target that is not the architecture being built on
+# skips them, that one being emulated. Only buildx sets BUILDPLATFORM, so anything
+# else building with RUN_TESTS=1 runs them.
 ARG RUN_TESTS=0
 ARG BUILDPLATFORM
 ARG TARGETPLATFORM
@@ -27,7 +29,7 @@ RUN source /ros_entrypoint.sh && \
     cd ros2_ws && \
     export MAKEFLAGS="-j2" && \
     colcon build --event-handlers console_direct+ --install-base /opt/ros/$ROS_DISTRO --merge-install --cmake-args -DRTABMAP_SYNC_MULTI_RGBD=ON -DCMAKE_BUILD_TYPE=Release && \
-    if [ "$RUN_TESTS" = "1" ] && [ "$BUILDPLATFORM" = "$TARGETPLATFORM" ]; then \
+    if [ "$RUN_TESTS" = "1" ] && [ "${BUILDPLATFORM:-$TARGETPLATFORM}" = "$TARGETPLATFORM" ]; then \
         colcon test --executor sequential --event-handlers console_direct+ --install-base /opt/ros/$ROS_DISTRO --merge-install && \
         colcon test-result --verbose; \
     fi && \
