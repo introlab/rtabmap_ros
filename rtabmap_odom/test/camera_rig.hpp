@@ -18,6 +18,7 @@ All rights reserved. (BSD-3-Clause, see the repository root.)
 
 #include <opencv2/core/core.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <random>
 #include <string>
@@ -81,11 +82,12 @@ struct CameraRig
 /**
  * @brief A rig of @p cameras cameras in a world of @p numPoints points.
  *
- * The horizontal field of view is 360/cameras degrees, so the cameras tile the full
- * circle without overlapping: a point is then seen by exactly one of them, which keeps
- * every descriptor unique within a frame. Two cameras seeing the same point would put
- * two identical descriptors in the same frame, and the ratio test that accepts a match
- * only when the best candidate is clearly better than the second would throw both away.
+ * The horizontal field of view is 360/cameras degrees, up to 90, so the cameras tile as
+ * much of the circle as they can without overlapping: a point is then seen by at most one
+ * of them, which keeps every descriptor unique within a frame. Two cameras seeing the same
+ * point would put two identical descriptors in the same frame, and the ratio test that
+ * accepts a match only when the best candidate is clearly better than the second would
+ * throw both away.
  *
  * The points sit in a box wider than the trajectory, minus a hole around it: something
  * closer than @p minRange would swing through a camera's field of view, or behind it,
@@ -106,8 +108,11 @@ inline CameraRig makeCameraRig(
 	CameraRig rig;
 	rig.width = width;
 	rig.height = height;
-	// Half the horizontal field of view spans half the angle between two cameras.
-	rig.fx = (width/2.0) / std::tan(M_PI/double(cameras));
+	// Half the horizontal field of view spans half the angle between two cameras, capped
+	// at 45 degrees: one or two cameras would otherwise be asked for a 360 or 180 degree
+	// view, which no pinhole model has. The cap only widens the gaps between cameras, so
+	// a point is still seen by at most one of them.
+	rig.fx = (width/2.0) / std::tan(std::min(M_PI/double(cameras), M_PI/4.0));
 
 	for(int i=0; i<cameras; ++i)
 	{

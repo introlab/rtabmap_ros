@@ -864,5 +864,70 @@ TEST_F(StereoOdometryRigTest, the_same_frames_without_their_features_have_nothin
 	EXPECT_TRUE(isLost(odom->back()));
 }
 
+/**
+ * @brief The same rig on the numbered topics, one to six stereo pairs.
+ *
+ * `rgbd_cameras:=N` subscribes to N topics and synchronizes them with a callback of its
+ * own per N, six of them in all. The test above drives the `rgbd_cameras:=0` one; these
+ * drive the rest, by publishing each camera of the rig on its own topic and asking for
+ * the same metre back.
+ */
+class StereoOdometryRigCamerasTest :
+		public StereoOdometryTest,
+		public ::testing::WithParamInterface<int>
+{
+};
+
+TEST_P(StereoOdometryRigCamerasTest, recovers_the_trajectory_from_the_numbered_topics)
+{
+	const int cameras = GetParam();
+	const CameraRig rig = makeCameraRig(cameras);
+	publishRigTf(rig);
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+			collect<nav_msgs::msg::Odometry>("odom");
+	makeNode({rclcpp::Parameter("subscribe_rgbd", true),
+	          rclcpp::Parameter("rgbd_cameras", cameras)});
+
+	// One camera listens on rgbd_image, more than one on rgbd_image0..N-1.
+	std::vector<rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr> publishers;
+	for(int i=0; i<cameras; ++i)
+	{
+		publishers.push_back(helper()->create_publisher<rtabmap_msgs::msg::RGBDImage>(
+				cameras == 1 ? "rgbd_image" : "rgbd_image" + std::to_string(i), 10));
+	}
+	for(int i=0; i<cameras; ++i)
+	{
+		ASSERT_TRUE(waitForSubscriber(publishers[i])) << "camera " << i << " has no subscriber";
+	}
+
+	const int frames = 11;
+	for(int i=0; i<frames; ++i)
+	{
+		const rtabmap_msgs::msg::RGBDImages frame =
+				cameraRigStereoFrame(rig, rtabmap::Transform(0.1f*i, 0, 0, 0, 0, 0), 1.0 + 0.1*i);
+		ASSERT_EQ(size_t(cameras), frame.rgbd_images.size());
+		for(int c=0; c<cameras; ++c)
+		{
+			publishers[c]->publish(frame.rgbd_images[c]);
+		}
+		ASSERT_TRUE(spinUntil([&]() { return odom->size() >= size_t(i+1); }))
+				<< "nothing came back for frame " << i;
+	}
+
+	const nav_msgs::msg::Odometry & last = odom->back();
+	ASSERT_FALSE(isLost(last)) << "lost tracking with " << cameras << " camera(s)";
+	EXPECT_NEAR(1.0, last.pose.pose.position.x, 0.05) << "the rig travelled a metre along x";
+	EXPECT_NEAR(0.0, last.pose.pose.position.y, 0.05);
+	EXPECT_NEAR(0.0, last.pose.pose.position.z, 0.05);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+		StereoCameras,
+		StereoOdometryRigCamerasTest,
+		::testing::Range(1, 7),
+		[](const ::testing::TestParamInfo<int> & info) {
+			return std::to_string(info.param) + (info.param == 1 ? "_camera" : "_cameras");
+		});
+
 }  // namespace
 }  // namespace rtabmap_odom_test
