@@ -145,8 +145,8 @@ flowchart TD
     GUESS(["/odom<br><i>guess_frame_id</i>"])
     BASE(["/base_link<br><i>frame_id</i>"])
     SENSOR(["/camera or /lidar<br><i>the sensor's header.frame_id</i>"])
-    ODOM -->|correction, this node<br>e.g. ~10 Hz, ~50 ms late| GUESS
-    GUESS -->|robot driver or robot_localization<br>e.g. ~50 Hz, ~1 ms late| BASE
+    ODOM -->|correction, this node<br>e.g. ~10 Hz, ~50 ms delay| GUESS
+    GUESS -->|robot driver or robot_localization<br>e.g. ~50 Hz, ~1 ms delay| BASE
     BASE -->|static| SENSOR
 ```
 
