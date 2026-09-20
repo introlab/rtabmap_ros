@@ -71,6 +71,10 @@ jobs:
           context: .
           push: ${{ github.event_name != 'pull_request' }}
           platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || matrix.docker_platforms }}
+          # Run the test suites inside the image being built. Nothing of them is kept, and
+          # the build fails if one does, so no image is published from a tree that fails.
+          build-args: |
+            RUN_TESTS=1
           file: ./docker/${{ matrix.docker_path }}/Dockerfile
           tags: introlab3it/rtabmap_ros:${{ matrix.docker_tag }}
           no-cache: true
