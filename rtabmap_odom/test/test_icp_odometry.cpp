@@ -13,6 +13,10 @@ All rights reserved. (BSD-3-Clause, see the repository root.)
 
 #include <rtabmap_odom/icp_odometry.hpp>
 
+#include <rtabmap/core/util3d_registration.h>
+
+#include <rtabmap_conversions/PointCloudConversion.h>
+
 #include <tf2_msgs/msg/tf_message.hpp>
 
 #include <std_srvs/srv/empty.hpp>
@@ -22,6 +26,7 @@ All rights reserved. (BSD-3-Clause, see the repository root.)
 #include <cstring>
 #include <limits>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "bag_playback.hpp"
@@ -134,6 +139,36 @@ size_t countPositive(const std::vector<float> & values)
 {
 	return size_t(std::count_if(values.begin(), values.end(),
 			[](float value) { return value > 0.0f; }));
+}
+
+/**
+ * @brief The share of @p cloud's points that still sit within @p maxDistance of @p reference.
+ *
+ * Deskewing moves points along the sweep rather than adding or removing them, and
+ * voxelizing the result renumbers whatever is left, so the two clouds cannot be compared
+ * index by index. This is RTAB-Map's own correspondence count, which does not care about
+ * the ordering: 1.0 means the two clouds are on top of each other, and anything less is
+ * how much of one moved away from the other.
+ */
+double correspondenceRatio(
+		const sensor_msgs::msg::PointCloud2 & cloud,
+		const sensor_msgs::msg::PointCloud2 & reference,
+		double maxDistance)
+{
+	pcl::PointCloud<pcl::PointXYZ>::Ptr source(new pcl::PointCloud<pcl::PointXYZ>);
+	pcl::PointCloud<pcl::PointXYZ>::Ptr target(new pcl::PointCloud<pcl::PointXYZ>);
+	rtabmap_conversions::fromPointCloud2Msg(cloud, *source);
+	rtabmap_conversions::fromPointCloud2Msg(reference, *target);
+	if(source->empty() || target->empty())
+	{
+		return 0.0;
+	}
+
+	double variance = 0.0;
+	int correspondences = 0;
+	rtabmap::util3d::computeVarianceAndCorrespondences(
+			source, target, maxDistance, variance, correspondences, false);
+	return double(correspondences) / double(source->size());
 }
 
 class IcpOdometryTest : public NodeTest
@@ -726,18 +761,14 @@ TEST_F(IcpOdometryTest, deskews_a_rotating_lidar_sweep_against_tf)
 	makeNode({rclcpp::Parameter("deskewing", true),
 	          rclcpp::Parameter("guess_frame_id", "base_link"),
 	          rclcpp::Parameter("scan_cloud_max_points", 65536),
-	          // A 20 cm voxel and a 2 m correspondence distance: the room is metres across
-	          // and the two sweeps start half a turn apart, so ICP needs to reach that far
-	          // to pair them at all.
+	          // The room is metres across and the sweeps start half a turn apart.
 	          rclcpp::Parameter("scan_voxel_size", 0.2),
 	          rclcpp::Parameter("Icp/MaxCorrespondenceDistance", "2.0"),
-	          // Without this the uncorrected run is not merely worse, it is refused:
-	          // libpointmatcher aborts with "limit out of bounds: tr 0.214/0.2" when the
-	          // fit walks past Icp/MaxTranslation, so there would be nothing to compare.
+	          // Pinned: a build without libpointmatcher defaults it to false.
+	          rclcpp::Parameter("Icp/PointToPlane", "true"),
+	          // Raised from 0.2 m, which the uncorrected run walks past and is refused for.
 	          rclcpp::Parameter("Icp/MaxTranslation", "0.5"),
-	          // Insurance for a loaded machine: the transforms are published before the
-	          // clouds, but under load they can still be arriving when the first one
-	          // lands, and the default 100 ms is short enough to lose that race.
+	          // The recorded transforms may still be arriving when the first cloud lands.
 	          rclcpp::Parameter("wait_for_transform", 2.0)},
 	         "deskewed");
 	ASSERT_TRUE(publishRecordedTf(recording));
@@ -759,9 +790,10 @@ TEST_F(IcpOdometryTest, deskews_a_rotating_lidar_sweep_against_tf)
 
 	// The ground truth is known: the platform never moves in this recording, only the
 	// mast turns, so base_link is where it started and the pose should be the identity.
-	// What comes out is 0.013 m and 0.012 rad -- the error left after deskewing half a
-	// turn of rotation out of two sweeps, repeatable to the last digit.
-	EXPECT_LT(translationNorm(odom->back()), 0.10)
+	// What is left after deskewing half a turn of rotation out of two sweeps is 0.013 m
+	// and 0.012 rad with libpointmatcher, 0.09 m and 0.015 rad with PCL -- point to
+	// plane either way, which is why the parameter above is not left to its default.
+	EXPECT_LT(translationNorm(odom->back()), 0.15)
 			<< "the platform never moved; this is too far from the origin";
 	EXPECT_LT(rotationAngle(odom->back()), 0.05)
 			<< "the platform never turned; this is too far from the origin";
@@ -771,10 +803,14 @@ TEST_F(IcpOdometryTest, deskews_a_rotating_lidar_sweep_against_tf)
  * The same two sweeps with and without deskewing, registered side by side.
  *
  * The platform never moved, so the answer is known: the identity. Corrected, the pair
- * lands 0.013 m and 0.012 rad from it. Uncorrected, it still registers -- on nearly as
- * many points, 0.259 against 0.265 -- but arrives at 0.046 m and 0.053 rad, three to four
+ * lands 0.013 m and 0.012 rad from it with libpointmatcher and 0.09 m with PCL.
+ * Uncorrected, it still registers -- on nearly as many points -- but arrives several
  * times further out. That is the shape of a deskewing bug in the field: not a failure, a
  * quietly worse answer.
+ *
+ * The correction itself is measured too, on the scan each node republishes on
+ * odom_filtered_input_scan. That one does not depend on the backend at all, so it is the
+ * assertion that catches a deskewing step that quietly stopped working.
  *
  * At RTAB-Map's default Icp/MaxTranslation of 0.2 m the uncorrected run does not even get
  * that far: libpointmatcher aborts with "limit out of bounds: tr 0.214016/0.2" and the
@@ -791,6 +827,10 @@ TEST_F(IcpOdometryTest, deskewing_is_what_lets_a_half_turn_pair_register)
 			collect<rtabmap_msgs::msg::OdomInfo>("odom_info_deskewed");
 	std::shared_ptr<Collector<rtabmap_msgs::msg::OdomInfo>> asRecordedInfo =
 			collect<rtabmap_msgs::msg::OdomInfo>("odom_info_as_recorded");
+	std::shared_ptr<Collector<sensor_msgs::msg::PointCloud2>> deskewedScan =
+			collect<sensor_msgs::msg::PointCloud2>("odom_filtered_input_scan_deskewed");
+	std::shared_ptr<Collector<sensor_msgs::msg::PointCloud2>> asRecordedScan =
+			collect<sensor_msgs::msg::PointCloud2>("odom_filtered_input_scan_as_recorded");
 	const Recording recording = readOusterRecording();
 	ASSERT_TRUE(recording.valid()) << "could not read " << ousterHalfTurnBag();
 
@@ -798,35 +838,23 @@ TEST_F(IcpOdometryTest, deskewing_is_what_lets_a_half_turn_pair_register)
 	makeNode({rclcpp::Parameter("deskewing", true),
 	          rclcpp::Parameter("guess_frame_id", "base_link"),
 	          rclcpp::Parameter("scan_cloud_max_points", 65536),
-	          // A 20 cm voxel and a 2 m correspondence distance: the room is metres across
-	          // and the two sweeps start half a turn apart, so ICP needs to reach that far
-	          // to pair them at all.
+	          // The room is metres across and the sweeps start half a turn apart.
 	          rclcpp::Parameter("scan_voxel_size", 0.2),
 	          rclcpp::Parameter("Icp/MaxCorrespondenceDistance", "2.0"),
-	          // Without this the uncorrected run is not merely worse, it is refused:
-	          // libpointmatcher aborts with "limit out of bounds: tr 0.214/0.2" when the
-	          // fit walks past Icp/MaxTranslation, so there would be nothing to compare.
+	          // Pinned: a build without libpointmatcher defaults it to false.
+	          rclcpp::Parameter("Icp/PointToPlane", "true"),
+	          // Raised from 0.2 m, which the uncorrected run walks past and is refused for.
 	          rclcpp::Parameter("Icp/MaxTranslation", "0.5"),
-	          // Insurance for a loaded machine: the transforms are published before the
-	          // clouds, but under load they can still be arriving when the first one
-	          // lands, and the default 100 ms is short enough to lose that race.
+	          // The recorded transforms may still be arriving when the first cloud lands.
 	          rclcpp::Parameter("wait_for_transform", 2.0)},
 	         "deskewed");
 	makeNode({rclcpp::Parameter("deskewing", false),
 	          rclcpp::Parameter("guess_frame_id", "base_link"),
 	          rclcpp::Parameter("scan_cloud_max_points", 65536),
-	          // A 20 cm voxel and a 2 m correspondence distance: the room is metres across
-	          // and the two sweeps start half a turn apart, so ICP needs to reach that far
-	          // to pair them at all.
 	          rclcpp::Parameter("scan_voxel_size", 0.2),
 	          rclcpp::Parameter("Icp/MaxCorrespondenceDistance", "2.0"),
-	          // Without this the uncorrected run is not merely worse, it is refused:
-	          // libpointmatcher aborts with "limit out of bounds: tr 0.214/0.2" when the
-	          // fit walks past Icp/MaxTranslation, so there would be nothing to compare.
+	          rclcpp::Parameter("Icp/PointToPlane", "true"),
 	          rclcpp::Parameter("Icp/MaxTranslation", "0.5"),
-	          // Insurance for a loaded machine: the transforms are published before the
-	          // clouds, but under load they can still be arriving when the first one
-	          // lands, and the default 100 ms is short enough to lose that race.
 	          rclcpp::Parameter("wait_for_transform", 2.0)},
 	         "as_recorded");
 	ASSERT_TRUE(publishRecordedTf(recording));
@@ -834,6 +862,8 @@ TEST_F(IcpOdometryTest, deskewing_is_what_lets_a_half_turn_pair_register)
 	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub =
 			helper()->create_publisher<sensor_msgs::msg::PointCloud2>("scan_cloud", 10);
 	ASSERT_TRUE(waitForSubscriber(pub, 2));
+	ASSERT_TRUE(waitForPublisher(deskewedScan->subscription));
+	ASSERT_TRUE(waitForPublisher(asRecordedScan->subscription));
 
 	pub->publish(recording.clouds[0]);
 	ASSERT_TRUE(spinUntil([&]() { return !deskewed->empty() && !asRecorded->empty(); }));
@@ -843,19 +873,37 @@ TEST_F(IcpOdometryTest, deskewing_is_what_lets_a_half_turn_pair_register)
 		       deskewedInfo->size() >= 2 && asRecordedInfo->size() >= 2; }));
 
 	ASSERT_FALSE(isLost(deskewed->back())) << "the deskewed pair failed to register";
+	EXPECT_GT(deskewedInfo->back().icp_inliers_ratio, 0.1f)
+			<< "the deskewed pair barely matched itself, so something else is wrong";
+
+	// The correction itself: the same sweep, as the two nodes handed it to ICP. Half a
+	// turn of mast rotation across one sweep moves the far end of it by a good fraction
+	// of a metre, and a deskewing step that stopped working would leave these two clouds
+	// on top of each other.
+	ASSERT_FALSE(deskewedScan->empty()) << "the deskewed run republished no scan";
+	ASSERT_FALSE(asRecordedScan->empty()) << "the uncorrected run republished no scan";
+	// The control: the measure has to say every point of a cloud corresponds to itself,
+	// so a number well below that is the two clouds genuinely having moved apart rather
+	// than the measurement being broken.
+	EXPECT_NEAR(1.0, correspondenceRatio(deskewedScan->back(), deskewedScan->back(), 0.01),
+			1e-6) << "the correspondence measure does not even match a cloud to itself";
+
+	// How far apart the two are depends on PCL's correspondence estimation, which is not
+	// the same from one version to the next -- 0.12 with 1.12 against 0.07 with 1.15 --
+	// so the bound is loose. A deskewing step that stopped working would leave the two
+	// clouds identical and put this back at 1.0, which is what it is here to catch.
+	const double stillTogether =
+			correspondenceRatio(deskewedScan->back(), asRecordedScan->back(), 0.01);
+	EXPECT_LT(stillTogether, 0.5)
+			<< stillTogether*100.0 << "% of the deskewed scan is still within a centimetre "
+			   "of the uncorrected one, so the correction never reached the cloud";
+
+	// Both runs register, so this part of the claim is about accuracy rather than
+	// survival.
 	EXPECT_LT(translationNorm(deskewed->back()), 0.15)
 			<< "the platform never moved; the deskewed estimate should say so";
 	EXPECT_LT(rotationAngle(deskewed->back()), 0.05)
 			<< "the platform never turned; the deskewed estimate should say so";
-	EXPECT_GT(deskewedInfo->back().icp_inliers_ratio, 0.1f)
-			<< "the deskewed pair barely matched itself, so something else is wrong";
-
-	// Both runs register, so the claim is about accuracy rather than survival -- and how
-	// much accuracy depends on the backend. With libpointmatcher (Icp/Strategy=1) the
-	// errors are 0.013 m corrected against 0.046 m uncorrected, a factor of 3.5; with PCL
-	// (Icp/Strategy=0) the same pair gives 0.082 against 0.101, a factor of 1.23. So the
-	// assertion is the ordering plus a little, which holds for both and still catches a
-	// deskewing step that does nothing at all.
 	if(isLost(asRecorded->back()))
 	{
 		// It failed outright instead -- an even stronger version of the same claim.
@@ -864,11 +912,11 @@ TEST_F(IcpOdometryTest, deskewing_is_what_lets_a_half_turn_pair_register)
 	else
 	{
 		EXPECT_GT(translationNorm(asRecorded->back()), translationNorm(deskewed->back()) * 1.1)
-				<< "deskewing barely changed the translation error, so the correction "
-				   "never reached the cloud (deskewed=" << translationNorm(deskewed->back())
-				<< " m, as recorded=" << translationNorm(asRecorded->back()) << " m)";
+				<< "deskewing did not improve the translation error (deskewed="
+				<< translationNorm(deskewed->back()) << " m, as recorded="
+				<< translationNorm(asRecorded->back()) << " m)";
 		EXPECT_GT(rotationAngle(asRecorded->back()), rotationAngle(deskewed->back()) * 1.1)
-				<< "deskewing barely changed the rotation error (deskewed="
+				<< "deskewing did not improve the rotation error (deskewed="
 				<< rotationAngle(deskewed->back()) << " rad, as recorded="
 				<< rotationAngle(asRecorded->back()) << " rad)";
 	}
@@ -2048,6 +2096,8 @@ TEST_F(IcpOdometryTest, pause_and_resume_stop_and_restart_processing_scans)
 	pub->publish(cornerScan(1.2, 0.10));
 	EXPECT_TRUE(spinUntil([&]() { return odom->size() > whilePaused; }));
 }
+
+
 
 }  // namespace
 }  // namespace rtabmap_odom_test

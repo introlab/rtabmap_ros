@@ -190,7 +190,7 @@ if(BUILD_TESTING)
       target_compile_definitions(${test_name} PRIVATE
         RTABMAP_ODOM_TEST_DATA_ROOT="${rtabmap_odom_test_data_root}")
       target_link_libraries(${test_name} rtabmap_odom_plugins rtabmap_odom
-        opencv_core opencv_imgcodecs rosbag2_cpp::rosbag2_cpp)
+        opencv_core opencv_imgcodecs rosbag2_cpp::rosbag2_cpp rtabmap::core)
       if("$ENV{ROS_DISTRO}" STRLESS "lyrical")
         ament_target_dependencies(${test_name} ${AmentLibraries})
       else()
