@@ -74,6 +74,8 @@ RGBDOdometry::RGBDOdometry(const rclcpp::NodeOptions & options) :
 
 RGBDOdometry::~RGBDOdometry()
 {
+	this->join(true);
+
 	delete approxSync_;
 	delete exactSync_;
 	delete approxSync2_;

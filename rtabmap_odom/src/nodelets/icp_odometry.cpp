@@ -70,6 +70,7 @@ ICPOdometry::ICPOdometry(const rclcpp::NodeOptions & options) :
 
 ICPOdometry::~ICPOdometry()
 {
+	this->join(true);
 }
 
 void ICPOdometry::onOdomInit()

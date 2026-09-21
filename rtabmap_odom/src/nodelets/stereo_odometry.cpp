@@ -74,6 +74,8 @@ StereoOdometry::StereoOdometry(const rclcpp::NodeOptions & options) :
 
 StereoOdometry::~StereoOdometry()
 {
+	this->join(true);
+
 	delete approxSync_;
 	delete exactSync_;
 	delete approxSync2_;
