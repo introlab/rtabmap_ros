@@ -25,6 +25,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include <rtabmap_conversions/PointCloudConversion.h>
 #include "rtabmap_odom/OdometryROS.h"
 
 #include <sensor_msgs/msg/image.hpp>
@@ -1082,7 +1083,7 @@ void OdometryROS::processData()
 				cloud.push_back(pt);
 			}
 			sensor_msgs::msg::PointCloud2 cloudMsg;
-			pcl::toROSMsg(cloud, cloudMsg);
+			rtabmap_conversions::toPointCloud2Msg(cloud, cloudMsg);
 			cloudMsg.header.stamp = header.stamp; // use corresponding time stamp to image
 			cloudMsg.header.frame_id = odomFrameId_;
 			odomLocalMap_->publish(cloudMsg);
@@ -1105,7 +1106,7 @@ void OdometryROS::processData()
 					}
 
 					sensor_msgs::msg::PointCloud2 cloudMsg;
-					pcl::toROSMsg(cloud, cloudMsg);
+					rtabmap_conversions::toPointCloud2Msg(cloud, cloudMsg);
 					cloudMsg.header.stamp = header.stamp; // use corresponding time stamp to image
 					cloudMsg.header.frame_id = odomFrameId_;
 					odomLastFrame_->publish(cloudMsg);
@@ -1125,7 +1126,7 @@ void OdometryROS::processData()
 						cloud.push_back(pcl::PointXYZ(pt.x, pt.y, pt.z));
 					}
 					sensor_msgs::msg::PointCloud2 cloudMsg;
-					pcl::toROSMsg(cloud, cloudMsg);
+					rtabmap_conversions::toPointCloud2Msg(cloud, cloudMsg);
 					cloudMsg.header.stamp = header.stamp; // use corresponding time stamp to image
 					cloudMsg.header.frame_id = odomFrameId_;
 					odomLastFrame_->publish(cloudMsg);
@@ -1139,22 +1140,22 @@ void OdometryROS::processData()
 			if(info.localScanMap.hasNormals() && info.localScanMap.hasIntensity())
 			{
 				pcl::PointCloud<pcl::PointXYZINormal>::Ptr cloud = util3d::laserScanToPointCloudINormal(info.localScanMap, info.localScanMap.localTransform());
-				pcl::toROSMsg(*cloud, cloudMsg);
+				rtabmap_conversions::toPointCloud2Msg(*cloud, cloudMsg);
 			}
 			else if(info.localScanMap.hasNormals())
 			{
 				pcl::PointCloud<pcl::PointNormal>::Ptr cloud = util3d::laserScanToPointCloudNormal(info.localScanMap, info.localScanMap.localTransform());
-				pcl::toROSMsg(*cloud, cloudMsg);
+				rtabmap_conversions::toPointCloud2Msg(*cloud, cloudMsg);
 			}
 			else if(info.localScanMap.hasIntensity())
 			{
 				pcl::PointCloud<pcl::PointXYZI>::Ptr cloud = util3d::laserScanToPointCloudI(info.localScanMap, info.localScanMap.localTransform());
-				pcl::toROSMsg(*cloud, cloudMsg);
+				rtabmap_conversions::toPointCloud2Msg(*cloud, cloudMsg);
 			}
 			else
 			{
 				pcl::PointCloud<pcl::PointXYZ>::Ptr cloud = util3d::laserScanToPointCloud(info.localScanMap, info.localScanMap.localTransform());
-				pcl::toROSMsg(*cloud, cloudMsg);
+				rtabmap_conversions::toPointCloud2Msg(*cloud, cloudMsg);
 			}
 
 			cloudMsg.header.stamp = header.stamp; // use corresponding time stamp to image
