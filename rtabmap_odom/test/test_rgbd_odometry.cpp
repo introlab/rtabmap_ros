@@ -514,7 +514,10 @@ TEST_F(RgbdOdometryTest, publishes_the_feature_map_and_the_frame_that_registered
 	pub->publish(makeFrame(kFrame, 1.0));
 	ASSERT_TRUE(spinUntil([&]() { return !odom->empty(); }));
 	pub->publish(makeFrame(kFrame, 1.1));
-	ASSERT_TRUE(spinUntil([&]() { return odom->size() >= 2; }));
+	// All three collectors: the clouds are published after the odometry of the same frame,
+	// so waiting for odom alone leaves them one spin behind.
+	ASSERT_TRUE(spinUntil([&]() {
+				return odom->size() >= 2 && !localMap->empty() && !lastFrame->empty(); }));
 
 	// 534 features on this frame, in both, expressed in the odometry frame.
 	ASSERT_FALSE(localMap->empty()) << "no feature map was published";
@@ -577,7 +580,10 @@ TEST_P(RgbdOdometryRigTest, recovers_the_trajectory_of_a_rig_from_the_features_i
 		lastFrame = cameraRigFrame(rig, rtabmap::Transform(0.1f*i, 0, 0, 0, 0, 0), 1.0 + 0.1*i);
 		ASSERT_EQ(rig.cameras(), lastFrame.rgbd_images.size());
 		pub->publish(lastFrame);
-		ASSERT_TRUE(spinUntil([&]() { return odom->size() >= size_t(i+1); }))
+		// Both collectors: odom and odom_info are published separately, and the feature
+		// count asserted below is read from the odom_info of this same frame.
+		ASSERT_TRUE(spinUntil([&]() {
+					return odom->size() >= size_t(i+1) && info->size() >= size_t(i+1); }))
 				<< "nothing came back for frame " << i;
 	}
 

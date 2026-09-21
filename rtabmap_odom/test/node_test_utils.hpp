@@ -35,6 +35,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <chrono>
 #include <functional>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -103,12 +104,22 @@ protected:
 		executor_.reset();
 	}
 
-	/// Adds a node under test to the shared executor and keeps it alive for the test.
+	/**
+	 * @brief Adds a node under test to the shared executor and keeps it alive for the test.
+	 *
+	 * The wait is for tf2_ros, not for anything the test does with the node.
+	 * ~TransformListener cancels its worker's executor and joins it without ordering the
+	 * cancel after the worker reached spin(), so a node dropped microseconds after it was
+	 * built -- which a test that only reads a parameter back does -- hangs the binary for
+	 * good (ros2/geometry2#517). The window is a few instructions wide and nothing here
+	 * can observe that thread, so this buys time instead. Drop it once #752 lands.
+	 */
 	template <typename NodeT>
 	std::shared_ptr<NodeT> addNode(const std::shared_ptr<NodeT> & node)
 	{
 		executor_->add_node(node);
 		nodes_.push_back(node);
+		spinFor(std::chrono::milliseconds(50));
 		return node;
 	}
 
@@ -179,20 +190,57 @@ protected:
 		std::vector<typename MsgT::ConstSharedPtr> messages;
 		size_t size() const { return messages.size(); }
 		bool empty() const { return messages.empty(); }
-		const MsgT & back() const { return *messages.back(); }
-		const MsgT & front() const { return *messages.front(); }
+
+		/**
+		 * @brief The last (first) message received.
+		 *
+		 * A test that reads these without having waited for the topic it is reading --
+		 * having waited for a different one, say -- gets a legible failure rather than a
+		 * segmentation fault: std::vector::back() on an empty vector dereferences
+		 * nullptr-1, which crashes the whole binary and takes the rest of its tests with
+		 * it. gtest turns the exception into a failure of the test that threw it.
+		 */
+		const MsgT & back() const { return *checked(messages.empty()?0:&messages.back()); }
+		const MsgT & front() const { return *checked(messages.empty()?0:&messages.front()); }
+
+	private:
+		const typename MsgT::ConstSharedPtr & checked(
+				const typename MsgT::ConstSharedPtr * msg) const
+		{
+			if(msg == 0)
+			{
+				throw std::out_of_range(
+						std::string("nothing was received on \"") +
+						(subscription?subscription->get_topic_name():"?") +
+						"\", so there is no message to read: wait for it to arrive first");
+			}
+			return *msg;
+		}
 	};
 
-	/// Subscribes the helper node to @p topic and records everything it receives.
+	/**
+	 * @brief Subscribes the helper node to @p topic and records everything it receives.
+	 *
+	 * The callback holds the collector weakly. Capturing it by shared_ptr would close a
+	 * cycle -- collector owns the subscription, the subscription owns the callback, the
+	 * callback owns the collector -- and neither would ever be freed. A subscription that
+	 * outlives its test keeps the helper node's rcl handle alive with it, which leaves the
+	 * node's rosout publisher registered and greets the next test with "Publisher already
+	 * registered for node name: 'rtabmap_odom_test_helper'".
+	 */
 	template <typename MsgT>
 	std::shared_ptr<Collector<MsgT>> collect(
 			const std::string & topic, const rclcpp::QoS & qos = rclcpp::QoS(10))
 	{
 		std::shared_ptr<Collector<MsgT>> collector = std::make_shared<Collector<MsgT>>();
+		std::weak_ptr<Collector<MsgT>> weak = collector;
 		collector->subscription = helper_->create_subscription<MsgT>(
 				topic, qos,
-				[collector](const typename MsgT::ConstSharedPtr msg) {
-					collector->messages.push_back(msg);
+				[weak](const typename MsgT::ConstSharedPtr msg) {
+					if(std::shared_ptr<Collector<MsgT>> collector = weak.lock())
+					{
+						collector->messages.push_back(msg);
+					}
 				});
 		return collector;
 	}

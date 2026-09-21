@@ -813,7 +813,10 @@ TEST_P(StereoOdometryRigTest, recovers_the_trajectory_of_a_rig_from_the_features
 		lastFrame = cameraRigStereoFrame(rig, rtabmap::Transform(0.1f*i, 0, 0, 0, 0, 0), 1.0 + 0.1*i);
 		ASSERT_EQ(rig.cameras(), lastFrame.rgbd_images.size());
 		pub->publish(lastFrame);
-		ASSERT_TRUE(spinUntil([&]() { return odom->size() >= size_t(i+1); }))
+		// Both collectors: odom and odom_info are published separately, and the feature
+		// count asserted below is read from the odom_info of this same frame.
+		ASSERT_TRUE(spinUntil([&]() {
+					return odom->size() >= size_t(i+1) && info->size() >= size_t(i+1); }))
 				<< "nothing came back for frame " << i;
 	}
 
