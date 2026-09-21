@@ -50,6 +50,10 @@ protected:
 	{
 		std::vector<rclcpp::Parameter> all = icpTestParameters();
 		all.push_back(rclcpp::Parameter("frame_id", "base_link"));
+		// What a sweep holds, as a real lidar reports it. ICP measures its correspondence
+		// ratio against this, and without it the ratio falls back to the scan's own size
+		// -- which lets the three points of degenerateCloud() match themselves perfectly.
+		all.push_back(rclcpp::Parameter("scan_cloud_max_points", int(corner3D().size())));
 		// See the note in test_icp_odometry.cpp: without this the node drops frames that
 		// arrive closer together than their stamps claim, which is what a loaded runner
 		// does to a sequence published back to back.
@@ -99,8 +103,20 @@ protected:
 	/// A scan with nothing in it to register against: three points on a line.
 	sensor_msgs::msg::PointCloud2 degenerateCloud(double stamp)
 	{
-		return makeXYZCloud("lidar", stamp,
-				{cv::Point3f(1,0,0), cv::Point3f(1.1f,0,0), cv::Point3f(1.2f,0,0)});
+		// A short line off in free space: enough points for the scan_normal_k neighbours
+		// the node asks for, and jittered, because a perfectly straight one has no
+		// second axis for the normals to be fitted against and some PCL versions return
+		// them as NaN -- which empties the scan and has the odometry refuse it for that
+		// rather than for its shape. Its structural complexity stays near 0.016, under
+		// the 0.02 that Icp/PointToPlaneMinComplexity asks of a frame to start a map on.
+		cv::RNG rng(0xDECAF);
+		std::vector<cv::Point3f> line;
+		for(int i=0; i<20; ++i)
+		{
+			line.push_back(cv::Point3f(1.0f + 0.05f*float(i),
+					float(rng.gaussian(0.002)), float(rng.gaussian(0.002))));
+		}
+		return makeXYZCloud("lidar", stamp, line);
 	}
 
 	/// Counts the transforms matching @p parent -> @p child seen so far.
@@ -1056,6 +1072,13 @@ TEST_F(OdometryRosTest, recovers_on_the_guess_after_a_metre_of_being_lost_announ
 			collect<nav_msgs::msg::Odometry>("odom");
 	makeNode({rclcpp::Parameter("guess_frame_id", "wheel_odom"),
 	          rclcpp::Parameter("Odom/ResetCountdown", "1"),
+	          // Point to plane, so the scan's own shape is what decides whether a frame
+	          // is good enough to start a map on, rather than how ICP happened to fail.
+	          // The threshold sits between the two scenes this test feeds it: the corner
+	          // measures 0.016 and the line of degenerateCloud() 0.0001, and the 0.02
+	          // default would turn away both.
+	          rclcpp::Parameter("Icp/PointToPlane", "true"),
+	          rclcpp::Parameter("Icp/PointToPlaneMinComplexity", "0.005"),
 	          rclcpp::Parameter("wait_for_transform", 2.0)});
 
 	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub = scanPublisher();
@@ -1082,7 +1105,9 @@ TEST_F(OdometryRosTest, recovers_on_the_guess_after_a_metre_of_being_lost_announ
 	EXPECT_GE(odom->back().pose.covariance[0], 9999.0)
 			<< "a usable pose while there was nothing to register";
 
-	// The scene comes back, seen from where the wheels say the robot now is.
+	// The scene comes back, seen from where the wheels say the robot now is. Two frames:
+	// the line was never good enough to start a map on, so the first corner does that
+	// and the second is the first that has something to be registered against.
 	pub->publish(makeXYZCloud("lidar", 2.2, corner3D(cv::Point3f(float(1.2*speed), 0, 0))));
 	spinFor(std::chrono::milliseconds(200));
 	pub->publish(makeXYZCloud("lidar", 2.3, corner3D(cv::Point3f(float(1.3*speed), 0, 0))));
