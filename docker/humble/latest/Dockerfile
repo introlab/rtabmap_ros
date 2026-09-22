@@ -19,7 +19,7 @@ ARG RUN_TESTS=0
 
 RUN source /ros_entrypoint.sh && \
     cd ros2_ws && \
-    export MAKEFLAGS="-j4" && \
+    export MAKEFLAGS="-j2" && \
     colcon build --executor sequential --event-handlers console_direct+ --install-base /opt/ros/humble --merge-install --cmake-args -DRTABMAP_SYNC_MULTI_RGBD=ON -DCMAKE_BUILD_TYPE=Release && \
     if [ "$RUN_TESTS" = "1" ]; then \
         colcon test --executor sequential --event-handlers console_direct+ --install-base /opt/ros/humble --merge-install && \
