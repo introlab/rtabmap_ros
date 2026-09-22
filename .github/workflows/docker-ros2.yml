@@ -1,5 +1,19 @@
 name: docker-ros2
 
+# ROS2 images: humble, jazzy, kilted and lyrical.
+#
+# The images built from this tree (docker/*/latest) compile the workspace, which
+# is far too slow to emulate, so every arch of those is built natively: amd64 on
+# an x86 runner, arm64 on a GitHub arm64 runner. Because a single Docker Hub tag
+# cannot hold two independently pushed architectures, each build pushes an
+# arch-suffixed tag (e.g. :humble-latest-amd64 / :humble-latest-arm64) and a
+# final job joins them into the real multi-arch tag (:humble-latest) with
+# `imagetools create`.
+#
+# The runner image only hosts the build; it does not have to match the Ubuntu
+# release inside the image, so ubuntu-26.04{,-arm} is used for all of them
+# (ubuntu-22.04{,-arm} and ubuntu-24.04{,-arm} also exist, if ever needed).
+
 on:
   push:
     branches: [ ros2 ]
@@ -16,42 +30,33 @@ jobs:
   docker:
     # A manual dispatch is honored only on ros2, the only ref we push from.
     if: ${{ github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/ros2' }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
 
     strategy:
       fail-fast: false
       matrix:
         docker_tag: [humble-latest, jazzy-latest, kilted-latest, lyrical-latest]
+        arch: [amd64, arm64]
         include:
         - docker_tag: humble-latest
           docker_path: 'humble/latest'
-          docker_platforms: |
-            linux/amd64
-            linux/arm64
         - docker_tag: jazzy-latest
           docker_path: 'jazzy/latest'
-          docker_platforms: |
-            linux/amd64
-            linux/arm64
         - docker_tag: kilted-latest
           docker_path: 'kilted/latest'
-          docker_platforms: |
-            linux/amd64
         - docker_tag: lyrical-latest
           docker_path: 'lyrical/latest'
-          docker_platforms: |
-            linux/amd64
-            linux/arm64
+        - arch: amd64
+          runner: ubuntu-26.04
+          docker_platform: linux/amd64
+        - arch: arm64
+          runner: ubuntu-26.04-arm
+          docker_platform: linux/arm64
 
     steps:
       -
         name: Checkout
         uses: actions/checkout@v4
-      -
-        name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: all
       -
         name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -70,19 +75,50 @@ jobs:
         with:
           context: .
           push: ${{ github.event_name != 'pull_request' }}
-          platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || matrix.docker_platforms }}
+          platforms: ${{ matrix.docker_platform }}
           # Run the test suites inside the image being built. Nothing of them is kept, and
           # the build fails if one does, so no image is published from a tree that fails.
           build-args: |
             RUN_TESTS=1
           file: ./docker/${{ matrix.docker_path }}/Dockerfile
-          tags: introlab3it/rtabmap_ros:${{ matrix.docker_tag }}
+          tags: introlab3it/rtabmap_ros:${{ matrix.docker_tag }}-${{ matrix.arch }}
           no-cache: true
           cache-to: type=inline
+
+  docker_manifest:
+    needs: docker
+    # Nothing to join on pull requests, where the per-arch tags are never pushed.
+    if: ${{ !cancelled() && !failure() && github.event_name != 'pull_request' && (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/ros2') }}
+    runs-on: ubuntu-26.04
+
+    strategy:
+      fail-fast: false
+      matrix:
+        docker_tag: [humble-latest, jazzy-latest, kilted-latest, lyrical-latest]
+
+    steps:
+      -
+        name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      -
+        name: Create multi-arch manifest
+        run: |
+          docker buildx imagetools create \
+            -t introlab3it/rtabmap_ros:${{ matrix.docker_tag }} \
+            introlab3it/rtabmap_ros:${{ matrix.docker_tag }}-amd64 \
+            introlab3it/rtabmap_ros:${{ matrix.docker_tag }}-arm64
 
   # Images that install a released rtabmap_ros from apt (docker/<distro>): they hold
   # nothing from the tree under review, so building them on a pull request would only
   # report that the release still installs. Left to the pushes that publish them.
+  #
+  # This one is left on a single QEMU-emulated job, for simplicity: it only
+  # apt-installs a released rtabmap_ros, so nothing is compiled under emulation,
+  # and one build pushes the multi-arch tag straight away -- no per-arch tags and
+  # no manifest job to join them.
   docker-released:
     if: ${{ github.event_name != 'pull_request' && (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/ros2') }}
     runs-on: ubuntu-latest
