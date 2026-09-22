@@ -35,6 +35,9 @@
   <depend>rtabmap_util</depend>
   <depend>rtabmap_sync</depend>
   
+  <test_depend>ament_cmake_gtest</test_depend>
+  <test_depend>rcl_interfaces</test_depend>
+
   <export>
 	<build_type>ament_cmake</build_type>
   </export>
