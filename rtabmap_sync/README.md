@@ -6,6 +6,14 @@ A SLAM node needs a camera's color image, its depth image and its calibration as
 
 Every node is a [composable node](https://docs.ros.org/en/jazzy/Tutorials/Intermediate/Composition.html) as well as a standalone executable. **Compose these into the camera driver's process where you can**: they copy every pixel of every frame, and across a process boundary that copy is a serialization plus a memcpy per image.
 
+## Contents
+
+- [Nodes](#nodes)
+- [Library](#library)
+- [Conventions](#conventions)
+- [Build options](#build-options)
+- [License](#license)
+
 ## Nodes
 
 One page per node.
@@ -61,16 +69,6 @@ For several cameras, **prefer turning `RTABMAP_SYNC_MULTI_RGBD` on**. The consum
 `rgbdx_sync` is the route that needs no rebuild — against binary packages, say — and the only one that goes past 6 cameras. See [Feeding it to rtabmap](doc/rgbdx_sync.md#feeding-it-to-rtabmap).
 
 Without the options, asking for either is refused rather than ignored quietly — `subscribe_user_data` is reset to false with an error, and `rgbd_cameras` > 1 leaves nothing subscribed and says so.
-
-## Building and testing
-
-```bash
-colcon build --packages-select rtabmap_sync
-colcon test --packages-select rtabmap_sync
-colcon test-result --verbose
-```
-
-The tests drive each node over real ROS topics inside the gtest binary — no launch files and no separate processes — so they also serve as worked examples of each node's topics and parameters.
 
 ## License
 

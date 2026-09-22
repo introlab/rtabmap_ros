@@ -9,6 +9,17 @@ Two typical setups:
 * **Lidar + one or more RGB cameras.** The natural way to feed a lidar into an RGB-D SLAM setup: the lidar supplies the geometry, the cameras the appearance. Run one instance per camera, each subscribing to the same cloud but to that camera's `camera_info`; a 3D lidar usually covers all of them at once. The resulting RGB-D streams can then be combined with [rtabmap_sync](https://docs.ros.org/en/jazzy/p/rtabmap_sync/)'s `rgbd_sync`/`rgbdx_sync` and given to RTAB-Map through its `rgbd_cameras` parameter.
 * **ToF camera + RGB camera, not synchronized.** Two separate sensors, each with its own clock and its own pose, so their frames line up neither in time nor in space. Projecting the ToF cloud into the RGB camera registers the depth to the color image, and setting `fixed_frame_id` to a high-rate odometry frame — VIO, or an IMU-driven odometry running well above the camera rate — compensates the motion between the two stamps at the same time. See [Motion compensation](#motion-compensation).
 
+## Contents
+
+- [Usage](#usage)
+- [Subscribed Topics](#subscribed-topics)
+- [Published Topics](#published-topics)
+- [Required Transforms](#required-transforms)
+- [Parameters](#parameters)
+- [Motion compensation](#motion-compensation)
+- [Hole filling](#hole-filling)
+- [Notes](#notes)
+
 ## Usage
 
 ```bash

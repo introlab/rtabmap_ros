@@ -6,6 +6,12 @@ RTAB-Map is a C++ library, and the data it hands to ROS is not always plain ROS 
 
 There are no nodes here. It is an `ament_python` package that installs one importable module.
 
+## Contents
+
+- [Module](#module)
+- [Things worth knowing](#things-worth-knowing)
+- [License](#license)
+
 ## Module
 
 `rtabmap_python.cv_compression` — a single-channel `cv::Mat` to and from bytes.
@@ -33,16 +39,6 @@ The encoding is a zlib stream followed by a 12-byte trailer holding rows, cols a
 **Single-channel only.** The C++ encoder packs the channel count into the type code; the tables here cover the single-channel depths `CV_8U` through `CV_64F`. A multi-channel matrix written by the C++ side raises `KeyError` rather than decoding wrongly. So does an unsupported dtype on the way in — `int64` and `float16` have no encoding.
 
 **The trailer is host-endian**, because the C++ side writes raw `int`s. A blob is not portable between machines of opposite endianness.
-
-## Building and testing
-
-```bash
-colcon build --packages-select rtabmap_python
-colcon test --packages-select rtabmap_python
-colcon test-result --verbose
-```
-
-The tests cover the round trip for every supported depth, the exact trailer bytes against the codes RTAB-Map's `serializeMatType()` produces, and each of the behaviours above. Alongside them, the standard `ament_copyright`, `ament_flake8` and `ament_pep257` linters run over the package.
 
 ## License
 

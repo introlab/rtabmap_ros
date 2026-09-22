@@ -8,6 +8,17 @@ The sensors do not have to fire together: the clouds are matched by nearest stam
 
 It combines **several sensors into one frame**. To combine **one sensor over many frames**, use [point_cloud_assembler](point_cloud_assembler.md).
 
+## Contents
+
+- [Usage](#usage)
+- [Subscribed Topics](#subscribed-topics)
+- [Published Topics](#published-topics)
+- [Required Transforms](#required-transforms)
+- [Parameters](#parameters)
+- [Converting back to a LaserScan](#converting-back-to-a-laserscan)
+- [Sensors that do not fire together](#sensors-that-do-not-fire-together)
+- [Diagnostics](#diagnostics)
+
 ## Usage
 
 ```bash

@@ -12,27 +12,19 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Images built from this tree (docker/*/latest), the ones a change here can break.
   docker:
     # A manual dispatch is honored only on ros2, the only ref we push from.
     if: ${{ github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/ros2' }}
     runs-on: ubuntu-latest
-    
+
     strategy:
       fail-fast: false
       matrix:
-        docker_tag: [humble, humble-latest, jazzy, jazzy-latest, kilted, kilted-latest, lyrical-latest]
+        docker_tag: [humble-latest, jazzy-latest, kilted-latest, lyrical-latest]
         include:
-        - docker_tag: humble
-          docker_path: 'humble'
-          docker_platforms: |
-            linux/amd64
         - docker_tag: humble-latest
           docker_path: 'humble/latest'
-          docker_platforms: |
-            linux/amd64
-            linux/arm64
-        - docker_tag: jazzy
-          docker_path: 'jazzy'
           docker_platforms: |
             linux/amd64
             linux/arm64
@@ -41,27 +33,16 @@ jobs:
           docker_platforms: |
             linux/amd64
             linux/arm64
-        - docker_tag: kilted
-          docker_path: 'kilted'
-          docker_platforms: |
-            linux/amd64
-            linux/arm64
         - docker_tag: kilted-latest
           docker_path: 'kilted/latest'
           docker_platforms: |
             linux/amd64
-        #Disabled till rtabmap_ros is released on lyrical
-        #- docker_tag: lyrical
-        #  docker_path: 'lyrical'
-        #  docker_platforms: |
-        #    linux/amd64
-        #    linux/arm64
         - docker_tag: lyrical-latest
           docker_path: 'lyrical/latest'
           docker_platforms: |
             linux/amd64
             linux/arm64
-    
+
     steps:
       -
         name: Checkout
@@ -90,8 +71,73 @@ jobs:
           context: .
           push: ${{ github.event_name != 'pull_request' }}
           platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || matrix.docker_platforms }}
+          # Run the test suites inside the image being built. Nothing of them is kept, and
+          # the build fails if one does, so no image is published from a tree that fails.
+          build-args: |
+            RUN_TESTS=1
           file: ./docker/${{ matrix.docker_path }}/Dockerfile
           tags: introlab3it/rtabmap_ros:${{ matrix.docker_tag }}
           no-cache: true
           cache-to: type=inline
 
+  # Images that install a released rtabmap_ros from apt (docker/<distro>): they hold
+  # nothing from the tree under review, so building them on a pull request would only
+  # report that the release still installs. Left to the pushes that publish them.
+  docker-released:
+    if: ${{ github.event_name != 'pull_request' && (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/ros2') }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        docker_tag: [humble, jazzy, kilted, lyrical]
+        include:
+        - docker_tag: humble
+          docker_path: 'humble'
+          docker_platforms: |
+            linux/amd64
+        - docker_tag: jazzy
+          docker_path: 'jazzy'
+          docker_platforms: |
+            linux/amd64
+            linux/arm64
+        - docker_tag: kilted
+          docker_path: 'kilted'
+          docker_platforms: |
+            linux/amd64
+            linux/arm64
+        - docker_tag: lyrical
+          docker_path: 'lyrical'
+          docker_platforms: |
+            linux/amd64
+            linux/arm64
+
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v4
+      -
+        name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
+      -
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      -
+        name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      -
+        name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: ${{ matrix.docker_platforms }}
+          file: ./docker/${{ matrix.docker_path }}/Dockerfile
+          tags: introlab3it/rtabmap_ros:${{ matrix.docker_tag }}
+          no-cache: true
+          cache-to: type=inline

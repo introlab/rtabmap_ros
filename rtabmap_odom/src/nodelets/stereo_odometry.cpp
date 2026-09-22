@@ -42,6 +42,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/utilite/UTimer.h>
 #include <rtabmap/utilite/UStl.h>
 #include <rtabmap/utilite/UConversion.h>
+#include <rtabmap/core/Compression.h>
 #include <rtabmap/core/Odometry.h>
 
 using namespace rtabmap;
@@ -73,6 +74,8 @@ StereoOdometry::StereoOdometry(const rclcpp::NodeOptions & options) :
 
 StereoOdometry::~StereoOdometry()
 {
+	this->join(true);
+
 	delete approxSync_;
 	delete exactSync_;
 	delete approxSync2_;
@@ -407,29 +410,46 @@ void StereoOdometry::commonCallback(
 		const std::vector<cv_bridge::CvImageConstPtr> & leftImages,
 		const std::vector<cv_bridge::CvImageConstPtr> & rightImages,
 		const std::vector<sensor_msgs::msg::CameraInfo>& leftCameraInfos,
-		const std::vector<sensor_msgs::msg::CameraInfo>& rightCameraInfos)
+		const std::vector<sensor_msgs::msg::CameraInfo>& rightCameraInfos,
+		const std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > & localKeyPointsMsgs,
+		const std::vector<std::vector<rtabmap_msgs::msg::Point3f> > & localPoints3dMsgs,
+		const std::vector<cv::Mat> & localDescriptorsMsgs)
 {
 	UASSERT(leftImages.size() > 0 &&
 			leftImages.size() == rightImages.size() &&
 			leftImages.size() == leftCameraInfos.size() &&
 			rightImages.size() == rightCameraInfos.size());
 	rclcpp::Time higherStamp;
-	int leftWidth = leftImages[0]->image.cols;
-	int leftHeight = leftImages[0]->image.rows;
+
+	// The images are what the local features would otherwise be extracted from, so a frame
+	// that brings its own can leave them out -- which is nearly all of the bandwidth. It
+	// then describes itself with its calibration alone: how big the left image would have
+	// been, where the rig is, how far apart the two cameras are.
+	const bool hasImages = !leftImages[0]->image.empty() && !rightImages[0]->image.empty();
+
+	int leftWidth = hasImages?leftImages[0]->image.cols:(int)leftCameraInfos[0].width;
+	int leftHeight = hasImages?leftImages[0]->image.rows:(int)leftCameraInfos[0].height;
 	int rightWidth = rightImages[0]->image.cols;
 	int rightHeight = rightImages[0]->image.rows;
 
-	UASSERT_MSG(
-			leftWidth == rightWidth && leftHeight == rightHeight,
-		uFormat("left=%dx%d right=%dx%d", leftWidth, leftHeight, rightWidth, rightHeight).c_str());
+	if(hasImages)
+	{
+		UASSERT_MSG(
+				leftWidth == rightWidth && leftHeight == rightHeight,
+			uFormat("left=%dx%d right=%dx%d", leftWidth, leftHeight, rightWidth, rightHeight).c_str());
+	}
 
 	int cameraCount = leftImages.size();
 	cv::Mat left;
 	cv::Mat right;
 	std::vector<rtabmap::StereoCameraModel> cameraModels;
+	std::vector<cv::KeyPoint> keypoints;
+	std::vector<cv::Point3f> points3d;
+	cv::Mat descriptors;
 	for(unsigned int i=0; i<leftImages.size(); ++i)
 	{
-		if(!(leftImages[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) ==0 ||
+		if(hasImages &&
+		   (!(leftImages[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) ==0 ||
 			 leftImages[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
 			 leftImages[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||
 			 leftImages[i]->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
@@ -442,14 +462,21 @@ void StereoOdometry::commonCallback(
 			  rightImages[i]->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
 			  rightImages[i]->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0 ||
 			  rightImages[i]->encoding.compare(sensor_msgs::image_encodings::BGRA8) == 0 ||
-			  rightImages[i]->encoding.compare(sensor_msgs::image_encodings::RGBA8) == 0))
+			  rightImages[i]->encoding.compare(sensor_msgs::image_encodings::RGBA8) == 0)))
 		{
 			RCLCPP_ERROR(this->get_logger(), "Input type must be image=mono8,mono16,rgb8,bgr8,rgba8,bgra8 (mono8 recommended), received types are %s (left) and %s (right)",
 					leftImages[i]->encoding.c_str(), rightImages[i]->encoding.c_str());
 			return;
 		}
 
-		rclcpp::Time stamp = rtabmap_conversions::timestampFromROS(leftImages[i]->header.stamp)>rtabmap_conversions::timestampFromROS(rightImages[i]->header.stamp)?leftImages[i]->header.stamp:rightImages[i]->header.stamp;
+		// An image that is not there carries no header either, so a frame that has none is
+		// stamped and placed by its calibration, which is all it has.
+		const std::string & cameraFrameId = hasImages?leftImages[i]->header.frame_id:leftCameraInfos[i].header.frame_id;
+		rclcpp::Time stamp = leftCameraInfos[i].header.stamp;
+		if(hasImages)
+		{
+			stamp = rtabmap_conversions::timestampFromROS(leftImages[i]->header.stamp)>rtabmap_conversions::timestampFromROS(rightImages[i]->header.stamp)?leftImages[i]->header.stamp:rightImages[i]->header.stamp;
+		}
 
 		if(i == 0)
 		{
@@ -460,7 +487,7 @@ void StereoOdometry::commonCallback(
 			higherStamp = stamp;
 		}
 
-		Transform localTransform = rtabmap_conversions::getTransform(this->frameId(), leftImages[i]->header.frame_id, stamp, tfBuffer(), waitForTransform());
+		Transform localTransform = rtabmap_conversions::getTransform(this->frameId(), cameraFrameId, stamp, tfBuffer(), waitForTransform());
 		if(localTransform.isNull())
 		{
 			return;
@@ -488,7 +515,13 @@ void StereoOdometry::commonCallback(
 			}
 		}
 
-		if(!leftImages[i]->image.empty() && !rightImages[i]->image.empty())
+		if(hasImages != (!leftImages[i]->image.empty() && !rightImages[i]->image.empty()))
+		{
+			RCLCPP_ERROR(this->get_logger(), "Odom: camera %d of this frame has images while "
+					"another one doesn't (or the other way around)?!?", i);
+			return;
+		}
+
 		{
 			bool alreadyRectified = true;
 			Parameters::parse(parameters(), Parameters::kRtabmapImagesAlreadyRectified(), alreadyRectified);
@@ -602,62 +635,76 @@ void StereoOdometry::commonCallback(
 					shown = true;
 				}
 			}
-			cv_bridge::CvImageConstPtr ptrLeft = leftImages[i];
-			if(leftImages[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) !=0 &&
-			   leftImages[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) != 0)
+			if(hasImages)
 			{
-				if(keepColor_ && leftImages[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) != 0)
+				cv_bridge::CvImageConstPtr ptrLeft = leftImages[i];
+				if(leftImages[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) !=0 &&
+				   leftImages[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) != 0)
 				{
-					ptrLeft = cv_bridge::cvtColor(leftImages[i], "bgr8");
+					if(keepColor_ && leftImages[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) != 0)
+					{
+						ptrLeft = cv_bridge::cvtColor(leftImages[i], "bgr8");
+					}
+					else
+					{
+						ptrLeft = cv_bridge::cvtColor(leftImages[i], "mono8");
+					}
+				}
+				cv_bridge::CvImageConstPtr ptrRight = rightImages[i];
+				if(rightImages[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) !=0 &&
+				   rightImages[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) != 0)
+				{
+					ptrRight = cv_bridge::cvtColor(rightImages[i], "mono8");
+				}
+
+				// initialize
+				if(left.empty())
+				{
+					left = cv::Mat(leftHeight, leftWidth*cameraCount, ptrLeft->image.type());
+				}
+				if(right.empty())
+				{
+					right = cv::Mat(rightHeight, rightWidth*cameraCount, ptrRight->image.type());
+				}
+
+				if(ptrLeft->image.type() == left.type())
+				{
+					ptrLeft->image.copyTo(cv::Mat(left, cv::Rect(i*leftWidth, 0, leftWidth, leftHeight)));
 				}
 				else
 				{
-					ptrLeft = cv_bridge::cvtColor(leftImages[i], "mono8");
+					RCLCPP_ERROR(this->get_logger(), "Some left images are not the same type! %d vs %d", ptrLeft->image.type(), left.type());
+					return;
 				}
-			}
-			cv_bridge::CvImageConstPtr ptrRight = rightImages[i];
-			if(rightImages[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) !=0 &&
-			   rightImages[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) != 0)
-			{
-				ptrRight = cv_bridge::cvtColor(rightImages[i], "mono8");
-			}
 
-			// initialize
-			if(left.empty())
-			{
-				left = cv::Mat(leftHeight, leftWidth*cameraCount, ptrLeft->image.type());
-			}
-			if(right.empty())
-			{
-				right = cv::Mat(rightHeight, rightWidth*cameraCount, ptrRight->image.type());
-			}
-
-			if(ptrLeft->image.type() == left.type())
-			{
-				ptrLeft->image.copyTo(cv::Mat(left, cv::Rect(i*leftWidth, 0, leftWidth, leftHeight)));
-			}
-			else
-			{
-				RCLCPP_ERROR(this->get_logger(), "Some left images are not the same type! %d vs %d", ptrLeft->image.type(), left.type());
-				return;
-			}
-
-			if(ptrRight->image.type() == right.type())
-			{
-				ptrRight->image.copyTo(cv::Mat(right, cv::Rect(i*rightWidth, 0, rightWidth, rightHeight)));
-			}
-			else
-			{
-				RCLCPP_ERROR(this->get_logger(), "Some right images are not the same type! %d vs %d", ptrRight->image.type(), right.type());
-				return;
+				if(ptrRight->image.type() == right.type())
+				{
+					ptrRight->image.copyTo(cv::Mat(right, cv::Rect(i*rightWidth, 0, rightWidth, rightHeight)));
+				}
+				else
+				{
+					RCLCPP_ERROR(this->get_logger(), "Some right images are not the same type! %d vs %d", ptrRight->image.type(), right.type());
+					return;
+				}
 			}
 
 			cameraModels.push_back(stereoModel);
 		}
-		else
+
+		// The left images of all cameras are stitched side by side above, so the keypoints
+		// of camera i are shifted by as many images as come before it, and their 3D points,
+		// which arrive in that camera's optical frame, are brought back to the base frame.
+		if(localKeyPointsMsgs.size() == leftImages.size())
 		{
-			RCLCPP_ERROR(this->get_logger(), "Odom: input images empty?!?");
-			return;
+			rtabmap_conversions::keypointsFromROS(localKeyPointsMsgs[i], keypoints, leftWidth*i);
+		}
+		if(localPoints3dMsgs.size() == leftImages.size())
+		{
+			rtabmap_conversions::points3fFromROS(localPoints3dMsgs[i], points3d, localTransform);
+		}
+		if(localDescriptorsMsgs.size() == leftImages.size())
+		{
+			descriptors.push_back(localDescriptorsMsgs[i]);
 		}
 	}
 
@@ -669,9 +716,30 @@ void StereoOdometry::commonCallback(
 			0,
 			rtabmap_conversions::timestampFromROS(higherStamp));
 
+	// Features that came with the frame are used as they are: the odometry then skips
+	// detection, description and the disparity search that would otherwise rebuild them
+	// (see RegistrationVis, which extracts only when the frame carries no keypoints).
+	// They are dropped rather than trusted if the three of them disagree, as using them
+	// out of step would silently mismatch keypoints with their descriptors or 3D points.
+	if(!keypoints.empty())
+	{
+		if((!points3d.empty() && points3d.size() != keypoints.size()) ||
+		   (!descriptors.empty() && descriptors.rows != (int)keypoints.size()))
+		{
+			RCLCPP_ERROR(this->get_logger(), "Ignoring the local features received with this frame: "
+					"%d keypoints, %d 3D points and %d descriptors, which should be the same count "
+					"(or none at all for the 3D points and the descriptors).",
+					(int)keypoints.size(), (int)points3d.size(), descriptors.rows);
+		}
+		else
+		{
+			data.setFeatures(keypoints, points3d, descriptors);
+		}
+	}
+
 	std_msgs::msg::Header header;
 	header.stamp = higherStamp;
-	header.frame_id = leftImages.size()==1?leftImages[0]->header.frame_id:"";
+	header.frame_id = leftImages.size()==1?(hasImages?leftImages[0]->header.frame_id:leftCameraInfos[0].header.frame_id):"";
 	this->processData(data, header);
 }
 
@@ -715,6 +783,27 @@ void StereoOdometry::callback(
 	}
 }
 
+namespace {
+
+/**
+ * @brief Collects the local features one camera's frame carries, cameras in order.
+ *
+ * A frame that carries none pushes empty entries rather than nothing, so that the
+ * per-camera indexing still lines up with the images.
+ */
+void appendLocalFeatures(
+		const rtabmap_msgs::msg::RGBDImage & image,
+		std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > & keyPoints,
+		std::vector<std::vector<rtabmap_msgs::msg::Point3f> > & points3d,
+		std::vector<cv::Mat> & descriptors)
+{
+	keyPoints.push_back(image.key_points);
+	points3d.push_back(image.points);
+	descriptors.push_back(rtabmap::uncompressData(image.descriptors));
+}
+
+}  // namespace
+
 void StereoOdometry::callbackRGBD(
 		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr image)
 {
@@ -730,7 +819,12 @@ void StereoOdometry::callbackRGBD(
 		leftInfoMsgs.push_back(image->rgb_camera_info);
 		rightInfoMsgs.push_back(image->depth_camera_info);
 
-		this->commonCallback(leftMsgs, rightMsgs, leftInfoMsgs, rightInfoMsgs);
+		std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > localKeyPoints;
+		std::vector<std::vector<rtabmap_msgs::msg::Point3f> > localPoints3d;
+		std::vector<cv::Mat> localDescriptors;
+		appendLocalFeatures(*image, localKeyPoints, localPoints3d, localDescriptors);
+
+		this->commonCallback(leftMsgs, rightMsgs, leftInfoMsgs, rightInfoMsgs, localKeyPoints, localPoints3d, localDescriptors);
 	}
 }
 
@@ -750,14 +844,18 @@ void StereoOdometry::callbackRGBDX(
 		std::vector<cv_bridge::CvImageConstPtr> rightMsgs(images->rgbd_images.size());
 		std::vector<sensor_msgs::msg::CameraInfo> leftInfoMsgs;
 		std::vector<sensor_msgs::msg::CameraInfo> rightInfoMsgs;
+		std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > localKeyPoints;
+		std::vector<std::vector<rtabmap_msgs::msg::Point3f> > localPoints3d;
+		std::vector<cv::Mat> localDescriptors;
 		for(size_t i=0; i<images->rgbd_images.size(); ++i)
 		{
 			rtabmap_conversions::toCvShare(images->rgbd_images[i], images, leftMsgs[i], rightMsgs[i]);
 			leftInfoMsgs.push_back(images->rgbd_images[i].rgb_camera_info);
 			rightInfoMsgs.push_back(images->rgbd_images[i].depth_camera_info);
+			appendLocalFeatures(images->rgbd_images[i], localKeyPoints, localPoints3d, localDescriptors);
 		}
 
-		this->commonCallback(leftMsgs, rightMsgs, leftInfoMsgs, rightInfoMsgs);
+		this->commonCallback(leftMsgs, rightMsgs, leftInfoMsgs, rightInfoMsgs, localKeyPoints, localPoints3d, localDescriptors);
 	}
 }
 
@@ -780,7 +878,13 @@ void StereoOdometry::callbackRGBD2(
 		rightInfoMsgs.push_back(image->depth_camera_info);
 		rightInfoMsgs.push_back(image2->depth_camera_info);
 
-		this->commonCallback(leftMsgs, rightMsgs, leftInfoMsgs, rightInfoMsgs);
+		std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > localKeyPoints;
+		std::vector<std::vector<rtabmap_msgs::msg::Point3f> > localPoints3d;
+		std::vector<cv::Mat> localDescriptors;
+		appendLocalFeatures(*image, localKeyPoints, localPoints3d, localDescriptors);
+		appendLocalFeatures(*image2, localKeyPoints, localPoints3d, localDescriptors);
+
+		this->commonCallback(leftMsgs, rightMsgs, leftInfoMsgs, rightInfoMsgs, localKeyPoints, localPoints3d, localDescriptors);
 	}
 }
 
@@ -807,7 +911,14 @@ void StereoOdometry::callbackRGBD3(
 		rightInfoMsgs.push_back(image2->depth_camera_info);
 		rightInfoMsgs.push_back(image3->depth_camera_info);
 
-		this->commonCallback(leftMsgs, rightMsgs, leftInfoMsgs, rightInfoMsgs);
+		std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > localKeyPoints;
+		std::vector<std::vector<rtabmap_msgs::msg::Point3f> > localPoints3d;
+		std::vector<cv::Mat> localDescriptors;
+		appendLocalFeatures(*image, localKeyPoints, localPoints3d, localDescriptors);
+		appendLocalFeatures(*image2, localKeyPoints, localPoints3d, localDescriptors);
+		appendLocalFeatures(*image3, localKeyPoints, localPoints3d, localDescriptors);
+
+		this->commonCallback(leftMsgs, rightMsgs, leftInfoMsgs, rightInfoMsgs, localKeyPoints, localPoints3d, localDescriptors);
 	}
 }
 
@@ -838,7 +949,15 @@ void StereoOdometry::callbackRGBD4(
 		rightInfoMsgs.push_back(image3->depth_camera_info);
 		rightInfoMsgs.push_back(image4->depth_camera_info);
 
-		this->commonCallback(leftMsgs, rightMsgs, leftInfoMsgs, rightInfoMsgs);
+		std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > localKeyPoints;
+		std::vector<std::vector<rtabmap_msgs::msg::Point3f> > localPoints3d;
+		std::vector<cv::Mat> localDescriptors;
+		appendLocalFeatures(*image, localKeyPoints, localPoints3d, localDescriptors);
+		appendLocalFeatures(*image2, localKeyPoints, localPoints3d, localDescriptors);
+		appendLocalFeatures(*image3, localKeyPoints, localPoints3d, localDescriptors);
+		appendLocalFeatures(*image4, localKeyPoints, localPoints3d, localDescriptors);
+
+		this->commonCallback(leftMsgs, rightMsgs, leftInfoMsgs, rightInfoMsgs, localKeyPoints, localPoints3d, localDescriptors);
 	}
 }
 
@@ -873,7 +992,16 @@ void StereoOdometry::callbackRGBD5(
 		rightInfoMsgs.push_back(image4->depth_camera_info);
 		rightInfoMsgs.push_back(image5->depth_camera_info);
 
-		this->commonCallback(leftMsgs, rightMsgs, leftInfoMsgs, rightInfoMsgs);
+		std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > localKeyPoints;
+		std::vector<std::vector<rtabmap_msgs::msg::Point3f> > localPoints3d;
+		std::vector<cv::Mat> localDescriptors;
+		appendLocalFeatures(*image, localKeyPoints, localPoints3d, localDescriptors);
+		appendLocalFeatures(*image2, localKeyPoints, localPoints3d, localDescriptors);
+		appendLocalFeatures(*image3, localKeyPoints, localPoints3d, localDescriptors);
+		appendLocalFeatures(*image4, localKeyPoints, localPoints3d, localDescriptors);
+		appendLocalFeatures(*image5, localKeyPoints, localPoints3d, localDescriptors);
+
+		this->commonCallback(leftMsgs, rightMsgs, leftInfoMsgs, rightInfoMsgs, localKeyPoints, localPoints3d, localDescriptors);
 	}
 }
 
@@ -912,7 +1040,17 @@ void StereoOdometry::callbackRGBD6(
 		rightInfoMsgs.push_back(image5->depth_camera_info);
 		rightInfoMsgs.push_back(image6->depth_camera_info);
 
-		this->commonCallback(leftMsgs, rightMsgs, leftInfoMsgs, rightInfoMsgs);
+		std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > localKeyPoints;
+		std::vector<std::vector<rtabmap_msgs::msg::Point3f> > localPoints3d;
+		std::vector<cv::Mat> localDescriptors;
+		appendLocalFeatures(*image, localKeyPoints, localPoints3d, localDescriptors);
+		appendLocalFeatures(*image2, localKeyPoints, localPoints3d, localDescriptors);
+		appendLocalFeatures(*image3, localKeyPoints, localPoints3d, localDescriptors);
+		appendLocalFeatures(*image4, localKeyPoints, localPoints3d, localDescriptors);
+		appendLocalFeatures(*image5, localKeyPoints, localPoints3d, localDescriptors);
+		appendLocalFeatures(*image6, localKeyPoints, localPoints3d, localDescriptors);
+
+		this->commonCallback(leftMsgs, rightMsgs, leftInfoMsgs, rightInfoMsgs, localKeyPoints, localPoints3d, localDescriptors);
 	}
 }
 

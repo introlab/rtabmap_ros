@@ -4,6 +4,12 @@ Standalone utility nodes for [RTAB-Map](https://github.com/introlab/rtabmap) pip
 
 Every node is a [composable node](https://docs.ros.org/en/jazzy/Tutorials/Intermediate/Composition.html) as well as a standalone executable. Composing them into one process with their producer avoids copying images and clouds between processes, which is worth doing for anything on the sensor path.
 
+## Contents
+
+- [Nodes](#nodes)
+- [Library](#library)
+- [Conventions](#conventions)
+
 ## Nodes
 
 One page per node.
