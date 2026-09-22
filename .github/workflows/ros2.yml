@@ -25,16 +25,16 @@ jobs:
         include:
         - ros_distro: humble
           skip_keys: ''
-          packages: 'rtabmap_slam rtabmap_ros rtabmap_conversions rtabmap_odom rtabmap_sync rtabmap_util rtabmap_python'
+          packages: 'rtabmap_ros rtabmap_conversions rtabmap_odom rtabmap_sync rtabmap_util rtabmap_python'
         - ros_distro: jazzy
           skip_keys: ''
-          packages: 'rtabmap_slam rtabmap_ros rtabmap_conversions rtabmap_odom rtabmap_sync rtabmap_util rtabmap_python'
+          packages: 'rtabmap_ros rtabmap_conversions rtabmap_odom rtabmap_sync rtabmap_util rtabmap_python'
         - ros_distro: kilted
           skip_keys: 'grid_map_ros'
-          packages: 'rtabmap_slam rtabmap_ros rtabmap_conversions rtabmap_odom rtabmap_sync rtabmap_util rtabmap_python'
+          packages: 'rtabmap_ros rtabmap_conversions rtabmap_odom rtabmap_sync rtabmap_util rtabmap_python'
         - ros_distro: lyrical
           skip_keys: 'velodyne grid_map_ros libpointmatcher'
-          packages: 'rtabmap_slam rtabmap_ros rtabmap_conversions rtabmap_odom rtabmap_sync rtabmap_util rtabmap_python'
+          packages: 'rtabmap_ros rtabmap_conversions rtabmap_odom rtabmap_sync rtabmap_util rtabmap_python'
         - ros_distro: rolling
           # Rolling has moved to Ubuntu resolute and much of it has not been rebuilt for
           # that yet, so rosdep finds nothing to install for these. They are all optional

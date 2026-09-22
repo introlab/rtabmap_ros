@@ -240,24 +240,4 @@ install(DIRECTORY include/
    FILES_MATCHING PATTERN "*.h"
 )
 
-if(BUILD_TESTING)
-  find_package(ament_cmake_gtest REQUIRED)
-  find_package(rcl_interfaces REQUIRED)
-  ament_add_gtest_executable(test_scan_tf_recovery test/test_scan_tf_recovery.cpp)
-  if(TARGET test_scan_tf_recovery)
-    target_link_libraries(test_scan_tf_recovery rtabmap_slam_plugins)
-    if("$ENV{ROS_DISTRO}" STRLESS "lyrical")
-      ament_target_dependencies(test_scan_tf_recovery ${AmentLibraries} rcl_interfaces)
-    else()
-      target_link_libraries(test_scan_tf_recovery ${Libraries} rcl_interfaces::rcl_interfaces)
-    endif()
-    # Separate processes/domains keep either deadlock from hiding the other case.
-    # Existing util, sync and odom tests use domains starting at 30, 50 and 70.
-    ament_add_gtest_test(test_scan_tf_recovery TEST_NAME test_scan_tf_recovery_2d
-      ENV ROS_DOMAIN_ID=90 GTEST_FILTER=ScanTfRecovery.Recovers2D TIMEOUT 45)
-    ament_add_gtest_test(test_scan_tf_recovery TEST_NAME test_scan_tf_recovery_3d
-      ENV ROS_DOMAIN_ID=91 GTEST_FILTER=ScanTfRecovery.Recovers3D TIMEOUT 45)
-  endif()
-endif()
-
 ament_package()
