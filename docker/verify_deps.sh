@@ -55,9 +55,22 @@ for targets in /usr/lib/*/cmake/vtk-*/VTK-targets.cmake /usr/lib/cmake/vtk-*/VTK
   fi
 done
 
+# libssl-dev ships the libssl.so and libcrypto.so development symlinks beside the
+# headers FindOpenSSL reads its version from. Every find_package(rclcpp) reaches
+# find_package(OpenSSL REQUIRED) through fastrtps-config.cmake, so headers without
+# the symlinks fail the first package that configures rclcpp, several packages in.
+if [ -e /usr/include/openssl/opensslv.h ]; then
+  for lib in ssl crypto; do
+    if ! compgen -G "/usr/lib/*-linux-gnu/lib${lib}.so" > /dev/null \
+       && [ ! -e "/usr/lib/lib${lib}.so" ]; then
+      fail "no lib${lib}.so under /usr/lib while /usr/include/openssl is installed (libssl-dev is incomplete)"
+    fi
+  done
+fi
+
 if [ "${status}" -ne 0 ]; then
   echo "verify_deps: dependency installation left an inconsistent sysroot, aborting before the build" >&2
   exit 1
 fi
 
-echo "verify_deps: PCL and VTK sysroot look consistent"
+echo "verify_deps: PCL, VTK and OpenSSL sysroot look consistent"
