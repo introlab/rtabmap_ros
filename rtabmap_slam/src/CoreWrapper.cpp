@@ -1801,6 +1801,7 @@ void CoreWrapper::commonLaserScanCallback(
 					rtabmap_.getMemory() && uStrNumCmp(rtabmap_.getMemory()->getDatabaseVersion(), "0.11.10") < 0))
 			{
 				RCLCPP_ERROR(this->get_logger(), "Could not convert laser scan msg! Aborting rtabmap update...");
+				syncDataMutex_.unlock();
 				return;
 			}
 		}
@@ -1819,6 +1820,7 @@ void CoreWrapper::commonLaserScanCallback(
 					scanCloudIs2d_))
 			{
 				RCLCPP_ERROR(this->get_logger(), "Could not convert 3d laser scan msg! Aborting rtabmap update...");
+				syncDataMutex_.unlock();
 				return;
 			}
 		}
