@@ -2179,12 +2179,14 @@ TEST(MsgConversion, toCvShareAliasesRawImages)
 
 namespace {
 
-/// Builds a depth image compressed the way rtabmap does it (not a jpg/png CompressedImage).
-sensor_msgs::msg::CompressedImage makeRtabmapCompressedDepth(const cv::Mat & depth)
+/// Builds a depth CompressedImage via toCompressedDepthImageMsg() ("compressedDepth" format, as in compressed_image_transport).
+sensor_msgs::msg::CompressedImage makeCompressedDepth(const cv::Mat & depth)
 {
+	cv_bridge::CvImage cvImg;
+	cvImg.image = depth;
+	cvImg.encoding = depth.type() == CV_32FC1?sensor_msgs::image_encodings::TYPE_32FC1:sensor_msgs::image_encodings::TYPE_16UC1;
 	sensor_msgs::msg::CompressedImage msg;
-	msg.format = "";   // anything but "jpg" takes the rtabmap::uncompressImage path
-	msg.data = rtabmap::compressImage(depth, ".png");
+	toCompressedDepthImageMsg(cvImg, msg, "png");
 	return msg;
 }
 
@@ -2195,7 +2197,7 @@ TEST(MsgConversion, toCvCopyReadsCompressedDepth)
 	const cv::Mat depth(4, 4, CV_16UC1, cv::Scalar(1234));
 
 	rtabmap_msgs::msg::RGBDImage msg;
-	msg.depth_compressed = makeRtabmapCompressedDepth(depth);
+	msg.depth_compressed = makeCompressedDepth(depth);
 
 	cv_bridge::CvImagePtr rgbPtr, depthPtr;
 	toCvCopy(msg, rgbPtr, depthPtr);
@@ -2212,7 +2214,7 @@ TEST(MsgConversion, toCvShareReadsCompressedDepth)
 	const cv::Mat depth(4, 4, CV_32FC1, cv::Scalar(1.5f));
 
 	rtabmap_msgs::msg::RGBDImage msg;
-	msg.depth_compressed = makeRtabmapCompressedDepth(depth);
+	msg.depth_compressed = makeCompressedDepth(depth);
 
 	cv_bridge::CvImageConstPtr rgbPtr, depthPtr;
 	toCvShare(msg, std::shared_ptr<void const>(), rgbPtr, depthPtr);
@@ -2221,7 +2223,7 @@ TEST(MsgConversion, toCvShareReadsCompressedDepth)
 	ASSERT_FALSE(depthPtr->image.empty());
 	EXPECT_EQ(depthPtr->image.type(), CV_32FC1);
 	EXPECT_EQ(depthPtr->encoding, sensor_msgs::image_encodings::TYPE_32FC1);
-	EXPECT_EQ(cv::countNonZero(depthPtr->image != depth), 0);
+	EXPECT_NEAR(depthPtr->image.at<float>(0, 0), 1.5f, 1e-3f);
 }
 
 TEST(MsgConversion, toCvShareOnAnEmptyMessageGivesEmptyImages)

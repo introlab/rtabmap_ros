@@ -84,28 +84,38 @@ private:
 			const std::vector<sensor_msgs::msg::CameraInfo> & depthCameraInfoMsgs,
 			const sensor_msgs::msg::LaserScan & scanMsg,
 			const sensor_msgs::msg::PointCloud2 & scan3dMsg,
-			const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr& odomInfoMsg,
+			const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr & odomInfoMsg,
 			const std::vector<rtabmap_msgs::msg::GlobalDescriptor> & globalDescriptorMsgs = std::vector<rtabmap_msgs::msg::GlobalDescriptor>(),
 			const std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > & localKeyPoints = std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> >(),
 			const std::vector<std::vector<rtabmap_msgs::msg::Point3f> > & localPoints3d = std::vector<std::vector<rtabmap_msgs::msg::Point3f> >(),
 			const std::vector<cv::Mat> & localDescriptors = std::vector<cv::Mat>());
+
 	virtual void commonLaserScanCallback(
 			const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
 			const rtabmap_msgs::msg::UserData::ConstSharedPtr & userDataMsg,
 			const sensor_msgs::msg::LaserScan & scan2dMsg,
 			const sensor_msgs::msg::PointCloud2 & scan3dMsg,
-			const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr& odomInfoMsg,
+			const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr & odomInfoMsg,
 			const rtabmap_msgs::msg::GlobalDescriptor & globalDescriptor = rtabmap_msgs::msg::GlobalDescriptor());
 
 	virtual void commonOdomCallback(
 			const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
 			const rtabmap_msgs::msg::UserData::ConstSharedPtr & userDataMsg,
-			const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr& odomInfoMsg);
+			const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr & odomInfoMsg);
 
 	virtual void commonSensorDataCallback(
 			const rtabmap_msgs::msg::SensorData::ConstSharedPtr & sensorDataMsg,
 			const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
 			const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr & odomInfoMsg);
+
+	virtual void commonRGBDImageCallback(
+			const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr & rgbdMsg,
+			const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
+			const rtabmap_msgs::msg::UserData::ConstSharedPtr & userDataMsg,
+			const sensor_msgs::msg::LaserScan & scanMsg,
+			const sensor_msgs::msg::PointCloud2 & scan3dMsg,
+			const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr & odomInfoMsg,
+			const rtabmap_msgs::msg::GlobalDescriptor & globalDescriptor = rtabmap_msgs::msg::GlobalDescriptor());
 
 	void defaultCallback(const nav_msgs::msg::Odometry::SharedPtr & odomMsg);
 
