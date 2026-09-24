@@ -6,6 +6,13 @@ This package is a library only — it contains no nodes, no launch files and no 
 
 You only need it directly if you are writing your own node against RTAB-Map's C++ API and want to publish or subscribe to `rtabmap_msgs`.
 
+## Contents
+
+- [Usage](#usage)
+- [What it covers](#what-it-covers)
+- [Conventions worth knowing](#conventions-worth-knowing)
+- [License](#license)
+
 ## Usage
 
 Add the dependency to your `package.xml` and `CMakeLists.txt`:
@@ -55,14 +62,6 @@ These cut across the whole API and are not obvious from the signatures. Per-func
 **Null transforms.** RTAB-Map distinguishes a *null* transform (unknown) from identity. Over the wire this is encoded as an all-zero quaternion, so `transformFromGeometryMsg()` and `transformFromPoseMsg()` return a null `rtabmap::Transform` for one. Always check `isNull()` before using a result. `tf2::Transform` cannot represent this — it stores rotation as a basis matrix — so `transformToTF()` returns a `bool` instead.
 
 **`CameraInfo` matrices are fixed-size arrays.** `k`, `r` and `p` are `std::array`, so they are never "empty" — an unset matrix is all zeros. `cameraModelFromROS()` treats a zero `k[0]`/`p[0]` (the focal length) as absent.
-
-## Building and testing
-
-```bash
-colcon build --packages-select rtabmap_conversions
-colcon test --packages-select rtabmap_conversions
-colcon test-result --verbose
-```
 
 ## License
 

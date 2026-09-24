@@ -36,7 +36,7 @@ The stack is split into small packages so a pipeline only pulls in what it uses.
 | Package | Description |
 |---|---|
 | `rtabmap_slam` | The `rtabmap` node itself: appearance-based loop closure detection, graph optimization, memory management and map assembly. |
-| `rtabmap_odom` | Odometry nodes — `rgbd_odometry`, `stereo_odometry` and `icp_odometry`. Any external odometry can be used instead. |
+| [`rtabmap_odom`](rtabmap_odom/README.md) | Odometry nodes — `rgbd_odometry`, `stereo_odometry` and `icp_odometry`. Any external odometry can be used instead. |
 | [`rtabmap_sync`](rtabmap_sync/README.md) | Synchronizes camera and lidar topics into a single message so they reach the SLAM node together — `rgbd_sync`, `stereo_sync`, `rgbdx_sync`. |
 
 ### Sensor processing
@@ -99,6 +99,15 @@ sudo apt install ros-$ROS_DISTRO-rtabmap-ros
     ```bash
     colcon build --symlink-install --cmake-args -DRTABMAP_SYNC_MULTI_RGBD=ON -DRTABMAP_SYNC_USER_DATA=ON -DCMAKE_BUILD_TYPE=Release
     ```
+
+### Testing
+
+```bash
+cd ~/ros2_ws
+colcon build --base-paths src/rtabmap_ros
+colcon test --base-paths src/rtabmap_ros
+colcon test-result --verbose
+```
 
 # Usage
 

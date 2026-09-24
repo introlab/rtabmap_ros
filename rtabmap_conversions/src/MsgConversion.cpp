@@ -25,6 +25,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include <rtabmap_conversions/PointCloudConversion.h>
 #include "rtabmap_conversions/MsgConversion.h"
 
 #include <cmath>
@@ -2935,7 +2936,7 @@ bool convertScanMsg(
 	if(hasIntensity)
 	{
 		pcl::PointCloud<pcl::PointXYZI>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZI>);
-		pcl::fromROSMsg(scanOut, *pclScan);
+		rtabmap_conversions::fromPointCloud2Msg(scanOut, *pclScan);
 		pclScan->is_dense = true;
 		data = rtabmap::util3d::laserScan2dFromPointCloud(*pclScan, laserToOdom).data(); // put back in laser frame
 		format = rtabmap::LaserScan::kXYI;
@@ -2943,7 +2944,7 @@ bool convertScanMsg(
 	else
 	{
 		pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
-		pcl::fromROSMsg(scanOut, *pclScan);
+		rtabmap_conversions::fromPointCloud2Msg(scanOut, *pclScan);
 		pclScan->is_dense = true;
 		data = rtabmap::util3d::laserScan2dFromPointCloud(*pclScan, laserToOdom).data(); // put back in laser frame
 		format = rtabmap::LaserScan::kXY;

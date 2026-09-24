@@ -63,6 +63,18 @@ It can also decimate the images, rescale depth into the unit RTAB-Map expects, a
 
 For a monocular camera use [rgb_sync](rgb_sync.md); for a stereo pair, [stereo_sync](stereo_sync.md); for several RGB-D cameras, one of these per camera feeding [rgbdx_sync](rgbdx_sync.md).
 
+## Contents
+
+- [Usage](#usage)
+- [Subscribed Topics](#subscribed-topics)
+- [Published Topics](#published-topics)
+- [Parameters](#parameters)
+- [Synchronization](#synchronization)
+- [Depth units](#depth-units)
+- [Compressing for a slow link](#compressing-for-a-slow-link)
+- [Decimation](#decimation)
+- [Diagnostics](#diagnostics)
+
 ## Usage
 
 ```bash

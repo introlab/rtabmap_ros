@@ -25,6 +25,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include <rtabmap_conversions/PointCloudConversion.h>
 #include <rtabmap_util/point_cloud_xyz.hpp>
 
 #include <rtabmap_conversions/MsgConversion.h>
@@ -345,7 +346,7 @@ if(!pclCloud->empty() && (pclCloud->is_dense || !indices->empty()) && (normalK_ 
 		{
 			pclCloudNormal = rtabmap::util3d::removeNaNNormalsFromPointCloud(pclCloudNormal);
 		}
-		pcl::toROSMsg(*pclCloudNormal, *rosCloud);
+		rtabmap_conversions::toPointCloud2Msg(*pclCloudNormal, *rosCloud);
 	}
 	else
 	{
@@ -353,7 +354,7 @@ if(!pclCloud->empty() && (pclCloud->is_dense || !indices->empty()) && (normalK_ 
 		{
 			pclCloud = rtabmap::util3d::removeNaNFromPointCloud(pclCloud);
 		}
-		pcl::toROSMsg(*pclCloud, *rosCloud);
+		rtabmap_conversions::toPointCloud2Msg(*pclCloud, *rosCloud);
 	}
 	rosCloud->header.stamp = header.stamp;
 	rosCloud->header.frame_id = header.frame_id;

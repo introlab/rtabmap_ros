@@ -2,9 +2,23 @@
 
 Broadcasts the orientation of an IMU as a TF transform.
 
-The node subscribes to a `sensor_msgs/msg/Imu` topic, takes the `orientation` field and broadcasts it on `/tf` as the rotation of `fixed_frame_id` → the IMU frame. Set `base_frame_id` and that frame becomes the child instead, with the orientation re-expressed in it from the IMU's mounting, so the transform says how the *robot* is oriented rather than how the sensor is. Either way `fixed_frame_id` is the parent, and nothing else of the message is used: the transform's translation is always zero, and the angular velocity and linear acceleration are ignored.
+The node subscribes to a [`sensor_msgs/msg/Imu`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/Imu.html) topic, takes the `orientation` field and broadcasts it on `/tf` as the rotation of `fixed_frame_id` → the IMU frame. Set `base_frame_id` and that frame becomes the child instead, with the orientation re-expressed in it from the IMU's mounting, so the transform says how the *robot* is oriented rather than how the sensor is. Either way `fixed_frame_id` is the parent, and nothing else of the message is used: the transform's translation is always zero, and the angular velocity and linear acceleration are ignored.
 
 It exists so that a consumer that needs an oriented frame — a lidar deskewing node, a point cloud assembler, RViz — can get one from an IMU alone, without running odometry.
+
+## Contents
+
+- [Usage](#usage)
+  - [When the IMU has no orientation](#when-the-imu-has-no-orientation)
+  - [A stabilized frame for lidar deskewing and odometry](#a-stabilized-frame-for-lidar-deskewing-and-odometry)
+  - [A rotation guess for visual odometry](#a-rotation-guess-for-visual-odometry)
+- [Subscribed Topics](#subscribed-topics)
+- [Published Topics](#published-topics)
+- [Published Transforms](#published-transforms)
+- [Required Transforms](#required-transforms)
+- [Parameters](#parameters)
+- [Mounting offset](#mounting-offset)
+- [Notes](#notes)
 
 ## Usage
 

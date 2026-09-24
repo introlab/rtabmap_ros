@@ -44,6 +44,17 @@ flowchart LR
     ODOMT --> MAP & VIZ
 ```
 
+## Contents
+
+- [Usage](#usage)
+- [Subscribed Topics](#subscribed-topics)
+- [Published Topics](#published-topics)
+- [Parameters](#parameters)
+- [How a stereo pair travels in an RGBDImage](#how-a-stereo-pair-travels-in-an-rgbdimage)
+- [Synchronization](#synchronization)
+- [Compressing for a slow link](#compressing-for-a-slow-link)
+- [Diagnostics](#diagnostics)
+
 ## Usage
 
 ```bash

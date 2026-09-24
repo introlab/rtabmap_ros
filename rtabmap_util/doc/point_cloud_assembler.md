@@ -8,6 +8,20 @@ That is used for two quite different things. With a **narrow field of view** —
 
 It combines **one sensor over many frames**. To combine **several sensors into one frame**, use [point_cloud_aggregator](point_cloud_aggregator.md) — or, if you want them merely accumulated rather than matched into sets, remap them all onto this node's `cloud` topic. Nothing stops several publishers sharing it, and each cloud is placed by its own stamp and frame like any other; the publish trigger then covers them together — `max_clouds` counts across all the sensors, and a given `assembling_time` gathers correspondingly more clouds.
 
+## Contents
+
+- [Usage](#usage)
+  - [Denser clouds for SLAM, and keeping every point](#denser-clouds-for-slam-and-keeping-every-point)
+  - [Widening a narrow field of view](#widening-a-narrow-field-of-view)
+- [Subscribed Topics](#subscribed-topics)
+- [Published Topics](#published-topics)
+- [Required Transforms](#required-transforms)
+- [Parameters](#parameters)
+- [Where the poses come from](#where-the-poses-come-from)
+- [Following odometry's keyframes](#following-odometrys-keyframes)
+- [Notes](#notes)
+- [Diagnostics](#diagnostics)
+
 ## Usage
 
 Assemble 10 sweeps, using TF for the poses:

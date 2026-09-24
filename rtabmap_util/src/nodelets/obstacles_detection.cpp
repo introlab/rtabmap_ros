@@ -25,6 +25,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include <rtabmap_conversions/PointCloudConversion.h>
 #include <rtabmap_util/obstacles_detection.hpp>
 
 #include <pcl/point_cloud.h>
@@ -159,7 +160,7 @@ void ObstaclesDetection::callback(const sensor_msgs::msg::PointCloud2::ConstShar
 			uFormat("data=%d row_step=%d height=%d", cloudMsg->data.size(), cloudMsg->row_step, cloudMsg->height).c_str());
 
 	pcl::PointCloud<pcl::PointXYZ>::Ptr inputCloud(new pcl::PointCloud<pcl::PointXYZ>);
-	pcl::fromROSMsg(*cloudMsg, *inputCloud);
+	rtabmap_conversions::fromPointCloud2Msg(*cloudMsg, *inputCloud);
 	if(inputCloud->isOrganized())
 	{
 		std::vector<int> indices;
@@ -273,7 +274,7 @@ void ObstaclesDetection::callback(const sensor_msgs::msg::PointCloud2::ConstShar
 	if(groundPub_->get_subscription_count())
 	{
 		sensor_msgs::msg::PointCloud2::UniquePtr rosCloud(new sensor_msgs::msg::PointCloud2);
-		pcl::toROSMsg(*groundCloud, *rosCloud);
+		rtabmap_conversions::toPointCloud2Msg(*groundCloud, *rosCloud);
 		rosCloud->header = cloudMsg->header;
 
 		//publish the message
@@ -283,7 +284,7 @@ void ObstaclesDetection::callback(const sensor_msgs::msg::PointCloud2::ConstShar
 	if(obstaclesPub_->get_subscription_count())
 	{
 		sensor_msgs::msg::PointCloud2::UniquePtr rosCloud(new sensor_msgs::msg::PointCloud2);
-		pcl::toROSMsg(*obstaclesCloud, *rosCloud);
+		rtabmap_conversions::toPointCloud2Msg(*obstaclesCloud, *rosCloud);
 		rosCloud->header = cloudMsg->header;
 
 		//publish the message
@@ -293,7 +294,7 @@ void ObstaclesDetection::callback(const sensor_msgs::msg::PointCloud2::ConstShar
 	if(projObstaclesPub_->get_subscription_count())
 	{
 		sensor_msgs::msg::PointCloud2::UniquePtr rosCloud(new sensor_msgs::msg::PointCloud2);
-		pcl::toROSMsg(*obstaclesCloudWithoutFlatSurfaces, *rosCloud);
+		rtabmap_conversions::toPointCloud2Msg(*obstaclesCloudWithoutFlatSurfaces, *rosCloud);
 		rosCloud->header.stamp = cloudMsg->header.stamp;
 		rosCloud->header.frame_id = frameId_;
 

@@ -24,6 +24,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include <rtabmap_conversions/PointCloudConversion.h>
 #include "rtabmap_util/MapsManager.h"
 
 #include <rtabmap/utilite/ULogger.h>
@@ -1045,7 +1046,7 @@ void MapsManager::publishMaps(
 			if(cloudGroundPub_->get_subscription_count())
 			{
 				sensor_msgs::msg::PointCloud2::UniquePtr cloudMsg(new sensor_msgs::msg::PointCloud2);
-				pcl::toROSMsg(*assembledGround_, *cloudMsg);
+				rtabmap_conversions::toPointCloud2Msg(*assembledGround_, *cloudMsg);
 				cloudMsg->header.stamp = stamp;
 				cloudMsg->header.frame_id = mapFrameId;
 				cloudGroundPub_->publish(std::move(cloudMsg));
@@ -1054,7 +1055,7 @@ void MapsManager::publishMaps(
 			if(cloudObstaclesPub_->get_subscription_count())
 			{
 				sensor_msgs::msg::PointCloud2::UniquePtr cloudMsg(new sensor_msgs::msg::PointCloud2);
-				pcl::toROSMsg(*assembledObstacles_, *cloudMsg);
+				rtabmap_conversions::toPointCloud2Msg(*assembledObstacles_, *cloudMsg);
 				cloudMsg->header.stamp = stamp;
 				cloudMsg->header.frame_id = mapFrameId;
 				cloudObstaclesPub_->publish(std::move(cloudMsg));
@@ -1064,7 +1065,7 @@ void MapsManager::publishMaps(
 			{
 				pcl::PointCloud<pcl::PointXYZRGB> cloud = *assembledObstacles_ + *assembledGround_;
 				sensor_msgs::msg::PointCloud2::UniquePtr cloudMsg(new sensor_msgs::msg::PointCloud2);
-				pcl::toROSMsg(cloud, *cloudMsg);
+				rtabmap_conversions::toPointCloud2Msg(cloud, *cloudMsg);
 				cloudMsg->header.stamp = stamp;
 				cloudMsg->header.frame_id = mapFrameId;
 
@@ -1172,7 +1173,7 @@ void MapsManager::publishMaps(
 				pcl::PointCloud<pcl::PointXYZRGB> cloudOccupiedSpace;
 				pcl::IndicesPtr indices = util3d::concatenate(obstacleIndices, groundIndices);
 				pcl::copyPointCloud(*cloud, *indices, cloudOccupiedSpace);
-				pcl::toROSMsg(cloudOccupiedSpace, msg);
+				rtabmap_conversions::toPointCloud2Msg(cloudOccupiedSpace, msg);
 				msg.header.frame_id = mapFrameId;
 				msg.header.stamp = stamp;
 				octoMapCloud_->publish(msg);
@@ -1182,7 +1183,7 @@ void MapsManager::publishMaps(
 			{
 				pcl::PointCloud<pcl::PointXYZRGB> cloudFrontier;
 				pcl::copyPointCloud(*cloud, *frontierIndices, cloudFrontier);
-				pcl::toROSMsg(cloudFrontier, msg);
+				rtabmap_conversions::toPointCloud2Msg(cloudFrontier, msg);
 				msg.header.frame_id = mapFrameId;
 				msg.header.stamp = stamp;
 				octoMapFrontierCloud_->publish(msg);
@@ -1192,7 +1193,7 @@ void MapsManager::publishMaps(
 			{
 				pcl::PointCloud<pcl::PointXYZRGB> cloudObstacles;
 				pcl::copyPointCloud(*cloud, *obstacleIndices, cloudObstacles);
-				pcl::toROSMsg(cloudObstacles, msg);
+				rtabmap_conversions::toPointCloud2Msg(cloudObstacles, msg);
 				msg.header.frame_id = mapFrameId;
 				msg.header.stamp = stamp;
 				octoMapObstacleCloud_->publish(msg);
@@ -1202,7 +1203,7 @@ void MapsManager::publishMaps(
 			{
 				pcl::PointCloud<pcl::PointXYZRGB> cloudGround;
 				pcl::copyPointCloud(*cloud, *groundIndices, cloudGround);
-				pcl::toROSMsg(cloudGround, msg);
+				rtabmap_conversions::toPointCloud2Msg(cloudGround, msg);
 				msg.header.frame_id = mapFrameId;
 				msg.header.stamp = stamp;
 				octoMapGroundCloud_->publish(msg);
@@ -1212,7 +1213,7 @@ void MapsManager::publishMaps(
 			{
 				pcl::PointCloud<pcl::PointXYZRGB> cloudEmptySpace;
 				pcl::copyPointCloud(*cloud, *emptyIndices, cloudEmptySpace);
-				pcl::toROSMsg(cloudEmptySpace, msg);
+				rtabmap_conversions::toPointCloud2Msg(cloudEmptySpace, msg);
 				msg.header.frame_id = mapFrameId;
 				msg.header.stamp = stamp;
 				octoMapEmptySpace_->publish(msg);

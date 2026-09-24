@@ -6,6 +6,15 @@ An `RGBDImage` can carry its images raw or compressed. This node converts betwee
 
 With both `compress` and `uncompress` left false the message is forwarded untouched, which makes the node a plain relay — useful to give a topic a second name, or to bridge two incompatible QoS profiles with `qos_sub` and `qos_pub`. See [Bridging QoS profiles](#bridging-qos-profiles).
 
+## Contents
+
+- [Usage](#usage)
+- [Subscribed Topics](#subscribed-topics)
+- [Published Topics](#published-topics)
+- [Parameters](#parameters)
+- [Bridging QoS profiles](#bridging-qos-profiles)
+- [Notes](#notes)
+
 ## Usage
 
 Compress before sending over a slow link:

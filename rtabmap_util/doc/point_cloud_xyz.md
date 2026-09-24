@@ -8,6 +8,15 @@ The node takes a depth image and its calibration and produces a [`sensor_msgs/ms
 
 See [point_cloud_xyzrgb](point_cloud_xyzrgb.md) for the colored equivalent.
 
+## Contents
+
+- [Usage](#usage)
+- [Subscribed Topics](#subscribed-topics)
+- [Published Topics](#published-topics)
+- [Parameters](#parameters)
+- [Organized output](#organized-output)
+- [Notes](#notes)
+
 ## Usage
 
 ```bash
