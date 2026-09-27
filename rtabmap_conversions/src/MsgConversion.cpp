@@ -1305,7 +1305,8 @@ rtabmap::SensorData sensorDataFromROS(const rtabmap_msgs::msg::SensorData & msg)
 		pcl::PCLPointCloud2 cloud;
 		pcl_conversions::toPCL(msg.laser_scan, cloud);
 		s.setLaserScan(rtabmap::LaserScan(
-			rtabmap::util3d::laserScanFromPointCloud(cloud),
+			rtabmap::util3d::laserScanFromPointCloud(cloud, true,
+					rtabmap::LaserScan::isScan2d((rtabmap::LaserScan::Format)msg.laser_scan_format)),
 			msg.laser_scan_max_pts,
 			msg.laser_scan_max_range,
 			transformFromGeometryMsg(msg.laser_scan_local_transform)),
@@ -2714,13 +2715,41 @@ bool convertScanMsg(
 	}
 
 	// make sure the frame of the laser is updated during the whole scan time
-	rtabmap::Transform tmpT = getMovingTransform(
-			scan2dMsg.header.frame_id,
-			odomFrameId.empty()?frameId:odomFrameId,
-			rclcpp::Time(scan2dMsg.header.stamp.sec, scan2dMsg.header.stamp.nanosec),
-			rclcpp::Time(scan2dMsg.header.stamp.sec, scan2dMsg.header.stamp.nanosec) + rclcpp::Duration::from_seconds((scan2dMsg.ranges.empty()?0:scan2dMsg.ranges.size()-1)*scan2dMsg.time_increment),
-			tfBuffer,
-			waitForTransform);
+	const rclcpp::Time scanStart(scan2dMsg.header.stamp);
+	const rclcpp::Time scanEnd = scanStart + rclcpp::Duration::from_seconds((scan2dMsg.ranges.empty()?0:scan2dMsg.ranges.size()-1)*scan2dMsg.time_increment);
+	std::string fixedFrameId = odomFrameId.empty()?frameId:odomFrameId;
+	rtabmap::Transform tmpT;
+	if(fixedFrameId == frameId || tfBuffer._frameExists(fixedFrameId)) // don't wait for a frame never published
+	{
+		tmpT = getMovingTransform(
+				scan2dMsg.header.frame_id,
+				fixedFrameId,
+				scanStart,
+				scanEnd,
+				tfBuffer,
+				waitForTransform);
+	}
+	if(tmpT.isNull() && fixedFrameId != frameId)
+	{
+		// Odometry not in TF: use the scan as it is rather than dropping it.
+		static bool warned = false;
+		if(!warned)
+		{
+			UWARN("Could not get laser frame \"%s\" relative to odometry frame \"%s\" over the scan "
+				  "(%fs to %fs). Laser scans are used without deskewing nor synchronization with "
+				  "odometry. Publish odometry on TF to have them deskewed. This message is only shown once.",
+				  scan2dMsg.header.frame_id.c_str(), odomFrameId.c_str(), scanStart.seconds(), scanEnd.seconds());
+			warned = true;
+		}
+		fixedFrameId = frameId;
+		tmpT = getMovingTransform(
+				scan2dMsg.header.frame_id,
+				fixedFrameId,
+				scanStart,
+				scanEnd,
+				tfBuffer,
+				waitForTransform);
+	}
 	if(tmpT.isNull())
 	{
 		return false;
@@ -2740,12 +2769,12 @@ bool convertScanMsg(
 	//transform in frameId_ frame
 	sensor_msgs::msg::PointCloud2 scanOut;
 	laser_geometry::LaserProjection projection;
-	projection.transformLaserScanToPointCloud(odomFrameId.empty()?frameId:odomFrameId, scan2dMsg, scanOut, tfBuffer);
+	projection.transformLaserScanToPointCloud(fixedFrameId, scan2dMsg, scanOut, tfBuffer);
 
 	//transform back in laser frame
 	rtabmap::Transform laserToOdom = getTransform(
 			scan2dMsg.header.frame_id,
-			odomFrameId.empty()?frameId:odomFrameId,
+			fixedFrameId,
 			scan2dMsg.header.stamp,
 			tfBuffer,
 			waitForTransform);
@@ -2755,7 +2784,7 @@ bool convertScanMsg(
 	}
 
 	// sync with odometry stamp
-	if(!odomFrameId.empty() && odomStamp != scan2dMsg.header.stamp)
+	if(fixedFrameId != frameId && odomStamp != scan2dMsg.header.stamp)
 	{
 		rtabmap::Transform sensorT = getMovingTransform(
 				frameId,

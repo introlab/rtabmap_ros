@@ -139,7 +139,7 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 		tfThreadRunning_(false),
 		interOdomSync_(0),
 		stereoToDepth_(false),
-		odomSensorSync_(false),
+		odomSensorSync_(true),
 		rate_(Parameters::defaultRtabmapDetectionRate()),
 		createIntermediateNodes_(Parameters::defaultRtabmapCreateIntermediateNodes()),
 		mappingMaxNodes_(Parameters::defaultGridGlobalMaxNodes()),
@@ -232,6 +232,8 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 
 	stereoToDepth_ = this->declare_parameter("stereo_to_depth", stereoToDepth_);
 	odomSensorSync_ = this->declare_parameter("odom_sensor_sync", odomSensorSync_);
+	bool interOdomInfo = false;
+	interOdomInfo = this->declare_parameter("subscribe_inter_odom_info", interOdomInfo);
 
 	RCLCPP_INFO(this->get_logger(), "rtabmap: frame_id      = \"%s\"", frameId_.c_str());
 	RCLCPP_INFO(this->get_logger(), "rtabmap: odom_frame_id = \"%s\"", odomFrameId_.c_str());
@@ -418,11 +420,12 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 		iter!=Parameters::getRemovedParameters().end();
 		++iter)
 	{
+		// Old names are never declared, so they can only be found among the overrides.
 		std::string paramValue;
-		rclcpp::Parameter parameter;
-		if(get_parameter(iter->first, parameter))
+		std::map<std::string, rclcpp::ParameterValue>::const_iterator oter = overrides.find(iter->first);
+		if(oter != overrides.end() && oter->second.get_type() == rclcpp::ParameterType::PARAMETER_STRING)
 		{
-			paramValue = parameter.as_string();
+			paramValue = oter->second.get<std::string>();
 		}
 		if(!paramValue.empty())
 		{
@@ -563,8 +566,7 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 			RCLCPP_INFO(this->get_logger(), "Create intermediate nodes");
 			if(rate_ == 0.0f)
 			{
-				bool interOdomInfo = false;
-				if(get_parameter("subscribe_inter_odom_info", interOdomInfo))
+				if(interOdomInfo)
 				{
 					RCLCPP_INFO(this->get_logger(), "Subscribe to inter odom + info messages");
 					interOdomSync_ = new message_filters::Synchronizer<MyExactInterOdomSyncPolicy>(MyExactInterOdomSyncPolicy(100), interOdomSyncSub_, interOdomInfoSyncSub_);
@@ -808,13 +810,14 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 
 			if(modifiedParameters.find(Parameters::kRGBDProximityPathMaxNeighbors()) == modifiedParameters.end())
 			{
-				if(this->isSubscribedToScan2d())
+				if(this->isSubscribedToScan2d() || (this->isSubscribedToScan3d() && scanCloudIs2d_))
 				{
-					RCLCPP_WARN(this->get_logger(), "Setting \"%s\" parameter to 10 (default 0) as \"subscribe_scan\" is "
+					RCLCPP_WARN(this->get_logger(), "Setting \"%s\" parameter to 10 (default 0) as \"%s\" is "
 							"true and \"%s\" uses ICP. Proximity detection by space will be also done by merging close "
 							"scans. To disable, set \"%s\" to 0. To suppress this warning, "
 							"add <param name=\"%s\" type=\"string\" value=\"10\"/>",
 							Parameters::kRGBDProximityPathMaxNeighbors().c_str(),
+							this->isSubscribedToScan2d()?"subscribe_scan":"scan_cloud_is_2d",
 							Parameters::kRegStrategy().c_str(),
 							Parameters::kRGBDProximityPathMaxNeighbors().c_str(),
 							Parameters::kRGBDProximityPathMaxNeighbors().c_str());
@@ -1991,6 +1994,22 @@ void CoreWrapper::commonSensorDataCallback(
 		syncData_.data = rtabmap_conversions::sensorDataFromROS(*sensorDataMsg);
 		syncData_.data.setId(lastPoseIntermediate_?-1:0);
 
+		{
+			UScopeMutex lock(userDataMutex_);
+			if(!userData_.empty())
+			{
+				if(!syncData_.data.userDataRaw().empty() || !syncData_.data.userDataCompressed().empty())
+				{
+					RCLCPP_WARN(this->get_logger(), "Sensor data received already contains user data. Async user data dropped!");
+				}
+				else
+				{
+					syncData_.data.setUserData(userData_);
+				}
+				userData_ = cv::Mat();
+			}
+		}
+
 		OdometryInfo odomInfo;
 		if(odomInfoMsg.get())
 		{
@@ -2059,7 +2078,7 @@ void CoreWrapper::process(
 		// Add intermediate nodes?
 		for(std::list<std::pair<nav_msgs::msg::Odometry, rtabmap_msgs::msg::OdomInfo> >::iterator iter=interOdoms_.begin(); iter!=interOdoms_.end();)
 		{
-			if(rclcpp::Time(iter->first.header.stamp.sec, iter->first.header.stamp.nanosec) < stamp)
+			if(rclcpp::Time(iter->first.header.stamp) < stamp)
 			{
 				Transform interOdom;
 				if(!rtabmap_.getLocalOptimizedPoses().empty())
@@ -2208,8 +2227,8 @@ void CoreWrapper::process(
 				Transform correction = rtabmap_conversions::getMovingTransform(
 						frameId_,
 						odomFrameId,
-						stamp,
 						rclcpp::Time(globalPoseMsg.header.stamp.sec, globalPoseMsg.header.stamp.nanosec),
+						stamp,
 						*tfBuffer_,
 						waitForTransform_);
 				if(!correction.isNull())
