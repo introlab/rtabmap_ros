@@ -99,12 +99,12 @@ A consequence worth knowing: an odometry that returns to *exactly* the identity 
 
 `Mem/IncrementalMemory` chooses between the two:
 
-- **`true`, mapping (SLAM)**, the default. Updates become nodes and the map grows.
-- **`false`, localization.** The map is loaded and not extended: each update is compared against it, localizes the robot if it matches, and is then forgotten rather than added to the database.
+- **`true`, mapping (SLAM)**, the default. Updates become nodes and the map grows. This is the mode to create a map of the environment.
+- **`false`, localization.** The map is loaded and not extended: each update is compared against it, localizes the robot if it matches, and is not added to the database. This is the mode to localize in a map already recorded, without increasing CPU and RAM usage, since the map is kept fixed.
 
 `set_mode_localization` and `set_mode_mapping` switch at runtime. Going back to mapping starts a new session, since nothing links where the robot is now to where it left the map — until a loop closure does.
 
-In localization mode the robot is placed on the map by the first loop closure. Before that, the **`initial_pose`** parameter (`"x y z roll pitch yaw"`, read at startup) or a message on the **`initialpose`** topic — what RViz's *2D Pose Estimate* publishes — says where to start, and odometry carries the pose from there. Without them, the robot is assumed to restart where it was when the node last shut down, or at the map's origin with `RGBD/StartAtOrigin` set to `true`. All three are ignored in mapping mode, where the map starts wherever the robot is.
+See [Localization](doc/rtabmap.md#localization) for where the robot starts on the map in localization mode.
 
 ## License
 

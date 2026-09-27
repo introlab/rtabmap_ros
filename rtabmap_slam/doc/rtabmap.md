@@ -2,9 +2,12 @@
 
 Graph SLAM: each update that moved far enough becomes a node, linked to the previous one by odometry and to earlier ones by the loop closures found, and the graph is optimized every time a loop closure is added.
 
-Loop closures are found two ways. **Appearance**: the node's visual words are compared against every node in working memory with a bag-of-words, which finds a place again however far the odometry has drifted. **Proximity**: the node is registered against the nodes the graph says are nearby, which is what a lidar-only setup relies on. Working memory can be bounded, by update time (`Rtabmap/TimeThr`, in ms) or by node count (`Rtabmap/MemoryThr`): older nodes are then moved to the database and brought back when the robot returns near them, so the update time stays flat on large maps. Both are `0` by default, which leaves working memory unbounded: every node stays in it, and the update time grows with the map.
+Loop closures are found two ways:
 
-The shared conventions — the database, the update rate, odometry covariance, mapping versus localization — are in the [package README](../README.md#conventions). This page covers the inputs, the outputs and the features built on them.
+- **Appearance-based**: the node's visual words are compared against every node in working memory with an incremental bag-of-words (BoW) approach, which is independent of the odometry pose, and so of its drift.
+- **Proximity-based**: the node is registered against the nodes the graph says are nearby, based on the previous localization and the current odometry pose. This is what a lidar-only setup relies on.
+
+**Memory management**: working memory can be bounded, by update time (`Rtabmap/TimeThr`, in ms) or by node count (`Rtabmap/MemoryThr`): older nodes are then moved to the database and brought back when the robot returns near them, so the update time stays flat on large maps. Both are `0` by default, which leaves working memory unbounded: every node stays in it, and the update time grows with the map. Before enabling memory management, we strongly recommend reading [Long-Term Online Multi-Session Graph-Based SPLAM with Memory Management](https://arxiv.org/abs/2301.00050), which explains how it works and what it implies for mapping, localization and planning.
 
 ## Contents
 
@@ -479,8 +482,8 @@ The ones that set how often a node is added, explained in [Update rate and dropp
 | `tf_delay` | `double` | `0.05` | Period of that publication, in seconds (20 Hz). `0` disables it. |
 | `tf_tolerance` | `double` | `0.1` | How far in the future the transform is stamped, in seconds, so that lookups at the latest sensor stamp do not have to wait for it. |
 | `wait_for_transform` | `double` | `0.2` | Seconds to wait for a TF lookup before giving up on it. |
-| `ground_truth_frame_id` | `string` | `""` | A frame carrying a ground truth pose, looked up and stored with each node, for evaluating a trajectory afterwards. |
-| `ground_truth_base_frame_id` | `string` | value of `frame_id` | The robot frame in the ground truth tree. |
+| `ground_truth_frame_id` | `string` | `""` | The fixed frame of a ground truth system, for example `world` published by an external localization system like Vicon or OptiTrack. `ground_truth_frame_id` → `ground_truth_base_frame_id` is looked up and stored with each node, for evaluating a trajectory afterwards. |
+| `ground_truth_base_frame_id` | `string` | value of `frame_id` | The robot frame in the ground truth tree, for example `base_link_gt`. To avoid breaking the TF tree, it represents the same frame as `frame_id`, but in a parallel TF tree, so that the robot frame does not get two parents. |
 
 **This node publishes exactly one transform: `map` → `odom`.** It is the correction that puts the odometry frame where the optimized graph says it belongs — the identity until a loop closure moves it. Odometry keeps publishing `odom` → `base_link`, and the sensors must be attached to `base_link` in TF, as in the [TF tree](../README.md#frames-and-tf).
 
