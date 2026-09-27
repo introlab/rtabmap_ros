@@ -291,7 +291,14 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 
 	infoPub_ = this->create_publisher<rtabmap_msgs::msg::Info>("info", 1);
 	mapDataPub_ = this->create_publisher<rtabmap_msgs::msg::MapData>("mapData", 1);
-	mapGraphPub_ = this->create_publisher<rtabmap_msgs::msg::MapGraph>("mapGraph", rclcpp::QoS(1).reliable().durability(mapsManager_.isLatching()?RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL:RMW_QOS_POLICY_DURABILITY_VOLATILE));
+	// Intra-process communication doesn't support transient local durability: when latching,
+	// disable it on this publisher, otherwise keep the node's setting.
+	rclcpp::PublisherOptions latchedPubOptions;
+	if(mapsManager_.isLatching())
+	{
+		latchedPubOptions.use_intra_process_comm = rclcpp::IntraProcessSetting::Disable;
+	}
+	mapGraphPub_ = this->create_publisher<rtabmap_msgs::msg::MapGraph>("mapGraph", rclcpp::QoS(1).reliable().durability(mapsManager_.isLatching()?RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL:RMW_QOS_POLICY_DURABILITY_VOLATILE), latchedPubOptions);
 	odomCachePub_ = this->create_publisher<rtabmap_msgs::msg::MapGraph>("mapOdomCache", 1);
 	landmarksPub_ = this->create_publisher<geometry_msgs::msg::PoseArray>("landmarks", 1);
 	labelsPub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>("labels", 1);

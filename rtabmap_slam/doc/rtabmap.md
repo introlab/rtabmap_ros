@@ -84,6 +84,8 @@ ComposableNode(
 
 The executable runs the node on a **multi-threaded** executor, and the node relies on it. SLAM runs in its own callback group, so the synchronized inputs keep arriving while an update is being processed; the asynchronous inputs (GPS, IMU, landmarks, user data...) have groups of their own, so they are buffered rather than blocked. Loaded into a single-threaded component container, it still works, but everything is serialized behind the SLAM update.
 
+In a component container with intra-process communication enabled (`use_intra_process_comms`), the latched publishers (`mapGraph` and the [`MapsManager`](../../rtabmap_util/README.md#mapsmanager) maps, with `latch` on, the default) automatically opt out of it, since intra-process communication does not support transient local durability. The other publishers keep the container's setting, and with `latch` off, all of them do.
+
 [`rtabmap_launch`](https://github.com/introlab/rtabmap_ros/tree/ros2/rtabmap_launch) wraps all of this, together with odometry and `rtabmap_viz`, and is where most setups should start.
 
 ## Choosing the inputs

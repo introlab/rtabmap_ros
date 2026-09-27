@@ -34,6 +34,8 @@ ComposableNode(
                  'cloud_output_voxelized': True}])
 ```
 
+In a component container with intra-process communication enabled (`use_intra_process_comms`), the map publishers automatically opt out of it when `latch` is on (the default), since intra-process communication does not support transient local durability. With `latch` off, they keep the container's setting. See [`MapsManager`](../README.md#mapsmanager).
+
 The graph comes from the SLAM node; the maps are built here, off its critical path. Nothing forces the split across machines — a second process on the robot works too — but only `mapData` crosses the boundary, so putting the assembling on a workstation keeps the heavy topics off the link as well as off the robot's CPU:
 
 ```mermaid

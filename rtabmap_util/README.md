@@ -58,6 +58,8 @@ The package also installs a small C++ library, whose API is documented in the [C
 
 **Published topics.** Everything is published only when subscribed, and -- by default -- **latched**, so a subscriber joining late immediately receives the current map.
 
+In a component container with intra-process communication enabled (`use_intra_process_comms`), these publishers automatically opt out of it when `latch` is on, since intra-process communication does not support transient local durability. With `latch` off, they keep the container's setting.
+
 | Topic | Type | Description |
 |---|---|---|
 | `cloud_map` | [`sensor_msgs/msg/PointCloud2`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/PointCloud2.html) | Ground and obstacles together. |

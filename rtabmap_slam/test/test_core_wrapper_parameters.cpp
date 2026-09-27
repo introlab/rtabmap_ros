@@ -276,6 +276,33 @@ TEST_F(CoreWrapperParametersTest, migrates_a_renamed_parameter)
 	EXPECT_EQ("2.5", param(Parameters::kOptimizerPixelVariance()));
 }
 
+/**
+ * Loaded in a component container with intra-process communication on, the node must
+ * still start. Intra-process communication doesn't support transient local durability,
+ * so the latched publishers (`latch`, on by default) opt out of it, while the others keep
+ * the container's setting.
+ */
+TEST_F(CoreWrapperParametersTest, starts_with_intra_process_comms_whether_latching_or_not)
+{
+	for(bool latch : {true, false})
+	{
+		SCOPED_TRACE(latch ? "latch" : "no latch");
+		rclcpp::NodeOptions options;
+		options.use_intra_process_comms(true);
+		options.parameter_overrides(defaultParameters({rclcpp::Parameter("latch", latch)}));
+		ASSERT_NO_THROW(node_ = addNode(std::make_shared<rtabmap_slam::CoreWrapper>(options)));
+
+		for(const std::string & topic : {std::string("mapGraph"), std::string("map")})
+		{
+			auto infos = node_->get_publishers_info_by_topic(node_->get_node_topics_interface()->resolve_topic_name(topic));
+			ASSERT_EQ(1u, infos.size()) << topic;
+			EXPECT_EQ(latch ? rclcpp::DurabilityPolicy::TransientLocal : rclcpp::DurabilityPolicy::Volatile,
+					infos[0].qos_profile().durability()) << topic;
+		}
+		destroyNode();
+	}
+}
+
 }  // namespace
 
 }  // namespace rtabmap_slam_test
