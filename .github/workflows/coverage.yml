@@ -124,12 +124,14 @@ jobs:
           # Baseline from the .gcno files. Without it a source file that no test
           # ever loaded is missing from the report altogether rather than
           # counted as 0%, which quietly inflates the result.
-          colcon lcov-result --initial --packages-select $PKGS
+          # Line coverage only, no branch coverage: see the comment in .github/lcovrc.
+          LCOVRC=src/rtabmap_ros/.github/lcovrc
+          colcon lcov-result --initial --packages-select $PKGS --lcov-config-file $LCOVRC
           # The verb ends by running genhtml and returns *its* exit code, so a
           # cosmetic HTML hiccup fails the whole job even though the report was
           # written. The deliverable is total_coverage.info; the HTML is a
           # convenience. Tolerate the former, then gate on the latter.
-          colcon lcov-result --packages-select $PKGS --verbose \
+          colcon lcov-result --packages-select $PKGS --lcov-config-file $LCOVRC --verbose \
             --filter '*/test/*' '/usr/*' '/opt/*' \
               '*CompilerId*' '*/CMakeFiles/*' || true
           test -s lcov/total_coverage.info
