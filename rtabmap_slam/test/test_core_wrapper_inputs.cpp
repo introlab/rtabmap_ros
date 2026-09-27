@@ -280,6 +280,68 @@ TEST_F(CoreWrapperInputsTest, drops_a_scan_without_its_tf)
 }
 
 /**
+ * A scan that cannot be converted is dropped, but must not block the next ones: once the
+ * lidar's TF is there, the following scans are mapped. The conversion failure used to
+ * return with the synchronization mutex still locked, and every later update was then
+ * silently skipped. The node runs on a multi-threaded executor, as in the `rtabmap`
+ * executable: on a single thread, the recursive mutex would just be taken again.
+ */
+TEST_F(CoreWrapperInputsTest, maps_the_next_scans_after_one_without_its_tf)
+{
+	makeMultiThreadedNode({rclcpp::Parameter("subscribe_scan", true),
+			  rclcpp::Parameter("wait_for_transform", 0.05)});
+	std::shared_ptr<Collector<rtabmap_msgs::msg::Info>> info = collectInfo();
+	rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom = odomPublisher();
+	rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr scan =
+			helper()->create_publisher<sensor_msgs::msg::LaserScan>("scan", 10);
+	ASSERT_TRUE(waitForSubscriber(scan));
+
+	sendOdom(odom, 1.0, 0.0);
+	scan->publish(makeRoomScan("laser", 1.0, 0.0));
+	spinFor(std::chrono::milliseconds(500));
+	ASSERT_TRUE(info->empty()) << "the scan without TF should have been dropped";
+
+	publishStaticTf("laser");
+	for(int i=1; i<=3; ++i)
+	{
+		const size_t before = info->size();
+		sendOdom(odom, 1.0 + i, 0.5*i);
+		scan->publish(makeRoomScan("laser", 1.0 + i, 0.5*i));
+		ASSERT_TRUE(spinUntil([&]() { return info->size() > before; }))
+				<< "scan " << i << " was not processed after the one without TF";
+	}
+	EXPECT_EQ(3u, getGraph().graph.poses_id.size());
+}
+
+/// The same with a 3D lidar, whose conversion fails the same way without its TF.
+TEST_F(CoreWrapperInputsTest, maps_the_next_clouds_after_one_without_its_tf)
+{
+	makeMultiThreadedNode({rclcpp::Parameter("subscribe_scan_cloud", true),
+			  rclcpp::Parameter("wait_for_transform", 0.05)});
+	std::shared_ptr<Collector<rtabmap_msgs::msg::Info>> info = collectInfo();
+	rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom = odomPublisher();
+	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr cloud =
+			helper()->create_publisher<sensor_msgs::msg::PointCloud2>("scan_cloud", 10);
+	ASSERT_TRUE(waitForSubscriber(cloud));
+
+	sendOdom(odom, 1.0, 0.0);
+	cloud->publish(makeCloud("lidar", 1.0, roomScan3d(0.0, 0.0, 0.5)));
+	spinFor(std::chrono::milliseconds(500));
+	ASSERT_TRUE(info->empty()) << "the cloud without TF should have been dropped";
+
+	publishStaticTf("lidar", 0.0, 0.0, 0.5);
+	for(int i=1; i<=3; ++i)
+	{
+		const size_t before = info->size();
+		sendOdom(odom, 1.0 + i, 0.5*i);
+		cloud->publish(makeCloud("lidar", 1.0 + i, roomScan3d(0.5*i, 0.0, 0.5)));
+		ASSERT_TRUE(spinUntil([&]() { return info->size() > before; }))
+				<< "cloud " << i << " was not processed after the one without TF";
+	}
+	EXPECT_EQ(3u, getGraph().graph.poses_id.size());
+}
+
+/**
  * With odom_frame_id set, odometry is read from TF at each scan's stamp instead of from a
  * topic, and subscribe_odom is ignored.
  */

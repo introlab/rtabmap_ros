@@ -32,6 +32,7 @@ All rights reserved. (BSD-3-Clause, see the repository root.)
 #include <cstdlib>
 #include <memory>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace rtabmap_slam_test {
@@ -65,6 +66,7 @@ protected:
 	{
 		// Removes the node from the executor first: the destructor then runs with nothing
 		// left to call back into it.
+		stopNodeThreads();
 		NodeTest::TearDown();
 		node_.reset();
 		staticTf_.reset();
@@ -122,6 +124,29 @@ protected:
 	}
 
 	/**
+	 * @brief Builds the node under test like makeNode(), but spins it on a multi-threaded
+	 *        executor of its own, in the background, as the `rtabmap` executable does.
+	 *
+	 * The node's mutexes are recursive: on the shared single-threaded executor, a mutex a
+	 * callback leaves locked is simply taken again by the next callback, on the same thread,
+	 * and nothing shows. With callbacks on several threads, the next one is blocked or skips
+	 * its update, as in the real node. The helper node keeps spinning on the shared executor.
+	 */
+	std::shared_ptr<rtabmap_slam::CoreWrapper> makeMultiThreadedNode(
+			const std::vector<rclcpp::Parameter> & params = {})
+	{
+		rclcpp::NodeOptions options;
+		options.parameter_overrides(defaultParameters(params));
+		node_ = std::make_shared<rtabmap_slam::CoreWrapper>(options);
+		nodeExecutor_ = std::make_shared<rclcpp::executors::MultiThreadedExecutor>(
+				rclcpp::ExecutorOptions(), 4);
+		nodeExecutor_->add_node(node_);
+		nodeThread_ = std::thread([this]() { nodeExecutor_->spin(); });
+		spinFor(std::chrono::milliseconds(50));   // see NodeTest::addNode()
+		return node_;
+	}
+
+	/**
 	 * @brief Destroys the node under test, which is what saves its database.
 	 *
 	 * The executor and the helper node are rebuilt along with it, so publishers and
@@ -131,6 +156,7 @@ protected:
 	 */
 	void destroyNode()
 	{
+		stopNodeThreads();
 		staticTf_.reset();
 		tfPub_.reset();
 		NodeTest::TearDown();
@@ -356,6 +382,35 @@ protected:
 	std::shared_ptr<rtabmap_slam::CoreWrapper> node_;
 
 private:
+	/**
+	 * Stops the executor of makeMultiThreadedNode(), if any. After a failure, a callback may
+	 * be blocked for good on a leaked lock, and joining would hang the binary instead of
+	 * reporting it: the thread and the node are then abandoned, to die with the process.
+	 */
+	void stopNodeThreads()
+	{
+		if(!nodeExecutor_)
+		{
+			return;
+		}
+		nodeExecutor_->cancel();
+		if(HasFailure())
+		{
+			nodeThread_.detach();
+			new std::shared_ptr<rtabmap_slam::CoreWrapper>(node_);   // never destroyed
+			new std::shared_ptr<rclcpp::executors::MultiThreadedExecutor>(nodeExecutor_);
+		}
+		else
+		{
+			nodeThread_.join();
+			nodeExecutor_->remove_node(node_);
+		}
+		nodeExecutor_.reset();
+	}
+
+	rclcpp::executors::MultiThreadedExecutor::SharedPtr nodeExecutor_;
+	std::thread nodeThread_;
+
 	static void removeDir(const std::string & dir)
 	{
 		UDirectory d(dir);
