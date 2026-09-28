@@ -8,6 +8,7 @@ Every node is a [composable node](https://docs.ros.org/en/jazzy/Tutorials/Interm
 
 - [Nodes](#nodes)
 - [Library](#library)
+  - [MapsManager](#mapsmanager)
 - [Conventions](#conventions)
 
 ## Nodes
@@ -51,7 +52,58 @@ One page per node.
 
 The package also installs a small C++ library, whose API is documented in the [C++ API reference](https://docs.ros.org/en/jazzy/p/rtabmap_util/generated/index.html) generated from the headers.
 
-`MapsManager` is the piece worth knowing about: it turns a pose graph plus per-node occupancy grids into the assembled clouds, occupancy grid, octomap and elevation map, and publishes them. Both [map_assembler](doc/map_assembler.md) and `rtabmap_slam`'s `rtabmap` node use it, which is why their map outputs and `Grid/*` parameters behave identically.
+`MapsManager` is the piece worth knowing about: it turns a pose graph plus per-node occupancy grids into the assembled clouds, occupancy grid, octomap and elevation map, and publishes them. Both [map_assembler](doc/map_assembler.md) and [`rtabmap_slam`](../rtabmap_slam/README.md)'s `rtabmap` node use it, which is why their map outputs and `Grid/*` parameters behave identically. It is described below.
+
+### MapsManager
+
+**Published topics.** Everything is published only when subscribed, and -- by default -- **latched**, so a subscriber joining late immediately receives the current map.
+
+In a component container with intra-process communication enabled (`use_intra_process_comms`), these publishers automatically opt out of it when `latch` is on, since intra-process communication does not support transient local durability. With `latch` off, they keep the container's setting.
+
+| Topic | Type | Description |
+|---|---|---|
+| `cloud_map` | [`sensor_msgs/msg/PointCloud2`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/PointCloud2.html) | Ground and obstacles together. |
+| `cloud_ground` | [`sensor_msgs/msg/PointCloud2`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/PointCloud2.html) | Ground only, colored green. |
+| `cloud_obstacles` | [`sensor_msgs/msg/PointCloud2`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/PointCloud2.html) | Obstacles only, colored red. |
+| `map` | [`nav_msgs/msg/OccupancyGrid`](https://docs.ros.org/en/jazzy/p/nav_msgs/msg/OccupancyGrid.html) | The 2D occupancy grid, the one navigation wants. |
+| `grid_prob_map` | [`nav_msgs/msg/OccupancyGrid`](https://docs.ros.org/en/jazzy/p/nav_msgs/msg/OccupancyGrid.html) | The same grid as occupancy probabilities rather than free/occupied/unknown. |
+| `octomap_occupied_space`, `octomap_obstacles`, `octomap_ground`, `octomap_empty_space`, `octomap_global_frontier_space` | [`sensor_msgs/msg/PointCloud2`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/PointCloud2.html) | Octomap contents, one cloud per category. Requires RTAB-Map built with OctoMap. |
+| `octomap_grid` | [`nav_msgs/msg/OccupancyGrid`](https://docs.ros.org/en/jazzy/p/nav_msgs/msg/OccupancyGrid.html) | The octomap projected to 2D. |
+| `octomap_binary`, `octomap_full` | [`octomap_msgs/msg/Octomap`](https://docs.ros.org/en/jazzy/p/octomap_msgs/msg/Octomap.html) | The tree itself, for `octovis` or other octomap consumers. Serialized as a **`ColorOcTree`**, see [Octomap tree type](#octomap-tree-type). |
+| `elevation_map` | [`grid_map_msgs/msg/GridMap`](https://github.com/ANYbotics/grid_map/blob/master/grid_map_msgs/msg/GridMap.msg) | Elevation map. Requires RTAB-Map built with `grid_map`. |
+
+**Parameters.**
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `latch` | `bool` | `true` | Publish with transient-local durability so late subscribers get the current map. |
+| `map_filter_radius` | `double` | `0.0` | Skip nodes closer together than this, in meters. A cheap way to thin a dense graph. `0` disables. |
+| `map_filter_angle` | `double` | `30.0` | With `map_filter_radius`, nodes are only merged if they also differ by less than this angle, in degrees. |
+| `map_always_update` | `bool` | `false` | Also assemble the latest sensor data, not yet a node, so the maps update even when the robot stands still and no node is added. |
+| `map_empty_ray_tracing` | `bool` | `true` | For that latest data, fill the 2D scan's rays with empty cells (`Grid/Scan2dUnknownSpaceFilled`). |
+| `map_cleanup` | `bool` | `true` | Free the cached clouds when nobody is subscribed. |
+| `cloud_output_voxelized` | `bool` | `true` | Voxelize the assembled clouds at `Grid/CellSize`. |
+| `cloud_subtract_filtering` | `bool` | `false` | Drop points that duplicate ones already in the map. Slower, smaller output. |
+| `cloud_subtract_filtering_min_neighbors` | `int` | `2` | Neighbors needed for a point to count as a duplicate. |
+| `octomap_tree_depth` | `int` | `16` | Depth the octomap clouds are generated at. Lower means coarser and faster. Maximum 16. |
+
+`map_always_update` and `map_empty_ray_tracing` only apply to the latest sensor data, not yet committed as a node, which only the `rtabmap` node has: they do nothing in `map_assembler`.
+
+Every RTAB-Map **`Grid/*`**, **`GridGlobal/*`**, **`StereoBM/*`** and **`StereoSGBM/*`** parameter is also exposed, all documented in RTAB-Map's [parameter reference](https://introlab.github.io/rtabmap/api/latest/parameters.html). The split between the first two is worth knowing: **`Grid/*`** decides how each node's local grid is built from its sensor data -- the same segmentation [obstacles_detection](doc/obstacles_detection.md#parameters) does, and the parameters listed there apply here too -- while **`GridGlobal/*`** decides how those local grids are merged into the global map, so it covers the map's minimum size, its occupancy threshold, and how far the graph must move before the whole map is rebuilt.
+
+#### Octomap tree type
+
+RTAB-Map keeps a color per voxel, so the tree it publishes on `octomap_binary` and `octomap_full` reports its `id` as **`ColorOcTree`**, not the plain `OcTree` many examples assume.
+
+That is deliberate and interoperable: `octomap_msgs::binaryMsgToMap()` and `fullMsgToMap()` branch on that `id` and hand you back an `octomap::ColorOcTree`, and `octovis` opens it without complaint. What does break is code that assumes the other branch:
+
+```cpp
+octomap::AbstractOcTree * tree = octomap_msgs::binaryMsgToMap(msg);
+octomap::OcTree * octree = dynamic_cast<octomap::OcTree *>(tree);   // null
+octomap::ColorOcTree * octree = dynamic_cast<octomap::ColorOcTree *>(tree);   // ok
+```
+
+`ColorOcTree` does not derive from `OcTree` -- both derive from `OccupancyOcTreeBase` -- so cast to `ColorOcTree`, or to `octomap::OccupancyOcTreeBase<...>` if you only need occupancy and want to accept either.
 
 ## Conventions
 
