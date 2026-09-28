@@ -508,14 +508,14 @@ void OdometryROS::callbackIMU(const sensor_msgs::msg::Imu::SharedPtr msg)
 				imus_.erase(imus_.begin());
 			}
 		}
-		if(dataMutex_.lockTry() == 0)
+		UScopeMutex dataLock(dataMutex_, false);
+		if(dataLock.lockTry() == 0)
 		{
 			if(bufferedDataToProcess_ && rtabmap_conversions::timestampFromROS(dataHeaderToProcess_.stamp) <= stamp)
 			{
 				bufferedDataToProcess_ = false;
 				dataReady_.release();
 			}
-			dataMutex_.unlock();
 		}
 	}
 }
@@ -524,7 +524,8 @@ void OdometryROS::processData(SensorData & data, const std_msgs::msg::Header & h
 {
 	//RCLCPP_WARN(get_logger(), "Received image: %f delay=%f", data.stamp(), (now() - header.stamp).seconds());
 	double clockNow = rtabmap_conversions::timestampFromROS(now());
-	if(dataMutex_.lockTry() == 0)
+	UScopeMutex dataLock(dataMutex_, false);
+	if(dataLock.lockTry() == 0)
 	{
 		if(bufferedDataToProcess_) {
 			RCLCPP_ERROR(this->get_logger(), "We didn't receive IMU newer than previous image/scan (%f) and we just received a new image/scan (%f). The previous image/scan is dropped! Make sure IMU is published faster and with less delay than the image/scan.",
@@ -537,7 +538,7 @@ void OdometryROS::processData(SensorData & data, const std_msgs::msg::Header & h
 		if(alwaysProcessMostRecentFrame_) {
 			dataReady_.release();
 		}
-		dataMutex_.unlock();
+		dataLock.unlock(); // processData() below must run unlocked
 		++processedMsgs_;
 		if(!alwaysProcessMostRecentFrame_) {
 			processData();

@@ -1402,7 +1402,8 @@ void CoreWrapper::commonMultiCameraCallback(
 		}
 	}
 
-	if(syncTimer_->is_canceled() && syncDataMutex_.lockTry() == 0)
+	UScopeMutex syncDataLock(syncDataMutex_, false);
+	if(syncTimer_->is_canceled() && syncDataLock.lockTry() == 0)
 	{
 		UScopeMutex lock(lastPoseMutex_);
 		commonMultiCameraCallbackImpl(odomFrameId,
@@ -1422,7 +1423,6 @@ void CoreWrapper::commonMultiCameraCallback(
 		if(syncData_.valid) {
 			syncTimer_->reset();
 		}
-		syncDataMutex_.unlock();
 	}
 }
 
@@ -1793,7 +1793,8 @@ void CoreWrapper::commonLaserScanCallback(
 		}
 	}
 
-	if(syncTimer_->is_canceled() && syncDataMutex_.lockTry() == 0)
+	UScopeMutex syncDataLock(syncDataMutex_, false);
+	if(syncTimer_->is_canceled() && syncDataLock.lockTry() == 0)
 	{
 		UScopeMutex lock(lastPoseMutex_);
 		LaserScan scan;
@@ -1811,7 +1812,6 @@ void CoreWrapper::commonLaserScanCallback(
 					rtabmap_.getMemory() && uStrNumCmp(rtabmap_.getMemory()->getDatabaseVersion(), "0.11.10") < 0))
 			{
 				RCLCPP_ERROR(this->get_logger(), "Could not convert laser scan msg! Aborting rtabmap update...");
-				syncDataMutex_.unlock();
 				return;
 			}
 		}
@@ -1830,7 +1830,6 @@ void CoreWrapper::commonLaserScanCallback(
 					scanCloudIs2d_))
 			{
 				RCLCPP_ERROR(this->get_logger(), "Could not convert 3d laser scan msg! Aborting rtabmap update...");
-				syncDataMutex_.unlock();
 				return;
 			}
 		}
@@ -1890,7 +1889,6 @@ void CoreWrapper::commonLaserScanCallback(
 		lastPoseCovariance_ = cv::Mat();
 
 		syncTimer_->reset();
-		syncDataMutex_.unlock();
 	}
 }
 
@@ -1907,7 +1905,8 @@ void CoreWrapper::commonOdomCallback(
 		return;
 	}
 
-	if(syncTimer_->is_canceled() && syncDataMutex_.lockTry() == 0)
+	UScopeMutex syncDataLock(syncDataMutex_, false);
+	if(syncTimer_->is_canceled() && syncDataLock.lockTry() == 0)
 	{
 		UScopeMutex lock(lastPoseMutex_);
 		cv::Mat userData;
@@ -1959,7 +1958,6 @@ void CoreWrapper::commonOdomCallback(
 		lastPoseCovariance_ = cv::Mat();
 
 		syncTimer_->reset();
-		syncDataMutex_.unlock();
 	}
 }
 
@@ -1995,7 +1993,8 @@ void CoreWrapper::commonSensorDataCallback(
 		}
 	}
 
-	if(syncTimer_->is_canceled() && syncDataMutex_.lockTry() == 0)
+	UScopeMutex syncDataLock(syncDataMutex_, false);
+	if(syncTimer_->is_canceled() && syncDataLock.lockTry() == 0)
 	{
 		UScopeMutex lock(lastPoseMutex_);
 		syncData_.data = rtabmap_conversions::sensorDataFromROS(*sensorDataMsg);
@@ -2040,7 +2039,6 @@ void CoreWrapper::commonSensorDataCallback(
 		lastPoseCovariance_ = cv::Mat();
 
 		syncTimer_->reset();
-		syncDataMutex_.unlock();
 	}
 }
 
