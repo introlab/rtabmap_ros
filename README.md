@@ -35,7 +35,7 @@ The stack is split into small packages so a pipeline only pulls in what it uses.
 
 | Package | Description |
 |---|---|
-| `rtabmap_slam` | The `rtabmap` node itself: appearance-based loop closure detection, graph optimization, memory management and map assembly. |
+| [`rtabmap_slam`](rtabmap_slam/README.md) | The `rtabmap` node itself: appearance-based loop closure detection, graph optimization, memory management and map assembly. |
 | [`rtabmap_odom`](rtabmap_odom/README.md) | Odometry nodes — `rgbd_odometry`, `stereo_odometry` and `icp_odometry`. Any external odometry can be used instead. |
 | [`rtabmap_sync`](rtabmap_sync/README.md) | Synchronizes camera and lidar topics into a single message so they reach the SLAM node together — `rgbd_sync`, `stereo_sync`, `rgbdx_sync`. |
 

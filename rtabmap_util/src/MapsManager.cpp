@@ -136,40 +136,47 @@ void MapsManager::init(rclcpp::Node & node, const std::string & name, bool)
 
 	// mapping topics
 	latched_.clear();
-	gridMapPub_ = node.create_publisher<nav_msgs::msg::OccupancyGrid>("map", rclcpp::QoS(1).reliable().durability(latching_?RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL:RMW_QOS_POLICY_DURABILITY_VOLATILE));
+	// Intra-process communication doesn't support transient local durability: when latching,
+	// disable it on these publishers, otherwise keep the node's setting.
+	rclcpp::PublisherOptions pubOptions;
+	if(latching_)
+	{
+		pubOptions.use_intra_process_comm = rclcpp::IntraProcessSetting::Disable;
+	}
+	gridMapPub_ = node.create_publisher<nav_msgs::msg::OccupancyGrid>("map", rclcpp::QoS(1).reliable().durability(latching_?RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL:RMW_QOS_POLICY_DURABILITY_VOLATILE), pubOptions);
 	latched_.insert(std::make_pair((void*)&gridMapPub_, false));
-	gridProbMapPub_ = node.create_publisher<nav_msgs::msg::OccupancyGrid>("grid_prob_map", rclcpp::QoS(1).reliable().durability(latching_?RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL:RMW_QOS_POLICY_DURABILITY_VOLATILE));
+	gridProbMapPub_ = node.create_publisher<nav_msgs::msg::OccupancyGrid>("grid_prob_map", rclcpp::QoS(1).reliable().durability(latching_?RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL:RMW_QOS_POLICY_DURABILITY_VOLATILE), pubOptions);
 	latched_.insert(std::make_pair((void*)&gridProbMapPub_, false));
-	cloudMapPub_ = node.create_publisher<sensor_msgs::msg::PointCloud2>("cloud_map", rclcpp::QoS(1).reliable().durability(latching_?RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL:RMW_QOS_POLICY_DURABILITY_VOLATILE));
+	cloudMapPub_ = node.create_publisher<sensor_msgs::msg::PointCloud2>("cloud_map", rclcpp::QoS(1).reliable().durability(latching_?RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL:RMW_QOS_POLICY_DURABILITY_VOLATILE), pubOptions);
 	latched_.insert(std::make_pair((void*)&cloudMapPub_, false));
-	cloudObstaclesPub_ = node.create_publisher<sensor_msgs::msg::PointCloud2>("cloud_obstacles", rclcpp::QoS(1).reliable().durability(latching_?RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL:RMW_QOS_POLICY_DURABILITY_VOLATILE));
+	cloudObstaclesPub_ = node.create_publisher<sensor_msgs::msg::PointCloud2>("cloud_obstacles", rclcpp::QoS(1).reliable().durability(latching_?RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL:RMW_QOS_POLICY_DURABILITY_VOLATILE), pubOptions);
 	latched_.insert(std::make_pair((void*)&cloudObstaclesPub_, false));
-	cloudGroundPub_ = node.create_publisher<sensor_msgs::msg::PointCloud2>("cloud_ground", rclcpp::QoS(1).reliable().durability(latching_?RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL:RMW_QOS_POLICY_DURABILITY_VOLATILE));
+	cloudGroundPub_ = node.create_publisher<sensor_msgs::msg::PointCloud2>("cloud_ground", rclcpp::QoS(1).reliable().durability(latching_?RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL:RMW_QOS_POLICY_DURABILITY_VOLATILE), pubOptions);
 	latched_.insert(std::make_pair((void*)&cloudGroundPub_, false));
 
 #ifdef RTABMAP_OCTOMAP
 #ifdef WITH_OCTOMAP_MSGS
-	octoMapPubBin_ = node.create_publisher<octomap_msgs::msg::Octomap>("octomap_binary", rclcpp::QoS(1).reliable().durability(latching_?RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL:RMW_QOS_POLICY_DURABILITY_VOLATILE));
+	octoMapPubBin_ = node.create_publisher<octomap_msgs::msg::Octomap>("octomap_binary", rclcpp::QoS(1).reliable().durability(latching_?RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL:RMW_QOS_POLICY_DURABILITY_VOLATILE), pubOptions);
 	latched_.insert(std::make_pair((void*)&octoMapPubBin_, false));
-	octoMapPubFull_ = node.create_publisher<octomap_msgs::msg::Octomap>("octomap_full", rclcpp::QoS(1).reliable().durability(latching_?RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL:RMW_QOS_POLICY_DURABILITY_VOLATILE));
+	octoMapPubFull_ = node.create_publisher<octomap_msgs::msg::Octomap>("octomap_full", rclcpp::QoS(1).reliable().durability(latching_?RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL:RMW_QOS_POLICY_DURABILITY_VOLATILE), pubOptions);
 	latched_.insert(std::make_pair((void*)&octoMapPubFull_, false));
 #endif
-	octoMapCloud_ = node.create_publisher<sensor_msgs::msg::PointCloud2>("octomap_occupied_space", rclcpp::QoS(1).reliable().durability(latching_?RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL:RMW_QOS_POLICY_DURABILITY_VOLATILE)); // FIXME latching option in ROS2?
+	octoMapCloud_ = node.create_publisher<sensor_msgs::msg::PointCloud2>("octomap_occupied_space", rclcpp::QoS(1).reliable().durability(latching_?RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL:RMW_QOS_POLICY_DURABILITY_VOLATILE), pubOptions); // FIXME latching option in ROS2?
 	latched_.insert(std::make_pair((void*)&octoMapCloud_, false));
-	octoMapFrontierCloud_ = node.create_publisher<sensor_msgs::msg::PointCloud2>("octomap_global_frontier_space", rclcpp::QoS(1).reliable().durability(latching_?RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL:RMW_QOS_POLICY_DURABILITY_VOLATILE));
+	octoMapFrontierCloud_ = node.create_publisher<sensor_msgs::msg::PointCloud2>("octomap_global_frontier_space", rclcpp::QoS(1).reliable().durability(latching_?RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL:RMW_QOS_POLICY_DURABILITY_VOLATILE), pubOptions);
 	latched_.insert(std::make_pair((void*)&octoMapFrontierCloud_, false));
-	octoMapObstacleCloud_ = node.create_publisher<sensor_msgs::msg::PointCloud2>("octomap_obstacles", rclcpp::QoS(1).reliable().durability(latching_?RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL:RMW_QOS_POLICY_DURABILITY_VOLATILE));
+	octoMapObstacleCloud_ = node.create_publisher<sensor_msgs::msg::PointCloud2>("octomap_obstacles", rclcpp::QoS(1).reliable().durability(latching_?RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL:RMW_QOS_POLICY_DURABILITY_VOLATILE), pubOptions);
 	latched_.insert(std::make_pair((void*)&octoMapObstacleCloud_, false));
-	octoMapGroundCloud_ = node.create_publisher<sensor_msgs::msg::PointCloud2>("octomap_ground", rclcpp::QoS(1).reliable().durability(latching_?RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL:RMW_QOS_POLICY_DURABILITY_VOLATILE));
+	octoMapGroundCloud_ = node.create_publisher<sensor_msgs::msg::PointCloud2>("octomap_ground", rclcpp::QoS(1).reliable().durability(latching_?RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL:RMW_QOS_POLICY_DURABILITY_VOLATILE), pubOptions);
 	latched_.insert(std::make_pair((void*)&octoMapGroundCloud_, false));
-	octoMapEmptySpace_ = node.create_publisher<sensor_msgs::msg::PointCloud2>("octomap_empty_space", rclcpp::QoS(1).reliable().durability(latching_?RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL:RMW_QOS_POLICY_DURABILITY_VOLATILE));
+	octoMapEmptySpace_ = node.create_publisher<sensor_msgs::msg::PointCloud2>("octomap_empty_space", rclcpp::QoS(1).reliable().durability(latching_?RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL:RMW_QOS_POLICY_DURABILITY_VOLATILE), pubOptions);
 	latched_.insert(std::make_pair((void*)&octoMapEmptySpace_, false));
-	octoMapProj_ = node.create_publisher<nav_msgs::msg::OccupancyGrid>("octomap_grid", rclcpp::QoS(1).reliable().durability(latching_?RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL:RMW_QOS_POLICY_DURABILITY_VOLATILE));
+	octoMapProj_ = node.create_publisher<nav_msgs::msg::OccupancyGrid>("octomap_grid", rclcpp::QoS(1).reliable().durability(latching_?RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL:RMW_QOS_POLICY_DURABILITY_VOLATILE), pubOptions);
 	latched_.insert(std::make_pair((void*)&octoMapProj_, false));
 #endif
 
 #if defined(WITH_GRID_MAP_ROS) and defined(RTABMAP_GRIDMAP)
-	elevationMapPub_ = node.create_publisher<grid_map_msgs::msg::GridMap>("elevation_map", rclcpp::QoS(1).reliable().durability(latching_?RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL:RMW_QOS_POLICY_DURABILITY_VOLATILE));
+	elevationMapPub_ = node.create_publisher<grid_map_msgs::msg::GridMap>("elevation_map", rclcpp::QoS(1).reliable().durability(latching_?RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL:RMW_QOS_POLICY_DURABILITY_VOLATILE), pubOptions);
 	latched_.insert(std::make_pair((void*)&elevationMapPub_, false));
 #endif
 }

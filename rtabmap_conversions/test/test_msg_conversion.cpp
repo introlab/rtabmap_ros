@@ -2362,6 +2362,76 @@ TEST(MsgConversion, sensorDataLaserScanRoundTrip)
 	expectTransformNear(outScan.localTransform(), localTransform, 1e-4f);
 }
 
+/**
+ * A raw scan survives the round trip through a SensorData message in every format: it
+ * goes out as a cloud with one field per channel, and comes back in laser_scan_format
+ * with the same values. A 2D scan in particular goes out as an x/y/z cloud with z at 0,
+ * which alone cannot tell it was 2D -- the odometry nodes' odom_sensor_data/raw does this
+ * for a 2D lidar -- and must come back 2D rather than as a 3D scan that fails the format
+ * check.
+ */
+TEST(MsgConversion, sensorDataLaserScanRoundTripEveryFormat)
+{
+	for(int f = rtabmap::LaserScan::kXY; f <= rtabmap::LaserScan::kXYZIRT; ++f)
+	{
+		const rtabmap::LaserScan::Format format = (rtabmap::LaserScan::Format)f;
+		SCOPED_TRACE(rtabmap::LaserScan::formatName(format));
+		const int channels = rtabmap::LaserScan::channels(format);
+		ASSERT_GT(channels, 0);
+
+		// Small integers in every channel: exact through float and through the integer
+		// fields some formats use, like the ring.
+		cv::Mat points(1, 3, CV_32FC(channels));
+		for(int i = 0; i < points.cols; ++i)
+		{
+			float * p = points.ptr<float>(0, i);
+			for(int c = 0; c < channels; ++c)
+			{
+				p[c] = float(1 + i + c);
+			}
+		}
+		const rtabmap::Transform localTransform(0.1f, 0.0f, 0.2f, 0.0f, 0.0f, 0.0f);
+		const rtabmap::LaserScan scan(points, /*maxPoints=*/360, /*maxRange=*/10.0f, format, localTransform);
+		if(scan.hasRGB())
+		{
+			// A packed 0x00RRGGBB color, as PCL stores it.
+			for(int i = 0; i < points.cols; ++i)
+			{
+				const uint32_t rgb = 0x00102030u + i;
+				memcpy(points.ptr<float>(0, i) + scan.getRGBOffset(), &rgb, sizeof(float));
+			}
+		}
+
+		rtabmap::SensorData in;
+		in.setStamp(1000.0);
+		in.setLaserScan(scan);
+
+		rtabmap_msgs::msg::SensorData msg;
+		sensorDataToROS(in, msg, "base_link", /*copyRawData=*/true);
+		ASSERT_FALSE(msg.laser_scan.data.empty());
+		EXPECT_EQ(msg.laser_scan_format, (int)format);
+
+		rtabmap::SensorData out;
+		bool converted = false;
+		EXPECT_NO_THROW({ out = sensorDataFromROS(msg); converted = true; });
+		if(!converted)
+		{
+			continue; // reported above; carry on so every failing format is listed
+		}
+		const rtabmap::LaserScan & outScan = out.laserScanRaw();
+		ASSERT_FALSE(outScan.isEmpty());
+		EXPECT_EQ(outScan.format(), format);
+		EXPECT_EQ(outScan.is2d(), scan.is2d());
+		EXPECT_EQ(outScan.maxPoints(), scan.maxPoints());
+		EXPECT_FLOAT_EQ(outScan.rangeMax(), scan.rangeMax());
+		expectTransformNear(outScan.localTransform(), localTransform, 1e-4f);
+		ASSERT_EQ(outScan.data().size(), scan.data().size());
+		ASSERT_EQ(outScan.data().type(), scan.data().type());
+		EXPECT_EQ(0, memcmp(outScan.data().data, scan.data().data,
+				scan.data().total() * scan.data().elemSize())) << "the values changed";
+	}
+}
+
 TEST(MsgConversion, sensorDataStereoModelRoundTrip)
 {
 	const double fx = 525.0;
@@ -3290,6 +3360,75 @@ TEST(MsgConversion, convertScanMsgSyncsToOdomStamp)
 			scan, *buffer, 0.0));
 
 	EXPECT_NEAR(scan.localTransform().x(), 1.2, 1e-3) << "0.2 base->laser plus 1.0 motion";
+}
+
+namespace {
+
+/// 21 rays of 5 m over +-1 rad, swept in 0.5 s, from "laser" at @p stamp.
+sensor_msgs::msg::LaserScan makeSweep(double stamp)
+{
+	sensor_msgs::msg::LaserScan msg;
+	msg.header.stamp = timestampToROS(stamp);
+	msg.header.frame_id = "laser";
+	msg.angle_min = -1.0f;
+	msg.angle_max = 1.0f;
+	msg.angle_increment = 0.1f;
+	msg.time_increment = 0.5f / 20.0f;
+	msg.range_min = 0.1f;
+	msg.range_max = 30.0f;
+	msg.ranges.assign(21, 5.0f);
+	return msg;
+}
+
+}  // namespace
+
+/**
+ * With the odometry frame on TF, each ray is placed where the robot was when it was
+ * measured: at 1 m/s over a 0.5 s sweep, the last ray lands 0.5 m further than it would
+ * from the pose at the scan's stamp, the first one not at all.
+ */
+TEST(MsgConversion, convertScanMsgDeskewsWithOdometryTf)
+{
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();
+	addTf(*buffer, "base_link", "laser", rtabmap::Transform::getIdentity(), 1000.0);
+	addOdomMotion(*buffer);
+	const sensor_msgs::msg::LaserScan msg = makeSweep(1000.0);
+
+	rtabmap::LaserScan skewed, deskewed;
+	ASSERT_TRUE(convertScanMsg(msg, "base_link", "", timestampToROS(1000.0), skewed, *buffer, 0.0));
+	ASSERT_TRUE(convertScanMsg(msg, "base_link", "odom", timestampToROS(1000.0), deskewed, *buffer, 0.0));
+	ASSERT_EQ(skewed.size(), deskewed.size());
+	ASSERT_EQ(21, deskewed.size());
+
+	const float * first = deskewed.data().ptr<float>(0, 0);
+	const float * firstSkewed = skewed.data().ptr<float>(0, 0);
+	EXPECT_NEAR(firstSkewed[0], first[0], 1e-4);
+	EXPECT_NEAR(firstSkewed[1], first[1], 1e-4);
+	const float * last = deskewed.data().ptr<float>(0, 20);
+	const float * lastSkewed = skewed.data().ptr<float>(0, 20);
+	EXPECT_NEAR(lastSkewed[0] + 0.5f, last[0], 1e-3) << "moved by the robot's 0.5 m during the sweep";
+	EXPECT_NEAR(lastSkewed[1], last[1], 1e-3);
+}
+
+/**
+ * Without the odometry frame on TF -- odometry published as a topic only -- the scan is
+ * still converted, as it would be without an odometry frame: not deskewed, but not refused
+ * either.
+ */
+TEST(MsgConversion, convertScanMsgUsesTheScanAsItIsWithoutOdometryTf)
+{
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();
+	const rtabmap::Transform baseToLaser(0.2f, 0.0f, 0.1f, 0.0f, 0.0f, 0.0f);
+	addTf(*buffer, "base_link", "laser", baseToLaser, 1000.0);
+	const sensor_msgs::msg::LaserScan msg = makeSweep(1000.0);
+
+	rtabmap::LaserScan withoutOdom, withMissingOdom;
+	ASSERT_TRUE(convertScanMsg(msg, "base_link", "", timestampToROS(1000.0), withoutOdom, *buffer, 0.0));
+	ASSERT_TRUE(convertScanMsg(msg, "base_link", "odom", timestampToROS(1000.0), withMissingOdom, *buffer, 0.0));
+
+	expectTransformNear(withMissingOdom.localTransform(), baseToLaser, 1e-4f);
+	ASSERT_EQ(withoutOdom.data().size(), withMissingOdom.data().size());
+	EXPECT_EQ(0.0, cv::norm(withoutOdom.data(), withMissingOdom.data(), cv::NORM_INF));
 }
 
 TEST(MsgConversion, convertRGBDMsgsRejectsBadEncoding)

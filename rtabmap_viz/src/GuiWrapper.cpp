@@ -72,7 +72,7 @@ GuiWrapper::GuiWrapper(const rclcpp::NodeOptions & options) :
 		frameId_("base_link"),
 		odomFrameId_(""),
 		waitForTransform_(0.2), // 200 ms
-		odomSensorSync_(false),
+		odomSensorSync_(true),
 		maxOdomUpdateRate_(10)
 {
 	tfBuffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());

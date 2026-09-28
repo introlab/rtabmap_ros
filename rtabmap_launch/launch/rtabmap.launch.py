@@ -508,7 +508,7 @@ def generate_launch_description():
         DeclareLaunchArgument('odom_tf_angular_variance',   default_value='0.01',    description='If TF is used to get odometry, this is the default angular variance'),
         DeclareLaunchArgument('odom_tf_linear_variance',    default_value='0.001',   description='If TF is used to get odometry, this is the default linear variance'),
         DeclareLaunchArgument('odom_args',                  default_value='',      description='More arguments for odometry (overwrite same parameters in rtabmap_args).'),
-        DeclareLaunchArgument('odom_sensor_sync',           default_value='false', description=''),
+        DeclareLaunchArgument('odom_sensor_sync',           default_value='true', description='Correct each sensor\'s position for the motion between its stamp and the odometry\'s, using TF.'),
         DeclareLaunchArgument('odom_guess_frame_id',        default_value='',      description=''),
         DeclareLaunchArgument('odom_guess_min_translation', default_value='0.0',   description=''),
         DeclareLaunchArgument('odom_guess_min_rotation',    default_value='0.0',   description=''),

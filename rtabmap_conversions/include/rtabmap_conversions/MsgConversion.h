@@ -860,9 +860,9 @@ bool convertStereoMsg(
  * @param odomStamp        stamp the scan is synchronized to
  * @param[out] scan        the converted scan
  * @param tfBuffer         must contain @p frameId -> the laser frame at the scan stamp,
- *                         and the laser frame relative to @p odomFrameId (or @p frameId
- *                         when that is empty) across the whole sweep, since the points
- *                         are projected through it
+ *                         and, to deskew, the laser frame relative to @p odomFrameId
+ *                         across the whole sweep, since the points are projected through
+ *                         it
  * @param waitForTransform seconds to wait for TF, 0 to not wait
  * @param outputInFrameId  express the points in @p frameId rather than the laser frame
  * @return false if the scan is malformed (zero angle increment, inverted range or angle
@@ -874,7 +874,9 @@ bool convertStereoMsg(
  *       target is a fixed frame, i.e. if @p odomFrameId is set — with it empty the
  *       target is @p frameId, which does not move relative to itself. This is also why
  *       the laser frame must be known across the whole sweep, which the function checks
- *       up front.
+ *       up front. When it is not known relative to @p odomFrameId -- odometry not
+ *       published on TF -- the scan is converted as with @p odomFrameId empty, neither
+ *       deskewed nor synchronized, with a warning shown once, rather than refused.
  * @note The odometry correction is applied only when the scan stamp differs from
  *       @p odomStamp; a failed correction lookup warns and leaves the pose uncorrected.
  */
