@@ -25,7 +25,11 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include <rtabmap_conversions/PointCloudConversion.h>
 #include "rtabmap_conversions/MsgConversion.h"
+
+#include <cmath>
+#include <limits>
 
 #include <opencv2/highgui/highgui.hpp>
 #include <zlib.h>
@@ -60,21 +64,46 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace rtabmap_conversions {
 
-void transformToTF(const rtabmap::Transform & transform, tf2::Transform & tfTransform)
+bool transformToTF(const rtabmap::Transform & transform, tf2::Transform & tfTransform)
 {
-	if(!transform.isNull())
+	if(transform.isNull())
 	{
-		geometry_msgs::msg::TransformStamped gm = tf2::eigenToTransform(transform.toEigen3d());
-		//tf2::fromMsg(gm, tfTransform);
+		// tf2::Transform cannot represent a null transform: it stores its rotation as a
+		// basis matrix, so there is no equivalent of the all-zero quaternion used by the
+		// geometry_msgs conversions. Fill it with NaN so that a caller ignoring the
+		// return value corrupts its results loudly instead of silently carrying on with
+		// an identity that looks legitimate.
+		const tf2Scalar nan = std::numeric_limits<tf2Scalar>::quiet_NaN();
+		tfTransform = tf2::Transform(
+				tf2::Matrix3x3(nan, nan, nan, nan, nan, nan, nan, nan, nan),
+				tf2::Vector3(nan, nan, nan));
+		return false;
 	}
-	else
-	{
-		tfTransform = tf2::Transform(tf2::Quaternion(0,0,0,0));
-	}
+
+	geometry_msgs::msg::Transform msg;
+	transformToGeometryMsg(transform, msg);
+	tf2::fromMsg(msg, tfTransform);
+	return true;
 }
 
 rtabmap::Transform transformFromTF(const tf2::Transform & transform)
 {
+	// transformToTF() poisons its output with NaN for a null transform, as tf2::Transform
+	// has no null representation of its own. Map that back to a null transform here so the
+	// two functions round-trip, and so a NaN coming from anywhere else does not silently
+	// propagate into the rest of the pipeline.
+	const tf2::Vector3 & origin = transform.getOrigin();
+	const tf2::Matrix3x3 & basis = transform.getBasis();
+	bool nan = std::isnan(origin.x()) || std::isnan(origin.y()) || std::isnan(origin.z());
+	for(int i=0; !nan && i<3; ++i)
+	{
+		nan = std::isnan(basis[i].x()) || std::isnan(basis[i].y()) || std::isnan(basis[i].z());
+	}
+	if(nan)
+	{
+		return rtabmap::Transform();
+	}
+
 	Eigen::Isometry3d eigenTf;
 	geometry_msgs::msg::Transform gm = tf2::toMsg(transform);
 	eigenTf = tf2::transformToEigen(gm);
@@ -227,6 +256,11 @@ void toCvShare(const rtabmap_msgs::msg::RGBDImage & image, const std::shared_ptr
 				depth = ptr;
 			}
 		}
+		else
+		{
+			// empty
+			depth = std::make_shared<cv_bridge::CvImage>();
+		}
 	}
 	catch(cv::Exception& e) {
 		UFATAL("Fatal error while converting rgbd image (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
@@ -244,6 +278,7 @@ void rgbdImageToROS(const rtabmap::SensorData & data, rtabmap_msgs::msg::RGBDIma
 		UERROR("Cannot convert multi-camera data to rgbd image");
 		return;
 	}
+	msg.header = header;
 	if(data.cameraModels().size() == 1)
 	{
 		//rgb+depth
@@ -403,7 +438,11 @@ rtabmap::SensorData rgbdImageFromROS(const rtabmap_msgs::msg::RGBDImage::ConstSh
 		int depthWidth = depthMsg->image.cols;
 		int depthHeight = depthMsg->image.rows;
 
+		// The depth image is optional: a message can legitimately carry only the color
+		// image and its camera info. Compare the resolutions only when there is a depth
+		// image, otherwise the ratios divide by zero.
 		UASSERT_MSG(
+			depthMsg->image.empty() ||
 			imageWidth/depthWidth == imageHeight/depthHeight,
 			uFormat("rgb=%dx%d depth=%dx%d", imageWidth, imageHeight, depthWidth, depthHeight).c_str());
 
@@ -419,7 +458,8 @@ rtabmap::SensorData rgbdImageFromROS(const rtabmap_msgs::msg::RGBDImage::ConstSh
 			 imageMsg->encoding.compare(sensor_msgs::image_encodings::BGRA8) == 0 ||
 			 imageMsg->encoding.compare(sensor_msgs::image_encodings::RGBA8) == 0 ||
 			 imageMsg->encoding.compare(sensor_msgs::image_encodings::BAYER_GRBG8) == 0) ||
-			!(depthMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1) == 0 ||
+			!(depthMsg->image.empty() ||
+			 depthMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1) == 0 ||
 			 depthMsg->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1) == 0 ||
 			 depthMsg->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0))
 		{
@@ -558,6 +598,13 @@ void infoFromROS(const rtabmap_msgs::msg::Info & info, rtabmap::Statistics & sta
 
 void infoToROS(const rtabmap::Statistics & stats, rtabmap_msgs::msg::Info & info)
 {
+	// Fall back to the statistics' own stamp when the caller left the header unstamped.
+	// Callers that already stamped it keep their value, which may be a publication time
+	// unrelated to the data, or the exact input stamp rather than this double-derived one.
+	if(info.header.stamp.sec == 0 && info.header.stamp.nanosec == 0)
+	{
+		info.header.stamp = timestampToROS(stats.stamp());
+	}
 	info.ref_id = stats.refImageId();
 	info.loop_closure_id = stats.loopClosureId();
 	info.proximity_detection_id = stats.proximityDetectionId();
@@ -829,9 +876,12 @@ rtabmap::CameraModel cameraModelFromROS(
 		const sensor_msgs::msg::CameraInfo & camInfo,
 		const rtabmap::Transform & localTransform)
 {
+	// Note: k, r and p are fixed-size arrays in the ROS message, so they are never
+	// empty and their size is always right. An unset matrix is signalled by all-zero
+	// content instead: k[0] and p[0] hold the focal length, which is always non-zero
+	// for a valid calibration, and an unset rectification matrix is all zeros.
 	cv:: Mat K;
-	UASSERT(camInfo.k.empty() || camInfo.k.size() == 9);
-	if(!camInfo.k.empty())
+	if(camInfo.k[0] != 0.0)
 	{
 		K = cv::Mat(3, 3, CV_64FC1);
 		memcpy(K.data, camInfo.k.data(), 9*sizeof(double));
@@ -858,17 +908,22 @@ rtabmap::CameraModel cameraModelFromROS(
 		}
 	}
 
+	// R is a rotation matrix, so any of its elements can legitimately be zero: only
+	// an entirely zero matrix means "not set".
 	cv:: Mat R;
-	UASSERT(camInfo.r.empty() || camInfo.r.size() == 9);
-	if(!camInfo.r.empty())
+	bool rIsSet = false;
+	for(size_t i=0; !rIsSet && i<camInfo.r.size(); ++i)
+	{
+		rIsSet = camInfo.r[i] != 0.0;
+	}
+	if(rIsSet)
 	{
 		R = cv::Mat(3, 3, CV_64FC1);
 		memcpy(R.data, camInfo.r.data(), 9*sizeof(double));
 	}
 
 	cv:: Mat P;
-	UASSERT(camInfo.p.empty() || camInfo.p.size() == 12);
-	if(!camInfo.p.empty())
+	if(camInfo.p[0] != 0.0)
 	{
 		P = cv::Mat(3, 4, CV_64FC1);
 		memcpy(P.data, camInfo.p.data(), 12*sizeof(double));
@@ -942,8 +997,9 @@ void cameraModelToROS(
 	{
 		memset(camInfo.p.data(), 0.0, 12*sizeof(double));
 		if(!model.K_raw().empty()) {
+			// P = [K | 0]: copying K already sets the homogeneous P(2,2)=1, and the
+			// fourth column (the Tx/Ty/Tz translation) stays zero for a single camera.
 			model.K_raw().copyTo(cv::Mat(3,4,CV_64FC1, camInfo.p.data()).colRange(0,3));
-			camInfo.p.back() = 1.0;
 		}
 	}
 	else
@@ -1249,7 +1305,8 @@ rtabmap::SensorData sensorDataFromROS(const rtabmap_msgs::msg::SensorData & msg)
 		pcl::PCLPointCloud2 cloud;
 		pcl_conversions::toPCL(msg.laser_scan, cloud);
 		s.setLaserScan(rtabmap::LaserScan(
-			rtabmap::util3d::laserScanFromPointCloud(cloud),
+			rtabmap::util3d::laserScanFromPointCloud(cloud, true,
+					rtabmap::LaserScan::isScan2d((rtabmap::LaserScan::Format)msg.laser_scan_format)),
 			msg.laser_scan_max_pts,
 			msg.laser_scan_max_range,
 			transformFromGeometryMsg(msg.laser_scan_local_transform)),
@@ -1352,10 +1409,13 @@ void sensorDataToROS(const rtabmap::SensorData & data, rtabmap_msgs::msg::Sensor
 	{
 		pcl::PCLPointCloud2::Ptr cloud = rtabmap::util3d::laserScanToPointCloud2(data.laserScanRaw());
 		pcl_conversions::moveFromPCL(*cloud, msg.laser_scan);
-		msg.laser_scan_max_pts = data.laserScanCompressed().maxPoints();
-		msg.laser_scan_max_range = data.laserScanCompressed().rangeMax();
-		msg.laser_scan_format = data.laserScanCompressed().format();
-		transformToGeometryMsg(data.laserScanCompressed().localTransform(), msg.laser_scan_local_transform);
+		// Describe the scan we just serialized: reading these from laserScanCompressed()
+		// zeroes them whenever only the raw scan is set, and sensorDataFromROS() then
+		// fails its format assertion.
+		msg.laser_scan_max_pts = data.laserScanRaw().maxPoints();
+		msg.laser_scan_max_range = data.laserScanRaw().rangeMax();
+		msg.laser_scan_format = data.laserScanRaw().format();
+		transformToGeometryMsg(data.laserScanRaw().localTransform(), msg.laser_scan_local_transform);
 	}
 	if(!data.laserScanCompressed().empty())
 	{
@@ -1624,10 +1684,17 @@ std::map<std::string, float> odomInfoToStatistics(const rtabmap::OdometryInfo & 
 	stats.insert(std::make_pair("Odometry/ICPStructuralComplexity/", info.reg.icpStructuralComplexity));
 	stats.insert(std::make_pair("Odometry/ICPStructuralDistribution/", info.reg.icpStructuralDistribution));
 	stats.insert(std::make_pair("Odometry/ICPCorrespondences/", info.reg.icpCorrespondences));
-	stats.insert(std::make_pair("Odometry/StdDevLin/", sqrt((float)info.reg.covariance.at<double>(0,0))));
-	stats.insert(std::make_pair("Odometry/StdDevAng/", sqrt((float)info.reg.covariance.at<double>(5,5))));
-	stats.insert(std::make_pair("Odometry/VarianceLin/", (float)info.reg.covariance.at<double>(0,0)));
-	stats.insert(std::make_pair("Odometry/VarianceAng/", (float)info.reg.covariance.at<double>(5,5)));
+	// RegistrationInfo leaves covariance empty by default, so only read it when the
+	// expected 6x6 matrix is actually there.
+	if(info.reg.covariance.type() == CV_64FC1 &&
+	   info.reg.covariance.rows == 6 &&
+	   info.reg.covariance.cols == 6)
+	{
+		stats.insert(std::make_pair("Odometry/StdDevLin/", sqrt((float)info.reg.covariance.at<double>(0,0))));
+		stats.insert(std::make_pair("Odometry/StdDevAng/", sqrt((float)info.reg.covariance.at<double>(5,5))));
+		stats.insert(std::make_pair("Odometry/VarianceLin/", (float)info.reg.covariance.at<double>(0,0)));
+		stats.insert(std::make_pair("Odometry/VarianceAng/", (float)info.reg.covariance.at<double>(5,5)));
+	}
 	stats.insert(std::make_pair("Odometry/TimeEstimation/ms", info.timeEstimation*1000.0f));
 	stats.insert(std::make_pair("Odometry/TimeFiltering/ms", info.timeParticleFiltering*1000.0f));
 	stats.insert(std::make_pair("Odometry/LocalMapSize/", info.localMapSize));
@@ -2648,13 +2715,41 @@ bool convertScanMsg(
 	}
 
 	// make sure the frame of the laser is updated during the whole scan time
-	rtabmap::Transform tmpT = getMovingTransform(
-			scan2dMsg.header.frame_id,
-			odomFrameId.empty()?frameId:odomFrameId,
-			rclcpp::Time(scan2dMsg.header.stamp.sec, scan2dMsg.header.stamp.nanosec),
-			rclcpp::Time(scan2dMsg.header.stamp.sec, scan2dMsg.header.stamp.nanosec) + rclcpp::Duration::from_seconds(scan2dMsg.ranges.size()*scan2dMsg.time_increment),
-			tfBuffer,
-			waitForTransform);
+	const rclcpp::Time scanStart(scan2dMsg.header.stamp);
+	const rclcpp::Time scanEnd = scanStart + rclcpp::Duration::from_seconds((scan2dMsg.ranges.empty()?0:scan2dMsg.ranges.size()-1)*scan2dMsg.time_increment);
+	std::string fixedFrameId = odomFrameId.empty()?frameId:odomFrameId;
+	rtabmap::Transform tmpT;
+	if(fixedFrameId == frameId || tfBuffer._frameExists(fixedFrameId)) // don't wait for a frame never published
+	{
+		tmpT = getMovingTransform(
+				scan2dMsg.header.frame_id,
+				fixedFrameId,
+				scanStart,
+				scanEnd,
+				tfBuffer,
+				waitForTransform);
+	}
+	if(tmpT.isNull() && fixedFrameId != frameId)
+	{
+		// Odometry not in TF: use the scan as it is rather than dropping it.
+		static bool warned = false;
+		if(!warned)
+		{
+			UWARN("Could not get laser frame \"%s\" relative to odometry frame \"%s\" over the scan "
+				  "(%fs to %fs). Laser scans are used without deskewing nor synchronization with "
+				  "odometry. Publish odometry on TF to have them deskewed. This message is only shown once.",
+				  scan2dMsg.header.frame_id.c_str(), odomFrameId.c_str(), scanStart.seconds(), scanEnd.seconds());
+			warned = true;
+		}
+		fixedFrameId = frameId;
+		tmpT = getMovingTransform(
+				scan2dMsg.header.frame_id,
+				fixedFrameId,
+				scanStart,
+				scanEnd,
+				tfBuffer,
+				waitForTransform);
+	}
 	if(tmpT.isNull())
 	{
 		return false;
@@ -2674,12 +2769,12 @@ bool convertScanMsg(
 	//transform in frameId_ frame
 	sensor_msgs::msg::PointCloud2 scanOut;
 	laser_geometry::LaserProjection projection;
-	projection.transformLaserScanToPointCloud(odomFrameId.empty()?frameId:odomFrameId, scan2dMsg, scanOut, tfBuffer);
+	projection.transformLaserScanToPointCloud(fixedFrameId, scan2dMsg, scanOut, tfBuffer);
 
 	//transform back in laser frame
 	rtabmap::Transform laserToOdom = getTransform(
 			scan2dMsg.header.frame_id,
-			odomFrameId.empty()?frameId:odomFrameId,
+			fixedFrameId,
 			scan2dMsg.header.stamp,
 			tfBuffer,
 			waitForTransform);
@@ -2689,7 +2784,7 @@ bool convertScanMsg(
 	}
 
 	// sync with odometry stamp
-	if(!odomFrameId.empty() && odomStamp != scan2dMsg.header.stamp)
+	if(fixedFrameId != frameId && odomStamp != scan2dMsg.header.stamp)
 	{
 		rtabmap::Transform sensorT = getMovingTransform(
 				frameId,
@@ -2743,7 +2838,7 @@ bool convertScanMsg(
 	if(hasIntensity)
 	{
 		pcl::PointCloud<pcl::PointXYZI>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZI>);
-		pcl::fromROSMsg(scanOut, *pclScan);
+		rtabmap_conversions::fromPointCloud2Msg(scanOut, *pclScan);
 		pclScan->is_dense = true;
 		data = rtabmap::util3d::laserScan2dFromPointCloud(*pclScan, laserToOdom).data(); // put back in laser frame
 		format = rtabmap::LaserScan::kXYI;
@@ -2751,7 +2846,7 @@ bool convertScanMsg(
 	else
 	{
 		pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
-		pcl::fromROSMsg(scanOut, *pclScan);
+		rtabmap_conversions::fromPointCloud2Msg(scanOut, *pclScan);
 		pclScan->is_dense = true;
 		data = rtabmap::util3d::laserScan2dFromPointCloud(*pclScan, laserToOdom).data(); // put back in laser frame
 		format = rtabmap::LaserScan::kXY;
@@ -2832,8 +2927,7 @@ bool deskew_impl(
 		tf2_ros::Buffer * tfBuffer,
 		double waitForTransform,
 		bool slerp,
-		const rtabmap::Transform & velocity,
-		double previousStamp)
+		const rtabmap::Transform & velocity)
 {
 	if(tfBuffer != 0)
 	{
@@ -2854,12 +2948,6 @@ bool deskew_impl(
 		if(!slerp)
 		{
 			UERROR("slerp should be true when constant velocity model is used!");
-			return false;
-		}
-
-		if(previousStamp <= 0.0)
-		{
-			UERROR("previousStamp should be >0 when constant velocity model is used!");
 			return false;
 		}
 
@@ -3133,8 +3221,23 @@ bool deskew_impl(
 	}
 	else if(lastStamp == firstStamp)
 	{
-		UERROR("First and last stamps in the scan are the same (%f) (header=%f)!", timestampFromROS(lastStamp), timestampFromROS(input.header.stamp));
-		return false;
+		// There is no time spread across the scan, so there is nothing to correct. This
+		// happens when the driver doesn't fill the per-point time channel, and also when
+		// the cloud has already been deskewed: deskewing zeroes that channel to mark it.
+		// Pass the cloud through unchanged so that deskewing twice is a no-op rather than
+		// a failure that makes the caller drop the frame.
+		static bool warned = false;
+		if(!warned)
+		{
+			UWARN("First and last stamps in the scan are the same (%f) (header=%f), the "
+				  "cloud is returned unchanged. Either the time channel is not filled by "
+				  "the driver, or the cloud has already been deskewed. This warning is "
+				  "only shown once.",
+				  timestampFromROS(lastStamp), timestampFromROS(input.header.stamp));
+			warned = true;
+		}
+		output = input;
+		return true;
 	}
 	std::string errorMsg;
 	if(tfBuffer != 0 &&
@@ -3184,23 +3287,19 @@ bool deskew_impl(
 			float vx,vy,vz, vroll,vpitch,vyaw;
 			velocity.getTranslationAndEulerAngles(vx,vy,vz, vroll,vpitch,vyaw);
 
-			// We need three poses:
-			//  1- The pose of base frame in odom frame at first stamp
-			//  2- The pose of base frame in odom frame at msg stamp
-			//  3- The pose of base frame in odom frame at last stamp
-			UASSERT(timestampFromROS(firstStamp) >= previousStamp);
-			UASSERT(timestampFromROS(lastStamp) > previousStamp);
-			double dt1 = timestampFromROS(firstStamp) - previousStamp;
-			double dt2 = timestampFromROS(input.header.stamp) - previousStamp;
-			double dt3 = timestampFromROS(lastStamp) - previousStamp;
-
-			rtabmap::Transform p1(vx*dt1, vy*dt1, vz*dt1, vroll*dt1, vpitch*dt1, vyaw*dt1);
-			rtabmap::Transform p2(vx*dt2, vy*dt2, vz*dt2, vroll*dt2, vpitch*dt2, vyaw*dt2);
-			rtabmap::Transform p3(vx*dt3, vy*dt3, vz*dt3, vroll*dt3, vpitch*dt3, vyaw*dt3);
+			// Integrate the velocity directly from the stamp of the msg, which is the
+			// frame the deskewed cloud is expressed in. Going through a third, earlier
+			// reference pose and composing it away would give the same answer for a pure
+			// translation, but not for a rotation: Transform() scales roll/pitch/yaw
+			// linearly instead of using the twist exponential, so the composition only
+			// cancels in the small-angle limit. Keeping dt bounded by the scan duration
+			// is where that approximation is at its best.
+			double dt1 = timestampFromROS(firstStamp) - timestampFromROS(input.header.stamp);
+			double dt3 = timestampFromROS(lastStamp) - timestampFromROS(input.header.stamp);
 
 			// First and last poses are relative to stamp of the msg
-			firstPose = p2.inverse() * p1;
-			lastPose = p2.inverse() * p3;
+			firstPose = rtabmap::Transform(vx*dt1, vy*dt1, vz*dt1, vroll*dt1, vpitch*dt1, vyaw*dt1);
+			lastPose = rtabmap::Transform(vx*dt3, vy*dt3, vz*dt3, vroll*dt3, vpitch*dt3, vyaw*dt3);
 		}
 
 		if(firstPose.isNull())
@@ -3227,6 +3326,7 @@ bool deskew_impl(
 
 	output = input;
 	rclcpp::Time stamp;
+	bool clampWarned = false;   // reported once per cloud, see the clamp below
 	UTimer processingTime;
 	if(timeOnColumns)
 	{
@@ -3272,7 +3372,27 @@ bool deskew_impl(
 			rtabmap::Transform transform;
 			if(slerp)
 			{
-				transform = firstPose.interpolate((stamp-firstStamp).seconds() / scanTime, lastPose);
+				// The ordering check only compares the first and last samples, so a stamp
+				// outside [firstStamp, lastStamp] can slip through. Clamp it: extrapolating
+				// would throw the point far beyond the sweep.
+				double ratio = (stamp-firstStamp).seconds() / scanTime;
+				if(ratio < 0.0 || ratio > 1.0)
+				{
+					// Warned once per cloud rather than once per process: the timestamp
+					// channel is corrupted, which is a serious upstream problem worth
+					// reporting on every affected scan, but not once per point.
+					if(!clampWarned)
+					{
+						UWARN("A point has a stamp (%f) outside the first (%f) and last (%f) "
+							  "stamps of the scan, its correction is clamped to the closest end "
+							  "of the sweep. The timestamp channel of the input cloud is likely "
+							  "corrupted. Only the first such point of this cloud is reported.",
+							  timestampFromROS(stamp), timestampFromROS(firstStamp), timestampFromROS(lastStamp));
+						clampWarned = true;
+					}
+					ratio = ratio<0.0?0.0:1.0;
+				}
+				transform = firstPose.interpolate(float(ratio), lastPose);
 			}
 			else
 			{
@@ -3366,7 +3486,27 @@ bool deskew_impl(
 			rtabmap::Transform transform;
 			if(slerp)
 			{
-				transform = firstPose.interpolate((stamp-firstStamp).seconds() / scanTime, lastPose);
+				// The ordering check only compares the first and last samples, so a stamp
+				// outside [firstStamp, lastStamp] can slip through. Clamp it: extrapolating
+				// would throw the point far beyond the sweep.
+				double ratio = (stamp-firstStamp).seconds() / scanTime;
+				if(ratio < 0.0 || ratio > 1.0)
+				{
+					// Warned once per cloud rather than once per process: the timestamp
+					// channel is corrupted, which is a serious upstream problem worth
+					// reporting on every affected scan, but not once per point.
+					if(!clampWarned)
+					{
+						UWARN("A point has a stamp (%f) outside the first (%f) and last (%f) "
+							  "stamps of the scan, its correction is clamped to the closest end "
+							  "of the sweep. The timestamp channel of the input cloud is likely "
+							  "corrupted. Only the first such point of this cloud is reported.",
+							  timestampFromROS(stamp), timestampFromROS(firstStamp), timestampFromROS(lastStamp));
+						clampWarned = true;
+					}
+					ratio = ratio<0.0?0.0:1.0;
+				}
+				transform = firstPose.interpolate(float(ratio), lastPose);
 			}
 			else
 			{
@@ -3428,16 +3568,15 @@ bool deskew(
 		double waitForTransform,
 		bool slerp)
 {
-	return deskew_impl(input, output, fixedFrameId, &tfBuffer, waitForTransform, slerp, rtabmap::Transform(), 0);
+	return deskew_impl(input, output, fixedFrameId, &tfBuffer, waitForTransform, slerp, rtabmap::Transform());
 }
 
 bool deskew(
 		const sensor_msgs::msg::PointCloud2 & input,
 		sensor_msgs::msg::PointCloud2 & output,
-		double previousStamp,
 		const rtabmap::Transform & velocity)
 {
-	return deskew_impl(input, output, "", 0, 0, true, velocity, previousStamp);
+	return deskew_impl(input, output, "", 0, 0, true, velocity);
 }
 
 
@@ -3493,8 +3632,15 @@ transformPointCloud (
     Eigen::Vector4f pt_out;
 
     bool max_range_point = false;
-    int distance_ptr_offset = i*in.point_step + in.fields[dist_idx].offset;
-    float* distance_ptr = (dist_idx < 0 ? NULL : (float*)(&in.data[distance_ptr_offset]));
+    // Only touch in.fields[dist_idx] when the "distance" field actually exists:
+    // indexing with -1 is out of bounds and aborts on a hardened libstdc++.
+    int distance_ptr_offset = 0;
+    float* distance_ptr = NULL;
+    if (dist_idx >= 0)
+    {
+      distance_ptr_offset = i*in.point_step + in.fields[dist_idx].offset;
+      distance_ptr = (float*)(&in.data[distance_ptr_offset]);
+    }
     if (!std::isfinite (pt[0]) || !std::isfinite (pt[1]) || !std::isfinite (pt[2]))
     {
       if (distance_ptr==NULL || !std::isfinite(*distance_ptr))  // Invalid point

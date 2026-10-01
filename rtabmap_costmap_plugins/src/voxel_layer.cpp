@@ -58,42 +58,76 @@ using rcl_interfaces::msg::ParameterType;
 namespace rtabmap_costmap_plugins
 {
 
+namespace
+{
+
+/// nav2's Observation::cloud_ used to be a raw pointer and is now the cloud itself, so
+/// it is reached through this rather than dereferenced directly.
+inline const sensor_msgs::msg::PointCloud2 & cloudOf(
+  const sensor_msgs::msg::PointCloud2 & cloud)
+{
+  return cloud;
+}
+
+inline const sensor_msgs::msg::PointCloud2 & cloudOf(
+  const sensor_msgs::msg::PointCloud2 * cloud)
+{
+  return *cloud;
+}
+
+/// nav2 hands out observations by value up to kilted and by shared pointer after it.
+inline const nav2_costmap_2d::Observation & obsOf(
+  const nav2_costmap_2d::Observation & observation)
+{
+  return observation;
+}
+
+inline const nav2_costmap_2d::Observation & obsOf(
+  const std::shared_ptr<const nav2_costmap_2d::Observation> & observation)
+{
+  return *observation;
+}
+
+}  // namespace
+
+/// nav2 declared a layer's parameters through Layer::declareParameter up to kilted and
+/// through the node itself after it.
+template<typename T, typename NodeT>
+T VoxelLayer::declareOrGetParameter(
+  NodeT & node, const std::string & name, const T & defaultValue)
+{
+#ifdef PRE_ROS_LYRICAL
+  declareParameter(name, rclcpp::ParameterValue(defaultValue));
+  T value = defaultValue;
+  node->get_parameter(name_ + "." + name, value);
+  return value;
+#else
+  return node->declare_or_get_parameter(name_ + "." + name, defaultValue);
+#endif
+}
+
 void VoxelLayer::onInitialize()
 {
   nav2_costmap_2d::ObstacleLayer::onInitialize();
-
-  declareParameter("enabled", rclcpp::ParameterValue(true));
-  declareParameter("footprint_clearing_enabled", rclcpp::ParameterValue(true));
-  declareParameter("min_obstacle_height", rclcpp::ParameterValue(0.0));
-  declareParameter("max_obstacle_height", rclcpp::ParameterValue(2.0));
-  declareParameter("z_voxels", rclcpp::ParameterValue(10));
-  declareParameter("origin_z", rclcpp::ParameterValue(0.0));
-  declareParameter("z_resolution", rclcpp::ParameterValue(0.2));
-  declareParameter("unknown_threshold", rclcpp::ParameterValue(15));
-  declareParameter("mark_threshold", rclcpp::ParameterValue(0));
-  declareParameter("combination_method", rclcpp::ParameterValue(1));
-  declareParameter("publish_voxel_map", rclcpp::ParameterValue(false));
-  declareParameter("robot_base_frame", rclcpp::ParameterValue("base_link"));
 
   auto node = node_.lock();
   if (!node) {
     throw std::runtime_error{"Failed to lock node"};
   }
 
-  node->get_parameter(name_ + "." + "enabled", enabled_);
-  node->get_parameter(name_ + "." + "footprint_clearing_enabled", footprint_clearing_enabled_);
-  node->get_parameter(name_ + "." + "min_obstacle_height", min_obstacle_height_);
-  node->get_parameter(name_ + "." + "max_obstacle_height", max_obstacle_height_);
-  node->get_parameter(name_ + "." + "z_voxels", size_z_);
-  node->get_parameter(name_ + "." + "origin_z", origin_z_);
-  node->get_parameter(name_ + "." + "z_resolution", z_resolution_);
-  node->get_parameter(name_ + "." + "unknown_threshold", unknown_threshold_);
-  node->get_parameter(name_ + "." + "mark_threshold", mark_threshold_);
-  node->get_parameter(name_ + "." + "publish_voxel_map", publish_voxel_);
-  node->get_parameter(name_ + "." + "robot_base_frame", robot_base_frame_);
+  enabled_ = declareOrGetParameter(node, "enabled", true);
+  footprint_clearing_enabled_ = declareOrGetParameter(node, "footprint_clearing_enabled", true);
+  min_obstacle_height_ = declareOrGetParameter(node, "min_obstacle_height", 0.0);
+  max_obstacle_height_ = declareOrGetParameter(node, "max_obstacle_height", 2.0);
+  size_z_ = declareOrGetParameter(node, "z_voxels", 10);
+  origin_z_ = declareOrGetParameter(node, "origin_z", 0.0);
+  z_resolution_ = declareOrGetParameter(node, "z_resolution", 0.2);
+  unknown_threshold_ = declareOrGetParameter(node, "unknown_threshold", 15);
+  mark_threshold_ = declareOrGetParameter(node, "mark_threshold", 0);
+  publish_voxel_ = declareOrGetParameter(node, "publish_voxel_map", false);
+  robot_base_frame_ = declareOrGetParameter(node, "robot_base_frame", std::string("base_link"));
 
-  int combination_method_param{};
-  node->get_parameter(name_ + "." + "combination_method", combination_method_param);
+  const int combination_method_param = declareOrGetParameter(node, "combination_method", 1);
 #ifdef PRE_ROS_JAZZY
   combination_method_ = combination_method_param;
 #else
@@ -169,7 +203,11 @@ void VoxelLayer::updateBounds(
   useExtraBounds(min_x, min_y, max_x, max_y);
 
   bool current = true;
+#ifdef PRE_ROS_LYRICAL
   std::vector<nav2_costmap_2d::Observation> observations, clearing_observations;
+#else
+  std::vector<nav2_costmap_2d::Observation::ConstSharedPtr> observations, clearing_observations;
+#endif
 
   // get the marking observations
   current = getMarkingObservations(observations) && current;
@@ -182,16 +220,15 @@ void VoxelLayer::updateBounds(
 
   // raytrace freespace
   for (unsigned int i = 0; i < clearing_observations.size(); ++i) {
-    raytraceFreespace(clearing_observations[i], min_x, min_y, max_x, max_y);
+    raytraceFreespace(obsOf(clearing_observations[i]), min_x, min_y, max_x, max_y);
   }
 
   // place the new obstacles into a priority queue... each with a priority of zero to begin with
-  for (std::vector<nav2_costmap_2d::Observation>::const_iterator it = observations.begin(); it != observations.end();
-    ++it)
+  for (auto it = observations.begin(); it != observations.end(); ++it)
   {
-    const nav2_costmap_2d::Observation & obs = *it;
+    const nav2_costmap_2d::Observation & obs = obsOf(*it);
 
-    const sensor_msgs::msg::PointCloud2 & cloud = *(obs.cloud_);
+    const sensor_msgs::msg::PointCloud2 & cloud = cloudOf(obs.cloud_);
 
     double sq_obstacle_max_range = obs.obstacle_max_range_ * obs.obstacle_max_range_;
     double sq_obstacle_min_range = obs.obstacle_min_range_ * obs.obstacle_min_range_;
@@ -277,7 +314,9 @@ void VoxelLayer::raytraceFreespace(
 {
   auto clearing_endpoints_ = std::make_unique<sensor_msgs::msg::PointCloud2>();
 
-  if (clearing_observation.cloud_->height == 0 || clearing_observation.cloud_->width == 0) {
+  const sensor_msgs::msg::PointCloud2 & clearing_cloud = cloudOf(clearing_observation.cloud_);
+
+  if (clearing_cloud.height == 0 || clearing_cloud.width == 0) {
     return;
   }
 
@@ -311,8 +350,8 @@ void VoxelLayer::raytraceFreespace(
   }
 
   clearing_endpoints_->data.clear();
-  clearing_endpoints_->width = clearing_observation.cloud_->width;
-  clearing_endpoints_->height = clearing_observation.cloud_->height;
+  clearing_endpoints_->width = clearing_cloud.width;
+  clearing_endpoints_->height = clearing_cloud.height;
   clearing_endpoints_->is_dense = true;
   clearing_endpoints_->is_bigendian = false;
 
@@ -331,9 +370,9 @@ void VoxelLayer::raytraceFreespace(
   double map_end_y = origin_y_ + getSizeInMetersY();
   double map_end_z = origin_z_ + getSizeInMetersZ();
 
-  sensor_msgs::PointCloud2ConstIterator<float> iter_x(*(clearing_observation.cloud_), "x");
-  sensor_msgs::PointCloud2ConstIterator<float> iter_y(*(clearing_observation.cloud_), "y");
-  sensor_msgs::PointCloud2ConstIterator<float> iter_z(*(clearing_observation.cloud_), "z");
+  sensor_msgs::PointCloud2ConstIterator<float> iter_x(clearing_cloud, "x");
+  sensor_msgs::PointCloud2ConstIterator<float> iter_y(clearing_cloud, "y");
+  sensor_msgs::PointCloud2ConstIterator<float> iter_z(clearing_cloud, "z");
 
   for (; iter_x != iter_x.end(); ++iter_x, ++iter_y, ++iter_z) {
     double wpx = *iter_x;
@@ -431,7 +470,7 @@ void VoxelLayer::raytraceFreespace(
 
   if (publish_clearing_points) {
     clearing_endpoints_->header.frame_id = global_frame_;
-    clearing_endpoints_->header.stamp = clearing_observation.cloud_->header.stamp;
+    clearing_endpoints_->header.stamp = clearing_cloud.header.stamp;
 
     clearing_endpoints_pub_->publish(std::move(clearing_endpoints_));
   }

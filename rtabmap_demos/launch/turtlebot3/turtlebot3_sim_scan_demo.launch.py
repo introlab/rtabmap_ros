@@ -183,6 +183,12 @@ def generate_launch_description():
             description='Launch ICP odometry on top of wheel odometry.'),
         
         DeclareLaunchArgument(
+            'deskewing', default_value='false',
+            description='Do lidar scan deskewing based on wheel odometry. In simulation it '
+                        'doesn\'t matter because laser scans are not skewed, but the option '
+                        'is there for the demo.'),
+
+        DeclareLaunchArgument(
             'x_pose', default_value='-2.0',
             description='Initial position of the robot in the simulator.'),
         

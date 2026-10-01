@@ -62,6 +62,9 @@ private:
 
 	void timerCallback();
 
+	/// Subscribes to "mapData"; the node is live from here on.
+	void subscribeToMapData();
+
 #ifdef WITH_OCTOMAP_MSGS
 #ifdef RTABMAP_OCTOMAP
 	void octomapBinaryCallback(
@@ -79,6 +82,7 @@ private:
 private:
 	MapsManager mapsManager_;
 	std::map<int, rtabmap::Signature> nodes_;
+	int lastNodeAdded_;
 	std::map<int, rtabmap::Transform> optimizedPoses_;
 	std::string mapFrameId_;
 	std::string rtabmapNodeName_;
@@ -99,6 +103,7 @@ private:
 #endif
 #endif
 	bool localGridsRegenerated_;
+	double initializeFromRtabmapTimeout_;
 };
 
 }

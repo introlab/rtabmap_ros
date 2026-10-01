@@ -41,8 +41,6 @@ namespace rtabmap_util
 
 PointCloudAggregator::PointCloudAggregator(const rclcpp::NodeOptions & options) :
 	Node("point_cloud_aggregator", options),
-	warningThread_(0),
-	callbackCalled_(false),
 	exactSync4_(0),
 	approxSync4_(0),
 	exactSync3_(0),
@@ -162,23 +160,16 @@ PointCloudAggregator::PointCloudAggregator(const rclcpp::NodeOptions & options) 
 	}
 
 
-	warningThread_ = new std::thread([&](){
-		rclcpp::Rate r(1.0/5.0);
-		while(!callbackCalled_)
-		{
-			r.sleep();
-			if(!callbackCalled_)
-			{
-				RCLCPP_WARN(this->get_logger(), "%s: Did not receive data since 5 seconds! Make sure the input topics are "
-						"published (\"$ ros2 topic hz my_topic\") and the timestamps in their "
-						"header are set. %s%s",
-						this->get_name(),
-						approx?"":"Parameter \"approx_sync\" is false, which means that input "
-							"topics should have all the exact timestamp for the callback to be called.",
-						subscribedTopicsMsg.c_str());
-			}
-		}
-	});
+	syncDiagnostic_.reset(new rtabmap_sync::SyncDiagnostic(this, 0.5));
+	syncDiagnostic_->init(cloudSub_1_.getSubscriber()->get_topic_name(),
+		uFormat("%s: Did not receive data since 5 seconds! Make sure the input topics are "
+				"published (\"$ ros2 topic hz my_topic\") and the timestamps in their "
+				"header are set. %s%s",
+				this->get_name(),
+				approx?"":"Parameter \"approx_sync\" is false, which means that input "
+					"topics should have all the exact timestamp for the callback to be called.",
+				subscribedTopicsMsg.c_str()));
+
 	RCLCPP_INFO(this->get_logger(), "%s", subscribedTopicsMsg.c_str());
 }
 
@@ -190,13 +181,6 @@ PointCloudAggregator::~PointCloudAggregator()
 	delete approxSync3_;
 	delete exactSync2_;
 	delete approxSync2_;
-
-	if(warningThread_)
-	{
-		callbackCalled_=true;
-		warningThread_->join();
-		delete warningThread_;
-	}
 }
 
 void PointCloudAggregator::clouds4_callback(const sensor_msgs::msg::PointCloud2::ConstSharedPtr cloudMsg_1,
@@ -234,8 +218,8 @@ void PointCloudAggregator::clouds2_callback(const sensor_msgs::msg::PointCloud2:
 }
 void PointCloudAggregator::combineClouds(const std::vector<sensor_msgs::msg::PointCloud2::ConstSharedPtr> & cloudMsgs)
 {
-	callbackCalled_ = true;
 	UASSERT(cloudMsgs.size() > 1);
+	syncDiagnostic_->tickInput(cloudMsgs[0]->header.stamp);
 	if(cloudPub_->get_subscription_count())
 	{
 		pcl::PCLPointCloud2::Ptr output(new pcl::PCLPointCloud2);
@@ -420,6 +404,7 @@ void PointCloudAggregator::combineClouds(const std::vector<sensor_msgs::msg::Poi
 		rosCloud->header.frame_id = frameId;
 		cloudPub_->publish(std::move(rosCloud));
 	}
+	syncDiagnostic_->tickOutput(cloudMsgs[0]->header.stamp);
 }
 }
 

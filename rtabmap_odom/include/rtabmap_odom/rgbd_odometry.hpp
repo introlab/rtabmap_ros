@@ -38,6 +38,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <image_transport/subscriber_filter.hpp>
 
 #include <sensor_msgs/msg/image.hpp>
+#include <rtabmap_msgs/msg/key_point.hpp>
+#include <rtabmap_msgs/msg/point3f.hpp>
 #include <rtabmap_msgs/msg/rgbd_image.hpp>
 #include <rtabmap_msgs/msg/rgbd_images.hpp>
 
@@ -50,6 +52,18 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace rtabmap_odom
 {
 
+/**
+ * @brief Odometry from an RGB-D camera, or from several on one rig.
+ *
+ * Takes either the three raw topics of a camera (`rgb/image`, `depth/image`,
+ * `rgb/camera_info`) or pre-synchronized rtabmap_msgs::msg::RGBDImage messages, one per
+ * camera, and registers each frame's visual features against a local feature map. A
+ * frame that arrives with its own keypoints, 3D points and descriptors is registered
+ * with those rather than having them extracted again.
+ *
+ * @see doc/rgbd_odometry.md for the topics, the parameters and what to do when it loses
+ *      tracking.
+ */
 class RGBDOdometry : public rtabmap_odom::OdometryROS
 {
 public:
@@ -61,10 +75,19 @@ private:
 	virtual void updateParameters(rtabmap::ParametersMap & parameters);
 	virtual void onOdomInit();
 
+	/**
+	 * Local features, when the input topic carries them, are indexed per camera like
+	 * the images are: one entry per camera, in the same order. They are optional, and
+	 * a frame that comes without them is processed exactly as before, the features
+	 * being extracted from the images downstream.
+	 */
 	void commonCallback(
 				const std::vector<cv_bridge::CvImageConstPtr> & rgbImages,
 				const std::vector<cv_bridge::CvImageConstPtr> & depthImages,
-				const std::vector<sensor_msgs::msg::CameraInfo>& cameraInfos);
+				const std::vector<sensor_msgs::msg::CameraInfo>& cameraInfos,
+				const std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > & localKeyPointsMsgs = {},
+				const std::vector<std::vector<rtabmap_msgs::msg::Point3f> > & localPoints3dMsgs = {},
+				const std::vector<cv::Mat> & localDescriptorsMsgs = {});
 
 	void callback(
 			const sensor_msgs::msg::Image::ConstSharedPtr image,

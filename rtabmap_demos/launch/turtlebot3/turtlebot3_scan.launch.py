@@ -27,13 +27,17 @@ def launch_setup(context, *args, **kwargs):
     localization = localization == 'True' or localization == 'true'
     icp_odometry = LaunchConfiguration('icp_odometry').perform(context)
     icp_odometry = icp_odometry == 'True' or icp_odometry == 'true'
+    deskewing = LaunchConfiguration('deskewing').perform(context)
+    deskewing = deskewing == 'True' or deskewing == 'true'
     
     parameters={
           'frame_id':'base_footprint',
           'use_sim_time':use_sim_time,
           'subscribe_depth':False,
           'subscribe_rgb':False,
-          'subscribe_scan':True,
+          'subscribe_scan':not deskewing,
+          'subscribe_scan_cloud':deskewing,
+          'scan_cloud_is_2d': True,
           'approx_sync':True,
           'use_action_for_goal':True,
           'Reg/Strategy':'1',
@@ -50,13 +54,24 @@ def launch_setup(context, *args, **kwargs):
         arguments.append('-d') # This will delete the previous database (~/.ros/rtabmap.db)
                
     remappings=[
-          ('scan', '/scan')]
+          ('scan', '/scan' if not deskewing else 'scan_not_used'),
+          ('scan_cloud', '/scan/deskewed' if deskewing else 'scan_cloud_not_used' )]
     if icp_odometry:
         remappings.append(('odom', 'icp_odom'))
     
     return [
         # Nodes to launch
-        
+
+        # Lidar deskewing (optional, useful with real lidar)
+        Node(
+            condition=IfCondition(LaunchConfiguration('deskewing')),
+            package='rtabmap_util', executable='lidar_deskewing', output='screen',
+            parameters=[{'wait_for_transform': 0.1,
+                         'fixed_frame_id': 'odom',
+                         'slerp': False,
+                         'use_sim_time':use_sim_time}],
+            remappings=[('input_scan', '/scan')]),
+
         # ICP odometry (optional)
         Node(
             condition=IfCondition(LaunchConfiguration('icp_odometry')),
@@ -96,6 +111,10 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'icp_odometry', default_value='false',
             description='Launch ICP odometry on top of wheel odometry.'),
+
+        DeclareLaunchArgument(
+            'deskewing', default_value='false',
+            description='Do lidar scan deskewing based on wheel odometry.'),
 
         OpaqueFunction(function=launch_setup)
     ])

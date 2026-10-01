@@ -28,6 +28,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap_util/disparity_to_depth.hpp>
 #include <sensor_msgs/image_encodings.hpp>
 
+#include <rtabmap/utilite/ULogger.h>
+#include <rtabmap/utilite/UConversion.h>
+
 #include <image_transport/image_transport.hpp>
 
 #ifdef PRE_ROS_IRON
@@ -44,16 +47,27 @@ DisparityToDepth::DisparityToDepth(const rclcpp::NodeOptions & options) :
 {
 	int qos = RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT;
 	qos = this->declare_parameter("qos", qos);
+	// Each side can be set independently so the node can bridge a producer and a
+	// consumer that don't agree on reliability. Both default to qos.
+	int qosSub = this->declare_parameter("qos_sub", qos);
+	int qosPub = this->declare_parameter("qos_pub", qos);
+	int queueSub = this->declare_parameter("queue_sub", 1);
+	int queuePub = this->declare_parameter("queue_pub", 1);
+
+	UASSERT_MSG(queueSub >= 1 && queuePub >= 1,
+			uFormat("queue_sub (%d) and queue_pub (%d) must be at least 1", queueSub, queuePub).c_str());
+
+	const rclcpp::QoS pubQos = rclcpp::QoS(queuePub).reliability((rmw_qos_reliability_policy_t)qosPub);
 
 #ifdef PRE_ROS_LYRICAL
-	pub32f_ = image_transport::create_publisher(this, "depth", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());
-	pub16u_ = image_transport::create_publisher(this, "depth_raw", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos).get_rmw_qos_profile());	
+	pub32f_ = image_transport::create_publisher(this, "depth", pubQos.get_rmw_qos_profile());
+	pub16u_ = image_transport::create_publisher(this, "depth_raw", pubQos.get_rmw_qos_profile());
 #else
-	pub32f_ = image_transport::create_publisher(*this, "depth", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos));
-	pub16u_ = image_transport::create_publisher(*this, "depth_raw", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos));
+	pub32f_ = image_transport::create_publisher(*this, "depth", pubQos);
+	pub16u_ = image_transport::create_publisher(*this, "depth_raw", pubQos);
 #endif
 
-	sub_ = create_subscription<stereo_msgs::msg::DisparityImage>("disparity", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos), std::bind(&DisparityToDepth::callback, this, std::placeholders::_1));
+	sub_ = create_subscription<stereo_msgs::msg::DisparityImage>("disparity", rclcpp::QoS(queueSub).reliability((rmw_qos_reliability_policy_t)qosSub), std::bind(&DisparityToDepth::callback, this, std::placeholders::_1));
 }
 
 DisparityToDepth::~DisparityToDepth(){}
