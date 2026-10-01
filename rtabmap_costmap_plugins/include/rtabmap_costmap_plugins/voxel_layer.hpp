@@ -284,6 +284,15 @@ protected:
   rcl_interfaces::msg::SetParametersResult
   dynamicParametersCallback(std::vector<rclcpp::Parameter> parameters);
 
+  /**
+   * @brief Declares one of this layer's parameters and returns its value
+   * @param node the node the layer runs in
+   * @param name the parameter's name, without the layer prefix
+   * @param defaultValue the value to use when nothing else sets it
+   */
+  template<typename T, typename NodeT>
+  T declareOrGetParameter(NodeT & node, const std::string & name, const T & defaultValue);
+
   // Dynamic parameters handler
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr dyn_params_handler_;
 };

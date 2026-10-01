@@ -4,9 +4,13 @@ on:
   push:
     branches:
       - 'master'
+  workflow_dispatch:
 
 jobs:
   docker:
+    # Built and pushed only from master (push or manual dispatch), since it
+    # pushes the introlab3it/rtabmap_ros tags to Docker Hub.
+    if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     
     strategy:

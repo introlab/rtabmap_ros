@@ -2,7 +2,7 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>rtabmap_sync</name>
-  <version>0.23.7</version>
+  <version>0.23.13</version>
   <description>RTAB-Map's synchronization package.</description>
   <maintainer email="matlabbe@gmail.com">Mathieu Labbe</maintainer>
   <author>Mathieu Labbe</author>
@@ -25,7 +25,10 @@
   <depend>sensor_msgs</depend>
   <depend>diagnostic_updater</depend>
 
+  <test_depend>ament_cmake_gtest</test_depend>
+
   <export>
 	<build_type>ament_cmake</build_type>
+	<rosdoc2>rosdoc2.yaml</rosdoc2>
   </export>
 </package>
