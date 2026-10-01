@@ -25,6 +25,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include <rtabmap_conversions/PointCloudConversion.h>
 #include <rtabmap_odom/icp_odometry.hpp>
 
 #include <laser_geometry/laser_geometry.hpp>
@@ -69,6 +70,7 @@ ICPOdometry::ICPOdometry(const rclcpp::NodeOptions & options) :
 
 ICPOdometry::~ICPOdometry()
 {
+	this->join(true);
 }
 
 void ICPOdometry::onOdomInit()
@@ -313,7 +315,7 @@ void ICPOdometry::callbackScan(const sensor_msgs::msg::LaserScan::SharedPtr scan
 				scanMsg->header.frame_id,
 				guessFrameId().empty()?frameId():guessFrameId(),
 				scanMsg->header.stamp,
-				rclcpp::Time(scanMsg->header.stamp.sec, scanMsg->header.stamp.nanosec) + rclcpp::Duration::from_seconds(scanMsg->ranges.size()*scanMsg->time_increment),
+				rclcpp::Time(scanMsg->header.stamp.sec, scanMsg->header.stamp.nanosec) + rclcpp::Duration::from_seconds((scanMsg->ranges.empty()?0:scanMsg->ranges.size()-1)*scanMsg->time_increment),
 				this->tfBuffer(),
 				this->waitForTransform());
 		if(tmpT.isNull())
@@ -333,7 +335,7 @@ void ICPOdometry::callbackScan(const sensor_msgs::msg::LaserScan::SharedPtr scan
 		{
 			// deskew with constant velocity model (we are in frameId)
 			sensor_msgs::msg::PointCloud2 scanOutDeskewed;
-			if(!rtabmap_conversions::deskew(scanOut, scanOutDeskewed, previousStamp(), velocityGuess()))
+			if(!rtabmap_conversions::deskew(scanOut, scanOutDeskewed, velocityGuess()))
 			{
 				RCLCPP_ERROR(this->get_logger(), "Failed to deskew input cloud, aborting odometry update!");
 				return;
@@ -362,7 +364,7 @@ void ICPOdometry::callbackScan(const sensor_msgs::msg::LaserScan::SharedPtr scan
 		{
 			// deskew with constant velocity model
 			sensor_msgs::msg::PointCloud2 scanOutDeskewed;
-			if(!rtabmap_conversions::deskew(scanOut, scanOutDeskewed, previousStamp(), velocityGuess()))
+			if(!rtabmap_conversions::deskew(scanOut, scanOutDeskewed, velocityGuess()))
 			{
 				RCLCPP_ERROR(this->get_logger(), "Failed to deskew input cloud, aborting odometry update!");
 				return;
@@ -399,12 +401,12 @@ void ICPOdometry::callbackScan(const sensor_msgs::msg::LaserScan::SharedPtr scan
 
 	if(hasIntensity)
 	{
-		pcl::fromROSMsg(scanOut, *pclScanI);
+		rtabmap_conversions::fromPointCloud2Msg(scanOut, *pclScanI);
 		pclScanI->is_dense = true;
 	}
 	else
 	{
-		pcl::fromROSMsg(scanOut, *pclScan);
+		rtabmap_conversions::fromPointCloud2Msg(scanOut, *pclScan);
 		pclScan->is_dense = true;
 	}
 
@@ -519,7 +521,7 @@ void ICPOdometry::callbackScan(const sensor_msgs::msg::LaserScan::SharedPtr scan
 void ICPOdometry::callbackCloud(const sensor_msgs::msg::PointCloud2::SharedPtr pointCloudMsg)
 {
 	UASSERT_MSG(pointCloudMsg->data.size() == pointCloudMsg->row_step*pointCloudMsg->height,
-			uFormat("data=%d row_step=%d height=%d", pointCloudMsg->data.size(), pointCloudMsg->row_step, pointCloudMsg->height).c_str());
+			uFormat("data=%d row_step=%d height=%d", (int)pointCloudMsg->data.size(), (int)pointCloudMsg->row_step, (int)pointCloudMsg->height).c_str());
 
 	if(scanReceived_)
 	{
@@ -583,7 +585,7 @@ void ICPOdometry::callbackCloud(const sensor_msgs::msg::PointCloud2::SharedPtr p
 			}
 
 			std::shared_ptr<sensor_msgs::msg::PointCloud2> cloudDeskewed(new sensor_msgs::msg::PointCloud2);
-			if(!rtabmap_conversions::deskew(*cloudPtr, *cloudDeskewed, previousStamp(), velocityGuess()))
+			if(!rtabmap_conversions::deskew(*cloudPtr, *cloudDeskewed, velocityGuess()))
 			{
 				RCLCPP_ERROR(this->get_logger(), "Failed to deskew input cloud, aborting odometry update!");
 				return;
@@ -668,7 +670,7 @@ void ICPOdometry::callbackCloud(const sensor_msgs::msg::PointCloud2::SharedPtr p
 	if(hasNormals && hasIntensity)
 	{
 		pcl::PointCloud<pcl::PointXYZINormal>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZINormal>);
-		pcl::fromROSMsg(*cloudMsg, *pclScan);
+		rtabmap_conversions::fromPointCloud2Msg(*cloudMsg, *pclScan);
 		if(pclScan->size() && scanDownsamplingStep_ > 1)
 		{
 			pclScan = util3d::downsample(pclScan, scanDownsamplingStep_);
@@ -686,7 +688,7 @@ void ICPOdometry::callbackCloud(const sensor_msgs::msg::PointCloud2::SharedPtr p
 	else if(hasNormals)
 	{
 		pcl::PointCloud<pcl::PointNormal>::Ptr pclScan(new pcl::PointCloud<pcl::PointNormal>);
-		pcl::fromROSMsg(*cloudMsg, *pclScan);
+		rtabmap_conversions::fromPointCloud2Msg(*cloudMsg, *pclScan);
 		if(pclScan->size() && scanDownsamplingStep_ > 1)
 		{
 			pclScan = util3d::downsample(pclScan, scanDownsamplingStep_);
@@ -704,7 +706,7 @@ void ICPOdometry::callbackCloud(const sensor_msgs::msg::PointCloud2::SharedPtr p
 	else if(hasIntensity)
 	{
 		pcl::PointCloud<pcl::PointXYZI>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZI>);
-		pcl::fromROSMsg(*cloudMsg, *pclScan);
+		rtabmap_conversions::fromPointCloud2Msg(*cloudMsg, *pclScan);
 		if(pclScan->size() && scanDownsamplingStep_ > 1)
 		{
 			pclScan = util3d::downsample(pclScan, scanDownsamplingStep_);
@@ -750,7 +752,7 @@ void ICPOdometry::callbackCloud(const sensor_msgs::msg::PointCloud2::SharedPtr p
 	else
 	{
 		pcl::PointCloud<pcl::PointXYZ>::Ptr pclScan(new pcl::PointCloud<pcl::PointXYZ>);
-		pcl::fromROSMsg(*cloudMsg, *pclScan);
+		rtabmap_conversions::fromPointCloud2Msg(*cloudMsg, *pclScan);
 		if(pclScan->size() && scanDownsamplingStep_ > 1)
 		{
 			pclScan = util3d::downsample(pclScan, scanDownsamplingStep_);
