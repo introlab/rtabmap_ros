@@ -240,4 +240,43 @@ install(DIRECTORY include/
    FILES_MATCHING PATTERN "*.h"
 )
 
+#############
+## Testing ##
+#############
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+  find_package(rtabmap_conversions REQUIRED)
+
+  # Each test binary drives its own rtabmap node: a crash or a stuck executor in one
+  # cannot take the others down, and each starts from a clean DDS graph.
+  #
+  # Each binary also gets its own DDS domain. colcon tests packages in parallel and ctest
+  # can run these binaries in parallel, while these suites share topic names -- odom,
+  # scan, info -- with the other packages' suites. On a shared domain they discover each
+  # other's publishers and assertions then see traffic the test never sent. rtabmap_util
+  # numbers from 30, rtabmap_sync from 50 and rtabmap_odom from 70; keep the ranges apart.
+  set(rtabmap_slam_test_domain_id 90)
+  macro(rtabmap_slam_add_node_test test_name)
+    ament_add_gtest(${test_name} test/${test_name}.cpp
+      ENV ROS_DOMAIN_ID=${rtabmap_slam_test_domain_id}
+      TIMEOUT 300)
+    math(EXPR rtabmap_slam_test_domain_id "${rtabmap_slam_test_domain_id} + 1")
+    if(TARGET ${test_name})
+      target_include_directories(${test_name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/test)
+      target_link_libraries(${test_name} rtabmap_slam_plugins)
+      if("$ENV{ROS_DISTRO}" STRLESS "lyrical")
+        ament_target_dependencies(${test_name} ${AmentLibraries} rtabmap_conversions)
+      else()
+        target_link_libraries(${test_name} ${Libraries} rtabmap_conversions::rtabmap_conversions)
+      endif()
+    endif()
+  endmacro()
+
+  rtabmap_slam_add_node_test(test_core_wrapper_parameters)
+  rtabmap_slam_add_node_test(test_core_wrapper_mapping)
+  rtabmap_slam_add_node_test(test_core_wrapper_services)
+  rtabmap_slam_add_node_test(test_core_wrapper_planning)
+  rtabmap_slam_add_node_test(test_core_wrapper_inputs)
+endif()
+
 ament_package()

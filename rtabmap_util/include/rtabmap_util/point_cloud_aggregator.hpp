@@ -36,6 +36,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <message_filters/sync_policies/approximate_time.hpp>
 #include <message_filters/subscriber.hpp>
 #include <message_filters/sync_policies/exact_time.hpp>
+#include <rtabmap_sync/SyncDiagnostic.h>
 
 namespace rtabmap_util
 {
@@ -66,8 +67,7 @@ private:
 						 const sensor_msgs::msg::PointCloud2::ConstSharedPtr cloudMsg_2);
 	void combineClouds(const std::vector<sensor_msgs::msg::PointCloud2::ConstSharedPtr> & cloudMsgs);
 
-	std::thread * warningThread_;
-	bool callbackCalled_;
+	std::unique_ptr<rtabmap_sync::SyncDiagnostic> syncDiagnostic_;
 
 	typedef message_filters::sync_policies::ExactTime<sensor_msgs::msg::PointCloud2, sensor_msgs::msg::PointCloud2, sensor_msgs::msg::PointCloud2, sensor_msgs::msg::PointCloud2> ExactSync4Policy;
 	typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::msg::PointCloud2, sensor_msgs::msg::PointCloud2, sensor_msgs::msg::PointCloud2, sensor_msgs::msg::PointCloud2> ApproxSync4Policy;

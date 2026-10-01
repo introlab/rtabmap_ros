@@ -25,6 +25,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include <rtabmap_conversions/PointCloudConversion.h>
 #include "rtabmap_rviz_plugins/MapCloudDisplay.h"
 
 #include <QApplication>
@@ -325,7 +326,7 @@ void MapCloudDisplay::processMapData(const rtabmap_msgs::msg::MapData& map)
 
 					if(!cloud->empty())
 					{
-						pcl::toROSMsg(*cloud, *cloudMsg);
+						rtabmap_conversions::toPointCloud2Msg(*cloud, *cloudMsg);
 					}
 				}
 			}
@@ -352,7 +353,7 @@ void MapCloudDisplay::processMapData(const rtabmap_msgs::msg::MapData& map)
 
 				if(!cloud->empty())
 				{
-					pcl::toROSMsg(*cloud, *cloudMsg);
+					rtabmap_conversions::toPointCloud2Msg(*cloud, *cloudMsg);
 				}
 			}
 

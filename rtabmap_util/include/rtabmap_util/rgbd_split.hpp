@@ -48,6 +48,9 @@ public:
 	void callback(const rtabmap_msgs::msg::RGBDImage::SharedPtr input) const;
 
 private:
+	/// True when the outputs are named left/right rather than rgb/depth.
+	bool stereo_;
+
 	rclcpp::Subscription<rtabmap_msgs::msg::RGBDImage>::SharedPtr rgbdImageSub_;
 
 	image_transport::Publisher rgbPub_;

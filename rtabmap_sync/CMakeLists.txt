@@ -2,16 +2,17 @@ cmake_minimum_required(VERSION 3.5)
 project(rtabmap_sync)
 
 if(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
-  # issues #1285 #1288
+  # issues #1285 #1288 (best-effort probes: not REQUIRED, a phantom miss under
+  # emulated arm64 should not fail the build)
   find_library(
     builtin_interfaces__rosidl_generator_c_LIB NAMES builtin_interfaces__rosidl_generator_c
     PATHS "/opt/ros/$ENV{ROS_DISTRO}/lib"
-    NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH REQUIRED
+    NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH
   )
   find_library(
     crypto_LIB NAMES crypto
     PATHS "/usr/lib/${CMAKE_SYSTEM_PROCESSOR}-linux-gnu"
-    NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH REQUIRED
+    NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH
   )
 endif()
 
@@ -195,5 +196,45 @@ install(DIRECTORY include/
    DESTINATION include
    FILES_MATCHING PATTERN "*.h"
 )
+
+#############
+## Testing ##
+#############
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+  find_package(RTABMap REQUIRED)
+
+  # Each node gets its own test binary: a crash or a stuck executor in one node cannot
+  # take the others down, and every binary starts with a clean DDS graph.
+  #
+  # Each binary also gets its own DDS domain. colcon tests packages in parallel and ctest
+  # can run these binaries in parallel, while these suites share topic names -- rgb/image,
+  # rgbd_image, odom -- with rtabmap_util's. On a shared domain they discover each other's
+  # publishers, and assertions then see traffic the test never sent. rtabmap_util numbers
+  # its own from 30; keep the two ranges apart.
+  set(rtabmap_sync_test_domain_id 50)
+  macro(rtabmap_sync_add_node_test test_name)
+    ament_add_gtest(${test_name} test/${test_name}.cpp
+      ENV ROS_DOMAIN_ID=${rtabmap_sync_test_domain_id})
+    math(EXPR rtabmap_sync_test_domain_id "${rtabmap_sync_test_domain_id} + 1")
+    if(TARGET ${test_name})
+      target_include_directories(${test_name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/test)
+      target_link_libraries(${test_name} rtabmap_sync_plugins rtabmap_sync)
+      if("$ENV{ROS_DISTRO}" STRLESS "lyrical")
+        ament_target_dependencies(${test_name} ${AmentLibraries})
+      else()
+        target_link_libraries(${test_name} ${Libraries} ${PublicLibraries})
+      endif()
+    endif()
+  endmacro()
+
+  rtabmap_sync_add_node_test(test_rgbd_sync)
+  rtabmap_sync_add_node_test(test_rgb_sync)
+  rtabmap_sync_add_node_test(test_stereo_sync)
+  rtabmap_sync_add_node_test(test_rgbdx_sync)
+  rtabmap_sync_add_node_test(test_common_data_subscriber)
+  rtabmap_sync_add_node_test(test_common_data_subscriber_sync)
+  rtabmap_sync_add_node_test(test_sync_diagnostic)
+endif()
 
 ament_package(CONFIG_EXTRAS ${CMAKE_CURRENT_BINARY_DIR}/cmake/extra_configs.cmake)

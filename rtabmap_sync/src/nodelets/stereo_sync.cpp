@@ -48,6 +48,7 @@ StereoSync::StereoSync(const rclcpp::NodeOptions & options) :
 		Node("stereo_sync", options),
 		compressedRate_(0),
 		approxSyncMaxInterval_(0.0),
+		lastCompressedPublished_(0, 0, RCL_ROS_TIME),
 		approxSync_(0),
 		exactSync_(0)
 {

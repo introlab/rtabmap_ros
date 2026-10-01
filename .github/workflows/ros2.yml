@@ -6,6 +6,7 @@ on:
     branches: [ lyrical-devel ]
   pull_request:
     branches: [ lyrical-devel ]
+  workflow_dispatch:
 
 env:
   BUILD_TYPE: Release
@@ -16,16 +17,16 @@ concurrency:
 
 jobs:
   build:
-    name: Build ros2 ${{ matrix.ros_distro }}
+    name: Build ros2 ${{ matrix.ros_distro }}${{ matrix.ros2_testing && ' (ros-testing)' || '' }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
         ros_distro: [lyrical]
+        ros2_testing: [false, true] # build with main and ros-testing apt repositories
         include:
         - ros_distro: lyrical
           skip_keys: '' # skip keys shoudl be empty when release on ROSDISTRO_devel branch, comment these keys in the appriopriate package.
-          # rtabmap_costmap_plugins cannot be built, missing nav2 on lyrical, commented from rtabmap_ros package. 
-          # Make sure rosdistro doesn't declare rtabmap_costmap_plugins.
+          # velodyne and grid_map_ros are not available on lyrical, they are commented in rtabmap_examples and rtabmap_util packages.
           packages: 'rtabmap_ros'
       fail-fast: false
     container:
@@ -35,6 +36,7 @@ jobs:
     - uses: ros-tooling/setup-ros@v0.7
       with:
         required-ros-distributions: ${{ matrix.ros_distro }}
+        use-ros2-testing: ${{ matrix.ros2_testing }}
     - run: |
         DEBIAN_FRONTEND=noninteractive
         sudo apt update

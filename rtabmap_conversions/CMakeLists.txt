@@ -30,7 +30,7 @@ find_package(tf2_eigen REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 
-find_package(RTABMap 0.23.5 REQUIRED)
+find_package(RTABMap 0.23.13 REQUIRED)
 
 # libraries
 SET(Libraries
@@ -121,6 +121,23 @@ install(DIRECTORY include/
    DESTINATION include
    FILES_MATCHING PATTERN "*.h"
 )
+
+#############
+## Testing ##
+#############
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+
+  ament_add_gtest(test_msg_conversion test/test_msg_conversion.cpp)
+  if(TARGET test_msg_conversion)
+    target_link_libraries(test_msg_conversion rtabmap_conversions)
+    if("$ENV{ROS_DISTRO}" STRLESS "lyrical")
+      ament_target_dependencies(test_msg_conversion ${AmentLibraries})
+    else()
+      target_link_libraries(test_msg_conversion ${Libraries} ${PublicLibraries})
+    endif()
+  endif()
+endif()
 
 ament_package()
 
