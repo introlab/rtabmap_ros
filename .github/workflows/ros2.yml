@@ -13,7 +13,7 @@ env:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -27,7 +27,8 @@ jobs:
         - ros_distro: lyrical
           skip_keys: '' # skip keys shoudl be empty when release on ROSDISTRO_devel branch, comment these keys in the appriopriate package.
           # velodyne and grid_map_ros are not available on lyrical, they are commented in rtabmap_examples and rtabmap_util packages.
-          packages: 'rtabmap_ros'
+          # Listed packages are built with their dependencies, but only listed packages are tested.
+          packages: 'rtabmap_ros rtabmap_conversions rtabmap_odom rtabmap_slam rtabmap_sync rtabmap_util rtabmap_python'
       fail-fast: false
     container:
       image: osrf/ros:${{ matrix.ros_distro }}-desktop-full
