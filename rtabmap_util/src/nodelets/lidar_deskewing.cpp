@@ -61,7 +61,7 @@ void LidarDeskewing::callbackScan(const sensor_msgs::msg::LaserScan::ConstShared
 			msg->header.frame_id,
 			fixedFrameId_,
 			msg->header.stamp,
-			rclcpp::Time(msg->header.stamp.sec, msg->header.stamp.nanosec) + rclcpp::Duration::from_seconds(msg->ranges.size()*msg->time_increment),
+			rclcpp::Time(msg->header.stamp.sec, msg->header.stamp.nanosec) + rclcpp::Duration::from_seconds((msg->ranges.empty()?0:msg->ranges.size()-1)*msg->time_increment),
 			*tfBuffer_,
 			waitForTransformDuration_);
 	if(tmpT.isNull())

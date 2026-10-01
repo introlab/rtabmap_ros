@@ -44,6 +44,17 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace rtabmap_sync
 {
 
+/**
+ * @brief Groups a camera's color and calibration topics into one `RGBDImage`, with no
+ *        depth.
+ *
+ * The RGB-only counterpart of RGBDSync, for a monocular camera feeding an appearance-only
+ * pipeline -- loop closure detection and relocalization without 3D reconstruction. With
+ * `fill_empty_depth` it adds an all-zero depth image for consumers that insist on one.
+ *
+ * See the [node documentation](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_sync/doc/rgb_sync.md)
+ * for topics and parameters.
+ */
 class RGBSync : public rclcpp::Node
 {
 public:
@@ -60,6 +71,9 @@ private:
 	double compressedRate_;
 	bool fillEmptyDepth_;
 
+	/// Stamp of the last compressed message published, for compressed_rate throttling.
+	/// Explicitly on the ROS clock: the default is the system clock, and rclcpp refuses
+	/// to compare two times that do not come from the same source.
 	rclcpp::Time lastCompressedPublished_;
 
 	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr rgbdImagePub_;

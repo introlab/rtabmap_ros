@@ -43,6 +43,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "rtabmap/core/Compression.h"
 #include "rtabmap/utilite/UConversion.h"
+#include "rtabmap/utilite/ULogger.h"
 
 namespace rtabmap_util
 {
@@ -54,11 +55,20 @@ RGBDRelay::RGBDRelay(const rclcpp::NodeOptions & options) :
 {
 	int qos = RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT;
 	qos = this->declare_parameter("qos", qos);
+	// The two sides can be set independently so the relay can bridge a publisher
+	// and a subscriber that don't agree on reliability. Both default to qos.
+	int qosSub = this->declare_parameter("qos_sub", qos);
+	int qosPub = this->declare_parameter("qos_pub", qos);
+	int queueSub = this->declare_parameter("queue_sub", 5);
+	int queuePub = this->declare_parameter("queue_pub", 1);
 	compress_ = this->declare_parameter("compress", compress_);
 	uncompress_ = this->declare_parameter("uncompress", uncompress_);
 
-	rgbdImageSub_ = create_subscription<rtabmap_msgs::msg::RGBDImage>("rgbd_image", rclcpp::QoS(5).reliability((rmw_qos_reliability_policy_t)qos), std::bind(&RGBDRelay::callback, this, std::placeholders::_1));
-	rgbdImagePub_ = create_publisher<rtabmap_msgs::msg::RGBDImage>("rgbd_image_relay", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos));
+	UASSERT_MSG(queueSub >= 1 && queuePub >= 1,
+			uFormat("queue_sub (%d) and queue_pub (%d) must be at least 1", queueSub, queuePub).c_str());
+
+	rgbdImageSub_ = create_subscription<rtabmap_msgs::msg::RGBDImage>("rgbd_image", rclcpp::QoS(queueSub).reliability((rmw_qos_reliability_policy_t)qosSub), std::bind(&RGBDRelay::callback, this, std::placeholders::_1));
+	rgbdImagePub_ = create_publisher<rtabmap_msgs::msg::RGBDImage>("rgbd_image_relay", rclcpp::QoS(queuePub).reliability((rmw_qos_reliability_policy_t)qosPub));
 }
 
 void RGBDRelay::callback(const rtabmap_msgs::msg::RGBDImage::SharedPtr input) const
@@ -125,7 +135,7 @@ void RGBDRelay::callback(const rtabmap_msgs::msg::RGBDImage::SharedPtr input) co
 				// already raw, just copy pointer
 				output->rgb = input->rgb;
 			}
-			if(!input->rgb_compressed.data.empty())
+			else if(!input->rgb_compressed.data.empty())
 			{
 				cv_bridge::toCvCopy(input->rgb_compressed)->toImageMsg(output->rgb);
 			}
@@ -135,20 +145,37 @@ void RGBDRelay::callback(const rtabmap_msgs::msg::RGBDImage::SharedPtr input) co
 				// already raw, just copy pointer
 				output->depth = input->depth;
 			}
-			else if(input->depth_compressed.format.compare("jpg")==0)
+			else if(!input->depth_compressed.data.empty())
 			{
-				// right stereo image
-				cv_bridge::toCvCopy(input->depth_compressed)->toImageMsg(output->depth);
-			}
-			else
-			{
-				// dpeth image
+				// Decode first, then pick the encoding from what actually came out.
+				// Branching on the "jpg"/"png" format string instead would abort on a
+				// right image compressed as PNG, which nothing forbids.
 				auto cvImg = std::make_unique<cv_bridge::CvImage>();
 				cvImg->header = input->depth_compressed.header;
 				cvImg->image = rtabmap::uncompressImage(input->depth_compressed.data);
-				UASSERT(cvImg->image.empty() || cvImg->image.type() == CV_32FC1 || cvImg->image.type() == CV_16UC1);
-				cvImg->encoding = cvImg->image.empty()?"":cvImg->image.type() == CV_32FC1?sensor_msgs::image_encodings::TYPE_32FC1:sensor_msgs::image_encodings::TYPE_16UC1;
-				cvImg->toImageMsg(output->depth);
+				if(cvImg->image.empty())
+				{
+					RCLCPP_ERROR(this->get_logger(), "Could not decompress the depth/right image of \"%s\" (format=\"%s\").",
+							rgbdImageSub_->get_topic_name(), input->depth_compressed.format.c_str());
+				}
+				else
+				{
+					switch(cvImg->image.type())
+					{
+						case CV_32FC1: cvImg->encoding = sensor_msgs::image_encodings::TYPE_32FC1; break;
+						case CV_16UC1: cvImg->encoding = sensor_msgs::image_encodings::TYPE_16UC1; break;
+						case CV_8UC1:  cvImg->encoding = sensor_msgs::image_encodings::MONO8; break;
+						case CV_8UC3:  cvImg->encoding = sensor_msgs::image_encodings::BGR8; break;
+						default:
+							RCLCPP_ERROR(this->get_logger(), "Unsupported decompressed depth/right image type %d.", cvImg->image.type());
+							cvImg->image = cv::Mat();
+							break;
+					}
+					if(!cvImg->image.empty())
+					{
+						cvImg->toImageMsg(output->depth);
+					}
+				}
 			}
 		}
 

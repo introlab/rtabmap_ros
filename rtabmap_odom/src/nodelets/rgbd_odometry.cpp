@@ -38,6 +38,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtabmap_conversions/MsgConversion.h"
 #include <rtabmap_msgs/msg/rgbd_images.hpp>
 
+#include <rtabmap/core/Compression.h>
 #include <rtabmap/core/util3d.h>
 #include <rtabmap/core/util2d.h>
 #include <rtabmap/utilite/ULogger.h>
@@ -73,6 +74,8 @@ RGBDOdometry::RGBDOdometry(const rclcpp::NodeOptions & options) :
 
 RGBDOdometry::~RGBDOdometry()
 {
+	this->join(true);
+
 	delete approxSync_;
 	delete exactSync_;
 	delete approxSync2_;
@@ -435,40 +438,58 @@ void RGBDOdometry::updateParameters(ParametersMap & parameters)
 void RGBDOdometry::commonCallback(
 			const std::vector<cv_bridge::CvImageConstPtr> & rgbImages,
 			const std::vector<cv_bridge::CvImageConstPtr> & depthImages,
-			const std::vector<sensor_msgs::msg::CameraInfo>& cameraInfos)
+			const std::vector<sensor_msgs::msg::CameraInfo>& cameraInfos,
+			const std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > & localKeyPointsMsgs,
+			const std::vector<std::vector<rtabmap_msgs::msg::Point3f> > & localPoints3dMsgs,
+			const std::vector<cv::Mat> & localDescriptorsMsgs)
 {
 	UASSERT(rgbImages.size() > 0 && rgbImages.size() == depthImages.size() && rgbImages.size() == cameraInfos.size());
 	rclcpp::Time higherStamp;
 	UASSERT_MSG(rgbImages[0], "RGB image is null!");
-	int imageWidth = rgbImages[0]->image.cols;
-	int imageHeight = rgbImages[0]->image.rows;
 	UASSERT_MSG(depthImages[0], "Depth image is null!");
+
+	// The images are what the local features would otherwise be extracted from, so a frame
+	// that brings its own can leave them out -- which is nearly all of the bandwidth. It
+	// then describes itself with its calibration alone: how big the image would have been,
+	// where the camera is, what it sees. (An RGB-D message with no depth image at all also
+	// used to divide by zero below.)
+	const bool hasRgb = !rgbImages[0]->image.empty();
+	const bool hasDepth = !depthImages[0]->image.empty();
+
+	int imageWidth = hasRgb?rgbImages[0]->image.cols:(int)cameraInfos[0].width;
+	int imageHeight = hasRgb?rgbImages[0]->image.rows:(int)cameraInfos[0].height;
 	int depthWidth = depthImages[0]->image.cols;
 	int depthHeight = depthImages[0]->image.rows;
 
-	UASSERT_MSG(
-			imageWidth/depthWidth == imageHeight/depthHeight,
-			uFormat("rgb=%dx%d depth=%dx%d", imageWidth, imageHeight, depthWidth, depthHeight).c_str());
+	if(hasDepth)
+	{
+		UASSERT_MSG(
+				imageWidth/depthWidth == imageHeight/depthHeight,
+				uFormat("rgb=%dx%d depth=%dx%d", imageWidth, imageHeight, depthWidth, depthHeight).c_str());
+	}
 
 	int cameraCount = rgbImages.size();
 	cv::Mat rgb;
 	cv::Mat depth;
 	std::vector<rtabmap::CameraModel> cameraModels;
+	std::vector<cv::KeyPoint> keypoints;
+	std::vector<cv::Point3f> points3d;
+	cv::Mat descriptors;
 	for(unsigned int i=0; i<rgbImages.size(); ++i)
 	{
 		UASSERT_MSG(rgbImages[i], uFormat("RGB image is null for camera %d", i).c_str());
 		UASSERT_MSG(depthImages[i], uFormat("Depth image is null for camera %d", i).c_str());
-		if(!(rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) ==0 ||
+		if((hasRgb && !(rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) ==0 ||
 			 rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) ==0 ||
 			 rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) ==0 ||
 			 rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::BGR8) == 0 ||
 			 rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::RGB8) == 0 ||
 			 rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::BGRA8) == 0 ||
 			 rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::RGBA8) == 0 ||
-			 rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::BAYER_GRBG8) == 0) ||
-			!(depthImages[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1) == 0 ||
+			 rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::BAYER_GRBG8) == 0)) ||
+			(hasDepth && !(depthImages[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1) == 0 ||
 			 depthImages[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1) == 0 ||
-			 depthImages[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0))
+			 depthImages[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0)))
 		{
 			RCLCPP_ERROR(this->get_logger(), "Input type must be image=mono8,mono16,rgb8,bgr8,bgra8,rgba8 and "
 			"image_depth=32FC1,16UC1,mono16. Current rgb=%s and depth=%s",
@@ -476,20 +497,33 @@ void RGBDOdometry::commonCallback(
 				depthImages[i]->encoding.c_str());
 			return;
 		}
-		UASSERT_MSG(rgbImages[i]->image.cols == imageWidth && rgbImages[i]->image.rows == imageHeight,
-				uFormat("imageWidth=%d vs %d imageHeight=%d vs %d",
-						imageWidth,
-						rgbImages[i]->image.cols,
-						imageHeight,
-						rgbImages[i]->image.rows).c_str());
-		UASSERT_MSG(depthImages[i]->image.cols == depthWidth && depthImages[i]->image.rows == depthHeight,
-				uFormat("depthWidth=%d vs %d depthHeight=%d vs %d",
-						depthWidth,
-						depthImages[i]->image.cols,
-						depthHeight,
-						depthImages[i]->image.rows).c_str());
+		if(hasRgb)
+		{
+			UASSERT_MSG(rgbImages[i]->image.cols == imageWidth && rgbImages[i]->image.rows == imageHeight,
+					uFormat("imageWidth=%d vs %d imageHeight=%d vs %d",
+							imageWidth,
+							rgbImages[i]->image.cols,
+							imageHeight,
+							rgbImages[i]->image.rows).c_str());
+		}
+		if(hasDepth)
+		{
+			UASSERT_MSG(depthImages[i]->image.cols == depthWidth && depthImages[i]->image.rows == depthHeight,
+					uFormat("depthWidth=%d vs %d depthHeight=%d vs %d",
+							depthWidth,
+							depthImages[i]->image.cols,
+							depthHeight,
+							depthImages[i]->image.rows).c_str());
+		}
 
-		rclcpp::Time stamp = rtabmap_conversions::timestampFromROS(rgbImages[i]->header.stamp)>rtabmap_conversions::timestampFromROS(depthImages[i]->header.stamp)?rgbImages[i]->header.stamp:depthImages[i]->header.stamp;
+		// An image that is not there carries no header either, so a frame that has none is
+		// stamped and placed by its calibration, which is all it has.
+		const std::string & cameraFrameId = hasRgb?rgbImages[i]->header.frame_id:cameraInfos[i].header.frame_id;
+		rclcpp::Time stamp = cameraInfos[i].header.stamp;
+		if(hasRgb || hasDepth)
+		{
+			stamp = rtabmap_conversions::timestampFromROS(rgbImages[i]->header.stamp)>rtabmap_conversions::timestampFromROS(depthImages[i]->header.stamp)?rgbImages[i]->header.stamp:depthImages[i]->header.stamp;
+		}
 
 		if(i == 0)
 		{
@@ -500,7 +534,7 @@ void RGBDOdometry::commonCallback(
 			higherStamp = stamp;
 		}
 
-		Transform localTransform = rtabmap_conversions::getTransform(this->frameId(), rgbImages[i]->header.frame_id, stamp, tfBuffer(), waitForTransform());
+		Transform localTransform = rtabmap_conversions::getTransform(this->frameId(), cameraFrameId, stamp, tfBuffer(), waitForTransform());
 		if(localTransform.isNull())
 		{
 			return;
@@ -528,53 +562,75 @@ void RGBDOdometry::commonCallback(
 			}
 		}
 
-		cv_bridge::CvImageConstPtr ptrImage = rgbImages[i];
-		if(rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) !=0 &&
-		   rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) != 0)
+		if(hasRgb)
 		{
-			if(keepColor_ && rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) != 0)
+			cv_bridge::CvImageConstPtr ptrImage = rgbImages[i];
+			if(rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::TYPE_8UC1) !=0 &&
+			   rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::MONO8) != 0)
 			{
-				ptrImage = cv_bridge::cvtColor(rgbImages[i], "bgr8");
+				if(keepColor_ && rgbImages[i]->encoding.compare(sensor_msgs::image_encodings::MONO16) != 0)
+				{
+					ptrImage = cv_bridge::cvtColor(rgbImages[i], "bgr8");
+				}
+				else
+				{
+					ptrImage = cv_bridge::cvtColor(rgbImages[i], "mono8");
+				}
+			}
+
+			// initialize
+			if(rgb.empty())
+			{
+				rgb = cv::Mat(imageHeight, imageWidth*cameraCount, ptrImage->image.type());
+			}
+
+			if(ptrImage->image.type() == rgb.type())
+			{
+				ptrImage->image.copyTo(cv::Mat(rgb, cv::Rect(i*imageWidth, 0, imageWidth, imageHeight)));
 			}
 			else
 			{
-				ptrImage = cv_bridge::cvtColor(rgbImages[i], "mono8");
+				RCLCPP_ERROR(this->get_logger(), "Some RGB images are not the same type! %d vs %d", ptrImage->image.type(), rgb.type());
+				return;
 			}
 		}
 
-		cv_bridge::CvImageConstPtr ptrDepth = depthImages[i];
+		if(hasDepth)
+		{
+			cv_bridge::CvImageConstPtr ptrDepth = depthImages[i];
+			if(depth.empty())
+			{
+				depth = cv::Mat(depthHeight, depthWidth*cameraCount, ptrDepth->image.type());
+			}
 
-		// initialize
-		if(rgb.empty())
-		{
-			rgb = cv::Mat(imageHeight, imageWidth*cameraCount, ptrImage->image.type());
-		}
-		if(depth.empty())
-		{
-			depth = cv::Mat(depthHeight, depthWidth*cameraCount, ptrDepth->image.type());
-		}
-
-		if(ptrImage->image.type() == rgb.type())
-		{
-			ptrImage->image.copyTo(cv::Mat(rgb, cv::Rect(i*imageWidth, 0, imageWidth, imageHeight)));
-		}
-		else
-		{
-			RCLCPP_ERROR(this->get_logger(), "Some RGB images are not the same type! %d vs %d", ptrImage->image.type(), rgb.type());
-			return;
-		}
-
-		if(ptrDepth->image.type() == depth.type())
-		{
-			ptrDepth->image.copyTo(cv::Mat(depth, cv::Rect(i*depthWidth, 0, depthWidth, depthHeight)));
-		}
-		else
-		{
-			RCLCPP_ERROR(this->get_logger(), "Some Depth images are not the same type! %d vs %d", ptrDepth->image.type(), depth.type());
-			return;
+			if(ptrDepth->image.type() == depth.type())
+			{
+				ptrDepth->image.copyTo(cv::Mat(depth, cv::Rect(i*depthWidth, 0, depthWidth, depthHeight)));
+			}
+			else
+			{
+				RCLCPP_ERROR(this->get_logger(), "Some Depth images are not the same type! %d vs %d", ptrDepth->image.type(), depth.type());
+				return;
+			}
 		}
 
 		cameraModels.push_back(rtabmap_conversions::cameraModelFromROS(cameraInfos[i], localTransform));
+
+		// The images of all cameras are stitched side by side above, so the keypoints of
+		// camera i are shifted by as many images as come before it, and their 3D points,
+		// which arrive in that camera's optical frame, are brought back to the base frame.
+		if(localKeyPointsMsgs.size() == rgbImages.size())
+		{
+			rtabmap_conversions::keypointsFromROS(localKeyPointsMsgs[i], keypoints, imageWidth*i);
+		}
+		if(localPoints3dMsgs.size() == rgbImages.size())
+		{
+			rtabmap_conversions::points3fFromROS(localPoints3dMsgs[i], points3d, localTransform);
+		}
+		if(localDescriptorsMsgs.size() == rgbImages.size())
+		{
+			descriptors.push_back(localDescriptorsMsgs[i]);
+		}
 	}
 
 	rtabmap::SensorData data(
@@ -584,9 +640,30 @@ void RGBDOdometry::commonCallback(
 			0,
 			rtabmap_conversions::timestampFromROS(higherStamp));
 
+	// Features that came with the frame are used as they are: the odometry then skips
+	// detection, description and the depth lookup that would otherwise rebuild them
+	// (see RegistrationVis, which extracts only when the frame carries no keypoints).
+	// They are dropped rather than trusted if the three of them disagree, as using them
+	// out of step would silently mismatch keypoints with their descriptors or 3D points.
+	if(!keypoints.empty())
+	{
+		if((!points3d.empty() && points3d.size() != keypoints.size()) ||
+		   (!descriptors.empty() && descriptors.rows != (int)keypoints.size()))
+		{
+			RCLCPP_ERROR(this->get_logger(), "Ignoring the local features received with this frame: "
+					"%d keypoints, %d 3D points and %d descriptors, which should be the same count "
+					"(or none at all for the 3D points and the descriptors).",
+					(int)keypoints.size(), (int)points3d.size(), descriptors.rows);
+		}
+		else
+		{
+			data.setFeatures(keypoints, points3d, descriptors);
+		}
+	}
+
 	std_msgs::msg::Header header;
 	header.stamp = higherStamp;
-	header.frame_id = rgbImages.size()==1?rgbImages[0]->header.frame_id:"";
+	header.frame_id = rgbImages.size()==1?(hasRgb?rgbImages[0]->header.frame_id:cameraInfos[0].header.frame_id):"";
 	this->processData(data, header);
 }
 
@@ -627,6 +704,27 @@ void RGBDOdometry::callback(
 	}
 }
 
+namespace {
+
+/**
+ * @brief Collects the local features one camera's image carries, cameras in order.
+ *
+ * An image that carries none pushes empty entries rather than nothing, so that the
+ * per-camera indexing still lines up with the images.
+ */
+void appendLocalFeatures(
+		const rtabmap_msgs::msg::RGBDImage & image,
+		std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > & keyPoints,
+		std::vector<std::vector<rtabmap_msgs::msg::Point3f> > & points3d,
+		std::vector<cv::Mat> & descriptors)
+{
+	keyPoints.push_back(image.key_points);
+	points3d.push_back(image.points);
+	descriptors.push_back(rtabmap::uncompressData(image.descriptors));
+}
+
+}  // namespace
+
 void RGBDOdometry::callbackRGBDX(
 		const rtabmap_msgs::msg::RGBDImages::ConstSharedPtr images)
 {
@@ -642,13 +740,17 @@ void RGBDOdometry::callbackRGBDX(
 		std::vector<cv_bridge::CvImageConstPtr> imageMsgs(images->rgbd_images.size());
 		std::vector<cv_bridge::CvImageConstPtr> depthMsgs(images->rgbd_images.size());
 		std::vector<sensor_msgs::msg::CameraInfo> infoMsgs;
+		std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > localKeyPoints;
+		std::vector<std::vector<rtabmap_msgs::msg::Point3f> > localPoints3d;
+		std::vector<cv::Mat> localDescriptors;
 		for(size_t i=0; i<images->rgbd_images.size(); ++i)
 		{
 			rtabmap_conversions::toCvShare(images->rgbd_images[i], images, imageMsgs[i], depthMsgs[i]);
 			infoMsgs.push_back(images->rgbd_images[i].rgb_camera_info);
+			appendLocalFeatures(images->rgbd_images[i], localKeyPoints, localPoints3d, localDescriptors);
 		}
 
-		this->commonCallback(imageMsgs, depthMsgs, infoMsgs);
+		this->commonCallback(imageMsgs, depthMsgs, infoMsgs, localKeyPoints, localPoints3d, localDescriptors);
 	}
 }
 
@@ -665,7 +767,12 @@ void RGBDOdometry::callbackRGBD(
 		rtabmap_conversions::toCvShare(image, imageMsgs[0], depthMsgs[0]);
 		infoMsgs.push_back(image->rgb_camera_info);
 
-		this->commonCallback(imageMsgs, depthMsgs, infoMsgs);
+		std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > localKeyPoints;
+		std::vector<std::vector<rtabmap_msgs::msg::Point3f> > localPoints3d;
+		std::vector<cv::Mat> localDescriptors;
+		appendLocalFeatures(*image, localKeyPoints, localPoints3d, localDescriptors);
+
+		this->commonCallback(imageMsgs, depthMsgs, infoMsgs, localKeyPoints, localPoints3d, localDescriptors);
 	}
 }
 
@@ -685,7 +792,13 @@ void RGBDOdometry::callbackRGBD2(
 		infoMsgs.push_back(image->rgb_camera_info);
 		infoMsgs.push_back(image2->rgb_camera_info);
 
-		this->commonCallback(imageMsgs, depthMsgs, infoMsgs);
+		std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > localKeyPoints;
+		std::vector<std::vector<rtabmap_msgs::msg::Point3f> > localPoints3d;
+		std::vector<cv::Mat> localDescriptors;
+		appendLocalFeatures(*image, localKeyPoints, localPoints3d, localDescriptors);
+		appendLocalFeatures(*image2, localKeyPoints, localPoints3d, localDescriptors);
+
+		this->commonCallback(imageMsgs, depthMsgs, infoMsgs, localKeyPoints, localPoints3d, localDescriptors);
 	}
 }
 
@@ -708,7 +821,14 @@ void RGBDOdometry::callbackRGBD3(
 		infoMsgs.push_back(image2->rgb_camera_info);
 		infoMsgs.push_back(image3->rgb_camera_info);
 
-		this->commonCallback(imageMsgs, depthMsgs, infoMsgs);
+		std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > localKeyPoints;
+		std::vector<std::vector<rtabmap_msgs::msg::Point3f> > localPoints3d;
+		std::vector<cv::Mat> localDescriptors;
+		appendLocalFeatures(*image, localKeyPoints, localPoints3d, localDescriptors);
+		appendLocalFeatures(*image2, localKeyPoints, localPoints3d, localDescriptors);
+		appendLocalFeatures(*image3, localKeyPoints, localPoints3d, localDescriptors);
+
+		this->commonCallback(imageMsgs, depthMsgs, infoMsgs, localKeyPoints, localPoints3d, localDescriptors);
 	}
 }
 
@@ -734,7 +854,15 @@ void RGBDOdometry::callbackRGBD4(
 		infoMsgs.push_back(image3->rgb_camera_info);
 		infoMsgs.push_back(image4->rgb_camera_info);
 
-		this->commonCallback(imageMsgs, depthMsgs, infoMsgs);
+		std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > localKeyPoints;
+		std::vector<std::vector<rtabmap_msgs::msg::Point3f> > localPoints3d;
+		std::vector<cv::Mat> localDescriptors;
+		appendLocalFeatures(*image, localKeyPoints, localPoints3d, localDescriptors);
+		appendLocalFeatures(*image2, localKeyPoints, localPoints3d, localDescriptors);
+		appendLocalFeatures(*image3, localKeyPoints, localPoints3d, localDescriptors);
+		appendLocalFeatures(*image4, localKeyPoints, localPoints3d, localDescriptors);
+
+		this->commonCallback(imageMsgs, depthMsgs, infoMsgs, localKeyPoints, localPoints3d, localDescriptors);
 	}
 }
 
@@ -763,7 +891,16 @@ void RGBDOdometry::callbackRGBD5(
 		infoMsgs.push_back(image4->rgb_camera_info);
 		infoMsgs.push_back(image5->rgb_camera_info);
 
-		this->commonCallback(imageMsgs, depthMsgs, infoMsgs);
+		std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > localKeyPoints;
+		std::vector<std::vector<rtabmap_msgs::msg::Point3f> > localPoints3d;
+		std::vector<cv::Mat> localDescriptors;
+		appendLocalFeatures(*image, localKeyPoints, localPoints3d, localDescriptors);
+		appendLocalFeatures(*image2, localKeyPoints, localPoints3d, localDescriptors);
+		appendLocalFeatures(*image3, localKeyPoints, localPoints3d, localDescriptors);
+		appendLocalFeatures(*image4, localKeyPoints, localPoints3d, localDescriptors);
+		appendLocalFeatures(*image5, localKeyPoints, localPoints3d, localDescriptors);
+
+		this->commonCallback(imageMsgs, depthMsgs, infoMsgs, localKeyPoints, localPoints3d, localDescriptors);
 	}
 }
 
@@ -795,7 +932,17 @@ void RGBDOdometry::callbackRGBD6(
 		infoMsgs.push_back(image5->rgb_camera_info);
 		infoMsgs.push_back(image6->rgb_camera_info);
 
-		this->commonCallback(imageMsgs, depthMsgs, infoMsgs);
+		std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > localKeyPoints;
+		std::vector<std::vector<rtabmap_msgs::msg::Point3f> > localPoints3d;
+		std::vector<cv::Mat> localDescriptors;
+		appendLocalFeatures(*image, localKeyPoints, localPoints3d, localDescriptors);
+		appendLocalFeatures(*image2, localKeyPoints, localPoints3d, localDescriptors);
+		appendLocalFeatures(*image3, localKeyPoints, localPoints3d, localDescriptors);
+		appendLocalFeatures(*image4, localKeyPoints, localPoints3d, localDescriptors);
+		appendLocalFeatures(*image5, localKeyPoints, localPoints3d, localDescriptors);
+		appendLocalFeatures(*image6, localKeyPoints, localPoints3d, localDescriptors);
+
+		this->commonCallback(imageMsgs, depthMsgs, infoMsgs, localKeyPoints, localPoints3d, localDescriptors);
 	}
 }
 

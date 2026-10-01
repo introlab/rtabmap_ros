@@ -121,9 +121,35 @@ class StereoDense;
 
 namespace rtabmap_slam {
 
+/**
+ * @brief The `rtabmap` node: graph SLAM around an rtabmap::Rtabmap instance.
+ *
+ * Registered as the `rtabmap_slam::CoreWrapper` component, and run by the `rtabmap`
+ * executable. The node is always named `rtabmap` unless remapped, and advertises its
+ * services under that name (`/rtabmap/reset`...).
+ *
+ * The input topics come from rtabmap_sync::CommonDataSubscriber, chosen by the
+ * `subscribe_*` parameters; each synchronized update is converted to an
+ * rtabmap::SensorData and processed on a callback group of its own, while asynchronous
+ * inputs (GPS, IMU, landmarks, user data...) are buffered on theirs and attached to the
+ * next update. An update arriving while the previous one is still processed is dropped.
+ *
+ * The graph is published on `mapGraph`, `mapData` and `mapPath`, the assembled maps
+ * through an rtabmap_util::MapsManager, and the correction `map` -> odometry frame on TF.
+ * The database is saved when the node is destroyed.
+ *
+ * See the package README and doc/rtabmap.md for the topics, parameters and services.
+ */
 class CoreWrapper : public rclcpp::Node, public rtabmap_sync::CommonDataSubscriber
 {
 public:
+	/**
+	 * @brief Declares the parameters, opens the database and sets up every topic and
+	 *        service.
+	 *
+	 * RTAB-Map parameters are declared as strings under their RTAB-Map names, except the
+	 * odometry ones. Throws if one is given with another type.
+	 */
 	RTABMAP_SLAM_PUBLIC
 	explicit CoreWrapper(const rclcpp::NodeOptions & options);
 	virtual ~CoreWrapper();
