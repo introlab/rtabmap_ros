@@ -2520,8 +2520,6 @@ void CoreWrapper::process(
 						// let nav2 finish reaching the goal
 #ifdef WITH_NAV2_MSGS
 						if(nav2Client_ == 0 || rtabmap_.getPathStatus() <= 0)
-#else
-						if(rtabmap_.getPathStatus() <= 0)
 #endif
 						{
 							if(rtabmap_.getPathStatus() > 0)
