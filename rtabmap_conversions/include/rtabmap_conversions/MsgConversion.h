@@ -34,8 +34,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <geometry_msgs/msg/pose.hpp>
 #include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
 #include <sensor_msgs/msg/camera_info.hpp>
-#include <sensor_msgs/msg/laser_scan.hpp>
+#include <sensor_msgs/msg/compressed_image.hpp>
 #include <sensor_msgs/msg/image.hpp>
+#include <sensor_msgs/msg/laser_scan.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 
 #include <opencv2/opencv.hpp>
@@ -158,6 +159,33 @@ rtabmap::Transform transformFromPoseMsg(const geometry_msgs::msg::Pose & msg, bo
 // Images
 // Extracting OpenCV images from RGBDImage messages, and building them back.
 //============================================================================
+
+/**
+ * @brief Decode a compressed image into a cv_bridge image.
+ *
+ * In addition to regular compressed images, it supports the `compressedDepth`
+ * format (`compressedDepth png` and `compressedDepth rvl`), following the same
+ * conventions as the `compressed_depth_image_transport` package: the 12-byte
+ * header and the inverse-depth quantization of 32FC1 images.
+ *
+ * @param[in]  source the compressed image to decode
+ * @return     the decoded image, empty when the data cannot be decoded or the compressedDepth format is unsupported
+ */
+cv_bridge::CvImagePtr toCvCopy(const sensor_msgs::msg::CompressedImage & source);
+
+/**
+ * @brief Encode a depth image into a compressedDepth message.
+ *
+ * Wraps the image in the `compressedDepth` transport format, following the same
+ * conventions as the `compressed_depth_image_transport` package: the 12-byte
+ * header carrying the quantization parameters, and the inverse-depth
+ * quantization of 32FC1 images before compression.
+ *
+ * @param[in]  source    the depth image to encode; only `16UC1` and `32FC1` encodings are supported
+ * @param[out] ros_image the compressed depth image, with its format set to `<encoding>; compressedDepth <format>`
+ * @param[in]  format    compression format, `rvl` or `png`
+ */
+void toCompressedDepthImageMsg(const cv_bridge::CvImage & source, sensor_msgs::msg::CompressedImage & ros_image, const std::string & format = "rvl");
 
 /**
  * @brief Extract the RGB and depth images of an RGBDImage message, copying the pixels.

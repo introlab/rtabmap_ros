@@ -38,6 +38,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <opencv2/highgui/highgui.hpp>
 
 #include <rtabmap/gui/MainWindow.h>
+#include <rtabmap/core/Compression.h>
 #include <rtabmap/core/RtabmapEvent.h>
 #include <rtabmap/core/Parameters.h>
 #include <rtabmap/core/ParamEvent.h>
@@ -1096,6 +1097,35 @@ void GuiWrapper::commonSensorDataCallback(
 		info);
 
 	QMetaObject::invokeMethod(mainWindow_, "processOdometry", Q_ARG(rtabmap::OdometryEvent, odomEvent), Q_ARG(bool, ignoreData));
+}
+
+void GuiWrapper::commonRGBDImageCallback(
+		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr & rgbdMsg,
+		const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
+		const rtabmap_msgs::msg::UserData::ConstSharedPtr & userDataMsg,
+		const sensor_msgs::msg::LaserScan & scanMsg,
+		const sensor_msgs::msg::PointCloud2 & scan3dMsg,
+		const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr & odomInfoMsg,
+		const rtabmap_msgs::msg::GlobalDescriptor & globalDescriptor)
+{
+	cv_bridge::CvImageConstPtr rgb, depth;
+	rtabmap_conversions::toCvShare(rgbdMsg, rgb, depth);
+
+	std::vector<rtabmap_msgs::msg::GlobalDescriptor> globalDescriptorMsgs;
+	if(!rgbdMsg->global_descriptor.data.empty())
+	{
+		globalDescriptorMsgs.push_back(rgbdMsg->global_descriptor);
+	}
+	if(!globalDescriptor.data.empty())
+	{
+		globalDescriptorMsgs.push_back(globalDescriptor);
+	}
+
+	commonSingleCameraCallback(odomMsg, userDataMsg, rgb, depth,
+			rgbdMsg->rgb_camera_info, rgbdMsg->depth_camera_info,
+			scanMsg, scan3dMsg, odomInfoMsg, globalDescriptorMsgs,
+			rgbdMsg->key_points, rgbdMsg->points,
+			rtabmap::uncompressData(rgbdMsg->descriptors));
 }
 
 }

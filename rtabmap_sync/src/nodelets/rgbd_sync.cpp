@@ -221,28 +221,24 @@ void RGBDSync::callback(
 			msg->depth_camera_info = *cameraInfo;
 		}
 
-		cv::Mat rgbMat;
-		cv::Mat depthMat;
-		cv_bridge::CvImageConstPtr imagePtr, imageDepthPtr;
+		cv_bridge::CvImagePtr imagePtr, imageDepthPtr;
 		try {
-			imagePtr = cv_bridge::toCvShare(image);
-			imageDepthPtr = cv_bridge::toCvShare(depth);
+			imagePtr = cv_bridge::toCvCopy(image);
+			imageDepthPtr = cv_bridge::toCvCopy(depth);
 		}
 		catch(cv::Exception& e) {
 			UFATAL("Fatal error while converting images (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
 		}
-		rgbMat = imagePtr->image;
-		depthMat = imageDepthPtr->image;
 
 		if(decimation_>1)
 		{
-			rgbMat = rtabmap::util2d::decimate(rgbMat, decimation_);
-			depthMat = rtabmap::util2d::decimate(depthMat, decimation_);
+			imagePtr->image = rtabmap::util2d::decimate(imagePtr->image, decimation_);
+			imageDepthPtr->image = rtabmap::util2d::decimate(imageDepthPtr->image, decimation_);
 		}
 
 		if(depthScale_ != 1.0)
 		{
-			depthMat*=depthScale_;
+			imageDepthPtr->image *= depthScale_;
 		}
 
 		if(rgbdImageCompressedPub_->get_subscription_count())
@@ -266,16 +262,8 @@ void RGBDSync::callback(
 				msgCompressed->rgb_camera_info = msg->rgb_camera_info;
 				msgCompressed->depth_camera_info = msg->depth_camera_info;
 
-				cv_bridge::CvImage cvImg;
-				cvImg.header = image->header;
-				cvImg.image = rgbMat;
-				cvImg.encoding = image->encoding;
-				cvImg.toCompressedImageMsg(msgCompressed->rgb_compressed, cv_bridge::JPG);
-
-				msgCompressed->depth_compressed.header = imageDepthPtr->header;
-				msgCompressed->depth_compressed.data = rtabmap::compressImage(depthMat, ".png");
-
-				msgCompressed->depth_compressed.format = "png";
+				imagePtr->toCompressedImageMsg(msgCompressed->rgb_compressed, cv_bridge::JPG);
+				rtabmap_conversions::toCompressedDepthImageMsg(*imageDepthPtr, msgCompressed->depth_compressed, "rvl");
 
 				rgbdImageCompressedPub_->publish(std::move(msgCompressed));
 			}
@@ -283,17 +271,8 @@ void RGBDSync::callback(
 
 		if(rgbdImagePub_->get_subscription_count())
 		{
-			cv_bridge::CvImage cvImg;
-			cvImg.header = image->header;
-			cvImg.image = rgbMat;
-			cvImg.encoding = image->encoding;
-			cvImg.toImageMsg(msg->rgb);
-
-			cv_bridge::CvImage cvDepth;
-			cvDepth.header = depth->header;
-			cvDepth.image = depthMat;
-			cvDepth.encoding = depth->encoding;
-			cvDepth.toImageMsg(msg->depth);
+			imagePtr->toImageMsg(msg->rgb);
+			imageDepthPtr->toImageMsg(msg->depth);
 
 			rgbdImagePub_->publish(std::move(msg));
 		}
