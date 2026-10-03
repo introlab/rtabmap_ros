@@ -199,6 +199,19 @@ TEST_F(StereoSyncTest, ApproxSyncMaxIntervalRejectsDistantFrames)
 	EXPECT_TRUE(spinUntil([&]() { return !out_->empty(); }));
 }
 
+TEST_F(StereoSyncTest, ImageCompressionFormatAppliesToBothImages)
+{
+	start({rclcpp::Parameter("image_compression_format", std::string(".png"))});
+	collectCompressed();
+
+	publish(1000.0);
+	ASSERT_TRUE(spinUntil([&]() { return !compressed_->empty(); }));
+
+	const rtabmap_msgs::msg::RGBDImage & got = compressed_->back();
+	EXPECT_EQ(got.rgb_compressed.format, "mono8; png compressed mono8");
+	EXPECT_EQ(got.depth_compressed.format, "mono8; png compressed mono8");
+}
+
 TEST_F(StereoSyncTest, CompressesBothImagesAsJpeg)
 {
 	// Both halves of a stereo pair are ordinary images, so both take the lossy path --

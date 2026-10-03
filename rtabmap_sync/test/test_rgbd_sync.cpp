@@ -311,6 +311,31 @@ TEST_F(RGBDSyncTest, CompressesColorAsJpegAndDepthAsPng)
 	EXPECT_EQ(got.header.frame_id, "camera_link");
 }
 
+TEST_F(RGBDSyncTest, ImageCompressionFormatAppliesToTheColorImage)
+{
+	start({rclcpp::Parameter("image_compression_format", std::string(".png"))});
+	collectCompressed();
+
+	publish(1000.0);
+	ASSERT_TRUE(spinUntil([&]() { return !compressed_->empty(); }));
+	const rtabmap_msgs::msg::RGBDImage & got = compressed_->back();
+	EXPECT_EQ(got.rgb_compressed.format, "bgr8; png compressed bgr8");
+	// Lossless: the color is the input's
+	const cv::Mat rgb = cv_bridge::toCvCopy(got.rgb_compressed)->image;
+	const cv::Mat input = cv_bridge::toCvCopy(makeRgbImage("camera_link", 1000.0))->image;
+	EXPECT_EQ(cv::norm(rgb, input, cv::NORM_INF), 0.0);
+}
+
+TEST_F(RGBDSyncTest, InvalidImageCompressionFormatFallsBackToJpeg)
+{
+	start({rclcpp::Parameter("image_compression_format", std::string("bmp"))});
+	collectCompressed();
+
+	publish(1000.0);
+	ASSERT_TRUE(spinUntil([&]() { return !compressed_->empty(); }));
+	EXPECT_EQ(compressed_->back().rgb_compressed.format, "bgr8; jpeg compressed bgr8");
+}
+
 TEST_F(RGBDSyncTest, TheCompressedDepthDecompressesBackToTheInput)
 {
 	start();

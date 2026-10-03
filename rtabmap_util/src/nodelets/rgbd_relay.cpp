@@ -64,6 +64,12 @@ RGBDRelay::RGBDRelay(const rclcpp::NodeOptions & options) :
 	int queuePub = this->declare_parameter("queue_pub", 1);
 	compress_ = this->declare_parameter("compress", compress_);
 	uncompress_ = this->declare_parameter("uncompress", uncompress_);
+	imageCompressionFormat_ = this->declare_parameter("image_compression_format", imageCompressionFormat_);
+	if(!rtabmap_conversions::isValidImageCompressionFormat(imageCompressionFormat_))
+	{
+		RCLCPP_ERROR(this->get_logger(), "Invalid image_compression_format \"%s\" (should be \".jpg\" or \".png\"), using \".jpg\".", imageCompressionFormat_.c_str());
+		imageCompressionFormat_ = ".jpg";
+	}
 	depthCompressionFormat_ = this->declare_parameter("depth_compression_format", depthCompressionFormat_);
 	if(!rtabmap_conversions::isValidDepthCompressionFormat(depthCompressionFormat_))
 	{
@@ -111,7 +117,7 @@ void RGBDRelay::callback(const rtabmap_msgs::msg::RGBDImage::SharedPtr input) co
 			else if(!input->rgb.data.empty())
 			{
 				cv_bridge::CvImageConstPtr rgb = cv_bridge::toCvShare(input->rgb, input);
-				rtabmap_conversions::toCompressedImageMsg(*rgb, "jpeg", output->rgb_compressed);
+				rtabmap_conversions::toCompressedImageMsg(*rgb, imageCompressionFormat_, output->rgb_compressed);
 			}
 
 			if(!input->depth_compressed.data.empty())
@@ -125,7 +131,7 @@ void RGBDRelay::callback(const rtabmap_msgs::msg::RGBDImage::SharedPtr input) co
 				{
 					// right stereo image
 					cv_bridge::CvImageConstPtr imageRightPtr = cv_bridge::toCvShare(input->depth, input);
-					rtabmap_conversions::toCompressedImageMsg(*imageRightPtr, "jpeg", output->depth_compressed);
+					rtabmap_conversions::toCompressedImageMsg(*imageRightPtr, imageCompressionFormat_, output->depth_compressed);
 				}
 				else
 				{

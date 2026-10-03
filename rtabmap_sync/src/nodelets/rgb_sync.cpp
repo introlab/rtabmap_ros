@@ -76,6 +76,12 @@ RGBSync::RGBSync(const rclcpp::NodeOptions & options) :
 	qos = this->declare_parameter("qos", qos);
 	int qosCaminfo = this->declare_parameter("qos_camera_info", qos);
 	compressedRate_ = this->declare_parameter("compressed_rate", compressedRate_);
+	imageCompressionFormat_ = this->declare_parameter("image_compression_format", imageCompressionFormat_);
+	if(!rtabmap_conversions::isValidImageCompressionFormat(imageCompressionFormat_))
+	{
+		RCLCPP_ERROR(this->get_logger(), "Invalid image_compression_format \"%s\" (should be \".jpg\" or \".png\"), using \".jpg\".", imageCompressionFormat_.c_str());
+		imageCompressionFormat_ = ".jpg";
+	}
 	std::string imageTransport = this->declare_parameter("image_transport", std::string("raw"));
 	fillEmptyDepth_ = this->declare_parameter("fill_empty_depth", fillEmptyDepth_);
 
@@ -189,7 +195,7 @@ void RGBSync::callback(
 				rtabmap_msgs::msg::RGBDImage msgCompressed = msg;
 
 				cv_bridge::CvImageConstPtr imagePtr = cv_bridge::toCvShare(image);
-				rtabmap_conversions::toCompressedImageMsg(*imagePtr, "jpeg", msgCompressed.rgb_compressed);
+				rtabmap_conversions::toCompressedImageMsg(*imagePtr, imageCompressionFormat_, msgCompressed.rgb_compressed);
 
 				if(fillEmptyDepth_)
 				{

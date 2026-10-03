@@ -175,6 +175,16 @@ TEST_F(RGBSyncTest, CompressesColorAsJpeg)
 		<< "without fill_empty_depth there is nothing to compress on the depth side";
 }
 
+TEST_F(RGBSyncTest, ImageCompressionFormatAppliesToTheColorImage)
+{
+	start({rclcpp::Parameter("image_compression_format", std::string(".png"))});
+	collectCompressed();
+
+	publish(1000.0);
+	ASSERT_TRUE(spinUntil([&]() { return !compressed_->empty(); }));
+	EXPECT_EQ(compressed_->back().rgb_compressed.format, "bgr8; png compressed bgr8");
+}
+
 TEST_F(RGBSyncTest, CompressesTheFakeDepthAsPng)
 {
 	start({rclcpp::Parameter("fill_empty_depth", true)});

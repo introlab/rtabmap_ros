@@ -4152,7 +4152,14 @@ TEST(MsgConversion, toCompressedImageMsgSetsTheTransportFormat)
 	cv_bridge::CvImage image(std_msgs::msg::Header(), "bgr8", cv::Mat(6, 8, CV_8UC3, cv::Scalar(1, 2, 3)));
 	sensor_msgs::msg::CompressedImage msg;
 	msg.format = "unchanged";
-	EXPECT_FALSE(toCompressedImageMsg(image, "jpg", msg)) << "\"jpeg\", as compressed_image_transport names it";
+	EXPECT_FALSE(toCompressedImageMsg(image, "jpg", msg)) << "\"jpeg\" or \".jpg\"";
 	EXPECT_FALSE(toCompressedImageMsg(image, "tiff", msg));
+	EXPECT_FALSE(toCompressedImageMsg(image, ".bmp", msg));
 	EXPECT_EQ(msg.format, "unchanged");
+
+	// rtabmap's names
+	ASSERT_TRUE(toCompressedImageMsg(image, ".jpg", msg));
+	EXPECT_EQ(msg.format, "bgr8; jpeg compressed bgr8");
+	ASSERT_TRUE(toCompressedImageMsg(image, ".png", msg));
+	EXPECT_EQ(msg.format, "bgr8; png compressed bgr8");
 }

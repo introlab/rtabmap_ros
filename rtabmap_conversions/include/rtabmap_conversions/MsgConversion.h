@@ -389,11 +389,17 @@ bool compressDepthImage(const cv::Mat & depth, const std::string & format, senso
  * instead of only "jpg", from which subscribers have to guess it.
  *
  * @param[in]  image  the image to compress
- * @param[in]  format "jpeg" or "png"
+ * @param[in]  format "jpeg" or "png", or as rtabmap names them, ".jpg" or ".png"
  * @param[out] msg    the message; `header`, `format` and `data` are set
  * @return false if the image could not be compressed (an error is logged)
  */
 bool toCompressedImageMsg(const cv_bridge::CvImage & image, const std::string & format, sensor_msgs::msg::CompressedImage & msg);
+
+/**
+ * @return true if @p format is a valid format for toCompressedImageMsg(): ".jpg", ".png",
+ *         "jpeg" or "png".
+ */
+bool isValidImageCompressionFormat(const std::string & format);
 
 
 //============================================================================

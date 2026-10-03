@@ -74,6 +74,8 @@ private:
 	int decimation_;
 	double compressedRate_;
 	std::string depthCompressionFormat_;
+	/// Format of the compressed color (and right) images: ".jpg" or ".png".
+	std::string imageCompressionFormat_ = ".jpg";
 	double approxSyncMaxInterval_;
 
 	/// Stamp of the last compressed message published, for compressed_rate throttling.

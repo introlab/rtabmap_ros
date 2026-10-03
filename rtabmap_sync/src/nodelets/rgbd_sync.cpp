@@ -78,6 +78,12 @@ RGBDSync::RGBDSync(const rclcpp::NodeOptions & options) :
 	depthScale_ = this->declare_parameter("depth_scale", depthScale_);
 	decimation_ = this->declare_parameter("decimation", decimation_);
 	compressedRate_ = this->declare_parameter("compressed_rate", compressedRate_);
+	imageCompressionFormat_ = this->declare_parameter("image_compression_format", imageCompressionFormat_);
+	if(!rtabmap_conversions::isValidImageCompressionFormat(imageCompressionFormat_))
+	{
+		RCLCPP_ERROR(this->get_logger(), "Invalid image_compression_format \"%s\" (should be \".jpg\" or \".png\"), using \".jpg\".", imageCompressionFormat_.c_str());
+		imageCompressionFormat_ = ".jpg";
+	}
 	depthCompressionFormat_ = this->declare_parameter("depth_compression_format", depthCompressionFormat_);
 	if(!rtabmap_conversions::isValidDepthCompressionFormat(depthCompressionFormat_))
 	{
@@ -278,7 +284,7 @@ void RGBDSync::callback(
 				cvImg.header = image->header;
 				cvImg.image = rgbMat;
 				cvImg.encoding = image->encoding;
-				rtabmap_conversions::toCompressedImageMsg(cvImg, "jpeg", msgCompressed->rgb_compressed);
+				rtabmap_conversions::toCompressedImageMsg(cvImg, imageCompressionFormat_, msgCompressed->rgb_compressed);
 
 				msgCompressed->depth_compressed.header = imageDepthPtr->header;
 				rtabmap_conversions::compressDepthImage(depthMat, depthCompressionFormat_, msgCompressed->depth_compressed);

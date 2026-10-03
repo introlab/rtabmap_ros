@@ -111,7 +111,7 @@ ComposableNode(
 | Topic | Type | Description |
 |---|---|---|
 | `rgbd_image` | [`rtabmap_msgs/msg/RGBDImage`](https://docs.ros.org/en/jazzy/p/rtabmap_msgs/msg/RGBDImage.html) | The three inputs, raw. Published only when someone is subscribed. |
-| `rgbd_image/compressed` | [`rtabmap_msgs/msg/RGBDImage`](https://docs.ros.org/en/jazzy/p/rtabmap_msgs/msg/RGBDImage.html) | The same frame with JPEG color and PNG depth instead of raw images. Published only when someone is subscribed. |
+| `rgbd_image/compressed` | [`rtabmap_msgs/msg/RGBDImage`](https://docs.ros.org/en/jazzy/p/rtabmap_msgs/msg/RGBDImage.html) | The same frame with compressed color (JPEG by default) and depth (PNG by default) instead of raw images. Published only when someone is subscribed. |
 
 The output's `header.frame_id` is taken from the **camera_info**, which is the frame the calibration is expressed in — so make sure the images and the `camera_info` carry the same `frame_id`. If they disagree, the output is labelled with the calibration's frame while the pixels were measured in another, and every point projected out of them lands somewhere else.
 
@@ -131,6 +131,7 @@ The output's `header.stamp` is the **later** of the color and depth stamps, so t
 | `depth_scale` | `double` | `1.0` | Multiplies every depth pixel. See [Depth units](#depth-units). |
 | `decimation` | `int` | `1` | Downsample both images by this factor, scaling the calibration to match. Must divide the depth image size exactly, or it is ignored. |
 | `compressed_rate` | `double` | `0.0` | Maximum rate, in Hz, of `rgbd_image/compressed`. `0` means every frame. Does not affect `rgbd_image`. |
+| `image_compression_format` | `string` | `".jpg"` | Format of the color image in `rgbd_image/compressed`: `".jpg"` (lossy, smaller) or `".png"` (lossless, larger). An invalid value falls back to `".jpg"` with an error. |
 | `depth_compression_format` | `string` | `".png"` | Format of the depth in `rgbd_image/compressed`: `".png"`, `".rvl"`, `".png:<maxDepth>:<quantization>"`, `".rvl:<maxDepth>:<quantization>"`, any of them prefixed by `"legacy:"`, or `"legacy"`. See [Compressing for a slow link](#compressing-for-a-slow-link). |
 | `image_transport` | `string` | `"raw"` | Transport for `rgb/image`, e.g. `compressed`. |
 | `depth_transport` | `string` | `"raw"` | Transport for `depth/image`, e.g. `compressedDepth`. |
@@ -160,7 +161,7 @@ RTAB-Map reads `16UC1` depth as millimeters and `32FC1` as meters. A driver that
 
 ## Compressing for a slow link
 
-`rgbd_image/compressed` carries the same frame with the color image as **JPEG** and the depth image as **PNG**. Depth stays lossless deliberately: JPEG artifacts in a depth image are not blur, they are invented geometry.
+`rgbd_image/compressed` carries the same frame with the color image as **JPEG** and the depth image as **PNG**. Depth stays lossless deliberately: JPEG artifacts in a depth image are not blur, they are invented geometry. `image_compression_format: ".png"` makes the color image lossless too, at a few times the size.
 
 The images are in the formats of `compressed_image_transport` (e.g. `"bgr8; jpeg compressed bgr8"`) and `compressed_depth_image_transport` (e.g. `"16UC1; compressedDepth png"`), so the `compressed` and `compressedDepth` image_transport plugins can read them.
 

@@ -67,10 +67,7 @@ namespace rtabmap_conversions {
 
 namespace {
 
-// Compressed depth image layouts of rtabmap (see rtabmap/core/Compression.h)
-const char kRtabmapRvlSignature[8] = {'D', 'E', 'P', 'T', 'H', 'R', 'V', 'L'};
-const char kRtabmapInvDepthSignature[8] = {'D', 'E', 'P', 'T', 'H', 'I', 'N', 'V'};
-const size_t kRtabmapInvDepthHeaderSize = 16; // signature, float depthQuantA, float depthQuantB
+// PNG file signature. rtabmap's own depth layouts are in rtabmap/core/Compression.h.
 const unsigned char kPngSignature[8] = {0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n'};
 
 // compressed_depth_image_transport::ConfigHeader, at the start of the message data
@@ -684,18 +681,18 @@ cv::Mat compressedDepthTransportToRtabmap(const sensor_msgs::msg::CompressedImag
 	const unsigned char * payload = msg.data.data() + sizeof(CompressedDepthConfigHeader);
 	const size_t payloadSize = msg.data.size() - sizeof(CompressedDepthConfigHeader);
 
-	cv::Mat bytes(1, (int)((inverseDepth?kRtabmapInvDepthHeaderSize:0) + (rvl?8:0) + payloadSize), CV_8UC1);
+	cv::Mat bytes(1, (int)((inverseDepth?rtabmap::kCompressedDepthInvHeaderSize:0) + (rvl?8:0) + payloadSize), CV_8UC1);
 	unsigned char * out = bytes.data;
 	if(inverseDepth)
 	{
-		memcpy(out, kRtabmapInvDepthSignature, 8);
+		memcpy(out, rtabmap::kCompressedDepthInvSignature, 8);
 		memcpy(out+8, &header.depthParam[0], 4);
 		memcpy(out+12, &header.depthParam[1], 4);
-		out += kRtabmapInvDepthHeaderSize;
+		out += rtabmap::kCompressedDepthInvHeaderSize;
 	}
 	if(rvl)
 	{
-		memcpy(out, kRtabmapRvlSignature, 8);
+		memcpy(out, rtabmap::kCompressedDepthRvlSignature, 8);
 		out += 8;
 	}
 	memcpy(out, payload, payloadSize);
@@ -712,18 +709,18 @@ bool rtabmapToCompressedDepthTransport(const cv::Mat & compressed, sensor_msgs::
 	header.format = 0; // INV_DEPTH, also set for 16UC1 by compressed_depth_image_transport
 	header.depthParam[0] = header.depthParam[1] = 0.0f;
 	std::string encoding = sensor_msgs::image_encodings::TYPE_16UC1;
-	if(hasSignature(bytes, size, kRtabmapInvDepthSignature) && size > kRtabmapInvDepthHeaderSize)
+	if(hasSignature(bytes, size, rtabmap::kCompressedDepthInvSignature) && size > rtabmap::kCompressedDepthInvHeaderSize)
 	{
 		encoding = sensor_msgs::image_encodings::TYPE_32FC1;
 		memcpy(&header.depthParam[0], bytes+8, 4);
 		memcpy(&header.depthParam[1], bytes+12, 4);
-		bytes += kRtabmapInvDepthHeaderSize;
-		size -= kRtabmapInvDepthHeaderSize;
+		bytes += rtabmap::kCompressedDepthInvHeaderSize;
+		size -= rtabmap::kCompressedDepthInvHeaderSize;
 	}
 
 	std::string codec;
 	std::vector<unsigned char> png;
-	if(hasSignature(bytes, size, kRtabmapRvlSignature) && size >= 16)
+	if(hasSignature(bytes, size, rtabmap::kCompressedDepthRvlSignature) && size >= rtabmap::kCompressedDepthRvlHeaderSize)
 	{
 #ifdef PRE_ROS_JAZZY
 		// compressed_depth_image_transport decodes RVL only since Jazzy: re-compress
@@ -762,13 +759,20 @@ bool rtabmapToCompressedDepthTransport(const cv::Mat & compressed, sensor_msgs::
 	return true;
 }
 
-bool toCompressedImageMsg(const cv_bridge::CvImage & image, const std::string & format, sensor_msgs::msg::CompressedImage & msg)
+bool isValidImageCompressionFormat(const std::string & format)
 {
-	if(format != "jpeg" && format != "png")
+	return format == ".jpg" || format == ".png" || format == "jpeg" || format == "png";
+}
+
+bool toCompressedImageMsg(const cv_bridge::CvImage & image, const std::string & inputFormat, sensor_msgs::msg::CompressedImage & msg)
+{
+	if(!isValidImageCompressionFormat(inputFormat))
 	{
-		UERROR("Unsupported compressed image format \"%s\" (should be \"jpeg\" or \"png\").", format.c_str());
+		UERROR("Unsupported compressed image format \"%s\" (should be \".jpg\", \".png\", \"jpeg\" or \"png\").", inputFormat.c_str());
 		return false;
 	}
+	// compressed_image_transport's names
+	const std::string format = inputFormat == ".jpg" || inputFormat == "jpeg" ? "jpeg" : "png";
 	try
 	{
 		image.toCompressedImageMsg(msg, format == "jpeg" ? cv_bridge::JPEG : cv_bridge::PNG);

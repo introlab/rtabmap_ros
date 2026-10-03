@@ -22,13 +22,15 @@ class RGBDRelayTest : public NodeTest
 {
 protected:
 	/// Starts the node, wires up the input publisher and the output collector.
-	void start(bool compress, bool uncompress, const std::string & depthCompressionFormat = ".png")
+	void start(bool compress, bool uncompress, const std::string & depthCompressionFormat = ".png",
+			const std::string & imageCompressionFormat = ".jpg")
 	{
 		addNode(std::make_shared<rtabmap_util::RGBDRelay>(rclcpp::NodeOptions()
 				.parameter_overrides({
 					rclcpp::Parameter("compress", compress),
 					rclcpp::Parameter("uncompress", uncompress),
-					rclcpp::Parameter("depth_compression_format", depthCompressionFormat)})));
+					rclcpp::Parameter("depth_compression_format", depthCompressionFormat),
+					rclcpp::Parameter("image_compression_format", imageCompressionFormat)})));
 
 		out_ = collect<rtabmap_msgs::msg::RGBDImage>("rgbd_image_relay");
 		pub_ = helper()->create_publisher<rtabmap_msgs::msg::RGBDImage>("rgbd_image", 10);
@@ -89,6 +91,19 @@ TEST_F(RGBDRelayTest, CompressesAStereoPairAsJpeg)
 	EXPECT_NE(got.depth_compressed.format.find("jp"), std::string::npos)
 		<< "expected a jpeg format, got \"" << got.depth_compressed.format << "\"";
 	EXPECT_LT(got.depth_camera_info.p[3], 0.0) << "the baseline must survive the relay";
+}
+
+TEST_F(RGBDRelayTest, ImageCompressionFormatAppliesToColorAndRightImages)
+{
+	start(/*compress=*/true, /*uncompress=*/false, ".png", ".png");
+
+	pub_->publish(makeRGBDImage("camera_link", 1000.0));
+	ASSERT_TRUE(spinUntil([&]() { return !out_->empty(); }));
+	EXPECT_EQ(out_->back().rgb_compressed.format, "bgr8; png compressed bgr8");
+
+	pub_->publish(makeStereoRGBDImage("camera_link", 1001.0));
+	ASSERT_TRUE(spinUntil([&]() { return out_->size() > 1; }));
+	EXPECT_EQ(out_->back().depth_compressed.format, "mono8; png compressed mono8") << "right image";
 }
 
 TEST_F(RGBDRelayTest, CompressesDepthAsLosslessPng)

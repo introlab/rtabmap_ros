@@ -59,7 +59,7 @@ ComposableNode(
 | Topic | Type | Description |
 |---|---|---|
 | `rgbd_image` | [`rtabmap_msgs/msg/RGBDImage`](https://docs.ros.org/en/jazzy/p/rtabmap_msgs/msg/RGBDImage.html) | The image and its calibration. The depth slot is left empty unless `fill_empty_depth`. Published only when someone is subscribed. |
-| `rgbd_image/compressed` | [`rtabmap_msgs/msg/RGBDImage`](https://docs.ros.org/en/jazzy/p/rtabmap_msgs/msg/RGBDImage.html) | The same frame with the image as JPEG. Published only when someone is subscribed. |
+| `rgbd_image/compressed` | [`rtabmap_msgs/msg/RGBDImage`](https://docs.ros.org/en/jazzy/p/rtabmap_msgs/msg/RGBDImage.html) | The same frame with the image compressed, JPEG by default (see `image_compression_format`). Published only when someone is subscribed. |
 
 The output's `header.frame_id` comes from the camera_info; its `header.stamp` is the image's.
 
@@ -76,6 +76,7 @@ The output's `header.frame_id` comes from the camera_info; its `header.stamp` is
 | `qos_camera_info` | `int` | value of `qos` | Reliability of the `rgb/camera_info` subscription alone. |
 | `fill_empty_depth` | `bool` | `false` | Add an all-zero depth image the size of the color one. See below. |
 | `compressed_rate` | `double` | `0.0` | Maximum rate, in Hz, of `rgbd_image/compressed`. `0` means every frame. |
+| `image_compression_format` | `string` | `".jpg"` | Format of the image in `rgbd_image/compressed`: `".jpg"` (lossy, smaller) or `".png"` (lossless, larger). An invalid value falls back to `".jpg"` with an error. |
 | `image_transport` | `string` | `"raw"` | Transport for `rgb/image`, e.g. `compressed`. |
 
 ## fill_empty_depth
