@@ -138,7 +138,7 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	minUpdateRate_(0.0),
 	alwaysProcessMostRecentFrame_(true),
 	compressionImgFormat_(".jpg"),
-	compressionDepthFormat_(".png"),
+	compressionDepthFormat_(".rvl"),
 	compressionParallelized_(true),
 	odomStrategy_(Parameters::defaultOdomStrategy()),
 	waitIMUToinit_(false),
@@ -203,8 +203,8 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 		   (codec != ".png" && codec != ".rvl"))
 		{
 			RCLCPP_ERROR(this->get_logger(), "Invalid sensor_data_depth_compression_format \"%s\" (should be \".png\" or \".rvl\", "
-					"optionally followed by \":maxDepth[:quantization]\"), using \".png\".", compressionDepthFormat_.c_str());
-			compressionDepthFormat_ = ".png";
+					"optionally followed by \":maxDepth[:quantization]\"), using \".rvl\".", compressionDepthFormat_.c_str());
+			compressionDepthFormat_ = ".rvl";
 		}
 	}
 	compressionParallelized_ = this->declare_parameter("sensor_data_parallel_compression", compressionParallelized_);
@@ -1314,7 +1314,11 @@ void OdometryROS::processData()
 	
 	postProcessData(data, header);
 
-	if(!data.imageRaw().empty() && odomRgbdImagePub_->get_subscription_count()>0)
+	// Any frame with a camera, also with features only or compressed images only (lidar
+	// odometry sets an invalid CameraModel() as placeholder)
+	if(((!data.cameraModels().empty() && data.cameraModels()[0].isValidForProjection()) ||
+	    (!data.stereoCameraModels().empty() && data.stereoCameraModels()[0].isValidForProjection())) &&
+	   odomRgbdImagePub_->get_subscription_count()>0)
 	{
 		if(!header.frame_id.empty())
 		{

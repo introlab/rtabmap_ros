@@ -4163,3 +4163,60 @@ TEST(MsgConversion, toCompressedImageMsgSetsTheTransportFormat)
 	ASSERT_TRUE(toCompressedImageMsg(image, ".png", msg));
 	EXPECT_EQ(msg.format, "bgr8; png compressed bgr8");
 }
+
+//============================================================================
+// Mixed raw and compressed images, features of RGBDImage
+//============================================================================
+
+/// A SensorData message may carry one image raw and the other compressed: both are kept.
+TEST(MsgConversion, sensorDataFromROSKeepsARawImageNextToACompressedOne)
+{
+	const rtabmap::CameraModel model(50.0, 50.0, 4.0, 3.0, rtabmap::CameraModel::opticalRotation(), 0.0, cv::Size(8, 6));
+	const cv::Mat rgb(6, 8, CV_8UC3, cv::Scalar(10, 20, 30));
+	const cv::Mat depth(6, 8, CV_16UC1, cv::Scalar(1500));
+
+	for(bool rawColor : {true, false})
+	{
+		SCOPED_TRACE(rawColor ? "raw color, compressed depth" : "compressed color, raw depth");
+		rtabmap::SensorData in(rawColor ? rgb : rtabmap::compressImage2(rgb, ".png"),
+				rawColor ? rtabmap::compressImage2(depth, ".png") : depth, model, 1, 1.0);
+		rtabmap_msgs::msg::SensorData msg;
+		sensorDataToROS(in, msg, "base_link", true);
+
+		const rtabmap::SensorData out = sensorDataFromROS(msg);
+		EXPECT_EQ(out.imageRaw().empty(), !rawColor);
+		EXPECT_EQ(out.depthRaw().empty(), rawColor);
+		EXPECT_EQ(out.imageCompressed().empty(), rawColor);
+		EXPECT_EQ(out.depthOrRightCompressed().empty(), !rawColor);
+		const cv::Mat outRgb = rawColor ? out.imageRaw() : rtabmap::uncompressImage(out.imageCompressed());
+		const cv::Mat outDepth = rawColor ? rtabmap::uncompressImage(out.depthOrRightCompressed()) : out.depthRaw();
+		EXPECT_EQ(cv::norm(outRgb, rgb, cv::NORM_INF), 0.0);
+		EXPECT_EQ(cv::countNonZero(outDepth != depth), 0);
+	}
+}
+
+/// rgbdImageFromROS() keeps the features and the global descriptor of the message.
+TEST(MsgConversion, rgbdImageFromROSKeepsFeatures)
+{
+	const rtabmap::CameraModel model(50.0, 50.0, 4.0, 3.0, rtabmap::Transform::getIdentity(), 0.0, cv::Size(8, 6));
+	rtabmap::SensorData in(cv::Mat(6, 8, CV_8UC3, cv::Scalar(1, 2, 3)), cv::Mat(6, 8, CV_16UC1, cv::Scalar(1000)), model, 1, 1.0);
+	const std::vector<cv::KeyPoint> kpts = {cv::KeyPoint(1, 2, 3), cv::KeyPoint(4, 5, 6)};
+	const std::vector<cv::Point3f> pts = {cv::Point3f(0.1f, 0.2f, 1.0f), cv::Point3f(0.3f, 0.4f, 2.0f)};
+	const cv::Mat descriptors = (cv::Mat_<float>(2, 3) << 1, 2, 3, 4, 5, 6);
+	in.setFeatures(kpts, pts, descriptors);
+	in.addGlobalDescriptor(rtabmap::GlobalDescriptor(1, (cv::Mat_<float>(1, 4) << 0.1f, 0.2f, 0.3f, 0.4f)));
+
+	rtabmap_msgs::msg::RGBDImage::SharedPtr msg = std::make_shared<rtabmap_msgs::msg::RGBDImage>();
+	rgbdImageToROS(in, *msg, "camera");
+
+	const rtabmap::SensorData out = rgbdImageFromROS(msg);
+	ASSERT_EQ(out.keypoints().size(), 2u);
+	EXPECT_FLOAT_EQ(out.keypoints()[1].pt.x, 4.0f);
+	ASSERT_EQ(out.keypoints3D().size(), 2u);
+	EXPECT_NEAR(out.keypoints3D()[1].z, 2.0f, 1e-6);
+	ASSERT_EQ(out.descriptors().rows, 2);
+	EXPECT_EQ(cv::norm(out.descriptors(), descriptors, cv::NORM_INF), 0.0);
+	ASSERT_EQ(out.globalDescriptors().size(), 1u);
+	EXPECT_EQ(out.globalDescriptors()[0].type(), 1);
+	EXPECT_EQ(cv::norm(out.globalDescriptors()[0].data(), in.globalDescriptors()[0].data(), cv::NORM_INF), 0.0);
+}

@@ -239,6 +239,10 @@ void rgbdImageToROS(const rtabmap::SensorData & data, rtabmap_msgs::msg::RGBDIma
  * The depth image is optional: a message carrying only the color image and its camera
  * info gives a SensorData with no depth, which is valid.
  *
+ * The local features (key points, their 3D points and descriptors) and the global
+ * descriptor of the message are set too; the 3D points stay in the camera frame, as the
+ * local transform is left to identity.
+ *
  * @param image the message to convert
  * @return the converted sensor data, empty (SensorData::isValid() false) if the message
  *         carries no color image or an unsupported encoding

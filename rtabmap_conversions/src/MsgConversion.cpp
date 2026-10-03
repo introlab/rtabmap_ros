@@ -614,6 +614,22 @@ rtabmap::SensorData rgbdImageFromROS(const rtabmap_msgs::msg::RGBDImage::ConstSh
 				rtabmap_conversions::timestampFromROS(image->header.stamp));
 	}
 
+	if(data.isValid())
+	{
+		// Features, in the camera frame like the local transform (identity here)
+		if(!image->key_points.empty())
+		{
+			data.setFeatures(
+					keypointsFromROS(image->key_points),
+					points3fFromROS(image->points),
+					rtabmap::uncompressData(image->descriptors));
+		}
+		if(!image->global_descriptor.data.empty())
+		{
+			data.addGlobalDescriptor(globalDescriptorFromROS(image->global_descriptor));
+		}
+	}
+
 	return data;
 }
 
@@ -1684,7 +1700,9 @@ rtabmap::SensorData sensorDataFromROS(const rtabmap_msgs::msg::SensorData & msg)
 			compressedMatFromBytes(msg.left_compressed),
 			compressedMatFromBytes(msg.right_compressed),
 			stereoModels);
-		if(!left.empty() && !right.empty())
+		// Raw images override their compressed ones; an image without its raw
+		// version stays compressed only.
+		if(!left.empty() || !right.empty())
 		{
 			s.setStereoImage(left, right, stereoModels, false);
 		}
@@ -1695,7 +1713,9 @@ rtabmap::SensorData sensorDataFromROS(const rtabmap_msgs::msg::SensorData & msg)
 			compressedMatFromBytes(msg.left_compressed),
 			compressedMatFromBytes(msg.right_compressed),
 			models);
-		if(!left.empty() && !right.empty())
+		// Raw images override their compressed ones; an image without its raw
+		// version stays compressed only.
+		if(!left.empty() || !right.empty())
 		{
 			s.setRGBDImage(left, right, models, false);
 		}
