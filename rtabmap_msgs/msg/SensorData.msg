@@ -9,7 +9,11 @@ sensor_msgs/Image left
 sensor_msgs/Image right
 
 # Compressed images
-# use rtabmap::util3d::uncompressImage() from "rtabmap/core/util3d.h"
+# use rtabmap::uncompressImage() from "rtabmap/core/Compression.h"
+# right_compressed holds a depth image in rtabmap's format (see Mem/DepthCompressionFormat),
+# not readable by image_transport plugins: see
+# rtabmap_conversions::rtabmapToCompressedDepthTransport() to convert it without
+# decompression to compressed_depth_image_transport's format.
 uint8[] left_compressed
 uint8[] right_compressed
 
@@ -23,7 +27,7 @@ geometry_msgs/Transform[] local_transform
 # raw 2d or 3D laser scan
 sensor_msgs/PointCloud2 laser_scan
 # compressed 2D or 3D laser scan
-# use rtabmap::util3d::uncompressData() from "rtabmap/core/util3d.h"
+# use rtabmap::uncompressData() from "rtabmap/core/Compression.h"
 uint8[] laser_scan_compressed
 int32 laser_scan_max_pts
 float32 laser_scan_max_range
@@ -32,11 +36,11 @@ int32 laser_scan_format
 geometry_msgs/Transform laser_scan_local_transform
 
 # compressed user data
-# use rtabmap::util3d::uncompressData() from "rtabmap/core/util3d.h"
+# use rtabmap::uncompressData() from "rtabmap/core/Compression.h"
 uint8[] user_data
 
 # compressed occupancy grid
-# use rtabmap::util3d::uncompressData() from "rtabmap/core/util3d.h"
+# use rtabmap::uncompressData() from "rtabmap/core/Compression.h"
 uint8[] grid_ground
 uint8[] grid_obstacles
 uint8[] grid_empty_cells
@@ -47,7 +51,7 @@ Point3f grid_view_point
 KeyPoint[] key_points
 Point3f[] points
 # compressed descriptors
-# use rtabmap::util3d::uncompressData() from "rtabmap/core/util3d.h"
+# use rtabmap::uncompressData() from "rtabmap/core/Compression.h"
 uint8[] descriptors
 
 GlobalDescriptor[] global_descriptors

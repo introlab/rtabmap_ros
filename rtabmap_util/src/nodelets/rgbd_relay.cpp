@@ -51,7 +51,8 @@ namespace rtabmap_util
 RGBDRelay::RGBDRelay(const rclcpp::NodeOptions & options) :
 	Node("rgbd_relay", options),
 	compress_(false),
-	uncompress_(false)
+	uncompress_(false),
+	depthCompressionFormat_(".png")
 {
 	int qos = RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT;
 	qos = this->declare_parameter("qos", qos);
@@ -63,6 +64,13 @@ RGBDRelay::RGBDRelay(const rclcpp::NodeOptions & options) :
 	int queuePub = this->declare_parameter("queue_pub", 1);
 	compress_ = this->declare_parameter("compress", compress_);
 	uncompress_ = this->declare_parameter("uncompress", uncompress_);
+	depthCompressionFormat_ = this->declare_parameter("depth_compression_format", depthCompressionFormat_);
+	if(!rtabmap_conversions::isValidDepthCompressionFormat(depthCompressionFormat_))
+	{
+		RCLCPP_ERROR(this->get_logger(), "Invalid depth_compression_format \"%s\" (should be \".png\" or \".rvl\", "
+				"optionally followed by \":maxDepth[:quantization]\", optionally prefixed by \"legacy:\", or \"legacy\"), using \".png\".", depthCompressionFormat_.c_str());
+		depthCompressionFormat_ = ".png";
+	}
 
 	UASSERT_MSG(queueSub >= 1 && queuePub >= 1,
 			uFormat("queue_sub (%d) and queue_pub (%d) must be at least 1", queueSub, queuePub).c_str());
@@ -103,7 +111,7 @@ void RGBDRelay::callback(const rtabmap_msgs::msg::RGBDImage::SharedPtr input) co
 			else if(!input->rgb.data.empty())
 			{
 				cv_bridge::CvImageConstPtr rgb = cv_bridge::toCvShare(input->rgb, input);
-				rgb->toCompressedImageMsg(output->rgb_compressed, cv_bridge::JPG);
+				rtabmap_conversions::toCompressedImageMsg(*rgb, "jpeg", output->rgb_compressed);
 			}
 
 			if(!input->depth_compressed.data.empty())
@@ -117,14 +125,14 @@ void RGBDRelay::callback(const rtabmap_msgs::msg::RGBDImage::SharedPtr input) co
 				{
 					// right stereo image
 					cv_bridge::CvImageConstPtr imageRightPtr = cv_bridge::toCvShare(input->depth, input);
-					imageRightPtr->toCompressedImageMsg(output->depth_compressed, cv_bridge::JPG);
+					rtabmap_conversions::toCompressedImageMsg(*imageRightPtr, "jpeg", output->depth_compressed);
 				}
 				else
 				{
 					// depth image
 					cv_bridge::CvImageConstPtr imageDepthPtr = cv_bridge::toCvShare(input->depth, input);
-					output->depth_compressed.data = rtabmap::compressImage(imageDepthPtr->image, ".png");
-					output->depth_compressed.format = "png";
+					output->depth_compressed.header = input->depth.header;
+					rtabmap_conversions::compressDepthImage(imageDepthPtr->image, depthCompressionFormat_, output->depth_compressed);
 				}
 			}
 		}
@@ -147,34 +155,10 @@ void RGBDRelay::callback(const rtabmap_msgs::msg::RGBDImage::SharedPtr input) co
 			}
 			else if(!input->depth_compressed.data.empty())
 			{
-				// Decode first, then pick the encoding from what actually came out.
-				// Branching on the "jpg"/"png" format string instead would abort on a
-				// right image compressed as PNG, which nothing forbids.
-				auto cvImg = std::make_unique<cv_bridge::CvImage>();
-				cvImg->header = input->depth_compressed.header;
-				cvImg->image = rtabmap::uncompressImage(input->depth_compressed.data);
-				if(cvImg->image.empty())
+				cv_bridge::CvImagePtr cvImg = rtabmap_conversions::uncompressDepthImage(input->depth_compressed);
+				if(!cvImg->image.empty())
 				{
-					RCLCPP_ERROR(this->get_logger(), "Could not decompress the depth/right image of \"%s\" (format=\"%s\").",
-							rgbdImageSub_->get_topic_name(), input->depth_compressed.format.c_str());
-				}
-				else
-				{
-					switch(cvImg->image.type())
-					{
-						case CV_32FC1: cvImg->encoding = sensor_msgs::image_encodings::TYPE_32FC1; break;
-						case CV_16UC1: cvImg->encoding = sensor_msgs::image_encodings::TYPE_16UC1; break;
-						case CV_8UC1:  cvImg->encoding = sensor_msgs::image_encodings::MONO8; break;
-						case CV_8UC3:  cvImg->encoding = sensor_msgs::image_encodings::BGR8; break;
-						default:
-							RCLCPP_ERROR(this->get_logger(), "Unsupported decompressed depth/right image type %d.", cvImg->image.type());
-							cvImg->image = cv::Mat();
-							break;
-					}
-					if(!cvImg->image.empty())
-					{
-						cvImg->toImageMsg(output->depth);
-					}
+					cvImg->toImageMsg(output->depth);
 				}
 			}
 		}

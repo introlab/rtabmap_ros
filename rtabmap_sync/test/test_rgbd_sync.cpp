@@ -9,6 +9,7 @@ All rights reserved. (BSD-3-Clause, see the repository root.)
 #include <rtabmap_sync/rgbd_sync.hpp>
 
 #include <rtabmap/core/Compression.h>
+#include <rtabmap_conversions/MsgConversion.h>
 
 #include <cmath>
 
@@ -70,6 +71,18 @@ protected:
 	}
 
 	/// Publishes one hardware-synchronized set: every input carries the same stamp.
+	/// Publishes the three inputs with a 32FC1 depth image of @p meters.
+	void publishFloatDepth(double stamp, float meters)
+	{
+		sensor_msgs::msg::Image depth;
+		cv_bridge::CvImage(makeRgbImage("camera_link", stamp).header,
+				sensor_msgs::image_encodings::TYPE_32FC1,
+				cv::Mat(8, 8, CV_32FC1, cv::Scalar(meters))).toImageMsg(depth);
+		rgbPub_->publish(makeRgbImage("camera_link", stamp));
+		depthPub_->publish(depth);
+		infoPub_->publish(makeCameraInfo("camera_link", stamp));
+	}
+
 	void publish(double stamp, int width = 8, int height = 8,
 			uint16_t depthMillimeters = 1500)
 	{
@@ -287,9 +300,12 @@ TEST_F(RGBDSyncTest, CompressesColorAsJpegAndDepthAsPng)
 	const rtabmap_msgs::msg::RGBDImage & got = compressed_->back();
 	EXPECT_FALSE(got.rgb_compressed.data.empty());
 	EXPECT_FALSE(got.depth_compressed.data.empty());
-	EXPECT_EQ(got.depth_compressed.format, "png") << "depth must stay lossless";
+	EXPECT_EQ(got.depth_compressed.format, "16UC1; compressedDepth png")
+		<< "depth must stay lossless, in compressed_depth_image_transport's format";
 	EXPECT_NE(got.rgb_compressed.format.find("jp"), std::string::npos)
 		<< "expected a jpeg format, got \"" << got.rgb_compressed.format << "\"";
+	EXPECT_EQ(got.rgb_compressed.format, "bgr8; jpeg compressed bgr8")
+		<< "compressed_image_transport's format, with the encoding";
 	EXPECT_TRUE(got.rgb.data.empty()) << "the compressed output carries no raw images";
 	EXPECT_TRUE(got.depth.data.empty());
 	EXPECT_EQ(got.header.frame_id, "camera_link");
@@ -304,13 +320,70 @@ TEST_F(RGBDSyncTest, TheCompressedDepthDecompressesBackToTheInput)
 	ASSERT_TRUE(spinUntil([&]() { return !compressed_->empty(); }));
 
 	const cv::Mat depth =
-			rtabmap::uncompressImage(compressed_->back().depth_compressed.data);
+			rtabmap_conversions::uncompressDepthImage(compressed_->back().depth_compressed)->image;
 	ASSERT_FALSE(depth.empty());
 	EXPECT_EQ(depth.type(), CV_16UC1);
 	EXPECT_EQ(depth.cols, 8);
 	EXPECT_EQ(depth.rows, 8);
 	EXPECT_EQ(depth.at<uint16_t>(0, 0), 1234)
 		<< "png is lossless, so the value must survive the round trip exactly";
+}
+
+TEST_F(RGBDSyncTest, DepthCompressionFormatAppliesToTheCompressedDepth)
+{
+	start({rclcpp::Parameter("depth_compression_format", std::string(".rvl:10:100"))});
+	collectCompressed();
+
+	// 16UC1: the codec is used, losslessly; the inverse depth parameters are ignored.
+	// (RVL is re-compressed as PNG before Jazzy, compressed_depth_image_transport cannot
+	// decode it.)
+	publish(1000.0, 8, 8, /*depthMillimeters=*/1234);
+	ASSERT_TRUE(spinUntil([&]() { return !compressed_->empty(); }));
+	EXPECT_EQ(compressed_->back().depth_compressed.format.rfind("16UC1; compressedDepth ", 0), 0u)
+		<< compressed_->back().depth_compressed.format;
+	cv::Mat depth = rtabmap_conversions::uncompressDepthImage(compressed_->back().depth_compressed)->image;
+	ASSERT_EQ(depth.type(), CV_16UC1);
+	EXPECT_EQ(depth.at<uint16_t>(0, 0), 1234);
+
+	// 32FC1: 16 bits inverse depth
+	const size_t received = compressed_->size();
+	publishFloatDepth(1001.0, 2.0f);
+	ASSERT_TRUE(spinUntil([&]() { return compressed_->size() > received; }));
+	EXPECT_EQ(compressed_->back().depth_compressed.format.rfind("32FC1; compressedDepth ", 0), 0u)
+		<< compressed_->back().depth_compressed.format;
+	depth = rtabmap_conversions::uncompressDepthImage(compressed_->back().depth_compressed)->image;
+	ASSERT_EQ(depth.type(), CV_32FC1);
+	EXPECT_NEAR(depth.at<float>(0, 0), 2.0f, 0.001f);
+}
+
+TEST_F(RGBDSyncTest, FloatDepthIsCompressedInMillimetersByDefault)
+{
+	start();
+	collectCompressed();
+	publishFloatDepth(1000.0, 2.0004f);
+	ASSERT_TRUE(spinUntil([&]() { return !compressed_->empty(); }));
+
+	const sensor_msgs::msg::CompressedImage & got = compressed_->back().depth_compressed;
+	EXPECT_EQ(got.format, "16UC1; compressedDepth png");
+	const cv::Mat depth = rtabmap_conversions::uncompressDepthImage(got)->image;
+	ASSERT_EQ(depth.type(), CV_16UC1);
+	EXPECT_EQ(depth.at<uint16_t>(0, 0), 2000);
+}
+
+TEST_F(RGBDSyncTest, LegacyKeepsFloatDepthLossless)
+{
+	// rtabmap's format before 0.24: 32FC1 kept losslessly, readable by older versions
+	start({rclcpp::Parameter("depth_compression_format", std::string("legacy"))});
+	collectCompressed();
+	publishFloatDepth(1000.0, 2.0004f);
+	ASSERT_TRUE(spinUntil([&]() { return !compressed_->empty(); }));
+
+	const sensor_msgs::msg::CompressedImage & got = compressed_->back().depth_compressed;
+	EXPECT_EQ(got.format, "png");
+	const cv::Mat depth = rtabmap::uncompressImage(got.data);
+	ASSERT_EQ(depth.type(), CV_32FC1);
+	EXPECT_EQ(depth.at<float>(0, 0), 2.0004f);
+	EXPECT_EQ(rtabmap_conversions::uncompressDepthImage(got)->image.at<float>(0, 0), 2.0004f);
 }
 
 TEST_F(RGBDSyncTest, CompressedRateThrottlesTheCompressedOutputOnly)

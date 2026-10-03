@@ -138,6 +138,7 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	minUpdateRate_(0.0),
 	alwaysProcessMostRecentFrame_(true),
 	compressionImgFormat_(".jpg"),
+	compressionDepthFormat_(".png"),
 	compressionParallelized_(true),
 	odomStrategy_(Parameters::defaultOdomStrategy()),
 	waitIMUToinit_(false),
@@ -194,6 +195,18 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	alwaysProcessMostRecentFrame_ = this->declare_parameter("always_process_most_recent_frame", alwaysProcessMostRecentFrame_);
 
 	compressionImgFormat_ = this->declare_parameter("sensor_data_compression_format", compressionImgFormat_);
+	compressionDepthFormat_ = this->declare_parameter("sensor_data_depth_compression_format", compressionDepthFormat_);
+	{
+		std::string codec;
+		float maxDepth, quantization;
+		if(!rtabmap::parseImageCompressionFormat(compressionDepthFormat_, codec, maxDepth, quantization) ||
+		   (codec != ".png" && codec != ".rvl"))
+		{
+			RCLCPP_ERROR(this->get_logger(), "Invalid sensor_data_depth_compression_format \"%s\" (should be \".png\" or \".rvl\", "
+					"optionally followed by \":maxDepth[:quantization]\"), using \".png\".", compressionDepthFormat_.c_str());
+			compressionDepthFormat_ = ".png";
+		}
+	}
 	compressionParallelized_ = this->declare_parameter("sensor_data_parallel_compression", compressionParallelized_);
 
 	waitIMUToinit_ = this->declare_parameter("wait_imu_to_init", waitIMUToinit_);
@@ -268,6 +281,7 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	RCLCPP_INFO(this->get_logger(), "Odometry: wait_imu_to_init       = %s", waitIMUToinit_?"true":"false");
 	RCLCPP_INFO(this->get_logger(), "Odometry: always_check_imu_tf    = %s", alwaysCheckImuTf_?"true":"false");
 	RCLCPP_INFO(this->get_logger(), "Odometry: sensor_data_compression_format = %s", compressionImgFormat_.c_str());
+	RCLCPP_INFO(this->get_logger(), "Odometry: sensor_data_depth_compression_format = %s", compressionDepthFormat_.c_str());
 	RCLCPP_INFO(this->get_logger(), "Odometry: sensor_data_parallel_compression = %s", compressionParallelized_?"true":"false");
 }
 
@@ -1344,7 +1358,7 @@ void OdometryROS::processData()
 		if(compressionParallelized_)
 		{
 			rtabmap::CompressionThread ctImage(data.imageRaw(), compressionImgFormat_);
-			rtabmap::CompressionThread ctDepth(data.depthOrRightRaw(), data.depthOrRightRaw().type() == CV_32FC1 || data.depthOrRightRaw().type() == CV_16UC1?std::string(".png"):compressionImgFormat_);
+			rtabmap::CompressionThread ctDepth(data.depthOrRightRaw(), data.depthOrRightRaw().type() == CV_32FC1 || data.depthOrRightRaw().type() == CV_16UC1?compressionDepthFormat_:compressionImgFormat_);
 			rtabmap::CompressionThread ctLaserScan(data.laserScanRaw().data());
 			if(!data.imageRaw().empty())
 			{
@@ -1369,7 +1383,7 @@ void OdometryROS::processData()
 		else
 		{
 			compressedImage = compressImage2(data.imageRaw(), compressionImgFormat_);
-			compressedDepth = compressImage2(data.depthOrRightRaw(), data.depthOrRightRaw().type() == CV_32FC1 || data.depthOrRightRaw().type() == CV_16UC1?std::string(".png"):compressionImgFormat_);
+			compressedDepth = compressImage2(data.depthOrRightRaw(), data.depthOrRightRaw().type() == CV_32FC1 || data.depthOrRightRaw().type() == CV_16UC1?compressionDepthFormat_:compressionImgFormat_);
 			compressedScan = compressData2(data.laserScanRaw().data());
 		}
 		if(!compressedImage.empty() && !data.stereoCameraModels().empty())

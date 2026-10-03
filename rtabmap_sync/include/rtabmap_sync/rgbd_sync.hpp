@@ -73,6 +73,7 @@ private:
 	double depthScale_;
 	int decimation_;
 	double compressedRate_;
+	std::string depthCompressionFormat_;
 	double approxSyncMaxInterval_;
 
 	/// Stamp of the last compressed message published, for compressed_rate throttling.

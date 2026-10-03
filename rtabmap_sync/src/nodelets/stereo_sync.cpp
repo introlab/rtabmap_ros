@@ -199,7 +199,7 @@ void StereoSync::callback(
 				catch(cv::Exception& e) {
 					UFATAL("Fatal error while converting left image (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
 				}
-				imagePtr->toCompressedImageMsg(msgCompressed->rgb_compressed, cv_bridge::JPG);
+				rtabmap_conversions::toCompressedImageMsg(*imagePtr, "jpeg", msgCompressed->rgb_compressed);
 
 				cv_bridge::CvImageConstPtr imageDepthPtr;
 				try {
@@ -208,7 +208,7 @@ void StereoSync::callback(
 				catch(cv::Exception& e) {
 					UFATAL("Fatal error while converting right image (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
 				}
-				imageDepthPtr->toCompressedImageMsg(msgCompressed->depth_compressed, cv_bridge::JPG);
+				rtabmap_conversions::toCompressedImageMsg(*imageDepthPtr, "jpeg", msgCompressed->depth_compressed);
 
 				rgbdImageCompressedPub_->publish(std::move(msgCompressed));
 			}

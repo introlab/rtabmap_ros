@@ -33,6 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <image_transport/image_transport.hpp>
 
 #include "rtabmap_msgs/msg/rgbd_image.hpp"
+#include <sensor_msgs/msg/compressed_image.hpp>
 
 namespace rtabmap_util
 {
@@ -55,6 +56,15 @@ private:
 
 	image_transport::Publisher rgbPub_;
 	image_transport::Publisher depthPub_;
+	/// Replaces the compressedDepth image_transport plugin of depthPub_, so that depth
+	/// already compressed in the RGBDImage is republished without being decompressed.
+	/// Null if "compressed_depth_passthrough" is false or "stereo" is true.
+	rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr compressedDepthPub_;
+	/// Format used when depth has to be compressed (raw input, or compressed in a format
+	/// that compressed_depth_image_transport cannot read), same parameters as the plugin.
+	std::string compressedDepthFormat_;
+	double compressedDepthMax_;
+	double compressedDepthQuantization_;
   rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr rgbInfoPub_;
   rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr depthInfoPub_;
 };

@@ -77,7 +77,8 @@ flowchart LR
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `compress` | `bool` | `false` | Fill the compressed fields of the output. Color becomes JPEG; depth becomes PNG, or JPEG when the message carries a stereo pair rather than depth. Fields already compressed on input are passed through as-is. |
-| `uncompress` | `bool` | `false` | Fill the raw fields of the output by decoding the compressed ones. Fields already raw on input are passed through as-is. |
+| `uncompress` | `bool` | `false` | Fill the raw fields of the output by decoding the compressed ones. Fields already raw on input are passed through as-is. Depth compressed by rtabmap or by `compressed_depth_image_transport` is accepted. |
+| `depth_compression_format` | `string` | `".png"` | With `compress`, format of the compressed depth, see [rgbd_sync](https://docs.ros.org/en/jazzy/p/rtabmap_sync/)'s parameter of the same name: `".png"` or `".rvl"` (32FC1 converted to millimeters), optionally followed by `":<maxDepth>[:<quantization>]"` (32FC1 as inverse depth), optionally prefixed by `"legacy:"` (rtabmap's own format, 32FC1 lossless without depth parameters), or `"legacy"` (`"legacy:.png"`). |
 | `qos` | `int` | `0` | Reliability of both sides: `0` system default, `1` reliable, `2` best effort. |
 | `qos_sub` | `int` | value of `qos` | Reliability of the `rgbd_image` subscription alone. |
 | `qos_pub` | `int` | value of `qos` | Reliability of the `rgbd_image_relay` publisher alone. |
@@ -118,4 +119,4 @@ Setting neither `compress` nor `uncompress` forwards the message unchanged and s
 
 Setting both is allowed and produces a message carrying each image twice, raw and compressed. That is rarely what you want.
 
-Depth is compressed as **PNG**, a stereo right image as **JPEG**.
+Depth is compressed as **PNG** by default (see `depth_compression_format`), in `compressed_depth_image_transport`'s format, a stereo right image as **JPEG**, in `compressed_image_transport`'s format.

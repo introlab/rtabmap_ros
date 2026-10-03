@@ -27,6 +27,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <rtabmap_sync/CommonDataSubscriber.h>
 #include <rtabmap/utilite/ULogger.h>
+#include <rtabmap/core/Compression.h>
+#include <rtabmap_conversions/MsgConversion.h>
 
 namespace rtabmap_sync {
 
@@ -1073,7 +1075,9 @@ void CommonDataSubscriber::commonSingleCameraCallback(
 		const std::vector<rtabmap_msgs::msg::GlobalDescriptor> & globalDescriptorMsgs,
 		const std::vector<rtabmap_msgs::msg::KeyPoint> & localKeyPoints,
 		const std::vector<rtabmap_msgs::msg::Point3f> & localPoints3d,
-		const cv::Mat & localDescriptors)
+		const cv::Mat & localDescriptors,
+		const cv::Mat & compressedImage,
+		const cv::Mat & compressedDepth)
 {
 	std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > localKeyPointsMsgs;
 	localKeyPointsMsgs.push_back(localKeyPoints);
@@ -1096,7 +1100,25 @@ void CommonDataSubscriber::commonSingleCameraCallback(
 	}
 	cameraInfoMsgs.push_back(rgbCameraInfoMsg);
 	depthCameraInfoMsgs.push_back(depthCameraInfoMsg);
-	commonMultiCameraCallback(
+	if(compressedImage.empty() && compressedDepth.empty())
+	{
+		commonMultiCameraCallback(
+				odomMsg,
+				userDataMsg,
+				imageMsgs,
+				depthMsgs,
+				cameraInfoMsgs,
+				depthCameraInfoMsgs,
+				scanMsg,
+				scan3dMsg,
+				odomInfoMsg,
+				globalDescriptorMsgs,
+				localKeyPointsMsgs,
+				localPoints3dMsgs,
+				localDescriptorsMsgs);
+		return;
+	}
+	commonMultiCameraCallbackWithCompressed(
 			odomMsg,
 			userDataMsg,
 			imageMsgs,
@@ -1109,7 +1131,9 @@ void CommonDataSubscriber::commonSingleCameraCallback(
 			globalDescriptorMsgs,
 			localKeyPointsMsgs,
 			localPoints3dMsgs,
-			localDescriptorsMsgs);
+			localDescriptorsMsgs,
+			std::vector<cv::Mat>(1, compressedImage),
+			std::vector<cv::Mat>(1, compressedDepth));
 }
 
 void CommonDataSubscriber::tick(const rclcpp::Time & stamp, double targetFrequency)

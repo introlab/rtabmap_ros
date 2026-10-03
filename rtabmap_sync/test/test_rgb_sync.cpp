@@ -9,6 +9,7 @@ All rights reserved. (BSD-3-Clause, see the repository root.)
 #include <rtabmap_sync/rgb_sync.hpp>
 
 #include <rtabmap/core/Compression.h>
+#include <rtabmap_conversions/MsgConversion.h>
 
 #include <string>
 #include <vector>
@@ -184,8 +185,8 @@ TEST_F(RGBSyncTest, CompressesTheFakeDepthAsPng)
 
 	const rtabmap_msgs::msg::RGBDImage & got = compressed_->back();
 	ASSERT_FALSE(got.depth_compressed.data.empty());
-	EXPECT_EQ(got.depth_compressed.format, "png");
-	const cv::Mat depth = rtabmap::uncompressImage(got.depth_compressed.data);
+	EXPECT_EQ(got.depth_compressed.format, "16UC1; compressedDepth png");
+	const cv::Mat depth = rtabmap_conversions::uncompressDepthImage(got.depth_compressed)->image;
 	ASSERT_FALSE(depth.empty());
 	EXPECT_EQ(depth.type(), CV_16UC1);
 	EXPECT_EQ(cv::countNonZero(depth), 0) << "the fake depth is all zeros";

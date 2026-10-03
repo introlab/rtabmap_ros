@@ -17,7 +17,7 @@ int32[] word_id_values
 KeyPoint[] word_kpts
 Point3f[] word_pts
 # compressed descriptors
-# use rtabmap::util3d::uncompressData() from "rtabmap/core/util3d.h"
+# use rtabmap::uncompressData() from "rtabmap/core/Compression.h"
 uint8[] word_descriptors
 
 SensorData data

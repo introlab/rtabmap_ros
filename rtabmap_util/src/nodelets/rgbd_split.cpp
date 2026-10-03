@@ -27,9 +27,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <rtabmap_util/rgbd_split.hpp>
 #include <rtabmap/core/Compression.h>
+#include <rtabmap_conversions/MsgConversion.h>
 #include <rtabmap/utilite/ULogger.h>
 #include <rtabmap/utilite/UConversion.h>
 #include <sensor_msgs/image_encodings.hpp>
+#include <algorithm>
+#include <cstring>
 
 #ifdef PRE_ROS_IRON
 #include <cv_bridge/cv_bridge.h>
@@ -42,7 +45,10 @@ namespace rtabmap_util
 
 RGBDSplit::RGBDSplit(const rclcpp::NodeOptions & options) :
 	Node("rgbd_split", options),
-	stereo_(false)
+	stereo_(false),
+	compressedDepthFormat_("png"),
+	compressedDepthMax_(10.0),
+	compressedDepthQuantization_(100.0)
 {
 	int qos = RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT;
 	qos = this->declare_parameter("qos", qos);
@@ -55,11 +61,14 @@ RGBDSplit::RGBDSplit(const rclcpp::NodeOptions & options) :
 	// A stereo RGBDImage carries the right image in the depth slot, so name the outputs
 	// left/right instead of rgb/depth to say what they really are.
 	stereo_ = this->declare_parameter("stereo", false);
+	// Republish compressed depth on the compressedDepth topic without decompressing it.
+	bool compressedDepthPassthrough = this->declare_parameter("compressed_depth_passthrough", true);
 
 	RCLCPP_INFO(this->get_logger(), "%s: qos         = %d", get_name(), qos);
 	RCLCPP_INFO(this->get_logger(), "%s: queue_sub   = %d", get_name(), queueSub);
 	RCLCPP_INFO(this->get_logger(), "%s: queue_pub   = %d", get_name(), queuePub);
 	RCLCPP_INFO(this->get_logger(), "%s: stereo      = %s", get_name(), stereo_?"true":"false");
+	RCLCPP_INFO(this->get_logger(), "%s: compressed_depth_passthrough = %s", get_name(), compressedDepthPassthrough?"true":"false");
 
 	UASSERT_MSG(queueSub >= 1 && queuePub >= 1,
 			uFormat("queue_sub (%d) and queue_pub (%d) must be at least 1", queueSub, queuePub).c_str());
@@ -71,12 +80,75 @@ RGBDSplit::RGBDSplit(const rclcpp::NodeOptions & options) :
 	const std::string secondName = stereo_?"/right":"/depth";
 	const rclcpp::QoS pubQos = rclcpp::QoS(queuePub).reliability((rmw_qos_reliability_policy_t)qosPub);
 
+	const std::string depthTopic = base + secondName + "/image";
+	if(!stereo_ && compressedDepthPassthrough)
+	{
+		// Parameter namespace image_transport gives to the depth topic (see
+		// image_transport::Publisher), e.g., "rgbd_image.depth.image".
+		std::string paramBase = depthTopic.substr(std::min(depthTopic.size(), this->get_effective_namespace().size()));
+		std::replace(paramBase.begin(), paramBase.end(), '/', '.');
+		if(!paramBase.empty() && paramBase.front() == '.')
+		{
+			paramBase = paramBase.substr(1);
+		}
+		// Disable the compressedDepth plugin, we publish on its topic instead. Its
+		// list can still be set by the user, in which case the plugin is kept if it
+		// is in it.
+		const std::string kCompressedDepth = "image_transport/compressedDepth";
+		std::vector<std::string> plugins;
+		for(const std::string & transport : image_transport::getLoadableTransports())
+		{
+			if(transport != kCompressedDepth)
+			{
+				plugins.push_back(transport);
+			}
+		}
+		plugins = this->declare_parameter(paramBase + ".enable_pub_plugins", plugins);
+		if(std::find(plugins.begin(), plugins.end(), kCompressedDepth) == plugins.end())
+		{
+			// Same parameters as compressed_depth_image_transport's publisher
+			// ("png_level" is not supported).
+			const std::string cdBase = paramBase + ".compressedDepth.";
+			compressedDepthFormat_ = this->declare_parameter(cdBase + "format", compressedDepthFormat_);
+			compressedDepthMax_ = this->declare_parameter(cdBase + "depth_max", compressedDepthMax_);
+			compressedDepthQuantization_ = this->declare_parameter(cdBase + "depth_quantization", compressedDepthQuantization_);
+#ifdef PRE_ROS_JAZZY
+			if(compressedDepthFormat_ == "rvl")
+			{
+				RCLCPP_ERROR(this->get_logger(), "%sformat \"rvl\" cannot be decoded by compressed_depth_image_transport "
+						"before ROS Jazzy, using \"png\".", cdBase.c_str());
+				compressedDepthFormat_ = "png";
+			}
+#endif
+			if(compressedDepthFormat_ != "png" && compressedDepthFormat_ != "rvl")
+			{
+				RCLCPP_ERROR(this->get_logger(), "%sformat should be \"png\" or \"rvl\" (\"%s\"), using \"png\".",
+						cdBase.c_str(), compressedDepthFormat_.c_str());
+				compressedDepthFormat_ = "png";
+			}
+			if(compressedDepthMax_ <= 0.0 || compressedDepthQuantization_ <= 0.0)
+			{
+				RCLCPP_ERROR(this->get_logger(), "%sdepth_max (%f) and %sdepth_quantization (%f) should be positive, using 10 and 100.",
+						cdBase.c_str(), compressedDepthMax_, cdBase.c_str(), compressedDepthQuantization_);
+				compressedDepthMax_ = 10.0;
+				compressedDepthQuantization_ = 100.0;
+			}
+			compressedDepthPub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>(depthTopic + "/compressedDepth", pubQos);
+		}
+		else
+		{
+			RCLCPP_INFO(this->get_logger(), "%s: %s is enabled in %s.enable_pub_plugins, compressed depth will "
+					"be decompressed and re-compressed by it (compressed_depth_passthrough ignored).",
+					get_name(), kCompressedDepth.c_str(), paramBase.c_str());
+		}
+	}
+
 #ifdef PRE_ROS_LYRICAL
 	rgbPub_ = image_transport::create_publisher(this, base + firstName + "/image", pubQos.get_rmw_qos_profile());
-	depthPub_ = image_transport::create_publisher(this, base + secondName + "/image", pubQos.get_rmw_qos_profile());
+	depthPub_ = image_transport::create_publisher(this, depthTopic, pubQos.get_rmw_qos_profile());
 #else
 	rgbPub_ = image_transport::create_publisher(*this, base + firstName + "/image", pubQos);
-	depthPub_ = image_transport::create_publisher(*this, base + secondName + "/image", pubQos);
+	depthPub_ = image_transport::create_publisher(*this, depthTopic, pubQos);
 #endif
 	rgbInfoPub_ = this->create_publisher<sensor_msgs::msg::CameraInfo>(base + firstName + "/camera_info", pubQos);
 	depthInfoPub_ = this->create_publisher<sensor_msgs::msg::CameraInfo>(base + secondName + "/camera_info", pubQos);
@@ -119,53 +191,77 @@ void RGBDSplit::callback(const rtabmap_msgs::msg::RGBDImage::SharedPtr input) co
 		rgbInfoPub_->publish(outputCameraInfo);
 	}
 
-	if(depthPub_.getNumSubscribers())
+	const bool rawDepthSubscribed = depthPub_.getNumSubscribers() > 0;
+	const bool compressedDepthSubscribed = compressedDepthPub_ && compressedDepthPub_->get_subscription_count() > 0;
+	if(rawDepthSubscribed || compressedDepthSubscribed)
 	{
 		sensor_msgs::msg::Image outputImage;
 		sensor_msgs::msg::CameraInfo outputCameraInfo;
 		outputCameraInfo = input->depth_camera_info;
 
+		// compressedDepth without decompression, when the depth is already compressed
+		// in a format compressed_depth_image_transport can read.
+		sensor_msgs::msg::CompressedImage outputCompressedDepth;
+		bool compressedDepthReady = false;
+		if(compressedDepthSubscribed && input->depth.data.empty() && !input->depth_compressed.data.empty())
+		{
+			const bool rosFormat = input->depth_compressed.format.find("compressedDepth") != std::string::npos;
+#ifdef PRE_ROS_JAZZY
+			const bool rvlSupported = false;
+#else
+			const bool rvlSupported = true;
+#endif
+			if(rosFormat && (rvlSupported || input->depth_compressed.format.find(" rvl") == std::string::npos))
+			{
+				outputCompressedDepth = input->depth_compressed;
+				compressedDepthReady = true;
+			}
+			else
+			{
+				// RVL is re-compressed as PNG before Jazzy. Legacy 32FC1 format (4 channels
+				// PNG) and right images have no compressedDepth equivalent, they are
+				// re-compressed below.
+				const cv::Mat bytes = rosFormat ?
+						rtabmap_conversions::compressedDepthTransportToRtabmap(input->depth_compressed) :
+						rtabmap_conversions::compressedMatFromBytes(input->depth_compressed.data, false);
+				outputCompressedDepth.header = input->depth_compressed.header;
+				compressedDepthReady = rtabmap_conversions::rtabmapToCompressedDepthTransport(bytes, outputCompressedDepth, false);
+			}
+		}
+
+		cv::Mat depth;
 		if(!input->depth.data.empty())
 		{
-			// already raw, just copy pointer
-			outputImage = input->depth;
+			if(rawDepthSubscribed)
+			{
+				// already raw, just copy pointer
+				outputImage = input->depth;
+			}
+			else
+			{
+				outputImage.header = input->depth.header;
+			}
+			if(compressedDepthSubscribed)
+			{
+				depth = cv_bridge::toCvShare(input->depth, input)->image;
+			}
 		}
-		else if(!input->depth_compressed.data.empty())
+		else if(!input->depth_compressed.data.empty() && (rawDepthSubscribed || !compressedDepthReady))
 		{
 #ifdef CV_BRIDGE_HYDRO
 			ROS_ERROR("Unsupported compressed image copy, please upgrade at least to ROS Indigo to use this.");
 #else
-			// Decode first, then pick the encoding from what actually came out. Going
-			// by the "jpg"/"png" format string instead would mislabel a depth PNG as
-			// mono8 (cv_bridge cannot infer 16-bit from it), and would abort outright on
-			// a right image compressed as PNG, which nothing forbids.
-			cv_bridge::CvImage cvImg;
-			cvImg.header = input->depth_compressed.header;
-			cvImg.image = rtabmap::uncompressImage(input->depth_compressed.data);
-			if(cvImg.image.empty())
+			cv_bridge::CvImagePtr cvImg = rtabmap_conversions::uncompressDepthImage(input->depth_compressed);
+			if(!cvImg->image.empty())
 			{
-				RCLCPP_ERROR(this->get_logger(), "Could not decompress the depth/right image of \"%s\" (format=\"%s\").",
-						rgbdImageSub_->get_topic_name(), input->depth_compressed.format.c_str());
-			}
-			else
-			{
-				switch(cvImg.image.type())
-				{
-					case CV_32FC1: cvImg.encoding = sensor_msgs::image_encodings::TYPE_32FC1; break;
-					case CV_16UC1: cvImg.encoding = sensor_msgs::image_encodings::TYPE_16UC1; break;
-					case CV_8UC1:  cvImg.encoding = sensor_msgs::image_encodings::MONO8; break;
-					case CV_8UC3:  cvImg.encoding = sensor_msgs::image_encodings::BGR8; break;
-					default:
-						RCLCPP_ERROR(this->get_logger(), "Unsupported decompressed depth/right image type %d.", cvImg.image.type());
-						cvImg.image = cv::Mat();
-						break;
-				}
-			}
-			if(!cvImg.image.empty())
-			{
-				cvImg.toImageMsg(outputImage);
+				cvImg->toImageMsg(outputImage);
+				depth = cvImg->image;
 			}
 #endif
+		}
+		else
+		{
+			outputImage.header = input->depth_compressed.header;
 		}
 		if(outputCameraInfo.header.frame_id.empty()) {
 			if(outputImage.header.frame_id.empty()) {
@@ -214,7 +310,32 @@ void RGBDSplit::callback(const rtabmap_msgs::msg::RGBDImage::SharedPtr input) co
 			}
 		}
 
-		depthPub_.publish(outputImage);
+		if(rawDepthSubscribed)
+		{
+			depthPub_.publish(outputImage);
+		}
+		if(compressedDepthSubscribed)
+		{
+			if(!compressedDepthReady && (depth.type() == CV_32FC1 || depth.type() == CV_16UC1))
+			{
+				const std::string format = depth.type() == CV_32FC1 ?
+						uFormat(".%s:%g:%g", compressedDepthFormat_.c_str(), compressedDepthMax_, compressedDepthQuantization_) :
+						"." + compressedDepthFormat_;
+				// Same as compressed_depth_image_transport: inverse depth for 32FC1
+				compressedDepthReady = rtabmap_conversions::compressDepthImage(depth, format, outputCompressedDepth);
+			}
+			else if(!compressedDepthReady && !depth.empty())
+			{
+				RCLCPP_WARN_ONCE(this->get_logger(), "Cannot publish \"%s\" as compressedDepth, it is "
+						"not a depth image (type=%d). (This warning is printed only once)",
+						compressedDepthPub_->get_topic_name(), depth.type());
+			}
+			if(compressedDepthReady)
+			{
+				outputCompressedDepth.header = outputImage.header;
+				compressedDepthPub_->publish(outputCompressedDepth);
+			}
+		}
 		depthInfoPub_->publish(outputCameraInfo);
 	}
 }

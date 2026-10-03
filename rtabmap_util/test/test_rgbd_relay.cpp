@@ -9,6 +9,7 @@ All rights reserved. (BSD-3-Clause, see the repository root.)
 #include <rtabmap_util/rgbd_relay.hpp>
 
 #include <rtabmap/core/Compression.h>
+#include <rtabmap_conversions/MsgConversion.h>
 #include <rtabmap/utilite/UException.h>
 
 using namespace rtabmap_util_test;
@@ -21,12 +22,13 @@ class RGBDRelayTest : public NodeTest
 {
 protected:
 	/// Starts the node, wires up the input publisher and the output collector.
-	void start(bool compress, bool uncompress)
+	void start(bool compress, bool uncompress, const std::string & depthCompressionFormat = ".png")
 	{
 		addNode(std::make_shared<rtabmap_util::RGBDRelay>(rclcpp::NodeOptions()
 				.parameter_overrides({
 					rclcpp::Parameter("compress", compress),
-					rclcpp::Parameter("uncompress", uncompress)})));
+					rclcpp::Parameter("uncompress", uncompress),
+					rclcpp::Parameter("depth_compression_format", depthCompressionFormat)})));
 
 		out_ = collect<rtabmap_msgs::msg::RGBDImage>("rgbd_image_relay");
 		pub_ = helper()->create_publisher<rtabmap_msgs::msg::RGBDImage>("rgbd_image", 10);
@@ -65,8 +67,9 @@ TEST_F(RGBDRelayTest, CompressesRawImagesWhenAsked)
 	const rtabmap_msgs::msg::RGBDImage & got = out_->back();
 	EXPECT_FALSE(got.rgb_compressed.data.empty()) << "rgb must be compressed";
 	EXPECT_FALSE(got.depth_compressed.data.empty()) << "depth must be compressed";
-	// Depth is lossless png; color is jpg.
-	EXPECT_EQ(got.depth_compressed.format, "png");
+	// Depth is lossless png in compressed_depth_image_transport's format; color is jpeg.
+	EXPECT_EQ(got.depth_compressed.format, "16UC1; compressedDepth png");
+	EXPECT_EQ(got.rgb_compressed.format, "bgr8; jpeg compressed bgr8");
 	EXPECT_TRUE(got.rgb.data.empty()) << "the raw image is not carried as well";
 }
 
@@ -81,8 +84,8 @@ TEST_F(RGBDRelayTest, CompressesAStereoPairAsJpeg)
 
 	const rtabmap_msgs::msg::RGBDImage & got = out_->back();
 	ASSERT_FALSE(got.depth_compressed.data.empty());
-	EXPECT_NE(got.depth_compressed.format, "png")
-		<< "a stereo right image must not take the depth PNG path";
+	EXPECT_EQ(got.depth_compressed.format, "mono8; jpeg compressed mono8")
+		<< "a stereo right image must not take the depth path";
 	EXPECT_NE(got.depth_compressed.format.find("jp"), std::string::npos)
 		<< "expected a jpeg format, got \"" << got.depth_compressed.format << "\"";
 	EXPECT_LT(got.depth_camera_info.p[3], 0.0) << "the baseline must survive the relay";
@@ -98,7 +101,7 @@ TEST_F(RGBDRelayTest, CompressesDepthAsLosslessPng)
 
 	const rtabmap_msgs::msg::RGBDImage & got = out_->back();
 	ASSERT_FALSE(got.depth_compressed.data.empty());
-	EXPECT_EQ(got.depth_compressed.format, "png") << "depth must stay lossless";
+	EXPECT_EQ(got.depth_compressed.format, "16UC1; compressedDepth png") << "depth must stay lossless";
 	EXPECT_DOUBLE_EQ(got.depth_camera_info.p[3], 0.0) << "no baseline: not stereo";
 }
 
@@ -144,6 +147,76 @@ TEST_F(RGBDRelayTest, UncompressRestoresRawImages)
 	EXPECT_EQ(got.depth.encoding, sensor_msgs::image_encodings::TYPE_16UC1);
 	EXPECT_EQ(got.depth.width, 8u);
 	EXPECT_EQ(got.depth.height, 8u);
+}
+
+TEST_F(RGBDRelayTest, CompressesFloatDepthAsInverseDepthWhenAsked)
+{
+	start(/*compress=*/true, /*uncompress=*/false, ".rvl:10:100");
+
+	rtabmap_msgs::msg::RGBDImage in = makeRGBDImage("camera_link", 1000.0);
+	const cv::Mat depth(8, 8, CV_32FC1, cv::Scalar(1.5f));
+	cv_bridge::CvImage(in.header, sensor_msgs::image_encodings::TYPE_32FC1, depth).toImageMsg(in.depth);
+
+	pub_->publish(in);
+	ASSERT_TRUE(spinUntil([&]() { return !out_->empty(); }));
+
+	const rtabmap_msgs::msg::RGBDImage & got = out_->back();
+	ASSERT_FALSE(got.depth_compressed.data.empty());
+	EXPECT_EQ(got.depth_compressed.format.rfind("32FC1; compressedDepth ", 0), 0u) << got.depth_compressed.format;
+	EXPECT_EQ(got.depth_compressed.header.frame_id, in.depth.header.frame_id);
+	const cv::Mat restored = rtabmap_conversions::uncompressDepthImage(got.depth_compressed)->image;
+	ASSERT_EQ(restored.type(), CV_32FC1);
+	EXPECT_LT(cv::norm(restored, depth, cv::NORM_INF), 0.001);
+}
+
+TEST_F(RGBDRelayTest, InvalidDepthCompressionFormatFallsBackToPng)
+{
+	start(/*compress=*/true, /*uncompress=*/false, ".jpg:10");
+
+	pub_->publish(makeRGBDImage("camera_link", 1000.0));
+	ASSERT_TRUE(spinUntil([&]() { return !out_->empty(); }));
+	EXPECT_EQ(out_->back().depth_compressed.format, "16UC1; compressedDepth png");
+}
+
+TEST_F(RGBDRelayTest, LegacyDepthCompressionKeepsFloatDepthLossless)
+{
+	start(/*compress=*/true, /*uncompress=*/false, "legacy");
+
+	rtabmap_msgs::msg::RGBDImage in = makeRGBDImage("camera_link", 1000.0);
+	const cv::Mat depth(8, 8, CV_32FC1, cv::Scalar(1.2345f));
+	cv_bridge::CvImage(in.header, sensor_msgs::image_encodings::TYPE_32FC1, depth).toImageMsg(in.depth);
+
+	pub_->publish(in);
+	ASSERT_TRUE(spinUntil([&]() { return !out_->empty(); }));
+
+	const rtabmap_msgs::msg::RGBDImage & got = out_->back();
+	EXPECT_EQ(got.depth_compressed.format, "png");
+	const cv::Mat restored = rtabmap::uncompressImage(got.depth_compressed.data);
+	ASSERT_EQ(restored.type(), CV_32FC1);
+	EXPECT_EQ(cv::norm(restored, depth, cv::NORM_INF), 0.0) << "lossless";
+}
+
+TEST_F(RGBDRelayTest, UncompressRestoresRosCompressedDepth)
+{
+	// depth_compressed filled by compressed_depth_image_transport ("32FC1; compressedDepth png")
+	start(/*compress=*/false, /*uncompress=*/true);
+
+	rtabmap_msgs::msg::RGBDImage in = makeRGBDImage("camera_link", 1000.0);
+	const cv::Mat depth(8, 8, CV_32FC1, cv::Scalar(2.5f));
+	in.depth = sensor_msgs::msg::Image();
+	in.depth_compressed.header = in.header;
+	ASSERT_TRUE(rtabmap_conversions::rtabmapToCompressedDepthTransport(
+			rtabmap::compressImage2(depth, ".png:10:100"), in.depth_compressed));
+	ASSERT_EQ(in.depth_compressed.format, "32FC1; compressedDepth png");
+
+	pub_->publish(in);
+	ASSERT_TRUE(spinUntil([&]() { return !out_->empty(); }));
+
+	const rtabmap_msgs::msg::RGBDImage & got = out_->back();
+	ASSERT_FALSE(got.depth.data.empty()) << "depth must be decompressed";
+	EXPECT_EQ(got.depth.encoding, sensor_msgs::image_encodings::TYPE_32FC1);
+	const cv::Mat restored = cv_bridge::toCvCopy(got.depth)->image;
+	EXPECT_LT(cv::norm(restored, depth, cv::NORM_INF), 0.001);
 }
 
 TEST_F(RGBDRelayTest, UncompressPrefersTheRawImageOverTheCompressedOne)

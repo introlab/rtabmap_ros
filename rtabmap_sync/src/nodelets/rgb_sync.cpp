@@ -189,13 +189,12 @@ void RGBSync::callback(
 				rtabmap_msgs::msg::RGBDImage msgCompressed = msg;
 
 				cv_bridge::CvImageConstPtr imagePtr = cv_bridge::toCvShare(image);
-				imagePtr->toCompressedImageMsg(msgCompressed.rgb_compressed, cv_bridge::JPG);
+				rtabmap_conversions::toCompressedImageMsg(*imagePtr, "jpeg", msgCompressed.rgb_compressed);
 
 				if(fillEmptyDepth_)
 				{
 					msgCompressed.depth_compressed.header = image->header;
-					msgCompressed.depth_compressed.data = rtabmap::compressImage(fakeDepthImage.image, ".png");
-					msgCompressed.depth_compressed.format = "png";
+					rtabmap_conversions::compressDepthImage(fakeDepthImage.image, ".png", msgCompressed.depth_compressed);
 				}
 
 				rgbdImageCompressedPub_->publish(msgCompressed);
