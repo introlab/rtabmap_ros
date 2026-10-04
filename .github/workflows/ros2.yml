@@ -38,13 +38,14 @@ jobs:
         - ros_distro: rolling
           # Rolling has moved to Ubuntu resolute and much of it has not been rebuilt for
           # that yet, so rosdep finds nothing to install for these. They are all optional
-          # to rtabmap, which just builds without them.
-          skip_keys: 'velodyne libpointmatcher gtsam grid_map_ros'
+          # to rtabmap, which just builds without them. nav2_msgs too: rtabmap_slam builds
+          # without it.
+          skip_keys: 'velodyne libpointmatcher gtsam grid_map_ros nav2_msgs'
           use_ros2_testing: true # Rolling is using ros2-testing (nightly)
-          # nav2 is missing from resolute too, and it is not optional: rtabmap_slam and
-          # rtabmap_costmap_plugins need it to compile at all, and the rtabmap_ros
-          # metapackage pulls both in. So rolling names the packages it can build.
-          packages: 'rtabmap_conversions rtabmap_odom rtabmap_sync rtabmap_util rtabmap_python'
+          # nav2 is missing from resolute too, and rtabmap_costmap_plugins needs
+          # nav2_costmap_2d to compile at all. The rtabmap_ros metapackage pulls it in, so
+          # rolling names the packages it can build.
+          packages: 'rtabmap_conversions rtabmap_odom rtabmap_slam rtabmap_sync rtabmap_util rtabmap_python'
       fail-fast: false
     container:
       image: osrf/ros:${{ matrix.ros_distro }}-desktop-full
