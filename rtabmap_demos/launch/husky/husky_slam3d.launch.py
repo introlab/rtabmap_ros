@@ -101,6 +101,10 @@ def generate_launch_description():
             description='Robot namespace.'),
 
         DeclareLaunchArgument(
+            'rtabmap_viz', default_value='true', choices=['true', 'false'],
+            description='Start rtabmap_viz.'),
+
+        DeclareLaunchArgument(
             'use_camera', default_value='true',
             description='Use camera for global loop closure / re-localization.'),
 
@@ -139,6 +143,7 @@ def generate_launch_description():
             remappings=remappings),
 
         Node(
+            condition=IfCondition(LaunchConfiguration('rtabmap_viz')),
             package='rtabmap_viz', executable='rtabmap_viz', output='screen',
             namespace=robot_ns,
             parameters=[rtabmap_parameters, shared_parameters,
