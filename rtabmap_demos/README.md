@@ -90,3 +90,16 @@ FusionCore (wheel + IMU UKF) and `icp_odometry` run in a feedback loop: FusionCo
 [isaac_sim_vslam_demo.launch.py](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_demos/launch/isaac/isaac_sim_vslam_demo.launch.py) stereo:=false vo:=rtabmap
 
 ![Peek 2024-11-30 13-22](https://github.com/user-attachments/assets/240820c6-4dea-4cbf-9431-b4b3af695d51)
+
+## Tests
+
+`colcon test --packages-select rtabmap_demos` runs two tests:
+
+* `test_launch_files` loads every launch file of this package, with its default arguments and with each of its switches flipped, without starting anything. It checks that the files, executables, components and included launch files exist, that the arguments passed to our own launch files are declared, and that RTAB-Map's parameters exist in the installed library. Packages that are not installed (simulators, robots) are stubbed and named in a warning.
+* `test_demo_playback` replays demo bags through the demo launch files and compares the resulting graphs with the golden ones in `test/golden` (number of nodes and of loop closures, and the trajectory error rtabmap computes against the golden trajectory, replayed as ground truth). It is skipped unless the bags were downloaded first (a few GB):
+
+```bash
+rtabmap_demos/test/fetch_test_data.sh   # or set RTABMAP_DEMOS_TEST_DATA to download elsewhere
+```
+
+The bags are replayed in lockstep with the demo's nodes: each sensor message is published only once every node is idle, so results do not depend on how loaded the machine is. A replay takes a few minutes per bag. To keep a run's graph, database and log, set `RTABMAP_DEMOS_TEST_RESULTS` to a directory. After a change that is expected to change the results, regenerate the golden graphs with `RTABMAP_DEMOS_UPDATE_GOLDEN=1` and commit them.

@@ -176,7 +176,11 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 	odomFrameIdInit = this->declare_parameter("odom_frame_id_init", odomFrameIdInit); // set to publish map->odom TF before receiving odom topic
 	mapFrameId_ = this->declare_parameter("map_frame_id", mapFrameId_);
 	groundTruthFrameId_ = this->declare_parameter("ground_truth_frame_id", groundTruthFrameId_);
-	groundTruthBaseFrameId_ = this->declare_parameter("ground_truth_base_frame_id", frameId_);
+	groundTruthBaseFrameId_ = this->declare_parameter("ground_truth_base_frame_id", frameId_+"_gt");
+	if(groundTruthBaseFrameId_.empty())
+	{
+		groundTruthBaseFrameId_ = frameId_+"_gt";
+	}
 
 	if(!odomFrameIdInit.empty())
 	{

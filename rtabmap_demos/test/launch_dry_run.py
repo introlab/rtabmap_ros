@@ -13,20 +13,28 @@ Packages the machine does not have (simulators, robot descriptions) are replaced
 empty stubs instead of failing the run: their launch files include nothing and their
 nodes are recorded unchecked. What the demo itself passes on is still checked. Packages
 named rtabmap* are never stubbed, so a typo in one of ours still fails.
+
+check_launch_file() is the whole check of one launch file, as the test_launch_files of
+rtabmap_demos and rtabmap_examples run it. This file is installed with rtabmap_demos
+(share/rtabmap_demos/test) so that other packages' tests can import it.
 """
 
 import contextlib
+import functools
 import logging
 import os
+import subprocess
 import tempfile
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set
+from pathlib import Path
+from typing import Dict, List, Optional, Set, Tuple
 
 import ament_index_python
 import ament_index_python.packages
 import launch_ros.substitutions.find_package
 import yaml
-from ament_index_python.packages import PackageNotFoundError
+from ament_index_python.packages import (PackageNotFoundError, get_package_prefix,
+                                         get_package_share_directory)
 from launch import LaunchContext, LaunchService
 from launch.actions import (DeclareLaunchArgument, ExecuteLocal, IncludeLaunchDescription,
                             TimerAction)
@@ -270,6 +278,10 @@ class _DryRun:
         for description in action._dry_run_descriptions:
             package = perform_substitutions(context, description.package)
             plugin = perform_substitutions(context, description.node_plugin)
+            # A component's package is not looked up by launch, only by the container
+            # loading it: look it up here, so a package not installed gets stubbed like
+            # a node's would.
+            self.get_package_prefix(package)
             stubbed = self.is_stubbed(package)
             started = Started('component', package, plugin, stubbed)
             if not stubbed:
@@ -404,3 +416,76 @@ def dry_run(launch_file: str, launch_arguments: Dict[str, str],
         if return_code != 0 and not errors.messages:
             session.problem(f'launch returned {return_code}')
         return session.result
+
+
+@functools.lru_cache(maxsize=None)
+def known_rtabmap_parameters() -> frozenset:
+    """All RTAB-Map parameters of the installed library.
+
+    The SLAM node leaves the odometry ones out of its --params listing, and the
+    odometry node the SLAM ones, so it takes both.
+    """
+    names = set()
+    for package, executable in (('rtabmap_slam', 'rtabmap'), ('rtabmap_odom', 'rgbd_odometry')):
+        path = Path(get_package_prefix(package)) / 'lib' / package / executable
+        output = subprocess.run([str(path), '--params'], capture_output=True, text=True,
+                                timeout=60, check=True).stdout
+        for line in output.splitlines():
+            if line.startswith('Param: '):
+                names.add(line[len('Param: '):].split(' = ', 1)[0].strip())
+    if len(names) < 300:
+        raise RuntimeError(f'could not read the parameter list ({len(names)} found)')
+    return frozenset(names)
+
+
+def variants(launch_file: str):
+    """The default arguments, then each boolean flipped and each other choice, one at a time."""
+    yield {}
+    context = LaunchContext()
+    for argument in declared_arguments(launch_file):
+        if argument.choices:
+            default = None
+            if argument.default_value is not None:
+                default = perform_substitutions(context, argument.default_value)
+            for choice in argument.choices:
+                if choice != default:
+                    yield {argument.name: choice}
+            continue
+        if argument.default_value is None:
+            continue
+        try:
+            default = perform_substitutions(context, argument.default_value)
+        except Exception:
+            continue  # default made of other arguments; not a switch
+        if default.lower() in ('true', 'false'):
+            yield {argument.name: 'false' if default.lower() == 'true' else 'true'}
+
+
+def launch_files(source_dir: Path) -> List[str]:
+    """The launch files under a package's launch directory, relative to it."""
+    return sorted(str(p.relative_to(source_dir)) for p in source_dir.rglob('*.launch.py'))
+
+
+def check_launch_file(package: str, launch_file: str) -> Tuple[List[str], Set[str]]:
+    """Dry-run the installed share/<package>/launch/<launch_file> with each variant.
+
+    Returns the failures, one per variant that has problems, and the packages that had
+    to be stubbed.
+    """
+    installed = Path(get_package_share_directory(package)) / 'launch' / launch_file
+    if not installed.is_file():
+        return [f'{launch_file} is not installed'], set()
+    failures = []
+    stubbed = set()
+    for arguments in variants(str(installed)):
+        result = dry_run(str(installed), arguments, known_rtabmap_parameters())
+        stubbed |= result.stubbed_packages
+        problems = list(result.problems)
+        # Every launch file here is there to run some part of RTAB-Map. A condition or
+        # an include gone wrong can drop it without any error.
+        if not arguments and not any(_is_rtabmap_package(s.package) for s in result.started):
+            problems.append('starts nothing from an rtabmap package')
+        if problems:
+            shown = ' '.join(f'{k}:={v}' for k, v in arguments.items()) or '(defaults)'
+            failures.append(f'{shown}\n    ' + '\n    '.join(problems))
+    return failures, stubbed

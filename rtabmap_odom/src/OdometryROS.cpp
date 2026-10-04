@@ -177,7 +177,11 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	waitForTransform_ = this->declare_parameter("wait_for_transform", waitForTransform_);
 	initialPoseStr = this->declare_parameter("initial_pose", initialPoseStr); // "x y z roll pitch yaw"
 	groundTruthFrameId_ = this->declare_parameter("ground_truth_frame_id", groundTruthFrameId_);
-	groundTruthBaseFrameId_ = this->declare_parameter("ground_truth_base_frame_id", frameId_);
+	groundTruthBaseFrameId_ = this->declare_parameter("ground_truth_base_frame_id", frameId_+"_gt");
+	if(groundTruthBaseFrameId_.empty())
+	{
+		groundTruthBaseFrameId_ = frameId_+"_gt";
+	}
 	configPath_ = this->declare_parameter("config_path", configPath_);
 	publishNullWhenLost_ = this->declare_parameter("publish_null_when_lost", publishNullWhenLost_);
 

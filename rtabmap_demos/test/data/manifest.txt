@@ -1,0 +1,18 @@
+# Test data assets fetched by rtabmap_demos/test/fetch_test_data.sh.
+# Format: <basename>\t<url>\t<sha256>[\t<extracted>]
+# - basename is the file's name on disk under this directory.
+# - url is a full http(s):// URL; the bags are assets of the rtabmap_ros GitHub releases.
+# - sha256 must match the bytes of the file the tests read (compute with
+#   `sha256sum file.db3`), which for an archive is the file it holds rather than
+#   the archive itself: a corrupt archive is caught by the extractor. Leave as
+#   TODO_FILL_SHA256 to bypass the integrity check on first download then paste
+#   the actual hash back in.
+# - extracted is optional and only for archives (.zip): the file the archive holds,
+#   relative to this directory. A bag archive holds a whole bag directory (the .db3
+#   and its metadata.yaml); the .db3 is the file named here. The archive is removed
+#   once extracted, so this file is both what the sha256 is of and what tells the
+#   script the asset is already there.
+#
+# Lines starting with '#' and blank lines are ignored.
+demo_mapping_bag.zip	https://github.com/introlab/rtabmap_ros/releases/download/0.23.13/demo_mapping_bag.zip	b233777634dea8207677d7a76d76718b43bc7043f03d061f6c332f12a9e07be8	demo_mapping_bag/demo_mapping.db3
+stereo_outdoorA_bag.zip	https://github.com/introlab/rtabmap_ros/releases/download/0.23.13/stereo_outdoorA_bag.zip	e63533a750cfd02bff1640d140552c002264f31802baf9d0182c4140749cd45d	stereo_outdoorA_bag/stereo_outdoorA.db3
