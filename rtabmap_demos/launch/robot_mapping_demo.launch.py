@@ -1,6 +1,6 @@
 # Requirements:
 #   Download rosbag:
-#    * demo_mapping.db3: https://drive.google.com/file/d/1v9qJ2U7GlYhqBJr7OQHWbDSCfgiVaLWb/view?usp=drive_link
+#    * demo_mapping_bag.zip: https://github.com/introlab/rtabmap_ros/releases/download/0.23.13/demo_mapping_bag.zip
 #
 # Example:
 #
@@ -8,7 +8,7 @@
 #     $ ros2 launch rtabmap_demos robot_mapping_demo.launch.py rviz:=true rtabmap_viz:=true
 #
 #   Rosbag:
-#     $ ros2 bag play demo_mapping.db3 --clock
+#     $ ros2 bag play demo_mapping_bag --clock
 #
 
 from launch import LaunchDescription

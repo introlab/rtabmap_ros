@@ -1,4 +1,7 @@
 # rtabmap_demos
+
+Ready-to-run demos of RTAB-Map. Each launch file sets up a complete pipeline for one of the demo bags or one simulated robot, so you can watch RTAB-Map map, close loops and navigate without any hardware. The bags can be downloaded from the [0.23.13 release](https://github.com/introlab/rtabmap_ros/releases/tag/0.23.13).
+
 + [Outdoor Stereo VSLAM](#outdoor-stereo-vslam)
 + [Indoor 2D LiDAR and RGB-D SLAM](#indoor-2d-lidar-and-rgb-d-slam)
 + [Multi-Session Indoor 2D LiDAR and RGB-D SLAM](#multi-session-indoor-2d-lidar-and-rgb-d-slam)

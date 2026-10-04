@@ -1,7 +1,7 @@
 # Requirements:
 #   find_object_2d package installed
 #   Download rosbag:
-#    * demo_find_object.db3: https://drive.google.com/file/d/1web54yQkxeGFr2UwOjKeoajGGDm0fZXT/view?usp=drive_link
+#    * demo_find_object_bag.zip: https://github.com/introlab/rtabmap_ros/releases/download/0.23.13/demo_find_object_bag.zip
 #
 # Example:
 #
@@ -9,7 +9,7 @@
 #     $ ros2 launch rtabmap_demos find_object_demo.launch.py
 #
 #   Rosbag:
-#     $ ros2 bag play demo_find_object.db3 --clock
+#     $ ros2 bag play demo_find_object_bag --clock
 #
 
 from launch import LaunchDescription

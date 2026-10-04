@@ -1,10 +1,10 @@
 # Requirements:
 #   Download one or more rosbags:
-#    * map1.db3: https://drive.google.com/file/d/1XajzWm0u1Tk7m7x63ybcKVMXj80r5P6r/view?usp=drive_link
-#    * map2.db3: https://drive.google.com/file/d/1_FxEalE2O-DQKq2tRpLIpDn5Mbvu0jZc/view?usp=drive_link
-#    * map3.db3: https://drive.google.com/file/d/1dJzMOoRPA28gQZUIWCeAa08Qn4wG9oRw/view?usp=drive_link
-#    * map4.db3: https://drive.google.com/file/d/19Y6yye0ndIIwdhEWMwTdoiSy9WlKS44c/view?usp=drive_link
-#    * map5.db3: https://drive.google.com/file/d/1zCx4Q4SftPplQtW1xeG-W3OkbTxwd5GD/view?usp=drive_link
+#    * map1_bag.zip: https://github.com/introlab/rtabmap_ros/releases/download/0.23.13/map1_bag.zip
+#    * map2_bag.zip: https://github.com/introlab/rtabmap_ros/releases/download/0.23.13/map2_bag.zip
+#    * map3_bag.zip: https://github.com/introlab/rtabmap_ros/releases/download/0.23.13/map3_bag.zip
+#    * map4_bag.zip: https://github.com/introlab/rtabmap_ros/releases/download/0.23.13/map4_bag.zip
+#    * map5_bag.zip: https://github.com/introlab/rtabmap_ros/releases/download/0.23.13/map5_bag.zip
 #
 # Example:
 #
@@ -13,12 +13,12 @@
 #     $ ros2 launch rtabmap_demos multisession_mapping_demo.launch.py
 #
 #   Rosbag:
-#     $ ros2 bag play map1.db3 --clock
+#     $ ros2 bag play map1_bag --clock
 #     when done, you can play the next bag(s):
-#     $ ros2 bag play map2.db3 --clock
-#     $ ros2 bag play map3.db3 --clock
-#     $ ros2 bag play map4.db3 --clock
-#     $ ros2 bag play map5.db3 --clock
+#     $ ros2 bag play map2_bag --clock
+#     $ ros2 bag play map3_bag --clock
+#     $ ros2 bag play map4_bag --clock
+#     $ ros2 bag play map5_bag --clock
 #
 # Refer to this paper for more info: https://arxiv.org/abs/2407.15305
 #
