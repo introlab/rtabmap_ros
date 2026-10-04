@@ -4164,6 +4164,115 @@ TEST(MsgConversion, toCompressedImageMsgSetsTheTransportFormat)
 	EXPECT_EQ(msg.format, "bgr8; png compressed bgr8");
 }
 
+/// 16 bits color PNGs: the format and the decoded encoding come from the PNG header.
+TEST(MsgConversion, compressedImageTransportFormatReads16BitsColor)
+{
+	struct Case { cv::Mat image; std::string encoding; };
+	const Case cases[] = {
+			{cv::Mat(6, 8, CV_16UC3, cv::Scalar(1000, 2000, 3000)), "bgr16"},
+			{cv::Mat(6, 8, CV_16UC4, cv::Scalar(1000, 2000, 3000, 4000)), "bgra16"}};
+	for(const Case & cs : cases)
+	{
+		SCOPED_TRACE(cs.encoding);
+		rtabmap_msgs::msg::RGBDImage msg;
+		ASSERT_TRUE(cv::imencode(".png", cs.image, msg.rgb_compressed.data));
+		EXPECT_EQ(compressedImageTransportFormat(msg.rgb_compressed.data),
+				cs.encoding + "; png compressed " + cs.encoding);
+		msg.rgb_compressed.format = "png";
+
+		cv_bridge::CvImagePtr rgb, depth;
+		toCvCopy(msg, rgb, depth);
+		ASSERT_TRUE(rgb);
+		EXPECT_EQ(rgb->encoding, cs.encoding) << "not the 8 bits encoding cv_bridge gives";
+		EXPECT_EQ(cv::norm(rgb->image, cs.image, cv::NORM_INF), 0.0);
+	}
+}
+
+/// PNGs OpenCV does not decode to one of the supported encodings: no transport format.
+TEST(MsgConversion, compressedImageTransportFormatRejectsUnsupportedPngs)
+{
+	std::vector<unsigned char> png;
+	ASSERT_TRUE(cv::imencode(".png", cv::Mat(6, 8, CV_8UC1, cv::Scalar(40)), png));
+	ASSERT_EQ(compressedImageTransportFormat(png), "mono8; png compressed mono8") << "precondition";
+
+	// IHDR: bit depth at 24, color type at 25
+	std::vector<unsigned char> palette = png;
+	palette[25] = 3;
+	EXPECT_EQ(compressedImageTransportFormat(palette), "");
+	std::vector<unsigned char> grayAlpha = png;
+	grayAlpha[25] = 4;
+	EXPECT_EQ(compressedImageTransportFormat(grayAlpha), "");
+	std::vector<unsigned char> oneBit = png;
+	oneBit[24] = 1;
+	EXPECT_EQ(compressedImageTransportFormat(oneBit), "") << "decoded as 8 bits by OpenCV";
+
+	png.resize(20);
+	EXPECT_EQ(compressedImageTransportFormat(png), "") << "truncated before IHDR";
+}
+
+/// The number of components of a JPEG is found past the markers before its frame header.
+TEST(MsgConversion, compressedImageTransportFormatSkipsJpegMarkers)
+{
+	for(const bool color : {false, true})
+	{
+		SCOPED_TRACE(color ? "bgr8" : "mono8");
+		const std::string expected = color ? "bgr8; jpeg compressed bgr8" : "mono8; jpeg compressed mono8";
+		std::vector<unsigned char> jpeg;
+		ASSERT_TRUE(cv::imencode(".jpg", color ?
+				cv::Mat(6, 8, CV_8UC3, cv::Scalar(10, 20, 30)) : cv::Mat(6, 8, CV_8UC1, cv::Scalar(40)), jpeg));
+		ASSERT_EQ(compressedImageTransportFormat(jpeg), expected) << "precondition";
+
+		// After the start of image: a restart marker (no length), then fill bytes before
+		// the next marker
+		std::vector<unsigned char> markers(jpeg.begin(), jpeg.begin() + 2);
+		markers.insert(markers.end(), {0xFF, 0xD0, 0xFF, 0xFF});
+		markers.insert(markers.end(), jpeg.begin() + 2, jpeg.end());
+		EXPECT_EQ(compressedImageTransportFormat(markers), expected);
+	}
+
+	// Start of image only, no frame header: the codec is known, not the encoding
+	const std::vector<unsigned char> noFrame = {0xFF, 0xD8, 0xFF, 0xD9, 0x00, 0x00};
+	EXPECT_EQ(compressedImageTransportFormat(noFrame), "");
+	EXPECT_EQ(compressedImageTransportFormat({0xFF, 0xD8}), "");
+	EXPECT_EQ(compressedImageTransportFormat({0x00, 0x01, 0x02, 0x03}), "") << "not an image";
+}
+
+/// The right image of a compressed stereo pair is published as is, in
+/// compressed_image_transport's format.
+TEST(MsgConversion, rgbdImageToROSKeepsACompressedStereoPair)
+{
+	const rtabmap::StereoCameraModel stereo(
+			525.0, 525.0, 4.0, 3.0, 0.12, rtabmap::Transform::getIdentity(), cv::Size(8, 6));
+	const cv::Mat left(6, 8, CV_8UC3, cv::Scalar(10, 20, 30));
+	const cv::Mat right(6, 8, CV_8UC1, cv::Scalar(40));
+	for(const std::string format : {".jpg", ".png"})
+	{
+		SCOPED_TRACE(format);
+		const cv::Mat leftCompressed = rtabmap::compressImage2(left, format);
+		const cv::Mat rightCompressed = rtabmap::compressImage2(right, format);
+		rtabmap::SensorData in;
+		in.setStereoImage(leftCompressed, rightCompressed, stereo, false);
+		ASSERT_TRUE(in.imageRaw().empty());
+		ASSERT_TRUE(in.rightRaw().empty());
+
+		rtabmap_msgs::msg::RGBDImage msg;
+		rgbdImageToROS(in, msg, "camera_link");
+		EXPECT_TRUE(msg.depth.data.empty());
+		const std::string codec = format == ".jpg" ? "jpeg" : "png";
+		EXPECT_EQ(msg.depth_compressed.format, "mono8; " + codec + " compressed mono8");
+		EXPECT_EQ(msg.depth_compressed.data, toBytes(rightCompressed)) << "not re-compressed";
+		EXPECT_EQ(msg.depth_compressed.header.frame_id, "camera_link");
+		EXPECT_EQ(msg.rgb_compressed.data, toBytes(leftCompressed)) << "not re-compressed";
+
+		const rtabmap::SensorData out = rgbdImageFromROS(std::make_shared<rtabmap_msgs::msg::RGBDImage>(msg));
+		ASSERT_EQ(out.stereoCameraModels().size(), 1u);
+		cv::Mat leftOut, rightOut;
+		out.uncompressDataConst(&leftOut, &rightOut);
+		ASSERT_EQ(rightOut.type(), CV_8UC1);
+		EXPECT_LE(cv::norm(rightOut, right, cv::NORM_INF), format == ".jpg" ? 3.0 : 0.0);
+	}
+}
+
 //============================================================================
 // Mixed raw and compressed images, features of RGBDImage
 //============================================================================

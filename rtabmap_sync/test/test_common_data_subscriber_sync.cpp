@@ -376,6 +376,127 @@ TEST_F(CommonDataSubscriberSyncTest, RGBDModeDecodesCompressedImagesOtherwise)
 	EXPECT_EQ(got.depths, 1u);
 }
 
+/// A subclass not overriding commonMultiCameraCallbackWithCompressed() gets the decoded
+/// images in commonMultiCameraCallback(), the compressed ones are dropped.
+TEST_F(CommonDataSubscriberSyncTest, RGBDModeFallsBackOnTheDecodedImagesCallback)
+{
+	start({rclcpp::Parameter("subscribe_rgbd", true),
+		   rclcpp::Parameter("subscribe_odom", false)});
+	sub_->defaultCompressedCallback = true;
+	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr rgbd =
+			advertise<rtabmap_msgs::msg::RGBDImage>("rgbd_image");
+
+	rgbd->publish(makeCompressedRGBDImage("camera_link", 1000.0));
+	ASSERT_TRUE(spinUntil([&]() { return !sub_->empty(); }));
+	EXPECT_EQ(sub_->back().images, 1u);
+	EXPECT_EQ(sub_->back().depths, 1u);
+	EXPECT_EQ(sub_->back().compressedImages, 0u);
+	EXPECT_EQ(sub_->back().compressedDepths, 0u);
+	EXPECT_EQ(sub_->back().frameId, "camera_link");
+}
+
+namespace {
+
+/// What is synchronized with the RGBDImage: each combination has its own callback.
+struct RGBDInputs
+{
+	std::string name;
+	bool odom;
+	std::string extra;  ///< "", "scan", "scan_cloud", "scan_descriptor" or "odom_info"
+};
+
+std::ostream & operator<<(std::ostream & os, const RGBDInputs & inputs) { return os << inputs.name; }
+
+class RGBDModeInputsTest :
+		public CommonDataSubscriberTest,
+		public ::testing::WithParamInterface<RGBDInputs> {};
+
+}  // namespace
+
+/// Every callback of a single RGBDImage passes its compressed images along, and what is
+/// synchronized with it.
+TEST_P(RGBDModeInputsTest, PassesCompressedImagesAlong)
+{
+	const RGBDInputs & inputs = GetParam();
+	std::vector<rclcpp::Parameter> params = {
+			rclcpp::Parameter("subscribe_rgbd", true),
+			rclcpp::Parameter("subscribe_odom", inputs.odom)};
+	if(!inputs.extra.empty())
+	{
+		params.push_back(rclcpp::Parameter("subscribe_" + inputs.extra, true));
+	}
+	start(params);
+	sub_->decodeOnDemand = true;
+
+	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr rgbd =
+			advertise<rtabmap_msgs::msg::RGBDImage>("rgbd_image");
+	rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom;
+	if(inputs.odom)
+	{
+		odom = advertise<nav_msgs::msg::Odometry>("odom");
+	}
+	rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr scan;
+	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr cloud;
+	rclcpp::Publisher<rtabmap_msgs::msg::ScanDescriptor>::SharedPtr descriptor;
+	rclcpp::Publisher<rtabmap_msgs::msg::OdomInfo>::SharedPtr odomInfo;
+	if(inputs.extra == "scan")
+	{
+		scan = advertise<sensor_msgs::msg::LaserScan>("scan");
+	}
+	else if(inputs.extra == "scan_cloud")
+	{
+		cloud = advertise<sensor_msgs::msg::PointCloud2>("scan_cloud");
+	}
+	else if(inputs.extra == "scan_descriptor")
+	{
+		descriptor = advertise<rtabmap_msgs::msg::ScanDescriptor>("scan_descriptor");
+	}
+	else if(inputs.extra == "odom_info")
+	{
+		odomInfo = advertise<rtabmap_msgs::msg::OdomInfo>("odom_info");
+	}
+
+	rgbd->publish(makeCompressedRGBDImage("camera_link", 1000.0));
+	if(odom) { odom->publish(makeOdometry("odom", 1000.0, 1.5)); }
+	if(scan) { scan->publish(makeLaserScan("base_scan", 1000.0)); }
+	if(cloud) { cloud->publish(makeScanCloud("lidar_link", 1000.0)); }
+	if(descriptor)
+	{
+		descriptor->publish(makeScanDescriptor("base_scan", 1000.0,
+				/*with2d=*/true, /*with3d=*/false, /*withGlobalDescriptor=*/true));
+	}
+	if(odomInfo) { odomInfo->publish(makeOdomInfo("odom", 1000.0)); }
+	ASSERT_TRUE(spinUntil([&]() { return !sub_->empty(); }));
+
+	const RecordingSubscriber::Record & got = sub_->back();
+	EXPECT_EQ(got.kind, RecordingSubscriber::Record::kMultiCamera);
+	EXPECT_EQ(got.images, 0u) << "not decoded";
+	EXPECT_EQ(got.depths, 0u) << "not decoded";
+	EXPECT_EQ(got.compressedImages, 1u);
+	EXPECT_EQ(got.compressedDepths, 1u);
+	EXPECT_EQ(got.frameId, "camera_link");
+	EXPECT_EQ(got.hasOdom, inputs.odom);
+	EXPECT_EQ(got.hasScan2d, inputs.extra == "scan" || inputs.extra == "scan_descriptor");
+	EXPECT_EQ(got.hasScan3d, inputs.extra == "scan_cloud");
+	EXPECT_EQ(got.globalDescriptors, inputs.extra == "scan_descriptor" ? 1u : 0u);
+	EXPECT_EQ(got.hasOdomInfo, inputs.extra == "odom_info");
+}
+
+INSTANTIATE_TEST_SUITE_P(
+		Inputs, RGBDModeInputsTest,
+		::testing::Values(
+				RGBDInputs{"rgbd", false, ""},
+				RGBDInputs{"scan", false, "scan"},
+				RGBDInputs{"scan_cloud", false, "scan_cloud"},
+				RGBDInputs{"scan_descriptor", false, "scan_descriptor"},
+				RGBDInputs{"odom_info", false, "odom_info"},
+				RGBDInputs{"odom", true, ""},
+				RGBDInputs{"odom_scan", true, "scan"},
+				RGBDInputs{"odom_scan_cloud", true, "scan_cloud"},
+				RGBDInputs{"odom_scan_descriptor", true, "scan_descriptor"},
+				RGBDInputs{"odom_odom_info", true, "odom_info"}),
+		[](const ::testing::TestParamInfo<RGBDInputs> & info) { return info.param.name; });
+
 TEST_F(CommonDataSubscriberSyncTest, RGBDModeCarriesAScanAlongside)
 {
 	start({rclcpp::Parameter("subscribe_rgbd", true),

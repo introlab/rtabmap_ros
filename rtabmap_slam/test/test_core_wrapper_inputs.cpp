@@ -749,6 +749,23 @@ protected:
 		EXPECT_EQ(rtabmap::compressedDepthFormat(node.data.right_compressed), storedFormat);
 	}
 
+	/// Maps a compressed stereo pair and checks it is stored as is.
+	void checkStereoStoredAsReceived(bool decodeOnDemand)
+	{
+		rtabmap_msgs::msg::RGBDImage msg = makeMsg();
+		msg.depth_camera_info.p[3] = -msg.depth_camera_info.p[0] * 0.1; // 10 cm baseline
+		cv::Mat left, right;
+		cv::cvtColor(colorImage(), left, cv::COLOR_BGR2GRAY);
+		cv::flip(left, right, 1);
+		msg.rgb_compressed = compressedColor(left, "mono8");
+		msg.depth_compressed = compressedColor(right, "mono8");
+		const rtabmap_msgs::msg::Node node = map(msg, {rclcpp::Parameter("decode_images_on_demand", decodeOnDemand)});
+		ASSERT_EQ(1, node.id);
+		ASSERT_EQ(node.data.right_camera_info.size(), 1u) << "stored as a stereo pair";
+		EXPECT_EQ(node.data.left_compressed, msg.rgb_compressed.data);
+		EXPECT_EQ(node.data.right_compressed, msg.depth_compressed.data);
+	}
+
 	static bool isJpeg(const std::vector<unsigned char> & bytes)
 	{
 		return bytes.size() >= 2 && bytes[0] == 0xFF && bytes[1] == 0xD8;
@@ -797,21 +814,16 @@ TEST_F(CoreWrapperCompressedRGBDTest, decodes_images_to_generate_a_scan)
 	EXPECT_EQ(node.data.left_compressed, msg.rgb_compressed.data) << "still stored as received";
 }
 
-/// A compressed stereo pair (gray right image) is stored as received too.
+/// A compressed stereo pair (gray right image) is stored as received too, decoded on
+/// demand or here.
 TEST_F(CoreWrapperCompressedRGBDTest, stores_a_compressed_stereo_pair_as_received)
 {
-	rtabmap_msgs::msg::RGBDImage msg = makeMsg();
-	msg.depth_camera_info.p[3] = -msg.depth_camera_info.p[0] * 0.1; // 10 cm baseline
-	cv::Mat left, right;
-	cv::cvtColor(colorImage(), left, cv::COLOR_BGR2GRAY);
-	cv::flip(left, right, 1);
-	msg.rgb_compressed = compressedColor(left, "mono8");
-	msg.depth_compressed = compressedColor(right, "mono8");
-	const rtabmap_msgs::msg::Node node = map(msg);
-	ASSERT_EQ(1, node.id);
-	ASSERT_EQ(node.data.right_camera_info.size(), 1u) << "stored as a stereo pair";
-	EXPECT_EQ(node.data.left_compressed, msg.rgb_compressed.data);
-	EXPECT_EQ(node.data.right_compressed, msg.depth_compressed.data);
+	checkStereoStoredAsReceived(true);
+}
+
+TEST_F(CoreWrapperCompressedRGBDTest, stores_a_compressed_stereo_pair_as_received_when_decoded_here)
+{
+	checkStereoStoredAsReceived(false);
 }
 
 /// A raw image is compressed by rtabmap; the compressed one next to it is still stored as is.

@@ -63,14 +63,17 @@ RGBDSplit::RGBDSplit(const rclcpp::NodeOptions & options) :
 	// left/right instead of rgb/depth to say what they really are.
 	stereo_ = this->declare_parameter("stereo", false);
 	// Republish compressed images on the compressed and compressedDepth topics without
-	// decompressing them.
+	// decompressing them. Depth can be set apart, e.g., to use the jpeg_quality parameter
+	// of the compressed plugin while still passing the depth through.
 	bool compressedPassthrough = this->declare_parameter("compressed_passthrough", true);
+	bool compressedDepthPassthrough = this->declare_parameter("compressed_depth_passthrough", compressedPassthrough);
 
 	RCLCPP_INFO(this->get_logger(), "%s: qos         = %d", get_name(), qos);
 	RCLCPP_INFO(this->get_logger(), "%s: queue_sub   = %d", get_name(), queueSub);
 	RCLCPP_INFO(this->get_logger(), "%s: queue_pub   = %d", get_name(), queuePub);
 	RCLCPP_INFO(this->get_logger(), "%s: stereo      = %s", get_name(), stereo_?"true":"false");
 	RCLCPP_INFO(this->get_logger(), "%s: compressed_passthrough = %s", get_name(), compressedPassthrough?"true":"false");
+	RCLCPP_INFO(this->get_logger(), "%s: compressed_depth_passthrough = %s", get_name(), compressedDepthPassthrough?"true":"false");
 
 	UASSERT_MSG(queueSub >= 1 && queuePub >= 1,
 			uFormat("queue_sub (%d) and queue_pub (%d) must be at least 1", queueSub, queuePub).c_str());
@@ -97,9 +100,11 @@ RGBDSplit::RGBDSplit(const rclcpp::NodeOptions & options) :
 		return paramBase;
 	};
 	// Disables the image_transport @p transport plugin of @p topic, as we publish on its
-	// topic instead. The list of plugins can still be set by the user, in which case the
-	// plugin is kept if it is in it: false is returned.
-	const auto replacePlugin = [this, &paramBaseOf](const std::string & topic, const std::string & transport) {
+	// topic instead. image_transport reads the list of plugins from this parameter when
+	// the publisher is created: the plugin is removed from it even if set by the user,
+	// otherwise both would publish on the same topic.
+	const auto removePlugin = [this, &paramBaseOf](const std::string & topic, const std::string & transport, const std::string & passthroughParam) {
+		const std::string name = paramBaseOf(topic) + ".enable_pub_plugins";
 		std::vector<std::string> plugins;
 		for(const std::string & loadable : image_transport::getLoadableTransports())
 		{
@@ -108,47 +113,43 @@ RGBDSplit::RGBDSplit(const rclcpp::NodeOptions & options) :
 				plugins.push_back(loadable);
 			}
 		}
-		plugins = this->declare_parameter(paramBaseOf(topic) + ".enable_pub_plugins", plugins);
-		if(std::find(plugins.begin(), plugins.end(), transport) != plugins.end())
+		plugins = this->declare_parameter(name, plugins);
+		const auto plugin = std::find(plugins.begin(), plugins.end(), transport);
+		if(plugin != plugins.end())
 		{
-			RCLCPP_INFO(this->get_logger(), "%s: %s is enabled in %s.enable_pub_plugins, compressed images "
-					"will be decompressed and re-compressed by it (compressed_passthrough ignored).",
-					get_name(), transport.c_str(), paramBaseOf(topic).c_str());
-			return false;
+			RCLCPP_WARN(this->get_logger(), "%s: %s is removed from %s, as %s is true: the node "
+					"publishes that topic itself. Set %s to false to use the plugin.",
+					get_name(), transport.c_str(), name.c_str(), passthroughParam.c_str(), passthroughParam.c_str());
+			plugins.erase(plugin);
+			this->set_parameter(rclcpp::Parameter(name, plugins));
 		}
-		return true;
 	};
 
 	if(compressedPassthrough)
 	{
 		const std::string kCompressed = "image_transport/compressed";
-		const bool rgbReplaced = replacePlugin(rgbTopic, kCompressed);
-		const bool rightReplaced = stereo_ && replacePlugin(depthTopic, kCompressed);
-		if(rgbReplaced || rightReplaced)
+		// Same parameter as compressed_image_transport's publisher ("jpeg_quality" and
+		// "png_level" are not supported), read from the color topic.
+		const std::string cBase = paramBaseOf(rgbTopic) + ".compressed.";
+		compressedImageFormat_ = this->declare_parameter(cBase + "format", compressedImageFormat_);
+		if(compressedImageFormat_ != "jpeg" && compressedImageFormat_ != "png")
 		{
-			// Same parameter as compressed_image_transport's publisher ("jpeg_quality" and
-			// "png_level" are not supported), read from the color topic.
-			const std::string cBase = paramBaseOf(rgbTopic) + ".compressed.";
-			compressedImageFormat_ = this->declare_parameter(cBase + "format", compressedImageFormat_);
-			if(compressedImageFormat_ != "jpeg" && compressedImageFormat_ != "png")
-			{
-				RCLCPP_ERROR(this->get_logger(), "%sformat should be \"jpeg\" or \"png\" (\"%s\"), using \"jpeg\".",
-						cBase.c_str(), compressedImageFormat_.c_str());
-				compressedImageFormat_ = "jpeg";
-			}
+			RCLCPP_ERROR(this->get_logger(), "%sformat should be \"jpeg\" or \"png\" (\"%s\"), using \"jpeg\".",
+					cBase.c_str(), compressedImageFormat_.c_str());
+			compressedImageFormat_ = "jpeg";
 		}
-		if(rgbReplaced)
+		removePlugin(rgbTopic, kCompressed, "compressed_passthrough");
+		compressedRgbPub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>(rgbTopic + "/compressed", pubQos);
+		if(stereo_)
 		{
-			compressedRgbPub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>(rgbTopic + "/compressed", pubQos);
-		}
-		if(rightReplaced)
-		{
+			removePlugin(depthTopic, kCompressed, "compressed_passthrough");
 			compressedRightPub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>(depthTopic + "/compressed", pubQos);
 		}
 	}
 
-	if(!stereo_ && compressedPassthrough && replacePlugin(depthTopic, "image_transport/compressedDepth"))
+	if(!stereo_ && compressedDepthPassthrough)
 	{
+		removePlugin(depthTopic, "image_transport/compressedDepth", "compressed_depth_passthrough");
 		// Same parameters as compressed_depth_image_transport's publisher
 		// ("png_level" is not supported).
 		const std::string cdBase = paramBaseOf(depthTopic) + ".compressedDepth.";

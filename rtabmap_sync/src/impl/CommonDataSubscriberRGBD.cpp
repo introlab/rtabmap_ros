@@ -132,6 +132,10 @@ void CommonDataSubscriber::rgbdScanDescCallback(
 	{
 		globalDescriptorMsgs.push_back(image1Msg->global_descriptor);
 	}
+	if(!scanDescMsg->global_descriptor.data.empty())
+	{
+		globalDescriptorMsgs.push_back(scanDescMsg->global_descriptor);
+	}
 
 	commonSingleCameraCallback(odomMsg, userDataMsg, rgb,
 			depth, image1Msg->rgb_camera_info, image1Msg->depth_camera_info,

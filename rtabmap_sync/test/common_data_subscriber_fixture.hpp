@@ -55,6 +55,9 @@ public:
 
 	/// What imagesDecodedOnDemand() returns: whether images may be left compressed.
 	bool decodeOnDemand = false;
+	/// Leaves commonMultiCameraCallbackWithCompressed() to CommonDataSubscriber's default,
+	/// like a subclass that does not override it.
+	bool defaultCompressedCallback = false;
 
 	/**
 	 * @param options ROS options; the subscribe_* parameters go in here
@@ -93,6 +96,14 @@ protected:
 			const std::vector<cv::Mat> & compressedImages,
 			const std::vector<cv::Mat> & compressedDepths) override
 	{
+		if(defaultCompressedCallback)
+		{
+			CommonDataSubscriber::commonMultiCameraCallbackWithCompressed(odomMsg, userDataMsg,
+					imageMsgs, depthMsgs, cameraInfoMsgs, depthCameraInfoMsgs, scanMsg, scan3dMsg,
+					odomInfoMsg, globalDescriptorMsgs, localKeyPoints, localPoints3d,
+					localDescriptors, compressedImages, compressedDepths);
+			return;
+		}
 		commonMultiCameraCallback(odomMsg, userDataMsg, imageMsgs, depthMsgs, cameraInfoMsgs,
 				depthCameraInfoMsgs, scanMsg, scan3dMsg, odomInfoMsg, globalDescriptorMsgs,
 				localKeyPoints, localPoints3d, localDescriptors);

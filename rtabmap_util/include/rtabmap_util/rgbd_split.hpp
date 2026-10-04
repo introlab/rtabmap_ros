@@ -63,7 +63,8 @@ private:
 	rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr compressedRightPub_;
 	/// Format used when an image has to be compressed: "jpeg" or "png".
 	std::string compressedImageFormat_;
-	/// Same for the "compressedDepth" plugin of depthPub_, without "stereo".
+	/// Same for the "compressedDepth" plugin of depthPub_, without "stereo". Null if
+	/// "compressed_depth_passthrough" is false.
 	rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr compressedDepthPub_;
 	/// Format used when depth has to be compressed (raw input, or compressed in a format
 	/// that compressed_depth_image_transport cannot read), same parameters as the plugin.
