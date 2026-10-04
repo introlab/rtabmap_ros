@@ -19,8 +19,11 @@
 #   Launch the example by adjusting the lidar topic, imu topic and base frame:
 #   $ ros2 launch rtabmap_examples lidar3d.launch.py lidar_topic:=/velodyne_points imu_topic:=/imu/data frame_id:=velodyne
 
+import os
+
 from launch import LaunchDescription, LaunchContext
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
+from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
@@ -115,6 +118,12 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
     'Reg/Strategy': '1',
     'Icp/CorrespondenceRatio': str(LaunchConfiguration('min_loop_closure_overlap').perform(context))
   }
+
+  database_parameters = {
+    'database_path': LaunchConfiguration('database_path'),
+    'ground_truth_frame_id': LaunchConfiguration('ground_truth_frame_id'),
+    'ground_truth_base_frame_id': LaunchConfiguration('ground_truth_base_frame_id'),
+  }
   
   remappings = [('imu', imu_topic),
                 ('odom', 'icp_odom')]
@@ -129,7 +138,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
     rtabmap_parameters['Mem/IncrementalMemory'] = 'False'
     rtabmap_parameters['Mem/InitWMWithAllNodes'] = 'True'
   else:
-    arguments.append('-d') # This will delete the previous database (~/.ros/rtabmap.db)
+    arguments.append('-d') # This will delete the previous database (database_path)
     
   if external_odom_frame_id:
     viz_topic = lidar_topic_deskewed
@@ -162,7 +171,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
     # Update the map
     Node(
       package='rtabmap_slam', executable='rtabmap', output='screen',
-      parameters=[shared_parameters, rtabmap_parameters,
+      parameters=[shared_parameters, rtabmap_parameters, database_parameters,
                   {'subscribe_rgbd': rgbd_image_used,
                    'rgbd_cameras': rgbd_cameras,
                    'topic_queue_size': 40,
@@ -172,6 +181,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
 
     # Just for visualization
     Node(
+      condition=IfCondition(LaunchConfiguration('rtabmap_viz')),
       package='rtabmap_viz', executable='rtabmap_viz', output='screen',
       parameters=[shared_parameters, rtabmap_parameters,
                   {'odometry_node_name': "icp_odometry"}],
@@ -267,6 +277,22 @@ def generate_launch_description():
     DeclareLaunchArgument(
       'qos', default_value='1',
       description='Quality of Service: 0=system default, 1=reliable, 2=best effort.'),
+
+    DeclareLaunchArgument(
+      'rtabmap_viz', default_value='true',
+      description='Launch RTAB-Map UI.'),
+
+    DeclareLaunchArgument(
+      'database_path', default_value=os.path.join(os.environ.get('ROS_HOME', '~/.ros'), 'rtabmap.db'),
+      description='Database where the map is saved (deleted on start in SLAM mode).'),
+
+    DeclareLaunchArgument(
+      'ground_truth_frame_id', default_value='',
+      description='Fixed frame of a ground truth trajectory in TF. If set, RTAB-Map reports its error against it in its statistics (Gt/*).'),
+
+    DeclareLaunchArgument(
+      'ground_truth_base_frame_id', default_value='',
+      description='Robot frame of the ground truth trajectory in TF. Empty: frame_id + "_gt".'),
 
     OpaqueFunction(function=launch_setup),
   ])

@@ -15,8 +15,8 @@ nodes are recorded unchecked. What the demo itself passes on is still checked. P
 named rtabmap* are never stubbed, so a typo in one of ours still fails.
 
 check_launch_file() is the whole check of one launch file, as the test_launch_files of
-rtabmap_demos and rtabmap_examples run it. This file is installed with rtabmap_demos
-(share/rtabmap_demos/test) so that other packages' tests can import it.
+rtabmap_examples and rtabmap_demos run it. This file is installed with rtabmap_examples
+(share/rtabmap_examples/test) so that other packages' tests can import it.
 """
 
 import contextlib
@@ -376,7 +376,7 @@ def _restored_environ():
 
 @contextlib.contextmanager
 def _session(known_parameters):
-    with tempfile.TemporaryDirectory(prefix='rtabmap_demos_stubs_') as stub_root:
+    with tempfile.TemporaryDirectory(prefix='launch_dry_run_stubs_') as stub_root:
         session = _DryRun(os.path.realpath(stub_root), known_parameters)
         with _patched(session), _restored_environ():
             yield session
