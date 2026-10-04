@@ -305,6 +305,8 @@ install(DIRECTORY include/
 #############
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
+  find_package(ament_index_cpp REQUIRED)
+  find_package(class_loader REQUIRED)
 
   # Each node gets its own test binary: a crash or a stuck executor in one node cannot
   # take the others down, and every binary starts with a clean DDS graph.
@@ -335,6 +337,11 @@ if(BUILD_TESTING)
   rtabmap_util_add_node_test(test_rgbd_relay)
   rtabmap_util_add_node_test(test_rgbd_split)
   rtabmap_util_add_node_test(test_rgbd_pipeline)
+  # Loads rtabmap_sync's components by hand: since Kilted, rclcpp_components no longer
+  # exports these to its dependents.
+  if(TARGET test_rgbd_pipeline)
+    target_link_libraries(test_rgbd_pipeline ament_index_cpp::ament_index_cpp class_loader::class_loader)
+  endif()
   rtabmap_util_add_node_test(test_lidar_deskewing)
   rtabmap_util_add_node_test(test_obstacles_detection)
   rtabmap_util_add_node_test(test_point_cloud_aggregator)
