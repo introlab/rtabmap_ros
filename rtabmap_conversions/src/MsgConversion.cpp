@@ -788,6 +788,12 @@ bool rtabmapToCompressedDepthTransport(const cv::Mat & compressed, sensor_msgs::
 	return true;
 }
 
+std::string compressedImageTransportFormat(const std::vector<unsigned char> & data)
+{
+	const std::string format = compressedImageFormat(data);
+	return format.find(';') == std::string::npos ? std::string() : format;
+}
+
 bool isValidImageCompressionFormat(const std::string & format)
 {
 	return format == ".jpg" || format == ".png" || format == "jpeg" || format == "png";

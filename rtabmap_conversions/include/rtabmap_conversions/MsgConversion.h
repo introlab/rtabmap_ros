@@ -420,6 +420,16 @@ bool toCompressedImageMsg(const cv_bridge::CvImage & image, const std::string & 
  */
 bool isValidImageCompressionFormat(const std::string & format);
 
+/**
+ * @brief compressed_image_transport's format of a JPEG or PNG image, e.g.,
+ *        "bgr8; jpeg compressed bgr8", with the encoding read from its header, without
+ *        decoding it.
+ * @param data the compressed image
+ * @return the format, or empty if @p data is not a JPEG or PNG image whose encoding is
+ *         known (mono8, mono16, bgr8, bgr16, bgra8 or bgra16)
+ */
+std::string compressedImageTransportFormat(const std::vector<unsigned char> & data);
+
 
 //============================================================================
 // Statistics
