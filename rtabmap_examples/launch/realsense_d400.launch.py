@@ -36,7 +36,7 @@ def generate_launch_description():
                 get_package_share_directory('realsense2_camera'), 'launch'),
                 '/rs_launch.py']),
                 launch_arguments={'align_depth.enable': 'true',
-                                  'rgb_camera.profile': '640x360x30'}.items(),
+                                  'rgb_camera.color_profile': '640x360x30'}.items(),
         ),
 
         Node(
