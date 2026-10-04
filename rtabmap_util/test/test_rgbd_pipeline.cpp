@@ -134,7 +134,7 @@ protected:
 #ifdef PRE_ROS_LYRICAL
 		return image_transport::create_subscription(helper().get(), topic, callback, transport);
 #else
-		return image_transport::create_subscription(*helper(), topic, callback, transport);
+		return image_transport::create_subscription(*helper(), topic, callback, transport, rclcpp::QoS(10), rclcpp::SubscriptionOptions());
 #endif
 	}
 
@@ -316,7 +316,7 @@ protected:
 #ifdef PRE_ROS_LYRICAL
 		return image_transport::create_subscription(helper().get(), topic, callback, transport);
 #else
-		return image_transport::create_subscription(*helper(), topic, callback, transport);
+		return image_transport::create_subscription(*helper(), topic, callback, transport, rclcpp::QoS(10), rclcpp::SubscriptionOptions());
 #endif
 	}
 

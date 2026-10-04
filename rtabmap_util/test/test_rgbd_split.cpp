@@ -201,7 +201,7 @@ protected:
 #ifdef PRE_ROS_LYRICAL
 		decodedSub_ = image_transport::create_subscription(helper().get(), "rgbd_image/depth/image", callback, "compressedDepth");
 #else
-		decodedSub_ = image_transport::create_subscription(*helper(), "rgbd_image/depth/image", callback, "compressedDepth");
+		decodedSub_ = image_transport::create_subscription(*helper(), "rgbd_image/depth/image", callback, "compressedDepth", rclcpp::QoS(10), rclcpp::SubscriptionOptions());
 #endif
 		pub_ = helper()->create_publisher<rtabmap_msgs::msg::RGBDImage>("rgbd_image", 10);
 		ASSERT_TRUE(waitForSubscriber(pub_));
@@ -368,7 +368,7 @@ protected:
 #ifdef PRE_ROS_LYRICAL
 		decodedSub_ = image_transport::create_subscription(helper().get(), topic, callback, "compressed");
 #else
-		decodedSub_ = image_transport::create_subscription(*helper(), topic, callback, "compressed");
+		decodedSub_ = image_transport::create_subscription(*helper(), topic, callback, "compressed", rclcpp::QoS(10), rclcpp::SubscriptionOptions());
 #endif
 		pub_ = helper()->create_publisher<rtabmap_msgs::msg::RGBDImage>("rgbd_image", 10);
 		ASSERT_TRUE(waitForSubscriber(pub_));
