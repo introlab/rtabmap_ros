@@ -128,6 +128,7 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 		genScanMaxDepth_(4.0),
 		genScanMinDepth_(0.0),
 		genDepth_(false),
+		decodeImagesOnDemand_(true),
 		genDepthDecimation_(1),
 		genDepthFillHolesSize_(0),
 		genDepthFillIterations_(1),
@@ -223,6 +224,7 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 	genScanMaxDepth_ = this->declare_parameter("gen_scan_max_depth", genScanMaxDepth_);
 	genScanMinDepth_ = this->declare_parameter("gen_scan_min_depth", genScanMinDepth_);
 	genDepth_ = this->declare_parameter("gen_depth", genDepth_);
+	decodeImagesOnDemand_ = this->declare_parameter("decode_images_on_demand", decodeImagesOnDemand_);
 	genDepthDecimation_ = this->declare_parameter("gen_depth_decimation", genDepthDecimation_);
 	genDepthFillHolesSize_ = this->declare_parameter("gen_depth_fill_holes_size", genDepthFillHolesSize_);
 	genDepthFillIterations_ = this->declare_parameter("gen_depth_fill_iterations", genDepthFillIterations_);
@@ -268,6 +270,7 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 	}
 
 	RCLCPP_INFO(get_logger(), "rtabmap: gen_depth  = %s", genDepth_?"true":"false");
+	RCLCPP_INFO(get_logger(), "rtabmap: decode_images_on_demand = %s", decodeImagesOnDemand_?"true":"false");
 	if(genDepth_)
 	{
 		RCLCPP_INFO(get_logger(), "rtabmap: gen_depth_decimation        = %d", genDepthDecimation_);
@@ -1726,7 +1729,19 @@ void CoreWrapper::commonMultiCameraCallbackImpl(
 	// Keep the compressed images the images come from, so that rtabmap stores them as is
 	// instead of compressing them again (see Memory). Only for a single camera, and only if
 	// the images were not changed on the way (color conversion, generated depth).
-	if(imageMsgs.size() == 1 && compressedImages.size() == 1 && compressedDepths.size() == 1)
+	if(imageMsgs.empty() && depthMsgs.empty() && compressedImages.size() == 1 && compressedDepths.size() == 1)
+	{
+		// Not decoded (see imagesDecodedOnDemand()): rtabmap decodes them if it needs to
+		if(!stereoCameraModels.empty())
+		{
+			syncData_.data.setStereoImage(compressedImages[0], compressedDepths[0], stereoCameraModels, false);
+		}
+		else
+		{
+			syncData_.data.setRGBDImage(compressedImages[0], compressedDepths[0], cameraModels, false);
+		}
+	}
+	else if(imageMsgs.size() == 1 && compressedImages.size() == 1 && compressedDepths.size() == 1)
 	{
 		const bool sameImage = !compressedImages[0].empty() && imageMsgs[0].get() &&
 				rgb.type() == imageMsgs[0]->image.type() && rgb.size() == imageMsgs[0]->image.size();

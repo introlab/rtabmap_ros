@@ -178,6 +178,12 @@ private:
 				const std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > & localKeyPoints = std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> >(),
 				const std::vector<std::vector<rtabmap_msgs::msg::Point3f> > & localPoints3d = std::vector<std::vector<rtabmap_msgs::msg::Point3f> >(),
 				const std::vector<cv::Mat> & localDescriptors = std::vector<cv::Mat>());
+	/// Compressed images are left to rtabmap to decode when it needs them, unless
+	/// something here needs the pixels (stereo_to_depth, gen_scan, gen_depth).
+	virtual bool imagesDecodedOnDemand() const override
+	{
+		return decodeImagesOnDemand_ && !stereoToDepth_ && !genScan_ && !genDepth_;
+	}
 	virtual void commonMultiCameraCallbackWithCompressed(
 				const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
 				const rtabmap_msgs::msg::UserData::ConstSharedPtr & userDataMsg,
@@ -389,6 +395,7 @@ private:
 	double genScanMaxDepth_;
 	double genScanMinDepth_;
 	bool genDepth_;
+	bool decodeImagesOnDemand_;
 	int genDepthDecimation_;
 	int genDepthFillHolesSize_;
 	int genDepthFillIterations_;

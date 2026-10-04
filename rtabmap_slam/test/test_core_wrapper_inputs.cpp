@@ -23,6 +23,7 @@ All rights reserved. (BSD-3-Clause, see the repository root.)
 #include <rtabmap/core/Parameters.h>
 
 #include <rtabmap/core/Compression.h>
+#include <opencv2/imgproc.hpp>
 #include <rtabmap/core/SensorData.h>
 #include <rtabmap_conversions/MsgConversion.h>
 
@@ -769,6 +770,48 @@ TEST_F(CoreWrapperCompressedRGBDTest, stores_inverse_depth_as_received)
 TEST_F(CoreWrapperCompressedRGBDTest, stores_legacy_float_depth_as_received)
 {
 	checkStoredAsReceived(compressedDepth(floatDepth(), "legacy"), ".png");
+}
+
+/// Decoding on demand can be disabled: images are then decoded here, and still stored as
+/// received.
+TEST_F(CoreWrapperCompressedRGBDTest, stores_compressed_images_as_received_when_decoded_here)
+{
+	rtabmap_msgs::msg::RGBDImage msg = makeMsg();
+	msg.rgb_compressed = compressedColor(colorImage(), "bgr8");
+	msg.depth_compressed = compressedDepth(floatDepth(), ".png:10:100");
+	const rtabmap_msgs::msg::Node node = map(msg, {rclcpp::Parameter("decode_images_on_demand", false)});
+	ASSERT_EQ(1, node.id);
+	EXPECT_EQ(node.data.left_compressed, msg.rgb_compressed.data);
+	EXPECT_EQ(rtabmap::compressedDepthFormat(node.data.right_compressed), ".png:10:100");
+}
+
+/// gen_scan needs the depth pixels: the images are decoded here, and the scan generated.
+TEST_F(CoreWrapperCompressedRGBDTest, decodes_images_to_generate_a_scan)
+{
+	rtabmap_msgs::msg::RGBDImage msg = makeMsg();
+	msg.rgb_compressed = compressedColor(colorImage(), "bgr8");
+	msg.depth_compressed = compressedDepth(floatDepth(), ".png:10:100");
+	const rtabmap_msgs::msg::Node node = map(msg, {rclcpp::Parameter("gen_scan", true)});
+	ASSERT_EQ(1, node.id);
+	EXPECT_FALSE(node.data.laser_scan_compressed.empty()) << "scan generated from the depth image";
+	EXPECT_EQ(node.data.left_compressed, msg.rgb_compressed.data) << "still stored as received";
+}
+
+/// A compressed stereo pair (gray right image) is stored as received too.
+TEST_F(CoreWrapperCompressedRGBDTest, stores_a_compressed_stereo_pair_as_received)
+{
+	rtabmap_msgs::msg::RGBDImage msg = makeMsg();
+	msg.depth_camera_info.p[3] = -msg.depth_camera_info.p[0] * 0.1; // 10 cm baseline
+	cv::Mat left, right;
+	cv::cvtColor(colorImage(), left, cv::COLOR_BGR2GRAY);
+	cv::flip(left, right, 1);
+	msg.rgb_compressed = compressedColor(left, "mono8");
+	msg.depth_compressed = compressedColor(right, "mono8");
+	const rtabmap_msgs::msg::Node node = map(msg);
+	ASSERT_EQ(1, node.id);
+	ASSERT_EQ(node.data.right_camera_info.size(), 1u) << "stored as a stereo pair";
+	EXPECT_EQ(node.data.left_compressed, msg.rgb_compressed.data);
+	EXPECT_EQ(node.data.right_compressed, msg.depth_compressed.data);
 }
 
 /// A raw image is compressed by rtabmap; the compressed one next to it is still stored as is.

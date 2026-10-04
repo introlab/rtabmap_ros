@@ -256,6 +256,17 @@ protected:
 	 *
 	 * The default implementation ignores them and calls commonMultiCameraCallback().
 	 */
+	/**
+	 * @brief Whether the subclass accepts images left compressed, not decoded.
+	 *
+	 * When true, a single `RGBDImage` (RGB-D or stereo) carrying only compressed images
+	 * that rtabmap can use as they are (see
+	 * rtabmap_conversions::isCompressedRGBDSupportedByRtabmap()) is not decoded:
+	 * commonMultiCameraCallbackWithCompressed() is called with no decoded image, only the
+	 * compressed ones, and the camera infos. The default is false: images are always
+	 * decoded.
+	 */
+	virtual bool imagesDecodedOnDemand() const { return false; }
 	virtual void commonMultiCameraCallbackWithCompressed(
 				const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
 				const rtabmap_msgs::msg::UserData::ConstSharedPtr & userDataMsg,
@@ -352,6 +363,14 @@ private:
 			const cv::Mat & localDescriptors = cv::Mat(),
 			const cv::Mat & compressedImage = cv::Mat(),
 			const cv::Mat & compressedDepth = cv::Mat());
+	/// The images of @p msg, decoded unless imagesDecodedOnDemand() allows not to (then
+	/// @p rgb and @p depth are null), and its compressed images in rtabmap's format.
+	void convertRGBDImage(
+			const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr & msg,
+			cv_bridge::CvImageConstPtr & rgb,
+			cv_bridge::CvImageConstPtr & depth,
+			cv::Mat & compressedImage,
+			cv::Mat & compressedDepth) const;
 	void processSyncData();
 	void setupDepthCallbacks(
 			rclcpp::Node & node,

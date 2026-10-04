@@ -1062,6 +1062,32 @@ CommonDataSubscriber::~CommonDataSubscriber()
 	rgbdSubs_.clear();
 }
 
+void CommonDataSubscriber::convertRGBDImage(
+		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr & msg,
+		cv_bridge::CvImageConstPtr & rgb,
+		cv_bridge::CvImageConstPtr & depth,
+		cv::Mat & compressedImage,
+		cv::Mat & compressedDepth) const
+{
+	rtabmap_conversions::rgbdImageCompressedToRtabmap(*msg, compressedImage, compressedDepth);
+	const bool compressedOnly =
+			msg->rgb.data.empty() && msg->depth.data.empty() &&
+			(!compressedImage.empty() || !compressedDepth.empty()) &&
+			(msg->rgb_compressed.data.empty() || !compressedImage.empty()) &&
+			(msg->depth_compressed.data.empty() || !compressedDepth.empty());
+	// A stereo pair has its baseline in P(0,3) of one of its camera infos
+	const bool stereo = msg->rgb_camera_info.p[3] != 0.0 || msg->depth_camera_info.p[3] != 0.0;
+	if(compressedOnly &&
+	   imagesDecodedOnDemand() &&
+	   rtabmap_conversions::isCompressedRGBDSupportedByRtabmap(compressedImage, compressedDepth, stereo))
+	{
+		rgb.reset();
+		depth.reset();
+		return;
+	}
+	rtabmap_conversions::toCvShare(msg, rgb, depth);
+}
+
 void CommonDataSubscriber::commonSingleCameraCallback(
 		const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
 		const rtabmap_msgs::msg::UserData::ConstSharedPtr & userDataMsg,

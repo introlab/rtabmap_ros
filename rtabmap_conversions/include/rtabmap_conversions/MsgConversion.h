@@ -346,6 +346,21 @@ cv_bridge::CvImagePtr uncompressDepthImage(const sensor_msgs::msg::CompressedIma
 void rgbdImageCompressedToRtabmap(const rtabmap_msgs::msg::RGBDImage & msg, cv::Mat & rgb, cv::Mat & depth);
 
 /**
+ * @brief Whether rtabmap can use compressed images as they are, decoding them itself
+ *        only when needed (see rtabmap::Memory), without any conversion of the decoded
+ *        images: checked from their headers, without decoding them.
+ *
+ * @param rgb    compressed color or left image in rtabmap's format (see
+ *               rgbdImageCompressedToRtabmap()), or empty: gray or color JPEG or 8 bits PNG
+ * @param depth  compressed depth or right image in rtabmap's format, or empty. Depth:
+ *               16UC1 PNG or RVL, 32FC1 inverse depth, or rtabmap's legacy 32FC1 PNG.
+ *               Right image: gray JPEG or 8 bits PNG.
+ * @param stereo whether @p depth is the right image of a stereo pair
+ * @return false if both are empty, or if one of them is not supported
+ */
+bool isCompressedRGBDSupportedByRtabmap(const cv::Mat & rgb, const cv::Mat & depth, bool stereo = false);
+
+/**
  * @return true if @p format is a valid format for compressDepthImage(): ".png" or ".rvl",
  *         optionally followed by ":<maxDepth>[:<quantization>]", optionally prefixed by
  *         "legacy:", or "legacy".

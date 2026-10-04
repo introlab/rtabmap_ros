@@ -87,11 +87,11 @@ bool hasSignature(const unsigned char * bytes, size_t size, const void * signatu
 // compressed_image_transport's format of a JPEG or PNG image ("<encoding>; <codec>
 // compressed <encoding>"), with the encoding read from its header. Only the codec name
 // if the encoding cannot be read from it.
-std::string compressedImageFormat(const std::vector<unsigned char> & d)
+std::string compressedImageFormat(const unsigned char * d, size_t size)
 {
 	std::string codec;
 	std::string encoding;
-	if(d.size() > 25 && hasSignature(d.data(), d.size(), kPngSignature))
+	if(size > 25 && hasSignature(d, size, kPngSignature))
 	{
 		codec = "png";
 		// IHDR: bit depth, color type. OpenCV decodes color as BGR.
@@ -108,12 +108,12 @@ std::string compressedImageFormat(const std::vector<unsigned char> & d)
 			encoding.clear(); // e.g., 1 bit per pixel, decoded as 8 bits by OpenCV
 		}
 	}
-	else if(d.size() > 2 && d[0] == 0xFF && d[1] == 0xD8)
+	else if(size > 2 && d[0] == 0xFF && d[1] == 0xD8)
 	{
 		codec = "jpeg";
 		// Number of components in the start of frame segment
 		size_t i = 2;
-		while(i + 4 <= d.size() && d[i] == 0xFF)
+		while(i + 4 <= size && d[i] == 0xFF)
 		{
 			const unsigned char marker = d[i+1];
 			if(marker == 0xFF)
@@ -129,7 +129,7 @@ std::string compressedImageFormat(const std::vector<unsigned char> & d)
 			const size_t length = (size_t(d[i+2]) << 8) | d[i+3];
 			if(marker >= 0xC0 && marker <= 0xCF && marker != 0xC4 && marker != 0xC8 && marker != 0xCC)
 			{
-				if(i + 9 < d.size())
+				if(i + 9 < size)
 				{
 					encoding = d[i+9] == 1 ? sensor_msgs::image_encodings::MONO8 :
 							d[i+9] == 3 ? sensor_msgs::image_encodings::BGR8 : "";
@@ -144,6 +144,19 @@ std::string compressedImageFormat(const std::vector<unsigned char> & d)
 		return codec;
 	}
 	return encoding + "; " + codec + " compressed " + encoding;
+}
+
+std::string compressedImageFormat(const std::vector<unsigned char> & d)
+{
+	return compressedImageFormat(d.data(), d.size());
+}
+
+// Encoding of a JPEG or PNG image read from its header, empty if unknown
+std::string compressedImageEncoding(const cv::Mat & bytes)
+{
+	const std::string format = compressedImageFormat(bytes.data, bytes.total());
+	const size_t split = format.find(';');
+	return split == std::string::npos ? std::string() : format.substr(0, split);
 }
 
 } // namespace
@@ -883,6 +896,45 @@ void rgbdImageCompressedToRtabmap(const rtabmap_msgs::msg::RGBDImage & msg, cv::
 				compressedDepthTransportToRtabmap(msg.depth_compressed) :
 				compressedMatFromBytes(msg.depth_compressed.data);
 	}
+}
+
+bool isCompressedRGBDSupportedByRtabmap(const cv::Mat & rgb, const cv::Mat & depth, bool stereo)
+{
+	if(rgb.empty() && depth.empty())
+	{
+		return false;
+	}
+	if(!rgb.empty())
+	{
+		UASSERT(rgb.type() == CV_8UC1);
+		const std::string encoding = compressedImageEncoding(rgb);
+		if(encoding != sensor_msgs::image_encodings::MONO8 && encoding != sensor_msgs::image_encodings::BGR8)
+		{
+			return false;
+		}
+	}
+	if(!depth.empty())
+	{
+		UASSERT(depth.type() == CV_8UC1);
+		if(stereo)
+		{
+			// Right image, used in gray
+			return compressedImageEncoding(depth) == sensor_msgs::image_encodings::MONO8;
+		}
+		const unsigned char * d = depth.data;
+		const size_t size = depth.total();
+		const bool rtabmapFormat =
+				hasSignature(d, size, rtabmap::kCompressedDepthRvlSignature) ||
+				hasSignature(d, size, rtabmap::kCompressedDepthInvSignature);
+		// IHDR: 16 bits gray (16UC1), or 8 bits RGBA (legacy 32FC1)
+		const bool png = size > 25 && hasSignature(d, size, kPngSignature) &&
+				((d[24] == 16 && d[25] == 0) || (d[24] == 8 && d[25] == 6));
+		if(!rtabmapFormat && !png)
+		{
+			return false;
+		}
+	}
+	return true;
 }
 
 bool isValidDepthCompressionFormat(const std::string & format)
@@ -2584,7 +2636,13 @@ bool convertRGBDMsgs(
 	int depthWidth = depthMsgs.size()?depthMsgs[0]->image.cols:0;
 	int depthHeight = depthMsgs.size()?depthMsgs[0]->image.rows:0;
 
-	bool isDepth = depthMsgs.empty() || (depthMsgs[0].get() != 0 && (
+	// Without a decoded depth/right image (e.g., left compressed, see
+	// CommonDataSubscriber::imagesDecodedOnDemand()), the camera infos tell: a stereo pair
+	// has its baseline in P(0,3) of one of them.
+	bool isDepth = depthMsgs.empty() ?
+			!(depthCameraInfoMsgs.size() == cameraInfoMsgs.size() &&
+			  (cameraInfoMsgs[0].p[3] != 0.0 || depthCameraInfoMsgs[0].p[3] != 0.0)) :
+			(depthMsgs[0].get() != 0 && (
 			depthMsgs[0]->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1) == 0 ||
 			depthMsgs[0]->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1) == 0 ||
 			depthMsgs[0]->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0));
