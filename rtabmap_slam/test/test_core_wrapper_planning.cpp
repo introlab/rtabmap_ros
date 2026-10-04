@@ -50,6 +50,10 @@ protected:
 		ASSERT_TRUE(waitForPublisher(goalReached_->subscription));
 		ASSERT_TRUE(waitForPublisher(globalPath_->subscription));
 		ASSERT_TRUE(waitForPublisher(globalPathNodes_->subscription));
+		if(simulatedTime())
+		{
+			waitForTfBeforeOdom();
+		}
 		driveStraight(odom_, info_, 5);   // nodes 1..5 at x = 0, 0.5, 1.0, 1.5, 2.0
 		nextStamp_ = 6.0;
 	}
@@ -64,6 +68,7 @@ protected:
 	}
 
 	virtual std::vector<rclcpp::Parameter> nodeParameters() { return {}; }
+	virtual bool simulatedTime() const { return false; }
 
 	/// Moves the robot to @p x and waits for the update to be processed.
 	bool moveTo(double x)
@@ -253,9 +258,13 @@ class CoreWrapperPlanningSimTimeTest : public CoreWrapperPlanningTest
 protected:
 	std::vector<rclcpp::Parameter> nodeParameters() override
 	{
+		// wait_for_transform=0: the clock is advanced by the test only, a wait for a
+		// transform on it would never end (see waitForTfBeforeOdom()).
 		return {rclcpp::Parameter("use_sim_time", true),
-				rclcpp::Parameter("tf_tolerance", 0.0)};
+				rclcpp::Parameter("tf_tolerance", 0.0),
+				rclcpp::Parameter("wait_for_transform", 0.0)};
 	}
+	bool simulatedTime() const override { return true; }
 
 	/// Sets the node's clock to @p seconds.
 	void setClock(double seconds)
@@ -288,21 +297,8 @@ TEST_F(CoreWrapperPlanningSimTimeTest, transforms_a_goal_in_the_robot_frame_to_t
 	// The goal is looked up through map -> odom -> base_link at its stamp: bring the clock
 	// to the turn's stamp, and wait for map -> odom to be published at it.
 	const double stamp = nextStamp_;
-	std::shared_ptr<Collector<tf2_msgs::msg::TFMessage>> tf =
-			collect<tf2_msgs::msg::TFMessage>("/tf", rclcpp::QoS(100));
 	setClock(stamp);
-	ASSERT_TRUE(spinUntil([&]() {
-		for(const tf2_msgs::msg::TFMessage::ConstSharedPtr & msg : tf->messages)
-		{
-			for(const geometry_msgs::msg::TransformStamped & t : msg->transforms)
-			{
-				if(t.child_frame_id == "odom" && rclcpp::Time(t.header.stamp) == stampOf(stamp))
-				{
-					return true;
-				}
-			}
-		}
-		return false; }));
+	ASSERT_TRUE(spinUntil([&]() { return hasTransform(*tfReceived_, "odom", stamp); }));
 
 	// 1 m straight ahead of the robot, facing where it faces.
 	geometry_msgs::msg::PoseStamped pose;
