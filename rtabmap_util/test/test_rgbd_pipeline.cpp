@@ -53,10 +53,21 @@ rclcpp::Node::SharedPtr loadComponent(
 		const std::string & package, const std::string & className, const rclcpp::NodeOptions & options)
 {
 	std::string content, basePath;
+#ifdef PRE_ROS_LYRICAL
 	if(!ament_index_cpp::get_resource("rclcpp_components", package, content, &basePath))
 	{
 		return nullptr;
 	}
+#else
+	// The overload above is deprecated in Lyrical and removed in Rolling
+	const ament_index_cpp::PathWithResource resource = ament_index_cpp::get_resource("rclcpp_components", package);
+	if(!resource.resourcePath)
+	{
+		return nullptr;
+	}
+	content = resource.contents;
+	basePath = resource.resourcePath->string();
+#endif
 	std::istringstream lines(content);
 	std::string line;
 	while(std::getline(lines, line))
