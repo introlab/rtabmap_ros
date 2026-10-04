@@ -187,7 +187,7 @@ TEST_F(RGBDSplitTest, DecompressesRosCompressedDepthAndInverseDepth)
 }
 
 /// The compressedDepth topic of depth/image, published by rgbd_split itself (see
-/// "compressed_depth_passthrough") and read here through the real
+/// "compressed_passthrough") and read here through the real
 /// compressed_depth_image_transport plugin, as any ROS consumer would.
 class RGBDSplitCompressedDepthTest : public NodeTest
 {
@@ -344,7 +344,7 @@ TEST_F(RGBDSplitCompressedDepthTest, CompressesRawDepth)
 
 TEST_F(RGBDSplitCompressedDepthTest, PluginIsUsedWhenPassthroughIsDisabled)
 {
-	start({rclcpp::Parameter("compressed_depth_passthrough", false)});
+	start({rclcpp::Parameter("compressed_passthrough", false)});
 	const cv::Mat compressed = rtabmap::compressImage2(cv::Mat(8, 8, CV_32FC1, cv::Scalar(3.0f)), ".png:10:100");
 
 	publishAndWait(withCompressedDepth(compressed, "png:10:100"));
@@ -352,6 +352,98 @@ TEST_F(RGBDSplitCompressedDepthTest, PluginIsUsedWhenPassthroughIsDisabled)
 	// Re-compressed by the plugin ("32FC1; compressedDepth" before Jazzy, without the codec)
 	EXPECT_EQ(compressed_->back().format.rfind("32FC1; compressedDepth", 0), 0u) << compressed_->back().format;
 	EXPECT_EQ(rtabmap::compressedDepthFormat(rtabmap_conversions::compressedDepthTransportToRtabmap(compressed_->back())), ".png:10:100");
+}
+
+/// The compressed topic of the color (or left/right) image, published by rgbd_split
+/// itself too, read through the real compressed_image_transport plugin.
+class RGBDSplitCompressedImageTest : public NodeTest
+{
+protected:
+	void start(const std::string & topic, const std::vector<rclcpp::Parameter> & params = {})
+	{
+		addNode(std::make_shared<rtabmap_util::RGBDSplit>(
+				rclcpp::NodeOptions().parameter_overrides(params)));
+		compressed_ = collect<sensor_msgs::msg::CompressedImage>(topic + "/compressed");
+		const auto callback = [this](const sensor_msgs::msg::Image::ConstSharedPtr & msg) { decoded_.push_back(msg); };
+#ifdef PRE_ROS_LYRICAL
+		decodedSub_ = image_transport::create_subscription(helper().get(), topic, callback, "compressed");
+#else
+		decodedSub_ = image_transport::create_subscription(*helper(), topic, callback, "compressed");
+#endif
+		pub_ = helper()->create_publisher<rtabmap_msgs::msg::RGBDImage>("rgbd_image", 10);
+		ASSERT_TRUE(waitForSubscriber(pub_));
+		ASSERT_TRUE(waitForPublisher(compressed_->subscription));
+	}
+
+	void publishAndWait(const rtabmap_msgs::msg::RGBDImage & in)
+	{
+		const size_t received = compressed_->size();
+		const size_t decoded = decoded_.size();
+		pub_->publish(in);
+		ASSERT_TRUE(spinUntil([&]() { return compressed_->size() > received && decoded_.size() > decoded; }));
+	}
+
+	std::shared_ptr<Collector<sensor_msgs::msg::CompressedImage>> compressed_;
+	std::vector<sensor_msgs::msg::Image::ConstSharedPtr> decoded_;
+	image_transport::Subscriber decodedSub_;
+	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr pub_;
+};
+
+TEST_F(RGBDSplitCompressedImageTest, RepublishesCompressedColorAsIs)
+{
+	start("rgbd_image/rgb/image");
+	rtabmap_msgs::msg::RGBDImage in = makeRGBDImage("camera_link", 1000.0);
+	const cv::Mat color = cv_bridge::toCvCopy(in.rgb)->image;
+	in.rgb = sensor_msgs::msg::Image();
+	ASSERT_TRUE(rtabmap_conversions::toCompressedImageMsg(
+			cv_bridge::CvImage(in.header, "bgr8", color), ".png", in.rgb_compressed));
+
+	publishAndWait(in);
+	EXPECT_EQ(compressed_->back().data, in.rgb_compressed.data) << "not decompressed and re-compressed";
+	EXPECT_EQ(compressed_->back().format, "bgr8; png compressed bgr8");
+	EXPECT_EQ(cv::norm(cv_bridge::toCvCopy(decoded_.back())->image, color, cv::NORM_INF), 0.0);
+}
+
+/// Older producers set only "jpg" as format: the encoding is added from the image header.
+TEST_F(RGBDSplitCompressedImageTest, AddsTheEncodingToAnOldFormat)
+{
+	start("rgbd_image/rgb/image");
+	rtabmap_msgs::msg::RGBDImage in = makeRGBDImage("camera_link", 1000.0);
+	cv_bridge::toCvCopy(in.rgb)->toCompressedImageMsg(in.rgb_compressed, cv_bridge::JPG);
+	in.rgb = sensor_msgs::msg::Image();
+	ASSERT_EQ(in.rgb_compressed.format, "jpg");
+
+	publishAndWait(in);
+	EXPECT_EQ(compressed_->back().data, in.rgb_compressed.data);
+	EXPECT_EQ(compressed_->back().format, "bgr8; jpeg compressed bgr8");
+	EXPECT_EQ(decoded_.back()->encoding, "bgr8");
+}
+
+/// A raw color image is compressed with "<topic>.compressed.format".
+TEST_F(RGBDSplitCompressedImageTest, CompressesRawColorWithTheTransportParameter)
+{
+	start("rgbd_image/rgb/image", {rclcpp::Parameter("rgbd_image.rgb.image.compressed.format", std::string("png"))});
+	const rtabmap_msgs::msg::RGBDImage in = makeRGBDImage("camera_link", 1000.0);
+
+	publishAndWait(in);
+	EXPECT_EQ(compressed_->back().format, "bgr8; png compressed bgr8");
+	EXPECT_EQ(cv::norm(cv_bridge::toCvCopy(decoded_.back())->image, cv_bridge::toCvCopy(in.rgb)->image, cv::NORM_INF), 0.0);
+}
+
+/// With "stereo", the right image is republished as is on right/image/compressed.
+TEST_F(RGBDSplitCompressedImageTest, RepublishesACompressedRightImageAsIs)
+{
+	start("rgbd_image/right/image", {rclcpp::Parameter("stereo", true)});
+	rtabmap_msgs::msg::RGBDImage in = makeStereoRGBDImage("camera_link", 1000.0);
+	const cv::Mat right = cv_bridge::toCvCopy(in.depth)->image;
+	in.depth = sensor_msgs::msg::Image();
+	ASSERT_TRUE(rtabmap_conversions::toCompressedImageMsg(
+			cv_bridge::CvImage(in.header, "mono8", right), ".jpg", in.depth_compressed));
+
+	publishAndWait(in);
+	EXPECT_EQ(compressed_->back().data, in.depth_compressed.data);
+	EXPECT_EQ(compressed_->back().format, "mono8; jpeg compressed mono8");
+	EXPECT_EQ(decoded_.back()->encoding, "mono8");
 }
 
 /// Feeds a compressed right image in @p format and returns what lands on depth/image.

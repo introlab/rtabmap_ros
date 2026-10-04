@@ -6,7 +6,8 @@ All rights reserved. (BSD-3-Clause, see the repository root.)
 /**
  * Round trip of raw images through rgbd_sync (compressed output) and rgbd_split, read
  * back through image_transport (raw, and the "compressed" and "compressedDepth" plugins),
- * compared to the original images, for each image and depth compression format.
+ * compared to the original images, for each image and depth compression format. Same
+ * for a stereo pair through stereo_sync and rgbd_split ("stereo").
  */
 
 #include "node_test_utils.hpp"
@@ -19,6 +20,7 @@ All rights reserved. (BSD-3-Clause, see the repository root.)
 #include <image_transport/image_transport.hpp>
 #include <rclcpp_components/node_factory.hpp>
 #include <sensor_msgs/image_encodings.hpp>
+#include <opencv2/imgproc.hpp>
 
 #include <cmath>
 #include <limits>
@@ -146,13 +148,8 @@ protected:
 					rclcpp::Parameter("depth_compression_format", cs.depthFormat)}));
 		ASSERT_TRUE(sync) << "rtabmap_sync::RGBDSync component not found";
 		addNode(sync);
-		// rgbd_split decodes the color image, which the "compressed" plugin compresses
-		// again: in PNG, so that what is read back is what rgbd_sync sent.
 		addNode(std::make_shared<rtabmap_util::RGBDSplit>(rclcpp::NodeOptions()
-				.arguments({"--ros-args", "-r", "rgbd_image:=rgbd_image/compressed"})
-				.parameter_overrides({
-					rclcpp::Parameter("rgbd_image.compressed.rgb.image.format", std::string("png")),
-					rclcpp::Parameter("rgbd_image.compressed.rgb.image.compressed.format", std::string("png"))})));
+				.arguments({"--ros-args", "-r", "rgbd_image:=rgbd_image/compressed"})));
 
 		const std::string rgbTopic = "rgbd_image/compressed/rgb/image";
 		const std::string depthTopic = "rgbd_image/compressed/depth/image";
@@ -303,3 +300,107 @@ INSTANTIATE_TEST_SUITE_P(
 				PipelineCase{"legacy_rvl_32FC1", CV_32FC1, ".png", "legacy:.rvl"},
 				PipelineCase{"legacy_inverse_depth", CV_32FC1, ".png", "legacy:.png:10:100"}),
 		[](const ::testing::TestParamInfo<PipelineCase> & info) { return info.param.name; });
+
+namespace {
+
+/// The same round trip for a stereo pair: stereo_sync -> rgbd_split ("stereo"), with a
+/// color left image and a gray right image.
+class StereoPipelineTest : public NodeTest, public ::testing::WithParamInterface<std::string>
+{
+protected:
+	using ImagePtr = sensor_msgs::msg::Image::ConstSharedPtr;
+
+	image_transport::Subscriber subscribe(const std::string & topic, const std::string & transport, std::vector<ImagePtr> & out)
+	{
+		const auto callback = [&out](const ImagePtr & msg) { out.push_back(msg); };
+#ifdef PRE_ROS_LYRICAL
+		return image_transport::create_subscription(helper().get(), topic, callback, transport);
+#else
+		return image_transport::create_subscription(*helper(), topic, callback, transport);
+#endif
+	}
+
+	/// @p msg is @p original, exactly in PNG, closely in JPEG.
+	static void expectImage(const ImagePtr & msg, const cv::Mat & original, const std::string & imageFormat)
+	{
+		SCOPED_TRACE(msg->encoding);
+		const cv::Mat image = cv_bridge::toCvCopy(msg)->image;
+		ASSERT_EQ(image.type(), original.type());
+		ASSERT_EQ(image.size(), original.size());
+		if(imageFormat == ".png")
+		{
+			EXPECT_EQ(cv::norm(image, original, cv::NORM_INF), 0.0) << "lossless";
+		}
+		else
+		{
+			EXPECT_LT(cv::norm(image, original, cv::NORM_L1) / double(image.total() * image.channels()), 3.0)
+				<< "mean error of JPEG";
+		}
+	}
+};
+
+}  // namespace
+
+TEST_P(StereoPipelineTest, ImagesReadBackAsSent)
+{
+	const std::string imageFormat = GetParam();
+	rclcpp::Node::SharedPtr sync = loadComponent("rtabmap_sync", "rtabmap_sync::StereoSync",
+			rclcpp::NodeOptions().parameter_overrides({
+				rclcpp::Parameter("approx_sync", false),
+				rclcpp::Parameter("image_compression_format", imageFormat)}));
+	ASSERT_TRUE(sync) << "rtabmap_sync::StereoSync component not found";
+	addNode(sync);
+	addNode(std::make_shared<rtabmap_util::RGBDSplit>(rclcpp::NodeOptions()
+			.arguments({"--ros-args", "-r", "rgbd_image:=rgbd_image/compressed"})
+			.parameter_overrides({rclcpp::Parameter("stereo", true)})));
+
+	std::vector<ImagePtr> leftRaw, leftCompressed, rightRaw, rightCompressed;
+	const std::string leftTopic = "rgbd_image/compressed/left/image";
+	const std::string rightTopic = "rgbd_image/compressed/right/image";
+	image_transport::Subscriber subs[] = {
+		subscribe(leftTopic, "raw", leftRaw),
+		subscribe(leftTopic, "compressed", leftCompressed),
+		subscribe(rightTopic, "raw", rightRaw),
+		subscribe(rightTopic, "compressed", rightCompressed)};
+
+	rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr leftPub =
+			helper()->create_publisher<sensor_msgs::msg::Image>("left/image_rect", 10);
+	rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr rightPub =
+			helper()->create_publisher<sensor_msgs::msg::Image>("right/image_rect", 10);
+	rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr leftInfoPub =
+			helper()->create_publisher<sensor_msgs::msg::CameraInfo>("left/camera_info", 10);
+	rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr rightInfoPub =
+			helper()->create_publisher<sensor_msgs::msg::CameraInfo>("right/camera_info", 10);
+	ASSERT_TRUE(waitForSubscriber(leftPub));
+	ASSERT_TRUE(waitForSubscriber(rightPub));
+	ASSERT_TRUE(waitForSubscriber(leftInfoPub));
+	ASSERT_TRUE(waitForSubscriber(rightInfoPub));
+	for(const image_transport::Subscriber & sub : subs)
+	{
+		ASSERT_TRUE(spinUntil([&]() { return sub.getNumPublishers() > 0; })) << sub.getTopic();
+	}
+
+	const cv::Mat left = colorImage();
+	cv::Mat right;
+	cv::cvtColor(left, right, cv::COLOR_BGR2GRAY);
+	cv::flip(right, right, 1);
+	leftPub->publish(makeImage("camera_link", 1000.0, left, sensor_msgs::image_encodings::BGR8));
+	rightPub->publish(makeImage("camera_link", 1000.0, right, sensor_msgs::image_encodings::MONO8));
+	leftInfoPub->publish(makeCameraInfo("camera_link", 1000.0, kWidth, kHeight));
+	rightInfoPub->publish(makeCameraInfo("camera_link", 1000.0, kWidth, kHeight, -10.0)); // 10 cm baseline
+
+	ASSERT_TRUE(spinUntil([&]() {
+		return !leftRaw.empty() && !leftCompressed.empty() && !rightRaw.empty() && !rightCompressed.empty();
+	}));
+	expectImage(leftRaw.back(), left, imageFormat);
+	expectImage(leftCompressed.back(), left, imageFormat);
+	expectImage(rightRaw.back(), right, imageFormat);
+	expectImage(rightCompressed.back(), right, imageFormat);
+	EXPECT_EQ(rightCompressed.back()->encoding, "mono8");
+}
+
+INSTANTIATE_TEST_SUITE_P(
+		Formats,
+		StereoPipelineTest,
+		::testing::Values(std::string(".jpg"), std::string(".png")),
+		[](const ::testing::TestParamInfo<std::string> & info) { return info.param.substr(1); });
