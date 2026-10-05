@@ -19,6 +19,7 @@
   <exec_depend>rtabmap_viz</exec_depend>
   <exec_depend>nav2_bringup</exec_depend>
   <exec_depend>rtabmap_examples</exec_depend>
+  <exec_depend>imu_complementary_filter</exec_depend>
 
   <test_depend>ament_cmake_pytest</test_depend>
   <test_depend>launch</test_depend>

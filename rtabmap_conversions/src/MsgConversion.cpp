@@ -28,6 +28,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap_conversions/PointCloudConversion.h>
 #include "rtabmap_conversions/MsgConversion.h"
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
 
@@ -2147,6 +2148,36 @@ bool convertRGBDMsgs(
 			(cameraInfoMsgs.size() == imageMsgs.size() || imageMsgs.empty()) &&
 			(cameraInfoMsgs.size() == depthMsgs.size() || depthMsgs.empty()) &&
 			(cameraInfoMsgs.size() == depthCameraInfoMsgs.size() || depthCameraInfoMsgs.empty()));
+
+	// An RGBDImage of a camera without depth (e.g., from rgb_sync) has an empty depth
+	// slot, which reaches here as empty depth images: convert the frame as color only,
+	// rather than as a stereo pair missing its right image.
+	if(!depthMsgs.empty() &&
+	   std::all_of(depthMsgs.begin(), depthMsgs.end(),
+			   [](const cv_bridge::CvImageConstPtr & msg) { return msg.get() == 0 || msg->image.empty(); }))
+	{
+		return convertRGBDMsgs(
+				imageMsgs,
+				std::vector<cv_bridge::CvImageConstPtr>(),
+				cameraInfoMsgs,
+				std::vector<sensor_msgs::msg::CameraInfo>(),
+				frameId,
+				odomFrameId,
+				odomStamp,
+				rgb,
+				depth,
+				cameraModels,
+				stereoCameraModels,
+				tfBuffer,
+				waitForTransform,
+				alreadRectifiedImages,
+				localKeyPointsMsgs,
+				localPoints3dMsgs,
+				localDescriptorsMsgs,
+				localKeyPoints,
+				localPoints3d,
+				localDescriptors);
+	}
 
 	int imageWidth = imageMsgs.size()?imageMsgs[0]->image.cols:cameraInfoMsgs[0].width;
 	int imageHeight = imageMsgs.size()?imageMsgs[0]->image.rows:cameraInfoMsgs[0].height;
