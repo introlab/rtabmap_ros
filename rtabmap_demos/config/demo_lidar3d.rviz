@@ -1,0 +1,267 @@
+Panels:
+  - Class: rviz_common/Displays
+    Help Height: 0
+    Name: Displays
+    Property Tree Widget:
+      Expanded:
+        - /Image1/Topic1
+      Splitter Ratio: 0.5
+    Tree Height: 390
+  - Class: rviz_common/Views
+    Expanded:
+      - /Current View1
+      - /Current View1/Wall clipping1
+    Name: Views
+    Splitter Ratio: 0.5
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Alpha: 0.5
+      Cell Size: 1
+      Class: rviz_default_plugins/Grid
+      Color: 160; 160; 164
+      Enabled: true
+      Line Style:
+        Line Width: 0.029999999329447746
+        Value: Lines
+      Name: Grid
+      Normal Cell Count: 0
+      Offset:
+        X: 0
+        Y: 0
+        Z: 0
+      Plane: XY
+      Plane Cell Count: 10
+      Reference Frame: <Fixed Frame>
+      Value: true
+    - Class: rviz_default_plugins/TF
+      Enabled: true
+      Frame Timeout: 15
+      Frames:
+        All Enabled: true
+        arducam:
+          Value: true
+        base_link:
+          Value: true
+        base_link_stabilized:
+          Value: true
+        box_link:
+          Value: true
+        camera_link:
+          Value: true
+        dynamixel_base:
+          Value: true
+        dynamixel_shaft:
+          Value: true
+        icp_odom:
+          Value: true
+        imu_link:
+          Value: true
+        map:
+          Value: true
+        os_imu:
+          Value: true
+        os_lidar:
+          Value: true
+        os_sensor:
+          Value: true
+        os_sensor_base:
+          Value: true
+        rotor_0:
+          Value: true
+        rotor_1:
+          Value: true
+        rotor_2:
+          Value: true
+        rotor_3:
+          Value: true
+      Marker Scale: 1
+      Name: TF
+      Show Arrows: true
+      Show Axes: true
+      Show Names: false
+      Tree:
+        map:
+          icp_odom:
+            base_link_stabilized:
+              base_link:
+                box_link:
+                  camera_link:
+                    arducam:
+                      {}
+                  dynamixel_base:
+                    dynamixel_shaft:
+                      os_sensor_base:
+                        os_sensor:
+                          os_imu:
+                            {}
+                          os_lidar:
+                            {}
+                imu_link:
+                  {}
+                rotor_0:
+                  {}
+                rotor_1:
+                  {}
+                rotor_2:
+                  {}
+                rotor_3:
+                  {}
+      Update Interval: 0
+      Value: true
+    - Alpha: 1
+      Autocompute Intensity Bounds: false
+      Autocompute Value Bounds:
+        Max Value: 63.8961181640625
+        Min Value: -59.4283332824707
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rtabmap_rviz_plugins/MapCloud
+      Cloud decimation: 4
+      Cloud from scan: true
+      Cloud max depth (m): 0
+      Cloud min depth (m): 0
+      Cloud voxel size (m): 0
+      Color: 255; 255; 255
+      Color Transformer: Intensity
+      Download graph: false
+      Download map: false
+      Download namespace: rtabmap
+      Enabled: false
+      Filter ceiling (m): 0
+      Filter floor (m): 0
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Max Intensity: 750
+      Min Color: 0; 0; 0
+      Min Intensity: 0
+      Name: MapCloud
+      Node filtering angle (degrees): 30
+      Node filtering radius (m): 0
+      Position Transformer: XYZ
+      Size (Pixels): 3
+      Size (m): 0.009999999776482582
+      Style: Points
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /mapData
+      Use Fixed Frame: true
+      Use rainbow: true
+      Value: false
+    - Alpha: 1
+      Class: rtabmap_rviz_plugins/MapGraph
+      Enabled: true
+      Global loop closure: 255; 0; 0
+      Landmark: 0; 128; 0
+      Local loop closure: 255; 255; 0
+      Merged neighbor: 255; 170; 0
+      Name: MapGraph
+      Neighbor: 0; 0; 255
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /mapGraph
+      User: 255; 0; 0
+      Value: true
+      Virtual: 255; 0; 255
+    - Class: octomap_rviz_plugins/ColorOccupancyGrid
+      Enabled: true
+      Max. Height Display: 3.4028234663852886e+38
+      Max. Octree Depth: 14
+      Min. Height Display: -3.4028234663852886e+38
+      Name: ColorOccupancyGrid
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /octomap_binary
+      Value: true
+      Voxel Alpha: 1
+      Voxel Coloring: Z-Axis
+      Voxel Rendering: Occupied Voxels
+    - Class: rviz_default_plugins/Image
+      Enabled: true
+      Max Value: 1
+      Median window: 5
+      Min Value: 0
+      Name: Image
+      Normalize Range: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /camera/image_raw/compressed
+      Value: true
+  Enabled: true
+  Global Options:
+    Background Color: 48; 48; 48
+    Fixed Frame: map
+    Frame Rate: 30
+  Name: root
+  Tools:
+    - Class: rviz_default_plugins/Interact
+      Hide Inactive Objects: true
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+    - Class: rviz_default_plugins/FocusCamera
+    - Class: rviz_default_plugins/Measure
+      Line color: 128; 128; 0
+  Transformation:
+    Current:
+      Class: rviz_default_plugins/TF
+  Value: true
+  Views:
+    Current:
+      Class: rtabmap_rviz_plugins/OrbitOriented
+      Distance: 2.5
+      Enable Stereo Rendering:
+        Stereo Eye Separation: 0.05999999865889549
+        Stereo Focal Distance: 1
+        Swap Stereo Eyes: false
+        Value: false
+      Field of View: 1.2000000476837158
+      Focal Point:
+        X: 0
+        Y: 0
+        Z: 0
+      Focal Shape Fixed Size: false
+      Focal Shape Size: 0.05000000074505806
+      Invert Z Axis: false
+      Name: Current View
+      Near Clip Distance: 0.009999999776482582
+      Pitch: 0.3403986096382141
+      Target Frame: base_link
+      Value: OrbitOriented (rtabmap_rviz_plugins)
+      Wall clipping:
+        Ignore Distance: 1
+        Octomap Topic: /octomap_binary
+        Octree Depth: 14
+        Value: true
+        Wall Margin: 0.05000000074505806
+      Yaw: 3.100417137145996
+    Saved: ~
+Window Geometry:
+  Displays:
+    collapsed: false
+  Height: 876
+  Hide Left Dock: false
+  Hide Right Dock: false
+  Image:
+    collapsed: false
+  QMainWindow State: 000000ff00000000fd00000001000000000000015600000312fc0200000003fb000000100044006900730070006c006100790073010000003d000001c3000000c900fffffffb0000000a00560069006500770073000000016200000116000000a400fffffffb0000000a0049006d0061006700650100000206000001490000002800ffffff000002990000031200000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  Views:
+    collapsed: false
+  Width: 1013
+  X: 69
+  Y: 48
