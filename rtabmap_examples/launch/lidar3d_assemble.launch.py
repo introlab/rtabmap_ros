@@ -156,6 +156,11 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
     else:
       remappings.append(('rgbd_images', LaunchConfiguration('rgbd_images_topic')))
     
+  intermediate_nodes = LaunchConfiguration('intermediate_nodes').perform(context).lower() == 'true'
+  if intermediate_nodes and not external_odom_frame_id:
+    # Every odometry pose between the nodes is saved as a node without data.
+    rtabmap_parameters['Rtabmap/CreateIntermediateNodes'] = 'true'
+
   arguments = []
   if localization:
     rtabmap_parameters['Mem/IncrementalMemory'] = 'False'
@@ -201,7 +206,8 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
                    'rgbd_cameras': rgbd_cameras,
                    'topic_queue_size': 40,
                    'sync_queue_size': 40,}],
-      remappings=remappings + [('scan_cloud', 'assembled_cloud'), ('gps/fix', LaunchConfiguration('gps_topic'))],
+      remappings=remappings + [('scan_cloud', 'assembled_cloud'), ('gps/fix', LaunchConfiguration('gps_topic')),
+                               ('inter_odom', 'icp_odom')],
       arguments=arguments), 
 
     # Just for visualization
@@ -339,6 +345,10 @@ def generate_launch_description():
     DeclareLaunchArgument(
       'deskewing_slerp', default_value='true',
       description='Use fast slerp interpolation between first and last stamps of the scan for deskewing. It would less accruate than requesting TF for every points, but a lot faster. Enable this if the delay of the deskewed scan is significant larger than the original scan.'),
+
+    DeclareLaunchArgument(
+      'intermediate_nodes', default_value='false',
+      description='Also save every odometry pose between the map\'s nodes in the database, as nodes without data (Rtabmap/CreateIntermediateNodes). Only with icp_odometry (external_odom_frame_id empty).'),
 
     DeclareLaunchArgument(
       'qos', default_value='1',
