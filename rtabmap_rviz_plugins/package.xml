@@ -26,7 +26,7 @@
   <depend>tf2</depend>
   <depend>rtabmap_conversions</depend>
   <depend>rtabmap_msgs</depend>
-  <depend>octomap</depend> <!-- optional: OrbitOriented's wall clipping -->
+  <depend>liboctomap-dev</depend> <!-- optional: OrbitOriented's wall clipping -->
   <depend>octomap_msgs</depend> <!-- optional: OrbitOriented's wall clipping -->
   
   <export>

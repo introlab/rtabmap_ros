@@ -7,10 +7,9 @@
 #   lidar3d_assemble.launch.py, set up for the bag: scans are assembled over half a
 #   turn of the mast, so each node of the map holds a full sphere.
 #
-#   Note: the extrinsics between the camera and the lidar were not calibrated (the
-#   camera's TF in the bag is approximate). Offsets are expected between the image and
-#   the lidar projected into it (gen_depth), and so in the 3D positions given to the
-#   visual features.
+#   Note: the camera's rotation relative to the lidar (box_link -> camera_link in the
+#   bags' TF) was calibrated with rtabmap's rtabmap-lidarCameraCalibration tool; its
+#   translation is as measured.
 #
 # Requirements:
 #   Download one or more rosbags, the consecutive minutes of the same run:
@@ -75,6 +74,8 @@ def generate_launch_description():
                               description='Add the camera images to the map, with a depth made from the lidar, for visual loop closure detection (bag-of-words). Registration stays lidar only.'),
         DeclareLaunchArgument('lidar_range_min', default_value='0.84',
                               description='Lidar points closer than this (m) are ignored. About 6% of each scan hits the drone itself, all within 0.6 m; the surroundings start at ~0.9 m.'),
+        DeclareLaunchArgument('assembler_voxel_size', default_value='0.05',
+                              description='Voxel size (m) of the assembled clouds added to the map; 0 keeps every point (larger database, e.g., for camera-lidar calibration).'),
         DeclareLaunchArgument('assembling_time', default_value='4.3',
                               description='How long (s) scans are assembled before being added to the map. The mast turns at 42 deg/s: 4.3 s is half a turn, in which the lidar\'s scanning plane sweeps the whole sphere.'),
         DeclareLaunchArgument('database_path', default_value=os.path.join(os.environ.get('ROS_HOME', '~/.ros'), 'rtabmap.db'),
@@ -98,7 +99,7 @@ def generate_launch_description():
                 'icp_outlier_ratio': '0.3',
                 'odom_key_frame_threshold': '0.9',
                 'odom_local_map_size': '20000',
-                'assembler_voxel_size': '0.05',
+                'assembler_voxel_size': LaunchConfiguration('assembler_voxel_size'),
                 'rgbd_image_topic': rgbd_image_topic,
                 # The images are raw (k1=-0.34): rectify them, so that the lidar projected
                 # into them as their depth (gen_depth) lines up.
