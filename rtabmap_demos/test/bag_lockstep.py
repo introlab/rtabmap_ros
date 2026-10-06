@@ -33,6 +33,7 @@ import os
 import time
 from typing import Callable, Dict, List, Optional, Set
 
+import numpy as np
 import rosbag2_py
 from geometry_msgs.msg import TransformStamped
 from rclpy.node import Node
@@ -40,6 +41,7 @@ from rclpy.serialization import serialize_message
 from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
 from rosgraph_msgs.msg import Clock
 from rosidl_runtime_py.utilities import get_message
+from scipy.spatial.transform import Rotation, Slerp
 from tf2_msgs.msg import TFMessage
 
 # Topics published without waiting: TF listeners keep a long queue and a buffer.
@@ -149,21 +151,38 @@ class LockstepPlayer:
             self._publishers[meta.name] = (
                 name, node.create_publisher(get_message(meta.type), name, qos))
 
-    def add_trajectory(self, frame_id: str, child_frame_id: str, trajectory, lead: float):
+    def add_trajectory(self, frame_id: str, child_frame_id: str, trajectory,
+                       step: float = 0.25):
         """Publish (stamp, (x y z qx qy qz qw)) poses as frame_id -> child_frame_id.
 
-        TF interpolates between two samples, so a lookup at a stamp needs the sample
-        after it: lead must exceed the largest gap of the trajectory. The first and last
-        poses are held to the bag's start and end, so that no lookup falls outside of
-        it: one would make the node wait for the transform, asleep, looking idle.
+        The first and last poses are held to the bag's start and end, so that no lookup
+        falls outside of it: one would make the node wait for the transform, asleep,
+        looking idle. Poses are then added, interpolated as TF would (linearly, and by
+        slerp for the rotation), so that none are more than `step` seconds apart: TF
+        returns the same from them at any stamp.
+
+        TF interpolates between two samples, so a lookup at a stamp needs the sample after
+        it: each is sent 2 * step ahead of its stamp. A node may still look a stamp up
+        late (rtabmap, an intermediate node when the next node with data arrives) and a
+        TF buffer keeps 10 s: the trajectory's own gaps can be several seconds (a robot
+        standing still adds no nodes), and a lead covering them would leave it no slack.
         """
         metadata = self._open().get_metadata()
         start = metadata.starting_time.nanoseconds / 1e9
         end = start + metadata.duration.nanoseconds / 1e9
         trajectory = sorted(trajectory)
-        if trajectory:
-            trajectory = ([(start, trajectory[0][1])] + trajectory + [(end, trajectory[-1][1])])
-        for stamp, (x, y, z, qx, qy, qz, qw) in trajectory:
+        if not trajectory:
+            return
+        trajectory = [(start, trajectory[0][1])] + trajectory + [(end, trajectory[-1][1])]
+        stamps = np.array([stamp for stamp, _ in trajectory])
+        poses = np.array([pose for _, pose in trajectory])
+        stamps, unique = np.unique(stamps, return_index=True)
+        poses = poses[unique]
+        dense = np.union1d(stamps, np.arange(stamps[0], stamps[-1], step))
+        xyz = np.stack([np.interp(dense, stamps, poses[:, k]) for k in range(3)], axis=1)
+        quaternions = Slerp(stamps, Rotation.from_quat(poses[:, 3:]))(dense).as_quat()
+        lead = 2 * step
+        for stamp, (x, y, z), (qx, qy, qz, qw) in zip(dense, xyz, quaternions):
             ns = int(round(stamp * 1e9))
             msg = TransformStamped()
             msg.header.stamp = _to_time(ns)

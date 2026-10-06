@@ -30,12 +30,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List
 
-import numpy as np
 import pytest
 import rclpy
 from rclpy.executors import SingleThreadedExecutor
 from rtabmap_msgs.msg import Info
-from scipy.spatial.transform import Rotation, Slerp
 
 from bag_lockstep import LockstepPlayer, ProcessTree
 from graph_metrics import Graph, export_graph, load_tum
@@ -122,23 +120,6 @@ def _stop(process: subprocess.Popen) -> bool:
         return False
 
 
-def _densify(trajectory, step: float = 0.25):
-    """The trajectory with poses added, interpolated as TF would, at most `step` s apart.
-
-    TF returns the same from it at any stamp. rtabmap interpolates the ground truth at a
-    node's stamp, so the pose after it must be in its TF buffer, which keeps 10 s: sent
-    ahead of the bag by more than the largest gap between poses, which can be several
-    seconds (a robot standing still adds no nodes), it could leave rtabmap no slack to
-    look a node up late (an intermediate one, when the next node with data arrives).
-    """
-    stamps = np.array([stamp for stamp, _ in trajectory])
-    poses = np.array([pose for _, pose in trajectory])
-    dense = np.union1d(stamps, np.arange(stamps[0], stamps[-1], step))
-    xyz = np.stack([np.interp(dense, stamps, poses[:, k]) for k in range(3)], axis=1)
-    quaternions = Slerp(stamps, Rotation.from_quat(poses[:, 3:]))(dense).as_quat()
-    return [(stamp, tuple(t) + tuple(q)) for stamp, t, q in zip(dense, xyz, quaternions)]
-
-
 # See bag_lockstep.py: publish() must have sent the message when it returns, in this
 # process and in the demo's nodes alike. Read when each process initializes its RMW.
 os.environ['RMW_FASTRTPS_PUBLICATION_MODE'] = 'SYNCHRONOUS'
@@ -186,10 +167,7 @@ def _replay(scenario: Scenario, bag: Path, results: Path, ground_truth=None):
         tree = ProcessTree(launch.pid)
         player = LockstepPlayer(node, str(bag), tree)
         if ground_truth:
-            # Poses at most 0.25 s apart (see _densify()): a lead of 0.5 s is enough, and
-            # leaves rtabmap 9.5 s of the 10 s its TF buffer keeps to look them up late.
-            player.add_trajectory(GROUND_TRUTH_FRAME, GROUND_TRUTH_BASE_FRAME,
-                                  _densify(ground_truth), lead=0.5)
+            player.add_trajectory(GROUND_TRUTH_FRAME, GROUND_TRUTH_BASE_FRAME, ground_truth)
         player.connect(scenario.required_topics)
         nodes = {pid: Path(f'/proc/{pid}/comm').read_text().strip() for pid in tree.pids()}
         print(f'\n{scenario.name}: {len(nodes)} processes ({", ".join(nodes.values())}), '
