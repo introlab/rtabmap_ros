@@ -204,6 +204,24 @@ class LockstepPlayer:
                     raise TimeoutError(f'{name} not matched with all its subscribers')
                 time.sleep(0.1)
 
+        # Discovery may not have found every subscriber yet, and what is published before
+        # a subscriber is matched never reaches it: the first transforms of the bag, say,
+        # which the first frames need. Wait until the subscribers this node knows of, and
+        # those each publisher is matched with, have not changed for a while.
+        def counts():
+            return tuple((self.node.count_subscribers(name), publisher.get_subscription_count())
+                         for name, publisher in list(self._publishers.values()) +
+                         [('/tf', self._extra_tf)])
+
+        stable_since, last = time.monotonic(), counts()
+        while time.monotonic() - stable_since < 2.0:
+            if time.monotonic() > deadline:
+                raise TimeoutError('discovery did not settle')
+            time.sleep(0.1)
+            current = counts()
+            if current != last:
+                stable_since, last = time.monotonic(), current
+
         for bag_topic, (name, publisher) in self._publishers.items():
             if self.node.count_subscribers(name) > 0:
                 # TF too: the first frames' transforms would otherwise be lost, or not,

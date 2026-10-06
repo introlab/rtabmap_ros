@@ -121,6 +121,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
     'Rtabmap/DetectionRate': '0', # indirectly set to 1 Hz by the assembling time below (1s)
     'RGBD/ProximityMaxGraphDepth': '0',
     'RGBD/ProximityPathMaxNeighbors': '1',
+    'RGBD/ProximityAngle': '0', # assuming 360 lidar
     'RGBD/AngularUpdate': '0.05',
     'RGBD/LinearUpdate': '0.05',
     'RGBD/CreateOccupancyGrid': 'false',
