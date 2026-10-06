@@ -65,7 +65,8 @@ Output names are derived from the **resolved** input names, so remapping the inp
 | `fixed_frame_id` | `string` | `""` | **Required.** Frame the motion is measured against, usually `odom`. |
 | `wait_for_transform` | `double` | `0.01` | Seconds to wait for the transforms spanning the sweep. Raise it if odometry lags the lidar. |
 | `slerp` | `bool` | `false` | Interpolate between the poses at the start and end of the sweep instead of looking up TF per point. Much cheaper, and accurate enough at constant velocity. |
-| `queue_size` | `int` | `1` | Queue depth of the input subscriptions. |
+| `queue_size` | `int` | `5` | Queue depth of the input subscriptions. |
+| `output_queue_size` | `int` | `1` | History depth of the deskewed cloud publishers. |
 | `qos` | `int` | `0` | Reliability of the input subscriptions: `0` system default, `1` reliable, `2` best effort. |
 
 ## Requirements

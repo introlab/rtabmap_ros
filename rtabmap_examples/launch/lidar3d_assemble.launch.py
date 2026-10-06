@@ -106,9 +106,6 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
     'Odom/ScanKeyFrameThr': LaunchConfiguration('odom_key_frame_threshold').perform(context),
     'OdomF2M/ScanSubtractRadius': str(voxel_size_value),
     'OdomF2M/ScanMaxSize': LaunchConfiguration('odom_local_map_size').perform(context),
-    'topic_queue_size': int(LaunchConfiguration('odom_topic_queue_size').perform(context)),
-    'always_process_most_recent_frame':
-      LaunchConfiguration('odom_always_process_most_recent_frame').perform(context).lower() == 'true',
     'OdomF2M/BundleAdjustment': 'false',
     'Icp/CorrespondenceRatio': '0.01'
   }
@@ -325,14 +322,6 @@ def generate_launch_description():
     DeclareLaunchArgument(
       'odom_local_map_size', default_value='15000',
       description='OdomF2M/ScanMaxSize: maximum number of points of the odometry local map.'),
-
-    DeclareLaunchArgument(
-      'odom_topic_queue_size', default_value='1',
-      description='Lidar scans icp_odometry keeps waiting while it processes one.'),
-
-    DeclareLaunchArgument(
-      'odom_always_process_most_recent_frame', default_value='true',
-      description='icp_odometry processes the most recent scan received, dropping older ones waiting (true), or every one in turn (false, e.g., to replay a bag in lockstep with the pipeline).'),
 
     DeclareLaunchArgument(
       'assembler_voxel_size', default_value='0.0',

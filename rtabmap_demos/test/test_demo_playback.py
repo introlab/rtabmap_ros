@@ -32,6 +32,7 @@ from typing import Dict, List
 
 import pytest
 import rclpy
+from ament_index_python.packages import get_package_share_directory
 from rclpy.executors import SingleThreadedExecutor
 from rtabmap_msgs.msg import Info
 
@@ -54,6 +55,9 @@ class Scenario:
     # Topics the pipeline must have subscribed to before the replay can start.
     required_topics: List[str]
     launch_arguments: Dict[str, str] = field(default_factory=dict)
+    # ROS parameters set on every node the launch file starts (see _wrapper_launch()), for
+    # settings the launch file has no argument for. A node's own value for one wins.
+    parameters: Dict[str, object] = field(default_factory=dict)
     # How far a run may be from the golden graph.
     max_node_difference: float = 0.02      # relative
     # Loop closures, for each kind, may be fewer than the golden graph's by this ratio
@@ -74,6 +78,9 @@ SCENARIOS = [
         bag='demo_mapping_bag',
         required_topics=['/jn0/base_scan', '/data_throttled_image/compressed'],
         launch_arguments={'rtabmap_viz': 'false', 'rviz': 'false'},
+        # Every image rgbd_sync makes reaches rtabmap: with a history of 1, the next one
+        # replaces one rtabmap has not received yet when it is busy.
+        parameters={'output_queue_size': 10},
         # How many frames rtabmap merges into the previous node (rehearsal) depends on
         # its build (its optional dependencies): 205 nodes in CI against 210 here. Loop
         # closures vary from run to run (11 to 13 global ones), and so the errors:
@@ -88,6 +95,10 @@ SCENARIOS = [
         required_topics=['/stereo_camera/left/image_raw_throttle/compressed',
                          '/stereo_camera/right/image_raw_throttle/compressed'],
         launch_arguments={'rtabmap_viz': 'false', 'rviz': 'false'},
+        # As for netherdrone_lidar3d below: every pair stereo_sync makes reaches odometry
+        # and is registered (all 3741 of them on an idle machine).
+        parameters={'output_queue_size': 10,
+                    'always_process_most_recent_frame': False},
         # As for robot_mapping: 161 nodes in CI against 185 here.
         max_node_difference=0.15,
         max_rmse=0.1,
@@ -100,16 +111,44 @@ SCENARIOS = [
                          '/camera/image_raw/compressed', '/camera/camera_info'],
         # A node is half a turn of the lidar's mast, about 4.4 s apart; the odometry
         # poses in between are saved too (intermediate nodes), and compared as well.
-        # Odometry processes every scan: by default it drops those arriving while it is
-        # busy (as when lidar_deskewing, waiting for a transform asleep, looks idle to
-        # the lockstep player), and how many depends on the machine.
-        launch_arguments={'rtabmap_viz': 'false', 'rviz': 'false', 'intermediate_nodes': 'true',
-                          'odom_topic_queue_size': '10',
-                          'odom_always_process_most_recent_frame': 'false'},
+        launch_arguments={'rtabmap_viz': 'false', 'rviz': 'false', 'intermediate_nodes': 'true'},
+        # Every scan reaches odometry, and is registered. By default odometry drops those
+        # arriving while it is busy (as when lidar_deskewing, waiting for a transform
+        # asleep, looks idle to the lockstep player), and lidar_deskewing replaces a scan
+        # odometry has not received yet with the next one: how many depends on the
+        # machine. output_queue_size also reaches rgb_sync, for the camera. topic_queue_size
+        # reaches only icp_odometry: rgb_sync and point_cloud_assembler already default
+        # to 10, and rtabmap sets its own.
+        parameters={'output_queue_size': 10,
+                    'topic_queue_size': 10,
+                    'always_process_most_recent_frame': False},
         max_rmse=0.1,
         max_rotational_rmse=2.0,
         max_node_difference=0.05),
 ]
+
+
+def _wrapper_launch(scenario: Scenario, arguments: Dict[str, str], path: Path) -> Path:
+    """Write a launch file that sets scenario.parameters on every node, then includes the
+    demo's with `arguments`: launch_ros' SetParameter applies to the nodes launched after
+    it, whatever launch file they come from."""
+    demo = Path(get_package_share_directory('rtabmap_demos')) / 'launch' / scenario.launch_file
+    set_parameters = ''.join(f'        SetParameter(name={name!r}, value={value!r}),\n'
+                             for name, value in scenario.parameters.items())
+    path.write_text(
+        'from launch import LaunchDescription\n'
+        'from launch.actions import IncludeLaunchDescription\n'
+        'from launch.launch_description_sources import PythonLaunchDescriptionSource\n'
+        'from launch_ros.actions import SetParameter\n'
+        '\n'
+        '\n'
+        'def generate_launch_description():\n'
+        '    return LaunchDescription([\n'
+        f'{set_parameters}'
+        f'        IncludeLaunchDescription(PythonLaunchDescriptionSource({str(demo)!r}),\n'
+        f'                                 launch_arguments={list(arguments.items())!r}),\n'
+        '    ])\n')
+    return path
 
 
 def _stop(process: subprocess.Popen) -> bool:
@@ -155,8 +194,7 @@ def _replay(scenario: Scenario, bag: Path, results: Path, ground_truth=None):
                          ground_truth_base_frame_id=GROUND_TRUTH_BASE_FRAME)
     log = open(results / 'launch.log', 'w')
     launch = subprocess.Popen(
-        ['ros2', 'launch', 'rtabmap_demos', scenario.launch_file,
-         *[f'{k}:={v}' for k, v in arguments.items()]],
+        ['ros2', 'launch', str(_wrapper_launch(scenario, arguments, results / 'demo.launch.py'))],
         stdout=log, stderr=subprocess.STDOUT, start_new_session=True,
         preexec_fn=_die_with_parent)
     context = rclpy.Context()

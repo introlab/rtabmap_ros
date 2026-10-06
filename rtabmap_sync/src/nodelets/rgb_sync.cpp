@@ -63,6 +63,7 @@ RGBSync::RGBSync(const rclcpp::NodeOptions & options) :
 	approxSync = this->declare_parameter("approx_sync", approxSync);
 	approxSyncMaxInterval = this->declare_parameter("approx_sync_max_interval", approxSyncMaxInterval);
 	topicQueueSize = this->declare_parameter("topic_queue_size", topicQueueSize);
+	int outputQueueSize = this->declare_parameter("output_queue_size", 1);
 	int queueSize = this->declare_parameter("queue_size", -1);
 	if(queueSize != -1)
 	{
@@ -83,6 +84,7 @@ RGBSync::RGBSync(const rclcpp::NodeOptions & options) :
 	if(approxSync)
 		RCLCPP_INFO(this->get_logger(), "%s: approx_sync_max_interval = %f", get_name(), approxSyncMaxInterval);
 	RCLCPP_INFO(this->get_logger(), "%s: topic_queue_size  = %d", get_name(), topicQueueSize);
+	RCLCPP_INFO(this->get_logger(), "%s: output_queue_size = %d", get_name(), outputQueueSize);
 	RCLCPP_INFO(this->get_logger(), "%s: sync_queue_size   = %d", get_name(), syncQueueSize);
 	RCLCPP_INFO(this->get_logger(), "%s: qos             = %d", get_name(), qos);
 	RCLCPP_INFO(this->get_logger(), "%s: qos_camera_info = %d", get_name(), qosCaminfo);
@@ -90,8 +92,8 @@ RGBSync::RGBSync(const rclcpp::NodeOptions & options) :
 	RCLCPP_INFO(this->get_logger(), "%s: image_transport = %s", get_name(), imageTransport.c_str());
 	RCLCPP_INFO(this->get_logger(), "%s: fill_empty_depth = %s", get_name(), fillEmptyDepth_?"true":"false");
 
-	rgbdImagePub_ = this->create_publisher<rtabmap_msgs::msg::RGBDImage>("rgbd_image", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos));
-	rgbdImageCompressedPub_ = this->create_publisher<rtabmap_msgs::msg::RGBDImage>("rgbd_image/compressed", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos));
+	rgbdImagePub_ = this->create_publisher<rtabmap_msgs::msg::RGBDImage>("rgbd_image", rclcpp::QoS(outputQueueSize).reliability((rmw_qos_reliability_policy_t)qos));
+	rgbdImageCompressedPub_ = this->create_publisher<rtabmap_msgs::msg::RGBDImage>("rgbd_image/compressed", rclcpp::QoS(outputQueueSize).reliability((rmw_qos_reliability_policy_t)qos));
 
 	if(approxSync)
 	{

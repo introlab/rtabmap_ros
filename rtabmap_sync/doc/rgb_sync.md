@@ -70,6 +70,7 @@ The output's `header.frame_id` comes from the camera_info; its `header.stamp` is
 | `approx_sync` | `bool` | `false` | Match the image and its calibration by nearest stamp. Defaults to **exact**; see [Synchronization](#synchronization). |
 | `approx_sync_max_interval` | `double` | `0.0` | Reject pairs spanning more than this many seconds. `0` disables. |
 | `topic_queue_size` | `int` | `10` | Queue depth of each input subscription. |
+| `output_queue_size` | `int` | `1` | History depth of the `rgbd_image` publishers. |
 | `sync_queue_size` | `int` | `10` | Queue depth of the synchronizer. |
 | `queue_size` | `int` | — | **Deprecated**, renamed to `sync_queue_size`. |
 | `qos` | `int` | `0` | Reliability of the subscription and the publishers: `0` system default, `1` reliable, `2` best effort. |
