@@ -73,12 +73,16 @@ def generate_launch_description():
         # Uncompress images for find_object
         Node(
             package='image_transport', executable='republish', name='republish_rgb', output='screen',
+            # The transports: as arguments up to humble, as parameters from jazzy.
             arguments=['compressed', 'raw'],
+            parameters=[{'in_transport': 'compressed', 'out_transport': 'raw'}],
             remappings=[('in/compressed', '/camera/data_throttled_image/compressed'),
                         ('out',           '/camera/data_throttled_image')]),
         Node(
             package='image_transport', executable='republish', name='republish_depth', output='screen',
+            # The transports: as arguments up to humble, as parameters from jazzy.
             arguments=['compressedDepth', 'raw'],
+            parameters=[{'in_transport': 'compressedDepth', 'out_transport': 'raw'}],
             remappings=[('in/compressedDepth', '/camera/data_throttled_image_depth/compressedDepth'),
                         ('out',                '/camera/data_throttled_image_depth')]),
         

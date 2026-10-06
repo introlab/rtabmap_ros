@@ -84,7 +84,9 @@ def launch_setup(context, *args, **kwargs):
             remappings=[
                 (['in/', LaunchConfiguration('rgb_image_transport')], [LaunchConfiguration('rgb_topic'), '/', LaunchConfiguration('rgb_image_transport')]),
                 ('out', LaunchConfiguration('rgb_topic_relay'))], 
+            # The transports: as arguments up to humble, as parameters from jazzy.
             arguments=[LaunchConfiguration('rgb_image_transport'), 'raw'],
+            parameters=[{'in_transport': LaunchConfiguration('rgb_image_transport'), 'out_transport': 'raw'}],
             namespace=LaunchConfiguration('namespace')),
         Node(
             package='image_transport', executable='republish', name='republish_depth',
@@ -92,7 +94,9 @@ def launch_setup(context, *args, **kwargs):
             remappings=[
                 (['in/', LaunchConfiguration('depth_image_transport')], [LaunchConfiguration('depth_topic'), '/', LaunchConfiguration('depth_image_transport')]),
                 ('out', LaunchConfiguration('depth_topic_relay'))], 
+            # The transports: as arguments up to humble, as parameters from jazzy.
             arguments=[LaunchConfiguration('depth_image_transport'), 'raw'],
+            parameters=[{'in_transport': LaunchConfiguration('depth_image_transport'), 'out_transport': 'raw'}],
             namespace=LaunchConfiguration('namespace')),
         Node(
             package='rtabmap_sync', executable='rgbd_sync', name="rgbd_sync", output="screen",
@@ -120,7 +124,9 @@ def launch_setup(context, *args, **kwargs):
             remappings=[
                 (['in/', LaunchConfiguration('rgb_image_transport')], [LaunchConfiguration('left_image_topic'), '/', LaunchConfiguration('rgb_image_transport')]),
                 ('out', LaunchConfiguration('left_image_topic_relay'))], 
+            # The transports: as arguments up to humble, as parameters from jazzy.
             arguments=[LaunchConfiguration('rgb_image_transport'), 'raw'],
+            parameters=[{'in_transport': LaunchConfiguration('rgb_image_transport'), 'out_transport': 'raw'}],
             namespace=LaunchConfiguration('namespace')),
         Node(
             package='image_transport', executable='republish', name='republish_right',
@@ -128,7 +134,9 @@ def launch_setup(context, *args, **kwargs):
             remappings=[
                 (['in/', LaunchConfiguration('rgb_image_transport')], [LaunchConfiguration('right_image_topic'), '/', LaunchConfiguration('rgb_image_transport')]),
                 ('out', LaunchConfiguration('right_image_topic_relay'))], 
+            # The transports: as arguments up to humble, as parameters from jazzy.
             arguments=[LaunchConfiguration('rgb_image_transport'), 'raw'],
+            parameters=[{'in_transport': LaunchConfiguration('rgb_image_transport'), 'out_transport': 'raw'}],
             namespace=LaunchConfiguration('namespace')),
         Node(
             package='rtabmap_sync', executable='stereo_sync', name="stereo_sync", output="screen",

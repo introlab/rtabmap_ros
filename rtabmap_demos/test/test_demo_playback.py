@@ -75,8 +75,12 @@ SCENARIOS = [
         required_topics=['/jn0/base_scan', '/data_throttled_image/compressed'],
         launch_arguments={'rtabmap_viz': 'false', 'rviz': 'false'},
         # How many frames rtabmap merges into the previous node (rehearsal) depends on
-        # its build (its optional dependencies): 205 nodes in CI against 210 here.
-        max_node_difference=0.05),
+        # its build (its optional dependencies): 205 nodes in CI against 210 here. Loop
+        # closures vary from run to run (11 to 13 global ones), and so the errors:
+        # 0.046-0.053 m and up to 1.22 deg.
+        max_node_difference=0.05,
+        max_rmse=0.1,
+        max_rotational_rmse=2.0),
     Scenario(
         name='stereo_outdoorA',
         launch_file='stereo_outdoor_demo.launch.py',
@@ -94,12 +98,14 @@ SCENARIOS = [
         bag='netherdrone_ouster_vertige_bag_0',
         required_topics=['/os_cloud_node/points', '/imu/data_raw',
                          '/camera/image_raw/compressed', '/camera/camera_info'],
-        # A node is half a turn of the lidar's mast, about 4.4 s apart: with the
-        # odometry poses in between (intermediate nodes), the golden trajectory has a
-        # pose every 0.1 s, as the ground truth needs (see _replay()).
+        # A node is half a turn of the lidar's mast, about 4.4 s apart; the odometry
+        # poses in between are saved too (intermediate nodes), and compared as well.
         launch_arguments={'rtabmap_viz': 'false', 'rviz': 'false', 'intermediate_nodes': 'true'},
         max_rmse=0.1,
-        max_rotational_rmse=2.0),
+        max_rotational_rmse=2.0,
+        # Intermediate nodes are odometry updates: a few dropped or not make the count
+        # vary (518 in CI against 533 here).
+        max_node_difference=0.05),
 ]
 
 

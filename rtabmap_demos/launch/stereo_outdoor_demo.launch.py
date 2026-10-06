@@ -78,13 +78,17 @@ def generate_launch_description():
         Node(
             package='image_transport', executable='republish', name='republish_left', output='screen',
             namespace='stereo_camera',
+            # The transports: as arguments up to humble, as parameters from jazzy.
             arguments=['compressed', 'raw'],
+            parameters=[{'in_transport': 'compressed', 'out_transport': 'raw'}],
             remappings=[('in/compressed', 'left/image_raw_throttle/compressed'),
                         ('out',           'left/image_raw')]),
         Node(
             package='image_transport', executable='republish', name='republish_right', output='screen',
             namespace='stereo_camera',
+            # The transports: as arguments up to humble, as parameters from jazzy.
             arguments=['compressed', 'raw'],
+            parameters=[{'in_transport': 'compressed', 'out_transport': 'raw'}],
             remappings=[('in/compressed', 'right/image_raw_throttle/compressed'),
                         ('out',           'right/image_raw')]),
 
