@@ -45,6 +45,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rviz_common/properties/vector_property.hpp>
 #include <rviz_common/ros_integration/ros_node_abstraction_iface.hpp>
 #include <rviz_rendering/objects/shape.hpp>
+#include <rclcpp/node.hpp>
 
 #ifdef RTABMAP_RVIZ_PLUGINS_OCTOMAP
 #include <octomap/ColorOcTree.h>
