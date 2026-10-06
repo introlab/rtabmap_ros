@@ -100,11 +100,14 @@ SCENARIOS = [
                          '/camera/image_raw/compressed', '/camera/camera_info'],
         # A node is half a turn of the lidar's mast, about 4.4 s apart; the odometry
         # poses in between are saved too (intermediate nodes), and compared as well.
-        launch_arguments={'rtabmap_viz': 'false', 'rviz': 'false', 'intermediate_nodes': 'true'},
+        # Odometry processes every scan: by default it drops those arriving while it is
+        # busy (as when lidar_deskewing, waiting for a transform asleep, looks idle to
+        # the lockstep player), and how many depends on the machine.
+        launch_arguments={'rtabmap_viz': 'false', 'rviz': 'false', 'intermediate_nodes': 'true',
+                          'odom_topic_queue_size': '10',
+                          'odom_always_process_most_recent_frame': 'false'},
         max_rmse=0.1,
         max_rotational_rmse=2.0,
-        # Intermediate nodes are odometry updates: a few dropped or not make the count
-        # vary (518 in CI against 533 here).
         max_node_difference=0.05),
 ]
 
