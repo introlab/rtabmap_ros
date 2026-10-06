@@ -29,6 +29,7 @@
   <test_depend>python3-pytest</test_depend>
   <test_depend>python3-yaml</test_depend>
   <test_depend>python3-numpy</test_depend>
+  <test_depend>python3-scipy</test_depend>
   <test_depend>rclpy</test_depend>
   <test_depend>rosbag2_py</test_depend>
   <test_depend>rosgraph_msgs</test_depend>
