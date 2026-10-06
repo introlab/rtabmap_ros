@@ -101,6 +101,7 @@ def generate_launch_description():
                 'max_correspondence_distance': '1.0',
                 'icp_outlier_ratio': '0.3',
                 'odom_key_frame_threshold': '0.9',
+                'min_loop_closure_overlap': '0.1',
                 'odom_local_map_size': '20000',
                 'assembler_voxel_size': LaunchConfiguration('assembler_voxel_size'),
                 'rgbd_image_topic': rgbd_image_topic,
