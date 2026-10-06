@@ -27,12 +27,13 @@
 #
 #   Rosbag:
 #     $ ros2 bag play netherdrone_ouster_vertige_bag_0 --clock
-#     when done, you can play the next bag(s):
-#     $ ros2 bag play netherdrone_ouster_vertige_bag_1 --clock
-#     $ ros2 bag play netherdrone_ouster_vertige_bag_2 --clock
-#     $ ros2 bag play netherdrone_ouster_vertige_bag_3 --clock
-#     $ ros2 bag play netherdrone_ouster_vertige_bag_4 --clock
-#     $ ros2 bag play netherdrone_ouster_vertige_bag_5 --clock
+#     or, to play the bags one after the other:
+#     $ ros2 bag play netherdrone_ouster_vertige_bag_0 --clock && \
+#       ros2 bag play netherdrone_ouster_vertige_bag_1 --clock && \
+#       ros2 bag play netherdrone_ouster_vertige_bag_2 --clock && \
+#       ros2 bag play netherdrone_ouster_vertige_bag_3 --clock && \
+#       ros2 bag play netherdrone_ouster_vertige_bag_4 --clock && \
+#       ros2 bag play netherdrone_ouster_vertige_bag_5 --clock
 #
 
 import os

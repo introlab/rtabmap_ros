@@ -83,6 +83,18 @@ SCENARIOS = [
         launch_arguments={'rtabmap_viz': 'false', 'rviz': 'false'},
         max_rmse=0.1,
         max_rotational_rmse=2.0),
+    Scenario(
+        name='netherdrone_lidar3d',
+        launch_file='netherdrone_lidar3d_demo.launch.py',
+        bag='netherdrone_ouster_vertige_bag_0',
+        required_topics=['/os_cloud_node/points', '/imu/data_raw',
+                         '/camera/image_raw/compressed', '/camera/camera_info'],
+        # A node is half a turn of the lidar's mast, about 4.4 s apart: with the
+        # odometry poses in between (intermediate nodes), the golden trajectory has a
+        # pose every 0.1 s, as the ground truth needs (see _replay()).
+        launch_arguments={'rtabmap_viz': 'false', 'rviz': 'false', 'intermediate_nodes': 'true'},
+        max_rmse=0.1,
+        max_rotational_rmse=2.0),
 ]
 
 
@@ -145,9 +157,10 @@ def _replay(scenario: Scenario, bag: Path, results: Path, ground_truth=None):
         tree = ProcessTree(launch.pid)
         player = LockstepPlayer(node, str(bag), tree)
         if ground_truth:
-            # Nodes are about a second apart (Rtabmap/DetectionRate); a lead of a few
-            # seconds keeps the sample after any stamp in the buffer, well within the
-            # 10 s TF keeps.
+            # The golden trajectory's poses are at most about a second apart (nodes at
+            # Rtabmap/DetectionRate, or intermediate nodes); a lead of a few seconds
+            # keeps the sample after any stamp in the buffer, well within the 10 s TF
+            # keeps.
             player.add_trajectory(GROUND_TRUTH_FRAME, GROUND_TRUTH_BASE_FRAME, ground_truth,
                                   lead=3.0)
         player.connect(scenario.required_topics)
