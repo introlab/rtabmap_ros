@@ -14,9 +14,10 @@ empty stubs instead of failing the run: their launch files include nothing and t
 nodes are recorded unchecked. What the demo itself passes on is still checked. Packages
 named rtabmap* are never stubbed, so a typo in one of ours still fails.
 
-check_launch_file() is the whole check of one launch file, as the test_launch_files of
-rtabmap_examples and rtabmap_demos run it. This file is installed with rtabmap_examples
-(share/rtabmap_examples/test) so that other packages' tests can import it.
+check_launch_file() is the whole check of one launch file, as test_launch_files.py runs
+it. Both are installed with rtabmap_launch (share/rtabmap_launch/test), so that the
+launch files of rtabmap_launch, rtabmap_examples and rtabmap_demos are all checked by the
+same test.
 """
 
 import contextlib

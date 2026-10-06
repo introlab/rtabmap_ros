@@ -371,8 +371,8 @@ def generate_launch_description():
       description='Fixed frame of a ground truth trajectory in TF. If set, RTAB-Map reports its error against it in its statistics (Gt/*).'),
 
     DeclareLaunchArgument(
-      'ground_truth_base_frame_id', default_value='',
-      description='Robot frame of the ground truth trajectory in TF. Empty: frame_id + "_gt".'),
+      'ground_truth_base_frame_id', default_value=[LaunchConfiguration('frame_id'), '_gt'],
+      description='Robot frame of the ground truth trajectory in TF. Empty: the ground truth is not used.'),
 
     OpaqueFunction(function=launch_setup),
   ])

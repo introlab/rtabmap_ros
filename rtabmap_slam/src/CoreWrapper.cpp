@@ -177,10 +177,6 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 	mapFrameId_ = this->declare_parameter("map_frame_id", mapFrameId_);
 	groundTruthFrameId_ = this->declare_parameter("ground_truth_frame_id", groundTruthFrameId_);
 	groundTruthBaseFrameId_ = this->declare_parameter("ground_truth_base_frame_id", frameId_+"_gt");
-	if(groundTruthBaseFrameId_.empty())
-	{
-		groundTruthBaseFrameId_ = frameId_+"_gt";
-	}
 
 	if(!odomFrameIdInit.empty())
 	{
@@ -2135,7 +2131,7 @@ void CoreWrapper::process(
 
 					SensorData interData(cv::Mat(), cv::Mat(), rtabmap::CameraModel(), -1, rtabmap_conversions::timestampFromROS(iter->first.header.stamp));
 					Transform gt;
-					if(!groundTruthFrameId_.empty())
+					if(!groundTruthFrameId_.empty() && !groundTruthBaseFrameId_.empty())
 					{
 						gt = rtabmap_conversions::getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, iter->first.header.stamp, *tfBuffer_, waitForTransform_);
 					}
@@ -2189,7 +2185,7 @@ void CoreWrapper::process(
 
 		//Add async stuff
 		Transform groundTruthPose;
-		if(!groundTruthFrameId_.empty())
+		if(!groundTruthFrameId_.empty() && !groundTruthBaseFrameId_.empty())
 		{
 			groundTruthPose = rtabmap_conversions::getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, stamp, *tfBuffer_, waitForTransform_);
 		}

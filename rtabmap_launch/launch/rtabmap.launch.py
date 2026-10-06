@@ -463,7 +463,7 @@ def generate_launch_description():
         DeclareLaunchArgument('use_action_for_goal', default_value='false',         description='Connect to nav2\'s navigate_to_pose action server instead of publishing the output goal topic.'),
 
         DeclareLaunchArgument('ground_truth_frame_id',      default_value='', description='e.g., "world"'),
-        DeclareLaunchArgument('ground_truth_base_frame_id', default_value='', description='e.g., "tracker", a fake frame matching the frame "frame_id" (but on different TF tree)'),
+        DeclareLaunchArgument('ground_truth_base_frame_id', default_value=[LaunchConfiguration('frame_id'), '_gt'], description='e.g., "tracker", a fake frame matching the frame "frame_id" (but on different TF tree). Empty: the ground truth is not used.'),
         
         DeclareLaunchArgument('approx_sync',  default_value='false',            description='If timestamps of the input topics should be synchronized using approximate or exact time policy.'),
         DeclareLaunchArgument('approx_sync_max_interval',  default_value='0.0', description='(sec) 0 means infinite interval duration (used with approx_sync=true)'),

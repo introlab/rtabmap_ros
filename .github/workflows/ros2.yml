@@ -25,16 +25,16 @@ jobs:
         include:
         - ros_distro: humble
           skip_keys: ''
-          packages: 'rtabmap_ros rtabmap_conversions rtabmap_odom rtabmap_slam rtabmap_sync rtabmap_util rtabmap_python rtabmap_demos'
+          packages: 'rtabmap_ros rtabmap_conversions rtabmap_odom rtabmap_slam rtabmap_sync rtabmap_util rtabmap_python rtabmap_launch rtabmap_examples rtabmap_demos'
         - ros_distro: jazzy
           skip_keys: ''
-          packages: 'rtabmap_ros rtabmap_conversions rtabmap_odom rtabmap_slam rtabmap_sync rtabmap_util rtabmap_python rtabmap_demos'
+          packages: 'rtabmap_ros rtabmap_conversions rtabmap_odom rtabmap_slam rtabmap_sync rtabmap_util rtabmap_python rtabmap_launch rtabmap_examples rtabmap_demos'
         - ros_distro: kilted
           skip_keys: 'grid_map_ros'
-          packages: 'rtabmap_ros rtabmap_conversions rtabmap_odom rtabmap_slam rtabmap_sync rtabmap_util rtabmap_python rtabmap_demos'
+          packages: 'rtabmap_ros rtabmap_conversions rtabmap_odom rtabmap_slam rtabmap_sync rtabmap_util rtabmap_python rtabmap_launch rtabmap_examples rtabmap_demos'
         - ros_distro: lyrical
           skip_keys: 'velodyne grid_map_ros libpointmatcher'
-          packages: 'rtabmap_ros rtabmap_conversions rtabmap_odom rtabmap_slam rtabmap_sync rtabmap_util rtabmap_python rtabmap_demos'
+          packages: 'rtabmap_ros rtabmap_conversions rtabmap_odom rtabmap_slam rtabmap_sync rtabmap_util rtabmap_python rtabmap_launch rtabmap_examples rtabmap_demos'
         - ros_distro: rolling
           # Rolling has moved to Ubuntu resolute and much of it has not been rebuilt for
           # that yet, so rosdep finds nothing to install for these. They are all optional
@@ -44,7 +44,7 @@ jobs:
           # rtabmap_ros metapackage, which pulls it in, are not built.
           skip_keys: 'velodyne libpointmatcher gtsam grid_map_ros nav2_msgs nav2_bringup nav2_costmap_2d'
           use_ros2_testing: true # Rolling is using ros2-testing (nightly)
-          packages: 'rtabmap_conversions rtabmap_odom rtabmap_slam rtabmap_sync rtabmap_util rtabmap_python rtabmap_demos'
+          packages: 'rtabmap_conversions rtabmap_odom rtabmap_slam rtabmap_sync rtabmap_util rtabmap_python rtabmap_launch rtabmap_examples rtabmap_demos'
       fail-fast: false
     timeout-minutes: 180
     container:

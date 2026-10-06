@@ -485,7 +485,7 @@ The ones that set how often a node is added, explained in [Update rate and dropp
 | `tf_tolerance` | `double` | `0.1` | How far in the future the transform is stamped, in seconds, so that lookups at the latest sensor stamp do not have to wait for it. |
 | `wait_for_transform` | `double` | `0.2` | Seconds to wait for a TF lookup before giving up on it. |
 | `ground_truth_frame_id` | `string` | `""` | The fixed frame of a ground truth system, for example `world` published by an external localization system like Vicon or OptiTrack. `ground_truth_frame_id` → `ground_truth_base_frame_id` is looked up and stored with each node, for evaluating a trajectory afterwards. |
-| `ground_truth_base_frame_id` | `string` | value of `frame_id` + `"_gt"` | The robot frame in the ground truth tree, for example `base_link_gt`. Empty also means this default. To avoid breaking the TF tree, it represents the same frame as `frame_id`, but in a parallel TF tree, so that the robot frame does not get two parents. |
+| `ground_truth_base_frame_id` | `string` | value of `frame_id` + `"_gt"` | The robot frame in the ground truth tree, for example `base_link_gt`. Empty: the ground truth is not used. To avoid breaking the TF tree, it represents the same frame as `frame_id`, but in a parallel TF tree, so that the robot frame does not get two parents. |
 
 **This node publishes exactly one transform: `map` → `odom`.** It is the correction that puts the odometry frame where the optimized graph says it belongs — the identity until a loop closure moves it. Odometry keeps publishing `odom` → `base_link`, and the sensors must be attached to `base_link` in TF, as in the [TF tree](../README.md#frames-and-tf).
 
