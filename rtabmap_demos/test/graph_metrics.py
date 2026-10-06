@@ -63,8 +63,10 @@ class Graph:
 def export_graph(database: Path, prefix: Path):
     """Write <prefix>.g2o and <prefix>.tum from an rtabmap database.
 
-    --opt 2 takes the optimized poses rtabmap saved in the database when it closed, so
-    they are the run's own, not a re-optimization.
+    The graph of every node in the database, optimized (--opt 0). Not the optimized poses
+    rtabmap saved when it closed (--opt 2): they are those of its local map only, without
+    the intermediate nodes, and are saved or not depending on how it closed, while
+    rtabmap-export falls back to optimizing every node when there are none.
     """
     tool = shutil.which('rtabmap-export')
     if tool is None:
@@ -72,7 +74,7 @@ def export_graph(database: Path, prefix: Path):
                                 'its tools?)')
     out_dir = database.parent
     for poses_format, extension, suffix in ((4, 'g2o', '.g2o'), (10, 'txt', '.tum')):
-        subprocess.run([tool, '--poses', '--poses_format', str(poses_format), '--opt', '2',
+        subprocess.run([tool, '--poses', '--poses_format', str(poses_format), '--opt', '0',
                         '--output_dir', str(out_dir), str(database)],
                        check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
         exported = out_dir / f'{database.stem}_poses.{extension}'
