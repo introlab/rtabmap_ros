@@ -484,7 +484,7 @@ void OdometryROS::callbackIMU(const sensor_msgs::msg::Imu::SharedPtr msg)
 	if(!this->isPaused())
 	{
 		double stamp = rtabmap_conversions::timestampFromROS(msg->header.stamp);
-		//RCLCPP_WARN(get_logger(), "Received imu: %f delay=%f", stamp, (now() - msg->header.stamp).seconds());
+		RCLCPP_WARN(get_logger(), "Received imu: %f delay=%f", stamp, (now() - msg->header.stamp).seconds());
 
 		{
 			UScopeMutex m(imuMutex_);
@@ -522,7 +522,7 @@ void OdometryROS::callbackIMU(const sensor_msgs::msg::Imu::SharedPtr msg)
 
 void OdometryROS::processData(SensorData & data, const std_msgs::msg::Header & header)
 {
-	//RCLCPP_WARN(get_logger(), "Received image: %f delay=%f", data.stamp(), (now() - header.stamp).seconds());
+	RCLCPP_WARN(get_logger(), "Received image: %f delay=%f", data.stamp(), (now() - header.stamp).seconds());
 	double clockNow = rtabmap_conversions::timestampFromROS(now());
 	UScopeMutex dataLock(dataMutex_, false);
 	if(dataLock.lockTry() == 0)
@@ -561,6 +561,7 @@ void OdometryROS::processData(SensorData & data, const std_msgs::msg::Header & h
 			topicPeriod,
 			lastReceivedTopicStamp_);
 		}
+		RCLCPP_WARN(get_logger(), "Dropped image/scan: %f (the previous one is still being processed)", data.stamp());
 		++droppedMsgs_;
 	}
 	lastReceivedTopicStamp_ = rtabmap_conversions::timestampFromROS(header.stamp);

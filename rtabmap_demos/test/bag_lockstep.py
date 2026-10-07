@@ -220,7 +220,16 @@ class LockstepPlayer:
         def wait_matched(name, publisher):
             while publisher.get_subscription_count() < self.node.count_subscribers(name):
                 if time.monotonic() > deadline:
-                    raise TimeoutError(f'{name} not matched with all its subscribers')
+                    # Usually a subscriber asking for a QoS this publisher cannot offer.
+                    subscribers = '\n'.join(
+                        f'  {info.node_namespace.rstrip("/")}/{info.node_name}: '
+                        f'{info.qos_profile.reliability.name}, '
+                        f'{info.qos_profile.durability.name}, '
+                        f'{info.qos_profile.history.name} {info.qos_profile.depth}'
+                        for info in self.node.get_subscriptions_info_by_topic(name))
+                    raise TimeoutError(
+                        f'{name} matched with {publisher.get_subscription_count()} of its '
+                        f'{self.node.count_subscribers(name)} subscribers:\n{subscribers}')
                 time.sleep(0.1)
 
         # Discovery may not have found every subscriber yet, and what is published before
