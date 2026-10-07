@@ -28,6 +28,7 @@ Transforms not in the bag can be added to its TF (add_trajectory), each sent a l
 time before its stamp: a ground truth trajectory for rtabmap, for instance.
 """
 
+import collections
 import heapq
 import os
 import time
@@ -113,11 +114,20 @@ class ProcessTree:
         """
         deadline = time.monotonic() + timeout
         quiet = 0
-        busy: List[str] = []
+        polls = 0
+        # How often each thread was seen busy: one that keeps waking up (a timer) can keep
+        # the pipeline from ever looking idle long enough, without being busy at the last
+        # poll.
+        seen = collections.Counter()
         while quiet < idle_polls:
             if time.monotonic() > deadline:
-                raise TimeoutError(f'still busy after {timeout:.0f} s: {", ".join(busy)}')
+                most = ', '.join(f'{name} ({count})' for name, count in seen.most_common(5))
+                raise TimeoutError(
+                    f'never idle for {idle_polls} polls in a row after {timeout:.0f} s; '
+                    f'busy most often, of {polls} polls: {most}')
             busy = self.busy_threads()
+            polls += 1
+            seen.update(busy)
             quiet = 0 if busy else quiet + 1
             time.sleep(period)
 
