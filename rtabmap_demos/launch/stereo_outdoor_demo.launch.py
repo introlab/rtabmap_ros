@@ -62,12 +62,6 @@ def generate_launch_description():
         DeclareLaunchArgument('rtabmap_viz',  default_value='false',  description='Launch RTAB-Map UI (optional).'),
         DeclareLaunchArgument('rviz',         default_value='true',   description='Launch RVIZ (optional).'),
         DeclareLaunchArgument('localization', default_value='false',  description='Launch in localization mode.'),
-        DeclareLaunchArgument('database_path', default_value=os.path.join(os.environ.get('ROS_HOME', '~/.ros'), 'rtabmap.db'),
-                              description='Database where the map is saved (deleted on start in SLAM mode).'),
-        DeclareLaunchArgument('ground_truth_frame_id', default_value='',
-                              description='Fixed frame of a ground truth trajectory in TF. If set, RTAB-Map reports its error against it in its statistics (Gt/*).'),
-        DeclareLaunchArgument('ground_truth_base_frame_id', default_value='base_footprint_gt',
-                              description='Robot frame of the ground truth trajectory in TF.'),
         DeclareLaunchArgument('rviz_cfg', default_value=config_rviz,  description='Configuration path of rviz2.'),
 
         SetParameter(name='use_sim_time', value=True),
@@ -134,22 +128,16 @@ def generate_launch_description():
         Node(
             condition=UnlessCondition(localization),
             package='rtabmap_slam', executable='rtabmap', output='screen',
-            parameters=[parameters,
-              {'database_path': LaunchConfiguration('database_path'),
-               'ground_truth_frame_id': LaunchConfiguration('ground_truth_frame_id'),
-               'ground_truth_base_frame_id': LaunchConfiguration('ground_truth_base_frame_id')}],
+            parameters=[parameters],
             remappings=remappings,
-            arguments=['-d']), # This will delete the previous database (database_path)
+            arguments=['-d']), # This will delete the previous database (~/.ros/rtabmap.db)
             
         # Localization mode:
         Node(
             condition=IfCondition(localization),
             package='rtabmap_slam', executable='rtabmap', output='screen',
             parameters=[parameters,
-              {'database_path': LaunchConfiguration('database_path'),
-               'ground_truth_frame_id': LaunchConfiguration('ground_truth_frame_id'),
-               'ground_truth_base_frame_id': LaunchConfiguration('ground_truth_base_frame_id'),
-               'Mem/IncrementalMemory':'False',
+              {'Mem/IncrementalMemory':'False',
                'Mem/InitWMWithAllNodes':'True'}],
             remappings=remappings),
 

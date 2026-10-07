@@ -13,18 +13,22 @@ import shutil
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Set, Tuple
 
 import numpy as np
 
 # rtabmap::Link::Type
 NEIGHBOR, GLOBAL_CLOSURE, LOCAL_SPACE_CLOSURE, LOCAL_TIME_CLOSURE = 0, 1, 2, 3
+LANDMARK = 8
 
 
 @dataclass
 class Graph:
     poses: Dict[int, Tuple[float, ...]] = field(default_factory=dict)  # x y z qx qy qz qw
     link_types: List[int] = field(default_factory=list)
+    # Vertices that are landmarks, not nodes: rtabmap-export writes them after the nodes,
+    # with positive ids, the ends of the landmark links.
+    landmarks: Set[int] = field(default_factory=set)
 
     @classmethod
     def load(cls, g2o_path: str) -> 'Graph':
@@ -45,14 +49,18 @@ class Graph:
                                               0.0, 0.0, np.sin(yaw / 2), np.cos(yaw / 2))
                 elif v[0] in edge_fields:
                     n = edge_fields[v[0]]
-                    graph.link_types.append(int(v[n]) if len(v) > n else NEIGHBOR)
+                    link_type = int(v[n]) if len(v) > n else NEIGHBOR
+                    graph.link_types.append(link_type)
+                    if link_type == LANDMARK:
+                        graph.landmarks.add(int(v[2]))
         return graph
 
     def summary(self) -> dict:
-        ids = sorted(self.poses)
+        ids = sorted(set(self.poses) - self.landmarks)
         xyz = np.array([self.poses[i][:3] for i in ids]).reshape(-1, 3)
         return {
-            'nodes': len(self.poses),
+            'nodes': len(ids),
+            'landmarks': len(self.landmarks),
             'global_closures': sum(t == GLOBAL_CLOSURE for t in self.link_types),
             'local_closures': sum(t in (LOCAL_SPACE_CLOSURE, LOCAL_TIME_CLOSURE)
                                   for t in self.link_types),

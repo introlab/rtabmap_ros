@@ -7,10 +7,11 @@
 | `robot_mapping` | `robot_mapping_demo.launch.py` | `demo_mapping_bag` |
 | `stereo_outdoorA` | `stereo_outdoor_demo.launch.py` | `stereo_outdoorA_bag` |
 | `netherdrone_lidar3d` | `netherdrone_lidar3d_demo.launch.py` | `netherdrone_ouster_vertige_bag_0` |
+| `find_object` | `find_object_demo.launch.py` | `demo_find_object_bag` (skipped without `find_object_2d`, which Lyrical and Rolling do not have) |
 
 ## Running
 
-The bags are about 2 GB, so they are not in the repository. Fetch them once, into `test/data` (each bag is listed with its SHA-256 in [data/manifest.txt](data/manifest.txt)):
+The bags are about 2.5 GB, so they are not in the repository. Fetch them once, into `test/data` (each bag is listed with its SHA-256 in [data/manifest.txt](data/manifest.txt)):
 
 ```bash
 bash test/fetch_test_data.sh
@@ -32,7 +33,7 @@ The three scenarios take about 20 minutes on a desktop. The test's CMake registr
 
 ## How a run works
 
-1. The demo's launch file is started through a small generated launch file (`demo.launch.py` in the results folder), which first sets the scenario's `parameters` on every node with `launch_ros`' `SetParameter`, then includes the demo with the scenario's `launch_arguments`. A node's own value for a parameter wins over these.
+1. The demo's launch file is started through a small generated launch file (`demo.launch.py` in the results folder), which includes the demo with the scenario's `launch_arguments` after `launch_ros`' `SetParametersFromFile`. Its parameter file (`demo.launch.yaml`) gives the node named `rtabmap` its database path and ground truth frames, and every node the scenario's `parameters`. So the demos need no launch argument for the test, and a node's own value for a parameter, set by its launch file, wins over the file's.
 2. The bag is replayed in lockstep with the pipeline (see below), and the golden trajectory is published in TF beside it, as `golden_map` → `golden_base`. rtabmap is given these as its ground truth frames, so it computes the error of its map against the golden trajectory itself (the `Gt/*` statistics of `/info`).
 3. Once the bag is done, the launch file is stopped as Ctrl-C would, so rtabmap closes its database. The graph is exported from the database with `rtabmap-export`, every node optimized.
 4. The run is compared with the golden graph: node count, loop closures and path length within each scenario's tolerances, and rtabmap's translational and rotational RMSE against the golden trajectory under each scenario's limits.

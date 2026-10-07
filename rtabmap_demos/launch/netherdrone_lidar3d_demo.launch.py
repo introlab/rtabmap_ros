@@ -81,12 +81,6 @@ def generate_launch_description():
                               description='How long (s) scans are assembled before being added to the map. The mast turns at 42 deg/s: 4.3 s is half a turn, in which the lidar\'s scanning plane sweeps the whole sphere.'),
         DeclareLaunchArgument('intermediate_nodes', default_value='false',
                               description='Also save every odometry pose (10 Hz) between the map\'s nodes in the database.'),
-        DeclareLaunchArgument('database_path', default_value=os.path.join(os.environ.get('ROS_HOME', '~/.ros'), 'rtabmap.db'),
-                              description='Database where the map is saved (deleted on start in SLAM mode).'),
-        DeclareLaunchArgument('ground_truth_frame_id', default_value='',
-                              description='Fixed frame of a ground truth trajectory in TF. If set, RTAB-Map reports its error against it in its statistics (Gt/*).'),
-        DeclareLaunchArgument('ground_truth_base_frame_id', default_value='base_link_gt',
-                              description='Robot frame of the ground truth trajectory in TF.'),
 
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(lidar3d_assemble_launch),
@@ -119,10 +113,7 @@ def generate_launch_description():
                 'rtabmap_viz': LaunchConfiguration('rtabmap_viz'),
                 'rtabmap_viz_cfg': LaunchConfiguration('rtabmap_viz_cfg'),
                 'localization': LaunchConfiguration('localization'),
-                'database_path': LaunchConfiguration('database_path'),
                 'intermediate_nodes': LaunchConfiguration('intermediate_nodes'),
-                'ground_truth_frame_id': LaunchConfiguration('ground_truth_frame_id'),
-                'ground_truth_base_frame_id': LaunchConfiguration('ground_truth_base_frame_id'),
             }.items()),
 
         # Camera image and calibration, together in one topic for rtabmap. Both have

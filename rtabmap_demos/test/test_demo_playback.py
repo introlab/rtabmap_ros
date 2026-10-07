@@ -31,8 +31,9 @@ from pathlib import Path
 from typing import Dict, List
 
 import pytest
+import yaml
 import rclpy
-from ament_index_python.packages import get_package_share_directory
+from ament_index_python.packages import PackageNotFoundError, get_package_share_directory
 from rclpy.executors import SingleThreadedExecutor
 from rtabmap_msgs.msg import Info
 
@@ -58,12 +59,20 @@ class Scenario:
     # ROS parameters set on every node the launch file starts (see _wrapper_launch()), for
     # settings the launch file has no argument for. A node's own value for one wins.
     parameters: Dict[str, object] = field(default_factory=dict)
+    # ROS parameters for one node, by node name, for a parameter name other nodes use too.
+    node_parameters: Dict[str, Dict[str, object]] = field(default_factory=dict)
+    # Packages the launch file needs besides ours: the scenario is skipped without them
+    # (not every ROS distro has them).
+    packages: List[str] = field(default_factory=list)
     # How far a run may be from the golden graph.
     max_node_difference: float = 0.02      # relative
     # Loop closures, for each kind, may be fewer than the golden graph's by this ratio
     # of them, or by 2, whichever is more: from one run to the next, a closure more or
     # less is noise, however few there are.
     closure_slack: float = 0.2
+    # False when the scenario turns loop closure detection off, against a golden graph
+    # made with it.
+    compare_closures: bool = True
     max_rmse: float = 0.05                 # m, Gt/Translational_rmse
     max_rotational_rmse: float = 1.0       # deg, Gt/Rotational_rmse
 
@@ -125,26 +134,68 @@ SCENARIOS = [
         max_rmse=0.1,
         max_rotational_rmse=2.0,
         max_node_difference=0.05),
+    Scenario(
+        name='find_object',
+        launch_file='find_object_demo.launch.py',
+        bag='demo_find_object_bag',
+        required_topics=['/base_scan', '/camera/data_throttled_image/compressed'],
+        launch_arguments={'rtabmap_viz': 'false', 'rviz': 'false', 'find_object_gui': 'false'},
+        # As for robot_mapping, with the same pipeline (find_object_2d besides it).
+        parameters={'output_queue_size': 10},
+        # Without loop closures (neither from the images nor by proximity), only odometry
+        # and the objects as landmarks constrain the map: how far it stays from the golden
+        # one, made with all of them, is what the landmarks are worth. 0.124 m and 1.06
+        # deg with the landmarks, against 0.708 m without them.
+        node_parameters={'rtabmap': {'Kp/MaxFeatures': '-1',
+                                     'RGBD/ProximityBySpace': 'false'}},
+        compare_closures=False,
+        packages=['find_object_2d'],
+        max_node_difference=0.05,
+        max_rmse=0.2,
+        max_rotational_rmse=2.0),
 ]
 
 
-def _wrapper_launch(scenario: Scenario, arguments: Dict[str, str], path: Path) -> Path:
-    """Write a launch file that sets scenario.parameters on every node, then includes the
-    demo's with `arguments`: launch_ros' SetParameter applies to the nodes launched after
-    it, whatever launch file they come from."""
+# Every QoS parameter of rtabmap's nodes: reliable (1). Their default, the system's, is best
+# effort for a subscriber with Fast DDS, which drops what arrives while the node is busy:
+# the lockstep player cannot see that (see bag_lockstep.py).
+RELIABLE_QOS = {name: 1 for name in (
+    'qos', 'qos_camera_info', 'qos_env_sensor', 'qos_global_pose', 'qos_gps', 'qos_image',
+    'qos_imu', 'qos_odom', 'qos_pub', 'qos_scan', 'qos_scan_cloud', 'qos_sensor_data',
+    'qos_sub', 'qos_user_data')}
+
+
+def _wrapper_launch(scenario: Scenario, rtabmap_parameters: Dict[str, object],
+                    arguments: Dict[str, str], path: Path) -> Path:
+    """Write a launch file that sets parameters on the demo's nodes, then includes the
+    demo's launch file with `arguments`.
+
+    The parameters go in a parameter file next to it, which launch_ros'
+    SetParametersFromFile gives to every node launched after it, whatever launch file they
+    come from: each node reads its own section. RELIABLE_QOS and scenario.parameters are
+    for every node (/**), and `rtabmap_parameters` for the node named rtabmap only (/**/rtabmap): the
+    ground truth frames, which the odometry nodes also read. A node's own value for a
+    parameter, set by its launch file, wins over the file's.
+    """
     demo = Path(get_package_share_directory('rtabmap_demos')) / 'launch' / scenario.launch_file
-    set_parameters = ''.join(f'        SetParameter(name={name!r}, value={value!r}),\n'
-                             for name, value in scenario.parameters.items())
+    parameter_file = path.with_suffix('.yaml')
+    # The nodes' own sections first: after /**, rcl would not apply /** to the other nodes.
+    sections = {f'/**/{node}': {'ros__parameters': dict(values)}
+                for node, values in scenario.node_parameters.items()}
+    rtabmap_section = sections.setdefault('/**/rtabmap', {'ros__parameters': {}})
+    rtabmap_section['ros__parameters'].update(rtabmap_parameters)
+    sections['/**'] = {'ros__parameters': dict(RELIABLE_QOS, **scenario.parameters)}
+    parameter_file.write_text(yaml.safe_dump(sections, sort_keys=False))
     path.write_text(
         'from launch import LaunchDescription\n'
         'from launch.actions import IncludeLaunchDescription\n'
         'from launch.launch_description_sources import PythonLaunchDescriptionSource\n'
-        'from launch_ros.actions import SetParameter\n'
+        'from launch_ros.actions import SetParametersFromFile\n'
         '\n'
         '\n'
         'def generate_launch_description():\n'
         '    return LaunchDescription([\n'
-        f'{set_parameters}'
+        f'        SetParametersFromFile({str(parameter_file)!r}),\n'
         f'        IncludeLaunchDescription(PythonLaunchDescriptionSource({str(demo)!r}),\n'
         f'                                 launch_arguments={list(arguments.items())!r}),\n'
         '    ])\n')
@@ -188,13 +239,17 @@ def _replay(scenario: Scenario, bag: Path, results: Path, ground_truth=None):
 
     rtabmap is stopped when this returns, its database closed with the optimized graph.
     """
-    arguments = dict(scenario.launch_arguments, database_path=str(results / 'rtabmap.db'))
+    # The database and the ground truth are for rtabmap only: the demos have no launch
+    # argument for them, they are set from the parameter file (see _wrapper_launch()).
+    rtabmap_parameters = {'database_path': str(results / 'rtabmap.db')}
     if ground_truth:
-        arguments.update(ground_truth_frame_id=GROUND_TRUTH_FRAME,
-                         ground_truth_base_frame_id=GROUND_TRUTH_BASE_FRAME)
+        rtabmap_parameters.update(ground_truth_frame_id=GROUND_TRUTH_FRAME,
+                                  ground_truth_base_frame_id=GROUND_TRUTH_BASE_FRAME)
+    arguments = dict(scenario.launch_arguments)
     log = open(results / 'launch.log', 'w')
     launch = subprocess.Popen(
-        ['ros2', 'launch', str(_wrapper_launch(scenario, arguments, results / 'demo.launch.py'))],
+        ['ros2', 'launch', str(_wrapper_launch(scenario, rtabmap_parameters, arguments,
+                                               results / 'demo.launch.py'))],
         stdout=log, stderr=subprocess.STDOUT, start_new_session=True,
         preexec_fn=_die_with_parent)
     context = rclpy.Context()
@@ -254,6 +309,11 @@ def _replay(scenario: Scenario, bag: Path, results: Path, ground_truth=None):
 
 @pytest.mark.parametrize('scenario', SCENARIOS, ids=str)
 def test_demo_playback(scenario: Scenario, tmp_path):
+    for package in scenario.packages:
+        try:
+            get_package_share_directory(package)
+        except PackageNotFoundError:
+            pytest.skip(f'{package} is not installed')
     bag = DATA_DIR / scenario.bag
     if not bag.is_dir():
         pytest.skip(f'{bag} not found; fetch it with {TEST_DIR / "fetch_test_data.sh"}')
@@ -287,7 +347,7 @@ def test_demo_playback(scenario: Scenario, tmp_path):
     problems = []
     if abs(summary['nodes'] - expected['nodes']) > scenario.max_node_difference * expected['nodes']:
         problems.append(f'nodes: {summary["nodes"]}, golden {expected["nodes"]}')
-    for kind in ('global_closures', 'local_closures'):
+    for kind in ('global_closures', 'local_closures') if scenario.compare_closures else ():
         minimum = expected[kind] - max(2, scenario.closure_slack * expected[kind])
         if summary[kind] < minimum:
             problems.append(f'{kind}: {summary[kind]}, golden {expected[kind]} '

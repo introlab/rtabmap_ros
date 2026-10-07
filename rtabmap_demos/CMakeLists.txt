@@ -6,6 +6,10 @@ find_package(ament_cmake REQUIRED)
 install(DIRECTORY launch config params data
    DESTINATION share/${PROJECT_NAME}
 )
+# find_object_2d's detections as landmarks, for find_object_demo.launch.py.
+install(PROGRAMS scripts/find_object_to_landmarks.py
+   DESTINATION lib/${PROJECT_NAME}
+)
 
 if(BUILD_TESTING)
   find_package(ament_cmake_pytest REQUIRED)

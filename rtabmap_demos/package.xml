@@ -20,6 +20,11 @@
   <exec_depend>nav2_bringup</exec_depend>
   <exec_depend>rtabmap_examples</exec_depend>
   <exec_depend>imu_complementary_filter</exec_depend>
+  <exec_depend>find_object_2d</exec_depend>
+  <!-- scripts/find_object_to_landmarks.py -->
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>tf2_ros_py</exec_depend>
+  <exec_depend>rtabmap_msgs</exec_depend>
 
   <test_depend>ament_cmake_pytest</test_depend>
   <test_depend>ament_index_python</test_depend>

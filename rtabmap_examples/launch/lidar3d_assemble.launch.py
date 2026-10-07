@@ -144,9 +144,6 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
     camera_parameters['Mem/SaveDepth16Format'] = 'true'
 
   database_parameters = {
-    'database_path': LaunchConfiguration('database_path'),
-    'ground_truth_frame_id': LaunchConfiguration('ground_truth_frame_id'),
-    'ground_truth_base_frame_id': LaunchConfiguration('ground_truth_base_frame_id'),
   }
   
   remappings = [('imu', imu_topic),
@@ -167,7 +164,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
     rtabmap_parameters['Mem/IncrementalMemory'] = 'False'
     rtabmap_parameters['Mem/InitWMWithAllNodes'] = 'True'
   else:
-    arguments.append('-d') # This will delete the previous database (database_path)
+    arguments.append('-d') # This will delete the previous database (~/.ros/rtabmap.db)
     
   if external_odom_frame_id:
     viz_topic = lidar_topic_deskewed
@@ -182,7 +179,8 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
         'use_sim_time': use_sim_time,
         'fixed_frame_id': fixed_frame_id,
         'wait_for_transform': 0.2,
-        'slerp': deskewing_slerp}],
+        'slerp': deskewing_slerp,
+        'qos': LaunchConfiguration('qos')}],
       remappings=[
           ('input_cloud', lidar_topic)
       ]),
@@ -195,6 +193,8 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
         'assembling_time': LaunchConfiguration('assembling_time'), 
         'range_min': lidar_range_min,
         'voxel_size': float(LaunchConfiguration('assembler_voxel_size').perform(context)),
+        'qos': LaunchConfiguration('qos'),
+        'qos_odom': LaunchConfiguration('qos'),
         'fixed_frame_id': (external_odom_frame_id if external_odom_frame_id else "")}], # This will make the node subscribing to icp odometry topic "icp_odom"
       remappings=[('cloud', lidar_topic_deskewed),
                   ('odom', 'icp_odom')]),
@@ -238,7 +238,8 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
           'use_sim_time': use_sim_time,
           'fixed_frame_id': fixed_frame_id,
           'base_frame_id': frame_id,
-          'wait_for_transform_duration': 0.001}],
+          'wait_for_transform_duration': 0.001,
+          'qos': LaunchConfiguration('qos')}],
         remappings=[('imu/data', imu_topic)]))
   
   return nodes
@@ -363,17 +364,8 @@ def generate_launch_description():
       'rtabmap_viz_cfg', default_value='~/.ros/rtabmapGUI.ini',
       description='Configuration file of rtabmap_viz, where it also saves its settings.'),
 
-    DeclareLaunchArgument(
-      'database_path', default_value=os.path.join(os.environ.get('ROS_HOME', '~/.ros'), 'rtabmap.db'),
-      description='Database where the map is saved (deleted on start in SLAM mode).'),
 
-    DeclareLaunchArgument(
-      'ground_truth_frame_id', default_value='',
-      description='Fixed frame of a ground truth trajectory in TF. If set, RTAB-Map reports its error against it in its statistics (Gt/*).'),
 
-    DeclareLaunchArgument(
-      'ground_truth_base_frame_id', default_value=[LaunchConfiguration('frame_id'), '_gt'],
-      description='Robot frame of the ground truth trajectory in TF. Empty: the ground truth is not used.'),
 
     OpaqueFunction(function=launch_setup),
   ])

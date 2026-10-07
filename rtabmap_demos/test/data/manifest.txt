@@ -17,3 +17,4 @@
 demo_mapping_bag.zip	https://github.com/introlab/rtabmap_ros/releases/download/0.23.13/demo_mapping_bag.zip	b233777634dea8207677d7a76d76718b43bc7043f03d061f6c332f12a9e07be8	demo_mapping_bag/demo_mapping.db3
 stereo_outdoorA_bag.zip	https://github.com/introlab/rtabmap_ros/releases/download/0.23.13/stereo_outdoorA_bag.zip	e63533a750cfd02bff1640d140552c002264f31802baf9d0182c4140749cd45d	stereo_outdoorA_bag/stereo_outdoorA.db3
 netherdrone_ouster_vertige_bag_0.zip	https://github.com/introlab/rtabmap_ros/releases/download/0.23.13/netherdrone_ouster_vertige_bag_0.zip	f603088fb975a982f6e8d1f7c06b4c806eb9e97b6ba81d09eb42f07e85579402	netherdrone_ouster_vertige_bag_0/netherdrone_ouster_vertige_bag_0.db3
+demo_find_object_bag.zip	https://github.com/introlab/rtabmap_ros/releases/download/0.23.13/demo_find_object_bag.zip	d4b37af28153b1dbd0649c91e004b342044c7268fb179aa3428a345f08da8691	demo_find_object_bag/demo_find_object.db3
