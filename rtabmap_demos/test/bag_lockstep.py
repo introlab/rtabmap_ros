@@ -53,15 +53,20 @@ UNGATED_TOPICS = ('/tf', '/tf_static')
 def _recorded_transient_local(offered_qos_profiles) -> bool:
     """Whether a topic was recorded with a TRANSIENT_LOCAL publisher.
 
-    rosbag2_py gives the recorded profiles as YAML text (with the durability as a number,
-    1, or as a name, transient_local, depending on the bag's version), or as QoS objects.
+    rosbag2_py gives the recorded profiles as YAML text (humble; the durability as a
+    number, 1, or a name, transient_local, depending on the bag's version), or as its own
+    QoS objects (lyrical), whose durability() only sets it: those are converted to rclpy's.
     """
     profiles = offered_qos_profiles
     if isinstance(profiles, str):
         profiles = yaml.safe_load(profiles) if profiles.strip() else []
     for profile in profiles or []:
-        durability = (profile.get('durability') if isinstance(profile, dict)
-                      else getattr(profile, 'durability', None))
+        if isinstance(profile, dict):
+            durability = profile.get('durability')
+        else:
+            if not isinstance(profile, QoSProfile) and hasattr(rosbag2_py, 'convert_rclcpp_qos_to_rclpy_qos'):
+                profile = rosbag2_py.convert_rclcpp_qos_to_rclpy_qos(profile)
+            durability = getattr(profile, 'durability', None)
         if durability in (1, DurabilityPolicy.TRANSIENT_LOCAL) or str(durability).lower() in (
                 'transient_local', 'durabilitypolicy.transient_local'):
             return True
