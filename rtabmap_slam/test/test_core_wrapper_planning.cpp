@@ -50,7 +50,15 @@ protected:
 		ASSERT_TRUE(waitForPublisher(goalReached_->subscription));
 		ASSERT_TRUE(waitForPublisher(globalPath_->subscription));
 		ASSERT_TRUE(waitForPublisher(globalPathNodes_->subscription));
-		driveStraight(odom_, info_, 5);   // nodes 1..5 at x = 0, 0.5, 1.0, 1.5, 2.0
+		// Nodes 1..5 at x = 0, 0.5, 1.0, 1.5, 2.0.
+		for(int i=0; i<5; ++i)
+		{
+			const size_t before = info_->size();
+			beforeUpdate(1.0 + i);
+			sendOdom(odom_, 1.0 + i, 0.5 * i);
+			ASSERT_TRUE(spinUntil([&]() { return info_->size() > before; }))
+					<< "update " << i << " was not processed";
+		}
 		nextStamp_ = 6.0;
 	}
 
@@ -65,10 +73,14 @@ protected:
 
 	virtual std::vector<rclcpp::Parameter> nodeParameters() { return {}; }
 
+	/// Called before each odometry update stamped @p stamp is sent.
+	virtual void beforeUpdate(double stamp) { (void)stamp; }
+
 	/// Moves the robot to @p x and waits for the update to be processed.
 	bool moveTo(double x)
 	{
 		const size_t before = info_->size();
+		beforeUpdate(nextStamp_);
 		sendOdom(odom_, nextStamp_, x);
 		nextStamp_ += 1.0;
 		return spinUntil([&]() { return info_->size() > before; });
@@ -244,9 +256,11 @@ TEST_F(CoreWrapperPlanningTest, plans_through_the_graph_beyond_the_local_radius)
 /**
  * The same corridor, with the node on the tests' own clock (use_sim_time): map -> odom is
  * then stamped in the odometry's time base, and with tf_tolerance at 0, exactly at the
- * clock's time. Only for tests whose TF lookups never have to wait: with a clock that only
- * moves when told to, a lookup waiting for a transform that is not there -- a goal in an
- * unknown frame, say -- would wait forever.
+ * clock's time. The clock is set to each update's stamp before it is sent: a TF lookup's
+ * timeout is on that clock, and frozen, a lookup that has to wait (the odometry arriving
+ * before its transform) could wait forever. Only for tests whose lookups find their
+ * transform eventually: one for a transform that is not there -- a goal in an unknown
+ * frame, say -- would still wait forever.
  */
 class CoreWrapperPlanningSimTimeTest : public CoreWrapperPlanningTest
 {
@@ -256,6 +270,8 @@ protected:
 		return {rclcpp::Parameter("use_sim_time", true),
 				rclcpp::Parameter("tf_tolerance", 0.0)};
 	}
+
+	void beforeUpdate(double stamp) override { setClock(stamp); }
 
 	/// Sets the node's clock to @p seconds.
 	void setClock(double seconds)
@@ -278,6 +294,7 @@ TEST_F(CoreWrapperPlanningSimTimeTest, transforms_a_goal_in_the_robot_frame_to_t
 {
 	// Turn the robot to face +y where it stands, at x = 2.
 	const size_t before = info_->size();
+	beforeUpdate(nextStamp_);
 	sendOdom(odom_, nextStamp_, 2.0, 0.0, M_PI/2.0);
 	ASSERT_TRUE(spinUntil([&]() { return info_->size() > before; }));
 
