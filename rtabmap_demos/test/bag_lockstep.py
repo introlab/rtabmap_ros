@@ -36,6 +36,7 @@ from typing import Callable, Dict, List, Optional, Set
 
 import numpy as np
 import rosbag2_py
+import yaml
 from geometry_msgs.msg import TransformStamped
 from rclpy.node import Node
 from rclpy.serialization import serialize_message
@@ -47,6 +48,24 @@ from tf2_msgs.msg import TFMessage
 
 # Topics published without waiting: TF listeners keep a long queue and a buffer.
 UNGATED_TOPICS = ('/tf', '/tf_static')
+
+
+def _recorded_transient_local(offered_qos_profiles) -> bool:
+    """Whether a topic was recorded with a TRANSIENT_LOCAL publisher.
+
+    rosbag2_py gives the recorded profiles as YAML text (with the durability as a number,
+    1, or as a name, transient_local, depending on the bag's version), or as QoS objects.
+    """
+    profiles = offered_qos_profiles
+    if isinstance(profiles, str):
+        profiles = yaml.safe_load(profiles) if profiles.strip() else []
+    for profile in profiles or []:
+        durability = (profile.get('durability') if isinstance(profile, dict)
+                      else getattr(profile, 'durability', None))
+        if durability in (1, DurabilityPolicy.TRANSIENT_LOCAL) or str(durability).lower() in (
+                'transient_local', 'durabilitypolicy.transient_local'):
+            return True
+    return False
 
 
 def _read_stat(path: str):
@@ -151,13 +170,15 @@ class LockstepPlayer:
         reader = self._open()
         for meta in reader.get_all_topics_and_types():
             name = meta.name if meta.name.startswith('/') else '/' + meta.name
-            if name == '/tf_static':
-                qos = QoSProfile(depth=100, history=HistoryPolicy.KEEP_LAST,
-                                 reliability=ReliabilityPolicy.RELIABLE,
-                                 durability=DurabilityPolicy.TRANSIENT_LOCAL)
-            else:
-                qos = QoSProfile(depth=100, history=HistoryPolicy.KEEP_LAST,
-                                 reliability=ReliabilityPolicy.RELIABLE)
+            # Durability as recorded, as ros2 bag play does: a subscriber asking for
+            # TRANSIENT_LOCAL is not matched with a VOLATILE publisher (image_proc's, for
+            # camera info, with Fast DDS since lyrical). Always reliable, and deep, to
+            # lose nothing.
+            transient = name == '/tf_static' or _recorded_transient_local(meta.offered_qos_profiles)
+            qos = QoSProfile(depth=100, history=HistoryPolicy.KEEP_LAST,
+                             reliability=ReliabilityPolicy.RELIABLE,
+                             durability=(DurabilityPolicy.TRANSIENT_LOCAL if transient
+                                         else DurabilityPolicy.VOLATILE))
             self._publishers[meta.name] = (
                 name, node.create_publisher(get_message(meta.type), name, qos))
 
@@ -315,6 +336,9 @@ class LockstepPlayer:
             sequence += 1
             release(t)
         release(float('inf'))
+        # A longer quiet than between two messages, for the last one. A node polling for
+        # its messages on a fast timer is never quiet that long (find_object_2d with
+        # Camera/4imageRate 0, as fast as possible: set a rate instead).
         self.tree.wait_idle(idle_polls=50, timeout=idle_timeout)
         return published
 
