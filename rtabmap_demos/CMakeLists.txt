@@ -26,7 +26,7 @@ if(BUILD_TESTING)
   # the other packages' ranges.
   ament_add_pytest_test(test_demo_playback test/test_demo_playback.py
     ENV ROS_DOMAIN_ID=110
-    TIMEOUT 3600)
+    TIMEOUT 7200)
 endif()
 
 ament_package()

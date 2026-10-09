@@ -32,7 +32,7 @@ import collections
 import heapq
 import os
 import time
-from typing import Callable, Dict, List, Optional, Set
+from typing import Callable, Dict, List, Optional, Set, Tuple
 
 import numpy as np
 import rosbag2_py
@@ -46,8 +46,13 @@ from rosidl_runtime_py.utilities import get_message
 from scipy.spatial.transform import Rotation, Slerp
 from tf2_msgs.msg import TFMessage
 
-# Topics published without waiting: TF listeners keep a long queue and a buffer.
-UNGATED_TOPICS = ('/tf', '/tf_static')
+# Only the large messages, those the pipeline takes time to process, wait for it to be
+# idle: images, point clouds and laser scans. The others (IMU, camera info, odometry,
+# TF...) go out in the bag's order without waiting, and wait in their subscribers'
+# queues if need be: before the next large one, the pipeline is idle again, so it has
+# processed them all.
+GATED_TYPES = ('sensor_msgs/msg/Image', 'sensor_msgs/msg/CompressedImage',
+               'sensor_msgs/msg/PointCloud2', 'sensor_msgs/msg/LaserScan')
 
 
 def _recorded_transient_local(offered_qos_profiles) -> bool:
@@ -88,6 +93,9 @@ class ProcessTree:
         self.root_pid = root_pid
         self._pids: List[int] = []
         self._refreshed = 0.0
+        # Each thread's stat file, kept open: re-reading it (pread) is a fraction of the
+        # cost of opening it again, at each poll, for hundreds of threads.
+        self._stat_fds: Dict[Tuple[int, str], int] = {}
 
     def pids(self) -> List[int]:
         # Nodes start in the first seconds and component containers may spawn later;
@@ -113,28 +121,47 @@ class ProcessTree:
     def busy_threads(self) -> List[str]:
         """Threads of the tree's processes (not of the root) that have work to do."""
         busy = []
+        alive = set()
         for pid in self.pids():
             try:
+                # Listed at every poll (cheap): a thread started since is watched at once.
                 tids = os.listdir(f'/proc/{pid}/task')
             except OSError:
                 continue
             for tid in tids:
+                key = (pid, tid)
+                alive.add(key)
+                fd = self._stat_fds.get(key)
                 try:
-                    name, fields = _read_stat(f'/proc/{pid}/task/{tid}/stat')
-                except (OSError, ValueError):
+                    if fd is None:
+                        fd = os.open(f'/proc/{pid}/task/{tid}/stat', os.O_RDONLY)
+                        self._stat_fds[key] = fd
+                    stat = os.pread(fd, 512, 0)
+                except OSError:
                     continue
+                # The state follows the command name, which is in parentheses and may
+                # itself hold spaces or parentheses.
+                end = stat.rfind(b')')
+                if end < 0 or end + 2 >= len(stat):
+                    continue
+                state = chr(stat[end + 2])
                 # R: running or runnable. D: in an uninterruptible wait, writing the
                 # database for instance -- busy as well. S, I, T, Z: nothing to do.
-                if fields[0] in ('R', 'D'):
-                    busy.append(f'{pid}/{name}:{fields[0]}')
+                if state in ('R', 'D'):
+                    name = stat[stat.find(b'(') + 1:end].decode(errors='replace')
+                    busy.append(f'{pid}/{name}:{state}')
+        for key in [k for k in self._stat_fds if k not in alive]:
+            os.close(self._stat_fds.pop(key))
         return busy
 
-    def wait_idle(self, idle_polls: int = 3, period: float = 0.002, timeout: float = 300.0):
+    def wait_idle(self, idle_polls: int = 2, period: float = 0.002, timeout: float = 300.0):
         """Wait until idle_polls polls in a row see no busy thread.
 
         A single quiet poll is not enough: timers wake threads briefly, and a message
         in flight between two nodes leaves a gap of a few microseconds where both
-        sleep. Raises TimeoutError, naming the busy threads, if never idle.
+        sleep. Two, a period apart, cover a few milliseconds; a longer gap seen as idle
+        only lets the next message out early, to wait in its subscriber's queue. Raises
+        TimeoutError, naming the busy threads, if never idle.
         """
         deadline = time.monotonic() + timeout
         quiet = 0
@@ -153,27 +180,36 @@ class ProcessTree:
             polls += 1
             seen.update(busy)
             quiet = 0 if busy else quiet + 1
-            time.sleep(period)
+            if quiet < idle_polls:
+                time.sleep(period)
 
 
 class LockstepPlayer:
-    """Publish a bag's messages, each sensor message once the pipeline is idle."""
+    """Publish a bag's messages, each sensor message once the pipeline is idle.
 
-    def __init__(self, node: Node, bag_dir: str, tree: ProcessTree, lookahead: float = 0.2):
+    Several bags (a list) are played one after the other, as `ros2 bag play` of each in
+    turn would: the recordings of a session split in parts.
+    """
+
+    def __init__(self, node: Node, bag_dir, tree: ProcessTree, lookahead: float = 0.2):
         self.node = node
-        self.bag_dir = bag_dir
+        self.bag_dirs = [bag_dir] if isinstance(bag_dir, str) else list(bag_dir)
         self.tree = tree
         self.lookahead = lookahead
         self.gated: Set[str] = set()
         self._publishers = {}
+        self._types = {}
         self._clock = node.create_publisher(Clock, '/clock', 10)
         self._extra = []  # (release time, serialized TFMessage)
         self._extra_tf = node.create_publisher(
             TFMessage, '/tf', QoSProfile(depth=100, history=HistoryPolicy.KEEP_LAST,
                                          reliability=ReliabilityPolicy.RELIABLE))
 
-        reader = self._open()
-        for meta in reader.get_all_topics_and_types():
+        metas = {}
+        for bag in self.bag_dirs:
+            for meta in self._open(bag).get_all_topics_and_types():
+                metas.setdefault(meta.name, meta)
+        for meta in metas.values():
             name = meta.name if meta.name.startswith('/') else '/' + meta.name
             # Durability as recorded, as ros2 bag play does: a subscriber asking for
             # TRANSIENT_LOCAL is not matched with a VOLATILE publisher (image_proc's, for
@@ -186,12 +222,13 @@ class LockstepPlayer:
                                          else DurabilityPolicy.VOLATILE))
             self._publishers[meta.name] = (
                 name, node.create_publisher(get_message(meta.type), name, qos))
+            self._types[meta.name] = meta.type
 
     def add_trajectory(self, frame_id: str, child_frame_id: str, trajectory,
                        step: float = 0.25):
         """Publish (stamp, (x y z qx qy qz qw)) poses as frame_id -> child_frame_id.
 
-        The first and last poses are held to the bag's start and end, so that no lookup
+        The first and last poses are held to the bags' start and end, so that no lookup
         falls outside of it: one would make the node wait for the transform, asleep,
         looking idle. Poses are then added, interpolated as TF would (linearly, and by
         slerp for the rotation), so that none are more than `step` seconds apart: TF
@@ -203,9 +240,12 @@ class LockstepPlayer:
         TF buffer keeps 10 s: the trajectory's own gaps can be several seconds (a robot
         standing still adds no nodes), and a lead covering them would leave it no slack.
         """
-        metadata = self._open().get_metadata()
-        start = metadata.starting_time.nanoseconds / 1e9
-        end = start + metadata.duration.nanoseconds / 1e9
+        spans = []
+        for bag in self.bag_dirs:
+            metadata = self._open(bag).get_metadata()
+            begin = metadata.starting_time.nanoseconds / 1e9
+            spans.append((begin, begin + metadata.duration.nanoseconds / 1e9))
+        start, end = min(s for s, _ in spans), max(e for _, e in spans)
         trajectory = sorted(trajectory)
         if not trajectory:
             return
@@ -229,9 +269,10 @@ class LockstepPlayer:
             self._extra.append(
                 (ns - int(lead * 1e9), serialize_message(TFMessage(transforms=[msg]))))
 
-    def _open(self):
+    @staticmethod
+    def _open(bag_dir: str):
         reader = rosbag2_py.SequentialReader()
-        reader.open(rosbag2_py.StorageOptions(uri=self.bag_dir, storage_id='sqlite3'),
+        reader.open(rosbag2_py.StorageOptions(uri=bag_dir, storage_id='sqlite3'),
                     rosbag2_py.ConverterOptions('cdr', 'cdr'))
         return reader
 
@@ -291,14 +332,13 @@ class LockstepPlayer:
                 # TF too: the first frames' transforms would otherwise be lost, or not,
                 # depending on when discovery got there.
                 wait_matched(name, publisher)
-                if name not in UNGATED_TOPICS:
+                if self._types[bag_topic] in GATED_TYPES:
                     self.gated.add(bag_topic)
         wait_matched('/tf', self._extra_tf)
 
     def play(self, progress: Optional[Callable[[int, int], None]] = None,
              idle_timeout: float = 300.0) -> int:
-        """Publish the whole bag; returns the number of gated messages published."""
-        reader = self._open()
+        """Publish the whole bag(s); returns the number of gated messages published."""
         pending = []  # (release time, sequence, topic, data, bag time)
         sequence = 0
         for release_ns, data in self._extra:
@@ -332,14 +372,16 @@ class LockstepPlayer:
                     publisher.publish(data)
 
         lookahead_ns = int(self.lookahead * 1e9)
-        while reader.has_next():
-            topic, data, t = reader.read_next()
-            # Sensor data is held back by the lookahead, so the TF of the next
-            # lookahead seconds goes out before it.
-            delay = lookahead_ns if topic in self.gated else 0
-            heapq.heappush(pending, (t + delay, sequence, topic, data, t))
-            sequence += 1
-            release(t)
+        for bag in self.bag_dirs:
+            reader = self._open(bag)
+            while reader.has_next():
+                topic, data, t = reader.read_next()
+                # Sensor data is held back by the lookahead, so the TF of the next
+                # lookahead seconds goes out before it.
+                delay = lookahead_ns if topic in self.gated else 0
+                heapq.heappush(pending, (t + delay, sequence, topic, data, t))
+                sequence += 1
+                release(t)
         release(float('inf'))
         # A longer quiet than between two messages, for the last one. A node polling for
         # its messages on a fast timer is never quiet that long (find_object_2d with
@@ -347,9 +389,94 @@ class LockstepPlayer:
         self.tree.wait_idle(idle_polls=50, timeout=idle_timeout)
         return published
 
+    def play_chunked(self, done_stamp: Callable[[], float], chunk: float = 10.0,
+                     slack: float = 2.0, stall_timeout: float = 30.0, rate: float = 1.0,
+                     progress: Optional[Callable[[int, int], None]] = None) -> int:
+        """Publish the whole bag(s) at their own pace (times `rate`), `chunk` seconds at a
+        time.
+
+        As `ros2 bag play`, but after each chunk, wait until the pipeline has caught up:
+        until done_stamp() (the stamp, in seconds, of the last output of its last node,
+        rtabmap's info for instance) is within `slack` seconds of the last sensor message
+        published. Waiting fails if done_stamp() stops moving for `stall_timeout` seconds,
+        as when a node crashed. Faster than play(), with no idle polling; but within a
+        chunk, a node slower than real time builds up a backlog in its queue, which must
+        be deep enough to hold it. Returns the number of gated messages published.
+        """
+        pending = []  # (release time, sequence, topic, data, bag time)
+        sequence = 0
+        for release_ns, data in self._extra:
+            heapq.heappush(pending, (release_ns, sequence, None, data, release_ns))
+            sequence += 1
+        state = {'clock_ns': 0, 'published': 0, 'last_sensor_ns': 0, 'pace': None}
+        gated_total = self._count_gated()
+        chunk_ns = int(chunk * 1e9)
+        lookahead_ns = int(self.lookahead * 1e9)
+
+        def release(until_ns):
+            while pending and pending[0][0] <= until_ns:
+                release_ns, _, topic, data, t = heapq.heappop(pending)
+                # The bag's pace: from the wall time the chunk started at.
+                if state['pace'] is None:
+                    state['pace'] = (time.monotonic(), release_ns)
+                wall, start_ns = state['pace']
+                delay = wall + (release_ns - start_ns) / 1e9 / rate - time.monotonic()
+                if delay > 0:
+                    time.sleep(delay)
+                if topic is None:
+                    self._extra_tf.publish(data)
+                    continue
+                _, publisher = self._publishers[topic]
+                if topic in self.gated:
+                    if t > state['clock_ns']:
+                        state['clock_ns'] = t
+                        self._clock.publish(Clock(clock=_to_time(t)))
+                    publisher.publish(data)
+                    state['last_sensor_ns'] = max(state['last_sensor_ns'], t)
+                    state['published'] += 1
+                    if progress:
+                        progress(state['published'], gated_total)
+                else:
+                    publisher.publish(data)
+
+        def wait_caught_up():
+            target = state['last_sensor_ns'] / 1e9 - slack
+            last, since = done_stamp(), time.monotonic()
+            while done_stamp() < target:
+                now, stamp = time.monotonic(), done_stamp()
+                if stamp != last:
+                    last, since = stamp, now
+                elif now - since > stall_timeout:
+                    raise TimeoutError(
+                        f'the pipeline did not catch up: its last output is stamped '
+                        f'{stamp:.3f}, {target - stamp:.1f} s short of the last sensor '
+                        f'message published, and has not moved for {stall_timeout:.0f} s')
+                time.sleep(0.05)
+            state['pace'] = None  # resume at the bag's pace from now
+
+        chunk_end = None
+        for bag in self.bag_dirs:
+            reader = self._open(bag)
+            while reader.has_next():
+                topic, data, t = reader.read_next()
+                if chunk_end is None:
+                    chunk_end = t + chunk_ns
+                elif t >= chunk_end:
+                    release(chunk_end)
+                    wait_caught_up()
+                    chunk_end += chunk_ns
+                delay = lookahead_ns if topic in self.gated else 0
+                heapq.heappush(pending, (t + delay, sequence, topic, data, t))
+                sequence += 1
+                release(t)
+        release(float('inf'))
+        wait_caught_up()
+        return state['published']
+
     def _count_gated(self) -> int:
-        metadata = self._open().get_metadata()
-        return sum(t.message_count for t in metadata.topics_with_message_count
+        return sum(t.message_count
+                   for bag in self.bag_dirs
+                   for t in self._open(bag).get_metadata().topics_with_message_count
                    if t.topic_metadata.name in self.gated)
 
 

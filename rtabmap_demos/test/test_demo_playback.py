@@ -16,6 +16,10 @@ Environment:
                               (default: a pytest temporary directory)
   RTABMAP_DEMOS_UPDATE_GOLDEN set to 1 to write the run's graph as the new golden one
                               instead of comparing with it
+  RTABMAP_DEMOS_REPLAY        lockstep (default): each sensor message once the pipeline is
+                              idle; chunked: at the bag's pace, 10 s at a time, waiting
+                              for rtabmap to catch up after each
+  RTABMAP_DEMOS_RATE          with chunked: how many times the bag's pace (default 1)
 """
 
 import ctypes
@@ -28,7 +32,7 @@ import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Union
 
 import pytest
 import yaml
@@ -42,6 +46,10 @@ from graph_metrics import Graph, export_graph, load_tum
 
 TEST_DIR = Path(__file__).resolve().parent
 DATA_DIR = Path(os.environ.get('RTABMAP_DEMOS_TEST_DATA', TEST_DIR / 'data'))
+# lockstep (default, see bag_lockstep.py) or chunked (LockstepPlayer.play_chunked()).
+REPLAY = os.environ.get('RTABMAP_DEMOS_REPLAY', 'lockstep')
+# chunked only: how many times the bag's own pace.
+REPLAY_RATE = float(os.environ.get('RTABMAP_DEMOS_RATE', '1.0'))
 GOLDEN_DIR = TEST_DIR / 'golden'
 # The golden trajectory's frames in TF; unconnected to the robot's own tree.
 GROUND_TRUTH_FRAME = 'golden_map'
@@ -52,7 +60,7 @@ GROUND_TRUTH_BASE_FRAME = 'golden_base'
 class Scenario:
     name: str
     launch_file: str
-    bag: str
+    bag: Union[str, List[str]]  # several: played one after the other
     # Topics the pipeline must have subscribed to before the replay can start.
     required_topics: List[str]
     launch_arguments: Dict[str, str] = field(default_factory=dict)
@@ -64,6 +72,9 @@ class Scenario:
     # Packages the launch file needs besides ours: the scenario is skipped without them
     # (not every ROS distro has them).
     packages: List[str] = field(default_factory=list)
+    # With RTABMAP_DEMOS_REPLAY=chunked: how far rtabmap's last output may lag the last
+    # sensor message published, as it processes the data (seconds).
+    chunk_slack: float = 2.0
     # How far a run may be from the golden graph.
     max_node_difference: float = 0.02      # relative
     # Loop closures, for each kind, may be fewer than the golden graph's by this ratio
@@ -115,7 +126,8 @@ SCENARIOS = [
     Scenario(
         name='netherdrone_lidar3d',
         launch_file='netherdrone_lidar3d_demo.launch.py',
-        bag='netherdrone_ouster_vertige_bag_0',
+        # The whole flight, its six parts played one after the other.
+        bag=[f'netherdrone_ouster_vertige_bag_{i}' for i in range(6)],
         required_topics=['/os_cloud_node/points', '/imu/data_raw',
                          '/camera/image_raw/compressed', '/camera/camera_info'],
         # A node is half a turn of the lidar's mast, about 4.4 s apart; the odometry
@@ -131,6 +143,8 @@ SCENARIOS = [
         parameters={'output_queue_size': 10,
                     'topic_queue_size': 10,
                     'always_process_most_recent_frame': False},
+        # A node every 4.3 s, when the assembled cloud of half a turn of the mast is ready.
+        chunk_slack=5.0,
         max_rmse=0.1,
         max_rotational_rmse=2.0,
         max_node_difference=0.05),
@@ -234,7 +248,7 @@ def _die_with_parent():
     ctypes.CDLL('libc.so.6', use_errno=True).prctl(PR_SET_PDEATHSIG, signal.SIGINT)
 
 
-def _replay(scenario: Scenario, bag: Path, results: Path, ground_truth=None):
+def _replay(scenario: Scenario, bag: List[Path], results: Path, ground_truth=None):
     """Replay the bag; returns the statistics of rtabmap's last update.
 
     rtabmap is stopped when this returns, its database closed with the optimized graph.
@@ -256,10 +270,12 @@ def _replay(scenario: Scenario, bag: Path, results: Path, ground_truth=None):
     rclpy.init(context=context)
     node = rclpy.create_node('demo_playback_test', context=context)
     stats = {}
+    info_stamp = [0.0]
 
     def on_info(msg):
         stats.clear()
         stats.update(zip(msg.stats_keys, msg.stats_values))
+        info_stamp[0] = max(info_stamp[0], msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9)
     node.create_subscription(Info, '/info', on_info, 10)
     executor = SingleThreadedExecutor(context=context)
     executor.add_node(node)
@@ -267,7 +283,7 @@ def _replay(scenario: Scenario, bag: Path, results: Path, ground_truth=None):
     spinner.start()
     try:
         tree = ProcessTree(launch.pid)
-        player = LockstepPlayer(node, str(bag), tree)
+        player = LockstepPlayer(node, [str(b) for b in bag], tree)
         if ground_truth:
             player.add_trajectory(GROUND_TRUTH_FRAME, GROUND_TRUTH_BASE_FRAME, ground_truth)
         player.connect(scenario.required_topics)
@@ -291,7 +307,11 @@ def _replay(scenario: Scenario, bag: Path, results: Path, ground_truth=None):
                 last_report[0] = now
                 print(f'  {done}/{total} messages, {now - start:.0f} s', flush=True)
 
-        player.play(progress=progress)
+        if REPLAY == 'chunked':
+            player.play_chunked(lambda: info_stamp[0], slack=scenario.chunk_slack,
+                                rate=REPLAY_RATE, progress=progress)
+        else:
+            player.play(progress=progress)
         print(f'  replayed in {time.monotonic() - start:.0f} s', flush=True)
         result = dict(stats)
     finally:
@@ -314,9 +334,11 @@ def test_demo_playback(scenario: Scenario, tmp_path):
             get_package_share_directory(package)
         except PackageNotFoundError:
             pytest.skip(f'{package} is not installed')
-    bag = DATA_DIR / scenario.bag
-    if not bag.is_dir():
-        pytest.skip(f'{bag} not found; fetch it with {TEST_DIR / "fetch_test_data.sh"}')
+    bag = [DATA_DIR / name for name in
+           ([scenario.bag] if isinstance(scenario.bag, str) else scenario.bag)]
+    for b in bag:
+        if not b.is_dir():
+            pytest.skip(f'{b} not found; fetch it with {TEST_DIR / "fetch_test_data.sh"}')
 
     results = Path(os.environ.get('RTABMAP_DEMOS_TEST_RESULTS', tmp_path)) / scenario.name
     results.mkdir(parents=True, exist_ok=True)

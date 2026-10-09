@@ -54,6 +54,10 @@ jobs:
       # runner's path, not the container's.
       RTABMAP_DEMOS_TEST_DATA: /rtabmap_demos_test_data
       RTABMAP_DEMOS_TEST_RESULTS: /rtabmap_demos_test_results
+      # The demos' bags at twice their own pace, 10 s at a time, rtabmap catching up after
+      # each (test_demo_playback.py), instead of lockstep, the default.
+      RTABMAP_DEMOS_REPLAY: chunked
+      RTABMAP_DEMOS_RATE: 2
     steps:
     - uses: actions/checkout@v4
     - uses: ros-tooling/setup-ros@v0.7
