@@ -86,6 +86,17 @@ def _read_stat(path: str):
     return name, stat[stat.rindex(')') + 2:].split()
 
 
+def _read_next(reader):
+    """The next message of @p reader: topic, serialized data and receive timestamp.
+
+    read_next_ext() (Lyrical and later) also returns the send timestamp; read_next(),
+    deprecated there, warns at each message.
+    """
+    if hasattr(reader, 'read_next_ext'):
+        return reader.read_next_ext()[:3]
+    return reader.read_next()
+
+
 class ProcessTree:
     """The processes started under a root process (the `ros2 launch` one)."""
 
@@ -375,7 +386,7 @@ class LockstepPlayer:
         for bag in self.bag_dirs:
             reader = self._open(bag)
             while reader.has_next():
-                topic, data, t = reader.read_next()
+                topic, data, t = _read_next(reader)
                 # Sensor data is held back by the lookahead, so the TF of the next
                 # lookahead seconds goes out before it.
                 delay = lookahead_ns if topic in self.gated else 0
@@ -458,7 +469,7 @@ class LockstepPlayer:
         for bag in self.bag_dirs:
             reader = self._open(bag)
             while reader.has_next():
-                topic, data, t = reader.read_next()
+                topic, data, t = _read_next(reader)
                 if chunk_end is None:
                     chunk_end = t + chunk_ns
                 elif t >= chunk_end:

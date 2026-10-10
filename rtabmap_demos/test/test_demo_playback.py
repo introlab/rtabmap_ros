@@ -77,9 +77,11 @@ class Scenario:
     chunk_slack: float = 2.0
     # How far a run may be from the golden graph.
     max_node_difference: float = 0.02      # relative
-    # Loop closures, for each kind, may be fewer than the golden graph's by this ratio
-    # of them, or by 2, whichever is more: from one run to the next, a closure more or
-    # less is noise, however few there are.
+    # Loop closures, global and local together, may be fewer than the golden graph's by
+    # this ratio of them, or by 2, whichever is more: from one run to the next, a closure
+    # more or less is noise, however few there are. Together, as a place revisited can be
+    # closed by either: in stereo_outdoor, 13 global and 9 local closures in one run, 15
+    # and 5 in another.
     closure_slack: float = 0.2
     # False when the scenario turns loop closure detection off, against a golden graph
     # made with it.
@@ -371,11 +373,13 @@ def test_demo_playback(scenario: Scenario, tmp_path):
     problems = []
     if abs(summary['nodes'] - expected['nodes']) > scenario.max_node_difference * expected['nodes']:
         problems.append(f'nodes: {summary["nodes"]}, golden {expected["nodes"]}')
-    for kind in ('global_closures', 'local_closures') if scenario.compare_closures else ():
-        minimum = expected[kind] - max(2, scenario.closure_slack * expected[kind])
-        if summary[kind] < minimum:
-            problems.append(f'{kind}: {summary[kind]}, golden {expected[kind]} '
-                            f'(at least {minimum:.0f} expected)')
+    if scenario.compare_closures:
+        closures, golden_closures = (
+            g['global_closures'] + g['local_closures'] for g in (summary, expected))
+        minimum = golden_closures - max(2, scenario.closure_slack * golden_closures)
+        if closures < minimum:
+            problems.append(f'loop closures (global and local): {closures}, golden '
+                            f'{golden_closures} (at least {minimum:.0f} expected)')
     if rmse is None:
         problems.append('rtabmap reported no Gt/* statistics: the golden trajectory did not '
                         f'reach it as ground truth (see {results / "launch.log"})')
