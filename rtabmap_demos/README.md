@@ -39,6 +39,11 @@ Ready-to-run demos of RTAB-Map. Each launch file sets up a complete pipeline for
 
 ![Peek 2024-11-29 12-01](https://github.com/user-attachments/assets/b3cc0c67-517a-4f69-b4cc-35d288e96165)
 
+### Netherdrone 3D LiDAR SLAM
+[netherdrone_lidar3d_demo.launch.py](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_demos/launch/netherdrone_lidar3d_demo.launch.py)
+
+![Peek 2026-10-10 12-12](https://github.com/user-attachments/assets/a79f0519-6c39-48a4-8c14-799c0775571e)
+
 ### Turtlebot4 Nav2, 2D LiDAR and RGB-D SLAM
 [turtlebot4_sim_demo.launch.py](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_demos/launch/turtlebot4/turtlebot4_sim_demo.launch.py)
 
