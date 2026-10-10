@@ -78,7 +78,7 @@ These apply to all three nodes.
 | `wait_for_transform` | `double` | `0.1` | Seconds to wait for a needed transform before giving up on the frame. |
 | `initial_pose` | `string` | `""` | Starting pose, `"x y z roll pitch yaw"`. Also settable at runtime through `reset_odom_to_pose`. |
 | `ground_truth_frame_id` | `string` | `""` | When set, the pose is taken from this TF instead of being computed — for replaying a dataset with a known trajectory. |
-| `ground_truth_base_frame_id` | `string` | value of `frame_id` | The robot frame within the ground truth TF tree. |
+| `ground_truth_base_frame_id` | `string` | value of `frame_id` + `"_gt"` | The robot frame within the ground truth TF tree. Empty: the ground truth is not used. |
 | `guess_frame_id` | `string` | `""` | A frame carrying another odometry source, used as the initial guess for each registration. Documented with its companions under [Feeding in an external guess](#feeding-in-an-external-guess) -- **the highest-value parameter here for a wheeled robot**. |
 
 The sensor must be connected to `frame_id` in TF **before the first frame arrives**, or that frame is dropped with a warning. A static publisher is the usual answer.

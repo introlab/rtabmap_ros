@@ -94,6 +94,48 @@ TEST_F(CoreWrapperMappingTest, adds_a_node_per_odometry_update)
 }
 
 /**
+ * With a ground truth frame, each node gets the ground truth's pose at its stamp, and
+ * rtabmap reports its error against it (Gt/* statistics): ground_truth_frame_id ->
+ * ground_truth_base_frame_id, which defaults to frame_id + "_gt". Here only base_link_gt
+ * is in TF, following the odometry exactly. Empty, ground_truth_base_frame_id turns the
+ * ground truth off.
+ */
+class CoreWrapperGroundTruthTest : public CoreWrapperMappingTest
+{
+protected:
+	/// Gt/Translational_rmse/m after three updates with @p params, -1 if not reported.
+	float groundTruthRmse(const std::vector<rclcpp::Parameter> & params)
+	{
+		makeNode(params);
+		std::shared_ptr<Collector<rtabmap_msgs::msg::Info>> info = collectInfo();
+		rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom = odomPublisher();
+		for(int i=0; i<3; ++i)
+		{
+			const size_t before = info->size();
+			publishTf(makeTransform("world", "base_link_gt", 1.0 + i, 0.5 * i));
+			sendOdom(odom, 1.0 + i, 0.5 * i);
+			EXPECT_TRUE(spinUntil([&]() { return info->size() > before; }))
+					<< "update " << i << " was not processed";
+		}
+		return info->empty() ? -1.0f : stat(info->back(), "Gt/Translational_rmse/m");
+	}
+};
+
+TEST_F(CoreWrapperGroundTruthTest, compares_with_the_ground_truth_of_frame_id_gt_by_default)
+{
+	const float rmse = groundTruthRmse({rclcpp::Parameter("ground_truth_frame_id", "world")});
+	ASSERT_GE(rmse, 0.0f) << "no Gt/* statistics: the ground truth was not found";
+	EXPECT_NEAR(0.0f, rmse, 1e-3);
+}
+
+TEST_F(CoreWrapperGroundTruthTest, ignores_the_ground_truth_when_its_base_frame_is_empty)
+{
+	EXPECT_LT(groundTruthRmse({rclcpp::Parameter("ground_truth_frame_id", "world"),
+	                           rclcpp::Parameter("ground_truth_base_frame_id", "")}), 0.0f)
+			<< "Gt/* statistics reported although the ground truth is off";
+}
+
+/**
  * An update that did not move at least RGBD/LinearUpdate (or turn RGBD/AngularUpdate)
  * since the last node is not added: a robot standing still does not grow the map.
  */

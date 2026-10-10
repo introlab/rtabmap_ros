@@ -75,7 +75,7 @@ def generate_launch_description():
                                   'enable_infra2': 'true',
                                   'align_depth.enable': 'true',
                                   'enable_sync': 'true',
-                                  'rgb_camera.profile': '640x360x30'}.items(),
+                                  'rgb_camera.color_profile': '640x360x30'}.items(),
         ),
 
         Node(

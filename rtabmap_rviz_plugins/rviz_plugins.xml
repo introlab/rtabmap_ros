@@ -23,4 +23,11 @@
     </description>
     <message_type>rtabmap_rviz_plugins/msg/Info</message_type>
   </class>
+  <class name="rtabmap_rviz_plugins/OrbitOriented"
+         type="rtabmap_rviz_plugins::OrbitOrientedViewController"
+         base_class_type="rviz_common::ViewController">
+    <description>
+      Orbit camera turning with the target frame's yaw, so the view stays behind the robot. Optionally (built with octomap), the camera is moved in front of the octomap obstacles that would hide the target.
+    </description>
+  </class>
 </library>

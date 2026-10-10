@@ -1,7 +1,7 @@
 # Requirements:
 #   find_object_2d package installed
 #   Download rosbag:
-#    * demo_find_object.db3: https://drive.google.com/file/d/1web54yQkxeGFr2UwOjKeoajGGDm0fZXT/view?usp=drive_link
+#    * demo_find_object_bag.zip: https://github.com/introlab/rtabmap_ros/releases/download/0.23.13/demo_find_object_bag.zip
 #
 # Example:
 #
@@ -9,7 +9,7 @@
 #     $ ros2 launch rtabmap_demos find_object_demo.launch.py
 #
 #   Rosbag:
-#     $ ros2 bag play demo_find_object.db3 --clock
+#     $ ros2 bag play demo_find_object_bag --clock
 #
 
 from launch import LaunchDescription
@@ -38,6 +38,15 @@ def generate_launch_description():
           'RGBD/NeighborLinkRefining': 'true',    # Do odometry correction with consecutive laser scans
           'Reg/Strategy':              '1',       # 0=Visual, 1=ICP, 2=Visual+ICP
           'Reg/Force3DoF':             'true',    # 2D SLAM          
+          # The objects find_object_2d detects become landmarks (see find_object_to_landmarks.py,
+          # which sets their covariance from these, as rtabmap does for its own markers).
+          # Range and bearing only (GTSAM): the objects' orientation is the least reliable
+          # part of find_object_2d's estimate. Linear: the range variance (m^2), angular:
+          # the bearing variance (rad^2).
+          'Marker/VarianceLinear':     '0.001',
+          'Marker/VarianceAngular':    '0.01',
+          'Marker/VarianceOrientationIgnored': 'true',
+          'Optimizer/Strategy':        '2',       # GTSAM
     }
     
     remappings=[
@@ -63,6 +72,7 @@ def generate_launch_description():
         # Launch arguments
         DeclareLaunchArgument('rtabmap_viz',  default_value='false',  description='Launch RTAB-Map UI (optional).'),
         DeclareLaunchArgument('rviz',         default_value='true',   description='Launch RVIZ (optional).'),
+        DeclareLaunchArgument('find_object_gui', default_value='true', description='Show the Find-Object window (false: headless).'),
         DeclareLaunchArgument('localization', default_value='false',  description='Launch in localization mode.'),
         DeclareLaunchArgument('rviz_cfg', default_value=config_rviz,  description='Configuration path of rviz2.'),
 
@@ -73,12 +83,16 @@ def generate_launch_description():
         # Uncompress images for find_object
         Node(
             package='image_transport', executable='republish', name='republish_rgb', output='screen',
+            # The transports: as arguments up to humble, as parameters from jazzy.
             arguments=['compressed', 'raw'],
+            parameters=[{'in_transport': 'compressed', 'out_transport': 'raw'}],
             remappings=[('in/compressed', '/camera/data_throttled_image/compressed'),
                         ('out',           '/camera/data_throttled_image')]),
         Node(
             package='image_transport', executable='republish', name='republish_depth', output='screen',
+            # The transports: as arguments up to humble, as parameters from jazzy.
             arguments=['compressedDepth', 'raw'],
+            parameters=[{'in_transport': 'compressedDepth', 'out_transport': 'raw'}],
             remappings=[('in/compressedDepth', '/camera/data_throttled_image_depth/compressedDepth'),
                         ('out',                '/camera/data_throttled_image_depth')]),
         
@@ -119,11 +133,15 @@ def generate_launch_description():
         # Find-Object
         Node(
             package='find_object_2d', executable='find_object_2d', output='screen',
-            parameters=[{'gui': True,
+            parameters=[{'gui': LaunchConfiguration('find_object_gui'),
                          'subscribe_depth': True,
                          'settings_path': config_find_object,
                          'objects_path': data_find_object}],
             remappings=[('rgb/image_rect_color', '/camera/data_throttled_image'),
                         ('depth_registered/image_raw', '/camera/data_throttled_image_depth'),
                         ('depth_registered/camera_info', '/camera/data_throttled_camera_info')]),
+        # Its detections as landmarks for rtabmap (landmark_detections)
+        Node(
+            package='rtabmap_demos', executable='find_object_to_landmarks.py', output='screen',
+            parameters=[parameters]),
     ])

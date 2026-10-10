@@ -84,7 +84,9 @@ def launch_setup(context, *args, **kwargs):
             remappings=[
                 (['in/', LaunchConfiguration('rgb_image_transport')], [LaunchConfiguration('rgb_topic'), '/', LaunchConfiguration('rgb_image_transport')]),
                 ('out', LaunchConfiguration('rgb_topic_relay'))], 
+            # The transports: as arguments up to humble, as parameters from jazzy.
             arguments=[LaunchConfiguration('rgb_image_transport'), 'raw'],
+            parameters=[{'in_transport': LaunchConfiguration('rgb_image_transport'), 'out_transport': 'raw'}],
             namespace=LaunchConfiguration('namespace')),
         Node(
             package='image_transport', executable='republish', name='republish_depth',
@@ -92,7 +94,9 @@ def launch_setup(context, *args, **kwargs):
             remappings=[
                 (['in/', LaunchConfiguration('depth_image_transport')], [LaunchConfiguration('depth_topic'), '/', LaunchConfiguration('depth_image_transport')]),
                 ('out', LaunchConfiguration('depth_topic_relay'))], 
+            # The transports: as arguments up to humble, as parameters from jazzy.
             arguments=[LaunchConfiguration('depth_image_transport'), 'raw'],
+            parameters=[{'in_transport': LaunchConfiguration('depth_image_transport'), 'out_transport': 'raw'}],
             namespace=LaunchConfiguration('namespace')),
         Node(
             package='rtabmap_sync', executable='rgbd_sync', name="rgbd_sync", output="screen",
@@ -120,7 +124,9 @@ def launch_setup(context, *args, **kwargs):
             remappings=[
                 (['in/', LaunchConfiguration('rgb_image_transport')], [LaunchConfiguration('left_image_topic'), '/', LaunchConfiguration('rgb_image_transport')]),
                 ('out', LaunchConfiguration('left_image_topic_relay'))], 
+            # The transports: as arguments up to humble, as parameters from jazzy.
             arguments=[LaunchConfiguration('rgb_image_transport'), 'raw'],
+            parameters=[{'in_transport': LaunchConfiguration('rgb_image_transport'), 'out_transport': 'raw'}],
             namespace=LaunchConfiguration('namespace')),
         Node(
             package='image_transport', executable='republish', name='republish_right',
@@ -128,7 +134,9 @@ def launch_setup(context, *args, **kwargs):
             remappings=[
                 (['in/', LaunchConfiguration('rgb_image_transport')], [LaunchConfiguration('right_image_topic'), '/', LaunchConfiguration('rgb_image_transport')]),
                 ('out', LaunchConfiguration('right_image_topic_relay'))], 
+            # The transports: as arguments up to humble, as parameters from jazzy.
             arguments=[LaunchConfiguration('rgb_image_transport'), 'raw'],
+            parameters=[{'in_transport': LaunchConfiguration('rgb_image_transport'), 'out_transport': 'raw'}],
             namespace=LaunchConfiguration('namespace')),
         Node(
             package='rtabmap_sync', executable='stereo_sync', name="stereo_sync", output="screen",
@@ -463,7 +471,7 @@ def generate_launch_description():
         DeclareLaunchArgument('use_action_for_goal', default_value='false',         description='Connect to nav2\'s navigate_to_pose action server instead of publishing the output goal topic.'),
 
         DeclareLaunchArgument('ground_truth_frame_id',      default_value='', description='e.g., "world"'),
-        DeclareLaunchArgument('ground_truth_base_frame_id', default_value='', description='e.g., "tracker", a fake frame matching the frame "frame_id" (but on different TF tree)'),
+        DeclareLaunchArgument('ground_truth_base_frame_id', default_value=[LaunchConfiguration('frame_id'), '_gt'], description='e.g., "tracker", a fake frame matching the frame "frame_id" (but on different TF tree). Empty: the ground truth is not used.'),
         
         DeclareLaunchArgument('approx_sync',  default_value='false',            description='If timestamps of the input topics should be synchronized using approximate or exact time policy.'),
         DeclareLaunchArgument('approx_sync_max_interval',  default_value='0.0', description='(sec) 0 means infinite interval duration (used with approx_sync=true)'),

@@ -19,6 +19,8 @@ LidarDeskewing::LidarDeskewing(const rclcpp::NodeOptions & options) :
 	int queueSize = 5;
 	int qos = RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT;
 	queueSize = this->declare_parameter("queue_size", queueSize);
+	int outputQueueSize = 1;
+	outputQueueSize = this->declare_parameter("output_queue_size", outputQueueSize);
 	qos = this->declare_parameter("qos", qos);
 	fixedFrameId_ = this->declare_parameter("fixed_frame_id", fixedFrameId_);
 	waitForTransformDuration_ = this->declare_parameter("wait_for_transform", waitForTransformDuration_);
@@ -36,8 +38,8 @@ LidarDeskewing::LidarDeskewing(const rclcpp::NodeOptions & options) :
 	subScan_ = create_subscription<sensor_msgs::msg::LaserScan>("input_scan", rclcpp::QoS(queueSize).reliability((rmw_qos_reliability_policy_t)qos), std::bind(&LidarDeskewing::callbackScan, this, std::placeholders::_1));
 	subCloud_ = create_subscription<sensor_msgs::msg::PointCloud2>("input_cloud", rclcpp::QoS(queueSize).reliability((rmw_qos_reliability_policy_t)qos), std::bind(&LidarDeskewing::callbackCloud, this, std::placeholders::_1));
 
-	pubScan_ = create_publisher<sensor_msgs::msg::PointCloud2>(std::string(subScan_->get_topic_name()) + "/deskewed", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos));
-	pubCloud_ = create_publisher<sensor_msgs::msg::PointCloud2>(std::string(subCloud_->get_topic_name()) + "/deskewed", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos));
+	pubScan_ = create_publisher<sensor_msgs::msg::PointCloud2>(std::string(subScan_->get_topic_name()) + "/deskewed", rclcpp::QoS(outputQueueSize).reliability((rmw_qos_reliability_policy_t)qos));
+	pubCloud_ = create_publisher<sensor_msgs::msg::PointCloud2>(std::string(subCloud_->get_topic_name()) + "/deskewed", rclcpp::QoS(outputQueueSize).reliability((rmw_qos_reliability_policy_t)qos));
 }
 
 LidarDeskewing::~LidarDeskewing()

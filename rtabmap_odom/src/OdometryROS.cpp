@@ -177,7 +177,7 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	waitForTransform_ = this->declare_parameter("wait_for_transform", waitForTransform_);
 	initialPoseStr = this->declare_parameter("initial_pose", initialPoseStr); // "x y z roll pitch yaw"
 	groundTruthFrameId_ = this->declare_parameter("ground_truth_frame_id", groundTruthFrameId_);
-	groundTruthBaseFrameId_ = this->declare_parameter("ground_truth_base_frame_id", frameId_);
+	groundTruthBaseFrameId_ = this->declare_parameter("ground_truth_base_frame_id", frameId_+"_gt");
 	configPath_ = this->declare_parameter("config_path", configPath_);
 	publishNullWhenLost_ = this->declare_parameter("publish_null_when_lost", publishNullWhenLost_);
 
@@ -746,7 +746,7 @@ void OdometryROS::processData()
 			return;
 		}
 
-		if(!groundTruthFrameId_.empty())
+		if(!groundTruthFrameId_.empty() && !groundTruthBaseFrameId_.empty())
 		{
 			groundTruth = rtabmap_conversions::getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, header.stamp, *tfBuffer_, waitForTransform_);
 

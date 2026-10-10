@@ -102,7 +102,9 @@ GuiWrapper::GuiWrapper(const rclcpp::NodeOptions & options) :
 	uSleep(500);
 	prefDialog_ = new PreferencesDialogROS(this, configFile, rtabmapNodeName_);
 	mainWindow_ = new MainWindow(prefDialog_);
-	mainWindow_->setWindowTitle(mainWindow_->windowTitle()+" [ROS]");
+	// The configuration file in the title, as rviz does: it is where the settings are
+	// saved, so which one is in use matters.
+	mainWindow_->setWindowTitle(mainWindow_->windowTitle()+" [ROS] - "+prefDialog_->getIniFilePath());
 	mainWindow_->show();
 
 	bool paused = false;

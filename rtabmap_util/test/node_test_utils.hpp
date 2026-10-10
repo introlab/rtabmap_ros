@@ -31,6 +31,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <gtest/gtest.h>
 
 #include <rclcpp/rclcpp.hpp>
+
+#include <execinfo.h>
+#include <unistd.h>
+
+#include <csignal>
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <tf2/LinearMath/Quaternion.hpp>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
@@ -71,11 +76,38 @@ public:
 	}
 };
 
+/**
+ * @brief Prints the stack of a test binary that crashes, then crashes as it would have.
+ *
+ * A crash in CI shows only the return code otherwise (-11 for SIGSEGV), there being no
+ * debugger or core dump there. Library frames come with their function names; this
+ * binary's with an offset, for `addr2line -C -f -e <binary> <offset>`.
+ */
+inline void printStackOnCrash(int signal)
+{
+	void * frames[64];
+	const int count = ::backtrace(frames, 64);
+	const char header[] = "\n*** Crashed, stack trace:\n";
+	if(::write(STDERR_FILENO, header, sizeof(header) - 1) < 0) {}
+	::backtrace_symbols_fd(frames, count, STDERR_FILENO);
+	std::signal(signal, SIG_DFL);
+	std::raise(signal);
+}
+
 /// Registers RclcppEnvironment. Call once at file scope in each test binary.
 inline ::testing::Environment * registerRclcppEnvironment()
 {
-	static ::testing::Environment * const env =
-			::testing::AddGlobalTestEnvironment(new RclcppEnvironment);
+	static ::testing::Environment * const env = []() {
+		// backtrace() loads libgcc on its first call, which is not safe in a signal
+		// handler: done here.
+		void * frame;
+		::backtrace(&frame, 1);
+		for(int signal : {SIGSEGV, SIGBUS, SIGFPE, SIGILL, SIGABRT})
+		{
+			std::signal(signal, printStackOnCrash);
+		}
+		return ::testing::AddGlobalTestEnvironment(new RclcppEnvironment);
+	}();
 	return env;
 }
 

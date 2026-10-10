@@ -36,6 +36,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <OgreSceneManager.h>
 
 #include "rclcpp/clock.hpp"
+#include "rclcpp/node.hpp"
 
 #include "rviz_common/display.hpp"
 #include "rviz_default_plugins/displays/pointcloud/point_cloud_to_point_cloud2.hpp"

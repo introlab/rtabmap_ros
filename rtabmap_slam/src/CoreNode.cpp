@@ -99,6 +99,11 @@ int main(int argc, char** argv)
 	executor.add_node(node);
 	UINFO("rtabmap %s started...", RTABMAP_VERSION);
 	executor.spin();
+	// Close the database before rclcpp::shutdown(), which uninstalls the signal
+	// handlers: a second SIGINT (e.g., Ctrl-C then ros2 launch's own) would otherwise
+	// kill the node while it is still saving.
+	executor.remove_node(node);
+	node.reset();
 	rclcpp::shutdown();
 	return 0;
 }
