@@ -44,7 +44,7 @@ def generate_launch_description():
           'OdomF2M/MaxSize': '1000',
           'GFTT/MinDistance': '10',
           'GFTT/QualityLevel': '0.00001',
-          'g2o/Optimizer': '1', # Gauss-Newton: converges faster than Levenberg-Marquardt on this graph when rtabmap uses g2o (built without GTSAM)
+          'Optimizer/Iterations': '40', # With g2o (rtabmap built without GTSAM), Levenberg-Marquardt needs ~25 iterations to converge on this graph
           #'Kp/DetectorStrategy': '6', # Uncommment to match ros1 noetic results, but opencv should be built with xfeatures2d
           #'Vis/FeatureType': '6'      # Uncommment to match ros1 noetic results, but opencv should be built with xfeatures2d
     }
