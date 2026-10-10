@@ -149,6 +149,9 @@ SCENARIOS = [
                     'always_process_most_recent_frame': False},
         # A node every 4.3 s, when the assembled cloud of half a turn of the mast is ready.
         chunk_slack=5.0,
+        # Local closures only (no global ones: the camera's bag-of-words finds none),
+        # 25 in the golden graph, 19 in a Kilted CI run.
+        closure_slack=0.3,
         max_rmse=0.1,
         max_rotational_rmse=2.0,
         max_node_difference=0.05),
