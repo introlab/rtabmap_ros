@@ -125,7 +125,9 @@ export RCUTILS_COLORIZED_OUTPUT=1
 ```
 
 ## Recommended DDS
-If RTAB-Map's GUI or topic frequency feel laggy (even if processing time looks fast enough), it may be caused by the DDS. I recommend to use [Cyclone DDS](https://docs.ros.org/en/jazzy/Installation/RMW-Implementations/DDS-Implementations/Working-with-Eclipse-CycloneDDS.html), you can try it by adding this before launching any nodes/launch files (or add to your `.bashrc`):
+If RTAB-Map's GUI or topic frequency feel laggy (even if processing time looks fast enough), or messages seem to get lost, it may be caused by the DDS. By default (`qos` parameters set to `0`), RTAB-Map's nodes subscribe with the DDS's own default reliability, and that differs between them: Cyclone DDS subscribes reliably, while Fast DDS, the default DDS of ROS 2 (still with Lyrical), subscribes in best effort. In best effort, a large message (image, point cloud) arriving while a node is still busy with the previous one can be dropped, without any warning.
+
+With Fast DDS, you can make RTAB-Map's nodes subscribe reliably with their `qos` parameters set to `1` (e.g., `qos:=1` with `rtabmap.launch.py`). Otherwise, I recommend to use [Cyclone DDS](https://docs.ros.org/en/jazzy/Installation/RMW-Implementations/DDS-Implementations/Working-with-Eclipse-CycloneDDS.html), you can try it by adding this before launching any nodes/launch files (or add to your `.bashrc`):
 ```bash
 export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 # Cyclone prefers multicast by default, if your router got too much spammed, 

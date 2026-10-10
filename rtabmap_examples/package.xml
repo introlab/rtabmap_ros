@@ -23,6 +23,14 @@
   <exec_depend>tf2_ros</exec_depend>
   <exec_depend>realsense2_camera</exec_depend>
   <exec_depend>velodyne</exec_depend>
+
+  <test_depend>ament_cmake_pytest</test_depend>
+  <test_depend>launch</test_depend>
+  <test_depend>launch_ros</test_depend>
+  <test_depend>python3-pytest</test_depend>
+  <test_depend>python3-yaml</test_depend>
+  <test_depend>ament_index_python</test_depend>
+  <test_depend>rtabmap_launch</test_depend>
   
   <export>
     <build_type>ament_cmake</build_type>

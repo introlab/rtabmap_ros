@@ -87,6 +87,10 @@ def generate_launch_description():
             'robot_ns', default_value='a200_0000',
             description='Robot namespace.'),
 
+        DeclareLaunchArgument(
+            'rtabmap_viz', default_value='true', choices=['true', 'false'],
+            description='Start rtabmap_viz.'),
+
         # Nodes to launch
         Node(
             package='rtabmap_sync', executable='rgbd_sync', output='screen',
@@ -121,6 +125,7 @@ def generate_launch_description():
             remappings=remappings),
 
         Node(
+            condition=IfCondition(LaunchConfiguration('rtabmap_viz')),
             package='rtabmap_viz', executable='rtabmap_viz', output='screen',
             namespace=robot_ns,
             parameters=[rtabmap_parameters, shared_parameters,

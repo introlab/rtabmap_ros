@@ -69,6 +69,45 @@ protected:
 		return nullptr;
 	}
 
+	/**
+	 * @brief Calls @p send until the node processes the update stamped @p stamp: an info
+	 *        at that stamp.
+	 *
+	 * For a node on its own multi-threaded executor (makeMultiThreadedNode()): it
+	 * publishes info from inside its update, and takes new data only once that update
+	 * has returned, dropping what arrives in between. Woken by info, the test can send
+	 * the next update in that window, on a slow machine; it is then sent again. A copy
+	 * sent while the first is still being processed is dropped the same way; one that
+	 * was processed anyway only adds an info at a stamp already seen. A node that never
+	 * takes new data again still fails.
+	 */
+	bool sendUntilProcessed(
+			const std::function<void()> & send,
+			const std::shared_ptr<Collector<rtabmap_msgs::msg::Info>> & info,
+			double stamp)
+	{
+		const rclcpp::Time expected(stampOf(stamp));
+		auto processed = [&]() {
+			for(const rtabmap_msgs::msg::Info::ConstSharedPtr & msg : info->messages)
+			{
+				if(rclcpp::Time(msg->header.stamp) == expected)
+				{
+					return true;
+				}
+			}
+			return false;
+		};
+		for(int attempt=0; attempt<10; ++attempt)
+		{
+			send();
+			if(spinUntil(processed, std::chrono::milliseconds(500)))
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
 	static bool hasPose(const rtabmap_msgs::msg::MapGraph & graph, int id)
 	{
 		return std::find(graph.poses_id.begin(), graph.poses_id.end(), id) != graph.poses_id.end();
@@ -305,11 +344,10 @@ TEST_F(CoreWrapperInputsTest, maps_the_next_scans_after_one_without_its_tf)
 	publishStaticTf("laser");
 	for(int i=1; i<=3; ++i)
 	{
-		const size_t before = info->size();
-		sendOdom(odom, 1.0 + i, 0.5*i);
-		scan->publish(makeRoomScan("laser", 1.0 + i, 0.5*i));
-		ASSERT_TRUE(spinUntil([&]() { return info->size() > before; }))
-				<< "scan " << i << " was not processed after the one without TF";
+		ASSERT_TRUE(sendUntilProcessed([&]() {
+				sendOdom(odom, 1.0 + i, 0.5*i);
+				scan->publish(makeRoomScan("laser", 1.0 + i, 0.5*i));
+			}, info, 1.0 + i)) << "scan " << i << " was not processed after the one without TF";
 	}
 	EXPECT_EQ(3u, getGraph().graph.poses_id.size());
 }
@@ -333,11 +371,10 @@ TEST_F(CoreWrapperInputsTest, maps_the_next_clouds_after_one_without_its_tf)
 	publishStaticTf("lidar", 0.0, 0.0, 0.5);
 	for(int i=1; i<=3; ++i)
 	{
-		const size_t before = info->size();
-		sendOdom(odom, 1.0 + i, 0.5*i);
-		cloud->publish(makeCloud("lidar", 1.0 + i, roomScan3d(0.5*i, 0.0, 0.5)));
-		ASSERT_TRUE(spinUntil([&]() { return info->size() > before; }))
-				<< "cloud " << i << " was not processed after the one without TF";
+		ASSERT_TRUE(sendUntilProcessed([&]() {
+				sendOdom(odom, 1.0 + i, 0.5*i);
+				cloud->publish(makeCloud("lidar", 1.0 + i, roomScan3d(0.5*i, 0.0, 0.5)));
+			}, info, 1.0 + i)) << "cloud " << i << " was not processed after the one without TF";
 	}
 	EXPECT_EQ(3u, getGraph().graph.poses_id.size());
 }
@@ -355,7 +392,10 @@ TEST_F(CoreWrapperInputsTest, reads_odometry_from_tf_with_odom_frame_id)
 	rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr scan =
 			helper()->create_publisher<sensor_msgs::msg::LaserScan>("scan", 10);
 	ASSERT_TRUE(waitForSubscriber(scan));
-	EXPECT_EQ(0u, helper()->count_publishers("odom") + helper()->count_subscribers("odom"));
+	// Waits: the graph can still list the previous test's odom endpoints for a moment.
+	EXPECT_TRUE(spinUntil([&]() {
+		return helper()->count_publishers("odom") + helper()->count_subscribers("odom") == 0; }))
+			<< "something subscribes or publishes on odom";
 
 	driveWithScans(nullptr, scan, info, 3, 0.0);
 

@@ -277,6 +277,12 @@ if(BUILD_TESTING)
   rtabmap_slam_add_node_test(test_core_wrapper_services)
   rtabmap_slam_add_node_test(test_core_wrapper_planning)
   rtabmap_slam_add_node_test(test_core_wrapper_inputs)
+
+  # The `rtabmap` executable under `ros2 launch`, stopped as Ctrl-C does.
+  find_package(ament_cmake_pytest REQUIRED)
+  ament_add_pytest_test(test_shutdown test/test_shutdown.py
+    ENV ROS_DOMAIN_ID=${rtabmap_slam_test_domain_id} "PYTEST_ADDOPTS=-p no:cacheprovider"
+    TIMEOUT 300)
 endif()
 
 ament_package()

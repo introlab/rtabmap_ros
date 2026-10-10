@@ -1,0 +1,4 @@
+# Fetched by ../fetch_test_data.sh; only the manifest is committed.
+*
+!.gitignore
+!manifest.txt

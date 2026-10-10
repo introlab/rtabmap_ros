@@ -1,4 +1,7 @@
 # rtabmap_demos
+
+Ready-to-run demos of RTAB-Map. Each launch file sets up a complete pipeline for one of the demo bags or one simulated robot, so you can watch RTAB-Map map, close loops and navigate without any hardware. The bags can be downloaded from the [0.23.13 release](https://github.com/introlab/rtabmap_ros/releases/tag/0.23.13).
+
 + [Outdoor Stereo VSLAM](#outdoor-stereo-vslam)
 + [Indoor 2D LiDAR and RGB-D SLAM](#indoor-2d-lidar-and-rgb-d-slam)
 + [Multi-Session Indoor 2D LiDAR and RGB-D SLAM](#multi-session-indoor-2d-lidar-and-rgb-d-slam)
@@ -35,6 +38,11 @@
 [find_object_demo.launch.py](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_demos/launch/find_object_demo.launch.py) ([Video](https://youtu.be/o1GSQanY-Do))
 
 ![Peek 2024-11-29 12-01](https://github.com/user-attachments/assets/b3cc0c67-517a-4f69-b4cc-35d288e96165)
+
+### Netherdrone 3D LiDAR SLAM
+[netherdrone_lidar3d_demo.launch.py](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_demos/launch/netherdrone_lidar3d_demo.launch.py)
+
+![Peek 2026-10-10 12-12](https://github.com/user-attachments/assets/a79f0519-6c39-48a4-8c14-799c0775571e)
 
 ### Turtlebot4 Nav2, 2D LiDAR and RGB-D SLAM
 [turtlebot4_sim_demo.launch.py](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_demos/launch/turtlebot4/turtlebot4_sim_demo.launch.py)
@@ -90,3 +98,16 @@ FusionCore (wheel + IMU UKF) and `icp_odometry` run in a feedback loop: FusionCo
 [isaac_sim_vslam_demo.launch.py](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_demos/launch/isaac/isaac_sim_vslam_demo.launch.py) stereo:=false vo:=rtabmap
 
 ![Peek 2024-11-30 13-22](https://github.com/user-attachments/assets/240820c6-4dea-4cbf-9431-b4b3af695d51)
+
+## Tests
+
+`colcon test --packages-select rtabmap_demos` runs two tests:
+
+* `test_launch_files` loads every launch file of this package, with its default arguments and with each of its switches flipped, without starting anything. It checks that the files, executables, components and included launch files exist, that the arguments passed to our own launch files are declared, and that RTAB-Map's parameters exist in the installed library. Packages that are not installed (simulators, robots) are stubbed and named in a warning.
+* `test_demo_playback` replays demo bags through the demo launch files and compares the resulting graphs with the golden ones in `test/golden` (number of nodes and of loop closures, and the trajectory error rtabmap computes against the golden trajectory, replayed as ground truth). It is skipped unless the bags were downloaded first (a few GB):
+
+```bash
+rtabmap_demos/test/fetch_test_data.sh   # or set RTABMAP_DEMOS_TEST_DATA to download elsewhere
+```
+
+The bags are replayed in lockstep with the demo's nodes: each sensor message is published only once every node is idle, so results do not depend on how loaded the machine is. A replay takes a few minutes per bag. To keep a run's graph, database and log, set `RTABMAP_DEMOS_TEST_RESULTS` to a directory. After a change that is expected to change the results, regenerate the golden graphs with `RTABMAP_DEMOS_UPDATE_GOLDEN=1` and commit them.

@@ -1,7 +1,7 @@
 # Requirements:
 #   Download one or both rosbags:
-#    * stereo_outdoorA.db3: https://drive.google.com/file/d/1O7mCXg_sw4tZY1S88a-n96O6OulmqvqI/view?usp=drive_link
-#    * stereo_outdoorB.db3: https://drive.google.com/file/d/1mSu7418Fkbe-hIz2-3Mi936PrWuD2un_/view?usp=drive_link
+#    * stereo_outdoorA_bag.zip: https://github.com/introlab/rtabmap_ros/releases/download/0.23.13/stereo_outdoorA_bag.zip
+#    * stereo_outdoorB_bag.zip: https://github.com/introlab/rtabmap_ros/releases/download/0.23.13/stereo_outdoorB_bag.zip
 #
 # Example:
 #
@@ -9,9 +9,9 @@
 #     $ ros2 launch rtabmap_demos stereo_outdoor_demo.launch.py  rviz:=true rtabmap_viz:=true
 #
 #   Rosbag:
-#     $ ros2 bag play stereo_outdoorA.db3 --clock
+#     $ ros2 bag play stereo_outdoorA_bag --clock
 #     when done, you can play the secon bag:
-#     $ ros2 bag play stereo_outdoorB.db3 --clock
+#     $ ros2 bag play stereo_outdoorB_bag --clock
 #
 
 from launch import LaunchDescription
@@ -44,6 +44,7 @@ def generate_launch_description():
           'OdomF2M/MaxSize': '1000',
           'GFTT/MinDistance': '10',
           'GFTT/QualityLevel': '0.00001',
+          'Optimizer/Iterations': '30', # With g2o (rtabmap built without GTSAM), Levenberg-Marquardt needs ~25 iterations to converge on this graph
           #'Kp/DetectorStrategy': '6', # Uncommment to match ros1 noetic results, but opencv should be built with xfeatures2d
           #'Vis/FeatureType': '6'      # Uncommment to match ros1 noetic results, but opencv should be built with xfeatures2d
     }
@@ -72,13 +73,17 @@ def generate_launch_description():
         Node(
             package='image_transport', executable='republish', name='republish_left', output='screen',
             namespace='stereo_camera',
+            # The transports: as arguments up to humble, as parameters from jazzy.
             arguments=['compressed', 'raw'],
+            parameters=[{'in_transport': 'compressed', 'out_transport': 'raw'}],
             remappings=[('in/compressed', 'left/image_raw_throttle/compressed'),
                         ('out',           'left/image_raw')]),
         Node(
             package='image_transport', executable='republish', name='republish_right', output='screen',
             namespace='stereo_camera',
+            # The transports: as arguments up to humble, as parameters from jazzy.
             arguments=['compressed', 'raw'],
+            parameters=[{'in_transport': 'compressed', 'out_transport': 'raw'}],
             remappings=[('in/compressed', 'right/image_raw_throttle/compressed'),
                         ('out',           'right/image_raw')]),
 

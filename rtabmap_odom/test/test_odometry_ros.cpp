@@ -454,6 +454,63 @@ TEST_F(OdometryRosTest, starts_from_the_configured_initial_pose)
 	EXPECT_NEAR(3.0, odom->back().pose.pose.position.z, 1e-3);
 }
 
+/**
+ * With a ground truth frame, the odometry starts from the ground truth's first pose:
+ * ground_truth_frame_id -> ground_truth_base_frame_id, which defaults to frame_id + "_gt".
+ * Empty, ground_truth_base_frame_id turns the ground truth off.
+ */
+class OdometryRosGroundTruthTest : public OdometryRosTest
+{
+protected:
+	/// Latches world -> base_link_gt at (1, 2, 3), the only ground truth in TF.
+	void publishGroundTruth()
+	{
+		geometry_msgs::msg::TransformStamped gt;
+		gt.header.stamp = helper()->now();
+		gt.header.frame_id = "world";
+		gt.child_frame_id = "base_link_gt";
+		gt.transform.translation.x = 1.0;
+		gt.transform.translation.y = 2.0;
+		gt.transform.translation.z = 3.0;
+		gt.transform.rotation.w = 1.0;
+		gtTf_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(*helper());
+		gtTf_->sendTransform(gt);
+	}
+
+	/// The pose of the first frame, with the ground truth and @p params.
+	geometry_msgs::msg::Point firstPose(const std::vector<rclcpp::Parameter> & params)
+	{
+		publishSensorTf();
+		publishGroundTruth();
+		std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+				collect<nav_msgs::msg::Odometry>("odom");
+		makeNode(params);
+		rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub = scanPublisher();
+		EXPECT_TRUE(waitForSubscriber(pub));
+		feedFrames(pub, odom, 1);
+		return odom->empty() ? geometry_msgs::msg::Point() : odom->back().pose.pose.position;
+	}
+
+	std::shared_ptr<tf2_ros::StaticTransformBroadcaster> gtTf_;
+};
+
+TEST_F(OdometryRosGroundTruthTest, starts_from_the_ground_truth_of_frame_id_gt_by_default)
+{
+	geometry_msgs::msg::Point p = firstPose({rclcpp::Parameter("ground_truth_frame_id", "world")});
+	EXPECT_NEAR(1.0, p.x, 1e-3);
+	EXPECT_NEAR(2.0, p.y, 1e-3);
+	EXPECT_NEAR(3.0, p.z, 1e-3);
+}
+
+TEST_F(OdometryRosGroundTruthTest, ignores_the_ground_truth_when_its_base_frame_is_empty)
+{
+	geometry_msgs::msg::Point p = firstPose({rclcpp::Parameter("ground_truth_frame_id", "world"),
+	                                         rclcpp::Parameter("ground_truth_base_frame_id", "")});
+	EXPECT_NEAR(0.0, p.x, 1e-3);
+	EXPECT_NEAR(0.0, p.y, 1e-3);
+	EXPECT_NEAR(0.0, p.z, 1e-3);
+}
+
 /// reset_odom puts the pose back to the identity and starts the map again.
 TEST_F(OdometryRosTest, reset_odom_returns_the_pose_to_the_origin)
 {

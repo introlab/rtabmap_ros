@@ -25,31 +25,36 @@ jobs:
         include:
         - ros_distro: humble
           skip_keys: ''
-          packages: 'rtabmap_ros rtabmap_conversions rtabmap_odom rtabmap_slam rtabmap_sync rtabmap_util rtabmap_python'
+          packages: 'rtabmap_ros rtabmap_conversions rtabmap_odom rtabmap_slam rtabmap_sync rtabmap_util rtabmap_python rtabmap_launch rtabmap_examples rtabmap_demos'
         - ros_distro: jazzy
           skip_keys: ''
-          packages: 'rtabmap_ros rtabmap_conversions rtabmap_odom rtabmap_slam rtabmap_sync rtabmap_util rtabmap_python'
+          packages: 'rtabmap_ros rtabmap_conversions rtabmap_odom rtabmap_slam rtabmap_sync rtabmap_util rtabmap_python rtabmap_launch rtabmap_examples rtabmap_demos'
         - ros_distro: kilted
           skip_keys: 'grid_map_ros'
-          packages: 'rtabmap_ros rtabmap_conversions rtabmap_odom rtabmap_slam rtabmap_sync rtabmap_util rtabmap_python'
+          packages: 'rtabmap_ros rtabmap_conversions rtabmap_odom rtabmap_slam rtabmap_sync rtabmap_util rtabmap_python rtabmap_launch rtabmap_examples rtabmap_demos'
         - ros_distro: lyrical
-          skip_keys: 'velodyne grid_map_ros libpointmatcher'
-          packages: 'rtabmap_ros rtabmap_conversions rtabmap_odom rtabmap_slam rtabmap_sync rtabmap_util rtabmap_python'
+          skip_keys: 'velodyne grid_map_ros libpointmatcher find_object_2d'
+          packages: 'rtabmap_ros rtabmap_conversions rtabmap_odom rtabmap_slam rtabmap_sync rtabmap_util rtabmap_python rtabmap_launch rtabmap_examples rtabmap_demos'
         - ros_distro: rolling
           # Rolling has moved to Ubuntu resolute and much of it has not been rebuilt for
           # that yet, so rosdep finds nothing to install for these. They are all optional
-          # to rtabmap, which just builds without them. nav2_msgs too: rtabmap_slam builds
-          # without it.
-          skip_keys: 'velodyne libpointmatcher gtsam grid_map_ros nav2_msgs'
+          # to rtabmap, which just builds without them. nav2 is missing from resolute
+          # too: optional to rtabmap_slam (nav2_msgs) and to the demos (nav2_bringup, for
+          # the navigation demos only), but not to rtabmap_costmap_plugins, so it and the
+          # rtabmap_ros metapackage, which pulls it in, are not built.
+          skip_keys: 'velodyne libpointmatcher gtsam grid_map_ros nav2_msgs nav2_bringup nav2_costmap_2d find_object_2d'
           use_ros2_testing: true # Rolling is using ros2-testing (nightly)
-          # nav2 is missing from resolute too, and rtabmap_costmap_plugins needs
-          # nav2_costmap_2d to compile at all. The rtabmap_ros metapackage pulls it in, so
-          # rolling names the packages it can build.
-          packages: 'rtabmap_conversions rtabmap_odom rtabmap_slam rtabmap_sync rtabmap_util rtabmap_python'
+          packages: 'rtabmap_conversions rtabmap_odom rtabmap_slam rtabmap_sync rtabmap_util rtabmap_python rtabmap_launch rtabmap_examples rtabmap_demos'
       fail-fast: false
+    timeout-minutes: 180
     container:
       image: osrf/ros:${{ matrix.ros_distro }}-desktop-full
-    steps:   
+    env:
+      # Absolute and inside the container: ${{ github.workspace }} would be the
+      # runner's path, not the container's.
+      RTABMAP_DEMOS_TEST_DATA: /rtabmap_demos_test_data
+      RTABMAP_DEMOS_TEST_RESULTS: /rtabmap_demos_test_results
+    steps:
     - uses: actions/checkout@v4
     - uses: ros-tooling/setup-ros@v0.7
       with:
@@ -62,9 +67,76 @@ jobs:
     - run: |
         echo "repositories:\n  introlab/rtabmap:\n    type: git\n    url: https://github.com/introlab/rtabmap.git\n    version: master\n" > /tmp/deps.repos &&\
         cat /tmp/deps.repos
+    # Build only: the tests are run below, the quick ones first, so that a failing unit
+    # test shows before the demos' playback, which takes tens of minutes.
     - uses: ros-tooling/action-ros-ci@v0.4
       with:
         package-name: ${{ matrix.packages }}
         target-ros2-distro: ${{ matrix.ros_distro }}
         vcs-repo-file-url: /tmp/deps.repos
         rosdep-skip-keys: "${{ matrix.skip_keys }}"
+        skip-tests: true
+
+    - name: Unit tests
+      working-directory: ros_ws
+      shell: bash
+      run: |
+        source /opt/ros/${{ matrix.ros_distro }}/setup.bash
+        source install/setup.bash
+        colcon test --packages-select ${{ matrix.packages }} \
+          --event-handlers console_cohesion+ --ctest-args -E test_demo_playback
+        colcon test-result --verbose
+
+    # The demos' playback (rtabmap_demos/test/test_demo_playback.py) replays bags that
+    # are assets of the rtabmap_ros GitHub releases, listed with their SHA-256 in
+    # rtabmap_demos/test/data/manifest.txt. As rtabmap's own CI does with its test
+    # databases (cmake-ros.yml), they are cached between runs, keyed on that manifest
+    # only: every distro shares one entry, and a new or changed bag there fetches again.
+    - name: Restore test data
+      id: cache-testdata
+      uses: actions/cache@v4
+      with:
+        path: /rtabmap_demos_test_data
+        key: rtabmap-demos-test-data-${{ hashFiles('rtabmap_demos/test/data/manifest.txt') }}
+
+    - name: Fetch test data
+      if: steps.cache-testdata.outputs.cache-hit != 'true'
+      shell: bash
+      run: bash rtabmap_demos/test/fetch_test_data.sh
+
+    # Without its bag, a scenario skips itself and the step would pass having replayed
+    # nothing: check that every bag of the manifest is there.
+    - name: Check test data
+      shell: bash
+      run: |
+        missing=0
+        while IFS=$'\t' read -r name url sha extracted; do
+          [[ -z "${name// }" || "$name" =~ ^# ]] && continue
+          file="$RTABMAP_DEMOS_TEST_DATA/${extracted:-$name}"
+          if [[ ! -f "$file" ]]; then
+            echo "::error::$file is missing (from $url)"
+            missing=1
+          fi
+        done < rtabmap_demos/test/data/manifest.txt
+        exit $missing
+
+    # The golden graphs were made with humble: each scenario's tolerances
+    # (test_demo_playback.py) absorb small differences between distros.
+    - name: Demo playback tests
+      working-directory: ros_ws
+      shell: bash
+      run: |
+        source /opt/ros/${{ matrix.ros_distro }}/setup.bash
+        source install/setup.bash
+        colcon test --packages-select rtabmap_demos \
+          --event-handlers console_cohesion+ --ctest-args -R test_demo_playback
+        colcon test-result --verbose --test-result-base build/rtabmap_demos
+
+    # Each scenario's launch log, graph and database, to see what went wrong.
+    - name: Upload the playback results
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: demo-playback-results-${{ matrix.ros_distro }}
+        path: /rtabmap_demos_test_results
+        retention-days: 7

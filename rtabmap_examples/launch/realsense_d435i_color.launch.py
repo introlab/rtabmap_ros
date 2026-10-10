@@ -58,7 +58,7 @@ def generate_launch_description():
                                   'unite_imu_method': LaunchConfiguration('unite_imu_method'),
                                   'align_depth.enable': 'true',
                                   'enable_sync': 'true',
-                                  'rgb_camera.profile': '640x360x30'}.items(),
+                                  'rgb_camera.color_profile': '640x360x30'}.items(),
         ),
 
         Node(

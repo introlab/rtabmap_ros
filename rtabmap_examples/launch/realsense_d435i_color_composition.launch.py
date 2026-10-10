@@ -81,7 +81,7 @@ def generate_launch_description():
                         'unite_imu_method': LaunchConfiguration('unite_imu_method'),
                         'align_depth.enable': True,
                         'enable_sync': True,
-                        'rgb_camera.profile': '640x360x30',
+                        'rgb_camera.color_profile': '640x360x30',
                         'depth_module.emitter_enabled': 1}], # Make sure IR emitter is enabled
                     extra_arguments=intra_process),
 

@@ -1,6 +1,6 @@
 # Requirements:
 #   Download rosbag:
-#    * demo_mapping.db3: https://drive.google.com/file/d/1v9qJ2U7GlYhqBJr7OQHWbDSCfgiVaLWb/view?usp=drive_link
+#    * demo_mapping_bag.zip: https://github.com/introlab/rtabmap_ros/releases/download/0.23.13/demo_mapping_bag.zip
 #
 # Example:
 #
@@ -8,7 +8,7 @@
 #     $ ros2 launch rtabmap_demos robot_mapping_demo.launch.py rviz:=true rtabmap_viz:=true
 #
 #   Rosbag:
-#     $ ros2 bag play demo_mapping.db3 --clock
+#     $ ros2 bag play demo_mapping_bag --clock
 #
 
 from launch import LaunchDescription
@@ -43,11 +43,11 @@ def generate_launch_description():
           'RGBD/OptimizeFromGraphEnd': 'false',   # Optimize graph from initial node so /map -> /odom transform will be generated
           'RGBD/OptimizeMaxError':     '4',       # Reject any loop closure causing large errors (>3x link's covariance) in the map
           'Reg/Force3DoF':             'true',    # 2D SLAM
-          'Grid/FromDepth':            'false',   # Create 2D occupancy grid from laser scan
+          'Grid/Sensor':               '0',       # Create 2D occupancy grid from laser scan
           'Mem/STMSize':               '30',      # increased to 30 to avoid adding too many loop closures on just seen locations
           'RGBD/LocalRadius':          '5',       # limit length of proximity detections
           'Icp/CorrespondenceRatio':   '0.2',     # minimum scan overlap to accept loop closure
-          'Icp/PM':                    'false',
+          'Icp/Strategy':              '0',       # 0=PCL, 1=libpointmatcher
           'Icp/PointToPlane':          'false',
           'Icp/MaxCorrespondenceDistance': '0.15',
           'Icp/VoxelSize':             '0.05'

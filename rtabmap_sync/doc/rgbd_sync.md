@@ -124,6 +124,7 @@ The output's `header.stamp` is the **later** of the color and depth stamps, so t
 | `approx_sync` | `bool` | `true` | Match the inputs by nearest stamp. **Set `false` if your camera allows it** — see [Synchronization](#synchronization). |
 | `approx_sync_max_interval` | `double` | `0.0` | Reject sets spanning more than this many seconds. `0` disables. Worth setting; see [Synchronization](#synchronization). |
 | `topic_queue_size` | `int` | `10` | Queue depth of each input subscription. |
+| `output_queue_size` | `int` | `1` | History depth of the `rgbd_image` publishers. |
 | `sync_queue_size` | `int` | `10` | Queue depth of the synchronizer. |
 | `queue_size` | `int` | — | **Deprecated**, renamed to `sync_queue_size`. Still copied to it, with a warning. |
 | `qos` | `int` | `0` | Reliability of the subscriptions and the publishers: `0` system default, `1` reliable, `2` best effort. |

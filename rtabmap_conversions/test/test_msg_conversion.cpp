@@ -3068,6 +3068,43 @@ TEST(MsgConversion, convertRGBDMsgsSingleCamera)
 	EXPECT_EQ(depth.at<unsigned short>(0, 0), 1500);
 }
 
+// A camera without depth, through an RGBDImage as rgb_sync publishes it: the depth slot
+// is left empty, and toCvShare() turns it into an empty depth image. The frame must
+// come out as color only, not be rejected as a stereo pair without a right image.
+TEST(MsgConversion, convertRGBDMsgsColorOnlyRGBDImage)
+{
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();
+	const rtabmap::Transform baseToCamera(0.1f, 0.0f, 0.2f, 0.0f, 0.0f, 0.0f);
+	addTf(*buffer, "base_link", "camera_link", baseToCamera, 1000.0);
+
+	const cv::Mat rgbImage(8, 8, CV_8UC3, cv::Scalar(10, 20, 30));
+	rtabmap_msgs::msg::RGBDImage rgbdImage;
+	rgbdImage.header = makeImage("camera_link", 1000.0, rgbImage, "bgr8")->header;
+	makeImage("camera_link", 1000.0, rgbImage, "bgr8")->toImageMsg(rgbdImage.rgb);
+	rgbdImage.rgb_camera_info = makeCameraInfo("camera_link", 1000.0, 8, 8);
+
+	cv_bridge::CvImageConstPtr image, depthImage;
+	toCvShare(rgbdImage, std::shared_ptr<void const>(), image, depthImage);
+	ASSERT_TRUE(depthImage.get() != 0);
+	ASSERT_TRUE(depthImage->image.empty()) << "an RGBDImage without depth gives an empty depth image";
+
+	cv::Mat rgb, depth;
+	std::vector<rtabmap::CameraModel> models;
+	std::vector<rtabmap::StereoCameraModel> stereoModels;
+	ASSERT_TRUE(convertRGBDMsgs({image}, {depthImage}, {rgbdImage.rgb_camera_info},
+			{rgbdImage.depth_camera_info}, "base_link", "",
+			timestampToROS(1000.0), rgb, depth, models, stereoModels,
+			*buffer, 0.0, /*alreadyRectifiedImages=*/true));
+
+	EXPECT_TRUE(stereoModels.empty());
+	ASSERT_EQ(models.size(), 1u);
+	EXPECT_NEAR(models[0].fx(), 100.0, 1e-9);
+	expectTransformNear(models[0].localTransform(), baseToCamera, 1e-4f);
+	ASSERT_EQ(rgb.cols, 8);
+	ASSERT_EQ(rgb.rows, 8);
+	EXPECT_TRUE(depth.empty());
+}
+
 TEST(MsgConversion, convertRGBDMsgsMultiCameraSideBySide)
 {
 	// Two cameras are concatenated horizontally into one wide image, one model each.

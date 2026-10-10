@@ -30,6 +30,15 @@ find_package(tf2 REQUIRED)
 find_package(rtabmap_conversions REQUIRED)
 find_package(rtabmap_msgs REQUIRED)
 
+# Optional: wall clipping of the OrbitOriented view controller
+find_package(octomap QUIET)
+find_package(octomap_msgs QUIET)
+IF(octomap_FOUND AND octomap_msgs_FOUND)
+  MESSAGE(STATUS "WITH octomap (OrbitOriented's wall clipping)")
+ELSE()
+  MESSAGE(STATUS "WITHOUT octomap (OrbitOriented's wall clipping disabled)")
+ENDIF()
+
 include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
@@ -78,9 +87,11 @@ add_library(rtabmap_rviz_plugins SHARED
        src/MapCloudDisplay.cpp
        src/MapGraphDisplay.cpp
        src/InfoDisplay.cpp
+       src/OrbitOrientedViewController.cpp
        include/${PROJECT_NAME}/MapCloudDisplay.h
        include/${PROJECT_NAME}/MapGraphDisplay.h
        include/${PROJECT_NAME}/InfoDisplay.h
+       include/${PROJECT_NAME}/OrbitOrientedViewController.h
 )
 set_property(TARGET rtabmap_rviz_plugins PROPERTY AUTOMOC ON)
 target_include_directories(rtabmap_rviz_plugins
@@ -92,6 +103,19 @@ if("$ENV{ROS_DISTRO}" STRLESS "lyrical")
   ament_target_dependencies(rtabmap_rviz_plugins ${AmentLibraries})
 ELSE()
   target_link_libraries(rtabmap_rviz_plugins PRIVATE ${Libraries})
+ENDIF()
+
+IF(octomap_FOUND AND octomap_msgs_FOUND)
+  target_compile_definitions(rtabmap_rviz_plugins PRIVATE RTABMAP_RVIZ_PLUGINS_OCTOMAP)
+  target_include_directories(rtabmap_rviz_plugins PRIVATE ${OCTOMAP_INCLUDE_DIRS})
+  # octomap's config only sets variables. The same signature as above, as CMake
+  # requires for a target.
+  if("$ENV{ROS_DISTRO}" STRLESS "lyrical")
+    ament_target_dependencies(rtabmap_rviz_plugins octomap_msgs)
+    target_link_libraries(rtabmap_rviz_plugins ${OCTOMAP_LIBRARIES})
+  ELSE()
+    target_link_libraries(rtabmap_rviz_plugins PRIVATE octomap_msgs::octomap_msgs ${OCTOMAP_LIBRARIES})
+  ENDIF()
 ENDIF()
 
 # Causes the visibility macros to use dllexport rather than dllimport,
