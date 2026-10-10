@@ -128,6 +128,7 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 		genScanMaxDepth_(4.0),
 		genScanMinDepth_(0.0),
 		genDepth_(false),
+		decodeImagesOnDemand_(true),
 		genDepthDecimation_(1),
 		genDepthFillHolesSize_(0),
 		genDepthFillIterations_(1),
@@ -223,6 +224,7 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 	genScanMaxDepth_ = this->declare_parameter("gen_scan_max_depth", genScanMaxDepth_);
 	genScanMinDepth_ = this->declare_parameter("gen_scan_min_depth", genScanMinDepth_);
 	genDepth_ = this->declare_parameter("gen_depth", genDepth_);
+	decodeImagesOnDemand_ = this->declare_parameter("decode_images_on_demand", decodeImagesOnDemand_);
 	genDepthDecimation_ = this->declare_parameter("gen_depth_decimation", genDepthDecimation_);
 	genDepthFillHolesSize_ = this->declare_parameter("gen_depth_fill_holes_size", genDepthFillHolesSize_);
 	genDepthFillIterations_ = this->declare_parameter("gen_depth_fill_iterations", genDepthFillIterations_);
@@ -268,6 +270,7 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 	}
 
 	RCLCPP_INFO(get_logger(), "rtabmap: gen_depth  = %s", genDepth_?"true":"false");
+	RCLCPP_INFO(get_logger(), "rtabmap: decode_images_on_demand = %s", decodeImagesOnDemand_?"true":"false");
 	if(genDepth_)
 	{
 		RCLCPP_INFO(get_logger(), "rtabmap: gen_depth_decimation        = %d", genDepthDecimation_);
@@ -1349,6 +1352,29 @@ void CoreWrapper::commonMultiCameraCallback(
 		const std::vector<std::vector<rtabmap_msgs::msg::Point3f> > & localPoints3d,
 		const std::vector<cv::Mat> & localDescriptors)
 {
+	commonMultiCameraCallbackWithCompressed(odomMsg, userDataMsg, imageMsgs, depthMsgs,
+			cameraInfoMsgs, depthCameraInfoMsgs, scan2dMsg, scan3dMsg, odomInfoMsg,
+			globalDescriptorMsgs, localKeyPoints, localPoints3d, localDescriptors,
+			std::vector<cv::Mat>(), std::vector<cv::Mat>());
+}
+
+void CoreWrapper::commonMultiCameraCallbackWithCompressed(
+		const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
+		const rtabmap_msgs::msg::UserData::ConstSharedPtr & userDataMsg,
+		const std::vector<cv_bridge::CvImageConstPtr> & imageMsgs,
+		const std::vector<cv_bridge::CvImageConstPtr> & depthMsgs,
+		const std::vector<sensor_msgs::msg::CameraInfo> & cameraInfoMsgs,
+		const std::vector<sensor_msgs::msg::CameraInfo> & depthCameraInfoMsgs,
+		const sensor_msgs::msg::LaserScan & scan2dMsg,
+		const sensor_msgs::msg::PointCloud2 & scan3dMsg,
+		const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr& odomInfoMsg,
+		const std::vector<rtabmap_msgs::msg::GlobalDescriptor> & globalDescriptorMsgs,
+		const std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > & localKeyPoints,
+		const std::vector<std::vector<rtabmap_msgs::msg::Point3f> > & localPoints3d,
+		const std::vector<cv::Mat> & localDescriptors,
+		const std::vector<cv::Mat> & compressedImages,
+		const std::vector<cv::Mat> & compressedDepths)
+{
 	std::string odomFrameId;
 	if(odomMsg.get())
 	{
@@ -1418,7 +1444,9 @@ void CoreWrapper::commonMultiCameraCallback(
 				globalDescriptorMsgs,
 				localKeyPoints,
 				localPoints3d,
-				localDescriptors);
+				localDescriptors,
+				compressedImages,
+				compressedDepths);
 		
 		if(syncData_.valid) {
 			syncTimer_->reset();
@@ -1439,7 +1467,9 @@ void CoreWrapper::commonMultiCameraCallbackImpl(
 		const std::vector<rtabmap_msgs::msg::GlobalDescriptor> & globalDescriptorMsgs,
 		const std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > & localKeyPointsMsgs,
 		const std::vector<std::vector<rtabmap_msgs::msg::Point3f> > & localPoints3dMsgs,
-		const std::vector<cv::Mat> & localDescriptorsMsgs)
+		const std::vector<cv::Mat> & localDescriptorsMsgs,
+		const std::vector<cv::Mat> & compressedImages,
+		const std::vector<cv::Mat> & compressedDepths)
 {
 	UTimer timerConversion;
 	cv::Mat rgb;
@@ -1694,6 +1724,43 @@ void CoreWrapper::commonMultiCameraCallbackImpl(
 				lastPoseIntermediate_?-1:0,
 				rtabmap_conversions::timestampFromROS(lastPoseStamp_),
 				userData);
+	}
+
+	// Keep the compressed images the images come from, so that rtabmap stores them as is
+	// instead of compressing them again (see Memory). Only for a single camera, and only if
+	// the images were not changed on the way (color conversion, generated depth).
+	if(imageMsgs.empty() && depthMsgs.empty() && compressedImages.size() == 1 && compressedDepths.size() == 1)
+	{
+		// Not decoded (see imagesDecodedOnDemand()): rtabmap decodes them if it needs to
+		if(!stereoCameraModels.empty())
+		{
+			syncData_.data.setStereoImage(compressedImages[0], compressedDepths[0], stereoCameraModels, false);
+		}
+		else
+		{
+			syncData_.data.setRGBDImage(compressedImages[0], compressedDepths[0], cameraModels, false);
+		}
+	}
+	else if(imageMsgs.size() == 1 && compressedImages.size() == 1 && compressedDepths.size() == 1)
+	{
+		const bool sameImage = !compressedImages[0].empty() && imageMsgs[0].get() &&
+				rgb.type() == imageMsgs[0]->image.type() && rgb.size() == imageMsgs[0]->image.size();
+		const bool sameDepth = !compressedDepths[0].empty() && !genDepth_ &&
+				depthMsgs.size() == 1 && depthMsgs[0].get() &&
+				depth.type() == depthMsgs[0]->image.type() && depth.size() == depthMsgs[0]->image.size();
+		if(sameImage || sameDepth)
+		{
+			const cv::Mat compressedImage = sameImage ? compressedImages[0] : cv::Mat();
+			const cv::Mat compressedDepth = sameDepth ? compressedDepths[0] : cv::Mat();
+			if(!stereoCameraModels.empty())
+			{
+				syncData_.data.setStereoImage(compressedImage, compressedDepth, stereoCameraModels, false);
+			}
+			else
+			{
+				syncData_.data.setRGBDImage(compressedImage, compressedDepth, cameraModels, false);
+			}
+		}
 	}
 
 	OdometryInfo odomInfo;

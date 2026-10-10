@@ -36,6 +36,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sensor_msgs/msg/camera_info.hpp>
 #include <sensor_msgs/msg/laser_scan.hpp>
 #include <sensor_msgs/msg/image.hpp>
+#include <sensor_msgs/msg/compressed_image.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 
 #include <opencv2/opencv.hpp>
@@ -208,7 +209,17 @@ void toCvShare(const rtabmap_msgs::msg::RGBDImage & image, const std::shared_ptr
  * @param[in]  data          the sensor data to convert
  * @param[out] msg           the converted message, stamped with @p data's stamp
  * @param[in]  sensorFrameId frame id stamped on the message and its sub-messages
+ * @param[in]  legacyDepthCompression if @p data carries only compressed images, keep its
+ *                                    compressed depth in rtabmap's format as is (readable by
+ *                                    rtabmap_ros < 0.24) instead of converting it to
+ *                                    compressed_depth_image_transport's format (see
+ *                                    compressDepthImage(), "legacy" format)
  *
+ * @note Compressed images (as loaded from a database) are copied without being
+ *       decompressed when possible: color and right images as is, depth converted with
+ *       rtabmapToCompressedDepthTransport(). Only depth in rtabmap's legacy 32FC1 format,
+ *       which has no compressed_depth_image_transport equivalent, is decompressed and
+ *       re-compressed in millimeters.
  * @note rtabmap::SensorData holds its stamp as a double, so the stamp written here is
  *       only accurate to a few hundred nanoseconds at current epoch times and will not
  *       compare equal to the ROS stamp the data originally came from. Callers that need
@@ -217,7 +228,7 @@ void toCvShare(const rtabmap_msgs::msg::RGBDImage & image, const std::shared_ptr
  *       kept: the same header is applied to every sub-message here, so preserving only
  *       the top-level one would leave the message internally inconsistent.
  */
-void rgbdImageToROS(const rtabmap::SensorData & data, rtabmap_msgs::msg::RGBDImage & msg, const std::string & sensorFrameId);
+void rgbdImageToROS(const rtabmap::SensorData & data, rtabmap_msgs::msg::RGBDImage & msg, const std::string & sensorFrameId, bool legacyDepthCompression = false);
 
 /**
  * @brief Build a SensorData from an RGBDImage message.
@@ -227,6 +238,10 @@ void rgbdImageToROS(const rtabmap::SensorData & data, rtabmap_msgs::msg::RGBDIma
  *
  * The depth image is optional: a message carrying only the color image and its camera
  * info gives a SensorData with no depth, which is valid.
+ *
+ * The local features (key points, their 3D points and descriptors) and the global
+ * descriptor of the message are set too; the 3D points stay in the camera frame, as the
+ * local transform is left to identity.
  *
  * @param image the message to convert
  * @return the converted sensor data, empty (SensorData::isValid() false) if the message
@@ -259,6 +274,161 @@ void compressedMatToBytes(const cv::Mat & compressed, std::vector<unsigned char>
  * @return the matrix, empty when @p bytes is empty
  */
 cv::Mat compressedMatFromBytes(const std::vector<unsigned char> & bytes, bool copy = true);
+
+/**
+ * @brief Convert a compressed_depth_image_transport message into a depth image compressed
+ *        the way rtabmap does it, without decompressing it.
+ *
+ * Only the header is converted, the compressed payload is copied as is: 32FC1 depth
+ * images become rtabmap's inverse depth format (e.g., ".png:10:100"), 16UC1 (or mono16)
+ * depth images become rtabmap's ".png" or ".rvl" format. The result can be decoded with
+ * rtabmap::uncompressImage(), or set as compressed depth of a rtabmap::SensorData.
+ *
+ * @param msg a message published by compressed_depth_image_transport, with a format like
+ *            "32FC1; compressedDepth png" or "16UC1; compressedDepth rvl"
+ * @return a 1xN CV_8UC1 matrix of compressed bytes, empty if the format is not supported
+ *         (an error is logged)
+ * @see rtabmapToCompressedDepthTransport()
+ */
+cv::Mat compressedDepthTransportToRtabmap(const sensor_msgs::msg::CompressedImage & msg);
+
+/**
+ * @brief Convert a depth image compressed the way rtabmap does it into a
+ *        compressed_depth_image_transport message, without decompressing it.
+ *
+ * Only the header is converted, the compressed payload is copied as is. Supported are
+ * 16UC1 depth images compressed in ".png" or ".rvl" and 32FC1 depth images compressed
+ * in inverse depth format (e.g., ".rvl:10:100", see Mem/DepthCompressionFormat). 32FC1
+ * depth images compressed in the legacy ".png" format (4 channels) have no equivalent.
+ *
+ * Before ROS Jazzy, compressed_depth_image_transport cannot decode RVL: RVL payloads are
+ * then decompressed and re-compressed as PNG (lossless, the 16 bits values are the same).
+ *
+ * @param[in]  compressed a 1xN CV_8UC1 matrix of compressed bytes (e.g.,
+ *                        rtabmap::SensorData::depthOrRightCompressed())
+ * @param[out] msg        the message; only `format` and `data` are set, the header is kept
+ * @param[in]  logErrors  log an error if @p compressed cannot be converted
+ * @return false if the compressed depth image cannot be converted, in which case @p msg
+ *         is not modified
+ * @see compressedDepthTransportToRtabmap()
+ */
+bool rtabmapToCompressedDepthTransport(const cv::Mat & compressed, sensor_msgs::msg::CompressedImage & msg, bool logErrors = true);
+
+/**
+ * @brief Decompress the `depth_compressed` field of an RGBDImage message.
+ *
+ * Accepts every format that field can hold: a depth image compressed by rtabmap
+ * (rtabmap::compressImage(), e.g., ".png", ".rvl" or ".rvl:10:100"), a message published
+ * by compressed_depth_image_transport (format "<encoding>; compressedDepth <codec>", see
+ * compressedDepthTransportToRtabmap()), or a right stereo image compressed as JPEG or PNG.
+ *
+ * @param msg the compressed image
+ * @return always valid; the decompressed image with its encoding (32FC1, 16UC1, mono8 or
+ *         bgr8) and the header of @p msg, or an empty image if @p msg is empty or could
+ *         not be decompressed (an error is logged)
+ */
+cv_bridge::CvImagePtr uncompressDepthImage(const sensor_msgs::msg::CompressedImage & msg);
+
+/**
+ * @brief Get the compressed images of an RGBDImage in rtabmap's format, without
+ *        decompressing them, e.g., to store them as is in rtabmap::SensorData.
+ *
+ * `rgb_compressed` (JPEG or PNG) is copied as is. `depth_compressed` is converted with
+ * compressedDepthTransportToRtabmap() if in compressed_depth_image_transport's format,
+ * otherwise copied as is (rtabmap's format, or JPEG/PNG right image). A field is only
+ * returned if the message has no raw image for it: the raw image is then the one decoded
+ * from it.
+ *
+ * @param[in]  msg   the message
+ * @param[out] rgb   1xN CV_8UC1 compressed color/left image, or empty
+ * @param[out] depth 1xN CV_8UC1 compressed depth/right image, or empty
+ */
+void rgbdImageCompressedToRtabmap(const rtabmap_msgs::msg::RGBDImage & msg, cv::Mat & rgb, cv::Mat & depth);
+
+/**
+ * @brief Whether rtabmap can use compressed images as they are, decoding them itself
+ *        only when needed (see rtabmap::Memory), without any conversion of the decoded
+ *        images: checked from their headers, without decoding them.
+ *
+ * @param rgb    compressed color or left image in rtabmap's format (see
+ *               rgbdImageCompressedToRtabmap()), or empty: gray or color JPEG or 8 bits PNG
+ * @param depth  compressed depth or right image in rtabmap's format, or empty. Depth:
+ *               16UC1 PNG or RVL, 32FC1 inverse depth, or rtabmap's legacy 32FC1 PNG.
+ *               Right image: gray JPEG or 8 bits PNG.
+ * @param stereo whether @p depth is the right image of a stereo pair
+ * @return false if both are empty, or if one of them is not supported
+ */
+bool isCompressedRGBDSupportedByRtabmap(const cv::Mat & rgb, const cv::Mat & depth, bool stereo = false);
+
+/**
+ * @return true if @p format is a valid format for compressDepthImage(): ".png" or ".rvl",
+ *         optionally followed by ":<maxDepth>[:<quantization>]", optionally prefixed by
+ *         "legacy:", or "legacy".
+ */
+bool isValidDepthCompressionFormat(const std::string & format);
+
+/**
+ * @brief Compress a depth image (16UC1 or 32FC1) into the `depth_compressed` field of an
+ *        RGBDImage message, in compressed_depth_image_transport's format.
+ *
+ * The result is readable by the "compressedDepth" image_transport plugin:
+ * - 16UC1: compressed with the codec, losslessly ("16UC1; compressedDepth png").
+ * - 32FC1 without depth parameters (".png", ".rvl"): rounded to millimeters (16UC1, values
+ *   over 65.535 m become 0) and compressed with the codec ("16UC1; compressedDepth png").
+ * - 32FC1 with depth parameters (".png:<maxDepth>[:<quantization>]"): quantized as 16 bits
+ *   inverse depth, like compressed_depth_image_transport ("32FC1; compressedDepth png"),
+ *   see Mem/DepthCompressionFormat.
+ * - "legacy:<format>" ("legacy" is "legacy:.png"): rtabmap's own format, the same as in
+ *   its database (see Mem/DepthCompressionFormat and rtabmap::compressImage()), not
+ *   readable by image_transport plugins: 16UC1 with the codec, 32FC1 without depth
+ *   parameters losslessly as 4 channels PNG, 32FC1 with depth parameters as inverse depth.
+ *   `format` is set to the format without its leading dot, e.g., "png", "rvl",
+ *   "rvl:10:100". Readable by rtabmap_ros before 0.24, except inverse depth. Use it to
+ *   keep 32FC1 depth lossless, or for RVL before Jazzy.
+ *
+ * Before ROS Jazzy, ".rvl" gives PNG data, as compressed_depth_image_transport cannot
+ * decode RVL (see rtabmapToCompressedDepthTransport()).
+ *
+ * @param[in]  depth  the depth image
+ * @param[in]  format see above
+ * @param[out] msg    the message; `data` and `format` are set, the header is kept
+ * @return false if the image could not be compressed (an error is logged), in which case
+ *         @p msg is not modified
+ * @see uncompressDepthImage()
+ */
+bool compressDepthImage(const cv::Mat & depth, const std::string & format, sensor_msgs::msg::CompressedImage & msg);
+
+/**
+ * @brief Compress an image the way compressed_image_transport does, so that any
+ *        "compressed" image_transport subscriber can read it.
+ *
+ * Like cv_bridge::CvImage::toCompressedImageMsg(), bgr8, bgra8, mono8 and mono16 images
+ * are compressed as is and other color images are converted to bgr8 (bgra8 with alpha),
+ * but `format` also says which encoding the data is in, e.g. "bgr8; jpeg compressed bgr8",
+ * instead of only "jpg", from which subscribers have to guess it.
+ *
+ * @param[in]  image  the image to compress
+ * @param[in]  format "jpeg" or "png", or as rtabmap names them, ".jpg" or ".png"
+ * @param[out] msg    the message; `header`, `format` and `data` are set
+ * @return false if the image could not be compressed (an error is logged)
+ */
+bool toCompressedImageMsg(const cv_bridge::CvImage & image, const std::string & format, sensor_msgs::msg::CompressedImage & msg);
+
+/**
+ * @return true if @p format is a valid format for toCompressedImageMsg(): ".jpg", ".png",
+ *         "jpeg" or "png".
+ */
+bool isValidImageCompressionFormat(const std::string & format);
+
+/**
+ * @brief compressed_image_transport's format of a JPEG or PNG image, e.g.,
+ *        "bgr8; jpeg compressed bgr8", with the encoding read from its header, without
+ *        decoding it.
+ * @param data the compressed image
+ * @return the format, or empty if @p data is not a JPEG or PNG image whose encoding is
+ *         known (mono8, mono16, bgr8, bgr16, bgra8 or bgra16)
+ */
+std::string compressedImageTransportFormat(const std::vector<unsigned char> & data);
 
 
 //============================================================================

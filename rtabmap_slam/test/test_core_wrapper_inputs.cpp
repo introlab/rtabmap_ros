@@ -23,6 +23,7 @@ All rights reserved. (BSD-3-Clause, see the repository root.)
 #include <rtabmap/core/Parameters.h>
 
 #include <rtabmap/core/Compression.h>
+#include <opencv2/imgproc.hpp>
 #include <rtabmap/core/SensorData.h>
 #include <rtabmap_conversions/MsgConversion.h>
 
@@ -568,6 +569,331 @@ TEST_F(CoreWrapperInputsTest, maps_sensor_data)
 	}
 
 	EXPECT_EQ(2u, getGraph().graph.poses_id.size());
+}
+
+/**
+ * Compressed images of rtabmap_msgs/SensorData (what odom_sensor_data/compressed carries)
+ * are stored as received, not decompressed and re-compressed: the formats below differ
+ * from Mem/ImageCompressionFormat (".jpg") and Mem/DepthCompressionFormat (".rvl"), so
+ * re-compressed images would not be the same bytes.
+ */
+class CoreWrapperCompressedSensorDataTest :
+	public CoreWrapperInputsTest,
+	public ::testing::WithParamInterface<std::tuple<std::string, bool>>
+{
+protected:
+	static constexpr int kWidth = 64;
+	static constexpr int kHeight = 48;
+
+	/// A textured color image and a depth image of @p depthType, compressed by rtabmap.
+	static rtabmap::SensorData makeCompressedData(int depthType, const std::string & depthFormat, double stamp)
+	{
+		cv::Mat rgb(kHeight, kWidth, CV_8UC3);
+		cv::randu(rgb, 0, 255);
+		cv::Mat depth(kHeight, kWidth, depthType);
+		if(depthType == CV_16UC1)
+		{
+			cv::randu(depth, 1000, 3000);
+		}
+		else
+		{
+			cv::randu(depth, 1.0f, 3.0f);
+		}
+		const rtabmap::CameraModel model(50.0, 50.0, kWidth/2.0, kHeight/2.0,
+				rtabmap::CameraModel::opticalRotation(), 0.0, cv::Size(kWidth, kHeight));
+		return rtabmap::SensorData(
+				rtabmap::compressImage2(rgb, ".png"),
+				rtabmap::compressImage2(depth, depthFormat),
+				model, 0, stamp);
+	}
+
+	/// Publishes @p data (compressed only, or with its raw images too) and returns the
+	/// node it became.
+	rtabmap_msgs::msg::Node map(const rtabmap::SensorData & data, bool withRaw,
+			const std::vector<rclcpp::Parameter> & params = {})
+	{
+		std::vector<rclcpp::Parameter> all = {
+				rclcpp::Parameter("subscribe_sensor_data", true),
+				rclcpp::Parameter("Mem/ImageCompressionFormat", std::string(".jpg")),
+				rclcpp::Parameter("Mem/DepthCompressionFormat", std::string(".rvl"))};
+		all.insert(all.end(), params.begin(), params.end());
+		makeNode(all);
+		std::shared_ptr<Collector<rtabmap_msgs::msg::Info>> info = collectInfo();
+		rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom = odomPublisher();
+		rclcpp::Publisher<rtabmap_msgs::msg::SensorData>::SharedPtr pub =
+				helper()->create_publisher<rtabmap_msgs::msg::SensorData>("sensor_data", 10);
+		EXPECT_TRUE(waitForSubscriber(pub));
+
+		rtabmap::SensorData copy = data;
+		if(withRaw)
+		{
+			copy.uncompressData();
+			EXPECT_FALSE(copy.imageRaw().empty());
+			EXPECT_FALSE(copy.depthRaw().empty());
+		}
+		rtabmap_msgs::msg::SensorData msg;
+		rtabmap_conversions::sensorDataToROS(copy, msg, "base_link", withRaw);
+		msg.header.stamp = stampOf(data.stamp());
+		sendOdom(odom, data.stamp(), 0.0);
+		pub->publish(msg);
+		EXPECT_TRUE(spinUntil([&]() { return !info->empty(); }));
+		return getNode(1);
+	}
+
+	static std::vector<unsigned char> bytes(const cv::Mat & compressed)
+	{
+		return std::vector<unsigned char>(compressed.data, compressed.data + compressed.total());
+	}
+};
+
+TEST_P(CoreWrapperCompressedSensorDataTest, stores_compressed_images_as_received)
+{
+	const std::string depthFormat = std::get<0>(GetParam());
+	const bool withRaw = std::get<1>(GetParam());
+	const int depthType = depthFormat == ".png" ? CV_16UC1 : CV_32FC1;
+	const rtabmap::SensorData data = makeCompressedData(depthType, depthFormat, 1.0);
+
+	const rtabmap_msgs::msg::Node node = map(data, withRaw);
+	ASSERT_EQ(1, node.id);
+	EXPECT_EQ(node.data.left_compressed, bytes(data.imageCompressed())) << "color not re-compressed";
+	EXPECT_EQ(node.data.right_compressed, bytes(data.depthOrRightCompressed())) << "depth not re-compressed";
+}
+
+INSTANTIATE_TEST_SUITE_P(
+		Formats,
+		CoreWrapperCompressedSensorDataTest,
+		::testing::Combine(
+				// 16UC1 PNG, 32FC1 lossless PNG (4 channels), 32FC1 inverse depth
+				::testing::Values(std::string(".png"), std::string(".png:10:100")),
+				::testing::Bool()),   // compressed only, or raw images too
+		[](const ::testing::TestParamInfo<std::tuple<std::string, bool>> & info) {
+			const std::string & f = std::get<0>(info.param);
+			return std::string(f == ".png" ? "png16" : "inverse_depth") +
+					(std::get<1>(info.param) ? "_with_raw" : "_compressed_only");
+		});
+
+/// The legacy lossless 32FC1 format is stored as received too.
+TEST_F(CoreWrapperCompressedSensorDataTest, stores_legacy_float_depth_as_received)
+{
+	const rtabmap::SensorData data = makeCompressedData(CV_32FC1, ".png", 1.0);
+	ASSERT_EQ(rtabmap::compressedDepthFormat(data.depthOrRightCompressed()), ".png");
+	const rtabmap_msgs::msg::Node node = map(data, false);
+	ASSERT_EQ(1, node.id);
+	EXPECT_EQ(node.data.right_compressed, bytes(data.depthOrRightCompressed()));
+}
+
+/// When Memory changes an image (here the color image, by Mem/ImagePostDecimation), it
+/// compresses it itself, with its own format; the images it leaves as is (here depth,
+/// decimated only by Mem/ImagePreDecimation) are still stored as received.
+TEST_F(CoreWrapperCompressedSensorDataTest, recompresses_only_the_images_it_changes)
+{
+	const rtabmap::SensorData data = makeCompressedData(CV_16UC1, ".png", 1.0);
+	const rtabmap_msgs::msg::Node node = map(data, false,
+			{rclcpp::Parameter("Mem/ImagePostDecimation", std::string("2"))});
+	ASSERT_EQ(1, node.id);
+	const cv::Mat rgb = rtabmap::uncompressImage(node.data.left_compressed);
+	EXPECT_EQ(rgb.cols, kWidth/2);
+	ASSERT_GE(node.data.left_compressed.size(), 2u);
+	EXPECT_EQ(node.data.left_compressed[0], 0xFF) << "JPEG, Mem/ImageCompressionFormat";
+	EXPECT_EQ(node.data.right_compressed, bytes(data.depthOrRightCompressed()));
+}
+
+/**
+ * The same for rtabmap_msgs/RGBDImage: images received compressed only are stored as
+ * received (depth in compressed_depth_image_transport's format only converted to rtabmap's
+ * format, without decompression), unless they had to be changed on the way.
+ */
+class CoreWrapperCompressedRGBDTest : public CoreWrapperInputsTest
+{
+protected:
+	static constexpr int kWidth = 64;
+	static constexpr int kHeight = 48;
+
+	/// @p msg with only its images and camera infos left to set.
+	static rtabmap_msgs::msg::RGBDImage makeMsg()
+	{
+		rtabmap_msgs::msg::RGBDImage msg;
+		msg.header.frame_id = "camera";
+		msg.header.stamp = stampOf(1.0);
+		msg.rgb_camera_info = makeCameraInfo("camera", 1.0, kWidth, kHeight);
+		msg.depth_camera_info = msg.rgb_camera_info;
+		return msg;
+	}
+
+	static cv::Mat colorImage()
+	{
+		return cv_bridge::toCvCopy(makeTexturedImage("camera", 1.0, kWidth, kHeight))->image;
+	}
+
+	static cv::Mat floatDepth()
+	{
+		cv::Mat depth(kHeight, kWidth, CV_32FC1);
+		cv::randu(depth, 1.0f, 3.0f);
+		return depth;
+	}
+
+	static sensor_msgs::msg::CompressedImage compressedColor(const cv::Mat & image, const std::string & encoding)
+	{
+		sensor_msgs::msg::CompressedImage msg;
+		EXPECT_TRUE(rtabmap_conversions::toCompressedImageMsg(
+				cv_bridge::CvImage(makeMsg().header, encoding, image), "png", msg));
+		return msg;
+	}
+
+	static sensor_msgs::msg::CompressedImage compressedDepth(const cv::Mat & depth, const std::string & format)
+	{
+		sensor_msgs::msg::CompressedImage msg;
+		msg.header = makeMsg().header;
+		EXPECT_TRUE(rtabmap_conversions::compressDepthImage(depth, format, msg));
+		return msg;
+	}
+
+	/// Maps @p msg (Mem/ImageCompressionFormat=".jpg", Mem/DepthCompressionFormat=".rvl",
+	/// so that re-compressed images are not the same bytes) and returns its node.
+	rtabmap_msgs::msg::Node map(const rtabmap_msgs::msg::RGBDImage & msg,
+			const std::vector<rclcpp::Parameter> & params = {})
+	{
+		std::vector<rclcpp::Parameter> all = {
+				rclcpp::Parameter("subscribe_rgbd", true),
+				rclcpp::Parameter("Mem/ImageCompressionFormat", std::string(".jpg")),
+				rclcpp::Parameter("Mem/DepthCompressionFormat", std::string(".rvl"))};
+		all.insert(all.end(), params.begin(), params.end());
+		publishStaticTf("camera");
+		makeNode(all);
+		std::shared_ptr<Collector<rtabmap_msgs::msg::Info>> info = collectInfo();
+		rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom = odomPublisher();
+		rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr rgbd =
+				helper()->create_publisher<rtabmap_msgs::msg::RGBDImage>("rgbd_image", 10);
+		EXPECT_TRUE(waitForSubscriber(rgbd));
+		sendOdom(odom, 1.0, 0.0);
+		rgbd->publish(msg);
+		EXPECT_TRUE(spinUntil([&]() { return !info->empty(); }));
+		return getNode(1);
+	}
+
+	/// Maps a color PNG and @p depth, both compressed only, and checks they are stored as is.
+	void checkStoredAsReceived(const sensor_msgs::msg::CompressedImage & depth, const std::string & storedFormat)
+	{
+		rtabmap_msgs::msg::RGBDImage msg = makeMsg();
+		msg.rgb_compressed = compressedColor(colorImage(), "bgr8");
+		msg.depth_compressed = depth;
+
+		const rtabmap_msgs::msg::Node node = map(msg);
+		ASSERT_EQ(1, node.id);
+		EXPECT_EQ(node.data.left_compressed, msg.rgb_compressed.data) << "color not re-compressed";
+		const cv::Mat expected = depth.format.find("compressedDepth") != std::string::npos ?
+				rtabmap_conversions::compressedDepthTransportToRtabmap(depth) :
+				rtabmap_conversions::compressedMatFromBytes(depth.data);
+		EXPECT_EQ(node.data.right_compressed, std::vector<unsigned char>(expected.data, expected.data + expected.total()))
+			<< "depth not re-compressed";
+		EXPECT_EQ(rtabmap::compressedDepthFormat(node.data.right_compressed), storedFormat);
+	}
+
+	/// Maps a compressed stereo pair and checks it is stored as is.
+	void checkStereoStoredAsReceived(bool decodeOnDemand)
+	{
+		rtabmap_msgs::msg::RGBDImage msg = makeMsg();
+		msg.depth_camera_info.p[3] = -msg.depth_camera_info.p[0] * 0.1; // 10 cm baseline
+		cv::Mat left, right;
+		cv::cvtColor(colorImage(), left, cv::COLOR_BGR2GRAY);
+		cv::flip(left, right, 1);
+		msg.rgb_compressed = compressedColor(left, "mono8");
+		msg.depth_compressed = compressedColor(right, "mono8");
+		const rtabmap_msgs::msg::Node node = map(msg, {rclcpp::Parameter("decode_images_on_demand", decodeOnDemand)});
+		ASSERT_EQ(1, node.id);
+		ASSERT_EQ(node.data.right_camera_info.size(), 1u) << "stored as a stereo pair";
+		EXPECT_EQ(node.data.left_compressed, msg.rgb_compressed.data);
+		EXPECT_EQ(node.data.right_compressed, msg.depth_compressed.data);
+	}
+
+	static bool isJpeg(const std::vector<unsigned char> & bytes)
+	{
+		return bytes.size() >= 2 && bytes[0] == 0xFF && bytes[1] == 0xD8;
+	}
+};
+
+TEST_F(CoreWrapperCompressedRGBDTest, stores_16bits_compressed_depth_as_received)
+{
+	cv::Mat depth16U;
+	floatDepth().convertTo(depth16U, CV_16UC1, 1000.0);
+	checkStoredAsReceived(compressedDepth(depth16U, ".png"), ".png");
+}
+
+TEST_F(CoreWrapperCompressedRGBDTest, stores_inverse_depth_as_received)
+{
+	checkStoredAsReceived(compressedDepth(floatDepth(), ".png:10:100"), ".png:10:100");
+}
+
+TEST_F(CoreWrapperCompressedRGBDTest, stores_legacy_float_depth_as_received)
+{
+	checkStoredAsReceived(compressedDepth(floatDepth(), "legacy"), ".png");
+}
+
+/// Decoding on demand can be disabled: images are then decoded here, and still stored as
+/// received.
+TEST_F(CoreWrapperCompressedRGBDTest, stores_compressed_images_as_received_when_decoded_here)
+{
+	rtabmap_msgs::msg::RGBDImage msg = makeMsg();
+	msg.rgb_compressed = compressedColor(colorImage(), "bgr8");
+	msg.depth_compressed = compressedDepth(floatDepth(), ".png:10:100");
+	const rtabmap_msgs::msg::Node node = map(msg, {rclcpp::Parameter("decode_images_on_demand", false)});
+	ASSERT_EQ(1, node.id);
+	EXPECT_EQ(node.data.left_compressed, msg.rgb_compressed.data);
+	EXPECT_EQ(rtabmap::compressedDepthFormat(node.data.right_compressed), ".png:10:100");
+}
+
+/// gen_scan needs the depth pixels: the images are decoded here, and the scan generated.
+TEST_F(CoreWrapperCompressedRGBDTest, decodes_images_to_generate_a_scan)
+{
+	rtabmap_msgs::msg::RGBDImage msg = makeMsg();
+	msg.rgb_compressed = compressedColor(colorImage(), "bgr8");
+	msg.depth_compressed = compressedDepth(floatDepth(), ".png:10:100");
+	const rtabmap_msgs::msg::Node node = map(msg, {rclcpp::Parameter("gen_scan", true)});
+	ASSERT_EQ(1, node.id);
+	EXPECT_FALSE(node.data.laser_scan_compressed.empty()) << "scan generated from the depth image";
+	EXPECT_EQ(node.data.left_compressed, msg.rgb_compressed.data) << "still stored as received";
+}
+
+/// A compressed stereo pair (gray right image) is stored as received too, decoded on
+/// demand or here.
+TEST_F(CoreWrapperCompressedRGBDTest, stores_a_compressed_stereo_pair_as_received)
+{
+	checkStereoStoredAsReceived(true);
+}
+
+TEST_F(CoreWrapperCompressedRGBDTest, stores_a_compressed_stereo_pair_as_received_when_decoded_here)
+{
+	checkStereoStoredAsReceived(false);
+}
+
+/// A raw image is compressed by rtabmap; the compressed one next to it is still stored as is.
+TEST_F(CoreWrapperCompressedRGBDTest, stores_compressed_depth_with_raw_color)
+{
+	rtabmap_msgs::msg::RGBDImage msg = makeMsg();
+	msg.rgb = makeTexturedImage("camera", 1.0, kWidth, kHeight);
+	msg.depth_compressed = compressedDepth(floatDepth(), ".png:10:100");
+	const rtabmap_msgs::msg::Node node = map(msg);
+	ASSERT_EQ(1, node.id);
+	EXPECT_TRUE(isJpeg(node.data.left_compressed)) << "Mem/ImageCompressionFormat";
+	const cv::Mat expected = rtabmap_conversions::compressedDepthTransportToRtabmap(msg.depth_compressed);
+	EXPECT_EQ(node.data.right_compressed, std::vector<unsigned char>(expected.data, expected.data + expected.total()));
+}
+
+/// A color image that has to be converted (here mono16 to mono8) is not the image of its
+/// compressed bytes anymore: it is compressed again by rtabmap.
+TEST_F(CoreWrapperCompressedRGBDTest, recompresses_converted_images)
+{
+	rtabmap_msgs::msg::RGBDImage msg = makeMsg();
+	cv::Mat gray16(kHeight, kWidth, CV_16UC1);
+	cv::randu(gray16, 0, 65535);
+	msg.rgb_compressed = compressedColor(gray16, "mono16");
+	ASSERT_EQ(msg.rgb_compressed.format, "mono16; png compressed mono16");
+	msg.depth_compressed = compressedDepth(floatDepth(), ".png:10:100");
+	const rtabmap_msgs::msg::Node node = map(msg);
+	ASSERT_EQ(1, node.id);
+	EXPECT_TRUE(isJpeg(node.data.left_compressed)) << "converted to mono8, then Mem/ImageCompressionFormat";
+	EXPECT_EQ(rtabmap::uncompressImage(node.data.left_compressed).type(), CV_8UC1);
+	EXPECT_EQ(rtabmap::compressedDepthFormat(node.data.right_compressed), ".png:10:100") << "depth still as received";
 }
 
 //==========================================================================================

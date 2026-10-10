@@ -13,6 +13,7 @@ It is the inverse of [rtabmap_sync](https://docs.ros.org/en/jazzy/p/rtabmap_sync
 - [Published Topics](#published-topics)
 - [Parameters](#parameters)
 - [Stereo messages](#stereo-messages)
+- [Compressed images](#compressed-images)
 - [Notes](#notes)
 
 ## Usage
@@ -57,6 +58,8 @@ The output topics are named after the **resolved** input topic, so remapping `rg
 | `<rgbd_image>/rgb/camera_info` | [`sensor_msgs/msg/CameraInfo`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/CameraInfo.html) | |
 | `<rgbd_image>/depth/image` | [`sensor_msgs/msg/Image`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/Image.html) | The depth image, or the right image of a stereo pair. |
 | `<rgbd_image>/depth/camera_info` | [`sensor_msgs/msg/CameraInfo`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/CameraInfo.html) | For a stereo pair this is the right camera, and its `P(0,3)` carries the baseline. |
+| `<rgbd_image>/rgb/image/compressed` | [`sensor_msgs/msg/CompressedImage`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/CompressedImage.html) | The color image in [`compressed_image_transport`](https://github.com/ros-perception/image_transport_plugins)'s format, published by the node itself unless `compressed_passthrough` is false. Same for `<rgbd_image>/right/image/compressed` with `stereo: true`. See [Compressed images](#compressed-images). |
+| `<rgbd_image>/depth/image/compressedDepth` | [`sensor_msgs/msg/CompressedImage`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/CompressedImage.html) | The depth image in [`compressed_depth_image_transport`](https://github.com/ros-perception/image_transport_plugins)'s format, published by the node itself unless `compressed_depth_passthrough` is false. See [Compressed images](#compressed-images). |
 
 Each half is only unpacked if something is subscribed to it, so subscribing to color alone does not pay for depth decompression.
 
@@ -70,6 +73,12 @@ Each half is only unpacked if something is subscribed to it, so subscribing to c
 | `queue_sub` | `int` | `5` | Queue depth of the `rgbd_image` subscription. Must be at least 1. |
 | `queue_pub` | `int` | `1` | Queue depth of every publisher. Must be at least 1. |
 | `stereo` | `bool` | `false` | Name the outputs `left`/`right` instead of `rgb`/`depth`. See [Stereo messages](#stereo-messages). |
+| `compressed_passthrough` | `bool` | `true` | Publish the `compressed` topics (color, left and right images) from the compressed images of the input without decompressing them, in place of the `compressed` image_transport plugin. See [Compressed images](#compressed-images). |
+| `compressed_depth_passthrough` | `bool` | `compressed_passthrough` | Same for the `compressedDepth` topic (depth), in place of the `compressedDepth` image_transport plugin. |
+| `<color topic>.compressed.format` | `string` | `"jpeg"` | `jpeg` or `png`. With `compressed_passthrough`, used only when an image (color, left or right) has to be compressed. `<color topic>` is the color (or left) topic with `.` instead of `/`, e.g. `rgbd_image.rgb.image`. |
+| `<depth topic>.compressedDepth.format` | `string` | `"png"` | `png` or `rvl` (Jazzy and later). With `compressed_depth_passthrough`, used only when the depth has to be compressed. `<depth topic>` is the depth topic with `.` instead of `/`, e.g. `rgbd_image.depth.image`. |
+| `<depth topic>.compressedDepth.depth_max` | `double` | `10.0` | Same, maximum depth (m) of a 32FC1 depth image. |
+| `<depth topic>.compressedDepth.depth_quantization` | `double` | `100.0` | Same, depth quantization of a 32FC1 depth image. |
 
 ## Stereo messages
 
@@ -91,6 +100,27 @@ ros2 run rtabmap_util rgbd_split --ros-args \
 Only the names change — the message contents and the order of the two halves are the same either way, so the `rgb` slot always becomes the left image. The two namings are exclusive: with `stereo: true` nothing is published on `rgb`/`depth`.
 
 The node checks the setting against what actually arrives, going by the encoding of the second half: `16UC1`, `32FC1` and `mono16` are depth, anything else is an image. If the two disagree it logs a warning **once** and keeps forwarding — a mismatch makes the topic name misleading, not the data wrong, so it is never worth dropping a frame over.
+
+## Compressed images
+
+`rgb_compressed` of an `RGBDImage` holds a JPEG or PNG image, and so does `depth_compressed` for the right image of a stereo pair. With `compressed_passthrough` (the default), the node republishes them as they are on `<rgbd_image>/rgb/image/compressed` (and `<rgbd_image>/right/image/compressed`), readable with the `compressed` transport. Their format is set from the image header, with the encoding (e.g. `"bgr8; jpeg compressed bgr8"`), which producers before 0.24 did not set. Raw images, or images whose header cannot be read, are compressed with `<color topic>.compressed.format`.
+
+`depth_compressed` of an `RGBDImage` holds depth in `compressed_depth_image_transport`'s format, or, from rtabmap_ros before 0.24 or with `depth_compression_format: "legacy"`, in rtabmap's own format (`png`, `rvl`, `png:<max>:<q>`, `rvl:<max>:<q>`), which image_transport plugins cannot read. The node republishes both on `<rgbd_image>/depth/image/compressedDepth`, readable with the `compressedDepth` transport:
+
+```bash
+ros2 run image_transport republish compressedDepth raw --ros-args \
+  -r in/compressedDepth:=/camera/rgbd_image/depth/image/compressedDepth -r out:=/depth
+```
+
+With `compressed_depth_passthrough` (the default), the depth is not decompressed when that can be avoided:
+
+| Input depth | `compressedDepth` output |
+|---|---|
+| `compressed_depth_image_transport` format | Republished as is (RVL re-compressed as PNG before Jazzy). |
+| rtabmap's legacy `png` (16UC1), `rvl`, `png:<max>:<q>`, `rvl:<max>:<q>` | Only the header is converted, the compressed payload is copied. Before Jazzy, `compressed_depth_image_transport` cannot decode RVL, so RVL payloads are re-compressed as PNG, losslessly. |
+| Raw, or rtabmap's legacy `png` of 32FC1 depth (4 channels) | Compressed with the `<depth topic>.compressedDepth.*` parameters. |
+
+The passthrough does not support the plugins' `jpeg_quality` and `png_level` parameters: to set them, set `compressed_passthrough: false` (`compressed` plugin) or `compressed_depth_passthrough: false` (`compressedDepth` plugin), and the plugin decompresses and re-compresses every frame instead. `compressed_depth_passthrough` follows `compressed_passthrough` unless set, so e.g. `compressed_passthrough: false` with `compressed_depth_passthrough: true` sets `jpeg_quality` of the color image while still passing the depth through.
 
 ## Notes
 

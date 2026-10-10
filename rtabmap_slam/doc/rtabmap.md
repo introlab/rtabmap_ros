@@ -37,6 +37,7 @@ Loop closures are found two ways:
   - [User data and environment sensors](#user-data-and-environment-sensors)
   - [Intermediate odometry](#intermediate-odometry)
 - [Deriving missing data](#deriving-missing-data)
+- [Compressed images](#compressed-images)
 - [Localization](#localization)
 - [Planning](#planning)
 - [Diagnostics](#diagnostics)
@@ -426,6 +427,7 @@ The node's own ROS parameters, with their real types. The ones about frames are 
 | `gen_depth_fill_iterations` | `int` | `1` | Hole-filling passes. |
 | `gen_depth_fill_holes_error` | `double` | `0.1` | Maximum depth difference, in meters, across a hole for it to be filled. |
 | `stereo_to_depth` | `bool` | `false` | Compute a depth image from the stereo pair (with the `StereoBM/*` parameters) and map it as RGB-D. |
+| `decode_images_on_demand` | `bool` | `true` | Leave compressed images of `rgbd_image` to RTAB-Map to decode, only if it needs them. See [Compressed images](#compressed-images). |
 | `scan_cloud_max_points` | `int` | `0` | Points in a full `scan_cloud` sweep, for an organized or fixed-size cloud; used by ICP as the reference for its correspondence ratio. `0` takes each cloud's own size. |
 | `scan_cloud_is_2d` | `bool` | `false` | `scan_cloud` is a 2D lidar published as a cloud. |
 | `odom_sensor_sync` | `bool` | `true` | Place each sensor where the robot was at that sensor's stamp, and deskew 2D scans ray by ray, using the odometry in TF. See [Sensors not stamped together](#sensors-not-stamped-together). |
@@ -562,6 +564,12 @@ With `subscribe_inter_odom_info`, `inter_odom` is synchronized by exact stamp wi
 **`gen_depth`** goes the other way: with an RGB camera (`subscribe_rgb`) and a lidar (`subscribe_scan_cloud`), the cloud is projected into the camera to give a sparse depth image, filled by `gen_depth_fill_*`, so visual loop closures get 3D features.
 
 **`stereo_to_depth`** computes a dense depth image from a stereo pair, so a stereo camera is mapped like an RGB-D one — denser grids and clouds, at the cost of the disparity computation.
+
+## Compressed images
+
+An `rgbd_image` (`subscribe_rgbd`, single camera) carrying only compressed images, as [rgbd_sync](https://docs.ros.org/en/jazzy/p/rtabmap_sync/)'s `rgbd_image/compressed` does, is not decoded by this node: the compressed images are given to RTAB-Map as they are, which decodes them only if it needs the pixels -- to extract features, build a grid from depth or rectify the images. With features already extracted by odometry (`Mem/UseOdomFeatures`), they are often never decoded at all. Either way, they are stored in the database as received, not compressed again.
+
+The images are decoded here instead when this node needs them (`gen_scan`, `gen_depth`, `stereo_to_depth`), when RTAB-Map could not use them as they are (e.g., 16 bits color images, a color right image, which are converted first), and for several cameras. `decode_images_on_demand: false` always decodes them here, as before 0.24: a fallback if something needs the decoded images that this node does not know of.
 
 ## Localization
 

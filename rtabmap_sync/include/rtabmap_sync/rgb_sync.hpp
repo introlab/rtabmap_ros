@@ -69,6 +69,8 @@ public:
 
 private:
 	double compressedRate_;
+	/// Format of the compressed color (and right) images: ".jpg" or ".png".
+	std::string imageCompressionFormat_ = ".jpg";
 	bool fillEmptyDepth_;
 
 	/// Stamp of the last compressed message published, for compressed_rate throttling.

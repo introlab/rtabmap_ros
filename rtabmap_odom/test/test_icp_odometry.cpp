@@ -4,6 +4,7 @@ All rights reserved. (BSD-3-Clause, see the repository root.)
 */
 
 #include <gtest/gtest.h>
+#include <rtabmap_msgs/msg/rgbd_image.hpp>
 
 #include <tf2_ros/static_transform_broadcaster.hpp>
 
@@ -582,6 +583,28 @@ TEST_F(IcpOdometryTest, publishes_an_identity_pose_for_the_first_scan_cloud)
 	EXPECT_NEAR(0.0, msg.pose.pose.position.x, 1e-6);
 	EXPECT_NEAR(0.0, msg.pose.pose.position.y, 1e-6);
 	EXPECT_NEAR(0.0, msg.pose.pose.position.z, 1e-6);
+}
+
+/// Without a camera there is no RGBDImage to republish: odom_rgbd_image stays silent,
+/// while the odometry itself is published.
+TEST_F(IcpOdometryTest, does_not_publish_an_rgbd_image_without_a_camera)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+			collect<nav_msgs::msg::Odometry>("odom");
+	std::shared_ptr<Collector<rtabmap_msgs::msg::RGBDImage>> frames =
+			collect<rtabmap_msgs::msg::RGBDImage>("odom_rgbd_image");
+	makeNode(icpTestParameters());
+
+	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub =
+			helper()->create_publisher<sensor_msgs::msg::PointCloud2>("scan_cloud", 10);
+	ASSERT_TRUE(waitForSubscriber(pub));
+	ASSERT_TRUE(waitForPublisher(frames->subscription));
+
+	pub->publish(makeXYZCloud("lidar", 1.0, corner3D()));
+	ASSERT_TRUE(spinUntil([&]() { return !odom->empty(); }));
+	spinFor(std::chrono::milliseconds(200));
+	EXPECT_TRUE(frames->empty());
 }
 
 /// A 2D lidar goes in on `scan` instead of `scan_cloud`, and reaches the same odometry.

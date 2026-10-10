@@ -27,6 +27,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <rtabmap_sync/CommonDataSubscriber.h>
 #include <rtabmap/utilite/ULogger.h>
+#include <rtabmap/core/Compression.h>
+#include <rtabmap_conversions/MsgConversion.h>
 
 namespace rtabmap_sync {
 
@@ -1060,6 +1062,32 @@ CommonDataSubscriber::~CommonDataSubscriber()
 	rgbdSubs_.clear();
 }
 
+void CommonDataSubscriber::convertRGBDImage(
+		const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr & msg,
+		cv_bridge::CvImageConstPtr & rgb,
+		cv_bridge::CvImageConstPtr & depth,
+		cv::Mat & compressedImage,
+		cv::Mat & compressedDepth) const
+{
+	rtabmap_conversions::rgbdImageCompressedToRtabmap(*msg, compressedImage, compressedDepth);
+	const bool compressedOnly =
+			msg->rgb.data.empty() && msg->depth.data.empty() &&
+			(!compressedImage.empty() || !compressedDepth.empty()) &&
+			(msg->rgb_compressed.data.empty() || !compressedImage.empty()) &&
+			(msg->depth_compressed.data.empty() || !compressedDepth.empty());
+	// A stereo pair has its baseline in P(0,3) of one of its camera infos
+	const bool stereo = msg->rgb_camera_info.p[3] != 0.0 || msg->depth_camera_info.p[3] != 0.0;
+	if(compressedOnly &&
+	   imagesDecodedOnDemand() &&
+	   rtabmap_conversions::isCompressedRGBDSupportedByRtabmap(compressedImage, compressedDepth, stereo))
+	{
+		rgb.reset();
+		depth.reset();
+		return;
+	}
+	rtabmap_conversions::toCvShare(msg, rgb, depth);
+}
+
 void CommonDataSubscriber::commonSingleCameraCallback(
 		const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
 		const rtabmap_msgs::msg::UserData::ConstSharedPtr & userDataMsg,
@@ -1073,7 +1101,9 @@ void CommonDataSubscriber::commonSingleCameraCallback(
 		const std::vector<rtabmap_msgs::msg::GlobalDescriptor> & globalDescriptorMsgs,
 		const std::vector<rtabmap_msgs::msg::KeyPoint> & localKeyPoints,
 		const std::vector<rtabmap_msgs::msg::Point3f> & localPoints3d,
-		const cv::Mat & localDescriptors)
+		const cv::Mat & localDescriptors,
+		const cv::Mat & compressedImage,
+		const cv::Mat & compressedDepth)
 {
 	std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > localKeyPointsMsgs;
 	localKeyPointsMsgs.push_back(localKeyPoints);
@@ -1096,7 +1126,25 @@ void CommonDataSubscriber::commonSingleCameraCallback(
 	}
 	cameraInfoMsgs.push_back(rgbCameraInfoMsg);
 	depthCameraInfoMsgs.push_back(depthCameraInfoMsg);
-	commonMultiCameraCallback(
+	if(compressedImage.empty() && compressedDepth.empty())
+	{
+		commonMultiCameraCallback(
+				odomMsg,
+				userDataMsg,
+				imageMsgs,
+				depthMsgs,
+				cameraInfoMsgs,
+				depthCameraInfoMsgs,
+				scanMsg,
+				scan3dMsg,
+				odomInfoMsg,
+				globalDescriptorMsgs,
+				localKeyPointsMsgs,
+				localPoints3dMsgs,
+				localDescriptorsMsgs);
+		return;
+	}
+	commonMultiCameraCallbackWithCompressed(
 			odomMsg,
 			userDataMsg,
 			imageMsgs,
@@ -1109,7 +1157,9 @@ void CommonDataSubscriber::commonSingleCameraCallback(
 			globalDescriptorMsgs,
 			localKeyPointsMsgs,
 			localPoints3dMsgs,
-			localDescriptorsMsgs);
+			localDescriptorsMsgs,
+			std::vector<cv::Mat>(1, compressedImage),
+			std::vector<cv::Mat>(1, compressedDepth));
 }
 
 void CommonDataSubscriber::tick(const rclcpp::Time & stamp, double targetFrequency)

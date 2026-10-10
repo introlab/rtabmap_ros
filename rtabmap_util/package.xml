@@ -37,6 +37,11 @@
   <depend>grid_map_ros</depend>
 
   <test_depend>ament_cmake_gtest</test_depend>
+  <test_depend>ament_index_cpp</test_depend>
+  <test_depend>class_loader</test_depend>
+  <!-- image_transport plugins the tests read rgbd_split's outputs with -->
+  <test_depend>compressed_image_transport</test_depend>
+  <test_depend>compressed_depth_image_transport</test_depend>
 
   <export>
 	<build_type>ament_cmake</build_type>
