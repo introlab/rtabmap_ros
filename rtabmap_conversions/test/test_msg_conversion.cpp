@@ -28,6 +28,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <cstring>
 #include <functional>
 #include <limits>
 
@@ -2275,6 +2276,25 @@ TEST(MsgConversion, rgbdImageFromROSWithoutDepthKeepsTheColorImage)
 	EXPECT_NEAR(data.cameraModels()[0].fx(), 525.0, 1e-9);
 }
 
+/// cv_bridge labels a decoded 16 bits image by its number of channels only (mono8);
+/// toCvCopy() and toCvShare() must say mono16, so that it is converted, not misread.
+TEST(MsgConversion, toCvCopyLabels16BitsCompressedRgb)
+{
+	cv::Mat gray16(6, 8, CV_16UC1);
+	cv::randu(gray16, 0, 65535);
+	rtabmap_msgs::msg::RGBDImage::SharedPtr msg = std::make_shared<rtabmap_msgs::msg::RGBDImage>();
+	ASSERT_TRUE(toCompressedImageMsg(cv_bridge::CvImage(std_msgs::msg::Header(), "mono16", gray16), "png", msg->rgb_compressed));
+
+	cv_bridge::CvImagePtr rgb, depth;
+	toCvCopy(*msg, rgb, depth);
+	EXPECT_EQ(rgb->encoding, "mono16");
+	EXPECT_EQ(rgb->image.type(), CV_16UC1);
+
+	cv_bridge::CvImageConstPtr rgbShared, depthShared;
+	toCvShare(msg, rgbShared, depthShared);
+	EXPECT_EQ(rgbShared->encoding, "mono16");
+}
+
 TEST(MsgConversion, toCvCopyReadsCompressedRgb)
 {
 	const cv::Mat rgb(8, 8, CV_8UC3, cv::Scalar(10, 20, 30));
@@ -3680,4 +3700,669 @@ TEST(MsgConversion, imuRoundTrip)
 		EXPECT_DOUBLE_EQ(out.linear_acceleration_covariance[i], in.linear_acceleration_covariance[i])
 			<< "linear acceleration covariance at " << i;
 	}
+}
+
+//============================================================================
+// compressedDepthTransportToRtabmap / rtabmapToCompressedDepthTransport
+//============================================================================
+
+namespace {
+
+cv::Mat makeFloatDepthRamp(int rows, int cols, float minDepth, float maxDepth)
+{
+	cv::Mat depth(rows, cols, CV_32FC1);
+	for(int r = 0; r < rows; ++r)
+	{
+		for(int c = 0; c < cols; ++c)
+		{
+			depth.at<float>(r, c) = minDepth + (maxDepth - minDepth) * float(r * cols + c) / float(rows * cols);
+		}
+	}
+	return depth;
+}
+
+// What compressed_depth_image_transport publishes for a 32FC1 or 16UC1 depth image.
+sensor_msgs::msg::CompressedImage encodeCompressedDepth(const cv::Mat & depth, const std::string & codec, float maxDepth, float quantization)
+{
+	struct { int32_t format; float depthParam[2]; } header = {0, {0.0f, 0.0f}};
+	cv::Mat image = depth;
+	if(depth.type() == CV_32FC1)
+	{
+		const float A = quantization * (quantization + 1.0f);
+		const float B = 1.0f - A / maxDepth;
+		image = cv::Mat(depth.size(), CV_16UC1);
+		for(int r = 0; r < depth.rows; ++r)
+		{
+			for(int c = 0; c < depth.cols; ++c)
+			{
+				const float d = depth.at<float>(r, c);
+				image.at<uint16_t>(r, c) = d < maxDepth ? (uint16_t)(A / d + B) : 0;
+			}
+		}
+		header.depthParam[0] = A;
+		header.depthParam[1] = B;
+	}
+	std::vector<unsigned char> payload;
+	if(codec == "png")
+	{
+		cv::imencode(".png", image, payload);
+	}
+	else
+	{
+		const std::vector<unsigned char> rtabmapRvl = rtabmap::compressImage(image, ".rvl");
+		payload.assign(rtabmapRvl.begin() + 8, rtabmapRvl.end()); // without "DEPTHRVL"
+	}
+	sensor_msgs::msg::CompressedImage msg;
+	msg.format = (depth.type() == CV_32FC1 ? "32FC1" : "16UC1") + std::string("; compressedDepth ") + codec;
+	msg.data.resize(sizeof(header));
+	memcpy(msg.data.data(), &header, sizeof(header));
+	msg.data.insert(msg.data.end(), payload.begin(), payload.end());
+	return msg;
+}
+
+std::vector<unsigned char> toBytes(const cv::Mat & compressed)
+{
+	return std::vector<unsigned char>(compressed.data, compressed.data + compressed.total());
+}
+
+} // namespace
+
+TEST(MsgConversion, compressedDepthRoundTrip)
+{
+	const cv::Mat depth = makeFloatDepthRamp(48, 64, 0.2f, 9.9f);
+	cv::Mat depth16;
+	depth.convertTo(depth16, CV_16UC1, 1000.0);
+	const float A = 100.0f * 101.0f;
+
+	struct Case { cv::Mat image; std::string codec; };
+	const Case cases[] = {{depth, "png"}, {depth, "rvl"}, {depth16, "png"}, {depth16, "rvl"}};
+	for(const Case & cs : cases)
+	{
+		const sensor_msgs::msg::CompressedImage rosMsg = encodeCompressedDepth(cs.image, cs.codec, 10.0f, 100.0f);
+		SCOPED_TRACE(rosMsg.format);
+		const bool isFloat = cs.image.type() == CV_32FC1;
+
+		const cv::Mat compressed = compressedDepthTransportToRtabmap(rosMsg);
+		ASSERT_FALSE(compressed.empty());
+		ASSERT_EQ(compressed.type(), CV_8UC1);
+		EXPECT_EQ(rtabmap::compressedDepthFormat(compressed), isFloat ? "." + cs.codec + ":10:100" : "." + cs.codec);
+		// Only the header changed, the payload is the same
+		const size_t payloadSize = rosMsg.data.size() - 12;
+		ASSERT_GE(compressed.total(), payloadSize);
+		EXPECT_EQ(memcmp(compressed.data + compressed.total() - payloadSize, rosMsg.data.data() + 12, payloadSize), 0);
+
+		const cv::Mat restored = rtabmap::uncompressImage(compressed);
+		ASSERT_EQ(restored.size(), cs.image.size());
+		ASSERT_EQ(restored.type(), cs.image.type());
+		if(isFloat)
+		{
+			for(int r = 0; r < depth.rows; ++r)
+			{
+				for(int c = 0; c < depth.cols; ++c)
+				{
+					// compressed_depth_image_transport truncates: up to one quantization step of error
+					const float d = depth.at<float>(r, c);
+					ASSERT_NEAR(restored.at<float>(r, c), d, 1.02f * d * d / A + 1e-6f);
+				}
+			}
+		}
+		else
+		{
+			EXPECT_EQ(cv::countNonZero(restored != depth16), 0);
+		}
+
+		// And back to ROS
+		sensor_msgs::msg::CompressedImage rosMsgOut;
+		rosMsgOut.header.frame_id = "camera";
+		ASSERT_TRUE(rtabmapToCompressedDepthTransport(compressed, rosMsgOut));
+		EXPECT_EQ(rosMsgOut.header.frame_id, "camera");
+#ifdef PRE_ROS_JAZZY
+		if(cs.codec == "rvl")
+		{
+			// compressed_depth_image_transport cannot decode RVL before Jazzy: re-compressed
+			// as PNG, with the same 16 bits values
+			EXPECT_EQ(rosMsgOut.format, (isFloat ? "32FC1" : "16UC1") + std::string("; compressedDepth png"));
+			EXPECT_EQ(cv::countNonZero(rtabmap::uncompressImage(compressedDepthTransportToRtabmap(rosMsgOut)) != restored), 0);
+			continue;
+		}
+#endif
+		EXPECT_EQ(rosMsgOut.format, rosMsg.format);
+		EXPECT_EQ(rosMsgOut.data, rosMsg.data);
+
+		// Depth images compressed by rtabmap can be published as compressedDepth
+		const cv::Mat rtabmapCompressed = rtabmap::compressImage2(cs.image, "." + cs.codec + ":10:100");
+		ASSERT_TRUE(rtabmapToCompressedDepthTransport(rtabmapCompressed, rosMsgOut));
+		EXPECT_EQ(rosMsgOut.format, rosMsg.format);
+		EXPECT_EQ(toBytes(compressedDepthTransportToRtabmap(rosMsgOut)), toBytes(rtabmapCompressed));
+	}
+}
+
+TEST(MsgConversion, compressedDepthTransportToRtabmapOldFormatIsPng)
+{
+	sensor_msgs::msg::CompressedImage msg = encodeCompressedDepth(makeFloatDepthRamp(8, 8, 0.5f, 5.0f), "png", 10.0f, 100.0f);
+	msg.format = "32FC1; compressedDepth";
+	EXPECT_EQ(rtabmap::compressedDepthFormat(compressedDepthTransportToRtabmap(msg)), ".png:10:100");
+	msg.format = "mono16; compressedDepth png";
+	EXPECT_EQ(rtabmap::compressedDepthFormat(compressedDepthTransportToRtabmap(msg)), ".png");
+}
+
+TEST(MsgConversion, compressedDepthUnsupported)
+{
+	const cv::Mat depth = makeFloatDepthRamp(8, 8, 0.5f, 5.0f);
+	sensor_msgs::msg::CompressedImage msg = encodeCompressedDepth(depth, "png", 10.0f, 100.0f);
+
+	sensor_msgs::msg::CompressedImage bad = msg;
+	bad.format = "32FC1; compressedDepth zstd";
+	EXPECT_TRUE(compressedDepthTransportToRtabmap(bad).empty());
+	bad.format = "bgr8; compressedDepth png";
+	EXPECT_TRUE(compressedDepthTransportToRtabmap(bad).empty());
+	bad = msg;
+	bad.data.resize(12);
+	EXPECT_TRUE(compressedDepthTransportToRtabmap(bad).empty());
+	EXPECT_TRUE(compressedDepthTransportToRtabmap(sensor_msgs::msg::CompressedImage()).empty());
+
+	// Legacy 32FC1 (4 channels PNG), 8 bits and empty images have no compressedDepth equivalent
+	sensor_msgs::msg::CompressedImage out;
+	out.format = "unchanged";
+	EXPECT_FALSE(rtabmapToCompressedDepthTransport(rtabmap::compressImage2(depth, ".png"), out));
+	EXPECT_FALSE(rtabmapToCompressedDepthTransport(rtabmap::compressImage2(cv::Mat::ones(8, 8, CV_8UC1), ".png"), out));
+	EXPECT_FALSE(rtabmapToCompressedDepthTransport(cv::Mat(), out));
+	EXPECT_EQ(out.format, "unchanged");
+	EXPECT_TRUE(out.data.empty());
+}
+
+//============================================================================
+// uncompressDepthImage / compressDepthImage
+//============================================================================
+
+TEST(MsgConversion, uncompressDepthImageAcceptsEveryFormat)
+{
+	const cv::Mat depth32F = makeFloatDepthRamp(6, 8, 0.5f, 8.0f);
+	cv::Mat depth16U;
+	depth32F.convertTo(depth16U, CV_16UC1, 1000.0);
+	const cv::Mat gray(6, 8, CV_8UC1, cv::Scalar(77));
+	const cv::Mat bgr(6, 8, CV_8UC3, cv::Scalar(1, 2, 3));
+
+	struct Case
+	{
+		std::string name;
+		sensor_msgs::msg::CompressedImage msg;
+		cv::Mat expected;
+		std::string encoding;
+		float tolerance;
+	};
+	std::vector<Case> cases;
+	const auto rtabmapMsg = [](const cv::Mat & image, const std::string & format) {
+		sensor_msgs::msg::CompressedImage msg;
+		msg.header.frame_id = "camera";
+		EXPECT_TRUE(compressDepthImage(image, format, msg)) << format;
+		return msg;
+	};
+	cases.push_back({"png 16UC1", rtabmapMsg(depth16U, ".png"), depth16U, "16UC1", 0.0f});
+	cases.push_back({"rvl 16UC1", rtabmapMsg(depth16U, ".rvl"), depth16U, "16UC1", 0.0f});
+	cases.push_back({"32FC1 in millimeters", rtabmapMsg(depth32F, ".png"), depth16U, "16UC1", 1.0f});
+	cases.push_back({"inverse depth", rtabmapMsg(depth32F, ".rvl:10:100"), depth32F, "32FC1", 0.004f});
+	cases.push_back({"legacy 16UC1", rtabmapMsg(depth16U, "legacy"), depth16U, "16UC1", 0.0f});
+	cases.push_back({"legacy 32FC1", rtabmapMsg(depth32F, "legacy"), depth32F, "32FC1", 0.0f});
+	{
+		// rtabmap_ros < 0.24 (rtabmap's bytes with a format of rtabmap's codec)
+		sensor_msgs::msg::CompressedImage msg;
+		msg.header.frame_id = "camera";
+		msg.format = "rvl";
+		msg.data = rtabmap::compressImage(depth16U, ".rvl");
+		cases.push_back({"rtabmap rvl", msg, depth16U, "16UC1", 0.0f});
+		msg.format = "png:10:100";
+		msg.data = rtabmap::compressImage(depth32F, ".png:10:100");
+		cases.push_back({"rtabmap inverse depth", msg, depth32F, "32FC1", 0.004f});
+	}
+	{
+		sensor_msgs::msg::CompressedImage msg = encodeCompressedDepth(depth32F, "png", 10.0f, 100.0f);
+		msg.header.frame_id = "camera";
+		cases.push_back({"compressedDepth 32FC1", msg, depth32F, "32FC1", 0.008f});
+	}
+	{
+		sensor_msgs::msg::CompressedImage msg = encodeCompressedDepth(depth16U, "rvl", 10.0f, 100.0f);
+		msg.header.frame_id = "camera";
+		cases.push_back({"compressedDepth 16UC1", msg, depth16U, "16UC1", 0.0f});
+	}
+	{
+		sensor_msgs::msg::CompressedImage msg;
+		cv_bridge::CvImage(std_msgs::msg::Header(), "mono8", gray).toCompressedImageMsg(msg, cv_bridge::PNG);
+		msg.header.frame_id = "camera";
+		cases.push_back({"png right image", msg, gray, "mono8", 0.0f});
+	}
+	{
+		sensor_msgs::msg::CompressedImage msg;
+		cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", bgr).toCompressedImageMsg(msg, cv_bridge::JPG);
+		msg.header.frame_id = "camera";
+		cases.push_back({"jpeg right image", msg, bgr, "bgr8", 2.0f});
+	}
+
+	for(const Case & cs : cases)
+	{
+		SCOPED_TRACE(cs.name + " (format=\"" + cs.msg.format + "\")");
+		const cv_bridge::CvImagePtr out = uncompressDepthImage(cs.msg);
+		ASSERT_TRUE(out);
+		ASSERT_EQ(out->image.type(), cs.expected.type());
+		EXPECT_EQ(out->encoding, cs.encoding);
+		EXPECT_EQ(out->header.frame_id, "camera");
+		EXPECT_LE(cv::norm(out->image, cs.expected, cv::NORM_INF), cs.tolerance);
+	}
+}
+
+TEST(MsgConversion, uncompressDepthImageEmptyOrInvalid)
+{
+	sensor_msgs::msg::CompressedImage msg;
+	msg.header.frame_id = "camera";
+	cv_bridge::CvImagePtr out = uncompressDepthImage(msg);
+	ASSERT_TRUE(out);
+	EXPECT_TRUE(out->image.empty());
+	EXPECT_EQ(out->header.frame_id, "camera");
+
+	msg.format = "png";
+	msg.data = {1, 2, 3, 4, 5};
+	out = uncompressDepthImage(msg);
+	ASSERT_TRUE(out);
+	EXPECT_TRUE(out->image.empty());
+	EXPECT_TRUE(out->encoding.empty());
+
+	msg.format = "32FC1; compressedDepth png";
+	out = uncompressDepthImage(msg);
+	ASSERT_TRUE(out);
+	EXPECT_TRUE(out->image.empty());
+}
+
+TEST(MsgConversion, compressDepthImageSetsTheFormat)
+{
+	const cv::Mat depth32F = makeFloatDepthRamp(4, 4, 0.5f, 3.0f);
+	const cv::Mat depth16U(4, 4, CV_16UC1, cv::Scalar(1000));
+	sensor_msgs::msg::CompressedImage msg;
+	msg.header.frame_id = "camera";
+
+#ifdef PRE_ROS_JAZZY
+	const std::string rvl = "png"; // compressed_depth_image_transport cannot decode RVL before Jazzy
+#else
+	const std::string rvl = "rvl";
+#endif
+	ASSERT_TRUE(compressDepthImage(depth32F, ".rvl:10:100", msg));
+	EXPECT_EQ(msg.format, "32FC1; compressedDepth " + rvl);
+	EXPECT_EQ(msg.header.frame_id, "camera") << "the header is kept";
+	ASSERT_TRUE(compressDepthImage(depth32F, ".png", msg));
+	EXPECT_EQ(msg.format, "16UC1; compressedDepth png") << "32FC1 without depth parameters: millimeters";
+	ASSERT_TRUE(compressDepthImage(depth16U, ".rvl:10:100", msg));
+	EXPECT_EQ(msg.format, "16UC1; compressedDepth " + rvl) << "16UC1 ignores the inverse depth parameters";
+	ASSERT_TRUE(compressDepthImage(depth32F, "legacy", msg));
+	EXPECT_EQ(msg.format, "png");
+	EXPECT_EQ(rtabmap::compressedDepthFormat(msg.data), ".png");
+	const cv::Mat legacy = rtabmap::uncompressImage(msg.data);
+	ASSERT_EQ(legacy.type(), CV_32FC1);
+	EXPECT_EQ(memcmp(legacy.data, depth32F.data, depth32F.total() * depth32F.elemSize()), 0) << "lossless";
+
+	const std::vector<unsigned char> previous = msg.data;
+	EXPECT_FALSE(compressDepthImage(cv::Mat(4, 4, CV_8UC1, cv::Scalar(1)), ".png", msg));
+	EXPECT_FALSE(compressDepthImage(depth32F, ".jpg:10", msg));
+	EXPECT_FALSE(compressDepthImage(depth32F, "legacy:10", msg));
+	EXPECT_EQ(msg.data, previous) << "not modified on error";
+	EXPECT_EQ(msg.format, "png");
+
+	EXPECT_TRUE(isValidDepthCompressionFormat(".png"));
+	EXPECT_TRUE(isValidDepthCompressionFormat(".rvl:10:100"));
+	EXPECT_TRUE(isValidDepthCompressionFormat("legacy"));
+	EXPECT_TRUE(isValidDepthCompressionFormat("legacy:.rvl"));
+	EXPECT_TRUE(isValidDepthCompressionFormat("legacy:.png:10:100"));
+	EXPECT_FALSE(isValidDepthCompressionFormat(".jpg"));
+	EXPECT_FALSE(isValidDepthCompressionFormat("png"));
+	EXPECT_FALSE(isValidDepthCompressionFormat("legacy:"));
+	EXPECT_FALSE(isValidDepthCompressionFormat("legacy:.jpg"));
+	EXPECT_FALSE(isValidDepthCompressionFormat("legacy:rvl"));
+}
+
+TEST(MsgConversion, compressDepthImageLegacyIsRtabmapFormat)
+{
+	const cv::Mat depth32F = makeFloatDepthRamp(6, 8, 0.5f, 8.0f);
+	cv::Mat depth16U;
+	depth32F.convertTo(depth16U, CV_16UC1, 1000.0);
+
+	struct Case { cv::Mat depth; std::string format; std::string expected; };
+	const Case cases[] = {
+			{depth16U, "legacy", "png"},
+			{depth16U, "legacy:.rvl", "rvl"},
+			{depth16U, "legacy:.rvl:10:100", "rvl"},
+			{depth32F, "legacy", "png"},
+			{depth32F, "legacy:.rvl", "png"},  // RVL is 16 bits only: lossless 4 channels PNG
+			{depth32F, "legacy:.rvl:10:100", "rvl:10:100"}};
+	for(const Case & cs : cases)
+	{
+		SCOPED_TRACE(cs.format + (cs.depth.type() == CV_32FC1 ? " 32FC1" : " 16UC1"));
+		sensor_msgs::msg::CompressedImage msg;
+		ASSERT_TRUE(compressDepthImage(cs.depth, cs.format, msg));
+		EXPECT_EQ(msg.format, cs.expected);
+		// Same bytes as rtabmap stores in its database with Mem/DepthCompressionFormat
+		const std::string rtabmapFormat = cs.format == "legacy" ? ".png" : cs.format.substr(7);
+		EXPECT_EQ(msg.data, rtabmap::compressImage(cs.depth, rtabmapFormat));
+		const cv_bridge::CvImagePtr out = uncompressDepthImage(msg);
+		ASSERT_EQ(out->image.type(), cs.depth.type());
+		EXPECT_LE(cv::norm(out->image, cs.depth, cv::NORM_INF), cs.expected == "rvl:10:100" ? 0.004 : 0.0);
+	}
+}
+
+TEST(MsgConversion, compressDepthImageInMillimeters)
+{
+	cv::Mat depth(1, 8, CV_32FC1);
+	const float values[] = {1.2344f, 1.2346f, 0.0f, -1.0f, 65.6f,
+			std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::infinity(), 0.0004f};
+	const uint16_t expected[] = {1234, 1235, 0, 0, 0, 0, 0, 0};
+	for(int i = 0; i < 8; ++i)
+	{
+		depth.at<float>(0, i) = values[i];
+	}
+	sensor_msgs::msg::CompressedImage msg;
+	ASSERT_TRUE(compressDepthImage(depth, ".png", msg));
+	const cv_bridge::CvImagePtr out = uncompressDepthImage(msg);
+	ASSERT_EQ(out->encoding, "16UC1");
+	for(int i = 0; i < 8; ++i)
+	{
+		EXPECT_EQ(out->image.at<uint16_t>(0, i), expected[i]) << "input " << values[i];
+	}
+}
+
+TEST(MsgConversion, rgbdImageToROSConvertsCompressedDepth)
+{
+	const rtabmap::CameraModel model(500.0, 500.0, 4.0, 3.0, rtabmap::Transform::getIdentity());
+	const cv::Mat rgb = rtabmap::compressImage2(cv::Mat(6, 8, CV_8UC3, cv::Scalar(1, 2, 3)), ".jpg");
+	const cv::Mat depth32F = makeFloatDepthRamp(6, 8, 0.5f, 8.0f);
+	cv::Mat depth16U;
+	depth32F.convertTo(depth16U, CV_16UC1, 1000.0);
+#ifdef PRE_ROS_JAZZY
+	const std::string rvl = "png";
+#else
+	const std::string rvl = "rvl";
+#endif
+
+	struct Case { std::string name; cv::Mat compressed; std::string format; std::string legacyFormat; };
+	const Case cases[] = {
+			{"16UC1 rvl", rtabmap::compressImage2(depth16U, ".rvl"), "16UC1; compressedDepth " + rvl, "rvl"},
+			{"inverse depth", rtabmap::compressImage2(depth32F, ".png:10:100"), "32FC1; compressedDepth png", "png:10:100"},
+			{"legacy 32FC1", rtabmap::compressImage2(depth32F, ".png"), "16UC1; compressedDepth png", "png"}};
+	for(const Case & cs : cases)
+	{
+		SCOPED_TRACE(cs.name);
+		const rtabmap::SensorData data(rgb, cs.compressed, model, 1, 1.0);
+		for(bool legacy : {false, true})
+		{
+			rtabmap_msgs::msg::RGBDImage msg;
+			rgbdImageToROS(data, msg, "camera", legacy);
+			EXPECT_EQ(msg.depth_compressed.format, legacy ? cs.legacyFormat : cs.format);
+			if(legacy)
+			{
+				EXPECT_EQ(msg.depth_compressed.data, toBytes(cs.compressed)) << "copied as is";
+			}
+			const cv_bridge::CvImagePtr out = uncompressDepthImage(msg.depth_compressed);
+			ASSERT_FALSE(out->image.empty());
+		}
+	}
+}
+
+TEST(MsgConversion, rgbdImageToROSKeepsCompressedImages)
+{
+	cv::Mat K = (cv::Mat_<double>(3, 3) <<
+			525.0, 0.0, 320.0, 0.0, 525.0, 240.0, 0.0, 0.0, 1.0);
+	const rtabmap::CameraModel model(
+			"cam", cv::Size(8, 6), K, cv::Mat(), cv::Mat(), cv::Mat(),
+			rtabmap::Transform(0.0f, 0.0f, 0.1f, 0.0f, 0.0f, 0.0f));
+	const cv::Mat rgb(6, 8, CV_8UC3, cv::Scalar(10, 20, 30));
+	const cv::Mat depth = makeFloatDepthRamp(6, 8, 0.5f, 8.0f);
+
+	for(const std::string rgbFormat : {".jpg", ".png"})
+	{
+		SCOPED_TRACE(rgbFormat);
+		// Compressed only, as loaded from a database
+		const cv::Mat rgbCompressed = rtabmap::compressImage2(rgb, rgbFormat);
+		const cv::Mat depthCompressed = rtabmap::compressImage2(depth, ".rvl:10:100");
+		const rtabmap::SensorData in(rgbCompressed, depthCompressed, model, 1, 1234.5);
+		ASSERT_TRUE(in.imageRaw().empty());
+		ASSERT_TRUE(in.depthRaw().empty());
+
+		rtabmap_msgs::msg::RGBDImage msg;
+		rgbdImageToROS(in, msg, "camera_link");
+		EXPECT_TRUE(msg.rgb.data.empty());
+		EXPECT_TRUE(msg.depth.data.empty());
+		EXPECT_EQ(msg.rgb_compressed.format, rgbFormat == ".jpg" ? "bgr8; jpeg compressed bgr8" : "bgr8; png compressed bgr8");
+		EXPECT_EQ(msg.rgb_compressed.data, toBytes(rgbCompressed)) << "not re-compressed";
+#ifdef PRE_ROS_JAZZY
+		EXPECT_EQ(msg.depth_compressed.format, "32FC1; compressedDepth png");
+#else
+		EXPECT_EQ(msg.depth_compressed.format, "32FC1; compressedDepth rvl");
+		EXPECT_EQ(toBytes(compressedDepthTransportToRtabmap(msg.depth_compressed)), toBytes(depthCompressed)) << "not re-compressed";
+#endif
+		EXPECT_EQ(msg.depth_compressed.header.frame_id, "camera_link");
+
+		cv_bridge::CvImagePtr rgbOut, depthOut;
+		toCvCopy(msg, rgbOut, depthOut);
+		ASSERT_EQ(rgbOut->image.type(), CV_8UC3);
+		EXPECT_LE(cv::norm(rgbOut->image, rgb, cv::NORM_INF), rgbFormat == ".jpg" ? 3.0 : 0.0);
+		ASSERT_EQ(depthOut->encoding, "32FC1");
+		EXPECT_LE(cv::norm(depthOut->image, depth, cv::NORM_INF), 0.004);
+	}
+}
+
+//============================================================================
+// rgb_compressed: compressed_image_transport's format
+//============================================================================
+
+TEST(MsgConversion, toCompressedImageMsgSetsTheTransportFormat)
+{
+	struct Case { std::string encoding; cv::Mat image; std::string format; std::string expected; };
+	const Case cases[] = {
+			{"bgr8", cv::Mat(6, 8, CV_8UC3, cv::Scalar(10, 20, 30)), "jpeg", "bgr8; jpeg compressed bgr8"},
+			{"rgb8", cv::Mat(6, 8, CV_8UC3, cv::Scalar(10, 20, 30)), "jpeg", "bgr8; jpeg compressed bgr8"},
+			{"mono8", cv::Mat(6, 8, CV_8UC1, cv::Scalar(40)), "jpeg", "mono8; jpeg compressed mono8"},
+			{"bgr8", cv::Mat(6, 8, CV_8UC3, cv::Scalar(10, 20, 30)), "png", "bgr8; png compressed bgr8"},
+			{"bgra8", cv::Mat(6, 8, CV_8UC4, cv::Scalar(10, 20, 30, 40)), "png", "bgra8; png compressed bgra8"},
+			{"mono16", cv::Mat(6, 8, CV_16UC1, cv::Scalar(1234)), "png", "mono16; png compressed mono16"}};
+	for(const Case & cs : cases)
+	{
+		SCOPED_TRACE(cs.encoding + " " + cs.format);
+		cv_bridge::CvImage image;
+		image.header.frame_id = "camera";
+		image.encoding = cs.encoding;
+		image.image = cs.image;
+		sensor_msgs::msg::CompressedImage msg;
+		ASSERT_TRUE(toCompressedImageMsg(image, cs.format, msg));
+		EXPECT_EQ(msg.format, cs.expected);
+		EXPECT_EQ(msg.header.frame_id, "camera");
+
+		// The encoding announced is the one of the data
+		const cv_bridge::CvImagePtr decoded = cv_bridge::toCvCopy(msg);
+		const std::string announced = msg.format.substr(0, msg.format.find(';'));
+		EXPECT_EQ(decoded->image.channels(), sensor_msgs::image_encodings::numChannels(announced));
+		EXPECT_EQ(decoded->image.elemSize1() * 8, (size_t)sensor_msgs::image_encodings::bitDepth(announced));
+
+		// Same format as rgbdImageToROS() reads from the header of the compressed bytes
+		const rtabmap::CameraModel model(500.0, 500.0, 4.0, 3.0, rtabmap::Transform::getIdentity());
+		const rtabmap::SensorData data(compressedMatFromBytes(msg.data), cv::Mat(), model, 1, 1.0);
+		rtabmap_msgs::msg::RGBDImage rgbd;
+		rgbdImageToROS(data, rgbd, "camera");
+		EXPECT_EQ(rgbd.rgb_compressed.format, cs.expected);
+	}
+
+	cv_bridge::CvImage image(std_msgs::msg::Header(), "bgr8", cv::Mat(6, 8, CV_8UC3, cv::Scalar(1, 2, 3)));
+	sensor_msgs::msg::CompressedImage msg;
+	msg.format = "unchanged";
+	EXPECT_FALSE(toCompressedImageMsg(image, "jpg", msg)) << "\"jpeg\" or \".jpg\"";
+	EXPECT_FALSE(toCompressedImageMsg(image, "tiff", msg));
+	EXPECT_FALSE(toCompressedImageMsg(image, ".bmp", msg));
+	EXPECT_EQ(msg.format, "unchanged");
+
+	// rtabmap's names
+	ASSERT_TRUE(toCompressedImageMsg(image, ".jpg", msg));
+	EXPECT_EQ(msg.format, "bgr8; jpeg compressed bgr8");
+	ASSERT_TRUE(toCompressedImageMsg(image, ".png", msg));
+	EXPECT_EQ(msg.format, "bgr8; png compressed bgr8");
+}
+
+/// 16 bits color PNGs: the format and the decoded encoding come from the PNG header.
+TEST(MsgConversion, compressedImageTransportFormatReads16BitsColor)
+{
+	struct Case { cv::Mat image; std::string encoding; };
+	const Case cases[] = {
+			{cv::Mat(6, 8, CV_16UC3, cv::Scalar(1000, 2000, 3000)), "bgr16"},
+			{cv::Mat(6, 8, CV_16UC4, cv::Scalar(1000, 2000, 3000, 4000)), "bgra16"}};
+	for(const Case & cs : cases)
+	{
+		SCOPED_TRACE(cs.encoding);
+		rtabmap_msgs::msg::RGBDImage msg;
+		ASSERT_TRUE(cv::imencode(".png", cs.image, msg.rgb_compressed.data));
+		EXPECT_EQ(compressedImageTransportFormat(msg.rgb_compressed.data),
+				cs.encoding + "; png compressed " + cs.encoding);
+		msg.rgb_compressed.format = "png";
+
+		cv_bridge::CvImagePtr rgb, depth;
+		toCvCopy(msg, rgb, depth);
+		ASSERT_TRUE(rgb);
+		EXPECT_EQ(rgb->encoding, cs.encoding) << "not the 8 bits encoding cv_bridge gives";
+		EXPECT_EQ(cv::norm(rgb->image, cs.image, cv::NORM_INF), 0.0);
+	}
+}
+
+/// PNGs OpenCV does not decode to one of the supported encodings: no transport format.
+TEST(MsgConversion, compressedImageTransportFormatRejectsUnsupportedPngs)
+{
+	std::vector<unsigned char> png;
+	ASSERT_TRUE(cv::imencode(".png", cv::Mat(6, 8, CV_8UC1, cv::Scalar(40)), png));
+	ASSERT_EQ(compressedImageTransportFormat(png), "mono8; png compressed mono8") << "precondition";
+
+	// IHDR: bit depth at 24, color type at 25
+	std::vector<unsigned char> palette = png;
+	palette[25] = 3;
+	EXPECT_EQ(compressedImageTransportFormat(palette), "");
+	std::vector<unsigned char> grayAlpha = png;
+	grayAlpha[25] = 4;
+	EXPECT_EQ(compressedImageTransportFormat(grayAlpha), "");
+	std::vector<unsigned char> oneBit = png;
+	oneBit[24] = 1;
+	EXPECT_EQ(compressedImageTransportFormat(oneBit), "") << "decoded as 8 bits by OpenCV";
+
+	png.resize(20);
+	EXPECT_EQ(compressedImageTransportFormat(png), "") << "truncated before IHDR";
+}
+
+/// The number of components of a JPEG is found past the markers before its frame header.
+TEST(MsgConversion, compressedImageTransportFormatSkipsJpegMarkers)
+{
+	for(const bool color : {false, true})
+	{
+		SCOPED_TRACE(color ? "bgr8" : "mono8");
+		const std::string expected = color ? "bgr8; jpeg compressed bgr8" : "mono8; jpeg compressed mono8";
+		std::vector<unsigned char> jpeg;
+		ASSERT_TRUE(cv::imencode(".jpg", color ?
+				cv::Mat(6, 8, CV_8UC3, cv::Scalar(10, 20, 30)) : cv::Mat(6, 8, CV_8UC1, cv::Scalar(40)), jpeg));
+		ASSERT_EQ(compressedImageTransportFormat(jpeg), expected) << "precondition";
+
+		// After the start of image: a restart marker (no length), then fill bytes before
+		// the next marker
+		std::vector<unsigned char> markers(jpeg.begin(), jpeg.begin() + 2);
+		markers.insert(markers.end(), {0xFF, 0xD0, 0xFF, 0xFF});
+		markers.insert(markers.end(), jpeg.begin() + 2, jpeg.end());
+		EXPECT_EQ(compressedImageTransportFormat(markers), expected);
+	}
+
+	// Start of image only, no frame header: the codec is known, not the encoding
+	const std::vector<unsigned char> noFrame = {0xFF, 0xD8, 0xFF, 0xD9, 0x00, 0x00};
+	EXPECT_EQ(compressedImageTransportFormat(noFrame), "");
+	EXPECT_EQ(compressedImageTransportFormat({0xFF, 0xD8}), "");
+	EXPECT_EQ(compressedImageTransportFormat({0x00, 0x01, 0x02, 0x03}), "") << "not an image";
+}
+
+/// The right image of a compressed stereo pair is published as is, in
+/// compressed_image_transport's format.
+TEST(MsgConversion, rgbdImageToROSKeepsACompressedStereoPair)
+{
+	const rtabmap::StereoCameraModel stereo(
+			525.0, 525.0, 4.0, 3.0, 0.12, rtabmap::Transform::getIdentity(), cv::Size(8, 6));
+	const cv::Mat left(6, 8, CV_8UC3, cv::Scalar(10, 20, 30));
+	const cv::Mat right(6, 8, CV_8UC1, cv::Scalar(40));
+	for(const std::string format : {".jpg", ".png"})
+	{
+		SCOPED_TRACE(format);
+		const cv::Mat leftCompressed = rtabmap::compressImage2(left, format);
+		const cv::Mat rightCompressed = rtabmap::compressImage2(right, format);
+		rtabmap::SensorData in;
+		in.setStereoImage(leftCompressed, rightCompressed, stereo, false);
+		ASSERT_TRUE(in.imageRaw().empty());
+		ASSERT_TRUE(in.rightRaw().empty());
+
+		rtabmap_msgs::msg::RGBDImage msg;
+		rgbdImageToROS(in, msg, "camera_link");
+		EXPECT_TRUE(msg.depth.data.empty());
+		const std::string codec = format == ".jpg" ? "jpeg" : "png";
+		EXPECT_EQ(msg.depth_compressed.format, "mono8; " + codec + " compressed mono8");
+		EXPECT_EQ(msg.depth_compressed.data, toBytes(rightCompressed)) << "not re-compressed";
+		EXPECT_EQ(msg.depth_compressed.header.frame_id, "camera_link");
+		EXPECT_EQ(msg.rgb_compressed.data, toBytes(leftCompressed)) << "not re-compressed";
+
+		const rtabmap::SensorData out = rgbdImageFromROS(std::make_shared<rtabmap_msgs::msg::RGBDImage>(msg));
+		ASSERT_EQ(out.stereoCameraModels().size(), 1u);
+		cv::Mat leftOut, rightOut;
+		out.uncompressDataConst(&leftOut, &rightOut);
+		ASSERT_EQ(rightOut.type(), CV_8UC1);
+		EXPECT_LE(cv::norm(rightOut, right, cv::NORM_INF), format == ".jpg" ? 3.0 : 0.0);
+	}
+}
+
+//============================================================================
+// Mixed raw and compressed images, features of RGBDImage
+//============================================================================
+
+/// A SensorData message may carry one image raw and the other compressed: both are kept.
+TEST(MsgConversion, sensorDataFromROSKeepsARawImageNextToACompressedOne)
+{
+	const rtabmap::CameraModel model(50.0, 50.0, 4.0, 3.0, rtabmap::CameraModel::opticalRotation(), 0.0, cv::Size(8, 6));
+	const cv::Mat rgb(6, 8, CV_8UC3, cv::Scalar(10, 20, 30));
+	const cv::Mat depth(6, 8, CV_16UC1, cv::Scalar(1500));
+
+	for(bool rawColor : {true, false})
+	{
+		SCOPED_TRACE(rawColor ? "raw color, compressed depth" : "compressed color, raw depth");
+		rtabmap::SensorData in(rawColor ? rgb : rtabmap::compressImage2(rgb, ".png"),
+				rawColor ? rtabmap::compressImage2(depth, ".png") : depth, model, 1, 1.0);
+		rtabmap_msgs::msg::SensorData msg;
+		sensorDataToROS(in, msg, "base_link", true);
+
+		const rtabmap::SensorData out = sensorDataFromROS(msg);
+		EXPECT_EQ(out.imageRaw().empty(), !rawColor);
+		EXPECT_EQ(out.depthRaw().empty(), rawColor);
+		EXPECT_EQ(out.imageCompressed().empty(), rawColor);
+		EXPECT_EQ(out.depthOrRightCompressed().empty(), !rawColor);
+		const cv::Mat outRgb = rawColor ? out.imageRaw() : rtabmap::uncompressImage(out.imageCompressed());
+		const cv::Mat outDepth = rawColor ? rtabmap::uncompressImage(out.depthOrRightCompressed()) : out.depthRaw();
+		EXPECT_EQ(cv::norm(outRgb, rgb, cv::NORM_INF), 0.0);
+		EXPECT_EQ(cv::countNonZero(outDepth != depth), 0);
+	}
+}
+
+/// rgbdImageFromROS() keeps the features and the global descriptor of the message.
+TEST(MsgConversion, rgbdImageFromROSKeepsFeatures)
+{
+	const rtabmap::CameraModel model(50.0, 50.0, 4.0, 3.0, rtabmap::Transform::getIdentity(), 0.0, cv::Size(8, 6));
+	rtabmap::SensorData in(cv::Mat(6, 8, CV_8UC3, cv::Scalar(1, 2, 3)), cv::Mat(6, 8, CV_16UC1, cv::Scalar(1000)), model, 1, 1.0);
+	const std::vector<cv::KeyPoint> kpts = {cv::KeyPoint(1, 2, 3), cv::KeyPoint(4, 5, 6)};
+	const std::vector<cv::Point3f> pts = {cv::Point3f(0.1f, 0.2f, 1.0f), cv::Point3f(0.3f, 0.4f, 2.0f)};
+	const cv::Mat descriptors = (cv::Mat_<float>(2, 3) << 1, 2, 3, 4, 5, 6);
+	in.setFeatures(kpts, pts, descriptors);
+	in.addGlobalDescriptor(rtabmap::GlobalDescriptor(1, (cv::Mat_<float>(1, 4) << 0.1f, 0.2f, 0.3f, 0.4f)));
+
+	rtabmap_msgs::msg::RGBDImage::SharedPtr msg = std::make_shared<rtabmap_msgs::msg::RGBDImage>();
+	rgbdImageToROS(in, *msg, "camera");
+
+	const rtabmap::SensorData out = rgbdImageFromROS(msg);
+	ASSERT_EQ(out.keypoints().size(), 2u);
+	EXPECT_FLOAT_EQ(out.keypoints()[1].pt.x, 4.0f);
+	ASSERT_EQ(out.keypoints3D().size(), 2u);
+	EXPECT_NEAR(out.keypoints3D()[1].z, 2.0f, 1e-6);
+	ASSERT_EQ(out.descriptors().rows, 2);
+	EXPECT_EQ(cv::norm(out.descriptors(), descriptors, cv::NORM_INF), 0.0);
+	ASSERT_EQ(out.globalDescriptors().size(), 1u);
+	EXPECT_EQ(out.globalDescriptors()[0].type(), 1);
+	EXPECT_EQ(cv::norm(out.globalDescriptors()[0].data(), in.globalDescriptors()[0].data(), cv::NORM_INF), 0.0);
 }

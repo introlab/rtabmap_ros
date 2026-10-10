@@ -50,6 +50,7 @@ RGBDSync::RGBDSync(const rclcpp::NodeOptions & options) :
 	depthScale_(1.0),
 	decimation_(1),
 	compressedRate_(0),
+	depthCompressionFormat_(".png"),
 	approxSyncMaxInterval_(0.0),
 	lastCompressedPublished_(0, 0, RCL_ROS_TIME),
 	approxSyncDepth_(0),
@@ -78,6 +79,19 @@ RGBDSync::RGBDSync(const rclcpp::NodeOptions & options) :
 	depthScale_ = this->declare_parameter("depth_scale", depthScale_);
 	decimation_ = this->declare_parameter("decimation", decimation_);
 	compressedRate_ = this->declare_parameter("compressed_rate", compressedRate_);
+	imageCompressionFormat_ = this->declare_parameter("image_compression_format", imageCompressionFormat_);
+	if(!rtabmap_conversions::isValidImageCompressionFormat(imageCompressionFormat_))
+	{
+		RCLCPP_ERROR(this->get_logger(), "Invalid image_compression_format \"%s\" (should be \".jpg\" or \".png\"), using \".jpg\".", imageCompressionFormat_.c_str());
+		imageCompressionFormat_ = ".jpg";
+	}
+	depthCompressionFormat_ = this->declare_parameter("depth_compression_format", depthCompressionFormat_);
+	if(!rtabmap_conversions::isValidDepthCompressionFormat(depthCompressionFormat_))
+	{
+		RCLCPP_ERROR(this->get_logger(), "Invalid depth_compression_format \"%s\" (should be \".png\" or \".rvl\", "
+				"optionally followed by \":maxDepth[:quantization]\", optionally prefixed by \"legacy:\", or \"legacy\"), using \".png\".", depthCompressionFormat_.c_str());
+		depthCompressionFormat_ = ".png";
+	}
 	std::string rgbImageTransport = this->declare_parameter<std::string>("rgb_image_transport", std::string("raw"));
 	std::string depthImageTransport = this->declare_parameter<std::string>("depth_image_transport", std::string("raw"));
 	if(rgbImageTransport != "raw") {
@@ -272,12 +286,10 @@ void RGBDSync::callback(
 				cvImg.header = image->header;
 				cvImg.image = rgbMat;
 				cvImg.encoding = image->encoding;
-				cvImg.toCompressedImageMsg(msgCompressed->rgb_compressed, cv_bridge::JPG);
+				rtabmap_conversions::toCompressedImageMsg(cvImg, imageCompressionFormat_, msgCompressed->rgb_compressed);
 
 				msgCompressed->depth_compressed.header = imageDepthPtr->header;
-				msgCompressed->depth_compressed.data = rtabmap::compressImage(depthMat, ".png");
-
-				msgCompressed->depth_compressed.format = "png";
+				rtabmap_conversions::compressDepthImage(depthMat, depthCompressionFormat_, msgCompressed->depth_compressed);
 
 				rgbdImageCompressedPub_->publish(std::move(msgCompressed));
 			}

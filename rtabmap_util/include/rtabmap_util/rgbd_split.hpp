@@ -33,6 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <image_transport/image_transport.hpp>
 
 #include "rtabmap_msgs/msg/rgbd_image.hpp"
+#include <sensor_msgs/msg/compressed_image.hpp>
 
 namespace rtabmap_util
 {
@@ -55,6 +56,32 @@ private:
 
 	image_transport::Publisher rgbPub_;
 	image_transport::Publisher depthPub_;
+	/// Replace the "compressed" image_transport plugin of rgbPub_, and of depthPub_ with
+	/// "stereo" (right image), so that images already compressed in the RGBDImage are
+	/// republished without being decompressed. Null if "compressed_passthrough" is false.
+	rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr compressedRgbPub_;
+	rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr compressedRightPub_;
+	/// Format used when an image has to be compressed: "jpeg" or "png".
+	std::string compressedImageFormat_;
+	/// Same for the "compressedDepth" plugin of depthPub_, without "stereo". Null if
+	/// "compressed_depth_passthrough" is false.
+	rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr compressedDepthPub_;
+	/// Format used when depth has to be compressed (raw input, or compressed in a format
+	/// that compressed_depth_image_transport cannot read), same parameters as the plugin.
+	std::string compressedDepthFormat_;
+	double compressedDepthMax_;
+	double compressedDepthQuantization_;
+
+	/// Publishes the image (color, left or right) of @p raw or @p compressed on @p rawPub
+	/// and on @p compressedPub, without decompressing it when possible.
+	void publishImage(
+			const sensor_msgs::msg::Image & raw,
+			const sensor_msgs::msg::CompressedImage & compressed,
+			const std_msgs::msg::Header & defaultHeader,
+			const rtabmap_msgs::msg::RGBDImage::SharedPtr & input,
+			const image_transport::Publisher & rawPub,
+			const rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr & compressedPub,
+			sensor_msgs::msg::Image & outputImage) const;
   rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr rgbInfoPub_;
   rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr depthInfoPub_;
 };

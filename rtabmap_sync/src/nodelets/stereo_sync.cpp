@@ -73,6 +73,12 @@ StereoSync::StereoSync(const rclcpp::NodeOptions & options) :
 	qos = this->declare_parameter("qos", qos);
 	int qosCamInfo = this->declare_parameter("qos_camera_info", qos);
 	compressedRate_ = this->declare_parameter("compressed_rate", compressedRate_);
+	imageCompressionFormat_ = this->declare_parameter("image_compression_format", imageCompressionFormat_);
+	if(!rtabmap_conversions::isValidImageCompressionFormat(imageCompressionFormat_))
+	{
+		RCLCPP_ERROR(this->get_logger(), "Invalid image_compression_format \"%s\" (should be \".jpg\" or \".png\"), using \".jpg\".", imageCompressionFormat_.c_str());
+		imageCompressionFormat_ = ".jpg";
+	}
 	std::string imageTransport = this->declare_parameter("image_transport", std::string("raw"));
 
 	RCLCPP_INFO(this->get_logger(), "%s: approx_sync = %s", get_name(), approxSync?"true":"false");
@@ -201,7 +207,7 @@ void StereoSync::callback(
 				catch(cv::Exception& e) {
 					UFATAL("Fatal error while converting left image (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
 				}
-				imagePtr->toCompressedImageMsg(msgCompressed->rgb_compressed, cv_bridge::JPG);
+				rtabmap_conversions::toCompressedImageMsg(*imagePtr, imageCompressionFormat_, msgCompressed->rgb_compressed);
 
 				cv_bridge::CvImageConstPtr imageDepthPtr;
 				try {
@@ -210,7 +216,7 @@ void StereoSync::callback(
 				catch(cv::Exception& e) {
 					UFATAL("Fatal error while converting right image (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
 				}
-				imageDepthPtr->toCompressedImageMsg(msgCompressed->depth_compressed, cv_bridge::JPG);
+				rtabmap_conversions::toCompressedImageMsg(*imageDepthPtr, imageCompressionFormat_, msgCompressed->depth_compressed);
 
 				rgbdImageCompressedPub_->publish(std::move(msgCompressed));
 			}

@@ -178,6 +178,28 @@ private:
 				const std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > & localKeyPoints = std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> >(),
 				const std::vector<std::vector<rtabmap_msgs::msg::Point3f> > & localPoints3d = std::vector<std::vector<rtabmap_msgs::msg::Point3f> >(),
 				const std::vector<cv::Mat> & localDescriptors = std::vector<cv::Mat>());
+	/// Compressed images are left to rtabmap to decode when it needs them, unless
+	/// something here needs the pixels (stereo_to_depth, gen_scan, gen_depth).
+	virtual bool imagesDecodedOnDemand() const override
+	{
+		return decodeImagesOnDemand_ && !stereoToDepth_ && !genScan_ && !genDepth_;
+	}
+	virtual void commonMultiCameraCallbackWithCompressed(
+				const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
+				const rtabmap_msgs::msg::UserData::ConstSharedPtr & userDataMsg,
+				const std::vector<cv_bridge::CvImageConstPtr> & imageMsgs,
+				const std::vector<cv_bridge::CvImageConstPtr> & depthMsgs,
+				const std::vector<sensor_msgs::msg::CameraInfo> & cameraInfoMsgs,
+				const std::vector<sensor_msgs::msg::CameraInfo> & depthCameraInfoMsgs,
+				const sensor_msgs::msg::LaserScan & scanMsg,
+				const sensor_msgs::msg::PointCloud2 & scan3dMsg,
+				const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr& odomInfoMsg,
+				const std::vector<rtabmap_msgs::msg::GlobalDescriptor> & globalDescriptorMsgs,
+				const std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > & localKeyPoints,
+				const std::vector<std::vector<rtabmap_msgs::msg::Point3f> > & localPoints3d,
+				const std::vector<cv::Mat> & localDescriptors,
+				const std::vector<cv::Mat> & compressedImages,
+				const std::vector<cv::Mat> & compressedDepths) override;
 	// Callback called from sync thread
 	void commonMultiCameraCallbackImpl(
 				const std::string & odomFrameId,
@@ -192,7 +214,9 @@ private:
 				const std::vector<rtabmap_msgs::msg::GlobalDescriptor> & globalDescriptorMsgs,
 				const std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > & localKeyPoints,
 				const std::vector<std::vector<rtabmap_msgs::msg::Point3f> > & localPoints3d,
-				const std::vector<cv::Mat> & localDescriptors);
+				const std::vector<cv::Mat> & localDescriptors,
+				const std::vector<cv::Mat> & compressedImages = std::vector<cv::Mat>(),
+				const std::vector<cv::Mat> & compressedDepths = std::vector<cv::Mat>());
 	// Callback called from sync thread
 	virtual void commonLaserScanCallback(
 				const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
@@ -371,6 +395,7 @@ private:
 	double genScanMaxDepth_;
 	double genScanMinDepth_;
 	bool genDepth_;
+	bool decodeImagesOnDemand_;
 	int genDepthDecimation_;
 	int genDepthFillHolesSize_;
 	int genDepthFillIterations_;

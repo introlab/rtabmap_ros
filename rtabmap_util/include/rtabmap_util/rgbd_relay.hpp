@@ -45,6 +45,9 @@ private:
 private:
 	bool compress_;
 	bool uncompress_;
+	std::string depthCompressionFormat_;
+	/// Format of the compressed color (and right) images: ".jpg" or ".png".
+	std::string imageCompressionFormat_ = ".jpg";
 	rclcpp::Subscription<rtabmap_msgs::msg::RGBDImage>::SharedPtr rgbdImageSub_;
 	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr rgbdImagePub_;
 };

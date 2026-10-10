@@ -30,7 +30,7 @@ find_package(tf2_eigen REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 
-find_package(RTABMap 0.23.13 REQUIRED)
+find_package(RTABMap 0.24.0 REQUIRED)
 
 # libraries
 SET(Libraries
@@ -77,6 +77,11 @@ ENDIF()
 
 IF("$ENV{ROS_DISTRO}" STRLESS "kilted")
   add_definitions(-DPRE_ROS_KILTED)
+ENDIF()
+
+# compressed_depth_image_transport decodes RVL since Jazzy
+IF("$ENV{ROS_DISTRO}" STRLESS "jazzy")
+  add_definitions(-DPRE_ROS_JAZZY)
 ENDIF()
 
 ###########

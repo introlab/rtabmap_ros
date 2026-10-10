@@ -223,9 +223,9 @@ protected:
 		if(!tfPub_)
 		{
 			tfPub_ = helper()->create_publisher<tf2_msgs::msg::TFMessage>("/tf", rclcpp::QoS(100));
-			// The node's listener and nothing else: publishing before it is matched loses
+			// The node's listener (and tfReceived_): publishing before it is matched loses
 			// the transform.
-			waitForSubscriber(tfPub_);
+			waitForSubscriber(tfPub_, tfReceived_ ? 2 : 1);
 		}
 		tf2_msgs::msg::TFMessage msg;
 		msg.transforms.push_back(tf);
@@ -244,8 +244,46 @@ protected:
 			double variance = 0.001)
 	{
 		publishTf(makeTransform("odom", "base_link", stamp, x, y, yaw));
+		if(tfReceived_)
+		{
+			EXPECT_TRUE(spinUntil([&]() { return hasTransform(*tfReceived_, "base_link", stamp); }))
+					<< "odom -> base_link at " << stamp << " was not received";
+		}
 		pub->publish(makeOdometry(stamp, x, y, yaw, variance));
 	}
+
+	/// Whether @p tf received the transform of @p child at @p stamp.
+	static bool hasTransform(const Collector<tf2_msgs::msg::TFMessage> & tf,
+			const std::string & child, double stamp)
+	{
+		for(const tf2_msgs::msg::TFMessage::ConstSharedPtr & msg : tf.messages)
+		{
+			for(const geometry_msgs::msg::TransformStamped & t : msg->transforms)
+			{
+				if(t.child_frame_id == child && rclcpp::Time(t.header.stamp) == stampOf(stamp))
+				{
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * @brief Makes sendOdom() wait for each odom -> base_link transform to be received
+	 *        before publishing the odometry.
+	 *
+	 * To use with wait_for_transform=0 when the node is on simulated time: since Lyrical,
+	 * tf2_ros waits for a transform on the node's clock, which does not advance while the
+	 * test, the only /clock publisher, is blocked in the node's callback waiting for it.
+	 */
+	void waitForTfBeforeOdom()
+	{
+		tfReceived_ = collect<tf2_msgs::msg::TFMessage>("/tf", rclcpp::QoS(100));
+	}
+
+	/// The test's own /tf subscription, see waitForTfBeforeOdom().
+	std::shared_ptr<Collector<tf2_msgs::msg::TFMessage>> tfReceived_;
 
 	rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odomPublisher()
 	{

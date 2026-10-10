@@ -245,6 +245,52 @@ protected:
 				const std::vector<std::vector<rtabmap_msgs::msg::Point3f> > & localPoints3d = std::vector<std::vector<rtabmap_msgs::msg::Point3f> >(),
 				const std::vector<cv::Mat> & localDescriptors = std::vector<cv::Mat>()) = 0;
 	/**
+	 * @brief Same as commonMultiCameraCallback(), with the compressed images the decoded
+	 *        images come from, called instead of it when there are some.
+	 *
+	 * For a single `RGBDImage` carrying compressed images only, @p compressedImages and
+	 * @p compressedDepths hold them in rtabmap's format (see
+	 * rtabmap_conversions::rgbdImageCompressedToRtabmap()), so that they can be stored as
+	 * is instead of being compressed again. An element is empty when the corresponding
+	 * image was raw.
+	 *
+	 * The default implementation ignores them and calls commonMultiCameraCallback().
+	 */
+	/**
+	 * @brief Whether the subclass accepts images left compressed, not decoded.
+	 *
+	 * When true, a single `RGBDImage` (RGB-D or stereo) carrying only compressed images
+	 * that rtabmap can use as they are (see
+	 * rtabmap_conversions::isCompressedRGBDSupportedByRtabmap()) is not decoded:
+	 * commonMultiCameraCallbackWithCompressed() is called with no decoded image, only the
+	 * compressed ones, and the camera infos. The default is false: images are always
+	 * decoded.
+	 */
+	virtual bool imagesDecodedOnDemand() const { return false; }
+	virtual void commonMultiCameraCallbackWithCompressed(
+				const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
+				const rtabmap_msgs::msg::UserData::ConstSharedPtr & userDataMsg,
+				const std::vector<cv_bridge::CvImageConstPtr> & imageMsgs,
+				const std::vector<cv_bridge::CvImageConstPtr> & depthMsgs,
+				const std::vector<sensor_msgs::msg::CameraInfo> & cameraInfoMsgs,
+				const std::vector<sensor_msgs::msg::CameraInfo> & depthCameraInfoMsgs,
+				const sensor_msgs::msg::LaserScan& scanMsg,
+				const sensor_msgs::msg::PointCloud2& scan3dMsg,
+				const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr& odomInfoMsg,
+				const std::vector<rtabmap_msgs::msg::GlobalDescriptor> & globalDescriptorMsgs,
+				const std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > & localKeyPoints,
+				const std::vector<std::vector<rtabmap_msgs::msg::Point3f> > & localPoints3d,
+				const std::vector<cv::Mat> & localDescriptors,
+				const std::vector<cv::Mat> & compressedImages,
+				const std::vector<cv::Mat> & compressedDepths)
+	{
+		(void)compressedImages;
+		(void)compressedDepths;
+		commonMultiCameraCallback(odomMsg, userDataMsg, imageMsgs, depthMsgs,
+				cameraInfoMsgs, depthCameraInfoMsgs, scanMsg, scan3dMsg, odomInfoMsg,
+				globalDescriptorMsgs, localKeyPoints, localPoints3d, localDescriptors);
+	}
+	/**
 	 * @brief Called with one synchronized scan, when no camera is subscribed.
 	 *
 	 * @param odomMsg          the pose, or null when odometry is not subscribed
@@ -314,7 +360,17 @@ private:
 			const std::vector<rtabmap_msgs::msg::GlobalDescriptor> & globalDescriptorMsgs = std::vector<rtabmap_msgs::msg::GlobalDescriptor>(),
 			const std::vector<rtabmap_msgs::msg::KeyPoint> & localKeyPoints = std::vector<rtabmap_msgs::msg::KeyPoint>(),
 			const std::vector<rtabmap_msgs::msg::Point3f> & localPoints3d = std::vector<rtabmap_msgs::msg::Point3f>(),
-			const cv::Mat & localDescriptors = cv::Mat());
+			const cv::Mat & localDescriptors = cv::Mat(),
+			const cv::Mat & compressedImage = cv::Mat(),
+			const cv::Mat & compressedDepth = cv::Mat());
+	/// The images of @p msg, decoded unless imagesDecodedOnDemand() allows not to (then
+	/// @p rgb and @p depth are null), and its compressed images in rtabmap's format.
+	void convertRGBDImage(
+			const rtabmap_msgs::msg::RGBDImage::ConstSharedPtr & msg,
+			cv_bridge::CvImageConstPtr & rgb,
+			cv_bridge::CvImageConstPtr & depth,
+			cv::Mat & compressedImage,
+			cv::Mat & compressedDepth) const;
 	void processSyncData();
 	void setupDepthCallbacks(
 			rclcpp::Node & node,
