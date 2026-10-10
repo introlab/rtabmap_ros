@@ -5,7 +5,7 @@
 # - sha256 must match the bytes of the file the tests read (compute with
 #   `sha256sum file.db3`), which for an archive is the file it holds rather than
 #   the archive itself: a corrupt archive is caught by the extractor. Leave as
-#   TODO_FILL_SHA256 to bypass the integrity check on first download then paste
+#   3a55cb8344e5d555459da5fc3a9ab55ceaad8a0c6bef8d8ac6fff6cc65c8b614 to bypass the integrity check on first download then paste
 #   the actual hash back in.
 # - extracted is optional and only for archives (.zip): the file the archive holds,
 #   relative to this directory. A bag archive holds a whole bag directory (the .db3
@@ -16,6 +16,7 @@
 # Lines starting with '#' and blank lines are ignored.
 demo_mapping_bag.zip	https://github.com/introlab/rtabmap_ros/releases/download/0.23.13/demo_mapping_bag.zip	b233777634dea8207677d7a76d76718b43bc7043f03d061f6c332f12a9e07be8	demo_mapping_bag/demo_mapping.db3
 stereo_outdoorA_bag.zip	https://github.com/introlab/rtabmap_ros/releases/download/0.23.13/stereo_outdoorA_bag.zip	e63533a750cfd02bff1640d140552c002264f31802baf9d0182c4140749cd45d	stereo_outdoorA_bag/stereo_outdoorA.db3
+stereo_outdoorB_bag.zip	https://github.com/introlab/rtabmap_ros/releases/download/0.23.13/stereo_outdoorB_bag.zip	3a55cb8344e5d555459da5fc3a9ab55ceaad8a0c6bef8d8ac6fff6cc65c8b614	stereo_outdoorB_bag/stereo_outdoorB.db3
 netherdrone_ouster_vertige_bag_0.zip	https://github.com/introlab/rtabmap_ros/releases/download/0.23.13/netherdrone_ouster_vertige_bag_0.zip	f603088fb975a982f6e8d1f7c06b4c806eb9e97b6ba81d09eb42f07e85579402	netherdrone_ouster_vertige_bag_0/netherdrone_ouster_vertige_bag_0.db3
 netherdrone_ouster_vertige_bag_1.zip	https://github.com/introlab/rtabmap_ros/releases/download/0.23.13/netherdrone_ouster_vertige_bag_1.zip	2e7983e055164ae88464af1295c0f16c8d7e81faecfd4c489f0c8c773a95bba0	netherdrone_ouster_vertige_bag_1/netherdrone_ouster_vertige_bag_1.db3
 netherdrone_ouster_vertige_bag_2.zip	https://github.com/introlab/rtabmap_ros/releases/download/0.23.13/netherdrone_ouster_vertige_bag_2.zip	809f6008f4ea946f30767a962f02e05557070f897992fc9137821a6f924a8c92	netherdrone_ouster_vertige_bag_2/netherdrone_ouster_vertige_bag_2.db3

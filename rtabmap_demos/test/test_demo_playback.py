@@ -109,9 +109,10 @@ SCENARIOS = [
         max_rmse=0.1,
         max_rotational_rmse=2.0),
     Scenario(
-        name='stereo_outdoorA',
+        name='stereo_outdoor',
         launch_file='stereo_outdoor_demo.launch.py',
-        bag='stereo_outdoorA_bag',
+        # Both parts of the run, played one after the other.
+        bag=['stereo_outdoorA_bag', 'stereo_outdoorB_bag'],
         required_topics=['/stereo_camera/left/image_raw_throttle/compressed',
                          '/stereo_camera/right/image_raw_throttle/compressed'],
         launch_arguments={'rtabmap_viz': 'false', 'rviz': 'false'},
@@ -119,7 +120,8 @@ SCENARIOS = [
         # and is registered (all 3741 of them on an idle machine).
         parameters={'output_queue_size': 10,
                     'always_process_most_recent_frame': False},
-        # As for robot_mapping: 161 nodes in CI against 185 here, and up to 3.06 deg.
+        # As for robot_mapping: with bag A alone, 161 nodes in CI against 185 here, and
+        # up to 3.06 deg.
         max_node_difference=0.15,
         max_rmse=0.1,
         max_rotational_rmse=4.0),

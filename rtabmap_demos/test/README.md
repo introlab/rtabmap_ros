@@ -5,7 +5,7 @@
 | Scenario | Launch file | Bag |
 |---|---|---|
 | `robot_mapping` | `robot_mapping_demo.launch.py` | `demo_mapping_bag` |
-| `stereo_outdoorA` | `stereo_outdoor_demo.launch.py` | `stereo_outdoorA_bag` |
+| `stereo_outdoor` | `stereo_outdoor_demo.launch.py` | `stereo_outdoorA_bag` then `stereo_outdoorB_bag` |
 | `netherdrone_lidar3d` | `netherdrone_lidar3d_demo.launch.py` | `netherdrone_ouster_vertige_bag_0` to `_5`, played one after the other |
 | `find_object` | `find_object_demo.launch.py` | `demo_find_object_bag` (skipped without `find_object_2d`, which Lyrical and Rolling do not have) |
 
@@ -94,9 +94,9 @@ sequenceDiagram
 
 With `output_queue_size: 10` on `rgbd_sync`, an image it publishes is not replaced before rtabmap has received it.
 
-### `stereo_outdoorA`: one stereo frame
+### `stereo_outdoor`: one stereo frame
 
-The bag holds the left and right compressed images and camera infos of a stereo camera, and TF. The demo uncompresses the images (`image_transport` `republish`), rectifies them (`stereo_image_proc`), pairs them (`stereo_sync`), computes visual odometry from them (`stereo_odometry`) and maps (`rtabmap`, one update per second, `Rtabmap/DetectionRate`). The two gated topics are the left and right `image_raw_throttle/compressed`; their `camera_info_throttle` go out without waiting. For one stereo frame:
+Each of the two bags holds the left and right compressed images and camera infos of a stereo camera, and TF. The demo uncompresses the images (`image_transport` `republish`), rectifies them (`stereo_image_proc`), pairs them (`stereo_sync`), computes visual odometry from them (`stereo_odometry`) and maps (`rtabmap`, one update per second, `Rtabmap/DetectionRate`). The two gated topics are the left and right `image_raw_throttle/compressed`; their `camera_info_throttle` go out without waiting. For one stereo frame:
 
 ```mermaid
 sequenceDiagram
