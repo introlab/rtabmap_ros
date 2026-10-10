@@ -63,6 +63,10 @@ def _map(node, launch):
         odom_pub.get_subscription_count() > 0 and tf_pub.get_subscription_count() > 0
         and node.count_publishers('info') > 0))
     assert _spin_until(node, started, 60.0) and launch.poll() is None, 'rtabmap did not start'
+    # Matched on this side only: rtabmap's side matches on its own time, and until then
+    # its best-effort subscription (Fast DDS's default) drops what it is sent, and it
+    # does not publish info, having no subscriber.
+    _spin_until(node, lambda: False, 1.0)
     for i in range(NODES):
         tf, odom = _odometry(1.0 + i, 0.5 * i)
         tf_pub.publish(tf)
@@ -87,6 +91,8 @@ def test_ctrl_c_saves_the_database(tmp_path):
             node.destroy_node()
         os.killpg(launch.pid, signal.SIGINT)  # Ctrl-C
         launch.wait(timeout=60)
+    except AssertionError as e:
+        raise AssertionError(f'{e}\n{log_path.read_text()}') from None
     finally:
         rclpy.try_shutdown()
         if launch.poll() is None:
