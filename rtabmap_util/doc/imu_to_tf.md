@@ -77,8 +77,7 @@ Point `fixed_frame_id` at a frame that does not exist anywhere else, named after
 Node(
     package='rtabmap_util', executable='imu_to_tf',
     parameters=[{'fixed_frame_id': 'base_link_stabilized',
-                 'base_frame_id': 'base_link',
-                 'wait_for_transform_duration': 0.001}],
+                 'base_frame_id': 'base_link'}],
     remappings=[('imu/data', '/imu/data')])
 ```
 
@@ -224,7 +223,8 @@ The transform carries a rotation only; its translation is always zero. It is sta
 | `fixed_frame_id` | `string` | `"odom"` | Parent frame of the broadcast transform. |
 | `base_frame_id` | `string` | `""` | Frame to report the orientation in. Empty broadcasts the IMU frame itself, which is the cheapest option when nothing else needs the base frame oriented. |
 | `qos` | `int` | `0` | Reliability of the `imu/data` subscription: `0` system default, `1` reliable, `2` best effort. Must match the publisher, or no message arrives. |
-| `wait_for_transform_duration` | `double` | `0.1` | Seconds to wait for the `base_frame_id` → IMU transform before giving up on a message. Only used when `base_frame_id` is set. |
+| `wait_for_transform_duration` | `double` | `0.1` | Seconds to wait for the `base_frame_id` → IMU transform before giving up on a message. Only used when `base_frame_id` is set. With a static mount, the transform is already there and this adds no delay; with a moving one (e.g., a lidar's own IMU on a rotating mast), an IMU message often arrives before TF covers its stamp. |
+| `queue_size` | `int` | `100` | Queue size of the `imu/data` subscription. Deep enough to keep the messages received while waiting for TF (`wait_for_transform_duration`), so that none is skipped. |
 
 ## Mounting offset
 

@@ -44,16 +44,22 @@ ImuToTF::ImuToTF(const rclcpp::NodeOptions & options) :
 	tfBroadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(*this);
 
 	int qos = RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT;
+	// Deep enough to keep the IMU messages received while waiting for TF (see
+	// wait_for_transform_duration): each one is needed, its TF is used for deskewing.
+	int queueSize = 100;
 	fixedFrameId_ = this->declare_parameter("fixed_frame_id", fixedFrameId_);
 	baseFrameId_ = this->declare_parameter("base_frame_id", baseFrameId_);
 	qos = this->declare_parameter("qos", qos);
 	waitForTransformDuration_ = this->declare_parameter("wait_for_transform_duration", waitForTransformDuration_);
+	queueSize = this->declare_parameter("queue_size", queueSize);
 
 	RCLCPP_INFO(this->get_logger(), "fixed_frame_id: %s", fixedFrameId_.c_str());
 	RCLCPP_INFO(this->get_logger(), "base_frame_id: %s", baseFrameId_.c_str());
 	RCLCPP_INFO(this->get_logger(), "qos: %d", qos);
+	RCLCPP_INFO(this->get_logger(), "wait_for_transform_duration: %f", waitForTransformDuration_);
+	RCLCPP_INFO(this->get_logger(), "queue_size: %d", queueSize);
 
-	sub_ = create_subscription<sensor_msgs::msg::Imu>("imu/data", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos), std::bind(&ImuToTF::imuCallback, this, std::placeholders::_1));
+	sub_ = create_subscription<sensor_msgs::msg::Imu>("imu/data", rclcpp::QoS(queueSize).reliability((rmw_qos_reliability_policy_t)qos), std::bind(&ImuToTF::imuCallback, this, std::placeholders::_1));
 }
 
 ImuToTF::~ImuToTF()
@@ -77,7 +83,7 @@ void ImuToTF::imuCallback(const sensor_msgs::msg::Imu::ConstSharedPtr msg)
 			if(!tfBuffer_->canTransform(baseFrameId_, msg->header.frame_id, msg->header.stamp, rclcpp::Duration::from_seconds(waitForTransformDuration_), &errorMsg))
 			{
 				RCLCPP_ERROR(this->get_logger(), "Could not get transform from %s to %s after %f seconds (for stamp=%f)! Error=\"%s\".",
-						baseFrameId_.c_str(), msg->header.frame_id.c_str(), 0.1, rtabmap_conversions::timestampFromROS(msg->header.stamp), errorMsg.c_str());
+						baseFrameId_.c_str(), msg->header.frame_id.c_str(), waitForTransformDuration_, rtabmap_conversions::timestampFromROS(msg->header.stamp), errorMsg.c_str());
 				return;
 			}
 
