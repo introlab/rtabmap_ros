@@ -122,6 +122,10 @@ def generate_launch_description():
                 # for more TF lookups.
                 'deskewing_slerp': 'false',
                 'deskewing_imu': LaunchConfiguration('deskewing_imu'),
+                # The drone's accelerometer reads ~9.55 m/s^2 at rest: estimated while the
+                # drone is still at start. The Ouster IMU turns with the mast, so it is never
+                # still: standard gravity is kept with imu:=ouster.
+                'deskewing_imu_gravity': '0',
                 'rtabmap_viz': LaunchConfiguration('rtabmap_viz'),
                 'rtabmap_viz_cfg': LaunchConfiguration('rtabmap_viz_cfg'),
                 'localization': LaunchConfiguration('localization'),

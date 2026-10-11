@@ -124,6 +124,8 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
     # the order of the velocity itself. A delay > 0 also enables the IMU acceleration,
     # which carries that velocity to the last frame, so it is not delayed.
     icp_odometry_parameters['Odom/GuessSmoothingDelay'] = '0.5'
+    # Removed from the IMU linear acceleration; 0 estimates it while the IMU is still.
+    icp_odometry_parameters['Odom/ImuGravity'] = LaunchConfiguration('deskewing_imu_gravity').perform(context)
 
   rtabmap_parameters = {
     'subscribe_depth': False,
@@ -372,6 +374,10 @@ def generate_launch_description():
     DeclareLaunchArgument(
       'deskewing_imu', default_value='false',
       description='Deskew the scans in icp_odometry, with the motion predicted from the IMU (orientation and acceleration) since its last pose, instead of with lidar_deskewing and a fixed frame made from the IMU orientation only. Ignored if fixed_frame_id or external_odom_frame_id is set.'),
+
+    DeclareLaunchArgument(
+      'deskewing_imu_gravity', default_value='9.80665',
+      description='With deskewing_imu, gravity (m/s^2) removed from the IMU linear acceleration (Odom/ImuGravity): standard gravity by default, or what the accelerometer reads at rest. 0: estimated while the IMU is still, with standard gravity until then (the robot should then be perfectly still for a moment, e.g., at start).'),
     
     DeclareLaunchArgument(
       'deskewing_slerp', default_value='true',
