@@ -516,74 +516,111 @@ bool OdometryROS::enableImuMotionPrediction()
 	return true;
 }
 
-rtabmap::ImuMotionPredictor OdometryROS::imuMotionPredictor() const
+rtabmap::ImuMotionPredictor OdometryROS::imuMotionPredictor()
 {
+	{
+		// With the samples whose mounting is known by now
+		UScopeMutex lock(imuMutex_);
+		flushImuPending();
+	}
 	UScopeMutex lock(imuMotionPredictorMutex_);
 	return imuMotionPredictor_;
+}
+
+void OdometryROS::flushImuPending()
+{
+	// imuMutex_ must be locked by the caller.
+	// Each IMU message is converted with its mounting (frame_id -> imu frame) at its own
+	// stamp. With always_check_imu_tf, the mounting may move (e.g., a lidar's own IMU on a
+	// rotating mast): an IMU message is often received before TF covers its stamp, and it
+	// waits for it, as the last known mounting would be off by the motion since. Otherwise
+	// the mounting is static, looked up once.
+	while(!imusPending_.empty())
+	{
+		const sensor_msgs::msg::Imu::ConstSharedPtr & msg = imusPending_.front();
+		const double stamp = rtabmap_conversions::timestampFromROS(msg->header.stamp);
+		Transform localTransform;
+		if(this->frameId().compare(msg->header.frame_id) == 0)
+		{
+			localTransform = Transform::getIdentity();
+		}
+		else if(!alwaysCheckImuTf_ && !imuLocalTransform_.isNull())
+		{
+			localTransform = imuLocalTransform_;
+		}
+		else if(tfBuffer_->canTransform(this->frameId(), msg->header.frame_id, msg->header.stamp))
+		{
+			localTransform = rtabmap_conversions::getTransform(this->frameId(), msg->header.frame_id, msg->header.stamp, *tfBuffer_, 0);
+		}
+		if(localTransform.isNull())
+		{
+			// Not yet in TF: wait for it, unless it is too late for it to come
+			if(rtabmap_conversions::timestampFromROS(imusPending_.back()->header.stamp) - stamp < 0.5)
+			{
+				break;
+			}
+			static bool warned = false;
+			if(!warned)
+			{
+				RCLCPP_WARN(this->get_logger(), "TF between \"%s\" and \"%s\" is not available at "
+						"the stamp of IMU messages (%f) 0.5 s later, they are dropped. If the IMU is "
+						"fixed on \"%s\", publish that transform as static, or set always_check_imu_tf "
+						"to false. This warning is shown once.",
+						this->frameId().c_str(), msg->header.frame_id.c_str(), stamp, this->frameId().c_str());
+				warned = true;
+			}
+			imusPending_.pop_front();
+			continue;
+		}
+		imuLocalTransform_ = localTransform;
+
+		const IMU imu(
+				cv::Vec4d(msg->orientation.x, msg->orientation.y, msg->orientation.z, msg->orientation.w),
+				cv::Mat(3,3,CV_64FC1,(void*)msg->orientation_covariance.data()).clone(),
+				cv::Vec3d(msg->angular_velocity.x, msg->angular_velocity.y, msg->angular_velocity.z),
+				cv::Mat(3,3,CV_64FC1,(void*)msg->angular_velocity_covariance.data()).clone(),
+				cv::Vec3d(msg->linear_acceleration.x, msg->linear_acceleration.y, msg->linear_acceleration.z),
+				cv::Mat(3,3,CV_64FC1,(void*)msg->linear_acceleration_covariance.data()).clone(),
+				localTransform);
+
+		// For the odometry
+		imus_.insert(std::make_pair(stamp, imu));
+		if(imus_.size() > 1000)
+		{
+			RCLCPP_WARN(this->get_logger(), "Dropping imu data!");
+			imus_.erase(imus_.begin());
+		}
+
+		// For the motion prediction (deskewing), which removes gravity and ignores what the
+		// message doesn't have (orientation or acceleration, covariance -1 or all zeros)
+		if(imuMotionPredictionEnabled_)
+		{
+			UScopeMutex lock(imuMotionPredictorMutex_);
+			imuMotionPredictor_.addImu(stamp, imu);
+		}
+		imusPending_.pop_front();
+	}
 }
 
 void OdometryROS::callbackIMU(const sensor_msgs::msg::Imu::SharedPtr msg)
 {
 	if(!this->isPaused())
 	{
-		double stamp = rtabmap_conversions::timestampFromROS(msg->header.stamp);
-
-		if(imuMotionPredictionEnabled_)
-		{
-			if(imuMotionPredictorLocalTransform_.isNull() || alwaysCheckImuTf_)
-			{
-				Transform localTransform = this->frameId().compare(msg->header.frame_id) == 0?
-						Transform::getIdentity():
-						rtabmap_conversions::getTransform(this->frameId(), msg->header.frame_id, msg->header.stamp, *tfBuffer_, 0);
-				if(!localTransform.isNull())
-				{
-					imuMotionPredictorLocalTransform_ = localTransform;
-				}
-			}
-			if(!imuMotionPredictorLocalTransform_.isNull())
-			{
-				// The predictor removes gravity and ignores what the message doesn't have
-				// (orientation or acceleration, covariance -1 or all zeros).
-				const IMU imu(
-						cv::Vec4d(msg->orientation.x, msg->orientation.y, msg->orientation.z, msg->orientation.w),
-						cv::Mat(3,3,CV_64FC1,(void*)msg->orientation_covariance.data()).clone(),
-						cv::Vec3d(msg->angular_velocity.x, msg->angular_velocity.y, msg->angular_velocity.z),
-						cv::Mat(3,3,CV_64FC1,(void*)msg->angular_velocity_covariance.data()).clone(),
-						cv::Vec3d(msg->linear_acceleration.x, msg->linear_acceleration.y, msg->linear_acceleration.z),
-						cv::Mat(3,3,CV_64FC1,(void*)msg->linear_acceleration_covariance.data()).clone(),
-						imuMotionPredictorLocalTransform_);
-				UScopeMutex lock(imuMotionPredictorMutex_);
-				imuMotionPredictor_.addImu(stamp, imu);
-			}
-		}
-		//RCLCPP_WARN(get_logger(), "Received imu: %f delay=%f", stamp, (now() - msg->header.stamp).seconds());
-
+		//RCLCPP_WARN(get_logger(), "Received imu: %f delay=%f", rtabmap_conversions::timestampFromROS(msg->header.stamp), (now() - msg->header.stamp).seconds());
+		double newestImuStamp = 0.0;
 		{
 			UScopeMutex m(imuMutex_);
-
-			if(!imuProcessed_ && imus_.empty())
+			imusPending_.push_back(msg);
+			flushImuPending();
+			if(!imus_.empty())
 			{
-				rtabmap::Transform localTransform = rtabmap_conversions::getTransform(this->frameId(), msg->header.frame_id, msg->header.stamp, *tfBuffer_, waitForTransform_);
-				if(localTransform.isNull())
-				{
-					RCLCPP_WARN(this->get_logger(), "Dropping imu data! A valid TF between %s and %s is required to initialize IMU.",
-						this->frameId().c_str(), msg->header.frame_id.c_str());
-					return;
-				}
-			}
-
-			imus_.insert(std::make_pair(stamp, msg));
-
-			if(imus_.size() > 1000)
-			{
-				RCLCPP_WARN(this->get_logger(), "Dropping imu data!");
-				imus_.erase(imus_.begin());
+				newestImuStamp = imus_.rbegin()->first;
 			}
 		}
 		UScopeMutex dataLock(dataMutex_, false);
 		if(dataLock.lockTry() == 0)
 		{
-			if(bufferedDataToProcess_ && imuUntilStampToProcess_ <= stamp)
+			if(bufferedDataToProcess_ && newestImuStamp > 0.0 && imuUntilStampToProcess_ <= newestImuStamp)
 			{
 				bufferedDataToProcess_ = false;
 				dataReady_.release();
@@ -664,7 +701,7 @@ void OdometryROS::processData()
 	SensorData & data = dataToProcess_;
 	std_msgs::msg::Header & header = dataHeaderToProcess_;
 
-	std::vector<std::pair<double, sensor_msgs::msg::Imu::ConstSharedPtr> > imus;
+	std::vector<std::pair<double, IMU> > imus;
 	{
 		UScopeMutex m(imuMutex_);
 	
@@ -698,19 +735,20 @@ void OdometryROS::processData()
 			return;
 		}
 		// process all imu data up to current image stamp (or the end of the sweep, see above), or just after so that underlying odom approach can do interpolation of imu at that stamp
-		std::map<double, sensor_msgs::msg::Imu::ConstSharedPtr>::iterator iterEnd = imus_.lower_bound(imuUntilStamp);
-		std::map<double, sensor_msgs::msg::Imu::ConstSharedPtr>::iterator iterLast = iterEnd;
+		std::map<double, IMU>::iterator iterEnd = imus_.lower_bound(imuUntilStamp);
+		std::map<double, IMU>::iterator iterLast = iterEnd;
 		if(iterEnd!= imus_.end())
 		{
 			++iterEnd;
 		}
-		std::map<double, sensor_msgs::msg::Imu::ConstSharedPtr>::iterator iterFirst = imus_.begin();
-		for(std::map<double, sensor_msgs::msg::Imu::ConstSharedPtr>::iterator iter=iterFirst; iter!=iterEnd;)
+		for(std::map<double, IMU>::iterator iter=imus_.begin(); iter!=iterEnd;)
 		{
-			// Because we always keep the last processed imu in the buffer, skip the first 
-			// one when processing again the buffer
-			if(iter!=iterFirst) {
+			// The last processed imu is kept in the buffer, so it is there again at the
+			// next pass: skip what was already processed (and only that: the very first
+			// imu was not, and it can be the only one when the first frame is processed)
+			if(iter->first > lastImuStampProcessed_) {
 				imus.push_back(*iter);
+				lastImuStampProcessed_ = iter->first;
 			}
 			if(iter!=iterLast) {
 				imus_.erase(iter++);
@@ -721,46 +759,10 @@ void OdometryROS::processData()
 		}
 	} // end imu lock
 
-	bool imuWarnShown = false;
+	// Already with their mounting (see flushImuPending())
 	for(size_t i=0; i<imus.size(); ++i)
 	{
-		if((alwaysCheckImuTf_ && !imuWarnShown) || imuLocalTransform_.isNull())
-		{
-			if(this->frameId().compare(imus[i].second->header.frame_id) != 0)
-			{
-				// We should not have to wait for IMU TF (imu delay <<< sensor data delay), so don't
-				rtabmap::Transform localTransform = rtabmap_conversions::getTransform(this->frameId(), imus[i].second->header.frame_id, imus[i].second->header.stamp, *tfBuffer_, 0);
-				if(localTransform.isNull())
-				{
-					if(imuLocalTransform_.isNull()) {
-						RCLCPP_ERROR(this->get_logger(), "Could not transform IMU msg from frame \"%s\" to frame \"%s\", TF is not available at IMU msg time %f. All IMU msgs up to sensor data time %f are skipped! If IMU TF is not static, make sure to publish it before the the imu topic is published.",
-								imus[i].second->header.frame_id.c_str(), this->frameId().c_str(), rtabmap_conversions::timestampFromROS(imus[i].second->header.stamp), data.stamp());
-						break;
-					} else if(!imuWarnShown) {
-						imuWarnShown = true; // show only one time
-						RCLCPP_WARN(this->get_logger(), "Could not transform IMU msg from frame \"%s\" to frame \"%s\", TF is not available at IMU msg time %f. We will use latest known IMU local transform (if TF between camera/lidar and the IMU is static, you can safely ignore this warning and set always_check_imu_tf to false).",
-								imus[i].second->header.frame_id.c_str(), this->frameId().c_str(), rtabmap_conversions::timestampFromROS(imus[i].second->header.stamp));
-					}
-				}
-				else {
-					imuLocalTransform_ = localTransform;
-				}
-			}
-			else if(imuLocalTransform_.isNull())
-			{
-				imuLocalTransform_.setIdentity();
-			}
-		}
-		
-		IMU imu(cv::Vec4d(imus[i].second->orientation.x, imus[i].second->orientation.y, imus[i].second->orientation.z, imus[i].second->orientation.w),
-				cv::Mat(3,3,CV_64FC1,(void*)imus[i].second->orientation_covariance.data()).clone(),
-				cv::Vec3d(imus[i].second->angular_velocity.x, imus[i].second->angular_velocity.y, imus[i].second->angular_velocity.z),
-				cv::Mat(3,3,CV_64FC1,(void*)imus[i].second->angular_velocity_covariance.data()).clone(),
-				cv::Vec3d(imus[i].second->linear_acceleration.x, imus[i].second->linear_acceleration.y, imus[i].second->linear_acceleration.z),
-				cv::Mat(3,3,CV_64FC1,(void*)imus[i].second->linear_acceleration_covariance.data()).clone(),
-				imuLocalTransform_);
-
-		SensorData dataIMU(imu, 0, imus[i].first);
+		SensorData dataIMU(imus[i].second, 0, imus[i].first);
 		odometry_->process(dataIMU);
 		imuProcessed_ = true;
 	}
@@ -1572,8 +1574,10 @@ void OdometryROS::reset(const Transform & pose)
 	bufferedDataToProcess_ = false;
 	imuMutex_.lock();
 	imus_.clear();
-	imuMutex_.unlock();
+	imusPending_.clear();
+	lastImuStampProcessed_ = 0.0;
 	imuLocalTransform_.setNull();
+	imuMutex_.unlock();
 	imuMotionPredictorMutex_.lock();
 	imuMotionPredictor_.reset();
 	imuMotionPredictorMutex_.unlock();

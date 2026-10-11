@@ -12,12 +12,17 @@ All rights reserved. (BSD-3-Clause, see the repository root.)
 #include <rtabmap_msgs/msg/sensor_data.hpp>
 
 #include <rtabmap_odom/icp_odometry.hpp>
+#include <rtabmap/core/Odometry.h>
+#include <rtabmap/core/OdometryInfo.h>
+#include <rtabmap/core/IMU.h>
 
 #include <rtabmap/core/util3d_registration.h>
 
 #include <rtabmap_conversions/PointCloudConversion.h>
 
 #include <tf2_msgs/msg/tf_message.hpp>
+#include <tf2/buffer_core.hpp>
+#include <tf2/time.hpp>
 
 #include <std_srvs/srv/empty.hpp>
 
@@ -25,6 +30,7 @@ All rights reserved. (BSD-3-Clause, see the repository root.)
 #include <cmath>
 #include <cstring>
 #include <limits>
+#include <map>
 #include <string>
 #include <utility>
 #include <vector>
@@ -170,6 +176,21 @@ double correspondenceRatio(
 			source, target, maxDistance, variance, correspondences, false);
 	return double(correspondences) / double(source->size());
 }
+
+/**
+ * @brief How close to the ground truth the recorded half turn registers, by ICP backend.
+ *
+ * The recorded sweeps register within about a centimetre and 0.01 rad of the truth with
+ * libpointmatcher, the default when RTAB-Map is built with it, but 7 to 10 cm and 0.015 rad
+ * with PCL, which is what a build without it uses. A deskewing that stopped working is
+ * several times worse in rotation with either, but in translation only with libpointmatcher.
+ */
+struct IcpBounds
+{
+	bool libpointmatcher = rtabmap::Parameters::defaultIcpStrategy() == 1;
+	double translation = libpointmatcher ? 0.05 : 0.15;   // m
+	double rotation = libpointmatcher ? 0.03 : 0.05;      // rad
+};
 
 class IcpOdometryTest : public NodeTest
 {
@@ -545,6 +566,157 @@ protected:
 			}
 		}
 		return spinUntil([&]() { return echo->size() >= recording.transforms.size(); });
+	}
+
+	/**
+	 * @brief Publishes the IMU messages recorded on @p topic, on `imu`, after the nodes exist.
+	 *
+	 * The recording has two IMUs, each raw and filtered; see test/data/README.md. They cover
+	 * the same windows as TF, so their mounting can be looked up for every message.
+	 *
+	 * @return false if the topic is not in the recording or the nodes never subscribed
+	 */
+	bool publishRecordedImu(const std::string & topic, size_t subscribers = 1)
+	{
+		const std::vector<sensor_msgs::msg::Imu> messages =
+				readBagMessages<sensor_msgs::msg::Imu>(ousterHalfTurnBag(), topic);
+		if(messages.empty())
+		{
+			return false;
+		}
+		imuPublisher_ = helper()->create_publisher<sensor_msgs::msg::Imu>("imu", rclcpp::QoS(200));
+		if(!waitForSubscriber(imuPublisher_, subscribers))
+		{
+			return false;
+		}
+		size_t published = 0;
+		for(const sensor_msgs::msg::Imu & message : messages)
+		{
+			imuPublisher_->publish(message);
+			if(++published % 10 == 0)
+			{
+				spinFor(std::chrono::milliseconds(5));
+			}
+		}
+		spinFor(std::chrono::milliseconds(200));
+		return true;
+	}
+
+	/**
+	 * @brief The motion of @p frame between the two recorded sweeps, from the recorded TF.
+	 *
+	 * base_link never moves in the recording, so this is the ground truth odometry computed
+	 * in @p frame should report between the two sweeps.
+	 */
+	static rtabmap::Transform recordedMotion(const Recording & recording, const std::string & frame)
+	{
+		tf2::BufferCore buffer(tf2::durationFromSec(100.0));
+		for(const tf2_msgs::msg::TFMessage & message : recording.staticTransforms)
+		{
+			for(const geometry_msgs::msg::TransformStamped & t : message.transforms)
+			{
+				buffer.setTransform(t, "recording", true);
+			}
+		}
+		for(const tf2_msgs::msg::TFMessage & message : recording.transforms)
+		{
+			for(const geometry_msgs::msg::TransformStamped & t : message.transforms)
+			{
+				buffer.setTransform(t, "recording", false);
+			}
+		}
+		const geometry_msgs::msg::TransformStamped motion = buffer.lookupTransform(
+				frame, tf2::timeFromSec(rtabmap_conversions::timestampFromROS(recording.clouds[0].header.stamp)),
+				frame, tf2::timeFromSec(rtabmap_conversions::timestampFromROS(recording.clouds[1].header.stamp)),
+				"base_link");
+		return rtabmap_conversions::transformFromGeometryMsg(motion.transform);
+	}
+
+	/// The angle (rad) of the rotation of @p t.
+	static double angleOf(const rtabmap::Transform & t)
+	{
+		return 2.0 * std::acos(std::min(1.0, std::fabs(t.getQuaterniond().w())));
+	}
+
+	/// What odometry reported between its first and last poses, differenced from @p expected.
+	static rtabmap::Transform odometryError(
+			const Collector<nav_msgs::msg::Odometry> & odom, const rtabmap::Transform & expected)
+	{
+		const rtabmap::Transform motion =
+				rtabmap_conversions::transformFromPoseMsg(odom.front().pose.pose).inverse() *
+				rtabmap_conversions::transformFromPoseMsg(odom.back().pose.pose);
+		return expected.inverse() * motion;
+	}
+
+	/**
+	 * @brief deskewing_imu:=true at base_link, against deskewing with TF in base_link.
+	 *
+	 * The base's motion comes from the IMU recorded on @p imuTopic and the last odometry pose
+	 * instead of TF, while the mast's own motion still comes from TF, per point. The platform
+	 * never moves and the IMU says so, so the result must be the cloud deskewing against TF in
+	 * base_link gives -- point for point, both sweeps. The first one included: before odometry
+	 * has a pose, the IMU still gives the rotation.
+	 */
+	void expectImuDeskewingAsTf(const std::string & imuTopic, double pointDistance)
+	{
+		std::shared_ptr<Collector<nav_msgs::msg::Odometry>> imuOdom =
+				collect<nav_msgs::msg::Odometry>("odom_imu");
+		std::shared_ptr<Collector<sensor_msgs::msg::PointCloud2>> imuScan =
+				collect<sensor_msgs::msg::PointCloud2>("odom_deskewed_input_scan_imu");
+		std::shared_ptr<Collector<sensor_msgs::msg::PointCloud2>> tfScan =
+				collect<sensor_msgs::msg::PointCloud2>("odom_deskewed_input_scan_tf");
+		const Recording recording = readOusterRecording();
+		ASSERT_TRUE(recording.valid()) << "could not read " << ousterHalfTurnBag();
+
+		const std::vector<rclcpp::Parameter> common = {
+			rclcpp::Parameter("deskewing", true),
+			rclcpp::Parameter("scan_cloud_max_points", 65536),
+			rclcpp::Parameter("scan_voxel_size", 0.2),
+			rclcpp::Parameter("Icp/MaxCorrespondenceDistance", "2.0"),
+			rclcpp::Parameter("Icp/PointToPlane", "true"),
+			rclcpp::Parameter("Icp/MaxTranslation", "0.5"),
+			rclcpp::Parameter("wait_for_transform", 2.0)};
+		std::vector<rclcpp::Parameter> imuParams = common;
+		imuParams.push_back(rclcpp::Parameter("deskewing_imu", true));
+		imuParams.push_back(rclcpp::Parameter("wait_imu_to_init", true));
+		makeNode(imuParams, "imu");
+		std::vector<rclcpp::Parameter> tfParams = common;
+		tfParams.push_back(rclcpp::Parameter("guess_frame_id", "base_link"));
+		makeNode(tfParams, "tf");
+		ASSERT_TRUE(publishRecordedTf(recording));
+
+		ASSERT_TRUE(publishRecordedImu(imuTopic));
+
+		rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub =
+				helper()->create_publisher<sensor_msgs::msg::PointCloud2>("scan_cloud", 10);
+		ASSERT_TRUE(waitForSubscriber(pub, 2));
+		ASSERT_TRUE(waitForPublisher(imuScan->subscription));
+		ASSERT_TRUE(waitForPublisher(tfScan->subscription));
+
+		pub->publish(recording.clouds[0]);
+		ASSERT_TRUE(spinUntil([&]() { return imuScan->size() >= 1 && tfScan->size() >= 1; }))
+				<< "the first sweep was not deskewed with the imu";
+		pub->publish(recording.clouds[1]);
+		ASSERT_TRUE(spinUntil([&]() {
+			return imuScan->size() >= 2 && tfScan->size() >= 2 && imuOdom->size() >= 2; }));
+
+		for(size_t i=0; i<2; ++i)
+		{
+			const double together = correspondenceRatio(*imuScan->messages[i], *tfScan->messages[i], pointDistance);
+			EXPECT_GT(together, 0.99)
+					<< "sweep " << i << ": only " << together*100.0 << "% of the scan deskewed "
+					   "with the imu is within " << pointDistance << " m of the one deskewed with tf";
+		}
+
+		ASSERT_FALSE(isLost(imuOdom->back())) << "lost tracking between the two sweeps";
+		// Between the two sweeps: odometry starts from the IMU's orientation (the platform is
+		// tilted by a few degrees), so that is what the motion is relative to.
+		const rtabmap::Transform motion = odometryError(*imuOdom, rtabmap::Transform::getIdentity());
+		const IcpBounds bounds;
+		EXPECT_LT(motion.getNorm(), bounds.translation)
+				<< "the platform never moved; this is too far from where it started";
+		EXPECT_LT(angleOf(motion), bounds.rotation)
+				<< "the platform never turned; this is too far from where it started";
 	}
 
 private:
@@ -926,88 +1098,264 @@ TEST_F(IcpOdometryTest, deskewing_is_what_lets_a_half_turn_pair_register)
 
 
 /**
- * deskewing_imu:=true on the same two sweeps: the base's motion comes from the IMU and
- * the last odometry pose instead of TF, while the mast's own motion still comes from TF,
- * per point. The platform never moves and the IMU says so, so the result must be the
- * cloud deskewing against TF in base_link gives -- point for point, both sweeps. The first
- * one included: before odometry has a pose, the IMU still gives the rotation.
+ * The drone's IMU, as filtered in the demo: on the platform, so its mounting is fixed. Both
+ * deskewings agree within a centimetre.
  */
 TEST_F(IcpOdometryTest, deskews_with_the_imu_and_the_mount_from_tf)
 {
-	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> imuOdom =
-			collect<nav_msgs::msg::Odometry>("odom_imu");
-	std::shared_ptr<Collector<sensor_msgs::msg::PointCloud2>> imuScan =
-			collect<sensor_msgs::msg::PointCloud2>("odom_deskewed_input_scan_imu");
-	std::shared_ptr<Collector<sensor_msgs::msg::PointCloud2>> tfScan =
-			collect<sensor_msgs::msg::PointCloud2>("odom_deskewed_input_scan_tf");
+	expectImuDeskewingAsTf("/imu/data_filtered", 0.01);
+}
+
+/**
+ * The lidar's own IMU, at base_link: it turns with the mast, so its mounting changes at
+ * every message, and is taken from TF at each message's stamp. The base's rotation is then
+ * the IMU's minus the mast's, two half-turn-a-second rotations that cancel out only as
+ * well as the filtered IMU and the mast's TF agree: a percent off over a sweep is a few
+ * centimetres at the far end. Both deskewings agree within 5 cm, and the registration is as
+ * good as with the drone's IMU.
+ */
+TEST_F(IcpOdometryTest, deskews_with_the_lidars_own_imu_at_the_base)
+{
+	expectImuDeskewingAsTf("/os_cloud_node/imu/data_filtered", 0.05);
+}
+
+/**
+ * The lidar's own IMU, inside the Ouster: rigid with the sensor, so it turns with the mast.
+ * With frame_id at the sensor, the mast's rotation is the sensor's own motion, which the IMU
+ * measures: no TF is needed during the sweep. Deskewed by the node (deskewing_imu), against
+ * the same two sweeps without deskewing. The ground truth is the sensor's motion between the
+ * sweeps, from TF; the IMU also gives the guess of the half turn between them.
+ *
+ * RTAB-Map's odometry can deskew with the IMU too (Odom/Deskewing), but not behind this
+ * node: the cloud reaches it voxelized and without its time channel.
+ */
+TEST_F(IcpOdometryTest, deskews_with_the_lidars_own_imu)
+{
 	const Recording recording = readOusterRecording();
 	ASSERT_TRUE(recording.valid()) << "could not read " << ousterHalfTurnBag();
+	std::map<std::string, std::shared_ptr<Collector<nav_msgs::msg::Odometry>>> odom;
+	for(const std::string & name : {"node", "none"})
+	{
+		odom[name] = collect<nav_msgs::msg::Odometry>("odom_" + name);
+	}
 
 	const std::vector<rclcpp::Parameter> common = {
-		rclcpp::Parameter("deskewing", true),
+		rclcpp::Parameter("frame_id", "os_sensor"),
+		rclcpp::Parameter("wait_imu_to_init", true),
 		rclcpp::Parameter("scan_cloud_max_points", 65536),
 		rclcpp::Parameter("scan_voxel_size", 0.2),
 		rclcpp::Parameter("Icp/MaxCorrespondenceDistance", "2.0"),
 		rclcpp::Parameter("Icp/PointToPlane", "true"),
 		rclcpp::Parameter("Icp/MaxTranslation", "0.5"),
 		rclcpp::Parameter("wait_for_transform", 2.0)};
-	std::vector<rclcpp::Parameter> imuParams = common;
-	imuParams.push_back(rclcpp::Parameter("deskewing_imu", true));
-	imuParams.push_back(rclcpp::Parameter("wait_imu_to_init", true));
-	makeNode(imuParams, "imu");
-	std::vector<rclcpp::Parameter> tfParams = common;
-	tfParams.push_back(rclcpp::Parameter("guess_frame_id", "base_link"));
-	makeNode(tfParams, "tf");
+	std::vector<rclcpp::Parameter> params = common;
+	params.push_back(rclcpp::Parameter("deskewing", true));
+	params.push_back(rclcpp::Parameter("deskewing_imu", true));
+	makeNode(params, "node");
+	params = common;
+	params.push_back(rclcpp::Parameter("deskewing", false));
+	makeNode(params, "none");
 	ASSERT_TRUE(publishRecordedTf(recording));
-
-	// A level IMU at rest, from before the first sweep to after the second. The heading is
-	// not exactly zero: RTAB-Map reads an orientation whose x, y and z are all zero as
-	// "not set".
-	publishImuTf();
-	rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu =
-			helper()->create_publisher<sensor_msgs::msg::Imu>("imu", rclcpp::QoS(200));
-	ASSERT_TRUE(waitForSubscriber(imu));
-	const double first = rtabmap_conversions::timestampFromROS(recording.clouds[0].header.stamp);
-	const double last = rtabmap_conversions::timestampFromROS(recording.clouds[1].header.stamp);
-	size_t published = 0;
-	for(double t = first - 0.2; t <= last + 0.3; t += 0.01)
-	{
-		sensor_msgs::msg::Imu sample = imuSample(t, 0.001);
-		sample.linear_acceleration.z = 9.80665;
-		imu->publish(sample);
-		if(++published % 10 == 0)
-		{
-			spinFor(std::chrono::milliseconds(5));
-		}
-	}
-	spinFor(std::chrono::milliseconds(200));
+	ASSERT_TRUE(publishRecordedImu("/os_cloud_node/imu/data_filtered", 2));
 
 	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub =
 			helper()->create_publisher<sensor_msgs::msg::PointCloud2>("scan_cloud", 10);
 	ASSERT_TRUE(waitForSubscriber(pub, 2));
-	ASSERT_TRUE(waitForPublisher(imuScan->subscription));
-	ASSERT_TRUE(waitForPublisher(tfScan->subscription));
-
 	pub->publish(recording.clouds[0]);
-	ASSERT_TRUE(spinUntil([&]() { return imuScan->size() >= 1 && tfScan->size() >= 1; }))
-			<< "the first sweep was not deskewed with the imu";
+	ASSERT_TRUE(spinUntil([&]() { return !odom["node"]->empty() && !odom["none"]->empty(); }));
 	pub->publish(recording.clouds[1]);
-	ASSERT_TRUE(spinUntil([&]() {
-		return imuScan->size() >= 2 && tfScan->size() >= 2 && imuOdom->size() >= 2; }));
+	ASSERT_TRUE(spinUntil([&]() { return odom["node"]->size() >= 2 && odom["none"]->size() >= 2; }));
 
-	for(size_t i=0; i<2; ++i)
+	const rtabmap::Transform expected = recordedMotion(recording, "os_sensor");
+	std::map<std::string, rtabmap::Transform> error;
+	// Odometry starts from the IMU's orientation: the direction of gravity seen from the
+	// sensor (whatever the yaw) is the one TF gives, the platform being level, within the
+	// few degrees the filtered IMU and the mast's TF disagree by.
 	{
-		const double together = correspondenceRatio(*imuScan->messages[i], *tfScan->messages[i], 0.01);
-		EXPECT_GT(together, 0.99)
-				<< "sweep " << i << ": only " << together*100.0 << "% of the scan deskewed "
-				   "with the imu is within a centimetre of the one deskewed with tf";
+		tf2::BufferCore buffer(tf2::durationFromSec(100.0));
+		for(const tf2_msgs::msg::TFMessage & message : recording.staticTransforms)
+			for(const geometry_msgs::msg::TransformStamped & t : message.transforms) buffer.setTransform(t, "recording", true);
+		for(const tf2_msgs::msg::TFMessage & message : recording.transforms)
+			for(const geometry_msgs::msg::TransformStamped & t : message.transforms) buffer.setTransform(t, "recording", false);
+		const rtabmap::Transform truth = rtabmap_conversions::transformFromGeometryMsg(buffer.lookupTransform("base_link", "os_sensor",
+				tf2::timeFromSec(rtabmap_conversions::timestampFromROS(recording.clouds[0].header.stamp))).transform);
+		const rtabmap::Transform first = rtabmap_conversions::transformFromPoseMsg(odom["node"]->front().pose.pose);
+		const Eigen::Vector3d upTruth = truth.getQuaterniond().inverse() * Eigen::Vector3d::UnitZ();
+		const Eigen::Vector3d upOdom = first.getQuaterniond().inverse() * Eigen::Vector3d::UnitZ();
+		EXPECT_LT(std::acos(std::min(1.0, upTruth.dot(upOdom))), 0.1)
+				<< "the first pose is not oriented as the IMU says (up in the sensor frame: odometry "
+				<< upOdom.transpose() << ", TF " << upTruth.transpose() << ")";
 	}
+	for(const std::string & name : {"node", "none"})
+	{
+		ASSERT_FALSE(isLost(odom[name]->back())) << name << ": lost tracking between the two sweeps";
+		error[name] = odometryError(*odom[name], expected);
+		RCLCPP_INFO(helper()->get_logger(), "%s: error %.3f m, %.3f rad (motion %.3f m, %.3f rad)",
+				name.c_str(), error[name].getNorm(), angleOf(error[name]),
+				expected.getNorm(), angleOf(expected));
+	}
+	const IcpBounds bounds;
+	EXPECT_LT(error["node"].getNorm(), bounds.translation) << "too far from the sensor's motion";
+	EXPECT_LT(angleOf(error["node"]), bounds.rotation) << "too far from the sensor's rotation";
+	// Without deskewing, the sweeps register further away, so the correction matters
+	EXPECT_GT(angleOf(error["none"]), angleOf(error["node"]) * 2.0);
+	if(bounds.libpointmatcher)
+	{
+		EXPECT_GT(error["none"].getNorm(), error["node"].getNorm() * 2.0);
+	}
+}
 
-	ASSERT_FALSE(isLost(imuOdom->back())) << "lost tracking between the two sweeps";
-	EXPECT_LT(translationNorm(imuOdom->back()), 0.15)
-			<< "the platform never moved; this is too far from the origin";
-	EXPECT_LT(rotationAngle(imuOdom->back()), 0.05)
-			<< "the platform never turned; this is too far from the origin";
+namespace {
+
+/**
+ * @brief A recorded Ouster sweep as RTAB-Map's own lidar drivers give it.
+ *
+ * Organized (rings x columns, so the time order is known from the layout), with each
+ * point's ring and time, in seconds from the stamp. The Ouster gives its time in
+ * nanoseconds as an unsigned integer, which PCL's conversion to RTAB-Map's PointXYZIRT
+ * would copy as is, so it is converted here. Points without return, all zeros, are set to
+ * NaN: deskewing would otherwise move them away from the origin like real points.
+ */
+rtabmap::LaserScan laserScanWithTime(const sensor_msgs::msg::PointCloud2 & cloud)
+{
+	std::map<std::string, uint32_t> offset;
+	for(const sensor_msgs::msg::PointField & field : cloud.fields)
+	{
+		offset[field.name] = field.offset;
+	}
+	cv::Mat data(cloud.height, cloud.width, CV_32FC(6));
+	for(uint32_t v=0; v<cloud.height; ++v)
+	{
+		for(uint32_t u=0; u<cloud.width; ++u)
+		{
+			const uint8_t * point = &cloud.data[v*cloud.row_step + u*cloud.point_step];
+			float x, y, z, intensity;
+			uint32_t nsec;
+			memcpy(&x, point + offset["x"], sizeof(float));
+			memcpy(&y, point + offset["y"], sizeof(float));
+			memcpy(&z, point + offset["z"], sizeof(float));
+			memcpy(&intensity, point + offset["intensity"], sizeof(float));
+			memcpy(&nsec, point + offset["t"], sizeof(uint32_t));
+			if(x == 0.0f && y == 0.0f && z == 0.0f)
+			{
+				x = y = z = std::numeric_limits<float>::quiet_NaN();
+			}
+			float * out = data.ptr<float>(v, u);
+			out[0] = x;
+			out[1] = y;
+			out[2] = z;
+			out[3] = intensity;
+			out[4] = float(point[offset["ring"]]);
+			out[5] = float(double(nsec) * 1e-9);
+		}
+	}
+	return rtabmap::LaserScan(data, int(cloud.width*cloud.height), 0.0f,
+			rtabmap::LaserScan::kXYZIRT, rtabmap::Transform::getIdentity());
+}
+
+rtabmap::IMU imuFromMsg(const sensor_msgs::msg::Imu & msg, const rtabmap::Transform & localTransform)
+{
+	return rtabmap::IMU(
+			cv::Vec4d(msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w),
+			cv::Mat(3,3,CV_64FC1,(void*)msg.orientation_covariance.data()).clone(),
+			cv::Vec3d(msg.angular_velocity.x, msg.angular_velocity.y, msg.angular_velocity.z),
+			cv::Mat(3,3,CV_64FC1,(void*)msg.angular_velocity_covariance.data()).clone(),
+			cv::Vec3d(msg.linear_acceleration.x, msg.linear_acceleration.y, msg.linear_acceleration.z),
+			cv::Mat(3,3,CV_64FC1,(void*)msg.linear_acceleration_covariance.data()).clone(),
+			localTransform);
+}
+
+}  // namespace
+
+/**
+ * RTAB-Map's own odometry deskewing with the IMU (Odom/Deskewing), without the node:
+ * rtabmap::Odometry is given the recorded sweeps as its lidar drivers give them, with
+ * their time channel, and the lidar's own IMU up to the end of each sweep, as
+ * OdometryThread does. The same sweeps, ground truth and expectations as
+ * deskews_with_the_lidars_own_imu, where the node deskews instead.
+ */
+TEST_F(IcpOdometryTest, rtabmap_odometry_deskews_with_the_lidars_own_imu)
+{
+	const Recording recording = readOusterRecording();
+	ASSERT_TRUE(recording.valid()) << "could not read " << ousterHalfTurnBag();
+	const std::vector<sensor_msgs::msg::Imu> imus =
+			readBagMessages<sensor_msgs::msg::Imu>(ousterHalfTurnBag(), "/os_cloud_node/imu/data_filtered");
+	ASSERT_FALSE(imus.empty());
+
+	// os_sensor -> os_imu, static
+	rtabmap::Transform imuLocalTransform;
+	for(const tf2_msgs::msg::TFMessage & message : recording.staticTransforms)
+	{
+		for(const geometry_msgs::msg::TransformStamped & t : message.transforms)
+		{
+			if(t.header.frame_id == "os_sensor" && t.child_frame_id == "os_imu")
+			{
+				imuLocalTransform = rtabmap_conversions::transformFromGeometryMsg(t.transform);
+			}
+		}
+	}
+	ASSERT_FALSE(imuLocalTransform.isNull());
+
+	auto motion = [&](bool deskewing) -> rtabmap::Transform
+	{
+		rtabmap::ParametersMap parameters;
+		parameters.insert(rtabmap::ParametersPair(rtabmap::Parameters::kRegStrategy(), "1"));
+		parameters.insert(rtabmap::ParametersPair(rtabmap::Parameters::kIcpVoxelSize(), "0.2"));
+		parameters.insert(rtabmap::ParametersPair(rtabmap::Parameters::kIcpMaxCorrespondenceDistance(), "2.0"));
+		parameters.insert(rtabmap::ParametersPair(rtabmap::Parameters::kIcpPointToPlane(), "true"));
+		parameters.insert(rtabmap::ParametersPair(rtabmap::Parameters::kIcpMaxTranslation(), "0.5"));
+		parameters.insert(rtabmap::ParametersPair(rtabmap::Parameters::kOdomDeskewing(), deskewing?"true":"false"));
+		std::unique_ptr<rtabmap::Odometry> odometry(rtabmap::Odometry::create(parameters));
+
+		std::vector<rtabmap::Transform> poses;
+		size_t next = 0;
+		for(size_t i=0; i<recording.clouds.size(); ++i)
+		{
+			const double stamp = rtabmap_conversions::timestampFromROS(recording.clouds[i].header.stamp);
+			const rtabmap::LaserScan scan = laserScanWithTime(recording.clouds[i]);
+			double sweepEnd = stamp;
+			for(int k=0; k<scan.size(); ++k)
+			{
+				sweepEnd = std::max(sweepEnd, stamp + double(scan.data().ptr<float>(0, k)[scan.getTimeOffset()]));
+			}
+			// The IMU up to the end of the sweep (and the first sample after it)
+			while(next < imus.size())
+			{
+				const double imuStamp = rtabmap_conversions::timestampFromROS(imus[next].header.stamp);
+				rtabmap::SensorData imuData(imuFromMsg(imus[next], imuLocalTransform), 0, imuStamp);
+				odometry->process(imuData);
+				++next;
+				if(imuStamp > sweepEnd)
+				{
+					break;
+				}
+			}
+			rtabmap::SensorData data(scan, cv::Mat(), cv::Mat(), rtabmap::CameraModel(), int(i+1), stamp);
+			rtabmap::OdometryInfo info;
+			poses.push_back(odometry->process(data, &info));
+			EXPECT_FALSE(poses.back().isNull()) << "sweep " << i << " was not registered";
+		}
+		return poses.size() == 2 && !poses[0].isNull() && !poses[1].isNull()?
+				poses[0].inverse() * poses[1] : rtabmap::Transform();
+	};
+
+	const rtabmap::Transform expected = recordedMotion(recording, "os_sensor");
+	const rtabmap::Transform deskewed = motion(true);
+	const rtabmap::Transform skewed = motion(false);
+	ASSERT_FALSE(deskewed.isNull());
+	ASSERT_FALSE(skewed.isNull());
+	const rtabmap::Transform deskewedError = expected.inverse() * deskewed;
+	const rtabmap::Transform skewedError = expected.inverse() * skewed;
+	RCLCPP_INFO(helper()->get_logger(), "deskewed: error %.3f m, %.3f rad; not deskewed: error %.3f m, %.3f rad",
+			deskewedError.getNorm(), angleOf(deskewedError), skewedError.getNorm(), angleOf(skewedError));
+	const IcpBounds bounds;
+	EXPECT_LT(deskewedError.getNorm(), bounds.translation) << "too far from the sensor's motion";
+	EXPECT_LT(angleOf(deskewedError), bounds.rotation) << "too far from the sensor's rotation";
+	EXPECT_GT(angleOf(skewedError), angleOf(deskewedError) * 2.0);
+	if(bounds.libpointmatcher)
+	{
+		EXPECT_GT(skewedError.getNorm(), deskewedError.getNorm() * 2.0);
+	}
 }
 
 /**
@@ -1091,6 +1439,38 @@ TEST_F(IcpOdometryTest, holds_a_frame_until_an_imu_covers_its_stamp)
 	imu->publish(imuSample(1.06, kImuHeading));
 	EXPECT_TRUE(spinUntil([&]() { return !odom->empty(); }))
 			<< "the held frame was never processed once the IMU caught up";
+}
+
+/**
+ * When the first frame is released by the very first IMU message, that message is what the
+ * odometry starts from: it is the only one in the buffer, and it was not processed before.
+ */
+TEST_F(IcpOdometryTest, starts_from_the_first_imu_message)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+			collect<nav_msgs::msg::Odometry>("odom");
+	std::vector<rclcpp::Parameter> params = icpTestParameters();
+	params.push_back(rclcpp::Parameter("wait_imu_to_init", true));
+	makeNode(params);
+
+	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub =
+			helper()->create_publisher<sensor_msgs::msg::PointCloud2>("scan_cloud", 10);
+	rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu =
+			helper()->create_publisher<sensor_msgs::msg::Imu>("imu", rclcpp::QoS(200));
+	ASSERT_TRUE(waitForSubscriber(pub));
+	ASSERT_TRUE(waitForSubscriber(imu));
+	publishImuTf();
+
+	// A single IMU message, past the frame's stamp, then the frame
+	imu->publish(imuSample(1.06, 0.7));
+	spinFor(std::chrono::milliseconds(300));
+	pub->publish(makeXYZCloud("lidar", 1.05, corner3D()));
+	ASSERT_TRUE(spinUntil([&]() { return !odom->empty(); }));
+
+	const geometry_msgs::msg::Quaternion & q = odom->front().pose.pose.orientation;
+	EXPECT_NEAR(2.0 * std::atan2(q.z, q.w), 0.7, 0.01)
+			<< "the odometry did not start from the orientation of the only IMU message";
 }
 
 /**
