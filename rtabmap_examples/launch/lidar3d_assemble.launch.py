@@ -171,8 +171,10 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
     
   intermediate_nodes = LaunchConfiguration('intermediate_nodes').perform(context).lower() == 'true'
   if intermediate_nodes and not external_odom_frame_id:
-    # Every odometry pose between the nodes is saved as a node without data.
+    # Every odometry pose between the nodes is saved as a node without data, with its
+    # odometry statistics (e.g., the ICP correction of the guess).
     rtabmap_parameters['Rtabmap/CreateIntermediateNodes'] = 'true'
+    rtabmap_parameters['subscribe_inter_odom_info'] = True
 
   arguments = []
   if localization:
@@ -217,7 +219,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
                    'topic_queue_size': 40,
                    'sync_queue_size': 40,}],
       remappings=remappings + [('scan_cloud', 'assembled_cloud'), ('gps/fix', LaunchConfiguration('gps_topic')),
-                               ('inter_odom', 'icp_odom')],
+                               ('inter_odom', 'icp_odom'), ('inter_odom_info', 'odom_info')],
       arguments=arguments), 
 
     # Just for visualization
@@ -377,7 +379,7 @@ def generate_launch_description():
 
     DeclareLaunchArgument(
       'intermediate_nodes', default_value='false',
-      description='Also save every odometry pose between the map\'s nodes in the database, as nodes without data (Rtabmap/CreateIntermediateNodes). Only with icp_odometry (external_odom_frame_id empty).'),
+      description='Also save every odometry pose between the map\'s nodes in the database, as nodes without data (Rtabmap/CreateIntermediateNodes), with their odometry statistics. Only with icp_odometry (external_odom_frame_id empty).'),
 
     DeclareLaunchArgument(
       'qos', default_value='1',

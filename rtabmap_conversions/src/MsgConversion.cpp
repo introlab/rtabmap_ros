@@ -1681,7 +1681,7 @@ std::map<std::string, float> odomInfoToStatistics(const rtabmap::OdometryInfo & 
 	stats.insert(std::make_pair("Odometry/InliersRatio/", info.reg.inliers));
 	stats.insert(std::make_pair("Odometry/ICPInliersRatio/", info.reg.icpInliersRatio));
 	stats.insert(std::make_pair("Odometry/ICPRotation/rad", info.reg.icpRotation));
-	stats.insert(std::make_pair("Odometry/icp_translation/m", info.reg.icpTranslation));
+	stats.insert(std::make_pair("Odometry/ICPTranslation/m", info.reg.icpTranslation));
 	stats.insert(std::make_pair("Odometry/ICPStructuralComplexity/", info.reg.icpStructuralComplexity));
 	stats.insert(std::make_pair("Odometry/ICPStructuralDistribution/", info.reg.icpStructuralDistribution));
 	stats.insert(std::make_pair("Odometry/ICPCorrespondences/", info.reg.icpCorrespondences));
