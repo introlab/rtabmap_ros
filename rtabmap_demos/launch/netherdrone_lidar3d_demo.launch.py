@@ -84,6 +84,8 @@ def generate_launch_description():
                               description='Voxel size (m) of the assembled clouds added to the map; 0 keeps every point (larger database, e.g., for camera-lidar calibration).'),
         DeclareLaunchArgument('assembling_time', default_value='4.3',
                               description='How long (s) scans are assembled before being added to the map. The mast turns at 42 deg/s: 4.3 s is half a turn, in which the lidar\'s scanning plane sweeps the whole sphere.'),
+        DeclareLaunchArgument('frame_id', default_value='base_link',
+                              description='Base frame of odometry and of the map: "base_link" (the drone), or "os_sensor" (the lidar, turning with the mast; with imu:=ouster, the IMU is then rigid with it, and the mast\'s TF is not needed to deskew). With "os_sensor", set camera:=false: rtabmap cannot place the camera images in a frame turning with the mast.'),
         DeclareLaunchArgument('imu', default_value='drone', choices=['drone', 'ouster'],
                               description='IMU used for deskewing and odometry: "drone" (/imu/data_raw, 75 Hz, on the drone frame) or "ouster" (/os_cloud_node/imu/data_raw, 100 Hz, inside the lidar, so turning with the mast). Neither gives an orientation that is used: it is filtered from their gyro and accelerometer.'),
         DeclareLaunchArgument('deskewing_imu', default_value='false',
@@ -95,7 +97,7 @@ def generate_launch_description():
             PythonLaunchDescriptionSource(lidar3d_assemble_launch),
             launch_arguments={
                 'use_sim_time': 'true',
-                'frame_id': 'base_link',
+                'frame_id': LaunchConfiguration('frame_id'),
                 'lidar_topic': '/os_cloud_node/points',
                 # The fixed frame for deskewing (base_link_stabilized) is made from its
                 # orientation.
