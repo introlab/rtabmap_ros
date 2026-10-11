@@ -987,6 +987,26 @@ TEST_F(OdometryRosTest, publishes_compressed_sensor_data_when_asked)
 			<< "the raw scan should have been replaced by the compressed one";
 }
 
+/// Same, compressing in the odometry thread instead of one thread per sensor.
+TEST_F(OdometryRosTest, publishes_compressed_sensor_data_without_parallel_compression)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+			collect<nav_msgs::msg::Odometry>("odom");
+	std::shared_ptr<Collector<rtabmap_msgs::msg::SensorData>> compressed =
+			collect<rtabmap_msgs::msg::SensorData>("odom_sensor_data/compressed");
+	makeNode({rclcpp::Parameter("publish_compressed_sensor_data", true),
+	          rclcpp::Parameter("sensor_data_parallel_compression", false)});
+
+	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub = scanPublisher();
+	ASSERT_TRUE(waitForSubscriber(pub));
+	feedFrames(pub, odom, 2);
+	ASSERT_TRUE(spinUntil([&]() { return !compressed->empty(); }))
+			<< "nothing was published on odom_sensor_data/compressed";
+	EXPECT_GT(compressed->back().laser_scan_compressed.size(), 0u);
+	EXPECT_EQ(0u, compressed->back().laser_scan.data.size());
+}
+
 
 /**
  * The whole recovery story, as a wheeled robot would live it: a guess frame it trusts,

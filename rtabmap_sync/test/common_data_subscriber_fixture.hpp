@@ -48,8 +48,16 @@ public:
 		bool hasScan2d = false;          ///< a non-empty LaserScan reached the callback
 		bool hasScan3d = false;          ///< a non-empty PointCloud2 reached the callback
 		size_t globalDescriptors = 0;
+		size_t compressedImages = 0;     ///< compressed color images passed along, not empty
+		size_t compressedDepths = 0;     ///< compressed depth images passed along, not empty
 		std::string frameId;
 	};
+
+	/// What imagesDecodedOnDemand() returns: whether images may be left compressed.
+	bool decodeOnDemand = false;
+	/// Leaves commonMultiCameraCallbackWithCompressed() to CommonDataSubscriber's default,
+	/// like a subclass that does not override it.
+	bool defaultCompressedCallback = false;
 
 	/**
 	 * @param options ROS options; the subscribe_* parameters go in here
@@ -69,6 +77,40 @@ public:
 	const Record & back() const { return records_.back(); }
 
 protected:
+	bool imagesDecodedOnDemand() const override { return decodeOnDemand; }
+
+	void commonMultiCameraCallbackWithCompressed(
+			const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
+			const rtabmap_msgs::msg::UserData::ConstSharedPtr & userDataMsg,
+			const std::vector<cv_bridge::CvImageConstPtr> & imageMsgs,
+			const std::vector<cv_bridge::CvImageConstPtr> & depthMsgs,
+			const std::vector<sensor_msgs::msg::CameraInfo> & cameraInfoMsgs,
+			const std::vector<sensor_msgs::msg::CameraInfo> & depthCameraInfoMsgs,
+			const sensor_msgs::msg::LaserScan & scanMsg,
+			const sensor_msgs::msg::PointCloud2 & scan3dMsg,
+			const rtabmap_msgs::msg::OdomInfo::ConstSharedPtr & odomInfoMsg,
+			const std::vector<rtabmap_msgs::msg::GlobalDescriptor> & globalDescriptorMsgs,
+			const std::vector<std::vector<rtabmap_msgs::msg::KeyPoint> > & localKeyPoints,
+			const std::vector<std::vector<rtabmap_msgs::msg::Point3f> > & localPoints3d,
+			const std::vector<cv::Mat> & localDescriptors,
+			const std::vector<cv::Mat> & compressedImages,
+			const std::vector<cv::Mat> & compressedDepths) override
+	{
+		if(defaultCompressedCallback)
+		{
+			CommonDataSubscriber::commonMultiCameraCallbackWithCompressed(odomMsg, userDataMsg,
+					imageMsgs, depthMsgs, cameraInfoMsgs, depthCameraInfoMsgs, scanMsg, scan3dMsg,
+					odomInfoMsg, globalDescriptorMsgs, localKeyPoints, localPoints3d,
+					localDescriptors, compressedImages, compressedDepths);
+			return;
+		}
+		commonMultiCameraCallback(odomMsg, userDataMsg, imageMsgs, depthMsgs, cameraInfoMsgs,
+				depthCameraInfoMsgs, scanMsg, scan3dMsg, odomInfoMsg, globalDescriptorMsgs,
+				localKeyPoints, localPoints3d, localDescriptors);
+		for(const cv::Mat & m : compressedImages) { records_.back().compressedImages += m.empty()?0:1; }
+		for(const cv::Mat & m : compressedDepths) { records_.back().compressedDepths += m.empty()?0:1; }
+	}
+
 	void commonMultiCameraCallback(
 			const nav_msgs::msg::Odometry::ConstSharedPtr & odomMsg,
 			const rtabmap_msgs::msg::UserData::ConstSharedPtr & userDataMsg,

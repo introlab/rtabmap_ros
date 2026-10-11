@@ -30,6 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <limits>
 
 #include <opencv2/highgui/highgui.hpp>
@@ -64,6 +65,102 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endif
 
 namespace rtabmap_conversions {
+
+namespace {
+
+// PNG file signature. rtabmap's own depth layouts are in rtabmap/core/Compression.h.
+const unsigned char kPngSignature[8] = {0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n'};
+
+// compressed_depth_image_transport::ConfigHeader, at the start of the message data
+struct CompressedDepthConfigHeader
+{
+	int32_t format; // 0: INV_DEPTH
+	float depthParam[2];
+};
+static_assert(sizeof(CompressedDepthConfigHeader) == 12, "Unexpected compressedDepth header size");
+
+bool hasSignature(const unsigned char * bytes, size_t size, const void * signature)
+{
+	return size >= 8 && memcmp(bytes, signature, 8) == 0;
+}
+
+
+// compressed_image_transport's format of a JPEG or PNG image ("<encoding>; <codec>
+// compressed <encoding>"), with the encoding read from its header. Only the codec name
+// if the encoding cannot be read from it.
+std::string compressedImageFormat(const unsigned char * d, size_t size)
+{
+	std::string codec;
+	std::string encoding;
+	if(size > 25 && hasSignature(d, size, kPngSignature))
+	{
+		codec = "png";
+		// IHDR: bit depth, color type. OpenCV decodes color as BGR.
+		const bool depth16 = d[24] == 16;
+		switch(d[25])
+		{
+			case 0: encoding = depth16 ? sensor_msgs::image_encodings::MONO16 : sensor_msgs::image_encodings::MONO8; break;
+			case 2: encoding = depth16 ? sensor_msgs::image_encodings::BGR16 : sensor_msgs::image_encodings::BGR8; break;
+			case 6: encoding = depth16 ? sensor_msgs::image_encodings::BGRA16 : sensor_msgs::image_encodings::BGRA8; break;
+			default: break;
+		}
+		if(d[24] != 8 && !depth16)
+		{
+			encoding.clear(); // e.g., 1 bit per pixel, decoded as 8 bits by OpenCV
+		}
+	}
+	else if(size > 2 && d[0] == 0xFF && d[1] == 0xD8)
+	{
+		codec = "jpeg";
+		// Number of components in the start of frame segment
+		size_t i = 2;
+		while(i + 4 <= size && d[i] == 0xFF)
+		{
+			const unsigned char marker = d[i+1];
+			if(marker == 0xFF)
+			{
+				++i; // fill byte
+				continue;
+			}
+			if(marker == 0x01 || (marker >= 0xD0 && marker <= 0xD8))
+			{
+				i += 2; // no length
+				continue;
+			}
+			const size_t length = (size_t(d[i+2]) << 8) | d[i+3];
+			if(marker >= 0xC0 && marker <= 0xCF && marker != 0xC4 && marker != 0xC8 && marker != 0xCC)
+			{
+				if(i + 9 < size)
+				{
+					encoding = d[i+9] == 1 ? sensor_msgs::image_encodings::MONO8 :
+							d[i+9] == 3 ? sensor_msgs::image_encodings::BGR8 : "";
+				}
+				break;
+			}
+			i += 2 + length;
+		}
+	}
+	if(codec.empty() || encoding.empty())
+	{
+		return codec;
+	}
+	return encoding + "; " + codec + " compressed " + encoding;
+}
+
+std::string compressedImageFormat(const std::vector<unsigned char> & d)
+{
+	return compressedImageFormat(d.data(), d.size());
+}
+
+// Encoding of a JPEG or PNG image read from its header, empty if unknown
+std::string compressedImageEncoding(const cv::Mat & bytes)
+{
+	const std::string format = compressedImageFormat(bytes.data, bytes.total());
+	const size_t split = format.find(';');
+	return split == std::string::npos ? std::string() : format.substr(0, split);
+}
+
+} // namespace
 
 bool transformToTF(const rtabmap::Transform & transform, tf2::Transform & tfTransform)
 {
@@ -178,6 +275,28 @@ rtabmap::Transform transformFromPoseMsg(const geometry_msgs::msg::Pose & msg, bo
 	return rtabmap::Transform::fromEigen3d(tfPose);
 }
 
+namespace {
+
+// cv_bridge::toCvCopy() labels a decoded 16 bits image mono8/bgr8 (it only looks at the
+// number of channels): fix the encoding so that it can be converted downstream.
+cv_bridge::CvImagePtr toCvCopyCompressedImage(const sensor_msgs::msg::CompressedImage & msg)
+{
+	cv_bridge::CvImagePtr ptr = cv_bridge::toCvCopy(msg);
+	if(ptr && ptr->image.depth() == CV_16U)
+	{
+		switch(ptr->image.channels())
+		{
+			case 1: ptr->encoding = sensor_msgs::image_encodings::MONO16; break;
+			case 3: ptr->encoding = sensor_msgs::image_encodings::BGR16; break;
+			case 4: ptr->encoding = sensor_msgs::image_encodings::BGRA16; break;
+			default: break;
+		}
+	}
+	return ptr;
+}
+
+} // namespace
+
 void toCvCopy(const rtabmap_msgs::msg::RGBDImage & image, cv_bridge::CvImagePtr & rgb, cv_bridge::CvImagePtr & depth)
 {
 	if(!image.rgb.data.empty())
@@ -186,7 +305,7 @@ void toCvCopy(const rtabmap_msgs::msg::RGBDImage & image, cv_bridge::CvImagePtr 
 	}
 	else if(!image.rgb_compressed.data.empty())
 	{
-		rgb = cv_bridge::toCvCopy(image.rgb_compressed);
+		rgb = toCvCopyCompressedImage(image.rgb_compressed);
 	}
 	else
 	{
@@ -200,12 +319,7 @@ void toCvCopy(const rtabmap_msgs::msg::RGBDImage & image, cv_bridge::CvImagePtr 
 	}
 	else if(!image.depth_compressed.data.empty())
 	{
-		cv_bridge::CvImagePtr ptr = std::make_unique<cv_bridge::CvImage>();
-		ptr->header = image.depth_compressed.header;
-		ptr->image = rtabmap::uncompressImage(image.depth_compressed.data);
-		UASSERT(ptr->image.empty() || ptr->image.type() == CV_32FC1 || ptr->image.type() == CV_16UC1);
-		ptr->encoding = ptr->image.empty()?"":ptr->image.type() == CV_32FC1?sensor_msgs::image_encodings::TYPE_32FC1:sensor_msgs::image_encodings::TYPE_16UC1;
-		depth = ptr;
+		depth = uncompressDepthImage(image.depth_compressed);
 	}
 	else
 	{
@@ -229,7 +343,7 @@ void toCvShare(const rtabmap_msgs::msg::RGBDImage & image, const std::shared_ptr
 		}
 		else if(!image.rgb_compressed.data.empty())
 		{
-			rgb = cv_bridge::toCvCopy(image.rgb_compressed);
+			rgb = toCvCopyCompressedImage(image.rgb_compressed);
 		}
 		else
 		{
@@ -243,19 +357,7 @@ void toCvShare(const rtabmap_msgs::msg::RGBDImage & image, const std::shared_ptr
 		}
 		else if(!image.depth_compressed.data.empty())
 		{
-			if(image.depth_compressed.format.compare("jpg")==0)
-			{
-				depth = cv_bridge::toCvCopy(image.depth_compressed);
-			}
-			else
-			{
-				cv_bridge::CvImagePtr ptr = std::make_shared<cv_bridge::CvImage>();
-				ptr->header = image.depth_compressed.header;
-				ptr->image = rtabmap::uncompressImage(image.depth_compressed.data);
-				UASSERT(ptr->image.empty() || ptr->image.type() == CV_32FC1 || ptr->image.type() == CV_16UC1);
-				ptr->encoding = ptr->image.empty()?"":ptr->image.type() == CV_32FC1?sensor_msgs::image_encodings::TYPE_32FC1:sensor_msgs::image_encodings::TYPE_16UC1;
-				depth = ptr;
-			}
+			depth = uncompressDepthImage(image.depth_compressed);
 		}
 		else
 		{
@@ -268,7 +370,7 @@ void toCvShare(const rtabmap_msgs::msg::RGBDImage & image, const std::shared_ptr
 	}
 }
 
-void rgbdImageToROS(const rtabmap::SensorData & data, rtabmap_msgs::msg::RGBDImage & msg, const std::string & sensorFrameId)
+void rgbdImageToROS(const rtabmap::SensorData & data, rtabmap_msgs::msg::RGBDImage & msg, const std::string & sensorFrameId, bool legacyDepthCompression)
 {
 	std_msgs::msg::Header header;
 	header.frame_id = sensorFrameId;
@@ -308,7 +410,10 @@ void rgbdImageToROS(const rtabmap::SensorData & data, rtabmap_msgs::msg::RGBDIma
 	}
 	else if(!data.imageCompressed().empty())
 	{
-		UERROR("Conversion of compressed SensorData to RGBDImage is not implemented...");
+		// JPEG or PNG, read as is by compressed_image_transport
+		msg.rgb_compressed.header = header;
+		compressedMatToBytes(data.imageCompressed(), msg.rgb_compressed.data);
+		msg.rgb_compressed.format = compressedImageFormat(msg.rgb_compressed.data);
 	}
 
 	if(!data.depthOrRightRaw().empty())
@@ -322,7 +427,29 @@ void rgbdImageToROS(const rtabmap::SensorData & data, rtabmap_msgs::msg::RGBDIma
 	}
 	else if(!data.depthOrRightCompressed().empty())
 	{
-		UERROR("Conversion of compressed SensorData to RGBDImage is not implemented...");
+		msg.depth_compressed.header = header;
+		if(!data.stereoCameraModels().empty())
+		{
+			// Right image: JPEG or PNG, read as is by compressed_image_transport
+			compressedMatToBytes(data.depthOrRightCompressed(), msg.depth_compressed.data);
+			msg.depth_compressed.format = compressedImageFormat(msg.depth_compressed.data);
+		}
+		else if(legacyDepthCompression)
+		{
+			// rtabmap's format, see uncompressDepthImage()
+			compressedMatToBytes(data.depthOrRightCompressed(), msg.depth_compressed.data);
+			msg.depth_compressed.format = rtabmap::compressedDepthFormat(data.depthOrRightCompressed()).substr(1);
+		}
+		else if(!rtabmapToCompressedDepthTransport(data.depthOrRightCompressed(), msg.depth_compressed, false))
+		{
+			// Legacy 32FC1 format (4 channels PNG), no compressedDepth equivalent
+			const cv::Mat depth = rtabmap::uncompressImage(data.depthOrRightCompressed());
+			if(depth.type() != CV_32FC1 || !compressDepthImage(depth, ".png", msg.depth_compressed))
+			{
+				UERROR("Could not convert compressed depth image (%d bytes) to compressedDepth format.",
+						(int)data.depthOrRightCompressed().total());
+			}
+		}
 	}
 
 	//convert features
@@ -501,6 +628,22 @@ rtabmap::SensorData rgbdImageFromROS(const rtabmap_msgs::msg::RGBDImage::ConstSh
 				rtabmap_conversions::timestampFromROS(image->header.stamp));
 	}
 
+	if(data.isValid())
+	{
+		// Features, in the camera frame like the local transform (identity here)
+		if(!image->key_points.empty())
+		{
+			data.setFeatures(
+					keypointsFromROS(image->key_points),
+					points3fFromROS(image->points),
+					rtabmap::uncompressData(image->descriptors));
+		}
+		if(!image->global_descriptor.data.empty())
+		{
+			data.addGlobalDescriptor(globalDescriptorFromROS(image->global_descriptor));
+		}
+	}
+
 	return data;
 }
 
@@ -527,6 +670,348 @@ cv::Mat compressedMatFromBytes(const std::vector<unsigned char> & bytes, bool co
 		}
 	}
 	return out;
+}
+
+cv::Mat compressedDepthTransportToRtabmap(const sensor_msgs::msg::CompressedImage & msg)
+{
+	// Same parsing as compressed_depth_image_transport
+	const std::string & format = msg.format;
+	const size_t split = format.find(';');
+	const std::string encoding = format.substr(0, split);
+	const bool rvl = split != std::string::npos && format.find("compressedDepth rvl", split) != std::string::npos;
+	if(split != std::string::npos && !rvl &&
+	   format.find("compressedDepth png", split) == std::string::npos &&
+	   (format.find("compressedDepth", split) == std::string::npos || format.find("compressedDepth ", split) != std::string::npos))
+	{
+		UERROR("Unsupported compressedDepth format \"%s\".", format.c_str());
+		return cv::Mat();
+	}
+	const bool inverseDepth = encoding == sensor_msgs::image_encodings::TYPE_32FC1;
+	if(!inverseDepth &&
+	   encoding != sensor_msgs::image_encodings::TYPE_16UC1 &&
+	   encoding != sensor_msgs::image_encodings::MONO16)
+	{
+		UERROR("Unsupported compressedDepth encoding \"%s\" (format=\"%s\"), only 32FC1, 16UC1 and mono16 are supported.",
+				encoding.c_str(), format.c_str());
+		return cv::Mat();
+	}
+	// RVL payload starts with uint32 cols, uint32 rows
+	if(msg.data.size() <= sizeof(CompressedDepthConfigHeader) + (rvl?8:0))
+	{
+		UERROR("compressedDepth data is truncated (%d bytes).", (int)msg.data.size());
+		return cv::Mat();
+	}
+	CompressedDepthConfigHeader header;
+	memcpy(&header, msg.data.data(), sizeof(CompressedDepthConfigHeader));
+	if(inverseDepth && header.format != 0)
+	{
+		UERROR("Unsupported compressedDepth compression format %d (only 0=INV_DEPTH is supported).", header.format);
+		return cv::Mat();
+	}
+	const unsigned char * payload = msg.data.data() + sizeof(CompressedDepthConfigHeader);
+	const size_t payloadSize = msg.data.size() - sizeof(CompressedDepthConfigHeader);
+
+	cv::Mat bytes(1, (int)((inverseDepth?rtabmap::kCompressedDepthInvHeaderSize:0) + (rvl?8:0) + payloadSize), CV_8UC1);
+	unsigned char * out = bytes.data;
+	if(inverseDepth)
+	{
+		memcpy(out, rtabmap::kCompressedDepthInvSignature, 8);
+		memcpy(out+8, &header.depthParam[0], 4);
+		memcpy(out+12, &header.depthParam[1], 4);
+		out += rtabmap::kCompressedDepthInvHeaderSize;
+	}
+	if(rvl)
+	{
+		memcpy(out, rtabmap::kCompressedDepthRvlSignature, 8);
+		out += 8;
+	}
+	memcpy(out, payload, payloadSize);
+	return bytes;
+}
+
+bool rtabmapToCompressedDepthTransport(const cv::Mat & compressed, sensor_msgs::msg::CompressedImage & msg, bool logErrors)
+{
+	UASSERT(compressed.empty() || compressed.type() == CV_8UC1);
+	const unsigned char * bytes = compressed.data;
+	size_t size = compressed.total();
+
+	CompressedDepthConfigHeader header;
+	header.format = 0; // INV_DEPTH, also set for 16UC1 by compressed_depth_image_transport
+	header.depthParam[0] = header.depthParam[1] = 0.0f;
+	std::string encoding = sensor_msgs::image_encodings::TYPE_16UC1;
+	if(hasSignature(bytes, size, rtabmap::kCompressedDepthInvSignature) && size > rtabmap::kCompressedDepthInvHeaderSize)
+	{
+		encoding = sensor_msgs::image_encodings::TYPE_32FC1;
+		memcpy(&header.depthParam[0], bytes+8, 4);
+		memcpy(&header.depthParam[1], bytes+12, 4);
+		bytes += rtabmap::kCompressedDepthInvHeaderSize;
+		size -= rtabmap::kCompressedDepthInvHeaderSize;
+	}
+
+	std::string codec;
+	std::vector<unsigned char> png;
+	if(hasSignature(bytes, size, rtabmap::kCompressedDepthRvlSignature) && size >= rtabmap::kCompressedDepthRvlHeaderSize)
+	{
+#ifdef PRE_ROS_JAZZY
+		// compressed_depth_image_transport decodes RVL only since Jazzy: re-compress
+		// the 16 bits image as PNG, losslessly.
+		png = rtabmap::compressImage(rtabmap::uncompressImage(bytes, size), ".png");
+		bytes = png.data();
+		size = png.size();
+		codec = "png";
+#else
+		codec = "rvl";
+		bytes += 8; // keep uint32 cols, uint32 rows, data
+		size -= 8;
+#endif
+	}
+	else if(hasSignature(bytes, size, kPngSignature) && size > 25 &&
+			bytes[24] == 16 && bytes[25] == 0) // IHDR: 16 bits grayscale
+	{
+		codec = "png";
+	}
+	if(codec.empty() || size == 0)
+	{
+		if(logErrors)
+		{
+			UERROR("Compressed depth image (%d bytes) cannot be converted to compressedDepth format, "
+				   "only 16UC1 depth images compressed in PNG or RVL and 32FC1 depth images "
+				   "compressed in inverse depth format are supported (legacy 32FC1 PNG format "
+				   "is not supported, see Mem/DepthCompressionFormat).", (int)compressed.total());
+		}
+		return false;
+	}
+
+	msg.format = encoding + "; compressedDepth " + codec;
+	msg.data.resize(sizeof(CompressedDepthConfigHeader) + size);
+	memcpy(msg.data.data(), &header, sizeof(CompressedDepthConfigHeader));
+	memcpy(msg.data.data() + sizeof(CompressedDepthConfigHeader), bytes, size);
+	return true;
+}
+
+std::string compressedImageTransportFormat(const std::vector<unsigned char> & data)
+{
+	const std::string format = compressedImageFormat(data);
+	return format.find(';') == std::string::npos ? std::string() : format;
+}
+
+bool isValidImageCompressionFormat(const std::string & format)
+{
+	return format == ".jpg" || format == ".png" || format == "jpeg" || format == "png";
+}
+
+bool toCompressedImageMsg(const cv_bridge::CvImage & image, const std::string & inputFormat, sensor_msgs::msg::CompressedImage & msg)
+{
+	if(!isValidImageCompressionFormat(inputFormat))
+	{
+		UERROR("Unsupported compressed image format \"%s\" (should be \".jpg\", \".png\", \"jpeg\" or \"png\").", inputFormat.c_str());
+		return false;
+	}
+	// compressed_image_transport's names
+	const std::string format = inputFormat == ".jpg" || inputFormat == "jpeg" ? "jpeg" : "png";
+	try
+	{
+		image.toCompressedImageMsg(msg, format == "jpeg" ? cv_bridge::JPEG : cv_bridge::PNG);
+	}
+	catch(const std::exception & e)
+	{
+		UERROR("Could not compress image (encoding=\"%s\") as %s: %s", image.encoding.c_str(), format.c_str(), e.what());
+		return false;
+	}
+	if(msg.data.empty())
+	{
+		UERROR("Could not compress image (encoding=\"%s\") as %s.", image.encoding.c_str(), format.c_str());
+		return false;
+	}
+	// Encoding of what was compressed, see cv_bridge::CvImage::toCompressedImageMsg()
+	std::string encoding = image.encoding;
+	if(encoding != sensor_msgs::image_encodings::BGR8 &&
+	   encoding != sensor_msgs::image_encodings::BGRA8 &&
+	   encoding != sensor_msgs::image_encodings::MONO8 &&
+	   encoding != sensor_msgs::image_encodings::MONO16)
+	{
+		encoding = sensor_msgs::image_encodings::hasAlpha(encoding) ?
+				sensor_msgs::image_encodings::BGRA8 : sensor_msgs::image_encodings::BGR8;
+	}
+	msg.format = encoding + "; " + format + " compressed " + encoding;
+	return true;
+}
+
+cv_bridge::CvImagePtr uncompressDepthImage(const sensor_msgs::msg::CompressedImage & msg)
+{
+	cv_bridge::CvImagePtr ptr = std::make_shared<cv_bridge::CvImage>();
+	ptr->header = msg.header;
+	if(msg.data.empty())
+	{
+		return ptr;
+	}
+	if(msg.format.find("compressedDepth") != std::string::npos)
+	{
+		ptr->image = rtabmap::uncompressImage(compressedDepthTransportToRtabmap(msg));
+	}
+	else
+	{
+		// rtabmap's formats, or JPEG/PNG right image
+		ptr->image = rtabmap::uncompressImage(msg.data);
+	}
+	// Pick the encoding from what actually came out: the format string cannot tell
+	// a 16 bits depth PNG from a right image compressed as PNG.
+	switch(ptr->image.empty() ? -1 : ptr->image.type())
+	{
+		case CV_32FC1: ptr->encoding = sensor_msgs::image_encodings::TYPE_32FC1; break;
+		case CV_16UC1: ptr->encoding = sensor_msgs::image_encodings::TYPE_16UC1; break;
+		case CV_8UC1:  ptr->encoding = sensor_msgs::image_encodings::MONO8; break;
+		case CV_8UC3:  ptr->encoding = sensor_msgs::image_encodings::BGR8; break;
+		default:
+			ptr->image = cv::Mat();
+			break;
+	}
+	if(ptr->image.empty())
+	{
+		UERROR("Could not decompress the depth/right image (format=\"%s\", %d bytes).",
+				msg.format.c_str(), (int)msg.data.size());
+	}
+	return ptr;
+}
+
+namespace {
+
+// rtabmap's format of "legacy" or "legacy:<format>", empty if @p format is not legacy
+std::string legacyDepthCompressionFormat(const std::string & format)
+{
+	if(format == "legacy")
+	{
+		return ".png";
+	}
+	if(format.compare(0, 7, "legacy:") == 0)
+	{
+		return format.substr(7);
+	}
+	return "";
+}
+
+} // namespace
+
+void rgbdImageCompressedToRtabmap(const rtabmap_msgs::msg::RGBDImage & msg, cv::Mat & rgb, cv::Mat & depth)
+{
+	rgb = msg.rgb.data.empty() && !msg.rgb_compressed.data.empty() ?
+			compressedMatFromBytes(msg.rgb_compressed.data) : cv::Mat();
+	depth = cv::Mat();
+	if(msg.depth.data.empty() && !msg.depth_compressed.data.empty())
+	{
+		depth = msg.depth_compressed.format.find("compressedDepth") != std::string::npos ?
+				compressedDepthTransportToRtabmap(msg.depth_compressed) :
+				compressedMatFromBytes(msg.depth_compressed.data);
+	}
+}
+
+bool isCompressedRGBDSupportedByRtabmap(const cv::Mat & rgb, const cv::Mat & depth, bool stereo)
+{
+	if(rgb.empty() && depth.empty())
+	{
+		return false;
+	}
+	if(!rgb.empty())
+	{
+		UASSERT(rgb.type() == CV_8UC1);
+		const std::string encoding = compressedImageEncoding(rgb);
+		if(encoding != sensor_msgs::image_encodings::MONO8 && encoding != sensor_msgs::image_encodings::BGR8)
+		{
+			return false;
+		}
+	}
+	if(!depth.empty())
+	{
+		UASSERT(depth.type() == CV_8UC1);
+		if(stereo)
+		{
+			// Right image, used in gray
+			return compressedImageEncoding(depth) == sensor_msgs::image_encodings::MONO8;
+		}
+		const unsigned char * d = depth.data;
+		const size_t size = depth.total();
+		const bool rtabmapFormat =
+				hasSignature(d, size, rtabmap::kCompressedDepthRvlSignature) ||
+				hasSignature(d, size, rtabmap::kCompressedDepthInvSignature);
+		// IHDR: 16 bits gray (16UC1), or 8 bits RGBA (legacy 32FC1)
+		const bool png = size > 25 && hasSignature(d, size, kPngSignature) &&
+				((d[24] == 16 && d[25] == 0) || (d[24] == 8 && d[25] == 6));
+		if(!rtabmapFormat && !png)
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+bool isValidDepthCompressionFormat(const std::string & format)
+{
+	const std::string legacy = legacyDepthCompressionFormat(format);
+	std::string codec;
+	float maxDepth, quantization;
+	return rtabmap::parseImageCompressionFormat(legacy.empty() ? format : legacy, codec, maxDepth, quantization) &&
+			(codec == ".png" || codec == ".rvl");
+}
+
+bool compressDepthImage(const cv::Mat & depth, const std::string & format, sensor_msgs::msg::CompressedImage & msg)
+{
+	if(depth.type() != CV_16UC1 && depth.type() != CV_32FC1)
+	{
+		UERROR("Depth image should be 16UC1 or 32FC1 (type=%d).", depth.type());
+		return false;
+	}
+	if(!isValidDepthCompressionFormat(format))
+	{
+		UERROR("Invalid depth compression format \"%s\".", format.c_str());
+		return false;
+	}
+
+	const std::string legacy = legacyDepthCompressionFormat(format);
+	if(!legacy.empty())
+	{
+		// rtabmap's own format, as Mem/DepthCompressionFormat: 32FC1 without depth
+		// parameters losslessly as 4 channels PNG. Readable by rtabmap_ros before 0.24,
+		// except inverse depth.
+		std::vector<unsigned char> bytes = rtabmap::compressImage(depth, legacy);
+		if(bytes.empty())
+		{
+			UERROR("Could not compress depth image with format \"%s\".", format.c_str());
+			return false;
+		}
+		msg.format = rtabmap::compressedDepthFormat(bytes).substr(1);
+		msg.data = std::move(bytes);
+		return true;
+	}
+
+	std::string codec;
+	float maxDepth, quantization;
+	rtabmap::parseImageCompressionFormat(format, codec, maxDepth, quantization);
+	cv::Mat image = depth;
+	if(depth.type() == CV_32FC1 && maxDepth <= 0.0f)
+	{
+		// No inverse depth parameters: rounded to millimeters, 0 (invalid) over 65.535 m
+		image = cv::Mat(depth.size(), CV_16UC1);
+		for(int i=0; i<depth.rows; ++i)
+		{
+			const float * in = depth.ptr<float>(i);
+			uint16_t * out = image.ptr<uint16_t>(i);
+			for(int j=0; j<depth.cols; ++j)
+			{
+				const float mm = in[j] * 1000.0f + 0.5f;
+				out[j] = mm >= 1.0f && mm < 65536.0f ? (uint16_t)mm : 0; // false for NaN
+			}
+		}
+	}
+	const cv::Mat bytes = rtabmap::compressImage2(image, image.type() == CV_32FC1 ? format : codec);
+	sensor_msgs::msg::CompressedImage out;
+	if(bytes.empty() || !rtabmapToCompressedDepthTransport(bytes, out))
+	{
+		UERROR("Could not compress depth image with format \"%s\".", format.c_str());
+		return false;
+	}
+	msg.format = std::move(out.format);
+	msg.data = std::move(out.data);
+	return true;
 }
 
 void infoFromROS(const rtabmap_msgs::msg::Info & info, rtabmap::Statistics & stat)
@@ -1274,7 +1759,9 @@ rtabmap::SensorData sensorDataFromROS(const rtabmap_msgs::msg::SensorData & msg)
 			compressedMatFromBytes(msg.left_compressed),
 			compressedMatFromBytes(msg.right_compressed),
 			stereoModels);
-		if(!left.empty() && !right.empty())
+		// Raw images override their compressed ones; an image without its raw
+		// version stays compressed only.
+		if(!left.empty() || !right.empty())
 		{
 			s.setStereoImage(left, right, stereoModels, false);
 		}
@@ -1285,7 +1772,9 @@ rtabmap::SensorData sensorDataFromROS(const rtabmap_msgs::msg::SensorData & msg)
 			compressedMatFromBytes(msg.left_compressed),
 			compressedMatFromBytes(msg.right_compressed),
 			models);
-		if(!left.empty() && !right.empty())
+		// Raw images override their compressed ones; an image without its raw
+		// version stays compressed only.
+		if(!left.empty() || !right.empty())
 		{
 			s.setRGBDImage(left, right, models, false);
 		}
@@ -2184,7 +2673,13 @@ bool convertRGBDMsgs(
 	int depthWidth = depthMsgs.size()?depthMsgs[0]->image.cols:0;
 	int depthHeight = depthMsgs.size()?depthMsgs[0]->image.rows:0;
 
-	bool isDepth = depthMsgs.empty() || (depthMsgs[0].get() != 0 && (
+	// Without a decoded depth/right image (e.g., left compressed, see
+	// CommonDataSubscriber::imagesDecodedOnDemand()), the camera infos tell: a stereo pair
+	// has its baseline in P(0,3) of one of them.
+	bool isDepth = depthMsgs.empty() ?
+			!(depthCameraInfoMsgs.size() == cameraInfoMsgs.size() &&
+			  (cameraInfoMsgs[0].p[3] != 0.0 || depthCameraInfoMsgs[0].p[3] != 0.0)) :
+			(depthMsgs[0].get() != 0 && (
 			depthMsgs[0]->encoding.compare(sensor_msgs::image_encodings::TYPE_16UC1) == 0 ||
 			depthMsgs[0]->encoding.compare(sensor_msgs::image_encodings::TYPE_32FC1) == 0 ||
 			depthMsgs[0]->encoding.compare(sensor_msgs::image_encodings::MONO16) == 0));

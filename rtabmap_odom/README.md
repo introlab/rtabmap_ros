@@ -19,6 +19,7 @@ SLAM needs a pose for every measurement it maps. These nodes produce one by regi
 - [Services](#services)
 - [Published topics](#published-topics)
   - [Outputting filtered scans and features](#outputting-filtered-scans-and-features)
+  - [Compressed sensor data](#compressed-sensor-data)
 - [Diagnostics](#diagnostics)
 - [License](#license)
 
@@ -254,7 +255,7 @@ Common to all three nodes. **Every one of them, `odom` included, is published on
 | `odom_local_scan_map` | [`sensor_msgs/msg/PointCloud2`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/PointCloud2.html) | The scan map, the ICP path's equivalent of `odom_local_map`. |
 | `odom_last_frame` | [`sensor_msgs/msg/PointCloud2`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/PointCloud2.html) | The current frame's **features**, in the odom frame — not its scan or its pixels. Visual paths only, for the same reason as `odom_local_map`; for the filtered scan see `odom_sensor_data/*`. |
 | `odom_rgbd_image` | [`rtabmap_msgs/msg/RGBDImage`](https://docs.ros.org/en/jazzy/p/rtabmap_msgs/msg/RGBDImage.html) | The frame **as odometry processed it**, not the input as it arrived. See [Outputting filtered scans and features](#outputting-filtered-scans-and-features). |
-| `odom_sensor_data/raw`, `/features`, `/compressed` | [`rtabmap_msgs/msg/SensorData`](https://docs.ros.org/en/jazzy/p/rtabmap_msgs/msg/SensorData.html) | The same frame as `SensorData`. `/features` strips the images and scan and keeps only the extracted features; `/compressed` carries JPEG/PNG images instead of raw. |
+| `odom_sensor_data/raw`, `/features`, `/compressed` | [`rtabmap_msgs/msg/SensorData`](https://docs.ros.org/en/jazzy/p/rtabmap_msgs/msg/SensorData.html) | The same frame as `SensorData`. `/features` strips the images and scan and keeps only the extracted features; `/compressed` carries compressed images instead of raw, see [Compressed sensor data](#compressed-sensor-data). |
 
 ### Outputting filtered scans and features
 
@@ -263,6 +264,18 @@ Common to all three nodes. **Every one of them, `odom` included, is published on
 - **Features are included.** Registration writes the keypoints, their 3D positions and their descriptors back into the frame, so these topics carry them. `odom_sensor_data/features` is that alone, with the images and scan removed.
 - **The scan is the filtered one.** `icp_odometry` builds the frame after deskewing, voxelization, range filtering and normal estimation, so what comes out here is the decimated cloud ICP saw — not the raw sweep the lidar published. Subscribe to the driver's topic if you want the original.
 - **Images are converted.** `rgbd_odometry` hands over grayscale unless `keep_color` is set, so that is what these carry too.
+
+### Compressed sensor data
+
+`odom_sensor_data/compressed` carries the frame with its images and scan compressed, for a slow link. It is only built when something subscribes to it.
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `sensor_data_compression_format` | `string` | `".jpg"` | Format of the color image, and of the right image of a stereo pair: `".jpg"` or `".png"`. |
+| `sensor_data_depth_compression_format` | `string` | `".rvl"` | Format of the depth image: `".rvl"` (lossless, faster) or `".png"` (lossless, smaller), optionally followed by `":<maxDepth>[:<quantization>]"` (e.g. `".rvl:10:100"`) to compress 32FC1 depth as 16 bits inverse depth, as `Mem/DepthCompressionFormat`. That is lossy -- depth over `maxDepth` is lost and the error grows with the square of the depth (~0.05 mm at 1 m and 5 mm at 10 m with a quantization of 100) -- but much smaller than the lossless 32FC1 PNG. 16UC1 depth is always lossless. An invalid value falls back to `".rvl"` with an error. |
+| `sensor_data_parallel_compression` | `bool` | `true` | Compress the images and the scan in parallel threads. |
+
+The depth is in rtabmap's format (`rtabmap::uncompressImage()` reads it), not in `compressed_depth_image_transport`'s; `rtabmap_conversions::rtabmapToCompressedDepthTransport()` converts it without decompressing it.
 
 ## Diagnostics
 

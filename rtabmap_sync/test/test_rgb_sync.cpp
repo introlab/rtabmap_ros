@@ -9,6 +9,7 @@ All rights reserved. (BSD-3-Clause, see the repository root.)
 #include <rtabmap_sync/rgb_sync.hpp>
 
 #include <rtabmap/core/Compression.h>
+#include <rtabmap_conversions/MsgConversion.h>
 
 #include <string>
 #include <vector>
@@ -174,6 +175,16 @@ TEST_F(RGBSyncTest, CompressesColorAsJpeg)
 		<< "without fill_empty_depth there is nothing to compress on the depth side";
 }
 
+TEST_F(RGBSyncTest, ImageCompressionFormatAppliesToTheColorImage)
+{
+	start({rclcpp::Parameter("image_compression_format", std::string(".png"))});
+	collectCompressed();
+
+	publish(1000.0);
+	ASSERT_TRUE(spinUntil([&]() { return !compressed_->empty(); }));
+	EXPECT_EQ(compressed_->back().rgb_compressed.format, "bgr8; png compressed bgr8");
+}
+
 TEST_F(RGBSyncTest, CompressesTheFakeDepthAsPng)
 {
 	start({rclcpp::Parameter("fill_empty_depth", true)});
@@ -184,8 +195,8 @@ TEST_F(RGBSyncTest, CompressesTheFakeDepthAsPng)
 
 	const rtabmap_msgs::msg::RGBDImage & got = compressed_->back();
 	ASSERT_FALSE(got.depth_compressed.data.empty());
-	EXPECT_EQ(got.depth_compressed.format, "png");
-	const cv::Mat depth = rtabmap::uncompressImage(got.depth_compressed.data);
+	EXPECT_EQ(got.depth_compressed.format, "16UC1; compressedDepth png");
+	const cv::Mat depth = rtabmap_conversions::uncompressDepthImage(got.depth_compressed)->image;
 	ASSERT_FALSE(depth.empty());
 	EXPECT_EQ(depth.type(), CV_16UC1);
 	EXPECT_EQ(cv::countNonZero(depth), 0) << "the fake depth is all zeros";

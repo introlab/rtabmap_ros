@@ -6,6 +6,7 @@ All rights reserved. (BSD-3-Clause, see the repository root.)
 #include "common_data_subscriber_fixture.hpp"
 
 #include <rtabmap_msgs/msg/rgbd_images.hpp>
+#include <rtabmap_conversions/MsgConversion.h>
 
 using namespace rtabmap_sync_test;
 
@@ -266,6 +267,235 @@ TEST_F(CommonDataSubscriberSyncTest, RGBDModeUnpacksTheMessageIntoImages)
 	EXPECT_EQ(got.cameraInfos, 1u);
 	EXPECT_EQ(got.frameId, "camera_link");
 }
+
+namespace {
+
+/// An RGBDImage with its images compressed only, in compressed_image_transport's and
+/// compressed_depth_image_transport's formats.
+rtabmap_msgs::msg::RGBDImage makeCompressedRGBDImage(
+		const std::string & frameId, double stamp, const std::string & colorEncoding = "bgr8")
+{
+	rtabmap_msgs::msg::RGBDImage msg = makeRGBDImage(frameId, stamp);
+	const cv::Mat color = colorEncoding == "mono16" ?
+			cv::Mat(8, 8, CV_16UC1, cv::Scalar(1000)) : cv_bridge::toCvCopy(msg.rgb)->image;
+	EXPECT_TRUE(rtabmap_conversions::toCompressedImageMsg(
+			cv_bridge::CvImage(msg.rgb.header, colorEncoding, color), ".png", msg.rgb_compressed));
+	msg.depth_compressed.header = msg.depth.header;
+	EXPECT_TRUE(rtabmap_conversions::compressDepthImage(
+			cv_bridge::toCvCopy(msg.depth)->image, ".png", msg.depth_compressed));
+	msg.rgb = sensor_msgs::msg::Image();
+	msg.depth = sensor_msgs::msg::Image();
+	return msg;
+}
+
+}  // namespace
+
+/// A subclass accepting it gets compressed images left compressed, not decoded.
+TEST_F(CommonDataSubscriberSyncTest, RGBDModeLeavesCompressedImagesCompressedWhenAccepted)
+{
+	start({rclcpp::Parameter("subscribe_rgbd", true),
+		   rclcpp::Parameter("subscribe_odom", false)});
+	sub_->decodeOnDemand = true;
+	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr rgbd =
+			advertise<rtabmap_msgs::msg::RGBDImage>("rgbd_image");
+
+	rgbd->publish(makeCompressedRGBDImage("camera_link", 1000.0));
+	ASSERT_TRUE(spinUntil([&]() { return !sub_->empty(); }));
+	EXPECT_EQ(sub_->back().images, 0u) << "not decoded";
+	EXPECT_EQ(sub_->back().depths, 0u) << "not decoded";
+	EXPECT_EQ(sub_->back().compressedImages, 1u);
+	EXPECT_EQ(sub_->back().compressedDepths, 1u);
+	EXPECT_EQ(sub_->back().cameraInfos, 1u);
+	EXPECT_EQ(sub_->back().frameId, "camera_link");
+}
+
+/// A stereo pair (baseline in the right camera info) with a gray right image is left
+/// compressed too.
+TEST_F(CommonDataSubscriberSyncTest, RGBDModeLeavesACompressedStereoPairCompressedWhenAccepted)
+{
+	start({rclcpp::Parameter("subscribe_rgbd", true),
+		   rclcpp::Parameter("subscribe_odom", false)});
+	sub_->decodeOnDemand = true;
+	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr rgbd =
+			advertise<rtabmap_msgs::msg::RGBDImage>("rgbd_image");
+
+	rtabmap_msgs::msg::RGBDImage stereo = makeCompressedRGBDImage("camera_link", 1000.0);
+	stereo.depth_camera_info.p[3] = -5.0;
+	EXPECT_TRUE(rtabmap_conversions::toCompressedImageMsg(
+			cv_bridge::CvImage(stereo.rgb_compressed.header, "mono8", cv::Mat(8, 8, CV_8UC1, cv::Scalar(60))),
+			".jpg", stereo.depth_compressed));
+
+	rgbd->publish(stereo);
+	ASSERT_TRUE(spinUntil([&]() { return !sub_->empty(); }));
+	EXPECT_EQ(sub_->back().images, 0u) << "not decoded";
+	EXPECT_EQ(sub_->back().depths, 0u) << "not decoded";
+	EXPECT_EQ(sub_->back().compressedImages, 1u);
+	EXPECT_EQ(sub_->back().compressedDepths, 1u);
+}
+
+/// By default, or when rtabmap could not use them as they are, images are decoded.
+TEST_F(CommonDataSubscriberSyncTest, RGBDModeDecodesCompressedImagesOtherwise)
+{
+	start({rclcpp::Parameter("subscribe_rgbd", true),
+		   rclcpp::Parameter("subscribe_odom", false)});
+	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr rgbd =
+			advertise<rtabmap_msgs::msg::RGBDImage>("rgbd_image");
+	size_t received = 0;
+	const auto publish = [&](const rtabmap_msgs::msg::RGBDImage & msg) {
+		rgbd->publish(msg);
+		EXPECT_TRUE(spinUntil([&]() { return sub_->size() > received; }));
+		received = sub_->size();
+		return sub_->back();
+	};
+
+	// Not accepted by the subclass (the default)
+	RecordingSubscriber::Record got = publish(makeCompressedRGBDImage("camera_link", 1000.0));
+	EXPECT_EQ(got.images, 1u);
+	EXPECT_EQ(got.depths, 1u);
+	EXPECT_EQ(got.compressedImages, 1u) << "still passed along, to be stored as is";
+
+	sub_->decodeOnDemand = true;
+
+	// 16 bits color: rtabmap needs it converted to 8 bits
+	got = publish(makeCompressedRGBDImage("camera_link", 1001.0, "mono16"));
+	EXPECT_EQ(got.images, 1u);
+
+	// Stereo pair with a color right image: rtabmap needs it converted to gray
+	rtabmap_msgs::msg::RGBDImage stereo = makeCompressedRGBDImage("camera_link", 1002.0);
+	stereo.depth_camera_info.p[3] = -5.0;
+	stereo.depth_compressed = stereo.rgb_compressed;
+	got = publish(stereo);
+	EXPECT_EQ(got.images, 1u);
+	EXPECT_EQ(got.depths, 1u);
+
+	// A raw image next to a compressed one
+	rtabmap_msgs::msg::RGBDImage mixed = makeCompressedRGBDImage("camera_link", 1003.0);
+	mixed.rgb = makeRGBDImage("camera_link", 1003.0).rgb;
+	got = publish(mixed);
+	EXPECT_EQ(got.images, 1u);
+	EXPECT_EQ(got.depths, 1u);
+}
+
+/// A subclass not overriding commonMultiCameraCallbackWithCompressed() gets the decoded
+/// images in commonMultiCameraCallback(), the compressed ones are dropped.
+TEST_F(CommonDataSubscriberSyncTest, RGBDModeFallsBackOnTheDecodedImagesCallback)
+{
+	start({rclcpp::Parameter("subscribe_rgbd", true),
+		   rclcpp::Parameter("subscribe_odom", false)});
+	sub_->defaultCompressedCallback = true;
+	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr rgbd =
+			advertise<rtabmap_msgs::msg::RGBDImage>("rgbd_image");
+
+	rgbd->publish(makeCompressedRGBDImage("camera_link", 1000.0));
+	ASSERT_TRUE(spinUntil([&]() { return !sub_->empty(); }));
+	EXPECT_EQ(sub_->back().images, 1u);
+	EXPECT_EQ(sub_->back().depths, 1u);
+	EXPECT_EQ(sub_->back().compressedImages, 0u);
+	EXPECT_EQ(sub_->back().compressedDepths, 0u);
+	EXPECT_EQ(sub_->back().frameId, "camera_link");
+}
+
+namespace {
+
+/// What is synchronized with the RGBDImage: each combination has its own callback.
+struct RGBDInputs
+{
+	std::string name;
+	bool odom;
+	std::string extra;  ///< "", "scan", "scan_cloud", "scan_descriptor" or "odom_info"
+};
+
+std::ostream & operator<<(std::ostream & os, const RGBDInputs & inputs) { return os << inputs.name; }
+
+class RGBDModeInputsTest :
+		public CommonDataSubscriberTest,
+		public ::testing::WithParamInterface<RGBDInputs> {};
+
+}  // namespace
+
+/// Every callback of a single RGBDImage passes its compressed images along, and what is
+/// synchronized with it.
+TEST_P(RGBDModeInputsTest, PassesCompressedImagesAlong)
+{
+	const RGBDInputs & inputs = GetParam();
+	std::vector<rclcpp::Parameter> params = {
+			rclcpp::Parameter("subscribe_rgbd", true),
+			rclcpp::Parameter("subscribe_odom", inputs.odom)};
+	if(!inputs.extra.empty())
+	{
+		params.push_back(rclcpp::Parameter("subscribe_" + inputs.extra, true));
+	}
+	start(params);
+	sub_->decodeOnDemand = true;
+
+	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr rgbd =
+			advertise<rtabmap_msgs::msg::RGBDImage>("rgbd_image");
+	rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom;
+	if(inputs.odom)
+	{
+		odom = advertise<nav_msgs::msg::Odometry>("odom");
+	}
+	rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr scan;
+	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr cloud;
+	rclcpp::Publisher<rtabmap_msgs::msg::ScanDescriptor>::SharedPtr descriptor;
+	rclcpp::Publisher<rtabmap_msgs::msg::OdomInfo>::SharedPtr odomInfo;
+	if(inputs.extra == "scan")
+	{
+		scan = advertise<sensor_msgs::msg::LaserScan>("scan");
+	}
+	else if(inputs.extra == "scan_cloud")
+	{
+		cloud = advertise<sensor_msgs::msg::PointCloud2>("scan_cloud");
+	}
+	else if(inputs.extra == "scan_descriptor")
+	{
+		descriptor = advertise<rtabmap_msgs::msg::ScanDescriptor>("scan_descriptor");
+	}
+	else if(inputs.extra == "odom_info")
+	{
+		odomInfo = advertise<rtabmap_msgs::msg::OdomInfo>("odom_info");
+	}
+
+	rgbd->publish(makeCompressedRGBDImage("camera_link", 1000.0));
+	if(odom) { odom->publish(makeOdometry("odom", 1000.0, 1.5)); }
+	if(scan) { scan->publish(makeLaserScan("base_scan", 1000.0)); }
+	if(cloud) { cloud->publish(makeScanCloud("lidar_link", 1000.0)); }
+	if(descriptor)
+	{
+		descriptor->publish(makeScanDescriptor("base_scan", 1000.0,
+				/*with2d=*/true, /*with3d=*/false, /*withGlobalDescriptor=*/true));
+	}
+	if(odomInfo) { odomInfo->publish(makeOdomInfo("odom", 1000.0)); }
+	ASSERT_TRUE(spinUntil([&]() { return !sub_->empty(); }));
+
+	const RecordingSubscriber::Record & got = sub_->back();
+	EXPECT_EQ(got.kind, RecordingSubscriber::Record::kMultiCamera);
+	EXPECT_EQ(got.images, 0u) << "not decoded";
+	EXPECT_EQ(got.depths, 0u) << "not decoded";
+	EXPECT_EQ(got.compressedImages, 1u);
+	EXPECT_EQ(got.compressedDepths, 1u);
+	EXPECT_EQ(got.frameId, "camera_link");
+	EXPECT_EQ(got.hasOdom, inputs.odom);
+	EXPECT_EQ(got.hasScan2d, inputs.extra == "scan" || inputs.extra == "scan_descriptor");
+	EXPECT_EQ(got.hasScan3d, inputs.extra == "scan_cloud");
+	EXPECT_EQ(got.globalDescriptors, inputs.extra == "scan_descriptor" ? 1u : 0u);
+	EXPECT_EQ(got.hasOdomInfo, inputs.extra == "odom_info");
+}
+
+INSTANTIATE_TEST_SUITE_P(
+		Inputs, RGBDModeInputsTest,
+		::testing::Values(
+				RGBDInputs{"rgbd", false, ""},
+				RGBDInputs{"scan", false, "scan"},
+				RGBDInputs{"scan_cloud", false, "scan_cloud"},
+				RGBDInputs{"scan_descriptor", false, "scan_descriptor"},
+				RGBDInputs{"odom_info", false, "odom_info"},
+				RGBDInputs{"odom", true, ""},
+				RGBDInputs{"odom_scan", true, "scan"},
+				RGBDInputs{"odom_scan_cloud", true, "scan_cloud"},
+				RGBDInputs{"odom_scan_descriptor", true, "scan_descriptor"},
+				RGBDInputs{"odom_odom_info", true, "odom_info"}),
+		[](const ::testing::TestParamInfo<RGBDInputs> & info) { return info.param.name; });
 
 TEST_F(CommonDataSubscriberSyncTest, RGBDModeCarriesAScanAlongside)
 {

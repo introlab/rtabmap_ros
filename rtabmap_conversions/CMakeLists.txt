@@ -79,6 +79,11 @@ IF("$ENV{ROS_DISTRO}" STRLESS "kilted")
   add_definitions(-DPRE_ROS_KILTED)
 ENDIF()
 
+# compressed_depth_image_transport decodes RVL since Jazzy
+IF("$ENV{ROS_DISTRO}" STRLESS "jazzy")
+  add_definitions(-DPRE_ROS_JAZZY)
+ENDIF()
+
 ###########
 ## Build ##
 ###########
