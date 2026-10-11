@@ -32,7 +32,7 @@ import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Union
+from typing import Dict, List, Tuple, Union
 
 import pytest
 import yaml
@@ -69,6 +69,9 @@ class Scenario:
     parameters: Dict[str, object] = field(default_factory=dict)
     # ROS parameters for one node, by node name, for a parameter name other nodes use too.
     node_parameters: Dict[str, Dict[str, object]] = field(default_factory=dict)
+    # Topic remappings (from, to) for every node the launch file starts, applied before
+    # their own (see _wrapper_launch()): the first rule matching a topic wins.
+    remappings: List[Tuple[str, str]] = field(default_factory=list)
     # Packages the launch file needs besides ours: the scenario is skipped without them
     # (not every ROS distro has them).
     packages: List[str] = field(default_factory=list)
@@ -144,9 +147,14 @@ SCENARIOS = [
         # machine. output_queue_size also reaches rgb_sync, for the camera. topic_queue_size
         # reaches only icp_odometry: rgb_sync and point_cloud_assembler already default
         # to 10, and rtabmap sets its own.
+        # output_queue_size also reaches icp_odometry: its odometry and odometry info are
+        # what rtabmap saves as intermediate nodes, both needed for each one.
         parameters={'output_queue_size': 10,
                     'topic_queue_size': 10,
                     'always_process_most_recent_frame': False},
+        # The intermediate nodes' statistics without the bulky data (features, local map)
+        # the full odometry info carries: lighter to deliver for every pose.
+        remappings=[('inter_odom_info', 'odom_info_lite')],
         # A node every 4.3 s, when the assembled cloud of half a turn of the mast is ready.
         chunk_slack=5.0,
         # Local closures only (no global ones: the camera's bag-of-words finds none),
@@ -196,7 +204,8 @@ def _wrapper_launch(scenario: Scenario, rtabmap_parameters: Dict[str, object],
     come from: each node reads its own section. RELIABLE_QOS and scenario.parameters are
     for every node (/**), and `rtabmap_parameters` for the node named rtabmap only (/**/rtabmap): the
     ground truth frames, which the odometry nodes also read. A node's own value for a
-    parameter, set by its launch file, wins over the file's.
+    parameter, set by its launch file, wins over the file's. scenario.remappings are set
+    with SetRemap, before the nodes' own remappings: they win over them.
     """
     demo = Path(get_package_share_directory('rtabmap_demos')) / 'launch' / scenario.launch_file
     parameter_file = path.with_suffix('.yaml')
@@ -211,12 +220,13 @@ def _wrapper_launch(scenario: Scenario, rtabmap_parameters: Dict[str, object],
         'from launch import LaunchDescription\n'
         'from launch.actions import IncludeLaunchDescription\n'
         'from launch.launch_description_sources import PythonLaunchDescriptionSource\n'
-        'from launch_ros.actions import SetParametersFromFile\n'
+        'from launch_ros.actions import SetParametersFromFile, SetRemap\n'
         '\n'
         '\n'
         'def generate_launch_description():\n'
         '    return LaunchDescription([\n'
         f'        SetParametersFromFile({str(parameter_file)!r}),\n'
+        + ''.join(f'        SetRemap(src={src!r}, dst={dst!r}),\n' for src, dst in scenario.remappings) +
         f'        IncludeLaunchDescription(PythonLaunchDescriptionSource({str(demo)!r}),\n'
         f'                                 launch_arguments={list(arguments.items())!r}),\n'
         '    ])\n')

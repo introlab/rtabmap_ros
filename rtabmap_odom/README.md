@@ -188,6 +188,7 @@ Registration runs on its own thread, so a slow frame does not block the subscrip
 | `expected_update_rate` | `double` | `0.0` | The rate frames are expected at, in Hz. Used only when `max_update_rate` is unset, and it is a **ceiling**: a frame arriving sooner than `1/expected_update_rate` after the last one is skipped, with a warning that the input is faster than expected. `0` disables. |
 | `max_update_rate` | `double` | `0.0` | Throttle registration to at most this rate, skipping frames silently. Takes precedence over `expected_update_rate`. `0` disables. |
 | `min_update_rate` | `double` | `0.0` | Treat odometry as **lost and reset it** when more than `1/min_update_rate` passes between updates — the motion assumption no longer holds across a gap that long. `0` disables. |
+| `output_queue_size` | `int` | `1` | History depth of the `odom`, `odom_info` and `odom_info_lite` publishers. Even with a reliable `qos`, a message a subscriber has not acknowledged yet is lost when the next one replaces it: raise it when every pose must arrive, e.g., when `rtabmap` saves them all as intermediate nodes (`Rtabmap/CreateIntermediateNodes`) and may be busy. |
 
 **`always_process_most_recent_frame` already bounds the delay.** A frame arriving while registration is still running is dropped on the spot rather than queued, so the worker always picks up the newest frame and the published pose is at most one registration behind the sensor. No backlog ever forms. `/diagnostics` reports how many frames went this way.
 

@@ -158,10 +158,14 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 
 	int qos = this->declare_parameter("qos", (int)qos_);
 	qos_ = (rmw_qos_reliability_policy_t)qos;
+	// History of the odometry and its info: with a reliable QoS, a message not acknowledged
+	// yet by a subscriber is lost when the next one replaces it, which a loaded subscriber
+	// (e.g., rtabmap saving every pose as an intermediate node) can miss.
+	const int outputQueueSize = this->declare_parameter("output_queue_size", 1);
 
-	odomPub_ = create_publisher<nav_msgs::msg::Odometry>("odom", rclcpp::QoS(1).reliability(qos_));
-	odomInfoPub_ = create_publisher<rtabmap_msgs::msg::OdomInfo>("odom_info", rclcpp::QoS(1).reliability(qos_));
-	odomInfoLitePub_ = create_publisher<rtabmap_msgs::msg::OdomInfo>("odom_info_lite", rclcpp::QoS(1).reliability(qos_));
+	odomPub_ = create_publisher<nav_msgs::msg::Odometry>("odom", rclcpp::QoS(outputQueueSize).reliability(qos_));
+	odomInfoPub_ = create_publisher<rtabmap_msgs::msg::OdomInfo>("odom_info", rclcpp::QoS(outputQueueSize).reliability(qos_));
+	odomInfoLitePub_ = create_publisher<rtabmap_msgs::msg::OdomInfo>("odom_info_lite", rclcpp::QoS(outputQueueSize).reliability(qos_));
 	odomLocalMap_ = create_publisher<sensor_msgs::msg::PointCloud2>("odom_local_map", rclcpp::QoS(1).reliability(qos_));
 	odomLocalScanMap_ = create_publisher<sensor_msgs::msg::PointCloud2>("odom_local_scan_map", rclcpp::QoS(1).reliability(qos_));
 	odomLastFrame_ = create_publisher<sensor_msgs::msg::PointCloud2>("odom_last_frame", rclcpp::QoS(1).reliability(qos_));
@@ -282,6 +286,7 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	RCLCPP_INFO(this->get_logger(), "Odometry: expected_update_rate   = %f Hz", expectedUpdateRate_);
 	RCLCPP_INFO(this->get_logger(), "Odometry: max_update_rate        = %f Hz", maxUpdateRate_);
 	RCLCPP_INFO(this->get_logger(), "Odometry: min_update_rate        = %f Hz", minUpdateRate_);
+	RCLCPP_INFO(this->get_logger(), "Odometry: output_queue_size      = %d", outputQueueSize);
 	RCLCPP_INFO(this->get_logger(), "Odometry: wait_imu_to_init       = %s", waitIMUToinit_?"true":"false");
 	RCLCPP_INFO(this->get_logger(), "Odometry: always_check_imu_tf    = %s", alwaysCheckImuTf_?"true":"false");
 	RCLCPP_INFO(this->get_logger(), "Odometry: sensor_data_compression_format = %s", compressionImgFormat_.c_str());
