@@ -162,6 +162,7 @@ Common to all three nodes; see [the README](../README.md#published-topics).
 | `qos_camera_info` | `int` | value of `qos` | Reliability of the two `camera_info` subscriptions. |
 | `keep_color` | `bool` | `false` | Keep the left image in color in the data passed on, rather than converting to grayscale. Registration is grayscale either way. |
 | `image_transport` | `string` | `"raw"` | Transport for both image topics. |
+| `stereo_exposure_compensation` | `bool` | `false` | Equalize the exposure of the left and right images (gain compensation) before the odometry. The stereo correspondences assume the same brightness in both images: set it when the two cameras expose differently, e.g., when most of them are reported as rejected. |
 
 ## Synchronization
 

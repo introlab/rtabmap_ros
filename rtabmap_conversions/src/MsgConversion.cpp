@@ -2221,6 +2221,12 @@ std::map<std::string, float> odomInfoToStatistics(const rtabmap::OdometryInfo & 
 			stats.insert(std::make_pair("Odometry/Speed/mps", speed));
 		}
 	}
+	if(!info.guess.isNull() && !info.transform.isNull())
+	{
+		// How far the motion estimated is from the guess it started from
+		stats.insert(std::make_pair("Odometry/Guess_error_lin/m", info.guess.getDistance(info.transform)));
+		stats.insert(std::make_pair("Odometry/Guess_error_ang/deg", info.guess.getAngle(info.transform)*180.0/CV_PI));
+	}
 	if(!info.transformGroundTruth.isNull())
 	{
 		if(!info.transform.isNull())

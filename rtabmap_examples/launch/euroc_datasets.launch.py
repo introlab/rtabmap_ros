@@ -6,11 +6,11 @@
 #
 #   $ ros2 launch rtabmap_examples euroc_datasets.launch.py gt:=true
 #   $ cd V1_01_easy
-#   $ ros2 bag play V1_01_easy.db3 --clock
+#   $ ros2 bag play V1_01_easy --clock
 #
 #   $ ros2 launch rtabmap_examples euroc_datasets.launch.py gt:=false
 #   $ cd MH_01_easy
-#   $ ros2 bag play MH_01_easy.db3 --clock
+#   $ ros2 bag play MH_01_easy --clock
 
 
 from launch import LaunchDescription
@@ -63,7 +63,8 @@ def generate_launch_description():
         Node(
             package='rtabmap_odom', executable='stereo_odometry', output='screen',
             parameters=[parameters,
-                { 'always_process_most_recent_frame':True}],
+                { 'always_process_most_recent_frame':True,
+                  'stereo_exposure_compensation': True,}],
             remappings=remappings),
 
         Node(
