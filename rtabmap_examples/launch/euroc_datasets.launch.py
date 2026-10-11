@@ -11,6 +11,17 @@
 #   $ ros2 launch rtabmap_examples euroc_datasets.launch.py gt:=false
 #   $ cd MH_01_easy
 #   $ ros2 bag play MH_01_easy --clock
+#
+# Notes when comparing with published results:
+#   * The stereo calibration (config/euroc_*.yaml, same as the datasets' sensor.yaml) was
+#     recorded with the V1 sequences. On the V2 sequences, recorded months later, the
+#     rectified stereo pairs are ~1.8 px apart vertically (the right camera rotated by
+#     ~0.2 deg), which degrades stereo matching and odometry there.
+#   * The ground truth used here (gt:=true) is the raw Vicon pose from the bags
+#     (vicon/firefly_sbx/firefly_sbx) with an approximate offset to the base frame, not
+#     the ground truth published with the datasets (state_groundtruth_estimate0/data.csv):
+#     they differ by a few cm, and up to ~0.2 s in time on the V2 sequences. The RMSE
+#     computed here may then differ from the one in papers using the published ground truth.
 
 
 from launch import LaunchDescription
@@ -64,7 +75,12 @@ def generate_launch_description():
             package='rtabmap_odom', executable='stereo_odometry', output='screen',
             parameters=[parameters,
                 { 'always_process_most_recent_frame':True,
-                  'stereo_exposure_compensation': True,}],
+                  'stereo_exposure_compensation': True,
+                  # Motion guess predicted with the IMU acceleration, from the velocity
+                  # over the last 0.5 s
+                  'Odom/GuessSmoothingDelay':'0.5',
+                  # Gravity estimated while the MAV is still at the start of the sequence
+                  'Odom/ImuGravity':'0'}],
             remappings=remappings),
 
         Node(
