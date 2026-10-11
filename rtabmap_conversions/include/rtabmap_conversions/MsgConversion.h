@@ -28,6 +28,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef MSGCONVERSION_H_
 #define MSGCONVERSION_H_
 
+#include <functional>
 #include "rclcpp/time.hpp"
 #include "tf2_ros/buffer.hpp"
 #include <geometry_msgs/msg/transform.hpp>
@@ -951,6 +952,28 @@ bool deskew(
 		const sensor_msgs::msg::PointCloud2 & input,
 		sensor_msgs::msg::PointCloud2 & output,
 		const rtabmap::Transform & velocity);
+
+/**
+ * @brief Deskew a point cloud using a motion given by the caller.
+ *
+ * Same as the TF overload, but the motion of the cloud's frame during the sweep comes
+ * from @p motion instead of TF: for instance a pose predicted from an IMU, composed with
+ * the sensor's own moving mount.
+ *
+ * @param input        cloud with a per-point time channel
+ * @param[out] output  deskewed cloud, expressed in the frame at input's header stamp
+ * @param motion       for a stamp in the sweep, the pose of the cloud's frame at that
+ *                     stamp relative to the cloud's frame at input's header stamp (what
+ *                     getMovingTransform() returns); a null transform aborts deskewing
+ * @param slerp        call @p motion only for the sweep's first and last points and
+ *                     interpolate in between, instead of calling it for every point time
+ * @return false if the cloud has no usable time channel or @p motion failed
+ */
+bool deskew(
+		const sensor_msgs::msg::PointCloud2 & input,
+		sensor_msgs::msg::PointCloud2 & output,
+		const std::function<rtabmap::Transform(const rclcpp::Time & stamp)> & motion,
+		bool slerp = false);
 
 /**
  * @brief Apply a rigid transform to the XYZ fields of a point cloud.

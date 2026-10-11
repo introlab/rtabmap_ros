@@ -1996,6 +1996,68 @@ TEST(MsgConversion, deskewIsIdempotent)
 	EXPECT_EQ(twice.data, once.data) << "a second pass must change nothing";
 }
 
+TEST(MsgConversion, deskewWithMotionFollowsANonLinearMotionPerPoint)
+{
+	// The robot accelerates towards the wall, a motion the constant velocity model cannot
+	// describe. Given that motion, every point is corrected at its own time and the wall
+	// comes back flat.
+	const double headerStamp = 1000.0;
+	const double acceleration = 20.0;   // m/s^2, from rest at the first point
+	auto travelled = [&](double elapsed) { return 0.5 * acceleration * elapsed * elapsed; };
+	const sensor_msgs::msg::PointCloud2 in = makeSkewedWallScan(
+			headerStamp, 0.0, kOffsetSecFloat32, kTimeOnColumns, 1, "t", false, travelled);
+
+	std::vector<double> stamps;
+	auto motion = [&](const rclcpp::Time & stamp) {
+		stamps.push_back(timestampFromROS(stamp));
+		return rtabmap::Transform(float(travelled(timestampFromROS(stamp) - headerStamp)), 0, 0, 0, 0, 0);
+	};
+
+	sensor_msgs::msg::PointCloud2 out;
+	ASSERT_TRUE(deskew(in, out, motion));
+	EXPECT_EQ(stamps.size(), kScanPoints) << "the motion is asked for every point time";
+	for(size_t i=0; i<kScanPoints; ++i)
+	{
+		EXPECT_NEAR(readField(out, i, 0), kWallDistance, 1e-4) << "x of point " << i;
+		EXPECT_FLOAT_EQ(readField(out, i, 3), 0.0f) << "t must be zeroed, point " << i;
+	}
+}
+
+TEST(MsgConversion, deskewWithMotionAndSlerpOnlyAsksForTheSweepEnds)
+{
+	// With slerp, the motion is asked for the first and last points only and interpolated
+	// in between: exact for a constant velocity, which this is.
+	const double headerStamp = 1000.0;
+	const sensor_msgs::msg::PointCloud2 in = makeSkewedWallScan(headerStamp, 0.0);
+
+	std::vector<double> stamps;
+	auto motion = [&](const rclcpp::Time & stamp) {
+		stamps.push_back(timestampFromROS(stamp));
+		return rtabmap::Transform(float(kSpeed * (timestampFromROS(stamp) - headerStamp)), 0, 0, 0, 0, 0);
+	};
+
+	sensor_msgs::msg::PointCloud2 out;
+	ASSERT_TRUE(deskew(in, out, motion, true));
+	ASSERT_EQ(stamps.size(), 2u);
+	EXPECT_NEAR(stamps[0], headerStamp, 1e-6);
+	EXPECT_NEAR(stamps[1], headerStamp + kScanSpan, 1e-6);
+	for(size_t i=0; i<kScanPoints; ++i)
+	{
+		EXPECT_NEAR(readField(out, i, 0), kWallDistance, 1e-4) << "x of point " << i;
+	}
+}
+
+TEST(MsgConversion, deskewWithMotionFailsWhenTheMotionDoes)
+{
+	const sensor_msgs::msg::PointCloud2 in = makeSkewedWallScan(1000.0, 0.0);
+	sensor_msgs::msg::PointCloud2 out;
+	auto failing = [](const rclcpp::Time &) { return rtabmap::Transform(); };
+	EXPECT_FALSE(deskew(in, out, failing));
+	EXPECT_FALSE(deskew(in, out, failing, true));
+	EXPECT_FALSE(deskew(in, out, std::function<rtabmap::Transform(const rclcpp::Time &)>()))
+		<< "an empty motion function must be refused";
+}
+
 TEST(MsgConversion, deskewClampsSamplesOutsideTheSweep)
 {
 	// The ordering check only inspects the first and last samples, so a corrupt stamp in

@@ -2951,42 +2951,22 @@ bool convertScan3dMsg(
 	return true;
 }
 
+/**
+ * @param motion       for a stamp in the sweep, the pose of the cloud's frame at that stamp
+ *                     relative to the cloud's frame at input's header stamp
+ * @param motionSource what the motion comes from, for the error messages
+ */
 bool deskew_impl(
 		const sensor_msgs::msg::PointCloud2 & input,
 		sensor_msgs::msg::PointCloud2 & output,
-		const std::string & fixedFrameId,
-		tf2_ros::Buffer * tfBuffer,
-		double waitForTransform,
+		const std::function<rtabmap::Transform(const rclcpp::Time &)> & motion,
 		bool slerp,
-		const rtabmap::Transform & velocity)
+		const std::string & motionSource)
 {
-	if(tfBuffer != 0)
+	if(!motion)
 	{
-		if(input.header.frame_id.empty())
-		{
-			UERROR("Input cloud has empty frame_id!");
-			return false;
-		}
-
-		if(fixedFrameId.empty())
-		{
-			UERROR("fixedFrameId parameter should be set!");
-			return false;
-		}
-	}
-	else
-	{
-		if(!slerp)
-		{
-			UERROR("slerp should be true when constant velocity model is used!");
-			return false;
-		}
-
-		if(velocity.isNull())
-		{
-			UERROR("velocity should be valid when constant velocity model is used!");
-			return false;
-		}
+		UERROR("motion function should be set!");
+		return false;
 	}
 
 	int offsetTime = -1;
@@ -3270,74 +3250,19 @@ bool deskew_impl(
 		output = input;
 		return true;
 	}
-	std::string errorMsg;
-	if(tfBuffer != 0 &&
-	   waitForTransform>0.0 &&
-	   !tfBuffer->canTransform(
-			input.header.frame_id,
-			firstStamp,
-			input.header.frame_id,
-			lastStamp,
-			fixedFrameId,
-			rclcpp::Duration::from_seconds(waitForTransform),
-			&errorMsg))
-	{
-		UERROR("Could not estimate motion of %s accordingly to fixed frame %s between stamps %f and %f! (%s)",
-				input.header.frame_id.c_str(),
-				fixedFrameId.c_str(),
-				timestampFromROS(firstStamp),
-				timestampFromROS(lastStamp),
-				errorMsg.c_str());
-		return false;
-	}
-
 	rtabmap::Transform firstPose;
 	rtabmap::Transform lastPose;
 	double scanTime = 0;
 	if(slerp)
 	{
-		if(tfBuffer != 0)
-		{
-			firstPose = rtabmap_conversions::getMovingTransform(
-					input.header.frame_id,
-					fixedFrameId,
-					input.header.stamp,
-					firstStamp,
-					*tfBuffer,
-					0);
-			lastPose = rtabmap_conversions::getMovingTransform(
-					input.header.frame_id,
-					fixedFrameId,
-					input.header.stamp,
-					lastStamp,
-					*tfBuffer,
-					0);
-		}
-		else
-		{
-			float vx,vy,vz, vroll,vpitch,vyaw;
-			velocity.getTranslationAndEulerAngles(vx,vy,vz, vroll,vpitch,vyaw);
-
-			// Integrate the velocity directly from the stamp of the msg, which is the
-			// frame the deskewed cloud is expressed in. Going through a third, earlier
-			// reference pose and composing it away would give the same answer for a pure
-			// translation, but not for a rotation: Transform() scales roll/pitch/yaw
-			// linearly instead of using the twist exponential, so the composition only
-			// cancels in the small-angle limit. Keeping dt bounded by the scan duration
-			// is where that approximation is at its best.
-			double dt1 = timestampFromROS(firstStamp) - timestampFromROS(input.header.stamp);
-			double dt3 = timestampFromROS(lastStamp) - timestampFromROS(input.header.stamp);
-
-			// First and last poses are relative to stamp of the msg
-			firstPose = rtabmap::Transform(vx*dt1, vy*dt1, vz*dt1, vroll*dt1, vpitch*dt1, vyaw*dt1);
-			lastPose = rtabmap::Transform(vx*dt3, vy*dt3, vz*dt3, vroll*dt3, vpitch*dt3, vyaw*dt3);
-		}
+		firstPose = motion(firstStamp);
+		lastPose = motion(lastStamp);
 
 		if(firstPose.isNull())
 		{
 			UERROR("Could not get transform of %s accordingly to %s between stamps %f and %f!",
 					input.header.frame_id.c_str(),
-					fixedFrameId.empty()?"velocity":fixedFrameId.c_str(),
+					motionSource.c_str(),
 					timestampFromROS(firstStamp),
 					timestampFromROS(input.header.stamp));
 			return false;
@@ -3346,7 +3271,7 @@ bool deskew_impl(
 		{
 			UERROR("Could not get transform of %s accordingly to %s between stamps %f and %f!",
 					input.header.frame_id.c_str(),
-					fixedFrameId.empty()?"velocity":fixedFrameId.c_str(),
+					motionSource.c_str(),
 					timestampFromROS(lastStamp),
 					timestampFromROS(input.header.stamp));
 			return false;
@@ -3427,18 +3352,12 @@ bool deskew_impl(
 			}
 			else
 			{
-				transform = rtabmap_conversions::getMovingTransform(
-						output.header.frame_id,
-						fixedFrameId,
-						output.header.stamp,
-						stamp,
-						*tfBuffer,
-						0);
+				transform = motion(stamp);
 				if(transform.isNull())
 				{
 					UERROR("Could not get transform of %s accordingly to %s between stamps %f and %f!",
 							output.header.frame_id.c_str(),
-							fixedFrameId.c_str(),
+							motionSource.c_str(),
 							timestampFromROS(stamp),
 							timestampFromROS(output.header.stamp));
 					return false;
@@ -3541,18 +3460,12 @@ bool deskew_impl(
 			}
 			else
 			{
-				transform = rtabmap_conversions::getMovingTransform(
-						output.header.frame_id,
-						fixedFrameId,
-						output.header.stamp,
-						stamp,
-						*tfBuffer,
-						0);
+				transform = motion(stamp);
 				if(transform.isNull())
 				{
 					UERROR("Could not get transform of %s accordingly to %s between stamps %f and %f!",
 							output.header.frame_id.c_str(),
-							fixedFrameId.c_str(),
+							motionSource.c_str(),
 							timestampFromROS(stamp),
 							timestampFromROS(output.header.stamp));
 					return false;
@@ -3587,7 +3500,7 @@ bool deskew_impl(
 			}
 		}
 	}
-	UDEBUG("Lidar deskewing time=%fs (slerp=%s waitForTransform=%f)", processingTime.elapsed(), slerp?"true":"false", waitForTransform);
+	UDEBUG("Lidar deskewing time=%fs (slerp=%s motion=%s)", processingTime.elapsed(), slerp?"true":"false", motionSource.c_str());
 	return true;
 }
 
@@ -3599,7 +3512,29 @@ bool deskew(
 		double waitForTransform,
 		bool slerp)
 {
-	return deskew_impl(input, output, fixedFrameId, &tfBuffer, waitForTransform, slerp, rtabmap::Transform());
+	if(input.header.frame_id.empty())
+	{
+		UERROR("Input cloud has empty frame_id!");
+		return false;
+	}
+	if(fixedFrameId.empty())
+	{
+		UERROR("fixedFrameId parameter should be set!");
+		return false;
+	}
+	// Each lookup waits only if TF doesn't cover that stamp yet, which in practice is
+	// the end of the sweep, the most recent part of it.
+	auto motion = [&](const rclcpp::Time & stamp)
+	{
+		return rtabmap_conversions::getMovingTransform(
+				input.header.frame_id,
+				fixedFrameId,
+				input.header.stamp,
+				stamp,
+				tfBuffer,
+				waitForTransform);
+	};
+	return deskew_impl(input, output, motion, slerp, fixedFrameId);
 }
 
 bool deskew(
@@ -3607,7 +3542,37 @@ bool deskew(
 		sensor_msgs::msg::PointCloud2 & output,
 		const rtabmap::Transform & velocity)
 {
-	return deskew_impl(input, output, "", 0, 0, true, velocity);
+	if(velocity.isNull())
+	{
+		UERROR("velocity should be valid when constant velocity model is used!");
+		return false;
+	}
+	float vx,vy,vz, vroll,vpitch,vyaw;
+	velocity.getTranslationAndEulerAngles(vx,vy,vz, vroll,vpitch,vyaw);
+
+	// Integrate the velocity directly from the stamp of the msg, which is the frame the
+	// deskewed cloud is expressed in. Going through a third, earlier reference pose and
+	// composing it away would give the same answer for a pure translation, but not for a
+	// rotation: Transform() scales roll/pitch/yaw linearly instead of using the twist
+	// exponential, so the composition only cancels in the small-angle limit. Keeping dt
+	// bounded by the scan duration is where that approximation is at its best. Only the
+	// two ends of the sweep are computed this way (slerp), the points in between are
+	// interpolated.
+	auto motion = [&](const rclcpp::Time & stamp)
+	{
+		const double dt = timestampFromROS(stamp) - timestampFromROS(input.header.stamp);
+		return rtabmap::Transform(vx*dt, vy*dt, vz*dt, vroll*dt, vpitch*dt, vyaw*dt);
+	};
+	return deskew_impl(input, output, motion, true, "velocity");
+}
+
+bool deskew(
+		const sensor_msgs::msg::PointCloud2 & input,
+		sensor_msgs::msg::PointCloud2 & output,
+		const std::function<rtabmap::Transform(const rclcpp::Time & stamp)> & motion,
+		bool slerp)
+{
+	return deskew_impl(input, output, motion, slerp, "motion");
 }
 
 

@@ -61,6 +61,7 @@ ICPOdometry::ICPOdometry(const rclcpp::NodeOptions & options) :
 	scanNormalGroundUp_(0.0),
 	deskewing_(false),
 	deskewingSlerp_(false),
+	deskewingImu_(false),
 	topicQueueSize_(1),
 	scanReceived_(false),
 	cloudReceived_(false)
@@ -86,6 +87,7 @@ void ICPOdometry::onOdomInit()
 	scanNormalGroundUp_ = this->declare_parameter("scan_normal_ground_up", scanNormalGroundUp_);
 	deskewing_ = this->declare_parameter("deskewing", deskewing_);
 	deskewingSlerp_ = this->declare_parameter("deskewing_slerp", deskewingSlerp_);
+	deskewingImu_ = this->declare_parameter("deskewing_imu", deskewingImu_);
 	topicQueueSize_ = this->declare_parameter("topic_queue_size", topicQueueSize_);
 
 	RCLCPP_INFO(this->get_logger(), "IcpOdometry: qos                    = %d", (int)qos());
@@ -100,6 +102,26 @@ void ICPOdometry::onOdomInit()
 	RCLCPP_INFO(this->get_logger(), "IcpOdometry: scan_normal_ground_up  = %f", scanNormalGroundUp_);
 	RCLCPP_INFO(this->get_logger(), "IcpOdometry: deskewing              = %s", deskewing_?"true":"false");
 	RCLCPP_INFO(this->get_logger(), "IcpOdometry: deskewing_slerp        = %s", deskewingSlerp_?"true":"false");
+	RCLCPP_INFO(this->get_logger(), "IcpOdometry: deskewing_imu          = %s", deskewingImu_?"true":"false");
+
+	if(deskewingImu_)
+	{
+		if(!deskewing_)
+		{
+			RCLCPP_WARN(this->get_logger(), "IcpOdometry: \"deskewing_imu\" is true but \"deskewing\" is false, scans won't be deskewed.");
+		}
+		else if(!guessFrameId().empty())
+		{
+			RCLCPP_WARN(this->get_logger(), "IcpOdometry: \"deskewing_imu\" is true but \"guess_frame_id\" is set, "
+					"scans are deskewed with TF of \"%s\" instead of the IMU.", guessFrameId().c_str());
+		}
+		if(!enableImuMotionPrediction())
+		{
+			RCLCPP_ERROR(this->get_logger(), "IcpOdometry: \"deskewing_imu\" requires an IMU, which is subscribed "
+					"only with \"wait_imu_to_init\" set to true. Deskewing falls back to the constant velocity model.");
+			deskewingImu_ = false;
+		}
+	}
 	RCLCPP_INFO(this->get_logger(), "IcpOdometry: topic_queue_size       = %d", topicQueueSize_);
 
 	rclcpp::SubscriptionOptions options;
@@ -109,6 +131,7 @@ void ICPOdometry::onOdomInit()
 	cloud_sub_ = create_subscription<sensor_msgs::msg::PointCloud2>("scan_cloud", rclcpp::QoS(topicQueueSize_).reliability((rmw_qos_reliability_policy_t)qos()), std::bind(&ICPOdometry::callbackCloud, this, std::placeholders::_1), options);
 
 	filtered_scan_pub_ = create_publisher<sensor_msgs::msg::PointCloud2>("odom_filtered_input_scan", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos()));
+	deskewed_scan_pub_ = create_publisher<sensor_msgs::msg::PointCloud2>("odom_deskewed_input_scan", rclcpp::QoS(1).reliability((rmw_qos_reliability_policy_t)qos()));
 
 	initDiagnosticMsg(uFormat("\n%s subscribed to %s and %s (make sure only one of this topic is published, otherwise remap one to a dummy topic name).",
 			get_name(),
@@ -551,6 +574,7 @@ void ICPOdometry::callbackCloud(const sensor_msgs::msg::PointCloud2::SharedPtr p
 		return;
 	}
 
+	bool deskewed = false;
 	if(deskewing_)
 	{
 		if(!guessFrameId().empty())
@@ -561,10 +585,48 @@ void ICPOdometry::callbackCloud(const sensor_msgs::msg::PointCloud2::SharedPtr p
 				RCLCPP_ERROR(this->get_logger(), "Failed to deskew input cloud, aborting odometry update!");
 				return;
 			}
+			deskewed = true;
 		}
-		else if(previousStamp() > 0 && !velocityGuess().isNull())
+		else if(deskewingImu_ && isImuMotionPredictionEnabled())
 		{
-			// deskew with constant velocity model
+			// deskew with the base motion predicted from the IMU, and the motion of the
+			// sensor on the base (if it is not rigidly mounted) from TF.
+			//
+			// On a copy of the predictor: while this sweep is deskewed, the IMU callback
+			// keeps adding samples to the original and the odometry thread may add the pose
+			// of the previous frame, which moves what predictions start from. With the copy,
+			// every point of the sweep is predicted from the same pose and samples, and the
+			// original's lock is only held for the copy, not for the whole deskewing.
+			const rtabmap::ImuMotionPredictor imuPredictor = imuMotionPredictor();
+			// Pose of the base frame at the stamp of the cloud (only its orientation until
+			// odometry has a pose), null until an IMU message is received.
+			const rtabmap::Transform referencePose = imuPredictor.predict(rtabmap_conversions::timestampFromROS(pointCloudMsg->header.stamp));
+			if(!referencePose.isNull())
+			{
+				const rtabmap::Transform referenceInverse = (referencePose * localScanTransform).inverse();
+				const std::string & cloudFrameId = pointCloudMsg->header.frame_id;
+				auto motion = [&](const rclcpp::Time & stamp) -> rtabmap::Transform
+				{
+					rtabmap::Transform pose = imuPredictor.predict(rtabmap_conversions::timestampFromROS(stamp));
+					rtabmap::Transform mount = rtabmap_conversions::getTransform(this->frameId(), cloudFrameId, stamp, this->tfBuffer(), this->waitForTransform());
+					if(pose.isNull() || mount.isNull())
+					{
+						return rtabmap::Transform();
+					}
+					return referenceInverse * pose * mount;
+				};
+				if(!rtabmap_conversions::deskew(*pointCloudMsg, *cloudMsg, motion, deskewingSlerp_))
+				{
+					RCLCPP_ERROR(this->get_logger(), "Failed to deskew input cloud, aborting odometry update!");
+					return;
+				}
+				deskewed = true;
+			}
+		}
+
+		if(!deskewed && guessFrameId().empty() && previousStamp() > 0 && !velocityGuess().isNull())
+		{
+			// deskew with constant velocity model (also while the IMU hasn't been received)
 			bool alreadyInBaseFrame = frameId().compare(pointCloudMsg->header.frame_id) == 0;
 			std::shared_ptr<sensor_msgs::msg::PointCloud2> cloudInBaseFrame;
 			std::shared_ptr<sensor_msgs::msg::PointCloud2> cloudPtr = cloudMsg;
@@ -607,7 +669,13 @@ void ICPOdometry::callbackCloud(const sensor_msgs::msg::PointCloud2::SharedPtr p
 			{
 				cloudMsg = cloudDeskewed;
 			}
+			deskewed = true;
 		}
+	}
+
+	if(deskewed && deskewed_scan_pub_->get_subscription_count())
+	{
+		deskewed_scan_pub_->publish(*cloudMsg);
 	}
 
 	LaserScan scan;

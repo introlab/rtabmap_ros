@@ -79,6 +79,8 @@ def generate_launch_description():
                               description='Voxel size (m) of the assembled clouds added to the map; 0 keeps every point (larger database, e.g., for camera-lidar calibration).'),
         DeclareLaunchArgument('assembling_time', default_value='4.3',
                               description='How long (s) scans are assembled before being added to the map. The mast turns at 42 deg/s: 4.3 s is half a turn, in which the lidar\'s scanning plane sweeps the whole sphere.'),
+        DeclareLaunchArgument('deskewing_imu', default_value='false',
+                              description='Deskew the sweeps in icp_odometry, with the base motion predicted from the IMU since the last odometry pose (orientation and acceleration), instead of with lidar_deskewing against a frame stabilized with the IMU orientation only. The mast motion comes from TF either way.'),
         DeclareLaunchArgument('intermediate_nodes', default_value='false',
                               description='Also save every odometry pose (10 Hz) between the map\'s nodes in the database.'),
 
@@ -110,6 +112,7 @@ def generate_launch_description():
                 # interpolating between the first and last points of the sweep: exact,
                 # for more TF lookups.
                 'deskewing_slerp': 'false',
+                'deskewing_imu': LaunchConfiguration('deskewing_imu'),
                 'rtabmap_viz': LaunchConfiguration('rtabmap_viz'),
                 'rtabmap_viz_cfg': LaunchConfiguration('rtabmap_viz_cfg'),
                 'localization': LaunchConfiguration('localization'),
