@@ -26,6 +26,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #include <gtest/gtest.h>
+#include <chrono>
 
 #include <cmath>
 #include <cstring>
@@ -2637,6 +2638,15 @@ void addTf(tf2_ros::Buffer & buffer,
 	ASSERT_TRUE(buffer.setTransform(msg, "unit_test", isStatic));
 }
 
+/// tf2_ros::Buffer waits for a transform only while rclcpp is up: brought up for a test
+/// that measures how long a lookup waits, and down again after it.
+struct ScopedRclcpp
+{
+	ScopedRclcpp() : initialized(!rclcpp::ok()) { if(initialized) rclcpp::init(0, nullptr); }
+	~ScopedRclcpp() { if(initialized) rclcpp::shutdown(); }
+	const bool initialized;
+};
+
 }  // namespace
 
 TEST(MsgConversion, getTransformReadsTheBuffer)
@@ -2673,6 +2683,37 @@ TEST(MsgConversion, getTransformIsInvertedByFrameOrder)
 			getTransform("camera_link", "base_link", timestampToROS(1000.0), *buffer, 0.0);
 
 	expectTransformNear(backward, forward.inverse(), 1e-4f);
+}
+
+TEST(MsgConversion, getTransformDoesNotWaitForATransformTooOldToArrive)
+{
+	// The buffer keeps 10 s: with transforms up to t=1020, nothing older than t=1010 can be
+	// added anymore. Asking for t=1005 fails at once, however long it is allowed to wait.
+	const ScopedRclcpp rclcpp;
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();
+	for(double t = 1000.0; t <= 1020.0; t += 1.0)
+	{
+		addTf(*buffer, "odom", "base_link", rtabmap::Transform(float(t - 1000.0), 0, 0, 0, 0, 0), t, false);
+	}
+	const std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+	EXPECT_TRUE(getTransform("odom", "base_link", timestampToROS(1005.0), *buffer, 2.0).isNull());
+	EXPECT_LT(std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count(), 0.5)
+			<< "waited for a transform older than the buffer can hold";
+
+	// Within the buffer, as before
+	expectTransformNear(getTransform("odom", "base_link", timestampToROS(1015.0), *buffer, 2.0),
+			rtabmap::Transform(15.0f, 0, 0, 0, 0, 0));
+}
+
+TEST(MsgConversion, getTransformStillWaitsForANewerTransform)
+{
+	// Newer than the newest transform: it may still arrive, so it is waited for.
+	const ScopedRclcpp rclcpp;
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();
+	addTf(*buffer, "odom", "base_link", rtabmap::Transform::getIdentity(), 1000.0, false);
+	const std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+	EXPECT_TRUE(getTransform("odom", "base_link", timestampToROS(1001.0), *buffer, 0.3).isNull());
+	EXPECT_GE(std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count(), 0.25);
 }
 
 TEST(MsgConversion, getMovingTransformMeasuresMotionBetweenStamps)
