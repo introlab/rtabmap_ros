@@ -1497,6 +1497,40 @@ TEST_F(IcpOdometryTest, starts_from_the_first_imu_message)
 }
 
 /**
+ * An IMU message received before the transform of its mounting waits for it. If that was
+ * the only IMU message (no next one to flush it), the next frame still finds it, as long as
+ * the transform has arrived by then.
+ */
+TEST_F(IcpOdometryTest, uses_an_imu_message_received_before_its_transform)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+			collect<nav_msgs::msg::Odometry>("odom");
+	std::vector<rclcpp::Parameter> params = icpTestParameters();
+	params.push_back(rclcpp::Parameter("wait_imu_to_init", true));
+	makeNode(params);
+
+	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub =
+			helper()->create_publisher<sensor_msgs::msg::PointCloud2>("scan_cloud", 10);
+	rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu =
+			helper()->create_publisher<sensor_msgs::msg::Imu>("imu", rclcpp::QoS(200));
+	ASSERT_TRUE(waitForSubscriber(pub));
+	ASSERT_TRUE(waitForSubscriber(imu));
+
+	// The IMU message first, its mounting's transform only after
+	imu->publish(imuSample(1.06, 0.7));
+	spinFor(std::chrono::milliseconds(300));
+	publishImuTf();
+	spinFor(std::chrono::milliseconds(300));
+	pub->publish(makeXYZCloud("lidar", 1.05, corner3D()));
+	ASSERT_TRUE(spinUntil([&]() { return !odom->empty(); }))
+			<< "the frame never found the IMU message waiting for its transform";
+
+	const geometry_msgs::msg::Quaternion & q = odom->front().pose.pose.orientation;
+	EXPECT_NEAR(2.0 * std::atan2(q.z, q.w), 0.7, 0.01);
+}
+
+/**
  * The orientation handed to the odometry is the one belonging to the frame's stamp, not
  * whatever the IMU has reached by the time the frame is processed. Here the IMU keeps
  * turning well past the second frame -- to 2.0 rad, twice the turn between the scans --
