@@ -108,15 +108,20 @@ def generate_launch_description():
               ('camera_info', 'right/camera_info')],
             namespace='stereo_camera'),
             
+        # Its camera_info is the one beside the image topic since Kilted (image_transport's
+        # camera subscriber), relative to the node's namespace before: both are remapped to
+        # the one yaml_to_camera_info.py publishes.
         Node(
             package='image_proc', executable='rectify_node', output='screen',
             remappings=[
-              ('image', '/cam0/image_raw')],
+              ('image', '/cam0/image_raw'),
+              ('/cam0/camera_info', '/stereo_camera/left/camera_info')],
             namespace='stereo_camera/left'),
         Node(
             package='image_proc', executable='rectify_node', output='screen',
             remappings=[
-              ('image', '/cam1/image_raw')],
+              ('image', '/cam1/image_raw'),
+              ('/cam1/camera_info', '/stereo_camera/right/camera_info')],
             namespace='stereo_camera/right'),
 
         Node(

@@ -82,9 +82,14 @@ def export_graph(database: Path, prefix: Path):
                                 'its tools?)')
     out_dir = database.parent
     for poses_format, extension, suffix in ((4, 'g2o', '.g2o'), (10, 'txt', '.tum')):
-        subprocess.run([tool, '--poses', '--poses_format', str(poses_format), '--opt', '0',
-                        '--output_dir', str(out_dir), str(database)],
-                       check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+        result = subprocess.run([tool, '--poses', '--poses_format', str(poses_format), '--opt', '0',
+                                 '--output_dir', str(out_dir), str(database)],
+                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        if result.returncode != 0:
+            # Its last lines say why (e.g., a database without any node: the pipeline
+            # never produced odometry, see the launch log next to the database)
+            raise RuntimeError(f'rtabmap-export failed (exit {result.returncode}) on {database}:\n'
+                               + '\n'.join(result.stdout.strip().splitlines()[-15:]))
         exported = out_dir / f'{database.stem}_poses.{extension}'
         exported.replace(str(prefix) + suffix)
 
