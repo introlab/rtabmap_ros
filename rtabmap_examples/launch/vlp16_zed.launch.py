@@ -67,7 +67,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
     ),
     
     # Static transform between zed and velodyne frame (zed will be our base frame because VIO is already linked to it)
-    Node(package='tf2_ros', executable='static_transform_publisher', arguments=["0", "0", "-0.05", "0", "0", "0", "zed_camera_link", "velodyne"]),
+    Node(package='tf2_ros', executable='static_transform_publisher', arguments=["--x", "0", "--y", "0", "--z", "-0.05", "--yaw", "0", "--pitch", "0", "--roll", "0", "--frame-id", "zed_camera_link", "--child-frame-id", "velodyne"]),
     
     # Sync rgb/depth/camera_info together
     Node(
