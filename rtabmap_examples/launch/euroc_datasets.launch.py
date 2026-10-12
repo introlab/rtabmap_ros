@@ -108,7 +108,7 @@ def generate_launch_description():
               ('camera_info', 'right/camera_info')],
             namespace='stereo_camera'),
             
-        # Its camera_info is the one beside the image topic since Kilted (image_transport's
+        # Its camera_info is the one beside the image topic since Jazzy (image_transport's
         # camera subscriber), relative to the node's namespace before: both are remapped to
         # the one yaml_to_camera_info.py publishes.
         Node(
