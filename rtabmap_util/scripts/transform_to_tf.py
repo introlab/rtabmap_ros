@@ -16,11 +16,13 @@ class TransformToTf(Node):
 
         self.tf_broadcaster = TransformBroadcaster(self)
 
+        # Deep enough to keep all the transforms published in a burst (e.g., a motion
+        # capture's poses replayed between two camera frames)
         self.subscription = self.create_subscription(
             TransformStamped,
             'transform',
             self.callback,
-            1)
+            100)
         self.subscription  # prevent unused variable warning
 
     def callback(self, t):

@@ -56,14 +56,17 @@ def generate_launch_description():
             'gt', default_value='false',
             description='If the VH rosbag sequence is used, you can enable ground truth.'),
 
+        DeclareLaunchArgument(
+            'rtabmap_viz', default_value='true',
+            description='Launch RTAB-Map UI (optional).'),
+
         SetParameter(name='use_sim_time', value=True),
         # 'use_sim_time' will be set on all nodes following the line above
 
         # Nodes to launch
         Node(
             package='rtabmap_odom', executable='stereo_odometry', output='screen',
-            parameters=[parameters,
-                { 'always_process_most_recent_frame':True}],
+            parameters=[parameters],
             remappings=remappings),
 
         Node(
@@ -82,6 +85,7 @@ def generate_launch_description():
             arguments=['-d']),
 
         Node(
+            condition=IfCondition(LaunchConfiguration('rtabmap_viz')),
             package='rtabmap_viz', executable='rtabmap_viz', output='screen',
             parameters=[parameters,
                         {'odometry_node_name': "stereo_odometry"}],

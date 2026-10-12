@@ -199,17 +199,29 @@ class LockstepPlayer:
     """Publish a bag's messages, each sensor message once the pipeline is idle.
 
     Several bags (a list) are played one after the other, as `ros2 bag play` of each in
-    turn would: the recordings of a session split in parts.
+    turn would: the recordings of a session split in parts. `start` skips the first seconds
+    of the session (from its first bag's start), as `ros2 bag play --start-offset` would.
     """
 
-    def __init__(self, node: Node, bag_dir, tree: ProcessTree, lookahead: float = 0.2):
+    def __init__(self, node: Node, bag_dir, tree: ProcessTree, lookahead: float = 0.2,
+                 start: float = 0.0):
         self.node = node
         self.bag_dirs = [bag_dir] if isinstance(bag_dir, str) else list(bag_dir)
         self.tree = tree
         self.lookahead = lookahead
+        # The session's span, in ns: from its first bag's start (plus `start`) to the end of
+        # its last one
+        spans = []
+        for bag in self.bag_dirs:
+            metadata = self._open(bag).get_metadata()
+            begin = metadata.starting_time.nanoseconds
+            spans.append((begin, begin + metadata.duration.nanoseconds))
+        self._begin_ns = min(b for b, _ in spans) + int(round(start * 1e9))
+        self._end_ns = max(e for _, e in spans)
         self.gated: Set[str] = set()
         self._publishers = {}
         self._types = {}
+        self._skipped: Set[str] = set()  # bag topics whose message type is not installed
         self._clock = node.create_publisher(Clock, '/clock', 10)
         self._extra = []  # (release time, serialized TFMessage)
         self._extra_tf = node.create_publisher(
@@ -231,8 +243,17 @@ class LockstepPlayer:
                              reliability=ReliabilityPolicy.RELIABLE,
                              durability=(DurabilityPolicy.TRANSIENT_LOCAL if transient
                                          else DurabilityPolicy.VOLATILE))
+            try:
+                message_type = get_message(meta.type)
+            except (AttributeError, ModuleNotFoundError, ValueError):
+                # A message package not installed (e.g., a robot's own, in a dataset's
+                # bag): not played, nothing here can subscribe to it anyway.
+                print(f'  {name} ({meta.type}) not played: its message type is not installed',
+                      flush=True)
+                self._skipped.add(meta.name)
+                continue
             self._publishers[meta.name] = (
-                name, node.create_publisher(get_message(meta.type), name, qos))
+                name, node.create_publisher(message_type, name, qos))
             self._types[meta.name] = meta.type
 
     def add_trajectory(self, frame_id: str, child_frame_id: str, trajectory,
@@ -251,12 +272,7 @@ class LockstepPlayer:
         TF buffer keeps 10 s: the trajectory's own gaps can be several seconds (a robot
         standing still adds no nodes), and a lead covering them would leave it no slack.
         """
-        spans = []
-        for bag in self.bag_dirs:
-            metadata = self._open(bag).get_metadata()
-            begin = metadata.starting_time.nanoseconds / 1e9
-            spans.append((begin, begin + metadata.duration.nanoseconds / 1e9))
-        start, end = min(s for s, _ in spans), max(e for _, e in spans)
+        start, end = self._begin_ns / 1e9, self._end_ns / 1e9
         trajectory = sorted(trajectory)
         if not trajectory:
             return
@@ -285,6 +301,14 @@ class LockstepPlayer:
         reader = rosbag2_py.SequentialReader()
         reader.open(rosbag2_py.StorageOptions(uri=bag_dir, storage_id='sqlite3'),
                     rosbag2_py.ConverterOptions('cdr', 'cdr'))
+        return reader
+
+    def _open_from_start(self, bag_dir: str):
+        """The bag, from the session's start (see `start`)."""
+        reader = self._open(bag_dir)
+        if self._skipped:
+            reader.set_filter(rosbag2_py.StorageFilter(topics=list(self._publishers)))
+        reader.seek(self._begin_ns)
         return reader
 
     def connect(self, required: List[str], timeout: float = 60.0):
@@ -384,7 +408,7 @@ class LockstepPlayer:
 
         lookahead_ns = int(self.lookahead * 1e9)
         for bag in self.bag_dirs:
-            reader = self._open(bag)
+            reader = self._open_from_start(bag)
             while reader.has_next():
                 topic, data, t = _read_next(reader)
                 # Sensor data is held back by the lookahead, so the TF of the next
@@ -467,7 +491,7 @@ class LockstepPlayer:
 
         chunk_end = None
         for bag in self.bag_dirs:
-            reader = self._open(bag)
+            reader = self._open_from_start(bag)
             while reader.has_next():
                 topic, data, t = _read_next(reader)
                 if chunk_end is None:
@@ -485,10 +509,18 @@ class LockstepPlayer:
         return state['published']
 
     def _count_gated(self) -> int:
-        return sum(t.message_count
-                   for bag in self.bag_dirs
-                   for t in self._open(bag).get_metadata().topics_with_message_count
-                   if t.topic_metadata.name in self.gated)
+        """How many gated messages will be published, for progress only: those of the
+        bags' part played (see `start`), assuming they are evenly spread over it."""
+        total = 0.0
+        for bag in self.bag_dirs:
+            metadata = self._open(bag).get_metadata()
+            begin = metadata.starting_time.nanoseconds
+            duration = metadata.duration.nanoseconds
+            played = 1.0 if duration <= 0 else \
+                min(1.0, max(0.0, (begin + duration - max(begin, self._begin_ns)) / duration))
+            total += played * sum(t.message_count for t in metadata.topics_with_message_count
+                                  if t.topic_metadata.name in self.gated)
+        return int(round(total))
 
 
 def _to_time(ns: int):
