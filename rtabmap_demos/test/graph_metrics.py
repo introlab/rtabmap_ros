@@ -29,6 +29,8 @@ class Graph:
     # Vertices that are landmarks, not nodes: rtabmap-export writes them after the nodes,
     # with positive ids, the ends of the landmark links.
     landmarks: Set[int] = field(default_factory=set)
+    # Nodes at either end of a loop closure, global or local.
+    closed_nodes: Set[int] = field(default_factory=set)
 
     @classmethod
     def load(cls, g2o_path: str) -> 'Graph':
@@ -53,6 +55,8 @@ class Graph:
                     graph.link_types.append(link_type)
                     if link_type == LANDMARK:
                         graph.landmarks.add(int(v[2]))
+                    elif link_type in (GLOBAL_CLOSURE, LOCAL_SPACE_CLOSURE, LOCAL_TIME_CLOSURE):
+                        graph.closed_nodes.update((int(v[1]), int(v[2])))
         return graph
 
     def summary(self) -> dict:
@@ -65,6 +69,8 @@ class Graph:
             'local_closures': sum(t in (LOCAL_SPACE_CLOSURE, LOCAL_TIME_CLOSURE)
                                   for t in self.link_types),
             'path_length': round(float(np.linalg.norm(np.diff(xyz, axis=0), axis=1).sum()), 2),
+            # The first node has a loop closure: the map was closed back to its start.
+            'first_node_closed': bool(ids) and ids[0] in self.closed_nodes,
         }
 
 

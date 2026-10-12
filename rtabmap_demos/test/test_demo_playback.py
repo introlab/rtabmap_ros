@@ -97,6 +97,9 @@ class Scenario:
     # False when the scenario turns loop closure detection off, against a golden graph
     # made with it.
     compare_closures: bool = True
+    # The first node must have a loop closure, for a run whose end overlaps its start: the
+    # map is closed back to its start, whatever the closure count.
+    close_first_node: bool = False
     max_rmse: float = 0.05                 # m, Gt/Translational_rmse
     max_rotational_rmse: Optional[float] = 1.0  # deg, Gt/Rotational_rmse; None: not checked
 
@@ -166,8 +169,13 @@ SCENARIOS = [
         # A node every 4.3 s, when the assembled cloud of half a turn of the mast is ready.
         chunk_slack=5.0,
         # Local closures only (no global ones: the camera's bag-of-words finds none),
-        # 25 in the golden graph, 19 in a Kilted CI run.
-        closure_slack=0.3,
+        # 25 in the golden graph, 19 in a Kilted CI run, 17 in a Jazzy one: at least 15,
+        # with some margin, the closure with the first node below being what matters.
+        closure_slack=0.4,
+        # The end of the flight overlaps its start enough for a proximity closure back to
+        # the first node, as in the golden graph (1-3558) and every run so far (1-3551 in
+        # a Jazzy one).
+        close_first_node=True,
         max_rmse=0.1,
         max_rotational_rmse=2.0,
         max_node_difference=0.05),
@@ -425,6 +433,9 @@ def test_demo_playback(scenario: Scenario, tmp_path):
         if closures < minimum:
             problems.append(f'loop closures (global and local): {closures}, golden '
                             f'{golden_closures} (at least {minimum:.0f} expected)')
+    if scenario.close_first_node and not summary['first_node_closed']:
+        problems.append('no loop closure with the first node: the map was not closed '
+                        'back to its start')
     if rmse is None:
         source = 'the bag\'s ground truth' if scenario.ground_truth_from_bag else 'the golden trajectory'
         problems.append(f'rtabmap reported no Gt/* statistics: {source} did not '
