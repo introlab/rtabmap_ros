@@ -331,7 +331,7 @@ protected:
 
 	/// Subscribes and waits until MapsManager has seen the subscription.
 	template <typename MsgT>
-	std::shared_ptr<Collector<MsgT>> collectFromMaps(const std::string & name)
+	[[nodiscard]] std::shared_ptr<Collector<MsgT>> collectFromMaps(const std::string & name)
 	{
 		std::shared_ptr<Collector<MsgT>> collector = collect<MsgT>(topic(name));
 		EXPECT_TRUE(waitForPublisher(collector->subscription))
@@ -638,7 +638,8 @@ TEST_F(MapsManagerTest, HasNoSubscribersOnItsOwn)
 TEST_F(MapsManagerTest, HasSubscribersOnceSomeoneListens)
 {
 	start();
-	collectFromMaps<sensor_msgs::msg::PointCloud2>("cloud_map");
+	std::shared_ptr<Collector<sensor_msgs::msg::PointCloud2>> listener =
+			collectFromMaps<sensor_msgs::msg::PointCloud2>("cloud_map");
 	EXPECT_TRUE(maps_->hasSubscribers());
 }
 
@@ -654,7 +655,8 @@ TEST_F(MapsManagerTest, AssumesTheMapChangedWithoutGridSubscribers)
 TEST_F(MapsManagerTest, ReportsTheMapUnchangedOnASecondIdenticalUpdate)
 {
 	start();
-	collectFromMaps<nav_msgs::msg::OccupancyGrid>("map");
+	std::shared_ptr<Collector<nav_msgs::msg::OccupancyGrid>> listener =
+			collectFromMaps<nav_msgs::msg::OccupancyGrid>("map");
 
 	maps_->updateMapCaches(posesOfScene(), 0, true, false, scene());
 	EXPECT_TRUE(maps_->isMapUpdated()) << "the first update adds both nodes";
@@ -684,7 +686,8 @@ TEST_F(MapsManagerTest, LatchesTheMapForLateSubscribers)
 {
 	start();   // latch defaults to true
 	EXPECT_TRUE(maps_->isLatching());
-	collectFromMaps<nav_msgs::msg::OccupancyGrid>("map");
+	std::shared_ptr<Collector<nav_msgs::msg::OccupancyGrid>> listener =
+			collectFromMaps<nav_msgs::msg::OccupancyGrid>("map");
 	updateAndPublish();
 
 	// A subscriber joining after the fact still gets the last map, because the publisher
@@ -700,7 +703,8 @@ TEST_F(MapsManagerTest, DoesNotLatchWhenLatchIsFalse)
 {
 	start({rclcpp::Parameter("latch", false)});
 	EXPECT_FALSE(maps_->isLatching());
-	collectFromMaps<nav_msgs::msg::OccupancyGrid>("map");
+	std::shared_ptr<Collector<nav_msgs::msg::OccupancyGrid>> listener =
+			collectFromMaps<nav_msgs::msg::OccupancyGrid>("map");
 	updateAndPublish();
 
 	// With a volatile publisher there is no history to hand out (and a transient local

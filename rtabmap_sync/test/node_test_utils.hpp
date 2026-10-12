@@ -228,7 +228,7 @@ protected:
 	 * library is unloaded at exit, crashing a binary whose tests all passed.
 	 */
 	template <typename MsgT>
-	std::shared_ptr<Collector<MsgT>> collect(
+	[[nodiscard]] std::shared_ptr<Collector<MsgT>> collect(
 			const std::string & topic, const rclcpp::QoS & qos = rclcpp::QoS(10))
 	{
 		std::shared_ptr<Collector<MsgT>> collector = std::make_shared<Collector<MsgT>>();

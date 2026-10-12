@@ -195,6 +195,7 @@ TEST_F(DbPlayerTest, ReplaysCameraCalibration)
 			collect<sensor_msgs::msg::CameraInfo>("depth/camera_info");
 	ASSERT_TRUE(waitForPublisher(rgb->subscription));
 	ASSERT_TRUE(waitForPublisher(rgbInfo->subscription));
+	ASSERT_TRUE(waitForPublisher(depthInfo->subscription));
 	ASSERT_TRUE(replayUntil([&]() { return !rgbInfo->empty() && !depthInfo->empty(); }));
 
 	EXPECT_EQ(rgbInfo->back().width, uint32_t(kImageWidth));
