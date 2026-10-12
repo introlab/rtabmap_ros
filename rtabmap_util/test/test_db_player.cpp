@@ -189,11 +189,15 @@ TEST_F(DbPlayerTest, ReplaysCameraCalibration)
 
 	std::shared_ptr<Collector<sensor_msgs::msg::Image>> rgb =
 			collect<sensor_msgs::msg::Image>("rgb/image");
+	// The calibrations go out with their image, so the depth image needs a subscriber too.
+	std::shared_ptr<Collector<sensor_msgs::msg::Image>> depth =
+			collect<sensor_msgs::msg::Image>("depth/image");
 	std::shared_ptr<Collector<sensor_msgs::msg::CameraInfo>> rgbInfo =
 			collect<sensor_msgs::msg::CameraInfo>("rgb/camera_info");
 	std::shared_ptr<Collector<sensor_msgs::msg::CameraInfo>> depthInfo =
 			collect<sensor_msgs::msg::CameraInfo>("depth/camera_info");
 	ASSERT_TRUE(waitForPublisher(rgb->subscription));
+	ASSERT_TRUE(waitForPublisher(depth->subscription));
 	ASSERT_TRUE(waitForPublisher(rgbInfo->subscription));
 	ASSERT_TRUE(waitForPublisher(depthInfo->subscription));
 	ASSERT_TRUE(replayUntil([&]() { return !rgbInfo->empty() && !depthInfo->empty(); }));
