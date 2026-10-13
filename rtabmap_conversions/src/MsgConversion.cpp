@@ -3439,7 +3439,7 @@ bool convertScan3dMsg(
 		bool is2D)
 {
 	UASSERT_MSG(scan3dMsg.data.size() == scan3dMsg.row_step*scan3dMsg.height,
-			uFormat("data=%d row_step=%d height=%d", scan3dMsg.data.size(), scan3dMsg.row_step, scan3dMsg.height).c_str());
+			uFormat("data=%zu row_step=%u height=%u", scan3dMsg.data.size(), scan3dMsg.row_step, scan3dMsg.height).c_str());
 
 	rtabmap::Transform scanLocalTransform = getTransform(frameId, scan3dMsg.header.frame_id, scan3dMsg.header.stamp, tfBuffer, waitForTransform);
 	if(scanLocalTransform.isNull())

@@ -204,8 +204,6 @@ SCENARIOS = [
         launch_package='rtabmap_examples',
         launch_file='euroc_datasets.launch.py',
         bag='euroc_V1_02_medium_bag',
-        # The MAV is on the ground for the first seconds
-        bag_start=11.0,
         required_topics=['/cam0/image_raw', '/cam1/image_raw', '/imu0',
                          '/vicon/firefly_sbx/firefly_sbx'],
         # gt: rtabmap's ground truth is the bag's Vicon poses
@@ -215,11 +213,9 @@ SCENARIOS = [
                     'always_process_most_recent_frame': False},
         packages=['imu_complementary_filter', 'image_proc'],
         max_node_difference=0.05,
-        # 0.061 to 0.065 m in runs against the golden graph. The rotational RMSE is not
-        # checked: it is mostly the launch file's own, its ground truth frame (from the
-        # Vicon's) being ~20 deg from base_link (19.5 to 19.8 deg in those runs).
-        max_rmse=0.10,
-        max_rotational_rmse=None),
+        # 0.071 to 0.094 m and 3.65 deg in runs against the golden graph
+        max_rmse=0.15,
+        max_rotational_rmse=6.0),
 ]
 
 

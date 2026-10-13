@@ -8,7 +8,7 @@
 | `stereo_outdoor` | `stereo_outdoor_demo.launch.py` | `stereo_outdoorA_bag` then `stereo_outdoorB_bag` |
 | `netherdrone_lidar3d` | `netherdrone_lidar3d_demo.launch.py` | `netherdrone_ouster_vertige_bag_0` to `_5`, played one after the other |
 | `find_object` | `find_object_demo.launch.py` | `demo_find_object_bag` (skipped without `find_object_2d`, which Lyrical and Rolling do not have) |
-| `euroc_stereo` | `rtabmap_examples`' `euroc_datasets.launch.py` (`gt:=true`) | `euroc_V1_02_medium_bag` (EuRoC MAV's V1_02_medium), from 11 s in |
+| `euroc_stereo` | `rtabmap_examples`' `euroc_datasets.launch.py` (`gt:=true`) | `euroc_V1_02_medium_bag` (EuRoC MAV's V1_02_medium) |
 
 ## Running
 

@@ -18,10 +18,11 @@
 #     rectified stereo pairs are ~1.8 px apart vertically (the right camera rotated by
 #     ~0.2 deg), which degrades stereo matching and odometry there.
 #   * The ground truth used here (gt:=true) is the raw Vicon pose from the bags
-#     (vicon/firefly_sbx/firefly_sbx) with an approximate offset to the base frame, not
-#     the ground truth published with the datasets (state_groundtruth_estimate0/data.csv):
-#     they differ by a few cm, and up to ~0.2 s in time on the V2 sequences. The RMSE
-#     computed here may then differ from the one in papers using the published ground truth.
+#     (vicon/firefly_sbx/firefly_sbx), moved to the base frame with the datasets' Vicon
+#     calibration, not the ground truth published with them
+#     (state_groundtruth_estimate0/data.csv): they differ by ~2 cm and ~1 deg, and up to
+#     ~0.2 s in time on the V2 sequences. The RMSE computed here may then differ from the
+#     one in papers using the published ground truth.
 
 
 from launch import LaunchDescription
@@ -78,13 +79,18 @@ def generate_launch_description():
         Node(
             package='rtabmap_odom', executable='stereo_odometry', output='screen',
             parameters=[parameters,
-                { 'always_process_most_recent_frame':True,
-                  'stereo_exposure_compensation': True,
+                { 'stereo_exposure_compensation': True,
                   # Motion guess predicted with the IMU acceleration, from the velocity
                   # over the last 0.5 s
                   'Odom/GuessSmoothingDelay':'0.5',
                   # Gravity estimated while the MAV is still at the start of the sequence
-                  'Odom/ImuGravity':'0'}],
+                  'Odom/ImuGravity':'0',
+                  # As in the JFR2018 EuRoC evaluation: denser corners and a stricter
+                  # matching ratio, more inliers through the blur of fast motions, and
+                  # features matched within 20 pixels of their projection with the guess
+                  'GFTT/MinDistance':'3',
+                  'Vis/CorNNDR':'0.6',
+                  'Vis/CorGuessWinSize':'20'}],
             remappings=remappings),
 
         Node(
@@ -164,11 +170,24 @@ def generate_launch_description():
             arguments=['--x', '-0.019844', '--y', '0.045369', '--z', '0.007862',
                        '--yaw', '1.558237', '--pitch', '0.025393', '--roll', '0.017907',
                        '--frame-id', 'imu4', '--child-frame-id', 'cam1']),
+        # Ground truth's base frame, in two steps. The IMU in the Vicon marker's frame: the
+        # inverse of the datasets' mav0/vicon0/sensor.yaml T_BS (the Vicon marker in the IMU
+        # frame), which is:
+        #   T_BS: [ 0.33638, -0.01749,  0.94156,  0.06901,
+        #          -0.02078, -0.99972, -0.01114, -0.02781,
+        #           0.94150, -0.01582, -0.33665, -0.12395,
+        #           0.0,      0.0,      0.0,      1.0]
         Node(
             package='tf2_ros', executable='static_transform_publisher', output='screen',
-            arguments=['--x', '0.12395', '--y', '-0.02781', '--z', '-0.06901',
-                       '--yaw', '0', '--pitch', '0', '--roll', '0',
-                       '--frame-id', 'vicon/firefly_sbx/firefly_sbx', '--child-frame-id', 'base_link_gt']),
+            arguments=['--x', '0.09291', '--y', '-0.02856', '--z', '-0.10701',
+                       '--yaw', '-0.051939', '--pitch', '-1.227243', '--roll', '-3.108506',
+                       '--frame-id', 'vicon/firefly_sbx/firefly_sbx', '--child-frame-id', 'imu4_gt']),
+        # Then base_link from the IMU: the inverse of base_link -> imu4 above (as a quaternion,
+        # its pitch being -90 deg)
+        Node(
+            package='tf2_ros', executable='static_transform_publisher', output='screen',
+            arguments=['--qx', '-0.707107', '--qy', '0', '--qz', '-0.707107', '--qw', '0',
+                       '--frame-id', 'imu4_gt', '--child-frame-id', 'base_link_gt']),
         Node(
             package='tf2_ros', executable='static_transform_publisher', output='screen',
             arguments=['--x', '0', '--y', '0', '--z', '0',

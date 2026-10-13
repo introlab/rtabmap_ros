@@ -1157,7 +1157,7 @@ TEST_F(IcpOdometryTest, deskews_with_the_lidars_own_imu)
 	const Recording recording = readOusterRecording();
 	ASSERT_TRUE(recording.valid()) << "could not read " << ousterHalfTurnBag();
 	std::map<std::string, std::shared_ptr<Collector<nav_msgs::msg::Odometry>>> odom;
-	for(const std::string & name : {"node", "none"})
+	for(const std::string name : {"node", "none"})
 	{
 		odom[name] = collect<nav_msgs::msg::Odometry>("odom_" + name);
 	}
@@ -1209,7 +1209,7 @@ TEST_F(IcpOdometryTest, deskews_with_the_lidars_own_imu)
 				<< "the first pose is not oriented as the IMU says (up in the sensor frame: odometry "
 				<< upOdom.transpose() << ", TF " << upTruth.transpose() << ")";
 	}
-	for(const std::string & name : {"node", "none"})
+	for(const std::string name : {"node", "none"})
 	{
 		ASSERT_FALSE(isLost(odom[name]->back())) << name << ": lost tracking between the two sweeps";
 		error[name] = odometryError(*odom[name], expected);

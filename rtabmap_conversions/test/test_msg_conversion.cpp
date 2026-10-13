@@ -679,7 +679,7 @@ TEST(MsgConversion, cameraModelFromROSPacksFisheyeDistortion)
 {
 	// Fisheye/equidistant models carry 4 coefficients, which rtabmap stores in a
 	// 1x6 matrix at positions 0, 1, 4 and 5.
-	for(const std::string & model : {"fisheye", "equidistant", "Kannala Brandt4"})
+	for(const std::string model : {"fisheye", "equidistant", "Kannala Brandt4"})
 	{
 		sensor_msgs::msg::CameraInfo in;
 		in.width = 640;
@@ -1878,7 +1878,7 @@ TEST(MsgConversion, deskewLayoutsAgree)
 
 TEST(MsgConversion, deskewAcceptsEveryTimeFieldName)
 {
-	for(const std::string & name : {"t", "time", "stamps", "timestamp"})
+	for(const std::string name : {"t", "time", "stamps", "timestamp"})
 	{
 		expectDeskewRecoversWall(kOffsetSecFloat32, kTimeOnColumns, 1, 1000.0, name);
 	}
