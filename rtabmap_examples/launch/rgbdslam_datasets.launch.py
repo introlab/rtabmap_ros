@@ -94,5 +94,5 @@ def generate_launch_description():
         # /tf topic is missing in the converted ROS2 bag, create a fake tf
         Node(
             package='tf2_ros', executable='static_transform_publisher', output='screen',
-            arguments=['0.0', '0.0', '0.0', '-1.57079632679', '0.0', '-1.57079632679', 'kinect', 'openni_rgb_optical_frame']),
+            arguments=['--x', '0.0', '--y', '0.0', '--z', '0.0', '--yaw', '-1.57079632679', '--pitch', '0.0', '--roll', '-1.57079632679', '--frame-id', 'kinect', '--child-frame-id', 'openni_rgb_optical_frame']),
     ])

@@ -30,7 +30,7 @@ def generate_launch_description():
         # Optical rotation
         Node(
             package='tf2_ros', executable='static_transform_publisher', output='screen',
-            arguments=["0", "0", "0", "-1.57", "0", "-1.57", "camera_link", "kinect_rgb"]),
+            arguments=["--x", "0", "--y", "0", "--z", "0", "--yaw", "-1.57", "--pitch", "0", "--roll", "-1.57", "--frame-id", "camera_link", "--child-frame-id", "kinect_rgb"]),
 
         Node(
             package='rtabmap_odom', executable='rgbd_odometry', output='screen',

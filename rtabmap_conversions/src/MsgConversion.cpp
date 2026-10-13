@@ -2576,6 +2576,27 @@ rtabmap::Transform getTransform(
 		tf2_ros::Buffer & tfBuffer,
 		double waitForTransform)
 {
+	// A transform older than the newest one minus the buffer's length can never become
+	// available (tf2 rejects data that old): don't wait for it, tf2 would wait the whole
+	// time anyway. A chain of static transforms only is at time 0: available at any stamp.
+	if(waitForTransform > 0.0)
+	{
+		try
+		{
+			const geometry_msgs::msg::TransformStamped newest = tfBuffer.lookupTransform(fromFrameId, toFrameId, tf2::TimePointZero);
+			const tf2::TimePoint newestStamp = tf2_ros::fromMsg(newest.header.stamp);
+			if(newestStamp != tf2::TimePointZero &&
+			   tf2_ros::fromMsg(stamp) < newestStamp - tfBuffer.getCacheLength())
+			{
+				waitForTransform = 0.0;
+			}
+		}
+		catch(tf2::TransformException &)
+		{
+			// Not connected yet: wait for it as asked
+		}
+	}
+
 	// TF ready?
 	rtabmap::Transform transform;
 	try

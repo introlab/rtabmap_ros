@@ -723,7 +723,10 @@ void OdometryROS::processData()
 	std::vector<std::pair<double, IMU> > imus;
 	{
 		UScopeMutex m(imuMutex_);
-	
+		// IMU messages received before the TF of their mounting were left pending, until the
+		// next one: the transform may have arrived since, even if no other IMU message did.
+		flushImuPending();
+
 		if((waitIMUToinit_ && !imuProcessed_) && odometry_->framesProcessed() == 0 && odometry_->getPose().isIdentity() && imus_.empty())
 		{
 			RCLCPP_WARN(this->get_logger(), "odometry: waiting imu (%s) to initialize orientation (wait_imu_to_init=true)", imuSub_->get_topic_name());

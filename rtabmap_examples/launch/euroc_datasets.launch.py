@@ -67,6 +67,10 @@ def generate_launch_description():
             'gt', default_value='false',
             description='If the VH rosbag sequence is used, you can enable ground truth.'),
 
+        DeclareLaunchArgument(
+            'rtabmap_viz', default_value='true',
+            description='Launch RTAB-Map UI (optional).'),
+
         SetParameter(name='use_sim_time', value=True),
         # 'use_sim_time' will be set on all nodes following the line above
 
@@ -99,6 +103,7 @@ def generate_launch_description():
             arguments=['-d']),
 
         Node(
+            condition=IfCondition(LaunchConfiguration('rtabmap_viz')),
             package='rtabmap_viz', executable='rtabmap_viz', output='screen',
             parameters=[parameters,
                         {'odometry_node_name': "stereo_odometry"}],
@@ -121,15 +126,20 @@ def generate_launch_description():
               ('camera_info', 'right/camera_info')],
             namespace='stereo_camera'),
             
+        # Its camera_info is the one beside the image topic since Jazzy (image_transport's
+        # camera subscriber), relative to the node's namespace before: both are remapped to
+        # the one yaml_to_camera_info.py publishes.
         Node(
             package='image_proc', executable='rectify_node', output='screen',
             remappings=[
-              ('image', '/cam0/image_raw')],
+              ('image', '/cam0/image_raw'),
+              ('/cam0/camera_info', '/stereo_camera/left/camera_info')],
             namespace='stereo_camera/left'),
         Node(
             package='image_proc', executable='rectify_node', output='screen',
             remappings=[
-              ('image', '/cam1/image_raw')],
+              ('image', '/cam1/image_raw'),
+              ('/cam1/camera_info', '/stereo_camera/right/camera_info')],
             namespace='stereo_camera/right'),
 
         Node(
@@ -137,22 +147,33 @@ def generate_launch_description():
             parameters=[{'use_mag': False, 'world_frame':'enu', 'publish_tf':False}],
             remappings=[('imu/data_raw', '/imu0')]),
        
-        # create a fake tf tree
+        # create a fake tf tree (static_transform_publisher's named arguments: Rolling no longer
+        # takes the old positional ones)
         Node(
             package='tf2_ros', executable='static_transform_publisher', output='screen',
-            arguments=['0', '0', '0', '3.1415926', '-1.570796', '0', 'base_link', 'imu4']),
+            arguments=['--x', '0', '--y', '0', '--z', '0',
+                       '--yaw', '3.1415926', '--pitch', '-1.570796', '--roll', '0',
+                       '--frame-id', 'base_link', '--child-frame-id', 'imu4']),
         Node(
             package='tf2_ros', executable='static_transform_publisher', output='screen',
-            arguments=['-0.021640', '-0.064677', '0.009811', '1.555925', '0.025777', '0.003757', 'imu4', 'cam0']),
+            arguments=['--x', '-0.021640', '--y', '-0.064677', '--z', '0.009811',
+                       '--yaw', '1.555925', '--pitch', '0.025777', '--roll', '0.003757',
+                       '--frame-id', 'imu4', '--child-frame-id', 'cam0']),
         Node(
             package='tf2_ros', executable='static_transform_publisher', output='screen',
-            arguments=['-0.019844', '0.045369', '0.007862', '1.558237', '0.025393', '0.017907', 'imu4', 'cam1']),
+            arguments=['--x', '-0.019844', '--y', '0.045369', '--z', '0.007862',
+                       '--yaw', '1.558237', '--pitch', '0.025393', '--roll', '0.017907',
+                       '--frame-id', 'imu4', '--child-frame-id', 'cam1']),
         Node(
             package='tf2_ros', executable='static_transform_publisher', output='screen',
-            arguments=['0.12395', '-0.02781', '-0.06901', '0', '0', '0', 'vicon/firefly_sbx/firefly_sbx', 'base_link_gt']),
+            arguments=['--x', '0.12395', '--y', '-0.02781', '--z', '-0.06901',
+                       '--yaw', '0', '--pitch', '0', '--roll', '0',
+                       '--frame-id', 'vicon/firefly_sbx/firefly_sbx', '--child-frame-id', 'base_link_gt']),
         Node(
             package='tf2_ros', executable='static_transform_publisher', output='screen',
-            arguments=['0', '0', '0', '0', '0', '0', 'world', 'map']),
+            arguments=['--x', '0', '--y', '0', '--z', '0',
+                       '--yaw', '0', '--pitch', '0', '--roll', '0',
+                       '--frame-id', 'world', '--child-frame-id', 'map']),
         
         Node(
             package='rtabmap_util', executable='transform_to_tf.py', output='screen',
