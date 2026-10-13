@@ -2205,7 +2205,12 @@ void CoreWrapper::process(
 					Transform gt;
 					if(!groundTruthFrameId_.empty() && !groundTruthBaseFrameId_.empty())
 					{
-						gt = rtabmap_conversions::getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, iter->first.header.stamp, *tfBuffer_, waitForTransform_);
+						// Without waiting: processed only when the next node with data
+						// arrives, an intermediate node's stamp is in the past, so its
+						// ground truth is either in the TF buffer already or will not be.
+						// Waiting for each of them would delay rtabmap (and then even more
+						// of them would be too old for the buffer).
+						gt = rtabmap_conversions::getTransform(groundTruthFrameId_, groundTruthBaseFrameId_, iter->first.header.stamp, *tfBuffer_, 0.0);
 					}
 					interData.setGroundTruth(gt);
 

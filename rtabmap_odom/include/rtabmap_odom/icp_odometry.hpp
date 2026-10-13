@@ -49,8 +49,8 @@ namespace rtabmap_odom
  *
  * Takes a sensor_msgs::msg::LaserScan or a sensor_msgs::msg::PointCloud2 and registers
  * each scan against the previous ones with ICP. A cloud whose points carry their own
- * timestamps is deskewed first, using TF or the last known velocity, since a scan taken
- * while the robot moves is not one rigid observation.
+ * timestamps is deskewed first, using TF, the IMU or the last known velocity, since a
+ * scan taken while the robot moves is not one rigid observation.
  *
  * @see doc/icp_odometry.md for the topics, the parameters and the shapes it can and
  *      cannot constrain.
@@ -78,6 +78,7 @@ private:
 	rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub_;
 	rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr cloud_sub_;
 	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr filtered_scan_pub_;
+	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr deskewed_scan_pub_;
 	int scanCloudMaxPoints_;
 	bool scanCloudIs2d_;
 	int scanDownsamplingStep_;
@@ -89,6 +90,7 @@ private:
 	double scanNormalGroundUp_;
 	bool deskewing_;
 	bool deskewingSlerp_;
+	bool deskewingImu_;
 	int topicQueueSize_;
 	//std::vector<std::shared_ptr<rtabmap_ros::PluginInterface> > plugins_;
 	//pluginlib::ClassLoader<rtabmap_ros::PluginInterface> plugin_loader_;

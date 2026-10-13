@@ -57,6 +57,11 @@ def generate_launch_description():
         get_package_share_directory('rtabmap_demos'), 'config', 'demo_lidar3d_gui.ini')
 
     camera = LaunchConfiguration('camera')
+    # The IMU filtered into /imu/data_filtered: the drone's, or the Ouster's own, which
+    # turns with the mast (its mounting is looked up in TF at every message's stamp).
+    imu_raw_topic = PythonExpression(
+        ["'/os_cloud_node/imu/data_raw' if '", LaunchConfiguration('imu'), "'.lower() == 'ouster' else '/imu/data_raw'"])
+
     rgbd_image_topic = PythonExpression(
         ["'/camera/rgbd_image' if '", camera, "'.lower() == 'true' else ''"])
 
@@ -79,6 +84,12 @@ def generate_launch_description():
                               description='Voxel size (m) of the assembled clouds added to the map; 0 keeps every point (larger database, e.g., for camera-lidar calibration).'),
         DeclareLaunchArgument('assembling_time', default_value='4.3',
                               description='How long (s) scans are assembled before being added to the map. The mast turns at 42 deg/s: 4.3 s is half a turn, in which the lidar\'s scanning plane sweeps the whole sphere.'),
+        DeclareLaunchArgument('frame_id', default_value='base_link',
+                              description='Base frame of odometry and of the map: "base_link" (the drone), or "os_sensor" (the lidar, turning with the mast; with imu:=ouster, the IMU is then rigid with it, and the mast\'s TF is not needed to deskew). With "os_sensor", set camera:=false: rtabmap cannot place the camera images in a frame turning with the mast.'),
+        DeclareLaunchArgument('imu', default_value='drone', choices=['drone', 'ouster'],
+                              description='IMU used for deskewing and odometry: "drone" (/imu/data_raw, 75 Hz, on the drone frame) or "ouster" (/os_cloud_node/imu/data_raw, 100 Hz, inside the lidar, so turning with the mast). Neither gives an orientation that is used: it is filtered from their gyro and accelerometer.'),
+        DeclareLaunchArgument('deskewing_imu', default_value='false',
+                              description='Deskew the sweeps in icp_odometry, with the base motion predicted from the IMU since the last odometry pose (orientation and acceleration), instead of with lidar_deskewing against a frame stabilized with the IMU orientation only. The mast motion comes from TF either way.'),
         DeclareLaunchArgument('intermediate_nodes', default_value='false',
                               description='Also save every odometry pose (10 Hz) between the map\'s nodes in the database.'),
 
@@ -86,7 +97,7 @@ def generate_launch_description():
             PythonLaunchDescriptionSource(lidar3d_assemble_launch),
             launch_arguments={
                 'use_sim_time': 'true',
-                'frame_id': 'base_link',
+                'frame_id': LaunchConfiguration('frame_id'),
                 'lidar_topic': '/os_cloud_node/points',
                 # The fixed frame for deskewing (base_link_stabilized) is made from its
                 # orientation.
@@ -110,6 +121,11 @@ def generate_launch_description():
                 # interpolating between the first and last points of the sweep: exact,
                 # for more TF lookups.
                 'deskewing_slerp': 'false',
+                'deskewing_imu': LaunchConfiguration('deskewing_imu'),
+                # The drone's accelerometer reads ~9.55 m/s^2 at rest: estimated while the
+                # drone is still at start. The Ouster IMU turns with the mast, so it is never
+                # still: standard gravity is kept with imu:=ouster.
+                'deskewing_imu_gravity': '0',
                 'rtabmap_viz': LaunchConfiguration('rtabmap_viz'),
                 'rtabmap_viz_cfg': LaunchConfiguration('rtabmap_viz_cfg'),
                 'localization': LaunchConfiguration('localization'),
@@ -129,9 +145,10 @@ def generate_launch_description():
                         ('rgb/camera_info', '/camera/camera_info'),
                         ('rgbd_image', '/camera/rgbd_image')]),
 
-        # Orientation from the gyro and accelerometer of /imu/data_raw. Its own
-        # orientation (despite the name, it has one) is off from the accelerometer by a
-        # constant ~2 deg in roll and ~4 deg in pitch, so it is not used.
+        # Orientation from the gyro and accelerometer of the IMU chosen with "imu". The
+        # drone's own orientation (despite the topic's name, it has one) is off from the
+        # accelerometer by a constant ~2 deg in roll and ~4 deg in pitch, so it is not used;
+        # the Ouster's has none.
         Node(
             package='imu_complementary_filter', executable='complementary_filter_node', output='screen',
             parameters=[{
@@ -140,7 +157,7 @@ def generate_launch_description():
                 'publish_tf': False,
                 'do_bias_estimation': True,
                 'do_adaptive_gain': True}],
-            remappings=[('imu/data_raw', '/imu/data_raw'),
+            remappings=[('imu/data_raw', imu_raw_topic),
                         ('imu/data', '/imu/data_filtered')]),
 
         Node(

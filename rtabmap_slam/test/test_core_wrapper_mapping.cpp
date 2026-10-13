@@ -95,7 +95,7 @@ TEST_F(CoreWrapperMappingTest, adds_a_node_per_odometry_update)
 
 /**
  * With a ground truth frame, each node gets the ground truth's pose at its stamp, and
- * rtabmap reports its error against it (Gt/* statistics): ground_truth_frame_id ->
+ * rtabmap reports its error against it (the Gt/ statistics): ground_truth_frame_id ->
  * ground_truth_base_frame_id, which defaults to frame_id + "_gt". Here only base_link_gt
  * is in TF, following the odometry exactly. Empty, ground_truth_base_frame_id turns the
  * ground truth off.

@@ -172,7 +172,7 @@ After an automatic reset the countdown is left armed, so if odometry still canno
 | `wait_imu_to_init` | `bool` | `false` | Hold off until an IMU message has arrived, so gravity is known from the first frame. |
 | `imu_queue_size` | `int` | `200` | Depth of the IMU buffer. IMUs run far faster than cameras; this is why it is large. |
 | `qos_imu` | `int` | value of `qos` | Reliability of the `imu` subscription. |
-| `always_check_imu_tf` | `bool` | `false` | Re-read the IMU-to-robot transform every message rather than caching it. |
+| `always_check_imu_tf` | `bool` | `true` | Look the IMU-to-robot transform up at every message's stamp rather than once, for an IMU on a moving mount. A message then waits until TF covers its stamp (dropped if it still doesn't 0.5 s later), rather than using an older transform. Set it to `false` for an IMU fixed on the robot: the transform is then read once and adds no delay. |
 
 The `imu` topic is optional on all three nodes. Supplying it lets odometry know which way is down, which constrains roll and pitch — worth doing on any robot that has an IMU, and close to mandatory for a handheld or aerial one.
 
@@ -188,6 +188,7 @@ Registration runs on its own thread, so a slow frame does not block the subscrip
 | `expected_update_rate` | `double` | `0.0` | The rate frames are expected at, in Hz. Used only when `max_update_rate` is unset, and it is a **ceiling**: a frame arriving sooner than `1/expected_update_rate` after the last one is skipped, with a warning that the input is faster than expected. `0` disables. |
 | `max_update_rate` | `double` | `0.0` | Throttle registration to at most this rate, skipping frames silently. Takes precedence over `expected_update_rate`. `0` disables. |
 | `min_update_rate` | `double` | `0.0` | Treat odometry as **lost and reset it** when more than `1/min_update_rate` passes between updates — the motion assumption no longer holds across a gap that long. `0` disables. |
+| `output_queue_size` | `int` | `1` | History depth of the `odom`, `odom_info` and `odom_info_lite` publishers. Even with a reliable `qos`, a message a subscriber has not acknowledged yet is lost when the next one replaces it: raise it when every pose must arrive, e.g., when `rtabmap` saves them all as intermediate nodes (`Rtabmap/CreateIntermediateNodes`) and may be busy. |
 
 **`always_process_most_recent_frame` already bounds the delay.** A frame arriving while registration is still running is dropped on the spot rather than queued, so the worker always picks up the newest frame and the published pose is at most one registration behind the sensor. No backlog ever forms. `/diagnostics` reports how many frames went this way.
 

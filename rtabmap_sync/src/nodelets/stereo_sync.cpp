@@ -38,6 +38,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <opencv2/highgui/highgui.hpp>
 
 #include "rtabmap/core/Compression.h"
+#include "rtabmap/core/util2d.h"
 #include "rtabmap/utilite/UConversion.h"
 #include "rtabmap_conversions/MsgConversion.h"
 
@@ -80,6 +81,7 @@ StereoSync::StereoSync(const rclcpp::NodeOptions & options) :
 		imageCompressionFormat_ = ".jpg";
 	}
 	std::string imageTransport = this->declare_parameter("image_transport", std::string("raw"));
+	stereoExposureCompensation_ = this->declare_parameter("stereo_exposure_compensation", stereoExposureCompensation_);
 
 	RCLCPP_INFO(this->get_logger(), "%s: approx_sync = %s", get_name(), approxSync?"true":"false");
 	RCLCPP_INFO(this->get_logger(), "%s: approx_sync_max_interval = %f", get_name(), approxSyncMaxInterval_);
@@ -90,6 +92,7 @@ StereoSync::StereoSync(const rclcpp::NodeOptions & options) :
 	RCLCPP_INFO(this->get_logger(), "%s: qos_camera_info = %d", get_name(), qosCamInfo);
 	RCLCPP_INFO(this->get_logger(), "%s: compressed_rate = %f", get_name(), compressedRate_);
 	RCLCPP_INFO(this->get_logger(), "%s: image_transport = %s", get_name(), imageTransport.c_str());
+	RCLCPP_INFO(this->get_logger(), "%s: stereo_exposure_compensation = %s", get_name(), stereoExposureCompensation_?"true":"false");
 
 	rgbdImagePub_ = create_publisher<rtabmap_msgs::msg::RGBDImage>("rgbd_image", rclcpp::QoS(outputQueueSize).reliability((rmw_qos_reliability_policy_t)qos));
 	rgbdImageCompressedPub_ = create_publisher<rtabmap_msgs::msg::RGBDImage>("rgbd_image/compressed", rclcpp::QoS(outputQueueSize).reliability((rmw_qos_reliability_policy_t)qos));
@@ -176,6 +179,30 @@ void StereoSync::callback(
 					rightStamp);
 		}
 
+		// The images published: the input ones, or with their exposure equalized
+		sensor_msgs::msg::Image::ConstSharedPtr left = imageLeft;
+		sensor_msgs::msg::Image::ConstSharedPtr right = imageRight;
+		if(stereoExposureCompensation_)
+		{
+			cv_bridge::CvImageConstPtr leftPtr;
+			cv_bridge::CvImageConstPtr rightPtr;
+			try {
+				leftPtr = cv_bridge::toCvShare(imageLeft);
+				rightPtr = cv_bridge::toCvShare(imageRight);
+			}
+			catch(cv_bridge::Exception & e) {
+				RCLCPP_ERROR(this->get_logger(), "stereo_exposure_compensation: cannot convert the images (%s)", e.what());
+			}
+			cv::Mat leftCompensated;
+			cv::Mat rightCompensated;
+			if(leftPtr.get() && rightPtr.get() &&
+			   rtabmap::util2d::stereoExposureCompensation(leftPtr->image, rightPtr->image, leftCompensated, rightCompensated))
+			{
+				left = cv_bridge::CvImage(imageLeft->header, imageLeft->encoding, leftCompensated).toImageMsg();
+				right = cv_bridge::CvImage(imageRight->header, imageRight->encoding, rightCompensated).toImageMsg();
+			}
+		}
+
 		rtabmap_msgs::msg::RGBDImage::UniquePtr msg(new rtabmap_msgs::msg::RGBDImage);
 		msg->header.frame_id = cameraInfoLeft->header.frame_id;
 		msg->header.stamp = leftStamp>rightStamp?imageLeft->header.stamp:imageRight->header.stamp;
@@ -202,7 +229,7 @@ void StereoSync::callback(
 
 				cv_bridge::CvImageConstPtr imagePtr;
 				try {
-					imagePtr = cv_bridge::toCvShare(imageLeft);
+					imagePtr = cv_bridge::toCvShare(left);
 				}
 				catch(cv::Exception& e) {
 					UFATAL("Fatal error while converting left image (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
@@ -211,7 +238,7 @@ void StereoSync::callback(
 
 				cv_bridge::CvImageConstPtr imageDepthPtr;
 				try {
-					imageDepthPtr = cv_bridge::toCvShare(imageRight);
+					imageDepthPtr = cv_bridge::toCvShare(right);
 				}
 				catch(cv::Exception& e) {
 					UFATAL("Fatal error while converting right image (do you have multiple opencv versions? if so, make sure cv_bridge is loading the right opencv libraries on runtime): %s", e.what());
@@ -224,8 +251,8 @@ void StereoSync::callback(
 
 		if(rgbdImagePub_->get_subscription_count())
 		{
-			msg->rgb = *imageLeft;
-			msg->depth = *imageRight;
+			msg->rgb = *left;
+			msg->depth = *right;
 			rgbdImagePub_->publish(std::move(msg));
 		}
 

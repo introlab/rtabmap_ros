@@ -107,6 +107,26 @@ TEST_F(StereoSyncTest, PacksTheStereoPairIntoTheRgbAndDepthSlots)
 	EXPECT_EQ(got.depth.data[0], 90) << "depth must be the right image";
 }
 
+TEST_F(StereoSyncTest, EqualizesTheExposureOfTheTwoImagesWhenAsked)
+{
+	// The left camera exposes darker (60) than the right one (90): with
+	// stereo_exposure_compensation, both are brought closer, and still go in their slots.
+	start({rclcpp::Parameter("stereo_exposure_compensation", true)});
+
+	publish(1000.0);
+	ASSERT_TRUE(spinUntil([&]() { return !out_->empty(); }));
+
+	const rtabmap_msgs::msg::RGBDImage & got = out_->back();
+	ASSERT_FALSE(got.rgb.data.empty());
+	ASSERT_FALSE(got.depth.data.empty());
+	EXPECT_EQ(got.rgb.encoding, "mono8");
+	EXPECT_EQ(got.depth.encoding, "mono8");
+	EXPECT_GT(got.rgb.data[0], 60) << "the darker left image is brightened";
+	EXPECT_LT(got.depth.data[0], 90) << "the brighter right image is darkened";
+	EXPECT_LT(std::abs(int(got.depth.data[0]) - int(got.rgb.data[0])), 30);
+	EXPECT_EQ(got.rgb.header.stamp, got.header.stamp);
+}
+
 TEST_F(StereoSyncTest, CarriesTheBaselineInTheSecondCameraInfo)
 {
 	start();

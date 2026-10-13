@@ -37,14 +37,19 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
 
   external_odom_frame_id =  LaunchConfiguration('external_odom_frame_id').perform(context)
 
+  deskewing_imu = LaunchConfiguration('deskewing_imu').perform(context).lower() == 'true'
+
   fixed_frame_from_imu = False
   fixed_frame_id =  LaunchConfiguration('fixed_frame_id').perform(context)
   if not fixed_frame_id:
     if external_odom_frame_id:
       fixed_frame_id = external_odom_frame_id
-    else:
+    elif not deskewing_imu:
       fixed_frame_from_imu = True
       fixed_frame_id = frame_id.perform(context) + "_stabilized"
+  # icp_odometry deskews the scans itself, with the IMU and its last pose, rather than
+  # lidar_deskewing with TF of a fixed frame.
+  deskewing_in_odometry = deskewing_imu and not fixed_frame_id and not external_odom_frame_id
   
   imu_topic = LaunchConfiguration('imu_topic')
   
@@ -101,6 +106,9 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
     'wait_imu_to_init': True,
     'odom_frame_id': 'icp_odom',
     'guess_frame_id': fixed_frame_id,
+    'deskewing': deskewing_in_odometry,
+    'deskewing_imu': deskewing_in_odometry,
+    'deskewing_slerp': deskewing_slerp,
     'scan_range_min': lidar_range_min,
     # RTAB-Map's internal parameters are strings:
     'Odom/ScanKeyFrameThr': LaunchConfiguration('odom_key_frame_threshold').perform(context),
@@ -109,6 +117,15 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
     'OdomF2M/BundleAdjustment': 'false',
     'Icp/CorrespondenceRatio': '0.01'
   }
+
+  if deskewing_in_odometry:
+    # The velocity the IMU prediction starts from (for deskewing and the guess) is
+    # estimated over this delay: over a single frame, the noise of the poses would be of
+    # the order of the velocity itself. A delay > 0 also enables the IMU acceleration,
+    # which carries that velocity to the last frame, so it is not delayed.
+    icp_odometry_parameters['Odom/GuessSmoothingDelay'] = '0.5'
+    # Removed from the IMU linear acceleration; 0 estimates it while the IMU is still.
+    icp_odometry_parameters['Odom/ImuGravity'] = LaunchConfiguration('deskewing_imu_gravity').perform(context)
 
   rtabmap_parameters = {
     'subscribe_depth': False,
@@ -156,8 +173,10 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
     
   intermediate_nodes = LaunchConfiguration('intermediate_nodes').perform(context).lower() == 'true'
   if intermediate_nodes and not external_odom_frame_id:
-    # Every odometry pose between the nodes is saved as a node without data.
+    # Every odometry pose between the nodes is saved as a node without data, with its
+    # odometry statistics (e.g., the ICP correction of the guess).
     rtabmap_parameters['Rtabmap/CreateIntermediateNodes'] = 'true'
+    rtabmap_parameters['subscribe_inter_odom_info'] = True
 
   arguments = []
   if localization:
@@ -171,20 +190,14 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
   else:
     viz_topic = 'odom_filtered_input_scan'
   
+  if deskewing_in_odometry:
+    # Deskewed by icp_odometry, which republishes the full cloud for the assembler
+    odom_input_topic = lidar_topic
+    lidar_topic_deskewed = 'odom_deskewed_input_scan'
+  else:
+    odom_input_topic = lidar_topic_deskewed
+
   nodes = [
-    # Lidar deskewing
-    Node(
-      package='rtabmap_util', executable='lidar_deskewing', output='screen',
-      parameters=[{
-        'use_sim_time': use_sim_time,
-        'fixed_frame_id': fixed_frame_id,
-        'wait_for_transform': 0.2,
-        'slerp': deskewing_slerp,
-        'qos': LaunchConfiguration('qos')}],
-      remappings=[
-          ('input_cloud', lidar_topic)
-      ]),
-    
     # Assemble deskewed scans based on icp odometry
     Node(
       package='rtabmap_util', executable='point_cloud_assembler', output='screen',
@@ -208,7 +221,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
                    'topic_queue_size': 40,
                    'sync_queue_size': 40,}],
       remappings=remappings + [('scan_cloud', 'assembled_cloud'), ('gps/fix', LaunchConfiguration('gps_topic')),
-                               ('inter_odom', 'icp_odom')],
+                               ('inter_odom', 'icp_odom'), ('inter_odom_info', 'odom_info')],
       arguments=arguments), 
 
     # Just for visualization
@@ -227,8 +240,23 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
       Node(
         package='rtabmap_odom', executable='icp_odometry', output='screen',
         parameters=[shared_parameters, icp_odometry_parameters],
-        remappings=remappings + [('scan_cloud', lidar_topic_deskewed)]))
+        remappings=remappings + [('scan_cloud', odom_input_topic)]))
   
+  if not deskewing_in_odometry:
+    # Lidar deskewing
+    nodes.append(
+      Node(
+        package='rtabmap_util', executable='lidar_deskewing', output='screen',
+        parameters=[{
+          'use_sim_time': use_sim_time,
+          'fixed_frame_id': fixed_frame_id,
+          'wait_for_transform': 0.2,
+          'slerp': deskewing_slerp,
+          'qos': LaunchConfiguration('qos')}],
+        remappings=[
+            ('input_cloud', lidar_topic)
+        ]))
+
   if fixed_frame_from_imu:
     # Create a stabilized base frame based on imu for lidar deskewing
     nodes.append(
@@ -238,7 +266,6 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
           'use_sim_time': use_sim_time,
           'fixed_frame_id': fixed_frame_id,
           'base_frame_id': frame_id,
-          'wait_for_transform_duration': 0.001,
           'qos': LaunchConfiguration('qos')}],
         remappings=[('imu/data', imu_topic)]))
   
@@ -345,12 +372,20 @@ def generate_launch_description():
       description='How much time (sec) we assemble lidar scans before sending them to mapping node.'),
 
     DeclareLaunchArgument(
+      'deskewing_imu', default_value='false',
+      description='Deskew the scans in icp_odometry, with the motion predicted from the IMU (orientation and acceleration) since its last pose, instead of with lidar_deskewing and a fixed frame made from the IMU orientation only. Ignored if fixed_frame_id or external_odom_frame_id is set.'),
+
+    DeclareLaunchArgument(
+      'deskewing_imu_gravity', default_value='9.80665',
+      description='With deskewing_imu, gravity (m/s^2) removed from the IMU linear acceleration (Odom/ImuGravity): standard gravity by default, or what the accelerometer reads at rest. 0: estimated while the IMU is still, with standard gravity until then (the robot should then be perfectly still for a moment, e.g., at start).'),
+    
+    DeclareLaunchArgument(
       'deskewing_slerp', default_value='true',
       description='Use fast slerp interpolation between first and last stamps of the scan for deskewing. It would less accruate than requesting TF for every points, but a lot faster. Enable this if the delay of the deskewed scan is significant larger than the original scan.'),
 
     DeclareLaunchArgument(
       'intermediate_nodes', default_value='false',
-      description='Also save every odometry pose between the map\'s nodes in the database, as nodes without data (Rtabmap/CreateIntermediateNodes). Only with icp_odometry (external_odom_frame_id empty).'),
+      description='Also save every odometry pose between the map\'s nodes in the database, as nodes without data (Rtabmap/CreateIntermediateNodes), with their odometry statistics. Only with icp_odometry (external_odom_frame_id empty).'),
 
     DeclareLaunchArgument(
       'qos', default_value='1',

@@ -261,7 +261,7 @@ protected:
 	 * registered for node name: 'rtabmap_slam_test_helper'".
 	 */
 	template <typename MsgT>
-	std::shared_ptr<Collector<MsgT>> collect(
+	[[nodiscard]] std::shared_ptr<Collector<MsgT>> collect(
 			const std::string & topic, const rclcpp::QoS & qos = rclcpp::QoS(10))
 	{
 		std::shared_ptr<Collector<MsgT>> collector = std::make_shared<Collector<MsgT>>();

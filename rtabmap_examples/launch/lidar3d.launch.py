@@ -167,8 +167,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
         parameters=[{
           'use_sim_time': use_sim_time,
           'fixed_frame_id': fixed_frame_id,
-          'base_frame_id': frame_id,
-          'wait_for_transform_duration': 0.001}],
+          'base_frame_id': frame_id}],
         remappings=[('imu/data', imu_topic)]))
 
   if fixed_frame_id and deskewing:

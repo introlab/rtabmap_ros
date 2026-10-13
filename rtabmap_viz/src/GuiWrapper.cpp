@@ -183,7 +183,7 @@ GuiWrapper::GuiWrapper(const rclcpp::NodeOptions & options) :
 
 GuiWrapper::~GuiWrapper()
 {
-	UDEBUG("");
+	UDEBUG("Destroying");
 
 	delete infoMapSync_;
 	delete mainWindow_;

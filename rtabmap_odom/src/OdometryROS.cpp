@@ -56,6 +56,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtabmap/utilite/UFile.h"
 #include "rtabmap/utilite/UMath.h"
 
+#include <algorithm>
+
 #define BAD_COVARIANCE 9999
 
 using namespace rtabmap;
@@ -123,6 +125,7 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	publishCompressedSensorData_(false),
 	qos_(RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT),
 	bufferedDataToProcess_(false),
+	imuUntilStampToProcess_(0.0),
 	paused_(false),
 	resetCountdown_(0),
 	resetCurrentCount_(0),
@@ -148,16 +151,21 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	droppedMsgs_(0),
 	configPath_(),
 	initialPose_(Transform::getIdentity()),
+	imuMotionPredictionEnabled_(false),
 	ulogToRosout_(this)
 {
 	dataCallbackGroup_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
 	int qos = this->declare_parameter("qos", (int)qos_);
 	qos_ = (rmw_qos_reliability_policy_t)qos;
+	// History of the odometry and its info: with a reliable QoS, a message not acknowledged
+	// yet by a subscriber is lost when the next one replaces it, which a loaded subscriber
+	// (e.g., rtabmap saving every pose as an intermediate node) can miss.
+	const int outputQueueSize = this->declare_parameter("output_queue_size", 1);
 
-	odomPub_ = create_publisher<nav_msgs::msg::Odometry>("odom", rclcpp::QoS(1).reliability(qos_));
-	odomInfoPub_ = create_publisher<rtabmap_msgs::msg::OdomInfo>("odom_info", rclcpp::QoS(1).reliability(qos_));
-	odomInfoLitePub_ = create_publisher<rtabmap_msgs::msg::OdomInfo>("odom_info_lite", rclcpp::QoS(1).reliability(qos_));
+	odomPub_ = create_publisher<nav_msgs::msg::Odometry>("odom", rclcpp::QoS(outputQueueSize).reliability(qos_));
+	odomInfoPub_ = create_publisher<rtabmap_msgs::msg::OdomInfo>("odom_info", rclcpp::QoS(outputQueueSize).reliability(qos_));
+	odomInfoLitePub_ = create_publisher<rtabmap_msgs::msg::OdomInfo>("odom_info_lite", rclcpp::QoS(outputQueueSize).reliability(qos_));
 	odomLocalMap_ = create_publisher<sensor_msgs::msg::PointCloud2>("odom_local_map", rclcpp::QoS(1).reliability(qos_));
 	odomLocalScanMap_ = create_publisher<sensor_msgs::msg::PointCloud2>("odom_local_scan_map", rclcpp::QoS(1).reliability(qos_));
 	odomLastFrame_ = create_publisher<sensor_msgs::msg::PointCloud2>("odom_last_frame", rclcpp::QoS(1).reliability(qos_));
@@ -278,6 +286,7 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	RCLCPP_INFO(this->get_logger(), "Odometry: expected_update_rate   = %f Hz", expectedUpdateRate_);
 	RCLCPP_INFO(this->get_logger(), "Odometry: max_update_rate        = %f Hz", maxUpdateRate_);
 	RCLCPP_INFO(this->get_logger(), "Odometry: min_update_rate        = %f Hz", minUpdateRate_);
+	RCLCPP_INFO(this->get_logger(), "Odometry: output_queue_size      = %d", outputQueueSize);
 	RCLCPP_INFO(this->get_logger(), "Odometry: wait_imu_to_init       = %s", waitIMUToinit_?"true":"false");
 	RCLCPP_INFO(this->get_logger(), "Odometry: always_check_imu_tf    = %s", alwaysCheckImuTf_?"true":"false");
 	RCLCPP_INFO(this->get_logger(), "Odometry: sensor_data_compression_format = %s", compressionImgFormat_.c_str());
@@ -493,39 +502,144 @@ rtabmap::Transform OdometryROS::velocityGuess() const
 	return rtabmap::Transform();
 }
 
+bool OdometryROS::enableImuMotionPrediction()
+{
+	if(!imuSub_)
+	{
+		return false;
+	}
+	if(imuMotionPredictionEnabled_)
+	{
+		// Its settings are fixed for its life
+		RCLCPP_ERROR(this->get_logger(), "IMU motion prediction is already enabled.");
+		return true;
+	}
+	// Same velocity window and gravity as RTAB-Map's own odometry uses with an IMU (the
+	// acceleration is used only with a velocity window)
+	float smoothingDelay = Parameters::defaultOdomGuessSmoothingDelay();
+	Parameters::parse(parameters_, Parameters::kOdomGuessSmoothingDelay(), smoothingDelay);
+	float imuGravity = Parameters::defaultOdomImuGravity();
+	Parameters::parse(parameters_, Parameters::kOdomImuGravity(), imuGravity);
+	if(smoothingDelay < 0.2)
+	{
+		RCLCPP_WARN(this->get_logger(), "IMU motion prediction: \"%s\" is %f s, the IMU acceleration is "
+				"then not used, or the velocity estimated over (almost) a single frame, where the noise "
+				"of the poses is of the order of the velocity itself. Consider setting it to about 0.5 s.",
+				Parameters::kOdomGuessSmoothingDelay().c_str(), smoothingDelay);
+	}
+	{
+		UScopeMutex lock(imuMotionPredictorMutex_);
+		imuMotionPredictor_ = rtabmap::ImuMotionPredictor(1.0, smoothingDelay, imuGravity);
+	}
+	imuMotionPredictionEnabled_ = true;
+	return true;
+}
+
+rtabmap::ImuMotionPredictor OdometryROS::imuMotionPredictor()
+{
+	{
+		// With the samples whose mounting is known by now
+		UScopeMutex lock(imuMutex_);
+		flushImuPending();
+	}
+	UScopeMutex lock(imuMotionPredictorMutex_);
+	return imuMotionPredictor_;
+}
+
+void OdometryROS::flushImuPending()
+{
+	// imuMutex_ must be locked by the caller.
+	// Each IMU message is converted with its mounting (frame_id -> imu frame) at its own
+	// stamp. With always_check_imu_tf, the mounting may move (e.g., a lidar's own IMU on a
+	// rotating mast): an IMU message is often received before TF covers its stamp, and it
+	// waits for it, as the last known mounting would be off by the motion since. Otherwise
+	// the mounting is static, looked up once.
+	while(!imusPending_.empty())
+	{
+		const sensor_msgs::msg::Imu::ConstSharedPtr & msg = imusPending_.front();
+		const double stamp = rtabmap_conversions::timestampFromROS(msg->header.stamp);
+		Transform localTransform;
+		if(this->frameId().compare(msg->header.frame_id) == 0)
+		{
+			localTransform = Transform::getIdentity();
+		}
+		else if(!alwaysCheckImuTf_ && !imuLocalTransform_.isNull())
+		{
+			localTransform = imuLocalTransform_;
+		}
+		else if(tfBuffer_->canTransform(this->frameId(), msg->header.frame_id, msg->header.stamp))
+		{
+			localTransform = rtabmap_conversions::getTransform(this->frameId(), msg->header.frame_id, msg->header.stamp, *tfBuffer_, 0);
+		}
+		if(localTransform.isNull())
+		{
+			// Not yet in TF: wait for it, unless it is too late for it to come
+			if(rtabmap_conversions::timestampFromROS(imusPending_.back()->header.stamp) - stamp < 0.5)
+			{
+				break;
+			}
+			static bool warned = false;
+			if(!warned)
+			{
+				RCLCPP_WARN(this->get_logger(), "TF between \"%s\" and \"%s\" is not available at "
+						"the stamp of IMU messages (%f) 0.5 s later, they are dropped. If the IMU is "
+						"fixed on \"%s\", publish that transform as static, or set always_check_imu_tf "
+						"to false. This warning is shown once.",
+						this->frameId().c_str(), msg->header.frame_id.c_str(), stamp, this->frameId().c_str());
+				warned = true;
+			}
+			imusPending_.pop_front();
+			continue;
+		}
+		imuLocalTransform_ = localTransform;
+
+		const IMU imu(
+				cv::Vec4d(msg->orientation.x, msg->orientation.y, msg->orientation.z, msg->orientation.w),
+				cv::Mat(3,3,CV_64FC1,(void*)msg->orientation_covariance.data()).clone(),
+				cv::Vec3d(msg->angular_velocity.x, msg->angular_velocity.y, msg->angular_velocity.z),
+				cv::Mat(3,3,CV_64FC1,(void*)msg->angular_velocity_covariance.data()).clone(),
+				cv::Vec3d(msg->linear_acceleration.x, msg->linear_acceleration.y, msg->linear_acceleration.z),
+				cv::Mat(3,3,CV_64FC1,(void*)msg->linear_acceleration_covariance.data()).clone(),
+				localTransform);
+
+		// For the odometry
+		imus_.insert(std::make_pair(stamp, imu));
+		if(imus_.size() > 1000)
+		{
+			RCLCPP_WARN(this->get_logger(), "Dropping imu data!");
+			imus_.erase(imus_.begin());
+		}
+
+		// For the motion prediction (deskewing), which removes gravity and ignores what the
+		// message doesn't have (orientation or acceleration, covariance -1 or all zeros)
+		if(imuMotionPredictionEnabled_)
+		{
+			UScopeMutex lock(imuMotionPredictorMutex_);
+			imuMotionPredictor_.addImu(stamp, imu);
+		}
+		imusPending_.pop_front();
+	}
+}
+
 void OdometryROS::callbackIMU(const sensor_msgs::msg::Imu::SharedPtr msg)
 {
 	if(!this->isPaused())
 	{
-		double stamp = rtabmap_conversions::timestampFromROS(msg->header.stamp);
-		//RCLCPP_WARN(get_logger(), "Received imu: %f delay=%f", stamp, (now() - msg->header.stamp).seconds());
-
+		//RCLCPP_WARN(get_logger(), "Received imu: %f delay=%f", rtabmap_conversions::timestampFromROS(msg->header.stamp), (now() - msg->header.stamp).seconds());
+		double newestImuStamp = 0.0;
 		{
 			UScopeMutex m(imuMutex_);
-
-			if(!imuProcessed_ && imus_.empty())
+			imusPending_.push_back(msg);
+			flushImuPending();
+			if(!imus_.empty())
 			{
-				rtabmap::Transform localTransform = rtabmap_conversions::getTransform(this->frameId(), msg->header.frame_id, msg->header.stamp, *tfBuffer_, waitForTransform_);
-				if(localTransform.isNull())
-				{
-					RCLCPP_WARN(this->get_logger(), "Dropping imu data! A valid TF between %s and %s is required to initialize IMU.",
-						this->frameId().c_str(), msg->header.frame_id.c_str());
-					return;
-				}
-			}
-
-			imus_.insert(std::make_pair(stamp, msg));
-
-			if(imus_.size() > 1000)
-			{
-				RCLCPP_WARN(this->get_logger(), "Dropping imu data!");
-				imus_.erase(imus_.begin());
+				newestImuStamp = imus_.rbegin()->first;
 			}
 		}
 		UScopeMutex dataLock(dataMutex_, false);
 		if(dataLock.lockTry() == 0)
 		{
-			if(bufferedDataToProcess_ && rtabmap_conversions::timestampFromROS(dataHeaderToProcess_.stamp) <= stamp)
+			if(bufferedDataToProcess_ && newestImuStamp > 0.0 && imuUntilStampToProcess_ <= newestImuStamp)
 			{
 				bufferedDataToProcess_ = false;
 				dataReady_.release();
@@ -606,17 +720,33 @@ void OdometryROS::processData()
 	SensorData & data = dataToProcess_;
 	std_msgs::msg::Header & header = dataHeaderToProcess_;
 
-	std::vector<std::pair<double, sensor_msgs::msg::Imu::ConstSharedPtr> > imus;
+	std::vector<std::pair<double, IMU> > imus;
 	{
 		UScopeMutex m(imuMutex_);
-	
+		// IMU messages received before the TF of their mounting were left pending, until the
+		// next one: the transform may have arrived since, even if no other IMU message did.
+		flushImuPending();
+
 		if((waitIMUToinit_ && !imuProcessed_) && odometry_->framesProcessed() == 0 && odometry_->getPose().isIdentity() && imus_.empty())
 		{
 			RCLCPP_WARN(this->get_logger(), "odometry: waiting imu (%s) to initialize orientation (wait_imu_to_init=true)", imuSub_->get_topic_name());
 			return;
 		}
 
-		if(waitIMUToinit_ && (imus_.empty() || imus_.rbegin()->first < rtabmap_conversions::timestampFromROS(header.stamp)))
+		// The IMU is needed up to the frame's stamp, or for a lidar scan with a time channel up
+		// to the end of its sweep: RTAB-Map's deskewing predicts the pose of every point with
+		// it. Approaches processing the IMU themselves get it as before.
+		double imuUntilStamp = rtabmap_conversions::timestampFromROS(header.stamp);
+		const LaserScan & scan = data.laserScanRaw();
+		if(!odometry_->canProcessAsyncIMU() && !scan.isEmpty() && scan.hasTime())
+		{
+			imuUntilStamp += std::max(0.0f, std::max(
+					scan.data().ptr<float>(0, 0)[scan.getTimeOffset()],
+					scan.data().ptr<float>(0, scan.size()-1)[scan.getTimeOffset()]));
+		}
+		imuUntilStampToProcess_ = imuUntilStamp;
+
+		if(waitIMUToinit_ && (imus_.empty() || imus_.rbegin()->first < imuUntilStamp))
 		{
 			if(imus_.empty()) {
 				// If empty, it is an error!
@@ -626,20 +756,21 @@ void OdometryROS::processData()
 			bufferedDataToProcess_ = true;
 			return;
 		}
-		// process all imu data up to current image stamp (or just after so that underlying odom approach can do interpolation of imu at image stamp)
-		std::map<double, sensor_msgs::msg::Imu::ConstSharedPtr>::iterator iterEnd = imus_.lower_bound(rtabmap_conversions::timestampFromROS(header.stamp));
-		std::map<double, sensor_msgs::msg::Imu::ConstSharedPtr>::iterator iterLast = iterEnd;
+		// process all imu data up to current image stamp (or the end of the sweep, see above), or just after so that underlying odom approach can do interpolation of imu at that stamp
+		std::map<double, IMU>::iterator iterEnd = imus_.lower_bound(imuUntilStamp);
+		std::map<double, IMU>::iterator iterLast = iterEnd;
 		if(iterEnd!= imus_.end())
 		{
 			++iterEnd;
 		}
-		std::map<double, sensor_msgs::msg::Imu::ConstSharedPtr>::iterator iterFirst = imus_.begin();
-		for(std::map<double, sensor_msgs::msg::Imu::ConstSharedPtr>::iterator iter=iterFirst; iter!=iterEnd;)
+		for(std::map<double, IMU>::iterator iter=imus_.begin(); iter!=iterEnd;)
 		{
-			// Because we always keep the last processed imu in the buffer, skip the first 
-			// one when processing again the buffer
-			if(iter!=iterFirst) {
+			// The last processed imu is kept in the buffer, so it is there again at the
+			// next pass: skip what was already processed (and only that: the very first
+			// imu was not, and it can be the only one when the first frame is processed)
+			if(iter->first > lastImuStampProcessed_) {
 				imus.push_back(*iter);
+				lastImuStampProcessed_ = iter->first;
 			}
 			if(iter!=iterLast) {
 				imus_.erase(iter++);
@@ -650,46 +781,10 @@ void OdometryROS::processData()
 		}
 	} // end imu lock
 
-	bool imuWarnShown = false;
+	// Already with their mounting (see flushImuPending())
 	for(size_t i=0; i<imus.size(); ++i)
 	{
-		if((alwaysCheckImuTf_ && !imuWarnShown) || imuLocalTransform_.isNull())
-		{
-			if(this->frameId().compare(imus[i].second->header.frame_id) != 0)
-			{
-				// We should not have to wait for IMU TF (imu delay <<< sensor data delay), so don't
-				rtabmap::Transform localTransform = rtabmap_conversions::getTransform(this->frameId(), imus[i].second->header.frame_id, imus[i].second->header.stamp, *tfBuffer_, 0);
-				if(localTransform.isNull())
-				{
-					if(imuLocalTransform_.isNull()) {
-						RCLCPP_ERROR(this->get_logger(), "Could not transform IMU msg from frame \"%s\" to frame \"%s\", TF is not available at IMU msg time %f. All IMU msgs up to sensor data time %f are skipped! If IMU TF is not static, make sure to publish it before the the imu topic is published.",
-								imus[i].second->header.frame_id.c_str(), this->frameId().c_str(), rtabmap_conversions::timestampFromROS(imus[i].second->header.stamp), data.stamp());
-						break;
-					} else if(!imuWarnShown) {
-						imuWarnShown = true; // show only one time
-						RCLCPP_WARN(this->get_logger(), "Could not transform IMU msg from frame \"%s\" to frame \"%s\", TF is not available at IMU msg time %f. We will use latest known IMU local transform (if TF between camera/lidar and the IMU is static, you can safely ignore this warning and set always_check_imu_tf to false).",
-								imus[i].second->header.frame_id.c_str(), this->frameId().c_str(), rtabmap_conversions::timestampFromROS(imus[i].second->header.stamp));
-					}
-				}
-				else {
-					imuLocalTransform_ = localTransform;
-				}
-			}
-			else if(imuLocalTransform_.isNull())
-			{
-				imuLocalTransform_.setIdentity();
-			}
-		}
-		
-		IMU imu(cv::Vec4d(imus[i].second->orientation.x, imus[i].second->orientation.y, imus[i].second->orientation.z, imus[i].second->orientation.w),
-				cv::Mat(3,3,CV_64FC1,(void*)imus[i].second->orientation_covariance.data()).clone(),
-				cv::Vec3d(imus[i].second->angular_velocity.x, imus[i].second->angular_velocity.y, imus[i].second->angular_velocity.z),
-				cv::Mat(3,3,CV_64FC1,(void*)imus[i].second->angular_velocity_covariance.data()).clone(),
-				cv::Vec3d(imus[i].second->linear_acceleration.x, imus[i].second->linear_acceleration.y, imus[i].second->linear_acceleration.z),
-				cv::Mat(3,3,CV_64FC1,(void*)imus[i].second->linear_acceleration_covariance.data()).clone(),
-				imuLocalTransform_);
-
-		SensorData dataIMU(imu, 0, imus[i].first);
+		SensorData dataIMU(imus[i].second, 0, imus[i].first);
 		odometry_->process(dataIMU);
 		imuProcessed_ = true;
 	}
@@ -955,6 +1050,15 @@ void OdometryROS::processData()
 			}
 		}
 		pose = odometry_->process(data, guess_, &info);
+	}
+
+	if(imuMotionPredictionEnabled_ && isFrame)
+	{
+		// The next frame's motion is predicted from this pose. A null one (lost) resets
+		// the prediction: after a reset the pose jumps, so no velocity can be estimated
+		// across it.
+		UScopeMutex lock(imuMotionPredictorMutex_);
+		imuMotionPredictor_.addPose(rtabmap_conversions::timestampFromROS(header.stamp), pose);
 	}
 
 	// 9999 on both covariances is how rtabmap is told a frame starts a new map. When the
@@ -1496,8 +1600,13 @@ void OdometryROS::reset(const Transform & pose)
 	bufferedDataToProcess_ = false;
 	imuMutex_.lock();
 	imus_.clear();
-	imuMutex_.unlock();
+	imusPending_.clear();
+	lastImuStampProcessed_ = 0.0;
 	imuLocalTransform_.setNull();
+	imuMutex_.unlock();
+	imuMotionPredictorMutex_.lock();
+	imuMotionPredictor_.reset();
+	imuMotionPredictorMutex_.unlock();
 	this->flushCallbacks();
 }
 

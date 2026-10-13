@@ -26,6 +26,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #include <gtest/gtest.h>
+#include <chrono>
 
 #include <cmath>
 #include <cstring>
@@ -678,7 +679,7 @@ TEST(MsgConversion, cameraModelFromROSPacksFisheyeDistortion)
 {
 	// Fisheye/equidistant models carry 4 coefficients, which rtabmap stores in a
 	// 1x6 matrix at positions 0, 1, 4 and 5.
-	for(const std::string & model : {"fisheye", "equidistant", "Kannala Brandt4"})
+	for(const std::string model : {"fisheye", "equidistant", "Kannala Brandt4"})
 	{
 		sensor_msgs::msg::CameraInfo in;
 		in.width = 640;
@@ -1877,7 +1878,7 @@ TEST(MsgConversion, deskewLayoutsAgree)
 
 TEST(MsgConversion, deskewAcceptsEveryTimeFieldName)
 {
-	for(const std::string & name : {"t", "time", "stamps", "timestamp"})
+	for(const std::string name : {"t", "time", "stamps", "timestamp"})
 	{
 		expectDeskewRecoversWall(kOffsetSecFloat32, kTimeOnColumns, 1, 1000.0, name);
 	}
@@ -1995,6 +1996,68 @@ TEST(MsgConversion, deskewIsIdempotent)
 	sensor_msgs::msg::PointCloud2 twice;
 	ASSERT_TRUE(deskew(once, twice, velocity)) << "a second pass must not fail";
 	EXPECT_EQ(twice.data, once.data) << "a second pass must change nothing";
+}
+
+TEST(MsgConversion, deskewWithMotionFollowsANonLinearMotionPerPoint)
+{
+	// The robot accelerates towards the wall, a motion the constant velocity model cannot
+	// describe. Given that motion, every point is corrected at its own time and the wall
+	// comes back flat.
+	const double headerStamp = 1000.0;
+	const double acceleration = 20.0;   // m/s^2, from rest at the first point
+	auto travelled = [&](double elapsed) { return 0.5 * acceleration * elapsed * elapsed; };
+	const sensor_msgs::msg::PointCloud2 in = makeSkewedWallScan(
+			headerStamp, 0.0, kOffsetSecFloat32, kTimeOnColumns, 1, "t", false, travelled);
+
+	std::vector<double> stamps;
+	auto motion = [&](const rclcpp::Time & stamp) {
+		stamps.push_back(timestampFromROS(stamp));
+		return rtabmap::Transform(float(travelled(timestampFromROS(stamp) - headerStamp)), 0, 0, 0, 0, 0);
+	};
+
+	sensor_msgs::msg::PointCloud2 out;
+	ASSERT_TRUE(deskew(in, out, motion));
+	EXPECT_EQ(stamps.size(), kScanPoints) << "the motion is asked for every point time";
+	for(size_t i=0; i<kScanPoints; ++i)
+	{
+		EXPECT_NEAR(readField(out, i, 0), kWallDistance, 1e-4) << "x of point " << i;
+		EXPECT_FLOAT_EQ(readField(out, i, 3), 0.0f) << "t must be zeroed, point " << i;
+	}
+}
+
+TEST(MsgConversion, deskewWithMotionAndSlerpOnlyAsksForTheSweepEnds)
+{
+	// With slerp, the motion is asked for the first and last points only and interpolated
+	// in between: exact for a constant velocity, which this is.
+	const double headerStamp = 1000.0;
+	const sensor_msgs::msg::PointCloud2 in = makeSkewedWallScan(headerStamp, 0.0);
+
+	std::vector<double> stamps;
+	auto motion = [&](const rclcpp::Time & stamp) {
+		stamps.push_back(timestampFromROS(stamp));
+		return rtabmap::Transform(float(kSpeed * (timestampFromROS(stamp) - headerStamp)), 0, 0, 0, 0, 0);
+	};
+
+	sensor_msgs::msg::PointCloud2 out;
+	ASSERT_TRUE(deskew(in, out, motion, true));
+	ASSERT_EQ(stamps.size(), 2u);
+	EXPECT_NEAR(stamps[0], headerStamp, 1e-6);
+	EXPECT_NEAR(stamps[1], headerStamp + kScanSpan, 1e-6);
+	for(size_t i=0; i<kScanPoints; ++i)
+	{
+		EXPECT_NEAR(readField(out, i, 0), kWallDistance, 1e-4) << "x of point " << i;
+	}
+}
+
+TEST(MsgConversion, deskewWithMotionFailsWhenTheMotionDoes)
+{
+	const sensor_msgs::msg::PointCloud2 in = makeSkewedWallScan(1000.0, 0.0);
+	sensor_msgs::msg::PointCloud2 out;
+	auto failing = [](const rclcpp::Time &) { return rtabmap::Transform(); };
+	EXPECT_FALSE(deskew(in, out, failing));
+	EXPECT_FALSE(deskew(in, out, failing, true));
+	EXPECT_FALSE(deskew(in, out, std::function<rtabmap::Transform(const rclcpp::Time &)>()))
+		<< "an empty motion function must be refused";
 }
 
 TEST(MsgConversion, deskewClampsSamplesOutsideTheSweep)
@@ -2575,6 +2638,15 @@ void addTf(tf2_ros::Buffer & buffer,
 	ASSERT_TRUE(buffer.setTransform(msg, "unit_test", isStatic));
 }
 
+/// tf2_ros::Buffer waits for a transform only while rclcpp is up: brought up for a test
+/// that measures how long a lookup waits, and down again after it.
+struct ScopedRclcpp
+{
+	ScopedRclcpp() : initialized(!rclcpp::ok()) { if(initialized) rclcpp::init(0, nullptr); }
+	~ScopedRclcpp() { if(initialized) rclcpp::shutdown(); }
+	const bool initialized;
+};
+
 }  // namespace
 
 TEST(MsgConversion, getTransformReadsTheBuffer)
@@ -2611,6 +2683,37 @@ TEST(MsgConversion, getTransformIsInvertedByFrameOrder)
 			getTransform("camera_link", "base_link", timestampToROS(1000.0), *buffer, 0.0);
 
 	expectTransformNear(backward, forward.inverse(), 1e-4f);
+}
+
+TEST(MsgConversion, getTransformDoesNotWaitForATransformTooOldToArrive)
+{
+	// The buffer keeps 10 s: with transforms up to t=1020, nothing older than t=1010 can be
+	// added anymore. Asking for t=1005 fails at once, however long it is allowed to wait.
+	const ScopedRclcpp rclcpp;
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();
+	for(double t = 1000.0; t <= 1020.0; t += 1.0)
+	{
+		addTf(*buffer, "odom", "base_link", rtabmap::Transform(float(t - 1000.0), 0, 0, 0, 0, 0), t, false);
+	}
+	const std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+	EXPECT_TRUE(getTransform("odom", "base_link", timestampToROS(1005.0), *buffer, 2.0).isNull());
+	EXPECT_LT(std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count(), 0.5)
+			<< "waited for a transform older than the buffer can hold";
+
+	// Within the buffer, as before
+	expectTransformNear(getTransform("odom", "base_link", timestampToROS(1015.0), *buffer, 2.0),
+			rtabmap::Transform(15.0f, 0, 0, 0, 0, 0));
+}
+
+TEST(MsgConversion, getTransformStillWaitsForANewerTransform)
+{
+	// Newer than the newest transform: it may still arrive, so it is waited for.
+	const ScopedRclcpp rclcpp;
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();
+	addTf(*buffer, "odom", "base_link", rtabmap::Transform::getIdentity(), 1000.0, false);
+	const std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+	EXPECT_TRUE(getTransform("odom", "base_link", timestampToROS(1001.0), *buffer, 0.3).isNull());
+	EXPECT_GE(std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count(), 0.25);
 }
 
 TEST(MsgConversion, getMovingTransformMeasuresMotionBetweenStamps)
