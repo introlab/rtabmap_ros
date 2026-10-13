@@ -171,6 +171,7 @@ private:
 	int topicQueueSize_;
 	int syncQueueSize_;
 	bool keepColor_;
+	bool stereoExposureCompensation_;
 	double approxSyncMaxInterval_;
 };
 

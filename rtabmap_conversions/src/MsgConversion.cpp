@@ -2221,6 +2221,12 @@ std::map<std::string, float> odomInfoToStatistics(const rtabmap::OdometryInfo & 
 			stats.insert(std::make_pair("Odometry/Speed/mps", speed));
 		}
 	}
+	if(!info.guess.isNull() && !info.transform.isNull())
+	{
+		// How far the motion estimated is from the guess it started from
+		stats.insert(std::make_pair("Odometry/Guess_error_lin/m", info.guess.getDistance(info.transform)));
+		stats.insert(std::make_pair("Odometry/Guess_error_ang/deg", info.guess.getAngle(info.transform)*180.0/CV_PI));
+	}
 	if(!info.transformGroundTruth.isNull())
 	{
 		if(!info.transform.isNull())
@@ -3433,7 +3439,7 @@ bool convertScan3dMsg(
 		bool is2D)
 {
 	UASSERT_MSG(scan3dMsg.data.size() == scan3dMsg.row_step*scan3dMsg.height,
-			uFormat("data=%d row_step=%d height=%d", scan3dMsg.data.size(), scan3dMsg.row_step, scan3dMsg.height).c_str());
+			uFormat("data=%zu row_step=%u height=%u", scan3dMsg.data.size(), scan3dMsg.row_step, scan3dMsg.height).c_str());
 
 	rtabmap::Transform scanLocalTransform = getTransform(frameId, scan3dMsg.header.frame_id, scan3dMsg.header.stamp, tfBuffer, waitForTransform);
 	if(scanLocalTransform.isNull())

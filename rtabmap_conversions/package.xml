@@ -21,7 +21,7 @@
   <depend>pcl_conversions</depend>
   <depend>rclcpp</depend>
   <depend>rclcpp_components</depend>
-  <depend version_gte="0.24.1">rtabmap</depend>
+  <depend version_gte="0.24.2">rtabmap</depend>
   <depend>rtabmap_msgs</depend>
   <depend>sensor_msgs</depend>
   <depend>std_msgs</depend>

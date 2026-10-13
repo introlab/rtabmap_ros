@@ -44,6 +44,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/utilite/UConversion.h>
 #include <rtabmap/core/Compression.h>
 #include <rtabmap/core/Odometry.h>
+#include <rtabmap/core/util2d.h>
 
 using namespace rtabmap;
 
@@ -67,6 +68,7 @@ StereoOdometry::StereoOdometry(const rclcpp::NodeOptions & options) :
 		topicQueueSize_(10),
 		syncQueueSize_(5),
 		keepColor_(false),
+		stereoExposureCompensation_(false),
 		approxSyncMaxInterval_(0.0)
 {
 	OdometryROS::init(true, true, false);
@@ -112,6 +114,7 @@ void StereoOdometry::onOdomInit()
 	subscribeRGBD = this->declare_parameter("subscribe_rgbd", subscribeRGBD);
 	rgbdCameras = this->declare_parameter("rgbd_cameras", rgbdCameras);
 	keepColor_ = this->declare_parameter("keep_color", keepColor_);
+	stereoExposureCompensation_ = this->declare_parameter("stereo_exposure_compensation", stereoExposureCompensation_);
 	std::string imageTransport = this->declare_parameter("image_transport", std::string("raw"));
 
 	RCLCPP_INFO(this->get_logger(), "StereoOdometry: approx_sync = %s", approxSync?"true":"false");
@@ -123,6 +126,7 @@ void StereoOdometry::onOdomInit()
 	RCLCPP_INFO(this->get_logger(), "StereoOdometry: qos_camera_info = %d", qosCamInfo);
 	RCLCPP_INFO(this->get_logger(), "StereoOdometry: subscribe_rgbd = %s", subscribeRGBD?"true":"false");
 	RCLCPP_INFO(this->get_logger(), "StereoOdometry: keep_color     = %s", keepColor_?"true":"false");
+	RCLCPP_INFO(this->get_logger(), "StereoOdometry: stereo_exposure_compensation = %s", stereoExposureCompensation_?"true":"false");
 	RCLCPP_INFO(this->get_logger(), "StereoOdometry: image_transport = %s", imageTransport.c_str());
 
 	rclcpp::SubscriptionOptions options;
@@ -657,33 +661,41 @@ void StereoOdometry::commonCallback(
 					ptrRight = cv_bridge::cvtColor(rightImages[i], "mono8");
 				}
 
+				cv::Mat leftImage = ptrLeft->image;
+				cv::Mat rightImage = ptrRight->image;
+				if(stereoExposureCompensation_)
+				{
+					// The same brightness in both images, for the stereo correspondences
+					rtabmap::util2d::stereoExposureCompensation(ptrLeft->image, ptrRight->image, leftImage, rightImage);
+				}
+
 				// initialize
 				if(left.empty())
 				{
-					left = cv::Mat(leftHeight, leftWidth*cameraCount, ptrLeft->image.type());
+					left = cv::Mat(leftHeight, leftWidth*cameraCount, leftImage.type());
 				}
 				if(right.empty())
 				{
-					right = cv::Mat(rightHeight, rightWidth*cameraCount, ptrRight->image.type());
+					right = cv::Mat(rightHeight, rightWidth*cameraCount, rightImage.type());
 				}
 
-				if(ptrLeft->image.type() == left.type())
+				if(leftImage.type() == left.type())
 				{
-					ptrLeft->image.copyTo(cv::Mat(left, cv::Rect(i*leftWidth, 0, leftWidth, leftHeight)));
+					leftImage.copyTo(cv::Mat(left, cv::Rect(i*leftWidth, 0, leftWidth, leftHeight)));
 				}
 				else
 				{
-					RCLCPP_ERROR(this->get_logger(), "Some left images are not the same type! %d vs %d", ptrLeft->image.type(), left.type());
+					RCLCPP_ERROR(this->get_logger(), "Some left images are not the same type! %d vs %d", leftImage.type(), left.type());
 					return;
 				}
 
-				if(ptrRight->image.type() == right.type())
+				if(rightImage.type() == right.type())
 				{
-					ptrRight->image.copyTo(cv::Mat(right, cv::Rect(i*rightWidth, 0, rightWidth, rightHeight)));
+					rightImage.copyTo(cv::Mat(right, cv::Rect(i*rightWidth, 0, rightWidth, rightHeight)));
 				}
 				else
 				{
-					RCLCPP_ERROR(this->get_logger(), "Some right images are not the same type! %d vs %d", ptrRight->image.type(), right.type());
+					RCLCPP_ERROR(this->get_logger(), "Some right images are not the same type! %d vs %d", rightImage.type(), right.type());
 					return;
 				}
 			}

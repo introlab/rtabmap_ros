@@ -111,6 +111,7 @@ The output's `header.frame_id` comes from the **left** camera_info, and its `hea
 | `compressed_rate` | `double` | `0.0` | Maximum rate, in Hz, of `rgbd_image/compressed`. `0` means every frame. |
 | `image_compression_format` | `string` | `".jpg"` | Format of the left and right images in `rgbd_image/compressed`: `".jpg"` (lossy, smaller) or `".png"` (lossless, larger). An invalid value falls back to `".jpg"` with an error. |
 | `image_transport` | `string` | `"raw"` | Transport for both images, e.g. `compressed`. |
+| `stereo_exposure_compensation` | `bool` | `false` | Equalize the exposure of the left and right images (gain compensation) before publishing them. The stereo correspondences computed downstream assume the same brightness in both images: set it when the two cameras expose differently. |
 
 ## How a stereo pair travels in an RGBDImage
 

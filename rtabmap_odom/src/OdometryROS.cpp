@@ -147,11 +147,11 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	waitIMUToinit_(false),
 	alwaysCheckImuTf_(true),
 	imuProcessed_(false),
-	imuMotionPredictionEnabled_(false),
 	processedMsgs_(0),
 	droppedMsgs_(0),
 	configPath_(),
 	initialPose_(Transform::getIdentity()),
+	imuMotionPredictionEnabled_(false),
 	ulogToRosout_(this)
 {
 	dataCallbackGroup_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);

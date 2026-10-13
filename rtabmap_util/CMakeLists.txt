@@ -259,7 +259,7 @@ ament_export_libraries(rtabmap_util rtabmap_util_plugins)           # To include
 install(PROGRAMS
   scripts/patrol.py
 #  scripts/objects_to_tags.py
-#  scripts/point_to_tf.py
+  scripts/point_to_tf.py
 #  scripts/netvlad_tf_ros.py
 #  scripts/gazebo_ground_truth.py
   scripts/transform_to_tf.py

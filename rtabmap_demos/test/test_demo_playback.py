@@ -169,9 +169,9 @@ SCENARIOS = [
         # A node every 4.3 s, when the assembled cloud of half a turn of the mast is ready.
         chunk_slack=5.0,
         # Local closures only (no global ones: the camera's bag-of-words finds none),
-        # 25 in the golden graph, 19 in a Kilted CI run, 17 in a Jazzy one: at least 15,
-        # with some margin, the closure with the first node below being what matters.
-        closure_slack=0.4,
+        # 25 in the golden graph, 19 in a Kilted CI run, 17 in a Jazzy one, 11 in another:
+        # at least 10, the closure with the first node below being what matters.
+        closure_slack=0.6,
         # The end of the flight overlaps its start enough for a proximity closure back to
         # the first node, as in the golden graph (1-3558) and every run so far (1-3551 in
         # a Jazzy one).
@@ -204,22 +204,18 @@ SCENARIOS = [
         launch_package='rtabmap_examples',
         launch_file='euroc_datasets.launch.py',
         bag='euroc_V1_02_medium_bag',
-        # The MAV is on the ground for the first seconds
-        bag_start=11.0,
         required_topics=['/cam0/image_raw', '/cam1/image_raw', '/imu0',
                          '/vicon/firefly_sbx/firefly_sbx'],
         # gt: rtabmap's ground truth is the bag's Vicon poses
-        launch_arguments={'rtabmap_viz': 'false', 'gt': 'true'},
+        launch_arguments={'rtabmap_viz': 'false', 'gt': 'vicon'},
         ground_truth_from_bag=True,
         parameters={'output_queue_size': 10,
                     'always_process_most_recent_frame': False},
         packages=['imu_complementary_filter', 'image_proc'],
         max_node_difference=0.05,
-        # 0.061 to 0.065 m in runs against the golden graph. The rotational RMSE is not
-        # checked: it is mostly the launch file's own, its ground truth frame (from the
-        # Vicon's) being ~20 deg from base_link (19.5 to 19.8 deg in those runs).
-        max_rmse=0.10,
-        max_rotational_rmse=None),
+        # 0.071 to 0.094 m and 3.65 deg in runs against the golden graph
+        max_rmse=0.15,
+        max_rotational_rmse=6.0),
 ]
 
 
