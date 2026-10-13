@@ -39,8 +39,8 @@ odometry at the origin, the second has to be registered against it.
   22.00 s is ~1.04 m at around 45 inliers and lost tracking outright in one run out of
   eight, where this pair holds 210 or more.
 - **`lidar/ouster_half_turn`** -- two Ouster sweeps 4.40 s apart, recorded as a ROS 2 mcap
-  bag (`/tf`, `/tf_static`, `/os_cloud_node/points`) rather than as loose files, because
-  what makes them worth keeping is the TF history around them.
+  bag (`/tf`, `/tf_static`, `/os_cloud_node/points`, and the IMU topics below) rather than as
+  loose files, because what makes them worth keeping is the TF and IMU history around them.
 
   The sensor sits on a mast turning at ~42 deg/s while the platform stays put, so it moves
   through its own 0.1 s sweep and the cloud comes off the driver skewed. The two sweeps are
@@ -52,6 +52,25 @@ odometry at the origin, the second has to be registered against it.
 
   TF runs from 0.1 s before each sweep to 0.1 s past its end, with nothing in between: the
   gap holds transforms nobody looks up, and keeping them would have tripled the file.
+
+  Two IMUs, each raw and filtered, around each sweep, with the same gap in between. Each is
+  kept where TF has its whole mounting to `base_link` (the drone's `box_link -> imu_link` is
+  recorded at 10 Hz only), which still covers the sweep from its start to its end:
+
+  | Topic | IMU | |
+  | --- | --- | --- |
+  | `/imu/data_raw` | the drone's, on `imu_link` (fixed on `base_link`), 75 Hz | as recorded; its own orientation is off by a constant ~2 deg in roll and ~4 deg in pitch |
+  | `/imu/data_filtered` | the same | orientation from `imu_complementary_filter` |
+  | `/os_cloud_node/imu/data_raw` | the Ouster's own, on `os_imu` (fixed on `os_sensor`, so turning with the mast), 100 Hz | as recorded, without orientation |
+  | `/os_cloud_node/imu/data_filtered` | the same | orientation from `imu_complementary_filter` |
+
+  The filtered topics were made by running `complementary_filter_node` with the parameters of
+  `rtabmap_demos`' `netherdrone_lidar3d_demo.launch.py` (`use_mag: false`,
+  `do_bias_estimation: true`, `do_adaptive_gain: true`) over `netherdrone_ouster_vertige_bag_0`
+  from its start, 2.7 s before the first sweep, so the filters had settled. Their stamps are
+  those of the raw messages. The orientation between the two windows is consistent, since the
+  filters ran through the gap: an odometry guess from the IMU sees the half turn between the
+  sweeps.
 - **`rgbd`** -- `17` and `154`, two frames of a hand-held Kinect sequence, far enough apart
   that losing tracking between them is a legitimate outcome.
 

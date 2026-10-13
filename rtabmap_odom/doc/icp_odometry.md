@@ -64,16 +64,17 @@ One of the two scan topics, not both.
 |---|---|---|
 | `scan` | [`sensor_msgs/msg/LaserScan`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/LaserScan.html) | A 2D lidar. |
 | `scan_cloud` | [`sensor_msgs/msg/PointCloud2`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/PointCloud2.html) | A 3D lidar, or a 2D one already converted to a cloud. |
-| `imu` | [`sensor_msgs/msg/Imu`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/Imu.html) | Optional, and more useful here than elsewhere — it pins roll and pitch, which a lidar alone constrains poorly. |
+| `imu` | [`sensor_msgs/msg/Imu`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/Imu.html) | Optional, and more useful here than elsewhere — it pins roll and pitch, which a lidar alone constrains poorly. Subscribed only with `wait_imu_to_init:=true`. With `deskewing_imu:=true` it also gives the motion to deskew with. |
 
 ## Published Topics
 
-Most are common to all three nodes; see [the README](../README.md#published-topics). Two belong to this path:
+Most are common to all three nodes; see [the README](../README.md#published-topics). Three belong to this path:
 
 | Topic | Type | Description |
 |---|---|---|
 | `odom_local_scan_map` | [`sensor_msgs/msg/PointCloud2`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/PointCloud2.html) | The accumulated scan map the current scan was registered against. |
 | `odom_filtered_input_scan` | [`sensor_msgs/msg/PointCloud2`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/PointCloud2.html) | The input scan **after** deskewing, voxelization, range filtering and normal estimation — exactly what ICP registered, carrying the original header. |
+| `odom_deskewed_input_scan` | [`sensor_msgs/msg/PointCloud2`](https://docs.ros.org/en/jazzy/p/sensor_msgs/msg/PointCloud2.html) | The input cloud **after** deskewing only: every point, full resolution, same header and frame. Published only for clouds that were deskewed, and only when something subscribes. |
 
 ### Reusing the filtered scan downstream
 
@@ -104,7 +105,9 @@ flowchart LR
     ICP -->|odom + TF| MAP
 ```
 
-That is the only way to give `rtabmap` **every point of the sweep**. `odom_filtered_input_scan` carries the decimated cloud ICP registered, so a map built from it inherits whatever voxelization odometry applied — and outdoors that is 30 to 50 cm. Deskewing upstream separates the two: odometry can filter as hard as it likes while the map is built from the full-resolution cloud, at the cost of an extra node and an extra copy of every sweep.
+That gives `rtabmap` **every point of the sweep**. `odom_filtered_input_scan` carries the decimated cloud ICP registered, so a map built from it inherits whatever voxelization odometry applied — and outdoors that is 30 to 50 cm. Deskewing upstream separates the two: odometry can filter as hard as it likes while the map is built from the full-resolution cloud, at the cost of an extra node and an extra copy of every sweep.
+
+`odom_deskewed_input_scan` is the third way: the full-resolution cloud this node deskewed, before it filtered it. It is the one to use with `deskewing_imu:=true`, where the motion to deskew with depends on the odometry's own last pose, which a node upstream cannot know.
 
 ## Parameters
 
@@ -125,6 +128,7 @@ These two sets overlap, and the node resolves the overlap for you — see [Where
 | `scan_cloud_is_2d` | `bool` | `false` | Treat `scan_cloud` as a planar scan even though it carries a `z` field, so it is registered as a 2D scan rather than a 3D one. For a 2D lidar already converted to a cloud. |
 | `deskewing` | `bool` | `false` | Correct for motion during the sweep. See [Deskewing](#deskewing). |
 | `deskewing_slerp` | `bool` | `false` | Interpolate the deskewing transform rather than looking up TF per point. Faster, slightly less accurate. |
+| `deskewing_imu` | `bool` | `false` | Deskew with the motion predicted from the IMU since the last odometry pose. Needs `wait_imu_to_init:=true`. Ignored when `guess_frame_id` is set. See [Deskewing](#deskewing). |
 | `topic_queue_size` | `int` | `1` | Queue depth of the scan subscription. Deliberately small: a stale scan is worse than a dropped one. |
 
 ### Where these defaults come from
@@ -175,10 +179,48 @@ A spinning lidar measures its points over a whole revolution, not at an instant.
 
 `deskewing:=true` corrects it. It needs the cloud to carry **per-point timestamps**, in a field named `t`, `time`, `stamps` or `timestamp`; without one the node logs an error and drops the frame rather than guessing.
 
-There are two ways it gets the motion to correct with, and which one is used depends on whether you gave it an external guess:
+There are three ways it gets the motion to correct with, tried in this order:
 
-- **With `guess_frame_id` set** — the motion comes from that TF. This is the accurate route, and the reason to pair deskewing with wheel odometry or an IMU-integrated frame.
-- **Without it** — a constant-velocity model from the previous frame's estimate. It cannot deskew the very first frame, and it degrades exactly when velocity changes fastest, which is when deskewing matters most.
+- **With `guess_frame_id` set** — the motion comes from that TF. This is the accurate route, and the reason to pair deskewing with wheel odometry or another low-latency odometry.
+- **With `deskewing_imu:=true`** — the motion of `frame_id` is predicted from the IMU, starting from the last pose odometry estimated (see below). If the lidar moves on `frame_id` during the sweep, for instance on a motorized mount, that motion is still looked up in TF at every point's time Clouds on `scan_cloud` only: a `LaserScan` on `scan` falls through to the next model.
+- **Otherwise** — a constant-velocity model from the previous frame's estimate. It cannot deskew the very first frame, and it degrades exactly when velocity changes fastest, which is when deskewing matters most.
+
+### Deskewing with the IMU
+
+When another odometry with a high enough rate is available in TF, wheel odometry for instance, give it as `guess_frame_id` and deskew with it. This is for when there is none: TF cannot give this node's own odometry frame for the sweep being deskewed, since it publishes that frame only after registering the sweep. Its last pose, from the previous sweep, is known though, and the IMU covers the time since. From those, every point's pose is predicted:
+
+- **Orientation** — the IMU's own, rotated into `odom_frame_id` so that it matches the last odometry pose. The IMU messages must carry an orientation, as a filter such as `imu_filter_madgwick` or `imu_complementary_filter` gives.
+- **Position** — integrated from the velocity at the last pose and the IMU's acceleration, with gravity removed. That velocity is estimated again at every odometry update, from the displacement over the last `Odom/GuessSmoothingDelay` seconds corrected by the acceleration measured in between, so only the motion since the last update is ever predicted: well under a second, over which the accelerometer's bias barely matters. With `Odom/GuessSmoothingDelay` at 0, or IMU messages without acceleration (all zeros, or a covariance of -1), the position follows the velocity instead.
+
+Set `Odom/GuessSmoothingDelay` to about 0.5 s with `deskewing_imu`: a delay > 0 is also what enables the IMU acceleration. At its default, 0, the position only follows the velocity of the last frame, estimated over that single frame. Without the acceleration, a longer delay would delay the velocity; with it, the velocity over the delay is carried to the last frame, and the noise of the odometry poses is divided by the delay rather than by a tenth of a second: deskewing with a noisy velocity feeds that noise back into the next poses, which zig-zag. The guess of the registration uses the same prediction (RTAB-Map's odometry does it with an IMU, the same way).
+
+Before odometry has a pose, and after it got lost, only the orientation is predicted. The very first sweep is then deskewed for rotation, which is most of the skew of a lidar moved by hand or flown.
+
+Gravity is removed from the IMU's acceleration with `Odom/ImuGravity`, standard gravity by default. If the accelerometer reads noticeably more or less than that at rest, setting it to that value compensates for the accelerometer's scale error.
+
+The IMU is taken as being at `frame_id`'s origin: the lever arm between the two adds accelerations that are negligible over a sweep. The deskewed cloud is published on `odom_deskewed_input_scan`, for a map built from every point (see [Reusing the filtered scan downstream](#reusing-the-filtered-scan-downstream)).
+
+With [`point_cloud_assembler`](../../rtabmap_util/doc/point_cloud_assembler.md), as `lidar3d_assemble.launch.py` does with `deskewing_imu:=true`: odometry deskews the raw sweeps itself, and the assembler accumulates them at full resolution, rather than the decimated cloud ICP registered. No `lidar_deskewing` node, and no fixed frame made from the IMU:
+
+```mermaid
+flowchart LR
+    LIDAR["lidar driver"]
+    IMU["IMU filter<br>(orientation)"]
+    ICP["icp_odometry<br>deskewing: true<br>deskewing_imu: true<br>wait_imu_to_init: true<br>Odom/GuessSmoothingDelay: 0.5"]
+    ASM["point_cloud_assembler<br>fixed_frame_id: ''"]
+    MAP["rtabmap"]
+    DESKEWED(["odom_deskewed_input_scan"])
+    ICPODOM(["icp_odom"])
+    LIDAR -->|scan_cloud| ICP
+    IMU -->|imu| ICP
+    ICP --> DESKEWED
+    DESKEWED -->|cloud| ASM
+    ICP --> ICPODOM
+    ICPODOM -->|odom| ASM & MAP
+    ASM -->|assembled_cloud| MAP
+```
+
+Each deskewed sweep keeps the header of the input cloud, so the assembler pairs it with the odometry message of the same stamp.
 
 `deskewing_slerp` interpolates between the sweep's endpoints rather than looking up a transform per point. Much cheaper, and accurate enough unless the motion within one sweep is strongly non-linear.
 

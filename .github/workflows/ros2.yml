@@ -140,3 +140,15 @@ jobs:
         name: demo-playback-results-${{ matrix.ros_distro }}
         path: /rtabmap_demos_test_results
         retention-days: 7
+
+    # Passing too, without the databases (several hundred MB): the launch logs and graphs,
+    # a few MB, to compare a failing run with a passing one (another distro, or before).
+    - name: Upload the playback results (without the databases)
+      if: success()
+      uses: actions/upload-artifact@v4
+      with:
+        name: demo-playback-results-${{ matrix.ros_distro }}
+        path: |
+          /rtabmap_demos_test_results
+          !/rtabmap_demos_test_results/**/*.db
+        retention-days: 7

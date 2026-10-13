@@ -32,7 +32,7 @@ import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import pytest
 import yaml
@@ -69,6 +69,17 @@ class Scenario:
     parameters: Dict[str, object] = field(default_factory=dict)
     # ROS parameters for one node, by node name, for a parameter name other nodes use too.
     node_parameters: Dict[str, Dict[str, object]] = field(default_factory=dict)
+    # Topic remappings (from, to) for every node the launch file starts, applied before
+    # their own (see _wrapper_launch()): the first rule matching a topic wins.
+    remappings: List[Tuple[str, str]] = field(default_factory=list)
+    # Package whose launch/ folder has launch_file.
+    launch_package: str = 'rtabmap_demos'
+    # Seconds of the bag(s) skipped at the start, as `ros2 bag play --start-offset`.
+    bag_start: float = 0.0
+    # The launch file gives rtabmap its own ground truth (e.g., a motion capture's poses in
+    # the bag): the Gt/* statistics are then against it, not against the golden trajectory,
+    # which is not replayed.
+    ground_truth_from_bag: bool = False
     # Packages the launch file needs besides ours: the scenario is skipped without them
     # (not every ROS distro has them).
     packages: List[str] = field(default_factory=list)
@@ -86,8 +97,11 @@ class Scenario:
     # False when the scenario turns loop closure detection off, against a golden graph
     # made with it.
     compare_closures: bool = True
+    # The first node must have a loop closure, for a run whose end overlaps its start: the
+    # map is closed back to its start, whatever the closure count.
+    close_first_node: bool = False
     max_rmse: float = 0.05                 # m, Gt/Translational_rmse
-    max_rotational_rmse: float = 1.0       # deg, Gt/Rotational_rmse
+    max_rotational_rmse: Optional[float] = 1.0  # deg, Gt/Rotational_rmse; None: not checked
 
     def __str__(self):
         return self.name
@@ -144,14 +158,24 @@ SCENARIOS = [
         # machine. output_queue_size also reaches rgb_sync, for the camera. topic_queue_size
         # reaches only icp_odometry: rgb_sync and point_cloud_assembler already default
         # to 10, and rtabmap sets its own.
+        # output_queue_size also reaches icp_odometry: its odometry and odometry info are
+        # what rtabmap saves as intermediate nodes, both needed for each one.
         parameters={'output_queue_size': 10,
                     'topic_queue_size': 10,
                     'always_process_most_recent_frame': False},
+        # The intermediate nodes' statistics without the bulky data (features, local map)
+        # the full odometry info carries: lighter to deliver for every pose.
+        remappings=[('inter_odom_info', 'odom_info_lite')],
         # A node every 4.3 s, when the assembled cloud of half a turn of the mast is ready.
         chunk_slack=5.0,
         # Local closures only (no global ones: the camera's bag-of-words finds none),
-        # 25 in the golden graph, 19 in a Kilted CI run.
-        closure_slack=0.3,
+        # 25 in the golden graph, 19 in a Kilted CI run, 17 in a Jazzy one: at least 15,
+        # with some margin, the closure with the first node below being what matters.
+        closure_slack=0.4,
+        # The end of the flight overlaps its start enough for a proximity closure back to
+        # the first node, as in the golden graph (1-3558) and every run so far (1-3551 in
+        # a Jazzy one).
+        close_first_node=True,
         max_rmse=0.1,
         max_rotational_rmse=2.0,
         max_node_difference=0.05),
@@ -174,6 +198,28 @@ SCENARIOS = [
         max_node_difference=0.05,
         max_rmse=0.2,
         max_rotational_rmse=2.0),
+    Scenario(
+        name='euroc_stereo',
+        # Stereo odometry with an IMU, from rtabmap_examples, on a EuRoC MAV sequence
+        launch_package='rtabmap_examples',
+        launch_file='euroc_datasets.launch.py',
+        bag='euroc_V1_02_medium_bag',
+        # The MAV is on the ground for the first seconds
+        bag_start=11.0,
+        required_topics=['/cam0/image_raw', '/cam1/image_raw', '/imu0',
+                         '/vicon/firefly_sbx/firefly_sbx'],
+        # gt: rtabmap's ground truth is the bag's Vicon poses
+        launch_arguments={'rtabmap_viz': 'false', 'gt': 'true'},
+        ground_truth_from_bag=True,
+        parameters={'output_queue_size': 10,
+                    'always_process_most_recent_frame': False},
+        packages=['imu_complementary_filter', 'image_proc'],
+        max_node_difference=0.05,
+        # 0.061 to 0.065 m in runs against the golden graph. The rotational RMSE is not
+        # checked: it is mostly the launch file's own, its ground truth frame (from the
+        # Vicon's) being ~20 deg from base_link (19.5 to 19.8 deg in those runs).
+        max_rmse=0.10,
+        max_rotational_rmse=None),
 ]
 
 
@@ -196,9 +242,10 @@ def _wrapper_launch(scenario: Scenario, rtabmap_parameters: Dict[str, object],
     come from: each node reads its own section. RELIABLE_QOS and scenario.parameters are
     for every node (/**), and `rtabmap_parameters` for the node named rtabmap only (/**/rtabmap): the
     ground truth frames, which the odometry nodes also read. A node's own value for a
-    parameter, set by its launch file, wins over the file's.
+    parameter, set by its launch file, wins over the file's. scenario.remappings are set
+    with SetRemap, before the nodes' own remappings: they win over them.
     """
-    demo = Path(get_package_share_directory('rtabmap_demos')) / 'launch' / scenario.launch_file
+    demo = Path(get_package_share_directory(scenario.launch_package)) / 'launch' / scenario.launch_file
     parameter_file = path.with_suffix('.yaml')
     # The nodes' own sections first: after /**, rcl would not apply /** to the other nodes.
     sections = {f'/**/{node}': {'ros__parameters': dict(values)}
@@ -211,12 +258,13 @@ def _wrapper_launch(scenario: Scenario, rtabmap_parameters: Dict[str, object],
         'from launch import LaunchDescription\n'
         'from launch.actions import IncludeLaunchDescription\n'
         'from launch.launch_description_sources import PythonLaunchDescriptionSource\n'
-        'from launch_ros.actions import SetParametersFromFile\n'
+        'from launch_ros.actions import SetParametersFromFile, SetRemap\n'
         '\n'
         '\n'
         'def generate_launch_description():\n'
         '    return LaunchDescription([\n'
         f'        SetParametersFromFile({str(parameter_file)!r}),\n'
+        + ''.join(f'        SetRemap(src={src!r}, dst={dst!r}),\n' for src, dst in scenario.remappings) +
         f'        IncludeLaunchDescription(PythonLaunchDescriptionSource({str(demo)!r}),\n'
         f'                                 launch_arguments={list(arguments.items())!r}),\n'
         '    ])\n')
@@ -290,7 +338,7 @@ def _replay(scenario: Scenario, bag: List[Path], results: Path, ground_truth=Non
     spinner.start()
     try:
         tree = ProcessTree(launch.pid)
-        player = LockstepPlayer(node, [str(b) for b in bag], tree)
+        player = LockstepPlayer(node, [str(b) for b in bag], tree, start=scenario.bag_start)
         if ground_truth:
             player.add_trajectory(GROUND_TRUTH_FRAME, GROUND_TRUTH_BASE_FRAME, ground_truth)
         player.connect(scenario.required_topics)
@@ -355,7 +403,8 @@ def test_demo_playback(scenario: Scenario, tmp_path):
         pytest.fail(f'no golden graph {golden_prefix}.g2o; '
                     'run once with RTABMAP_DEMOS_UPDATE_GOLDEN=1 to create it')
 
-    ground_truth = None if update else load_tum(str(golden_prefix) + '.tum')
+    ground_truth = None if update or scenario.ground_truth_from_bag else \
+        load_tum(str(golden_prefix) + '.tum')
     stats = _replay(scenario, bag, results, ground_truth)
     prefix = results / scenario.name
     export_graph(results / 'rtabmap.db', prefix)
@@ -364,7 +413,8 @@ def test_demo_playback(scenario: Scenario, tmp_path):
 
     if update:
         GOLDEN_DIR.mkdir(exist_ok=True)
-        for suffix in ('.g2o', '.tum'):
+        # The poses (.tum) are only replayed as ground truth: not kept when the bag has its own
+        for suffix in ('.g2o',) if scenario.ground_truth_from_bag else ('.g2o', '.tum'):
             shutil.copyfile(str(prefix) + suffix, str(golden_prefix) + suffix)
         print(f'  golden graph updated: {golden_prefix}.g2o', flush=True)
         return
@@ -383,16 +433,21 @@ def test_demo_playback(scenario: Scenario, tmp_path):
         if closures < minimum:
             problems.append(f'loop closures (global and local): {closures}, golden '
                             f'{golden_closures} (at least {minimum:.0f} expected)')
+    if scenario.close_first_node and not summary['first_node_closed']:
+        problems.append('no loop closure with the first node: the map was not closed '
+                        'back to its start')
     if rmse is None:
-        problems.append('rtabmap reported no Gt/* statistics: the golden trajectory did not '
+        source = 'the bag\'s ground truth' if scenario.ground_truth_from_bag else 'the golden trajectory'
+        problems.append(f'rtabmap reported no Gt/* statistics: {source} did not '
                         f'reach it as ground truth (see {results / "launch.log"})')
     else:
         if rmse > scenario.max_rmse:
             problems.append(f'Gt/Translational_rmse: {rmse:.3f} m (max {scenario.max_rmse} m)')
-        if rotational_rmse > scenario.max_rotational_rmse:
+        if scenario.max_rotational_rmse is not None and rotational_rmse > scenario.max_rotational_rmse:
             problems.append(f'Gt/Rotational_rmse: {rotational_rmse:.2f} deg '
                             f'(max {scenario.max_rotational_rmse} deg)')
-        print(f'  vs golden {expected}: RMSE {rmse:.3f} m, {rotational_rmse:.2f} deg',
+        against = ' (against the bag\'s ground truth)' if scenario.ground_truth_from_bag else ''
+        print(f'  vs golden {expected}: RMSE {rmse:.3f} m, {rotational_rmse:.2f} deg{against}',
               flush=True)
     assert not problems, f'{scenario.name}:\n  ' + '\n  '.join(problems)
 

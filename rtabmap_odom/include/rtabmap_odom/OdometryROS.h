@@ -30,6 +30,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "rclcpp/rclcpp.hpp"
 
+#include <deque>
+
 #include <tf2_ros/transform_broadcaster.hpp>
 #include <tf2_ros/buffer.hpp>
 #include <tf2_ros/transform_listener.hpp>
@@ -47,6 +49,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap_msgs/srv/reset_pose.hpp>
 #include <rtabmap/core/SensorData.h>
 #include <rtabmap/core/Parameters.h>
+#include <rtabmap/core/ImuMotionPredictor.h>
+#include <rtabmap/core/IMU.h>
 #include <rtabmap/utilite/UThread.h>
 
 #include <boost/thread.hpp>
@@ -179,6 +183,25 @@ protected:
 	double previousStamp() const {return previousStamp_;}
 	/// Called after a frame has been registered and published, for a subclass to add to it.
 	virtual void postProcessData(const rtabmap::SensorData & /*data*/, const std_msgs::msg::Header & /*header*/) const {}
+	/**
+	 * @brief Starts predicting the pose of the base frame between frames with the IMU.
+	 *
+	 * The IMU is only subscribed with `wait_imu_to_init`, so this does nothing without it
+	 * (it returns false). Call it from onOdomInit(); imuMotionPredictor() is then fed
+	 * with every IMU message and every registered pose. Its velocity is estimated over
+	 * `Odom/GuessSmoothingDelay`, as RTAB-Map's odometry does with an IMU (the
+	 * acceleration is used only with a delay > 0).
+	 */
+	bool enableImuMotionPrediction();
+	/// Whether enableImuMotionPrediction() succeeded.
+	bool isImuMotionPredictionEnabled() const {return imuMotionPredictionEnabled_;}
+	/**
+	 * @brief A copy of the IMU motion predictor, taken under its lock.
+	 *
+	 * The IMU callback and the odometry thread keep updating the original: a copy gives
+	 * predictions consistent with each other, e.g. over a whole sweep to deskew.
+	 */
+	rtabmap::ImuMotionPredictor imuMotionPredictor();
 
 private:
 	void processData();
@@ -252,6 +275,7 @@ private:
 	rtabmap::SensorData dataToProcess_;
 	std_msgs::msg::Header dataHeaderToProcess_;
 	bool bufferedDataToProcess_;
+	double imuUntilStampToProcess_; // IMU needed up to this stamp to process the buffered data
 
 	bool paused_;
 	int resetCountdown_;
@@ -278,10 +302,20 @@ private:
 	bool imuProcessed_;
 	int processedMsgs_;
 	int droppedMsgs_;
-	std::map<double, sensor_msgs::msg::Imu::ConstSharedPtr> imus_;
+	// IMU messages waiting for TF to give their mounting at their stamp, then converted with it
+	// (both under imuMutex_, see flushImuPending())
+	std::deque<sensor_msgs::msg::Imu::ConstSharedPtr> imusPending_;
+	std::map<double, rtabmap::IMU> imus_;
+	double lastImuStampProcessed_ = 0.0; // stamp of the last imu in imus_ given to the odometry
+	rtabmap::Transform imuLocalTransform_; // last mounting (frame_id -> imu frame)
+	void flushImuPending();
 	std::string configPath_;
 	rtabmap::Transform initialPose_;
-	rtabmap::Transform imuLocalTransform_;
+	// Set by enableImuMotionPrediction(), with settings fixed for its life. Fed by the IMU
+	// callback and the odometry thread, read by the subclass: always used under its mutex.
+	bool imuMotionPredictionEnabled_;
+	rtabmap::ImuMotionPredictor imuMotionPredictor_;
+	UMutex imuMotionPredictorMutex_;
 
 	rtabmap_util::ULogToRosout ulogToRosout_;
 
