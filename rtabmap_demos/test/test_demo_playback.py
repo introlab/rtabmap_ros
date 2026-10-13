@@ -207,7 +207,7 @@ SCENARIOS = [
         required_topics=['/cam0/image_raw', '/cam1/image_raw', '/imu0',
                          '/vicon/firefly_sbx/firefly_sbx'],
         # gt: rtabmap's ground truth is the bag's Vicon poses
-        launch_arguments={'rtabmap_viz': 'false', 'gt': 'true'},
+        launch_arguments={'rtabmap_viz': 'false', 'gt': 'vicon'},
         ground_truth_from_bag=True,
         parameters={'output_queue_size': 10,
                     'always_process_most_recent_frame': False},

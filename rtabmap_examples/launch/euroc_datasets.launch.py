@@ -4,11 +4,11 @@
 #   $ rosbags-convert V1_01_easy.bag
 #   $ rosbags-convert MH_01_easy.bag
 #
-#   $ ros2 launch rtabmap_examples euroc_datasets.launch.py gt:=true
+#   $ ros2 launch rtabmap_examples euroc_datasets.launch.py gt:=vicon
 #   $ cd V1_01_easy
 #   $ ros2 bag play V1_01_easy --clock
 #
-#   $ ros2 launch rtabmap_examples euroc_datasets.launch.py gt:=false
+#   $ ros2 launch rtabmap_examples euroc_datasets.launch.py gt:=leica
 #   $ cd MH_01_easy
 #   $ ros2 bag play MH_01_easy --clock
 #
@@ -17,12 +17,19 @@
 #     recorded with the V1 sequences. On the V2 sequences, recorded months later, the
 #     rectified stereo pairs are ~1.8 px apart vertically (the right camera rotated by
 #     ~0.2 deg), which degrades stereo matching and odometry there.
-#   * The ground truth used here (gt:=true) is the raw Vicon pose from the bags
+#   * The ground truth used here (gt:=vicon) is the raw Vicon pose from the bags
 #     (vicon/firefly_sbx/firefly_sbx), moved to the base frame with the datasets' Vicon
 #     calibration, not the ground truth published with them
 #     (state_groundtruth_estimate0/data.csv): they differ by ~2 cm and ~1 deg, and up to
 #     ~0.2 s in time on the V2 sequences. The RMSE computed here may then differ from the
 #     one in papers using the published ground truth.
+#   * On the MH sequences (gt:=leica), the ground truth is the Leica laser tracker's
+#     position of the MAV's prism, which has no orientation: euroc_leica_ground_truth.py
+#     gives it the IMU's (from the complementary filter), aligned in yaw, and corrects the
+#     Leica's latency, both estimated from the accelerations seen by the two (see the
+#     script). There is no ground truth until they are estimated, after the MAV has moved
+#     up and down and horizontally (~10 to 60 s into the sequences). Against the
+#     published ground truth: ~1 to 4 cm.
 
 
 from launch import LaunchDescription
@@ -32,7 +39,8 @@ from launch.actions import DeclareLaunchArgument
 from launch.actions import SetEnvironmentVariable
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
-from launch.conditions import IfCondition, UnlessCondition
+from launch.conditions import IfCondition
+from launch.substitutions import PythonExpression
 from launch_ros.substitutions import FindPackageShare
 from launch_ros.actions import Node
 from launch_ros.actions import PushRosNamespace
@@ -41,6 +49,8 @@ from launch_ros.actions import SetParameter
 def generate_launch_description():
 
     ground_truth = LaunchConfiguration('gt')
+    def ground_truth_is(value):
+        return IfCondition(PythonExpression(["'", ground_truth, "' == '", value, "'"]))
 
     parameters={
           'frame_id':'base_link',
@@ -66,7 +76,7 @@ def generate_launch_description():
 
         DeclareLaunchArgument(
             'gt', default_value='false',
-            description='If the VH rosbag sequence is used, you can enable ground truth.'),
+            description='Ground truth: vicon (V1/V2 sequences), leica (MH sequences) or false.'),
 
         DeclareLaunchArgument(
             'rtabmap_viz', default_value='true',
@@ -94,7 +104,7 @@ def generate_launch_description():
             remappings=remappings),
 
         Node(
-            condition=IfCondition(ground_truth),
+            condition=IfCondition(PythonExpression(["'", ground_truth, "' != 'false'"])),
             package='rtabmap_slam', executable='rtabmap', output='screen',
             parameters=[parameters,
                 { 'ground_truth_frame_id':'world',
@@ -102,7 +112,7 @@ def generate_launch_description():
             remappings=remappings,
             arguments=['-d']),
         Node(
-            condition=UnlessCondition(ground_truth),
+            condition=ground_truth_is('false'),
             package='rtabmap_slam', executable='rtabmap', output='screen',
             parameters=[parameters],
             remappings=remappings,
@@ -170,7 +180,7 @@ def generate_launch_description():
             arguments=['--x', '-0.019844', '--y', '0.045369', '--z', '0.007862',
                        '--yaw', '1.558237', '--pitch', '0.025393', '--roll', '0.017907',
                        '--frame-id', 'imu4', '--child-frame-id', 'cam1']),
-        # Ground truth's base frame, in two steps. The IMU in the Vicon marker's frame: the
+        # Vicon ground truth (V1/V2 sequences): its base frame, in two steps. The IMU in the Vicon marker's frame: the
         # inverse of the datasets' mav0/vicon0/sensor.yaml T_BS (the Vicon marker in the IMU
         # frame), which is:
         #   T_BS: [ 0.33638, -0.01749,  0.94156,  0.06901,
@@ -178,13 +188,15 @@ def generate_launch_description():
         #           0.94150, -0.01582, -0.33665, -0.12395,
         #           0.0,      0.0,      0.0,      1.0]
         Node(
+            condition=ground_truth_is('vicon'),
             package='tf2_ros', executable='static_transform_publisher', output='screen',
             arguments=['--x', '0.09291', '--y', '-0.02856', '--z', '-0.10701',
                        '--yaw', '-0.051939', '--pitch', '-1.227243', '--roll', '-3.108506',
                        '--frame-id', 'vicon/firefly_sbx/firefly_sbx', '--child-frame-id', 'imu4_gt']),
-        # Then base_link from the IMU: the inverse of base_link -> imu4 above (as a quaternion,
-        # its pitch being -90 deg)
+        # Then base_link from the IMU (Vicon and Leica ground truths): the inverse of
+        # base_link -> imu4 above (as a quaternion, its pitch being -90 deg)
         Node(
+            condition=IfCondition(PythonExpression(["'", ground_truth, "' != 'false'"])),
             package='tf2_ros', executable='static_transform_publisher', output='screen',
             arguments=['--qx', '-0.707107', '--qy', '0', '--qz', '-0.707107', '--qw', '0',
                        '--frame-id', 'imu4_gt', '--child-frame-id', 'base_link_gt']),
@@ -195,9 +207,29 @@ def generate_launch_description():
                        '--frame-id', 'world', '--child-frame-id', 'map']),
         
         Node(
+            condition=ground_truth_is('vicon'),
             package='rtabmap_util', executable='transform_to_tf.py', output='screen',
             parameters=[{'frame_id': 'world', 'child_frame_id': 'vicon/firefly_sbx/firefly_sbx'}],
-            remappings=[('transform', '/vicon/firefly_sbx/firefly_sbx')]),    
+            remappings=[('transform', '/vicon/firefly_sbx/firefly_sbx')]),
+
+        # Leica ground truth (MH sequences): the prism's position with the IMU's orientation
+        # (see the notes above)
+        Node(
+            condition=ground_truth_is('leica'),
+            package='rtabmap_examples', executable='euroc_leica_ground_truth.py', output='screen',
+            parameters=[{'frame_id': 'leica', 'fixed_frame_id': 'world'}],
+            remappings=[('point', '/leica/position'), ('imu', '/imu/data')]),
+        # Then the IMU from the prism: the inverse of the datasets' mav0/leica0/sensor.yaml
+        # T_BS (the prism in the IMU frame, without rotation), which is:
+        #   T_BS: [1.0, 0.0, 0.0,  7.48903e-02,
+        #          0.0, 1.0, 0.0, -1.84772e-02,
+        #          0.0, 0.0, 1.0, -1.20209e-01,
+        #          0.0, 0.0, 0.0,  1.0]
+        Node(
+            condition=ground_truth_is('leica'),
+            package='tf2_ros', executable='static_transform_publisher', output='screen',
+            arguments=['--x', '-0.0748903', '--y', '0.0184772', '--z', '0.120209',
+                       '--frame-id', 'leica', '--child-frame-id', 'imu4_gt']),
     ])
 
 

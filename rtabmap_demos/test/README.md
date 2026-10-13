@@ -8,7 +8,7 @@
 | `stereo_outdoor` | `stereo_outdoor_demo.launch.py` | `stereo_outdoorA_bag` then `stereo_outdoorB_bag` |
 | `netherdrone_lidar3d` | `netherdrone_lidar3d_demo.launch.py` | `netherdrone_ouster_vertige_bag_0` to `_5`, played one after the other |
 | `find_object` | `find_object_demo.launch.py` | `demo_find_object_bag` (skipped without `find_object_2d`, which Lyrical and Rolling do not have) |
-| `euroc_stereo` | `rtabmap_examples`' `euroc_datasets.launch.py` (`gt:=true`) | `euroc_V1_02_medium_bag` (EuRoC MAV's V1_02_medium) |
+| `euroc_stereo` | `rtabmap_examples`' `euroc_datasets.launch.py` (`gt:=vicon`) | `euroc_V1_02_medium_bag` (EuRoC MAV's V1_02_medium) |
 
 ## Running
 
@@ -39,7 +39,7 @@ Each scenario replays its bag in about real time on a desktop, longer on a slowe
 3. Once the bag is done, the launch file is stopped as Ctrl-C would, so rtabmap closes its database. The graph is exported from the database with `rtabmap-export`, every node optimized.
 4. The run is compared with the golden graph: node count, loop closures and path length within each scenario's tolerances (and, for `netherdrone_lidar3d`, a loop closure with the first node, the end of the flight overlapping its start), and rtabmap's translational and rotational RMSE against the golden trajectory under each scenario's limits.
 
-A scenario whose launch file gives rtabmap its own ground truth (`ground_truth_from_bag`, as `euroc_stereo` with `gt:=true`: the bag's Vicon poses) skips the golden trajectory: its RMSE is against that ground truth instead, and its golden files are only the graph (`.g2o`, for the node and loop closure counts), without the poses (`.tum`). A scenario can also start partway into its bag (`bag_start`), and use a launch file from another package (`launch_package`). Topics whose message type is not installed (a robot's own messages in a dataset's bag) are not played.
+A scenario whose launch file gives rtabmap its own ground truth (`ground_truth_from_bag`, as `euroc_stereo` with `gt:=vicon`: the bag's Vicon poses) skips the golden trajectory: its RMSE is against that ground truth instead, and its golden files are only the graph (`.g2o`, for the node and loop closure counts), without the poses (`.tum`). A scenario can also start partway into its bag (`bag_start`), and use a launch file from another package (`launch_package`). Topics whose message type is not installed (a robot's own messages in a dataset's bag) are not played.
 
 ## The lockstep player
 

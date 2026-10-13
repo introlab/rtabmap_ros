@@ -7,6 +7,11 @@ install(DIRECTORY launch config
    DESTINATION share/${PROJECT_NAME}
 )
 
+install(PROGRAMS
+  scripts/euroc_leica_ground_truth.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 if(BUILD_TESTING)
   find_package(ament_cmake_pytest REQUIRED)
   # rtabmap_launch's launch file test, on this package's installed launch files: each
