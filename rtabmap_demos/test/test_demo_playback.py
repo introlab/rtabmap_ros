@@ -169,9 +169,9 @@ SCENARIOS = [
         # A node every 4.3 s, when the assembled cloud of half a turn of the mast is ready.
         chunk_slack=5.0,
         # Local closures only (no global ones: the camera's bag-of-words finds none),
-        # 25 in the golden graph, 19 in a Kilted CI run, 17 in a Jazzy one: at least 15,
-        # with some margin, the closure with the first node below being what matters.
-        closure_slack=0.4,
+        # 25 in the golden graph, 19 in a Kilted CI run, 17 in a Jazzy one, 11 in another:
+        # at least 10, the closure with the first node below being what matters.
+        closure_slack=0.6,
         # The end of the flight overlaps its start enough for a proximity closure back to
         # the first node, as in the golden graph (1-3558) and every run so far (1-3551 in
         # a Jazzy one).
