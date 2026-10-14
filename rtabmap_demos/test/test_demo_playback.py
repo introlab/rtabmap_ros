@@ -213,7 +213,11 @@ SCENARIOS = [
                     'always_process_most_recent_frame': False},
         packages=['imu_complementary_filter', 'image_proc'],
         max_node_difference=0.05,
-        # 0.071 to 0.094 m and 3.65 deg in runs against the golden graph
+        # Global and local closures: 38 in the golden graph and in runs here, 29 in a
+        # Rolling CI run, 19 in a Kilted one (CI's rtabmap build): at least 17.
+        closure_slack=0.55,
+        # 0.071 to 0.094 m and 3.65 deg in runs against the golden graph; 0.083 m and
+        # 3.61 deg, and 0.101 m and 3.81 deg in those CI runs
         max_rmse=0.15,
         max_rotational_rmse=6.0),
 ]

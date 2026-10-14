@@ -390,6 +390,7 @@ private:
 	double waitForTransform_;
 	double stalenessFactor_;
 	bool useActionForGoal_;
+	std::string apriltagTfPrefix_;
 	bool useSavedMap_;
 	bool genScan_;
 	double genScanMaxDepth_;

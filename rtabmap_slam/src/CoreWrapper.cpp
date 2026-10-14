@@ -123,6 +123,7 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 		waitForTransform_(0.2),// 200 ms
 		stalenessFactor_(0.0),
 		useActionForGoal_(false),
+		apriltagTfPrefix_(""), // Default to "[family]:" when empty
 		useSavedMap_(true),
 		genScan_(false),
 		genScanMaxDepth_(4.0),
@@ -283,6 +284,10 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 		RCLCPP_INFO(get_logger(), "rtabmap: scan_cloud_max_points = %d", scanCloudMaxPoints_);
 		RCLCPP_INFO(get_logger(), "rtabmap: scan_cloud_is_2d = %s", scanCloudIs2d_?"true":"false");
 	}
+#ifdef WITH_APRILTAG_MSGS
+	apriltagTfPrefix_ = this->declare_parameter("apriltag_tf_prefix", apriltagTfPrefix_);
+	RCLCPP_INFO(this->get_logger(), "rtabmap: apriltag_tf_prefix = %s", apriltagTfPrefix_.c_str());
+#endif
 
 	// Create the processing timer  
 	processingCallbackGroup_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
@@ -2872,10 +2877,10 @@ void CoreWrapper::apriltagAsyncCallback(const apriltag_msgs::msg::AprilTagDetect
 		UScopeMutex lock(landmarksMutex_);
 		for(unsigned int i=0; i<msg->detections.size(); ++i)
 		{
-			std::string tagFrameId = msg->detections[i].family+":"+uNumber2Str(msg->detections[i].id);
+			std::string tagFrameId = (apriltagTfPrefix_.empty()?msg->detections[i].family+":":apriltagTfPrefix_)+uNumber2Str(msg->detections[i].id);
 			Transform camToTag = rtabmap_conversions::getTransform(
 				msg->header.frame_id, // e.g., camera_optical_frame
-				tagFrameId,                     // e.g., tag36h11:42
+				tagFrameId,           // e.g., tag36h11:42
 				msg->header.stamp,
 				*tfBuffer_,
 				waitForTransform_);
