@@ -570,13 +570,17 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 
 	if(parameters_.find(Parameters::kRtabmapDetectionRate()) != parameters_.end())
 	{
-		Parameters::parse(parameters_, Parameters::kRtabmapDetectionRate(), rate_);
-		RCLCPP_INFO(this->get_logger(), "RTAB-Map detection rate = %f Hz", rate_);
+		float rate = rate_;
+		Parameters::parse(parameters_, Parameters::kRtabmapDetectionRate(), rate);
+		rate_ = rate;
+		RCLCPP_INFO(this->get_logger(), "RTAB-Map detection rate = %f Hz", rate);
 	}
 	if(parameters_.find(Parameters::kRtabmapCreateIntermediateNodes()) != parameters_.end())
 	{
-		Parameters::parse(parameters_, Parameters::kRtabmapCreateIntermediateNodes(), createIntermediateNodes_);
-		if(createIntermediateNodes_)
+		bool createIntermediateNodes = createIntermediateNodes_;
+		Parameters::parse(parameters_, Parameters::kRtabmapCreateIntermediateNodes(), createIntermediateNodes);
+		createIntermediateNodes_ = createIntermediateNodes;
+		if(createIntermediateNodes)
 		{
 			RCLCPP_INFO(this->get_logger(), "Create intermediate nodes");
 			if(rate_ == 0.0f)
@@ -616,7 +620,9 @@ CoreWrapper::CoreWrapper(const rclcpp::NodeOptions & options) :
 	}
 	if(parameters_.find(Parameters::kRtabmapImagesAlreadyRectified()) != parameters_.end())
 	{
-		Parameters::parse(parameters_, Parameters::kRtabmapImagesAlreadyRectified(), alreadyRectifiedImages_);
+		bool alreadyRectifiedImages = alreadyRectifiedImages_;
+		Parameters::parse(parameters_, Parameters::kRtabmapImagesAlreadyRectified(), alreadyRectifiedImages);
+		alreadyRectifiedImages_ = alreadyRectifiedImages;
 	}
 	if(parameters_.find(Parameters::kRegForce3DoF()) != parameters_.end())
 	{
@@ -1189,7 +1195,7 @@ bool CoreWrapper::odomUpdate(const nav_msgs::msg::Odometry & odomMsg, rclcpp::Ti
 				stamp.seconds(),
 				previousStamp_.seconds(),
 				Parameters::kRtabmapDetectionRate().c_str(),
-				rate_,
+				rate_.load(),
 				1.0f/rate_,
 				stalenessFactor_,
 				stalenessFactor_/rate_);
@@ -1299,7 +1305,7 @@ bool CoreWrapper::odomTFUpdate(const std::string & odomFrameId, const rclcpp::Ti
 				stamp.seconds(),
 				previousStamp_.seconds(),
 				Parameters::kRtabmapDetectionRate().c_str(),
-				rate_,
+				rate_.load(),
 				1.0f/rate_,
 				stalenessFactor_,
 				stalenessFactor_/rate_);
@@ -2385,12 +2391,14 @@ void CoreWrapper::process(
 			Transform t = Transform::getTransform(imus_, data.stamp());
 			if(!t.isNull())
 			{
+				// copy under lock, imuAsyncCallback() can modify it concurrently
+				std::string imuFrameId = imuFrameId_;
 				imuMutex_.unlock();
 				// get local transform
 				rtabmap::Transform localTransform;
-				if(frameId_.compare(imuFrameId_) != 0)
+				if(frameId_.compare(imuFrameId) != 0)
 				{
-					localTransform = rtabmap_conversions::getTransform(frameId_, imuFrameId_, rtabmap_conversions::timestampToROS(data.stamp()), *tfBuffer_, waitForTransform_);
+					localTransform = rtabmap_conversions::getTransform(frameId_, imuFrameId, rtabmap_conversions::timestampToROS(data.stamp()), *tfBuffer_, waitForTransform_);
 				}
 				else
 				{
@@ -2687,7 +2695,7 @@ void CoreWrapper::process(
 			if(data.id() >= 0)
 			{
 				localizationDiagnostic_.updateStatus(rtabmap_.getStatistics().localizationCovariance(), twoDMapping_);
-				tick(stamp, rate_>0?rate_:1000.0/(timeMsgConversion+timeRtabmap+timeUpdateMaps+timePublishMaps));
+				tick(stamp, rate_>0?rate_.load():1000.0/(timeMsgConversion+timeRtabmap+timeUpdateMaps+timePublishMaps));
 			}
 		}
 		else
@@ -2764,7 +2772,7 @@ void CoreWrapper::userDataAsyncCallback(const rtabmap_msgs::msg::UserData::Share
 					"data input topic rate is higher than "
 					"map update rate (current %s=%f), only latest data is saved "
 					"in the next node created. This message will is shown only once.",
-					Parameters::kRtabmapDetectionRate().c_str(), rate_);
+					Parameters::kRtabmapDetectionRate().c_str(), rate_.load());
 			warningShow = true;
 		}
 		userData_ = rtabmap_conversions::userDataFromROS(*dataMsg);
@@ -3323,7 +3331,7 @@ void CoreWrapper::applyParameters()
 	if(parameters_.find(Parameters::kRtabmapDetectionRate()) != parameters_.end())
 	{
 		rate_ = uStr2Float(parameters_.at(Parameters::kRtabmapDetectionRate()));
-		RCLCPP_INFO(get_logger(), "RTAB-Map rate detection = %f Hz", rate_);
+		RCLCPP_INFO(get_logger(), "RTAB-Map rate detection = %f Hz", rate_.load());
 	}
 	if(parameters_.find(Parameters::kRtabmapCreateIntermediateNodes()) != parameters_.end())
 	{
