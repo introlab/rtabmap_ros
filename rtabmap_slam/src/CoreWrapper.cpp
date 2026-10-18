@@ -3044,7 +3044,7 @@ void CoreWrapper::imuAsyncCallback(const sensor_msgs::msg::Imu::SharedPtr msg)
 				imus_.clear();
 				imuFrameId_.clear();
 			}
-			else
+			else if(imuFrameId_.empty())
 			{
 				imuFrameId_ = msg->header.frame_id;
 			}
