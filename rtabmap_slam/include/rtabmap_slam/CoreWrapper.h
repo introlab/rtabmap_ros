@@ -31,6 +31,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap_slam/visibility.h>
 #include <rclcpp/rclcpp.hpp>
 
+#include <atomic>
+
 #include <std_srvs/srv/empty.hpp>
 
 #include <tf2_ros/buffer.hpp>
@@ -481,7 +483,7 @@ private:
 #endif
 
 	std::thread* transformThread_;
-	bool tfThreadRunning_;
+	std::atomic<bool> tfThreadRunning_;
 
 	// for loop closure detection only
 	image_transport::Subscriber defaultSub_;
@@ -548,11 +550,12 @@ private:
 
 	bool stereoToDepth_;
 	bool odomSensorSync_;
-	float rate_;
-	bool createIntermediateNodes_;
+	// atomic: written by the parameter event callback, read by the sync callbacks
+	std::atomic<float> rate_;
+	std::atomic<bool> createIntermediateNodes_;
 	int mappingMaxNodes_;
 	double mappingAltitudeDelta_;
-	bool alreadyRectifiedImages_;
+	std::atomic<bool> alreadyRectifiedImages_;
 	bool twoDMapping_;
 	rclcpp::Time previousStamp_;
 
