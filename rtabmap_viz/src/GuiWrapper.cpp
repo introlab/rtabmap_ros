@@ -186,6 +186,7 @@ GuiWrapper::~GuiWrapper()
 	UDEBUG("Destroying");
 
 	delete infoMapSync_;
+	delete goalPathSync_;
 	delete mainWindow_;
 }
 
