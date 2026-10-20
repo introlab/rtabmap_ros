@@ -170,6 +170,12 @@ RGBDXSync::~RGBDXSync()
 	SYNC_DEL(rgbd6);
 	SYNC_DEL(rgbd7);
 	SYNC_DEL(rgbd8);
+	// After the synchronizers, which are connected to the subscribers.
+	for(size_t i=0; i<rgbdSubs_.size(); ++i)
+	{
+		delete rgbdSubs_[i];
+	}
+	rgbdSubs_.clear();
 }
 
 void RGBDXSync::rgbd2Callback(

@@ -142,12 +142,12 @@ private:
 	typedef message_filters::sync_policies::ExactTime<
 			rtabmap_msgs::msg::Info,
 			rtabmap_msgs::msg::MapData> MyInfoMapSyncPolicy;
-	message_filters::Synchronizer<MyInfoMapSyncPolicy> * infoMapSync_;
+	message_filters::Synchronizer<MyInfoMapSyncPolicy> * infoMapSync_ = nullptr;
 
 	typedef message_filters::sync_policies::ExactTime<
 			rtabmap_msgs::msg::Goal,
 			nav_msgs::msg::Path> MyGoalPathSyncPolicy;
-	message_filters::Synchronizer<MyGoalPathSyncPolicy> * goalPathSync_;
+	message_filters::Synchronizer<MyGoalPathSyncPolicy> * goalPathSync_ = nullptr;
 };
 
 }
