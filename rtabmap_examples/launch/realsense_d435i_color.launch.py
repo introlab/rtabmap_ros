@@ -15,7 +15,8 @@ def generate_launch_description():
           'subscribe_depth':True,
           'subscribe_odom_info':True,
           'approx_sync':False,
-          'wait_imu_to_init':True}]
+          'wait_imu_to_init':True,
+          'qos': 1}]  # reliable: with best effort, a lost fragment of a large image drops the whole image
 
     remappings=[
           ('imu', '/imu/data'),

@@ -16,7 +16,8 @@ from launch.substitutions import LaunchConfiguration
 def generate_launch_description():
     vo_parameters={
           'frame_id':'camera_link',
-          'wait_imu_to_init':True}
+          'wait_imu_to_init':True,
+          'qos': 1}  # reliable: with best effort, a lost fragment of a large image drops the whole image
 
     vo_remappings=[
           ('imu', '/imu/data'),
@@ -29,7 +30,8 @@ def generate_launch_description():
           'frame_id':'camera_link',
           'subscribe_depth':True,
           'subscribe_odom_info':True,
-          'approx_sync':False}
+          'approx_sync':False,
+          'qos': 1}  # reliable: with best effort, a lost fragment of a large image drops the whole image
 
     slam_remappings=[
           ('imu', '/imu/data'),

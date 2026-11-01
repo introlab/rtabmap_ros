@@ -101,15 +101,10 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
                 extra_arguments=intra_process))
 
     # VSLAM
-    # Note: latch=False. rtabmap latches its map/cloud/octomap/mapGraph topics
-    # by default (transient_local QoS), which is incompatible with intra-process
-    # comms ("intraprocess communication allowed only with volatile durability").
-    # latch=False makes them volatile so the node can join the container.
     composable_nodes.append(
         ComposableNode(
             package='rtabmap_slam', plugin='rtabmap_slam::CoreWrapper',
-            parameters=parameters + [{'delete_db_on_start': True, # Equivalent of '-d'
-                                      'latch': False}],
+            parameters=parameters + [{'delete_db_on_start': True}], # Equivalent of '-d'
             remappings=remappings,
             extra_arguments=intra_process))
 

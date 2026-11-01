@@ -12,7 +12,8 @@ def generate_launch_description():
           'frame_id':'camera_link',
           'subscribe_depth':True,
           'subscribe_odom_info':True,
-          'approx_sync':False}]
+          'approx_sync':False,
+          'qos': 1}]  # reliable: with best effort, a lost fragment of a large image drops the whole image
 
     remappings=[
           ('rgb/image', '/camera/color/image_raw'),
