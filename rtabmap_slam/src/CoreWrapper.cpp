@@ -73,8 +73,16 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #ifdef WITH_OCTOMAP_MSGS
 #ifdef RTABMAP_OCTOMAP
+// octomap includes <ciso646>, which GCC deprecates (#warning) from C++20.
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcpp"
+#endif
 #include <octomap_msgs/conversions.h>
 #include <rtabmap/core/OctoMap.h>
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 #endif
 #endif
 

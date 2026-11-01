@@ -150,7 +150,7 @@ PointCloudAssembler::PointCloudAssembler(const rclcpp::NodeOptions & options) :
 		syncOdomInfoSub_.subscribe(this, "odom_info", RCLCPP_QOS(topicQueueSize, qosOdom));
 		exactInfoSync_ = new message_filters::Synchronizer<syncInfoPolicy>(syncInfoPolicy(syncQueueSize), syncCloudSub_, syncOdomSub_, syncOdomInfoSub_);
 		exactInfoSync_->registerCallback(std::bind(&rtabmap_util::PointCloudAssembler::callbackCloudOdomInfo, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
-		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (exact sync):\n   %s,\n   %s",
+		subscribedTopicsMsg_ = uFormat("\n%s subscribed to (exact sync):\n   %s,\n   %s,\n   %s",
 							get_name(),
 							syncCloudSub_.getSubscriber()->get_topic_name(),
 							syncOdomSub_.getSubscriber()->get_topic_name(),
@@ -278,7 +278,7 @@ void PointCloudAssembler::callbackCloud(const sensor_msgs::msg::PointCloud2::Con
 	if(cloudPub_->get_subscription_count())
 	{
 		UASSERT_MSG(cloudMsg->data.size() == cloudMsg->row_step*cloudMsg->height,
-						uFormat("data=%d row_step=%d height=%d", cloudMsg->data.size(), cloudMsg->row_step, cloudMsg->height).c_str());
+						uFormat("data=%zu row_step=%u height=%u", cloudMsg->data.size(), cloudMsg->row_step, cloudMsg->height).c_str());
 
 		if(skipClouds_<=0 || cloudsSkipped_ >= skipClouds_)
 		{

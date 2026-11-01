@@ -64,7 +64,9 @@ def generate_launch_description():
             name='rtabmap_container',
             namespace='',
             package='rclcpp_components',
-            executable='component_container',
+            # Multi-threaded: rtabmap's processing (tens of ms) doesn't hold back
+            # the camera and odometry callbacks.
+            executable='component_container_mt',
             output='screen',
             composable_node_descriptions=[
 

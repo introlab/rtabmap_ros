@@ -54,7 +54,7 @@ A scenario whose launch file gives rtabmap its own ground truth (`ground_truth_f
 A sleeping thread looks idle even when work is still under way: a node waiting for a transform with a timeout, or a message still on its way to a subscriber. A message then goes out early, and waits in its subscriber's queue, so nothing is lost as long as every subscriber keeps what it receives:
 
 - **Reliable subscriptions:** every QoS parameter of rtabmap's nodes is set to reliable (`RELIABLE_QOS` in `test_demo_playback.py`). Their default, the system's, is best effort with Fast DDS (the ROS 2 default), which drops a message arriving while the node is busy: a loaded CI runner lost up to two thirds of the lidar sweeps that way.
-- **Every frame processed:** odometry with `always_process_most_recent_frame` on drops a frame arriving while it is busy. The scenarios set it off, and deepen the queues that need it (`parameters`, `node_parameters`).
+- **Every frame processed:** odometry by default registers only the newest of the frames arriving while it is busy (`frame_policy`). The scenarios set `frame_policy` to 0, and deepen the queues that need it (`parameters`, `node_parameters`).
 
 `RTABMAP_DEMOS_REPLAY=chunked` replays without the idle check instead: at the bag's pace, 10 s at a time, waiting after each until rtabmap's `/info` has caught up (within each scenario's `chunk_slack`). It is as fast, but within a chunk a node slower than real time builds up a backlog: lockstep, the default, waits for it instead.
 
@@ -137,7 +137,7 @@ sequenceDiagram
     Note over P: everything asleep again:<br/>the next frame can go
 ```
 
-The pipeline is idle only once rtabmap is done with the frame, so the next frame is never published while any node is still working on this one. With `always_process_most_recent_frame: False`, odometry registers each frame in turn rather than skipping to the most recent, and with `output_queue_size: 10` on `stereo_sync`, a frame it publishes is not replaced before odometry and rtabmap have received it.
+The pipeline is idle only once rtabmap is done with the frame, so the next frame is never published while any node is still working on this one. With `frame_policy: 0`, odometry registers each frame in turn rather than skipping to the most recent, and with `output_queue_size: 10` on `stereo_sync`, a frame it publishes is not replaced before odometry and rtabmap have received it.
 
 ### `netherdrone_lidar3d`: one lidar sweep
 
@@ -197,7 +197,7 @@ sequenceDiagram
     Note over P: everything asleep again:<br/>the next message can go
 ```
 
-The idle check before each sweep comes after the IMU messages before it: by then, the filter and `imu_to_tf` have processed them, and the transforms `lidar_deskewing` needs are there. Every sweep reaches odometry with reliable subscriptions throughout (a best-effort `lidar_deskewing` lost up to two thirds of them on CI), and `icp_odometry` registers each in turn (`always_process_most_recent_frame: False`, `topic_queue_size: 10`). The six bags of the flight are played one after the other, about 6 minutes of data.
+The idle check before each sweep comes after the IMU messages before it: by then, the filter and `imu_to_tf` have processed them, and the transforms `lidar_deskewing` needs are there. Every sweep reaches odometry with reliable subscriptions throughout (a best-effort `lidar_deskewing` lost up to two thirds of them on CI), and `icp_odometry` registers each in turn (`frame_policy: 0`, `topic_queue_size: 10`). The six bags of the flight are played one after the other, about 6 minutes of data.
 
 ## Golden graphs
 

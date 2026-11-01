@@ -135,7 +135,7 @@ SCENARIOS = [
         # As for netherdrone_lidar3d below: every pair stereo_sync makes reaches odometry
         # and is registered (all 3741 of them on an idle machine).
         parameters={'output_queue_size': 10,
-                    'always_process_most_recent_frame': False},
+                    'frame_policy': 0},
         # As for robot_mapping: with bag A alone, 161 nodes in CI against 185 here, and
         # up to 3.06 deg.
         max_node_difference=0.15,
@@ -162,7 +162,7 @@ SCENARIOS = [
         # what rtabmap saves as intermediate nodes, both needed for each one.
         parameters={'output_queue_size': 10,
                     'topic_queue_size': 10,
-                    'always_process_most_recent_frame': False},
+                    'frame_policy': 0},
         # The intermediate nodes' statistics without the bulky data (features, local map)
         # the full odometry info carries: lighter to deliver for every pose.
         remappings=[('inter_odom_info', 'odom_info_lite')],
@@ -210,7 +210,7 @@ SCENARIOS = [
         launch_arguments={'rtabmap_viz': 'false', 'gt': 'vicon'},
         ground_truth_from_bag=True,
         parameters={'output_queue_size': 10,
-                    'always_process_most_recent_frame': False},
+                    'frame_policy': 0},
         packages=['imu_complementary_filter', 'image_proc'],
         max_node_difference=0.05,
         # Global and local closures: 38 in the golden graph and in runs here, 29 in a

@@ -229,7 +229,7 @@ protected:
 	{
 		// Defaults first, so a test that passes the same parameter overrides them.
 		//
-		// always_process_most_recent_frame:=false is what the node itself recommends for
+		// frame_policy:=0 is what the node itself recommends for
 		// data that arrives faster than its stamps: these tests publish a whole sequence
 		// back to back with stamps a tenth of a second apart, and when the executor is
 		// slow enough that two of them land in the same spin -- a loaded CI runner, a
@@ -240,7 +240,7 @@ protected:
 		std::vector<rclcpp::Parameter> all = {
 			rclcpp::Parameter("frame_id", "base_link"),
 			rclcpp::Parameter("publish_tf", false),
-			rclcpp::Parameter("always_process_most_recent_frame", false),
+			rclcpp::Parameter("frame_policy", 0),
 		};
 		all.insert(all.end(), params.begin(), params.end());
 		rclcpp::NodeOptions options;

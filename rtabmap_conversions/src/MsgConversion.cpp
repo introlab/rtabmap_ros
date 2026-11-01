@@ -3077,6 +3077,38 @@ bool convertRGBDMsgs(
 	return true;
 }
 
+bool convertCameraModelsMsgs(
+		const std::vector<sensor_msgs::msg::CameraInfo> & cameraInfoMsgs,
+		const std::vector<sensor_msgs::msg::CameraInfo> & depthCameraInfoMsgs,
+		const std::string & frameId,
+		const std::string & odomFrameId,
+		const rclcpp::Time & odomStamp,
+		std::vector<rtabmap::CameraModel> & cameraModels,
+		std::vector<rtabmap::StereoCameraModel> & stereoCameraModels,
+		tf2_ros::Buffer & tfBuffer,
+		double waitForTransform,
+		bool alreadRectifiedImages)
+{
+	// convertRGBDMsgs() without images: the same models, nothing done with the images
+	cv::Mat rgb;
+	cv::Mat depth;
+	return convertRGBDMsgs(
+			std::vector<cv_bridge::CvImageConstPtr>(),
+			std::vector<cv_bridge::CvImageConstPtr>(),
+			cameraInfoMsgs,
+			depthCameraInfoMsgs,
+			frameId,
+			odomFrameId,
+			odomStamp,
+			rgb,
+			depth,
+			cameraModels,
+			stereoCameraModels,
+			tfBuffer,
+			waitForTransform,
+			alreadRectifiedImages);
+}
+
 bool convertStereoMsg(
 		const cv_bridge::CvImageConstPtr& leftImageMsg,
 		const cv_bridge::CvImageConstPtr& rightImageMsg,

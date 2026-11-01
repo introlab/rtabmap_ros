@@ -29,9 +29,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtabmap/utilite/ULogger.h"
 
 #include <QApplication>
+#include <QSurfaceFormat>
 #include <rtabmap/gui/MainWindow.h>
 #include <rtabmap/utilite/ULogger.h>
 #include <signal.h>
+
+#include <vtkVersionMacros.h>
+#if VTK_MAJOR_VERSION > 9 || (VTK_MAJOR_VERSION==9 && VTK_MINOR_VERSION >= 1)
+#include <QVTKRenderWidget.h>
+#endif
 
 QApplication * app = 0;
 
@@ -48,6 +54,13 @@ int main(int argc, char** argv)
 	ULogger::setLevel(ULogger::kWarning);
 
 	rclcpp::init(argc, argv);
+
+	// As rtabmap's app: the OpenGL context VTK needs, shared by all its render
+	// widgets, set before QApplication is constructed.
+#if VTK_MAJOR_VERSION > 9 || (VTK_MAJOR_VERSION==9 && VTK_MINOR_VERSION >= 1)
+	QSurfaceFormat::setDefaultFormat(QVTKRenderWidget::defaultFormat());
+#endif
+	QApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
 
 	app = new QApplication(argc, argv);
 	app->connect( app, SIGNAL( lastWindowClosed() ), app, SLOT( quit() ) );

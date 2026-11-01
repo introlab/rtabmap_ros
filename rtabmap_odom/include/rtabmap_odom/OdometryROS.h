@@ -88,9 +88,15 @@ namespace rtabmap_odom {
  *
  * The class is also a UThread. By default the frame handed to processData() is passed to
  * that thread and the callback returns at once, so a slow registration cannot block the
- * executor; a frame arriving while the thread is busy is dropped rather than queued. With
- * `always_process_most_recent_frame:=false` it is registered on the calling thread
- * instead, which keeps every frame at the cost of holding up the executor.
+ * executor. What happens to a frame arriving while the thread is busy is `frame_policy`:
+ * - 2 (default): it waits in a one-frame slot, replaced by any newer one, and is
+ *   registered as soon as the thread is free: the highest frame rate, frames delivered
+ *   in bursts are not lost;
+ * - 1: it is dropped, the thread waits for the next one: the lowest delay;
+ * - 0: every frame is registered on the calling thread instead, in order, at the cost of
+ *   holding up the executor (e.g. replaying a bag).
+ * `always_process_most_recent_frame` is the deprecated parameter it replaces (false: 0,
+ * true: 1).
  *
  * @see the package README for the parameters and topics these nodes have in common.
  */
@@ -111,9 +117,10 @@ public:
 	 * @param[in]     header stamp and frame of the data, used to publish the result
 	 *
 	 * The frame is either queued for the worker thread or registered right here,
-	 * depending on `always_process_most_recent_frame`. Either way, a frame that arrives
-	 * while the previous one is still being registered is dropped: the odometry stays on
-	 * the newest data rather than falling behind.
+	 * depending on `frame_policy`. A frame that arrives while the previous one is still
+	 * being registered is kept for right after (only the newest one, policy 2) or dropped
+	 * (policies 0 and 1): the odometry stays on the newest data rather than falling
+	 * behind.
 	 */
 	void processData(rtabmap::SensorData & data, const std_msgs::msg::Header & header);
 
@@ -276,6 +283,12 @@ private:
 	std_msgs::msg::Header dataHeaderToProcess_;
 	bool bufferedDataToProcess_;
 	double imuUntilStampToProcess_; // IMU needed up to this stamp to process the buffered data
+	// frame_policy 2: the newest frame arrived while registering, next to process.
+	// Locked after dataMutex_ when both are.
+	UMutex pendingMutex_;
+	rtabmap::SensorData pendingData_;
+	std_msgs::msg::Header pendingHeader_;
+	bool hasPendingData_;
 
 	bool paused_;
 	int resetCountdown_;
@@ -292,7 +305,7 @@ private:
 	double expectedUpdateRate_;
 	double maxUpdateRate_;
 	double minUpdateRate_;
-	bool alwaysProcessMostRecentFrame_;
+	int framePolicy_; // 0: every frame, in the callback; 1: drop the ones arriving while busy; 2: keep the newest of them
 	std::string compressionImgFormat_;
 	std::string compressionDepthFormat_;
 	bool compressionParallelized_;
