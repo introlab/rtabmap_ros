@@ -3457,6 +3457,76 @@ TEST(MsgConversion, convertRGBDMsgsSurvivesAFailedOdomLookup)
 	EXPECT_NEAR(models[0].localTransform().x(), 0.1, 1e-3) << "left uncorrected";
 }
 
+// convertCameraModelsMsgs() is convertRGBDMsgs() with no image at all, e.g. for
+// rtabmap_viz subscribed to odom_info only: everything comes from the camera infos.
+TEST(MsgConversion, convertCameraModelsMsgsRGBDFromCameraInfos)
+{
+	// The camera info is stamped 1 s after odomStamp: synced as an image would be.
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();
+	addTf(*buffer, "base_link", "camera_link", rtabmap::Transform(0.1f, 0.0f, 0.2f, 0.0f, 0.0f, 0.0f), 1000.0);
+	addOdomMotion(*buffer);
+
+	std::vector<rtabmap::CameraModel> models;
+	std::vector<rtabmap::StereoCameraModel> stereoModels;
+	ASSERT_TRUE(convertCameraModelsMsgs(
+			{makeCameraInfo("camera_link", 1001.0, 64, 48)},
+			{makeCameraInfo("camera_link", 1001.0, 64, 48)},
+			"base_link", "odom", timestampToROS(1000.0), models, stereoModels,
+			*buffer, 0.0, true));
+
+	EXPECT_TRUE(stereoModels.empty()) << "no baseline in the camera infos, so RGB-D";
+	ASSERT_EQ(models.size(), 1u);
+	EXPECT_EQ(models[0].imageWidth(), 64) << "the size comes from the camera info";
+	EXPECT_EQ(models[0].imageHeight(), 48);
+	EXPECT_NEAR(models[0].fx(), 100.0, 1e-9);
+	EXPECT_NEAR(models[0].localTransform().x(), 1.1, 1e-3) << "0.1 base->camera plus 1.0 of odometry motion";
+	EXPECT_NEAR(models[0].localTransform().z(), 0.2, 1e-3);
+}
+
+TEST(MsgConversion, convertCameraModelsMsgsStereoFromCameraInfos)
+{
+	const double fx = 100.0;
+	const double baseline0 = 0.15;
+	const double baseline1 = 0.20;
+
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();
+	addTf(*buffer, "base_link", "left0", rtabmap::Transform(0.1f, 0.1f, 0, 0, 0, 0), 1000.0);
+	addTf(*buffer, "base_link", "left1", rtabmap::Transform(0.1f, -0.1f, 0, 0, 0, 0), 1000.0);
+
+	std::vector<rtabmap::CameraModel> models;
+	std::vector<rtabmap::StereoCameraModel> stereoModels;
+	ASSERT_TRUE(convertCameraModelsMsgs(
+			{makeCameraInfo("left0", 1000.0, 64, 48, 0.0, fx),
+			 makeCameraInfo("left1", 1000.0, 64, 48, 0.0, fx)},
+			{makeCameraInfo("right0", 1000.0, 64, 48, -fx*baseline0, fx),
+			 makeCameraInfo("right1", 1000.0, 64, 48, -fx*baseline1, fx)},
+			"base_link", "", timestampToROS(1000.0), models, stereoModels,
+			*buffer, 0.0, true));
+
+	EXPECT_TRUE(models.empty()) << "a baseline in the right camera info means stereo";
+	ASSERT_EQ(stereoModels.size(), 2u);
+	EXPECT_NEAR(stereoModels[0].baseline(), baseline0, 1e-6);
+	EXPECT_NEAR(stereoModels[1].baseline(), baseline1, 1e-6);
+	EXPECT_EQ(stereoModels[0].left().imageWidth(), 64);
+	EXPECT_EQ(stereoModels[0].left().imageHeight(), 48);
+	EXPECT_NEAR(stereoModels[0].localTransform().y(), 0.1, 1e-3);
+	EXPECT_NEAR(stereoModels[1].localTransform().y(), -0.1, 1e-3);
+}
+
+TEST(MsgConversion, convertCameraModelsMsgsFailsWithoutTheCameraTransform)
+{
+	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();
+
+	std::vector<rtabmap::CameraModel> models;
+	std::vector<rtabmap::StereoCameraModel> stereoModels;
+	EXPECT_FALSE(convertCameraModelsMsgs(
+			{makeCameraInfo("camera_link", 1000.0, 64, 48)}, {},
+			"base_link", "", timestampToROS(1000.0), models, stereoModels,
+			*buffer, 0.0, true));
+	EXPECT_TRUE(models.empty());
+	EXPECT_TRUE(stereoModels.empty());
+}
+
 TEST(MsgConversion, convertStereoMsgSyncsToOdomStamp)
 {
 	const std::shared_ptr<tf2_ros::Buffer> buffer = makeTfBuffer();

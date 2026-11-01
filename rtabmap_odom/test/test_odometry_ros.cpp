@@ -17,6 +17,9 @@ All rights reserved. (BSD-3-Clause, see the repository root.)
 
 #include <rtabmap_odom/icp_odometry.hpp>
 
+#include <rtabmap/core/Parameters.h>
+#include <rtabmap/utilite/UDirectory.h>
+
 #include "msg_builders.hpp"
 #include "node_test_utils.hpp"
 #include "scan_scenes.hpp"
@@ -262,7 +265,11 @@ TEST_F(OdometryRosTest, drops_frames_that_arrive_while_the_previous_one_is_regis
 }
 
 /// With policy 2, the frames arriving during a registration are not all lost: the newest
-/// one is registered right after, so the burst always ends on its last frame.
+/// one is registered right after, so a burst always ends on its last frame.
+///
+/// Several bursts, because policy 1 also registers the last frame of one when the worker
+/// happens to be idle as it arrives (about a third of the time here): all of them ending
+/// on their last frame is what tells the two policies apart.
 TEST_F(OdometryRosTest, registers_the_newest_frame_that_arrived_while_registering)
 {
 	publishSensorTf();
@@ -274,17 +281,21 @@ TEST_F(OdometryRosTest, registers_the_newest_frame_that_arrived_while_registerin
 	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub = scanPublisher();
 	ASSERT_TRUE(waitForSubscriber(pub));
 
+	const size_t bursts = 5;
 	const size_t burst = 10;
-	const double lastStamp = 1.0 + 0.1*(burst-1);
-	for(size_t i=0; i<burst; ++i)
+	size_t frame = 0;
+	for(size_t b=0; b<bursts; ++b)
 	{
-		pub->publish(makeXYZCloud("lidar", 1.0 + 0.1*i, corner3D(cv::Point3f(0.05f*i, 0, 0))));
+		for(size_t i=0; i<burst; ++i, ++frame)
+		{
+			pub->publish(makeXYZCloud("lidar", 1.0 + 0.1*frame, corner3D(cv::Point3f(0.05f*frame, 0, 0))));
+		}
+		const double lastStamp = 1.0 + 0.1*(frame-1);
+		ASSERT_TRUE(spinUntil([&]() {
+			return !odom->empty() && std::abs(rclcpp::Time(odom->back().header.stamp).seconds() - lastStamp) < 1e-6; }))
+				<< "the last frame of burst " << b << " was not registered (" << odom->size() << " poses)";
 	}
-
-	ASSERT_TRUE(spinUntil([&]() {
-		return !odom->empty() && std::abs(rclcpp::Time(odom->back().header.stamp).seconds() - lastStamp) < 1e-6; }))
-			<< "the last frame of the burst was not registered (" << odom->size() << " poses)";
-	EXPECT_LE(odom->size(), burst) << "more poses than frames";
+	EXPECT_LE(odom->size(), frame) << "more poses than frames";
 }
 
 /// With policy 0, the same burst is registered whole, one pose per frame.
@@ -328,6 +339,30 @@ TEST_F(OdometryRosTest, frame_policy_default_and_deprecated_parameter)
 	EXPECT_EQ(1, policyOf({rclcpp::Parameter("always_process_most_recent_frame", true)}));
 	EXPECT_EQ(2, policyOf({rclcpp::Parameter("always_process_most_recent_frame", true),
 	                       rclcpp::Parameter("frame_policy", 2)}));
+	EXPECT_EQ(2, policyOf({rclcpp::Parameter("frame_policy", 5)})) << "an invalid policy falls back to the default";
+	EXPECT_EQ(2, policyOf({rclcpp::Parameter("frame_policy", -1)})) << "an invalid policy falls back to the default";
+}
+
+/// The working directory is the rtabmap node's one, $ROS_HOME or ~/.ros, instead of
+/// RTAB-Map's own.
+TEST_F(OdometryRosTest, uses_ros_home_as_working_directory)
+{
+	// Restores ROS_HOME whatever happens below.
+	struct RosHomeGuard
+	{
+		RosHomeGuard() : wasSet(getenv("ROS_HOME") != nullptr), value(wasSet?getenv("ROS_HOME"):"") {}
+		~RosHomeGuard() { if(wasSet) setenv("ROS_HOME", value.c_str(), 1); else unsetenv("ROS_HOME"); }
+		bool wasSet;
+		std::string value;
+	} guard;
+
+	unsetenv("ROS_HOME");
+	EXPECT_EQ(UDirectory::homeDir() + "/.ros",
+			makeNode()->get_parameter(rtabmap::Parameters::kRtabmapWorkingDirectory()).as_string());
+
+	setenv("ROS_HOME", "/tmp/rtabmap_odom_test_ros_home", 1);
+	EXPECT_EQ("/tmp/rtabmap_odom_test_ros_home",
+			makeNode()->get_parameter(rtabmap::Parameters::kRtabmapWorkingDirectory()).as_string());
 }
 
 /// The frames the pose is published in are both configurable.

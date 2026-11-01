@@ -6,6 +6,7 @@ Ready-to-run demos of RTAB-Map. Each launch file sets up a complete pipeline for
 + [Indoor 2D LiDAR and RGB-D SLAM](#indoor-2d-lidar-and-rgb-d-slam)
 + [Multi-Session Indoor 2D LiDAR and RGB-D SLAM](#multi-session-indoor-2d-lidar-and-rgb-d-slam)
 + [Find-Object with SLAM](#find-object-with-slam)
++ [Netherdrone 3D LiDAR SLAM](#netherdrone-3d-lidar-slam)
 + [Turtlebot4 Nav2, 2D LiDAR and RGB-D SLAM](#turtlebot4-nav2-2d-lidar-and-rgb-d-slam)
 + [Turtlebot3 Nav2 and 2D LiDAR SLAM](#turtlebot3-nav2-and-2d-lidar-slam)
 + [Turtlebot3 Nav2 and RGB-D SLAM](#turtlebot3-nav2-and-rgb-d-slam)
@@ -40,7 +41,7 @@ Ready-to-run demos of RTAB-Map. Each launch file sets up a complete pipeline for
 ![Peek 2024-11-29 12-01](https://github.com/user-attachments/assets/b3cc0c67-517a-4f69-b4cc-35d288e96165)
 
 ### Netherdrone 3D LiDAR SLAM
-[netherdrone_lidar3d_demo.launch.py](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_demos/launch/netherdrone_lidar3d_demo.launch.py)
+[netherdrone_lidar3d_demo.launch.py](https://github.com/introlab/rtabmap_ros/blob/ros2/rtabmap_demos/launch/netherdrone_lidar3d_demo.launch.py) ([Video](https://youtu.be/ytsfhMdv9W0))
 
 ![Peek 2026-10-10 12-12](https://github.com/user-attachments/assets/a79f0519-6c39-48a4-8c14-799c0775571e)
 
