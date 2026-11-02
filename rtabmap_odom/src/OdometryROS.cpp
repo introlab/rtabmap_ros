@@ -687,9 +687,15 @@ void OdometryROS::processData(SensorData & data, const std_msgs::msg::Header & h
 {
 	//RCLCPP_WARN(get_logger(), "Received image: %f delay=%f", data.stamp(), (now() - header.stamp).seconds());
 	double clockNow = rtabmap_conversions::timestampFromROS(now());
+	// pendingMutex_ before trying dataMutex_ (not blocking, so no deadlock with the
+	// registration locking them the other way): a frame that cannot get dataMutex_ is then
+	// pending before that registration hands the pending frame over, see processData().
+	UScopeMutex pendingLock(pendingMutex_);
 	UScopeMutex dataLock(dataMutex_, false);
 	if(dataLock.lockTry() == 0)
 	{
+		// a pending frame is always handed over before dataMutex_ is released
+		UASSERT(!hasPendingData_);
 		if(bufferedDataToProcess_) {
 			RCLCPP_ERROR(this->get_logger(), "We didn't receive IMU newer than previous image/scan (%f) and we just received a new image/scan (%f). The previous image/scan is dropped! Make sure IMU is published faster and with less delay than the image/scan.",
 						rtabmap_conversions::timestampFromROS(dataHeaderToProcess_.stamp), rtabmap_conversions::timestampFromROS(header.stamp));
@@ -698,20 +704,11 @@ void OdometryROS::processData(SensorData & data, const std_msgs::msg::Header & h
 		dataToProcess_ = data;
 		dataHeaderToProcess_ = header;
 		bufferedDataToProcess_ = false;
-		{
-			// newer than a frame still waiting from a previous registration
-			UScopeMutex pendingLock(pendingMutex_);
-			if(hasPendingData_)
-			{
-				hasPendingData_ = false;
-				pendingData_ = SensorData();
-				++droppedMsgs_;
-			}
-		}
 		if(framePolicy_ != 0) {
 			dataReady_.release();
 		}
 		dataLock.unlock(); // processData() below must run unlocked
+		pendingLock.unlock();
 		++processedMsgs_;
 		if(framePolicy_ == 0) {
 			processData();
@@ -719,8 +716,7 @@ void OdometryROS::processData(SensorData & data, const std_msgs::msg::Header & h
 	}
 	else if(framePolicy_ == 2)
 	{
-		// Registering: keep it for right after (mainLoop()), replacing an older one.
-		UScopeMutex pendingLock(pendingMutex_);
+		// Registering: keep it for right after (processData()), replacing an older one.
 		if(hasPendingData_)
 		{
 			++droppedMsgs_;
@@ -768,9 +764,15 @@ void OdometryROS::mainLoop()
 		return;
 	}
 	processData();
+}
 
-	// frame_policy 2: the newest frame that arrived while registering, now
-	UScopeMutex dataLock(dataMutex_);
+void OdometryROS::processData()
+{
+	UScopeMutex lock(dataMutex_);
+	processDataLocked();
+
+	// frame_policy 2: the newest frame that arrived while registering, next. Handed over
+	// before dataMutex_ is released, so that a newer frame cannot get it first.
 	UScopeMutex pendingLock(pendingMutex_);
 	if(hasPendingData_)
 	{
@@ -788,10 +790,9 @@ void OdometryROS::mainLoop()
 		dataReady_.release();
 	}
 }
-void OdometryROS::processData()
-{
-	UScopeMutex lock(dataMutex_);
 
+void OdometryROS::processDataLocked()
+{
 	// aliases
 	SensorData & data = dataToProcess_;
 	std_msgs::msg::Header & header = dataHeaderToProcess_;

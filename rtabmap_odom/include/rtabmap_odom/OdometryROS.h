@@ -212,6 +212,8 @@ protected:
 
 private:
 	void processData();
+	/// processData() with dataMutex_ held: registers dataToProcess_.
+	void processDataLocked();
 	virtual void mainLoop();
 	virtual void mainLoopKill();
 	/// Lets a subclass adjust the RTAB-Map parameters before the odometry is created.
@@ -284,7 +286,7 @@ private:
 	bool bufferedDataToProcess_;
 	double imuUntilStampToProcess_; // IMU needed up to this stamp to process the buffered data
 	// frame_policy 2: the newest frame arrived while registering, next to process.
-	// Locked after dataMutex_ when both are.
+	// Locked after dataMutex_, except by processData(data, header) which only tries dataMutex_.
 	UMutex pendingMutex_;
 	rtabmap::SensorData pendingData_;
 	std_msgs::msg::Header pendingHeader_;
