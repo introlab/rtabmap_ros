@@ -5,6 +5,7 @@ All rights reserved. (BSD-3-Clause, see the repository root.)
 
 #include <gtest/gtest.h>
 
+#include <cmath>
 #include <cstdlib>
 
 #include <tf2_msgs/msg/tf_message.hpp>
@@ -15,6 +16,9 @@ All rights reserved. (BSD-3-Clause, see the repository root.)
 #include <rtabmap_msgs/srv/reset_pose.hpp>
 
 #include <rtabmap_odom/icp_odometry.hpp>
+
+#include <rtabmap/core/Parameters.h>
+#include <rtabmap/utilite/UDirectory.h>
 
 #include "msg_builders.hpp"
 #include "node_test_utils.hpp"
@@ -57,7 +61,7 @@ protected:
 		// See the note in test_icp_odometry.cpp: without this the node drops frames that
 		// arrive closer together than their stamps claim, which is what a loaded runner
 		// does to a sequence published back to back.
-		all.push_back(rclcpp::Parameter("always_process_most_recent_frame", false));
+		all.push_back(rclcpp::Parameter("frame_policy", 0));
 		for(const rclcpp::Parameter & p : params)
 		{
 			all.push_back(p);
@@ -221,18 +225,18 @@ protected:
 };
 
 /**
- * always_process_most_recent_frame is a "skip the backlog" policy, and it is on by
- * default: a frame that arrives while the previous one is still being registered is
- * dropped rather than queued, so the odometry stays on the newest data instead of falling
- * further and further behind a sensor it cannot keep up with. Registration holds the data
- * mutex for its whole duration, and a frame that cannot take that mutex is the one that
- * gets dropped.
+ * frame_policy decides what happens to a frame arriving while the previous one is still
+ * being registered. Registration holds the data mutex for its whole duration, and a frame
+ * that cannot take that mutex is the one the policy is about:
+ * - 2 (default) keeps the newest of them and registers it right after;
+ * - 1 drops them, so the odometry starts on the next frame as soon as it arrives;
+ * - 0 registers every frame in turn on the subscription thread.
  *
- * Every other test in these suites turns the policy off, to be able to account for each
- * frame; this pair is where the default itself is covered.
+ * Every other test in these suites uses 0, to be able to account for each frame; these
+ * are where the other policies are covered.
  *
  * topic_queue_size is raised because icp_odometry defaults to 1: with a queue that deep
- * the middleware would drop the burst before the node ever saw it, and the test would
+ * the middleware would drop the burst before the node ever saw it, and the tests would
  * pass without exercising anything.
  */
 TEST_F(OdometryRosTest, drops_frames_that_arrive_while_the_previous_one_is_registering)
@@ -240,7 +244,7 @@ TEST_F(OdometryRosTest, drops_frames_that_arrive_while_the_previous_one_is_regis
 	publishSensorTf();
 	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
 			collect<nav_msgs::msg::Odometry>("odom");
-	makeNode({rclcpp::Parameter("always_process_most_recent_frame", true),
+	makeNode({rclcpp::Parameter("frame_policy", 1),
 	          rclcpp::Parameter("topic_queue_size", 20)});
 
 	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub = scanPublisher();
@@ -260,13 +264,47 @@ TEST_F(OdometryRosTest, drops_frames_that_arrive_while_the_previous_one_is_regis
 			<< "every frame of the burst came back out, so nothing was skipped";
 }
 
-/// With the policy off, the same burst is registered whole, one pose per frame.
+/// With policy 2, the frames arriving during a registration are not all lost: the newest
+/// one is registered right after, so a burst always ends on its last frame.
+///
+/// Several bursts, because policy 1 also registers the last frame of one when the worker
+/// happens to be idle as it arrives (about a third of the time here): all of them ending
+/// on their last frame is what tells the two policies apart.
+TEST_F(OdometryRosTest, registers_the_newest_frame_that_arrived_while_registering)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+			collect<nav_msgs::msg::Odometry>("odom");
+	makeNode({rclcpp::Parameter("frame_policy", 2),
+	          rclcpp::Parameter("topic_queue_size", 20)});
+
+	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub = scanPublisher();
+	ASSERT_TRUE(waitForSubscriber(pub));
+
+	const size_t bursts = 5;
+	const size_t burst = 10;
+	size_t frame = 0;
+	for(size_t b=0; b<bursts; ++b)
+	{
+		for(size_t i=0; i<burst; ++i, ++frame)
+		{
+			pub->publish(makeXYZCloud("lidar", 1.0 + 0.1*frame, corner3D(cv::Point3f(0.05f*frame, 0, 0))));
+		}
+		const double lastStamp = 1.0 + 0.1*(frame-1);
+		ASSERT_TRUE(spinUntil([&]() {
+			return !odom->empty() && std::abs(rclcpp::Time(odom->back().header.stamp).seconds() - lastStamp) < 1e-6; }))
+				<< "the last frame of burst " << b << " was not registered (" << odom->size() << " poses)";
+	}
+	EXPECT_LE(odom->size(), frame) << "more poses than frames";
+}
+
+/// With policy 0, the same burst is registered whole, one pose per frame.
 TEST_F(OdometryRosTest, processes_every_frame_of_a_burst_when_the_policy_is_off)
 {
 	publishSensorTf();
 	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
 			collect<nav_msgs::msg::Odometry>("odom");
-	// always_process_most_recent_frame:=false comes from the fixture.
+	// frame_policy:=0 comes from the fixture.
 	makeNode({rclcpp::Parameter("topic_queue_size", 20)});
 
 	rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub = scanPublisher();
@@ -282,6 +320,49 @@ TEST_F(OdometryRosTest, processes_every_frame_of_a_burst_when_the_policy_is_off)
 			<< "only " << odom->size() << " of " << burst << " frames came back out";
 	spinFor(std::chrono::milliseconds(200));
 	EXPECT_EQ(burst, odom->size()) << "more poses than frames";
+}
+
+/// frame_policy is 2 by default; the deprecated always_process_most_recent_frame is used
+/// only when set (false: 0, true: 1), and frame_policy wins when both are.
+TEST_F(OdometryRosTest, frame_policy_default_and_deprecated_parameter)
+{
+	auto policyOf = [&](const std::vector<rclcpp::Parameter> & params) {
+		std::vector<rclcpp::Parameter> all = icpTestParameters();
+		all.push_back(rclcpp::Parameter("frame_id", "base_link"));
+		all.insert(all.end(), params.begin(), params.end());
+		rclcpp::NodeOptions options;
+		options.parameter_overrides(all);
+		return addNode(std::make_shared<rtabmap_odom::ICPOdometry>(options))->get_parameter("frame_policy").as_int();
+	};
+	EXPECT_EQ(2, policyOf({}));
+	EXPECT_EQ(0, policyOf({rclcpp::Parameter("always_process_most_recent_frame", false)}));
+	EXPECT_EQ(1, policyOf({rclcpp::Parameter("always_process_most_recent_frame", true)}));
+	EXPECT_EQ(2, policyOf({rclcpp::Parameter("always_process_most_recent_frame", true),
+	                       rclcpp::Parameter("frame_policy", 2)}));
+	EXPECT_EQ(2, policyOf({rclcpp::Parameter("frame_policy", 5)})) << "an invalid policy falls back to the default";
+	EXPECT_EQ(2, policyOf({rclcpp::Parameter("frame_policy", -1)})) << "an invalid policy falls back to the default";
+}
+
+/// The working directory is the rtabmap node's one, $ROS_HOME or ~/.ros, instead of
+/// RTAB-Map's own.
+TEST_F(OdometryRosTest, uses_ros_home_as_working_directory)
+{
+	// Restores ROS_HOME whatever happens below.
+	struct RosHomeGuard
+	{
+		RosHomeGuard() : wasSet(getenv("ROS_HOME") != nullptr), value(wasSet?getenv("ROS_HOME"):"") {}
+		~RosHomeGuard() { if(wasSet) setenv("ROS_HOME", value.c_str(), 1); else unsetenv("ROS_HOME"); }
+		bool wasSet;
+		std::string value;
+	} guard;
+
+	unsetenv("ROS_HOME");
+	EXPECT_EQ(UDirectory::homeDir() + "/.ros",
+			makeNode()->get_parameter(rtabmap::Parameters::kRtabmapWorkingDirectory()).as_string());
+
+	setenv("ROS_HOME", "/tmp/rtabmap_odom_test_ros_home", 1);
+	EXPECT_EQ("/tmp/rtabmap_odom_test_ros_home",
+			makeNode()->get_parameter(rtabmap::Parameters::kRtabmapWorkingDirectory()).as_string());
 }
 
 /// The frames the pose is published in are both configurable.

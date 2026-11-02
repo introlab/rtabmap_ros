@@ -45,11 +45,19 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/core/LocalGridMaker.h>
 
 #ifdef RTABMAP_OCTOMAP
+// octomap includes <ciso646>, which GCC deprecates (#warning) from C++20.
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcpp"
+#endif
 #ifdef WITH_OCTOMAP_MSGS
 #include <octomap_msgs/conversions.h>
 #endif
 #include <octomap/ColorOcTree.h>
 #include <rtabmap/core/OctoMap.h>
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 #endif
 
 #if defined(WITH_GRID_MAP_ROS) and defined(RTABMAP_GRIDMAP)
@@ -940,7 +948,7 @@ void MapsManager::publishMaps(
 						}
 						if(subtractedCloud->size())
 						{
-							UDEBUG("Adding ground %d pts=%d/%d (index=%d)", iter->first, subtractedCloud->size(), transformed->size(), assembledGroundIndex_.indexedFeatures());
+							UDEBUG("Adding ground %d pts=%d/%d (index=%d)", iter->first, (int)subtractedCloud->size(), (int)transformed->size(), (int)assembledGroundIndex_.indexedFeatures());
 							cv::Mat pts(subtractedCloud->size(), 3, CV_32FC1);
 							for(unsigned int i=0; i<subtractedCloud->size(); ++i)
 							{
@@ -991,7 +999,7 @@ void MapsManager::publishMaps(
 						}
 						if(subtractedCloud->size())
 						{
-							UDEBUG("Adding obstacle %d pts=%d/%d (index=%d)", iter->first, subtractedCloud->size(), transformed->size(), assembledObstacleIndex_.indexedFeatures());
+							UDEBUG("Adding obstacle %d pts=%d/%d (index=%d)", iter->first, (int)subtractedCloud->size(), (int)transformed->size(), (int)assembledObstacleIndex_.indexedFeatures());
 							cv::Mat pts(subtractedCloud->size(), 3, CV_32FC1);
 							for(unsigned int i=0; i<subtractedCloud->size(); ++i)
 							{

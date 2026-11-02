@@ -72,7 +72,9 @@ GuiWrapper::GuiWrapper(const rclcpp::NodeOptions & options) :
 		odomFrameId_(""),
 		waitForTransform_(0.2), // 200 ms
 		odomSensorSync_(true),
-		maxOdomUpdateRate_(10)
+		maxOdomUpdateRate_(10),
+		imagesAlreadyRectified_(Parameters::defaultRtabmapImagesAlreadyRectified()),
+		detectionRate_(Parameters::defaultRtabmapDetectionRate())
 {
 	tfBuffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
 	tfListener_ = std::make_shared<tf2_ros::TransformListener>(*tfBuffer_);
@@ -105,6 +107,7 @@ GuiWrapper::GuiWrapper(const rclcpp::NodeOptions & options) :
 	// The configuration file in the title, as rviz does: it is where the settings are
 	// saved, so which one is in use matters.
 	mainWindow_->setWindowTitle(mainWindow_->windowTitle()+" [ROS] - "+prefDialog_->getIniFilePath());
+	updateCachedParameters(prefDialog_->getAllParameters());
 	mainWindow_->show();
 
 	bool paused = false;
@@ -129,6 +132,23 @@ GuiWrapper::GuiWrapper(const rclcpp::NodeOptions & options) :
 	RCLCPP_INFO(get_logger(), "%s: max_odom_update_rate = %f", get_name(), maxOdomUpdateRate_);
 	RCLCPP_INFO(get_logger(), "%s: subscribe_info_only  = %s", get_name(), subscribeInfoOnly?"true":"false");
 	RCLCPP_INFO(get_logger(), "%s: init_cache_path      = \"%s\"", get_name(), initCachePath.c_str());
+
+	// max_odom_update_rate can be changed while running ("ros2 param set").
+	parametersCallbackHandle_ = this->add_on_set_parameters_callback(
+		[this](const std::vector<rclcpp::Parameter> & parameters)
+		{
+			rcl_interfaces::msg::SetParametersResult result;
+			result.successful = true;
+			for(const rclcpp::Parameter & parameter : parameters)
+			{
+				if(parameter.get_name() == "max_odom_update_rate")
+				{
+					maxOdomUpdateRate_ = parameter.as_double();
+					RCLCPP_INFO(get_logger(), "%s: max_odom_update_rate = %f", get_name(), maxOdomUpdateRate_);
+				}
+			}
+			return result;
+		});
 
 	if(initCachePath.size())
 	{
@@ -217,11 +237,7 @@ void GuiWrapper::infoMapCallback(
 
 	this->post(new RtabmapEvent(stat));
 
-	ParametersMap allParameters = prefDialog_->getAllParameters();
-	float detectionRate = Parameters::defaultRtabmapDetectionRate();
-	Parameters::parse(allParameters, Parameters::kRtabmapDetectionRate(), detectionRate);
-
-	tick(infoMsg->header.stamp, detectionRate);
+	tick(infoMsg->header.stamp, detectionRate_);
 
 }
 
@@ -254,11 +270,7 @@ void GuiWrapper::infoCallback(
 
 	this->post(new RtabmapEvent(stat));
 
-	ParametersMap allParameters = prefDialog_->getAllParameters();
-	float detectionRate = Parameters::defaultRtabmapDetectionRate();
-	Parameters::parse(allParameters, Parameters::kRtabmapDetectionRate(), detectionRate);
-
-	tick(infoMsg->header.stamp, detectionRate);
+	tick(infoMsg->header.stamp, detectionRate_);
 }
 
 void GuiWrapper::goalPathCallback(
@@ -286,7 +298,11 @@ void GuiWrapper::processRequestedMap(const rtabmap_msgs::msg::MapData & map)
 	// Make sure parameters are loaded
 	if(((PreferencesDialogROS*)prefDialog_)->hasAllParameters())
 	{
-		QMetaObject::invokeMethod(((PreferencesDialogROS*)prefDialog_), "readRtabmapNodeParameters");
+		// on the dialog's thread, the cached preferences right after (no ParamEvent for these)
+		QMetaObject::invokeMethod(prefDialog_, [this]() {
+			((PreferencesDialogROS*)prefDialog_)->readRtabmapNodeParameters();
+			updateCachedParameters(prefDialog_->getAllParameters());
+		});
 	}
 
 	std::map<int, Signature> signatures;
@@ -346,12 +362,23 @@ bool GuiWrapper::callMapDataService(const std::string & name, bool global, bool 
 	return false;
 }
 
+void GuiWrapper::updateCachedParameters(const ParametersMap & parameters)
+{
+	bool imagesAlreadyRectified = imagesAlreadyRectified_;
+	float detectionRate = detectionRate_;
+	Parameters::parse(parameters, Parameters::kRtabmapImagesAlreadyRectified(), imagesAlreadyRectified);
+	Parameters::parse(parameters, Parameters::kRtabmapDetectionRate(), detectionRate);
+	imagesAlreadyRectified_ = imagesAlreadyRectified;
+	detectionRate_ = detectionRate;
+}
+
 bool GuiWrapper::handleEvent(UEvent * anEvent)
 {
 	if(anEvent->getClassName().compare("ParamEvent") == 0)
 	{
 		const rtabmap::ParametersMap & defaultParameters = rtabmap::Parameters::getDefaultParameters();
 		rtabmap::ParametersMap parameters = ((rtabmap::ParamEvent *)anEvent)->getParameters();
+		updateCachedParameters(parameters);
 		std::vector<rclcpp::Parameter> rosParameters;
 		for(rtabmap::ParametersMap::iterator i=parameters.begin(); i!=parameters.end(); ++i)
 		{
@@ -650,9 +677,7 @@ void GuiWrapper::commonMultiCameraCallback(
 
 		if(imageMsgs.size() && imageMsgs[0].get() && depthMsgs.size() && depthMsgs[0].get())
 		{
-			ParametersMap allParameters = prefDialog_->getAllParameters();
-			bool imagesAlreadyRectified = Parameters::defaultRtabmapImagesAlreadyRectified();
-			Parameters::parse(allParameters, Parameters::kRtabmapImagesAlreadyRectified(), imagesAlreadyRectified);
+			const bool imagesAlreadyRectified = imagesAlreadyRectified_;
 
 			if(!rtabmap_conversions::convertRGBDMsgs(
 					imageMsgs,
@@ -716,6 +741,27 @@ void GuiWrapper::commonMultiCameraCallback(
 	{
 		info = rtabmap_conversions::odomInfoFromROS(*odomInfoMsg).copyWithoutData();
 		ignoreData = true;
+		// No images, but the camera models (from the camera infos, the TF is usually
+		// static) so that the camera frustum is drawn at this pose, moving cameras included.
+		if(!cameraInfoMsgs.empty())
+		{
+			const bool imagesAlreadyRectified = imagesAlreadyRectified_;
+			if(!rtabmap_conversions::convertCameraModelsMsgs(
+					cameraInfoMsgs,
+					depthCameraInfoMsgs,
+					frameId,
+					odomSensorSync_?odomHeader.frame_id:"",
+					odomHeader.stamp,
+					cameraModels,
+					stereoCameraModels,
+					*tfBuffer_,
+					waitForTransform_,
+					imagesAlreadyRectified))
+			{
+				cameraModels.clear();
+				stereoCameraModels.clear();
+			}
+		}
 	}
 	else
 	{

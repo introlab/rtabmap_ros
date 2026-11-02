@@ -8,21 +8,16 @@
 #              for better pose estimation while seding RGB-D data to slam for 
 #              a colored map.
 #
-import os
-
-from ament_index_python.packages import get_package_share_directory
-
 from launch import LaunchDescription
-from launch_ros.actions import Node, SetParameter
-from launch.actions import IncludeLaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
-from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch_ros.actions import Node
+from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 
 def generate_launch_description():
     vo_parameters={
           'frame_id':'camera_link',
-          'wait_imu_to_init':True}
+          'wait_imu_to_init':True,
+          'qos': 1}  # reliable: with best effort, a lost fragment of a large image drops the whole image
 
     vo_remappings=[
           ('imu', '/imu/data'),
@@ -35,7 +30,8 @@ def generate_launch_description():
           'frame_id':'camera_link',
           'subscribe_depth':True,
           'subscribe_odom_info':True,
-          'approx_sync':False}
+          'approx_sync':False,
+          'qos': 1}  # reliable: with best effort, a lost fragment of a large image drops the whole image
 
     slam_remappings=[
           ('imu', '/imu/data'),
@@ -50,9 +46,6 @@ def generate_launch_description():
             'unite_imu_method', default_value='2',
             description='0-None, 1-copy, 2-linear_interpolation. Use unite_imu_method:="1" if imu topics stop being published.'),
 
-        #Hack to disable IR emitter
-        SetParameter(name='depth_module.emitter_enabled', value=0),
-        
         DeclareLaunchArgument(
             'args', default_value='',
             description='Extra arguments set to rtabmap and odometry nodes.'),
@@ -61,21 +54,19 @@ def generate_launch_description():
             'odom_args', default_value='',
             description='Extra arguments just for odometry node. If the same argument is already set in \"args\", it will be overwritten by the one in \"odom_args\".'),
 
-
         # Launch camera driver
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource([os.path.join(
-                get_package_share_directory('realsense2_camera'), 'launch'),
-                '/rs_launch.py']),
-                launch_arguments={'camera_namespace': '',
-                                  'enable_gyro': 'true',
-                                  'enable_accel': 'true',
-                                  'unite_imu_method': LaunchConfiguration('unite_imu_method'),
-                                  'enable_infra1': 'true',
-                                  'enable_infra2': 'true',
-                                  'align_depth.enable': 'true',
-                                  'enable_sync': 'true',
-                                  'rgb_camera.color_profile': '640x360x30'}.items(),
+        Node(
+            package='realsense2_camera', executable='realsense2_camera_node',
+            name='camera', namespace='', output='screen',
+            parameters=[{'enable_gyro': True,
+                         'enable_accel': True,
+                         'unite_imu_method': LaunchConfiguration('unite_imu_method'),
+                         'enable_infra1': True,
+                         'enable_infra2': True,
+                         'align_depth.enable': True,
+                         'enable_sync': True,
+                         'rgb_camera.color_profile': '640x360x30',
+                         'depth_module.emitter_enabled': 0}],  # Hack to disable IR emitter
         ),
 
         Node(

@@ -51,7 +51,16 @@ def launch_setup(context, *args, **kwargs):
     elif use_stereo_odometry:
         rtabmap_viz_odometry_node_name = "stereo_odometry"
 
-    return [
+    # odom_always_process_most_recent_frame is deprecated, used only when set:
+    # false is frame_policy 0, true is 1.
+    odom_frame_policy = int(LaunchConfiguration('odom_frame_policy').perform(context))
+    deprecated_policy = LaunchConfiguration('odom_always_process_most_recent_frame').perform(context)
+    deprecated_messages = []
+    if deprecated_policy:
+        odom_frame_policy = 1 if deprecated_policy.lower() == 'true' else 0
+        deprecated_messages.append(LogInfo(msg="odom_always_process_most_recent_frame is deprecated, use odom_frame_policy instead (odom_always_process_most_recent_frame:=%s is odom_frame_policy:=%d)." % (deprecated_policy, odom_frame_policy)))
+
+    return deprecated_messages + [
         DeclareLaunchArgument('depth', default_value=ConditionalText('false', 'true', IfCondition(PythonExpression(["'", LaunchConfiguration('stereo'), "' == 'true'"]))._predicate_func(context)), description=''),
         DeclareLaunchArgument('subscribe_rgb', default_value=LaunchConfiguration('depth'), description=''),
         DeclareLaunchArgument('args',  default_value=LaunchConfiguration('rtabmap_args'), description='Can be used to pass RTAB-Map\'s parameters or other flags like --udebug and --delete_db_on_start/-d'),
@@ -206,7 +215,7 @@ def launch_setup(context, *args, **kwargs):
                 "guess_frame_id": LaunchConfiguration('odom_guess_frame_id').perform(context),
                 "guess_min_translation": LaunchConfiguration('odom_guess_min_translation'),
                 "guess_min_rotation": LaunchConfiguration('odom_guess_min_rotation'),
-                "always_process_most_recent_frame": LaunchConfiguration('odom_always_process_most_recent_frame')}],
+                "frame_policy": odom_frame_policy}],
             remappings=[
                 ("rgb/image", LaunchConfiguration('rgb_topic_relay')),
                 ("depth/image", LaunchConfiguration('depth_topic_relay')),
@@ -244,7 +253,7 @@ def launch_setup(context, *args, **kwargs):
                 "guess_frame_id": LaunchConfiguration('odom_guess_frame_id').perform(context),
                 "guess_min_translation": LaunchConfiguration('odom_guess_min_translation'),
                 "guess_min_rotation": LaunchConfiguration('odom_guess_min_rotation'),
-                "always_process_most_recent_frame": LaunchConfiguration('odom_always_process_most_recent_frame')}],
+                "frame_policy": odom_frame_policy}],
             remappings=[
                 ("left/image_rect", LaunchConfiguration('left_image_topic_relay')),
                 ("right/image_rect", LaunchConfiguration('right_image_topic_relay')),
@@ -280,7 +289,7 @@ def launch_setup(context, *args, **kwargs):
                 "guess_frame_id": LaunchConfiguration('odom_guess_frame_id').perform(context),
                 "guess_min_translation": LaunchConfiguration('odom_guess_min_translation'),
                 "guess_min_rotation": LaunchConfiguration('odom_guess_min_rotation'),
-                "always_process_most_recent_frame": LaunchConfiguration('odom_always_process_most_recent_frame')}],
+                "frame_policy": odom_frame_policy}],
             remappings=[
                 ("scan", LaunchConfiguration('scan_topic')),
                 ("scan_cloud", LaunchConfiguration('scan_cloud_topic')),
@@ -520,7 +529,8 @@ def generate_launch_description():
         DeclareLaunchArgument('odom_guess_frame_id',        default_value='',      description=''),
         DeclareLaunchArgument('odom_guess_min_translation', default_value='0.0',   description=''),
         DeclareLaunchArgument('odom_guess_min_rotation',    default_value='0.0',   description=''),
-        DeclareLaunchArgument('odom_always_process_most_recent_frame', default_value='true', description='Odometry: always process latest frame to reduce delay, skipping frames in case odometry is slower than camera frame rate. In case you want to make sure to process all frames (e.g., from a rosbag/dataset) and you don\'t care about delay, set this to false.'),
+        DeclareLaunchArgument('odom_frame_policy',          default_value='2',     description='Odometry: what happens to a frame arriving while the previous one is processed. 2: it is processed right after (only the most recent one), for the highest frame rate. 1: it is dropped, for the lowest delay. 0: every frame is processed in order (e.g., from a rosbag/dataset), whatever the delay.'),
+        DeclareLaunchArgument('odom_always_process_most_recent_frame', default_value='', description='Deprecated, use odom_frame_policy: false is odom_frame_policy 0, true is 1.'),
 
         # imu
         DeclareLaunchArgument('imu_topic',        default_value='/imu/data', description='Used with VIO approaches and for SLAM graph optimization (gravity constraints).'),

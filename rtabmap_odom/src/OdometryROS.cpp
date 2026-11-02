@@ -53,6 +53,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtabmap/utilite/UConversion.h"
 #include "rtabmap/utilite/ULogger.h"
 #include "rtabmap/utilite/UStl.h"
+#include "rtabmap/utilite/UDirectory.h"
 #include "rtabmap/utilite/UFile.h"
 #include "rtabmap/utilite/UMath.h"
 
@@ -126,6 +127,7 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	qos_(RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT),
 	bufferedDataToProcess_(false),
 	imuUntilStampToProcess_(0.0),
+	hasPendingData_(false),
 	paused_(false),
 	resetCountdown_(0),
 	resetCurrentCount_(0),
@@ -139,7 +141,7 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	expectedUpdateRate_(0.0),
 	maxUpdateRate_(0.0),
 	minUpdateRate_(0.0),
-	alwaysProcessMostRecentFrame_(true),
+	framePolicy_(2),
 	compressionImgFormat_(".jpg"),
 	compressionDepthFormat_(".rvl"),
 	compressionParallelized_(true),
@@ -200,7 +202,36 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	expectedUpdateRate_ = this->declare_parameter("expected_update_rate", expectedUpdateRate_);
 	maxUpdateRate_ = this->declare_parameter("max_update_rate", maxUpdateRate_);
 	minUpdateRate_ = this->declare_parameter("min_update_rate", minUpdateRate_);
-	alwaysProcessMostRecentFrame_ = this->declare_parameter("always_process_most_recent_frame", alwaysProcessMostRecentFrame_);
+	framePolicy_ = this->declare_parameter("frame_policy", framePolicy_);
+	{
+		// Deprecated, used only when set: false is frame_policy 0, true is 1 (its behavior).
+		const std::string deprecated = "always_process_most_recent_frame";
+		const std::map<std::string, rclcpp::ParameterValue> & overrides =
+				this->get_node_parameters_interface()->get_parameter_overrides();
+		if(this->has_parameter(deprecated) || overrides.find(deprecated) != overrides.end())
+		{
+			bool alwaysProcessMostRecentFrame = this->has_parameter(deprecated)?
+					this->get_parameter(deprecated).as_bool():
+					this->declare_parameter(deprecated, true);
+			if(overrides.find("frame_policy") != overrides.end())
+			{
+				RCLCPP_WARN(this->get_logger(), "Odometry: Parameter \"%s\" is deprecated and ignored, \"frame_policy\"=%d is used.",
+						deprecated.c_str(), framePolicy_);
+			}
+			else
+			{
+				framePolicy_ = alwaysProcessMostRecentFrame?1:0;
+				RCLCPP_WARN(this->get_logger(), "Odometry: Parameter \"%s\" is deprecated, use \"frame_policy\" instead (%s=%s is frame_policy=%d).",
+						deprecated.c_str(), deprecated.c_str(), alwaysProcessMostRecentFrame?"true":"false", framePolicy_);
+			}
+		}
+	}
+	if(framePolicy_ < 0 || framePolicy_ > 2)
+	{
+		RCLCPP_ERROR(this->get_logger(), "Odometry: Invalid frame_policy %d (0, 1 or 2), using 2.", framePolicy_);
+		framePolicy_ = 2;
+	}
+	this->set_parameter(rclcpp::Parameter("frame_policy", framePolicy_)); // the one used, e.g. for "ros2 param get"
 
 	compressionImgFormat_ = this->declare_parameter("sensor_data_compression_format", compressionImgFormat_);
 	compressionDepthFormat_ = this->declare_parameter("sensor_data_depth_compression_format", compressionDepthFormat_);
@@ -286,6 +317,7 @@ OdometryROS::OdometryROS(const std::string & name, const rclcpp::NodeOptions & o
 	RCLCPP_INFO(this->get_logger(), "Odometry: expected_update_rate   = %f Hz", expectedUpdateRate_);
 	RCLCPP_INFO(this->get_logger(), "Odometry: max_update_rate        = %f Hz", maxUpdateRate_);
 	RCLCPP_INFO(this->get_logger(), "Odometry: min_update_rate        = %f Hz", minUpdateRate_);
+	RCLCPP_INFO(this->get_logger(), "Odometry: frame_policy           = %d", framePolicy_);
 	RCLCPP_INFO(this->get_logger(), "Odometry: output_queue_size      = %d", outputQueueSize);
 	RCLCPP_INFO(this->get_logger(), "Odometry: wait_imu_to_init       = %s", waitIMUToinit_?"true":"false");
 	RCLCPP_INFO(this->get_logger(), "Odometry: always_check_imu_tf    = %s", alwaysCheckImuTf_?"true":"false");
@@ -321,6 +353,9 @@ void OdometryROS::init(bool stereoParams, bool visParams, bool icpParams)
 		}
 	}
 	parameters_.insert(*Parameters::getDefaultParameters().find(Parameters::kRtabmapImagesAlreadyRectified()));
+	// Same working directory as the rtabmap node (~/.ros)
+	char * rosHomePath = getenv("ROS_HOME");
+	parameters_.insert(ParametersPair(Parameters::kRtabmapWorkingDirectory(), rosHomePath?rosHomePath:UDirectory::homeDir()+"/.ros"));
 	if(!configPath_.empty())
 	{
 		if(UFile::exists(configPath_.c_str()))
@@ -652,9 +687,15 @@ void OdometryROS::processData(SensorData & data, const std_msgs::msg::Header & h
 {
 	//RCLCPP_WARN(get_logger(), "Received image: %f delay=%f", data.stamp(), (now() - header.stamp).seconds());
 	double clockNow = rtabmap_conversions::timestampFromROS(now());
+	// pendingMutex_ before trying dataMutex_ (not blocking, so no deadlock with the
+	// registration locking them the other way): a frame that cannot get dataMutex_ is then
+	// pending before that registration hands the pending frame over, see processData().
+	UScopeMutex pendingLock(pendingMutex_);
 	UScopeMutex dataLock(dataMutex_, false);
 	if(dataLock.lockTry() == 0)
 	{
+		// a pending frame is always handed over before dataMutex_ is released
+		UASSERT(!hasPendingData_);
 		if(bufferedDataToProcess_) {
 			RCLCPP_ERROR(this->get_logger(), "We didn't receive IMU newer than previous image/scan (%f) and we just received a new image/scan (%f). The previous image/scan is dropped! Make sure IMU is published faster and with less delay than the image/scan.",
 						rtabmap_conversions::timestampFromROS(dataHeaderToProcess_.stamp), rtabmap_conversions::timestampFromROS(header.stamp));
@@ -663,14 +704,26 @@ void OdometryROS::processData(SensorData & data, const std_msgs::msg::Header & h
 		dataToProcess_ = data;
 		dataHeaderToProcess_ = header;
 		bufferedDataToProcess_ = false;
-		if(alwaysProcessMostRecentFrame_) {
+		if(framePolicy_ != 0) {
 			dataReady_.release();
 		}
 		dataLock.unlock(); // processData() below must run unlocked
+		pendingLock.unlock();
 		++processedMsgs_;
-		if(!alwaysProcessMostRecentFrame_) {
+		if(framePolicy_ == 0) {
 			processData();
 		}
+	}
+	else if(framePolicy_ == 2)
+	{
+		// Registering: keep it for right after (processData()), replacing an older one.
+		if(hasPendingData_)
+		{
+			++droppedMsgs_;
+		}
+		pendingData_ = data;
+		pendingHeader_ = header;
+		hasPendingData_ = true;
 	}
 	else
 	{
@@ -681,7 +734,7 @@ void OdometryROS::processData(SensorData & data, const std_msgs::msg::Header & h
 			"Dropping image/scan data with stamp %f (delay=%f). Something is wrong "
 			"because the clock difference with the previous topic received (%fs) is much lower than the "
 			"expected one (%fs) estimated from the topic stamps (previous stamp=%f). If you are processing "
-			"a large bag with flaky replaying delay, consider setting parameter \"always_process_most_recent_frame:=false\" "
+			"a large bag with flaky replaying delay, consider setting parameter \"frame_policy:=0\" "
 			"to avoid aggressively dropping data.",
 			rtabmap_conversions::timestampFromROS(header.stamp),
 			clockNow - rtabmap_conversions::timestampFromROS(header.stamp),
@@ -712,10 +765,34 @@ void OdometryROS::mainLoop()
 	}
 	processData();
 }
+
 void OdometryROS::processData()
 {
 	UScopeMutex lock(dataMutex_);
+	processDataLocked();
 
+	// frame_policy 2: the newest frame that arrived while registering, next. Handed over
+	// before dataMutex_ is released, so that a newer frame cannot get it first.
+	UScopeMutex pendingLock(pendingMutex_);
+	if(hasPendingData_)
+	{
+		if(bufferedDataToProcess_)
+		{
+			// the frame still waiting for IMU is replaced by a newer one, as in processData(data, header)
+			++droppedMsgs_;
+		}
+		dataToProcess_ = pendingData_;
+		dataHeaderToProcess_ = pendingHeader_;
+		bufferedDataToProcess_ = false;
+		pendingData_ = SensorData();
+		hasPendingData_ = false;
+		++processedMsgs_;
+		dataReady_.release();
+	}
+}
+
+void OdometryROS::processDataLocked()
+{
 	// aliases
 	SensorData & data = dataToProcess_;
 	std_msgs::msg::Header & header = dataHeaderToProcess_;
@@ -1598,6 +1675,11 @@ void OdometryROS::reset(const Transform & pose)
 	dataToProcess_ = SensorData();
 	dataHeaderToProcess_ = std_msgs::msg::Header();
 	bufferedDataToProcess_ = false;
+	pendingMutex_.lock();
+	pendingData_ = SensorData();
+	pendingHeader_ = std_msgs::msg::Header();
+	hasPendingData_ = false;
+	pendingMutex_.unlock();
 	imuMutex_.lock();
 	imus_.clear();
 	imusPending_.clear();

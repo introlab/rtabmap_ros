@@ -143,7 +143,9 @@ def generate_launch_description():
             name='rtabmap_container',
             namespace='',
             package='rclcpp_components',
-            executable='component_container',
+            # Multi-threaded: rtabmap's processing (tens of ms) doesn't hold back
+            # the image processing and odometry callbacks.
+            executable='component_container_mt',
             output='screen',
             composable_node_descriptions=
                 image_proc_nodes('left') +
@@ -151,13 +153,6 @@ def generate_launch_description():
                 rtabmap_nodes),
 
         # SLAM mode (loaded into the shared container):
-        # Note: latch=False. rtabmap latches its map/cloud/octomap/mapGraph
-        # topics by default (transient_local QoS), which is incompatible with
-        # intra-process comms ("intraprocess communication allowed only with
-        # volatile durability"). Setting latch=False makes those topics volatile
-        # so the node can join the zero-copy container. Trade-off: viewers that
-        # start after a map is published won't get the retained last message,
-        # but rtabmap republishes the map as it updates.
         LoadComposableNodes(
             condition=UnlessCondition(localization),
             target_container=container_name,
@@ -165,8 +160,7 @@ def generate_launch_description():
                 ComposableNode(
                     package='rtabmap_slam', plugin='rtabmap_slam::CoreWrapper',
                     parameters=[parameters,
-                      {'delete_db_on_start': True, # Equivalent of '-d': delete the previous database (~/.ros/rtabmap.db)
-                       'latch': False}],
+                      {'delete_db_on_start': True}], # Equivalent of '-d': delete the previous database (~/.ros/rtabmap.db)
                     remappings=remappings,
                     extra_arguments=intra_process),
             ]),
@@ -180,8 +174,7 @@ def generate_launch_description():
                     package='rtabmap_slam', plugin='rtabmap_slam::CoreWrapper',
                     parameters=[parameters,
                       {'Mem/IncrementalMemory':'False',
-                       'Mem/InitWMWithAllNodes':'True',
-                       'latch': False}],  # volatile QoS, see SLAM-mode note above
+                       'Mem/InitWMWithAllNodes':'True'}],
                     remappings=remappings,
                     extra_arguments=intra_process),
             ]),

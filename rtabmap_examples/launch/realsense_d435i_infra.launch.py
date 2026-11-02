@@ -4,15 +4,9 @@
 # Example:
 #   $ ros2 launch rtabmap_examples realsense_d435i_infra.launch.py
 
-import os
-
-from ament_index_python.packages import get_package_share_directory
-
 from launch import LaunchDescription
-from launch_ros.actions import Node, SetParameter
-from launch.actions import IncludeLaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
-from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch_ros.actions import Node
+from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 
 def generate_launch_description():
@@ -21,7 +15,8 @@ def generate_launch_description():
           'subscribe_depth':True,
           'subscribe_odom_info':True,
           'approx_sync':False,
-          'wait_imu_to_init':True}]
+          'wait_imu_to_init':True,
+          'qos': 1}]  # reliable: with best effort, a lost fragment of a large image drops the whole image
 
     remappings=[
           ('imu', '/imu/data'),
@@ -44,21 +39,17 @@ def generate_launch_description():
             'odom_args', default_value='',
             description='Extra arguments just for odometry node. If the same argument is already set in \"args\", it will be overwritten by the one in \"odom_args\".'),
 
-        #Hack to disable IR emitter
-        SetParameter(name='depth_module.emitter_enabled', value=0),
-
         # Launch camera driver
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource([os.path.join(
-                get_package_share_directory('realsense2_camera'), 'launch'),
-                '/rs_launch.py']),
-                launch_arguments={'camera_namespace': '',
-                                  'enable_gyro': 'true',
-                                  'enable_accel': 'true',
-                                  'unite_imu_method': LaunchConfiguration('unite_imu_method'),
-                                  'enable_infra1': 'true',
-                                  'enable_infra2': 'true',
-                                  'enable_sync': 'true'}.items(),
+        Node(
+            package='realsense2_camera', executable='realsense2_camera_node',
+            name='camera', namespace='', output='screen',
+            parameters=[{'enable_gyro': True,
+                         'enable_accel': True,
+                         'unite_imu_method': LaunchConfiguration('unite_imu_method'),
+                         'enable_infra1': True,
+                         'enable_infra2': True,
+                         'enable_sync': True,
+                         'depth_module.emitter_enabled': 0}],  # Hack to disable IR emitter
         ),
 
         Node(

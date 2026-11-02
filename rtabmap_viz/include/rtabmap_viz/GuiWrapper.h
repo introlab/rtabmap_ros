@@ -37,6 +37,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "rtabmap_msgs/msg/goal.hpp"
 #include "rtabmap/utilite/UEventsHandler.h"
 #include "rtabmap/core/Transform.h"
+#include "rtabmap/core/Parameters.h"
 
 #include <tf2_ros/buffer.hpp>
 #include <tf2_ros/transform_listener.hpp>
@@ -46,6 +47,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <std_msgs/msg/bool.hpp>
 #include <std_msgs/msg/int32_multi_array.hpp>
 #include "rtabmap_msgs/srv/get_map.hpp"
+
+#include <atomic>
 
 #include <rtabmap_sync/CommonDataSubscriber.h>
 
@@ -112,6 +115,8 @@ private:
 	void processRequestedMap(const rtabmap_msgs::msg::MapData & map);
 	bool callEmptyService(const std::string & name);
 	bool callMapDataService(const std::string & name, bool global, bool optimized, bool graphOnly);
+	/// Updates imagesAlreadyRectified_ and detectionRate_ with those of @p parameters, if there.
+	void updateCachedParameters(const rtabmap::ParametersMap & parameters);
 
 private:
 	rtabmap::PreferencesDialog * prefDialog_;
@@ -126,6 +131,11 @@ private:
 	double waitForTransform_;
 	bool odomSensorSync_;
 	double maxOdomUpdateRate_;
+	// Preferences used at every message, kept from the ones loaded and updated with the
+	// ones changed (ParamEvent) rather than read from the dialog each time.
+	std::atomic<bool> imagesAlreadyRectified_;
+	std::atomic<float> detectionRate_;
+	rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr parametersCallbackHandle_;
 	std::shared_ptr<tf2_ros::Buffer> tfBuffer_;
 	std::shared_ptr<tf2_ros::TransformListener> tfListener_;
 

@@ -951,6 +951,34 @@ bool convertRGBDMsgs(
 		cv::Mat * localDescriptors = 0);
 
 /**
+ * @brief The camera models convertRGBDMsgs() would give, from the camera infos only.
+ *
+ * Nothing is done with the images, which don't have to be decoded or even received: the
+ * size, frame and stamp of each camera come from its camera info, and a stereo pair is
+ * told by the baseline in P(0,3) of one of the two. The local transforms are looked up
+ * in TF, and synchronized with @p odomStamp, as by convertRGBDMsgs().
+ *
+ * @param cameraInfoMsgs       one camera info per camera (RGB or left)
+ * @param depthCameraInfoMsgs  the depth (or right) camera infos, one per camera, or empty
+ * @param[out] cameraModels    one model per camera, when the input is RGB-D
+ * @param[out] stereoCameraModels one model per camera, when the input is stereo
+ * @return false on a missing camera local transform
+ *
+ * The other parameters are those of convertRGBDMsgs().
+ */
+bool convertCameraModelsMsgs(
+		const std::vector<sensor_msgs::msg::CameraInfo> & cameraInfoMsgs,
+		const std::vector<sensor_msgs::msg::CameraInfo> & depthCameraInfoMsgs,
+		const std::string & frameId,
+		const std::string & odomFrameId,
+		const rclcpp::Time & odomStamp,
+		std::vector<rtabmap::CameraModel> & cameraModels,
+		std::vector<rtabmap::StereoCameraModel> & stereoCameraModels,
+		tf2_ros::Buffer & tfBuffer,
+		double waitForTransform,
+		bool alreadRectifiedImages);
+
+/**
  * @brief Convert a stereo pair into RTAB-Map inputs.
  *
  * The left image keeps its color; the right image is always reduced to mono.

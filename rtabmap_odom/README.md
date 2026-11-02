@@ -184,17 +184,23 @@ Registration runs on its own thread, so a slow frame does not block the subscrip
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `always_process_most_recent_frame` | `bool` | `true` | Drop frames that arrive while registration is still running and take the newest. `false` registers every frame in order, on the subscription thread. |
+| `frame_policy` | `int` | `2` | What happens to a frame arriving while registration is still running. `2`: it waits, replaced by any newer one, and is registered as soon as the previous registration ends (highest frame rate). `1`: it is dropped (lowest delay). `0`: every frame is registered in order, on the subscription thread. |
+| `always_process_most_recent_frame` | `bool` | | Deprecated, use `frame_policy`, which wins when both are set: `false` is `0`, `true` is `1`. |
 | `expected_update_rate` | `double` | `0.0` | The rate frames are expected at, in Hz. Used only when `max_update_rate` is unset, and it is a **ceiling**: a frame arriving sooner than `1/expected_update_rate` after the last one is skipped, with a warning that the input is faster than expected. `0` disables. |
 | `max_update_rate` | `double` | `0.0` | Throttle registration to at most this rate, skipping frames silently. Takes precedence over `expected_update_rate`. `0` disables. |
 | `min_update_rate` | `double` | `0.0` | Treat odometry as **lost and reset it** when more than `1/min_update_rate` passes between updates — the motion assumption no longer holds across a gap that long. `0` disables. |
 | `output_queue_size` | `int` | `1` | History depth of the `odom`, `odom_info` and `odom_info_lite` publishers. Even with a reliable `qos`, a message a subscriber has not acknowledged yet is lost when the next one replaces it: raise it when every pose must arrive, e.g., when `rtabmap` saves them all as intermediate nodes (`Rtabmap/CreateIntermediateNodes`) and may be busy. |
 
-**`always_process_most_recent_frame` already bounds the delay.** A frame arriving while registration is still running is dropped on the spot rather than queued, so the worker always picks up the newest frame and the published pose is at most one registration behind the sensor. No backlog ever forms. `/diagnostics` reports how many frames went this way.
+**`frame_policy` 1 and 2 both bound the delay.** No backlog ever forms: at most one frame waits, and a newer one replaces it. They differ when frames arrive during a registration, e.g. delivered in bursts (images from another process, a busy executor), or when registration is slower than the sensor:
+
+- **`2` (default) maximizes the frame rate.** The newest frame that arrived meanwhile is registered right after, so a frame delivered a few milliseconds after the previous one is not lost. The cost, only when registration takes longer than the sensor period: that frame waited, and the published pose can be up to two registrations behind the sensor.
+- **`1` minimizes the delay.** The frames arriving meanwhile are dropped and the worker waits for the next one, so a registered frame never waited and the pose is at most one registration behind the sensor. Bursts lose frames, and a registration slower than the sensor period halves the rate.
+
+`/diagnostics` reports how many frames were dropped or replaced.
 
 That is why **`max_update_rate` is about CPU, not latency**: given the skipping above, the worst-case delay is roughly the same whether it is set or not. What it changes is how many frames get registered at all. Set it to give the rest of the robot its cores back — not to make the pose fresher, which it will not do.
 
-Setting `always_process_most_recent_frame:=false` is the opposite trade: every frame is registered, in order, on the subscription thread. That is what you want when replaying a bag, where dropping frames loses data you meant to process.
+`frame_policy:=0` is the opposite trade: every frame is registered, in order, on the subscription thread. That is what you want when replaying a bag, where dropping frames loses data you meant to process.
 
 ### Lost frames, resets and new maps
 

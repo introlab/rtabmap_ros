@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.16)
 project(rtabmap_util)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -31,8 +31,15 @@ find_package(rtabmap_sync REQUIRED)
 find_package(RTABMap COMPONENTS gui REQUIRED)
 
 # Optional components
-find_package(octomap_msgs)
-find_package(grid_map_ros)
+find_package(octomap_msgs QUIET)
+find_package(grid_map_ros QUIET)
+foreach(dep octomap_msgs grid_map_ros)
+  if(${dep}_FOUND)
+    message(STATUS "Optional dependency ${dep}: found")
+  else()
+    message(STATUS "Optional dependency ${dep}: not found, related features disabled")
+  endif()
+endforeach()
 
 include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/include

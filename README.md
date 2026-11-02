@@ -127,7 +127,14 @@ export RCUTILS_COLORIZED_OUTPUT=1
 ## Recommended DDS
 If RTAB-Map's GUI or topic frequency feel laggy (even if processing time looks fast enough), or messages seem to get lost, it may be caused by the DDS. By default (`qos` parameters set to `0`), RTAB-Map's nodes subscribe with the DDS's own default reliability, and that differs between them: Cyclone DDS subscribes reliably, while Fast DDS, the default DDS of ROS 2 (still with Lyrical), subscribes in best effort. In best effort, a large message (image, point cloud) arriving while a node is still busy with the previous one can be dropped, without any warning.
 
-With Fast DDS, you can make RTAB-Map's nodes subscribe reliably with their `qos` parameters set to `1` (e.g., `qos:=1` with `rtabmap.launch.py`). Otherwise, I recommend to use [Cyclone DDS](https://docs.ros.org/en/jazzy/Installation/RMW-Implementations/DDS-Implementations/Working-with-Eclipse-CycloneDDS.html), you can try it by adding this before launching any nodes/launch files (or add to your `.bashrc`):
+With Fast DDS, you can make RTAB-Map's nodes subscribe reliably with their `qos` parameters set to `1` (e.g., `qos:=1` with `rtabmap.launch.py`). For large images (e.g., depth images of a RealSense camera), also use Fast DDS's `LARGE_DATA` transport: its default shared memory segments are smaller than a depth image, which makes images arrive in bursts or get lost. Set it in the environment of every process (e.g., in your `.bashrc`), then restart the ROS daemon:
+```bash
+export FASTDDS_BUILTIN_TRANSPORTS=LARGE_DATA
+ros2 daemon stop
+```
+Set it on all the computers of the system or none: between computers, `LARGE_DATA` sends the data over TCP where the default uses UDP. With a D435i at 30 Hz, RGB-D odometry went from 17.5 Hz (best effort) to 26 Hz with `qos:=1`, and to 27 Hz, every frame the camera sent, with `LARGE_DATA` too (see [rtabmap_examples](rtabmap_examples/README.md#large-images-between-processes)).
+
+An alternative is [Cyclone DDS](https://docs.ros.org/en/jazzy/Installation/RMW-Implementations/DDS-Implementations/Working-with-Eclipse-CycloneDDS.html), which subscribes reliably by default. To try it, add this before launching any nodes/launch files (or to your `.bashrc`):
 ```bash
 export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 # Cyclone prefers multicast by default, if your router got too much spammed, 

@@ -34,7 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <OgreCamera.h>
 #include <OgreQuaternion.h>
 #include <OgreSceneNode.h>
-#include <OgreVector3.h>
+#include <OgreVector.h>
 
 #include <rviz_common/display_context.hpp>
 #include <rviz_common/logging.hpp>
@@ -48,9 +48,17 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rclcpp/node.hpp>
 
 #ifdef RTABMAP_RVIZ_PLUGINS_OCTOMAP
+// octomap includes <ciso646>, which GCC deprecates (#warning) from C++20.
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcpp"
+#endif
 #include <octomap/ColorOcTree.h>
 #include <octomap/OcTree.h>
 #include <octomap_msgs/conversions.h>
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 #endif
 
 namespace rtabmap_rviz_plugins

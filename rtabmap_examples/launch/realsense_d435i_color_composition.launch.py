@@ -67,7 +67,9 @@ def generate_launch_description():
             name='rtabmap_container',
             namespace='',
             package='rclcpp_components',
-            executable='component_container',
+            # Multi-threaded: rtabmap's processing (tens of ms) doesn't hold back
+            # the camera and odometry callbacks.
+            executable='component_container_mt',
             output='screen',
             composable_node_descriptions=[
 
@@ -103,16 +105,10 @@ def generate_launch_description():
                     extra_arguments=intra_process),
 
                 # SLAM
-                # Note: latch=False. rtabmap latches its map/cloud/octomap/mapGraph
-                # topics by default (transient_local QoS), which is incompatible
-                # with intra-process comms ("intraprocess communication allowed
-                # only with volatile durability"). latch=False makes them volatile
-                # so the node can join the zero-copy container.
                 ComposableNode(
                     package='rtabmap_slam', plugin='rtabmap_slam::CoreWrapper',
                     parameters=[parameters,
-                      {'delete_db_on_start': True, # Equivalent of '-d'
-                       'latch': False}],
+                      {'delete_db_on_start': True}], # Equivalent of '-d'
                     remappings=remappings,
                     extra_arguments=intra_process),
             ]),

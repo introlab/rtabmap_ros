@@ -157,7 +157,7 @@ void ObstaclesDetection::callback(const sensor_msgs::msg::PointCloud2::ConstShar
 	}
 
 	UASSERT_MSG(cloudMsg->data.size() == cloudMsg->row_step*cloudMsg->height,
-			uFormat("data=%d row_step=%d height=%d", cloudMsg->data.size(), cloudMsg->row_step, cloudMsg->height).c_str());
+			uFormat("data=%zu row_step=%u height=%u", cloudMsg->data.size(), cloudMsg->row_step, cloudMsg->height).c_str());
 
 	pcl::PointCloud<pcl::PointXYZ>::Ptr inputCloud(new pcl::PointCloud<pcl::PointXYZ>);
 	rtabmap_conversions::fromPointCloud2Msg(*cloudMsg, *inputCloud);
