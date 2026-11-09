@@ -44,6 +44,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rtabmap/utilite/ULogger.h>
 #include <rtabmap/utilite/UTimer.h>
 #include <pcl_conversions/pcl_conversions.h>
+#include <pcl/common/transforms.h>
 #ifdef PRE_ROS_IRON
 #include <image_geometry/pinhole_camera_model.h>
 #include <image_geometry/stereo_camera_model.h>
@@ -3918,6 +3919,7 @@ bool deskew_impl(
 				}
 			}
 
+			const Eigen::Affine3f transformEigen = transform.toEigen3f();
 			for(size_t v=0; v<input.height; ++v)
 			{
 				unsigned char * dataPtr = &output.data[v*output.row_step + u*output.point_step];
@@ -3925,7 +3927,7 @@ bool deskew_impl(
 				float & y = *((float*)(dataPtr+offsetY));
 				float & z = *((float*)(dataPtr+offsetZ));
 				pcl::PointXYZ pt(x,y,z);
-				pt = rtabmap::util3d::transformPoint(pt, transform);
+				pt = pcl::transformPoint(pt, transformEigen);
 				x = pt.x;
 				y = pt.y;
 				z = pt.z;
@@ -4026,6 +4028,7 @@ bool deskew_impl(
 				}
 			}
 
+			const Eigen::Affine3f transformEigen = transform.toEigen3f();
 			for(size_t u=0; u<input.width; ++u)
 			{
 				unsigned char * dataPtr = &output.data[v*output.row_step + u*output.point_step];
@@ -4033,7 +4036,7 @@ bool deskew_impl(
 				float & y = *((float*)(dataPtr+offsetY));
 				float & z = *((float*)(dataPtr+offsetZ));
 				pcl::PointXYZ pt(x,y,z);
-				pt = rtabmap::util3d::transformPoint(pt, transform);
+				pt = pcl::transformPoint(pt, transformEigen);
 				x = pt.x;
 				y = pt.y;
 				z = pt.z;
