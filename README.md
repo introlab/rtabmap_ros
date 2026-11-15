@@ -3,7 +3,7 @@ rtabmap_ros
 
 ROS 2 wrapper for [RTAB-Map](https://github.com/introlab/rtabmap), a graph-based SLAM library with appearance-based loop closure detection. It builds and maintains a 3D map from RGB-D, stereo or lidar data, closes loops on revisited places and exports the result as an occupancy grid, a point cloud or an OctoMap.
 
-**ROS 2 Humble minimum required.** The interface matches ROS 1: parameters and topic names still follow the [ROS 1 documentation](http://wiki.ros.org/rtabmap_ros) for anything not yet covered by the package pages below.
+**ROS 2 Humble minimum required.** The interface matches ROS 1: parameters and topic names are unchanged, so the [ROS 1 tutorials](https://github.com/introlab/rtabmap_ros/wiki) still apply for anything not yet covered by the package pages below.
 
 #### CI Latest
 
@@ -149,7 +149,7 @@ export CYCLONEDDS_URI="<Disc><DefaultMulticastAddress>0.0.0.0</></>"
 * **Parameters** — every `Rtabmap/*`, `Grid/*`, `Odom/*` and other core parameter is listed in the [RTAB-Map parameter reference](https://introlab.github.io/rtabmap/api/latest/parameters.html).
 * **Library API** — [RTAB-Map's own API documentation](https://introlab.github.io/rtabmap/api/latest/).
 * **Papers and videos** — [introlab.github.io/rtabmap](https://introlab.github.io/rtabmap/).
-* **Old tutorials** — the [ROS 1 wiki](http://wiki.ros.org/rtabmap_ros/Tutorials), for anything not covered above; parameters and topic names are unchanged.
+* **ROS 1 tutorials** — on this repo's [wiki](https://github.com/introlab/rtabmap_ros/wiki), for anything not covered above; parameters and topic names are unchanged. ROS 1 demos are in [rtabmap_demos](https://github.com/introlab/rtabmap_ros/tree/master/rtabmap_demos) on the `master` branch.
 
 ## Building the documentation
 

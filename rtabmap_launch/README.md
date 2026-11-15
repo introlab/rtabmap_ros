@@ -2,7 +2,7 @@
 
 # Usage
 
-`rtabmap.launch` from ros1 has been ported to ROS2 as `rtabmap.launch.py` with same arguments. If you see [ROS1 examples](http://wiki.ros.org/rtabmap_ros/Tutorials/HandHeldMapping) like this:
+`rtabmap.launch` from ros1 has been ported to ROS2 as `rtabmap.launch.py` with same arguments. If you see [ROS1 examples](https://github.com/introlab/rtabmap_ros/wiki/RGB%E2%80%90D-Handheld-Mapping-(ROS1)) like this:
 
 ```bash
 roslaunch zed_wrapper zed_no_tf.launch
