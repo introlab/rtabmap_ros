@@ -3,7 +3,9 @@ rtabmap_ros
 
 RTAB-Map's ROS package.
 
-For more information, demos and tutorials about this package, visit [rtabmap_ros](http://wiki.ros.org/rtabmap_ros) page on ROS wiki.
+* **Demos**: see [rtabmap_demos](rtabmap_demos).
+* **Tutorials**: see the ROS1 tutorials on this repo's [wiki](https://github.com/introlab/rtabmap_ros/wiki).
+* **Package documentation**: see the [ros2](https://github.com/introlab/rtabmap_ros/tree/ros2) branch; parameters and topic names are the same in ROS1.
 
 For the RTAB-Map libraries and standalone application, visit [RTAB-Map's home page](http://introlab.github.io/rtabmap) or [RTAB-Map's wiki](https://github.com/introlab/rtabmap/wiki).
 
