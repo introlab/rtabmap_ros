@@ -131,7 +131,8 @@ CoreWrapper::CoreWrapper() :
 		alreadyRectifiedImages_(Parameters::defaultRtabmapImagesAlreadyRectified()),
 		twoDMapping_(Parameters::defaultRegForce3DoF()),
 		previousStamp_(0),
-		mbClient_(0)
+		mbClient_(0),
+		triggerNewMapBeforeNextUpdate_(false)
 {
 	char * rosHomePath = getenv("ROS_HOME");
 	std::string workingDir = rosHomePath?rosHomePath:UDirectory::homeDir()+"/.ros";
@@ -143,6 +144,23 @@ void CoreWrapper::onInit()
 {
 	ros::NodeHandle & nh = getNodeHandle();
 	ros::NodeHandle & pnh = getPrivateNodeHandle();
+
+	// The synchronized input topics are subscribed on their own callback queue,
+	// served by a single thread, so that they keep being processed (and dropped)
+	// while process() is running. Everything else (services, async sensor topics,
+	// and the syncTimer_ triggering process()) stays on the nodelet's
+	// single-threaded queue, which keeps them all mutually exclusive.
+	dataNh_ = ros::NodeHandle(nh);
+	dataPnh_ = ros::NodeHandle(pnh);
+	dataNh_.setCallbackQueue(&dataQueue_);
+	dataPnh_.setCallbackQueue(&dataQueue_);
+
+	syncTimer_ = nh.createWallTimer(
+			ros::WallDuration(0.001),
+			&CoreWrapper::processAsync,
+			this,
+			true,   // oneshot
+			false); // don't autostart
 
 	mapsManager_.init(nh, pnh, getName(), true);
 
@@ -763,7 +781,7 @@ void CoreWrapper::onInit()
 		localizationDiagnostic_.setLocalizationThreshold(localizationThreshold);
 		tasks.push_back(&localizationDiagnostic_);
 	}
-	setupCallbacks(nh, pnh, getName(), tasks); // do it at the end
+	setupCallbacks(dataNh_, dataPnh_, getName(), tasks); // do it at the end
 	if(!this->isDataSubscribed())
 	{
 		bool isRGBD = uStr2Bool(parameters_.at(Parameters::kRGBDEnabled()).c_str());
@@ -875,10 +893,28 @@ void CoreWrapper::onInit()
 #endif
 	imuSub_ = nh.subscribe("imu", 100, &CoreWrapper::imuAsyncCallback, this);
 	republishNodeDataSub_ = nh.subscribe("republish_node_data", 100, &CoreWrapper::republishNodeDataCallback, this);
+
+	// Start serving the synchronized input topics only once everything above is
+	// constructed, otherwise a callback could fire on a half-initialized node.
+	dataSpinner_.reset(new ros::AsyncSpinner(1, &dataQueue_));
+	dataSpinner_->start();
 }
 
 CoreWrapper::~CoreWrapper()
 {
+	// Stop feeding new data before tearing anything down, then make sure a frame
+	// currently being converted is done with syncData_.
+	if(dataSpinner_.get())
+	{
+		dataSpinner_->stop();
+		dataSpinner_.reset();
+	}
+	syncTimer_.stop();
+	{
+		boost::mutex::scoped_lock lock(syncDataMutex_);
+		syncData_.valid = false;
+	}
+
 	if(transformThread_)
 	{
 		tfThreadRunning_ = false;
@@ -1069,12 +1105,15 @@ bool CoreWrapper::odomUpdate(const nav_msgs::OdometryConstPtr & odomMsg, ros::Ti
 			}
 		}
 
+		boost::mutex::scoped_lock lock(lastPoseMutex_);
+
 		if(!lastPose_.isIdentity() && !odom.isNull() && (odom.isIdentity() || (odomMsg->pose.covariance[0] >= BAD_COVARIANCE && odomMsg->twist.covariance[0] >= BAD_COVARIANCE)))
 		{
 			UWARN("Odometry is reset (identity pose or high variance (%f) detected). Increment map id!", MAX(odomMsg->pose.covariance[0], odomMsg->twist.covariance[0]));
-			rtabmap_.triggerNewMap();
+			// Deferred: rtabmap_ is only touched from the processing thread.
+			triggerNewMapBeforeNextUpdate_ = true;
 			covariance_ = cv::Mat();
-		} 
+		}
 		else if(stalenessFactor_>0.0 && 
 			    previousStamp_.toSec() > 0.0 && 
 				rate_>0.0f && 
@@ -1092,7 +1131,8 @@ bool CoreWrapper::odomUpdate(const nav_msgs::OdometryConstPtr & odomMsg, ros::Ti
 				1.0f/rate_,
 				stalenessFactor_,
 				stalenessFactor_/rate_);
-			rtabmap_.triggerNewMap();
+			// Deferred: rtabmap_ is only touched from the processing thread.
+			triggerNewMapBeforeNextUpdate_ = true;
 			covariance_ = cv::Mat();
 		}
 
@@ -1160,10 +1200,9 @@ bool CoreWrapper::odomUpdate(const nav_msgs::OdometryConstPtr & odomMsg, ros::Ti
 				return false;
 			}
 		}
-		else if(!ignoreFrame)
-		{
-			previousStamp_ = stamp;
-		}
+		// previousStamp_ is advanced by the callback once the frame is actually
+		// accepted for processing, so that a frame dropped because the previous
+		// one is still being processed doesn't shift the detection rate window.
 
 		return true;
 	}
@@ -1174,17 +1213,27 @@ bool CoreWrapper::odomTFUpdate(const ros::Time & stamp)
 {
 	if(!paused_)
 	{
+		// odomFrameId_ is written by process() on the processing thread.
+		std::string odomFrameId;
+		{
+			boost::mutex::scoped_lock lock(mapToOdomMutex_);
+			odomFrameId = odomFrameId_;
+		}
+
 		// Odom TF ready?
-		Transform odom = rtabmap_conversions::getTransform(odomFrameId_, frameId_, stamp, tfBuffer_, waitForTransform_?waitForTransformDuration_:0.0);
+		Transform odom = rtabmap_conversions::getTransform(odomFrameId, frameId_, stamp, tfBuffer_, waitForTransform_?waitForTransformDuration_:0.0);
 		if(odom.isNull())
 		{
 			return false;
 		}
 
+		boost::mutex::scoped_lock lock(lastPoseMutex_);
+
 		if(!lastPose_.isIdentity() && odom.isIdentity())
 		{
 			UWARN("Odometry is reset (identity pose detected). Increment map id!");
-			rtabmap_.triggerNewMap();
+			// Deferred: rtabmap_ is only touched from the processing thread.
+			triggerNewMapBeforeNextUpdate_ = true;
 			covariance_ = cv::Mat();
 		}
 		else if(stalenessFactor_>0.0 && 
@@ -1204,7 +1253,8 @@ bool CoreWrapper::odomTFUpdate(const ros::Time & stamp)
 				1.0f/rate_,
 				stalenessFactor_,
 				stalenessFactor_/rate_);
-			rtabmap_.triggerNewMap();
+			// Deferred: rtabmap_ is only touched from the processing thread.
+			triggerNewMapBeforeNextUpdate_ = true;
 			covariance_ = cv::Mat();
 		}
 
@@ -1237,10 +1287,7 @@ bool CoreWrapper::odomTFUpdate(const ros::Time & stamp)
 				return false;
 			}
 		}
-		else if(!ignoreFrame)
-		{
-			previousStamp_ = stamp;
-		}
+		// See odomUpdate(): previousStamp_ is advanced by the callback instead.
 
 		return true;
 	}
@@ -1262,7 +1309,11 @@ void CoreWrapper::commonMultiCameraCallback(
 		const std::vector<std::vector<rtabmap_msgs::Point3f> > & localPoints3d,
 		const std::vector<cv::Mat> & localDescriptors)
 {
-	std::string odomFrameId = odomFrameId_;
+	std::string odomFrameId;
+	{
+		boost::mutex::scoped_lock lock(mapToOdomMutex_);
+		odomFrameId = odomFrameId_;
+	}
 	if(odomMsg.get())
 	{
 		odomFrameId = odomMsg->header.frame_id;
@@ -1304,6 +1355,16 @@ void CoreWrapper::commonMultiCameraCallback(
 		return;
 	}
 
+	// Drop the frame if a previous one is still pending or being processed:
+	// the lock fails while processAsync() holds it, and syncData_.valid means a
+	// converted frame is already waiting for the processing thread.
+	boost::unique_lock<boost::mutex> lock(syncDataMutex_, boost::try_to_lock);
+	if(!lock.owns_lock() || syncData_.valid)
+	{
+		return;
+	}
+	boost::mutex::scoped_lock poseLock(lastPoseMutex_);
+
 	commonMultiCameraCallbackImpl(odomFrameId,
 			userDataMsg,
 			imageMsgs,
@@ -1317,6 +1378,17 @@ void CoreWrapper::commonMultiCameraCallback(
 			localKeyPoints,
 			localPoints3d,
 			localDescriptors);
+
+	// Re-arm outside the locks: ros::WallTimer::stop() blocks until a running
+	// timer callback has returned, and processAsync() takes syncDataMutex_.
+	bool scheduled = syncData_.valid;
+	poseLock.unlock();
+	lock.unlock();
+	if(scheduled)
+	{
+		syncTimer_.stop();
+		syncTimer_.start();
+	}
 }
 
 void CoreWrapper::commonMultiCameraCallbackImpl(
@@ -1552,6 +1624,7 @@ void CoreWrapper::commonMultiCameraCallbackImpl(
 	if(userDataMsg.get())
 	{
 		userData = rtabmap_conversions::userDataFromROS(*userDataMsg);
+		boost::mutex::scoped_lock userDataLock(userDataMutex_);
 		if(!userData_.empty())
 		{
 			NODELET_WARN("Synchronized and asynchronized user data topics cannot be used at the same time. Async user data dropped!");
@@ -1560,6 +1633,7 @@ void CoreWrapper::commonMultiCameraCallbackImpl(
 	}
 	else
 	{
+		boost::mutex::scoped_lock userDataLock(userDataMutex_);
 		userData = userData_;
 		userData_ = cv::Mat();
 	}
@@ -1606,14 +1680,22 @@ void CoreWrapper::commonMultiCameraCallbackImpl(
 		data.setFeatures(keypoints, points, descriptors);
 	}
 
-	process(lastPoseStamp_,
-			data,
-			lastPose_,
-			lastPoseVelocity_,
-			odomFrameId,
-			covariance_,
-			odomInfo,
-			timerConversion.ticks());
+	// Hand the frame over to processAsync(); the caller holds syncDataMutex_.
+	syncData_.data = data;
+	syncData_.valid = true;
+	syncData_.stamp = lastPoseStamp_;
+	syncData_.odom = lastPose_;
+	syncData_.odomVelocity = lastPoseVelocity_;
+	syncData_.odomFrameId = odomFrameId;
+	syncData_.odomCovariance = covariance_;
+	syncData_.odomInfo = odomInfo;
+	syncData_.timeMsgConversion = timerConversion.ticks();
+
+	if(!lastPoseIntermediate_)
+	{
+		previousStamp_ = lastPoseStamp_;
+	}
+
 	covariance_ = cv::Mat();
 }
 
@@ -1626,7 +1708,11 @@ void CoreWrapper::commonLaserScanCallback(
 		const rtabmap_msgs::GlobalDescriptor & globalDescriptor)
 {
 	UTimer timerConversion;
-	std::string odomFrameId = odomFrameId_;
+	std::string odomFrameId;
+	{
+		boost::mutex::scoped_lock lock(mapToOdomMutex_);
+		odomFrameId = odomFrameId_;
+	}
 	if(odomMsg.get())
 	{
 		odomFrameId = odomMsg->header.frame_id;
@@ -1667,6 +1753,14 @@ void CoreWrapper::commonLaserScanCallback(
 	{
 		return;
 	}
+
+	// Drop the frame if a previous one is still pending or being processed.
+	boost::unique_lock<boost::mutex> lock(syncDataMutex_, boost::try_to_lock);
+	if(!lock.owns_lock() || syncData_.valid)
+	{
+		return;
+	}
+	boost::mutex::scoped_lock poseLock(lastPoseMutex_);
 
 	LaserScan scan;
 	if(!scan2dMsg.ranges.empty())
@@ -1709,6 +1803,7 @@ void CoreWrapper::commonLaserScanCallback(
 	if(userDataMsg.get())
 	{
 		userData = rtabmap_conversions::userDataFromROS(*userDataMsg);
+		boost::mutex::scoped_lock userDataLock(userDataMutex_);
 		if(!userData_.empty())
 		{
 			NODELET_WARN("Synchronized and asynchronized user data topics cannot be used at the same time. Async user data dropped!");
@@ -1717,6 +1812,7 @@ void CoreWrapper::commonLaserScanCallback(
 	}
 	else
 	{
+		boost::mutex::scoped_lock userDataLock(userDataMutex_);
 		userData = userData_;
 		userData_ = cv::Mat();
 	}
@@ -1741,16 +1837,30 @@ void CoreWrapper::commonLaserScanCallback(
 		data.addGlobalDescriptor(rtabmap_conversions::globalDescriptorFromROS(globalDescriptor));
 	}
 
-	process(lastPoseStamp_,
-			data,
-			lastPose_,
-			lastPoseVelocity_,
-			odomFrameId,
-			covariance_,
-			odomInfo,
-			timerConversion.ticks());
+	// Hand the frame over to processAsync().
+	syncData_.data = data;
+	syncData_.valid = true;
+	syncData_.stamp = lastPoseStamp_;
+	syncData_.odom = lastPose_;
+	syncData_.odomVelocity = lastPoseVelocity_;
+	syncData_.odomFrameId = odomFrameId;
+	syncData_.odomCovariance = covariance_;
+	syncData_.odomInfo = odomInfo;
+	syncData_.timeMsgConversion = timerConversion.ticks();
+
+	if(!lastPoseIntermediate_)
+	{
+		previousStamp_ = lastPoseStamp_;
+	}
 
 	covariance_ = cv::Mat();
+
+	// Re-arm outside the locks: ros::WallTimer::stop() blocks until a running
+	// timer callback has returned, and processAsync() takes syncDataMutex_.
+	poseLock.unlock();
+	lock.unlock();
+	syncTimer_.stop();
+	syncTimer_.start();
 }
 
 void CoreWrapper::commonOdomCallback(
@@ -1760,18 +1870,26 @@ void CoreWrapper::commonOdomCallback(
 {
 	UTimer timerConversion;
 	UASSERT(odomMsg.get());
-	std::string odomFrameId = odomFrameId_;
+	std::string odomFrameId = odomMsg->header.frame_id;
 
-	odomFrameId = odomMsg->header.frame_id;
 	if(!odomUpdate(odomMsg, odomMsg->header.stamp))
 	{
 		return;
 	}
 
+	// Drop the frame if a previous one is still pending or being processed.
+	boost::unique_lock<boost::mutex> lock(syncDataMutex_, boost::try_to_lock);
+	if(!lock.owns_lock() || syncData_.valid)
+	{
+		return;
+	}
+	boost::mutex::scoped_lock poseLock(lastPoseMutex_);
+
 	cv::Mat userData;
 	if(userDataMsg.get())
 	{
 		userData = rtabmap_conversions::userDataFromROS(*userDataMsg);
+		boost::mutex::scoped_lock userDataLock(userDataMutex_);
 		if(!userData_.empty())
 		{
 			NODELET_WARN("Synchronized and asynchronized user data topics cannot be used at the same time. Async user data dropped!");
@@ -1780,6 +1898,7 @@ void CoreWrapper::commonOdomCallback(
 	}
 	else
 	{
+		boost::mutex::scoped_lock userDataLock(userDataMutex_);
 		userData = userData_;
 		userData_ = cv::Mat();
 	}
@@ -1798,16 +1917,30 @@ void CoreWrapper::commonOdomCallback(
 		odomInfo = rtabmap_conversions::odomInfoFromROS(*odomInfoMsg);
 	}
 
-	process(lastPoseStamp_,
-			data,
-			lastPose_,
-			lastPoseVelocity_,
-			odomFrameId,
-			covariance_,
-			odomInfo,
-			timerConversion.ticks());
+	// Hand the frame over to processAsync().
+	syncData_.data = data;
+	syncData_.valid = true;
+	syncData_.stamp = lastPoseStamp_;
+	syncData_.odom = lastPose_;
+	syncData_.odomVelocity = lastPoseVelocity_;
+	syncData_.odomFrameId = odomFrameId;
+	syncData_.odomCovariance = covariance_;
+	syncData_.odomInfo = odomInfo;
+	syncData_.timeMsgConversion = timerConversion.ticks();
+
+	if(!lastPoseIntermediate_)
+	{
+		previousStamp_ = lastPoseStamp_;
+	}
 
 	covariance_ = cv::Mat();
+
+	// Re-arm outside the locks: ros::WallTimer::stop() blocks until a running
+	// timer callback has returned, and processAsync() takes syncDataMutex_.
+	poseLock.unlock();
+	lock.unlock();
+	syncTimer_.stop();
+	syncTimer_.start();
 }
 
 void CoreWrapper::commonSensorDataCallback(
@@ -1817,7 +1950,11 @@ void CoreWrapper::commonSensorDataCallback(
 {
 	UTimer timerConversion;
 	UASSERT(sensorDataMsg.get());
-	std::string odomFrameId = odomFrameId_;
+	std::string odomFrameId;
+	{
+		boost::mutex::scoped_lock lock(mapToOdomMutex_);
+		odomFrameId = odomFrameId_;
+	}
 	if(odomMsg.get())
 	{
 		odomFrameId = odomMsg->header.frame_id;
@@ -1831,6 +1968,14 @@ void CoreWrapper::commonSensorDataCallback(
 		return;
 	}
 
+	// Drop the frame if a previous one is still pending or being processed.
+	boost::unique_lock<boost::mutex> lock(syncDataMutex_, boost::try_to_lock);
+	if(!lock.owns_lock() || syncData_.valid)
+	{
+		return;
+	}
+	boost::mutex::scoped_lock poseLock(lastPoseMutex_);
+
 	SensorData data = rtabmap_conversions::sensorDataFromROS(*sensorDataMsg);
 	data.setId(lastPoseIntermediate_?-1:0);
 
@@ -1840,16 +1985,58 @@ void CoreWrapper::commonSensorDataCallback(
 		odomInfo = rtabmap_conversions::odomInfoFromROS(*odomInfoMsg);
 	}
 
-	process(lastPoseStamp_,
-			data,
-			lastPose_,
-			lastPoseVelocity_,
-			odomFrameId,
-			covariance_,
-			odomInfo,
-			timerConversion.ticks());
+	// Hand the frame over to processAsync().
+	syncData_.data = data;
+	syncData_.valid = true;
+	syncData_.stamp = lastPoseStamp_;
+	syncData_.odom = lastPose_;
+	syncData_.odomVelocity = lastPoseVelocity_;
+	syncData_.odomFrameId = odomFrameId;
+	syncData_.odomCovariance = covariance_;
+	syncData_.odomInfo = odomInfo;
+	syncData_.timeMsgConversion = timerConversion.ticks();
+
+	if(!lastPoseIntermediate_)
+	{
+		previousStamp_ = lastPoseStamp_;
+	}
 
 	covariance_ = cv::Mat();
+
+	// Re-arm outside the locks: ros::WallTimer::stop() blocks until a running
+	// timer callback has returned, and processAsync() takes syncDataMutex_.
+	poseLock.unlock();
+	lock.unlock();
+	syncTimer_.stop();
+	syncTimer_.start();
+}
+
+void CoreWrapper::processAsync(const ros::WallTimerEvent & event)
+{
+	// Runs on the nodelet's single-threaded callback queue, so it cannot overlap
+	// with any service. syncDataMutex_ is held for the whole of process(), which
+	// is what makes the input callbacks drop frames instead of queuing them.
+	boost::mutex::scoped_lock lock(syncDataMutex_);
+
+	if(triggerNewMapBeforeNextUpdate_)
+	{
+		rtabmap_.triggerNewMap();
+		triggerNewMapBeforeNextUpdate_ = false;
+	}
+
+	if(syncData_.valid)
+	{
+		process(syncData_.stamp,
+				syncData_.data,
+				syncData_.odom,
+				syncData_.odomVelocity,
+				syncData_.odomFrameId,
+				syncData_.odomCovariance,
+				syncData_.odomInfo,
+				syncData_.timeMsgConversion);
+		syncData_.valid = false;
+		syncData_.data = SensorData();
+	}
 }
 
 void CoreWrapper::process(
@@ -1868,7 +2055,9 @@ void CoreWrapper::process(
 		// Add intermediate nodes?
 		for(std::list<std::pair<nav_msgs::Odometry, rtabmap_msgs::OdomInfo> >::iterator iter=interOdoms_.begin(); iter!=interOdoms_.end();)
 		{
-			if(iter->first.header.stamp < lastPoseStamp_)
+			// Use the stamp of the frame being processed, not lastPoseStamp_ which
+			// is owned by the input thread and may already have moved on.
+			if(iter->first.header.stamp < stamp)
 			{
 				Transform interOdom;
 				if(!rtabmap_.getLocalOptimizedPoses().empty())
@@ -2411,6 +2600,7 @@ void CoreWrapper::userDataAsyncCallback(const rtabmap_msgs::UserDataConstPtr & d
 {
 	if(!paused_)
 	{
+		boost::mutex::scoped_lock userDataLock(userDataMutex_);
 		static bool warningShow = false;
 		if(!userData_.empty() && !warningShow)
 		{
@@ -2896,6 +3086,8 @@ bool CoreWrapper::resetRtabmapCallback(std_srvs::Empty::Request&, std_srvs::Empt
 {
 	NODELET_INFO("rtabmap: Reset");
 	rtabmap_.resetMemory();
+	boost::mutex::scoped_lock poseLock(lastPoseMutex_);
+	boost::mutex::scoped_lock userDataLock(userDataMutex_);
 	covariance_ = cv::Mat();
 	lastPose_.setIdentity();
 	lastPoseVelocity_.clear();
@@ -2993,6 +3185,8 @@ bool CoreWrapper::loadDatabaseCallback(rtabmap_msgs::LoadDatabase::Request& req,
 	rtabmap_.close(saveDatabase);
 	NODELET_INFO("LoadDatabase: Saving current map (%s, %ld MB)... done!", databasePath_.c_str(), UFile::length(databasePath_)/(1024*1024));
 
+	boost::mutex::scoped_lock poseLock(lastPoseMutex_);
+	boost::mutex::scoped_lock userDataLock(userDataMutex_);
 	covariance_ = cv::Mat();
 	lastPose_.setIdentity();
 	lastPoseVelocity_.clear();
@@ -3145,6 +3339,8 @@ bool CoreWrapper::backupDatabaseCallback(std_srvs::Empty::Request&, std_srvs::Em
 	rtabmap_.close(saveDatabase);
 	NODELET_INFO("Backup: Saving memory... done!");
 
+	boost::mutex::scoped_lock poseLock(lastPoseMutex_);
+	boost::mutex::scoped_lock userDataLock(userDataMutex_);
 	covariance_ = cv::Mat();
 	lastPose_.setIdentity();
 	lastPoseVelocity_.clear();

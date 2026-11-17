@@ -30,7 +30,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 #include <ros/ros.h>
+#include <ros/callback_queue.h>
 #include <nodelet/nodelet.h>
+
+#include <boost/thread.hpp>
 
 #include <std_srvs/Empty.h>
 
@@ -186,6 +189,10 @@ private:
 	void goalCallback(const geometry_msgs::PoseStampedConstPtr & msg);
 	void goalNodeCallback(const rtabmap_msgs::GoalConstPtr & msg);
 	void updateGoal(const ros::Time & stamp);
+
+	// Called on the nodelet's single-threaded callback queue, so it is
+	// mutually exclusive with all services and the other subscriptions.
+	void processAsync(const ros::WallTimerEvent & event);
 
 	void process(
 			const ros::Time & stamp,
@@ -409,6 +416,37 @@ private:
 	ros::Time previousStamp_;
 
 	rtabmap_util::ULogToRosout ulogToRosout_;
+
+	// Asynchronous processing: the synchronized input topics are subscribed on
+	// their own single-threaded callback queue (dataQueue_/dataSpinner_), while
+	// process() runs from syncTimer_ on the nodelet's single-threaded callback
+	// queue, together with all services. A frame received while a previous one
+	// is still pending or being processed is dropped instead of being queued,
+	// which keeps the delay bounded by the processing time instead of letting
+	// it grow with the transport queues.
+	struct SyncData {
+		SyncData() : valid(false), timeMsgConversion(0.0) {}
+		bool valid;
+		ros::Time stamp;
+		rtabmap::SensorData data;
+		rtabmap::Transform odom;
+		std::vector<float> odomVelocity;
+		std::string odomFrameId;
+		cv::Mat odomCovariance;
+		rtabmap::OdometryInfo odomInfo;
+		double timeMsgConversion;
+	};
+	SyncData syncData_;
+	boost::mutex syncDataMutex_;  // held by processAsync() for the whole process()
+	boost::mutex lastPoseMutex_;  // guards lastPose*_, covariance_ and previousStamp_
+	boost::mutex userDataMutex_;  // guards userData_, written by both threads
+	bool triggerNewMapBeforeNextUpdate_;
+
+	ros::CallbackQueue dataQueue_;
+	boost::shared_ptr<ros::AsyncSpinner> dataSpinner_;
+	ros::NodeHandle dataNh_;
+	ros::NodeHandle dataPnh_;
+	ros::WallTimer syncTimer_;
 
 	class LocalizationStatusTask : public diagnostic_updater::DiagnosticTask
 	{
