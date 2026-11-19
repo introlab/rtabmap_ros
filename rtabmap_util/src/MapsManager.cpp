@@ -749,7 +749,7 @@ pcl::PointCloud<pcl::PointXYZRGB>::Ptr subtractFiltering(
 	{
 		std::vector<std::vector<size_t> > kIndices;
 		std::vector<std::vector<float> > kDistances;
-		cv::Mat pt = (cv::Mat_<float>(1, 3) << cloud->at(i).x, cloud->at(i).y, cloud->at(i).z);
+		cv::Mat pt = cv::Mat(cv::Matx13f(cloud->at(i).x, cloud->at(i).y, cloud->at(i).z));
 		substractCloudIndex.radiusSearch(pt, kIndices, kDistances, radiusSearch, minNeighborsInRadius, 32, 0, false);
 		if(kIndices.size() == 1 && int(kIndices[0].size()) < minNeighborsInRadius)
 		{
@@ -859,12 +859,12 @@ void MapsManager::publishMaps(
 							{
 								if(tmpGroundPts.empty())
 								{
-									tmpGroundPts = (cv::Mat_<float>(1, 3) << transformed->at(i).x, transformed->at(i).y, transformed->at(i).z);
+									tmpGroundPts = cv::Mat(cv::Matx13f(transformed->at(i).x, transformed->at(i).y, transformed->at(i).z));
 									tmpGroundPts.reserve(previousIndexedGroundSize>0?previousIndexedGroundSize:100);
 								}
 								else
 								{
-									cv::Mat pt = (cv::Mat_<float>(1, 3) << transformed->at(i).x, transformed->at(i).y, transformed->at(i).z);
+									cv::Mat pt = cv::Mat(cv::Matx13f(transformed->at(i).x, transformed->at(i).y, transformed->at(i).z));
 									tmpGroundPts.push_back(pt);
 								}
 							}
@@ -887,12 +887,12 @@ void MapsManager::publishMaps(
 							{
 								if(tmpObstaclePts.empty())
 								{
-									tmpObstaclePts = (cv::Mat_<float>(1, 3) << transformed->at(i).x, transformed->at(i).y, transformed->at(i).z);
+									tmpObstaclePts = cv::Mat(cv::Matx13f(transformed->at(i).x, transformed->at(i).y, transformed->at(i).z));
 									tmpObstaclePts.reserve(previousIndexedObstacleSize>0?previousIndexedObstacleSize:100);
 								}
 								else
 								{
-									cv::Mat pt = (cv::Mat_<float>(1, 3) << transformed->at(i).x, transformed->at(i).y, transformed->at(i).z);
+									cv::Mat pt = cv::Mat(cv::Matx13f(transformed->at(i).x, transformed->at(i).y, transformed->at(i).z));
 									tmpObstaclePts.push_back(pt);
 								}
 							}
