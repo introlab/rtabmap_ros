@@ -472,6 +472,96 @@ TEST_F(MapsManagerTest, TheGroundHeightDecidesWhatIsAnObstacle)
 	EXPECT_EQ(obstacles->back().width * obstacles->back().height, 0u);
 }
 
+TEST_F(MapsManagerTest, SubtractFilteringDropsPointsAlreadyInTheMap)
+{
+	// With cloud_subtract_filtering, a new node only adds the points that are not already
+	// within a cell of the assembled cloud, looked up in a kd-tree of that cloud. The tree
+	// is grown as nodes are added, and rebuilt from the kept points of every node when the
+	// graph is optimized. Each step below adds a node overlapping the map and checks only
+	// its new points made it in: the last one can only pass if the rebuilt tree holds the
+	// right points.
+	//
+	// Voxelization is off, it would merge the duplicates by itself. A single neighbor is
+	// enough to drop a point, so one overlapping cell is enough.
+	start({rclcpp::Parameter("cloud_subtract_filtering", true),
+		   rclcpp::Parameter("cloud_subtract_filtering_min_neighbors", 1),
+		   rclcpp::Parameter("cloud_output_voxelized", false)});
+	std::shared_ptr<Collector<sensor_msgs::msg::PointCloud2>> ground =
+			collectFromMaps<sensor_msgs::msg::PointCloud2>("cloud_ground");
+	std::shared_ptr<Collector<sensor_msgs::msg::PointCloud2>> obstacles =
+			collectFromMaps<sensor_msgs::msg::PointCloud2>("cloud_obstacles");
+
+	std::map<int, rtabmap::Signature> signatures;
+	std::map<int, rtabmap::Transform> poses;
+	auto updateAndWait = [&]() {
+		const size_t groundCount = ground->size();
+		const size_t obstacleCount = obstacles->size();
+		maps_->updateMapCaches(poses, /*memory=*/0, true, false, signatures);
+		maps_->publishMaps(poses, node_->now(), "map");
+		return spinUntil([&]() {
+			return ground->size() > groundCount && obstacles->size() > obstacleCount;
+		});
+	};
+	auto sizeOf = [](const sensor_msgs::msg::PointCloud2 & cloud) {
+		return size_t(cloud.width) * cloud.height;
+	};
+
+	// Node 1 at the origin starts the map, and the tree.
+	const rtabmap::Transform pose1 = rtabmap::Transform::getIdentity();
+	signatures.insert(std::make_pair(1, makeGridSignature(1, pose1,
+			{cv::Point3f(0.5f, -0.1f, 0.0f), cv::Point3f(0.5f, 0.1f, 0.0f)},
+			{cv::Point3f(1.0f, 0.0f, 0.0f)})));
+	// Node 2, 0.5 m along x, repeats one ground and one obstacle cell of node 1.
+	const rtabmap::Transform pose2(0.5f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+	signatures.insert(std::make_pair(2, makeGridSignature(2, pose2,
+			{cv::Point3f(0.0f, -0.1f, 0.0f),     // = node 1's (0.5, -0.1)
+			 cv::Point3f(1.0f, 0.1f, 0.0f)},     // new, at (1.5, 0.1)
+			{cv::Point3f(0.5f, 0.0f, 0.0f),      // = node 1's (1.0, 0)
+			 cv::Point3f(1.5f, 0.0f, 0.0f)})));  // new, at (2.0, 0)
+	poses.insert(std::make_pair(1, pose1));
+	poses.insert(std::make_pair(2, pose2));
+
+	ASSERT_TRUE(updateAndWait()) << "no clouds published for nodes 1 and 2";
+	EXPECT_EQ(sizeOf(ground->back()), 3u) << "node 2's repeated ground cell must be dropped";
+	EXPECT_EQ(sizeOf(obstacles->back()), 2u) << "node 2's repeated obstacle must be dropped";
+	EXPECT_TRUE(containsPoint(ground->back(), cv::Point3f(1.5f, 0.1f, 0.0f)));
+	EXPECT_TRUE(containsPoint(obstacles->back(), cv::Point3f(2.0f, 0.0f, 0.0f)));
+
+	// The graph is optimized: node 2 moves 10 cm, well past the update error. The clouds
+	// are reassembled from what each node kept, and the tree rebuilt from them.
+	const rtabmap::Transform pose2Optimized(0.6f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+	poses[2] = pose2Optimized;
+
+	ASSERT_TRUE(updateAndWait()) << "no clouds published after the graph was optimized";
+	EXPECT_EQ(sizeOf(ground->back()), 3u)
+		<< "the reassembled ground has the points kept before, no more";
+	EXPECT_EQ(sizeOf(obstacles->back()), 2u);
+	EXPECT_TRUE(containsPoint(ground->back(), cv::Point3f(1.6f, 0.1f, 0.0f)))
+		<< "node 2's kept ground cell follows its new pose";
+	EXPECT_TRUE(containsPoint(obstacles->back(), cv::Point3f(2.1f, 0.0f, 0.0f)))
+		<< "node 2's kept obstacle follows its new pose";
+
+	// Node 3 repeats the first point of node 1 and the moved point of node 2, both only
+	// found in the rebuilt tree, and brings one new point of each kind.
+	const rtabmap::Transform pose3(1.6f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+	signatures.insert(std::make_pair(3, makeGridSignature(3, pose3,
+			{cv::Point3f(-1.1f, -0.1f, 0.0f),    // = node 1's (0.5, -0.1)
+			 cv::Point3f(0.0f, 0.1f, 0.0f),      // = node 2's moved (1.6, 0.1)
+			 cv::Point3f(0.0f, 1.0f, 0.0f)},     // new, at (1.6, 1.0)
+			{cv::Point3f(-0.6f, 0.0f, 0.0f),     // = node 1's (1.0, 0)
+			 cv::Point3f(0.5f, 0.0f, 0.0f),      // = node 2's moved (2.1, 0)
+			 cv::Point3f(1.0f, 0.5f, 0.0f)})));  // new, at (2.6, 0.5)
+	poses.insert(std::make_pair(3, pose3));
+
+	ASSERT_TRUE(updateAndWait()) << "no clouds published for node 3";
+	EXPECT_EQ(sizeOf(ground->back()), 4u)
+		<< "the rebuilt tree must hold nodes 1 and 2 ground cells at their current poses";
+	EXPECT_EQ(sizeOf(obstacles->back()), 3u)
+		<< "the rebuilt tree must hold nodes 1 and 2 obstacles at their current poses";
+	EXPECT_TRUE(containsPoint(ground->back(), cv::Point3f(1.6f, 1.0f, 0.0f)));
+	EXPECT_TRUE(containsPoint(obstacles->back(), cv::Point3f(2.6f, 0.5f, 0.0f)));
+}
+
 //============================================================================
 // Occupancy grid
 //============================================================================
