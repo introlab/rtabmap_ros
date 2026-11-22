@@ -59,7 +59,7 @@ The stack is split into small packages so a pipeline only pulls in what it uses.
 | Package | Description |
 |---|---|
 | `rtabmap_viz` | RTAB-Map's own GUI as a ROS 2 node: live graph, loop closures, feature matches and the parameter panel. |
-| `rtabmap_rviz_plugins` | RViz displays for the map graph, the assembled cloud and the SLAM info. |
+| [`rtabmap_rviz_plugins`](rtabmap_rviz_plugins/README.md) | RViz displays for the map cloud, the map graph and the SLAM info, plus a view controller following the robot. |
 
 ### Launch files
 
