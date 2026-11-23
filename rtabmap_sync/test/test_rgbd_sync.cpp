@@ -250,17 +250,56 @@ TEST_F(RGBDSyncTest, DecimationScalesTheImagesAndTheCalibration)
 	EXPECT_EQ(got.depth_camera_info.width, 4u);
 }
 
-TEST_F(RGBDSyncTest, DecimationIsDisabledWhenItWouldNotDivideTheDepthImage)
+TEST_F(RGBDSyncTest, DecimationLeavesADepthAlreadyAtTheDecimatedSize)
 {
-	// A decimation that does not divide the depth size exactly would misalign depth
-	// against color, so the node gives up on it rather than producing a wrong cloud.
-	start({rclcpp::Parameter("decimation", 3)});
+	// Same rule as RTAB-Map's Odom/ImageDecimation: the depth is only decimated down to
+	// the size of the decimated color image. A depth already that small is left as it
+	// is, rather than shrunk to half the color image along with it.
+	start({rclcpp::Parameter("decimation", 2)});
 
-	publish(1000.0, /*width=*/8, /*height=*/8);
+	rgbPub_->publish(makeRgbImage("camera_link", 1000.0, 8, 8));
+	depthPub_->publish(makeDepthImage("camera_link", 1000.0, 4, 4, 1500));
+	infoPub_->publish(makeCameraInfo("camera_link", 1000.0, 8, 8));
 	ASSERT_TRUE(spinUntil([&]() { return !out_->empty(); }));
 
-	EXPECT_EQ(out_->back().rgb.width, 8u) << "images must be passed through unresized";
-	EXPECT_EQ(out_->back().depth.width, 8u);
+	const rtabmap_msgs::msg::RGBDImage & got = out_->back();
+	EXPECT_EQ(got.rgb.width, 4u);
+	EXPECT_EQ(got.rgb.height, 4u);
+	EXPECT_EQ(got.depth.width, 4u) << "the depth must not be decimated below the color image";
+	EXPECT_EQ(got.depth.height, 4u);
+	EXPECT_NEAR(got.rgb_camera_info.k[0], 50.0, 1e-6);
+}
+
+TEST_F(RGBDSyncTest, DecimationOnlyBringsALargerDepthDownToTheColorSize)
+{
+	// A depth twice the color size, decimated with the color by 2, comes out at the size
+	// of the decimated color image: decimated by 4.
+	start({rclcpp::Parameter("decimation", 2)});
+
+	rgbPub_->publish(makeRgbImage("camera_link", 1000.0, 8, 8));
+	depthPub_->publish(makeDepthImage("camera_link", 1000.0, 16, 16, 1500));
+	infoPub_->publish(makeCameraInfo("camera_link", 1000.0, 8, 8));
+	ASSERT_TRUE(spinUntil([&]() { return !out_->empty(); }));
+
+	const rtabmap_msgs::msg::RGBDImage & got = out_->back();
+	EXPECT_EQ(got.rgb.width, 4u);
+	EXPECT_EQ(got.depth.width, 4u);
+	EXPECT_EQ(got.depth.height, 4u);
+}
+
+TEST_F(RGBDSyncTest, DecimationIsDisabledWhenItWouldNotDivideTheDepthImage)
+{
+	// A depth decimation that does not divide the depth size exactly would misalign depth
+	// against color, so the node gives up on it rather than producing a wrong cloud.
+	// 10x10 decimated by 3 is 3 rows, which the 10x10 depth reaches decimated by 4: not
+	// exact. (8x8 by 3 would be fine: 2 rows, a depth decimated by 4 exactly.)
+	start({rclcpp::Parameter("decimation", 3)});
+
+	publish(1000.0, /*width=*/10, /*height=*/10);
+	ASSERT_TRUE(spinUntil([&]() { return !out_->empty(); }));
+
+	EXPECT_EQ(out_->back().rgb.width, 10u) << "images must be passed through unresized";
+	EXPECT_EQ(out_->back().depth.width, 10u);
 	EXPECT_NEAR(out_->back().rgb_camera_info.k[0], 100.0, 1e-9);
 }
 

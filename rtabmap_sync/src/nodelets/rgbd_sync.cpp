@@ -216,11 +216,24 @@ void RGBDSync::callback(
 		rtabmap_msgs::msg::RGBDImage::UniquePtr msg(new rtabmap_msgs::msg::RGBDImage);
 		msg->header.frame_id = cameraInfo->header.frame_id;
 		msg->header.stamp = rgbStamp>depthStamp?image->header.stamp:depth->header.stamp;
-		if(decimation_>1 && !(depth->width % decimation_ == 0 && depth->height % decimation_ == 0))
+		// Same rule as RTAB-Map's Odom/ImageDecimation and Mem/ImagePostDecimation: the RGB
+		// is decimated by the factor, the depth only as much as needed to stay at most the
+		// size of the decimated RGB (not at all if it is already that small).
+		int decimationDepth = decimation_;
+		if(decimation_>1)
 		{
-			RCLCPP_WARN(this->get_logger(), "Decimation of depth images should be exact (decimation=%d, size=(%d,%d))! "
-				   "Images won't be resized.", decimation_, depth->width, depth->height);
+			int targetSize = image->height / decimation_;
+			// A decimation larger than the image is caught below: 0 never divides.
+			decimationDepth = targetSize < 1 ? 0 :
+					targetSize >= (int)depth->height ? 1 : (int)ceil(float(depth->height) / float(targetSize));
+		}
+		if(decimationDepth == 0 ||
+		   (decimationDepth>1 && !(depth->width % decimationDepth == 0 && depth->height % decimationDepth == 0)))
+		{
+			RCLCPP_WARN(this->get_logger(), "Decimation of depth images should be exact (decimation=%d, depth decimation=%d, size=(%d,%d))! "
+				   "Images won't be resized.", decimation_, decimationDepth, depth->width, depth->height);
 			decimation_ = 1;
+			decimationDepth = 1;
 		}
 		if(decimation_>1)
 		{
@@ -253,7 +266,10 @@ void RGBDSync::callback(
 		if(decimation_>1)
 		{
 			rgbMat = rtabmap::util2d::decimate(rgbMat, decimation_);
-			depthMat = rtabmap::util2d::decimate(depthMat, decimation_);
+		}
+		if(decimationDepth>1)
+		{
+			depthMat = rtabmap::util2d::decimate(depthMat, decimationDepth);
 		}
 
 		if(depthScale_ != 1.0)
