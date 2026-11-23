@@ -127,6 +127,7 @@ Specific to this node. The shared ones — `frame_id`, `publish_tf`, `guess_fram
 | `queue_size` | `int` | — | **Deprecated**, renamed to `sync_queue_size`. Copied to it with a warning. |
 | `qos_camera_info` | `int` | value of `qos` | Reliability of the `rgb/camera_info` subscription alone. |
 | `keep_color` | `bool` | `false` | Keep the color image in the data handed to the odometry instead of converting to grayscale. Registration is grayscale either way; this only matters for what downstream consumers of `odom_rgbd_image` receive. |
+| `image_decimation` | `int` | `1` | Decimate the RGB image by this factor in the node, before the odometry: the depth image is decimated only as much as needed to stay at most the size of the decimated RGB, and the calibrations and the features received with the frame are scaled with them. Same rule as `Odom/ImageDecimation`, which decimates a copy for the registration only; here what the node republishes (`odom_rgbd_image`, `odom_sensor_data/*`) is decimated too, so downstream nodes receive smaller images. The depth decimation has to divide the depth image size exactly, otherwise the images are not decimated (warning). |
 | `image_transport` | `string` | `"raw"` | Transport for `rgb/image`, e.g. `compressed`. |
 | `depth_transport` | `string` | `"raw"` | Transport for `depth/image`, e.g. `compressedDepth`. |
 | `rgb_transport` | `string` | — | **Deprecated**, renamed to `image_transport`. |

@@ -43,6 +43,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <rtabmap/core/odometry/OdometryF2M.h>
 #include <rtabmap/core/odometry/OdometryF2F.h>
+#include <rtabmap/core/util2d.h>
+#include <rtabmap/core/Version.h>
 #include <rtabmap/core/util3d.h>
 #include <rtabmap/core/util3d_transforms.h>
 #include <rtabmap/core/Memory.h>
@@ -681,6 +683,96 @@ void OdometryROS::callbackIMU(const sensor_msgs::msg::Imu::SharedPtr msg)
 			}
 		}
 	}
+}
+
+bool OdometryROS::decimateImages(SensorData & data, int decimation)
+{
+	if(decimation <= 1 || data.imageRaw().empty())
+	{
+		return true;
+	}
+	if(decimation > data.imageRaw().rows || decimation > data.imageRaw().cols)
+	{
+		return false;
+	}
+	const bool stereo = data.cameraModels().empty() && !data.stereoCameraModels().empty();
+	const cv::Mat & image = data.imageRaw();
+	const cv::Mat & depthOrRight = data.depthOrRightRaw();
+
+	// Odometry::process()'s rule for Odom/ImageDecimation: the right image like the left,
+	// the depth only down to the size of the decimated RGB.
+	int decimationDepth = decimation;
+	if(!stereo && !depthOrRight.empty())
+	{
+		int targetSize = image.rows / decimation;
+		if(targetSize < 1)
+		{
+			return false;
+		}
+		decimationDepth = targetSize >= depthOrRight.rows ? 1 : (int)ceil(float(depthOrRight.rows) / float(targetSize));
+	}
+	if(!depthOrRight.empty() && decimationDepth > 1 &&
+	   (depthOrRight.type() == CV_16UC1 || depthOrRight.type() == CV_32FC1) &&
+	   (depthOrRight.rows % decimationDepth != 0 || depthOrRight.cols % decimationDepth != 0))
+	{
+		return false;
+	}
+
+	cv::Mat decimatedImage = util2d::decimate(image, decimation);
+	cv::Mat decimatedDepthOrRight = depthOrRight.empty() ? cv::Mat() : util2d::decimate(depthOrRight, decimationDepth);
+#if RTABMAP_VERSION_COMPARE(>=,0,22,0)
+	// The depth confidence follows the depth, as in Memory's pre/post decimation.
+	cv::Mat depthConfidence = data.depthConfidenceRaw();
+	if(!depthConfidence.empty() && decimationDepth > 1)
+	{
+		depthConfidence = util2d::decimate(depthConfidence, decimationDepth);
+	}
+#endif
+
+	// The features that came with the frame are placed in the full size image.
+	std::vector<cv::KeyPoint> keypoints = data.keypoints();
+	if(!keypoints.empty())
+	{
+		const float ratio = 1.0f / float(decimation);
+		const double log2value = log(double(decimation))/log(2.0);
+		for(cv::KeyPoint & kpt : keypoints)
+		{
+			kpt.pt.x *= ratio;
+			kpt.pt.y *= ratio;
+			kpt.size *= ratio;
+			kpt.octave -= log2value;
+		}
+	}
+	std::vector<cv::Point3f> keypoints3D = data.keypoints3D();
+	cv::Mat descriptors = data.descriptors();
+
+	if(stereo)
+	{
+		std::vector<StereoCameraModel> models = data.stereoCameraModels();
+		for(StereoCameraModel & model : models)
+		{
+			model.scale(1.0/double(decimation));
+		}
+		data.setStereoImage(decimatedImage, decimatedDepthOrRight, models);
+	}
+	else
+	{
+		std::vector<CameraModel> models = data.cameraModels();
+		for(CameraModel & model : models)
+		{
+			model = model.scaled(1.0/double(decimation));
+		}
+#if RTABMAP_VERSION_COMPARE(>=,0,22,0)
+		data.setRGBDImage(decimatedImage, decimatedDepthOrRight, depthConfidence, models);
+#else
+		data.setRGBDImage(decimatedImage, decimatedDepthOrRight, models);
+#endif
+	}
+	if(!keypoints.empty())
+	{
+		data.setFeatures(keypoints, keypoints3D, descriptors);
+	}
+	return true;
 }
 
 void OdometryROS::processData(SensorData & data, const std_msgs::msg::Header & header)

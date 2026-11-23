@@ -16,6 +16,8 @@ All rights reserved. (BSD-3-Clause, see the repository root.)
 
 #include <cmath>
 
+#include <opencv2/imgproc.hpp>
+
 #include <rtabmap/core/Version.h>
 
 #include "camera_rig.hpp"
@@ -489,6 +491,71 @@ TEST_F(RgbdOdometryTest, converts_the_image_to_grayscale_by_default)
 }
 
 /**
+ * image_decimation decimates the frame in the node, before the odometry, so what comes
+ * back out is decimated too (Odom/ImageDecimation only decimates the copy it registers).
+ * The depth is the size of the RGB here, so it follows it down, and the calibration is
+ * scaled with them.
+ */
+TEST_F(RgbdOdometryTest, image_decimation_decimates_what_is_republished)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<rtabmap_msgs::msg::RGBDImage>> frames =
+			collect<rtabmap_msgs::msg::RGBDImage>("odom_rgbd_image");
+	makeNode({rclcpp::Parameter("subscribe_rgbd", true),
+	          rclcpp::Parameter("image_decimation", 2)});
+
+	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr pub =
+			helper()->create_publisher<rtabmap_msgs::msg::RGBDImage>("rgbd_image", 10);
+	ASSERT_TRUE(waitForSubscriber(pub));
+	ASSERT_TRUE(waitForPublisher(frames->subscription));
+
+	const rtabmap_msgs::msg::RGBDImage frame = makeFrame(kFrame, 1.0);
+	ASSERT_EQ(frame.rgb.width, frame.depth.width);
+	pub->publish(frame);
+	ASSERT_TRUE(spinUntil([&]() { return !frames->empty(); }));
+
+	const rtabmap_msgs::msg::RGBDImage & out = frames->back();
+	EXPECT_EQ(frame.rgb.width/2, out.rgb.width);
+	EXPECT_EQ(frame.rgb.height/2, out.rgb.height);
+	EXPECT_EQ(frame.depth.width/2, out.depth.width);
+	EXPECT_EQ(frame.depth.height/2, out.depth.height);
+	EXPECT_EQ(frame.rgb.width/2, out.rgb_camera_info.width);
+	EXPECT_DOUBLE_EQ(frame.rgb_camera_info.k[0]/2.0, out.rgb_camera_info.k[0]);
+	EXPECT_DOUBLE_EQ(frame.rgb_camera_info.k[2]/2.0, out.rgb_camera_info.k[2]);
+}
+
+/**
+ * A depth image already at the size of the decimated RGB is left as it is, like
+ * Odom/ImageDecimation does: only the RGB is decimated, to the depth's size.
+ */
+TEST_F(RgbdOdometryTest, image_decimation_leaves_a_depth_already_at_the_decimated_size)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<rtabmap_msgs::msg::RGBDImage>> frames =
+			collect<rtabmap_msgs::msg::RGBDImage>("odom_rgbd_image");
+	makeNode({rclcpp::Parameter("subscribe_rgbd", true),
+	          rclcpp::Parameter("image_decimation", 2)});
+
+	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImage>::SharedPtr pub =
+			helper()->create_publisher<rtabmap_msgs::msg::RGBDImage>("rgbd_image", 10);
+	ASSERT_TRUE(waitForSubscriber(pub));
+	ASSERT_TRUE(waitForPublisher(frames->subscription));
+
+	rtabmap_msgs::msg::RGBDImage frame = makeFrame(kFrame, 1.0);
+	cv::Mat halfDepth;
+	cv::resize(rgbdDepthImage(kFrame), halfDepth, cv::Size(), 0.5, 0.5, cv::INTER_NEAREST);
+	frame.depth = makeImage("camera", 1.0, halfDepth, "16UC1");
+	pub->publish(frame);
+	ASSERT_TRUE(spinUntil([&]() { return !frames->empty(); }));
+
+	const rtabmap_msgs::msg::RGBDImage & out = frames->back();
+	EXPECT_EQ(frame.rgb.width/2, out.rgb.width);
+	EXPECT_EQ(frame.rgb.height/2, out.rgb.height);
+	EXPECT_EQ((unsigned int)halfDepth.cols, out.depth.width);
+	EXPECT_EQ((unsigned int)halfDepth.rows, out.depth.height);
+}
+
+/**
  * The two feature topics the lidar node cannot fill: both are built from the frame's
  * visual words, so they carry content only on the visual paths. `odom_local_map` is the
  * map the frame was registered against, `odom_last_frame` the frame's own features, both
@@ -678,6 +745,44 @@ TEST_F(RgbdOdometryRigTest, decimation_brings_the_given_features_down_with_the_i
 	makeNode({rclcpp::Parameter("subscribe_rgbd", true),
 	          rclcpp::Parameter("rgbd_cameras", 0),
 	          rclcpp::Parameter("Odom/ImageDecimation", "2")});
+
+	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImages>::SharedPtr pub =
+			helper()->create_publisher<rtabmap_msgs::msg::RGBDImages>("rgbd_images", 10);
+	ASSERT_TRUE(waitForSubscriber(pub));
+
+	const int frames = 11;
+	for(int i=0; i<frames; ++i)
+	{
+		pub->publish(cameraRigFrame(rig, rtabmap::Transform(0.1f*i, 0, 0, 0, 0, 0),
+				1.0 + 0.1*i, /*withImages=*/true));
+		ASSERT_TRUE(spinUntil([&]() { return odom->size() >= size_t(i+1); }))
+				<< "nothing came back for frame " << i;
+	}
+
+	const nav_msgs::msg::Odometry & last = odom->back();
+	ASSERT_FALSE(isLost(last)) << "the features were lost on the way into the decimated frame";
+	EXPECT_NEAR(1.0, last.pose.pose.position.x, 0.05);
+	EXPECT_NEAR(0.0, last.pose.pose.position.y, 0.05);
+	EXPECT_NEAR(0.0, last.pose.pose.position.z, 0.05);
+}
+
+/**
+ * The same with image_decimation, which decimates the frame in the node instead: the
+ * features that came with it have to be brought down with the image there too.
+ */
+TEST_F(RgbdOdometryRigTest, image_decimation_brings_the_given_features_down_with_the_image)
+{
+#ifndef RTABMAP_OPENGV
+	GTEST_SKIP() << "a multi-camera PnP is solved by OpenGV, which RTAB-Map was built without";
+#endif
+
+	const CameraRig rig = makeCameraRig();
+	publishRigTf(rig);
+	std::shared_ptr<Collector<nav_msgs::msg::Odometry>> odom =
+			collect<nav_msgs::msg::Odometry>("odom");
+	makeNode({rclcpp::Parameter("subscribe_rgbd", true),
+	          rclcpp::Parameter("rgbd_cameras", 0),
+	          rclcpp::Parameter("image_decimation", 2)});
 
 	rclcpp::Publisher<rtabmap_msgs::msg::RGBDImages>::SharedPtr pub =
 			helper()->create_publisher<rtabmap_msgs::msg::RGBDImages>("rgbd_images", 10);

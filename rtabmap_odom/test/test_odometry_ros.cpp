@@ -18,6 +18,8 @@ All rights reserved. (BSD-3-Clause, see the repository root.)
 #include <rtabmap_odom/icp_odometry.hpp>
 
 #include <rtabmap/core/Parameters.h>
+#include <rtabmap/core/SensorData.h>
+#include <rtabmap/core/Version.h>
 #include <rtabmap/utilite/UDirectory.h>
 
 #include "msg_builders.hpp"
@@ -1502,6 +1504,83 @@ TEST_F(OdometryRosTest, marks_the_restarting_frame_as_unlinked_when_null_publish
 	EXPECT_NEAR(0.3, odom->back().pose.pose.position.x, 0.02);
 	EXPECT_GE(odom->back().pose.covariance[0], 9999.0);
 	EXPECT_GE(odom->back().twist.covariance[0], 9999.0);
+}
+
+/// Exposes OdometryROS::decimateImages(), which is protected. Never instantiated.
+struct OdometryROSDecimation : public rtabmap_odom::OdometryROS
+{
+	using rtabmap_odom::OdometryROS::decimateImages;
+};
+
+/**
+ * image_decimation's rule, the one of Odom/ImageDecimation: the RGB is decimated by the
+ * factor, the depth only down to the size of the decimated RGB (here it already is), and
+ * the calibration and the keypoints that came with the frame follow the RGB. Their 3D
+ * points and descriptors do not depend on the image size and are kept as they are.
+ */
+TEST(OdometryROSDecimateImages, decimates_the_rgb_and_the_depth_only_down_to_its_size)
+{
+	rtabmap::SensorData data(
+			cv::Mat(480, 640, CV_8UC3, cv::Scalar(10, 20, 30)),
+			cv::Mat(240, 320, CV_16UC1, cv::Scalar(1000)),
+			rtabmap::CameraModel(500, 500, 320, 240, rtabmap::CameraModel::opticalRotation(), 0, cv::Size(640, 480)));
+	data.setFeatures(
+			std::vector<cv::KeyPoint>{cv::KeyPoint(100.0f, 200.0f, 8.0f, -1.0f, 0.0f, 1)},
+			std::vector<cv::Point3f>{cv::Point3f(1, 2, 3)},
+			cv::Mat::ones(1, 32, CV_8UC1));
+
+	ASSERT_TRUE(OdometryROSDecimation::decimateImages(data, 2));
+
+	EXPECT_EQ(320, data.imageRaw().cols);
+	EXPECT_EQ(240, data.imageRaw().rows);
+	EXPECT_EQ(320, data.depthRaw().cols) << "a depth already at the decimated size is left as it is";
+	EXPECT_EQ(240, data.depthRaw().rows);
+	ASSERT_EQ(1u, data.cameraModels().size());
+	EXPECT_DOUBLE_EQ(250.0, data.cameraModels()[0].fx());
+	EXPECT_DOUBLE_EQ(160.0, data.cameraModels()[0].cx());
+	EXPECT_EQ(320, data.cameraModels()[0].imageWidth());
+	ASSERT_EQ(1u, data.keypoints().size());
+	EXPECT_FLOAT_EQ(50.0f, data.keypoints()[0].pt.x);
+	EXPECT_FLOAT_EQ(100.0f, data.keypoints()[0].pt.y);
+	EXPECT_FLOAT_EQ(4.0f, data.keypoints()[0].size);
+	EXPECT_EQ(0, data.keypoints()[0].octave);
+	ASSERT_EQ(1u, data.keypoints3D().size());
+	EXPECT_FLOAT_EQ(3.0f, data.keypoints3D()[0].z);
+	EXPECT_EQ(1, data.descriptors().rows);
+}
+
+#if RTABMAP_VERSION_COMPARE(>=,0,22,0)
+/// The depth confidence is kept, and decimated with the depth.
+TEST(OdometryROSDecimateImages, keeps_the_depth_confidence_decimated_with_the_depth)
+{
+	rtabmap::SensorData data(
+			cv::Mat(480, 640, CV_8UC3, cv::Scalar(10, 20, 30)),
+			cv::Mat(480, 640, CV_16UC1, cv::Scalar(1000)),
+			cv::Mat(480, 640, CV_8UC1, cv::Scalar(100)),
+			rtabmap::CameraModel(500, 500, 320, 240, rtabmap::CameraModel::opticalRotation(), 0, cv::Size(640, 480)));
+
+	ASSERT_TRUE(OdometryROSDecimation::decimateImages(data, 2));
+
+	EXPECT_EQ(320, data.depthRaw().cols);
+	ASSERT_FALSE(data.depthConfidenceRaw().empty()) << "the confidence was dropped";
+	EXPECT_EQ(320, data.depthConfidenceRaw().cols);
+	EXPECT_EQ(240, data.depthConfidenceRaw().rows);
+}
+#endif
+
+/// A depth that the decimation would not divide exactly is refused, the frame untouched.
+TEST(OdometryROSDecimateImages, refuses_a_depth_decimation_that_is_not_exact)
+{
+	rtabmap::SensorData data(
+			cv::Mat(8, 8, CV_8UC3, cv::Scalar(10, 20, 30)),
+			cv::Mat(7, 7, CV_16UC1, cv::Scalar(1000)),
+			rtabmap::CameraModel(10, 10, 4, 4, rtabmap::CameraModel::opticalRotation(), 0, cv::Size(8, 8)));
+
+	EXPECT_FALSE(OdometryROSDecimation::decimateImages(data, 2));
+
+	EXPECT_EQ(8, data.imageRaw().cols);
+	EXPECT_EQ(7, data.depthRaw().cols);
+	EXPECT_DOUBLE_EQ(10.0, data.cameraModels()[0].fx());
 }
 
 }  // namespace

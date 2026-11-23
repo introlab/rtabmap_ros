@@ -68,6 +68,7 @@ StereoOdometry::StereoOdometry(const rclcpp::NodeOptions & options) :
 		topicQueueSize_(10),
 		syncQueueSize_(5),
 		keepColor_(false),
+		imageDecimation_(1),
 		stereoExposureCompensation_(false),
 		approxSyncMaxInterval_(0.0)
 {
@@ -114,6 +115,21 @@ void StereoOdometry::onOdomInit()
 	subscribeRGBD = this->declare_parameter("subscribe_rgbd", subscribeRGBD);
 	rgbdCameras = this->declare_parameter("rgbd_cameras", rgbdCameras);
 	keepColor_ = this->declare_parameter("keep_color", keepColor_);
+	// Decimated here rather than by Odom/ImageDecimation, so that what is republished
+	// (odom_sensor_data, odom_rgbd_image) is decimated too.
+	imageDecimation_ = this->declare_parameter("image_decimation", imageDecimation_);
+	if(imageDecimation_ < 1)
+	{
+		imageDecimation_ = 1;
+	}
+	if(imageDecimation_ > 1 &&
+	   uStr2Int(parameters().at(rtabmap::Parameters::kOdomImageDecimation())) > 1)
+	{
+		RCLCPP_WARN(this->get_logger(), "%s: both \"image_decimation\" (%d) and \"%s\" (%s) are set: "
+				"the images are decimated by both, one after the other.", get_name(), imageDecimation_,
+				rtabmap::Parameters::kOdomImageDecimation().c_str(),
+				parameters().at(rtabmap::Parameters::kOdomImageDecimation()).c_str());
+	}
 	stereoExposureCompensation_ = this->declare_parameter("stereo_exposure_compensation", stereoExposureCompensation_);
 	std::string imageTransport = this->declare_parameter("image_transport", std::string("raw"));
 
@@ -126,6 +142,7 @@ void StereoOdometry::onOdomInit()
 	RCLCPP_INFO(this->get_logger(), "StereoOdometry: qos_camera_info = %d", qosCamInfo);
 	RCLCPP_INFO(this->get_logger(), "StereoOdometry: subscribe_rgbd = %s", subscribeRGBD?"true":"false");
 	RCLCPP_INFO(this->get_logger(), "StereoOdometry: keep_color     = %s", keepColor_?"true":"false");
+	RCLCPP_INFO(this->get_logger(), "StereoOdometry: image_decimation = %d", imageDecimation_);
 	RCLCPP_INFO(this->get_logger(), "StereoOdometry: stereo_exposure_compensation = %s", stereoExposureCompensation_?"true":"false");
 	RCLCPP_INFO(this->get_logger(), "StereoOdometry: image_transport = %s", imageTransport.c_str());
 
@@ -752,6 +769,12 @@ void StereoOdometry::commonCallback(
 	std_msgs::msg::Header header;
 	header.stamp = higherStamp;
 	header.frame_id = leftImages.size()==1?(hasImages?leftImages[0]->header.frame_id:leftCameraInfos[0].header.frame_id):"";
+	if(!decimateImages(data, imageDecimation_))
+	{
+		RCLCPP_WARN_ONCE(this->get_logger(), "%s: image_decimation=%d is larger than the images (%dx%d): "
+				"they are not decimated.", get_name(), imageDecimation_,
+				data.imageRaw().cols, data.imageRaw().rows);
+	}
 	this->processData(data, header);
 }
 

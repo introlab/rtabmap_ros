@@ -174,6 +174,7 @@ private:
 	int topicQueueSize_;
 	int syncQueueSize_;
 	bool keepColor_;
+	int imageDecimation_;
 	double approxSyncMaxInterval_;
 };
 
