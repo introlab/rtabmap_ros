@@ -2164,11 +2164,11 @@ std::map<std::string, float> odomInfoToStatistics(const rtabmap::OdometryInfo & 
 	// Based on rtabmap/MainWindow.cpp
 	stats.insert(std::make_pair("Odometry/Features/", info.features));
 	stats.insert(std::make_pair("Odometry/Matches/", info.reg.matches));
-	stats.insert(std::make_pair("Odometry/MatchesRatio/", info.features<=0?0.0f:float(info.reg.inliers)/float(info.features)));
+	stats.insert(std::make_pair("Odometry/MatchesRatio/", info.features<=0?0.0f:float(info.reg.matches)/float(info.features)));
 	stats.insert(std::make_pair("Odometry/Inliers/", info.reg.inliers));
 	stats.insert(std::make_pair("Odometry/InliersMeanDistance/m", info.reg.inliersMeanDistance));
 	stats.insert(std::make_pair("Odometry/InliersDistribution/", info.reg.inliersDistribution));
-	stats.insert(std::make_pair("Odometry/InliersRatio/", info.reg.inliers));
+	stats.insert(std::make_pair("Odometry/InliersRatio/", info.features<=0?0.0f:float(info.reg.inliers)/float(info.features)));
 	stats.insert(std::make_pair("Odometry/ICPInliersRatio/", info.reg.icpInliersRatio));
 	stats.insert(std::make_pair("Odometry/ICPRotation/rad", info.reg.icpRotation));
 	stats.insert(std::make_pair("Odometry/ICPTranslation/m", info.reg.icpTranslation));
@@ -2197,7 +2197,7 @@ std::map<std::string, float> odomInfoToStatistics(const rtabmap::OdometryInfo & 
 	stats.insert(std::make_pair("Odometry/localBundleAvgInlierDistance/pix", info.localBundleAvgInlierDistance));
 	stats.insert(std::make_pair("Odometry/localBundleMaxKeyFramesForInlier/", info.localBundleMaxKeyFramesForInlier));
 	stats.insert(std::make_pair("Odometry/KeyFrameAdded/", info.keyFrameAdded?1.0f:0.0f));
-	stats.insert(std::make_pair("Odometry/Interval/ms", (float)info.interval));
+	stats.insert(std::make_pair("Odometry/Interval/ms", (float)info.interval*1000.0f)); // interval is in seconds
 	stats.insert(std::make_pair("Odometry/Distance/m", info.distanceTravelled));
 
 	float x,y,z,roll,pitch,yaw;

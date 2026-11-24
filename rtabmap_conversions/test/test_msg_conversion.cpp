@@ -1036,6 +1036,7 @@ TEST(MsgConversion, odomInfoToStatistics)
 	info.reg.inliers = 100;
 	info.reg.matches = 200;
 	info.localMapSize = 1234;
+	info.interval = 0.2; // s
 
 	const std::map<std::string, float> stats = odomInfoToStatistics(info);
 
@@ -1044,8 +1045,12 @@ TEST(MsgConversion, odomInfoToStatistics)
 	EXPECT_FLOAT_EQ(stats.at("Odometry/Matches/"), 200.0f);
 	EXPECT_FLOAT_EQ(stats.at("Odometry/Inliers/"), 100.0f);
 	EXPECT_FLOAT_EQ(stats.at("Odometry/LocalMapSize/"), 1234.0f);
-	// MatchesRatio is inliers/features, and must not divide by zero.
-	EXPECT_FLOAT_EQ(stats.at("Odometry/MatchesRatio/"), 100.0f/400.0f);
+	// As rtabmap's MainWindow computes them: matches and inliers over features.
+	EXPECT_FLOAT_EQ(stats.at("Odometry/MatchesRatio/"), 200.0f/400.0f);
+	EXPECT_FLOAT_EQ(stats.at("Odometry/InliersRatio/"), 100.0f/400.0f)
+		<< "a ratio, not the inliers count";
+	// OdometryInfo::interval is in seconds.
+	EXPECT_FLOAT_EQ(stats.at("Odometry/Interval/ms"), 200.0f);
 }
 
 TEST(MsgConversion, odomInfoToStatisticsEmptyCovariance)
@@ -1083,8 +1088,11 @@ TEST(MsgConversion, odomInfoToStatisticsNoFeatures)
 	rtabmap::OdometryInfo info;
 	info.features = 0;
 	info.reg.inliers = 10;
+	info.reg.matches = 20;
 
 	EXPECT_FLOAT_EQ(odomInfoToStatistics(info).at("Odometry/MatchesRatio/"), 0.0f)
+		<< "must not divide by zero";
+	EXPECT_FLOAT_EQ(odomInfoToStatistics(info).at("Odometry/InliersRatio/"), 0.0f)
 		<< "must not divide by zero";
 }
 
