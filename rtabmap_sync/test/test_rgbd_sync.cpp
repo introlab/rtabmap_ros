@@ -287,6 +287,27 @@ TEST_F(RGBDSyncTest, DecimationOnlyBringsALargerDepthDownToTheColorSize)
 	EXPECT_EQ(got.depth.height, 4u);
 }
 
+TEST_F(RGBDSyncTest, DecimationFallsBackToTheFactorWhenItDividesTheDepth)
+{
+	// The RealSense D435 case (1280x720 color, 848x480 depth, decimation 4) at a smaller
+	// scale: the color goes down to 3 rows, which the 8-row depth reaches only decimated
+	// by 3, not exact on 20x8. The factor itself divides the depth, so it is used for it
+	// instead of giving up: the ratio between the two images is kept.
+	start({rclcpp::Parameter("decimation", 4)});
+
+	rgbPub_->publish(makeRgbImage("camera_link", 1000.0, 24, 12));
+	depthPub_->publish(makeDepthImage("camera_link", 1000.0, 20, 8, 1500));
+	infoPub_->publish(makeCameraInfo("camera_link", 1000.0, 24, 12));
+	ASSERT_TRUE(spinUntil([&]() { return !out_->empty(); }));
+
+	const rtabmap_msgs::msg::RGBDImage & got = out_->back();
+	EXPECT_EQ(got.rgb.width, 6u);
+	EXPECT_EQ(got.rgb.height, 3u);
+	EXPECT_EQ(got.depth.width, 5u) << "the depth must be decimated by the factor, which divides it";
+	EXPECT_EQ(got.depth.height, 2u);
+	EXPECT_NEAR(got.rgb_camera_info.k[0], 25.0, 1e-6);
+}
+
 TEST_F(RGBDSyncTest, DecimationIsDisabledWhenItWouldNotDivideTheColorImage)
 {
 	// A decimation that does not divide the color size exactly would round the resized
@@ -317,6 +338,24 @@ TEST_F(RGBDSyncTest, DecimationIsDisabledWhenItWouldNotDivideTheDepthImage)
 	EXPECT_EQ(out_->back().rgb.width, 12u) << "images must be passed through unresized";
 	EXPECT_EQ(out_->back().depth.width, 10u);
 	EXPECT_NEAR(out_->back().rgb_camera_info.k[0], 100.0, 1e-9);
+}
+
+TEST_F(RGBDSyncTest, DecimationResumesAfterAFrameItDoesNotDivide)
+{
+	// One frame the factor does not divide (a driver's first frame at another size, a
+	// resolution switch) is passed through unresized, but must not turn decimation off
+	// for the frames that follow at a size it divides.
+	start({rclcpp::Parameter("decimation", 2)});
+
+	publish(1000.0, /*width=*/7, /*height=*/7);
+	ASSERT_TRUE(spinUntil([&]() { return !out_->empty(); }));
+	EXPECT_EQ(out_->back().rgb.width, 7u) << "the odd frame is passed through unresized";
+
+	publish(1001.0, /*width=*/8, /*height=*/8);
+	ASSERT_TRUE(spinUntil([&]() { return out_->size() >= 2u; }));
+	EXPECT_EQ(out_->back().rgb.width, 4u) << "decimation must resume on a frame the factor divides";
+	EXPECT_EQ(out_->back().depth.width, 4u);
+	EXPECT_NEAR(out_->back().rgb_camera_info.k[0], 50.0, 1e-6);
 }
 
 TEST_F(RGBDSyncTest, ADecimationBelowOneIsClampedToOne)

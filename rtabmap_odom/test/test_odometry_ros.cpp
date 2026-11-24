@@ -1586,6 +1586,27 @@ TEST(OdometryROSDecimateImages, refuses_a_factor_that_does_not_divide_the_rgb)
 	EXPECT_DOUBLE_EQ(10.0, data.cameraModels()[0].fx());
 }
 
+/**
+ * A RealSense D435 at its defaults (1280x720 color, 848x480 depth) decimated by 4: the
+ * depth reaches the 180 rows of the decimated RGB only decimated by 3, which does not
+ * divide it. The factor itself does, so it is used for the depth instead of refusing.
+ */
+TEST(OdometryROSDecimateImages, falls_back_to_the_factor_when_it_divides_the_depth)
+{
+	rtabmap::SensorData data(
+			cv::Mat(720, 1280, CV_8UC3, cv::Scalar(10, 20, 30)),
+			cv::Mat(480, 848, CV_16UC1, cv::Scalar(1000)),
+			rtabmap::CameraModel(900, 900, 640, 360, rtabmap::CameraModel::opticalRotation(), 0, cv::Size(1280, 720)));
+
+	ASSERT_TRUE(OdometryROSDecimation::decimateImages(data, 4));
+
+	EXPECT_EQ(320, data.imageRaw().cols);
+	EXPECT_EQ(180, data.imageRaw().rows);
+	EXPECT_EQ(212, data.depthRaw().cols) << "the depth must be decimated by the factor, which divides it";
+	EXPECT_EQ(120, data.depthRaw().rows);
+	EXPECT_DOUBLE_EQ(225.0, data.cameraModels()[0].fx());
+}
+
 /// A depth that the decimation would not divide exactly is refused, the frame untouched.
 TEST(OdometryROSDecimateImages, refuses_a_depth_decimation_that_is_not_exact)
 {
@@ -1599,6 +1620,43 @@ TEST(OdometryROSDecimateImages, refuses_a_depth_decimation_that_is_not_exact)
 	EXPECT_EQ(8, data.imageRaw().cols);
 	EXPECT_EQ(7, data.depthRaw().cols);
 	EXPECT_DOUBLE_EQ(10.0, data.cameraModels()[0].fx());
+}
+
+/**
+ * The depth images of several cameras are side by side in one image: the factor has to
+ * divide each camera's depth, not only the whole. Here the whole (14 columns) is even but
+ * each camera's 7 columns are not: decimated as a whole, the second camera's depth would
+ * be sampled half a pixel out of step with its scaled calibration.
+ */
+TEST(OdometryROSDecimateImages, refuses_a_depth_that_the_decimation_does_not_divide_per_camera)
+{
+	std::vector<rtabmap::CameraModel> models(2,
+			rtabmap::CameraModel(10, 10, 4, 4, rtabmap::CameraModel::opticalRotation(), 0, cv::Size(8, 8)));
+	rtabmap::SensorData data(
+			cv::Mat(8, 16, CV_8UC3, cv::Scalar(10, 20, 30)),
+			cv::Mat(6, 14, CV_16UC1, cv::Scalar(1000)),
+			models);
+
+	EXPECT_FALSE(OdometryROSDecimation::decimateImages(data, 2));
+
+	EXPECT_EQ(16, data.imageRaw().cols);
+	EXPECT_EQ(14, data.depthRaw().cols);
+	EXPECT_DOUBLE_EQ(10.0, data.cameraModels()[0].fx());
+}
+
+/// A right image that the factor does not divide is refused like the left, the pair untouched.
+TEST(OdometryROSDecimateImages, refuses_a_right_image_that_the_decimation_does_not_divide)
+{
+	rtabmap::SensorData data(
+			cv::Mat(8, 8, CV_8UC1, cv::Scalar(10)),
+			cv::Mat(8, 7, CV_8UC1, cv::Scalar(10)),
+			rtabmap::StereoCameraModel(10, 10, 4, 4, 0.1, rtabmap::CameraModel::opticalRotation(), cv::Size(8, 8)));
+
+	EXPECT_FALSE(OdometryROSDecimation::decimateImages(data, 2));
+
+	EXPECT_EQ(8, data.imageRaw().cols);
+	EXPECT_EQ(7, data.rightRaw().cols);
+	EXPECT_DOUBLE_EQ(10.0, data.stereoCameraModels()[0].left().fx());
 }
 
 }  // namespace

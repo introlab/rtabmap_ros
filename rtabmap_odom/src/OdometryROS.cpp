@@ -718,10 +718,22 @@ bool OdometryROS::decimateImages(SensorData & data, int decimation)
 			return false;
 		}
 		decimationDepth = targetSize >= depthOrRight.rows ? 1 : (int)ceil(float(depthOrRight.rows) / float(targetSize));
+		// When that is not exact but the factor itself divides the depth (e.g. a RealSense
+		// D435 at 1280x720 color + 848x480 depth, decimation 4), the depth is decimated by
+		// the factor instead, which keeps the ratio between the two images.
+		if(decimationDepth > 1 &&
+		   (depthOrRight.rows % decimationDepth != 0 || (depthOrRight.cols / cameraCount) % decimationDepth != 0) &&
+		   depthOrRight.rows % decimation == 0 && (depthOrRight.cols / cameraCount) % decimation == 0)
+		{
+			decimationDepth = decimation;
+		}
 	}
+	// The depth or right image of each camera has to be divided exactly too: a right image
+	// resized with rounding would be out of step with its calibration, the depth is sampled
+	// (util2d::decimate asserts it), and the images of several cameras are side by side in
+	// one image, which decimated as a whole would sample across the camera boundaries.
 	if(!depthOrRight.empty() && decimationDepth > 1 &&
-	   (depthOrRight.type() == CV_16UC1 || depthOrRight.type() == CV_32FC1) &&
-	   (depthOrRight.rows % decimationDepth != 0 || depthOrRight.cols % decimationDepth != 0))
+	   (depthOrRight.rows % decimationDepth != 0 || (depthOrRight.cols / cameraCount) % decimationDepth != 0))
 	{
 		return false;
 	}
