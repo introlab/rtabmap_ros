@@ -169,26 +169,6 @@ protected:
 	/// The reliability the subclass should give its own subscriptions, from `qos`.
 	rmw_qos_reliability_policy_t qos() const {return qos_;}
 	/**
-	 * @brief Decimates the images of @p data in place, before they reach the odometry.
-	 * @param[in,out] data       an RGB-D or stereo frame, with its calibrations and any
-	 *                           features that came with it
-	 * @param[in]     decimation the factor (`image_decimation`), 1 does nothing
-	 *
-	 * Same rule as RTAB-Map's `Odom/ImageDecimation`: the RGB (or left) image is divided
-	 * by @p decimation, the depth only as much as needed to stay at most the size of the
-	 * decimated RGB (and its confidence image with it), the right image like the left one,
-	 * and the calibrations are scaled with them. Keypoints that came with the frame are brought down to the decimated
-	 * image. Unlike `Odom/ImageDecimation`, which decimates a copy for the registration
-	 * only, what the node republishes (`odom_sensor_data/*`, `odom_rgbd_image`) is then
-	 * decimated too.
-	 *
-	 * @return false, with @p data left untouched, if @p decimation does not divide the size
-	 *         of each camera's image, or if the depth would have to be decimated by a
-	 *         factor that does not divide its size: both decimations have to be exact, or
-	 *         the images and their calibrations come out of step.
-	 */
-	static bool decimateImages(rtabmap::SensorData & data, int decimation);
-	/**
 	 * @brief Starts the diagnostics, once the subclass knows what it subscribed to.
 	 * @param[in] subscribedTopicsMsg the human readable list logged at startup and
 	 *                                repeated in the "no data received" warning

@@ -216,55 +216,6 @@ void RGBDSync::callback(
 		rtabmap_msgs::msg::RGBDImage::UniquePtr msg(new rtabmap_msgs::msg::RGBDImage);
 		msg->header.frame_id = cameraInfo->header.frame_id;
 		msg->header.stamp = rgbStamp>depthStamp?image->header.stamp:depth->header.stamp;
-		// Same rule as RTAB-Map's Odom/ImageDecimation and Mem/ImagePostDecimation: the RGB
-		// is decimated by the factor, the depth only as much as needed to stay at most the
-		// size of the decimated RGB (not at all if it is already that small). When that
-		// depth decimation is not exact but the factor itself divides the depth (e.g. a
-		// RealSense D435 at 1280x720 color + 848x480 depth, decimation 4), the depth is
-		// decimated by the factor instead, which keeps the ratio between the two images.
-		// A frame it does not divide is published as it is, with a warning: the parameter is
-		// kept for the next frames, which may have a size it divides.
-		int decimation = decimation_;
-		int decimationDepth = decimation;
-		if(decimation>1)
-		{
-			int targetSize = image->height / decimation;
-			// A decimation larger than the image is caught below: 0 never divides.
-			decimationDepth = targetSize < 1 ? 0 :
-					targetSize >= (int)depth->height ? 1 : (int)ceil(float(depth->height) / float(targetSize));
-			if(decimationDepth>1 &&
-			   !(depth->width % decimationDepth == 0 && depth->height % decimationDepth == 0) &&
-			   depth->width % decimation == 0 && depth->height % decimation == 0)
-			{
-				decimationDepth = decimation;
-			}
-		}
-		// Both decimations have to be exact: a color image that the factor does not divide
-		// is rounded by its resize, out of step with its calibration and with the depth.
-		if(decimationDepth == 0 ||
-		   (decimation>1 && !(image->width % decimation == 0 && image->height % decimation == 0)) ||
-		   (decimationDepth>1 && !(depth->width % decimationDepth == 0 && depth->height % decimationDepth == 0)))
-		{
-			RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000, "Decimation of images should be exact (decimation=%d of color %ux%u, depth decimation=%d of depth %ux%u)! "
-				   "Images won't be resized.", decimation, image->width, image->height, decimationDepth, depth->width, depth->height);
-			decimation = 1;
-			decimationDepth = 1;
-		}
-		if(decimation>1)
-		{
-			rtabmap::CameraModel model = rtabmap_conversions::cameraModelFromROS(*cameraInfo);
-			sensor_msgs::msg::CameraInfo info;
-			rtabmap_conversions::cameraModelToROS(model.scaled(1.0f/float(decimation)), info);
-			info.header = cameraInfo->header;
-			msg->rgb_camera_info = info;
-			msg->depth_camera_info = info;
-		}
-		else
-		{
-			msg->rgb_camera_info = *cameraInfo;
-			msg->depth_camera_info = *cameraInfo;
-		}
-
 		cv::Mat rgbMat;
 		cv::Mat depthMat;
 		cv_bridge::CvImageConstPtr imagePtr, imageDepthPtr;
@@ -278,13 +229,45 @@ void RGBDSync::callback(
 		rgbMat = imagePtr->image;
 		depthMat = imageDepthPtr->image;
 
+		// Same rule as RTAB-Map's Odom/ImageDecimation and Mem/ImagePostDecimation, by the
+		// same function: the RGB is decimated by the factor, the depth only as much as
+		// needed to stay at most the size of the decimated RGB (not at all if it is already
+		// that small), or by the factor when that is the only one dividing it (e.g. a
+		// RealSense D435 at 1280x720 color + 848x480 depth, decimation 4). A frame that
+		// can't be decimated exactly is published as it is, with a warning: the parameter
+		// is kept for the next frames, which may have a size it divides.
+		int decimation = decimation_;
+		int decimationDepth = 1;
 		if(decimation>1)
 		{
-			rgbMat = rtabmap::util2d::decimate(rgbMat, decimation);
+			decimationDepth = rtabmap::util2d::exactDepthDecimation(rgbMat, depthMat, image->height, decimation);
+			if(decimationDepth == 0)
+			{
+				RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000, "Decimation of images should be exact (decimation=%d of color %ux%u and depth %ux%u)! "
+					   "Images won't be resized.", decimation, image->width, image->height, depth->width, depth->height);
+				decimation = 1;
+				decimationDepth = 1;
+			}
 		}
-		if(decimationDepth>1)
+		if(decimation>1)
 		{
-			depthMat = rtabmap::util2d::decimate(depthMat, decimationDepth);
+			rtabmap::CameraModel model = rtabmap_conversions::cameraModelFromROS(*cameraInfo);
+			sensor_msgs::msg::CameraInfo info;
+			rtabmap_conversions::cameraModelToROS(model.scaled(1.0f/float(decimation)), info);
+			info.header = cameraInfo->header;
+			msg->rgb_camera_info = info;
+			msg->depth_camera_info = info;
+
+			rgbMat = rtabmap::util2d::decimate(rgbMat, decimation);
+			if(decimationDepth>1)
+			{
+				depthMat = rtabmap::util2d::decimate(depthMat, decimationDepth);
+			}
+		}
+		else
+		{
+			msg->rgb_camera_info = *cameraInfo;
+			msg->depth_camera_info = *cameraInfo;
 		}
 
 		if(depthScale_ != 1.0)

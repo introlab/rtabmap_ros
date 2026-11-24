@@ -681,7 +681,7 @@ void RGBDOdometry::commonCallback(
 	std_msgs::msg::Header header;
 	header.stamp = higherStamp;
 	header.frame_id = rgbImages.size()==1?(hasRgb?rgbImages[0]->header.frame_id:cameraInfos[0].header.frame_id):"";
-	if(!decimateImages(data, imageDecimation_))
+	if(!util2d::decimateImages(data, imageDecimation_))
 	{
 		RCLCPP_WARN_ONCE(this->get_logger(), "%s: image_decimation=%d cannot be applied to RGB %dx%d "
 				"and depth %dx%d (the factor has to divide each camera's RGB size exactly, and the "

@@ -769,7 +769,7 @@ void StereoOdometry::commonCallback(
 	std_msgs::msg::Header header;
 	header.stamp = higherStamp;
 	header.frame_id = leftImages.size()==1?(hasImages?leftImages[0]->header.frame_id:leftCameraInfos[0].header.frame_id):"";
-	if(!decimateImages(data, imageDecimation_))
+	if(!util2d::decimateImages(data, imageDecimation_))
 	{
 		RCLCPP_WARN_ONCE(this->get_logger(), "%s: image_decimation=%d does not divide the size of each "
 				"camera's images (%dx%d) exactly: they are not decimated.", get_name(), imageDecimation_,
