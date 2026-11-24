@@ -67,6 +67,7 @@ RGBDOdometry::RGBDOdometry(const rclcpp::NodeOptions & options) :
 		topicQueueSize_(10),
 		syncQueueSize_(5),
 		keepColor_(false),
+		imageDecimation_(1),
 		approxSyncMaxInterval_(0.0)
 {
 	OdometryROS::init(false, true, false);
@@ -116,6 +117,21 @@ void RGBDOdometry::onOdomInit()
 		rgbdCameras = 0;
 	}
 	keepColor_ = this->declare_parameter("keep_color", keepColor_);
+	// Decimated here rather than by Odom/ImageDecimation, so that what is republished
+	// (odom_sensor_data, odom_rgbd_image) is decimated too.
+	imageDecimation_ = this->declare_parameter("image_decimation", imageDecimation_);
+	if(imageDecimation_ < 1)
+	{
+		imageDecimation_ = 1;
+	}
+	if(imageDecimation_ > 1 &&
+	   uStr2Int(parameters().at(rtabmap::Parameters::kOdomImageDecimation())) > 1)
+	{
+		RCLCPP_WARN(this->get_logger(), "%s: both \"image_decimation\" (%d) and \"%s\" (%s) are set: "
+				"the images are decimated by both, one after the other.", get_name(), imageDecimation_,
+				rtabmap::Parameters::kOdomImageDecimation().c_str(),
+				parameters().at(rtabmap::Parameters::kOdomImageDecimation()).c_str());
+	}
 	std::string rgbTransport = this->declare_parameter("rgb_transport", std::string("raw"));
 	if(rgbTransport != "raw") {
 		RCLCPP_WARN(this->get_logger(), "Parameter \"rgb_transport\" has been renamed "
@@ -137,6 +153,7 @@ void RGBDOdometry::onOdomInit()
 	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: subscribe_rgbd = %s", subscribeRGBD?"true":"false");
 	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: rgbd_cameras   = %d", rgbdCameras);
 	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: keep_color     = %s", keepColor_?"true":"false");
+	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: image_decimation = %d", imageDecimation_);
 	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: image_transport = %s", imageTransport.c_str());
 	RCLCPP_INFO(this->get_logger(), "RGBDOdometry: depth_transport = %s", depthTransport.c_str());
 
@@ -664,6 +681,14 @@ void RGBDOdometry::commonCallback(
 	std_msgs::msg::Header header;
 	header.stamp = higherStamp;
 	header.frame_id = rgbImages.size()==1?(hasRgb?rgbImages[0]->header.frame_id:cameraInfos[0].header.frame_id):"";
+	if(!util2d::decimateImages(data, imageDecimation_))
+	{
+		RCLCPP_WARN_ONCE(this->get_logger(), "%s: image_decimation=%d cannot be applied to RGB %dx%d "
+				"and depth %dx%d (the factor has to divide each camera's RGB size exactly, and the "
+				"depth decimation the depth size): the images are not decimated.", get_name(),
+				imageDecimation_, data.imageRaw().cols, data.imageRaw().rows,
+				data.depthOrRightRaw().cols, data.depthOrRightRaw().rows);
+	}
 	this->processData(data, header);
 }
 

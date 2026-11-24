@@ -18,6 +18,7 @@ All rights reserved. (BSD-3-Clause, see the repository root.)
 #include <rtabmap_odom/icp_odometry.hpp>
 
 #include <rtabmap/core/Parameters.h>
+#include <rtabmap/core/SensorData.h>
 #include <rtabmap/utilite/UDirectory.h>
 
 #include "msg_builders.hpp"

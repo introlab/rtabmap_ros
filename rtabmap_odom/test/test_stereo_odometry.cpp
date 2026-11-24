@@ -501,6 +501,34 @@ TEST_F(StereoOdometryTest, keeps_the_left_image_in_color_when_asked)
 	EXPECT_EQ("mono8", frames->back().depth.encoding);
 }
 
+/**
+ * image_decimation decimates the pair in the node, before the odometry, so what comes back
+ * out is decimated too: both images by the factor, and the calibration with them.
+ */
+TEST_F(StereoOdometryTest, image_decimation_decimates_what_is_republished)
+{
+	publishSensorTf();
+	std::shared_ptr<Collector<rtabmap_msgs::msg::RGBDImage>> frames =
+			collect<rtabmap_msgs::msg::RGBDImage>("odom_rgbd_image");
+	makeNode({rclcpp::Parameter("image_decimation", 2)});
+
+	StereoPublishers pubs = makeStereoPublishers();
+	ASSERT_TRUE(waitForStereoSubscribers(pubs));
+	ASSERT_TRUE(waitForPublisher(frames->subscription));
+
+	const cv::Mat left = stereoLeftImage(kFirstFrame, kRectified);
+	const sensor_msgs::msg::CameraInfo leftInfo = stereoLeftInfo("camera", 1.0, kRectified);
+	publishStereoFrame(pubs, kFirstFrame, 1.0);
+
+	ASSERT_TRUE(spinUntil([&]() { return !frames->empty(); }));
+	const rtabmap_msgs::msg::RGBDImage & out = frames->back();
+	EXPECT_EQ((unsigned int)left.cols/2, out.rgb.width);
+	EXPECT_EQ((unsigned int)left.rows/2, out.rgb.height);
+	EXPECT_EQ((unsigned int)left.cols/2, out.depth.width);
+	EXPECT_EQ((unsigned int)left.rows/2, out.depth.height);
+	EXPECT_DOUBLE_EQ(leftInfo.p[0]/2.0, out.rgb_camera_info.p[0]);
+}
+
 /// Off by default: RTAB-Map converts the pair to grayscale on the way in.
 TEST_F(StereoOdometryTest, converts_the_left_image_to_grayscale_by_default)
 {

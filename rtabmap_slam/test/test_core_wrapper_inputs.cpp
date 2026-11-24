@@ -585,12 +585,14 @@ protected:
 	static constexpr int kWidth = 64;
 	static constexpr int kHeight = 48;
 
-	/// A textured color image and a depth image of @p depthType, compressed by rtabmap.
-	static rtabmap::SensorData makeCompressedData(int depthType, const std::string & depthFormat, double stamp)
+	/// A textured color image and a depth image of @p depthType (@p depthDecimation times
+	/// smaller than the color image), compressed by rtabmap.
+	static rtabmap::SensorData makeCompressedData(int depthType, const std::string & depthFormat, double stamp,
+			int depthDecimation = 1)
 	{
 		cv::Mat rgb(kHeight, kWidth, CV_8UC3);
 		cv::randu(rgb, 0, 255);
-		cv::Mat depth(kHeight, kWidth, depthType);
+		cv::Mat depth(kHeight/depthDecimation, kWidth/depthDecimation, depthType);
 		if(depthType == CV_16UC1)
 		{
 			cv::randu(depth, 1000, 3000);
@@ -683,11 +685,12 @@ TEST_F(CoreWrapperCompressedSensorDataTest, stores_legacy_float_depth_as_receive
 }
 
 /// When Memory changes an image (here the color image, by Mem/ImagePostDecimation), it
-/// compresses it itself, with its own format; the images it leaves as is (here depth,
-/// decimated only by Mem/ImagePreDecimation) are still stored as received.
+/// compresses it itself, with its own format; the images it leaves as is (here the depth,
+/// already at the size of the decimated color image, which Mem/ImagePostDecimation only
+/// brings the depth down to) are still stored as received.
 TEST_F(CoreWrapperCompressedSensorDataTest, recompresses_only_the_images_it_changes)
 {
-	const rtabmap::SensorData data = makeCompressedData(CV_16UC1, ".png", 1.0);
+	const rtabmap::SensorData data = makeCompressedData(CV_16UC1, ".png", 1.0, /*depthDecimation=*/2);
 	const rtabmap_msgs::msg::Node node = map(data, false,
 			{rclcpp::Parameter("Mem/ImagePostDecimation", std::string("2"))});
 	ASSERT_EQ(1, node.id);
