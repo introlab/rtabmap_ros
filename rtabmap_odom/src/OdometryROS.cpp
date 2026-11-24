@@ -699,6 +699,14 @@ bool OdometryROS::decimateImages(SensorData & data, int decimation)
 	const cv::Mat & image = data.imageRaw();
 	const cv::Mat & depthOrRight = data.depthOrRightRaw();
 
+	// The factor has to divide each camera's image exactly: a color image that it does not
+	// divide is rounded by its resize, out of step with its calibration and with the depth.
+	const int cameraCount = std::max(1, (int)(stereo ? data.stereoCameraModels().size() : data.cameraModels().size()));
+	if(image.rows % decimation != 0 || (image.cols / cameraCount) % decimation != 0)
+	{
+		return false;
+	}
+
 	// Odometry::process()'s rule for Odom/ImageDecimation: the right image like the left,
 	// the depth only down to the size of the decimated RGB.
 	int decimationDepth = decimation;
@@ -740,7 +748,9 @@ bool OdometryROS::decimateImages(SensorData & data, int decimation)
 			kpt.pt.x *= ratio;
 			kpt.pt.y *= ratio;
 			kpt.size *= ratio;
-			kpt.octave -= log2value;
+			// Never below the finest level of the decimated image, as Odometry does with
+			// Odom/ImageDecimation: ORB refuses a negative octave.
+			kpt.octave = std::max(0, int(kpt.octave - log2value));
 		}
 	}
 	std::vector<cv::Point3f> keypoints3D = data.keypoints3D();

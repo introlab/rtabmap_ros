@@ -684,8 +684,8 @@ void RGBDOdometry::commonCallback(
 	if(!decimateImages(data, imageDecimation_))
 	{
 		RCLCPP_WARN_ONCE(this->get_logger(), "%s: image_decimation=%d cannot be applied to RGB %dx%d "
-				"and depth %dx%d (the depth decimation has to divide the depth size exactly, and the "
-				"factor cannot exceed the RGB size): the images are not decimated.", get_name(),
+				"and depth %dx%d (the factor has to divide each camera's RGB size exactly, and the "
+				"depth decimation the depth size): the images are not decimated.", get_name(),
 				imageDecimation_, data.imageRaw().cols, data.imageRaw().rows,
 				data.depthOrRightRaw().cols, data.depthOrRightRaw().rows);
 	}

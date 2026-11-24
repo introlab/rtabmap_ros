@@ -161,7 +161,7 @@ Common to all three nodes; see [the README](../README.md#published-topics).
 | `queue_size` | `int` | — | **Deprecated**, renamed to `sync_queue_size`. |
 | `qos_camera_info` | `int` | value of `qos` | Reliability of the two `camera_info` subscriptions. |
 | `keep_color` | `bool` | `false` | Keep the left image in color in the data passed on, rather than converting to grayscale. Registration is grayscale either way. |
-| `image_decimation` | `int` | `1` | Decimate the left and right images by this factor in the node, before the odometry, and scale the calibrations and the features received with the frame with them. Same rule as `Odom/ImageDecimation`, which decimates a copy for the registration only; here what the node republishes (`odom_rgbd_image`, `odom_sensor_data/*`) is decimated too, so downstream nodes receive smaller images. |
+| `image_decimation` | `int` | `1` | Decimate the left and right images by this factor in the node, before the odometry, and scale the calibrations and the features received with the frame with them. Same rule as `Odom/ImageDecimation`, which decimates a copy for the registration only; here what the node republishes (`odom_rgbd_image`, `odom_sensor_data/*`) is decimated too, so downstream nodes receive smaller images. The factor has to divide each camera's image size exactly, otherwise the images are not decimated (warning). |
 | `image_transport` | `string` | `"raw"` | Transport for both image topics. |
 | `stereo_exposure_compensation` | `bool` | `false` | Equalize the exposure of the left and right images (gain compensation) before the odometry. The stereo correspondences assume the same brightness in both images: set it when the two cameras expose differently, e.g., when most of them are reported as rejected. |
 

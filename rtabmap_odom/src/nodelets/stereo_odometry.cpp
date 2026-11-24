@@ -771,8 +771,8 @@ void StereoOdometry::commonCallback(
 	header.frame_id = leftImages.size()==1?(hasImages?leftImages[0]->header.frame_id:leftCameraInfos[0].header.frame_id):"";
 	if(!decimateImages(data, imageDecimation_))
 	{
-		RCLCPP_WARN_ONCE(this->get_logger(), "%s: image_decimation=%d is larger than the images (%dx%d): "
-				"they are not decimated.", get_name(), imageDecimation_,
+		RCLCPP_WARN_ONCE(this->get_logger(), "%s: image_decimation=%d does not divide the size of each "
+				"camera's images (%dx%d) exactly: they are not decimated.", get_name(), imageDecimation_,
 				data.imageRaw().cols, data.imageRaw().rows);
 	}
 	this->processData(data, header);

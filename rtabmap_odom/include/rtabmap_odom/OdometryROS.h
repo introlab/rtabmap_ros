@@ -182,9 +182,10 @@ protected:
 	 * only, what the node republishes (`odom_sensor_data/*`, `odom_rgbd_image`) is then
 	 * decimated too.
 	 *
-	 * @return false, with @p data left untouched, if the depth (or right) image would have
-	 *         to be decimated by a factor that does not divide its size: depth pixels are
-	 *         sampled, not interpolated, so that decimation has to be exact.
+	 * @return false, with @p data left untouched, if @p decimation does not divide the size
+	 *         of each camera's image, or if the depth would have to be decimated by a
+	 *         factor that does not divide its size: both decimations have to be exact, or
+	 *         the images and their calibrations come out of step.
 	 */
 	static bool decimateImages(rtabmap::SensorData & data, int decimation);
 	/**

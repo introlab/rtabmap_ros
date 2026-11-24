@@ -1568,6 +1568,24 @@ TEST(OdometryROSDecimateImages, keeps_the_depth_confidence_decimated_with_the_de
 }
 #endif
 
+/**
+ * A factor that does not divide the RGB size exactly is refused, the frame untouched: the
+ * resize would round the RGB out of step with its calibration and with the depth.
+ */
+TEST(OdometryROSDecimateImages, refuses_a_factor_that_does_not_divide_the_rgb)
+{
+	rtabmap::SensorData data(
+			cv::Mat(8, 8, CV_8UC3, cv::Scalar(10, 20, 30)),
+			cv::Mat(8, 8, CV_16UC1, cv::Scalar(1000)),
+			rtabmap::CameraModel(10, 10, 4, 4, rtabmap::CameraModel::opticalRotation(), 0, cv::Size(8, 8)));
+
+	EXPECT_FALSE(OdometryROSDecimation::decimateImages(data, 3));
+
+	EXPECT_EQ(8, data.imageRaw().cols);
+	EXPECT_EQ(8, data.depthRaw().cols);
+	EXPECT_DOUBLE_EQ(10.0, data.cameraModels()[0].fx());
+}
+
 /// A depth that the decimation would not divide exactly is refused, the frame untouched.
 TEST(OdometryROSDecimateImages, refuses_a_depth_decimation_that_is_not_exact)
 {

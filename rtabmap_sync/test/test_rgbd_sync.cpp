@@ -287,18 +287,34 @@ TEST_F(RGBDSyncTest, DecimationOnlyBringsALargerDepthDownToTheColorSize)
 	EXPECT_EQ(got.depth.height, 4u);
 }
 
-TEST_F(RGBDSyncTest, DecimationIsDisabledWhenItWouldNotDivideTheDepthImage)
+TEST_F(RGBDSyncTest, DecimationIsDisabledWhenItWouldNotDivideTheColorImage)
 {
-	// A depth decimation that does not divide the depth size exactly would misalign depth
-	// against color, so the node gives up on it rather than producing a wrong cloud.
-	// 10x10 decimated by 3 is 3 rows, which the 10x10 depth reaches decimated by 4: not
-	// exact. (8x8 by 3 would be fine: 2 rows, a depth decimated by 4 exactly.)
+	// A decimation that does not divide the color size exactly would round the resized
+	// color image out of step with its calibration and with the depth, so the node gives
+	// up on it rather than producing a wrong cloud. (The depth would be fine here: 8x8
+	// brought down to the 2 rows of 8/3, decimated by 4.)
 	start({rclcpp::Parameter("decimation", 3)});
 
-	publish(1000.0, /*width=*/10, /*height=*/10);
+	publish(1000.0, /*width=*/8, /*height=*/8);
 	ASSERT_TRUE(spinUntil([&]() { return !out_->empty(); }));
 
-	EXPECT_EQ(out_->back().rgb.width, 10u) << "images must be passed through unresized";
+	EXPECT_EQ(out_->back().rgb.width, 8u) << "images must be passed through unresized";
+	EXPECT_EQ(out_->back().depth.width, 8u);
+	EXPECT_NEAR(out_->back().rgb_camera_info.k[0], 100.0, 1e-9);
+}
+
+TEST_F(RGBDSyncTest, DecimationIsDisabledWhenItWouldNotDivideTheDepthImage)
+{
+	// The color divides (12x12 by 3: 4 rows), but the depth reaches 4 rows only decimated
+	// by 3 from 10x10, which is not exact: misaligned depth, so no decimation either.
+	start({rclcpp::Parameter("decimation", 3)});
+
+	rgbPub_->publish(makeRgbImage("camera_link", 1000.0, 12, 12));
+	depthPub_->publish(makeDepthImage("camera_link", 1000.0, 10, 10, 1500));
+	infoPub_->publish(makeCameraInfo("camera_link", 1000.0, 12, 12));
+	ASSERT_TRUE(spinUntil([&]() { return !out_->empty(); }));
+
+	EXPECT_EQ(out_->back().rgb.width, 12u) << "images must be passed through unresized";
 	EXPECT_EQ(out_->back().depth.width, 10u);
 	EXPECT_NEAR(out_->back().rgb_camera_info.k[0], 100.0, 1e-9);
 }

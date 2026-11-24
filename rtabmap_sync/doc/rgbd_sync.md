@@ -130,7 +130,7 @@ The output's `header.stamp` is the **later** of the color and depth stamps, so t
 | `qos` | `int` | `0` | Reliability of the subscriptions and the publishers: `0` system default, `1` reliable, `2` best effort. |
 | `qos_camera_info` | `int` | value of `qos` | Reliability of the `rgb/camera_info` subscription alone. Drivers often publish images best effort and `camera_info` reliable. |
 | `depth_scale` | `double` | `1.0` | Multiplies every depth pixel. See [Depth units](#depth-units). |
-| `decimation` | `int` | `1` | Downsample the color image by this factor, and the depth image only as much as needed to stay at most the size of the decimated color image, scaling the calibration to match. The depth decimation must divide the depth image size exactly, or it is ignored. |
+| `decimation` | `int` | `1` | Downsample the color image by this factor, and the depth image only as much as needed to stay at most the size of the decimated color image, scaling the calibration to match. The factor must divide the color image size exactly, and the resulting depth decimation the depth image size, or it is ignored. |
 | `compressed_rate` | `double` | `0.0` | Maximum rate, in Hz, of `rgbd_image/compressed`. `0` means every frame. Does not affect `rgbd_image`. |
 | `image_compression_format` | `string` | `".jpg"` | Format of the color image in `rgbd_image/compressed`: `".jpg"` (lossy, smaller) or `".png"` (lossless, larger). An invalid value falls back to `".jpg"` with an error. |
 | `depth_compression_format` | `string` | `".png"` | Format of the depth in `rgbd_image/compressed`: `".png"`, `".rvl"`, `".png:<maxDepth>:<quantization>"`, `".rvl:<maxDepth>:<quantization>"`, any of them prefixed by `"legacy:"`, or `"legacy"`. See [Compressing for a slow link](#compressing-for-a-slow-link). |
@@ -191,7 +191,7 @@ Neither output is produced unless it has a subscriber, so the compression costs 
 
 The depth image follows the same rule as RTAB-Map's `Odom/ImageDecimation` and `Mem/ImagePostDecimation`: it is decimated only as much as needed to stay at most the size of the decimated color image. A depth the size of the color image is decimated by the same factor; a depth already at the decimated size (e.g., a 640x480 color image with a 320x240 depth, `decimation:=2`) is left as it is.
 
-The depth decimation must divide the **depth** image size exactly. If it does not, the node logs a warning and stops decimating rather than resampling depth in a way that would misalign it against color. A value below 1 is treated as 1.
+Both decimations must be exact: the factor must divide the **color** image size, and the resulting depth decimation the **depth** image size. If either does not, the node logs a warning and stops decimating rather than producing images out of step with each other and with their calibration. A value below 1 is treated as 1.
 
 ## Diagnostics
 

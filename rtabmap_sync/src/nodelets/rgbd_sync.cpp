@@ -227,11 +227,14 @@ void RGBDSync::callback(
 			decimationDepth = targetSize < 1 ? 0 :
 					targetSize >= (int)depth->height ? 1 : (int)ceil(float(depth->height) / float(targetSize));
 		}
+		// Both decimations have to be exact: a color image that the factor does not divide
+		// is rounded by its resize, out of step with its calibration and with the depth.
 		if(decimationDepth == 0 ||
+		   (decimation_>1 && !(image->width % decimation_ == 0 && image->height % decimation_ == 0)) ||
 		   (decimationDepth>1 && !(depth->width % decimationDepth == 0 && depth->height % decimationDepth == 0)))
 		{
-			RCLCPP_WARN(this->get_logger(), "Decimation of depth images should be exact (decimation=%d, depth decimation=%d, size=(%d,%d))! "
-				   "Images won't be resized.", decimation_, decimationDepth, depth->width, depth->height);
+			RCLCPP_WARN(this->get_logger(), "Decimation of images should be exact (decimation=%d of color %dx%d, depth decimation=%d of depth %dx%d)! "
+				   "Images won't be resized.", decimation_, image->width, image->height, decimationDepth, depth->width, depth->height);
 			decimation_ = 1;
 			decimationDepth = 1;
 		}
